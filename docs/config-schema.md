@@ -8,6 +8,34 @@ gitissue works with zero configuration — all settings have sensible defaults. 
 
 Place `.gitissue.yml` in the repository root to customize behavior.
 
+### Config Loading Flow
+
+```mermaid
+graph TD
+    A["Skill invoked<br/>(e.g. /issue-resolver)"] --> B{".gitissue.yml<br/>exists?"}
+    B -- Yes --> C["Load & validate config"]
+    B -- No --> D["Use defaults<br/>○ First run hint"]
+    C --> E{Valid?}
+    E -- Yes --> F["Proceed with<br/>skill execution"]
+    E -- No --> G["✗ Show validation<br/>errors with line numbers"]
+    D --> F
+
+    style A fill:#4CAF50,color:#fff
+    style F fill:#2196F3,color:#fff
+```
+
+### Config Hierarchy
+
+```mermaid
+graph LR
+    GY[".gitissue.yml<br/>(configuration)"] --- |"read once<br/>at start"| SK["Skills"]
+    GD[".gitissue/<br/>(state directory)"] --- |"read/write<br/>during execution"| SK
+    SD["Skill defaults<br/>(built-in)"] --- |"fallback when<br/>no config"| SK
+
+    style GY fill:#4CAF50,color:#fff
+    style GD fill:#2196F3,color:#fff
+```
+
 ## Full Schema
 
 ```yaml
@@ -99,6 +127,34 @@ triage:
   # Type: boolean
   # Default: false
   include_closed: false
+```
+
+### Config Section Map
+
+```mermaid
+graph TD
+    R[".gitissue.yml"] --> P["platform<br/>(github | gitlab)"]
+    R --> I["issue"]
+    R --> RS["resolve"]
+    R --> T["triage"]
+
+    I --> I1["auto_normalize"]
+    I --> I2["template"]
+    I --> I3["labels_auto_suggest"]
+    I --> I4["normalize_comment"]
+
+    RS --> R1["approval_gate"]
+    RS --> R2["branch_prefix"]
+    RS --> R3["auto_test"]
+    RS --> R4["test_timeout"]
+    RS --> R5["pr_auto_link"]
+    RS --> R6["max_commits"]
+
+    T --> T1["stale_threshold_days"]
+    T --> T2["auto_priority"]
+    T --> T3["include_closed"]
+
+    style R fill:#4CAF50,color:#fff
 ```
 
 ## `.gitissue/` Directory

@@ -41,6 +41,20 @@ Text-only fallback: output is fully readable without any color.
 
 ## Output Structure
 
+```mermaid
+graph TD
+    A["● Progress<br/>(what's happening now)"] --> B["◆ Section Header<br/>┄┄┄┄┄┄┄┄┄┄┄┄"]
+    B --> C["Content<br/>(indented 2 spaces)"]
+    C --> D{"Result"}
+    D -- Success --> E["✓ Result<br/>(what happened)"]
+    D -- Failure --> F["✗ Error<br/>(what went wrong)"]
+    E --> G["URL<br/>(on its own line)"]
+
+    style A fill:#4CAF50,color:#fff
+    style E fill:#4CAF50,color:#fff
+    style F fill:#f44336,color:#fff
+```
+
 Every command follows this hierarchy:
 
 ```
@@ -91,6 +105,15 @@ Rules:
 - Use `—` for empty cells (not blank)
 
 ## Error Format
+
+```mermaid
+graph LR
+    A["✗ What went wrong"] --> B["To fix:<br/>actionable command"]
+    B --> C["Docs:<br/>link to learn more"]
+
+    style A fill:#f44336,color:#fff
+    style C fill:#2196F3,color:#fff
+```
 
 Errors are the moment users need the most help.
 

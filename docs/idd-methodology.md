@@ -72,47 +72,35 @@ The issue becomes the spec. The code is the delivery. Git tracks everything in b
 
 ## The IDD Workflow
 
-```
-  Problem described (text, screenshot, planning doc)
-          │
-     /issue-creator
-          │
-  ┌───────┴───────────────────────────┐
-  │ Structured issue:                 │
-  │   - Type (bug/feature/improvement)│
-  │   - Affected files + confidence   │
-  │   - Acceptance criteria           │
-  │   - Technical constraints         │
-  └───────┬───────────────────────────┘
-          │
-     /issue-triage (optional)
-          │
-  ┌───────┴───────────────────────────┐
-  │ Backlog analysis:                 │
-  │   - Dependency graph              │
-  │   - Priority suggestions          │
-  │   - Execution order               │
-  │   - Stale issue detection         │
-  └───────┬───────────────────────────┘
-          │
-     /issue-resolver N
-          │
-  ┌───────┴───────────────────────────┐
-  │ [1/7] Fetch issue                 │
-  │ [2/7] Create branch               │
-  │ [3/7] Research affected code       │
-  │ [4/7] Plan approach                │
-  │ [5/7] Execute (code + tests)       │
-  │ [6/7] Verify (run tests)           │
-  │ [7/7] Ship (PR with Closes #N)     │
-  └───────┬───────────────────────────┘
-          │
-  Atomic PR → Review → Merge → Issue auto-closes
+```mermaid
+graph TD
+    A["Problem described<br/>(text, screenshot, planning doc)"] --> B["/issue-creator"]
+    B --> C["Structured issue:<br/>Type, Affected files,<br/>Acceptance criteria,<br/>Technical constraints"]
+    C --> D["/issue-triage (optional)"]
+    D --> E["Backlog analysis:<br/>Dependency graph,<br/>Priority suggestions,<br/>Execution order"]
+    E --> F["/issue-resolver N"]
+    F --> G["7-step pipeline:<br/>Fetch → Branch → Research →<br/>Plan → Execute → Verify → Ship"]
+    G --> H["Atomic PR → Review →<br/>Merge → Issue auto-closes"]
+
+    style A fill:#4CAF50,color:#fff
+    style H fill:#2196F3,color:#fff
 ```
 
 ## Core Concepts
 
 ### Issue Normalization
+
+```mermaid
+graph TD
+    A["Raw issue<br/>(unstructured text)"] --> B["Codebase scan<br/>(Grep + Glob + Read)"]
+    B --> C["Type classification<br/>(bug/feature/improvement)"]
+    C --> D["Confidence scoring<br/>(high/medium/low)"]
+    D --> E["Template fill<br/>(affected files, criteria)"]
+    E --> F["Normalized issue<br/>(structured markdown)"]
+
+    style A fill:#4CAF50,color:#fff
+    style F fill:#2196F3,color:#fff
+```
 
 Normalization is the process of enriching an unstructured issue with codebase context. A normalized issue contains:
 

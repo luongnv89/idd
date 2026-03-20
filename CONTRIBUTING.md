@@ -19,6 +19,20 @@ Thanks for your interest in contributing! issue-dev is a skills-only project —
 
 ### Submitting Changes
 
+```mermaid
+graph TD
+    A[Fork repository] --> B["Create feature branch<br/>from main"]
+    B --> C[Make changes]
+    C --> D["Test against real<br/>GitHub repo"]
+    D --> E["Commit using<br/>Conventional Commits"]
+    E --> F["Open Pull Request<br/>against main"]
+    F --> G[Code review]
+    G --> H[Merge]
+
+    style A fill:#4CAF50,color:#fff
+    style H fill:#2196F3,color:#fff
+```
+
 1. Fork the repository
 2. Create a feature branch from `main`:
    ```bash
@@ -91,12 +105,42 @@ docs: add triage workflow example to README
 
 ## Branching Strategy
 
+```mermaid
+graph LR
+    M[main<br/>stable, releasable] --> F["feat/*<br/>new features"]
+    M --> X["fix/*<br/>bug fixes"]
+    M --> I["issue-N/*<br/>issue-linked branches"]
+
+    F --> M
+    X --> M
+    I --> M
+
+    style M fill:#4CAF50,color:#fff
+```
+
 - `main` — stable, always releasable
 - `feat/*` — new features
 - `fix/*` — bug fixes
 - `issue-N/*` — issue-linked branches (created by `/issue-resolver`)
 
 ## Pull Request Process
+
+```mermaid
+graph TD
+    A["Fill in PR template"] --> B["Link issue (Closes #N)"]
+    B --> C["Tests pass?"]
+    C -- Yes --> D["Docs updated?"]
+    C -- No --> E["Fix failing tests"]
+    E --> C
+    D -- Yes --> F["Request review"]
+    D -- No --> G["Update docs"]
+    G --> F
+    F --> H["Approval received"]
+    H --> I["Merge to main"]
+
+    style A fill:#4CAF50,color:#fff
+    style I fill:#2196F3,color:#fff
+```
 
 1. Fill in the PR template completely
 2. Link to the related issue (use `Closes #N`)

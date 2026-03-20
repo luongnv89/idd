@@ -155,25 +155,18 @@ Issue-Driven Development treats GitHub issues as the atomic unit of all developm
 
 The key innovation is **issue normalization**: any issue, whether filed by a human or created by an AI, gets auto-enriched with codebase context before work begins.
 
-```
-Developer describes a problem
-        │
-   /issue-creator
-        │
-   Structured issue with codebase context
-        │
-   /issue-triage (optional — plan work order)
-        │
-   /issue-resolver N
-        │
-   ┌────┴────────────────────────────┐
-   │ Fetch → Branch → Research →     │
-   │ Plan → Execute → Verify → Ship  │
-   └────┬────────────────────────────┘
-        │
-   Atomic PR linked to issue
-        │
-   Review → Merge → Issue auto-closes
+```mermaid
+graph TD
+    A[Developer describes a problem] --> B["/issue-creator"]
+    B --> C[Structured issue with codebase context]
+    C --> D["/issue-triage (optional)"]
+    D --> E["/issue-resolver N"]
+    E --> F["Fetch → Branch → Research → Plan → Execute → Verify → Ship"]
+    F --> G[Atomic PR linked to issue]
+    G --> H["Review → Merge → Issue auto-closes"]
+
+    style A fill:#4CAF50,color:#fff
+    style H fill:#2196F3,color:#fff
 ```
 
 ### IDD vs Other Methodologies
