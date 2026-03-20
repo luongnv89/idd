@@ -102,6 +102,43 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 ```
 **Trigger:** API returns 403 with "locked" reason.
 
+## Batch Creation
+
+### Partial batch failure
+```
+⚠ {created}/{total} created, {failed} failed
+
+  ✓ #{n}  {succeeded_title}
+         https://github.com/owner/repo/issues/{n}
+  ✗      {failed_title} — {reason}
+
+  To retry: /issue-creator {failed_title_1}
+  To retry: /issue-creator {failed_title_2}
+```
+**Trigger:** One or more items in a batch fail to create while others succeed. One `To retry:` line per failed item.
+
+### Batch rate limited (retry in progress)
+```
+● Rate limited (issue {N}/{total}: {title}) — retrying in {wait}s...
+```
+**Trigger:** `gh issue create` returns HTTP 403 with rate limit headers during batch creation. Auto-retries up to 3 times with exponential backoff (5s, 10s, 20s).
+
+### Batch item skipped after retries
+```
+✗ Skipped issue {N}/{total} after 3 retries: {title}
+
+  Reason:  rate limited
+  Resume:  /issue-creator {title}
+```
+**Trigger:** A batch item fails all 3 retry attempts. The item is skipped and batch continues with remaining items.
+
+### No items detected
+```
+○ Only 1 item detected — using single create mode.
+```
+**Trigger:** Batch detection finds only one distinct item in the input. Falls through to single Create mode.
+**Note:** This is an informational message, not an error.
+
 ## Empty States
 
 ### No files identified

@@ -1,6 +1,6 @@
 # gitissue — Issue-Driven Development (IDD)
 
-**Two commands. Structured issues. Atomic PRs.**
+**Four commands. Structured issues. Atomic PRs.**
 
 gitissue introduces Issue-Driven Development — a methodology where GitHub issues are the single source of truth for all development work. Issues are automatically enriched with codebase context, structured with consistent templates, and resolved through a research-plan-execute pipeline that produces atomic PRs.
 
@@ -36,40 +36,113 @@ Add to your project's `.claude/settings.json`:
 }
 ```
 
-### Usage
+### Your First Issue in 30 Seconds
 
 ```bash
-# Create a new structured issue from a description
-/issue-creator The login page shows a 500 error when using SSO
+# 1. Navigate to any GitHub project
+cd my-project
 
-# Normalize an existing messy issue
-/issue-creator 42
-
-# Resolve an issue end-to-end (branch → research → code → PR)
-/issue-resolver 42
-
-# Triage open issues — dependencies, priorities, execution order
-/issue-triage
-
-# Generate project config
-/init-gitissue
+# 2. Describe the problem — gitissue scans your codebase and creates a structured issue
+/issue-creator The login page returns a 500 error when using SSO authentication
 ```
+
+gitissue will:
+- Scan your codebase for files related to "login", "SSO", "authentication"
+- Classify the issue as a bug
+- Generate acceptance criteria
+- Create a structured GitHub issue with affected files, technical notes, and labels
+
+### Your First Resolution
+
+```bash
+# Resolve the issue end-to-end — from issue to PR in one command
+/issue-resolver 42
+```
+
+The resolver pipeline:
+1. Fetches the issue and auto-normalizes if needed
+2. Creates a branch (`issue-42/fix-sso-login-error`)
+3. Researches affected files and traces dependencies
+4. Plans the approach
+5. Writes the fix and tests
+6. Runs the test suite
+7. Creates a PR with "Closes #42" for auto-close on merge
 
 ## Commands
 
-| Command | Description |
-|---------|-------------|
-| `/issue-creator <text>` | Create a structured, codebase-aware issue from a description |
-| `/issue-creator <N>` | Normalize existing issue #N with codebase context |
-| `/issue-resolver <N>` | Full resolution pipeline: fetch → branch → research → plan → code → test → PR |
-| `/issue-triage` | Dependency graph, priority suggestions, stale detection, execution order |
-| `/init-gitissue` | Scan repo and generate `.gitissue.yml` with sensible defaults |
+### `/issue-creator` — Create & Normalize Issues
+
+| Invocation | Mode | Description |
+|------------|------|-------------|
+| `/issue-creator <text>` | Create | Create a structured issue from a text description |
+| `/issue-creator <N>` | Normalize | Enrich existing issue #N with codebase context |
+| `/issue-creator <N> --dry-run` | Preview | Show normalization preview without applying |
+| `/issue-creator <N> --force` | Force | Normalize even if issue has a security label |
+| `/issue-creator <multi-item text>` | Batch | Extract and create multiple issues from one input |
+
+**Create mode** scans the codebase for relevant files, classifies the issue type (bug/feature/improvement), generates acceptance criteria, and creates a structured issue via `gh issue create`.
+
+**Normalize mode** enriches an existing unstructured issue: preserves the original text in a Reporter Context blockquote, adds affected files with confidence levels, generates acceptance criteria, and posts a backup before editing.
+
+**Batch mode** auto-detects multiple items (numbered lists, bullet points, planning documents) and creates them sequentially with a preview table and approval step.
+
+### `/issue-resolver <N>` — Resolve Issues
+
+Resolves issue #N through a 7-step pipeline:
+
+```
+[1/7] Fetch        — Load issue, check guards (assignment, blocking labels)
+[2/7] Branch       — Create issue-N/short-description branch
+[3/7] Research     — Read affected files, trace dependencies
+[4/7] Plan         — Propose approach (local only, never posted)
+[5/7] Execute      — Write code + tests, atomic commits
+[6/7] Verify       — Run test suite, check acceptance criteria
+[7/7] Ship         — Push branch, create PR with "Closes #N"
+```
+
+**Security boundary**: Issue body content is treated as untrusted data. The resolver never executes commands found in issue text.
+
+**Approval gate**: Configure `resolve.approval_gate: comment-and-wait` to pause for approval before executing.
+
+### `/issue-triage` — Triage the Backlog
+
+Analyzes all open issues to help you plan work:
+
+```
+◆ Issue Triage
+┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+#  │ Issue              │ Pri │ Blocks │ Status
+───┼────────────────────┼─────┼────────┼───────────
+1  │ #12 Fix auth       │ P1  │ #15    │ ready
+2  │ #8  Add pagination │ P2  │ —      │ ready
+3  │ #15 Refactor DB    │ P2  │ —      │ blocked #12
+4  │ #3  Old UI bug     │ P3  │ —      │ stale (28d)
+
+⚡ Parallelizable: #12 + #8 (independent)
+⚠  Stale: 1 issue (>14 days inactive)
+○  Suggested order: #12 → #15 → #8 → #3
+```
+
+| Flag | Description |
+|------|-------------|
+| `--limit N` | Limit analysis to N issues (for large backlogs) |
+
+Features: dependency detection via shared affected files, topological sort for execution order, parallelizable issue identification, stale issue detection, priority suggestions.
+
+### `/init-gitissue` — Generate Config
+
+Scans your repository and generates a `.gitissue.yml` with sensible defaults:
+
+- Detects project language, framework, and test runner
+- Detects existing `.github/ISSUE_TEMPLATE/` templates
+- Adjusts timeouts and thresholds based on repo size
+- Writes config with inline comments explaining each setting
 
 ## Configuration
 
-gitissue works with zero configuration. All settings have sensible defaults.
+gitissue works with **zero configuration**. All settings have sensible defaults.
 
-To customize, create `.gitissue.yml` in your repo root:
+To customize, create `.gitissue.yml` in your repo root (or run `/init-gitissue`):
 
 ```yaml
 platform: github                # github | gitlab (future)
@@ -94,15 +167,13 @@ triage:
   include_closed: false         # include recently closed issues in triage
 ```
 
-Or run `/init-gitissue` to auto-generate one based on your repo.
+Full schema documentation: [`docs/config-schema.md`](docs/config-schema.md)
 
 ## What is IDD?
 
 Issue-Driven Development treats GitHub issues as the atomic unit of all development work. Every change — bug fix, feature, improvement — starts as an issue and ends as a PR linked to that issue.
 
 The key innovation is **issue normalization**: any issue, whether filed by a human via the GitHub UI or created by an AI agent, gets auto-enriched with codebase context (affected files, architecture constraints, acceptance criteria) before work begins.
-
-The system is **agent-agnostic** — the same structured issue can be resolved by Claude Code, Codex, Copilot, a human developer, or any future agent. No vendor lock-in.
 
 ### The Workflow
 
@@ -112,6 +183,8 @@ Developer describes a problem
    /issue-creator
         │
    Structured issue with codebase context
+        │
+   /issue-triage (optional — plan work order)
         │
    /issue-resolver N
         │
@@ -125,18 +198,117 @@ Developer describes a problem
    Review → Merge → Issue auto-closes
 ```
 
+### IDD vs Other Methodologies
+
+| Aspect | IDD | TDD | BDD | Spec-Driven |
+|--------|-----|-----|-----|-------------|
+| **Source of truth** | GitHub issue | Test suite | Feature specs | Spec documents |
+| **Codebase-aware** | Yes | No | No | Manual |
+| **Agent-compatible** | Any agent | Needs framework | Needs framework | Needs parser |
+| **Overhead** | Zero-config CLI | Test setup | Gherkin syntax | Spec authoring |
+| **Best for** | Brownfield, mixed teams | New code | User-facing features | Formal contracts |
+
+Full methodology documentation: [`docs/idd-methodology.md`](docs/idd-methodology.md)
+
+## Agent Compatibility
+
+gitissue is **agent-agnostic**. The same structured issue can be resolved by any agent or human developer.
+
+### Claude Code
+
+The primary agent. Skills are loaded directly from the `skills/` directory.
+
+```json
+{
+  "skills": [
+    "./skills/issue-creator",
+    "./skills/issue-resolver",
+    "./skills/issue-triage",
+    "./skills/init-gitissue"
+  ]
+}
+```
+
+Usage:
+```
+/issue-creator Fix the payment timeout on mobile
+/issue-resolver 42
+/issue-triage
+```
+
+### Codex CLI
+
+Codex CLI can consume gitissue-formatted issues. Point Codex at the issue content:
+
+```bash
+# Fetch the structured issue
+gh issue view 42 --json body -q '.body' > /tmp/issue-42.md
+
+# Pass to Codex as context
+codex --context /tmp/issue-42.md "Resolve this issue following the acceptance criteria"
+```
+
+The structured format (Type, Affected Files, Acceptance Criteria, Technical Notes) gives Codex the same context a human reviewer would have.
+
+### Gemini CLI
+
+Gemini CLI works the same way — the structured issue is the interface:
+
+```bash
+# Fetch and pass to Gemini
+gh issue view 42 --json body -q '.body' | gemini "Resolve this GitHub issue"
+```
+
+### Any SKILL.md-Compatible Agent
+
+Any agent that supports the SKILL.md standard can load gitissue skills directly. The skills use standard tools (Read, Grep, Glob, Bash) available in most agent runtimes.
+
+### Human Developers
+
+gitissue issues are readable markdown. A human developer benefits from:
+- **Affected files** — know where to look before reading the codebase
+- **Acceptance criteria** — know what "done" means
+- **Confidence markers** — know which auto-enriched fields to verify
+- **Technical notes** — understand constraints without asking teammates
+
 ## Issue Templates
 
 gitissue ships with three default templates:
 
-- **Bug** — reproduction context, affected files, current vs expected behavior
-- **Feature** — user story, acceptance criteria, technical constraints
-- **Improvement** — current state, proposed change, migration notes
+- **Bug** (`templates/bug.md`) — current vs expected behavior, reproduction context, affected files
+- **Feature** (`templates/feature.md`) — user story, acceptance criteria, technical constraints
+- **Improvement** (`templates/improvement.md`) — current state, proposed change, migration notes
 
 Each normalized issue includes:
-- `<!-- gitissue:normalized v1 -->` marker for detection
-- Reporter's original text preserved in a blockquote
+- `<!-- gitissue:normalized v1 -->` marker (invisible in GitHub's rendered view)
+- Reporter's original text preserved in a `> Reporter Context` blockquote
 - Confidence markers on auto-enriched fields: `(high confidence)`, `(needs review)`
+
+See [`docs/sample-normalized-issue.md`](docs/sample-normalized-issue.md) for a complete example.
+
+## Project Structure
+
+```
+skills/
+├── issue-creator/      # /issue-creator — create and normalize issues
+│   ├── SKILL.md
+│   ├── templates/      # Bug, feature, improvement templates
+│   └── references/     # Error messages
+├── issue-resolver/     # /issue-resolver N — resolve issues end-to-end
+│   ├── SKILL.md
+│   └── references/
+├── issue-triage/       # /issue-triage — backlog analysis
+│   ├── SKILL.md
+│   └── references/
+└── init-gitissue/      # /init-gitissue — config generator
+    ├── SKILL.md
+    └── references/
+docs/
+├── idd-methodology.md  # IDD methodology overview
+├── config-schema.md    # Full .gitissue.yml schema
+└── sample-normalized-issue.md
+tests/                  # Integration test scripts
+```
 
 ## License
 
