@@ -102,7 +102,7 @@ The 7-step pipeline runs automatically:
 
 ## Installation
 
-Three ways to install. Pick your favorite.
+Two ways to install. Pick your favorite.
 
 ### Prerequisites
 
@@ -120,25 +120,6 @@ npx skills add https://github.com/luongnv89/idd
 
 ```bash
 asm install https://github.com/luongnv89/idd
-```
-
-### Option 3: Manual
-
-Clone the repo and add skills to your project's `.claude/settings.json`:
-
-```bash
-git clone https://github.com/luongnv89/idd.git ~/.issue-dev
-```
-
-```json
-{
-  "skills": [
-    "~/.issue-dev/skills/issue-creator",
-    "~/.issue-dev/skills/issue-resolver",
-    "~/.issue-dev/skills/issue-triage",
-    "~/.issue-dev/skills/init-gitissue"
-  ]
-}
 ```
 
 ### Installing Individual Skills
