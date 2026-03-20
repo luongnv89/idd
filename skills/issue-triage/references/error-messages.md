@@ -58,3 +58,25 @@ All errors follow the rich error format: what went wrong + fix command + docs li
   To fix:  wait a few minutes, then retry
   Check:   gh api rate_limit --jq '.rate.remaining'
 ```
+
+## Persistence
+
+### No triage report found
+```
+○ No triage report found. Run /issue-triage to generate one.
+```
+
+### Corrupted triage report
+```
+✗ .gitissue/triage.json is corrupted
+
+  To fix:  rm .gitissue/triage.json && /issue-triage
+  Check:   was the file edited manually?
+```
+
+### Could not save triage report
+```
+⚠ Could not save triage report to .gitissue/triage.json
+
+  To fix:  check file permissions in the .gitissue/ directory
+```
