@@ -54,47 +54,35 @@ Every issue created or normalized by issue-dev includes:
 
 ### 1. Describe a problem
 
-```bash
-/issue-creator The login page returns a 500 error when using SSO
-```
+<p align="center">
+  <img src="assets/screenshots/issue-creator.svg" alt="issue-creator terminal output" width="680">
+</p>
 
 issue-dev scans your codebase for files related to "login", "SSO", "authentication" — classifies it as a bug — and creates a structured GitHub issue with affected files, acceptance criteria, and labels.
 
 ### 2. Resolve it in one command
 
-```bash
-/issue-resolver 42
-```
+<p align="center">
+  <img src="assets/screenshots/issue-resolver.svg" alt="issue-resolver terminal output" width="680">
+</p>
 
-The 7-step pipeline runs automatically:
-
-```
-[1/7] Fetch        ✓ issue #42 loaded
-[2/7] Branch       ✓ issue-42/fix-sso-login-error
-[3/7] Research     ✓ read 5 files, traced 3 deps
-[4/7] Plan         ✓ approach: fix redirect logic
-[5/7] Execute      ✓ 2 files changed, 45 lines
-[6/7] Verify       ✓ 12 tests passed
-[7/7] Ship         ✓ PR #87 created — Closes #42
-```
+The 7-step pipeline runs automatically: fetch the issue, create a branch, research affected files, plan the fix, write code + tests, verify everything passes, and ship a PR with `Closes #N`.
 
 ### 3. Triage the backlog
 
-```bash
-/issue-triage
-```
+<p align="center">
+  <img src="assets/screenshots/issue-triage.svg" alt="issue-triage terminal output" width="680">
+</p>
 
-```
-#  │ Issue              │ Pri │ Blocks │ Status
-───┼────────────────────┼─────┼────────┼───────────
-1  │ #12 Fix auth       │ P1  │ #15    │ ready
-2  │ #8  Add pagination │ P2  │ —      │ ready
-3  │ #15 Refactor DB    │ P2  │ —      │ blocked #12
-4  │ #3  Old UI bug     │ P3  │ —      │ stale (28d)
+Dependency detection, priority suggestions, parallelizable work identification, and stale issue warnings — all in one command.
 
-⚡ Parallelizable: #12 + #8 (independent)
-○  Suggested order: #12 → #15 → #8 → #3
-```
+### 4. Set up your project
+
+<p align="center">
+  <img src="assets/screenshots/init-gitissue.svg" alt="init-gitissue terminal output" width="680">
+</p>
+
+Auto-detects your language, framework, test runner, and repo size to generate a tailored `.gitissue.yml` config.
 
 [**Install Now →**](#installation)
 
@@ -155,25 +143,18 @@ Issue-Driven Development treats GitHub issues as the atomic unit of all developm
 
 The key innovation is **issue normalization**: any issue, whether filed by a human or created by an AI, gets auto-enriched with codebase context before work begins.
 
-```
-Developer describes a problem
-        │
-   /issue-creator
-        │
-   Structured issue with codebase context
-        │
-   /issue-triage (optional — plan work order)
-        │
-   /issue-resolver N
-        │
-   ┌────┴────────────────────────────┐
-   │ Fetch → Branch → Research →     │
-   │ Plan → Execute → Verify → Ship  │
-   └────┬────────────────────────────┘
-        │
-   Atomic PR linked to issue
-        │
-   Review → Merge → Issue auto-closes
+```mermaid
+graph TD
+    A[Developer describes a problem] --> B["/issue-creator"]
+    B --> C[Structured issue with codebase context]
+    C --> D["/issue-triage (optional)"]
+    D --> E["/issue-resolver N"]
+    E --> F["Fetch → Branch → Research → Plan → Execute → Verify → Ship"]
+    F --> G[Atomic PR linked to issue]
+    G --> H["Review → Merge → Issue auto-closes"]
+
+    style A fill:#4CAF50,color:#fff
+    style H fill:#2196F3,color:#fff
 ```
 
 ### IDD vs Other Methodologies

@@ -28,6 +28,18 @@
 
 ## Making Changes
 
+```mermaid
+graph TD
+    A["Clone repo & install skills"] --> B["Edit SKILL.md"]
+    B --> C["Update error-messages.md<br/>(if new errors)"]
+    C --> D["Test against real<br/>GitHub repo"]
+    D --> E["Verify terminal output<br/>matches DESIGN.md"]
+    E --> F["Submit PR"]
+
+    style A fill:#4CAF50,color:#fff
+    style F fill:#2196F3,color:#fff
+```
+
 ### Editing a Skill
 
 Skills live in `skills/<name>/SKILL.md`. When editing:
@@ -79,6 +91,20 @@ When testing manually:
 - **Backup before edit** — always post a backup comment before modifying an issue
 
 ## File Reference
+
+```mermaid
+graph TD
+    CM["CLAUDE.md<br/>Agent conventions"] --> DM["DESIGN.md<br/>Output style guide"]
+    CM --> CS["docs/config-schema.md<br/>Config schema"]
+    CM --> AR["docs/ARCHITECTURE.md<br/>System design"]
+    AR --> SK["skills/*/SKILL.md<br/>Skill definitions"]
+    SK --> EM["skills/*/references/<br/>Error messages"]
+    SK --> TM["skills/*/templates/<br/>Issue templates"]
+    CS --> GY[".gitissue.yml<br/>Project config"]
+
+    style CM fill:#4CAF50,color:#fff
+    style SK fill:#2196F3,color:#fff
+```
 
 | File | Purpose |
 |------|---------|
