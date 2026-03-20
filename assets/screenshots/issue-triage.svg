@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 440">
+  <!-- Window -->
+  <rect fill="#1e1e2e" width="720" height="440" rx="10" ry="10"/>
+  <rect fill="#313244" width="720" height="36" rx="10" ry="10"/>
+  <rect fill="#313244" width="720" height="18" y="18"/>
+  <!-- Traffic lights -->
+  <circle fill="#f38ba8" cx="20" cy="18" r="6"/>
+  <circle fill="#f9e2af" cx="40" cy="18" r="6"/>
+  <circle fill="#a6e3a1" cx="60" cy="18" r="6"/>
+  <text fill="#cdd6f4" font-family="monospace" font-size="12" x="320" y="22" text-anchor="middle">/issue-triage</text>
+  <!-- Terminal content -->
+  <text fill="#cba6f7" font-family="monospace" font-size="13" x="20" y="64">$</text>
+  <text fill="#cdd6f4" font-family="monospace" font-size="13" x="34" y="64">/issue-triage</text>
+
+  <text fill="#6c7086" font-family="monospace" font-size="13" x="20" y="96">  &#x25CF; Fetching 23 open issues...</text>
+  <text fill="#6c7086" font-family="monospace" font-size="13" x="20" y="116">  &#x25CF; Analyzing dependencies...</text>
+
+  <text fill="#cdd6f4" font-family="monospace" font-size="13" font-weight="bold" x="20" y="148">  &#x25C6; Issue Triage</text>
+  <text fill="#6c7086" font-family="monospace" font-size="13" x="20" y="168">  &#x2504;&#x2504;&#x2504;&#x2504;&#x2504;&#x2504;&#x2504;&#x2504;&#x2504;&#x2504;&#x2504;&#x2504;&#x2504;&#x2504;</text>
+
+  <text fill="#6c7086" font-family="monospace" font-size="13" x="20" y="192">  #  &#x2502; Issue              &#x2502; Pri &#x2502; Blocks &#x2502; Status</text>
+  <text fill="#6c7086" font-family="monospace" font-size="13" x="20" y="212">  &#x2500;&#x2500;&#x2500;&#x253C;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x253C;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x253C;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x253C;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;</text>
+
+  <text font-family="monospace" font-size="13" x="20" y="236">
+    <tspan fill="#cdd6f4">  1  &#x2502; </tspan><tspan fill="#89dceb">#12</tspan><tspan fill="#cdd6f4"> Fix auth       &#x2502; </tspan><tspan fill="#f38ba8">P1</tspan><tspan fill="#cdd6f4">  &#x2502; </tspan><tspan fill="#89dceb">#15</tspan><tspan fill="#cdd6f4">    &#x2502; </tspan><tspan fill="#a6e3a1">ready</tspan>
+  </text>
+  <text font-family="monospace" font-size="13" x="20" y="260">
+    <tspan fill="#cdd6f4">  2  &#x2502; </tspan><tspan fill="#89dceb">#8</tspan><tspan fill="#cdd6f4">  Add pagination &#x2502; </tspan><tspan fill="#f9e2af">P2</tspan><tspan fill="#cdd6f4">  &#x2502; &#x2014;      &#x2502; </tspan><tspan fill="#a6e3a1">ready</tspan>
+  </text>
+  <text font-family="monospace" font-size="13" x="20" y="284">
+    <tspan fill="#cdd6f4">  3  &#x2502; </tspan><tspan fill="#89dceb">#15</tspan><tspan fill="#cdd6f4"> Refactor DB    &#x2502; </tspan><tspan fill="#f9e2af">P2</tspan><tspan fill="#cdd6f4">  &#x2502; &#x2014;      &#x2502; </tspan><tspan fill="#f38ba8">blocked #12</tspan>
+  </text>
+  <text font-family="monospace" font-size="13" x="20" y="308">
+    <tspan fill="#cdd6f4">  4  &#x2502; </tspan><tspan fill="#89dceb">#3</tspan><tspan fill="#cdd6f4">  Old UI bug     &#x2502; </tspan><tspan fill="#6c7086">P3</tspan><tspan fill="#cdd6f4">  &#x2502; &#x2014;      &#x2502; </tspan><tspan fill="#f9e2af">stale (28d)</tspan>
+  </text>
+
+  <text font-family="monospace" font-size="13" x="20" y="344">
+    <tspan fill="#cdd6f4">  &#x26A1; Parallelizable: </tspan><tspan fill="#89dceb">#12</tspan><tspan fill="#cdd6f4"> + </tspan><tspan fill="#89dceb">#8</tspan><tspan fill="#6c7086"> (independent)</tspan>
+  </text>
+  <text fill="#f9e2af" font-family="monospace" font-size="13" x="20" y="368">  &#x26A0;  Stale: 1 issue (&gt;14 days inactive)</text>
+  <text font-family="monospace" font-size="13" x="20" y="392">
+    <tspan fill="#cdd6f4">  &#x25CB;  Suggested order: </tspan><tspan fill="#89dceb">#12</tspan><tspan fill="#cdd6f4"> &#x2192; </tspan><tspan fill="#89dceb">#15</tspan><tspan fill="#cdd6f4"> &#x2192; </tspan><tspan fill="#89dceb">#8</tspan><tspan fill="#cdd6f4"> &#x2192; </tspan><tspan fill="#89dceb">#3</tspan>
+  </text>
+
+  <text fill="#a6e3a1" font-family="monospace" font-size="13" x="20" y="420">  &#x2713; Triage saved to .gitissue/triage.json</text>
+</svg>

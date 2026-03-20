@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 420">
+  <!-- Window -->
+  <rect fill="#1e1e2e" width="720" height="420" rx="10" ry="10"/>
+  <rect fill="#313244" width="720" height="36" rx="10" ry="10"/>
+  <rect fill="#313244" width="720" height="18" y="18"/>
+  <!-- Traffic lights -->
+  <circle fill="#f38ba8" cx="20" cy="18" r="6"/>
+  <circle fill="#f9e2af" cx="40" cy="18" r="6"/>
+  <circle fill="#a6e3a1" cx="60" cy="18" r="6"/>
+  <text fill="#cdd6f4" font-family="monospace" font-size="12" x="320" y="22" text-anchor="middle">/issue-creator</text>
+  <!-- Terminal content -->
+  <text fill="#cba6f7" font-family="monospace" font-size="13" x="20" y="64">$</text>
+  <text fill="#cdd6f4" font-family="monospace" font-size="13" x="34" y="64">/issue-creator The login page returns a 500 error when using SSO</text>
+
+  <text fill="#6c7086" font-family="monospace" font-size="13" x="20" y="96">  &#x25CF; Scanning codebase...</text>
+  <text fill="#cdd6f4" font-family="monospace" font-size="13" x="20" y="116">    Found 3 relevant files</text>
+
+  <text fill="#cdd6f4" font-family="monospace" font-size="13" font-weight="bold" x="20" y="148">  &#x25C6; Issue Preview</text>
+  <text fill="#6c7086" font-family="monospace" font-size="13" x="20" y="168">  &#x2504;&#x2504;&#x2504;&#x2504;&#x2504;&#x2504;&#x2504;&#x2504;&#x2504;&#x2504;&#x2504;&#x2504;&#x2504;&#x2504;&#x2504;&#x2504;&#x2504;&#x2504;</text>
+
+  <text font-family="monospace" font-size="13" x="20" y="188">
+    <tspan fill="#cdd6f4">    Type:     </tspan><tspan fill="#f9e2af">bug</tspan><tspan fill="#6c7086"> (high)</tspan>
+  </text>
+  <text fill="#cdd6f4" font-family="monospace" font-size="13" x="20" y="208">    Title:    Fix login page 500 error on SSO</text>
+  <text font-family="monospace" font-size="13" x="20" y="228">
+    <tspan fill="#cdd6f4">    Files:    </tspan><tspan fill="#89dceb">auth.py</tspan><tspan fill="#6c7086"> (high)</tspan><tspan fill="#cdd6f4">, </tspan><tspan fill="#89dceb">middleware.py</tspan><tspan fill="#6c7086"> (high)</tspan><tspan fill="#cdd6f4">, </tspan><tspan fill="#89dceb">config.py</tspan><tspan fill="#6c7086"> (medium)</tspan>
+  </text>
+  <text font-family="monospace" font-size="13" x="20" y="248">
+    <tspan fill="#cdd6f4">    Labels:   </tspan><tspan fill="#f9e2af">bug</tspan><tspan fill="#6c7086"> (high)</tspan><tspan fill="#cdd6f4">, </tspan><tspan fill="#89b4fa">auth</tspan><tspan fill="#6c7086"> (medium)</tspan><tspan fill="#cdd6f4">, </tspan><tspan fill="#89b4fa">sso</tspan><tspan fill="#6c7086"> (medium)</tspan>
+  </text>
+  <text font-family="monospace" font-size="13" x="20" y="268">
+    <tspan fill="#cdd6f4">    Criteria: 3 acceptance criteria generated </tspan><tspan fill="#6c7086">(medium)</tspan>
+  </text>
+
+  <text font-family="monospace" font-size="13" x="20" y="300">
+    <tspan fill="#cdd6f4">  Create issue? </tspan><tspan fill="#6c7086">[Y/n] </tspan><tspan fill="#a6e3a1">Y</tspan>
+  </text>
+
+  <text fill="#a6e3a1" font-family="monospace" font-size="13" x="20" y="332">  &#x2713; Created issue #42</text>
+  <text fill="#89dceb" font-family="monospace" font-size="13" x="20" y="352">    https://github.com/user/repo/issues/42</text>
+</svg>
