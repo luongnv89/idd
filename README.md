@@ -1,5 +1,9 @@
 <p align="center">
-  <strong>issue-dev</strong>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/logo/logo-white.svg">
+    <source media="(prefers-color-scheme: light)" srcset="assets/logo/logo-black.svg">
+    <img src="assets/logo/logo-black.svg" alt="issuedev logo" height="64">
+  </picture>
 </p>
 
 <p align="center">

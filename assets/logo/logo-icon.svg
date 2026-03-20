@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- App icon: mark centered on dark rounded square -->
+  <rect width="512" height="512" rx="96" fill="#0A0A0A"/>
+
+  <g transform="translate(96, 96) scale(2.667)">
+    <path fill-rule="evenodd" fill="#00FF41"
+          d="M60 12 L108 60 L60 108 L12 60 Z
+             M48 46 L80 60 L48 74 Z"/>
+  </g>
+</svg>
