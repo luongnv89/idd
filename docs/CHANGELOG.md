@@ -7,6 +7,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 ## [Unreleased]
 
 ### Added
+- `/issue-triage` persistence — triage results saved to `.gitissue/triage.json` for cross-session access
+- `/issue-triage view` mode — render cached triage report without GitHub API calls, with report age indicator
+- `/issue-triage update` mode — explicit full re-triage with persistence
+- `.gitissue/` directory convention for persistent skill state
 - CONTRIBUTING.md, CODE_OF_CONDUCT.md, SECURITY.md
 - GitHub issue and PR templates
 - .gitignore

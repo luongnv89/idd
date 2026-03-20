@@ -23,3 +23,12 @@ All P1 items from the original review are implemented in Sprints 1-3:
 - **Effort:** S (human: ~1 day / CC: ~15 min)
 - **Depends on:** F2 implemented (done)
 - **Context:** Plant the data seed early so it accumulates passively. Comparison logic can be built in Phase 5.
+
+### Cross-skill triage updates
+- **What:** `/issue-creator` and `/issue-resolver` update `.gitissue/triage.json` after creating/resolving issues — append to `issues[]` and `history[]`.
+- **Why:** Keeps triage report fresh between full re-triage runs. Currently `triage.json` goes stale after any issue lifecycle event (create, resolve).
+- **Pros:** Users see up-to-date triage without re-running. Reduces GitHub API calls.
+- **Cons:** Breaks pure skill isolation (though file-based IPC is already the pattern with `.gitissue.yml`). Each skill needs JSON read/write instructions added to its SKILL.md.
+- **Effort:** S (human: ~2 days / CC: ~20 min)
+- **Depends on:** #11 (triage persistence) shipped
+- **Context:** Decided during eng review of #11. JSON schema already includes `history[]` array to support this — no schema version bump needed when implemented. `/issue-creator` would append new issues with `priority: "needs-review"`. `/issue-resolver` would set `status: "resolved"` on the matching issue entry.

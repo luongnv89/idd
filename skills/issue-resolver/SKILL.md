@@ -1,6 +1,11 @@
 ---
 name: issue-resolver
 description: Resolve a GitHub issue end-to-end through a 7-step pipeline (Fetch, Branch, Research, Plan, Execute, Verify, Ship) producing an atomic PR with "Closes #N". Includes guard checks and auto-normalization before the pipeline starts. Use this skill whenever someone says "resolve issue", "fix issue", "work on issue", "implement issue", "/issue-resolver", or provides an issue number they want resolved. Also trigger when asked to "close this issue with a PR", "implement #N", "fix #N", "take issue #N", "start working on #N", "pick up issue #N", or even just "#N" with the intent to work on it. If the user mentions a GitHub issue number and wants code written to address it, this is the right skill — even if they don't say "resolve" explicitly. The skill handles everything from reading the issue to creating the PR, so use it any time the goal is going from an open issue to a merged fix.
+license: MIT
+metadata:
+  version: 0.1.0
+  creator: Luong NGUYEN <luongnv89@gmail.com>
+compatibility: Requires git and GitHub CLI (gh) with authentication and push access to the repository. Run `gh auth status` to verify.
 ---
 
 # /issue-resolver N
@@ -63,6 +68,8 @@ Defaults:
 - `resolve.test_timeout: 300`
 - `resolve.pr_auto_link: true`
 - `resolve.max_commits: 10`
+
+If the config file exists but contains invalid values, output the validation error from `references/error-messages.md` and stop.
 
 Do not re-read the config at each step.
 
@@ -155,6 +162,13 @@ Normalize the issue inline — this is the same logic as the normalization mode 
 After normalization, re-fetch the issue to get the enriched body.
 
 If the issue is already normalized, skip silently.
+
+If any step of auto-normalization fails (backup comment, API error), do not abort the pipeline. Print the warning from `references/error-messages.md` and continue with the original issue body:
+```
+⚠ Auto-normalization failed for issue #N — proceeding without normalization.
+
+  To fix:  run /issue-creator N manually to normalize
+```
 
 After fetch + guards + normalize are complete:
 ```
@@ -364,6 +378,14 @@ Push the branch and create a pull request.
 git push -u origin {branch_name}
 ```
 
+If the push fails, output the error from `references/error-messages.md` and stop:
+```
+✗ Failed to push branch {branch_name}
+
+  To fix:  check remote access: git remote -v
+  Check:   do you have push permission? gh repo view --json viewerPermission
+```
+
 ### Create PR
 
 ```bash
@@ -529,3 +551,5 @@ All errors use the rich format from `references/error-messages.md`:
 ## Additional Resources
 
 - **`references/error-messages.md`** — Complete error catalog with triggers and exact output
+- **`DESIGN.md`** — Terminal output style guide (repo root)
+- **`docs/config-schema.md`** — Full configuration schema

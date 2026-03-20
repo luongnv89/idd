@@ -1,6 +1,11 @@
 ---
 name: issue-creator
 description: Create structured GitHub issues from text, screenshots, or images, normalize existing unstructured issues with codebase context, and batch-create multiple issues from a single input. Use this skill whenever someone says "create issue", "file a bug", "report a feature request", "normalize issue", "enrich issue", "structure this issue", "/issue-creator", or describes a bug, feature, or improvement they want tracked. Also use when someone shares an issue number and wants it cleaned up or enriched, or when pasting a screenshot of a bug. Even if the user just describes a problem without saying "issue", this skill turns it into a structured, codebase-aware GitHub issue with affected files, acceptance criteria, and labels via gh CLI. For batch creation, trigger when the user provides a list of items, a planning document, multiple bugs, or says "create issues from this", "file these bugs", "batch create", or pastes text with multiple distinct problems to track.
+license: MIT
+metadata:
+  version: 0.1.0
+  creator: Luong NGUYEN <luongnv89@gmail.com>
+compatibility: Requires git and GitHub CLI (gh) with authentication. Run `gh auth status` to verify.
 ---
 
 # /issue-creator
@@ -62,6 +67,8 @@ Load `.gitissue.yml` from the repo root once at skill start. If the file does no
 ```
 
 Defaults: `issue.auto_normalize: true`, `issue.template: "default"`, `issue.labels_auto_suggest: true`, `issue.normalize_comment: true`
+
+If the config file exists but contains invalid values, output the validation error from `references/error-messages.md` and stop.
 
 Do not re-read the config at each step.
 

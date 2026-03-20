@@ -9,12 +9,16 @@
 - Identifies parallelizable issues that can be worked on simultaneously
 - Flags stale issues (configurable threshold, default 14 days)
 - Suggests P1/P2/P3 priorities based on type, age, and blocking relationships
+- Persists results to `.gitissue/triage.json` for cross-session access
+- View mode renders cached results without GitHub API calls
 
 ## When to Use
 
 | Say this... | Skill will... |
 |---|---|
-| `/issue-triage` | Analyze all open issues, show dependency table with priorities and execution order |
+| `/issue-triage` | Analyze all open issues, persist to `.gitissue/triage.json`, show dependency table |
+| `/issue-triage view` | Show cached triage report without API calls |
+| `/issue-triage update` | Force a fresh analysis and overwrite cached results |
 | "what should I work on next" | Triage the backlog and recommend which issue to pick up first |
 | "which issues are blocked" | Build dependency graph and show which issues depend on others |
 | "sprint planning" | Output a prioritized, dependency-aware work plan |
@@ -49,6 +53,8 @@ asm install https://github.com/luongnv89/idd --skill issue-triage
 
 ```
 /issue-triage
+/issue-triage view
+/issue-triage update
 /issue-triage --limit 20
 ```
 
@@ -65,3 +71,4 @@ A structured triage table in the terminal with:
 - Parallelizable issue groups
 - Stale issue warnings
 - Suggested execution order
+- Persistent JSON report at `.gitissue/triage.json`

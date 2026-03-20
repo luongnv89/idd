@@ -1,18 +1,69 @@
 ---
 name: issue-triage
-description: Triage open GitHub issues by analyzing dependencies, detecting circular references, computing execution order, identifying parallelizable work, flagging stale issues, and suggesting priorities. Use this skill whenever someone says "triage issues", "prioritize issues", "what should I work on next", "issue dependencies", "which issues are blocked", "stale issues", "backlog review", "sprint planning", "dependency graph", "what's blocking", "/issue-triage", or wants to understand the relationship between open issues in a repository. Also trigger when someone asks for a sprint plan, wants to know which issues can be worked on in parallel, needs to identify blocked or stale work, asks "which issue should I pick up", "what order should we resolve these", or wants to plan their next sprint. This skill reads all open issues, builds a dependency graph from affected files, performs topological sorting, and outputs a structured triage table with priority suggestions, parallelization recommendations, stale warnings, and a suggested resolution order — all via gh CLI with structured JSON output.
+description: Triage open GitHub issues by analyzing dependencies, detecting circular references, computing execution order, identifying parallelizable work, flagging stale issues, and suggesting priorities. Persists results to .gitissue/triage.json for cross-session access. Supports update mode (full analysis + persist) and view mode (render cached results without API calls). Use this skill whenever someone says "triage issues", "prioritize issues", "what should I work on next", "issue dependencies", "which issues are blocked", "stale issues", "backlog review", "sprint planning", "dependency graph", "what's blocking", "/issue-triage", "/issue-triage view", "/issue-triage update", or wants to understand the relationship between open issues in a repository. Also trigger when someone asks for a sprint plan, wants to know which issues can be worked on in parallel, needs to identify blocked or stale work, asks "which issue should I pick up", "what order should we resolve these", "show me the last triage", "triage report", or wants to plan their next sprint. This skill reads all open issues, builds a dependency graph from affected files, performs topological sorting, and outputs a structured triage table with priority suggestions, parallelization recommendations, stale warnings, and a suggested resolution order — all via gh CLI with structured JSON output, persisted to .gitissue/triage.json.
+license: MIT
+metadata:
+  version: 0.1.0
+  creator: Luong NGUYEN <luongnv89@gmail.com>
+compatibility: Requires git and GitHub CLI (gh) with authentication. View mode (`/issue-triage view`) needs only local file access — no gh required.
 ---
 
 # /issue-triage
 
-Analyze open GitHub issues to surface dependencies, suggest priorities, identify parallelizable work, and flag stale issues. Outputs a structured triage table with a recommended execution order.
+Analyze open GitHub issues to surface dependencies, suggest priorities, identify parallelizable work, and flag stale issues. Outputs a structured triage table with a recommended execution order. Persists results to `.gitissue/triage.json` for cross-session access via `view` mode.
 
 ## Invocation
 
 | Invocation | What happens |
 |------------|--------------|
-| `/issue-triage` | Triage all open issues (default limit 100) |
-| `/issue-triage --limit N` | Triage up to N open issues |
+| `/issue-triage` | Triage all open issues, persist to `.gitissue/triage.json` |
+| `/issue-triage update` | Same as default — run full analysis and persist |
+| `/issue-triage view` | Read cached `.gitissue/triage.json` and render to terminal. **No GitHub API calls.** |
+| `/issue-triage --limit N` | Triage up to N open issues, persist results |
+
+## View Mode
+
+When invoked as `/issue-triage view`, skip the entire analysis pipeline (Steps 1-8) and the persist step (Step 9). Instead:
+
+1. Check for `.gitissue/triage.json` at the repo root
+2. If the file does not exist, output the empty-state message from `references/error-messages.md` and stop:
+   ```
+   ○ No triage report found. Run /issue-triage to generate one.
+   ```
+3. Read and parse the JSON file
+4. If the JSON is malformed or unparseable, output the error from `references/error-messages.md` and stop:
+   ```
+   ✗ .gitissue/triage.json is corrupted
+
+     To fix:  rm .gitissue/triage.json && /issue-triage
+     Check:   was the file edited manually?
+   ```
+5. Compute report age from the `updated` timestamp relative to now
+6. Render the triage table to terminal using the same DESIGN.md format as Step 8, with a cache header:
+
+```
+◆ Issue Triage (cached)
+┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  Last updated:  {updated timestamp, formatted as YYYY-MM-DD HH:MM UTC}
+  Report age:    {Nd Nh} (e.g., "3d 2h")
+  Updated by:    {source field from JSON}
+  Issues:        {analyzed_count} analyzed
+
+  #  │ Issue              │ Pri │ Blocks │ Status
+  ───┼────────────────────┼─────┼────────┼───────────
+  1  │ #12 Fix auth       │ P1  │ #15    │ ready
+  2  │ #8  Add pagination │ P3  │ —      │ ready
+
+  ⚡ Parallelizable: #12 + #8 (independent)
+  ⚠  Stale: 1 issue (>14 days inactive)
+  ○  Suggested order: #12 → #8 → #3 → #15
+
+○ Cached report. Run /issue-triage update for fresh analysis.
+```
+
+After rendering, stop. View mode never writes to the file or makes API calls.
+
+---
 
 ## Prerequisites
 
@@ -59,6 +110,8 @@ Triage settings and defaults:
 | `triage.stale_threshold_days` | `14` | Flag issues with no activity beyond this many days |
 | `triage.auto_priority` | `true` | Suggest P1/P2/P3 based on type, age, and dependency position |
 | `triage.include_closed` | `false` | Include recently closed issues in triage analysis |
+
+If the config file exists but contains invalid values, output the validation error from `references/error-messages.md` and stop.
 
 Do not re-read the config at each step.
 
@@ -222,6 +275,104 @@ After the table, output summary recommendations:
 
 ---
 
+## Step 9 — Persist
+
+After Step 8 (terminal output is always shown regardless of persistence success), save the triage results to `.gitissue/triage.json`.
+
+### Write process
+
+1. Create the directory if it doesn't exist: `mkdir -p .gitissue/`
+2. Build the JSON object from Steps 1-8 analysis results using the schema below
+3. Append one entry to the `history` array
+4. Write `.gitissue/triage.json` with formatted JSON (readable diffs in git)
+5. Print: `✓ Triage saved to .gitissue/triage.json`
+
+### JSON Schema (`.gitissue/triage.json`)
+
+```json
+{
+  "version": 1,
+  "updated": "2026-03-20T14:30:00Z",
+  "source": "/issue-triage",
+  "analyzed_count": 4,
+  "issues": [
+    {
+      "number": 12,
+      "title": "Fix auth redirect",
+      "type": "bug",
+      "priority": "P1",
+      "blocks": [15],
+      "blocked_by": [],
+      "status": "ready",
+      "stale_days": null,
+      "labels": ["bug", "auth"],
+      "affected_files": ["auth.py", "middleware.py"],
+      "updated_at": "2026-03-18T10:00:00Z"
+    }
+  ],
+  "summary": {
+    "parallel_groups": [[12, 8]],
+    "stale_count": 1,
+    "stale_threshold_days": 14,
+    "suggested_order": [12, 8, 3, 15],
+    "circular_deps": []
+  },
+  "history": [
+    {
+      "time": "2026-03-20T14:30:00Z",
+      "source": "/issue-triage",
+      "changes": "Full re-triage (4 issues)"
+    }
+  ]
+}
+```
+
+### Schema field reference
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `version` | integer | Schema version, always `1` |
+| `updated` | ISO 8601 string | Timestamp of this triage run |
+| `source` | string | Always `"/issue-triage"` for this skill |
+| `analyzed_count` | integer | Number of issues analyzed |
+| `issues[]` | array | One entry per analyzed issue |
+| `issues[].number` | integer | GitHub issue number |
+| `issues[].title` | string | Issue title |
+| `issues[].type` | string | `"bug"`, `"feature"`, or `"improvement"` |
+| `issues[].priority` | string | `"P1"`, `"P2"`, or `"P3"` (null if auto_priority is off) |
+| `issues[].blocks` | integer[] | Issue numbers this issue blocks |
+| `issues[].blocked_by` | integer[] | Issue numbers blocking this issue |
+| `issues[].status` | string | `"ready"`, `"blocked"`, or `"stale"` |
+| `issues[].stale_days` | integer or null | Days since last update, null if not stale |
+| `issues[].labels` | string[] | GitHub labels |
+| `issues[].affected_files` | string[] | Files from the normalized body |
+| `issues[].updated_at` | ISO 8601 string | GitHub `updatedAt` value |
+| `summary.parallel_groups` | integer[][] | Groups of parallelizable issue numbers |
+| `summary.stale_count` | integer | Number of stale issues |
+| `summary.stale_threshold_days` | integer | Threshold used for stale detection |
+| `summary.suggested_order` | integer[] | Execution order by issue number |
+| `summary.circular_deps` | integer[][] | Detected circular dependency chains |
+| `history[]` | array | One entry per triage run |
+| `history[].time` | ISO 8601 string | When this entry was created |
+| `history[].source` | string | Skill that wrote this entry |
+| `history[].changes` | string | Human-readable description |
+
+### Overwrite behavior
+
+A full re-triage **overwrites the entire file** — it does not append to previous data. The `history` array contains exactly one entry per triage run (the current run). Future cross-skill updates (deferred) may append additional history entries.
+
+### Error handling
+
+If writing fails (e.g., permission denied):
+```
+⚠ Could not save triage report to .gitissue/triage.json
+
+  To fix:  check file permissions in the .gitissue/ directory
+```
+This is a warning, not a fatal error — the terminal output from Step 8 was already displayed.
+
+---
+
 ## Example: Triage with dependencies and stale issues
 
 **Repository has 4 open issues:**
@@ -239,6 +390,8 @@ After the table, output summary recommendations:
 5. Parallelizable → #12 + #8 + #3 are all at the first level, but #12 blocks #15 so #8 and #3 can run in parallel with #12
 6. Stale → #3 is 28 days old (>14 day threshold)
 7. Priorities → #12 = P1 (bug, blocks #15), #8 = P3 (feature, blocks nothing), #15 = P2 (improvement, blocked), #3 = P3 (stale bug, blocks nothing)
+8. Output → triage table displayed
+9. Persist → write `.gitissue/triage.json`
 
 **Output:**
 
@@ -258,6 +411,8 @@ After the table, output summary recommendations:
   ⚡ Parallelizable: #12 + #8 + #3 (independent)
   ⚠  Stale: 1 issue (>14 days inactive)
   ○  Suggested order: #12 → #8 → #3 → #15
+
+  ✓ Triage saved to .gitissue/triage.json
 ```
 
 ---
@@ -298,6 +453,44 @@ After the table, output summary recommendations:
   2  │ #9  Refactor session mgmt   │ P2  │ —      │ ready
 
   ○  Suggested order: #5 → #9
+```
+
+---
+
+## Example: View mode (cached report)
+
+**User says:** `/issue-triage view`
+
+```
+  ◆ Issue Triage (cached)
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+    Last updated:  2026-03-17 14:30 UTC
+    Report age:    3d 2h
+    Updated by:    /issue-triage
+    Issues:        4 analyzed
+
+    #  │ Issue                  │ Pri │ Blocks │ Status
+    ───┼────────────────────────┼─────┼────────┼───────────
+    1  │ #12 Fix auth redirect  │ P1  │ #15    │ ready
+    2  │ #8  Add pagination     │ P3  │ —      │ ready
+    3  │ #3  Old UI alignment   │ P3  │ —      │ stale (28d)
+    4  │ #15 Refactor DB layer  │ P2  │ —      │ blocked #12
+
+    ⚡ Parallelizable: #12 + #8 + #3 (independent)
+    ⚠  Stale: 1 issue (>14 days inactive)
+    ○  Suggested order: #12 → #8 → #3 → #15
+
+  ○ Cached report. Run /issue-triage update for fresh analysis.
+```
+
+---
+
+## Example: View mode (no report)
+
+**User says:** `/issue-triage view` (no previous triage run)
+
+```
+  ○ No triage report found. Run /issue-triage to generate one.
 ```
 
 ---
