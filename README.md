@@ -33,7 +33,7 @@ issue-dev makes every GitHub issue a self-contained work order — enriched with
 
 | Command | What It Does |
 |---------|-------------|
-| `/issue-creator` | Scans your codebase, classifies the type, generates acceptance criteria, creates a structured issue |
+| `/issue-creator` | Scans your codebase, classifies the type, generates acceptance criteria, uploads screenshots, creates a structured issue |
 | `/issue-resolver N` | Fetches the issue, creates a branch, researches files, writes code + tests, opens a PR with "Closes #N" |
 | `/issue-triage` | Builds a dependency graph, detects stale issues, suggests priority and execution order |
 | `/init-gitissue` | Detects your language/framework/test runner and generates a `.gitissue.yml` config |
@@ -43,6 +43,7 @@ Every issue created or normalized by issue-dev includes:
 - **Acceptance criteria** derived from the problem description and codebase
 - **Technical notes** — architecture constraints, test coverage, breaking change risk
 - **Reporter's original text** preserved verbatim
+- **Embedded screenshots** — images uploaded to GitHub and embedded inline in the issue body
 
 ## How It Works
 
@@ -255,7 +256,7 @@ npx skills add https://github.com/luongnv89/idd
 | `/issue-creator <N> --force` | Force | Normalize even if issue has a security label |
 | `/issue-creator <multi-item text>` | Batch | Extract and create multiple issues from one input |
 
-**Create mode** scans the codebase for relevant files, classifies the issue type (bug/feature/improvement), generates acceptance criteria, and creates a structured issue via `gh issue create`.
+**Create mode** scans the codebase for relevant files, classifies the issue type (bug/feature/improvement), generates acceptance criteria, uploads any provided screenshots to GitHub (embedded inline in the issue body), and creates a structured issue via `gh issue create`.
 
 **Normalize mode** enriches an existing unstructured issue: preserves the original text in a Reporter Context blockquote, adds affected files with confidence levels, generates acceptance criteria, and posts a backup before editing.
 

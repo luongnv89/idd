@@ -139,6 +139,53 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 **Trigger:** Batch detection finds only one distinct item in the input. Falls through to single Create mode.
 **Note:** This is an informational message, not an error.
 
+## Image Upload
+
+### Image file not found
+```
+⚠ Image upload failed: {filename} — file not found
+  Issue created without embedded image.
+  Tip: upload the image manually via GitHub's web UI.
+```
+**Trigger:** The provided image path does not exist on disk.
+
+### Unsupported image format
+```
+⚠ Image upload failed: {filename} — unsupported format
+  Issue created without embedded image.
+  Supported: PNG, JPG, JPEG, GIF, WEBP, SVG
+  Tip: convert the image and retry, or upload manually via GitHub's web UI.
+```
+**Trigger:** The file extension is not in the supported list (png, jpg, jpeg, gif, webp, svg).
+
+### Image too large
+```
+⚠ Image upload failed: {filename} — file too large ({size} MB, max 10 MB)
+  Issue created without embedded image.
+  Tip: resize or compress the image, or upload manually via GitHub's web UI.
+```
+**Trigger:** The file size exceeds 10 MB (GitHub API limit for contents API).
+
+### Image upload API error
+```
+⚠ Image upload failed: {filename} — GitHub API error
+  Issue created without embedded image.
+  To fix:  check your permissions: gh api repos/{owner}/{repo}/contents
+  Tip: upload the image manually via GitHub's web UI.
+```
+**Trigger:** The `gh api` call to upload the image returns a non-success status (403, 404, 422, 500).
+
+### Partial image upload failure
+```
+⚠ {uploaded}/{total} images uploaded, {failed} failed
+
+  ✓ {success_filename} — embedded in issue
+  ✗ {failed_filename} — {reason}
+
+  Tip: upload failed images manually via GitHub's web UI.
+```
+**Trigger:** In a multi-image upload, some succeed and some fail. Issue is created with successfully uploaded images embedded.
+
 ## Empty States
 
 ### No files identified

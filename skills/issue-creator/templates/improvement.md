@@ -25,6 +25,10 @@ Improvement
 > **Reporter Context**
 > {original_reporter_text}
 
+## Screenshots
+
+{screenshots}
+
 ## Acceptance Criteria
 
 - [ ] {criterion_1}
