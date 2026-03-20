@@ -233,6 +233,34 @@ Generated from PRD v1.1 and review decisions on 2026-03-20.
 
 ---
 
+## Sprint 4: Distribution & Landing Page (v0.4.0) — Target: 2026-03-20
+
+### Task 4.1: Landing page README
+- **Status**: DONE
+- **Priority**: P1
+- **Description**: Rewrite README.md as a persuasive landing page using PAS (Problem-Agitate-Solution) framework while preserving all technical content in collapsed sections.
+- **Deliverables**:
+  - [x] Hero section with badges and value proposition headline
+  - [x] Problem section — vague issues, off-target AI PRs, untriaged backlogs
+  - [x] Solution section — 4-command table with benefit descriptions
+  - [x] How It Works — 3-step walkthrough with real terminal output
+  - [x] FAQ — 7 real questions covering free, security, customization
+  - [x] Collapsed sections for commands reference, configuration, templates, project structure
+  - [x] Multiple CTAs throughout
+
+### Task 4.2: Installation methods
+- **Status**: DONE
+- **Priority**: P1
+- **Description**: Document three installation methods: Vercel (npx), agent-skill-manager (asm), and manual clone.
+- **Deliverables**:
+  - [x] Vercel install: `npx skills add https://github.com/luongnv89/idd`
+  - [x] ASM install: `asm install github:luongnv89/idd`
+  - [x] Manual install: git clone + settings.json setup
+  - [x] Per-skill installation table with links to skill folders
+  - [x] Skill READMEs already have individual install commands (Vercel + asm)
+
+---
+
 ## Key Implementation Conventions
 
 These apply to ALL tasks above:
