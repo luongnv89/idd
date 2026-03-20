@@ -1,49 +1,47 @@
 ---
 name: create-issue
-description: This skill should be used when creating structured GitHub issues from text descriptions, normalizing existing unstructured issues with codebase context, or batch-creating issues from documents. Trigger phrases include "create issue", "create-issue", "file a bug", "normalize issue", "enrich issue", "structure this issue". Scans the codebase to identify affected files, classifies issue type, generates acceptance criteria, and produces GitHub-ready structured issues via gh CLI.
+description: Create structured GitHub issues from text, screenshots, or images, and normalize existing unstructured issues with codebase context. Use this skill whenever someone says "create issue", "file a bug", "report a feature request", "normalize issue", "enrich issue", "structure this issue", "/create-issue", or describes a bug, feature, or improvement they want tracked. Also use when someone shares an issue number and wants it cleaned up or enriched, or when pasting a screenshot of a bug. Even if the user just describes a problem without saying "issue", this skill turns it into a structured, codebase-aware GitHub issue with affected files, acceptance criteria, and labels via gh CLI.
 ---
 
 # /create-issue
 
 Create structured, codebase-aware GitHub issues — or normalize existing ones with codebase context.
 
+Two modes: **Create** (new issue from text/image) and **Normalize** (enrich existing issue #N).
+
 ## Modes
 
-| Invocation | Mode | Description |
-|------------|------|-------------|
-| `/create-issue <text>` | **Create** | Create a new structured issue from a text description |
-| `/create-issue <N>` | **Normalize** | Enrich existing issue #N with codebase context |
-| `/create-issue <N> --dry-run` | **Preview** | Preview normalization without applying |
-| `/create-issue <N> --force` | **Force** | Normalize even if security-labeled |
+| Invocation | Mode | What happens |
+|------------|------|--------------|
+| `/create-issue <text>` | Create | New structured issue from a text description |
+| `/create-issue <N>` | Normalize | Enrich existing issue #N with codebase context |
+| `/create-issue <N> --dry-run` | Preview | Show normalization preview without applying |
+| `/create-issue <N> --force` | Force | Normalize even if security-labeled |
 
-Detect mode by checking whether the argument is a number (normalize) or text (create).
+Detect mode: if the argument is a number → Normalize. If text → Create.
 
-**Image/screenshot input**: If the user provides an image path or screenshot, read the image using the Read tool to extract visual context, then treat the extracted text as the input description. Combine visual observations with any text the user provides.
+**Image/screenshot input**: When the user provides an image path or screenshot, read the image with the Read tool to extract visual context, then treat extracted information as the input description. Combine visual observations with any accompanying text.
 
-## Prerequisites Check
+## Prerequisites
 
 Before any operation, verify the environment. On failure, output the exact error from `references/error-messages.md` and stop.
 
-1. Confirm this is a git repository: `git rev-parse --git-dir`
+1. Confirm git repository: `git rev-parse --git-dir`
 2. Confirm `gh` is installed: `which gh`
 3. Confirm authentication: `gh auth status`
 4. Confirm GitHub remote exists: `git remote -v`
 
 ## Configuration
 
-Load `.gitissue.yml` from the repo root ONCE at the start. If the file does not exist, use all defaults and output:
+Load `.gitissue.yml` from the repo root once at skill start. If the file does not exist, use defaults and print:
 
 ```
 ○ First run — using default config. Run /init-gitissue to customize.
 ```
 
-Default values:
-- `issue.auto_normalize`: true
-- `issue.template`: "default"
-- `issue.labels_auto_suggest`: true
-- `issue.normalize_comment`: true
+Defaults: `issue.auto_normalize: true`, `issue.template: "default"`, `issue.labels_auto_suggest: true`, `issue.normalize_comment: true`
 
-Read the config file if it exists. Do not re-read it at each step.
+Do not re-read the config at each step.
 
 ---
 
@@ -51,25 +49,25 @@ Read the config file if it exists. Do not re-read it at each step.
 
 ### Step 1 — Parse Input
 
-Extract from the user's text description:
-- Keywords (error messages, component names, file paths, function names)
-- Implied issue type (bug if describing broken behavior; feature if describing new capability; improvement if describing existing behavior to change)
-- Any mentioned file paths or code references
+Extract from the description:
+- Keywords: error messages, component names, file paths, function names
+- Implied type: bug (broken behavior, errors, crashes), feature (new capability), improvement (enhancement to existing behavior)
+- Any explicitly mentioned file paths or code references
 
 ### Step 2 — Scan Codebase
 
-Use the keywords extracted in Step 1 to search the codebase:
+Search the codebase using extracted keywords:
 
-1. Use Grep to search for error messages, function names, and component names mentioned in the description
-2. Use Glob to find files matching mentioned paths or component names
+1. Grep for error messages, function names, and component names
+2. Glob for files matching mentioned paths or component names
 3. Read the most relevant files (max 10) to understand context
 
-For each matched file, assign a confidence level:
-- **high** — file path or function name explicitly mentioned in the description, or file contains the exact error message
-- **medium** — file matches a keyword or component name from the description
-- **low** — file is in a related module but not directly mentioned (mark as `(needs review)`)
+Assign confidence to each matched file:
+- **high** — file path or function explicitly mentioned, or file contains the exact error message
+- **medium** — matches a keyword or component name from the description
+- **low** — related module but not directly mentioned → mark `(needs review)` in the issue body
 
-If no files are found:
+If no files found:
 ```
 ⚠ Could not identify affected files. Issue created with manual-review flag.
   Tip: mention specific filenames or error messages for better results.
@@ -77,81 +75,70 @@ If no files are found:
 
 ### Step 3 — Classify Type
 
-Determine issue type based on the description content:
-- **bug** — describes broken behavior, errors, crashes, regressions, unexpected results
-- **feature** — describes new capability, new endpoint, new UI element, new workflow
-- **improvement** — describes enhancement to existing behavior, refactoring, performance, UX polish
+- **bug** — broken behavior, errors, crashes, regressions
+- **feature** — new capability, endpoint, UI element, workflow
+- **improvement** — enhancement, refactoring, performance, UX polish
 
 ### Step 4 — Check for Duplicates
-
-Search for similar open issues:
 
 ```bash
 gh issue list --state open --json number,title,body --limit 50
 ```
 
-Compare the new issue's title and key terms against existing issues. If a potential duplicate is found, warn:
+Compare the new issue's title and key terms against existing issues. If a potential duplicate exists:
 
 ```
-⚠ Possible duplicate: #N "{title}"
-  View: https://github.com/{owner}/{repo}/issues/N
+⚠ Possible duplicate: #42 "Fix auth redirect loop"
+  View: https://github.com/owner/repo/issues/42
 
   Continue creating? [Y/n]
 ```
 
 ### Step 5 — Generate Issue Content
 
-Select the appropriate template from `templates/` based on the classified type (bug.md, feature.md, or improvement.md).
+Read the appropriate template from `templates/` (bug.md, feature.md, or improvement.md) and populate every section:
 
-Populate each template section:
-
-1. **Type** — the classified type
-2. **Context** — affected files with confidence levels, current behavior (for bugs), related components, related issues
-3. **Description** — synthesized from the user's input, enriched with codebase context
-4. **Reporter Context** — the user's original text, verbatim, in a blockquote
-5. **Acceptance Criteria** — generate 3-5 testable criteria based on the described problem and codebase context
-6. **Technical Notes** — architecture constraints from reading affected files, test coverage status, breaking change risk assessment
+1. **Type** — classified type
+2. **Context** — affected files with confidence levels, current behavior (bugs), related components, related issues
+3. **Description** — synthesized from user input, enriched with codebase context
+4. **Reporter Context** — user's original text, verbatim, in a blockquote
+5. **Acceptance Criteria** — 3-5 testable criteria based on the problem and codebase context
+6. **Technical Notes** — architecture constraints from reading affected files, test coverage status, breaking change risk
 7. **Metadata** — suggested priority, estimated effort (XS/S/M/L/XL), suggested labels
 
 ### Step 6 — Preview and Confirm
 
-Output the issue preview following DESIGN.md format:
-
 ```
 ● Scanning codebase...
-  Found {N} relevant files
+  Found 3 relevant files
 
 ◆ Issue Preview
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-Type:     {type}
-Title:    {title}
-Files:    {file1}, {file2}, {file3}
-Labels:   {label1}, {label2}
-Criteria: {N} acceptance criteria generated
+  Type:     bug
+  Title:    Fix mobile auth redirect loop
+  Files:    auth.py (high), middleware.py (high), config.py (medium)
+  Labels:   bug, auth, mobile
+  Criteria: 3 acceptance criteria generated
 
 Create issue? [Y/n]
 ```
 
-Wait for user confirmation before proceeding. If the user declines, stop without creating the issue.
+Wait for confirmation. If declined, stop without creating.
 
 ### Step 7 — Create Issue
 
-Create the issue via GitHub CLI:
-
 ```bash
-gh issue create --title "{title}" --body "{populated_template}" --label "{label1},{label2}"
+gh issue create --title "{title}" --body "{populated_template}" --label "{labels}"
 ```
 
-IMPORTANT: Use `gh issue create` with explicit flags. The body must be the fully populated template content including the `<!-- gitissue:normalized v1 -->` marker at the top.
-
-Output the result:
+The body is the fully populated template including `<!-- gitissue:normalized v1 -->` at the top.
 
 ```
-✓ Created issue #{number}
-  https://github.com/{owner}/{repo}/issues/{number}
+✓ Created issue #42
+  https://github.com/owner/repo/issues/42
 ```
 
-If creation fails, output the appropriate error from `references/error-messages.md`.
+On failure, output the matching error from `references/error-messages.md`.
 
 ---
 
@@ -163,9 +150,9 @@ If creation fails, output the appropriate error from `references/error-messages.
 gh issue view {N} --json number,title,body,labels,assignees,state,comments
 ```
 
-If the issue is not found, output:
+If not found:
 ```
-✗ Issue #{N} not found
+✗ Issue #42 not found
 
   To fix:  gh issue list
   Check:   is this the right repository?
@@ -173,95 +160,86 @@ If the issue is not found, output:
 
 ### Step 2 — Check Already Normalized
 
-Search the issue body for the normalization marker: `<!-- gitissue:normalized v1 -->`
+Look for `<!-- gitissue:normalized v1 -->` as a standalone HTML comment in the issue body.
 
 If found:
 ```
-✓ Issue #{N} is already normalized (v1, {date}). No changes needed.
+✓ Issue #42 is already normalized (v1, 2026-03-20). No changes needed.
 ```
-Where `{date}` is today's date in YYYY-MM-DD format. Stop here.
+Stop. The date is today's date in YYYY-MM-DD format.
 
-IMPORTANT: Only check for the marker as a standalone HTML comment. If the text `<!-- gitissue:normalized v1 -->` appears inside a code block or as quoted text, it is NOT a normalization marker — proceed with normalization.
+Important: if the marker text appears inside a code block or blockquote, it is not a real marker — proceed with normalization.
 
 ### Step 3 — Check Issue State
 
-Check if the issue is locked or in a state that prevents editing:
-
-If the issue state indicates it is locked:
+If the issue is locked:
 ```
-✗ Issue #{N} is locked
+✗ Issue #42 is locked
 
   To fix:  unlock the issue in GitHub's web UI, then retry
 ```
-Stop here.
+Stop.
 
-If the issue body exceeds 60,000 characters, note this for Step 5 — technical notes and low-priority sections will be truncated to keep the normalized body under GitHub's 65KB limit.
+If the issue body exceeds 60,000 characters, note this — Technical Notes and Metadata will be truncated in Step 6 to stay under GitHub's 65KB limit.
 
 ### Step 4 — Security Label Check
 
-Check issue labels against security keywords: `security`, `CVE`, `vulnerability` (case-insensitive).
+Check labels for: `security`, `CVE`, `vulnerability` (case-insensitive).
 
-If a security label is found and `--force` was NOT used:
+If found and `--force` not used:
 ```
-⚠ Issue #{N} has a security label ({label_name}). Skipping normalization.
+⚠ Issue #42 has a security label (security). Skipping normalization.
   Codebase context could reveal exploit details.
 
-  To override: /create-issue {N} --force
+  To override: /create-issue 42 --force
 ```
-Stop here.
+Stop.
 
 ### Step 5 — Scan Codebase for Context
 
-Extract keywords from the existing issue title and body:
-- Error messages, stack traces, file paths, function names, component names
-- Use the same scanning approach as Create mode (Grep + Glob + Read)
-
-Assign confidence levels to each discovered file.
+Extract keywords from the existing issue title and body — error messages, stack traces, file paths, function names, component names. Use the same Grep + Glob + Read approach as Create mode. Assign confidence levels.
 
 ### Step 6 — Generate Normalization Content
 
-Using the appropriate template (classify type from existing issue content):
+Classify type from the existing issue content, then use the matching template:
 
-1. Preserve the ENTIRE original issue body in the `> **Reporter Context**` blockquote
-2. Fill in all template sections with codebase-enriched data
-3. Add the `<!-- gitissue:normalized v1 -->` marker at the top
-4. If the original body exceeds 60,000 characters (noted in Step 3), truncate Technical Notes and Metadata sections to keep total body under 65KB
+1. Preserve the entire original issue body in `> **Reporter Context**` blockquote
+2. Fill all template sections with codebase-enriched data
+3. Place `<!-- gitissue:normalized v1 -->` at the top
+4. If original body > 60K chars, truncate Technical Notes and Metadata to fit under 65KB
 
 ### Step 7 — Preview with Confidence Scores
 
-Output the normalization preview:
-
 ```
-● Fetching issue #{N}...
+● Fetching issue #42...
 ● Scanning codebase for context...
 
 ◆ Normalization Preview
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-+ Type:        {type} (high confidence)
-+ Files:       {file1} (high), {file2} (medium)
-+ Criteria:    {N} acceptance criteria (medium)
-+ Labels:      +{label1}, +{label2}
-= Original:    preserved in Reporter Context block
+  + Type:        bug (high confidence)
+  + Files:       auth.py (high), config.py (medium)
+  + Criteria:    3 acceptance criteria (medium)
+  + Labels:      +bug, +auth
+  = Original:    preserved in Reporter Context block
 
 Apply normalization? [Y/n/dry-run]
 ```
 
-The `+` prefix indicates added fields. The `=` prefix indicates preserved fields.
+`+` = added field, `=` = preserved field. Use `(high confidence)` for Type, abbreviated `(high)`, `(medium)`, `(low)` for files/criteria. Low-confidence fields get `(needs review)` in the issue body.
 
-Confidence format: use `(high confidence)` for the Type field, use abbreviated `(high)`, `(medium)`, `(low)` for files and criteria. Mark low-confidence fields with `(needs review)` in the issue body.
-
-Wait for user confirmation. If the user selects `n`, stop. If the user selects `dry-run`, proceed as dry-run.
+Wait for confirmation. `n` → stop. `dry-run` → proceed to Step 8.
 
 ### Step 8 — Dry Run Check
 
-If `--dry-run` was specified or user selected dry-run at the prompt, stop after the preview:
+If `--dry-run` was specified or selected at the prompt:
 ```
 ○ Dry run complete. No changes applied.
 ```
+Stop.
 
 ### Step 9 — Backup Original Body
 
-CRITICAL: Before editing the issue body, post a backup comment containing the original body. This is a data safety requirement — if the backup fails, abort normalization entirely.
+Post a backup comment with the original body before making any edits. This is a data safety requirement — if the backup fails, abort entirely. Never edit the issue body without a verified backup.
 
 ```bash
 gh issue comment {N} --body "<details><summary>Original issue body (backup by gitissue)</summary>
@@ -271,20 +249,16 @@ gh issue comment {N} --body "<details><summary>Original issue body (backup by gi
 </details>"
 ```
 
-Verify the comment was posted by checking the command exit code.
-
-If backup fails:
+Verify success via the command exit code. If it fails:
 ```
-✗ Failed to post backup comment for issue #{N}
+✗ Failed to post backup comment for issue #42
 
   Normalization aborted — original issue body is unchanged.
-  To fix:  check your permissions: gh issue comment {N} --body "test"
+  To fix:  check your permissions: gh issue comment 42 --body "test"
 ```
-Stop here. Do NOT proceed to edit the issue body.
+Stop. Do not edit the issue body.
 
 ### Step 10 — Update Issue Body
-
-Only after backup is verified:
 
 ```bash
 gh issue edit {N} --body "{normalized_body}"
@@ -292,7 +266,7 @@ gh issue edit {N} --body "{normalized_body}"
 
 ### Step 11 — Post Normalization Comment
 
-If `issue.normalize_comment` is true in config:
+If `issue.normalize_comment` is true:
 
 ```bash
 gh issue comment {N} --body "🔧 **Normalized by gitissue**
@@ -312,31 +286,62 @@ gh issue edit {N} --add-label "{label1},{label2}"
 ### Step 13 — Report
 
 ```
-✓ Backup posted (comment #{comment_id})
-✓ Issue #{N} normalized
-  https://github.com/{owner}/{repo}/issues/{N}
+✓ Backup posted (comment #5)
+✓ Issue #42 normalized
+  https://github.com/owner/repo/issues/42
 ```
 
 ---
 
-## Terminal Output Rules
+## Example: Create from a vague description
 
-Follow these rules from DESIGN.md for ALL output:
+**User says:** `/create-issue the checkout page is broken on Safari`
 
-1. **Symbols**: `● ` in progress, `✓ ` success, `✗ ` failure, `◆ ` section header, `⚡` action/recommendation, `⚠ ` warning, `○ ` info
-2. **Indentation**: two-space indent for content under headers
-3. **Section separator**: `┄` (light dash, not heavy box)
-4. **URLs**: always on their own line
-5. **Tables**: box-drawing characters `│ ─ ┼`, right-align numbers, left-align text
-6. **Max width**: 80 characters (truncate with `...` if needed)
-7. **Empty cells**: use `—` (not blank)
-8. **One blank line** between sections
-9. **No trailing blank lines**
-10. **Static sequential output** — each step prints a new line, no terminal animation
+1. Parse → keywords: "checkout", "broken", "Safari"; type: bug
+2. Scan → Grep finds `src/checkout/payment.js` mentions "Safari", Glob finds `src/checkout/` directory
+3. Classify → bug
+4. Duplicates → none found
+5. Generate → populates bug.md template with affected files, Safari-specific acceptance criteria
+6. Preview:
+   ```
+   ● Scanning codebase...
+     Found 2 relevant files
+
+   ◆ Issue Preview
+   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+     Type:     bug
+     Title:    Fix checkout page broken on Safari
+     Files:    src/checkout/payment.js (high), src/checkout/cart.js (medium)
+     Labels:   bug, checkout
+     Criteria: 3 acceptance criteria generated
+
+   Create issue? [Y/n]
+   ```
+7. On confirmation → `gh issue create` → `✓ Created issue #15`
+
+## GitHub CLI Convention
+
+Every `gh` command for data retrieval uses `--json` with explicit field selection. Never parse text output.
+
+- `gh issue view 42 --json number,title,body,labels,assignees,state,comments`
+- `gh issue list --state open --json number,title,body --limit 50`
+- `gh issue create --title "..." --body "..." --label "..."`
+
+## Terminal Output
+
+Follow DESIGN.md symbol vocabulary and output structure for all output. Key rules:
+
+- Symbols: `●` progress, `✓` success, `✗` failure, `◆` section header, `⚡` recommendation, `⚠` warning, `○` info, `+` added, `=` preserved
+- Two-space indent for content under section headers
+- Section separators: `┄` (light dash)
+- URLs on their own line
+- Max 80 chars wide (truncate with `...`)
+- One blank line between sections
+- Static sequential output — each step prints a new line, no animation
 
 ## Error Handling
 
-For ALL errors, use the rich error format. Reference `references/error-messages.md` for the exact messages. The format is always:
+All errors use the rich format from `references/error-messages.md`:
 
 ```
 ✗ Short error description
@@ -345,21 +350,9 @@ For ALL errors, use the rich error format. Reference `references/error-messages.
   Docs:    <url> (when applicable)
 ```
 
-## GitHub CLI Convention
-
-CRITICAL: Every `gh` command MUST use `--json` with explicit field selection for data retrieval. Never parse text output.
-
-Examples:
-- `gh issue view 42 --json number,title,body,labels,assignees,state,comments`
-- `gh issue list --state open --json number,title,body --limit 50`
-- `gh issue create --title "..." --body "..." --label "..."`
-
 ## Additional Resources
 
-### Reference Files
-- **`references/error-messages.md`** — Complete error message catalog with triggers and exact output format
-
-### Templates
+- **`references/error-messages.md`** — Complete error catalog with triggers and exact output
 - **`templates/bug.md`** — Bug report template
 - **`templates/feature.md`** — Feature request template
 - **`templates/improvement.md`** — Improvement template
