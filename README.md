@@ -113,7 +113,7 @@ npx skills add https://github.com/luongnv89/idd
 ### Option 2: Agent Skill Manager (asm)
 
 ```bash
-asm install github:luongnv89/idd
+asm install https://github.com/luongnv89/idd
 ```
 
 ### Option 3: Manual

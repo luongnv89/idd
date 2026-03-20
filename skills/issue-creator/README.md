@@ -57,7 +57,7 @@ npx skills add https://github.com/luongnv89/idd --skill issue-creator
 Or via [agent-skill-manager (asm)](https://www.npmjs.com/package/agent-skill-manager):
 
 ```bash
-asm install github:luongnv89/idd:skills/issue-creator
+asm install https://github.com/luongnv89/idd --skill issue-creator
 ```
 
 ## Usage

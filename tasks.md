@@ -254,7 +254,7 @@ Generated from PRD v1.1 and review decisions on 2026-03-20.
 - **Description**: Document three installation methods: Vercel (npx), agent-skill-manager (asm), and manual clone.
 - **Deliverables**:
   - [x] Vercel install: `npx skills add https://github.com/luongnv89/idd`
-  - [x] ASM install: `asm install github:luongnv89/idd`
+  - [x] ASM install: `asm install https://github.com/luongnv89/idd`
   - [x] Manual install: git clone + settings.json setup
   - [x] Per-skill installation table with links to skill folders
   - [x] Skill READMEs already have individual install commands (Vercel + asm)

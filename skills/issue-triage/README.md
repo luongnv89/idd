@@ -42,7 +42,7 @@ npx skills add https://github.com/luongnv89/idd --skill issue-triage
 Or via [agent-skill-manager (asm)](https://www.npmjs.com/package/agent-skill-manager):
 
 ```bash
-asm install github:luongnv89/idd:skills/issue-triage
+asm install https://github.com/luongnv89/idd --skill issue-triage
 ```
 
 ## Usage
