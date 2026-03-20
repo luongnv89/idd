@@ -21,7 +21,7 @@ Three modes: **Create** (new issue from text/image), **Normalize** (enrich exist
 
 Detect mode: if the argument is a number → Normalize. If the input contains multiple distinct items (numbered list, bullet points, multiple paragraphs describing different problems, or a planning document with several work items) → Batch. Otherwise → Create.
 
-**Image/screenshot input**: When the user provides an image path or screenshot, read the image with the Read tool to extract visual context, then treat extracted information as the input description. Combine visual observations with any accompanying text.
+**Image/screenshot input**: When the user provides an image path or screenshot, read the image with the Read tool to extract visual context, then treat extracted information as the input description. Combine visual observations with any accompanying text. Additionally, upload the image to GitHub and embed it in the issue body — see the **Image Upload** section below.
 
 ## Prerequisites
 
@@ -64,6 +64,98 @@ Load `.gitissue.yml` from the repo root once at skill start. If the file does no
 Defaults: `issue.auto_normalize: true`, `issue.template: "default"`, `issue.labels_auto_suggest: true`, `issue.normalize_comment: true`
 
 Do not re-read the config at each step.
+
+## Image Upload
+
+When the user provides one or more image paths (e.g., screenshots, photos, diagrams), upload each image to GitHub and embed it in the issue body. This happens **in addition to** reading the image for visual context extraction.
+
+### Supported formats
+
+PNG, JPG/JPEG, GIF, WEBP, SVG. Maximum file size: 10 MB per image (GitHub's limit).
+
+### Upload procedure
+
+For each image path provided:
+
+1. **Validate the file** — confirm it exists, is a supported format, and is under 10 MB:
+   ```bash
+   test -f "{image_path}" && stat -f%z "{image_path}" 2>/dev/null || stat -c%s "{image_path}" 2>/dev/null
+   ```
+
+2. **Upload via GitHub API** — use the repository contents API to commit the image to `.github/issue-assets/`:
+   ```bash
+   # Base64-encode the image
+   base64_content=$(base64 < "{image_path}")
+
+   # Generate a unique filename: timestamp + original name
+   filename="$(date +%Y%m%d%H%M%S)-{original_filename}"
+
+   # Upload via gh api
+   gh api repos/{owner}/{repo}/contents/.github/issue-assets/{filename} \
+     --method PUT \
+     --field message="Upload image for issue: {filename}" \
+     --field content="$base64_content"
+   ```
+
+3. **Extract the URL** — the API response includes `download_url`. Use this for the markdown embed. Parse the response:
+   ```bash
+   gh api repos/{owner}/{repo}/contents/.github/issue-assets/{filename} \
+     --method PUT \
+     --field message="Upload image for issue: {filename}" \
+     --field content="$base64_content" \
+     --jq '.content.download_url'
+   ```
+
+4. **Build the markdown** — create an image embed for each uploaded file:
+   ```markdown
+   ![{original_filename}]({download_url})
+   ```
+
+### Placement in issue body
+
+Embed uploaded images in a **Screenshots** section placed between the Description and Acceptance Criteria sections:
+
+```markdown
+## Screenshots
+
+![screenshot-1.png](https://raw.githubusercontent.com/owner/repo/main/.github/issue-assets/20260320120000-screenshot-1.png)
+
+![error-log.png](https://raw.githubusercontent.com/owner/repo/main/.github/issue-assets/20260320120001-error-log.png)
+```
+
+If no images are provided, omit the Screenshots section entirely.
+
+### Multiple images
+
+When multiple images are provided, upload each sequentially and embed all of them in the Screenshots section. Number them if the user did not provide descriptive filenames:
+
+```markdown
+## Screenshots
+
+![Screenshot 1](url1)
+
+![Screenshot 2](url2)
+```
+
+### Failure handling
+
+If an image upload fails, do **not** block issue creation. Create the issue with text context only and warn:
+
+```
+⚠ Image upload failed: {filename} — {reason}
+  Issue created without embedded image.
+  Tip: upload the image manually via GitHub's web UI.
+```
+
+Reasons include: file not found, unsupported format, file too large (>10 MB), API error, permission denied.
+
+If some images in a batch succeed and others fail, embed the successful ones and warn about the failures.
+
+### Normalization mode
+
+When normalizing an existing issue that mentions image paths or contains image URLs, preserve existing images. Do not re-upload images that are already embedded with `![...]()` syntax.
+
+---
 
 ## Confidence Scoring System
 
@@ -145,15 +237,18 @@ Compare the new issue's title and key terms against existing issues. If a potent
 
 ### Step 5 — Generate Issue Content
 
+If the user provided image paths, upload them now using the **Image Upload** procedure. Collect the resulting markdown embeds for inclusion in the issue body.
+
 Read the appropriate template from `templates/` (bug.md, feature.md, or improvement.md) and populate every section:
 
 1. **Type** — classified type
 2. **Context** — affected files with confidence levels, current behavior (bugs), related components, related issues
 3. **Description** — synthesized from user input, enriched with codebase context
-4. **Reporter Context** — user's original text, verbatim, in a blockquote
-5. **Acceptance Criteria** — 3-5 testable criteria based on the problem and codebase context
-6. **Technical Notes** — architecture constraints from reading affected files, test coverage status, breaking change risk
-7. **Metadata** — suggested priority, estimated effort (XS/S/M/L/XL), suggested labels with confidence levels
+4. **Screenshots** — embedded images (only if images were provided and uploaded successfully)
+5. **Reporter Context** — user's original text, verbatim, in a blockquote
+6. **Acceptance Criteria** — 3-5 testable criteria based on the problem and codebase context
+7. **Technical Notes** — architecture constraints from reading affected files, test coverage status, breaking change risk
+8. **Metadata** — suggested priority, estimated effort (XS/S/M/L/XL), suggested labels with confidence levels
 
 ### Step 6 — Preview and Confirm
 
@@ -166,11 +261,14 @@ Read the appropriate template from `templates/` (bug.md, feature.md, or improvem
   Type:     bug (high)
   Title:    Fix mobile auth redirect loop
   Files:    auth.py (high), middleware.py (high), config.py (medium)
+  Images:   2 uploaded ✓
   Labels:   bug (high), auth (medium), mobile (medium)
   Criteria: 3 acceptance criteria generated (medium)
 
 Create issue? [Y/n]
 ```
+
+The `Images:` line appears only when images were provided. Show count and upload status. If some failed: `Images: 1/2 uploaded (1 failed)`.
 
 Wait for confirmation. If declined, stop without creating.
 
