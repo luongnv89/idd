@@ -23,6 +23,27 @@ Before any operation, verify the environment. On failure, output the exact error
 3. Confirm authentication: `gh auth status`
 4. Confirm GitHub remote exists: `git remote -v`
 
+## Repo Sync (recommended)
+
+Before analyzing issues, recommend syncing with the remote so dependency analysis based on local files is accurate:
+
+```
+⚡ Your branch may be behind the remote. Sync before triaging?
+
+  This ensures file-based dependency detection uses the latest code.
+  Sync now? [Y/n]
+```
+
+If the user agrees, run:
+
+```bash
+branch="$(git rev-parse --abbrev-ref HEAD)"
+git fetch origin
+git pull --rebase origin "$branch"
+```
+
+If the working tree is dirty, stash first, sync, then pop. If `origin` is missing or conflicts occur, inform the user and continue without syncing. If the user declines, proceed without syncing.
+
 ## Configuration
 
 Load `.gitissue.yml` from the repo root once at skill start. If the file does not exist, use defaults and print:

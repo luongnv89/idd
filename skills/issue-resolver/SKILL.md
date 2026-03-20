@@ -24,9 +24,18 @@ Before any operation, verify the environment. On failure, output the exact error
 3. Confirm authentication: `gh auth status`
 4. Confirm GitHub remote exists: `git remote -v`
 
-## Repo Sync Before Edits (mandatory)
+## Repo Sync (recommended)
 
-Before making any file modifications, sync with the remote to avoid conflicts:
+Before making file modifications, recommend syncing with the remote to avoid conflicts and ensure codebase analysis uses current code:
+
+```
+⚡ Your branch may be behind the remote. Sync before resolving?
+
+  This ensures the fix targets the latest code and avoids merge conflicts.
+  Sync now? [Y/n]
+```
+
+If the user agrees, run:
 
 ```bash
 branch="$(git rev-parse --abbrev-ref HEAD)"
@@ -34,7 +43,9 @@ git fetch origin
 git pull --rebase origin "$branch"
 ```
 
-If the working tree is dirty, stash first (`git stash`), sync, then pop (`git stash pop`). If `origin` is missing or conflicts occur, stop and ask the user before continuing.
+If the working tree is dirty, stash first (`git stash`), sync, then pop (`git stash pop`). If `origin` is missing or conflicts occur, inform the user and continue without syncing.
+
+If the user declines, proceed without syncing.
 
 ## Configuration
 
