@@ -1,10 +1,15 @@
 <p align="center">
-  <strong>issue-dev</strong>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/logo/logo-white.svg">
+    <source media="(prefers-color-scheme: light)" srcset="assets/logo/logo-black.svg">
+    <img src="assets/logo/logo-black.svg" alt="issuedev logo" height="64">
+  </picture>
 </p>
 
 <p align="center">
   <a href="https://github.com/luongnv89/idd/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="MIT License"></a>
   <a href="https://github.com/luongnv89/idd"><img src="https://img.shields.io/badge/skills-4-blue.svg" alt="4 skills"></a>
+  <a href="https://github.com/luongnv89/idd/blob/main/CONTRIBUTING.md"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs Welcome"></a>
 </p>
 
 # Turn GitHub Issues Into Your Entire Dev Workflow
@@ -364,6 +369,9 @@ skills/
     ├── SKILL.md
     └── references/
 docs/
+├── ARCHITECTURE.md     # System design and data flow
+├── CHANGELOG.md        # Version history
+├── DEVELOPMENT.md      # Dev setup and debugging
 ├── idd-methodology.md  # IDD methodology overview
 ├── config-schema.md    # Full .gitissue.yml schema
 └── sample-normalized-issue.md
@@ -373,6 +381,15 @@ tests/                  # Integration test scripts
 </details>
 
 ---
+
+## Contributing
+
+Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on:
+- Reporting bugs and requesting features
+- Development setup and testing
+- Commit conventions and PR process
+
+Please read our [Code of Conduct](CODE_OF_CONDUCT.md) before participating.
 
 ## License
 

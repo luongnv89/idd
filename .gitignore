@@ -1,0 +1,38 @@
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Node (if skills are installed via npx)
+node_modules/
+package-lock.json
+yarn.lock
+
+# Python (if test scripts use Python)
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+env/
+
+# Test artifacts
+tests/tmp/
+tests/output/
+*.log
+
+# Claude Code local state
+.claude/settings.local.json
