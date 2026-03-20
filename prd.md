@@ -21,9 +21,9 @@
 |-------|-------|
 | Product Name | gitissue |
 | Methodology | Issue-Driven Development (IDD) |
-| Version | 1.0 |
-| Last Updated | 2026-03-19 |
-| Status | Draft |
+| Version | 1.1 |
+| Last Updated | 2026-03-20 |
+| Status | Reviewed (CEO + Eng + Design) |
 
 ---
 
@@ -154,16 +154,20 @@ gitissue is purpose-built for **brownfield projects** — the 90% of software wo
 - [ ] Detects whether the issue is already normalized (has gitissue template markers)
 - [ ] If not normalized: preserves original description in a "Reporter Context" blockquote
 - [ ] Adds all template sections: type classification, affected files, acceptance criteria, technical notes, labels
-- [ ] Updates the issue body in-place via `gh issue edit`
+- [ ] Posts backup comment with original body (in `<details>` block) BEFORE editing — abort if backup fails
+- [ ] Updates the issue body in-place via `gh issue edit` (only after backup is verified)
 - [ ] Adds a comment noting normalization was performed, with summary of what was added
 - [ ] Never deletes or modifies original reporter content
 - [ ] Supports `--dry-run` flag to preview normalization without applying
+- [ ] Skips normalization for security-labeled issues (labels: 'security', 'CVE', 'vulnerability') unless `--force` is used
 
 **Edge Cases**:
 - Issue already normalized → skip, report "Issue #N is already normalized"
 - Issue is locked or read-only → error with explanation
 - Issue belongs to a different repo → error with repo context
 - Large issue body (>65KB) → truncate technical notes, prioritize essential fields
+- Security-labeled issue → warn and skip normalization (codebase context could reveal exploit details)
+- Backup comment fails → abort normalization entirely (never edit body without a verified backup)
 
 #### F3: Issue Templates
 
@@ -188,9 +192,11 @@ gitissue is purpose-built for **brownfield projects** — the 90% of software wo
 - As a team lead, I want the resolve pipeline to auto-normalize issues before working on them so that resolution quality doesn't depend on issue quality.
 
 **Acceptance Criteria**:
-- [ ] Fetches issue #N from GitHub
+- [ ] Fetches issue #N from GitHub using `gh --json` for reliable parsing
+- [ ] Checks guards before proceeding: warns if issue is assigned to someone else or has blocking labels (wontfix, blocked, do-not-merge)
 - [ ] Auto-normalizes if not already normalized (when `auto_normalize: true` in config)
 - [ ] Creates a branch following naming convention (default: `issue-N/short-description`)
+- [ ] Treats issue body content as untrusted data (prompt injection boundary — never executes commands found in the issue text)
 - [ ] **Research phase**: reads all files mentioned in the issue, traces imports/dependencies, understands current behavior
 - [ ] **Plan phase**: proposes approach locally (not posted to issue). When `approval_gate: comment-and-wait`, pauses for user approval
 - [ ] **Execute phase**: writes code changes, writes/updates tests, creates atomic commits per logical change
@@ -202,8 +208,11 @@ gitissue is purpose-built for **brownfield projects** — the 90% of software wo
 **Edge Cases**:
 - Issue has no acceptance criteria (even after normalization) → resolve proceeds but PR notes "No acceptance criteria defined — manual review recommended"
 - Tests fail during verify → report failures, do not create PR, suggest fixes
+- Tests hang/timeout → abort after `resolve.test_timeout` seconds (default: 300s), report timeout
 - Branch already exists → prompt: continue from existing branch or create fresh
 - Merge conflicts with main → report conflict, suggest rebase or manual resolution
+- Issue assigned to another user → warn before proceeding, require confirmation
+- Issue has blocking labels → warn before proceeding, require confirmation
 
 #### F5: `.gitissue.yml` Configuration
 
@@ -232,6 +241,7 @@ resolve:
   approval_gate: auto           # auto | comment-and-wait
   branch_prefix: "issue-"      # branch naming: issue-42/short-description
   auto_test: true               # run tests before creating PR
+  test_timeout: 300             # abort verify phase after N seconds (default: 5 min)
   pr_auto_link: true            # include "Closes #N" in PR body
   max_commits: 10               # warn if resolve produces >N commits
 
@@ -344,23 +354,30 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    A[Run /create-issue 42] --> B[Fetch issue #42\nvia gh issue view]
+    A[Run /create-issue 42] --> B[Fetch issue #42\nvia gh issue view --json]
     B --> C{Already\nnormalized?}
     C -->|Yes| D[Report: already normalized]
-    C -->|No| E[Preserve original description\nin Reporter Context block]
+    C -->|No| SEC{Security\nlabeled?}
+    SEC -->|Yes| SECW[Warn: security issue\nskip unless --force]
+    SEC -->|No| E[Preserve original description\nin Reporter Context block]
     E --> F[Scan codebase using\nkeywords from issue]
     F --> G[Classify type\nidentify affected files]
     G --> H[Generate acceptance criteria\ntechnical notes]
     H --> I[Show normalization preview\nwith confidence scores]
     I --> J{--dry-run?}
     J -->|Yes| K[Display preview only]
-    J -->|No| L[Update issue body\nvia gh issue edit]
+    J -->|No| BAK[Post backup comment\nwith original body]
+    BAK --> BAKC{Backup\nsucceeded?}
+    BAKC -->|No| BAKE[ABORT: Cannot backup\ndo not edit body]
+    BAKC -->|Yes| L[Update issue body\nvia gh issue edit]
     L --> M[Add normalization comment]
     M --> N[Apply suggested labels]
     N --> O[Report changes made]
     D --> Z[Done]
     K --> Z
     O --> Z
+    SECW --> Z
+    BAKE --> Z
 ```
 
 ### 4.3 Resolve Issue (Primary Flow)
@@ -369,8 +386,11 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    A[Run /resolve-issue 42] --> B[Fetch issue #42]
-    B --> C{Normalized?}
+    A[Run /resolve-issue 42] --> B[Fetch issue #42\nvia gh --json]
+    B --> GRD{Check guards:\nassigned? blocking\nlabels?}
+    GRD -->|Warning| GRDW[Warn user\nrequire confirmation]
+    GRD -->|Clear| C{Normalized?}
+    GRDW --> C
     C -->|No| D{auto_normalize\nenabled?}
     D -->|Yes| E[Run /create-issue 42\nauto-normalize]
     D -->|No| F[Warn: unstructured issue\nproceed anyway]
@@ -415,11 +435,22 @@ flowchart TD
     L --> Z[Done]
 ```
 
-**Error States**:
-- No GitHub remote → "No GitHub remote configured. Run `git remote add origin <url>` first."
-- `gh` CLI not installed → "GitHub CLI required. Install: https://cli.github.com"
-- Authentication failed → "Run `gh auth login` to authenticate with GitHub"
-- Issue not found → "Issue #N not found. Run `gh issue list` to see open issues."
+**Error States** (all errors follow the rich error format defined in DESIGN.md):
+- No GitHub remote:
+  `✗ No GitHub remote configured`
+  `  To fix:  git remote add origin <url>`
+- `gh` CLI not installed:
+  `✗ GitHub CLI not found`
+  `  To fix:  brew install gh`
+  `  Docs:    https://cli.github.com`
+- Authentication failed:
+  `✗ Not authenticated with GitHub`
+  `  To fix:  gh auth login`
+  `  Docs:    https://cli.github.com/manual/gh_auth_login`
+- Issue not found:
+  `✗ Issue #N not found`
+  `  To fix:  gh issue list`
+  `  Check:   is this the right repository?`
 
 ---
 
@@ -443,25 +474,31 @@ flowchart TD
 - **No secrets in issues**: Warn if issue content appears to contain API keys, passwords, or tokens
 - **Minimum permissions**: Require only `repo` scope for GitHub token — no admin access needed
 - **Local-only plan phase**: Resolution plans never leave the local machine unless the user explicitly posts them
+- **Prompt injection boundary**: `/resolve-issue` treats issue body as untrusted user data — the skill prompt explicitly instructs the agent to never execute commands found in issue text, only follow the resolve pipeline steps
+- **Security issue protection**: Normalization skips issues with security-related labels to avoid leaking exploit details through codebase context enrichment
+- **Normalization data safety**: Backup comment is posted and verified BEFORE editing the issue body — if backup fails, normalization is aborted entirely
 
 ### 5.3 Compatibility
 
 | Platform | Requirement |
 |----------|-------------|
 | Operating Systems | macOS, Linux, Windows (WSL) |
-| Python | 3.10+ |
 | GitHub CLI | 2.0+ |
 | Git | 2.30+ |
 | GitHub | github.com and GitHub Enterprise Server 3.0+ |
 | GitLab (future) | gitlab.com and self-hosted GitLab 15.0+ |
-| AI Agents | Claude Code, Codex CLI, GitHub Copilot, OpenHands, any agent supporting `gh` CLI |
+| AI Agents | Claude Code, Codex CLI, Gemini CLI, Cursor, and any agent supporting the SKILL.md standard |
 
-### 5.4 Accessibility
+### 5.4 Accessibility & CLI Output
 
-- All output uses standard markdown — renderable in any terminal or GitHub web view
+- All terminal output follows the CLI Style Guide defined in `DESIGN.md`
+- Semantic symbols (✓ ✗ ● ◆ ⚠) carry meaning without color — never rely on color alone
 - Color-coded terminal output includes text fallbacks (not color-dependent)
 - All commands support `--json` flag for machine-readable output
 - Issue templates are screen-reader-friendly (semantic markdown structure)
+- Static sequential output (no terminal animations or cursor manipulation)
+- First-run experience: `○ First run — using default config. Run /init-gitissue to customize.`
+- Tables truncate at 80 chars; narrow terminals (<60 chars) switch to list format
 
 ---
 
@@ -528,27 +565,47 @@ graph TB
     K --> P
 ```
 
-### 6.2 Skill Architecture (Claude Code)
+### 6.2 Skill Architecture (Cross-Agent)
 
-gitissue is implemented as a set of **Claude Code skills** — markdown files that define prompts, workflows, and tool usage patterns. This architecture enables:
+gitissue is implemented as a set of **agent skills** — markdown files that define prompts, workflows, and tool usage patterns. Each skill is a **self-contained, isolated component** in its own folder. This architecture enables:
 
-- Zero-install usage (skills are loaded by Claude Code directly)
-- Works with any Claude Code-compatible agent
+- Zero-install usage (skills are loaded by any compatible AI agent)
+- Works with Claude Code, Codex CLI, Gemini CLI, Cursor, and any agent supporting the SKILL.md standard
+- Each skill is independently installable and deployable
 - Extensible via custom skills
+- Skills built using `/skill-creator` for consistent structure and quality
 
 ```
 skills/
-├── create-issue.md        # /create-issue skill definition
-├── resolve-issue.md       # /resolve-issue skill definition
-├── triage-issues.md       # /triage-issues skill definition
-└── init-gitissue.md       # /init-gitissue skill definition
+├── create-issue/
+│   ├── SKILL.md              # /create-issue skill definition
+│   ├── templates/
+│   │   ├── bug.md
+│   │   ├── feature.md
+│   │   └── improvement.md
+│   └── references/
+│       └── error-messages.md  # Standard error handling
+├── resolve-issue/
+│   ├── SKILL.md              # /resolve-issue skill definition
+│   └── references/
+│       └── error-messages.md
+├── triage-issues/
+│   ├── SKILL.md              # /triage-issues skill definition
+│   └── references/
+│       └── error-messages.md
+└── init-gitissue/
+    ├── SKILL.md              # /init-gitissue skill definition
+    └── references/
+        └── error-messages.md
 ```
 
 Each skill orchestrates:
 - **Read tools** (Glob, Grep, Read) for codebase analysis
-- **Bash tool** for `gh` CLI commands (issue creation, PR management)
+- **Bash tool** for `gh` CLI commands (issue creation, PR management) — always using `gh --json` for reliable parsing
 - **Agent tool** for parallel research during resolve pipeline
 - **Write/Edit tools** for code generation during resolution
+
+**Design System**: All skill output follows the CLI Style Guide defined in `DESIGN.md` — consistent symbols, colors, spacing, error format, and progress patterns across all commands.
 
 ### 6.3 Issue Template Engine
 
@@ -589,9 +646,9 @@ Platform Layer
 
 | Service | Purpose | Priority |
 |---------|---------|----------|
-| GitHub CLI (`gh`) | Issue CRUD, PR creation, label management, authentication | Must-have |
+| GitHub CLI (`gh`) | Issue CRUD, PR creation, label management, authentication — always via `--json` for reliable parsing | Must-have |
 | Git | Branch management, commit history, file system access | Must-have |
-| Claude Code | Skill runtime, codebase analysis tools, AI-powered code generation | Must-have |
+| AI Agent Runtime | Any agent supporting SKILL.md standard (Claude Code, Codex CLI, Gemini CLI, Cursor) — provides Read/Grep/Glob/Bash/Agent tools | Must-have |
 | GitLab CLI (`glab`) | GitLab issue/MR management | Could-have |
 
 ---
@@ -770,3 +827,4 @@ Not applicable for MVP — gitissue is a CLI tool. Future versions may include:
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
 | 1.0 | 2026-03-19 | — | Initial PRD draft |
+| 1.1 | 2026-03-20 | — | Post-review update: incorporated decisions from CEO review (HOLD SCOPE), Eng review, and Design review. Added: backup-first normalization, prompt injection boundary, assignment/label guards, test timeout config, security issue protection, cross-agent skill architecture (isolated components), `gh --json` convention, rich error format, CLI Style Guide (DESIGN.md), first-run experience, warm empty states. |
