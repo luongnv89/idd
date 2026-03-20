@@ -84,27 +84,21 @@ For each image path provided:
 
 2. **Upload via GitHub API** — use the repository contents API to commit the image to `.github/issue-assets/`:
    ```bash
-   # Base64-encode the image
-   base64_content=$(base64 < "{image_path}")
+   # Base64-encode the image (cross-platform: try Linux -w0 flag first, fall back to macOS)
+   base64_content=$(base64 -w0 < "{image_path}" 2>/dev/null || base64 < "{image_path}")
 
    # Generate a unique filename: timestamp + original name
    filename="$(date +%Y%m%d%H%M%S)-{original_filename}"
 
-   # Upload via gh api
-   gh api repos/{owner}/{repo}/contents/.github/issue-assets/{filename} \
-     --method PUT \
-     --field message="Upload image for issue: {filename}" \
-     --field content="$base64_content"
-   ```
-
-3. **Extract the URL** — the API response includes `download_url`. Use this for the markdown embed. Parse the response:
-   ```bash
-   gh api repos/{owner}/{repo}/contents/.github/issue-assets/{filename} \
+   # Upload via gh api and capture the download URL
+   download_url=$(gh api repos/{owner}/{repo}/contents/.github/issue-assets/{filename} \
      --method PUT \
      --field message="Upload image for issue: {filename}" \
      --field content="$base64_content" \
-     --jq '.content.download_url'
+     --jq '.content.download_url')
    ```
+
+3. **Extract the URL** — the upload command in Step 2 already captures `download_url` via `--jq`. Verify it is non-empty before proceeding. If empty, treat as an upload failure.
 
 4. **Build the markdown** — create an image embed for each uploaded file:
    ```markdown
@@ -244,8 +238,8 @@ Read the appropriate template from `templates/` (bug.md, feature.md, or improvem
 1. **Type** — classified type
 2. **Context** — affected files with confidence levels, current behavior (bugs), related components, related issues
 3. **Description** — synthesized from user input, enriched with codebase context
-4. **Screenshots** — embedded images (only if images were provided and uploaded successfully)
-5. **Reporter Context** — user's original text, verbatim, in a blockquote
+4. **Reporter Context** — user's original text, verbatim, in a blockquote
+5. **Screenshots** — embedded images (only if images were provided and uploaded successfully)
 6. **Acceptance Criteria** — 3-5 testable criteria based on the problem and codebase context
 7. **Technical Notes** — architecture constraints from reading affected files, test coverage status, breaking change risk
 8. **Metadata** — suggested priority, estimated effort (XS/S/M/L/XL), suggested labels with confidence levels
