@@ -1,6 +1,10 @@
 ---
 name: issue-triage
+version: 0.1.0
+author: luongnv89
+license: MIT
 description: Triage open GitHub issues by analyzing dependencies, detecting circular references, computing execution order, identifying parallelizable work, flagging stale issues, and suggesting priorities. Persists results to .gitissue/triage.json for cross-session access. Supports update mode (full analysis + persist) and view mode (render cached results without API calls). Use this skill whenever someone says "triage issues", "prioritize issues", "what should I work on next", "issue dependencies", "which issues are blocked", "stale issues", "backlog review", "sprint planning", "dependency graph", "what's blocking", "/issue-triage", "/issue-triage view", "/issue-triage update", or wants to understand the relationship between open issues in a repository. Also trigger when someone asks for a sprint plan, wants to know which issues can be worked on in parallel, needs to identify blocked or stale work, asks "which issue should I pick up", "what order should we resolve these", "show me the last triage", "triage report", or wants to plan their next sprint. This skill reads all open issues, builds a dependency graph from affected files, performs topological sorting, and outputs a structured triage table with priority suggestions, parallelization recommendations, stale warnings, and a suggested resolution order — all via gh CLI with structured JSON output, persisted to .gitissue/triage.json.
+compatibility: Requires git and GitHub CLI (gh) with authentication. View mode (`/issue-triage view`) needs only local file access — no gh required.
 ---
 
 # /issue-triage
@@ -105,6 +109,8 @@ Triage settings and defaults:
 | `triage.stale_threshold_days` | `14` | Flag issues with no activity beyond this many days |
 | `triage.auto_priority` | `true` | Suggest P1/P2/P3 based on type, age, and dependency position |
 | `triage.include_closed` | `false` | Include recently closed issues in triage analysis |
+
+If the config file exists but contains invalid values, output the validation error from `references/error-messages.md` and stop.
 
 Do not re-read the config at each step.
 
