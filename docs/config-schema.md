@@ -19,7 +19,7 @@ platform: github
 
 # Issue creation and normalization settings
 issue:
-  # Auto-normalize issues in /resolve-issue before resolution
+  # Auto-normalize issues in /issue-resolver before resolution
   # Type: boolean
   # Default: true
   auto_normalize: true
@@ -120,7 +120,7 @@ Config is validated on load at the start of every skill invocation. Errors inclu
 | Setting | Default | Description |
 |---------|---------|-------------|
 | `platform` | `github` | Platform for issue management |
-| `issue.auto_normalize` | `true` | Auto-normalize in /resolve-issue |
+| `issue.auto_normalize` | `true` | Auto-normalize in /issue-resolver |
 | `issue.template` | `default` | Built-in templates |
 | `issue.labels_auto_suggest` | `true` | Suggest labels from content |
 | `issue.normalize_comment` | `true` | Comment on normalization |

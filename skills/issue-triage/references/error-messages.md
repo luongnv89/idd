@@ -1,4 +1,4 @@
-# Error Messages — /triage-issues
+# Error Messages — /issue-triage
 
 All errors follow the rich error format: what went wrong + fix command + docs link.
 
@@ -32,14 +32,14 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 ### No open issues
 ```
 ○ No open issues found. Nothing to triage!
-  Create issues with /create-issue to get started.
+  Create issues with /issue-creator to get started.
 ```
 
 ### Too many issues
 ```
 ⚠ {count} open issues found. Analyzing first {limit}.
 
-  To analyze all: /triage-issues --limit {count}
+  To analyze all: /issue-triage --limit {count}
 ```
 
 ### Circular dependencies

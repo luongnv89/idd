@@ -4,8 +4,8 @@
 
 Introduce a new software development methodology called **Issue-Driven Development (IDD)**, more adapted to brownfield projects than greenfield. The core workflow is two commands:
 
-- `/create-issue` — Create structured, codebase-aware issues (supports batch creation from screenshots, text, docs)
-- `/resolve-issue [number]` — Pick up an issue and work through research → plan → code → PR
+- `/issue-creator` — Create structured, codebase-aware issues (supports batch creation from screenshots, text, docs)
+- `/issue-resolver [number]` — Pick up an issue and work through research → plan → code → PR
 
 This workflow is tightly integrated with GitHub/GitLab issue management — no extra layer.
 
@@ -16,12 +16,12 @@ IDD treats GitHub issues as the **atomic unit of all development work**. Every c
 The system is **agent-agnostic** — the same structured issue can be resolved by Claude Code, Codex, Devin, a human developer, or any future agent. No vendor lock-in.
 
 ### Key Design Decisions
-- **Templates**: Start minimal, but handle messy human-filed issues via auto-normalization (`/create-issue 42` enriches existing issue #42)
+- **Templates**: Start minimal, but handle messy human-filed issues via auto-normalization (`/issue-creator 42` enriches existing issue #42)
 - **Approval gates**: Configurable — auto-proceed by default, comment-and-wait for teams
-- **Existing issues**: `/resolve-issue` works on any issue; auto-normalizes if needed
+- **Existing issues**: `/issue-resolver` works on any issue; auto-normalizes if needed
 - **Platform**: GitHub first, GitLab second, core logic platform-agnostic
 - **Batch creation**: Supports extraction from screenshots, emails, planning docs (like github-issue-creator skill)
-- **Triage**: `/triage-issues` generates dependency tables, priority ordering, stale detection
+- **Triage**: `/issue-triage` generates dependency tables, priority ordering, stale detection
 - **Plan phase**: Stays local (not posted as issue comment)
 
 ## Target Audience
@@ -34,13 +34,13 @@ The system is **agent-agnostic** — the same structured issue can be resolved b
 ## Goals & Objectives
 
 - **Primary**: Establish IDD as a recognized methodology for brownfield development
-- **MVP Goal**: Working `/create-issue` and `/resolve-issue` skills that integrate with GitHub
+- **MVP Goal**: Working `/issue-creator` and `/issue-resolver` skills that integrate with GitHub
 - **6-month Goal**: Community adoption, GitLab support, triage capabilities
 - **12-month Goal**: Recognized as a standard approach for AI-agent-compatible issue workflows
 
 ### Success Metrics
 - Issues created via GitIssue have higher first-PR-merge rate than manually created issues
-- Time from issue creation to PR is measurably shorter with `/resolve-issue`
+- Time from issue creation to PR is measurably shorter with `/issue-resolver`
 - At least 3 different AI agents can consume GitIssue-formatted issues without modification
 
 ## Technical Context
@@ -50,27 +50,27 @@ The system is **agent-agnostic** — the same structured issue can be resolved b
 - **Budget**: Side project / open-source
 - **Existing Assets**:
   - `github-issue-creator` skill (batch issue creation from screenshots/text)
-  - Claude Code skill system (for `/create-issue` and `/resolve-issue`)
+  - Claude Code skill system (for `/issue-creator` and `/issue-resolver`)
   - `gh` CLI for GitHub API interaction
 
 ## The Four Commands
 
 ```
-/create-issue          — Create new structured issue(s) from text, screenshot, or batch input
-/create-issue 42       — Normalize an existing issue (enrich with codebase context)
-/resolve-issue 42      — Branch → research → plan → code → PR
-/triage-issues         — Review open issues: prioritize, detect deps, suggest execution order
+/issue-creator          — Create new structured issue(s) from text, screenshot, or batch input
+/issue-creator 42       — Normalize an existing issue (enrich with codebase context)
+/issue-resolver 42      — Branch → research → plan → code → PR
+/issue-triage         — Review open issues: prioritize, detect deps, suggest execution order
 ```
 
 ## Discussion Notes
 
 ### Issue Normalization Flow
 ```
-Human files issue via GitHub UI     AI creates via /create-issue
+Human files issue via GitHub UI     AI creates via /issue-creator
   │ (messy, unstructured)              │ (already structured)
   └──────────┬─────────────────────────┘
              │
-     /resolve-issue 42
+     /issue-resolver 42
              │
        ┌─────▼──────┐
        │ Is this     │── Yes ──→ Proceed to resolve
@@ -78,7 +78,7 @@ Human files issue via GitHub UI     AI creates via /create-issue
        └─────┬───────┘
              No
              │
-     Auto-run /create-issue 42
+     Auto-run /issue-creator 42
      (enrich with codebase context)
              │
        Update issue in-place
@@ -88,7 +88,7 @@ Human files issue via GitHub UI     AI creates via /create-issue
 
 ### Resolve Pipeline
 ```
-resolve-issue 42
+issue-resolver 42
   │
   ├── 1. Fetch issue from GitHub
   ├── 2. Create branch (issue-42/short-description)
@@ -117,4 +117,4 @@ triage:
 ```
 
 ### The IDD Pitch
-Issue-Driven Development treats GitHub issues as the single source of truth for all development work. Two commands — /create-issue and /resolve-issue — form a complete workflow that works for humans and AI agents alike. Issues are automatically enriched with codebase context, structured with consistent templates, and resolved through a research-plan-execute pipeline that produces atomic PRs. No extra tools, no sync overhead, no translation layer. The issue is the spec. The code is the delivery. Git tracks everything in between.
+Issue-Driven Development treats GitHub issues as the single source of truth for all development work. Two commands — /issue-creator and /issue-resolver — form a complete workflow that works for humans and AI agents alike. Issues are automatically enriched with codebase context, structured with consistent templates, and resolved through a research-plan-execute pipeline that produces atomic PRs. No extra tools, no sync overhead, no translation layer. The issue is the spec. The code is the delivery. Git tracks everything in between.

@@ -13,7 +13,7 @@ Generated from PRD v1.1 and review decisions on 2026-03-20.
   - [x] `README.md` — quick-start guide, installation, usage
   - [x] `LICENSE` — MIT
   - [x] `.gitissue.yml` schema documentation
-  - [x] Skill folder structure: `skills/create-issue/`, `skills/resolve-issue/`, `skills/triage-issues/`, `skills/init-gitissue/`
+  - [x] Skill folder structure: `skills/issue-creator/`, `skills/issue-resolver/`, `skills/issue-triage/`, `skills/init-gitissue/`
 - **Notes**: Each skill is a self-contained, isolated component in its own folder. Use `/skill-creator` for building each skill.
 - **Depends on**: —
 
@@ -22,9 +22,9 @@ Generated from PRD v1.1 and review decisions on 2026-03-20.
 - **Priority**: P0 (blocker for F1, F2)
 - **Description**: Create the 3 default issue templates: bug, feature, improvement. Templates must render cleanly in GitHub's web UI.
 - **Deliverables**:
-  - [x] `skills/create-issue/templates/bug.md`
-  - [x] `skills/create-issue/templates/feature.md`
-  - [x] `skills/create-issue/templates/improvement.md`
+  - [x] `skills/issue-creator/templates/bug.md`
+  - [x] `skills/issue-creator/templates/feature.md`
+  - [x] `skills/issue-creator/templates/improvement.md`
   - [x] Normalization marker: `<!-- gitissue:normalized v1 -->`
   - [x] Template sections: Type, Context (affected files, current behavior, related issues), Description, Acceptance Criteria, Technical Notes, Metadata
   - [x] Reporter Context blockquote for preserved original text
@@ -45,13 +45,13 @@ Generated from PRD v1.1 and review decisions on 2026-03-20.
 - **Notes**: Config is loaded ONCE at the start of every skill, not re-read at each step.
 - **Depends on**: —
 
-### Task 1.4: `/create-issue` skill (F1)
+### Task 1.4: `/issue-creator` skill (F1)
 - **Status**: DONE
 - **Priority**: P1
-- **Description**: Build the `/create-issue` skill for creating new structured issues from text/screenshot/batch input. Use `/skill-creator`.
+- **Description**: Build the `/issue-creator` skill for creating new structured issues from text/screenshot/batch input. Use `/skill-creator`.
 - **Deliverables**:
-  - [x] `skills/create-issue/SKILL.md`
-  - [x] `skills/create-issue/references/error-messages.md`
+  - [x] `skills/issue-creator/SKILL.md`
+  - [x] `skills/issue-creator/references/error-messages.md`
   - [x] Single issue creation from text description
   - [x] Codebase scanning for relevant files (keywords, component names, error messages)
   - [x] Auto-classification: bug/feature/improvement
@@ -65,10 +65,10 @@ Generated from PRD v1.1 and review decisions on 2026-03-20.
 - **Acceptance Criteria**: All F1 acceptance criteria from PRD met.
 - **Depends on**: Task 1.2, Task 1.3
 
-### Task 1.5: `/create-issue N` normalization skill (F2)
+### Task 1.5: `/issue-creator N` normalization skill (F2)
 - **Status**: DONE
 - **Priority**: P1
-- **Description**: Add normalization mode to the create-issue skill. Enriches existing unstructured issues with codebase context.
+- **Description**: Add normalization mode to the issue-creator skill. Enriches existing unstructured issues with codebase context.
 - **Deliverables**:
   - [x] Normalization detection via `<!-- gitissue:normalized v1 -->` marker
   - [x] Security label check — skip for 'security', 'CVE', 'vulnerability' unless `--force`
@@ -86,7 +86,7 @@ Generated from PRD v1.1 and review decisions on 2026-03-20.
 ### Task 1.6: Phase 1 integration testing
 - **Status**: DONE
 - **Priority**: P1
-- **Description**: Create scripted smoke tests for create-issue and normalization flows.
+- **Description**: Create scripted smoke tests for issue-creator and normalization flows.
 - **Deliverables**:
   - [x] `tests/` directory with shell scripts
   - [x] Test: create issue from one-sentence description → verify structured issue created
@@ -104,13 +104,13 @@ Generated from PRD v1.1 and review decisions on 2026-03-20.
 
 ## Sprint 2: Resolution (v0.2.0) — Target: 2026-04-16
 
-### Task 2.1: `/resolve-issue N` skill (F4)
+### Task 2.1: `/issue-resolver N` skill (F4)
 - **Status**: TODO
 - **Priority**: P1
 - **Description**: Build the full resolution pipeline skill: fetch → guards → normalize → branch → research → plan → execute → verify → ship.
 - **Deliverables**:
-  - [ ] `skills/resolve-issue/SKILL.md`
-  - [ ] `skills/resolve-issue/references/error-messages.md`
+  - [ ] `skills/issue-resolver/SKILL.md`
+  - [ ] `skills/issue-resolver/references/error-messages.md`
   - [ ] Guard checks: assignment + blocking labels → warn before proceeding
   - [ ] Auto-normalization when `auto_normalize: true`
   - [ ] Branch creation: `issue-N/short-description`
@@ -131,7 +131,7 @@ Generated from PRD v1.1 and review decisions on 2026-03-20.
 ### Task 2.2: Batch issue creation (F7)
 - **Status**: TODO
 - **Priority**: P2
-- **Description**: Add batch mode to `/create-issue` — extract multiple issues from text, screenshots, or documents.
+- **Description**: Add batch mode to `/issue-creator` — extract multiple issues from text, screenshots, or documents.
 - **Deliverables**:
   - [ ] Multi-item extraction with boundary detection
   - [ ] Screenshot/image input support
@@ -161,13 +161,13 @@ Generated from PRD v1.1 and review decisions on 2026-03-20.
 
 ## Sprint 3: Triage & Polish (v0.3.0) — Target: 2026-04-30
 
-### Task 3.1: `/triage-issues` skill (F6)
+### Task 3.1: `/issue-triage` skill (F6)
 - **Status**: TODO
 - **Priority**: P2
 - **Description**: Build the triage skill: dependency analysis, priority suggestions, stale detection, execution order.
 - **Deliverables**:
-  - [ ] `skills/triage-issues/SKILL.md`
-  - [ ] `skills/triage-issues/references/error-messages.md`
+  - [ ] `skills/issue-triage/SKILL.md`
+  - [ ] `skills/issue-triage/references/error-messages.md`
   - [ ] Fetch all open issues via `gh issue list --json` (bodies included, avoid N+1)
   - [ ] Dependency detection via shared affected files and module dependencies
   - [ ] Dependency table: `# | Issue | Pri | Blocks | Status`

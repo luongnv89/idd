@@ -1,4 +1,4 @@
-# Error Messages — /resolve-issue
+# Error Messages — /issue-resolver
 
 All errors follow the rich error format: what went wrong + fix command + docs link.
 
@@ -120,5 +120,5 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 ✗ Branch has merge conflicts with {base_branch}
 
   To fix:  git rebase {base_branch} and resolve conflicts
-  Then:    /resolve-issue N (to resume from verify phase)
+  Then:    /issue-resolver N (to resume from verify phase)
 ```

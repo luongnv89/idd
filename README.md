@@ -28,9 +28,9 @@ Add to your project's `.claude/settings.json`:
 ```json
 {
   "skills": [
-    "./skills/create-issue",
-    "./skills/resolve-issue",
-    "./skills/triage-issues",
+    "./skills/issue-creator",
+    "./skills/issue-resolver",
+    "./skills/issue-triage",
     "./skills/init-gitissue"
   ]
 }
@@ -40,16 +40,16 @@ Add to your project's `.claude/settings.json`:
 
 ```bash
 # Create a new structured issue from a description
-/create-issue The login page shows a 500 error when using SSO
+/issue-creator The login page shows a 500 error when using SSO
 
 # Normalize an existing messy issue
-/create-issue 42
+/issue-creator 42
 
 # Resolve an issue end-to-end (branch → research → code → PR)
-/resolve-issue 42
+/issue-resolver 42
 
 # Triage open issues — dependencies, priorities, execution order
-/triage-issues
+/issue-triage
 
 # Generate project config
 /init-gitissue
@@ -59,10 +59,10 @@ Add to your project's `.claude/settings.json`:
 
 | Command | Description |
 |---------|-------------|
-| `/create-issue <text>` | Create a structured, codebase-aware issue from a description |
-| `/create-issue <N>` | Normalize existing issue #N with codebase context |
-| `/resolve-issue <N>` | Full resolution pipeline: fetch → branch → research → plan → code → test → PR |
-| `/triage-issues` | Dependency graph, priority suggestions, stale detection, execution order |
+| `/issue-creator <text>` | Create a structured, codebase-aware issue from a description |
+| `/issue-creator <N>` | Normalize existing issue #N with codebase context |
+| `/issue-resolver <N>` | Full resolution pipeline: fetch → branch → research → plan → code → test → PR |
+| `/issue-triage` | Dependency graph, priority suggestions, stale detection, execution order |
 | `/init-gitissue` | Scan repo and generate `.gitissue.yml` with sensible defaults |
 
 ## Configuration
@@ -75,7 +75,7 @@ To customize, create `.gitissue.yml` in your repo root:
 platform: github                # github | gitlab (future)
 
 issue:
-  auto_normalize: true          # auto-normalize in /resolve-issue
+  auto_normalize: true          # auto-normalize in /issue-resolver
   template: default             # default | path to custom template dir
   labels_auto_suggest: true     # auto-suggest labels based on content
   normalize_comment: true       # add comment when normalizing
@@ -109,11 +109,11 @@ The system is **agent-agnostic** — the same structured issue can be resolved b
 ```
 Developer describes a problem
         │
-   /create-issue
+   /issue-creator
         │
    Structured issue with codebase context
         │
-   /resolve-issue N
+   /issue-resolver N
         │
    ┌────┴────────────────────────────┐
    │ Fetch → Branch → Research →     │

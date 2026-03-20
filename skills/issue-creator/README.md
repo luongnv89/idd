@@ -1,4 +1,4 @@
-# Create Issue
+# Issue Creator
 
 > Create structured, codebase-aware GitHub issues — or normalize existing ones with codebase context.
 
@@ -13,9 +13,9 @@
 
 | Say this... | Skill will... |
 |---|---|
-| "/create-issue the login page is broken on mobile" | Scan codebase, create structured bug issue with affected files and acceptance criteria |
-| "/create-issue 42" | Fetch issue #42, enrich with codebase context, preserve original text in backup |
-| "/create-issue 42 --dry-run" | Preview what normalization would add without changing anything |
+| "/issue-creator the login page is broken on mobile" | Scan codebase, create structured bug issue with affected files and acceptance criteria |
+| "/issue-creator 42" | Fetch issue #42, enrich with codebase context, preserve original text in backup |
+| "/issue-creator 42 --dry-run" | Preview what normalization would add without changing anything |
 | "file a bug about the checkout timeout" | Create a structured bug issue from the description |
 
 ## How It Works
@@ -47,10 +47,10 @@ graph TD
 ## Usage
 
 ```
-/create-issue <description>        # New issue from text
-/create-issue <N>                  # Normalize existing issue
-/create-issue <N> --dry-run        # Preview normalization
-/create-issue <N> --force          # Normalize security-labeled issue
+/issue-creator <description>        # New issue from text
+/issue-creator <N>                  # Normalize existing issue
+/issue-creator <N> --dry-run        # Preview normalization
+/issue-creator <N> --force          # Normalize security-labeled issue
 ```
 
 ## Resources

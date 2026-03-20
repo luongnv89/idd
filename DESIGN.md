@@ -64,14 +64,14 @@ Rules:
 
 ## Progress Patterns
 
-**Multi-step pipeline** (resolve-issue):
+**Multi-step pipeline** (issue-resolver):
 ```
   [1/7] Fetch        ✓ issue #42 loaded
   [2/7] Branch       ✓ issue-42/fix-auth
   [3/7] Research     ● reading 5 files...
 ```
 
-**Single operation** (create-issue):
+**Single operation** (issue-creator):
 ```
   ● Scanning codebase...
 ```
@@ -139,7 +139,7 @@ Every empty state has warmth and a next action:
 | Scenario | Output |
 |----------|--------|
 | No files identified | `⚠ Could not identify affected files. Issue created with manual-review flag. Tip: mention specific filenames for better results.` |
-| No open issues (triage) | `○ No open issues found. Nothing to triage! Create issues with /create-issue to get started.` |
+| No open issues (triage) | `○ No open issues found. Nothing to triage! Create issues with /issue-creator to get started.` |
 | Already normalized | `✓ Issue #42 is already normalized (v1, 2026-03-15). No changes needed.` |
 | Issue not found | `✗ Issue #42 not found\n\n  To fix: gh issue list\n  Check: is this the right repository?` |
 
@@ -156,7 +156,7 @@ Normalized issues must render cleanly in GitHub's web UI:
 
 ## Terminal Output Mockups
 
-### /create-issue (single)
+### /issue-creator (single)
 
 ```
   ● Scanning codebase...
@@ -174,7 +174,7 @@ Normalized issues must render cleanly in GitHub's web UI:
     https://github.com/user/repo/issues/42
 ```
 
-### /create-issue N (normalize)
+### /issue-creator N (normalize)
 
 ```
   ● Fetching issue #42...
@@ -195,7 +195,7 @@ Normalized issues must render cleanly in GitHub's web UI:
     https://github.com/user/repo/issues/42
 ```
 
-### /resolve-issue N
+### /issue-resolver N
 
 ```
   ● Fetching issue #42...
@@ -216,7 +216,7 @@ Normalized issues must render cleanly in GitHub's web UI:
     Closes #42
 ```
 
-### /triage-issues
+### /issue-triage
 
 ```
   ● Fetching 23 open issues...

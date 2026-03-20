@@ -10,7 +10,7 @@ Updated from /plan-design-review on 2026-03-20.
 - **What:** Add `resolve.test_timeout` to `.gitissue.yml` schema (default: 300s). During verify phase, abort and report if tests don't complete within timeout.
 - **Why:** Tests can hang indefinitely (infinite loops, network waits), leaving the resolve pipeline stuck with no feedback. A timeout converts a silent failure into a visible one.
 - **Effort:** S (human: ~4 hours / CC: ~10 min)
-- **Depends on:** F4 (resolve-issue) implementation
+- **Depends on:** F4 (issue-resolver) implementation
 - **Context:** Add to config schema: `resolve.test_timeout: 300`. Skill instructs agent to use Bash timeout parameter.
 
 ### Use `gh --json` everywhere (convention)

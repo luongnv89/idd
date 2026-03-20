@@ -1,9 +1,9 @@
 ---
-name: create-issue
-description: Create structured GitHub issues from text, screenshots, or images, and normalize existing unstructured issues with codebase context. Use this skill whenever someone says "create issue", "file a bug", "report a feature request", "normalize issue", "enrich issue", "structure this issue", "/create-issue", or describes a bug, feature, or improvement they want tracked. Also use when someone shares an issue number and wants it cleaned up or enriched, or when pasting a screenshot of a bug. Even if the user just describes a problem without saying "issue", this skill turns it into a structured, codebase-aware GitHub issue with affected files, acceptance criteria, and labels via gh CLI.
+name: issue-creator
+description: Create structured GitHub issues from text, screenshots, or images, and normalize existing unstructured issues with codebase context. Use this skill whenever someone says "create issue", "file a bug", "report a feature request", "normalize issue", "enrich issue", "structure this issue", "/issue-creator", or describes a bug, feature, or improvement they want tracked. Also use when someone shares an issue number and wants it cleaned up or enriched, or when pasting a screenshot of a bug. Even if the user just describes a problem without saying "issue", this skill turns it into a structured, codebase-aware GitHub issue with affected files, acceptance criteria, and labels via gh CLI.
 ---
 
-# /create-issue
+# /issue-creator
 
 Create structured, codebase-aware GitHub issues — or normalize existing ones with codebase context.
 
@@ -13,10 +13,10 @@ Two modes: **Create** (new issue from text/image) and **Normalize** (enrich exis
 
 | Invocation | Mode | What happens |
 |------------|------|--------------|
-| `/create-issue <text>` | Create | New structured issue from a text description |
-| `/create-issue <N>` | Normalize | Enrich existing issue #N with codebase context |
-| `/create-issue <N> --dry-run` | Preview | Show normalization preview without applying |
-| `/create-issue <N> --force` | Force | Normalize even if security-labeled |
+| `/issue-creator <text>` | Create | New structured issue from a text description |
+| `/issue-creator <N>` | Normalize | Enrich existing issue #N with codebase context |
+| `/issue-creator <N> --dry-run` | Preview | Show normalization preview without applying |
+| `/issue-creator <N> --force` | Force | Normalize even if security-labeled |
 
 Detect mode: if the argument is a number → Normalize. If text → Create.
 
@@ -191,7 +191,7 @@ If found and `--force` not used:
 ⚠ Issue #42 has a security label (security). Skipping normalization.
   Codebase context could reveal exploit details.
 
-  To override: /create-issue 42 --force
+  To override: /issue-creator 42 --force
 ```
 Stop.
 
@@ -295,7 +295,7 @@ gh issue edit {N} --add-label "{label1},{label2}"
 
 ## Example: Create from a vague description
 
-**User says:** `/create-issue the checkout page is broken on Safari`
+**User says:** `/issue-creator the checkout page is broken on Safari`
 
 1. Parse → keywords: "checkout", "broken", "Safari"; type: bug
 2. Scan → Grep finds `src/checkout/payment.js` mentions "Safari", Glob finds `src/checkout/` directory

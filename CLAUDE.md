@@ -10,14 +10,14 @@ This is a **skills-only** project. There is no runtime code — each skill is a 
 
 ```
 skills/
-├── create-issue/       # /create-issue and /create-issue N (normalization)
+├── issue-creator/      # /issue-creator and /issue-creator N (normalization)
 │   ├── SKILL.md
 │   ├── templates/      # Issue templates (bug, feature, improvement)
 │   └── references/     # Error messages, detailed patterns
-├── resolve-issue/      # /resolve-issue N
+├── issue-resolver/     # /issue-resolver N
 │   ├── SKILL.md
 │   └── references/
-├── triage-issues/      # /triage-issues
+├── issue-triage/       # /issue-triage
 │   ├── SKILL.md
 │   └── references/
 └── init-gitissue/      # /init-gitissue
@@ -50,6 +50,7 @@ skills/
 - `.gitissue.yml` loaded ONCE at skill start, not re-read at each step
 - Zero-config: all defaults applied when no config file exists
 - First-run hint: `○ First run — using default config. Run /init-gitissue to customize.`
+
 
 ### Skills
 - Each skill follows the skill-creator standard (frontmatter with name/description, progressive disclosure)

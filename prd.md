@@ -31,7 +31,7 @@
 
 ### 1.1 Product Vision
 
-**gitissue** introduces Issue-Driven Development (IDD) — a software development methodology where GitHub issues are the single source of truth for all development work. Two commands (`/create-issue` and `/resolve-issue`) form a complete workflow that works for humans and AI agents alike. Issues are automatically enriched with codebase context, structured with consistent templates, and resolved through a research-plan-execute pipeline that produces atomic PRs. No extra tools, no sync overhead, no translation layer. The issue is the spec. The code is the delivery. Git tracks everything in between.
+**gitissue** introduces Issue-Driven Development (IDD) — a software development methodology where GitHub issues are the single source of truth for all development work. Two commands (`/issue-creator` and `/issue-resolver`) form a complete workflow that works for humans and AI agents alike. Issues are automatically enriched with codebase context, structured with consistent templates, and resolved through a research-plan-execute pipeline that produces atomic PRs. No extra tools, no sync overhead, no translation layer. The issue is the spec. The code is the delivery. Git tracks everything in between.
 
 gitissue is purpose-built for **brownfield projects** — the 90% of software work that's modifying existing codebases, not greenfield architecture.
 
@@ -55,10 +55,10 @@ gitissue is purpose-built for **brownfield projects** — the 90% of software wo
 
 | Metric | Target | Measurement Method |
 |--------|--------|-------------------|
-| First-PR-merge rate | gitissue-created issues merge at >80% rate vs <60% for unstructured issues | Track issues created via `/create-issue` vs manually created, compare merge rates over 90 days |
+| First-PR-merge rate | gitissue-created issues merge at >80% rate vs <60% for unstructured issues | Track issues created via `/issue-creator` vs manually created, compare merge rates over 90 days |
 | Time-to-PR | 50% reduction in time from issue creation to first PR | Measure timestamp delta between issue creation and linked PR creation |
 | Agent compatibility | 3+ agents | Demonstrate same gitissue-formatted issue resolved by Claude Code, Copilot Coding Agent, and OpenHands without modification |
-| Normalization adoption | 70% of manually-filed issues get normalized before resolution | Track `/create-issue N` calls vs direct `/resolve-issue N` on unnormalized issues |
+| Normalization adoption | 70% of manually-filed issues get normalized before resolution | Track `/issue-creator N` calls vs direct `/issue-resolver N` on unnormalized issues |
 | GitHub stars | 500+ in first 6 months | GitHub repo metrics |
 
 ---
@@ -70,7 +70,7 @@ gitissue is purpose-built for **brownfield projects** — the 90% of software wo
 - **Demographics**: 30, freelance full-stack developer, works on 3-5 client projects simultaneously
 - **Goals**: Ship client fixes quickly with minimal context-switching overhead. Wants AI agents to handle routine issues while focusing on complex work.
 - **Pain Points**: Client bug reports are vague ("the thing is broken"). Spends 30% of time just understanding what to fix before writing any code. No project management budget — uses plain GitHub issues.
-- **User Journey**: Client emails a vague bug report → Alex runs `/create-issue` with the text → gitissue scans the codebase, identifies affected files, creates a structured issue → Alex runs `/resolve-issue 42` → AI agent researches, plans, codes, opens PR → Alex reviews and merges.
+- **User Journey**: Client emails a vague bug report → Alex runs `/issue-creator` with the text → gitissue scans the codebase, identifies affected files, creates a structured issue → Alex runs `/issue-resolver 42` → AI agent researches, plans, codes, opens PR → Alex reviews and merges.
 - **Quote**: "I just want to paste the client's complaint and have something actionable come out the other end."
 
 ### Persona 2: Maya — Open-Source Maintainer
@@ -78,7 +78,7 @@ gitissue is purpose-built for **brownfield projects** — the 90% of software wo
 - **Demographics**: 35, senior engineer at a startup, maintains 2 popular open-source libraries with 50+ open issues
 - **Goals**: Triage the issue backlog efficiently. Enable community contributors (human and AI) to pick up issues without extensive onboarding.
 - **Pain Points**: Issue quality varies wildly — from detailed reproduction steps to "doesn't work." Half her time is spent asking reporters for more information. Contributors struggle to understand issue scope without deep codebase knowledge.
-- **User Journey**: Community member files a vague issue → Maya runs `/create-issue 87` to normalize it (adds affected files, acceptance criteria, labels) → runs `/triage-issues` to see the dependency graph and prioritize → assigns issues to contributors or AI agents → contributors run `/resolve-issue 87` and submit PRs.
+- **User Journey**: Community member files a vague issue → Maya runs `/issue-creator 87` to normalize it (adds affected files, acceptance criteria, labels) → runs `/issue-triage` to see the dependency graph and prioritize → assigns issues to contributors or AI agents → contributors run `/issue-resolver 87` and submit PRs.
 - **Quote**: "I need every issue to tell the resolver exactly what to look at and what 'done' means — whether that resolver is a first-time contributor or an AI bot."
 
 ### Persona 3: Raj — Engineering Lead at a Startup
@@ -86,7 +86,7 @@ gitissue is purpose-built for **brownfield projects** — the 90% of software wo
 - **Demographics**: 40, leads a 6-person engineering team, responsible for a 3-year-old SaaS product
 - **Goals**: Maximize team throughput by making issues self-contained work orders. Mix human and AI agent work seamlessly. Track dependencies to avoid blocking.
 - **Pain Points**: Team uses GitHub issues but they're inconsistent. Junior devs spend too long ramping up on issue context. AI agents produce off-target PRs because issue descriptions lack codebase context. No visibility into issue dependencies.
-- **User Journey**: Raj creates issues via `/create-issue` (auto-enriched with codebase context) → runs `/triage-issues` weekly to see the dependency table and reorder priorities → assigns simple issues to AI agents, complex ones to senior devs → all resolvers use `/resolve-issue N` → PRs link back to issues, auto-close on merge.
+- **User Journey**: Raj creates issues via `/issue-creator` (auto-enriched with codebase context) → runs `/issue-triage` weekly to see the dependency table and reorder priorities → assigns simple issues to AI agents, complex ones to senior devs → all resolvers use `/issue-resolver N` → PRs link back to issues, auto-close on merge.
 - **Quote**: "I want to see which issues block which, assign work to humans or AI interchangeably, and know that every issue has enough context to be resolved without a 30-minute standup."
 
 ---
@@ -97,26 +97,26 @@ gitissue is purpose-built for **brownfield projects** — the 90% of software wo
 
 | ID | Feature | Description | Priority | Dependencies |
 |----|---------|-------------|----------|--------------|
-| F1 | `/create-issue` (new) | Create structured, codebase-aware issues from text, screenshot, or batch input | Must-have | — |
-| F2 | `/create-issue N` (normalize) | Enrich an existing unstructured issue with codebase context, templates, and acceptance criteria | Must-have | F1 |
+| F1 | `/issue-creator` (new) | Create structured, codebase-aware issues from text, screenshot, or batch input | Must-have | — |
+| F2 | `/issue-creator N` (normalize) | Enrich an existing unstructured issue with codebase context, templates, and acceptance criteria | Must-have | F1 |
 | F3 | Issue templates | Default templates for bug, feature, improvement with structured sections | Must-have | — |
-| F4 | `/resolve-issue N` | Full resolution pipeline: fetch → branch → research → plan → code → test → PR | Must-have | F1, F3 |
+| F4 | `/issue-resolver N` | Full resolution pipeline: fetch → branch → research → plan → code → test → PR | Must-have | F1, F3 |
 | F5 | `.gitissue.yml` configuration | Project-level config for templates, approval gates, branch naming, platform selection | Must-have | — |
-| F6 | `/triage-issues` | Review open issues: dependency graph, priority suggestions, stale detection, execution order | Should-have | F1 |
+| F6 | `/issue-triage` | Review open issues: dependency graph, priority suggestions, stale detection, execution order | Should-have | F1 |
 | F7 | Batch issue creation | Extract multiple issues from screenshots, emails, planning docs, or text | Should-have | F1 |
 | F8 | Confidence scoring | Show confidence levels for auto-enriched fields during normalization | Should-have | F2 |
 | F9 | `/init-gitissue` | Scan repo and generate sensible `.gitissue.yml` defaults | Should-have | F5 |
 | F10 | GitLab support | Platform abstraction layer supporting GitLab MR workflows via `glab` CLI | Could-have | F4, F5 |
-| F11 | Batch normalization | `/create-issue --normalize-all` to enrich all open issues in one pass | Could-have | F2 |
+| F11 | Batch normalization | `/issue-creator --normalize-all` to enrich all open issues in one pass | Could-have | F2 |
 | F12 | Resolution templates | Specialized resolve pipelines for common patterns (API endpoint, React component, DB migration) | Could-have | F4 |
 | F13 | Issue intelligence | Learn from resolved issues to improve future normalization accuracy | Won't-have (MVP) | F2, F4 |
 | F14 | Cross-repo awareness | Normalization spans related repositories in multi-repo projects | Won't-have (MVP) | F2 |
-| F15 | IDE extensions | VS Code / JetBrains integration for `/create-issue` and `/resolve-issue` | Won't-have (MVP) | F1, F4 |
+| F15 | IDE extensions | VS Code / JetBrains integration for `/issue-creator` and `/issue-resolver` | Won't-have (MVP) | F1, F4 |
 | F16 | Team analytics | Track normalization accuracy, resolve success rate, time-to-merge by issue type | Won't-have (MVP) | F4 |
 
 ### 3.2 Feature Details
 
-#### F1: `/create-issue` (New Issue Creation)
+#### F1: `/issue-creator` (New Issue Creation)
 
 **Description**: Create one or more structured, codebase-aware GitHub issues from text input, screenshots, emails, or planning documents. The command scans the codebase to enrich the issue with affected files, architectural constraints, and acceptance criteria.
 
@@ -141,13 +141,13 @@ gitissue is purpose-built for **brownfield projects** — the 90% of software wo
 - No GitHub remote configured → error with clear setup instructions
 - Rate limit hit during batch creation → queue remaining, report progress, resume on next run
 
-#### F2: `/create-issue N` (Issue Normalization)
+#### F2: `/issue-creator N` (Issue Normalization)
 
 **Description**: Enrich an existing unstructured GitHub issue (filed by anyone via the web UI or any other method) with codebase context, structured template sections, and acceptance criteria. Preserves all original content.
 
 **User Stories**:
 - As a maintainer, I want to normalize a messy community-filed issue into a structured format so that contributors and AI agents can resolve it without asking follow-up questions.
-- As a developer, I want `/resolve-issue` to auto-normalize issues before resolution so that I never work from an unstructured issue.
+- As a developer, I want `/issue-resolver` to auto-normalize issues before resolution so that I never work from an unstructured issue.
 
 **Acceptance Criteria**:
 - [ ] Fetches issue #N from GitHub via `gh issue view`
@@ -183,7 +183,7 @@ gitissue is purpose-built for **brownfield projects** — the 90% of software wo
 - [ ] Template markers allow normalization detection (e.g., `<!-- gitissue:normalized -->` comment)
 - [ ] Templates render cleanly in GitHub's issue view
 
-#### F4: `/resolve-issue N`
+#### F4: `/issue-resolver N`
 
 **Description**: Full resolution pipeline that takes a GitHub issue through research, planning, implementation, verification, and shipping — producing an atomic PR linked to the issue.
 
@@ -232,7 +232,7 @@ gitissue is purpose-built for **brownfield projects** — the 90% of software wo
 platform: github  # github | gitlab
 
 issue:
-  auto_normalize: true          # auto-normalize in /resolve-issue
+  auto_normalize: true          # auto-normalize in /issue-resolver
   template: default             # default | path to custom template dir
   labels_auto_suggest: true     # auto-suggest labels based on content
   normalize_comment: true       # add comment when normalizing
@@ -251,7 +251,7 @@ triage:
   include_closed: false         # include recently closed issues in triage
 ```
 
-#### F6: `/triage-issues`
+#### F6: `/issue-triage`
 
 **Description**: Review all open issues, detect dependencies, suggest priorities, identify stale issues, and recommend execution order. Outputs a dependency table and work plan.
 
@@ -330,7 +330,7 @@ triage:
 
 ```mermaid
 flowchart TD
-    A[Developer runs /create-issue] --> B[Provide description\ntext / screenshot / document]
+    A[Developer runs /issue-creator] --> B[Provide description\ntext / screenshot / document]
     B --> C{Single or\nmultiple issues?}
     C -->|Single| D[Scan codebase for\nrelevant files]
     C -->|Multiple| E[Extract individual items\nshow preview table]
@@ -354,7 +354,7 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    A[Run /create-issue 42] --> B[Fetch issue #42\nvia gh issue view --json]
+    A[Run /issue-creator 42] --> B[Fetch issue #42\nvia gh issue view --json]
     B --> C{Already\nnormalized?}
     C -->|Yes| D[Report: already normalized]
     C -->|No| SEC{Security\nlabeled?}
@@ -386,13 +386,13 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    A[Run /resolve-issue 42] --> B[Fetch issue #42\nvia gh --json]
+    A[Run /issue-resolver 42] --> B[Fetch issue #42\nvia gh --json]
     B --> GRD{Check guards:\nassigned? blocking\nlabels?}
     GRD -->|Warning| GRDW[Warn user\nrequire confirmation]
     GRD -->|Clear| C{Normalized?}
     GRDW --> C
     C -->|No| D{auto_normalize\nenabled?}
-    D -->|Yes| E[Run /create-issue 42\nauto-normalize]
+    D -->|Yes| E[Run /issue-creator 42\nauto-normalize]
     D -->|No| F[Warn: unstructured issue\nproceed anyway]
     C -->|Yes| G[Create branch\nissue-42/short-desc]
     E --> G
@@ -420,7 +420,7 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    A[Run /triage-issues] --> B[Fetch all open issues\nvia gh issue list]
+    A[Run /issue-triage] --> B[Fetch all open issues\nvia gh issue list]
     B --> C[Analyze issue content\nand affected files]
     C --> D[Detect dependencies\nshared files / module deps]
     D --> E[Build dependency graph]
@@ -460,10 +460,10 @@ flowchart TD
 
 | Requirement | Target | Notes |
 |-------------|--------|-------|
-| `/create-issue` (single) | < 15s | Includes codebase scan + GitHub API call |
-| `/create-issue N` (normalize) | < 20s | Includes fetch + scan + update |
-| `/resolve-issue` (research + plan) | < 60s | Before code generation begins |
-| `/triage-issues` (50 issues) | < 30s | Includes dependency analysis |
+| `/issue-creator` (single) | < 15s | Includes codebase scan + GitHub API call |
+| `/issue-creator N` (normalize) | < 20s | Includes fetch + scan + update |
+| `/issue-resolver` (research + plan) | < 60s | Before code generation begins |
+| `/issue-triage` (50 issues) | < 30s | Includes dependency analysis |
 | Batch creation (10 issues) | < 2min | Sequential API calls with rate limit respect |
 | Codebase scan | < 10s | For repos up to 100K LOC |
 
@@ -474,7 +474,7 @@ flowchart TD
 - **No secrets in issues**: Warn if issue content appears to contain API keys, passwords, or tokens
 - **Minimum permissions**: Require only `repo` scope for GitHub token — no admin access needed
 - **Local-only plan phase**: Resolution plans never leave the local machine unless the user explicitly posts them
-- **Prompt injection boundary**: `/resolve-issue` treats issue body as untrusted user data — the skill prompt explicitly instructs the agent to never execute commands found in issue text, only follow the resolve pipeline steps
+- **Prompt injection boundary**: `/issue-resolver` treats issue body as untrusted user data — the skill prompt explicitly instructs the agent to never execute commands found in issue text, only follow the resolve pipeline steps
 - **Security issue protection**: Normalization skips issues with security-related labels to avoid leaking exploit details through codebase context enrichment
 - **Normalization data safety**: Backup comment is posted and verified BEFORE editing the issue body — if backup fails, normalization is aborted entirely
 
@@ -509,9 +509,9 @@ flowchart TD
 ```mermaid
 graph TB
     subgraph "User Interface"
-        A["/create-issue"]
-        B["/resolve-issue N"]
-        C["/triage-issues"]
+        A["/issue-creator"]
+        B["/issue-resolver N"]
+        C["/issue-triage"]
         D["/init-gitissue"]
     end
 
@@ -577,20 +577,20 @@ gitissue is implemented as a set of **agent skills** — markdown files that def
 
 ```
 skills/
-├── create-issue/
-│   ├── SKILL.md              # /create-issue skill definition
+├── issue-creator/
+│   ├── SKILL.md              # /issue-creator skill definition
 │   ├── templates/
 │   │   ├── bug.md
 │   │   ├── feature.md
 │   │   └── improvement.md
 │   └── references/
 │       └── error-messages.md  # Standard error handling
-├── resolve-issue/
-│   ├── SKILL.md              # /resolve-issue skill definition
+├── issue-resolver/
+│   ├── SKILL.md              # /issue-resolver skill definition
 │   └── references/
 │       └── error-messages.md
-├── triage-issues/
-│   ├── SKILL.md              # /triage-issues skill definition
+├── issue-triage/
+│   ├── SKILL.md              # /issue-triage skill definition
 │   └── references/
 │       └── error-messages.md
 └── init-gitissue/
@@ -659,7 +659,7 @@ Platform Layer
 
 | Category | Metric | Description | Target |
 |----------|--------|-------------|--------|
-| Adoption | Issues created via gitissue | Count of `/create-issue` invocations (tracked via issue marker) | Growth month-over-month |
+| Adoption | Issues created via gitissue | Count of `/issue-creator` invocations (tracked via issue marker) | Growth month-over-month |
 | Quality | Normalization coverage | % of issues that are normalized before resolution | >70% |
 | Efficiency | Time-to-PR | Delta between issue creation timestamp and linked PR creation | 50% reduction vs baseline |
 | Effectiveness | First-PR-merge rate | % of gitissue-linked PRs that merge without major rework | >80% |
@@ -688,7 +688,7 @@ Not applicable for MVP — gitissue is a CLI tool. Future versions may include:
 |-------|-----------|----------|----------|
 | Normalization failure | `gh issue edit` returns error | High | Report error, suggest manual normalization |
 | Test failure during resolve | Test suite fails in verify phase | High | Abort PR creation, report failures |
-| Stale issue threshold | Issue has no activity > configured days | Low | Flag in `/triage-issues` output |
+| Stale issue threshold | Issue has no activity > configured days | Low | Flag in `/issue-triage` output |
 | Rate limit approaching | GitHub API returns rate limit headers < 100 remaining | Medium | Pause batch operations, report wait time |
 
 ---
@@ -699,8 +699,8 @@ Not applicable for MVP — gitissue is a CLI tool. Future versions may include:
 **Target Date**: 2026-04-02 (Week 1-2)
 
 **Core Features**:
-- [ ] `/create-issue` — single issue creation with codebase scanning
-- [ ] `/create-issue N` — normalize existing issues
+- [ ] `/issue-creator` — single issue creation with codebase scanning
+- [ ] `/issue-creator N` — normalize existing issues
 - [ ] Issue templates (bug, feature, improvement)
 - [ ] `.gitissue.yml` configuration with defaults
 - [ ] Normalization detection via markers
@@ -712,8 +712,8 @@ Not applicable for MVP — gitissue is a CLI tool. Future versions may include:
 - Works without `.gitissue.yml` (zero-config)
 
 **Launch Checklist**:
-- [ ] All `/create-issue` acceptance criteria met
-- [ ] All `/create-issue N` acceptance criteria met
+- [ ] All `/issue-creator` acceptance criteria met
+- [ ] All `/issue-creator N` acceptance criteria met
 - [ ] Templates validated on GitHub rendering
 - [ ] `gh` CLI integration tested (create, edit, view)
 - [ ] README with quick-start guide
@@ -723,7 +723,7 @@ Not applicable for MVP — gitissue is a CLI tool. Future versions may include:
 **Target Date**: 2026-04-16 (Weeks 3-4)
 
 **Features**:
-- [ ] `/resolve-issue N` — full resolution pipeline
+- [ ] `/issue-resolver N` — full resolution pipeline
 - [ ] Configurable approval gates (auto / comment-and-wait)
 - [ ] Auto-normalization before resolution
 - [ ] PR creation with issue linking and auto-close
@@ -733,7 +733,7 @@ Not applicable for MVP — gitissue is a CLI tool. Future versions may include:
 **Target Date**: 2026-04-30 (Weeks 5-6)
 
 **Features**:
-- [ ] `/triage-issues` — dependency graph, priority suggestions, stale detection
+- [ ] `/issue-triage` — dependency graph, priority suggestions, stale detection
 - [ ] `/init-gitissue` — config generator
 - [ ] Confidence scoring for normalization (F8)
 - [ ] IDD methodology documentation
@@ -767,7 +767,7 @@ Not applicable for MVP — gitissue is a CLI tool. Future versions may include:
 |---|----------|--------|-------|-----|
 | 1 | Should normalization post the plan as an issue comment (for async team review) or keep it local-only? | Medium — affects team collaboration model | Product | Before v0.2.0 |
 | 2 | How should gitissue handle private repos where codebase context in public issues would leak information? | High — security concern for enterprise adoption | Engineering | Before v0.1.0 |
-| 3 | Should `/triage-issues` output be cached locally or regenerated each time? | Low — affects performance for large backlogs | Engineering | Before v0.3.0 |
+| 3 | Should `/issue-triage` output be cached locally or regenerated each time? | Low — affects performance for large backlogs | Engineering | Before v0.3.0 |
 | 4 | What's the right granularity for resolution templates — per-framework, per-pattern, or per-project? | Medium — affects extensibility model | Product | Before v1.0.0 |
 | 5 | Should gitissue install GitHub issue templates (`.github/ISSUE_TEMPLATE/`) to guide manual issue creation toward gitissue format? | Medium — could improve normalization rates | Product | Before v0.3.0 |
 
@@ -813,7 +813,7 @@ Not applicable for MVP — gitissue is a CLI tool. Future versions may include:
 | Term | Definition |
 |------|------------|
 | IDD | Issue-Driven Development — methodology where GitHub issues are the atomic unit of all development work |
-| gitissue | The tool implementing IDD — provides `/create-issue`, `/resolve-issue`, `/triage-issues`, and `/init-gitissue` commands |
+| gitissue | The tool implementing IDD — provides `/issue-creator`, `/issue-resolver`, `/issue-triage`, and `/init-gitissue` commands |
 | Normalization | The process of enriching an unstructured issue with codebase context, template structure, and acceptance criteria |
 | Resolution pipeline | The 7-step process: fetch → branch → research → plan → execute → verify → ship |
 | Codebase-aware | Issues that include affected file paths, architecture constraints, and dependency information derived from analyzing the actual code |

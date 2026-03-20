@@ -65,11 +65,11 @@ IDD fills a genuine gap in the developer tooling ecosystem. While individual pie
 
 ## How to Strengthen
 
-1. **Ship normalization first** — Before building the full resolve pipeline, release `/create-issue` with normalization as a standalone tool. It's immediately useful even without `/resolve-issue`. Let people experience the "messy issue → structured issue" transformation.
+1. **Ship normalization first** — Before building the full resolve pipeline, release `/issue-creator` with normalization as a standalone tool. It's immediately useful even without `/issue-resolver`. Let people experience the "messy issue → structured issue" transformation.
 
 2. **Publish the IDD manifesto** — Write a clear, opinionated document defining the methodology. Reference TDD, BDD as prior art. Position IDD as the natural evolution for the AI-agent era. Blog posts, README, maybe a simple website.
 
-3. **Build a "normalize existing issues" migration tool** — For brownfield adoption, let teams run `/create-issue --normalize-all` to batch-enrich their existing open issues. This solves the cold-start problem.
+3. **Build a "normalize existing issues" migration tool** — For brownfield adoption, let teams run `/issue-creator --normalize-all` to batch-enrich their existing open issues. This solves the cold-start problem.
 
 4. **Add confidence scoring to normalization** — When enriching issues, show confidence levels for each added field. "Affected files (high confidence): auth.py, middleware.py" vs "Affected files (low confidence): might also involve config.py". Let users correct before proceeding.
 
@@ -86,25 +86,25 @@ IDD fills a genuine gap in the developer tooling ecosystem. While individual pie
 - **Resolution templates**: Common patterns (API endpoint, React component, database migration) get specialized resolve pipelines
 - **Team analytics**: Track normalization accuracy, resolve success rate, time-to-merge by issue type
 - **GitLab parity**: Full GitLab CI/CD integration, MR workflows
-- **IDE integration**: VS Code / JetBrains extensions that surface the `/create-issue` and `/resolve-issue` workflow
+- **IDE integration**: VS Code / JetBrains extensions that surface the `/issue-creator` and `/issue-resolver` workflow
 
 ## Implementation Roadmap
 
 ### Phase 1: Foundation (Weeks 1-2)
 - [ ] Project scaffolding (repo, .gitissue.yml schema, templates)
-- [ ] `/create-issue` skill — interactive creation with codebase scanning
-- [ ] `/create-issue N` — normalization of existing issues
+- [ ] `/issue-creator` skill — interactive creation with codebase scanning
+- [ ] `/issue-creator N` — normalization of existing issues
 - [ ] Batch creation from text/screenshot (leverage github-issue-creator)
 - [ ] Default issue templates (bug, feature, improvement)
 
 ### Phase 2: Resolution (Weeks 3-4)
-- [ ] `/resolve-issue N` skill — fetch → branch → research → plan → code → PR
+- [ ] `/issue-resolver N` skill — fetch → branch → research → plan → code → PR
 - [ ] Configurable approval gates (auto / comment-and-wait)
 - [ ] Auto-normalization before resolution
 - [ ] PR auto-linking and issue auto-close
 
 ### Phase 3: Triage & Polish (Weeks 5-6)
-- [ ] `/triage-issues` — dependency graph, priority suggestions, stale detection
+- [ ] `/issue-triage` — dependency graph, priority suggestions, stale detection
 - [ ] `.gitissue.yml` generator (`/init-gitissue`)
 - [ ] Confidence scoring for normalization
 - [ ] Documentation and IDD methodology write-up

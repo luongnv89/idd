@@ -1,12 +1,12 @@
 # Integration Tests — gitissue Sprint 1
 
-These are manual integration tests for `/create-issue` and `/create-issue N` (normalization).
+These are manual integration tests for `/issue-creator` and `/issue-creator N` (normalization).
 
 ## Prerequisites
 
 - A test GitHub repository with push access
 - `gh` CLI authenticated (`gh auth status`)
-- Claude Code with the `/create-issue` skill loaded
+- Claude Code with the `/issue-creator` skill loaded
 
 ## Setup
 
@@ -32,7 +32,7 @@ These are manual integration tests for `/create-issue` and `/create-issue N` (no
 3. Load the skill in Claude Code:
    Add to `.claude/settings.json`:
    ```json
-   { "skills": ["./skills/create-issue"] }
+   { "skills": ["./skills/issue-creator"] }
    ```
 
 ---
@@ -43,7 +43,7 @@ These are manual integration tests for `/create-issue` and `/create-issue N` (no
 
 **Input:**
 ```
-/create-issue The login page returns a 500 error when using SSO authentication
+/issue-creator The login page returns a 500 error when using SSO authentication
 ```
 
 **Expected:**
@@ -68,7 +68,7 @@ gh issue view <N> --json body | jq -r '.body' | head -5
 
 **Input:**
 ```
-/create-issue Something is broken
+/issue-creator Something is broken
 ```
 
 **Expected:**
@@ -88,7 +88,7 @@ gh issue create --title "login broken on mobile" --body "the login doesn't work 
 
 **Input:**
 ```
-/create-issue <N>
+/issue-creator <N>
 ```
 
 **Expected:**
@@ -126,7 +126,7 @@ gh issue view <N> --json body --jq '.body' | grep "Reporter Context"
 
 **Input:**
 ```
-/create-issue <N>
+/issue-creator <N>
 ```
 
 **Expected:**
@@ -146,12 +146,12 @@ gh issue create --title "XSS in comment field" --body "script tags are not sanit
 
 **Input:**
 ```
-/create-issue <N>
+/issue-creator <N>
 ```
 
 **Expected:**
 - [ ] Output shows `⚠ Issue #N has a security label (security). Skipping normalization.`
-- [ ] Output shows `To override: /create-issue N --force`
+- [ ] Output shows `To override: /issue-creator N --force`
 - [ ] No backup comment posted
 - [ ] No body edits made
 
@@ -161,7 +161,7 @@ gh issue create --title "XSS in comment field" --body "script tags are not sanit
 
 **Input:**
 ```
-/create-issue <N> --force
+/issue-creator <N> --force
 ```
 
 **Expected:**
@@ -180,7 +180,7 @@ gh issue create --title "API timeout on large requests" --body "requests over 1M
 
 **Input:**
 ```
-/create-issue <N> --dry-run
+/issue-creator <N> --dry-run
 ```
 
 **Expected:**
@@ -209,7 +209,7 @@ gh issue view <N> --json body --jq '.body'
 
 **Input:**
 ```
-/create-issue Test issue
+/issue-creator Test issue
 ```
 
 **Expected:**
@@ -228,7 +228,7 @@ gh issue view <N> --json body --jq '.body'
 
 **Input:**
 ```
-/create-issue 99999
+/issue-creator 99999
 ```
 
 **Expected:**
@@ -258,7 +258,7 @@ This issue is NOT normalized.'
 
 **Input:**
 ```
-/create-issue <N>
+/issue-creator <N>
 ```
 
 **Expected:**
@@ -277,7 +277,7 @@ gh issue create --title "Fix login redirect loop" --body "The login page redirec
 
 **Input:**
 ```
-/create-issue The login redirect keeps looping
+/issue-creator The login redirect keeps looping
 ```
 
 **Expected:**
@@ -293,7 +293,7 @@ gh issue create --title "Fix login redirect loop" --body "The login page redirec
 
 **Input:**
 ```
-/create-issue Add dark mode support
+/issue-creator Add dark mode support
 ```
 
 **Expected:**

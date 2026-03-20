@@ -1,4 +1,4 @@
-# Error Messages — /create-issue
+# Error Messages — /issue-creator
 
 All errors follow the rich error format: what went wrong + fix command + docs link.
 
@@ -81,7 +81,7 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 ⚠ Issue #N has a security label ({label_name}). Skipping normalization.
   Codebase context could reveal exploit details.
 
-  To override: /create-issue N --force
+  To override: /issue-creator N --force
 ```
 **Trigger:** Issue has label matching: 'security', 'CVE', 'vulnerability'.
 
