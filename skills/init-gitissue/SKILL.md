@@ -237,6 +237,9 @@ triage:
 
   # Include recently closed issues in triage analysis
   include_closed: false
+
+  # Max seconds to scan codebase per issue for file dependencies
+  scan_timeout_per_issue: 30
 ```
 
 If **merge** mode was chosen, read the existing file first, preserve all user-set values, and only add fields that are missing.
@@ -343,7 +346,7 @@ And earlier in the flow, print:
    - `jest.config.ts` found → Jest
    - `.github/ISSUE_TEMPLATE/` found with 3 files
    - `git ls-files` returns 342 files → medium
-4. Defaults: `test_timeout: 300`, `auto_test: true`, `stale_threshold_days: 14`
+4. Defaults: `test_timeout: 300`, `auto_test: true`, `stale_threshold_days: 14`, `scan_timeout_per_issue: 30`
 5. Write `.gitissue.yml` with Next.js-specific comments
 6. Report:
 
@@ -377,7 +380,7 @@ And earlier in the flow, print:
    - No `.github/ISSUE_TEMPLATE/` directory
    - 47 tracked files → small
 4. Print: `○ Could not detect test runner. Setting resolve.auto_test: false.`
-5. Defaults: `test_timeout: 60`, `auto_test: false`, `stale_threshold_days: 7`
+5. Defaults: `test_timeout: 60`, `auto_test: false`, `stale_threshold_days: 7`, `scan_timeout_per_issue: 30`
 6. Write `.gitissue.yml`
 7. Report:
 

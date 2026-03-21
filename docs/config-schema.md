@@ -47,7 +47,7 @@ platform: github
 
 # Issue creation and normalization settings
 issue:
-  # Auto-normalize issues in /issue-resolver before resolution
+  # Auto-normalize issues (structure-only, no codebase scan) in /issue-resolver before resolution
   # Type: boolean
   # Default: true
   auto_normalize: true
@@ -127,6 +127,13 @@ triage:
   # Type: boolean
   # Default: false
   include_closed: false
+
+  # Max seconds to scan codebase per issue for file dependencies
+  # Type: integer
+  # Default: 30
+  # Minimum: 5
+  # Maximum: 300
+  scan_timeout_per_issue: 30
 ```
 
 ### Config Section Map
@@ -153,6 +160,7 @@ graph TD
     T --> T1["stale_threshold_days"]
     T --> T2["auto_priority"]
     T --> T3["include_closed"]
+    T --> T4["scan_timeout_per_issue"]
 
     style R fill:#4CAF50,color:#fff
 ```
@@ -203,3 +211,4 @@ Config is validated on load at the start of every skill invocation. Errors inclu
 | `triage.stale_threshold_days` | `14` | Stale issue threshold |
 | `triage.auto_priority` | `true` | Auto-suggest priorities |
 | `triage.include_closed` | `false` | Exclude closed from triage |
+| `triage.scan_timeout_per_issue` | `30` | Max seconds per issue scan |

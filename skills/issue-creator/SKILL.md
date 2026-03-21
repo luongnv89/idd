@@ -1,6 +1,6 @@
 ---
 name: issue-creator
-description: Create structured GitHub issues from text, screenshots, or images, normalize existing unstructured issues with codebase context, and batch-create multiple issues from a single input. Use this skill whenever someone says "create issue", "file a bug", "report a feature request", "normalize issue", "enrich issue", "structure this issue", "/issue-creator", or describes a bug, feature, or improvement they want tracked. Also use when someone shares an issue number and wants it cleaned up or enriched, or when pasting a screenshot of a bug. Even if the user just describes a problem without saying "issue", this skill turns it into a structured, codebase-aware GitHub issue with affected files, acceptance criteria, and labels via gh CLI. For batch creation, trigger when the user provides a list of items, a planning document, multiple bugs, or says "create issues from this", "file these bugs", "batch create", or pastes text with multiple distinct problems to track.
+description: Create structured GitHub issues from text, screenshots, or images, normalize existing unstructured issues into a standard template, and batch-create multiple issues from a single input. Use this skill whenever someone says "create issue", "file a bug", "report a feature request", "normalize issue", "enrich issue", "structure this issue", "/issue-creator", or describes a bug, feature, or improvement they want tracked. Also use when someone shares an issue number and wants it cleaned up or enriched, or when pasting a screenshot of a bug. Even if the user just describes a problem without saying "issue", this skill turns it into a structured GitHub issue with acceptance criteria and labels via gh CLI. For batch creation, trigger when the user provides a list of items, a planning document, multiple bugs, or says "create issues from this", "file these bugs", "batch create", or pastes text with multiple distinct problems to track.
 license: MIT
 metadata:
   version: 0.1.0
@@ -10,16 +10,16 @@ compatibility: Requires git and GitHub CLI (gh) with authentication. Run `gh aut
 
 # /issue-creator
 
-Create structured, codebase-aware GitHub issues — or normalize existing ones with codebase context. Supports single, batch, and normalization modes.
+Create structured GitHub issues — or normalize existing ones into a standard template. Supports single, batch, and normalization modes. Issues capture human intent only (no codebase analysis) — the resolver and triage skills scan the codebase themselves when needed.
 
-Three modes: **Create** (new issue from text/image), **Normalize** (enrich existing issue #N), and **Batch** (extract multiple issues from one input).
+Three modes: **Create** (new issue from text/image), **Normalize** (restructure existing issue #N into standard template), and **Batch** (extract multiple issues from one input).
 
 ## Modes
 
 | Invocation | Mode | What happens |
 |------------|------|--------------|
 | `/issue-creator <text>` | Create | New structured issue from a text description |
-| `/issue-creator <N>` | Normalize | Enrich existing issue #N with codebase context |
+| `/issue-creator <N>` | Normalize | Restructure existing issue #N into standard template |
 | `/issue-creator <N> --dry-run` | Preview | Show normalization preview without applying |
 | `/issue-creator <N> --force` | Force | Normalize even if security-labeled |
 | `/issue-creator <multi-item text>` | Batch | Extract multiple issues from one input and create sequentially |
@@ -36,27 +36,6 @@ Before any operation, verify the environment. On failure, output the exact error
 2. Confirm `gh` is installed: `which gh`
 3. Confirm authentication: `gh auth status`
 4. Confirm GitHub remote exists: `git remote -v`
-
-## Repo Sync (recommended)
-
-Before scanning the codebase, recommend syncing with the remote so affected-file detection uses the latest code:
-
-```
-⚡ Your branch may be behind the remote. Sync before scanning?
-
-  This ensures issue context reflects the latest codebase state.
-  Sync now? [Y/n]
-```
-
-If the user agrees, run:
-
-```bash
-branch="$(git rev-parse --abbrev-ref HEAD)"
-git fetch origin
-git pull --rebase origin "$branch"
-```
-
-If the working tree is dirty, stash first, sync, then pop. If `origin` is missing or conflicts occur, inform the user and continue without syncing. If the user declines, proceed without syncing.
 
 ## Configuration
 
@@ -160,25 +139,22 @@ When normalizing an existing issue that mentions image paths or contains image U
 
 ## Confidence Scoring System
 
-All auto-enriched fields include a confidence level. Confidence is displayed in previews and written into the issue body.
+Auto-enriched fields include a confidence level. Confidence is displayed in previews and written into the issue body.
 
 ### Levels
 
 | Level | Criteria | Preview display | Issue body display |
 |-------|----------|-----------------|-------------------|
-| **high** | Direct file/function mention in issue text, exact string match in codebase | `(high)` | `(high confidence)` |
-| **medium** | Keyword-based inference, related module detected, component name match | `(medium)` | `(medium confidence)` |
-| **low** | Best guess based on issue type, project structure, or directory proximity | `(needs review)` | `(needs review)` |
+| **high** | Explicit keywords match clearly (e.g., crash/error → bug, "add new" → feature) or requirements stated directly | `(high)` | `(high confidence)` |
+| **medium** | Inferred from description context or tone | `(medium)` | `(medium confidence)` |
+| **low** | Ambiguous, defaulted based on common patterns | `(needs review)` | `(needs review)` |
 
 ### Fields with Confidence
 
 | Field | How confidence is determined |
 |-------|------------------------------|
-| **Affected files** | high = explicitly mentioned or contains exact error message; medium = keyword/component match; low = same directory as a match |
 | **Type classification** | high = explicit error/crash keywords (bug) or "add"/"new" (feature); medium = inferred from description tone; low = ambiguous, defaulted |
 | **Acceptance criteria** | high = directly derived from explicit requirements in description; medium = inferred from problem description; low = generic criteria from template |
-| **Suggested labels** | high = matches type directly (bug→bug label); medium = inferred from component/area; low = generic project labels |
-| **Technical notes** | high = architecture constraints read directly from affected files; medium = inferred from imports/dependencies; low = generic notes based on project structure |
 
 ---
 
@@ -189,28 +165,8 @@ All auto-enriched fields include a confidence level. Confidence is displayed in 
 Extract from the description:
 - Keywords: error messages, component names, file paths, function names
 - Implied type: bug (broken behavior, errors, crashes), feature (new capability), improvement (enhancement to existing behavior)
-- Any explicitly mentioned file paths or code references
 
-### Step 2 — Scan Codebase
-
-Search the codebase using extracted keywords:
-
-1. Grep for error messages, function names, and component names
-2. Glob for files matching mentioned paths or component names
-3. Read the most relevant files (max 10) to understand context
-
-Assign confidence to each matched file:
-- **high** — file path or function explicitly mentioned, or file contains the exact error message
-- **medium** — matches a keyword or component name from the description
-- **low** — related module but not directly mentioned → mark `(needs review)` in the issue body
-
-If no files found:
-```
-⚠ Could not identify affected files. Issue created with manual-review flag.
-  Tip: mention specific filenames or error messages for better results.
-```
-
-### Step 3 — Classify Type
+### Step 2 — Classify Type
 
 - **bug** — broken behavior, errors, crashes, regressions
 - **feature** — new capability, endpoint, UI element, workflow
@@ -221,7 +177,7 @@ Assign confidence to the type classification:
 - **medium** — inferred from description context (e.g., "doesn't work" → bug, "would be nice" → feature)
 - **low** — ambiguous description, type defaulted based on most common pattern
 
-### Step 4 — Check for Duplicates
+### Step 3 — Check for Duplicates
 
 ```bash
 gh issue list --state open --json number,title,body --limit 50
@@ -236,34 +192,30 @@ Compare the new issue's title and key terms against existing issues. If a potent
   Continue creating? [Y/n]
 ```
 
-### Step 5 — Generate Issue Content
+### Step 4 — Generate Issue Content
 
 If the user provided image paths, upload them now using the **Image Upload** procedure. Collect the resulting markdown embeds for inclusion in the issue body.
 
 Read the appropriate template from `templates/` (bug.md, feature.md, or improvement.md) and populate every section:
 
-1. **Type** — classified type
-2. **Context** — affected files with confidence levels, current behavior (bugs), related components, related issues
-3. **Description** — synthesized from user input, enriched with codebase context
-4. **Reporter Context** — user's original text, verbatim, in a blockquote
-5. **Screenshots** — embedded images (only if images were provided and uploaded successfully)
-6. **Acceptance Criteria** — 3-5 testable criteria based on the problem and codebase context
-7. **Technical Notes** — architecture constraints from reading affected files, test coverage status, breaking change risk
-8. **Metadata** — suggested priority, estimated effort (XS/S/M/L/XL), suggested labels with confidence levels
+1. **Type** — classified type with confidence
+2. **Description** — synthesized from user input, including current/expected behavior (bugs), related components, related issues
+3. **Reporter Context** — user's original text, verbatim, in a blockquote
+4. **Screenshots** — embedded images (only if images were provided and uploaded successfully)
+5. **Acceptance Criteria** — 3-5 testable criteria derived from the problem description, with confidence levels
+6. **Metadata** — suggested priority, estimated effort (XS/S/M/L/XL), suggested labels
 
-### Step 6 — Preview and Confirm
+**Note:** Issues intentionally do NOT include codebase analysis (affected files, technical notes, architecture constraints). The resolver and triage skills scan the codebase themselves when needed, against current code.
+
+### Step 5 — Preview and Confirm
 
 ```
-● Scanning codebase...
-  Found 3 relevant files
-
 ◆ Issue Preview
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Type:     bug (high)
   Title:    Fix mobile auth redirect loop
-  Files:    auth.py (high), middleware.py (high), config.py (medium)
   Images:   2 uploaded ✓
-  Labels:   bug (high), auth (medium), mobile (medium)
+  Labels:   bug, auth, mobile
   Criteria: 3 acceptance criteria generated (medium)
 
 Create issue? [Y/n]
@@ -273,7 +225,7 @@ The `Images:` line appears only when images were provided. Show count and upload
 
 Wait for confirmation. If declined, stop without creating.
 
-### Step 7 — Create Issue
+### Step 6 — Create Issue
 
 ```bash
 gh issue create --title "{title}" --body "{populated_template}" --label "{labels}"
@@ -328,7 +280,7 @@ If the issue is locked:
 ```
 Stop.
 
-If the issue body exceeds 60,000 characters, note this — Technical Notes and Metadata will be truncated in Step 6 to stay under GitHub's 65KB limit.
+If the issue body exceeds 60,000 characters, note this — Metadata will be truncated in Step 5 to stay under GitHub's 65KB limit.
 
 ### Step 4 — Security Label Check
 
@@ -343,42 +295,37 @@ If found and `--force` not used:
 ```
 Stop.
 
-### Step 5 — Scan Codebase for Context
-
-Extract keywords from the existing issue title and body — error messages, stack traces, file paths, function names, component names. Use the same Grep + Glob + Read approach as Create mode. Assign confidence levels.
-
-### Step 6 — Generate Normalization Content
+### Step 5 — Generate Normalization Content
 
 Classify type from the existing issue content, then use the matching template:
 
 1. Preserve the entire original issue body in `> **Reporter Context**` blockquote
-2. Fill all template sections with codebase-enriched data
+2. Fill all template sections from the issue text (type, description, acceptance criteria, metadata)
 3. Place `<!-- gitissue:normalized v1 -->` at the top
-4. If original body > 60K chars, truncate Technical Notes and Metadata to fit under 65KB
+4. If original body > 60K chars, truncate Metadata to fit under 65KB
 
-### Step 7 — Preview with Confidence Scores
+**Note:** Normalization is structure-only — it restructures the issue into the standard template without scanning the codebase. No affected files, technical notes, or architecture constraints are added.
+
+### Step 6 — Preview with Confidence Scores
 
 ```
 ● Fetching issue #42...
-● Scanning codebase for context...
 
 ◆ Normalization Preview
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   + Type:        bug (high confidence)
-  + Files:       auth.py (high), config.py (medium)
   + Criteria:    3 acceptance criteria (medium)
-  + Labels:      +bug (high), +auth (medium)
-  + Tech notes:  architecture constraints (medium)
+  + Labels:      +bug, +auth
   = Original:    preserved in Reporter Context block
 
 Apply normalization? [Y/n/dry-run]
 ```
 
-`+` = added field, `=` = preserved field. Use `(high confidence)` for Type, abbreviated `(high)`, `(medium)`, `(low)` for files/criteria. Low-confidence fields get `(needs review)` in the issue body.
+`+` = added field, `=` = preserved field. Use `(high confidence)` for Type, abbreviated `(high)`, `(medium)`, `(low)` for criteria. Low-confidence fields get `(needs review)` in the issue body.
 
-Wait for confirmation. `n` → stop. `dry-run` → proceed to Step 8.
+Wait for confirmation. `n` → stop. `dry-run` → proceed to Step 7.
 
-### Step 8 — Dry Run Check
+### Step 7 — Dry Run Check
 
 If `--dry-run` was specified or selected at the prompt:
 ```
@@ -386,7 +333,7 @@ If `--dry-run` was specified or selected at the prompt:
 ```
 Stop.
 
-### Step 9 — Backup Original Body
+### Step 8 — Backup Original Body
 
 Post a backup comment with the original body before making any edits. This is a data safety requirement — if the backup fails, abort entirely. Never edit the issue body without a verified backup.
 
@@ -407,24 +354,24 @@ Verify success via the command exit code. If it fails:
 ```
 Stop. Do not edit the issue body.
 
-### Step 10 — Update Issue Body
+### Step 9 — Update Issue Body
 
 ```bash
 gh issue edit {N} --body "{normalized_body}"
 ```
 
-### Step 11 — Post Normalization Comment
+### Step 10 — Post Normalization Comment
 
 If `issue.normalize_comment` is true:
 
 ```bash
 gh issue comment {N} --body "🔧 **Normalized by gitissue**
 
-Added: type classification, affected files, acceptance criteria, technical notes.
+Added: type classification, acceptance criteria, structured description.
 Original body preserved in Reporter Context block and backup comment above."
 ```
 
-### Step 12 — Apply Labels
+### Step 11 — Apply Labels
 
 If `issue.labels_auto_suggest` is true and new labels were suggested:
 
@@ -432,7 +379,7 @@ If `issue.labels_auto_suggest` is true and new labels were suggested:
 gh issue edit {N} --add-label "{label1},{label2}"
 ```
 
-### Step 13 — Report
+### Step 12 — Report
 
 ```
 ✓ Backup posted (comment #5)
@@ -460,16 +407,12 @@ For each detected item, extract: a short title, keywords, and implied type (bug/
 
 If only one item is detected, fall through to single Create mode silently.
 
-### Step 2 — Scan Codebase
-
-Run the same codebase scan as single Create mode (Grep + Glob + Read), but batch the keyword searches across all items to avoid redundant scans. Assign affected files and confidence levels per item.
-
-### Step 3 — Preview Table
+### Step 2 — Preview Table
 
 Display all extracted items in a table for review before creating anything:
 
 ```
-● Scanning codebase...
+● Parsing input...
   Found {N} items in input
 
 ◆ Batch Preview
@@ -483,7 +426,7 @@ Display all extracted items in a table for review before creating anything:
 
 Use DESIGN.md table format: box-drawing characters `│ ─ ┼`, right-align numbers, left-align text, max 80 chars wide (truncate titles with `...`).
 
-### Step 4 — Duplicate Check
+### Step 3 — Duplicate Check
 
 ```bash
 gh issue list --state open --json number,title,body --limit 50
@@ -498,7 +441,7 @@ Check each batch item against existing issues AND against other items in the bat
 
 Duplicates are flagged but not removed — the user decides in the approval step.
 
-### Step 5 — Approval
+### Step 4 — Approval
 
 Prompt the user with three options:
 
@@ -515,7 +458,7 @@ If the user chooses Edit, apply the requested changes, re-display the updated ta
 Create {N} issues? [A]ll / [e]dit / [c]ancel
 ```
 
-### Step 6 — Create Issues
+### Step 5 — Create Issues
 
 Create each approved issue sequentially using the same pipeline as single Create mode (generate content from template, `gh issue create`). Each issue gets the full template treatment — `<!-- gitissue:normalized v1 -->` marker, all sections populated.
 
@@ -536,7 +479,7 @@ Create each approved issue sequentially using the same pipeline as single Create
 ✗ Failed to create: Refactor auth middleware (rate limited)
 ```
 
-### Step 7 — Report
+### Step 6 — Report
 
 Show a summary of all results:
 
@@ -580,10 +523,9 @@ Here are the items from our sprint planning:
 ```
 
 1. Detect → 3 items from numbered list
-2. Scan → batch keyword search finds checkout/, settings/, auth/ files
-3. Preview table → 3 rows with types and effort estimates
-4. Duplicates → none found
-5. Approval:
+2. Preview table → 3 rows with types and effort estimates
+3. Duplicates → none found
+4. Approval:
    ```
    ● Scanning codebase...
      Found 3 items in input
@@ -598,7 +540,7 @@ Here are the items from our sprint planning:
 
    Create 3 issues? [A]ll / [e]dit / [c]ancel
    ```
-6. On "All" → create each → `✓ 3/3 issues created`
+5. On "All" → create each → `✓ 3/3 issues created`
 
 ---
 
@@ -607,26 +549,21 @@ Here are the items from our sprint planning:
 **User says:** `/issue-creator the checkout page is broken on Safari`
 
 1. Parse → keywords: "checkout", "broken", "Safari"; type: bug
-2. Scan → Grep finds `src/checkout/payment.js` mentions "Safari", Glob finds `src/checkout/` directory
-3. Classify → bug
-4. Duplicates → none found
-5. Generate → populates bug.md template with affected files, Safari-specific acceptance criteria
-6. Preview:
+2. Classify → bug (high confidence)
+3. Duplicates → none found
+4. Generate → populates bug.md template with Safari-specific acceptance criteria
+5. Preview:
    ```
-   ● Scanning codebase...
-     Found 2 relevant files
-
    ◆ Issue Preview
    ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
      Type:     bug (high)
      Title:    Fix checkout page broken on Safari
-     Files:    src/checkout/payment.js (high), src/checkout/cart.js (medium)
-     Labels:   bug (high), checkout (medium)
+     Labels:   bug, checkout
      Criteria: 3 acceptance criteria generated (medium)
 
    Create issue? [Y/n]
    ```
-7. On confirmation → `gh issue create` → `✓ Created issue #15`
+6. On confirmation → `gh issue create` → `✓ Created issue #15`
 
 ## GitHub CLI Convention
 

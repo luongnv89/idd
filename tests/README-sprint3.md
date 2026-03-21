@@ -33,63 +33,50 @@ If not already set up from Sprint 1:
    git add . && git commit -m "add test files" && git push
    ```
 
-3. Create 10+ open issues for triage tests:
+3. Create 10+ open issues for triage tests (lean format — no affected files in body):
    ```bash
-   # Issue 1: bug affecting auth
+   # Issue 1: bug about auth (triage will find auth files via keyword scan)
    gh issue create --title "Fix login redirect loop" --body '<!-- gitissue:normalized v1 -->
    ## Type
    Bug
-   ## Context
-   **Affected files:**
-   - `src/auth/login.py` (high confidence)
    ## Description
-   Login page redirects infinitely.
+   Login page redirects infinitely. The redirect logic in the auth module loops.
    ## Acceptance Criteria
    - [ ] Login completes without redirect loop
    ## Metadata
    **Priority:** P1
    **Labels:** bug, auth'
 
-   # Issue 2: feature affecting api
+   # Issue 2: feature about api
    gh issue create --title "Add pagination to users endpoint" --body '<!-- gitissue:normalized v1 -->
    ## Type
    Feature
-   ## Context
-   **Affected files:**
-   - `src/api/users.py` (high confidence)
    ## Description
-   Users endpoint needs pagination support.
+   Users endpoint needs pagination support. The API users module needs page/limit params.
    ## Acceptance Criteria
    - [ ] GET /users supports page and limit params
    ## Metadata
    **Priority:** P2
    **Labels:** feature, api'
 
-   # Issue 3: improvement affecting auth (shares files with issue 1)
-   gh issue create --title "Refactor auth middleware" --body '<!-- gitissue:normalized v1 -->
+   # Issue 3: improvement about auth (triage should detect overlap with issue 1 via keyword scan)
+   gh issue create --title "Refactor auth middleware for OAuth2" --body '<!-- gitissue:normalized v1 -->
    ## Type
    Improvement
-   ## Context
-   **Affected files:**
-   - `src/auth/login.py` (high confidence)
-   - `src/auth/errors.py` (medium confidence)
    ## Description
-   Auth middleware needs refactoring for OAuth2 support.
+   Auth middleware needs refactoring for OAuth2 support. The login and error handling modules need updates.
    ## Acceptance Criteria
    - [ ] Auth middleware supports OAuth2 flow
    ## Metadata
    **Priority:** P2
    **Labels:** improvement, auth'
 
-   # Issue 4: bug affecting db
+   # Issue 4: bug about db
    gh issue create --title "Fix database connection leak" --body '<!-- gitissue:normalized v1 -->
    ## Type
    Bug
-   ## Context
-   **Affected files:**
-   - `src/db/connection.py` (high confidence)
    ## Description
-   Database connections are not being closed properly.
+   Database connections are not being closed properly. The connection module leaks handles.
    ## Acceptance Criteria
    - [ ] All database connections are properly closed after use
    ## Metadata
@@ -100,18 +87,15 @@ If not already set up from Sprint 1:
    gh issue create --title "Add dark mode toggle" --body '<!-- gitissue:normalized v1 -->
    ## Type
    Feature
-   ## Context
-   **Affected files:**
-   - `src/ui/settings.py` (high confidence)
    ## Description
-   Add a dark mode toggle to settings.
+   Add a dark mode toggle to settings page.
    ## Acceptance Criteria
    - [ ] Dark mode can be toggled in settings
    ## Metadata
    **Priority:** P3
    **Labels:** feature, ui'
 
-   # Issues 6-10: create more for backlog depth
+   # Issues 6-10: create more for backlog depth (unstructured — triage scans keywords)
    gh issue create --title "Improve error messages in API" --body "API errors are too generic"
    gh issue create --title "Add rate limiting to endpoints" --body "Endpoints need rate limiting"
    gh issue create --title "Update user profile schema" --body "Profile schema needs new fields"
@@ -134,11 +118,11 @@ If not already set up from Sprint 1:
 
 **Expected:**
 - [ ] Output shows `● Fetching {N} open issues...`
-- [ ] Output shows `● Analyzing dependencies...`
+- [ ] Output shows `● Scanning codebase for issue dependencies...`
 - [ ] Output shows `◆ Issue Triage` section header
 - [ ] Dependency table uses box-drawing characters: `│ ─ ┼`
 - [ ] Table has columns: `# │ Issue │ Pri │ Blocks │ Status`
-- [ ] Issues sharing affected files show dependency (e.g., issue 1 and 3 both touch `src/auth/login.py`)
+- [ ] Issues with keyword overlap detected via codebase scan (e.g., issue 1 and 3 both mention "auth" → triage finds shared files in `src/auth/`)
 - [ ] Status column shows `ready`, `blocked`, or `stale` as appropriate
 - [ ] Output shows `⚡ Parallelizable:` line identifying independent issues
 - [ ] Output shows `○ Suggested order:` with topological sort
@@ -146,7 +130,8 @@ If not already set up from Sprint 1:
 
 **Verify:**
 ```bash
-# Confirm issues 1 and 3 are detected as dependent (shared auth files)
+# Confirm issues 1 and 3 are detected as dependent
+# (triage keyword scan finds both mention "auth" → shared files in src/auth/)
 # The triage output should show one blocking the other
 ```
 
@@ -154,18 +139,14 @@ If not already set up from Sprint 1:
 
 ### T22: Triage with circular dependencies
 
-**Setup:** Create two issues that reference each other's files:
+**Setup:** Create an issue whose keywords overlap with both issue 1 (auth) and issue 2 (API users):
 
 ```bash
 gh issue create --title "Refactor API auth integration" --body '<!-- gitissue:normalized v1 -->
 ## Type
 Improvement
-## Context
-**Affected files:**
-- `src/api/users.py` (high confidence)
-- `src/auth/login.py` (high confidence)
 ## Description
-API needs to use new auth middleware.
+API needs to use new auth middleware. The users endpoint and login module need to be integrated.
 ## Acceptance Criteria
 - [ ] API uses refactored auth
 ## Metadata
@@ -173,7 +154,7 @@ API needs to use new auth middleware.
 **Labels:** improvement'
 ```
 
-This issue shares files with both issue 1 (`src/auth/login.py`) and issue 2 (`src/api/users.py`), potentially creating a cycle if dependency detection is bidirectional.
+This issue mentions both "auth/login" and "API/users" keywords, so triage's keyword scan should find files overlapping with both issue 1 and issue 2, potentially creating a cycle.
 
 **Input:**
 ```
@@ -386,31 +367,34 @@ cd - && rm -rf /tmp/test-empty-repo
 
 ---
 
-## Test Cases: Confidence Scoring
+## Test Cases: Confidence Scoring (Lean Issues)
 
-### T30: High confidence — explicit file path in description
+Confidence scoring now applies only to **type classification** and **acceptance criteria**. File-level confidence is removed (issues no longer contain affected files).
 
-**Setup:** Ensure `src/auth/login.py` exists in the repo.
+### T30: High confidence — explicit bug keywords
 
 **Input:**
 ```
-/issue-creator There is a bug in src/auth/login.py where passwords are not hashed
+/issue-creator The login page crashes with a 500 Internal Server Error when using SSO
 ```
 
 **Expected:**
-- [ ] Preview shows `Files: src/auth/login.py (high)`
-- [ ] Preview shows `Type: bug (high)`
-- [ ] Created issue body shows `src/auth/login.py` with `(high confidence)`
-- [ ] Type classification shows `(high confidence)` in the issue body
+- [ ] Preview shows `Type: bug (high)` — crash/500/error keywords trigger high confidence
+- [ ] Preview does NOT show a `Files:` line
+- [ ] Created issue body shows type with `(high confidence)`
+- [ ] Acceptance criteria are generated with confidence levels
 
 **Verify:**
 ```bash
 gh issue view <N> --json body --jq '.body' | grep "high confidence"
+# Should match on the Type line
+gh issue view <N> --json body --jq '.body' | grep -c "Affected files"
+# Should be: 0
 ```
 
 ---
 
-### T31: Medium confidence — keyword match
+### T31: Medium confidence — inferred type
 
 **Input:**
 ```
@@ -418,9 +402,9 @@ gh issue view <N> --json body --jq '.body' | grep "high confidence"
 ```
 
 **Expected:**
-- [ ] Preview shows files related to auth (e.g., `src/auth/login.py (medium)`)
-- [ ] The word "authentication" triggers a keyword match, not a direct file path match
-- [ ] Created issue body shows affected files with `(medium confidence)`
+- [ ] Preview shows `Type: bug (medium)` — "fails" suggests bug but isn't explicit crash/error
+- [ ] Issue body shows type with `(medium confidence)`
+- [ ] Issue body does NOT contain affected files
 
 **Verify:**
 ```bash
@@ -437,10 +421,10 @@ gh issue view <N> --json body --jq '.body' | grep "medium confidence"
 ```
 
 **Expected:**
-- [ ] Preview shows files with `(needs review)` or no files found
-- [ ] If files are matched, they show `(needs review)` for low-confidence matches
-- [ ] Issue body marks low-confidence fields with `(needs review)`
-- [ ] Output may show `⚠ Could not identify affected files` if nothing matches
+- [ ] Preview shows `Type: bug (needs review)` — ambiguous, defaulted
+- [ ] Issue body marks type with `(needs review)`
+- [ ] Acceptance criteria likely marked `(needs review)` too
+- [ ] Issue body does NOT contain affected files
 
 **Verify:**
 ```bash
@@ -449,7 +433,7 @@ gh issue view <N> --json body --jq '.body' | grep "needs review"
 
 ---
 
-### T33: Confidence in normalization preview
+### T33: Confidence in normalization preview (structure-only)
 
 **Setup:**
 ```bash
@@ -462,13 +446,106 @@ gh issue create --title "Auth login is slow" --body "The login function takes fo
 ```
 
 **Expected:**
-- [ ] Normalization preview shows confidence on ALL fields:
-  - `+ Type:` with confidence (e.g., `bug (high)` or `improvement (medium)`)
-  - `+ Files:` with per-file confidence (e.g., `login.py (medium)`)
+- [ ] Normalization preview shows confidence on Type and Criteria only:
+  - `+ Type:` with confidence (e.g., `improvement (medium)`)
   - `+ Criteria:` with confidence (e.g., `3 acceptance criteria (medium)`)
-  - `+ Labels:` with confidence (e.g., `+bug (high), +auth (medium)`)
+- [ ] Preview does NOT show `+ Files:` line
 - [ ] `= Original:` line shows preserved text
 - [ ] Low-confidence items show `(needs review)` in the preview
+
+---
+
+## Test Cases: Triage Keyword Scan (Lean Issues)
+
+### T34: Triage builds dependency graph from keyword scan (not issue body)
+
+**Setup:** Use issues from setup above (lean format — no affected files in body).
+
+**Input:**
+```
+/issue-triage
+```
+
+**Expected:**
+- [ ] Output shows `● Scanning codebase for issue dependencies...`
+- [ ] Triage scans codebase for each issue's keywords (not reading affected files from body)
+- [ ] Issues 1 and 3 both mention "auth" keywords → triage finds files in `src/auth/` for both → dependency detected
+- [ ] Issue 4 mentions "database/connection" → triage finds `src/db/connection.py` → independent from auth issues
+- [ ] Dependency graph is built from scan results, not from issue body content
+
+**Verify:**
+```bash
+# Check triage.json was created
+cat .gitissue/triage.json | jq '.issues[0].affected_files'
+# Should contain files found by keyword scan (e.g., ["src/auth/login.py"])
+# NOT files read from the issue body
+```
+
+---
+
+### T35: Triage handles issues with no affected files section
+
+**Setup:** Ensure some issues have no `## Context` or `**Affected files:**` section (issues 6-10 from setup are unstructured).
+
+**Input:**
+```
+/issue-triage
+```
+
+**Expected:**
+- [ ] No errors about missing affected files
+- [ ] Unstructured issues still appear in the triage table
+- [ ] Triage extracts keywords from raw title/body text for unstructured issues
+- [ ] If keyword scan finds files, dependencies are detected normally
+
+---
+
+### T36: Triage scan timeout
+
+**Setup:** Create a `.gitissue.yml` with a very short timeout to force timeout behavior:
+```bash
+cat > .gitissue.yml << 'EOF'
+triage:
+  scan_timeout_per_issue: 1
+EOF
+git add .gitissue.yml && git commit -m "temp: 1s scan timeout" && git push
+```
+
+**Input:**
+```
+/issue-triage
+```
+
+**Expected:**
+- [ ] If any issue scan exceeds 1 second, output shows `⚠ Scan timeout for #N — skipping file analysis`
+- [ ] Timed-out issues appear in the table with `no-deps (timeout)` status
+- [ ] Triage completes successfully (timeout is non-fatal)
+- [ ] Non-timed-out issues still have their dependencies analyzed
+
+**Cleanup:**
+```bash
+git rm .gitissue.yml && git commit -m "remove temp config" && git push
+```
+
+---
+
+### T37: Triage persists keyword-scan results to triage.json
+
+**Input:**
+```
+/issue-triage
+```
+
+**Expected:**
+- [ ] `.gitissue/triage.json` is created/updated
+- [ ] Each issue entry has `affected_files` populated from keyword scan (not from issue body)
+- [ ] `affected_files` reflect current codebase state
+
+**Verify:**
+```bash
+cat .gitissue/triage.json | jq '.issues[] | {number, affected_files}'
+# Each issue should have affected_files from scan results
+```
 
 ---
 

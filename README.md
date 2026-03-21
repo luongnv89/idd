@@ -14,7 +14,7 @@
 
 # Turn GitHub Issues Into Your Entire Dev Workflow
 
-**Four commands. Structured issues. Atomic PRs.** issue-dev brings Issue-Driven Development (IDD) to your terminal — describe a problem, get a codebase-aware issue. Point at that issue, get a tested PR. No extra tools, no sync overhead.
+**Four commands. Structured issues. Atomic PRs.** issue-dev brings Issue-Driven Development (IDD) to your terminal — describe a problem, get a structured issue. Point at that issue, get a tested PR. No extra tools, no sync overhead.
 
 Works for humans and AI agents alike.
 
@@ -34,19 +34,18 @@ The gap isn't your team or your tools. It's that GitHub issues were designed for
 
 ## What issue-dev Does
 
-issue-dev makes every GitHub issue a self-contained work order — enriched with affected files, acceptance criteria, and technical context pulled from your actual codebase.
+issue-dev makes every GitHub issue a self-contained work order — enriched with acceptance criteria and structured descriptions.
 
 | Command | What It Does |
 |---------|-------------|
-| `/issue-creator` | Scans your codebase, classifies the type, generates acceptance criteria, uploads screenshots, creates a structured issue |
-| `/issue-resolver N` | Fetches the issue, creates a branch, researches files, writes code + tests, opens a PR with "Closes #N" |
+| `/issue-creator` | Classifies the type, generates acceptance criteria, uploads screenshots, creates a structured issue |
+| `/issue-resolver N` | Fetches the issue, creates a branch, scans codebase for relevant files, writes code + tests, opens a PR with "Closes #N" |
 | `/issue-triage` | Builds a dependency graph, detects stale issues, suggests priority and execution order |
 | `/init-gitissue` | Detects your language/framework/test runner and generates a `.gitissue.yml` config |
 
 Every issue created or normalized by issue-dev includes:
-- **Affected files** with confidence levels (high/medium/low)
-- **Acceptance criteria** derived from the problem description and codebase
-- **Technical notes** — architecture constraints, test coverage, breaking change risk
+- **Acceptance criteria** derived from the problem description
+- **Structured description** — current vs expected behavior, related issues
 - **Reporter's original text** preserved verbatim
 - **Embedded screenshots** — images uploaded to GitHub and embedded inline in the issue body
 
@@ -58,7 +57,7 @@ Every issue created or normalized by issue-dev includes:
   <img src="assets/screenshots/issue-creator.svg" alt="issue-creator terminal output" width="680">
 </p>
 
-issue-dev scans your codebase for files related to "login", "SSO", "authentication" — classifies it as a bug — and creates a structured GitHub issue with affected files, acceptance criteria, and labels.
+issue-dev classifies the problem as a bug, generates acceptance criteria, and creates a structured GitHub issue with labels.
 
 ### 2. Resolve it in one command
 
@@ -66,7 +65,7 @@ issue-dev scans your codebase for files related to "login", "SSO", "authenticati
   <img src="assets/screenshots/issue-resolver.svg" alt="issue-resolver terminal output" width="680">
 </p>
 
-The 7-step pipeline runs automatically: fetch the issue, create a branch, research affected files, plan the fix, write code + tests, verify everything passes, and ship a PR with `Closes #N`.
+The 7-step pipeline runs automatically: fetch the issue, create a branch, scan codebase for relevant files, plan the fix, write code + tests, verify everything passes, and ship a PR with `Closes #N`.
 
 ### 3. Triage the backlog
 
@@ -133,7 +132,7 @@ issue-dev is **agent-agnostic**. The structured issue format works with any reso
 | **Codex CLI** | `gh issue view 42 --json body -q '.body' > /tmp/issue.md && codex --context /tmp/issue.md "Resolve this issue"` |
 | **Gemini CLI** | `gh issue view 42 --json body -q '.body' \| gemini "Resolve this GitHub issue"` |
 | **Any SKILL.md agent** | Load skills from `skills/` directory |
-| **Human developers** | Read the issue — affected files, acceptance criteria, and technical notes are all there |
+| **Human developers** | Read the issue — acceptance criteria and structured descriptions are all there |
 
 ---
 
@@ -141,13 +140,13 @@ issue-dev is **agent-agnostic**. The structured issue format works with any reso
 
 Issue-Driven Development treats GitHub issues as the atomic unit of all development work. Every change — bug fix, feature, improvement — starts as an issue and ends as a PR linked to that issue.
 
-The key innovation is **issue normalization**: any issue, whether filed by a human or created by an AI, gets auto-enriched with codebase context before work begins.
+The key innovation is **issue normalization**: any issue, whether filed by a human or created by an AI, gets structured with acceptance criteria and clear descriptions before work begins. Codebase analysis happens at resolution time, not creation time.
 
 ```mermaid
 graph TD
     A[Developer describes a problem] --> B["/issue-creator"]
-    B --> C[Structured issue with codebase context]
-    C --> D["/issue-triage (optional)"]
+    B --> C[Structured issue with acceptance criteria]
+    C --> D["/issue-triage (optional, scans codebase)"]
     D --> E["/issue-resolver N"]
     E --> F["Fetch → Branch → Research → Plan → Execute → Verify → Ship"]
     F --> G[Atomic PR linked to issue]
@@ -162,7 +161,7 @@ graph TD
 | Aspect | IDD | TDD | BDD | Spec-Driven |
 |--------|-----|-----|-----|-------------|
 | **Source of truth** | GitHub issue | Test suite | Feature specs | Spec documents |
-| **Codebase-aware** | Yes | No | No | Manual |
+| **Codebase-aware** | At resolution time | No | No | Manual |
 | **Agent-compatible** | Any agent | Needs framework | Needs framework | Needs parser |
 | **Overhead** | Zero-config CLI | Test setup | Gherkin syntax | Spec authoring |
 | **Best for** | Brownfield, mixed teams | New code | User-facing features | Formal contracts |
@@ -198,7 +197,7 @@ Issue body content is treated as untrusted data. The resolver never executes com
 
 ## Get Started
 
-Paste a bug report. Get a structured, codebase-aware issue. Resolve it into a tested PR. All from your terminal.
+Paste a bug report. Get a structured issue. Resolve it into a tested PR. All from your terminal.
 
 MIT licensed. Zero config. Works today.
 
@@ -218,14 +217,14 @@ npx skills add https://github.com/luongnv89/idd
 | Invocation | Mode | Description |
 |------------|------|-------------|
 | `/issue-creator <text>` | Create | Create a structured issue from a text description |
-| `/issue-creator <N>` | Normalize | Enrich existing issue #N with codebase context |
+| `/issue-creator <N>` | Normalize | Structure existing issue #N with acceptance criteria |
 | `/issue-creator <N> --dry-run` | Preview | Show normalization preview without applying |
 | `/issue-creator <N> --force` | Force | Normalize even if issue has a security label |
 | `/issue-creator <multi-item text>` | Batch | Extract and create multiple issues from one input |
 
-**Create mode** scans the codebase for relevant files, classifies the issue type (bug/feature/improvement), generates acceptance criteria, uploads any provided screenshots to GitHub (embedded inline in the issue body), and creates a structured issue via `gh issue create`.
+**Create mode** classifies the issue type (bug/feature/improvement), generates acceptance criteria, uploads any provided screenshots to GitHub (embedded inline in the issue body), and creates a structured issue via `gh issue create`.
 
-**Normalize mode** enriches an existing unstructured issue: preserves the original text in a Reporter Context blockquote, adds affected files with confidence levels, generates acceptance criteria, and posts a backup before editing.
+**Normalize mode** structures an existing unstructured issue: preserves the original text in a Reporter Context blockquote, generates acceptance criteria, and posts a backup before editing.
 
 **Batch mode** auto-detects multiple items (numbered lists, bullet points, planning documents) and creates them sequentially with a preview table and approval step.
 
@@ -236,7 +235,7 @@ Resolves issue #N through a 7-step pipeline:
 ```
 [1/7] Fetch        — Load issue, check guards (assignment, blocking labels)
 [2/7] Branch       — Create issue-N/short-description branch
-[3/7] Research     — Read affected files, trace dependencies
+[3/7] Research     — Scan codebase for relevant files, trace dependencies
 [4/7] Plan         — Propose approach (local only, never posted)
 [5/7] Execute      — Write code + tests, atomic commits
 [6/7] Verify       — Run test suite, check acceptance criteria
@@ -245,7 +244,7 @@ Resolves issue #N through a 7-step pipeline:
 
 ### `/issue-triage` — Triage the Backlog
 
-Analyzes all open issues: dependency detection via shared affected files, topological sort for execution order, parallelizable issue identification, stale issue detection (>14 days), priority suggestions.
+Analyzes all open issues: dependency detection via codebase keyword scanning, topological sort for execution order, parallelizable issue identification, stale issue detection (>14 days), priority suggestions.
 
 ### `/init-gitissue` — Generate Config
 
@@ -264,7 +263,7 @@ To customize, create `.gitissue.yml` in your repo root (or run `/init-gitissue`)
 platform: github                # github | gitlab (future)
 
 issue:
-  auto_normalize: true          # auto-normalize in /issue-resolver
+  auto_normalize: true          # auto-normalize (structure-only) in /issue-resolver
   template: default             # default | path to custom template dir
   labels_auto_suggest: true     # auto-suggest labels based on content
   normalize_comment: true       # add comment when normalizing
@@ -281,6 +280,7 @@ triage:
   stale_threshold_days: 14      # flag issues with no activity
   auto_priority: true           # suggest priorities based on type + age + deps
   include_closed: false         # include recently closed issues in triage
+  scan_timeout_per_issue: 30    # max seconds to scan codebase per issue
 ```
 
 Full schema documentation: [`docs/config-schema.md`](docs/config-schema.md)
@@ -292,7 +292,7 @@ Full schema documentation: [`docs/config-schema.md`](docs/config-schema.md)
 
 issue-dev ships with three default templates:
 
-- **Bug** (`templates/bug.md`) — current vs expected behavior, reproduction context, affected files
+- **Bug** (`templates/bug.md`) — current vs expected behavior, reproduction context
 - **Feature** (`templates/feature.md`) — user story, acceptance criteria, technical constraints
 - **Improvement** (`templates/improvement.md`) — current state, proposed change, migration notes
 

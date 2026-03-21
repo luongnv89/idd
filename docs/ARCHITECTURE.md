@@ -66,13 +66,12 @@ Only used by `issue-creator`. Contains Markdown templates for bug, feature, and 
 
 ```mermaid
 graph TD
-    A["User input (text/screenshot)"] --> B["Codebase scan (find relevant files)"]
-    B --> C["Type classification (bug/feature/improvement)"]
-    C --> D["Template fill (affected files + confidence, acceptance criteria)"]
-    D --> E["gh issue create --json ..."]
+    A["User input (text/screenshot)"] --> B["Type classification (bug/feature/improvement)"]
+    B --> C["Template fill (acceptance criteria)"]
+    C --> D["gh issue create --json ..."]
 
     style A fill:#4CAF50,color:#fff
-    style E fill:#2196F3,color:#fff
+    style D fill:#2196F3,color:#fff
 ```
 
 ### Issue Resolution
@@ -80,10 +79,10 @@ graph TD
 ```mermaid
 graph TD
     A["gh issue view N --json ..."] --> B{Normalized?}
-    B -- No --> C[Auto-normalize]
+    B -- No --> C["Auto-normalize (structure only)"]
     C --> D
     B -- Yes --> D["Branch creation (issue-N/description)"]
-    D --> E["Research (read affected files, trace deps)"]
+    D --> E["Research (scan codebase, trace deps)"]
     E --> F["Plan (local only, never posted)"]
     F --> G["Execute (code + tests, atomic commits)"]
     G --> H["Verify (run test suite)"]
@@ -125,3 +124,4 @@ All settings have defaults — the system works with zero configuration.
 2. **`gh` CLI is the only interface** — all GitHub interaction via `gh --json`
 3. **Static sequential output** — each step prints a new line, no terminal animation
 4. **Agent-agnostic** — structured issues are plain GitHub Markdown, consumable by any tool
+5. **Lean issues** — issues capture human intent only; codebase analysis is performed by consumer skills (resolver, triage) at execution time against current code

@@ -171,7 +171,7 @@ Every empty state has warmth and a next action:
 Normalized issues must render cleanly in GitHub's web UI:
 
 - Use standard markdown (no HTML except the invisible marker)
-- Section headers: `## Type`, `## Context`, `## Acceptance Criteria`
+- Section headers: `## Type`, `## Description`, `## Acceptance Criteria`
 - Code blocks for file paths and technical details
 - Normalization marker: `<!-- gitissue:normalized v1 -->` (invisible in rendered view)
 - Reporter's original text: in a `> Reporter Context` blockquote

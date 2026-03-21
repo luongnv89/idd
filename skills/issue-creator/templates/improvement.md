@@ -4,10 +4,9 @@
 
 Improvement
 
-## Context
+## Description
 
-**Affected files:**
-- `{file_path}` ({confidence})
+{description}
 
 **Current state:**
 {current_state}
@@ -17,10 +16,6 @@ Improvement
 
 **Related issues:**
 {related_issues}
-
-## Description
-
-{description}
 
 > **Reporter Context**
 > {original_reporter_text}
@@ -34,19 +29,6 @@ Improvement
 - [ ] {criterion_1}
 - [ ] {criterion_2}
 - [ ] {criterion_3}
-
-## Technical Notes
-
-**Architecture constraints:**
-{architecture_constraints}
-
-**Migration notes:**
-{migration_notes}
-
-**Test coverage:**
-{test_coverage}
-
-**Breaking change risk:** {breaking_change_risk}
 
 ## Metadata
 

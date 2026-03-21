@@ -1,6 +1,8 @@
-# Integration Tests — gitissue Sprint 1
+# Integration Tests — gitissue Sprint 1 (Lean Issues)
 
 These are manual integration tests for `/issue-creator` and `/issue-creator N` (normalization).
+
+Updated for the **lean issues architecture**: issues contain only human intent (type, description, acceptance criteria). No codebase scanning during issue creation or normalization.
 
 ## Prerequisites
 
@@ -19,7 +21,7 @@ These are manual integration tests for `/issue-creator` and `/issue-creator N` (
    git push -u origin main
    ```
 
-2. Create some test files for codebase scanning:
+2. Create some test files (used by triage and resolver tests, not creator):
    ```bash
    mkdir -p src/auth src/api tests
    echo 'def login(user, password): pass' > src/auth/login.py
@@ -39,7 +41,7 @@ These are manual integration tests for `/issue-creator` and `/issue-creator N` (
 
 ## Test Cases
 
-### T1: Create issue from one-sentence description
+### T1: Create lean issue from one-sentence description
 
 **Input:**
 ```
@@ -47,24 +49,33 @@ These are manual integration tests for `/issue-creator` and `/issue-creator N` (
 ```
 
 **Expected:**
-- [ ] Output shows `● Scanning codebase...`
-- [ ] Output shows `◆ Issue Preview` section with Type, Title, Files, Labels, Criteria
+- [ ] Output shows `◆ Issue Preview` section with Type, Title, Labels, Criteria
+- [ ] Output does NOT show `● Scanning codebase...` (no codebase scan)
+- [ ] Preview does NOT contain a `Files:` line
 - [ ] Issue type is classified as `bug`
-- [ ] Affected files include `src/auth/login.py` (or related auth files)
 - [ ] Issue is created on GitHub with structured template
 - [ ] Issue body contains `<!-- gitissue:normalized v1 -->` marker
-- [ ] Issue body contains `## Type`, `## Context`, `## Description`, `## Acceptance Criteria`, `## Technical Notes`, `## Metadata` sections
+- [ ] Issue body contains `## Type`, `## Description`, `## Acceptance Criteria`, `## Metadata` sections
+- [ ] Issue body does NOT contain `## Context` or `## Technical Notes` sections
 - [ ] Output shows `✓ Created issue #N` with GitHub URL on its own line
 
 **Verify:**
 ```bash
 gh issue view <N> --json body | jq -r '.body' | head -5
 # Should start with: <!-- gitissue:normalized v1 -->
+
+# Verify NO affected files section
+gh issue view <N> --json body | jq -r '.body' | grep -c "Affected files"
+# Should be: 0
+
+# Verify NO technical notes section
+gh issue view <N> --json body | jq -r '.body' | grep -c "Technical Notes"
+# Should be: 0
 ```
 
 ---
 
-### T2: Create issue from vague description (empty state)
+### T2: Create issue from vague description (lean format)
 
 **Input:**
 ```
@@ -72,13 +83,14 @@ gh issue view <N> --json body | jq -r '.body' | head -5
 ```
 
 **Expected:**
-- [ ] Output shows `⚠ Could not identify affected files. Issue created with manual-review flag.`
-- [ ] Issue is still created (not blocked by missing files)
-- [ ] Issue body has empty or "Unable to determine" for affected files section
+- [ ] Output does NOT show `⚠ Could not identify affected files` (that message is removed)
+- [ ] Issue is created with type classified (likely `bug` with low confidence)
+- [ ] Issue body has acceptance criteria (even if generic)
+- [ ] Issue body has NO affected files section
 
 ---
 
-### T3: Normalize a messy existing issue
+### T3: Normalize a messy issue (structure-only)
 
 **Setup:**
 ```bash
@@ -93,12 +105,14 @@ gh issue create --title "login broken on mobile" --body "the login doesn't work 
 
 **Expected:**
 - [ ] Output shows `● Fetching issue #N...`
-- [ ] Output shows `● Scanning codebase for context...`
+- [ ] Output does NOT show `● Scanning codebase for context...` (no scan)
 - [ ] Output shows `◆ Normalization Preview` with `+` prefixed added fields and `=` preserved fields
-- [ ] Confidence scores shown: `(high)`, `(medium)`, or `(low)`
+- [ ] Preview does NOT contain a `Files:` line
+- [ ] Confidence scores shown for Type and Criteria
 - [ ] Backup comment posted BEFORE body edit (verify in GitHub)
 - [ ] Backup comment contains original body in `<details>` block
-- [ ] Issue body updated with full template structure
+- [ ] Issue body updated with template structure
+- [ ] Issue body does NOT contain `## Context` or `## Technical Notes`
 - [ ] Reporter Context blockquote contains: "the login doesn't work on phones. it just spins forever."
 - [ ] Normalization comment posted noting what was added
 - [ ] Output shows `✓ Backup posted` and `✓ Issue #N normalized` with URL
@@ -116,6 +130,10 @@ gh issue view <N> --json body --jq '.body' | head -1
 # Check Reporter Context preserved
 gh issue view <N> --json body --jq '.body' | grep "Reporter Context"
 # Should contain the original text
+
+# Verify NO affected files
+gh issue view <N> --json body --jq '.body' | grep -c "Affected files"
+# Should be: 0
 ```
 
 ---

@@ -4,10 +4,9 @@
 
 Bug
 
-## Context
+## Description
 
-**Affected files:**
-- `{file_path}` ({confidence})
+{description}
 
 **Current behavior:**
 {current_behavior}
@@ -17,10 +16,6 @@ Bug
 
 **Related issues:**
 {related_issues}
-
-## Description
-
-{description}
 
 > **Reporter Context**
 > {original_reporter_text}
@@ -34,16 +29,6 @@ Bug
 - [ ] {criterion_1}
 - [ ] {criterion_2}
 - [ ] {criterion_3}
-
-## Technical Notes
-
-**Architecture constraints:**
-{architecture_constraints}
-
-**Test coverage:**
-{test_coverage}
-
-**Breaking change risk:** {breaking_change_risk}
 
 ## Metadata
 

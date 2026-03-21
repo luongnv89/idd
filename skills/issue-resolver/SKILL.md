@@ -149,17 +149,17 @@ If `issue.auto_normalize` is true and the issue body does not contain `<!-- giti
 ● Auto-normalizing...
 ```
 
-Normalize the issue inline — this is the same logic as the normalization mode but executed directly, not by invoking another skill (skills are isolated):
+Normalize the issue inline — structure-only, no codebase scan:
 
-1. Extract keywords from the issue title and body
-2. Scan the codebase (Grep + Glob + Read) for affected files with confidence levels
-3. Classify the issue type (bug/feature/improvement)
-4. Generate a normalized body using the matching template structure: Type, Context (affected files), Description, Reporter Context (original text preserved in blockquote), Acceptance Criteria, Technical Notes, Metadata
-5. Place `<!-- gitissue:normalized v1 -->` at the top
-6. Post a backup comment with the original body in a `<details>` block
-7. Update the issue body via `gh issue edit {N} --body "{normalized_body}"`
+1. Classify the issue type (bug/feature/improvement) from the title and body
+2. Generate a normalized body using the matching template structure: Type, Description, Reporter Context (original text preserved in blockquote), Acceptance Criteria, Metadata
+3. Place `<!-- gitissue:normalized v1 -->` at the top
+4. Post a backup comment with the original body in a `<details>` block
+5. Update the issue body via `gh issue edit {N} --body "{normalized_body}"`
 
-After normalization, re-fetch the issue to get the enriched body.
+**Note:** Auto-normalize is structure-only — it restructures the issue text into the standard template without scanning the codebase. No affected files, technical notes, or architecture constraints are added. The Research step (Step 3) handles all codebase analysis.
+
+After normalization, re-fetch the issue to get the structured body.
 
 If the issue is already normalized, skip silently.
 
@@ -214,24 +214,25 @@ After branch creation:
 
 ## Step 3 — Research
 
-Read and understand all code relevant to the issue. This step gathers context — no code changes.
+Read and understand all code relevant to the issue. This is the **single authoritative codebase scan** — all file discovery happens here against the current code.
 
 ### Extract targets from issue
 
-From the normalized issue body, extract:
-- Files listed in the **Context > Affected files** section
-- Error messages, function names, class names from the **Description**
+From the issue body, extract:
+- Error messages, function names, class names, component names from the **Description**
 - Stack traces or code references from **Reporter Context**
 - Requirements from **Acceptance Criteria**
+- Keywords from the issue title
 
-### Read affected files
+### Scan codebase
 
-1. Read all files listed in the Affected files section (respect confidence: start with `high`, then `medium`)
-2. For each file, trace imports and dependencies — read the files they import
-3. Grep for error messages or function names mentioned in the issue
-4. Use the Agent tool for parallel file reads when there are 3+ files to examine
+1. Grep for error messages, function names, and component names extracted from the issue
+2. Glob for files matching mentioned paths or component names
+3. Read the most relevant files (max 20) to understand context
+4. For each file, trace imports and dependencies — read the files they import
+5. Use the Agent tool for parallel file reads when there are 3+ files to examine
 
-**Maximum scope:** Read up to 20 files. If more are relevant, prioritize by confidence level and direct mention in the issue.
+**Maximum scope:** Read up to 20 files. If more are relevant, prioritize by direct mention in the issue and keyword match strength.
 
 ### Understand current behavior
 

@@ -60,10 +60,19 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 ```
 ⚠ Circular dependency detected: #{a} → #{b} → #{a}
 
-  These issues reference each other's affected files.
+  These issues share affected files detected by codebase scan.
   Suggestion: resolve #{a} first (fewer dependencies).
 ```
 **Trigger:** Depth-first traversal of the dependency graph detects a cycle.
+
+### Scan timeout
+```
+⚠ Scan timeout for #{N} — skipping file analysis
+
+  Issue will appear as no-deps (timeout) in the dependency graph.
+  To fix:  increase triage.scan_timeout_per_issue in .gitissue.yml
+```
+**Trigger:** Keyword scan for a single issue exceeds `triage.scan_timeout_per_issue` seconds.
 
 ### API rate limit during fetch
 ```

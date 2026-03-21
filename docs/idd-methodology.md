@@ -102,27 +102,29 @@ graph TD
     style F fill:#2196F3,color:#fff
 ```
 
-Normalization is the process of enriching an unstructured issue with codebase context. A normalized issue contains:
+Normalization is the process of restructuring an unstructured issue into the standard template. A normalized issue contains:
 
-- **Type classification** — bug, feature, or improvement
-- **Affected files** with confidence levels — `auth.py (high confidence)`, `config.py (needs review)`
-- **Acceptance criteria** — testable conditions for "done"
-- **Technical notes** — architecture constraints, test coverage, breaking change risk
+- **Type classification** — bug, feature, or improvement (with confidence level)
+- **Description** — synthesized from the original text with current/expected behavior
+- **Acceptance criteria** — testable conditions for "done" (with confidence level)
 - **Reporter Context** — original text preserved verbatim
+- **Metadata** — suggested priority, effort, labels
+
+Issues intentionally do NOT include codebase analysis (affected files, technical notes). The resolver and triage skills scan the codebase themselves when needed, against current code.
 
 The normalization marker `<!-- gitissue:normalized v1 -->` is invisible in GitHub's rendered view but detectable by tools.
 
 ### Confidence Scoring
 
-Auto-enriched fields include confidence indicators:
+Type classification and acceptance criteria include confidence indicators:
 
 | Level | Meaning | Display |
 |-------|---------|---------|
-| **high** | Direct match — file explicitly mentioned or contains the exact error | `(high confidence)` |
-| **medium** | Keyword inference — related module or component name match | `(medium confidence)` |
-| **low** | Best guess — same directory or project structure inference | `(needs review)` |
+| **high** | Explicit keywords — crash/error/500 → bug, "add new" → feature | `(high confidence)` |
+| **medium** | Inferred from description context or tone | `(medium confidence)` |
+| **low** | Ambiguous description, defaulted | `(needs review)` |
 
-Low-confidence fields are marked `(needs review)` so resolvers know to verify before relying on them.
+Low-confidence fields are marked `(needs review)` so reviewers know to verify.
 
 ### Agent-Agnostic Design
 

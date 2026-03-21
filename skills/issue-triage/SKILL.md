@@ -110,6 +110,7 @@ Triage settings and defaults:
 | `triage.stale_threshold_days` | `14` | Flag issues with no activity beyond this many days |
 | `triage.auto_priority` | `true` | Suggest P1/P2/P3 based on type, age, and dependency position |
 | `triage.include_closed` | `false` | Include recently closed issues in triage analysis |
+| `triage.scan_timeout_per_issue` | `30` | Max seconds to scan per issue for file dependencies |
 
 If the config file exists but contains invalid values, output the validation error from `references/error-messages.md` and stop.
 
@@ -154,17 +155,24 @@ Progress output:
 
 ## Step 2 — Analyze Dependencies
 
-For each issue, extract affected files from the normalized body. Look for the `**Affected files:**` section (or variations: `## Context` with file paths, inline code blocks containing file paths, `**Files:**` field). Issues sharing affected files or modules (same parent directory) are considered dependent.
+For each issue, extract keywords from the issue title and body — look for error messages, component names, file paths, function names, class names, and module references. Then grep the codebase for each issue's keywords to find affected files. Issues sharing affected files or modules (same parent directory) are considered dependent.
+
+**Keyword extraction:** Parse the title and body for meaningful search terms. Ignore common stop-words, markdown syntax, and generic phrases. Prefer specific identifiers: function names (`handleAuth`), file paths (`src/auth.py`), error strings (`"ECONNREFUSED"`), component names (`SessionManager`).
+
+**Codebase scan:** For each extracted keyword, search the local codebase (respecting `.gitignore`). Collect the set of files that match. This is the issue's affected files list.
+
+**Scan timeout:** Each issue's scan is bounded by `triage.scan_timeout_per_issue` (default: 30 seconds). If the scan exceeds this limit, stop scanning for that issue, mark it as `no-deps (timeout)` in the dependency graph, and emit the timeout warning from `references/error-messages.md`.
 
 Build a dependency graph:
 - Each issue is a node.
-- An edge from issue A to issue B means they share one or more affected files, and A should be resolved before B (determined by: earlier creation date, more blocking relationships, or bug type takes precedence).
+- An edge from issue A to issue B means they share one or more affected files (found by keyword scan), and A should be resolved before B (determined by: earlier creation date, more blocking relationships, or bug type takes precedence).
 - If two issues share the same file and neither clearly precedes the other, mark them as co-dependent at the same level.
+- Issues marked `no-deps (timeout)` have no edges — they appear as isolated nodes.
 
 Progress output:
 
 ```
-● Analyzing dependencies...
+● Scanning codebase for issue dependencies...
 ```
 
 ## Step 3 — Detect Circular Dependencies
@@ -176,7 +184,7 @@ If a cycle is found, warn using the format from `references/error-messages.md`:
 ```
 ⚠ Circular dependency detected: #12 → #15 → #12
 
-  These issues reference each other's affected files.
+  These issues share affected files detected by codebase scan.
   Suggestion: resolve #12 first (fewer dependencies).
 ```
 
@@ -345,7 +353,7 @@ After Step 8 (terminal output is always shown regardless of persistence success)
 | `issues[].status` | string | `"ready"`, `"blocked"`, or `"stale"` |
 | `issues[].stale_days` | integer or null | Days since last update, null if not stale |
 | `issues[].labels` | string[] | GitHub labels |
-| `issues[].affected_files` | string[] | Files from the normalized body |
+| `issues[].affected_files` | string[] | Files identified by keyword-based codebase scan at triage time |
 | `issues[].updated_at` | ISO 8601 string | GitHub `updatedAt` value |
 | `summary.parallel_groups` | integer[][] | Groups of parallelizable issue numbers |
 | `summary.stale_count` | integer | Number of stale issues |
@@ -376,15 +384,15 @@ This is a warning, not a fatal error — the terminal output from Step 8 was alr
 ## Example: Triage with dependencies and stale issues
 
 **Repository has 4 open issues:**
-- #12 "Fix auth redirect" (bug, updated 2 days ago, affects `auth.py`, `middleware.py`)
-- #8 "Add pagination" (feature, updated 5 days ago, affects `api/views.py`)
-- #15 "Refactor DB layer" (improvement, updated 3 days ago, affects `auth.py`, `db.py`)
-- #3 "Old UI alignment bug" (bug, updated 28 days ago, affects `styles.css`)
+- #12 "Fix auth redirect" (bug, updated 2 days ago, keywords: 'auth redirect')
+- #8 "Add pagination" (feature, updated 5 days ago, keywords: 'pagination views')
+- #15 "Refactor DB layer" (improvement, updated 3 days ago, keywords: 'auth db layer')
+- #3 "Old UI alignment bug" (bug, updated 28 days ago, keywords: 'UI alignment')
 
 **Execution:**
 
 1. Fetch → 4 open issues
-2. Dependencies → #12 and #15 share `auth.py`, so #12 blocks #15
+2. Dependencies → keyword scan finds #12 and #15 both match `auth.py`, so #12 blocks #15
 3. Cycles → none
 4. Topological sort → #12 first (bug, blocks #15), then #8 and #3 (independent), then #15
 5. Parallelizable → #12 + #8 + #3 are all at the first level, but #12 blocks #15 so #8 and #3 can run in parallel with #12
@@ -397,7 +405,7 @@ This is a warning, not a fatal error — the terminal output from Step 8 was alr
 
 ```
   ● Fetching 4 open issues...
-  ● Analyzing dependencies...
+  ● Scanning codebase for issue dependencies...
 
   ◆ Issue Triage
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄
@@ -430,19 +438,19 @@ This is a warning, not a fatal error — the terminal output from Step 8 was alr
 
 ## Example: Circular dependency
 
-**Repository has 2 open issues that reference each other's files:**
-- #5 "Fix login flow" (bug, affects `auth.py`, `session.py`)
-- #9 "Refactor session management" (improvement, affects `session.py`, `auth.py`)
+**Repository has 2 open issues whose keyword scans overlap:**
+- #5 "Fix login flow" (bug, keywords: 'login auth session')
+- #9 "Refactor session management" (improvement, keywords: 'session auth refactor')
 
 **Output:**
 
 ```
   ● Fetching 2 open issues...
-  ● Analyzing dependencies...
+  ● Scanning codebase for issue dependencies...
 
   ⚠ Circular dependency detected: #5 → #9 → #5
 
-    These issues reference each other's affected files.
+    These issues share affected files detected by codebase scan.
     Suggestion: resolve #5 first (fewer dependencies).
 
   ◆ Issue Triage

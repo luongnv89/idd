@@ -136,7 +136,7 @@ gitissue is purpose-built for **brownfield projects** — the 90% of software wo
 - [ ] Created issue follows the gitissue template structure
 
 **Edge Cases**:
-- Description too vague to identify affected files → create issue with "Affected files: Unable to determine — manual review needed" and lower confidence flag
+- Description too vague to classify type → create issue with type marked `(needs review)` and lower confidence flag
 - Duplicate issue detection → warn if a similar open issue exists (title + description similarity)
 - No GitHub remote configured → error with clear setup instructions
 - Rate limit hit during batch creation → queue remaining, report progress, resume on next run

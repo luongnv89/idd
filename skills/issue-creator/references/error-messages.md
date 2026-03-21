@@ -79,7 +79,6 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 ### Security label detected
 ```
 ⚠ Issue #N has a security label ({label_name}). Skipping normalization.
-  Codebase context could reveal exploit details.
 
   To override: /issue-creator N --force
 ```
@@ -187,13 +186,6 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 **Trigger:** In a multi-image upload, some succeed and some fail. Issue is created with successfully uploaded images embedded.
 
 ## Empty States
-
-### No files identified
-```
-⚠ Could not identify affected files. Issue created with manual-review flag.
-  Tip: mention specific filenames or error messages for better results.
-```
-**Trigger:** Codebase scan returns no file matches.
 
 ### No labels suggested
 ```
