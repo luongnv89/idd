@@ -16,23 +16,25 @@
 
 | Say this... | Skill will... |
 |---|---|
-| `/issue-triage` | Analyze all open issues, persist to `.gitissue/triage.json`, show dependency table |
-| `/issue-triage view` | Show cached triage report without API calls |
+| `/issue-triage` | Show cached triage instantly (or auto-generate on first run), suggest update if changes detected |
 | `/issue-triage update` | Force a fresh analysis and overwrite cached results |
-| "what should I work on next" | Triage the backlog and recommend which issue to pick up first |
-| "which issues are blocked" | Build dependency graph and show which issues depend on others |
+| "what should I work on next" | Show triage report and recommend which issue to pick up first |
+| "which issues are blocked" | Show dependency graph from cached or fresh analysis |
 | "sprint planning" | Output a prioritized, dependency-aware work plan |
 
 ## How It Works
 
 ```mermaid
 graph TD
-    A["Fetch all open issues"] --> B["Analyze dependencies via shared files"]
-    B --> C["Detect cycles & compute execution order"]
-    C --> D["Identify parallelizable work & stale issues"]
-    D --> E["Output triage table with priorities"]
+    A["Check for cached triage"] --> B{"Cache exists?"}
+    B -- Yes --> C["Render cached report instantly"]
+    B -- No --> D["Auto-run full analysis"]
+    C --> E["Check git history for changes"]
+    E --> F["Suggest update if stale"]
+    D --> G["Persist & display results"]
     style A fill:#4CAF50,color:#fff
-    style E fill:#2196F3,color:#fff
+    style F fill:#2196F3,color:#fff
+    style G fill:#2196F3,color:#fff
 ```
 
 ## Installation
@@ -53,7 +55,6 @@ asm install https://github.com/luongnv89/idd --skill issue-triage
 
 ```
 /issue-triage
-/issue-triage view
 /issue-triage update
 /issue-triage --limit 20
 ```

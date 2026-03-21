@@ -88,19 +88,19 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 
 ### No triage report found
 ```
-○ No triage report found. Run /issue-triage to generate one.
+○ No cached triage found — running first analysis...
 ```
-**Trigger:** `/issue-triage view` invoked but `.gitissue/triage.json` does not exist.
+**Trigger:** `/issue-triage` or `/issue-triage view` invoked but `.gitissue/triage.json` does not exist. The skill automatically falls through to a full analysis.
 **Note:** This is an informational message, not an error.
 
 ### Corrupted triage report
 ```
 ✗ .gitissue/triage.json is corrupted
 
-  To fix:  rm .gitissue/triage.json && /issue-triage
+  To fix:  rm .gitissue/triage.json && /issue-triage update
   Check:   was the file edited manually?
 ```
-**Trigger:** `/issue-triage view` finds the file but JSON parsing fails.
+**Trigger:** `/issue-triage` or `/issue-triage view` finds the file but JSON parsing fails.
 
 ### Could not save triage report
 ```
