@@ -239,6 +239,55 @@ Normalized issues must render cleanly in GitHub's web UI:
     Closes #42
 ```
 
+### /issue-analysis N
+
+```
+  ● Fetching issue #42...
+
+  ◆ Analysis Pipeline
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  [1/8] Fetch          ✓ issue #42 loaded (bug)
+  [2/8] Extract        ✓ 8 keywords, 2 file refs
+  [3/8] Research       ✓ read 18 files, traced 12 deps
+  [4/8] History        ✓ 5 related commits, 1 regression
+  [5/8] Cross-refs     ✓ 2 related issues
+  [6/8] Analysis       ✓ root cause identified
+  [7/8] Options        ✓ 3 approaches proposed
+  [8/8] Report         ✓ analysis complete
+
+  ◆ Issue Analysis: #42 Fix mobile auth redirect loop
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+
+  Type:        bug
+  Labels:      bug, auth, mobile
+
+  ◆ Git History
+  ┄┄┄┄┄┄┄┄┄┄┄┄
+    Domain experts:  @jdoe (12), @asmith (5)
+    ⚡ Possible regression: e4f5g6h 2026-03-10
+
+  ◆ Cross-references
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+    Blocks: #55, #60
+    ⚠ Possible duplicate: #51
+
+  ◆ Implementation Options
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+    Option 1: Minimal fix (S)
+      + Smallest change, lowest risk
+
+    Option 2: Route-based config (M)
+      + Declarative auth per route
+
+  ◆ Summary
+  ┄┄┄┄┄┄┄┄┄
+    Complexity:   S │ Risk: Low
+    Recommended:  Option 1 — Minimal fix
+
+  ✓ Done — analysis of #42: Fix mobile auth ...
+    Saved: .gitissue/analysis-42.json
+```
+
 ### /issue-triage
 
 ```

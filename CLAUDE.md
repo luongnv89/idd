@@ -10,6 +10,9 @@ This is a **skills-only** project. There is no runtime code — each skill is a 
 
 ```
 skills/
+├── issue-analysis/     # /issue-analysis N
+│   ├── SKILL.md
+│   └── references/
 ├── issue-creator/      # /issue-creator and /issue-creator N (normalization)
 │   ├── SKILL.md
 │   ├── templates/      # Issue templates (bug, feature, improvement)

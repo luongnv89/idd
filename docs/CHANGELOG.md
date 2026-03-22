@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Added
+- `/issue-analysis` skill — deep single-issue analysis with root cause, implementation options, and risk assessment
+  - 8-step pipeline: Fetch → Extract → Research → History → Cross-refs → Analysis → Options → Report
+  - Git history analysis: prior fix attempts, regression detection, domain expert identification
+  - Cross-references: triage data, related issues/PRs, duplicate detection, "already resolved" detection
+  - Persists to `.gitissue/analysis-<N>.json` for cross-session access and future use by `/issue-resolver`
+  - View mode renders cached analysis without GitHub API calls
+  - Configurable scan depth (`analysis.max_files`, `analysis.trace_depth`, `analysis.scan_timeout`)
+  - Analyzes closed issues for reference (does not stop on closed state)
+
 ## [0.1.0] - 2026-03-21
 
 ### Added
