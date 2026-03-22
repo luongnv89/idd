@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-03-22
+
 ### Added
 - `/issue-analysis` skill — deep single-issue analysis with root cause, implementation options, and risk assessment
   - 8-step pipeline: Fetch → Extract → Research → History → Cross-refs → Analysis → Options → Report
@@ -15,6 +17,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   - View mode renders cached analysis without GitHub API calls
   - Configurable scan depth (`analysis.max_files`, `analysis.trace_depth`, `analysis.scan_timeout`)
   - Analyzes closed issues for reference (does not stop on closed state)
+- `effort` attribute in all skill frontmatter (low/medium/high/max)
+- README rewritten as landing page with "Works With Any Tool" section
+
+### Changed
+- `/issue-triage` — view is now the default mode; removed `/view` subcommand
+- README command table includes Version and Effort columns
+- Documentation updated with `/issue-analysis` references (ARCHITECTURE.md, DESIGN.md, config-schema.md)
 
 ## [0.1.0] - 2026-03-21
 
