@@ -1,6 +1,7 @@
 ---
 name: issue-resolver
 description: Resolve a GitHub issue end-to-end through a 7-step pipeline (Fetch, Branch, Research, Plan, Execute, Verify, Ship) producing an atomic PR with "Closes #N". Includes guard checks and auto-normalization before the pipeline starts. Use this skill whenever someone says "resolve issue", "fix issue", "work on issue", "implement issue", "/issue-resolver", or provides an issue number they want resolved. Also trigger when asked to "close this issue with a PR", "implement #N", "fix #N", "take issue #N", "start working on #N", "pick up issue #N", or even just "#N" with the intent to work on it. If the user mentions a GitHub issue number and wants code written to address it, this is the right skill — even if they don't say "resolve" explicitly. The skill handles everything from reading the issue to creating the PR, so use it any time the goal is going from an open issue to a merged fix.
+effort: max
 license: MIT
 metadata:
   version: 0.1.0

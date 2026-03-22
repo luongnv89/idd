@@ -46,13 +46,13 @@ graph LR
     style G fill:#2196F3,color:#fff
 ```
 
-| Command | What it does |
-|---------|-------------|
-| `/issue-creator` | Classify type, generate acceptance criteria, create a structured issue |
-| `/issue-analysis N` | Root cause, git history, implementation options, complexity and risk |
-| `/issue-resolver N` | Fetch, branch, scan codebase, write code + tests, open PR with `Closes #N` |
-| `/issue-triage` | Dependency graph, stale detection, priority and execution order |
-| `/init-gitissue` | Auto-detect language/framework/test runner, generate `.gitissue.yml` |
+| Command | What it does | Version | Effort |
+|---------|-------------|---------|--------|
+| `/issue-creator` | Classify type, generate acceptance criteria, create a structured issue | 0.1.0 | medium |
+| `/issue-analysis N` | Root cause, git history, implementation options, complexity and risk | 0.1.0 | high |
+| `/issue-resolver N` | Fetch, branch, scan codebase, write code + tests, open PR with `Closes #N` | 0.1.0 | max |
+| `/issue-triage` | Dependency graph, stale detection, priority and execution order | 0.2.0 | medium |
+| `/init-gitissue` | Auto-detect language/framework/test runner, generate `.gitissue.yml` | 0.1.0 | low |
 
 ---
 
