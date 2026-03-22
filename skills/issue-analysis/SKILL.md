@@ -137,7 +137,7 @@ Each step prints a new line when it starts (with `●`) and updates to `✓` on 
 ```
 
 ```bash
-gh issue view {N} --json number,title,body,labels,assignees,state,comments,createdAt,updatedAt
+gh issue view {N} --json number,title,body,labels,assignees,state,comments,createdAt,updatedAt,author
 ```
 
 **If not found:**
@@ -477,6 +477,7 @@ Display the full analysis following DESIGN.md conventions.
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
 
   Type:        {bug|feature|improvement}
+  Reporter:    @{author.login}
   Priority:    {from triage data if available, else "—"}
   Labels:      {label1}, {label2}
   Created:     {created_at, YYYY-MM-DD}
@@ -661,6 +662,10 @@ This is a warning, not a fatal error — the terminal output from Step 6 was alr
     "number": 42,
     "title": "Fix mobile auth redirect loop",
     "type": "bug",
+    "reporter": {
+      "login": "janedoe",
+      "name": "Jane Doe"
+    },
     "labels": ["bug", "auth", "mobile"],
     "state": "open",
     "created_at": "2026-03-15T10:00:00Z",
@@ -778,6 +783,9 @@ This is a warning, not a fatal error — the terminal output from Step 6 was alr
 | `issue.number` | integer | GitHub issue number |
 | `issue.title` | string | Issue title |
 | `issue.type` | string | `"bug"`, `"feature"`, or `"improvement"` |
+| `issue.reporter` | object | Issue author from GitHub |
+| `issue.reporter.login` | string | GitHub username |
+| `issue.reporter.name` | string or null | Display name (may be null if not set) |
 | `issue.labels` | string[] | GitHub labels |
 | `issue.state` | string | `"open"` or `"closed"` |
 | `issue.created_at` | ISO 8601 string | Issue creation date |
@@ -912,6 +920,7 @@ If `.gitissue/analysis-<N>.json` already exists when running a full analysis (no
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
 
   Type:        bug
+  Reporter:    @janedoe
   Priority:    P1 (from triage)
   Labels:      bug, auth, mobile
   Created:     2026-03-15
@@ -1047,7 +1056,7 @@ If `.gitissue/analysis-<N>.json` already exists when running a full analysis (no
 
 Every `gh` command for data retrieval uses `--json` with explicit field selection. Never parse text output.
 
-- `gh issue view N --json number,title,body,labels,assignees,state,comments,createdAt,updatedAt`
+- `gh issue view N --json number,title,body,labels,assignees,state,comments,createdAt,updatedAt,author`
 
 ## Terminal Output
 
