@@ -167,11 +167,26 @@ Extract from the description:
 - Keywords: error messages, component names, file paths, function names
 - Implied type: bug (broken behavior, errors, crashes), feature (new capability), improvement (enhancement to existing behavior)
 
-### Step 2 — Classify Type
+### Step 2 — Classify Type and Title
 
+**Type classification:**
 - **bug** — broken behavior, errors, crashes, regressions
 - **feature** — new capability, endpoint, UI element, workflow
 - **improvement** — enhancement, refactoring, performance, UX polish
+
+**Issue title conventions** (see `docs/naming-conventions.md` for the full reference):
+- Use **imperative mood** (like a command): "Fix login crash on mobile" not "Login is crashing"
+- Keep titles **concise, descriptive, and actionable** — under 70 characters
+- Include **context** when helpful: "Fix checkout page redirect on Safari"
+- The title should read as what needs to happen, not what is broken
+- Optional **type prefix** for extra clarity: "Bug: App crashes on iOS login"
+
+| Good | Bad |
+|------|-----|
+| Fix mobile auth redirect loop | Login is broken |
+| Add dark mode toggle to settings | Dark mode |
+| Refactor auth middleware for OAuth2 | Auth stuff needs updating |
+| Bug: App crashes on iOS when tapping login | It doesn't work on my phone |
 
 Assign confidence to the type classification:
 - **high** — explicit crash/error/500 keywords (bug), "add new"/"create" (feature), "refactor"/"improve"/"optimize" (improvement)
@@ -600,6 +615,7 @@ All errors use the rich format from `references/error-messages.md`:
 ## Additional Resources
 
 - **`references/error-messages.md`** — Complete error catalog with triggers and exact output
+- **`docs/naming-conventions.md`** — Issue title and labeling conventions
 - **`templates/bug.md`** — Bug report template
 - **`templates/feature.md`** — Feature request template
 - **`templates/improvement.md`** — Improvement template

@@ -212,8 +212,11 @@ resolve:
   approval_gate: auto
 
   # Branch naming prefix
-  # Branch format: {prefix}{issue_number}/{short-description}
-  branch_prefix: "issue-"
+  # "auto" uses type-based prefixes: fix/, feat/, refactor/, docs/, test/, chore/
+  # Branch format: {type}/{issue_number}-{short-description}
+  # Examples: fix/42-mobile-auth-redirect, feat/15-add-dark-mode
+  # Set a custom string (e.g., "issue-") to override type-based naming
+  branch_prefix: "auto"
 
   # Run tests before creating PR
   auto_test: {true_or_false}
@@ -469,5 +472,6 @@ All errors use the rich format from `references/error-messages.md`:
 ## Additional Resources
 
 - **`references/error-messages.md`** — Complete error catalog with triggers and exact output
+- **`docs/naming-conventions.md`** — Branch, commit, PR, and issue naming conventions (referenced by generated config)
 - **`docs/config-schema.md`** — Full configuration schema that this skill generates
 - **`DESIGN.md`** — Terminal output style guide (repo root)

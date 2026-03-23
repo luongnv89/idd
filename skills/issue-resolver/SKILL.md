@@ -64,7 +64,7 @@ Load `.gitissue.yml` from the repo root once at skill start. If the file does no
 Defaults:
 - `issue.auto_normalize: true`
 - `resolve.approval_gate: auto`
-- `resolve.branch_prefix: "issue-"`
+- `resolve.branch_prefix: "auto"` (uses type-based prefix: fix/, feat/, refactor/, etc.)
 - `resolve.auto_test: true`
 - `resolve.test_timeout: 300`
 - `resolve.pr_auto_link: true`
@@ -84,7 +84,7 @@ The resolve pipeline has 7 steps. Display progress using the `[N/7]` step counte
   ◆ Resolve Pipeline
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   [1/7] Fetch        ✓ issue #42 loaded
-  [2/7] Branch       ✓ issue-42/fix-mobile-auth
+  [2/7] Branch       ✓ fix/42-mobile-auth
   [3/7] Research     ● reading 5 files...
 ```
 
@@ -182,11 +182,27 @@ After fetch + guards + normalize are complete:
 
 Create a working branch from the default branch (usually `main`).
 
-**Branch naming:** `{resolve.branch_prefix}{N}/{short-description}`
+**Branch naming:** `{type}/{N}-{short-description}`
 
-The `short-description` is derived from the issue title: lowercase, spaces replaced with hyphens, non-alphanumeric characters removed, truncated to 50 characters.
+The branch name follows the project naming conventions (see `docs/naming-conventions.md` for the full reference):
 
-Example: Issue #42 "Fix mobile auth redirect loop" → `issue-42/fix-mobile-auth-redirect-loop`
+1. **Type prefix** — derived from the issue type:
+   - bug → `fix/`
+   - feature → `feat/`
+   - improvement → `refactor/`
+   - documentation → `docs/`
+   - test → `test/`
+   - maintenance → `chore/`
+2. **Issue number** — always included for traceability
+3. **Short description** — derived from the issue title: lowercase, spaces → hyphens, non-alphanumeric removed, total branch name kept under 50 characters
+
+Example: Issue #42 "Fix mobile auth redirect loop" (bug) → `fix/42-mobile-auth-redirect-loop`
+Example: Issue #15 "Add dark mode toggle" (feature) → `feat/15-add-dark-mode-toggle`
+
+If the user has configured a custom `resolve.branch_prefix` in `.gitissue.yml`, use that fixed prefix instead of the type-based prefix. The custom prefix format is `{prefix}{N}/{short-description}`:
+
+- `branch_prefix: "auto"` (default) → `fix/42-mobile-auth-redirect-loop`
+- `branch_prefix: "issue-"` → `issue-42/fix-mobile-auth-redirect-loop`
 
 ```bash
 git checkout -b {branch_name}
@@ -194,7 +210,7 @@ git checkout -b {branch_name}
 
 **If branch already exists:**
 ```
-⚠ Branch issue-N/{description} already exists
+⚠ Branch {type}/N-{description} already exists
 
   Options:
     continue  — resume from existing branch
@@ -297,9 +313,15 @@ Write the code changes and tests. This is the core implementation step.
 1. **Follow existing code patterns** — match the style, conventions, and architecture of the target codebase
 2. **Write tests alongside code** — if the codebase has tests, write/update tests for the changes
 3. **Atomic commits** — each logical change gets its own commit with a clear message
-4. **Commit message format:** `{type}: {description} (#{issue_number})`
-   - Types: `fix`, `feat`, `refactor`, `test`, `docs`
-   - Example: `fix: resolve mobile auth redirect loop (#42)`
+4. **Commit message format** (Conventional Commits — see `docs/naming-conventions.md` for the full reference):
+   `{type}({scope}): {description} (#{issue_number})`
+   - Types: `fix`, `feat`, `refactor`, `test`, `docs`, `chore`, `style`, `perf`
+   - Scope is optional but recommended — use the module or component name (e.g., `auth`, not `auth.py`)
+   - Description in imperative mood, lowercase, no trailing period
+   - Always reference the issue number at the end: `(#N)`
+   - Keep the first line under 72 characters
+   - Example: `fix(auth): resolve mobile auth redirect loop (#42)`
+   - Example: `test(auth): add redirect loop regression test (#42)`
 
 ### Max commits guard
 
@@ -396,7 +418,14 @@ gh pr create --title "{pr_title}" --body "{pr_body}" --json number,url
 
 This returns the PR number and URL as structured JSON for use in the final report.
 
-**PR title:** Same as the issue title, or a concise summary of the fix.
+**PR title** (Conventional Commits format — see `docs/naming-conventions.md` for the full reference):
+`{type}({scope}): {description} (#{issue_number})`
+
+- Same format as commit messages
+- Use the **dominant type** if the PR spans multiple types (e.g., fix + test → `fix`)
+- Keep under 72 characters
+- Example: `fix(auth): resolve mobile auth redirect loop (#42)`
+- Example: `feat(settings): add dark mode toggle (#15)`
 
 **PR body structure:**
 
@@ -507,14 +536,14 @@ If the estimated change spans more than 20 files, warn before executing:
   ◆ Resolve Pipeline
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   [1/7] Fetch        ✓ issue #42 loaded
-  [2/7] Branch       ✓ issue-42/fix-mobile-auth
+  [2/7] Branch       ✓ fix/42-mobile-auth
   [3/7] Research     ✓ read 5 files, traced 3 deps
   [4/7] Plan         ✓ approach: fix redirect logic
   [5/7] Execute      ✓ 2 files changed, 45 lines
   [6/7] Verify       ✓ 12 tests passed
   [7/7] Ship         ✓ PR #87 created
 
-  ✓ Done — PR #87: Fix mobile auth redirect
+  ✓ Done — PR #87: fix(auth): resolve mobile auth redirect (#42)
     https://github.com/user/repo/pull/87
     Closes #42
 ```
@@ -553,5 +582,6 @@ All errors use the rich format from `references/error-messages.md`:
 ## Additional Resources
 
 - **`references/error-messages.md`** — Complete error catalog with triggers and exact output
+- **`docs/naming-conventions.md`** — Branch, commit, PR, and issue naming conventions
 - **`DESIGN.md`** — Terminal output style guide (repo root)
 - **`docs/config-schema.md`** — Full configuration schema

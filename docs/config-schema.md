@@ -82,10 +82,12 @@ resolve:
 
   # Branch naming prefix
   # Type: string
-  # Default: "issue-"
-  # Branch format: {prefix}{issue_number}/{short-description}
-  # Example: issue-42/fix-auth-redirect
-  branch_prefix: "issue-"
+  # Default: "auto"
+  # "auto" uses type-based prefixes: fix/, feat/, refactor/, docs/, test/, chore/
+  # Branch format: {type}/{issue_number}-{short-description}
+  # Examples: fix/42-mobile-auth-redirect, feat/15-add-dark-mode
+  # Set a custom string (e.g., "issue-") to override type-based naming
+  branch_prefix: "auto"
 
   # Run tests before creating PR
   # Type: boolean
@@ -232,7 +234,7 @@ Config is validated on load at the start of every skill invocation. Errors inclu
 | `issue.labels_auto_suggest` | `true` | Suggest labels from content |
 | `issue.normalize_comment` | `true` | Comment on normalization |
 | `resolve.approval_gate` | `auto` | No approval wait |
-| `resolve.branch_prefix` | `issue-` | Branch naming prefix |
+| `resolve.branch_prefix` | `auto` | Type-based branch prefix (fix/, feat/, etc.) |
 | `resolve.auto_test` | `true` | Run tests before PR |
 | `resolve.test_timeout` | `300` | 5 minute test timeout |
 | `resolve.pr_auto_link` | `true` | Auto-close issue on merge |

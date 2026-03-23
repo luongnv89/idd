@@ -239,7 +239,7 @@ issue:
 
 resolve:
   approval_gate: auto           # auto | comment-and-wait
-  branch_prefix: "issue-"      # branch naming: issue-42/short-description
+  branch_prefix: "auto"        # type-based: fix/42-description, feat/15-description
   auto_test: true               # run tests before creating PR
   test_timeout: 300             # abort verify phase after N seconds (default: 5 min)
   pr_auto_link: true            # include "Closes #N" in PR body
@@ -394,7 +394,7 @@ flowchart TD
     C -->|No| D{auto_normalize\nenabled?}
     D -->|Yes| E[Run /issue-creator 42\nauto-normalize]
     D -->|No| F[Warn: unstructured issue\nproceed anyway]
-    C -->|Yes| G[Create branch\nissue-42/short-desc]
+    C -->|Yes| G[Create branch\nfix/42-short-desc]
     E --> G
     F --> G
     G --> H[RESEARCH PHASE\nRead affected files\nTrace dependencies\nUnderstand current behavior]

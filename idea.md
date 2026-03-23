@@ -91,7 +91,7 @@ Human files issue via GitHub UI     AI creates via /issue-creator
 issue-resolver 42
   │
   ├── 1. Fetch issue from GitHub
-  ├── 2. Create branch (issue-42/short-description)
+  ├── 2. Create branch (fix/42-short-description)
   ├── 3. Research phase (read affected files, trace deps)
   ├── 4. Plan phase (propose approach, local only)
   ├── 5. Execute (write code, write tests, atomic commits)
@@ -108,7 +108,7 @@ issue:
   labels_auto_suggest: true
 resolve:
   approval_gate: auto
-  branch_prefix: "issue-"
+  branch_prefix: "auto"
   auto_test: true
   pr_auto_link: true
 triage:

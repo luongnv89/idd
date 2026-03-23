@@ -310,7 +310,7 @@ issue:
 
 resolve:
   approval_gate: auto           # auto | comment-and-wait
-  branch_prefix: "issue-"       # branch naming: issue-42/short-description
+  branch_prefix: "auto"         # type-based: fix/42-description, feat/15-description
   auto_test: true               # run tests before creating PR
   test_timeout: 300             # abort verify phase after N seconds
   pr_auto_link: true            # include "Closes #N" in PR body
