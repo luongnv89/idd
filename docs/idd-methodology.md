@@ -2,11 +2,32 @@
 
 ## What is IDD?
 
-Issue-Driven Development is a software development methodology where **GitHub issues are the single source of truth** for all development work. Every change — bug fix, feature, improvement — starts as a structured issue and ends as an atomic PR linked to that issue.
+Issue-Driven Development — also **Intention-Driven Development** — is a software development methodology where **GitHub issues are the single source of truth** for all development work. Every change — bug fix, feature, improvement — starts as a structured issue and ends as an atomic PR linked to that issue.
 
-The key insight: the gap between "someone describes a problem" and "someone resolves it" is a translation gap. Vague bug reports become structured work orders. Any resolver — human or AI agent — gets the same context: affected files, acceptance criteria, architecture constraints.
+The key insight: the gap between "someone describes a problem" and "someone resolves it" is both a **translation gap** and an **intention gap**. Vague bug reports become structured work orders through an iterative process that helps creators discover and articulate what they actually want. Any resolver — human or AI agent — gets the same context: acceptance criteria, architecture constraints, and a precise expression of intent.
 
 IDD is purpose-built for **brownfield projects** — the 90% of software work that's modifying existing codebases, not greenfield architecture.
+
+## IDD as Intention-Driven Development
+
+IDD is also **Intention-Driven Development** — and that name reveals the methodology's deeper purpose.
+
+Expressing what you actually want is one of the hardest problems in software development. Even experienced developers struggle to articulate a bug or feature request clearly enough for someone else — human or AI — to act on it correctly. The result: wrong assumptions, wasted effort, and solutions that miss the point.
+
+`/issue-creator` addresses this through an **iterative clarification loop**:
+
+1. **Describe the problem** — loosely, incompletely, however it comes to mind
+2. **The agent proposes a structured issue** — classifying the type, filling in context, generating acceptance criteria
+3. **Read back what it captured** — and realize what you actually meant, what's missing, what's imprecise
+4. **Refine through conversation** — correct, add detail, sharpen the intent through multi-turn discussion until the issue says exactly what you want
+
+This process does something no template or form can do: it helps you **discover your own intention**. The agent acts as both a mirror and a structured interviewer — reflecting your input back in a standardized format and prompting you to think more precisely about what you need.
+
+By the time the issue is finalized, it accurately represents what the creator wants — expressed in a way that both humans and AI agents can understand and execute without ambiguity.
+
+This matters because understanding user requirements is one of the hardest steps in the software development lifecycle. Most bugs, missed features, and scope creep trace back to requirements that were never clearly stated. IDD makes that step explicit, collaborative, and repeatable — turning an informal complaint into a precise, agent-ready work order.
+
+The structured issue becomes the **single source of truth** for what needs to happen. When `/issue-resolver` picks it up, there's no guesswork — the intention is already captured.
 
 ## Why IDD?
 
@@ -151,9 +172,10 @@ Run `/init-gitissue` to auto-detect your project's language, framework, and test
 ## Principles
 
 1. **The issue is the spec.** If it's not in the issue, it's not in scope.
-2. **Normalize before resolve.** Every issue gets codebase context before work begins.
-3. **Confidence over certainty.** Show what's inferred vs. what's known. Mark low-confidence fields for human review.
-4. **Agent-agnostic.** The same issue works for any resolver — human, Claude, Codex, Copilot.
-5. **Zero overhead.** No extra tools, no platform accounts, no sync. Just `gh` and Git.
-6. **Brownfield-first.** Built for existing codebases where context matters most.
-7. **Data safety.** Backup before edit. Never modify without a verified backup.
+2. **Intention before implementation.** The iterative clarification loop ensures the issue captures what the creator actually wants before any code is written.
+3. **Normalize before resolve.** Every issue gets codebase context before work begins.
+4. **Confidence over certainty.** Show what's inferred vs. what's known. Mark low-confidence fields for human review.
+5. **Agent-agnostic.** The same issue works for any resolver — human, Claude, Codex, Copilot.
+6. **Zero overhead.** No extra tools, no platform accounts, no sync. Just `gh` and Git.
+7. **Brownfield-first.** Built for existing codebases where context matters most.
+8. **Data safety.** Backup before edit. Never modify without a verified backup.

@@ -17,7 +17,7 @@
 
 Five terminal commands that structure, analyze, triage, and resolve GitHub issues — so any developer or AI agent can pick up an issue and ship a tested PR.
 
-[**Get Started**](#get-started) · [**What is IDD?**](#what-is-idd) · [**Works With Any Tool**](#works-with-any-tool)
+[**Get Started**](#get-started) · [**What is IDD?**](#what-is-idd) · [**Intention-Driven Development**](#idd-as-intention-driven-development) · [**Works With Any Tool**](#works-with-any-tool)
 
 ---
 
@@ -170,9 +170,9 @@ You can also install individual skills. See each skill folder for per-skill comm
 
 ## What is IDD?
 
-Issue-Driven Development treats GitHub issues as the atomic unit of all development work. Every change starts as a structured issue and ends as a PR linked to that issue.
+Issue-Driven Development — also **Intention-Driven Development** — treats GitHub issues as the atomic unit of all development work. Every change starts as a structured issue and ends as a PR linked to that issue.
 
-The key idea: the gap between "someone describes a problem" and "someone ships a fix" is a **translation gap**. IDD automates that translation — turning vague reports into structured work orders with acceptance criteria, then resolving them through a repeatable pipeline.
+The key idea: the gap between "someone describes a problem" and "someone ships a fix" is both a **translation gap** and an **intention gap**. IDD automates that translation — turning vague reports into structured work orders with acceptance criteria — while helping creators discover and articulate what they actually want through iterative refinement.
 
 ```mermaid
 graph TD
@@ -187,6 +187,25 @@ graph TD
     style A fill:#4CAF50,color:#fff
     style H fill:#2196F3,color:#fff
 ```
+
+### IDD as Intention-Driven Development
+
+IDD is also **Intention-Driven Development** — and that name captures something deeper about what it solves.
+
+Expressing what you actually want is hard. Even experienced developers struggle to articulate a problem clearly enough for someone else — human or AI — to act on it. Vague descriptions lead to wrong assumptions, wasted effort, and solutions that miss the point.
+
+`/issue-creator` changes this dynamic. When you describe a problem in plain language, it structures your input into a typed issue with acceptance criteria, context, and technical notes. But the real value isn't the output — it's the **feedback loop**:
+
+1. **You describe the problem** — loosely, incompletely, however it comes to mind
+2. **The agent proposes a structured issue** — classifying the type, filling in context, generating acceptance criteria
+3. **You read back what it captured** — and realize what you actually meant, what's missing, what's wrong
+4. **You refine through conversation** — correcting, adding detail, sharpening the intent until the issue says exactly what you want
+
+This iterative process does something no template or form can do: it helps you **discover your own intention**. By the time the issue is finalized, it accurately represents what the creator wants — expressed in a way that both humans and AI agents can understand and execute.
+
+This matters because understanding user requirements is one of the hardest steps in the software development lifecycle. Most bugs and missed features trace back to requirements that were never clearly stated. IDD makes that step explicit, collaborative, and repeatable — turning an informal complaint into a precise, agent-ready work order.
+
+The structured issue becomes the **single source of truth** for what needs to happen. When `/issue-resolver` picks it up, there's no guesswork — the intention is already captured.
 
 ### IDD and other methodologies
 
