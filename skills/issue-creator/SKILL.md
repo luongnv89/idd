@@ -4,7 +4,7 @@ description: Create structured GitHub issues from text, screenshots, or images, 
 effort: medium
 license: MIT
 metadata:
-  version: 0.1.0
+  version: 0.2.0
   creator: Luong NGUYEN <luongnv89@gmail.com>
 compatibility: Requires git and GitHub CLI (gh) with authentication. Run `gh auth status` to verify.
 ---

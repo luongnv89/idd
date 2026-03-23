@@ -4,7 +4,7 @@ description: Initialize gitissue configuration for the current repository by sca
 effort: low
 license: MIT
 metadata:
-  version: 0.1.0
+  version: 0.2.0
   creator: Luong NGUYEN <luongnv89@gmail.com>
 compatibility: Requires git. No GitHub CLI or authentication needed — generates a local config file only.
 ---

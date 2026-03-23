@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-03-23
+
+### Added
+- `docs/naming-conventions.md` — standalone, tool-agnostic naming conventions for branches, commits, PRs, and issues
+- Naming conventions section in CLAUDE.md referencing the standalone doc
+
+### Changed
+- `/issue-resolver` v0.2.0 — branch naming switched from `issue-N/description` to type-based `fix/N-description`, commit messages use Conventional Commits with optional scope, PR titles follow same format
+- `/issue-creator` v0.2.0 — issue title conventions added (imperative mood, good/bad examples table)
+- `/init-gitissue` v0.2.0 — generated config uses `branch_prefix: "auto"` with type-based prefix documentation
+- `resolve.branch_prefix` default changed from `"issue-"` to `"auto"` across all docs and config schema
+- All terminal mockups and examples updated to reflect new naming conventions (DESIGN.md, README.md, prd.md, idea.md)
+
 ## [0.2.0] - 2026-03-22
 
 ### Added
