@@ -413,10 +413,10 @@ If the push fails, output the error from `references/error-messages.md` and stop
 ### Create PR
 
 ```bash
-gh pr create --title "{pr_title}" --body "{pr_body}" --json number,url
+gh pr create --title "{pr_title}" --body "{pr_body}"
 ```
 
-This returns the PR number and URL as structured JSON for use in the final report.
+The PR URL is printed to stdout on success.
 
 **PR title** (Conventional Commits format — see `docs/naming-conventions.md` for the full reference):
 `{type}({scope}): {description} (#{issue_number})`

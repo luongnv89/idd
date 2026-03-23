@@ -89,7 +89,7 @@ graph TD
     E --> F["Plan (local only, never posted)"]
     F --> G["Execute (code + tests, atomic commits)"]
     G --> H["Verify (run test suite)"]
-    H --> I["gh pr create --json ... (Closes #N)"]
+    H --> I["gh pr create (Closes #N)"]
 
     style A fill:#4CAF50,color:#fff
     style I fill:#2196F3,color:#fff
