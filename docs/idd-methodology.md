@@ -169,13 +169,78 @@ gitissue works without any configuration file. All settings have sensible defaul
 
 Run `/init-gitissue` to auto-detect your project's language, framework, and test runner, and generate a tailored config.
 
+## The Value of Well-Defined Issues and Commit Messages
+
+IDD's deepest payoff is not speed — it's **history**. Every software project accumulates a git history. The question is whether that history is useful or just noise.
+
+### Issues as decision records
+
+A well-defined issue is more than a task description — it's a **decision record**. It captures:
+
+- **What was wrong or missing** — the problem as the reporter experienced it
+- **What "done" looks like** — acceptance criteria that define the boundary of the work
+- **What was considered** — when `/issue-analysis` evaluates implementation options, the structured issue preserves the reasoning behind the chosen approach
+
+Six months later, when someone asks "why does this code check for expired sessions before redirecting?", the answer isn't buried in someone's memory or a Slack thread — it's in issue #42, linked from the commit that introduced the check.
+
+### Commit messages as a narrative
+
+A commit message is the smallest unit of project storytelling. When commits follow Conventional Commits format and reference their issue number, the git log becomes a **navigable narrative**:
+
+```
+fix(auth): resolve mobile redirect loop (#42)
+feat(settings): add dark mode toggle (#15)
+refactor(db): extract connection pool logic (#8)
+test(auth): add login flow unit tests (#31)
+```
+
+Each line answers three questions: *what kind of change* (type), *where it happened* (scope), and *what problem it solved* (issue reference). Compare this to a typical unstructured history:
+
+```
+fix stuff
+update
+WIP
+done
+```
+
+The first history is a knowledge base. The second is a liability.
+
+### The traceability chain
+
+IDD creates an unbroken chain from problem to solution:
+
+```
+Issue #42 (problem) → Branch fix/42-mobile-auth-redirect → Commits fix(auth): ... (#42) → PR fix(auth): ... (#42) with Closes #42 → Merge → Issue auto-closes
+```
+
+Every artifact links to every other artifact. `git blame` on any line leads to the commit, which leads to the PR, which leads to the issue. This traceability is what makes the history *valuable* — not just a record of what changed, but a record of why.
+
+### Why this matters for AI agents
+
+AI agents scanning git history for context (during `/issue-analysis` or `/issue-resolver`) depend entirely on the quality of that history. A structured commit message like `fix(auth): resolve mobile redirect loop (#42)` is instantly useful — the agent knows the type, scope, and related issue. A message like `fix bug` is invisible to meaningful analysis.
+
+The same applies to issues. When an agent triages the backlog or analyzes dependencies, structured issues with acceptance criteria provide actionable data. Unstructured issues force the agent to guess — and guessing produces wrong results.
+
+### The compounding effect
+
+Good issues and commits compound over time. Each well-structured artifact makes the next one easier:
+
+- `/issue-triage` produces better dependency graphs because issues have clear scope
+- `/issue-analysis` finds more relevant prior art because commits reference issues
+- `/issue-resolver` writes better code because the issue defines precise acceptance criteria
+- New team members onboard faster because the history teaches the project's evolution
+- Changelogs generate automatically from conventional commit messages
+
+Bad history also compounds — but in the wrong direction. Vague issues spawn vague commits, which make future analysis unreliable, which makes the next issue harder to resolve. IDD breaks this cycle by enforcing structure at the point of creation.
+
 ## Principles
 
 1. **The issue is the spec.** If it's not in the issue, it's not in scope.
 2. **Intention before implementation.** The iterative clarification loop ensures the issue captures what the creator actually wants before any code is written.
-3. **Normalize before resolve.** Every issue gets codebase context before work begins.
-4. **Confidence over certainty.** Show what's inferred vs. what's known. Mark low-confidence fields for human review.
-5. **Agent-agnostic.** The same issue works for any resolver — human, Claude, Codex, Copilot.
-6. **Zero overhead.** No extra tools, no platform accounts, no sync. Just `gh` and Git.
-7. **Brownfield-first.** Built for existing codebases where context matters most.
-8. **Data safety.** Backup before edit. Never modify without a verified backup.
+3. **History is a product.** Well-defined issues and commit messages create a development history that remains valuable for the lifetime of the project. Every artifact should be written for the person — or agent — who reads it six months from now.
+4. **Normalize before resolve.** Every issue gets codebase context before work begins.
+5. **Confidence over certainty.** Show what's inferred vs. what's known. Mark low-confidence fields for human review.
+6. **Agent-agnostic.** The same issue works for any resolver — human, Claude, Codex, Copilot.
+7. **Zero overhead.** No extra tools, no platform accounts, no sync. Just `gh` and Git.
+8. **Brownfield-first.** Built for existing codebases where context matters most.
+9. **Data safety.** Backup before edit. Never modify without a verified backup.
