@@ -166,6 +166,73 @@ Do not re-read the config at each step.
 
 ---
 
+## Subagent Architecture (Update Mode)
+
+During a full triage update, the skill delegates the two heaviest phases to subagents. This keeps the main agent's context clean — it never reads source files or parses git history directly.
+
+```
+Main Agent (orchestrator)
+├── Step 1: Fetch Issues (lightweight — stays in main agent)
+│
+├── Spawn: History Scanner subagent (Step 1b)
+│   Scans git log + merged PRs for already-fixed issues
+│   Returns: list of potentially-fixed issues with confidence
+│
+├── Spawn: Dependency Scanner subagent(s) (Step 2)
+│   Scans codebase for each issue's keywords, builds dependency map
+│   For 10+ issues, split into parallel batches
+│   Returns: affected files per issue + dependency edges
+│
+├── Steps 3-7: Main agent (lightweight computation)
+│   Circular dep detection, topological sort, parallelization,
+│   stale detection, priority assignment — all operate on the
+│   structured data returned by subagents
+│
+├── Step 8: Output (main agent — render terminal report)
+└── Step 9: Persist (main agent — write triage.json)
+```
+
+Read `agents/history-scanner.md` for the history scanner prompt.
+Read `agents/dependency-scanner.md` for the dependency scanner prompt.
+
+### Parallel execution
+
+Steps 1b and 2 are **independent** of each other. After fetching issues in Step 1, spawn the history scanner and dependency scanner(s) **in the same turn** so they run in parallel:
+
+```
+Step 1 completes
+    ├── Spawn history-scanner (Step 1b)    ─┐
+    └── Spawn dependency-scanner (Step 2)  ─┤  parallel
+                                            │
+    Collect both results ◄──────────────────┘
+Step 3 continues with merged data
+```
+
+### Batch splitting for dependency scanning
+
+When there are 10+ issues, split them into batches of ~5 and spawn multiple dependency-scanner subagents in parallel:
+
+```
+Step 1 completes (18 issues)
+    ├── Spawn history-scanner (all 18 issues)
+    ├── Spawn dependency-scanner batch 1 (issues 1-5)
+    ├── Spawn dependency-scanner batch 2 (issues 6-10)
+    ├── Spawn dependency-scanner batch 3 (issues 11-15)
+    └── Spawn dependency-scanner batch 4 (issues 16-18)
+
+    Collect all results, merge dependency maps
+    Main agent adds cross-batch dependency edges
+Step 3 continues
+```
+
+### Environment check
+
+If the Agent tool is available, use subagents as described above.
+If not (e.g., Claude.ai), execute history scanning and dependency analysis inline — the steps below include the full procedure for both modes.
+When the Agent tool is available and there are 10+ issues, split dependency scanning into parallel batches of ~5 issues each for faster execution.
+
+---
+
 ## Step 1 — Fetch Issues
 
 ```bash
@@ -204,6 +271,14 @@ Progress output:
 ## Step 1b — Detect Already-Fixed Issues
 
 Some open issues may have been incidentally fixed by commits or PRs that targeted a different issue. For example, a PR titled `fix(auth): resolve redirect loop (#42)` might also fix the bug described in issue #17 if they share the same root cause. This step scans recent git history and merged PRs to catch these cases, so the team doesn't waste time on issues that are already resolved.
+
+### Subagent delegation
+
+**When the Agent tool is available:** Delegate this step to the history-scanner subagent. Read `agents/history-scanner.md` for the full prompt template. Pass the list of open issues (number and title) from Step 1, along with the repo root path (absolute). The subagent returns a JSON object with a `potentially_fixed` array and `scanned_commits`/`scanned_prs` counts. Spawn this subagent **in the same turn** as the dependency scanner (Step 2) — they are independent and run in parallel.
+
+**Note:** The history-scanner only implements the commit-level signal (explicit issue references in commit messages and PR bodies). The file-overlap signal (detecting fixes via shared affected files) requires data from the dependency scanner (Step 2) and is handled by the main agent as a post-merge step after both subagents return. See the merge step after Steps 1b and 2 complete.
+
+**When the Agent tool is NOT available:** Execute the procedure below inline.
 
 ### How it works
 
@@ -277,6 +352,19 @@ If any are found:
 ```
 
 ## Step 2 — Analyze Dependencies
+
+### Subagent delegation
+
+**When the Agent tool is available:** Delegate this step to the dependency-scanner subagent. Read `agents/dependency-scanner.md` for the full prompt template. Pass the list of issues (number, title, body) from Step 1 along with the repo root path and the `scan_timeout_per_issue` config value (passed as `scan_timeout` in the subagent input). Spawn this subagent **in the same turn** as the history scanner (Step 1b) — they are independent and run in parallel.
+
+**For 10+ issues:** Split the issues into batches of ~5 and spawn one dependency-scanner subagent per batch (all in the same turn). After all subagents return, merge their results:
+1. Concatenate the `issues` maps from each batch into a single map
+2. Concatenate the `dependency_edges` arrays from each batch
+3. Run a cross-batch pass: for any two issues from different batches, check if their `affected_files` overlap. If they do, add a dependency edge. Determine directionality using the same heuristics as the inline procedure: earlier creation date takes precedence, more blocking relationships take precedence, and bug type takes precedence over feature/improvement. If neither issue clearly precedes the other, mark them as co-dependent at the same level. This is a lightweight comparison the main agent does on the merged data.
+
+**When the Agent tool is NOT available:** Execute the procedure below inline.
+
+### Inline procedure
 
 For each issue, extract keywords from the issue title and body — look for error messages, component names, file paths, function names, class names, and module references. Then grep the codebase for each issue's keywords to find affected files. Issues sharing affected files or modules (same parent directory) are considered dependent.
 

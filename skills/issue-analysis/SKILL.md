@@ -112,6 +112,43 @@ Do not re-read the config at each step.
 
 ---
 
+## Subagent Architecture
+
+The analysis pipeline delegates heavy work to subagents to keep the main agent's context clean. The main agent orchestrates and communicates with the user, while subagents handle codebase exploration and analytical synthesis.
+
+```
+Main Agent (orchestrator)
+├── Step 1: Fetch issue (lightweight — stays in main agent)
+│
+├── Spawn: Explorer subagent (Steps 2-5)
+│   Extracts keywords, scans codebase, traces deps, reads git history,
+│   cross-references issues/PRs
+│   Returns: structured findings JSON
+│
+├── Main agent: Reviews findings, displays progress for Steps 2-5
+│
+├── Spawn: Synthesizer subagent (Steps 6-7)
+│   Analyzes root cause/architecture, proposes implementation options
+│   Returns: analysis text + options
+│
+└── Main agent: Step 8 (Output) and Persist
+```
+
+Read `agents/explorer.md` for the full explorer prompt.
+Read `agents/synthesizer.md` for the full synthesizer prompt.
+
+### Environment check
+
+If the Agent tool is available, use subagents as described above.
+If not (e.g., Claude.ai), execute each phase inline instead:
+- Steps 2-5: Read files and scan directly in the main conversation
+- Steps 6-7: Perform analysis inline
+- Step 8: Output as normal
+
+The steps below include both the subagent delegation path and the inline fallback.
+
+---
+
 ## Pipeline Overview
 
 The analysis pipeline has 8 steps plus a persist step. Display progress using the `[N/8]` step counter:
@@ -174,7 +211,36 @@ After fetch:
 
 ---
 
-## Step 2 — Extract Targets
+## Steps 2-5 — Explorer Phase
+
+### Subagent delegation (preferred)
+
+When the Agent tool is available, spawn the explorer subagent to handle Steps 2-5 in a single pass. Pass the following context:
+
+- Issue data: number, title, body, labels, type, state, author, createdAt, updatedAt, comments
+- Config: max_files, trace_depth, scan_timeout
+- Repo root path (absolute)
+
+The explorer prompt is defined in `agents/explorer.md`. It performs keyword extraction, deep codebase scanning (up to `max_files` files with `trace_depth` levels of import tracing), git history analysis, and cross-reference scanning against other issues and PRs. It returns a structured JSON summary with: extraction results, affected files (with relevance/role), architecture mapping, git history findings, cross-reference insights, and scan stats.
+
+After the explorer returns, display progress lines for Steps 2-5 based on its results:
+
+```
+[2/8] Extract        ✓ {extraction.keywords count} keywords, {extraction.file_refs count} file refs
+[3/8] Research       ✓ read {scan_stats.files_read} files, traced {scan_stats.deps_traced} deps
+[4/8] History        ✓ {history.related_commits count} related commits, {history prior fix attempts count} prior fix attempts
+[5/8] Cross-refs     ✓ {cross_references.related_issues count} related issues, {insights count} insights
+```
+
+Store the explorer's output as the **exploration findings** — these are passed to the synthesizer subagent in Steps 6-7. When spawning the synthesizer, construct its input by wrapping the explorer's full JSON output under the `"findings"` key: `{ "issue": <issue data from Step 1>, "findings": <explorer output> }`.
+
+### Inline fallback
+
+If the Agent tool is not available, execute Steps 2-5 inline as described below.
+
+---
+
+### Step 2 — Extract Targets
 
 Extract actionable search targets from the issue body. These targets drive the codebase scan in Step 3.
 
@@ -199,7 +265,7 @@ After extraction:
 
 ---
 
-## Step 3 — Research (Deep Codebase Scan)
+### Step 3 — Research (Deep Codebase Scan)
 
 This is the most thorough codebase scan in the gitissue system — more comprehensive than issue-resolver's Research step.
 
@@ -248,7 +314,7 @@ After research:
 
 ---
 
-## Step 4 — History (Git Log Analysis)
+### Step 4 — History (Git Log Analysis)
 
 Scan the git history for commits related to the issue and its affected files. This provides crucial context: whether the problem was introduced recently, whether prior fix attempts exist, and which developers have domain knowledge.
 
@@ -316,7 +382,7 @@ After history:
 
 ---
 
-## Step 5 — Cross-references (Issues & Triage)
+### Step 5 — Cross-references (Issues & Triage)
 
 Cross-reference this issue against other open issues and triage data to surface relationships that inform the analysis.
 
@@ -397,7 +463,31 @@ After cross-references:
 
 ---
 
-## Step 6 — Root Cause / Impact Analysis
+## Steps 6-7 — Synthesizer Phase
+
+### Subagent delegation (preferred)
+
+When the Agent tool is available, spawn the synthesizer subagent to handle Steps 6-7. Pass the following context:
+
+- Issue data: number, title, body, labels, type, state, author, createdAt
+- Exploration findings: the full structured JSON returned by the explorer subagent (or collected inline in Steps 2-5)
+
+The synthesizer prompt is defined in `agents/synthesizer.md`. It produces the root cause / architecture / implementation analysis (Step 6) and proposes 2-3 implementation options with complexity and risk ratings (Step 7). It returns a structured JSON with: analysis text (type-specific), implementation options (with all fields), recommended option, overall complexity, and overall risk.
+
+After the synthesizer returns, display progress lines:
+
+```
+[6/8] Analysis       ✓ root cause identified
+[7/8] Options        ✓ {options count} approaches proposed
+```
+
+### Inline fallback
+
+If the Agent tool is not available, execute Steps 6-7 inline as described below.
+
+---
+
+### Step 6 — Root Cause / Impact Analysis
 
 Based on research findings, git history (Step 4), and cross-references (Step 5), produce a structured analysis that varies by issue type.
 
@@ -430,18 +520,20 @@ After analysis:
 
 ---
 
-## Step 7 — Implementation Options
+### Step 7 — Implementation Options
 
 Propose 2-3 distinct implementation approaches. Each approach includes:
 
-1. **Name** — a short label (e.g., "Minimal fix", "Full refactor", "New abstraction")
-2. **Summary** — one-sentence description
-3. **Files to modify** — list with brief description of changes
-4. **Files to create** — if any
-5. **Pros** — advantages of this approach
-6. **Cons** — disadvantages, risks, trade-offs
-7. **Complexity** — XS / S / M / L / XL estimate
-8. **Risk** — Low / Medium / High with brief explanation
+1. **Number** — sequential identifier (1, 2, 3)
+2. **Name** — a short label (e.g., "Minimal fix", "Full refactor", "New abstraction")
+3. **Summary** — one-sentence description
+4. **Files to modify** — list with brief description of changes
+5. **Files to create** — if any
+6. **Pros** — advantages of this approach
+7. **Cons** — disadvantages, risks, trade-offs
+8. **Complexity** — XS / S / M / L / XL estimate
+9. **Risk** — Low / Medium / High
+10. **Risk details** — brief explanation of the risk rating
 
 The approaches should cover a spectrum: typically one minimal/tactical fix, one moderate refactor, and one larger structural change (when applicable). For simple issues, 2 options may suffice.
 
@@ -480,7 +572,7 @@ Display the full analysis following DESIGN.md conventions.
   Reporter:    @{author.login}
   Priority:    {from triage data if available, else "—"}
   Labels:      {label1}, {label2}
-  Created:     {created_at, YYYY-MM-DD}
+  Created:     {createdAt, YYYY-MM-DD}
 ```
 
 ### Keywords & targets
@@ -668,8 +760,8 @@ This is a warning, not a fatal error — the terminal output from Step 6 was alr
     },
     "labels": ["bug", "auth", "mobile"],
     "state": "open",
-    "created_at": "2026-03-15T10:00:00Z",
-    "updated_at": "2026-03-20T08:00:00Z"
+    "createdAt": "2026-03-15T10:00:00Z",
+    "updatedAt": "2026-03-20T08:00:00Z"
   },
   "extraction": {
     "error_messages": ["ERR_TOO_MANY_REDIRECTS"],
@@ -788,8 +880,8 @@ This is a warning, not a fatal error — the terminal output from Step 6 was alr
 | `issue.reporter.name` | string or null | Display name (may be null if not set) |
 | `issue.labels` | string[] | GitHub labels |
 | `issue.state` | string | `"open"` or `"closed"` |
-| `issue.created_at` | ISO 8601 string | Issue creation date |
-| `issue.updated_at` | ISO 8601 string | Last update date |
+| `issue.createdAt` | ISO 8601 string | Issue creation date |
+| `issue.updatedAt` | ISO 8601 string | Last update date |
 | `extraction.error_messages` | string[] | Error strings found in issue body |
 | `extraction.functions` | string[] | Function/method names extracted |
 | `extraction.classes` | string[] | Class/component names extracted |
@@ -1087,6 +1179,8 @@ All errors use the rich format from `references/error-messages.md`:
 
 ## Additional Resources
 
+- **`agents/explorer.md`** — Explorer subagent prompt (Steps 2-5 delegation)
+- **`agents/synthesizer.md`** — Synthesizer subagent prompt (Steps 6-7 delegation)
 - **`references/error-messages.md`** — Complete error catalog with triggers and exact output
 - **`DESIGN.md`** — Terminal output style guide (repo root)
 - **`docs/config-schema.md`** — Full configuration schema
