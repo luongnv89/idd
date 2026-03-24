@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-03-24
+
+### Added
+- `/auto-pilot` skill — fully automated triage → resolve → review → merge loop with subagent architecture and 2-pass code review
+  - Supports explicit issue lists to process specific issues in user-defined order
+  - Two fix-review cycles before merge, with stop conditions for safety
+- `/issue-triage` already-fixed detection — scans commit history and merged PRs to find open issues incidentally resolved by other PRs
+  - Confidence levels (high/medium) based on closing keywords vs bare references
+  - Detail block with suggested `gh issue close` commands
+- `/issue-analysis` now includes issue reporter information in analysis output
+
+### Fixed
+- `/issue-resolver` — removed invalid `--json` flag from `gh pr create` command (#17)
+
+### Changed
+- README updated with Intention-Driven Development concept and commit message guidance
+- `/issue-triage` v0.3.0, `/auto-pilot` v0.3.0, `/issue-analysis` v0.2.0
+
 ## [0.2.1] - 2026-03-23
 
 ### Added

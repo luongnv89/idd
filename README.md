@@ -7,15 +7,15 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/luongnv89/idd/releases/latest"><img src="https://img.shields.io/badge/version-0.2.0-blue.svg" alt="Version 0.2.0"></a>
+  <a href="https://github.com/luongnv89/idd/releases/latest"><img src="https://img.shields.io/badge/version-0.3.0-blue.svg" alt="Version 0.3.0"></a>
   <a href="https://github.com/luongnv89/idd/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="MIT License"></a>
-  <a href="https://github.com/luongnv89/idd"><img src="https://img.shields.io/badge/skills-5-blue.svg" alt="5 skills"></a>
+  <a href="https://github.com/luongnv89/idd"><img src="https://img.shields.io/badge/skills-6-blue.svg" alt="6 skills"></a>
   <a href="https://github.com/luongnv89/idd/blob/main/CONTRIBUTING.md"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs Welcome"></a>
 </p>
 
 # Turn GitHub Issues Into Structured, Agent-Ready Work Orders
 
-Five terminal commands that structure, analyze, triage, and resolve GitHub issues — so any developer or AI agent can pick up an issue and ship a tested PR.
+Six terminal commands that structure, analyze, triage, and resolve GitHub issues — so any developer or AI agent can pick up an issue and ship a tested PR.
 
 [**Get Started**](#get-started) · [**What is IDD?**](#what-is-idd) · [**Intention-Driven Development**](#idd-as-intention-driven-development) · [**Why Good Issues & Commits Matter**](#why-good-issues-and-commit-messages-matter) · [**Works With Any Tool**](#works-with-any-tool)
 
@@ -51,10 +51,11 @@ graph LR
 | Command | What it does | Version | Effort |
 |---------|-------------|---------|--------|
 | `/issue-creator` | Classify type, generate acceptance criteria, create a structured issue | 0.2.0 | medium |
-| `/issue-analysis N` | Root cause, git history, implementation options, complexity and risk | 0.1.0 | high |
+| `/issue-analysis N` | Root cause, git history, implementation options, complexity and risk | 0.2.0 | high |
 | `/issue-resolver N` | Fetch, branch, scan codebase, write code + tests, open PR with `Closes #N` | 0.2.0 | max |
-| `/issue-triage` | Dependency graph, stale detection, priority and execution order | 0.2.0 | medium |
+| `/issue-triage` | Dependency graph, stale detection, already-fixed detection, priority and execution order | 0.3.0 | medium |
 | `/init-gitissue` | Auto-detect language/framework/test runner, generate `.gitissue.yml` | 0.2.0 | low |
+| `/auto-pilot` | Triage → resolve → review → merge loop, fully automated backlog processing | 0.3.0 | max |
 
 ---
 

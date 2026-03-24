@@ -4,7 +4,7 @@ description: Fully automated development loop that triages open issues, picks th
 effort: max
 license: MIT
 metadata:
-  version: 0.2.0
+  version: 0.3.0
   creator: Luong NGUYEN <luongnv89@gmail.com>
 compatibility: Requires git and GitHub CLI (gh) with authentication and push access. Requires merge permission for auto-merge. Uses /issue-triage, /issue-resolver, and /code-review skills internally.
 ---
