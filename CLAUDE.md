@@ -15,6 +15,7 @@ skills/
 │   └── references/
 ├── issue-analysis/     # /issue-analysis N
 │   ├── SKILL.md
+│   ├── agents/         # explorer, synthesizer subagents
 │   └── references/
 ├── issue-creator/      # /issue-creator and /issue-creator N (normalization)
 │   ├── SKILL.md
@@ -22,9 +23,11 @@ skills/
 │   └── references/     # Error messages, detailed patterns
 ├── issue-resolver/     # /issue-resolver N
 │   ├── SKILL.md
+│   ├── agents/         # researcher, implementer subagents
 │   └── references/
 ├── issue-triage/       # /issue-triage
 │   ├── SKILL.md
+│   ├── agents/         # history-scanner, dependency-scanner subagents
 │   └── references/
 ├── review-fix-loop/    # /review-fix-loop — automated review-fix cycle
 │   ├── SKILL.md
