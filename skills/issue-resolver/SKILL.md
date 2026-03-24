@@ -1,17 +1,17 @@
 ---
 name: issue-resolver
-description: Resolve a GitHub issue end-to-end through a 7-step pipeline (Fetch, Branch, Research, Plan, Execute, Verify, Ship) producing an atomic PR with "Closes #N". Includes guard checks and auto-normalization before the pipeline starts. Use this skill whenever someone says "resolve issue", "fix issue", "work on issue", "implement issue", "/issue-resolver", or provides an issue number they want resolved. Also trigger when asked to "close this issue with a PR", "implement #N", "fix #N", "take issue #N", "start working on #N", "pick up issue #N", or even just "#N" with the intent to work on it. If the user mentions a GitHub issue number and wants code written to address it, this is the right skill — even if they don't say "resolve" explicitly. The skill handles everything from reading the issue to creating the PR, so use it any time the goal is going from an open issue to a merged fix.
+description: Resolve a GitHub issue end-to-end through an 8-step pipeline (Fetch, Branch, Research, Plan, Execute, Test, Verify, Ship) producing an atomic PR with "Closes #N". Includes guard checks and auto-normalization before the pipeline starts. The dedicated Test step writes unit tests and end-to-end tests for all new or changed functionality before verification. Use this skill whenever someone says "resolve issue", "fix issue", "work on issue", "implement issue", "/issue-resolver", or provides an issue number they want resolved. Also trigger when asked to "close this issue with a PR", "implement #N", "fix #N", "take issue #N", "start working on #N", "pick up issue #N", or even just "#N" with the intent to work on it. If the user mentions a GitHub issue number and wants code written to address it, this is the right skill — even if they don't say "resolve" explicitly. The skill handles everything from reading the issue to creating the PR, so use it any time the goal is going from an open issue to a merged fix.
 effort: max
 license: MIT
 metadata:
-  version: 0.3.0
+  version: 0.4.0
   creator: Luong NGUYEN <luongnv89@gmail.com>
 compatibility: Requires git and GitHub CLI (gh) with authentication and push access to the repository. Run `gh auth status` to verify.
 ---
 
 # /issue-resolver N
 
-Resolve a GitHub issue end-to-end — from issue to atomic PR in 7 steps.
+Resolve a GitHub issue end-to-end — from issue to atomic PR in 8 steps.
 
 ## Invocation
 
@@ -93,33 +93,38 @@ Main Agent (orchestrator)
 │   Presents plan to user for approval if configured
 │
 ├── Spawn: Implementer subagent (Step 5)
-│   Writes code changes and tests based on approved plan
+│   Writes code changes based on approved plan
 │   Returns: files changed, commits created
 │
-├── Step 6: Verify (main agent — runs tests, checks criteria)
-└── Step 7: Ship (main agent — push + create PR)
+├── Spawn: Test Writer subagent (Step 6)
+│   Writes unit tests + e2e tests for new/changed functionality
+│   Returns: tests written, test framework used
+│
+├── Step 7: Verify (main agent — runs tests, checks criteria)
+└── Step 8: Ship (main agent — push + create PR)
 ```
 
 Read `agents/researcher.md` for the full researcher prompt.
 Read `agents/implementer.md` for the full implementer prompt.
+Read `agents/test-writer.md` for the full test writer prompt.
 
 ### Environment check
 
-If the Agent tool is available, use subagents as described above for Steps 3 and 5.
+If the Agent tool is available, use subagents as described above for Steps 3, 5, and 6.
 If not (e.g., Claude.ai or environments without the Agent tool), execute research and implementation inline using the fallback instructions included in each step.
 
 ---
 
 ## Pipeline Overview
 
-The resolve pipeline has 7 steps. Display progress using the `[N/7]` step counter:
+The resolve pipeline has 8 steps. Display progress using the `[N/8]` step counter:
 
 ```
   ◆ Resolve Pipeline
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  [1/7] Fetch        ✓ issue #42 loaded
-  [2/7] Branch       ✓ fix/42-mobile-auth
-  [3/7] Research     ● reading 5 files...
+  [1/8] Fetch        ✓ issue #42 loaded
+  [2/8] Branch       ✓ fix/42-mobile-auth
+  [3/8] Research     ● reading 5 files...
 ```
 
 Each step prints a new line when it starts (with `●`) and updates to `✓` on success or `✗` on failure. Static sequential output — no animation.
@@ -207,7 +212,7 @@ If any step of auto-normalization fails (backup comment, API error), do not abor
 
 After fetch + guards + normalize are complete:
 ```
-[1/7] Fetch        ✓ issue #N loaded
+[1/8] Fetch        ✓ issue #N loaded
 ```
 
 ---
@@ -258,7 +263,7 @@ git checkout -b {branch_name}
 
 After branch creation:
 ```
-[2/7] Branch       ✓ {branch_name}
+[2/8] Branch       ✓ {branch_name}
 ```
 
 ---
@@ -311,7 +316,7 @@ After research (whether subagent or inline):
 When using the subagent path, parse the "Files Read Count" line from the researcher's markdown output (format: `Read {N} files, traced {M} dependencies`) to extract the numeric values `N` and `M` for the progress line below.
 
 ```
-[3/7] Research     ✓ read {N} files, traced {M} deps
+[3/8] Research     ✓ read {N} files, traced {M} deps
 ```
 
 ---
@@ -334,7 +339,7 @@ Check `resolve.approval_gate` from config:
 
 - **`auto`** (default) — display the plan and proceed immediately:
   ```
-  [4/7] Plan         ✓ approach: {one-sentence summary}
+  [4/8] Plan         ✓ approach: {one-sentence summary}
   ```
 
 - **`comment-and-wait`** — display the plan and wait for user approval:
@@ -351,7 +356,7 @@ Check `resolve.approval_gate` from config:
   ```
   If declined, stop. If approved:
   ```
-  [4/7] Plan         ✓ approach: {one-sentence summary}
+  [4/8] Plan         ✓ approach: {one-sentence summary}
   ```
 
 ---
@@ -371,7 +376,7 @@ When the Agent tool is available, spawn the implementer subagent to perform this
 - Naming conventions reference: `docs/naming-conventions.md`
 - Max commits limit: `resolve.max_commits` from config (default: 10)
 
-The subagent prompt is defined in `agents/implementer.md`. The implementer will write code changes, write/update tests, and create atomic commits following conventional commit format. It returns a summary with: files changed (count + paths), lines changed, commits created (with messages), and tests written.
+The subagent prompt is defined in `agents/implementer.md`. The implementer will write code changes, fix any broken existing tests, and create atomic commits following conventional commit format. Comprehensive new tests are written by the test writer subagent in Step 6. It returns a summary with: files changed (count + paths), lines changed, and commits created (with messages).
 
 After the implementer returns, the main agent checks the max commits guard (see below).
 
@@ -382,7 +387,7 @@ If the Agent tool is not available, execute the implementation inline:
 #### Guidelines
 
 1. **Follow existing code patterns** — match the style, conventions, and architecture of the target codebase
-2. **Write tests alongside code** — if the codebase has tests, write/update tests for the changes
+2. **Fix broken existing tests** — if your implementation breaks existing tests, update them to pass. Do not write comprehensive new tests here; Step 6 (Test) handles that.
 3. **Atomic commits** — each logical change gets its own commit with a clear message
 4. **Commit message format** (Conventional Commits — see `docs/naming-conventions.md` for the full reference):
    `{type}({scope}): {description} (#{issue_number})`
@@ -411,25 +416,139 @@ Default is No.
 
 After execution (whether subagent or inline):
 ```
-[5/7] Execute      ✓ {N} files changed, {M} lines
+[5/8] Execute      ✓ {N} files changed, {M} lines
 ```
 
 ---
 
-## Step 6 — Verify
+## Step 6 — Test
 
-Run the test suite and check acceptance criteria.
+Write unit tests and end-to-end tests for all new or changed functionality. This is a dedicated test-writing step — separate from the implementation in Step 5 — to ensure thorough test coverage before verification.
+
+The goal: every new feature, bug fix, or behavior change should have tests that would catch a regression if the code were reverted. Unit tests validate individual functions and components in isolation. End-to-end tests validate that the feature works correctly in the context of the full system.
+
+### Subagent delegation (preferred)
+
+When the Agent tool is available, spawn the test writer subagent. Pass the following context:
+
+- Issue data: number, title, body, labels, type, acceptance criteria
+- Research findings (from Step 3 — includes test files, frameworks, and patterns)
+- Implementation summary (from Step 5 — files changed, commits created, what was implemented)
+- Branch name (from Step 2)
+
+The subagent prompt is defined in `agents/test-writer.md`. The test writer will:
+
+1. Identify the test framework and patterns used in the codebase (from research findings)
+2. Write **unit tests** for each new or modified function/method/component
+3. Write **end-to-end tests** where feasible — if the codebase has an e2e testing setup (e.g., Playwright, Cypress, Selenium, supertest, integration test directories), write e2e tests that exercise the new functionality through the full stack
+4. If no e2e framework exists, skip e2e tests and note it in the output — do not install new e2e frameworks
+5. Follow existing test naming conventions, file organization, and assertion styles
+6. Create atomic commits for the tests: `test(scope): add unit tests for ... (#N)` and `test(scope): add e2e tests for ... (#N)`
+
+### Inline fallback
+
+If the Agent tool is not available, write tests inline:
+
+#### Determine what to test
+
+From the implementation changes (Step 5):
+- **New functions/methods** — write unit tests covering happy path, edge cases, and error conditions
+- **Modified functions** — write regression tests that verify the fix/change works correctly
+- **New API endpoints or routes** — write integration/e2e tests if an e2e framework exists
+- **New UI components** — write component tests if a component testing framework exists
+
+#### Determine test feasibility
+
+- **Unit tests:** Always write these. Every codebase can have unit tests, even if none exist yet. Match the language's standard test framework (pytest, jest, go test, cargo test, JUnit, etc.)
+- **End-to-end tests:** Only write these if the codebase already has an e2e testing setup. Check for:
+  - E2e config files: `playwright.config.*`, `cypress.config.*`, `wdio.conf.*`, `.selenium/`
+  - E2e test directories: `e2e/`, `tests/e2e/`, `test/integration/`, `tests/integration/`
+  - E2e dependencies in package.json, requirements.txt, etc.
+  - Existing e2e test files that can be used as patterns
+
+If no e2e setup exists:
+```
+○ No e2e framework detected — skipping e2e tests.
+  To add e2e coverage, set up a test framework and re-run.
+```
+
+#### Write tests
+
+1. **Follow existing test patterns** — match the file structure, naming, imports, fixtures, and assertion style from existing tests identified in the research findings
+2. **Place test files correctly** — use the same directory conventions as the codebase (e.g., `__tests__/`, `*_test.go`, `test_*.py`, `*.spec.ts`)
+3. **Cover key scenarios:**
+   - Happy path — the expected behavior works
+   - Edge cases — boundary values, empty inputs, null/undefined
+   - Error conditions — invalid inputs, missing data, network failures (where relevant)
+   - Regression — for bug fixes, write a test that would fail on the old code
+4. **Commit test files** separately from implementation commits:
+   - `test(scope): add unit tests for {feature} (#N)`
+   - `test(scope): add e2e tests for {feature} (#N)` (if applicable)
+
+After test writing (whether subagent or inline):
+```
+[6/8] Test         ✓ {N} unit tests, {M} e2e tests written
+```
+
+If e2e tests were skipped:
+```
+[6/8] Test         ✓ {N} unit tests written (no e2e framework)
+```
+
+---
+
+## Step 7 — Verify
+
+Build the project, run the test suite (including the newly written tests), and check acceptance criteria. The build check catches compilation and syntax errors before running tests — there is no point executing tests if the code does not compile.
+
+### Build / Compile
+
+Detect the project's build system and run a build check:
+
+| Build system | Detection | Command |
+|-------------|-----------|---------|
+| Node.js (TypeScript) | `tsconfig.json` | `npx tsc --noEmit` |
+| Node.js (JS) | `package.json` with `build` script | `npm run build` |
+| Python | `setup.py`, `pyproject.toml` | `python -m py_compile` on changed files, or `python -m compileall {src_dir}` |
+| Go | `go.mod` | `go build ./...` |
+| Rust | `Cargo.toml` | `cargo build` |
+| Java (Maven) | `pom.xml` | `mvn compile -q` |
+| Java (Gradle) | `build.gradle` | `./gradlew compileJava` |
+| C/C++ (CMake) | `CMakeLists.txt` | `cmake --build {build_dir}` |
+
+If no build system is detected or the project is interpreted without a build step (e.g., plain Python, Ruby, shell scripts), perform a syntax check on all new or modified files instead:
+- Python: `python -m py_compile {file}`
+- Ruby: `ruby -c {file}`
+- Shell: `bash -n {file}`
+- JavaScript: `node --check {file}`
+
+**If build succeeds:**
+```
+● Build check passed
+```
+Proceed to test suite.
+
+**If build fails:**
+```
+✗ Build failed — PR not created
+
+  {build_error_output}
+
+  To fix:  resolve compilation errors above
+  Run:     {build_command}
+```
+Stop. Do not create a PR.
 
 ### Run tests
 
 If `resolve.auto_test` is true:
 
 1. Detect the test runner from the project (e.g., `pytest`, `npm test`, `go test`, `cargo test`)
-2. Run the test suite with a timeout of `resolve.test_timeout` seconds (default: 300)
+2. Run the full test suite — including the new tests from Step 6 — with a timeout of `resolve.test_timeout` seconds (default: 300)
 
 **If tests pass:**
 ```
-[6/7] Verify       ✓ {N} tests passed
+[7/8] Verify       ✓ build ok, {N} tests passed
 ```
 
 **If tests fail:**
@@ -463,7 +582,7 @@ This is a note, not a blocker — proceed to Ship.
 
 ---
 
-## Step 7 — Ship
+## Step 8 — Ship
 
 Push the branch and create a pull request.
 
@@ -549,14 +668,14 @@ The first line `Closes #{issue_number}` is required when `resolve.pr_auto_link` 
 
 After successful PR creation:
 ```
-[7/7] Ship         ✓ PR #{pr_number} created
+[8/8] Ship         ✓ PR #{pr_number} created
 ```
 
 ---
 
 ## Final Report
 
-After all 7 steps complete:
+After all 8 steps complete:
 
 ```
 ✓ Done — PR #{pr_number}: {pr_title}
@@ -606,13 +725,14 @@ If the estimated change spans more than 20 files, warn before executing:
 
   ◆ Resolve Pipeline
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  [1/7] Fetch        ✓ issue #42 loaded
-  [2/7] Branch       ✓ fix/42-mobile-auth
-  [3/7] Research     ✓ read 5 files, traced 3 deps
-  [4/7] Plan         ✓ approach: fix redirect logic
-  [5/7] Execute      ✓ 2 files changed, 45 lines
-  [6/7] Verify       ✓ 12 tests passed
-  [7/7] Ship         ✓ PR #87 created
+  [1/8] Fetch        ✓ issue #42 loaded
+  [2/8] Branch       ✓ fix/42-mobile-auth
+  [3/8] Research     ✓ read 5 files, traced 3 deps
+  [4/8] Plan         ✓ approach: fix redirect logic
+  [5/8] Execute      ✓ 2 files changed, 45 lines
+  [6/8] Test         ✓ 4 unit tests, 1 e2e test written
+  [7/8] Verify       ✓ build ok, 17 tests passed
+  [8/8] Ship         ✓ PR #87 created
 
   ✓ Done — PR #87: fix(auth): resolve mobile auth redirect (#42)
     https://github.com/user/repo/pull/87
@@ -630,7 +750,7 @@ Every `gh` command for data retrieval uses `--json` with explicit field selectio
 
 Follow DESIGN.md symbol vocabulary and output structure for all output. Key rules:
 
-- Step counter: `[N/7]` for pipeline steps
+- Step counter: `[N/8]` for pipeline steps
 - Symbols: `●` progress, `✓` success, `✗` failure, `◆` section header, `⚡` recommendation, `⚠` warning, `○` info
 - Two-space indent for content under section headers
 - Section separators: `┄` (light dash)
@@ -654,6 +774,7 @@ All errors use the rich format from `references/error-messages.md`:
 
 - **`agents/researcher.md`** — Researcher subagent prompt (Step 3 delegation)
 - **`agents/implementer.md`** — Implementer subagent prompt (Step 5 delegation)
+- **`agents/test-writer.md`** — Test writer subagent prompt (Step 6 delegation)
 - **`references/error-messages.md`** — Complete error catalog with triggers and exact output
 - **`docs/naming-conventions.md`** — Branch, commit, PR, and issue naming conventions
 - **`DESIGN.md`** — Terminal output style guide (repo root)

@@ -4,7 +4,7 @@ description: Fully automated development loop that triages open issues, picks th
 effort: max
 license: MIT
 metadata:
-  version: 0.4.0
+  version: 0.5.0
   creator: Luong NGUYEN <luongnv89@gmail.com>
 compatibility: Requires git and GitHub CLI (gh) with authentication and push access. Requires merge permission for auto-merge. Uses /issue-triage, /issue-resolver, and /issue-analysis skills internally.
 ---
@@ -95,8 +95,8 @@ Main Agent (orchestrator)
   │     Returns: optimized_order, batches, dependencies
   │
   ├── Subagent: Resolver (or Batch Resolver for batched issues)
-  │     Runs the full /issue-resolver pipeline (Fetch → Ship)
-  │     Returns: branch_name, pr_number, files_changed, tests_passed
+  │     Runs the full /issue-resolver 8-step pipeline (Fetch → Branch → Research → Plan → Execute → Test → Verify → Ship)
+  │     Returns: branch_name, pr_number, files_changed, tests_written, tests_passed
   │
   ├── Subagent: Reviewer (pass 1)          ← always runs
   │     Reviews the PR diff fresh
@@ -371,7 +371,7 @@ The auto-pilot runs a continuous loop with 5 phases per iteration:
 ┄┄┄┄┄┄┄┄┄┄┄┄
   Phase 1 — Triage          Refresh priorities and pick next issue
                              (skipped in explicit list mode)
-  Phase 2 — Resolve         Subagent: full 7-step resolve pipeline
+  Phase 2 — Resolve         Subagent: full 8-step resolve pipeline
   Phase 3+4 — Review-Fix    Subagents: review (x5 max), fix if needed
                              Requires 2 consecutive PASS (or 1 at cycle limit)
   Phase 5 — Merge           Merge the PR and close the issue
@@ -503,11 +503,11 @@ Launch a subagent using the Agent tool to perform the entire resolve pipeline. T
   ⟶ Spawning resolver subagent...
 ```
 
-Use the **Resolver Subagent** prompt from `references/subagent-prompts.md`, substituting `{issue_number}`. The subagent runs the full /issue-resolver pipeline and returns only: status, branch_name, pr_number, pr_url, files_changed, tests_passed (and failure_step/failure_reason on failure).
+Use the **Resolver Subagent** prompt from `references/subagent-prompts.md`, substituting `{issue_number}`. The subagent runs the full /issue-resolver pipeline and returns only: status, branch_name, pr_number, pr_url, files_changed, tests_written, tests_passed (and failure_step/failure_reason on failure).
 
 ### Step 2.3 — Process Resolver Result
 
-Parse the subagent's response. Extract: `status`, `branch_name`, `pr_number`, `pr_url`, `failure_step`, `failure_reason`.
+Parse the subagent's response. Extract: `status`, `branch_name`, `pr_number`, `pr_url`, `tests_written`, `failure_step`, `failure_reason`.
 
 **On success:**
 ```
@@ -515,7 +515,7 @@ Parse the subagent's response. Extract: `status`, `branch_name`, `pr_number`, `p
     Branch:  {branch_name}
     PR:      #{pr_number}
     Changed: {files_changed} files
-    Tests:   {tests_passed} passed
+    Tests:   {tests_written} written, {tests_passed} passed
 ```
 
 Proceed to Phase 3 (Review).
@@ -822,7 +822,7 @@ Start auto-pilot? [Y/n]
     Branch:  fix/12-auth-redirect-loop
     PR:      #45
     Changed: 2 files
-    Tests:   8 passed
+    Tests:   4 written, 12 passed
 
 ● Review pass 1 for PR #45...
   ⟶ Spawning reviewer subagent...
@@ -921,7 +921,7 @@ Start auto-pilot? [Y/n]
     Branch:  refactor/12-refactor-auth-middleware
     PR:      #50
     Changed: 2 files
-    Tests:   6 passed
+    Tests:   3 written, 9 passed
 
 ● Review pass 1 for PR #50...
   ⟶ Spawning reviewer subagent...
@@ -946,7 +946,7 @@ Start auto-pilot? [Y/n]
     Branch:  fix/5-login-crash-mobile
     PR:      #51
     Changed: 3 files
-    Tests:   8 passed
+    Tests:   5 written, 13 passed
 
 ● Review pass 1 for PR #51...
   ⟶ Spawning reviewer subagent...
@@ -1104,7 +1104,7 @@ Every `gh` command for data retrieval uses `--json` with explicit field selectio
 Follow DESIGN.md symbol vocabulary and output structure for all output. Key rules:
 
 - Iteration counter: `[Iteration {i}/{max}]` for loop progress
-- Step counter: `[N/7]` for resolve pipeline steps (inherited from issue-resolver)
+- Step counter: `[N/8]` for resolve pipeline steps (inherited from issue-resolver)
 - Symbols: `●` progress, `✓` success, `✗` failure, `◆` section header, `⚡` recommendation, `⚠` warning, `○` info
 - Two-space indent for content under section headers
 - Section separators: `┄` (light dash)
