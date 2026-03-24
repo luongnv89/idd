@@ -10,6 +10,9 @@ This is a **skills-only** project. There is no runtime code — each skill is a 
 
 ```
 skills/
+├── auto-pilot/         # /auto-pilot — triage, resolve, review, merge loop
+│   ├── SKILL.md
+│   └── references/
 ├── issue-analysis/     # /issue-analysis N
 │   ├── SKILL.md
 │   └── references/
