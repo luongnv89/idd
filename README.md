@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/luongnv89/idd/releases/latest"><img src="https://img.shields.io/badge/version-0.5.0-blue.svg" alt="Version 0.5.0"></a>
+  <a href="https://github.com/luongnv89/idd/releases/latest"><img src="https://img.shields.io/badge/version-0.6.0-blue.svg" alt="Version 0.6.0"></a>
   <a href="https://github.com/luongnv89/idd/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="MIT License"></a>
   <a href="https://github.com/luongnv89/idd"><img src="https://img.shields.io/badge/skills-7-blue.svg" alt="7 skills"></a>
   <a href="https://github.com/luongnv89/idd/blob/main/CONTRIBUTING.md"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs Welcome"></a>
@@ -55,10 +55,10 @@ graph LR
 |---------|-------------|---------|--------|
 | `/issue-creator` | Classify type, generate acceptance criteria, create a structured issue | 0.2.0 | medium |
 | `/issue-analysis N` | Root cause, git history, implementation options, complexity and risk | 0.3.0 | high |
-| `/issue-resolver N` | Fetch, branch, scan codebase, write code + tests, open PR with `Closes #N` | 0.3.0 | max |
+| `/issue-resolver N` | 8-step pipeline: fetch, branch, research, plan, execute, write tests, verify, ship PR with `Closes #N` | 0.4.0 | max |
 | `/issue-triage` | Dependency graph, stale detection, already-fixed detection via commit/PR scanning, priority and execution order | 0.4.0 | medium |
 | `/init-gitissue` | Auto-detect language/framework/test runner, generate `.gitissue.yml` | 0.2.0 | low |
-| `/auto-pilot` | Triage → resolve → review → merge loop, fully automated backlog processing | 0.3.0 | max |
+| `/auto-pilot` | Triage → resolve → review → merge loop, fully automated backlog processing | 0.5.0 | max |
 | `/review-fix-loop` | Automated review-fix cycle with fresh reviewer agents, repeat until clean, one clean commit | 0.4.0 | high |
 
 ---

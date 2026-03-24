@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-03-24
+
+### Added
+- Dedicated Test step (Step 6) in `/issue-resolver` pipeline — expands the pipeline from 7 steps to 8 (Fetch → Branch → Research → Plan → Execute → Test → Verify → Ship)
+  - Test writer subagent (`agents/test-writer.md`) writes unit tests and e2e tests (when an e2e framework exists) for all new/changed functionality
+  - Inline fallback for environments without the Agent tool
+- Build verification in `/issue-resolver` Step 7 (Verify) — compiles/builds the project before running tests to catch errors early
+- `/auto-pilot` resolver and batch resolver subagent prompts updated to enforce the Test step and report `tests_written` count
+
+### Changed
+- `/issue-resolver` v0.4.0, `/auto-pilot` v0.6.0
+- `/issue-resolver` implementer subagent now defers comprehensive test writing to the dedicated Test Writer subagent (Step 6)
+- `/auto-pilot` pipeline references updated from 7-step to 8-step across SKILL.md and subagent-prompts.md
+- README command table updated with current skill versions
+
 ## [0.5.0] - 2026-03-24
 
 ### Added
