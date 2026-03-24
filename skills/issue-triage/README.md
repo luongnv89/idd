@@ -1,10 +1,11 @@
 # Issue Triage
 
-> Analyze open GitHub issues to surface dependencies, suggest priorities, identify parallelizable work, and flag stale issues.
+> Analyze open GitHub issues to surface dependencies, suggest priorities, identify parallelizable work, flag stale issues, and detect issues already fixed by other PRs.
 
 ## Highlights
 
 - Builds a dependency graph from shared affected files across issues
+- Detects open issues that were incidentally fixed by PRs targeting other issues
 - Computes execution order via topological sort with circular dependency detection
 - Identifies parallelizable issues that can be worked on simultaneously
 - Flags stale issues (configurable threshold, default 14 days)
@@ -17,9 +18,10 @@
 | Say this... | Skill will... |
 |---|---|
 | `/issue-triage` | Show cached triage instantly (or auto-generate on first run), suggest update if changes detected |
-| `/issue-triage update` | Force a fresh analysis and overwrite cached results |
+| `/issue-triage update` | Force a fresh analysis, scan for already-fixed issues, and overwrite cached results |
 | "what should I work on next" | Show triage report and recommend which issue to pick up first |
 | "which issues are blocked" | Show dependency graph from cached or fresh analysis |
+| "are any issues already fixed" | Scan commit history to find issues resolved by other PRs |
 | "sprint planning" | Output a prioritized, dependency-aware work plan |
 
 ## How It Works
@@ -28,10 +30,12 @@
 graph TD
     A["Check for cached triage"] --> B{"Cache exists?"}
     B -- Yes --> C["Render cached report instantly"]
-    B -- No --> D["Auto-run full analysis"]
+    B -- No --> D["Fetch open issues"]
     C --> E["Check git history for changes"]
     E --> F["Suggest update if stale"]
-    D --> G["Persist & display results"]
+    D --> D2["Scan commits for already-fixed issues"]
+    D2 --> D3["Analyze dependencies & prioritize"]
+    D3 --> G["Persist & display results"]
     style A fill:#4CAF50,color:#fff
     style F fill:#2196F3,color:#fff
     style G fill:#2196F3,color:#fff
@@ -69,6 +73,7 @@ asm install https://github.com/luongnv89/idd --skill issue-triage
 
 A structured triage table in the terminal with:
 - Dependency table: `# | Issue | Pri | Blocks | Status`
+- Already-fixed detection with confidence levels and suggested close commands
 - Parallelizable issue groups
 - Stale issue warnings
 - Suggested execution order

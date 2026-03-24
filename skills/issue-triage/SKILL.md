@@ -1,17 +1,17 @@
 ---
 name: issue-triage
-description: Triage open GitHub issues by analyzing dependencies, detecting circular references, computing execution order, identifying parallelizable work, flagging stale issues, and suggesting priorities. By default, instantly shows cached triage from .gitissue/triage.json (auto-generates on first run if no cache exists). Suggests an update when local git history shows changes since the last triage, but never auto-updates. Full re-analysis only runs when the user explicitly says "/issue-triage update". Use this skill whenever someone says "triage issues", "prioritize issues", "what should I work on next", "issue dependencies", "which issues are blocked", "stale issues", "backlog review", "sprint planning", "dependency graph", "what's blocking", "/issue-triage", "/issue-triage update", or wants to understand the relationship between open issues in a repository. Also trigger when someone asks for a sprint plan, wants to know which issues can be worked on in parallel, needs to identify blocked or stale work, asks "which issue should I pick up", "what order should we resolve these", "show me the last triage", "triage report", or wants to plan their next sprint. This skill reads all open issues, builds a dependency graph from affected files, performs topological sorting, and outputs a structured triage table with priority suggestions, parallelization recommendations, stale warnings, and a suggested resolution order — all via gh CLI with structured JSON output, persisted to .gitissue/triage.json.
+description: Triage open GitHub issues by analyzing dependencies, detecting circular references, computing execution order, identifying parallelizable work, flagging stale issues, detecting issues already fixed by other PRs, and suggesting priorities. By default, instantly shows cached triage from .gitissue/triage.json (auto-generates on first run if no cache exists). Suggests an update when local git history shows changes since the last triage, but never auto-updates. Full re-analysis only runs when the user explicitly says "/issue-triage update". Use this skill whenever someone says "triage issues", "prioritize issues", "what should I work on next", "issue dependencies", "which issues are blocked", "stale issues", "already fixed", "backlog review", "sprint planning", "dependency graph", "what's blocking", "/issue-triage", "/issue-triage update", or wants to understand the relationship between open issues in a repository. Also trigger when someone asks for a sprint plan, wants to know which issues can be worked on in parallel, needs to identify blocked or stale work, asks "which issue should I pick up", "what order should we resolve these", "show me the last triage", "triage report", "are any issues already fixed", or wants to plan their next sprint. This skill reads all open issues, builds a dependency graph from affected files, performs topological sorting, and outputs a structured triage table with priority suggestions, parallelization recommendations, stale warnings, already-fixed detection, and a suggested resolution order — all via gh CLI with structured JSON output, persisted to .gitissue/triage.json.
 effort: medium
 license: MIT
 metadata:
-  version: 0.2.0
+  version: 0.3.0
   creator: Luong NGUYEN <luongnv89@gmail.com>
 compatibility: Requires git and GitHub CLI (gh) with authentication. Default mode (cached view) needs only local file access — no gh required.
 ---
 
 # /issue-triage
 
-Analyze open GitHub issues to surface dependencies, suggest priorities, identify parallelizable work, and flag stale issues. Defaults to **view mode** — instantly renders cached results from `.gitissue/triage.json`. On first run (no cache), automatically performs a full analysis. After showing cached data, checks local git history and suggests an update if changes are detected. Full re-analysis only happens when the user explicitly requests `/issue-triage update`.
+Analyze open GitHub issues to surface dependencies, suggest priorities, identify parallelizable work, flag stale issues, and detect issues that may have already been fixed by commits or PRs targeting other issues. Defaults to **view mode** — instantly renders cached results from `.gitissue/triage.json`. On first run (no cache), automatically performs a full analysis. After showing cached data, checks local git history and suggests an update if changes are detected. Full re-analysis only happens when the user explicitly requests `/issue-triage update`.
 
 ## Invocation
 
@@ -201,6 +201,81 @@ Progress output:
 ● Fetching {N} open issues...
 ```
 
+## Step 1b — Detect Already-Fixed Issues
+
+Some open issues may have been incidentally fixed by commits or PRs that targeted a different issue. For example, a PR titled `fix(auth): resolve redirect loop (#42)` might also fix the bug described in issue #17 if they share the same root cause. This step scans recent git history and merged PRs to catch these cases, so the team doesn't waste time on issues that are already resolved.
+
+### How it works
+
+**a) Scan commit messages for issue references:**
+
+```bash
+git log --all --oneline --since="3 months ago"
+```
+
+Parse each commit message for references to open issue numbers. Look for patterns like:
+- `#N` (bare reference)
+- `Closes #N`, `Fixes #N`, `Resolves #N` (GitHub closing keywords, case-insensitive)
+- Branch names containing issue numbers (e.g., `fix/42-mobile-auth`)
+
+For each open issue, collect all commits that reference it.
+
+**b) Cross-reference with merged PRs:**
+
+```bash
+gh pr list --state merged --json number,title,body,mergeCommit,headRefName --limit 50
+```
+
+For each merged PR, extract:
+- Issue numbers from the PR title (e.g., `(#42)`)
+- Issue numbers from the PR body (`Closes #N`, `Fixes #N`, `Resolves #N`)
+- Issue numbers from the branch name (`fix/42-...`)
+
+This gives you a map: **PR → set of issue numbers it explicitly targets**.
+
+**c) Identify potentially fixed issues:**
+
+An open issue `#X` is flagged as **potentially fixed** when:
+
+1. **Commit-level signal**: A commit references `#X` (via `Closes`, `Fixes`, `Resolves`, or bare `#N`) but that commit belongs to a PR that was created for a *different* issue. This means issue `#X` was mentioned in someone else's fix.
+
+2. **File-overlap signal**: A merged PR modified files that overlap with issue `#X`'s affected files (from the keyword scan in Step 2), AND the PR's commit messages or body mention issue `#X` by number.
+
+Both signals require an explicit mention of the issue number — pure file overlap without a reference is not enough (that's what dependency analysis in Step 2 handles).
+
+**d) Confidence levels:**
+
+| Confidence | Criteria |
+|-----------|----------|
+| `high` | Commit uses a closing keyword (`Closes #X`, `Fixes #X`, `Resolves #X`) and is in a merged PR for a different issue |
+| `medium` | Commit references `#X` (bare mention) in a merged PR for a different issue, or the PR body mentions `#X` alongside another issue |
+| `low` | Branch name contains `#X`'s number but no explicit commit/PR body reference |
+
+Only `high` and `medium` confidence matches are flagged. `low` is too noisy — branch names like `fix/12-auth` could match issue #1 or #12 accidentally.
+
+### Output
+
+For each potentially fixed issue, collect:
+- The issue number
+- The PR(s) and/or commit(s) that likely fixed it
+- The confidence level
+- Which other issue the PR was targeting
+
+This data feeds into Step 8 (Output) and Step 9 (Persist).
+
+Progress output:
+
+```
+● Scanning commit history for already-fixed issues...
+```
+
+If any are found:
+
+```
+● Scanning commit history for already-fixed issues...
+  ◆ {N} issue(s) may already be fixed
+```
+
 ## Step 2 — Analyze Dependencies
 
 For each issue, extract keywords from the issue title and body — look for error messages, component names, file paths, function names, class names, and module references. Then grep the codebase for each issue's keywords to find affected files. Issues sharing affected files or modules (same parent directory) are considered dependent.
@@ -251,7 +326,10 @@ Perform a topological sort on the dependency graph (after breaking any cycles fr
 Assign a status to each issue:
 - **ready** — no unresolved dependencies
 - **blocked #N** — depends on issue #N being resolved first
+- **maybe-fixed** — flagged in Step 1b as potentially already resolved (high or medium confidence)
 - **stale (Nd)** — flagged in Step 6 (added later, but the status column reflects it)
+
+Issues flagged as `maybe-fixed` are sorted to the bottom of the execution order — there's no point working on them until someone verifies whether the fix actually landed. They still appear in the triage table so the team can review and close them.
 
 ## Step 5 — Identify Parallelizable Issues
 
@@ -322,12 +400,46 @@ After the table, output summary recommendations:
 ```
   ⚡ Parallelizable: #12 + #8 (independent)
   ⚠  Stale: 1 issue (>14 days inactive)
+  ◆  Maybe fixed: 1 issue may already be resolved
   ○  Suggested order: #12 → #15 → #8 → #3
 ```
 
 - **Parallelizable**: List groups of issues that can be worked on simultaneously. If multiple groups exist, show each on its own line. If no parallelizable issues, omit this line.
 - **Stale**: Count of stale issues with the threshold. If none are stale, omit this line.
+- **Maybe fixed**: Count of issues flagged as potentially already fixed. If none, omit this line.
 - **Suggested order**: The full execution order from Step 4, shown as issue numbers connected by `→`. If more than 10 issues, show the first 10 and append `... (+N more)`.
+
+### Already-Fixed Detail Block
+
+If any issues were flagged as potentially fixed in Step 1b, output a detail block after the summary lines:
+
+```
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  ◆ Potentially Already Fixed
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+
+  #17 Fix session timeout on mobile
+    ● Likely fixed by PR #43 (fix/42-mobile-auth-redirect)
+      Commit: abc1234 "fix(auth): resolve redirect loop (#42)"
+      Confidence: high — commit uses "Fixes #17"
+      Target issue: #42
+    → Verify and close: gh issue close 17 -c "Fixed by #43"
+
+  #9 Duplicate error in logs
+    ● Likely fixed by PR #31 (refactor/8-cleanup-auth-module)
+      Commit: def5678 "refactor(auth): deduplicate error handlers (#8)"
+      Confidence: medium — commit references #9
+      Target issue: #8
+    → Verify and close: gh issue close 9 -c "Fixed by #31"
+```
+
+For each flagged issue, show:
+- The issue number and title
+- Which PR likely fixed it and its branch name
+- The specific commit with its message
+- Confidence level with the reason
+- Which issue that PR was originally targeting
+- A suggested `gh issue close` command to make it easy to act on
 
 ---
 
@@ -363,13 +475,15 @@ After Step 8 (terminal output is always shown regardless of persistence success)
       "stale_days": null,
       "labels": ["bug", "auth"],
       "affected_files": ["auth.py", "middleware.py"],
-      "updated_at": "2026-03-18T10:00:00Z"
+      "updated_at": "2026-03-18T10:00:00Z",
+      "potentially_fixed_by": null
     }
   ],
   "summary": {
     "parallel_groups": [[12, 8]],
     "stale_count": 1,
     "stale_threshold_days": 14,
+    "potentially_fixed_count": 0,
     "suggested_order": [12, 8, 3, 15],
     "circular_deps": []
   },
@@ -403,9 +517,11 @@ After Step 8 (terminal output is always shown regardless of persistence success)
 | `issues[].labels` | string[] | GitHub labels |
 | `issues[].affected_files` | string[] | Files identified by keyword-based codebase scan at triage time |
 | `issues[].updated_at` | ISO 8601 string | GitHub `updatedAt` value |
+| `issues[].potentially_fixed_by` | object or null | If flagged as maybe-fixed: `{ "pr": 43, "branch": "fix/42-auth", "commit": "abc1234", "commit_message": "fix(auth): ...", "confidence": "high", "target_issue": 42 }`. Null if not flagged. |
 | `summary.parallel_groups` | integer[][] | Groups of parallelizable issue numbers |
 | `summary.stale_count` | integer | Number of stale issues |
 | `summary.stale_threshold_days` | integer | Threshold used for stale detection |
+| `summary.potentially_fixed_count` | integer | Number of issues flagged as potentially already fixed |
 | `summary.suggested_order` | integer[] | Execution order by issue number |
 | `summary.circular_deps` | integer[][] | Detected circular dependency chains |
 | `history[]` | array | One entry per triage run |
@@ -437,6 +553,7 @@ This is a warning, not a fatal error — the terminal output from Step 8 was alr
   ○ No cached triage found — running first analysis...
 
   ● Fetching 4 open issues...
+  ● Scanning commit history for already-fixed issues...
   ● Scanning codebase for issue dependencies...
 
   ◆ Issue Triage
@@ -520,6 +637,8 @@ This is a warning, not a fatal error — the terminal output from Step 8 was alr
 
 ```
   ● Fetching 4 open issues...
+  ● Scanning commit history for already-fixed issues...
+    ◆ 1 issue(s) may already be fixed
   ● Scanning codebase for issue dependencies...
 
   ◆ Issue Triage
@@ -528,12 +647,23 @@ This is a warning, not a fatal error — the terminal output from Step 8 was alr
   ───┼────────────────────────┼─────┼────────┼───────────
   1  │ #12 Fix auth redirect  │ P1  │ #15    │ ready
   2  │ #8  Add pagination     │ P3  │ —      │ ready
-  3  │ #3  Old UI alignment   │ P3  │ —      │ stale (28d)
-  4  │ #15 Refactor DB layer  │ P2  │ —      │ blocked #12
+  3  │ #15 Refactor DB layer  │ P2  │ —      │ blocked #12
+  4  │ #3  Old UI alignment   │ P3  │ —      │ maybe-fixed
 
-  ⚡ Parallelizable: #12 + #8 + #3 (independent)
-  ⚠  Stale: 1 issue (>14 days inactive)
-  ○  Suggested order: #12 → #8 → #3 → #15
+  ⚡ Parallelizable: #12 + #8 (independent)
+  ◆  Maybe fixed: 1 issue may already be resolved
+  ○  Suggested order: #12 → #8 → #15 → #3
+
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  ◆ Potentially Already Fixed
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+
+  #3 Old UI alignment
+    ● Likely fixed by PR #14 (fix/12-fix-auth-redirect)
+      Commit: abc1234 "fix(ui): align header elements (#12)"
+      Confidence: medium — commit references #3
+      Target issue: #12
+    → Verify and close: gh issue close 3 -c "Fixed by #14"
 
   ✓ Triage saved to .gitissue/triage.json
 ```
@@ -565,6 +695,7 @@ This is a warning, not a fatal error — the terminal output from Step 8 was alr
 
 ```
   ● Fetching 2 open issues...
+  ● Scanning commit history for already-fixed issues...
   ● Scanning codebase for issue dependencies...
 
   ⚠ Circular dependency detected: #5 → #9 → #5

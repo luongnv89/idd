@@ -74,6 +74,22 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 ```
 **Trigger:** Keyword scan for a single issue exceeds `triage.scan_timeout_per_issue` seconds.
 
+### No merged PRs found for fix-scan
+```
+○ No merged PRs found in the last 3 months — skipping already-fixed detection.
+```
+**Trigger:** `gh pr list --state merged` returns an empty array. This is expected for new repos.
+**Note:** This is an informational message, not an error. The triage continues without fix-scanning.
+
+### API rate limit during fix-scan
+```
+⚠ GitHub API rate limit reached during fix-scan
+
+  Skipping already-fixed detection. Triage continues without it.
+  Check:   gh api rate_limit --jq '.rate.remaining'
+```
+**Trigger:** HTTP 403 with rate limit headers during the merged PR fetch in Step 1b.
+
 ### API rate limit during fetch
 ```
 ✗ GitHub API rate limit reached while fetching issues
