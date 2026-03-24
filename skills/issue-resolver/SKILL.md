@@ -4,7 +4,7 @@ description: Resolve a GitHub issue end-to-end through a 7-step pipeline (Fetch,
 effort: max
 license: MIT
 metadata:
-  version: 0.2.0
+  version: 0.3.0
   creator: Luong NGUYEN <luongnv89@gmail.com>
 compatibility: Requires git and GitHub CLI (gh) with authentication and push access to the repository. Run `gh auth status` to verify.
 ---

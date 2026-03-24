@@ -4,7 +4,7 @@ description: Deep analysis of a single GitHub issue — root cause, affected fil
 effort: high
 license: MIT
 metadata:
-  version: 0.2.0
+  version: 0.3.0
   creator: Luong NGUYEN <luongnv89@gmail.com>
 compatibility: Requires git and GitHub CLI (gh) with authentication. View mode (`/issue-analysis N view`) needs only local file access — no gh required.
 ---
