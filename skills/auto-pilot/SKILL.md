@@ -1,19 +1,19 @@
 ---
 name: auto-pilot
-description: Fully automated development loop that triages open issues, picks the highest-priority task, resolves it end-to-end, reviews the PR with two fix-review cycles, merges the PR, and repeats until all issues are resolved or a stop condition is hit. Supports an explicit issue list to process specific issues in a user-defined order, skipping triage entirely. Use this skill whenever someone says "auto-pilot", "autopilot", "auto resolve all issues", "resolve everything", "work through the backlog", "resolve all", "run the loop", "automate the backlog", "hands-free mode", "keep going until done", or wants the agent to continuously triage-resolve-review-merge without manual intervention. Also trigger when someone asks to "process all issues", "batch resolve", "resolve next", "work on issues automatically", "start the dev loop", "resolve issues 1, 2, 3", "work on these issues", "resolve #5 #10 #12 in order", or provides a list of issue numbers to process sequentially.
+description: Fully automated development loop that triages open issues, picks the highest-priority task, resolves it end-to-end, reviews the PR with up to 5 fix-review cycles, merges the PR, and repeats until all issues are resolved or a stop condition is hit. When given an explicit issue list, runs deep analysis first to identify dependencies, optimal resolution order, and opportunities to batch-resolve related issues with minimum changes — saving iterations and reducing conflicts. Use this skill whenever someone says "auto-pilot", "autopilot", "auto resolve all issues", "resolve everything", "work through the backlog", "resolve all", "run the loop", "automate the backlog", "hands-free mode", "keep going until done", or wants the agent to continuously triage-resolve-review-merge without manual intervention. Also trigger when someone asks to "process all issues", "batch resolve", "resolve next", "work on issues automatically", "start the dev loop", "resolve issues 1, 2, 3", "work on these issues", "resolve #5 #10 #12 in order", or provides a list of issue numbers to process.
 effort: max
 license: MIT
 metadata:
-  version: 0.3.0
+  version: 0.4.0
   creator: Luong NGUYEN <luongnv89@gmail.com>
-compatibility: Requires git and GitHub CLI (gh) with authentication and push access. Requires merge permission for auto-merge. Uses /issue-triage, /issue-resolver, and /code-review skills internally.
+compatibility: Requires git and GitHub CLI (gh) with authentication and push access. Requires merge permission for auto-merge. Uses /issue-triage, /issue-resolver, and /issue-analysis skills internally.
 ---
 
 # /auto-pilot
 
 Fully automated development loop: triage, pick, resolve, review, fix, merge, repeat.
 
-The auto-pilot orchestrates existing gitissue skills into a continuous loop that processes the issue backlog without manual intervention. Each iteration: triage the backlog, pick the top-priority issue, resolve it via the full pipeline, review the PR and fix detected issues (up to 2 cycles), merge the PR, then loop back.
+The auto-pilot orchestrates existing gitissue skills into a continuous loop that processes the issue backlog without manual intervention. Each iteration: triage the backlog, pick the top-priority issue, resolve it via the full pipeline, review the PR and fix detected issues (up to 5 cycles), merge the PR, then loop back.
 
 ## Invocation
 
@@ -67,7 +67,7 @@ Load `.gitissue.yml` from the repo root once at start. If the file does not exis
 
 Defaults:
 - `autopilot.max_iterations: 10` — maximum issues to process before stopping
-- `autopilot.review_cycles: 2` — number of review-fix cycles per PR (minimum: 2, enforces at least 2 review passes)
+- `autopilot.review_cycles: 5` — maximum fix attempts per PR (minimum: 2). A cycle = one fix attempt + one review pass. Confirmation-only review passes (spawned after a PASS to verify, without a preceding fix) do not consume a cycle.
 - `autopilot.auto_merge: true` — merge PRs automatically after review passes
 - `autopilot.pause_on_failure: true` — stop the loop if a resolution fails
 - `autopilot.skip_labels: ["wontfix", "blocked", "do-not-merge"]` — skip issues with these labels
@@ -85,12 +85,16 @@ The solution: the main agent acts as a **lightweight orchestrator** that delegat
 
 ### Subagent Architecture
 
-Each iteration spawns up to 3 subagents. The main agent only tracks: issue number, title, branch name, PR number, and pass/fail status.
+Each iteration spawns up to 3 subagents. The main agent only tracks: issue number, title, branch name, PR number, and pass/fail status. In explicit list mode, an additional analyzer subagent runs once upfront before the loop begins.
 
 ```
 Main Agent (orchestrator)
   │
-  ├── Subagent: Resolver
+  ├── Subagent: Analyzer (explicit list mode only, runs once)
+  │     Analyzes all issues, finds dependencies and batch opportunities
+  │     Returns: optimized_order, batches, dependencies
+  │
+  ├── Subagent: Resolver (or Batch Resolver for batched issues)
   │     Runs the full /issue-resolver pipeline (Fetch → Ship)
   │     Returns: branch_name, pr_number, files_changed, tests_passed
   │
@@ -109,7 +113,7 @@ Main Agent (orchestrator)
   └── ... (more fix/review cycles if needed, up to review_cycles)
 ```
 
-Each review pass spawns a **new, independent** reviewer subagent. This ensures genuine fresh-eyes review — no subagent carries memory from a prior pass. A PR needs **2 consecutive PASS results** before it can merge.
+Each review pass spawns a **new, independent** reviewer subagent. This ensures genuine fresh-eyes review — no subagent carries memory from a prior pass. A PR normally needs **2 consecutive PASS results** before it can merge; if all review cycles are exhausted, 1 clean PASS is acceptable.
 
 ### Why Subagents Matter
 
@@ -139,7 +143,7 @@ The main agent should never: read source files, read PR diffs, run tests, or wri
 The auto-pilot operates in one of two modes based on the invocation:
 
 - **Triage mode** (default) — `/auto-pilot` with no `--issues` flag. Runs a full triage each iteration and picks the next issue by priority. Phase 1 executes normally.
-- **Explicit list mode** — `/auto-pilot --issues 5,10,12`. The user provides the exact issues and order. Phase 1 (Triage and Pick) is replaced by a simple list walk — no triage, no dependency analysis, no priority computation.
+- **Explicit list mode** — `/auto-pilot --issues 5,10,12`. The user provides the issues to process. Phase 1 (Triage and Pick) is replaced by an analysis phase that examines all issues, identifies dependencies and shared files, detects batching opportunities, and computes the optimal resolution order.
 
 Detect mode by checking whether `--issues` was provided. If yes, parse the comma-separated list into an ordered array of issue numbers. The list defines both **which** issues to process and **in what order**.
 
@@ -147,7 +151,7 @@ Detect mode by checking whether `--issues` was provided. If yes, parse the comma
 
 ## Explicit List Mode
 
-When `--issues` is provided, the triage phase is entirely skipped. Instead:
+When `--issues` is provided, the triage phase is replaced by an analysis & optimization phase that finds the smartest way to resolve the given issues:
 
 ### Parsing the issue list
 
@@ -196,9 +200,80 @@ If all issues are invalid:
 ```
 Stop.
 
+### Analysis & Optimization
+
+After validation, the auto-pilot analyzes all issues to find the smartest resolution strategy. The goal: resolve the maximum number of issues with the minimum number of changes by identifying dependencies, shared files, and batching opportunities.
+
+```
+● Analyzing {valid_count} issues for optimal resolution strategy...
+  ⟶ Spawning analyzer subagent...
+```
+
+Spawn the **Analyzer Subagent** (see `references/subagent-prompts.md`) with the full list of validated issue numbers. The analyzer:
+
+1. **Runs `/issue-analysis` on each issue** — identifies affected files, root causes, complexity, and implementation approach
+2. **Builds a dependency graph** — issue A's fix may conflict with or depend on issue B's fix (e.g., both touch `auth.js`)
+3. **Detects batch opportunities** — issues that share affected files or have related root causes can often be resolved together in a single PR with fewer total changes
+4. **Computes optimal order** — topological sort considering: dependencies first, then batch groups together, then independent issues by complexity (simplest first)
+
+### Handling analyzer results
+
+**On success**, the analyzer returns:
+- `optimized_order`: array of issue numbers in recommended resolution order
+- `batches`: array of batch groups, each with `issues` (numbers that should be resolved together) and `reason` (why they batch well)
+- `dependencies`: array of `{issue, depends_on, reason}` explaining ordering constraints
+- `analysis_summary`: one-line-per-issue summary of affected files and complexity
+
+**On failure** (analyzer subagent returns failure or times out), fall back gracefully. Output the error from `references/error-messages.md`:
+```
+⚠ Issue analysis failed — falling back to user-defined order
+
+  The analyzer could not complete analysis for all issues.
+  Proceeding with original order without batching optimization.
+```
+Set `optimized_order` to the original validated list, `batches` to empty, and proceed to Confirmation. The auto-pilot still works — it just loses the optimization.
+
+**On partial failure** (analyzer could not analyze a specific issue), output for each failed issue:
+```
+⚠ Could not analyze #{N} — excluded from batching
+
+  Issue #{N} will be resolved individually in its original position.
+```
+Exclude that issue from any batch groups but keep it in the `optimized_order` at its original position.
+
+### Displaying analysis results
+
+On success, display the analysis results:
+
+```
+◆ Analysis Results
+┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  Issues analyzed:  {valid_count}
+
+  Dependencies detected:
+  ● #{a} must come before #{b} — {reason}
+
+  Batch opportunities:
+  ⚡ #{x}, #{y} share {N} files — can batch-resolve together
+  ⚡ #{p}, #{q} have related root cause — can batch-resolve together
+
+  Optimized resolution order:
+  1. #{n1} — {title1} {complexity}
+  2. #{n2} — {title2} {complexity} (batched with #{n1})
+  3. #{n3} — {title3} {complexity}
+```
+
+If no dependencies or batching opportunities are found, the original user-defined order is preserved:
+```
+  ○ No dependencies or batching opportunities detected
+  ○ Using user-defined order
+```
+
 ### Confirmation
 
-Show the execution plan (same format as triage mode, but without priority/dependency info):
+Show the execution plan with analysis insights:
+
+Compute `saved_iterations` as: sum of `(batch.issues.length - 1)` across all batches. Each batch of N issues resolves them in 1 iteration instead of N, saving N-1 iterations. If there are no batches, omit the `Batches:` line entirely.
 
 ```
 ◆ Auto-Pilot Plan (explicit list)
@@ -206,11 +281,12 @@ Show the execution plan (same format as triage mode, but without priority/depend
   Issues to process:  {valid_count} (of {original_count} provided)
   Review cycles:      {review_cycles}
   Auto-merge:         {yes/no}
-  Mode:               explicit list (triage skipped)
+  Mode:               explicit list (analyzed + optimized)
+  Batches:            {batch_count} (saving ~{saved_iterations} iterations)
 
-  Execution order (user-defined):
+  Optimized execution order:
   1. #{n1} — {title1}
-  2. #{n2} — {title2}
+  2. #{n2} — {title2} (batched with #{n1})
   3. #{n3} — {title3}
 
 Start auto-pilot? [Y/n]
@@ -224,19 +300,65 @@ Stop.
 
 ### Loop behavior
 
-In explicit list mode, the loop iterates through the validated list in order. Phase 1 is replaced: instead of triaging and picking, simply advance to the next issue in the list.
+In explicit list mode, the loop iterates through the **optimized** order (not the original user order). Phase 1 is replaced: instead of triaging and picking, advance to the next issue (or batch) in the optimized list.
+
+#### Batch detection
+
+Before starting the loop, build a **batch lookup map** from the analyzer's `batches` array. For each batch group, map every issue number in the group to its co-batch partners:
 
 ```
-● [Issue 1/3] Next from list: #5 — Fix login crash
+batch_map = {}
+for batch in analyzer.batches:
+    for issue in batch.issues:
+        batch_map[issue] = batch  # includes all co-batch issues + reason + shared_files
 ```
 
-The `[Issue {i}/{total}]` counter replaces `[Iteration {i}/{max}]` to reflect that the total is the list length, not a config limit.
+Also maintain a `processed` set (initially empty) that tracks which issues have been resolved — either individually or as part of a batch.
+
+When advancing to the next item in `optimized_order`:
+1. **If already processed** (in the `processed` set): emit a skip line and advance:
+   ```
+   ○ [Issue {i}/{total}] #{N} — already resolved in batch with #{batch_primary}
+   ```
+2. Check `batch_map` — is this issue number part of a batch?
+3. **If yes**: collect all co-batch issue numbers, use the **Batch Resolver Subagent** (see `references/subagent-prompts.md`). Do NOT pre-mark issues as processed — wait for the resolver result (see "Processing batch resolver results" below) to determine which issues were actually resolved.
+4. **If no**: use the standard Resolver Subagent for a single issue. On success, add the issue to the `processed` set.
+
+For batched issues, the resolver subagent receives all issue numbers in the batch:
+
+```
+● [Issue 1/3] Resolving #{n1} (+ batched: #{n2})...
+  ⟶ Spawning batch resolver subagent...
+```
+
+The batch resolver creates a single branch and PR that addresses all issues in the batch. The PR body includes `Closes #{n1}` and `Closes #{n2}` for each issue in the batch.
+
+**Processing batch resolver results:**
+
+- **Full success** (`issues_resolved` contains all batch issues): add all batch issues to the `processed` set. After merge, they are skipped when encountered later in `optimized_order`.
+- **Partial success** (`issues_resolved` is a subset of the batch): the PR addresses some but not all issues. Add only the resolved issues to the `processed` set. For unresolved issues, remove them from the `batch_map` so they are treated as individual issues when encountered later in `optimized_order`:
+  ```
+  ⚠ Batch partially resolved: #{n1} addressed, #{n2} not addressed
+    #{n2} will be resolved individually
+  ```
+- **Full failure** (`status: "failure"`): remove all issues in this batch from `batch_map` so they are treated as independent issues, then fall back to resolving each one individually (standard Resolver Subagent, one at a time):
+  ```
+  ⚠ Batch resolve failed for #{n1}, #{n2} — resolving individually
+  ```
+
+For non-batched issues, the flow is identical to before:
+
+```
+● [Issue 3/3] Resolving #{n3}...
+```
+
+The `[Issue {i}/{total}]` counter reflects total issues (not batches), so the user can track overall progress.
 
 All other phases (Resolve, Review, Fix, Merge) run identically to triage mode.
 
 ### Re-triage between iterations
 
-Explicit list mode does **not** re-triage between iterations. The user chose the order — respect it. The only per-iteration pre-work is syncing to the default branch (Step 2.1).
+Explicit list mode does **not** re-triage between iterations. The analysis determined the order upfront — respect it. The only per-iteration pre-work is syncing to the default branch (Step 2.1).
 
 ---
 
@@ -250,8 +372,8 @@ The auto-pilot runs a continuous loop with 5 phases per iteration:
   Phase 1 — Triage          Refresh priorities and pick next issue
                              (skipped in explicit list mode)
   Phase 2 — Resolve         Subagent: full 7-step resolve pipeline
-  Phase 3+4 — Review-Fix    Subagents: review (x2 min), fix if needed
-                             Requires 2 consecutive PASS to proceed
+  Phase 3+4 — Review-Fix    Subagents: review (x5 max), fix if needed
+                             Requires 2 consecutive PASS (or 1 at cycle limit)
   Phase 5 — Merge           Merge the PR and close the issue
   ─────────────────────────────────────────────────────────────
   Loop back to Phase 1 until done or limit reached
@@ -437,7 +559,7 @@ A single review pass can miss issues — the reviewer may focus on obvious probl
 - **Pass 1** catches the initial issues
 - **Pass 2** (after fixes, or as confirmation) catches regressions and anything missed
 
-The loop runs for `autopilot.review_cycles` iterations (default: 2, minimum: 2). A PR can only proceed to merge after receiving **2 consecutive PASS results** or exhausting all review cycles.
+The loop allows up to `autopilot.review_cycles` fix attempts (default: 5, minimum: 2). A fix attempt = one fixer subagent run + one reviewer subagent pass. Confirmation-only review passes (spawned after a PASS to get the required 2 consecutive) do not consume a fix attempt. A PR can proceed to merge after **2 consecutive PASS results**, or after **1 PASS** if all fix attempts are exhausted.
 
 ### Loop Flow
 
@@ -452,10 +574,14 @@ Review pass 1 (fresh reviewer subagent)
                     └── NEEDS FIX → Fix → Review pass 3 (if cycles remain)
 ```
 
+Before entering the review-fix loop, initialize two counters:
+- `consecutive_passes = 0` — increments on each PASS, resets to 0 on NEEDS FIX or after any code change
+- `fix_cycles_used = 0` — increments by 1 each time a Fixer Subagent is spawned (Step 4.1). Fix cycles remaining = `review_cycles - fix_cycles_used`
+
 ### Step 3.1 — Spawn Reviewer Subagent
 
 ```
-● Review pass {pass}/{max_passes} for PR #{pr_number}...
+● Review pass {pass} for PR #{pr_number}...
   ⟶ Spawning reviewer subagent...
 ```
 
@@ -466,7 +592,7 @@ Use the **Reviewer Subagent** prompt from `references/subagent-prompts.md`, subs
 Parse the reviewer subagent's response and display the summary:
 
 ```
-◆ Review #{pr_number} (pass {pass}/{max_passes})
+◆ Review #{pr_number} (pass {pass})
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Correctness:     {✓ pass / ⚠ N issues}
   Test coverage:   {✓ pass / ⚠ N issues}
@@ -483,18 +609,18 @@ Parse the reviewer subagent's response and display the summary:
 
 Track `consecutive_passes` — a counter that increments on each PASS and resets to 0 on each NEEDS FIX.
 
-| Review result | consecutive_passes | Cycles remaining? | Action |
-|---------------|-------------------|-------------------|--------|
+| Review result | consecutive_passes | Fix cycles remaining? | Action |
+|---------------|-------------------|-----------------------|--------|
 | PASS | >= 2 | any | Proceed to Phase 5 (Merge) |
-| PASS | 1 | yes | Spawn another reviewer (confirmation pass) |
-| PASS | 1 | no (last cycle) | Proceed to Phase 5 (Merge) — 1 clean pass is acceptable at cycle limit |
-| NEEDS FIX | 0 | yes | Proceed to Step 4.1 (Fix) |
-| NEEDS FIX | 0 | no (last cycle) | Proceed to Step 4.2 (Cycle Exhaustion) |
+| PASS | 1 | yes | Spawn another reviewer (confirmation pass — does not consume a fix cycle) |
+| PASS | 1 | no (last fix cycle) | Proceed to Phase 5 (Merge) — 1 clean pass is acceptable when fix budget is exhausted |
+| NEEDS FIX | 0 | yes | Proceed to Step 4.1 (Fix — consumes 1 fix cycle) |
+| NEEDS FIX | 0 | no (last fix cycle) | Proceed to Step 4.2 (Cycle Exhaustion) |
 
 ### Step 4.1 — Spawn Fixer Subagent
 
 ```
-● Fix cycle {cycle}/{max_cycles}
+● Fix cycle {cycle}/{review_cycles}
   ⟶ Spawning fixer subagent...
 ```
 
@@ -514,21 +640,21 @@ Reset `consecutive_passes` to 0. Spawn a fresh reviewer subagent (back to Step 3
   Remaining: {remaining_issues}
 ```
 
-If more cycles remain, spawn a new fixer subagent for the remaining issues. If cycles are exhausted, proceed to Step 4.2.
+Reset `consecutive_passes` to 0 (code on branch has changed). If more fix cycles remain, spawn a new fixer subagent for the remaining issues. If cycles are exhausted, proceed to Step 4.2.
 
 **On test failure:**
 ```
   ✗ Tests failed after fix
 ```
 
-If more cycles remain, spawn a new fixer subagent that includes the test failure context. If cycles are exhausted, proceed to Step 4.2.
+Reset `consecutive_passes` to 0 (code on branch has changed). If more fix cycles remain, spawn a new fixer subagent that includes the test failure context. If cycles are exhausted, proceed to Step 4.2.
 
 ### Step 4.2 — Cycle Exhaustion
 
 If all review cycles are exhausted and issues remain:
 
 ```
-⚠ Review issues remain after {max_cycles} review-fix cycles
+⚠ Review issues remain after {review_cycles} review-fix cycles
 
   Remaining issues:
     1. {issue_description_1}
@@ -673,7 +799,7 @@ When the loop ends (for any reason), print a comprehensive summary:
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Issues to process:  5 (of 8 open)
   Limit:              3
-  Review cycles:      2
+  Review cycles:      5
   Auto-merge:         yes
   First issue:        #12 — Fix auth redirect loop
 
@@ -698,17 +824,17 @@ Start auto-pilot? [Y/n]
     Changed: 2 files
     Tests:   8 passed
 
-● Review pass 1/2 for PR #45...
+● Review pass 1 for PR #45...
   ⟶ Spawning reviewer subagent...
 
-◆ Review #45 (pass 1/2)
+◆ Review #45 (pass 1)
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Result:          PASS
 
-● Review pass 2/2 for PR #45 (confirmation)...
+● Review pass 2 for PR #45 (confirmation)...
   ⟶ Spawning reviewer subagent (fresh)...
 
-◆ Review #45 (pass 2/2)
+◆ Review #45 (pass 2)
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Result:          PASS (2 consecutive ✓)
 
@@ -754,61 +880,104 @@ Start auto-pilot? [Y/n]
   ✓ #12 — Refactor auth middleware (open)
   ✓ #8  — Add dark mode toggle (open)
 
+● Analyzing 3 issues for optimal resolution strategy...
+  ⟶ Spawning analyzer subagent...
+
+◆ Analysis Results
+┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  Issues analyzed:  3
+
+  Dependencies detected:
+  ● #12 must come before #8 — #8 touches UI theme which depends on auth context refactored by #12
+
+  Batch opportunities:
+  ⚡ #5, #8 share 2 files (styles.css, theme.ts) — can batch-resolve together
+
+  Optimized resolution order:
+  1. #12 — Refactor auth middleware (high, dependency of #8)
+  2. #5  — Fix login crash on mobile (medium, batched with #8)
+  3. #8  — Add dark mode toggle (low, batched with #5)
+
 ◆ Auto-Pilot Plan (explicit list)
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Issues to process:  3 (of 3 provided)
-  Review cycles:      2
+  Review cycles:      5
   Auto-merge:         yes
-  Mode:               explicit list (triage skipped)
+  Mode:               explicit list (analyzed + optimized)
+  Batches:            1 (saving ~1 iterations)
 
-  Execution order (user-defined):
-  1. #5  — Fix login crash on mobile
-  2. #12 — Refactor auth middleware
-  3. #8  — Add dark mode toggle
+  Optimized execution order:
+  1. #12 — Refactor auth middleware
+  2. #5  — Fix login crash on mobile (batched with #8)
+  3. #8  — Add dark mode toggle (batched with #5)
 
 Start auto-pilot? [Y/n]
 
-● [Issue 1/3] Next from list: #5 — Fix login crash on mobile
+● [Issue 1/3] Next from optimized order: #12 — Refactor auth middleware
 
-● Resolving #5...
+● Resolving #12...
   ⟶ Spawning resolver subagent...
-  ✓ Resolved #5
-    Branch:  fix/5-login-crash-mobile
+  ✓ Resolved #12
+    Branch:  refactor/12-refactor-auth-middleware
     PR:      #50
-    Changed: 1 file
+    Changed: 2 files
     Tests:   6 passed
 
-● Review pass 1/2 for PR #50...
+● Review pass 1 for PR #50...
   ⟶ Spawning reviewer subagent...
   Result: PASS
 
-● Review pass 2/2 for PR #50 (confirmation)...
+● Review pass 2 for PR #50 (confirmation)...
   ⟶ Spawning reviewer subagent (fresh)...
   Result: PASS (2 consecutive ✓)
 
-✓ PR #50 merged — #5 closed
+✓ PR #50 merged — #12 closed
   https://github.com/owner/repo/pull/50
 
 ✓ Issue 1/3 complete
-  Issue:    #5 — Fix login crash on mobile
+  Issue:    #12 — Refactor auth middleware
   PR:       #50 — merged ✓
   ────────────────────────────────────
   Remaining: 2 issues in list
 
-● [Issue 2/3] Next from list: #12 — Refactor auth middleware
-  ...
+● [Issue 2/3] Resolving #5 (+ batched: #8)...
+  ⟶ Spawning batch resolver subagent...
+  ✓ Resolved #5 and #8
+    Branch:  fix/5-login-crash-mobile
+    PR:      #51
+    Changed: 3 files
+    Tests:   8 passed
+
+● Review pass 1 for PR #51...
+  ⟶ Spawning reviewer subagent...
+  Result: PASS
+
+● Review pass 2 for PR #51 (confirmation)...
+  ⟶ Spawning reviewer subagent (fresh)...
+  Result: PASS (2 consecutive ✓)
+
+✓ PR #51 merged — #5 closed, #8 closed (batched)
+  https://github.com/owner/repo/pull/51
+
+✓ Issue 2/3 complete (2 issues resolved via batch)
+  Issues:   #5 — Fix login crash on mobile, #8 — Add dark mode toggle
+  PR:       #51 — merged ✓
+  ────────────────────────────────────
+  Remaining: 0 issues in list
+
+○ [Issue 3/3] #8 — already resolved in batch with #5
 
 ◆ Auto-Pilot Summary
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Status:      completed
-  Iterations:  3/3
-  Duration:    8m 15s
-  Mode:        explicit list
+  Iterations:  2/3 (1 batch saved an iteration)
+  Duration:    6m 10s
+  Mode:        explicit list (analyzed + optimized)
 
   Resolved:
-  ✓ #5  — Fix login crash on mobile    →  PR #50 merged
-  ✓ #12 — Refactor auth middleware      →  PR #51 merged
-  ✓ #8  — Add dark mode toggle          →  PR #52 merged
+  ✓ #12 — Refactor auth middleware      →  PR #50 merged
+  ✓ #5  — Fix login crash on mobile    →  PR #51 merged (batch: +#8)
+  ✓ #8  — Add dark mode toggle          →  PR #51 merged (batched with #5)
 
   Next action: all requested issues resolved!
 ```
@@ -828,11 +997,11 @@ Start auto-pilot? [Y/n]
 ◆ Auto-Pilot Plan (explicit list)
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Issues to process:  1 (of 3 provided)
-  Review cycles:      2
+  Review cycles:      5
   Auto-merge:         yes
-  Mode:               explicit list (triage skipped)
+  Mode:               explicit list (analyzed + optimized)
 
-  Execution order (user-defined):
+  Optimized execution order:
   1. #5  — Fix login crash on mobile
 
   Removed:
@@ -849,37 +1018,37 @@ Start auto-pilot? [Y/n]
 ### Review finds issues, fix cycle succeeds
 
 ```
-● Review pass 1/2 for PR #45...
+● Review pass 1 for PR #45...
   ⟶ Spawning reviewer subagent...
 
-◆ Review #45 (pass 1/2)
+◆ Review #45 (pass 1)
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Result: NEEDS FIX
   Issues: 2
 
-● Fix cycle 1/2
+● Fix cycle 1/5
   ⟶ Spawning fixer subagent...
   ✓ Fixed 2/2 issues
   ✓ Tests passed
 
-● Review pass 2/2 for PR #45...
+● Review pass 2 for PR #45...
   ⟶ Spawning reviewer subagent (fresh)...
 
-◆ Review #45 (pass 2/2)
+◆ Review #45 (pass 2)
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Result: PASS (1 consecutive — need 2)
 
-● Review pass 3/3 for PR #45 (confirmation, bonus cycle)...
+● Review pass 3 for PR #45 (confirmation)...
   ⟶ Spawning reviewer subagent (fresh)...
 
-◆ Review #45 (pass 3/3)
+◆ Review #45 (pass 3)
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Result: PASS (2 consecutive ✓)
 
 ✓ PR #45 merged — #12 closed
 ```
 
-Note: the initial NEEDS FIX reset the consecutive counter. After the fix, it took 2 more PASS results (passes 2 and 3) to reach the merge threshold. The `review_cycles` config controls how many fix attempts are allowed — review passes for confirmation don't count against it.
+Note: the initial NEEDS FIX reset the consecutive counter. After the fix, it took 2 more PASS results (passes 2 and 3) to reach the merge threshold. The `review_cycles` config controls how many fix attempts are allowed — confirmation-only review passes (spawned after a PASS, without a preceding fix) do not consume a fix cycle.
 
 ### All eligible issues are blocked
 

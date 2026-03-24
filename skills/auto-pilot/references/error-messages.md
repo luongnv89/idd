@@ -98,6 +98,25 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 ```
 **Trigger:** Both `--issues` and `--limit` flags are provided.
 
+## Analysis (Explicit List Mode)
+
+### Analysis failed
+```
+⚠ Issue analysis failed — falling back to user-defined order
+
+  The analyzer could not complete analysis for all issues.
+  Proceeding with original order without batching optimization.
+```
+**Trigger:** Analyzer subagent returns failure or times out. Non-fatal — the auto-pilot falls back to processing issues in the original user-defined order without batching.
+
+### Analysis partial failure
+```
+⚠ Could not analyze #{N} — excluded from batching
+
+  Issue #{N} will be resolved individually in its original position.
+```
+**Trigger:** Analyzer could not analyze a specific issue (e.g., issue body is empty or unparseable). Non-fatal — the issue is excluded from batching but still resolved individually.
+
 ## Triage
 
 ### No open issues
@@ -160,7 +179,7 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 
 ### Review cycles exhausted
 ```
-⚠ Review issues remain after {max_cycles} fix cycles
+⚠ Review issues remain after {review_cycles} review-fix cycles
 
   Remaining issues:
     1. {issue_description_1}
