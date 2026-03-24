@@ -26,6 +26,9 @@ skills/
 ├── issue-triage/       # /issue-triage
 │   ├── SKILL.md
 │   └── references/
+├── review-fix-loop/    # /review-fix-loop — automated review-fix cycle
+│   ├── SKILL.md
+│   └── references/
 └── init-gitissue/      # /init-gitissue
     ├── SKILL.md
     └── references/

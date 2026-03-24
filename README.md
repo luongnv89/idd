@@ -7,15 +7,15 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/luongnv89/idd/releases/latest"><img src="https://img.shields.io/badge/version-0.3.0-blue.svg" alt="Version 0.3.0"></a>
+  <a href="https://github.com/luongnv89/idd/releases/latest"><img src="https://img.shields.io/badge/version-0.4.0-blue.svg" alt="Version 0.4.0"></a>
   <a href="https://github.com/luongnv89/idd/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="MIT License"></a>
-  <a href="https://github.com/luongnv89/idd"><img src="https://img.shields.io/badge/skills-6-blue.svg" alt="6 skills"></a>
+  <a href="https://github.com/luongnv89/idd"><img src="https://img.shields.io/badge/skills-7-blue.svg" alt="7 skills"></a>
   <a href="https://github.com/luongnv89/idd/blob/main/CONTRIBUTING.md"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs Welcome"></a>
 </p>
 
 # Turn GitHub Issues Into Structured, Agent-Ready Work Orders
 
-Six terminal commands that structure, analyze, triage, and resolve GitHub issues — so any developer or AI agent can pick up an issue and ship a tested PR.
+Seven terminal commands that structure, analyze, triage, resolve, and review GitHub issues — so any developer or AI agent can pick up an issue and ship a tested PR.
 
 [**Get Started**](#get-started) · [**What is IDD?**](#what-is-idd) · [**Intention-Driven Development**](#idd-as-intention-driven-development) · [**Why Good Issues & Commits Matter**](#why-good-issues-and-commit-messages-matter) · [**Works With Any Tool**](#works-with-any-tool)
 
@@ -59,6 +59,7 @@ graph LR
 | `/issue-triage` | Dependency graph, stale detection, already-fixed detection via commit/PR scanning, priority and execution order | 0.3.0 | medium |
 | `/init-gitissue` | Auto-detect language/framework/test runner, generate `.gitissue.yml` | 0.2.0 | low |
 | `/auto-pilot` | Triage → resolve → review → merge loop, fully automated backlog processing | 0.3.0 | max |
+| `/review-fix-loop` | Automated review-fix cycle with fresh reviewer agents, repeat until clean, one clean commit | 0.4.0 | high |
 
 ---
 
@@ -193,6 +194,7 @@ You can also install individual skills. See each skill folder for per-skill comm
 | `/issue-resolver` | [`skills/issue-resolver/`](skills/issue-resolver/) |
 | `/issue-triage` | [`skills/issue-triage/`](skills/issue-triage/) |
 | `/auto-pilot` | [`skills/auto-pilot/`](skills/auto-pilot/) |
+| `/review-fix-loop` | [`skills/review-fix-loop/`](skills/review-fix-loop/) |
 | `/init-gitissue` | [`skills/init-gitissue/`](skills/init-gitissue/) |
 
 ---
@@ -362,6 +364,26 @@ Fully automated loop: triage open issues, pick the highest-priority task, resolv
 /auto-pilot 5, 12, 3             # resolve these issues in this order
 ```
 
+### /review-fix-loop -- Automated Review-Fix Cycle
+
+Spawns a fresh reviewer agent, fixes detected issues, re-reviews with another fresh agent, and repeats until clean. Each review cycle uses an independent subagent with no memory of prior passes — fresh eyes every time.
+
+```
+/review-fix-loop                 # review and fix current branch until clean
+```
+
+Cycle output:
+
+```
+◆ Review-Fix Loop Complete
+  Cycles: 3
+  Total issues found: 12
+  Total issues fixed: 12
+  Status: ✓ Clean
+```
+
+One clean commit at the end. Max 5 cycles with stagnation detection. Supports PR branches and regular branches.
+
 ### /init-gitissue -- Generate Config
 
 Scans your repository and generates `.gitissue.yml` with sensible defaults: detects language, framework, test runner, existing templates, and adjusts timeouts based on repo size.
@@ -438,6 +460,9 @@ skills/
 │   ├── SKILL.md
 │   └── references/
 ├── issue-triage/       # /issue-triage
+│   ├── SKILL.md
+│   └── references/
+├── review-fix-loop/    # /review-fix-loop
 │   ├── SKILL.md
 │   └── references/
 └── init-gitissue/      # /init-gitissue

@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-03-24
+
+### Added
+- `/review-fix-loop` skill — automated review-fix cycle that spawns fresh reviewer agents, fixes detected issues, and repeats until clean
+  - Each review cycle uses an independent `feature-dev:code-reviewer` subagent for unbiased assessment
+  - Fixes accumulate without committing — one clean commit at the end
+  - Stagnation detection stops the loop if the same issues recur across 2 consecutive cycles
+  - Max 5 cycles safety cap, high-confidence-only filtering to avoid nitpicking
+  - Auto-detects PR branches (uses `gh pr diff`) or regular branches (uses `git diff base...HEAD`)
+
+### Changed
+- `/review-fix-loop` v0.1.0
+- README updated with review-fix-loop skill in command table and project structure
+
 ## [0.3.0] - 2026-03-24
 
 ### Added
