@@ -43,9 +43,12 @@ graph LR
     D --> E["/issue-analysis N"]
     E --> F["/issue-resolver N"]
     F --> G["Tested PR that closes the issue"]
+    D -.-> H["/auto-pilot"]
+    H -.-> G
 
     style A fill:#4CAF50,color:#fff
     style G fill:#2196F3,color:#fff
+    style H fill:#FF9800,color:#fff
 ```
 
 | Command | What it does | Version | Effort |
@@ -53,7 +56,7 @@ graph LR
 | `/issue-creator` | Classify type, generate acceptance criteria, create a structured issue | 0.2.0 | medium |
 | `/issue-analysis N` | Root cause, git history, implementation options, complexity and risk | 0.2.0 | high |
 | `/issue-resolver N` | Fetch, branch, scan codebase, write code + tests, open PR with `Closes #N` | 0.2.0 | max |
-| `/issue-triage` | Dependency graph, stale detection, already-fixed detection, priority and execution order | 0.3.0 | medium |
+| `/issue-triage` | Dependency graph, stale detection, already-fixed detection via commit/PR scanning, priority and execution order | 0.3.0 | medium |
 | `/init-gitissue` | Auto-detect language/framework/test runner, generate `.gitissue.yml` | 0.2.0 | low |
 | `/auto-pilot` | Triage → resolve → review → merge loop, fully automated backlog processing | 0.3.0 | max |
 
@@ -83,7 +86,7 @@ Seven steps run automatically: fetch the issue, create a branch, scan the codeba
   <img src="assets/screenshots/issue-triage.svg" alt="issue-triage terminal output" width="680">
 </p>
 
-Dependency detection, priority suggestions, parallelizable work, and stale issue warnings — one command for the entire backlog.
+Dependency detection, priority suggestions, parallelizable work, stale issue warnings, and already-fixed detection — one command for the entire backlog.
 
 ### 4. Deep-dive on a single issue
 
@@ -97,6 +100,22 @@ Dependency detection, priority suggestions, parallelizable work, and stale issue
   [7/8] Options        ✓ 3 approaches proposed
   [8/8] Report         ✓ saved to .gitissue/analysis-42.json
 ```
+
+### 5. Go hands-free with auto-pilot
+
+```
+  ◆ auto-pilot        starting (5 open issues)
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  [1/5] #42            ✓ resolved → PR #51 merged
+  [2/5] #38            ✓ resolved → PR #52 merged
+  [3/5] #35            ✗ stopped — test failures after 2 fix cycles
+  [4/5] #29            ✓ resolved → PR #53 merged
+  [5/5] #21            ✓ resolved → PR #54 merged
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  ◆ complete           4/5 resolved, 1 stopped
+```
+
+Triage, resolve, review, merge — repeated for every open issue. Two fix-review cycles per PR before merge. Supports explicit issue lists for targeted runs.
 
 ---
 
@@ -157,6 +176,12 @@ Triage the backlog:
 /issue-triage
 ```
 
+Or go hands-free — triage, resolve, review, and merge everything:
+
+```bash
+/auto-pilot
+```
+
 Zero config required. Run `/init-gitissue` to customize.
 
 You can also install individual skills. See each skill folder for per-skill commands:
@@ -167,6 +192,7 @@ You can also install individual skills. See each skill folder for per-skill comm
 | `/issue-analysis` | [`skills/issue-analysis/`](skills/issue-analysis/) |
 | `/issue-resolver` | [`skills/issue-resolver/`](skills/issue-resolver/) |
 | `/issue-triage` | [`skills/issue-triage/`](skills/issue-triage/) |
+| `/auto-pilot` | [`skills/auto-pilot/`](skills/auto-pilot/) |
 | `/init-gitissue` | [`skills/init-gitissue/`](skills/init-gitissue/) |
 
 ---
@@ -186,9 +212,12 @@ graph TD
     E --> F["/issue-resolver N"]
     F --> G["Fetch → Branch → Research → Plan → Execute → Verify → Ship"]
     G --> H["PR merges → Issue auto-closes"]
+    D -.-> I["/auto-pilot"]
+    I -.-> |"triage → resolve → review → merge loop"| H
 
     style A fill:#4CAF50,color:#fff
     style H fill:#2196F3,color:#fff
+    style I fill:#FF9800,color:#fff
 ```
 
 ### IDD as Intention-Driven Development
@@ -322,7 +351,16 @@ Resolves issue #N through a 7-step pipeline:
 
 ### /issue-triage -- Triage the Backlog
 
-Dependency detection via codebase scanning, topological sort for execution order, parallelizable issue identification, stale issue detection (>14 days), priority suggestions.
+Dependency detection via codebase scanning, topological sort for execution order, parallelizable issue identification, stale issue detection (>14 days), already-fixed detection (scans commit history and merged PRs with confidence levels), priority suggestions.
+
+### /auto-pilot -- Automated Backlog Processing
+
+Fully automated loop: triage open issues, pick the highest-priority task, resolve it end-to-end, review the PR with two fix-review cycles, merge, and repeat. Supports explicit issue lists to process specific issues in user-defined order. Stop conditions prevent runaway execution.
+
+```
+/auto-pilot                      # triage and resolve all open issues
+/auto-pilot 5, 12, 3             # resolve these issues in this order
+```
 
 ### /init-gitissue -- Generate Config
 
@@ -386,6 +424,9 @@ Each normalized issue includes:
 
 ```
 skills/
+├── auto-pilot/         # /auto-pilot
+│   ├── SKILL.md
+│   └── references/
 ├── issue-analysis/     # /issue-analysis N
 │   ├── SKILL.md
 │   └── references/
