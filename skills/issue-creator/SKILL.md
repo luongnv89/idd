@@ -716,10 +716,28 @@ All errors use the rich format from `references/error-messages.md`:
   Docs:    <url> (when applicable)
 ```
 
+## GitHub Projects Sync
+
+After creating an issue (single or batch mode), sync the issue to the repo's GitHub Project board if `projects.sync_enabled` is `true` in `.gitissue.yml`. Follow the procedures in `docs/github-projects-sync.md`:
+
+1. Discover the linked project (or use cached project ID)
+2. Add the newly created issue to the project board
+3. Set the Status field to `projects.status_map.todo` (default: "Todo")
+
+```
+● Syncing project board...
+✓ Added to project "{project_title}" — Status: Todo
+```
+
+In batch mode, sync each issue after it is created.
+
+If `projects.sync_enabled` is `false` (default), skip silently. If any sync step fails, print a `⚠` warning and continue — never block issue creation on project sync failure. See `docs/github-projects-sync.md` for error messages and graceful degradation details.
+
 ## Additional Resources
 
 - **`references/error-messages.md`** — Complete error catalog with triggers and exact output
 - **`docs/naming-conventions.md`** — Issue title and labeling conventions
+- **`docs/github-projects-sync.md`** — Shared GitHub Projects status sync reference
 - **`templates/bug.md`** — Bug report template
 - **`templates/feature.md`** — Feature request template
 - **`templates/improvement.md`** — Improvement template
