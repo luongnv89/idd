@@ -840,8 +840,15 @@ All errors use the rich format from `references/error-messages.md`:
 
 See `references/error-messages.md` for the complete error catalog including: authentication failures, CLI not found, no remote, no issues, too many issues, circular dependencies, and API rate limits.
 
+## GitHub Projects Sync
+
+The triage skill is **read-only** with respect to the GitHub Project board. It does not change issue status. Future versions may reorder project board items based on triage priority.
+
+See `docs/github-projects-sync.md` for the shared reference on how other skills (issue-creator, issue-resolver) update project board status.
+
 ## Additional Resources
 
 - **`references/error-messages.md`** — Complete error catalog with triggers and exact output
+- **`docs/github-projects-sync.md`** — Shared GitHub Projects status sync reference
 - **`DESIGN.md`** — Terminal output style guide (repo root)
 - **`docs/config-schema.md`** — Full configuration schema

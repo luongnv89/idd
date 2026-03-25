@@ -159,6 +159,46 @@ analysis:
   # Minimum: 30
   # Maximum: 600
   scan_timeout: 120
+
+# GitHub Projects board sync settings
+# See docs/github-projects-sync.md for the full integration reference
+projects:
+  # Enable automatic project board status sync
+  # Type: boolean
+  # Default: false
+  # When false, all project sync operations are silently skipped
+  sync_enabled: false
+
+  # Explicit project number (from the project URL)
+  # Type: integer or null
+  # Default: null (auto-detect first linked project)
+  # Set this if the repo has multiple linked projects
+  project_number: null
+
+  # Name of the Status field on the project board
+  # Type: string
+  # Default: "Status"
+  # Must match the exact field name on the project (case-sensitive)
+  status_field: "Status"
+
+  # Map of internal status keys to project board option values
+  # Type: object
+  # Each value must match an option name in the Status field
+  status_map:
+    # Status for newly created issues
+    # Type: string
+    # Default: "Todo"
+    todo: "Todo"
+
+    # Status when work starts (branch created)
+    # Type: string
+    # Default: "In Progress"
+    in_progress: "In Progress"
+
+    # Status when PR is created
+    # Type: string
+    # Default: "Done"
+    done: "Done"
 ```
 
 ### Config Section Map
@@ -170,6 +210,7 @@ graph TD
     R --> RS["resolve"]
     R --> T["triage"]
     R --> A["analysis"]
+    R --> PR["projects"]
 
     I --> I1["auto_normalize"]
     I --> I2["template"]
@@ -191,6 +232,11 @@ graph TD
     A --> A1["max_files"]
     A --> A2["trace_depth"]
     A --> A3["scan_timeout"]
+
+    PR --> PR1["sync_enabled"]
+    PR --> PR2["project_number"]
+    PR --> PR3["status_field"]
+    PR --> PR4["status_map"]
 
     style R fill:#4CAF50,color:#fff
 ```
@@ -246,3 +292,9 @@ Config is validated on load at the start of every skill invocation. Errors inclu
 | `analysis.max_files` | `30` | Max files to read during analysis |
 | `analysis.trace_depth` | `3` | Import trace depth levels |
 | `analysis.scan_timeout` | `120` | Max seconds for codebase scan |
+| `projects.sync_enabled` | `false` | Enable project board sync |
+| `projects.project_number` | `null` | Explicit project number (null = auto-detect) |
+| `projects.status_field` | `"Status"` | Name of the Status field on the board |
+| `projects.status_map.todo` | `"Todo"` | Status for new issues |
+| `projects.status_map.in_progress` | `"In Progress"` | Status when work starts |
+| `projects.status_map.done` | `"Done"` | Status when PR is created |

@@ -266,6 +266,21 @@ After branch creation:
 [2/8] Branch       ✓ {branch_name}
 ```
 
+### Project board sync (In Progress)
+
+After the branch is created, sync the issue status on the repo's GitHub Project board if `projects.sync_enabled` is `true` in `.gitissue.yml`. Follow the procedures in `docs/github-projects-sync.md`:
+
+1. Discover the linked project (or use cached project ID)
+2. Add the issue to the project board (if not already present)
+3. Set the Status field to `projects.status_map.in_progress` (default: "In Progress")
+
+```
+● Syncing project board...
+✓ Project status: In Progress
+```
+
+If `projects.sync_enabled` is `false` (default), skip silently. If any sync step fails, print a `⚠` warning and continue — never block the resolve pipeline on project sync failure.
+
 ---
 
 ## Step 3 — Research
@@ -671,6 +686,18 @@ After successful PR creation:
 [8/8] Ship         ✓ PR #{pr_number} created
 ```
 
+### Project board sync (Done)
+
+After the PR is created, update the issue status on the project board if `projects.sync_enabled` is `true`. Follow the procedures in `docs/github-projects-sync.md`:
+
+1. Update the Status field to `projects.status_map.done` (default: "Done")
+
+```
+✓ Project status: Done
+```
+
+If sync fails, print a `⚠` warning and continue — the PR is already created, so this is non-blocking.
+
 ---
 
 ## Final Report
@@ -777,5 +804,6 @@ All errors use the rich format from `references/error-messages.md`:
 - **`agents/test-writer.md`** — Test writer subagent prompt (Step 6 delegation)
 - **`references/error-messages.md`** — Complete error catalog with triggers and exact output
 - **`docs/naming-conventions.md`** — Branch, commit, PR, and issue naming conventions
+- **`docs/github-projects-sync.md`** — Shared GitHub Projects status sync reference
 - **`DESIGN.md`** — Terminal output style guide (repo root)
 - **`docs/config-schema.md`** — Full configuration schema
