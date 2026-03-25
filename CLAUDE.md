@@ -19,6 +19,7 @@ skills/
 │   └── references/
 ├── issue-creator/      # /issue-creator and /issue-creator N (normalization)
 │   ├── SKILL.md
+│   ├── agents/         # duplicate-detector subagent
 │   ├── templates/      # Issue templates (bug, feature, improvement)
 │   └── references/     # Error messages, detailed patterns
 ├── issue-resolver/     # /issue-resolver N

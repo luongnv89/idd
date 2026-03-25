@@ -4,7 +4,7 @@ description: Create structured GitHub issues from text, screenshots, or images, 
 effort: medium
 license: MIT
 metadata:
-  version: 0.2.0
+  version: 0.3.0
   creator: Luong NGUYEN <luongnv89@gmail.com>
 compatibility: Requires git and GitHub CLI (gh) with authentication. Run `gh auth status` to verify.
 ---
@@ -51,6 +51,50 @@ Defaults: `issue.auto_normalize: true`, `issue.template: "default"`, `issue.labe
 If the config file exists but contains invalid values, output the validation error from `references/error-messages.md` and stop.
 
 Do not re-read the config at each step.
+
+## Subagent Architecture
+
+The issue-creator skill delegates duplicate detection to a subagent so the main agent's context stays clean and, in batch mode, duplicate checking runs in parallel with template generation.
+
+```
+Main Agent (orchestrator) — Create mode
+├── Step 1: Parse Input (lightweight — stays in main agent)
+├── Step 2: Classify Type and Title (lightweight — stays in main agent)
+│
+├── Spawn: Duplicate Detector subagent (Step 3)
+│   Fetches open issues, scores proposed item(s) against them
+│   In batch mode, also cross-checks items against each other
+│   Returns: structured duplicate matches with confidence levels
+│
+├── Step 4: Generate Issue Content (main agent — uses template)
+├── Step 5: Preview and Confirm (main agent — user interaction)
+└── Step 6: Create Issue (main agent — gh issue create)
+```
+
+In **batch mode**, the duplicate detector checks all batch items in a single pass (including internal cross-checks), so only one subagent spawn is needed regardless of batch size.
+
+Read `agents/duplicate-detector.md` for the full duplicate detector prompt.
+
+### Environment check
+
+If the Agent tool is available, use the duplicate-detector subagent as described above for Step 3.
+If not (e.g., Claude.ai or environments without the Agent tool), execute duplicate checking inline using the fallback instructions included in Step 3.
+
+### Parallel execution — Batch mode
+
+In batch mode, the duplicate detector and template generation can run in parallel since they are independent:
+
+```
+Batch mode — Step 2 completes (items classified)
+    ├── Spawn duplicate-detector (Step 3)       ─┐
+    └── Pre-generate template content (for S5)   ─┤  parallel
+                                                  │
+    Collect both results ◄────────────────────────┘
+Step 4 (Approval) continues with merged data
+Step 5 (Create Issues) uses pre-generated templates
+```
+
+---
 
 ## Image Upload
 
@@ -195,11 +239,40 @@ Assign confidence to the type classification:
 
 ### Step 3 — Check for Duplicates
 
-```bash
-gh issue list --state open --json number,title,body --limit 50
+#### Subagent delegation
+
+Spawn the duplicate-detector subagent with:
+
+```json
+{
+  "mode": "create",
+  "items": [
+    {
+      "index": 1,
+      "title": "{classified_title}",
+      "keywords": ["{keyword1}", "{keyword2}"],
+      "type": "{bug|feature|improvement}"
+    }
+  ],
+  "repo_root": "{repo_root}"
+}
 ```
 
-Compare the new issue's title and key terms against existing issues. If a potential duplicate exists:
+Read `agents/duplicate-detector.md` for the full prompt. The subagent returns a `duplicates` array with scored matches.
+
+#### Fallback (no Agent tool)
+
+If the Agent tool is not available, run inline:
+
+```bash
+gh issue list --state open --json number,title,body,labels --limit 100
+```
+
+Compare the new issue's title and key terms against existing issues.
+
+#### Present results
+
+If the subagent (or fallback) found potential duplicates (confidence `medium` or `high`):
 
 ```
 ⚠ Possible duplicate: #42 "Fix auth redirect loop"
@@ -207,6 +280,8 @@ Compare the new issue's title and key terms against existing issues. If a potent
 
   Continue creating? [Y/n]
 ```
+
+If no duplicates found, proceed silently.
 
 ### Step 4 — Generate Issue Content
 
@@ -444,15 +519,44 @@ Use DESIGN.md table format: box-drawing characters `│ ─ ┼`, right-align nu
 
 ### Step 3 — Duplicate Check
 
-```bash
-gh issue list --state open --json number,title,body --limit 50
+#### Subagent delegation
+
+Spawn the duplicate-detector subagent with all batch items:
+
+```json
+{
+  "mode": "batch",
+  "items": [
+    { "index": 1, "title": "...", "keywords": [...], "type": "bug" },
+    { "index": 2, "title": "...", "keywords": [...], "type": "feature" }
+  ],
+  "repo_root": "{repo_root}"
+}
 ```
 
-Check each batch item against existing issues AND against other items in the batch. Flag duplicates:
+Read `agents/duplicate-detector.md` for the full prompt. The subagent checks each item against existing open issues AND cross-checks items against each other in a single pass.
+
+**Parallel execution:** In batch mode, spawn the duplicate-detector at the same time as pre-generating template content — both results are ready by Step 4 (Approval) and consumed at Step 5 (Create Issues).
+
+#### Fallback (no Agent tool)
+
+If the Agent tool is not available, run inline:
+
+```bash
+gh issue list --state open --json number,title,body,labels --limit 100
+```
+
+Check each batch item against existing issues AND against other items in the batch.
+
+#### Present results
+
+Flag duplicates found by the subagent (or fallback). Both `existing_issue` and `batch_internal` matches are shown:
 
 ```
 ⚠ Item 2 may duplicate: #15 "Dark mode support"
   View: https://github.com/owner/repo/issues/15
+
+⚠ Item 3 overlaps with Item 1 — both address auth session handling
 ```
 
 Duplicates are flagged but not removed — the user decides in the approval step.
@@ -586,7 +690,7 @@ Here are the items from our sprint planning:
 Every `gh` command for data retrieval uses `--json` with explicit field selection. Never parse text output.
 
 - `gh issue view 42 --json number,title,body,labels,assignees,state,comments`
-- `gh issue list --state open --json number,title,body --limit 50`
+- `gh issue list --state open --json number,title,body,labels --limit 100`
 - `gh issue create --title "..." --body "..." --label "..."`
 
 ## Terminal Output

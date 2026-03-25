@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "updated": "2026-03-24T12:00:00Z",
+  "updated": "2026-03-25T00:00:00Z",
   "source": "/issue-triage",
-  "analyzed_count": 1,
+  "analyzed_count": 2,
   "issues": [
     {
       "number": 16,
@@ -14,22 +14,65 @@
       "status": "ready",
       "stale_days": null,
       "labels": ["feature"],
-      "affected_files": ["README.md", "prd.md", "validate.md"],
-      "updated_at": "2026-03-23T06:20:01Z"
+      "affected_files": [
+        "README.md",
+        "prd.md",
+        "validate.md",
+        "skills/issue-creator/SKILL.md",
+        "skills/issue-resolver/SKILL.md",
+        "skills/issue-triage/SKILL.md",
+        "skills/review-fix-loop/SKILL.md"
+      ],
+      "updated_at": "2026-03-23T06:20:01Z",
+      "potentially_fixed_by": null
+    },
+    {
+      "number": 19,
+      "title": "Add sub-agent architecture to all skills for better context management",
+      "type": "improvement",
+      "priority": "P3",
+      "blocks": [],
+      "blocked_by": [],
+      "status": "ready",
+      "stale_days": null,
+      "labels": ["improvement"],
+      "affected_files": [
+        "README.md",
+        "CLAUDE.md",
+        "docs/CHANGELOG.md",
+        "skills/auto-pilot/SKILL.md",
+        "skills/auto-pilot/references/subagent-prompts.md",
+        "skills/issue-analysis/SKILL.md",
+        "skills/issue-analysis/agents/explorer.md",
+        "skills/issue-analysis/agents/synthesizer.md",
+        "skills/issue-resolver/SKILL.md",
+        "skills/issue-resolver/agents/researcher.md",
+        "skills/issue-resolver/agents/implementer.md",
+        "skills/issue-resolver/agents/test-writer.md",
+        "skills/issue-triage/SKILL.md",
+        "skills/issue-triage/agents/dependency-scanner.md",
+        "skills/issue-triage/agents/history-scanner.md",
+        "skills/issue-creator/SKILL.md",
+        "skills/issue-creator/agents/duplicate-detector.md",
+        "skills/review-fix-loop/SKILL.md"
+      ],
+      "updated_at": "2026-03-24T11:54:28Z",
+      "potentially_fixed_by": null
     }
   ],
   "summary": {
     "parallel_groups": [],
     "stale_count": 0,
     "stale_threshold_days": 14,
-    "suggested_order": [16],
+    "potentially_fixed_count": 0,
+    "suggested_order": [16, 19],
     "circular_deps": []
   },
   "history": [
     {
-      "time": "2026-03-24T12:00:00Z",
+      "time": "2026-03-25T00:00:00Z",
       "source": "/issue-triage",
-      "changes": "Full re-triage (1 issue)"
+      "changes": "Full re-triage (2 issues)"
     }
   ]
 }
