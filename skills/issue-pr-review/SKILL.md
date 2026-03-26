@@ -192,7 +192,7 @@ Or if failures:
 Poll GitHub Actions / CI status for the PR:
 
 ```bash
-gh pr checks {N} --json name,state,conclusion
+gh pr checks {N} --json name,state,bucket
 ```
 
 ### Polling behavior
@@ -211,7 +211,7 @@ gh pr checks {N} --json name,state,conclusion
 **Checks failed:**
 ```
 [4/6] CI Status    ✗ {N} checks failed
-                     {check_name}: {conclusion}
+                     {check_name}: {bucket}
 ```
 
 Extract failure details from the CI log:
