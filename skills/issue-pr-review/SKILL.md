@@ -51,6 +51,7 @@ Load `.gitissue.yml` once. Defaults:
 - `review.check_ci: true`
 - `review.ci_poll_interval: 30` (seconds)
 - `review.ci_timeout: 600` (seconds, 10 minutes)
+- `review.test_timeout: 300` (seconds)
 
 ---
 
@@ -172,7 +173,7 @@ Detect and run all test types:
 2. **Integration tests** — if integration test directory/config exists
 3. **E2e tests** — if e2e framework exists (playwright, cypress, etc.)
 
-Timeout: `resolve.test_timeout` seconds (default: 300).
+Timeout: `review.test_timeout` seconds (default: 300).
 
 ```
 [3/6] Test         ✓ build ok, {N} tests passed
