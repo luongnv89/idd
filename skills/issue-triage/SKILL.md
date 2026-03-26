@@ -192,35 +192,32 @@ Main Agent (orchestrator)
 └── Step 9: Persist (main agent — write triage.json)
 ```
 
-Read `agents/history-scanner.md` for the history scanner prompt.
-Read `agents/dependency-scanner.md` for the dependency scanner prompt.
+Read `shared/agents/issue-relationship-scanner.md` for the combined scanner prompt (handles both dependency scanning and history scanning in a single agent).
 
 ### Parallel execution
 
-Steps 1b and 2 are **independent** of each other. After fetching issues in Step 1, spawn the history scanner and dependency scanner(s) **in the same turn** so they run in parallel:
+After fetching issues in Step 1, spawn issue-relationship-scanner subagent(s). Each scanner instance performs both dependency scanning (file-level overlap) and history scanning (already-fixed detection) for its batch.
 
 ```
 Step 1 completes
-    ├── Spawn history-scanner (Step 1b)    ─┐
-    └── Spawn dependency-scanner (Step 2)  ─┤  parallel
-                                            │
-    Collect both results ◄──────────────────┘
+    └── Spawn issue-relationship-scanner    ─┐
+                                             │
+    Collect results ◄────────────────────────┘
 Step 3 continues with merged data
 ```
 
-### Batch splitting for dependency scanning
+### Batch splitting
 
-When there are 10+ issues, split them into batches of ~5 and spawn multiple dependency-scanner subagents in parallel:
+When there are 10+ issues, split into batches of ~5 and spawn multiple scanner subagents in parallel:
 
 ```
 Step 1 completes (18 issues)
-    ├── Spawn history-scanner (all 18 issues)
-    ├── Spawn dependency-scanner batch 1 (issues 1-5)
-    ├── Spawn dependency-scanner batch 2 (issues 6-10)
-    ├── Spawn dependency-scanner batch 3 (issues 11-15)
-    └── Spawn dependency-scanner batch 4 (issues 16-18)
+    ├── Spawn scanner batch 1 (issues 1-5)
+    ├── Spawn scanner batch 2 (issues 6-10)
+    ├── Spawn scanner batch 3 (issues 11-15)
+    └── Spawn scanner batch 4 (issues 16-18)
 
-    Collect all results, merge dependency maps
+    Collect all results, merge dependency maps + history results
     Main agent adds cross-batch dependency edges
 Step 3 continues
 ```
@@ -274,7 +271,7 @@ Some open issues may have been incidentally fixed by commits or PRs that targete
 
 ### Subagent delegation
 
-**When the Agent tool is available:** Delegate this step to the history-scanner subagent. Read `agents/history-scanner.md` for the full prompt template. Pass the list of open issues (number and title) from Step 1, along with the repo root path (absolute). The subagent returns a JSON object with a `potentially_fixed` array and `scanned_commits`/`scanned_prs` counts. Spawn this subagent **in the same turn** as the dependency scanner (Step 2) — they are independent and run in parallel.
+**When the Agent tool is available:** Delegate this step to the issue-relationship-scanner subagent (history scan). Read `shared/agents/issue-relationship-scanner.md` for the full prompt template. Pass the list of open issues (number and title) from Step 1, along with the repo root path (absolute). The subagent returns a JSON object with a `potentially_fixed` array and `scanned_commits`/`scanned_prs` counts. Spawn this subagent **in the same turn** as the dependency scanner (Step 2) — they are independent and run in parallel.
 
 **Note:** The history-scanner only implements the commit-level signal (explicit issue references in commit messages and PR bodies). The file-overlap signal (detecting fixes via shared affected files) requires data from the dependency scanner (Step 2) and is handled by the main agent as a post-merge step after both subagents return. See the merge step after Steps 1b and 2 complete.
 
@@ -355,9 +352,9 @@ If any are found:
 
 ### Subagent delegation
 
-**When the Agent tool is available:** Delegate this step to the dependency-scanner subagent. Read `agents/dependency-scanner.md` for the full prompt template. Pass the list of issues (number, title, body) from Step 1 along with the repo root path and the `scan_timeout_per_issue` config value (passed as `scan_timeout` in the subagent input). Spawn this subagent **in the same turn** as the history scanner (Step 1b) — they are independent and run in parallel.
+**When the Agent tool is available:** Delegate this step to the issue-relationship-scanner subagent (dependency scan). Read `shared/agents/issue-relationship-scanner.md` for the full prompt template. Pass the list of issues (number, title, body) from Step 1 along with the repo root path and the `scan_timeout_per_issue` config value (passed as `scan_timeout` in the subagent input). Spawn this subagent **in the same turn** as the history scanner (Step 1b) — they are independent and run in parallel.
 
-**For 10+ issues:** Split the issues into batches of ~5 and spawn one dependency-scanner subagent per batch (all in the same turn). After all subagents return, merge their results:
+**For 10+ issues:** Split the issues into batches of ~5 and spawn one issue-relationship-scanner subagent (dependency scan) per batch (all in the same turn). After all subagents return, merge their results:
 1. Concatenate the `issues` maps from each batch into a single map
 2. Concatenate the `dependency_edges` arrays from each batch
 3. Run a cross-batch pass: for any two issues from different batches, check if their `affected_files` overlap. If they do, add a dependency edge. Determine directionality using the same heuristics as the inline procedure: earlier creation date takes precedence, more blocking relationships take precedence, and bug type takes precedence over feature/improvement. If neither issue clearly precedes the other, mark them as co-dependent at the same level. This is a lightweight comparison the main agent does on the merged data.

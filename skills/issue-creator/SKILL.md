@@ -73,7 +73,7 @@ Main Agent (orchestrator) — Create mode
 
 In **batch mode**, the duplicate detector checks all batch items in a single pass (including internal cross-checks), so only one subagent spawn is needed regardless of batch size.
 
-Read `agents/duplicate-detector.md` for the full duplicate detector prompt.
+Read `shared/agents/duplicate-detector.md` for the full duplicate detector prompt.
 
 ### Environment check
 
@@ -258,7 +258,7 @@ Spawn the duplicate-detector subagent with:
 }
 ```
 
-Read `agents/duplicate-detector.md` for the full prompt. The subagent returns a `duplicates` array with scored matches.
+Read `shared/agents/duplicate-detector.md` for the full prompt. The subagent returns a `duplicates` array with scored matches.
 
 #### Fallback (no Agent tool)
 
@@ -534,7 +534,7 @@ Spawn the duplicate-detector subagent with all batch items:
 }
 ```
 
-Read `agents/duplicate-detector.md` for the full prompt. The subagent checks each item against existing open issues AND cross-checks items against each other in a single pass.
+Read `shared/agents/duplicate-detector.md` for the full prompt. The subagent checks each item against existing open issues AND cross-checks items against each other in a single pass.
 
 **Parallel execution:** In batch mode, spawn the duplicate-detector at the same time as pre-generating template content — both results are ready by Step 4 (Approval) and consumed at Step 5 (Create Issues).
 
