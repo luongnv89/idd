@@ -1,14 +1,14 @@
 # Issue Resolver
 
-> Resolve a GitHub issue end-to-end — from open issue to atomic PR in 8 steps.
+> Resolve a GitHub issue end-to-end — from open issue to atomic PR in 6 steps.
 
 ## Highlights
 
-- **Full pipeline**: Fetch → Guards → Normalize → Branch → Research → Plan → Execute → Test → Verify → Ship
-- **Dedicated test step**: Writes unit tests and e2e tests (when feasible) for all new features and changes
-- **Build verification**: Compiles/builds the project before running tests to catch errors early
-- **Auto-normalization**: Enriches unstructured issues with codebase context before resolving
-- **Safety guards**: Warns on assigned issues, blocking labels, and prompt injection in issue bodies
+- **Full pipeline**: Preflight → Research → Plan → Implement → QA → Deliver
+- **Shared agents**: Delegates heavy work to `shared/agents/` (codebase-researcher, synthesizer, implementer, code-reviewer)
+- **Built-in QA**: Code review + test + build + fix loop (max 5 cycles) before shipping
+- **3-option planning**: Synthesizer proposes 3 approaches — user picks in interactive mode, auto-selected in auto-pilot
+- **Safety guards**: Preflight checks for already-resolved issues, existing PRs, and blocking labels
 - **Configurable gates**: Auto-proceed or pause for approval at the plan phase
 - **Atomic PRs**: Creates a single PR with "Closes #N", summary, approach, files changed, and test results
 
@@ -16,24 +16,22 @@
 
 | Say this... | Skill will... |
 |---|---|
-| `/issue-resolver 42` | Resolve issue #42 through the full 8-step pipeline |
+| `/issue-resolver 42` | Resolve issue #42 through the full 6-step pipeline |
+| `/issue-resolver 42 --auto` | Resolve autonomously without user prompts |
 | "fix issue #42" | Fetch, research, implement, test, and ship a PR for #42 |
 | "work on #15" | Branch, implement changes, write tests, verify, create PR closing #15 |
-| "implement the auth fix in issue 7" | Research the issue, plan the fix, execute, write tests, and ship |
 
 ## How It Works
 
 ```mermaid
 graph TD
-    A["[1/8] Fetch + Guards + Normalize"] --> B["[2/8] Branch"]
-    B --> C["[3/8] Research"]
-    C --> D["[4/8] Plan"]
-    D --> E["[5/8] Execute"]
-    E --> F["[6/8] Test"]
-    F --> G["[7/8] Verify"]
-    G --> H["[8/8] Ship PR"]
+    A["[0/5] Preflight"] --> B["[1/5] Research"]
+    B --> C["[2/5] Plan"]
+    C --> D["[3/5] Implement"]
+    D --> E["[4/5] QA"]
+    E --> F["[5/5] Deliver PR"]
     style A fill:#4CAF50,color:#fff
-    style H fill:#2196F3,color:#fff
+    style F fill:#2196F3,color:#fff
 ```
 
 ## Installation

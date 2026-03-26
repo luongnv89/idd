@@ -371,7 +371,7 @@ The auto-pilot runs a continuous loop with 5 phases per iteration:
 ┄┄┄┄┄┄┄┄┄┄┄┄
   Phase 1 — Triage          Refresh priorities and pick next issue
                              (skipped in explicit list mode)
-  Phase 2 — Resolve         Subagent: full 8-step resolve pipeline
+  Phase 2 — Resolve         Subagent: full 6-step resolve pipeline
   Phase 3+4 — Review-Fix    Subagents: review (x5 max), fix if needed
                              Requires 2 consecutive PASS (or 1 at cycle limit)
   Phase 5 — Merge           Merge the PR and close the issue
@@ -1045,7 +1045,7 @@ Every `gh` command for data retrieval uses `--json` with explicit field selectio
 Follow DESIGN.md symbol vocabulary and output structure for all output. Key rules:
 
 - Iteration counter: `[Iteration {i}/{max}]` for loop progress
-- Step counter: `[N/8]` for resolve pipeline steps (inherited from issue-resolver)
+- Step counter: `[N/5]` for resolve pipeline steps (inherited from issue-resolver)
 - Symbols: `●` progress, `✓` success, `✗` failure, `◆` section header, `⚡` recommendation, `⚠` warning, `○` info
 - Two-space indent for content under section headers
 - Section separators: `┄` (light dash)
