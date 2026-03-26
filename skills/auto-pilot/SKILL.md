@@ -85,7 +85,7 @@ The solution: the main agent acts as a **lightweight orchestrator** that delegat
 
 ### Subagent Architecture
 
-Each iteration spawns up to 3 subagents. The main agent only tracks: issue number, title, branch name, PR number, and pass/fail status. In explicit list mode, an additional analyzer subagent runs once upfront before the loop begins.
+Each iteration spawns up to 2 subagents. The main agent only tracks: issue number, title, branch name, PR number, and pass/fail status. In explicit list mode, an additional analyzer subagent runs once upfront before the loop begins.
 
 ```
 Main Agent (orchestrator)
@@ -98,22 +98,13 @@ Main Agent (orchestrator)
   │     Runs the full /issue-resolver 6-step pipeline (Preflight → Research → Plan → Implement → QA → Deliver)
   │     Returns: branch_name, pr_number, files_changed, tests_written, tests_passed
   │
-  ├── Subagent: Reviewer (pass 1)          ← always runs
-  │     Reviews the PR diff fresh
-  │     Returns: PASS/NEEDS_FIX, list of issues found
-  │
-  ├── Subagent: Fixer (if NEEDS_FIX)       ← only if issues found
-  │     Fixes review issues, re-runs tests, pushes
-  │     Returns: fixed_count, tests_passed, remaining_issues
-  │
-  ├── Subagent: Reviewer (pass 2)          ← always runs (confirmation)
-  │     Fresh reviewer, no memory of pass 1
-  │     Returns: PASS/NEEDS_FIX
-  │
-  └── ... (more fix/review cycles if needed, up to review_cycles)
+  └── Subagent: PR Reviewer (via /issue-pr-review --auto)
+        Runs the full review pipeline: code review, tests, CI, fix, repeat (max 5 cycles)
+        Auto-merges when clean
+        Returns: MERGED/PASS/NEEDS_FIX, review_cycles, issues_found, issues_fixed
 ```
 
-Each review pass spawns a **new, independent** reviewer subagent. This ensures genuine fresh-eyes review — no subagent carries memory from a prior pass. A PR normally needs **2 consecutive PASS results** before it can merge; if all review cycles are exhausted, 1 clean PASS is acceptable.
+The PR review subagent runs `/issue-pr-review --auto`, which handles the full review-fix-merge cycle internally — including spawning fresh reviewer agents each cycle and auto-merging when clean.
 
 ### Why Subagents Matter
 
@@ -128,11 +119,10 @@ The main agent handles only orchestration tasks that are lightweight and sequent
 1. **Prerequisites** — environment checks (git, gh, auth)
 2. **Triage/Pick** — fetch issue list, compute order (or walk explicit list)
 3. **Spawn resolver subagent** — pass issue number, wait for result
-4. **Spawn reviewer subagent** — pass PR number, wait for result
-5. **Spawn fixer subagent** (if needed) — pass PR number + review issues
-6. **Merge** — `gh pr merge` (a single command, no context needed)
-7. **Track results** — append to the iteration log
-8. **Loop** — advance to next issue
+4. **Spawn PR review subagent** — delegates to `/issue-pr-review --auto` which handles review, test, CI, fix, and merge
+5. **Merge fallback** — only if issue-pr-review couldn't auto-merge (branch protection, etc.)
+6. **Track results** — append to the iteration log
+7. **Loop** — advance to next issue
 
 The main agent should never: read source files, read PR diffs, run tests, or write code. All of that happens inside subagents.
 
@@ -613,6 +603,10 @@ Check `autopilot.pause_on_failure`:
 
 ## Phase 5 — Merge
 
+### Already merged?
+
+If the PR review subagent returned **MERGED** (Step 3.2), the PR is already merged. Skip Steps 5.1 and 5.2 — go directly to Step 5.3 (Cleanup).
+
 ### Step 5.1 — Pre-merge Checks
 
 Before merging, verify:
@@ -959,24 +953,13 @@ Start auto-pilot? [Y/n]
 ### Review finds issues, fix cycle succeeds
 
 ```
-● Review pass 1 for PR #45...
-  ⟶ Spawning reviewer subagent...
+● Reviewing PR #45...
+  ⟶ Spawning PR review subagent (/issue-pr-review --auto)...
 
-◆ Review #45 (pass 1)
-┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  Result: NEEDS FIX
-  Issues: 2
-
-● Fix cycle 1/5
-  ⟶ Spawning fixer subagent...
-  ✓ Fixed 2/2 issues
-  ✓ Tests passed
-
-● Review pass 2 for PR #45...
-  ⟶ Spawning reviewer subagent (fresh)...
-
-◆ Review #45 (pass 2)
-┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  ✓ PR #45 reviewed and merged
+    Review cycles: 2
+    Issues found/fixed: 2/2
+    CI: all checks passed
   Result: PASS (1 consecutive — need 2)
 
 ● Review pass 3 for PR #45 (confirmation)...

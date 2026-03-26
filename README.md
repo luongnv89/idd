@@ -55,11 +55,11 @@ graph LR
 |---------|-------------|---------|--------|
 | `/issue-creator` | Classify type, generate acceptance criteria, create a structured issue | 0.2.0 | medium |
 | `/issue-analysis N` | Root cause, git history, implementation options, complexity and risk | 0.3.0 | high |
-| `/issue-resolver N` | 6-step pipeline: preflight, research, plan, implement, QA, deliver PR with `Closes #N` | 0.7.0 | max |
+| `/issue-resolver N` | 6-step pipeline: preflight, research, plan, implement, QA, deliver PR with `Closes #N` | 0.5.0 | max |
 | `/issue-triage` | Dependency graph, stale detection, already-fixed detection via commit/PR scanning, priority and execution order | 0.4.0 | medium |
 | `/init-gitissue` | Auto-detect language/framework/test runner, generate `.gitissue.yml` | 0.2.0 | low |
 | `/auto-pilot` | Triage → resolve → review → merge loop, fully automated backlog processing | 0.5.0 | max |
-| `/issue-pr-review` | Review PR end-to-end: code review, tests, CI check, fix issues, repeat until clean | 0.7.0 | high |
+| `/issue-pr-review` | Review PR end-to-end: code review, tests, CI check, fix issues, repeat until clean | 0.1.0 | high |
 
 ---
 
