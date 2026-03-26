@@ -174,14 +174,11 @@ During a full triage update, the skill delegates the two heaviest phases to suba
 Main Agent (orchestrator)
 ├── Step 1: Fetch Issues (lightweight — stays in main agent)
 │
-├── Spawn: History Scanner subagent (Step 1b)
-│   Scans git log + merged PRs for already-fixed issues
-│   Returns: list of potentially-fixed issues with confidence
-│
-├── Spawn: Dependency Scanner subagent(s) (Step 2)
-│   Scans codebase for each issue's keywords, builds dependency map
+├── Spawn: Issue Relationship Scanner subagent(s) (Steps 1b + 2)
+│   Combined agent: scans git log + merged PRs for already-fixed issues,
+│   AND scans codebase for keywords, builds dependency map
 │   For 10+ issues, split into parallel batches
-│   Returns: affected files per issue + dependency edges
+│   Returns: potentially-fixed issues, affected files per issue, dependency edges
 │
 ├── Steps 3-7: Main agent (lightweight computation)
 │   Circular dep detection, topological sort, parallelization,
@@ -273,7 +270,7 @@ Some open issues may have been incidentally fixed by commits or PRs that targete
 
 **When the Agent tool is available:** Delegate this step to the issue-relationship-scanner subagent (history scan). Read `shared/agents/issue-relationship-scanner.md` for the full prompt template. Pass the list of open issues (number and title) from Step 1, along with the repo root path (absolute). The subagent returns a JSON object with a `potentially_fixed` array and `scanned_commits`/`scanned_prs` counts. Spawn this subagent **in the same turn** as the dependency scanner (Step 2) — they are independent and run in parallel.
 
-**Note:** The history-scanner only implements the commit-level signal (explicit issue references in commit messages and PR bodies). The file-overlap signal (detecting fixes via shared affected files) requires data from the dependency scanner (Step 2) and is handled by the main agent as a post-merge step after both subagents return. See the merge step after Steps 1b and 2 complete.
+**Note:** The issue-relationship-scanner's history scan only implements the commit-level signal (explicit issue references in commit messages and PR bodies). The file-overlap signal (detecting fixes via shared affected files) requires data from the dependency scan and is handled by the main agent as a post-merge step after the subagent returns. See the merge step after Steps 1b and 2 complete.
 
 **When the Agent tool is NOT available:** Execute the procedure below inline.
 

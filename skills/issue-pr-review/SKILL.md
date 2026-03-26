@@ -154,7 +154,7 @@ Check each acceptance criterion against the PR changes.
 
 ### Build check
 
-Detect and run the project's build system (same detection as issue-resolver Step 7):
+Detect and run the project's build system:
 
 | Build system | Detection | Command |
 |-------------|-----------|---------|
