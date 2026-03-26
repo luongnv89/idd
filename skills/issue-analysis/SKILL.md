@@ -232,7 +232,7 @@ After the explorer returns, display progress lines for Steps 2-5 based on its re
 [5/8] Cross-refs     ✓ {cross_references.related_issues count} related issues, {insights count} insights
 ```
 
-Store the explorer's output as the **exploration findings** — these are passed to the synthesizer subagent in Steps 6-7. When spawning the synthesizer, construct its input by wrapping the explorer's full JSON output under the `"findings"` key: `{ "issue": <issue data from Step 1>, "findings": <explorer output> }`.
+Store the explorer's output as the **exploration findings** — these are passed to the synthesizer subagent in Steps 6-7. When spawning the synthesizer, construct its input by wrapping the explorer's full JSON output under the `"findings"` key: `{ "issue": <issue data from Step 1>, "findings": <explorer output>, "mode": "interactive" }`.
 
 ### Inline fallback
 

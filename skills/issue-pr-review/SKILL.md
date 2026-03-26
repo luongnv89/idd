@@ -255,7 +255,7 @@ For each issue:
 3. Stage: `git add <specific-file>`
 
 After all fixes:
-4. Commit: `fix({scope}): address review feedback (#{linked_issue})`
+4. Commit: `fix({scope}): address review feedback` (append `(#{linked_issue})` only if a linked issue exists)
 5. Push: `git push origin {branch_name}`
 
 ```
