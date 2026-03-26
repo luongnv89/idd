@@ -55,11 +55,11 @@ graph LR
 |---------|-------------|---------|--------|
 | `/issue-creator` | Classify type, generate acceptance criteria, create a structured issue | 0.2.0 | medium |
 | `/issue-analysis N` | Root cause, git history, implementation options, complexity and risk | 0.3.0 | high |
-| `/issue-resolver N` | 8-step pipeline: fetch, branch, research, plan, execute, write tests, verify, ship PR with `Closes #N` | 0.4.0 | max |
+| `/issue-resolver N` | 6-step pipeline: preflight, research, plan, implement, QA, deliver PR with `Closes #N` | 0.7.0 | max |
 | `/issue-triage` | Dependency graph, stale detection, already-fixed detection via commit/PR scanning, priority and execution order | 0.4.0 | medium |
 | `/init-gitissue` | Auto-detect language/framework/test runner, generate `.gitissue.yml` | 0.2.0 | low |
 | `/auto-pilot` | Triage → resolve → review → merge loop, fully automated backlog processing | 0.5.0 | max |
-| `/review-fix-loop` | Automated review-fix cycle with fresh reviewer agents, repeat until clean, one clean commit | 0.4.0 | high |
+| `/issue-pr-review` | Review PR end-to-end: code review, tests, CI check, fix issues, repeat until clean | 0.7.0 | high |
 
 ---
 
@@ -194,7 +194,7 @@ You can also install individual skills. See each skill folder for per-skill comm
 | `/issue-resolver` | [`skills/issue-resolver/`](skills/issue-resolver/) |
 | `/issue-triage` | [`skills/issue-triage/`](skills/issue-triage/) |
 | `/auto-pilot` | [`skills/auto-pilot/`](skills/auto-pilot/) |
-| `/review-fix-loop` | [`skills/review-fix-loop/`](skills/review-fix-loop/) |
+| `/issue-pr-review` | [`skills/issue-pr-review/`](skills/issue-pr-review/) |
 | `/init-gitissue` | [`skills/init-gitissue/`](skills/init-gitissue/) |
 
 ---
@@ -339,16 +339,15 @@ Analyzes issue #N in depth without making code changes:
 
 ### /issue-resolver N -- Resolve Issues
 
-Resolves issue #N through a 7-step pipeline:
+Resolves issue #N through a 6-step pipeline:
 
 ```
-[1/7] Fetch        — Load issue, check guards
-[2/7] Branch       — Create issue-N/short-description branch
-[3/7] Research     — Scan codebase, trace dependencies
-[4/7] Plan         — Propose approach (local only)
-[5/7] Execute      — Write code + tests, atomic commits
-[6/7] Verify       — Run test suite, check acceptance criteria
-[7/7] Ship         — Push branch, create PR with "Closes #N"
+[0/5] Preflight    — Check issue status, verify not already resolved
+[1/5] Research     — Scan codebase, trace dependencies
+[2/5] Plan         — Propose 3 approaches, pick one
+[3/5] Implement    — Write code + tests, atomic commits
+[4/5] QA           — Code review + test + build + fix loop
+[5/5] Deliver      — Push branch, create PR with "Closes #N"
 ```
 
 ### /issue-triage -- Triage the Backlog
@@ -364,25 +363,27 @@ Fully automated loop: triage open issues, pick the highest-priority task, resolv
 /auto-pilot 5, 12, 3             # resolve these issues in this order
 ```
 
-### /review-fix-loop -- Automated Review-Fix Cycle
+### /issue-pr-review -- PR Review Pipeline
 
-Spawns a fresh reviewer agent, fixes detected issues, re-reviews with another fresh agent, and repeats until clean. Each review cycle uses an independent subagent with no memory of prior passes — fresh eyes every time.
-
-```
-/review-fix-loop                 # review and fix current branch until clean
-```
-
-Cycle output:
+Reviews a PR end-to-end: code review with confidence-based filtering, runs tests and build, checks CI status, fixes issues, and repeats until clean. Supports auto-merge in auto-pilot mode.
 
 ```
-◆ Review-Fix Loop Complete
-  Cycles: 3
-  Total issues found: 12
-  Total issues fixed: 12
-  Status: ✓ Clean
+/issue-pr-review 87              # review PR #87
+/issue-pr-review                 # auto-detect PR for current branch
 ```
 
-One clean commit at the end. Max 5 cycles with stagnation detection. Supports PR branches and regular branches.
+Pipeline:
+
+```
+[1/6] PR Info      ✓ PR #87: fix(auth): resolve redirect (#42)
+[2/6] Review       ● analyzing changes...
+[3/6] Test         ✓ 17 tests passed, build ok
+[4/6] CI Status    ✓ all checks passed
+[5/6] Fix          ○ no issues to fix
+[6/6] Report       ✓ PR is clean — ready to merge
+```
+
+Max 5 review-fix cycles with stagnation detection.
 
 ### /init-gitissue -- Generate Config
 
@@ -445,13 +446,21 @@ Each normalized issue includes:
 <summary><strong>Project Structure</strong></summary>
 
 ```
+shared/
+└── agents/                    # Shared agent definitions (used by multiple skills)
+    ├── codebase-researcher.md # Deep codebase scan + solution research
+    ├── synthesizer.md         # Analysis + implementation options
+    ├── implementer.md         # Code + tests implementation
+    ├── code-reviewer.md       # Confidence-based code review
+    ├── duplicate-detector.md  # Issue dedup scoring
+    └── issue-relationship-scanner.md  # File deps + already-fixed detection
+
 skills/
 ├── auto-pilot/         # /auto-pilot
 │   ├── SKILL.md
 │   └── references/
 ├── issue-analysis/     # /issue-analysis N
 │   ├── SKILL.md
-│   ├── agents/         # explorer, synthesizer subagents
 │   └── references/
 ├── issue-creator/      # /issue-creator
 │   ├── SKILL.md
@@ -459,13 +468,14 @@ skills/
 │   └── references/
 ├── issue-resolver/     # /issue-resolver N
 │   ├── SKILL.md
-│   ├── agents/         # researcher, implementer subagents
 │   └── references/
 ├── issue-triage/       # /issue-triage
 │   ├── SKILL.md
-│   ├── agents/         # history-scanner, dependency-scanner subagents
 │   └── references/
-├── review-fix-loop/    # /review-fix-loop
+├── issue-pr-review/    # /issue-pr-review — review, test, CI check, fix, merge
+│   ├── SKILL.md
+│   └── references/
+├── review-fix-loop/    # /review-fix-loop (deprecated → redirects to /issue-pr-review)
 │   ├── SKILL.md
 │   └── references/
 └── init-gitissue/      # /init-gitissue

@@ -471,6 +471,7 @@ When the Agent tool is available, spawn the synthesizer subagent to handle Steps
 
 - Issue data: number, title, body, labels, type, state, author, createdAt
 - Exploration findings: the full structured JSON returned by the explorer subagent (or collected inline in Steps 2-5)
+- Mode: `"interactive"` (issue-analysis is always interactive)
 
 The synthesizer prompt is defined in `shared/agents/synthesizer.md`. It produces the root cause / architecture / implementation analysis (Step 6) and proposes 2-3 implementation options with complexity and risk ratings (Step 7). It returns a structured JSON with: analysis text (type-specific), implementation options (with all fields), recommended option, overall complexity, and overall risk.
 
