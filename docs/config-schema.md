@@ -180,7 +180,7 @@ autopilot:
   # Maximum: 50
   max_iterations: 10
 
-  # Max review-fix cycles per PR (passed to /issue-pr-review)
+  # Max review-fix cycles per PR (overrides review.max_cycles in subagent prompt)
   # Type: integer
   # Default: 5
   # Minimum: 1

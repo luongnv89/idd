@@ -55,7 +55,7 @@ Instructions:
    - Run all tests (unit, integration, e2e, build/compile)
    - Check CI status
    - Fix any detected issues
-   - Repeat up to 5 cycles
+   - Repeat up to {review_cycles} cycles (override review.max_cycles with this value)
    - Auto-merge via squash when clean
 4. All agents are in shared/agents/ — use those, not external agent types
 
@@ -192,5 +192,6 @@ Replace these placeholders before passing to the Agent tool:
 | `{additional_issue_numbers}` | Other issue numbers in the batch |
 | `{branch_name}` | Branch name returned by resolver |
 | `{scope}` | Module/component name from issue context |
+| `{review_cycles}` | Value of `autopilot.review_cycles` config (default: 5) |
 | `{batch_reason}` | Reason for batching from analyzer |
 | `{shared_files}` | Shared file paths from analyzer |
