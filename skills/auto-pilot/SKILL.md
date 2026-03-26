@@ -362,8 +362,8 @@ The auto-pilot runs a continuous loop with 5 phases per iteration:
   Phase 1 — Triage          Refresh priorities and pick next issue
                              (skipped in explicit list mode)
   Phase 2 — Resolve         Subagent: full 6-step resolve pipeline
-  Phase 3+4 — Review-Fix    Subagents: review (x5 max), fix if needed
-                             Requires 2 consecutive PASS (or 1 at cycle limit)
+  Phase 3+4 — Review-Fix    Delegates to /issue-pr-review --auto
+                             Review, test, CI check, fix (x5 max), merge
   Phase 5 — Merge           Merge the PR and close the issue
   ─────────────────────────────────────────────────────────────
   Loop back to Phase 1 until done or limit reached
@@ -759,19 +759,13 @@ Start auto-pilot? [Y/n]
     Changed: 2 files
     Tests:   4 written, 12 passed
 
-● Review pass 1 for PR #45...
-  ⟶ Spawning reviewer subagent...
+● Reviewing PR #45...
+  ⟶ Spawning PR review subagent (/issue-pr-review --auto)...
 
-◆ Review #45 (pass 1)
-┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  Result:          PASS
-
-● Review pass 2 for PR #45 (confirmation)...
-  ⟶ Spawning reviewer subagent (fresh)...
-
-◆ Review #45 (pass 2)
-┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  Result:          PASS (2 consecutive ✓)
+  ✓ PR #45 reviewed and merged
+    Review cycles: 1
+    Issues found/fixed: 0/0
+    CI: all checks passed
 
 ✓ PR #45 merged — #12 closed
   https://github.com/owner/repo/pull/45
@@ -858,13 +852,9 @@ Start auto-pilot? [Y/n]
     Changed: 2 files
     Tests:   3 written, 9 passed
 
-● Review pass 1 for PR #50...
-  ⟶ Spawning reviewer subagent...
-  Result: PASS
-
-● Review pass 2 for PR #50 (confirmation)...
-  ⟶ Spawning reviewer subagent (fresh)...
-  Result: PASS (2 consecutive ✓)
+● Reviewing PR #50...
+  ⟶ Spawning PR review subagent (/issue-pr-review --auto)...
+  ✓ PR #50 reviewed and merged (1 cycle, 0 issues)
 
 ✓ PR #50 merged — #12 closed
   https://github.com/owner/repo/pull/50
@@ -883,13 +873,9 @@ Start auto-pilot? [Y/n]
     Changed: 3 files
     Tests:   5 written, 13 passed
 
-● Review pass 1 for PR #51...
-  ⟶ Spawning reviewer subagent...
-  Result: PASS
-
-● Review pass 2 for PR #51 (confirmation)...
-  ⟶ Spawning reviewer subagent (fresh)...
-  Result: PASS (2 consecutive ✓)
+● Reviewing PR #51...
+  ⟶ Spawning PR review subagent (/issue-pr-review --auto)...
+  ✓ PR #51 reviewed and merged (1 cycle, 0 issues)
 
 ✓ PR #51 merged — #5 closed, #8 closed (batched)
   https://github.com/owner/repo/pull/51
@@ -960,19 +946,11 @@ Start auto-pilot? [Y/n]
     Review cycles: 2
     Issues found/fixed: 2/2
     CI: all checks passed
-  Result: PASS (1 consecutive — need 2)
-
-● Review pass 3 for PR #45 (confirmation)...
-  ⟶ Spawning reviewer subagent (fresh)...
-
-◆ Review #45 (pass 3)
-┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  Result: PASS (2 consecutive ✓)
 
 ✓ PR #45 merged — #12 closed
 ```
 
-Note: the initial NEEDS FIX reset the consecutive counter. After the fix, it took 2 more PASS results (passes 2 and 3) to reach the merge threshold. The `review_cycles` config controls how many fix attempts are allowed — confirmation-only review passes (spawned after a PASS, without a preceding fix) do not consume a fix cycle.
+Note: the `/issue-pr-review --auto` subagent handled the full review-fix-merge cycle internally. It found 2 issues in cycle 1, fixed them, then cycle 2 passed clean — triggering auto-merge via squash.
 
 ### All eligible issues are blocked
 
