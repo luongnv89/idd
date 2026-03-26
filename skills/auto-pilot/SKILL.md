@@ -633,7 +633,7 @@ Check `autopilot.pause_on_failure` for behavior.
 If `autopilot.auto_merge` is true:
 
 ```bash
-gh pr merge {pr_number} --merge --delete-branch
+gh pr merge {pr_number} --squash --delete-branch
 ```
 
 ```
@@ -994,10 +994,10 @@ Note: the initial NEEDS FIX reset the consecutive counter. After the fix, it too
 ⚠ PR #45 is not mergeable
 
   Reason: 2 status checks pending (CI / lint)
-  Waiting for checks to complete... (timeout: 300s)
+  Waiting for checks to complete... (timeout: 600s)
 ```
 
-Wait up to `resolve.test_timeout` seconds for CI checks. Poll every 30 seconds:
+Wait up to `review.ci_timeout` seconds for CI checks. Poll every 30 seconds:
 
 ```bash
 gh pr view {pr_number} --json statusCheckRollup --jq '.statusCheckRollup[] | select(.status != "COMPLETED")'
@@ -1020,7 +1020,7 @@ Every `gh` command for data retrieval uses `--json` with explicit field selectio
 - `gh issue list --state open --json number,title,body,labels,assignees --limit 100`
 - `gh issue view N --json number,title,body,labels,assignees,state,comments`
 - `gh pr view N --json mergeable,reviewDecision,statusCheckRollup`
-- `gh pr merge N --merge --delete-branch`
+- `gh pr merge N --squash --delete-branch`
 - `gh pr diff N`
 
 ## Terminal Output
@@ -1055,7 +1055,7 @@ All errors use the rich format from `references/error-messages.md`:
 
 ## Additional Resources
 
-- **`references/subagent-prompts.md`** — Exact prompts for resolver, reviewer, and fixer subagents (read once at skill start)
+- **`references/subagent-prompts.md`** — Exact prompts for resolver, reviewer, analyzer, and batch-resolver subagents (read once at skill start)
 - **`references/error-messages.md`** — Complete error catalog with triggers and exact output
 - **`docs/naming-conventions.md`** — Branch, commit, PR, and issue naming conventions
 - **`DESIGN.md`** — Terminal output style guide (repo root)
