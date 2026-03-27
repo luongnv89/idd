@@ -815,7 +815,7 @@ Not applicable for MVP — gitissue is a CLI tool. Future versions may include:
 | IDD | Issue-Driven Development — methodology where GitHub issues are the atomic unit of all development work |
 | gitissue | The tool implementing IDD — provides `/issue-creator`, `/issue-resolver`, `/issue-triage`, and `/init-gitissue` commands |
 | Normalization | The process of enriching an unstructured issue with codebase context, template structure, and acceptance criteria |
-| Resolution pipeline | The 7-step process: fetch → branch → research → plan → execute → verify → ship |
+| Resolution pipeline | The 6-step process: preflight → research → plan → implement → QA → deliver |
 | Codebase-aware | Issues that include affected file paths, architecture constraints, and dependency information derived from analyzing the actual code |
 | Agent-agnostic | Designed to work with any AI coding agent or human developer without modification |
 | Brownfield | Software development on an existing codebase (as opposed to greenfield/new projects) |

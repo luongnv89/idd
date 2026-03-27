@@ -12,31 +12,28 @@
   <text fill="#cba6f7" font-family="monospace" font-size="13" x="20" y="64">$</text>
   <text fill="#cdd6f4" font-family="monospace" font-size="13" x="34" y="64">/issue-resolver 42</text>
 
-  <text fill="#6c7086" font-family="monospace" font-size="13" x="20" y="96">  &#x25CF; Fetching issue #42...</text>
+  <text fill="#6c7086" font-family="monospace" font-size="13" x="20" y="96">  &#x25CF; Preflight check for issue #42...</text>
 
   <text fill="#cdd6f4" font-family="monospace" font-size="13" font-weight="bold" x="20" y="128">  &#x25C6; Resolve Pipeline</text>
   <text fill="#6c7086" font-family="monospace" font-size="13" x="20" y="148">  &#x2504;&#x2504;&#x2504;&#x2504;&#x2504;&#x2504;&#x2504;&#x2504;&#x2504;&#x2504;&#x2504;&#x2504;&#x2504;&#x2504;&#x2504;&#x2504;&#x2504;&#x2504;</text>
 
   <text font-family="monospace" font-size="13" x="20" y="176">
-    <tspan fill="#6c7086">  [1/7] </tspan><tspan fill="#cdd6f4">Fetch        </tspan><tspan fill="#a6e3a1">&#x2713;</tspan><tspan fill="#cdd6f4"> issue #42 loaded</tspan>
+    <tspan fill="#6c7086">  [0/5] </tspan><tspan fill="#cdd6f4">Preflight    </tspan><tspan fill="#a6e3a1">&#x2713;</tspan><tspan fill="#cdd6f4"> issue #42 open, branch: </tspan><tspan fill="#89dceb">fix/42-sso-login-error</tspan>
   </text>
   <text font-family="monospace" font-size="13" x="20" y="200">
-    <tspan fill="#6c7086">  [2/7] </tspan><tspan fill="#cdd6f4">Branch       </tspan><tspan fill="#a6e3a1">&#x2713;</tspan><tspan fill="#cdd6f4"> </tspan><tspan fill="#89dceb">issue-42/fix-sso-login-error</tspan>
+    <tspan fill="#6c7086">  [1/5] </tspan><tspan fill="#cdd6f4">Research     </tspan><tspan fill="#a6e3a1">&#x2713;</tspan><tspan fill="#cdd6f4"> read 5 files, complexity: medium</tspan>
   </text>
   <text font-family="monospace" font-size="13" x="20" y="224">
-    <tspan fill="#6c7086">  [3/7] </tspan><tspan fill="#cdd6f4">Research     </tspan><tspan fill="#a6e3a1">&#x2713;</tspan><tspan fill="#cdd6f4"> read 5 files, traced 3 deps</tspan>
+    <tspan fill="#6c7086">  [2/5] </tspan><tspan fill="#cdd6f4">Plan         </tspan><tspan fill="#a6e3a1">&#x2713;</tspan><tspan fill="#cdd6f4"> approach: fix redirect logic</tspan>
   </text>
   <text font-family="monospace" font-size="13" x="20" y="248">
-    <tspan fill="#6c7086">  [4/7] </tspan><tspan fill="#cdd6f4">Plan         </tspan><tspan fill="#a6e3a1">&#x2713;</tspan><tspan fill="#cdd6f4"> approach: fix redirect logic</tspan>
+    <tspan fill="#6c7086">  [3/5] </tspan><tspan fill="#cdd6f4">Implement    </tspan><tspan fill="#a6e3a1">&#x2713;</tspan><tspan fill="#cdd6f4"> 2 files changed, 4 unit tests</tspan>
   </text>
   <text font-family="monospace" font-size="13" x="20" y="272">
-    <tspan fill="#6c7086">  [5/7] </tspan><tspan fill="#cdd6f4">Execute      </tspan><tspan fill="#a6e3a1">&#x2713;</tspan><tspan fill="#cdd6f4"> 2 files changed, 45 lines</tspan>
+    <tspan fill="#6c7086">  [4/5] </tspan><tspan fill="#cdd6f4">QA           </tspan><tspan fill="#a6e3a1">&#x2713;</tspan><tspan fill="#cdd6f4"> clean after 1 cycle</tspan>
   </text>
   <text font-family="monospace" font-size="13" x="20" y="296">
-    <tspan fill="#6c7086">  [6/7] </tspan><tspan fill="#cdd6f4">Verify       </tspan><tspan fill="#a6e3a1">&#x2713;</tspan><tspan fill="#cdd6f4"> 12 tests passed</tspan>
-  </text>
-  <text font-family="monospace" font-size="13" x="20" y="320">
-    <tspan fill="#6c7086">  [7/7] </tspan><tspan fill="#cdd6f4">Ship         </tspan><tspan fill="#a6e3a1">&#x2713;</tspan><tspan fill="#cdd6f4"> PR #87 created</tspan>
+    <tspan fill="#6c7086">  [5/5] </tspan><tspan fill="#cdd6f4">Deliver      </tspan><tspan fill="#a6e3a1">&#x2713;</tspan><tspan fill="#cdd6f4"> PR #87 created</tspan>
   </text>
 
   <text fill="#a6e3a1" font-family="monospace" font-size="13" x="20" y="356">  &#x2713; Done &#x2014; PR #87: Fix SSO login redirect</text>
