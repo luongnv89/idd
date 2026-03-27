@@ -207,6 +207,10 @@ After preflight:
 
 Deeply understand the issue, the affected codebase, and possible solutions. This step also verifies the issue hasn't already been fixed.
 
+### GitHub Projects status transition
+
+If `projects.sync_enabled` is true, set the issue status to `status_map.in_progress` (see `docs/github-projects-sync.md`).
+
 ### Subagent delegation (preferred)
 
 Spawn the codebase-researcher agent with:
@@ -469,7 +473,7 @@ Closes #{issue_number}
 
 ### Project board sync
 
-If `projects.sync_enabled` is true, update status to "Done" (see `docs/github-projects-sync.md`).
+If `projects.sync_enabled` is true, update status to `status_map.done` (see `docs/github-projects-sync.md`).
 
 After delivery:
 ```

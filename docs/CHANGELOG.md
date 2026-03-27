@@ -40,7 +40,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Added
 - `/review-fix-loop` skill — automated review-fix cycle that spawns fresh reviewer agents, fixes detected issues, and repeats until clean
-  - Each review cycle uses an independent `feature-dev:code-reviewer` subagent for unbiased assessment
+  - Each review cycle uses an independent `shared/agents/code-reviewer.md` subagent for unbiased assessment
   - Fixes accumulate without committing — one clean commit at the end
   - Stagnation detection stops the loop if the same issues recur across 2 consecutive cycles
   - Max 5 cycles safety cap, high-confidence-only filtering to avoid nitpicking
