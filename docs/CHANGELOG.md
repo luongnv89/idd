@@ -6,6 +6,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-03-27
+
+### Added
+- Shared agents architecture — consolidated 9 per-skill agent definitions into 6 reusable shared agents in `shared/agents/`:
+  - `codebase-researcher.md` — deep codebase scan and solution research
+  - `synthesizer.md` — analysis and implementation options
+  - `implementer.md` — code and tests implementation
+  - `code-reviewer.md` — confidence-based code review
+  - `duplicate-detector.md` — issue dedup scoring
+  - `issue-relationship-scanner.md` — file deps and already-fixed detection
+- `/issue-pr-review` skill — review, test, CI check, fix, and merge PRs (replaces `/review-fix-loop`)
+- `/issue-pr-review-fix-loop` skill — outer review-fix loop with fresh context per cycle for genuinely independent reviews
+- Structured step-by-step final reports for all skills
+
+### Changed
+- `/issue-resolver` rewritten from 8-step pipeline (Fetch → Branch → Research → Plan → Execute → Test → Verify → Ship) to 6-step pipeline (Preflight → Research → Plan → Implement → QA → Deliver)
+  - Step 0 (Preflight) consolidates fetch, branch creation, guards, and auto-normalize
+  - Step 4 (QA) integrates code review and test running in a single review-fix loop
+  - Step 5 (Deliver) consolidates push, PR creation, and project board sync
+- All skills now reference shared agents from `shared/agents/` instead of per-skill agent definitions
+- Removed all external agent type dependencies (`subagent_type` parameter no longer used)
+- `/review-fix-loop` deprecated — redirects to `/issue-pr-review`
+- Updated `docs/github-projects-sync.md` step references to match new 6-step pipeline
+
+### Removed
+- Per-skill agent definitions (replaced by shared agents)
+- Old 8-step pipeline structure and associated step-specific agent files
+
 ## [0.6.0] - 2026-03-24
 
 ### Added
