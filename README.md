@@ -9,13 +9,13 @@
 <p align="center">
   <a href="https://github.com/luongnv89/idd/releases/latest"><img src="https://img.shields.io/badge/version-0.6.0-blue.svg" alt="Version 0.6.0"></a>
   <a href="https://github.com/luongnv89/idd/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="MIT License"></a>
-  <a href="https://github.com/luongnv89/idd"><img src="https://img.shields.io/badge/skills-7-blue.svg" alt="7 skills"></a>
+  <a href="https://github.com/luongnv89/idd"><img src="https://img.shields.io/badge/skills-8-blue.svg" alt="8 skills"></a>
   <a href="https://github.com/luongnv89/idd/blob/main/CONTRIBUTING.md"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs Welcome"></a>
 </p>
 
 # Turn GitHub Issues Into Structured, Agent-Ready Work Orders
 
-Seven terminal commands that structure, analyze, triage, resolve, and review GitHub issues — so any developer or AI agent can pick up an issue and ship a tested PR.
+Eight terminal commands that structure, analyze, triage, resolve, and review GitHub issues — so any developer or AI agent can pick up an issue and ship a tested PR.
 
 [**Get Started**](#get-started) · [**What is IDD?**](#what-is-idd) · [**Intention-Driven Development**](#idd-as-intention-driven-development) · [**Why Good Issues & Commits Matter**](#why-good-issues-and-commit-messages-matter) · [**Works With Any Tool**](#works-with-any-tool)
 
@@ -53,12 +53,12 @@ graph LR
 
 | Command | What it does | Version | Effort |
 |---------|-------------|---------|--------|
-| `/issue-creator` | Classify type, generate acceptance criteria, create a structured issue | 0.2.0 | medium |
-| `/issue-analysis N` | Root cause, git history, implementation options, complexity and risk | 0.3.0 | high |
-| `/issue-resolver N` | 6-step pipeline: preflight, research, plan, implement, QA, deliver PR with `Closes #N` | 0.5.0 | max |
-| `/issue-triage` | Dependency graph, stale detection, already-fixed detection via commit/PR scanning, priority and execution order | 0.4.0 | medium |
-| `/init-gitissue` | Auto-detect language/framework/test runner, generate `.gitissue.yml` | 0.2.0 | low |
-| `/auto-pilot` | Triage → resolve → review → merge loop, fully automated backlog processing | 0.5.0 | max |
+| `/issue-creator` | Classify type, generate acceptance criteria, create a structured issue | 0.4.0 | medium |
+| `/issue-analysis N` | Root cause, git history, implementation options, complexity and risk | 0.4.0 | high |
+| `/issue-resolver N` | 6-step pipeline: preflight, research, plan, implement, QA, deliver PR with `Closes #N` | 0.6.0 | max |
+| `/issue-triage` | Dependency graph, stale detection, already-fixed detection via commit/PR scanning, priority and execution order | 0.5.0 | medium |
+| `/init-gitissue` | Auto-detect language/framework/test runner, generate `.gitissue.yml` | 0.3.0 | low |
+| `/auto-pilot` | Triage → resolve → review → merge loop, fully automated backlog processing | 0.7.0 | max |
 | `/issue-pr-review` | Review PR end-to-end: code review, tests, CI check, fix issues, repeat until clean | 0.1.0 | high |
 | `/issue-pr-review-fix-loop` | Outer review-fix loop: fresh reviewer each cycle, fix, commit, push, repeat until clean | 0.1.0 | high |
 
@@ -80,7 +80,7 @@ Describe a bug, feature, or improvement in plain text. gitissue classifies it, g
   <img src="assets/screenshots/issue-resolver.svg" alt="issue-resolver terminal output" width="680">
 </p>
 
-Seven steps run automatically: fetch the issue, create a branch, scan the codebase, plan the fix, write code + tests, verify, and ship a PR with `Closes #N`.
+Six steps run automatically: preflight, research, plan, implement, QA, and deliver a PR with `Closes #N`.
 
 ### 3. Triage the backlog
 

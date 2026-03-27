@@ -199,11 +199,11 @@ autopilot:
 
   # Labels that cause an issue to be skipped
   # Type: array of strings
-  # Default: ["wontfix", "duplicate", "invalid"]
+  # Default: ["wontfix", "blocked", "do-not-merge"]
   skip_labels:
     - wontfix
-    - duplicate
-    - invalid
+    - blocked
+    - do-not-merge
 
 # Triage settings
 triage:
