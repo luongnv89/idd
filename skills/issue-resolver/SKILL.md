@@ -4,7 +4,7 @@ description: Resolve a GitHub issue end-to-end through a 6-step pipeline (Prefli
 effort: max
 license: MIT
 metadata:
-  version: 0.5.0
+  version: 0.6.0
   creator: Luong NGUYEN <luongnv89@gmail.com>
 compatibility: Requires git and GitHub CLI (gh) with authentication and push access. Self-contained — uses shared agents from shared/agents/.
 ---

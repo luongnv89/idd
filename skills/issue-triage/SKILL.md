@@ -4,7 +4,7 @@ description: Triage open GitHub issues by analyzing dependencies, detecting circ
 effort: medium
 license: MIT
 metadata:
-  version: 0.4.0
+  version: 0.5.0
   creator: Luong NGUYEN <luongnv89@gmail.com>
 compatibility: Requires git and GitHub CLI (gh) with authentication. Default mode (cached view) needs only local file access — no gh required.
 ---

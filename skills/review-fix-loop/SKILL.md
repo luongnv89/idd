@@ -4,7 +4,7 @@ description: "DEPRECATED: Use /issue-pr-review instead. This skill redirects to 
 effort: low
 license: MIT
 metadata:
-  version: 0.2.0
+  version: 0.3.0
   creator: Luong NGUYEN <luongnv89@gmail.com>
 compatibility: Requires /issue-pr-review skill.
 ---
