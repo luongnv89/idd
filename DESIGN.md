@@ -80,9 +80,9 @@ Rules:
 
 **Multi-step pipeline** (issue-resolver):
 ```
-  [1/7] Fetch        ✓ issue #42 loaded
-  [2/7] Branch       ✓ fix/42-auth-redirect
-  [3/7] Research     ● reading 5 files...
+  [0/5] Preflight    ✓ issue #42 open, not yet resolved
+  [1/5] Research     ✓ read 5 files, complexity: medium
+  [2/5] Plan         ● selecting approach...
 ```
 
 **Single operation** (issue-creator):
@@ -226,13 +226,12 @@ Normalized issues must render cleanly in GitHub's web UI:
 
   ◆ Resolve Pipeline
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  [1/7] Fetch        ✓ issue #42 loaded
-  [2/7] Branch       ✓ fix/42-mobile-auth-redirect
-  [3/7] Research     ✓ read 5 files, traced 3 deps
-  [4/7] Plan         ✓ approach: fix redirect logic
-  [5/7] Execute      ✓ 2 files changed, 45 lines
-  [6/7] Verify       ✓ 12 tests passed
-  [7/7] Ship         ✓ PR #87 created
+  [0/5] Preflight    ✓ issue #42 open, not yet resolved
+  [1/5] Research     ✓ read 5 files, complexity: medium
+  [2/5] Plan         ✓ approach: fix redirect logic
+  [3/5] Implement    ✓ 2 files changed, 45 lines
+  [4/5] QA           ✓ clean after 2 cycles
+  [5/5] Deliver      ✓ PR #87 created
 
   ✓ Done — PR #87: fix(auth): resolve mobile auth redirect (#42)
     https://github.com/user/repo/pull/87
