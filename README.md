@@ -60,6 +60,7 @@ graph LR
 | `/init-gitissue` | Auto-detect language/framework/test runner, generate `.gitissue.yml` | 0.2.0 | low |
 | `/auto-pilot` | Triage → resolve → review → merge loop, fully automated backlog processing | 0.5.0 | max |
 | `/issue-pr-review` | Review PR end-to-end: code review, tests, CI check, fix issues, repeat until clean | 0.1.0 | high |
+| `/issue-pr-review-fix-loop` | Outer review-fix loop: fresh reviewer each cycle, fix, commit, push, repeat until clean | 0.1.0 | high |
 
 ---
 
@@ -195,6 +196,7 @@ You can also install individual skills. See each skill folder for per-skill comm
 | `/issue-triage` | [`skills/issue-triage/`](skills/issue-triage/) |
 | `/auto-pilot` | [`skills/auto-pilot/`](skills/auto-pilot/) |
 | `/issue-pr-review` | [`skills/issue-pr-review/`](skills/issue-pr-review/) |
+| `/issue-pr-review-fix-loop` | [`skills/issue-pr-review-fix-loop/`](skills/issue-pr-review-fix-loop/) |
 | `/init-gitissue` | [`skills/init-gitissue/`](skills/init-gitissue/) |
 
 ---
@@ -385,6 +387,33 @@ Pipeline:
 
 Max 5 review-fix cycles with stagnation detection.
 
+### /issue-pr-review-fix-loop -- Outer Review-Fix Loop
+
+Wraps `/issue-pr-review` in an outer loop where each cycle spawns a completely fresh reviewer with zero memory of prior passes. Guarantees genuinely independent reviews.
+
+```
+/issue-pr-review-fix-loop 87       # review-fix loop for PR #87
+/issue-pr-review-fix-loop          # auto-detect PR for current branch
+/issue-pr-review-fix-loop 87 --auto  # review-fix + auto-merge when clean
+```
+
+Loop:
+
+```
+Cycle 1/5
+  [Review]   ⟶ Spawn /issue-pr-review --review-only (fresh subagent)
+  [Result]   ✗ NEEDS_FIX — 3 issues
+  [Fix]      ✓ fixed 3 issues
+  [Commit]   ✓ fix(auth): address review feedback (#42)
+  [Push]     ✓ pushed to origin
+
+Cycle 2/5
+  [Review]   ⟶ Spawn /issue-pr-review --review-only (fresh subagent)
+  [Result]   ✓ PASS — 0 issues
+```
+
+Max 5 cycles with stagnation detection. Each cycle creates an atomic commit.
+
 ### /init-gitissue -- Generate Config
 
 Scans your repository and generates `.gitissue.yml` with sensible defaults: detects language, framework, test runner, existing templates, and adjusts timeouts based on repo size.
@@ -473,6 +502,9 @@ skills/
 │   ├── SKILL.md
 │   └── references/
 ├── issue-pr-review/    # /issue-pr-review — review, test, CI check, fix, merge
+│   ├── SKILL.md
+│   └── references/
+├── issue-pr-review-fix-loop/  # /issue-pr-review-fix-loop — outer review-fix loop
 │   ├── SKILL.md
 │   └── references/
 ├── review-fix-loop/    # /review-fix-loop (deprecated → redirects to /issue-pr-review)
