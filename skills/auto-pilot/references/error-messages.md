@@ -217,7 +217,7 @@ All errors follow the rich error format: what went wrong + fix command + docs li
   PR: https://github.com/owner/repo/pull/{pr_number}
   To fix:  wait for CI to finish, then /auto-pilot to resume
 ```
-**Trigger:** Status checks remain pending after `resolve.test_timeout` seconds of polling.
+**Trigger:** Status checks remain pending after `review.ci_timeout` seconds of polling.
 
 ### CI checks failed
 ```

@@ -100,7 +100,7 @@ graph TD
     C --> D["/issue-triage (optional)"]
     D --> E["Backlog analysis:<br/>Dependency graph,<br/>Priority suggestions,<br/>Execution order"]
     E --> F["/issue-resolver N"]
-    F --> G["7-step pipeline:<br/>Fetch → Branch → Research →<br/>Plan → Execute → Verify → Ship"]
+    F --> G["6-step pipeline:<br/>Preflight → Research → Plan →<br/>Implement → QA → Deliver"]
     G --> H["Atomic PR → Review →<br/>Merge → Issue auto-closes"]
 
     style A fill:#4CAF50,color:#fff

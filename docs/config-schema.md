@@ -112,6 +112,99 @@ resolve:
   # Minimum: 1
   max_commits: 10
 
+  # Max QA review-fix cycles during resolve Step 4
+  # Type: integer
+  # Default: 5
+  # Minimum: 1
+  # Maximum: 10
+  qa_max_cycles: 5
+
+# PR review settings (used by /issue-pr-review and /auto-pilot)
+review:
+  # Max review-fix cycles before stopping
+  # Type: integer
+  # Default: 5
+  # Minimum: 1
+  # Maximum: 10
+  max_cycles: 5
+
+  # Auto-merge PR when clean (overridden to true in --auto mode)
+  # Type: boolean
+  # Default: false
+  auto_merge: false
+
+  # Only report issues at or above this confidence level (0-100)
+  # Type: integer
+  # Default: 80
+  # Minimum: 50
+  # Maximum: 100
+  confidence_threshold: 80
+
+  # Run tests as part of the review pipeline
+  # Type: boolean
+  # Default: true
+  run_tests: true
+
+  # Check CI status as part of the review pipeline
+  # Type: boolean
+  # Default: true
+  check_ci: true
+
+  # Seconds between CI status polls
+  # Type: integer
+  # Default: 30
+  # Minimum: 10
+  # Maximum: 120
+  ci_poll_interval: 30
+
+  # Abort CI polling after N seconds
+  # Type: integer
+  # Default: 600 (10 minutes)
+  # Minimum: 60
+  # Maximum: 3600
+  ci_timeout: 600
+
+  # Abort test suite after N seconds
+  # Type: integer
+  # Default: 300 (5 minutes)
+  # Minimum: 30
+  # Maximum: 3600
+  test_timeout: 300
+
+# Auto-pilot settings (used by /auto-pilot)
+autopilot:
+  # Max iterations (issues to process) before stopping
+  # Type: integer
+  # Default: 10
+  # Minimum: 1
+  # Maximum: 50
+  max_iterations: 10
+
+  # Max review-fix cycles per PR (overrides review.max_cycles in subagent prompt)
+  # Type: integer
+  # Default: 5
+  # Minimum: 1
+  # Maximum: 10
+  review_cycles: 5
+
+  # Auto-merge PRs after review passes
+  # Type: boolean
+  # Default: true
+  auto_merge: true
+
+  # Pause loop on failure instead of skipping to next issue
+  # Type: boolean
+  # Default: true
+  pause_on_failure: true
+
+  # Labels that cause an issue to be skipped
+  # Type: array of strings
+  # Default: ["wontfix", "blocked", "do-not-merge"]
+  skip_labels:
+    - wontfix
+    - blocked
+    - do-not-merge
+
 # Triage settings
 triage:
   # Flag issues with no activity beyond this threshold (days)
@@ -208,6 +301,8 @@ graph TD
     R[".gitissue.yml"] --> P["platform<br/>(github | gitlab)"]
     R --> I["issue"]
     R --> RS["resolve"]
+    R --> RV["review"]
+    R --> AP["autopilot"]
     R --> T["triage"]
     R --> A["analysis"]
     R --> PR["projects"]
@@ -223,6 +318,22 @@ graph TD
     RS --> R4["test_timeout"]
     RS --> R5["pr_auto_link"]
     RS --> R6["max_commits"]
+    RS --> R7["qa_max_cycles"]
+
+    RV --> RV1["max_cycles"]
+    RV --> RV2["auto_merge"]
+    RV --> RV3["confidence_threshold"]
+    RV --> RV4["run_tests"]
+    RV --> RV5["check_ci"]
+    RV --> RV6["ci_poll_interval"]
+    RV --> RV7["ci_timeout"]
+    RV --> RV8["test_timeout"]
+
+    AP --> AP1["max_iterations"]
+    AP --> AP2["review_cycles"]
+    AP --> AP3["auto_merge"]
+    AP --> AP4["pause_on_failure"]
+    AP --> AP5["skip_labels"]
 
     T --> T1["stale_threshold_days"]
     T --> T2["auto_priority"]

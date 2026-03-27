@@ -11,8 +11,8 @@ When skills perform actions (create issues, start/complete work, reprioritize), 
 | Skill | Trigger | Status transition |
 |-------|---------|-------------------|
 | `/issue-creator` | Issue created | Add to board, set "Todo" |
-| `/issue-resolver` | Branch created (Step 2) | Set "In Progress" |
-| `/issue-resolver` | PR created (Step 8) | Set "Done" |
+| `/issue-resolver` | Branch created (Step 0 Preflight) | Set "In Progress" |
+| `/issue-resolver` | PR created (Step 5 Deliver) | Set "Done" |
 | `/issue-triage` | Priority changed | (read-only, no status change) |
 | `/issue-analysis` | Analysis complete | (read-only, no status change) |
 
@@ -231,7 +231,7 @@ After successful issue creation (Step 6 in single mode, Step 5 in batch mode):
 
 ### In `/issue-resolver`
 
-**After branch creation (Step 2):**
+**After branch creation (Step 0 — Preflight):**
 
 ```
 ● Syncing project board...
@@ -245,7 +245,7 @@ After successful issue creation (Step 6 in single mode, Step 5 in batch mode):
 ✓ Project status: In Progress
 ```
 
-**After PR creation (Step 8):**
+**After PR creation (Step 5 — Deliver):**
 
 1. Update status to `projects.status_map.done`
 

@@ -4,7 +4,7 @@ description: Create structured GitHub issues from text, screenshots, or images, 
 effort: medium
 license: MIT
 metadata:
-  version: 0.3.0
+  version: 0.4.0
   creator: Luong NGUYEN <luongnv89@gmail.com>
 compatibility: Requires git and GitHub CLI (gh) with authentication. Run `gh auth status` to verify.
 ---
@@ -73,7 +73,7 @@ Main Agent (orchestrator) — Create mode
 
 In **batch mode**, the duplicate detector checks all batch items in a single pass (including internal cross-checks), so only one subagent spawn is needed regardless of batch size.
 
-Read `agents/duplicate-detector.md` for the full duplicate detector prompt.
+Read `shared/agents/duplicate-detector.md` for the full duplicate detector prompt.
 
 ### Environment check
 
@@ -258,7 +258,7 @@ Spawn the duplicate-detector subagent with:
 }
 ```
 
-Read `agents/duplicate-detector.md` for the full prompt. The subagent returns a `duplicates` array with scored matches.
+Read `shared/agents/duplicate-detector.md` for the full prompt. The subagent returns a `duplicates` array with scored matches.
 
 #### Fallback (no Agent tool)
 
@@ -324,9 +324,28 @@ gh issue create --title "{title}" --body "{populated_template}" --label "{labels
 
 The body is the fully populated template including `<!-- gitissue:normalized v1 -->` at the top.
 
+Print a structured step-by-step summary:
+
 ```
-✓ Created issue #42
+◆ Issue Created
+┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+
+  Parse input:       ✓ pass
+  Classify:          ✓ pass ({type})
+  Duplicates:        ✓ pass (no duplicates found)
+  Template:          ✓ pass
+  Preview:           ✓ approved
+  Create:            ✓ pass
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  Result:            DONE
+
+  #42  {title}
   https://github.com/owner/repo/issues/42
+```
+
+If duplicates were found but user proceeded:
+```
+  Duplicates:        ⚠ warn ({N} potential duplicates, user overrode)
 ```
 
 On failure, output the matching error from `references/error-messages.md`.
@@ -472,10 +491,26 @@ gh issue edit {N} --add-label "{label1},{label2}"
 
 ### Step 12 — Report
 
+Print a structured step-by-step summary:
+
 ```
-✓ Backup posted (comment #5)
-✓ Issue #42 normalized
-  https://github.com/owner/repo/issues/42
+◆ Issue Normalized: #{N}
+┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+
+  Fetch:             ✓ pass
+  Already normal:    ✓ pass (not yet normalized)
+  State check:       ✓ pass (unlocked)
+  Security check:    ✓ pass (no security labels)
+  Generate:          ✓ pass ({type} template applied)
+  Dry-run:           ✓ approved
+  Backup:            ✓ pass (comment #{comment_id})
+  Update:            ✓ pass
+  Labels:            ✓ pass ({N} labels applied)
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  Result:            DONE
+
+  #{N}  {title}
+  https://github.com/owner/repo/issues/{N}
 ```
 
 ---
@@ -534,7 +569,7 @@ Spawn the duplicate-detector subagent with all batch items:
 }
 ```
 
-Read `agents/duplicate-detector.md` for the full prompt. The subagent checks each item against existing open issues AND cross-checks items against each other in a single pass.
+Read `shared/agents/duplicate-detector.md` for the full prompt. The subagent checks each item against existing open issues AND cross-checks items against each other in a single pass.
 
 **Parallel execution:** In batch mode, spawn the duplicate-detector at the same time as pre-generating template content — both results are ready by Step 4 (Approval) and consumed at Step 5 (Create Issues).
 
@@ -601,23 +636,39 @@ Create each approved issue sequentially using the same pipeline as single Create
 
 ### Step 6 — Report
 
-Show a summary of all results:
+Print a structured step-by-step summary:
 
 **All succeeded:**
 ```
-✓ 3/3 issues created
+◆ Batch Create — {N}/{N} issues
+┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
 
-  #42  Fix Safari checkout redirect
-       https://github.com/owner/repo/issues/42
-  #43  Add dark mode toggle
-       https://github.com/owner/repo/issues/43
-  #44  Refactor auth middleware
-       https://github.com/owner/repo/issues/44
+  Detect items:      ✓ pass ({N} items found)
+  Preview:           ✓ approved
+  Duplicates:        ✓ pass (no duplicates)
+  Create:            ✓ pass ({N}/{N} created)
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  Result:            DONE
+
+  ✓ #42  Fix Safari checkout redirect
+         https://github.com/owner/repo/issues/42
+  ✓ #43  Add dark mode toggle
+         https://github.com/owner/repo/issues/43
+  ✓ #44  Refactor auth middleware
+         https://github.com/owner/repo/issues/44
 ```
 
 **Partial failure:**
 ```
-⚠ 2/3 created, 1 failed
+◆ Batch Create — {succeeded}/{total} issues
+┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+
+  Detect items:      ✓ pass ({total} items found)
+  Preview:           ✓ approved
+  Duplicates:        ✓ pass
+  Create:            ⚠ warn ({succeeded}/{total} created, {failed} failed)
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  Result:            PARTIAL
 
   ✓ #42  Fix Safari checkout redirect
          https://github.com/owner/repo/issues/42
@@ -625,7 +676,7 @@ Show a summary of all results:
          https://github.com/owner/repo/issues/43
   ✗      Refactor auth middleware — rate limited
 
-  To retry failed items: /issue-creator Refactor auth middleware
+  To retry failed: /issue-creator Refactor auth middleware
 ```
 
 The retry hint shows the single-create invocation for each failed item, so the user can easily pick up where the batch left off.

@@ -6,34 +6,45 @@ gitissue implements Issue-Driven Development (IDD) — a methodology where GitHu
 
 ## Architecture
 
-This is a **skills-only** project. There is no runtime code — each skill is a self-contained Claude Code skill (SKILL.md + references/ + templates/) that instructs the agent how to perform a task.
+This is a **skills-only** project. There is no runtime code — each skill is a self-contained Claude Code skill (SKILL.md + references/ + templates/) that instructs the agent how to perform a task. Shared agents live in `shared/agents/` and are referenced by multiple skills.
 
 ```
+shared/
+└── agents/                    # Shared agent definitions (used by multiple skills)
+    ├── codebase-researcher.md # Deep codebase scan + solution research
+    ├── synthesizer.md         # Analysis + implementation options
+    ├── implementer.md         # Code + tests implementation
+    ├── code-reviewer.md       # Confidence-based code review
+    ├── duplicate-detector.md  # Issue dedup scoring
+    └── issue-relationship-scanner.md  # File deps + already-fixed detection
+
 skills/
 ├── auto-pilot/         # /auto-pilot — triage, resolve, review, merge loop
 │   ├── SKILL.md
 │   └── references/
-├── issue-analysis/     # /issue-analysis N
+├── issue-analysis/     # /issue-analysis N — deep issue investigation
 │   ├── SKILL.md
-│   ├── agents/         # explorer, synthesizer subagents
 │   └── references/
-├── issue-creator/      # /issue-creator and /issue-creator N (normalization)
+├── issue-creator/      # /issue-creator — create/normalize/batch issues
 │   ├── SKILL.md
-│   ├── agents/         # duplicate-detector subagent
 │   ├── templates/      # Issue templates (bug, feature, improvement)
-│   └── references/     # Error messages, detailed patterns
-├── issue-resolver/     # /issue-resolver N
-│   ├── SKILL.md
-│   ├── agents/         # researcher, implementer subagents
 │   └── references/
-├── issue-triage/       # /issue-triage
-│   ├── SKILL.md
-│   ├── agents/         # history-scanner, dependency-scanner subagents
-│   └── references/
-├── review-fix-loop/    # /review-fix-loop — automated review-fix cycle
+├── issue-resolver/     # /issue-resolver N — 6-step resolve pipeline
 │   ├── SKILL.md
 │   └── references/
-└── init-gitissue/      # /init-gitissue
+├── issue-triage/       # /issue-triage — prioritize and order issues
+│   ├── SKILL.md
+│   └── references/
+├── issue-pr-review/    # /issue-pr-review — review, test, CI check, fix, merge
+│   ├── SKILL.md
+│   └── references/
+├── issue-pr-review-fix-loop/  # /issue-pr-review-fix-loop — outer review-fix loop with fresh context per cycle
+│   ├── SKILL.md
+│   └── references/
+├── review-fix-loop/    # DEPRECATED — redirects to /issue-pr-review
+│   ├── SKILL.md
+│   └── references/
+└── init-gitissue/      # /init-gitissue — generate .gitissue.yml
     ├── SKILL.md
     └── references/
 ```
@@ -128,7 +139,9 @@ Examples:
 ### Skills
 - Each skill follows the skill-creator standard (frontmatter with name/description, progressive disclosure)
 - Each skill has its own `references/error-messages.md`
-- Skills are isolated — no cross-skill imports or shared state
+- Shared agents live in `shared/agents/` — skills reference them by path, not by external agent types
+- All subagents use the default general-purpose agent (no `subagent_type` parameter)
+- In auto-pilot mode, all agents/skills run autonomously without user prompts
 - Static sequential output — each step prints a new line, no terminal animation
 
 ### Testing

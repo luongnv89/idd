@@ -4,9 +4,9 @@ description: Fully automated development loop that triages open issues, picks th
 effort: max
 license: MIT
 metadata:
-  version: 0.6.0
+  version: 0.7.0
   creator: Luong NGUYEN <luongnv89@gmail.com>
-compatibility: Requires git and GitHub CLI (gh) with authentication and push access. Requires merge permission for auto-merge. Uses /issue-triage, /issue-resolver, and /issue-analysis skills internally.
+compatibility: Requires git and GitHub CLI (gh) with authentication and push access. Requires merge permission for auto-merge. Uses /issue-triage, /issue-resolver, /issue-analysis, and /issue-pr-review skills internally. All agents are in shared/agents/.
 ---
 
 # /auto-pilot
@@ -85,7 +85,7 @@ The solution: the main agent acts as a **lightweight orchestrator** that delegat
 
 ### Subagent Architecture
 
-Each iteration spawns up to 3 subagents. The main agent only tracks: issue number, title, branch name, PR number, and pass/fail status. In explicit list mode, an additional analyzer subagent runs once upfront before the loop begins.
+Each iteration spawns up to 2 subagents. The main agent only tracks: issue number, title, branch name, PR number, and pass/fail status. In explicit list mode, an additional analyzer subagent runs once upfront before the loop begins.
 
 ```
 Main Agent (orchestrator)
@@ -95,25 +95,16 @@ Main Agent (orchestrator)
   │     Returns: optimized_order, batches, dependencies
   │
   ├── Subagent: Resolver (or Batch Resolver for batched issues)
-  │     Runs the full /issue-resolver 8-step pipeline (Fetch → Branch → Research → Plan → Execute → Test → Verify → Ship)
+  │     Runs the full /issue-resolver 6-step pipeline (Preflight → Research → Plan → Implement → QA → Deliver)
   │     Returns: branch_name, pr_number, files_changed, tests_written, tests_passed
   │
-  ├── Subagent: Reviewer (pass 1)          ← always runs
-  │     Reviews the PR diff fresh
-  │     Returns: PASS/NEEDS_FIX, list of issues found
-  │
-  ├── Subagent: Fixer (if NEEDS_FIX)       ← only if issues found
-  │     Fixes review issues, re-runs tests, pushes
-  │     Returns: fixed_count, tests_passed, remaining_issues
-  │
-  ├── Subagent: Reviewer (pass 2)          ← always runs (confirmation)
-  │     Fresh reviewer, no memory of pass 1
-  │     Returns: PASS/NEEDS_FIX
-  │
-  └── ... (more fix/review cycles if needed, up to review_cycles)
+  └── Subagent: PR Reviewer (via /issue-pr-review --auto)
+        Runs the full review pipeline: code review, tests, CI, fix, repeat (max 5 cycles)
+        Auto-merges when clean
+        Returns: MERGED/PASS/NEEDS_FIX, review_cycles, issues_found, issues_fixed
 ```
 
-Each review pass spawns a **new, independent** reviewer subagent. This ensures genuine fresh-eyes review — no subagent carries memory from a prior pass. A PR normally needs **2 consecutive PASS results** before it can merge; if all review cycles are exhausted, 1 clean PASS is acceptable.
+The PR review subagent runs `/issue-pr-review --auto`, which handles the full review-fix-merge cycle internally — including spawning fresh reviewer agents each cycle and auto-merging when clean.
 
 ### Why Subagents Matter
 
@@ -128,11 +119,10 @@ The main agent handles only orchestration tasks that are lightweight and sequent
 1. **Prerequisites** — environment checks (git, gh, auth)
 2. **Triage/Pick** — fetch issue list, compute order (or walk explicit list)
 3. **Spawn resolver subagent** — pass issue number, wait for result
-4. **Spawn reviewer subagent** — pass PR number, wait for result
-5. **Spawn fixer subagent** (if needed) — pass PR number + review issues
-6. **Merge** — `gh pr merge` (a single command, no context needed)
-7. **Track results** — append to the iteration log
-8. **Loop** — advance to next issue
+4. **Spawn PR review subagent** — delegates to `/issue-pr-review --auto` which handles review, test, CI, fix, and merge
+5. **Merge fallback** — only if issue-pr-review couldn't auto-merge (branch protection, etc.)
+6. **Track results** — append to the iteration log
+7. **Loop** — advance to next issue
 
 The main agent should never: read source files, read PR diffs, run tests, or write code. All of that happens inside subagents.
 
@@ -371,9 +361,9 @@ The auto-pilot runs a continuous loop with 5 phases per iteration:
 ┄┄┄┄┄┄┄┄┄┄┄┄
   Phase 1 — Triage          Refresh priorities and pick next issue
                              (skipped in explicit list mode)
-  Phase 2 — Resolve         Subagent: full 8-step resolve pipeline
-  Phase 3+4 — Review-Fix    Subagents: review (x5 max), fix if needed
-                             Requires 2 consecutive PASS (or 1 at cycle limit)
+  Phase 2 — Resolve         Subagent: full 6-step resolve pipeline
+  Phase 3+4 — Review-Fix    Delegates to /issue-pr-review --auto
+                             Review, test, CI check, fix (x5 max), merge
   Phase 5 — Merge           Merge the PR and close the issue
   ─────────────────────────────────────────────────────────────
   Loop back to Phase 1 until done or limit reached
@@ -549,119 +539,60 @@ Check `autopilot.pause_on_failure`:
 
 ---
 
-## Phase 3 & 4 — Review-Fix Loop (Subagents)
+## Phase 3 & 4 — PR Review (via /issue-pr-review)
 
-After the PR is created, the auto-pilot runs a **review-fix loop** with a minimum of 2 review passes. Each review pass spawns a fresh reviewer subagent (independent context, no memory of implementation or prior reviews). If a review finds issues, a fixer subagent is spawned before the next review pass.
+After the PR is created, the auto-pilot delegates review, testing, CI checking, fixing, and merging to the `/issue-pr-review` skill in auto mode. This replaces the former inline review-fix loop with a more comprehensive pipeline that includes CI status monitoring.
 
-### Why at least 2 reviews
+### What issue-pr-review does in auto mode
 
-A single review pass can miss issues — the reviewer may focus on obvious problems and overlook subtler ones, or the fix for one issue may introduce another. Two passes provide defense in depth:
-- **Pass 1** catches the initial issues
-- **Pass 2** (after fixes, or as confirmation) catches regressions and anything missed
+1. Analyzes PR changes (code review with fresh agent each cycle)
+2. Runs all tests (unit, integration, e2e) and build/compile
+3. Checks CI status (polls GitHub Actions until complete)
+4. Fixes any detected issues
+5. Repeats steps 1-4 up to 5 cycles
+6. Auto-merges via squash when clean
 
-The loop allows up to `autopilot.review_cycles` fix attempts (default: 5, minimum: 2). A fix attempt = one fixer subagent run + one reviewer subagent pass. Confirmation-only review passes (spawned after a PASS to get the required 2 consecutive) do not consume a fix attempt. A PR can proceed to merge after **2 consecutive PASS results**, or after **1 PASS** if all fix attempts are exhausted.
+See `skills/issue-pr-review/SKILL.md` for the full pipeline.
 
-### Loop Flow
-
-```
-Review pass 1 (fresh reviewer subagent)
-  ├── PASS → Review pass 2 (fresh reviewer subagent, confirmation)
-  │            ├── PASS → Merge (2 consecutive passes ✓)
-  │            └── NEEDS FIX → Fix → Review pass 3 (if cycles remain)
-  └── NEEDS FIX → Fix (fixer subagent) → Review pass 2 (fresh reviewer)
-                    ├── PASS → Review pass 3 (confirmation, if cycles remain)
-                    │           └── ... or merge if 2 consecutive passes reached
-                    └── NEEDS FIX → Fix → Review pass 3 (if cycles remain)
-```
-
-Before entering the review-fix loop, initialize two counters:
-- `consecutive_passes = 0` — increments on each PASS, resets to 0 on NEEDS FIX or after any code change
-- `fix_cycles_used = 0` — increments by 1 each time a Fixer Subagent is spawned (Step 4.1). Fix cycles remaining = `review_cycles - fix_cycles_used`
-
-### Step 3.1 — Spawn Reviewer Subagent
+### Step 3.1 — Spawn PR Review Subagent
 
 ```
-● Review pass {pass} for PR #{pr_number}...
-  ⟶ Spawning reviewer subagent...
+● Reviewing PR #{pr_number}...
+  ⟶ Spawning PR review subagent...
 ```
 
-Use the **Reviewer Subagent** prompt from `references/subagent-prompts.md`, substituting `{pr_number}` and `{issue_number}`. Each review pass spawns a **new** subagent — never reuse a prior reviewer. This ensures fresh eyes on every pass.
+Use the **PR Reviewer Subagent** prompt from `references/subagent-prompts.md`, substituting `{pr_number}`. The subagent runs the full `/issue-pr-review --auto` pipeline: review, test, CI check, fix, repeat, merge.
 
 ### Step 3.2 — Process Review Result
 
-Parse the reviewer subagent's response and display the summary:
+Parse the subagent's response:
 
+**On MERGED:**
 ```
-◆ Review #{pr_number} (pass {pass})
-┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  Correctness:     {✓ pass / ⚠ N issues}
-  Test coverage:   {✓ pass / ⚠ N issues}
-  Code quality:    {✓ pass / ⚠ N issues}
-  Security:        {✓ pass / ⚠ N issues}
-  Edge cases:      {✓ pass / ⚠ N issues}
-  Criteria:        {✓ N/M met}
-  ─────────────────────────
-  Result:          {PASS / NEEDS FIX}
-  Issues found:    {count}
+  ✓ PR #{pr_number} reviewed and merged
+    Review cycles: {review_cycles}
+    Issues found/fixed: {issues_found}/{issues_fixed}
+    CI: {ci_status}
 ```
+Proceed to Phase 5 (Cleanup).
 
-### Step 3.3 — Decide Next Action
-
-Track `consecutive_passes` — a counter that increments on each PASS and resets to 0 on each NEEDS FIX.
-
-| Review result | consecutive_passes | Fix cycles remaining? | Action |
-|---------------|-------------------|-----------------------|--------|
-| PASS | >= 2 | any | Proceed to Phase 5 (Merge) |
-| PASS | 1 | yes | Spawn another reviewer (confirmation pass — does not consume a fix cycle) |
-| PASS | 1 | no (last fix cycle) | Proceed to Phase 5 (Merge) — 1 clean pass is acceptable when fix budget is exhausted |
-| NEEDS FIX | 0 | yes | Proceed to Step 4.1 (Fix — consumes 1 fix cycle) |
-| NEEDS FIX | 0 | no (last fix cycle) | Proceed to Step 4.2 (Cycle Exhaustion) |
-
-### Step 4.1 — Spawn Fixer Subagent
-
+**On PASS (not merged — e.g., merge blocked by branch protection):**
 ```
-● Fix cycle {cycle}/{review_cycles}
-  ⟶ Spawning fixer subagent...
+  ✓ PR #{pr_number} review passed — merge pending
+    Issues found/fixed: {issues_found}/{issues_fixed}
 ```
+Proceed to Phase 5 (manual merge attempt).
 
-Use the **Fixer Subagent** prompt from `references/subagent-prompts.md`, substituting `{pr_number}`, `{branch_name}`, `{issue_number}`, and the formatted list of issues from the reviewer.
-
-**On success (all fixed, tests pass):**
+**On NEEDS_FIX (review cycles exhausted with remaining issues):**
 ```
-  ✓ Fixed {fixed_count} review issues
-  ✓ Tests passed
-```
-
-Reset `consecutive_passes` to 0. Spawn a fresh reviewer subagent (back to Step 3.1).
-
-**On partial fix (some fixed, tests pass):**
-```
-  ⚠ Fixed {fixed_count}/{total} issues
-  Remaining: {remaining_issues}
-```
-
-Reset `consecutive_passes` to 0 (code on branch has changed). If more fix cycles remain, spawn a new fixer subagent for the remaining issues. If cycles are exhausted, proceed to Step 4.2.
-
-**On test failure:**
-```
-  ✗ Tests failed after fix
-```
-
-Reset `consecutive_passes` to 0 (code on branch has changed). If more fix cycles remain, spawn a new fixer subagent that includes the test failure context. If cycles are exhausted, proceed to Step 4.2.
-
-### Step 4.2 — Cycle Exhaustion
-
-If all review cycles are exhausted and issues remain:
-
-```
-⚠ Review issues remain after {review_cycles} review-fix cycles
+⚠ PR #{pr_number} has unresolved review issues after {review_cycles} cycles
 
   Remaining issues:
-    1. {issue_description_1}
-    2. {issue_description_2}
+    ● {issue_description_1}
+    ● {issue_description_2}
 
   Auto-merge skipped — PR needs manual review.
-  PR: https://github.com/owner/repo/pull/{pr_number}
+  PR: {pr_url}
 ```
 
 Check `autopilot.pause_on_failure`:
@@ -671,6 +602,10 @@ Check `autopilot.pause_on_failure`:
 ---
 
 ## Phase 5 — Merge
+
+### Already merged?
+
+If the PR review subagent returned **MERGED** (Step 3.2), the PR is already merged. Skip Steps 5.1 and 5.2 — go directly to Step 5.3 (Cleanup).
 
 ### Step 5.1 — Pre-merge Checks
 
@@ -698,7 +633,7 @@ Check `autopilot.pause_on_failure` for behavior.
 If `autopilot.auto_merge` is true:
 
 ```bash
-gh pr merge {pr_number} --merge --delete-branch
+gh pr merge {pr_number} --squash --delete-branch
 ```
 
 ```
@@ -761,28 +696,44 @@ The loop stops when any of these conditions are met:
 
 ## Final Summary
 
-When the loop ends (for any reason), print a comprehensive summary:
+When the loop ends (for any reason), print a structured step-by-step summary showing each iteration's outcome:
 
 ```
-◆ Auto-Pilot Summary
-┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  Status:      {completed / paused / limit reached}
-  Iterations:  {completed}/{max}
-  Duration:    {total_time}
+◆ Auto-Pilot Summary — {completed}/{max} iterations
+┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
 
-  Resolved:
-  ✓ #{n1} — {title1}  →  PR #{pr1} merged
-  ✓ #{n2} — {title2}  →  PR #{pr2} merged
+  Iteration 1:       ✓ pass — #{n1} {title1} → PR #{pr1} merged
+  Iteration 2:       ✓ pass — #{n2} {title2} → PR #{pr2} merged
+  Iteration 3:       ✗ fail — #{n5} {title5} (test failure at Verify)
+  Iteration 4:       ○ skip — #{n3} {title3} (blocked)
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  Resolved:          {resolved_count}
+  Skipped:           {skipped_count}
+  Failed:            {failed_count}
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  Result:            {COMPLETED / PAUSED / LIMIT REACHED}
 
-  Skipped:
-  ○ #{n3} — {title3}  (blocked)
-  ○ #{n4} — {title4}  (assigned to @user)
+  Remaining:         {remaining_count} open issues
+  Next action:       /auto-pilot to continue
+```
 
-  Failed:
-  ✗ #{n5} — {title5}  (test failure at Verify)
+If batch analysis was used (explicit issue list):
+```
+◆ Auto-Pilot Summary — {completed}/{max} iterations (batch mode)
+┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
 
-  Remaining:   {remaining_count} open issues
-  Next action: /auto-pilot to continue
+  Analysis:          ✓ pass ({N} issues, {batches} batch groups)
+  Iteration 1:       ✓ pass — #{n1} {title1} → PR #{pr1} merged
+  Iteration 2:       ✓ pass — #{n2} {title2} → PR #{pr2} merged
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  Resolved:          {resolved_count}
+  Skipped:           {skipped_count}
+  Failed:            {failed_count}
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  Result:            {COMPLETED / PAUSED / LIMIT REACHED}
+
+  Remaining:         {remaining_count} open issues
+  Next action:       /auto-pilot to continue
 ```
 
 ---
@@ -824,19 +775,13 @@ Start auto-pilot? [Y/n]
     Changed: 2 files
     Tests:   4 written, 12 passed
 
-● Review pass 1 for PR #45...
-  ⟶ Spawning reviewer subagent...
+● Reviewing PR #45...
+  ⟶ Spawning PR review subagent (/issue-pr-review --auto)...
 
-◆ Review #45 (pass 1)
-┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  Result:          PASS
-
-● Review pass 2 for PR #45 (confirmation)...
-  ⟶ Spawning reviewer subagent (fresh)...
-
-◆ Review #45 (pass 2)
-┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  Result:          PASS (2 consecutive ✓)
+  ✓ PR #45 reviewed and merged
+    Review cycles: 1
+    Issues found/fixed: 0/0
+    CI: all checks passed
 
 ✓ PR #45 merged — #12 closed
   https://github.com/owner/repo/pull/45
@@ -923,13 +868,9 @@ Start auto-pilot? [Y/n]
     Changed: 2 files
     Tests:   3 written, 9 passed
 
-● Review pass 1 for PR #50...
-  ⟶ Spawning reviewer subagent...
-  Result: PASS
-
-● Review pass 2 for PR #50 (confirmation)...
-  ⟶ Spawning reviewer subagent (fresh)...
-  Result: PASS (2 consecutive ✓)
+● Reviewing PR #50...
+  ⟶ Spawning PR review subagent (/issue-pr-review --auto)...
+  ✓ PR #50 reviewed and merged (1 cycle, 0 issues)
 
 ✓ PR #50 merged — #12 closed
   https://github.com/owner/repo/pull/50
@@ -948,13 +889,9 @@ Start auto-pilot? [Y/n]
     Changed: 3 files
     Tests:   5 written, 13 passed
 
-● Review pass 1 for PR #51...
-  ⟶ Spawning reviewer subagent...
-  Result: PASS
-
-● Review pass 2 for PR #51 (confirmation)...
-  ⟶ Spawning reviewer subagent (fresh)...
-  Result: PASS (2 consecutive ✓)
+● Reviewing PR #51...
+  ⟶ Spawning PR review subagent (/issue-pr-review --auto)...
+  ✓ PR #51 reviewed and merged (1 cycle, 0 issues)
 
 ✓ PR #51 merged — #5 closed, #8 closed (batched)
   https://github.com/owner/repo/pull/51
@@ -1018,37 +955,18 @@ Start auto-pilot? [Y/n]
 ### Review finds issues, fix cycle succeeds
 
 ```
-● Review pass 1 for PR #45...
-  ⟶ Spawning reviewer subagent...
+● Reviewing PR #45...
+  ⟶ Spawning PR review subagent (/issue-pr-review --auto)...
 
-◆ Review #45 (pass 1)
-┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  Result: NEEDS FIX
-  Issues: 2
-
-● Fix cycle 1/5
-  ⟶ Spawning fixer subagent...
-  ✓ Fixed 2/2 issues
-  ✓ Tests passed
-
-● Review pass 2 for PR #45...
-  ⟶ Spawning reviewer subagent (fresh)...
-
-◆ Review #45 (pass 2)
-┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  Result: PASS (1 consecutive — need 2)
-
-● Review pass 3 for PR #45 (confirmation)...
-  ⟶ Spawning reviewer subagent (fresh)...
-
-◆ Review #45 (pass 3)
-┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  Result: PASS (2 consecutive ✓)
+  ✓ PR #45 reviewed and merged
+    Review cycles: 2
+    Issues found/fixed: 2/2
+    CI: all checks passed
 
 ✓ PR #45 merged — #12 closed
 ```
 
-Note: the initial NEEDS FIX reset the consecutive counter. After the fix, it took 2 more PASS results (passes 2 and 3) to reach the merge threshold. The `review_cycles` config controls how many fix attempts are allowed — confirmation-only review passes (spawned after a PASS, without a preceding fix) do not consume a fix cycle.
+Note: the `/issue-pr-review --auto` subagent handled the full review-fix-merge cycle internally. It found 2 issues in cycle 1, fixed them, then cycle 2 passed clean — triggering auto-merge via squash.
 
 ### All eligible issues are blocked
 
@@ -1070,10 +988,10 @@ Note: the initial NEEDS FIX reset the consecutive counter. After the fix, it too
 ⚠ PR #45 is not mergeable
 
   Reason: 2 status checks pending (CI / lint)
-  Waiting for checks to complete... (timeout: 300s)
+  Waiting for checks to complete... (timeout: 600s)
 ```
 
-Wait up to `resolve.test_timeout` seconds for CI checks. Poll every 30 seconds:
+Wait up to `review.ci_timeout` seconds for CI checks. Poll every 30 seconds:
 
 ```bash
 gh pr view {pr_number} --json statusCheckRollup --jq '.statusCheckRollup[] | select(.status != "COMPLETED")'
@@ -1096,7 +1014,7 @@ Every `gh` command for data retrieval uses `--json` with explicit field selectio
 - `gh issue list --state open --json number,title,body,labels,assignees --limit 100`
 - `gh issue view N --json number,title,body,labels,assignees,state,comments`
 - `gh pr view N --json mergeable,reviewDecision,statusCheckRollup`
-- `gh pr merge N --merge --delete-branch`
+- `gh pr merge N --squash --delete-branch`
 - `gh pr diff N`
 
 ## Terminal Output
@@ -1104,7 +1022,7 @@ Every `gh` command for data retrieval uses `--json` with explicit field selectio
 Follow DESIGN.md symbol vocabulary and output structure for all output. Key rules:
 
 - Iteration counter: `[Iteration {i}/{max}]` for loop progress
-- Step counter: `[N/8]` for resolve pipeline steps (inherited from issue-resolver)
+- Step counter: `[N/5]` for resolve pipeline steps (inherited from issue-resolver)
 - Symbols: `●` progress, `✓` success, `✗` failure, `◆` section header, `⚡` recommendation, `⚠` warning, `○` info
 - Two-space indent for content under section headers
 - Section separators: `┄` (light dash)
@@ -1131,7 +1049,7 @@ All errors use the rich format from `references/error-messages.md`:
 
 ## Additional Resources
 
-- **`references/subagent-prompts.md`** — Exact prompts for resolver, reviewer, and fixer subagents (read once at skill start)
+- **`references/subagent-prompts.md`** — Exact prompts for resolver, reviewer, analyzer, and batch-resolver subagents (read once at skill start)
 - **`references/error-messages.md`** — Complete error catalog with triggers and exact output
 - **`docs/naming-conventions.md`** — Branch, commit, PR, and issue naming conventions
 - **`DESIGN.md`** — Terminal output style guide (repo root)

@@ -4,7 +4,7 @@ description: Deep analysis of a single GitHub issue — root cause, affected fil
 effort: high
 license: MIT
 metadata:
-  version: 0.3.0
+  version: 0.4.0
   creator: Luong NGUYEN <luongnv89@gmail.com>
 compatibility: Requires git and GitHub CLI (gh) with authentication. View mode (`/issue-analysis N view`) needs only local file access — no gh required.
 ---
@@ -120,7 +120,7 @@ The analysis pipeline delegates heavy work to subagents to keep the main agent's
 Main Agent (orchestrator)
 ├── Step 1: Fetch issue (lightweight — stays in main agent)
 │
-├── Spawn: Explorer subagent (Steps 2-5)
+├── Spawn: Codebase Researcher subagent (Steps 2-5)
 │   Extracts keywords, scans codebase, traces deps, reads git history,
 │   cross-references issues/PRs
 │   Returns: structured findings JSON
@@ -134,8 +134,8 @@ Main Agent (orchestrator)
 └── Main agent: Step 8 (Output) and Persist
 ```
 
-Read `agents/explorer.md` for the full explorer prompt.
-Read `agents/synthesizer.md` for the full synthesizer prompt.
+Read `shared/agents/codebase-researcher.md` for the full explorer prompt.
+Read `shared/agents/synthesizer.md` for the full synthesizer prompt.
 
 ### Environment check
 
@@ -221,7 +221,7 @@ When the Agent tool is available, spawn the explorer subagent to handle Steps 2-
 - Config: max_files, trace_depth, scan_timeout
 - Repo root path (absolute)
 
-The explorer prompt is defined in `agents/explorer.md`. It performs keyword extraction, deep codebase scanning (up to `max_files` files with `trace_depth` levels of import tracing), git history analysis, and cross-reference scanning against other issues and PRs. It returns a structured JSON summary with: extraction results, affected files (with relevance/role), architecture mapping, git history findings, cross-reference insights, and scan stats.
+The explorer prompt is defined in `shared/agents/codebase-researcher.md`. It performs keyword extraction, deep codebase scanning (up to `max_files` files with `trace_depth` levels of import tracing), git history analysis, and cross-reference scanning against other issues and PRs. It returns a structured JSON summary with: extraction results, affected files (with relevance/role), architecture mapping, git history findings, cross-reference insights, and scan stats.
 
 After the explorer returns, display progress lines for Steps 2-5 based on its results:
 
@@ -232,7 +232,7 @@ After the explorer returns, display progress lines for Steps 2-5 based on its re
 [5/8] Cross-refs     ✓ {cross_references.related_issues count} related issues, {insights count} insights
 ```
 
-Store the explorer's output as the **exploration findings** — these are passed to the synthesizer subagent in Steps 6-7. When spawning the synthesizer, construct its input by wrapping the explorer's full JSON output under the `"findings"` key: `{ "issue": <issue data from Step 1>, "findings": <explorer output> }`.
+Store the explorer's output as the **exploration findings** — these are passed to the synthesizer subagent in Steps 6-7. When spawning the synthesizer, construct its input by wrapping the explorer's full JSON output under the `"findings"` key: `{ "issue": <issue data from Step 1>, "findings": <explorer output>, "mode": "interactive" }`.
 
 ### Inline fallback
 
@@ -471,8 +471,9 @@ When the Agent tool is available, spawn the synthesizer subagent to handle Steps
 
 - Issue data: number, title, body, labels, type, state, author, createdAt
 - Exploration findings: the full structured JSON returned by the explorer subagent (or collected inline in Steps 2-5)
+- Mode: `"interactive"` (issue-analysis is always interactive)
 
-The synthesizer prompt is defined in `agents/synthesizer.md`. It produces the root cause / architecture / implementation analysis (Step 6) and proposes 2-3 implementation options with complexity and risk ratings (Step 7). It returns a structured JSON with: analysis text (type-specific), implementation options (with all fields), recommended option, overall complexity, and overall risk.
+The synthesizer prompt is defined in `shared/agents/synthesizer.md`. It produces the root cause / architecture / implementation analysis (Step 6) and proposes 2-3 implementation options with complexity and risk ratings (Step 7). It returns a structured JSON with: analysis text (type-specific), implementation options (with all fields), recommended option, overall complexity, and overall risk.
 
 After the synthesizer returns, display progress lines:
 
@@ -949,13 +950,46 @@ This is a warning, not a fatal error — the terminal output from Step 6 was alr
 
 ## Final Report
 
-After all 8 steps and persistence complete:
+After all 8 steps and persistence complete, print a structured step-by-step summary so the user can see what happened at each stage:
 
 ```
-✓ Done — analysis of issue #N: {title}
+◆ Issue Analysis: #{N} — {title}
+┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+
+  Fetch:             ✓ pass (issue loaded)
+  Extract targets:   ✓ pass ({keywords_count} keywords, {file_refs_count} file refs)
+  Research:          ✓ pass ({files_read} files scanned)
+  Git history:       ✓ pass ({commits_count} related commits)
+  Cross-references:  ✓ pass ({related_count} related issues)
+  Root cause:        ✓ pass
+  Options:           ✓ pass ({options_count} approaches proposed)
+  Report:            ✓ pass
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  Result:            DONE
+
   Complexity: {XS|S|M|L|XL} │ Risk: {Low|Medium|High}
   Recommended: Option {N} — {name}
   Saved: .gitissue/analysis-N.json
+```
+
+If a step produced no results (e.g., no git history found), mark it with a note:
+
+```
+  Git history:       ○ skip (no related commits found)
+```
+
+If the issue may already be resolved:
+
+```
+◆ Issue Analysis: #{N} — {title}
+┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+
+  Fetch:             ✓ pass
+  Extract targets:   ✓ pass
+  Research:          ⚡ may already be fixed by {sha7}
+  ...
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  Result:            DONE (verify if already resolved)
 ```
 
 ---
@@ -1179,8 +1213,8 @@ All errors use the rich format from `references/error-messages.md`:
 
 ## Additional Resources
 
-- **`agents/explorer.md`** — Explorer subagent prompt (Steps 2-5 delegation)
-- **`agents/synthesizer.md`** — Synthesizer subagent prompt (Steps 6-7 delegation)
+- **`shared/agents/codebase-researcher.md`** — Codebase Researcher subagent prompt (Steps 2-5 delegation)
+- **`shared/agents/synthesizer.md`** — Synthesizer subagent prompt (Steps 6-7 delegation)
 - **`references/error-messages.md`** — Complete error catalog with triggers and exact output
 - **`DESIGN.md`** — Terminal output style guide (repo root)
 - **`docs/config-schema.md`** — Full configuration schema
