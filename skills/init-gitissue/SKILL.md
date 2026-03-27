@@ -279,32 +279,36 @@ If existing issue templates were detected in `.github/ISSUE_TEMPLATE/`, add a co
 
 ## Step 4 — Report
 
-Print the full scan results and confirmation:
+Print a structured step-by-step summary showing what was detected and configured:
 
 ```
-  ● Scanning repository...
-    Language:    {language} (detected from {file})
-    Framework:   {framework}
-    Test runner: {test_runner}
-    Templates:   {template_status}
-    Repo size:   {size} ({count} files)
+◆ Init Gitissue — setup complete
+┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
 
-  ◆ Configuration
-  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-    Generated .gitissue.yml with project-specific defaults
+  Git repo:          ✓ pass
+  Language:          ✓ {language} (from {file})
+  Framework:         ✓ {framework}
+  Test runner:       ✓ {test_runner}
+  Templates:         ✓ {template_status}
+  Repo size:         ✓ {size} ({count} files)
+  Config:            ✓ generated .gitissue.yml
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  Result:            DONE
 
-  ✓ Setup complete
-    Config: .gitissue.yml
-    Run /issue-creator to create your first issue
+  Config: .gitissue.yml
+  Next action: /issue-creator to create your first issue
 ```
 
 ### Variations
 
-**No framework detected** — omit the `Framework:` line entirely.
+**No framework detected** — show:
+```
+  Framework:         ○ skip (not detected)
+```
 
 **No language detected** — show:
 ```
-    Language:    unknown
+  Language:          ⚠ warn (unknown — using generic defaults)
 ```
 And earlier in the flow, print:
 ```
@@ -314,7 +318,7 @@ And earlier in the flow, print:
 
 **No test runner detected** — show:
 ```
-    Test runner: none
+  Test runner:       ⚠ warn (none — auto_test disabled)
 ```
 And earlier in the flow, print:
 ```
@@ -324,27 +328,22 @@ And earlier in the flow, print:
 
 **No issue templates** — show:
 ```
-    Templates:   none found
+  Templates:         ○ skip (none found)
 ```
 
 **Existing issue templates** — show:
 ```
-    Templates:   .github/ISSUE_TEMPLATE/ found ({N} templates)
+  Templates:         ✓ .github/ISSUE_TEMPLATE/ ({N} templates)
 ```
 
-**Merge mode** — change the Configuration section to:
+**Merge mode** — change Config line and result:
 ```
-  ◆ Configuration
-  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-    Merged new fields into existing .gitissue.yml
-    {N} new fields added, {M} existing values preserved
+  Config:            ✓ merged into existing .gitissue.yml ({N} new, {M} preserved)
 ```
 
-**Overwrite mode** — change the Configuration section to:
+**Overwrite mode** — change Config line:
 ```
-  ◆ Configuration
-  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-    Replaced .gitissue.yml with new auto-detected config
+  Config:            ✓ replaced .gitissue.yml with new config
 ```
 
 ---

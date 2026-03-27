@@ -696,28 +696,44 @@ The loop stops when any of these conditions are met:
 
 ## Final Summary
 
-When the loop ends (for any reason), print a comprehensive summary:
+When the loop ends (for any reason), print a structured step-by-step summary showing each iteration's outcome:
 
 ```
-◆ Auto-Pilot Summary
-┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  Status:      {completed / paused / limit reached}
-  Iterations:  {completed}/{max}
-  Duration:    {total_time}
+◆ Auto-Pilot Summary — {completed}/{max} iterations
+┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
 
-  Resolved:
-  ✓ #{n1} — {title1}  →  PR #{pr1} merged
-  ✓ #{n2} — {title2}  →  PR #{pr2} merged
+  Iteration 1:       ✓ pass — #{n1} {title1} → PR #{pr1} merged
+  Iteration 2:       ✓ pass — #{n2} {title2} → PR #{pr2} merged
+  Iteration 3:       ✗ fail — #{n5} {title5} (test failure at Verify)
+  Iteration 4:       ○ skip — #{n3} {title3} (blocked)
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  Resolved:          {resolved_count}
+  Skipped:           {skipped_count}
+  Failed:            {failed_count}
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  Result:            {COMPLETED / PAUSED / LIMIT REACHED}
 
-  Skipped:
-  ○ #{n3} — {title3}  (blocked)
-  ○ #{n4} — {title4}  (assigned to @user)
+  Remaining:         {remaining_count} open issues
+  Next action:       /auto-pilot to continue
+```
 
-  Failed:
-  ✗ #{n5} — {title5}  (test failure at Verify)
+If batch analysis was used (explicit issue list):
+```
+◆ Auto-Pilot Summary — {completed}/{max} iterations (batch mode)
+┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
 
-  Remaining:   {remaining_count} open issues
-  Next action: /auto-pilot to continue
+  Analysis:          ✓ pass ({N} issues, {batches} batch groups)
+  Iteration 1:       ✓ pass — #{n1} {title1} → PR #{pr1} merged
+  Iteration 2:       ✓ pass — #{n2} {title2} → PR #{pr2} merged
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  Resolved:          {resolved_count}
+  Skipped:           {skipped_count}
+  Failed:            {failed_count}
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  Result:            {COMPLETED / PAUSED / LIMIT REACHED}
+
+  Remaining:         {remaining_count} open issues
+  Next action:       /auto-pilot to continue
 ```
 
 ---

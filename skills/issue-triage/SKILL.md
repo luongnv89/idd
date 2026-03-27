@@ -627,6 +627,49 @@ This is a warning, not a fatal error — the terminal output from Step 8 was alr
 
 ---
 
+## Final Report
+
+After the triage table (Step 8) and persist (Step 9) are both complete, print a structured step-by-step summary at the end:
+
+```
+◆ Issue Triage — {N} issues analyzed
+┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+
+  Fetch issues:      ✓ pass ({N} open issues)
+  Already-fixed:     ✓ pass ({fixed_count} potentially fixed)
+  Dependencies:      ✓ pass ({dep_count} dependencies found)
+  Circular deps:     ✓ pass (none detected)
+  Execution order:   ✓ pass (topological sort)
+  Parallelizable:    ✓ pass ({group_count} parallel groups)
+  Stale detection:   ✓ pass ({stale_count} stale issues)
+  Priority:          ✓ pass ({p1} P1, {p2} P2, {p3} P3)
+  Persist:           ✓ pass (saved to .gitissue/triage.json)
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  Result:            DONE
+
+  Suggested start:   #{first} — {title}
+  Next action:       /issue-resolver {first}
+```
+
+For cached view mode (no update run):
+
+```
+◆ Issue Triage — cached
+┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+
+  Cache load:        ✓ pass (age: {Nd Nh})
+  Issues:            {N} analyzed
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  Result:            CACHED
+
+  Suggested start:   #{first} — {title}
+  Next action:       /issue-resolver {first}
+```
+
+Omit lines where a step found nothing (e.g., omit `Already-fixed` if count is 0, omit `Circular deps` if none checked).
+
+---
+
 ## Example: First run (no cache exists)
 
 **User says:** `/issue-triage` (no previous triage run)

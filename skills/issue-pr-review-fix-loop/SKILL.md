@@ -291,39 +291,42 @@ If `cycle >= max_cycles` and issues remain, exit with remaining issues.
 
 ## Summary Report
 
+Print a structured step-by-step summary showing the review-fix loop results.
+
 ### Clean PR
 
 ```
-◆ Review-Fix Loop Complete
-┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+◆ Review-Fix Loop: #{pr_number} (cycle {cycles_used}/{max_cycles} — clean)
+┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
 
-  PR:           #{pr_number}: {title}
-  URL:          {pr_url}
-  Status:       ✓ Clean
-  Cycles:       {cycles_used}/{max_cycles}
-  Total fixed:  {total_fixed}
+  Cycle 1 review:    ✓ pass ({N} issues found)
+  Cycle 1 fix:       ✓ pass ({N} issues fixed)
+  Cycle 2 review:    ✓ pass (clean)
+  Total fixed:       ✓ {total_fixed}
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  Result:            PASS ({cycles_used} cycles)
 
-  Cycle history:
-    Cycle 1: {N} issues ({categories}) — fixed
-    Cycle 2: ✓ PASS
+  {pr_url}
 ```
 
 ### PR with remaining issues
 
 ```
-◆ Review-Fix Loop Complete
-┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+◆ Review-Fix Loop: #{pr_number} (cycle {max_cycles}/{max_cycles} — issues remain)
+┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
 
-  PR:           #{pr_number}: {title}
-  URL:          {pr_url}
-  Status:       ⚠ {N} issues remain after {max_cycles} cycles
-  Cycles:       {max_cycles}/{max_cycles}
-  Total fixed:  {total_fixed}
+  Cycle 1 review:    ✓ pass ({N1} issues found)
+  Cycle 1 fix:       ✓ pass ({N1} fixed)
+  Cycle 2 review:    ✓ pass ({N2} issues found)
+  Cycle 2 fix:       ⚠ warn ({remaining} remain)
+  Total fixed:       ✓ {total_fixed}
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  Result:            WARN (manual review recommended)
 
-  Remaining issues:
+  Remaining:
     ● [{category}] {description} ({file}:{line})
 
-  These may need manual attention.
+  {pr_url}
 ```
 
 ### Auto-merge (auto mode only)
@@ -334,9 +337,13 @@ If the PR is clean AND `--auto` flag is set:
 gh pr merge {pr_number} --squash --delete-branch
 ```
 
+Append to the report:
 ```
-✓ PR #{pr_number} merged via squash
-  Branch {head_branch} deleted
+  Merge:             ✓ pass (squash merged)
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  Result:            MERGED
+
+  ✓ PR #{pr_number} merged — branch {head_branch} deleted
 ```
 
 If merge fails:

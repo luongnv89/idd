@@ -286,45 +286,41 @@ After Step 5, go back to Step 2 with a fresh reviewer agent.
 
 ## Step 6 — Summary Report
 
+Print a structured step-by-step summary showing the review pipeline results.
+
 ### Clean PR
 
 ```
-◆ PR Review Complete
-┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+◆ PR Review: #{pr_number} (pass {N} — clean)
+┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
 
-  PR:          #{pr_number}: {title}
-  URL:         {pr_url}
-  Status:      ✓ Clean
-  Cycles:      {N}
-  Issues fixed: {total_fixed}
+  Code review:       ✓ pass
+  Tests:             ✓ pass ({count} passed)
+  CI status:         ✓ pass ({checks_count} checks passed)
+  Issues fixed:      ✓ {total_fixed} total across {cycles} cycles
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  Result:            PASS
 
-  Review:      PASS
-  Tests:       {count} passed
-  CI:          all checks passed
-
-  Cycle history:
-    Cycle 1: {N} issues (categories)
-    Cycle 2: {N} issues (categories)
-    Cycle 3: ✓ PASS
+  {pr_url}
 ```
 
 ### PR with remaining issues
 
 ```
-◆ PR Review Complete
-┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+◆ PR Review: #{pr_number} (pass {max} — issues remain)
+┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
 
-  PR:          #{pr_number}: {title}
-  URL:         {pr_url}
-  Status:      ⚠ {N} issues remain after {max} cycles
-  Cycles:      {max}
-  Issues fixed: {total_fixed}
+  Code review:       ⚠ warn ({N} issues remain)
+  Tests:             ✓ pass
+  CI status:         ✓ pass
+  Issues fixed:      ✓ {total_fixed} total across {max} cycles
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  Result:            WARN (manual review recommended)
 
-  Remaining issues:
+  Remaining:
     ● [category] description (file:line)
-    ● [category] description (file:line)
 
-  These may need manual attention.
+  {pr_url}
 ```
 
 ### Auto-merge (auto mode only)
@@ -335,16 +331,20 @@ If the PR is clean AND `--auto` flag is set:
 gh pr merge {N} --squash --delete-branch
 ```
 
+Append to the report:
 ```
-✓ PR #{N} merged via squash
-  Branch {branch_name} deleted
+  Merge:             ✓ pass (squash merged)
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  Result:            MERGED
+
+  ✓ PR #{N} merged — branch {branch_name} deleted
 ```
 
-If merge fails (conflicts, branch protection):
+If merge fails:
 ```
-⚠ Auto-merge failed: {reason}
-
-  Manual merge required.
+  Merge:             ✗ fail ({reason})
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  Result:            BLOCKED (manual merge required)
 ```
 
 In interactive mode: never auto-merge. Just report status.

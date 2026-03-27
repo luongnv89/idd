@@ -484,15 +484,60 @@ After delivery:
 
 ## Final Report
 
+After the pipeline completes, print a structured step-by-step summary showing what happened at each stage. This gives the user a quick visual scan of the entire resolution.
+
+### Successful resolution
+
 ```
-✓ Done — PR #{pr_number}: {pr_title}
+◆ Issue #{issue_number} — resolved
+┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+
+  Preflight:       ✓ pass
+  Research:        ✓ pass ({files_read} files analyzed, {complexity})
+  Plan:            ✓ pass ({option_name}, {risk_rating} risk)
+  Implement:       ✓ pass ({files_changed} files, {tests_written} tests)
+  QA:              ✓ pass ({cycles} cycles, {issues_found} issues fixed)
+  Deliver:         ✓ pass (PR #{pr_number} created)
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  Result:          DONE
+
+  PR #{pr_number}: {pr_title}
   https://github.com/owner/repo/pull/{pr_number}
   Closes #{issue_number}
+```
 
-  Research:    {complexity}, {files_read} files analyzed
-  Plan:        {option_name} ({complexity_rating}, {risk_rating} risk)
-  Implement:   {files_changed} files, {tests_written} tests
-  QA:          {cycles} cycles, {issues_found} issues fixed
+### Resolution with issues
+
+If any step had problems (e.g., QA found unfixable issues, tests still failing):
+
+```
+◆ Issue #{issue_number} — resolved with warnings
+┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+
+  Preflight:       ✓ pass
+  Research:        ✓ pass ({files_read} files analyzed)
+  Plan:            ✓ pass ({option_name})
+  Implement:       ✓ pass ({files_changed} files)
+  QA:              ⚠ warn ({remaining} issues remain after {cycles} cycles)
+  Deliver:         ✓ pass (PR #{pr_number} created)
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  Result:          DONE (manual review recommended)
+
+  PR #{pr_number}: {pr_title}
+  https://github.com/owner/repo/pull/{pr_number}
+  Closes #{issue_number}
+```
+
+### Already resolved
+
+```
+◆ Issue #{issue_number} — already resolved
+┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+
+  Preflight:       ✓ pass
+  Research:        ○ skipped (already fixed by {sha7})
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  Result:          SKIPPED — issue closed
 ```
 
 ---

@@ -950,13 +950,46 @@ This is a warning, not a fatal error — the terminal output from Step 6 was alr
 
 ## Final Report
 
-After all 8 steps and persistence complete:
+After all 8 steps and persistence complete, print a structured step-by-step summary so the user can see what happened at each stage:
 
 ```
-✓ Done — analysis of issue #N: {title}
+◆ Issue Analysis: #{N} — {title}
+┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+
+  Fetch:             ✓ pass (issue loaded)
+  Extract targets:   ✓ pass ({keywords_count} keywords, {file_refs_count} file refs)
+  Research:          ✓ pass ({files_read} files scanned)
+  Git history:       ✓ pass ({commits_count} related commits)
+  Cross-references:  ✓ pass ({related_count} related issues)
+  Root cause:        ✓ pass
+  Options:           ✓ pass ({options_count} approaches proposed)
+  Report:            ✓ pass
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  Result:            DONE
+
   Complexity: {XS|S|M|L|XL} │ Risk: {Low|Medium|High}
   Recommended: Option {N} — {name}
   Saved: .gitissue/analysis-N.json
+```
+
+If a step produced no results (e.g., no git history found), mark it with a note:
+
+```
+  Git history:       ○ skip (no related commits found)
+```
+
+If the issue may already be resolved:
+
+```
+◆ Issue Analysis: #{N} — {title}
+┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+
+  Fetch:             ✓ pass
+  Extract targets:   ✓ pass
+  Research:          ⚡ may already be fixed by {sha7}
+  ...
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  Result:            DONE (verify if already resolved)
 ```
 
 ---
