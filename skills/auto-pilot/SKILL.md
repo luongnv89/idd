@@ -126,11 +126,10 @@ Main Agent (orchestrator)
   │
   └── Subagent: PR Reviewer (via /issue-pr-review --auto)
         Runs the full review pipeline: code review, tests, CI, fix, repeat (max 5 cycles)
-        Auto-merges when clean
-        Returns: MERGED/PASS/NEEDS_FIX, review_cycles, issues_found, issues_fixed
+        Returns: PASS/NEEDS_FIX, review_cycles, issues_found, issues_fixed
 ```
 
-The PR review subagent runs `/issue-pr-review --auto`, which handles the full review-fix-merge cycle internally — including spawning fresh reviewer agents each cycle and auto-merging when clean.
+The PR review subagent runs `/issue-pr-review --auto`, which handles the full review-fix cycle internally — spawning fresh reviewer agents each cycle. Merging is always the main agent's responsibility (Phase 5).
 
 ### Why Subagents Matter
 
@@ -591,7 +590,7 @@ After the PR is created, the auto-pilot delegates review, testing, CI checking, 
 3. Checks CI status (polls GitHub Actions until complete)
 4. Fixes any detected issues
 5. Repeats steps 1-4 up to 5 cycles
-6. Auto-merges via squash when clean
+6. Repeats until clean or cycles exhausted
 
 See `skills/issue-pr-review/SKILL.md` for the full pipeline.
 
@@ -602,27 +601,19 @@ See `skills/issue-pr-review/SKILL.md` for the full pipeline.
   ⟶ Spawning PR review subagent...
 ```
 
-Use the **PR Reviewer Subagent** prompt from `references/subagent-prompts.md`, substituting `{pr_number}`. The subagent runs the full `/issue-pr-review --auto` pipeline: review, test, CI check, fix, repeat, merge.
+Use the **PR Reviewer Subagent** prompt from `references/subagent-prompts.md`, substituting `{pr_number}`. The subagent runs the full `/issue-pr-review --auto` pipeline: review, test, CI check, fix, repeat. It does NOT merge — merging is the main agent's job in Phase 5.
 
 ### Step 3.2 — Process Review Result
 
 Parse the subagent's response:
 
-**On MERGED:**
+**On PASS:**
 ```
-  ✓ PR #{pr_number} reviewed and merged
+  ✓ PR #{pr_number} review passed
     Review cycles: {review_cycles}
     Issues found/fixed: {issues_found}/{issues_fixed}
-    CI: {ci_status}
 ```
-Proceed to Phase 5 (Cleanup).
-
-**On PASS (not merged — e.g., merge blocked by branch protection):**
-```
-  ✓ PR #{pr_number} review passed — merge pending
-    Issues found/fixed: {issues_found}/{issues_fixed}
-```
-Proceed to Phase 5 (manual merge attempt).
+Proceed to Phase 5 (Merge).
 
 **On NEEDS_FIX (review cycles exhausted with remaining issues):**
 ```
@@ -645,10 +636,6 @@ If `autopilot.pause_on_failure` is explicitly `true`:
 ---
 
 ## Phase 5 — Merge
-
-### Already merged?
-
-If the PR review subagent returned **MERGED** (Step 3.2), the PR is already merged. Skip Steps 5.1 and 5.2 — go directly to Step 5.3 (Cleanup).
 
 ### Step 5.1 — Pre-merge Checks
 
