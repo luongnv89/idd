@@ -40,23 +40,20 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 
 ## Pre-flight
 
-### Dirty working tree
+### Dirty working tree (auto-resolved)
 ```
-✗ Working tree has uncommitted changes
-
-  To fix:  git stash or git commit
-  The auto-pilot needs a clean working tree to create branches.
+⚠ Working tree had uncommitted changes — auto-stashed
+  Stash ref: {stash_ref}
 ```
 **Trigger:** `git status --porcelain` returns non-empty output.
+**Action:** Auto-stash with `git stash --include-untracked -m "auto-pilot: stash before run"`. Non-fatal — auto-pilot continues.
 
-### Not on default branch
+### Not on default branch (auto-resolved)
 ```
-⚠ Currently on branch {branch}, not the default branch.
-
-  Auto-pilot works best from the default branch.
-  Switch to {default_branch}? [Y/n]
+⚠ Was on branch {branch} — auto-switched to {default_branch}
 ```
 **Trigger:** `git rev-parse --abbrev-ref HEAD` returns a branch that is not `main` or `master`.
+**Action:** Auto-switch with `git checkout {default_branch} && git pull --rebase origin {default_branch}`. Non-fatal — auto-pilot continues.
 
 ## Explicit List Mode
 
@@ -149,31 +146,40 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 
 ## Resolve
 
-### Resolve failure (pause mode)
+### Resolve failure (autonomous default)
 ```
-⚠ Auto-pilot paused due to failure.
+⚠ Skipping #{issue_number} — will retry on next run.
+  Continuing to next issue...
+```
+**Trigger:** Issue resolver fails at any step. Default behavior: log failure, skip issue, continue loop.
+
+### Resolve failure (pause mode — opt-in)
+```
+⚠ Auto-pilot paused due to failure (pause_on_failure: true).
 
   Failed on:  #{issue_number} — {title}
   Step:       {step_name}
   To resume:  fix the issue, then /auto-pilot
   To skip:    /auto-pilot --skip {issue_number}
 ```
-**Trigger:** Issue resolver fails at any step and `autopilot.pause_on_failure` is true.
+**Trigger:** Issue resolver fails and `autopilot.pause_on_failure` is explicitly set to `true` in config.
 
-### Resolve failure (continue mode)
+### Sync conflict (auto-resolved)
 ```
-⚠ Skipping #{issue_number} — will retry on next run.
+⚠ Sync conflict — auto-reset to origin/{default_branch}
+  Any local-only changes were discarded (all work is already pushed to PRs).
 ```
-**Trigger:** Issue resolver fails and `autopilot.pause_on_failure` is false.
+**Trigger:** `git pull --rebase origin {default_branch}` fails with merge conflicts.
+**Action:** Auto-recover with `git rebase --abort && git reset --hard origin/{default_branch}`. Non-fatal — auto-pilot continues.
 
-### Sync failure
+### Sync failure (unrecoverable)
 ```
-✗ Failed to sync with {default_branch}
+✗ Failed to sync with {default_branch} — cannot recover automatically
 
   To fix:  resolve conflicts manually: git rebase --continue
   Then:    /auto-pilot to resume
 ```
-**Trigger:** `git pull --rebase origin {default_branch}` fails with merge conflicts.
+**Trigger:** Both rebase and hard reset fail. Fatal — auto-pilot stops.
 
 ## Review
 
@@ -192,23 +198,23 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 
 ## Merge
 
-### PR not mergeable
+### PR not mergeable (auto-skip)
 ```
 ⚠ PR #{pr_number} is not mergeable
 
   Reason: {conflict / failing checks / review requested}
-  To fix:  resolve the blocker, then /auto-pilot to resume
+  PR left open — continuing to next issue.
 ```
 **Trigger:** `gh pr view` shows `mergeable` is false or `reviewDecision` is `CHANGES_REQUESTED`.
+**Action:** Leave PR open, continue to next issue. Non-fatal.
 
-### Merge failed
+### Merge failed (auto-skip)
 ```
-✗ Failed to merge PR #{pr_number}
-
-  To fix:  check merge status: gh pr view {pr_number} --json mergeable
-  Check:   does the repo require approvals? gh repo view --json mergeCommitAllowed
+⚠ Merge failed for PR #{pr_number} — PR left open
+  Continuing to next issue...
 ```
 **Trigger:** `gh pr merge` returns non-zero exit code.
+**Action:** Leave PR open, continue to next issue. Non-fatal.
 
 ### CI checks timeout
 ```
