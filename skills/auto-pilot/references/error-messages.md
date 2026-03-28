@@ -158,7 +158,7 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 ⚠ Auto-pilot paused due to failure (pause_on_failure: true).
 
   Failed on:  #{issue_number} — {title}
-  Step:       {step_name}
+  Step:       {failure_step}
   To resume:  fix the issue, then /auto-pilot
   To skip:    /auto-pilot --skip {issue_number}
 ```

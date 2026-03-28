@@ -543,6 +543,16 @@ Parse the subagent's response. Extract: `status`, `branch_name`, `pr_number`, `p
 
 Proceed to Phase 3 (Review).
 
+**On already_resolved:**
+
+The resolver subagent may report that the issue is already fixed (status: `already_resolved`). In this case, skip the review/fix/merge phases entirely and move on.
+
+```
+○ #{issue_number} already resolved — skipping
+```
+
+Continue to the next iteration.
+
 **On failure:**
 
 ```
@@ -726,7 +736,7 @@ The loop stops when any of these conditions are met:
 | No eligible issues (all blocked/skipped) | `⚠ No eligible issues to pick` |
 | Resolution failure (pause_on_failure: true) | `⚠ Auto-pilot paused` |
 | Review cycles exhausted (pause_on_failure: true) | `⚠ Auto-pilot paused` |
-| Merge blocked (PR left open, loop continues) | `⚠ PR not mergeable — continuing to next issue` |
+| Merge blocked (PR left open, loop continues) | `⚠ PR #{pr_number} is not mergeable` / `PR left open — continuing to next issue.` |
 | User cancellation | `○ Auto-pilot stopped by user` |
 
 ---
@@ -880,8 +890,8 @@ If batch analysis was used (explicit issue list):
   2. #5  — Fix login crash on mobile (medium, batched with #8)
   3. #8  — Add dark mode toggle (low, batched with #5)
 
-◆ Auto-Pilot Plan (explicit list — autonomous)
-┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+◆ Auto-Pilot Plan (explicit list)
+┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Issues to process:  3 (of 3 provided)
   Review cycles:      5
   Auto-merge:         {yes/no}
