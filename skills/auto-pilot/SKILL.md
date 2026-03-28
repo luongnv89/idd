@@ -673,7 +673,14 @@ If not mergeable:
 
 ### Step 5.2 — Merge
 
-Merge the PR automatically:
+First, check `autopilot.auto_merge`. If it is explicitly set to `false`, skip the merge entirely and continue to the next issue:
+```
+○ PR #{pr_number} ready for manual merge (auto_merge: false)
+  https://github.com/owner/repo/pull/{pr_number}
+  Continuing to next issue...
+```
+
+If `autopilot.auto_merge` is `true` (the default), merge the PR:
 
 ```bash
 gh pr merge {pr_number} --squash --delete-branch
@@ -687,13 +694,6 @@ gh pr merge {pr_number} --squash --delete-branch
 If merge fails (branch protection, required approvals, etc.), leave the PR open and continue:
 ```
 ⚠ Merge failed for PR #{pr_number} — PR left open
-  Continuing to next issue...
-```
-
-If `autopilot.auto_merge` is explicitly set to `false`, leave the PR open without attempting merge and continue to the next issue (don't stop the loop):
-```
-○ PR #{pr_number} ready for manual merge (auto_merge: false)
-  https://github.com/owner/repo/pull/{pr_number}
   Continuing to next issue...
 ```
 
