@@ -4,11 +4,11 @@
 
 ## Highlights
 
-- **Zero-confirmation autonomy** --- makes all non-critical decisions automatically, only asks for genuinely irreversible actions
-- **Smart batching** --- analyzes related issues and batch-resolves them in a single PR to save iterations
-- **Self-healing** --- auto-stashes dirty trees, auto-switches branches, auto-recovers from sync conflicts
-- **Subagent architecture** --- fresh context per issue keeps quality high across long runs
-- **Graceful degradation** --- skips failed issues and continues rather than blocking the entire loop
+- **Zero-confirmation autonomy** — makes all non-critical decisions automatically, only asks for genuinely irreversible actions
+- **Smart batching** — analyzes related issues and batch-resolves them in a single PR to save iterations
+- **Self-healing** — auto-stashes dirty trees, auto-switches branches, auto-recovers from sync conflicts
+- **Subagent architecture** — fresh context per issue keeps quality high across long runs
+- **Graceful degradation** — skips failed issues and continues rather than blocking the entire loop
 
 ## When to Use
 
@@ -47,8 +47,8 @@ graph TD
 
 The auto-pilot classifies decisions into two categories:
 
-- **Auto-decide** (99%) --- branch switching, strategy selection, failure recovery, merging
-- **Confirm with user** (rare) --- force-push to shared branches, deleting remote resources, production deployments
+- **Auto-decide** (99%) — branch switching, strategy selection, failure recovery, merging
+- **Confirm with user** (rare) — force-push to shared branches, deleting remote resources, production deployments
 
 When something fails, the auto-pilot skips and continues rather than stopping. All work is pushed to remote PRs, so nothing is lost.
 

@@ -13,6 +13,12 @@ compatibility: Requires git and GitHub CLI (gh) with authentication and push acc
 
 Fully autonomous development loop: triage, pick, resolve, review, fix, merge, repeat — zero user prompts.
 
+### Breaking changes in 1.0.0
+
+- The loop no longer pauses on failure by default — failed issues are skipped and the loop continues (`pause_on_failure` defaults to `false`)
+- `auto_merge: false` no longer halts the loop — PRs that pass review are left open and the loop moves to the next issue
+- All confirmation prompts removed — the loop runs with full autonomy from start to finish
+
 The auto-pilot orchestrates existing gitissue skills into a continuous loop that processes the issue backlog with absolute autonomy. Each iteration: triage the backlog, pick the top-priority issue, resolve it via the full pipeline, review the PR and fix detected issues (up to 5 cycles), merge the PR, then loop back. The agent makes all non-critical decisions automatically, always choosing the best available path forward. User confirmation is only requested for genuinely irreversible actions that affect shared/production systems.
 
 ## Autonomy Philosophy
@@ -290,7 +296,7 @@ Compute `saved_iterations` as: sum of `(batch.issues.length - 1)` across all bat
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Issues to process:  {valid_count} (of {original_count} provided)
   Review cycles:      {review_cycles}
-  Auto-merge:         yes
+  Auto-merge:         {yes/no}
   Mode:               explicit list (analyzed + optimized)
   Batches:            {batch_count} (saving ~{saved_iterations} iterations)
 
@@ -460,7 +466,7 @@ On the first iteration, display the execution plan and immediately begin — no 
   Issues to process:  {eligible_count} (of {total_open} open)
   Limit:              {max_iterations}
   Review cycles:      {review_cycles}
-  Auto-merge:         yes
+  Auto-merge:         {yes/no}
   First issue:        #{number} — {title}
 
   Execution order:
@@ -503,7 +509,7 @@ git reset --hard origin/{default_branch}
   Any local-only changes were discarded (all work is already pushed to PRs).
 ```
 
-This is safe because the auto-pilot always pushes work to remote PRs before cleanup. If the hard reset also fails (unlikely), then stop:
+This is safe because the auto-pilot always pushes work to remote PRs before cleanup. Note: `git stash` entries created during pre-flight (with the user's uncommitted work) are stored in the reflog and survive `git reset --hard` — the user's stashed work is preserved. If the hard reset also fails (unlikely), then stop:
 ```
 ✗ Failed to sync with {default_branch} — cannot recover automatically
 
@@ -621,11 +627,10 @@ Proceed to Phase 5 (manual merge attempt).
   Continuing to next issue...
 ```
 
-**Autonomous behavior:** Leave the PR open for later manual review and continue to the next issue. The PR is already created and pushed — nothing is lost.
+**Autonomous behavior (default):** Leave the PR open for later manual review and continue to the next issue. The PR is already created and pushed — nothing is lost.
 
 If `autopilot.pause_on_failure` is explicitly `true`:
-- stop the loop
-- **false** — skip this issue and continue to next iteration
+- stop the loop and print the remaining issues for manual inspection
 
 ---
 
@@ -783,7 +788,7 @@ If batch analysis was used (explicit issue list):
   Issues to process:  5 (of 8 open)
   Limit:              3
   Review cycles:      5
-  Auto-merge:         yes
+  Auto-merge:         {yes/no}
   First issue:        #12 — Fix auth redirect loop
 
   Execution order:
@@ -879,7 +884,7 @@ If batch analysis was used (explicit issue list):
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Issues to process:  3 (of 3 provided)
   Review cycles:      5
-  Auto-merge:         yes
+  Auto-merge:         {yes/no}
   Mode:               explicit list (analyzed + optimized)
   Batches:            1 (saving ~1 iterations)
 
@@ -967,7 +972,7 @@ If batch analysis was used (explicit issue list):
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Issues to process:  1 (of 3 provided)
   Review cycles:      5
-  Auto-merge:         yes
+  Auto-merge:         {yes/no}
   Mode:               explicit list (analyzed + optimized)
 
   Optimized execution order:
