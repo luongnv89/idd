@@ -188,13 +188,15 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 ⚠ Review issues remain after {review_cycles} review-fix cycles
 
   Remaining issues:
-    1. {issue_description_1}
-    2. {issue_description_2}
+    ● {issue_description_1}
+    ● {issue_description_2}
 
-  Auto-merge skipped — PR needs manual review.
+  Auto-merge skipped — PR left open for manual review.
   PR: https://github.com/owner/repo/pull/{pr_number}
+  Continuing to next issue...
 ```
 **Trigger:** All review-fix cycles are exhausted and the review still finds issues.
+**Action:** Leave PR open, continue to next issue. Non-fatal.
 
 ## Merge
 

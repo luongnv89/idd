@@ -18,6 +18,7 @@
 | "/auto-pilot --issues 5,10,12" | Analyze those issues for dependencies and batching, then resolve in optimal order |
 | "/auto-pilot --limit 3" | Process at most 3 issues then stop |
 | "/auto-pilot --dry-run" | Show the execution plan without resolving anything |
+| "/auto-pilot --skip 7" | Skip issue #7 (exclude from processing) |
 
 ## How It Works
 
@@ -48,7 +49,7 @@ graph TD
 The auto-pilot classifies decisions into two categories:
 
 - **Auto-decide** (99%) — branch switching, strategy selection, failure recovery, merging
-- **Confirm with user** (rare) — force-push to shared branches, deleting remote resources, production deployments
+- **Confirm with user** (rare) — force-push to shared branches, deleting remote resources, production deployments, package publishing, modifying repository settings or branch protection rules
 
 When something fails, the auto-pilot skips and continues rather than stopping. All work is pushed to remote PRs, so nothing is lost.
 

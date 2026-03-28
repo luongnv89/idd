@@ -509,7 +509,7 @@ git reset --hard origin/{default_branch}
   Any local-only changes were discarded (all work is already pushed to PRs).
 ```
 
-This is safe because the auto-pilot always pushes work to remote PRs before cleanup. Note: `git stash` entries created during pre-flight (with the user's uncommitted work) are stored in the reflog and survive `git reset --hard` — the user's stashed work is preserved. If the hard reset also fails (unlikely), then stop:
+This is safe because the auto-pilot always pushes work to remote PRs before cleanup. Note: `git stash` entries created during pre-flight (with the user's uncommitted work) are stored under their own ref (`refs/stash`) and survive `git reset --hard` — the user's stashed work is preserved (`git stash list` will still show them). If the hard reset also fails (unlikely), then stop:
 ```
 ✗ Failed to sync with {default_branch} — cannot recover automatically
 
@@ -726,7 +726,7 @@ The loop stops when any of these conditions are met:
 | No eligible issues (all blocked/skipped) | `⚠ No eligible issues to pick` |
 | Resolution failure (pause_on_failure: true) | `⚠ Auto-pilot paused` |
 | Review cycles exhausted (pause_on_failure: true) | `⚠ Auto-pilot paused` |
-| Merge blocked | `⚠ PR not mergeable` |
+| Merge blocked (PR left open, loop continues) | `⚠ PR not mergeable — continuing to next issue` |
 | User cancellation | `○ Auto-pilot stopped by user` |
 
 ---
