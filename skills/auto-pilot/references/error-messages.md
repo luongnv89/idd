@@ -153,6 +153,13 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 ```
 **Trigger:** Issue resolver fails at any step. Default behavior: log failure, skip issue, continue loop.
 
+### Issue already resolved
+```
+○ #{issue_number} already resolved — skipping
+```
+**Trigger:** Resolver subagent returns `already_resolved` status.
+**Action:** Skip review/fix/merge phases, continue to next iteration.
+
 ### Resolve failure (pause mode — opt-in)
 ```
 ⚠ Auto-pilot paused due to failure (pause_on_failure: true).
@@ -220,25 +227,19 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 
 ### CI checks timeout
 ```
-✗ CI checks did not complete within {timeout}s
-
-  PR: https://github.com/owner/repo/pull/{pr_number}
-  To fix:  wait for CI to finish, then /auto-pilot to resume
+⚠ CI checks did not complete within {timeout}s — PR left open
+  Continuing to next issue...
 ```
 **Trigger:** Status checks remain pending after `review.ci_timeout` seconds of polling.
+**Action:** Leave PR open, continue to next issue. Non-fatal.
 
 ### CI checks failed
 ```
-✗ CI checks failed for PR #{pr_number}
-
-  Failed checks:
-    ✗ {check_name_1}: {conclusion}
-    ✗ {check_name_2}: {conclusion}
-
-  PR: https://github.com/owner/repo/pull/{pr_number}
-  To fix:  review check logs and fix: gh pr checks {pr_number}
+⚠ CI checks failed for PR #{pr_number} — PR left open
+  Continuing to next issue...
 ```
 **Trigger:** One or more status checks complete with `failure` or `error` conclusion.
+**Action:** Leave PR open, continue to next issue. Non-fatal.
 
 ## Configuration
 

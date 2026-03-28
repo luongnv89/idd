@@ -726,7 +726,7 @@ Then loop back to Phase 1.
 
 ## Stop Conditions
 
-The loop stops when any of these conditions are met:
+The loop stops when any of these conditions are met (except "Merge blocked", which leaves the PR open and continues to the next issue):
 
 | Condition | Output |
 |-----------|--------|
@@ -736,7 +736,7 @@ The loop stops when any of these conditions are met:
 | No eligible issues (all blocked/skipped) | `⚠ No eligible issues to pick` |
 | Resolution failure (pause_on_failure: true) | `⚠ Auto-pilot paused` |
 | Review cycles exhausted (pause_on_failure: true) | `⚠ Auto-pilot paused` |
-| Merge blocked (PR left open, loop continues) | `⚠ PR #{pr_number} is not mergeable` / `PR left open — continuing to next issue.` |
+| Merge blocked | `⚠ PR #{pr_number} is not mergeable — PR left open, continuing` |
 | User cancellation | `○ Auto-pilot stopped by user` |
 
 ---
@@ -1046,11 +1046,10 @@ gh pr view {pr_number} --json statusCheckRollup --jq '.statusCheckRollup[] | sel
 
 If all checks pass within the timeout, proceed with merge. If timeout:
 ```
-✗ CI checks did not complete within {timeout}s
-
-  PR: https://github.com/owner/repo/pull/{pr_number}
-  To fix:  wait for CI to finish, then /auto-pilot to resume
+⚠ CI checks did not complete within {timeout}s — PR left open
+  Continuing to next issue...
 ```
+Leave PR open, continue to next issue. Non-fatal.
 
 ---
 

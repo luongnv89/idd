@@ -49,7 +49,7 @@ graph TD
 The auto-pilot classifies decisions into two categories:
 
 - **Auto-decide** (99%) — branch switching, strategy selection, failure recovery, merging
-- **Confirm with user** (rare) — force-push to shared branches, deleting remote resources, production deployments, package publishing, modifying repository settings or branch protection rules
+- **Confirm with user** (rare) — force-push to shared branches, deleting remote branches that others might depend on, production deployments, package publishing, modifying repository settings or branch protection rules
 
 When something fails, the auto-pilot skips and continues rather than stopping. All work is pushed to remote PRs, so nothing is lost.
 
