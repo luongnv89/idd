@@ -4,16 +4,42 @@ description: Fully automated development loop that triages open issues, picks th
 effort: max
 license: MIT
 metadata:
-  version: 0.7.0
+  version: 1.0.0
   creator: Luong NGUYEN <luongnv89@gmail.com>
 compatibility: Requires git and GitHub CLI (gh) with authentication and push access. Requires merge permission for auto-merge. Uses /issue-triage, /issue-resolver, /issue-analysis, and /issue-pr-review skills internally. All agents are in shared/agents/.
 ---
 
 # /auto-pilot
 
-Fully automated development loop: triage, pick, resolve, review, fix, merge, repeat.
+Fully autonomous development loop: triage, pick, resolve, review, fix, merge, repeat — zero user prompts.
 
-The auto-pilot orchestrates existing gitissue skills into a continuous loop that processes the issue backlog without manual intervention. Each iteration: triage the backlog, pick the top-priority issue, resolve it via the full pipeline, review the PR and fix detected issues (up to 5 cycles), merge the PR, then loop back.
+### Breaking changes in 1.0.0
+
+- The loop no longer pauses on failure by default — failed issues are skipped and the loop continues (`pause_on_failure` defaults to `false`)
+- `auto_merge: false` no longer halts the loop — PRs that pass review are left open and the loop moves to the next issue
+- All confirmation prompts removed — the loop runs with full autonomy from start to finish
+
+The auto-pilot orchestrates existing gitissue skills into a continuous loop that processes the issue backlog with absolute autonomy. Each iteration: triage the backlog, pick the top-priority issue, resolve it via the full pipeline, review the PR and fix detected issues (up to 5 cycles), merge the PR, then loop back. The agent makes all non-critical decisions automatically, always choosing the best available path forward. User confirmation is only requested for genuinely irreversible actions that affect shared/production systems.
+
+## Autonomy Philosophy
+
+Inspired by the auto-adapt-mode pattern: **always proceed, never block on recoverable situations**. The auto-pilot classifies every decision into two categories:
+
+1. **Auto-decide** (99% of cases) — The agent picks the best option and continues:
+   - Switching branches, stashing changes, syncing with remote
+   - Choosing resolution strategies, picking implementation approaches
+   - Skipping failed issues and moving to the next one
+   - Retrying after transient failures
+   - Merging PRs that pass review
+   - Falling back to simpler strategies when optimizations fail
+
+2. **Confirm with user** (rare, critical) — Only for genuinely irreversible or dangerous actions:
+   - Force-pushing to a shared branch (never done automatically)
+   - Deleting remote branches that others might depend on
+   - Modifying repository settings or branch protection rules
+   - Any action that matches the dangerous patterns list (destructive ops, production deployment, package publishing)
+
+When in doubt, the auto-pilot proceeds with the safer option rather than stopping to ask. A skipped issue can always be retried; a blocked loop wastes time.
 
 ## Invocation
 
@@ -38,24 +64,24 @@ Before starting the loop, verify the environment. On failure, output the exact e
 5. Confirm clean working tree: `git status --porcelain`
 6. Confirm on default branch: `git rev-parse --abbrev-ref HEAD`
 
-If the working tree is dirty:
+If the working tree is dirty, auto-stash and continue:
+```bash
+git stash --include-untracked -m "auto-pilot: stash before run"
 ```
-✗ Working tree has uncommitted changes
-
-  To fix:  git stash or git commit
-  The auto-pilot needs a clean working tree to create branches.
 ```
-Stop.
-
-If not on the default branch (main/master):
-```
-⚠ Currently on branch {branch}, not the default branch.
-
-  Auto-pilot works best from the default branch.
-  Switch to {default_branch}? [Y/n]
+⚠ Working tree had uncommitted changes — auto-stashed
+  Stash ref: {stash_ref}
 ```
 
-If the user agrees, run `git checkout {default_branch} && git pull --rebase origin {default_branch}`.
+If not on the default branch (main/master), auto-switch:
+```bash
+git checkout {default_branch} && git pull --rebase origin {default_branch}
+```
+```
+⚠ Was on branch {branch} — auto-switched to {default_branch}
+```
+
+These are safe, local, reversible operations — no user confirmation needed. The stash is preserved and can be restored with `git stash pop` after the auto-pilot finishes.
 
 ## Configuration
 
@@ -69,7 +95,7 @@ Defaults:
 - `autopilot.max_iterations: 10` — maximum issues to process before stopping
 - `autopilot.review_cycles: 5` — maximum fix attempts per PR (minimum: 2). A cycle = one fix attempt + one review pass. Confirmation-only review passes (spawned after a PASS to verify, without a preceding fix) do not consume a cycle.
 - `autopilot.auto_merge: true` — merge PRs automatically after review passes
-- `autopilot.pause_on_failure: true` — stop the loop if a resolution fails
+- `autopilot.pause_on_failure: false` — skip failed issues and continue to the next one (autonomous default). When false, the auto-pilot logs the failure, adds the issue to the skip list, and moves on. Set to true only if you want the loop to halt on every failure for manual inspection.
 - `autopilot.skip_labels: ["wontfix", "blocked", "do-not-merge"]` — skip issues with these labels
 - All `resolve.*` and `triage.*` settings are inherited by the sub-skills
 
@@ -100,11 +126,10 @@ Main Agent (orchestrator)
   │
   └── Subagent: PR Reviewer (via /issue-pr-review --auto)
         Runs the full review pipeline: code review, tests, CI, fix, repeat (max 5 cycles)
-        Auto-merges when clean
-        Returns: MERGED/PASS/NEEDS_FIX, review_cycles, issues_found, issues_fixed
+        Returns: PASS/NEEDS_FIX, review_cycles, issues_found, issues_fixed
 ```
 
-The PR review subagent runs `/issue-pr-review --auto`, which handles the full review-fix-merge cycle internally — including spawning fresh reviewer agents each cycle and auto-merging when clean.
+The PR review subagent runs `/issue-pr-review --auto`, which handles the full review-fix cycle internally — spawning fresh reviewer agents each cycle. Merging is always the main agent's responsibility (Phase 5).
 
 ### Why Subagents Matter
 
@@ -259,9 +284,9 @@ If no dependencies or batching opportunities are found, the original user-define
   ○ Using user-defined order
 ```
 
-### Confirmation
+### Execution Plan (auto-start)
 
-Show the execution plan with analysis insights:
+Display the execution plan and immediately begin — no confirmation prompt. The user invoked `/auto-pilot` with an explicit list, so intent is clear.
 
 Compute `saved_iterations` as: sum of `(batch.issues.length - 1)` across all batches. Each batch of N issues resolves them in 1 iteration instead of N, saving N-1 iterations. If there are no batches, omit the `Batches:` line entirely.
 
@@ -279,7 +304,7 @@ Compute `saved_iterations` as: sum of `(batch.issues.length - 1)` across all bat
   2. #{n2} — {title2} (batched with #{n1})
   3. #{n3} — {title3}
 
-Start auto-pilot? [Y/n]
+  ⟶ Starting immediately...
 ```
 
 If `--dry-run`:
@@ -430,9 +455,9 @@ If no eligible issue is found (all blocked, skipped, or assigned):
 ```
 Stop.
 
-### Step 1.3 — Confirm (first iteration only)
+### Step 1.3 — Display Plan and Auto-Start
 
-On the first iteration only, show the execution plan and confirm:
+On the first iteration, display the execution plan and immediately begin — no confirmation prompt. The user's invocation of `/auto-pilot` is the confirmation.
 
 ```
 ◆ Auto-Pilot Plan
@@ -449,7 +474,7 @@ On the first iteration only, show the execution plan and confirm:
   ○  #{n3} — {title3}
   ...
 
-Start auto-pilot? [Y/n]
+  ⟶ Starting immediately...
 ```
 
 If `--dry-run` was specified:
@@ -457,10 +482,6 @@ If `--dry-run` was specified:
 ○ Dry run complete. No issues resolved.
 ```
 Stop.
-
-If declined, stop.
-
-Subsequent iterations proceed without confirmation.
 
 ---
 
@@ -475,14 +496,25 @@ git checkout {default_branch}
 git pull --rebase origin {default_branch}
 ```
 
-If this fails (merge conflict from a prior iteration), output:
+If this fails (merge conflict from a prior iteration), attempt auto-resolution:
+
+```bash
+git rebase --abort
+git reset --hard origin/{default_branch}
 ```
-✗ Failed to sync with {default_branch}
+
+```
+⚠ Sync conflict — auto-reset to origin/{default_branch}
+  Any local-only changes were discarded (all work is already pushed to PRs).
+```
+
+This is safe because the auto-pilot always pushes work to remote PRs before cleanup. Note: `git stash` entries created during pre-flight (with the user's uncommitted work) are stored under their own ref (`refs/stash`) and survive `git reset --hard` — the user's stashed work is preserved (`git stash list` will still show them). If the hard reset also fails (unlikely), then stop:
+```
+✗ Failed to sync with {default_branch} — cannot recover automatically
 
   To fix:  resolve conflicts manually: git rebase --continue
   Then:    /auto-pilot to resume
 ```
-Stop.
 
 ### Step 2.2 — Spawn Resolver Subagent
 
@@ -510,6 +542,16 @@ Parse the subagent's response. Extract: `status`, `branch_name`, `pr_number`, `p
 
 Proceed to Phase 3 (Review).
 
+**On already_resolved:**
+
+The resolver subagent may report that the issue is already fixed (status: `already_resolved`). In this case, skip the review/fix/merge phases entirely and move on.
+
+```
+○ #{issue_number} already resolved — skipping
+```
+
+Continue to the next iteration.
+
 **On failure:**
 
 ```
@@ -518,24 +560,22 @@ Proceed to Phase 3 (Review).
   {failure_reason}
 ```
 
-Check `autopilot.pause_on_failure`:
+**Autonomous behavior:** Log the failure, add the issue to the skip list, and continue to the next issue. Failed issues can always be retried later — stopping the entire loop wastes time on issues that might succeed.
 
-- **true** (default) — stop the loop:
-  ```
-  ⚠ Auto-pilot paused due to failure.
+```
+⚠ Skipping #{issue_number} — will retry on next run.
+  Continuing to next issue...
+```
 
-    Failed on:  #{issue_number} — {title}
-    Step:       {failure_step}
-    To resume:  fix the issue, then /auto-pilot
-    To skip:    /auto-pilot --skip {issue_number}
-  ```
-  Stop.
+If `autopilot.pause_on_failure` is explicitly set to `true` in config, stop the loop instead:
+```
+⚠ Auto-pilot paused due to failure (pause_on_failure: true).
 
-- **false** — log the failure, add the issue to the skip list, and continue:
-  ```
-  ⚠ Skipping #{issue_number} — will retry on next run.
-  ```
-  Continue to next iteration.
+  Failed on:  #{issue_number} — {title}
+  Step:       {failure_step}
+  To resume:  fix the issue, then /auto-pilot
+  To skip:    /auto-pilot --skip {issue_number}
+```
 
 ---
 
@@ -550,7 +590,7 @@ After the PR is created, the auto-pilot delegates review, testing, CI checking, 
 3. Checks CI status (polls GitHub Actions until complete)
 4. Fixes any detected issues
 5. Repeats steps 1-4 up to 5 cycles
-6. Auto-merges via squash when clean
+6. Repeats until clean or cycles exhausted
 
 See `skills/issue-pr-review/SKILL.md` for the full pipeline.
 
@@ -561,27 +601,19 @@ See `skills/issue-pr-review/SKILL.md` for the full pipeline.
   ⟶ Spawning PR review subagent...
 ```
 
-Use the **PR Reviewer Subagent** prompt from `references/subagent-prompts.md`, substituting `{pr_number}`. The subagent runs the full `/issue-pr-review --auto` pipeline: review, test, CI check, fix, repeat, merge.
+Use the **PR Reviewer Subagent** prompt from `references/subagent-prompts.md`, substituting `{pr_number}`. The subagent runs the full `/issue-pr-review --auto` pipeline: review, test, CI check, fix, repeat. It does NOT merge — merging is the main agent's job in Phase 5.
 
 ### Step 3.2 — Process Review Result
 
 Parse the subagent's response:
 
-**On MERGED:**
+**On PASS:**
 ```
-  ✓ PR #{pr_number} reviewed and merged
+  ✓ PR #{pr_number} review passed
     Review cycles: {review_cycles}
     Issues found/fixed: {issues_found}/{issues_fixed}
-    CI: {ci_status}
 ```
-Proceed to Phase 5 (Cleanup).
-
-**On PASS (not merged — e.g., merge blocked by branch protection):**
-```
-  ✓ PR #{pr_number} review passed — merge pending
-    Issues found/fixed: {issues_found}/{issues_fixed}
-```
-Proceed to Phase 5 (manual merge attempt).
+Proceed to Phase 5 (Merge).
 
 **On NEEDS_FIX (review cycles exhausted with remaining issues):**
 ```
@@ -591,21 +623,19 @@ Proceed to Phase 5 (manual merge attempt).
     ● {issue_description_1}
     ● {issue_description_2}
 
-  Auto-merge skipped — PR needs manual review.
+  Auto-merge skipped — PR left open for manual review.
   PR: {pr_url}
+  Continuing to next issue...
 ```
 
-Check `autopilot.pause_on_failure`:
-- **true** — stop the loop
-- **false** — skip this issue and continue to next iteration
+**Autonomous behavior (default):** Leave the PR open for later manual review and continue to the next issue. The PR is already created and pushed — nothing is lost.
+
+If `autopilot.pause_on_failure` is explicitly `true`:
+- stop the loop and print the remaining issues for manual inspection
 
 ---
 
 ## Phase 5 — Merge
-
-### Already merged?
-
-If the PR review subagent returned **MERGED** (Step 3.2), the PR is already merged. Skip Steps 5.1 and 5.2 — go directly to Step 5.3 (Cleanup).
 
 ### Step 5.1 — Pre-merge Checks
 
@@ -623,14 +653,21 @@ If not mergeable:
 ⚠ PR #{pr_number} is not mergeable
 
   Reason: {conflict / failing checks / review requested}
-  To fix:  resolve the blocker, then /auto-pilot to resume
+  PR left open — continuing to next issue.
 ```
 
-Check `autopilot.pause_on_failure` for behavior.
+**Autonomous behavior:** Leave the PR open and move on. The PR is already created with all changes — it can be merged manually later or picked up on the next auto-pilot run. Only pause if `autopilot.pause_on_failure` is explicitly `true`.
 
 ### Step 5.2 — Merge
 
-If `autopilot.auto_merge` is true:
+First, check `autopilot.auto_merge`. If it is explicitly set to `false`, skip the merge entirely and continue to the next issue:
+```
+○ PR #{pr_number} ready for manual merge (auto_merge: false)
+  https://github.com/owner/repo/pull/{pr_number}
+  Continuing to next issue...
+```
+
+If `autopilot.auto_merge` is `true` (the default), merge the PR:
 
 ```bash
 gh pr merge {pr_number} --squash --delete-branch
@@ -641,14 +678,11 @@ gh pr merge {pr_number} --squash --delete-branch
   https://github.com/owner/repo/pull/{pr_number}
 ```
 
-If `autopilot.auto_merge` is false:
+If merge fails (branch protection, required approvals, etc.), leave the PR open and continue:
 ```
-○ PR #{pr_number} ready for manual merge
-  https://github.com/owner/repo/pull/{pr_number}
-
-  Auto-merge disabled — merge manually to continue.
+⚠ Merge failed for PR #{pr_number} — PR left open
+  Continuing to next issue...
 ```
-Stop. The user must merge manually before re-running `/auto-pilot`.
 
 ### Step 5.3 — Cleanup
 
@@ -679,7 +713,7 @@ Then loop back to Phase 1.
 
 ## Stop Conditions
 
-The loop stops when any of these conditions are met:
+The loop stops when any of these conditions are met (except "Merge blocked", which leaves the PR open and continues to the next issue):
 
 | Condition | Output |
 |-----------|--------|
@@ -689,7 +723,7 @@ The loop stops when any of these conditions are met:
 | No eligible issues (all blocked/skipped) | `⚠ No eligible issues to pick` |
 | Resolution failure (pause_on_failure: true) | `⚠ Auto-pilot paused` |
 | Review cycles exhausted (pause_on_failure: true) | `⚠ Auto-pilot paused` |
-| Merge blocked | `⚠ PR not mergeable` |
+| Merge blocked | `⚠ PR #{pr_number} is not mergeable — PR left open, continuing` |
 | User cancellation | `○ Auto-pilot stopped by user` |
 
 ---
@@ -751,7 +785,7 @@ If batch analysis was used (explicit issue list):
   Issues to process:  5 (of 8 open)
   Limit:              3
   Review cycles:      5
-  Auto-merge:         yes
+  Auto-merge:         {yes/no}
   First issue:        #12 — Fix auth redirect loop
 
   Execution order:
@@ -759,7 +793,7 @@ If batch analysis was used (explicit issue list):
   ○  #8  — Add pagination to API
   ○  #15 — Refactor middleware
 
-Start auto-pilot? [Y/n]
+  ⟶ Starting immediately...
 
 ● [Iteration 1/3] Triaging open issues...
 ✓ Triage updated — 8 open issues
@@ -847,7 +881,7 @@ Start auto-pilot? [Y/n]
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Issues to process:  3 (of 3 provided)
   Review cycles:      5
-  Auto-merge:         yes
+  Auto-merge:         {yes/no}
   Mode:               explicit list (analyzed + optimized)
   Batches:            1 (saving ~1 iterations)
 
@@ -856,7 +890,7 @@ Start auto-pilot? [Y/n]
   2. #5  — Fix login crash on mobile (batched with #8)
   3. #8  — Add dark mode toggle (batched with #5)
 
-Start auto-pilot? [Y/n]
+  ⟶ Starting immediately...
 
 ● [Issue 1/3] Next from optimized order: #12 — Refactor auth middleware
 
@@ -935,7 +969,7 @@ Start auto-pilot? [Y/n]
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Issues to process:  1 (of 3 provided)
   Review cycles:      5
-  Auto-merge:         yes
+  Auto-merge:         {yes/no}
   Mode:               explicit list (analyzed + optimized)
 
   Optimized execution order:
@@ -945,7 +979,7 @@ Start auto-pilot? [Y/n]
   ✗ #99 — not found
   ○ #12 — skipped by --skip flag
 
-Start auto-pilot? [Y/n]
+  ⟶ Starting immediately...
 ```
 
 ---
@@ -999,11 +1033,10 @@ gh pr view {pr_number} --json statusCheckRollup --jq '.statusCheckRollup[] | sel
 
 If all checks pass within the timeout, proceed with merge. If timeout:
 ```
-✗ CI checks did not complete within {timeout}s
-
-  PR: https://github.com/owner/repo/pull/{pr_number}
-  To fix:  wait for CI to finish, then /auto-pilot to resume
+⚠ CI checks did not complete within {timeout}s — PR left open
+  Continuing to next issue...
 ```
+Leave PR open, continue to next issue. Non-fatal.
 
 ---
 
