@@ -190,20 +190,46 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 
 ## Review
 
-### Review cycles exhausted
+### Review cycles exhausted (non-critical issue)
 ```
-⚠ Review issues remain after {review_cycles} review-fix cycles
+⚠ PR #{pr_number} has unresolved issues after {review_cycles} cycles
 
   Remaining issues:
     ● {issue_description_1}
     ● {issue_description_2}
 
-  Auto-merge skipped — PR left open for manual review.
-  PR: https://github.com/owner/repo/pull/{pr_number}
+  ✓ Created follow-up issue #{followup_number}
+  ⟶ Merging PR with partial fix...
+  ✓ PR #{pr_number} merged (partial fix)
+    Unresolved issues tracked in #{followup_number}
   Continuing to next issue...
 ```
-**Trigger:** All review-fix cycles are exhausted and the review still finds issues.
-**Action:** Leave PR open, continue to next issue. Non-fatal.
+**Trigger:** All review-fix cycles exhausted and the original issue does NOT have a `critical_labels` label.
+**Action:** Create a follow-up GitHub issue with `auto-pilot-followup` label describing the unresolved problems. Merge the PR to preserve progress. Continue to next issue. Non-fatal.
+
+### Review cycles exhausted (critical issue)
+```
+⚠ CRITICAL issue #{issue_number} has unresolved review issues after {review_cycles} cycles
+
+  Issue:  #{issue_number} — {issue_title}
+  PR:     #{pr_number} ({pr_url})
+  Labels: {labels}
+
+  Remaining issues:
+    ● {issue_description_1}
+    ● {issue_description_2}
+
+  ⚠ This issue is marked critical — auto-pilot requires your decision.
+
+  Options:
+    1. Merge PR as-is (partial fix) and create follow-up issue
+    2. Leave PR open for manual review — do not merge
+    3. Skip this issue and continue the loop
+
+  What would you like to do?
+```
+**Trigger:** All review-fix cycles exhausted and the original issue HAS a `critical_labels` label.
+**Action:** Stop the loop and ask the user for a decision. Fatal (pauses loop).
 
 ## Merge
 

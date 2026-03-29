@@ -1,10 +1,10 @@
 ---
 name: auto-pilot
-description: Fully automated development loop that triages open issues, picks the highest-priority task, resolves it end-to-end, reviews the PR with up to 5 fix-review cycles, merges the PR, and repeats until all issues are resolved or a stop condition is hit. When given an explicit issue list, runs deep analysis first to identify dependencies, optimal resolution order, and opportunities to batch-resolve related issues with minimum changes — saving iterations and reducing conflicts. Use this skill whenever someone says "auto-pilot", "autopilot", "auto resolve all issues", "resolve everything", "work through the backlog", "resolve all", "run the loop", "automate the backlog", "hands-free mode", "keep going until done", or wants the agent to continuously triage-resolve-review-merge without manual intervention. Also trigger when someone asks to "process all issues", "batch resolve", "resolve next", "work on issues automatically", "start the dev loop", "resolve issues 1, 2, 3", "work on these issues", "resolve #5 #10 #12 in order", or provides a list of issue numbers to process.
+description: Fully automated development loop that triages open issues, picks the highest-priority task, resolves it end-to-end, reviews the PR with up to 3 token-optimized fix-review cycles (script pre-pass handles lint/format, LLM only fixes critical issues), and if issues remain creates a follow-up issue then merges the PR anyway so progress is never lost. Critical issues get special treatment — if a critical issue cannot be fully resolved, the loop stops and asks the user for a decision instead of auto-continuing. When given an explicit issue list, runs deep analysis first to identify dependencies, optimal resolution order, and opportunities to batch-resolve related issues with minimum changes — saving iterations and reducing conflicts. Use this skill whenever someone says "auto-pilot", "autopilot", "auto resolve all issues", "resolve everything", "work through the backlog", "resolve all", "run the loop", "automate the backlog", "hands-free mode", "keep going until done", or wants the agent to continuously triage-resolve-review-merge without manual intervention. Also trigger when someone asks to "process all issues", "batch resolve", "resolve next", "work on issues automatically", "start the dev loop", "resolve issues 1, 2, 3", "work on these issues", "resolve #5 #10 #12 in order", or provides a list of issue numbers to process.
 effort: max
 license: MIT
 metadata:
-  version: 1.0.0
+  version: 2.1.0
   creator: Luong NGUYEN <luongnv89@gmail.com>
 compatibility: Requires git and GitHub CLI (gh) with authentication and push access. Requires merge permission for auto-merge. Uses /issue-triage, /issue-resolver, /issue-analysis, and /issue-pr-review skills internally. All agents are in shared/agents/.
 ---
@@ -13,13 +13,21 @@ compatibility: Requires git and GitHub CLI (gh) with authentication and push acc
 
 Fully autonomous development loop: triage, pick, resolve, review, fix, merge, repeat — zero user prompts.
 
-### Breaking changes in 1.0.0
+### Changes in 2.1.0 — Token optimization
+
+- Review cycles reduced from 10 to **3** — script pre-pass handles lint/format, so fewer LLM cycles needed
+- `/issue-pr-review` now runs a **script pre-pass** (lint, format, test auto-fix) before spawning LLM reviewers — zero token cost for mechanical fixes
+- Code reviewer now classifies issues as `"fix"` or `"note"` — only "fix" issues trigger fix cycles, "note" issues are reported but don't consume tokens
+- **Soft pass condition** — PR passes when zero "fix" issues remain, even with ≤ 2 medium "note" issues
+- Lint/format violations no longer consume LLM review cycles — handled entirely by tooling
+
+### Breaking changes in 2.0.0
 
 - The loop no longer pauses on failure by default — failed issues are skipped and the loop continues (`pause_on_failure` defaults to `false`)
 - `auto_merge: false` no longer halts the loop — PRs that pass review are left open and the loop moves to the next issue
 - All confirmation prompts removed — the loop runs with full autonomy from start to finish
 
-The auto-pilot orchestrates existing gitissue skills into a continuous loop that processes the issue backlog with absolute autonomy. Each iteration: triage the backlog, pick the top-priority issue, resolve it via the full pipeline, review the PR and fix detected issues (up to 5 cycles), merge the PR, then loop back. The agent makes all non-critical decisions automatically, always choosing the best available path forward. User confirmation is only requested for genuinely irreversible actions that affect shared/production systems.
+The auto-pilot orchestrates existing gitissue skills into a continuous loop that processes the issue backlog with absolute autonomy. Each iteration: triage the backlog, pick the top-priority issue, resolve it via the full pipeline, review the PR with up to 3 token-optimized fix-review cycles (script pre-pass for lint/format, LLM only for critical issues), and if issues remain create a follow-up issue then merge anyway so progress is never blocked. For critical issues, the loop stops and asks the user for a decision instead of auto-continuing. The agent makes all non-critical decisions automatically, always choosing the best available path forward.
 
 ## Autonomy Philosophy
 
@@ -38,6 +46,7 @@ Inspired by the auto-adapt-mode pattern: **always proceed, never block on recove
    - Deleting remote branches that others might depend on
    - Modifying repository settings or branch protection rules
    - Any action that matches the dangerous patterns list (destructive ops, production deployment, package publishing)
+   - **Critical issues with unresolved review problems** — if the issue has a `critical` or `priority:critical` label and the review-fix loop exhausts its cycles without resolving all issues, stop and ask
 
 When in doubt, the auto-pilot proceeds with the safer option rather than stopping to ask. A skipped issue can always be retried; a blocked loop wastes time.
 
@@ -93,10 +102,11 @@ Load `.gitissue.yml` from the repo root once at start. If the file does not exis
 
 Defaults:
 - `autopilot.max_iterations: 10` — maximum issues to process before stopping
-- `autopilot.review_cycles: 5` — maximum fix attempts per PR (minimum: 2). A cycle = one fix attempt + one review pass. Confirmation-only review passes (spawned after a PASS to verify, without a preceding fix) do not consume a cycle.
+- `autopilot.review_cycles: 3` — maximum fix attempts per PR. After this many cycles, if issues remain the auto-pilot creates a follow-up issue and merges the PR anyway. Reduced from 10 — the script pre-pass in issue-pr-review handles lint/format, so 3 LLM cycles suffice for logic issues. A cycle = one fix attempt + one review pass. Confirmation-only review passes (spawned after a PASS to verify, without a preceding fix) do not consume a cycle.
 - `autopilot.auto_merge: true` — merge PRs automatically after review passes
 - `autopilot.pause_on_failure: false` — skip failed issues and continue to the next one (autonomous default). When false, the auto-pilot logs the failure, adds the issue to the skip list, and moves on. Set to true only if you want the loop to halt on every failure for manual inspection.
 - `autopilot.skip_labels: ["wontfix", "blocked", "do-not-merge"]` — skip issues with these labels
+- `autopilot.critical_labels: ["critical", "priority:critical"]` — labels that mark an issue as critical. When a critical issue has unresolved review problems after all cycles, the loop stops and asks the user for a decision instead of auto-creating a follow-up.
 - All `resolve.*` and `triage.*` settings are inherited by the sub-skills
 
 Do not re-read the config at each iteration.
@@ -125,7 +135,7 @@ Main Agent (orchestrator)
   │     Returns: branch_name, pr_number, files_changed, tests_written, tests_passed
   │
   └── Subagent: PR Reviewer (via /issue-pr-review --auto)
-        Runs the full review pipeline: code review, tests, CI, fix, repeat (max 5 cycles)
+        Script pre-pass (lint/format auto-fix), then LLM review cycles (max 3)
         Returns: PASS/NEEDS_FIX, review_cycles, issues_found, issues_fixed
 ```
 
@@ -388,7 +398,7 @@ The auto-pilot runs a continuous loop with 5 phases per iteration:
                              (skipped in explicit list mode)
   Phase 2 — Resolve         Subagent: full 6-step resolve pipeline
   Phase 3+4 — Review-Fix    Delegates to /issue-pr-review --auto
-                             Review, test, CI check, fix (x5 max), merge
+                             Script pre-pass, then LLM review+fix (x3 max)
   Phase 5 — Merge           Merge the PR and close the issue
   ─────────────────────────────────────────────────────────────
   Loop back to Phase 1 until done or limit reached
@@ -585,12 +595,12 @@ After the PR is created, the auto-pilot delegates review, testing, CI checking, 
 
 ### What issue-pr-review does in auto mode
 
-1. Analyzes PR changes (code review with fresh agent each cycle)
-2. Runs all tests (unit, integration, e2e) and build/compile
-3. Checks CI status (polls GitHub Actions until complete)
-4. Fixes any detected issues
-5. Repeats steps 1-4 up to 5 cycles
-6. Repeats until clean or cycles exhausted
+1. **Script pre-pass** — runs lint/format auto-fix tools, then tests (zero LLM tokens)
+2. Analyzes PR changes (code review with fresh agent each cycle, only reports "fix" vs "note" issues)
+3. Runs all tests (unit, integration, e2e) and build/compile
+4. Checks CI status (polls GitHub Actions until complete)
+5. Fixes only `action: "fix"` issues (critical/high severity) — notes medium issues without spending tokens
+6. Repeats steps 2-5 up to `review_cycles` cycles (default: 3)
 
 See `skills/issue-pr-review/SKILL.md` for the full pipeline.
 
@@ -616,22 +626,112 @@ Parse the subagent's response:
 Proceed to Phase 5 (Merge).
 
 **On NEEDS_FIX (review cycles exhausted with remaining issues):**
+
+The review-fix loop tried `review_cycles` times (default: 3) but could not resolve all issues. The behavior depends on whether the original issue is critical.
+
+#### Non-critical issues: create follow-up issue, merge PR, continue
+
+For non-critical issues (no `critical` or `priority:critical` label), the auto-pilot captures the unresolved problems as a new GitHub issue, then merges the PR to preserve the progress that was made, and continues to the next issue.
+
+**Step 1 — Create follow-up issue:**
+
+```bash
+gh issue create \
+  --title "Follow-up: unresolved review issues from #{issue_number}" \
+  --label "auto-pilot-followup" \
+  --body "$(cat <<'EOF'
+<!-- gitissue:normalized v1 -->
+
+## Type
+Enhancement
+
+## Context
+Auto-pilot resolved #{issue_number} ({issue_title}) but the review-fix loop could not resolve all issues within {review_cycles} cycles. The PR #{pr_number} was merged with the following issues remaining.
+
+## Description
+The following review issues were not resolved:
+
+{remaining_issues_bulleted}
+
+## Acceptance Criteria
+- [ ] All listed review issues are addressed
+- [ ] Tests pass
+
+## Technical Notes
+- Original issue: #{issue_number}
+- PR with partial fix: #{pr_number}
+- Branch: {branch_name}
+- Review cycles attempted: {review_cycles}
+
+## Metadata
+- **Priority:** medium
+- **Effort:** small
+EOF
+)"
 ```
-⚠ PR #{pr_number} has unresolved review issues after {review_cycles} cycles
+
+```
+⚠ PR #{pr_number} has unresolved issues after {review_cycles} cycles
 
   Remaining issues:
     ● {issue_description_1}
     ● {issue_description_2}
 
-  Auto-merge skipped — PR left open for manual review.
-  PR: {pr_url}
+  ✓ Created follow-up issue #{followup_number}
+    "Follow-up: unresolved review issues from #{issue_number}"
+  ⟶ Merging PR with partial fix...
+```
+
+**Step 2 — Merge the PR anyway:**
+
+The PR contains valid progress (the resolver completed, and some or all review issues may have been fixed). Merge it to avoid losing that work:
+
+```bash
+gh pr merge {pr_number} --squash --delete-branch
+```
+
+```
+  ✓ PR #{pr_number} merged (partial fix) — #{issue_number} closed
+    Unresolved issues tracked in #{followup_number}
   Continuing to next issue...
 ```
 
-**Autonomous behavior (default):** Leave the PR open for later manual review and continue to the next issue. The PR is already created and pushed — nothing is lost.
+If merge fails (branch protection, etc.), leave the PR open and note it:
+```
+  ⚠ Merge failed for PR #{pr_number} — PR left open
+    Unresolved issues tracked in #{followup_number}
+  Continuing to next issue...
+```
 
-If `autopilot.pause_on_failure` is explicitly `true`:
-- stop the loop and print the remaining issues for manual inspection
+#### Critical issues: stop and ask the user
+
+If the original issue has any label in `autopilot.critical_labels` (default: `["critical", "priority:critical"]`), the auto-pilot does **not** create a follow-up or auto-merge. Instead, it stops the loop and presents the situation to the user for a decision. Critical issues deserve human judgment — an incomplete fix could make things worse.
+
+```
+⚠ CRITICAL issue #{issue_number} has unresolved review issues after {review_cycles} cycles
+
+  Issue:  #{issue_number} — {issue_title}
+  PR:     #{pr_number} ({pr_url})
+  Labels: {labels}
+
+  Remaining issues:
+    ● {issue_description_1}
+    ● {issue_description_2}
+
+  ⚠ This issue is marked critical — auto-pilot requires your decision.
+
+  Options:
+    1. Merge PR as-is (partial fix) and create follow-up issue
+    2. Leave PR open for manual review — do not merge
+    3. Skip this issue and continue the loop
+
+  What would you like to do?
+```
+
+The loop pauses and waits for the user's response. Based on the user's choice:
+- **Option 1:** Create follow-up issue (same as non-critical flow), merge PR, continue loop
+- **Option 2:** Leave PR open, do not merge, continue loop to the next issue
+- **Option 3:** Skip issue, leave PR open, continue loop
 
 ---
 
@@ -722,7 +822,8 @@ The loop stops when any of these conditions are met (except "Merge blocked", whi
 | Explicit list exhausted | `✓ All requested issues resolved!` |
 | No eligible issues (all blocked/skipped) | `⚠ No eligible issues to pick` |
 | Resolution failure (pause_on_failure: true) | `⚠ Auto-pilot paused` |
-| Review cycles exhausted (pause_on_failure: true) | `⚠ Auto-pilot paused` |
+| Review exhausted (non-critical) | Follow-up issue created, PR merged, loop continues |
+| Review exhausted (critical issue) | `⚠ CRITICAL — auto-pilot requires your decision` (loop pauses) |
 | Merge blocked | `⚠ PR #{pr_number} is not mergeable — PR left open, continuing` |
 | User cancellation | `○ Auto-pilot stopped by user` |
 
@@ -738,10 +839,11 @@ When the loop ends (for any reason), print a structured step-by-step summary sho
 
   Iteration 1:       ✓ pass — #{n1} {title1} → PR #{pr1} merged
   Iteration 2:       ✓ pass — #{n2} {title2} → PR #{pr2} merged
-  Iteration 3:       ✗ fail — #{n5} {title5} (test failure at Verify)
+  Iteration 3:       ⚠ partial — #{n5} {title5} → PR #{pr5} merged, follow-up #{f5}
   Iteration 4:       ○ skip — #{n3} {title3} (blocked)
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Resolved:          {resolved_count}
+  Partial:           {partial_count} (follow-up issues created)
   Skipped:           {skipped_count}
   Failed:            {failed_count}
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
@@ -761,6 +863,7 @@ If batch analysis was used (explicit issue list):
   Iteration 2:       ✓ pass — #{n2} {title2} → PR #{pr2} merged
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Resolved:          {resolved_count}
+  Partial:           {partial_count} (follow-up issues created)
   Skipped:           {skipped_count}
   Failed:            {failed_count}
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
@@ -784,7 +887,7 @@ If batch analysis was used (explicit issue list):
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Issues to process:  5 (of 8 open)
   Limit:              3
-  Review cycles:      5
+  Review cycles:      3
   Auto-merge:         {yes/no}
   First issue:        #12 — Fix auth redirect loop
 
@@ -880,7 +983,7 @@ If batch analysis was used (explicit issue list):
 ◆ Auto-Pilot Plan (explicit list)
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Issues to process:  3 (of 3 provided)
-  Review cycles:      5
+  Review cycles:      3
   Auto-merge:         {yes/no}
   Mode:               explicit list (analyzed + optimized)
   Batches:            1 (saving ~1 iterations)
@@ -968,7 +1071,7 @@ If batch analysis was used (explicit issue list):
 ◆ Auto-Pilot Plan (explicit list)
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Issues to process:  1 (of 3 provided)
-  Review cycles:      5
+  Review cycles:      3
   Auto-merge:         {yes/no}
   Mode:               explicit list (analyzed + optimized)
 

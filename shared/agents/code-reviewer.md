@@ -61,6 +61,15 @@ You are reviewing code changes on branch "{branch_name}" against base branch "{b
 
    **Only report issues with confidence >= 80.**
 
+6. For each issue, determine the **action** — whether the automated loop should spend a fix cycle on it or just note it in the report:
+   - **"fix"**: correctness, security, edge_cases with high severity — these break functionality or pose risk
+   - **"fix"**: test failures — broken tests block merging
+   - **"note"**: code_quality medium issues — informational, not worth a fix cycle
+   - **"note"**: test_coverage medium issues — good to have, not blocking
+   - **"note"**: any issue that is cosmetic, stylistic, or subjective
+
+   The goal is to reserve fix cycles for issues that actually affect correctness, security, or functionality. Cosmetic and nice-to-have improvements should be reported but not trigger expensive LLM fix cycles.
+
 ## Output
 
 Return ONLY a JSON block:
@@ -68,11 +77,13 @@ Return ONLY a JSON block:
 {
   "result": "PASS" or "NEEDS_FIX",
   "issues_found": <count>,
+  "fixable_count": <count of issues with action "fix">,
   "issues": [
     {
       "category": "correctness|test_coverage|code_quality|security|edge_cases",
       "severity": "high|medium",
       "confidence": <80-100>,
+      "action": "fix|note",
       "description": "One-line description of the concrete problem",
       "file": "path/to/file",
       "line": <approximate line number>,
@@ -85,8 +96,9 @@ Return ONLY a JSON block:
 ## Rules
 
 - If nothing is wrong, return "PASS" with empty issues array. Do not invent issues.
-- Only "high" severity issues block — "medium" are informational.
-- "NEEDS_FIX" requires at least one "high" severity issue.
+- **PASS** when: zero issues with action "fix". Medium-severity "note" issues may exist — they don't block.
+- **NEEDS_FIX** when: at least one issue with action "fix" (high-severity correctness, security, or edge case).
 - Do NOT flag: style preferences, naming conventions, missing comments, import ordering, or anything subjective.
-- Focus on quality over quantity.
+- Focus on quality over quantity — fewer actionable issues beats a long list of nits.
+- Lint and format violations should NOT be reported — those are handled by automated tooling before this review runs.
 ```

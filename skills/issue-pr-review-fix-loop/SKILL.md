@@ -4,7 +4,7 @@ description: Outer review-fix loop that calls /issue-pr-review in review-only mo
 effort: high
 license: MIT
 metadata:
-  version: 0.1.0
+  version: 0.2.0
   creator: Luong NGUYEN <luongnv89@gmail.com>
 compatibility: Requires git and GitHub CLI (gh) with authentication. Depends on /issue-pr-review skill (skills/issue-pr-review/SKILL.md). Uses shared agents from shared/agents/.
 ---
@@ -52,7 +52,7 @@ If dirty: stash, sync, pop. If `origin` missing or conflicts: stop and ask (inte
 ## Configuration
 
 Load `.gitissue.yml` once. Relevant defaults:
-- `review.max_cycles: 5` — max outer loop iterations
+- `review.max_cycles: 3` — max outer loop iterations (reduced from 5 — script pre-pass handles mechanical issues)
 - `review.auto_merge: false` (overridden to `true` in `--auto` mode)
 - `review.confidence_threshold: 80`
 
@@ -66,24 +66,24 @@ Load `.gitissue.yml` once. Relevant defaults:
 
   Main Agent (orchestrator — never reads code)
   │
-  ├── Cycle 1/5
+  ├── Cycle 1/3
   │     [Review]   ⟶ Reviewer subagent (/issue-pr-review --review-only)
-  │     [Result]   ✗ NEEDS_FIX — 3 issues found
-  │     [Fix]      ⟶ Fixer subagent (read, fix, commit, push)
-  │     [Fix]      ✓ fixed 3 issues
+  │     [Result]   ✗ NEEDS_FIX — 2 fixable, 1 noted
+  │     [Fix]      ⟶ Fixer subagent (only "fix" issues, skip "note")
+  │     [Fix]      ✓ fixed 2 issues, noted 1
   │     [Commit]   ✓ fix(scope): address review feedback (#42)
   │     [Push]     ✓ pushed to origin
   │
-  └── Cycle 2/5
+  └── Cycle 2/3
         [Review]   ⟶ Reviewer subagent (fresh — no memory of cycle 1)
-        [Result]   ✓ PASS — 0 issues
+        [Result]   ✓ PASS — 0 fixable issues (1 noted, not blocking)
         [Done]     ✓ PR is clean after 2 cycles
 
   ◆ Summary
   ┄┄┄┄┄┄┄┄┄
     PR:           #87: fix(auth): resolve redirect (#42)
     Status:       ✓ Clean
-    Cycles:       2/5
+    Cycles:       2/3
     Total fixed:  3
 ```
 

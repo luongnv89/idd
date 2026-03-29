@@ -1,10 +1,10 @@
 ---
 name: issue-pr-review
-description: Review a pull request end-to-end with automated fix cycles and CI monitoring. Analyzes code changes, runs all tests (unit, integration, e2e), checks CI status, fixes detected issues, and repeats up to 5 times until clean — then provides a summary report and auto-merges in auto-pilot mode. Replaces review-fix-loop with CI awareness. Use when asked to "review PR", "review and fix PR", "check this PR", "is this PR ready", "review-fix-loop", "review fix loop", "auto-review my PR", "fix review issues", "clean up this PR", "review until clean", "polish this branch", "make this PR ready", or "keep reviewing until it passes". Also trigger when auto-pilot needs to review a PR after issue resolution.
+description: Review a pull request end-to-end with token-optimized fix cycles — runs a script pre-pass for lint/format/test auto-fix before spawning LLM reviewers, filters by severity (only fix critical+high issues, note medium), and uses soft pass conditions (zero critical, ≤ 2 medium remaining). Up to 3 cycles max. Provides summary report and auto-merges in auto-pilot mode. Replaces review-fix-loop with CI awareness. Use when asked to "review PR", "review and fix PR", "check this PR", "is this PR ready", "review-fix-loop", "review fix loop", "auto-review my PR", "fix review issues", "clean up this PR", "review until clean", "polish this branch", "make this PR ready", or "keep reviewing until it passes". Also trigger when auto-pilot needs to review a PR after issue resolution.
 effort: high
 license: MIT
 metadata:
-  version: 0.1.0
+  version: 0.2.0
   creator: Luong NGUYEN <luongnv89@gmail.com>
 compatibility: Requires git and GitHub CLI (gh) with authentication. Self-contained — uses shared agents from shared/agents/.
 ---
@@ -44,7 +44,7 @@ If dirty: stash, sync, pop. If `origin` missing or conflicts: stop and ask (inte
 ## Configuration
 
 Load `.gitissue.yml` once. Defaults:
-- `review.max_cycles: 5`
+- `review.max_cycles: 3` — reduced from 5; script pre-pass handles mechanical issues, so 3 LLM cycles suffice for logic/architecture
 - `review.auto_merge: false` (overridden to `true` in auto mode)
 - `review.confidence_threshold: 80`
 - `review.run_tests: true`
@@ -52,6 +52,7 @@ Load `.gitissue.yml` once. Defaults:
 - `review.ci_poll_interval: 30` (seconds)
 - `review.ci_timeout: 600` (seconds, 10 minutes)
 - `review.test_timeout: 300` (seconds)
+- `review.soft_pass: true` — pass when zero "fix" issues remain, even if "note" issues exist (≤ 2 medium allowed)
 
 ---
 
@@ -60,19 +61,29 @@ Load `.gitissue.yml` once. Defaults:
 ```
   ◆ PR Review Pipeline
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  [1/6] PR Info      ✓ PR #87: fix(auth): resolve redirect (#42)
-  [2/6] Review       ● analyzing changes...
-  [3/6] Test         ✓ 17 tests passed, build ok
-  [4/6] CI Status    ✓ all checks passed
-  [5/6] Fix          ○ no issues to fix
-  [6/6] Report       ✓ PR is clean — ready to merge
+  [1/7] PR Info      ✓ PR #87: fix(auth): resolve redirect (#42)
+  [2/7] Pre-pass     ✓ lint clean, format clean, 17 tests passed
+  [3/7] Review       ● analyzing changes...
+  [4/7] Test         ✓ 17 tests passed, build ok
+  [5/7] CI Status    ✓ all checks passed
+  [6/7] Fix          ○ no fixable issues
+  [7/7] Report       ✓ PR is clean — ready to merge
 ```
 
-Steps 2-5 repeat up to `review.max_cycles` times. Step 6 runs once at the end.
+Step 2 (Pre-pass) runs once before the review loop. Steps 3-6 repeat up to `review.max_cycles` times (default: 3). Step 7 runs once at the end.
+
+### Token optimization strategy
+
+The pipeline is designed to minimize LLM token usage:
+
+1. **Script pre-pass (Step 2)** — Lint, format, and test tools run via shell scripts, not LLM agents. Auto-fixes mechanical issues for free (zero tokens). This handles the bulk of lint/format violations that previously consumed full review cycles.
+2. **Severity-based filtering** — The code reviewer classifies each issue with `action: "fix"` or `action: "note"`. Only "fix" issues trigger a fix cycle. "Note" issues are reported but don't consume tokens.
+3. **Soft pass condition** — The review passes when zero "fix" issues remain, even if some medium "note" issues exist. This avoids burning cycles on diminishing-return fixes.
+4. **Reduced cycles (3 max)** — With mechanical issues handled by scripts and only critical issues triggering fixes, 3 LLM cycles are sufficient.
 
 ---
 
-## Step 1 — Get PR Info
+## Step 1 — Get PR Info [1/7]
 
 ### Auto-detect PR
 
@@ -110,13 +121,75 @@ Extract:
 Stop.
 
 ```
-[1/6] PR Info      ✓ PR #{N}: {title}
+[1/7] PR Info      ✓ PR #{N}: {title}
                      {files_count} files changed, base: {base_branch}
 ```
 
 ---
 
-## Step 2 — Analyze & Review
+## Step 2 — Script Pre-pass [2/7]
+
+Before spawning any LLM reviewer, run deterministic tools to catch and auto-fix mechanical issues. This step uses zero LLM tokens — all work is done by scripts and CLI tools.
+
+### Detect project tooling
+
+Detect available lint/format/test tools from the project:
+
+| Tool type | Detection | Auto-fix command |
+|-----------|-----------|-----------------|
+| ESLint | `.eslintrc*` or `eslint` in package.json | `npx eslint --fix .` |
+| Prettier | `.prettierrc*` or `prettier` in package.json | `npx prettier --write .` |
+| Black | `pyproject.toml` with `[tool.black]` | `python -m black .` |
+| Ruff | `pyproject.toml` with `[tool.ruff]` or `ruff.toml` | `ruff check --fix . && ruff format .` |
+| isort | `pyproject.toml` with `[tool.isort]` | `python -m isort .` |
+| gofmt | `go.mod` | `gofmt -w .` |
+| rustfmt | `Cargo.toml` | `cargo fmt` |
+| clang-format | `.clang-format` | `find . -name '*.c' -o -name '*.h' \| xargs clang-format -i` |
+
+### Run auto-fix
+
+For each detected tool, run the auto-fix command. Capture output but don't block on warnings — only block on errors that prevent the fix from running.
+
+```bash
+# Example for a Node.js project:
+npx eslint --fix . 2>&1
+npx prettier --write . 2>&1
+```
+
+### Run tests
+
+Run the project's test suite to catch test failures early (before the LLM review):
+
+```bash
+# Detected test runner
+npm test          # or pytest, go test ./..., cargo test, etc.
+```
+
+### Commit auto-fixes
+
+If any files were modified by the auto-fix tools:
+
+```bash
+git add -A
+git commit -m "style: auto-fix lint and format issues"
+git push origin {branch_name}
+```
+
+```
+[2/7] Pre-pass     ✓ lint clean, format clean, {N} tests passed
+                     Auto-fixed: {files_fixed} files (lint/format)
+```
+
+If no tools detected:
+```
+[2/7] Pre-pass     ○ no lint/format tools detected, tests: {N} passed
+```
+
+If tests fail at this stage, continue to the review loop — test failures will be picked up in Step 4 and addressed in the fix cycle.
+
+---
+
+## Step 3 — Analyze & Review [3/7]
 
 Spawn a **fresh** code-reviewer agent each cycle. Fresh context ensures no bias from prior review passes.
 
@@ -146,12 +219,12 @@ gh issue view {linked_issue} --json number,title,body,labels
 Check each acceptance criterion against the PR changes.
 
 ```
-[2/6] Review       ✓ {result} — {issues_found} issues found
+[3/7] Review       ✓ {result} — {fixable_count} fixable, {note_count} noted
 ```
 
 ---
 
-## Step 3 — Run Tests & Build
+## Step 4 — Run Tests & Build [4/7]
 
 ### Build check
 
@@ -176,18 +249,18 @@ Detect and run all test types:
 Timeout: `review.test_timeout` seconds (default: 300).
 
 ```
-[3/6] Test         ✓ build ok, {N} tests passed
+[4/7] Test         ✓ build ok, {N} tests passed
 ```
 
 Or if failures:
 ```
-[3/6] Test         ✗ {N} tests failed
+[4/7] Test         ✗ {N} tests failed
                      {brief failure summary}
 ```
 
 ---
 
-## Step 4 — Check CI Status
+## Step 5 — Check CI Status [5/7]
 
 Poll GitHub Actions / CI status for the PR:
 
@@ -205,12 +278,12 @@ gh pr checks {N} --json name,state,bucket
 
 **All checks passed:**
 ```
-[4/6] CI Status    ✓ all checks passed
+[5/7] CI Status    ✓ all checks passed
 ```
 
 **Checks failed:**
 ```
-[4/6] CI Status    ✗ {N} checks failed
+[5/7] CI Status    ✗ {N} checks failed
                      {check_name}: {bucket}
 ```
 
@@ -221,35 +294,36 @@ gh run view {run_id} --log-failed
 
 **Checks still running after timeout:**
 ```
-[4/6] CI Status    ⚠ checks still running after {timeout}s
+[5/7] CI Status    ⚠ checks still running after {timeout}s
 ```
 In interactive mode: ask to wait more or proceed.
 In auto mode: proceed — the next cycle will re-check.
 
 **No CI configured:**
 ```
-[4/6] CI Status    ○ no CI checks configured
+[5/7] CI Status    ○ no CI checks configured
 ```
 
 ---
 
-## Step 5 — Fix Issues
+## Step 6 — Fix Issues [6/7]
 
-Collect all issues from Steps 2-4:
-- Code review issues (from the reviewer agent)
-- Test failures (from Step 3)
-- CI failures (from Step 4)
+Collect issues from Steps 3-5, but **only fix issues with `action: "fix"`**. Issues with `action: "note"` are reported in the summary but do not trigger a fix cycle. This is the key token optimization — note-only issues (medium code_quality, test_coverage suggestions) are skipped.
 
-### If no issues
+- Code review issues with `action: "fix"` (from the reviewer agent)
+- Test failures (from Step 4)
+- CI failures (from Step 5)
+
+### If no fixable issues
 
 ```
-[5/6] Fix          ○ no issues to fix
+[6/7] Fix          ○ no fixable issues (noted: {note_count})
 ```
-Exit the loop — PR is clean.
+Exit the loop — PR passes the soft-pass condition.
 
-### If issues found
+### If fixable issues found
 
-For each issue:
+For each issue where `action: "fix"`:
 1. Read the affected file
 2. Apply the fix
 3. Stage: `git add <specific-file>`
@@ -259,32 +333,33 @@ After all fixes:
 5. Push: `git push origin {branch_name}`
 
 ```
-[5/6] Fix          ✓ fixed {N} issues
+[6/7] Fix          ✓ fixed {N} issues (noted: {note_count} — not fixed)
 ```
 
-Track what was fixed:
+Track what was fixed and what was noted:
 ```
 Cycle {N}:
-  ✗ {issues_found} issues found
+  ✗ {fixable_count} fixable issues found
   ✓ Fixed: [category] description (file:line)
   ✓ Fixed: [category] description (file:line)
+  ○ Noted: [category] description (file:line) — medium, not blocking
 ```
 
 ---
 
 ## Review Loop
 
-After Step 5, go back to Step 2 with a fresh reviewer agent.
+After Step 6, go back to Step 3 with a fresh reviewer agent.
 
 **Loop controls:**
-- **Max cycles:** `review.max_cycles` (default: 5)
-- **Exit on clean:** Stop when reviewer returns `PASS` AND tests pass AND CI passes
+- **Max cycles:** `review.max_cycles` (default: 3)
+- **Soft pass (default):** Stop when zero `action: "fix"` issues remain AND tests pass AND CI passes. Medium "note" issues (≤ 2) are allowed — they don't block the pass. This avoids burning cycles on diminishing-return fixes.
 - **Exit on stagnation:** If the same issues appear in 2 consecutive cycles, stop and report
-- **Review-only mode:** Run one cycle of Steps 2-4 only, never fix or loop
+- **Review-only mode:** Run one cycle of Steps 3-5 only, never fix or loop
 
 ---
 
-## Step 6 — Summary Report
+## Step 7 — Summary Report [7/7]
 
 Print a structured step-by-step summary showing the review pipeline results.
 
@@ -294,10 +369,12 @@ Print a structured step-by-step summary showing the review pipeline results.
 ◆ PR Review: #{pr_number} (pass {N} — clean)
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
 
+  Script pre-pass:   ✓ lint/format auto-fixed ({auto_fixed} files)
   Code review:       ✓ pass
   Tests:             ✓ pass ({count} passed)
   CI status:         ✓ pass ({checks_count} checks passed)
   Issues fixed:      ✓ {total_fixed} total across {cycles} cycles
+  Issues noted:      ○ {note_count} (medium, not blocking)
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Result:            PASS
 
@@ -355,9 +432,9 @@ In interactive mode: never auto-merge. Just report status.
 
 When invoked with `--review-only`:
 
-1. Run Steps 1-4 once (PR info, review, test, CI check)
-2. Skip Step 5 (no fixes)
-3. Report findings in Step 6
+1. Run Steps 1-5 once (PR info, pre-pass, review, test, CI check)
+2. Skip Step 6 (no fixes)
+3. Report findings in Step 7
 4. Never loop, never fix, never merge
 
 ---
@@ -369,7 +446,7 @@ Every `gh` command uses `--json` with explicit field selection. Never parse text
 ## Terminal Output
 
 Follow DESIGN.md symbol vocabulary:
-- Step counter: `[N/6]`
+- Step counter: `[N/7]`
 - Symbols: `●` progress, `✓` success, `✗` failure, `◆` header, `⚠` warning, `○` info
 - Two-space indent, `┄` separators, URLs on own line, max 80 chars
 
