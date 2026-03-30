@@ -1,10 +1,10 @@
 ---
 name: auto-pilot
-description: Fully automated development loop that triages open issues, picks the highest-priority task, resolves it end-to-end, reviews the PR with up to 3 token-optimized fix-review cycles (script pre-pass handles lint/format, LLM only fixes critical issues), and if issues remain creates a follow-up issue then merges the PR anyway so progress is never lost. Critical issues get special treatment — if a critical issue cannot be fully resolved, the loop stops and asks the user for a decision instead of auto-continuing. When given an explicit issue list, runs deep analysis first to identify dependencies, optimal resolution order, and opportunities to batch-resolve related issues with minimum changes — saving iterations and reducing conflicts. Use this skill whenever someone says "auto-pilot", "autopilot", "auto resolve all issues", "resolve everything", "work through the backlog", "resolve all", "run the loop", "automate the backlog", "hands-free mode", "keep going until done", or wants the agent to continuously triage-resolve-review-merge without manual intervention. Also trigger when someone asks to "process all issues", "batch resolve", "resolve next", "work on issues automatically", "start the dev loop", "resolve issues 1, 2, 3", "work on these issues", "resolve #5 #10 #12 in order", or provides a list of issue numbers to process.
+description: Fully automated development loop that triages open issues, picks the highest-priority task, resolves it end-to-end, reviews the PR with up to 3 token-optimized fix-review cycles (script pre-pass handles lint/format, LLM only fixes critical issues), and if issues remain creates a follow-up issue then merges the PR anyway so progress is never lost. Critical issues get special treatment — if unresolvable, the loop stops and asks the user instead of auto-continuing. Use this skill whenever someone says "auto-pilot", "autopilot", "auto resolve all issues", "resolve everything", "work through the backlog", "resolve all", "run the loop", "automate the backlog", "hands-free mode", "keep going until done", or wants the agent to continuously triage-resolve-review-merge without manual intervention.
 effort: max
 license: MIT
 metadata:
-  version: 2.1.0
+  version: 2.1.1
   creator: Luong NGUYEN <luongnv89@gmail.com>
 compatibility: Requires git and GitHub CLI (gh) with authentication and push access. Requires merge permission for auto-merge. Uses /issue-triage, /issue-resolver, /issue-analysis, and /issue-pr-review skills internally. All agents are in shared/agents/.
 ---
