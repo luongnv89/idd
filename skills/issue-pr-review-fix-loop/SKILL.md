@@ -1,6 +1,6 @@
 ---
 name: issue-pr-review-fix-loop
-description: Outer review-fix loop that calls /issue-pr-review in review-only mode, fixes detected issues with a fresh context each cycle, commits, pushes, and repeats until clean or max cycles reached. Each cycle gets genuinely independent fresh-eyes review because the reviewer subagent has zero memory of prior passes. Use when asked to "review and fix my PR", "review fix loop", "keep fixing until clean", "polish this PR", "clean up this PR iteratively", "fresh review each pass", "independent review loop", or when you want to ensure each review pass is truly unbiased by prior context. Also trigger when auto-pilot needs a review-fix-merge cycle with guaranteed context isolation between passes.
+description: Outer review-fix loop that calls /issue-pr-review in review-only mode, fixes detected issues, commits, pushes, and repeats until clean or max cycles reached. Reuses the same reviewer and fixer agents across cycles for efficiency, with a fresh confirmation pass at the end to provide an unbiased final check. Use when asked to "review and fix my PR", "review fix loop", "keep fixing until clean", "polish this PR", "clean up this PR iteratively", "review loop", or when you want iterative review-fix cycles with a fresh confirmation at the end. Also trigger when auto-pilot needs a review-fix-merge cycle.
 effort: high
 license: MIT
 metadata:
@@ -11,7 +11,7 @@ compatibility: Requires git and GitHub CLI (gh) with authentication. Depends on 
 
 # /issue-pr-review-fix-loop [PR_NUMBER]
 
-Outer loop that reviews a PR, fixes issues, commits, and repeats — each cycle with a completely fresh reviewer context.
+Outer loop that reviews a PR, fixes issues, commits, and repeats — with agent reuse across cycles and a fresh confirmation pass at the end.
 
 ## Why This Exists
 
@@ -20,7 +20,7 @@ Outer loop that reviews a PR, fixes issues, commits, and repeats — each cycle 
 1. **Reviewer subagent** — runs `/issue-pr-review --review-only`, returns structured issues
 2. **Fixer subagent** — reads files, applies fixes, commits, pushes
 
-The main agent never touches code — it only tracks cycle counts, issue counts, and pass/fail. This guarantees genuinely independent reviews where cycle N cannot be biased by what cycles 1 through N-1 found or fixed.
+The main agent never touches code — it only tracks cycle counts, issue counts, and pass/fail. Cycles 2+ reuse the same reviewer and fixer agents for efficiency (the reviewer verifies its own issues were fixed, and the fixer retains repo context). A fresh confirmation pass at the end provides the unbiased check where it matters most — after all fixes are applied.
 
 ## Invocation
 
