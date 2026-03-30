@@ -1,10 +1,10 @@
 ---
 name: issue-pr-review
-description: Review a pull request end-to-end with token-optimized fix cycles — runs a script pre-pass for lint/format/test auto-fix before spawning LLM reviewers, filters by severity (only fix critical+high issues, note medium), and uses soft pass conditions (zero critical, ≤ 2 medium remaining). Up to 3 cycles max. Provides summary report and auto-merges in auto-pilot mode. Replaces review-fix-loop with CI awareness. Use when asked to "review PR", "review and fix PR", "check this PR", "is this PR ready", "review-fix-loop", "review fix loop", "auto-review my PR", "fix review issues", "clean up this PR", "review until clean", "polish this branch", "make this PR ready", or "keep reviewing until it passes". Also trigger when auto-pilot needs to review a PR after issue resolution.
+description: Review a pull request end-to-end with token-optimized fix cycles — runs a script pre-pass for lint/format/test auto-fix, reuses the same reviewer and fixer agents across cycles (only spawns fresh for the final confirmation pass), filters by severity (only fix critical+high issues, note medium), and uses soft pass conditions (zero critical, ≤ 2 medium remaining). Up to 3 cycles max. Provides summary report and auto-merges in auto-pilot mode. Replaces review-fix-loop with CI awareness. Use when asked to "review PR", "review and fix PR", "check this PR", "is this PR ready", "review-fix-loop", "review fix loop", "auto-review my PR", "fix review issues", "clean up this PR", "review until clean", "polish this branch", "make this PR ready", or "keep reviewing until it passes". Also trigger when auto-pilot needs to review a PR after issue resolution.
 effort: high
 license: MIT
 metadata:
-  version: 0.2.0
+  version: 0.3.0
   creator: Luong NGUYEN <luongnv89@gmail.com>
 compatibility: Requires git and GitHub CLI (gh) with authentication. Self-contained — uses shared agents from shared/agents/.
 ---
@@ -77,9 +77,10 @@ Step 2 (Pre-pass) runs once before the review loop. Steps 3-6 repeat up to `revi
 The pipeline is designed to minimize LLM token usage:
 
 1. **Script pre-pass (Step 2)** — Lint, format, and test tools run via shell scripts, not LLM agents. Auto-fixes mechanical issues for free (zero tokens). This handles the bulk of lint/format violations that previously consumed full review cycles.
-2. **Severity-based filtering** — The code reviewer classifies each issue with `action: "fix"` or `action: "note"`. Only "fix" issues trigger a fix cycle. "Note" issues are reported but don't consume tokens.
-3. **Soft pass condition** — The review passes when zero "fix" issues remain, even if some medium "note" issues exist. This avoids burning cycles on diminishing-return fixes.
-4. **Reduced cycles (3 max)** — With mechanical issues handled by scripts and only critical issues triggering fixes, 3 LLM cycles are sufficient.
+2. **Agent reuse (Steps 3-6)** — The same reviewer and fixer agents are reused across fix cycles via `SendMessage`. Only the final confirmation pass spawns a fresh agent. This cuts agent spawn cost from 2 per cycle to ~1.3 average (reuse in cycles 2-3, fresh only for confirmation).
+3. **Severity-based filtering** — The code reviewer classifies each issue with `action: "fix"` or `action: "note"`. Only "fix" issues trigger a fix cycle. "Note" issues are reported but don't consume tokens.
+4. **Soft pass condition** — The review passes when zero "fix" issues remain, even if some medium "note" issues exist. This avoids burning cycles on diminishing-return fixes.
+5. **Reduced cycles (3 max)** — With mechanical issues handled by scripts and only critical issues triggering fixes, 3 LLM cycles are sufficient.
 
 ---
 
@@ -191,7 +192,17 @@ If tests fail at this stage, continue to the review loop — test failures will 
 
 ## Step 3 — Analyze & Review [3/7]
 
-Spawn a **fresh** code-reviewer agent each cycle. Fresh context ensures no bias from prior review passes.
+### Agent reuse strategy
+
+To minimize token usage, the review loop **reuses the same reviewer agent** across fix cycles instead of spawning a fresh one each time. The reviewer already has the codebase context loaded, so subsequent reviews are cheaper.
+
+- **Cycle 1:** Spawn a new reviewer agent (cold start — reads diff, files, context)
+- **Cycles 2-3:** Send the reviewer a follow-up message via `SendMessage` asking it to re-review the diff after fixes were applied. The agent retains its context and only needs to re-read the updated diff, not re-discover the entire codebase.
+- **Confirmation pass:** After the fixer reports all issues resolved, spawn a **fresh confirmation reviewer** (separate agent, no memory of prior cycles) for an unbiased final check. This is the only fresh spawn after cycle 1.
+
+This trades perfect independence between cycles (which rarely matters in practice — the reviewer was already correct about what the issues were) for significant token savings. The fresh confirmation pass at the end catches anything the reused reviewer might have missed.
+
+### Cycle 1 — Initial review
 
 Read `shared/agents/code-reviewer.md` for the full prompt template.
 
@@ -201,14 +212,23 @@ Pass to the reviewer:
 - `pr_context`: PR title and body
 - `diff_command`: `gh pr diff {N}`
 
-The reviewer returns structured JSON:
-```json
-{
-  "result": "PASS" or "NEEDS_FIX",
-  "issues_found": N,
-  "issues": [ ... ],
-  "summary": "..."
-}
+### Cycles 2+ — Re-review via SendMessage
+
+Send a message to the existing reviewer agent:
+```
+The fixer applied changes. Re-review the PR diff to check if the issues were resolved and find any new issues.
+
+Run: {diff_command}
+
+Return the same JSON format as before.
+```
+
+### Confirmation pass
+
+After the fix cycle reports zero fixable issues, spawn a **fresh** confirmation reviewer (new agent, no memory). If it finds new fixable issues, they go back to the existing fixer. If it confirms clean, the PR passes.
+
+```
+[3/7] Review       ✓ {result} — {fixable_count} fixable, {note_count} noted
 ```
 
 Also fetch linked issues for acceptance criteria verification:
@@ -217,10 +237,6 @@ gh issue view {linked_issue} --json number,title,body,labels
 ```
 
 Check each acceptance criterion against the PR changes.
-
-```
-[3/7] Review       ✓ {result} — {fixable_count} fixable, {note_count} noted
-```
 
 ---
 
@@ -349,11 +365,13 @@ Cycle {N}:
 
 ## Review Loop
 
-After Step 6, go back to Step 3 with a fresh reviewer agent.
+After Step 6, go back to Step 3 — but reuse the same reviewer agent via `SendMessage` (not a fresh spawn). Only spawn fresh for the confirmation pass.
 
 **Loop controls:**
 - **Max cycles:** `review.max_cycles` (default: 3)
-- **Soft pass (default):** Stop when zero `action: "fix"` issues remain AND tests pass AND CI passes. Medium "note" issues (≤ 2) are allowed — they don't block the pass. This avoids burning cycles on diminishing-return fixes.
+- **Agent reuse:** Cycles 2+ reuse the existing reviewer and fixer agents. Fresh spawn only for the confirmation pass after fixer reports zero issues.
+- **Soft pass (default):** Stop when zero `action: "fix"` issues remain AND tests pass AND CI passes. Medium "note" issues (≤ 2) are allowed — they don't block the pass.
+- **Confirmation pass:** When the fixer reports all fixed, spawn one fresh reviewer for unbiased verification. If clean → PASS. If new issues → back to existing fixer (counts as a cycle).
 - **Exit on stagnation:** If the same issues appear in 2 consecutive cycles, stop and report
 - **Review-only mode:** Run one cycle of Steps 3-5 only, never fix or loop
 

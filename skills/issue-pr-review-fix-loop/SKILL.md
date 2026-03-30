@@ -4,7 +4,7 @@ description: Outer review-fix loop that calls /issue-pr-review in review-only mo
 effort: high
 license: MIT
 metadata:
-  version: 0.2.0
+  version: 0.3.0
   creator: Luong NGUYEN <luongnv89@gmail.com>
 compatibility: Requires git and GitHub CLI (gh) with authentication. Depends on /issue-pr-review skill (skills/issue-pr-review/SKILL.md). Uses shared agents from shared/agents/.
 ---
@@ -67,17 +67,21 @@ Load `.gitissue.yml` once. Relevant defaults:
   Main Agent (orchestrator — never reads code)
   │
   ├── Cycle 1/3
-  │     [Review]   ⟶ Reviewer subagent (/issue-pr-review --review-only)
+  │     [Review]   ⟶ Spawn reviewer subagent (/issue-pr-review --review-only)
   │     [Result]   ✗ NEEDS_FIX — 2 fixable, 1 noted
-  │     [Fix]      ⟶ Fixer subagent (only "fix" issues, skip "note")
+  │     [Fix]      ⟶ Spawn fixer subagent (only "fix" issues, skip "note")
   │     [Fix]      ✓ fixed 2 issues, noted 1
   │     [Commit]   ✓ fix(scope): address review feedback (#42)
   │     [Push]     ✓ pushed to origin
   │
-  └── Cycle 2/3
-        [Review]   ⟶ Reviewer subagent (fresh — no memory of cycle 1)
-        [Result]   ✓ PASS — 0 fixable issues (1 noted, not blocking)
-        [Done]     ✓ PR is clean after 2 cycles
+  ├── Cycle 2/3
+  │     [Review]   ⟶ SendMessage to SAME reviewer (re-review after fixes)
+  │     [Result]   ✓ PASS — 0 fixable issues (1 noted, not blocking)
+  │
+  └── Confirmation
+        [Confirm]  ⟶ Spawn FRESH reviewer (unbiased final check)
+        [Result]   ✓ PASS — confirmed clean
+        [Done]     ✓ PR is clean after 2 cycles + confirmation
 
   ◆ Summary
   ┄┄┄┄┄┄┄┄┄
@@ -131,16 +135,17 @@ Initialize:
 - `cycle_history = []`
 - `previous_issues = null` (for stagnation detection)
 
-### Step 1 — Review (fresh subagent)
+### Step 1 — Review (reuse agent when possible)
 
-Spawn a **new** subagent each cycle. The subagent has no memory of prior cycles — this is the whole point of the outer loop architecture.
+**Cycle 1:** Spawn a new reviewer subagent (cold start — loads codebase context).
+**Cycles 2+:** Reuse the same reviewer via `SendMessage` — it already has the codebase context loaded, so re-review is cheaper (only re-reads the diff).
 
 ```
 Cycle {cycle}/{max_cycles}
-  [Review]   ⟶ Spawning fresh reviewer...
+  [Review]   ⟶ {Spawning reviewer... | Re-reviewing with existing reviewer...}
 ```
 
-**Subagent prompt:**
+**Cycle 1 subagent prompt (spawn new):**
 
 ```
 Review pull request #{pr_number} in this repository.
@@ -167,6 +172,7 @@ When done, report back ONLY these fields as JSON:
       "category": "correctness|test_coverage|code_quality|security|edge_cases",
       "severity": "high|medium",
       "confidence": <80-100>,
+      "action": "fix|note",
       "description": "one-line description",
       "file": "path/to/file",
       "line": <line number>,
@@ -181,6 +187,16 @@ When done, report back ONLY these fields as JSON:
 ```
 
 Do **NOT** set `subagent_type` — use the default general-purpose agent.
+
+**Cycles 2+ message (SendMessage to existing reviewer):**
+
+```
+The fixer applied changes to the PR. Re-review the diff to check if issues were resolved and find any new issues.
+
+Run the diff again: gh pr diff {pr_number}
+
+Return the same JSON format as your previous review.
+```
 
 ### Step 2 — Evaluate Result
 
@@ -204,27 +220,30 @@ Exit the loop — PR is clean. Proceed to Summary.
 ```
 Exit the loop. Proceed to Summary with remaining issues.
 
-### Step 3 — Fix Issues (fixer subagent)
+### Step 3 — Fix Issues (reuse fixer agent when possible)
 
-Spawn a **fixer subagent** to apply fixes, commit, and push. The main agent never reads source code — this keeps its context clean so it cannot influence future review cycles.
+**Cycle 1:** Spawn a new fixer subagent (cold start — loads repo context).
+**Cycles 2+:** Reuse the same fixer via `SendMessage` with the new issues to fix. The fixer already knows the repo layout, so subsequent fixes are cheaper.
+
+The main agent never reads source code — this keeps its context clean.
 
 ```
-  [Fix]      ⟶ Spawning fixer subagent...
+  [Fix]      ⟶ {Spawning fixer... | Sending new issues to existing fixer...}
 ```
 
-**Fixer subagent prompt:**
+**Cycle 1 fixer subagent prompt (spawn new):**
 
 ```
 Fix the following review issues found in PR #{pr_number} on branch {head_branch}.
 
-Issues to fix:
+Issues to fix (only issues with action "fix" — skip "note" issues):
 {formatted_issues_json}
 
 Instructions:
 1. Sync with remote first:
    git fetch origin
    git pull --rebase origin {head_branch}
-2. For each issue:
+2. For each issue where action is "fix":
    a. Read the affected file
    b. Apply the fix described in "suggested_fix"
    c. Stage the specific file: git add <file>
@@ -255,6 +274,17 @@ When done, report back ONLY these fields as JSON:
 
 Do **NOT** set `subagent_type` — use the default general-purpose agent.
 
+**Cycles 2+ message (SendMessage to existing fixer):**
+
+```
+New review issues to fix on branch {head_branch}. Sync first, then fix and push.
+
+Issues to fix:
+{formatted_issues_json}
+
+Same instructions and output format as before.
+```
+
 **On success:**
 ```
   [Fix]      ✓ fixed {N} issues
@@ -281,11 +311,33 @@ Update tracking:
 - `previous_issues = current_issues` (for stagnation detection)
 - `cycle_history.append({cycle, issues_found, issues_fixed, categories})`
 
-### Step 4 — Loop Back
+### Step 4 — Loop Back or Confirm
 
-Increment `cycle`. If `cycle < max_cycles`, go back to Step 1 with a fresh subagent.
+Increment `cycle`.
 
-If `cycle >= max_cycles` and issues remain, exit with remaining issues.
+**If reviewer returned NEEDS_FIX and `cycle < max_cycles`:** Go back to Step 1 — reuse the existing reviewer via `SendMessage` (not a fresh spawn).
+
+**If reviewer returned PASS (zero fixable issues):** Proceed to the **Confirmation Pass** (Step 5).
+
+**If `cycle >= max_cycles` and fixable issues remain:** Exit with remaining issues — skip confirmation.
+
+### Step 5 — Confirmation Pass (fresh reviewer)
+
+This is the only point where a **fresh agent** is spawned after cycle 1. The fresh reviewer has no memory of prior cycles, providing an unbiased final check.
+
+```
+  [Confirm]  ⟶ Spawning fresh confirmation reviewer...
+```
+
+Use the same reviewer prompt as cycle 1 (full `/issue-pr-review --review-only`), but this is a new agent — no `SendMessage`.
+
+**If confirmation returns PASS:** The PR is confirmed clean. Proceed to Summary.
+
+**If confirmation returns NEEDS_FIX:** The reused reviewer missed something. Send the new issues to the existing fixer via `SendMessage` (this counts as a cycle). After fixing, the confirmation reviewer itself re-checks (via `SendMessage` to the confirmation agent). If it passes, done. If it fails again and cycles remain, repeat. If max cycles hit, exit with remaining issues.
+
+```
+  [Confirm]  ✓ PASS — confirmed clean by fresh reviewer
+```
 
 ---
 
@@ -361,9 +413,10 @@ In interactive mode: never auto-merge. Just report status.
 ## Main Agent Rules
 
 The main agent is a **lightweight orchestrator**. It should:
-- Track: cycle count, issue counts, pass/fail, cycle history
-- Spawn: one fresh reviewer subagent per cycle (Step 1)
-- Spawn: one fresh fixer subagent per cycle when issues are found (Step 3)
+- Track: cycle count, issue counts, pass/fail, cycle history, agent IDs
+- **Cycle 1:** Spawn one reviewer subagent + one fixer subagent (if needed)
+- **Cycles 2+:** Reuse the existing reviewer and fixer via `SendMessage`
+- **Confirmation:** Spawn one fresh reviewer for the final unbiased check
 - Parse subagent results and decide whether to loop, stop, or report
 
 The main agent should **never**:
@@ -372,9 +425,15 @@ The main agent should **never**:
 - Perform code review itself (the reviewer subagent does that)
 - Run tests (the reviewer subagent does that)
 - Apply fixes or run git commands beyond PR info fetching
-- Carry any code-level context from one cycle to the next
 
-This strict separation is what guarantees fresh-eyes review each cycle. The main agent's context window contains only metadata (PR number, issue counts, pass/fail), never code.
+### Why reuse agents?
+
+Spawning a fresh agent each cycle was the original design — it guaranteed unbiased reviews. But in practice:
+- The reviewer correctly identifies issues in cycle 1. Re-reviewing after fixes doesn't need a blank slate — it needs the same reviewer to verify its own issues were fixed.
+- The fixer already knows the repo layout from cycle 1. Subsequent fixes are cheaper with context retained.
+- The **fresh confirmation pass** at the end provides the unbiased check where it matters most — after all fixes are applied.
+
+**Token savings:** Instead of 2 fresh spawns per cycle (reviewer + fixer), we get 2 fresh spawns for cycle 1 + 1 fresh spawn for confirmation = 3 total regardless of cycle count. Previously: 2 × max_cycles = 6 spawns for 3 cycles.
 
 ---
 

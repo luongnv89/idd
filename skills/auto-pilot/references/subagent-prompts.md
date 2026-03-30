@@ -60,6 +60,7 @@ Instructions:
    - Only fix "fix" issues — "note" issues are reported but don't consume fix cycles
    - Run all tests (unit, integration, e2e, build/compile)
    - Check CI status
+   - Reuse the same reviewer/fixer agents across cycles (SendMessage), only spawn fresh for the final confirmation pass
    - Repeat up to {review_cycles} cycles (default: 3, override review.max_cycles with this value)
    - Soft pass: stop when zero "fix" issues remain (≤ 2 medium "note" issues allowed)
 4. Do NOT merge the PR — merging is handled by the main agent in Phase 5

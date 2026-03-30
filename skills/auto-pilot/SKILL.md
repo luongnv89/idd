@@ -596,11 +596,12 @@ After the PR is created, the auto-pilot delegates review, testing, CI checking, 
 ### What issue-pr-review does in auto mode
 
 1. **Script pre-pass** — runs lint/format auto-fix tools, then tests (zero LLM tokens)
-2. Analyzes PR changes (code review with fresh agent each cycle, only reports "fix" vs "note" issues)
+2. Analyzes PR changes (cycle 1: fresh reviewer; cycles 2+: reuses same reviewer via SendMessage)
 3. Runs all tests (unit, integration, e2e) and build/compile
 4. Checks CI status (polls GitHub Actions until complete)
-5. Fixes only `action: "fix"` issues (critical/high severity) — notes medium issues without spending tokens
+5. Fixes only `action: "fix"` issues — reuses the same fixer agent across cycles
 6. Repeats steps 2-5 up to `review_cycles` cycles (default: 3)
+7. **Confirmation pass** — spawns one fresh reviewer for unbiased final check
 
 See `skills/issue-pr-review/SKILL.md` for the full pipeline.
 
