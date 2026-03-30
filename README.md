@@ -58,9 +58,9 @@ graph LR
 | `/issue-resolver N` | 6-step pipeline: preflight, research, plan, implement, QA, deliver PR with `Closes #N` | 0.6.0 | max |
 | `/issue-triage` | Dependency graph, stale detection, already-fixed detection via commit/PR scanning, priority and execution order | 0.5.0 | medium |
 | `/init-gitissue` | Auto-detect language/framework/test runner, generate `.gitissue.yml` | 0.3.0 | low |
-| `/auto-pilot` | Triage → resolve → review → merge loop, fully automated backlog processing | 0.7.0 | max |
-| `/issue-pr-review` | Review PR end-to-end: code review, tests, CI check, fix issues, repeat until clean | 0.1.0 | high |
-| `/issue-pr-review-fix-loop` | Outer review-fix loop: fresh reviewer each cycle, fix, commit, push, repeat until clean | 0.1.0 | high |
+| `/auto-pilot` | Triage → resolve → review → merge loop, fully automated backlog processing | 2.1.0 | max |
+| `/issue-pr-review` | Review PR end-to-end: token-optimized code review with script pre-pass, reuses reviewer/fixer agents across cycles, fixes critical+high issues | 0.3.0 | high |
+| `/issue-pr-review-fix-loop` | Outer review-fix loop: reuses reviewer/fixer agents across cycles, fresh confirmation pass at the end, fix, commit, push, repeat until clean | 0.3.0 | high |
 
 ---
 
@@ -385,11 +385,11 @@ Pipeline:
 [6/6] Report       ✓ PR is clean — ready to merge
 ```
 
-Max 5 review-fix cycles with stagnation detection.
+Max 3 review-fix cycles with stagnation detection.
 
 ### /issue-pr-review-fix-loop -- Outer Review-Fix Loop
 
-Wraps `/issue-pr-review` in an outer loop where each cycle spawns a completely fresh reviewer with zero memory of prior passes. Guarantees genuinely independent reviews.
+Wraps `/issue-pr-review` in an outer loop that reuses the same reviewer and fixer agents across cycles for efficiency. A fresh confirmation pass runs at the end to provide an unbiased final check after all fixes are applied.
 
 ```
 /issue-pr-review-fix-loop 87       # review-fix loop for PR #87
@@ -400,19 +400,23 @@ Wraps `/issue-pr-review` in an outer loop where each cycle spawns a completely f
 Loop:
 
 ```
-Cycle 1/5
-  [Review]   ⟶ Spawn /issue-pr-review --review-only (fresh subagent)
+Cycle 1/3
+  [Review]   ⟶ /issue-pr-review --review-only (reused reviewer agent)
   [Result]   ✗ NEEDS_FIX — 3 issues
-  [Fix]      ✓ fixed 3 issues
+  [Fix]      ✓ fixed 3 issues (reused fixer agent)
   [Commit]   ✓ fix(auth): address review feedback (#42)
   [Push]     ✓ pushed to origin
 
-Cycle 2/5
-  [Review]   ⟶ Spawn /issue-pr-review --review-only (fresh subagent)
+Cycle 2/3
+  [Review]   ⟶ /issue-pr-review --review-only (reused reviewer agent)
   [Result]   ✓ PASS — 0 issues
+
+Confirmation
+  [Review]   ⟶ Fresh reviewer (independent final check)
+  [Result]   ✓ PASS — confirmed clean
 ```
 
-Max 5 cycles with stagnation detection. Each cycle creates an atomic commit.
+Max 3 cycles with stagnation detection. Each cycle creates an atomic commit.
 
 ### /init-gitissue -- Generate Config
 

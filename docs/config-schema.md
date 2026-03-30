@@ -123,10 +123,10 @@ resolve:
 review:
   # Max review-fix cycles before stopping
   # Type: integer
-  # Default: 5
+  # Default: 3
   # Minimum: 1
   # Maximum: 10
-  max_cycles: 5
+  max_cycles: 3
 
   # Auto-merge PR when clean (overridden to true in --auto mode)
   # Type: boolean
@@ -182,10 +182,10 @@ autopilot:
 
   # Max review-fix cycles per PR (overrides review.max_cycles in subagent prompt)
   # Type: integer
-  # Default: 5
+  # Default: 3
   # Minimum: 1
   # Maximum: 10
-  review_cycles: 5
+  review_cycles: 3
 
   # Auto-merge PRs after review passes
   # Type: boolean
