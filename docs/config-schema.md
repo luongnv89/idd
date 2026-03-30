@@ -123,10 +123,10 @@ resolve:
 review:
   # Max review-fix cycles before stopping
   # Type: integer
-  # Default: 5
+  # Default: 3
   # Minimum: 1
   # Maximum: 10
-  max_cycles: 5
+  max_cycles: 3
 
   # Auto-merge PR when clean (overridden to true in --auto mode)
   # Type: boolean
@@ -171,6 +171,11 @@ review:
   # Maximum: 3600
   test_timeout: 300
 
+  # Treat soft-pass (no critical issues but minor warnings) as pass
+  # Type: boolean
+  # Default: true
+  soft_pass: true
+
 # Auto-pilot settings (used by /auto-pilot)
 autopilot:
   # Max iterations (issues to process) before stopping
@@ -182,10 +187,10 @@ autopilot:
 
   # Max review-fix cycles per PR (overrides review.max_cycles in subagent prompt)
   # Type: integer
-  # Default: 5
+  # Default: 3
   # Minimum: 1
   # Maximum: 10
-  review_cycles: 5
+  review_cycles: 3
 
   # Auto-merge PRs after review passes
   # Type: boolean
@@ -204,6 +209,13 @@ autopilot:
     - wontfix
     - blocked
     - do-not-merge
+
+  # Labels that mark an issue as critical (processed first)
+  # Type: array of strings
+  # Default: ["critical", "priority:critical"]
+  critical_labels:
+    - critical
+    - priority:critical
 
 # Triage settings
 triage:
@@ -328,12 +340,14 @@ graph TD
     RV --> RV6["ci_poll_interval"]
     RV --> RV7["ci_timeout"]
     RV --> RV8["test_timeout"]
+    RV --> RV9["soft_pass"]
 
     AP --> AP1["max_iterations"]
     AP --> AP2["review_cycles"]
     AP --> AP3["auto_merge"]
     AP --> AP4["pause_on_failure"]
     AP --> AP5["skip_labels"]
+    AP --> AP6["critical_labels"]
 
     T --> T1["stale_threshold_days"]
     T --> T2["auto_priority"]
@@ -396,6 +410,21 @@ Config is validated on load at the start of every skill invocation. Errors inclu
 | `resolve.test_timeout` | `300` | 5 minute test timeout |
 | `resolve.pr_auto_link` | `true` | Auto-close issue on merge |
 | `resolve.max_commits` | `10` | Max commits warning |
+| `review.max_cycles` | `3` | Max review-fix cycles |
+| `review.auto_merge` | `false` | Auto-merge PR when clean |
+| `review.confidence_threshold` | `80` | Min confidence level for issues |
+| `review.run_tests` | `true` | Run tests during review |
+| `review.check_ci` | `true` | Check CI status during review |
+| `review.ci_poll_interval` | `30` | Seconds between CI polls |
+| `review.ci_timeout` | `600` | CI polling timeout |
+| `review.test_timeout` | `300` | Review test timeout |
+| `review.soft_pass` | `true` | Treat soft-pass as pass |
+| `autopilot.max_iterations` | `10` | Max issues to process |
+| `autopilot.review_cycles` | `3` | Max review-fix cycles per PR |
+| `autopilot.auto_merge` | `true` | Auto-merge PRs after review |
+| `autopilot.pause_on_failure` | `true` | Pause on failure |
+| `autopilot.skip_labels` | `["wontfix", "blocked", "do-not-merge"]` | Labels that skip issues |
+| `autopilot.critical_labels` | `["critical", "priority:critical"]` | Labels that prioritize issues |
 | `triage.stale_threshold_days` | `14` | Stale issue threshold |
 | `triage.auto_priority` | `true` | Auto-suggest priorities |
 | `triage.include_closed` | `false` | Exclude closed from triage |

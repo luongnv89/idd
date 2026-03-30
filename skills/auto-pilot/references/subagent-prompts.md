@@ -19,7 +19,7 @@ Instructions:
 3. Use --auto mode — all decisions are automatic, NEVER prompt the user
 4. The Research step verifies the issue isn't already fixed. If it is, report back with status: "already_resolved"
 5. The Plan step auto-selects the best-balance option. When multiple approaches exist, pick the one with the best risk/reward tradeoff — don't ask.
-6. The QA step (Step 4) runs up to 5 review-fix cycles autonomously. Fix all issues you can; report any you can't.
+6. The QA step (Step 4) runs up to 3 review-fix cycles autonomously. Fix all issues you can; report any you can't.
 7. All agents are in shared/agents/ — use those, not external agent types
 8. Follow all naming conventions from docs/naming-conventions.md
 9. AUTONOMY: Make every decision yourself. If you encounter an ambiguous choice, pick the safer/simpler option. Never stop to ask the user anything.
@@ -54,11 +54,15 @@ Instructions:
 1. Read the skill at: skills/issue-pr-review/SKILL.md
 2. Use --auto mode for full autonomous review-fix cycle (review only — do NOT merge)
 3. The skill will:
+   - Run script pre-pass first: lint/format auto-fix + tests (zero LLM tokens)
    - Analyze the PR changes (code quality, security, correctness)
+   - Classify issues as "fix" (critical/high: correctness, security, edge cases) or "note" (medium: code quality, test coverage suggestions)
+   - Only fix "fix" issues — "note" issues are reported but don't consume fix cycles
    - Run all tests (unit, integration, e2e, build/compile)
    - Check CI status
-   - Fix any detected issues — always apply the best fix without asking
-   - Repeat up to {review_cycles} cycles (override review.max_cycles with this value)
+   - Reuse the same reviewer/fixer agents across cycles (SendMessage), only spawn fresh for the final confirmation pass
+   - Repeat up to {review_cycles} cycles (default: 3, override review.max_cycles with this value)
+   - Soft pass: stop when zero "fix" issues remain (≤ 2 medium "note" issues allowed)
 4. Do NOT merge the PR — merging is handled by the main agent in Phase 5
 5. All agents are in shared/agents/ — use those, not external agent types
 6. AUTONOMY: Never prompt the user. Fix everything you can, report what you can't.
@@ -70,8 +74,10 @@ When done, report back ONLY these fields:
 - result: "PASS" or "NEEDS_FIX"
 - review_cycles: number of review cycles run
 - issues_found: total issues found across all cycles
-- issues_fixed: total issues fixed
+- issues_fixed: total issues fixed (only "fix" action issues)
+- issues_noted: total issues noted but not fixed ("note" action issues)
 - remaining_issues: array of unfixed issue descriptions (empty if clean)
+- pre_pass_fixes: number of files auto-fixed by lint/format tools
 - tests_passed: true/false
 - ci_status: "passed", "failed", or "no_ci"
 ```
@@ -159,7 +165,7 @@ Instructions:
    minimum set of changes to resolve everything.
 5. Execute the unified fix
 6. Write tests (unit, integration, e2e) for all new/changed functionality
-7. Run QA loop: review, test, build, fix — up to 5 cycles
+7. Run QA loop: review, test, build, fix — up to 3 cycles
 8. Ship: create ONE PR with body containing Closes #N for EACH issue
 
 Use --auto mode — NEVER ask for user approval. Make all decisions autonomously.
@@ -195,6 +201,6 @@ Replace these placeholders before passing to the Agent tool:
 | `{additional_issue_numbers}` | Other issue numbers in the batch |
 | `{branch_name}` | Branch name returned by resolver |
 | `{scope}` | Module/component name from issue context |
-| `{review_cycles}` | Value of `autopilot.review_cycles` config (default: 5) |
+| `{review_cycles}` | Value of `autopilot.review_cycles` config (default: 3) |
 | `{batch_reason}` | Reason for batching from analyzer |
 | `{shared_files}` | Shared file paths from analyzer |

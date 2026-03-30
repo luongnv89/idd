@@ -4,6 +4,9 @@
 
 ## Highlights
 
+- **Token-optimized review** — script pre-pass auto-fixes lint/format (zero tokens), LLM only reviews critical issues, soft pass skips nits
+- **3-cycle review-fix loop** — with script pre-pass handling mechanical issues, 3 LLM cycles suffice; follow-up issues track anything left
+- **Critical issue guard** — critical issues get human oversight: if the review can't fully resolve them, the loop stops and asks you for a decision
 - **Zero-confirmation autonomy** — makes all non-critical decisions automatically, only asks for genuinely irreversible actions
 - **Smart batching** — analyzes related issues and batch-resolves them in a single PR to save iterations
 - **Self-healing** — auto-stashes dirty trees, auto-switches branches, auto-recovers from sync conflicts
