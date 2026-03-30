@@ -139,7 +139,7 @@ Main Agent (orchestrator)
         Returns: PASS/NEEDS_FIX, review_cycles, issues_found, issues_fixed
 ```
 
-The PR review subagent runs `/issue-pr-review --auto`, which handles the full review-fix cycle internally — spawning fresh reviewer agents each cycle. Merging is always the main agent's responsibility (Phase 5).
+The PR review subagent runs `/issue-pr-review --auto`, which handles the full review-fix cycle internally — reusing the same reviewer and fixer agents across cycles, with a fresh confirmation pass at the end. Merging is always the main agent's responsibility (Phase 5).
 
 ### Why Subagents Matter
 

@@ -377,12 +377,13 @@ Reviews a PR end-to-end: code review with confidence-based filtering, runs tests
 Pipeline:
 
 ```
-[1/6] PR Info      ✓ PR #87: fix(auth): resolve redirect (#42)
-[2/6] Review       ● analyzing changes...
-[3/6] Test         ✓ 17 tests passed, build ok
-[4/6] CI Status    ✓ all checks passed
-[5/6] Fix          ○ no issues to fix
-[6/6] Report       ✓ PR is clean — ready to merge
+[1/7] PR Info      ✓ PR #87: fix(auth): resolve redirect (#42)
+[2/7] Pre-pass     ✓ lint clean, format clean, 17 tests passed
+[3/7] Review       ● analyzing changes...
+[4/7] Test         ✓ 17 tests passed, build ok
+[5/7] CI Status    ✓ all checks passed
+[6/7] Fix          ○ no issues to fix
+[7/7] Report       ✓ PR is clean — ready to merge
 ```
 
 Max 3 review-fix cycles with stagnation detection.
