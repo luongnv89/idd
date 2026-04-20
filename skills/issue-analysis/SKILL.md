@@ -1,12 +1,12 @@
 ---
 name: issue-analysis
 description: Deep analysis of a single GitHub issue — root cause, affected files, implementation options, complexity, and risk assessment. Persists results to .gitissue/analysis-<N>.json for use by issue-resolver. Use this skill whenever someone says "analyze issue", "understand issue", "investigate issue", "deep dive on issue", "what would it take to fix issue", "impact analysis", "root cause analysis", "how hard is issue", "/issue-analysis", or wants to understand a single issue in depth before deciding whether or how to resolve it. Also trigger when someone asks "what files does issue #N touch", "how complex is #N", "what are my options for #N", "should I resolve #N or break it up", "explain issue #N", or wants pre-resolution analysis. Does NOT make code changes — for resolution, use /issue-resolver after analysis.
-effort: high
 license: MIT
+compatibility: Requires git and GitHub CLI (gh) with authentication. View mode (`/issue-analysis N view`) needs only local file access — no gh required.
+effort: high
 metadata:
   version: 0.4.0
   creator: Luong NGUYEN <luongnv89@gmail.com>
-compatibility: Requires git and GitHub CLI (gh) with authentication. View mode (`/issue-analysis N view`) needs only local file access — no gh required.
 ---
 
 # /issue-analysis N

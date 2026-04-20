@@ -1,12 +1,12 @@
 ---
 name: issue-triage
 description: Triage open GitHub issues by analyzing dependencies, detecting circular references, computing execution order, identifying parallelizable work, flagging stale issues, detecting issues already fixed by other PRs, and suggesting priorities. By default, instantly shows cached triage from .gitissue/triage.json (auto-generates on first run if no cache exists). Suggests an update when local git history shows changes since the last triage, but never auto-updates. Full re-analysis only runs when the user explicitly says "/issue-triage update". Use this skill whenever someone says "triage issues", "prioritize issues", "what should I work on next", "issue dependencies", "which issues are blocked", "stale issues", "already fixed", "backlog review", "sprint planning", "dependency graph", "what's blocking", "/issue-triage", or "/issue-triage update".
-effort: medium
 license: MIT
+compatibility: Requires git and GitHub CLI (gh) with authentication. Default mode (cached view) needs only local file access — no gh required.
+effort: medium
 metadata:
   version: 0.5.1
   creator: Luong NGUYEN <luongnv89@gmail.com>
-compatibility: Requires git and GitHub CLI (gh) with authentication. Default mode (cached view) needs only local file access — no gh required.
 ---
 
 # /issue-triage

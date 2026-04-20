@@ -1,12 +1,12 @@
 ---
 name: issue-pr-review-fix-loop
 description: Outer review-fix loop that calls /issue-pr-review in review-only mode, fixes detected issues, commits, pushes, and repeats until clean or max cycles reached. Reuses the same reviewer and fixer agents across cycles for efficiency, with a fresh confirmation pass at the end to provide an unbiased final check. Use when asked to "review and fix my PR", "review fix loop", "keep fixing until clean", "polish this PR", "clean up this PR iteratively", "review loop", or when you want iterative review-fix cycles with a fresh confirmation at the end. Also trigger when auto-pilot needs a review-fix-merge cycle.
-effort: high
 license: MIT
+compatibility: Requires git and GitHub CLI (gh) with authentication. Depends on /issue-pr-review skill (skills/issue-pr-review/SKILL.md). Uses shared agents from shared/agents/.
+effort: high
 metadata:
   version: 0.3.0
   creator: Luong NGUYEN <luongnv89@gmail.com>
-compatibility: Requires git and GitHub CLI (gh) with authentication. Depends on /issue-pr-review skill (skills/issue-pr-review/SKILL.md). Uses shared agents from shared/agents/.
 ---
 
 # /issue-pr-review-fix-loop [PR_NUMBER]

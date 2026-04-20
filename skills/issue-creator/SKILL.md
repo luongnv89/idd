@@ -1,12 +1,12 @@
 ---
 name: issue-creator
 description: Create structured GitHub issues from text, screenshots, or images, normalize existing unstructured issues into a standard template, and batch-create multiple issues from a single input. Use this skill whenever someone says "create issue", "file a bug", "report a feature request", "normalize issue", "enrich issue", "structure this issue", "/issue-creator", or describes a bug, feature, or improvement they want tracked. Also use when someone shares an issue number and wants it cleaned up or enriched, or when pasting a screenshot of a bug. Even if the user just describes a problem without saying "issue", this skill turns it into a structured GitHub issue with acceptance criteria and labels via gh CLI. For batch creation, trigger when the user provides a list of items, a planning document, multiple bugs, or says "create issues from this", "file these bugs", "batch create", or pastes text with multiple distinct problems to track.
-effort: medium
 license: MIT
+compatibility: Requires git and GitHub CLI (gh) with authentication. Run `gh auth status` to verify.
+effort: medium
 metadata:
   version: 0.4.0
   creator: Luong NGUYEN <luongnv89@gmail.com>
-compatibility: Requires git and GitHub CLI (gh) with authentication. Run `gh auth status` to verify.
 ---
 
 # /issue-creator
