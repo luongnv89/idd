@@ -1,0 +1,76 @@
+# Issue PR Review
+
+> Review a pull request end-to-end — analyze, test, fix, check CI, and auto-merge when clean — with up to 3 token-optimized fix cycles.
+
+## Highlights
+
+- Mechanical pre-pass (lint, format, tests) before any LLM cycles to save tokens
+- Up to 3 LLM-driven review-fix cycles, ending early when clean
+- Runs the project's real test suite, not mocks
+- Monitors CI status and waits for green before merging
+- Auto-merge in `--auto` mode (used by `/auto-pilot`); read-only mode available
+- Soft-pass when zero "fix" issues remain, even if minor "note" issues linger
+
+## When to Use
+
+| Say this... | Skill will... |
+|---|---|
+| `/issue-pr-review 42` | Review PR #42 interactively, report findings, offer fixes |
+| `/issue-pr-review 42 --auto` | Review, fix, wait for CI, and auto-merge when green |
+| `/issue-pr-review --review-only` | Review and report only — never fix or merge |
+| "is this PR ready?" | Run the pipeline against the current branch's PR |
+| "clean up this PR" | Iterate fix cycles until the review is clean |
+
+## How It Works
+
+```mermaid
+graph TD
+    A["PR info + repo sync"] --> B["Mechanical pre-pass"]
+    B --> C["LLM review cycle"]
+    C --> D{"Clean?"}
+    D -- No --> E["Apply fixes"]
+    E --> C
+    D -- Yes --> F["Run tests"]
+    F --> G["Wait for CI"]
+    G --> H["Auto-merge (if --auto)"]
+    style A fill:#4CAF50,color:#fff
+    style H fill:#2196F3,color:#fff
+```
+
+## Installation
+
+Install via [npx (Vercel)](https://www.npmjs.com/package/skills):
+
+```bash
+npx skills add https://github.com/luongnv89/idd --skill issue-pr-review
+```
+
+Or via [agent-skill-manager (asm)](https://www.npmjs.com/package/agent-skill-manager):
+
+```bash
+asm install https://github.com/luongnv89/idd --skill issue-pr-review
+```
+
+## Usage
+
+```
+/issue-pr-review
+/issue-pr-review <PR_NUMBER>
+/issue-pr-review <PR_NUMBER> --auto
+/issue-pr-review --review-only
+```
+
+## Resources
+
+| Path | Description |
+|---|---|
+| `references/error-messages.md` | Error catalog for auth failures, dirty trees, CI timeouts, and merge conflicts |
+
+## Output
+
+A structured 7-step pipeline report in the terminal with:
+- PR title, number, and base/head branch
+- Pre-pass results (lint, format, test counts)
+- Per-cycle findings with confidence and severity
+- Test and CI status
+- Final verdict: pass, fix-and-retry, or hard-fail

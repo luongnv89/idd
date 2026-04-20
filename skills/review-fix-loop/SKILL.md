@@ -1,11 +1,11 @@
 ---
 name: review-fix-loop
-description: Review a PR by delegating to /issue-pr-review — this skill is deprecated and forwards all invocations to the replacement, which adds CI monitoring and auto-merge. Use when asked to "review and fix", "review fix loop", or "auto-review my PR".
+description: "Review a PR by delegating to /issue-pr-review — this skill is deprecated and forwards all invocations to the replacement, which adds CI monitoring and auto-merge. Use when asked to review and fix, review fix loop, or auto-review my PR. Don't use for new projects — prefer /issue-pr-review directly, or /issue-pr-review-fix-loop for outer-loop iteration."
 license: MIT
 compatibility: Requires /issue-pr-review skill.
 effort: low
 metadata:
-  version: 0.3.0
+  version: 0.3.1
   creator: Luong NGUYEN <luongnv89@gmail.com>
 ---
 

@@ -1,11 +1,11 @@
 ---
 name: issue-resolver
-description: Create an atomic PR that closes a GitHub issue end-to-end via a 6-step pipeline. Use when asked to "resolve issue #N", "fix #N", "implement #N", "work on #N", "take issue #N", or "/issue-resolver".
+description: "Create an atomic PR that closes a GitHub issue end-to-end via a 6-step pipeline. Use when asked to resolve issue #N, fix #N, implement #N, work on #N, take issue #N, or /issue-resolver. Don't use for analyzing an issue without implementing (use /issue-analysis), reviewing an existing PR (use /issue-pr-review), or bulk backlog processing (use /auto-pilot)."
 license: MIT
 compatibility: Requires git and GitHub CLI (gh) with authentication and push access. Self-contained — uses shared agents from shared/agents/.
 effort: max
 metadata:
-  version: 0.6.0
+  version: 0.7.0
   creator: Luong NGUYEN <luongnv89@gmail.com>
 ---
 
@@ -205,54 +205,9 @@ After preflight:
 
 ## Step 1 — Research
 
-Deeply understand the issue, the affected codebase, and possible solutions. This step also verifies the issue hasn't already been fixed.
+Deeply understand the issue, affected codebase, and possible solutions. Also verifies the issue hasn't already been fixed (early-exit path closes the issue in auto mode).
 
-### GitHub Projects status transition
-
-If `projects.sync_enabled` is true, set the issue status to `status_map.in_progress` (see `docs/github-projects-sync.md`).
-
-### Subagent delegation (preferred)
-
-Spawn the codebase-researcher agent with:
-
-```json
-{
-  "issue": { <issue data from Step 0> },
-  "config": {
-    "max_files": 30,
-    "trace_depth": 3,
-    "scan_timeout": 120,
-    "output_format": "json"
-  },
-  "repo_root": "<absolute path>"
-}
-```
-
-The researcher will:
-1. **Verify not already resolved** — check git history for closing commits, check codebase for evidence the bug is fixed
-2. **Scan codebase** — extract targets, grep/glob, read files, trace deps
-3. **Assess complexity** — trivial / low / medium / high / complex
-4. **Research solutions** (for high/complex) — algorithms, optimizations, design patterns, web search if needed
-5. **Analyze git history** — prior attempts, regressions, domain experts
-6. **Cross-reference issues** — duplicates, blockers, related work
-
-### Early exit: already resolved
-
-If the researcher returns `already_resolved: true` or `pr_in_progress: true`:
-
-```
-✓ Issue #N appears to already be resolved
-  {resolution_details}
-
-  Recommend closing the issue.
-```
-
-In auto mode: close the issue with a comment and move to the next issue.
-In interactive mode: inform the user and stop.
-
-### Inline fallback
-
-If no Agent tool, execute research inline following the same phases described in `shared/agents/codebase-researcher.md`.
+Spawn the `codebase-researcher` subagent (see `shared/agents/codebase-researcher.md`). Full delegation payload, phases, early-exit behavior, and inline fallback are in `references/pipeline-steps.md` (*Step 1 — Research*).
 
 After research:
 ```
@@ -263,90 +218,20 @@ After research:
 
 ## Step 2 — Plan
 
-Generate implementation options and select one.
+Generate implementation options and select one. Spawn the `synthesizer` subagent (see `shared/agents/synthesizer.md`). It returns 3 options — minimal / balanced / comprehensive — with the balanced option usually recommended.
 
-### Subagent delegation (preferred)
+Selection behavior (interactive auto, interactive comment-and-wait, auto-pilot) and inline fallback are in `references/pipeline-steps.md` (*Step 2 — Plan*).
 
-Spawn the synthesizer agent with:
-- Issue data
-- Research findings (JSON from Step 1)
-- Mode: `"auto"` if auto-pilot, `"interactive"` otherwise
-
-The synthesizer returns 3 options differing in scope:
-1. **Minimal fix** — smallest change
-2. **Balanced approach** — proper fix, reasonable scope (usually recommended)
-3. **Comprehensive refactor** — addresses root cause and technical debt
-
-### Plan selection
-
-**Interactive mode (`resolve.approval_gate: auto`):**
-Display the plan summary and proceed with the recommended option:
+After plan selection:
 ```
 [2/5] Plan         ✓ approach: {selected option name}
 ```
-
-**Interactive mode (`resolve.approval_gate: comment-and-wait`):**
-Present all 3 options to the user:
-
-```
-◆ Implementation Options
-┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-
-  [1] Minimal fix (S, Low risk)
-      {summary}
-
-  [2] Balanced refactor (M, Medium risk) ← recommended
-      {summary}
-
-  [3] Comprehensive overhaul (L, High risk)
-      {summary}
-
-Select option [1/2/3]:
-```
-
-**Auto mode:**
-Auto-select the recommended option (best balance of quality and effort). No user prompt.
-
-```
-[2/5] Plan         ✓ auto-selected option {N}: {name}
-```
-
-### Inline fallback
-
-If no Agent tool, analyze the research findings and generate the plan inline.
 
 ---
 
 ## Step 3 — Implement
 
-Write code and all tests based on the selected plan.
-
-### Subagent delegation (preferred)
-
-Spawn the implementer agent with:
-- Issue data
-- Research findings (from Step 1)
-- Selected plan (the chosen option from Step 2)
-- Branch name
-- Naming conventions: `docs/naming-conventions.md`
-- Max commits: `resolve.max_commits`
-
-The implementer writes:
-1. Implementation code with atomic commits
-2. Unit tests for all new/changed functions
-3. Integration tests (if framework exists)
-4. E2e tests (if framework exists)
-5. All committed following conventional commit format
-
-### Max commits guard
-
-If commits exceed `resolve.max_commits`:
-- Interactive: warn and ask to continue
-- Auto: warn in log, continue anyway
-
-### Inline fallback
-
-If no Agent tool, implement inline following `shared/agents/implementer.md`.
+Write code and tests based on the selected plan. Spawn the `implementer` subagent (see `shared/agents/implementer.md`) with the plan, branch name, and naming conventions. Full payload, commit guardrails, and inline fallback are in `references/pipeline-steps.md` (*Step 3 — Implement*).
 
 After implementation:
 ```
@@ -357,48 +242,9 @@ After implementation:
 
 ## Step 4 — QA
 
-Automated quality assurance loop: review code, run tests, build, fix issues. Repeats until clean or max cycles reached.
+Automated review-fix loop: review → test → fix → repeat until clean or max cycles reached. Each cycle spawns a *fresh* `code-reviewer` subagent (see `shared/agents/code-reviewer.md`) for unbiased review.
 
-### QA cycle
-
-Each cycle:
-
-1. **Code review** — spawn a fresh code-reviewer agent (see `shared/agents/code-reviewer.md`). Fresh agent each cycle ensures unbiased review.
-
-2. **Run tests** — detect and run the project's test suite:
-   - Unit tests
-   - Integration tests
-   - E2e tests (if framework exists)
-   - Build/compile check
-
-3. **Evaluate results:**
-   - If reviewer returns `PASS` AND all tests pass AND build succeeds → exit loop, QA passed
-   - If issues found → fix them, then start next cycle
-
-4. **Fix issues** — for each issue from the reviewer or test failures:
-   - Read affected file
-   - Apply fix
-   - Stage and commit: `fix(scope): address review feedback (#N)`
-
-### Loop controls
-
-- **Max cycles:** `resolve.qa_max_cycles` (default: 5)
-- **Exit on clean:** Stop as soon as review passes AND tests pass
-- **Exit on stagnation:** If the same issues appear in 2 consecutive cycles, stop and report
-
-### After QA
-
-If clean:
-```
-[4/5] QA           ✓ clean after {N} cycles
-```
-
-If max cycles with remaining issues:
-```
-[4/5] QA           ⚠ {N} issues remain after {max} cycles
-```
-In interactive mode: show remaining issues and ask to continue.
-In auto mode: continue to Deliver — the PR can be created with known issues noted.
+Cycle mechanics, loop controls (`resolve.qa_max_cycles`, exit-on-clean, exit-on-stagnation), and the remaining-issues flow are in `references/pipeline-steps.md` (*Step 4 — QA*).
 
 ---
 
@@ -438,38 +284,7 @@ gh pr create --title "{pr_title}" --body "{pr_body}"
 
 **PR title:** `{type}({scope}): {description} (#{issue_number})` (see `docs/naming-conventions.md`)
 
-**PR body:**
-
-```markdown
-Closes #{issue_number}
-
-## Summary
-
-{One-paragraph summary}
-
-## Approach
-
-{Selected option name and description}
-
-## Changes
-
-| File | Change |
-|------|--------|
-| `{file}` | {description} |
-
-## Test Results
-
-- Unit tests: {count} passed
-- Integration tests: {count} passed (or skipped)
-- E2e tests: {count} passed (or skipped)
-- Build: passed
-- QA cycles: {count}
-
-## Acceptance Criteria
-
-- [x] {criterion — checked if addressed}
-- [ ] {criterion — unchecked with note}
-```
+**PR body:** Fill the template in `references/report-templates.md` (section *PR Body Template*) — Summary, Approach, Changes table, Test Results, Acceptance Criteria.
 
 ### Project board sync
 
@@ -484,61 +299,11 @@ After delivery:
 
 ## Final Report
 
-After the pipeline completes, print a structured step-by-step summary showing what happened at each stage. This gives the user a quick visual scan of the entire resolution.
+After the pipeline completes, print a structured step-by-step summary so the user can scan the whole resolution at a glance. Use the templates in `references/report-templates.md`:
 
-### Successful resolution
-
-```
-◆ Issue #{issue_number} — resolved
-┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-
-  Preflight:       ✓ pass
-  Research:        ✓ pass ({files_read} files analyzed, {complexity})
-  Plan:            ✓ pass ({option_name}, {risk_rating} risk)
-  Implement:       ✓ pass ({files_changed} files, {tests_written} tests)
-  QA:              ✓ pass ({cycles} cycles, {issues_found} issues fixed)
-  Deliver:         ✓ pass (PR #{pr_number} created)
-  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  Result:          DONE
-
-  PR #{pr_number}: {pr_title}
-  https://github.com/owner/repo/pull/{pr_number}
-  Closes #{issue_number}
-```
-
-### Resolution with issues
-
-If any step had problems (e.g., QA found unfixable issues, tests still failing):
-
-```
-◆ Issue #{issue_number} — resolved with warnings
-┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-
-  Preflight:       ✓ pass
-  Research:        ✓ pass ({files_read} files analyzed)
-  Plan:            ✓ pass ({option_name})
-  Implement:       ✓ pass ({files_changed} files)
-  QA:              ⚠ warn ({remaining} issues remain after {cycles} cycles)
-  Deliver:         ✓ pass (PR #{pr_number} created)
-  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  Result:          DONE (manual review recommended)
-
-  PR #{pr_number}: {pr_title}
-  https://github.com/owner/repo/pull/{pr_number}
-  Closes #{issue_number}
-```
-
-### Already resolved
-
-```
-◆ Issue #{issue_number} — already resolved
-┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-
-  Preflight:       ✓ pass
-  Research:        ○ skipped (already fixed by {sha7})
-  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  Result:          SKIPPED — issue closed
-```
+- *Final Report — Successful Resolution* — every step passed
+- *Final Report — Resolution With Warnings* — QA left residual issues or another step warned
+- *Final Report — Already Resolved* — Step 0 or Step 1 detected the issue was already closed
 
 ---
 
@@ -559,22 +324,7 @@ No `[y/N]` prompts, no `Choose:` prompts, no `Continue?` prompts. Every decision
 
 ## Expected Output
 
-A successful resolve prints the full 6-step tracker and ends with the PR URL:
-
-```
-  ◆ Resolve Pipeline
-  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  [0/5] Preflight    ✓ issue #42 open, not yet resolved
-  [1/5] Research     ✓ read 12 files, complexity: medium
-  [2/5] Plan         ✓ option 2 selected: balanced refactor
-  [3/5] Implement    ✓ 3 files changed, 8 unit tests, 2 e2e tests
-  [4/5] QA           ✓ clean after 2 cycles
-  [5/5] Deliver      ✓ PR #87 created
-
-  ✓ Done — PR #87: fix(auth): resolve mobile auth redirect (#42)
-    https://github.com/user/repo/pull/87
-    Closes #42
-```
+A successful resolve prints the 6-step tracker and ends with the PR URL — see the *Expected Inline Pipeline Output* example in `references/report-templates.md`.
 
 ## Edge Cases
 
@@ -625,6 +375,8 @@ All errors use rich format from `references/error-messages.md`:
 - **`shared/agents/synthesizer.md`** — Plan subagent (Step 2)
 - **`shared/agents/implementer.md`** — Implement subagent (Step 3)
 - **`shared/agents/code-reviewer.md`** — QA review subagent (Step 4)
+- **`references/pipeline-steps.md`** — Full delegation payloads, phases, and inline fallbacks for Steps 1–4
+- **`references/report-templates.md`** — PR body template, final report templates, and expected inline output
 - **`references/error-messages.md`** — Complete error catalog
 - **`docs/naming-conventions.md`** — Branch, commit, PR naming conventions
 - **`docs/github-projects-sync.md`** — GitHub Projects status sync

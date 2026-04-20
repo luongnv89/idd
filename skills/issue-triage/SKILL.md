@@ -1,11 +1,11 @@
 ---
 name: issue-triage
-description: Analyze and triage open GitHub issues for dependencies, priorities, parallelizable work, staleness, and already-fixed detection, caching results to .gitissue/triage.json. Use when asked to "triage issues", "prioritize issues", "what should I work on next", or "/issue-triage".
+description: "Analyze and triage open GitHub issues for dependencies, priorities, parallelizable work, staleness, and already-fixed detection, caching results to .gitissue/triage.json. Use when asked to triage issues, prioritize issues, what should I work on next, or /issue-triage. Don't use for analyzing one specific issue (use /issue-analysis), resolving an issue (use /issue-resolver), or creating new issues (use /issue-creator)."
 license: MIT
 compatibility: Requires git and GitHub CLI (gh) with authentication. Default mode (cached view) needs only local file access — no gh required.
 effort: medium
 metadata:
-  version: 0.5.1
+  version: 0.5.2
   creator: Luong NGUYEN <luongnv89@gmail.com>
 ---
 
