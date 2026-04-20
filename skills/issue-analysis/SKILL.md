@@ -994,6 +994,31 @@ If the issue may already be resolved:
 
 ---
 
+## Expected Output
+
+A successful analysis prints the 8-step tracker and a condensed report, then persists the full result to `.gitissue/analysis-<N>.json`:
+
+```
+  ◆ Analysis Pipeline
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  [1/8] Fetch          ✓ issue #42 loaded (bug)
+  [2/8] Extract        ✓ 8 keywords, 2 file refs
+  [3/8] Research       ✓ read 18 files, traced 12 deps
+  [4/8] History        ✓ 5 related commits, 1 prior fix attempt
+  [5/8] Cross-refs     ✓ 2 related issues, 1 may resolve this
+  [6/8] Analysis       ✓ root cause identified
+  [7/8] Options        ✓ 3 approaches proposed
+  [8/8] Persist        ✓ .gitissue/analysis-42.json
+
+  Root cause:      {short summary}
+  Affected files:  {count} files, {count} modules
+  Complexity:      M (estimated)
+  Risk:            medium (touches auth middleware)
+  Recommendation:  {one-sentence next step}
+```
+
+View mode (`/issue-analysis N view`) reads the JSON and renders the same report without re-running the pipeline.
+
 ## Edge Cases
 
 ### Issue body is empty

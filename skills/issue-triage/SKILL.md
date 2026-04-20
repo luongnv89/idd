@@ -883,6 +883,34 @@ The triage skill is **read-only** with respect to the GitHub Project board. It d
 
 See `docs/github-projects-sync.md` for the shared reference on how other skills (issue-creator, issue-resolver) update project board status.
 
+## Expected Output
+
+A cached view renders instantly from `.gitissue/triage.json`:
+
+```
+  ◆ Triage Snapshot — 12 open issues
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  │ Rank │ Issue │ Title                           │ Status       │
+  ├──────┼───────┼─────────────────────────────────┼──────────────┤
+  │  1   │ #42   │ Fix mobile auth redirect loop   │ ready        │
+  │  2   │ #15   │ Add dark mode toggle            │ ready        │
+  │  3   │ #31   │ Cover auth in unit tests        │ blocked-by #8│
+  ...
+
+  ● Suggestion: git history shows 3 new commits since last triage.
+    Run /issue-triage update to refresh.
+```
+
+An update (`/issue-triage update`) runs Steps 1–9 and overwrites the cache, ending with the same snapshot view.
+
+## Edge Cases
+
+- **No cache and no issues** — prints a friendly `○ No open issues` and exits without creating a cache file.
+- **Circular dependency detected** — flagged in the report with the offending cycle; execution order still computed via topological pruning.
+- **Stale issues (>90 days)** — grouped at the bottom of the report with a `⚠ stale` marker.
+- **Rate-limited by GitHub API** — partial results are kept, the report notes incompleteness, and the user is shown the exact retry command.
+- **Already-fixed detection false positive** — the report lists supporting commits/PRs so the user can verify before closing.
+
 ## Additional Resources
 
 - **`references/error-messages.md`** — Complete error catalog with triggers and exact output

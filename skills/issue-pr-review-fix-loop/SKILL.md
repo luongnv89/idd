@@ -457,6 +457,34 @@ All errors use rich format from `references/error-messages.md`:
   To fix:  <actionable command>
 ```
 
+## Expected Output
+
+Each cycle prints a compact report and the loop ends with a final confirmation:
+
+```
+  ◆ Cycle 1
+  ┄┄┄┄┄┄┄┄┄
+  Review     ✓ 2 critical, 3 medium
+  Fix        ✓ 5 issues resolved, pushed
+
+  ◆ Cycle 2
+  ┄┄┄┄┄┄┄┄┄
+  Review     ✓ 0 critical, 1 medium
+
+  ◆ Fresh Confirmation
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  Review     ✓ clean
+
+  ✓ PR is ready — 2 cycles, 5 fixes
+```
+
+## Edge Cases
+
+- **Max cycles reached with issues remaining** — loop exits with a summary listing unresolved issues; does not merge.
+- **No changes to push after a fix cycle** — loop detects the no-op, skips the push, and ends the cycle.
+- **Fresh confirmation disagrees with the reused reviewer** — the fresh pass wins; any new issues open a new cycle if budget allows.
+- **PR auto-merged mid-loop by another actor** — loop detects the merged state and exits cleanly.
+
 ## Additional Resources
 
 - **`skills/issue-pr-review/SKILL.md`** — The review skill invoked each cycle

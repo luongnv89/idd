@@ -477,6 +477,30 @@ All errors use rich format from `references/error-messages.md`:
   To fix:  <actionable command>
 ```
 
+## Expected Output
+
+A clean review prints the 7-step tracker and a summary:
+
+```
+  [1/7] PR Info       ✓ #87 fix(auth): resolve redirect (#42)
+  [2/7] Script Pre    ✓ 3 lint fixes applied
+  [3/7] Review        ✓ 0 critical, 1 medium (note)
+  [4/7] Tests         ✓ 12 passed
+  [5/7] CI            ✓ all checks green
+  [6/7] Fix           ○ skipped — nothing to fix
+  [7/7] Summary       ✓ PR ready to merge
+
+  ✓ PR #87 passed review (soft-pass: 1 medium note)
+```
+
+## Edge Cases
+
+- **No PR for current branch** — the skill asks for an explicit `<N>` or stops cleanly.
+- **CI still running** — waits up to `review.ci_wait_timeout`, then prints the current state and stops without merging.
+- **Critical issue unresolvable after 3 cycles** — stops, prints remaining issues, does not merge, asks the user to take over.
+- **Merge conflict with base** — prints the exact rebase command and stops.
+- **Review-only mode (`--review-only`)** — never fixes or merges, always reports.
+
 ## Additional Resources
 
 - **`shared/agents/code-reviewer.md`** — Review subagent prompt

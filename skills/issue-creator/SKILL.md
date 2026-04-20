@@ -784,6 +784,29 @@ In batch mode, sync each issue after it is created.
 
 If `projects.sync_enabled` is `false` (default), skip silently. If any sync step fails, print a `⚠` warning and continue — never block issue creation on project sync failure. See `docs/github-projects-sync.md` for error messages and graceful degradation details.
 
+## Expected Output
+
+A successful create prints the issue URL and a compact summary:
+
+```
+  ✓ Issue #42 created
+    https://github.com/owner/repo/issues/42
+
+  Title:  Fix mobile auth redirect loop
+  Type:   bug (high confidence)
+  Labels: bug, auth, mobile
+```
+
+In batch mode, one line per issue is printed followed by a totals footer (`✓ 5 created, 1 skipped (duplicate)`).
+
+## Edge Cases
+
+- **Duplicate detection** — if an existing open issue closely matches, the skill asks before filing; the user can dedupe or create anyway.
+- **Screenshot-only input** — the image is inspected, described in text, and a structured issue is drafted; the image is also attached to the issue body.
+- **Ambiguous batch input** — if item boundaries are unclear, the skill shows a parsed preview and asks for confirmation before creating.
+- **GitHub API rate limit** — creation stops at the last successful issue; the partial result is reported with a resume hint.
+- **Empty body** — the issue is created with only a title; `(needs review)` is noted in the metadata section.
+
 ## Additional Resources
 
 - **`references/error-messages.md`** — Complete error catalog with triggers and exact output

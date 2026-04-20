@@ -28,3 +28,24 @@ Run `/issue-pr-review` instead:
 ```
 
 When this skill is triggered, immediately redirect to `/issue-pr-review` with the same arguments.
+
+## Prerequisites
+
+- `/issue-pr-review` must be installed (skills/issue-pr-review/SKILL.md).
+- `gh` authenticated — the target skill requires GitHub CLI access.
+
+## Expected Output
+
+On trigger, this skill prints a single redirect notice and hands off control:
+
+```
+  ○ /review-fix-loop is deprecated — redirecting to /issue-pr-review.
+```
+
+The forwarded skill then produces the usual review-cycle output.
+
+## Edge Cases
+
+- **Arguments passed** — the exact arguments are forwarded verbatim to `/issue-pr-review`.
+- **No `/issue-pr-review` installed** — the skill prints a `✗` error pointing to the install path and stops.
+- **User explicitly invokes `/review-fix-loop`** — still redirect; do not implement the loop here.

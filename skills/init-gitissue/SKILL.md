@@ -468,6 +468,29 @@ All errors use the rich format from `references/error-messages.md`:
   To fix:  <actionable command>
 ```
 
+## Expected Output
+
+After a successful run, the repo root contains a `.gitissue.yml` file and the terminal prints:
+
+```
+  ✓ Wrote .gitissue.yml (24 lines)
+
+  Detected:
+    language:    TypeScript
+    framework:   Next.js
+    test_runner: vitest
+    repo_size:   medium (42 files)
+
+  Run /auto-pilot to start the loop, or /issue-creator to file a first issue.
+```
+
+## Edge Cases
+
+- **Config already exists** — the skill prints a diff of detected vs current values and asks before overwriting.
+- **Unrecognized language** — falls back to a minimal generic config with inline comments guiding manual edits.
+- **Not a git repository** — prints the exact error from `references/error-messages.md` and stops; no file is written.
+- **Empty repo (no source files)** — writes a minimal default config and notes that detection was skipped.
+
 ## Additional Resources
 
 - **`references/error-messages.md`** — Complete error catalog with triggers and exact output

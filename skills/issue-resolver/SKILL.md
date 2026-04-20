@@ -557,6 +557,26 @@ No `[y/N]` prompts, no `Choose:` prompts, no `Continue?` prompts. Every decision
 
 ---
 
+## Expected Output
+
+A successful resolve prints the full 7-step tracker and ends with the PR URL:
+
+```
+  ◆ Resolve Pipeline
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  [1/7] Fetch        ✓ issue #42 loaded
+  [2/7] Branch       ✓ fix/42-mobile-auth
+  [3/7] Research     ✓ read 5 files, traced 3 deps
+  [4/7] Plan         ✓ approach: fix redirect logic
+  [5/7] Execute      ✓ 2 files changed, 45 lines
+  [6/7] Verify       ✓ 12 tests passed
+  [7/7] Ship         ✓ PR #87 created
+
+  ✓ Done — PR #87: fix(auth): resolve mobile auth redirect (#42)
+    https://github.com/user/repo/pull/87
+    Closes #42
+```
+
 ## Edge Cases
 
 ### No acceptance criteria
@@ -569,6 +589,13 @@ PR body notes: `> **Note:** No acceptance criteria defined — manual review rec
 ### Large issues (20+ files estimated)
 - Interactive: warn and ask
 - Auto: warn in log, continue
+
+### Tests fail or timeout
+- PR is not created. The Verify step stops with the failing test output and a resume hint.
+
+### Branch already exists
+- Interactive: `continue` or `fresh` prompt.
+- Auto: resume from the existing branch.
 
 ---
 
