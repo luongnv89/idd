@@ -1,12 +1,12 @@
 ---
 name: issue-pr-review-fix-loop
-description: Outer review-fix loop that calls /issue-pr-review in review-only mode, fixes detected issues, commits, pushes, and repeats until clean or max cycles reached. Reuses the same reviewer and fixer agents across cycles for efficiency, with a fresh confirmation pass at the end to provide an unbiased final check. Use when asked to "review and fix my PR", "review fix loop", "keep fixing until clean", "polish this PR", "clean up this PR iteratively", "review loop", or when you want iterative review-fix cycles with a fresh confirmation at the end. Also trigger when auto-pilot needs a review-fix-merge cycle.
-effort: high
+description: Run an outer review-fix loop over a PR that calls /issue-pr-review in review-only mode, fixes, commits, pushes, and repeats until clean, ending with a fresh confirmation pass. Use when asked to "review and fix my PR", "keep fixing until clean", or "review loop".
 license: MIT
+compatibility: Requires git and GitHub CLI (gh) with authentication. Depends on /issue-pr-review skill (skills/issue-pr-review/SKILL.md). Uses shared agents from shared/agents/.
+effort: high
 metadata:
   version: 0.3.0
   creator: Luong NGUYEN <luongnv89@gmail.com>
-compatibility: Requires git and GitHub CLI (gh) with authentication. Depends on /issue-pr-review skill (skills/issue-pr-review/SKILL.md). Uses shared agents from shared/agents/.
 ---
 
 # /issue-pr-review-fix-loop [PR_NUMBER]
@@ -456,6 +456,34 @@ All errors use rich format from `references/error-messages.md`:
 
   To fix:  <actionable command>
 ```
+
+## Expected Output
+
+Each cycle prints a compact report and the loop ends with a final confirmation:
+
+```
+  ◆ Cycle 1
+  ┄┄┄┄┄┄┄┄┄
+  Review     ✓ 2 critical, 3 medium
+  Fix        ✓ 5 issues resolved, pushed
+
+  ◆ Cycle 2
+  ┄┄┄┄┄┄┄┄┄
+  Review     ✓ 0 critical, 1 medium
+
+  ◆ Fresh Confirmation
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  Review     ✓ clean
+
+  ✓ PR is ready — 2 cycles, 5 fixes
+```
+
+## Edge Cases
+
+- **Max cycles reached with issues remaining** — loop exits with a summary listing unresolved issues; does not merge.
+- **No changes to push after a fix cycle** — loop detects the no-op, skips the push, and ends the cycle.
+- **Fresh confirmation disagrees with the reused reviewer** — the fresh pass wins; any new issues open a new cycle if budget allows.
+- **PR auto-merged mid-loop by another actor** — loop detects the merged state and exits cleanly.
 
 ## Additional Resources
 

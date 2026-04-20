@@ -1,12 +1,12 @@
 ---
 name: issue-resolver
-description: Resolve a GitHub issue end-to-end through a 6-step pipeline (Preflight, Research, Plan, Implement, QA, Deliver) producing an atomic PR with "Closes #N". Checks issue status and verifies the issue hasn't already been resolved before starting work. In auto-pilot mode, all steps run autonomously without user prompts. Use this skill whenever someone says "resolve issue", "fix issue", "work on issue", "implement issue", "/issue-resolver", or provides an issue number they want resolved. Also trigger when asked to "close this issue with a PR", "implement #N", "fix #N", "take issue #N", "start working on #N", "pick up issue #N", or even just "#N" with the intent to work on it. If the user mentions a GitHub issue number and wants code written to address it, this is the right skill — even if they don't say "resolve" explicitly.
-effort: max
+description: Create an atomic PR that closes a GitHub issue end-to-end via a 6-step pipeline. Use when asked to "resolve issue #N", "fix #N", "implement #N", "work on #N", "take issue #N", or "/issue-resolver".
 license: MIT
+compatibility: Requires git and GitHub CLI (gh) with authentication and push access. Self-contained — uses shared agents from shared/agents/.
+effort: max
 metadata:
   version: 0.6.0
   creator: Luong NGUYEN <luongnv89@gmail.com>
-compatibility: Requires git and GitHub CLI (gh) with authentication and push access. Self-contained — uses shared agents from shared/agents/.
 ---
 
 # /issue-resolver N
@@ -74,7 +74,7 @@ Defaults:
 
 ## Subagent Architecture
 
-The resolve pipeline delegates heavy work to subagents to keep the main agent's context clean. All agents are in `shared/agents/`.
+The resolve pipeline delegates heavy work to subagents to keep the main agent's **context window** clean and the **token budget** predictable. All agents are in `shared/agents/`.
 
 ```
 Main Agent (orchestrator)
@@ -557,6 +557,25 @@ No `[y/N]` prompts, no `Choose:` prompts, no `Continue?` prompts. Every decision
 
 ---
 
+## Expected Output
+
+A successful resolve prints the full 6-step tracker and ends with the PR URL:
+
+```
+  ◆ Resolve Pipeline
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  [0/5] Preflight    ✓ issue #42 open, not yet resolved
+  [1/5] Research     ✓ read 12 files, complexity: medium
+  [2/5] Plan         ✓ option 2 selected: balanced refactor
+  [3/5] Implement    ✓ 3 files changed, 8 unit tests, 2 e2e tests
+  [4/5] QA           ✓ clean after 2 cycles
+  [5/5] Deliver      ✓ PR #87 created
+
+  ✓ Done — PR #87: fix(auth): resolve mobile auth redirect (#42)
+    https://github.com/user/repo/pull/87
+    Closes #42
+```
+
 ## Edge Cases
 
 ### No acceptance criteria
@@ -569,6 +588,13 @@ PR body notes: `> **Note:** No acceptance criteria defined — manual review rec
 ### Large issues (20+ files estimated)
 - Interactive: warn and ask
 - Auto: warn in log, continue
+
+### Tests fail or timeout
+- PR is not created. The Verify step stops with the failing test output and a resume hint.
+
+### Branch already exists
+- Interactive: `continue` or `fresh` prompt.
+- Auto: resume from the existing branch.
 
 ---
 

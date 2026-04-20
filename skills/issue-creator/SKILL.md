@@ -1,12 +1,12 @@
 ---
 name: issue-creator
-description: Create structured GitHub issues from text, screenshots, or images, normalize existing unstructured issues into a standard template, and batch-create multiple issues from a single input. Use this skill whenever someone says "create issue", "file a bug", "report a feature request", "normalize issue", "enrich issue", "structure this issue", "/issue-creator", or describes a bug, feature, or improvement they want tracked. Also use when someone shares an issue number and wants it cleaned up or enriched, or when pasting a screenshot of a bug. Even if the user just describes a problem without saying "issue", this skill turns it into a structured GitHub issue with acceptance criteria and labels via gh CLI. For batch creation, trigger when the user provides a list of items, a planning document, multiple bugs, or says "create issues from this", "file these bugs", "batch create", or pastes text with multiple distinct problems to track.
-effort: medium
+description: Create structured GitHub issues from text, screenshots, or lists — or normalize and enrich existing ones into a standard template. Use when asked to "create issue", "file a bug", "normalize issue", "batch create", "/issue-creator", or when a user describes a bug or feature to track.
 license: MIT
+compatibility: Requires git and GitHub CLI (gh) with authentication. Run `gh auth status` to verify.
+effort: medium
 metadata:
   version: 0.4.0
   creator: Luong NGUYEN <luongnv89@gmail.com>
-compatibility: Requires git and GitHub CLI (gh) with authentication. Run `gh auth status` to verify.
 ---
 
 # /issue-creator
@@ -54,7 +54,7 @@ Do not re-read the config at each step.
 
 ## Subagent Architecture
 
-The issue-creator skill delegates duplicate detection to a subagent so the main agent's context stays clean and, in batch mode, duplicate checking runs in parallel with template generation.
+The issue-creator skill delegates duplicate detection to a subagent so the main agent's **context window** stays clean and the **token budget** stays predictable; in batch mode, duplicate checking runs in parallel with template generation.
 
 ```
 Main Agent (orchestrator) — Create mode
@@ -352,390 +352,16 @@ On failure, output the matching error from `references/error-messages.md`.
 
 ---
 
-## Mode: Normalize Existing Issue
+## Modes: Normalize & Batch Create
 
-### Step 1 — Fetch Issue
+In addition to **Create**, the skill supports two more modes, each with its own step-by-step flow:
 
-```bash
-gh issue view {N} --json number,title,body,labels,assignees,state,comments
-```
+- **Normalize** — fetch an existing issue, classify it, fill in missing sections, and update the issue body.
+- **Batch Create** — parse a multi-item input, preview parsed items, and create one issue per item with per-item success/failure tracking.
 
-If not found:
-```
-✗ Issue #42 not found
-
-  To fix:  gh issue list
-  Check:   is this the right repository?
-```
-
-### Step 2 — Check Already Normalized
-
-Look for `<!-- gitissue:normalized v1 -->` as a standalone HTML comment in the issue body.
-
-If found:
-```
-✓ Issue #42 is already normalized (v1, 2026-03-20). No changes needed.
-```
-Stop. The date is today's date in YYYY-MM-DD format.
-
-Important: if the marker text appears inside a code block or blockquote, it is not a real marker — proceed with normalization.
-
-### Step 3 — Check Issue State
-
-If the issue is locked:
-```
-✗ Issue #42 is locked
-
-  To fix:  unlock the issue in GitHub's web UI, then retry
-```
-Stop.
-
-If the issue body exceeds 60,000 characters, note this — Metadata will be truncated in Step 5 to stay under GitHub's 65KB limit.
-
-### Step 4 — Security Label Check
-
-Check labels for: `security`, `CVE`, `vulnerability` (case-insensitive).
-
-If found and `--force` not used:
-```
-⚠ Issue #42 has a security label (security). Skipping normalization.
-  Codebase context could reveal exploit details.
-
-  To override: /issue-creator 42 --force
-```
-Stop.
-
-### Step 5 — Generate Normalization Content
-
-Classify type from the existing issue content, then use the matching template:
-
-1. Preserve the entire original issue body in `> **Reporter Context**` blockquote
-2. Fill all template sections from the issue text (type, description, acceptance criteria, metadata)
-3. Place `<!-- gitissue:normalized v1 -->` at the top
-4. If original body > 60K chars, truncate Metadata to fit under 65KB
-
-**Note:** Normalization is structure-only — it restructures the issue into the standard template without scanning the codebase. No affected files, technical notes, or architecture constraints are added.
-
-### Step 6 — Preview with Confidence Scores
-
-```
-● Fetching issue #42...
-
-◆ Normalization Preview
-┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  + Type:        bug (high confidence)
-  + Criteria:    3 acceptance criteria (medium)
-  + Labels:      +bug, +auth
-  = Original:    preserved in Reporter Context block
-
-Apply normalization? [Y/n/dry-run]
-```
-
-`+` = added field, `=` = preserved field. Use `(high confidence)` for Type, abbreviated `(high)`, `(medium)`, `(low)` for criteria. Low-confidence fields get `(needs review)` in the issue body.
-
-Wait for confirmation. `n` → stop. `dry-run` → proceed to Step 7.
-
-### Step 7 — Dry Run Check
-
-If `--dry-run` was specified or selected at the prompt:
-```
-○ Dry run complete. No changes applied.
-```
-Stop.
-
-### Step 8 — Backup Original Body
-
-Post a backup comment with the original body before making any edits. This is a data safety requirement — if the backup fails, abort entirely. Never edit the issue body without a verified backup.
-
-```bash
-gh issue comment {N} --body "<details><summary>Original issue body (backup by gitissue)</summary>
-
-{original_body}
-
-</details>"
-```
-
-Verify success via the command exit code. If it fails:
-```
-✗ Failed to post backup comment for issue #42
-
-  Normalization aborted — original issue body is unchanged.
-  To fix:  check your permissions: gh issue comment 42 --body "test"
-```
-Stop. Do not edit the issue body.
-
-### Step 9 — Update Issue Body
-
-```bash
-gh issue edit {N} --body "{normalized_body}"
-```
-
-### Step 10 — Post Normalization Comment
-
-If `issue.normalize_comment` is true:
-
-```bash
-gh issue comment {N} --body "🔧 **Normalized by gitissue**
-
-Added: type classification, acceptance criteria, structured description.
-Original body preserved in Reporter Context block and backup comment above."
-```
-
-### Step 11 — Apply Labels
-
-If `issue.labels_auto_suggest` is true and new labels were suggested:
-
-```bash
-gh issue edit {N} --add-label "{label1},{label2}"
-```
-
-### Step 12 — Report
-
-Print a structured step-by-step summary:
-
-```
-◆ Issue Normalized: #{N}
-┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-
-  Fetch:             ✓ pass
-  Already normal:    ✓ pass (not yet normalized)
-  State check:       ✓ pass (unlocked)
-  Security check:    ✓ pass (no security labels)
-  Generate:          ✓ pass ({type} template applied)
-  Dry-run:           ✓ approved
-  Backup:            ✓ pass (comment #{comment_id})
-  Update:            ✓ pass
-  Labels:            ✓ pass ({N} labels applied)
-  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  Result:            DONE
-
-  #{N}  {title}
-  https://github.com/owner/repo/issues/{N}
-```
+Full per-mode step specs and error paths live in `references/modes.md`. Example runs (batch from a planning document, create from a vague description) live in `references/examples.md`.
 
 ---
-
-## Mode: Batch Create
-
-Create multiple issues from a single input — a planning document, a list of bugs, a screenshot with multiple items, or any text containing several distinct problems or features.
-
-### Step 1 — Detect Items
-
-Parse the input and identify distinct items. Boundary detection heuristics:
-
-- **Numbered lists** — `1.`, `2.`, etc. are separate items
-- **Bullet points** — each `- ` or `* ` at the top level is an item
-- **Paragraph breaks** — distinct paragraphs describing different problems
-- **Headings** — each heading starts a new item
-- **Screenshot items** — for images, each visually distinct element (separate error, UI element, or annotation)
-
-For each detected item, extract: a short title, keywords, and implied type (bug/feature/improvement).
-
-If only one item is detected, fall through to single Create mode silently.
-
-### Step 2 — Preview Table
-
-Display all extracted items in a table for review before creating anything:
-
-```
-● Parsing input...
-  Found {N} items in input
-
-◆ Batch Preview
-┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  #  │ Type        │ Title                              │ Effort
-  ───┼─────────────┼────────────────────────────────────┼───────
-  1  │ bug         │ Fix Safari checkout redirect        │ S
-  2  │ feature     │ Add dark mode toggle                │ M
-  3  │ improvement │ Refactor auth middleware             │ L
-```
-
-Use DESIGN.md table format: box-drawing characters `│ ─ ┼`, right-align numbers, left-align text, max 80 chars wide (truncate titles with `...`).
-
-### Step 3 — Duplicate Check
-
-#### Subagent delegation
-
-Spawn the duplicate-detector subagent with all batch items:
-
-```json
-{
-  "mode": "batch",
-  "items": [
-    { "index": 1, "title": "...", "keywords": [...], "type": "bug" },
-    { "index": 2, "title": "...", "keywords": [...], "type": "feature" }
-  ],
-  "repo_root": "{repo_root}"
-}
-```
-
-Read `shared/agents/duplicate-detector.md` for the full prompt. The subagent checks each item against existing open issues AND cross-checks items against each other in a single pass.
-
-**Parallel execution:** In batch mode, spawn the duplicate-detector at the same time as pre-generating template content — both results are ready by Step 4 (Approval) and consumed at Step 5 (Create Issues).
-
-#### Fallback (no Agent tool)
-
-If the Agent tool is not available, run inline:
-
-```bash
-gh issue list --state open --json number,title,body,labels --limit 100
-```
-
-Check each batch item against existing issues AND against other items in the batch.
-
-#### Present results
-
-Flag duplicates found by the subagent (or fallback). Both `existing_issue` and `batch_internal` matches are shown:
-
-```
-⚠ Item 2 may duplicate: #15 "Dark mode support"
-  View: https://github.com/owner/repo/issues/15
-
-⚠ Item 3 overlaps with Item 1 — both address auth session handling
-```
-
-Duplicates are flagged but not removed — the user decides in the approval step.
-
-### Step 4 — Approval
-
-Prompt the user with three options:
-
-```
-Create 3 issues? [A]ll / [e]dit / [c]ancel
-```
-
-- **All** (default) — create all items as-is
-- **Edit** — let the user specify items to modify or remove (e.g., "remove 2, change 3 title to...")
-- **Cancel** — stop without creating any issues
-
-If the user chooses Edit, apply the requested changes, re-display the updated table, and show the approval prompt again:
-```
-Create {N} issues? [A]ll / [e]dit / [c]ancel
-```
-
-### Step 5 — Create Issues
-
-Create each approved issue sequentially using the same pipeline as single Create mode (generate content from template, `gh issue create`). Each issue gets the full template treatment — `<!-- gitissue:normalized v1 -->` marker, all sections populated.
-
-**Rate limiting:** If `gh issue create` returns a rate limit error, wait and retry with exponential backoff (5s, 10s, 20s). After 3 retries for a single item, skip it and continue with remaining items.
-
-**Progress output:** Show per-item progress:
-
-```
-● Creating issue 1/3...
-✓ Created issue #42: Fix Safari checkout redirect
-  https://github.com/owner/repo/issues/42
-
-● Creating issue 2/3...
-✓ Created issue #43: Add dark mode toggle
-  https://github.com/owner/repo/issues/43
-
-● Creating issue 3/3...
-✗ Failed to create: Refactor auth middleware (rate limited)
-```
-
-### Step 6 — Report
-
-Print a structured step-by-step summary:
-
-**All succeeded:**
-```
-◆ Batch Create — {N}/{N} issues
-┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-
-  Detect items:      ✓ pass ({N} items found)
-  Preview:           ✓ approved
-  Duplicates:        ✓ pass (no duplicates)
-  Create:            ✓ pass ({N}/{N} created)
-  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  Result:            DONE
-
-  ✓ #42  Fix Safari checkout redirect
-         https://github.com/owner/repo/issues/42
-  ✓ #43  Add dark mode toggle
-         https://github.com/owner/repo/issues/43
-  ✓ #44  Refactor auth middleware
-         https://github.com/owner/repo/issues/44
-```
-
-**Partial failure:**
-```
-◆ Batch Create — {succeeded}/{total} issues
-┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-
-  Detect items:      ✓ pass ({total} items found)
-  Preview:           ✓ approved
-  Duplicates:        ✓ pass
-  Create:            ⚠ warn ({succeeded}/{total} created, {failed} failed)
-  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  Result:            PARTIAL
-
-  ✓ #42  Fix Safari checkout redirect
-         https://github.com/owner/repo/issues/42
-  ✓ #43  Add dark mode toggle
-         https://github.com/owner/repo/issues/43
-  ✗      Refactor auth middleware — rate limited
-
-  To retry failed: /issue-creator Refactor auth middleware
-```
-
-The retry hint shows the single-create invocation for each failed item, so the user can easily pick up where the batch left off.
-
----
-
-## Example: Batch from a planning document
-
-**User says:** `/issue-creator` followed by:
-```
-Here are the items from our sprint planning:
-1. Fix the Safari checkout redirect bug — payments fail on iOS Safari
-2. Add dark mode toggle to the settings page
-3. Refactor auth middleware to support OAuth2
-```
-
-1. Detect → 3 items from numbered list
-2. Preview table → 3 rows with types and effort estimates
-3. Duplicates → none found
-4. Approval:
-   ```
-   ● Scanning codebase...
-     Found 3 items in input
-
-   ◆ Batch Preview
-   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-     #  │ Type        │ Title                              │ Effort
-     ───┼─────────────┼────────────────────────────────────┼───────
-     1  │ bug         │ Fix Safari checkout redirect        │ S
-     2  │ feature     │ Add dark mode toggle                │ M
-     3  │ improvement │ Refactor auth middleware for OAuth2  │ L
-
-   Create 3 issues? [A]ll / [e]dit / [c]ancel
-   ```
-5. On "All" → create each → `✓ 3/3 issues created`
-
----
-
-## Example: Create from a vague description
-
-**User says:** `/issue-creator the checkout page is broken on Safari`
-
-1. Parse → keywords: "checkout", "broken", "Safari"; type: bug
-2. Classify → bug (high confidence)
-3. Duplicates → none found
-4. Generate → populates bug.md template with Safari-specific acceptance criteria
-5. Preview:
-   ```
-   ◆ Issue Preview
-   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-     Type:     bug (high)
-     Title:    Fix checkout page broken on Safari
-     Labels:   bug, checkout
-     Criteria: 3 acceptance criteria generated (medium)
-
-   Create issue? [Y/n]
-   ```
-6. On confirmation → `gh issue create` → `✓ Created issue #15`
-
 ## GitHub CLI Convention
 
 Every `gh` command for data retrieval uses `--json` with explicit field selection. Never parse text output.
@@ -783,6 +409,29 @@ After creating an issue (single or batch mode), sync the issue to the repo's Git
 In batch mode, sync each issue after it is created.
 
 If `projects.sync_enabled` is `false` (default), skip silently. If any sync step fails, print a `⚠` warning and continue — never block issue creation on project sync failure. See `docs/github-projects-sync.md` for error messages and graceful degradation details.
+
+## Expected Output
+
+A successful create prints the issue URL and a compact summary:
+
+```
+  ✓ Issue #42 created
+    https://github.com/owner/repo/issues/42
+
+  Title:  Fix mobile auth redirect loop
+  Type:   bug (high confidence)
+  Labels: bug, auth, mobile
+```
+
+In batch mode, one line per issue is printed followed by a totals footer (`✓ 5 created, 1 skipped (duplicate)`).
+
+## Edge Cases
+
+- **Duplicate detection** — if an existing open issue closely matches, the skill asks before filing; the user can dedupe or create anyway.
+- **Screenshot-only input** — the image is inspected, described in text, and a structured issue is drafted; the image is also attached to the issue body.
+- **Ambiguous batch input** — if item boundaries are unclear, the skill shows a parsed preview and asks for confirmation before creating.
+- **GitHub API rate limit** — creation stops at the last successful issue; the partial result is reported with a resume hint.
+- **Empty body** — the issue is created with only a title; `(needs review)` is noted in the metadata section.
 
 ## Additional Resources
 

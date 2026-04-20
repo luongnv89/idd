@@ -1,12 +1,12 @@
 ---
 name: issue-pr-review
-description: Review a pull request end-to-end with token-optimized fix cycles — runs a script pre-pass for lint/format/test auto-fix, reuses the same reviewer and fixer agents across cycles (only spawns fresh for the final confirmation pass), filters by severity (only fix critical+high issues, note medium), and uses soft pass conditions (zero critical, ≤ 2 medium remaining). Up to 3 cycles max. Provides summary report and auto-merges in auto-pilot mode. Replaces review-fix-loop with CI awareness. Use when asked to "review PR", "review and fix PR", "check this PR", "is this PR ready", "review-fix-loop", "review fix loop", "auto-review my PR", "fix review issues", "clean up this PR", "review until clean", "polish this branch", "make this PR ready", or "keep reviewing until it passes". Also trigger when auto-pilot needs to review a PR after issue resolution.
-effort: high
+description: Review a pull request end-to-end with up to 3 token-optimized fix cycles, CI monitoring, and auto-merge in auto-pilot mode. Use when asked to "review PR", "review and fix PR", "is this PR ready", "clean up this PR", or "polish this branch".
 license: MIT
+compatibility: Requires git and GitHub CLI (gh) with authentication. Self-contained — uses shared agents from shared/agents/.
+effort: high
 metadata:
   version: 0.3.0
   creator: Luong NGUYEN <luongnv89@gmail.com>
-compatibility: Requires git and GitHub CLI (gh) with authentication. Self-contained — uses shared agents from shared/agents/.
 ---
 
 # /issue-pr-review [PR_NUMBER]
@@ -476,6 +476,30 @@ All errors use rich format from `references/error-messages.md`:
 
   To fix:  <actionable command>
 ```
+
+## Expected Output
+
+A clean review prints the 7-step tracker and a summary:
+
+```
+  [1/7] PR Info       ✓ #87 fix(auth): resolve redirect (#42)
+  [2/7] Script Pre    ✓ 3 lint fixes applied
+  [3/7] Review        ✓ 0 critical, 1 medium (note)
+  [4/7] Tests         ✓ 12 passed
+  [5/7] CI            ✓ all checks green
+  [6/7] Fix           ○ skipped — nothing to fix
+  [7/7] Summary       ✓ PR ready to merge
+
+  ✓ PR #87 passed review (soft-pass: 1 medium note)
+```
+
+## Edge Cases
+
+- **No PR for current branch** — the skill asks for an explicit `<N>` or stops cleanly.
+- **CI still running** — waits up to `review.ci_timeout`, then prints the current state and stops without merging.
+- **Critical issue unresolvable after 3 cycles** — stops, prints remaining issues, does not merge, asks the user to take over.
+- **Merge conflict with base** — prints the exact rebase command and stops.
+- **Review-only mode (`--review-only`)** — never fixes or merges, always reports.
 
 ## Additional Resources
 
