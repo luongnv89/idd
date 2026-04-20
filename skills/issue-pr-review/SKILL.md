@@ -496,7 +496,7 @@ A clean review prints the 7-step tracker and a summary:
 ## Edge Cases
 
 - **No PR for current branch** — the skill asks for an explicit `<N>` or stops cleanly.
-- **CI still running** — waits up to `review.ci_wait_timeout`, then prints the current state and stops without merging.
+- **CI still running** — waits up to `review.ci_timeout`, then prints the current state and stops without merging.
 - **Critical issue unresolvable after 3 cycles** — stops, prints remaining issues, does not merge, asks the user to take over.
 - **Merge conflict with base** — prints the exact rebase command and stops.
 - **Review-only mode (`--review-only`)** — never fixes or merges, always reports.

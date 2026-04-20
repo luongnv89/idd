@@ -1,6 +1,6 @@
 ---
 name: issue-resolver
-description: Create an atomic PR that closes a GitHub issue end-to-end via a 7-step pipeline. Use when asked to "resolve issue #N", "fix #N", "implement #N", "work on #N", "take issue #N", or "/issue-resolver".
+description: Create an atomic PR that closes a GitHub issue end-to-end via a 6-step pipeline. Use when asked to "resolve issue #N", "fix #N", "implement #N", "work on #N", "take issue #N", or "/issue-resolver".
 license: MIT
 compatibility: Requires git and GitHub CLI (gh) with authentication and push access. Self-contained — uses shared agents from shared/agents/.
 effort: max
@@ -559,18 +559,17 @@ No `[y/N]` prompts, no `Choose:` prompts, no `Continue?` prompts. Every decision
 
 ## Expected Output
 
-A successful resolve prints the full 7-step tracker and ends with the PR URL:
+A successful resolve prints the full 6-step tracker and ends with the PR URL:
 
 ```
   ◆ Resolve Pipeline
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  [1/7] Fetch        ✓ issue #42 loaded
-  [2/7] Branch       ✓ fix/42-mobile-auth
-  [3/7] Research     ✓ read 5 files, traced 3 deps
-  [4/7] Plan         ✓ approach: fix redirect logic
-  [5/7] Execute      ✓ 2 files changed, 45 lines
-  [6/7] Verify       ✓ 12 tests passed
-  [7/7] Ship         ✓ PR #87 created
+  [0/5] Preflight    ✓ issue #42 open, not yet resolved
+  [1/5] Research     ✓ read 12 files, complexity: medium
+  [2/5] Plan         ✓ option 2 selected: balanced refactor
+  [3/5] Implement    ✓ 3 files changed, 8 unit tests, 2 e2e tests
+  [4/5] QA           ✓ clean after 2 cycles
+  [5/5] Deliver      ✓ PR #87 created
 
   ✓ Done — PR #87: fix(auth): resolve mobile auth redirect (#42)
     https://github.com/user/repo/pull/87
