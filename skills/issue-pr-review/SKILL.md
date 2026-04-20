@@ -1,11 +1,11 @@
 ---
 name: issue-pr-review
-description: Review a pull request end-to-end with up to 3 token-optimized fix cycles, CI monitoring, and auto-merge in auto-pilot mode. Use when asked to "review PR", "review and fix PR", "is this PR ready", "clean up this PR", or "polish this branch".
+description: "Review a pull request end-to-end with up to 3 token-optimized fix cycles, CI monitoring, and auto-merge in auto-pilot mode. Use when asked to review PR, review and fix PR, is this PR ready, clean up this PR, or polish this branch. Don't use for creating a PR (use /issue-resolver), reviewing raw issues (use /issue-analysis), or reviewing code that's not yet in a PR (use /code-review or a generic reviewer)."
 license: MIT
 compatibility: Requires git and GitHub CLI (gh) with authentication. Self-contained — uses shared agents from shared/agents/.
 effort: high
 metadata:
-  version: 0.3.0
+  version: 0.3.2
   creator: Luong NGUYEN <luongnv89@gmail.com>
 ---
 
@@ -379,70 +379,13 @@ After Step 6, go back to Step 3 — but reuse the same reviewer agent via `SendM
 
 ## Step 7 — Summary Report [7/7]
 
-Print a structured step-by-step summary showing the review pipeline results.
+Print a structured step-by-step summary showing the review pipeline results. Use the templates in `references/report-templates.md`:
 
-### Clean PR
+- *Summary — Clean PR* — all checks pass, may include soft-pass notes
+- *Summary — PR With Remaining Issues* — review couldn't clear everything within `review.max_cycles`
+- *Auto-Merge (auto mode only)* — post-report squash merge and block-on-failure handling
 
-```
-◆ PR Review: #{pr_number} (pass {N} — clean)
-┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-
-  Script pre-pass:   ✓ lint/format auto-fixed ({auto_fixed} files)
-  Code review:       ✓ pass
-  Tests:             ✓ pass ({count} passed)
-  CI status:         ✓ pass ({checks_count} checks passed)
-  Issues fixed:      ✓ {total_fixed} total across {cycles} cycles
-  Issues noted:      ○ {note_count} (medium, not blocking)
-  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  Result:            PASS
-
-  {pr_url}
-```
-
-### PR with remaining issues
-
-```
-◆ PR Review: #{pr_number} (pass {max} — issues remain)
-┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-
-  Code review:       ⚠ warn ({N} issues remain)
-  Tests:             ✓ pass
-  CI status:         ✓ pass
-  Issues fixed:      ✓ {total_fixed} total across {max} cycles
-  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  Result:            WARN (manual review recommended)
-
-  Remaining:
-    ● [category] description (file:line)
-
-  {pr_url}
-```
-
-### Auto-merge (auto mode only)
-
-If the PR is clean AND `--auto` flag is set:
-
-```bash
-gh pr merge {N} --squash --delete-branch
-```
-
-Append to the report:
-```
-  Merge:             ✓ pass (squash merged)
-  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  Result:            MERGED
-
-  ✓ PR #{N} merged — branch {branch_name} deleted
-```
-
-If merge fails:
-```
-  Merge:             ✗ fail ({reason})
-  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  Result:            BLOCKED (manual merge required)
-```
-
-In interactive mode: never auto-merge. Just report status.
+In interactive mode: never auto-merge — just report status.
 
 ---
 
@@ -479,19 +422,7 @@ All errors use rich format from `references/error-messages.md`:
 
 ## Expected Output
 
-A clean review prints the 7-step tracker and a summary:
-
-```
-  [1/7] PR Info       ✓ #87 fix(auth): resolve redirect (#42)
-  [2/7] Script Pre    ✓ 3 lint fixes applied
-  [3/7] Review        ✓ 0 critical, 1 medium (note)
-  [4/7] Tests         ✓ 12 passed
-  [5/7] CI            ✓ all checks green
-  [6/7] Fix           ○ skipped — nothing to fix
-  [7/7] Summary       ✓ PR ready to merge
-
-  ✓ PR #87 passed review (soft-pass: 1 medium note)
-```
+A clean review prints the 7-step tracker and a summary — see the *Expected Inline Output* example in `references/report-templates.md`.
 
 ## Edge Cases
 
@@ -504,6 +435,7 @@ A clean review prints the 7-step tracker and a summary:
 ## Additional Resources
 
 - **`shared/agents/code-reviewer.md`** — Review subagent prompt
+- **`references/report-templates.md`** — Step 7 summary templates, auto-merge flow, expected inline output
 - **`references/error-messages.md`** — Error catalog
 - **`docs/naming-conventions.md`** — Naming conventions
 - **`DESIGN.md`** — Terminal output style guide

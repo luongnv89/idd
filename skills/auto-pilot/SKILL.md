@@ -1,11 +1,11 @@
 ---
 name: auto-pilot
-description: Run a fully autonomous triage-resolve-review-merge loop over the GitHub issue backlog with zero user prompts. Use when asked to "auto-pilot", "autopilot", "resolve everything", "work through the backlog", "run the loop", or "keep going until done".
+description: "Run a fully autonomous triage-resolve-review-merge loop over the GitHub issue backlog with zero user prompts. Use when asked to auto-pilot, autopilot, resolve everything, work through the backlog, run the loop, or keep going until done. Don't use for single-issue work (use /issue-resolver), one-shot triage (use /issue-triage), or interactive PR review (use /issue-pr-review)."
 license: MIT
 compatibility: Requires git and GitHub CLI (gh) with authentication and push access. Requires merge permission for auto-merge. Uses /issue-triage, /issue-resolver, /issue-analysis, and /issue-pr-review skills internally. All agents are in shared/agents/.
 effort: max
 metadata:
-  version: 2.1.1
+  version: 2.1.2
   creator: Luong NGUYEN <luongnv89@gmail.com>
 ---
 
