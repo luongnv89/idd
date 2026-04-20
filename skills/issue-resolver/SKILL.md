@@ -1,6 +1,6 @@
 ---
 name: issue-resolver
-description: Resolve a GitHub issue end-to-end through a 7-step pipeline producing an atomic PR that closes the issue. Use when asked to "resolve issue #N", "fix #N", "implement #N", "work on #N", "take issue #N", or "/issue-resolver".
+description: Create an atomic PR that closes a GitHub issue end-to-end via a 7-step pipeline. Use when asked to "resolve issue #N", "fix #N", "implement #N", "work on #N", "take issue #N", or "/issue-resolver".
 license: MIT
 compatibility: Requires git and GitHub CLI (gh) with authentication and push access. Self-contained — uses shared agents from shared/agents/.
 effort: max
@@ -74,7 +74,7 @@ Defaults:
 
 ## Subagent Architecture
 
-The resolve pipeline delegates heavy work to subagents to keep the main agent's context clean. All agents are in `shared/agents/`.
+The resolve pipeline delegates heavy work to subagents to keep the main agent's **context window** clean and the **token budget** predictable. All agents are in `shared/agents/`.
 
 ```
 Main Agent (orchestrator)
