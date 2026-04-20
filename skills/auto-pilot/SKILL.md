@@ -1,6 +1,6 @@
 ---
 name: auto-pilot
-description: Fully automated development loop that triages open issues, picks the highest-priority task, resolves it end-to-end, reviews the PR with up to 3 token-optimized fix-review cycles (script pre-pass handles lint/format, LLM only fixes critical issues), and if issues remain creates a follow-up issue then merges the PR anyway so progress is never lost. Critical issues get special treatment — if unresolvable, the loop stops and asks the user instead of auto-continuing. Use this skill whenever someone says "auto-pilot", "autopilot", "auto resolve all issues", "resolve everything", "work through the backlog", "resolve all", "run the loop", "automate the backlog", "hands-free mode", "keep going until done", or wants the agent to continuously triage-resolve-review-merge without manual intervention.
+description: Run a fully autonomous triage-resolve-review-merge loop over the GitHub issue backlog with zero user prompts. Use when asked to "auto-pilot", "autopilot", "resolve everything", "work through the backlog", "run the loop", or "keep going until done".
 license: MIT
 compatibility: Requires git and GitHub CLI (gh) with authentication and push access. Requires merge permission for auto-merge. Uses /issue-triage, /issue-resolver, /issue-analysis, and /issue-pr-review skills internally. All agents are in shared/agents/.
 effort: max

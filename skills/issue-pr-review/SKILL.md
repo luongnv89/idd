@@ -1,6 +1,6 @@
 ---
 name: issue-pr-review
-description: Review a pull request end-to-end with token-optimized fix cycles — runs a script pre-pass for lint/format/test auto-fix, reuses the same reviewer and fixer agents across cycles (only spawns fresh for the final confirmation pass), filters by severity (only fix critical+high issues, note medium), and uses soft pass conditions (zero critical, ≤ 2 medium remaining). Up to 3 cycles max. Provides summary report and auto-merges in auto-pilot mode. Replaces review-fix-loop with CI awareness. Use when asked to "review PR", "review and fix PR", "check this PR", "is this PR ready", "review-fix-loop", "review fix loop", "auto-review my PR", "fix review issues", "clean up this PR", "review until clean", "polish this branch", "make this PR ready", or "keep reviewing until it passes". Also trigger when auto-pilot needs to review a PR after issue resolution.
+description: Review a pull request end-to-end with up to 3 token-optimized fix cycles, CI monitoring, and auto-merge in auto-pilot mode. Use when asked to "review PR", "review and fix PR", "is this PR ready", "clean up this PR", or "polish this branch".
 license: MIT
 compatibility: Requires git and GitHub CLI (gh) with authentication. Self-contained — uses shared agents from shared/agents/.
 effort: high

@@ -1,6 +1,6 @@
 ---
 name: review-fix-loop
-description: "DEPRECATED: Use /issue-pr-review instead. This skill redirects to issue-pr-review which adds CI status monitoring and auto-merge capabilities on top of the original review-fix-loop functionality. Triggers on: \"review and fix\", \"review fix loop\", \"auto-review my PR\", \"fix review issues\", \"clean up this PR\", \"review until clean\", \"polish this branch\", \"make this PR ready\"."
+description: Redirect the user to /issue-pr-review — this skill is deprecated and replaced by issue-pr-review with CI monitoring and auto-merge. Use when asked to "review and fix", "review fix loop", "auto-review my PR", or "polish this branch".
 license: MIT
 compatibility: Requires /issue-pr-review skill.
 effort: low

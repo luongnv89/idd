@@ -1,6 +1,6 @@
 ---
 name: init-gitissue
-description: Initialize gitissue configuration for the current repository by scanning the codebase and generating a project-specific .gitissue.yml file. Use this skill whenever someone says "init gitissue", "setup gitissue", "initialize config", "configure gitissue", "create gitissue config", "first time setup", "new project setup", "get started with gitissue", "configure my repo", "what settings should I use", "/init-gitissue", or wants to set up IDD for the first time. Also trigger when a user opens a new repo and wants to start using gitissue, asks how to configure issue-driven development, or says "set up my project for issues". This skill auto-detects language, framework, test runner, and repo size to produce a tailored configuration with inline comments explaining each setting.
+description: Generate a project-specific .gitissue.yml by auto-detecting language, framework, test runner, and repo size. Use when asked to "init gitissue", "setup gitissue", "configure gitissue", "first time setup", "/init-gitissue", or to set up IDD on a new repo.
 license: MIT
 compatibility: Requires git. No GitHub CLI or authentication needed — generates a local config file only.
 effort: low
