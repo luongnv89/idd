@@ -1,6 +1,6 @@
 ---
 name: issue-pr-review
-description: "Review a pull request end-to-end with up to 3 token-optimized fix cycles, CI monitoring, and auto-merge in auto-pilot mode. Use when asked to review PR, review and fix PR, is this PR ready, clean up this PR, or polish this branch. Don't use for creating a PR (use /issue-resolver), reviewing raw issues (use /issue-analysis), or reviewing code that's not yet in a PR (use /code-review or a generic reviewer)."
+description: "Review a PR end-to-end with CI checks, fix cycles, and optional auto-merge. Use for PR review, cleanup, or readiness checks. Don't use for creating PRs, raw issue analysis, or non-PR code review."
 license: MIT
 compatibility: Requires git and GitHub CLI (gh) with authentication. Self-contained — uses shared agents from shared/agents/.
 effort: high
