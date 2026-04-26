@@ -1,6 +1,6 @@
 ---
 name: issue-pr-review-fix-loop
-description: "Run an outer review-fix loop over a PR that calls /issue-pr-review in review-only mode, fixes, commits, pushes, and repeats until clean, ending with a fresh confirmation pass. Use when asked to review and fix my PR, keep fixing until clean, or review loop. Don't use for a single review pass (use /issue-pr-review), creating a PR (use /issue-resolver), or backlog-wide automation (use /auto-pilot)."
+description: "Run an outer PR review-fix loop that reviews, fixes, commits, pushes, and repeats until clean. Use for keep-fixing PR requests. Don't use for single review passes, PR creation, or backlog automation."
 license: MIT
 compatibility: Requires git and GitHub CLI (gh) with authentication. Depends on /issue-pr-review skill (skills/issue-pr-review/SKILL.md). Uses shared agents from shared/agents/.
 effort: high

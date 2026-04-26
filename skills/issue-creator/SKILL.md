@@ -1,6 +1,6 @@
 ---
 name: issue-creator
-description: "Create structured GitHub issues from text, screenshots, or lists — or normalize and enrich existing ones into a standard template. Use when asked to create issue, file a bug, normalize issue, batch create, /issue-creator, or when a user describes a bug or feature to track. Don't use for resolving or implementing an issue (use /issue-resolver), triaging/prioritizing issues (use /issue-triage), or analyzing a single issue (use /issue-analysis)."
+description: "Create or normalize structured GitHub issues from text, screenshots, or lists. Use for filing bugs/features, batch creation, or template cleanup. Don't use for resolving, triaging, or deep issue analysis."
 license: MIT
 compatibility: Requires git and GitHub CLI (gh) with authentication. Run `gh auth status` to verify.
 effort: medium
