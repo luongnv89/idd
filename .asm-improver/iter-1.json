@@ -1,0 +1,38 @@
+{
+  "evaluatedAt": "2026-04-26T18:26:27.375Z",
+  "skills": [
+    {
+      "name": "issue-pr-review",
+      "baseline": {
+        "overallScore": 90,
+        "descriptionScore": 6
+      },
+      "final": {
+        "overallScore": 96,
+        "descriptionScore": 10
+      }
+    },
+    {
+      "name": "issue-creator",
+      "baseline": {
+        "overallScore": 91,
+        "descriptionScore": 6
+      },
+      "final": {
+        "overallScore": 97,
+        "descriptionScore": 10
+      }
+    },
+    {
+      "name": "issue-pr-review-fix-loop",
+      "baseline": {
+        "overallScore": 90,
+        "descriptionScore": 6
+      },
+      "final": {
+        "overallScore": 96,
+        "descriptionScore": 10
+      }
+    }
+  ]
+}
