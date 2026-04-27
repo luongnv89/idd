@@ -132,7 +132,7 @@ IDD is a methodology, not a vendor lock-in. The structured issue format is plain
 | **Codex CLI** | `gh issue view 42 --json body` and pass to codex as context |
 | **Gemini CLI** | Pipe issue body to gemini for resolution |
 | **GitHub Copilot** | Structured issues give Copilot better context for suggestions |
-| **Any SKILL.md agent** | Load skills from `skills/` directory |
+| **Any SKILL.md agent** | Load skills from `src/skills/` directory |
 | **Human developers** | Read the issue — acceptance criteria and structure are right there |
 
 gitissue is **complementary** to your existing workflow. Use it alongside TDD, BDD, CI/CD pipelines, project management tools, or any AI coding agent. It fills one gap — structuring and triaging issues — and stays out of the way for everything else.
@@ -191,15 +191,15 @@ You can also install individual skills. See each skill folder for per-skill comm
 
 | Skill | Folder |
 |-------|--------|
-| `/issue-creator` | [`skills/issue-creator/`](skills/issue-creator/) |
-| `/issue-analysis` | [`skills/issue-analysis/`](skills/issue-analysis/) |
-| `/issue-resolver` | [`skills/issue-resolver/`](skills/issue-resolver/) |
-| `/issue-triage` | [`skills/issue-triage/`](skills/issue-triage/) |
-| `/auto-pilot` | [`skills/auto-pilot/`](skills/auto-pilot/) |
-| `/issue-pr-review` | [`skills/issue-pr-review/`](skills/issue-pr-review/) |
-| `/idd-doctor` | [`skills/idd-doctor/`](skills/idd-doctor/) |
-| `/issue-pr-review-fix-loop` _(deprecated)_ | [`skills/issue-pr-review-fix-loop/`](skills/issue-pr-review-fix-loop/) |
-| `/init-gitissue` | [`skills/init-gitissue/`](skills/init-gitissue/) |
+| `/issue-creator` | [`src/skills/issue-creator/`](src/skills/issue-creator/) |
+| `/issue-analysis` | [`src/skills/issue-analysis/`](src/skills/issue-analysis/) |
+| `/issue-resolver` | [`src/skills/issue-resolver/`](src/skills/issue-resolver/) |
+| `/issue-triage` | [`src/skills/issue-triage/`](src/skills/issue-triage/) |
+| `/auto-pilot` | [`src/skills/auto-pilot/`](src/skills/auto-pilot/) |
+| `/issue-pr-review` | [`src/skills/issue-pr-review/`](src/skills/issue-pr-review/) |
+| `/idd-doctor` | [`src/internal-skills/idd-doctor/`](src/internal-skills/idd-doctor/) |
+| `/issue-pr-review-fix-loop` _(deprecated)_ | [`src/deprecated-skills/issue-pr-review-fix-loop/`](src/deprecated-skills/issue-pr-review-fix-loop/) |
+| `/init-gitissue` | [`src/skills/init-gitissue/`](src/skills/init-gitissue/) |
 
 ---
 
@@ -259,7 +259,7 @@ When these artifacts are well-crafted:
 - **Reverts and rollbacks are safe.** When every commit is atomic and linked to an issue, you can revert a specific change with confidence — you know exactly what it did and why.
 - **Changelogs write themselves.** Conventional commit messages (`feat:`, `fix:`, `refactor:`) can be parsed automatically into release notes grouped by type.
 
-gitissue enforces this discipline automatically. `/issue-creator` structures the issue. `/issue-resolver` creates branches, commits, and PRs that follow [naming conventions](docs/naming-conventions.md) — linking every artifact back to the issue that started it. The result: a development history that remains useful and valuable for the entire lifetime of the project.
+gitissue enforces this discipline automatically. `/issue-creator` structures the issue. `/issue-resolver` creates branches, commits, and PRs that follow [naming conventions](src/docs/naming-conventions.md) — linking every artifact back to the issue that started it. The result: a development history that remains useful and valuable for the entire lifetime of the project.
 
 ### IDD and other methodologies
 
@@ -497,7 +497,7 @@ review:
   require_acceptance_criteria_check: true # block soft-pass if AC Verification fails
 ```
 
-Full schema: [`docs/config-schema.md`](docs/config-schema.md)
+Full schema: [`src/docs/config-schema.md`](src/docs/config-schema.md)
 
 </details>
 
@@ -523,35 +523,43 @@ Each normalized issue includes:
 <summary><strong>Project Structure</strong></summary>
 
 ```
-shared/
-└── agents/                    # Shared agent definitions (used by multiple skills)
-    ├── codebase-researcher.md # Deep codebase scan + solution research
-    ├── synthesizer.md         # Analysis + implementation options
-    ├── implementer.md         # Code + tests implementation
-    ├── code-reviewer.md       # Confidence-based code review
-    ├── duplicate-detector.md  # Issue dedup scoring
-    └── issue-relationship-scanner.md  # File deps + already-fixed detection
+src/
+├── shared/
+│   └── agents/                    # Shared agent definitions (used by multiple skills)
+│       ├── codebase-researcher.md # Deep codebase scan + solution research
+│       ├── synthesizer.md         # Analysis + implementation options
+│       ├── implementer.md         # Code + tests implementation
+│       ├── code-reviewer.md       # Confidence-based code review
+│       ├── duplicate-detector.md  # Issue dedup scoring
+│       └── issue-relationship-scanner.md  # File deps + already-fixed detection
+│
+├── skills/
+│   ├── auto-pilot/         # /auto-pilot
+│   ├── issue-analysis/     # /issue-analysis N
+│   ├── issue-creator/      # /issue-creator (+ templates/)
+│   ├── issue-resolver/     # /issue-resolver N
+│   ├── issue-triage/       # /issue-triage
+│   ├── issue-pr-review/    # /issue-pr-review — review, test, CI, fix, merge
+│   └── init-gitissue/      # /init-gitissue
+│       (each skill has SKILL.md, README.md, references/)
+│
+├── internal-skills/
+│   └── idd-doctor/         # /idd-doctor — read-only repo health check
+│
+├── deprecated-skills/
+│   └── issue-pr-review-fix-loop/  # DEPRECATED v0.4.0 — redirects to /issue-pr-review
+│
+└── docs/                         # Runtime docs (consumed by skills at runtime)
+    ├── config-schema.md          # Full .gitissue.yml schema (autopilot + review)
+    ├── idd-methodology.md        # IDD methodology + analysis-artifact rule
+    ├── naming-conventions.md     # Branch / commit / PR / issue naming
+    └── github-projects-sync.md   # GitHub Projects v2 integration
 
-skills/
-├── auto-pilot/         # /auto-pilot
-├── issue-analysis/     # /issue-analysis N
-├── issue-creator/      # /issue-creator (+ templates/)
-├── issue-resolver/     # /issue-resolver N
-├── issue-triage/       # /issue-triage
-├── issue-pr-review/    # /issue-pr-review — review, test, CI, fix, merge
-├── idd-doctor/         # /idd-doctor — read-only repo health check
-├── issue-pr-review-fix-loop/  # DEPRECATED v0.4.0 — redirects to /issue-pr-review
-└── init-gitissue/      # /init-gitissue
-    (each skill has SKILL.md, README.md, references/)
-docs/
-├── ARCHITECTURE.md            # System design + data flow diagrams
-├── CHANGELOG.md               # Per-release notes
-├── DEVELOPMENT.md             # Local setup + contribution guide
-├── config-schema.md           # Full .gitissue.yml schema (autopilot + review)
-├── idd-methodology.md         # IDD methodology + analysis-artifact rule
-├── naming-conventions.md      # Branch / commit / PR / issue naming
-├── github-projects-sync.md    # GitHub Projects v2 integration
-└── sample-normalized-issue.md # Example normalized issue
+docs/                             # Top-level project docs (humans only)
+├── ARCHITECTURE.md               # System design + data flow diagrams
+├── CHANGELOG.md                  # Per-release notes
+├── DEVELOPMENT.md                # Local setup + contribution guide
+└── sample-normalized-issue.md    # Example normalized issue
 ```
 
 </details>
@@ -559,6 +567,6 @@ docs/
 <details>
 <summary><strong>IDD Methodology</strong></summary>
 
-Full documentation: [`docs/idd-methodology.md`](docs/idd-methodology.md)
+Full documentation: [`src/docs/idd-methodology.md`](src/docs/idd-methodology.md)
 
 </details>

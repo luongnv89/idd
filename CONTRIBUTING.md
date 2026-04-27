@@ -54,22 +54,32 @@ graph TD
 ### Project Structure
 
 ```
-skills/
-├── issue-creator/      # /issue-creator — create and normalize issues
-│   ├── SKILL.md        # Skill definition (the "code")
-│   ├── templates/      # Issue templates (bug, feature, improvement)
-│   └── references/     # Error messages, detailed patterns
-├── issue-resolver/     # /issue-resolver N — resolve issues end-to-end
-│   ├── SKILL.md
-│   └── references/
-├── issue-triage/       # /issue-triage — backlog analysis
-│   ├── SKILL.md
-│   └── references/
-└── init-gitissue/      # /init-gitissue — config generator
-    ├── SKILL.md
-    └── references/
-docs/                   # Project documentation
-tests/                  # Integration test scripts
+src/
+├── skills/
+│   ├── issue-creator/      # /issue-creator — create and normalize issues
+│   │   ├── SKILL.md        # Skill definition (the "code")
+│   │   ├── templates/      # Issue templates (bug, feature, improvement)
+│   │   └── references/     # Error messages, detailed patterns
+│   ├── issue-resolver/     # /issue-resolver N — resolve issues end-to-end
+│   │   ├── SKILL.md
+│   │   └── references/
+│   ├── issue-triage/       # /issue-triage — backlog analysis
+│   │   ├── SKILL.md
+│   │   └── references/
+│   └── init-gitissue/      # /init-gitissue — config generator
+│       ├── SKILL.md
+│       └── references/
+├── internal-skills/        # /idd-doctor and other internal-only skills
+├── deprecated-skills/      # Skills retained one release cycle past deprecation
+├── shared/
+│   └── agents/             # Shared agent definitions used by multiple skills
+└── docs/                   # Runtime docs consumed by skills
+    ├── config-schema.md
+    ├── idd-methodology.md
+    ├── naming-conventions.md
+    └── github-projects-sync.md
+docs/                       # Top-level project documentation (humans only)
+tests/                      # Integration test scripts
 ```
 
 ### Testing

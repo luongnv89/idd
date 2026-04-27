@@ -23,7 +23,7 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-SKILL_DIR="$REPO_ROOT/skills/idd-doctor"
+SKILL_DIR="$REPO_ROOT/src/internal-skills/idd-doctor"
 PASS=0
 FAIL=0
 
@@ -44,9 +44,9 @@ echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄�
 # T1: Skill file structure exists
 # ───────────────────────────────────────────────────────────
 if [ -d "$SKILL_DIR" ]; then
-  pass "T1.0: skills/idd-doctor/ directory exists"
+  pass "T1.0: src/internal-skills/idd-doctor/ directory exists"
 else
-  fail "T1.0: skills/idd-doctor/ directory missing"
+  fail "T1.0: src/internal-skills/idd-doctor/ directory missing"
 fi
 
 if [ -f "$SKILL_DIR/SKILL.md" ]; then
@@ -289,7 +289,7 @@ fi
 # Check 1 evidence: /issue-creator README.md and SKILL.md are
 # clean per the intent-only contract (other skills are out of scope).
 DRIFT_FOUND=0
-for f in "$REPO_ROOT/skills/issue-creator/README.md" "$REPO_ROOT/skills/issue-creator/SKILL.md"; do
+for f in "$REPO_ROOT/src/skills/issue-creator/README.md" "$REPO_ROOT/src/skills/issue-creator/SKILL.md"; do
   [ -f "$f" ] || continue
   while IFS= read -r line; do
     lower=$(printf '%s' "$line" | tr '[:upper:]' '[:lower:]')
@@ -316,7 +316,7 @@ fi
 
 # Check 2 evidence: no template file in this repo contains a forbidden field.
 TEMPLATE_DRIFT=0
-for f in "$REPO_ROOT"/skills/issue-creator/templates/*.md \
+for f in "$REPO_ROOT"/src/skills/issue-creator/templates/*.md \
          "$REPO_ROOT"/.github/ISSUE_TEMPLATE/*.md \
          "$REPO_ROOT"/.github/ISSUE_TEMPLATE/*.yml \
          "$REPO_ROOT"/.github/ISSUE_TEMPLATE/*.yaml; do

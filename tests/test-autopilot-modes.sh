@@ -34,7 +34,7 @@ echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄�
 # ───────────────────────────────────────────────────────────
 # T1: init-gitissue template ships conservative defaults
 # ───────────────────────────────────────────────────────────
-TEMPLATE="$REPO_ROOT/skills/init-gitissue/templates/gitissue-template.yml"
+TEMPLATE="$REPO_ROOT/src/skills/init-gitissue/templates/gitissue-template.yml"
 
 if [ -f "$TEMPLATE" ]; then
   pass "T1.0: template file exists"
@@ -63,7 +63,7 @@ fi
 # ───────────────────────────────────────────────────────────
 # T2: docs/config-schema.md documents both new keys
 # ───────────────────────────────────────────────────────────
-SCHEMA="$REPO_ROOT/docs/config-schema.md"
+SCHEMA="$REPO_ROOT/src/docs/config-schema.md"
 
 if grep -qE 'autopilot\.mode' "$SCHEMA"; then
   pass "T2.1: config-schema.md documents autopilot.mode"
@@ -110,7 +110,7 @@ fi
 # ───────────────────────────────────────────────────────────
 # T3: auto-pilot SKILL.md documents merge modes
 # ───────────────────────────────────────────────────────────
-SKILL="$REPO_ROOT/skills/auto-pilot/SKILL.md"
+SKILL="$REPO_ROOT/src/skills/auto-pilot/SKILL.md"
 
 if grep -qiE 'Merge Modes' "$SKILL"; then
   pass "T3.1: SKILL.md has a Merge Modes section"
@@ -150,7 +150,7 @@ done
 # ───────────────────────────────────────────────────────────
 # T4: phases.md gates merge behavior on mode
 # ───────────────────────────────────────────────────────────
-PHASES="$REPO_ROOT/skills/auto-pilot/references/phases.md"
+PHASES="$REPO_ROOT/src/skills/auto-pilot/references/phases.md"
 
 if grep -qE 'autopilot\.mode|effective mode' "$PHASES"; then
   pass "T4.1: phases.md describes mode gating"
@@ -188,7 +188,7 @@ done
 # ───────────────────────────────────────────────────────────
 # T5: README highlights conservative-by-default
 # ───────────────────────────────────────────────────────────
-README="$REPO_ROOT/skills/auto-pilot/README.md"
+README="$REPO_ROOT/src/skills/auto-pilot/README.md"
 
 if grep -qiE 'conservative' "$README"; then
   pass "T5.1: README mentions conservative mode"

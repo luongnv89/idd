@@ -14,7 +14,7 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-SKILL_DIR="$REPO_ROOT/skills/issue-pr-review-fix-loop"
+SKILL_DIR="$REPO_ROOT/src/deprecated-skills/issue-pr-review-fix-loop"
 SKILL="$SKILL_DIR/SKILL.md"
 README="$SKILL_DIR/README.md"
 ROOT_README="$REPO_ROOT/README.md"
@@ -262,8 +262,8 @@ while IFS= read -r match; do
   DEP_HITS=$((DEP_HITS + 1))
   DEP_MATCHES="${DEP_MATCHES}    ${src}: ${rest}\n"
 done < <(grep -rn "issue-pr-review-fix-loop" \
-  "$REPO_ROOT/skills" \
-  "$REPO_ROOT/shared" \
+  "$REPO_ROOT/src/skills" \
+  "$REPO_ROOT/src/shared" \
   "$REPO_ROOT/tests" \
   2>/dev/null || true)
 
@@ -275,7 +275,7 @@ else
 fi
 
 # Bonus: confirm /issue-pr-review is the redirect target and exists.
-if [ -f "$REPO_ROOT/skills/issue-pr-review/SKILL.md" ]; then
+if [ -f "$REPO_ROOT/src/skills/issue-pr-review/SKILL.md" ]; then
   pass "T10.2: AC #1 — successor /issue-pr-review skill exists"
 else
   fail "T10.2: AC #1 — successor /issue-pr-review skill missing"
