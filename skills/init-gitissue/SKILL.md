@@ -5,7 +5,7 @@ license: MIT
 compatibility: Requires git. No GitHub CLI or authentication needed — generates a local config file only.
 effort: low
 metadata:
-  version: 0.3.1
+  version: 0.3.2
   creator: Luong NGUYEN <luongnv89@gmail.com>
 ---
 

@@ -11,10 +11,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - `/issue-pr-review` four-check traceability dimension — verifies `Closes #N` in PR body, at least one commit referencing the issue (via `git log --grep`), durable analysis fields (Decision Record + Acceptance Criteria Verification block), and the squash-merge assumption
 - Five-dimension review output — `correctness`, `acceptance_criteria`, `traceability`, `maintainability`, `safety` — replacing the prior single-line review verdict in cycle reports and the Step 7 summary
 - `tests/test-issue-pr-review-traceability.sh` — 50 spec assertions verifying every Phase 2 acceptance criterion from issue #36
+- `.gitissue.yml` configuration keys `review.require_acceptance_criteria_check` (default `true`) and `review.require_traceability_check` (default `true`) — gate the Phase 2 acceptance-criteria and traceability dimensions in `/issue-pr-review`. When `false`, the corresponding dimension is reported as `pass — verification disabled` and never blocks soft-pass.
+- `/init-gitissue` template emits `review.require_acceptance_criteria_check: true` and `review.require_traceability_check: true` on a fresh install, alongside the existing `autopilot.mode: conservative` and `autopilot.merge_partial: false` defaults
+- `tests/test-config-schema-38.sh` — spec assertions verifying every issue #38 acceptance criterion (schema documents the four keys with defaults; init template emits them; no speculative keys; consuming skills wire the gates)
 
 ### Changed
 - `/issue-pr-review` soft-pass condition now hard-blocks on `traceability: fail` (e.g., missing `Closes #N`) and any `acceptance_criteria: fail`, even when tests and CI are green — this matches the explicit issue #36 contract that a PR can pass tests and fail traceability
-- `/issue-pr-review` v0.4.0 — Phase 2 review-traceability work
+- `/issue-pr-review` v0.4.1 — Phase 2 hard-block conditions now gated on `review.require_*_check` flags (#38)
+- `/init-gitissue` v0.3.2 — emits the unified Phase 1b + Phase 2 configuration schema
 - Step 3 of `/issue-pr-review` now runs in a documented order per cycle: reviewer subagent → per-criterion AC verification → traceability checks → dimensional aggregation
 - Human-authored PRs without a Decision Record are reported as `traceability: partial`, not `fail`, while `Closes #N` and acceptance-criteria checks still apply at full strength
 
