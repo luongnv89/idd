@@ -2,6 +2,10 @@
 
 > Deep analysis of a single GitHub issue — root cause, architecture impact, implementation options, complexity, and risk — persisted to `.gitissue/analysis-N.json`.
 
+## Intent-Code Boundary
+
+`/issue-analysis` respects the intent-code boundary that separates durable intent from time-sensitive code understanding. The **issue body** is the source of truth for *what* should change — problem, reporter context, acceptance criteria. This skill does the *where and why* against the **current codebase**: root cause, affected files, implementation options, complexity, and risk. Those findings are written to `.gitissue/analysis-N.json` so they stay attached to a specific point in time, not frozen into the issue body. A fresh `/issue-analysis N` always re-scans current code rather than trusting cached file lists. See `docs/idd-methodology.md` for the full boundary contract.
+
 ## Highlights
 
 - Scans the codebase for files most relevant to the issue

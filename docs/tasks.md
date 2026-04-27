@@ -1,5 +1,8 @@
 # Tasks — gitissue / IDD
 
+> **Historical document — superseded by GitHub issues.**
+> This task list was generated from PRD v1.1 (2026-03-20) and predates the intent-code boundary correction. Several deliverables describe issue templates with codebase-derived sections (affected files, technical notes, architecture constraints) that the shipped product does **not** include — those sections are produced fresh by `/issue-analysis`, `/issue-triage`, and `/issue-resolver` against the current codebase, not embedded in issue bodies. Active work tracking now lives in GitHub issues; consult skill READMEs and `docs/idd-methodology.md` for current behavior.
+
 Generated from PRD v1.1 and review decisions on 2026-03-20.
 
 ## Sprint 1: Foundation (v0.1.0) — Target: 2026-04-02

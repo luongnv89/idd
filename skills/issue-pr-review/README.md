@@ -2,6 +2,10 @@
 
 > Review a pull request end-to-end — analyze, test, fix, check CI, and auto-merge when clean — with up to 3 token-optimized fix cycles.
 
+## Intent-Code Boundary
+
+`/issue-pr-review` respects the intent-code boundary. The reviewer reads the **PR diff** and the **current codebase** for findings — it never relies on a predicted file list embedded in the linked issue body. When the linked issue exists, its **acceptance criteria** are the contract the PR is evaluated against; everything else (root cause, affected files, implementation choices) is verified against the code as it is right now. Findings stay in the PR review thread and per-cycle reports — they are not written back into the issue body. See `docs/idd-methodology.md` for the full boundary contract.
+
 ## Highlights
 
 - Mechanical pre-pass (lint, format, tests) before any LLM cycles to save tokens
