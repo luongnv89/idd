@@ -38,10 +38,7 @@ skills/
 ├── issue-pr-review/    # /issue-pr-review — review, test, CI check, fix, merge
 │   ├── SKILL.md
 │   └── references/
-├── issue-pr-review-fix-loop/  # /issue-pr-review-fix-loop — outer review-fix loop with fresh context per cycle
-│   ├── SKILL.md
-│   └── references/
-├── review-fix-loop/    # DEPRECATED — redirects to /issue-pr-review
+├── issue-pr-review-fix-loop/  # DEPRECATED v0.4.0 — redirects to /issue-pr-review (retained one release cycle)
 │   ├── SKILL.md
 │   └── references/
 └── init-gitissue/      # /init-gitissue — generate .gitissue.yml

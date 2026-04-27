@@ -1,15 +1,48 @@
 ---
 name: issue-pr-review-fix-loop
-description: "Run an outer PR review-fix loop that reviews, fixes, commits, pushes, and repeats until clean. Use for keep-fixing PR requests. Don't use for single review passes, PR creation, or backlog automation."
+description: "DEPRECATED — use /issue-pr-review instead. Outer PR review-fix loop wrapper kept for backward compatibility with existing references."
 license: MIT
 compatibility: Requires git and GitHub CLI (gh) with authentication. Depends on /issue-pr-review skill (skills/issue-pr-review/SKILL.md). Uses shared agents from shared/agents/.
 effort: high
 metadata:
-  version: 0.3.1
+  version: 0.4.0
   creator: Luong NGUYEN <luongnv89@gmail.com>
+  deprecated: true
+  deprecated_in: 0.4.0
+  removal_target: "one release cycle after 0.4.0"
+  successor: /issue-pr-review
 ---
 
 # /issue-pr-review-fix-loop [PR_NUMBER]
+
+> ## Deprecated — use `/issue-pr-review`
+>
+> This skill is deprecated as of version 0.4.0. All review-fix loop capabilities,
+> including review-fix cycles and traceability checks, are now part of
+> [`/issue-pr-review`](../issue-pr-review/SKILL.md).
+>
+> ### Migration
+>
+> | If you ran… | Run this instead |
+> |---|---|
+> | `/issue-pr-review-fix-loop` | `/issue-pr-review` |
+> | `/issue-pr-review-fix-loop 42` | `/issue-pr-review 42` |
+> | `/issue-pr-review-fix-loop 42 --auto` | `/issue-pr-review 42 --auto` |
+>
+> ### Why
+>
+> `/issue-pr-review` v0.3.0+ folded in this skill's outer-loop responsibilities
+> (reuse reviewer/fixer subagents across cycles, fresh confirmation pass) and
+> v0.4.0 added per-criterion acceptance-criteria verification plus traceability
+> checks. Maintaining two surfaces invites drift, so this wrapper is being
+> retired.
+>
+> ### Removal timeline
+>
+> This file is retained for **one release cycle** after 0.4.0 to keep existing
+> references resolvable. After that release cycle the directory will be removed
+> from the public skill index. The legacy contents below remain unchanged for
+> reference only — invocations should be migrated.
 
 Outer loop that reviews a PR, fixes issues, commits, and repeats — with agent reuse across cycles and a fresh confirmation pass at the end.
 
