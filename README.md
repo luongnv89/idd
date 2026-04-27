@@ -60,8 +60,15 @@ graph LR
 | `/init-gitissue` | Auto-detect language/framework/test runner, generate `.gitissue.yml` | 0.3.2 | low |
 | `/auto-pilot` | Triage → resolve → review → merge loop. Conservative-by-default merge modes (`conservative`/`balanced`/`aggressive`) and explicit issue lists for targeted runs | 2.2.0 | max |
 | `/issue-pr-review` | Review PR end-to-end: script pre-pass (lint/format/test auto-fix), per-criterion AC verification, five-dimension scoring (correctness, acceptance_criteria, traceability, maintainability, safety), reuses reviewer/fixer agents across cycles | 0.4.1 | high |
-| `/idd-doctor` | Read-only health check: verifies issue-creator intent-only contract, gh `--json` field selection, error-message format, and merge strategy assumptions | 0.1.0 | low |
 | `/issue-pr-review-fix-loop` | _Deprecated v0.4.0 — use `/issue-pr-review`._ The outer review-fix loop is now part of `/issue-pr-review`. Retained one release cycle for backward-compat references; will be removed from this index. | 0.4.0 (deprecated) | high |
+
+### Internal tooling
+
+Internal-only skills are not published in the public skill index and are not built into `dist/`. They live alongside the source for repo maintainers to invoke directly from a working tree.
+
+| Skill | Folder | Purpose |
+|-------|--------|---------|
+| `/idd-doctor` | [`src/internal-skills/idd-doctor/`](src/internal-skills/idd-doctor/) | Read-only health check for IDD repository invariants — runs against the local `src/` checkout; not distributed |
 
 ---
 
@@ -197,9 +204,9 @@ You can also install individual skills. See each skill folder for per-skill comm
 | `/issue-triage` | [`src/skills/issue-triage/`](src/skills/issue-triage/) |
 | `/auto-pilot` | [`src/skills/auto-pilot/`](src/skills/auto-pilot/) |
 | `/issue-pr-review` | [`src/skills/issue-pr-review/`](src/skills/issue-pr-review/) |
-| `/idd-doctor` | [`src/internal-skills/idd-doctor/`](src/internal-skills/idd-doctor/) |
 | `/issue-pr-review-fix-loop` _(deprecated)_ | [`src/deprecated-skills/issue-pr-review-fix-loop/`](src/deprecated-skills/issue-pr-review-fix-loop/) |
 | `/init-gitissue` | [`src/skills/init-gitissue/`](src/skills/init-gitissue/) |
+| `/idd-doctor` _(internal)_ | [`src/internal-skills/idd-doctor/`](src/internal-skills/idd-doctor/) |
 
 ---
 

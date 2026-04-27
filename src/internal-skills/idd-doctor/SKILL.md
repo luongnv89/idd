@@ -17,7 +17,7 @@ Run a report-only health check on an IDD repository. Surfaces doc drift on the i
 
 ## When to Use
 
-- **Do** run this skill before landing any change that touches `skills/issue-creator/` README/SKILL text or the issue templates.
+- **Do** run this skill before landing any change that touches `src/skills/issue-creator/` README/SKILL text or the issue templates.
 - **Do** run it after `/init-gitissue` to confirm the generated config sets `autopilot.mode`.
 - **Do** wire it into pre-merge or pre-release checks.
 - **Avoid** running it as a fix tool — v1 is **report-only**. No files are modified, no issues are commented on, no PRs are created.
@@ -29,8 +29,8 @@ The doctor performs exactly four checks. Anything beyond these is **out of scope
 
 | # | Check | What it verifies | Failure mode |
 |---|-------|-----------------|--------------|
-| 1 | Stale skill claims | `skills/issue-creator/README.md` and `skills/issue-creator/SKILL.md` are free of language asserting `/issue-creator` scans the codebase, predicts affected files, or generates implementation notes. | `FAIL` |
-| 2 | Issue-template fields | Issue templates under `skills/issue-creator/templates/` and `.github/ISSUE_TEMPLATE/` (if present) do not request predicted affected files, generated technical notes, root cause, or implementation hints. | `FAIL` |
+| 1 | Stale skill claims | `src/skills/issue-creator/README.md` and `src/skills/issue-creator/SKILL.md` are free of language asserting `/issue-creator` scans the codebase, predicts affected files, or generates implementation notes. | `FAIL` |
+| 2 | Issue-template fields | Issue templates under `src/skills/issue-creator/templates/` and `.github/ISSUE_TEMPLATE/` (if present) do not request predicted affected files, generated technical notes, root cause, or implementation hints. | `FAIL` |
 | 3 | Autopilot mode set | If `.gitissue.yml` exists in the repo root, it contains an `autopilot.mode` key. | `FAIL` (only when `.gitissue.yml` exists) |
 | 4 | Squash-merge default | The repository's default merge strategy is squash (squash allowed AND merge-commit and rebase-merge disallowed). | `WARN` |
 
@@ -103,8 +103,8 @@ Scan the `/issue-creator` skill's `README.md` and `SKILL.md` for stale claims ab
 ### What to scan
 
 ```
-skills/issue-creator/README.md
-skills/issue-creator/SKILL.md
+src/skills/issue-creator/README.md
+src/skills/issue-creator/SKILL.md
 ```
 
 These are the only files in scope. Other skills (`/issue-analysis`, `/init-gitissue`, `/auto-pilot`, etc.) legitimately scan code as part of their work; flagging them would be a false positive. Do **not** scan `references/`, `templates/`, `docs/`, the top-level `README.md`, or any other skill's files.
@@ -158,7 +158,7 @@ Scan issue-template files for field labels that ask the reporter (or normalizer)
 ### What to scan
 
 ```
-skills/issue-creator/templates/*.md
+src/skills/issue-creator/templates/*.md
 .github/ISSUE_TEMPLATE/*.md     # only if the directory exists
 .github/ISSUE_TEMPLATE/*.yml    # GitHub form templates
 .github/ISSUE_TEMPLATE/*.yaml
@@ -193,7 +193,7 @@ The match is **substring**, case-insensitive. A literal phrase like `Affected Fi
 
 Per-finding format (same as Check 1).
 
-If no template files exist at all (neither `skills/issue-creator/templates/` nor `.github/ISSUE_TEMPLATE/`), the check passes with `✓ [2/4] Issue-template fields no template files found — nothing to check`.
+If no template files exist at all (neither `src/skills/issue-creator/templates/` nor `.github/ISSUE_TEMPLATE/`), the check passes with `✓ [2/4] Issue-template fields no template files found — nothing to check`.
 
 ---
 
@@ -360,11 +360,11 @@ All errors use the rich format from `references/error-messages.md`:
 - **`.gitissue.yml` has `autopilot.mode` set to a non-canonical value** (e.g., `mode: yolo`) — Check 3 still passes (any non-empty value satisfies the "key set" requirement); a future v2 may add value validation.
 - **A skill README contains the forbidden pattern inside a code block or fenced quote** — Check 1 still flags it. The intent of v1 is mechanical strictness, not contextual nuance.
 - **GitHub Enterprise repos without `gh` auth** — Check 4 is skipped, never failed.
-- **`/issue-creator` skill is missing** — Check 1 fails with a clear `skills/issue-creator/README.md not found` finding (the `/issue-creator` skill is required for an IDD repo).
+- **`/issue-creator` skill is missing** — Check 1 fails with a clear `src/skills/issue-creator/README.md not found` finding (the `/issue-creator` skill is required for an IDD repo).
 
 ## Additional Resources
 
 - **`references/error-messages.md`** — Complete error catalog with triggers and exact output
-- **`docs/naming-conventions.md`** — Branch, commit, PR, and issue naming conventions (referenced for context)
-- **`docs/config-schema.md`** — Full configuration schema (Check 3 references the `autopilot.mode` field)
+- **`src/docs/naming-conventions.md`** — Branch, commit, PR, and issue naming conventions (referenced for context)
+- **`src/docs/config-schema.md`** — Full configuration schema (Check 3 references the `autopilot.mode` field)
 - **`DESIGN.md`** — Terminal output style guide (repo root)
