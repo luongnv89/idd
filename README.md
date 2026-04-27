@@ -53,13 +53,13 @@ graph LR
 
 | Command | What it does | Version | Effort |
 |---------|-------------|---------|--------|
-| `/issue-creator` | Classify type, generate acceptance criteria, create a structured issue | 0.4.0 | medium |
-| `/issue-analysis N` | Root cause, git history, implementation options, complexity and risk | 0.4.0 | high |
-| `/issue-resolver N` | 6-step pipeline: preflight, research, plan, implement, QA, deliver PR with `Closes #N` | 0.6.0 | max |
-| `/issue-triage` | Dependency graph, stale detection, already-fixed detection via commit/PR scanning, priority and execution order | 0.5.0 | medium |
-| `/init-gitissue` | Auto-detect language/framework/test runner, generate `.gitissue.yml` | 0.3.0 | low |
+| `/issue-creator` | Classify type, generate acceptance criteria, create a structured issue | 0.4.1 | medium |
+| `/issue-analysis N` | Root cause, git history, implementation options, complexity and risk | 0.4.1 | high |
+| `/issue-resolver N` | 6-step pipeline: preflight, research, plan, implement, QA, deliver PR with `Closes #N` | 0.7.0 | max |
+| `/issue-triage` | Dependency graph, stale detection, already-fixed detection via commit/PR scanning, priority and execution order | 0.5.2 | medium |
+| `/init-gitissue` | Auto-detect language/framework/test runner, generate `.gitissue.yml` | 0.3.2 | low |
 | `/auto-pilot` | Triage → resolve → review → merge loop. Conservative-by-default merge modes (`conservative`/`balanced`/`aggressive`) and explicit issue lists for targeted runs | 2.2.0 | max |
-| `/issue-pr-review` | Review PR end-to-end: script pre-pass (lint/format/test auto-fix), per-criterion AC verification, five-dimension scoring (correctness, acceptance_criteria, traceability, maintainability, safety), reuses reviewer/fixer agents across cycles | 0.4.0 | high |
+| `/issue-pr-review` | Review PR end-to-end: script pre-pass (lint/format/test auto-fix), per-criterion AC verification, five-dimension scoring (correctness, acceptance_criteria, traceability, maintainability, safety), reuses reviewer/fixer agents across cycles | 0.4.1 | high |
 | `/idd-doctor` | Read-only health check: verifies issue-creator intent-only contract, gh `--json` field selection, error-message format, and merge strategy assumptions | 0.1.0 | low |
 | `/issue-pr-review-fix-loop` | _Deprecated v0.4.0 — use `/issue-pr-review`._ The outer review-fix loop is now part of `/issue-pr-review`. Retained one release cycle for backward-compat references; will be removed from this index. | 0.4.0 (deprecated) | high |
 
