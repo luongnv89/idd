@@ -2,6 +2,8 @@
 
 Templates for the Step 7 summary report and the expected inline pipeline output. SKILL.md keeps the contract short; this file holds the full templates.
 
+The Step 7 summary always shows the **five review dimensions** explicitly so reviewers can see, at a glance, that a PR is being judged on more than just tests. A PR can pass tests and still fail on `traceability` or `acceptance_criteria` — those dimensions are reported with their own status line.
+
 ## Summary — Clean PR
 
 ```
@@ -9,7 +11,14 @@ Templates for the Step 7 summary report and the expected inline pipeline output.
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
 
   Script pre-pass:   ✓ lint/format auto-fixed ({auto_fixed} files)
-  Code review:       ✓ pass
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  Review dimensions:
+    correctness:         ✓ pass
+    acceptance_criteria: ✓ pass ({n_pass}/{n_total} criteria pass)
+    traceability:        ✓ pass (Closes #{N}, commit ref, Decision Record, AC block)
+    maintainability:     ○ partial ({note_count} note-level findings)
+    safety:              ✓ pass
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Tests:             ✓ pass ({count} passed)
   CI status:         ✓ pass ({checks_count} checks passed)
   Issues fixed:      ✓ {total_fixed} total across {cycles} cycles
@@ -26,7 +35,13 @@ Templates for the Step 7 summary report and the expected inline pipeline output.
 ◆ PR Review: #{pr_number} (pass {max} — issues remain)
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
 
-  Code review:       ⚠ warn ({N} issues remain)
+  Review dimensions:
+    correctness:         ⚠ partial ({N} issues)
+    acceptance_criteria: ✗ fail ({n_fail}/{n_total} criteria fail, {n_unverified} unverified)
+    traceability:        ✗ fail — Closes #{N} missing
+    maintainability:     ✓ pass
+    safety:              ✓ pass
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Tests:             ✓ pass
   CI status:         ✓ pass
   Issues fixed:      ✓ {total_fixed} total across {max} cycles
@@ -34,10 +49,30 @@ Templates for the Step 7 summary report and the expected inline pipeline output.
   Result:            WARN (manual review recommended)
 
   Remaining:
-    ● [category] description (file:line)
+    ● [acceptance_criteria] criterion 2: "{text}" — fail ({evidence})
+    ● [traceability] PR body missing Closes #{N}
+    ● [correctness] {description} ({file}:{line})
 
   {pr_url}
 ```
+
+The `traceability: fail` line is the one case where tests can be green and the PR is still blocked from soft-pass. Issue #36's contract: missing `Closes #N` always reports a traceability failure even if tests pass.
+
+## Summary — Human-Authored PR (Decision Record absent)
+
+When a human-authored PR (one not produced by `/issue-resolver`) is reviewed, the Decision Record is typically absent. This is reported as `partial` traceability, not `fail`, per issue #36's "Human-Authored PRs" decision (see issue #36 body and the IDD methodology doc):
+
+```
+  Review dimensions:
+    correctness:         ✓ pass
+    acceptance_criteria: ✓ pass ({n_pass}/{n_total} criteria pass)
+    traceability:        ⚠ partial — PR not produced by /issue-resolver;
+                           Decision Record absent
+    maintainability:     ✓ pass
+    safety:              ✓ pass
+```
+
+Acceptance-criteria checks still apply at full strength — they do not relax for human PRs. `Closes #{N}` checks also still apply at full strength — a human PR missing the issue link still fails traceability.
 
 ## Auto-Merge (auto mode only)
 
@@ -65,6 +100,8 @@ On merge failure:
   Result:            BLOCKED (manual merge required)
 ```
 
+Auto-merge is gated on the same soft-pass condition as the loop exit, including `traceability != fail` and zero `acceptance_criteria: fail`. A PR that passes tests and CI but fails traceability or acceptance criteria is **not** auto-merged.
+
 In interactive mode: never auto-merge — just report status.
 
 ## Expected Inline Output
@@ -74,7 +111,8 @@ A clean review prints the 7-step tracker and a summary:
 ```
   [1/7] PR Info       ✓ #87 fix(auth): resolve redirect (#42)
   [2/7] Script Pre    ✓ 3 lint fixes applied
-  [3/7] Review        ✓ 0 critical, 1 medium (note)
+  [3/7] Review        ✓ correctness:pass ac:pass trace:pass maint:pass safety:pass
+                        0 fixable, 1 noted
   [4/7] Tests         ✓ 12 passed
   [5/7] CI            ✓ all checks green
   [6/7] Fix           ○ skipped — nothing to fix

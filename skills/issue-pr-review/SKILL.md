@@ -5,7 +5,7 @@ license: MIT
 compatibility: Requires git and GitHub CLI (gh) with authentication. Self-contained — uses shared agents from shared/agents/.
 effort: high
 metadata:
-  version: 0.3.2
+  version: 0.4.0
   creator: Luong NGUYEN <luongnv89@gmail.com>
 ---
 
@@ -228,7 +228,8 @@ Return the same JSON format as before.
 After the fix cycle reports zero fixable issues, spawn a **fresh** confirmation reviewer (new agent, no memory). If it finds new fixable issues, they go back to the existing fixer. If it confirms clean, the PR passes.
 
 ```
-[3/7] Review       ✓ {result} — {fixable_count} fixable, {note_count} noted
+[3/7] Review       ✓ correctness:pass  ac:pass  trace:pass  maint:partial  safety:pass
+                     {fixable_count} fixable, {note_count} noted
 ```
 
 Also fetch linked issues for acceptance criteria verification:
@@ -236,25 +237,104 @@ Also fetch linked issues for acceptance criteria verification:
 gh issue view {linked_issue} --json number,title,body,labels
 ```
 
-Check each acceptance criterion against the PR changes.
+Parse the `## Acceptance Criteria` section into one entry per checklist item and check each criterion against the PR changes — see *Acceptance-criteria verification (per criterion)* below.
 
-### Durable analysis fields (presence check)
+### Order within Step 3
 
-Per the dual-write rule (see *Analysis Artifacts and Durable Memory* in `docs/idd-methodology.md`), `/issue-resolver` is expected to lift a Decision Record and an Acceptance Criteria Verification table into the PR body so the durable signal survives the squash-merge into git history.
+Within a single review cycle, the work runs in this order:
+1. Spawn (or re-message) the reviewer subagent and collect its findings.
+2. Run per-criterion acceptance-criteria verification against the linked issue.
+3. Run the four traceability checks against the PR body and commit history.
+4. Aggregate reviewer findings + AC results + traceability results into the five user-facing dimensions for the cycle report.
 
-Scan the PR body for the following fields. This is a **presence check only** — full per-criterion verification is handled by `/issue-pr-review`'s Phase 2 work, not here.
+### Dimensional review output
 
-- A `## Decision Record` section containing the labels `Root cause`, `Options considered`, `Options rejected`, `Selected option`, `Residual risk`.
-- A `## Acceptance Criteria Verification` section (table or list) with at least one entry, OR an explicit `No acceptance criteria defined` note.
-- A `Closes #{N}` reference linking the PR to its issue.
+Step 3 produces a single review verdict organized into **five dimensions**. The reviewer subagent reports findings against its own internal categories (correctness, test_coverage, code_quality, security, edge_cases); this skill maps those findings into the user-facing dimensions and adds two dimensions the reviewer does not produce (acceptance criteria, traceability). Mapping is fixed:
 
-Report results as a `note`-level traceability finding (does not block a soft pass):
+| User-facing dimension | Source | Failure means |
+|----------------------|--------|---------------|
+| `correctness` | reviewer category `correctness` | logic, off-by-one, race conditions |
+| `acceptance_criteria` | per-criterion verification (this skill) | one or more criteria report `fail` |
+| `traceability` | PR-body and commit-history scan (this skill) | issue-to-code link is broken |
+| `maintainability` | reviewer categories `code_quality` + `test_coverage` | dead code, untested paths, complex logic |
+| `safety` | reviewer categories `security` + `edge_cases` | injection, auth bypass, unsafe nulls, crash paths |
 
-- All three present → ○ traceability: full
-- Decision Record absent (e.g., human-authored PR not produced by `/issue-resolver`) → ○ traceability: partial — Decision Record absent; full verification deferred to manual review
-- `Closes #{N}` absent → ⚠ traceability: fail — PR is not linked to an issue (this is the only traceability finding that escalates beyond `note`)
+Each dimension reports `pass`, `partial`, or `fail`. A PR can pass tests and still fail on `traceability` or `acceptance_criteria` — those dimensions are not gated by test results.
 
-The presence check uses the exact field labels emitted by `/issue-analysis` and `/issue-resolver` because the labels are the stable contract — do not rewrite them.
+### Acceptance-criteria verification (per criterion)
+
+Fetch the linked issue and parse its `## Acceptance Criteria` section into individual checklist items. For each criterion, evaluate against the PR diff and produce one of three statuses:
+
+| Status | When |
+|--------|------|
+| `pass` | The PR demonstrably satisfies the criterion. Evidence is required: a file path with line range, a test name, or a one-line description of how the change fulfills the criterion. |
+| `fail` | The PR does not satisfy the criterion. Evidence is required: what's missing or what contradicts the criterion. |
+| `unverified` | The criterion cannot be verified from the diff alone (e.g., needs production validation, manual user testing, or behavior outside the change set). Explanation is required. |
+
+Output a structured block:
+
+```
+○ Acceptance Criteria
+  | # | Criterion | Status | Evidence |
+  |---|-----------|--------|----------|
+  | 1 | "{criterion text}" | pass | tests/foo.test.ts: case 'rejects empty' |
+  | 2 | "{criterion text}" | fail | exclusion list still hard-codes /login |
+  | 3 | "{criterion text}" | unverified | needs manual mobile-device test |
+```
+
+If the issue has no acceptance criteria:
+
+```
+○ Acceptance Criteria — none defined; manual review recommended
+```
+
+**Pass/partial/fail rule for the dimension:**
+- All criteria `pass` → ✓ acceptance_criteria: pass
+- Any criterion `fail` → ✗ acceptance_criteria: fail (blocks soft-pass; treat as fixable)
+- No fails, but at least one `unverified` → ⚠ acceptance_criteria: partial (does not block soft-pass; surfaced in report)
+- No criteria defined → ○ acceptance_criteria: pass (with the "manual review recommended" note)
+
+Each `fail` criterion becomes a fixable issue in Step 6 with `category: acceptance_criteria`, `action: fix`, evidence as the description, and the criterion text as the suggested fix target.
+
+### Traceability checks
+
+Per the dual-write rule (see *Analysis Artifacts and Durable Memory* in `docs/idd-methodology.md`), the durable analysis signal must survive the squash-merge into git history. Run the following four checks against the PR body and the commits in the PR:
+
+1. **Issue link** — PR body contains `Closes #{N}`, `Fixes #{N}`, or `Resolves #{N}` for the linked issue. Detected with the same regex used by GitHub itself: `(?i)(close[sd]?|fix(e[sd])?|resolve[sd]?)\s+#\d+`.
+2. **Commit references issue** — at least one commit between base and head references the issue number:
+   ```bash
+   git log "{base_branch}..{head_branch}" --grep="#{N}" --oneline
+   ```
+   The reference may live in the subject or body. A reference inside a `Co-authored-by:` trailer does not count.
+3. **Durable analysis fields in PR body** — the PR body contains a `## Decision Record` section with the five stable labels (`Root cause`, `Options considered`, `Options rejected`, `Selected option`, `Residual risk`) and a `## Acceptance Criteria Verification` section (table or the explicit `No acceptance criteria defined` note). The labels are the contract — match them as exact strings, do not rewrite.
+4. **Squash-commit-body assumption** — under squash-merge (the project default per `docs/idd-methodology.md`), GitHub copies the PR body verbatim into the commit message. Treat passing check 3 as evidence the squash commit will carry the durable summary; no separate check is needed pre-merge. Note this assumption explicitly in the report so reviewers know what is and is not verified.
+
+**Pass/partial/fail rule for the dimension:**
+
+| Outcome | Conditions | Status |
+|---------|-----------|--------|
+| All four checks pass | Closes #N + commit ref + Decision Record + AC Verification block all present | ✓ traceability: pass |
+| `Closes #{N}` absent | check 1 fails (regardless of other checks) | ✗ traceability: fail (blocking — see below) |
+| Decision Record absent on a human-authored PR | check 3 partially fails: PR was not produced by `/issue-resolver` and has no Decision Record | ⚠ traceability: partial — "PR not produced by `/issue-resolver`; Decision Record absent" |
+| Commit reference absent | check 2 fails but check 1 passes (PR body has Closes #N but no commit references the issue) | ⚠ traceability: partial — "no commit references #{N}" |
+| Acceptance Criteria Verification block absent on a `/issue-resolver` PR | check 3 fails on a PR that does include a Decision Record | ⚠ traceability: partial — "Acceptance Criteria Verification block missing" |
+
+The `Closes #{N}` failure is the only traceability outcome that **blocks** the soft-pass. All other partial outcomes are reported but do not block. This matches issue #36's contract: a PR missing `Closes #N` reports a traceability failure even if tests pass; a human-authored PR without a Decision Record reports `partial`, not `fail`.
+
+When traceability fails on `Closes #{N}`, emit a fixable issue in Step 6 with `category: traceability`, `action: fix`, suggested fix: "Add `Closes #{N}` to the PR body."
+
+### Reviewer call-out for the other three dimensions
+
+Pass the reviewer the issue body alongside the diff (the existing `pr_context` field is fine). The reviewer's JSON output already partitions findings by category — at the end of Step 3, this skill aggregates:
+
+- `correctness` findings → `correctness` dimension
+- `code_quality` + `test_coverage` findings → `maintainability` dimension
+- `security` + `edge_cases` findings → `safety` dimension
+
+Each dimension's status is computed from its findings:
+- Any `action: fix` finding in the dimension → ✗ `fail`
+- Only `action: note` findings → ⚠ `partial`
+- No findings → ✓ `pass`
 
 ---
 
@@ -344,9 +424,13 @@ In auto mode: proceed — the next cycle will re-check.
 
 Collect issues from Steps 3-5, but **only fix issues with `action: "fix"`**. Issues with `action: "note"` are reported in the summary but do not trigger a fix cycle. This is the key token optimization — note-only issues (medium code_quality, test_coverage suggestions) are skipped.
 
-- Code review issues with `action: "fix"` (from the reviewer agent)
+- Code review issues with `action: "fix"` (from the reviewer agent — `correctness`, `maintainability`, `safety` dimensions)
+- Acceptance-criteria failures (from Step 3 per-criterion verification — one fixable issue per `fail` criterion, `category: acceptance_criteria`)
+- Traceability failures on `Closes #{N}` (from Step 3 traceability checks — `category: traceability`, suggested fix: edit the PR body to add the link)
 - Test failures (from Step 4)
 - CI failures (from Step 5)
+
+Acceptance-criteria fixes typically require code changes (the criterion is unmet); traceability `Closes #{N}` fixes require a PR-body edit via `gh pr edit {N} --body`. Apply both kinds of fixes, then commit and push as usual.
 
 ### If no fixable issues
 
@@ -388,7 +472,8 @@ After Step 6, go back to Step 3 — but reuse the same reviewer agent via `SendM
 **Loop controls:**
 - **Max cycles:** `review.max_cycles` (default: 3)
 - **Agent reuse:** Cycles 2+ reuse the existing reviewer and fixer agents. Fresh spawn only for the confirmation pass after fixer reports zero issues.
-- **Soft pass (default):** Stop when zero `action: "fix"` issues remain AND tests pass AND CI passes. Medium "note" issues (≤ 2) are allowed — they don't block the pass.
+- **Soft pass (default):** Stop when ALL of the following hold: zero `action: "fix"` issues remain (across all five dimensions, including `acceptance_criteria` and `traceability` failures) AND tests pass AND CI passes AND traceability is not `fail`. Medium "note" issues (≤ 2) and `partial` dimensions are allowed — they don't block the pass.
+- **Hard-block conditions:** `traceability: fail` (e.g., `Closes #{N}` missing) and any `acceptance_criteria: fail` always block, even if every other dimension is clean. Tests passing does not override these — that is the explicit contract from issue #36.
 - **Confirmation pass:** When the fixer reports all fixed, spawn one fresh reviewer for unbiased verification. If clean → PASS. If new issues → back to existing fixer (counts as a cycle).
 - **Exit on stagnation:** If the same issues appear in 2 consecutive cycles, stop and report
 - **Review-only mode:** Run one cycle of Steps 3-5 only, never fix or loop

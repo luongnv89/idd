@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Added
+- `/issue-pr-review` per-criterion acceptance-criteria verification — each criterion in the linked issue reports `pass` / `fail` / `unverified` with required evidence
+- `/issue-pr-review` four-check traceability dimension — verifies `Closes #N` in PR body, at least one commit referencing the issue (via `git log --grep`), durable analysis fields (Decision Record + Acceptance Criteria Verification block), and the squash-merge assumption
+- Five-dimension review output — `correctness`, `acceptance_criteria`, `traceability`, `maintainability`, `safety` — replacing the prior single-line review verdict in cycle reports and the Step 7 summary
+- `tests/test-issue-pr-review-traceability.sh` — 50 spec assertions verifying every Phase 2 acceptance criterion from issue #36
+
+### Changed
+- `/issue-pr-review` soft-pass condition now hard-blocks on `traceability: fail` (e.g., missing `Closes #N`) and any `acceptance_criteria: fail`, even when tests and CI are green — this matches the explicit issue #36 contract that a PR can pass tests and fail traceability
+- `/issue-pr-review` v0.4.0 — Phase 2 review-traceability work
+- Step 3 of `/issue-pr-review` now runs in a documented order per cycle: reviewer subagent → per-criterion AC verification → traceability checks → dimensional aggregation
+- Human-authored PRs without a Decision Record are reported as `traceability: partial`, not `fail`, while `Closes #N` and acceptance-criteria checks still apply at full strength
+
 ## [0.7.0] - 2026-03-27
 
 ### Added

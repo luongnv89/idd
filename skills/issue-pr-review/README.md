@@ -13,7 +13,9 @@
 - Runs the project's real test suite, not mocks
 - Monitors CI status and waits for green before merging
 - Auto-merge in `--auto` mode (used by `/auto-pilot`); read-only mode available
-- Soft-pass when zero "fix" issues remain, even if minor "note" issues linger
+- Five-dimension review output — correctness, acceptance_criteria, traceability, maintainability, safety — so a PR can pass tests and still be flagged for missing issue links or unmet acceptance criteria
+- Per-criterion acceptance-criteria verification (`pass` / `fail` / `unverified` with evidence) against the linked issue
+- Soft-pass when zero "fix" issues remain, with **hard blocks** on `traceability: fail` (missing `Closes #N`) and any `acceptance_criteria: fail` — green tests do not override these
 
 ## When to Use
 
