@@ -230,7 +230,7 @@ IDD is also **Intention-Driven Development** — and that name captures somethin
 
 Expressing what you actually want is hard. Even experienced developers struggle to articulate a problem clearly enough for someone else — human or AI — to act on it. Vague descriptions lead to wrong assumptions, wasted effort, and solutions that miss the point.
 
-`/issue-creator` changes this dynamic. When you describe a problem in plain language, it structures your input into a typed issue with acceptance criteria, context, and technical notes. But the real value isn't the output — it's the **feedback loop**:
+`/issue-creator` changes this dynamic. When you describe a problem in plain language, it structures your input into a typed issue with reporter context and acceptance criteria — capturing intent only, never guessing affected files or implementation notes. But the real value isn't the output — it's the **feedback loop**:
 
 1. **You describe the problem** — loosely, incompletely, however it comes to mind
 2. **The agent proposes a structured issue** — classifying the type, filling in context, generating acceptance criteria

@@ -268,7 +268,7 @@ Two subagents run in parallel: the **history scanner** finds issues already fixe
 
 Summary:
 - **Step 1b** — flags open issues whose titles/bodies match recent commit messages or merged PR descriptions. Marks them `potentially_fixed` with evidence links.
-- **Step 2** — for each issue, derives affected files from the body, then computes pairwise overlap to produce a `dependencies[]` graph.
+- **Step 2** — for each issue, extracts keywords from the title and body and scans the current codebase to discover affected files, then computes pairwise overlap to produce a `dependencies[]` graph. Affected files are derived from the codebase scan, never read from the issue body.
 - **Step 3** — detects circular dependency cycles in the graph and breaks them before the topological sort.
 
 ---

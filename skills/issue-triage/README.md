@@ -2,6 +2,10 @@
 
 > Analyze open GitHub issues to surface dependencies, suggest priorities, identify parallelizable work, flag stale issues, and detect issues already fixed by other PRs.
 
+## Intent-Code Boundary
+
+`/issue-triage` respects the intent-code boundary. **Issues** are read for intent — title, body keywords, age, labels — and the **current codebase** is scanned fresh at triage time to discover which files each issue touches. Dependencies between issues are computed from this live scan, not from any predicted file list embedded in issue bodies. Already-fixed detection comes from current git history (commits and merged PRs), not from claims inside the issue. Results are cached to `.gitissue/triage.json` with a timestamp so users see immediately when the snapshot is stale. See `docs/idd-methodology.md` for the full boundary contract.
+
 ## Highlights
 
 - Builds a dependency graph from shared affected files across issues

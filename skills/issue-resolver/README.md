@@ -2,6 +2,10 @@
 
 > Resolve a GitHub issue end-to-end — from open issue to atomic PR in 6 steps.
 
+## Intent-Code Boundary
+
+`/issue-resolver` respects the intent-code boundary. The **issue body** owns durable intent: the problem statement, reporter context, and acceptance criteria. The resolver scans the **current codebase** during Research (Step 1) to discover affected files, dependencies, and constraints — it never trusts the issue body for predicted file lists or implementation hints. The atomic PR captures *how* the change was made; the linked issue captures *why* it mattered. If the issue body lacks structure (e.g., no acceptance criteria), the resolver runs `/issue-creator` first to normalize it without inventing technical detail. See `docs/idd-methodology.md` for the full boundary contract.
+
 ## Highlights
 
 - **Full pipeline**: Preflight → Research → Plan → Implement → QA → Deliver

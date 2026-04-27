@@ -2,6 +2,10 @@
 
 > Outer review-fix loop with agent reuse across cycles and a fresh confirmation pass at the end — review, fix, commit, push, repeat until clean.
 
+## Intent-Code Boundary
+
+`/issue-pr-review-fix-loop` respects the intent-code boundary. It wraps `/issue-pr-review` in an outer loop; both reviewer and fixer subagents read the **PR diff** and the **current codebase** for every cycle — they do not rely on predicted file lists or implementation hints from the linked issue body. The linked issue's **acceptance criteria** define the pass condition; the loop converges by addressing live review findings, not by reconciling against stale issue-embedded notes. Cycle history and remaining issues stay in the PR thread, not in the issue body. See `docs/idd-methodology.md` for the full boundary contract.
+
 ## Highlights
 
 - **Reuses reviewer and fixer agents** across cycles for efficiency — the reviewer verifies its own issues were fixed, and the fixer retains repo context
