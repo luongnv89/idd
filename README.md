@@ -60,7 +60,7 @@ graph LR
 | `/init-gitissue` | Auto-detect language/framework/test runner, generate `.gitissue.yml` | 0.3.0 | low |
 | `/auto-pilot` | Triage → resolve → review → merge loop, fully automated backlog processing | 2.1.0 | max |
 | `/issue-pr-review` | Review PR end-to-end: token-optimized code review with script pre-pass, reuses reviewer/fixer agents across cycles, fixes critical+high issues | 0.3.0 | high |
-| `/issue-pr-review-fix-loop` | Outer review-fix loop: reuses reviewer/fixer agents across cycles, fresh confirmation pass at the end, fix, commit, push, repeat until clean | 0.3.0 | high |
+| `/issue-pr-review-fix-loop` | _Deprecated — use `/issue-pr-review`._ Outer review-fix loop: reuses reviewer/fixer agents across cycles, fresh confirmation pass at the end, fix, commit, push, repeat until clean. Retained one release cycle for backward-compat references; will be removed from this index. | 0.4.0 (deprecated) | high |
 
 ---
 
@@ -196,7 +196,7 @@ You can also install individual skills. See each skill folder for per-skill comm
 | `/issue-triage` | [`skills/issue-triage/`](skills/issue-triage/) |
 | `/auto-pilot` | [`skills/auto-pilot/`](skills/auto-pilot/) |
 | `/issue-pr-review` | [`skills/issue-pr-review/`](skills/issue-pr-review/) |
-| `/issue-pr-review-fix-loop` | [`skills/issue-pr-review-fix-loop/`](skills/issue-pr-review-fix-loop/) |
+| `/issue-pr-review-fix-loop` _(deprecated)_ | [`skills/issue-pr-review-fix-loop/`](skills/issue-pr-review-fix-loop/) |
 | `/init-gitissue` | [`skills/init-gitissue/`](skills/init-gitissue/) |
 
 ---
@@ -388,7 +388,9 @@ Pipeline:
 
 Max 3 review-fix cycles with stagnation detection.
 
-### /issue-pr-review-fix-loop -- Outer Review-Fix Loop
+### /issue-pr-review-fix-loop -- Outer Review-Fix Loop _(deprecated)_
+
+> **Deprecated in v0.4.0** — use `/issue-pr-review` instead. The capabilities below now live in `/issue-pr-review`. This skill is retained for one release cycle to keep existing references resolvable; it will then be removed from the public skill index.
 
 Wraps `/issue-pr-review` in an outer loop that reuses the same reviewer and fixer agents across cycles for efficiency. A fresh confirmation pass runs at the end to provide an unbiased final check after all fixes are applied.
 
@@ -509,10 +511,7 @@ skills/
 ├── issue-pr-review/    # /issue-pr-review — review, test, CI check, fix, merge
 │   ├── SKILL.md
 │   └── references/
-├── issue-pr-review-fix-loop/  # /issue-pr-review-fix-loop — outer review-fix loop
-│   ├── SKILL.md
-│   └── references/
-├── review-fix-loop/    # /review-fix-loop (deprecated → redirects to /issue-pr-review)
+├── issue-pr-review-fix-loop/  # /issue-pr-review-fix-loop (deprecated — redirects to /issue-pr-review)
 │   ├── SKILL.md
 │   └── references/
 └── init-gitissue/      # /init-gitissue

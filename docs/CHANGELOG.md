@@ -18,6 +18,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - Step 3 of `/issue-pr-review` now runs in a documented order per cycle: reviewer subagent → per-criterion AC verification → traceability checks → dimensional aggregation
 - Human-authored PRs without a Decision Record are reported as `traceability: partial`, not `fail`, while `Closes #N` and acceptance-criteria checks still apply at full strength
 
+### Deprecated
+- `/issue-pr-review-fix-loop` (v0.4.0) — its outer review-fix loop, agent reuse, and fresh confirmation pass are all part of `/issue-pr-review` now (since v0.3.0), and Phase 2 acceptance-criteria + traceability checks landed there in v0.4.0. The skill file is retained for one release cycle so existing references resolve; after that release cycle it will be removed from the public skill index. Migration: replace any `/issue-pr-review-fix-loop` invocation with `/issue-pr-review` (same PR number, same `--auto` flag). Tracking issue: #37.
+
 ## [0.7.0] - 2026-03-27
 
 ### Added

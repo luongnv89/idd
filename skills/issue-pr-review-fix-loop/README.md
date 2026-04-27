@@ -1,5 +1,9 @@
 # Issue PR Review Fix Loop
 
+> **Deprecated as of v0.4.0** — use [`/issue-pr-review`](../issue-pr-review/) instead. The review-fix loop, traceability checks, and acceptance-criteria verification all live in `/issue-pr-review` now. This wrapper is kept for one release cycle to keep existing references resolvable, then will be removed from the public skill index.
+>
+> Migration: replace any `/issue-pr-review-fix-loop` invocation with `/issue-pr-review` (same PR number, same `--auto` flag). See the deprecation banner at the top of [`SKILL.md`](SKILL.md).
+
 > Outer review-fix loop with agent reuse across cycles and a fresh confirmation pass at the end — review, fix, commit, push, repeat until clean.
 
 ## Intent-Code Boundary
