@@ -176,6 +176,27 @@ review:
   # Default: true
   soft_pass: true
 
+  # Run per-criterion acceptance-criteria verification against the linked issue.
+  # Type: boolean
+  # Default: true
+  # When true, /issue-pr-review parses the linked issue's `## Acceptance Criteria`
+  # and reports each criterion as pass/fail/unverified; any `fail` blocks soft-pass.
+  # When false, the acceptance_criteria dimension is reported as `pass` with a
+  # "verification disabled" note and never blocks. Default true preserves the
+  # contract from issue #36.
+  require_acceptance_criteria_check: true
+
+  # Run the four traceability checks against the PR body and commit history.
+  # Type: boolean
+  # Default: true
+  # When true, /issue-pr-review verifies `Closes #N`, commit references,
+  # Decision Record presence, and Acceptance Criteria Verification block; the
+  # missing-`Closes #N` case blocks soft-pass even on green tests/CI.
+  # When false, the traceability dimension is reported as `pass` with a
+  # "verification disabled" note and never blocks. Default true preserves the
+  # contract from issue #36.
+  require_traceability_check: true
+
 # Auto-pilot settings (used by /auto-pilot)
 autopilot:
   # Merge mode — controls when /auto-pilot is allowed to merge PRs.
@@ -364,6 +385,8 @@ graph TD
     RV --> RV7["ci_timeout"]
     RV --> RV8["test_timeout"]
     RV --> RV9["soft_pass"]
+    RV --> RV10["require_acceptance_criteria_check"]
+    RV --> RV11["require_traceability_check"]
 
     AP --> AP0["mode"]
     AP --> AP00["merge_partial"]
@@ -444,6 +467,8 @@ Config is validated on load at the start of every skill invocation. Errors inclu
 | `review.ci_timeout` | `600` | CI polling timeout |
 | `review.test_timeout` | `300` | Review test timeout |
 | `review.soft_pass` | `true` | Treat soft-pass as pass |
+| `review.require_acceptance_criteria_check` | `true` | Run per-criterion acceptance-criteria verification; `fail` blocks soft-pass |
+| `review.require_traceability_check` | `true` | Run the four traceability checks; missing `Closes #N` blocks soft-pass |
 | `autopilot.mode` | `conservative` | Merge mode: `conservative` (never merge), `balanced` (merge clean PRs), `aggressive` (merge clean + partial w/ `merge_partial: true`) |
 | `autopilot.merge_partial` | `false` | Allow merging PRs with unresolved review issues. Only honored when `mode: aggressive` |
 | `autopilot.max_iterations` | `10` | Max issues to process |

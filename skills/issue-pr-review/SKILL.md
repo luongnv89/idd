@@ -5,7 +5,7 @@ license: MIT
 compatibility: Requires git and GitHub CLI (gh) with authentication. Self-contained — uses shared agents from shared/agents/.
 effort: high
 metadata:
-  version: 0.4.0
+  version: 0.4.1
   creator: Luong NGUYEN <luongnv89@gmail.com>
 ---
 
@@ -53,6 +53,8 @@ Load `.gitissue.yml` once. Defaults:
 - `review.ci_timeout: 600` (seconds, 10 minutes)
 - `review.test_timeout: 300` (seconds)
 - `review.soft_pass: true` — pass when zero "fix" issues remain, even if "note" issues exist (≤ 2 medium allowed)
+- `review.require_acceptance_criteria_check: true` — when `false`, skip per-criterion AC verification; report acceptance_criteria as `pass` with a "verification disabled" note (never blocks soft-pass). Default `true` preserves the issue #36 contract.
+- `review.require_traceability_check: true` — when `false`, skip the four traceability checks; report traceability as `pass` with a "verification disabled" note (never blocks soft-pass). Default `true` preserves the issue #36 contract.
 
 ---
 
@@ -261,7 +263,20 @@ Step 3 produces a single review verdict organized into **five dimensions**. The 
 
 Each dimension reports `pass`, `partial`, or `fail`. A PR can pass tests and still fail on `traceability` or `acceptance_criteria` — those dimensions are not gated by test results.
 
+### Verification gates
+
+Two `.gitissue.yml` flags decide whether the acceptance-criteria and traceability checks run at all:
+
+| Flag | Default | When `true` (default) | When `false` |
+|------|---------|----------------------|--------------|
+| `review.require_acceptance_criteria_check` | `true` | Run per-criterion verification described below; any `fail` blocks soft-pass. | Skip the check entirely. Report `○ acceptance_criteria: pass` with the explicit note `verification disabled (review.require_acceptance_criteria_check: false)`. Never blocks soft-pass; emit no fixable issues for this dimension. |
+| `review.require_traceability_check` | `true` | Run the four traceability checks below; missing `Closes #N` blocks soft-pass. | Skip the check entirely. Report `○ traceability: pass` with the explicit note `verification disabled (review.require_traceability_check: false)`. Never blocks soft-pass; emit no fixable issues for this dimension. |
+
+Both default to `true`, which preserves the issue #36 contract verbatim. Setting either flag to `false` is an explicit opt-out — the corresponding hard-block conditions in *Loop controls* below no longer apply for that dimension.
+
 ### Acceptance-criteria verification (per criterion)
+
+> Run only when `review.require_acceptance_criteria_check` is `true`. When `false`, skip this entire subsection and emit `○ acceptance_criteria: pass — verification disabled (review.require_acceptance_criteria_check: false)`.
 
 Fetch the linked issue and parse its `## Acceptance Criteria` section into individual checklist items. For each criterion, evaluate against the PR diff and produce one of three statuses:
 
@@ -297,6 +312,8 @@ If the issue has no acceptance criteria:
 Each `fail` criterion becomes a fixable issue in Step 6 with `category: acceptance_criteria`, `action: fix`, evidence as the description, and the criterion text as the suggested fix target.
 
 ### Traceability checks
+
+> Run only when `review.require_traceability_check` is `true`. When `false`, skip this entire subsection and emit `○ traceability: pass — verification disabled (review.require_traceability_check: false)`.
 
 Per the dual-write rule (see *Analysis Artifacts and Durable Memory* in `docs/idd-methodology.md`), the durable analysis signal must survive the squash-merge into git history. Run the following four checks against the PR body and the commits in the PR:
 
@@ -473,7 +490,7 @@ After Step 6, go back to Step 3 — but reuse the same reviewer agent via `SendM
 - **Max cycles:** `review.max_cycles` (default: 3)
 - **Agent reuse:** Cycles 2+ reuse the existing reviewer and fixer agents. Fresh spawn only for the confirmation pass after fixer reports zero issues.
 - **Soft pass (default):** Stop when ALL of the following hold: zero `action: "fix"` issues remain (across all five dimensions, including `acceptance_criteria` and `traceability` failures) AND tests pass AND CI passes AND traceability is not `fail`. Medium "note" issues (≤ 2) and `partial` dimensions are allowed — they don't block the pass.
-- **Hard-block conditions:** `traceability: fail` (e.g., `Closes #{N}` missing) and any `acceptance_criteria: fail` always block, even if every other dimension is clean. Tests passing does not override these — that is the explicit contract from issue #36.
+- **Hard-block conditions:** `traceability: fail` (e.g., `Closes #{N}` missing) and any `acceptance_criteria: fail` always block, even if every other dimension is clean. Tests passing does not override these — that is the explicit contract from issue #36. The block is gated on `review.require_traceability_check` and `review.require_acceptance_criteria_check`: when either flag is `false`, the corresponding dimension is reported as `pass — verification disabled` and never blocks soft-pass. Both flags default to `true`.
 - **Confirmation pass:** When the fixer reports all fixed, spawn one fresh reviewer for unbiased verification. If clean → PASS. If new issues → back to existing fixer (counts as a cycle).
 - **Exit on stagnation:** If the same issues appear in 2 consecutive cycles, stop and report
 - **Review-only mode:** Run one cycle of Steps 3-5 only, never fix or loop
