@@ -61,6 +61,26 @@ triage:
   # Max seconds to scan codebase per issue for file dependencies
   scan_timeout_per_issue: 30
 
+# Auto-pilot settings (used by /auto-pilot)
+autopilot:
+  # Merge mode — controls when /auto-pilot is allowed to merge PRs.
+  # Values: "conservative" | "balanced" | "aggressive"
+  # Default: "conservative" — create PR, run review-fix cycles, leave PR open.
+  #   Never auto-merges. Safest default; recommended for most projects.
+  # "balanced":     auto-merge clean PRs (review passed). PRs with unresolved
+  #                 review issues get a follow-up issue and stay open.
+  # "aggressive":   auto-merge clean PRs AND merge partial PRs when
+  #                 merge_partial=true is also set (see below). Risky —
+  #                 only enable on disposable/experimental repos.
+  mode: conservative
+
+  # Allow merging PRs that still have unresolved fixable review issues.
+  # Default: false — never merge a partial PR.
+  # Only honored when mode is "aggressive". With any other mode this
+  # field is ignored. Combined opt-in (mode=aggressive AND merge_partial=true)
+  # is required to reach the prior 2.1.x "merge anyway with follow-up" path.
+  merge_partial: false
+
 # Issue analysis settings
 analysis:
   # Max files to read during deep analysis (5-100)
