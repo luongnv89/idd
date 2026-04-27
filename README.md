@@ -9,13 +9,13 @@
 <p align="center">
   <a href="https://github.com/luongnv89/idd/releases/latest"><img src="https://img.shields.io/badge/version-0.7.0-blue.svg" alt="Version 0.7.0"></a>
   <a href="https://github.com/luongnv89/idd/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="MIT License"></a>
-  <a href="https://github.com/luongnv89/idd"><img src="https://img.shields.io/badge/skills-8-blue.svg" alt="8 skills"></a>
+  <a href="https://github.com/luongnv89/idd"><img src="https://img.shields.io/badge/skills-9-blue.svg" alt="9 skills"></a>
   <a href="https://github.com/luongnv89/idd/blob/main/CONTRIBUTING.md"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs Welcome"></a>
 </p>
 
 # Turn GitHub Issues Into Structured, Agent-Ready Work Orders
 
-Eight terminal commands that structure, analyze, triage, resolve, and review GitHub issues — so any developer or AI agent can pick up an issue and ship a tested PR.
+Nine terminal commands that structure, analyze, triage, resolve, review, and self-check GitHub issue workflows — so any developer or AI agent can pick up an issue and ship a tested PR.
 
 [**Get Started**](#get-started) · [**What is IDD?**](#what-is-idd) · [**Intention-Driven Development**](#idd-as-intention-driven-development) · [**Why Good Issues & Commits Matter**](#why-good-issues-and-commit-messages-matter) · [**Works With Any Tool**](#works-with-any-tool)
 
@@ -53,14 +53,15 @@ graph LR
 
 | Command | What it does | Version | Effort |
 |---------|-------------|---------|--------|
-| `/issue-creator` | Classify type, generate acceptance criteria, create a structured issue | 0.4.0 | medium |
-| `/issue-analysis N` | Root cause, git history, implementation options, complexity and risk | 0.4.0 | high |
-| `/issue-resolver N` | 6-step pipeline: preflight, research, plan, implement, QA, deliver PR with `Closes #N` | 0.6.0 | max |
-| `/issue-triage` | Dependency graph, stale detection, already-fixed detection via commit/PR scanning, priority and execution order | 0.5.0 | medium |
-| `/init-gitissue` | Auto-detect language/framework/test runner, generate `.gitissue.yml` | 0.3.0 | low |
-| `/auto-pilot` | Triage → resolve → review → merge loop, fully automated backlog processing | 2.1.0 | max |
-| `/issue-pr-review` | Review PR end-to-end: token-optimized code review with script pre-pass, reuses reviewer/fixer agents across cycles, fixes critical+high issues | 0.3.0 | high |
-| `/issue-pr-review-fix-loop` | _Deprecated — use `/issue-pr-review`._ Outer review-fix loop: reuses reviewer/fixer agents across cycles, fresh confirmation pass at the end, fix, commit, push, repeat until clean. Retained one release cycle for backward-compat references; will be removed from this index. | 0.4.0 (deprecated) | high |
+| `/issue-creator` | Classify type, generate acceptance criteria, create a structured issue | 0.4.1 | medium |
+| `/issue-analysis N` | Root cause, git history, implementation options, complexity and risk | 0.4.1 | high |
+| `/issue-resolver N` | 6-step pipeline: preflight, research, plan, implement, QA, deliver PR with `Closes #N` | 0.7.0 | max |
+| `/issue-triage` | Dependency graph, stale detection, already-fixed detection via commit/PR scanning, priority and execution order | 0.5.2 | medium |
+| `/init-gitissue` | Auto-detect language/framework/test runner, generate `.gitissue.yml` | 0.3.2 | low |
+| `/auto-pilot` | Triage → resolve → review → merge loop. Conservative-by-default merge modes (`conservative`/`balanced`/`aggressive`) and explicit issue lists for targeted runs | 2.2.0 | max |
+| `/issue-pr-review` | Review PR end-to-end: script pre-pass (lint/format/test auto-fix), per-criterion AC verification, five-dimension scoring (correctness, acceptance_criteria, traceability, maintainability, safety), reuses reviewer/fixer agents across cycles | 0.4.1 | high |
+| `/idd-doctor` | Read-only health check: verifies issue-creator intent-only contract, gh `--json` field selection, error-message format, and merge strategy assumptions | 0.1.0 | low |
+| `/issue-pr-review-fix-loop` | _Deprecated v0.4.0 — use `/issue-pr-review`._ The outer review-fix loop is now part of `/issue-pr-review`. Retained one release cycle for backward-compat references; will be removed from this index. | 0.4.0 (deprecated) | high |
 
 ---
 
@@ -117,7 +118,7 @@ Dependency detection, priority suggestions, parallelizable work, stale issue war
   ◆ complete           4/5 resolved, 1 stopped
 ```
 
-Triage, resolve, review, merge — repeated for every open issue. Two fix-review cycles per PR before merge. Supports explicit issue lists for targeted runs.
+Triage, resolve, review, merge — repeated for every open issue. Up to three review-fix cycles per PR with a script pre-pass (lint/format/test auto-fix) before any LLM cycle is spent. Conservative by default: clean PRs are merged, partial PRs are left open for review unless `autopilot.mode: aggressive` is explicitly set. Supports explicit issue lists for targeted runs.
 
 ---
 
@@ -196,6 +197,7 @@ You can also install individual skills. See each skill folder for per-skill comm
 | `/issue-triage` | [`skills/issue-triage/`](skills/issue-triage/) |
 | `/auto-pilot` | [`skills/auto-pilot/`](skills/auto-pilot/) |
 | `/issue-pr-review` | [`skills/issue-pr-review/`](skills/issue-pr-review/) |
+| `/idd-doctor` | [`skills/idd-doctor/`](skills/idd-doctor/) |
 | `/issue-pr-review-fix-loop` _(deprecated)_ | [`skills/issue-pr-review-fix-loop/`](skills/issue-pr-review-fix-loop/) |
 | `/init-gitissue` | [`skills/init-gitissue/`](skills/init-gitissue/) |
 
@@ -358,16 +360,41 @@ Dependency detection via codebase scanning, topological sort for execution order
 
 ### /auto-pilot -- Automated Backlog Processing
 
-Fully automated loop: triage open issues, pick the highest-priority task, resolve it end-to-end, review the PR with two fix-review cycles, merge, and repeat. Supports explicit issue lists to process specific issues in user-defined order. Stop conditions prevent runaway execution.
+Fully automated loop: triage open issues, pick the highest-priority task, resolve it end-to-end, review the PR with up to three review-fix cycles (script pre-pass first, LLM cycles only for issues the pre-pass can't resolve), merge, and repeat. Supports explicit issue lists to process specific issues in user-defined order. Stop conditions prevent runaway execution.
 
 ```
-/auto-pilot                      # triage and resolve all open issues
-/auto-pilot 5, 12, 3             # resolve these issues in this order
+/auto-pilot                          # triage and resolve all open issues
+/auto-pilot --issues 5,12,3          # resolve these issues in this order
+/auto-pilot --limit 5                # cap to 5 iterations
+/auto-pilot --dry-run                # show plan without resolving
+```
+
+Merge modes (configured under `autopilot.mode` in `.gitissue.yml`):
+
+| Mode | Clean PR | Partial PR (review issues remain) |
+|------|----------|-----------------------------------|
+| `conservative` (default) | merge | leave open |
+| `balanced` | merge | leave open + create follow-up issue |
+| `aggressive` | merge | merge + create follow-up issue (requires `merge_partial: true`) |
+
+### /idd-doctor -- Read-Only Health Check
+
+Quick read-only diagnostic that verifies the IDD invariants of the current repo. Checks four things and reports per-check pass/fail with file/line evidence:
+
+1. `/issue-creator` keeps its intent-only contract (no `affected_files` / `technical_notes` / `architecture_constraints` in templates or output)
+2. Every `gh` invocation in skills uses `--json` with explicit field selection
+3. Each skill has a `references/error-messages.md` using the three-part format
+4. Repo merge strategy is set to squash so PR bodies land in `git log` (durable analysis-artifact rule from #35)
+
+Read-only by design — never modifies files, branches, or remote state.
+
+```
+/idd-doctor                          # run all checks
 ```
 
 ### /issue-pr-review -- PR Review Pipeline
 
-Reviews a PR end-to-end: code review with confidence-based filtering, runs tests and build, checks CI status, fixes issues, and repeats until clean. Supports auto-merge in auto-pilot mode.
+Reviews a PR end-to-end: script pre-pass (lint/format/test auto-fix, zero LLM cost), code review with confidence-based filtering classified as `fix` (critical/high) vs `note` (medium), per-criterion acceptance-criteria verification, traceability checks (Closes link, Decision Record, AC Verification table), runs tests and build, checks CI status, fixes only `fix` issues, and repeats until clean. Soft-pass when zero `fix` issues remain. Supports auto-merge in auto-pilot mode.
 
 ```
 /issue-pr-review 87              # review PR #87
@@ -456,6 +483,18 @@ triage:
   auto_priority: true           # suggest priorities based on type + age + deps
   include_closed: false         # include recently closed issues in triage
   scan_timeout_per_issue: 30    # max seconds to scan codebase per issue
+
+autopilot:
+  mode: conservative            # conservative | balanced | aggressive
+  merge_partial: false          # only meaningful when mode: aggressive
+  max_iterations: 10
+  review_cycles: 3              # max LLM review-fix cycles per PR
+  skip_labels: ["wontfix", "blocked", "do-not-merge"]
+  critical_labels: ["critical", "priority:critical"]
+
+review:
+  require_traceability_check: true        # block soft-pass if Closes #N is missing (covers Decision Record presence)
+  require_acceptance_criteria_check: true # block soft-pass if AC Verification fails
 ```
 
 Full schema: [`docs/config-schema.md`](docs/config-schema.md)
@@ -468,13 +507,15 @@ Full schema: [`docs/config-schema.md`](docs/config-schema.md)
 Three default templates:
 
 - **Bug** -- current vs expected behavior, reproduction context
-- **Feature** -- user story, acceptance criteria, technical constraints
-- **Improvement** -- current state, proposed change, migration notes
+- **Feature** -- user story, acceptance criteria
+- **Improvement** -- current state, proposed change
 
 Each normalized issue includes:
 - `<!-- gitissue:normalized v1 -->` marker (invisible in GitHub UI)
 - Reporter's original text in a `> Reporter Context` blockquote
-- Confidence markers: `(high confidence)`, `(needs review)`
+- Acceptance criteria derived from the reporter's intent
+
+`/issue-creator` is **intent-only** — it never scans the codebase, never lists "affected files", and never proposes implementation notes. Codebase analysis is performed at execution time by `/issue-resolver`, `/issue-triage`, and `/issue-analysis`, always against current code.
 
 </details>
 
@@ -493,37 +534,24 @@ shared/
 
 skills/
 ├── auto-pilot/         # /auto-pilot
-│   ├── SKILL.md
-│   └── references/
 ├── issue-analysis/     # /issue-analysis N
-│   ├── SKILL.md
-│   └── references/
-├── issue-creator/      # /issue-creator
-│   ├── SKILL.md
-│   ├── templates/
-│   └── references/
+├── issue-creator/      # /issue-creator (+ templates/)
 ├── issue-resolver/     # /issue-resolver N
-│   ├── SKILL.md
-│   └── references/
 ├── issue-triage/       # /issue-triage
-│   ├── SKILL.md
-│   └── references/
-├── issue-pr-review/    # /issue-pr-review — review, test, CI check, fix, merge
-│   ├── SKILL.md
-│   └── references/
-├── issue-pr-review-fix-loop/  # /issue-pr-review-fix-loop (deprecated — redirects to /issue-pr-review)
-│   ├── SKILL.md
-│   └── references/
+├── issue-pr-review/    # /issue-pr-review — review, test, CI, fix, merge
+├── idd-doctor/         # /idd-doctor — read-only repo health check
+├── issue-pr-review-fix-loop/  # DEPRECATED v0.4.0 — redirects to /issue-pr-review
 └── init-gitissue/      # /init-gitissue
-    ├── SKILL.md
-    └── references/
+    (each skill has SKILL.md, README.md, references/)
 docs/
-├── ARCHITECTURE.md
-├── CHANGELOG.md
-├── DEVELOPMENT.md
-├── idd-methodology.md
-├── config-schema.md
-└── sample-normalized-issue.md
+├── ARCHITECTURE.md            # System design + data flow diagrams
+├── CHANGELOG.md               # Per-release notes
+├── DEVELOPMENT.md             # Local setup + contribution guide
+├── config-schema.md           # Full .gitissue.yml schema (autopilot + review)
+├── idd-methodology.md         # IDD methodology + analysis-artifact rule
+├── naming-conventions.md      # Branch / commit / PR / issue naming
+├── github-projects-sync.md    # GitHub Projects v2 integration
+└── sample-normalized-issue.md # Example normalized issue
 ```
 
 </details>
