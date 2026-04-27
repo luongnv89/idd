@@ -65,8 +65,9 @@ Each skill has `references/error-messages.md`. Follow the three-part format:
 
 Issue templates are in `skills/issue-creator/templates/`. Each template must:
 - Include the `<!-- gitissue:normalized v1 -->` marker
-- Use standard sections: Type, Context, Description, Acceptance Criteria, Technical Notes, Metadata
+- Use intent-only sections: Type, Context, Description, Acceptance Criteria, Metadata
 - Preserve the Reporter Context blockquote
+- **Never** include sections that imply codebase analysis (no Affected Files, no Technical Notes, no Architecture Constraints, no Implementation Hints) — `/issue-creator` is intent-only; consumer skills (resolver, triage, analysis) scan the codebase fresh at execution time
 
 ## Testing
 
@@ -110,7 +111,10 @@ graph TD
 |------|---------|
 | `CLAUDE.md` | Project conventions for AI agents |
 | `DESIGN.md` | Terminal output style guide |
-| `docs/config-schema.md` | Full `.gitissue.yml` schema |
-| `docs/idd-methodology.md` | IDD methodology overview |
-| `docs/sample-normalized-issue.md` | Example normalized issue |
-| `docs/ARCHITECTURE.md` | System design and data flow |
+| `docs/config-schema.md` | Full `.gitissue.yml` schema (autopilot + review sections) |
+| `docs/idd-methodology.md` | IDD methodology overview + analysis-artifact dual-write rule |
+| `docs/naming-conventions.md` | Branch / commit / PR / issue naming |
+| `docs/sample-normalized-issue.md` | Example normalized issue (intent-only) |
+| `docs/ARCHITECTURE.md` | System design, data flow, durable-memory model |
+| `docs/CHANGELOG.md` | Per-release notes |
+| `skills/idd-doctor/SKILL.md` | Read-only health check — run before submitting a PR |
