@@ -61,7 +61,7 @@ No arguments. The skill reads from the current repo and prints a four-line repor
 | # | Check | Result type |
 |---|-------|-------------|
 | 1 | Stale `/issue-creator` claims in skill README/SKILL files | PASS / FAIL |
-| 2 | Forbidden fields in `skills/issue-creator/templates/*.md` and `.github/ISSUE_TEMPLATE/*` | PASS / FAIL |
+| 2 | Forbidden fields in `src/skills/issue-creator/templates/*.md` and `.github/ISSUE_TEMPLATE/*` | PASS / FAIL |
 | 3 | `autopilot.mode` is set in `.gitissue.yml` (when the file exists) | PASS / FAIL / SKIP |
 | 4 | Repo's default merge strategy is squash-only | PASS / WARN / SKIP |
 

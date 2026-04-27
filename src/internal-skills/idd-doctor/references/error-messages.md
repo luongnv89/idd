@@ -29,7 +29,7 @@ All errors follow the rich error format: what went wrong + fix command (+ docs l
 ```
   ✓ [1/4] Stale skill claims    no stale language in /issue-creator
 ```
-**Trigger:** `skills/issue-creator/README.md` and `skills/issue-creator/SKILL.md` are both clean.
+**Trigger:** `src/skills/issue-creator/README.md` and `src/skills/issue-creator/SKILL.md` are both clean.
 
 ### Fail
 ```
@@ -39,14 +39,14 @@ All errors follow the rich error format: what went wrong + fix command (+ docs l
         line:    {trimmed_line_text}
         ...
 ```
-**Trigger:** At least one line in `skills/issue-creator/README.md` or `skills/issue-creator/SKILL.md` matches a forbidden pattern without a negation marker on the same line.
+**Trigger:** At least one line in `src/skills/issue-creator/README.md` or `src/skills/issue-creator/SKILL.md` matches a forbidden pattern without a negation marker on the same line.
 
 **Fix hint** (printed once after the per-finding block):
 ```
         Fix: rewrite the offending lines to remove claims that /issue-creator
              scans the codebase, predicts affected files, or generates
              implementation notes. See docs §1a or
-             /Users/.../skills/issue-creator/README.md for the intent-only contract.
+             /Users/.../src/skills/issue-creator/README.md for the intent-only contract.
 ```
 
 ---
@@ -63,7 +63,7 @@ All errors follow the rich error format: what went wrong + fix command (+ docs l
 ```
   ✓ [2/4] Issue-template fields no template files found — nothing to check
 ```
-**Trigger:** Neither `skills/issue-creator/templates/` nor `.github/ISSUE_TEMPLATE/` contain any files.
+**Trigger:** Neither `src/skills/issue-creator/templates/` nor `.github/ISSUE_TEMPLATE/` contain any files.
 
 ### Fail
 ```
