@@ -164,6 +164,24 @@ Omit the `Create:` line if no files need to be created for that option.
     Recommended:  Option {N} — {name}
 ```
 
+### Decision Record
+
+The Decision Record is the durable analysis signal that `/issue-resolver` lifts into the PR body and squash commit body. It uses the same five field labels as the JSON `decision_record` block — labels are stable across `/issue-analysis`, `/issue-resolver`, and `/issue-pr-review` because downstream presence checks are string-matched.
+
+```
+  ◆ Decision Record
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+    Root cause:         {one-paragraph diagnosis from Step 6}
+    Options considered: Option 1 — {name}; Option 2 — {name}; Option 3 — {name}
+    Options rejected:   Option 1 — {one-line reason}; Option 3 — {reason}
+    Selected option:    Option {N} — {name}
+    Residual risk:      {what remains uncertain or accepted as known limitation}
+
+    Analyzed at:        {branch} @ {commit_sha_short} ({YYYY-MM-DD})
+```
+
+If only one option was generated, render `Options rejected: none`. If `residual_risk` is empty, render `Residual risk: none identified`.
+
 After output:
 ```
 [8/8] Report         ✓ analysis complete
@@ -176,9 +194,22 @@ After output:
 After Step 8, save the analysis to `.gitissue/analysis-<N>.json`.
 
 1. Create the directory if it doesn't exist: `mkdir -p .gitissue/`
-2. Build the JSON object from Steps 1-8 analysis results using the schema below
-3. Write `.gitissue/analysis-<N>.json` with formatted JSON (readable diffs in git)
-4. Print: `✓ Analysis saved to .gitissue/analysis-<N>.json`
+2. Capture `git_state` so the analysis is pinned to a specific point in time:
+   ```bash
+   git rev-parse --abbrev-ref HEAD            # branch
+   git rev-parse HEAD                         # commit_sha
+   git rev-parse --short=7 HEAD               # commit_sha_short
+   ```
+   If the working tree is detached or the branch cannot be resolved, fall back to `branch: "(detached)"` and continue.
+3. Build the `decision_record` block by lifting fields from Steps 6 and 7:
+   - `root_cause` ← `analysis.summary` (one paragraph; use `analysis.details` first paragraph if `summary` is empty)
+   - `options_considered` ← compact list of every entry in `options[]` (number + name only)
+   - `options_rejected` ← every option whose number is not `recommended_option`, each with a one-line reason derived from `options[].cons[0]` or `options[].risk_details`
+   - `selected_option` ← `options[recommended_option - 1]` reduced to number + name + summary
+   - `residual_risk` ← the highest-severity con of the selected option, or `"none identified"` if none
+4. Build the full JSON object from Steps 1-8 analysis results plus `git_state` and `decision_record` using the schema below
+5. Write `.gitissue/analysis-<N>.json` with formatted JSON (readable diffs in git)
+6. Print: `✓ Analysis saved to .gitissue/analysis-<N>.json`
 
 If writing fails:
 ```
@@ -306,6 +337,30 @@ This is a warning, not a fatal error — the terminal output from Step 6 was alr
     "keywords_extracted": 8,
     "file_refs_extracted": 2,
     "scan_duration_seconds": 45
+  },
+  "git_state": {
+    "branch": "main",
+    "commit_sha": "01afdc5ba2a1f856f116d46168f870d35b549789",
+    "commit_sha_short": "01afdc5",
+    "captured_at": "2026-04-27T05:35:43Z"
+  },
+  "decision_record": {
+    "root_cause": "One-paragraph diagnosis lifted from analysis.summary or analysis.details.",
+    "options_considered": [
+      {"number": 1, "name": "Minimal fix"},
+      {"number": 2, "name": "Balanced refactor"},
+      {"number": 3, "name": "Comprehensive overhaul"}
+    ],
+    "options_rejected": [
+      {"number": 1, "reason": "Hardcoded list grows over time."},
+      {"number": 3, "reason": "Out of scope for this issue."}
+    ],
+    "selected_option": {
+      "number": 2,
+      "name": "Balanced refactor",
+      "summary": "One-sentence description of the chosen approach."
+    },
+    "residual_risk": "What remains uncertain after the fix lands, or 'none identified'."
   }
 }
 ```
@@ -389,4 +444,20 @@ This is a warning, not a fatal error — the terminal output from Step 6 was alr
 | `scan_stats.keywords_extracted` | integer | Keywords found in issue body |
 | `scan_stats.file_refs_extracted` | integer | Explicit file paths found |
 | `scan_stats.scan_duration_seconds` | integer | Time spent on research |
+| `git_state.branch` | string | Branch name HEAD pointed at when analysis ran |
+| `git_state.commit_sha` | string | Full 40-character commit SHA at analysis time |
+| `git_state.commit_sha_short` | string | First 7 characters of `commit_sha` for display |
+| `git_state.captured_at` | ISO 8601 string | Timestamp when `git_state` was captured (matches top-level `timestamp`) |
+| `decision_record.root_cause` | string | One-paragraph diagnosis lifted from `analysis.summary` or `analysis.details` |
+| `decision_record.options_considered[]` | array | Compact list of all options proposed in Step 7 |
+| `decision_record.options_considered[].number` | integer | Option number (matches `options[].number`) |
+| `decision_record.options_considered[].name` | string | Option name (matches `options[].name`) |
+| `decision_record.options_rejected[]` | array | Options not chosen, with one-line reason; empty array if only one option was generated |
+| `decision_record.options_rejected[].number` | integer | Option number |
+| `decision_record.options_rejected[].reason` | string | One-line reason this option was not selected |
+| `decision_record.selected_option` | object | The chosen option, lifted from `options[recommended_option - 1]` |
+| `decision_record.selected_option.number` | integer | Option number |
+| `decision_record.selected_option.name` | string | Option name |
+| `decision_record.selected_option.summary` | string | One-sentence description of the chosen approach |
+| `decision_record.residual_risk` | string | What remains uncertain or accepted as a known limitation; `"none identified"` if empty |
 

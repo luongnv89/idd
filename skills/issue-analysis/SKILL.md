@@ -230,7 +230,16 @@ Step 8 renders the analysis as a structured terminal report following DESIGN.md 
 
 Summary:
 - Terminal report has 8 sections: header, classification, root cause, affected files, options, complexity, risk, recommendation.
-- JSON has keys: `issue`, `keywords`, `files`, `history`, `analysis`, `options`, `complexity`, `risk`, `generated_at`.
+- JSON has keys: `issue`, `keywords`, `files`, `history`, `analysis`, `options`, `complexity`, `risk`, `git_state`, `decision_record`, `generated_at`.
+
+### Durable analysis fields
+
+`/issue-analysis` JSON is local cache — see *Analysis Artifacts and Durable Memory* in `docs/idd-methodology.md`. To make the analysis durable, two structured fields are persisted alongside the existing analysis content so `/issue-resolver` can lift them into the PR body:
+
+1. **`git_state`** — the branch and commit SHA the analysis ran against. This pins the analysis to a specific point in time so reviewers can verify the current-code reality the recommendation was made against.
+2. **`decision_record`** — five fields lifted from Steps 6 and 7: `root_cause`, `options_considered`, `options_rejected`, `selected_option`, `residual_risk`. The labels are stable across `/issue-analysis`, `/issue-resolver`, and `/issue-pr-review` because the downstream presence checks are string-matched.
+
+Persisting these fields does **not** change the analysis pipeline — it only adds two new keys to the JSON and a *Decision Record* section to the terminal report. See `references/output-and-persist.md` for the exact schema and rendering.
 
 ---
 

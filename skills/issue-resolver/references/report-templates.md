@@ -4,6 +4,8 @@ Templates for the PR body, the step-by-step final report, and the expected pipel
 
 ## PR Body Template (Step 5 — Deliver)
 
+This template is the load-bearing artifact for durable project memory. Under squash-merge, GitHub copies the PR body verbatim into the commit message that lands on the default branch, so every section here is preserved in `git log -p` after merge. Repos using merge-commit or rebase-merge keep this content only on GitHub. See *Analysis Artifacts and Durable Memory* in `docs/idd-methodology.md`.
+
 ```markdown
 Closes #{issue_number}
 
@@ -14,6 +16,16 @@ Closes #{issue_number}
 ## Approach
 
 {Selected option name and description}
+
+## Decision Record
+
+- **Root cause:** {one-paragraph diagnosis from analysis Step 6}
+- **Options considered:** Option 1 — {name}; Option 2 — {name}; Option 3 — {name}
+- **Options rejected:** Option 1 — {one-line reason}; Option 3 — {reason}
+- **Selected option:** Option {N} — {name}
+- **Residual risk:** {what remains uncertain or accepted as known limitation, or "none identified"}
+
+Analyzed at: `{branch} @ {commit_sha_short}` ({YYYY-MM-DD})
 
 ## Changes
 
@@ -29,13 +41,23 @@ Closes #{issue_number}
 - Build: passed
 - QA cycles: {count}
 
-## Acceptance Criteria
+## Acceptance Criteria Verification
 
-- [x] {criterion — checked if addressed}
-- [ ] {criterion — unchecked with note}
+| Criterion | Status | Evidence |
+|-----------|--------|----------|
+| {criterion text from issue body} | pass | {short pointer — file/line, test name, manual check} |
+| {criterion text from issue body} | unverified | {explanation — out of scope, manual review needed} |
+
+Use `pass`, `fail`, or `unverified` per criterion. Always cite evidence (a file path, a test name, or a one-line explanation). If the issue has no acceptance criteria, replace the table with `> **Note:** No acceptance criteria defined — manual review recommended.`
 ```
 
 The PR title follows `{type}({scope}): {description} (#{issue_number})` — see `docs/naming-conventions.md`.
+
+### Lifting the Decision Record
+
+If a fresh `.gitissue/analysis-<N>.json` exists for this issue, lift its `decision_record` and `git_state` blocks directly into the *Decision Record* section above. Field labels are stable across `/issue-analysis`, `/issue-resolver`, and `/issue-pr-review` because downstream presence checks are string-matched — do not rename them.
+
+If no analysis JSON exists (e.g., resolver was invoked without prior analysis), synthesize the same five fields from the resolver's own Step 1 (Research) and Step 2 (Plan) findings, and use the synced base SHA as `commit_sha_short`. Either source produces the same template — what matters is that the durable analysis signal lands in the PR body, where squash-merge will carry it into git history.
 
 ## Final Report — Successful Resolution
 

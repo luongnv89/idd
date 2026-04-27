@@ -206,6 +206,14 @@ IDD separates durable intent from time-sensitive codebase analysis:
 
 This boundary keeps issues stable while still allowing analysis to stay fresh. A file prediction made when an issue is created can become stale after one merge. A codebase scan run during analysis or resolution reflects the current repository.
 
+## Analysis Artifacts and Durable Memory
+
+`/issue-analysis` writes its findings to `.gitissue/analysis-<N>.json` so the resolver can reuse them and reviewers can inspect the current-code reality the analysis ran against. That JSON is **local cache**: it is not required to be committed, it is safe to delete, and a fresh `/issue-analysis N` regenerates it. Local cache is useful for the live workflow but cannot be the home of project memory — once the PR merges and the cache is cleared, the reasoning would disappear with it.
+
+Durable project memory therefore lives in artifacts that already survive: the **issue body** (intent), the **PR body** (analysis lift, decision record, acceptance verification), and the **squash commit body** that lands on the default branch (the same content carried into git history). The dual-write rule says: any analysis signal worth preserving must appear in both the PR body and the squash commit body. Concretely, `/issue-resolver` lifts a five-field **Decision Record** — root cause, options considered, options rejected, selected option, residual risk — out of the analysis JSON and into the PR body, alongside an acceptance-criteria verification table. `/issue-pr-review` checks for the presence of those fields as part of its traceability dimension. Deleting `.gitissue/analysis-<N>.json` after the PR merges does not destroy the reasoning — it is already in `git log -p`.
+
+This rule **assumes squash-merge as the merge strategy**. GitHub's squash-merge carries the PR body verbatim into the commit message; standard merge commits and rebase-merge do not without extra tooling. Repos using a different strategy will keep durable memory in the PR body (and therefore only on GitHub) rather than in git history. `/init-gitissue` should warn when the repo's default merge strategy is not squash.
+
 ## Minimal Example
 
 Raw report:

@@ -238,6 +238,24 @@ gh issue view {linked_issue} --json number,title,body,labels
 
 Check each acceptance criterion against the PR changes.
 
+### Durable analysis fields (presence check)
+
+Per the dual-write rule (see *Analysis Artifacts and Durable Memory* in `docs/idd-methodology.md`), `/issue-resolver` is expected to lift a Decision Record and an Acceptance Criteria Verification table into the PR body so the durable signal survives the squash-merge into git history.
+
+Scan the PR body for the following fields. This is a **presence check only** — full per-criterion verification is handled by `/issue-pr-review`'s Phase 2 work, not here.
+
+- A `## Decision Record` section containing the labels `Root cause`, `Options considered`, `Options rejected`, `Selected option`, `Residual risk`.
+- A `## Acceptance Criteria Verification` section (table or list) with at least one entry, OR an explicit `No acceptance criteria defined` note.
+- A `Closes #{N}` reference linking the PR to its issue.
+
+Report results as a `note`-level traceability finding (does not block a soft pass):
+
+- All three present → ○ traceability: full
+- Decision Record absent (e.g., human-authored PR not produced by `/issue-resolver`) → ○ traceability: partial — Decision Record absent; full verification deferred to manual review
+- `Closes #{N}` absent → ⚠ traceability: fail — PR is not linked to an issue (this is the only traceability finding that escalates beyond `note`)
+
+The presence check uses the exact field labels emitted by `/issue-analysis` and `/issue-resolver` because the labels are the stable contract — do not rewrite them.
+
 ---
 
 ## Step 4 — Run Tests & Build [4/7]
