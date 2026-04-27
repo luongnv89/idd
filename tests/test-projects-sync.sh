@@ -27,14 +27,14 @@ echo "◆ Projects Sync Utility Tests"
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 
 # T1: Shared reference document exists
-if [ -f "$REPO_ROOT/docs/github-projects-sync.md" ]; then
-  pass "T1: docs/github-projects-sync.md exists"
+if [ -f "$REPO_ROOT/src/docs/github-projects-sync.md" ]; then
+  pass "T1: src/docs/github-projects-sync.md exists"
 else
-  fail "T1: docs/github-projects-sync.md not found"
+  fail "T1: src/docs/github-projects-sync.md not found"
 fi
 
 # T2: Reference document contains required sections
-DOC="$REPO_ROOT/docs/github-projects-sync.md"
+DOC="$REPO_ROOT/src/docs/github-projects-sync.md"
 for section in "## Overview" "## Configuration" "## Procedures" "### 1. Discover Project" "### 2. Get Status Field" "### 3. Add Issue to Project" "### 4. Update Status" "## Graceful Degradation" "## Skill Integration Reference" "## Error Messages"; do
   if grep -q "$section" "$DOC" 2>/dev/null; then
     pass "T2: Section '$section' found in reference doc"
@@ -53,7 +53,7 @@ for query in "addProjectV2ItemById" "updateProjectV2ItemFieldValue" "projectsV2"
 done
 
 # T4: Config schema includes projects section
-CONFIG_DOC="$REPO_ROOT/docs/config-schema.md"
+CONFIG_DOC="$REPO_ROOT/src/docs/config-schema.md"
 for field in "projects:" "sync_enabled:" "project_number:" "status_field:" "status_map:"; do
   if grep -q "$field" "$CONFIG_DOC" 2>/dev/null; then
     pass "T4: Config field '$field' found in config-schema.md"
@@ -72,7 +72,7 @@ for entry in "projects.sync_enabled" "projects.project_number" "projects.status_
 done
 
 # T6: issue-creator SKILL.md references the projects sync utility
-CREATOR="$REPO_ROOT/skills/issue-creator/SKILL.md"
+CREATOR="$REPO_ROOT/src/skills/issue-creator/SKILL.md"
 if grep -q "github-projects-sync.md" "$CREATOR" 2>/dev/null; then
   pass "T6: issue-creator references github-projects-sync.md"
 else
@@ -85,15 +85,17 @@ else
   fail "T6: issue-creator does not document Todo status transition"
 fi
 
-# T7: issue-resolver SKILL.md references the projects sync utility
-RESOLVER="$REPO_ROOT/skills/issue-resolver/SKILL.md"
+# T7: issue-resolver references the projects sync utility (in SKILL.md or
+# pipeline-steps.md — the in-progress transition lives in the latter since #35).
+RESOLVER="$REPO_ROOT/src/skills/issue-resolver/SKILL.md"
+RESOLVER_PIPELINE="$REPO_ROOT/src/skills/issue-resolver/references/pipeline-steps.md"
 if grep -q "github-projects-sync.md" "$RESOLVER" 2>/dev/null; then
   pass "T7: issue-resolver references github-projects-sync.md"
 else
   fail "T7: issue-resolver does not reference github-projects-sync.md"
 fi
 
-if grep -q "status_map.in_progress" "$RESOLVER" 2>/dev/null; then
+if grep -q "status_map.in_progress" "$RESOLVER" "$RESOLVER_PIPELINE" 2>/dev/null; then
   pass "T7: issue-resolver documents In Progress status transition"
 else
   fail "T7: issue-resolver does not document In Progress transition"
@@ -106,7 +108,7 @@ else
 fi
 
 # T8: issue-triage SKILL.md references the projects sync utility
-TRIAGE="$REPO_ROOT/skills/issue-triage/SKILL.md"
+TRIAGE="$REPO_ROOT/src/skills/issue-triage/SKILL.md"
 if grep -q "github-projects-sync.md" "$TRIAGE" 2>/dev/null; then
   pass "T8: issue-triage references github-projects-sync.md"
 else

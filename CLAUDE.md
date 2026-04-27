@@ -6,44 +6,58 @@ gitissue implements Issue-Driven Development (IDD) — a methodology where GitHu
 
 ## Architecture
 
-This is a **skills-only** project. There is no runtime code — each skill is a self-contained Claude Code skill (SKILL.md + references/ + templates/) that instructs the agent how to perform a task. Shared agents live in `shared/agents/` and are referenced by multiple skills.
+This is a **skills-only** project. There is no runtime code — each skill is a self-contained Claude Code skill (SKILL.md + references/ + templates/) that instructs the agent how to perform a task. Shared agents live in `src/shared/agents/` and are referenced by multiple skills. All authored sources live under `src/`; top-level `docs/` retains human-only project docs (architecture, changelog, development guide).
 
 ```
-shared/
-└── agents/                    # Shared agent definitions (used by multiple skills)
-    ├── codebase-researcher.md # Deep codebase scan + solution research
-    ├── synthesizer.md         # Analysis + implementation options
-    ├── implementer.md         # Code + tests implementation
-    ├── code-reviewer.md       # Confidence-based code review
-    ├── duplicate-detector.md  # Issue dedup scoring
-    └── issue-relationship-scanner.md  # File deps + already-fixed detection
-
-skills/
-├── auto-pilot/         # /auto-pilot — triage, resolve, review, merge loop
-│   ├── SKILL.md
-│   └── references/
-├── issue-analysis/     # /issue-analysis N — deep issue investigation
-│   ├── SKILL.md
-│   └── references/
-├── issue-creator/      # /issue-creator — create/normalize/batch issues
-│   ├── SKILL.md
-│   ├── templates/      # Issue templates (bug, feature, improvement)
-│   └── references/
-├── issue-resolver/     # /issue-resolver N — 6-step resolve pipeline
-│   ├── SKILL.md
-│   └── references/
-├── issue-triage/       # /issue-triage — prioritize and order issues
-│   ├── SKILL.md
-│   └── references/
-├── issue-pr-review/    # /issue-pr-review — review, test, CI check, fix, merge
-│   ├── SKILL.md
-│   └── references/
-├── issue-pr-review-fix-loop/  # DEPRECATED v0.4.0 — redirects to /issue-pr-review (retained one release cycle)
-│   ├── SKILL.md
-│   └── references/
-└── init-gitissue/      # /init-gitissue — generate .gitissue.yml
-    ├── SKILL.md
-    └── references/
+src/
+├── shared/
+│   └── agents/                    # Shared agent definitions (used by multiple skills)
+│       ├── codebase-researcher.md # Deep codebase scan + solution research
+│       ├── synthesizer.md         # Analysis + implementation options
+│       ├── implementer.md         # Code + tests implementation
+│       ├── code-reviewer.md       # Confidence-based code review
+│       ├── duplicate-detector.md  # Issue dedup scoring
+│       └── issue-relationship-scanner.md  # File deps + already-fixed detection
+│
+├── skills/
+│   ├── auto-pilot/         # /auto-pilot — triage, resolve, review, merge loop
+│   │   ├── SKILL.md
+│   │   └── references/
+│   ├── issue-analysis/     # /issue-analysis N — deep issue investigation
+│   │   ├── SKILL.md
+│   │   └── references/
+│   ├── issue-creator/      # /issue-creator — create/normalize/batch issues
+│   │   ├── SKILL.md
+│   │   ├── templates/      # Issue templates (bug, feature, improvement)
+│   │   └── references/
+│   ├── issue-resolver/     # /issue-resolver N — 6-step resolve pipeline
+│   │   ├── SKILL.md
+│   │   └── references/
+│   ├── issue-triage/       # /issue-triage — prioritize and order issues
+│   │   ├── SKILL.md
+│   │   └── references/
+│   ├── issue-pr-review/    # /issue-pr-review — review, test, CI check, fix, merge
+│   │   ├── SKILL.md
+│   │   └── references/
+│   └── init-gitissue/      # /init-gitissue — generate .gitissue.yml
+│       ├── SKILL.md
+│       └── references/
+│
+├── internal-skills/
+│   └── idd-doctor/         # /idd-doctor — read-only repo health check
+│       ├── SKILL.md
+│       └── references/
+│
+├── deprecated-skills/
+│   └── issue-pr-review-fix-loop/  # DEPRECATED v0.4.0 — redirects to /issue-pr-review (retained one release cycle)
+│       ├── SKILL.md
+│       └── references/
+│
+└── docs/                          # Runtime docs consumed by skills
+    ├── config-schema.md
+    ├── idd-methodology.md
+    ├── naming-conventions.md
+    └── github-projects-sync.md
 ```
 
 ## Conventions
@@ -69,7 +83,7 @@ skills/
 
 ### Naming Conventions
 
-All skills that create branches, commits, PRs, or issues follow these conventions. The full standalone reference is at `docs/naming-conventions.md` — skills reference that document directly so the conventions work with any tool, not just Claude.
+All skills that create branches, commits, PRs, or issues follow these conventions. The full standalone reference is at `src/docs/naming-conventions.md` — skills reference that document directly so the conventions work with any tool, not just Claude.
 
 #### Branch Names
 
@@ -136,7 +150,7 @@ Examples:
 ### Skills
 - Each skill follows the skill-creator standard (frontmatter with name/description, progressive disclosure)
 - Each skill has its own `references/error-messages.md`
-- Shared agents live in `shared/agents/` — skills reference them by path, not by external agent types
+- Shared agents live in `src/shared/agents/` — skills reference them by path, not by external agent types
 - All subagents use the default general-purpose agent (no `subagent_type` parameter)
 - In auto-pilot mode, all agents/skills run autonomously without user prompts
 - Static sequential output — each step prints a new line, no terminal animation

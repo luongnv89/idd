@@ -26,10 +26,10 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-SKILL="$REPO_ROOT/skills/issue-pr-review/SKILL.md"
-TEMPLATES="$REPO_ROOT/skills/issue-pr-review/references/report-templates.md"
-RESOLVER_TEMPLATES="$REPO_ROOT/skills/issue-resolver/references/report-templates.md"
-METHODOLOGY="$REPO_ROOT/docs/idd-methodology.md"
+SKILL="$REPO_ROOT/src/skills/issue-pr-review/SKILL.md"
+TEMPLATES="$REPO_ROOT/src/skills/issue-pr-review/references/report-templates.md"
+RESOLVER_TEMPLATES="$REPO_ROOT/src/skills/issue-resolver/references/report-templates.md"
+METHODOLOGY="$REPO_ROOT/src/docs/idd-methodology.md"
 PASS=0
 FAIL=0
 

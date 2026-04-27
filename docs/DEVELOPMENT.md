@@ -42,7 +42,7 @@ graph TD
 
 ### Editing a Skill
 
-Skills live in `skills/<name>/SKILL.md`. When editing:
+Skills live in `src/skills/<name>/SKILL.md` (internal-only skills under `src/internal-skills/<name>/`, deprecated skills under `src/deprecated-skills/<name>/`). When editing:
 
 1. Read the existing SKILL.md fully before making changes
 2. Follow the terminal output patterns in `DESIGN.md`
@@ -63,7 +63,7 @@ Each skill has `references/error-messages.md`. Follow the three-part format:
 
 ### Modifying Templates
 
-Issue templates are in `skills/issue-creator/templates/`. Each template must:
+Issue templates are in `src/skills/issue-creator/templates/`. Each template must:
 - Include the `<!-- gitissue:normalized v1 -->` marker
 - Use intent-only sections: Type, Context, Description, Acceptance Criteria, Metadata
 - Preserve the Reporter Context blockquote
@@ -96,11 +96,11 @@ When testing manually:
 ```mermaid
 graph TD
     CM["CLAUDE.md<br/>Agent conventions"] --> DM["DESIGN.md<br/>Output style guide"]
-    CM --> CS["docs/config-schema.md<br/>Config schema"]
+    CM --> CS["src/docs/config-schema.md<br/>Config schema"]
     CM --> AR["docs/ARCHITECTURE.md<br/>System design"]
-    AR --> SK["skills/*/SKILL.md<br/>Skill definitions"]
-    SK --> EM["skills/*/references/<br/>Error messages"]
-    SK --> TM["skills/*/templates/<br/>Issue templates"]
+    AR --> SK["src/skills/*/SKILL.md<br/>Skill definitions"]
+    SK --> EM["src/skills/*/references/<br/>Error messages"]
+    SK --> TM["src/skills/*/templates/<br/>Issue templates"]
     CS --> GY[".gitissue.yml<br/>Project config"]
 
     style CM fill:#4CAF50,color:#fff
@@ -111,10 +111,10 @@ graph TD
 |------|---------|
 | `CLAUDE.md` | Project conventions for AI agents |
 | `DESIGN.md` | Terminal output style guide |
-| `docs/config-schema.md` | Full `.gitissue.yml` schema (autopilot + review sections) |
-| `docs/idd-methodology.md` | IDD methodology overview + analysis-artifact dual-write rule |
-| `docs/naming-conventions.md` | Branch / commit / PR / issue naming |
+| `src/docs/config-schema.md` | Full `.gitissue.yml` schema (autopilot + review sections) |
+| `src/docs/idd-methodology.md` | IDD methodology overview + analysis-artifact dual-write rule |
+| `src/docs/naming-conventions.md` | Branch / commit / PR / issue naming |
 | `docs/sample-normalized-issue.md` | Example normalized issue (intent-only) |
 | `docs/ARCHITECTURE.md` | System design, data flow, durable-memory model |
 | `docs/CHANGELOG.md` | Per-release notes |
-| `skills/idd-doctor/SKILL.md` | Read-only health check — run before submitting a PR |
+| `src/internal-skills/idd-doctor/SKILL.md` | Read-only health check — run before submitting a PR |
