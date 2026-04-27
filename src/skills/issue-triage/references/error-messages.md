@@ -135,6 +135,6 @@ All errors follow the rich error format: what went wrong + fix command + docs li
   Line {N}: {field} {validation_message}
 
   To fix:  edit .gitissue.yml and correct the values above
-  Docs:    https://github.com/luongnv89/idd/blob/main/docs/config-schema.md
+  Docs:    https://github.com/luongnv89/idd/blob/main/src/docs/config-schema.md
 ```
 **Trigger:** Config file exists but contains invalid values (wrong type, out of range, unknown field).
