@@ -6,6 +6,8 @@ Detailed example runs and edge-case behaviors referenced from SKILL.md.
 
 **User says:** `/auto-pilot --limit 3`
 
+> Assumes `autopilot.mode: balanced` or `aggressive` in `.gitissue.yml`. Under the default `conservative` mode, each PR would end with `Outcome: left_open` instead of being merged automatically.
+
 ```
 ● Checking environment...
 ✓ Environment ready
@@ -15,7 +17,7 @@ Detailed example runs and edge-case behaviors referenced from SKILL.md.
   Issues to process:  5 (of 8 open)
   Limit:              3
   Review cycles:      3
-  Auto-merge:         {yes/no}
+  Merge mode:         {conservative | balanced | aggressive}
   First issue:        #12 — Fix auth redirect loop
 
   Execution order:
@@ -111,7 +113,7 @@ Detailed example runs and edge-case behaviors referenced from SKILL.md.
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Issues to process:  3 (of 3 provided)
   Review cycles:      3
-  Auto-merge:         {yes/no}
+  Merge mode:         {conservative | balanced | aggressive}
   Mode:               explicit list (analyzed + optimized)
   Batches:            1 (saving ~1 iterations)
 
@@ -199,7 +201,7 @@ Detailed example runs and edge-case behaviors referenced from SKILL.md.
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Issues to process:  1 (of 3 provided)
   Review cycles:      3
-  Auto-merge:         {yes/no}
+  Merge mode:         {conservative | balanced | aggressive}
   Mode:               explicit list (analyzed + optimized)
 
   Optimized execution order:

@@ -178,6 +178,25 @@ review:
 
 # Auto-pilot settings (used by /auto-pilot)
 autopilot:
+  # Merge mode — controls when /auto-pilot is allowed to merge PRs.
+  # Type: string
+  # Values: "conservative" | "balanced" | "aggressive"
+  # Default: "conservative"
+  # "conservative": create PR, run review-fix cycles, leave PR open. Never auto-merges.
+  # "balanced":     auto-merge clean PRs only. Unresolved issues create a follow-up
+  #                 and leave the PR open.
+  # "aggressive":   auto-merge clean PRs AND, when merge_partial=true, merge partial
+  #                 PRs with a follow-up issue. Documented as risky; opt-in only.
+  # When set, this field is authoritative — autopilot.auto_merge is ignored.
+  mode: conservative
+
+  # Allow merging PRs that still have unresolved fixable review issues.
+  # Type: boolean
+  # Default: false
+  # Only honored when mode is "aggressive"; ignored otherwise. Both keys must be
+  # set explicitly to reach partial-merge behavior — there is no casual opt-in.
+  merge_partial: false
+
   # Max iterations (issues to process) before stopping
   # Type: integer
   # Default: 10
@@ -195,6 +214,10 @@ autopilot:
   # Auto-merge PRs after review passes
   # Type: boolean
   # Default: true
+  # LEGACY: kept for backwards compatibility. Ignored when autopilot.mode is set.
+  # When mode is unset, falling back to legacy interpretation:
+  #   auto_merge: true  ≈ mode: aggressive + merge_partial: true (preserves prior 2.1.x behavior)
+  #   auto_merge: false ≈ mode: conservative
   auto_merge: true
 
   # Pause loop on failure instead of skipping to next issue
@@ -342,9 +365,11 @@ graph TD
     RV --> RV8["test_timeout"]
     RV --> RV9["soft_pass"]
 
+    AP --> AP0["mode"]
+    AP --> AP00["merge_partial"]
     AP --> AP1["max_iterations"]
     AP --> AP2["review_cycles"]
-    AP --> AP3["auto_merge"]
+    AP --> AP3["auto_merge<br/>(legacy)"]
     AP --> AP4["pause_on_failure"]
     AP --> AP5["skip_labels"]
     AP --> AP6["critical_labels"]
@@ -419,9 +444,11 @@ Config is validated on load at the start of every skill invocation. Errors inclu
 | `review.ci_timeout` | `600` | CI polling timeout |
 | `review.test_timeout` | `300` | Review test timeout |
 | `review.soft_pass` | `true` | Treat soft-pass as pass |
+| `autopilot.mode` | `conservative` | Merge mode: `conservative` (never merge), `balanced` (merge clean PRs), `aggressive` (merge clean + partial w/ `merge_partial: true`) |
+| `autopilot.merge_partial` | `false` | Allow merging PRs with unresolved review issues. Only honored when `mode: aggressive` |
 | `autopilot.max_iterations` | `10` | Max issues to process |
 | `autopilot.review_cycles` | `3` | Max review-fix cycles per PR |
-| `autopilot.auto_merge` | `true` | Auto-merge PRs after review |
+| `autopilot.auto_merge` | `true` | LEGACY — auto-merge PRs after review. Ignored when `autopilot.mode` is set |
 | `autopilot.pause_on_failure` | `true` | Pause on failure |
 | `autopilot.skip_labels` | `["wontfix", "blocked", "do-not-merge"]` | Labels that skip issues |
 | `autopilot.critical_labels` | `["critical", "priority:critical"]` | Labels that prioritize issues |

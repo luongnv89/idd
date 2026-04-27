@@ -5,13 +5,20 @@ license: MIT
 compatibility: Requires git and GitHub CLI (gh) with authentication and push access. Requires merge permission for auto-merge. Uses /issue-triage, /issue-resolver, /issue-analysis, and /issue-pr-review skills internally. All agents are in shared/agents/.
 effort: max
 metadata:
-  version: 2.1.2
+  version: 2.2.0
   creator: Luong NGUYEN <luongnv89@gmail.com>
 ---
 
 # /auto-pilot
 
 Fully autonomous development loop: triage, pick, resolve, review, fix, merge, repeat — zero user prompts.
+
+### Changes in 2.2.0 — Conservative-by-default merge modes
+
+- New `autopilot.mode` setting (`conservative` | `balanced` | `aggressive`). Default is **`conservative`**: PRs are created and reviewed but never auto-merged.
+- New `autopilot.merge_partial: false` setting. Aggressive partial-merge behavior now requires both `mode: aggressive` AND `merge_partial: true` — the previous "merge anyway with follow-up" path is no longer reachable by accident.
+- Final-report iteration outcomes now use the categorical labels `merged`, `left_open`, `partial_followup`, `failed`, `skipped`.
+- Legacy `autopilot.auto_merge` is honored when `autopilot.mode` is unset, but `mode` is authoritative when both are present. The schema is being consolidated separately in the autopilot/review config schema work — this release ships only the merge-mode behavior change.
 
 ### Changes in 2.1.0 — Token optimization
 
@@ -38,7 +45,7 @@ Inspired by the auto-adapt-mode pattern: **always proceed, never block on recove
    - Choosing resolution strategies, picking implementation approaches
    - Skipping failed issues and moving to the next one
    - Retrying after transient failures
-   - Merging PRs that pass review
+   - Merging PRs that pass review (only when `autopilot.mode` permits — see Configuration)
    - Falling back to simpler strategies when optimizations fail
 
 2. **Confirm with user** (rare, critical) — Only for genuinely irreversible or dangerous actions:
@@ -101,15 +108,36 @@ Load `.gitissue.yml` from the repo root once at start. If the file does not exis
 ```
 
 Defaults:
+- `autopilot.mode: conservative` — merge mode. See **Merge Modes** below for the three values.
+- `autopilot.merge_partial: false` — never merge a PR with unresolved fixable review issues unless explicitly opted in. Only honored when `mode: aggressive`.
 - `autopilot.max_iterations: 10` — maximum issues to process before stopping
-- `autopilot.review_cycles: 3` — maximum fix attempts per PR. After this many cycles, if issues remain the auto-pilot creates a follow-up issue and merges the PR anyway. Reduced from 10 — the script pre-pass in issue-pr-review handles lint/format, so 3 LLM cycles suffice for logic issues. A cycle = one fix attempt + one review pass. Confirmation-only review passes (spawned after a PASS to verify, without a preceding fix) do not consume a cycle.
-- `autopilot.auto_merge: true` — merge PRs automatically after review passes
+- `autopilot.review_cycles: 3` — maximum fix attempts per PR. After this many cycles, if issues remain the auto-pilot's behavior depends on `autopilot.mode` (see *Merge Modes* below). Reduced from 10 — the script pre-pass in issue-pr-review handles lint/format, so 3 LLM cycles suffice for logic issues. A cycle = one fix attempt + one review pass. Confirmation-only review passes (spawned after a PASS to verify, without a preceding fix) do not consume a cycle.
+- `autopilot.auto_merge: true` — **legacy** field, retained for backwards compatibility. When `autopilot.mode` is set, `mode` wins and this field is ignored. When `mode` is unset, falling back to legacy behavior, this still controls clean-PR merging. The schema cleanup is tracked separately.
 - `autopilot.pause_on_failure: false` — skip failed issues and continue to the next one (autonomous default). When false, the auto-pilot logs the failure, adds the issue to the skip list, and moves on. Set to true only if you want the loop to halt on every failure for manual inspection.
 - `autopilot.skip_labels: ["wontfix", "blocked", "do-not-merge"]` — skip issues with these labels
 - `autopilot.critical_labels: ["critical", "priority:critical"]` — labels that mark an issue as critical. When a critical issue has unresolved review problems after all cycles, the loop stops and asks the user for a decision instead of auto-creating a follow-up.
 - All `resolve.*` and `triage.*` settings are inherited by the sub-skills
 
 Do not re-read the config at each iteration.
+
+### Merge Modes
+
+The `autopilot.mode` setting controls when the loop is allowed to merge PRs. The default is **conservative** — a fresh install will create PRs and run review-fix cycles, but never auto-merge. Aggressive partial-merge behavior is unreachable without explicit opt-in.
+
+| Mode | Clean PR (review passes) | Partial PR (cycles exhausted, non-critical) | Critical with unresolved issues |
+|------|--------------------------|---------------------------------------------|----------------------------------|
+| `conservative` (default) | leave PR open | leave PR open + create follow-up issue | stop and ask user |
+| `balanced` | merge PR | leave PR open + create follow-up issue | stop and ask user |
+| `aggressive` (requires `merge_partial: true`) | merge PR | merge PR + create follow-up issue (`partial_followup`) | stop and ask user |
+| `aggressive` with `merge_partial: false` | merge PR | leave PR open + create follow-up issue (same as `balanced`) | stop and ask user |
+
+**Resolution rules:**
+
+- If `autopilot.mode` is set, it is the source of truth. The legacy `autopilot.auto_merge` field is ignored.
+- If `autopilot.mode` is unset, fall back to the legacy interpretation: `auto_merge: true` ≈ `aggressive` + `merge_partial: true` (preserves the prior 2.1.x behavior); `auto_merge: false` ≈ `conservative`.
+- Critical-issue handling is unchanged across all modes — the loop always stops and asks when a critical issue still has unresolved review problems after all cycles.
+
+The full per-phase decision logic lives in `references/phases.md` (Phase 3-4 partial gate, Phase 5 merge gate). Read that file when implementing or debugging a specific merge path.
 
 ---
 
@@ -216,12 +244,13 @@ See `references/phases.md` for full prompts, error handling, and decision tables
 ---
 ## Iteration Report
 
-After each iteration, print a brief status:
+After each iteration, print a brief status. The `Outcome` line uses one of the five categorical labels (`merged`, `left_open`, `partial_followup`, `failed`, `skipped`) so the iteration log and final summary stay consistent.
 
 ```
 ✓ Iteration {i}/{max} complete
   Issue:    #{number} — {title}
-  PR:       #{pr_number} — merged ✓
+  PR:       #{pr_number}
+  Outcome:  {merged | left_open | partial_followup | failed | skipped}
   Duration: {time}
   ────────────────────────────────────
   Remaining: {remaining} eligible issues
@@ -242,32 +271,44 @@ The loop stops when any of these conditions are met (except "Merge blocked", whi
 | Explicit list exhausted | `✓ All requested issues resolved!` |
 | No eligible issues (all blocked/skipped) | `⚠ No eligible issues to pick` |
 | Resolution failure (pause_on_failure: true) | `⚠ Auto-pilot paused` |
-| Review exhausted (non-critical) | Follow-up issue created, PR merged, loop continues |
+| Review exhausted (non-critical, mode-dependent) | Follow-up issue created. PR merged (`partial_followup`) only if `mode: aggressive` and `merge_partial: true`; otherwise PR left open (`left_open`). Loop continues either way. |
 | Review exhausted (critical issue) | `⚠ CRITICAL — auto-pilot requires your decision` (loop pauses) |
-| Merge blocked | `⚠ PR #{pr_number} is not mergeable — PR left open, continuing` |
+| Merge blocked (CI/conflicts) | `⚠ PR #{pr_number} is not mergeable — PR left open, continuing` (`left_open`) |
+| Mode forbids merge (clean PR in `conservative`) | `○ PR #{pr_number} ready for manual merge (mode: conservative)` (`left_open`) |
 | User cancellation | `○ Auto-pilot stopped by user` |
 
 ---
 
 ## Final Summary
 
-When the loop ends (for any reason), print a structured step-by-step summary showing each iteration's outcome:
+When the loop ends (for any reason), print a structured step-by-step summary showing each iteration's outcome. Each iteration is tagged with one of five categorical outcomes: **`merged`**, **`left_open`**, **`partial_followup`**, **`failed`**, **`skipped`**.
+
+| Outcome | Meaning |
+|---------|---------|
+| `merged` | PR passed review and was merged cleanly. |
+| `left_open` | PR was created but not merged — either the mode forbids merge, the merge was blocked (CI/conflicts), or unresolved review issues prevented merge under the current mode. |
+| `partial_followup` | PR was merged with unresolved review issues; a follow-up issue captures the remaining work. Only reachable in `aggressive` mode with `merge_partial: true`. |
+| `failed` | The resolver subagent failed before a PR could be created (or another fatal step failed). |
+| `skipped` | Issue was skipped before resolution started — already resolved, blocked by labels/dependencies, in the `--skip` list, or assigned to another user. |
 
 ```
 ◆ Auto-Pilot Summary — {completed}/{max} iterations
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
 
-  Iteration 1:       ✓ pass — #{n1} {title1} → PR #{pr1} merged
-  Iteration 2:       ✓ pass — #{n2} {title2} → PR #{pr2} merged
-  Iteration 3:       ⚠ partial — #{n5} {title5} → PR #{pr5} merged, follow-up #{f5}
-  Iteration 4:       ○ skip — #{n3} {title3} (blocked)
+  Iteration 1:       ✓ merged           — #{n1} {title1} → PR #{pr1}
+  Iteration 2:       ⚠ left_open        — #{n2} {title2} → PR #{pr2}
+  Iteration 3:       ⚠ partial_followup — #{n5} {title5} → PR #{pr5}, follow-up #{f5}
+  Iteration 4:       ○ skipped          — #{n3} {title3} (blocked)
+  Iteration 5:       ✗ failed           — #{n4} {title4} (resolver step {step})
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  Resolved:          {resolved_count}
-  Partial:           {partial_count} (follow-up issues created)
-  Skipped:           {skipped_count}
-  Failed:            {failed_count}
+  merged:            {merged_count}
+  left_open:         {left_open_count}
+  partial_followup:  {partial_followup_count}
+  failed:            {failed_count}
+  skipped:           {skipped_count}
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Result:            {COMPLETED / PAUSED / LIMIT REACHED}
+  Mode:              {conservative / balanced / aggressive}
 
   Remaining:         {remaining_count} open issues
   Next action:       /auto-pilot to continue
@@ -279,15 +320,17 @@ If batch analysis was used (explicit issue list):
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
 
   Analysis:          ✓ pass ({N} issues, {batches} batch groups)
-  Iteration 1:       ✓ pass — #{n1} {title1} → PR #{pr1} merged
-  Iteration 2:       ✓ pass — #{n2} {title2} → PR #{pr2} merged
+  Iteration 1:       ✓ merged           — #{n1} {title1} → PR #{pr1}
+  Iteration 2:       ⚠ left_open        — #{n2} {title2} → PR #{pr2}
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  Resolved:          {resolved_count}
-  Partial:           {partial_count} (follow-up issues created)
-  Skipped:           {skipped_count}
-  Failed:            {failed_count}
+  merged:            {merged_count}
+  left_open:         {left_open_count}
+  partial_followup:  {partial_followup_count}
+  failed:            {failed_count}
+  skipped:           {skipped_count}
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Result:            {COMPLETED / PAUSED / LIMIT REACHED}
+  Mode:              {conservative / balanced / aggressive}
 
   Remaining:         {remaining_count} open issues
   Next action:       /auto-pilot to continue
@@ -344,7 +387,7 @@ All errors use the rich format from `references/error-messages.md`:
 
 ## Expected Output
 
-Each iteration prints a static block like this:
+Each iteration prints a static block. The `Merge` line resolves to one of the five categorical outcomes (`merged`, `left_open`, `partial_followup`, `failed`, `skipped`) — the example below assumes a `balanced` or `aggressive` mode where a clean PR is merged. Under the default `conservative` mode the same iteration would end with `Merge ⚠ left_open (mode: conservative)`.
 
 ```
   ◆ Auto-Pilot Iteration 1
@@ -355,7 +398,7 @@ Each iteration prints a static block like this:
   Merge      ✓ merged
 ```
 
-On final stop, a summary table lists each iteration's issue, PR, status (merged / follow-up / failed), and cycle count.
+On final stop, a summary table lists each iteration's issue, PR, outcome (one of `merged`, `left_open`, `partial_followup`, `failed`, `skipped`), and cycle count.
 
 ## Edge Cases
 

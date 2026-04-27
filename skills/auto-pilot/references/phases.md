@@ -71,7 +71,7 @@ On the first iteration, display the execution plan and immediately begin — no 
   Issues to process:  {eligible_count} (of {total_open} open)
   Limit:              {max_iterations}
   Review cycles:      {review_cycles}
-  Auto-merge:         {yes/no}
+  Merge mode:         {conservative | balanced | aggressive}
   First issue:        #{number} — {title}
 
   Execution order:
@@ -154,9 +154,10 @@ The resolver subagent may report that the issue is already fixed (status: `alrea
 
 ```
 ○ #{issue_number} already resolved — skipping
+  Outcome: skipped
 ```
 
-Continue to the next iteration.
+Record the iteration outcome as `skipped` and continue to the next iteration.
 
 **On failure:**
 
@@ -164,9 +165,10 @@ Continue to the next iteration.
 ✗ Resolution failed for #{issue_number} at step {failure_step}
 
   {failure_reason}
+  Outcome: failed
 ```
 
-**Autonomous behavior:** Log the failure, add the issue to the skip list, and continue to the next issue. Failed issues can always be retried later — stopping the entire loop wastes time on issues that might succeed.
+**Autonomous behavior:** Log the failure as outcome `failed`, add the issue to the skip list, and continue to the next issue. Failed issues can always be retried later — stopping the entire loop wastes time on issues that might succeed.
 
 ```
 ⚠ Skipping #{issue_number} — will retry on next run.
@@ -224,13 +226,22 @@ Proceed to Phase 5 (Merge).
 
 **On NEEDS_FIX (review cycles exhausted with remaining issues):**
 
-The review-fix loop tried `review_cycles` times (default: 3) but could not resolve all issues. The behavior depends on whether the original issue is critical.
+The review-fix loop tried `review_cycles` times (default: 3) but could not resolve all issues. The behavior depends on (a) whether the original issue is critical and (b) the configured `autopilot.mode` (and `autopilot.merge_partial` for `aggressive`).
 
-#### Non-critical issues: create follow-up issue, merge PR, continue
+#### Non-critical issues: mode-gated partial-merge decision
 
-For non-critical issues (no `critical` or `priority:critical` label), the auto-pilot captures the unresolved problems as a new GitHub issue, then merges the PR to preserve the progress that was made, and continues to the next issue.
+For non-critical issues (no `critical` or `priority:critical` label), the auto-pilot always captures the unresolved problems as a follow-up issue. Whether the original PR is then merged depends on the mode:
 
-**Step 1 — Create follow-up issue:**
+| Mode (effective) | `merge_partial` | Behavior | Outcome label |
+|------------------|-----------------|----------|----------------|
+| `conservative` (default) | n/a (ignored) | follow-up created, PR left open | `left_open` |
+| `balanced` | n/a (ignored) | follow-up created, PR left open | `left_open` |
+| `aggressive` | `false` (default) | follow-up created, PR left open | `left_open` |
+| `aggressive` | `true` | follow-up created, PR merged anyway | `partial_followup` |
+
+The default install (`mode: conservative`) **never** auto-merges a PR with unresolved fixable review issues. Aggressive partial-merge is unreachable without setting both `mode: aggressive` and `merge_partial: true` in `.gitissue.yml`.
+
+**Step 1 — Create follow-up issue (always, regardless of mode):**
 
 ```bash
 gh issue create \
@@ -243,7 +254,7 @@ gh issue create \
 Enhancement
 
 ## Context
-Auto-pilot resolved #{issue_number} ({issue_title}) but the review-fix loop could not resolve all issues within {review_cycles} cycles. The PR #{pr_number} was merged with the following issues remaining.
+Auto-pilot resolved #{issue_number} ({issue_title}) but the review-fix loop could not resolve all issues within {review_cycles} cycles.
 
 ## Description
 The following review issues were not resolved:
@@ -259,12 +270,23 @@ The following review issues were not resolved:
 - PR with partial fix: #{pr_number}
 - Branch: {branch_name}
 - Review cycles attempted: {review_cycles}
+- Auto-pilot mode at run time: {mode} (merge_partial={merge_partial})
 
 ## Metadata
 - **Priority:** medium
 - **Effort:** small
 EOF
 )"
+```
+
+**Step 2 — Mode-gated merge decision:**
+
+If the effective mode is `aggressive` AND `autopilot.merge_partial` is `true`, merge the PR to preserve the partial progress; otherwise leave the PR open. Compute the **effective mode** by reading `autopilot.mode` if set, else applying the legacy mapping (`auto_merge: true` → aggressive+merge_partial; `auto_merge: false` → conservative).
+
+If merging (aggressive + merge_partial: true):
+
+```bash
+gh pr merge {pr_number} --squash --delete-branch
 ```
 
 ```
@@ -276,29 +298,38 @@ EOF
 
   ✓ Created follow-up issue #{followup_number}
     "Follow-up: unresolved review issues from #{issue_number}"
-  ⟶ Merging PR with partial fix...
-```
-
-**Step 2 — Merge the PR anyway:**
-
-The PR contains valid progress (the resolver completed, and some or all review issues may have been fixed). Merge it to avoid losing that work:
-
-```bash
-gh pr merge {pr_number} --squash --delete-branch
-```
-
-```
+  ⟶ mode: aggressive + merge_partial: true — merging partial PR...
   ✓ PR #{pr_number} merged (partial fix) — #{issue_number} closed
     Unresolved issues tracked in #{followup_number}
+    Outcome: partial_followup
   Continuing to next issue...
 ```
 
-If merge fails (branch protection, etc.), leave the PR open and note it:
+If the merge command itself fails (branch protection, etc.):
 ```
   ⚠ Merge failed for PR #{pr_number} — PR left open
     Unresolved issues tracked in #{followup_number}
+    Outcome: left_open
   Continuing to next issue...
 ```
+
+If NOT merging (`conservative`, `balanced`, or `aggressive` + `merge_partial: false`):
+
+```
+⚠ PR #{pr_number} has unresolved issues after {review_cycles} cycles
+
+  Remaining issues:
+    ● {issue_description_1}
+    ● {issue_description_2}
+
+  ✓ Created follow-up issue #{followup_number}
+    "Follow-up: unresolved review issues from #{issue_number}"
+  ○ mode: {mode} — PR left open for manual merge
+    Outcome: left_open
+  Continuing to next issue...
+```
+
+Record the iteration outcome (`partial_followup` or `left_open`) for the final summary.
 
 #### Critical issues: stop and ask the user
 
@@ -355,16 +386,34 @@ If not mergeable:
 
 **Autonomous behavior:** Leave the PR open and move on. The PR is already created with all changes — it can be merged manually later or picked up on the next auto-pilot run. Only pause if `autopilot.pause_on_failure` is explicitly `true`.
 
-### Step 5.2 — Merge
+### Step 5.2 — Merge (mode-gated)
 
-First, check `autopilot.auto_merge`. If it is explicitly set to `false`, skip the merge entirely and continue to the next issue:
+Merge behavior is controlled by `autopilot.mode`. This step only runs after the PR review returned PASS (clean PR, no unresolved fixable issues). The partial-merge case is handled in Phase 3-4.
+
+**Compute the effective mode:**
+
+1. If `autopilot.mode` is set in `.gitissue.yml`, use it directly (`conservative` | `balanced` | `aggressive`).
+2. If `autopilot.mode` is unset, fall back to legacy interpretation:
+   - `autopilot.auto_merge: false` → effective mode = `conservative`
+   - `autopilot.auto_merge: true` (or unset) → effective mode = `aggressive` (with `merge_partial: true`, preserving prior 2.1.x behavior)
+
+**Decision table for clean PRs:**
+
+| Effective mode | Action | Outcome label |
+|----------------|--------|----------------|
+| `conservative` | leave PR open for manual merge | `left_open` |
+| `balanced` | merge | `merged` |
+| `aggressive` | merge | `merged` |
+
+If the mode forbids merge (`conservative`):
 ```
-○ PR #{pr_number} ready for manual merge (auto_merge: false)
+○ PR #{pr_number} ready for manual merge (mode: conservative)
   https://github.com/owner/repo/pull/{pr_number}
+  Outcome: left_open
   Continuing to next issue...
 ```
 
-If `autopilot.auto_merge` is `true` (the default), merge the PR:
+If the mode allows merge (`balanced` or `aggressive`):
 
 ```bash
 gh pr merge {pr_number} --squash --delete-branch
@@ -373,13 +422,17 @@ gh pr merge {pr_number} --squash --delete-branch
 ```
 ✓ PR #{pr_number} merged — #{issue_number} closed
   https://github.com/owner/repo/pull/{pr_number}
+  Outcome: merged
 ```
 
-If merge fails (branch protection, required approvals, etc.), leave the PR open and continue:
+If the merge command fails (branch protection, required approvals, conflicts, etc.), leave the PR open and continue:
 ```
 ⚠ Merge failed for PR #{pr_number} — PR left open
+  Outcome: left_open
   Continuing to next issue...
 ```
+
+Record the iteration outcome (`merged` or `left_open`) for the final summary.
 
 ### Step 5.3 — Cleanup
 
