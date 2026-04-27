@@ -1,6 +1,6 @@
 ---
 name: issue-creator
-description: "Create or normalize structured GitHub issues from text, screenshots, or lists. Use for filing bugs/features, batch creation, or template cleanup. Don't use for resolving, triaging, or deep issue analysis."
+description: "Creates structured, intent-focused GitHub issues from text, screenshots, or lists. Preserves reporter context and generates acceptance criteria without guessing implementation details. Use for filing bugs/features, batch creation, or template cleanup. Don't use for resolving, triaging, or deep issue analysis."
 license: MIT
 compatibility: Requires git and GitHub CLI (gh) with authentication. Run `gh auth status` to verify.
 effort: medium
@@ -11,9 +11,24 @@ metadata:
 
 # /issue-creator
 
-Create structured GitHub issues — or normalize existing ones into a standard template. Supports single, batch, and normalization modes. Issues capture human intent only (no codebase analysis) — the resolver and triage skills scan the codebase themselves when needed.
+Creates structured, intent-focused GitHub issues from text, screenshots, or lists. Preserves reporter context and generates acceptance criteria without guessing implementation details.
+
+This skill is an **intent-capture tool only**. It does not analyze the codebase, predict affected files, or generate technical notes. The resolver and triage skills perform their own current-code analysis when needed — see the Output Contract below.
 
 Three modes: **Create** (new issue from text/image), **Normalize** (restructure existing issue #N into standard template), and **Batch** (extract multiple issues from one input).
+
+## Output Contract
+
+Issues produced by `/issue-creator` capture **durable human intent only**. The skill MUST NOT include any of the following in the issue body:
+
+- **No predicted affected files** — file paths, modules, or directories that the skill guessed by inspecting the codebase
+- **No generated technical notes** — implementation approach, architecture constraints, or design notes derived from code
+- **No root cause** — diagnostic reasoning about *why* a bug occurs in the current code
+- **No implementation hints** — code snippets, function signatures, or step-by-step "how to fix" instructions
+
+These four artifacts are the responsibility of `/issue-analysis`, `/issue-triage`, and `/issue-resolver`, which produce them fresh against the current codebase at the moment work begins. Encoding them in the issue body would freeze stale understanding into durable memory.
+
+What the issue body **does** contain: type classification, problem description, reporter context (verbatim), screenshots, acceptance criteria, and metadata (priority, effort, labels). Reporter-supplied technical detail is preserved verbatim inside the Reporter Context blockquote — only skill-generated technical content is prohibited.
 
 ## Modes
 
@@ -296,7 +311,7 @@ Read the appropriate template from `templates/` (bug.md, feature.md, or improvem
 5. **Acceptance Criteria** — 3-5 testable criteria derived from the problem description, with confidence levels
 6. **Metadata** — suggested priority, estimated effort (XS/S/M/L/XL), suggested labels
 
-**Note:** Issues intentionally do NOT include codebase analysis (affected files, technical notes, architecture constraints). The resolver and triage skills scan the codebase themselves when needed, against current code.
+**Note:** Per the Output Contract above, the issue body MUST NOT include predicted affected files, generated technical notes, root cause, or implementation hints. Acceptance criteria express *what done looks like*, not *how to implement it*.
 
 ### Step 5 — Preview and Confirm
 
