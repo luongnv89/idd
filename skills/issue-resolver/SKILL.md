@@ -284,7 +284,7 @@ gh pr create --title "{pr_title}" --body "{pr_body}"
 
 **PR title:** `{type}({scope}): {description} (#{issue_number})` (see `docs/naming-conventions.md`)
 
-**PR body:** Fill the template in `references/report-templates.md` (section *PR Body Template*) — Summary, Approach, Changes table, Test Results, Acceptance Criteria.
+**PR body:** Fill the template in `references/report-templates.md` (section *PR Body Template*) — Summary, Approach, **Decision Record** (lifted from `.gitissue/analysis-<N>.json` if present, else synthesized from Steps 1-2 findings), Changes table, Test Results, **Acceptance Criteria Verification** table. The Decision Record and the verification table are the durable analysis signal that survives the squash-merge into git history; do not omit them. See *Analysis Artifacts and Durable Memory* in `docs/idd-methodology.md`.
 
 ### Project board sync
 
