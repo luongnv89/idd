@@ -493,7 +493,7 @@ autopilot:
   critical_labels: ["critical", "priority:critical"]
 
 review:
-  require_decision_record_check: true   # block soft-pass if Decision Record absent
+  require_traceability_check: true        # block soft-pass if Closes #N is missing (covers Decision Record presence)
   require_acceptance_criteria_check: true # block soft-pass if AC Verification fails
 ```
 
