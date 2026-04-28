@@ -14,10 +14,13 @@
    cd idd
    ```
 
-2. Install skills locally in Claude Code:
+2. Install skills locally. Use either distribution path:
    ```bash
-   # Add to your project's .claude/settings.json
-   # Or use the manual installation path from README
+   # Plugin path (Claude Code) — extract a built tarball into the plugins dir.
+   # See README → Install for the full command.
+
+   # Standalone path (any SKILL.md harness) — copy from this checkout:
+   cp -r dist/skills/issue-resolver ~/.claude/skills/
    ```
 
 3. Verify setup:
@@ -25,6 +28,28 @@
    gh auth status        # Must be authenticated
    gh --version          # Must be 2.0+
    ```
+
+## Build Flow
+
+`src/` is the single source of truth. `dist/` is generated and must not be hand-edited.
+
+```mermaid
+graph LR
+    SRC["src/<br/>(authored)"] -->|"./scripts/build.sh"| DSK["dist/skills/<br/>(committed)"]
+    SRC -->|"./scripts/build.sh"| DPL["dist/plugin/<br/>(gitignored)"]
+    DPL -->|"release tag"| TAR["idd-plugin-&lt;tag&gt;.tar.gz<br/>(release asset)"]
+
+    style SRC fill:#4CAF50,color:#fff
+    style TAR fill:#2196F3,color:#fff
+```
+
+After editing anything under `src/`, rebuild before committing:
+
+```bash
+./scripts/build.sh
+```
+
+CI's drift check fails any PR where the committed `dist/skills/` does not match a fresh build.
 
 ## Making Changes
 
@@ -42,13 +67,14 @@ graph TD
 
 ### Editing a Skill
 
-Skills live in `src/skills/<name>/SKILL.md` (internal-only skills under `src/internal-skills/<name>/`, deprecated skills under `src/deprecated-skills/<name>/`). When editing:
+Skills live in `src/skills/<name>/SKILL.md` (internal-only skills under `src/internal-skills/<name>/`, deprecated skills under `src/deprecated-skills/<name>/`). Hand edits go in `src/` only — never edit `dist/skills/` directly. When editing:
 
 1. Read the existing SKILL.md fully before making changes
 2. Follow the terminal output patterns in `DESIGN.md`
 3. Use `--json` with explicit field selection for all `gh` commands
 4. Update `references/error-messages.md` if adding new error cases
-5. Test against a real GitHub repository
+5. Run `./scripts/build.sh` to regenerate `dist/skills/`
+6. Test against a real GitHub repository
 
 ### Adding Error Messages
 

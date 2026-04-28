@@ -155,15 +155,34 @@ gitissue is **complementary** to your existing workflow. Use it alongside TDD, B
 
 ### Install
 
+IDD ships through two distribution paths. Pick the one that matches your harness.
+
+#### Plugin path (Claude Code)
+
+Download the latest plugin tarball from the [releases page](https://github.com/luongnv89/idd/releases/latest) and extract it into your Claude Code plugins directory:
+
 ```bash
-npx skills add https://github.com/luongnv89/idd
+mkdir -p ~/.claude/plugins/idd
+curl -L -o /tmp/idd-plugin.tar.gz \
+  "$(gh release view --repo luongnv89/idd --json assets --jq '.assets[] | select(.name | startswith("idd-plugin-")) | .url')"
+tar -xzf /tmp/idd-plugin.tar.gz -C ~/.claude/plugins/idd
 ```
 
-Or with Agent Skill Manager:
+The tarball is named `idd-plugin-<tag>.tar.gz` and unpacks to `.claude-plugin/plugin.json`, `skills/`, `shared/`, and `docs/` at its root. Restart Claude Code to load the new plugin.
+
+#### Standalone path (any SKILL.md-compatible harness)
+
+Each skill under `dist/skills/<name>/` is fully self-contained — copy the directory you want into your harness's skill location:
 
 ```bash
-asm install https://github.com/luongnv89/idd
+git clone https://github.com/luongnv89/idd.git
+cp -r idd/dist/skills/issue-resolver ~/.claude/skills/
+# Repeat for any other skills you want
 ```
+
+You can also pull `dist/skills/<name>/` straight from a [GitHub source archive](https://github.com/luongnv89/idd/archive/refs/heads/main.tar.gz) without cloning.
+
+> **Note:** `dist/skills/` is committed to the repository so this path works without running a build. `dist/plugin/` is generated only at release time and shipped exclusively as the tarball above.
 
 ### First issue in 30 seconds
 
@@ -193,9 +212,9 @@ Or go hands-free — triage, resolve, review, and merge everything:
 
 Zero config required. Run `/init-gitissue` to customize.
 
-You can also install individual skills. See each skill folder for per-skill commands:
+Browse the authored source for each skill — these links point to `src/` for reading; install copies come from `dist/skills/<name>/` (see [Install](#install)):
 
-| Skill | Folder |
+| Skill | Source |
 |-------|--------|
 | `/issue-creator` | [`src/skills/issue-creator/`](src/skills/issue-creator/) |
 | `/issue-analysis` | [`src/skills/issue-analysis/`](src/skills/issue-analysis/) |
