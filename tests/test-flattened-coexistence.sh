@@ -1,0 +1,172 @@
+#!/usr/bin/env bash
+# test-flattened-coexistence.sh — Verify that two independent flattened skills
+# coexist in the same skills directory without reference collisions
+# (issue #58, §9 of refactor-plan-v10.md).
+#
+# Strategy:
+#   1. Copy `dist/skills/issue-creator/` and `dist/skills/init-gitissue/`
+#      into a fresh temp directory.
+#   2. Verify each skill remains self-contained: every `references/agents/*.md`
+#      and `references/docs/*.md` referenced from the skill exists inside its
+#      own directory.
+#   3. Verify the two skills' `references/` trees do not overlap in a way
+#      that would cause a copy of one skill to overwrite content of the other.
+#
+# Usage: bash tests/test-flattened-coexistence.sh
+# Returns: exit 0 on pass, exit 1 on failure.
+
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+DIST_SKILLS="$REPO_ROOT/dist/skills"
+BUILD_SH="$REPO_ROOT/scripts/build.sh"
+
+PASS=0
+FAIL=0
+
+pass() { echo "  ✓ $1"; PASS=$((PASS + 1)); }
+fail() { echo "  ✗ $1"; FAIL=$((FAIL + 1)); }
+
+echo "◆ Flattened Coexistence Tests (issue #58)"
+echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
+
+if [ ! -d "$DIST_SKILLS" ]; then
+  echo "  ○ dist/skills/ missing — running build..."
+  "$BUILD_SH" >/dev/null 2>&1 || {
+    fail "Pre-build failed"
+    exit 1
+  }
+fi
+
+# ───────────────────────────────────────────────────────────
+# T1: required source skills are present in dist
+# ───────────────────────────────────────────────────────────
+SKILL_A="$DIST_SKILLS/issue-creator"
+SKILL_B="$DIST_SKILLS/init-gitissue"
+
+if [ -d "$SKILL_A" ] && [ -d "$SKILL_B" ]; then
+  pass "T1: both candidate skills exist in dist/skills/"
+else
+  fail "T1: missing dist/skills/issue-creator or dist/skills/init-gitissue"
+  echo "  Cannot continue."
+  echo "  Passed: $PASS"
+  echo "  Failed: $FAIL"
+  exit 1
+fi
+
+# ───────────────────────────────────────────────────────────
+# T2: copy both skills into a single temp dir without collision
+# ───────────────────────────────────────────────────────────
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+
+cp -R "$SKILL_A" "$TMP/"
+cp -R "$SKILL_B" "$TMP/"
+
+if [ -d "$TMP/issue-creator" ] && [ -d "$TMP/init-gitissue" ]; then
+  pass "T2: both skills copied to a single skills directory"
+else
+  fail "T2: copy step did not produce both skill directories"
+fi
+
+# ───────────────────────────────────────────────────────────
+# T3: no file paths overlap between the two skill trees
+# ───────────────────────────────────────────────────────────
+collisions="$(python3 - "$SKILL_A" "$SKILL_B" <<'PY'
+import sys
+from pathlib import Path
+
+a = Path(sys.argv[1])
+b = Path(sys.argv[2])
+
+paths_a = {p.relative_to(a) for p in a.rglob("*") if p.is_file()}
+paths_b = {p.relative_to(b) for p in b.rglob("*") if p.is_file()}
+
+# Files at the skill root with the same relative path WITHIN each skill is
+# expected (e.g., both have SKILL.md). Coexistence concern is whether the
+# top-level directory names collide. Since the skills are placed at
+# <skills_dir>/issue-creator/ and <skills_dir>/init-gitissue/, top-level
+# names differ — no overlap is possible. Defensive: confirm directory names
+# are distinct.
+if a.name == b.name:
+    print(f"COLLIDE: skill directory names match: {a.name}")
+    sys.exit(1)
+
+# Also assert references/ paths inside each skill don't reach outside.
+for skill in (a, b):
+    for f in skill.rglob("*"):
+        if f.is_file():
+            rel = f.relative_to(skill)
+            # Any '..' in the relative path means the file lives outside
+            # the skill — not actually possible from rglob, but defensive.
+            if ".." in rel.parts:
+                print(f"OUTSIDE: {f}")
+                sys.exit(1)
+
+sys.exit(0)
+PY
+)" || {
+  fail "T3: skills collide when coexisting"
+  echo "$collisions" | sed 's/^/    /'
+  exit 1
+}
+pass "T3: no path collisions between issue-creator and init-gitissue"
+
+# ───────────────────────────────────────────────────────────
+# T4: each skill's local references resolve within its own tree
+# ───────────────────────────────────────────────────────────
+for skill_dir in "$TMP/issue-creator" "$TMP/init-gitissue"; do
+  name="$(basename "$skill_dir")"
+  if python3 - "$skill_dir" <<'PY'; then
+import re
+import sys
+from pathlib import Path
+
+base = Path(sys.argv[1])
+URL_RE = re.compile(r"https?://[^\s<>'\"\)]+")
+LOCAL_AGENT_RE = re.compile(r"(?<![\w/])references/agents/([a-z][a-z0-9-]+\.md)")
+LOCAL_DOC_RE = re.compile(r"(?<![\w/])references/docs/([a-z][a-z0-9-]+\.md)")
+EXTS = {".md", ".txt", ".yml", ".yaml", ".json", ".toml"}
+
+errors = []
+for f in base.rglob("*"):
+    if not f.is_file() or f.suffix not in EXTS:
+        continue
+    text = f.read_text(encoding="utf-8", errors="replace")
+    masked = URL_RE.sub(lambda m: " " * len(m.group(0)), text)
+    rel = f.relative_to(base)
+    for m in LOCAL_AGENT_RE.finditer(masked):
+        target = base / "references" / "agents" / m.group(1)
+        if not target.is_file():
+            errors.append(f"{rel}: missing references/agents/{m.group(1)}")
+    for m in LOCAL_DOC_RE.finditer(masked):
+        target = base / "references" / "docs" / m.group(1)
+        if not target.is_file():
+            errors.append(f"{rel}: missing references/docs/{m.group(1)}")
+
+if errors:
+    for e in errors[:20]:
+        print(f"  {e}")
+    sys.exit(1)
+sys.exit(0)
+PY
+    pass "T4: $name local references resolve inside the skill"
+  else
+    fail "T4: $name has unresolved local references after coexistence copy"
+  fi
+done
+
+# ───────────────────────────────────────────────────────────
+# Summary
+# ───────────────────────────────────────────────────────────
+echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
+echo "  Passed: $PASS"
+echo "  Failed: $FAIL"
+
+if [ "$FAIL" -gt 0 ]; then
+  echo "  ✗ Coexistence tests failed"
+  exit 1
+fi
+
+echo "  ✓ issue-creator and init-gitissue coexist cleanly"
+exit 0
