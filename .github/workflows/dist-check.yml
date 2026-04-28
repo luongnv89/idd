@@ -7,6 +7,8 @@ on:
 jobs:
   drift:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
 
@@ -77,13 +79,17 @@ jobs:
         run: bash tests/test-plugin-tarball-layout.sh
 
       - name: Create release tarball
-        run: tar -czf "idd-plugin-${{ github.ref_name }}.tar.gz" -C dist/plugin .
+        env:
+          TAG: ${{ github.ref_name }}
+        run: tar -czf "idd-plugin-${TAG}.tar.gz" -C dist/plugin .
 
       - name: Validate canonical root contents in tarball
         shell: bash
+        env:
+          TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          tarball="idd-plugin-${{ github.ref_name }}.tar.gz"
+          tarball="idd-plugin-${TAG}.tar.gz"
           required=(
             ./.claude-plugin/plugin.json
             ./skills/issue-creator/SKILL.md
