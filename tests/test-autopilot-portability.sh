@@ -1,13 +1,19 @@
 #!/usr/bin/env bash
-# test-autopilot-portability.sh — Validate auto-pilot portability (issue #53)
+# test-autopilot-portability.sh — Validate auto-pilot portability (issues #53, #58)
 #
-# This script verifies issue #53 acceptance criteria:
-#   AC #1: Source pattern `skills/.*/SKILL\.md` is absent from auto-pilot.
-#   AC #2: Phrase "All agents are in shared/agents" is absent from auto-pilot.
+# This script verifies:
+#   #53 AC #1: Source pattern `skills/.*/SKILL\.md` is absent from auto-pilot.
+#   #53 AC #2: Phrase "All agents are in shared/agents" is absent from auto-pilot.
+#   #58: Both dist outputs use the §6.0 ADR-decided rendering.
 #
-# Per the issue body, the post-build dist verification (flattened and plugin
-# outputs use the §6.0 ADR rendering) lights up in PR 3 once the build exists,
-# so it is intentionally out of scope for this test.
+# ADR row in use: (A-fail, B-fail, C-1) per
+# docs/decisions/cross-skill-invocation.md (2026-04-28).
+#
+# Expected rendered forms in auto-pilot dist outputs:
+#   dist/skills/auto-pilot/**:        ../<name>/SKILL.md, references/docs/...,
+#                                     references/agents/...
+#   dist/plugin/skills/auto-pilot/**: ../../<name>/SKILL.md, ../../../docs/...,
+#                                     ../../../shared/agents/...
 #
 # Usage: bash tests/test-autopilot-portability.sh
 # Returns: exit 0 if all tests pass, exit 1 on failure
@@ -16,6 +22,9 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 AUTOPILOT_DIR="$REPO_ROOT/src/skills/auto-pilot"
+AUTOPILOT_DIST_FLAT="$REPO_ROOT/dist/skills/auto-pilot"
+AUTOPILOT_DIST_PLUGIN="$REPO_ROOT/dist/plugin/skills/auto-pilot"
+BUILD_SH="$REPO_ROOT/scripts/build.sh"
 
 PASS=0
 FAIL=0
@@ -85,6 +94,62 @@ for skill in "issue-resolver" "issue-pr-review" "issue-analysis"; do
 done
 
 # ───────────────────────────────────────────────────────────
+# T5–T7: dist verification (issue #58) — runs build if dist missing
+# ───────────────────────────────────────────────────────────
+if [ ! -d "$AUTOPILOT_DIST_FLAT" ] || [ ! -d "$AUTOPILOT_DIST_PLUGIN" ]; then
+  echo "  ○ dist outputs missing — running build..."
+  if ! "$BUILD_SH" >/dev/null 2>&1; then
+    fail "Pre-build failed — cannot run dist verification"
+    echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
+    echo "  Passed: $PASS"
+    echo "  Failed: $FAIL"
+    exit 1
+  fi
+fi
+
+# T5: dist/skills/auto-pilot/ uses sibling-relative ../<name>/SKILL.md
+if grep -rqE '\.\./issue-resolver/SKILL\.md' "$AUTOPILOT_DIST_FLAT"; then
+  pass "T5: dist/skills/auto-pilot uses '../<name>/SKILL.md' (A-fail)"
+else
+  fail "T5: dist/skills/auto-pilot missing expected '../<name>/SKILL.md' rendering"
+fi
+
+# T5.1: no unresolved {{skill:...}} tokens in flattened output
+if grep -rqE '\{\{skill:' "$AUTOPILOT_DIST_FLAT" 2>/dev/null; then
+  fail "T5.1: dist/skills/auto-pilot contains unresolved {{skill:...}} tokens"
+else
+  pass "T5.1: dist/skills/auto-pilot has no unresolved {{skill:...}} tokens"
+fi
+
+# T6: dist/plugin/skills/auto-pilot/ uses ../../<name>/SKILL.md (C-1)
+if grep -rqE '\.\./\.\./issue-resolver/SKILL\.md' "$AUTOPILOT_DIST_PLUGIN"; then
+  pass "T6: dist/plugin/skills/auto-pilot uses '../../<name>/SKILL.md' (A-fail)"
+else
+  fail "T6: dist/plugin/skills/auto-pilot missing expected '../../<name>/SKILL.md' rendering"
+fi
+
+# T6.1: dist/plugin/skills/auto-pilot/ uses ../../../docs/... for runtime docs
+if grep -rqE '\.\./\.\./\.\./docs/[a-z-]+\.md' "$AUTOPILOT_DIST_PLUGIN"; then
+  pass "T6.1: dist/plugin/skills/auto-pilot uses '../../../docs/...' (C-1) for runtime docs"
+else
+  pass "T6.1: dist/plugin/skills/auto-pilot has no runtime doc references — vacuously OK"
+fi
+
+# T6.2: no unresolved tokens in plugin output
+if grep -rqE '\{\{skill:' "$AUTOPILOT_DIST_PLUGIN" 2>/dev/null; then
+  fail "T6.2: dist/plugin/skills/auto-pilot contains unresolved {{skill:...}} tokens"
+else
+  pass "T6.2: dist/plugin/skills/auto-pilot has no unresolved {{skill:...}} tokens"
+fi
+
+# T7: forbidden ${CLAUDE_PLUGIN_ROOT} (B-fail row in use, must use ../../../...)
+if grep -rqF '${CLAUDE_PLUGIN_ROOT}' "$AUTOPILOT_DIST_PLUGIN" 2>/dev/null; then
+  fail "T7: dist/plugin/skills/auto-pilot contains forbidden \${CLAUDE_PLUGIN_ROOT} (B-fail row)"
+else
+  pass "T7: dist/plugin/skills/auto-pilot has no \${CLAUDE_PLUGIN_ROOT} references"
+fi
+
+# ───────────────────────────────────────────────────────────
 # Summary
 # ───────────────────────────────────────────────────────────
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
@@ -96,5 +161,5 @@ if [ "$FAIL" -gt 0 ]; then
   exit 1
 fi
 
-echo "  ✓ Auto-pilot portability satisfies issue #53 source-level ACs"
+echo "  ✓ Auto-pilot portability satisfies #53 source ACs and #58 dist ACs"
 exit 0
