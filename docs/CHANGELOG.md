@@ -25,7 +25,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - Human-authored PRs without a Decision Record are reported as `traceability: partial`, not `fail`, while `Closes #N` and acceptance-criteria checks still apply at full strength
 
 ### Deprecated
-- `/issue-pr-review-fix-loop` (v0.4.0) — its outer review-fix loop, agent reuse, and fresh confirmation pass are all part of `/issue-pr-review` now (since v0.3.0), and Phase 2 acceptance-criteria + traceability checks landed there in v0.4.0. The skill file is retained for one release cycle so existing references resolve; after that release cycle it will be removed from the public skill index. Migration: replace any `/issue-pr-review-fix-loop` invocation with `/issue-pr-review` (same PR number, same `--auto` flag). Tracking issue: #37.
+- `/issue-pr-review-fix-loop` (v0.4.0) — its outer review-fix loop, agent reuse, and fresh confirmation pass are all part of `/issue-pr-review` now (since v0.3.0), and Phase 2 acceptance-criteria + traceability checks landed there in v0.4.0. Migration: replace any `/issue-pr-review-fix-loop` invocation with `/issue-pr-review` (same PR number, same `--auto` flag). Source remains under `src/deprecated-skills/issue-pr-review-fix-loop/` for repository history and migration references. Tracking issue: #37.
+
+### Removed
+- `/issue-pr-review-fix-loop` is removed from the public README command index and standalone install table. Its source remains under `src/deprecated-skills/issue-pr-review-fix-loop/` for repository history and migration references, but it is no longer publicly distributed unless a future compatibility release explicitly opts it in with a `distribute:` flag. Tracking issue: #54.
 
 ## [0.7.0] - 2026-03-27
 

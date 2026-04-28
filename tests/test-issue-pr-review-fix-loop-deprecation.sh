@@ -1,12 +1,17 @@
 #!/usr/bin/env bash
 # test-issue-pr-review-fix-loop-deprecation.sh — Validate the /issue-pr-review-fix-loop deprecation
 #
-# This script verifies issue #37 acceptance criteria:
+# This script verifies issue #37 and issue #54 acceptance criteria:
 #   AC #1: Audit confirms no workflow depends on /issue-pr-review-fix-loop.
 #   AC #2: skills/issue-pr-review-fix-loop/SKILL.md carries a deprecation
 #          notice and redirect to /issue-pr-review.
 #   AC #3: Tracking note added for removal from the public skill index after
 #          one release cycle.
+#   AC #54.1: Deprecated source remains under src/deprecated-skills/.
+#   AC #54.2: Root README no longer advertises /issue-pr-review-fix-loop as a
+#             public command or installable skill.
+#   AC #54.3: Public distribution excludes /issue-pr-review-fix-loop unless a
+#             future explicit distribution flag is added.
 #
 # Usage: bash tests/test-issue-pr-review-fix-loop-deprecation.sh
 # Returns: exit 0 if all tests pass, exit 1 on failure
@@ -20,6 +25,8 @@ README="$SKILL_DIR/README.md"
 ROOT_README="$REPO_ROOT/README.md"
 ROOT_CLAUDE="$REPO_ROOT/CLAUDE.md"
 CHANGELOG="$REPO_ROOT/docs/CHANGELOG.md"
+DIST_SKILL="$REPO_ROOT/dist/skills/issue-pr-review-fix-loop"
+PLUGIN_MANIFEST="$REPO_ROOT/dist/plugin/.claude-plugin/plugin.json"
 
 PASS=0
 FAIL=0
@@ -34,7 +41,7 @@ fail() {
   FAIL=$((FAIL + 1))
 }
 
-echo "◆ /issue-pr-review-fix-loop Deprecation Tests (issue #37)"
+echo "◆ /issue-pr-review-fix-loop Deprecation Tests (issues #37, #54)"
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 
 # ───────────────────────────────────────────────────────────
@@ -169,18 +176,24 @@ case "$readme_lower" in
 esac
 
 # ───────────────────────────────────────────────────────────
-# T7: Root README marks the skill as deprecated (AC #2 + AC #3)
+# T7: Root README no longer advertises the skill publicly (issue #54)
 # ───────────────────────────────────────────────────────────
-if grep -qE '^\|.*\`/issue-pr-review-fix-loop\`.*[Dd]eprecated' "$ROOT_README"; then
-  pass "T7.1: AC #2 — Root README skill table marks /issue-pr-review-fix-loop deprecated"
+if grep -qE '^\|[[:space:]]*`/issue-pr-review-fix-loop`' "$ROOT_README"; then
+  fail "T7.1: AC #54 — Root README still has a public table row for /issue-pr-review-fix-loop"
 else
-  fail "T7.1: AC #2 — Root README skill table does not mark /issue-pr-review-fix-loop deprecated"
+  pass "T7.1: AC #54 — Root README has no public table row for /issue-pr-review-fix-loop"
 fi
 
-if grep -qE '^### /issue-pr-review-fix-loop.*[Dd]eprecated' "$ROOT_README"; then
-  pass "T7.2: AC #2 — Root README section header marks skill deprecated"
+if grep -qE '^### /issue-pr-review-fix-loop' "$ROOT_README"; then
+  fail "T7.2: AC #54 — Root README still has a command reference section for /issue-pr-review-fix-loop"
 else
-  fail "T7.2: AC #2 — Root README section header missing deprecation marker"
+  pass "T7.2: AC #54 — Root README has no command reference section for /issue-pr-review-fix-loop"
+fi
+
+if grep -qE '^/issue-pr-review-fix-loop([[:space:]]|$)' "$ROOT_README"; then
+  fail "T7.3: AC #54 — Root README still contains runnable /issue-pr-review-fix-loop examples"
+else
+  pass "T7.3: AC #54 — Root README has no runnable /issue-pr-review-fix-loop examples"
 fi
 
 # ───────────────────────────────────────────────────────────
@@ -219,10 +232,10 @@ if awk '
   /^## \[Unreleased\]/ {in_unrel=1; next}
   /^## \[/ && in_unrel {exit}
   in_unrel
-' "$CHANGELOG" | grep -qiE 'one release cycle'; then
-  pass "T9.3: AC #3 — CHANGELOG entry references one-release-cycle window"
+' "$CHANGELOG" | grep -qE 'src/deprecated-skills/issue-pr-review-fix-loop'; then
+  pass "T9.3: AC #3/#54 — CHANGELOG documents retained deprecated source path"
 else
-  fail "T9.3: AC #3 — CHANGELOG entry missing one-release-cycle reference"
+  fail "T9.3: AC #3/#54 — CHANGELOG missing retained deprecated source path"
 fi
 
 if awk '
@@ -233,6 +246,26 @@ if awk '
   pass "T9.4: AC #3 — CHANGELOG entry links tracking issue #37"
 else
   fail "T9.4: AC #3 — CHANGELOG entry missing #37 tracking reference"
+fi
+
+if awk '
+  /^## \[Unreleased\]/ {in_unrel=1; next}
+  /^## \[/ && in_unrel {exit}
+  in_unrel
+' "$CHANGELOG" | grep -qE '^### Removed[[:space:]]*$'; then
+  pass "T9.5: AC #54 — CHANGELOG [Unreleased] has Removed subsection"
+else
+  fail "T9.5: AC #54 — CHANGELOG [Unreleased] missing Removed subsection"
+fi
+
+if awk '
+  /^## \[Unreleased\]/ {in_unrel=1; next}
+  /^## \[/ && in_unrel {exit}
+  in_unrel
+' "$CHANGELOG" | grep -qE '#54'; then
+  pass "T9.6: AC #54 — CHANGELOG documents the public distribution removal decision"
+else
+  fail "T9.6: AC #54 — CHANGELOG missing issue #54 removal decision"
 fi
 
 # ───────────────────────────────────────────────────────────
@@ -282,6 +315,27 @@ else
 fi
 
 # ───────────────────────────────────────────────────────────
+# T11: AC #54 — public distribution excludes the deprecated skill
+# ───────────────────────────────────────────────────────────
+if grep -qE '^[[:space:]]*distribute:' "$SKILL"; then
+  fail "T11.1: AC #54 — deprecated SKILL.md has a distribute flag"
+else
+  pass "T11.1: AC #54 — deprecated SKILL.md has no distribute flag"
+fi
+
+if [ -e "$DIST_SKILL" ]; then
+  fail "T11.2: AC #54 — dist/skills contains issue-pr-review-fix-loop"
+else
+  pass "T11.2: AC #54 — dist/skills excludes issue-pr-review-fix-loop"
+fi
+
+if [ -f "$PLUGIN_MANIFEST" ] && grep -q 'issue-pr-review-fix-loop' "$PLUGIN_MANIFEST"; then
+  fail "T11.3: AC #54 — public plugin manifest includes issue-pr-review-fix-loop"
+else
+  pass "T11.3: AC #54 — public plugin manifest excludes issue-pr-review-fix-loop"
+fi
+
+# ───────────────────────────────────────────────────────────
 # Summary
 # ───────────────────────────────────────────────────────────
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
@@ -293,5 +347,5 @@ if [ "$FAIL" -gt 0 ]; then
   exit 1
 fi
 
-echo "  ✓ Deprecation spec for /issue-pr-review-fix-loop satisfies issue #37 ACs"
+echo "  ✓ Deprecation spec for /issue-pr-review-fix-loop satisfies issue #37 and #54 ACs"
 exit 0
