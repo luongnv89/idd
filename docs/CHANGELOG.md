@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 ## [Unreleased]
 
 ### Added
+- `tests/test-autopilot-portability.sh` — source-level portability checks for `/auto-pilot`: forbids hardcoded `skills/<name>/SKILL.md` paths, forbids the "All agents are in shared/agents" phrase, and verifies the compatibility line names every required peer skill (#53)
 - `/issue-pr-review` per-criterion acceptance-criteria verification — each criterion in the linked issue reports `pass` / `fail` / `unverified` with required evidence
 - `/issue-pr-review` four-check traceability dimension — verifies `Closes #N` in PR body, at least one commit referencing the issue (via `git log --grep`), durable analysis fields (Decision Record + Acceptance Criteria Verification block), and the squash-merge assumption
 - Five-dimension review output — `correctness`, `acceptance_criteria`, `traceability`, `maintainability`, `safety` — replacing the prior single-line review verdict in cycle reports and the Step 7 summary
@@ -16,6 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - `tests/test-config-schema-38.sh` — spec assertions verifying every issue #38 acceptance criterion (schema documents the four keys with defaults; init template emits them; no speculative keys; consuming skills wire the gates)
 
 ### Changed
+- `/auto-pilot` cross-skill prompts now use `{{skill:<name>}}` tokens instead of hardcoded `skills/<name>/SKILL.md` paths; the `compatibility:` frontmatter spells out the required peer skills (issue-triage, issue-resolver, issue-analysis, issue-pr-review) and the optional issue-creator. Source no longer carries the boilerplate "All agents are in shared/agents/" sentence — invoked skills carry their own agent guidance. Build-time rendering of these tokens lights up in PR 3 (refactor-plan-v10 §6). (#53)
 - `/issue-pr-review` soft-pass condition now hard-blocks on `traceability: fail` (e.g., missing `Closes #N`) and any `acceptance_criteria: fail`, even when tests and CI are green — this matches the explicit issue #36 contract that a PR can pass tests and fail traceability
 - `/issue-pr-review` v0.4.1 — Phase 2 hard-block conditions now gated on `review.require_*_check` flags (#38)
 - `/init-gitissue` v0.3.2 — emits the unified Phase 1b + Phase 2 configuration schema
