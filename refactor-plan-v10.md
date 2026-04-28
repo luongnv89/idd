@@ -796,7 +796,7 @@ This refactor is done when:
 
 ### Release checklist (manual, not CI-gated)
 
-- [ ] **Smoke test 1 (single skill):** Copy one flattened skill (e.g., `issue-creator`) from a release tarball or repo checkout to a fresh `~/.claude/skills/` with no IDD repo present; invoke and confirm it runs.
-- [ ] **Smoke test 2 (independent coexistence):** Copy two flattened independent skills (e.g., `issue-creator` + `init-gitissue`) into the same fresh skills directory; invoke each and verify their `references/` do not collide.
-- [ ] **Smoke test 3 (dependency bundle):** Copy `auto-pilot` plus all prerequisite flattened skills (`issue-triage`, `issue-resolver`, `issue-analysis`, `issue-pr-review`, optional `issue-creator`) into a fresh skills directory; verify auto-pilot can locate its child skills via the §6.0 ADR-decided rendering.
-- [ ] **Smoke test 4 (plugin tarball):** Download the release tarball (`idd-plugin-vX.Y.Z.tar.gz`), extract, install in a test Claude Code environment, and invoke `/<plugin-slug>:issue-creator`. Validate `dist/plugin/` against the plugin schema and (if available) `claude plugin validate`.
+- [x] **Smoke test 1 (single skill):** Copy one flattened skill (e.g., `issue-creator`) from a release tarball or repo checkout to a fresh `~/.claude/skills/` with no IDD repo present; invoke and confirm it runs. *[v0.7.0 — `docs/release-notes/v0.7.0-smoke-tests.md` Test 1]*
+- [x] **Smoke test 2 (independent coexistence):** Copy two flattened independent skills (e.g., `issue-creator` + `init-gitissue`) into the same fresh skills directory; invoke each and verify their `references/` do not collide. *[v0.7.0 — Test 2]*
+- [x] **Smoke test 3 (dependency bundle):** Copy `auto-pilot` plus all prerequisite flattened skills (`issue-triage`, `issue-resolver`, `issue-analysis`, `issue-pr-review`, optional `issue-creator`) into a fresh skills directory; verify auto-pilot can locate its child skills via the §6.0 ADR-decided rendering. *[v0.7.0 — Test 3]*
+- [x] **Smoke test 4 (plugin tarball):** Download the release tarball (`idd-plugin-vX.Y.Z.tar.gz`), extract, install in a test Claude Code environment, and invoke `/<plugin-slug>:issue-creator`. Validate `dist/plugin/` against the plugin schema and (if available) `claude plugin validate`. *[v0.7.0 — Test 4, against locally-built tarball; first published tarball ships at release tag]*
