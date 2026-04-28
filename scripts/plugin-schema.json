@@ -1,0 +1,53 @@
+{
+  "$comment": "Best-effort Claude Code plugin manifest schema. derivedFrom: https://docs.claude.com/en/docs/claude-code/plugins (2026-04-28). The 'name' field carries the kebab-case plugin slug; 'author' is an object with name and optional email. See scripts/plugin-schema.provenance.md for rationale and re-validation cadence.",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": true,
+  "properties": {
+    "author": {
+      "oneOf": [
+        {
+          "additionalProperties": true,
+          "properties": {
+            "email": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "name"
+          ],
+          "type": "object"
+        },
+        {
+          "type": "string"
+        }
+      ]
+    },
+    "description": {
+      "type": "string"
+    },
+    "name": {
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "type": "string"
+    },
+    "version": {
+      "type": "string"
+    },
+    "x-derivedAt": {
+      "type": "string"
+    },
+    "x-derivedFrom": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "name",
+    "version"
+  ],
+  "title": "Claude Code Plugin Manifest (best-effort)",
+  "type": "object",
+  "x-derivedAt": "2026-04-28",
+  "x-derivedFrom": "https://docs.claude.com/en/docs/claude-code/plugins"
+}
