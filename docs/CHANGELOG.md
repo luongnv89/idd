@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 ## [Unreleased]
 
 ### Added
+- `docs/release-notes/v0.7.0-smoke-tests.md` — executed results for the four manual release-checklist smoke tests from `refactor-plan-v10.md` §14 against the locally built `0.7.0` artifact: single skill, independent coexistence, `auto-pilot` dependency bundle, plugin tarball + `claude plugin validate`. All four pass. (#61)
 - `tests/test-autopilot-portability.sh` — source-level portability checks for `/auto-pilot`: forbids hardcoded `skills/<name>/SKILL.md` paths, forbids the "All agents are in shared/agents" phrase, and verifies the compatibility line names every required peer skill (#53)
 - `/issue-pr-review` per-criterion acceptance-criteria verification — each criterion in the linked issue reports `pass` / `fail` / `unverified` with required evidence
 - `/issue-pr-review` four-check traceability dimension — verifies `Closes #N` in PR body, at least one commit referencing the issue (via `git log --grep`), durable analysis fields (Decision Record + Acceptance Criteria Verification block), and the squash-merge assumption
