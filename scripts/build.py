@@ -1,0 +1,734 @@
+#!/usr/bin/env python3
+"""Build script for IDD distribution.
+
+Reads authored sources under src/ and emits two distribution outputs:
+
+  <out>/skills/   — flattened, harness-agnostic skills (committed)
+  <out>/plugin/   — Claude Code plugin layout (built fresh in CI)
+
+The build is byte-deterministic per refactor-plan-v10.md §4.1.
+Implements the (A-fail, B-fail, C-1) ADR row from
+docs/decisions/cross-skill-invocation.md — sibling-relative paths only,
+no ${CLAUDE_PLUGIN_ROOT} anywhere.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+from typing import Iterable
+
+# --- Constants ---------------------------------------------------------------
+
+TEXT_EXTS = {".md", ".txt", ".yml", ".yaml", ".json", ".toml"}
+
+# Files we never rewrite inside (build-internal control files).
+SKIP_REWRITE_NAMES = {"plugin.json.in"}
+
+# Reference patterns. URL-aware: matches inside http(s):// URLs are excluded
+# at the rewriting stage by URL-prefix detection.
+SKILL_TOKEN_RE = re.compile(r"\{\{skill:([a-z][a-z0-9-]*)\}\}")
+SHARED_AGENT_RE = re.compile(r"(?<![\w/])shared/agents/([a-z][a-z0-9-]+\.md)")
+RUNTIME_DOC_RE = re.compile(r"(?<![\w/])docs/([a-z][a-z0-9-]+\.md)")
+BARE_SKILL_PATH_RE = re.compile(r"(?<![\w/])skills/([a-z][a-z0-9-]+)/SKILL\.md")
+
+URL_RE = re.compile(r"https?://[^\s<>'\"\)]+")
+
+# Phase E: stale GitHub URL guard. Match any IDD-repo URL whose path component
+# immediately preceding /docs/ is NOT 'src'. (Negative lookbehind on 'src'.)
+STALE_DOC_URL_RE = re.compile(
+    r"https://github\.com/luongnv89/idd/[^\s<>'\"\)]*?(?<!src)/docs/([a-z][a-z0-9-]+\.md)"
+)
+
+BANNER_TMPL = (
+    "<!-- Generated from src/{rel}. Do not edit. "
+    "Edit source and run ./scripts/build.sh. -->\n"
+)
+
+
+# --- Errors ------------------------------------------------------------------
+
+
+class BuildError(RuntimeError):
+    """Raised on every Phase E abort condition."""
+
+
+def _abort(msg: str) -> None:
+    print(f"✗ {msg}", file=sys.stderr)
+    raise BuildError(msg)
+
+
+# --- File helpers ------------------------------------------------------------
+
+
+def _is_text_file(path: Path) -> bool:
+    return path.suffix in TEXT_EXTS
+
+
+def _read_text(path: Path) -> str:
+    return path.read_text(encoding="utf-8")
+
+
+def _write_text(path: Path, content: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    # newline='\n' forces LF; no platform-default translation.
+    with open(path, "w", encoding="utf-8", newline="\n") as fh:
+        fh.write(content)
+
+
+def _copy_binary(src: Path, dst: Path) -> None:
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(src, dst)
+
+
+def _sorted_iterdir(path: Path) -> list[Path]:
+    return sorted(path.iterdir(), key=lambda p: p.name)
+
+
+def _walk_files(root: Path) -> Iterable[Path]:
+    """Yield every file under root, sorted lexicographically at each level."""
+    if not root.exists():
+        return
+    for entry in _sorted_iterdir(root):
+        if entry.is_dir():
+            yield from _walk_files(entry)
+        else:
+            yield entry
+
+
+# --- URL-aware scanning ------------------------------------------------------
+
+
+def _strip_urls(text: str) -> str:
+    """Replace URL substrings with spaces of equal length so URL-internal
+    bare paths are not misread as logical references during scanning."""
+    return URL_RE.sub(lambda m: " " * len(m.group(0)), text)
+
+
+# --- Phase A — Inventory -----------------------------------------------------
+
+
+def _read_plugin_manifest_input(src: Path) -> dict:
+    """Read src/plugin.json.in, validate placeholder table, return resolved
+    plugin metadata."""
+    pj_in = src / "plugin.json.in"
+    if not pj_in.exists():
+        _abort(f"src/plugin.json.in not found at {pj_in}")
+    raw = json.loads(_read_text(pj_in))
+    plugin = raw.get("plugin")
+    values = raw.get("values", {})
+    default_version = raw.get("default_version")
+    if not isinstance(plugin, dict):
+        _abort("plugin.json.in: missing 'plugin' object")
+    if not isinstance(values, dict):
+        _abort("plugin.json.in: missing 'values' object")
+    if "skills" in plugin:
+        _abort("plugin.json.in: 'plugin.skills' must not be authored — generated from discovery")
+
+    table = {
+        "PLUGIN_AUTHOR": values.get("PLUGIN_AUTHOR"),
+        "PLUGIN_DESCRIPTION": values.get("PLUGIN_DESCRIPTION"),
+        "PLUGIN_NAME": values.get("PLUGIN_NAME"),
+        "PLUGIN_SLUG": values.get("PLUGIN_SLUG"),
+        "PLUGIN_VERSION": values.get("PLUGIN_VERSION") or default_version,
+    }
+    for key, val in table.items():
+        if not isinstance(val, str) or not val:
+            _abort(f"plugin.json.in: missing or empty value for ${{{key}}}")
+
+    placeholder_re = re.compile(r"\$\{([A-Z_]+)\}")
+
+    def _substitute(value):
+        if isinstance(value, str):
+            def repl(m):
+                name = m.group(1)
+                if name not in table:
+                    _abort(f"plugin.json.in: unknown placeholder ${{{name}}}")
+                return table[name]
+            return placeholder_re.sub(repl, value)
+        if isinstance(value, dict):
+            return {k: _substitute(v) for k, v in value.items()}
+        if isinstance(value, list):
+            return [_substitute(v) for v in value]
+        return value
+
+    return _substitute(plugin)
+
+
+def _discover_public_skills(src: Path) -> list[str]:
+    skills_root = src / "skills"
+    if not skills_root.is_dir():
+        _abort(f"src/skills/ not found at {skills_root}")
+    out = []
+    for entry in _sorted_iterdir(skills_root):
+        if not entry.is_dir():
+            continue
+        if not (entry / "SKILL.md").is_file():
+            continue
+        out.append(entry.name)
+    return out
+
+
+def _discover_distributed_deprecated(src: Path) -> list[str]:
+    """Deprecated skills that opt in via 'distribute:' frontmatter. Returns
+    skill names that should be built into both dist outputs."""
+    root = src / "deprecated-skills"
+    if not root.is_dir():
+        return []
+    out = []
+    for entry in _sorted_iterdir(root):
+        if not entry.is_dir():
+            continue
+        skill_md = entry / "SKILL.md"
+        if not skill_md.is_file():
+            continue
+        text = _read_text(skill_md)
+        if re.search(r"^\s*distribute:\s*\S", text, re.MULTILINE):
+            out.append(entry.name)
+    return out
+
+
+def _check_non_markdown_in(root: Path, label: str) -> None:
+    if not root.exists():
+        return
+    for f in _walk_files(root):
+        if f.suffix != ".md":
+            _abort(f"non-markdown file under {label}: {f.relative_to(root.parent)}")
+
+
+# --- Phase B — Transitive closure -------------------------------------------
+
+
+def _scan_logical_refs(text: str) -> tuple[set[str], set[str], set[str]]:
+    """Return (skill_tokens, shared_agents, runtime_docs) from text, ignoring
+    matches inside http(s):// URLs."""
+    cleaned = _strip_urls(text)
+    skills = set(SKILL_TOKEN_RE.findall(cleaned))
+    agents = set(SHARED_AGENT_RE.findall(cleaned))
+    docs = set(RUNTIME_DOC_RE.findall(cleaned))
+    return skills, agents, docs
+
+
+def _compute_closure(
+    src: Path,
+    skill_name: str,
+    skill_root: Path,
+) -> tuple[set[str], set[str]]:
+    """Compute transitive closure of shared agents and docs reachable from
+    a skill. DFS with cycle detection (warning, no abort) and diamond-safe
+    visited tracking. Returns sorted-eligible (agent_names, doc_names)."""
+    agents: set[str] = set()
+    docs: set[str] = set()
+    visited: set[str] = set()
+    active: set[str] = set()
+
+    def _resolve(kind: str, name: str) -> Path | None:
+        if kind == "agent":
+            p = src / "shared" / "agents" / name
+        else:
+            p = src / "docs" / name
+        return p if p.is_file() else None
+
+    def _visit(kind: str, name: str, path_chain: list[str]) -> None:
+        key = f"{kind}:{name}"
+        if key in active:
+            chain = " -> ".join(path_chain + [key])
+            print(f"⚠ cycle detected: {chain}", file=sys.stderr)
+            return
+        if key in visited:
+            return
+        resolved = _resolve(kind, name)
+        if resolved is None:
+            _abort(
+                f"unresolved {kind} reference '{name}' "
+                f"(reachable from skill '{skill_name}')"
+            )
+        active.add(key)
+        if kind == "agent":
+            agents.add(name)
+        else:
+            docs.add(name)
+        text = _read_text(resolved)
+        _, sub_agents, sub_docs = _scan_logical_refs(text)
+        for a in sorted(sub_agents):
+            _visit("agent", a, path_chain + [key])
+        for d in sorted(sub_docs):
+            _visit("doc", d, path_chain + [key])
+        active.discard(key)
+        visited.add(key)
+
+    # Seed: scan every text file in the skill root.
+    seed_agents: set[str] = set()
+    seed_docs: set[str] = set()
+    for f in _walk_files(skill_root):
+        if not _is_text_file(f) or f.name in SKIP_REWRITE_NAMES:
+            continue
+        text = _read_text(f)
+        skills_in_file, a, d = _scan_logical_refs(text)
+        seed_agents.update(a)
+        seed_docs.update(d)
+        # Any bare skills/<name>/SKILL.md path is illegal in source.
+        if BARE_SKILL_PATH_RE.search(_strip_urls(text)):
+            _abort(
+                f"illegal bare 'skills/<name>/SKILL.md' reference in source: "
+                f"{f.relative_to(src.parent)} (use {{{{skill:<name>}}}} token)"
+            )
+
+    for a in sorted(seed_agents):
+        _visit("agent", a, [f"skill:{skill_name}"])
+    for d in sorted(seed_docs):
+        _visit("doc", d, [f"skill:{skill_name}"])
+
+    return agents, docs
+
+
+# --- Phase E — Stale URL guard -----------------------------------------------
+
+
+def _check_stale_doc_urls(src: Path) -> None:
+    """Abort if any IDD-repo /docs/<file>.md URL refers to a doc that lives
+    under src/docs/. Such URLs must use src/docs/<file>.md."""
+    docs_dir = src / "docs"
+    src_docs = {p.name for p in docs_dir.glob("*.md")} if docs_dir.is_dir() else set()
+    if not src_docs:
+        return
+    for f in _walk_files(src):
+        if not _is_text_file(f):
+            continue
+        text = _read_text(f)
+        for m in STALE_DOC_URL_RE.finditer(text):
+            file_name = m.group(1)
+            if file_name in src_docs:
+                _abort(
+                    f"stale GitHub URL in {f.relative_to(src.parent)}: {m.group(0)} "
+                    f"(should reference src/docs/{file_name})"
+                )
+
+
+def _check_init_template_urls(src: Path) -> None:
+    """Phase E init-template build-time check: scan
+    src/skills/init-gitissue/templates/gitissue-template.yml for stale URLs."""
+    template = src / "skills" / "init-gitissue" / "templates" / "gitissue-template.yml"
+    if not template.is_file():
+        return
+    text = _read_text(template)
+    docs_dir = src / "docs"
+    src_docs = {p.name for p in docs_dir.glob("*.md")} if docs_dir.is_dir() else set()
+    for m in STALE_DOC_URL_RE.finditer(text):
+        file_name = m.group(1)
+        if file_name in src_docs:
+            _abort(
+                f"init-gitissue template has stale doc URL: {m.group(0)} "
+                f"(should reference src/docs/{file_name})"
+            )
+
+
+# --- Reference rewriting -----------------------------------------------------
+
+
+def _rewrite_for_standalone(text: str) -> str:
+    """Apply standalone (dist/skills/) rewrites — URL-aware.
+
+      {{skill:X}}            -> ../X/SKILL.md
+      shared/agents/X.md     -> references/agents/X.md
+      docs/Y.md              -> references/docs/Y.md
+    """
+    return _rewrite_url_aware(
+        text,
+        skill_form=lambda name: f"../{name}/SKILL.md",
+        agent_form=lambda name: f"references/agents/{name}",
+        doc_form=lambda name: f"references/docs/{name}",
+    )
+
+
+def _rewrite_for_plugin(text: str) -> str:
+    """Apply plugin (dist/plugin/) rewrites — URL-aware.
+
+      {{skill:X}}            -> ../../X/SKILL.md
+      shared/agents/X.md     -> ../../../shared/agents/X.md
+      docs/Y.md              -> ../../../docs/Y.md
+    """
+    return _rewrite_url_aware(
+        text,
+        skill_form=lambda name: f"../../{name}/SKILL.md",
+        agent_form=lambda name: f"../../../shared/agents/{name}",
+        doc_form=lambda name: f"../../../docs/{name}",
+    )
+
+
+def _rewrite_url_aware(text, *, skill_form, agent_form, doc_form):
+    """Rewrite logical references outside of URLs only. URL spans are passed
+    through verbatim."""
+    parts = []
+    cursor = 0
+    for m in URL_RE.finditer(text):
+        # Rewrite the non-URL gap.
+        gap = text[cursor : m.start()]
+        gap = SKILL_TOKEN_RE.sub(lambda mm: skill_form(mm.group(1)), gap)
+        gap = SHARED_AGENT_RE.sub(lambda mm: agent_form(mm.group(1)), gap)
+        gap = RUNTIME_DOC_RE.sub(lambda mm: doc_form(mm.group(1)), gap)
+        parts.append(gap)
+        # Pass URL through unchanged.
+        parts.append(m.group(0))
+        cursor = m.end()
+    tail = text[cursor:]
+    tail = SKILL_TOKEN_RE.sub(lambda mm: skill_form(mm.group(1)), tail)
+    tail = SHARED_AGENT_RE.sub(lambda mm: agent_form(mm.group(1)), tail)
+    tail = RUNTIME_DOC_RE.sub(lambda mm: doc_form(mm.group(1)), tail)
+    parts.append(tail)
+    return "".join(parts)
+
+
+# --- Phase C — dist/skills/ (flattened) --------------------------------------
+
+
+def _emit_flattened_skill(
+    src: Path,
+    skill_root: Path,
+    out_dir: Path,
+    agents: set[str],
+    docs: set[str],
+) -> None:
+    """Copy authored skill content to out_dir, copy transitive deps under
+    out_dir/references/, rewrite logical refs throughout."""
+    if out_dir.exists():
+        shutil.rmtree(out_dir)
+    out_dir.mkdir(parents=True)
+
+    # Copy authored content (rewriting text files).
+    for f in _walk_files(skill_root):
+        rel = f.relative_to(skill_root)
+        dst = out_dir / rel
+        if _is_text_file(f) and f.name not in SKIP_REWRITE_NAMES:
+            text = _read_text(f)
+            _write_text(dst, _rewrite_for_standalone(text))
+        else:
+            _copy_binary(f, dst)
+
+    # Copy transitive shared agents (banner + rewrite).
+    for name in sorted(agents):
+        src_path = src / "shared" / "agents" / name
+        dst_path = out_dir / "references" / "agents" / name
+        text = _read_text(src_path)
+        banner = BANNER_TMPL.format(rel=f"shared/agents/{name}")
+        _write_text(dst_path, banner + _rewrite_for_standalone(text))
+
+    # Copy transitive docs (banner + rewrite).
+    for name in sorted(docs):
+        src_path = src / "docs" / name
+        dst_path = out_dir / "references" / "docs" / name
+        text = _read_text(src_path)
+        banner = BANNER_TMPL.format(rel=f"docs/{name}")
+        _write_text(dst_path, banner + _rewrite_for_standalone(text))
+
+
+# --- Phase D — dist/plugin/ --------------------------------------------------
+
+
+def _emit_plugin_tree(
+    src: Path,
+    out_root: Path,
+    public_skills: list[str],
+    deprecated_distributed: list[str],
+    plugin_meta: dict,
+) -> None:
+    if out_root.exists():
+        shutil.rmtree(out_root)
+    (out_root / ".claude-plugin").mkdir(parents=True)
+    (out_root / "skills").mkdir()
+    (out_root / "shared" / "agents").mkdir(parents=True)
+    (out_root / "docs").mkdir()
+
+    # Copy each public skill (rewritten).
+    skill_sources = [(name, src / "skills" / name) for name in public_skills]
+    for name in deprecated_distributed:
+        skill_sources.append((name, src / "deprecated-skills" / name))
+
+    for skill_name, skill_root in sorted(skill_sources, key=lambda x: x[0]):
+        dst_root = out_root / "skills" / skill_name
+        for f in _walk_files(skill_root):
+            rel = f.relative_to(skill_root)
+            dst = dst_root / rel
+            if _is_text_file(f) and f.name not in SKIP_REWRITE_NAMES:
+                text = _read_text(f)
+                _write_text(dst, _rewrite_for_plugin(text))
+            else:
+                _copy_binary(f, dst)
+
+    # Copy src/shared/agents/ wholesale (no rewrite needed — these don't
+    # reference {{skill:...}}, but they may reference docs/. Plugin-side those
+    # become ../../docs/X.md from shared/agents/, which differs from the
+    # ../../../docs form used inside skills/<n>/. Rewrite per-location.)
+    shared_src = src / "shared" / "agents"
+    if shared_src.is_dir():
+        for f in _walk_files(shared_src):
+            rel = f.relative_to(shared_src)
+            dst = out_root / "shared" / "agents" / rel
+            if _is_text_file(f):
+                text = _read_text(f)
+                # In dist/plugin/shared/agents/X.md, docs/Y.md should resolve
+                # to ../../docs/Y.md (up to plugin root, then docs/).
+                rewritten = _rewrite_url_aware(
+                    text,
+                    skill_form=lambda n: f"../../skills/{n}/SKILL.md",
+                    agent_form=lambda n: n,  # already in shared/agents, sibling
+                    doc_form=lambda n: f"../../docs/{n}",
+                )
+                _write_text(dst, rewritten)
+            else:
+                _copy_binary(f, dst)
+
+    # Copy src/docs/ wholesale.
+    docs_src = src / "docs"
+    if docs_src.is_dir():
+        for f in _walk_files(docs_src):
+            rel = f.relative_to(docs_src)
+            dst = out_root / "docs" / rel
+            if _is_text_file(f):
+                text = _read_text(f)
+                # Docs may reference other docs/ (sibling) or shared/agents/
+                # (sibling dir). From plugin/docs/, shared/agents/X.md is at
+                # ../shared/agents/X.md.
+                rewritten = _rewrite_url_aware(
+                    text,
+                    skill_form=lambda n: f"../skills/{n}/SKILL.md",
+                    agent_form=lambda n: f"../shared/agents/{n}",
+                    doc_form=lambda n: n,  # sibling
+                )
+                _write_text(dst, rewritten)
+            else:
+                _copy_binary(f, dst)
+
+    # Generate .claude-plugin/plugin.json. Transform plugin_meta from input
+    # shape (slug + name + author-string) into Claude Code plugin manifest
+    # shape (name=slug, author={name,email}). Skills array is omitted —
+    # plugins discover skills from skills/ directory at install time.
+    manifest = _build_plugin_manifest(plugin_meta)
+    pj_text = json.dumps(manifest, sort_keys=True, indent=2, ensure_ascii=False) + "\n"
+    _write_text(out_root / ".claude-plugin" / "plugin.json", pj_text)
+
+
+_AUTHOR_RE = re.compile(r"^(?P<name>[^<]+?)\s*<(?P<email>[^>]+)>\s*$")
+
+
+def _build_plugin_manifest(plugin_meta: dict) -> dict:
+    """Transform plugin.json.in resolved metadata into Claude Code's plugin
+    manifest shape:
+
+      input:  {slug, name, description, version, author: "Name <email>"}
+      output: {name: <slug>, description, version, author: {name, email}}
+    """
+    slug = plugin_meta.get("slug")
+    if not slug:
+        _abort("plugin.json.in: missing PLUGIN_SLUG")
+    out = {"name": slug}
+    if "version" in plugin_meta:
+        out["version"] = plugin_meta["version"]
+    if "description" in plugin_meta:
+        out["description"] = plugin_meta["description"]
+    author = plugin_meta.get("author")
+    if isinstance(author, str):
+        m = _AUTHOR_RE.match(author)
+        if m:
+            out["author"] = {"name": m.group("name"), "email": m.group("email")}
+        else:
+            out["author"] = {"name": author}
+    elif isinstance(author, dict):
+        out["author"] = author
+    return out
+
+
+# --- Phase E — Sanity scan over emitted output -------------------------------
+
+
+def _scan_dist_skills(out_skills: Path) -> None:
+    """Verify no unresolved logical refs in dist/skills/."""
+    for skill_dir in _sorted_iterdir(out_skills):
+        if not skill_dir.is_dir():
+            continue
+        for f in _walk_files(skill_dir):
+            if not _is_text_file(f):
+                continue
+            text = _read_text(f)
+            cleaned = _strip_urls(text)
+            if SKILL_TOKEN_RE.search(cleaned):
+                _abort(f"unresolved {{{{skill:...}}}} in {f.relative_to(out_skills.parent)}")
+            if SHARED_AGENT_RE.search(cleaned):
+                _abort(
+                    f"unresolved bare 'shared/agents/X.md' in "
+                    f"{f.relative_to(out_skills.parent)}"
+                )
+            if RUNTIME_DOC_RE.search(cleaned):
+                _abort(f"unresolved bare 'docs/Y.md' in {f.relative_to(out_skills.parent)}")
+            if BARE_SKILL_PATH_RE.search(cleaned):
+                _abort(
+                    f"unresolved bare 'skills/<name>/SKILL.md' in "
+                    f"{f.relative_to(out_skills.parent)}"
+                )
+
+
+def _scan_dist_plugin(out_plugin: Path) -> None:
+    """Verify dist/plugin/ uses the ADR-decided forms uniformly. The ADR row
+    is (A-fail, B-fail, C-1): cross-skill -> '../../<n>/SKILL.md',
+    shared/agents -> '../../../shared/agents/<n>', docs -> '../../../docs/<n>'.
+    No ${CLAUDE_PLUGIN_ROOT} forms allowed inside skills/."""
+    skills_root = out_plugin / "skills"
+    for skill_dir in _sorted_iterdir(skills_root) if skills_root.is_dir() else []:
+        if not skill_dir.is_dir():
+            continue
+        for f in _walk_files(skill_dir):
+            if not _is_text_file(f):
+                continue
+            text = _read_text(f)
+            cleaned = _strip_urls(text)
+            if SKILL_TOKEN_RE.search(cleaned):
+                _abort(f"unresolved {{{{skill:...}}}} in {f.relative_to(out_plugin.parent)}")
+            if SHARED_AGENT_RE.search(cleaned):
+                _abort(
+                    f"bare 'shared/agents/X.md' in plugin skill "
+                    f"{f.relative_to(out_plugin.parent)} (must be "
+                    f"'../../../shared/agents/X.md' per ADR)"
+                )
+            if RUNTIME_DOC_RE.search(cleaned):
+                _abort(
+                    f"bare 'docs/Y.md' in plugin skill {f.relative_to(out_plugin.parent)} "
+                    f"(must be '../../../docs/Y.md' per ADR)"
+                )
+            if "${CLAUDE_PLUGIN_ROOT}" in text:
+                _abort(
+                    f"${{CLAUDE_PLUGIN_ROOT}} found in {f.relative_to(out_plugin.parent)} "
+                    f"(ADR row is B-fail, this form is forbidden)"
+                )
+
+
+def _validate_plugin_manifest(out_plugin: Path) -> None:
+    """Run `claude plugin validate` if available; else local schema."""
+    pj = out_plugin / ".claude-plugin" / "plugin.json"
+    if not pj.is_file():
+        _abort(f".claude-plugin/plugin.json missing at {pj}")
+    if shutil.which("claude"):
+        try:
+            help_out = subprocess.run(
+                ["claude", "plugin", "--help"],
+                capture_output=True,
+                text=True,
+                timeout=15,
+            )
+            if "validate" in (help_out.stdout + help_out.stderr):
+                proc = subprocess.run(
+                    ["claude", "plugin", "validate", str(out_plugin)],
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                )
+                if proc.returncode != 0:
+                    _abort(
+                        f"claude plugin validate failed:\n{proc.stdout}\n{proc.stderr}"
+                    )
+                return
+        except (subprocess.TimeoutExpired, FileNotFoundError):
+            pass
+    # Fallback: local schema (best-effort, no jsonschema dependency).
+    schema_path = Path(__file__).parent / "plugin-schema.json"
+    if schema_path.is_file():
+        schema = json.loads(_read_text(schema_path))
+        manifest = json.loads(_read_text(pj))
+        for required in schema.get("required", []):
+            if required not in manifest:
+                _abort(f"plugin.json missing required field: {required}")
+
+
+# --- Orchestration -----------------------------------------------------------
+
+
+def _check_python_version() -> None:
+    if sys.version_info < (3, 11):
+        sys.exit(f"build.py requires Python 3.11+ (running {sys.version.split()[0]})")
+
+
+def build(out: Path, src: Path, *, verbose: bool = False) -> None:
+    if verbose:
+        print(f"● Building from {src} to {out}")
+
+    # Phase A: inventory + plugin metadata.
+    _check_non_markdown_in(src / "shared" / "agents", "src/shared/agents/")
+    _check_non_markdown_in(src / "docs", "src/docs/")
+    plugin_meta = _read_plugin_manifest_input(src)
+    public_skills = _discover_public_skills(src)
+    deprecated_distributed = _discover_distributed_deprecated(src)
+    if verbose:
+        print(f"  ✓ public skills: {len(public_skills)} ({', '.join(public_skills)})")
+        if deprecated_distributed:
+            print(f"  ✓ deprecated (distributed): {', '.join(deprecated_distributed)}")
+
+    # Phase E (early): stale-URL checks before any output is written.
+    _check_stale_doc_urls(src)
+    _check_init_template_urls(src)
+
+    # Prepare output dirs (clean only the trees we own).
+    out_skills = out / "skills"
+    out_plugin = out / "plugin"
+    if out_skills.exists():
+        shutil.rmtree(out_skills)
+    out_skills.mkdir(parents=True)
+
+    # Phase B + C: closures + flattened emission.
+    all_skill_sources = [(name, src / "skills" / name) for name in public_skills]
+    for name in deprecated_distributed:
+        all_skill_sources.append((name, src / "deprecated-skills" / name))
+    for skill_name, skill_root in sorted(all_skill_sources, key=lambda x: x[0]):
+        agents, docs = _compute_closure(src, skill_name, skill_root)
+        _emit_flattened_skill(src, skill_root, out_skills / skill_name, agents, docs)
+        if verbose:
+            print(f"  ✓ flattened: {skill_name} (agents={len(agents)}, docs={len(docs)})")
+
+    # Phase D: plugin tree.
+    _emit_plugin_tree(src, out_plugin, public_skills, deprecated_distributed, plugin_meta)
+    if verbose:
+        print(f"  ✓ plugin tree at {out_plugin}")
+
+    # Phase E (post): scan emitted output.
+    _scan_dist_skills(out_skills)
+    _scan_dist_plugin(out_plugin)
+    _validate_plugin_manifest(out_plugin)
+
+    if verbose:
+        print(f"✓ build complete")
+
+
+def main(argv: list[str]) -> int:
+    _check_python_version()
+    parser = argparse.ArgumentParser(
+        description="Build IDD distribution outputs (dist/skills/ and dist/plugin/)."
+    )
+    parser.add_argument(
+        "--out",
+        default="dist",
+        help="Output root directory (default: dist).",
+    )
+    parser.add_argument(
+        "--src",
+        default="src",
+        help="Source root directory (default: src).",
+    )
+    parser.add_argument("-v", "--verbose", action="store_true")
+    args = parser.parse_args(argv)
+    out = Path(args.out).resolve()
+    src = Path(args.src).resolve()
+    if not src.is_dir():
+        print(f"✗ src not found: {src}", file=sys.stderr)
+        return 1
+    try:
+        build(out, src, verbose=args.verbose)
+    except BuildError:
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
