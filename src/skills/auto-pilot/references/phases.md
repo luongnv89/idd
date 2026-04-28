@@ -201,7 +201,7 @@ After the PR is created, the auto-pilot delegates review, testing, CI checking, 
 6. Repeats steps 2-5 up to `review_cycles` cycles (default: 3)
 7. **Confirmation pass** — spawns one fresh reviewer for unbiased final check
 
-See `skills/issue-pr-review/SKILL.md` for the full pipeline.
+See the `{{skill:issue-pr-review}}` skill for the full pipeline.
 
 ### Step 3.1 — Spawn PR Review Subagent
 
