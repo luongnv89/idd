@@ -1,0 +1,119 @@
+name: dist-check
+
+on:
+  pull_request:
+  push:
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Source-level checks (fast fail before build)
+        run: bash tests/test-init-template-doc-urls-source.sh
+
+      - name: Build dist trees
+        run: ./scripts/build.sh
+
+      - name: Drift check — dist/skills/ must match committed baseline
+        run: |
+          if ! git diff --exit-code dist/skills/; then
+            echo "::error::dist/skills/ is out of date. Run ./scripts/build.sh and commit the result."
+            exit 1
+          fi
+
+      - name: test-build-script
+        run: bash tests/test-build-script.sh
+
+      - name: test-init-template-doc-urls-dist
+        run: bash tests/test-init-template-doc-urls-dist.sh
+
+      - name: test-flattened-self-contained
+        run: bash tests/test-flattened-self-contained.sh
+
+      - name: test-plugin-layout
+        run: bash tests/test-plugin-layout.sh
+
+      - name: test-plugin-reference-rendering
+        run: bash tests/test-plugin-reference-rendering.sh
+
+      - name: test-autopilot-portability
+        run: bash tests/test-autopilot-portability.sh
+
+      - name: test-flattened-coexistence
+        run: bash tests/test-flattened-coexistence.sh
+
+      - name: test-dependency-closure
+        run: bash tests/test-dependency-closure.sh
+
+      - name: test-build-determinism
+        run: bash tests/test-build-determinism.sh
+
+      - name: test-plugin-tarball-layout
+        run: bash tests/test-plugin-tarball-layout.sh
+
+  release:
+    needs: drift
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Build dist trees
+        run: ./scripts/build.sh
+
+      - name: Verify tarball layout before release
+        run: bash tests/test-plugin-tarball-layout.sh
+
+      - name: Create release tarball
+        run: tar -czf "idd-plugin-${{ github.ref_name }}.tar.gz" -C dist/plugin .
+
+      - name: Validate canonical root contents in tarball
+        shell: bash
+        run: |
+          set -euo pipefail
+          tarball="idd-plugin-${{ github.ref_name }}.tar.gz"
+          required=(
+            ./.claude-plugin/plugin.json
+            ./skills/issue-creator/SKILL.md
+            ./shared/agents/codebase-researcher.md
+            ./docs/naming-conventions.md
+          )
+          listing="$(tar -tzf "$tarball")"
+          for path in "${required[@]}"; do
+            if ! printf '%s\n' "$listing" | grep -qxF "$path"; then
+              echo "::error::Required path missing from tarball: $path"
+              exit 1
+            fi
+          done
+          top_levels="$(printf '%s\n' "$listing" | awk '
+            {
+              sub(/^\.\//, "", $0)
+              if ($0 == "" || $0 ~ /^\//) next
+              n = index($0, "/")
+              first = (n > 0) ? substr($0, 1, n - 1) : $0
+              if (first != "") seen[first] = 1
+            }
+            END { for (k in seen) print k }
+          ')"
+          if printf '%s\n' "$top_levels" | grep -qxF "plugin"; then
+            echo "::error::Tarball must not contain a top-level 'plugin/' directory"
+            exit 1
+          fi
+          echo "✓ Tarball canonical root contents verified"
+
+      - name: Upload release asset
+        uses: softprops/action-gh-release@v2
+        with:
+          files: idd-plugin-${{ github.ref_name }}.tar.gz

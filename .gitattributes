@@ -1,0 +1,2 @@
+dist/skills/** linguist-generated=true
+dist/skills/** -diff
