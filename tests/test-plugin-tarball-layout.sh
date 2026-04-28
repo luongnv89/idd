@@ -89,7 +89,12 @@ fi
 # ───────────────────────────────────────────────────────────
 # T4: .claude-plugin/plugin.json present in archive
 # ───────────────────────────────────────────────────────────
-if tar -tzf "$TARBALL" | grep -qE '^\.?/?\.claude-plugin/plugin\.json$'; then
+# Materialize listing first to avoid SIGPIPE racing under set -o pipefail:
+# `tar | grep -q` lets grep exit on first match, which sends SIGPIPE to tar;
+# under pipefail that nonzero exit fails the whole pipeline (Linux-tar
+# specific; macOS BSD tar masks it). Capture once, grep the buffer.
+listing="$(tar -tzf "$TARBALL")"
+if printf '%s\n' "$listing" | grep -qE '^\.?/?\.claude-plugin/plugin\.json$'; then
   pass "T4: .claude-plugin/plugin.json present in archive"
 else
   fail "T4: .claude-plugin/plugin.json missing from archive"
