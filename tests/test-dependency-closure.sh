@@ -39,7 +39,10 @@ echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄�
 # false-positive cycle warnings.
 TMP_OUT="$(mktemp -d)"
 BUILD_LOG="$(mktemp)"
-trap 'rm -rf "$TMP_OUT"; rm -f "$BUILD_LOG"' EXIT
+SYN_TMP="$(mktemp -d)"
+SYN_OUT="$(mktemp -d)"
+SYN_LOG="$(mktemp)"
+trap 'rm -rf "$TMP_OUT" "$SYN_TMP" "$SYN_OUT"; rm -f "$BUILD_LOG" "$SYN_LOG"' EXIT
 
 if "$BUILD_SH" --out "$TMP_OUT" >"$BUILD_LOG" 2>&1; then
   pass "T1: clean build into temp dir"
@@ -89,17 +92,35 @@ fi
 # ───────────────────────────────────────────────────────────
 COPIED_IMPL="$TMP_DIST_SKILLS/issue-resolver/references/agents/implementer.md"
 if [ -f "$COPIED_IMPL" ]; then
-  if grep -qE '(?<![\w/])docs/naming-conventions\.md' "$COPIED_IMPL"; then
-    fail "T4: copied implementer.md still has bare 'docs/naming-conventions.md'"
+  # Use Python for the bare-vs-rewritten check — the lookbehind needed here
+  # is PCRE-only and macOS grep is BSD/POSIX ERE only.
+  if python3 - "$COPIED_IMPL" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+text = Path(sys.argv[1]).read_text(encoding="utf-8")
+# Strip URLs first.
+text = re.sub(r"https?://\S+", "", text)
+# Bare 'docs/<file>.md' must NOT appear (it should have been rewritten to
+# 'references/docs/<file>.md'). Use word-boundary equivalent to avoid
+# false positives on 'references/docs/...' which is the rewritten form.
+BARE_RE = re.compile(r"(?<![\w/])docs/[a-z][a-z0-9-]+\.md")
+matches = BARE_RE.findall(text)
+sys.exit(1 if matches else 0)
+PY
+  then
+    pass "T4: copied implementer.md has bare 'docs/...' rewritten to 'references/docs/...'"
   else
-    pass "T4: copied implementer.md has bare doc reference rewritten"
+    fail "T4: copied implementer.md still contains bare 'docs/...' references"
   fi
-  if grep -qE 'references/docs/naming-conventions\.md' "$COPIED_IMPL" 2>/dev/null; then
-    pass "T4.1: copied implementer.md references rewritten to references/docs/...'"
+  if grep -qF 'references/docs/naming-conventions.md' "$COPIED_IMPL"; then
+    pass "T4.1: copied implementer.md uses 'references/docs/naming-conventions.md'"
   else
-    # Acceptable if the agent had no explicit docs/ reference originally —
-    # the assertion above (T4) is the hard check. This is a softer ack.
-    pass "T4.1: copied implementer.md doc reference shape OK"
+    # If the source agent never named naming-conventions.md (just 'docs/...'),
+    # the rewritten form may still be there — but a missing rewrite means T4
+    # didn't actually have anything to rewrite. Make this informational only.
+    pass "T4.1: copied implementer.md has no naming-conventions.md reference (vacuously OK)"
   fi
 else
   fail "T4: copied implementer.md missing from flattened issue-resolver"
@@ -141,7 +162,6 @@ done
 #   src/docs/D.md           → leaf (no further refs)
 # Expected: D.md appears exactly once in dist/skills/dia/references/docs/,
 #   no cycle warnings, exit 0.
-SYN_TMP="$(mktemp -d)"
 mkdir -p "$SYN_TMP/src/skills/dia" "$SYN_TMP/src/shared/agents" "$SYN_TMP/src/docs"
 cat > "$SYN_TMP/src/skills/dia/SKILL.md" <<'EOF'
 ---
@@ -196,8 +216,6 @@ cp "$REPO_ROOT/scripts/build.sh" "$SYN_TMP/scripts/build.sh"
 cp "$REPO_ROOT/scripts/plugin-schema.json" "$SYN_TMP/scripts/plugin-schema.json"
 chmod +x "$SYN_TMP/scripts/build.sh"
 
-SYN_LOG="$(mktemp)"
-SYN_OUT="$(mktemp -d)"
 if (cd "$SYN_TMP" && bash scripts/build.sh --out "$SYN_OUT") >"$SYN_LOG" 2>&1; then
   pass "T7.1: synthetic diamond build succeeds"
 else
@@ -225,8 +243,6 @@ if [ "$syn_dups" = "1" ]; then
 else
   fail "T7.4: synthetic D doc appears $syn_dups times (expected 1)"
 fi
-
-rm -rf "$SYN_TMP" "$SYN_OUT" "$SYN_LOG"
 
 # ───────────────────────────────────────────────────────────
 # Summary

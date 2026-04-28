@@ -53,13 +53,13 @@ PLUGIN_SKILLS="$DIST_PLUGIN/skills"
 # ───────────────────────────────────────────────────────────
 # T1: forbidden — bare local references
 # ───────────────────────────────────────────────────────────
-python3 - "$PLUGIN_SKILLS" <<'PY'
+if python3 - "$PLUGIN_SKILLS" <<'PY'
 import re
 import sys
 from pathlib import Path
 
 base = Path(sys.argv[1])
-URL_RE = re.compile(r"https?://[^\s<>'\"\)]+")
+URL_RE = re.compile(r"https?://\S+")
 SHARED_AGENT_RE = re.compile(r"(?<![\w/])shared/agents/([a-z][a-z0-9-]+\.md)")
 RUNTIME_DOC_RE = re.compile(r"(?<![\w/])docs/([a-z][a-z0-9-]+\.md)")
 PLUGIN_ROOT_RE = re.compile(r"\$\{CLAUDE_PLUGIN_ROOT\}")
@@ -125,7 +125,7 @@ if unresolved_tokens:
 
 sys.exit(1 if failed else 0)
 PY
-if [ "$?" -eq 0 ]; then
+then
   pass "T1: no forbidden reference forms in dist/plugin/skills/"
 else
   fail "T1: forbidden reference forms detected"
@@ -164,13 +164,13 @@ fi
 # ───────────────────────────────────────────────────────────
 # T3: same reference type does not appear in two forms across plugin tree
 # ───────────────────────────────────────────────────────────
-python3 - "$PLUGIN_SKILLS" <<'PY'
+if python3 - "$PLUGIN_SKILLS" <<'PY'
 import re
 import sys
 from pathlib import Path
 
 base = Path(sys.argv[1])
-URL_RE = re.compile(r"https?://[^\s<>'\"\)]+")
+URL_RE = re.compile(r"https?://\S+")
 EXTS = {".md", ".txt", ".yml", ".yaml", ".json", ".toml"}
 
 forms = {
@@ -216,7 +216,7 @@ for ref_type, found in forms.items():
 
 sys.exit(1 if failed else 0)
 PY
-if [ "$?" -eq 0 ]; then
+then
   pass "T3: no reference type appears in two forms within dist/plugin/"
 else
   fail "T3: at least one reference type appears in two forms"

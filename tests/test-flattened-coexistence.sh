@@ -9,8 +9,8 @@
 #   2. Verify each skill remains self-contained: every `references/agents/*.md`
 #      and `references/docs/*.md` referenced from the skill exists inside its
 #      own directory.
-#   3. Verify the two skills' `references/` trees do not overlap in a way
-#      that would cause a copy of one skill to overwrite content of the other.
+#   3. Verify the two skills' directories don't collide (different top-level
+#      names) and no file inside either skill escapes its own root.
 #
 # Usage: bash tests/test-flattened-coexistence.sh
 # Returns: exit 0 on pass, exit 1 on failure.
@@ -55,10 +55,11 @@ else
 fi
 
 # ───────────────────────────────────────────────────────────
-# T2: copy both skills into a single temp dir without collision
+# T2: copy both skills into a single temp dir
 # ───────────────────────────────────────────────────────────
 TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
+HELPER_DIR="$(mktemp -d)"
+trap 'rm -rf "$TMP" "$HELPER_DIR"' EXIT
 
 cp -R "$SKILL_A" "$TMP/"
 cp -R "$SKILL_B" "$TMP/"
@@ -70,60 +71,28 @@ else
 fi
 
 # ───────────────────────────────────────────────────────────
-# T3: no file paths overlap between the two skill trees
+# T3: skill directory names are distinct (no collision when placed side-by-side)
 # ───────────────────────────────────────────────────────────
-collisions="$(python3 - "$SKILL_A" "$SKILL_B" <<'PY'
-import sys
-from pathlib import Path
-
-a = Path(sys.argv[1])
-b = Path(sys.argv[2])
-
-paths_a = {p.relative_to(a) for p in a.rglob("*") if p.is_file()}
-paths_b = {p.relative_to(b) for p in b.rglob("*") if p.is_file()}
-
-# Files at the skill root with the same relative path WITHIN each skill is
-# expected (e.g., both have SKILL.md). Coexistence concern is whether the
-# top-level directory names collide. Since the skills are placed at
-# <skills_dir>/issue-creator/ and <skills_dir>/init-gitissue/, top-level
-# names differ — no overlap is possible. Defensive: confirm directory names
-# are distinct.
-if a.name == b.name:
-    print(f"COLLIDE: skill directory names match: {a.name}")
-    sys.exit(1)
-
-# Also assert references/ paths inside each skill don't reach outside.
-for skill in (a, b):
-    for f in skill.rglob("*"):
-        if f.is_file():
-            rel = f.relative_to(skill)
-            # Any '..' in the relative path means the file lives outside
-            # the skill — not actually possible from rglob, but defensive.
-            if ".." in rel.parts:
-                print(f"OUTSIDE: {f}")
-                sys.exit(1)
-
-sys.exit(0)
-PY
-)" || {
-  fail "T3: skills collide when coexisting"
-  echo "$collisions" | sed 's/^/    /'
-  exit 1
-}
-pass "T3: no path collisions between issue-creator and init-gitissue"
+NAME_A="$(basename "$SKILL_A")"
+NAME_B="$(basename "$SKILL_B")"
+if [ "$NAME_A" != "$NAME_B" ]; then
+  pass "T3: skill directory names differ ($NAME_A vs $NAME_B)"
+else
+  fail "T3: skill directory names collide ($NAME_A == $NAME_B)"
+fi
 
 # ───────────────────────────────────────────────────────────
-# T4: each skill's local references resolve within its own tree
+# T4: each skill's local references resolve within its own tree.
+# Use a Python helper file to keep the bash heredoc out of $(...) capture.
 # ───────────────────────────────────────────────────────────
-for skill_dir in "$TMP/issue-creator" "$TMP/init-gitissue"; do
-  name="$(basename "$skill_dir")"
-  if python3 - "$skill_dir" <<'PY'; then
+HELPER="$HELPER_DIR/check_local_refs.py"
+cat > "$HELPER" <<'PY'
 import re
 import sys
 from pathlib import Path
 
 base = Path(sys.argv[1])
-URL_RE = re.compile(r"https?://[^\s<>'\"\)]+")
+URL_RE = re.compile(r"https?://\S+")
 LOCAL_AGENT_RE = re.compile(r"(?<![\w/])references/agents/([a-z][a-z0-9-]+\.md)")
 LOCAL_DOC_RE = re.compile(r"(?<![\w/])references/docs/([a-z][a-z0-9-]+\.md)")
 EXTS = {".md", ".txt", ".yml", ".yaml", ".json", ".toml"}
@@ -150,6 +119,10 @@ if errors:
     sys.exit(1)
 sys.exit(0)
 PY
+
+for skill_dir in "$TMP/issue-creator" "$TMP/init-gitissue"; do
+  name="$(basename "$skill_dir")"
+  if python3 "$HELPER" "$skill_dir"; then
     pass "T4: $name local references resolve inside the skill"
   else
     fail "T4: $name has unresolved local references after coexistence copy"

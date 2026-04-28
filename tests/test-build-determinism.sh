@@ -58,7 +58,9 @@ else
 fi
 
 # ───────────────────────────────────────────────────────────
-# T3: SHA-256 of all files matches between trees (defense-in-depth)
+# T3: SHA-256 of all files matches between trees (defense-in-depth).
+# diff -r in T2 is the authoritative gate; this is a redundant cross-check.
+# Avoids non-portable `sort -z` (BSD sort on macOS lacks NUL-delimited mode).
 # ───────────────────────────────────────────────────────────
 if command -v shasum >/dev/null 2>&1; then
   HASH_CMD="shasum -a 256"
@@ -69,8 +71,10 @@ else
 fi
 
 if [ -n "$HASH_CMD" ]; then
-  hash_a="$(cd "$OUT_A" && find . -type f -print0 | sort -z | xargs -0 $HASH_CMD | $HASH_CMD | awk '{print $1}')"
-  hash_b="$(cd "$OUT_B" && find . -type f -print0 | sort -z | xargs -0 $HASH_CMD | $HASH_CMD | awk '{print $1}')"
+  # Plain sort over filenames is portable across BSD/GNU. Filenames in this
+  # repo contain no newlines, so non-NUL-delimited sort is safe here.
+  hash_a="$(cd "$OUT_A" && find . -type f | LC_ALL=C sort | xargs $HASH_CMD | $HASH_CMD | awk '{print $1}')"
+  hash_b="$(cd "$OUT_B" && find . -type f | LC_ALL=C sort | xargs $HASH_CMD | $HASH_CMD | awk '{print $1}')"
   if [ "$hash_a" = "$hash_b" ]; then
     pass "T3: SHA-256 of file contents matches across builds ($hash_a)"
   else

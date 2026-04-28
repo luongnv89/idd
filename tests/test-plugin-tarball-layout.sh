@@ -54,31 +54,18 @@ fi
 # ───────────────────────────────────────────────────────────
 # T2: archive root contains the four expected entries
 # ───────────────────────────────────────────────────────────
-listing="$(tar -tzf "$TARBALL")"
-
-# Top-level entries (strip ./ prefix from tar output, take first path
-# component). Use python for robust parsing.
-top_levels="$(printf '%s\n' "$listing" | python3 - <<'PY'
-import sys
-
-tops = set()
-for line in sys.stdin:
-    line = line.strip()
-    if not line:
-        continue
-    # Strip leading ./ and take the first path component
-    if line.startswith("./"):
-        line = line[2:]
-    if not line or line.startswith("/"):
-        continue
-    first = line.split("/", 1)[0]
-    if first:
-        tops.add(first)
-
-for t in sorted(tops):
-    print(t)
-PY
-)"
+# Use awk for top-level extraction (no Python stdin/script collision):
+#   strip leading ./ , take first path component, dedupe.
+top_levels="$(tar -tzf "$TARBALL" | awk '
+  {
+    sub(/^\.\//, "", $0)
+    if ($0 == "" || $0 ~ /^\//) next
+    n = index($0, "/")
+    first = (n > 0) ? substr($0, 1, n - 1) : $0
+    if (first != "") seen[first] = 1
+  }
+  END { for (k in seen) print k }
+' | sort)"
 
 for expected in ".claude-plugin" "skills" "shared" "docs"; do
   if printf '%s\n' "$top_levels" | grep -qxF "$expected"; then
@@ -102,7 +89,7 @@ fi
 # ───────────────────────────────────────────────────────────
 # T4: .claude-plugin/plugin.json present in archive
 # ───────────────────────────────────────────────────────────
-if printf '%s\n' "$listing" | grep -qE '^\.?/?\.claude-plugin/plugin\.json$'; then
+if tar -tzf "$TARBALL" | grep -qE '^\.?/?\.claude-plugin/plugin\.json$'; then
   pass "T4: .claude-plugin/plugin.json present in archive"
 else
   fail "T4: .claude-plugin/plugin.json missing from archive"

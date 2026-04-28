@@ -108,7 +108,7 @@ if [ ! -d "$AUTOPILOT_DIST_FLAT" ] || [ ! -d "$AUTOPILOT_DIST_PLUGIN" ]; then
 fi
 
 # T5: dist/skills/auto-pilot/ uses sibling-relative ../<name>/SKILL.md
-if grep -rqE '\(?\.\./issue-resolver/SKILL\.md' "$AUTOPILOT_DIST_FLAT"; then
+if grep -rqE '\.\./issue-resolver/SKILL\.md' "$AUTOPILOT_DIST_FLAT"; then
   pass "T5: dist/skills/auto-pilot uses '../<name>/SKILL.md' (A-fail)"
 else
   fail "T5: dist/skills/auto-pilot missing expected '../<name>/SKILL.md' rendering"
