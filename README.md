@@ -9,13 +9,13 @@
 <p align="center">
   <a href="https://github.com/luongnv89/idd/releases/latest"><img src="https://img.shields.io/badge/version-0.7.0-blue.svg" alt="Version 0.7.0"></a>
   <a href="https://github.com/luongnv89/idd/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="MIT License"></a>
-  <a href="https://github.com/luongnv89/idd"><img src="https://img.shields.io/badge/skills-9-blue.svg" alt="9 skills"></a>
+  <a href="https://github.com/luongnv89/idd"><img src="https://img.shields.io/badge/commands-8-blue.svg" alt="8 commands"></a>
   <a href="https://github.com/luongnv89/idd/blob/main/CONTRIBUTING.md"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs Welcome"></a>
 </p>
 
 # Turn GitHub Issues Into Structured, Agent-Ready Work Orders
 
-Nine terminal commands that structure, analyze, triage, resolve, review, and self-check GitHub issue workflows — so any developer or AI agent can pick up an issue and ship a tested PR.
+Eight terminal commands that structure, analyze, triage, resolve, review, and self-check GitHub issue workflows — so any developer or AI agent can pick up an issue and ship a tested PR.
 
 [**Get Started**](#get-started) · [**What is IDD?**](#what-is-idd) · [**Intention-Driven Development**](#idd-as-intention-driven-development) · [**Why Good Issues & Commits Matter**](#why-good-issues-and-commit-messages-matter) · [**Works With Any Tool**](#works-with-any-tool)
 
@@ -60,7 +60,6 @@ graph LR
 | `/init-gitissue` | Auto-detect language/framework/test runner, generate `.gitissue.yml` | 0.3.2 | low |
 | `/auto-pilot` | Triage → resolve → review → merge loop. Conservative-by-default merge modes (`conservative`/`balanced`/`aggressive`) and explicit issue lists for targeted runs | 2.2.0 | max |
 | `/issue-pr-review` | Review PR end-to-end: script pre-pass (lint/format/test auto-fix), per-criterion AC verification, five-dimension scoring (correctness, acceptance_criteria, traceability, maintainability, safety), reuses reviewer/fixer agents across cycles | 0.4.1 | high |
-| `/issue-pr-review-fix-loop` | _Deprecated v0.4.0 — use `/issue-pr-review`._ The outer review-fix loop is now part of `/issue-pr-review`. Retained one release cycle for backward-compat references; will be removed from this index. | 0.4.0 (deprecated) | high |
 
 ### Internal tooling
 
@@ -204,7 +203,6 @@ You can also install individual skills. See each skill folder for per-skill comm
 | `/issue-triage` | [`src/skills/issue-triage/`](src/skills/issue-triage/) |
 | `/auto-pilot` | [`src/skills/auto-pilot/`](src/skills/auto-pilot/) |
 | `/issue-pr-review` | [`src/skills/issue-pr-review/`](src/skills/issue-pr-review/) |
-| `/issue-pr-review-fix-loop` _(deprecated)_ | [`src/deprecated-skills/issue-pr-review-fix-loop/`](src/deprecated-skills/issue-pr-review-fix-loop/) |
 | `/init-gitissue` | [`src/skills/init-gitissue/`](src/skills/init-gitissue/) |
 | `/idd-doctor` _(internal)_ | [`src/internal-skills/idd-doctor/`](src/internal-skills/idd-doctor/) |
 
@@ -422,39 +420,6 @@ Pipeline:
 
 Max 3 review-fix cycles with stagnation detection.
 
-### /issue-pr-review-fix-loop -- Outer Review-Fix Loop _(deprecated)_
-
-> **Deprecated in v0.4.0** — use `/issue-pr-review` instead. The capabilities below now live in `/issue-pr-review`. This skill is retained for one release cycle to keep existing references resolvable; it will then be removed from the public skill index.
-
-Wraps `/issue-pr-review` in an outer loop that reuses the same reviewer and fixer agents across cycles for efficiency. A fresh confirmation pass runs at the end to provide an unbiased final check after all fixes are applied.
-
-```
-/issue-pr-review-fix-loop 87       # review-fix loop for PR #87
-/issue-pr-review-fix-loop          # auto-detect PR for current branch
-/issue-pr-review-fix-loop 87 --auto  # review-fix + auto-merge when clean
-```
-
-Loop:
-
-```
-Cycle 1/3
-  [Review]   ⟶ /issue-pr-review --review-only (reused reviewer agent)
-  [Result]   ✗ NEEDS_FIX — 3 issues
-  [Fix]      ✓ fixed 3 issues (reused fixer agent)
-  [Commit]   ✓ fix(auth): address review feedback (#42)
-  [Push]     ✓ pushed to origin
-
-Cycle 2/3
-  [Review]   ⟶ /issue-pr-review --review-only (reused reviewer agent)
-  [Result]   ✓ PASS — 0 issues
-
-Confirmation
-  [Review]   ⟶ Fresh reviewer (independent final check)
-  [Result]   ✓ PASS — confirmed clean
-```
-
-Max 3 cycles with stagnation detection. Each cycle creates an atomic commit.
-
 ### /init-gitissue -- Generate Config
 
 Scans your repository and generates `.gitissue.yml` with sensible defaults: detects language, framework, test runner, existing templates, and adjusts timeouts based on repo size.
@@ -554,7 +519,7 @@ src/
 │   └── idd-doctor/         # /idd-doctor — read-only repo health check
 │
 ├── deprecated-skills/
-│   └── issue-pr-review-fix-loop/  # DEPRECATED v0.4.0 — redirects to /issue-pr-review
+│   └── issue-pr-review-fix-loop/  # Retained deprecated source only; not distributed
 │
 └── docs/                         # Runtime docs (consumed by skills at runtime)
     ├── config-schema.md          # Full .gitissue.yml schema (autopilot + review)
