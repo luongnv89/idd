@@ -159,16 +159,17 @@ IDD ships through two distribution paths. Pick the one that matches your harness
 
 #### Plugin path (Claude Code)
 
-Download the latest plugin tarball from the [releases page](https://github.com/luongnv89/idd/releases/latest) and extract it into your Claude Code plugins directory:
+> **Note:** Plugin tarballs ship with the first tagged release that runs the release pipeline. Until then, use the [Standalone path](#standalone-path-any-skillmd-compatible-harness) below.
+
+Once a release is published, grab the `idd-plugin-<tag>.tar.gz` asset from the [releases page](https://github.com/luongnv89/idd/releases/latest) and extract it into your Claude Code plugins directory:
 
 ```bash
 mkdir -p ~/.claude/plugins/idd
-curl -L -o /tmp/idd-plugin.tar.gz \
-  "$(gh release view --repo luongnv89/idd --json assets --jq '.assets[] | select(.name | startswith("idd-plugin-")) | .url')"
-tar -xzf /tmp/idd-plugin.tar.gz -C ~/.claude/plugins/idd
+# Download idd-plugin-<tag>.tar.gz from the release page (browser or `gh release download`)
+tar -xzf idd-plugin-<tag>.tar.gz -C ~/.claude/plugins/idd
 ```
 
-The tarball is named `idd-plugin-<tag>.tar.gz` and unpacks to `.claude-plugin/plugin.json`, `skills/`, `shared/`, and `docs/` at its root. Restart Claude Code to load the new plugin.
+The tarball unpacks to `.claude-plugin/plugin.json`, `skills/`, `shared/`, and `docs/` at its root. Restart Claude Code to load the new plugin.
 
 #### Standalone path (any SKILL.md-compatible harness)
 

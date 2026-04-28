@@ -16,12 +16,13 @@
 
 2. Install skills locally. Use either distribution path:
    ```bash
-   # Plugin path (Claude Code) — extract a built tarball into the plugins dir.
+   # Plugin path (Claude Code) — extract a release tarball into ~/.claude/plugins/idd/.
    # See README → Install for the full command.
 
-   # Standalone path (any SKILL.md harness) — copy from this checkout:
+   # Standalone path (any SKILL.md harness) — copy from this checkout into ~/.claude/skills/:
    cp -r dist/skills/issue-resolver ~/.claude/skills/
    ```
+   The Plugin path lives under `~/.claude/plugins/idd/`; the Standalone path drops individual skills directly into `~/.claude/skills/`. Pick one.
 
 3. Verify setup:
    ```bash
