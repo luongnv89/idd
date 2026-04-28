@@ -58,8 +58,11 @@ if not src_docs.is_dir():
 existing = {p.name for p in src_docs.glob("*.md")}
 text = target.read_text(encoding="utf-8")
 
+# Mirrors STALE_DOC_URL_RE in scripts/build.py: negative lookbehind on 'src'
+# means the regex catches stale URLs regardless of how many path components
+# precede /docs/ (blob/<ref>/, raw/<ref>/, tree/<ref>/<sub>/, …).
 PATTERN = re.compile(
-    r"https://github\.com/luongnv89/idd/[^/\s]+/[^/\s]+/docs/([a-z][a-z0-9-]+\.md)"
+    r"https://github\.com/luongnv89/idd/[^\s<>'\"\)]*?(?<!src)/docs/([a-z][a-z0-9-]+\.md)"
 )
 
 violations = []

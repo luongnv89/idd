@@ -43,6 +43,9 @@ fi
 # ───────────────────────────────────────────────────────────
 # T2: scan template for stale doc URLs
 # ───────────────────────────────────────────────────────────
+# Capture violations regardless of Python exit code. Without `|| true`, the
+# Python `sys.exit(1)` on detected violations would propagate through
+# `set -euo pipefail` and abort the script before T2's pass/fail check.
 violation_output="$(python3 - "$TEMPLATE" "$SRC_DOCS" <<'PY'
 import re
 import sys
@@ -60,12 +63,13 @@ existing = {p.name for p in src_docs.glob("*.md")}
 
 text = template.read_text(encoding="utf-8")
 
-# Pattern: GitHub URLs to docs/<file>.md in luongnv89/idd repo where <file>
-# matches a doc in src/docs/. The URL must reference src/docs/<file>.md
-# instead. We allow any branch/tag in the path because the rule applies
-# regardless.
+# Pattern: GitHub URLs to docs/<file>.md in luongnv89/idd repo where the
+# segment immediately before /docs/ is NOT 'src'. Mirrors STALE_DOC_URL_RE
+# in scripts/build.py — uses a negative lookbehind so the regex is
+# independent of how many path components precede /docs/ (handles
+# blob/<ref>/docs/, raw/<ref>/docs/, tree/<ref>/<sub>/docs/, etc.).
 PATTERN = re.compile(
-    r"https://github\.com/luongnv89/idd/[^/\s]+/[^/\s]+/docs/([a-z][a-z0-9-]+\.md)"
+    r"https://github\.com/luongnv89/idd/[^\s<>'\"\)]*?(?<!src)/docs/([a-z][a-z0-9-]+\.md)"
 )
 
 violations = []
@@ -82,7 +86,7 @@ if violations:
     sys.exit(1)
 sys.exit(0)
 PY
-)"
+)" || true
 
 if [ -z "$violation_output" ]; then
   pass "T2: no stale 'docs/<file>.md' GitHub URLs in source template"
