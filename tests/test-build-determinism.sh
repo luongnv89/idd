@@ -60,28 +60,38 @@ fi
 # ───────────────────────────────────────────────────────────
 # T3: SHA-256 of all files matches between trees (defense-in-depth).
 # diff -r in T2 is the authoritative gate; this is a redundant cross-check.
-# Avoids non-portable `sort -z` (BSD sort on macOS lacks NUL-delimited mode).
+# Use Python so the aggregate is invariant to xargs batching: a naive
+# `find | xargs $HASH_CMD | $HASH_CMD` would split into multiple xargs
+# invocations once file count exceeds ARG_MAX, and the outer hash would
+# depend on batch count rather than just content.
 # ───────────────────────────────────────────────────────────
-if command -v shasum >/dev/null 2>&1; then
-  HASH_CMD="shasum -a 256"
-elif command -v sha256sum >/dev/null 2>&1; then
-  HASH_CMD="sha256sum"
-else
-  HASH_CMD=""
-fi
+hash_tree() {
+  python3 - "$1" <<'PY'
+import hashlib
+import os
+import sys
 
-if [ -n "$HASH_CMD" ]; then
-  # Plain sort over filenames is portable across BSD/GNU. Filenames in this
-  # repo contain no newlines, so non-NUL-delimited sort is safe here.
-  hash_a="$(cd "$OUT_A" && find . -type f | LC_ALL=C sort | xargs $HASH_CMD | $HASH_CMD | awk '{print $1}')"
-  hash_b="$(cd "$OUT_B" && find . -type f | LC_ALL=C sort | xargs $HASH_CMD | $HASH_CMD | awk '{print $1}')"
-  if [ "$hash_a" = "$hash_b" ]; then
-    pass "T3: SHA-256 of file contents matches across builds ($hash_a)"
-  else
-    fail "T3: SHA-256 differs ($hash_a vs $hash_b)"
-  fi
+root = sys.argv[1]
+agg = hashlib.sha256()
+files = []
+for dirpath, _, filenames in os.walk(root):
+    for f in filenames:
+        files.append(os.path.relpath(os.path.join(dirpath, f), root))
+files.sort()
+for rel in files:
+    full = os.path.join(root, rel)
+    with open(full, "rb") as fh:
+        agg.update(fh.read())
+print(agg.hexdigest())
+PY
+}
+
+hash_a="$(hash_tree "$OUT_A")"
+hash_b="$(hash_tree "$OUT_B")"
+if [ "$hash_a" = "$hash_b" ]; then
+  pass "T3: SHA-256 of file contents matches across builds ($hash_a)"
 else
-  pass "T3: no sha256 utility available — skipped (T2 covers this)"
+  fail "T3: SHA-256 differs ($hash_a vs $hash_b)"
 fi
 
 # ───────────────────────────────────────────────────────────

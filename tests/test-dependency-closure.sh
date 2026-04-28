@@ -244,6 +244,18 @@ else
   fail "T7.4: synthetic D doc appears $syn_dups times (expected 1)"
 fi
 
+# T7.5 — both transitive agents (the diamond's middle nodes) must be copied.
+# Without this, a build that silently dropped agent copies but still pulled
+# their referenced docs would slip past T7.3/T7.4.
+if [ -f "$SYN_DIA/references/agents/b-agent.md" ] && [ -f "$SYN_DIA/references/agents/c-agent.md" ]; then
+  pass "T7.5: both transitive agents copied to dia/references/agents/"
+else
+  missing=""
+  [ -f "$SYN_DIA/references/agents/b-agent.md" ] || missing="$missing b-agent.md"
+  [ -f "$SYN_DIA/references/agents/c-agent.md" ] || missing="$missing c-agent.md"
+  fail "T7.5: missing transitive agent copy:$missing"
+fi
+
 # ───────────────────────────────────────────────────────────
 # Summary
 # ───────────────────────────────────────────────────────────

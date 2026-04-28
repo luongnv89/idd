@@ -120,8 +120,9 @@ sys.exit(0)
 PY
 }
 
-TEXT_EXTS_REGEX='\.(md|txt|yml|yaml|json|toml)$'
-
+# Use a portable -name glob group rather than -regex. macOS BSD find defaults
+# to BRE for -regex (no `(`/`|` alternation); GNU find defaults to emacs regex
+# with the same effect. Both produce zero matches for the alternation form.
 for skill_dir in "$DIST_SKILLS"/*/; do
   name="$(basename "$skill_dir")"
   errors_in_skill=0
@@ -129,7 +130,10 @@ for skill_dir in "$DIST_SKILLS"/*/; do
     if ! scan_file "$f" "$skill_dir"; then
       errors_in_skill=$((errors_in_skill + 1))
     fi
-  done < <(find "$skill_dir" -type f -regex ".*$TEXT_EXTS_REGEX")
+  done < <(find "$skill_dir" -type f \( \
+      -name "*.md" -o -name "*.txt" -o -name "*.yml" \
+      -o -name "*.yaml" -o -name "*.json" -o -name "*.toml" \
+    \))
   if [ "$errors_in_skill" -eq 0 ]; then
     pass "T1: dist/skills/$name is self-contained"
   else
