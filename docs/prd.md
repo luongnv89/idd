@@ -1,7 +1,7 @@
 # PRD: gitissue
 
-> **Historical document — superseded by [`docs/idd-methodology.md`](idd-methodology.md) for the current methodology.**
-> This PRD (v1.1, 2026-03-20) describes the early product direction in which `/issue-creator` was specified to scan the codebase and embed affected files, technical notes, and architecture constraints into the issue body. That direction was reversed: issues now capture **intent only**. References in this document to "codebase-aware issues", "issue enrichment with codebase context", "affected files in the template", or "auto-enriched issues" are historical and do **not** describe the shipped behavior. The shipped behavior is described in skill READMEs and `docs/idd-methodology.md` (intent-code boundary).
+> **Historical document — superseded by [`src/docs/idd-methodology.md`](../src/docs/idd-methodology.md) for the current methodology.**
+> This PRD (v1.1, 2026-03-20) describes the early product direction in which `/issue-creator` was specified to scan the codebase and embed affected files, technical notes, and architecture constraints into the issue body. That direction was reversed: issues now capture **intent only**. References in this document to "codebase-aware issues", "issue enrichment with codebase context", "affected files in the template", or "auto-enriched issues" are historical and do **not** describe the shipped behavior. The shipped behavior is described in skill READMEs and [`src/docs/idd-methodology.md`](../src/docs/idd-methodology.md) (intent-code boundary).
 
 ## Table of Contents
 1. [Document Info](#document-info)
