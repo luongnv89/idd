@@ -95,14 +95,26 @@ Stop.
 
 ### Step 2.1 — Sync to Default Branch
 
-The main agent syncs to the default branch directly (this is lightweight — no code reading):
+The main agent syncs to the default branch directly (this is lightweight — no code reading). Use the stash-first pattern to protect any uncommitted work that may have appeared since the pre-flight stash (see `docs/sync-conventions.md`):
 
 ```bash
 git checkout {default_branch}
+dirty=0
+if [ -n "$(git status --porcelain)" ]; then
+  git stash push -u -m "pre-sync: {default_branch}"
+  dirty=1
+fi
+git fetch origin
 git pull --rebase origin {default_branch}
+if [ "$dirty" -eq 1 ]; then
+  git stash pop || {
+    echo "✗ Stash pop failed — recover with: git stash list && git stash show -p stash@{0}"
+    exit 1
+  }
+fi
 ```
 
-If this fails (merge conflict from a prior iteration), attempt auto-resolution:
+If the rebase itself fails (merge conflict from a prior iteration), attempt auto-resolution:
 
 ```bash
 git rebase --abort
@@ -436,9 +448,23 @@ Record the iteration outcome (`merged` or `left_open`) for the final summary.
 
 ### Step 5.3 — Cleanup
 
+Use the stash-first sync to protect any uncommitted changes that may have accumulated between iterations (see `docs/sync-conventions.md`):
+
 ```bash
 git checkout {default_branch}
+dirty=0
+if [ -n "$(git status --porcelain)" ]; then
+  git stash push -u -m "pre-cleanup: {default_branch}"
+  dirty=1
+fi
+git fetch origin
 git pull --rebase origin {default_branch}
+if [ "$dirty" -eq 1 ]; then
+  git stash pop || {
+    echo "✗ Stash pop failed — recover with: git stash list && git stash show -p stash@{0}"
+    exit 1
+  }
+fi
 git branch -d {branch_name} 2>/dev/null
 ```
 

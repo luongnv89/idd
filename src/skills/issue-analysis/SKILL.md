@@ -78,17 +78,26 @@ Before analyzing, recommend syncing with the remote so codebase analysis uses cu
   Sync now? [Y/n]
 ```
 
-If the user agrees, run:
+If the user agrees, run the stash-first sync (see `docs/sync-conventions.md`):
 
 ```bash
 branch="$(git rev-parse --abbrev-ref HEAD)"
+dirty=0
+if [ -n "$(git status --porcelain)" ]; then
+  git stash push -u -m "pre-sync: ${branch}"
+  dirty=1
+fi
 git fetch origin
 git pull --rebase origin "$branch"
+if [ "$dirty" -eq 1 ]; then
+  git stash pop || {
+    echo "✗ Stash pop failed — recover with: git stash list && git stash show -p stash@{0}"
+    exit 1
+  }
+fi
 ```
 
-If the working tree is dirty, stash first (`git stash`), sync, then pop (`git stash pop`). If `origin` is missing or conflicts occur, inform the user and continue without syncing.
-
-If the user declines, proceed without syncing.
+If `origin` is missing or rebase conflicts occur, inform the user and continue without syncing. If the user declines the prompt, proceed without syncing.
 
 ## Configuration
 
