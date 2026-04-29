@@ -19,7 +19,7 @@ metadata:
 >
 > This skill is deprecated as of version 0.4.0. All review-fix loop capabilities,
 > including review-fix cycles and traceability checks, are now part of
-> [`/issue-pr-review`](../issue-pr-review/SKILL.md).
+> [`/issue-pr-review`](../../skills/issue-pr-review/SKILL.md).
 >
 > ### Migration
 >

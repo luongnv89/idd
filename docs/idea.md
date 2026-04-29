@@ -1,7 +1,7 @@
 # Idea: GitIssue — Issue-Driven Development (IDD)
 
-> **Historical document — superseded by [`docs/idd-methodology.md`](idd-methodology.md).**
-> This file captures the original product concept (early 2026) when the design assumed `/issue-creator` would auto-enrich issues with codebase context. That direction was reversed: issues now capture **intent only**, and codebase analysis lives in `/issue-analysis`, `/issue-triage`, and `/issue-resolver` against current code. Phrases like "codebase-aware issues", "auto-enriched", or "affected files in the issue body" are historical and do **not** describe the shipped behavior. See `docs/idd-methodology.md` for the current intent-code boundary.
+> **Historical document — superseded by [`src/docs/idd-methodology.md`](../src/docs/idd-methodology.md).**
+> This file captures the original product concept (early 2026) when the design assumed `/issue-creator` would auto-enrich issues with codebase context. That direction was reversed: issues now capture **intent only**, and codebase analysis lives in `/issue-analysis`, `/issue-triage`, and `/issue-resolver` against current code. Phrases like "codebase-aware issues", "auto-enriched", or "affected files in the issue body" are historical and do **not** describe the shipped behavior. See [`src/docs/idd-methodology.md`](../src/docs/idd-methodology.md) for the current intent-code boundary.
 
 ## Original Concept
 
