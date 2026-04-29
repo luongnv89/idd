@@ -1,4 +1,4 @@
-<!-- Generated from src/docs/github-projects-sync.md. Do not edit. Edit source and run ./scripts/build.sh. -->
+<!-- Generated from /docs/github-projects-sync.md. Do not edit. Edit source and run ./scripts/build.sh. -->
 # GitHub Projects Status Sync
 
 Shared reference for synchronizing issue status on GitHub Project boards. This is an infrastructure component — a reusable procedure that each skill includes, not a standalone skill.

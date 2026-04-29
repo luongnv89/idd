@@ -72,7 +72,7 @@ The `--auto` flag is set automatically when invoked by `/auto-pilot`.
 
 ## Repo Sync Before Edits (mandatory)
 
-Before making any fixes, sync with remote using the stash-first pattern (see `src/docs/sync-conventions.md` in the project root for the full convention and recovery procedure):
+Before making any fixes, sync with remote using the stash-first pattern (see `docs/sync-conventions.md` in the project root for the full convention and recovery procedure):
 
 ```bash
 branch="$(git rev-parse --abbrev-ref HEAD)"
@@ -284,7 +284,7 @@ Issues to fix (only issues with action "fix" — skip "note" issues):
 {formatted_issues_json}
 
 Instructions:
-1. Sync with remote first using the stash-first pattern (see src/docs/sync-conventions.md):
+1. Sync with remote first using the stash-first pattern (see docs/sync-conventions.md):
    dirty=0
    if [ -n "$(git status --porcelain)" ]; then
      git stash push -u -m "pre-sync: {head_branch}"

@@ -307,7 +307,7 @@ When these artifacts are well-crafted:
 - **Reverts and rollbacks are safe.** When every commit is atomic and linked to an issue, you can revert a specific change with confidence — you know exactly what it did and why.
 - **Changelogs write themselves.** Conventional commit messages (`feat:`, `fix:`, `refactor:`) can be parsed automatically into release notes grouped by type.
 
-gitissue enforces this discipline automatically. `/issue-creator` structures the issue. `/issue-resolver` creates branches, commits, and PRs that follow [naming conventions](src/docs/naming-conventions.md) — linking every artifact back to the issue that started it. The result: a development history that remains useful and valuable for the entire lifetime of the project.
+gitissue enforces this discipline automatically. `/issue-creator` structures the issue. `/issue-resolver` creates branches, commits, and PRs that follow [naming conventions](docs/naming-conventions.md) — linking every artifact back to the issue that started it. The result: a development history that remains useful and valuable for the entire lifetime of the project.
 
 ### IDD and other methodologies
 
@@ -512,7 +512,7 @@ review:
   require_acceptance_criteria_check: true # block soft-pass if AC Verification fails
 ```
 
-Full schema: [`src/docs/config-schema.md`](src/docs/config-schema.md)
+Full schema: [`docs/config-schema.md`](docs/config-schema.md)
 
 </details>
 
@@ -564,17 +564,20 @@ src/
 ├── deprecated-skills/
 │   └── issue-pr-review-fix-loop/  # Retained deprecated source only; not distributed
 │
-└── docs/                         # Runtime docs (consumed by skills at runtime)
-    ├── config-schema.md          # Full .gitissue.yml schema (autopilot + review)
-    ├── idd-methodology.md        # IDD methodology + analysis-artifact rule
-    ├── naming-conventions.md     # Branch / commit / PR / issue naming
-    └── github-projects-sync.md   # GitHub Projects v2 integration
+└── (no docs/ — see below)
 
-docs/                             # Top-level project docs (humans only)
-├── ARCHITECTURE.md               # System design + data flow diagrams
-├── CHANGELOG.md                  # Per-release notes
-├── DEVELOPMENT.md                # Local setup + contribution guide
-└── sample-normalized-issue.md    # Example normalized issue
+docs/                             # Single docs tree (issue #81)
+├── config-schema.md              # ↓ Runtime docs — bundled into each skill
+├── idd-methodology.md            #   at build time via transitive-closure scan
+├── naming-conventions.md         #   on bare `docs/X.md` tokens
+├── sync-conventions.md
+├── github-projects-sync.md       # ↑
+├── ARCHITECTURE.md               # ↓ Project docs — humans only, not bundled
+├── CHANGELOG.md
+├── DEVELOPMENT.md                # ↑
+├── decisions/                    # Decision records
+├── experiments/                  # Experimental design notes
+└── release-notes/                # Per-release smoke-test reports
 ```
 
 </details>
@@ -582,6 +585,6 @@ docs/                             # Top-level project docs (humans only)
 <details>
 <summary><strong>IDD Methodology</strong></summary>
 
-Full documentation: [`src/docs/idd-methodology.md`](src/docs/idd-methodology.md)
+Full documentation: [`docs/idd-methodology.md`](docs/idd-methodology.md)
 
 </details>

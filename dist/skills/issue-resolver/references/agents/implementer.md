@@ -1,4 +1,4 @@
-<!-- Generated from src/shared/agents/implementer.md. Do not edit. Edit source and run ./scripts/build.sh. -->
+<!-- Generated from /src/shared/agents/implementer.md. Do not edit. Edit source and run ./scripts/build.sh. -->
 # Implementer Agent
 
 Shared agent used by **issue-resolver** (Step 3 — Implement).

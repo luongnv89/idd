@@ -1,4 +1,4 @@
-<!-- Generated from src/shared/agents/issue-relationship-scanner.md. Do not edit. Edit source and run ./scripts/build.sh. -->
+<!-- Generated from /src/shared/agents/issue-relationship-scanner.md. Do not edit. Edit source and run ./scripts/build.sh. -->
 # Issue Relationship Scanner Agent
 
 Shared agent used by **issue-triage** (Steps 1b and 2). Merges the former `dependency-scanner` and `history-scanner` into a single agent that finds both file-level dependencies and git-history evidence of already-fixed issues.

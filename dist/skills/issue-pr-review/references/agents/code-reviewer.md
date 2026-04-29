@@ -1,4 +1,4 @@
-<!-- Generated from src/shared/agents/code-reviewer.md. Do not edit. Edit source and run ./scripts/build.sh. -->
+<!-- Generated from /src/shared/agents/code-reviewer.md. Do not edit. Edit source and run ./scripts/build.sh. -->
 # Code Reviewer Agent
 
 Shared agent used by **issue-resolver** (Step 4 — QA), **issue-pr-review** (Step 2 — Review), and **auto-pilot** (via both skills).

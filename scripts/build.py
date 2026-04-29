@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Build script for IDD distribution.
 
-Reads authored sources under src/ and emits two distribution outputs:
+Reads authored sources under src/ + top-level docs/ and emits two
+distribution outputs:
 
   <out>/skills/   — flattened, harness-agnostic skills (committed)
   <out>/plugin/   — Claude Code plugin layout (built fresh in CI)
@@ -10,6 +11,13 @@ The build is byte-deterministic per refactor-plan-v10.md §4.1.
 Implements the (A-fail, B-fail, C-1) ADR row from
 docs/decisions/cross-skill-invocation.md — sibling-relative paths only,
 no ${CLAUDE_PLUGIN_ROOT} anywhere.
+
+Per issue #81 consolidation, runtime docs (config-schema.md,
+idd-methodology.md, naming-conventions.md, sync-conventions.md,
+github-projects-sync.md) live at the top-level docs/ alongside
+human-only project docs (ARCHITECTURE.md, CHANGELOG.md, etc.). The
+build's transitive-closure scan determines which docs each skill needs
+and bundles only those into the dist outputs.
 """
 
 from __future__ import annotations
@@ -39,14 +47,15 @@ BARE_SKILL_PATH_RE = re.compile(r"(?<![\w/])skills/([a-z][a-z0-9-]+)/SKILL\.md")
 
 URL_RE = re.compile(r"https?://[^\s<>'\"\)]+")
 
-# Phase E: stale GitHub URL guard. Match any IDD-repo URL whose path component
-# immediately preceding /docs/ is NOT 'src'. (Negative lookbehind on 'src'.)
+# Phase E: stale GitHub URL guard. Runtime docs live at top-level docs/ (issue
+# #81 — single-tree consolidation). Match any IDD-repo URL referencing
+# /src/docs/<file>.md — those are stale post-#81 and should be /docs/<file>.md.
 STALE_DOC_URL_RE = re.compile(
-    r"https://github\.com/luongnv89/idd/[^\s<>'\"\)]*?(?<!src)/docs/([a-z][a-z0-9-]+\.md)"
+    r"https://github\.com/luongnv89/idd/[^\s<>'\"\)]*?/src/docs/([a-z][a-z0-9-]+\.md)"
 )
 
 BANNER_TMPL = (
-    "<!-- Generated from src/{rel}. Do not edit. "
+    "<!-- Generated from /{rel}. Do not edit. "
     "Edit source and run ./scripts/build.sh. -->\n"
 )
 
@@ -193,10 +202,14 @@ def _discover_distributed_deprecated(src: Path) -> list[str]:
     return out
 
 
-def _check_non_markdown_in(root: Path, label: str) -> None:
+def _check_non_markdown_in(root: Path, label: str, *, recursive: bool = True) -> None:
     if not root.exists():
         return
-    for f in _walk_files(root):
+    if recursive:
+        candidates = list(_walk_files(root))
+    else:
+        candidates = [p for p in _sorted_iterdir(root) if p.is_file()]
+    for f in candidates:
         if f.suffix != ".md":
             _abort(f"non-markdown file under {label}: {f.relative_to(root.parent)}")
 
@@ -231,7 +244,8 @@ def _compute_closure(
         if kind == "agent":
             p = src / "shared" / "agents" / name
         else:
-            p = src / "docs" / name
+            # Runtime docs live at top-level docs/ (issue #81 consolidation).
+            p = src.parent / "docs" / name
         return p if p.is_file() else None
 
     def _visit(kind: str, name: str, path_chain: list[str]) -> None:
@@ -291,11 +305,12 @@ def _compute_closure(
 
 
 def _check_stale_doc_urls(src: Path) -> None:
-    """Abort if any IDD-repo /docs/<file>.md URL refers to a doc that lives
-    under src/docs/. Such URLs must use src/docs/<file>.md."""
-    docs_dir = src / "docs"
-    src_docs = {p.name for p in docs_dir.glob("*.md")} if docs_dir.is_dir() else set()
-    if not src_docs:
+    """Abort if any IDD-repo /src/docs/<file>.md URL refers to a doc that lives
+    under top-level docs/. Such URLs must use docs/<file>.md (issue #81
+    single-tree consolidation)."""
+    docs_dir = src.parent / "docs"
+    runtime_docs = {p.name for p in docs_dir.glob("*.md")} if docs_dir.is_dir() else set()
+    if not runtime_docs:
         return
     for f in _walk_files(src):
         if not _is_text_file(f):
@@ -303,28 +318,29 @@ def _check_stale_doc_urls(src: Path) -> None:
         text = _read_text(f)
         for m in STALE_DOC_URL_RE.finditer(text):
             file_name = m.group(1)
-            if file_name in src_docs:
+            if file_name in runtime_docs:
                 _abort(
                     f"stale GitHub URL in {f.relative_to(src.parent)}: {m.group(0)} "
-                    f"(should reference src/docs/{file_name})"
+                    f"(should reference docs/{file_name} — see issue #81)"
                 )
 
 
 def _check_init_template_urls(src: Path) -> None:
     """Phase E init-template build-time check: scan
-    src/skills/init-gitissue/templates/gitissue-template.yml for stale URLs."""
+    src/skills/init-gitissue/templates/gitissue-template.yml for stale URLs.
+    After issue #81 consolidation, runtime docs live at top-level docs/."""
     template = src / "skills" / "init-gitissue" / "templates" / "gitissue-template.yml"
     if not template.is_file():
         return
     text = _read_text(template)
-    docs_dir = src / "docs"
-    src_docs = {p.name for p in docs_dir.glob("*.md")} if docs_dir.is_dir() else set()
+    docs_dir = src.parent / "docs"
+    runtime_docs = {p.name for p in docs_dir.glob("*.md")} if docs_dir.is_dir() else set()
     for m in STALE_DOC_URL_RE.finditer(text):
         file_name = m.group(1)
-        if file_name in src_docs:
+        if file_name in runtime_docs:
             _abort(
                 f"init-gitissue template has stale doc URL: {m.group(0)} "
-                f"(should reference src/docs/{file_name})"
+                f"(should reference docs/{file_name} — see issue #81)"
             )
 
 
@@ -415,12 +431,13 @@ def _emit_flattened_skill(
         src_path = src / "shared" / "agents" / name
         dst_path = out_dir / "references" / "agents" / name
         text = _read_text(src_path)
-        banner = BANNER_TMPL.format(rel=f"shared/agents/{name}")
+        banner = BANNER_TMPL.format(rel=f"src/shared/agents/{name}")
         _write_text(dst_path, banner + _rewrite_for_standalone(text))
 
-    # Copy transitive docs (banner + rewrite).
+    # Copy transitive runtime docs (banner + rewrite). Runtime docs live at
+    # top-level docs/ post-#81 consolidation.
     for name in sorted(docs):
-        src_path = src / "docs" / name
+        src_path = src.parent / "docs" / name
         dst_path = out_dir / "references" / "docs" / name
         text = _read_text(src_path)
         banner = BANNER_TMPL.format(rel=f"docs/{name}")
@@ -483,26 +500,34 @@ def _emit_plugin_tree(
             else:
                 _copy_binary(f, dst)
 
-    # Copy src/docs/ wholesale.
-    docs_src = src / "docs"
+    # Copy runtime docs to plugin tree (issue #81 — single docs/ tree at top
+    # level holds both runtime and project docs; plugin ships runtime only).
+    # Runtime docs are identified by transitive closure from skills: any doc
+    # reachable via the bare `docs/X.md` token is runtime. Project-only docs
+    # (ARCHITECTURE.md, CHANGELOG.md, subdirs like decisions/) are excluded.
+    docs_src = src.parent / "docs"
     if docs_src.is_dir():
-        for f in _walk_files(docs_src):
-            rel = f.relative_to(docs_src)
-            dst = out_root / "docs" / rel
-            if _is_text_file(f):
-                text = _read_text(f)
-                # Docs may reference other docs/ (sibling) or shared/agents/
-                # (sibling dir). From plugin/docs/, shared/agents/X.md is at
-                # ../shared/agents/X.md.
-                rewritten = _rewrite_url_aware(
-                    text,
-                    skill_form=lambda n: f"../skills/{n}/SKILL.md",
-                    agent_form=lambda n: f"../shared/agents/{n}",
-                    doc_form=lambda n: n,  # sibling
-                )
-                _write_text(dst, rewritten)
-            else:
-                _copy_binary(f, dst)
+        # Compute the union of runtime docs across all built skills.
+        runtime_doc_names: set[str] = set()
+        for _name, sroot in sorted(skill_sources, key=lambda x: x[0]):
+            _, dset = _compute_closure(src, _name, sroot)
+            runtime_doc_names.update(dset)
+        for name in sorted(runtime_doc_names):
+            f = docs_src / name
+            if not f.is_file():
+                continue
+            dst = out_root / "docs" / name
+            text = _read_text(f)
+            # Docs may reference other docs/ (sibling) or shared/agents/
+            # (sibling dir). From plugin/docs/, shared/agents/X.md is at
+            # ../shared/agents/X.md.
+            rewritten = _rewrite_url_aware(
+                text,
+                skill_form=lambda n: f"../skills/{n}/SKILL.md",
+                agent_form=lambda n: f"../shared/agents/{n}",
+                doc_form=lambda n: n,  # sibling
+            )
+            _write_text(dst, rewritten)
 
     # Generate .claude-plugin/plugin.json. Transform plugin_meta from input
     # shape (slug + name + author-string) into Claude Code plugin manifest
@@ -657,7 +682,11 @@ def build(out: Path, src: Path, *, verbose: bool = False) -> None:
 
     # Phase A: inventory + plugin metadata.
     _check_non_markdown_in(src / "shared" / "agents", "src/shared/agents/")
-    _check_non_markdown_in(src / "docs", "src/docs/")
+    # Issue #81: runtime docs live at top-level docs/. Project docs (in
+    # subdirs like decisions/, experiments/, release-notes/) coexist there
+    # but are not bundled into skills, so only top-level .md files are
+    # required to be markdown — recursion off.
+    _check_non_markdown_in(src.parent / "docs", "docs/", recursive=False)
     plugin_meta = _read_plugin_manifest_input(src)
     public_skills = _discover_public_skills(src)
     deprecated_distributed = _discover_distributed_deprecated(src)

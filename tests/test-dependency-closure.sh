@@ -23,7 +23,8 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DIST_SKILLS="$REPO_ROOT/dist/skills"
 SRC_AGENTS="$REPO_ROOT/src/shared/agents"
-SRC_DOCS="$REPO_ROOT/src/docs"
+# Issue #81: runtime docs live at top-level docs/, not src/docs/.
+SRC_DOCS="$REPO_ROOT/docs"
 BUILD_SH="$REPO_ROOT/scripts/build.sh"
 
 PASS=0
@@ -146,7 +147,7 @@ for doc_path in "$TMP_DIST_SKILLS/issue-resolver/references/docs"/*.md; do
   [ -f "$doc_path" ] || continue
   doc_name="$(basename "$doc_path")"
   if [ -f "$SRC_DOCS/$doc_name" ]; then
-    pass "T6: $doc_name traceable to src/docs/"
+    pass "T6: $doc_name traceable to docs/"
   else
     fail "T6: $doc_name has no source counterpart"
   fi
@@ -155,14 +156,16 @@ done
 # ───────────────────────────────────────────────────────────
 # T7: synthetic diamond test — construct a tiny project and run the build
 # ───────────────────────────────────────────────────────────
-# This validates the algorithm on a controlled tree. We create:
+# This validates the algorithm on a controlled tree. Post-#81, runtime
+# docs live at top-level docs/ (sibling of src/), not src/docs/. We
+# create:
 #   src/skills/dia/SKILL.md → references shared/agents/B.md and C.md
 #   src/shared/agents/B.md  → references docs/D.md
 #   src/shared/agents/C.md  → references docs/D.md
-#   src/docs/D.md           → leaf (no further refs)
+#   docs/D.md               → leaf (no further refs)
 # Expected: D.md appears exactly once in dist/skills/dia/references/docs/,
 #   no cycle warnings, exit 0.
-mkdir -p "$SYN_TMP/src/skills/dia" "$SYN_TMP/src/shared/agents" "$SYN_TMP/src/docs"
+mkdir -p "$SYN_TMP/src/skills/dia" "$SYN_TMP/src/shared/agents" "$SYN_TMP/docs"
 cat > "$SYN_TMP/src/skills/dia/SKILL.md" <<'EOF'
 ---
 name: dia
@@ -183,7 +186,7 @@ cat > "$SYN_TMP/src/shared/agents/c-agent.md" <<'EOF'
 
 See `docs/d-doc.md`.
 EOF
-cat > "$SYN_TMP/src/docs/d-doc.md" <<'EOF'
+cat > "$SYN_TMP/docs/d-doc.md" <<'EOF'
 # D
 
 Leaf.

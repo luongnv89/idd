@@ -1,4 +1,4 @@
-<!-- Generated from src/docs/config-schema.md. Do not edit. Edit source and run ./scripts/build.sh. -->
+<!-- Generated from /docs/config-schema.md. Do not edit. Edit source and run ./scripts/build.sh. -->
 # `.gitissue.yml` Configuration Schema
 
 gitissue works with zero configuration — all settings have sensible defaults. When no `.gitissue.yml` file exists, the first-run hint is shown:
@@ -441,7 +441,7 @@ Config is validated on load at the start of every skill invocation. Errors inclu
   Line 15: resolve.test_timeout must be between 30 and 3600
 
   To fix:  edit .gitissue.yml and correct the values above
-  Docs:    https://github.com/luongnv89/idd/blob/main/src/docs/config-schema.md
+  Docs:    https://github.com/luongnv89/idd/blob/main/docs/config-schema.md
 ```
 
 ## Defaults Table

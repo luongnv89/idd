@@ -129,7 +129,7 @@ When testing manually:
 ```mermaid
 graph TD
     CM["CLAUDE.md<br/>Agent conventions"] --> DM["DESIGN.md<br/>Output style guide"]
-    CM --> CS["src/docs/config-schema.md<br/>Config schema"]
+    CM --> CS["docs/config-schema.md<br/>Config schema"]
     CM --> AR["docs/ARCHITECTURE.md<br/>System design"]
     AR --> SK["src/skills/*/SKILL.md<br/>Skill definitions"]
     SK --> EM["src/skills/*/references/<br/>Error messages"]
@@ -144,9 +144,9 @@ graph TD
 |------|---------|
 | `CLAUDE.md` | Project conventions for AI agents |
 | `DESIGN.md` | Terminal output style guide |
-| `src/docs/config-schema.md` | Full `.gitissue.yml` schema (autopilot + review sections) |
-| `src/docs/idd-methodology.md` | IDD methodology overview + analysis-artifact dual-write rule |
-| `src/docs/naming-conventions.md` | Branch / commit / PR / issue naming |
+| `docs/config-schema.md` | Full `.gitissue.yml` schema (autopilot + review sections) |
+| `docs/idd-methodology.md` | IDD methodology overview + analysis-artifact dual-write rule |
+| `docs/naming-conventions.md` | Branch / commit / PR / issue naming |
 | `docs/sample-normalized-issue.md` | Example normalized issue (intent-only) |
 | `docs/ARCHITECTURE.md` | System design, data flow, durable-memory model |
 | `docs/CHANGELOG.md` | Per-release notes |

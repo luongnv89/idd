@@ -43,10 +43,10 @@ echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄�
 # ───────────────────────────────────────────────────────────
 # T1: docs/sync-conventions.md exists
 # ───────────────────────────────────────────────────────────
-if [ -f "$REPO_ROOT/src/docs/sync-conventions.md" ]; then
-  pass "src/docs/sync-conventions.md exists (canonical convention)"
+if [ -f "$REPO_ROOT/docs/sync-conventions.md" ]; then
+  pass "docs/sync-conventions.md exists (canonical convention)"
 else
-  fail "src/docs/sync-conventions.md missing"
+  fail "docs/sync-conventions.md missing"
 fi
 
 # ───────────────────────────────────────────────────────────
@@ -155,7 +155,7 @@ done
 #     with the stash ref (AC #3).
 # ───────────────────────────────────────────────────────────
 
-CONV="$REPO_ROOT/src/docs/sync-conventions.md"
+CONV="$REPO_ROOT/docs/sync-conventions.md"
 if [ -f "$CONV" ]; then
   if grep -q "stash@{0}" "$CONV"; then
     pass "sync-conventions.md documents stash-pop recovery with stash ref"

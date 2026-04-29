@@ -6,7 +6,7 @@ gitissue implements Issue-Driven Development (IDD) — a methodology where GitHu
 
 ## Architecture
 
-This is a **skills-only** project. There is no runtime code — each skill is a self-contained Claude Code skill (SKILL.md + references/ + templates/) that instructs the agent how to perform a task. Shared agents live in `src/shared/agents/` and are referenced by multiple skills. All authored sources live under `src/`; top-level `docs/` retains human-only project docs (architecture, changelog, development guide).
+This is a **skills-only** project. There is no runtime code — each skill is a self-contained Claude Code skill (SKILL.md + references/ + templates/) that instructs the agent how to perform a task. Shared agents live in `src/shared/agents/` and are referenced by multiple skills. All authored skill sources live under `src/`. Per issue #81, all documentation — both runtime docs consumed by skills and human-only project docs — lives in a single top-level `docs/` tree.
 
 ```
 src/
@@ -48,17 +48,33 @@ src/
 │       ├── SKILL.md
 │       └── references/
 │
-├── deprecated-skills/
-│   └── issue-pr-review-fix-loop/  # DEPRECATED v0.4.0 — redirects to /issue-pr-review (retained one release cycle)
-│       ├── SKILL.md
-│       └── references/
-│
-└── docs/                          # Runtime docs consumed by skills
-    ├── config-schema.md
-    ├── idd-methodology.md
-    ├── naming-conventions.md
-    └── github-projects-sync.md
+└── deprecated-skills/
+    └── issue-pr-review-fix-loop/  # DEPRECATED v0.4.0 — redirects to /issue-pr-review (retained one release cycle)
+        ├── SKILL.md
+        └── references/
+
+docs/                              # All documentation — single tree (issue #81)
+├── config-schema.md               # ↓ Runtime docs (skills reference these via
+├── idd-methodology.md             #   bare `docs/X.md` tokens; build.py
+├── naming-conventions.md          #   bundles them into each skill's
+├── sync-conventions.md            #   references/docs/ at build time)
+├── github-projects-sync.md        # ↑
+├── ARCHITECTURE.md                # ↓ Human-only project docs (not bundled
+├── CHANGELOG.md                   #   into skills; readable on the
+├── DEVELOPMENT.md                 #   repo's main branch only)
+├── decisions/                     # ↑
+├── experiments/
+└── release-notes/
 ```
+
+### Docs placement rule
+
+All documentation lives in top-level `docs/`. Two kinds coexist there:
+
+1. **Runtime docs** — read by skills at execution time. A skill source file references them as bare `docs/X.md` tokens. `scripts/build.py` discovers these references via transitive-closure scan and copies the matching files into each skill's `references/docs/` (standalone) and the plugin tree's top-level `docs/` (plugin layout). To add a runtime doc: drop the new `.md` file at `docs/<name>.md` and reference it from a skill or shared agent — the build picks it up automatically. Today's runtime docs: `config-schema.md`, `idd-methodology.md`, `naming-conventions.md`, `sync-conventions.md`, `github-projects-sync.md`.
+2. **Project docs** — read by humans only. Architecture, changelog, dev guide, decision records, experiments, release notes. They are not referenced by any skill, so the build does not bundle them. Place new project docs at `docs/<name>.md` (top-level) or under a topical subdirectory (`docs/decisions/`, `docs/experiments/`, `docs/release-notes/`).
+
+When in doubt: if a skill source needs to read it at runtime, it is a runtime doc and goes at the top level of `docs/`. Otherwise it is a project doc.
 
 ## Conventions
 
@@ -83,7 +99,7 @@ src/
 
 ### Naming Conventions
 
-All skills that create branches, commits, PRs, or issues follow these conventions. The full standalone reference is at `src/docs/naming-conventions.md` — skills reference that document directly so the conventions work with any tool, not just Claude.
+All skills that create branches, commits, PRs, or issues follow these conventions. The full standalone reference is at `docs/naming-conventions.md` — skills reference that document directly so the conventions work with any tool, not just Claude.
 
 #### Branch Names
 
