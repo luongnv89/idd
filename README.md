@@ -165,11 +165,16 @@ Standalone is the recommended default. Each skill ships as a self-contained dire
 # One skill (most common):
 asm install github:luongnv89/idd#main:dist/skills/issue-resolver
 
-# Every public skill in one call:
-asm install github:luongnv89/idd#main:dist/skills --all -p claude
+# Every public skill in one loop:
+for skill in issue-creator issue-analysis issue-resolver issue-triage \
+             issue-pr-review auto-pilot init-gitissue; do
+  asm install "github:luongnv89/idd#main:dist/skills/$skill" -p claude -y
+done
 ```
 
 `asm` is idempotent — re-running the same command updates the skill in place with no duplicate files. Target Claude Code explicitly with `-p claude` (or `-p all` for every supported tool).
+
+> **Why a loop?** A single `asm install …:dist/skills --all` would be nicer, but `--all` is currently ignored when the source includes a subpath (tracked in [luongnv89/asm#251](https://github.com/luongnv89/asm/issues/251)). The per-skill loop above exercises the working single-skill path. Once asm #251 lands we'll switch back to the one-liner. If you'd rather not loop, the [from-source alternative](#from-source-alternative-no-asm-required) installs all skills with a single command today.
 
 After install, restart Claude Code so it picks up the new skill(s). The full list of skills lives under [`dist/skills/`](dist/skills/) — substitute any name (`issue-creator`, `issue-resolver`, `issue-triage`, `issue-pr-review`, `auto-pilot`, `issue-analysis`, `init-gitissue`) into the command above.
 
