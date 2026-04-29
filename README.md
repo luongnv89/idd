@@ -159,9 +159,7 @@ IDD ships through two distribution paths. Pick the one that matches your harness
 
 #### Plugin path (Claude Code)
 
-> **Note:** Plugin tarballs ship with the first tagged release that runs the release pipeline. Until then, use the [Standalone path](#standalone-path-any-skillmd-compatible-harness) below.
-
-Once a release is published, grab the `idd-plugin-<tag>.tar.gz` asset from the [releases page](https://github.com/luongnv89/idd/releases/latest) and extract it into your Claude Code plugins directory:
+Grab the `idd-plugin-<tag>.tar.gz` asset from the [latest release](https://github.com/luongnv89/idd/releases/latest) and extract it into your Claude Code plugins directory:
 
 ```bash
 mkdir -p ~/.claude/plugins/idd
@@ -170,6 +168,8 @@ tar -xzf idd-plugin-<tag>.tar.gz -C ~/.claude/plugins/idd
 ```
 
 The tarball unpacks to `.claude-plugin/plugin.json`, `skills/`, `shared/`, and `docs/` at its root. Restart Claude Code to load the new plugin.
+
+> **Heads up — `claude plugin install <tarball-url>` is not supported.** Claude Code's `claude plugin install` only accepts `plugin@marketplace` references and resolves them through configured marketplaces, not direct tarball URLs or paths. Running `claude plugin install https://github.com/luongnv89/idd/releases/download/<tag>/idd-plugin-<tag>.tar.gz` returns `not found in any configured marketplace` and does nothing. Use the manual `tar -xzf` extract above — that is the supported install path today. (Tracked in [#79](https://github.com/luongnv89/idd/issues/79).)
 
 #### Standalone path (any SKILL.md-compatible harness)
 
