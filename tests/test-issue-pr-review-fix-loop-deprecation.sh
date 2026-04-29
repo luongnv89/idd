@@ -289,6 +289,7 @@ while IFS= read -r match; do
     "$ROOT_README") continue ;;
     "$ROOT_CLAUDE") continue ;;
     "$REPO_ROOT/tests/test-issue-pr-review-fix-loop-deprecation.sh") continue ;;
+    "$REPO_ROOT/tests/test-sync-safety.sh") continue ;;
     "$REPO_ROOT/improvement-plan"*".md") continue ;;
     "$REPO_ROOT/docs/"*) continue ;;
   esac
