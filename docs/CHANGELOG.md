@@ -6,34 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
-### Added
-- `docs/release-notes/v0.7.0-smoke-tests.md` — executed results for the four manual release-checklist smoke tests from `refactor-plan-v10.md` §14 against the locally built `0.7.0` artifact: single skill, independent coexistence, `auto-pilot` dependency bundle, plugin tarball + `claude plugin validate`. All four pass. (#61)
-- `tests/test-autopilot-portability.sh` — source-level portability checks for `/auto-pilot`: forbids hardcoded `skills/<name>/SKILL.md` paths, forbids the "All agents are in shared/agents" phrase, and verifies the compatibility line names every required peer skill (#53)
-- `/issue-pr-review` per-criterion acceptance-criteria verification — each criterion in the linked issue reports `pass` / `fail` / `unverified` with required evidence
-- `/issue-pr-review` four-check traceability dimension — verifies `Closes #N` in PR body, at least one commit referencing the issue (via `git log --grep`), durable analysis fields (Decision Record + Acceptance Criteria Verification block), and the squash-merge assumption
-- Five-dimension review output — `correctness`, `acceptance_criteria`, `traceability`, `maintainability`, `safety` — replacing the prior single-line review verdict in cycle reports and the Step 7 summary
-- `tests/test-issue-pr-review-traceability.sh` — 50 spec assertions verifying every Phase 2 acceptance criterion from issue #36
-- `.gitissue.yml` configuration keys `review.require_acceptance_criteria_check` (default `true`) and `review.require_traceability_check` (default `true`) — gate the Phase 2 acceptance-criteria and traceability dimensions in `/issue-pr-review`. When `false`, the corresponding dimension is reported as `pass — verification disabled` and never blocks soft-pass.
-- `/init-gitissue` template emits `review.require_acceptance_criteria_check: true` and `review.require_traceability_check: true` on a fresh install, alongside the existing `autopilot.mode: conservative` and `autopilot.merge_partial: false` defaults
-- `tests/test-config-schema-38.sh` — spec assertions verifying every issue #38 acceptance criterion (schema documents the four keys with defaults; init template emits them; no speculative keys; consuming skills wire the gates)
-
-### Changed
-- `/auto-pilot` cross-skill prompts now use `{{skill:<name>}}` tokens instead of hardcoded `skills/<name>/SKILL.md` paths; the `compatibility:` frontmatter spells out the required peer skills (issue-triage, issue-resolver, issue-analysis, issue-pr-review) and the optional issue-creator. Source no longer carries the boilerplate "All agents are in shared/agents/" sentence — invoked skills carry their own agent guidance. Build-time rendering of these tokens lights up in PR 3 (refactor-plan-v10 §6). (#53)
-- `/issue-pr-review` soft-pass condition now hard-blocks on `traceability: fail` (e.g., missing `Closes #N`) and any `acceptance_criteria: fail`, even when tests and CI are green — this matches the explicit issue #36 contract that a PR can pass tests and fail traceability
-- `/issue-pr-review` v0.4.1 — Phase 2 hard-block conditions now gated on `review.require_*_check` flags (#38)
-- `/init-gitissue` v0.3.2 — emits the unified Phase 1b + Phase 2 configuration schema
-- Step 3 of `/issue-pr-review` now runs in a documented order per cycle: reviewer subagent → per-criterion AC verification → traceability checks → dimensional aggregation
-- Human-authored PRs without a Decision Record are reported as `traceability: partial`, not `fail`, while `Closes #N` and acceptance-criteria checks still apply at full strength
-
-### Deprecated
-- `/issue-pr-review-fix-loop` (v0.4.0) — its outer review-fix loop, agent reuse, and fresh confirmation pass are all part of `/issue-pr-review` now (since v0.3.0), and Phase 2 acceptance-criteria + traceability checks landed there in v0.4.0. Migration: replace any `/issue-pr-review-fix-loop` invocation with `/issue-pr-review` (same PR number, same `--auto` flag). Source remains under `src/deprecated-skills/issue-pr-review-fix-loop/` for repository history and migration references. Tracking issue: #37.
-
-### Removed
-- `/issue-pr-review-fix-loop` is removed from the public README command index and standalone install table. Its source remains under `src/deprecated-skills/issue-pr-review-fix-loop/` for repository history and migration references, but it is no longer publicly distributed unless a future compatibility release explicitly opts it in with a `distribute:` flag. Tracking issue: #54.
-
-## [0.7.0] - 2026-03-27
+## [0.7.0] - 2026-04-29
 
 ### Added
+- `scripts/build.py` and `scripts/build.sh` — byte-deterministic build that flattens authored sources under `src/` into `dist/skills/` (harness-agnostic) and `dist/plugin/` (Claude Code plugin layout). Sibling-relative path rewriting; no `${CLAUDE_PLUGIN_ROOT}` placeholders. (#56)
+- `/idd-doctor` internal skill — read-only repository health check that validates IDD invariants against the local `src/` checkout. Not distributed in `dist/`. (#34)
+- `feat(plugin)` `src/plugin.json.in` metadata input template — single source of truth for plugin name, slug, author, description, and default version, consumed by the build. (#55)
+- `feat(ci)` `dist-check` workflow and `.gitattributes` — CI verifies that `dist/` matches a fresh build of `src/`, and `.gitattributes` keeps generated files out of language stats. (#59)
+- `feat(config)` unified `autopilot.*` and `review.*` schema in `.gitissue.yml`, including `review.require_acceptance_criteria_check` (default `true`) and `review.require_traceability_check` (default `true`). When `false`, the corresponding dimension is reported as `pass — verification disabled` and never blocks soft-pass. `/init-gitissue` emits the new keys on a fresh install alongside `autopilot.mode: conservative` and `autopilot.merge_partial: false`. (#38)
+- `feat(auto-pilot)` conservative-by-default merge modes — `conservative`/`balanced`/`aggressive` selectable via `autopilot.mode`, and explicit issue lists for targeted runs. (#33)
+- `feat(auto-pilot)` fully autonomous workflow — zero-confirmation triage → resolve → review → merge loop with documented stop conditions.
+- `feat(issue-pr-review)` per-criterion acceptance-criteria verification — each criterion in the linked issue reports `pass` / `fail` / `unverified` with required evidence; four-check traceability dimension (`Closes #N` in PR body, ≥1 commit referencing the issue via `git log --grep`, durable analysis fields, squash-merge assumption); five-dimension review output (`correctness`, `acceptance_criteria`, `traceability`, `maintainability`, `safety`) replacing the prior single-line verdict. (#36)
+- `feat(issue-creator)` duplicate-detector subagent — scores potential duplicates against the open issue list before creation. (#19)
+- `feat(projects)` shared GitHub Projects status sync utility — keeps Project boards aligned with issue/PR state. (#16)
 - Shared agents architecture — consolidated 9 per-skill agent definitions into 6 reusable shared agents in `shared/agents/`:
   - `codebase-researcher.md` — deep codebase scan and solution research
   - `synthesizer.md` — analysis and implementation options
@@ -41,23 +26,46 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   - `code-reviewer.md` — confidence-based code review
   - `duplicate-detector.md` — issue dedup scoring
   - `issue-relationship-scanner.md` — file deps and already-fixed detection
-- `/issue-pr-review` skill — review, test, CI check, fix, and merge PRs (replaces `/review-fix-loop`)
-- `/issue-pr-review-fix-loop` skill — outer review-fix loop with fresh context per cycle for genuinely independent reviews
-- Structured step-by-step final reports for all skills
+- `/issue-pr-review` skill — review, test, CI check, fix, and merge PRs (replaces `/review-fix-loop`).
+- Structured step-by-step final reports for all skills.
+- `tests/test-autopilot-portability.sh` — source-level portability checks for `/auto-pilot`: forbids hardcoded `skills/<name>/SKILL.md` paths, forbids the "All agents are in shared/agents" phrase, and verifies the compatibility line names every required peer skill. (#53)
+- `tests/test-issue-pr-review-traceability.sh` — 50 spec assertions verifying every Phase 2 acceptance criterion from issue #36.
+- `tests/test-config-schema-38.sh` — spec assertions verifying every issue #38 acceptance criterion.
+- `tests/` — additional build, layout, and determinism tests. (#58)
+- `tests/test-projects.sh` — validation tests for the projects sync utility. (#16)
+- `docs/release-notes/v0.7.0-smoke-tests.md` — executed results for the four manual release-checklist smoke tests from `refactor-plan-v10.md` §14 against the locally built `0.7.0` artifact: single skill, independent coexistence, `auto-pilot` dependency bundle, plugin tarball + `claude plugin validate`. All four pass. (#61)
+- `docs/install` — plugin and standalone distribution install paths documented. (#60)
 
 ### Changed
-- `/issue-resolver` rewritten from 8-step pipeline (Fetch → Branch → Research → Plan → Execute → Test → Verify → Ship) to 6-step pipeline (Preflight → Research → Plan → Implement → QA → Deliver)
+- `refactor(repo)` authored sources moved into a `src/` tree — `src/skills/`, `src/internal-skills/`, `src/deprecated-skills/`, `src/shared/agents/`, `src/docs/`. Top-level `docs/` now retains human-only project docs. Internal references and runtime-doc URLs rewritten to match. (#48, #49, #50, #51)
+- `refactor(auto-pilot)` cross-skill prompts now use `{{skill:<name>}}` tokens instead of hardcoded `skills/<name>/SKILL.md` paths; the `compatibility:` frontmatter spells out the required peer skills (issue-triage, issue-resolver, issue-analysis, issue-pr-review) and the optional issue-creator. Source no longer carries the boilerplate "All agents are in shared/agents/" sentence — invoked skills carry their own agent guidance. (#53)
+- `/issue-pr-review` soft-pass condition now hard-blocks on `traceability: fail` (e.g., missing `Closes #N`) and any `acceptance_criteria: fail`, even when tests and CI are green — matches the explicit issue #36 contract that a PR can pass tests and fail traceability. Phase 2 hard-blocks are gated on `review.require_*_check` flags. Step 3 runs in a documented order per cycle: reviewer subagent → per-criterion AC verification → traceability checks → dimensional aggregation. Human-authored PRs without a Decision Record are reported as `traceability: partial`, not `fail`. (#36, #38)
+- `/issue-resolver` rewritten from 8-step pipeline (Fetch → Branch → Research → Plan → Execute → Test → Verify → Ship) to 6-step pipeline (Preflight → Research → Plan → Implement → QA → Deliver):
   - Step 0 (Preflight) consolidates fetch, branch creation, guards, and auto-normalize
   - Step 4 (QA) integrates code review and test running in a single review-fix loop
   - Step 5 (Deliver) consolidates push, PR creation, and project board sync
-- All skills now reference shared agents from `shared/agents/` instead of per-skill agent definitions
-- Removed all external agent type dependencies (`subagent_type` parameter no longer used)
-- `/review-fix-loop` deprecated — redirects to `/issue-pr-review`
-- Updated `docs/github-projects-sync.md` step references to match new 6-step pipeline
+- `refactor(review)` review-fix loop optimized for token usage — fewer redundant context loads across cycles. (#24)
+- `refactor(shared/agents)` consolidated agents into `shared/agents/` and restructured pipelines accordingly. (#21)
+- All skills now reference shared agents from `shared/agents/` instead of per-skill agent definitions; external agent type dependencies removed (`subagent_type` parameter no longer used).
+- Skill descriptions trimmed to the asm-eval pass threshold across all 9 skills. (#26, #28, #29)
+- `docs(skills)` skill READMEs audited for codebase-enriched claims and rewritten in intent-only language. (#31, #32, #35)
+- Updated `docs/github-projects-sync.md` step references to match the 6-step pipeline.
+- README and runtime docs adapted to post-#38 methodology. (#47)
+- Skill versions: `/auto-pilot` 2.2.0, `/issue-resolver` 0.7.0, `/issue-pr-review` 0.4.1, `/issue-analysis` 0.4.1, `/issue-creator` 0.4.1, `/issue-triage` 0.5.2, `/init-gitissue` 0.3.2, `/idd-doctor` 0.1.0.
+
+### Fixed
+- `fix(skills)` `/issue-resolver` Step 0 (Preflight) now stashes uncommitted changes before rebasing the working branch on the latest base, then restores them — protects in-progress work from sync side effects. (#22)
+- `fix(auto-pilot)` `auto_merge` guard ordering and `MERGED` status handling reworked; `already_resolved` status handled and consistency gaps closed; CI errors, stop conditions, and docs aligned with the autonomous model; reviewer prompt no longer triggers a merge directly. (#23)
+- `fix(skills)` truncated long descriptions and bumped patch versions for `/auto-pilot` and `/issue-triage`.
+
+### Deprecated
+- `/issue-pr-review-fix-loop` (v0.4.0) — its outer review-fix loop, agent reuse, and fresh confirmation pass are all part of `/issue-pr-review` now (since v0.3.0), and Phase 2 acceptance-criteria + traceability checks landed there in v0.4.0. Migration: replace any `/issue-pr-review-fix-loop` invocation with `/issue-pr-review` (same PR number, same `--auto` flag). Source remains under `src/deprecated-skills/issue-pr-review-fix-loop/` for repository history and migration references. Tracking issue: #37.
 
 ### Removed
-- Per-skill agent definitions (replaced by shared agents)
-- Old 8-step pipeline structure and associated step-specific agent files
+- `/issue-pr-review-fix-loop` is removed from the public README command index and standalone install table. Its source remains under `src/deprecated-skills/issue-pr-review-fix-loop/` for repository history and migration references, but it is no longer publicly distributed unless a future compatibility release explicitly opts it in with a `distribute:` flag. Tracking issue: #54.
+- `/review-fix-loop` (legacy redirect skill) — replaced entirely by `/issue-pr-review`.
+- Per-skill agent definitions (replaced by shared agents).
+- Old 8-step pipeline structure and associated step-specific agent files.
 
 ## [0.6.0] - 2026-03-24
 
