@@ -72,15 +72,26 @@ The `--auto` flag is set automatically when invoked by `/auto-pilot`.
 
 ## Repo Sync Before Edits (mandatory)
 
-Before making any fixes:
+Before making any fixes, sync with remote using the stash-first pattern (see `src/docs/sync-conventions.md` in the project root for the full convention and recovery procedure):
 
 ```bash
 branch="$(git rev-parse --abbrev-ref HEAD)"
+dirty=0
+if [ -n "$(git status --porcelain)" ]; then
+  git stash push -u -m "pre-sync: ${branch}"
+  dirty=1
+fi
 git fetch origin
 git pull --rebase origin "$branch"
+if [ "$dirty" -eq 1 ]; then
+  git stash pop || {
+    echo "✗ Stash pop failed — recover with: git stash list && git stash show -p stash@{0}"
+    exit 1
+  }
+fi
 ```
 
-If dirty: stash, sync, pop. If `origin` missing or conflicts: stop and ask (interactive) or abort (auto).
+If `origin` is missing or rebase conflicts occur, stop and ask (interactive) or abort with a clear error (auto).
 
 ## Configuration
 
@@ -273,9 +284,17 @@ Issues to fix (only issues with action "fix" — skip "note" issues):
 {formatted_issues_json}
 
 Instructions:
-1. Sync with remote first:
+1. Sync with remote first using the stash-first pattern (see src/docs/sync-conventions.md):
+   dirty=0
+   if [ -n "$(git status --porcelain)" ]; then
+     git stash push -u -m "pre-sync: {head_branch}"
+     dirty=1
+   fi
    git fetch origin
    git pull --rebase origin {head_branch}
+   if [ "$dirty" -eq 1 ]; then
+     git stash pop || { echo "✗ Stash pop failed — git stash list && git stash show -p stash@{0}"; exit 1; }
+   fi
 2. For each issue where action is "fix":
    a. Read the affected file
    b. Apply the fix described in "suggested_fix"

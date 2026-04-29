@@ -33,24 +33,26 @@ Before any operation, verify the environment. On failure, output the exact error
 
 ## Repo Sync Before Edits (mandatory)
 
-Before making file modifications, sync with remote:
+Before making file modifications, sync with remote using the stash-first pattern (see `references/docs/sync-conventions.md` for the full convention and recovery procedure):
 
 ```bash
 branch="$(git rev-parse --abbrev-ref HEAD)"
+dirty=0
+if [ -n "$(git status --porcelain)" ]; then
+  git stash push -u -m "pre-sync: ${branch}"
+  dirty=1
+fi
 git fetch origin
 git pull --rebase origin "$branch"
+if [ "$dirty" -eq 1 ]; then
+  git stash pop || {
+    echo "✗ Stash pop failed — recover with: git stash list && git stash show -p stash@{0}"
+    exit 1
+  }
+fi
 ```
 
-If the working tree is dirty, stash first, sync, then pop:
-
-```bash
-git stash push -u -m "pre-sync"
-branch="$(git rev-parse --abbrev-ref HEAD)"
-git fetch origin && git pull --rebase origin "$branch"
-git stash pop
-```
-
-If `origin` is missing or conflicts occur, stop and ask the user (in interactive mode) or abort with error (in auto mode).
+If `origin` is missing or rebase conflicts occur, stop and ask the user (interactive) or abort with a clear error (auto).
 
 ## Configuration
 

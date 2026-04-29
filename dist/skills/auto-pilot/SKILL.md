@@ -89,9 +89,29 @@ git stash --include-untracked -m "auto-pilot: stash before run"
   Stash ref: {stash_ref}
 ```
 
-If not on the default branch (main/master), auto-switch:
+If not on the default branch (main/master), auto-switch and sync. The stash above already protects any uncommitted work, so the rebase here runs on a clean tree (see `references/docs/sync-conventions.md` for the full sync convention and recovery procedure):
+
 ```bash
-git checkout {default_branch} && git pull --rebase origin {default_branch}
+git checkout {default_branch}
+# Defensive stash — the pre-flight stash above should have caught this,
+# but the convention is to stash-first whenever a rebase follows.
+dirty=0
+if [ -n "$(git status --porcelain)" ]; then
+  git stash push -u -m "pre-sync: {default_branch}"
+  dirty=1
+fi
+git fetch origin
+git pull --rebase origin {default_branch} || {
+  echo "✗ Rebase failed — aborting and resetting to remote"
+  git rebase --abort 2>/dev/null
+  exit 1
+}
+if [ "$dirty" -eq 1 ]; then
+  git stash pop || {
+    echo "✗ Stash pop failed — recover with: git stash list && git stash show -p stash@{0}"
+    exit 1
+  }
+fi
 ```
 ```
 ⚠ Was on branch {branch} — auto-switched to {default_branch}
