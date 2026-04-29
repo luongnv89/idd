@@ -155,9 +155,42 @@ gitissue is **complementary** to your existing workflow. Use it alongside TDD, B
 
 ### Install
 
-IDD ships through two distribution paths. Pick the one that matches your harness.
+Standalone is the recommended default. Each skill ships as a self-contained directory under `dist/skills/<name>/`, ready to drop into any SKILL.md-compatible harness — Claude Code, Codex CLI, or anything else that loads SKILL.md trees.
 
-#### Plugin path (Claude Code)
+#### Recommended — Standalone via `asm install`
+
+[`asm`](https://github.com/luongnv89/asm) is the primary install tool. It pulls the skill straight from this repo (no clone required) and writes it where Claude Code looks for skills. Pick one skill or install them all:
+
+```bash
+# One skill (most common):
+asm install github:luongnv89/idd#main:dist/skills/issue-resolver
+
+# Every public skill in one call:
+asm install github:luongnv89/idd#main:dist/skills --all -p claude
+```
+
+`asm` is idempotent — re-running the same command updates the skill in place with no duplicate files. Target Claude Code explicitly with `-p claude` (or `-p all` for every supported tool).
+
+After install, restart Claude Code so it picks up the new skill(s). The full list of skills lives under [`dist/skills/`](dist/skills/) — substitute any name (`issue-creator`, `issue-resolver`, `issue-triage`, `issue-pr-review`, `auto-pilot`, `issue-analysis`, `init-gitissue`) into the command above.
+
+#### From-source alternative (no `asm` required)
+
+If you can't or don't want to install `asm`, clone the repo and run the bundled install script. One command, no manual `tar`/`cp`, idempotent on re-run:
+
+```bash
+git clone https://github.com/luongnv89/idd.git
+cd idd
+./scripts/install.sh                          # all standalone skills
+# or: ./scripts/install.sh --skill issue-resolver
+```
+
+The script copies each `dist/skills/<name>/` to `~/.claude/skills/<name>/`, replacing any prior install cleanly. Use `./scripts/install.sh --target <dir>` to target a different Claude root. Pure POSIX bash — no extra runtime needed.
+
+You can also do the copy by hand if you prefer to see every file move: `cp -r dist/skills/<name> ~/.claude/skills/`. `dist/skills/` is committed to the repository, so this path works on a fresh clone without running a build.
+
+#### Plugin path (advanced — Claude Code only)
+
+The plugin layout bundles every public skill under one `~/.claude/plugins/idd/` tree. It is the heavier option; pick it only if you want all skills installed atomically as a single Claude Code plugin.
 
 Grab the `idd-plugin-<tag>.tar.gz` asset from the [latest release](https://github.com/luongnv89/idd/releases/latest) and extract it into your Claude Code plugins directory:
 
@@ -171,19 +204,9 @@ The tarball unpacks to `.claude-plugin/plugin.json`, `skills/`, `shared/`, and `
 
 > **Heads up — `claude plugin install <tarball-url>` is not supported.** Claude Code's `claude plugin install` only accepts `plugin@marketplace` references and resolves them through configured marketplaces, not direct tarball URLs or paths. Running `claude plugin install https://github.com/luongnv89/idd/releases/download/<tag>/idd-plugin-<tag>.tar.gz` returns `not found in any configured marketplace` and does nothing. Use the manual `tar -xzf` extract above — that is the supported install path today. (Tracked in [#79](https://github.com/luongnv89/idd/issues/79).)
 
-#### Standalone path (any SKILL.md-compatible harness)
+If you cloned the repo, you can build the plugin tree locally and install it with the script: `./scripts/build.sh && ./scripts/install.sh --plugin`. `dist/plugin/` is generated only at release time and gitignored, so the build step is required.
 
-Each skill under `dist/skills/<name>/` is fully self-contained — copy the directory you want into your harness's skill location:
-
-```bash
-git clone https://github.com/luongnv89/idd.git
-cp -r idd/dist/skills/issue-resolver ~/.claude/skills/
-# Repeat for any other skills you want
-```
-
-You can also pull `dist/skills/<name>/` straight from a [GitHub source archive](https://github.com/luongnv89/idd/archive/refs/heads/main.tar.gz) without cloning.
-
-> **Note:** `dist/skills/` is committed to the repository so this path works without running a build. `dist/plugin/` is generated only at release time and shipped exclusively as the tarball above.
+> **Note:** `dist/skills/` is committed so the standalone paths work without running a build. `dist/plugin/` is built fresh by `./scripts/build.sh` and shipped as the release tarball above.
 
 ### First issue in 30 seconds
 
