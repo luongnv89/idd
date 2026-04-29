@@ -1,4 +1,4 @@
-<!-- Generated from src/shared/agents/synthesizer.md. Do not edit. Edit source and run ./scripts/build.sh. -->
+<!-- Generated from /src/shared/agents/synthesizer.md. Do not edit. Edit source and run ./scripts/build.sh. -->
 # Synthesizer Agent
 
 Shared agent used by **issue-analysis** (Steps 6-7) and **issue-resolver** (Step 2 — Plan).

@@ -27,14 +27,14 @@ echo "◆ Projects Sync Utility Tests"
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 
 # T1: Shared reference document exists
-if [ -f "$REPO_ROOT/src/docs/github-projects-sync.md" ]; then
-  pass "T1: src/docs/github-projects-sync.md exists"
+if [ -f "$REPO_ROOT/docs/github-projects-sync.md" ]; then
+  pass "T1: docs/github-projects-sync.md exists"
 else
-  fail "T1: src/docs/github-projects-sync.md not found"
+  fail "T1: docs/github-projects-sync.md not found"
 fi
 
 # T2: Reference document contains required sections
-DOC="$REPO_ROOT/src/docs/github-projects-sync.md"
+DOC="$REPO_ROOT/docs/github-projects-sync.md"
 for section in "## Overview" "## Configuration" "## Procedures" "### 1. Discover Project" "### 2. Get Status Field" "### 3. Add Issue to Project" "### 4. Update Status" "## Graceful Degradation" "## Skill Integration Reference" "## Error Messages"; do
   if grep -q "$section" "$DOC" 2>/dev/null; then
     pass "T2: Section '$section' found in reference doc"
@@ -53,7 +53,7 @@ for query in "addProjectV2ItemById" "updateProjectV2ItemFieldValue" "projectsV2"
 done
 
 # T4: Config schema includes projects section
-CONFIG_DOC="$REPO_ROOT/src/docs/config-schema.md"
+CONFIG_DOC="$REPO_ROOT/docs/config-schema.md"
 for field in "projects:" "sync_enabled:" "project_number:" "status_field:" "status_map:"; do
   if grep -q "$field" "$CONFIG_DOC" 2>/dev/null; then
     pass "T4: Config field '$field' found in config-schema.md"

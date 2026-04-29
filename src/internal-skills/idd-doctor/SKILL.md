@@ -365,6 +365,6 @@ All errors use the rich format from `references/error-messages.md`:
 ## Additional Resources
 
 - **`references/error-messages.md`** — Complete error catalog with triggers and exact output
-- **`src/docs/naming-conventions.md`** — Branch, commit, PR, and issue naming conventions (referenced for context)
-- **`src/docs/config-schema.md`** — Full configuration schema (Check 3 references the `autopilot.mode` field)
+- **`docs/naming-conventions.md`** — Branch, commit, PR, and issue naming conventions (referenced for context)
+- **`docs/config-schema.md`** — Full configuration schema (Check 3 references the `autopilot.mode` field)
 - **`DESIGN.md`** — Terminal output style guide (repo root)

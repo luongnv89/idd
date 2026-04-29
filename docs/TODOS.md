@@ -1,6 +1,6 @@
 # TODOS — gitissue / IDD
 
-> **Historical document.** All P1 items in this file shipped in Sprints 1-3 (2026-03) and the lean-issue / methodology updates from issues #31-#38 (2026-04). For current open work, see GitHub issues. For methodology, see [`src/docs/idd-methodology.md`](../src/docs/idd-methodology.md). For the configuration schema, see [`src/docs/config-schema.md`](../src/docs/config-schema.md).
+> **Historical document.** All P1 items in this file shipped in Sprints 1-3 (2026-03) and the lean-issue / methodology updates from issues #31-#38 (2026-04). For current open work, see GitHub issues. For methodology, see [`idd-methodology.md`](idd-methodology.md). For the configuration schema, see [`config-schema.md`](config-schema.md).
 
 Generated from /plan-ceo-review on 2026-03-20.
 Updated from /plan-eng-review on 2026-03-20.

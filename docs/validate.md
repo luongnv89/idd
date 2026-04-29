@@ -1,6 +1,6 @@
 # Validation: GitIssue — Issue-Driven Development (IDD)
 
-> **Historical document — superseded by [`src/docs/idd-methodology.md`](../src/docs/idd-methodology.md).**
+> **Historical document — superseded by [`idd-methodology.md`](idd-methodology.md).**
 > This early validation memo describes a direction in which `/issue-creator` was assumed to perform "codebase-aware issue enrichment at creation time". That direction was reversed: issues now capture **intent only**. The differentiator versus competing tools today is structured intent capture plus separate, on-demand current-code analysis (`/issue-analysis`, `/issue-triage`, `/issue-resolver`) — not in-issue codebase enrichment. Treat any "codebase-aware issue" or "auto-enriched issue" wording below as historical, not as a description of the shipped product.
 
 ## Quick Verdict

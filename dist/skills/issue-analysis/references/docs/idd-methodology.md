@@ -1,4 +1,4 @@
-<!-- Generated from src/docs/idd-methodology.md. Do not edit. Edit source and run ./scripts/build.sh. -->
+<!-- Generated from /docs/idd-methodology.md. Do not edit. Edit source and run ./scripts/build.sh. -->
 # Issue-Driven Development (IDD)
 
 ## What is IDD?

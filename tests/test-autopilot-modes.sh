@@ -63,7 +63,7 @@ fi
 # ───────────────────────────────────────────────────────────
 # T2: docs/config-schema.md documents both new keys
 # ───────────────────────────────────────────────────────────
-SCHEMA="$REPO_ROOT/src/docs/config-schema.md"
+SCHEMA="$REPO_ROOT/docs/config-schema.md"
 
 if grep -qE 'autopilot\.mode' "$SCHEMA"; then
   pass "T2.1: config-schema.md documents autopilot.mode"

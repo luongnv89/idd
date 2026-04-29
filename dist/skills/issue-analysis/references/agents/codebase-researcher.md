@@ -1,4 +1,4 @@
-<!-- Generated from src/shared/agents/codebase-researcher.md. Do not edit. Edit source and run ./scripts/build.sh. -->
+<!-- Generated from /src/shared/agents/codebase-researcher.md. Do not edit. Edit source and run ./scripts/build.sh. -->
 # Codebase Researcher Agent
 
 Shared agent used by multiple skills: **issue-resolver** (Step 1 — Research), **issue-analysis** (Steps 2-5 — Explorer phase), and **auto-pilot** (via issue-resolver).

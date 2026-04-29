@@ -1,4 +1,4 @@
-<!-- Generated from src/docs/sync-conventions.md. Do not edit. Edit source and run ./scripts/build.sh. -->
+<!-- Generated from /docs/sync-conventions.md. Do not edit. Edit source and run ./scripts/build.sh. -->
 # Sync Conventions
 
 Standard convention for syncing a working branch with the remote before any IDD skill modifies files. Centralizing this here ensures every skill that performs a `git pull --rebase` first protects uncommitted changes — the unsafe pattern (bare rebase on a dirty tree) can silently destroy staged or unstaged work, so it must never appear in skill instructions.

@@ -1,4 +1,4 @@
-<!-- Generated from src/shared/agents/duplicate-detector.md. Do not edit. Edit source and run ./scripts/build.sh. -->
+<!-- Generated from /src/shared/agents/duplicate-detector.md. Do not edit. Edit source and run ./scripts/build.sh. -->
 # Duplicate Detector Agent
 
 Shared agent used by **issue-creator** (Step 3 — Duplicate Check).
