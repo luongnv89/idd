@@ -274,7 +274,55 @@ If the changes affect documented behavior:
 
 ### Push branch
 
+Before pushing, run the pre-commit security scan against every file touched by
+commits on this branch. The implementer ran the scan per commit during Step 3,
+but a final pre-push pass catches secrets that may have slipped in during QA
+fixes (see the pre-commit security conventions reference at
+`references/docs/pre-commit-security.md` — that document is authoritative; the snippet
+below mirrors its Primary Pattern). Real secrets block the push; warnings
+prompt for confirmation in interactive mode and log-and-continue in auto mode.
+
 ```bash
+# Pre-push security scan — mirrors the Primary Pattern in the
+# pre-commit-security conventions reference. Set IDD_AUTO_MODE=1 in auto mode.
+base="$(gh pr view --json baseRefName --jq .baseRefName 2>/dev/null || echo main)"
+files="$(git diff --name-only "origin/${base}"...HEAD)"
+secrets_found=0
+warnings=()
+if printf '%s\n' "$files" | grep -E -q '(^|/)\.env($|\.)|\.key$|\.pem$|credentials\.json$|secrets\.ya?ml$|id_rsa($|\.pub$)|\.p12$|\.pfx$|\.cer$'; then
+  echo "✗ Secret-bearing file in branch diff."
+  secrets_found=1
+fi
+realkey='(sk-(proj-)?[A-Za-z0-9_-]{20,}|sk_live_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|ASIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{30,}|gho_[A-Za-z0-9]{30,}|ghs_[A-Za-z0-9]{30,}|ghu_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{40,}|xox[abprs]-[A-Za-z0-9-]{10,}|glpat-[A-Za-z0-9_-]{20,}|AIza[0-9A-Za-z_-]{30,})'
+while IFS= read -r f; do
+  [ -z "$f" ] && continue
+  [ -f "$f" ] || continue
+  file --mime "$f" 2>/dev/null | grep -q 'charset=binary' && continue
+  if grep -E -q "$realkey" "$f" 2>/dev/null; then
+    echo "✗ Real API key detected in: $f"
+    secrets_found=1
+  fi
+  size=$(stat -f%z "$f" 2>/dev/null || stat -c%s "$f" 2>/dev/null || echo 0)
+  [ "$size" -gt 10485760 ] && warnings+=("⚠ Large file (>10 MB) without LFS: $f")
+done <<< "$files"
+junk='(^|/)(node_modules|dist|build|__pycache__|\.venv)(/|$)|\.pyc$|(^|/)(\.DS_Store|thumbs\.db)$|\.swp$|\.tmp$'
+while IFS= read -r f; do
+  [ -z "$f" ] && continue
+  printf '%s\n' "$f" | grep -E -q "$junk" && warnings+=("⚠ Build artifact in diff: $f")
+done <<< "$files"
+case "$(git rev-parse --abbrev-ref HEAD)" in
+  main|master|production|release) warnings+=("⚠ On protected branch — confirm intentional") ;;
+esac
+[ "$secrets_found" = 1 ] && { echo "✗ Pre-push security scan blocked. See pre-commit-security conventions reference."; exit 1; }
+if [ "${#warnings[@]}" -gt 0 ]; then
+  printf '%s\n' "${warnings[@]}"
+  if [ "${IDD_AUTO_MODE:-0}" = "1" ]; then
+    echo "○ Warnings logged — proceeding (auto mode)."
+  else
+    printf "Proceed anyway? [y/N] "; read -r reply
+    case "$reply" in y|Y|yes|YES) echo "○ Continuing despite warnings." ;; *) echo "✗ Stopped."; exit 1 ;; esac
+  fi
+fi
 git push -u origin {branch_name}
 ```
 
@@ -313,6 +361,7 @@ After the pipeline completes, print a structured step-by-step summary so the use
 
 When invoked with `--auto` (or by `/auto-pilot`), the entire pipeline runs without user interaction:
 
+- **Environment:** Export `IDD_AUTO_MODE=1` before any shell snippet that consults it (the pre-commit security scan reads this to switch from prompt-on-warning to log-and-continue; see `references/docs/pre-commit-security.md`).
 - **Preflight:** Skip assignment guard. Log blocking labels as warnings, don't stop.
 - **Research:** If already resolved, close the issue with a comment and exit cleanly.
 - **Plan:** Auto-select the recommended option (best balance of quality/effort).
