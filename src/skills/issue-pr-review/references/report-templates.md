@@ -72,7 +72,29 @@ When a human-authored PR (one not produced by `/issue-resolver`) is reviewed, th
     safety:              ✓ pass
 ```
 
-Acceptance-criteria checks still apply at full strength — they do not relax for human PRs. `Closes #{N}` checks also still apply at full strength — a human PR missing the issue link still fails traceability.
+Acceptance-criteria checks still apply at full strength — they do not relax for human PRs. `Closes #{N}` checks also still apply at full strength — a human PR missing the issue link still fails traceability, **unless** the PR matches the refactor/chore exemption described below.
+
+## Summary — Refactor/Chore Exempt PR
+
+Refactor or chore PRs (skill quality passes, dependency bumps, doc-only updates) are exempt from the `Closes #N` hard-fail when they match `review.traceability_exempt_labels` or `review.traceability_exempt_pattern`. Check 1 is skipped; checks 2-4 still run and report `partial` if absent.
+
+```
+  Review dimensions:
+    correctness:         ✓ pass
+    acceptance_criteria: ✓ pass — verification disabled
+    traceability:        ○ pass — exempt (refactor/chore PR; no Closes #N required)
+    maintainability:     ✓ pass
+    safety:              ✓ pass
+```
+
+When checks 2-4 produce partial findings on an exempt PR, append them inline:
+
+```
+    traceability:        ○ pass — exempt (refactor/chore PR; no Closes #N required);
+                           no commit references the PR
+```
+
+The match mechanism (label name or pattern) is logged so reviewers can audit which exemption rule fired. To restore strict issue #36 behavior (no exemption), set `review.traceability_exempt_labels: []` and `review.traceability_exempt_pattern: ""`.
 
 ## Auto-Merge (auto mode only)
 

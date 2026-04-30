@@ -197,6 +197,28 @@ review:
   # contract from issue #36.
   require_traceability_check: true
 
+  # PR labels that exempt a PR from the `Closes #N` hard-fail (check 1 only).
+  # Type: list of strings (label names — exact, case-sensitive match)
+  # Default: ["refactor", "chore"]
+  # When the PR carries any label in this list, /issue-pr-review skips the
+  # `Closes #N` check and reports `traceability: pass — exempt`. The other
+  # three traceability checks (commit reference, Decision Record, Acceptance
+  # Criteria Verification block) still run and report `partial` if absent.
+  # Set to [] to disable label-based exemption (see also traceability_exempt_pattern).
+  traceability_exempt_labels:
+    - refactor
+    - chore
+
+  # PR-body pattern that exempts a PR from the `Closes #N` hard-fail (check 1 only).
+  # Type: string (regex, multiline-anchored, case-insensitive)
+  # Default: "^\\s*Type:\\s*(refactor|chore)\\s*$"
+  # When the PR body contains a line matching this pattern, /issue-pr-review
+  # skips the `Closes #N` check and reports `traceability: pass — exempt`. The
+  # other three traceability checks still run.
+  # Set to "" to disable pattern-based exemption. Setting both this and
+  # traceability_exempt_labels to empty restores strict issue #36 behavior.
+  traceability_exempt_pattern: "^\\s*Type:\\s*(refactor|chore)\\s*$"
+
 # Auto-pilot settings (used by /auto-pilot)
 autopilot:
   # Merge mode — controls when /auto-pilot is allowed to merge PRs.
