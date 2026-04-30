@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Added
+- `dist/agents/` generated Claude Code subagent definitions for every shared IDD agent, including `code-reviewer`, so standalone installs can register the agent types skills may invoke on fresh environments. (#89)
+
+### Changed
+- `scripts/install.sh` now installs shared agents to `~/.claude/agents/` alongside standalone skills, supports `--agents-only`, `--no-agents`, `--force-agents`, and `--uninstall`, and avoids overwriting unmanaged same-name agents unless explicitly forced. Plugin builds now also include a top-level `agents/` directory for Claude Code plugin subagent discovery. (#89)
+
 ## [0.8.0] - 2026-04-30
 
 ### Added

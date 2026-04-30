@@ -18,7 +18,9 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 BUILD_SH="$REPO_ROOT/scripts/build.sh"
 SRC_SKILLS="$REPO_ROOT/src/skills"
+SRC_AGENTS="$REPO_ROOT/src/shared/agents"
 DIST_SKILLS="$REPO_ROOT/dist/skills"
+DIST_AGENTS="$REPO_ROOT/dist/agents"
 DIST_PLUGIN="$REPO_ROOT/dist/plugin"
 
 PASS=0
@@ -90,6 +92,7 @@ done
 # ───────────────────────────────────────────────────────────
 expected_plugin_paths=(
   ".claude-plugin/plugin.json"
+  "agents"
   "skills"
   "shared"
   "docs"
@@ -99,6 +102,24 @@ for p in "${expected_plugin_paths[@]}"; do
     pass "T5: dist/plugin/$p present"
   else
     fail "T5: dist/plugin/$p missing"
+  fi
+done
+
+# ───────────────────────────────────────────────────────────
+# T5.1: every shared source agent is emitted as a standalone Claude Code agent
+# ───────────────────────────────────────────────────────────
+for src_agent in "$SRC_AGENTS"/*.md; do
+  [ -f "$src_agent" ] || continue
+  name="$(basename "$src_agent")"
+  stem="${name%.md}"
+  dist_agent="$DIST_AGENTS/$name"
+  if [ -f "$dist_agent" ] && \
+     grep -q "^name: $stem$" "$dist_agent" && \
+     grep -q '^description: ' "$dist_agent" && \
+     grep -q 'Managed by IDD installer' "$dist_agent"; then
+    pass "T5.1: dist/agents/$name generated with Claude Code frontmatter"
+  else
+    fail "T5.1: dist/agents/$name missing or malformed"
   fi
 done
 
