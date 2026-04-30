@@ -58,10 +58,10 @@ else
   fail "T4: unknown placeholder names found"
 fi
 
-if grep -qF '"default_version": "0.7.0"' "$PLUGIN_INPUT"; then
-  pass "T5: default_version is project version 0.7.0"
+if grep -qF '"default_version": "0.8.0"' "$PLUGIN_INPUT"; then
+  pass "T5: default_version is project version 0.8.0"
 else
-  fail "T5: default_version must be 0.7.0 until release bump"
+  fail "T5: default_version must be 0.8.0 until release bump"
 fi
 
 if grep -qF '"PLUGIN_SLUG": "idd"' "$PLUGIN_INPUT"; then

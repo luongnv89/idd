@@ -6,8 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-04-30
+
 ### Added
 - `feat(security)` shared pre-commit security scan — `docs/pre-commit-security.md` codifies the secret/credential/large-file gate adopted from `/auto-push`. Every skill that runs `git commit` or `git push` now invokes the scan before staging or pushing; real secrets block, warnings log and continue. Wired into `src/shared/agents/implementer.md`, `src/skills/issue-pr-review/SKILL.md` (auto-fix and fix-cycle steps), and `src/skills/issue-resolver/SKILL.md` (Step 5 push). `tests/test-pre-commit-security.sh` greps shell-fenced `git commit`/`git push` invocations and asserts each is gated by a reference to the canonical doc. (#87)
+- `feat(install)` `scripts/install.sh` — single idempotent install command for users without `asm`. Installs all standalone skills by default; supports `--skill <name>` for a single skill, `--plugin` for the Claude Code plugin layout, `--all` for both, plus `--target <dir>`, `--dry-run`, and `--help`. Pure POSIX bash, shellcheck clean. (#76, #80)
+
+### Changed
+- `refactor(docs)` `src/docs/` and top-level `docs/` merged into a single top-level `docs/` tree containing both runtime (skill-consumed) docs and human-only project docs. The build script copies the same five runtime docs as before — `config-schema.md`, `idd-methodology.md`, `naming-conventions.md`, `sync-conventions.md`, `github-projects-sync.md` — into each skill's `references/docs/`. Internal references and runtime-doc URLs rewritten to match. (#81)
+- `docs(install)` README install hierarchy reorganized so standalone installation via `asm install` is the recommended default; the plugin path is preserved as an advanced option below standalone. `docs/DEVELOPMENT.md` updated to point at the new install script alongside the existing manual paths. (#76, #80)
+- Skill versions: `/issue-resolver` 0.7.1 (Step 5 pre-push security scan), `/issue-pr-review` 0.4.2 (Step 2 auto-fix and Step 6 fix-cycle pre-commit security scans).
+
+### Fixed
+- `docs(install)` README's "every public skill in one call" example previously used `asm install ...:dist/skills --all -p claude`, which fails on asm v2.5.0 because `--all` is ignored when the source includes a subpath ([asm#251](https://github.com/luongnv89/asm/issues/251)). Replaced with a per-skill loop that exercises the working single-skill path, plus a "Why a loop?" callout linking to the upstream asm issue. Single-skill and from-source instructions unchanged. (#85)
+- `docs(install)` README "Heads up" callout now explicitly states that `claude plugin install <tarball-url>` is unsupported — Claude Code's `claude plugin install` only accepts `plugin@marketplace` references, not tarball URLs or paths. Replaces the stale "tarballs ship with the first tagged release" note (v0.7.0 already ships `idd-plugin-v0.7.0.tar.gz`) and points users to the working manual `tar -xzf` extract path. (#79)
 
 ## [0.7.0] - 2026-04-29
 

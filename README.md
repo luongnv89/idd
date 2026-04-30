@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/luongnv89/idd/releases/latest"><img src="https://img.shields.io/badge/version-0.7.0-blue.svg" alt="Version 0.7.0"></a>
+  <a href="https://github.com/luongnv89/idd/releases/latest"><img src="https://img.shields.io/badge/version-0.8.0-blue.svg" alt="Version 0.8.0"></a>
   <a href="https://github.com/luongnv89/idd/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="MIT License"></a>
   <a href="https://github.com/luongnv89/idd"><img src="https://img.shields.io/badge/commands-8-blue.svg" alt="8 commands"></a>
   <a href="https://github.com/luongnv89/idd/blob/main/CONTRIBUTING.md"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs Welcome"></a>
@@ -55,11 +55,11 @@ graph LR
 |---------|-------------|---------|--------|
 | `/issue-creator` | Classify type, generate acceptance criteria, create a structured issue | 0.4.1 | medium |
 | `/issue-analysis N` | Root cause, git history, implementation options, complexity and risk | 0.4.1 | high |
-| `/issue-resolver N` | 6-step pipeline: preflight, research, plan, implement, QA, deliver PR with `Closes #N` | 0.7.0 | max |
+| `/issue-resolver N` | 6-step pipeline: preflight, research, plan, implement, QA, deliver PR with `Closes #N` | 0.7.1 | max |
 | `/issue-triage` | Dependency graph, stale detection, already-fixed detection via commit/PR scanning, priority and execution order | 0.5.2 | medium |
 | `/init-gitissue` | Auto-detect language/framework/test runner, generate `.gitissue.yml` | 0.3.2 | low |
 | `/auto-pilot` | Triage → resolve → review → merge loop. Conservative-by-default merge modes (`conservative`/`balanced`/`aggressive`) and explicit issue lists for targeted runs | 2.2.0 | max |
-| `/issue-pr-review` | Review PR end-to-end: script pre-pass (lint/format/test auto-fix), per-criterion AC verification, five-dimension scoring (correctness, acceptance_criteria, traceability, maintainability, safety), reuses reviewer/fixer agents across cycles | 0.4.1 | high |
+| `/issue-pr-review` | Review PR end-to-end: script pre-pass (lint/format/test auto-fix), per-criterion AC verification, five-dimension scoring (correctness, acceptance_criteria, traceability, maintainability, safety), reuses reviewer/fixer agents across cycles | 0.4.2 | high |
 
 ### Internal tooling
 
