@@ -6,11 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-04-30
+
 ### Added
+- `feat(issue-pr-review)` exempt refactor/chore PRs from the `Closes #N` traceability hard-fail. A PR is now exempt when either it carries a label in `review.traceability_exempt_labels` (default `["refactor", "chore"]`) or its body matches `review.traceability_exempt_pattern` (default recognizes `Type: refactor` / `Type: chore`, case-insensitive). The exemption applies only to check 1; checks 2–4 (commit reference, Decision Record, Acceptance Criteria Verification block) still run and report `partial` if absent. Strict issue #36 behavior is preserved when both keys are set to their empty values. (#91)
 - `dist/agents/` generated Claude Code subagent definitions for every shared IDD agent, including `code-reviewer`, so standalone installs can register the agent types skills may invoke on fresh environments. (#89)
 
 ### Changed
 - `scripts/install.sh` now installs shared agents to `~/.claude/agents/` alongside standalone skills, supports `--agents-only`, `--no-agents`, `--force-agents`, and `--uninstall`, and avoids overwriting unmanaged same-name agents unless explicitly forced. Plugin builds now also include a top-level `agents/` directory for Claude Code plugin subagent discovery. (#89)
+- Skill versions: `/issue-pr-review` 0.4.2 → 0.5.0 (new exempt-PR config keys).
 
 ## [0.8.0] - 2026-04-30
 
