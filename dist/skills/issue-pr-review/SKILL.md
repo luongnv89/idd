@@ -68,6 +68,8 @@ Load `.gitissue.yml` once. Defaults:
 - `review.soft_pass: true` — pass when zero "fix" issues remain, even if "note" issues exist (≤ 2 medium allowed)
 - `review.require_acceptance_criteria_check: true` — when `false`, skip per-criterion AC verification; report acceptance_criteria as `pass` with a "verification disabled" note (never blocks soft-pass). Default `true` preserves the issue #36 contract.
 - `review.require_traceability_check: true` — when `false`, skip the four traceability checks; report traceability as `pass` with a "verification disabled" note (never blocks soft-pass). Default `true` preserves the issue #36 contract.
+- `review.traceability_exempt_labels: ["refactor", "chore"]` — PR labels that exempt a PR from the `Closes #N` hard-fail (check 1 only; the other three traceability checks still run). Set to `[]` to disable label-based exemption.
+- `review.traceability_exempt_pattern: "^\\s*Type:\\s*(refactor|chore)\\s*$"` — case-insensitive multiline regex; if the PR body contains a matching line, the PR is exempt from the `Closes #N` hard-fail (check 1 only). Set to empty string `""` to disable pattern-based exemption.
 
 ---
 
@@ -330,6 +332,8 @@ Two `.gitissue.yml` flags decide whether the acceptance-criteria and traceabilit
 
 Both default to `true`, which preserves the issue #36 contract verbatim. Setting either flag to `false` is an explicit opt-out — the corresponding hard-block conditions in *Loop controls* below no longer apply for that dimension.
 
+A separate, narrower opt-out exists for refactor/chore PRs (see *Refactor/chore exemption* below). It relaxes only check 1 (`Closes #N`) for the matching PR; the other three traceability checks still run.
+
 ### Acceptance-criteria verification (per criterion)
 
 > Run only when `review.require_acceptance_criteria_check` is `true`. When `false`, skip this entire subsection and emit `○ acceptance_criteria: pass — verification disabled (review.require_acceptance_criteria_check: false)`.
@@ -373,7 +377,7 @@ Each `fail` criterion becomes a fixable issue in Step 6 with `category: acceptan
 
 Per the dual-write rule (see *Analysis Artifacts and Durable Memory* in `references/docs/idd-methodology.md`), the durable analysis signal must survive the squash-merge into git history. Run the following four checks against the PR body and the commits in the PR:
 
-1. **Issue link** — PR body contains `Closes #{N}`, `Fixes #{N}`, or `Resolves #{N}` for the linked issue. Detected with the same regex used by GitHub itself: `(?i)(close[sd]?|fix(e[sd])?|resolve[sd]?)\s+#\d+`.
+1. **Issue link** — PR body contains `Closes #{N}`, `Fixes #{N}`, or `Resolves #{N}` for the linked issue. Detected with the same regex used by GitHub itself: `(?i)(close[sd]?|fix(e[sd])?|resolve[sd]?)\s+#\d+`. See *Refactor/chore exemption* below — the `Closes #N` requirement is relaxed for refactor/chore PRs (the other three checks still run).
 2. **Commit references issue** — at least one commit between base and head references the issue number:
    ```bash
    git log "{base_branch}..{head_branch}" --grep="#{N}" --oneline
@@ -387,6 +391,7 @@ Per the dual-write rule (see *Analysis Artifacts and Durable Memory* in `referen
 | Outcome | Conditions | Status |
 |---------|-----------|--------|
 | All four checks pass | Closes #N + commit ref + Decision Record + AC Verification block all present | ✓ traceability: pass |
+| `Closes #{N}` absent on a refactor/chore-exempt PR | check 1 skipped via the *Refactor/chore exemption* below; checks 2-4 still run | ○ traceability: pass — exempt (refactor/chore PR; no Closes #N required), with any check 2-4 partial findings appended |
 | `Closes #{N}` absent | check 1 fails (regardless of other checks) | ✗ traceability: fail (blocking — see below) |
 | Decision Record absent on a human-authored PR | check 3 partially fails: PR was not produced by `/issue-resolver` and has no Decision Record | ⚠ traceability: partial — "PR not produced by `/issue-resolver`; Decision Record absent" |
 | Commit reference absent | check 2 fails but check 1 passes (PR body has Closes #N but no commit references the issue) | ⚠ traceability: partial — "no commit references #{N}" |
@@ -395,6 +400,32 @@ Per the dual-write rule (see *Analysis Artifacts and Durable Memory* in `referen
 The `Closes #{N}` failure is the only traceability outcome that **blocks** the soft-pass. All other partial outcomes are reported but do not block. This matches issue #36's contract: a PR missing `Closes #N` reports a traceability failure even if tests pass; a human-authored PR without a Decision Record reports `partial`, not `fail`.
 
 When traceability fails on `Closes #{N}`, emit a fixable issue in Step 6 with `category: traceability`, `action: fix`, suggested fix: "Add `Closes #{N}` to the PR body."
+
+### Refactor/chore exemption
+
+Some PRs aren't tied to a single tracked issue — skill quality passes, dependency bumps, doc-only updates. Forcing each one to open a tracking issue purely to satisfy the `Closes #N` gate is workflow ceremony with no information gain. To accommodate this, check 1 (`Closes #N`) is **skipped** when either of the following holds:
+
+1. The PR has any label whose name appears in `review.traceability_exempt_labels` (default: `["refactor", "chore"]`). Match is exact and case-sensitive against GitHub label names.
+2. The PR body contains a line matching `review.traceability_exempt_pattern` (default: `"^\\s*Type:\\s*(refactor|chore)\\s*$"`, case-insensitive, evaluated multiline-anchored against the body). The line may appear anywhere in the body. The default is shown in YAML double-quoted form, so `\\s` is the correct value to copy into `.gitissue.yml`.
+
+The exemption applies **only to check 1**. Checks 2-4 (commit reference, Decision Record, Acceptance Criteria Verification block) still run; their absence is reported as `partial`, never `fail`. Note that check 2 (`git log --grep="#{N}"`) is well-defined only when there is a tracked issue number; an exempt refactor/chore PR with no linked issue has no `#{N}` to grep for, so check 2 is reported as `n/a — no linked issue`, not `partial`. When an exempt PR _does_ have a linked issue (e.g., a refactor scoped under a tracking ticket) but no commit references it, the report is `○ pass — exempt; no commit references #{N} (note)`, not `fail`.
+
+Report wording:
+
+```
+traceability:        ○ pass — exempt (refactor/chore PR; no Closes #N required)
+```
+
+If checks 2-4 produce partial findings on an exempt PR, append them as in the human-authored case:
+
+```
+traceability:        ○ pass — exempt (refactor/chore PR; no Closes #N required);
+                       no commit references #{N}
+```
+
+To **disable** the exemption entirely (restore the strict issue #36 behavior), set `traceability_exempt_labels: []` and `traceability_exempt_pattern: ""` in `.gitissue.yml`.
+
+The exemption check runs before the four traceability checks; if a PR matches, log which mechanism matched (label name or pattern) so reviewers can audit the decision in the report.
 
 ### Reviewer call-out for the other three dimensions
 
@@ -593,7 +624,7 @@ After Step 6, go back to Step 3 — but reuse the same reviewer agent via `SendM
 - **Max cycles:** `review.max_cycles` (default: 3)
 - **Agent reuse:** Cycles 2+ reuse the existing reviewer and fixer agents. Fresh spawn only for the confirmation pass after fixer reports zero issues.
 - **Soft pass (default):** Stop when ALL of the following hold: zero `action: "fix"` issues remain (across all five dimensions, including `acceptance_criteria` and `traceability` failures) AND tests pass AND CI passes AND traceability is not `fail`. Medium "note" issues (≤ 2) and `partial` dimensions are allowed — they don't block the pass.
-- **Hard-block conditions:** `traceability: fail` (e.g., `Closes #{N}` missing) and any `acceptance_criteria: fail` always block, even if every other dimension is clean. Tests passing does not override these — that is the explicit contract from issue #36. The block is gated on `review.require_traceability_check` and `review.require_acceptance_criteria_check`: when either flag is `false`, the corresponding dimension is reported as `pass — verification disabled` and never blocks soft-pass. Both flags default to `true`.
+- **Hard-block conditions:** `traceability: fail` (e.g., `Closes #{N}` missing) and any `acceptance_criteria: fail` always block, even if every other dimension is clean. Tests passing does not override these — that is the explicit contract from issue #36. The block is gated on `review.require_traceability_check` and `review.require_acceptance_criteria_check`: when either flag is `false`, the corresponding dimension is reported as `pass — verification disabled` and never blocks soft-pass. Both flags default to `true`. A narrower opt-out applies to refactor/chore PRs (see *Refactor/chore exemption* in Step 3): a matching PR reports `traceability: pass — exempt` and is not blocked, even though the four checks (minus check 1) still run.
 - **Confirmation pass:** When the fixer reports all fixed, spawn one fresh reviewer for unbiased verification. If clean → PASS. If new issues → back to existing fixer (counts as a cycle).
 - **Exit on stagnation:** If the same issues appear in 2 consecutive cycles, stop and report
 - **Review-only mode:** Run one cycle of Steps 3-5 only, never fix or loop

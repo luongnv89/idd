@@ -16,6 +16,7 @@
 - Five-dimension review output — correctness, acceptance_criteria, traceability, maintainability, safety — so a PR can pass tests and still be flagged for missing issue links or unmet acceptance criteria
 - Per-criterion acceptance-criteria verification (`pass` / `fail` / `unverified` with evidence) against the linked issue
 - Soft-pass when zero "fix" issues remain, with **hard blocks** on `traceability: fail` (missing `Closes #N`) and any `acceptance_criteria: fail` — green tests do not override these
+- Refactor/chore PRs (matching `review.traceability_exempt_labels` or `review.traceability_exempt_pattern`) are exempt from the `Closes #N` hard-fail; the other three traceability checks still run
 
 ## When to Use
 
