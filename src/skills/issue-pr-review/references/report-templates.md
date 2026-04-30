@@ -93,8 +93,10 @@ When checks 2-4 produce partial findings on an exempt PR, append them inline:
 
 ```
     traceability:        ○ pass — exempt (refactor/chore PR; no Closes #N required);
-                           no commit references the PR
+                           no commit references #{N}
 ```
+
+Note: check 2 (`git log --grep="#{N}"`) is well-defined only when the exempt PR has a linked issue number to grep for. If the PR is opened without any tracked issue, check 2 is reported as `n/a — no linked issue` rather than `partial`.
 
 The match mechanism (label name or pattern) is logged so reviewers can audit which exemption rule fired. To restore strict issue #36 behavior (no exemption), set `review.traceability_exempt_labels: []` and `review.traceability_exempt_pattern: ""`.
 

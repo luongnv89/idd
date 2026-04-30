@@ -406,9 +406,9 @@ When traceability fails on `Closes #{N}`, emit a fixable issue in Step 6 with `c
 Some PRs aren't tied to a single tracked issue — skill quality passes, dependency bumps, doc-only updates. Forcing each one to open a tracking issue purely to satisfy the `Closes #N` gate is workflow ceremony with no information gain. To accommodate this, check 1 (`Closes #N`) is **skipped** when either of the following holds:
 
 1. The PR has any label whose name appears in `review.traceability_exempt_labels` (default: `["refactor", "chore"]`). Match is exact and case-sensitive against GitHub label names.
-2. The PR body contains a line matching `review.traceability_exempt_pattern` (default: `"^\s*Type:\s*(refactor|chore)\s*$"`, case-insensitive, evaluated multiline-anchored against the body). The line may appear anywhere in the body.
+2. The PR body contains a line matching `review.traceability_exempt_pattern` (default: `"^\\s*Type:\\s*(refactor|chore)\\s*$"`, case-insensitive, evaluated multiline-anchored against the body). The line may appear anywhere in the body. The default is shown in YAML double-quoted form, so `\\s` is the correct value to copy into `.gitissue.yml`.
 
-The exemption applies **only to check 1**. Checks 2-4 (commit reference, Decision Record, Acceptance Criteria Verification block) still run; their absence is reported as `partial`, never `fail`. This means an exempt PR whose commits do not reference the PR reports `○ pass — exempt; no commit references the PR (note)`, not `fail`.
+The exemption applies **only to check 1**. Checks 2-4 (commit reference, Decision Record, Acceptance Criteria Verification block) still run; their absence is reported as `partial`, never `fail`. Note that check 2 (`git log --grep="#{N}"`) is well-defined only when there is a tracked issue number; an exempt refactor/chore PR with no linked issue has no `#{N}` to grep for, so check 2 is reported as `n/a — no linked issue`, not `partial`. When an exempt PR _does_ have a linked issue (e.g., a refactor scoped under a tracking ticket) but no commit references it, the report is `○ pass — exempt; no commit references #{N} (note)`, not `fail`.
 
 Report wording:
 
@@ -420,7 +420,7 @@ If checks 2-4 produce partial findings on an exempt PR, append them as in the hu
 
 ```
 traceability:        ○ pass — exempt (refactor/chore PR; no Closes #N required);
-                       no commit references the PR
+                       no commit references #{N}
 ```
 
 To **disable** the exemption entirely (restore the strict issue #36 behavior), set `traceability_exempt_labels: []` and `traceability_exempt_pattern: ""` in `.gitissue.yml`.
