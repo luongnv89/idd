@@ -24,6 +24,8 @@ Review a pull request end-to-end — analyze, test, fix, check CI, repeat until 
 
 The `--auto` flag is set automatically when invoked by `/auto-pilot`.
 
+In auto mode, export `IDD_AUTO_MODE=1` before any shell snippet that consults it — the pre-commit security scan reads this to switch from prompt-on-warning to log-and-continue (see `docs/pre-commit-security.md`).
+
 ## Prerequisites
 
 1. Confirm git repository: `git rev-parse --git-dir`
@@ -181,9 +183,52 @@ npm test          # or pytest, go test ./..., cargo test, etc.
 
 ### Commit auto-fixes
 
-If any files were modified by the auto-fix tools:
+If any files were modified by the auto-fix tools, run the pre-commit security
+scan before staging (see the pre-commit security conventions reference at
+`docs/pre-commit-security.md` — that document is authoritative; the snippet
+below mirrors its Primary Pattern). Real secrets block; warnings prompt for
+confirmation in interactive mode and log-and-continue in auto mode.
 
 ```bash
+# Pre-commit security scan — mirrors the Primary Pattern in the
+# pre-commit-security conventions reference. Set IDD_AUTO_MODE=1 in auto mode.
+files="$(git status --porcelain | awk '{print $2}')"
+secrets_found=0
+warnings=()
+if printf '%s\n' "$files" | grep -E -q '(^|/)\.env($|\.)|\.key$|\.pem$|credentials\.json$|secrets\.ya?ml$|id_rsa($|\.pub$)|\.p12$|\.pfx$|\.cer$'; then
+  echo "✗ Secret-bearing file in working tree."
+  secrets_found=1
+fi
+realkey='(sk-(proj-)?[A-Za-z0-9_-]{20,}|sk_live_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|ASIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{30,}|gho_[A-Za-z0-9]{30,}|ghs_[A-Za-z0-9]{30,}|ghu_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{40,}|xox[abprs]-[A-Za-z0-9-]{10,}|glpat-[A-Za-z0-9_-]{20,}|AIza[0-9A-Za-z_-]{30,})'
+while IFS= read -r f; do
+  [ -z "$f" ] && continue
+  [ -f "$f" ] || continue
+  file --mime "$f" 2>/dev/null | grep -q 'charset=binary' && continue
+  if grep -E -q "$realkey" "$f" 2>/dev/null; then
+    echo "✗ Real API key detected in: $f"
+    secrets_found=1
+  fi
+  size=$(stat -f%z "$f" 2>/dev/null || stat -c%s "$f" 2>/dev/null || echo 0)
+  [ "$size" -gt 10485760 ] && warnings+=("⚠ Large file (>10 MB) without LFS: $f")
+done <<< "$files"
+junk='(^|/)(node_modules|dist|build|__pycache__|\.venv)(/|$)|\.pyc$|(^|/)(\.DS_Store|thumbs\.db)$|\.swp$|\.tmp$'
+while IFS= read -r f; do
+  [ -z "$f" ] && continue
+  printf '%s\n' "$f" | grep -E -q "$junk" && warnings+=("⚠ Build artifact staged: $f")
+done <<< "$files"
+case "$(git rev-parse --abbrev-ref HEAD)" in
+  main|master|production|release) warnings+=("⚠ On protected branch — confirm intentional") ;;
+esac
+[ "$secrets_found" = 1 ] && { echo "✗ Pre-commit security scan blocked. See pre-commit-security conventions reference."; exit 1; }
+if [ "${#warnings[@]}" -gt 0 ]; then
+  printf '%s\n' "${warnings[@]}"
+  if [ "${IDD_AUTO_MODE:-0}" = "1" ]; then
+    echo "○ Warnings logged — proceeding (auto mode)."
+  else
+    printf "Proceed anyway? [y/N] "; read -r reply
+    case "$reply" in y|Y|yes|YES) echo "○ Continuing despite warnings." ;; *) echo "✗ Stopped."; exit 1 ;; esac
+  fi
+fi
 git add -A
 git commit -m "style: auto-fix lint and format issues"
 git push origin {branch_name}
@@ -474,7 +519,54 @@ For each issue where `action: "fix"`:
 2. Apply the fix
 3. Stage: `git add <specific-file>`
 
-After all fixes:
+After all fixes, run the pre-commit security scan against the staged set before
+committing (see the pre-commit security conventions reference at
+`docs/pre-commit-security.md` — that document is authoritative; the snippet
+below mirrors its Primary Pattern). Real secrets block; warnings prompt for
+confirmation in interactive mode and log-and-continue in auto mode.
+
+```bash
+# Pre-commit security scan — mirrors the Primary Pattern in the
+# pre-commit-security conventions reference. Set IDD_AUTO_MODE=1 in auto mode.
+files="$(git diff --cached --name-only)"
+secrets_found=0
+warnings=()
+if printf '%s\n' "$files" | grep -E -q '(^|/)\.env($|\.)|\.key$|\.pem$|credentials\.json$|secrets\.ya?ml$|id_rsa($|\.pub$)|\.p12$|\.pfx$|\.cer$'; then
+  echo "✗ Secret-bearing file staged."
+  secrets_found=1
+fi
+realkey='(sk-(proj-)?[A-Za-z0-9_-]{20,}|sk_live_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|ASIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{30,}|gho_[A-Za-z0-9]{30,}|ghs_[A-Za-z0-9]{30,}|ghu_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{40,}|xox[abprs]-[A-Za-z0-9-]{10,}|glpat-[A-Za-z0-9_-]{20,}|AIza[0-9A-Za-z_-]{30,})'
+while IFS= read -r f; do
+  [ -z "$f" ] && continue
+  [ -f "$f" ] || continue
+  file --mime "$f" 2>/dev/null | grep -q 'charset=binary' && continue
+  if grep -E -q "$realkey" "$f" 2>/dev/null; then
+    echo "✗ Real API key detected in: $f"
+    secrets_found=1
+  fi
+  size=$(stat -f%z "$f" 2>/dev/null || stat -c%s "$f" 2>/dev/null || echo 0)
+  [ "$size" -gt 10485760 ] && warnings+=("⚠ Large file (>10 MB) without LFS: $f")
+done <<< "$files"
+junk='(^|/)(node_modules|dist|build|__pycache__|\.venv)(/|$)|\.pyc$|(^|/)(\.DS_Store|thumbs\.db)$|\.swp$|\.tmp$'
+while IFS= read -r f; do
+  [ -z "$f" ] && continue
+  printf '%s\n' "$f" | grep -E -q "$junk" && warnings+=("⚠ Build artifact staged: $f")
+done <<< "$files"
+case "$(git rev-parse --abbrev-ref HEAD)" in
+  main|master|production|release) warnings+=("⚠ On protected branch — confirm intentional") ;;
+esac
+[ "$secrets_found" = 1 ] && { echo "✗ Pre-commit security scan blocked. See pre-commit-security conventions reference."; exit 1; }
+if [ "${#warnings[@]}" -gt 0 ]; then
+  printf '%s\n' "${warnings[@]}"
+  if [ "${IDD_AUTO_MODE:-0}" = "1" ]; then
+    echo "○ Warnings logged — proceeding (auto mode)."
+  else
+    printf "Proceed anyway? [y/N] "; read -r reply
+    case "$reply" in y|Y|yes|YES) echo "○ Continuing despite warnings." ;; *) echo "✗ Stopped."; exit 1 ;; esac
+  fi
+fi
+```
+
 4. Commit: `fix({scope}): address review feedback` (append `(#{linked_issue})` only if a linked issue exists)
 5. Push: `git push origin {branch_name}`
 
