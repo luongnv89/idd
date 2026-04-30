@@ -81,11 +81,13 @@ Refactor or chore PRs (skill quality passes, dependency bumps, doc-only updates)
 ```
   Review dimensions:
     correctness:         ✓ pass
-    acceptance_criteria: ✓ pass — verification disabled
+    acceptance_criteria: ○ pass — none defined; manual review recommended
     traceability:        ○ pass — exempt (refactor/chore PR; no Closes #N required)
     maintainability:     ✓ pass
     safety:              ✓ pass
 ```
+
+The `acceptance_criteria` line above shows the common case for refactor/chore PRs (no linked issue, so no AC defined). When a refactor PR does have a linked issue with acceptance criteria, those criteria still verify normally — the refactor exemption relaxes only check 1 of traceability, never AC. The "verification disabled" wording appears only when `review.require_acceptance_criteria_check: false` is explicitly set.
 
 When checks 2-4 produce partial findings on an exempt PR, append them inline:
 

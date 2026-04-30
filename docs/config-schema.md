@@ -409,6 +409,8 @@ graph TD
     RV --> RV9["soft_pass"]
     RV --> RV10["require_acceptance_criteria_check"]
     RV --> RV11["require_traceability_check"]
+    RV --> RV12["traceability_exempt_labels"]
+    RV --> RV13["traceability_exempt_pattern"]
 
     AP --> AP0["mode"]
     AP --> AP00["merge_partial"]
@@ -491,6 +493,8 @@ Config is validated on load at the start of every skill invocation. Errors inclu
 | `review.soft_pass` | `true` | Treat soft-pass as pass |
 | `review.require_acceptance_criteria_check` | `true` | Run per-criterion acceptance-criteria verification; `fail` blocks soft-pass |
 | `review.require_traceability_check` | `true` | Run the four traceability checks; missing `Closes #N` blocks soft-pass |
+| `review.traceability_exempt_labels` | `["refactor", "chore"]` | PR labels that exempt a PR from the `Closes #N` hard-fail (check 1 only; other three checks still run) |
+| `review.traceability_exempt_pattern` | `"^\\s*Type:\\s*(refactor\|chore)\\s*$"` | Regex (multiline, case-insensitive) matched against PR body for exemption from check 1 |
 | `autopilot.mode` | `conservative` | Merge mode: `conservative` (never merge), `balanced` (merge clean PRs), `aggressive` (merge clean + partial w/ `merge_partial: true`) |
 | `autopilot.merge_partial` | `false` | Allow merging PRs with unresolved review issues. Only honored when `mode: aggressive` |
 | `autopilot.max_iterations` | `10` | Max issues to process |

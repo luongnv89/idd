@@ -408,7 +408,7 @@ Some PRs aren't tied to a single tracked issue — skill quality passes, depende
 1. The PR has any label whose name appears in `review.traceability_exempt_labels` (default: `["refactor", "chore"]`). Match is exact and case-sensitive against GitHub label names.
 2. The PR body contains a line matching `review.traceability_exempt_pattern` (default: `"^\s*Type:\s*(refactor|chore)\s*$"`, case-insensitive, evaluated multiline-anchored against the body). The line may appear anywhere in the body.
 
-The exemption applies **only to check 1**. Checks 2-4 (commit reference, Decision Record, Acceptance Criteria Verification block) still run; their absence is reported as `partial`, never `fail`. This means an exempt PR with no Decision Record reports `○ pass — exempt; no commit references the PR (note)`, not `fail`.
+The exemption applies **only to check 1**. Checks 2-4 (commit reference, Decision Record, Acceptance Criteria Verification block) still run; their absence is reported as `partial`, never `fail`. This means an exempt PR whose commits do not reference the PR reports `○ pass — exempt; no commit references the PR (note)`, not `fail`.
 
 Report wording:
 
