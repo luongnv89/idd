@@ -170,13 +170,25 @@ for skill in issue-creator issue-analysis issue-resolver issue-triage \
              issue-pr-review auto-pilot init-gitissue; do
   asm install "github:luongnv89/idd#main:dist/skills/$skill" -p claude -y
 done
+
+# Shared Claude Code agents used by those skills:
+mkdir -p "$HOME/.claude/agents"
+for agent in code-reviewer codebase-researcher duplicate-detector \
+             implementer issue-relationship-scanner synthesizer; do
+  dst="$HOME/.claude/agents/$agent.md"
+  if [ -f "$dst" ] && ! grep -q 'Managed by IDD installer' "$dst"; then
+    echo "Skipping unmanaged existing agent: $dst"
+    continue
+  fi
+  curl -fsSL "https://raw.githubusercontent.com/luongnv89/idd/main/dist/agents/$agent.md" -o "$dst"
+done
 ```
 
-`asm` is idempotent — re-running the same command updates the skill in place with no duplicate files. Target Claude Code explicitly with `-p claude` (or `-p all` for every supported tool).
+`asm` is idempotent — re-running the same command updates the skill in place with no duplicate files. The agent loop is also safe to re-run: it only replaces IDD-managed agents and skips unmanaged same-name files. Target Claude Code explicitly with `-p claude` (or `-p all` for every supported tool).
 
 > **Why a loop?** A single `asm install …:dist/skills --all` would be nicer, but `--all` is currently ignored when the source includes a subpath (tracked in [luongnv89/asm#251](https://github.com/luongnv89/asm/issues/251)). The per-skill loop above exercises the working single-skill path. Once asm #251 lands we'll switch back to the one-liner. If you'd rather not loop, the [from-source alternative](#from-source-alternative-no-asm-required) installs all skills with a single command today.
 
-After install, restart Claude Code so it picks up the new skill(s). The full list of skills lives under [`dist/skills/`](dist/skills/) — substitute any name (`issue-creator`, `issue-resolver`, `issue-triage`, `issue-pr-review`, `auto-pilot`, `issue-analysis`, `init-gitissue`) into the command above.
+After install, restart Claude Code so it picks up the new skill(s) and agents. The full list of skills lives under [`dist/skills/`](dist/skills/) and generated Claude Code agents live under [`dist/agents/`](dist/agents/) — substitute any skill name (`issue-creator`, `issue-resolver`, `issue-triage`, `issue-pr-review`, `auto-pilot`, `issue-analysis`, `init-gitissue`) into the command above.
 
 #### From-source alternative (no `asm` required)
 
@@ -189,9 +201,17 @@ cd idd
 # or: ./scripts/install.sh --skill issue-resolver
 ```
 
-The script copies each `dist/skills/<name>/` to `~/.claude/skills/<name>/`, replacing any prior install cleanly. Use `./scripts/install.sh --target <dir>` to target a different Claude root. Pure POSIX bash — no extra runtime needed.
+The script copies each `dist/skills/<name>/` to `~/.claude/skills/<name>/` and each generated shared agent from `dist/agents/*.md` to `~/.claude/agents/`. It replaces IDD-managed agents cleanly, removes stale managed agents on update, and skips unmanaged same-name agents unless you pass `--force-agents` (which backs them up before replacement). Use `./scripts/install.sh --target <dir>` to target a different Claude root. Pure POSIX bash — no extra runtime needed.
 
-You can also do the copy by hand if you prefer to see every file move: `cp -r dist/skills/<name> ~/.claude/skills/`. `dist/skills/` is committed to the repository, so this path works on a fresh clone without running a build.
+You can also do the copy by hand if you prefer to see every file move:
+
+```bash
+mkdir -p ~/.claude/skills ~/.claude/agents
+cp -r dist/skills/<name> ~/.claude/skills/
+cp dist/agents/*.md ~/.claude/agents/
+```
+
+`dist/skills/` and `dist/agents/` are committed to the repository, so this path works on a fresh clone without running a build.
 
 #### Plugin path (advanced — Claude Code only)
 
@@ -205,13 +225,13 @@ mkdir -p ~/.claude/plugins/idd
 tar -xzf idd-plugin-<tag>.tar.gz -C ~/.claude/plugins/idd
 ```
 
-The tarball unpacks to `.claude-plugin/plugin.json`, `skills/`, `shared/`, and `docs/` at its root. Restart Claude Code to load the new plugin.
+The tarball unpacks to `.claude-plugin/plugin.json`, `agents/`, `skills/`, `shared/`, and `docs/` at its root. Restart Claude Code to load the new plugin.
 
 > **Heads up — `claude plugin install <tarball-url>` is not supported.** Claude Code's `claude plugin install` only accepts `plugin@marketplace` references and resolves them through configured marketplaces, not direct tarball URLs or paths. Running `claude plugin install https://github.com/luongnv89/idd/releases/download/<tag>/idd-plugin-<tag>.tar.gz` returns `not found in any configured marketplace` and does nothing. Use the manual `tar -xzf` extract above — that is the supported install path today. (Tracked in [#79](https://github.com/luongnv89/idd/issues/79).)
 
 If you cloned the repo, you can build the plugin tree locally and install it with the script: `./scripts/build.sh && ./scripts/install.sh --plugin`. `dist/plugin/` is generated only at release time and gitignored, so the build step is required.
 
-> **Note:** `dist/skills/` is committed so the standalone paths work without running a build. `dist/plugin/` is built fresh by `./scripts/build.sh` and shipped as the release tarball above.
+> **Note:** `dist/skills/` and `dist/agents/` are committed so the standalone paths work without running a build. `dist/plugin/` is built fresh by `./scripts/build.sh` and shipped as the release tarball above.
 
 ### First issue in 30 seconds
 

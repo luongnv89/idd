@@ -20,7 +20,9 @@
    ./scripts/install.sh
 
    # Standalone — single skill from this checkout (manual variant):
+   mkdir -p ~/.claude/skills ~/.claude/agents
    cp -r dist/skills/issue-resolver ~/.claude/skills/
+   cp dist/agents/*.md ~/.claude/agents/
 
    # Standalone — via asm (no clone needed; targets Claude Code):
    asm install github:luongnv89/idd#main:dist/skills/issue-resolver
@@ -28,7 +30,7 @@
    # Plugin (Claude Code only) — build then install the plugin tree:
    ./scripts/build.sh && ./scripts/install.sh --plugin
    ```
-   The Plugin path lands under `~/.claude/plugins/idd/`; the Standalone paths drop individual skills directly into `~/.claude/skills/`. See [README → Install](../README.md#install) for the full hierarchy.
+   The Plugin path lands under `~/.claude/plugins/idd/`; the Standalone paths drop individual skills into `~/.claude/skills/` and shared Claude Code agents into `~/.claude/agents/`. See [README → Install](../README.md#install) for the full hierarchy.
 
 3. Verify setup:
    ```bash
@@ -43,6 +45,7 @@
 ```mermaid
 graph LR
     SRC["src/<br/>(authored)"] -->|"./scripts/build.sh"| DSK["dist/skills/<br/>(committed)"]
+    SRC -->|"./scripts/build.sh"| DAG["dist/agents/<br/>(committed)"]
     SRC -->|"./scripts/build.sh"| DPL["dist/plugin/<br/>(gitignored)"]
     DPL -->|"release tag"| TAR["idd-plugin-&lt;tag&gt;.tar.gz<br/>(release asset)"]
 
@@ -56,7 +59,7 @@ After editing anything under `src/`, rebuild before committing:
 ./scripts/build.sh
 ```
 
-CI's drift check fails any PR where the committed `dist/skills/` does not match a fresh build.
+CI's drift check fails any PR where the committed `dist/skills/` or `dist/agents/` output does not match a fresh build.
 
 ## Making Changes
 

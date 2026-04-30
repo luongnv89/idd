@@ -59,6 +59,27 @@ BANNER_TMPL = (
     "Edit source and run ./scripts/build.sh. -->\n"
 )
 
+AGENT_DESCRIPTIONS = {
+    "code-reviewer": (
+        "Review IDD code changes and PRs with confidence-based findings."
+    ),
+    "codebase-researcher": (
+        "Research GitHub issues against a codebase without modifying files."
+    ),
+    "duplicate-detector": (
+        "Detect duplicate GitHub issues before creating new structured issues."
+    ),
+    "implementer": (
+        "Implement an approved issue plan with code changes and focused tests."
+    ),
+    "issue-relationship-scanner": (
+        "Scan issues for dependencies, file overlap, and already-fixed signals."
+    ),
+    "synthesizer": (
+        "Synthesize issue research into ranked implementation options."
+    ),
+}
+
 
 # --- Errors ------------------------------------------------------------------
 
@@ -444,6 +465,51 @@ def _emit_flattened_skill(
         _write_text(dst_path, banner + _rewrite_for_standalone(text))
 
 
+def _agent_description(agent_name: str) -> str:
+    return AGENT_DESCRIPTIONS.get(
+        agent_name,
+        f"IDD shared agent prompt for {agent_name.replace('-', ' ')} workflows.",
+    )
+
+
+def _render_agent_definition(agent_name: str, source_text: str, source_rel: str) -> str:
+    """Render a Claude Code subagent definition from a shared agent prompt.
+
+    Claude Code loads subagents from Markdown files with YAML frontmatter.
+    Only name and description are required; omitting tools lets the agent
+    inherit the caller's tool set, matching the current shared-agent prompts.
+    """
+    frontmatter = (
+        "---\n"
+        f"name: {agent_name}\n"
+        f"description: {json.dumps(_agent_description(agent_name))}\n"
+        "---\n"
+    )
+    marker = (
+        f"<!-- Managed by IDD installer. Generated from /{source_rel}. "
+        "Do not edit installed copies; edit source and run ./scripts/build.sh. -->\n"
+    )
+    return frontmatter + "\n" + marker + BANNER_TMPL.format(rel=source_rel) + source_text
+
+
+def _emit_standalone_agents(src: Path, out_dir: Path) -> None:
+    """Emit installable Claude Code agent definitions under dist/agents/."""
+    if out_dir.exists():
+        shutil.rmtree(out_dir)
+    out_dir.mkdir(parents=True)
+
+    shared_src = src / "shared" / "agents"
+    if not shared_src.is_dir():
+        return
+    for f in _walk_files(shared_src):
+        if f.suffix != ".md":
+            continue
+        agent_name = f.stem
+        rel = f"src/shared/agents/{f.name}"
+        text = _read_text(f)
+        _write_text(out_dir / f.name, _render_agent_definition(agent_name, text, rel))
+
+
 # --- Phase D — dist/plugin/ --------------------------------------------------
 
 
@@ -457,6 +523,7 @@ def _emit_plugin_tree(
     if out_root.exists():
         shutil.rmtree(out_root)
     (out_root / ".claude-plugin").mkdir(parents=True)
+    (out_root / "agents").mkdir()
     (out_root / "skills").mkdir()
     (out_root / "shared" / "agents").mkdir(parents=True)
     (out_root / "docs").mkdir()
@@ -499,6 +566,16 @@ def _emit_plugin_tree(
                 _write_text(dst, rewritten)
             else:
                 _copy_binary(f, dst)
+
+            # Also expose the same prompt as a plugin subagent. Claude Code
+            # discovers plugin subagents from the plugin root's agents/.
+            if f.suffix == ".md":
+                agent_name = f.stem
+                source_rel = f"src/shared/agents/{f.name}"
+                _write_text(
+                    out_root / "agents" / f.name,
+                    _render_agent_definition(agent_name, _read_text(f), source_rel),
+                )
 
     # Copy runtime docs to plugin tree (issue #81 — single docs/ tree at top
     # level holds both runtime and project docs; plugin ships runtime only).
@@ -668,6 +745,22 @@ def _validate_plugin_manifest(out_plugin: Path) -> None:
                 _abort(f"plugin.json missing required field: {required}")
 
 
+def _scan_dist_agents(out_agents: Path) -> None:
+    """Verify dist/agents/ contains valid Claude Code subagent definitions."""
+    if not out_agents.is_dir():
+        _abort(f"dist/agents/ missing at {out_agents}")
+    for f in _walk_files(out_agents):
+        if f.suffix != ".md":
+            _abort(f"non-markdown file under dist/agents/: {f.name}")
+        text = _read_text(f)
+        if not text.startswith("---\n"):
+            _abort(f"agent missing YAML frontmatter: {f.relative_to(out_agents.parent)}")
+        if f"name: {f.stem}" not in text.split("---", 2)[1]:
+            _abort(f"agent frontmatter name mismatch: {f.relative_to(out_agents.parent)}")
+        if "description:" not in text.split("---", 2)[1]:
+            _abort(f"agent missing description: {f.relative_to(out_agents.parent)}")
+
+
 # --- Orchestration -----------------------------------------------------------
 
 
@@ -702,6 +795,7 @@ def build(out: Path, src: Path, *, verbose: bool = False) -> None:
     # Prepare output dirs (clean only the trees we own).
     out_skills = out / "skills"
     out_plugin = out / "plugin"
+    out_agents = out / "agents"
     if out_skills.exists():
         shutil.rmtree(out_skills)
     out_skills.mkdir(parents=True)
@@ -716,6 +810,13 @@ def build(out: Path, src: Path, *, verbose: bool = False) -> None:
         if verbose:
             print(f"  ✓ flattened: {skill_name} (agents={len(agents)}, docs={len(docs)})")
 
+    # Standalone Claude Code subagents. These are committed beside
+    # dist/skills/ so the from-source installer can register subagent types.
+    _emit_standalone_agents(src, out_agents)
+    if verbose:
+        agent_count = len(list(out_agents.glob("*.md"))) if out_agents.is_dir() else 0
+        print(f"  ✓ agents: {agent_count}")
+
     # Phase D: plugin tree.
     _emit_plugin_tree(src, out_plugin, public_skills, deprecated_distributed, plugin_meta)
     if verbose:
@@ -724,6 +825,7 @@ def build(out: Path, src: Path, *, verbose: bool = False) -> None:
     # Phase E (post): scan emitted output.
     _scan_dist_skills(out_skills)
     _scan_dist_plugin(out_plugin)
+    _scan_dist_agents(out_agents)
     _validate_plugin_manifest(out_plugin)
 
     if verbose:
