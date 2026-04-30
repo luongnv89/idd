@@ -74,6 +74,22 @@ review:
   # Set to false to skip the check (traceability reported as `pass`).
   require_traceability_check: true
 
+  # PR labels that exempt a PR from the `Closes #N` hard-fail (check 1 only;
+  # the other three traceability checks still run).
+  # Default: ["refactor", "chore"] — refactor/chore PRs are exempt by default.
+  # Set to [] to disable label-based exemption.
+  traceability_exempt_labels:
+    - refactor
+    - chore
+
+  # Regex matched against the PR body (multiline-anchored, case-insensitive).
+  # When the body contains a matching line, the PR is exempt from the
+  # `Closes #N` hard-fail (check 1 only).
+  # Default: "^\\s*Type:\\s*(refactor|chore)\\s*$" — recognizes a `Type: refactor`
+  # or `Type: chore` line anywhere in the PR body.
+  # Set to "" to disable pattern-based exemption.
+  traceability_exempt_pattern: "^\\s*Type:\\s*(refactor|chore)\\s*$"
+
 # Auto-pilot settings (used by /auto-pilot)
 autopilot:
   # Merge mode — controls when /auto-pilot is allowed to merge PRs.

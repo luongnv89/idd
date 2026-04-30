@@ -72,7 +72,33 @@ When a human-authored PR (one not produced by `/issue-resolver`) is reviewed, th
     safety:              ✓ pass
 ```
 
-Acceptance-criteria checks still apply at full strength — they do not relax for human PRs. `Closes #{N}` checks also still apply at full strength — a human PR missing the issue link still fails traceability.
+Acceptance-criteria checks still apply at full strength — they do not relax for human PRs. `Closes #{N}` checks also still apply at full strength — a human PR missing the issue link still fails traceability, **unless** the PR matches the refactor/chore exemption described below.
+
+## Summary — Refactor/Chore Exempt PR
+
+Refactor or chore PRs (skill quality passes, dependency bumps, doc-only updates) are exempt from the `Closes #N` hard-fail when they match `review.traceability_exempt_labels` or `review.traceability_exempt_pattern`. Check 1 is skipped; checks 2-4 still run and report `partial` if absent.
+
+```
+  Review dimensions:
+    correctness:         ✓ pass
+    acceptance_criteria: ○ pass — none defined; manual review recommended
+    traceability:        ○ pass — exempt (refactor/chore PR; no Closes #N required)
+    maintainability:     ✓ pass
+    safety:              ✓ pass
+```
+
+The `acceptance_criteria` line above shows the common case for refactor/chore PRs (no linked issue, so no AC defined). When a refactor PR does have a linked issue with acceptance criteria, those criteria still verify normally — the refactor exemption relaxes only check 1 of traceability, never AC. The "verification disabled" wording appears only when `review.require_acceptance_criteria_check: false` is explicitly set.
+
+When checks 2-4 produce partial findings on an exempt PR, append them inline:
+
+```
+    traceability:        ○ pass — exempt (refactor/chore PR; no Closes #N required);
+                           no commit references #{N}
+```
+
+Note: check 2 (`git log --grep="#{N}"`) is well-defined only when the exempt PR has a linked issue number to grep for. If the PR is opened without any tracked issue, check 2 is reported as `n/a — no linked issue` rather than `partial`.
+
+The match mechanism (label name or pattern) is logged so reviewers can audit which exemption rule fired. To restore strict issue #36 behavior (no exemption), set `review.traceability_exempt_labels: []` and `review.traceability_exempt_pattern: ""`.
 
 ## Auto-Merge (auto mode only)
 
