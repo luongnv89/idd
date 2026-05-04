@@ -414,7 +414,7 @@ This depends on #8
 
 Use a regex equivalent to `(?im)\b(?:depends\s+on|blocked\s+by)\b[^\n]*?#(\d+)` and capture every numeric reference on the matching line (handle comma lists like `#12, #15`). Cross-repo references (`org/repo#N`) are explicitly out of scope — match only bare `#N`. If no markers are found, the gate is satisfied; proceed to Step 5.2.
 
-**Cycle guard:** If issue A's body references its own number (`#A`), or if a dependency chain transitively closes back on issue A within the open set, log a warning and skip the gate (treat as satisfied). The auto-pilot must not pause forever on a malformed cycle:
+**Cycle guard:** If issue A's body references its own number (`#A`), log a warning and skip the gate (treat as satisfied). The auto-pilot must not pause forever on a self-referential cycle. Multi-hop cycles (A → B → A) are not detected here — they would require traversing each dependency's body, which is out of scope for the per-merge gate; the fail-safe is that any genuinely-cyclic issue set will eventually surface as `blocked_by_dependency` and require user intervention regardless. The check is:
 
 ```
 ⚠ Dependency cycle detected for #{issue_number} — skipping gate
@@ -445,7 +445,7 @@ For each unsatisfied dependency, record `{issue_number, issue_title, issue_state
 gh search prs "is:open" "Closes #N" --json number,state,url --limit 5
 ```
 
-— which finds open PRs whose body declares `Closes #N`. Treat that as the linked-PR set when the GraphQL field is missing.
+— which finds the open PRs that would close issue `#N` once merged. The fallback is scoped to `is:open` because it only needs to surface *blocking* PRs (the merged-issue path is already short-circuited by the `state == CLOSED` check above — a CLOSED issue with no in-flight PRs satisfies the gate without consulting the fallback). Treat the result as the unmerged-PR set for the open-issue case.
 
 Collect the unsatisfied set.
 

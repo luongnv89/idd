@@ -294,7 +294,7 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 ⚠ Dependency cycle detected for #{issue_number} — skipping gate
   Resume manually after fixing the issue body.
 ```
-**Trigger:** Phase 5.1b finds the issue references its own number, or a transitive cycle within the open set. The gate is skipped to avoid an infinite pause.
+**Trigger:** Phase 5.1b finds the issue's body references its own number (direct self-reference). Multi-hop cycles (A → B → A) are not detected at this gate; they would require traversing each dependency's body. The gate is skipped to avoid an infinite pause on the self-reference case.
 **Action:** Skip the gate, log the warning, proceed to Step 5.2. Non-fatal.
 
 ### Dependency reference not found (auto-skip)
