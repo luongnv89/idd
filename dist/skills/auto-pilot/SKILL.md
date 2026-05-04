@@ -5,13 +5,21 @@ license: MIT
 compatibility: "Requires git and GitHub CLI (gh) with auth and push access. Requires merge permission for auto-merge. Requires issue-triage, issue-resolver, issue-analysis, and issue-pr-review to be installed from the same distribution. Optional: issue-creator for normalizing unstructured issues mid-loop."
 effort: max
 metadata:
-  version: 2.2.0
+  version: 2.3.0
   creator: Luong NGUYEN <luongnv89@gmail.com>
 ---
 
 # /auto-pilot
 
 Fully autonomous development loop: triage, pick, resolve, review, fix, merge, repeat — zero user prompts.
+
+### Changes in 2.3.0 — Dependency-aware merge gating
+
+- New Phase 5 pre-merge gate honors `Depends on #N` / `Blocked by #N` markers in issue bodies. Before merging PR-A, the loop verifies that every dependency referenced from issue A is closed and its associated PR is merged. If any dependency is still open or its PR is unmerged, the auto-pilot pauses with a structured alert (mirroring the critical-issue alert shape) — the user merges the dependency, then re-runs `/auto-pilot` to resume.
+- New iteration outcome label: `blocked_by_dependency`. The PR is left open, the issue stays open, and the loop stops cleanly.
+- New config: `autopilot.respect_dependencies: true` (default on). Set to `false` to skip the gate entirely for repos that don't use the convention.
+- The `Depends on #N` convention is documented in `references/docs/idd-methodology.md` (Issue Dependencies). The marker is plain prose — case-insensitive, list/sentence-shape agnostic, cross-repo references ignored.
+- This is the second documented exception to the autonomy philosophy (alongside critical-issue review failures): merging a PR out of dependency order is effectively irreversible (squash-merge into history), so the loop pauses rather than guessing.
 
 ### Changes in 2.2.0 — Conservative-by-default merge modes
 
@@ -54,6 +62,7 @@ Inspired by the auto-adapt-mode pattern: **always proceed, never block on recove
    - Modifying repository settings or branch protection rules
    - Any action that matches the dangerous patterns list (destructive ops, production deployment, package publishing)
    - **Critical issues with unresolved review problems** — if the issue has a `critical` or `priority:critical` label and the review-fix loop exhausts its cycles without resolving all issues, stop and ask
+   - **PR blocked by an unmerged dependency** — if the originating issue has a `Depends on #N` / `Blocked by #N` marker and any referenced issue is still open (or its PR is unmerged), stop and ask. Merging out of dependency order is effectively irreversible (squash-merge lands on the default branch and rewrites history), so the loop pauses rather than guessing. Disabled by `autopilot.respect_dependencies: false`.
 
 When in doubt, the auto-pilot proceeds with the safer option rather than stopping to ask. A skipped issue can always be retried; a blocked loop wastes time.
 
@@ -136,6 +145,7 @@ Defaults:
 - `autopilot.pause_on_failure: false` — skip failed issues and continue to the next one (autonomous default). When false, the auto-pilot logs the failure, adds the issue to the skip list, and moves on. Set to true only if you want the loop to halt on every failure for manual inspection.
 - `autopilot.skip_labels: ["wontfix", "blocked", "do-not-merge"]` — skip issues with these labels
 - `autopilot.critical_labels: ["critical", "priority:critical"]` — labels that mark an issue as critical. When a critical issue has unresolved review problems after all cycles, the loop stops and asks the user for a decision instead of auto-creating a follow-up.
+- `autopilot.respect_dependencies: true` — honor `Depends on #N` / `Blocked by #N` markers in issue bodies. Before merging PR-A, verify that every dependency referenced from issue A is closed and its PR merged; if not, pause the loop with a structured alert. Set to `false` to skip the gate entirely. See *Phase 5 — Merge* in `references/phases.md` for the full check.
 - All `resolve.*` and `triage.*` settings are inherited by the sub-skills
 
 Do not re-read the config at each iteration.
@@ -264,13 +274,13 @@ See `references/phases.md` for full prompts, error handling, and decision tables
 ---
 ## Iteration Report
 
-After each iteration, print a brief status. The `Outcome` line uses one of the five categorical labels (`merged`, `left_open`, `partial_followup`, `failed`, `skipped`) so the iteration log and final summary stay consistent.
+After each iteration, print a brief status. The `Outcome` line uses one of the six categorical labels (`merged`, `left_open`, `partial_followup`, `blocked_by_dependency`, `failed`, `skipped`) so the iteration log and final summary stay consistent.
 
 ```
 ✓ Iteration {i}/{max} complete
   Issue:    #{number} — {title}
   PR:       #{pr_number}
-  Outcome:  {merged | left_open | partial_followup | failed | skipped}
+  Outcome:  {merged | left_open | partial_followup | blocked_by_dependency | failed | skipped}
   Duration: {time}
   ────────────────────────────────────
   Remaining: {remaining} eligible issues
@@ -295,19 +305,21 @@ The loop stops when any of these conditions are met (except "Merge blocked", whi
 | Review exhausted (critical issue) | `⚠ CRITICAL — auto-pilot requires your decision` (loop pauses) |
 | Merge blocked (CI/conflicts) | `⚠ PR #{pr_number} is not mergeable — PR left open, continuing` (`left_open`) |
 | Mode forbids merge (clean PR in `conservative`) | `○ PR #{pr_number} ready for manual merge (mode: conservative)` (`left_open`) |
+| PR blocked by an unmerged dependency | `⚠ BLOCKED — PR #{pr_number} cannot merge until dependency #{N} is merged` (loop pauses, `blocked_by_dependency`) |
 | User cancellation | `○ Auto-pilot stopped by user` |
 
 ---
 
 ## Final Summary
 
-When the loop ends (for any reason), print a structured step-by-step summary showing each iteration's outcome. Each iteration is tagged with one of five categorical outcomes: **`merged`**, **`left_open`**, **`partial_followup`**, **`failed`**, **`skipped`**.
+When the loop ends (for any reason), print a structured step-by-step summary showing each iteration's outcome. Each iteration is tagged with one of six categorical outcomes: **`merged`**, **`left_open`**, **`partial_followup`**, **`blocked_by_dependency`**, **`failed`**, **`skipped`**.
 
 | Outcome | Meaning |
 |---------|---------|
 | `merged` | PR passed review and was merged cleanly. |
 | `left_open` | PR was created but not merged — either the mode forbids merge, the merge was blocked (CI/conflicts), or unresolved review issues prevented merge under the current mode. |
 | `partial_followup` | PR was merged with unresolved review issues; a follow-up issue captures the remaining work. Only reachable in `aggressive` mode with `merge_partial: true`. |
+| `blocked_by_dependency` | PR was created and reviewed but cannot merge until a `Depends on #N` / `Blocked by #N` reference is itself merged. PR is left open, the loop pauses, and the user re-runs `/auto-pilot` after merging the dependency. |
 | `failed` | The resolver subagent failed before a PR could be created (or another fatal step failed). |
 | `skipped` | Issue was skipped before resolution started — already resolved, blocked by labels/dependencies, in the `--skip` list, or assigned to another user. |
 
@@ -315,23 +327,25 @@ When the loop ends (for any reason), print a structured step-by-step summary sho
 ◆ Auto-Pilot Summary — {completed}/{max} iterations
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
 
-  Iteration 1:       ✓ merged           — #{n1} {title1} → PR #{pr1}
-  Iteration 2:       ⚠ left_open        — #{n2} {title2} → PR #{pr2}
-  Iteration 3:       ⚠ partial_followup — #{n5} {title5} → PR #{pr5}, follow-up #{f5}
-  Iteration 4:       ○ skipped          — #{n3} {title3} (blocked)
-  Iteration 5:       ✗ failed           — #{n4} {title4} (resolver step {step})
+  Iteration 1:       ✓ merged                — #{n1} {title1} → PR #{pr1}
+  Iteration 2:       ⚠ left_open             — #{n2} {title2} → PR #{pr2}
+  Iteration 3:       ⚠ partial_followup      — #{n5} {title5} → PR #{pr5}, follow-up #{f5}
+  Iteration 4:       ⚠ blocked_by_dependency — #{n6} {title6} → PR #{pr6} (dep: #{dep})
+  Iteration 5:       ○ skipped               — #{n3} {title3} (blocked)
+  Iteration 6:       ✗ failed                — #{n4} {title4} (resolver step {step})
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  merged:            {merged_count}
-  left_open:         {left_open_count}
-  partial_followup:  {partial_followup_count}
-  failed:            {failed_count}
-  skipped:           {skipped_count}
+  merged:                  {merged_count}
+  left_open:               {left_open_count}
+  partial_followup:        {partial_followup_count}
+  blocked_by_dependency:   {blocked_by_dependency_count}
+  failed:                  {failed_count}
+  skipped:                 {skipped_count}
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  Result:            {COMPLETED / PAUSED / LIMIT REACHED}
-  Mode:              {conservative / balanced / aggressive}
+  Result:                  {COMPLETED / PAUSED / LIMIT REACHED}
+  Mode:                    {conservative / balanced / aggressive}
 
-  Remaining:         {remaining_count} open issues
-  Next action:       /auto-pilot to continue
+  Remaining:               {remaining_count} open issues
+  Next action:             /auto-pilot to continue
 ```
 
 If batch analysis was used (explicit issue list):
@@ -340,20 +354,21 @@ If batch analysis was used (explicit issue list):
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
 
   Analysis:          ✓ pass ({N} issues, {batches} batch groups)
-  Iteration 1:       ✓ merged           — #{n1} {title1} → PR #{pr1}
-  Iteration 2:       ⚠ left_open        — #{n2} {title2} → PR #{pr2}
+  Iteration 1:       ✓ merged                — #{n1} {title1} → PR #{pr1}
+  Iteration 2:       ⚠ left_open             — #{n2} {title2} → PR #{pr2}
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  merged:            {merged_count}
-  left_open:         {left_open_count}
-  partial_followup:  {partial_followup_count}
-  failed:            {failed_count}
-  skipped:           {skipped_count}
+  merged:                  {merged_count}
+  left_open:               {left_open_count}
+  partial_followup:        {partial_followup_count}
+  blocked_by_dependency:   {blocked_by_dependency_count}
+  failed:                  {failed_count}
+  skipped:                 {skipped_count}
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  Result:            {COMPLETED / PAUSED / LIMIT REACHED}
-  Mode:              {conservative / balanced / aggressive}
+  Result:                  {COMPLETED / PAUSED / LIMIT REACHED}
+  Mode:                    {conservative / balanced / aggressive}
 
-  Remaining:         {remaining_count} open issues
-  Next action:       /auto-pilot to continue
+  Remaining:               {remaining_count} open issues
+  Next action:             /auto-pilot to continue
 ```
 
 ---
