@@ -398,6 +398,98 @@ If not mergeable:
 
 **Autonomous behavior:** Leave the PR open and move on. The PR is already created with all changes — it can be merged manually later or picked up on the next auto-pilot run. Only pause if `autopilot.pause_on_failure` is explicitly `true`.
 
+### Step 5.1b — Dependency Gate
+
+If `autopilot.respect_dependencies` is `true` (default), check whether the originating issue declares any dependencies that are not yet merged. The convention is documented in `references/docs/idd-methodology.md` (Issue Dependencies). If the config is `false`, skip this step and proceed to Step 5.2.
+
+#### Parse dependency markers
+
+Fetch the issue body (already cached from Phase 1's triage call to `gh issue list ... --json body`, or re-fetch with `gh issue view N --json body` if running in explicit-list mode) and extract every `Depends on #N` and `Blocked by #N` reference. The match is case-insensitive and tolerates list/sentence/colon shapes:
+
+```
+- Depends on #12
+Blocked by: #15, #20
+This depends on #8
+```
+
+Use a regex equivalent to `(?im)\b(?:depends\s+on|blocked\s+by)\b[^\n]*?#(\d+)` and capture every numeric reference on the matching line (handle comma lists like `#12, #15`). Cross-repo references (`org/repo#N`) are explicitly out of scope — match only bare `#N`. If no markers are found, the gate is satisfied; proceed to Step 5.2.
+
+**Cycle guard:** If issue A's body references its own number (`#A`), or if a dependency chain transitively closes back on issue A within the open set, log a warning and skip the gate (treat as satisfied). The auto-pilot must not pause forever on a malformed cycle:
+
+```
+⚠ Dependency cycle detected for #{issue_number} — skipping gate
+  Resume manually after fixing the issue body.
+```
+
+#### Resolve each dependency
+
+For each captured `#N`, ask GitHub: "is this issue closed by a merged PR?" GitHub's GraphQL exposes the linked-PR set directly via `closedByPullRequestsReferences` on the Issue type, which `gh issue view` surfaces:
+
+```bash
+gh issue view N --json number,state,title,closedByPullRequestsReferences
+```
+
+The `closedByPullRequestsReferences.nodes[]` array contains every PR that closes (or would close) issue #N, each with `number`, `state` (`OPEN` / `CLOSED` / `MERGED`), and `url`. This is the authoritative answer — no need to grep PR bodies for `Closes #N`.
+
+A dependency is **satisfied** when both:
+- The issue's `state` is `CLOSED`, AND
+- Either `closedByPullRequestsReferences` is empty (issue was closed manually with no PR — treat as resolved), OR every PR in `closedByPullRequestsReferences` has `state: MERGED`.
+
+A dependency is **unsatisfied** when any of:
+- The issue's `state` is `OPEN` (regardless of PR state — the issue itself isn't done), OR
+- The issue is `CLOSED` but at least one referenced PR has `state: OPEN` (rare race window — treat as unsatisfied to be safe).
+
+For each unsatisfied dependency, record `{issue_number, issue_title, issue_state, pr_number, pr_state}` for the alert. If `closedByPullRequestsReferences` is unavailable on older `gh` versions (pre-2.45), fall back to:
+
+```bash
+gh search prs "is:open" "Closes #N" --json number,state,url --limit 5
+```
+
+— which finds open PRs whose body declares `Closes #N`. Treat that as the linked-PR set when the GraphQL field is missing.
+
+Collect the unsatisfied set.
+
+#### Pause when any dependency is unsatisfied
+
+If the unsatisfied set is non-empty, do **not** merge. Print the structured alert from `references/error-messages.md` (*PR blocked by unmerged dependency*), record the iteration outcome as `blocked_by_dependency`, and stop the loop. The headline names the dependency's PR directly (when known) so the user's next action is one step:
+
+```
+⚠ BLOCKED — PR #{pr_number} cannot merge until PR #{dep_pr_1} (closing #{dep_n1}) is merged
+
+  Issue:        #{issue_number} — {issue_title}
+  PR:           #{pr_number} ({pr_url})
+  Blocked by:
+    ● #{dep_n1} — {dep_title_1} ({dep_issue_state}; PR #{dep_pr_1} is {dep_pr_state})
+    ● #{dep_n2} — {dep_title_2} ({dep_issue_state}; no linked PR)
+
+  ⚠ Auto-pilot paused — merging out of dependency order is irreversible.
+
+  To resume:
+    1. Review and merge the dependency PR(s) above
+    2. Re-run /auto-pilot — the loop will pick up where it left off and
+       re-evaluate the gate for PR #{pr_number}
+    3. To bypass entirely: set autopilot.respect_dependencies: false in
+       .gitissue.yml (not recommended unless the marker is wrong)
+```
+
+When a dependency issue has no linked PR (`closedByPullRequestsReferences` is empty and the issue is still open), the bullet shows `no linked PR` in place of the PR state — the user knows they need to drive that issue forward, not wait on a PR. When the dependency is open with multiple linked PRs, list each one. The headline picks the first unsatisfied dependency to keep the one-line summary actionable; the bullets enumerate the rest.
+
+Set the iteration outcome to `blocked_by_dependency` and exit the loop cleanly (do not advance to the next issue — the next iteration may share the same dependency, and continuing would just produce more blocked PRs). The PR for the current issue is left open and unchanged.
+
+If a referenced `#N` does not exist (404 from `gh issue view`), log a warning and treat that single reference as satisfied (skip it). Do not block on a typo.
+
+```
+⚠ Dependency #{N} not found — ignoring
+```
+
+If all dependencies are satisfied, log and proceed:
+
+```
+○ Dependency gate passed — {n} dependency(ies) merged
+```
+
+Continue to Step 5.2.
+
 ### Step 5.2 — Merge (mode-gated)
 
 Merge behavior is controlled by `autopilot.mode`. This step only runs after the PR review returned PASS (clean PR, no unresolved fixable issues). The partial-merge case is handled in Phase 3-4.

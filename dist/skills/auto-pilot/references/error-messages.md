@@ -267,6 +267,43 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 **Trigger:** One or more status checks complete with `failure` or `error` conclusion.
 **Action:** Leave PR open, continue to next issue. Non-fatal.
 
+### PR blocked by unmerged dependency
+```
+⚠ BLOCKED — PR #{pr_number} cannot merge until PR #{dep_pr_1} (closing #{dep_n1}) is merged
+
+  Issue:        #{issue_number} — {issue_title}
+  PR:           #{pr_number} ({pr_url})
+  Blocked by:
+    ● #{dep_n1} — {dep_title_1} ({dep_issue_state}; PR #{dep_pr_1} is {dep_pr_state})
+    ● #{dep_n2} — {dep_title_2} ({dep_issue_state}; no linked PR)
+
+  ⚠ Auto-pilot paused — merging out of dependency order is irreversible.
+
+  To resume:
+    1. Review and merge the dependency PR(s) above
+    2. Re-run /auto-pilot — the loop will pick up where it left off and
+       re-evaluate the gate for PR #{pr_number}
+    3. To bypass entirely: set autopilot.respect_dependencies: false in
+       .gitissue.yml (not recommended unless the marker is wrong)
+```
+**Trigger:** Phase 5.1b (Dependency Gate) finds at least one `Depends on #N` / `Blocked by #N` reference whose target issue is still open, or whose target issue is closed but has an unmerged linked PR. Only fires when `autopilot.respect_dependencies: true`.
+**Action:** Stop the loop. Leave PR open. Record iteration outcome as `blocked_by_dependency`. Fatal (pauses loop until the user re-invokes `/auto-pilot`). The audit trail consists of the iteration line in the final summary table plus the alert above — together they satisfy AC#5 (pause/resume cycle tracked for audit). Mirrors the critical-issue alert shape — same structured-pause pattern, different trigger.
+
+### Dependency cycle detected (auto-skip)
+```
+⚠ Dependency cycle detected for #{issue_number} — skipping gate
+  Resume manually after fixing the issue body.
+```
+**Trigger:** Phase 5.1b finds the issue references its own number, or a transitive cycle within the open set. The gate is skipped to avoid an infinite pause.
+**Action:** Skip the gate, log the warning, proceed to Step 5.2. Non-fatal.
+
+### Dependency reference not found (auto-skip)
+```
+⚠ Dependency #{N} not found — ignoring
+```
+**Trigger:** A `Depends on #N` reference points at an issue that returns 404 from `gh issue view`. Likely a typo in the issue body.
+**Action:** Skip that reference, continue evaluating the gate. Non-fatal.
+
 ## Configuration
 
 ### Invalid config

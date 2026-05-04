@@ -215,6 +215,22 @@ Durable project memory therefore lives in artifacts that already survive: the **
 
 This rule **assumes squash-merge as the merge strategy**. GitHub's squash-merge carries the PR body verbatim into the commit message; standard merge commits and rebase-merge do not without extra tooling. Repos using a different strategy will keep durable memory in the PR body (and therefore only on GitHub) rather than in git history. `/init-gitissue` should warn when the repo's default merge strategy is not squash.
 
+## Issue Dependencies
+
+When one issue cannot be merged until another is merged, the relationship is recorded in the issue body using one of two synonymous markers, anywhere in the body (typically under `## Metadata` or in a dedicated `## Dependencies` section):
+
+- `Depends on #N` — explicit dependency on issue N (or its PR) being merged first
+- `Blocked by #N` — same meaning, alternative phrasing
+
+Multiple dependencies on one line are allowed: `Depends on #12, #15`. Cross-repo references (`org/repo#N`) are out of scope and ignored. The marker is case-insensitive and may appear in any list/sentence shape (`- Depends on #12`, `Depends on: #12`, `This depends on #12`).
+
+Skills that read the marker:
+
+- `/auto-pilot` — Phase 5 merge gate. Before merging PR-A for issue A, fetch issue A's body and parse `Depends on #N`. If any referenced issue is open, or has an open PR (unmerged), the auto-pilot pauses with a structured alert and leaves PR-A open. The user merges the dependency, then re-runs `/auto-pilot` to resume.
+- `/issue-triage` — may use the marker as an additional dependency-graph signal alongside file-overlap detection (existing behavior unchanged; this is opt-in for future enhancement).
+
+The convention is intentionally lightweight: it lives in plain prose in the issue body, requires no schema, and is grep-friendly for any tool — not just IDD skills.
+
 ## Minimal Example
 
 Raw report:

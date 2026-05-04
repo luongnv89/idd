@@ -284,6 +284,15 @@ autopilot:
     - critical
     - priority:critical
 
+  # Respect "Depends on #N" / "Blocked by #N" markers in issue bodies and pause
+  # the loop before merging a PR whose dependencies are not yet merged. When
+  # disabled, the merge gate is skipped — useful for repos that do not use the
+  # convention. See references/docs/idd-methodology.md (Issue Dependencies) for the marker
+  # syntax and resume protocol.
+  # Type: boolean
+  # Default: true
+  respect_dependencies: true
+
 # Triage settings
 triage:
   # Flag issues with no activity beyond this threshold (days)
@@ -504,6 +513,7 @@ Config is validated on load at the start of every skill invocation. Errors inclu
 | `autopilot.pause_on_failure` | `true` | Pause on failure |
 | `autopilot.skip_labels` | `["wontfix", "blocked", "do-not-merge"]` | Labels that skip issues |
 | `autopilot.critical_labels` | `["critical", "priority:critical"]` | Labels that prioritize issues |
+| `autopilot.respect_dependencies` | `true` | Honor `Depends on #N` / `Blocked by #N` markers — pause loop before merging a PR whose dependencies are unmerged |
 | `triage.stale_threshold_days` | `14` | Stale issue threshold |
 | `triage.auto_priority` | `true` | Auto-suggest priorities |
 | `triage.include_closed` | `false` | Exclude closed from triage |

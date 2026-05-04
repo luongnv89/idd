@@ -270,3 +270,36 @@ If all checks pass within the timeout, proceed with merge. If timeout:
 ```
 Leave PR open, continue to next issue. Non-fatal.
 
+### PR blocked by an unmerged dependency
+
+Issue #42 declares `Depends on #38` in its body. Auto-pilot resolves both #38 and #42 in the same session, but #38's PR is still open when #42's PR reaches Phase 5:
+
+```
+● Reviewing PR #87...
+  ✓ PR #87 review passed (clean in 1 cycle)
+● Pre-merge: dependency gate...
+  Found markers: Depends on #38
+
+⚠ BLOCKED — PR #87 cannot merge until PR #84 (closing #38) is merged
+
+  Issue:        #42 — Apply new auth middleware to checkout
+  PR:           #87 (https://github.com/owner/repo/pull/87)
+  Blocked by:
+    ● #38 — Add auth middleware base class (OPEN; PR #84 is OPEN)
+
+  ⚠ Auto-pilot paused — merging out of dependency order is irreversible.
+
+  To resume:
+    1. Review and merge the dependency PR(s) above
+    2. Re-run /auto-pilot — the loop will pick up where it left off and
+       re-evaluate the gate for PR #87
+    3. To bypass entirely: set autopilot.respect_dependencies: false in
+       .gitissue.yml (not recommended unless the marker is wrong)
+
+  Iteration 2/10:    ⚠ blocked_by_dependency — #42 → PR #87 (dep: #38, PR #84)
+```
+
+The user reviews and merges PR #84 manually. They re-invoke `/auto-pilot`. The loop re-triages, picks #42 again (since it's still open and PR #87 is still open and waiting), re-evaluates the gate (now satisfied — #38 is CLOSED and PR #84 is MERGED), and merges PR #87. The next iteration continues with the rest of the backlog.
+
+This is the second and only other place the loop pauses (alongside the critical-issue review-failure case). Both pauses share the same shape: structured alert with concrete next steps, no state file, resume-by-re-invocation.
+
