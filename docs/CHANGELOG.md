@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.10.0] - 2026-05-04
 
 ### Added
 - `feat(auto-pilot)` Phase 5 dependency-aware merge gate. Before merging PR-A, the loop parses `Depends on #N` / `Blocked by #N` markers from the originating issue's body and verifies every referenced issue is closed and its PR merged. If any dependency is unsatisfied, the auto-pilot pauses with a structured alert (mirroring the critical-issue alert shape) and leaves PR-A open — the user merges the dependency, then re-runs `/auto-pilot` to resume. New iteration outcome label: `blocked_by_dependency`. New config: `autopilot.respect_dependencies: true` (default on). The convention is documented in `docs/idd-methodology.md` (Issue Dependencies). Self-reference cycle detection skips the gate to avoid infinite pauses (multi-hop cycles surface as repeated `blocked_by_dependency` outcomes); cross-repo references are out of scope. (#93)
