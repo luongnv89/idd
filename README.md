@@ -36,7 +36,7 @@ GitHub issues were designed for humans to read, not for agents to execute. And c
 gitissue turns every GitHub issue into a self-contained work order: typed, structured, and enriched with acceptance criteria. Then it resolves them — with commit messages and PR titles that link every line of code back to the intention that created it.
 
 ```mermaid
-graph LR
+graph TD
     A["Describe a problem"] --> B["/issue-creator"]
     B --> C["Structured issue"]
     C --> D["/issue-triage"]
