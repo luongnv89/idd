@@ -266,6 +266,16 @@ This trades perfect independence between cycles (which rarely matters in practic
 
 Read `references/agents/code-reviewer.md` for the full prompt template.
 
+Spawn a new reviewer agent (cold start):
+
+```python
+Agent(
+  description="Review PR #N",
+  prompt=<code-reviewer.md prompt with {variables} replaced>,
+  subagent_type="general-purpose"  # NOT "code-reviewer"
+)
+```
+
 Pass to the reviewer:
 - `branch_name`: PR head branch
 - `base_branch`: PR base branch
@@ -285,7 +295,17 @@ Return the same JSON format as before.
 
 ### Confirmation pass
 
-After the fix cycle reports zero fixable issues, spawn a **fresh** confirmation reviewer (new agent, no memory). If it finds new fixable issues, they go back to the existing fixer. If it confirms clean, the PR passes.
+After the fix cycle reports zero fixable issues, spawn a **fresh** confirmation reviewer (new agent, no memory of prior cycles):
+
+```python
+Agent(
+  description="Confirmation review for PR #N",
+  prompt=<code-reviewer.md prompt with {variables} replaced>,
+  subagent_type="general-purpose"  # NOT "code-reviewer"
+)
+```
+
+If it finds new fixable issues, they go back to the existing fixer. If it confirms clean, the PR passes.
 
 ```
 [3/7] Review       ✓ correctness:pass  ac:pass  trace:pass  maint:partial  safety:pass
