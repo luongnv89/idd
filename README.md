@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/luongnv89/idd/releases/latest"><img src="https://img.shields.io/badge/version-0.9.0-blue.svg" alt="Version 0.9.0"></a>
+  <a href="https://github.com/luongnv89/idd/releases/latest"><img src="https://img.shields.io/badge/version-0.10.0-blue.svg" alt="Version 0.10.0"></a>
   <a href="https://github.com/luongnv89/idd/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="MIT License"></a>
   <a href="https://github.com/luongnv89/idd"><img src="https://img.shields.io/badge/commands-8-blue.svg" alt="8 commands"></a>
   <a href="https://github.com/luongnv89/idd/blob/main/CONTRIBUTING.md"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs Welcome"></a>
@@ -76,7 +76,7 @@ Internal-only skills are not published in the public skill index and are not bui
 ### 1. Create a structured issue
 
 <p align="center">
-  <img src="assets/screenshots/issue-creator.svg" alt="issue-creator terminal output" width="680">
+  <img src="assets/screenshots/issue-creator.png" alt="issue-creator terminal output" width="680">
 </p>
 
 Describe a bug, feature, or improvement in plain text. gitissue classifies it, generates acceptance criteria, and creates a GitHub issue with labels.
@@ -84,7 +84,7 @@ Describe a bug, feature, or improvement in plain text. gitissue classifies it, g
 ### 2. Resolve it in one command
 
 <p align="center">
-  <img src="assets/screenshots/issue-resolver.svg" alt="issue-resolver terminal output" width="680">
+  <img src="assets/screenshots/issue-resolver-11.png" alt="issue-resolver terminal output" width="680">
 </p>
 
 Six steps run automatically: preflight, research, plan, implement, QA, and deliver a PR with `Closes #N`.
@@ -92,7 +92,15 @@ Six steps run automatically: preflight, research, plan, implement, QA, and deliv
 ### 3. Triage the backlog
 
 <p align="center">
-  <img src="assets/screenshots/issue-triage.svg" alt="issue-triage terminal output" width="680">
+  <img src="assets/screenshots/issue-triage-view.png" alt="issue-triage terminal output" width="680">
+</p>
+
+<p align="center">
+  <img src="assets/screenshots/issue-triage-suggestion.png" alt="issue-triage suggested execution order" width="680">
+</p>
+
+<p align="center">
+  <img src="assets/screenshots/issue-triage-asm.png" alt="issue-triage hot-spot files and critical path analysis" width="680">
 </p>
 
 Dependency detection, priority suggestions, parallelizable work, stale issue warnings, and already-fixed detection — one command for the entire backlog.
