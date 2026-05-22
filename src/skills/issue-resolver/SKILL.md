@@ -209,7 +209,17 @@ After preflight:
 
 Deeply understand the issue, affected codebase, and possible solutions. Also verifies the issue hasn't already been fixed (early-exit path closes the issue in auto mode).
 
-Spawn the `codebase-researcher` subagent (see `shared/agents/codebase-researcher.md`). Full delegation payload, phases, early-exit behavior, and inline fallback are in `references/pipeline-steps.md` (*Step 1 — Research*).
+Spawn the `codebase-researcher` subagent (see `shared/agents/codebase-researcher.md`). Use this Agent invocation:
+
+```python
+Agent(
+  description="Research issue #N",
+  prompt=<codebase-researcher.md prompt with {variables} replaced>,
+  subagent_type="general-purpose"  # NOT "codebase-researcher"
+)
+```
+
+Full delegation payload, phases, early-exit behavior, and inline fallback are in `references/pipeline-steps.md` (*Step 1 — Research*).
 
 After research:
 ```
@@ -220,7 +230,17 @@ After research:
 
 ## Step 2 — Plan
 
-Generate implementation options and select one. Spawn the `synthesizer` subagent (see `shared/agents/synthesizer.md`). It returns 3 options — minimal / balanced / comprehensive — with the balanced option usually recommended.
+Generate implementation options and select one. Spawn the `synthesizer` subagent (see `shared/agents/synthesizer.md`). Use this Agent invocation:
+
+```python
+Agent(
+  description="Plan for issue #N",
+  prompt=<synthesizer.md prompt with {variables} replaced>,
+  subagent_type="general-purpose"  # NOT "synthesizer"
+)
+```
+
+It returns 3 options — minimal / balanced / comprehensive — with the balanced option usually recommended.
 
 Selection behavior (interactive auto, interactive comment-and-wait, auto-pilot) and inline fallback are in `references/pipeline-steps.md` (*Step 2 — Plan*).
 
@@ -233,7 +253,17 @@ After plan selection:
 
 ## Step 3 — Implement
 
-Write code and tests based on the selected plan. Spawn the `implementer` subagent (see `shared/agents/implementer.md`) with the plan, branch name, and naming conventions. Full payload, commit guardrails, and inline fallback are in `references/pipeline-steps.md` (*Step 3 — Implement*).
+Write code and tests based on the selected plan. Spawn the `implementer` subagent (see `shared/agents/implementer.md`) with the plan, branch name, and naming conventions. Use this Agent invocation:
+
+```python
+Agent(
+  description="Implement issue #N",
+  prompt=<implementer.md prompt with {variables} replaced>,
+  subagent_type="general-purpose"  # NOT "implementer"
+)
+```
+
+Full payload, commit guardrails, and inline fallback are in `references/pipeline-steps.md` (*Step 3 — Implement*).
 
 After implementation:
 ```
@@ -245,6 +275,20 @@ After implementation:
 ## Step 4 — QA
 
 Automated review-fix loop: review → test → fix → repeat until clean or max cycles reached. Each cycle spawns a *fresh* `code-reviewer` subagent (see `shared/agents/code-reviewer.md`) for unbiased review.
+
+### Spawning the code reviewer
+
+For each QA cycle, spawn a general-purpose agent with the code-reviewer prompt:
+
+```python
+Agent(
+  description="Review cycle N",
+  prompt=<code-reviewer.md prompt with {variables} replaced>,
+  subagent_type="general-purpose"
+)
+```
+
+**Do NOT use `subagent_type: "code-reviewer"`** — that is not a registered agent type. Always use `general-purpose` and pass the full code-reviewer prompt (see `shared/agents/code-reviewer.md`).
 
 Cycle mechanics, loop controls (`resolve.qa_max_cycles`, exit-on-clean, exit-on-stagnation), and the remaining-issues flow are in `references/pipeline-steps.md` (*Step 4 — QA*).
 
