@@ -148,6 +148,21 @@ else
   fail "T6.4: unknown tool name should be rejected"
 fi
 
+# Empty --tools value is rejected cleanly (not an unbound-variable crash).
+if ! inst --tools "" --dry-run >/dev/null 2>&1; then
+  pass "T6.5: empty --tools value rejected"
+else
+  fail "T6.5: empty --tools value should be rejected"
+fi
+
+# 'all' keyword tolerates case and surrounding whitespace, like the picker.
+count="$(inst --tools 'All ' --dry-run 2>&1 | grep -c 'installing standalone skills' || true)"
+if [ "$count" = "9" ]; then
+  pass "T6.6: --tools 'All ' normalizes to all 9 tools"
+else
+  fail "T6.6: --tools 'All ' selected $count tools (expected 9)"
+fi
+
 # ───────────────────────────────────────────────────────────
 # T7: uninstall removes a tool's skills
 # ───────────────────────────────────────────────────────────
