@@ -205,11 +205,18 @@ If you can't or don't want to install `asm`, clone the repo and run the bundled 
 ```bash
 git clone https://github.com/luongnv89/idd.git
 cd idd
-./scripts/install.sh                          # all standalone skills
+./scripts/install.sh                          # interactive tool picker — choose one or more tools
+# the picker lists every supported tool; pick by number (e.g. "1 3 4"), "a" for all,
+# or press Enter for Claude Code. Bypass the picker by naming tools explicitly:
 # or: ./scripts/install.sh --skill issue-resolver
+# or target another tool: ./scripts/install.sh --tool codex
+# or several at once:      ./scripts/install.sh --tools claude,codex,pi
+# or every supported tool: ./scripts/install.sh --tools all
 ```
 
-The script copies each `dist/skills/<name>/` to `~/.claude/skills/<name>/` and each generated shared agent from `dist/agents/*.md` to `~/.claude/agents/`. It replaces IDD-managed agents cleanly, removes stale managed agents on update, and skips unmanaged same-name agents unless you pass `--force-agents` (which backs them up before replacement). Use `./scripts/install.sh --target <dir>` to target a different Claude root. Pure POSIX bash — no extra runtime needed.
+> When run on a terminal with no `--tool`/`--tools` flag, the script shows an interactive picker so you can select one or more tools. In a non-interactive context (CI, `curl | bash` without a TTY, piped input) it falls back to Claude Code so automation keeps working.
+
+The script copies each `dist/skills/<name>/` to the selected tool's skills directory (default `~/.claude/skills/<name>/`). It supports `claude`, `agents`, `codex`, `opencode`, `pi`, `openclaw`, `hermes`, `antigravity`, and `windsurf` — each `dist/skills/<name>/` is a self-contained SKILL.md tree (the shared agents are bundled inside it at `references/agents/`), so a skill runs on any SKILL.md-compatible tool. Shared agents are *also* installed standalone from `dist/agents/*.md` into `~/.claude/agents/` (and `~/.agents/agents/`) — a Claude Code optimization for native subagent spawning; other tools use the bundled copies. The installer replaces IDD-managed agents cleanly, removes stale managed agents on update, and skips unmanaged same-name agents unless you pass `--force-agents` (which backs them up before replacement). Use `./scripts/install.sh --target <dir>` to target a different Claude root (Claude tool only; other tools use their fixed conventions). Pure POSIX bash — no extra runtime needed.
 
 You can also do the copy by hand if you prefer to see every file move:
 
