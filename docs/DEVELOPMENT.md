@@ -17,7 +17,13 @@
 2. Install skills locally. Standalone is the recommended default — pick one of these:
    ```bash
    # Standalone (recommended) — bundled install script, all skills, idempotent:
-   ./scripts/install.sh
+   ./scripts/install.sh                       # interactive tool picker (TTY); Claude if non-interactive
+
+   # Standalone — target another SKILL.md-compatible tool, or several at once (skips the picker):
+   ./scripts/install.sh --tool codex          # Codex CLI
+   ./scripts/install.sh --tools claude,pi     # multiple tools
+   ./scripts/install.sh --tools all           # every supported tool
+   # Supported: claude, agents, codex, opencode, pi, openclaw, hermes, antigravity, windsurf
 
    # Standalone — single skill from this checkout (manual variant):
    mkdir -p ~/.claude/skills ~/.claude/agents
@@ -30,7 +36,7 @@
    # Plugin (Claude Code only) — build then install the plugin tree:
    ./scripts/build.sh && ./scripts/install.sh --plugin
    ```
-   The Plugin path lands under `~/.claude/plugins/idd/`; the Standalone paths drop individual skills into `~/.claude/skills/` and shared Claude Code agents into `~/.claude/agents/`. See [README → Install](../README.md#install) for the full hierarchy.
+   The Plugin path lands under `~/.claude/plugins/idd/`; the Standalone paths drop individual skills into each tool's skills directory (e.g. `~/.claude/skills/`, `~/.codex/skills/`, `~/.windsurf/rules/`). Each `dist/skills/<name>/` is a self-contained SKILL.md tree with the shared agents bundled inside it (`references/agents/`), so it runs on any tool. Shared agents are also installed standalone into `~/.claude/agents/` (and `~/.agents/agents/`) — a Claude Code optimization for native subagent spawning; other tools fall back to the bundled copies. See [README → Install](../README.md#install) for the full hierarchy.
 
 3. Verify setup:
    ```bash
