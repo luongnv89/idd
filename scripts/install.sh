@@ -265,11 +265,13 @@ while [ $# -gt 0 ]; do
       add_tool "$2"; shift 2 ;;
     --tools)
       [ $# -ge 2 ] || { err "--tools requires a comma-separated list or 'all'"; exit 1; }
-      if [ "$2" = "all" ]; then
+      [ -n "$(printf '%s' "$2" | tr -d '[:space:]')" ] || \
+        { err "--tools requires a non-empty list or 'all'"; exit 1; }
+      if [ "$(printf '%s' "$2" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')" = "all" ]; then
         for t in $ALL_TOOLS; do add_tool "$t"; done
       else
         IFS=',' read -r -a _tools <<< "$2"
-        for t in "${_tools[@]}"; do
+        for t in "${_tools[@]+"${_tools[@]}"}"; do
           t="$(printf '%s' "$t" | tr -d '[:space:]')"
           [ -n "$t" ] && add_tool "$t"
         done
