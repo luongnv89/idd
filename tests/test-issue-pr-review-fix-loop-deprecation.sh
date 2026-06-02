@@ -206,66 +206,64 @@ else
 fi
 
 # ───────────────────────────────────────────────────────────
-# T9: CHANGELOG has Deprecated entry (AC #2 + AC #3)
+# T9: CHANGELOG documents the deprecation (#37) and removal (#54)
+#     of /issue-pr-review-fix-loop (AC #2 + AC #3 + AC #54).
+#
+#     These are durable historical facts. Keep a Changelog files
+#     finalize [Unreleased] entries into a dated release section when
+#     a version is cut — here they live under [0.7.0]. Scanning only
+#     [Unreleased] therefore reports the completed work as missing
+#     (issue #100). Instead, extract the `### Deprecated` and
+#     `### Removed` subsection bodies from anywhere in the file and
+#     assert the /issue-pr-review-fix-loop content within them. This
+#     stays content-anchored: a bare `### Removed` header from some
+#     other release won't satisfy the checks.
 # ───────────────────────────────────────────────────────────
-if awk '
-  /^## \[Unreleased\]/ {in_unrel=1; next}
-  /^## \[/ && in_unrel {exit}
-  in_unrel
-' "$CHANGELOG" | grep -qE '^### Deprecated[[:space:]]*$'; then
-  pass "T9.1: AC #3 — CHANGELOG [Unreleased] has Deprecated subsection"
+
+# Body of every `### Deprecated` subsection in the changelog (lines
+# until the next `###` or `##` header), concatenated.
+deprecated_body="$(awk '
+  /^### Deprecated[[:space:]]*$/ {grab=1; next}
+  /^#{2,3} / {grab=0}
+  grab
+' "$CHANGELOG")"
+
+# Body of every `### Removed` subsection.
+removed_body="$(awk '
+  /^### Removed[[:space:]]*$/ {grab=1; next}
+  /^#{2,3} / {grab=0}
+  grab
+' "$CHANGELOG")"
+
+if printf '%s\n' "$deprecated_body" | grep -qE '/issue-pr-review-fix-loop'; then
+  pass "T9.1: AC #3 — CHANGELOG ### Deprecated documents /issue-pr-review-fix-loop"
 else
-  fail "T9.1: AC #3 — CHANGELOG [Unreleased] missing Deprecated subsection"
+  fail "T9.1: AC #3 — CHANGELOG ### Deprecated missing /issue-pr-review-fix-loop"
 fi
 
-if awk '
-  /^## \[Unreleased\]/ {in_unrel=1; next}
-  /^## \[/ && in_unrel {exit}
-  in_unrel
-' "$CHANGELOG" | grep -qE '/issue-pr-review-fix-loop'; then
-  pass "T9.2: AC #2 — CHANGELOG [Unreleased] mentions /issue-pr-review-fix-loop"
+if printf '%s\n' "$deprecated_body" | grep -qE '#37'; then
+  pass "T9.2: AC #3 — CHANGELOG deprecation entry links tracking issue #37"
 else
-  fail "T9.2: AC #2 — CHANGELOG [Unreleased] missing /issue-pr-review-fix-loop entry"
+  fail "T9.2: AC #3 — CHANGELOG deprecation entry missing #37 tracking reference"
 fi
 
-if awk '
-  /^## \[Unreleased\]/ {in_unrel=1; next}
-  /^## \[/ && in_unrel {exit}
-  in_unrel
-' "$CHANGELOG" | grep -qE 'src/deprecated-skills/issue-pr-review-fix-loop'; then
+if printf '%s\n%s\n' "$deprecated_body" "$removed_body" \
+   | grep -qE 'src/deprecated-skills/issue-pr-review-fix-loop'; then
   pass "T9.3: AC #3/#54 — CHANGELOG documents retained deprecated source path"
 else
   fail "T9.3: AC #3/#54 — CHANGELOG missing retained deprecated source path"
 fi
 
-if awk '
-  /^## \[Unreleased\]/ {in_unrel=1; next}
-  /^## \[/ && in_unrel {exit}
-  in_unrel
-' "$CHANGELOG" | grep -qE '#37'; then
-  pass "T9.4: AC #3 — CHANGELOG entry links tracking issue #37"
+if printf '%s\n' "$removed_body" | grep -qE '/issue-pr-review-fix-loop'; then
+  pass "T9.4: AC #54 — CHANGELOG ### Removed documents /issue-pr-review-fix-loop"
 else
-  fail "T9.4: AC #3 — CHANGELOG entry missing #37 tracking reference"
+  fail "T9.4: AC #54 — CHANGELOG ### Removed missing /issue-pr-review-fix-loop"
 fi
 
-if awk '
-  /^## \[Unreleased\]/ {in_unrel=1; next}
-  /^## \[/ && in_unrel {exit}
-  in_unrel
-' "$CHANGELOG" | grep -qE '^### Removed[[:space:]]*$'; then
-  pass "T9.5: AC #54 — CHANGELOG [Unreleased] has Removed subsection"
+if printf '%s\n' "$removed_body" | grep -qE '#54'; then
+  pass "T9.5: AC #54 — CHANGELOG removal entry documents distribution decision (#54)"
 else
-  fail "T9.5: AC #54 — CHANGELOG [Unreleased] missing Removed subsection"
-fi
-
-if awk '
-  /^## \[Unreleased\]/ {in_unrel=1; next}
-  /^## \[/ && in_unrel {exit}
-  in_unrel
-' "$CHANGELOG" | grep -qE '#54'; then
-  pass "T9.6: AC #54 — CHANGELOG documents the public distribution removal decision"
-else
-  fail "T9.6: AC #54 — CHANGELOG missing issue #54 removal decision"
+  fail "T9.5: AC #54 — CHANGELOG removal entry missing issue #54 reference"
 fi
 
 # ───────────────────────────────────────────────────────────

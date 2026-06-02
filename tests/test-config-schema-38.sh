@@ -258,22 +258,19 @@ else
 fi
 
 # ───────────────────────────────────────────────────────────
-# T5: Version bumps — both consuming skills bumped, version bumps
-#     stay in the test-friendly version range.
+# T5: Version bumps — both consuming skills bumped past the
+#     pre-#38 baseline. Use a semver floor (sort -V) rather than
+#     pinning an exact minor, so the assertion survives later
+#     legitimate bumps (e.g. 0.5.0, 0.10.0) — see issue #100.
 # ───────────────────────────────────────────────────────────
-# /issue-pr-review must remain on 0.4.x so test-issue-pr-review-traceability.sh
-# T9 still passes.
-if grep -qE '^[[:space:]]*version:[[:space:]]+0\.4\.[0-9]+' "$PR_REVIEW_SKILL"; then
-  pass "T5.1: /issue-pr-review SKILL.md still on 0.4.x"
+# /issue-pr-review must be at or past 0.4.1 — i.e. #38's bump
+# landed and the version has only moved forward since.
+pr_review_ver="$(grep -E '^[[:space:]]*version:' "$PR_REVIEW_SKILL" | head -1 | sed -E 's/.*version:[[:space:]]*//')"
+if [ -n "$pr_review_ver" ] \
+   && [ "$(printf '%s\n%s\n' "0.4.1" "$pr_review_ver" | sort -V | head -n1)" = "0.4.1" ]; then
+  pass "T5.1: /issue-pr-review SKILL.md at or past 0.4.1 (#38 bump landed) — $pr_review_ver"
 else
-  fail "T5.1: /issue-pr-review SKILL.md not on 0.4.x"
-fi
-
-# Version actually moved past 0.4.0 — i.e., this PR bumped it.
-if grep -qE '^[[:space:]]*version:[[:space:]]+0\.4\.[1-9][0-9]*' "$PR_REVIEW_SKILL"; then
-  pass "T5.2: /issue-pr-review SKILL.md bumped past 0.4.0"
-else
-  fail "T5.2: /issue-pr-review SKILL.md still at 0.4.0 — expected a bump for #38"
+  fail "T5.1: /issue-pr-review SKILL.md below 0.4.1 — expected a bump for #38 (got '${pr_review_ver:-none}')"
 fi
 
 # /init-gitissue bumped past 0.3.1
