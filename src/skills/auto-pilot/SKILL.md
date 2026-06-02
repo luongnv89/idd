@@ -5,7 +5,7 @@ license: MIT
 compatibility: "Requires git and GitHub CLI (gh) with auth and push access. Requires merge permission for auto-merge. Requires issue-triage, issue-resolver, issue-analysis, and issue-pr-review to be installed from the same distribution. Optional: issue-creator for normalizing unstructured issues mid-loop."
 effort: max
 metadata:
-  version: 2.3.0
+  version: 2.3.1
   creator: Luong NGUYEN <luongnv89@gmail.com>
 ---
 

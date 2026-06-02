@@ -221,12 +221,16 @@ else
 fi
 
 # ───────────────────────────────────────────────────────────
-# T11: Skill version was bumped
+# T11: Skill version — at or past the 2.3.0 baseline the dependency
+# gate shipped under. Use a semver floor (sort -V), not an exact pin,
+# so the check survives later legitimate bumps (2.3.1, …) — issue #100.
 # ───────────────────────────────────────────────────────────
-if grep -qE '^\s*version:\s*2\.3\.0' "$SKILL"; then
-  pass "T11.1: SKILL.md version bumped to 2.3.0"
+skill_ver="$(grep -E '^[[:space:]]*version:' "$SKILL" | head -1 | sed -E 's/.*version:[[:space:]]*//')"
+if [ -n "$skill_ver" ] \
+   && [ "$(printf '%s\n%s\n' "2.3.0" "$skill_ver" | sort -V | head -n1)" = "2.3.0" ]; then
+  pass "T11.1: SKILL.md version at or past 2.3.0 — $skill_ver"
 else
-  fail "T11.1: SKILL.md version not at 2.3.0"
+  fail "T11.1: SKILL.md version below 2.3.0 (got '${skill_ver:-none}')"
 fi
 
 # ───────────────────────────────────────────────────────────

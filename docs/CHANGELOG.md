@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.10.1] - 2026-06-03
+
+### Changed
+- Skill versions corrected for the behavior fixes that shipped in 0.10.0 without their own version ticks: `/issue-resolver` 0.7.1 → 0.7.2 and `/issue-pr-review` 0.5.0 → 0.5.1 (correct subagent invocation, #95); `/auto-pilot` 2.3.0 → 2.3.1 (never pass a skill name as `subagent_type`, #98, #99). No behavior change beyond what 0.10.0 already shipped — this release only aligns each skill's `metadata.version` and the README table with the fixes already in `main`.
+
 ## [0.10.0] - 2026-06-03
 
 ### Added

@@ -5,7 +5,7 @@ license: MIT
 compatibility: Requires git and GitHub CLI (gh) with authentication. Self-contained — uses shared agents from shared/agents/.
 effort: high
 metadata:
-  version: 0.5.0
+  version: 0.5.1
   creator: Luong NGUYEN <luongnv89@gmail.com>
 ---
 
