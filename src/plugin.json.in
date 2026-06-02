@@ -1,5 +1,5 @@
 {
-  "default_version": "0.9.0",
+  "default_version": "0.10.0",
   "placeholder_policy": {
     "change_rule": "Adding a placeholder requires updating this file and scripts/build.py substitution table.",
     "syntax": "dollar-brace variable names only"

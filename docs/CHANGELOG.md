@@ -4,11 +4,22 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [0.10.0] - 2026-05-04
+## [0.10.0] - 2026-06-03
 
 ### Added
 - `feat(auto-pilot)` Phase 5 dependency-aware merge gate. Before merging PR-A, the loop parses `Depends on #N` / `Blocked by #N` markers from the originating issue's body and verifies every referenced issue is closed and its PR merged. If any dependency is unsatisfied, the auto-pilot pauses with a structured alert (mirroring the critical-issue alert shape) and leaves PR-A open — the user merges the dependency, then re-runs `/auto-pilot` to resume. New iteration outcome label: `blocked_by_dependency`. New config: `autopilot.respect_dependencies: true` (default on). The convention is documented in `docs/idd-methodology.md` (Issue Dependencies). Self-reference cycle detection skips the gate to avoid infinite pauses (multi-hop cycles surface as repeated `blocked_by_dependency` outcomes); cross-repo references are out of scope. (#93)
+- `feat(install)` `scripts/install.sh` now installs self-contained skills into agent tools beyond Claude Code: `agents`, `codex`, `opencode`, `pi`, `openclaw`, `hermes`, `antigravity`, and `windsurf`. New repeatable `--tool <name>` and `--tools <list|all>` flags, plus an interactive numbered picker when no tool is specified on a TTY (falls back to Claude Code in CI / `curl | bash` / piped contexts). Per-tool destination paths mirror `asm config show`; `--plugin`/`--all`/`--agents-only`/`--target` reject tools that lack the Claude-only layout, and unknown tool names are rejected. Adds `tests/test-install-script-tools.sh`. (#96, #97)
+
+### Changed
 - Skill versions: `/auto-pilot` 2.2.0 → 2.3.0 (new Phase 5 gate, `blocked_by_dependency` outcome, `autopilot.respect_dependencies` config key).
+
+### Fixed
+- `fix(skills)` `/issue-resolver` and `/issue-pr-review` SKILL.md now document the correct subagent invocation. Shared agents must be spawned with the Agent tool passing only `description` and `prompt` (the shared agent prompt) — never a `subagent_type` of a shared-agent or skill name (e.g. `code-reviewer`, `synthesizer`, `issue-resolver`), which are not registered agent types. Explicit `Agent()` invocation examples were added for every spawn point across the resolve and PR-review pipelines, fixing the "Agent type not found" error during QA cycles. (#95)
+- `fix(auto-pilot)` the orchestrator no longer passes a skill name as `subagent_type` when spawning the resolver, PR reviewer, analyzer, or batch resolver. The convention — pass only `description` and `prompt`, invoke the skill from inside the prompt — is now explicit in the subagent prompts and the Phase spawn step, fixing the "Agent type 'issue-resolver' not found" error. (#98, #99)
+
+### Internal
+- `test(issue-pr-review)` decoupled stale test assertions from exact version pins: `test-config-schema-38` and `test-issue-pr-review-traceability` now use a `sort -V` semver floor for the `/issue-pr-review` version (surviving two-digit minors like `0.10.0`) instead of an exact `0.4.x` match, and `test-issue-pr-review-fix-loop-deprecation` scans the `### Deprecated`/`### Removed` subsections wherever they live rather than only `[Unreleased]`. No change to shipped skill behavior or CHANGELOG content. (#100, #101)
+- `refactor(tests)` hardened the CHANGELOG subsection scan in `test-issue-pr-review-fix-loop-deprecation.sh` to avoid awk interval expressions that older one-true-awk builds treat as literals (which could silently let a stale entry pass). (#102)
 
 ## [0.9.0] - 2026-04-30
 

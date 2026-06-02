@@ -58,7 +58,7 @@ graph TD
 | `/issue-resolver N` | 6-step pipeline: preflight, research, plan, implement, QA, deliver PR with `Closes #N` | 0.7.1 | max |
 | `/issue-triage` | Dependency graph, stale detection, already-fixed detection via commit/PR scanning, priority and execution order | 0.5.2 | medium |
 | `/init-gitissue` | Auto-detect language/framework/test runner, generate `.gitissue.yml` | 0.3.2 | low |
-| `/auto-pilot` | Triage → resolve → review → merge loop. Conservative-by-default merge modes (`conservative`/`balanced`/`aggressive`) and explicit issue lists for targeted runs | 2.2.0 | max |
+| `/auto-pilot` | Triage → resolve → review → merge loop. Conservative-by-default merge modes (`conservative`/`balanced`/`aggressive`), explicit issue lists for targeted runs, and a dependency-aware merge gate (`Depends on #N` / `Blocked by #N`) | 2.3.0 | max |
 | `/issue-pr-review` | Review PR end-to-end: script pre-pass (lint/format/test auto-fix), per-criterion AC verification, five-dimension scoring (correctness, acceptance_criteria, traceability, maintainability, safety), reuses reviewer/fixer agents across cycles | 0.5.0 | high |
 
 ### Internal tooling
