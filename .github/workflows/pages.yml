@@ -1,0 +1,66 @@
+name: Deploy landing page to GitHub Pages
+
+# Publishes landing.html (plus the brand assets it references) to GitHub Pages
+# on every push to main. The site is assembled into a _site/ directory so the
+# repository source tree is never exposed — only the landing page and the
+# specific assets it loads are deployed.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - landing.html
+      - assets/logo/**
+      - assets/screenshots/**
+      - .github/workflows/pages.yml
+  workflow_dispatch:
+
+# Allow the workflow to publish to Pages.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Only one concurrent deployment; cancel in-progress runs of older commits.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Assemble site
+        run: |
+          set -euo pipefail
+          mkdir -p _site/assets/logo _site/assets/screenshots
+          # Landing page becomes the site index.
+          cp landing.html _site/index.html
+          # Only the assets the page actually references.
+          cp assets/logo/*.svg _site/assets/logo/
+          cp assets/screenshots/issue-creator.png        _site/assets/screenshots/
+          cp assets/screenshots/issue-resolver-11.png    _site/assets/screenshots/
+          cp assets/screenshots/issue-triage-suggestion.png _site/assets/screenshots/
+          cp assets/screenshots/issue-triage-view.png    _site/assets/screenshots/
+          cp assets/screenshots/issue-triage-asm.png     _site/assets/screenshots/
+          # Disable Jekyll so files/dirs are served verbatim.
+          touch _site/.nojekyll
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
