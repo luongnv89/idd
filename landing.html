@@ -174,6 +174,7 @@
     .c-prompt { color: var(--green); }
     .c-dim { color: var(--fg-dim); }
     .c-ok { color: var(--green); }
+    .c-fail { color: var(--red); }
     .c-cyan { color: var(--cyan); }
     .c-yellow { color: var(--yellow); }
     .c-head { color: var(--fg); font-weight: 700; }
@@ -420,20 +421,17 @@
           <span class="title">~/your-repo — issuedev</span>
         </div>
         <div class="term-body">
-<div class="ln"><span class="c-prompt">❯</span> /issue-resolver 42</div>
+<div class="ln"><span class="c-prompt">❯</span> /auto-pilot</div>
 <div class="ln">&nbsp;</div>
-<div class="ln"><span class="c-head">◆ Resolve Pipeline</span></div>
-<div class="ln c-dim">┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄</div>
-<div class="ln"><span class="c-step">[0/5] Preflight</span>    <span class="c-ok">✓</span> issue #42 open, not yet resolved</div>
-<div class="ln"><span class="c-step">[1/5] Research </span>    <span class="c-ok">✓</span> read 5 files, complexity: medium</div>
-<div class="ln"><span class="c-step">[2/5] Plan     </span>    <span class="c-ok">✓</span> approach: fix redirect logic</div>
-<div class="ln"><span class="c-step">[3/5] Implement</span>    <span class="c-ok">✓</span> 2 files changed, 45 lines</div>
-<div class="ln"><span class="c-step">[4/5] QA       </span>    <span class="c-ok">✓</span> clean after 2 cycles</div>
-<div class="ln"><span class="c-step">[5/5] Deliver  </span>    <span class="c-ok">✓</span> PR #87 created</div>
-<div class="ln">&nbsp;</div>
-<div class="ln"><span class="c-ok">✓</span> Done — <span class="c-cyan">PR #87</span>: fix(auth): resolve redirect (#42)</div>
-<div class="ln c-cyan">&nbsp;&nbsp;&nbsp;github.com/you/repo/pull/87</div>
-<div class="ln c-dim">&nbsp;&nbsp;&nbsp;Closes #42</div>
+<div class="ln"><span class="c-head">◆ auto-pilot</span>        <span class="c-dim">starting (5 open issues)</span></div>
+<div class="ln c-dim">┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄</div>
+<div class="ln"><span class="c-step">[1/5] #42</span>   <span class="c-ok">✓</span> resolved → <span class="c-cyan">PR #51</span> merged</div>
+<div class="ln"><span class="c-step">[2/5] #38</span>   <span class="c-ok">✓</span> resolved → <span class="c-cyan">PR #52</span> merged</div>
+<div class="ln"><span class="c-step">[3/5] #35</span>   <span class="c-fail">✗</span> stopped — test failures after 2 fix cycles</div>
+<div class="ln"><span class="c-step">[4/5] #29</span>   <span class="c-ok">✓</span> resolved → <span class="c-cyan">PR #53</span> merged</div>
+<div class="ln"><span class="c-step">[5/5] #21</span>   <span class="c-ok">✓</span> resolved → <span class="c-cyan">PR #54</span> merged</div>
+<div class="ln c-dim">┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄</div>
+<div class="ln"><span class="c-head">◆ complete</span>          <span class="c-ok">4/5 resolved</span>, <span class="c-yellow">1 stopped</span></div>
 <div class="ln"><span class="c-prompt">❯</span> <span class="cursor"></span></div>
         </div>
       </div>
