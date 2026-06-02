@@ -221,17 +221,22 @@ fi
 # ───────────────────────────────────────────────────────────
 
 # Body of every `### Deprecated` subsection in the changelog (lines
-# until the next `###` or `##` header), concatenated.
+# until the next markdown header), concatenated. The reset matches any
+# line starting with `#` rather than an interval like `^#{2,3} ` —
+# CHANGELOG body lines are bullets (`-`) or blank, never `#`, so any
+# `#` line is a header that ends the subsection. This avoids awk
+# interval expressions, which older one-true-awk builds treat as
+# literal characters (silently leaking the scan to EOF — issue #100).
 deprecated_body="$(awk '
   /^### Deprecated[[:space:]]*$/ {grab=1; next}
-  /^#{2,3} / {grab=0}
+  /^#/ {grab=0}
   grab
 ' "$CHANGELOG")"
 
 # Body of every `### Removed` subsection.
 removed_body="$(awk '
   /^### Removed[[:space:]]*$/ {grab=1; next}
-  /^#{2,3} / {grab=0}
+  /^#/ {grab=0}
   grab
 ' "$CHANGELOG")"
 
