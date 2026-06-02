@@ -136,7 +136,7 @@ This is safe because the auto-pilot always pushes work to remote PRs before clea
 
 ### Step 2.2 — Spawn Resolver Subagent
 
-Launch a subagent using the Agent tool to perform the entire resolve pipeline. This keeps all codebase reading, code writing, and test execution out of the main agent's context.
+Launch a subagent using the Agent tool to perform the entire resolve pipeline. This keeps all codebase reading, code writing, and test execution out of the main agent's context. Pass only `description` and `prompt` — do NOT set `subagent_type`. The resolver is a **skill** invoked from inside the prompt (via `../issue-resolver/SKILL.md`), not an agent type; passing `subagent_type: "issue-resolver"` fails with `Agent type 'issue-resolver' not found`.
 
 ```
 ● [Iteration {i}/{max}] Resolving #{issue_number}...
