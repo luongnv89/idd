@@ -304,12 +304,16 @@ else
 fi
 
 # ───────────────────────────────────────────────────────────
-# T9: Version bump
+# T9: Version bump — at or past the 0.4.0 baseline this spec shipped
+# under. Use a semver floor (sort -V), not an exact-minor pin, so the
+# check survives later legitimate bumps (0.5.0, 0.10.0, …) — issue #100.
 # ───────────────────────────────────────────────────────────
-if grep -qE '^[[:space:]]*version:[[:space:]]+0\.4\.[0-9]+' "$SKILL"; then
-  pass "T9: SKILL.md version bumped to 0.4.x"
+skill_ver="$(grep -E '^[[:space:]]*version:' "$SKILL" | head -1 | sed -E 's/.*version:[[:space:]]*//')"
+if [ -n "$skill_ver" ] \
+   && [ "$(printf '%s\n%s\n' "0.4.0" "$skill_ver" | sort -V | head -n1)" = "0.4.0" ]; then
+  pass "T9: SKILL.md version at or past 0.4.0 — $skill_ver"
 else
-  fail "T9: SKILL.md version not bumped to 0.4.x"
+  fail "T9: SKILL.md version below 0.4.0 (got '${skill_ver:-none}')"
 fi
 
 # ───────────────────────────────────────────────────────────
