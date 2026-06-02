@@ -2,7 +2,7 @@
 
 This file contains the exact prompts to pass to each subagent via the Agent tool. The main agent reads this file once at skill start and uses these templates for every iteration.
 
-**CRITICAL — never set `subagent_type`:** Every subagent below is spawned with the **default general-purpose agent**. Do NOT pass a `subagent_type` parameter to the Agent tool. The skills referenced in these prompts (`issue-resolver`, `issue-pr-review`, `issue-analysis`) are **skills**, not agent types — passing `subagent_type: "issue-resolver"` fails with `Agent type 'issue-resolver' not found`. The skill is invoked from *inside* the subagent's prompt via the `{{skill:...}}` token, never as the agent type. Pass only `description` and `prompt`.
+**CRITICAL — never set `subagent_type`:** Every subagent below is spawned with the **default general-purpose agent**. Do NOT pass a `subagent_type` parameter to the Agent tool. The skills referenced in these prompts (`issue-resolver`, `issue-pr-review`, `issue-analysis`) are **skills**, not agent types — passing `subagent_type: "issue-resolver"` fails with `Agent type 'issue-resolver' not found`. The skill is invoked from *inside* the subagent's prompt (via the skill prompts below), never as the agent type. Pass only `description` and `prompt`.
 
 **Autonomy principle:** All subagents operate in fully autonomous mode. They make all decisions independently, always choosing the best available option. They never prompt the user for confirmation. If something fails, they report the failure back to the main agent — they don't stop and ask.
 
