@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="0%" r="75%">
+      <stop offset="0%" stop-color="#00FF41" stop-opacity="0.16"/>
+      <stop offset="60%" stop-color="#00FF41" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="panel" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0c0e0f"/>
+      <stop offset="100%" stop-color="#0a0b0c"/>
+    </linearGradient>
+    <style>
+      .mono { font-family: 'JetBrains Mono', 'SFMono-Regular', Menlo, Consolas, monospace; }
+      .sans { font-family: 'Inter', -apple-system, 'Segoe UI', system-ui, sans-serif; }
+    </style>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="630" fill="#0A0A0A"/>
+  <rect width="1200" height="630" fill="url(#glow)"/>
+
+  <!-- Brand row -->
+  <g transform="translate(80, 84)">
+    <g transform="scale(0.42)">
+      <path fill-rule="evenodd" fill="#00FF41"
+            d="M60 12 L108 60 L60 108 L12 60 Z M48 46 L80 60 L48 74 Z"/>
+    </g>
+    <text x="62" y="38" class="sans" font-size="40" font-weight="800" letter-spacing="-1.5">
+      <tspan fill="#FAFAFA">issue</tspan><tspan fill="#00FF41">dev</tspan>
+    </text>
+  </g>
+
+  <!-- Eyebrow -->
+  <text x="80" y="232" class="mono" font-size="22" font-weight="600" fill="#00FF41" letter-spacing="0.5">
+    Issue-Driven Development · 8 commands · MIT
+  </text>
+
+  <!-- Headline -->
+  <text x="80" y="312" class="sans" font-size="62" font-weight="800" fill="#FAFAFA" letter-spacing="-2">
+    Turn GitHub issues into
+  </text>
+  <text x="80" y="386" class="sans" font-size="62" font-weight="800" fill="#00FF41" letter-spacing="-2">
+    agent-ready work orders.
+  </text>
+
+  <!-- Subtitle -->
+  <text x="80" y="448" class="sans" font-size="27" font-weight="400" fill="#a7b0b4" letter-spacing="-0.3">
+    Structure, triage, resolve, and review GitHub issues —
+  </text>
+  <text x="80" y="486" class="sans" font-size="27" font-weight="400" fill="#a7b0b4" letter-spacing="-0.3">
+    so any developer or AI agent can ship a tested PR.
+  </text>
+
+  <!-- Terminal chip -->
+  <g transform="translate(80, 530)">
+    <rect width="430" height="56" rx="10" fill="url(#panel)" stroke="#1f2428" stroke-width="1"/>
+    <circle cx="26" cy="28" r="6" fill="#ff5f56"/>
+    <circle cx="48" cy="28" r="6" fill="#ffbd2e"/>
+    <circle cx="70" cy="28" r="6" fill="#27c93f"/>
+    <text x="100" y="36" class="mono" font-size="22" font-weight="600">
+      <tspan fill="#00FF41">❯ </tspan><tspan fill="#FAFAFA">/issue-resolver 42</tspan>
+    </text>
+  </g>
+</svg>

@@ -10,8 +10,10 @@ on:
     branches: [main]
     paths:
       - landing.html
+      - sitemap.xml
       - assets/logo/**
       - assets/screenshots/**
+      - assets/og/**
       - .github/workflows/pages.yml
   workflow_dispatch:
 
@@ -36,11 +38,14 @@ jobs:
       - name: Assemble site
         run: |
           set -euo pipefail
-          mkdir -p _site/assets/logo _site/assets/screenshots
+          mkdir -p _site/assets/logo _site/assets/screenshots _site/assets/og
           # Landing page becomes the site index.
           cp landing.html _site/index.html
+          # Sitemap (lists only /idd/* URLs) for search engines.
+          cp sitemap.xml _site/sitemap.xml
           # Only the assets the page actually references.
           cp assets/logo/*.svg _site/assets/logo/
+          cp assets/og/og-card.png                       _site/assets/og/
           cp assets/screenshots/issue-creator.png        _site/assets/screenshots/
           cp assets/screenshots/issue-resolver-11.png    _site/assets/screenshots/
           cp assets/screenshots/issue-triage-suggestion.png _site/assets/screenshots/
