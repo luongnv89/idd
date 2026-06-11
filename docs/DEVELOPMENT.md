@@ -82,7 +82,7 @@ graph TD
 
 ### Editing a Skill
 
-Skills live in `src/skills/<name>/SKILL.md` (internal-only skills under `src/internal-skills/<name>/`). Hand edits go in `src/` only — never edit `skills/` directly. When editing:
+Skills live in `src/skills/<name>/SKILL.source.md` (internal-only skills under `src/internal-skills/<name>/`). Hand edits go in `src/` only — never edit `skills/` directly. When editing:
 
 1. Read the existing SKILL.md fully before making changes
 2. Follow the terminal output patterns in `DESIGN.md`
@@ -139,7 +139,7 @@ graph TD
     CM["CLAUDE.md<br/>Agent conventions"] --> DM["DESIGN.md<br/>Output style guide"]
     CM --> CS["docs/config-schema.md<br/>Config schema"]
     CM --> AR["docs/ARCHITECTURE.md<br/>System design"]
-    AR --> SK["src/skills/*/SKILL.md<br/>Skill definitions"]
+    AR --> SK["src/skills/*/SKILL.source.md<br/>Skill definitions"]
     SK --> EM["src/skills/*/references/<br/>Error messages"]
     SK --> TM["src/skills/*/templates/<br/>Issue templates"]
     CS --> GY[".gitissue.yml<br/>Project config"]
@@ -158,4 +158,4 @@ graph TD
 | `docs/sample-normalized-issue.md` | Example normalized issue (intent-only) |
 | `docs/ARCHITECTURE.md` | System design, data flow, durable-memory model |
 | `docs/CHANGELOG.md` | Per-release notes |
-| `src/internal-skills/idd-doctor/SKILL.md` | Read-only health check — run before submitting a PR |
+| `src/internal-skills/idd-doctor/SKILL.source.md` | Read-only health check — run before submitting a PR |

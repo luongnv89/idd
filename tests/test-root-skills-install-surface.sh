@@ -52,6 +52,12 @@ else
   pass "T5: internal idd-doctor excluded from root skills/"
 fi
 
+if find "$REPO_ROOT/src" -name 'SKILL.md' -type f | grep -q .; then
+  fail "T6: src/ leaks SKILL.md files that asm would discover"
+else
+  pass "T6: src/ uses SKILL.source.md and is hidden from asm discovery"
+fi
+
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 echo "  Passed: $PASS"
 echo "  Failed: $FAIL"

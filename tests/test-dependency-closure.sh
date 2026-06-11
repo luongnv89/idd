@@ -159,14 +159,14 @@ done
 # This validates the algorithm on a controlled tree. Post-#81, runtime
 # docs live at top-level docs/ (sibling of src/), not src/docs/. We
 # create:
-#   src/skills/dia/SKILL.md → references shared/agents/B.md and C.md
+#   src/skills/dia/SKILL.source.md → references shared/agents/B.md and C.md
 #   src/shared/agents/B.md  → references docs/D.md
 #   src/shared/agents/C.md  → references docs/D.md
 #   docs/D.md               → leaf (no further refs)
 # Expected: D.md appears exactly once in dist/skills/dia/references/docs/,
 #   no cycle warnings, exit 0.
 mkdir -p "$SYN_TMP/src/skills/dia" "$SYN_TMP/src/shared/agents" "$SYN_TMP/docs"
-cat > "$SYN_TMP/src/skills/dia/SKILL.md" <<'EOF'
+cat > "$SYN_TMP/src/skills/dia/SKILL.source.md" <<'EOF'
 ---
 name: dia
 description: diamond test skill

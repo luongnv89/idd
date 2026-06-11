@@ -110,7 +110,7 @@ fi
 # ───────────────────────────────────────────────────────────
 # T3: auto-pilot SKILL.md documents merge modes
 # ───────────────────────────────────────────────────────────
-SKILL="$REPO_ROOT/src/skills/auto-pilot/SKILL.md"
+SKILL="$REPO_ROOT/src/skills/auto-pilot/SKILL.source.md"
 
 if grep -qiE 'Merge Modes' "$SKILL"; then
   pass "T3.1: SKILL.md has a Merge Modes section"

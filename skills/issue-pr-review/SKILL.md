@@ -54,6 +54,28 @@ If it is missing, stop immediately and print:
 Do not continue with an inline or guessed reviewer prompt when the bundled agent
 is missing.
 
+Additionally, verify that this skill's bundled reference files are present.
+If any are missing, stop immediately and print:
+
+```
+text
+✗ Missing bundled dependency: {missing_file}
+
+  To fix:  asm install https://github.com/luongnv89/idd --skill issue-pr-review
+           (or reinstall the full distribution)
+
+  Then restart the agent session and re-run /issue-pr-review.
+```
+
+Check these files relative to the skill's directory (the dirname of this SKILL.md):
+
+- `references/agents/code-reviewer.md` — Review subagent prompt (already checked above)
+- `references/report-templates.md` — Step 7 summary templates, auto-merge flow, expected inline output
+- `references/docs/pre-commit-security.md` — pre-commit security conventions reference
+- `references/docs/sync-conventions.md` — stash-first sync convention and recovery
+- `references/docs/idd-methodology.md` — IDD methodology (durable analysis fields)
+- `references/docs/naming-conventions.md` — naming conventions
+
 ## Repo Sync Before Edits (mandatory)
 
 Before making any fixes, sync with remote using the stash-first pattern (see `references/docs/sync-conventions.md` for the full convention and recovery procedure):

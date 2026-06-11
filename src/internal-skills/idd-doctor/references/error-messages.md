@@ -29,7 +29,7 @@ All errors follow the rich error format: what went wrong + fix command (+ docs l
 ```
   ✓ [1/4] Stale skill claims    no stale language in /issue-creator
 ```
-**Trigger:** `src/skills/issue-creator/README.md` and `src/skills/issue-creator/SKILL.md` are both clean.
+**Trigger:** `src/skills/issue-creator/README.md` and `src/skills/issue-creator/SKILL.source.md` are both clean.
 
 ### Fail
 ```
@@ -39,7 +39,7 @@ All errors follow the rich error format: what went wrong + fix command (+ docs l
         line:    {trimmed_line_text}
         ...
 ```
-**Trigger:** At least one line in `src/skills/issue-creator/README.md` or `src/skills/issue-creator/SKILL.md` matches a forbidden pattern without a negation marker on the same line.
+**Trigger:** At least one line in `src/skills/issue-creator/README.md` or `src/skills/issue-creator/SKILL.source.md` matches a forbidden pattern without a negation marker on the same line.
 
 **Fix hint** (printed once after the per-finding block):
 ```

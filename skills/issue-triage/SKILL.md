@@ -236,6 +236,31 @@ If the Agent tool is available, use subagents as described above.
 If not (e.g., Claude.ai), execute history scanning and dependency analysis inline — the steps below include the full procedure for both modes.
 When the Agent tool is available and there are 10+ issues, split dependency scanning into parallel batches of ~5 issues each for faster execution.
 
+### Bundled dependency precheck
+
+Verify that this skill's bundled subagent prompts and reference files are present.
+If any are missing, stop immediately and print:
+
+```
+text
+✗ Missing bundled dependency: {missing_file}
+
+  To fix:  asm install https://github.com/luongnv89/idd --skill issue-triage
+           (or reinstall the full distribution)
+
+  Then restart the agent session and re-run /issue-triage.
+```
+
+Check these files relative to the skill's directory (the dirname of this SKILL.md):
+
+- `references/agents/issue-relationship-scanner.md` — Combined dependency + history scanner prompt
+- `references/detection.md` — Confidence-scoring rules and merge logic for detection
+- `references/output-and-persist.md` — Terminal report rendering spec and JSON schema
+- `references/docs/sync-conventions.md` — stash-first sync convention and recovery
+- `references/docs/idd-methodology.md` — IDD methodology (durable analysis fields)
+- `references/docs/github-projects-sync.md` — GitHub Projects status sync reference
+- `references/docs/config-schema.md` — configuration schema reference
+
 ---
 
 ## Step 1 — Fetch Issues
