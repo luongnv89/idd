@@ -1,0 +1,34 @@
+# issuedev
+
+> Issue-Driven Development for GitHub: eight terminal commands that structure, analyze, triage, resolve, review, and self-check GitHub issue workflows so humans and AI coding agents can ship tested PRs.
+
+## Start here
+
+- [Landing page](https://luongnv.com/idd/): Product overview, installation command, and workflow summary.
+- [Skills reference](https://luongnv.com/idd/docs.html): Complete command reference for `/init-gitissue`, `/issue-creator`, `/issue-analysis`, `/issue-triage`, `/issue-resolver`, `/issue-pr-review`, `/auto-pilot`, and `/idd-doctor`.
+- [GitHub repository](https://github.com/luongnv89/idd): Source code, issues, releases, and contribution workflow.
+- [README](https://github.com/luongnv89/idd/blob/main/README.md): Installation, methodology, examples, and command table.
+
+## Commands
+
+- [`/init-gitissue`](https://luongnv.com/idd/docs.html#init-gitissue): Generate a repository-specific `.gitissue.yml` config.
+- [`/issue-creator`](https://luongnv.com/idd/docs.html#issue-creator): Create, normalize, or batch-create structured GitHub issues.
+- [`/issue-analysis`](https://luongnv.com/idd/docs.html#issue-analysis): Analyze one issue for root cause, affected files, implementation options, complexity, and risk.
+- [`/issue-triage`](https://luongnv.com/idd/docs.html#issue-triage): Prioritize the backlog, detect dependencies, and find already-fixed signals.
+- [`/issue-resolver`](https://luongnv.com/idd/docs.html#issue-resolver): Resolve one GitHub issue into an atomic pull request.
+- [`/issue-pr-review`](https://luongnv.com/idd/docs.html#issue-pr-review): Review a pull request, fix issues, test, and check CI.
+- [`/auto-pilot`](https://luongnv.com/idd/docs.html#auto-pilot): Run the autonomous triage → resolve → review → merge loop.
+- [`/idd-doctor`](https://luongnv.com/idd/docs.html#idd-doctor): Run a read-only health check for IDD repository invariants.
+
+## Documentation
+
+- [IDD methodology](https://github.com/luongnv89/idd/blob/main/docs/idd-methodology.md): Issue-Driven Development concepts and operating model.
+- [Configuration schema](https://github.com/luongnv89/idd/blob/main/docs/config-schema.md): `.gitissue.yml` options and defaults.
+- [Naming conventions](https://github.com/luongnv89/idd/blob/main/docs/naming-conventions.md): Branch, commit, PR, and issue naming rules.
+- [Development guide](https://github.com/luongnv89/idd/blob/main/docs/DEVELOPMENT.md): Maintainer workflow and build/test instructions.
+
+## Optional
+
+- [Releases](https://github.com/luongnv89/idd/releases): Versioned release notes and downloadable artifacts.
+- [Contributing](https://github.com/luongnv89/idd/blob/main/CONTRIBUTING.md): How to contribute fixes and improvements.
+- [Security policy](https://github.com/luongnv89/idd/blob/main/SECURITY.md): Vulnerability reporting and security guidance.

@@ -62,9 +62,11 @@ graph TD
 | `/issue-analysis N` | Root cause, git history, implementation options, complexity and risk | 0.4.1 | high |
 | `/issue-resolver N` | 6-step pipeline: preflight, research, plan, implement, QA, deliver PR with `Closes #N` | 0.7.2 | max |
 | `/issue-triage` | Dependency graph, stale detection, already-fixed detection via commit/PR scanning, priority and execution order | 0.5.2 | medium |
-| `/init-gitissue` | Auto-detect language/framework/test runner, generate `.gitissue.yml` | 0.3.2 | low |
+| `/init-gitissue` | Auto-detect language/framework/test runner, generate `.gitissue.yml` | 0.3.3 | low |
 | `/auto-pilot` | Triage → resolve → review → merge loop. Balanced-by-default merge modes (`conservative`/`balanced`/`aggressive`), explicit issue lists for targeted runs, and a dependency-aware merge gate (`Depends on #N` / `Blocked by #N`) | 2.3.1 | max |
-| `/issue-pr-review` | Review PR end-to-end: script pre-pass (lint/format/test auto-fix), per-criterion AC verification, five-dimension scoring (correctness, acceptance_criteria, traceability, maintainability, safety), reuses reviewer/fixer agents across cycles | 0.5.1 | high |
+| `/issue-pr-review` | Review PR end-to-end: script pre-pass (lint/format/test auto-fix), per-criterion AC verification, five-dimension scoring (correctness, acceptance_criteria, traceability, maintainability, safety), reuses reviewer/fixer agents across cycles | 1.0.0 | high |
+
+See [`docs/skills.md`](docs/skills.md) for the full skills reference, including every supported input option.
 
 ### Internal tooling
 
