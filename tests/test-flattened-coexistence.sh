@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # test-flattened-coexistence.sh — Verify that two independent flattened skills
 # coexist in the same skills directory without reference collisions
-# (issue #58, §9 of refactor-plan-v10.md).
+# (issue #58, §9 of refactor-plan-v10.md; updated for #106: skills/ is the
+# committed install surface).
 #
 # Strategy:
-#   1. Copy `dist/skills/issue-creator/` and `dist/skills/init-gitissue/`
+#   1. Copy `skills/issue-creator/` and `skills/init-gitissue/`
 #      into a fresh temp directory.
 #   2. Verify each skill remains self-contained: every `references/agents/*.md`
 #      and `references/docs/*.md` referenced from the skill exists inside its
@@ -18,7 +19,7 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-DIST_SKILLS="$REPO_ROOT/dist/skills"
+SKILLS="$REPO_ROOT/skills"
 BUILD_SH="$REPO_ROOT/scripts/build.sh"
 
 PASS=0
@@ -30,8 +31,8 @@ fail() { echo "  ✗ $1"; FAIL=$((FAIL + 1)); }
 echo "◆ Flattened Coexistence Tests (issue #58)"
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 
-if [ ! -d "$DIST_SKILLS" ]; then
-  echo "  ○ dist/skills/ missing — running build..."
+if [ ! -d "$SKILLS" ]; then
+  echo "  ○ skills/ missing — running build..."
   "$BUILD_SH" >/dev/null 2>&1 || {
     fail "Pre-build failed"
     exit 1
@@ -39,15 +40,15 @@ if [ ! -d "$DIST_SKILLS" ]; then
 fi
 
 # ───────────────────────────────────────────────────────────
-# T1: required source skills are present in dist
+# T1: required source skills are present
 # ───────────────────────────────────────────────────────────
-SKILL_A="$DIST_SKILLS/issue-creator"
-SKILL_B="$DIST_SKILLS/init-gitissue"
+SKILL_A="$SKILLS/issue-creator"
+SKILL_B="$SKILLS/init-gitissue"
 
 if [ -d "$SKILL_A" ] && [ -d "$SKILL_B" ]; then
-  pass "T1: both candidate skills exist in dist/skills/"
+  pass "T1: both candidate skills exist in skills/"
 else
-  fail "T1: missing dist/skills/issue-creator or dist/skills/init-gitissue"
+  fail "T1: missing skills/issue-creator or skills/init-gitissue"
   echo "  Cannot continue."
   echo "  Passed: $PASS"
   echo "  Failed: $FAIL"

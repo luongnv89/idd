@@ -7,15 +7,14 @@
 #          PRIMARY documented code path.
 #   AC #3: On stash pop conflicts, output clear recovery instructions with the stash ref.
 #   AC #4: Consistent approach across all affected skills:
-#          issue-pr-review, issue-pr-review-fix-loop, issue-resolver, auto-pilot,
+#          issue-pr-review, issue-resolver, auto-pilot,
 #          plus issue-triage and issue-analysis (same anti-pattern).
 #
 # Strategy: walk every fenced code block (```bash / ```sh / ```) in src/skills/**/*.md
-# and src/skills/**/references/*.md and src/deprecated-skills/**/*.md, looking for
-# `git pull --rebase`. For each occurrence, the same fenced block must contain a
-# preceding `git stash` invocation. Inline prose mentions inside single backticks
-# are ignored — only fenced code blocks count, since those are what the skill
-# actually instructs the agent to execute.
+# and src/skills/**/references/*.md, looking for `git pull --rebase`. For each
+# occurrence, the same fenced block must contain a preceding `git stash` invocation.
+# Inline prose mentions inside single backticks are ignored — only fenced code blocks
+# count, since those are what the skill actually instructs the agent to execute.
 #
 # Usage: bash tests/test-sync-safety.sh
 # Returns: exit 0 if all checks pass, exit 1 on failure
@@ -58,11 +57,10 @@ fi
 # `git pull --rebase` line whose enclosing block does not also contain
 # `git stash`. Inline-code (single backticks) and prose are ignored.
 
-# Files in scope: skills + deprecated-skills + auto-pilot/issue-resolver
-# references. Exclude the convention doc itself (it documents the pattern).
+# Files in scope: skills + auto-pilot/issue-resolver references.
+# Exclude the convention doc itself (it documents the pattern).
 SCAN_DIRS=(
   "$REPO_ROOT/src/skills"
-  "$REPO_ROOT/src/deprecated-skills"
 )
 
 # Use a temp file to collect violations across files.
@@ -134,7 +132,6 @@ NAMED_FILES=(
   "src/skills/issue-pr-review/SKILL.md"
   "src/skills/issue-resolver/SKILL.md"
   "src/skills/auto-pilot/SKILL.md"
-  "src/deprecated-skills/issue-pr-review-fix-loop/SKILL.md"
 )
 
 for rel in "${NAMED_FILES[@]}"; do

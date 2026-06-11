@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# test-flattened-self-contained.sh — Verify dist/skills/* is fully self-contained
-# (issue #58, §9 of refactor-plan-v10.md).
+# test-flattened-self-contained.sh — Verify skills/* is fully self-contained
+# (issue #58, §9 of refactor-plan-v10.md; updated for #106: skills/ is the
+# committed install surface, built by default).
 #
 # URL-aware scan of every text file in each flattened skill. Fails on:
 #   - Unresolved local `shared/agents/X.md` references (must be rewritten to
@@ -21,7 +22,7 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-DIST_SKILLS="$REPO_ROOT/dist/skills"
+SKILLS="$REPO_ROOT/skills"
 BUILD_SH="$REPO_ROOT/scripts/build.sh"
 
 PASS=0
@@ -33,9 +34,9 @@ fail() { echo "  ✗ $1"; FAIL=$((FAIL + 1)); }
 echo "◆ Flattened Self-Contained Tests (issue #58)"
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 
-# Build if dist/skills/ is missing
-if [ ! -d "$DIST_SKILLS" ]; then
-  echo "  ○ dist/skills/ missing — running build..."
+# Build if skills/ is missing
+if [ ! -d "$SKILLS" ]; then
+  echo "  ○ skills/ missing — running build..."
   "$BUILD_SH" >/dev/null 2>&1 || {
     fail "Pre-build failed — cannot run scan"
     exit 1
@@ -123,7 +124,7 @@ PY
 # Use a portable -name glob group rather than -regex. macOS BSD find defaults
 # to BRE for -regex (no `(`/`|` alternation); GNU find defaults to emacs regex
 # with the same effect. Both produce zero matches for the alternation form.
-for skill_dir in "$DIST_SKILLS"/*/; do
+for skill_dir in "$SKILLS"/*/; do
   name="$(basename "$skill_dir")"
   errors_in_skill=0
   while IFS= read -r f; do
@@ -135,9 +136,9 @@ for skill_dir in "$DIST_SKILLS"/*/; do
       -o -name "*.yaml" -o -name "*.json" -o -name "*.toml" \
     \))
   if [ "$errors_in_skill" -eq 0 ]; then
-    pass "T1: dist/skills/$name is self-contained"
+    pass "T1: skills/$name is self-contained"
   else
-    fail "T1: dist/skills/$name has $errors_in_skill file(s) with unresolved references"
+    fail "T1: skills/$name has $errors_in_skill file(s) with unresolved references"
   fi
 done
 

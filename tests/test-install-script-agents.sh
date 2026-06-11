@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # test-install-script-agents.sh — Verify standalone install provisions IDD
-# Claude Code agents alongside skills (issue #89).
+# Claude Code agents alongside skills (issue #89; updated for #106).
 #
 # Asserts:
 #   - ./scripts/install.sh installs all dist/agents/*.md to <target>/agents/
@@ -19,7 +19,7 @@ BUILD_SH="$REPO_ROOT/scripts/build.sh"
 INSTALL_SH="$REPO_ROOT/scripts/install.sh"
 SRC_AGENTS="$REPO_ROOT/src/shared/agents"
 DIST_AGENTS="$REPO_ROOT/dist/agents"
-DIST_SKILLS="$REPO_ROOT/dist/skills"
+SKILLS="$REPO_ROOT/skills"
 
 PASS=0
 FAIL=0
@@ -41,6 +41,12 @@ else
 fi
 
 expected_agent_count="$(find "$SRC_AGENTS" -maxdepth 1 -type f -name '*.md' | wc -l | tr -d ' ')"
+
+# Build dist/ for the agents test (agents are gitignored, not committed)
+if ! "$BUILD_SH" >/dev/null 2>&1; then
+  fail "Build failed — cannot test agents"
+  exit 1
+fi
 
 # ───────────────────────────────────────────────────────────
 # T2: default install provisions skills and agents
@@ -75,7 +81,7 @@ else
 fi
 
 missing_skills=0
-for src_skill in "$DIST_SKILLS"/*/; do
+for src_skill in "$SKILLS"/*/; do
   [ -d "$src_skill" ] || continue
   name="$(basename "$src_skill")"
   if [ ! -f "$TARGET_ALL/skills/$name/SKILL.md" ]; then

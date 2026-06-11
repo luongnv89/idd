@@ -38,7 +38,10 @@ tests/output/
 .claude/
 
 # Build outputs not committed (per refactor-plan-v10 §1, §6.0)
+# - dist/skills/ and dist/agents/ are built by ./scripts/build.sh, not committed
 # - dist/plugin/ is built in CI and shipped as a release artifact, not committed
 # - dist/test-plugin/ is a throwaway scaffold for §6.0 experiments
+dist/skills/
+dist/agents/
 dist/plugin/
 dist/test-plugin/

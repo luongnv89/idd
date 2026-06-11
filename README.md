@@ -210,11 +210,11 @@ You can also do the copy by hand if you prefer to see every file move:
 
 ```bash
 mkdir -p ~/.claude/skills ~/.claude/agents
-cp -r dist/skills/<name> ~/.claude/skills/
+cp -r skills/<name> ~/.claude/skills/
 cp dist/agents/*.md ~/.claude/agents/
 ```
 
-`dist/skills/` and `dist/agents/` are committed to the repository, so this path works on a fresh clone without running a build.
+`skills/` is committed to the repository, so this path works on a fresh clone without running a build. (Run `./scripts/build.sh` first to produce `dist/agents/`.)
 
 #### Plugin path (advanced — Claude Code only)
 
@@ -234,7 +234,7 @@ The tarball unpacks to `.claude-plugin/plugin.json`, `agents/`, `skills/`, `shar
 
 If you cloned the repo, you can build the plugin tree locally and install it with the script: `./scripts/build.sh && ./scripts/install.sh --plugin`. `dist/plugin/` is generated only at release time and gitignored, so the build step is required.
 
-> **Note:** `dist/skills/` and `dist/agents/` are committed so the standalone paths work without running a build. `dist/plugin/` is built fresh by `./scripts/build.sh` and shipped as the release tarball above.
+> **Note:** `skills/` is committed so the standalone paths work without running a build. `dist/agents/` and `dist/plugin/` are built by `./scripts/build.sh` and shipped as release assets.
 
 ### First issue in 30 seconds
 
@@ -264,7 +264,7 @@ Or go hands-free — triage, resolve, review, and merge everything:
 
 Zero config required. Run `/init-gitissue` to customize.
 
-Browse the authored source for each skill — these links point to `src/` for reading; install copies come from `dist/skills/<name>/` (see [Install](#install)):
+Browse the authored source for each skill — these links point to `src/` for reading; install copies come from `skills/<name>/` (see [Install](#install)):
 
 | Skill | Source |
 |-------|--------|
@@ -588,9 +588,6 @@ src/
 │
 ├── internal-skills/
 │   └── idd-doctor/         # /idd-doctor — read-only repo health check
-│
-├── deprecated-skills/
-│   └── issue-pr-review-fix-loop/  # Retained deprecated source only; not distributed
 │
 └── (no docs/ — see below)
 
