@@ -52,6 +52,25 @@ Before any check, verify the environment. On failure, output the exact error fro
 
 `gh` is **optional**. The merge-strategy check (Check 4) requires `gh` and authentication; if either is missing, that check is skipped with an `○` note rather than failing the whole run.
 
+### Bundled dependency precheck
+
+Verify that this skill's bundled reference files are present.
+If any are missing, stop immediately and print:
+
+```
+text
+✗ Missing bundled dependency: {missing_file}
+
+  To fix:  asm install https://github.com/luongnv89/idd --skill idd-doctor
+           (or reinstall the full distribution)
+
+  Then restart the agent session and re-run /idd-doctor.
+```
+
+Check these files relative to the skill's directory (the dirname of this SKILL.md):
+
+- `references/error-messages.md` — Error catalog
+
 ## Configuration
 
 This skill **reads** `.gitissue.yml` (only to determine whether `autopilot.mode` is set in Check 3) and is otherwise config-free. There is no `doctor:` section in `.gitissue.yml` and no per-check toggles in v1.

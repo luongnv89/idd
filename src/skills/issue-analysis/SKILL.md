@@ -154,6 +154,31 @@ If not (e.g., Claude.ai), execute each phase inline instead:
 - Steps 6-7: Perform analysis inline
 - Step 8: Output as normal
 
+### Bundled dependency precheck
+
+Verify that this skill's bundled subagent prompts and reference files are present.
+If any are missing, stop immediately and print:
+
+```
+text
+✗ Missing bundled dependency: {missing_file}
+
+  To fix:  asm install https://github.com/luongnv89/idd --skill issue-analysis
+           (or reinstall the full distribution)
+
+  Then restart the agent session and re-run /issue-analysis.
+```
+
+Check these files relative to the skill's directory (the dirname of this SKILL.md):
+
+- `references/agents/codebase-researcher.md` — Codebase Researcher subagent prompt (Steps 2-5)
+- `references/agents/synthesizer.md` — Synthesizer subagent prompt (Steps 6-7)
+- `references/subagent-steps.md` — per-step prompts and tool budgets for subagents
+- `references/output-and-persist.md` — terminal report rendering spec and JSON schema
+- `references/docs/sync-conventions.md` — stash-first sync convention and recovery
+- `references/docs/idd-methodology.md` — IDD methodology (durable analysis fields)
+- `references/docs/config-schema.md` — configuration schema reference
+
 The steps below include both the subagent delegation path and the inline fallback.
 
 ---

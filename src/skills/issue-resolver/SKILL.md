@@ -112,6 +112,36 @@ Read `shared/agents/code-reviewer.md` for the reviewer prompt.
 If the Agent tool is available, use subagents as described above.
 If not (e.g., Claude.ai), execute each step inline using the fallback instructions.
 
+### Bundled dependency precheck
+
+Verify that this skill's bundled subagent prompts and reference files are present.
+If any are missing, stop immediately and print:
+
+```
+text
+✗ Missing bundled dependency: {missing_file}
+
+  To fix:  asm install https://github.com/luongnv89/idd --skill issue-resolver
+           (or reinstall the full distribution)
+
+  Then restart the agent session and re-run /issue-resolver.
+```
+
+Check these files relative to the skill's directory (the dirname of this SKILL.md):
+
+- `references/agents/codebase-researcher.md` — Research subagent (Step 1)
+- `references/agents/synthesizer.md` — Plan subagent (Step 2)
+- `references/agents/implementer.md` — Implement subagent (Step 3)
+- `references/agents/code-reviewer.md` — QA review subagent (Step 4)
+- `references/pipeline-steps.md` — Full delegation payloads, phases, and inline fallbacks for Steps 1–4
+- `references/report-templates.md` — PR body template, final report templates, and expected inline output
+- `references/docs/sync-conventions.md` — stash-first sync convention and recovery
+- `references/docs/naming-conventions.md` — branch, commit, PR naming conventions
+- `references/docs/pre-commit-security.md` — pre-commit security conventions reference
+- `references/docs/idd-methodology.md` — IDD methodology (durable analysis fields)
+- `references/docs/github-projects-sync.md` — GitHub Projects status sync
+- `references/docs/config-schema.md` — configuration schema reference
+
 ---
 
 ## Pipeline Overview
