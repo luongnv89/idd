@@ -622,6 +622,7 @@ Spawn or re-message the fixer with:
 - `findings_json`: all blocking findings from reviewer, acceptance-criteria checks, traceability checks, tests, and CI
 - `test_output`: trimmed relevant failure output from Steps 4-5
 - `commit_message`: `fix({scope}): address review feedback` (append `(#{linked_issue})` only if a linked issue exists)
+- `security_convention`: `references/docs/pre-commit-security.md` — the bundled pre-commit security scan the fixer MUST run before committing
 
 ```python
 Agent(
@@ -631,7 +632,7 @@ Agent(
 )
 ```
 
-The fixer subagent reads affected files, applies targeted changes, stages specific files, runs relevant verification, performs the pre-commit security scan, and commits any changes. The main agent only collects the fixer's JSON result and pushes if changes were committed.
+The fixer subagent reads affected files, applies targeted changes, stages specific files, runs relevant verification, and — before committing — runs the mandatory pre-commit security scan from `references/docs/pre-commit-security.md` against the staged set (real secrets block the commit). It then commits any changes. The main agent only collects the fixer's JSON result and pushes if changes were committed.
 
 If the fixer cannot resolve all blocking findings, keep the remaining items for the next loop/report.
 

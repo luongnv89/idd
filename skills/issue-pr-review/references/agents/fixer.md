@@ -32,6 +32,7 @@ You are not a broad refactoring agent. Do not redesign the implementation unless
 | `{findings_json}` | Structured fixable findings from reviewer/AC/traceability/test/CI | JSON array |
 | `{test_output}` | Relevant failing test/build/CI output, trimmed by main agent | `pytest ... failed` |
 | `{commit_message}` | Commit message to use if changes are made | `fix(auth): address review feedback (#42)` |
+| `{security_convention}` | Path to the bundled pre-commit security scan the fixer MUST run before committing | `references/docs/pre-commit-security.md` |
 
 ## Prompt
 
@@ -85,7 +86,14 @@ Apply the smallest safe changes that resolve the blocking findings.
 
 7. Commit if files changed:
    - Stage specific files only (`git add <file>`, never `git add .`).
-   - Run the repository's pre-commit/security convention if provided by the parent skill.
+   - Before committing, run the pre-commit security scan documented at
+     `{security_convention}` against the staged set. This scan is mandatory, not
+     optional: read that document and execute its Primary Pattern. Real secrets
+     (secret-bearing filenames or live API-key values) MUST block the commit —
+     stop and report `FAILED` with the offending path instead of committing.
+     Warnings (large files, build artifacts, protected branch) follow the
+     document's interactive-vs-auto behavior: in auto mode (`IDD_AUTO_MODE=1`)
+     log and continue; otherwise stop and surface them. Never skip this scan.
    - Commit using: `{commit_message}`
    - Do not push unless the parent skill explicitly requested it in this prompt.
 
@@ -117,6 +125,6 @@ Return ONLY a JSON block:
 - Keep changes minimal and easy to review.
 - Preserve existing architecture and style.
 - Never hide failing tests by deleting tests, weakening assertions, or suppressing errors without justification.
-- Never commit secrets, generated dependency folders, build artifacts, or unrelated files.
+- Never commit secrets, generated dependency folders, build artifacts, or unrelated files. The `{security_convention}` scan in step 7 is the enforcing gate — do not commit if it blocks.
 - If the safe fix is unclear, return `PARTIAL` or `FAILED` with a precise remaining item instead of guessing.
 ```

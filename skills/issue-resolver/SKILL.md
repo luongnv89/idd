@@ -333,7 +333,7 @@ Agent(
 )
 ```
 
-Pass the issue context, branch/base branch, reviewer findings, failing test/build output, and commit message `fix({scope}): address review feedback (#N)`. The main agent collects the fixer's JSON result and decides whether to start another QA cycle; it should not apply fixes inline when the Agent tool is available.
+Pass the issue context, branch/base branch, reviewer findings, failing test/build output, commit message `fix({scope}): address review feedback (#N)`, and `security_convention`: `references/docs/pre-commit-security.md` — the bundled pre-commit security scan the fixer MUST run before committing. The main agent collects the fixer's JSON result and decides whether to start another QA cycle; it should not apply fixes inline when the Agent tool is available.
 
 Cycle mechanics, loop controls (`resolve.qa_max_cycles`, exit-on-clean, exit-on-stagnation), and the remaining-issues flow are in `references/pipeline-steps.md` (*Step 4 — QA*).
 

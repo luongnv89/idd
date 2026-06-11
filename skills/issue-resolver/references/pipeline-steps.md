@@ -132,7 +132,7 @@ Each cycle:
 3. **Evaluate results:**
    - Reviewer returns `PASS` AND all tests pass AND build succeeds → exit loop, QA passed.
    - Issues found → delegate fixes, then start next cycle.
-4. **Fix issues** — spawn or re-message the fixer subagent (see `references/agents/fixer.md`) with reviewer findings and failing test/build output. The fixer reads affected files, applies targeted fixes, verifies them, and commits as `fix(scope): address review feedback (#N)`. The main agent does not apply code fixes inline when the Agent tool is available.
+4. **Fix issues** — spawn or re-message the fixer subagent (see `references/agents/fixer.md`) with reviewer findings and failing test/build output, passing `security_convention`: `references/docs/pre-commit-security.md`. The fixer reads affected files, applies targeted fixes, verifies them, runs the mandatory pre-commit security scan before committing (real secrets block), and commits as `fix(scope): address review feedback (#N)`. The main agent does not apply code fixes inline when the Agent tool is available.
 
 ### Loop controls
 
