@@ -42,7 +42,7 @@ Fully autonomous development loop: triage, pick, resolve, review, fix, merge, re
 - `auto_merge: false` no longer halts the loop — PRs that pass review are left open and the loop moves to the next issue
 - All confirmation prompts removed — the loop runs with full autonomy from start to finish
 
-The auto-pilot orchestrates existing gitissue skills into a continuous loop that processes the issue backlog with absolute autonomy. Each iteration: triage the backlog, pick the top-priority issue, resolve it via the full pipeline, review the PR with up to 3 token-optimized fix-review cycles (script pre-pass for lint/format, LLM only for critical issues), and if issues remain create a follow-up issue then merge anyway so progress is never blocked. For critical issues, the loop stops and asks the user for a decision instead of auto-continuing. The agent makes all non-critical decisions automatically, always choosing the best available path forward.
+The auto-pilot orchestrates existing gitissue skills into a continuous loop that processes the issue backlog with absolute autonomy. Each iteration: triage the backlog, pick the top-priority issue, resolve it via the full pipeline, review the PR with up to 3 token-optimized fix-review cycles (script pre-pass for lint/format, LLM only for critical issues), and merge according to `autopilot.mode`. Clean PRs merge in `balanced` or `aggressive` mode. PRs with unresolved review issues create a follow-up issue and stay open unless `mode: aggressive` and `merge_partial: true` are both explicitly set. For critical issues, the loop stops and asks the user for a decision instead of auto-continuing. The agent makes all non-critical decisions automatically, always choosing the best available path forward.
 
 ## Autonomy Philosophy
 
@@ -422,7 +422,7 @@ All errors use the rich format from `references/error-messages.md`:
 
 ## Expected Output
 
-Each iteration prints a static block. The `Merge` line resolves to one of the five categorical outcomes (`merged`, `left_open`, `partial_followup`, `failed`, `skipped`) — the example below uses the default `balanced` mode where a clean PR is merged. Under `conservative` mode the same iteration would end with `Merge ⚠ left_open (mode: conservative)`.
+Each iteration prints a static block. The `Merge` line resolves to one of the six categorical outcomes (`merged`, `left_open`, `partial_followup`, `blocked_by_dependency`, `failed`, `skipped`) — the example below uses the default `balanced` mode where a clean PR is merged. Under `conservative` mode the same iteration would end with `Merge ⚠ left_open (mode: conservative)`.
 
 ```
   ◆ Auto-Pilot Iteration 1

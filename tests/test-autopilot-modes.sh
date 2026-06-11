@@ -6,8 +6,8 @@
 #  - Default install never merges a PR with unresolved fixable review issues
 #  - Aggressive behavior is unreachable without explicit config (no casual flag)
 #  - /init-gitissue emits balanced defaults
-#  - /auto-pilot final report uses the five categories: merged, left_open,
-#    partial_followup, failed, skipped
+#  - /auto-pilot final report uses the six categories: merged, left_open,
+#    partial_followup, blocked_by_dependency, failed, skipped
 #
 # Usage: bash tests/test-autopilot-modes.sh
 # Returns: exit 0 if all tests pass, exit 1 on first failure
@@ -138,8 +138,8 @@ else
   fail "T3.4: SKILL.md does not reference autopilot.merge_partial"
 fi
 
-# Final-report uses the five categorical labels
-for category in merged left_open partial_followup failed skipped; do
+# Final-report uses the six categorical labels
+for category in merged left_open partial_followup blocked_by_dependency failed skipped; do
   if grep -qE "\b${category}\b" "$SKILL"; then
     pass "T3.5.${category}: SKILL.md final report mentions outcome '${category}'"
   else
