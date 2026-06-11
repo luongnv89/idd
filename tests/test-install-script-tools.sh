@@ -17,7 +17,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 BUILD_SH="$REPO_ROOT/scripts/build.sh"
 INSTALL_SH="$REPO_ROOT/scripts/install.sh"
-DIST_SKILLS="$REPO_ROOT/dist/skills"
+SKILLS="$REPO_ROOT/skills"
 
 PASS=0
 FAIL=0
@@ -32,13 +32,13 @@ TMP_HOME="$(mktemp -d)"
 trap 'rm -rf "$TMP_HOME"' EXIT
 
 if "$BUILD_SH" >/dev/null 2>&1; then
-  pass "T0: build.sh generates current dist outputs"
+  pass "T0: build.sh generates current outputs"
 else
   fail "T0: build.sh failed"
   exit 1
 fi
 
-skill_count="$(find "$DIST_SKILLS" -maxdepth 1 -mindepth 1 -type d | wc -l | tr -d ' ')"
+skill_count="$(find "$SKILLS" -maxdepth 1 -mindepth 1 -type d | wc -l | tr -d ' ')"
 
 # run install.sh under an isolated HOME
 inst() { HOME="$TMP_HOME" "$INSTALL_SH" "$@"; }

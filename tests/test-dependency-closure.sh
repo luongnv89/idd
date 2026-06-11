@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # test-dependency-closure.sh — Verify transitive dependency closure (issue #58,
-# §9 of refactor-plan-v10.md, §4 Phase B).
+# §9 of refactor-plan-v10.md, §4 Phase B; updated for #106).
 #
 # Asserts:
-#   - Transitive shared agents are copied into dist/skills/<name>/references/agents/
-#   - Transitive runtime docs are copied into dist/skills/<name>/references/docs/
+#   - Transitive shared agents are copied into skills/<name>/references/agents/
+#   - Transitive runtime docs are copied into skills/<name>/references/docs/
 #   - Logical references inside the *transitive* copies are themselves
 #     rewritten (a copied agent that references docs/X.md must end up using
 #     references/docs/X.md inside the flattened skill).

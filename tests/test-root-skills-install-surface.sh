@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # test-root-skills-install-surface.sh — Verify repo-root skills/ supports ASM installs.
+# Post #106: skills/ is the committed install surface (dist/ no longer tracked).
 
 set -euo pipefail
 
@@ -34,12 +35,6 @@ for src_skill_dir in "$SRC_SKILLS"/*/; do
   else
     fail "T2: skills/$name/SKILL.md missing"
     continue
-  fi
-
-  if diff -qr "$root_skill" "$dist_skill" >/dev/null; then
-    pass "T3: skills/$name mirrors dist/skills/$name"
-  else
-    fail "T3: skills/$name differs from dist/skills/$name"
   fi
 
   if find "$root_skill" -path '*/references/agents/*.md' -type f | grep -q .; then
