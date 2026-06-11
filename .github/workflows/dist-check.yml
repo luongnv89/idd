@@ -22,12 +22,22 @@ jobs:
       - name: Build dist trees
         run: ./scripts/build.sh
 
-      - name: Drift check — dist/skills/ must match committed baseline
+      - name: Drift check — committed skills/ must match transient build
         run: |
-          if ! git diff --exit-code dist/skills/; then
-            echo "::error::dist/skills/ is out of date. Run ./scripts/build.sh and commit the result."
+          # Build to a temp directory, then compare the built output
+          # against the committed repo-root skills/ tree.
+          TMP="$(mktemp -d)"
+          if ! ./scripts/build.sh --out "$TMP" --no-root-skills >/dev/null 2>&1; then
+            echo "::error::Build failed during drift check"
+            rm -rf "$TMP"
             exit 1
           fi
+          if ! diff -qr "$TMP/skills" skills/ > /dev/null 2>&1; then
+            echo "::error::skills/ is out of date. Run ./scripts/build.sh and commit the result."
+            rm -rf "$TMP"
+            exit 1
+          fi
+          rm -rf "$TMP"
 
       - name: test-build-script
         run: bash tests/test-build-script.sh
