@@ -41,6 +41,27 @@ Before any operation, verify the environment. On failure, output the exact error
 
 That is the only prerequisite. This skill does not need `gh` or GitHub authentication — it generates a local config file.
 
+### Bundled dependency precheck
+
+Verify that this skill's bundled template files are present. If any are missing,
+stop immediately and print:
+
+```
+text
+✗ Missing bundled dependency: {missing_file}
+
+  To fix:  asm install https://github.com/luongnv89/idd --skill init-gitissue
+           (or reinstall the full distribution)
+
+  Then restart the agent session and re-run /init-gitissue.
+```
+
+Check these files relative to the skill's directory (the dirname of this SKILL.md):
+
+- `templates/gitissue-template.yml` — canonical config template with all schema fields
+- `references/docs/config-schema.md` — full configuration schema
+- `references/docs/naming-conventions.md` — naming conventions (referenced by generated config)
+
 ## Configuration Check
 
 This skill GENERATES the config — it does not read one. Check if `.gitissue.yml` already exists in the repo root before proceeding.
