@@ -456,6 +456,8 @@
           <a class="btn btn-ghost" href="https://github.com/luongnv89/idd">View on GitHub</a>
         </div>
         <div class="hero-trust">
+          <span><span class="ok">✓</span> Latest release <a href="https://github.com/luongnv89/idd/releases/latest" id="latest-release">v0.11.1</a></span>
+          <span id="github-stars" hidden><span class="ok">★</span> <span id="github-stars-count"></span> GitHub stars</span>
           <span><span class="ok">✓</span> Plain GitHub markdown</span>
           <span><span class="ok">✓</span> No vendor lock-in</span>
           <span><span class="ok">✓</span> Runs in your terminal</span>
@@ -828,6 +830,33 @@
         });
       });
     });
+
+    // GitHub release + stars
+    (function () {
+      var repoApi = 'https://api.github.com/repos/luongnv89/idd';
+      var latestRelease = document.getElementById('latest-release');
+      var stars = document.getElementById('github-stars');
+      var starsCount = document.getElementById('github-stars-count');
+
+      fetch(repoApi + '/releases/latest')
+        .then(function (res) { return res.ok ? res.json() : null; })
+        .then(function (release) {
+          if (release && release.tag_name && latestRelease) {
+            latestRelease.textContent = release.tag_name;
+            latestRelease.href = release.html_url || 'https://github.com/luongnv89/idd/releases/latest';
+          }
+        })
+        .catch(function () {});
+
+      fetch(repoApi)
+        .then(function (res) { return res.ok ? res.json() : null; })
+        .then(function (repo) {
+          if (!repo || !stars || !starsCount || repo.stargazers_count <= 100) return;
+          starsCount.textContent = new Intl.NumberFormat('en').format(repo.stargazers_count);
+          stars.hidden = false;
+        })
+        .catch(function () {});
+    }());
 
     // Scroll reveal
     var io = new IntersectionObserver(function (entries) {
