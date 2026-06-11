@@ -3,14 +3,15 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>issuedev — Turn GitHub Issues Into Agent-Ready Work Orders</title>
-  <meta name="description" content="Eight terminal commands that structure, triage, resolve, and review GitHub issues — so any developer or AI agent can pick up an issue and ship a tested PR." />
+  <title>issuedev — GitHub Issue Workflow for AI Coding Agents</title>
+  <meta name="description" content="Issue-Driven Development for GitHub: structure, triage, resolve, and review issues with eight agent-ready terminal commands that ship tested PRs." />
   <link rel="canonical" href="https://luongnv.com/idd/" />
   <link rel="icon" type="image/svg+xml" href="assets/logo/favicon.svg" />
+  <meta name="theme-color" content="#0A0A0A" />
 
   <!-- Open Graph -->
-  <meta property="og:title" content="issuedev — Turn GitHub Issues Into Agent-Ready Work Orders" />
-  <meta property="og:description" content="Issue-Driven Development. Eight terminal commands that structure, triage, resolve, and review GitHub issues for humans and AI agents alike." />
+  <meta property="og:title" content="issuedev — GitHub Issue Workflow for AI Coding Agents" />
+  <meta property="og:description" content="Issue-Driven Development for GitHub: structure, triage, resolve, and review issues with eight agent-ready terminal commands." />
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://luongnv.com/idd/" />
   <meta property="og:site_name" content="issuedev" />
@@ -21,9 +22,10 @@
 
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="issuedev — Turn GitHub Issues Into Agent-Ready Work Orders" />
-  <meta name="twitter:description" content="Eight terminal commands that structure, triage, resolve, and review GitHub issues — so any developer or AI agent can ship a tested PR." />
+  <meta name="twitter:title" content="issuedev — GitHub Issue Workflow for AI Coding Agents" />
+  <meta name="twitter:description" content="Structure, triage, resolve, and review GitHub issues with eight agent-ready commands that ship tested PRs." />
   <meta name="twitter:image" content="https://luongnv.com/idd/assets/og/og-card.png" />
+  <meta name="twitter:image:alt" content="issuedev — turn GitHub issues into agent-ready work orders" />
 
   <!-- Structured data -->
   <script type="application/ld+json">
@@ -31,12 +33,20 @@
     "@context": "https://schema.org",
     "@graph": [
       {
+        "@type": "Organization",
+        "@id": "https://luongnv.com/#organization",
+        "name": "Luong Nguyen",
+        "url": "https://luongnv.com/",
+        "sameAs": ["https://github.com/luongnv89"]
+      },
+      {
         "@type": "WebSite",
         "@id": "https://luongnv.com/idd/#website",
         "url": "https://luongnv.com/idd/",
         "name": "issuedev",
         "description": "Issue-Driven Development — eight terminal commands that turn GitHub issues into agent-ready work orders.",
-        "inLanguage": "en"
+        "inLanguage": "en",
+        "publisher": { "@id": "https://luongnv.com/#organization" }
       },
       {
         "@type": "SoftwareApplication",
@@ -44,17 +54,38 @@
         "name": "issuedev",
         "alternateName": "gitissue",
         "applicationCategory": "DeveloperApplication",
+        "softwareApplicationCategory": "DeveloperApplication",
         "operatingSystem": "macOS, Linux, Windows",
-        "description": "Eight terminal commands that structure, analyze, triage, resolve, and review GitHub issues — so any developer or AI agent can pick up an issue and ship a tested PR.",
+        "description": "Issue-Driven Development for GitHub: structure, analyze, triage, resolve, and review issues so humans and AI coding agents can ship tested PRs.",
         "url": "https://luongnv.com/idd/",
+        "downloadUrl": "https://github.com/luongnv89/idd/releases/latest",
         "codeRepository": "https://github.com/luongnv89/idd",
         "license": "https://opensource.org/licenses/MIT",
         "isAccessibleForFree": true,
+        "author": { "@id": "https://luongnv.com/#organization" },
         "offers": {
           "@type": "Offer",
           "price": "0",
           "priceCurrency": "USD"
         }
+      },
+      {
+        "@type": "BreadcrumbList",
+        "@id": "https://luongnv.com/idd/#breadcrumbs",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "Home",
+            "item": "https://luongnv.com/"
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "name": "issuedev",
+            "item": "https://luongnv.com/idd/"
+          }
+        ]
       }
     ]
   }
@@ -434,6 +465,7 @@
       <nav class="nav-links">
         <a href="#how">How it works</a>
         <a href="#commands">Commands</a>
+        <a href="docs.html">Docs</a>
         <a href="#methodology">What is IDD?</a>
         <a href="#install">Install</a>
         <a class="nav-cta" href="https://github.com/luongnv89/idd">GitHub ↗</a>
@@ -453,6 +485,7 @@
         </p>
         <div class="hero-cta">
           <a class="btn btn-primary" href="#install">▶ Get Started</a>
+          <a class="btn btn-ghost" href="docs.html">Read the Docs</a>
           <a class="btn btn-ghost" href="https://github.com/luongnv89/idd">View on GitHub</a>
         </div>
         <div class="hero-trust">
@@ -534,7 +567,7 @@
         <div class="feat-card reveal">
           <span class="feat-cmd">/issue-creator</span>
           <h3>Structure, don't guess</h3>
-          <p>Describe a bug or feature in plain text. issuedev classifies the type, scans your codebase for the affected files, generates acceptance criteria, and files a clean issue — preserving your original words in a Reporter Context block.</p>
+          <p>Describe a bug or feature in plain text. issuedev classifies the type, generates acceptance criteria, and files a clean issue — preserving your original words in a Reporter Context block without guessing implementation details.</p>
         </div>
         <div class="feat-card reveal">
           <span class="feat-cmd">/issue-resolver N</span>
@@ -599,7 +632,7 @@
       <div class="shots">
         <div class="shot wide reveal">
           <div class="cap"><span class="green">❯</span> /issue-creator <span class="muted">— classify, find files, generate acceptance criteria</span></div>
-          <img src="assets/screenshots/issue-creator.png" alt="issue-creator terminal output showing a structured issue preview" width="898" height="735" loading="lazy" />
+          <img src="assets/screenshots/issue-creator.png" alt="issue-creator terminal output showing a structured issue preview" width="898" height="735" loading="eager" fetchpriority="high" />
         </div>
         <div class="shot reveal">
           <div class="cap"><span class="green">❯</span> /issue-resolver 11</div>
@@ -626,14 +659,14 @@
     <div class="wrap">
       <div class="section-tag">The toolkit</div>
       <h2 class="sec-title">Eight commands. One source of truth.</h2>
-      <p class="sec-lead">Each is a self-contained skill — drop it into Claude Code, Codex CLI, or any SKILL.md-compatible harness. Mix and match; nothing depends on the rest.</p>
+      <p class="sec-lead">Each is a self-contained skill — drop it into Claude Code, Codex CLI, or any SKILL.md-compatible harness. Mix and match; nothing depends on the rest. Need exact inputs? See the <a class="green" href="docs.html">full docs</a>.</p>
 
       <div class="feat-grid" style="grid-template-columns: repeat(2,1fr);">
-        <div class="feat-card reveal"><span class="feat-cmd">/issue-creator</span><p style="margin-top:2px">Classify type, scan for affected files, generate acceptance criteria, and create a structured issue.</p></div>
+        <div class="feat-card reveal"><span class="feat-cmd">/issue-creator</span><p style="margin-top:2px">Classify type, preserve reporter context, generate acceptance criteria, and create a structured issue.</p></div>
         <div class="feat-card reveal"><span class="feat-cmd">/issue-analysis N</span><p style="margin-top:2px">Root cause, git history, implementation options, complexity and risk — saved to <code>.gitissue/</code>.</p></div>
         <div class="feat-card reveal"><span class="feat-cmd">/issue-resolver N</span><p style="margin-top:2px">6-step pipeline: preflight → research → plan → implement → QA → deliver a PR with <code>Closes #N</code>.</p></div>
         <div class="feat-card reveal"><span class="feat-cmd">/issue-triage</span><p style="margin-top:2px">Dependency graph, stale detection, already-fixed scanning, priority and execution order.</p></div>
-        <div class="feat-card reveal"><span class="feat-cmd">/issue-pr-review</span><p style="margin-top:2px">Lint/format/test pre-pass, per-criterion AC verification, five-dimension scoring, fix &amp; merge.</p></div>
+        <div class="feat-card reveal"><span class="feat-cmd">/issue-pr-review</span><p style="margin-top:2px">Lint/format/test pre-pass, per-criterion AC verification, five-dimension scoring, and fix cycles. Auto-merge only with <code>--auto</code>.</p></div>
         <div class="feat-card reveal"><span class="feat-cmd">/auto-pilot</span><p style="margin-top:2px">Triage → resolve → review → merge loop with conservative-by-default merge modes.</p></div>
         <div class="feat-card reveal"><span class="feat-cmd">/init-gitissue</span><p style="margin-top:2px">Auto-detect language, framework, and test runner; generate a tuned <code>.gitissue.yml</code>.</p></div>
         <div class="feat-card reveal"><span class="feat-cmd">/idd-doctor</span><p style="margin-top:2px">Read-only health check for your IDD repository invariants. <span class="muted">(maintainer tooling)</span></p></div>
@@ -652,7 +685,7 @@
         <div class="idd-card reveal">
           <div class="kicker">// Issue-Driven Development</div>
           <h3>The translation gap</h3>
-          <p>Turning a vague report — "login is broken on mobile" — into a structured work order with acceptance criteria, affected files, and a clear definition of done. That's the gap between describing a problem and shipping a fix, and IDD automates it.</p>
+          <p>Turning a vague report — "login is broken on mobile" — into a structured work order with acceptance criteria, current-code analysis at execution time, and a clear definition of done. That's the gap between describing a problem and shipping a fix, and IDD automates it.</p>
         </div>
         <div class="idd-card reveal">
           <div class="kicker">// Intention-Driven Development</div>
@@ -803,6 +836,7 @@
       <div class="foot-links">
         <a href="https://github.com/luongnv89/idd">GitHub</a>
         <a href="#commands">Commands</a>
+        <a href="docs.html">Docs</a>
         <a href="#methodology">Methodology</a>
         <a href="https://github.com/luongnv89/idd/blob/main/LICENSE">License</a>
       </div>

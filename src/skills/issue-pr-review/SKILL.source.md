@@ -5,7 +5,7 @@ license: MIT
 compatibility: Requires git and GitHub CLI (gh) with authentication. Self-contained — uses shared agents from shared/agents/.
 effort: high
 metadata:
-  version: 0.5.1
+  version: 1.0.0
   creator: Luong NGUYEN <luongnv89@gmail.com>
 ---
 
@@ -17,7 +17,7 @@ Review a pull request end-to-end — analyze, test, fix, check CI, repeat until 
 
 | Invocation | Mode | What happens |
 |------------|------|--------------|
-| `/issue-pr-review <N>` | interactive | Review PR #N, report findings |
+| `/issue-pr-review <N>` | interactive | Review, fix, and repeat until clean; report findings (no auto-merge) |
 | `/issue-pr-review <N> --auto` | auto-pilot | Review, fix, and auto-merge when clean |
 | `/issue-pr-review` | detect | Auto-detect PR for current branch |
 | `/issue-pr-review --review-only` | read-only | Review and report, never fix or merge |

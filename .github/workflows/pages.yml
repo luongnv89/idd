@@ -1,16 +1,19 @@
 name: Deploy landing page to GitHub Pages
 
-# Publishes landing.html (plus the brand assets it references) to GitHub Pages
-# on every push to main. The site is assembled into a _site/ directory so the
-# repository source tree is never exposed — only the landing page and the
-# specific assets it loads are deployed.
+# Publishes landing.html, docs.html (plus the brand assets they reference) to
+# GitHub Pages on every push to main. The site is assembled into a _site/
+# directory so the repository source tree is never exposed — only the public
+# pages and the specific assets they load are deployed.
 
 on:
   push:
     branches: [main]
     paths:
       - landing.html
+      - docs.html
       - sitemap.xml
+      - robots.txt
+      - llms.txt
       - assets/logo/**
       - assets/screenshots/**
       - assets/og/**
@@ -39,10 +42,13 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p _site/assets/logo _site/assets/screenshots _site/assets/og
-          # Landing page becomes the site index.
+          # Landing page becomes the site index; docs.html is the dedicated docs page.
           cp landing.html _site/index.html
-          # Sitemap (lists only /idd/* URLs) for search engines.
+          cp docs.html _site/docs.html
+          # Crawl and AI-discovery files for search engines and LLM tools.
           cp sitemap.xml _site/sitemap.xml
+          cp robots.txt _site/robots.txt
+          cp llms.txt _site/llms.txt
           # Only the assets the page actually references.
           cp assets/logo/*.svg _site/assets/logo/
           cp assets/og/og-card.png                       _site/assets/og/
