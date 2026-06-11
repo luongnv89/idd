@@ -12,6 +12,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 ### Removed
 - `issue-pr-review-fix-loop` skill removed entirely — its source, installed skill, and project directory deleted. Its functionality was already folded into `/issue-pr-review` since v0.3.0. All references in AGENTS.md, CLAUDE.md, and README.md updated.
 
+## [0.11.0] - 2026-06-11
+
+### Added
+- `feat(site)` Landing page with GitHub Pages deploy workflow (#103)
+- `feat(site)` Hero terminal mock now shows `/auto-pilot` run in progress
+- `feat(config)` Default merge strategy updated to `balanced` with `always-create` config (#103)
+
+### Changed
+- `feat(site)` Hero terminal mock reverted back to `/issue-resolver` from `/auto-pilot`
+
+### Documentation
+- `docs(readme)` Added live website link (luongnv.com/idd) (#103)
+
+### Refactors
+- `refactor(skills)` Added flat install surface for all IDD skills (#104, #105)
+
+### Internal
+- `chore(repo)` Removed tracked `dist/` folder from version control (#106, #107)
+- `chore(seo)` Optimized landing page metadata and crawlability (#103)
+- `chore(skills)` Added bundled dependency precheck to all 8 IDD skills (#108)
+
 ## [0.10.1] - 2026-06-03
 
 ### Changed
