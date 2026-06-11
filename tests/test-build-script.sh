@@ -3,6 +3,7 @@
 # (issue #58, §9 of refactor-plan-v10.md).
 #
 # Asserts:
+#   - All public skills (src/skills/<name>/) appear in root skills/<name>/
 #   - All public skills (src/skills/<name>/) appear in dist/skills/<name>/
 #   - All public skills appear in dist/plugin/skills/<name>/
 #   - Plugin payload at expected paths: .claude-plugin/plugin.json, skills/,
@@ -19,6 +20,7 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 BUILD_SH="$REPO_ROOT/scripts/build.sh"
 SRC_SKILLS="$REPO_ROOT/src/skills"
 SRC_AGENTS="$REPO_ROOT/src/shared/agents"
+ROOT_SKILLS="$REPO_ROOT/skills"
 DIST_SKILLS="$REPO_ROOT/dist/skills"
 DIST_AGENTS="$REPO_ROOT/dist/agents"
 DIST_PLUGIN="$REPO_ROOT/dist/plugin"
@@ -64,14 +66,26 @@ else
 fi
 
 # ───────────────────────────────────────────────────────────
-# T3: every public src skill is present in dist/skills/
+# T3: every public src skill is present in root skills/
+# ───────────────────────────────────────────────────────────
+for src_skill_dir in "$SRC_SKILLS"/*/; do
+  name="$(basename "$src_skill_dir")"
+  if [ -f "$ROOT_SKILLS/$name/SKILL.md" ]; then
+    pass "T3: skills/$name/SKILL.md present"
+  else
+    fail "T3: skills/$name/SKILL.md missing"
+  fi
+done
+
+# ───────────────────────────────────────────────────────────
+# T3.1: every public src skill is present in dist/skills/
 # ───────────────────────────────────────────────────────────
 for src_skill_dir in "$SRC_SKILLS"/*/; do
   name="$(basename "$src_skill_dir")"
   if [ -f "$DIST_SKILLS/$name/SKILL.md" ]; then
-    pass "T3: dist/skills/$name/SKILL.md present"
+    pass "T3.1: dist/skills/$name/SKILL.md present"
   else
-    fail "T3: dist/skills/$name/SKILL.md missing"
+    fail "T3.1: dist/skills/$name/SKILL.md missing"
   fi
 done
 
@@ -130,10 +144,10 @@ if [ -d "$REPO_ROOT/src/internal-skills" ]; then
   for internal_dir in "$REPO_ROOT/src/internal-skills"/*/; do
     [ -d "$internal_dir" ] || continue
     name="$(basename "$internal_dir")"
-    if [ ! -d "$DIST_SKILLS/$name" ] && [ ! -d "$DIST_PLUGIN/skills/$name" ]; then
-      pass "T6: internal skill '$name' correctly excluded from dist outputs"
+    if [ ! -d "$ROOT_SKILLS/$name" ] && [ ! -d "$DIST_SKILLS/$name" ] && [ ! -d "$DIST_PLUGIN/skills/$name" ]; then
+      pass "T6: internal skill '$name' correctly excluded from generated outputs"
     else
-      fail "T6: internal skill '$name' leaked into dist outputs"
+      fail "T6: internal skill '$name' leaked into generated outputs"
     fi
   done
 fi
@@ -152,10 +166,10 @@ if [ -d "$REPO_ROOT/src/deprecated-skills" ]; then
       distribute_flag="$(head -30 "$skill_md" | grep -E '^distribute:' || true)"
     fi
     if [ -z "$distribute_flag" ]; then
-      if [ ! -d "$DIST_SKILLS/$name" ] && [ ! -d "$DIST_PLUGIN/skills/$name" ]; then
+      if [ ! -d "$ROOT_SKILLS/$name" ] && [ ! -d "$DIST_SKILLS/$name" ] && [ ! -d "$DIST_PLUGIN/skills/$name" ]; then
         pass "T7: deprecated skill '$name' (no distribute flag) excluded"
       else
-        fail "T7: deprecated skill '$name' leaked into dist outputs without distribute flag"
+        fail "T7: deprecated skill '$name' leaked into generated outputs without distribute flag"
       fi
     fi
   done
