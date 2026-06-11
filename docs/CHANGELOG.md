@@ -6,11 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-06-11
+
+### Added
+- `feat(skills)` Added a shared `fixer` agent (`src/shared/agents/fixer.md`) used by both `/issue-pr-review` (Step 6) and `/issue-resolver` (Step 4) to own commits. The fixer now runs a mandatory pre-commit security scan unconditionally: a `security_convention` variable points at the bundled `pre-commit-security.md`, and both skills pass it, so real secrets block the commit — restoring the deterministic secret-blocking gate that had been dropped. (#111)
+
 ### Changed
 - `breaking(issue-pr-review)` default behavior changed to automatic review-fix loop. `/issue-pr-review <N>` now loops to fix issues until clean (up to `review.max_cycles`), matching the former `--auto` loop behavior minus auto-merge. `--auto` flag adds auto-merge on top of the loop. `--review-only` remains the opt-out for a single-pass report without fixing or looping. Version bumped 0.5.1 → 1.0.0.
 
 ### Removed
 - `issue-pr-review-fix-loop` skill removed entirely — its source, installed skill, and project directory deleted. Its functionality was already folded into `/issue-pr-review` since v0.3.0. All references in AGENTS.md, CLAUDE.md, and README.md updated.
+
+### Documentation
+- `docs(landing)` Landing page SEO and AI-crawler discovery improvements — added `llms.txt`, `robots.txt`, `docs.html`, `docs/skills.md`, and sitemap updates. (#110)
+- `docs(landing)` Landing page now shows the latest release and GitHub star count dynamically.
 
 ## [0.11.1] - 2026-06-11
 
