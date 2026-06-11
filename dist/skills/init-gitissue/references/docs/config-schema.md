@@ -225,14 +225,14 @@ autopilot:
   # Merge mode — controls when /auto-pilot is allowed to merge PRs.
   # Type: string
   # Values: "conservative" | "balanced" | "aggressive"
-  # Default: "conservative"
-  # "conservative": create PR, run review-fix cycles, leave PR open. Never auto-merges.
+  # Default: "balanced"
   # "balanced":     auto-merge clean PRs only. Unresolved issues create a follow-up
-  #                 and leave the PR open.
+  #                 and leave the PR open. Recommended default for most projects.
+  # "conservative": create PR, run review-fix cycles, leave PR open. Never auto-merges.
   # "aggressive":   auto-merge clean PRs AND, when merge_partial=true, merge partial
   #                 PRs with a follow-up issue. Documented as risky; opt-in only.
   # When set, this field is authoritative — autopilot.auto_merge is ignored.
-  mode: conservative
+  mode: balanced
 
   # Allow merging PRs that still have unresolved fixable review issues.
   # Type: boolean
@@ -505,7 +505,7 @@ Config is validated on load at the start of every skill invocation. Errors inclu
 | `review.require_traceability_check` | `true` | Run the four traceability checks; missing `Closes #N` blocks soft-pass |
 | `review.traceability_exempt_labels` | `["refactor", "chore"]` | PR labels that exempt a PR from the `Closes #N` hard-fail (check 1 only; other three checks still run) |
 | `review.traceability_exempt_pattern` | `"^\\s*Type:\\s*(refactor\|chore)\\s*$"` | Regex (multiline, case-insensitive) matched against PR body for exemption from check 1 |
-| `autopilot.mode` | `conservative` | Merge mode: `conservative` (never merge), `balanced` (merge clean PRs), `aggressive` (merge clean + partial w/ `merge_partial: true`) |
+| `autopilot.mode` | `balanced` | Merge mode: `balanced` (auto-merge clean PRs), `conservative` (never merge), `aggressive` (merge clean + partial w/ `merge_partial: true`) |
 | `autopilot.merge_partial` | `false` | Allow merging PRs with unresolved review issues. Only honored when `mode: aggressive` |
 | `autopilot.max_iterations` | `10` | Max issues to process |
 | `autopilot.review_cycles` | `3` | Max review-fix cycles per PR |

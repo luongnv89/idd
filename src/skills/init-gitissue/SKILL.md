@@ -5,7 +5,7 @@ license: MIT
 compatibility: Requires git. No GitHub CLI or authentication needed — generates a local config file only.
 effort: low
 metadata:
-  version: 0.3.2
+  version: 0.3.3
   creator: Luong NGUYEN <luongnv89@gmail.com>
 ---
 
@@ -43,9 +43,21 @@ That is the only prerequisite. This skill does not need `gh` or GitHub authentic
 
 ## Configuration Check
 
-This skill GENERATES the config — it does not read one. However, check if `.gitissue.yml` already exists in the repo root before proceeding.
+This skill GENERATES the config — it does not read one. Check if `.gitissue.yml` already exists in the repo root before proceeding.
 
-If the file exists, show the prompt from `references/error-messages.md`:
+### File does NOT exist — always create
+
+When the file is missing, **always create it** without prompting. This happens regardless of context — even when the skill is invoked non-interactively from another skill. No early exit, no conditions, no cancel option.
+
+```
+○ No .gitissue.yml found — generating config...
+```
+
+Proceed directly to **Step 1 — Scan Repository**.
+
+### File exists — ask user
+
+If the file already exists, show the prompt from `references/error-messages.md`:
 
 ```
 ⚠ .gitissue.yml already exists

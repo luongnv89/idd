@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# test-autopilot-modes.sh — Validate the conservative-by-default merge modes
+# test-autopilot-modes.sh — Validate balanced-by-default merge modes
 #
 # This script verifies issue #33 acceptance criteria:
 #  - .gitissue.yml supports `autopilot.mode` with values conservative|balanced|aggressive
 #  - Default install never merges a PR with unresolved fixable review issues
 #  - Aggressive behavior is unreachable without explicit config (no casual flag)
-#  - /init-gitissue emits conservative defaults
-#  - /auto-pilot final report uses the five categories: merged, left_open,
-#    partial_followup, failed, skipped
+#  - /init-gitissue emits balanced defaults
+#  - /auto-pilot final report uses the six categories: merged, left_open,
+#    partial_followup, blocked_by_dependency, failed, skipped
 #
 # Usage: bash tests/test-autopilot-modes.sh
 # Returns: exit 0 if all tests pass, exit 1 on first failure
@@ -28,11 +28,11 @@ fail() {
   FAIL=$((FAIL + 1))
 }
 
-echo "◆ Auto-Pilot Conservative Merge Modes Tests (issue #33)"
+echo "◆ Auto-Pilot Balanced Merge Modes Tests (issue #33)"
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 
 # ───────────────────────────────────────────────────────────
-# T1: init-gitissue template ships conservative defaults
+# T1: init-gitissue template ships balanced defaults
 # ───────────────────────────────────────────────────────────
 TEMPLATE="$REPO_ROOT/src/skills/init-gitissue/templates/gitissue-template.yml"
 
@@ -42,10 +42,10 @@ else
   fail "T1.0: $TEMPLATE not found"
 fi
 
-if grep -qE '^\s*mode:\s*conservative\b' "$TEMPLATE"; then
-  pass "T1.1: template ships 'mode: conservative' as the default"
+if grep -qE '^\s*mode:\s*balanced\b' "$TEMPLATE"; then
+  pass "T1.1: template ships 'mode: balanced' as the default"
 else
-  fail "T1.1: template does not ship 'mode: conservative' as default"
+  fail "T1.1: template does not ship 'mode: balanced' as default"
 fi
 
 if grep -qE '^\s*merge_partial:\s*false\b' "$TEMPLATE"; then
@@ -86,11 +86,11 @@ for mode_value in conservative balanced aggressive; do
   fi
 done
 
-# Default in defaults table is conservative
-if grep -qE '\| \`autopilot\.mode\` \| \`conservative\`' "$SCHEMA"; then
-  pass "T2.4: defaults table lists conservative as the default mode"
+# Default in defaults table is balanced
+if grep -qE '\| \`autopilot\.mode\` \| \`balanced\`' "$SCHEMA"; then
+  pass "T2.4: defaults table lists balanced as the default mode"
 else
-  fail "T2.4: defaults table does not list conservative as the default mode"
+  fail "T2.4: defaults table does not list balanced as the default mode"
 fi
 
 # Default merge_partial is false
@@ -138,8 +138,8 @@ else
   fail "T3.4: SKILL.md does not reference autopilot.merge_partial"
 fi
 
-# Final-report uses the five categorical labels
-for category in merged left_open partial_followup failed skipped; do
+# Final-report uses the six categorical labels
+for category in merged left_open partial_followup blocked_by_dependency failed skipped; do
   if grep -qE "\b${category}\b" "$SKILL"; then
     pass "T3.5.${category}: SKILL.md final report mentions outcome '${category}'"
   else
@@ -158,7 +158,7 @@ else
   fail "T4.1: phases.md does not describe mode gating"
 fi
 
-if grep -qiE 'mode:\s*conservative.*manual\s+merge|conservative.*leave PR open|leave PR open.*conservative' "$PHASES"; then
+if grep -qiE 'mode:\s*balanced.*manual\s+merge|conservative.*leave PR open|leave PR open.*conservative' "$PHASES"; then
   pass "T4.2: phases.md describes conservative-mode leave-open behavior"
 else
   fail "T4.2: phases.md does not describe conservative-mode leave-open behavior"
@@ -186,7 +186,7 @@ for category in merged left_open partial_followup; do
 done
 
 # ───────────────────────────────────────────────────────────
-# T5: README highlights conservative-by-default
+# T5: README highlights merge modes
 # ───────────────────────────────────────────────────────────
 README="$REPO_ROOT/src/skills/auto-pilot/README.md"
 
@@ -213,12 +213,12 @@ else
 fi
 
 # AC #2: default install never merges a PR with unresolved fixable review issues
-# This is enforced by the conservative default + merge_partial: false default.
+# This is enforced by the balanced default + merge_partial: false default.
 # Verify the SKILL.md merge-modes table makes this explicit.
 if grep -qiE 'Default install never merges|never auto-merge' "$SKILL"; then
-  pass "T6.2: SKILL.md states default never auto-merges (AC #2)"
+  pass "T6.2: SKILL.md states default never merges unresolved PRs (AC #2)"
 else
-  fail "T6.2: SKILL.md does not explicitly state default never auto-merges"
+  fail "T6.2: SKILL.md does not explicitly state default never merges unresolved PRs"
 fi
 
 # ───────────────────────────────────────────────────────────

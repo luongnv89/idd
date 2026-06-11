@@ -63,7 +63,7 @@ graph TD
 | `/issue-resolver N` | 6-step pipeline: preflight, research, plan, implement, QA, deliver PR with `Closes #N` | 0.7.2 | max |
 | `/issue-triage` | Dependency graph, stale detection, already-fixed detection via commit/PR scanning, priority and execution order | 0.5.2 | medium |
 | `/init-gitissue` | Auto-detect language/framework/test runner, generate `.gitissue.yml` | 0.3.2 | low |
-| `/auto-pilot` | Triage → resolve → review → merge loop. Conservative-by-default merge modes (`conservative`/`balanced`/`aggressive`), explicit issue lists for targeted runs, and a dependency-aware merge gate (`Depends on #N` / `Blocked by #N`) | 2.3.1 | max |
+| `/auto-pilot` | Triage → resolve → review → merge loop. Balanced-by-default merge modes (`conservative`/`balanced`/`aggressive`), explicit issue lists for targeted runs, and a dependency-aware merge gate (`Depends on #N` / `Blocked by #N`) | 2.3.1 | max |
 | `/issue-pr-review` | Review PR end-to-end: script pre-pass (lint/format/test auto-fix), per-criterion AC verification, five-dimension scoring (correctness, acceptance_criteria, traceability, maintainability, safety), reuses reviewer/fixer agents across cycles | 0.5.1 | high |
 
 ### Internal tooling
@@ -137,7 +137,7 @@ Dependency detection, priority suggestions, parallelizable work, stale issue war
   ◆ complete           4/5 resolved, 1 stopped
 ```
 
-Triage, resolve, review, merge — repeated for every open issue. Up to three review-fix cycles per PR with a script pre-pass (lint/format/test auto-fix) before any LLM cycle is spent. Conservative by default: clean PRs are merged, partial PRs are left open for review unless `autopilot.mode: aggressive` is explicitly set. Supports explicit issue lists for targeted runs.
+Triage, resolve, review, merge — repeated for every open issue. Up to three review-fix cycles per PR with a script pre-pass (lint/format/test auto-fix) before any LLM cycle is spent. Balanced by default: clean PRs are merged, partial PRs are left open for review unless `autopilot.mode: aggressive` is explicitly set. Supports explicit issue lists for targeted runs.
 
 ---
 
@@ -466,8 +466,8 @@ Merge modes (configured under `autopilot.mode` in `.gitissue.yml`):
 
 | Mode | Clean PR | Partial PR (review issues remain) |
 |------|----------|-----------------------------------|
-| `conservative` (default) | merge | leave open |
-| `balanced` | merge | leave open + create follow-up issue |
+| `conservative` | leave open | leave open + create follow-up issue |
+| `balanced` (default) | merge | leave open + create follow-up issue |
 | `aggressive` | merge | merge + create follow-up issue (requires `merge_partial: true`) |
 
 ### /idd-doctor -- Read-Only Health Check
@@ -545,7 +545,7 @@ triage:
   scan_timeout_per_issue: 30    # max seconds to scan codebase per issue
 
 autopilot:
-  mode: conservative            # conservative | balanced | aggressive
+  mode: balanced                 # conservative | balanced | aggressive
   merge_partial: false          # only meaningful when mode: aggressive
   max_iterations: 10
   review_cycles: 3              # max LLM review-fix cycles per PR
