@@ -43,7 +43,7 @@ That is the only prerequisite. This skill does not need `gh` or GitHub authentic
 
 ### Bundled dependency precheck
 
-Verify that this skill's bundled template files are present. If any are missing,
+Verify that this skill's bundled template and reference files are present. If any are missing,
 stop immediately and print:
 
 ```

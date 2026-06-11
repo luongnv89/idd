@@ -70,8 +70,6 @@ text
 Check these files relative to the skill's directory (the dirname of this SKILL.md):
 
 - `references/error-messages.md` — Error catalog
-- `references/docs/config-schema.md` — configuration schema reference (Check 3)
-- `references/docs/naming-conventions.md` — naming conventions (context reference)
 
 ## Configuration
 
