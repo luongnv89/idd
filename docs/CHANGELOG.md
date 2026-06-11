@@ -12,6 +12,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 ### Removed
 - `issue-pr-review-fix-loop` skill removed entirely — its source, installed skill, and project directory deleted. Its functionality was already folded into `/issue-pr-review` since v0.3.0. All references in AGENTS.md, CLAUDE.md, and README.md updated.
 
+## [0.11.1] - 2026-06-11
+
+### Fixed
+- `fix(install)` Hide source skills from asm discovery so only the intended flat install surface is detected (#109)
+
+### Documentation
+- `docs(landing)` Update landing page install commands for the flat install surface
+
 ## [0.11.0] - 2026-06-11
 
 ### Added
