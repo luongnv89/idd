@@ -36,7 +36,7 @@
    # Plugin (Claude Code only) — build then install the plugin tree:
    ./scripts/build.sh && ./scripts/install.sh --plugin
    ```
-   The Plugin path lands under `~/.claude/plugins/idd/`; the Standalone paths drop individual skills into each tool's skills directory (e.g. `~/.claude/skills/`, `~/.codex/skills/`, `~/.windsurf/rules/`). Each top-level `skills/<name>/` package is a self-contained SKILL.md tree with the shared agents bundled inside it (`references/agents/`), so it runs on any tool. `dist/skills/<name>/` mirrors the same generated packages for backward-compatible subpath installs. Shared agents are also installed standalone into `~/.claude/agents/` (and `~/.agents/agents/`) — a Claude Code optimization for native subagent spawning; other tools fall back to the bundled copies. See [README → Install](../README.md#install) for the full hierarchy.
+   The Plugin path lands under `~/.claude/plugins/idd/`; the Standalone paths drop individual skills into each tool's skills directory (e.g. `~/.claude/skills/`, `~/.codex/skills/`, `~/.windsurf/rules/`). Each top-level `skills/<name>/` package is a self-contained SKILL.md tree with the shared agents bundled inside it (`references/agents/`), so it runs on any tool. No build step is needed for the standalone path since `skills/` is committed. Shared agents are also installed standalone into `~/.claude/agents/` (and `~/.agents/agents/`) — a Claude Code optimization for native subagent spawning; other tools fall back to the bundled copies. See [README → Install](../README.md#install) for the full hierarchy.
 
 3. Verify setup:
    ```bash
@@ -46,13 +46,11 @@
 
 ## Build Flow
 
-`src/` is the single source of truth. Top-level `skills/` and `dist/` are generated and must not be hand-edited.
+`src/` is the single source of truth. Top-level `skills/` is the committed install surface; `dist/` is generated (plugin tarball only, gitignored).
 
 ```mermaid
 graph LR
     SRC["src/<br/>(authored)"] -->|"./scripts/build.sh"| RSK["skills/<br/>(committed root install index)"]
-    SRC -->|"./scripts/build.sh"| DSK["dist/skills/<br/>(committed mirror)"]
-    SRC -->|"./scripts/build.sh"| DAG["dist/agents/<br/>(committed)"]
     SRC -->|"./scripts/build.sh"| DPL["dist/plugin/<br/>(gitignored)"]
     DPL -->|"release tag"| TAR["idd-plugin-&lt;tag&gt;.tar.gz<br/>(release asset)"]
 
@@ -66,7 +64,7 @@ After editing anything under `src/`, rebuild before committing:
 ./scripts/build.sh
 ```
 
-CI's drift check fails any PR where the committed `skills/`, `dist/skills/`, or `dist/agents/` output does not match a fresh build.
+CI's drift check fails any PR where the committed `skills/` output does not match a transient build.
 
 ## Making Changes
 
@@ -84,13 +82,13 @@ graph TD
 
 ### Editing a Skill
 
-Skills live in `src/skills/<name>/SKILL.md` (internal-only skills under `src/internal-skills/<name>/`, deprecated skills under `src/deprecated-skills/<name>/`). Hand edits go in `src/` only — never edit `dist/skills/` directly. When editing:
+Skills live in `src/skills/<name>/SKILL.md` (internal-only skills under `src/internal-skills/<name>/`, deprecated skills under `src/deprecated-skills/<name>/`). Hand edits go in `src/` only — never edit `skills/` directly. When editing:
 
 1. Read the existing SKILL.md fully before making changes
 2. Follow the terminal output patterns in `DESIGN.md`
 3. Use `--json` with explicit field selection for all `gh` commands
 4. Update `references/error-messages.md` if adding new error cases
-5. Run `./scripts/build.sh` to regenerate `skills/` and `dist/skills/`
+5. Run `./scripts/build.sh` to regenerate `skills/` (dist/ for plugin tarball only)
 6. Test against a real GitHub repository
 
 ### Adding Error Messages
