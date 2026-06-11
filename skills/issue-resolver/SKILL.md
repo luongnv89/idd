@@ -1,12 +1,12 @@
 ---
 name: issue-resolver
-description: "Create an atomic PR that closes a GitHub issue end-to-end via a 6-step pipeline. Use when asked to resolve issue #N, fix #N, implement #N, work on #N, take issue #N, or /issue-resolver. Don't use for analyzing an issue without implementing (use /issue-analysis), reviewing an existing PR (use /issue-pr-review), or bulk backlog processing (use /auto-pilot)."
+description: "Create an atomic PR that closes a GitHub issue end-to-end via a 6-step pipeline. Use for resolve, fix, implement, work on, or take issue #N. Don't use for analyzing an issue without implementing (use /issue-analysis), reviewing an existing PR (use /issue-pr-review), or bulk backlog processing (use /auto-pilot)."
 license: MIT
-compatibility: Requires git and GitHub CLI (gh) with authentication and push access. Self-contained — uses shared agents from shared/agents/.
+compatibility: "Requires git and GitHub CLI (gh) with authentication and push access. Self-contained — uses shared agents from shared/agents/."
 effort: max
 metadata:
-  version: 0.7.2
-  creator: Luong NGUYEN <luongnv89@gmail.com>
+  version: 0.8.0
+  author: Luong NGUYEN <luongnv89@gmail.com>
 ---
 
 # /issue-resolver N
@@ -363,55 +363,14 @@ If the changes affect documented behavior:
 
 ### Push branch
 
-Before pushing, run the pre-commit security scan against every file touched by
-commits on this branch. The implementer ran the scan per commit during Step 3,
-but a final pre-push pass catches secrets that may have slipped in during QA
-fixes (see the pre-commit security conventions reference at
-`references/docs/pre-commit-security.md` — that document is authoritative; the snippet
-below mirrors its Primary Pattern). Real secrets block the push; warnings
-prompt for confirmation in interactive mode and log-and-continue in auto mode.
+The implementer ran the security scan per commit during Step 3, but before pushing you MUST run a final pre-push pass over the whole branch diff (`git diff --name-only "origin/${base}"...HEAD`) — it catches secrets that may have slipped in during QA fixes. Run the **Primary Pattern** in `references/docs/pre-commit-security.md` (authoritative; do not improvise a weaker check); export `IDD_AUTO_MODE=1` first in auto mode. It enforces, in order:
+
+1. **Block on real secrets** — secret-bearing filenames (`.env`, `*.key`, `*.pem`, `credentials.json`, `id_rsa`, …) or real API-key patterns (OpenAI, AWS, GitHub, Slack, GitLab, Google) in any text file in the diff → print the offending file and `exit 1`. Never push.
+2. **Warn (non-blocking) on** large files (>10 MB without LFS), build artifacts in the diff (`node_modules`, `dist`, `__pycache__`, `*.pyc`, …), and being on a protected branch. Interactive: prompt `Proceed anyway? [y/N]`; auto (`IDD_AUTO_MODE=1`): log and continue.
+
+Only after the scan passes (or warnings are accepted):
 
 ```bash
-# Pre-push security scan — mirrors the Primary Pattern in the
-# pre-commit-security conventions reference. Set IDD_AUTO_MODE=1 in auto mode.
-base="$(gh pr view --json baseRefName --jq .baseRefName 2>/dev/null || echo main)"
-files="$(git diff --name-only "origin/${base}"...HEAD)"
-secrets_found=0
-warnings=()
-if printf '%s\n' "$files" | grep -E -q '(^|/)\.env($|\.)|\.key$|\.pem$|credentials\.json$|secrets\.ya?ml$|id_rsa($|\.pub$)|\.p12$|\.pfx$|\.cer$'; then
-  echo "✗ Secret-bearing file in branch diff."
-  secrets_found=1
-fi
-realkey='(sk-(proj-)?[A-Za-z0-9_-]{20,}|sk_live_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|ASIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{30,}|gho_[A-Za-z0-9]{30,}|ghs_[A-Za-z0-9]{30,}|ghu_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{40,}|xox[abprs]-[A-Za-z0-9-]{10,}|glpat-[A-Za-z0-9_-]{20,}|AIza[0-9A-Za-z_-]{30,})'
-while IFS= read -r f; do
-  [ -z "$f" ] && continue
-  [ -f "$f" ] || continue
-  file --mime "$f" 2>/dev/null | grep -q 'charset=binary' && continue
-  if grep -E -q "$realkey" "$f" 2>/dev/null; then
-    echo "✗ Real API key detected in: $f"
-    secrets_found=1
-  fi
-  size=$(stat -f%z "$f" 2>/dev/null || stat -c%s "$f" 2>/dev/null || echo 0)
-  [ "$size" -gt 10485760 ] && warnings+=("⚠ Large file (>10 MB) without LFS: $f")
-done <<< "$files"
-junk='(^|/)(node_modules|dist|build|__pycache__|\.venv)(/|$)|\.pyc$|(^|/)(\.DS_Store|thumbs\.db)$|\.swp$|\.tmp$'
-while IFS= read -r f; do
-  [ -z "$f" ] && continue
-  printf '%s\n' "$f" | grep -E -q "$junk" && warnings+=("⚠ Build artifact in diff: $f")
-done <<< "$files"
-case "$(git rev-parse --abbrev-ref HEAD)" in
-  main|master|production|release) warnings+=("⚠ On protected branch — confirm intentional") ;;
-esac
-[ "$secrets_found" = 1 ] && { echo "✗ Pre-push security scan blocked. See pre-commit-security conventions reference."; exit 1; }
-if [ "${#warnings[@]}" -gt 0 ]; then
-  printf '%s\n' "${warnings[@]}"
-  if [ "${IDD_AUTO_MODE:-0}" = "1" ]; then
-    echo "○ Warnings logged — proceeding (auto mode)."
-  else
-    printf "Proceed anyway? [y/N] "; read -r reply
-    case "$reply" in y|Y|yes|YES) echo "○ Continuing despite warnings." ;; *) echo "✗ Stopped."; exit 1 ;; esac
-  fi
-fi
 git push -u origin {branch_name}
 ```
 

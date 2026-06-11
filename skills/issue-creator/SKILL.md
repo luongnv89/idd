@@ -1,12 +1,12 @@
 ---
 name: issue-creator
-description: "Creates structured, intent-focused GitHub issues from text, screenshots, or lists. Preserves reporter context and generates acceptance criteria without guessing implementation details. Use for filing bugs/features, batch creation, or template cleanup. Don't use for resolving, triaging, or deep issue analysis."
+description: "Create structured GitHub issues from text, screenshots, or lists, with acceptance criteria and preserved reporter context. Use for filing bugs/features, batch creation, or template cleanup. Don't use for resolving, triaging, or deep issue analysis."
 license: MIT
-compatibility: Requires git and GitHub CLI (gh) with authentication. Run `gh auth status` to verify.
+compatibility: "Requires git and GitHub CLI (gh) with authentication. Run `gh auth status` to verify."
 effort: medium
 metadata:
-  version: 0.4.1
-  creator: Luong NGUYEN <luongnv89@gmail.com>
+  version: 0.5.0
+  author: Luong NGUYEN <luongnv89@gmail.com>
 ---
 
 # /issue-creator
@@ -52,6 +52,29 @@ Before any operation, verify the environment. On failure, output the exact error
 2. Confirm `gh` is installed: `which gh`
 3. Confirm authentication: `gh auth status`
 4. Confirm GitHub remote exists: `git remote -v`
+
+## Repo Sync Before Edits (mandatory)
+
+This skill can write to the repository: in Normalize mode it edits issue bodies, and when images are supplied it commits them to `.github/issue-assets/` via the GitHub contents API. Before any such write, sync with remote using the stash-first pattern (see `references/docs/sync-conventions.md` for the full convention and recovery procedure):
+
+```bash
+branch="$(git rev-parse --abbrev-ref HEAD)"
+dirty=0
+if [ -n "$(git status --porcelain)" ]; then
+  git stash push -u -m "pre-sync: ${branch}"
+  dirty=1
+fi
+git fetch origin
+git pull --rebase origin "$branch"
+if [ "$dirty" -eq 1 ]; then
+  git stash pop || {
+    echo "✗ Stash pop failed — recover with: git stash list && git stash show -p stash@{0}"
+    exit 1
+  }
+fi
+```
+
+If `origin` is missing or rebase conflicts occur, stop and ask the user before continuing. In a pure Create-from-text run with no image upload, this sync is a no-op safeguard and adds negligible cost.
 
 ## Configuration
 
@@ -120,19 +143,7 @@ Check these files relative to the skill's directory (the dirname of this SKILL.m
 - `references/docs/github-projects-sync.md` — GitHub Projects status sync reference
 - `references/modes.md` — Normalize and Batch mode step specs and error paths
 
-### Parallel execution — Batch mode
-
-In batch mode, the duplicate detector and template generation can run in parallel since they are independent:
-
-```
-Batch mode — Step 2 completes (items classified)
-    ├── Spawn duplicate-detector (Step 3)       ─┐
-    └── Pre-generate template content (for S5)   ─┤  parallel
-                                                  │
-    Collect both results ◄────────────────────────┘
-Step 4 (Approval) continues with merged data
-Step 5 (Create Issues) uses pre-generated templates
-```
+In batch mode, the duplicate detector (Step 3) and template pre-generation (for Step 5) run in parallel since they are independent; both results are merged before the Step 4 approval gate.
 
 ---
 
