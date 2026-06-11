@@ -5,12 +5,13 @@
 # not have `asm` (the recommended primary install tool — see README → Install).
 # This is a thin wrapper around the supported install layouts:
 #
-#   - Standalone path: copy each `dist/skills/<name>/` to <tool>/skills/<name>/
+#   - Standalone path: copy each `skills/<name>/` (or `dist/skills/<name>/` as
+#                      deprecated fallback) to <tool>/skills/<name>/
 #                      copy `dist/agents/*.md` to <tool>/agents/ (Claude + agents only)
 #   - Plugin path:     copy `dist/plugin/` to ~/.claude/plugins/idd/ (Claude only)
 #                      (requires a fresh build — `dist/plugin/` is gitignored)
 #
-# Each `dist/skills/<name>/` is a self-contained SKILL.md tree (the shared
+# Each `skills/<name>/` is a self-contained SKILL.md tree (the shared
 # agents are bundled inside it at references/agents/), so it works on any
 # SKILL.md-compatible tool. The standalone path therefore supports multiple
 # tools. The shared-agents and plugin layouts are Claude Code concepts and
@@ -29,6 +30,9 @@
 #
 # Idempotent: re-running cleans the destination directory first, so no
 # duplicate files or stale references are left behind.
+#
+# Auto-build: if skills/ is missing or empty, the installer runs
+# ./scripts/build.sh automatically (unless scripts/build.sh is absent).
 #
 # Usage:
 #   ./scripts/install.sh                  # interactive tool picker on a TTY;
@@ -58,7 +62,8 @@ set -euo pipefail
 # ---------------------------------------------------------------------------
 
 ROOT="$(cd -- "$(dirname -- "$0")/.." && pwd)"
-DIST_SKILLS="$ROOT/dist/skills"
+ROOT_SKILLS="$ROOT/skills"
+DIST_SKILLS_FALLBACK="$ROOT/dist/skills"  # deprecated fallback
 DIST_AGENTS="$ROOT/dist/agents"
 DIST_PLUGIN="$ROOT/dist/plugin"
 TARGET="${HOME}/.claude"
@@ -334,19 +339,45 @@ esac
 # ---------------------------------------------------------------------------
 
 ensure_skills_src() {
-  if [ ! -d "$DIST_SKILLS" ]; then
-    err "dist/skills/ not found at $DIST_SKILLS"
-    err "  This is committed in the repository — re-clone or run ./scripts/build.sh"
-    exit 1
+  # Primary source: repo-root skills/ (committed, no build needed).
+  if [ ! -d "$ROOT_SKILLS" ] || [ -z "$(ls -A "$ROOT_SKILLS" 2>/dev/null)" ]; then
+    # skills/ missing or empty — try auto-build
+    info "skills/ missing or empty — attempting auto-build..."
+    if [ -f "$ROOT/scripts/build.sh" ]; then
+      if "$ROOT/scripts/build.sh" >/dev/null 2>&1; then
+        ok "auto-build succeeded"
+      else
+        err "auto-build failed — please run ./scripts/build.sh manually"
+        exit 1
+      fi
+    else
+      err "scripts/build.sh not found — cannot auto-build"
+      exit 1
+    fi
   fi
-  if [ -n "$ONLY_SKILL" ] && [ ! -d "$DIST_SKILLS/$ONLY_SKILL" ]; then
-    err "skill '$ONLY_SKILL' not found under dist/skills/"
+  # Use skills/ (the build always emits it).
+  local SKILLS_SRC="$ROOT_SKILLS"
+  if [ ! -d "$SKILLS_SRC" ] || [ -z "$(ls -A "$SKILLS_SRC" 2>/dev/null)" ]; then
+    # Fallback: check dist/skills/ (deprecated)
+    if [ -d "$DIST_SKILLS_FALLBACK" ] && [ -n "$(ls -A "$DIST_SKILLS_FALLBACK" 2>/dev/null)" ]; then
+      warn "dist/skills/ is deprecated — skills/ is the primary install source"
+      SKILLS_SRC="$DIST_SKILLS_FALLBACK"
+    else
+      err "skills/ not found and no dist/skills/ fallback available"
+      err "  Run: ./scripts/build.sh"
+      exit 1
+    fi
+  fi
+  if [ -n "$ONLY_SKILL" ] && [ ! -d "$SKILLS_SRC/$ONLY_SKILL" ]; then
+    err "skill '$ONLY_SKILL' not found under skills/"
     err "  Available:"
-    for d in "$DIST_SKILLS"/*/; do
+    for d in "$SKILLS_SRC"/*/; do
       [ -d "$d" ] && err "    - $(basename "$d")"
     done
     exit 1
   fi
+  # Export for callers that need the resolved source path.
+  export _SKILLS_SRC="$SKILLS_SRC"
 }
 
 ensure_agents_src() {
@@ -377,7 +408,7 @@ ensure_plugin_src() {
 install_one_skill() {
   local name="$1"
   local skills_dest="$2"
-  local src="$DIST_SKILLS/$name"
+  local src="$_SKILLS_SRC/$name"
   local dst="$skills_dest/$name"
   run mkdir -p "$skills_dest"
   if [ -d "$dst" ]; then
@@ -463,7 +494,7 @@ install_standalone_tool() {
   if [ -n "$ONLY_SKILL" ]; then
     install_one_skill "$ONLY_SKILL" "$skills_dest"
   else
-    for d in "$DIST_SKILLS"/*/; do
+    for d in "$_SKILLS_SRC"/*/; do
       [ -d "$d" ] || continue
       install_one_skill "$(basename "$d")" "$skills_dest"
     done
@@ -541,7 +572,7 @@ uninstall_standalone_tool() {
     [ -n "$agents_dest" ] && info "[$tool] agents left installed because --skill targets one skill only"
     return
   fi
-  for d in "$DIST_SKILLS"/*/; do
+  for d in "$_SKILLS_SRC"/*/; do
     [ -d "$d" ] || continue
     remove_path "[$tool] skill" "$skills_dest/$(basename "$d")"
   done
