@@ -71,7 +71,7 @@ Generated skill packages are self-contained. Shared agents remain canonical in
 skill that references them so installed skills do not rely on shared runtime
 paths.
 
-Internal-only skills live in `src/internal-skills/` (e.g., `idd-doctor`); deprecated skills retained for one release cycle live in `src/deprecated-skills/`. Internal and non-distributed deprecated skills are excluded from both `skills/` and `dist/`. Per issue #81, all documentation lives in a single top-level `docs/` tree: runtime docs (consumed by skills via the `docs/X.md` token; bundled into each skill's `references/docs/` by the build) and human-only project docs (architecture, changelog, development guide) coexist there.
+Internal-only skills live in `src/internal-skills/` (e.g., `idd-doctor`). Skills are excluded from `skills/` and `dist/`. Per issue #81, all documentation lives in a single top-level `docs/` tree: runtime docs (consumed by skills via the `docs/X.md` token; bundled into each skill's `references/docs/` by the build) and human-only project docs (architecture, changelog, development guide) coexist there.
 The build generates the committed `skills/` tree and a gitignored `dist/` tree (plugin tarball only).
 
 ### SKILL.md

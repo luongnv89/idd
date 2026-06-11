@@ -48,11 +48,6 @@ src/
 │       ├── SKILL.md
 │       └── references/
 │
-└── deprecated-skills/
-    └── issue-pr-review-fix-loop/  # DEPRECATED v0.4.0 — redirects to /issue-pr-review (retained one release cycle)
-        ├── SKILL.md
-        └── references/
-
 docs/                              # All documentation — single tree (issue #81)
 ├── config-schema.md               # ↓ Runtime docs (skills reference these via
 ├── idd-methodology.md             #   bare `docs/X.md` tokens; build.py

@@ -70,7 +70,6 @@ src/                        # SOURCE OF TRUTH — hand-edit here
 │       ├── SKILL.md
 │       └── references/
 ├── internal-skills/        # /idd-doctor and other internal-only skills
-├── deprecated-skills/      # Skills retained one release cycle past deprecation
 ├── shared/
 │   └── agents/             # Shared agent definitions used by multiple skills
 ├── docs/                   # Runtime docs consumed by skills

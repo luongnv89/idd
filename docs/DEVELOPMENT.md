@@ -82,7 +82,7 @@ graph TD
 
 ### Editing a Skill
 
-Skills live in `src/skills/<name>/SKILL.md` (internal-only skills under `src/internal-skills/<name>/`, deprecated skills under `src/deprecated-skills/<name>/`). Hand edits go in `src/` only — never edit `skills/` directly. When editing:
+Skills live in `src/skills/<name>/SKILL.md` (internal-only skills under `src/internal-skills/<name>/`). Hand edits go in `src/` only — never edit `skills/` directly. When editing:
 
 1. Read the existing SKILL.md fully before making changes
 2. Follow the terminal output patterns in `DESIGN.md`

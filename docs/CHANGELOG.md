@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+- `breaking(issue-pr-review)` default behavior changed to automatic review-fix loop. `/issue-pr-review <N>` now loops to fix issues until clean (up to `review.max_cycles`), matching the former `--auto` loop behavior minus auto-merge. `--auto` flag adds auto-merge on top of the loop. `--review-only` remains the opt-out for a single-pass report without fixing or looping. Version bumped 0.5.1 → 1.0.0.
+
+### Removed
+- `issue-pr-review-fix-loop` skill removed entirely — its source, installed skill, and project directory deleted. Its functionality was already folded into `/issue-pr-review` since v0.3.0. All references in AGENTS.md, CLAUDE.md, and README.md updated.
+
 ## [0.10.1] - 2026-06-03
 
 ### Changed
@@ -104,10 +112,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - `fix(skills)` truncated long descriptions and bumped patch versions for `/auto-pilot` and `/issue-triage`.
 
 ### Deprecated
-- `/issue-pr-review-fix-loop` (v0.4.0) — its outer review-fix loop, agent reuse, and fresh confirmation pass are all part of `/issue-pr-review` now (since v0.3.0), and Phase 2 acceptance-criteria + traceability checks landed there in v0.4.0. Migration: replace any `/issue-pr-review-fix-loop` invocation with `/issue-pr-review` (same PR number, same `--auto` flag). Source remains under `src/deprecated-skills/issue-pr-review-fix-loop/` for repository history and migration references. Tracking issue: #37.
+- `/issue-pr-review-fix-loop` (v0.4.0) — its outer review-fix loop, agent reuse, and fresh confirmation pass are all part of `/issue-pr-review` now (since v0.3.0), and Phase 2 acceptance-criteria + traceability checks landed there in v0.4.0. Migration: replace any `/issue-pr-review-fix-loop` invocation with `/issue-pr-review` (same PR number, same `--auto` flag). Source removed in [Unreleased]. Tracking issue: #37.
 
 ### Removed
-- `/issue-pr-review-fix-loop` is removed from the public README command index and standalone install table. Its source remains under `src/deprecated-skills/issue-pr-review-fix-loop/` for repository history and migration references, but it is no longer publicly distributed unless a future compatibility release explicitly opts it in with a `distribute:` flag. Tracking issue: #54.
+- `/issue-pr-review-fix-loop` is removed from the public README command index and standalone install table. Its source was under `src/deprecated-skills/issue-pr-review-fix-loop/` and has been removed in [Unreleased]. Tracking issue: #54.
 - `/review-fix-loop` (legacy redirect skill) — replaced entirely by `/issue-pr-review`.
 - Per-skill agent definitions (replaced by shared agents).
 - Old 8-step pipeline structure and associated step-specific agent files.

@@ -589,9 +589,6 @@ src/
 ├── internal-skills/
 │   └── idd-doctor/         # /idd-doctor — read-only repo health check
 │
-├── deprecated-skills/
-│   └── issue-pr-review-fix-loop/  # Retained deprecated source only; not distributed
-│
 └── (no docs/ — see below)
 
 docs/                             # Single docs tree (issue #81)
