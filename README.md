@@ -264,7 +264,7 @@ Or go hands-free — triage, resolve, review, and merge everything:
 
 Zero config required. Run `/init-gitissue` to customize.
 
-Browse the authored source for each skill — these links point to `src/` for reading; install copies come from `dist/skills/<name>/` (see [Install](#install)):
+Browse the authored source for each skill — these links point to `src/` for reading; install copies come from `skills/<name>/` (see [Install](#install)):
 
 | Skill | Source |
 |-------|--------|
