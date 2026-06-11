@@ -4,6 +4,7 @@
 Reads authored sources under src/ + top-level docs/ and emits two
 distribution outputs:
 
+  skills/         — root-level flat skill index for repo URL installs (committed)
   <out>/skills/   — flattened, harness-agnostic skills (committed)
   <out>/plugin/   — Claude Code plugin layout (built fresh in CI)
 
@@ -421,7 +422,7 @@ def _rewrite_url_aware(text, *, skill_form, agent_form, doc_form):
     return "".join(parts)
 
 
-# --- Phase C — dist/skills/ (flattened) --------------------------------------
+# --- Phase C — flattened skills ----------------------------------------------
 
 
 def _emit_flattened_skill(
@@ -490,6 +491,24 @@ def _render_agent_definition(agent_name: str, source_text: str, source_rel: str)
         "Do not edit installed copies; edit source and run ./scripts/build.sh. -->\n"
     )
     return frontmatter + "\n" + marker + BANNER_TMPL.format(rel=source_rel) + source_text
+
+
+def _emit_repo_root_skills(repo_root: Path, out_skills: Path) -> None:
+    """Mirror flattened skills to repo-root skills/ for ASM repo URL installs.
+
+    ASM's standard repository installer discovers skills from top-level
+    skills/<name>/ directories. Keep src/ as the authoring tree and dist/skills/
+    for backward-compatible subpath installs, then publish the same
+    self-contained skill packages at repo root so users can run:
+
+      asm install https://github.com/luongnv89/idd
+
+    and select all or any specific skill using ASM's built-in picker.
+    """
+    root_skills = repo_root / "skills"
+    if root_skills.exists():
+        shutil.rmtree(root_skills)
+    shutil.copytree(out_skills, root_skills)
 
 
 def _emit_standalone_agents(src: Path, out_dir: Path) -> None:
@@ -810,6 +829,15 @@ def build(out: Path, src: Path, *, verbose: bool = False) -> None:
         if verbose:
             print(f"  ✓ flattened: {skill_name} (agents={len(agents)}, docs={len(docs)})")
 
+    # Repo-root flat skill index for `asm install <repo-url>`. This is emitted
+    # only for the canonical in-repo build, not for --out temp directories used
+    # by tests and release packaging.
+    repo_root = src.parent
+    if out == repo_root / "dist":
+        _emit_repo_root_skills(repo_root, out_skills)
+        if verbose:
+            print("  ✓ root skills mirror: skills/")
+
     # Standalone Claude Code subagents. These are committed beside
     # dist/skills/ so the from-source installer can register subagent types.
     _emit_standalone_agents(src, out_agents)
@@ -835,7 +863,7 @@ def build(out: Path, src: Path, *, verbose: bool = False) -> None:
 def main(argv: list[str]) -> int:
     _check_python_version()
     parser = argparse.ArgumentParser(
-        description="Build IDD distribution outputs (dist/skills/ and dist/plugin/)."
+        description="Build IDD distribution outputs (skills/, dist/skills/, and dist/plugin/)."
     )
     parser.add_argument(
         "--out",

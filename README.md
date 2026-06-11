@@ -168,40 +168,23 @@ gitissue is **complementary** to your existing workflow. Use it alongside TDD, B
 
 ### Install
 
-Standalone is the recommended default. Each skill ships as a self-contained directory under `dist/skills/<name>/`, ready to drop into any SKILL.md-compatible harness — Claude Code, Codex CLI, or anything else that loads SKILL.md trees.
+Standalone is the recommended default. Each skill ships as a self-contained directory under the top-level [`skills/`](skills/) tree, ready to drop into any SKILL.md-compatible harness — Claude Code, Codex CLI, or anything else that loads SKILL.md trees. The same generated packages are also mirrored under [`dist/skills/`](dist/skills/) for backward-compatible subpath installs.
 
 #### Recommended — Standalone via `asm install`
 
-[`asm`](https://github.com/luongnv89/asm) is the primary install tool. It pulls the skill straight from this repo (no clone required) and writes it where Claude Code looks for skills. Pick one skill or install them all:
+[`asm`](https://github.com/luongnv89/asm) is the primary install tool. It pulls the flat skill index straight from this repo (no clone required) and lets you select all skills or any specific skill using ASM's standard picker:
 
 ```bash
-# One skill (most common):
-asm install github:luongnv89/idd#main:dist/skills/issue-resolver
+# Recommended: install from the repo root and choose all or selected skills
+asm install https://github.com/luongnv89/idd
 
-# Every public skill in one loop:
-for skill in issue-creator issue-analysis issue-resolver issue-triage \
-             issue-pr-review auto-pilot init-gitissue; do
-  asm install "github:luongnv89/idd#main:dist/skills/$skill" -p claude -y
-done
-
-# Shared Claude Code agents used by those skills:
-mkdir -p "$HOME/.claude/agents"
-for agent in code-reviewer codebase-researcher duplicate-detector \
-             implementer issue-relationship-scanner synthesizer; do
-  dst="$HOME/.claude/agents/$agent.md"
-  if [ -f "$dst" ] && ! grep -q 'Managed by IDD installer' "$dst"; then
-    echo "Skipping unmanaged existing agent: $dst"
-    continue
-  fi
-  curl -fsSL "https://raw.githubusercontent.com/luongnv89/idd/main/dist/agents/$agent.md" -o "$dst"
-done
+# Non-interactive single-skill install
+asm install https://github.com/luongnv89/idd --skill issue-resolver
 ```
 
-`asm` is idempotent — re-running the same command updates the skill in place with no duplicate files. The agent loop is also safe to re-run: it only replaces IDD-managed agents and skips unmanaged same-name files. Target Claude Code explicitly with `-p claude` (or `-p all` for every supported tool).
+`asm` is idempotent — re-running the same command updates selected skills in place with no duplicate files. Each installed skill is complete: its required subagent prompts and runtime docs are bundled under `references/agents/` and `references/docs/`, so no separate shared-agent install step is required.
 
-> **Why a loop?** A single `asm install …:dist/skills --all` would be nicer, but `--all` is currently ignored when the source includes a subpath (tracked in [luongnv89/asm#251](https://github.com/luongnv89/asm/issues/251)). The per-skill loop above exercises the working single-skill path. Once asm #251 lands we'll switch back to the one-liner. If you'd rather not loop, the [from-source alternative](#from-source-alternative-no-asm-required) installs all skills with a single command today.
-
-After install, restart Claude Code so it picks up the new skill(s) and agents. The full list of skills lives under [`dist/skills/`](dist/skills/) and generated Claude Code agents live under [`dist/agents/`](dist/agents/) — substitute any skill name (`issue-creator`, `issue-resolver`, `issue-triage`, `issue-pr-review`, `auto-pilot`, `issue-analysis`, `init-gitissue`) into the command above.
+After install, restart Claude Code so it picks up the new skill(s). The full flat install surface lives under [`skills/`](skills/) and includes `issue-creator`, `issue-analysis`, `issue-resolver`, `issue-triage`, `issue-pr-review`, `auto-pilot`, and `init-gitissue`.
 
 #### From-source alternative (no `asm` required)
 

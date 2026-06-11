@@ -26,17 +26,17 @@
    # Supported: claude, agents, codex, opencode, pi, openclaw, hermes, antigravity, windsurf
 
    # Standalone — single skill from this checkout (manual variant):
-   mkdir -p ~/.claude/skills ~/.claude/agents
-   cp -r dist/skills/issue-resolver ~/.claude/skills/
-   cp dist/agents/*.md ~/.claude/agents/
+   mkdir -p ~/.claude/skills
+   cp -r skills/issue-resolver ~/.claude/skills/
 
-   # Standalone — via asm (no clone needed; targets Claude Code):
-   asm install github:luongnv89/idd#main:dist/skills/issue-resolver
+   # Standalone — via asm (no clone needed; choose all or one skill):
+   asm install https://github.com/luongnv89/idd
+   asm install https://github.com/luongnv89/idd --skill issue-resolver
 
    # Plugin (Claude Code only) — build then install the plugin tree:
    ./scripts/build.sh && ./scripts/install.sh --plugin
    ```
-   The Plugin path lands under `~/.claude/plugins/idd/`; the Standalone paths drop individual skills into each tool's skills directory (e.g. `~/.claude/skills/`, `~/.codex/skills/`, `~/.windsurf/rules/`). Each `dist/skills/<name>/` is a self-contained SKILL.md tree with the shared agents bundled inside it (`references/agents/`), so it runs on any tool. Shared agents are also installed standalone into `~/.claude/agents/` (and `~/.agents/agents/`) — a Claude Code optimization for native subagent spawning; other tools fall back to the bundled copies. See [README → Install](../README.md#install) for the full hierarchy.
+   The Plugin path lands under `~/.claude/plugins/idd/`; the Standalone paths drop individual skills into each tool's skills directory (e.g. `~/.claude/skills/`, `~/.codex/skills/`, `~/.windsurf/rules/`). Each top-level `skills/<name>/` package is a self-contained SKILL.md tree with the shared agents bundled inside it (`references/agents/`), so it runs on any tool. `dist/skills/<name>/` mirrors the same generated packages for backward-compatible subpath installs. Shared agents are also installed standalone into `~/.claude/agents/` (and `~/.agents/agents/`) — a Claude Code optimization for native subagent spawning; other tools fall back to the bundled copies. See [README → Install](../README.md#install) for the full hierarchy.
 
 3. Verify setup:
    ```bash
@@ -46,11 +46,12 @@
 
 ## Build Flow
 
-`src/` is the single source of truth. `dist/` is generated and must not be hand-edited.
+`src/` is the single source of truth. Top-level `skills/` and `dist/` are generated and must not be hand-edited.
 
 ```mermaid
 graph LR
-    SRC["src/<br/>(authored)"] -->|"./scripts/build.sh"| DSK["dist/skills/<br/>(committed)"]
+    SRC["src/<br/>(authored)"] -->|"./scripts/build.sh"| RSK["skills/<br/>(committed root install index)"]
+    SRC -->|"./scripts/build.sh"| DSK["dist/skills/<br/>(committed mirror)"]
     SRC -->|"./scripts/build.sh"| DAG["dist/agents/<br/>(committed)"]
     SRC -->|"./scripts/build.sh"| DPL["dist/plugin/<br/>(gitignored)"]
     DPL -->|"release tag"| TAR["idd-plugin-&lt;tag&gt;.tar.gz<br/>(release asset)"]
@@ -65,7 +66,7 @@ After editing anything under `src/`, rebuild before committing:
 ./scripts/build.sh
 ```
 
-CI's drift check fails any PR where the committed `dist/skills/` or `dist/agents/` output does not match a fresh build.
+CI's drift check fails any PR where the committed `skills/`, `dist/skills/`, or `dist/agents/` output does not match a fresh build.
 
 ## Making Changes
 
@@ -89,7 +90,7 @@ Skills live in `src/skills/<name>/SKILL.md` (internal-only skills under `src/int
 2. Follow the terminal output patterns in `DESIGN.md`
 3. Use `--json` with explicit field selection for all `gh` commands
 4. Update `references/error-messages.md` if adding new error cases
-5. Run `./scripts/build.sh` to regenerate `dist/skills/`
+5. Run `./scripts/build.sh` to regenerate `skills/` and `dist/skills/`
 6. Test against a real GitHub repository
 
 ### Adding Error Messages

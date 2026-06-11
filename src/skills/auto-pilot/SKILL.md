@@ -86,8 +86,35 @@ Before starting the loop, verify the environment. On failure, output the exact e
 2. Confirm `gh` is installed: `which gh`
 3. Confirm authentication: `gh auth status`
 4. Confirm GitHub remote exists: `git remote -v`
-5. Confirm clean working tree: `git status --porcelain`
-6. Confirm on default branch: `git rev-parse --abbrev-ref HEAD`
+5. Confirm required skills are installed from the same IDD distribution:
+   - `issue-triage`
+   - `issue-analysis`
+   - `issue-resolver`
+   - `issue-pr-review`
+6. Confirm clean working tree: `git status --porcelain`
+7. Confirm on default branch: `git rev-parse --abbrev-ref HEAD`
+
+### Skill dependency precheck
+
+`/auto-pilot` delegates work to other gitissue skills. Before any triage,
+resolution, review, merge, or repository mutation, verify those skills are
+available in the current agent environment.
+
+If one or more required skills are missing, stop immediately and print:
+
+```text
+✗ Missing required gitissue skill(s): {missing_skill_list}
+
+  To fix:  asm install https://github.com/luongnv89/idd
+           Select: {missing_skill_list}
+  Or:      asm install https://github.com/luongnv89/idd --skill {first_missing_skill}
+
+  Then restart the agent session and re-run /auto-pilot.
+```
+
+Do not continue with partial auto-pilot execution when required skills are
+missing. `issue-creator` is optional; if it is missing, skip mid-loop issue
+normalization and print a warning instead of stopping.
 
 If the working tree is dirty, auto-stash and continue:
 ```bash

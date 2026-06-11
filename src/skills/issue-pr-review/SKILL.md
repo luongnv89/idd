@@ -30,6 +30,29 @@ In auto mode, export `IDD_AUTO_MODE=1` before any shell snippet that consults it
 
 1. Confirm git repository: `git rev-parse --git-dir`
 2. Confirm `gh` is installed and authenticated: `gh auth status`
+3. Confirm the bundled reviewer agent exists at `references/agents/code-reviewer.md`
+
+### Bundled dependency precheck
+
+`/issue-pr-review` is distributed as a self-contained skill. It does not require
+another gitissue skill to review a PR, but it does require its bundled reviewer
+agent prompt. Before execution, verify `references/agents/code-reviewer.md` is
+present in the installed skill directory.
+
+If it is missing, stop immediately and print:
+
+```text
+✗ Missing bundled dependency: references/agents/code-reviewer.md
+
+  To fix:  asm install https://github.com/luongnv89/idd --skill issue-pr-review
+  Or:      asm install https://github.com/luongnv89/idd
+           Select: issue-pr-review
+
+  Then restart the agent session and re-run /issue-pr-review.
+```
+
+Do not continue with an inline or guessed reviewer prompt when the bundled agent
+is missing.
 
 ## Repo Sync Before Edits (mandatory)
 
