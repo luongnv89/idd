@@ -97,7 +97,7 @@ autopilot:
   # Default: "balanced" — auto-merge clean PRs (review passed). PRs with unresolved
   #   review issues get a follow-up and stay open. Recommended for most projects.
   # "conservative": create PR, run review-fix cycles, leave PR open.
-  #                 review issues get a follow-up issue and stay open.
+  #                 Never auto-merges.
   # "aggressive":   auto-merge clean PRs AND merge partial PRs when
   #                 merge_partial=true is also set (see below). Risky —
   #                 only enable on disposable/experimental repos.

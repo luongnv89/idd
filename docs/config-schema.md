@@ -227,8 +227,7 @@ autopilot:
   # Default: "balanced"
   # "balanced":     auto-merge clean PRs only. Unresolved issues create a follow-up
   #                 and leave the PR open. Recommended default for most projects.
-  # "balanced":     auto-merge clean PRs only. Unresolved issues create a follow-up
-  #                 and leave the PR open.
+  # "conservative": create PR, run review-fix cycles, leave PR open. Never auto-merges.
   # "aggressive":   auto-merge clean PRs AND, when merge_partial=true, merge partial
   #                 PRs with a follow-up issue. Documented as risky; opt-in only.
   # When set, this field is authoritative — autopilot.auto_merge is ignored.

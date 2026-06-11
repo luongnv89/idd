@@ -8,7 +8,7 @@
 
 ## Highlights
 
-- **Conservative-by-default merge modes** — fresh installs never auto-merge. `autopilot.mode` (`conservative` | `balanced` | `aggressive`) controls when the loop is allowed to merge; aggressive partial-merge requires both `mode: aggressive` AND `merge_partial: true`. See SKILL.md *Merge Modes* for the full decision matrix.
+- **Balanced-by-default merge modes** — fresh installs auto-merge clean PRs, while PRs with unresolved review issues stay open with follow-up issues. `autopilot.mode` (`conservative` | `balanced` | `aggressive`) controls when the loop is allowed to merge; aggressive partial-merge requires both `mode: aggressive` AND `merge_partial: true`. See SKILL.md *Merge Modes* for the full decision matrix.
 - **Token-optimized review** — script pre-pass auto-fixes lint/format (zero tokens), LLM only reviews critical issues, soft pass skips nits
 - **3-cycle review-fix loop** — with script pre-pass handling mechanical issues, 3 LLM cycles suffice; follow-up issues track anything left
 - **Critical issue guard** — critical issues get human oversight: if the review can't fully resolve them, the loop stops and asks you for a decision
@@ -59,7 +59,7 @@ The auto-pilot classifies decisions into two categories:
 - **Auto-decide** (99%) — branch switching, strategy selection, failure recovery, and merging *within the bounds of `autopilot.mode`*
 - **Confirm with user** (rare) — force-push to shared branches, deleting remote branches that others might depend on, production deployments, package publishing, modifying repository settings or branch protection rules
 
-Merging itself is gated by `autopilot.mode`. The default `conservative` mode never auto-merges — the loop creates and reviews PRs but leaves the merge decision to you. Switch to `balanced` to merge clean PRs, or to `aggressive` (with `merge_partial: true`) to also merge partial PRs alongside follow-up issues.
+Merging itself is gated by `autopilot.mode`. The default `balanced` mode merges clean PRs and leaves PRs with unresolved review issues open with follow-up issues. Switch to `conservative` to never auto-merge, or to `aggressive` (with `merge_partial: true`) to also merge partial PRs alongside follow-up issues.
 
 When something fails, the auto-pilot skips and continues rather than stopping. All work is pushed to remote PRs, so nothing is lost.
 

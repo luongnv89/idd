@@ -4,7 +4,7 @@
 #
 # This script verifies issue #38 acceptance criteria:
 #  AC1. .gitissue.yml schema documents the four keys with defaults:
-#         autopilot.mode (conservative), autopilot.merge_partial (false),
+#         autopilot.mode (balanced), autopilot.merge_partial (false),
 #         review.require_acceptance_criteria_check (true),
 #         review.require_traceability_check (true).
 #  AC2. /init-gitissue emits these defaults on a fresh install.
@@ -63,18 +63,18 @@ done
 # ───────────────────────────────────────────────────────────
 # T1: AC1 — schema documents all four keys with their defaults
 # ───────────────────────────────────────────────────────────
-# autopilot.mode = conservative (already shipped in #33; covered here for
+# autopilot.mode = balanced (already shipped in #33; covered here for
 # the unified-schema AC)
-if grep -qE '^\s*mode:\s*conservative\b' "$SCHEMA"; then
-  pass "T1.AC1.1: schema yaml block has 'mode: conservative'"
+if grep -qE '^\s*mode:\s*balanced\b' "$SCHEMA"; then
+  pass "T1.AC1.1: schema yaml block has 'mode: balanced'"
 else
-  fail "T1.AC1.1: schema yaml block missing 'mode: conservative'"
+  fail "T1.AC1.1: schema yaml block missing 'mode: balanced'"
 fi
 
-if grep -qE '\| \`autopilot\.mode\` \| \`conservative\`' "$SCHEMA"; then
-  pass "T1.AC1.2: defaults table lists autopilot.mode = conservative"
+if grep -qE '\| \`autopilot\.mode\` \| \`balanced\`' "$SCHEMA"; then
+  pass "T1.AC1.2: defaults table lists autopilot.mode = balanced"
 else
-  fail "T1.AC1.2: defaults table missing autopilot.mode = conservative"
+  fail "T1.AC1.2: defaults table missing autopilot.mode = balanced"
 fi
 
 # autopilot.merge_partial = false
@@ -134,10 +134,10 @@ fi
 # ───────────────────────────────────────────────────────────
 # autopilot.mode and merge_partial come from #33; verify they are still
 # emitted as part of the unified schema.
-if grep -qE '^\s*mode:\s*conservative\b' "$TEMPLATE"; then
-  pass "T2.AC2.1: init template emits 'mode: conservative'"
+if grep -qE '^\s*mode:\s*balanced\b' "$TEMPLATE"; then
+  pass "T2.AC2.1: init template emits 'mode: balanced'"
 else
-  fail "T2.AC2.1: init template missing 'mode: conservative'"
+  fail "T2.AC2.1: init template missing 'mode: balanced'"
 fi
 
 if grep -qE '^\s*merge_partial:\s*false\b' "$TEMPLATE"; then

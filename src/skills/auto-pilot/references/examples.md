@@ -6,7 +6,7 @@ Detailed example runs and edge-case behaviors referenced from SKILL.md.
 
 **User says:** `/auto-pilot --limit 3`
 
-> Assumes `autopilot.mode: balanced` or `aggressive` in `.gitissue.yml`. Under the default `conservative` mode, each PR would end with `Outcome: left_open` instead of being merged automatically.
+> Uses the default `autopilot.mode: balanced`, where clean PRs are merged automatically. Under `conservative` mode, each clean PR would end with `Outcome: left_open` instead.
 
 ```
 ● Checking environment...

@@ -23,7 +23,7 @@ Fully autonomous development loop: triage, pick, resolve, review, fix, merge, re
 
 ### Changes in 2.2.0 — Conservative-by-default merge modes
 
-- New `autopilot.mode` setting (`conservative` | `balanced` | `aggressive`). Default is **`conservative`**: PRs are created and reviewed but never auto-merged.
+- New `autopilot.mode` setting (`conservative` | `balanced` | `aggressive`). Default is **`balanced`**: clean PRs are auto-merged; PRs with unresolved review issues get follow-up issues and stay open.
 - New `autopilot.merge_partial: false` setting. Aggressive partial-merge behavior now requires both `mode: aggressive` AND `merge_partial: true` — the previous "merge anyway with follow-up" path is no longer reachable by accident.
 - Final-report iteration outcomes now use the categorical labels `merged`, `left_open`, `partial_followup`, `failed`, `skipped`.
 - Legacy `autopilot.auto_merge` is honored when `autopilot.mode` is unset, but `mode` is authoritative when both are present. The schema is being consolidated separately in the autopilot/review config schema work — this release ships only the merge-mode behavior change.
@@ -137,7 +137,7 @@ Load `.gitissue.yml` from the repo root once at start. If the file does not exis
 ```
 
 Defaults:
-- `autopilot.mode: conservative` — merge mode. See **Merge Modes** below for the three values.
+- `autopilot.mode: balanced` — merge mode. See **Merge Modes** below for the three values.
 - `autopilot.merge_partial: false` — never merge a PR with unresolved fixable review issues unless explicitly opted in. Only honored when `mode: aggressive`.
 - `autopilot.max_iterations: 10` — maximum issues to process before stopping
 - `autopilot.review_cycles: 3` — maximum fix attempts per PR. After this many cycles, if issues remain the auto-pilot's behavior depends on `autopilot.mode` (see *Merge Modes* below). Reduced from 10 — the script pre-pass in issue-pr-review handles lint/format, so 3 LLM cycles suffice for logic issues. A cycle = one fix attempt + one review pass. Confirmation-only review passes (spawned after a PASS to verify, without a preceding fix) do not consume a cycle.
@@ -152,12 +152,12 @@ Do not re-read the config at each iteration.
 
 ### Merge Modes
 
-The `autopilot.mode` setting controls when the loop is allowed to merge PRs. The default is **conservative** — a fresh install will create PRs and run review-fix cycles, but never auto-merge. Aggressive partial-merge behavior is unreachable without explicit opt-in.
+The `autopilot.mode` setting controls when the loop is allowed to merge PRs. The default is **balanced** — a fresh install auto-merges clean PRs, while PRs with unresolved review issues get a follow-up issue and stay open. Default install never merges a PR with unresolved fixable review issues. Aggressive partial-merge behavior is unreachable without explicit opt-in.
 
 | Mode | Clean PR (review passes) | Partial PR (cycles exhausted, non-critical) | Critical with unresolved issues |
 |------|--------------------------|---------------------------------------------|----------------------------------|
-| `conservative` (default) | leave PR open | leave PR open + create follow-up issue | stop and ask user |
-| `balanced` | merge PR | leave PR open + create follow-up issue | stop and ask user |
+| `conservative` | leave PR open | leave PR open + create follow-up issue | stop and ask user |
+| `balanced` (default) | merge PR | leave PR open + create follow-up issue | stop and ask user |
 | `aggressive` (requires `merge_partial: true`) | merge PR | merge PR + create follow-up issue (`partial_followup`) | stop and ask user |
 | `aggressive` with `merge_partial: false` | merge PR | leave PR open + create follow-up issue (same as `balanced`) | stop and ask user |
 
@@ -422,7 +422,7 @@ All errors use the rich format from `references/error-messages.md`:
 
 ## Expected Output
 
-Each iteration prints a static block. The `Merge` line resolves to one of the five categorical outcomes (`merged`, `left_open`, `partial_followup`, `failed`, `skipped`) — the example below assumes a `balanced` or `aggressive` mode where a clean PR is merged. Under the default `conservative` mode the same iteration would end with `Merge ⚠ left_open (mode: conservative)`.
+Each iteration prints a static block. The `Merge` line resolves to one of the five categorical outcomes (`merged`, `left_open`, `partial_followup`, `failed`, `skipped`) — the example below uses the default `balanced` mode where a clean PR is merged. Under `conservative` mode the same iteration would end with `Merge ⚠ left_open (mode: conservative)`.
 
 ```
   ◆ Auto-Pilot Iteration 1
