@@ -67,7 +67,7 @@ fi
 # ───────────────────────────────────────────────────────────
 # T3: Compatibility line names required peer skills (sanity check)
 # ───────────────────────────────────────────────────────────
-SKILL_FILE="$AUTOPILOT_DIR/SKILL.md"
+SKILL_FILE="$AUTOPILOT_DIR/SKILL.source.md"
 compat_line="$(grep -m1 '^compatibility:' "$SKILL_FILE" || true)"
 for required in "issue-triage" "issue-resolver" "issue-analysis" "issue-pr-review"; do
   case "$compat_line" in

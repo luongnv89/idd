@@ -129,9 +129,9 @@ fi
 # ───────────────────────────────────────────────────────────
 
 NAMED_FILES=(
-  "src/skills/issue-pr-review/SKILL.md"
-  "src/skills/issue-resolver/SKILL.md"
-  "src/skills/auto-pilot/SKILL.md"
+  "src/skills/issue-pr-review/SKILL.source.md"
+  "src/skills/issue-resolver/SKILL.source.md"
+  "src/skills/auto-pilot/SKILL.source.md"
 )
 
 for rel in "${NAMED_FILES[@]}"; do

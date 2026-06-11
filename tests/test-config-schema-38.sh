@@ -29,8 +29,8 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SCHEMA="$REPO_ROOT/docs/config-schema.md"
 TEMPLATE="$REPO_ROOT/src/skills/init-gitissue/templates/gitissue-template.yml"
-PR_REVIEW_SKILL="$REPO_ROOT/src/skills/issue-pr-review/SKILL.md"
-INIT_SKILL="$REPO_ROOT/src/skills/init-gitissue/SKILL.md"
+PR_REVIEW_SKILL="$REPO_ROOT/src/skills/issue-pr-review/SKILL.source.md"
+INIT_SKILL="$REPO_ROOT/src/skills/init-gitissue/SKILL.source.md"
 
 PASS=0
 FAIL=0

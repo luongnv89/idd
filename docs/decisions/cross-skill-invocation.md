@@ -59,13 +59,13 @@ Report back the resulting issue body in JSON.
 normalized IDD template. Asked for clarification on the correct skill name.
 
 **Run 2.** Same `Skill(issue-creator) → Unknown skill` error. Subagent fell
-back to reading `src/skills/issue-creator/SKILL.md` from the local
+back to reading `src/skills/issue-creator/SKILL.source.md` from the local
 filesystem, classified the issue manually as `improvement` with
 `needs review` confidence, populated `templates/improvement.md`, and produced
 a properly normalized issue body with acceptance criteria.
 
 **Run 3.** Identical pattern to Run 2. Same fallback path
-(`src/skills/issue-creator/SKILL.md`), same normalized output.
+(`src/skills/issue-creator/SKILL.source.md`), same normalized output.
 
 **Interpretation.** The bare `/issue-creator` form does not auto-resolve to a
 skill invocation in subagents in this Claude Code build. Runs 2 and 3

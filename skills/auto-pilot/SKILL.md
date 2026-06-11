@@ -116,6 +116,30 @@ Do not continue with partial auto-pilot execution when required skills are
 missing. `issue-creator` is optional; if it is missing, skip mid-loop issue
 normalization and print a warning instead of stopping.
 
+### Bundled dependency precheck
+
+Verify that this skill's bundled reference files are present. If any are
+missing, stop immediately and print:
+
+```
+text
+✗ Missing bundled dependency: {missing_file}
+
+  To fix:  asm install https://github.com/luongnv89/idd --skill auto-pilot
+           (or reinstall the full distribution)
+
+  Then restart the agent session and re-run /auto-pilot.
+```
+
+Check these files relative to the skill's directory (the dirname of this SKILL.md):
+
+- `references/phases.md` — phase-by-phase execution spec
+- `references/subagent-prompts.md` — resolver, reviewer, analyzer, batch-resolver subagent prompts
+- `references/docs/idd-methodology.md` — IDD methodology (issue dependencies, etc.)
+- `references/docs/sync-conventions.md` — stash-first sync convention and recovery
+- `references/docs/config-schema.md` — configuration schema reference
+- `references/explicit-list-mode.md` — explicit list mode parsing rules and dependency scan
+
 If the working tree is dirty, auto-stash and continue:
 ```bash
 git stash --include-untracked -m "auto-pilot: stash before run"

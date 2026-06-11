@@ -95,6 +95,31 @@ Read `references/agents/duplicate-detector.md` for the full duplicate detector p
 If the Agent tool is available, use the duplicate-detector subagent as described above for Step 3.
 If not (e.g., Claude.ai or environments without the Agent tool), execute duplicate checking inline using the fallback instructions included in Step 3.
 
+### Bundled dependency precheck
+
+Verify that this skill's bundled agent prompt and template files are present.
+If any are missing, stop immediately and print:
+
+```
+text
+✗ Missing bundled dependency: {missing_file}
+
+  To fix:  asm install https://github.com/luongnv89/idd --skill issue-creator
+           (or reinstall the full distribution)
+
+  Then restart the agent session and re-run /issue-creator.
+```
+
+Check these files relative to the skill's directory (the dirname of this SKILL.md):
+
+- `references/agents/duplicate-detector.md` — duplicate detection subagent prompt
+- `templates/bug.md` — bug issue template
+- `templates/feature.md` — feature request template
+- `templates/improvement.md` — improvement request template
+- `references/docs/naming-conventions.md` — issue title and labeling conventions
+- `references/docs/github-projects-sync.md` — GitHub Projects status sync reference
+- `references/modes.md` — Normalize and Batch mode step specs and error paths
+
 ### Parallel execution — Batch mode
 
 In batch mode, the duplicate detector and template generation can run in parallel since they are independent:

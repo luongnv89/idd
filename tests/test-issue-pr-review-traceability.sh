@@ -26,7 +26,7 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-SKILL="$REPO_ROOT/src/skills/issue-pr-review/SKILL.md"
+SKILL="$REPO_ROOT/src/skills/issue-pr-review/SKILL.source.md"
 TEMPLATES="$REPO_ROOT/src/skills/issue-pr-review/references/report-templates.md"
 RESOLVER_TEMPLATES="$REPO_ROOT/src/skills/issue-resolver/references/report-templates.md"
 METHODOLOGY="$REPO_ROOT/docs/idd-methodology.md"

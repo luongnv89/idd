@@ -72,7 +72,7 @@ for entry in "projects.sync_enabled" "projects.project_number" "projects.status_
 done
 
 # T6: issue-creator SKILL.md references the projects sync utility
-CREATOR="$REPO_ROOT/src/skills/issue-creator/SKILL.md"
+CREATOR="$REPO_ROOT/src/skills/issue-creator/SKILL.source.md"
 if grep -q "github-projects-sync.md" "$CREATOR" 2>/dev/null; then
   pass "T6: issue-creator references github-projects-sync.md"
 else
@@ -87,7 +87,7 @@ fi
 
 # T7: issue-resolver references the projects sync utility (in SKILL.md or
 # pipeline-steps.md — the in-progress transition lives in the latter since #35).
-RESOLVER="$REPO_ROOT/src/skills/issue-resolver/SKILL.md"
+RESOLVER="$REPO_ROOT/src/skills/issue-resolver/SKILL.source.md"
 RESOLVER_PIPELINE="$REPO_ROOT/src/skills/issue-resolver/references/pipeline-steps.md"
 if grep -q "github-projects-sync.md" "$RESOLVER" 2>/dev/null; then
   pass "T7: issue-resolver references github-projects-sync.md"
@@ -108,7 +108,7 @@ else
 fi
 
 # T8: issue-triage SKILL.md references the projects sync utility
-TRIAGE="$REPO_ROOT/src/skills/issue-triage/SKILL.md"
+TRIAGE="$REPO_ROOT/src/skills/issue-triage/SKILL.source.md"
 if grep -q "github-projects-sync.md" "$TRIAGE" 2>/dev/null; then
   pass "T8: issue-triage references github-projects-sync.md"
 else

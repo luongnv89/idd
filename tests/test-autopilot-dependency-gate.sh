@@ -30,7 +30,7 @@ fail() {
 echo "◆ Auto-Pilot Dependency Gate Tests (issue #93)"
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 
-SKILL="$REPO_ROOT/src/skills/auto-pilot/SKILL.md"
+SKILL="$REPO_ROOT/src/skills/auto-pilot/SKILL.source.md"
 PHASES="$REPO_ROOT/src/skills/auto-pilot/references/phases.md"
 ERRORS="$REPO_ROOT/src/skills/auto-pilot/references/error-messages.md"
 EXAMPLES="$REPO_ROOT/src/skills/auto-pilot/references/examples.md"

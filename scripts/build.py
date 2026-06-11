@@ -39,6 +39,12 @@ TEXT_EXTS = {".md", ".txt", ".yml", ".yaml", ".json", ".toml"}
 # Files we never rewrite inside (build-internal control files).
 SKIP_REWRITE_NAMES = {"plugin.json.in"}
 
+# Authored source skill prompts intentionally avoid the canonical SKILL.md
+# filename so repo-wide installers (asm) only discover the generated top-level
+# skills/ install surface, not the unbundled src/ authoring tree.
+SOURCE_SKILL_MD = "SKILL.source.md"
+OUTPUT_SKILL_MD = "SKILL.md"
+
 # Reference patterns. URL-aware: matches inside http(s):// URLs are excluded
 # at the rewriting stage by URL-prefix detection.
 SKILL_TOKEN_RE = re.compile(r"\{\{skill:([a-z][a-z0-9-]*)\}\}")
@@ -199,7 +205,7 @@ def _discover_public_skills(src: Path) -> list[str]:
     for entry in _sorted_iterdir(skills_root):
         if not entry.is_dir():
             continue
-        if not (entry / "SKILL.md").is_file():
+        if not (entry / SOURCE_SKILL_MD).is_file():
             continue
         out.append(entry.name)
     return out
@@ -215,7 +221,7 @@ def _discover_distributed_deprecated(src: Path) -> list[str]:
     for entry in _sorted_iterdir(root):
         if not entry.is_dir():
             continue
-        skill_md = entry / "SKILL.md"
+        skill_md = entry / SOURCE_SKILL_MD
         if not skill_md.is_file():
             continue
         text = _read_text(skill_md)
@@ -441,7 +447,8 @@ def _emit_flattened_skill(
     # Copy authored content (rewriting text files).
     for f in _walk_files(skill_root):
         rel = f.relative_to(skill_root)
-        dst = out_dir / rel
+        dst_rel = Path(OUTPUT_SKILL_MD) if rel == Path(SOURCE_SKILL_MD) else rel
+        dst = out_dir / dst_rel
         if _is_text_file(f) and f.name not in SKIP_REWRITE_NAMES:
             text = _read_text(f)
             _write_text(dst, _rewrite_for_standalone(text))
@@ -556,7 +563,8 @@ def _emit_plugin_tree(
         dst_root = out_root / "skills" / skill_name
         for f in _walk_files(skill_root):
             rel = f.relative_to(skill_root)
-            dst = dst_root / rel
+            dst_rel = Path(OUTPUT_SKILL_MD) if rel == Path(SOURCE_SKILL_MD) else rel
+            dst = dst_root / dst_rel
             if _is_text_file(f) and f.name not in SKIP_REWRITE_NAMES:
                 text = _read_text(f)
                 _write_text(dst, _rewrite_for_plugin(text))

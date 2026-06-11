@@ -49,10 +49,10 @@ else
   fail "T1.0: src/internal-skills/idd-doctor/ directory missing"
 fi
 
-if [ -f "$SKILL_DIR/SKILL.md" ]; then
-  pass "T1.1: SKILL.md exists"
+if [ -f "$SKILL_DIR/SKILL.source.md" ]; then
+  pass "T1.1: SKILL.source.md exists"
 else
-  fail "T1.1: SKILL.md missing"
+  fail "T1.1: SKILL.source.md missing"
 fi
 
 if [ -f "$SKILL_DIR/README.md" ]; then
@@ -76,7 +76,7 @@ fi
 # ───────────────────────────────────────────────────────────
 # T2: SKILL.md frontmatter and metadata
 # ───────────────────────────────────────────────────────────
-SKILL="$SKILL_DIR/SKILL.md"
+SKILL="$SKILL_DIR/SKILL.source.md"
 
 if grep -qE '^name:[[:space:]]+idd-doctor[[:space:]]*$' "$SKILL"; then
   pass "T2.1: frontmatter has 'name: idd-doctor'"
@@ -289,7 +289,7 @@ fi
 # Check 1 evidence: /issue-creator README.md and SKILL.md are
 # clean per the intent-only contract (other skills are out of scope).
 DRIFT_FOUND=0
-for f in "$REPO_ROOT/src/skills/issue-creator/README.md" "$REPO_ROOT/src/skills/issue-creator/SKILL.md"; do
+for f in "$REPO_ROOT/src/skills/issue-creator/README.md" "$REPO_ROOT/src/skills/issue-creator/SKILL.source.md"; do
   [ -f "$f" ] || continue
   while IFS= read -r line; do
     lower=$(printf '%s' "$line" | tr '[:upper:]' '[:lower:]')
