@@ -31,18 +31,19 @@ In auto mode, export `IDD_AUTO_MODE=1` before any shell snippet that consults it
 1. Confirm git repository: `git rev-parse --git-dir`
 2. Confirm `gh` is installed and authenticated: `gh auth status`
 3. Confirm the bundled reviewer agent exists at `references/agents/code-reviewer.md`
+4. Confirm the bundled fixer agent exists at `references/agents/fixer.md`
 
 ### Bundled dependency precheck
 
 `/issue-pr-review` is distributed as a self-contained skill. It does not require
 another gitissue skill to review a PR, but it does require its bundled reviewer
-agent prompt. Before execution, verify `references/agents/code-reviewer.md` is
-present in the installed skill directory.
+agent prompt. Before execution, verify `references/agents/code-reviewer.md` and
+`references/agents/fixer.md` are present in the installed skill directory.
 
-If it is missing, stop immediately and print:
+If either agent prompt is missing, stop immediately and print:
 
 ```text
-✗ Missing bundled dependency: references/agents/code-reviewer.md
+✗ Missing bundled dependency: {missing_agent_prompt}
 
   To fix:  asm install https://github.com/luongnv89/idd --skill issue-pr-review
   Or:      asm install https://github.com/luongnv89/idd
@@ -51,8 +52,8 @@ If it is missing, stop immediately and print:
   Then restart the agent session and re-run /issue-pr-review.
 ```
 
-Do not continue with an inline or guessed reviewer prompt when the bundled agent
-is missing.
+Do not continue with an inline or guessed reviewer/fixer prompt when a bundled
+agent is missing.
 
 Additionally, verify that this skill's bundled reference files are present.
 If any are missing, stop immediately and print:
@@ -70,6 +71,7 @@ text
 Check these files relative to the skill's directory (the dirname of this SKILL.md):
 
 - `references/agents/code-reviewer.md` — Review subagent prompt (already checked above)
+- `references/agents/fixer.md` — Fix subagent prompt
 - `references/report-templates.md` — Step 7 summary templates, auto-merge flow, expected inline output
 - `references/docs/pre-commit-security.md` — pre-commit security conventions reference
 - `references/docs/sync-conventions.md` — stash-first sync convention and recovery
@@ -309,7 +311,7 @@ This trades perfect independence between cycles (which rarely matters in practic
 
 ### Cycle 1 — Initial review
 
-Read `references/agents/code-reviewer.md` for the full prompt template.
+Read `references/agents/code-reviewer.md` for the full prompt template. Read `references/agents/fixer.md` for the fix-cycle prompt template.
 
 Spawn a new reviewer agent (cold start):
 
@@ -610,61 +612,31 @@ Exit the loop — PR passes the soft-pass condition.
 
 ### If fixable issues found
 
-For each issue where `action: "fix"`:
-1. Read the affected file
-2. Apply the fix
-3. Stage: `git add <specific-file>`
+Delegate fixes to the fixer subagent (see `references/agents/fixer.md`) instead of applying code changes in the main skill context. Reuse the same fixer agent across cycles when possible.
 
-After all fixes, run the pre-commit security scan against the staged set before
-committing (see the pre-commit security conventions reference at
-`references/docs/pre-commit-security.md` — that document is authoritative; the snippet
-below mirrors its Primary Pattern). Real secrets block; warnings prompt for
-confirmation in interactive mode and log-and-continue in auto mode.
+Spawn or re-message the fixer with:
+- `branch_name`: PR head branch
+- `base_branch`: PR base branch
+- `issue_context`: linked issue details and acceptance criteria, if any
+- `pr_context`: PR number, title, body, and URL
+- `findings_json`: all blocking findings from reviewer, acceptance-criteria checks, traceability checks, tests, and CI
+- `test_output`: trimmed relevant failure output from Steps 4-5
+- `commit_message`: `fix({scope}): address review feedback` (append `(#{linked_issue})` only if a linked issue exists)
+- `security_convention`: `references/docs/pre-commit-security.md` — the bundled pre-commit security scan the fixer MUST run before committing
 
-```bash
-# Pre-commit security scan — mirrors the Primary Pattern in the
-# pre-commit-security conventions reference. Set IDD_AUTO_MODE=1 in auto mode.
-files="$(git diff --cached --name-only)"
-secrets_found=0
-warnings=()
-if printf '%s\n' "$files" | grep -E -q '(^|/)\.env($|\.)|\.key$|\.pem$|credentials\.json$|secrets\.ya?ml$|id_rsa($|\.pub$)|\.p12$|\.pfx$|\.cer$'; then
-  echo "✗ Secret-bearing file staged."
-  secrets_found=1
-fi
-realkey='(sk-(proj-)?[A-Za-z0-9_-]{20,}|sk_live_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|ASIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{30,}|gho_[A-Za-z0-9]{30,}|ghs_[A-Za-z0-9]{30,}|ghu_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{40,}|xox[abprs]-[A-Za-z0-9-]{10,}|glpat-[A-Za-z0-9_-]{20,}|AIza[0-9A-Za-z_-]{30,})'
-while IFS= read -r f; do
-  [ -z "$f" ] && continue
-  [ -f "$f" ] || continue
-  file --mime "$f" 2>/dev/null | grep -q 'charset=binary' && continue
-  if grep -E -q "$realkey" "$f" 2>/dev/null; then
-    echo "✗ Real API key detected in: $f"
-    secrets_found=1
-  fi
-  size=$(stat -f%z "$f" 2>/dev/null || stat -c%s "$f" 2>/dev/null || echo 0)
-  [ "$size" -gt 10485760 ] && warnings+=("⚠ Large file (>10 MB) without LFS: $f")
-done <<< "$files"
-junk='(^|/)(node_modules|dist|build|__pycache__|\.venv)(/|$)|\.pyc$|(^|/)(\.DS_Store|thumbs\.db)$|\.swp$|\.tmp$'
-while IFS= read -r f; do
-  [ -z "$f" ] && continue
-  printf '%s\n' "$f" | grep -E -q "$junk" && warnings+=("⚠ Build artifact staged: $f")
-done <<< "$files"
-case "$(git rev-parse --abbrev-ref HEAD)" in
-  main|master|production|release) warnings+=("⚠ On protected branch — confirm intentional") ;;
-esac
-[ "$secrets_found" = 1 ] && { echo "✗ Pre-commit security scan blocked. See pre-commit-security conventions reference."; exit 1; }
-if [ "${#warnings[@]}" -gt 0 ]; then
-  printf '%s\n' "${warnings[@]}"
-  if [ "${IDD_AUTO_MODE:-0}" = "1" ]; then
-    echo "○ Warnings logged — proceeding (auto mode)."
-  else
-    printf "Proceed anyway? [y/N] "; read -r reply
-    case "$reply" in y|Y|yes|YES) echo "○ Continuing despite warnings." ;; *) echo "✗ Stopped."; exit 1 ;; esac
-  fi
-fi
+```python
+Agent(
+  description="Fix PR #N review issues",
+  prompt=<fixer.md prompt with {variables} replaced>,
+  subagent_type="general-purpose"  # NOT "fixer"
+)
 ```
 
-4. Commit: `fix({scope}): address review feedback` (append `(#{linked_issue})` only if a linked issue exists)
-5. Push: `git push origin {branch_name}`
+The fixer subagent reads affected files, applies targeted changes, stages specific files, runs relevant verification, and — before committing — runs the mandatory pre-commit security scan from `references/docs/pre-commit-security.md` against the staged set (real secrets block the commit). It then commits any changes. The main agent only collects the fixer's JSON result and pushes if changes were committed.
+
+If the fixer cannot resolve all blocking findings, keep the remaining items for the next loop/report.
+
+After the fixer returns with one or more commits, push: `git push origin {branch_name}`
 
 ```
 [6/7] Fix          ✓ fixed {N} issues (noted: {note_count} — not fixed)
@@ -754,6 +726,7 @@ A clean review prints the 7-step tracker and a summary — see the *Expected Inl
 ## Additional Resources
 
 - **`references/agents/code-reviewer.md`** — Review subagent prompt
+- **`references/agents/fixer.md`** — Fix subagent prompt
 - **`references/report-templates.md`** — Step 7 summary templates, auto-merge flow, expected inline output
 - **`references/error-messages.md`** — Error catalog
 - **`references/docs/naming-conventions.md`** — Naming conventions
