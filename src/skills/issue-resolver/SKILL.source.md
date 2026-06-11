@@ -96,6 +96,7 @@ Main Agent (orchestrator)
 │
 ├── Step 4: QA (main agent orchestrates review-fix loop)
 │   Spawns Code Reviewer subagent per cycle
+│   Spawns/reuses Fixer subagent for blocking findings
 │   Runs tests/build between cycles
 │   Max 5 cycles
 │
@@ -106,6 +107,7 @@ Read `shared/agents/codebase-researcher.md` for the researcher prompt.
 Read `shared/agents/synthesizer.md` for the synthesizer prompt.
 Read `shared/agents/implementer.md` for the implementer prompt.
 Read `shared/agents/code-reviewer.md` for the reviewer prompt.
+Read `shared/agents/fixer.md` for the fix-cycle prompt.
 
 ### Environment check
 
@@ -133,6 +135,7 @@ Check these files relative to the skill's directory (the dirname of this SKILL.m
 - `references/agents/synthesizer.md` — Plan subagent (Step 2)
 - `references/agents/implementer.md` — Implement subagent (Step 3)
 - `references/agents/code-reviewer.md` — QA review subagent (Step 4)
+- `references/agents/fixer.md` — QA fix subagent (Step 4)
 - `references/pipeline-steps.md` — Full delegation payloads, phases, and inline fallbacks for Steps 1–4
 - `references/report-templates.md` — PR body template, final report templates, and expected inline output
 - `references/docs/sync-conventions.md` — stash-first sync convention and recovery
@@ -304,7 +307,7 @@ After implementation:
 
 ## Step 4 — QA
 
-Automated review-fix loop: review → test → fix → repeat until clean or max cycles reached. Each cycle spawns a *fresh* `code-reviewer` subagent (see `shared/agents/code-reviewer.md`) for unbiased review.
+Automated review-fix loop: review → test → fix → repeat until clean or max cycles reached. Each cycle spawns a *fresh* `code-reviewer` subagent (see `shared/agents/code-reviewer.md`) for unbiased review and delegates blocking fixes to the `fixer` subagent (see `shared/agents/fixer.md`).
 
 ### Spawning the code reviewer
 
@@ -319,6 +322,18 @@ Agent(
 ```
 
 **Do NOT use `subagent_type: "code-reviewer"`** — that is not a registered agent type. Always use `general-purpose` and pass the full code-reviewer prompt (see `shared/agents/code-reviewer.md`).
+
+When the reviewer or test/build run returns blocking issues, spawn or re-message the fixer subagent:
+
+```python
+Agent(
+  description="Fix QA cycle N",
+  prompt=<fixer.md prompt with {variables} replaced>,
+  subagent_type="general-purpose"
+)
+```
+
+Pass the issue context, branch/base branch, reviewer findings, failing test/build output, and commit message `fix({scope}): address review feedback (#N)`. The main agent collects the fixer's JSON result and decides whether to start another QA cycle; it should not apply fixes inline when the Agent tool is available.
 
 Cycle mechanics, loop controls (`resolve.qa_max_cycles`, exit-on-clean, exit-on-stagnation), and the remaining-issues flow are in `references/pipeline-steps.md` (*Step 4 — QA*).
 
@@ -500,6 +515,7 @@ All errors use rich format from `references/error-messages.md`:
 - **`shared/agents/synthesizer.md`** — Plan subagent (Step 2)
 - **`shared/agents/implementer.md`** — Implement subagent (Step 3)
 - **`shared/agents/code-reviewer.md`** — QA review subagent (Step 4)
+- **`shared/agents/fixer.md`** — QA fix subagent (Step 4)
 - **`references/pipeline-steps.md`** — Full delegation payloads, phases, and inline fallbacks for Steps 1–4
 - **`references/report-templates.md`** — PR body template, final report templates, and expected inline output
 - **`references/error-messages.md`** — Complete error catalog

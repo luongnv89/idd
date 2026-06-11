@@ -79,6 +79,9 @@ AGENT_DESCRIPTIONS = {
     "implementer": (
         "Implement an approved issue plan with code changes and focused tests."
     ),
+    "fixer": (
+        "Apply targeted fixes for review, test, CI, AC, and traceability failures."
+    ),
     "issue-relationship-scanner": (
         "Scan issues for dependencies, file overlap, and already-fixed signals."
     ),

@@ -123,7 +123,7 @@ If commits exceed `resolve.max_commits`:
 
 If no Agent tool, implement inline following `references/agents/implementer.md`.
 
-## Step 4 — QA (code-reviewer subagent, per cycle)
+## Step 4 — QA (code-reviewer + fixer subagents)
 
 Each cycle:
 
@@ -131,8 +131,8 @@ Each cycle:
 2. **Run tests** — unit, integration, e2e (if present), build/compile.
 3. **Evaluate results:**
    - Reviewer returns `PASS` AND all tests pass AND build succeeds → exit loop, QA passed.
-   - Issues found → fix them, then start next cycle.
-4. **Fix issues** — for each issue from the reviewer or test failures: read affected file, apply fix, commit as `fix(scope): address review feedback (#N)`.
+   - Issues found → delegate fixes, then start next cycle.
+4. **Fix issues** — spawn or re-message the fixer subagent (see `references/agents/fixer.md`) with reviewer findings and failing test/build output. The fixer reads affected files, applies targeted fixes, verifies them, and commits as `fix(scope): address review feedback (#N)`. The main agent does not apply code fixes inline when the Agent tool is available.
 
 ### Loop controls
 
