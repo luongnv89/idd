@@ -788,7 +788,7 @@ def _check_python_version() -> None:
         sys.exit(f"build.py requires Python 3.11+ (running {sys.version.split()[0]})")
 
 
-def build(out: Path, src: Path, *, verbose: bool = False) -> None:
+def build(out: Path, src: Path, *, verbose: bool = False, no_root_skills: bool = False) -> None:
     if verbose:
         print(f"● Building from {src} to {out}")
 
@@ -829,11 +829,11 @@ def build(out: Path, src: Path, *, verbose: bool = False) -> None:
         if verbose:
             print(f"  ✓ flattened: {skill_name} (agents={len(agents)}, docs={len(docs)})")
 
-    # Repo-root flat skill index for `asm install <repo-url>`. This is emitted
-    # only for the canonical in-repo build, not for --out temp directories used
-    # by tests and release packaging.
+    # Repo-root flat skill index for `asm install <repo-url>`. Emitted by
+    # default (skills/ is the committed install surface). Use --no-root-skills
+    # to suppress when building to a temp directory only.
     repo_root = src.parent
-    if out == repo_root / "dist":
+    if not no_root_skills:
         _emit_repo_root_skills(repo_root, out_skills)
         if verbose:
             print("  ✓ root skills mirror: skills/")
@@ -875,15 +875,21 @@ def main(argv: list[str]) -> int:
         default="src",
         help="Source root directory (default: src).",
     )
+    parser.add_argument(
+        "--no-root-skills",
+        action="store_true",
+        help="Do not emit the repo-root skills/ flat index.",
+    )
     parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args(argv)
+    no_root_skills = args.no_root_skills
     out = Path(args.out).resolve()
     src = Path(args.src).resolve()
     if not src.is_dir():
         print(f"✗ src not found: {src}", file=sys.stderr)
         return 1
     try:
-        build(out, src, verbose=args.verbose)
+        build(out, src, verbose=args.verbose, no_root_skills=no_root_skills)
     except BuildError:
         return 1
     return 0
