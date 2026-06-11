@@ -162,6 +162,7 @@ Examples:
 - `.gitissue.yml` loaded ONCE at skill start, not re-read at each step
 - Zero-config: all defaults applied when no config file exists
 - First-run hint: `○ First run — using default config. Run /init-gitissue to customize.`
+- init-gitissue always creates `.gitissue.yml` when missing (even from non-interactive skill invocation)
 
 ### Skills
 - Each skill follows the skill-creator standard (frontmatter with name/description, progressive disclosure)

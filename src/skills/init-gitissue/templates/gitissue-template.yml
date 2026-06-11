@@ -94,14 +94,14 @@ review:
 autopilot:
   # Merge mode — controls when /auto-pilot is allowed to merge PRs.
   # Values: "conservative" | "balanced" | "aggressive"
-  # Default: "conservative" — create PR, run review-fix cycles, leave PR open.
-  #   Never auto-merges. Safest default; recommended for most projects.
-  # "balanced":     auto-merge clean PRs (review passed). PRs with unresolved
+  # Default: "balanced" — auto-merge clean PRs (review passed). PRs with unresolved
+  #   review issues get a follow-up and stay open. Recommended for most projects.
+  # "conservative": create PR, run review-fix cycles, leave PR open.
   #                 review issues get a follow-up issue and stay open.
   # "aggressive":   auto-merge clean PRs AND merge partial PRs when
   #                 merge_partial=true is also set (see below). Risky —
   #                 only enable on disposable/experimental repos.
-  mode: conservative
+  mode: balanced
 
   # Allow merging PRs that still have unresolved fixable review issues.
   # Default: false — never merge a partial PR.
