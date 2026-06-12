@@ -1,46 +1,19 @@
 ---
 name: auto-pilot
-description: "Run a fully autonomous triage-resolve-review-merge loop over the GitHub issue backlog with zero user prompts. Use when asked to auto-pilot, autopilot, resolve everything, work through the backlog, run the loop, or keep going until done. Don't use for single-issue work (use /issue-resolver), one-shot triage (use /issue-triage), or interactive PR review (use /issue-pr-review)."
+description: "Autonomous triage-resolve-review-merge loop over the GitHub issue backlog with zero prompts. Use when asked to auto-pilot, resolve everything, work through the backlog, or keep going until done. Don't use for single-issue work (use /issue-resolver), one-shot triage (use /issue-triage), or interactive PR review (use /issue-pr-review)."
 license: MIT
 compatibility: "Requires git and GitHub CLI (gh) with auth and push access. Requires merge permission for auto-merge. Requires issue-triage, issue-resolver, issue-analysis, and issue-pr-review to be installed from the same distribution. Optional: issue-creator for normalizing unstructured issues mid-loop."
 effort: max
 metadata:
-  version: 2.3.1
-  creator: Luong NGUYEN <luongnv89@gmail.com>
+  version: 2.3.2
+  author: Luong NGUYEN <luongnv89@gmail.com>
 ---
 
 # /auto-pilot
 
 Fully autonomous development loop: triage, pick, resolve, review, fix, merge, repeat — zero user prompts.
 
-### Changes in 2.3.0 — Dependency-aware merge gating
-
-- New Phase 5 pre-merge gate honors `Depends on #N` / `Blocked by #N` markers in issue bodies. Before merging PR-A, the loop verifies that every dependency referenced from issue A is closed and its associated PR is merged. If any dependency is still open or its PR is unmerged, the auto-pilot pauses with a structured alert (mirroring the critical-issue alert shape) — the user merges the dependency, then re-runs `/auto-pilot` to resume.
-- New iteration outcome label: `blocked_by_dependency`. The PR is left open, the issue stays open, and the loop stops cleanly.
-- New config: `autopilot.respect_dependencies: true` (default on). Set to `false` to skip the gate entirely for repos that don't use the convention.
-- The `Depends on #N` convention is documented in `docs/idd-methodology.md` (Issue Dependencies). The marker is plain prose — case-insensitive, list/sentence-shape agnostic, cross-repo references ignored.
-- This is the second documented exception to the autonomy philosophy (alongside critical-issue review failures): merging a PR out of dependency order is effectively irreversible (squash-merge into history), so the loop pauses rather than guessing.
-
-### Changes in 2.2.0 — Conservative-by-default merge modes
-
-- New `autopilot.mode` setting (`conservative` | `balanced` | `aggressive`). Default is **`balanced`**: clean PRs are auto-merged; PRs with unresolved review issues get follow-up issues and stay open.
-- New `autopilot.merge_partial: false` setting. Aggressive partial-merge behavior now requires both `mode: aggressive` AND `merge_partial: true` — the previous "merge anyway with follow-up" path is no longer reachable by accident.
-- Final-report iteration outcomes now use the categorical labels `merged`, `left_open`, `partial_followup`, `failed`, `skipped`.
-- Legacy `autopilot.auto_merge` is honored when `autopilot.mode` is unset, but `mode` is authoritative when both are present. The schema is being consolidated separately in the autopilot/review config schema work — this release ships only the merge-mode behavior change.
-
-### Changes in 2.1.0 — Token optimization
-
-- Review cycles reduced from 10 to **3** — script pre-pass handles lint/format, so fewer LLM cycles needed
-- `/issue-pr-review` now runs a **script pre-pass** (lint, format, test auto-fix) before spawning LLM reviewers — zero token cost for mechanical fixes
-- Code reviewer now classifies issues as `"fix"` or `"note"` — only "fix" issues trigger fix cycles, "note" issues are reported but don't consume tokens
-- **Soft pass condition** — PR passes when zero "fix" issues remain, even with ≤ 2 medium "note" issues
-- Lint/format violations no longer consume LLM review cycles — handled entirely by tooling
-
-### Breaking changes in 2.0.0
-
-- The loop no longer pauses on failure by default — failed issues are skipped and the loop continues (`pause_on_failure` defaults to `false`)
-- `auto_merge: false` no longer halts the loop — PRs that pass review are left open and the loop moves to the next issue
-- All confirmation prompts removed — the loop runs with full autonomy from start to finish
+> Version history lives in `docs/CHANGELOG.md` and `docs/release-notes/`, not in this skill body.
 
 The auto-pilot orchestrates existing gitissue skills into a continuous loop that processes the issue backlog with absolute autonomy. Each iteration: triage the backlog, pick the top-priority issue, resolve it via the full pipeline, review the PR with up to 3 token-optimized fix-review cycles (script pre-pass for lint/format, LLM only for critical issues), and merge according to `autopilot.mode`. Clean PRs merge in `balanced` or `aggressive` mode. PRs with unresolved review issues create a follow-up issue and stay open unless `mode: aggressive` and `merge_partial: true` are both explicitly set. For critical issues, the loop stops and asks the user for a decision instead of auto-continuing. The agent makes all non-critical decisions automatically, always choosing the best available path forward.
 
@@ -62,7 +35,7 @@ Inspired by the auto-adapt-mode pattern: **always proceed, never block on recove
    - Modifying repository settings or branch protection rules
    - Any action that matches the dangerous patterns list (destructive ops, production deployment, package publishing)
    - **Critical issues with unresolved review problems** — if the issue has a `critical` or `priority:critical` label and the review-fix loop exhausts its cycles without resolving all issues, stop and ask
-   - **PR blocked by an unmerged dependency** — if the originating issue has a `Depends on #N` / `Blocked by #N` marker and any referenced issue is still open (or its PR is unmerged), stop and ask. Merging out of dependency order is effectively irreversible (squash-merge lands on the default branch and rewrites history), so the loop pauses rather than guessing. Disabled by `autopilot.respect_dependencies: false`.
+   - **PR blocked by an unmerged dependency** — if the originating issue has a `Depends on #N` / `Blocked by #N` marker and any referenced issue is still open (or its PR is unmerged), stop and ask. Merging out of dependency order is effectively irreversible (squash-merge lands on the default branch and rewrites history), so the loop pauses rather than guessing. Disabled by `autopilot.respect_dependencies: false`. This is the second documented exception to the autonomy philosophy (alongside critical-issue review failures).
 
 When in doubt, the auto-pilot proceeds with the safer option rather than stopping to ask. A skipped issue can always be retried; a blocked loop wastes time.
 

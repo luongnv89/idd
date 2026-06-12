@@ -2,11 +2,11 @@
 name: issue-pr-review
 description: "Review a PR end-to-end with CI checks, fix cycles, and optional auto-merge. Use for PR review, cleanup, or readiness checks. Don't use for creating PRs, raw issue analysis, or non-PR code review."
 license: MIT
-compatibility: Requires git and GitHub CLI (gh) with authentication. Self-contained — uses shared agents from shared/agents/.
+compatibility: "Requires git and GitHub CLI (gh) with authentication. Self-contained — uses shared agents from shared/agents/."
 effort: high
 metadata:
-  version: 1.0.0
-  creator: Luong NGUYEN <luongnv89@gmail.com>
+  version: 2.0.0
+  author: Luong NGUYEN <luongnv89@gmail.com>
 ---
 
 # /issue-pr-review [PR_NUMBER]
@@ -35,31 +35,9 @@ In auto mode, export `IDD_AUTO_MODE=1` before any shell snippet that consults it
 
 ### Bundled dependency precheck
 
-`/issue-pr-review` is distributed as a self-contained skill. It does not require
-another gitissue skill to review a PR, but it does require its bundled reviewer
-agent prompt. Before execution, verify `references/agents/code-reviewer.md` and
-`references/agents/fixer.md` are present in the installed skill directory.
-
-If either agent prompt is missing, stop immediately and print:
+`/issue-pr-review` is distributed as a self-contained skill — it does not require another gitissue skill to review a PR, but it does require its bundled agent prompts and reference files. Before execution, verify the files below are present relative to the skill's directory (the dirname of this SKILL.md). If any is missing, stop immediately and print the error, then do not continue with an inline or guessed reviewer/fixer prompt:
 
 ```text
-✗ Missing bundled dependency: {missing_agent_prompt}
-
-  To fix:  asm install https://github.com/luongnv89/idd --skill issue-pr-review
-  Or:      asm install https://github.com/luongnv89/idd
-           Select: issue-pr-review
-
-  Then restart the agent session and re-run /issue-pr-review.
-```
-
-Do not continue with an inline or guessed reviewer/fixer prompt when a bundled
-agent is missing.
-
-Additionally, verify that this skill's bundled reference files are present.
-If any are missing, stop immediately and print:
-
-```
-text
 ✗ Missing bundled dependency: {missing_file}
 
   To fix:  asm install https://github.com/luongnv89/idd --skill issue-pr-review
@@ -68,10 +46,10 @@ text
   Then restart the agent session and re-run /issue-pr-review.
 ```
 
-Check these files relative to the skill's directory (the dirname of this SKILL.md):
-
-- `references/agents/code-reviewer.md` — Review subagent prompt (already checked above)
+- `references/agents/code-reviewer.md` — Review subagent prompt
 - `references/agents/fixer.md` — Fix subagent prompt
+- `references/verification-checks.md` — AC + traceability check procedure (Step 3)
+- `references/review-loop-mechanics.md` — reviewer/fixer spawn + reuse mechanics
 - `references/report-templates.md` — Step 7 summary templates, auto-merge flow, expected inline output
 - `references/docs/pre-commit-security.md` — pre-commit security conventions reference
 - `references/docs/sync-conventions.md` — stash-first sync convention and recovery
@@ -113,10 +91,12 @@ Load `.gitissue.yml` once. Defaults:
 - `review.ci_timeout: 600` (seconds, 10 minutes)
 - `review.test_timeout: 300` (seconds)
 - `review.soft_pass: true` — pass when zero "fix" issues remain, even if "note" issues exist (≤ 2 medium allowed)
-- `review.require_acceptance_criteria_check: true` — when `false`, skip per-criterion AC verification; report acceptance_criteria as `pass` with a "verification disabled" note (never blocks soft-pass). Default `true` preserves the issue #36 contract.
-- `review.require_traceability_check: true` — when `false`, skip the four traceability checks; report traceability as `pass` with a "verification disabled" note (never blocks soft-pass). Default `true` preserves the issue #36 contract.
-- `review.traceability_exempt_labels: ["refactor", "chore"]` — PR labels that exempt a PR from the `Closes #N` hard-fail (check 1 only; the other three traceability checks still run). Set to `[]` to disable label-based exemption.
-- `review.traceability_exempt_pattern: "^\\s*Type:\\s*(refactor|chore)\\s*$"` — case-insensitive multiline regex; if the PR body contains a matching line, the PR is exempt from the `Closes #N` hard-fail (check 1 only). Set to empty string `""` to disable pattern-based exemption.
+- `review.require_acceptance_criteria_check: true` — gate for per-criterion AC verification
+- `review.require_traceability_check: true` — gate for the four traceability checks
+- `review.traceability_exempt_labels: ["refactor", "chore"]` — labels that exempt a PR from the `Closes #N` hard-fail
+- `review.traceability_exempt_pattern: "^\\s*Type:\\s*(refactor|chore)\\s*$"` — body-line regex exempting a PR from the `Closes #N` hard-fail
+
+The last four flags default to `true`/the values shown, which preserve the issue #36 contract. Their full semantics (what `false` does, exemption scope, disabling) are in `references/verification-checks.md`.
 
 ---
 
@@ -134,17 +114,7 @@ Load `.gitissue.yml` once. Defaults:
   [7/7] Report       ✓ PR is clean — ready to merge
 ```
 
-Step 2 (Pre-pass) runs once before the review loop. Steps 3-6 repeat up to `review.max_cycles` times (default: 3). Step 7 runs once at the end.
-
-### Token optimization strategy
-
-The pipeline is designed to minimize LLM token usage:
-
-1. **Script pre-pass (Step 2)** — Lint, format, and test tools run via shell scripts, not LLM agents. Auto-fixes mechanical issues for free (zero tokens). This handles the bulk of lint/format violations that previously consumed full review cycles.
-2. **Agent reuse (Steps 3-6)** — The same reviewer and fixer agents are reused across fix cycles via `SendMessage`. Only the final confirmation pass spawns a fresh agent. This cuts agent spawn cost from 2 per cycle to ~1.3 average (reuse in cycles 2-3, fresh only for confirmation).
-3. **Severity-based filtering** — The code reviewer classifies each issue with `action: "fix"` or `action: "note"`. Only "fix" issues trigger a fix cycle. "Note" issues are reported but don't consume tokens.
-4. **Soft pass condition** — The review passes when zero "fix" issues remain, even if some medium "note" issues exist. This avoids burning cycles on diminishing-return fixes.
-5. **Reduced cycles (3 max)** — With mechanical issues handled by scripts and only critical issues triggering fixes, 3 LLM cycles are sufficient.
+Step 2 (Pre-pass) runs once before the review loop. Steps 3-6 repeat up to `review.max_cycles` times (default: 3). Step 7 runs once at the end. The pipeline minimizes LLM tokens via a zero-token script pre-pass (Step 2), reviewer/fixer reuse across cycles, severity-based `fix`/`note` filtering (Step 6), and the soft-pass condition (Review Loop).
 
 ---
 
@@ -232,52 +202,20 @@ npm test          # or pytest, go test ./..., cargo test, etc.
 
 ### Commit auto-fixes
 
-If any files were modified by the auto-fix tools, run the pre-commit security
-scan before staging (see the pre-commit security conventions reference at
-`docs/pre-commit-security.md` — that document is authoritative; the snippet
-below mirrors its Primary Pattern). Real secrets block; warnings prompt for
-confirmation in interactive mode and log-and-continue in auto mode.
+If any files were modified by the auto-fix tools, you MUST run the pre-commit
+security scan before staging. The authoritative scan is the **Primary Pattern**
+in `docs/pre-commit-security.md` — run that exact pattern against the working
+tree; do not improvise a weaker check. In auto mode, export `IDD_AUTO_MODE=1`
+first so the scan logs-and-continues on warnings instead of prompting.
+
+The scan enforces, in order:
+
+1. **Block on real secrets** — secret-bearing filenames (`.env`, `*.key`, `*.pem`, `credentials.json`, `id_rsa`, …) or real API-key patterns (OpenAI, AWS, GitHub, Slack, GitLab, Google) in any staged text file → print the offending file and `exit 1`. Never commit.
+2. **Warn (non-blocking) on** large files (>10 MB without LFS), staged build artifacts (`node_modules`, `dist`, `__pycache__`, `*.pyc`, …), and being on a protected branch (`main`/`master`/`production`/`release`). In interactive mode prompt `Proceed anyway? [y/N]`; in auto mode (`IDD_AUTO_MODE=1`) log and continue.
+
+Only after the scan passes (or warnings are accepted), commit and push:
 
 ```bash
-# Pre-commit security scan — mirrors the Primary Pattern in the
-# pre-commit-security conventions reference. Set IDD_AUTO_MODE=1 in auto mode.
-files="$(git status --porcelain | awk '{print $2}')"
-secrets_found=0
-warnings=()
-if printf '%s\n' "$files" | grep -E -q '(^|/)\.env($|\.)|\.key$|\.pem$|credentials\.json$|secrets\.ya?ml$|id_rsa($|\.pub$)|\.p12$|\.pfx$|\.cer$'; then
-  echo "✗ Secret-bearing file in working tree."
-  secrets_found=1
-fi
-realkey='(sk-(proj-)?[A-Za-z0-9_-]{20,}|sk_live_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|ASIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{30,}|gho_[A-Za-z0-9]{30,}|ghs_[A-Za-z0-9]{30,}|ghu_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{40,}|xox[abprs]-[A-Za-z0-9-]{10,}|glpat-[A-Za-z0-9_-]{20,}|AIza[0-9A-Za-z_-]{30,})'
-while IFS= read -r f; do
-  [ -z "$f" ] && continue
-  [ -f "$f" ] || continue
-  file --mime "$f" 2>/dev/null | grep -q 'charset=binary' && continue
-  if grep -E -q "$realkey" "$f" 2>/dev/null; then
-    echo "✗ Real API key detected in: $f"
-    secrets_found=1
-  fi
-  size=$(stat -f%z "$f" 2>/dev/null || stat -c%s "$f" 2>/dev/null || echo 0)
-  [ "$size" -gt 10485760 ] && warnings+=("⚠ Large file (>10 MB) without LFS: $f")
-done <<< "$files"
-junk='(^|/)(node_modules|dist|build|__pycache__|\.venv)(/|$)|\.pyc$|(^|/)(\.DS_Store|thumbs\.db)$|\.swp$|\.tmp$'
-while IFS= read -r f; do
-  [ -z "$f" ] && continue
-  printf '%s\n' "$f" | grep -E -q "$junk" && warnings+=("⚠ Build artifact staged: $f")
-done <<< "$files"
-case "$(git rev-parse --abbrev-ref HEAD)" in
-  main|master|production|release) warnings+=("⚠ On protected branch — confirm intentional") ;;
-esac
-[ "$secrets_found" = 1 ] && { echo "✗ Pre-commit security scan blocked. See pre-commit-security conventions reference."; exit 1; }
-if [ "${#warnings[@]}" -gt 0 ]; then
-  printf '%s\n' "${warnings[@]}"
-  if [ "${IDD_AUTO_MODE:-0}" = "1" ]; then
-    echo "○ Warnings logged — proceeding (auto mode)."
-  else
-    printf "Proceed anyway? [y/N] "; read -r reply
-    case "$reply" in y|Y|yes|YES) echo "○ Continuing despite warnings." ;; *) echo "✗ Stopped."; exit 1 ;; esac
-  fi
-fi
 git add -A
 git commit -m "style: auto-fix lint and format issues"
 git push origin {branch_name}
@@ -299,72 +237,18 @@ If tests fail at this stage, continue to the review loop — test failures will 
 
 ## Step 3 — Analyze & Review [3/7]
 
-### Agent reuse strategy
+### Reviewer agents and cycle reuse
 
-To minimize token usage, the review loop **reuses the same reviewer agent** across fix cycles instead of spawning a fresh one each time. The reviewer already has the codebase context loaded, so subsequent reviews are cheaper.
+Read `shared/agents/code-reviewer.md` for the reviewer prompt template and `shared/agents/fixer.md` for the fix-cycle prompt. Both are spawned with `subagent_type="general-purpose"` (NOT a custom `code-reviewer`/`fixer` type). Pass the reviewer `branch_name`, `base_branch`, `pr_context` (PR title + body), and `diff_command` (`gh pr diff {N}`).
 
-- **Cycle 1:** Spawn a new reviewer agent (cold start — reads diff, files, context)
-- **Cycles 2-3:** Send the reviewer a follow-up message via `SendMessage` asking it to re-review the diff after fixes were applied. The agent retains its context and only needs to re-read the updated diff, not re-discover the entire codebase.
-- **Confirmation pass:** After the fixer reports all issues resolved, spawn a **fresh confirmation reviewer** (separate agent, no memory of prior cycles) for an unbiased final check. This is the only fresh spawn after cycle 1.
+To minimize tokens, the loop **reuses the same reviewer across cycles**: cycle 1 is a cold-start spawn; cycles 2+ re-message that agent via `SendMessage` to re-review the updated diff; after the fixer reports zero fixable issues, one **fresh** confirmation reviewer does an unbiased final check. The full mechanics (exact spawn calls, the SendMessage re-review prompt, and the token-trade rationale) live in `references/review-loop-mechanics.md`.
 
-This trades perfect independence between cycles (which rarely matters in practice — the reviewer was already correct about what the issues were) for significant token savings. The fresh confirmation pass at the end catches anything the reused reviewer might have missed.
-
-### Cycle 1 — Initial review
-
-Read `shared/agents/code-reviewer.md` for the full prompt template. Read `shared/agents/fixer.md` for the fix-cycle prompt template.
-
-Spawn a new reviewer agent (cold start):
-
-```python
-Agent(
-  description="Review PR #N",
-  prompt=<code-reviewer.md prompt with {variables} replaced>,
-  subagent_type="general-purpose"  # NOT "code-reviewer"
-)
-```
-
-Pass to the reviewer:
-- `branch_name`: PR head branch
-- `base_branch`: PR base branch
-- `pr_context`: PR title and body
-- `diff_command`: `gh pr diff {N}`
-
-### Cycles 2+ — Re-review via SendMessage
-
-Send a message to the existing reviewer agent:
-```
-The fixer applied changes. Re-review the PR diff to check if the issues were resolved and find any new issues.
-
-Run: {diff_command}
-
-Return the same JSON format as before.
-```
-
-### Confirmation pass
-
-After the fix cycle reports zero fixable issues, spawn a **fresh** confirmation reviewer (new agent, no memory of prior cycles):
-
-```python
-Agent(
-  description="Confirmation review for PR #N",
-  prompt=<code-reviewer.md prompt with {variables} replaced>,
-  subagent_type="general-purpose"  # NOT "code-reviewer"
-)
-```
-
-If it finds new fixable issues, they go back to the existing fixer. If it confirms clean, the PR passes.
+Also fetch the linked issue for acceptance-criteria verification: `gh issue view {linked_issue} --json number,title,body,labels`.
 
 ```
 [3/7] Review       ✓ correctness:pass  ac:pass  trace:pass  maint:partial  safety:pass
                      {fixable_count} fixable, {note_count} noted
 ```
-
-Also fetch linked issues for acceptance criteria verification:
-```bash
-gh issue view {linked_issue} --json number,title,body,labels
-```
-
-Parse the `## Acceptance Criteria` section into one entry per checklist item and check each criterion against the PR changes — see *Acceptance-criteria verification (per criterion)* below.
 
 ### Order within Step 3
 
@@ -388,124 +272,18 @@ Step 3 produces a single review verdict organized into **five dimensions**. The 
 
 Each dimension reports `pass`, `partial`, or `fail`. A PR can pass tests and still fail on `traceability` or `acceptance_criteria` — those dimensions are not gated by test results.
 
-### Verification gates
+### Verification gates and the AC + traceability checks
 
-Two `.gitissue.yml` flags decide whether the acceptance-criteria and traceability checks run at all:
+Two of the five dimensions — `acceptance_criteria` and `traceability` — are produced by this skill, not the reviewer subagent. Their full procedure (per-criterion AC verification, the four traceability checks, the refactor/chore exemption, and the reviewer-category → dimension mapping) lives in `references/verification-checks.md`. **Read that file and apply it now**, before aggregating the cycle report.
 
-| Flag | Default | When `true` (default) | When `false` |
-|------|---------|----------------------|--------------|
-| `review.require_acceptance_criteria_check` | `true` | Run per-criterion verification described below; any `fail` blocks soft-pass. | Skip the check entirely. Report `○ acceptance_criteria: pass` with the explicit note `verification disabled (review.require_acceptance_criteria_check: false)`. Never blocks soft-pass; emit no fixable issues for this dimension. |
-| `review.require_traceability_check` | `true` | Run the four traceability checks below; missing `Closes #N` blocks soft-pass. | Skip the check entirely. Report `○ traceability: pass` with the explicit note `verification disabled (review.require_traceability_check: false)`. Never blocks soft-pass; emit no fixable issues for this dimension. |
+The gating rules that the rest of this skill depends on — keep these in mind here and enforce them in the Review Loop below:
 
-Both default to `true`, which preserves the issue #36 contract verbatim. Setting either flag to `false` is an explicit opt-out — the corresponding hard-block conditions in *Loop controls* below no longer apply for that dimension.
+- `review.require_acceptance_criteria_check` (default `true`) gates the AC check; `review.require_traceability_check` (default `true`) gates traceability. When either is `false`, that dimension reports `pass — verification disabled` and never blocks soft-pass.
+- **Any `acceptance_criteria: fail`** (a criterion the PR does not satisfy) → fixable issue in Step 6, `category: acceptance_criteria`. **Hard-blocks** soft-pass.
+- **`Closes #{N}` absent** (traceability check 1, unless the PR is refactor/chore-exempt) → fixable issue in Step 6, `category: traceability`, suggested fix "Add `Closes #{N}` to the PR body." **Hard-blocks** soft-pass.
+- All other traceability outcomes (missing commit ref, missing Decision Record on a human-authored PR, etc.) report `partial` and do **not** block.
 
-A separate, narrower opt-out exists for refactor/chore PRs (see *Refactor/chore exemption* below). It relaxes only check 1 (`Closes #N`) for the matching PR; the other three traceability checks still run.
-
-### Acceptance-criteria verification (per criterion)
-
-> Run only when `review.require_acceptance_criteria_check` is `true`. When `false`, skip this entire subsection and emit `○ acceptance_criteria: pass — verification disabled (review.require_acceptance_criteria_check: false)`.
-
-Fetch the linked issue and parse its `## Acceptance Criteria` section into individual checklist items. For each criterion, evaluate against the PR diff and produce one of three statuses:
-
-| Status | When |
-|--------|------|
-| `pass` | The PR demonstrably satisfies the criterion. Evidence is required: a file path with line range, a test name, or a one-line description of how the change fulfills the criterion. |
-| `fail` | The PR does not satisfy the criterion. Evidence is required: what's missing or what contradicts the criterion. |
-| `unverified` | The criterion cannot be verified from the diff alone (e.g., needs production validation, manual user testing, or behavior outside the change set). Explanation is required. |
-
-Output a structured block:
-
-```
-○ Acceptance Criteria
-  | # | Criterion | Status | Evidence |
-  |---|-----------|--------|----------|
-  | 1 | "{criterion text}" | pass | tests/foo.test.ts: case 'rejects empty' |
-  | 2 | "{criterion text}" | fail | exclusion list still hard-codes /login |
-  | 3 | "{criterion text}" | unverified | needs manual mobile-device test |
-```
-
-If the issue has no acceptance criteria:
-
-```
-○ Acceptance Criteria — none defined; manual review recommended
-```
-
-**Pass/partial/fail rule for the dimension:**
-- All criteria `pass` → ✓ acceptance_criteria: pass
-- Any criterion `fail` → ✗ acceptance_criteria: fail (blocks soft-pass; treat as fixable)
-- No fails, but at least one `unverified` → ⚠ acceptance_criteria: partial (does not block soft-pass; surfaced in report)
-- No criteria defined → ○ acceptance_criteria: pass (with the "manual review recommended" note)
-
-Each `fail` criterion becomes a fixable issue in Step 6 with `category: acceptance_criteria`, `action: fix`, evidence as the description, and the criterion text as the suggested fix target.
-
-### Traceability checks
-
-> Run only when `review.require_traceability_check` is `true`. When `false`, skip this entire subsection and emit `○ traceability: pass — verification disabled (review.require_traceability_check: false)`.
-
-Per the dual-write rule (see *Analysis Artifacts and Durable Memory* in `docs/idd-methodology.md`), the durable analysis signal must survive the squash-merge into git history. Run the following four checks against the PR body and the commits in the PR:
-
-1. **Issue link** — PR body contains `Closes #{N}`, `Fixes #{N}`, or `Resolves #{N}` for the linked issue. Detected with the same regex used by GitHub itself: `(?i)(close[sd]?|fix(e[sd])?|resolve[sd]?)\s+#\d+`. See *Refactor/chore exemption* below — the `Closes #N` requirement is relaxed for refactor/chore PRs (the other three checks still run).
-2. **Commit references issue** — at least one commit between base and head references the issue number:
-   ```bash
-   git log "{base_branch}..{head_branch}" --grep="#{N}" --oneline
-   ```
-   The reference may live in the subject or body. A reference inside a `Co-authored-by:` trailer does not count.
-3. **Durable analysis fields in PR body** — the PR body contains a `## Decision Record` section with the five stable labels (`Root cause`, `Options considered`, `Options rejected`, `Selected option`, `Residual risk`) and a `## Acceptance Criteria Verification` section (table or the explicit `No acceptance criteria defined` note). The labels are the contract — match them as exact strings, do not rewrite.
-4. **Squash-commit-body assumption** — under squash-merge (the project default per `docs/idd-methodology.md`), GitHub copies the PR body verbatim into the commit message. Treat passing check 3 as evidence the squash commit will carry the durable summary; no separate check is needed pre-merge. Note this assumption explicitly in the report so reviewers know what is and is not verified.
-
-**Pass/partial/fail rule for the dimension:**
-
-| Outcome | Conditions | Status |
-|---------|-----------|--------|
-| All four checks pass | Closes #N + commit ref + Decision Record + AC Verification block all present | ✓ traceability: pass |
-| `Closes #{N}` absent on a refactor/chore-exempt PR | check 1 skipped via the *Refactor/chore exemption* below; checks 2-4 still run | ○ traceability: pass — exempt (refactor/chore PR; no Closes #N required), with any check 2-4 partial findings appended |
-| `Closes #{N}` absent | check 1 fails (regardless of other checks) | ✗ traceability: fail (blocking — see below) |
-| Decision Record absent on a human-authored PR | check 3 partially fails: PR was not produced by `/issue-resolver` and has no Decision Record | ⚠ traceability: partial — "PR not produced by `/issue-resolver`; Decision Record absent" |
-| Commit reference absent | check 2 fails but check 1 passes (PR body has Closes #N but no commit references the issue) | ⚠ traceability: partial — "no commit references #{N}" |
-| Acceptance Criteria Verification block absent on a `/issue-resolver` PR | check 3 fails on a PR that does include a Decision Record | ⚠ traceability: partial — "Acceptance Criteria Verification block missing" |
-
-The `Closes #{N}` failure is the only traceability outcome that **blocks** the soft-pass. All other partial outcomes are reported but do not block. This matches issue #36's contract: a PR missing `Closes #N` reports a traceability failure even if tests pass; a human-authored PR without a Decision Record reports `partial`, not `fail`.
-
-When traceability fails on `Closes #{N}`, emit a fixable issue in Step 6 with `category: traceability`, `action: fix`, suggested fix: "Add `Closes #{N}` to the PR body."
-
-### Refactor/chore exemption
-
-Some PRs aren't tied to a single tracked issue — skill quality passes, dependency bumps, doc-only updates. Forcing each one to open a tracking issue purely to satisfy the `Closes #N` gate is workflow ceremony with no information gain. To accommodate this, check 1 (`Closes #N`) is **skipped** when either of the following holds:
-
-1. The PR has any label whose name appears in `review.traceability_exempt_labels` (default: `["refactor", "chore"]`). Match is exact and case-sensitive against GitHub label names.
-2. The PR body contains a line matching `review.traceability_exempt_pattern` (default: `"^\\s*Type:\\s*(refactor|chore)\\s*$"`, case-insensitive, evaluated multiline-anchored against the body). The line may appear anywhere in the body. The default is shown in YAML double-quoted form, so `\\s` is the correct value to copy into `.gitissue.yml`.
-
-The exemption applies **only to check 1**. Checks 2-4 (commit reference, Decision Record, Acceptance Criteria Verification block) still run; their absence is reported as `partial`, never `fail`. Note that check 2 (`git log --grep="#{N}"`) is well-defined only when there is a tracked issue number; an exempt refactor/chore PR with no linked issue has no `#{N}` to grep for, so check 2 is reported as `n/a — no linked issue`, not `partial`. When an exempt PR _does_ have a linked issue (e.g., a refactor scoped under a tracking ticket) but no commit references it, the report is `○ pass — exempt; no commit references #{N} (note)`, not `fail`.
-
-Report wording:
-
-```
-traceability:        ○ pass — exempt (refactor/chore PR; no Closes #N required)
-```
-
-If checks 2-4 produce partial findings on an exempt PR, append them as in the human-authored case:
-
-```
-traceability:        ○ pass — exempt (refactor/chore PR; no Closes #N required);
-                       no commit references #{N}
-```
-
-To **disable** the exemption entirely (restore the strict issue #36 behavior), set `traceability_exempt_labels: []` and `traceability_exempt_pattern: ""` in `.gitissue.yml`.
-
-The exemption check runs before the four traceability checks; if a PR matches, log which mechanism matched (label name or pattern) so reviewers can audit the decision in the report.
-
-### Reviewer call-out for the other three dimensions
-
-Pass the reviewer the issue body alongside the diff (the existing `pr_context` field is fine). The reviewer's JSON output already partitions findings by category — at the end of Step 3, this skill aggregates:
-
-- `correctness` findings → `correctness` dimension
-- `code_quality` + `test_coverage` findings → `maintainability` dimension
-- `security` + `edge_cases` findings → `safety` dimension
-
-Each dimension's status is computed from its findings:
-- Any `action: fix` finding in the dimension → ✗ `fail`
-- Only `action: note` findings → ⚠ `partial`
-- No findings → ✓ `pass`
+These two hard-blocks are the issue #36 contract: a PR can pass tests and still be blocked on `acceptance_criteria: fail` or a missing `Closes #N`.
 
 ---
 
@@ -612,31 +390,7 @@ Exit the loop — PR passes the soft-pass condition.
 
 ### If fixable issues found
 
-Delegate fixes to the fixer subagent (see `shared/agents/fixer.md`) instead of applying code changes in the main skill context. Reuse the same fixer agent across cycles when possible.
-
-Spawn or re-message the fixer with:
-- `branch_name`: PR head branch
-- `base_branch`: PR base branch
-- `issue_context`: linked issue details and acceptance criteria, if any
-- `pr_context`: PR number, title, body, and URL
-- `findings_json`: all blocking findings from reviewer, acceptance-criteria checks, traceability checks, tests, and CI
-- `test_output`: trimmed relevant failure output from Steps 4-5
-- `commit_message`: `fix({scope}): address review feedback` (append `(#{linked_issue})` only if a linked issue exists)
-- `security_convention`: `references/docs/pre-commit-security.md` — the bundled pre-commit security scan the fixer MUST run before committing
-
-```python
-Agent(
-  description="Fix PR #N review issues",
-  prompt=<fixer.md prompt with {variables} replaced>,
-  subagent_type="general-purpose"  # NOT "fixer"
-)
-```
-
-The fixer subagent reads affected files, applies targeted changes, stages specific files, runs relevant verification, and — before committing — runs the mandatory pre-commit security scan from `references/docs/pre-commit-security.md` against the staged set (real secrets block the commit). It then commits any changes. The main agent only collects the fixer's JSON result and pushes if changes were committed.
-
-If the fixer cannot resolve all blocking findings, keep the remaining items for the next loop/report.
-
-After the fixer returns with one or more commits, push: `git push origin {branch_name}`
+Delegate fixes to the fixer subagent (`shared/agents/fixer.md`) — never apply code changes in the main skill context — and reuse the same fixer across cycles when possible. The fixer reads affected files, applies targeted changes, runs the mandatory pre-commit security scan from `references/docs/pre-commit-security.md` against the staged set (real secrets block the commit), then commits. The main agent collects the fixer's JSON result and pushes any commits (`git push origin {branch_name}`); unresolved blocking findings carry to the next cycle. The exact spawn variables and `Agent(...)` call are in `references/review-loop-mechanics.md`.
 
 ```
 [6/7] Fix          ✓ fixed {N} issues (noted: {note_count} — not fixed)
@@ -678,16 +432,7 @@ Print a structured step-by-step summary showing the review pipeline results. Use
 
 In interactive mode: never auto-merge — just report status.
 
----
-
-## Review-Only Mode
-
-When invoked with `--review-only`:
-
-1. Run Steps 1-5 once (PR info, pre-pass, review, test, CI check)
-2. Skip Step 6 (no fixes)
-3. Report findings in Step 7
-4. Never loop, never fix, never merge
+**Review-only mode (`--review-only`):** run Steps 1-5 once, skip Step 6, report in Step 7 — never loop, fix, or merge.
 
 ---
 
@@ -721,12 +466,13 @@ A clean review prints the 7-step tracker and a summary — see the *Expected Inl
 - **CI still running** — waits up to `review.ci_timeout`, then prints the current state and stops without merging.
 - **Critical issue unresolvable after 3 cycles** — stops, prints remaining issues, does not merge, asks the user to take over.
 - **Merge conflict with base** — prints the exact rebase command and stops.
-- **Review-only mode (`--review-only`)** — never fixes or merges, always reports.
 
 ## Additional Resources
 
 - **`shared/agents/code-reviewer.md`** — Review subagent prompt
 - **`shared/agents/fixer.md`** — Fix subagent prompt
+- **`references/verification-checks.md`** — AC + traceability check procedure (Step 3)
+- **`references/review-loop-mechanics.md`** — reviewer/fixer spawn + reuse mechanics
 - **`references/report-templates.md`** — Step 7 summary templates, auto-merge flow, expected inline output
 - **`references/error-messages.md`** — Error catalog
 - **`docs/naming-conventions.md`** — Naming conventions

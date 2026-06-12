@@ -1,12 +1,12 @@
 ---
 name: issue-analysis
-description: "Analyze a single GitHub issue for root cause, affected files, implementation options, complexity, and risk; persists to .gitissue/analysis-N.json. Use when asked to analyze issue #N, investigate issue, impact analysis, how hard is #N, or /issue-analysis. Don't use for creating/filing issues (use /issue-creator), bulk triaging (use /issue-triage), or actually resolving the issue (use /issue-resolver)."
+description: "Analyze one GitHub issue for root cause, affected files, options, complexity, and risk; persists to .gitissue/analysis-N.json. Use for analyze issue #N, investigate, impact analysis, or how hard is #N. Don't use for creating/filing issues (use /issue-creator), bulk triaging (use /issue-triage), or actually resolving the issue (use /issue-resolver)."
 license: MIT
-compatibility: Requires git and GitHub CLI (gh) with authentication. View mode (`/issue-analysis N view`) needs only local file access — no gh required.
+compatibility: "Requires git and GitHub CLI (gh) with authentication. View mode (`/issue-analysis N view`) needs only local file access — no gh required."
 effort: high
 metadata:
-  version: 0.4.1
-  creator: Luong NGUYEN <luongnv89@gmail.com>
+  version: 0.4.2
+  author: Luong NGUYEN <luongnv89@gmail.com>
 ---
 
 # /issue-analysis N

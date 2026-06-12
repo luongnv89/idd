@@ -27,6 +27,16 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SKILL="$REPO_ROOT/src/skills/issue-pr-review/SKILL.source.md"
+# The detailed AC + traceability spec language (per-criterion statuses, the
+# Decision Record labels, the `traceability: partial` verdict, the
+# `git log --grep` commit check) was extracted from SKILL.source.md into
+# references/verification-checks.md for progressive disclosure (≤500-line
+# skill-creator standard). SKILL.source.md still instructs the agent to read
+# and apply that file at Step 3 ("Read that file and apply it now"), so the
+# runtime-reachable spec surface is SKILL.source.md *plus* verification-checks.md.
+# Assertions that target the extracted language grep this combined corpus.
+VERIFICATION_CHECKS="$REPO_ROOT/src/skills/issue-pr-review/references/verification-checks.md"
+SKILL_SPEC=("$SKILL" "$VERIFICATION_CHECKS")
 TEMPLATES="$REPO_ROOT/src/skills/issue-pr-review/references/report-templates.md"
 RESOLVER_TEMPLATES="$REPO_ROOT/src/skills/issue-resolver/references/report-templates.md"
 METHODOLOGY="$REPO_ROOT/docs/idd-methodology.md"
@@ -49,7 +59,7 @@ echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄�
 # ───────────────────────────────────────────────────────────
 # T0: Files exist
 # ───────────────────────────────────────────────────────────
-for f in "$SKILL" "$TEMPLATES" "$RESOLVER_TEMPLATES" "$METHODOLOGY"; do
+for f in "$SKILL" "$VERIFICATION_CHECKS" "$TEMPLATES" "$RESOLVER_TEMPLATES" "$METHODOLOGY"; do
   if [ -f "$f" ]; then
     pass "T0: $(basename "$f") exists"
   else
@@ -132,13 +142,13 @@ else
   fail "T3.AC2: SKILL.md does not address human-authored PRs"
 fi
 
-if grep -qiE 'traceability:.*partial' "$SKILL"; then
+if grep -qiE 'traceability:.*partial' "${SKILL_SPEC[@]}"; then
   pass "T3.AC2: SKILL.md uses 'traceability: partial' for the soft case"
 else
   fail "T3.AC2: SKILL.md never declares 'traceability: partial'"
 fi
 
-if grep -qiE 'Decision Record absent' "$SKILL"; then
+if grep -qiE 'Decision Record absent' "${SKILL_SPEC[@]}"; then
   pass "T3.AC2: SKILL.md notes Decision Record may be absent"
 else
   fail "T3.AC2: SKILL.md does not note Decision Record absent case"
@@ -168,7 +178,7 @@ fi
 # All five Decision Record stable labels must be enumerated, since they
 # are the string-matched contract.
 for label in "Root cause" "Options considered" "Options rejected" "Selected option" "Residual risk"; do
-  if grep -qF "$label" "$SKILL"; then
+  if grep -qF "$label" "${SKILL_SPEC[@]}"; then
     pass "T4.AC3: SKILL.md enumerates Decision Record label '$label'"
   else
     fail "T4.AC3: SKILL.md missing Decision Record label '$label'"
@@ -229,14 +239,14 @@ fi
 # All three statuses must be documented in /issue-pr-review too,
 # alongside the requirement that evidence accompanies pass/fail.
 for status in pass fail unverified; do
-  if grep -qE "\\\`$status\\\`" "$SKILL" || grep -qiE "(^|[^a-z_])$status([^a-z_]|$)" "$SKILL"; then
+  if grep -qE "\\\`$status\\\`" "${SKILL_SPEC[@]}" || grep -qiE "(^|[^a-z_])$status([^a-z_]|$)" "${SKILL_SPEC[@]}"; then
     pass "T6: SKILL.md documents AC status '$status'"
   else
     fail "T6: SKILL.md missing AC status '$status'"
   fi
 done
 
-if grep -qiE 'evidence' "$SKILL"; then
+if grep -qiE 'evidence' "${SKILL_SPEC[@]}"; then
   pass "T6: SKILL.md requires evidence on AC verifications"
 else
   fail "T6: SKILL.md does not require evidence on AC verifications"
@@ -256,7 +266,7 @@ else
   fail "T7: SKILL.md missing 'PR body contains Closes #N' check"
 fi
 
-if grep -qE 'git log.*--grep' "$SKILL"; then
+if grep -qE 'git log.*--grep' "${SKILL_SPEC[@]}"; then
   pass "T7: SKILL.md documents commit-references-issue check via git log --grep"
 else
   fail "T7: SKILL.md missing commit-references-issue check"
