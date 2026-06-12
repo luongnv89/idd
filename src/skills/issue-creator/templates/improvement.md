@@ -34,4 +34,5 @@ Improvement
 
 **Priority:** {priority}
 **Effort:** {effort}
+**Suggested model:** {model_suggestion}
 **Labels:** {labels}

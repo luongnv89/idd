@@ -205,3 +205,32 @@ All errors follow the rich error format: what went wrong + fix command + docs li
   Docs:    https://github.com/luongnv89/idd/blob/main/docs/config-schema.md
 ```
 **Trigger:** Config file exists but contains invalid values (wrong type, out of range, unknown field).
+
+## Model Suggestion
+
+All model-suggestion failures are **non-fatal** — they warn and continue creating the issue without a suggestion. None block creation.
+
+### Model data refresh failed
+```
+⚠ Model data refresh failed — {reason}
+  Using existing cached data (CursorBench {version}, fetched {age}).
+  Tip: retry later, or set model_suggestion.enabled: false to disable.
+```
+**Trigger:** The WebFetch refresh of `data_url` fails (network error, empty/unparseable response) while a usable cache or seed is present.
+
+### Model data unavailable
+```
+⚠ Model data unavailable — no cache and no bundled seed found
+  Skipping model suggestion for this issue.
+  To fix:  reinstall the skill, or set model_suggestion.enabled: false
+  Docs:    https://github.com/luongnv89/idd/blob/main/docs/config-schema.md
+```
+**Trigger:** `model_suggestion.enabled` is true but neither `.gitissue/model-data.json` nor the bundled `templates/model-data.json` seed can be read. Suggestions are skipped; issue creation proceeds.
+
+### Model data malformed
+```
+⚠ Model data is malformed — {detail}
+  Skipping model suggestion for this issue.
+  Tip: refresh the data, or restore .gitissue/model-data.json from the bundled seed.
+```
+**Trigger:** `.gitissue/model-data.json` exists but fails JSON parsing or is missing the `complexity_mapping` / `providers` keys.
