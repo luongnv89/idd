@@ -25,7 +25,130 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <style>
-    :root{--green:#00FF41;--bg:#0A0A0A;--panel:#111315;--panel2:#16191c;--line:#1f2428;--fg:#FAFAFA;--muted:#a7b0b4;--dim:#6b7479;--cyan:#4fd0e3;--yellow:#ffcb47;--red:#ff5d52;--radius:14px;--maxw:1120px;--mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;--sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif}*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--sans);line-height:1.6;font-size:16px;background-image:radial-gradient(900px 500px at 50% -8%,rgba(0,255,65,.10),transparent 60%)}a{color:inherit;text-decoration:none}.wrap{max-width:var(--maxw);margin:0 auto;padding:0 24px}.mono,code{font-family:var(--mono)}code{color:var(--green);background:rgba(0,255,65,.07);border:1px solid rgba(0,255,65,.16);border-radius:6px;padding:2px 6px;font-size:.92em}header{position:sticky;top:0;z-index:10;background:rgba(10,10,10,.78);backdrop-filter:blur(14px);border-bottom:1px solid #181c1f}.nav{height:64px;display:flex;align-items:center;justify-content:space-between}.brand{display:flex;align-items:center;gap:11px;font-weight:800;font-size:21px;letter-spacing:-.04em}.brand b:last-child{color:var(--green)}.nav-links{display:flex;gap:24px;align-items:center}.nav-links a{color:var(--muted);font-size:15px}.nav-links a:hover{color:var(--fg)}.nav-links a.active{color:var(--green)}.cta{font-family:var(--mono);color:var(--green)!important;border:1px solid rgba(0,255,65,.35);padding:8px 14px;border-radius:8px}.hero{padding:72px 0 42px}.eyebrow{font-family:var(--mono);color:var(--green);font-size:13px;font-weight:700;margin-bottom:18px}h1{font-size:clamp(2.4rem,6vw,4.4rem);line-height:1.04;margin:0 0 18px;letter-spacing:-.04em}h1 span{color:var(--green)}.lead{font-size:1.22rem;color:var(--muted);max-width:70ch;margin:0}.grid{display:grid;grid-template-columns:260px 1fr;gap:32px;align-items:start;padding:34px 0 80px}.toc{position:sticky;top:84px;border:1px solid var(--line);background:linear-gradient(180deg,#111315,#0d0f10);border-radius:var(--radius);padding:18px}.toc h2{font-size:13px;text-transform:uppercase;color:var(--dim);letter-spacing:.08em;margin:0 0 10px}.toc a{display:block;color:var(--muted);padding:8px 0;border-bottom:1px solid #181c1f;font-size:14px}.toc a:last-child{border-bottom:0}.toc a:hover{color:var(--green)}section.doc{border:1px solid var(--line);background:linear-gradient(180deg,var(--panel),#0e1011);border-radius:var(--radius);padding:28px;margin-bottom:18px}section.doc h2{margin:0 0 8px;font-size:1.75rem;letter-spacing:-.03em}section.doc h3{margin:24px 0 10px;color:var(--fg)}.summary{color:var(--muted);margin:0 0 16px}.tag{font-family:var(--mono);color:var(--green);font-size:13px;font-weight:700}.cards{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin:20px 0}.card{border:1px solid var(--line);background:var(--panel2);border-radius:12px;padding:16px}.card h3{margin:0 0 6px!important;font-size:1rem}.card p{margin:0;color:var(--muted);font-size:14px}table{width:100%;border-collapse:collapse;margin:14px 0 8px;overflow:hidden;border-radius:12px}th,td{text-align:left;vertical-align:top;border:1px solid var(--line);padding:12px 13px}th{background:#15191b;color:var(--fg);font-size:13px}td{color:var(--muted)}td:first-child{white-space:nowrap;color:var(--fg);font-family:var(--mono);font-size:14px}.note{border-left:3px solid var(--green);background:rgba(0,255,65,.06);padding:12px 14px;border-radius:8px;color:var(--muted)}footer{border-top:1px solid var(--line);padding:28px 0;color:var(--dim)}@media(max-width:860px){.grid{grid-template-columns:1fr}.toc{position:static}.cards{grid-template-columns:1fr}.nav-links a:not(.cta){display:none}td:first-child{white-space:normal}}
+    :root {
+      --green: #00FF41;
+      --bg: #0A0A0A;
+      --panel: #111315;
+      --panel2: #16191c;
+      --line: #1f2428;
+      --line-soft: #181c1f;
+      --fg: #FAFAFA;
+      --muted: #a7b0b4;
+      --dim: #6b7479;
+      --cyan: #4fd0e3;
+      --yellow: #ffcb47;
+      --red: #ff5d52;
+      --radius: 14px;
+      --maxw: 1120px;
+      --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      --sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: var(--sans);
+      line-height: 1.6;
+      font-size: 16px;
+      background-image: radial-gradient(900px 500px at 50% -8%, rgba(0,255,65,.10), transparent 60%);
+    }
+    a { color: inherit; text-decoration: none; }
+    .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 24px; }
+    .mono, code { font-family: var(--mono); }
+    code {
+      color: var(--green);
+      background: rgba(0,255,65,.07);
+      border: 1px solid rgba(0,255,65,.16);
+      border-radius: 6px;
+      padding: 2px 6px;
+      font-size: .92em;
+    }
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: rgba(10,10,10,0.72);
+      backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--line-soft);
+    }
+    .nav { height: 64px; display: flex; align-items: center; justify-content: space-between; }
+    .brand { display: flex; align-items: center; gap: 11px; font-weight: 800; font-size: 21px; letter-spacing: -.04em; }
+    .brand b:last-child { color: var(--green); }
+    .nav-links { display: flex; gap: 24px; align-items: center; }
+    .nav-links a { color: var(--muted); font-size: 15px; }
+    .nav-links a:hover { color: var(--fg); }
+    .nav-links a.active { color: var(--green); }
+    .cta {
+      font-family: var(--mono);
+      color: var(--green) !important;
+      border: 1px solid rgba(0,255,65,.35);
+      padding: 8px 14px;
+      border-radius: 8px;
+    }
+    .hero { padding: 72px 0 42px; }
+    .eyebrow { font-family: var(--mono); color: var(--green); font-size: 13px; font-weight: 700; margin-bottom: 18px; }
+    h1 {
+      font-size: clamp(2.4rem, 6vw, 4.4rem);
+      line-height: 1.04;
+      margin: 0 0 18px;
+      letter-spacing: -.04em;
+    }
+    h1 span { color: var(--green); }
+    .lead { font-size: 1.22rem; color: var(--muted); max-width: 70ch; margin: 0; }
+    .grid { display: grid; grid-template-columns: 260px 1fr; gap: 32px; align-items: start; padding: 34px 0 80px; }
+    .toc {
+      position: sticky;
+      top: 84px;
+      border: 1px solid var(--line);
+      background: linear-gradient(180deg, #111315, #0d0f10);
+      border-radius: var(--radius);
+      padding: 18px;
+    }
+    .toc h2 { font-size: 13px; text-transform: uppercase; color: var(--dim); letter-spacing: .08em; margin: 0 0 10px; }
+    .toc a { display: block; color: var(--muted); padding: 8px 0; border-bottom: 1px solid var(--line-soft); font-size: 14px; }
+    .toc a:last-child { border-bottom: 0; }
+    .toc a:hover { color: var(--green); }
+    section.doc {
+      border: 1px solid var(--line);
+      background: linear-gradient(180deg, var(--panel), #0e1011);
+      border-radius: var(--radius);
+      padding: 28px;
+      margin-bottom: 18px;
+    }
+    section.doc h2 { margin: 0 0 8px; font-size: 1.75rem; letter-spacing: -.03em; }
+    section.doc h3 { margin: 24px 0 10px; color: var(--fg); }
+    .summary { color: var(--muted); margin: 0 0 16px; }
+    .tag { font-family: var(--mono); color: var(--green); font-size: 13px; font-weight: 700; }
+    .cards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin: 20px 0; }
+    .card { border: 1px solid var(--line); background: var(--panel2); border-radius: 12px; padding: 16px; }
+    .card h3 { margin: 0 0 6px !important; font-size: 1rem; }
+    .card p { margin: 0; color: var(--muted); font-size: 14px; }
+    table { width: 100%; border-collapse: collapse; margin: 14px 0 8px; overflow: hidden; border-radius: 12px; }
+    th, td { text-align: left; vertical-align: top; border: 1px solid var(--line); padding: 12px 13px; }
+    th { background: #15191b; color: var(--fg); font-size: 13px; }
+    td { color: var(--muted); }
+    td:first-child { white-space: nowrap; color: var(--fg); font-family: var(--mono); font-size: 14px; }
+    .note {
+      border-left: 3px solid var(--green);
+      background: rgba(0,255,65,.06);
+      padding: 12px 14px;
+      border-radius: 8px;
+      color: var(--muted);
+    }
+    footer { border-top: 1px solid var(--line); padding: 28px 0; color: var(--dim); }
+    .foot-links { display: flex; gap: 26px; font-size: 14px; }
+    .foot-links a { color: var(--muted); transition: color .15s; }
+    .foot-links a:hover { color: var(--green); }
+    .foot-note { font-family: var(--mono); font-size: 12.5px; color: var(--dim); }
+    @media (max-width: 860px) {
+      .grid { grid-template-columns: 1fr; }
+      .toc { position: static; }
+      .cards { grid-template-columns: 1fr; }
+      .nav-links a:not(.cta) { display: none; }
+      td:first-child { white-space: normal; }
+    }
   </style>
 </head>
 <body>
@@ -48,6 +171,23 @@
     </div>
   </div>
 </main>
-<footer><div class="wrap">Issue-Driven Development · <a href="https://github.com/luongnv89/idd">GitHub</a> · <a href="landing.html#commands">Commands</a> · <a href="docs.html">Docs</a> · <a href="changelog.html">Changelog</a> · <a href="https://github.com/luongnv89/idd/blob/main/LICENSE">License</a></div></footer>
+<footer class="site">
+  <div class="wrap foot-inner">
+    <a class="brand" href="landing.html" style="font-size:18px;">
+      <svg width="22" height="22" viewBox="0 0 120 120" aria-hidden="true">
+        <path fill-rule="evenodd" fill="#00FF41" d="M60 12 L108 60 L60 108 L12 60 Z M48 46 L80 60 L48 74 Z"/>
+      </svg>
+      <span><span class="b-issue">issue</span><span class="b-dev">dev</span></span>
+    </a>
+    <div class="foot-links">
+      <a href="https://github.com/luongnv89/idd">GitHub</a>
+      <a href="landing.html#commands">Commands</a>
+      <a href="docs.html">Docs</a>
+      <a href="changelog.html">Changelog</a>
+      <a href="https://github.com/luongnv89/idd/blob/main/LICENSE">License</a>
+    </div>
+    <div class="foot-note">Issue-Driven Development · MIT</div>
+  </div>
+</footer>
 </body>
 </html>
