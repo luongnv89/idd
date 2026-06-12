@@ -35,7 +35,7 @@ Inspired by the auto-adapt-mode pattern: **always proceed, never block on recove
    - Modifying repository settings or branch protection rules
    - Any action that matches the dangerous patterns list (destructive ops, production deployment, package publishing)
    - **Critical issues with unresolved review problems** — if the issue has a `critical` or `priority:critical` label and the review-fix loop exhausts its cycles without resolving all issues, stop and ask
-   - **PR blocked by an unmerged dependency** — if the originating issue has a `Depends on #N` / `Blocked by #N` marker and any referenced issue is still open (or its PR is unmerged), stop and ask. Merging out of dependency order is effectively irreversible (squash-merge lands on the default branch and rewrites history), so the loop pauses rather than guessing. Disabled by `autopilot.respect_dependencies: false`.
+   - **PR blocked by an unmerged dependency** — if the originating issue has a `Depends on #N` / `Blocked by #N` marker and any referenced issue is still open (or its PR is unmerged), stop and ask. Merging out of dependency order is effectively irreversible (squash-merge lands on the default branch and rewrites history), so the loop pauses rather than guessing. Disabled by `autopilot.respect_dependencies: false`. This is the second documented exception to the autonomy philosophy (alongside critical-issue review failures).
 
 When in doubt, the auto-pilot proceeds with the safer option rather than stopping to ask. A skipped issue can always be retried; a blocked loop wastes time.
 
