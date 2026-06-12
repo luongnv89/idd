@@ -348,7 +348,7 @@ Read the appropriate template from `templates/` (bug.md, feature.md, or improvem
 3. **Reporter Context** — user's original text, verbatim, in a blockquote
 4. **Screenshots** — embedded images (only if images were provided and uploaded successfully)
 5. **Acceptance Criteria** — 3-5 testable criteria derived from the problem description, with confidence levels
-6. **Metadata** — suggested priority, estimated effort (XS/S/M/L/XL), suggested labels, and (when `model_suggestion.enabled`) an advisory **Suggested model:** line keyed off the effort band — see `references/model-suggestion.md`
+6. **Metadata** — suggested priority, estimated effort (XS/S/M/L/XL), suggested labels, and an advisory **Suggested model:** line keyed off the effort band — see `references/model-suggestion.md`. When `model_suggestion.enabled` is false (the default), remove the `**Suggested model:**` line from the Metadata section entirely, matching pre-feature behaviour.
 
 **Note:** Per the Output Contract above, the issue body MUST NOT include predicted affected files, generated technical notes, root cause, or implementation hints. Acceptance criteria express *what done looks like*, not *how to implement it*.
 
