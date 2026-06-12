@@ -120,3 +120,15 @@ analysis:
 
   # Max seconds for the full codebase scan phase (30-600)
   scan_timeout: 120
+
+# Model suggestion settings (used by /issue-creator)
+model_suggestion:
+  # Suggest a cost-effective model + thinking level per issue, from CursorBench
+  # data cached in .gitissue/model-data.json. When false, silently skipped.
+  enabled: false
+
+  # Source URL refreshed into the cache on opt-in
+  data_url: "https://cursor.com/cursorbench"
+
+  # Days before cached model data is considered stale
+  cache_ttl_days: 7
