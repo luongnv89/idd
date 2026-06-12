@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-06-12
+
+### Added
+- `feat(site)` Separate changelog page — extracted the changelog from `landing.html` into a standalone `changelog.html` with a matching dark terminal theme, a stats bar (total releases + date range), an interactive expandable timeline, and live GitHub API integration with an offline fallback dataset. Nav links added between the landing and changelog pages. (#112)
+
+### Changed
+- `chore(skills)` Brought all 7 IDD skills under `src/skills/` up to the skill-creator standard — normalized frontmatter (`metadata.author`), YAML-safe quoting, trimmed over-long descriptions while preserving every negative-trigger clause, and split the 4 skills that exceeded 500 lines into `references/` files (`issue-pr-review` 733→479, `issue-resolver` 525→484, `auto-pilot` 503→476, `issue-creator` kept under 500). Per-skill version bumps reflect the largest change. (#113)
+
 ## [0.12.0] - 2026-06-11
 
 ### Added

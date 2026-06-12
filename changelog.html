@@ -311,6 +311,7 @@
 
       // Known release data from CHANGELOG.md — used when API is unavailable
       var knownReleases = [
+        { tag: 'v0.13.0', date: '2026-06-12', summary: 'Separate changelog page, all 7 skills to skill-creator standard', changes: [{ type: 'added', text: 'Standalone changelog.html page with interactive timeline' }, { type: 'changed', text: 'All 7 IDD skills brought up to the skill-creator standard' }] },
         { tag: 'v0.12.0', date: '2026-06-11', summary: 'Fixer agent, auto review-fix loop, fix-loop skill removed', changes: [{ type: 'added', text: 'Shared fixer agent with mandatory pre-commit security scan' }, { type: 'changed', text: '/issue-pr-review now loops to fix issues until clean by default' }, { type: 'fixed', text: 'Landing page SEO and AI-crawler discovery' }] },
         { tag: 'v0.11.1', date: '2026-06-11', summary: 'Fix source skills visibility from asm discovery', changes: [{ type: 'fixed', text: 'Hide source skills from asm discovery' }, { type: 'changed', text: 'Update landing page install commands' }] },
         { tag: 'v0.11.0', date: '2026-06-11', summary: 'Landing page, flat install surface, balanced merge strategy', changes: [{ type: 'added', text: 'GitHub Pages deploy workflow and landing page' }, { type: 'added', text: 'Hero terminal mock shows /auto-pilot run' }, { type: 'changed', text: 'Default merge strategy updated to balanced' }, { type: 'changed', text: 'Flat install surface for all 8 IDD skills' }] },
