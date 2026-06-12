@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "source": "CursorBench 3.1",
+  "source_url": "https://cursor.com/cursorbench",
+  "last_fetched": "2026-06-12T00:00:00Z",
+  "note": "Bundled seed shipped with the issue-creator skill. Copied to .gitissue/model-data.json on first run when none exists. Cost/task figures are computed by applying each model's published per-million-token pricing to tokens used per task. Refresh with /issue-creator when older than 7 days.",
+  "providers": {
+    "openai": {
+      "family": "GPT-5.5",
+      "models": [
+        { "rank": 1, "name": "GPT-5.5 Extra High", "thinking": "extra-high", "score": 64.3, "cost_per_task_usd": 4.37, "tokens_per_task": 17905 },
+        { "rank": 2, "name": "GPT-5.5 High", "thinking": "high", "score": 62.6, "cost_per_task_usd": 3.59, "tokens_per_task": 13329 },
+        { "rank": 3, "name": "GPT-5.5 Medium", "thinking": "medium", "score": 59.2, "cost_per_task_usd": 2.22, "tokens_per_task": 9065 },
+        { "rank": 4, "name": "GPT-5.5 Low", "thinking": "low", "score": 48.8, "cost_per_task_usd": 1.19, "tokens_per_task": 4923 }
+      ]
+    },
+    "anthropic": {
+      "families": ["Fable 5", "Opus 4.7", "Opus 4.8"],
+      "models": [
+        { "rank": 1, "name": "Fable 5 Max", "family": "Fable 5", "thinking": "max", "score": 72.9, "cost_per_task_usd": 18.02, "tokens_per_task": 63842 },
+        { "rank": 2, "name": "Fable 5 Extra High", "family": "Fable 5", "thinking": "extra-high", "score": 72.0, "cost_per_task_usd": 13.74, "tokens_per_task": 48754 },
+        { "rank": 3, "name": "Fable 5 High", "family": "Fable 5", "thinking": "high", "score": 70.6, "cost_per_task_usd": 10.81, "tokens_per_task": 37173 },
+        { "rank": 4, "name": "Fable 5 Medium", "family": "Fable 5", "thinking": "medium", "score": 69.8, "cost_per_task_usd": 8.27, "tokens_per_task": 28507 },
+        { "rank": 5, "name": "Fable 5 Low", "family": "Fable 5", "thinking": "low", "score": 64.2, "cost_per_task_usd": 5.70, "tokens_per_task": 18882 },
+        { "rank": 6, "name": "Opus 4.7 Max", "family": "Opus 4.7", "thinking": "max", "score": 64.8, "cost_per_task_usd": 11.02, "tokens_per_task": 62989 },
+        { "rank": 7, "name": "Opus 4.8 Max", "family": "Opus 4.8", "thinking": "max", "score": 63.8, "cost_per_task_usd": 7.59, "tokens_per_task": 77370 },
+        { "rank": 8, "name": "Opus 4.8 Extra High", "family": "Opus 4.8", "thinking": "extra-high", "score": 62.1, "cost_per_task_usd": 6.14, "tokens_per_task": 55622 },
+        { "rank": 9, "name": "Opus 4.7 Extra High", "family": "Opus 4.7", "thinking": "extra-high", "score": 61.6, "cost_per_task_usd": 7.11, "tokens_per_task": 43942 },
+        { "rank": 10, "name": "Opus 4.7 High", "family": "Opus 4.7", "thinking": "high", "score": 59.4, "cost_per_task_usd": 5.01, "tokens_per_task": 32227 },
+        { "rank": 11, "name": "Opus 4.8 High", "family": "Opus 4.8", "thinking": "high", "score": 58.4, "cost_per_task_usd": 4.41, "tokens_per_task": 36788 },
+        { "rank": 12, "name": "Opus 4.8 Medium", "family": "Opus 4.8", "thinking": "medium", "score": 56.6, "cost_per_task_usd": 3.83, "tokens_per_task": 31684 },
+        { "rank": 13, "name": "Opus 4.8 Low", "family": "Opus 4.8", "thinking": "low", "score": 54.3, "cost_per_task_usd": 2.93, "tokens_per_task": 22726 },
+        { "rank": 14, "name": "Opus 4.7 Medium", "family": "Opus 4.7", "thinking": "medium", "score": 52.7, "cost_per_task_usd": 2.93, "tokens_per_task": 19193 },
+        { "rank": 15, "name": "Opus 4.7 Low", "family": "Opus 4.7", "thinking": "low", "score": 48.3, "cost_per_task_usd": 1.87, "tokens_per_task": 13164 }
+      ]
+    }
+  },
+  "complexity_mapping": {
+    "XS": { "label": "trivial",          "openai": "GPT-5.5 Low",        "anthropic": "Opus 4.7 Low",        "est_cost_per_task_usd": 3.06 },
+    "S":  { "label": "simple",           "openai": "GPT-5.5 Medium",     "anthropic": "Opus 4.8 Low",        "est_cost_per_task_usd": 5.15 },
+    "M":  { "label": "moderate",         "openai": "GPT-5.5 High",       "anthropic": "Opus 4.8 Medium",     "est_cost_per_task_usd": 7.42 },
+    "L":  { "label": "complex",          "openai": "GPT-5.5 Extra High", "anthropic": "Opus 4.7 Extra High", "est_cost_per_task_usd": 11.48 },
+    "XL": { "label": "super complex",    "openai": "GPT-5.5 Extra High", "anthropic": "Fable 5 Max",         "est_cost_per_task_usd": 22.39 }
+  }
+}

@@ -28,7 +28,9 @@ Issues produced by `/issue-creator` capture **durable human intent only**. The s
 
 These four artifacts are the responsibility of `/issue-analysis`, `/issue-triage`, and `/issue-resolver`, which produce them fresh against the current codebase at the moment work begins. Encoding them in the issue body would freeze stale understanding into durable memory.
 
-What the issue body **does** contain: type classification, problem description, reporter context (verbatim), screenshots, acceptance criteria, and metadata (priority, effort, labels). Reporter-supplied technical detail is preserved verbatim inside the Reporter Context blockquote — only skill-generated technical content is prohibited.
+What the issue body **does** contain: type classification, problem description, reporter context (verbatim), screenshots, acceptance criteria, and metadata (priority, effort, labels, and — when `model_suggestion.enabled` — an advisory **Suggested model:** line). Reporter-supplied technical detail is preserved verbatim inside the Reporter Context blockquote — only skill-generated technical content is prohibited.
+
+The model suggestion is the one externally-derived value admitted into the body. It is advisory metadata (cost guidance, like effort), not an implementation hint, and it is stamped with its CursorBench data date so its staleness is self-documenting — see `references/model-suggestion.md`.
 
 ## Modes
 
@@ -84,11 +86,13 @@ Load `.gitissue.yml` from the repo root once at skill start. If the file does no
 ○ First run — using default config. Run /init-gitissue to customize.
 ```
 
-Defaults: `issue.auto_normalize: true`, `issue.template: "default"`, `issue.labels_auto_suggest: true`, `issue.normalize_comment: true`
+Defaults: `issue.auto_normalize: true`, `issue.template: "default"`, `issue.labels_auto_suggest: true`, `issue.normalize_comment: true`, `model_suggestion.enabled: false`
 
 If the config file exists but contains invalid values, output the validation error from `references/error-messages.md` and stop.
 
 Do not re-read the config at each step.
+
+If `model_suggestion.enabled` is `true`, run the model-data cache lifecycle (check / seed / staleness-refresh) once now, before Step 1 — see `references/model-suggestion.md`. When `false` (default), skip all model-suggestion steps silently.
 
 ## Subagent Architecture
 
@@ -142,8 +146,7 @@ Check these files relative to the skill's directory (the dirname of this SKILL.m
 - `references/docs/naming-conventions.md` — issue title and labeling conventions
 - `references/docs/github-projects-sync.md` — GitHub Projects status sync reference
 - `references/modes.md` — Normalize and Batch mode step specs and error paths
-
-In batch mode, the duplicate detector (Step 3) and template pre-generation (for Step 5) run in parallel since they are independent; both results are merged before the Step 4 approval gate.
+- `references/model-suggestion.md` — model-suggestion cache lifecycle and mapping
 
 ---
 
@@ -345,7 +348,7 @@ Read the appropriate template from `templates/` (bug.md, feature.md, or improvem
 3. **Reporter Context** — user's original text, verbatim, in a blockquote
 4. **Screenshots** — embedded images (only if images were provided and uploaded successfully)
 5. **Acceptance Criteria** — 3-5 testable criteria derived from the problem description, with confidence levels
-6. **Metadata** — suggested priority, estimated effort (XS/S/M/L/XL), suggested labels
+6. **Metadata** — suggested priority, estimated effort (XS/S/M/L/XL), suggested labels, and (when `model_suggestion.enabled`) an advisory **Suggested model:** line keyed off the effort band — see `references/model-suggestion.md`
 
 **Note:** Per the Output Contract above, the issue body MUST NOT include predicted affected files, generated technical notes, root cause, or implementation hints. Acceptance criteria express *what done looks like*, not *how to implement it*.
 
@@ -357,13 +360,14 @@ Read the appropriate template from `templates/` (bug.md, feature.md, or improvem
   Type:     bug (high)
   Title:    Fix mobile auth redirect loop
   Images:   2 uploaded ✓
+  ⚡ Model:  GPT-5.5 High · Opus 4.8 Medium  (~$7.42/task)
   Labels:   bug, auth, mobile
   Criteria: 3 acceptance criteria generated (medium)
 
 Create issue? [Y/n]
 ```
 
-The `Images:` line appears only when images were provided. Show count and upload status. If some failed: `Images: 1/2 uploaded (1 failed)`.
+The `Images:` line appears only when images were provided. Show count and upload status. If some failed: `Images: 1/2 uploaded (1 failed)`. The `⚡ Model:` line appears only when `model_suggestion.enabled` — see `references/model-suggestion.md`.
 
 Wait for confirmation. If declined, stop without creating.
 
@@ -492,3 +496,4 @@ In batch mode, one line per issue is printed followed by a totals footer (`✓ 5
 - **`templates/bug.md`** — Bug report template
 - **`templates/feature.md`** — Feature request template
 - **`templates/improvement.md`** — Improvement template
+- **`references/model-suggestion.md`** — Model-suggestion cache + complexity→model mapping
