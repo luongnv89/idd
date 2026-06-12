@@ -1,7 +1,7 @@
 name: Deploy landing page to GitHub Pages
 
-# Publishes landing.html, docs.html (plus the brand assets they reference) to
-# GitHub Pages on every push to main. The site is assembled into a _site/
+# Publishes landing.html, docs.html, changelog.html (plus the brand assets they
+# reference) to GitHub Pages on every push to main. The site is assembled into a _site/
 # directory so the repository source tree is never exposed — only the public
 # pages and the specific assets they load are deployed.
 
@@ -11,6 +11,7 @@ on:
     paths:
       - landing.html
       - docs.html
+      - changelog.html
       - sitemap.xml
       - robots.txt
       - llms.txt
@@ -42,9 +43,11 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p _site/assets/logo _site/assets/screenshots _site/assets/og
-          # Landing page becomes the site index; docs.html is the dedicated docs page.
+          # Landing page becomes the site index; docs.html and changelog.html
+          # are dedicated pages linked from the nav.
           cp landing.html _site/index.html
           cp docs.html _site/docs.html
+          cp changelog.html _site/changelog.html
           # Crawl and AI-discovery files for search engines and LLM tools.
           cp sitemap.xml _site/sitemap.xml
           cp robots.txt _site/robots.txt
