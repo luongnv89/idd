@@ -107,8 +107,10 @@ signals, then pick the highest band any signal reaches:
 
 ## Complexity → model mapping (AC #5)
 
-Map the effort band to exactly **one** OpenAI model and **one** Anthropic
-model, using the cache's `complexity_mapping` (seed values shown):
+Every suggestion names **exactly two models — one OpenAI model and one
+Anthropic model — never one and never more**. Map the effort band to its
+`openai` and `anthropic` entries in the cache's `complexity_mapping` (seed
+values shown), and render both:
 
 | Effort | OpenAI | Anthropic | Est. cost/task |
 |--------|--------|-----------|----------------|
@@ -124,7 +126,9 @@ the nearest lower band and note `(needs review)`.
 
 ## Rendering the suggestion (AC #6)
 
-The suggestion appears in **two** places.
+The suggestion appears in **two** places. In both, render the OpenAI model
+first, then ` · `, then the Anthropic model — e.g. `GPT-5.5 High · Opus 4.8
+Medium`. Both providers are always present; never emit a single model.
 
 ### Step 5 preview (ephemeral)
 
@@ -150,8 +154,12 @@ Add a `**Suggested model:**` line after `**Effort:**` in the body. It is
 **Suggested model:** GPT-5.5 High · Opus 4.8 Medium _(CursorBench 3.1, 2026-06-12 — advisory)_
 ```
 
-The date is the cache's `last_fetched` (date portion). This is the one piece of
-externally-derived data the Output Contract admits into the body — see the
+The template placeholders fill from the cache: `{openai_model}` and
+`{anthropic_model}` are the effort band's `openai` / `anthropic` entries,
+`{data_version}` is the version portion of `source` (e.g. `3.1` from
+`CursorBench 3.1`), and `{data_date}` is the date portion of `last_fetched`.
+This is the one piece of externally-derived data the Output Contract admits
+into the body — see the
 **Output Contract** note in `SKILL.source.md`, which records why it is permitted
 (advisory metadata, like effort) and how the date label mitigates staleness.
 

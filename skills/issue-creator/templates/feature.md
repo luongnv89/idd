@@ -31,5 +31,5 @@ Feature
 
 **Priority:** {priority}
 **Effort:** {effort}
-**Suggested model:** {model_suggestion}
+**Suggested model:** {openai_model} · {anthropic_model} _(CursorBench {data_version}, {data_date} — advisory)_
 **Labels:** {labels}
