@@ -163,8 +163,8 @@ else
   fail "T5.AC7.2: Config Section Map missing model_suggestion"
 fi
 # Defaults table
-if grep -qE '\| \`model_suggestion\.enabled\` \| \`false\`' "$SCHEMA"; then
-  pass "T5.AC7.3: defaults table lists model_suggestion.enabled = false"
+if grep -qE '\| \`model_suggestion\.enabled\` \| \`true\`' "$SCHEMA"; then
+  pass "T5.AC7.3: defaults table lists model_suggestion.enabled = true"
 else
   fail "T5.AC7.3: defaults table missing model_suggestion.enabled"
 fi
@@ -199,11 +199,11 @@ else
   fail "T6.3: error catalog missing model-data failure entries"
 fi
 
-# Default-off: feature must be opt-in (projects-style toggle)
-if grep -qE '^\s*enabled:\s*false' "$INIT_TEMPLATE"; then
-  pass "T6.4: model_suggestion defaults to disabled (opt-in)"
+# Default-on: feature is enabled by default (opt-out toggle)
+if grep -qE '^\s*enabled:\s*true' "$INIT_TEMPLATE"; then
+  pass "T6.4: model_suggestion defaults to enabled (opt-out)"
 else
-  fail "T6.4: model_suggestion not default-disabled"
+  fail "T6.4: model_suggestion not default-enabled"
 fi
 
 # ───────────────────────────────────────────────────────────

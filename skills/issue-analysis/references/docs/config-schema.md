@@ -387,10 +387,10 @@ model_suggestion:
   # Suggest a cost-effective model + thinking level per issue, from CursorBench
   # data cached in .gitissue/model-data.json
   # Type: boolean
-  # Default: false
+  # Default: true
   # When false, all model-suggestion behavior is silently skipped and the issue
   # body / preview are unchanged from the pre-feature behavior
-  enabled: false
+  enabled: true
 
   # Source URL refreshed into the cache on opt-in
   # Type: string
@@ -554,6 +554,6 @@ Config is validated on load at the start of every skill invocation. Errors inclu
 | `projects.status_map.todo` | `"Todo"` | Status for new issues |
 | `projects.status_map.in_progress` | `"In Progress"` | Status when work starts |
 | `projects.status_map.done` | `"Done"` | Status when PR is created |
-| `model_suggestion.enabled` | `false` | Suggest a model + thinking level per issue |
+| `model_suggestion.enabled` | `true` | Suggest a model + thinking level per issue |
 | `model_suggestion.data_url` | `"https://cursor.com/cursorbench"` | CursorBench source refreshed into the cache |
 | `model_suggestion.cache_ttl_days` | `7` | Days before cached model data is stale |

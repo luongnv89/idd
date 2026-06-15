@@ -125,7 +125,7 @@ analysis:
 model_suggestion:
   # Suggest a cost-effective model + thinking level per issue, from CursorBench
   # data cached in .gitissue/model-data.json. When false, silently skipped.
-  enabled: false
+  enabled: true
 
   # Source URL refreshed into the cache on opt-in
   data_url: "https://cursor.com/cursorbench"

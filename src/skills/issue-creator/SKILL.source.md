@@ -86,13 +86,13 @@ Load `.gitissue.yml` from the repo root once at skill start. If the file does no
 ○ First run — using default config. Run /init-gitissue to customize.
 ```
 
-Defaults: `issue.auto_normalize: true`, `issue.template: "default"`, `issue.labels_auto_suggest: true`, `issue.normalize_comment: true`, `model_suggestion.enabled: false`
+Defaults: `issue.auto_normalize: true`, `issue.template: "default"`, `issue.labels_auto_suggest: true`, `issue.normalize_comment: true`, `model_suggestion.enabled: true`
 
 If the config file exists but contains invalid values, output the validation error from `references/error-messages.md` and stop.
 
 Do not re-read the config at each step.
 
-If `model_suggestion.enabled` is `true`, run the model-data cache lifecycle (check / seed / staleness-refresh) once now, before Step 1 — see `references/model-suggestion.md`. When `false` (default), skip all model-suggestion steps silently.
+If `model_suggestion.enabled` is `true` (the default), run the model-data cache lifecycle (check / seed / staleness-refresh) once now, before Step 1 — see `references/model-suggestion.md`. When `false`, skip all model-suggestion steps silently.
 
 ## Subagent Architecture
 
@@ -348,7 +348,7 @@ Read the appropriate template from `templates/` (bug.md, feature.md, or improvem
 3. **Reporter Context** — user's original text, verbatim, in a blockquote
 4. **Screenshots** — embedded images (only if images were provided and uploaded successfully)
 5. **Acceptance Criteria** — 3-5 testable criteria derived from the problem description, with confidence levels
-6. **Metadata** — suggested priority, estimated effort (XS/S/M/L/XL), suggested labels, and an advisory **Suggested model:** line keyed off the effort band — see `references/model-suggestion.md`. When `model_suggestion.enabled` is false (the default), remove the `**Suggested model:**` line from the Metadata section entirely, matching pre-feature behaviour.
+6. **Metadata** — suggested priority, estimated effort (XS/S/M/L/XL), suggested labels, and an advisory **Suggested model:** line keyed off the effort band — see `references/model-suggestion.md`. When `model_suggestion.enabled` is false, remove the `**Suggested model:**` line from the Metadata section entirely, matching pre-feature behaviour.
 
 **Note:** Per the Output Contract above, the issue body MUST NOT include predicted affected files, generated technical notes, root cause, or implementation hints. Acceptance criteria express *what done looks like*, not *how to implement it*.
 
