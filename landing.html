@@ -322,6 +322,37 @@
     .feat-card .effort { margin-top: 16px; font-family: var(--mono); font-size: 12px; color: var(--fg-dim); }
     .feat-card .effort b { color: var(--green); font-weight: 600; }
 
+    /* ── Model suggestion highlight ── */
+    .model-highlight {
+      margin-top: 52px;
+      display: grid;
+      grid-template-columns: 1.1fr 1fr;
+      gap: 28px;
+      align-items: stretch;
+    }
+    @media (max-width: 940px) { .model-highlight { grid-template-columns: 1fr; } }
+    .model-panel {
+      border: 1px solid rgba(0,255,65,0.22);
+      border-radius: var(--radius);
+      padding: 32px 30px;
+      background: linear-gradient(165deg, rgba(0,255,65,0.06), var(--panel));
+    }
+    .model-panel h3 { font-size: 1.35rem; font-weight: 800; margin: 0 0 12px; letter-spacing: -0.03em; }
+    .model-panel p { margin: 0 0 14px; color: var(--fg-muted); line-height: 1.62; font-size: 0.99rem; }
+    .model-table {
+      width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 12.5px;
+      margin-top: 18px;
+    }
+    .model-table th, .model-table td {
+      text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line-soft);
+    }
+    .model-table th { color: var(--fg-dim); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; }
+    .model-table td:first-child { color: var(--yellow); font-weight: 700; }
+    .model-table td:nth-child(2) { color: var(--fg-muted); }
+    .model-table td:last-child { color: var(--green); }
+    .model-note { margin-top: 16px; font-family: var(--mono); font-size: 12px; color: var(--fg-dim); line-height: 1.55; }
+    .terminal.compact .term-body { padding: 16px 18px; font-size: 12.5px; line-height: 1.75; }
+
     /* ── How it works ── */
     .steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; margin-top: 52px; }
     @media (max-width: 980px) { .steps { grid-template-columns: repeat(2,1fr); } }
@@ -496,6 +527,7 @@
           <span><span class="ok">✓</span> Plain GitHub markdown</span>
           <span><span class="ok">✓</span> No vendor lock-in</span>
           <span><span class="ok">✓</span> Runs in your terminal</span>
+          <span><span class="ok">⚡</span> Model + thinking hints on create</span>
         </div>
       </div>
 
@@ -566,10 +598,11 @@
       <p class="sec-lead">issuedev turns each GitHub issue into something typed, structured, and enriched with acceptance criteria — then resolves it, with commit messages and PR titles that link every line of code back to the intention that created it.</p>
 
       <div class="feat-grid">
-        <div class="feat-card reveal">
+        <div class="feat-card reveal" style="grid-column: 1 / -1;">
           <span class="feat-cmd">/issue-creator</span>
-          <h3>Structure, don't guess</h3>
-          <p>Describe a bug or feature in plain text. issuedev classifies the type, generates acceptance criteria, and files a clean issue — preserving your original words in a Reporter Context block without guessing implementation details.</p>
+          <h3>Structure, don't guess — plus the right model mode for the job</h3>
+          <p>Describe a bug or feature in plain text. issuedev classifies the type, estimates effort (XS–XL), generates acceptance criteria, and files a clean issue — preserving your original words in a Reporter Context block without guessing implementation details.</p>
+          <p style="margin-top: 12px;"><span class="mono green">⚡ Model:</span> Each issue gets an advisory <strong>Suggested model</strong> with <strong>thinking level</strong> (e.g. GPT-5.5 High · Opus 4.8 Medium) keyed off effort, using CursorBench benchmarks — so you pick a capable tier for hard work and a cheaper tier for trivial fixes instead of running everything on max.</p>
         </div>
         <div class="feat-card reveal">
           <span class="feat-cmd">/issue-resolver N</span>
@@ -588,6 +621,44 @@
           <p>Triage → resolve → review → merge, looped across the backlog. Clean PRs merge; partial ones stay open for review unless you opt into aggressive mode. Dependency-aware merge gate keeps order sane.</p>
           <div class="effort">effort <b>max</b></div>
         </div>
+      <div class="model-highlight reveal">
+        <div class="model-panel">
+          <div class="section-tag" style="margin-bottom: 10px;">Cost-aware by default</div>
+          <h3>Right model, right thinking level — stamped on every issue</h3>
+          <p>When you create or normalize an issue, <code>/issue-creator</code> maps estimated effort to a <strong>model + thinking tier</strong> from CursorBench data. The preview shows <span class="mono green">⚡ Model:</span>; the issue body stores an advisory <strong>Suggested model:</strong> line with the benchmark date.</p>
+          <p>Use it to route XS typo fixes to low-cost modes and reserve extra-high thinking for large features — without blocking creation if the cache is offline (bundled seed + graceful fallback).</p>
+          <table class="model-table" aria-label="Effort to suggested model mapping">
+            <thead><tr><th>Effort</th><th>OpenAI</th><th>Anthropic</th></tr></thead>
+            <tbody>
+              <tr><td>XS</td><td>GPT-5.5 Low</td><td>Opus 4.7 Low</td></tr>
+              <tr><td>S</td><td>GPT-5.5 Medium</td><td>Opus 4.8 Low</td></tr>
+              <tr><td>M</td><td>GPT-5.5 High</td><td>Opus 4.8 Medium</td></tr>
+              <tr><td>L</td><td>GPT-5.5 Extra High</td><td>Opus 4.7 Extra High</td></tr>
+              <tr><td>XL</td><td>GPT-5.5 Extra High</td><td>Fable 5 Max</td></tr>
+            </tbody>
+          </table>
+          <p class="model-note">Toggle with <code>model_suggestion.enabled</code> in <code>.gitissue.yml</code> · refresh CursorBench into <code>.gitissue/model-data.json</code></p>
+        </div>
+        <div class="terminal compact">
+          <div class="term-bar">
+            <div class="dots"><i></i><i></i><i></i></div>
+            <span class="title">/issue-creator — preview</span>
+          </div>
+          <div class="term-body">
+<div class="ln"><span class="c-head">◆ Issue Preview</span></div>
+<div class="ln c-dim">┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄</div>
+<div class="ln"><span class="c-step">  Type:</span>     bug (high)</div>
+<div class="ln"><span class="c-step">  Title:</span>    Fix session cookie expiry on mobile</div>
+<div class="ln"><span class="c-step">  Effort:</span>   M</div>
+<div class="ln"><span class="c-yellow">  ⚡ Model:</span>  <span class="c-ok">GPT-5.5 High · Opus 4.8 Medium</span>  <span class="c-dim">(~$7.42/task)</span></div>
+<div class="ln"><span class="c-step">  Labels:</span>   bug, auth, mobile</div>
+<div class="ln"><span class="c-step">  Criteria:</span> 4 acceptance criteria (medium)</div>
+<div class="ln">&nbsp;</div>
+<div class="ln c-dim">Metadata in issue body:</div>
+<div class="ln"><span class="c-cyan">**Suggested model:**</span> GPT-5.5 High · Opus 4.8 Medium</div>
+<div class="ln c-dim">  _(CursorBench 3.1, 2026-06-12 — advisory)_</div>
+          </div>
+        </div>
       </div>
     </div>
   </section>
@@ -603,7 +674,7 @@
         <div class="step reveal">
           <div class="num">1</div>
           <h3>Describe</h3>
-          <p>Type the problem in plain English. <code>/issue-creator</code> classifies and structures it into a typed issue with acceptance criteria.</p>
+          <p>Type the problem in plain English. <code>/issue-creator</code> classifies it, estimates effort, suggests model + thinking level, and structures a typed issue with acceptance criteria.</p>
         </div>
         <div class="step reveal">
           <div class="num">2</div>
@@ -633,7 +704,7 @@
 
       <div class="shots">
         <div class="shot wide reveal">
-          <div class="cap"><span class="green">❯</span> /issue-creator <span class="muted">— classify, find files, generate acceptance criteria</span></div>
+          <div class="cap"><span class="green">❯</span> /issue-creator <span class="muted">— classify, effort, model + thinking hint, acceptance criteria</span></div>
           <img src="assets/screenshots/issue-creator.png" alt="issue-creator terminal output showing a structured issue preview" width="898" height="735" loading="eager" fetchpriority="high" />
         </div>
         <div class="shot reveal">
@@ -664,7 +735,7 @@
       <p class="sec-lead">Each is a self-contained skill — drop it into Claude Code, Codex CLI, or any SKILL.md-compatible harness. Mix and match; nothing depends on the rest. Need exact inputs? See the <a class="green" href="docs.html">full docs</a>.</p>
 
       <div class="feat-grid" style="grid-template-columns: repeat(2,1fr);">
-        <div class="feat-card reveal"><span class="feat-cmd">/issue-creator</span><p style="margin-top:2px">Classify type, preserve reporter context, generate acceptance criteria, and create a structured issue.</p></div>
+        <div class="feat-card reveal"><span class="feat-cmd">/issue-creator</span><p style="margin-top:2px">Classify type, estimate effort, suggest model + thinking level (CursorBench), preserve reporter context, and file structured acceptance criteria.</p></div>
         <div class="feat-card reveal"><span class="feat-cmd">/issue-analysis N</span><p style="margin-top:2px">Root cause, git history, implementation options, complexity and risk — saved to <code>.gitissue/</code>.</p></div>
         <div class="feat-card reveal"><span class="feat-cmd">/issue-resolver N</span><p style="margin-top:2px">6-step pipeline: preflight → research → plan → implement → QA → deliver a PR with <code>Closes #N</code>.</p></div>
         <div class="feat-card reveal"><span class="feat-cmd">/issue-triage</span><p style="margin-top:2px">Dependency graph, stale detection, already-fixed scanning, priority and execution order.</p></div>
@@ -810,6 +881,10 @@
         <details>
           <summary>How much does it cost? <span class="q-ico">+</span></summary>
           <div class="a">issuedev is open source under the MIT license. Clone it, fork it, ship it. You only pay for whatever AI agent you choose to run the skills with.</div>
+        </details>
+        <details>
+          <summary>What is the suggested model on new issues? <span class="q-ico">+</span></summary>
+          <div class="a"><code>/issue-creator</code> estimates issue effort (XS–XL) and adds an advisory <strong>Suggested model</strong> with a <strong>thinking level</strong> (e.g. GPT-5.5 High · Opus 4.8 Medium), grounded in CursorBench benchmarks. It appears in the create preview as <code>⚡ Model:</code> and in the issue metadata so humans and agents can match spend to scope — use a low tier for trivial fixes and higher thinking only when the issue warrants it. Disable via <code>model_suggestion.enabled: false</code> in <code>.gitissue.yml</code>.</div>
         </details>
       </div>
     </div>
