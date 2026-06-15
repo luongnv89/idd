@@ -1,9 +1,9 @@
 # Model Suggestion — Reference
 
 How `/issue-creator` suggests a cost-effective model + thinking level for each
-issue, and how it manages the local CursorBench data cache. This procedure is
-**optional** and runs only when `model_suggestion.enabled` is `true` in
-`.gitissue.yml` (default: `false`). When disabled, every step here is skipped
+issue, and how it manages the local CursorBench data cache. This procedure
+runs when `model_suggestion.enabled` is `true` in `.gitissue.yml`
+(default: `true`). When disabled, every step here is skipped
 silently — issue creation behaves exactly as before.
 
 The suggestion is **advisory metadata**, like priority and effort. It never
@@ -165,7 +165,7 @@ changes from the pre-feature behaviour.
 # Suggest a cost-effective model + thinking level per issue (CursorBench data)
 model_suggestion:
   # Master switch. When false, all model-suggestion behaviour is skipped.
-  enabled: false
+  enabled: true
   # Source URL refreshed into .gitissue/model-data.json
   data_url: "https://cursor.com/cursorbench"
   # Days before the cache is considered stale
