@@ -96,9 +96,12 @@ fi
 
 # ───────────────────────────────────────────────────────────
 # T2: AC2/AC3 — cache lifecycle documented (check / seed / staleness)
+# Note: the cache location moved to the skill level in #124 — these assertions
+# track the current (skill-level, dated) lifecycle, with #124's behavior
+# covered in detail by tests/test-model-suggestion-124.sh.
 # ───────────────────────────────────────────────────────────
-if grep -q '.gitissue/model-data.json' "$REF"; then
-  pass "T2.AC2.1: reference documents the .gitissue/model-data.json cache"
+if grep -qE 'model-data-\{?[Y0-9-]*\}?\.json|model-data-<date>\.json|model-data-\*\.json' "$REF"; then
+  pass "T2.AC2.1: reference documents the skill-level dated model-data cache"
 else
   fail "T2.AC2.1: reference does not mention the cache file"
 fi

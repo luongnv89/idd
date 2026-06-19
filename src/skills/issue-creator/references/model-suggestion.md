@@ -15,13 +15,37 @@ and the skill continues (mirroring the image-upload degradation pattern).
 | Item | Value |
 |------|-------|
 | Source | CursorBench 3.1 — `https://cursor.com/cursorbench` |
-| Cache file | `.gitissue/model-data.json` (committed with other `.gitissue/` state) |
-| Bundled seed | `templates/model-data.json` (ships inside the skill) |
+| Cache file | `{skill_dir}/model-data-{YYYY-MM-DD}.json` — **skill-level, dated, one per machine** |
+| Bundled seed | `{skill_dir}/templates/model-data.json` — undated, ships inside the skill |
 | Staleness threshold | 7 days (compared against the cache's `last_fetched`) |
 
-The cache file mirrors the `.gitissue/triage.json` / `analysis-<N>.json`
-conventions: a top-level ISO-8601 (`Z`) timestamp, JSON formatted for readable
-git diffs, and a full overwrite on refresh (never append).
+The model-suggestion cache is **skill-level data — it does not vary by
+repository.** One cache under the installed skill folder serves every repo on the
+machine, so users never re-seed or maintain duplicate caches across projects.
+`{skill_dir}` is the directory of the installed `issue-creator` skill (the
+dirname of its `SKILL.md`).
+
+**The cache filename carries the date it was last updated**
+(`model-data-{YYYY-MM-DD}.json`, e.g. `model-data-2026-06-12.json`). That date is
+the date portion of the cache's own `last_fetched`, so the two can never
+disagree, and a glance at the filename tells you whether a refresh is likely
+needed without opening the file.
+
+The cache is **not** stored per-repo under `.gitissue/` and is **never
+committed**: it is regenerable runtime state, not project state. It lives at the
+**skill root**, never inside `templates/` — `templates/` ships only the undated
+seed, and the build copies that directory wholesale, so runtime state must stay
+out of it.
+
+> **Upgrade note.** Reinstalling the skill (`asm install` / `install.sh`)
+> replaces the skill folder, so the dated cache is cleared on upgrade. This is
+> self-healing, not data loss: the freshly-installed seed reseeds the lifecycle
+> below (and is usually newer than the cache it replaced), and a refresh is
+> offered on the next run.
+
+The cache file mirrors the `triage.json` / `analysis-<N>.json` JSON conventions:
+a top-level ISO-8601 (`Z`) `last_fetched` timestamp, JSON formatted for readable
+diffs, and a full overwrite on refresh (never append).
 
 ### Cache file schema
 
@@ -43,25 +67,51 @@ git diffs, and a full overwrite on refresh (never append).
 
 ## Cache lifecycle (runs once at skill start, after config load)
 
-Only when `model_suggestion.enabled` is `true`:
+Only when `model_suggestion.enabled` is `true`.
 
-1. **Cache present and fresh** (`last_fetched` ≤ 7 days old) → use it silently:
+### Locating the cache (skill-level, dated)
+
+The cache lives in the installed skill folder, not per-repo. Discover it by
+listing the skill root for `model-data-*.json` and selecting the newest by its
+filename date:
+
+```bash
+# Newest skill-level cache, or empty if none exists yet.
+cache="$(ls -1 "{skill_dir}"/model-data-*.json 2>/dev/null | sort | tail -n1)"
+```
+
+The filename date (`model-data-{YYYY-MM-DD}.json`) is the human-glance signal;
+the authoritative staleness check is always the cache's internal `last_fetched`.
+If several dated files are somehow present, the newest wins and the lifecycle
+prunes the rest on the next write (see *Refresh procedure*).
+
+> **Per-repo legacy cache (AC7).** A pre-existing `.gitissue/model-data.json`
+> from an older skill version is **ignored** — the skill neither reads nor
+> writes it, so model suggestions keep working unchanged. It is stale project
+> state, safe to delete; the skill does not touch or migrate it.
+
+### States
+
+1. **Cache present and fresh** (`last_fetched` ≤ `cache_ttl_days`, default 7) →
+   use it silently:
    ```
    ○ Using cached model data (CursorBench 3.1, fetched {age}).
    ```
 
-2. **Cache present but stale** (`last_fetched` > 7 days old) → warn and offer a
-   refresh. Use the stale data if the user declines or the refresh fails:
+2. **Cache present but stale** (`last_fetched` older than the threshold) → warn
+   and offer a refresh. Use the stale data if the user declines or the refresh
+   fails:
    ```
    ⚠ Model data is {age} old (CursorBench 3.1).
      Refresh now? [y/N]
    ```
 
-3. **Cache missing** → seed it from the bundled `templates/model-data.json`,
-   then offer a fresh fetch:
+3. **Cache missing** → seed it from the bundled `templates/model-data.json` into
+   the skill folder under a dated name, then offer a fresh fetch:
    ```bash
-   mkdir -p .gitissue
-   cp "{skill_dir}/templates/model-data.json" .gitissue/model-data.json
+   seed_date="$(date -u +%Y-%m-%d)"   # matches the seed's own last_fetched date
+   cp "{skill_dir}/templates/model-data.json" \
+      "{skill_dir}/model-data-${seed_date}.json"
    ```
    ```
    ○ Seeded model data from bundled CursorBench 3.1 snapshot.
@@ -75,17 +125,34 @@ Only when `model_suggestion.enabled` is `true`:
 In auto-pilot contexts (`IDD_AUTO_MODE=1`), never prompt: use cached or seeded
 data as-is, log staleness as a warning, and skip the fetch.
 
+### Forcing a refresh (AC6)
+
+`/issue-creator … --refresh-model-data` refreshes the cache **unconditionally**,
+regardless of staleness, so users can pull the latest CursorBench data on
+demand. It runs the *Refresh procedure* below before issue creation, then
+proceeds normally. The flag is honored even under `IDD_AUTO_MODE=1` (an explicit
+request overrides the no-prompt-no-fetch default); a failed forced refresh
+degrades to a warning and the existing cache, like any other refresh.
+
 ### Refresh procedure
 
-When the user accepts a refresh (or chooses to fetch fresh seed data), fetch the
-source URL with the **WebFetch** tool and ask it to extract the model scoring
-tables. On success, overwrite `.gitissue/model-data.json` with the parsed data
-and a new `last_fetched` set to the current time. On any failure (network,
-parse, empty result), warn with `Model data refresh failed` from
-`references/error-messages.md` and keep the existing cached/seeded data.
+When a refresh runs (accepted prompt, fresh-seed fetch, or `--refresh-model-data`),
+fetch the source URL with the **WebFetch** tool and ask it to extract the model
+scoring tables. On success:
+
+1. Build the parsed data with a new `last_fetched` set to the current time.
+2. Write it to `{skill_dir}/model-data-{YYYY-MM-DD}.json`, where the date is the
+   date portion of that new `last_fetched`.
+3. **Delete every other `model-data-*.json` in the skill folder** so exactly one
+   dated cache remains (the filename never accumulates stale copies).
+
+On any failure (network, parse, empty result), warn with
+`Model data refresh failed` from `references/error-messages.md` and keep the
+existing cached/seeded data and its dated file.
 
 > WebFetch is the only network call this skill makes, and only on explicit
-> opt-in. The bundled seed guarantees the feature works offline and on first run.
+> opt-in or `--refresh-model-data`. The bundled seed guarantees the feature
+> works offline and on first run.
 
 ## Complexity classification (AC #4)
 
@@ -174,11 +241,14 @@ changes from the pre-feature behaviour.
 model_suggestion:
   # Master switch. When false, all model-suggestion behaviour is skipped.
   enabled: true
-  # Source URL refreshed into .gitissue/model-data.json
+  # Source URL refreshed into the skill-level model-data-<date>.json cache
   data_url: "https://cursor.com/cursorbench"
   # Days before the cache is considered stale
   cache_ttl_days: 7
 ```
+
+Force a refresh at any time, independent of `cache_ttl_days`, with
+`/issue-creator … --refresh-model-data`.
 
 See `docs/config-schema.md` for the full schema, the Config Section Map, and the
 Defaults Table entries.

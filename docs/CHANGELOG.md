@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Changed
+- `feat(issue-creator)` Model-suggestion cache moved from per-repo `.gitissue/model-data.json` to a **skill-level** dated cache (`model-data-<date>.json` in the installed skill folder), so one cache serves every repo on the machine — no more re-seeding per project. The filename carries the last-update date for at-a-glance staleness, and `--refresh-model-data` forces a refresh on demand regardless of the staleness threshold. A legacy per-repo `.gitissue/model-data.json` is ignored and may be deleted. (#124)
+
 ## [0.13.0] - 2026-06-12
 
 ### Added

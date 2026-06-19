@@ -41,6 +41,7 @@ The model suggestion is the one externally-derived value admitted into the body.
 | `/issue-creator <N> --dry-run` | Preview | Show normalization preview without applying |
 | `/issue-creator <N> --force` | Force | Normalize even if security-labeled |
 | `/issue-creator <multi-item text>` | Batch | Extract multiple issues from one input and create sequentially |
+| `/issue-creator … --refresh-model-data` | Refresh | Force-refresh the skill-level model-data cache, then proceed (any mode) |
 
 Detect mode: if the argument is a number → Normalize. If the input contains multiple distinct items (numbered list, bullet points, multiple paragraphs describing different problems, or a planning document with several work items) → Batch. Otherwise → Create.
 
@@ -88,11 +89,9 @@ Load `.gitissue.yml` from the repo root once at skill start. If the file does no
 
 Defaults: `issue.auto_normalize: true`, `issue.template: "default"`, `issue.labels_auto_suggest: true`, `issue.normalize_comment: true`, `model_suggestion.enabled: true`
 
-If the config file exists but contains invalid values, output the validation error from `references/error-messages.md` and stop.
+If the config file exists but contains invalid values, output the validation error from `references/error-messages.md` and stop. Do not re-read the config at each step.
 
-Do not re-read the config at each step.
-
-If `model_suggestion.enabled` is `true` (the default), run the model-data cache lifecycle (check / seed / staleness-refresh) once now, before Step 1 — see `references/model-suggestion.md`. When `false`, skip all model-suggestion steps silently.
+If `model_suggestion.enabled` is `true` (the default), run the model-data cache lifecycle (check / seed / staleness-refresh) once now, before Step 1 — see `references/model-suggestion.md`. The cache is **skill-level** (a dated `model-data-<date>.json` in the installed skill folder, shared across all repos), not per-repo; `--refresh-model-data` forces a refresh first. When `false`, skip all model-suggestion steps silently.
 
 ## Subagent Architecture
 
