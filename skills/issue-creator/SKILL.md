@@ -167,20 +167,19 @@ For each image path provided:
    test -f "{image_path}" && stat -f%z "{image_path}" 2>/dev/null || stat -c%s "{image_path}" 2>/dev/null
    ```
 
-2. **Upload via GitHub API** — use the repository contents API to commit the image to `.github/issue-assets/`:
+2. **Upload via GitHub API** — use the repository contents API to commit the image to `.github/issue-assets/`. The contents API requires `content` to be base64-encoded, so encode the image and **stream the result to `gh` via stdin** — never pass the base64 string as a command-line argument, or large images overflow `ARG_MAX` (~1 MB on macOS) and the upload fails with "argument list too long" before any network call:
    ```bash
-   # Base64-encode the image (cross-platform: try Linux -w0 flag first, fall back to macOS)
-   base64_content=$(base64 -w0 < "{image_path}" 2>/dev/null || base64 < "{image_path}")
-
-   # Generate a unique filename: timestamp + original name
    filename="$(date +%Y%m%d%H%M%S)-{original_filename}"
 
-   # Upload via gh api and capture the download URL
-   download_url=$(gh api repos/{owner}/{repo}/contents/.github/issue-assets/{filename} \
-     --method PUT \
-     --field message="Upload image for issue: {filename}" \
-     --field content="$base64_content" \
-     --jq '.content.download_url')
+   # Pipe base64 (newlines stripped) to gh via stdin. `-F content=@-` (capital -F, NOT
+   # -f) reads the field from stdin, keeping the payload off argv to avoid ARG_MAX.
+   download_url=$(
+     { base64 -w0 < "{image_path}" 2>/dev/null || base64 < "{image_path}"; } | tr -d '\n' \
+     | gh api repos/{owner}/{repo}/contents/.github/issue-assets/{filename} \
+         --method PUT \
+         -f message="Upload image for issue: {filename}" \
+         -F content=@- \
+         --jq '.content.download_url')
    ```
 
 3. **Extract the URL** — the upload command in Step 2 already captures `download_url` via `--jq`. Verify it is non-empty before proceeding. If empty, treat as an upload failure.
@@ -203,6 +202,8 @@ Embed uploaded images in a **Screenshots** section placed between the Descriptio
 ```
 
 If no images are provided, omit the Screenshots section entirely.
+
+> **Repo visibility caveat:** Durable embedded images require a **public** repository — on a private repo the `raw.githubusercontent.com` link carries an expiring token and the embed breaks shortly after upload. The *source* image's location on disk (e.g. inside a gitignored `.gitissue/`) does not affect embedding; only repository visibility does.
 
 ### Multiple images
 
