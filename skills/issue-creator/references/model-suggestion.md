@@ -109,7 +109,10 @@ prunes the rest on the next write (see *Refresh procedure*).
 3. **Cache missing** → seed it from the bundled `templates/model-data.json` into
    the skill folder under a dated name, then offer a fresh fetch:
    ```bash
-   seed_date="$(date -u +%Y-%m-%d)"   # matches the seed's own last_fetched date
+   # Date portion of the seed's own last_fetched — NOT today's date — so the
+   # filename date and the cache's last_fetched can never disagree (AC5).
+   seed_date="$(grep -o '"last_fetched": *"[0-9-]\{10\}' \
+     "{skill_dir}/templates/model-data.json" | grep -o '[0-9-]\{10\}$')"
    cp "{skill_dir}/templates/model-data.json" \
       "{skill_dir}/model-data-${seed_date}.json"
    ```

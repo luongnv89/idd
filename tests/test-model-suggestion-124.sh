@@ -107,6 +107,18 @@ else
   fail "T2.AC5.3: refresh does not document pruning older dated files"
 fi
 
+# AC5 invariant: the seed step must derive the dated filename from the seed's
+# own last_fetched, NOT from today's date. Using `date` would name a freshly
+# seeded cache with today's date while it carries the seed's older last_fetched,
+# making the filename's at-a-glance staleness signal lie.
+seed_block="$(awk '/Cache missing/{f=1} f; /Bundled seed also missing/{exit}' "$REF")"
+if printf '%s' "$seed_block" | grep -q 'last_fetched' \
+   && ! printf '%s' "$seed_block" | grep -qE 'seed_date="?\$\(date'; then
+  pass "T2.AC5.4: seed filename date derived from last_fetched, not today's date"
+else
+  fail "T2.AC5.4: seed step names the cache from \`date\` — filename date can disagree with last_fetched (AC5)"
+fi
+
 # ───────────────────────────────────────────────────────────
 # T3: AC6 — force refresh, independent of staleness
 # ───────────────────────────────────────────────────────────
