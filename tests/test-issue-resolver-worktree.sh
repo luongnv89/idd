@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # test-issue-resolver-worktree.sh — Validate interactive worktree resolver contract
 #
-# This script verifies issue #123 acceptance criteria:
+# This script verifies issue #123 and #129 acceptance criteria:
 #   AC #1: interactive /issue-resolver offers a new git worktree or current tree.
 #   AC #2: accepted worktree path creates/prepares a worktree with local setup.
 #   AC #3: declined path keeps current in-place behavior.
 #   AC #4: auto-pilot / IDD_AUTO_MODE=1 never shows the worktree prompt.
 #   AC #5: prompt states copied/setup artifacts and branch/workspace naming.
+#   #129: auto mode in-place default is explicit; auto-pilot resolver prompt matches.
 #
 # Usage: bash tests/test-issue-resolver-worktree.sh
 # Returns: exit 0 if all checks pass, exit 1 on failure.
@@ -45,11 +46,12 @@ echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄�
 SRC_SKILL="$REPO_ROOT/src/skills/issue-resolver/SKILL.source.md"
 SRC_STEPS="$REPO_ROOT/src/skills/issue-resolver/references/pipeline-steps.md"
 SRC_ERRORS="$REPO_ROOT/src/skills/issue-resolver/references/error-messages.md"
+SRC_AUTOPILOT_PROMPTS="$REPO_ROOT/src/skills/auto-pilot/references/subagent-prompts.md"
 ROOT_SKILL="$REPO_ROOT/skills/issue-resolver/SKILL.md"
 ROOT_STEPS="$REPO_ROOT/skills/issue-resolver/references/pipeline-steps.md"
 ROOT_ERRORS="$REPO_ROOT/skills/issue-resolver/references/error-messages.md"
 
-for file in "$SRC_SKILL" "$SRC_STEPS" "$SRC_ERRORS" "$ROOT_SKILL" "$ROOT_STEPS" "$ROOT_ERRORS"; do
+for file in "$SRC_SKILL" "$SRC_STEPS" "$SRC_ERRORS" "$SRC_AUTOPILOT_PROMPTS" "$ROOT_SKILL" "$ROOT_STEPS" "$ROOT_ERRORS"; do
   if [ -f "$file" ]; then
     pass "exists: ${file#$REPO_ROOT/}"
   else
@@ -76,6 +78,10 @@ check_contains "$SRC_STEPS" 'Interactive mode only.*auto mode .*skipped|Interact
   "T2.2: pipeline details say worktree step is skipped in auto mode"
 check_contains "$SRC_STEPS" 'worktree prompt never appears in auto mode' \
   "T2.3: no-prompt auto-mode contract is explicit"
+check_contains "$SRC_SKILL" 'Workspace:.*in-place.*Skip Step 0e' \
+  "T2.4 (#129): Auto-Pilot Mode section states in-place default"
+check_contains "$SRC_SKILL" 'no `git worktree add` on the default resolution path' \
+  "T2.5 (#129): auto mode forbids default worktree creation"
 
 # ───────────────────────────────────────────────────────────
 # T3: Worktree branch/path naming and setup are stated before acceptance.
@@ -130,6 +136,14 @@ for file in "$ROOT_SKILL" "$ROOT_STEPS" "$ROOT_ERRORS"; do
   rel="${file#$REPO_ROOT/}"
   check_contains "$file" 'worktree|Worktree' "T6: generated $rel contains worktree contract text"
 done
+
+# ───────────────────────────────────────────────────────────
+# T7 (#129): Auto-pilot resolver subagent uses in-place auto contract.
+# ───────────────────────────────────────────────────────────
+check_contains "$SRC_AUTOPILOT_PROMPTS" 'Workspace is in-place only: skip Step 0e' \
+  "T7.1 (#129): auto-pilot resolver prompt skips worktree"
+check_contains "$SRC_AUTOPILOT_PROMPTS" 'no `git worktree add`' \
+  "T7.2 (#129): auto-pilot forbids worktree add on resolve path"
 
 # ───────────────────────────────────────────────────────────
 # Summary

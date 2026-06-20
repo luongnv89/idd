@@ -468,6 +468,7 @@ After the pipeline completes, print a structured step-by-step summary so the use
 When invoked with `--auto` (or by `/auto-pilot`), the entire pipeline runs without user interaction:
 
 - **Environment:** Export `IDD_AUTO_MODE=1` before any shell snippet that consults it (the pre-commit security scan reads this to switch from prompt-on-warning to log-and-continue; see `references/docs/pre-commit-security.md`).
+- **Workspace:** Always the **in-place** path. Skip Step 0e entirely — no worktree prompt, no `git worktree add` on the default resolution path. Run mandatory Repo Sync, then *0f — Create branch* in the current working tree. Isolated worktrees remain **interactive-only** (Step 0e).
 - **Preflight:** Skip assignment guard. Log blocking labels as warnings, don't stop.
 - **Research:** If already resolved, close the issue with a comment and exit cleanly.
 - **Plan:** Auto-select the recommended option (best balance of quality/effort).
