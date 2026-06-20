@@ -80,7 +80,7 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 
 ## Branch
 
-### Branch already exists
+### Branch already exists (worktree path — Step 0e)
 ```
 ⚠ Branch {branch} already exists
 
@@ -93,7 +93,19 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 
   Choose: [continue/fresh]
 ```
-**Trigger:** `git worktree add -b {branch} {wt_dir}` fails because the branch already exists (Step 0e). On `continue`, set `created_branch_in_step_0e=0` and run `git worktree add "$wt_dir" "$branch"`. On `fresh`, delete the branch, keep `created_branch_in_step_0e=1`, and retry creation. The in-place *0f — Create branch* flow uses the same `continue`/`fresh` wording but runs `git checkout {branch}` or `git branch -D` + `git checkout -b` instead of worktree commands.
+**Trigger:** `git worktree add -b {branch} {wt_dir}` fails because the branch already exists (Step 0e). On `continue`, set `created_branch_in_step_0e=0` and run `git worktree add "$wt_dir" "$branch"`. On `fresh`, delete the branch, keep `created_branch_in_step_0e=1`, and retry creation.
+
+### Branch already exists (in-place path — Step 0f)
+```
+⚠ Branch {branch} already exists
+
+  Options:
+    continue  — check out the existing branch in this working tree
+    fresh     — delete the branch and create it again from {base_branch}
+
+  Choose: [continue/fresh]
+```
+**Trigger:** `git checkout -b {branch}` fails because the branch already exists (Step 0f, in-place path). On `continue`, run `git checkout {branch}`. On `fresh`, run `git branch -D {branch}` then `git checkout -b {branch}`.
 
 ### Worktree creation failed
 ```

@@ -54,7 +54,7 @@ git worktree add -b "$branch" "$wt_dir" "origin/${base}"
 Keep `repo_root` and `wt_dir` available for the setup step below (both are
 absolute, so the copy works regardless of the current directory).
 
-**If the branch already exists** (`git worktree add -b` fails): in interactive mode ask `continue` (set `created_branch_in_step_0e=0`, then add a worktree for the existing branch with `git worktree add "$wt_dir" "$branch"`) or `fresh` (delete the branch, keep `created_branch_in_step_0e=1`, then retry). See `references/error-messages.md` → *Branch already exists*.
+**If the branch already exists** (`git worktree add -b` fails): in interactive mode ask `continue` (set `created_branch_in_step_0e=0`, then add a worktree for the existing branch with `git worktree add "$wt_dir" "$branch"`) or `fresh` (delete the branch, keep `created_branch_in_step_0e=1`, then retry). See `references/error-messages.md` → *Branch already exists (worktree path — Step 0e)*.
 
 **If worktree creation fails for any other reason** (e.g. path exists, disk, locked worktree): warn, print the message from `references/error-messages.md` → *Worktree creation failed*, and **fall back to the in-place path** (Repo Sync + *0f — Create branch*). Never abort the resolution just because the worktree could not be made.
 
