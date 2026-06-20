@@ -80,17 +80,52 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 
 ## Branch
 
-### Branch already exists
+### Branch already exists (worktree path — Step 0e)
 ```
-⚠ Branch issue-N/{description} already exists
+⚠ Branch {branch} already exists
+
+  You were creating a worktree for issue #{N}.
 
   Options:
-    continue  — resume from existing branch
-    fresh     — delete and start fresh
+    continue  — attach a new worktree to the existing branch
+              (git worktree add "{wt_dir}" "{branch}")
+    fresh     — delete the branch, then retry git worktree add -b
 
   Choose: [continue/fresh]
 ```
-**Trigger:** `git checkout -b {branch_name}` fails because the branch already exists.
+**Trigger:** `git worktree add -b {branch} {wt_dir}` fails because the branch already exists (Step 0e). On `continue`, set `created_branch_in_step_0e=0` and run `git worktree add "$wt_dir" "$branch"`. On `fresh`, delete the branch, keep `created_branch_in_step_0e=1`, and retry creation.
+
+### Branch already exists (in-place path — Step 0f)
+```
+⚠ Branch {branch} already exists
+
+  Options:
+    continue  — check out the existing branch in this working tree
+    fresh     — delete the branch and create it again from {base_branch}
+
+  Choose: [continue/fresh]
+```
+**Trigger:** `git checkout -b {branch}` fails because the branch already exists (Step 0f, in-place path). On `continue`, run `git checkout {branch}`. On `fresh`, run `git branch -D {branch}` then `git checkout -b {branch}`.
+
+### Worktree creation failed
+```
+⚠ Could not create the worktree at {wt_dir}
+
+  Falling back to resolving in the current working tree.
+  To clean up stale worktrees:  git worktree prune
+```
+**Trigger:** `git worktree add` fails for a reason other than an existing branch (path already occupied, locked worktree, disk error). Non-fatal — the resolver continues on the in-place path (Repo Sync + branch creation). Interactive only; the worktree offer never runs in auto mode.
+
+### Worktree setup failed
+```
+⚠ Worktree setup failed at {wt_dir}
+
+  Cleaning up the partial worktree, then falling back to resolving in the
+  current working tree.
+  Recover manually:  git worktree list && git worktree remove {wt_dir}
+                    git worktree prune
+```
+**Trigger:** local setup preparation fails after the worktree was created (copy error, dependency install failure, bootstrap failure). The resolver removes the partial worktree, deletes only a branch created by this Step 0e, then continues on the in-place path. If cleanup fails, stop and ask the user to run the recovery commands.
 
 ## Verify
 
