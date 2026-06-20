@@ -225,12 +225,12 @@ All model-suggestion failures are **non-fatal** — they warn and continue creat
   To fix:  reinstall the skill, or set model_suggestion.enabled: false
   Docs:    https://github.com/luongnv89/idd/blob/main/docs/config-schema.md
 ```
-**Trigger:** `model_suggestion.enabled` is true but neither `.gitissue/model-data.json` nor the bundled `templates/model-data.json` seed can be read. Suggestions are skipped; issue creation proceeds.
+**Trigger:** `model_suggestion.enabled` is true but neither a skill-level `model-data-<date>.json` cache nor the bundled `templates/model-data.json` seed can be read. Suggestions are skipped; issue creation proceeds.
 
 ### Model data malformed
 ```
 ⚠ Model data is malformed — {detail}
   Skipping model suggestion for this issue.
-  Tip: refresh the data, or restore .gitissue/model-data.json from the bundled seed.
+  Tip: refresh with --refresh-model-data, or reinstall the skill to restore the bundled seed.
 ```
-**Trigger:** `.gitissue/model-data.json` exists but fails JSON parsing or is missing the `complexity_mapping` / `providers` keys.
+**Trigger:** The skill-level `model-data-<date>.json` cache exists but fails JSON parsing or is missing the `complexity_mapping` / `providers` keys.

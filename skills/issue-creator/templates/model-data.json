@@ -3,7 +3,7 @@
   "source": "CursorBench 3.1",
   "source_url": "https://cursor.com/cursorbench",
   "last_fetched": "2026-06-12T00:00:00Z",
-  "note": "Bundled seed shipped with the issue-creator skill. Copied to .gitissue/model-data.json on first run when none exists. Cost/task figures are computed by applying each model's published per-million-token pricing to tokens used per task. Refresh with /issue-creator when older than 7 days.",
+  "note": "Bundled seed shipped with the issue-creator skill. Copied to a skill-level model-data-<date>.json cache (shared across all repos) on first run when none exists. Cost/task figures are computed by applying each model's published per-million-token pricing to tokens used per task. Refresh with /issue-creator (older than 7 days) or force with --refresh-model-data.",
   "providers": {
     "openai": {
       "family": "GPT-5.5",
