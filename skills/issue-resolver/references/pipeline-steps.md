@@ -2,6 +2,116 @@
 
 Detailed procedures for each subagent delegation in the resolve pipeline. SKILL.md keeps the contract short; this file holds the full input/output spec and inline fallback instructions.
 
+## Step 0e — Workspace (interactive only)
+
+Full procedure for the worktree offer described in SKILL.md *Step 0e — Workspace*. **Interactive mode only** — in auto mode (`--auto` / `IDD_AUTO_MODE=1`) this entire step is skipped and the pipeline uses the in-place path (Repo Sync + *0f — Create branch*), byte-for-byte as before. The worktree prompt never appears in auto mode (acceptance criterion 4).
+
+### Why a worktree
+
+`git worktree` checks out a branch into a *separate directory* that shares the same `.git` object store. The user's current working tree — including any uncommitted changes — is never modified. Branch creation, implementation, and the QA test runs all happen in the isolated directory.
+
+### The offer
+
+Present the prompt from SKILL.md (*Step 0e — Workspace*). It must state, before the user answers:
+
+- the **branch** name (`{type}/{N}-{short-description}`),
+- the **worktree path** (the naming convention below), and
+- what **setup** will be copied/run (gitignored local config + the project's detected install/bootstrap).
+
+Default is **accept** (`[Y/n]`). This satisfies acceptance criterion 5 (the proposal states what is copied and the workspace/branch naming).
+
+### Naming convention
+
+- **Branch:** `{type}/{N}-{short-description}` — identical to the in-place path (`references/docs/naming-conventions.md`). Unchanged so traceability and the `feat/`, `fix/`, … prefixes stay consistent.
+- **Worktree directory:** a *sibling* of the repo root, derived from the branch with `/` → `-` so it is a single path segment:
+
+  ```
+  ../{repo}-worktrees/{type}-{N}-{short-description}
+  ```
+
+  Example: repo `idd`, branch `feat/123-resolver-worktree-prompt` → `../idd-worktrees/feat-123-resolver-worktree-prompt`.
+
+  A sibling directory (outside the repo) keeps the worktree out of the repo's own status and ignore rules. If you instead place it *inside* the repo, the path **must** already be covered by `.gitignore` — otherwise the worktree's own files surface as untracked changes in the parent. Prefer the sibling location.
+
+### Create the worktree
+
+`git worktree add -b` creates the branch **and** the workspace in one command, off a freshly fetched base — so this replaces both the mandatory Repo Sync and *0f — Create branch* on the accepted path. No `git pull --rebase` / stash dance is needed (the new branch starts at `origin/<base>` directly).
+
+```bash
+repo_root="$(git rev-parse --show-toplevel)"        # absolute path to the repo
+base="$(git rev-parse --abbrev-ref HEAD)"           # base branch to fork from
+repo="$(basename "$repo_root")"
+branch="{type}/{N}-{short-description}"
+# Absolute worktree path (sibling of the repo) — independent of the current
+# directory, so later steps that `cd` into it stay correct.
+wt_dir="$(dirname "$repo_root")/${repo}-worktrees/$(printf '%s' "$branch" | tr '/' '-')"
+
+git fetch origin
+created_branch_in_step_0e=1
+git worktree add -b "$branch" "$wt_dir" "origin/${base}"
+```
+
+Keep `repo_root` and `wt_dir` available for the setup step below (both are
+absolute, so the copy works regardless of the current directory).
+
+**If the branch already exists** (`git worktree add -b` fails): in interactive mode ask `continue` (set `created_branch_in_step_0e=0`, then add a worktree for the existing branch with `git worktree add "$wt_dir" "$branch"`) or `fresh` (delete the branch, keep `created_branch_in_step_0e=1`, then retry). See `references/error-messages.md` → *Branch already exists*.
+
+**If worktree creation fails for any other reason** (e.g. path exists, disk, locked worktree): warn, print the message from `references/error-messages.md` → *Worktree creation failed*, and **fall back to the in-place path** (Repo Sync + *0f — Create branch*). Never abort the resolution just because the worktree could not be made.
+
+After creation, **change into the worktree** so every subsequent step (research, implement, QA, deliver) operates there:
+
+```bash
+cd "$wt_dir"
+```
+
+### Prepare the workspace (generic — discovered, not hardcoded)
+
+The goal: the worktree can build and run immediately, without the user reconfiguring it. A fresh worktree shares git history but **not** gitignored files (local config) or installed dependencies. Reconstruct them **by detecting what this repo uses** — do not assume any specific stack:
+
+1. **Copy gitignored local config** from the original working tree into the worktree. These are the files git does not track but the app needs at runtime — typically environment files. Copy what exists; skip silently what does not:
+
+   ```bash
+   # Absolute paths from the creation block — works from any directory, so this
+   # does not depend on a prior `cd` or on shell state carrying across steps.
+   for f in .env .env.local .env.development .env.test; do
+     [ -f "$repo_root/$f" ] && cp "$repo_root/$f" "$wt_dir/$f"
+   done
+   ```
+
+   If the repo keeps other gitignored local config (service-account JSON, local certs, a `config.local.*`), copy those too. Use the repo's `.gitignore` as the guide for what is local-only. **Never copy secrets anywhere outside the worktree, and never commit them** — the pre-commit security scan (`references/docs/pre-commit-security.md`) still blocks secret-bearing files on push.
+
+2. **Install dependencies** using the project's **detected** package manager — the same detection the researcher/implementer rely on. Examples (pick the one matching the repo, do not run all): `npm ci` / `pnpm install` / `yarn` (Node), `pip install -r requirements.txt` or `uv sync` inside the project venv (Python), `bundle install` (Ruby), `go mod download` (Go), `cargo fetch` (Rust). If the repo has no dependency manifest, skip this step.
+
+3. **Run project bootstrap** if the repo defines one — e.g. a `Makefile` `setup`/`bootstrap` target, a `scripts/setup.sh`, a documented "getting started" command, or generated files (`prisma generate`, etc.). Skip if none exists.
+
+Report what was prepared, e.g. `✓ Worktree ready — copied .env, ran npm ci`. Keep it factual: list only what actually ran.
+
+**If setup fails after the worktree was created** (copy error, dependency install failure, bootstrap failure): warn, print the message from `references/error-messages.md` → *Worktree setup failed*, then clean up the partial workspace before falling back to the in-place path. This avoids stranding the resolver on a branch that is already checked out in the failed worktree.
+
+```bash
+cd "$repo_root"
+git worktree remove "$wt_dir" --force 2>/dev/null || git worktree prune
+# Delete the branch only if this Step 0e created it with `git worktree add -b`.
+# If the user chose to continue an existing branch, keep the branch and let 0f's
+# existing branch flow handle it.
+if [ "${created_branch_in_step_0e:-0}" = "1" ]; then
+  git branch -D "$branch" 2>/dev/null || true
+fi
+```
+
+After cleanup, run the mandatory Repo Sync and *0f — Create branch* in the original working tree. If cleanup itself fails, stop and tell the user how to recover with `git worktree list`, `git worktree remove {wt_dir}`, and `git worktree prune` rather than attempting to use two checked-out copies of the same branch.
+
+### Cleanup (after delivery, interactive only)
+
+The worktree is intentionally left in place after the PR is created so the user can inspect it. Tell them how to remove it when done:
+
+```
+○ Worktree left at {wt_dir} for inspection.
+  Remove with:  git worktree remove {wt_dir}
+```
+
+Do not auto-remove it — the user may still want the local artifacts.
+
 ## Step 1 — Research (codebase-researcher subagent)
 
 ### Delegation payload

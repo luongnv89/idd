@@ -5,7 +5,7 @@ license: MIT
 compatibility: "Requires git and GitHub CLI (gh) with authentication and push access. Self-contained — uses shared agents from shared/agents/."
 effort: max
 metadata:
-  version: 0.8.0
+  version: 0.9.0
   author: Luong NGUYEN <luongnv89@gmail.com>
 ---
 
@@ -32,6 +32,8 @@ Before any operation, verify the environment. On failure, output the exact error
 4. Confirm GitHub remote exists: `git remote -v`
 
 ## Repo Sync Before Edits (mandatory)
+
+This applies to the **in-place path** (auto mode, or interactive when the user declines the worktree offer in Step 0e). On the **worktree path** the sync is unnecessary — `git worktree add` branches from a freshly fetched `origin/<base>`, so the new workspace already starts current (see Step 0e and `references/pipeline-steps.md`).
 
 Before making file modifications, sync with remote using the stash-first pattern (see `references/docs/sync-conventions.md` for the full convention and recovery procedure):
 
@@ -223,7 +225,60 @@ If `issue.auto_normalize` is true and the issue is not already normalized (no `<
 
 If normalization fails, warn and continue with original body.
 
-### 0e — Create branch
+### 0e — Workspace (interactive only)
+
+Decide *where* the resolution work happens. The branch name is the same in both
+cases: `{type}/{N}-{short-description}` (see `references/docs/naming-conventions.md`).
+
+**Auto mode (`--auto` / `IDD_AUTO_MODE=1`): skip this offer entirely.** Go
+straight to *0f — Create branch* (in-place). The worktree prompt never appears
+in auto mode (acceptance criterion 4).
+
+**Interactive mode:** offer to run the resolution in a dedicated git *worktree*
+— an isolated checkout in a separate directory — so branch creation,
+implementation, and testing never touch the user's current working tree. State
+plainly what will be set up and the workspace/branch naming the user can expect:
+
+```
+◆ Workspace for issue #N
+┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+
+  This resolution can run in an isolated git worktree instead of your
+  current working tree.
+
+    Branch:    {type}/{N}-{short-description}
+    Worktree:  ../{repo}-worktrees/{type}-{N}-{short-description}
+    Setup:     copies your gitignored local config (.env*, and similar),
+               then runs this project's detected install/bootstrap so the
+               workspace is ready to run without manual reconfiguration.
+
+  Accepting keeps your current working tree untouched. Declining uses the
+  current working tree with the existing sync and branch behavior.
+
+  Resolve in a new worktree? [Y/n]
+```
+
+- **Accept (default):** create the worktree and prepare it, then continue the
+  pipeline from inside it. This **replaces** *0f — Create branch* and the
+  mandatory Repo Sync (the worktree branches from a freshly fetched
+  `origin/<base>`, so it starts current). Full procedure — creation commands,
+  generic setup-artifact propagation, and cleanup guidance — is in
+  `references/pipeline-steps.md` (*Step 0e — Workspace*).
+- **Decline:** proceed in the current working tree exactly as today — run the
+  mandatory Repo Sync, then *0f — Create branch*. No behavior change.
+
+If worktree creation fails, warn and fall back to the in-place path (see
+`references/error-messages.md` → *Worktree creation failed*). If setup fails
+after the worktree was created, first remove that partial worktree (and delete
+only a branch created by this step), then fall back to the in-place path (see
+`references/error-messages.md` → *Worktree setup failed*). Never leave the user
+without a working resolution.
+
+### 0f — Create branch
+
+This is the **in-place path** — used in auto mode, and in interactive mode when
+the user declined the worktree offer. (On the accepted-worktree path the branch
+was already created by `git worktree add -b` in 0e; skip this sub-step.)
 
 Create working branch: `{type}/{N}-{short-description}` (see `references/docs/naming-conventions.md`).
 
@@ -233,8 +288,11 @@ Create working branch: `{type}/{N}-{short-description}` (see `references/docs/na
 
 After preflight:
 ```
-[0/5] Preflight    ✓ issue #N open, branch: {branch_name}
+[0/5] Preflight    ✓ issue #N open, branch: {branch_name}{workspace_note}
 ```
+
+where `{workspace_note}` is ` (worktree)` when the resolution is running in a
+worktree, and empty otherwise.
 
 ---
 

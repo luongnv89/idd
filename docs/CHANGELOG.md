@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Added
+- `feat(issue-resolver)` Interactive runs now offer to resolve the issue in an isolated git **worktree** instead of the current working tree. On accept, the resolver creates the branch + worktree in one `git worktree add -b` off a freshly fetched base (replacing the in-place stash-first sync and branch creation), copies the repo's gitignored local config (`.env*` and similar), and runs the project's detected install/bootstrap so the workspace is ready to run without manual reconfiguration. Declining keeps today's in-place behavior unchanged, and auto-pilot / `IDD_AUTO_MODE=1` never shows the prompt. Worktree creation failures fall back to the in-place path. Skill bumped 0.8.0 → 0.9.0. (#123)
+
 ### Changed
 - `feat(issue-creator)` Model-suggestion cache moved from per-repo `.gitissue/model-data.json` to a **skill-level** dated cache (`model-data-<date>.json` in the installed skill folder), so one cache serves every repo on the machine — no more re-seeding per project. The filename carries the last-update date for at-a-glance staleness, and `--refresh-model-data` forces a refresh on demand regardless of the staleness threshold. A legacy per-repo `.gitissue/model-data.json` is ignored and may be deleted. (#124)
 

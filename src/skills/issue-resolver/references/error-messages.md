@@ -92,6 +92,26 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 ```
 **Trigger:** `git checkout -b {branch_name}` fails because the branch already exists.
 
+### Worktree creation failed
+```
+⚠ Could not create the worktree at {wt_dir}
+
+  Falling back to resolving in the current working tree.
+  To clean up stale worktrees:  git worktree prune
+```
+**Trigger:** `git worktree add` fails for a reason other than an existing branch (path already occupied, locked worktree, disk error). Non-fatal — the resolver continues on the in-place path (Repo Sync + branch creation). Interactive only; the worktree offer never runs in auto mode.
+
+### Worktree setup failed
+```
+⚠ Worktree setup failed at {wt_dir}
+
+  Cleaning up the partial worktree, then falling back to resolving in the
+  current working tree.
+  Recover manually:  git worktree list && git worktree remove {wt_dir}
+                    git worktree prune
+```
+**Trigger:** local setup preparation fails after the worktree was created (copy error, dependency install failure, bootstrap failure). The resolver removes the partial worktree, deletes only a branch created by this Step 0e, then continues on the in-place path. If cleanup fails, stop and ask the user to run the recovery commands.
+
 ## Verify
 
 ### Tests failed
