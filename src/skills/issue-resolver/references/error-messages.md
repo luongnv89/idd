@@ -82,15 +82,18 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 
 ### Branch already exists
 ```
-⚠ Branch issue-N/{description} already exists
+⚠ Branch {branch} already exists
+
+  You were creating a worktree for issue #{N}.
 
   Options:
-    continue  — resume from existing branch
-    fresh     — delete and start fresh
+    continue  — attach a new worktree to the existing branch
+              (git worktree add "{wt_dir}" "{branch}")
+    fresh     — delete the branch, then retry git worktree add -b
 
   Choose: [continue/fresh]
 ```
-**Trigger:** `git checkout -b {branch_name}` fails because the branch already exists.
+**Trigger:** `git worktree add -b {branch} {wt_dir}` fails because the branch already exists (Step 0e). On `continue`, set `created_branch_in_step_0e=0` and run `git worktree add "$wt_dir" "$branch"`. On `fresh`, delete the branch, keep `created_branch_in_step_0e=1`, and retry creation. The in-place *0f — Create branch* flow uses the same `continue`/`fresh` wording but runs `git checkout {branch}` or `git branch -D` + `git checkout -b` instead of worktree commands.
 
 ### Worktree creation failed
 ```

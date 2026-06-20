@@ -90,7 +90,23 @@ Report what was prepared, e.g. `✓ Worktree ready — copied .env, ran npm ci`.
 
 ```bash
 cd "$repo_root"
-git worktree remove "$wt_dir" --force 2>/dev/null || git worktree prune
+cleanup_ok=1
+git worktree remove "$wt_dir" --force 2>/dev/null || cleanup_ok=0
+if [ "$cleanup_ok" -eq 1 ] && git worktree list --porcelain | grep -q "worktree $wt_dir$"; then
+  cleanup_ok=0
+fi
+if [ "$cleanup_ok" -eq 0 ]; then
+  git worktree prune 2>/dev/null || true
+  if git worktree list --porcelain | grep -q "worktree $wt_dir$"; then
+    cleanup_ok=0
+  else
+    cleanup_ok=1
+  fi
+fi
+if [ "$cleanup_ok" -eq 0 ]; then
+  # Do not fall back in-place while the branch is still checked out in the failed worktree.
+  stop with *Worktree setup failed* recovery commands and exit the resolution attempt.
+fi
 # Delete the branch only if this Step 0e created it with `git worktree add -b`.
 # If the user chose to continue an existing branch, keep the branch and let 0f's
 # existing branch flow handle it.
@@ -99,7 +115,7 @@ if [ "${created_branch_in_step_0e:-0}" = "1" ]; then
 fi
 ```
 
-After cleanup, run the mandatory Repo Sync and *0f — Create branch* in the original working tree. If cleanup itself fails, stop and tell the user how to recover with `git worktree list`, `git worktree remove {wt_dir}`, and `git worktree prune` rather than attempting to use two checked-out copies of the same branch.
+After **verified** cleanup (`cleanup_ok=1`), run the mandatory Repo Sync and *0f — Create branch* in the original working tree. If cleanup cannot remove the worktree entry, **stop** — print `references/error-messages.md` → *Worktree setup failed* and do not attempt the in-place path while the same branch may still be checked out in `{wt_dir}`.
 
 ### Cleanup (after delivery, interactive only)
 
