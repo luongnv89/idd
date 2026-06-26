@@ -142,6 +142,7 @@ Check these files relative to the skill's directory (the dirname of this SKILL.m
 - `references/agents/fixer.md` — QA fix subagent (Step 4)
 - `references/pipeline-steps.md` — Full delegation payloads, phases, and inline fallbacks for Steps 1–4
 - `references/report-templates.md` — PR body template, final report templates, and expected inline output
+- `references/bug-verification.md` — Red-capable reproduction checkpoint for bug issues (Step 3, before the fix)
 - `references/docs/sync-conventions.md` — stash-first sync convention and recovery
 - `references/docs/naming-conventions.md` — branch, commit, PR naming conventions
 - `references/docs/pre-commit-security.md` — pre-commit security conventions reference
@@ -355,6 +356,8 @@ Agent(
   subagent_type="general-purpose"  # NOT "implementer"
 )
 ```
+
+For **bug** issues, the implementer first runs the red-capable reproduction checkpoint — name a command/test that reproduces the symptom and confirm it fails red for the stated reason **before** the fix, then convert it to a regression test when a clean seam exists. The reproduction is returned and surfaced as evidence in the PR Decision Record and acceptance table. Non-bug issues skip it; auto mode never blocks. See `references/bug-verification.md`.
 
 Full payload, commit guardrails, and inline fallback are in `references/pipeline-steps.md` (*Step 3 — Implement*).
 
@@ -591,6 +594,7 @@ All errors use rich format from `references/error-messages.md`:
 - **`references/agents/fixer.md`** — QA fix subagent (Step 4)
 - **`references/pipeline-steps.md`** — Full delegation payloads, phases, and inline fallbacks for Steps 1–4
 - **`references/report-templates.md`** — PR body template, final report templates, and expected inline output
+- **`references/bug-verification.md`** — Red-capable reproduction checkpoint for bug issues (Step 3, before the fix)
 - **`references/error-messages.md`** — Complete error catalog
 - **`references/docs/naming-conventions.md`** — Branch, commit, PR naming conventions
 - **`references/docs/github-projects-sync.md`** — GitHub Projects status sync

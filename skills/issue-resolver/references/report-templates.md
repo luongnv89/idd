@@ -24,6 +24,7 @@ Closes #{issue_number}
 - **Options rejected:** Option 1 — {one-line reason}; Option 3 — {reason}
 - **Selected option:** Option {N} — {name}
 - **Residual risk:** {what remains uncertain or accepted as known limitation, or "none identified"}
+- **Reproduction:** {bug issues only — `<command>` confirmed red for the stated reason → regression test `<path>` (or "manual — no seam"); omit this line for non-bug issues}
 
 Analyzed at: `{branch} @ {commit_sha_short}` ({YYYY-MM-DD})
 
@@ -49,6 +50,8 @@ Analyzed at: `{branch} @ {commit_sha_short}` ({YYYY-MM-DD})
 | {criterion text from issue body} | unverified | {explanation — out of scope, manual review needed} |
 
 Use `pass`, `fail`, or `unverified` per criterion. Always cite evidence (a file path, a test name, or a one-line explanation). If the issue has no acceptance criteria, replace the table with `> **Note:** No acceptance criteria defined — manual review recommended.`
+
+**Bug issues — reproduction evidence.** When the issue `type` is `bug`, the Evidence column must cite the reproduction command from the Step 3 bug-verification checkpoint (`references/bug-verification.md`), not just a checkmark. Format the cell as `Verified red: <command> → fixed → <regression test path>` (or `… → manual repro, no seam` when no test seam exists). If the symptom could not be reproduced, mark that criterion `unverified` and note `not reproduced: <reason>`.
 ```
 
 The PR title follows `{type}({scope}): {description} (#{issue_number})` — see `references/docs/naming-conventions.md`.
@@ -57,7 +60,7 @@ The PR title follows `{type}({scope}): {description} (#{issue_number})` — see 
 
 If a fresh `.gitissue/analysis-<N>.json` exists for this issue, lift its `decision_record` and `git_state` blocks directly into the *Decision Record* section above. Field labels are stable across `/issue-analysis`, `/issue-resolver`, and `/issue-pr-review` because downstream presence checks are string-matched — do not rename them.
 
-If no analysis JSON exists (e.g., resolver was invoked without prior analysis), synthesize the same five fields from the resolver's own Step 1 (Research) and Step 2 (Plan) findings, and use the synced base SHA as `commit_sha_short`. Either source produces the same template — what matters is that the durable analysis signal lands in the PR body, where squash-merge will carry it into git history.
+If no analysis JSON exists (e.g., resolver was invoked without prior analysis), synthesize the same five core fields from the resolver's own Step 1 (Research) and Step 2 (Plan) findings, and use the synced base SHA as `commit_sha_short`. (For bug issues the sixth `Reproduction` line is added separately from the implementer's returned reproduction block — see the bug-verification checkpoint, not the analysis JSON.) Either source produces the same template — what matters is that the durable analysis signal lands in the PR body, where squash-merge will carry it into git history.
 
 ## Final Report — Successful Resolution
 

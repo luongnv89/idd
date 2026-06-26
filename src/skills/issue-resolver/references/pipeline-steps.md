@@ -239,6 +239,35 @@ If no Agent tool, analyze the research findings and generate the plan inline.
 4. E2e tests (if framework exists)
 5. All committed following conventional commit format
 
+### Bug verification checkpoint (bug issues only)
+
+Before the implementer applies any fix, run the red-capable reproduction checkpoint —
+see `references/bug-verification.md` for the full procedure. It applies **only** when the
+issue `type` is `bug`; non-bug issues skip it entirely (acceptance criterion 5).
+
+For a bug issue, the implementer (per `shared/agents/implementer.md` Task 1.5):
+
+1. **Names the reproduction command/test** that surfaces the symptom (an existing focused
+   test, a newly written failing test, or — when there is no test seam — the smallest
+   manual runtime command).
+2. **Confirms it is red for the stated reason** — the failure matches the symptom the
+   issue describes, not an unrelated non-zero exit.
+3. **After the fix, converts the repro into a regression test when a clean seam exists**;
+   with no seam (or no test runner — e.g. a docs/skills repo), records the manual
+   reproduction command as the evidence instead and adds no framework.
+
+The implementer **returns** a `reproduction` block (command, red status, stated-reason
+match, regression-test path or "manual — no seam"). The main agent folds it into the PR
+body's Decision Record and Acceptance Criteria Verification table (durable home — see
+`references/report-templates.md`); if a fresh `.gitissue/analysis-<N>.json` exists, the
+same data also lives in its `decision_record.reproduction` field (optional cache mirror,
+written by `/issue-analysis`, never created by the resolver).
+
+**Auto mode never blocks** (`--auto` / `IDD_AUTO_MODE=1`): a missing or failed
+reproduction is logged, recorded as `not_reproduced`, and the pipeline continues to
+deliver with the affected criterion marked `unverified` (acceptance criterion 6).
+Interactive mode behaves the same — surface the evidence (or its absence); do not halt.
+
 ### Max commits guard
 
 If commits exceed `resolve.max_commits`:
