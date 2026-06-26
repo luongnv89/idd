@@ -5,7 +5,7 @@ license: MIT
 compatibility: "Requires git and GitHub CLI (gh) with authentication. View mode (`/issue-analysis N view`) needs only local file access — no gh required."
 effort: high
 metadata:
-  version: 0.4.2
+  version: 0.5.0
   author: Luong NGUYEN <luongnv89@gmail.com>
 ---
 
