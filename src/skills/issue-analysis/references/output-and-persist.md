@@ -371,7 +371,7 @@ This is a warning, not a fatal error — the terminal output from Step 6 was alr
 }
 ```
 
-The `reproduction` object is **optional** and present only for `type: bug` issues — omit it for feature/improvement issues. It mirrors the red-capable verification evidence that `/issue-resolver` produces at its Step 3 bug-verification checkpoint (`src/skills/issue-resolver/references/bug-verification.md`). When present, `/issue-resolver` lifts it into the PR Decision Record and acceptance table alongside the other `decision_record` fields. `status` is `red` (reproduced and failing for the stated reason) or `not_reproduced` (could not be made red).
+The `reproduction` object is **optional** and present only for `type: bug` issues — omit it for feature/improvement issues. It mirrors the red-capable verification evidence that `/issue-resolver` produces at its Step 3 bug-verification checkpoint. When present, `/issue-resolver` lifts it into the PR Decision Record and acceptance table alongside the other `decision_record` fields. `status` is `red` (reproduced and failing for the stated reason) or `not_reproduced` (could not be made red).
 
 ### Schema field reference
 

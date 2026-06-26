@@ -102,10 +102,10 @@ the durable artifacts, with the local-cache JSON as an optional mirror:
    prior `/issue-analysis` ran. Under squash-merge it carries into git history.
 
 3. **Optional cache mirror.** If a fresh `.gitissue/analysis-<N>.json` exists, its
-   `decision_record.reproduction` field carries the same data (written by `/issue-analysis`;
-   schema in `src/skills/issue-analysis/references/output-and-persist.md`). The resolver
-   **lifts** that field when present but does **not** create or write the cache file
-   itself — the JSON is deletable local cache, not the home of project memory.
+   `decision_record.reproduction` field carries the same data (written by `/issue-analysis`,
+   which owns that schema). The resolver **lifts** that field when present but does
+   **not** create or write the cache file itself — the JSON is deletable local cache,
+   not the home of project memory.
 
 ## Auto mode never blocks
 
