@@ -96,10 +96,10 @@ else
   fail "T2.3: frontmatter missing 'license: MIT'"
 fi
 
-if grep -qE '^[[:space:]]*version:[[:space:]]+0\.1\.0' "$SKILL"; then
-  pass "T2.4: metadata.version is 0.1.0"
+if grep -qE '^[[:space:]]*version:[[:space:]]+[0-9]+\.[0-9]+\.[0-9]+' "$SKILL"; then
+  pass "T2.4: metadata.version is a semver"
 else
-  fail "T2.4: metadata.version is not 0.1.0"
+  fail "T2.4: metadata.version is missing or not semver"
 fi
 
 # ───────────────────────────────────────────────────────────
@@ -513,6 +513,118 @@ if [ "$SNAPSHOT_BEFORE" = "$SNAPSHOT_AFTER" ]; then
   pass "T16: AC #5 — test harness does not modify skills/idd-doctor or tests/"
 else
   fail "T16: AC #5 — test harness modified files (before/after differ)"
+fi
+
+# ───────────────────────────────────────────────────────────
+# T17: Run summary (#141) — informational runs.jsonl section
+# ───────────────────────────────────────────────────────────
+# The doctor reads .gitissue/runs.jsonl and prints a non-failing
+# summary. Verify the spec documents the section, its read-only +
+# graceful-degradation guarantees, and that the run-log is described.
+
+if grep -qF '## Run summary' "$SKILL"; then
+  pass "T17.1: spec documents the Run summary section"
+else
+  fail "T17.1: spec missing '## Run summary' section"
+fi
+
+# The run summary must run AFTER the four checks (it is not Check 5).
+LN_C4=$(grep -nF '## Check 4 ' "$SKILL" | head -1 | cut -d: -f1 || echo 0)
+LN_RS=$(grep -nF '## Run summary' "$SKILL" | head -1 | cut -d: -f1 || echo 0)
+if [ "$LN_C4" -gt 0 ] && [ "$LN_RS" -gt "$LN_C4" ]; then
+  pass "T17.2: Run summary appears after Check 4 (not a fifth check)"
+else
+  fail "T17.2: Run summary is not positioned after the four checks"
+fi
+
+# Graceful degradation: absent/empty/malformed runs.jsonl is non-fatal.
+if grep -qiE 'no runs logged yet|absent|malformed|unparseable' "$SKILL"; then
+  pass "T17.3: spec documents graceful degradation for missing/malformed runs.jsonl"
+else
+  fail "T17.3: spec missing graceful-degradation language for runs.jsonl"
+fi
+
+# It must not change the PASS/WARN/FAIL result and must stay read-only.
+if grep -qiE 'never (produces|changes|emit|affect).*(FAIL|WARN|result)|does .*not.* (change|affect).* result' "$SKILL"; then
+  pass "T17.4: spec states the run summary does not affect the result label"
+else
+  fail "T17.4: spec does not state run summary is result-neutral"
+fi
+
+# The metrics must be enumerated: resolve rate, median QA cycles, skip reasons.
+RS_METRICS_OK=1
+for term in "resolve rate" "median QA cycles" "skip reason"; do
+  grep -qiF "$term" "$SKILL" || RS_METRICS_OK=0
+done
+if [ "$RS_METRICS_OK" -eq 1 ]; then
+  pass "T17.5: spec enumerates resolve rate, median QA cycles, and skip reasons"
+else
+  fail "T17.5: spec missing one of the run-summary metrics"
+fi
+
+# Fixture: the median-of-qa_cycles + resolve-rate logic mirrors the spec.
+# resolve_rate = (merged|left_open|partial_followup) / (non-skipped attempts)
+run_summary_metrics() {
+  # Args: a newline-separated list of "outcome:qa_cycles" pairs (qa empty = none).
+  # Echoes "<ok>/<attempted> <median|na>".
+  local input="$1"
+  local ok=0 attempted=0
+  local cycles=""
+  while IFS= read -r pair; do
+    [ -z "$pair" ] && continue
+    local outcome="${pair%%:*}"
+    local qa="${pair#*:}"
+    case "$outcome" in
+      merged|left_open|partial_followup) ok=$((ok+1)); attempted=$((attempted+1)) ;;
+      failed|blocked_by_dependency)      attempted=$((attempted+1)) ;;
+      skipped) : ;;  # not an attempt
+    esac
+    case "$qa" in
+      ''|*[!0-9]*) : ;;          # no qa recorded
+      *) cycles="$cycles$qa
+" ;;
+    esac
+  done <<< "$input"
+  local median="na"
+  if [ -n "$cycles" ]; then
+    # median = middle element of sorted list (lower-middle for even counts,
+    # matching the spec's `.[ (length/2)|floor ]`).
+    local sorted n idx
+    sorted=$(printf '%s' "$cycles" | grep -v '^$' | sort -n)
+    n=$(printf '%s\n' "$sorted" | grep -c .)
+    idx=$(( n / 2 ))   # 0-based floor(n/2)
+    median=$(printf '%s\n' "$sorted" | sed -n "$((idx+1))p")
+  fi
+  echo "$ok/$attempted $median"
+}
+
+# 5 merged, 2 left_open, 2 skipped, 1 failed → ok=7, attempted=8.
+# qa_cycles present: 1,2,2,3,1,2,1,4 (skips contribute none) → sorted
+# 1,1,1,2,2,2,3,4 (n=8) → floor(8/2)=4 → 5th element = 2.
+RS_FIXTURE='merged:1
+merged:2
+merged:2
+merged:3
+merged:1
+left_open:2
+left_open:1
+skipped:
+skipped:
+failed:4'
+RS_RESULT="$(run_summary_metrics "$RS_FIXTURE")"
+if [ "$RS_RESULT" = "7/8 2" ]; then
+  pass "T17.6: resolve-rate (7/8) and median QA (2) computed per spec"
+else
+  fail "T17.6: run-summary metrics wrong — got '$RS_RESULT', expected '7/8 2'"
+fi
+
+# All-skipped → 0 attempted, median n/a (no division, no crash).
+RS_ALLSKIP='skipped:
+skipped:'
+if [ "$(run_summary_metrics "$RS_ALLSKIP")" = "0/0 na" ]; then
+  pass "T17.7: all-skipped runs → 0 attempted, median n/a (no divide-by-zero)"
+else
+  fail "T17.7: all-skipped handling wrong — got '$(run_summary_metrics "$RS_ALLSKIP")'"
 fi
 
 # ───────────────────────────────────────────────────────────

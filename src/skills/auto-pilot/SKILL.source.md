@@ -5,7 +5,7 @@ license: MIT
 compatibility: "Requires git and GitHub CLI (gh) with auth and push access. Requires merge permission for auto-merge. Requires issue-triage, issue-resolver, issue-analysis, and issue-pr-review to be installed from the same distribution. Optional: issue-creator for normalizing unstructured issues mid-loop."
 effort: max
 metadata:
-  version: 2.3.2
+  version: 2.4.0
   author: Luong NGUYEN <luongnv89@gmail.com>
 ---
 
@@ -238,7 +238,7 @@ The main agent handles only orchestration tasks that are lightweight and sequent
 3. **Spawn resolver subagent** — pass issue number, wait for result
 4. **Spawn PR review subagent** — delegates to `/issue-pr-review --auto` which handles review, test, CI, fix, and merge
 5. **Merge fallback** — only if issue-pr-review couldn't auto-merge (branch protection, etc.)
-6. **Track results** — append to the iteration log
+6. **Track results** — append to the iteration log **and** append one line to `.gitissue/runs.jsonl` (see *Run-Log*)
 7. **Loop** — advance to next issue
 
 The main agent should never: read source files, read PR diffs, run tests, or write code. All of that happens inside subagents.
@@ -311,6 +311,33 @@ After each iteration, print a brief status. The `Outcome` line uses one of the s
 ```
 
 Then loop back to Phase 1.
+
+---
+
+## Run-Log
+
+After every processed issue — **including skips** — append exactly **one** JSON line to `.gitissue/runs.jsonl`. This is the per-issue counterpart of the iteration report: the iteration report is printed to the terminal; the run-log line is the persistent, grep-friendly record that `/idd-doctor` summarizes across runs. Schema, field list, and `outcome` vocabulary are authoritative in `docs/config-schema.md` (*Run-log (`runs.jsonl`)*) — follow it.
+
+**One line per issue, not two.** The resolver subagent runs with `--no-run-log` (see `references/subagent-prompts.md`), so it does **not** write its own line — it returns telemetry instead. Auto-pilot writes the single enriched line here, combining that telemetry with the merge outcome it alone knows. This is why the suppress flag exists: without it, every auto-pilot iteration would log twice.
+
+**Fields.** Set `mode: "auto-pilot"`. Use the iteration's final categorical `outcome` (the same one used in the iteration report and final summary: `merged`, `left_open`, `partial_followup`, `blocked_by_dependency`, `failed`, `skipped`). Fold in the resolver telemetry (`complexity`, `qa_cycles`, `duration_s`) and `pr` when a PR was created. For a `skipped` issue, set `skipped_reason` to why it was skipped:
+
+| Skip situation | `skipped_reason` |
+|----------------|------------------|
+| Researcher reported already fixed, or a PR already targets it | `already_resolved` |
+| Skipped by a blocking label (`autopilot.skip_labels`) | `blocked_label` |
+| In the session `--skip` list | `in_skip_list` |
+| Assigned to another user (when that causes a skip) | `assigned_other` |
+| Not picked because an unmet dependency blocks it | `blocked_by_dependency` |
+
+**Write it** with the same append pattern as the resolver — `mkdir -p .gitissue`, build the object (use `jq -cn` for correct escaping; drop empty optional fields), append with `>>`, and **never `git add`** it. The line is local observability, kept out of the PR diff. Absence/deletion of the file is non-fatal — the next iteration recreates it. Example lines for a merged iteration and a skipped one:
+
+```jsonl
+{"ts":"2026-06-26T15:22:47Z","issue":142,"mode":"auto-pilot","complexity":"low","qa_cycles":1,"outcome":"merged","pr":154,"duration_s":268}
+{"ts":"2026-06-26T15:10:02Z","issue":138,"mode":"auto-pilot","outcome":"skipped","skipped_reason":"already_resolved"}
+```
+
+In `--dry-run` mode, do **not** write run-log lines (no real work happened).
 
 ---
 

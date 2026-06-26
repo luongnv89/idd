@@ -5,7 +5,7 @@ license: MIT
 compatibility: "Requires git and GitHub CLI (gh) with authentication and push access. Self-contained — uses shared agents from shared/agents/."
 effort: max
 metadata:
-  version: 0.10.0
+  version: 0.11.0
   author: Luong NGUYEN <luongnv89@gmail.com>
 ---
 
@@ -21,6 +21,8 @@ Resolve a GitHub issue end-to-end — from issue to atomic PR in 6 steps.
 | `/issue-resolver <N> --auto` | auto-pilot | Resolve fully autonomously, no user prompts |
 
 The argument must be a GitHub issue number. The `--auto` flag is set automatically when invoked by `/auto-pilot`.
+
+**`--no-run-log` flag:** suppresses this skill's own append to `.gitissue/runs.jsonl` (see *Run-Log* below). `/auto-pilot` passes it so that **one** enriched line is written per processed issue by the orchestrator instead of two. Standalone `/issue-resolver <N>` and `/issue-resolver <N> --auto` (run directly, not under auto-pilot) do **not** set it and write their own line. The flag is independent of `--auto` — `--auto` alone still logs.
 
 ## Prerequisites
 
@@ -179,14 +181,20 @@ Check whether this issue should be worked on at all.
 ● Preflight check for issue #N...
 ```
 
+Record the run start time so the final run-log line can report `duration_s` (env vars don't persist across Bash calls — see *Run-Log*):
+
+```bash
+mkdir -p .gitissue && date -u +%s > .gitissue/.run-start-{N}
+```
+
 ### 0a — Fetch issue
 
 ```bash
 gh issue view {N} --json number,title,body,labels,assignees,state,comments
 ```
 
-**If not found:** output error and stop.
-**If closed:** output warning and stop.
+**If not found:** output error and stop. (No issue number resolved → no run-log line.)
+**If closed:** output warning, write a run-log line (`outcome: "skipped"`, `skipped_reason: "closed"` — see *Run-Log*; suppressed under `--no-run-log`), and stop.
 
 ### 0b — Check for existing work
 
@@ -206,7 +214,7 @@ Scan PR bodies for `Closes #N`, `Fixes #N`, `Resolves #N`. If a PR already exist
 
   Use /issue-pr-review {pr_number} to review it instead.
 ```
-Stop.
+Write a run-log line (`outcome: "skipped"`, `skipped_reason: "already_resolved"`, `pr: {pr_number}` — see *Run-Log*; suppressed under `--no-run-log`, in which case return the telemetry instead), then stop.
 
 ### 0c — Guards
 
@@ -314,6 +322,8 @@ Agent(
 ```
 
 Full delegation payload, phases, early-exit behavior, and inline fallback are in `references/pipeline-steps.md` (*Step 1 — Research*).
+
+If research determines the issue is **already fixed** (early-exit): close the issue with a comment (auto mode), record the run (`outcome: "skipped"`, `skipped_reason: "already_resolved"` — see *Run-Log*), and exit cleanly. This is a terminal path: write the run-log line, **unless `--no-run-log` was passed** (auto-pilot), in which case return the telemetry so the orchestrator writes the single line.
 
 After research:
 ```
@@ -467,7 +477,7 @@ If tests fail at this point:
 ✗ Final test run failed — PR not created
   {failure details}
 ```
-Stop (even in auto mode — a failing PR is worse than no PR).
+Write a run-log line (`outcome: "failed"`, with `complexity`/`qa_cycles` if reached — see *Run-Log*; suppressed under `--no-run-log`, in which case return the telemetry instead), then stop (even in auto mode — a failing PR is worse than no PR).
 
 ### Update documentation
 
@@ -503,10 +513,99 @@ gh pr create --title "{pr_title}" --body "{pr_body}"
 
 If `projects.sync_enabled` is true, update status to `status_map.done` (see `references/docs/github-projects-sync.md`).
 
+### Record the run
+
+After the PR is created, write the run-log line (`outcome: "left_open"`, with `pr`, `complexity`, `qa_cycles`, `duration_s`) per *Run-Log* below — unless `--no-run-log` was passed (then return the telemetry instead). This is the successful-delivery terminal path.
+
 After delivery:
 ```
 [5/5] Deliver      ✓ PR #{pr_number} created
 ```
+
+---
+
+## Run-Log
+
+Append exactly **one** JSON line per run to `.gitissue/runs.jsonl` so resolve activity is observable across runs (QA cycle counts, complexity, failure modes, already-fixed detections). `/idd-doctor` summarizes this file. Schema, field list, and the `outcome` vocabulary are authoritative in `references/docs/config-schema.md` (*Run-log (`runs.jsonl`)*) — follow it; do not invent fields.
+
+> **Suppression rule (applies to every append below).** When `--no-run-log` was passed (only `/auto-pilot` passes it), **do not append anywhere** — at any terminal path, instead of writing the line, **return** the same telemetry in the result payload (see *Suppression under `/auto-pilot`*) so the orchestrator writes the single line. Every "write a run-log line" instruction in the steps above (closed issue, PR-exists, already-fixed early-exit, failed pipeline, successful deliver) and below is governed by this rule — read each as "write the line **unless `--no-run-log`**, in which case return the telemetry." This is what guarantees exactly one line per processed issue under auto-pilot.
+
+### When it fires
+
+Absent `--no-run-log`, the append fires on **every terminal path** of the pipeline — not only on a successful PR. Whichever way the run ends, write its line with whatever fields are known at that point:
+
+| Terminal path | `outcome` | Notable fields |
+|---------------|-----------|----------------|
+| Step 5 delivered a PR | `left_open` | `pr`, `complexity`, `qa_cycles`, `duration_s` |
+| Already-fixed early-exit (Step 1) | `skipped` | `skipped_reason: "already_resolved"` |
+| Preflight stop — closed issue, or a PR already targets #N | `skipped` | `skipped_reason: "already_resolved"` (PR exists) or `"closed"` |
+| Preflight guard declined (interactive only — user answers *no* at a Step 0c assignment/blocking-label prompt) | `skipped` | `skipped_reason: "assigned_other"` or `"blocked_label"` |
+| Pipeline aborted — final tests failed, or any step failed and stopped | `failed` | `complexity`/`qa_cycles` if reached |
+
+(The interactive-guard-declined row never occurs in auto mode — Step 0c does not stop there — and `--no-run-log` is auto-pilot-only, so that path always logs.)
+
+The resolver never emits `merged`, `partial_followup`, or `blocked_by_dependency` — it does not merge. A successful resolve records `left_open` (the PR is created and left for review/merge). The merge-stage outcomes are written by `/auto-pilot`.
+
+### Start timestamp (for `duration_s`)
+
+Environment variables do **not** persist across separate Bash tool calls. To measure `duration_s`, persist the start time once during Preflight (Step 0) and read it back when writing the line:
+
+```bash
+mkdir -p .gitissue
+date -u +%s > .gitissue/.run-start-{N}    # Step 0 — record start (epoch seconds)
+```
+
+When writing the run line, compute the delta and remove the marker:
+
+```bash
+start=$(cat .gitissue/.run-start-{N} 2>/dev/null || echo "")
+now=$(date -u +%s)
+dur=null; [ -n "$start" ] && dur=$((now - start))   # literal `null` when unknown (jq --argjson rejects "")
+rm -f .gitissue/.run-start-{N}
+```
+
+The marker file is scratch (dot-prefixed), is removed when the line is written, and is never staged. If it is missing (e.g. an early preflight stop before Step 0 recorded it), `dur` stays `null` and `duration_s` is omitted from the line.
+
+### Writing the line
+
+Build the object from known values and append it. Use `date -u +%Y-%m-%dT%H:%M:%SZ` for `ts`. Append only — never rewrite existing lines:
+
+```bash
+mkdir -p .gitissue
+ts="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+# --argjson values MUST be valid JSON literals — a number or the literal `null`,
+# never an empty string ("" makes jq error). --arg values are plain strings.
+# Use `null` for any unknown numeric field (qa, pr, dur); empty "" for an absent reason.
+qa=${qa:-null}; pr=${pr:-null}; dur=${dur:-null}    # default unknowns to the JSON literal null
+jq -cn \
+  --arg ts "$ts" --argjson issue {N} --arg mode "resolve" \
+  --arg outcome "{outcome}" --arg complexity "{complexity}" \
+  --argjson qa "$qa" --argjson pr "$pr" \
+  --argjson dur "$dur" --arg reason "{skipped_reason_or_empty}" \
+  '{ts:$ts, issue:$issue, mode:$mode, outcome:$outcome}
+   + (if $complexity=="" then {} else {complexity:$complexity} end)
+   + (if $qa==null then {} else {qa_cycles:$qa} end)
+   + (if $pr==null then {} else {pr:$pr} end)
+   + (if $dur==null then {} else {duration_s:$dur} end)
+   + (if $reason=="" then {} else {skipped_reason:$reason} end)' \
+  >> .gitissue/runs.jsonl
+```
+
+If `jq` is unavailable, fall back to appending a hand-built single-line JSON object with the same fields (escape any string values).
+
+### Do not stage it
+
+Append to the working-tree file but **never** `git add` `.gitissue/runs.jsonl` (and never the `.run-start-*` marker). The implementer already stages only explicit paths (never `git add .`/`-A`); the run line is written *after* PR creation, so it cannot be part of the resolution commits regardless. This keeps the run-log out of the PR diff. Absence or deletion of the file is non-fatal — the next run recreates it.
+
+### Suppression under `/auto-pilot`
+
+When invoked with `--no-run-log` (passed by `/auto-pilot`), **skip the append entirely**. Instead, **return** the telemetry in the result payload so the orchestrator writes the single enriched line:
+
+```json
+{ "outcome": "...", "pr": <number|null>, "complexity": "...", "qa_cycles": <number>, "duration_s": <number|null>, "skipped_reason": "<string|null>" }
+```
+
+This guarantees exactly one line per processed issue under auto-pilot. Standalone `/issue-resolver` (with or without `--auto`, run directly) does not receive `--no-run-log` and writes its own line.
 
 ---
 
@@ -532,6 +631,7 @@ When invoked with `--auto` (or by `/auto-pilot`), the entire pipeline runs witho
 - **Implement:** Continue past max commits guard with a warning.
 - **QA:** Run full cycle autonomously. If stagnation detected, continue to deliver with known issues.
 - **Deliver:** Create PR. Do NOT merge — merging is handled by `/auto-pilot` or `/issue-pr-review`.
+- **Run-Log:** `--auto` on its own still writes a `runs.jsonl` line. Only the separate `--no-run-log` flag — passed by the `/auto-pilot` orchestrator, not implied by `--auto` — suppresses the resolver's own append and makes it return telemetry instead (see *Run-Log*). A run started as `/issue-resolver N --auto` directly (not under auto-pilot) logs normally.
 
 No `[y/N]` prompts, no `Choose:` prompts, no `Continue?` prompts. Every decision point has a defined auto behavior.
 

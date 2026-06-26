@@ -168,6 +168,8 @@ If the researcher returns `already_resolved: true` or `pr_in_progress: true`:
 - Auto mode: close the issue with a comment and move on.
 - Interactive mode: inform the user and stop.
 
+Either way this is a **terminal path**: write a run-log line (`outcome: "skipped"`, `skipped_reason: "already_resolved"`) per the *Run-Log* section of `SKILL.source.md` before exiting — unless `--no-run-log` was passed (then return the telemetry so `/auto-pilot` writes it).
+
 ### Inline fallback
 
 If no Agent tool, execute research inline following the same phases described in `references/agents/codebase-researcher.md`.

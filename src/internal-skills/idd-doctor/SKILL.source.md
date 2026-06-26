@@ -5,13 +5,13 @@ license: MIT
 compatibility: Requires git and GitHub CLI (gh). Authentication is recommended for the merge-strategy check; the skill degrades gracefully when gh is unavailable.
 effort: low
 metadata:
-  version: 0.1.0
+  version: 0.2.0
   creator: Luong NGUYEN <luongnv89@gmail.com>
 ---
 
 # /idd-doctor
 
-Run a report-only health check on an IDD repository. Surfaces doc drift on the intent-code boundary, unsafe configuration, and merge defaults that conflict with IDD conventions.
+Run a report-only health check on an IDD repository. Surfaces doc drift on the intent-code boundary, unsafe configuration, and merge defaults that conflict with IDD conventions. Also prints an informational **run summary** of recent `/issue-resolver` and `/auto-pilot` activity from `.gitissue/runs.jsonl`.
 
 **Invocation:** `/idd-doctor` — no arguments.
 
@@ -25,7 +25,7 @@ Run a report-only health check on an IDD repository. Surfaces doc drift on the i
 
 ## Scope (v1)
 
-The doctor performs exactly four checks. Anything beyond these is **out of scope**:
+The doctor performs exactly four **checks** — the only things that produce a `PASS`/`WARN`/`FAIL` verdict. Anything beyond these is **out of scope** as a check:
 
 | # | Check | What it verifies | Failure mode |
 |---|-------|-----------------|--------------|
@@ -33,6 +33,8 @@ The doctor performs exactly four checks. Anything beyond these is **out of scope
 | 2 | Issue-template fields | Issue templates under `src/skills/issue-creator/templates/` and `.github/ISSUE_TEMPLATE/` (if present) do not request predicted affected files, generated technical notes, root cause, or implementation hints. | `FAIL` |
 | 3 | Autopilot mode set | If `.gitissue.yml` exists in the repo root, it contains an `autopilot.mode` key. | `FAIL` (only when `.gitissue.yml` exists) |
 | 4 | Squash-merge default | The repository's default merge strategy is squash (squash allowed AND merge-commit and rebase-merge disallowed). | `WARN` |
+
+In addition, the doctor prints one **informational run summary** (see *Run summary* below). It reads `.gitissue/runs.jsonl` and reports recent resolve/auto-pilot telemetry. It is **not a fifth check**: it never produces `FAIL`/`WARN` and never changes the result label — it is purely observational, and degrades to a single `○` note when the run-log is absent.
 
 ### Explicitly out of scope for v1
 
@@ -99,9 +101,15 @@ The doctor executes the four checks in order, prints one line per check, then a 
     ● [4/4] Squash-merge default...
     ✓ [4/4] Squash-merge default  squash-only
 
+    ○ Run summary             last 9 run(s) — resolve 78% (7/9 attempted), median QA 2
+        outcomes: merged 5, left_open 2, skipped 2
+        skip reasons: already_resolved 2
+
     ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
     Result: PASS  (4 checks, 0 failed, 0 warned)
 ```
+
+The run summary is informational (`○`) and does **not** count toward the `{total} checks` in the result line — the result label reflects only the four checks.
 
 **Exit codes** (when invoked from a script wrapper):
 
@@ -296,9 +304,73 @@ The warn line is followed by a fix hint indented one extra level:
 
 ---
 
+## Run summary
+
+After the four checks, print an **informational** summary of recent runs from `.gitissue/runs.jsonl`. This gives the IDD *monitoring* value visibility into cross-run health — resolve rate, QA-cycle distribution, and the most common skip reasons — without a dashboard. The file's schema is documented in `docs/config-schema.md` (*Run-log (`runs.jsonl`)*).
+
+This section is **observational only**: it never emits `FAIL` or `WARN` and never changes the run's `PASS`/`WARN`/`FAIL` result label. It uses the `○` info symbol.
+
+### Procedure
+
+1. Look for `.gitissue/runs.jsonl` in the repo root.
+   - **Absent or empty** → print `○ Run summary             no runs logged yet (.gitissue/runs.jsonl absent)` and skip the rest. This is the normal state for a repo that hasn't run `/issue-resolver` or `/auto-pilot` yet — not an error.
+2. Read the file and take the **last N = 50 lines** (most recent runs). Parse each line as JSON.
+   - **Malformed lines are skipped**, not fatal — count them and, if any, note `({M} unparseable line(s) skipped)`. A truncated or hand-edited file must never break the doctor.
+   - If every line is unparseable, treat it as "no valid runs" and print the same `○` note as the empty case, plus the skipped-line count.
+3. From the parsed runs, compute:
+   - **Total runs** considered (parsed count, out of how many lines read).
+   - **Resolve rate** — share of runs that produced a PR that was merged or left open for merge, i.e. `outcome ∈ {merged, left_open, partial_followup}`, divided by runs that actually attempted resolution (exclude `skipped`). Render as a percentage with the numerator/denominator, e.g. `78% (7/9 attempted)`. If no runs attempted resolution (all skipped), render `n/a (0 attempted)`.
+   - **Median QA cycles** — median of the `qa_cycles` field across runs that recorded it (ignore runs without it). Render as a number (e.g. `2`); if none recorded, `n/a`.
+   - **Outcome breakdown** — count per `outcome` value, most frequent first, e.g. `merged 5, left_open 2, skipped 3, failed 1`.
+   - **Common skip reasons** — among `outcome: "skipped"` runs, the top skip reasons by frequency (up to 3), e.g. `already_resolved 2, blocked_label 1`. Omit this line if there were no skips.
+
+A robust one-liner with `jq` (tolerates malformed lines via `-R 'fromjson? // empty'`):
+
+```bash
+tail -n 50 .gitissue/runs.jsonl 2>/dev/null \
+  | jq -R 'fromjson? // empty' \
+  | jq -s '{
+      total: length,
+      resolve_rate: ( (map(select(.outcome|IN("merged","left_open","partial_followup"))) | length) as $ok
+                    | (map(select(.outcome!="skipped")) | length) as $att
+                    | if $att==0 then "n/a (0 attempted)"
+                      else "\(($ok*100/$att)|floor)% (\($ok)/\($att) attempted)" end ),
+      median_qa_cycles: ( [ .[] | .qa_cycles | select(.!=null) ] | sort
+                        | if length==0 then "n/a"
+                          else (.[ (length/2)|floor ]) end ),
+      outcomes: ( group_by(.outcome) | map({(.[0].outcome): length}) | add ),
+      skip_reasons: ( map(select(.outcome=="skipped") | .skipped_reason // "unspecified")
+                    | group_by(.) | map({(.[0]): length}) | add )
+    }'
+```
+
+Use the result to render the report; do not require `jq` — if it is unavailable, parse the lines directly and compute the same fields, or degrade to printing just the total and outcome breakdown.
+
+### Output
+
+When runs exist:
+
+```
+    ○ Run summary             last {total} run(s) — resolve {resolve_rate}, median QA {median}
+        outcomes: {merged N, left_open N, skipped N, failed N, ...}
+        skip reasons: {already_resolved N, blocked_label N, ...}
+```
+
+Omit the `skip reasons` line when there were no skipped runs. Append `({M} unparseable line(s) skipped)` to the first line when malformed lines were encountered.
+
+When the file is absent, empty, or fully unparseable:
+
+```
+    ○ Run summary             no runs logged yet (.gitissue/runs.jsonl absent)
+```
+
+This section reads only — it never writes, trims, or repairs `runs.jsonl` (the read-only guarantee still holds).
+
+---
+
 ## Summary footer
 
-After all four checks, print:
+After all four checks **and the run summary**, print:
 
 ```
     ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
@@ -324,7 +396,7 @@ The skill MUST NOT modify any file in the repo, create branches or commits, open
 - Edit issue bodies or post comments
 - Mutate `.gitissue.yml` or any config file
 
-The implementation reads files (via `Read` / `cat`) and runs read-only `gh` queries (`gh repo view --json …`, `gh auth status`). Test fixtures (see *Testing*) assert that the working tree is unchanged after a doctor run.
+The implementation reads files (via `Read` / `cat`, including `.gitissue/runs.jsonl` for the run summary) and runs read-only `gh` queries (`gh repo view --json …`, `gh auth status`). It never writes, trims, or repairs `runs.jsonl`. Test fixtures (see *Testing*) assert that the working tree is unchanged after a doctor run.
 
 ---
 
@@ -380,10 +452,12 @@ All errors use the rich format from `references/error-messages.md`:
 - **A skill README contains the forbidden pattern inside a code block or fenced quote** — Check 1 still flags it. The intent of v1 is mechanical strictness, not contextual nuance.
 - **GitHub Enterprise repos without `gh` auth** — Check 4 is skipped, never failed.
 - **`/issue-creator` skill is missing** — Check 1 fails with a clear `src/skills/issue-creator/README.md not found` finding (the `/issue-creator` skill is required for an IDD repo).
+- **`.gitissue/runs.jsonl` absent, empty, or fully malformed** — the run summary prints a single `○ no runs logged yet` note and the result label is unaffected. The doctor never fails because telemetry is missing.
+- **`.gitissue/runs.jsonl` has some malformed lines** — those lines are skipped (counted in the `unparseable line(s) skipped` note); valid lines are still summarized.
 
 ## Additional Resources
 
 - **`references/error-messages.md`** — Complete error catalog with triggers and exact output
 - **`docs/naming-conventions.md`** — Branch, commit, PR, and issue naming conventions (referenced for context)
-- **`docs/config-schema.md`** — Full configuration schema (Check 3 references the `autopilot.mode` field)
+- **`docs/config-schema.md`** — Full configuration schema (Check 3 references the `autopilot.mode` field; the *Run summary* reads `.gitissue/runs.jsonl`, whose schema is documented there)
 - **`DESIGN.md`** — Terminal output style guide (repo root)

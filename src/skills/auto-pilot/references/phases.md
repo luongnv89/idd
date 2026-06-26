@@ -197,6 +197,8 @@ If `autopilot.pause_on_failure` is explicitly set to `true` in config, stop the 
   To skip:    /auto-pilot --skip {issue_number}
 ```
 
+> **Run-log:** the resolver subagent ran with `--no-run-log`, so it wrote no `runs.jsonl` line. Auto-pilot writes the single per-issue line itself once the iteration's final outcome is known (after merge), folding in the resolver telemetry (`complexity`, `qa_cycles`, `duration_s`). See the *Run-Log* section of `SKILL.source.md`. This applies to every terminal outcome here — `success` → eventual `merged`/`left_open`/etc., `already_resolved` → `skipped`/`already_resolved`, `failure` → `failed`.
+
 ---
 
 ## Phase 3 & 4 — PR Review (via /issue-pr-review)

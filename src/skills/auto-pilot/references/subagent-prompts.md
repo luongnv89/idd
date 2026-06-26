@@ -17,7 +17,7 @@ This file contains the exact prompts to pass to each subagent via the Agent tool
 Resolve GitHub issue #{issue_number} in this repository using the {{skill:issue-resolver}} skill in auto mode.
 
 Instructions:
-1. Use the {{skill:issue-resolver}} skill
+1. Use the {{skill:issue-resolver}} skill with the `--no-run-log` flag — auto-pilot writes the single `.gitissue/runs.jsonl` line for this issue itself, so the resolver must NOT append its own (it returns telemetry instead; see the report-back fields below)
 2. Follow the full 6-step pipeline: Preflight, Research, Plan, Implement, QA, Deliver
 3. Use --auto mode — all decisions are automatic, NEVER prompt the user
 4. Workspace is in-place only: skip Step 0e (no worktree prompt, no `git worktree add`). Do not spawn agent harness worktree isolation for this resolve.
@@ -38,11 +38,15 @@ When done, report back ONLY these fields:
 - files_changed: count of files modified
 - tests_written: count of new tests written (unit + integration + e2e)
 - tests_passed: count of tests passed
+- complexity: the researcher's complexity assessment ("low", "medium", or "high")
 - qa_cycles: number of QA cycles run
+- duration_s: wall-clock seconds for the resolve, if measured (else null)
 - failure_step: which step failed (if status is failure)
 - failure_reason: short error description (if status is failure)
 - resolution_details: explanation (if status is already_resolved)
 ```
+
+These fields (`status`, `complexity`, `qa_cycles`, `duration_s`, `pr_number`) are the telemetry auto-pilot folds into the per-issue `runs.jsonl` line (Phase 6 — see the *Run-Log* section of `SKILL.source.md`). Because the resolver ran with `--no-run-log`, it did not write its own line.
 
 ## PR Reviewer Subagent
 
