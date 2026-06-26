@@ -18,6 +18,7 @@ on:
       - assets/logo/**
       - assets/screenshots/**
       - assets/og/**
+      - assets/agents/**
       - .github/workflows/pages.yml
   workflow_dispatch:
 
@@ -42,7 +43,7 @@ jobs:
       - name: Assemble site
         run: |
           set -euo pipefail
-          mkdir -p _site/assets/logo _site/assets/screenshots _site/assets/og
+          mkdir -p _site/assets/logo _site/assets/screenshots _site/assets/og _site/assets/agents
           # Landing page becomes the site index; docs.html and changelog.html
           # are dedicated pages linked from the nav.
           cp landing.html _site/index.html
@@ -60,6 +61,8 @@ jobs:
           cp assets/screenshots/issue-triage-suggestion.png _site/assets/screenshots/
           cp assets/screenshots/issue-triage-view.png    _site/assets/screenshots/
           cp assets/screenshots/issue-triage-asm.png     _site/assets/screenshots/
+          # Vendored agent-team portraits (issue #137 follow-up).
+          cp assets/agents/*.jpg                         _site/assets/agents/
           # Disable Jekyll so files/dirs are served verbatim.
           touch _site/.nojekyll
 
