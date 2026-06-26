@@ -5,7 +5,7 @@ license: MIT
 compatibility: "Requires git and GitHub CLI (gh) with authentication and push access. Self-contained — uses shared agents from shared/agents/."
 effort: max
 metadata:
-  version: 0.10.0
+  version: 0.11.0
   author: Luong NGUYEN <luongnv89@gmail.com>
 ---
 
@@ -19,8 +19,11 @@ Resolve a GitHub issue end-to-end — from issue to atomic PR in 6 steps.
 |------------|------|--------------|
 | `/issue-resolver <N>` | interactive | Resolve issue #N, ask user to pick plan |
 | `/issue-resolver <N> --auto` | auto-pilot | Resolve fully autonomously, no user prompts |
+| `/issue-resolver <N> --no-run-log` | (modifier) | Suppress the `.gitissue/runs.jsonl` append; return telemetry to the caller instead |
 
 The argument must be a GitHub issue number. The `--auto` flag is set automatically when invoked by `/auto-pilot`.
+
+The `--no-run-log` flag is **orthogonal to `--auto`** and is passed **only by `/auto-pilot`** (which writes the single run-log line itself — see *Run-log entry*). It is **not** implied by `--auto`/`IDD_AUTO_MODE=1`: a standalone `/issue-resolver <N> --auto` still appends its own line. This keeps `/auto-pilot` the single writer per processed issue without silencing direct auto-mode resolves.
 
 ## Prerequisites
 
@@ -513,9 +516,11 @@ After delivery:
 At **every terminal outcome** of the pipeline — a delivered PR (`success`), an
 early exit because the issue was already fixed (`already_resolved`), or a failed
 step (`failed`) — append exactly **one JSON line** to `.gitissue/runs.jsonl` so
-the run leaves a persistent, cross-run telemetry signal. The schema and field
-list are defined once in `references/docs/config-schema.md` (*`.gitissue/runs.jsonl` — run
-log*); follow it rather than re-deriving fields here.
+the run leaves a persistent, cross-run telemetry signal — **unless invoked with
+`--no-run-log`** (see *Suppression rule* below), in which case append **nothing**
+and return the telemetry to the caller instead. The schema and field list are
+defined once in `references/docs/config-schema.md` (*`.gitissue/runs.jsonl` — run log*);
+follow it rather than re-deriving fields here.
 
 Build the object from values already known at this point: `ts` (current UTC time,
 ISO 8601), `issue` (N), `mode` (`auto` when `--auto`/`IDD_AUTO_MODE=1`, else
@@ -524,7 +529,20 @@ ISO 8601), `issue` (N), `mode` (`auto` when `--auto`/`IDD_AUTO_MODE=1`, else
 `duration_s` (pipeline wall time when measurable), and `skipped_reason` (for
 `already_resolved`, set it to `already_resolved`).
 
+> **Suppression rule (single writer under `/auto-pilot`).** When invoked with
+> `--no-run-log`, **do not append** to `.gitissue/runs.jsonl` at all. This flag
+> is passed only by `/auto-pilot`, which runs this resolver as a subagent and
+> writes the **single** run-log line for the issue itself — appending here too
+> would double-write one line per processed issue and skew `/idd-doctor`'s
+> resolve-rate and median-QA metrics (they count over every line). Instead,
+> **return** the telemetry the resolver alone knows — `outcome`, `qa_cycles`,
+> `complexity`, `duration_s` — in the subagent result payload so the orchestrator
+> can fold it into its enriched line. The flag is **independent of `--auto`**: a
+> standalone `/issue-resolver <N> --auto` is *not* suppressed and still appends
+> its own line (it is the single writer in that case).
+
 ```bash
+# Only when --no-run-log is NOT set:
 mkdir -p .gitissue
 printf '%s\n' "$run_json" >> .gitissue/runs.jsonl
 ```

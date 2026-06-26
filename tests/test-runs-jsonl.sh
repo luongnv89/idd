@@ -30,7 +30,9 @@ fail() {
 # grep helper: assert a pattern (fixed string) exists in a file.
 has() {
   # $1 = file, $2 = pattern, $3 = label
-  if grep -qiF "$2" "$1" 2>/dev/null; then
+  # -e guards patterns that begin with '-' (e.g. flag names like --no-run-log)
+  # from being parsed as grep options.
+  if grep -qiF -e "$2" "$1" 2>/dev/null; then
     pass "$3"
   else
     fail "$3 (missing: '$2' in ${1#$REPO_ROOT/})"
@@ -91,6 +93,52 @@ has "$DOCTOR" "no runs recorded yet" "T4: idd-doctor degrades gracefully when fi
 # read-only guarantee still asserted near the summary
 has "$DOCTOR" "read-only" "T4: idd-doctor summary preserves read-only guarantee"
 
+# --- T6: single-writer under auto-pilot (issue #156 — double-write fix) ------
+# Under /auto-pilot the resolver runs as a subagent in --auto mode. Without a
+# suppression contract, BOTH the resolver and auto-pilot append to runs.jsonl —
+# two lines per processed issue, corrupting idd-doctor's resolve-rate and
+# median-QA metrics (which count over all lines). The fix: auto-pilot passes a
+# dedicated --no-run-log flag (independent of --auto, so standalone
+# `/issue-resolver N --auto` still logs); the suppressed resolver returns its
+# telemetry instead, and auto-pilot writes the single enriched line.
+SUBAGENT="$REPO_ROOT/src/skills/auto-pilot/references/subagent-prompts.md"
+
+# Resolver documents the suppression flag and that it returns (not appends)
+# telemetry when suppressed.
+has "$RESOLVER" "--no-run-log" "T6: resolver documents the --no-run-log suppression flag"
+has "$RESOLVER" "single writer" "T6: resolver explains the single-writer-under-auto-pilot rule"
+# The flag must NOT be gated on --auto / IDD_AUTO_MODE — standalone --auto logs.
+has "$RESOLVER" "standalone" "T6: resolver clarifies standalone --auto still logs (flag != --auto)"
+
+# Auto-pilot passes --no-run-log to the (single-issue) resolver subagent and
+# expects telemetry back so it can write the one enriched line.
+has "$SUBAGENT" "--no-run-log" "T6: auto-pilot subagent prompt passes --no-run-log to the resolver"
+has "$SUBAGENT" "complexity" "T6: auto-pilot subagent prompt collects complexity for the enriched line"
+has "$SUBAGENT" "duration_s" "T6: auto-pilot subagent prompt collects duration_s for the enriched line"
+
+# Auto-pilot SKILL documents that it is the single writer and enriches its line.
+has "$AUTOPILOT" "--no-run-log" "T6: auto-pilot documents suppressing the resolver via --no-run-log"
+has "$AUTOPILOT" "single line" "T6: auto-pilot documents writing the single enriched line per issue"
+
+# The batch path is explicitly out of scope for #156 (tracked separately), so the
+# fix must NOT silence the Batch Resolver — only the single-issue resolver. Pin
+# that boundary: --no-run-log appears exactly once in the subagent prompts (the
+# single-issue Resolver Subagent). This exact-count assertion subsumes a presence
+# check, so no separate "present" assertion is needed.
+#
+# TRIPWIRE: when #158 lands and correctly adds --no-run-log to the Batch Resolver
+# prompt, this count becomes 2 and the assertion fails by design — that is the
+# signal to revisit this boundary here. The #158 author must update this check.
+if [ "$(grep -ciF -e '--no-run-log' "$SUBAGENT")" -eq 1 ]; then
+  pass "T6: --no-run-log scoped to the single-issue resolver only (batch path deferred, not silenced)"
+else
+  fail "T6: --no-run-log should appear exactly once (only the single-issue resolver); batch is out of scope for #156"
+fi
+
+# config-schema documents the single-writer / suppression convention.
+has "$CONFIG" "--no-run-log" "T6: config-schema documents the --no-run-log suppression convention"
+has "$CONFIG" "single writer" "T6: config-schema documents the single-writer rule under auto-pilot"
+
 # --- T5: generated install surface carries the behavior through -------------
 GEN_RESOLVER="$REPO_ROOT/skills/issue-resolver/SKILL.md"
 GEN_AUTOPILOT="$REPO_ROOT/skills/auto-pilot/SKILL.md"
@@ -103,8 +151,16 @@ else
 fi
 if [ -f "$GEN_AUTOPILOT" ]; then
   has "$GEN_AUTOPILOT" "runs.jsonl" "T5: generated auto-pilot SKILL.md has runs.jsonl"
+  has "$GEN_AUTOPILOT" "--no-run-log" "T5: generated auto-pilot SKILL.md carries the --no-run-log suppression"
 else
   fail "T5: generated skills/auto-pilot/SKILL.md not found — run scripts/build.py"
+fi
+GEN_SUBAGENT="$REPO_ROOT/skills/auto-pilot/references/subagent-prompts.md"
+if [ -f "$GEN_SUBAGENT" ]; then
+  has "$GEN_SUBAGENT" "--no-run-log" "T5: generated auto-pilot subagent prompt passes --no-run-log"
+fi
+if [ -f "$GEN_RESOLVER" ]; then
+  has "$GEN_RESOLVER" "--no-run-log" "T5: generated issue-resolver SKILL.md documents --no-run-log"
 fi
 if [ -f "$GEN_CONFIG" ]; then
   has "$GEN_CONFIG" ".gitissue/runs.jsonl" "T5: bundled config-schema carries runs.jsonl schema"

@@ -5,7 +5,7 @@ license: MIT
 compatibility: "Requires git and GitHub CLI (gh) with auth and push access. Requires merge permission for auto-merge. Requires issue-triage, issue-resolver, issue-analysis, and issue-pr-review to be installed from the same distribution. Optional: issue-creator for normalizing unstructured issues mid-loop."
 effort: max
 metadata:
-  version: 2.3.2
+  version: 2.3.3
   author: Luong NGUYEN <luongnv89@gmail.com>
 ---
 
@@ -319,13 +319,32 @@ same append-only run log written by `/issue-resolver`; the schema and field list
 live in `docs/config-schema.md` (*`.gitissue/runs.jsonl` — run log*). Follow it
 rather than re-deriving fields.
 
-Populate from the iteration's known values: `ts` (current UTC, ISO 8601), `issue`
-(the number), `mode` (the auto-pilot merge mode — `conservative` / `balanced` /
-`aggressive`), `skill` (`auto-pilot`), `outcome` (one of the six categorical
-labels), `pr` (the PR number when one was created, else `null`), and
-`duration_s` when measurable. **When the outcome is `skipped`, always include
-`skipped_reason`** (e.g. `already_resolved`, `blocked_label`,
-`blocked_by_dependency`, `in_skip_list`, `assigned_to_other`).
+> **Auto-pilot is the single writer per processed issue.** The resolver subagent
+> is invoked with `--no-run-log` (see *Resolver Subagent* in
+> `references/subagent-prompts.md`), so it **does not** append its own line —
+> only auto-pilot writes here. Writing in both places would double-write one line
+> per issue and skew `/idd-doctor`'s resolve-rate and median-QA metrics. The
+> resolver **returns** its telemetry (`qa_cycles`, `complexity`, `duration_s`) in
+> its result; fold those into the **single line** auto-pilot writes here (enriched
+> with that telemetry) so the per-issue QA signal survives even though the
+> resolver stayed silent. The resolver's run `status` informs auto-pilot's
+> decision but is **not** copied into the row's `outcome` — that field stays
+> auto-pilot's own six categorical label (set from the merge result, see below).
+
+Populate from the iteration's known values plus the resolver's returned
+telemetry: `ts` (current UTC, ISO 8601), `issue` (the number), `mode` (the
+auto-pilot merge mode — `conservative` / `balanced` / `aggressive`), `skill`
+(`auto-pilot`), `outcome` (one of the six categorical labels), `pr` (the PR
+number when one was created, else `null`), and — from the resolver's report-back
+— `qa_cycles`, `complexity`, and `duration_s` when present. **When the outcome is
+`skipped`, always include `skipped_reason`** (e.g. `already_resolved`,
+`blocked_label`, `blocked_by_dependency`, `in_skip_list`, `assigned_to_other`);
+a skip never ran the resolver, so it carries no resolver telemetry.
+
+> **Batch iterations** (the *Batch Resolver* path resolves several issues in one
+> PR) are **out of scope here** and are tracked separately — see issue #158. The
+> single-writer rule above is written for the 1:1 single-issue iteration. Until
+> #158 lands, batch run-log behavior is unchanged from before this fix.
 
 ```bash
 mkdir -p .gitissue
