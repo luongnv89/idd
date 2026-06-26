@@ -5,7 +5,7 @@ license: MIT
 compatibility: "Requires git and GitHub CLI (gh) with auth and push access. Requires merge permission for auto-merge. Requires issue-triage, issue-resolver, issue-analysis, and issue-pr-review to be installed from the same distribution. Optional: issue-creator for normalizing unstructured issues mid-loop."
 effort: max
 metadata:
-  version: 2.3.3
+  version: 2.3.4
   author: Luong NGUYEN <luongnv89@gmail.com>
 ---
 
@@ -314,7 +314,10 @@ After each iteration, print a brief status. The `Outcome` line uses one of the s
 
 After printing the iteration status — for **every processed issue (including
 skips)** — append exactly **one JSON line** to `.gitissue/runs.jsonl`.
-Skipped issues are logged too, with their `skipped_reason`. This is the
+Skipped issues are logged too, with their `skipped_reason` — **except** the
+in-batch `already resolved in batch` skip, which writes **no** line because the
+issue was already logged at batch time (see `references/explicit-list-mode.md`
+→ *Run-log fan-out for the batch*; the batch path is summarized below). This is the
 same append-only run log written by `/issue-resolver`; the schema and field list
 live in `references/docs/config-schema.md` (*`.gitissue/runs.jsonl` — run log*). Follow it
 rather than re-deriving fields.
@@ -342,9 +345,15 @@ number when one was created, else `null`), and — from the resolver's report-ba
 a skip never ran the resolver, so it carries no resolver telemetry.
 
 > **Batch iterations** (the *Batch Resolver* path resolves several issues in one
-> PR) are **out of scope here** and are tracked separately — see issue #158. The
-> single-writer rule above is written for the 1:1 single-issue iteration. Until
-> #158 lands, batch run-log behavior is unchanged from before this fix.
+> PR) follow the **same single-writer rule** — the Batch Resolver also runs with
+> `--no-run-log` and returns its telemetry — but auto-pilot must **fan its one
+> result out into one line per attempted issue** (keyed on the attempted set, not
+> `issues_resolved`), with the shared `pr`/`complexity` on every line and the
+> scalar `qa_cycles`/`duration_s` attributed to the primary issue's line only. The
+> full fan-out contract (per-attempted-issue lines, per-issue `outcome` from
+> `issues_resolved`, and the re-resolve double-count guard for partial/failed
+> batches) lives in `references/explicit-list-mode.md` (*Run-log fan-out for the
+> batch*), since batching only occurs in explicit-list mode.
 
 ```bash
 mkdir -p .gitissue

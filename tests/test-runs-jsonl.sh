@@ -120,24 +120,85 @@ has "$SUBAGENT" "duration_s" "T6: auto-pilot subagent prompt collects duration_s
 has "$AUTOPILOT" "--no-run-log" "T6: auto-pilot documents suppressing the resolver via --no-run-log"
 has "$AUTOPILOT" "single line" "T6: auto-pilot documents writing the single enriched line per issue"
 
-# The batch path is explicitly out of scope for #156 (tracked separately), so the
-# fix must NOT silence the Batch Resolver — only the single-issue resolver. Pin
-# that boundary: --no-run-log appears exactly once in the subagent prompts (the
-# single-issue Resolver Subagent). This exact-count assertion subsumes a presence
-# check, so no separate "present" assertion is needed.
-#
-# TRIPWIRE: when #158 lands and correctly adds --no-run-log to the Batch Resolver
-# prompt, this count becomes 2 and the assertion fails by design — that is the
-# signal to revisit this boundary here. The #158 author must update this check.
-if [ "$(grep -ciF -e '--no-run-log' "$SUBAGENT")" -eq 1 ]; then
-  pass "T6: --no-run-log scoped to the single-issue resolver only (batch path deferred, not silenced)"
+# --no-run-log now applies to BOTH the single-issue Resolver Subagent AND the Batch
+# Resolver Subagent (#158 made auto-pilot the single writer on the batch path too).
+# So it must appear exactly TWICE in the subagent prompts — one per resolver.
+# (Was exactly 1 before #158; the #156 tripwire here intentionally flipped.)
+if [ "$(grep -ciF -e '--no-run-log' "$SUBAGENT")" -eq 2 ]; then
+  pass "T6: --no-run-log appears twice — single-issue AND batch resolver both suppressed"
 else
-  fail "T6: --no-run-log should appear exactly once (only the single-issue resolver); batch is out of scope for #156"
+  fail "T6: --no-run-log should appear exactly twice (single-issue + batch resolver)"
 fi
 
 # config-schema documents the single-writer / suppression convention.
 has "$CONFIG" "--no-run-log" "T6: config-schema documents the --no-run-log suppression convention"
 has "$CONFIG" "single writer" "T6: config-schema documents the single-writer rule under auto-pilot"
+
+# --- T7: batch-resolver run-log fan-out (issue #158) ------------------------
+# A batch resolves N issues in ONE PR. The single-writer contract is one line per
+# PROCESSED (attempted) issue, not per PR — so auto-pilot must fan the batch's one
+# result into N lines. This is unverifiable instruction prose, so pin the contract
+# concretely: per-attempted-issue count, failed-batch coverage, telemetry attributed
+# once. The authoritative spec lives in explicit-list-mode.md (batching only happens
+# in explicit-list mode); config-schema mirrors the convention; the Batch Resolver
+# prompt carries --no-run-log + returns the telemetry.
+EXPLICIT="$REPO_ROOT/src/skills/auto-pilot/references/explicit-list-mode.md"
+
+# (a) The Batch Resolver prompt is suppressed AND located in the batch section.
+#     Assert --no-run-log lives specifically inside the Batch Resolver Subagent
+#     section (not just somewhere in the file) so the count check above can't pass
+#     on the single-issue occurrence alone.
+if awk '/^## Batch Resolver Subagent/,/^## Template Variables/' "$SUBAGENT" \
+     | grep -qiF -e '--no-run-log'; then
+  pass "T7: Batch Resolver prompt passes --no-run-log (suppressed like single-issue)"
+else
+  fail "T7: Batch Resolver prompt missing --no-run-log in its section"
+fi
+# Batch Resolver returns the telemetry auto-pilot needs to enrich the lines.
+has "$SUBAGENT" "complexity" "T7: Batch Resolver returns complexity for the fanned-out lines"
+has "$SUBAGENT" "duration_s" "T7: Batch Resolver returns duration_s (attributed once)"
+
+# (b) Per-attempted-issue contract: one line per ATTEMPTED issue, keyed on the
+#     attempted set — NOT issues_resolved (success-only).
+has "$EXPLICIT" "one line per attempted issue" "T7: spec writes one line per attempted issue"
+has "$EXPLICIT" "attempted set" "T7: spec keys the fan-out on the attempted set"
+has "$EXPLICIT" "Run-log fan-out for the batch" "T7: explicit-list-mode has the fan-out section"
+
+# (c) Per-issue outcome derives from issues_resolved (success vs failed).
+has "$EXPLICIT" "issues_resolved" "T7: per-issue outcome derives from issues_resolved"
+
+# (d) Failed/partial batch coverage: no inverse under-count, no re-resolve
+#     double-count. The unresolved issues are re-resolved individually and logged
+#     there — not double-logged as a batch 'failed' line.
+has "$EXPLICIT" "double-count this fix removes" "T7: spec guards the re-resolve double-count"
+has "$EXPLICIT" "individual" "T7: failed/partial batch issues re-resolved (and logged) individually"
+has "$CONFIG"   "no inverse under-count" "T7: config-schema documents no inverse under-count"
+# (d.0) Discriminates the batch-TIME write rule: an unresolved attempted issue is
+#       NEVER written a 'failed' line at batch time (it is re-queued and logged at
+#       its retry). Without this, prose that says "iterate the attempted set, absent
+#       -> failed" at batch time would reintroduce the exact per-issue double-count
+#       this fix removes — and the looser greps above would still pass.
+has "$EXPLICIT" "ever written a \`failed\` line at batch time" "T7: spec forbids a 'failed' batch-time line for unresolved issues"
+has "$CONFIG"   "No \`failed\` line is written at batch" "T7: config-schema forbids a 'failed' batch-time line"
+# (d.1) The spawn-position (primary) unresolved issue MUST be re-queued, else it is
+#       dropped (zero lines) — the inverse under-count criterion 5 forbids. This is
+#       the subtle hole: the primary's optimized_order slot is already consumed.
+has "$EXPLICIT" "re-queue the primary too" "T7: full-failure path re-queues the primary too"
+has "$EXPLICIT" "Re-queuing the primary is" "T7: fan-out spec mandates re-queuing the primary"
+has "$CONFIG"   "including the batch's primary" "T7: config-schema mandates re-queuing the primary"
+# (d.2) An in-batch 'already resolved in batch' skip writes NO run-log line (the
+#       member was already logged at batch time) — else the resolved members get two
+#       lines. The one exception to 'log every processed issue including skips'.
+has "$EXPLICIT" "writes no run-log line" "T7: in-batch skip writes no run-log line (no double-count)"
+has "$CONFIG"   "writes no run-log line" "T7: config-schema notes the in-batch skip writes no line"
+
+# (e) Scalar telemetry attributed ONCE (primary line), shared fields on every line.
+has "$EXPLICIT" "one line only" "T7: qa_cycles/duration_s attributed to one line only"
+has "$SUBAGENT" "primary issue's run-log line only" "T7: subagent prompt notes once-only attribution"
+
+# (f) The auto-pilot SKILL points to the authoritative fan-out spec.
+has "$AUTOPILOT" "fan" "T7: auto-pilot SKILL describes fanning the batch result out"
+has "$AUTOPILOT" "explicit-list-mode" "T7: auto-pilot SKILL points to the explicit-list-mode spec"
 
 # --- T5: generated install surface carries the behavior through -------------
 GEN_RESOLVER="$REPO_ROOT/skills/issue-resolver/SKILL.md"
@@ -158,6 +219,17 @@ fi
 GEN_SUBAGENT="$REPO_ROOT/skills/auto-pilot/references/subagent-prompts.md"
 if [ -f "$GEN_SUBAGENT" ]; then
   has "$GEN_SUBAGENT" "--no-run-log" "T5: generated auto-pilot subagent prompt passes --no-run-log"
+  # #158: the batch fan-out must survive the build into the generated mirror too.
+  if [ "$(grep -ciF -e '--no-run-log' "$GEN_SUBAGENT")" -eq 2 ]; then
+    pass "T5: generated subagent prompt carries --no-run-log twice (single-issue + batch)"
+  else
+    fail "T5: generated subagent prompt should carry --no-run-log twice — run scripts/build.py"
+  fi
+fi
+GEN_EXPLICIT="$REPO_ROOT/skills/auto-pilot/references/explicit-list-mode.md"
+if [ -f "$GEN_EXPLICIT" ]; then
+  has "$GEN_EXPLICIT" "Run-log fan-out for the batch" "T5: generated explicit-list-mode carries the batch fan-out spec"
+  has "$GEN_EXPLICIT" "one line per attempted issue" "T5: generated explicit-list-mode keeps the per-attempted-issue contract"
 fi
 if [ -f "$GEN_RESOLVER" ]; then
   has "$GEN_RESOLVER" "--no-run-log" "T5: generated issue-resolver SKILL.md documents --no-run-log"
