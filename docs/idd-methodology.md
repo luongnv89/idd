@@ -33,11 +33,12 @@ Expressing what you actually want is one of the hardest problems in software dev
 `/issue-creator` addresses this through an **iterative clarification loop**:
 
 1. **Describe the problem** — loosely, incompletely, however it comes to mind
-2. **The agent proposes a structured issue** — classifying the type, preserving reporter context, and generating acceptance criteria
-3. **Read back what it captured** — and realize what you actually meant, what's missing, what's imprecise
-4. **Refine through conversation** — correct, add detail, sharpen the intent through multi-turn discussion until the issue says exactly what you want
+2. **The agent disambiguates intent first** — when a core field is genuinely ambiguous (the type is unclear, or the requirements are unstated), the agent asks one or two targeted questions before drafting, each with a recommended default, and resolves anything the repository can answer by inspecting it rather than asking. When the input is already clear, it skips straight to the draft — no needless questions.
+3. **The agent proposes a structured issue** — classifying the type, preserving reporter context, and generating acceptance criteria
+4. **Read back what it captured** — and realize what you actually meant, what's missing, what's imprecise
+5. **Refine through conversation** — correct, add detail, sharpen the intent until the issue says exactly what you want
 
-This process does something no template or form can do: it helps you **discover your own intention**. The agent acts as both a mirror and a structured interviewer — reflecting your input back in a standardized format and prompting you to think more precisely about what you need.
+This process does something no template or form can do: it helps you **discover your own intention**. The agent acts as both a mirror and a structured interviewer — reflecting your input back in a standardized format, and asking a precise question exactly when ambiguity would otherwise be guessed at. The questioning is targeted, not an interrogation: it engages only on the fields that are genuinely unclear, and never adds friction when intent is already plain.
 
 By the time the issue is finalized, it represents what the creator wants in a format that both humans and AI agents can inspect, question, and execute against.
 
