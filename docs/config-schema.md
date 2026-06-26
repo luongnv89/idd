@@ -559,8 +559,8 @@ append — two lines per processed issue, which double-counts that issue in
 `/idd-doctor`'s resolve-rate and median-QA metrics (they aggregate over every
 line). To keep **exactly one line per processed issue**, `/auto-pilot` passes the
 resolver the `--no-run-log` flag: the suppressed resolver does **not** append and
-instead **returns** its telemetry (`outcome`, `qa_cycles`, `complexity`,
-`duration_s`) to the orchestrator, which folds it into the single enriched
+instead **returns** its telemetry — its run `status` (the `outcome`) plus
+`qa_cycles`, `complexity`, and `duration_s` — to the orchestrator, which folds it into the single enriched
 `auto-pilot` line. The flag is **orthogonal to `--auto`/`IDD_AUTO_MODE`** — a
 standalone `/issue-resolver <N> --auto` is *not* suppressed and remains the single
 writer for that run. So the rule is: the outermost skill is the single writer; an

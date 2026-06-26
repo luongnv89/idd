@@ -45,7 +45,9 @@ has() {
 has_n() {
   # $1 = file, $2 = pattern, $3 = min count, $4 = label
   local n
-  n=$(grep -ciF -e "$2" "$1" 2>/dev/null || echo 0)
+  # grep -c prints '0' and exits 1 on zero matches, so `|| echo 0` would append a
+  # second line; assign then default-to-0 to keep a clean single integer.
+  n=$(grep -ciF -e "$2" "$1" 2>/dev/null); n=${n:-0}
   if [ "$n" -ge "$3" ]; then
     pass "$4"
   else
