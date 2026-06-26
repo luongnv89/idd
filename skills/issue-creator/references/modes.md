@@ -268,6 +268,8 @@ Create {N} issues? [A]ll / [e]dit / [c]ancel
 
 Create each approved issue sequentially using the same pipeline as single Create mode (generate content from template, `gh issue create`). Each issue gets the full template treatment — `<!-- gitissue:normalized v1 -->` marker, all sections populated.
 
+> **Batch never blocks for clarification.** The single Create pipeline includes an interactive *Step 3.5 — Clarify Ambiguous Intent* that asks one targeted question when type/criteria confidence is low. Batch mode **skips that step entirely** — it never pauses to ask the user about an individual item. Low-confidence fields are drafted with their defaulted assumptions and marked `(needs review)` in the body, exactly as before. Batch's only interactive gate remains the Step 4 approval prompt over the whole set.
+
 **Rate limiting:** If `gh issue create` returns a rate limit error, wait and retry with exponential backoff (5s, 10s, 20s). After 3 retries for a single item, skip it and continue with remaining items.
 
 **Progress output:** Show per-item progress:
