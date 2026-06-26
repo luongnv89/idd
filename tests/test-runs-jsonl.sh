@@ -178,7 +178,7 @@ has "$CONFIG"   "no inverse under-count" "T7: config-schema documents no inverse
 #       its retry). Without this, prose that says "iterate the attempted set, absent
 #       -> failed" at batch time would reintroduce the exact per-issue double-count
 #       this fix removes — and the looser greps above would still pass.
-has "$EXPLICIT" "written a \`failed\` line at batch time" "T7: spec forbids a 'failed' batch-time line for unresolved issues"
+has "$EXPLICIT" "ever written a \`failed\` line at batch time" "T7: spec forbids a 'failed' batch-time line for unresolved issues"
 has "$CONFIG"   "No \`failed\` line is written at batch" "T7: config-schema forbids a 'failed' batch-time line"
 # (d.1) The spawn-position (primary) unresolved issue MUST be re-queued, else it is
 #       dropped (zero lines) — the inverse under-count criterion 5 forbids. This is
