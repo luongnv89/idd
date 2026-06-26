@@ -170,9 +170,20 @@ has "$EXPLICIT" "issues_resolved" "T7: per-issue outcome derives from issues_res
 # (d) Failed/partial batch coverage: no inverse under-count, no re-resolve
 #     double-count. The unresolved issues are re-resolved individually and logged
 #     there — not double-logged as a batch 'failed' line.
-has "$EXPLICIT" "re-resolve double-count" "T7: spec guards the re-resolve double-count"
+has "$EXPLICIT" "double-count this fix removes" "T7: spec guards the re-resolve double-count"
 has "$EXPLICIT" "individual" "T7: failed/partial batch issues re-resolved (and logged) individually"
 has "$CONFIG"   "no inverse under-count" "T7: config-schema documents no inverse under-count"
+# (d.1) The spawn-position (primary) unresolved issue MUST be re-queued, else it is
+#       dropped (zero lines) — the inverse under-count criterion 5 forbids. This is
+#       the subtle hole: the primary's optimized_order slot is already consumed.
+has "$EXPLICIT" "re-queue the primary too" "T7: full-failure path re-queues the primary too"
+has "$EXPLICIT" "Re-queuing the primary is" "T7: fan-out spec mandates re-queuing the primary"
+has "$CONFIG"   "including the batch's primary" "T7: config-schema mandates re-queuing the primary"
+# (d.2) An in-batch 'already resolved in batch' skip writes NO run-log line (the
+#       member was already logged at batch time) — else the resolved members get two
+#       lines. The one exception to 'log every processed issue including skips'.
+has "$EXPLICIT" "writes no run-log line" "T7: in-batch skip writes no run-log line (no double-count)"
+has "$CONFIG"   "writes no run-log line" "T7: config-schema notes the in-batch skip writes no line"
 
 # (e) Scalar telemetry attributed ONCE (primary line), shared fields on every line.
 has "$EXPLICIT" "one line only" "T7: qa_cycles/duration_s attributed to one line only"

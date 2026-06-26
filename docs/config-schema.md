@@ -577,11 +577,20 @@ fully-attempted issues). Each line's `outcome` comes from `issues_resolved`
 (attempted-and-resolved → success outcome; attempted-but-absent → `failed`); the
 shared `pr` and `complexity` go on every line, while the batch-scalar `qa_cycles`
 and `duration_s` are attributed to **one line only** (the primary issue's) so a
-batch is not weighted N-fold in `/idd-doctor`'s medians. A partial/failed batch
-re-resolves its unresolved issues individually in a later iteration (which writes
-*their* single line), so `/auto-pilot` does not also write a batch `failed` line for
-them — keeping exactly one line per attempted issue across the run, with no
-re-resolve double-count and no inverse under-count. The authored contract lives in
+batch is not weighted N-fold in `/idd-doctor`'s medians. On a partial/failed batch,
+`/auto-pilot` writes a line only for the resolved issues now and **re-queues every
+unresolved issue — including the batch's primary (spawn-position) issue — for
+individual resolution**, where that resolve writes its single line; re-queuing the
+primary is mandatory (its `optimized_order` slot is already consumed, so without an
+explicit re-append it would drop to zero lines — the inverse under-count). No
+`failed` batch line is written for an unresolved issue, so a
+batch-failed-then-individually-resolved issue is never double-counted. One further
+carve-out: when the loop later reaches a batch-resolved member it emits an
+`already resolved in batch` skip that is **display only and writes no run-log line**
+(it was already logged at batch time) — the single exception to logging every
+processed issue including skips. Net: exactly one line per attempted issue across
+the run, with no re-resolve double-count and no inverse under-count. The authored
+contract lives in
 `src/skills/auto-pilot/references/explicit-list-mode.md` (*Run-log fan-out for the
 batch*).
 
