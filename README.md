@@ -283,6 +283,10 @@ Browse the authored source for each skill — these links point to `src/` for re
 
 ## What is IDD?
 
+<!-- COOLDOWN-LAUNCH START · seasonal note · issue #133 — delete this block to revert to standard branding -->
+> 🧊 **Cooldown launch:** during the heat wave you may see **Ice Driven Development** floating around the site — it's a temporary, humor-only skin, *not* a rename. **IDD always means Intention-Driven Development:** capturing durable human intention so AI understands what you actually want and ships higher-quality output.
+<!-- COOLDOWN-LAUNCH END · seasonal note -->
+
 Issue-Driven Development — also **Intention-Driven Development** — treats GitHub issues as the atomic unit of all development work. Every change starts as a structured issue and ends as a PR linked to that issue.
 
 The key idea: the gap between "someone describes a problem" and "someone ships a fix" is both a **translation gap** and an **intention gap**. IDD automates that translation — turning vague reports into structured work orders with acceptance criteria — while helping creators discover and articulate what they actually want through iterative refinement.
