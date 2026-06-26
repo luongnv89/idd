@@ -201,6 +201,8 @@ The auto-pilot processes multiple issues in a single session. Without careful co
 
 The solution: the main agent acts as a **lightweight orchestrator** that delegates heavy work to subagents via the Agent tool. Each subagent gets a fresh context window, does its work, and returns a concise result. The main agent never reads code, diffs, or test output directly.
 
+Auto-pilot delegates to the resolver/reviewer **skills**, which spawn the shared agents (Ada Lovelace, Nikola Tesla, Linus Torvalds, Marie Curie, Dieter Rams, Thomas Edison) under their own persona + role identities. Those skills size each agent's model/effort per `docs/agent-model-effort.md` and follow the shared conventions in `docs/shared-agent-conventions.md`; auto-pilot folds the telemetry they return (`complexity`, `qa_cycles`, `duration_s`) into its single run-log line per issue (see the run-log note below).
+
 ### Subagent Architecture
 
 Each iteration spawns up to 2 subagents. The main agent only tracks: issue number, title, branch name, PR number, and pass/fail status. In explicit list mode, an additional analyzer subagent runs once upfront before the loop begins.

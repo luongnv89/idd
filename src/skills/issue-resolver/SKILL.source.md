@@ -109,11 +109,37 @@ Main Agent (orchestrator)
 └── Step 5: Deliver (main agent — push + create PR + report)
 ```
 
-Read `shared/agents/codebase-researcher.md` for the researcher prompt.
-Read `shared/agents/synthesizer.md` for the synthesizer prompt.
-Read `shared/agents/implementer.md` for the implementer prompt.
-Read `shared/agents/code-reviewer.md` for the reviewer prompt.
-Read `shared/agents/fixer.md` for the fix-cycle prompt.
+Read `shared/agents/codebase-researcher.md` for the researcher prompt (Ada Lovelace).
+Read `shared/agents/synthesizer.md` for the synthesizer prompt (Nikola Tesla).
+Read `shared/agents/implementer.md` for the implementer prompt (Linus Torvalds).
+Read `shared/agents/code-reviewer.md` for the reviewer prompt (Marie Curie).
+Read `shared/agents/ui-reviewer.md` for the UI/UX reviewer prompt (Dieter Rams).
+Read `shared/agents/fixer.md` for the fix-cycle prompt (Thomas Edison).
+
+Every agent opens with a persona + role header and a compact I/O contract; the
+conventions they share (spawn note, tool posture, injection boundary, confidence
+scale, `gh --json`, autonomous operation) live once in
+`docs/shared-agent-conventions.md`.
+
+### Orchestrating the agents (model/effort, monitoring, audit)
+
+As the orchestrator, for each spawned step:
+
+1. **Name the persona** — pass the agent's persona + role in the spawn
+   `description` (e.g. `"Ada Lovelace — research issue #N"`), so terminal output
+   and the run log identify a recognizable agent.
+2. **Size the model/effort** — select the tier per `docs/agent-model-effort.md`
+   from the most-recent complexity signal (researcher `complexity` → synthesizer
+   `overall_complexity`), falling back to each agent's default tier. The
+   orchestrator is the decision point; selection is advisory and never blocks.
+3. **Monitor before advancing** — verify the agent returned its contract's
+   required shape (researcher: `status` + `complexity`; synthesizer: exactly one
+   `recommended` option; implementer: commits + test stats + repro for bugs;
+   reviewer/fixer: `result` + counts). A missing/blocking return is itself the
+   signal: stop (interactive) or follow the step's auto behavior.
+4. **Audit** — record the per-step signal the pipeline already folds into the run
+   log line (`complexity`, `qa_cycles`, `outcome`, `duration_s` — see the
+   *run-log* note in Step 5) plus the printed `[N/5]` tracker line.
 
 ### Environment check
 
@@ -310,7 +336,7 @@ Spawn the `codebase-researcher` subagent (see `shared/agents/codebase-researcher
 
 ```python
 Agent(
-  description="Research issue #N",
+  description="Ada Lovelace — research issue #N",
   prompt=<codebase-researcher.md prompt with {variables} replaced>,
   subagent_type="general-purpose"  # NOT "codebase-researcher"
 )
@@ -331,7 +357,7 @@ Generate implementation options and select one. Spawn the `synthesizer` subagent
 
 ```python
 Agent(
-  description="Plan for issue #N",
+  description="Nikola Tesla — plan issue #N",
   prompt=<synthesizer.md prompt with {variables} replaced>,
   subagent_type="general-purpose"  # NOT "synthesizer"
 )
@@ -354,7 +380,7 @@ Write code and tests based on the selected plan. Spawn the `implementer` subagen
 
 ```python
 Agent(
-  description="Implement issue #N",
+  description="Linus Torvalds — implement issue #N",
   prompt=<implementer.md prompt with {variables} replaced>,
   subagent_type="general-purpose"  # NOT "implementer"
 )
@@ -381,7 +407,7 @@ For each QA cycle, spawn a general-purpose agent with the code-reviewer prompt:
 
 ```python
 Agent(
-  description="Review cycle N",
+  description="Marie Curie — review cycle N",
   prompt=<code-reviewer.md prompt with {variables} replaced>,
   subagent_type="general-purpose"
 )
@@ -393,7 +419,7 @@ When the reviewer or test/build run returns blocking issues, spawn or re-message
 
 ```python
 Agent(
-  description="Fix QA cycle N",
+  description="Thomas Edison — fix QA cycle N",
   prompt=<fixer.md prompt with {variables} replaced>,
   subagent_type="general-purpose"
 )
@@ -423,7 +449,7 @@ When `ui: detected`, spawn the `ui-reviewer` subagent in **code** mode (see `sha
 
 ```python
 Agent(
-  description="UI/UX code review (#N)",
+  description="Dieter Rams — UI/UX code review (#N)",
   prompt=<ui-reviewer.md prompt with mode=code, {variables} replaced>,
   subagent_type="general-purpose"
 )

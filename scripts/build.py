@@ -88,6 +88,9 @@ AGENT_DESCRIPTIONS = {
     "synthesizer": (
         "Synthesize issue research into ranked implementation options."
     ),
+    "ui-reviewer": (
+        "Review UI/UX code changes and screenshots for accessibility and layout."
+    ),
 }
 
 

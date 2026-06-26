@@ -296,7 +296,7 @@ When detection returns `ui: detected`, spawn the `ui-reviewer` subagent in **cod
 
 ```python
 Agent(
-  description="UI/UX code review for PR #{N}",
+  description="Dieter Rams — UI/UX code review for PR #{N}",
   prompt=<ui-reviewer.md prompt with mode=code, {variables} replaced>,
   subagent_type="general-purpose"
 )
