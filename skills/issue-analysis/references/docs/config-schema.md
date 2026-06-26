@@ -120,6 +120,20 @@ resolve:
   # Maximum: 10
   qa_max_cycles: 5
 
+  # UI/UX review settings (Step 4 — QA)
+  # Code-level UI review is auto-detected per issue and always runs when UI
+  # work is present; it needs no flag and runs in any environment (including
+  # headless servers with no display). Only the optional browser (screenshot)
+  # review is gated here.
+  ui_review:
+    # Browser (screenshot) review mode
+    # Type: string enum
+    # Values: "false" (never) | "ask" (prompt interactive, skip in auto) | "true" (always attempt)
+    # Default: "ask"
+    # Note: when enabled it still skips (fail-soft to code-only) if no app is
+    #       running/reachable or capture is unsafe — it never blocks code review.
+    browser_review: "ask"
+
 # PR review settings (used by /issue-pr-review and /auto-pilot)
 review:
   # Max review-fix cycles before stopping
@@ -219,6 +233,20 @@ review:
   # Set to "" to disable pattern-based exemption. Setting both this and
   # traceability_exempt_labels to empty restores strict issue #36 behavior.
   traceability_exempt_pattern: "^\\s*Type:\\s*(refactor|chore)\\s*$"
+
+  # UI/UX review settings (Step 3 — Review)
+  # Code-level UI review is auto-detected per PR and always runs when UI work is
+  # present; it needs no flag and runs in any environment (including headless
+  # servers with no display). Only the optional browser (screenshot) review is
+  # gated here.
+  ui_review:
+    # Browser (screenshot) review mode
+    # Type: string enum
+    # Values: "false" (never) | "ask" (prompt interactive, skip in auto) | "true" (always attempt)
+    # Default: "ask"
+    # Note: when enabled it still skips (fail-soft to code-only) if no app is
+    #       running/reachable or capture is unsafe — it never blocks code review.
+    browser_review: "ask"
 
 # Auto-pilot settings (used by /auto-pilot)
 autopilot:
@@ -527,6 +555,7 @@ Config is validated on load at the start of every skill invocation. Errors inclu
 | `resolve.test_timeout` | `300` | 5 minute test timeout |
 | `resolve.pr_auto_link` | `true` | Auto-close issue on merge |
 | `resolve.max_commits` | `10` | Max commits warning |
+| `resolve.ui_review.browser_review` | `"ask"` | Browser (screenshot) UI review mode; code UI review is auto-detected and always runs |
 | `review.max_cycles` | `3` | Max review-fix cycles |
 | `review.auto_merge` | `false` | Auto-merge PR when clean |
 | `review.confidence_threshold` | `80` | Min confidence level for issues |
@@ -540,6 +569,7 @@ Config is validated on load at the start of every skill invocation. Errors inclu
 | `review.require_traceability_check` | `true` | Run the four traceability checks; missing `Closes #N` blocks soft-pass |
 | `review.traceability_exempt_labels` | `["refactor", "chore"]` | PR labels that exempt a PR from the `Closes #N` hard-fail (check 1 only; other three checks still run) |
 | `review.traceability_exempt_pattern` | `"^\\s*Type:\\s*(refactor\|chore)\\s*$"` | Regex (multiline, case-insensitive) matched against PR body for exemption from check 1 |
+| `review.ui_review.browser_review` | `"ask"` | Browser (screenshot) UI review mode; code UI review is auto-detected and always runs |
 | `autopilot.mode` | `balanced` | Merge mode: `balanced` (auto-merge clean PRs), `conservative` (never merge), `aggressive` (merge clean + partial w/ `merge_partial: true`) |
 | `autopilot.merge_partial` | `false` | Allow merging PRs with unresolved review issues. Only honored when `mode: aggressive` |
 | `autopilot.max_iterations` | `10` | Max issues to process |

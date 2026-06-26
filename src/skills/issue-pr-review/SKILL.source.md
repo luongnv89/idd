@@ -32,6 +32,7 @@ In auto mode, export `IDD_AUTO_MODE=1` before any shell snippet that consults it
 2. Confirm `gh` is installed and authenticated: `gh auth status`
 3. Confirm the bundled reviewer agent exists at `references/agents/code-reviewer.md`
 4. Confirm the bundled fixer agent exists at `references/agents/fixer.md`
+5. Confirm the bundled UI reviewer agent exists at `references/agents/ui-reviewer.md`
 
 ### Bundled dependency precheck
 
@@ -48,6 +49,7 @@ In auto mode, export `IDD_AUTO_MODE=1` before any shell snippet that consults it
 
 - `references/agents/code-reviewer.md` — Review subagent prompt
 - `references/agents/fixer.md` — Fix subagent prompt
+- `references/agents/ui-reviewer.md` — UI/UX review subagent prompt (auto-detected; see Step 3)
 - `references/verification-checks.md` — AC + traceability check procedure (Step 3)
 - `references/review-loop-mechanics.md` — reviewer/fixer spawn + reuse mechanics
 - `references/report-templates.md` — Step 7 summary templates, auto-merge flow, expected inline output
@@ -95,8 +97,11 @@ Load `.gitissue.yml` once. Defaults:
 - `review.require_traceability_check: true` — gate for the four traceability checks
 - `review.traceability_exempt_labels: ["refactor", "chore"]` — labels that exempt a PR from the `Closes #N` hard-fail
 - `review.traceability_exempt_pattern: "^\\s*Type:\\s*(refactor|chore)\\s*$"` — body-line regex exempting a PR from the `Closes #N` hard-fail
+- `review.ui_review.browser_review: "ask"` — browser (screenshot) review mode (`"false"` | `"ask"` | `"true"`); `"ask"` prompts interactive users, skips in auto mode. Does **not** gate the code-level UI review, which is auto-detected and always runs when UI work is present.
 
-The last four flags default to `true`/the values shown, which preserve the issue #36 contract. Their full semantics (what `false` does, exemption scope, disabling) are in `references/verification-checks.md`.
+UI/UX **code** review needs no config flag — it is auto-detected per PR (see *Step 3 — UI/UX Review*). Only the optional browser review reads `review.ui_review.browser_review`.
+
+The traceability flags default to `true`/the values shown, which preserve the issue #36 contract. Their full semantics (what `false` does, exemption scope, disabling) are in `references/verification-checks.md`.
 
 ---
 
@@ -243,6 +248,98 @@ Read `shared/agents/code-reviewer.md` for the reviewer prompt template and `shar
 
 To minimize tokens, the loop **reuses the same reviewer across cycles**: cycle 1 is a cold-start spawn; cycles 2+ re-message that agent via `SendMessage` to re-review the updated diff; after the fixer reports zero fixable issues, one **fresh** confirmation reviewer does an unbiased final check. The full mechanics (exact spawn calls, the SendMessage re-review prompt, and the token-trade rationale) live in `references/review-loop-mechanics.md`.
 
+### UI/UX Review (Step 3 — auto-detected)
+
+UI review is **auto-detected per PR** — no config flag enables it. The skill examines the PR title/body and changed files to decide whether UI work is involved, then runs only the review that *can* and *should* run for this PR:
+
+- **Code UI review** is environment-independent — it reads the diff and changed files. It runs whenever UI work is detected, on any machine, **including a headless server with no display**. It is never gated on a GUI, a running app, or a browser.
+- **Browser UI review** is optional. It captures screenshots from a running app, so it only runs when there is a reachable running app *and* the user opted in. When it can't run (no app, no display capable of headless capture, capture unsafe, or auto mode without opt-in), it **skips with a warning and the code UI review still runs** — fail-soft to code-only, never block.
+
+This separation is the contract: detecting UI work always gives you a code UI review; the browser review is an additive bonus when the runtime allows it.
+
+#### Detection phase (runs once, after Step 2, before the review cycles)
+
+1. **Check PR context** for UI indicators:
+   ```bash
+   pr_body=$(gh pr view {N} --json body --jq .body)
+   ```
+   Scan title + body for UI keywords: `UI`, `frontend`, `component`, `style`, `css`, `html`, `design`, `layout`, `responsive`, `mobile`, `theme`, `dark mode`, `button`, `form`, `page`, `screen`, `visual`, `accessibility`, `a11y`, `icon`, `image`, `screenshot`, `dashboard`, `navigation`, `modal`, `dialog`, `card`, `table`, `chart`, `graph`.
+
+2. **Check PR diff** for UI file changes:
+   ```bash
+   ui_files=$(gh pr diff {N} --name-only | grep -E '\.(html|htm|css|scss|sass|less|styl|tsx|jsx|vue|svelte|astro)$|^(components|pages|views|layouts|app|src/app|screens|routes|templates)/|tailwind\.config\.|theme\.|tokens\.')
+   ```
+
+3. **Classify**:
+   - **`ui: detected`** — UI keywords in PR context OR UI files in diff → run the code UI review.
+   - **`ui: not detected`** — no UI indicators → skip UI review entirely (no agent spawned).
+
+4. **Propose review mix** (interactive mode only):
+   ```
+   ◆ UI Review Detected
+   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+   
+     PR mentions:    responsive, mobile, button
+     Files changed:  src/components/Button.tsx, src/styles/main.css
+   
+     Proposed review:
+       ✓ Code review (a11y, responsive, interaction patterns) — runs now
+       ○ Browser review (screenshot capture) — needs a running app
+   
+     Enable browser review? [Y/n] (requires a reachable app + Playwright)
+   ```
+   In auto mode (`IDD_AUTO_MODE=1`): log the detection result and proceed with **code review only** — browser review requires user confirmation per `review.ui_review.browser_review`.
+
+#### Code-based review
+
+When detection returns `ui: detected`, spawn the `ui-reviewer` subagent in **code** mode (see `shared/agents/ui-reviewer.md`):
+
+```python
+Agent(
+  description="UI/UX code review for PR #{N}",
+  prompt=<ui-reviewer.md prompt with mode=code, {variables} replaced>,
+  subagent_type="general-purpose"
+)
+```
+
+Pass `{branch_name}`, `{base_branch}`, `{pr_context}` (PR title + body), `{issue_context}` (the linked issue title/body + acceptance criteria, or empty if none), and `{diff_command}` (`gh pr diff {N}`). Merge UI reviewer findings into the code reviewer findings — both use the same `action: "fix" | "note"` semantics, so they flow into Step 6 unchanged.
+
+For cycle reuse, cycles 2+ re-message the existing UI reviewer via `SendMessage`:
+```
+The fixer applied changes. Re-review the PR diff for UI/UX issues.
+
+Run: gh pr diff {N}
+
+Return the same JSON format as before.
+```
+For the confirmation pass, spawn one **fresh** UI reviewer for an unbiased final check.
+
+#### Browser-based review (optional, gated)
+
+Browser review runs only when it both *can* and *should*. Check `review.ui_review.browser_review`:
+
+- **`"false"`** — skip; code review already ran.
+- **`"ask"`** — prompt interactive users; skip silently in auto mode.
+- **`"true"`** — proceed to the capability check below.
+
+Then verify the runtime can actually capture screenshots — **all** must hold:
+1. A target app is running and reachable (e.g. `curl -sf {app_url}` succeeds).
+2. A headless browser is available (Playwright/Chromium installed). A headless server with no physical display is fine — headless Chromium needs no display; what it needs is the browser binary and a reachable app.
+3. Capture is safe (not a production URL, no auth wall that would log real traffic).
+
+If the gate or any capability check fails, print a warning and skip — **without** affecting the code UI review that already ran:
+```
+⚠ Browser review skipped — {reason}
+  Code UI review still ran. Enable browser review with:
+  review.ui_review.browser_review: "true"  (and ensure the app is running and reachable)
+```
+
+When all hold, capture screenshots at mobile/tablet/desktop viewports and spawn the UI reviewer in **browser** mode with the screenshot paths and `{app_url}`.
+
+#### Integration with the fixer
+
+`action: "fix"` findings from the UI reviewer join the fixable issues in Step 6. The fixer handles file/line findings normally; browser-only findings without file/line are resolved by identifying the responsible files from the PR diff and issue context.
+
 Also fetch the linked issue for acceptance-criteria verification: `gh issue view {linked_issue} --json number,title,body,labels`.
 
 ```
@@ -254,21 +351,24 @@ Also fetch the linked issue for acceptance-criteria verification: `gh issue view
 
 Within a single review cycle, the work runs in this order:
 1. Spawn (or re-message) the reviewer subagent and collect its findings.
-2. Run per-criterion acceptance-criteria verification against the linked issue.
-3. Run the four traceability checks against the PR body and commit history.
-4. Aggregate reviewer findings + AC results + traceability results into the five user-facing dimensions for the cycle report.
+2. If UI work was detected (see *UI/UX Review* above), spawn (or re-message) the UI reviewer in **code** mode and collect its findings. Skip when `ui: not detected`.
+3. Run per-criterion acceptance-criteria verification against the linked issue.
+4. Run the four traceability checks against the PR body and commit history.
+5. Aggregate reviewer findings + UI reviewer findings + AC results + traceability results into the five user-facing dimensions for the cycle report.
 
 ### Dimensional review output
 
-Step 3 produces a single review verdict organized into **five dimensions**. The reviewer subagent reports findings against its own internal categories (correctness, test_coverage, code_quality, security, edge_cases); this skill maps those findings into the user-facing dimensions and adds two dimensions the reviewer does not produce (acceptance criteria, traceability). Mapping is fixed:
+Step 3 produces a single review verdict organized into **five dimensions**. The reviewer subagent reports findings against its own internal categories (correctness, test_coverage, code_quality, security, edge_cases); this skill maps those findings into the user-facing dimensions and adds two dimensions the reviewer does not produce (acceptance criteria, traceability). When UI work is detected, the UI reviewer's `ui_ux` findings fold into `maintainability` (a11y, responsive, interaction, and consistency are quality concerns). Mapping is fixed:
 
 | User-facing dimension | Source | Failure means |
 |----------------------|--------|---------------|
 | `correctness` | reviewer category `correctness` | logic, off-by-one, race conditions |
 | `acceptance_criteria` | per-criterion verification (this skill) | one or more criteria report `fail` |
 | `traceability` | PR-body and commit-history scan (this skill) | issue-to-code link is broken |
-| `maintainability` | reviewer categories `code_quality` + `test_coverage` | dead code, untested paths, complex logic |
+| `maintainability` | reviewer categories `code_quality` + `test_coverage`; UI reviewer `ui_ux` findings (when detected) | dead code, untested paths, complex logic, a11y/responsive/interaction defects |
 | `safety` | reviewer categories `security` + `edge_cases` | injection, auth bypass, unsafe nulls, crash paths |
+
+A UI `action: "fix"` finding makes `maintainability` report at least `partial` and contributes a fixable issue to Step 6 (`category: ui_ux`), so the dimensional verdict never shows all-pass while UI fixables remain.
 
 Each dimension reports `pass`, `partial`, or `fail`. A PR can pass tests and still fail on `traceability` or `acceptance_criteria` — those dimensions are not gated by test results.
 
@@ -374,6 +474,7 @@ In auto mode: proceed — the next cycle will re-check.
 Collect issues from Steps 3-5, but **only fix issues with `action: "fix"`**. Issues with `action: "note"` are reported in the summary but do not trigger a fix cycle. This is the key token optimization — note-only issues (medium code_quality, test_coverage suggestions) are skipped.
 
 - Code review issues with `action: "fix"` (from the reviewer agent — `correctness`, `maintainability`, `safety` dimensions)
+- UI/UX issues with `action: "fix"` (from the UI reviewer when UI work was detected — `category: ui_ux`, folded under `maintainability`)
 - Acceptance-criteria failures (from Step 3 per-criterion verification — one fixable issue per `fail` criterion, `category: acceptance_criteria`)
 - Traceability failures on `Closes #{N}` (from Step 3 traceability checks — `category: traceability`, suggested fix: edit the PR body to add the link)
 - Test failures (from Step 4)
@@ -470,6 +571,7 @@ A clean review prints the 7-step tracker and a summary — see the *Expected Inl
 ## Additional Resources
 
 - **`shared/agents/code-reviewer.md`** — Review subagent prompt
+- **`shared/agents/ui-reviewer.md`** — UI/UX review subagent prompt (Step 3, auto-detected)
 - **`shared/agents/fixer.md`** — Fix subagent prompt
 - **`references/verification-checks.md`** — AC + traceability check procedure (Step 3)
 - **`references/review-loop-mechanics.md`** — reviewer/fixer spawn + reuse mechanics

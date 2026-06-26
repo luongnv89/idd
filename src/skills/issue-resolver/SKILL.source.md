@@ -73,6 +73,7 @@ Defaults:
 - `resolve.pr_auto_link: true`
 - `resolve.max_commits: 10`
 - `resolve.qa_max_cycles: 5`
+- `resolve.ui_review.browser_review: "ask"` — browser (screenshot) review mode (`"false"` | `"ask"` | `"true"`); `"ask"` prompts interactive users, skips in auto mode. Does **not** gate the code-level UI review, which is auto-detected and always runs when UI work is present (see *Step 4 — UI/UX review*).
 
 ---
 
@@ -137,6 +138,7 @@ Check these files relative to the skill's directory (the dirname of this SKILL.m
 - `references/agents/synthesizer.md` — Plan subagent (Step 2)
 - `references/agents/implementer.md` — Implement subagent (Step 3)
 - `references/agents/code-reviewer.md` — QA review subagent (Step 4)
+- `references/agents/ui-reviewer.md` — UI/UX review subagent (Step 4, auto-detected)
 - `references/agents/fixer.md` — QA fix subagent (Step 4)
 - `references/pipeline-steps.md` — Full delegation payloads, phases, and inline fallbacks for Steps 1–4
 - `references/report-templates.md` — PR body template, final report templates, and expected inline output
@@ -393,6 +395,58 @@ Agent(
 
 Pass the issue context, branch/base branch, reviewer findings, failing test/build output, commit message `fix({scope}): address review feedback (#N)`, and `security_convention`: `references/docs/pre-commit-security.md` — the bundled pre-commit security scan the fixer MUST run before committing. The main agent collects the fixer's JSON result and decides whether to start another QA cycle; it should not apply fixes inline when the Agent tool is available.
 
+### UI/UX review (auto-detected)
+
+UI review is **auto-detected per issue** — no config flag enables it. Before the QA cycles, examine the issue body and the working diff to decide whether UI work is involved, then run only the review that *can* and *should* run:
+
+- **Code UI review** is environment-independent — it reads the diff and changed files. It runs whenever UI work is detected, on any machine, **including a headless server with no display**. It is never gated on a GUI, a running app, or a browser.
+- **Browser UI review** is optional and captures screenshots from a running app, so it only runs when there is a reachable running app *and* the user opted in. When it can't run, it **skips with a warning and the code UI review still runs** — fail-soft to code-only, never block.
+
+#### Detection
+
+1. Scan the issue title + body for UI keywords: `UI`, `frontend`, `component`, `style`, `css`, `html`, `design`, `layout`, `responsive`, `mobile`, `theme`, `dark mode`, `button`, `form`, `page`, `screen`, `visual`, `accessibility`, `a11y`, `icon`, `image`, `screenshot`, `dashboard`, `navigation`, `modal`, `dialog`, `card`, `table`, `chart`, `graph`.
+2. Scan the working diff for UI files:
+   ```bash
+   git diff --name-only "origin/${base}"...HEAD | grep -E '\.(html|htm|css|scss|sass|less|styl|tsx|jsx|vue|svelte|astro)$|^(components|pages|views|layouts|app|src/app|screens|routes|templates)/|tailwind\.config\.|theme\.|tokens\.'
+   ```
+3. Classify: **`ui: detected`** (keywords OR UI files) → run the code UI review; **`ui: not detected`** → skip UI review entirely.
+
+#### Code-based review
+
+When `ui: detected`, spawn the `ui-reviewer` subagent in **code** mode (see `shared/agents/ui-reviewer.md`):
+
+```python
+Agent(
+  description="UI/UX code review (#N)",
+  prompt=<ui-reviewer.md prompt with mode=code, {variables} replaced>,
+  subagent_type="general-purpose"
+)
+```
+
+Pass `{branch_name}`, `{base_branch}`, `{issue_context}` (the linked issue title/body + acceptance criteria), `{pr_context}` (empty — no PR exists yet at QA time), and `{diff_command}` (`git diff origin/${base}...HEAD`). Merge UI reviewer findings into the QA findings — both use the same `action: "fix" | "note"` semantics, so they flow into the fixer loop unchanged.
+
+#### Browser-based review (optional, gated)
+
+Browser review runs only when it both *can* and *should*. Check `resolve.ui_review.browser_review`:
+
+- **`"false"`** — skip; code review already ran.
+- **`"ask"`** — prompt interactive users; skip silently in auto mode.
+- **`"true"`** — proceed to the capability check.
+
+Then verify the runtime can actually capture screenshots — **all** must hold:
+1. A target app is running and reachable (e.g. `curl -sf {app_url}` succeeds).
+2. A headless browser is available (Playwright/Chromium installed). A headless server with no display is fine — headless Chromium needs no display, only the browser binary and a reachable app.
+3. Capture is safe (not a production URL, no auth wall that would log real traffic).
+
+If the gate or any check fails, print a warning and skip — **without** affecting the code UI review that already ran:
+```
+⚠ Browser review skipped — {reason}
+  Code UI review still ran. Enable browser review with:
+  resolve.ui_review.browser_review: "true"  (and ensure the app is running and reachable)
+```
+
+When all hold, capture screenshots at mobile/tablet/desktop viewports and spawn the UI reviewer in **browser** mode with the screenshot paths and `{app_url}`. UI `action: "fix"` findings join the QA fixable issues handled by the fixer.
+
 Cycle mechanics, loop controls (`resolve.qa_max_cycles`, exit-on-clean, exit-on-stagnation), and the remaining-issues flow are in `references/pipeline-steps.md` (*Step 4 — QA*).
 
 ---
@@ -533,6 +587,7 @@ All errors use rich format from `references/error-messages.md`:
 - **`shared/agents/synthesizer.md`** — Plan subagent (Step 2)
 - **`shared/agents/implementer.md`** — Implement subagent (Step 3)
 - **`shared/agents/code-reviewer.md`** — QA review subagent (Step 4)
+- **`shared/agents/ui-reviewer.md`** — UI/UX review subagent (Step 4, auto-detected)
 - **`shared/agents/fixer.md`** — QA fix subagent (Step 4)
 - **`references/pipeline-steps.md`** — Full delegation payloads, phases, and inline fallbacks for Steps 1–4
 - **`references/report-templates.md`** — PR body template, final report templates, and expected inline output
