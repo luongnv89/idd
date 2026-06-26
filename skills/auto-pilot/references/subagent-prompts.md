@@ -177,6 +177,10 @@ Instructions:
 8. Ship: create ONE PR with body containing Closes #N for EACH issue
 
 Use --auto mode — NEVER ask for user approval. Make all decisions autonomously.
+ALSO pass --no-run-log. Auto-pilot is the single writer of the `.gitissue/runs.jsonl`
+lines for this batch; you must NOT append any line yourself (it would double-write —
+auto-pilot fans your one result out into one line per attempted issue). Return your
+run telemetry in the report-back fields below instead.
 Workspace is in-place only (skip Step 0e; no worktree prompt or `git worktree add`).
 AUTONOMY: Choose the best unified fix strategy yourself. If issues conflict, prioritize the primary (first) issue. Report partial success rather than stopping.
 
@@ -188,11 +192,18 @@ When done, report back ONLY these fields:
 - branch_name: the branch created
 - pr_number: the PR number (if created)
 - pr_url: the PR URL (if created)
-- issues_resolved: array of issue numbers successfully addressed
+- issues_resolved: array of issue numbers successfully addressed — auto-pilot uses
+  this to set each fanned-out run-log line's per-issue `outcome` (attempted issues
+  in it get the success outcome; attempted issues absent from it get `failed`)
 - files_changed: count of files modified
 - tests_written: count of new tests written (unit + integration + e2e)
 - tests_passed: count of tests passed
-- qa_cycles: number of QA cycles run
+- qa_cycles: number of QA cycles run (batch total — auto-pilot attributes it to the
+  primary issue's run-log line only, so a batch is not weighted N-fold)
+- complexity: the complexity assessed in Research (e.g. low/medium/high), shared on
+  every fanned-out run-log line
+- duration_s: wall-clock seconds for the batch resolve, when measurable; like
+  qa_cycles it is attributed to the primary issue's line only
 - failure_step: which step failed (if status is failure)
 - failure_reason: short error description (if status is failure)
 ```

@@ -199,6 +199,60 @@ The batch resolver creates a single branch and PR that addresses all issues in t
   ⚠ Batch resolve failed for #{n1}, #{n2} — resolving individually
   ```
 
+#### Run-log fan-out for the batch (one line per attempted issue)
+
+The Batch Resolver runs with `--no-run-log` (see *Batch Resolver Subagent* in
+`references/subagent-prompts.md`), so — exactly like the single-issue resolver —
+it does **not** append to `.gitissue/runs.jsonl` itself. Auto-pilot is the single
+writer here too. But a batch resolves N issues in one PR, and the single-writer
+contract is **one line per processed (attempted) issue**, not one line per PR or
+per batch. So auto-pilot must **fan the one returned result out into N lines** —
+one for every issue in the **attempted set** (the issue numbers sent into the
+Batch Resolver — what `batch_map` holds when the batch is spawned), keyed on that
+attempted set and **never** on `issues_resolved` (success-only — keying there
+would drop fully-processed-but-failed issues, the inverse under-count #156/#158
+exist to kill).
+
+Build each line from `docs/config-schema.md` (*`.gitissue/runs.jsonl` — run log*)
+with these batch attributions:
+
+- **One line per attempted issue.** Iterate the attempted set, not `issues_resolved`.
+- **Per-issue `outcome` from `issues_resolved`.** An attempted issue **in**
+  `issues_resolved` gets the success-class outcome (`merged` when the batch PR
+  merged this iteration, else `left_open`); an attempted issue **absent** from
+  `issues_resolved` gets `failed`. (`issues_resolved` sets the per-issue outcome
+  only — it never decides *whether* a line is written.)
+- **Shared fields on every line:** the batch `pr` (the one PR number) and
+  `complexity` go on all N lines.
+- **Scalar telemetry attributed once.** `qa_cycles` and `duration_s` describe the
+  *whole batch*, not any single issue. Put them on **one line only — the primary
+  (first) issue's line** — and omit them from the others. Writing them on all N
+  lines would weight one batch N-fold in `/idd-doctor`'s median-QA-cycles and
+  duration aggregates.
+
+**Avoid the re-resolve double-count.** Only write a batch line for an issue whose
+**terminal disposition is this batch** — i.e. the issues that stay resolved here.
+On **full success**, that is every attempted issue → write all N lines now. On
+**partial success / full failure**, the unresolved issues are removed from
+`batch_map` and **re-resolved individually** in a later iteration, where that
+individual resolve writes their single line — so do **not** also write a `failed`
+batch line for them now, or a batch-failed-then-individually-resolved issue gets
+two lines (`failed` + its individual outcome), reintroducing the exact double-count
+this fix removes. Concretely: write a line for each issue **in** `issues_resolved`
+(success-class), and a `failed` line **only** for attempted issues that are
+**not** going to be retried individually (none, under the current fallback — every
+unresolved batch issue is re-queued). The invariant holds **across the whole
+auto-pilot run**: every attempted issue ends with exactly one line — written at
+batch time if it resolved in the batch, or at its individual retry otherwise.
+A failed/partial batch therefore still records all attempted issues (no inverse
+under-count); they are just recorded by their individual iteration.
+
+The Batch Resolver **returns** `qa_cycles`, `complexity`, and `duration_s` (added
+to its report-back for this fan-out) so auto-pilot can populate them; the resolver
+stayed silent on the run log. Each append uses the same best-effort, non-fatal
+`mkdir -p .gitissue` + single-`\n` rule as everywhere else — a failed append never
+stops the loop. Append only; never rewrite prior lines.
+
 For non-batched issues, the flow is identical to before:
 
 ```

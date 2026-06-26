@@ -566,6 +566,25 @@ standalone `/issue-resolver <N> --auto` is *not* suppressed and remains the sing
 writer for that run. So the rule is: the outermost skill is the single writer; an
 inner resolver invoked by `/auto-pilot` stays silent.
 
+**Batch fan-out (one line per attempted issue).** The same single-writer rule
+covers the *Batch Resolver* path (`/auto-pilot --issues`, where the analyzer bundles
+several issues into one PR): the Batch Resolver also runs with `--no-run-log` and
+returns its telemetry, and `/auto-pilot` writes the lines. Because "one line per
+**processed issue**" — not per PR — is the contract, `/auto-pilot` **fans the one
+batch result out into one line per attempted issue** (the set sent into the Batch
+Resolver, *not* the success-only `issues_resolved`, or a failed batch would drop
+fully-attempted issues). Each line's `outcome` comes from `issues_resolved`
+(attempted-and-resolved → success outcome; attempted-but-absent → `failed`); the
+shared `pr` and `complexity` go on every line, while the batch-scalar `qa_cycles`
+and `duration_s` are attributed to **one line only** (the primary issue's) so a
+batch is not weighted N-fold in `/idd-doctor`'s medians. A partial/failed batch
+re-resolves its unresolved issues individually in a later iteration (which writes
+*their* single line), so `/auto-pilot` does not also write a batch `failed` line for
+them — keeping exactly one line per attempted issue across the run, with no
+re-resolve double-count and no inverse under-count. The authored contract lives in
+`src/skills/auto-pilot/references/explicit-list-mode.md` (*Run-log fan-out for the
+batch*).
+
 > **Not in `.gitissue/`:** the model-suggestion cache is **skill-level**, not
 > per-repo. `/issue-creator` caches CursorBench scoring data at the installed
 > skill folder as `model-data-<date>.json` (one per machine, shared across all
