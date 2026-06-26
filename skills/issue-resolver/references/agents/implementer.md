@@ -56,6 +56,11 @@ You will receive the following data from the main agent:
 
 ### 1. Write implementation code
 
+**For `type: bug` issues, complete the reproduction checkpoint in Task 1.5
+(`references/bug-verification.md`) — name the repro command and confirm it is red
+for the stated reason — BEFORE writing the fix below.** Non-bug issues proceed
+directly.
+
 For each file in the plan:
 
 - **Read the file first** — confirm current state matches research findings
