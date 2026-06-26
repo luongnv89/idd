@@ -660,6 +660,182 @@
       color: var(--fg-muted);
     }
     .cooldown-note strong { color: var(--ice); }
+
+    /* ╔═══════════════════════════════════════════════════════════════╗
+       ║ COOLDOWN-LAUNCH · FROST-ON-ELEMENTS · issue #134 (extension)  ║
+       ║ Snow + ice + water dressing for the nav bar, every .btn, and  ║
+       ║ the simulation terminal frame. Pure CSS — attaches to         ║
+       ║ existing selectors via ::before / ::after pseudo-elements, so ║
+       ║ no markup changes are needed. All decorative layers are       ║
+       ║ pointer-events:none and aria-invisible. Delete this whole     ║
+       ║ sub-block to revert these elements to their standard look.    ║
+       ╚═══════════════════════════════════════════════════════════════╝ */
+
+    /* Shared frost pieces — reused by nav / buttons / terminal.
+       --snow:    lumpy white ridge that caps a top edge (snow).
+       --icicles: rounded drips hanging from a bottom edge (ice → water). */
+    .frost-snow,
+    .frost-ice { position: relative; }
+    .frost-snow::before,
+    .frost-ice::after {
+      content: "";
+      position: absolute;
+      left: 6px; right: 6px;
+      pointer-events: none;
+      z-index: 3;
+    }
+    /* Snow ridge on the top edge — scalloped white cap with a cool tint. */
+    .frost-snow::before {
+      top: -6px; height: 11px;
+      background: linear-gradient(180deg, #ffffff 0%, #eaf8ff 55%, rgba(200,238,255,0.85) 100%);
+      -webkit-mask-image: radial-gradient(7px 9px at 7px 100%, #000 96%, transparent 100%);
+              mask-image: radial-gradient(7px 9px at 7px 100%, #000 96%, transparent 100%);
+      -webkit-mask-size: 16px 11px; mask-size: 16px 11px;
+      -webkit-mask-repeat: repeat-x; mask-repeat: repeat-x;
+      filter: drop-shadow(0 1px 2px rgba(120,200,235,0.45));
+    }
+    /* Icicle / water drips hanging from the bottom edge. */
+    .frost-ice::after {
+      bottom: -11px; height: 15px;
+      background: linear-gradient(180deg, rgba(225,247,255,0.95) 0%, rgba(159,232,255,0.6) 60%, rgba(120,200,235,0.15) 100%);
+      -webkit-mask-image: radial-gradient(6px 15px at 6px 0, #000 94%, transparent 100%);
+              mask-image: radial-gradient(6px 15px at 6px 0, #000 94%, transparent 100%);
+      -webkit-mask-size: 19px 15px; mask-size: 19px 15px;
+      -webkit-mask-repeat: repeat-x; mask-repeat: repeat-x;
+      filter: drop-shadow(0 2px 3px rgba(120,200,235,0.4));
+      animation: frost-drip 6s ease-in-out infinite;
+    }
+    @keyframes frost-drip {
+      0%, 100% { transform: translateY(0);     opacity: 0.92; }
+      50%      { transform: translateY(1.5px); opacity: 0.7; }
+    }
+
+    /* ── NAV BAR ── icy frosted glass, snow ridge on top, icicles below ── */
+    header.nav {
+      background: linear-gradient(180deg, rgba(18,34,44,0.78), rgba(10,18,24,0.74));
+      border-bottom-color: rgba(150,220,245,0.35);
+      box-shadow: inset 0 1px 0 rgba(220,245,255,0.18), 0 6px 26px -16px var(--ice-glow);
+    }
+    header.nav::before {           /* snow ridge along the very top of the bar */
+      content: ""; position: absolute; left: 14px; right: 14px; top: -5px; height: 10px;
+      pointer-events: none; z-index: 51;
+      background: linear-gradient(180deg, #ffffff, #e6f6ff);
+      -webkit-mask-image: radial-gradient(7px 8px at 7px 100%, #000 96%, transparent 100%);
+              mask-image: radial-gradient(7px 8px at 7px 100%, #000 96%, transparent 100%);
+      -webkit-mask-size: 17px 10px; mask-size: 17px 10px;
+      -webkit-mask-repeat: repeat-x; mask-repeat: repeat-x;
+      filter: drop-shadow(0 1px 2px rgba(120,200,235,0.4));
+    }
+    header.nav::after {            /* icicles dripping from the bottom border */
+      content: ""; position: absolute; left: 0; right: 0; bottom: -12px; height: 16px;
+      pointer-events: none; z-index: 51;
+      background: linear-gradient(180deg, rgba(225,247,255,0.92), rgba(120,200,235,0.12));
+      -webkit-mask-image: radial-gradient(5px 16px at 5px 0, #000 94%, transparent 100%);
+              mask-image: radial-gradient(5px 16px at 5px 0, #000 94%, transparent 100%);
+      -webkit-mask-size: 27px 16px; mask-size: 27px 16px;
+      -webkit-mask-repeat: repeat-x; mask-repeat: repeat-x;
+      filter: drop-shadow(0 2px 3px rgba(120,200,235,0.35));
+      animation: frost-drip 7s ease-in-out infinite;
+    }
+    /* Frost the nav's icy-pill CTA so it matches the season. */
+    .nav-cta {
+      color: var(--ice); border-color: rgba(150,220,245,0.4);
+      background: rgba(120,200,235,0.08);
+    }
+    .nav-cta:hover { background: rgba(120,200,235,0.16); border-color: var(--ice); }
+
+    /* ── BUTTONS ── snow-capped tops, frosted icy rim, water-drip underside ── */
+    .btn {
+      position: relative;
+      overflow: visible;
+      isolation: isolate;
+    }
+    .btn::before {                 /* snow cap resting on top of the button */
+      content: ""; position: absolute; left: 7px; right: 7px; top: -5px; height: 9px;
+      pointer-events: none; z-index: 2;
+      background: linear-gradient(180deg, #ffffff, #e8f7ff);
+      -webkit-mask-image: radial-gradient(6px 7px at 6px 100%, #000 96%, transparent 100%);
+              mask-image: radial-gradient(6px 7px at 6px 100%, #000 96%, transparent 100%);
+      -webkit-mask-size: 14px 9px; mask-size: 14px 9px;
+      -webkit-mask-repeat: repeat-x; mask-repeat: repeat-x;
+      filter: drop-shadow(0 1px 1px rgba(120,200,235,0.45));
+    }
+    .btn::after {                  /* short icicle/water drips under the button */
+      content: ""; position: absolute; left: 10px; right: 10px; bottom: -8px; height: 11px;
+      pointer-events: none; z-index: 2;
+      background: linear-gradient(180deg, rgba(225,247,255,0.9), rgba(120,200,235,0.1));
+      -webkit-mask-image: radial-gradient(4px 11px at 4px 0, #000 93%, transparent 100%);
+              mask-image: radial-gradient(4px 11px at 4px 0, #000 93%, transparent 100%);
+      -webkit-mask-size: 16px 11px; mask-size: 16px 11px;
+      -webkit-mask-repeat: repeat-x; mask-repeat: repeat-x;
+      filter: drop-shadow(0 1px 2px rgba(120,200,235,0.35));
+      animation: frost-drip 6.5s ease-in-out infinite;
+    }
+    /* Glassy frozen sheen + icy outline shared by both button variants. */
+    .btn-primary {
+      box-shadow: 0 0 0 1px rgba(160,225,250,0.55), inset 0 1px 0 rgba(255,255,255,0.55),
+                  inset 0 -6px 14px -8px rgba(60,140,180,0.5), 0 12px 40px -12px var(--ice-glow);
+    }
+    .btn-primary:hover {
+      box-shadow: 0 0 0 1px var(--ice), inset 0 1px 0 rgba(255,255,255,0.7),
+                  inset 0 -6px 14px -8px rgba(60,140,180,0.6), 0 18px 50px -12px var(--ice-glow);
+    }
+    .btn-ghost {
+      border-color: rgba(150,220,245,0.4);
+      background: linear-gradient(180deg, rgba(159,232,255,0.07), rgba(120,200,235,0.02));
+      box-shadow: inset 0 1px 0 rgba(220,245,255,0.18);
+    }
+    .btn-ghost:hover { border-color: var(--ice); background: rgba(159,232,255,0.12); }
+
+    /* ── TERMINAL FRAME ── frozen-glass border, snowy title bar, hanging ice ── */
+    .terminal {
+      position: relative;
+      border-color: rgba(150,220,245,0.42);
+      box-shadow: 0 40px 120px -40px rgba(0,0,0,0.9),
+                  0 0 0 1px rgba(160,225,250,0.18),
+                  0 0 60px -28px var(--ice-glow),
+                  inset 0 0 40px rgba(120,200,235,0.08);
+    }
+    /* Snow accumulating on the title bar + icicles dripping beneath it. */
+    .term-bar { position: relative; overflow: visible; }
+    .term-bar::before {            /* snow ridge across the top of the window chrome
+                                      (kept at top:0 — the parent .terminal clips overflow) */
+      content: ""; position: absolute; left: 8px; right: 8px; top: 0; height: 10px;
+      pointer-events: none; z-index: 4;
+      background: linear-gradient(180deg, #ffffff, #e6f6ff);
+      -webkit-mask-image: radial-gradient(7px 8px at 7px 100%, #000 96%, transparent 100%);
+              mask-image: radial-gradient(7px 8px at 7px 100%, #000 96%, transparent 100%);
+      -webkit-mask-size: 18px 10px; mask-size: 18px 10px;
+      -webkit-mask-repeat: repeat-x; mask-repeat: repeat-x;
+      filter: drop-shadow(0 1px 2px rgba(120,200,235,0.4));
+    }
+    .term-bar::after {             /* icicles hanging from the title bar into the body */
+      content: ""; position: absolute; left: 0; right: 0; bottom: -13px; height: 17px;
+      pointer-events: none; z-index: 4;
+      background: linear-gradient(180deg, rgba(225,247,255,0.9), rgba(120,200,235,0.1));
+      -webkit-mask-image: radial-gradient(5px 17px at 5px 0, #000 94%, transparent 100%);
+              mask-image: radial-gradient(5px 17px at 5px 0, #000 94%, transparent 100%);
+      -webkit-mask-size: 23px 17px; mask-size: 23px 17px;
+      -webkit-mask-repeat: repeat-x; mask-repeat: repeat-x;
+      filter: drop-shadow(0 2px 3px rgba(120,200,235,0.35));
+      animation: frost-drip 7.5s ease-in-out infinite;
+    }
+    /* Give the terminal title bar a cold, frosted tint. */
+    .terminal .term-bar {
+      background: linear-gradient(180deg, #16252d, #101a20);
+      border-bottom-color: rgba(150,220,245,0.28);
+      box-shadow: inset 0 1px 0 rgba(220,245,255,0.16);
+    }
+
+    /* Calm everything down for users who prefer reduced motion: keep the
+       frost, drop the drip animation. */
+    @media (prefers-reduced-motion: reduce) {
+      .frost-ice::after,
+      header.nav::after,
+      .btn::after,
+      .term-bar::after { animation: none; }
+    }
+    /* ── COOLDOWN-LAUNCH FROST-ON-ELEMENTS END ── */
     /* ── COOLDOWN-LAUNCH END (CSS) ── */
   </style>
 </head>
