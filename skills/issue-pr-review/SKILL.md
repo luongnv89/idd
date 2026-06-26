@@ -302,7 +302,7 @@ Agent(
 )
 ```
 
-Pass `{branch_name}`, `{base_branch}`, `{pr_context}`, and `{diff_command}` (`gh pr diff {N}`). Merge UI reviewer findings into the code reviewer findings — both use the same `action: "fix" | "note"` semantics, so they flow into Step 6 unchanged.
+Pass `{branch_name}`, `{base_branch}`, `{pr_context}` (PR title + body), `{issue_context}` (the linked issue title/body + acceptance criteria, or empty if none), and `{diff_command}` (`gh pr diff {N}`). Merge UI reviewer findings into the code reviewer findings — both use the same `action: "fix" | "note"` semantics, so they flow into Step 6 unchanged.
 
 For cycle reuse, cycles 2+ re-message the existing UI reviewer via `SendMessage`:
 ```

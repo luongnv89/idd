@@ -423,7 +423,7 @@ Agent(
 )
 ```
 
-Pass `{branch_name}`, `{base_branch}`, `{issue_context}`, and `{diff_command}` (`git diff origin/${base}...HEAD`). Merge UI reviewer findings into the QA findings — both use the same `action: "fix" | "note"` semantics, so they flow into the fixer loop unchanged.
+Pass `{branch_name}`, `{base_branch}`, `{issue_context}` (the linked issue title/body + acceptance criteria), `{pr_context}` (empty — no PR exists yet at QA time), and `{diff_command}` (`git diff origin/${base}...HEAD`). Merge UI reviewer findings into the QA findings — both use the same `action: "fix" | "note"` semantics, so they flow into the fixer loop unchanged.
 
 #### Browser-based review (optional, gated)
 

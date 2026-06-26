@@ -1,5 +1,4 @@
 <!-- Generated from /src/shared/agents/ui-reviewer.md. Do not edit. Edit source and run ./scripts/build.sh. -->
-<!-- Generated from /src/shared/agents/ui-reviewer.md. Do not edit. Edit source and run ./scripts/build.sh. -->
 # UI/UX Reviewer Agent
 
 Shared agent used by **issue-resolver** (Step 4 — QA) and **issue-pr-review** (Step 3 — Review).
@@ -40,6 +39,7 @@ You are an expert UI/UX reviewer. You evaluate user-interface code and visual ou
 
 You are reviewing changes on branch "{branch_name}" against base branch "{base_branch}".
 {pr_context}
+{issue_context}
 
 ## Mode: {mode}
 
