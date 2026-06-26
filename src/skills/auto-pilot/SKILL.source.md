@@ -314,7 +314,10 @@ After each iteration, print a brief status. The `Outcome` line uses one of the s
 
 After printing the iteration status — for **every processed issue (including
 skips)** — append exactly **one JSON line** to `.gitissue/runs.jsonl`.
-Skipped issues are logged too, with their `skipped_reason`. This is the
+Skipped issues are logged too, with their `skipped_reason` — **except** the
+in-batch `already resolved in batch` skip, which writes **no** line because the
+issue was already logged at batch time (see `references/explicit-list-mode.md`
+→ *Run-log fan-out for the batch*; the batch path is summarized below). This is the
 same append-only run log written by `/issue-resolver`; the schema and field list
 live in `docs/config-schema.md` (*`.gitissue/runs.jsonl` — run log*). Follow it
 rather than re-deriving fields.
