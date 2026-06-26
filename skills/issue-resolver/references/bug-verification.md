@@ -101,11 +101,14 @@ the durable artifacts, with the local-cache JSON as an optional mirror:
    This is the always-present home — the resolver writes the PR body whether or not a
    prior `/issue-analysis` ran. Under squash-merge it carries into git history.
 
-3. **Optional cache mirror.** If a fresh `.gitissue/analysis-<N>.json` exists, its
-   `decision_record.reproduction` field carries the same data (written by `/issue-analysis`,
-   which owns that schema). The resolver **lifts** that field when present but does
-   **not** create or write the cache file itself — the JSON is deletable local cache,
-   not the home of project memory.
+3. **Optional cache mirror.** The `decision_record.reproduction` field in
+   `.gitissue/analysis-<N>.json` is defined in `/issue-analysis`'s output schema
+   (`references/output-and-persist.md`) so the two skills agree on its shape, but it is
+   usually empty: `/issue-analysis` is read-only and runs *before* the fix, so it cannot
+   produce the post-fix `regression_test` proof. The resolver **lifts** the field on the
+   rare occasion a prior analysis recorded a red repro, but it does **not** create or
+   write the cache file itself — the JSON is deletable local cache, not the home of
+   project memory, and the PR body (above) is the always-present durable home.
 
 ## Auto mode never blocks
 

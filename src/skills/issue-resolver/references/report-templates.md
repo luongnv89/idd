@@ -60,7 +60,7 @@ The PR title follows `{type}({scope}): {description} (#{issue_number})` — see 
 
 If a fresh `.gitissue/analysis-<N>.json` exists for this issue, lift its `decision_record` and `git_state` blocks directly into the *Decision Record* section above. Field labels are stable across `/issue-analysis`, `/issue-resolver`, and `/issue-pr-review` because downstream presence checks are string-matched — do not rename them.
 
-If no analysis JSON exists (e.g., resolver was invoked without prior analysis), synthesize the same five fields from the resolver's own Step 1 (Research) and Step 2 (Plan) findings, and use the synced base SHA as `commit_sha_short`. Either source produces the same template — what matters is that the durable analysis signal lands in the PR body, where squash-merge will carry it into git history.
+If no analysis JSON exists (e.g., resolver was invoked without prior analysis), synthesize the same five core fields from the resolver's own Step 1 (Research) and Step 2 (Plan) findings, and use the synced base SHA as `commit_sha_short`. (For bug issues the sixth `Reproduction` line is added separately from the implementer's returned reproduction block — see the bug-verification checkpoint, not the analysis JSON.) Either source produces the same template — what matters is that the durable analysis signal lands in the PR body, where squash-merge will carry it into git history.
 
 ## Final Report — Successful Resolution
 

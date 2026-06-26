@@ -371,7 +371,7 @@ This is a warning, not a fatal error — the terminal output from Step 6 was alr
 }
 ```
 
-The `reproduction` object is **optional** and present only for `type: bug` issues — omit it for feature/improvement issues. It mirrors the red-capable verification evidence that `/issue-resolver` produces at its Step 3 bug-verification checkpoint. When present, `/issue-resolver` lifts it into the PR Decision Record and acceptance table alongside the other `decision_record` fields. `status` is `red` (reproduced and failing for the stated reason) or `not_reproduced` (could not be made red).
+The `reproduction` object is **optional** and present only for `type: bug` issues — omit it for feature/improvement issues. This schema defines its shape so both skills agree on it, but `/issue-analysis` does not itself populate it: it is read-only and runs *before* the fix, so it cannot produce the post-fix `regression_test` proof. The evidence is produced by `/issue-resolver` at its Step 3 bug-verification checkpoint; this field is the optional cache mirror it lifts into the PR Decision Record and acceptance table when present (the PR body is the always-present durable home). `status` is `red` (reproduced and failing for the stated reason) or `not_reproduced` (could not be made red).
 
 ### Schema field reference
 
