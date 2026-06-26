@@ -411,13 +411,19 @@
     .shots-nav.prev { left: 12px; }
     .shots-nav.next { right: 12px; }
     /* Dots */
-    .shots-dots { display: flex; justify-content: center; gap: 10px; margin-top: 22px; }
+    .shots-dots { display: flex; justify-content: center; gap: 2px; margin-top: 22px; }
     .shots-dots button {
-      width: 9px; height: 9px; border-radius: 50%; padding: 0;
-      border: 1px solid var(--fg-dim); background: transparent;
-      cursor: pointer; transition: all .15s;
+      width: 28px; height: 28px; padding: 0;
+      border: 0; background: transparent;
+      display: grid; place-items: center;
+      cursor: pointer;
     }
-    .shots-dots button.active { background: var(--green); border-color: var(--green); box-shadow: 0 0 10px var(--green-glow); }
+    .shots-dots button::before {
+      content: ''; width: 9px; height: 9px; border-radius: 50%;
+      border: 1px solid var(--fg-dim); background: transparent;
+      transition: all .15s;
+    }
+    .shots-dots button.active::before { background: var(--green); border-color: var(--green); box-shadow: 0 0 10px var(--green-glow); }
     @media (max-width: 560px) {
       .shots-nav { width: 38px; height: 38px; font-size: 16px; }
       .shot .shot-frame, .shot img { max-height: 320px; }
