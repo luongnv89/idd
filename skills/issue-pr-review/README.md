@@ -13,7 +13,7 @@
 - Runs the project's real test suite, not mocks
 - Monitors CI status and waits for green before merging
 - Auto-merge in `--auto` mode (used by `/auto-pilot`); read-only mode available
-- Five-dimension review output — correctness, acceptance_criteria, traceability, maintainability, safety — so a PR can pass tests and still be flagged for missing issue links or unmet acceptance criteria
+- Five-dimension review output — correctness, acceptance_criteria, traceability, maintainability, safety — grouped under two axes (**Spec**: does it satisfy the acceptance criteria? · **Standards**: does it follow project conventions?) so clean-but-wrong and correct-but-ugly stay separate, and a PR can pass tests yet still be flagged for missing issue links or unmet acceptance criteria
 - Per-criterion acceptance-criteria verification (`pass` / `fail` / `unverified` with evidence) against the linked issue
 - Soft-pass when zero "fix" issues remain, with **hard blocks** on `traceability: fail` (missing `Closes #N`) and any `acceptance_criteria: fail` — green tests do not override these
 - Refactor/chore PRs (matching `review.traceability_exempt_labels` or `review.traceability_exempt_pattern`) are exempt from the `Closes #N` hard-fail; the other three traceability checks still run

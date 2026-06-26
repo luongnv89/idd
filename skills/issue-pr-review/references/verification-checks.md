@@ -21,6 +21,21 @@ A separate, narrower opt-out exists for refactor/chore PRs (see *Refactor/chore 
 
 The five user-facing dimensions and the fixed mapping from reviewer categories live in SKILL.md (*Dimensional review output*). The reviewer's JSON output partitions findings by its own categories; this skill aggregates them: `correctness` → `correctness`; `code_quality` + `test_coverage` → `maintainability`; `security` + `edge_cases` → `safety`. The remaining two dimensions (`acceptance_criteria`, `traceability`) are produced by the checks below. Each dimension's status: any `action: fix` finding → ✗ `fail`; only `action: note` findings → ⚠ `partial`; no findings → ✓ `pass`.
 
+## Two-axis grouping — Spec vs Standards
+
+The five dimensions are reported under **two named axes** that separate *does the PR do the right thing* from *does the PR follow our conventions*. A clean implementation of the wrong thing should not hide behind good style, and correct behavior should not be blocked by a convention nit — so the axes are reported separately. (Matt Pocock's two-axis review framing; plan reference P4.)
+
+| Axis | Question | Dimensions grouped under it |
+|------|----------|------------------------------|
+| **Spec axis** | Does the PR satisfy the issue's acceptance criteria — does it do the right thing? | `acceptance_criteria`, `correctness`, `safety` |
+| **Standards axis** | Does the PR follow documented project conventions? | `traceability`, `maintainability` |
+
+Rationale for the split: `acceptance_criteria` is the literal Spec contract; `correctness` is "does the implementation actually do the right thing"; `safety` (security, crash paths, edge cases) is correctness-of-behavior, so it sits on Spec, not on convention conformance. `traceability` (`Closes #N`, Decision Record, commit references) and `maintainability` (code quality, test coverage, style, a11y/interaction conventions) are conformance to documented project conventions, so they sit on Standards.
+
+**The axes are a presentation grouping only — they change nothing about analysis or gating.** The same findings, the same `action: "fix" | "note"` semantics, the same per-dimension `pass`/`partial`/`fail` status rules, and the same hard-block conditions apply unchanged. In particular the soft-pass gate is still computed per dimension (`acceptance_criteria: fail` and a missing `Closes #N` are the only hard-blocks); it is **not** recomputed as "Spec axis fail" or "Standards axis fail". Do not derive a per-axis verdict that gates the loop — the axis headers organize the report, the per-dimension statuses gate the pass.
+
+When the verification gates disable a dimension (`review.require_acceptance_criteria_check: false` or `review.require_traceability_check: false`), that dimension still appears under its axis, reported as `pass — verification disabled`. A disabled dimension never changes which axis the others sit under.
+
 ## Acceptance-criteria verification (per criterion)
 
 > Run only when `review.require_acceptance_criteria_check` is `true`. When `false`, skip this entire subsection and emit `○ acceptance_criteria: pass — verification disabled (review.require_acceptance_criteria_check: false)`.

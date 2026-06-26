@@ -327,6 +327,78 @@ else
 fi
 
 # ───────────────────────────────────────────────────────────
+# T10: Two-axis grouping (issue #142). Findings are grouped under a
+# Spec axis (acceptance criteria — does it do the right thing?) and a
+# Standards axis (project conventions). This is a presentation reframe:
+# the five dimension names (asserted in T1) must still all appear, and
+# the gating (fix/note, hard-blocks) must remain per-dimension, not
+# per-axis.
+# ───────────────────────────────────────────────────────────
+# The SKILL spec corpus (SKILL.source.md + verification-checks.md) must
+# name both axes.
+if grep -qiE 'Spec axis' "${SKILL_SPEC[@]}"; then
+  pass "T10.AC1: SKILL spec names the Spec axis"
+else
+  fail "T10.AC1: SKILL spec does not name the Spec axis"
+fi
+if grep -qiE 'Standards axis' "${SKILL_SPEC[@]}"; then
+  pass "T10.AC1: SKILL spec names the Standards axis"
+else
+  fail "T10.AC1: SKILL spec does not name the Standards axis"
+fi
+
+# The report templates must render both axis headers (AC6: templates
+# reflect the two-axis grouping).
+if grep -qiE 'Spec axis' "$TEMPLATES"; then
+  pass "T10.AC6: report-templates.md renders the Spec axis header"
+else
+  fail "T10.AC6: report-templates.md missing Spec axis header"
+fi
+if grep -qiE 'Standards axis' "$TEMPLATES"; then
+  pass "T10.AC6: report-templates.md renders the Standards axis header"
+else
+  fail "T10.AC6: report-templates.md missing Standards axis header"
+fi
+
+# AC2: the Spec axis maps to the issue's acceptance criteria — the
+# acceptance_criteria dimension must sit under the Spec axis. Verify the
+# mapping table in verification-checks.md groups acceptance_criteria with
+# the Spec axis.
+if grep -qiE 'Spec axis.*acceptance_criteria|acceptance_criteria.*Spec axis' "$VERIFICATION_CHECKS"; then
+  pass "T10.AC2: Spec axis maps to acceptance_criteria"
+else
+  fail "T10.AC2: Spec axis not mapped to acceptance_criteria"
+fi
+
+# AC3: the Standards axis maps to documented project conventions —
+# traceability (Closes #N, Decision Record) must sit under it.
+if grep -qiE 'Standards axis.*traceability|traceability.*Standards axis' "$VERIFICATION_CHECKS"; then
+  pass "T10.AC3: Standards axis maps to traceability"
+else
+  fail "T10.AC3: Standards axis not mapped to traceability"
+fi
+
+# AC4/AC5: gating and fix/note semantics unchanged — the spec must say
+# the axes are a presentation grouping that does NOT introduce a
+# per-axis verdict (gating stays per-dimension).
+if grep -qiE 'presentation grouping|per.dimension.*gat|gat.*per.dimension|no per.axis verdict|not.*recomputed as' "${SKILL_SPEC[@]}"; then
+  pass "T10.AC4: spec states gating stays per-dimension (no per-axis verdict)"
+else
+  fail "T10.AC4: spec does not clarify gating stays per-dimension"
+fi
+
+# All five dimension names must still appear in the templates after the
+# reframe (regression guard — the reframe groups, it does not drop
+# dimensions). This re-asserts T1's invariant post-grouping.
+for dim in correctness acceptance_criteria traceability maintainability safety; do
+  if grep -qF "$dim" "$TEMPLATES"; then
+    pass "T10: dimension '$dim' still present under axis grouping"
+  else
+    fail "T10: dimension '$dim' lost in axis grouping"
+  fi
+done
+
+# ───────────────────────────────────────────────────────────
 # Summary
 # ───────────────────────────────────────────────────────────
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"

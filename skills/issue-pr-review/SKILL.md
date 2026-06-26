@@ -5,7 +5,7 @@ license: MIT
 compatibility: "Requires git and GitHub CLI (gh) with authentication. Self-contained — uses shared agents from shared/agents/."
 effort: high
 metadata:
-  version: 2.0.0
+  version: 2.1.0
   author: Luong NGUYEN <luongnv89@gmail.com>
 ---
 
@@ -343,7 +343,8 @@ When all hold, capture screenshots at mobile/tablet/desktop viewports and spawn 
 Also fetch the linked issue for acceptance-criteria verification: `gh issue view {linked_issue} --json number,title,body,labels`.
 
 ```
-[3/7] Review       ✓ correctness:pass  ac:pass  trace:pass  maint:partial  safety:pass
+[3/7] Review       ✓ spec[ac:pass correctness:pass safety:pass]
+                     standards[trace:pass maint:partial]
                      {fixable_count} fixable, {note_count} noted
 ```
 
@@ -371,6 +372,8 @@ Step 3 produces a single review verdict organized into **five dimensions**. The 
 A UI `action: "fix"` finding makes `maintainability` report at least `partial` and contributes a fixable issue to Step 6 (`category: ui_ux`), so the dimensional verdict never shows all-pass while UI fixables remain.
 
 Each dimension reports `pass`, `partial`, or `fail`. A PR can pass tests and still fail on `traceability` or `acceptance_criteria` — those dimensions are not gated by test results.
+
+The five dimensions are grouped under **two named axes** in the report — a **Spec axis** (does the PR satisfy the issue's acceptance criteria — does it do the right thing?: `acceptance_criteria`, `correctness`, `safety`) and a **Standards axis** (does the PR follow documented project conventions?: `traceability`, `maintainability`). This is a presentation grouping that keeps "clean-but-wrong" and "correct-but-ugly" from being conflated; it changes nothing about analysis, the `fix`/`note` semantics, the per-dimension status rules, or the gating below. The soft-pass gate stays per-dimension — there is no per-axis verdict. The full mapping and rationale are in `references/verification-checks.md` (*Two-axis grouping — Spec vs Standards*).
 
 ### Verification gates and the AC + traceability checks
 
