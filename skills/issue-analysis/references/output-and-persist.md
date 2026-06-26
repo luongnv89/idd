@@ -360,10 +360,18 @@ This is a warning, not a fatal error — the terminal output from Step 6 was alr
       "name": "Balanced refactor",
       "summary": "One-sentence description of the chosen approach."
     },
-    "residual_risk": "What remains uncertain after the fix lands, or 'none identified'."
+    "residual_risk": "What remains uncertain after the fix lands, or 'none identified'.",
+    "reproduction": {
+      "command": "Exact command/test that reproduces the symptom (bug issues only).",
+      "status": "red",
+      "stated_reason_match": "The failing line/message that matches the issue symptom.",
+      "regression_test": "Path of the regression test, or 'manual — no seam'."
+    }
   }
 }
 ```
+
+The `reproduction` object is **optional** and present only for `type: bug` issues — omit it for feature/improvement issues. It mirrors the red-capable verification evidence that `/issue-resolver` produces at its Step 3 bug-verification checkpoint (`src/skills/issue-resolver/references/bug-verification.md`). When present, `/issue-resolver` lifts it into the PR Decision Record and acceptance table alongside the other `decision_record` fields. `status` is `red` (reproduced and failing for the stated reason) or `not_reproduced` (could not be made red).
 
 ### Schema field reference
 
@@ -460,4 +468,9 @@ This is a warning, not a fatal error — the terminal output from Step 6 was alr
 | `decision_record.selected_option.name` | string | Option name |
 | `decision_record.selected_option.summary` | string | One-sentence description of the chosen approach |
 | `decision_record.residual_risk` | string | What remains uncertain or accepted as a known limitation; `"none identified"` if empty |
+| `decision_record.reproduction` | object | **Bug issues only** (omit otherwise). Red-capable verification evidence mirrored from the resolver's bug-verification checkpoint |
+| `decision_record.reproduction.command` | string | Exact command/test that reproduces the symptom |
+| `decision_record.reproduction.status` | string | `"red"` (reproduced, failing for the stated reason) or `"not_reproduced"` |
+| `decision_record.reproduction.stated_reason_match` | string | The failing line/message matching the issue symptom |
+| `decision_record.reproduction.regression_test` | string | Path of the regression test, or `"manual — no seam"` |
 
