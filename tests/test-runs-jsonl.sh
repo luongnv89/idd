@@ -173,6 +173,13 @@ has "$EXPLICIT" "issues_resolved" "T7: per-issue outcome derives from issues_res
 has "$EXPLICIT" "double-count this fix removes" "T7: spec guards the re-resolve double-count"
 has "$EXPLICIT" "individual" "T7: failed/partial batch issues re-resolved (and logged) individually"
 has "$CONFIG"   "no inverse under-count" "T7: config-schema documents no inverse under-count"
+# (d.0) Discriminates the batch-TIME write rule: an unresolved attempted issue is
+#       NEVER written a 'failed' line at batch time (it is re-queued and logged at
+#       its retry). Without this, prose that says "iterate the attempted set, absent
+#       -> failed" at batch time would reintroduce the exact per-issue double-count
+#       this fix removes — and the looser greps above would still pass.
+has "$EXPLICIT" "written a \`failed\` line at batch time" "T7: spec forbids a 'failed' batch-time line for unresolved issues"
+has "$CONFIG"   "No \`failed\` line is written at batch" "T7: config-schema forbids a 'failed' batch-time line"
 # (d.1) The spawn-position (primary) unresolved issue MUST be re-queued, else it is
 #       dropped (zero lines) — the inverse under-count criterion 5 forbids. This is
 #       the subtle hole: the primary's optimized_order slot is already consumed.

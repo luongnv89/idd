@@ -573,9 +573,12 @@ returns its telemetry, and `/auto-pilot` writes the lines. Because "one line per
 **processed issue**" — not per PR — is the contract, `/auto-pilot` **fans the one
 batch result out into one line per attempted issue** (the set sent into the Batch
 Resolver, *not* the success-only `issues_resolved`, or a failed batch would drop
-fully-attempted issues). Each line's `outcome` comes from `issues_resolved`
-(attempted-and-resolved → success outcome; attempted-but-absent → `failed`); the
-shared `pr` and `complexity` go on every line, while the batch-scalar `qa_cycles`
+fully-attempted issues). The fan-out is *across the run*, not all-at-batch-time:
+at batch time `/auto-pilot` writes a line only for the issues **in**
+`issues_resolved` (their `outcome` is the success outcome — `merged`/`left_open`),
+and re-queues the rest so each unresolved attempted issue gets its one line at its
+individual retry (which sets *its* `outcome`). No `failed` line is written at batch
+time. The shared `pr` and `complexity` go on every line, while the batch-scalar `qa_cycles`
 and `duration_s` are attributed to **one line only** (the primary issue's) so a
 batch is not weighted N-fold in `/idd-doctor`'s medians. On a partial/failed batch,
 `/auto-pilot` writes a line only for the resolved issues now and **re-queues every

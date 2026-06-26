@@ -210,22 +210,31 @@ The Batch Resolver runs with `--no-run-log` (see *Batch Resolver Subagent* in
 it does **not** append to `.gitissue/runs.jsonl` itself. Auto-pilot is the single
 writer here too. But a batch resolves N issues in one PR, and the single-writer
 contract is **one line per processed (attempted) issue**, not one line per PR or
-per batch. So auto-pilot must **fan the one returned result out into N lines** —
-one for every issue in the **attempted set** (the issue numbers sent into the
-Batch Resolver — what `batch_map` holds when the batch is spawned), keyed on that
-attempted set and **never** on `issues_resolved` (success-only — keying there
-would drop fully-processed-but-failed issues, the inverse under-count #156/#158
-exist to kill).
+per batch. So auto-pilot must **fan the one returned result out** so that — **across the whole
+auto-pilot run** — every issue in the **attempted set** (the issue numbers sent into
+the Batch Resolver — what `batch_map` holds when the batch is spawned) ends with
+exactly one line. The across-run invariant is keyed on the attempted set and
+**never** on `issues_resolved` (success-only — keying the invariant there would drop
+fully-processed-but-failed issues, the inverse under-count #156/#158 exist to kill).
+
+That across-run invariant is **not** "write all N lines at batch time." The
+batch-time write is split by disposition (see *Write exactly the issues whose
+terminal disposition is this batch* below): at batch time auto-pilot writes a line
+**only** for the issues in `issues_resolved`; every unresolved attempted issue is
+re-queued and gets its one line later, at its individual retry. So `issues_resolved`
+membership **does** decide whether a *batch-time* line is written — it is the
+attempted set, fanned out over time (batch line now if resolved here, individual
+line later if not), that satisfies the per-attempted-issue invariant.
 
 Build each line from `references/docs/config-schema.md` (*`.gitissue/runs.jsonl` — run log*)
 with these batch attributions:
 
-- **One line per attempted issue.** Iterate the attempted set, not `issues_resolved`.
-- **Per-issue `outcome` from `issues_resolved`.** An attempted issue **in**
-  `issues_resolved` gets the success-class outcome (`merged` when the batch PR
-  merged this iteration, else `left_open`); an attempted issue **absent** from
-  `issues_resolved` gets `failed`. (`issues_resolved` sets the per-issue outcome
-  only — it never decides *whether* a line is written.)
+- **Per-issue `outcome` from `issues_resolved`.** An attempted issue resolved in the
+  batch gets the success-class outcome on its batch-time line (`merged` when the
+  batch PR merged this iteration, else `left_open`). An attempted issue **absent**
+  from `issues_resolved` is **not** written a `failed` line at batch time — it is
+  re-queued, and its individual retry sets its outcome. (`issues_resolved` sets the
+  per-issue outcome and, at batch time, also decides *whether* a line is written.)
 - **Shared fields on every line:** the batch `pr` (the one PR number) and
   `complexity` go on all N lines.
 - **Scalar telemetry attributed once.** `qa_cycles` and `duration_s` describe the

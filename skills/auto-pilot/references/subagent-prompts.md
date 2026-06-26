@@ -193,8 +193,10 @@ When done, report back ONLY these fields:
 - pr_number: the PR number (if created)
 - pr_url: the PR URL (if created)
 - issues_resolved: array of issue numbers successfully addressed — auto-pilot uses
-  this to set each fanned-out run-log line's per-issue `outcome` (attempted issues
-  in it get the success outcome; attempted issues absent from it get `failed`)
+  this to decide each attempted issue's run-log line: an issue in it gets a
+  success-outcome line at batch time; an issue absent from it is re-queued and gets
+  its line (with its own outcome) at its individual retry, NOT a `failed` line at
+  batch time
 - files_changed: count of files modified
 - tests_written: count of new tests written (unit + integration + e2e)
 - tests_passed: count of tests passed
