@@ -24,6 +24,7 @@ Closes #{issue_number}
 - **Options rejected:** Option 1 — {one-line reason}; Option 3 — {reason}
 - **Selected option:** Option {N} — {name}
 - **Residual risk:** {what remains uncertain or accepted as known limitation, or "none identified"}
+- **Design-confirm:** {high-complexity issues only — "confirmed Option {N} at design-confirm checkpoint (complexity: {level})" in interactive mode, or "auto-selected Option {N} (complexity: {level})" in auto mode; omit this line for trivial/low/medium complexity}
 - **Reproduction:** {bug issues only — `<command>` confirmed red for the stated reason → regression test `<path>` (or "manual — no seam"); omit this line for non-bug issues}
 
 Analyzed at: `{branch} @ {commit_sha_short}` ({YYYY-MM-DD})
