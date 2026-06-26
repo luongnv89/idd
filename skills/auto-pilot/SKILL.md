@@ -310,6 +310,31 @@ After each iteration, print a brief status. The `Outcome` line uses one of the s
   Remaining: {remaining} eligible issues
 ```
 
+### Run-log entry (monitoring)
+
+After printing the iteration status — for **every processed issue (including
+skips)** — append exactly **one JSON line** to `.gitissue/runs.jsonl`.
+Skipped issues are logged too, with their `skipped_reason`. This is the
+same append-only run log written by `/issue-resolver`; the schema and field list
+live in `references/docs/config-schema.md` (*`.gitissue/runs.jsonl` — run log*). Follow it
+rather than re-deriving fields.
+
+Populate from the iteration's known values: `ts` (current UTC, ISO 8601), `issue`
+(the number), `mode` (the auto-pilot merge mode — `conservative` / `balanced` /
+`aggressive`), `skill` (`auto-pilot`), `outcome` (one of the six categorical
+labels), `pr` (the PR number when one was created, else `null`), and
+`duration_s` when measurable. **When the outcome is `skipped`, always include
+`skipped_reason`** (e.g. `already_resolved`, `blocked_label`,
+`blocked_by_dependency`, `in_skip_list`, `assigned_to_other`).
+
+```bash
+mkdir -p .gitissue
+printf '%s\n' "$run_json" >> .gitissue/runs.jsonl
+```
+
+The write is **best-effort and non-fatal** — a failed append never stops the
+loop or changes the iteration outcome. Append only; never rewrite prior lines.
+
 Then loop back to Phase 1.
 
 ---

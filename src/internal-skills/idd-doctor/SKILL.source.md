@@ -25,7 +25,11 @@ Run a report-only health check on an IDD repository. Surfaces doc drift on the i
 
 ## Scope (v1)
 
-The doctor performs exactly four checks. Anything beyond these is **out of scope**:
+The doctor performs exactly four **gating checks** (each can PASS / WARN / FAIL).
+After the checks it also prints one **informational, non-gating** section — the
+*run-log summary* — that reports `.gitissue/runs.jsonl` telemetry but never
+affects the PASS/WARN/FAIL result. Anything beyond the four checks and this
+summary is **out of scope**:
 
 | # | Check | What it verifies | Failure mode |
 |---|-------|-----------------|--------------|
@@ -81,7 +85,7 @@ If `.gitissue.yml` does **not** exist, Check 3 is skipped with an `○ no .gitis
 
 ## Pipeline
 
-The doctor executes the four checks in order, prints one line per check, then a summary footer. Checks never short-circuit — every check runs even after a `FAIL`, so the operator sees the full picture in one pass.
+The doctor executes the four checks in order, prints one line per check, then a summary footer, then an informational run-log summary (see *Run-log summary*). Checks never short-circuit — every check runs even after a `FAIL`, so the operator sees the full picture in one pass.
 
 ```
   ◆ /idd-doctor — health check
@@ -315,6 +319,62 @@ If any check failed, append a one-line hint:
 
 ---
 
+## Run-log summary (informational, non-gating)
+
+After the summary footer, print a short **run-log summary** over the last N runs
+recorded in `.gitissue/runs.jsonl`. This surfaces the cross-run `monitoring`
+signal (resolve rate, QA effort, recurring skip reasons) that the per-run output
+otherwise forgets. It is **informational only** — it never changes the
+PASS/WARN/FAIL result, has no exit code, and (like every part of this skill) is
+strictly **read-only**: it reads `runs.jsonl` and writes nothing.
+
+The run-log schema is defined in `docs/config-schema.md` (*`.gitissue/runs.jsonl`
+— run log*): one JSON object per line, with at least `ts`, `issue`, `mode`,
+`outcome`, and `pr`, plus optional `qa_cycles` and `skipped_reason`.
+
+### Procedure
+
+1. If `.gitissue/runs.jsonl` does **not** exist or is empty, **degrade gracefully**
+   — print `○ Run-log summary           no runs recorded yet (.gitissue/runs.jsonl)`
+   and stop the section. Absence is never a failure.
+2. Otherwise read the file and take the **last N** lines (default `N = 50`).
+   Tolerate malformed lines: silently skip any line that is not valid JSON rather
+   than aborting the summary.
+3. Compute, over the parsed runs:
+   - **Resolve rate** — share of runs whose `outcome` indicates a delivered
+     resolution. Count `success` (resolver) and `merged` (auto-pilot) as resolved;
+     report as `resolved / total` plus a percentage.
+   - **Median QA cycles** — median of the `qa_cycles` field across runs that
+     carry it (omit runs without the field). Report `n/a` if none carry it.
+   - **Common skip reasons** — the top few `skipped_reason` values by frequency
+     among `skipped` / `already_resolved` runs, each with its count.
+4. Print the section using DESIGN.md symbols.
+
+### Output
+
+```
+    ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+    ○ Run-log summary           last {n} of {total} runs
+        Resolve rate:    {resolved}/{n} ({pct}%)
+        Median QA cycles: {median}
+        Top skip reasons: {reason1} ({c1}), {reason2} ({c2})
+```
+
+When no runs have been recorded, the single graceful-degradation line replaces the
+block:
+
+```
+    ○ Run-log summary           no runs recorded yet (.gitissue/runs.jsonl)
+```
+
+A read heuristic for steps 1–3 (no new dependency — `tail` + a JSON-aware pass):
+
+```bash
+[ -s .gitissue/runs.jsonl ] && tail -n 50 .gitissue/runs.jsonl
+```
+
+---
+
 ## Read-only guarantee
 
 The skill MUST NOT modify any file in the repo, create branches or commits, open issues or PRs, or mutate `.gitissue.yml` or any config file. In detail, the skill is forbidden to:
@@ -343,6 +403,7 @@ The test suite covers:
 7. The skip behavior for missing `gh`, missing `.gitissue.yml`, and missing template directories is documented
 8. The exit-code mapping (PASS=0, WARN=0, FAIL=1) is documented
 9. The fix hint format is documented for both Check 3 and Check 4
+10. The run-log summary is documented as informational/non-gating, reads `.gitissue/runs.jsonl`, degrades gracefully when the file is absent, and reports resolve rate, median QA cycles, and common skip reasons
 
 Run with:
 

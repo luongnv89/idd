@@ -508,6 +508,31 @@ After delivery:
 [5/5] Deliver      ✓ PR #{pr_number} created
 ```
 
+### Run-log entry (monitoring)
+
+At **every terminal outcome** of the pipeline — a delivered PR (`success`), an
+early exit because the issue was already fixed (`already_resolved`), or a failed
+step (`failed`) — append exactly **one JSON line** to `.gitissue/runs.jsonl` so
+the run leaves a persistent, cross-run telemetry signal. The schema and field
+list are defined once in `references/docs/config-schema.md` (*`.gitissue/runs.jsonl` — run
+log*); follow it rather than re-deriving fields here.
+
+Build the object from values already known at this point: `ts` (current UTC time,
+ISO 8601), `issue` (N), `mode` (`auto` when `--auto`/`IDD_AUTO_MODE=1`, else
+`interactive`), `skill` (`issue-resolver`), `outcome`, `pr` (the new PR number or
+`null`), plus the optional `complexity` (from Step 1), `qa_cycles` (from Step 4),
+`duration_s` (pipeline wall time when measurable), and `skipped_reason` (for
+`already_resolved`, set it to `already_resolved`).
+
+```bash
+mkdir -p .gitissue
+printf '%s\n' "$run_json" >> .gitissue/runs.jsonl
+```
+
+This write is **best-effort and non-fatal**: if it fails, report the run result
+normally — never fail or block a run because the run log could not be written.
+Do not rewrite or reorder existing lines; only append.
+
 ---
 
 ## Final Report
