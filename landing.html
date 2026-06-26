@@ -686,23 +686,32 @@
     }
     /* Snow ridge on the top edge — scalloped white cap with a cool tint. */
     .frost-snow::before {
-      top: -6px; height: 11px;
-      background: linear-gradient(180deg, #ffffff 0%, #eaf8ff 55%, rgba(200,238,255,0.85) 100%);
-      -webkit-mask-image: radial-gradient(7px 9px at 7px 100%, #000 96%, transparent 100%);
-              mask-image: radial-gradient(7px 9px at 7px 100%, #000 96%, transparent 100%);
-      -webkit-mask-size: 16px 11px; mask-size: 16px 11px;
+      top: -6px; height: 10px;
+      background: linear-gradient(180deg, #ffffff 0%, #f1fbff 50%, rgba(206,240,255,0.85) 100%);
+      -webkit-mask-image:
+        radial-gradient(9px 8px at 9px 100%, #000 92%, transparent 100%),
+        radial-gradient(6px 6px at 23px 100%, #000 92%, transparent 100%);
+              mask-image:
+        radial-gradient(9px 8px at 9px 100%, #000 92%, transparent 100%),
+        radial-gradient(6px 6px at 23px 100%, #000 92%, transparent 100%);
+      -webkit-mask-size: 28px 10px; mask-size: 28px 10px;
       -webkit-mask-repeat: repeat-x; mask-repeat: repeat-x;
-      filter: drop-shadow(0 1px 2px rgba(120,200,235,0.45));
+      filter: blur(0.4px) drop-shadow(0 1px 2px rgba(120,200,235,0.4));
     }
-    /* Icicle / water drips hanging from the bottom edge. */
+    /* Icicle / water drips hanging from the bottom edge — short, tapered to a
+       point, glassy, with alternating long/short tips for a natural ragged line. */
     .frost-ice::after {
-      bottom: -11px; height: 15px;
-      background: linear-gradient(180deg, rgba(225,247,255,0.95) 0%, rgba(159,232,255,0.6) 60%, rgba(120,200,235,0.15) 100%);
-      -webkit-mask-image: radial-gradient(6px 15px at 6px 0, #000 94%, transparent 100%);
-              mask-image: radial-gradient(6px 15px at 6px 0, #000 94%, transparent 100%);
-      -webkit-mask-size: 19px 15px; mask-size: 19px 15px;
+      bottom: -9px; height: 10px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(214,243,255,0.8) 30%, rgba(159,232,255,0.45) 72%, rgba(120,200,235,0.1) 100%);
+      -webkit-mask-image:
+        radial-gradient(3.5px 10px at 5px 0, #000 55%, transparent 100%),
+        radial-gradient(2.5px 6px at 14px 0, #000 55%, transparent 100%);
+              mask-image:
+        radial-gradient(3.5px 10px at 5px 0, #000 55%, transparent 100%),
+        radial-gradient(2.5px 6px at 14px 0, #000 55%, transparent 100%);
+      -webkit-mask-size: 20px 10px, 20px 6px; mask-size: 20px 10px, 20px 6px;
       -webkit-mask-repeat: repeat-x; mask-repeat: repeat-x;
-      filter: drop-shadow(0 2px 3px rgba(120,200,235,0.4));
+      filter: drop-shadow(0 1px 2px rgba(120,200,235,0.35));
       animation: frost-drip 6s ease-in-out infinite;
     }
     @keyframes frost-drip {
@@ -719,22 +728,30 @@
     header.nav::before {           /* snow ridge along the very top of the bar */
       content: ""; position: absolute; left: 14px; right: 14px; top: -5px; height: 10px;
       pointer-events: none; z-index: 51;
-      background: linear-gradient(180deg, #ffffff, #e6f6ff);
-      -webkit-mask-image: radial-gradient(7px 8px at 7px 100%, #000 96%, transparent 100%);
-              mask-image: radial-gradient(7px 8px at 7px 100%, #000 96%, transparent 100%);
-      -webkit-mask-size: 17px 10px; mask-size: 17px 10px;
+      background: linear-gradient(180deg, #ffffff, #eef9ff);
+      -webkit-mask-image:
+        radial-gradient(9px 8px at 9px 100%, #000 92%, transparent 100%),
+        radial-gradient(6px 6px at 23px 100%, #000 92%, transparent 100%);
+              mask-image:
+        radial-gradient(9px 8px at 9px 100%, #000 92%, transparent 100%),
+        radial-gradient(6px 6px at 23px 100%, #000 92%, transparent 100%);
+      -webkit-mask-size: 28px 10px; mask-size: 28px 10px;
       -webkit-mask-repeat: repeat-x; mask-repeat: repeat-x;
-      filter: drop-shadow(0 1px 2px rgba(120,200,235,0.4));
+      filter: blur(0.4px) drop-shadow(0 1px 2px rgba(120,200,235,0.35));
     }
-    header.nav::after {            /* icicles dripping from the bottom border */
-      content: ""; position: absolute; left: 0; right: 0; bottom: -12px; height: 16px;
+    header.nav::after {            /* short tapered icicles dripping from the bottom border */
+      content: ""; position: absolute; left: 0; right: 0; bottom: -11px; height: 12px;
       pointer-events: none; z-index: 51;
-      background: linear-gradient(180deg, rgba(225,247,255,0.92), rgba(120,200,235,0.12));
-      -webkit-mask-image: radial-gradient(5px 16px at 5px 0, #000 94%, transparent 100%);
-              mask-image: radial-gradient(5px 16px at 5px 0, #000 94%, transparent 100%);
-      -webkit-mask-size: 27px 16px; mask-size: 27px 16px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.92) 0%, rgba(206,240,255,0.78) 32%, rgba(159,232,255,0.4) 74%, rgba(120,200,235,0.08) 100%);
+      -webkit-mask-image:
+        radial-gradient(3.5px 12px at 6px 0, #000 55%, transparent 100%),
+        radial-gradient(2.5px 7px at 18px 0, #000 55%, transparent 100%);
+              mask-image:
+        radial-gradient(3.5px 12px at 6px 0, #000 55%, transparent 100%),
+        radial-gradient(2.5px 7px at 18px 0, #000 55%, transparent 100%);
+      -webkit-mask-size: 28px 12px, 28px 7px; mask-size: 28px 12px, 28px 7px;
       -webkit-mask-repeat: repeat-x; mask-repeat: repeat-x;
-      filter: drop-shadow(0 2px 3px rgba(120,200,235,0.35));
+      filter: drop-shadow(0 1px 2px rgba(120,200,235,0.3));
       animation: frost-drip 7s ease-in-out infinite;
     }
     /* Frost the nav's icy-pill CTA so it matches the season. */
@@ -760,15 +777,19 @@
       -webkit-mask-repeat: repeat-x; mask-repeat: repeat-x;
       filter: drop-shadow(0 1px 1px rgba(120,200,235,0.45));
     }
-    .btn::after {                  /* short icicle/water drips under the button */
-      content: ""; position: absolute; left: 10px; right: 10px; bottom: -8px; height: 11px;
+    .btn::after {                  /* tiny tapered icicle/water drips under the button */
+      content: ""; position: absolute; left: 10px; right: 10px; bottom: -6px; height: 7px;
       pointer-events: none; z-index: 2;
-      background: linear-gradient(180deg, rgba(225,247,255,0.9), rgba(120,200,235,0.1));
-      -webkit-mask-image: radial-gradient(4px 11px at 4px 0, #000 93%, transparent 100%);
-              mask-image: radial-gradient(4px 11px at 4px 0, #000 93%, transparent 100%);
-      -webkit-mask-size: 16px 11px; mask-size: 16px 11px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.92) 0%, rgba(206,240,255,0.75) 35%, rgba(159,232,255,0.35) 78%, rgba(120,200,235,0.08) 100%);
+      -webkit-mask-image:
+        radial-gradient(2.6px 7px at 4px 0, #000 52%, transparent 100%),
+        radial-gradient(2px 4px at 11px 0, #000 52%, transparent 100%);
+              mask-image:
+        radial-gradient(2.6px 7px at 4px 0, #000 52%, transparent 100%),
+        radial-gradient(2px 4px at 11px 0, #000 52%, transparent 100%);
+      -webkit-mask-size: 15px 7px, 15px 4px; mask-size: 15px 7px, 15px 4px;
       -webkit-mask-repeat: repeat-x; mask-repeat: repeat-x;
-      filter: drop-shadow(0 1px 2px rgba(120,200,235,0.35));
+      filter: drop-shadow(0 1px 1px rgba(120,200,235,0.3));
       animation: frost-drip 6.5s ease-in-out infinite;
     }
     /* Glassy frozen sheen + icy outline shared by both button variants. */
@@ -802,22 +823,30 @@
                                       (kept at top:0 — the parent .terminal clips overflow) */
       content: ""; position: absolute; left: 8px; right: 8px; top: 0; height: 10px;
       pointer-events: none; z-index: 4;
-      background: linear-gradient(180deg, #ffffff, #e6f6ff);
-      -webkit-mask-image: radial-gradient(7px 8px at 7px 100%, #000 96%, transparent 100%);
-              mask-image: radial-gradient(7px 8px at 7px 100%, #000 96%, transparent 100%);
-      -webkit-mask-size: 18px 10px; mask-size: 18px 10px;
+      background: linear-gradient(180deg, #ffffff, #eef9ff);
+      -webkit-mask-image:
+        radial-gradient(9px 8px at 9px 100%, #000 92%, transparent 100%),
+        radial-gradient(6px 6px at 23px 100%, #000 92%, transparent 100%);
+              mask-image:
+        radial-gradient(9px 8px at 9px 100%, #000 92%, transparent 100%),
+        radial-gradient(6px 6px at 23px 100%, #000 92%, transparent 100%);
+      -webkit-mask-size: 28px 10px; mask-size: 28px 10px;
       -webkit-mask-repeat: repeat-x; mask-repeat: repeat-x;
-      filter: drop-shadow(0 1px 2px rgba(120,200,235,0.4));
+      filter: blur(0.4px) drop-shadow(0 1px 2px rgba(120,200,235,0.35));
     }
-    .term-bar::after {             /* icicles hanging from the title bar into the body */
-      content: ""; position: absolute; left: 0; right: 0; bottom: -13px; height: 17px;
+    .term-bar::after {             /* short tapered icicles hanging from the title bar */
+      content: ""; position: absolute; left: 0; right: 0; bottom: -11px; height: 12px;
       pointer-events: none; z-index: 4;
-      background: linear-gradient(180deg, rgba(225,247,255,0.9), rgba(120,200,235,0.1));
-      -webkit-mask-image: radial-gradient(5px 17px at 5px 0, #000 94%, transparent 100%);
-              mask-image: radial-gradient(5px 17px at 5px 0, #000 94%, transparent 100%);
-      -webkit-mask-size: 23px 17px; mask-size: 23px 17px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.92) 0%, rgba(206,240,255,0.78) 32%, rgba(159,232,255,0.4) 74%, rgba(120,200,235,0.08) 100%);
+      -webkit-mask-image:
+        radial-gradient(3.5px 12px at 5px 0, #000 55%, transparent 100%),
+        radial-gradient(2.5px 7px at 15px 0, #000 55%, transparent 100%);
+              mask-image:
+        radial-gradient(3.5px 12px at 5px 0, #000 55%, transparent 100%),
+        radial-gradient(2.5px 7px at 15px 0, #000 55%, transparent 100%);
+      -webkit-mask-size: 24px 12px, 24px 7px; mask-size: 24px 12px, 24px 7px;
       -webkit-mask-repeat: repeat-x; mask-repeat: repeat-x;
-      filter: drop-shadow(0 2px 3px rgba(120,200,235,0.35));
+      filter: drop-shadow(0 1px 2px rgba(120,200,235,0.3));
       animation: frost-drip 7.5s ease-in-out infinite;
     }
     /* Give the terminal title bar a cold, frosted tint. */
