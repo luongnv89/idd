@@ -39,22 +39,6 @@ has() {
   fi
 }
 
-# has_n: assert a fixed pattern appears at least N times in a file. Used where a
-# single match would let a regression slip through (e.g. the flag must be in
-# BOTH the Resolver Subagent and the Batch Resolver prompt).
-has_n() {
-  # $1 = file, $2 = pattern, $3 = min count, $4 = label
-  local n
-  # grep -c prints '0' and exits 1 on zero matches, so `|| echo 0` would append a
-  # second line; assign then default-to-0 to keep a clean single integer.
-  n=$(grep -ciF -e "$2" "$1" 2>/dev/null); n=${n:-0}
-  if [ "$n" -ge "$3" ]; then
-    pass "$4"
-  else
-    fail "$4 (found ${n}×, need ≥$3: '$2' in ${1#$REPO_ROOT/})"
-  fi
-}
-
 echo "◆ Run-log (.gitissue/runs.jsonl) Tests"
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 
@@ -138,8 +122,13 @@ has "$AUTOPILOT" "single line" "T6: auto-pilot documents writing the single enri
 
 # The batch path is explicitly out of scope for #156 (tracked separately), so the
 # fix must NOT silence the Batch Resolver — only the single-issue resolver. Pin
-# that boundary: --no-run-log appears exactly once in the subagent prompts.
-has_n "$SUBAGENT" "--no-run-log" 1 "T6: --no-run-log present in subagent prompts (single-issue path)"
+# that boundary: --no-run-log appears exactly once in the subagent prompts (the
+# single-issue Resolver Subagent). This exact-count assertion subsumes a presence
+# check, so no separate "present" assertion is needed.
+#
+# TRIPWIRE: when #158 lands and correctly adds --no-run-log to the Batch Resolver
+# prompt, this count becomes 2 and the assertion fails by design — that is the
+# signal to revisit this boundary here. The #158 author must update this check.
 if [ "$(grep -ciF -e '--no-run-log' "$SUBAGENT")" -eq 1 ]; then
   pass "T6: --no-run-log scoped to the single-issue resolver only (batch path deferred, not silenced)"
 else

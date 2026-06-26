@@ -324,10 +324,12 @@ rather than re-deriving fields.
 > `references/subagent-prompts.md`), so it **does not** append its own line —
 > only auto-pilot writes here. Writing in both places would double-write one line
 > per issue and skew `/idd-doctor`'s resolve-rate and median-QA metrics. The
-> resolver **returns** its telemetry (`qa_cycles`, `complexity`, `duration_s`,
-> `outcome`) in its result; fold those into the **single line** auto-pilot writes
-> here (enriched with that telemetry) so the per-issue QA signal survives even
-> though the resolver stayed silent.
+> resolver **returns** its telemetry (`qa_cycles`, `complexity`, `duration_s`) in
+> its result; fold those into the **single line** auto-pilot writes here (enriched
+> with that telemetry) so the per-issue QA signal survives even though the
+> resolver stayed silent. The resolver's run `status` informs auto-pilot's
+> decision but is **not** copied into the row's `outcome` — that field stays
+> auto-pilot's own six categorical label (set from the merge result, see below).
 
 Populate from the iteration's known values plus the resolver's returned
 telemetry: `ts` (current UTC, ISO 8601), `issue` (the number), `mode` (the
