@@ -397,6 +397,78 @@
     .tool:hover { border-color: rgba(0,255,65,0.3); color: var(--fg); }
     .tool b { color: var(--green); font-weight: 600; }
 
+    /* ── Agent team ── */
+    .agent-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 20px;
+      margin-top: 50px;
+    }
+    @media (max-width: 1020px) { .agent-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 540px) { .agent-grid { grid-template-columns: 1fr; } }
+    .agent-card {
+      background: linear-gradient(180deg, var(--panel), var(--bg-soft));
+      border: 1px solid var(--line-soft);
+      border-radius: var(--radius);
+      padding: 22px 20px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      transition: border-color .2s, transform .2s;
+    }
+    .agent-card:hover {
+      border-color: rgba(0,255,65,0.28);
+      transform: translateY(-2px);
+    }
+    .agent-head { display: flex; align-items: center; gap: 14px; }
+    .agent-avatar {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 2px solid rgba(0,255,65,0.35);
+      flex-shrink: 0;
+      background: var(--panel-2);
+    }
+    .agent-meta h3 {
+      margin: 0;
+      font-size: 1rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      line-height: 1.2;
+    }
+    .agent-meta .role {
+      margin: 4px 0 0;
+      font-family: var(--mono);
+      font-size: 11.5px;
+      color: var(--green);
+      font-weight: 600;
+    }
+    .agent-quote {
+      margin: 0;
+      font-size: 0.88rem;
+      color: var(--fg-muted);
+      line-height: 1.55;
+      font-style: italic;
+      border-left: 2px solid rgba(0,255,65,0.35);
+      padding-left: 12px;
+    }
+    .agent-quote cite {
+      display: block;
+      margin-top: 8px;
+      font-style: normal;
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--fg-dim);
+    }
+    .agent-skills {
+      margin: 0;
+      font-size: 0.82rem;
+      color: var(--fg-dim);
+      line-height: 1.45;
+    }
+    .agent-skills span { color: var(--fg-muted); }
+
     /* ── Methodology split ── */
     .split { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; margin-top: 50px; }
     @media (max-width: 860px) { .split { grid-template-columns: 1fr; } }
@@ -498,6 +570,7 @@
         <a href="./" class="active">Home</a>
         <a href="./#how">How it works</a>
         <a href="./#commands">Commands</a>
+        <a href="./#team">Team</a>
         <a href="docs.html">Docs</a>
         <a href="changelog.html">Changelog</a>
         <a href="./#install">Install</a>
@@ -743,6 +816,113 @@
         <div class="feat-card reveal"><span class="feat-cmd">/auto-pilot</span><p style="margin-top:2px">Triage → resolve → review → merge loop with conservative-by-default merge modes.</p></div>
         <div class="feat-card reveal"><span class="feat-cmd">/init-gitissue</span><p style="margin-top:2px">Auto-detect language, framework, and test runner; generate a tuned <code>.gitissue.yml</code>.</p></div>
         <div class="feat-card reveal"><span class="feat-cmd">/idd-doctor</span><p style="margin-top:2px">Read-only health check for your IDD repository invariants. <span class="muted">(maintainer tooling)</span></p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ───────────────────────── AGENT TEAM ───────────────────────── -->
+  <section id="team">
+    <div class="wrap">
+      <div class="section-tag">Specialists under the hood</div>
+      <h2 class="sec-title">Eight shared agents. Eight famous minds.</h2>
+      <p class="sec-lead">Skills orchestrate the pipeline; sub-agents do the deep work. Each prompt in <code class="mono green">src/shared/agents/</code> carries a <strong>Persona</strong> — a historical figure whose thinking style matches the job — so research, review, and fixes stay focused instead of generic.</p>
+
+      <div class="agent-grid">
+        <article class="agent-card reveal">
+          <div class="agent-head">
+            <img class="agent-avatar" src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/c4/Sherlock_Holmes_Portrait_Paget.jpg/128px-Sherlock_Holmes_Portrait_Paget.jpg" alt="Portrait of Sherlock Holmes by Sidney Paget" width="128" height="128" loading="lazy" referrerpolicy="no-referrer" />
+            <div class="agent-meta">
+              <h3>Sherlock Holmes</h3>
+              <p class="role">Duplicate Detector</p>
+            </div>
+          </div>
+          <blockquote class="agent-quote">“When you have eliminated the impossible, whatever remains, however improbable, must be the truth.”<cite>— Arthur Conan Doyle</cite></blockquote>
+          <p class="agent-skills"><span>Used by:</span> /issue-creator — dedupe new issues against the backlog.</p>
+        </article>
+
+        <article class="agent-card reveal">
+          <div class="agent-head">
+            <img class="agent-avatar" src="https://upload.wikimedia.org/wikipedia/commons/thumb/a/a4/Ada_Lovelace_portrait.jpg/128px-Ada_Lovelace_portrait.jpg" alt="Portrait of Ada Lovelace" width="128" height="128" loading="lazy" referrerpolicy="no-referrer" />
+            <div class="agent-meta">
+              <h3>Ada Lovelace</h3>
+              <p class="role">Codebase Researcher</p>
+            </div>
+          </div>
+          <blockquote class="agent-quote">“That brain of mine is something more than merely mortal; as time will show.”<cite>— Ada Lovelace</cite></blockquote>
+          <p class="agent-skills"><span>Used by:</span> /issue-resolver, /issue-analysis, /auto-pilot — map files, deps, and history.</p>
+        </article>
+
+        <article class="agent-card reveal">
+          <div class="agent-head">
+            <img class="agent-avatar" src="https://upload.wikimedia.org/wikipedia/commons/thumb/d/d4/N.Tesla.JPG/128px-N.Tesla.JPG" alt="Portrait of Nikola Tesla" width="128" height="128" loading="lazy" referrerpolicy="no-referrer" />
+            <div class="agent-meta">
+              <h3>Nikola Tesla</h3>
+              <p class="role">Synthesizer</p>
+            </div>
+          </div>
+          <blockquote class="agent-quote">“The current pace of technological development is impressive, but it is nothing compared to what is yet to come.”<cite>— Nikola Tesla</cite></blockquote>
+          <p class="agent-skills"><span>Used by:</span> /issue-analysis, /issue-resolver — options, trade-offs, recommended approach.</p>
+        </article>
+
+        <article class="agent-card reveal">
+          <div class="agent-head">
+            <img class="agent-avatar" src="https://upload.wikimedia.org/wikipedia/commons/thumb/0/01/LinuxCon_Europe_Linus_Torvalds_03.jpg/128px-LinuxCon_Europe_Linus_Torvalds_03.jpg" alt="Portrait of Linus Torvalds" width="128" height="128" loading="lazy" referrerpolicy="no-referrer" />
+            <div class="agent-meta">
+              <h3>Linus Torvalds</h3>
+              <p class="role">Implementer</p>
+            </div>
+          </div>
+          <blockquote class="agent-quote">“Bad programmers worry about the code. Good programmers worry about data structures and their relationships.”<cite>— Linus Torvalds</cite></blockquote>
+          <p class="agent-skills"><span>Used by:</span> /issue-resolver — ship tested code that matches project conventions.</p>
+        </article>
+
+        <article class="agent-card reveal">
+          <div class="agent-head">
+            <img class="agent-avatar" src="https://upload.wikimedia.org/wikipedia/commons/thumb/7/7e/Marie_Curie_c1920.jpg/128px-Marie_Curie_c1920.jpg" alt="Portrait of Marie Curie" width="128" height="128" loading="lazy" referrerpolicy="no-referrer" />
+            <div class="agent-meta">
+              <h3>Marie Curie</h3>
+              <p class="role">Code Reviewer</p>
+            </div>
+          </div>
+          <blockquote class="agent-quote">“Nothing in life is to be feared, it is only to be understood.”<cite>— Marie Curie</cite></blockquote>
+          <p class="agent-skills"><span>Used by:</span> /issue-pr-review, /issue-resolver, /auto-pilot — evidence-based review, high confidence only.</p>
+        </article>
+
+        <article class="agent-card reveal">
+          <div class="agent-head">
+            <img class="agent-avatar" src="https://upload.wikimedia.org/wikipedia/commons/thumb/9/9d/Thomas_Edison2.jpg/128px-Thomas_Edison2.jpg" alt="Portrait of Thomas Edison" width="128" height="128" loading="lazy" referrerpolicy="no-referrer" />
+            <div class="agent-meta">
+              <h3>Thomas Edison</h3>
+              <p class="role">Fixer</p>
+            </div>
+          </div>
+          <blockquote class="agent-quote">“Our greatest weakness lies in giving up. The most certain way to succeed is always to try just one more time.”<cite>— Thomas Edison</cite></blockquote>
+          <p class="agent-skills"><span>Used by:</span> /issue-pr-review, /issue-resolver — targeted fixes until tests and review pass.</p>
+        </article>
+
+        <article class="agent-card reveal">
+          <div class="agent-head">
+            <img class="agent-avatar" src="https://upload.wikimedia.org/wikipedia/commons/thumb/2/2e/Charles_Darwin_seated_crop.jpg/128px-Charles_Darwin_seated_crop.jpg" alt="Portrait of Charles Darwin" width="128" height="128" loading="lazy" referrerpolicy="no-referrer" />
+            <div class="agent-meta">
+              <h3>Charles Darwin</h3>
+              <p class="role">Issue Relationship Scanner</p>
+            </div>
+          </div>
+          <blockquote class="agent-quote">“It is not the strongest of the species that survives… it is the one most adaptable to change.”<cite>— Charles Darwin</cite></blockquote>
+          <p class="agent-skills"><span>Used by:</span> /issue-triage — file deps, parallel work, already-fixed detection.</p>
+        </article>
+
+        <article class="agent-card reveal">
+          <div class="agent-head">
+            <img class="agent-avatar" src="https://upload.wikimedia.org/wikipedia/commons/thumb/4/4e/Dieter_Rams_2008.jpg/128px-Dieter_Rams_2008.jpg" alt="Portrait of Dieter Rams" width="128" height="128" loading="lazy" referrerpolicy="no-referrer" />
+            <div class="agent-meta">
+              <h3>Dieter Rams</h3>
+              <p class="role">UI/UX Reviewer</p>
+            </div>
+          </div>
+          <blockquote class="agent-quote">“Good design is as little design as possible — but not as little as possible.”<cite>— Dieter Rams</cite></blockquote>
+          <p class="agent-skills"><span>Used by:</span> /issue-pr-review, /issue-resolver — a11y, responsive layout, honest UI.</p>
+        </article>
       </div>
     </div>
   </section>
