@@ -216,8 +216,9 @@ EOF
 mkdir -p "$SYN_TMP/scripts"
 cp "$REPO_ROOT/scripts/build.py" "$SYN_TMP/scripts/build.py"
 cp "$REPO_ROOT/scripts/build.sh" "$SYN_TMP/scripts/build.sh"
+cp "$REPO_ROOT/scripts/verify_flattened_skills.sh" "$SYN_TMP/scripts/verify_flattened_skills.sh"
 cp "$REPO_ROOT/scripts/plugin-schema.json" "$SYN_TMP/scripts/plugin-schema.json"
-chmod +x "$SYN_TMP/scripts/build.sh"
+chmod +x "$SYN_TMP/scripts/build.sh" "$SYN_TMP/scripts/verify_flattened_skills.sh"
 
 if (cd "$SYN_TMP" && bash scripts/build.sh --out "$SYN_OUT") >"$SYN_LOG" 2>&1; then
   pass "T7.1: synthetic diamond build succeeds"

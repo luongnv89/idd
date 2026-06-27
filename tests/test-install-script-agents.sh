@@ -51,7 +51,26 @@ if ! "$BUILD_SH" >/dev/null 2>&1; then
 fi
 
 # ───────────────────────────────────────────────────────────
-# T2: default install provisions skills and agents
+# T2: fresh checkout/cache install auto-builds gitignored shared agents
+# ───────────────────────────────────────────────────────────
+TARGET_FRESH="$TMP_ROOT/fresh-target"
+rm -rf "$DIST_AGENTS"
+if "$INSTALL_SH" --target "$TARGET_FRESH" >"$TMP_ROOT/fresh.log" 2>&1; then
+  if [ -d "$DIST_AGENTS" ] && [ -f "$TARGET_FRESH/agents/codebase-researcher.md" ]; then
+    pass "T2.0: install auto-builds missing dist/agents before provisioning agents"
+  else
+    fail "T2.0: install exited 0 but did not recreate/install dist/agents"
+  fi
+else
+  fail "T2.0: install failed when dist/agents was missing"
+  sed 's/^/    /' "$TMP_ROOT/fresh.log" | head -20
+fi
+if [ ! -d "$DIST_AGENTS" ]; then
+  "$BUILD_SH" >/dev/null 2>&1 || true
+fi
+
+# ───────────────────────────────────────────────────────────
+# T3: default install provisions skills and agents
 # ───────────────────────────────────────────────────────────
 TARGET_ALL="$TMP_ROOT/default-target"
 if "$INSTALL_SH" --target "$TARGET_ALL" >/dev/null 2>&1; then

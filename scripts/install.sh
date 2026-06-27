@@ -106,6 +106,7 @@ INSTALL_AGENTS=1
 FORCE_AGENTS=0
 TARGET_SET=0        # 1 once --target is given (only valid for the claude tool)
 TOOLS=""            # space-separated list of selected tools; empty = default (claude)
+SOURCE_SYNCED=0     # 1 after idd_sync_source_tree has prepared ROOT for this run
 
 # All supported tools, in display order. Paths mirror `asm config show`.
 ALL_TOOLS="claude agents codex opencode pi openclaw hermes antigravity windsurf"
@@ -214,8 +215,13 @@ idd_rebind_paths() {
 # Ensure skills/ and dist/agents/ reflect the latest default branch (or local
 # checkout). Installs always copy from this tree — not from skill version fields.
 idd_sync_source_tree() {
+  if [ "$SOURCE_SYNCED" -eq 1 ]; then
+    return 0
+  fi
+
   if [ "$IDD_SKIP_SOURCE_SYNC" = "1" ]; then
     info "IDD_SKIP_SOURCE_SYNC=1 — using tree at $ROOT"
+    SOURCE_SYNCED=1
     return 0
   fi
 
@@ -235,6 +241,7 @@ idd_sync_source_tree() {
     fi
     ROOT="$IDD_INSTALL_CACHE"
     idd_rebind_paths
+    SOURCE_SYNCED=1
     ok "source ready at $ROOT"
     return 0
   fi
@@ -242,6 +249,7 @@ idd_sync_source_tree() {
   if [ -d "$ROOT/.git" ] && command -v git &>/dev/null; then
     if [ -n "$(git -C "$ROOT" status --porcelain 2>/dev/null)" ]; then
       info "local changes present — installing from current working tree"
+      SOURCE_SYNCED=1
       return 0
     fi
     info "syncing checkout with origin/$IDD_INSTALL_BRANCH..."
@@ -252,9 +260,26 @@ idd_sync_source_tree() {
       warn "could not sync with remote — installing from current working tree"
     fi
   fi
+  SOURCE_SYNCED=1
 }
 
 die() { err "$@"; exit 1; }
+
+run_build() {
+  local reason="$1"
+  shift || true
+  info "$reason — attempting auto-build..."
+  if [ ! -f "$ROOT/scripts/build.sh" ]; then
+    err "scripts/build.sh not found — cannot auto-build"
+    exit 1
+  fi
+  if "$ROOT/scripts/build.sh" "$@" >/dev/null 2>&1; then
+    ok "auto-build succeeded"
+  else
+    err "auto-build failed — please run ./scripts/build.sh manually"
+    exit 1
+  fi
+}
 
 run() {
   if [ "$DRY_RUN" -eq 1 ]; then
@@ -521,18 +546,7 @@ ensure_skills_src() {
   # Primary source: repo-root skills/ (committed, no build needed).
   if [ ! -d "$ROOT_SKILLS" ] || [ -z "$(ls -A "$ROOT_SKILLS" 2>/dev/null)" ]; then
     # skills/ missing or empty — try auto-build
-    info "skills/ missing or empty — attempting auto-build..."
-    if [ -f "$ROOT/scripts/build.sh" ]; then
-      if "$ROOT/scripts/build.sh" >/dev/null 2>&1; then
-        ok "auto-build succeeded"
-      else
-        err "auto-build failed — please run ./scripts/build.sh manually"
-        exit 1
-      fi
-    else
-      err "scripts/build.sh not found — cannot auto-build"
-      exit 1
-    fi
+    run_build "skills/ missing or empty"
   fi
   # Use skills/ (the build always emits it).
   local SKILLS_SRC="$ROOT_SKILLS"
@@ -560,7 +574,12 @@ ensure_skills_src() {
 }
 
 ensure_agents_src() {
-  if [ ! -d "$DIST_AGENTS" ]; then
+  idd_sync_source_tree
+  if [ ! -d "$DIST_AGENTS" ] || [ -z "$(ls -A "$DIST_AGENTS" 2>/dev/null)" ]; then
+    # dist/agents is gitignored, so fresh clones/cache installs need to build it.
+    run_build "dist/agents/ missing or empty" --no-promote-skills
+  fi
+  if [ ! -d "$DIST_AGENTS" ] || [ -z "$(ls -A "$DIST_AGENTS" 2>/dev/null)" ]; then
     err "dist/agents/ not found at $DIST_AGENTS"
     err "  Run: ./scripts/build.sh"
     exit 1
