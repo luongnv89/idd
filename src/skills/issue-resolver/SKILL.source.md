@@ -704,7 +704,7 @@ All errors use rich format from `references/error-messages.md`:
 - **`shared/agents/ui-reviewer.md`** — UI/UX review subagent (Step 4, auto-detected)
 - **`shared/agents/fixer.md`** — QA fix subagent (Step 4)
 - **`references/pipeline-steps.md`** — Full delegation payloads, phases, and inline fallbacks for Steps 1–4
-- **`references/report-templates.md`** — PR body template, final report templates, and expected inline output
+- **`references/report-templates.md`** — PR body template, closing summary templates, and expected inline output
 - **`references/bug-verification.md`** — Red-capable reproduction checkpoint for bug issues (Step 3, before the fix)
 - **`references/error-messages.md`** — Complete error catalog
 - **`docs/naming-conventions.md`** — Branch, commit, PR naming conventions
