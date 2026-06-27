@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [v0.16.0] — 2026-06-28
 
 ### Changed
 - `feat(install)` `scripts/install.sh` and root `install.sh` now refresh skills from the latest `main` on every run (clone/fetch for `curl | bash`, fast-forward for clean checkouts). Re-install always replaces each skill directory and overwrites IDD-managed agents from source — no skip when `cmp` matches and no reliance on skill `metadata.version`. Set `IDD_SKIP_SOURCE_SYNC=1` to install from the current tree without fetching. (#TBD)

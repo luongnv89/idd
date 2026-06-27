@@ -587,104 +587,12 @@
     .reveal { opacity: 0; transform: translateY(22px); transition: opacity .6s ease, transform .6s ease; }
     .reveal.in { opacity: 1; transform: none; }
 
-    /* ╔═══════════════════════════════════════════════════════════════╗
-       ║ COOLDOWN-LAUNCH START · "Ice Driven Development" seasonal skin ║
-       ║ Temporary heat-wave gag — issues #133 (rebrand), #135 (hero    ║
-       ║ humor), #134 (ice-cube effect). To REVERT to standard          ║
-       ║ branding, delete every block marked COOLDOWN-LAUNCH (this CSS  ║
-       ║ block, the .cooldown-ice overlay in <body>, and the marked     ║
-       ║ hero / methodology copy). Nothing else depends on these rules. ║
-       ╚═══════════════════════════════════════════════════════════════╝ */
-    :root {
-      --ice: #9fe8ff;
-      --ice-dim: #6fcfe8;
-      --ice-glow: rgba(120, 200, 235, 0.30);
-    }
-    /* #134 — atmospheric falling ice cubes, purely decorative & behind content */
-    .cooldown-ice {
-      position: fixed;
-      inset: 0;
-      z-index: 0;            /* content is lifted to z-index:1 below, nav stays at 50 */
-      pointer-events: none;  /* never intercepts clicks / selection */
-      overflow: hidden;
-    }
-    .cooldown-ice .ice-cube {
-      position: absolute;
-      top: -10vh;
-      width: 54px;
-      height: 54px;
-      border-radius: 12px;
-      background: linear-gradient(135deg, rgba(200, 240, 255, 0.20), rgba(120, 200, 235, 0.07));
-      border: 1px solid rgba(190, 235, 255, 0.28);
-      box-shadow: inset 0 0 6px rgba(255, 255, 255, 0.22), 0 0 12px var(--ice-glow);
-      opacity: 0;
-      animation: ice-fall linear infinite;
-      will-change: transform, opacity;  /* GPU-friendly: only transform + opacity animate */
-    }
-    @keyframes ice-fall {
-      0%   { transform: translate3d(0, -10vh, 0) rotate(0deg);    opacity: 0; }
-      12%  { opacity: 0.65; }
-      88%  { opacity: 0.55; }
-      100% { transform: translate3d(0, 112vh, 0) rotate(220deg);  opacity: 0; }
-    }
-    /* Lift all page content above the ice overlay (kept inside this block so a
-       clean delete fully reverts the stacking change). */
-    body > header,
-    body > section,
-    body > .final,
-    body > footer { position: relative; z-index: 1; }
-    /* Trim the cube count on small screens for performance / less clutter. */
-    @media (max-width: 600px) {
-      .cooldown-ice .ice-cube:nth-child(n+10) { display: none; }
-    }
-    /* Honour reduced-motion: drop the animation entirely. */
-    @media (prefers-reduced-motion: reduce) {
-      .cooldown-ice { display: none; }
-    }
 
-    /* #133 / #135 — icy hero copy treatment */
-    .cooldown-eyebrow {
-      color: var(--ice);
-      background: rgba(120, 200, 235, 0.08);
-      border-color: rgba(150, 220, 245, 0.30);
-      font-weight: 500;
-      max-width: 100%;
-    }
-    .cooldown-eyebrow .dot { background: var(--ice); box-shadow: 0 0 10px var(--ice); }
-    .cooldown-eyebrow strong { color: var(--ice); font-weight: 700; }
-    .cooldown-quip { color: var(--ice-dim); font-style: italic; }
-    .cooldown-quip strong { color: var(--ice); font-style: normal; font-weight: 600; }
-    .cooldown-note {
-      border-left: 2px solid rgba(150, 220, 245, 0.35);
-      padding-left: 16px;
-      color: var(--fg-muted);
-    }
-    .cooldown-note strong { color: var(--ice); }
-    /* ── COOLDOWN-LAUNCH END (CSS) ── */
   </style>
 </head>
 <body>
 
-  <!-- COOLDOWN-LAUNCH START · ice-cube overlay · issue #134 — delete this whole block to revert.
-       Decorative only: aria-hidden, pointer-events:none, sits behind content (z-index), and is
-       disabled under prefers-reduced-motion. -->
-  <div class="cooldown-ice" aria-hidden="true">
-    <span class="ice-cube" style="left:4%;  width:48px; height:48px; animation-duration:15s; animation-delay:-1s;"></span>
-    <span class="ice-cube" style="left:12%; width:66px; height:66px; animation-duration:19s; animation-delay:-6s;"></span>
-    <span class="ice-cube" style="left:21%; width:36px; height:36px; animation-duration:13s; animation-delay:-3s;"></span>
-    <span class="ice-cube" style="left:30%; width:57px; height:57px; animation-duration:21s; animation-delay:-9s;"></span>
-    <span class="ice-cube" style="left:39%; width:42px; height:42px; animation-duration:16s; animation-delay:-12s;"></span>
-    <span class="ice-cube" style="left:48%; width:72px; height:72px; animation-duration:23s; animation-delay:-2s;"></span>
-    <span class="ice-cube" style="left:57%; width:39px; height:39px; animation-duration:14s; animation-delay:-7s;"></span>
-    <span class="ice-cube" style="left:66%; width:60px; height:60px; animation-duration:18s; animation-delay:-15s;"></span>
-    <span class="ice-cube" style="left:74%; width:45px; height:45px; animation-duration:17s; animation-delay:-5s;"></span>
-    <span class="ice-cube" style="left:82%; width:69px; height:69px; animation-duration:22s; animation-delay:-10s;"></span>
-    <span class="ice-cube" style="left:89%; width:36px; height:36px; animation-duration:13s; animation-delay:-4s;"></span>
-    <span class="ice-cube" style="left:95%; width:54px; height:54px; animation-duration:20s; animation-delay:-8s;"></span>
-    <span class="ice-cube" style="left:17%; width:39px; height:39px; animation-duration:24s; animation-delay:-18s;"></span>
-    <span class="ice-cube" style="left:61%; width:48px; height:48px; animation-duration:19s; animation-delay:-13s;"></span>
-  </div>
-  <!-- COOLDOWN-LAUNCH END · ice-cube overlay -->
+
 
   <!-- ───────────────────────── NAV ───────────────────────── -->
   <header class="nav">
@@ -712,28 +620,20 @@
   <section class="hero" id="top">
     <div class="wrap hero-grid">
       <div>
-        <!-- COOLDOWN-LAUNCH START · seasonal banner · issues #133 #135 — to revert to standard
-             branding, swap the icy pill below back to the standard eyebrow copy:
-             "Issue-Driven Development · 8 commands · MIT" (drop the cooldown-eyebrow class). -->
-        <span class="eyebrow cooldown-eyebrow"><span class="dot"></span>🧊 <strong>Ice</strong> Driven Development</span>
-        <!-- COOLDOWN-LAUNCH END · seasonal banner -->
+        <span class="eyebrow">Issue-Driven Development · 8 commands · MIT</span>
         <h1 class="hero-title">Issues → <span class="accent">agent-ready work orders.</span></h1>
         <p class="hero-sub">
           Eight terminal commands that <strong>structure, analyze, triage, resolve, and review</strong> your GitHub issues —
           so any developer or AI agent can pick up an issue and ship a tested PR. Zero config.
         </p>
-        <!-- COOLDOWN-LAUNCH START · hero ice humor · issue #135 — delete to revert to standard messaging -->
-        <p class="hero-sub cooldown-quip">
-          🧊 Same IDD, served chilled — backlog <strong>cool</strong>, intentions <strong>crystal-clear</strong>, merge conflicts on ice.
-        </p>
-        <!-- COOLDOWN-LAUNCH END · hero ice humor -->
+
         <div class="hero-cta">
           <a class="btn btn-primary" href="./#install">▶ Get Started</a>
           <a class="btn btn-ghost" href="docs.html">Read the Docs</a>
           <a class="btn btn-ghost" href="https://github.com/luongnv89/idd">View on GitHub</a>
         </div>
         <div class="hero-trust">
-          <span><span class="ok">✓</span> Latest release <a href="https://github.com/luongnv89/idd/releases/latest" id="latest-release">v0.15.0</a></span>
+          <span><span class="ok">✓</span> Latest release <a href="https://github.com/luongnv89/idd/releases/latest" id="latest-release">v0.16.0</a></span>
           <span id="github-stars" hidden><span class="ok">★</span> <span id="github-stars-count"></span> GitHub stars</span>
           <span><span class="ok">✓</span> Plain GitHub markdown</span>
           <span><span class="ok">✓</span> No vendor lock-in</span>
@@ -1085,9 +985,7 @@
       <h2 class="sec-title">Two names for one idea: issues as the atomic unit of work.</h2>
       <p class="sec-lead">Every change starts as a structured issue and ends as a PR linked to it. The methodology is plain markdown — issuedev just automates the translation.</p>
 
-      <!-- COOLDOWN-LAUNCH START · methodology note · issue #133 — delete to revert. Keeps the intention thesis canonical while the ice gag is live. -->
-      <p class="sec-lead cooldown-note">🧊 During our heat-wave <strong>cooldown launch</strong> you'll spot <strong>Ice</strong> Driven Development sprinkled around — it's a temporary joke, not a rename. The canonical meaning never melts: <strong>IDD = Intention-Driven Development</strong> — capturing durable human intention so AI understands what you actually want and ships higher-quality output.</p>
-      <!-- COOLDOWN-LAUNCH END · methodology note -->
+
 
       <div class="split">
         <div class="idd-card reveal">

@@ -8,7 +8,7 @@
 
 <p align="center">
   <a href="https://luongnv.com/idd/"><img src="https://img.shields.io/badge/website-luongnv.com%2Fidd-00FF41.svg?labelColor=0A0A0A" alt="Website"></a>
-  <a href="https://github.com/luongnv89/idd/releases/latest"><img src="https://img.shields.io/badge/version-0.15.0-blue.svg" alt="Version 0.15.0"></a>
+  <a href="https://github.com/luongnv89/idd/releases/latest"><img src="https://img.shields.io/badge/version-0.16.0-blue.svg" alt="Version 0.16.0"></a>
   <a href="https://github.com/luongnv89/idd/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="MIT License"></a>
   <a href="https://github.com/luongnv89/idd"><img src="https://img.shields.io/badge/commands-8-blue.svg" alt="8 commands"></a>
   <a href="https://github.com/luongnv89/idd/blob/main/CONTRIBUTING.md"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs Welcome"></a>
@@ -293,10 +293,6 @@ Browse the authored source for each skill — these links point to `src/` for re
 ---
 
 ## What is IDD?
-
-<!-- COOLDOWN-LAUNCH START · seasonal note · issue #133 — delete this block to revert to standard branding -->
-> 🧊 **Cooldown launch:** during the heat wave you may see **Ice Driven Development** floating around the site — it's a temporary, humor-only skin, *not* a rename. **IDD always means Intention-Driven Development:** capturing durable human intention so AI understands what you actually want and ships higher-quality output.
-<!-- COOLDOWN-LAUNCH END · seasonal note -->
 
 Issue-Driven Development — also **Intention-Driven Development** — treats GitHub issues as the atomic unit of all development work. Every change starts as a structured issue and ends as a PR linked to that issue.
 
