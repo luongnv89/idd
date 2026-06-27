@@ -5,7 +5,7 @@ license: MIT
 compatibility: "Requires git and GitHub CLI (gh) with authentication and push access. Self-contained — uses shared agents from shared/agents/."
 effort: max
 metadata:
-  version: 0.11.0
+  version: 0.12.0
   author: Luong NGUYEN <luongnv89@gmail.com>
 ---
 
@@ -372,6 +372,38 @@ After plan selection:
 [2/5] Plan         ✓ approach: {selected option name}
 ```
 
+### Design-confirm checkpoint (high-complexity, interactive only)
+
+High-risk work earns **exactly one** extra agreement point before code is written —
+no new phase, artifact, or config key. The checkpoint is gated entirely on data Step 2
+already produced (the synthesizer's recommended option, its change summary, and its
+residual risk).
+
+Trigger it only when **both** hold:
+
+1. **High-complexity tier** — the synthesizer reports `overall_complexity: L` or `XL`,
+   or `overall_risk: High` (equivalently the most-recent complexity signal is the
+   researcher's `complexity: high|complex`). Trivial / low / medium → no checkpoint.
+2. **Interactive mode** — `--auto` / `IDD_AUTO_MODE=1` never pauses (see *Auto-Pilot Mode*).
+
+When triggered, present the already-selected recommended option for confirmation:
+
+```
+◆ Design confirm — issue #N (high complexity)
+┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  Proceed with Option {recommended.number} — {recommended.name}?
+    Changes:        {recommended.summary} ({len(files_to_modify)} files)
+    Residual risk:  {recommended.risk_details}
+  Proceed? [Y/n]
+```
+
+Accept (default) → continue to Step 3 unchanged. Decline → stop before implementing,
+leave the branch in place, and suggest re-running `/issue-resolver {N}` or picking a
+different option. **Record the decision** (selected option + complexity) in the PR
+Decision Record so it survives into durable memory — see `references/report-templates.md`
+(*Design-confirm* line). Full procedure, including the auto-mode log line, is in
+`references/pipeline-steps.md` (*Step 2 — Plan → Design-confirm checkpoint*).
+
 ---
 
 ## Step 3 — Implement
@@ -597,7 +629,7 @@ When invoked with `--auto` (or by `/auto-pilot`), the entire pipeline runs witho
 - **Workspace:** Always the **in-place** path. Skip Step 0e entirely — no worktree prompt, no `git worktree add` on the default resolution path. Run mandatory Repo Sync, then *0f — Create branch* in the current working tree. Isolated worktrees remain **interactive-only** (Step 0e).
 - **Preflight:** Skip assignment guard. Log blocking labels as warnings, don't stop.
 - **Research:** If already resolved, close the issue with a comment and exit cleanly.
-- **Plan:** Auto-select the recommended option (best balance of quality/effort).
+- **Plan:** Auto-select the recommended option (best balance of quality/effort). The high-complexity design-confirm checkpoint never appears in auto mode — log the selected option + complexity for the Decision Record and proceed without pausing.
 - **Implement:** Continue past max commits guard with a warning.
 - **QA:** Run full cycle autonomously. If stagnation detected, continue to deliver with known issues.
 - **Deliver:** Create PR. Do NOT merge — merging is handled by `/auto-pilot` or `/issue-pr-review`.
