@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
 # install.sh — install IDD skills and/or plugin from a working tree.
 #
-# One-line install for users with a fresh clone of the repository who do
-# not have `asm` (the recommended primary install tool — see README → Install).
+# One-line install for users with a fresh clone, a curl | bash one-liner, or
+# any re-run to refresh skills — without `asm` (see README → Install).
+# Re-running always replaces installed skill trees and refreshes IDD-managed
+# agents from the latest source files (never keyed on skill metadata.version).
+# When the script is not run from a repo checkout (typical curl | bash), it
+# clones or hard-resets a cache of the default branch before installing.
 # This is a thin wrapper around the supported install layouts:
 #
 #   - Standalone path: copy each `skills/<name>/` (or `dist/skills/<name>/` as
@@ -28,8 +32,8 @@
 #   antigravity  ~/.antigravity/skills
 #   windsurf     ~/.windsurf/rules
 #
-# Idempotent: re-running cleans the destination directory first, so no
-# duplicate files or stale references are left behind.
+# Idempotent: re-running removes each destination skill directory and copies
+# the full tree again, so upgrades always match the current repo — no stale files.
 #
 # Auto-build: if skills/ is missing or empty, the installer runs
 # ./scripts/build.sh automatically (unless scripts/build.sh is absent).
@@ -46,6 +50,8 @@
 #   ./scripts/install.sh --target <dir>   # override Claude install root (default: ~/.claude)
 #   ./scripts/install.sh --uninstall      # remove installed standalone skills + managed agents
 #   ./scripts/install.sh --dry-run        # show what would be installed
+#   ./scripts/install.sh --use-asm          # install via asm (skip asm prompt)
+#   ./scripts/install.sh --no-asm-prompt    # skip asm offer; use this script only
 #   ./scripts/install.sh --help           # this help text
 #
 # Exit codes:
@@ -61,7 +67,32 @@ set -euo pipefail
 # Defaults and helpers
 # ---------------------------------------------------------------------------
 
-ROOT="$(cd -- "$(dirname -- "$0")/.." && pwd)"
+IDD_INSTALL_REPO="${IDD_INSTALL_REPO:-https://github.com/luongnv89/idd.git}"
+IDD_INSTALL_BRANCH="${IDD_INSTALL_BRANCH:-main}"
+IDD_INSTALL_CACHE="${IDD_INSTALL_CACHE:-${XDG_CACHE_HOME:-$HOME/.cache}/idd/install}"
+IDD_SKIP_SOURCE_SYNC="${IDD_SKIP_SOURCE_SYNC:-0}"
+IDD_SKIP_ASM_PROMPT="${IDD_SKIP_ASM_PROMPT:-0}"
+IDD_ASM_INSTALL_URL="${IDD_ASM_INSTALL_URL:-https://github.com/luongnv89/idd}"
+USE_ASM=0
+NO_ASM_PROMPT=0
+
+_SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" && pwd)"
+_SCRIPT_NAME="$(basename -- "${BASH_SOURCE[0]:-$0}")"
+
+# 1 = run from curl|bash (no repo checkout next to scripts/install.sh)
+IDD_REMOTE_INSTALL=0
+if [ "$_SCRIPT_DIR" = "$PWD" ] && [ "$_SCRIPT_NAME" = "install.sh" ] && \
+   { [ ! -f "$_SCRIPT_DIR/../skills/issue-resolver/SKILL.md" ] && \
+     [ ! -d "$_SCRIPT_DIR/../skills" ]; }; then
+  IDD_REMOTE_INSTALL=1
+elif [ -f "$_SCRIPT_DIR/../skills/issue-resolver/SKILL.md" ] || \
+     { [ -d "$_SCRIPT_DIR/../skills" ] && [ -f "$_SCRIPT_DIR/build.sh" ]; }; then
+  ROOT="$(cd -- "$_SCRIPT_DIR/.." && pwd)"
+else
+  IDD_REMOTE_INSTALL=1
+  ROOT="$IDD_INSTALL_CACHE"
+fi
+
 ROOT_SKILLS="$ROOT/skills"
 DIST_SKILLS_FALLBACK="$ROOT/dist/skills"  # deprecated fallback
 DIST_AGENTS="$ROOT/dist/agents"
@@ -75,6 +106,7 @@ INSTALL_AGENTS=1
 FORCE_AGENTS=0
 TARGET_SET=0        # 1 once --target is given (only valid for the claude tool)
 TOOLS=""            # space-separated list of selected tools; empty = default (claude)
+SOURCE_SYNCED=0     # 1 after idd_sync_source_tree has prepared ROOT for this run
 
 # All supported tools, in display order. Paths mirror `asm config show`.
 ALL_TOOLS="claude agents codex opencode pi openclaw hermes antigravity windsurf"
@@ -145,6 +177,8 @@ OPTIONS
   --force-agents     Back up and replace unmanaged agent files with the same names
   --uninstall        Remove installed files instead of installing them
   --dry-run          Print actions without copying
+  --use-asm          Install with asm (agent-skill-manager); skip the asm prompt
+  --no-asm-prompt    Do not offer asm; use this install script only
   --help             Show this help
 
 SUPPORTED TOOLS
@@ -171,6 +205,82 @@ ok()   { log "✓ $*"; }
 warn() { log "⚠ $*"; }
 err()  { log "✗ $*" >&2; }
 
+idd_rebind_paths() {
+  ROOT_SKILLS="$ROOT/skills"
+  DIST_SKILLS_FALLBACK="$ROOT/dist/skills"
+  DIST_AGENTS="$ROOT/dist/agents"
+  DIST_PLUGIN="$ROOT/dist/plugin"
+}
+
+# Ensure skills/ and dist/agents/ reflect the latest default branch (or local
+# checkout). Installs always copy from this tree — not from skill version fields.
+idd_sync_source_tree() {
+  if [ "$SOURCE_SYNCED" -eq 1 ]; then
+    return 0
+  fi
+
+  if [ "$IDD_SKIP_SOURCE_SYNC" = "1" ]; then
+    info "IDD_SKIP_SOURCE_SYNC=1 — using tree at $ROOT"
+    SOURCE_SYNCED=1
+    return 0
+  fi
+
+  if [ "$IDD_REMOTE_INSTALL" -eq 1 ]; then
+    command -v git &>/dev/null || die "git is required for curl | bash install"
+    mkdir -p "$(dirname -- "$IDD_INSTALL_CACHE")"
+    if [ -d "$IDD_INSTALL_CACHE/.git" ]; then
+      info "refreshing IDD source (origin/$IDD_INSTALL_BRANCH)..."
+      if ! git -C "$IDD_INSTALL_CACHE" fetch --depth 1 origin "$IDD_INSTALL_BRANCH" 2>/dev/null; then
+        git -C "$IDD_INSTALL_CACHE" fetch origin "$IDD_INSTALL_BRANCH"
+      fi
+      git -C "$IDD_INSTALL_CACHE" reset --hard "origin/$IDD_INSTALL_BRANCH"
+    else
+      info "cloning IDD ($IDD_INSTALL_BRANCH)..."
+      rm -rf "$IDD_INSTALL_CACHE"
+      git clone --depth 1 --branch "$IDD_INSTALL_BRANCH" "$IDD_INSTALL_REPO" "$IDD_INSTALL_CACHE"
+    fi
+    ROOT="$IDD_INSTALL_CACHE"
+    idd_rebind_paths
+    SOURCE_SYNCED=1
+    ok "source ready at $ROOT"
+    return 0
+  fi
+
+  if [ -d "$ROOT/.git" ] && command -v git &>/dev/null; then
+    if [ -n "$(git -C "$ROOT" status --porcelain 2>/dev/null)" ]; then
+      info "local changes present — installing from current working tree"
+      SOURCE_SYNCED=1
+      return 0
+    fi
+    info "syncing checkout with origin/$IDD_INSTALL_BRANCH..."
+    if git -C "$ROOT" fetch origin "$IDD_INSTALL_BRANCH" 2>/dev/null && \
+       git -C "$ROOT" pull --ff-only origin "$IDD_INSTALL_BRANCH" 2>/dev/null; then
+      ok "checkout fast-forwarded to latest origin/$IDD_INSTALL_BRANCH"
+    else
+      warn "could not sync with remote — installing from current working tree"
+    fi
+  fi
+  SOURCE_SYNCED=1
+}
+
+die() { err "$@"; exit 1; }
+
+run_build() {
+  local reason="$1"
+  shift || true
+  info "$reason — attempting auto-build..."
+  if [ ! -f "$ROOT/scripts/build.sh" ]; then
+    err "scripts/build.sh not found — cannot auto-build"
+    exit 1
+  fi
+  if (cd "$ROOT" && ./scripts/build.sh "$@" >/dev/null 2>&1); then
+    ok "auto-build succeeded"
+  else
+    err "auto-build failed — please run ./scripts/build.sh manually"
+    exit 1
+  fi
+}
+
 run() {
   if [ "$DRY_RUN" -eq 1 ]; then
     log "  (dry-run) $*"
@@ -193,6 +303,81 @@ tool_label() {
     windsurf)    printf '%s\n' "Windsurf" ;;
     *)           printf '%s\n' "$1" ;;
   esac
+}
+
+# Offer asm (recommended) before the bundled copy installer. Yes → ensure asm is
+# on PATH, then `asm install <repo>` (optional --skill). No → continue here.
+should_offer_asm() {
+  [ "$ACTION" = "install" ] || return 1
+  [ "$NO_ASM_PROMPT" -eq 0 ] || return 1
+  [ "$USE_ASM" -eq 0 ] || return 1
+  [ "$IDD_SKIP_ASM_PROMPT" != "1" ] || return 1
+  [ "$MODE" = "standalone" ] || return 1
+  { [ "${IDD_FORCE_ASM_PROMPT:-0}" = "1" ] || { [ -t 0 ] && [ -r /dev/tty ]; }; }
+}
+
+prompt_for_asm() {
+  {
+    log ""
+    log "◆ Install IDD skills via asm (agent-skill-manager)?"
+    log "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
+    log "  asm is the recommended installer (pulls latest skills from GitHub,"
+    log "  works across Claude Code, Codex, Pi, and other agents)."
+    log ""
+    log "  [Y] Yes — install asm if needed, then run asm install"
+    log "  [n] No  — continue with this script (copy skills to tool dirs)"
+    log ""
+    log "  Press Enter for Yes."
+  } >&2
+  local reply
+  printf '  Install via asm? [Y/n] ' >&2
+  if [ -t 0 ] || [ "${IDD_FORCE_ASM_PROMPT:-0}" = "1" ]; then
+    read -r reply || reply=""
+  else
+    read -r reply </dev/tty || reply=""
+  fi
+  case "$(printf '%s' "$reply" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')" in
+    n|no) return 1 ;;
+    *) return 0 ;;
+  esac
+}
+
+ensure_asm_cmd() {
+  if command -v asm &>/dev/null; then
+    ok "asm found: $(command -v asm)"
+    return 0
+  fi
+  info "asm not on PATH — installing agent-skill-manager..."
+  if command -v npm &>/dev/null; then
+    if ! npm install -g agent-skill-manager; then
+      die "npm install -g agent-skill-manager failed"
+    fi
+  else
+    if ! curl -fsSL https://raw.githubusercontent.com/luongnv89/agent-skill-manager/main/install.sh | bash; then
+      die "asm install script failed — install manually: npm install -g agent-skill-manager"
+    fi
+  fi
+  command -v asm &>/dev/null || die "asm still not on PATH after install"
+  ok "asm installed"
+}
+
+run_asm_install() {
+  local -a asm_args=(install "$IDD_ASM_INSTALL_URL")
+  if [ -n "$ONLY_SKILL" ]; then
+    asm_args+=(--skill "$ONLY_SKILL")
+  fi
+  if [ "$DRY_RUN" -eq 1 ]; then
+    log "  (dry-run) would ensure asm on PATH, then: asm ${asm_args[*]}"
+    log ""
+    ok "done (dry-run) — asm install not executed"
+    exit 0
+  fi
+  ensure_asm_cmd
+  info "running: asm ${asm_args[*]}"
+  asm "${asm_args[@]}"
+  log ""
+  ok "done — restart your agent tool(s) to load skills installed via asm"
+  exit 0
 }
 
 # Interactively prompt for one or more tools, populating TOOLS. Falls back to
@@ -292,10 +477,28 @@ while [ $# -gt 0 ]; do
     --force-agents) FORCE_AGENTS=1; shift ;;
     --uninstall) ACTION="uninstall"; shift ;;
     --dry-run)   DRY_RUN=1; shift ;;
+    --use-asm)   USE_ASM=1; shift ;;
+    --no-asm-prompt) NO_ASM_PROMPT=1; shift ;;
     -h|--help)   usage; exit 0 ;;
     *)           err "Unknown argument: $1"; usage >&2; exit 1 ;;
   esac
 done
+
+if [ "$USE_ASM" -eq 1 ]; then
+  if [ "$ACTION" != "install" ]; then
+    err "--use-asm only applies to install (not --uninstall)"
+    exit 1
+  fi
+  if [ "$MODE" != "standalone" ]; then
+    err "--use-asm only supports standalone skill install (not --plugin / --all / --agents-only)"
+    exit 1
+  fi
+  run_asm_install
+fi
+
+if should_offer_asm && prompt_for_asm; then
+  run_asm_install
+fi
 
 # Resolve the tool selection when none was given on the command line.
 # For a standalone install on an interactive terminal, prompt the user to
@@ -339,21 +542,11 @@ esac
 # ---------------------------------------------------------------------------
 
 ensure_skills_src() {
+  idd_sync_source_tree
   # Primary source: repo-root skills/ (committed, no build needed).
   if [ ! -d "$ROOT_SKILLS" ] || [ -z "$(ls -A "$ROOT_SKILLS" 2>/dev/null)" ]; then
     # skills/ missing or empty — try auto-build
-    info "skills/ missing or empty — attempting auto-build..."
-    if [ -f "$ROOT/scripts/build.sh" ]; then
-      if "$ROOT/scripts/build.sh" >/dev/null 2>&1; then
-        ok "auto-build succeeded"
-      else
-        err "auto-build failed — please run ./scripts/build.sh manually"
-        exit 1
-      fi
-    else
-      err "scripts/build.sh not found — cannot auto-build"
-      exit 1
-    fi
+    run_build "skills/ missing or empty"
   fi
   # Use skills/ (the build always emits it).
   local SKILLS_SRC="$ROOT_SKILLS"
@@ -381,7 +574,12 @@ ensure_skills_src() {
 }
 
 ensure_agents_src() {
-  if [ ! -d "$DIST_AGENTS" ]; then
+  idd_sync_source_tree
+  if [ ! -d "$DIST_AGENTS" ] || [ -z "$(ls -A "$DIST_AGENTS" 2>/dev/null)" ]; then
+    # dist/agents is gitignored, so fresh clones/cache installs need to build it.
+    run_build "dist/agents/ missing or empty" --no-promote-skills
+  fi
+  if [ ! -d "$DIST_AGENTS" ] || [ -z "$(ls -A "$DIST_AGENTS" 2>/dev/null)" ]; then
     err "dist/agents/ not found at $DIST_AGENTS"
     err "  Run: ./scripts/build.sh"
     exit 1
@@ -435,13 +633,8 @@ install_one_agent() {
 
   run mkdir -p "$agents_dest"
   if [ -f "$dst" ]; then
-    if cmp -s "$src" "$dst"; then
-      ok "agent current: $name -> $dst"
-      return
-    fi
-
     if is_idd_managed_agent "$dst"; then
-      info "updating managed agent: $name"
+      info "refreshing managed agent: $name"
     elif [ "$FORCE_AGENTS" -eq 1 ]; then
       local backup="$dst.bak.$(date +%Y%m%d%H%M%S)"
       warn "backing up unmanaged agent before replace: $backup"

@@ -17,6 +17,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 BUILD_SH="$REPO_ROOT/scripts/build.sh"
 INSTALL_SH="$REPO_ROOT/scripts/install.sh"
+ROOT_INSTALL_SH="$REPO_ROOT/install.sh"
 SKILLS="$REPO_ROOT/skills"
 
 PASS=0
@@ -30,6 +31,8 @@ echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄�
 
 TMP_HOME="$(mktemp -d)"
 trap 'rm -rf "$TMP_HOME"' EXIT
+export IDD_SKIP_SOURCE_SYNC=1
+export IDD_SKIP_ASM_PROMPT=1
 
 if "$BUILD_SH" >/dev/null 2>&1; then
   pass "T0: build.sh generates current outputs"
@@ -242,6 +245,38 @@ if ! grep -q 'Select the tool' <<< "$out" && grep -q '\[claude\] installing' <<<
   pass "T8.8: non-interactive run skips prompt, defaults to Claude"
 else
   fail "T8.8: non-interactive run did not behave correctly"
+fi
+
+# asm offer: declining continues with bundled installer
+out="$(printf 'n\n' | IDD_FORCE_ASM_PROMPT=1 IDD_SKIP_ASM_PROMPT=0 HOME="$TMP_HOME" "$INSTALL_SH" --dry-run --tool codex 2>&1 || true)"
+if grep -q 'Install IDD skills via asm' <<< "$out" && grep -q '\[codex\] installing' <<< "$out"; then
+  pass "T9: declining asm prompt continues with install.sh"
+else
+  fail "T9: asm decline did not fall through to bundled install"
+fi
+
+# --no-asm-prompt skips asm question
+out="$(IDD_FORCE_ASM_PROMPT=1 IDD_SKIP_ASM_PROMPT=0 HOME="$TMP_HOME" "$INSTALL_SH" --dry-run --no-asm-prompt --tool pi 2>&1 || true)"
+if ! grep -q 'Install IDD skills via asm' <<< "$out" && grep -q '\[pi\] installing' <<< "$out"; then
+  pass "T9.1: --no-asm-prompt skips asm offer"
+else
+  fail "T9.1: --no-asm-prompt did not skip asm prompt"
+fi
+
+# ───────────────────────────────────────────────────────────
+# T10: curl|bash bootstrap ignores unrelated local scripts/install.sh
+# ───────────────────────────────────────────────────────────
+BOOT_TMP="$TMP_HOME/bootstrap-cwd"
+REMOTE_RAW="$TMP_HOME/bootstrap-raw"
+mkdir -p "$BOOT_TMP/scripts" "$REMOTE_RAW/scripts"
+printf '%s\n' '#!/usr/bin/env bash' 'echo LOCAL_SENTINEL_EXECUTED' 'exit 42' > "$BOOT_TMP/scripts/install.sh"
+printf '%s\n' '#!/usr/bin/env bash' 'echo REMOTE_INSTALLER_EXECUTED' > "$REMOTE_RAW/scripts/install.sh"
+chmod +x "$BOOT_TMP/scripts/install.sh" "$REMOTE_RAW/scripts/install.sh"
+out="$( (cd "$BOOT_TMP" && IDD_INSTALL_RAW="file://$REMOTE_RAW" bash < "$ROOT_INSTALL_SH") 2>&1 || true)"
+if grep -q 'REMOTE_INSTALLER_EXECUTED' <<< "$out" && ! grep -q 'LOCAL_SENTINEL_EXECUTED' <<< "$out"; then
+  pass "T10: stdin bootstrap downloads remote installer instead of local cwd sentinel"
+else
+  fail "T10: stdin bootstrap used local cwd scripts/install.sh or failed"
 fi
 
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"

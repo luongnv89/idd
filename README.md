@@ -190,7 +190,16 @@ After install, restart Claude Code so it picks up the new skill(s). The full fla
 
 #### From-source alternative (no `asm` required)
 
-If you can't or don't want to install `asm`, clone the repo and run the bundled install script. One command, no manual `tar`/`cp`, idempotent on re-run:
+If you can't or don't want to install `asm`, use the install script. Re-running **always** replaces each installed skill directory and refreshes IDD-managed agents from the latest files on `main` — it does not compare `metadata.version` or skip when content looks unchanged.
+
+**One-liner (no clone):**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/luongnv89/idd/main/install.sh | bash
+# or pass flags:  curl -fsSL .../install.sh | bash -s -- --tools all
+```
+
+**From a clone:**
 
 ```bash
 git clone https://github.com/luongnv89/idd.git
@@ -204,9 +213,11 @@ cd idd
 # or every supported tool: ./scripts/install.sh --tools all
 ```
 
-> When run on a terminal with no `--tool`/`--tools` flag, the script shows an interactive picker so you can select one or more tools. In a non-interactive context (CI, `curl | bash` without a TTY, piped input) it falls back to Claude Code so automation keeps working.
+> On an interactive terminal, the script first asks whether to install via **asm** (recommended). If you choose Yes, it installs `agent-skill-manager` when needed and runs `asm install https://github.com/luongnv89/idd`. Choose No to continue with the bundled copy installer. Skip the question with `--use-asm` or `--no-asm-prompt`.
+>
+> When run with no `--tool`/`--tools` flag (and not using asm), the script shows a tool picker. In a non-interactive context (CI, no TTY) it falls back to Claude Code.
 
-The script copies each `dist/skills/<name>/` to the selected tool's skills directory (default `~/.claude/skills/<name>/`). It supports `claude`, `agents`, `codex`, `opencode`, `pi`, `openclaw`, `hermes`, `antigravity`, and `windsurf` — each `dist/skills/<name>/` is a self-contained SKILL.md tree (the shared agents are bundled inside it at `references/agents/`), so a skill runs on any SKILL.md-compatible tool. Shared agents are *also* installed standalone from `dist/agents/*.md` into `~/.claude/agents/` (and `~/.agents/agents/`) — a Claude Code optimization for native subagent spawning; other tools use the bundled copies. The installer replaces IDD-managed agents cleanly, removes stale managed agents on update, and skips unmanaged same-name agents unless you pass `--force-agents` (which backs them up before replacement). Use `./scripts/install.sh --target <dir>` to target a different Claude root (Claude tool only; other tools use their fixed conventions). Pure POSIX bash — no extra runtime needed.
+The script copies each committed `skills/<name>/` tree to the selected tool's skills directory (default `~/.claude/skills/<name>/`). It supports `claude`, `agents`, `codex`, `opencode`, `pi`, `openclaw`, `hermes`, `antigravity`, and `windsurf` — each `dist/skills/<name>/` is a self-contained SKILL.md tree (the shared agents are bundled inside it at `references/agents/`), so a skill runs on any SKILL.md-compatible tool. Shared agents are *also* installed standalone from `dist/agents/*.md` into `~/.claude/agents/` (and `~/.agents/agents/`) — a Claude Code optimization for native subagent spawning; other tools use the bundled copies. The installer replaces IDD-managed agents cleanly, removes stale managed agents on update, and skips unmanaged same-name agents unless you pass `--force-agents` (which backs them up before replacement). Use `./scripts/install.sh --target <dir>` to target a different Claude root (Claude tool only; other tools use their fixed conventions). Pure POSIX bash — no extra runtime needed.
 
 You can also do the copy by hand if you prefer to see every file move:
 
