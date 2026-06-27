@@ -392,7 +392,7 @@ When triggered, present the already-selected recommended option for confirmation
 ◆ Design confirm — issue #N (high complexity)
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Proceed with Option {recommended.number} — {recommended.name}?
-    Changes:        {recommended.summary} ({M} files)
+    Changes:        {recommended.summary} ({len(files_to_modify)} files)
     Residual risk:  {recommended.risk_details}
   Proceed? [Y/n]
 ```
