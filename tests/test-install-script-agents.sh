@@ -55,7 +55,7 @@ fi
 # ───────────────────────────────────────────────────────────
 TARGET_FRESH="$TMP_ROOT/fresh-target"
 rm -rf "$DIST_AGENTS"
-if "$INSTALL_SH" --target "$TARGET_FRESH" >"$TMP_ROOT/fresh.log" 2>&1; then
+if (cd "$TMP_ROOT" && "$INSTALL_SH" --target "$TARGET_FRESH") >"$TMP_ROOT/fresh.log" 2>&1; then
   if [ -d "$DIST_AGENTS" ] && [ -f "$TARGET_FRESH/agents/codebase-researcher.md" ]; then
     pass "T2.0: install auto-builds missing dist/agents before provisioning agents"
   else

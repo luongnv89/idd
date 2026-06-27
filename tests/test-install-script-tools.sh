@@ -17,6 +17,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 BUILD_SH="$REPO_ROOT/scripts/build.sh"
 INSTALL_SH="$REPO_ROOT/scripts/install.sh"
+ROOT_INSTALL_SH="$REPO_ROOT/install.sh"
 SKILLS="$REPO_ROOT/skills"
 
 PASS=0
@@ -260,6 +261,22 @@ if ! grep -q 'Install IDD skills via asm' <<< "$out" && grep -q '\[pi\] installi
   pass "T9.1: --no-asm-prompt skips asm offer"
 else
   fail "T9.1: --no-asm-prompt did not skip asm prompt"
+fi
+
+# ───────────────────────────────────────────────────────────
+# T10: curl|bash bootstrap ignores unrelated local scripts/install.sh
+# ───────────────────────────────────────────────────────────
+BOOT_TMP="$TMP_HOME/bootstrap-cwd"
+REMOTE_RAW="$TMP_HOME/bootstrap-raw"
+mkdir -p "$BOOT_TMP/scripts" "$REMOTE_RAW/scripts"
+printf '%s\n' '#!/usr/bin/env bash' 'echo LOCAL_SENTINEL_EXECUTED' 'exit 42' > "$BOOT_TMP/scripts/install.sh"
+printf '%s\n' '#!/usr/bin/env bash' 'echo REMOTE_INSTALLER_EXECUTED' > "$REMOTE_RAW/scripts/install.sh"
+chmod +x "$BOOT_TMP/scripts/install.sh" "$REMOTE_RAW/scripts/install.sh"
+out="$( (cd "$BOOT_TMP" && IDD_INSTALL_RAW="file://$REMOTE_RAW" bash < "$ROOT_INSTALL_SH") 2>&1 || true)"
+if grep -q 'REMOTE_INSTALLER_EXECUTED' <<< "$out" && ! grep -q 'LOCAL_SENTINEL_EXECUTED' <<< "$out"; then
+  pass "T10: stdin bootstrap downloads remote installer instead of local cwd sentinel"
+else
+  fail "T10: stdin bootstrap used local cwd scripts/install.sh or failed"
 fi
 
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"

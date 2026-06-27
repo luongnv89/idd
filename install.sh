@@ -10,12 +10,20 @@
 
 set -euo pipefail
 
-HERE="$(cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" && pwd)"
+SCRIPT_PATH="${BASH_SOURCE[0]:-}"
 IDD_RAW_BASE="${IDD_INSTALL_RAW:-https://raw.githubusercontent.com/luongnv89/idd/main}"
 
-if [ -f "$HERE/scripts/install.sh" ]; then
-  exec bash "$HERE/scripts/install.sh" "$@"
-fi
+case "$SCRIPT_PATH" in
+  ""|-|/dev/stdin|/dev/fd/*|/proc/*/fd/*) ;;
+  *)
+    if [ -f "$SCRIPT_PATH" ]; then
+      HERE="$(cd -- "$(dirname -- "$SCRIPT_PATH")" && pwd)"
+      if [ -f "$HERE/scripts/install.sh" ]; then
+        exec bash "$HERE/scripts/install.sh" "$@"
+      fi
+    fi
+    ;;
+esac
 
 TMP_INSTALLER="$(mktemp)"
 trap 'rm -f "$TMP_INSTALLER"' EXIT

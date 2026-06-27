@@ -273,7 +273,7 @@ run_build() {
     err "scripts/build.sh not found — cannot auto-build"
     exit 1
   fi
-  if "$ROOT/scripts/build.sh" "$@" >/dev/null 2>&1; then
+  if (cd "$ROOT" && ./scripts/build.sh "$@" >/dev/null 2>&1); then
     ok "auto-build succeeded"
   else
     err "auto-build failed — please run ./scripts/build.sh manually"
