@@ -263,9 +263,12 @@ generate anything new. Pull `name`, `summary`, `files_to_modify` (count), and
 This is the **only** new interactive pause. It is independent of `resolve.approval_gate`:
 even with `approval_gate: auto` (which otherwise proceeds silently with the recommended
 option), the high-complexity checkpoint still asks — that is the entire point of the gate.
-With `approval_gate: comment-and-wait` the user has already chosen an option above; if that
-choice is the recommended high-complexity option, the design-confirm prompt is redundant
-and is skipped (the explicit selection already served as the agreement point).
+With `approval_gate: comment-and-wait` the user has **already made an explicit option choice
+above**, so that selection itself served as the agreement point — the design-confirm prompt
+is redundant and is skipped regardless of whether the chosen option was the recommended one.
+The checkpoint therefore only ever fires on the auto-gate/default path, where the recommended
+option is exactly what proceeds to Step 3 — which is why the prompt box above keys off
+`recommended.*`.
 
 #### Auto mode
 
