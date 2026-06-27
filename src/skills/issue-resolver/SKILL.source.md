@@ -5,7 +5,7 @@ license: MIT
 compatibility: "Requires git and GitHub CLI (gh) with authentication and push access. Self-contained — uses shared agents from shared/agents/."
 effort: max
 metadata:
-  version: 0.12.0
+  version: 0.12.1
   author: Luong NGUYEN <luongnv89@gmail.com>
 ---
 
@@ -170,7 +170,7 @@ Check these files relative to the skill's directory (the dirname of this SKILL.m
 - `references/agents/ui-reviewer.md` — UI/UX review subagent (Step 4, auto-detected)
 - `references/agents/fixer.md` — QA fix subagent (Step 4)
 - `references/pipeline-steps.md` — Full delegation payloads, phases, and inline fallbacks for Steps 1–4
-- `references/report-templates.md` — PR body template, final report templates, and expected inline output
+- `references/report-templates.md` — PR body template, closing summary templates, and expected inline output
 - `references/bug-verification.md` — Red-capable reproduction checkpoint for bug issues (Step 3, before the fix)
 - `references/docs/sync-conventions.md` — stash-first sync convention and recovery
 - `references/docs/naming-conventions.md` — branch, commit, PR naming conventions
@@ -611,13 +611,20 @@ Do not rewrite or reorder existing lines; only append.
 
 ---
 
-## Final Report
+## Closing Summary
 
-After the pipeline completes, print a structured step-by-step summary so the user can scan the whole resolution at a glance. Use the templates in `references/report-templates.md`:
+After the pipeline completes, print **one** closing block that repeats **nothing**
+the live `[N/5]` tracker already showed — not the per-step pass/fail, and not the
+per-step metrics (files read, complexity, option, files changed, test counts, QA
+cycles are all on the tracker lines). Repeating any of them is the duplication
+issue #165 removed. The closing block carries only the facts the tracker never
+printed: the outcome line, the `risk_rating`, and the single PR reference (number,
+title, URL, `Closes #N`). Use the matching variant in
+`references/report-templates.md` (*Closing Summary*):
 
-- *Final Report — Successful Resolution* — every step passed
-- *Final Report — Resolution With Warnings* — QA left residual issues or another step warned
-- *Final Report — Already Resolved* — Step 0 or Step 1 detected the issue was already closed
+- *Successful Resolution* — every step passed
+- *Resolution With Warnings* — QA left residual issues or another step warned
+- *Already Resolved* — Step 0 or Step 1 detected the issue was already closed (no PR reference, since none was created)
 
 ---
 
@@ -640,7 +647,10 @@ No `[y/N]` prompts, no `Choose:` prompts, no `Continue?` prompts. Every decision
 
 ## Expected Output
 
-A successful resolve prints the 6-step tracker and ends with the PR URL — see the *Expected Inline Pipeline Output* example in `references/report-templates.md`.
+A successful resolve prints the 6-step tracker, then the single Closing Summary
+block — per-step status appears only in the tracker, the full PR reference only in
+the closing block, never both. See the *Expected Inline Pipeline Output* example in
+`references/report-templates.md`.
 
 ## Edge Cases
 

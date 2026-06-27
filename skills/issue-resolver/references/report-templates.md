@@ -1,6 +1,6 @@
 # Report and PR Body Templates
 
-Templates for the PR body, the step-by-step final report, and the expected pipeline output. SKILL.md references this file at the relevant steps — do not inline these templates back into SKILL.md.
+Templates for the PR body, the single closing summary, and the expected pipeline output. SKILL.md references this file at the relevant steps — do not inline these templates back into SKILL.md.
 
 ## PR Body Template (Step 5 — Deliver)
 
@@ -63,63 +63,68 @@ If a fresh `.gitissue/analysis-<N>.json` exists for this issue, lift its `decisi
 
 If no analysis JSON exists (e.g., resolver was invoked without prior analysis), synthesize the same five core fields from the resolver's own Step 1 (Research) and Step 2 (Plan) findings, and use the synced base SHA as `commit_sha_short`. (For bug issues the sixth `Reproduction` line is added separately from the implementer's returned reproduction block — see the bug-verification checkpoint, not the analysis JSON.) Either source produces the same template — what matters is that the durable analysis signal lands in the PR body, where squash-merge will carry it into git history.
 
-## Final Report — Successful Resolution
+## Closing Summary
+
+The closing summary is the **single** end-of-run block. It does **not** repeat
+anything the live `[N/5]` tracker already showed — neither per-step pass/fail nor
+the per-step metrics (files read, complexity, option, files changed, test counts,
+QA cycles all appear on the tracker lines, see *Expected Inline Pipeline Output*).
+The closing block carries **only facts the tracker never printed**: the overall
+outcome line, the `risk_rating` (Plan never surfaces it on its tracker line), and
+the single PR reference (number, title, URL, `Closes #N`). Print it **once**,
+immediately after the tracker's `[5/5]` line — do not also print a separate
+step-by-step report. Pick the variant that matches the run's outcome.
+
+> Why so spare: the tracker is the recap. Restating its metrics here is the
+> duplication #165 removed — keep this block to the outcome, the one un-shown
+> metric (risk), and the PR reference.
+
+### Successful Resolution
+
+Every step passed:
 
 ```
-◆ Issue #{issue_number} — resolved
-┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-
-  Preflight:       ✓ pass
-  Research:        ✓ pass ({files_read} files analyzed, {complexity})
-  Plan:            ✓ pass ({option_name}, {risk_rating} risk)
-  Implement:       ✓ pass ({files_changed} files, {tests_written} tests)
-  QA:              ✓ pass ({cycles} cycles, {issues_found} issues fixed)
-  Deliver:         ✓ pass (PR #{pr_number} created)
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  Result:          DONE
+  ✓ Issue #{issue_number} resolved ({risk_rating} risk)
 
   PR #{pr_number}: {pr_title}
   https://github.com/owner/repo/pull/{pr_number}
   Closes #{issue_number}
 ```
 
-## Final Report — Resolution With Warnings
+### Resolution With Warnings
 
-When any step had problems (e.g., QA could not fully clean up, tests still flaky):
+When any step had problems (e.g., QA could not fully clean up, tests still flaky).
+The outcome line names the residual issue — the remaining-count and cycle total
+are genuinely new (the tracker's `[4/5] QA` line would have shown the in-progress
+state, not the final unresolved count):
 
 ```
-◆ Issue #{issue_number} — resolved with warnings
-┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-
-  Preflight:       ✓ pass
-  Research:        ✓ pass ({files_read} files analyzed)
-  Plan:            ✓ pass ({option_name})
-  Implement:       ✓ pass ({files_changed} files)
-  QA:              ⚠ warn ({remaining} issues remain after {cycles} cycles)
-  Deliver:         ✓ pass (PR #{pr_number} created)
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  Result:          DONE (manual review recommended)
+  ⚠ Issue #{issue_number} resolved — manual review recommended ({risk_rating} risk)
+    ⚠ QA: {remaining} issues remain after {cycles} cycles
 
   PR #{pr_number}: {pr_title}
   https://github.com/owner/repo/pull/{pr_number}
   Closes #{issue_number}
 ```
 
-## Final Report — Already Resolved
+### Already Resolved
+
+Step 0 or Step 1 detected the issue was already closed — no PR is created, so the
+PR reference is omitted entirely. The fixing SHA is the one new fact:
 
 ```
-◆ Issue #{issue_number} — already resolved
-┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-
-  Preflight:       ✓ pass
-  Research:        ○ skipped (already fixed by {sha7})
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  Result:          SKIPPED — issue closed
+  ○ Issue #{issue_number} already resolved — closed, no PR needed
+    already fixed by {sha7}
 ```
 
 ## Expected Inline Pipeline Output
 
-A successful resolve prints the full 6-step tracker and ends with the PR URL:
+A successful resolve prints the full 6-step tracker, then the single Closing
+Summary block — per-step status appears only in the tracker, the PR reference only
+in the closing block:
 
 ```
   ◆ Resolve Pipeline
@@ -130,8 +135,15 @@ A successful resolve prints the full 6-step tracker and ends with the PR URL:
   [3/5] Implement    ✓ 3 files changed, 8 unit tests, 2 e2e tests
   [4/5] QA           ✓ clean after 2 cycles
   [5/5] Deliver      ✓ PR #87 created
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  ✓ Issue #42 resolved (low risk)
 
-  ✓ Done — PR #87: fix(auth): resolve mobile auth redirect (#42)
-    https://github.com/user/repo/pull/87
-    Closes #42
+  PR #87: fix(auth): resolve mobile auth redirect (#42)
+  https://github.com/user/repo/pull/87
+  Closes #42
 ```
+
+Every metric the old closing block restated — files read, complexity, option,
+files changed, test counts, QA cycles — is already on a `[N/5]` tracker line
+above. Only the outcome, the `risk_rating`, and the PR reference are new, so only
+those appear below the separator.
