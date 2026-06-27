@@ -260,7 +260,7 @@ generate anything new. Pull `name`, `summary`, `files_to_modify` (count), and
     Re-run /issue-resolver {N} to try again, or refine the issue scope first.
   ```
 
-This is the **only** new interactive pause. It is independent of `resolve.approval_gate`:
+This is the **only** new interactive pause. It is **not suppressed by `approval_gate: auto`**:
 even with `approval_gate: auto` (which otherwise proceeds silently with the recommended
 option), the high-complexity checkpoint still asks — that is the entire point of the gate.
 With `approval_gate: comment-and-wait` the user has **already made an explicit option choice
