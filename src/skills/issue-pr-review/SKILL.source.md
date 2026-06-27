@@ -5,7 +5,7 @@ license: MIT
 compatibility: "Requires git and GitHub CLI (gh) with authentication. Self-contained — uses shared agents from shared/agents/."
 effort: high
 metadata:
-  version: 2.2.0
+  version: 2.2.1
   author: Luong NGUYEN <luongnv89@gmail.com>
 ---
 
@@ -316,18 +316,9 @@ For the confirmation pass, spawn one **fresh** UI reviewer for an unbiased final
 
 #### Browser-based review (optional, gated)
 
-Browser review runs only when it both *can* and *should*. Check `review.ui_review.browser_review`:
+Browser review runs only when it both *can* and *should*.
 
-- **`"false"`** — skip; code review already ran.
-- **`"ask"`** — prompt interactive users; skip silently in auto mode.
-- **`"true"`** — proceed to the capability check below.
-
-Then verify the runtime can actually capture screenshots — **all** must hold:
-1. A target app is running and reachable (e.g. `curl -sf {app_url}` succeeds).
-2. A headless browser is available (Playwright/Chromium installed). A headless server with no physical display is fine — headless Chromium needs no display; what it needs is the browser binary and a reachable app.
-3. Capture is safe (not a production URL, no auth wall that would log real traffic).
-
-**Detect the display environment (for the report only — capture is always headless).** Before capturing, classify the runtime as *no-GUI/server* or *graphical* so the review output can state the environment. This label never selects the launch mode and never gates the review — Playwright always runs **headless** (the only capture mode this review has ever used), so behavior on a graphical display is unchanged:
+**First, detect the display environment (for the report only — capture is always headless).** Classify the runtime as *no-GUI/server* or *graphical* up front, before the gate and capability checks, so `ui_env` is always defined for every code path below — including the early skip paths. This label never selects the launch mode and never gates the review — Playwright always runs **headless** (the only capture mode this review has ever used), so behavior on a graphical display is unchanged:
 
 ```bash
 # Label the environment for reporting. Capture stays headless either way —
@@ -340,6 +331,17 @@ fi
 ```
 
 This detection is **report-only**: it is never a fourth gate, and it never switches Playwright to a headed launch. A no-GUI result does **not** skip the browser review — headless Chromium needs no display, so capture proceeds headless exactly as it does on a graphical host.
+
+Then check `review.ui_review.browser_review`:
+
+- **`"false"`** — skip; code review already ran.
+- **`"ask"`** — prompt interactive users; skip silently in auto mode.
+- **`"true"`** — proceed to the capability check below.
+
+Then verify the runtime can actually capture screenshots — **all** must hold:
+1. A target app is running and reachable (e.g. `curl -sf {app_url}` succeeds).
+2. A headless browser is available (Playwright/Chromium installed). A headless server with no physical display is fine — headless Chromium needs no display; what it needs is the browser binary and a reachable app.
+3. Capture is safe (not a production URL, no auth wall that would log real traffic).
 
 If the gate or any capability check fails, print a warning and skip — **without** affecting the code UI review that already ran. Name the environment so a no-GUI host is never mistaken for a silent skip:
 ```
