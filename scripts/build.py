@@ -4,8 +4,8 @@
 Reads authored sources under src/ + top-level docs/ and emits two
 distribution outputs:
 
-  skills/         — root-level flat skill index for repo URL installs (committed)
-  <out>/skills/   — flattened, harness-agnostic skills (committed)
+  skills/         — committed install surface (updated by ./scripts/build.sh after verify)
+  <out>/skills/   — flattened, harness-agnostic skills (default: dist/skills/)
   <out>/plugin/   — Claude Code plugin layout (built fresh in CI)
 
 The build is byte-deterministic per refactor-plan-v10.md §4.1.
@@ -843,9 +843,8 @@ def build(out: Path, src: Path, *, verbose: bool = False, no_root_skills: bool =
         if verbose:
             print(f"  ✓ flattened: {skill_name} (agents={len(agents)}, docs={len(docs)})")
 
-    # Repo-root flat skill index for `asm install <repo-url>`. Emitted by
-    # default (skills/ is the committed install surface). Use --no-root-skills
-    # to suppress when building to a temp directory only.
+    # Repo-root skills/ mirror. Prefer ./scripts/build.sh (build → verify →
+    # promote). Use --no-root-skills when emitting only to <out>/skills/.
     repo_root = src.parent
     if not no_root_skills:
         _emit_repo_root_skills(repo_root, out_skills)
@@ -892,7 +891,7 @@ def main(argv: list[str]) -> int:
     parser.add_argument(
         "--no-root-skills",
         action="store_true",
-        help="Do not emit the repo-root skills/ flat index.",
+        help="Do not copy output into repo-root skills/ (use ./scripts/build.sh for verify-then-promote).",
     )
     parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args(argv)

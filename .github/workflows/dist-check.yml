@@ -19,32 +19,16 @@ jobs:
       - name: Source-level checks (fast fail before build)
         run: bash tests/test-init-template-doc-urls-source.sh
 
-      # Drift must run BEFORE any in-place build. `./scripts/build.sh` (no
-      # --out) overwrites the repo-root skills/ tree (build.py
-      # _emit_repo_root_skills), so building first would mask committed drift.
-      # We also read the committed skills/ from git rather than the working
-      # tree, so this check stays correct regardless of step ordering.
-      - name: Drift check — committed skills/ must match transient build
-        run: |
-          TMP="$(mktemp -d)"
-          COMMITTED="$(mktemp -d)"
-          if ! ./scripts/build.sh --out "$TMP" --no-root-skills >/dev/null 2>&1; then
-            echo "::error::Build failed during drift check"
-            rm -rf "$TMP" "$COMMITTED"
-            exit 1
-          fi
-          # Extract the committed skills/ tree straight from the commit, so an
-          # earlier in-place build cannot make the comparison pass spuriously.
-          git archive HEAD skills/ | tar -x -C "$COMMITTED"
-          if ! diff -qr "$TMP/skills" "$COMMITTED/skills" > /dev/null 2>&1; then
-            echo "::error::skills/ is out of date. Run ./scripts/build.sh and commit the result."
-            rm -rf "$TMP" "$COMMITTED"
-            exit 1
-          fi
-          rm -rf "$TMP" "$COMMITTED"
-
-      - name: Build dist trees
+      # build.sh: compile → verify dist/skills → promote skills/ only on success
+      - name: Build and verify skills (update skills/ on success)
         run: ./scripts/build.sh
+
+      - name: Drift check — committed skills/ must match verified build
+        run: |
+          if ! git diff --exit-code -- skills/; then
+            echo "::error::skills/ is out of date. Run ./scripts/build.sh and commit the result."
+            exit 1
+          fi
 
       - name: test-build-script
         run: bash tests/test-build-script.sh
@@ -89,7 +73,7 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Build dist trees
+      - name: Build and verify skills
         run: ./scripts/build.sh
 
       - name: Verify tarball layout before release
