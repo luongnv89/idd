@@ -32,6 +32,8 @@ echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄�
 
 TMP_ROOT="$(mktemp -d)"
 trap 'rm -rf "$TMP_ROOT"' EXIT
+export IDD_SKIP_SOURCE_SYNC=1
+export IDD_SKIP_ASM_PROMPT=1
 
 if "$BUILD_SH" >/dev/null 2>&1; then
   pass "T1: build.sh generates current dist outputs"
@@ -113,18 +115,33 @@ else
 fi
 
 # ───────────────────────────────────────────────────────────
-# T4: re-running is idempotent
+# T4: re-running is idempotent and refreshes managed agent bytes
 # ───────────────────────────────────────────────────────────
 before_count="$(find "$TARGET_ALL/agents" -maxdepth 1 -type f -name '*.md' | wc -l | tr -d ' ')"
 if "$INSTALL_SH" --target "$TARGET_ALL" >/dev/null 2>&1; then
   after_count="$(find "$TARGET_ALL/agents" -maxdepth 1 -type f -name '*.md' | wc -l | tr -d ' ')"
   if [ "$before_count" = "$after_count" ]; then
-    pass "T4: repeat install leaves one file per managed agent"
+    pass "T4.1: repeat install leaves one file per managed agent"
   else
-    fail "T4: repeat install changed agent count ($before_count -> $after_count)"
+    fail "T4.1: repeat install changed agent count ($before_count -> $after_count)"
   fi
 else
-  fail "T4: repeat install failed"
+  fail "T4.1: repeat install failed"
+fi
+
+TARGET_REFRESH="$TMP_ROOT/refresh-target"
+"$INSTALL_SH" --target "$TARGET_REFRESH" >/dev/null 2>&1
+agent_dst="$TARGET_REFRESH/agents/codebase-researcher.md"
+agent_src="$DIST_AGENTS/codebase-researcher.md"
+if [ -f "$agent_dst" ] && [ -f "$agent_src" ]; then
+  printf '\n# test-stale-marker\n' >> "$agent_dst"
+  if "$INSTALL_SH" --target "$TARGET_REFRESH" >/dev/null 2>&1 && cmp -s "$agent_src" "$agent_dst"; then
+    pass "T4.2: repeat install overwrites managed agents from source (no version skip)"
+  else
+    fail "T4.2: repeat install did not refresh managed agent from source"
+  fi
+else
+  fail "T4.2: missing agent paths for refresh test"
 fi
 
 # ───────────────────────────────────────────────────────────

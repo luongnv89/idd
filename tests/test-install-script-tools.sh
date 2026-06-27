@@ -30,6 +30,8 @@ echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄�
 
 TMP_HOME="$(mktemp -d)"
 trap 'rm -rf "$TMP_HOME"' EXIT
+export IDD_SKIP_SOURCE_SYNC=1
+export IDD_SKIP_ASM_PROMPT=1
 
 if "$BUILD_SH" >/dev/null 2>&1; then
   pass "T0: build.sh generates current outputs"
@@ -242,6 +244,22 @@ if ! grep -q 'Select the tool' <<< "$out" && grep -q '\[claude\] installing' <<<
   pass "T8.8: non-interactive run skips prompt, defaults to Claude"
 else
   fail "T8.8: non-interactive run did not behave correctly"
+fi
+
+# asm offer: declining continues with bundled installer
+out="$(printf 'n\n' | IDD_FORCE_ASM_PROMPT=1 IDD_SKIP_ASM_PROMPT=0 HOME="$TMP_HOME" "$INSTALL_SH" --dry-run --tool codex 2>&1 || true)"
+if grep -q 'Install IDD skills via asm' <<< "$out" && grep -q '\[codex\] installing' <<< "$out"; then
+  pass "T9: declining asm prompt continues with install.sh"
+else
+  fail "T9: asm decline did not fall through to bundled install"
+fi
+
+# --no-asm-prompt skips asm question
+out="$(IDD_FORCE_ASM_PROMPT=1 IDD_SKIP_ASM_PROMPT=0 HOME="$TMP_HOME" "$INSTALL_SH" --dry-run --no-asm-prompt --tool pi 2>&1 || true)"
+if ! grep -q 'Install IDD skills via asm' <<< "$out" && grep -q '\[pi\] installing' <<< "$out"; then
+  pass "T9.1: --no-asm-prompt skips asm offer"
+else
+  fail "T9.1: --no-asm-prompt did not skip asm prompt"
 fi
 
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
