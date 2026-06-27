@@ -5,7 +5,7 @@ license: MIT
 compatibility: "Requires git and GitHub CLI (gh) with authentication and push access. Self-contained — uses shared agents from shared/agents/."
 effort: max
 metadata:
-  version: 0.12.1
+  version: 0.13.0
   author: Luong NGUYEN <luongnv89@gmail.com>
 ---
 
@@ -502,14 +502,32 @@ Then verify the runtime can actually capture screenshots — **all** must hold:
 2. A headless browser is available (Playwright/Chromium installed). A headless server with no display is fine — headless Chromium needs no display, only the browser binary and a reachable app.
 3. Capture is safe (not a production URL, no auth wall that would log real traffic).
 
-If the gate or any check fails, print a warning and skip — **without** affecting the code UI review that already ran:
+**Detect the display environment (for the report only — capture is always headless).** Before capturing, classify the runtime as *no-GUI/server* or *graphical* so the review output can state the environment. This label never selects the launch mode and never gates the review — Playwright always runs **headless** (the only capture mode this review has ever used), so behavior on a graphical display is unchanged:
+
+```bash
+# Label the environment for reporting. Capture stays headless either way —
+# headless Chromium needs no display, so a no-GUI/server host is fully supported.
+if [ "$(uname)" = "Darwin" ] || [ -n "${DISPLAY:-}" ] || [ -n "${WAYLAND_DISPLAY:-}" ]; then
+  ui_env="graphical"        # a display is present (macOS, or Linux with X11/Wayland)
+else
+  ui_env="no-GUI server"    # no display ($DISPLAY/$WAYLAND_DISPLAY unset on a non-macOS host)
+fi
 ```
-⚠ Browser review skipped — {reason}
+
+This detection is **report-only**: it is never a fourth gate, and it never switches Playwright to a headed launch. A no-GUI result does **not** skip the browser review — headless Chromium needs no display, so capture proceeds headless exactly as it does on a graphical host.
+
+If the gate or any check fails, print a warning and skip — **without** affecting the code UI review that already ran. Name the environment so a no-GUI host is never mistaken for a silent skip:
+```
+⚠ Browser review skipped — {reason} (environment: {ui_env})
   Code UI review still ran. Enable browser review with:
   resolve.ui_review.browser_review: "true"  (and ensure the app is running and reachable)
 ```
 
-When all hold, capture screenshots at mobile/tablet/desktop viewports and spawn the UI reviewer in **browser** mode with the screenshot paths and `{app_url}`. UI `action: "fix"` findings join the QA fixable issues handled by the fixer.
+When all hold, capture screenshots at mobile/tablet/desktop viewports with Playwright launched **headless**, then spawn the UI reviewer in **browser** mode with the screenshot paths and `{app_url}`. **Report the mode and environment** on success so the review output always states that the headless path ran and where:
+```
+✓ Browser review — captured 3 viewports (Playwright: headless; environment: {ui_env})
+```
+UI `action: "fix"` findings join the QA fixable issues handled by the fixer.
 
 Cycle mechanics, loop controls (`resolve.qa_max_cycles`, exit-on-clean, exit-on-stagnation), and the remaining-issues flow are in `references/pipeline-steps.md` (*Step 4 — QA*).
 
