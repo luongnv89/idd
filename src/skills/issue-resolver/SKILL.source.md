@@ -5,7 +5,7 @@ license: MIT
 compatibility: "Requires git and GitHub CLI (gh) with authentication and push access. Self-contained — uses shared agents from shared/agents/."
 effort: max
 metadata:
-  version: 0.14.0
+  version: 0.15.0
   author: Luong NGUYEN <luongnv89@gmail.com>
 ---
 
@@ -172,6 +172,7 @@ Check these files relative to the skill's directory (the dirname of this SKILL.m
 - `references/pipeline-steps.md` — Full delegation payloads, phases, and inline fallbacks for Steps 1–4
 - `references/report-templates.md` — PR body template, closing summary templates, and expected inline output
 - `references/bug-verification.md` — Red-capable reproduction checkpoint for bug issues (Step 3, before the fix)
+- `references/skill-index.md` — Optional external-skill catalog (luongnv89/skills) for the Step 3 propose sub-step
 - `references/docs/sync-conventions.md` — stash-first sync convention and recovery
 - `references/docs/naming-conventions.md` — branch, commit, PR naming conventions
 - `references/docs/pre-commit-security.md` — pre-commit security conventions reference
@@ -408,7 +409,31 @@ Decision Record so it survives into durable memory — see `references/report-te
 
 ## Step 3 — Implement
 
-Write code and tests based on the selected plan. Spawn the `implementer` subagent (see `shared/agents/implementer.md`) with the plan, branch name, and naming conventions. Use this Agent invocation:
+### Propose relevant skills (interactive only)
+
+Before spawning the implementer, optionally augment it with **optional external
+skills** from the index in `references/skill-index.md` (the skills published at
+`https://github.com/luongnv89/skills`). This is a Step 3 **sub-step**, not a new
+numbered step — it emits a `◆`/`○` block and does **not** print a `[N/5]` tracker
+line; the `[3/5]` Implement line is unchanged.
+
+1. **Detect what's installed** — intersect the catalog in `references/skill-index.md`
+   with the skills available on this system (`~/.claude/skills/<name>`). Detection
+   is **source-agnostic**: it reads the candidate names from the index file and
+   never hardcodes the source repo, so the index is swappable later (the #170 seam).
+2. **Propose the relevant subset** — from the *installed* skills, pick the ones
+   relevant to the analyzed task (use the Step 1 complexity/affected-files and the
+   index's lifecycle grouping so the proposal can span implementation,
+   verification, testing, and documentation). Present them for selection.
+3. **Accept all / some / none** — the user can take the whole proposed set, a
+   subset, or decline entirely. The chosen set becomes `selected_skills`.
+
+The implementer **uses the selected skills where applicable and always falls back
+to the internal agents as the reliable minimum** — selecting none leaves today's
+behavior unchanged. Full procedure (detection, the selection prompt, and the
+auto-mode behavior) is in `references/pipeline-steps.md` (*Step 3 — Propose relevant skills*).
+
+Write code and tests based on the selected plan. Spawn the `implementer` subagent (see `shared/agents/implementer.md`) with the plan, branch name, naming conventions, and the `selected_skills` chosen above. Use this Agent invocation:
 
 ```python
 Agent(
@@ -589,7 +614,7 @@ When invoked with `--auto` (or by `/auto-pilot`), the entire pipeline runs witho
 - **Preflight:** Skip assignment guard. Log blocking labels as warnings, don't stop.
 - **Research:** If already resolved, close the issue with a comment and exit cleanly.
 - **Plan:** Auto-select the recommended option (best balance of quality/effort). The high-complexity design-confirm checkpoint never appears in auto mode — log the selected option + complexity for the Decision Record and proceed without pausing.
-- **Implement:** Continue past max commits guard with a warning.
+- **Implement:** Continue past max commits guard with a warning. The Step 3 propose-relevant-skills sub-step never prompts in auto mode — it selects no external skills (`selected_skills` empty), so the implementer uses the internal agents exactly as before (today's behavior, byte-for-byte).
 - **QA:** Run full cycle autonomously. If stagnation detected, continue to deliver with known issues.
 - **Deliver:** Create PR. Do NOT merge — merging is handled by `/auto-pilot` or `/issue-pr-review`.
 
@@ -658,6 +683,7 @@ All errors use rich format from `references/error-messages.md`:
 - **`references/pipeline-steps.md`** — Full delegation payloads, phases, and inline fallbacks for Steps 1–4
 - **`references/report-templates.md`** — PR body template, closing summary templates, and expected inline output
 - **`references/bug-verification.md`** — Red-capable reproduction checkpoint for bug issues (Step 3, before the fix)
+- **`references/skill-index.md`** — Optional external-skill catalog (luongnv89/skills) for the Step 3 propose sub-step
 - **`references/error-messages.md`** — Complete error catalog
 - **`docs/naming-conventions.md`** — Branch, commit, PR naming conventions
 - **`docs/github-projects-sync.md`** — GitHub Projects status sync
