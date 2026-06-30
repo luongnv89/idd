@@ -356,5 +356,6 @@ In interactive mode: never auto-merge — just report status.
 - **`references/error-messages.md`** — Error catalog
 - **`docs/pre-commit-security.md`** — Pre-commit security scan contract (Steps 2, 6)
 - **`docs/sync-conventions.md`** — Stash-first sync convention and recovery
+- **`docs/idd-methodology.md`** — IDD durable-analysis fields (traceability check 3)
 - **`docs/naming-conventions.md`** — Naming conventions
 - **`DESIGN.md`** — Terminal output style guide
