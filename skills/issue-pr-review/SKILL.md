@@ -5,7 +5,7 @@ license: MIT
 compatibility: "Requires git and GitHub CLI (gh) with authentication. Self-contained — uses shared agents from shared/agents/."
 effort: high
 metadata:
-  version: 2.3.0
+  version: 2.3.1
   author: Luong NGUYEN <luongnv89@gmail.com>
 ---
 
@@ -354,5 +354,7 @@ In interactive mode: never auto-merge — just report status.
 - **`references/review-loop-mechanics.md`** — reviewer/fixer spawn + reuse mechanics
 - **`references/report-templates.md`** — Step 7 summary templates, auto-merge flow, expected inline output
 - **`references/error-messages.md`** — Error catalog
+- **`references/docs/pre-commit-security.md`** — Pre-commit security scan contract (Steps 2, 6)
+- **`references/docs/sync-conventions.md`** — Stash-first sync convention and recovery
 - **`references/docs/naming-conventions.md`** — Naming conventions
 - **`DESIGN.md`** — Terminal output style guide
