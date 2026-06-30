@@ -295,6 +295,79 @@ mode, log the auto-selection and proceed.
 
 ## Step 3 — Implement (implementer subagent)
 
+### Step 3 — Propose relevant skills (sub-step, before the implementer spawn)
+
+Optionally augment the implementer with **optional external skills** from
+`references/skill-index.md` (the skills published at
+`https://github.com/luongnv89/skills`). This is a sub-step of Step 3 — it emits a
+`◆`/`○` block and prints **no** `[N/5]` tracker line (the `[3/5]` Implement line is
+unchanged), exactly like the design-confirm checkpoint. It runs for **every** issue
+type in interactive mode (it is interactive-gated, not complexity-gated).
+
+The skill index is treated as a **swappable candidate list**: the detection logic
+reads the skill names + lifecycle phases from `references/skill-index.md` and never
+hardcodes the source repo, so a future issue (#170) can swap the index contents to
+a different source without changing this step's logic.
+
+#### Detect — which catalogued skills are installed
+
+Intersect the catalog with the skills available on this system. A skill named `X`
+in the index is **available** when `~/.claude/skills/X/` exists and is invocable as
+`/X`:
+
+```bash
+# For each `name` listed in references/skill-index.md:
+[ -d "$HOME/.claude/skills/$name" ] && echo "available: $name"
+```
+
+Only **installed** skills are eligible to be proposed — a catalogued-but-not-installed
+skill is never offered (and the implementer would have no way to invoke it).
+
+#### Propose — the relevant subset for this task
+
+From the installed skills, pick the subset relevant to the analyzed task. Use the
+Step 1 research signal (issue type, complexity, affected files, UI detection) and the
+index's lifecycle grouping so the proposal can span **implementation, verification,
+testing, and documentation**. Present them grouped by lifecycle phase. The block
+below is an **illustrative example** — the one-skill-per-phase layout is not a
+required shape; propose however many (or few) installed skills actually fit the task:
+
+```
+◆ Optional skills for issue #N (example)
+┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+
+  These installed skills from luongnv89/skills look relevant to this task.
+  The implementer will use the ones you select; internal agents always remain
+  the reliable fallback.
+
+    [1] frontend-design     (implementation) — build the UI component
+    [2] test-coverage       (testing)        — unit tests for new branches
+    [3] code-review         (verification)   — extra review pass
+    [4] docs-generator      (documentation)  — update affected docs
+
+  Select skills to use — all, a subset (e.g. 1,2), or none [default: none]:
+```
+
+#### Accept all / some / none
+
+- **All** → `selected_skills` = every proposed skill.
+- **Subset** (e.g. `1,3`) → `selected_skills` = the chosen entries.
+- **None** (default) → `selected_skills` = `[]`; the implementer uses internal
+  agents only — today's behavior, byte-for-byte.
+
+If no installed skills are relevant, skip the prompt entirely and proceed with
+`selected_skills = []` (print one `○` line noting none were applicable). The chosen
+set is passed to the implementer via the delegation payload below.
+
+#### Auto mode
+
+In auto mode (`--auto` / `IDD_AUTO_MODE=1`) the prompt **never appears**: set
+`selected_skills = []` and proceed, so the implementer falls back to the internal
+agents and today's behavior is unchanged. Optionally emit one audit line
+(`○ Skill proposal (auto): skipped — using internal agents`). No new config key is
+introduced — the sub-step is gated entirely on interactive mode plus what is
+installed, following the design-confirm precedent.
+
 ### Delegation payload
 
 - Issue data
@@ -303,6 +376,7 @@ mode, log the auto-selection and proceed.
 - Branch name
 - Naming conventions: `references/docs/naming-conventions.md`
 - Max commits: `resolve.max_commits`
+- `selected_skills` — the external skills chosen in the propose sub-step above (`[]` in auto mode or when the user declines); the implementer uses them where applicable and always falls back to the internal approach
 
 ### What the implementer writes
 

@@ -11,7 +11,7 @@ See `docs/shared-agent-conventions.md` for spawn parameters, the prompt-injectio
 
 ## Contract
 
-- **Inputs:** issue data (number, title, body, labels, type, acceptance criteria); research findings (affected files, current behavior, code patterns, entry points, test files, architecture); the selected plan (approach, files to modify/create, test strategy, risk); branch name (already checked out); `max_commits` (default 10); naming conventions (`docs/naming-conventions.md`).
+- **Inputs:** issue data (number, title, body, labels, type, acceptance criteria); research findings (affected files, current behavior, code patterns, entry points, test files, architecture); the selected plan (approach, files to modify/create, test strategy, risk); branch name (already checked out); `max_commits` (default 10); naming conventions (`docs/naming-conventions.md`); `selected_skills` — optional external skills chosen by the resolver's Step 3 propose sub-step (`[]` when none; the reliable minimum is always the internal approach).
 - **Returns:** the structured markdown summary under [Output](#output) — Files Changed, Change Stats, Commits, Tests Written, Test Stats, Coverage Notes, and (bugs only) Reproduction.
 - **Stop / fail:** never push, open PRs, or touch GitHub state — local commits only. If a bug can't be made red for the stated reason, record `status: not_reproduced` and proceed (never block).
 
@@ -24,6 +24,8 @@ Write implementation code **and** tests (unit, integration, e2e) that resolve th
 ### 1. Write implementation code
 
 For **`type: bug`** issues, complete the reproduction checkpoint in Task 1.5 (`references/bug-verification.md`) **before** writing the fix. Non-bug issues go straight to the fix. For each file in the plan: read it first (confirm it matches research), match existing style/conventions/architecture, make targeted edits (Edit for existing, Write for new), and keep one logical change per commit.
+
+**Use `selected_skills` where applicable.** When the resolver passed any `selected_skills`, use the relevant ones to perform the matching part of the work (e.g. an implementation skill for the build, a testing skill for tests, a verification or documentation skill for those stages). Always fall back to the internal approach as the reliable minimum: if `selected_skills` is empty, a selected skill is unavailable, or it does not fit the work at hand, do the work yourself exactly as you would without it. Never block waiting on an external skill, and never invent skills that were not selected.
 
 ### 1.5. Reproduce the bug and confirm red — bug issues only
 
