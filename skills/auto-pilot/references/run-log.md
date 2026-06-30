@@ -1,0 +1,47 @@
+# Run-log monitoring contract
+
+`/auto-pilot` appends to `.gitissue/runs.jsonl` — the same append-only run log
+written by `/issue-resolver`. The schema and field list live in
+`references/docs/config-schema.md` (*`.gitissue/runs.jsonl` — run log*); follow it rather
+than re-deriving fields. This file documents the two contracts that keep the log
+accurate when auto-pilot orchestrates the resolver: the **single-writer rule**
+and the **batch fan-out**.
+
+## Single-writer rule (per processed issue)
+
+**Auto-pilot is the single writer per processed issue.** The resolver subagent
+is invoked with `--no-run-log` (see *Resolver Subagent* in
+`references/subagent-prompts.md`), so it **does not** append its own line — only
+auto-pilot writes here. Writing in both places would double-write one line per
+issue and skew `/idd-doctor`'s resolve-rate and median-QA metrics. The resolver
+**returns** its telemetry (`qa_cycles`, `complexity`, `duration_s`) in its
+result; fold those into the **single line** auto-pilot writes (enriched with that
+telemetry) so the per-issue QA signal survives even though the resolver stayed
+silent. The resolver's run `status` informs auto-pilot's decision but is **not**
+copied into the row's `outcome` — that field stays auto-pilot's own six
+categorical label (set from the merge result).
+
+## Batch fan-out (Batch Resolver path)
+
+**Batch iterations** (the *Batch Resolver* path resolves several issues in one
+PR) follow the **same single-writer rule** — the Batch Resolver also runs with
+`--no-run-log` and returns its telemetry — but auto-pilot must **fan its one
+result out into one line per attempted issue** (keyed on the attempted set, not
+`issues_resolved`), with the shared `pr`/`complexity` on every line and the
+scalar `qa_cycles`/`duration_s` attributed to the primary issue's line only. The
+full fan-out contract (per-attempted-issue lines, per-issue `outcome` from
+`issues_resolved`, and the re-resolve double-count guard for partial/failed
+batches) lives in `references/explicit-list-mode.md` (*Run-log fan-out for the
+batch*), since batching only occurs in explicit-list mode.
+
+## Fields to populate
+
+Populate from the iteration's known values plus the resolver's returned
+telemetry: `ts` (current UTC, ISO 8601), `issue` (the number), `mode` (the
+auto-pilot merge mode — `conservative` / `balanced` / `aggressive`), `skill`
+(`auto-pilot`), `outcome` (one of the six categorical labels), `pr` (the PR
+number when one was created, else `null`), and — from the resolver's report-back
+— `qa_cycles`, `complexity`, and `duration_s` when present. **When the outcome is
+`skipped`, always include `skipped_reason`** (e.g. `already_resolved`,
+`blocked_label`, `blocked_by_dependency`, `in_skip_list`, `assigned_to_other`); a
+skip never ran the resolver, so it carries no resolver telemetry.

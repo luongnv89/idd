@@ -1,12 +1,12 @@
 ---
 name: idd-doctor
-description: "Report-only health check that scans the IDD repo for doc drift on the intent-code boundary, missing autopilot mode config, and unsafe merge defaults. Use when asked to run idd-doctor, /idd-doctor, check the IDD setup, or verify the intent-only contract. Don't use for fixing issues (this skill is read-only — no files are modified), normalizing issue bodies (use /issue-creator), or general repo health checks unrelated to IDD."
+description: "Scan an IDD repo for doc drift, missing autopilot mode, and unsafe merge defaults. Use when running idd-doctor or checking the IDD setup. Read-only. Don't use for fixing issues, normalizing issues (use /issue-creator), or non-IDD health checks."
 license: MIT
 compatibility: Requires git and GitHub CLI (gh). Authentication is recommended for the merge-strategy check; the skill degrades gracefully when gh is unavailable.
 effort: low
 metadata:
-  version: 0.1.0
-  creator: Luong NGUYEN <luongnv89@gmail.com>
+  version: 0.2.0
+  author: Luong NGUYEN <luongnv89@gmail.com>
 ---
 
 # /idd-doctor
@@ -86,6 +86,8 @@ If `.gitissue.yml` does **not** exist, Check 3 is skipped with an `○ no .gitis
 ## Pipeline
 
 The doctor executes the four checks in order, prints one line per check, then a summary footer, then an informational run-log summary (see *Run-log summary*). Checks never short-circuit — every check runs even after a `FAIL`, so the operator sees the full picture in one pass.
+
+Expected output for a clean repo (verify against this when testing the skill):
 
 ```
   ◆ /idd-doctor — health check
@@ -337,9 +339,10 @@ The run-log schema is defined in `docs/config-schema.md` (*`.gitissue/runs.jsonl
 1. If `.gitissue/runs.jsonl` does **not** exist or is empty, **degrade gracefully**
    — print `○ Run-log summary           no runs recorded yet (.gitissue/runs.jsonl)`
    and stop the section. Absence is never a failure.
-2. Otherwise read the file and take the **last N** lines (default `N = 50`).
-   Tolerate malformed lines: silently skip any line that is not valid JSON rather
-   than aborting the summary.
+2. Otherwise read the file and take the **last N** lines (default `N = 50`). The
+   `N = 50` cap bounds the agent's context budget — never load the whole log into
+   the context window on a long-lived repo. Tolerate malformed lines: silently
+   skip any line that is not valid JSON rather than aborting the summary.
 3. Compute, over the parsed runs:
    - **Resolve rate** — share of runs whose `outcome` indicates a delivered
      resolution. Count `success` (resolver) and `merged` (auto-pilot) as resolved;
