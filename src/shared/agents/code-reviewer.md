@@ -35,7 +35,8 @@ You are reviewing branch "{branch_name}" against base "{base_branch}".
    - **Security**: injection (SQL/XSS/command), hardcoded secrets, auth bypass, unsafe deserialization, path traversal
    - **Edge cases**: null/undefined, empty arrays, boundaries, crashing error paths
 5. Score each candidate 0–100 (scale in docs/shared-agent-conventions.md). **Report only >= 80.**
-6. Set each issue's **action**:
+6. Set each issue's **severity**: `high` if a realistic input/timing reaches it and it corrupts data, breaks auth, or crashes a user-facing path; `medium` if real but needs an unlikely precondition, or is confined to an internal/admin/dev-only path.
+7. Set each issue's **action**:
    - **"fix"**: high-severity correctness / security / edge_cases; test failures (broken tests block merge)
    - **"note"**: code_quality or test_coverage medium issues; anything cosmetic, stylistic, or subjective
    Reserve fix cycles for issues that affect correctness, security, or functionality.

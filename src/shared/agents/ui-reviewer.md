@@ -43,7 +43,7 @@ Reviewing branch "{branch_name}" against base "{base_branch}".
 3. Per screenshot evaluate: layout & overflow (clipping, horizontal scroll, overlap, z-index, fixed-position breaking); responsive behavior across viewports; visual consistency (alignment, spacing, fonts, color, icon sizing, radius); interactive states (hover/focus/active/disabled, loading); accessibility indicators (focus rings, contrast, visible labels); content rendering (broken icons, truncation, emoji); cross-viewport breakage.
 
 ## Scoring (both modes)
-Score each candidate 0–100 (scale in docs/shared-agent-conventions.md). **Report only >= 75.** Set **action**:
+Score each candidate 0–100 (scale in docs/shared-agent-conventions.md). **Report only >= 75.** Set **severity**: `high` if it blocks a user from completing a task (can't read, click, focus, or submit) on a common viewport/AT; `medium` if the task is still completable but degraded (e.g. visible but sub-AA contrast, awkward but reachable target). Set **action**:
 - **"fix"**: WCAG A/AA violations, broken layouts on common viewports, missing focus indicators, unclickable touch targets, overflowing text, form-validation issues
 - **"note"**: minor spacing, AA+ contrast nice-to-haves, cosmetic alignment, enhancement suggestions
 
