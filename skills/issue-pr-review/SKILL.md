@@ -5,7 +5,7 @@ license: MIT
 compatibility: "Requires git and GitHub CLI (gh) with authentication. Self-contained — uses shared agents from shared/agents/."
 effort: high
 metadata:
-  version: 2.3.1
+  version: 2.3.2
   author: Luong NGUYEN <luongnv89@gmail.com>
 ---
 
@@ -32,7 +32,25 @@ The `--auto` flag is set automatically when invoked by `/auto-pilot`. In auto mo
 
 ### Bundled dependency precheck
 
-`/issue-pr-review` is distributed as a self-contained skill — it does not require another gitissue skill to review a PR, but it does require its bundled agent prompts and reference files (the three `references/agents/*.md`, the `references/*.md`, and the `references/docs/*.md` enumerated in *Additional Resources*). Before execution, verify those files exist relative to the skill's directory (the dirname of this SKILL.md). If any is missing, stop immediately, print the error, and do not continue with an inline or guessed reviewer/fixer prompt:
+`/issue-pr-review` is distributed as a self-contained skill — it does not require another gitissue skill to review a PR, but it does require its bundled agent prompts and reference files. Before execution, verify **every** path in the list below exists relative to the skill's directory (the dirname of this SKILL.md). This list is the authoritative guard — keep it complete and independent of the *Additional Resources* navigation index, which exists for human navigation and may list more or fewer files than the runtime requires. If any path is missing, stop immediately, print the error, and do not continue with an inline or guessed reviewer/fixer prompt:
+
+```text
+references/agents/code-reviewer.md
+references/agents/ui-reviewer.md
+references/agents/fixer.md
+references/ui-review-mechanics.md
+references/prepass-tests-ci-mechanics.md
+references/verification-checks.md
+references/review-loop-mechanics.md
+references/report-templates.md
+references/error-messages.md
+references/docs/pre-commit-security.md
+references/docs/sync-conventions.md
+references/docs/idd-methodology.md
+references/docs/config-schema.md
+references/docs/naming-conventions.md
+```
+
 
 ```text
 ✗ Missing bundled dependency: {missing_file}
