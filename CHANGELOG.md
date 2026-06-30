@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- gitissue:normalized v1 -->
 
+## [v0.17.0] — 2026-07-01
+
+### Features
+- **issue-resolver:** index luongnv89/skills and propose skills per task (#175) @luongnv89
+
+### Refactoring
+- **agents:** define severity high/medium boundary for reviewers (#173) @luongnv89
+- **skills:** improve all skills to skill-creator standard via auto-improver (#171) @luongnv89
+
+**Full Changelog**: https://github.com/luongnv89/idd/compare/v0.16.0...v0.17.0
+
 ## [v0.16.0] — 2026-06-28
 
 ### Features
