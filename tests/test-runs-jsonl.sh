@@ -39,12 +39,25 @@ has() {
   fi
 }
 
+# Like has(), but searches a skill's SKILL.source.md AND its references/ tree.
+# Run-log prose may live in either the main prompt or an extracted reference
+# (progressive disclosure), so contract phrases are asserted across the bundle.
+has_skill() {
+  # $1 = skill dir, $2 = pattern, $3 = label
+  if grep -rqiF -e "$2" "$1/SKILL.source.md" "$1/references" 2>/dev/null; then
+    pass "$3"
+  else
+    fail "$3 (missing: '$2' in ${1#$REPO_ROOT/} bundle)"
+  fi
+}
+
 echo "◆ Run-log (.gitissue/runs.jsonl) Tests"
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 
 CONFIG="$REPO_ROOT/docs/config-schema.md"
 RESOLVER="$REPO_ROOT/src/skills/issue-resolver/SKILL.source.md"
 AUTOPILOT="$REPO_ROOT/src/skills/auto-pilot/SKILL.source.md"
+AUTOPILOT_DIR="$REPO_ROOT/src/skills/auto-pilot"
 DOCTOR="$REPO_ROOT/src/internal-skills/idd-doctor/SKILL.source.md"
 
 # --- T1: canonical schema in config-schema.md -------------------------------
@@ -78,7 +91,7 @@ fi
 
 # --- T3: auto-pilot writes one line per processed issue incl. skips ---------
 has "$AUTOPILOT" "runs.jsonl" "T3: auto-pilot source references runs.jsonl"
-has "$AUTOPILOT" "Skipped issues are logged too" "T3: auto-pilot logs skipped issues too"
+has "$AUTOPILOT" "every processed issue including skips" "T3: auto-pilot logs skipped issues too"
 has "$AUTOPILOT" "skipped_reason" "T3: auto-pilot records skipped_reason on skips"
 has "$AUTOPILOT" "non-fatal" "T3: auto-pilot documents non-fatal write"
 
@@ -118,7 +131,7 @@ has "$SUBAGENT" "duration_s" "T6: auto-pilot subagent prompt collects duration_s
 
 # Auto-pilot SKILL documents that it is the single writer and enriches its line.
 has "$AUTOPILOT" "--no-run-log" "T6: auto-pilot documents suppressing the resolver via --no-run-log"
-has "$AUTOPILOT" "single line" "T6: auto-pilot documents writing the single enriched line per issue"
+has_skill "$AUTOPILOT_DIR" "single line" "T6: auto-pilot documents writing the single enriched line per issue"
 
 # --no-run-log now applies to BOTH the single-issue Resolver Subagent AND the Batch
 # Resolver Subagent (#158 made auto-pilot the single writer on the batch path too).

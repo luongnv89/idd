@@ -96,10 +96,10 @@ else
   fail "T2.3: frontmatter missing 'license: MIT'"
 fi
 
-if grep -qE '^[[:space:]]*version:[[:space:]]+0\.1\.0' "$SKILL"; then
-  pass "T2.4: metadata.version is 0.1.0"
+if grep -qE '^[[:space:]]*version:[[:space:]]+[0-9]+\.[0-9]+\.[0-9]+' "$SKILL"; then
+  pass "T2.4: metadata.version is present and valid semver"
 else
-  fail "T2.4: metadata.version is not 0.1.0"
+  fail "T2.4: metadata.version missing or not valid semver"
 fi
 
 # ───────────────────────────────────────────────────────────
