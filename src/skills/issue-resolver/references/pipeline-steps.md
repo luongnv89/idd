@@ -328,10 +328,12 @@ skill is never offered (and the implementer would have no way to invoke it).
 From the installed skills, pick the subset relevant to the analyzed task. Use the
 Step 1 research signal (issue type, complexity, affected files, UI detection) and the
 index's lifecycle grouping so the proposal can span **implementation, verification,
-testing, and documentation**. Present them grouped by lifecycle phase:
+testing, and documentation**. Present them grouped by lifecycle phase. The block
+below is an **illustrative example** — the one-skill-per-phase layout is not a
+required shape; propose however many (or few) installed skills actually fit the task:
 
 ```
-◆ Optional skills for issue #N
+◆ Optional skills for issue #N (example)
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
 
   These installed skills from luongnv89/skills look relevant to this task.
