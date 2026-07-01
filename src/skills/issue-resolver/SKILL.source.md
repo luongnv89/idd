@@ -120,7 +120,29 @@ If the Agent tool is available, use subagents as described above; if not (e.g. C
 
 ### Bundled dependency precheck
 
-Verify this skill's bundled subagent prompts and reference files are present (full list in *Additional Resources*, checked relative to this SKILL.md's directory). If any are missing, stop and print:
+Verify this skill's bundled subagent prompts and reference files are present. Before execution, verify **every** path in the list below exists relative to the skill's directory (the dirname of this SKILL.md). This list is the authoritative guard — keep it complete and independent of the *Additional Resources* navigation index, which exists for human navigation and may list files with source-relative group prefixes. If any path is missing, stop immediately and print the error below; do not continue with an inline or guessed subagent prompt:
+
+```text
+references/agents/codebase-researcher.md
+references/agents/synthesizer.md
+references/agents/implementer.md
+references/agents/code-reviewer.md
+references/agents/ui-reviewer.md
+references/agents/fixer.md
+references/pipeline-steps.md
+references/report-templates.md
+references/bug-verification.md
+references/skill-index.md
+references/error-messages.md
+references/docs/sync-conventions.md
+references/docs/naming-conventions.md
+references/docs/pre-commit-security.md
+references/docs/idd-methodology.md
+references/docs/github-projects-sync.md
+references/docs/config-schema.md
+references/docs/agent-model-effort.md
+references/docs/shared-agent-conventions.md
+```
 
 ```
 ✗ Missing bundled dependency: {missing_file}
