@@ -5,7 +5,7 @@ license: MIT
 compatibility: "Requires git and GitHub CLI (gh) with authentication. View mode (`/issue-analysis N view`) needs only local file access — no gh required."
 effort: high
 metadata:
-  version: 0.5.1
+  version: 0.5.2
   author: Luong NGUYEN <luongnv89@gmail.com>
 ---
 
@@ -160,7 +160,6 @@ Verify that this skill's bundled subagent prompts and reference files are presen
 If any are missing, stop immediately and print:
 
 ```
-text
 ✗ Missing bundled dependency: {missing_file}
 
   To fix:  asm install https://github.com/luongnv89/idd --skill issue-analysis
