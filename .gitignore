@@ -48,3 +48,5 @@ dist/test-plugin/
 
 # gstack browser/session artifacts
 .gstack/
+
+.asm-improver/
