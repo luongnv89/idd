@@ -5,7 +5,7 @@ license: MIT
 compatibility: "Requires git and GitHub CLI (gh) with authentication. Self-contained — uses shared agents from shared/agents/."
 effort: high
 metadata:
-  version: 2.3.2
+  version: 2.4.0
   author: Luong NGUYEN <luongnv89@gmail.com>
 ---
 
@@ -150,17 +150,14 @@ Before spawning any LLM reviewer, run deterministic tools to catch and auto-fix 
 ### Commit auto-fixes
 
 If any files were modified by the auto-fix tools, you MUST run the pre-commit
-security scan before staging. The authoritative scan is the **Primary Pattern**
-in `docs/pre-commit-security.md` — run that exact pattern against the working
-tree; do not improvise a weaker check. In auto mode, export `IDD_AUTO_MODE=1`
-first so the scan logs-and-continues on warnings instead of prompting.
-
-The scan enforces, in order (full patterns in `docs/pre-commit-security.md`):
-
-1. **Block on real secrets** — secret-bearing filenames (`.env`, `*.key`, `*.pem`, `id_rsa`, …) or real API-key patterns (OpenAI, AWS, GitHub, …) in any staged text file → print the offending file and `exit 1`. Never commit.
-2. **Warn (non-blocking) on** large files (>10 MB without LFS), staged build artifacts (`node_modules`, `dist`, `*.pyc`, …), and protected branches (`main`/`master`/`production`/`release`). Interactive: prompt `Proceed anyway? [y/N]`; auto (`IDD_AUTO_MODE=1`): log and continue.
-
-Only after the scan passes (or warnings are accepted), commit and push (`git add -A` → `git commit -m "style: auto-fix lint and format issues"` → `git push origin {branch_name}`).
+security scan before staging — the authoritative **Primary Pattern** in
+`docs/pre-commit-security.md` (block on real secrets, warn on large files /
+build artifacts / protected branches). Run that exact pattern against the
+working tree; do not improvise a weaker check. In auto mode, export
+`IDD_AUTO_MODE=1` first so the scan logs-and-continues on warnings instead of
+prompting. Only after the scan passes (or warnings are accepted), commit and
+push (`git add -A` → `git commit -m "style: auto-fix lint and format issues"`
+→ `git push origin {branch_name}`).
 
 ```
 [2/7] Pre-pass     ✓ lint clean, format clean, {N} tests passed
@@ -203,25 +200,13 @@ Also fetch the linked issue for acceptance-criteria verification: `gh issue view
 
 ### Order within Step 3
 
-Within a cycle, in order: (1) spawn or re-message the reviewer subagent and collect findings; (2) if UI work was detected, spawn or re-message the UI reviewer in **code** mode (skip when `ui: not detected`); (3) run per-criterion AC verification against the linked issue; (4) run the four traceability checks against the PR body and commit history; (5) aggregate reviewer + UI + AC + traceability results into the five dimensions for the cycle report.
+Within a cycle, in order: reviewer subagent → UI reviewer in **code** mode (skip when `ui: not detected`) → per-criterion AC verification → the four traceability checks → aggregate all four into the five dimensions below for the cycle report.
 
 ### Dimensional review output
 
-Step 3 produces a single verdict in **five dimensions**. The reviewer reports against its internal categories (correctness, test_coverage, code_quality, security, edge_cases); this skill maps those into the user-facing dimensions and adds two it does not produce (acceptance criteria, traceability). When UI work is detected, the UI reviewer's `ui_ux` findings fold into `maintainability`. Mapping is fixed:
+Step 3 produces a single verdict in **five dimensions** — `correctness`, `acceptance_criteria`, `traceability`, `maintainability`, `safety` — each reporting `pass`, `partial`, or `fail`. The reviewer's internal categories map onto them; when UI work is detected, the UI reviewer's `ui_ux` findings fold into `maintainability`, and a UI `action: "fix"` finding makes `maintainability` at least `partial` and adds a fixable issue to Step 6 (`category: ui_ux`) — the verdict never shows all-pass while UI fixables remain. The report groups the five under a **Spec axis** (`acceptance_criteria`, `correctness`, `safety`) and a **Standards axis** (`traceability`, `maintainability`) — presentation-only, no per-axis verdict. Full reviewer-category mapping and the two-axis rationale live in `references/verification-checks.md`. **Read that file and apply it now.**
 
-| User-facing dimension | Source | Failure means |
-|----------------------|--------|---------------|
-| `correctness` | reviewer category `correctness` | logic, off-by-one, race conditions |
-| `acceptance_criteria` | per-criterion verification (this skill) | one or more criteria report `fail` |
-| `traceability` | PR-body and commit-history scan (this skill) | issue-to-code link is broken |
-| `maintainability` | reviewer `code_quality` + `test_coverage`; UI reviewer `ui_ux` (when detected) | dead code, untested paths, complex logic, a11y/interaction defects |
-| `safety` | reviewer categories `security` + `edge_cases` | injection, auth bypass, unsafe nulls, crash paths |
-
-A UI `action: "fix"` finding makes `maintainability` at least `partial` and adds a fixable issue to Step 6 (`category: ui_ux`), so the verdict never shows all-pass while UI fixables remain.
-
-Each dimension reports `pass`, `partial`, or `fail`. A PR can pass tests and still fail `traceability` or `acceptance_criteria` — those are not gated by test results.
-
-The report groups the five dimensions under **two named axes** — a **Spec axis** (`acceptance_criteria`, `correctness`, `safety`) and a **Standards axis** (`traceability`, `maintainability`) — a presentation-only grouping that changes nothing about analysis, `fix`/`note` semantics, status rules, or gating (no per-axis verdict). Full mapping and rationale in `references/verification-checks.md` (*Two-axis grouping — Spec vs Standards*).
+A PR can pass tests and still fail `traceability` or `acceptance_criteria` — those are not gated by test results.
 
 ### Verification gates and the AC + traceability checks
 
@@ -282,13 +267,7 @@ In interactive mode: ask to wait more or proceed. In auto mode: proceed — the 
 
 ## Step 6 — Fix Issues [6/7]
 
-Collect issues from Steps 3-5, but **only fix those with `action: "fix"`** — `action: "note"` issues (medium code_quality/test_coverage suggestions) are reported in the summary but never trigger a fix cycle. This is the key token optimization. Fixable sources:
-
-- Code review `action: "fix"` (reviewer — `correctness`, `maintainability`, `safety`)
-- UI/UX `action: "fix"` (UI reviewer when detected — `category: ui_ux`, under `maintainability`)
-- Acceptance-criteria failures (Step 3 — one per `fail` criterion, `category: acceptance_criteria`)
-- Traceability `Closes #{N}` failures (Step 3 — `category: traceability`)
-- Test failures (Step 4) and CI failures (Step 5)
+Collect issues from Steps 3-5, but **only fix those with `action: "fix"`** — `action: "note"` issues (medium code_quality/test_coverage suggestions) are reported in the summary but never trigger a fix cycle. This is the key token optimization. Fixable sources are the same five dimensions from Step 3's *Dimensional review output* (each `fail`/UI `action:"fix"` becomes one fixable issue) plus Step 4 test failures and Step 5 CI failures.
 
 Acceptance-criteria fixes typically need code changes; the traceability `Closes #{N}` fix is a PR-body edit via `gh pr edit {N} --body`. Apply both, then commit and push as usual.
 
@@ -301,7 +280,7 @@ Exit the loop — PR passes the soft-pass condition.
 
 ### If fixable issues found
 
-Delegate fixes to the fixer subagent (`shared/agents/fixer.md`) — never apply code changes in the main skill context — reusing the same fixer across cycles when possible. The fixer reads affected files, applies targeted changes, runs the mandatory pre-commit security scan from `references/docs/pre-commit-security.md` against the staged set (real secrets block the commit), then commits. The main agent collects the fixer's JSON result and pushes (`git push origin {branch_name}`); unresolved blocking findings carry to the next cycle. The spawn variables and `Agent(...)` call are in `references/review-loop-mechanics.md`.
+Delegate fixes to the fixer subagent (`shared/agents/fixer.md`) — never apply code changes in the main skill context — reusing the same fixer across cycles when possible. The fixer reads affected files, applies targeted changes, runs the mandatory pre-commit security scan from `docs/pre-commit-security.md` against the staged set (real secrets block the commit), then commits. The main agent collects the fixer's JSON result and pushes (`git push origin {branch_name}`); unresolved blocking findings carry to the next cycle. The spawn variables and `Agent(...)` call are in `references/review-loop-mechanics.md`.
 
 ```
 [6/7] Fix          ✓ fixed {N} issues (noted: {note_count} — not fixed)

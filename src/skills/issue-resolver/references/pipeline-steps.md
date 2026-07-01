@@ -2,6 +2,36 @@
 
 Detailed procedures for each subagent delegation in the resolve pipeline. SKILL.md keeps the contract short; this file holds the full input/output spec and inline fallback instructions.
 
+## Subagent Architecture Diagram
+
+Full shape of the orchestrator → subagent delegation described in SKILL.md
+(*Subagent Architecture*):
+
+```
+Main Agent (orchestrator)
+├── Step 0: Preflight (lightweight — stays in main)
+│
+├── Spawn: Codebase Researcher subagent (Step 1)
+│   Verifies not already fixed, scans codebase, assesses complexity
+│   Returns: structured findings (JSON or markdown)
+│
+├── Spawn: Synthesizer subagent (Step 2)
+│   Proposes 3 implementation options from research
+│   Returns: analysis + ranked options
+│
+├── Spawn: Implementer subagent (Step 3)
+│   Writes code + all tests based on selected plan
+│   Returns: files changed, tests written, commits
+│
+├── Step 4: QA (main agent orchestrates review-fix loop)
+│   Spawns Code Reviewer subagent per cycle
+│   Spawns/reuses Fixer subagent for blocking findings
+│   Runs tests/build between cycles
+│   Max 5 cycles
+│
+└── Step 5: Deliver (main agent — push + create PR + report)
+```
+
 ## Step 0e — Workspace (interactive only)
 
 Full procedure for the worktree offer described in SKILL.md *Step 0e — Workspace*. **Interactive mode only** — in auto mode (`--auto` / `IDD_AUTO_MODE=1`) this entire step is skipped and the pipeline uses the in-place path (Repo Sync + *0f — Create branch*), byte-for-byte as before. The worktree prompt never appears in auto mode (acceptance criterion 4).
@@ -528,3 +558,25 @@ When all hold, capture screenshots at mobile/tablet/desktop viewports with Playw
 ✓ Browser review — captured 3 viewports (Playwright: headless; environment: {ui_env})
 ```
 UI `action: "fix"` findings join the QA fixable issues handled by the fixer.
+
+## Edge Cases
+
+Full behavior for the edge cases named in SKILL.md.
+
+### No acceptance criteria
+PR body notes: `> **Note:** No acceptance criteria defined — manual review recommended.`
+
+### Issue body is empty
+- Interactive: warn and ask to continue
+- Auto: warn in log, continue with title-only context
+
+### Large issues (20+ files estimated)
+- Interactive: warn and ask
+- Auto: warn in log, continue
+
+### Tests fail or timeout
+- PR is not created. The Verify step stops with the failing test output and a resume hint.
+
+### Branch already exists
+- Interactive: `continue` or `fresh` prompt.
+- Auto: resume from the existing branch.
