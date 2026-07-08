@@ -191,33 +191,11 @@ cat > "$SYN_TMP/docs/d-doc.md" <<'EOF'
 
 Leaf.
 EOF
-# Stub out the optional plugin metadata input so the build does not abort
-# on missing src/plugin.json.in. Use the simplest viable form.
-cat > "$SYN_TMP/src/plugin.json.in" <<'EOF'
-{
-  "default_version": "0.0.0",
-  "plugin": {
-    "author": "${PLUGIN_AUTHOR}",
-    "description": "${PLUGIN_DESCRIPTION}",
-    "name": "${PLUGIN_NAME}",
-    "slug": "${PLUGIN_SLUG}",
-    "version": "${PLUGIN_VERSION}"
-  },
-  "values": {
-    "PLUGIN_AUTHOR": "Test",
-    "PLUGIN_DESCRIPTION": "Test",
-    "PLUGIN_NAME": "Test",
-    "PLUGIN_SLUG": "test"
-  }
-}
-EOF
-
 # Copy build scripts so the synthetic build runs the same code path.
 mkdir -p "$SYN_TMP/scripts"
 cp "$REPO_ROOT/scripts/build.py" "$SYN_TMP/scripts/build.py"
 cp "$REPO_ROOT/scripts/build.sh" "$SYN_TMP/scripts/build.sh"
 cp "$REPO_ROOT/scripts/verify_flattened_skills.sh" "$SYN_TMP/scripts/verify_flattened_skills.sh"
-cp "$REPO_ROOT/scripts/plugin-schema.json" "$SYN_TMP/scripts/plugin-schema.json"
 chmod +x "$SYN_TMP/scripts/build.sh" "$SYN_TMP/scripts/verify_flattened_skills.sh"
 
 if (cd "$SYN_TMP" && bash scripts/build.sh --out "$SYN_OUT") >"$SYN_LOG" 2>&1; then

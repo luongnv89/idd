@@ -153,7 +153,7 @@ IDD is a methodology, not a vendor lock-in. The structured issue format is plain
 | **Codex CLI** | `gh issue view 42 --json body` and pass to codex as context |
 | **Gemini CLI** | Pipe issue body to gemini for resolution |
 | **GitHub Copilot** | Structured issues give Copilot better context for suggestions |
-| **Any SKILL.md agent** | Load skills from `src/skills/` directory |
+| **Any SKILL.md agent** | Install the self-contained [`skills/`](skills/) packages via `asm` or manual copy |
 | **Human developers** | Read the issue — acceptance criteria and structure are right there |
 
 gitissue is **complementary** to your existing workflow. Use it alongside TDD, BDD, CI/CD pipelines, project management tools, or any AI coding agent. It fills one gap — structuring and triaging issues — and stays out of the way for everything else.
@@ -170,84 +170,35 @@ gitissue is **complementary** to your existing workflow. Use it alongside TDD, B
 
 ### Install
 
-Standalone is the recommended default. Each skill ships as a self-contained directory under the top-level [`skills/`](skills/) tree, ready to drop into any SKILL.md-compatible harness — Claude Code, Codex CLI, or anything else that loads SKILL.md trees. The same generated packages are also mirrored under [`dist/skills/`](dist/skills/) for backward-compatible subpath installs.
+Each skill ships as a self-contained directory under the committed [`skills/`](skills/) tree — SKILL.md plus its bundled subagent prompts (`references/agents/`) and runtime docs (`references/docs/`) — ready to drop into any SKILL.md-compatible harness: Claude Code, Codex CLI, or anything else that loads SKILL.md trees.
 
-#### Recommended — Standalone via `asm install`
+#### Install with `asm`
 
-[`asm`](https://github.com/luongnv89/asm) is the primary install tool. It pulls the flat skill index straight from this repo (no clone required) and lets you select all skills or any specific skill using ASM's standard picker:
+[`asm`](https://github.com/luongnv89/asm) (agent-skill-manager) is the install tool. It pulls the skill index straight from this repo — no clone required — and installs to whichever agent tools you use:
 
 ```bash
-# Recommended: install from the repo root and choose all or selected skills
+# Install from the repo root and choose all or selected skills
 asm install https://github.com/luongnv89/idd
 
 # Non-interactive single-skill install
 asm install https://github.com/luongnv89/idd --skill issue-resolver
 ```
 
-`asm` is idempotent — re-running the same command updates selected skills in place with no duplicate files. Each installed skill is complete: its required subagent prompts and runtime docs are bundled under `references/agents/` and `references/docs/`, so no separate shared-agent install step is required.
+Don't have `asm`? `npm install -g agent-skill-manager`.
 
-After install, restart Claude Code so it picks up the new skill(s). The full flat install surface lives under [`skills/`](skills/) and includes `issue-creator`, `issue-analysis`, `issue-resolver`, `issue-triage`, `issue-pr-review`, `auto-pilot`, and `init-gitissue`.
+`asm` is idempotent — re-running the same command updates installed skills in place with no duplicate files. Each installed skill is complete, so there is no separate shared-agent install step. After install, restart your agent tool so it picks up the new skill(s). The full install surface lives under [`skills/`](skills/): `issue-creator`, `issue-analysis`, `issue-resolver`, `issue-triage`, `issue-pr-review`, `auto-pilot`, and `init-gitissue`.
 
-#### From-source alternative (no `asm` required)
+#### Fallback — manual copy
 
-If you can't or don't want to install `asm`, use the install script. Re-running **always** replaces each installed skill directory and refreshes IDD-managed agents from the latest files on `main` — it does not compare `metadata.version` or skip when content looks unchanged.
-
-**One-liner (no clone):**
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/luongnv89/idd/main/install.sh | bash
-# or pass flags:  curl -fsSL .../install.sh | bash -s -- --tools all
-```
-
-**From a clone:**
+Skills are plain directories. If you prefer to see every file move, clone and copy:
 
 ```bash
 git clone https://github.com/luongnv89/idd.git
-cd idd
-./scripts/install.sh                          # interactive tool picker — choose one or more tools
-# the picker lists every supported tool; pick by number (e.g. "1 3 4"), "a" for all,
-# or press Enter for Claude Code. Bypass the picker by naming tools explicitly:
-# or: ./scripts/install.sh --skill issue-resolver
-# or target another tool: ./scripts/install.sh --tool codex
-# or several at once:      ./scripts/install.sh --tools claude,codex,pi
-# or every supported tool: ./scripts/install.sh --tools all
+mkdir -p ~/.claude/skills
+cp -r idd/skills/<name> ~/.claude/skills/
 ```
 
-> On an interactive terminal, the script first asks whether to install via **asm** (recommended). If you choose Yes, it installs `agent-skill-manager` when needed and runs `asm install https://github.com/luongnv89/idd`. Choose No to continue with the bundled copy installer. Skip the question with `--use-asm` or `--no-asm-prompt`.
->
-> When run with no `--tool`/`--tools` flag (and not using asm), the script shows a tool picker. In a non-interactive context (CI, no TTY) it falls back to Claude Code.
-
-The script copies each committed `skills/<name>/` tree to the selected tool's skills directory (default `~/.claude/skills/<name>/`). It supports `claude`, `agents`, `codex`, `opencode`, `pi`, `openclaw`, `hermes`, `antigravity`, and `windsurf` — each `dist/skills/<name>/` is a self-contained SKILL.md tree (the shared agents are bundled inside it at `references/agents/`), so a skill runs on any SKILL.md-compatible tool. Shared agents are *also* installed standalone from `dist/agents/*.md` into `~/.claude/agents/` (and `~/.agents/agents/`) — a Claude Code optimization for native subagent spawning; other tools use the bundled copies. The installer replaces IDD-managed agents cleanly, removes stale managed agents on update, and skips unmanaged same-name agents unless you pass `--force-agents` (which backs them up before replacement). Use `./scripts/install.sh --target <dir>` to target a different Claude root (Claude tool only; other tools use their fixed conventions). Pure POSIX bash — no extra runtime needed.
-
-You can also do the copy by hand if you prefer to see every file move:
-
-```bash
-mkdir -p ~/.claude/skills ~/.claude/agents
-cp -r skills/<name> ~/.claude/skills/
-cp dist/agents/*.md ~/.claude/agents/
-```
-
-`skills/` is committed to the repository, so this path works on a fresh clone without running a build. (Run `./scripts/build.sh` first to produce `dist/agents/`.)
-
-#### Plugin path (advanced — Claude Code only)
-
-The plugin layout bundles every public skill under one `~/.claude/plugins/idd/` tree. It is the heavier option; pick it only if you want all skills installed atomically as a single Claude Code plugin.
-
-Grab the `idd-plugin-<tag>.tar.gz` asset from the [latest release](https://github.com/luongnv89/idd/releases/latest) and extract it into your Claude Code plugins directory:
-
-```bash
-mkdir -p ~/.claude/plugins/idd
-# Download idd-plugin-<tag>.tar.gz from the release page (browser or `gh release download`)
-tar -xzf idd-plugin-<tag>.tar.gz -C ~/.claude/plugins/idd
-```
-
-The tarball unpacks to `.claude-plugin/plugin.json`, `agents/`, `skills/`, `shared/`, and `docs/` at its root. Restart Claude Code to load the new plugin.
-
-> **Heads up — `claude plugin install <tarball-url>` is not supported.** Claude Code's `claude plugin install` only accepts `plugin@marketplace` references and resolves them through configured marketplaces, not direct tarball URLs or paths. Running `claude plugin install https://github.com/luongnv89/idd/releases/download/<tag>/idd-plugin-<tag>.tar.gz` returns `not found in any configured marketplace` and does nothing. Use the manual `tar -xzf` extract above — that is the supported install path today. (Tracked in [#79](https://github.com/luongnv89/idd/issues/79).)
-
-If you cloned the repo, you can build the plugin tree locally and install it with the script: `./scripts/build.sh && ./scripts/install.sh --plugin`. `dist/plugin/` is generated only at release time and gitignored, so the build step is required.
-
-> **Note:** `skills/` is committed so the standalone paths work without running a build. `dist/agents/` and `dist/plugin/` are built by `./scripts/build.sh` and shipped as release assets.
+`skills/` is committed, so this works on a fresh clone with no build step. For other tools, copy into that tool's skills directory instead (e.g. `~/.codex/skills/`). Optional Claude Code extra: `./scripts/build.sh && cp dist/agents/*.md ~/.claude/agents/` registers the shared subagents natively — skills work without it, since every skill bundles its agent prompts.
 
 ### First issue in 30 seconds
 

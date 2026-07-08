@@ -14,29 +14,17 @@
    cd idd
    ```
 
-2. Install skills locally. Standalone is the recommended default — pick one of these:
+2. Install skills locally — `asm` is the install tool, manual copy is the fallback:
    ```bash
-   # Standalone (recommended) — bundled install script, all skills, idempotent:
-   ./scripts/install.sh                       # interactive tool picker (TTY); Claude if non-interactive
-
-   # Standalone — target another SKILL.md-compatible tool, or several at once (skips the picker):
-   ./scripts/install.sh --tool codex          # Codex CLI
-   ./scripts/install.sh --tools claude,pi     # multiple tools
-   ./scripts/install.sh --tools all           # every supported tool
-   # Supported: claude, agents, codex, opencode, pi, openclaw, hermes, antigravity, windsurf
-
-   # Standalone — single skill from this checkout (manual variant):
-   mkdir -p ~/.claude/skills
-   cp -r skills/issue-resolver ~/.claude/skills/
-
-   # Standalone — via asm (no clone needed; choose all or one skill):
+   # asm (recommended; works from the clone or straight from GitHub):
    asm install https://github.com/luongnv89/idd
    asm install https://github.com/luongnv89/idd --skill issue-resolver
 
-   # Plugin (Claude Code only) — build then install the plugin tree:
-   ./scripts/build.sh && ./scripts/install.sh --plugin
+   # Manual copy — single skill from this checkout:
+   mkdir -p ~/.claude/skills
+   cp -r skills/issue-resolver ~/.claude/skills/
    ```
-   The Plugin path lands under `~/.claude/plugins/idd/`; the Standalone paths drop individual skills into each tool's skills directory (e.g. `~/.claude/skills/`, `~/.codex/skills/`, `~/.windsurf/rules/`). Each top-level `skills/<name>/` package is a self-contained SKILL.md tree with the shared agents bundled inside it (`references/agents/`), so it runs on any tool. No build step is needed for the standalone path since `skills/` is committed. Shared agents are also installed standalone into `~/.claude/agents/` (and `~/.agents/agents/`) — a Claude Code optimization for native subagent spawning; other tools fall back to the bundled copies. See [README → Install](../README.md#install) for the full hierarchy.
+   Each top-level `skills/<name>/` package is a self-contained SKILL.md tree with the shared agents bundled inside it (`references/agents/`), so it runs on any SKILL.md-compatible tool — for tools other than Claude Code, copy into that tool's skills directory (e.g. `~/.codex/skills/`). No build step is needed since `skills/` is committed. Optional Claude Code extra: `./scripts/build.sh && cp dist/agents/*.md ~/.claude/agents/` registers the shared subagents natively; other tools use the bundled copies. See [README → Install](../README.md#install).
 
 3. Verify setup:
    ```bash
@@ -46,16 +34,16 @@
 
 ## Build Flow
 
-`src/` is the single source of truth. Top-level `skills/` is the committed install surface; `dist/` is generated (plugin tarball only, gitignored).
+`src/` is the single source of truth. Top-level `skills/` is the committed install surface; `dist/` is a gitignored staging area (`dist/skills/` is verified then promoted to `skills/`; `dist/agents/` holds the optional standalone Claude Code subagent definitions).
 
 ```mermaid
 graph LR
-    SRC["src/<br/>(authored)"] -->|"./scripts/build.sh"| RSK["skills/<br/>(committed root install index)"]
-    SRC -->|"./scripts/build.sh"| DPL["dist/plugin/<br/>(gitignored)"]
-    DPL -->|"release tag"| TAR["idd-plugin-&lt;tag&gt;.tar.gz<br/>(release asset)"]
+    SRC["src/<br/>(authored)"] -->|"./scripts/build.sh"| DSK["dist/skills/<br/>(gitignored, verified)"]
+    DSK -->|"promote on verify pass"| RSK["skills/<br/>(committed root install index)"]
+    SRC -->|"./scripts/build.sh"| DAG["dist/agents/<br/>(gitignored, optional)"]
 
     style SRC fill:#4CAF50,color:#fff
-    style TAR fill:#2196F3,color:#fff
+    style RSK fill:#2196F3,color:#fff
 ```
 
 After editing anything under `src/`, rebuild before committing:
@@ -88,7 +76,7 @@ Skills live in `src/skills/<name>/SKILL.source.md` (internal-only skills under `
 2. Follow the terminal output patterns in `DESIGN.md`
 3. Use `--json` with explicit field selection for all `gh` commands
 4. Update `references/error-messages.md` if adding new error cases
-5. Run `./scripts/build.sh` to regenerate `skills/` (dist/ for plugin tarball only)
+5. Run `./scripts/build.sh` to regenerate `skills/`
 6. Test against a real GitHub repository
 
 ### Adding Error Messages

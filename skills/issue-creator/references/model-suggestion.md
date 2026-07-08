@@ -37,7 +37,7 @@ committed**: it is regenerable runtime state, not project state. It lives at the
 seed, and the build copies that directory wholesale, so runtime state must stay
 out of it.
 
-> **Upgrade note.** Reinstalling the skill (`asm install` / `install.sh`)
+> **Upgrade note.** Reinstalling the skill (`asm install`, or a manual copy)
 > replaces the skill folder, so the dated cache is cleared on upgrade. This is
 > self-healing, not data loss: the freshly-installed seed reseeds the lifecycle
 > below (and is usually newer than the cache it replaced), and a refresh is

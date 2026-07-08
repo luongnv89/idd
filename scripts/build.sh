@@ -2,7 +2,7 @@
 # build.sh — build dist outputs, verify flattened skills, then update skills/.
 #
 # Workflow (local and CI):
-#   1. Compile all skills (and plugin/agents) under <out>/ — does not touch skills/
+#   1. Compile all skills (and agents) under <out>/ — does not touch skills/
 #   2. Verify <out>/skills/ is complete and self-contained
 #   3. On success only, replace repo-root skills/ from <out>/skills/
 #

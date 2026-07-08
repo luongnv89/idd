@@ -4,9 +4,7 @@
 #
 # Asserts:
 #   - All public skills (src/skills/<name>/) appear in root skills/<name>/
-#   - All public skills appear in dist/plugin/skills/<name>/
-#   - Plugin payload at expected paths: .claude-plugin/plugin.json, skills/,
-#     shared/, docs/
+#   - Every shared source agent is emitted as a standalone Claude Code agent
 #   - Internal skills (src/internal-skills/) and deprecated skills
 #     (src/deprecated-skills/) without a distribute flag are excluded.
 #
@@ -20,7 +18,6 @@ BUILD_SH="$REPO_ROOT/scripts/build.sh"
 SRC_SKILLS="$REPO_ROOT/src/skills"
 SRC_AGENTS="$REPO_ROOT/src/shared/agents"
 ROOT_SKILLS="$REPO_ROOT/skills"
-DIST_PLUGIN="$REPO_ROOT/dist/plugin"
 
 PASS=0
 FAIL=0
@@ -75,36 +72,6 @@ for src_skill_dir in "$SRC_SKILLS"/*/; do
 done
 
 # ───────────────────────────────────────────────────────────
-# T4: every public src skill is present in dist/plugin/skills/
-# ───────────────────────────────────────────────────────────
-for src_skill_dir in "$SRC_SKILLS"/*/; do
-  name="$(basename "$src_skill_dir")"
-  if [ -f "$DIST_PLUGIN/skills/$name/SKILL.md" ]; then
-    pass "T4: dist/plugin/skills/$name/SKILL.md present"
-  else
-    fail "T4: dist/plugin/skills/$name/SKILL.md missing"
-  fi
-done
-
-# ───────────────────────────────────────────────────────────
-# T5: plugin payload at expected paths
-# ───────────────────────────────────────────────────────────
-expected_plugin_paths=(
-  ".claude-plugin/plugin.json"
-  "agents"
-  "skills"
-  "shared"
-  "docs"
-)
-for p in "${expected_plugin_paths[@]}"; do
-  if [ -e "$DIST_PLUGIN/$p" ]; then
-    pass "T5: dist/plugin/$p present"
-  else
-    fail "T5: dist/plugin/$p missing"
-  fi
-done
-
-# ───────────────────────────────────────────────────────────
 # T5: every shared source agent is emitted as a standalone Claude Code agent
 #      in the built dist/agents/ (agent outputs are gitignored, not committed)
 # ───────────────────────────────────────────────────────────
@@ -133,7 +100,7 @@ if [ -d "$REPO_ROOT/src/internal-skills" ]; then
   for internal_dir in "$REPO_ROOT/src/internal-skills"/*/; do
     [ -d "$internal_dir" ] || continue
     name="$(basename "$internal_dir")"
-    if [ ! -d "$ROOT_SKILLS/$name" ] && [ ! -d "$DIST_PLUGIN/skills/$name" ]; then
+    if [ ! -d "$ROOT_SKILLS/$name" ]; then
       pass "T6: internal skill '$name' correctly excluded from generated outputs"
     else
       fail "T6: internal skill '$name' leaked into generated outputs"
@@ -155,7 +122,7 @@ if [ -d "$REPO_ROOT/src/deprecated-skills" ]; then
       distribute_flag="$(head -30 "$skill_md" | grep -E '^distribute:' || true)"
     fi
     if [ -z "$distribute_flag" ]; then
-      if [ ! -d "$ROOT_SKILLS/$name" ] && [ ! -d "$DIST_PLUGIN/skills/$name" ]; then
+      if [ ! -d "$ROOT_SKILLS/$name" ]; then
         pass "T7: deprecated skill '$name' (no distribute flag) excluded"
       else
         fail "T7: deprecated skill '$name' leaked into generated outputs without distribute flag"

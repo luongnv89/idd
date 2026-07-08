@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
-# test-init-template-doc-urls-dist.sh — Verify both copies of the
-# init-gitissue template hold the URL policy after build (issue #58, §9 of
+# test-init-template-doc-urls-dist.sh — Verify the built copy of the
+# init-gitissue template holds the URL policy after build (issue #58, §9 of
 # refactor-plan-v10.md; updated for issue #81 and #106).
 #
 # Same rule as the source variant, applied to:
 #   skills/init-gitissue/templates/gitissue-template.yml (committed)
-#   dist/plugin/skills/init-gitissue/templates/gitissue-template.yml (gitignored)
 #
 # Stale pattern: any GitHub URL to /src/docs/<file>.md where <file> exists
 # at top-level docs/. Post-#81 the canonical path is /docs/<file>.md.
@@ -19,7 +18,6 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 RUNTIME_DOCS="$REPO_ROOT/docs"
 BUILD_SH="$REPO_ROOT/scripts/build.sh"
 SKILL_TEMPLATE="$REPO_ROOT/skills/init-gitissue/templates/gitissue-template.yml"
-DIST_PLUGIN_TEMPLATE="$REPO_ROOT/dist/plugin/skills/init-gitissue/templates/gitissue-template.yml"
 
 PASS=0
 FAIL=0
@@ -30,7 +28,7 @@ fail() { echo "  ✗ $1"; FAIL=$((FAIL + 1)); }
 echo "◆ Init Template Doc URL Dist Tests (issue #58)"
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 
-if [ ! -f "$SKILL_TEMPLATE" ] || [ ! -f "$DIST_PLUGIN_TEMPLATE" ]; then
+if [ ! -f "$SKILL_TEMPLATE" ]; then
   echo "  ○ template copies missing — running build..."
   "$BUILD_SH" >/dev/null 2>&1 || {
     fail "Pre-build failed"
@@ -96,21 +94,6 @@ else
 fi
 
 # ───────────────────────────────────────────────────────────
-# T2: dist/plugin/skills/init-gitissue copy
-# ───────────────────────────────────────────────────────────
-if [ -f "$DIST_PLUGIN_TEMPLATE" ]; then
-  plug_violations="$(scan "$DIST_PLUGIN_TEMPLATE" || true)"
-  if [ -z "$plug_violations" ]; then
-    pass "T2: dist/plugin/skills/init-gitissue/.../gitissue-template.yml passes URL policy"
-  else
-    fail "T2: stale URLs in plugin template copy"
-    printf '%s\n' "$plug_violations" | sed 's/^/    /'
-  fi
-else
-  fail "T2: dist/plugin/skills/init-gitissue/.../gitissue-template.yml missing"
-fi
-
-# ───────────────────────────────────────────────────────────
 # Summary
 # ───────────────────────────────────────────────────────────
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
@@ -122,5 +105,5 @@ if [ "$FAIL" -gt 0 ]; then
   exit 1
 fi
 
-echo "  ✓ Both dist template copies hold URL policy"
+echo "  ✓ Built template copy holds URL policy"
 exit 0
