@@ -2,7 +2,7 @@
 
 **Issue-Driven Development (IDD)** — a tool-neutral contract for turning an issue tracker and git history into executable project memory.
 
-- **Spec version:** 1.0
+- **Spec version:** 1.1
 - **Marker version:** `v1`
 - **Status:** Stable
 
@@ -77,6 +77,19 @@ Blocked by #N
 - Cross-repo references (`org/repo#N`) are out of scope for v1 and MUST be ignored.
 
 Semantics: the referenced issue (or its PR) must be merged before the dependent issue's PR is merged. Tools that automate merging MUST check these markers and pause rather than merge a PR whose dependencies are open.
+
+### 2.1 Hierarchy marker
+
+A parent/child (epic) relationship is recorded with a third marker in the child issue's body:
+
+```
+Part of #N
+```
+
+- Same matching rules as the dependency markers: case-insensitive, any list or sentence shape, anywhere in the body; cross-repo references are out of scope and MUST be ignored.
+- Semantics: **scope, not order**. `Part of #N` says this issue contributes to parent issue N's outcome; it does NOT imply merge order — use `Depends on #N` for that.
+- The parent (epic) is an ordinary conforming issue (§1) whose acceptance criteria describe the outcome of the whole effort. It SHOULD list its children as a markdown checklist (`- [ ] #12 — <title>`) so trackers with task-list references or native sub-issues track completion automatically.
+- The parent SHOULD close only when all of its children are closed.
 
 ## 3. Naming Conventions
 
@@ -188,6 +201,8 @@ Conformance is claimed per level, e.g. *"IDD L2 (spec v1.0)"*. Each level includ
 ## Versioning
 
 This spec follows semantic versioning. Additive, backward-compatible clarifications bump the minor version; any change that invalidates a previously conforming artifact bumps the major version and the normalization marker (`v1` → `v2`). Issues normalized under an older major version remain valid instances of that version.
+
+Changes: **1.1** — added the `Part of #N` hierarchy marker (§2.1). **1.0** — initial release.
 
 ---
 

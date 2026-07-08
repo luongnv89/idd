@@ -147,7 +147,7 @@ Triage, resolve, review, merge — repeated for every open issue. Up to three re
 
 ## Works With Any Tool
 
-IDD is a methodology, not a vendor lock-in. The structured issue format is plain GitHub markdown — any tool that reads GitHub issues can consume it. gitissue adds structure to your issues; your existing tools keep working exactly as before.
+IDD is a methodology, not a vendor lock-in. The structured issue format is plain GitHub markdown — any tool that reads GitHub issues can consume it. gitissue adds structure to your issues; your existing tools keep working exactly as before. No AI at all? The [manual IDD quickstart](docs/manual-idd-quickstart.md) proves L1 works with a text editor and your existing tracker.
 
 | Tool | How it works with gitissue |
 |------|---------------------------|
@@ -319,7 +319,7 @@ IDD is the outer loop, not a competitor: it structures the *work* before you wri
 MIT licensed. No telemetry, no accounts, no cloud dependency.
 
 **Does it work without Claude Code?**
-The skills are designed for Claude Code, but the structured issue format works with any AI agent or human developer. The issue is the interface.
+The skills are designed for Claude Code, but the structured issue format works with any AI agent or human developer. The issue is the interface. It even works with no AI at all — the [manual IDD quickstart](docs/manual-idd-quickstart.md) reaches L1 conformance with a text editor.
 
 **Will it modify my existing issues?**
 Only when you explicitly run `/issue-creator N`. A backup comment is posted before any changes. If the backup fails, it aborts.

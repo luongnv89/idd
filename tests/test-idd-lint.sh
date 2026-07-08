@@ -260,6 +260,16 @@ else
 fi
 
 # ───────────────────────────────────────────────────────────
+# T27: hierarchy marker Part of #N is reported (spec §2.1)
+# ───────────────────────────────────────────────────────────
+printf '%s\n\nPart of #7\n' "$(cat "$TMP/issue-good.md")" > "$TMP/issue-child.md"
+if python3 "$LINT" issue "$TMP/issue-child.md" 2>&1 | grep -q "Part of #7"; then
+  pass "T27: 'Part of #N' hierarchy marker reported (§2.1)"
+else
+  fail "T27: 'Part of #N' hierarchy marker reported (§2.1)"
+fi
+
+# ───────────────────────────────────────────────────────────
 # T21: the repo's own sample issue passes L1 (docs/sample-normalized-issue.md)
 # ───────────────────────────────────────────────────────────
 # Strip the doc's explanatory header (everything before the marker line).

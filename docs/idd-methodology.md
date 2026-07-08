@@ -208,6 +208,18 @@ Skills that read the marker:
 
 The convention is intentionally lightweight: it lives in plain prose in the issue body, requires no schema, and is grep-friendly for any tool — not just IDD skills.
 
+## Hierarchy of Intent
+
+IDD's unit of work is the issue, but larger efforts need one level above it: where does the design intent of a 15-issue effort live? The answer stays inside the tracker — an **epic is an ordinary issue** that parents other issues. No new artifact type, no separate roadmap database.
+
+- **The parent (epic)** is a normal, normalized issue whose acceptance criteria describe the outcome of the whole effort. It lists its children as a markdown checklist (`- [ ] #12 — <title>`), so trackers with task-list references or native sub-issues track completion automatically. It closes only when all children close.
+- **Each child** carries `Part of #N` in its body — the hierarchy marker defined in [SPEC.md §2.1](https://github.com/luongnv89/idd/blob/main/SPEC.md). Same grammar as `Depends on #N`: plain prose, case-insensitive, grep-friendly.
+- **Scope is not order.** `Part of #N` says a child contributes to the parent's outcome; it never gates merging. When child B needs child A merged first, B additionally says `Depends on #A` — the two markers answer different questions.
+
+**Decomposing a design document.** A PRD or design doc decomposes top-down: one epic per feature area, then independently resolvable children — each with its own acceptance criteria small enough for a single atomic PR. In gitissue, `/issue-creator`'s **batch mode** is the hook: feed it a PRD section or planning list and it creates the children in one pass; add the `Part of #N` markers and the parent checklist to bind them. The intent–code boundary applies at every level: the epic captures the *why* of the effort, the children capture the *what* of each slice, and no level predicts affected files.
+
+Skills treat the marker conservatively today: `/issue-triage` may group children under their epic as a display signal, and `/auto-pilot`'s merge gate remains driven by `Depends on #N` alone.
+
 ## Minimal Example
 
 Raw report:
@@ -293,6 +305,32 @@ Issue #42 (problem) → Branch fix/42-mobile-auth-redirect → Commits fix(auth)
 ```
 
 Every artifact links to every other artifact. `git blame` on any line leads to the commit, which leads to the PR, which leads to the issue. This traceability is what makes the history *valuable* — not just a record of what changed, but a record of why.
+
+### Reading the memory back
+
+The memory story is only half-done at write time — the payoff is retrieval, and it needs no agent. Every recipe below is plain git (plus `gh` where noted):
+
+```bash
+# Every commit that touched issue #42
+git log --oneline --grep "(#42)"
+
+# The full story of #42's resolution — squash commit body carries the
+# PR body: Summary, Decision Record, acceptance verification
+git log -p --grep "Closes #42" --format=fuller
+
+# All Decision Records ever merged (why does this code exist?)
+git log --format="%h %s" --grep "## Decision Record"
+
+# From a line of code to the original problem report:
+git blame -L 120,140 src/auth.py        # → commit hash
+git show <hash>                          # → 'Closes #42' in the body → the issue
+gh issue view 42 --json title,body       # → the intent that started it
+
+# Draft release notes from the conventional-commit narrative
+git log --format="%s" v1.2.0..HEAD | grep -E "^(feat|fix)"
+```
+
+`scripts/idd-lint.py stats` aggregates the same signals into an evidence report — trace completeness, Decision-Record coverage, and resolution outcomes by issue quality.
 
 ### Why this matters for AI agents
 

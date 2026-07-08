@@ -38,7 +38,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-SPEC_VERSION = "1.0"
+SPEC_VERSION = "1.1"
 SPEC_URL = "https://github.com/luongnv89/idd/blob/main/SPEC.md"
 
 MARKER_RE = re.compile(r"<!--\s*gitissue:normalized\s+v(\d+)\s*-->")
@@ -46,6 +46,7 @@ SECTION_RE = re.compile(r"^## +(.+?)\s*$")
 CONFIDENCE_RE = re.compile(r"\((?:high|medium) confidence\)|\(needs review\)")
 CHECKBOX_RE = re.compile(r"^\s*[-*] \[[ xX]\] \S", re.MULTILINE)
 DEP_MARKER_RE = re.compile(r"\b(?:depends on|blocked by):?\s*(#\d+(?:\s*,\s*#\d+)*)", re.IGNORECASE)
+PART_MARKER_RE = re.compile(r"\bpart of:?\s*(#\d+)", re.IGNORECASE)
 
 ISSUE_TYPES = ("bug", "feature", "improvement")
 BRANCH_TYPES = ("fix", "feat", "refactor", "docs", "test", "chore")
@@ -204,6 +205,11 @@ def lint_issue(body: str) -> list[Finding]:
         deps.extend(re.findall(r"#\d+", m.group(1)))
     if deps:
         findings.append(info("I08", f"dependency markers found: {', '.join(deps)} (§2)"))
+
+    # I09 — hierarchy marker (informational, §2.1)
+    parents = [m.group(1) for m in PART_MARKER_RE.finditer(body)]
+    if parents:
+        findings.append(info("I09", f"hierarchy marker: Part of {', '.join(parents)} (§2.1)"))
 
     return findings
 
