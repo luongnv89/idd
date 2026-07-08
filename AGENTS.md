@@ -53,7 +53,8 @@ docs/                              # All documentation — single tree (issue #8
 ├── idd-methodology.md             #   bare `docs/X.md` tokens; build.py
 ├── naming-conventions.md          #   bundles them into each skill's
 ├── sync-conventions.md            #   references/docs/ at build time)
-├── github-projects-sync.md        # ↑
+├── github-projects-sync.md        #
+├── platform-github.md             # ↑
 ├── ARCHITECTURE.md                # ↓ Human-only project docs (not bundled
 ├── CHANGELOG.md                   #   into skills; readable on the
 ├── DEVELOPMENT.md                 #   repo's main branch only)
@@ -66,7 +67,7 @@ docs/                              # All documentation — single tree (issue #8
 
 All documentation lives in top-level `docs/`. Two kinds coexist there:
 
-1. **Runtime docs** — read by skills at execution time. A skill source file references them as bare `docs/X.md` tokens. `scripts/build.py` discovers these references via transitive-closure scan and copies the matching files into each skill's `references/docs/`. To add a runtime doc: drop the new `.md` file at `docs/<name>.md` and reference it from a skill or shared agent — the build picks it up automatically. Today's runtime docs: `config-schema.md`, `idd-methodology.md`, `naming-conventions.md`, `sync-conventions.md`, `github-projects-sync.md`.
+1. **Runtime docs** — read by skills at execution time. A skill source file references them as bare `docs/X.md` tokens. `scripts/build.py` discovers these references via transitive-closure scan and copies the matching files into each skill's `references/docs/`. To add a runtime doc: drop the new `.md` file at `docs/<name>.md` and reference it from a skill or shared agent — the build picks it up automatically. Today's runtime docs include: `config-schema.md`, `idd-methodology.md`, `naming-conventions.md`, `sync-conventions.md`, `github-projects-sync.md`, `platform-github.md`.
 2. **Project docs** — read by humans only. Architecture, changelog, dev guide, decision records, experiments, release notes. They are not referenced by any skill, so the build does not bundle them. Place new project docs at `docs/<name>.md` (top-level) or under a topical subdirectory (`docs/decisions/`, `docs/experiments/`, `docs/release-notes/`).
 
 When in doubt: if a skill source needs to read it at runtime, it is a runtime doc and goes at the top level of `docs/`. Otherwise it is a project doc.

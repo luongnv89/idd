@@ -81,10 +81,10 @@ codebase.
 Each agent states its own report threshold (code-reviewer `>= 80`,
 ui-reviewer `>= 75`). Findings below threshold are dropped, not reported.
 
-## GitHub CLI
+## Platform driver
 
-Every `gh` call uses `--json` with explicit field selection. Never parse `gh`
-text output.
+Every `gh` call uses `--json` with explicit field selection; never parse `gh`
+text output. Canonical commands and driver rules: docs/platform-github.md.
 
 ## Autonomous operation
 

@@ -328,7 +328,7 @@ In interactive mode: never auto-merge — just report status.
 
 ## Conventions
 
-- **GitHub CLI:** every `gh` command uses `--json` with explicit field selection — never parse text output.
+- **Platform driver:** all tracker access follows the GitHub driver — `--json` with explicit field selection, never parsed text output; full catalog in references/docs/platform-github.md.
 - **Terminal output:** follow the DESIGN.md vocabulary — `[N/7]` step counter; symbols `●` progress, `✓` success, `✗` failure, `◆` header, `⚠` warning, `○` info; two-space indent, `┄` separators, URLs on their own line, max 80 chars.
 - **Errors:** rich format from `references/error-messages.md` — `✗ Short description` then `  To fix:  <command>`.
 - **Expected output:** a clean review prints the 7-step tracker and a summary — see *Expected Inline Output* in `references/report-templates.md`.

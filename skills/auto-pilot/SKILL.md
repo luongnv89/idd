@@ -290,9 +290,9 @@ Full example runs (happy path, explicit list, invalid issues) and edge-case scen
 
 ---
 
-## GitHub CLI Convention
+## Platform Driver
 
-Every `gh` command for data retrieval uses `--json` with explicit field selection — never parse text output (e.g. `gh issue list --state open --json number,title,body,labels,assignees --limit 100`, `gh pr view N --json mergeable,reviewDecision,statusCheckRollup`). Merge with `gh pr merge N --squash --delete-branch`.
+All tracker access follows the GitHub driver — `--json` with explicit field selection, never parsed text output. The full operation catalog and driver rules live in references/docs/platform-github.md.
 
 ## Terminal Output
 

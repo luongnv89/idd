@@ -40,9 +40,10 @@ graph LR
 ## Full Schema
 
 ```yaml
-# Platform for issue management
+# Tracker platform driver
 # Type: string
-# Values: "github" | "gitlab"
+# Values: "github" — the only implemented driver (see references/docs/platform-github.md);
+#         a new driver becomes valid here once its docs/platform-<name>.md exists
 # Default: "github"
 platform: github
 
@@ -436,7 +437,7 @@ model_suggestion:
 
 ```mermaid
 graph TD
-    R[".gitissue.yml"] --> P["platform<br/>(github | gitlab)"]
+    R[".gitissue.yml"] --> P["platform<br/>(driver: github)"]
     R --> I["issue"]
     R --> RS["resolve"]
     R --> RV["review"]
@@ -632,7 +633,7 @@ Config is validated on load at the start of every skill invocation. Errors inclu
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `platform` | `github` | Platform for issue management |
+| `platform` | `github` | Tracker platform driver — `github` is the only implemented driver (references/docs/platform-github.md) |
 | `issue.auto_normalize` | `true` | Auto-normalize in /issue-resolver |
 | `issue.template` | `default` | Built-in templates |
 | `issue.labels_auto_suggest` | `true` | Suggest labels from content |

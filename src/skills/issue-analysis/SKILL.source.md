@@ -385,11 +385,9 @@ Full example outputs (happy path, view mode, already-closed issue) are kept in `
 
 ---
 
-## GitHub CLI Convention
+## Platform Driver
 
-Every `gh` command for data retrieval uses `--json` with explicit field selection. Never parse text output.
-
-- `gh issue view N --json number,title,body,labels,assignees,state,comments,createdAt,updatedAt,author`
+All tracker access follows the GitHub driver — `--json` with explicit field selection, never parsed text output. The full operation catalog and driver rules live in docs/platform-github.md.
 
 ## Terminal Output
 

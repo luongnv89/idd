@@ -156,6 +156,8 @@ IDD is a methodology, not a vendor lock-in. The structured issue format is plain
 | **Any SKILL.md agent** | Install the self-contained [`skills/`](skills/) packages via `asm` or manual copy |
 | **Human developers** | Read the issue — acceptance criteria and structure are right there |
 
+All tracker access is concentrated behind one **platform driver** document — [`docs/platform-github.md`](docs/platform-github.md), the operation catalog every skill's `gh` commands must match. GitHub is the only implemented driver; porting to another tracker means writing one equivalent document (e.g. `glab` mappings), not hunting through seven skills.
+
 gitissue is **complementary** to your existing workflow. Use it alongside TDD, BDD, CI/CD pipelines, project management tools, or any AI coding agent. It fills one gap — structuring and triaging issues — and stays out of the way for everything else.
 
 ### Enforce the spec in CI — `idd-lint`
@@ -492,7 +494,7 @@ gitissue works with **zero configuration**. All settings have sensible defaults.
 To customize, create `.gitissue.yml` in your repo root (or run `/init-gitissue`):
 
 ```yaml
-platform: github                # github | gitlab (future)
+platform: github                # tracker driver — github is the only implemented one
 
 issue:
   auto_normalize: true          # auto-normalize in /issue-resolver

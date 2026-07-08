@@ -324,13 +324,9 @@ In addition to **Create**, the skill supports two more modes, each with its own 
 Full per-mode step specs and error paths live in `references/modes.md`. Example runs (batch from a planning document, create from a vague description) live in `references/examples.md`.
 
 ---
-## GitHub CLI Convention
+## Platform Driver
 
-Every `gh` command for data retrieval uses `--json` with explicit field selection. Never parse text output.
-
-- `gh issue view 42 --json number,title,body,labels,assignees,state,comments`
-- `gh issue list --state open --json number,title,body,labels --limit 100`
-- `gh issue create --title "..." --body "..." --label "..."`
+All tracker access follows the GitHub driver — `--json` with explicit field selection, never parsed text output. The full operation catalog and driver rules live in references/docs/platform-github.md.
 
 ## Terminal Output
 

@@ -3,7 +3,7 @@
 # Detected: Python (scripts/) | no framework | shell test scripts | medium repo (238 files)
 
 # Platform for issue management
-# Values: "github" | "gitlab"
+# Values: "github" (only implemented driver — see docs/platform-github.md)
 platform: github
 
 # Issue creation and normalization settings

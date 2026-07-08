@@ -486,9 +486,9 @@ and branch-already-exists are all handled — full behavior for each is in
 
 ---
 
-## GitHub CLI Convention
+## Platform Driver
 
-Every `gh` command uses `--json` with explicit field selection. Never parse text output.
+All tracker access follows the GitHub driver — `--json` with explicit field selection, never parsed text output. The full operation catalog and driver rules live in docs/platform-github.md.
 
 ## Terminal Output
 
@@ -515,6 +515,6 @@ Authoritative file list for the *Bundled dependency precheck* above:
 
 **References** (`references/`): `pipeline-steps.md` (payloads/phases/fallbacks, Steps 1–4) · `report-templates.md` (PR body, closing summary, expected output) · `bug-verification.md` (reproduction checkpoint, Step 3) · `skill-index.md` (external-skill catalog, Step 3) · `error-messages.md` (error catalog)
 
-**Docs** (`docs/`): `sync-conventions.md` · `naming-conventions.md` · `pre-commit-security.md` · `idd-methodology.md` · `github-projects-sync.md` · `config-schema.md` · `agent-model-effort.md` · `shared-agent-conventions.md`
+**Docs** (`docs/`): `sync-conventions.md` · `naming-conventions.md` · `pre-commit-security.md` · `idd-methodology.md` · `github-projects-sync.md` · `config-schema.md` · `agent-model-effort.md` · `shared-agent-conventions.md` · `platform-github.md`
 
 **`DESIGN.md`** — terminal output style guide.

@@ -416,12 +416,9 @@ Omit lines where a step found nothing (e.g., omit `Already-fixed` if count is 0,
 Full example runs (first run, cached view with/without changes, explicit update, empty repo, circular dependency scenario) live in `references/examples.md` to keep SKILL.md focused on mechanics.
 
 ---
-## GitHub CLI Convention
+## Platform Driver
 
-Every `gh` command for data retrieval uses `--json` with explicit field selection. Never parse text output.
-
-- `gh issue list --state open --json number,title,body,labels,assignees,state,updatedAt --limit 100`
-- `gh issue list --state closed --json number,title,body,labels,assignees,state,updatedAt --limit 100`
+All tracker access follows the GitHub driver — `--json` with explicit field selection, never parsed text output. The full operation catalog and driver rules live in references/docs/platform-github.md.
 
 ## Terminal Output
 

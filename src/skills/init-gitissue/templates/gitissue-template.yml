@@ -3,7 +3,7 @@
 # Detected: {language} | {framework} | {test_runner} | {repo_size} repo ({file_count} files)
 
 # Platform for issue management
-# Values: "github" | "gitlab"
+# Values: "github" (only implemented driver — see docs/platform-github.md)
 platform: github
 
 # Issue creation and normalization settings
