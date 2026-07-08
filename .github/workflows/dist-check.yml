@@ -19,6 +19,9 @@ jobs:
       - name: Source-level checks (fast fail before build)
         run: bash tests/test-init-template-doc-urls-source.sh
 
+      - name: test-idd-lint
+        run: bash tests/test-idd-lint.sh
+
       # build.sh: compile → verify dist/skills → promote skills/ only on success
       - name: Build and verify skills (update skills/ on success)
         run: ./scripts/build.sh

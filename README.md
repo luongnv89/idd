@@ -158,6 +158,23 @@ IDD is a methodology, not a vendor lock-in. The structured issue format is plain
 
 gitissue is **complementary** to your existing workflow. Use it alongside TDD, BDD, CI/CD pipelines, project management tools, or any AI coding agent. It fills one gap — structuring and triaging issues — and stays out of the way for everything else.
 
+### Enforce the spec in CI — `idd-lint`
+
+[`scripts/idd-lint.py`](scripts/idd-lint.py) validates [IDD Spec](SPEC.md) conformance from plain data — no LLM, no network, no dependencies beyond the Python standard library. Any repo can run it, whether or not it uses the gitissue skills:
+
+```bash
+# Lint the current branch name + commits against a base (local git only)
+python3 scripts/idd-lint.py repo --base origin/main
+
+# Lint an issue body, a PR body + title, a commit message, a branch name
+gh issue view 42 --json body -q .body | python3 scripts/idd-lint.py issue -
+gh pr view 7 --json body -q .body | python3 scripts/idd-lint.py pr - --title "$(gh pr view 7 --json title -q .title)"
+python3 scripts/idd-lint.py commit "fix(auth): resolve redirect loop (#42)"
+python3 scripts/idd-lint.py branch fix/42-mobile-auth-redirect
+```
+
+Checks are tagged with the spec section they enforce and mapped to the L1–L3 conformance levels (`--level L2` skips Decision-Record checks for repos not claiming L3). Exit code 0/1 makes it CI-native; `/idd-doctor` remains the deep, agent-powered health check.
+
 ---
 
 ## Get Started

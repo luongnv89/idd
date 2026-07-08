@@ -191,4 +191,4 @@ This spec follows semantic versioning. Additive, backward-compatible clarificati
 
 ---
 
-*Non-normative: the rationale behind this contract — the intent–code boundary, executable project memory, and the compounding value of structured history — is elaborated in [docs/idd-methodology.md](docs/idd-methodology.md). A rendered example of a conforming issue is at [docs/sample-normalized-issue.md](docs/sample-normalized-issue.md).*
+*Non-normative: the rationale behind this contract — the intent–code boundary, executable project memory, and the compounding value of structured history — is elaborated in [docs/idd-methodology.md](docs/idd-methodology.md). A rendered example of a conforming issue is at [docs/sample-normalized-issue.md](docs/sample-normalized-issue.md). A dependency-free conformance checker for §1–§5 ships as [scripts/idd-lint.py](scripts/idd-lint.py) — it validates issue bodies, PR bodies, commit messages, and branch names from plain data, mapped to the levels above.*
