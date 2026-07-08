@@ -171,9 +171,15 @@ gh issue view 42 --json body -q .body | python3 scripts/idd-lint.py issue -
 gh pr view 7 --json body -q .body | python3 scripts/idd-lint.py pr - --title "$(gh pr view 7 --json title -q .title)"
 python3 scripts/idd-lint.py commit "fix(auth): resolve redirect loop (#42)"
 python3 scripts/idd-lint.py branch fix/42-mobile-auth-redirect
+
+# Evidence report: trace-completeness, Decision-Record coverage, and run
+# outcomes from .gitissue/runs.jsonl — tiered by issue quality when gh is available
+python3 scripts/idd-lint.py stats            # add --no-github for offline, --json for machines
 ```
 
 Checks are tagged with the spec section they enforce and mapped to the L1–L3 conformance levels (`--level L2` skips Decision-Record checks for repos not claiming L3). Exit code 0/1 makes it CI-native; `/idd-doctor` remains the deep, agent-powered health check.
+
+`stats` closes the evidence loop: it measures whether the methodology is paying for itself — what fraction of commits trace to issues, how many merged PRs carry Decision Records into git history, and (when `gh` is available) whether normalized issues actually resolve with fewer QA cycles than unnormalized ones.
 
 ---
 

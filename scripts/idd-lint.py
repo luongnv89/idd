@@ -11,10 +11,14 @@ Validates Issue-Driven Development artifacts against the IDD Spec
   idd-lint pr     [FILE|-] [--title T] [--type bug|...]
                                         lint a PR body (+ title)     (L2 §5, L3 §4)
   idd-lint repo   [--base REF]          lint current branch + commits vs base
+  idd-lint stats  [--branch REF] [--no-github] [--json]
+                                        evidence report: trace-completeness,
+                                        Decision-Record coverage, run outcomes
 
 FILE of `-` (or omitted) reads stdin. `--level L1|L2|L3` (default L3) selects
 the conformance level to enforce; checks above the selected level are skipped.
 Exit codes: 0 = conformant (warnings allowed), 1 = errors found, 2 = usage.
+`stats` is a report, not a gate — it exits 0 unless the data is unreadable.
 
 CI example (GitHub Actions):
 
@@ -26,9 +30,12 @@ CI example (GitHub Actions):
 from __future__ import annotations
 
 import argparse
+import json
 import re
+import statistics
 import subprocess
 import sys
+from pathlib import Path
 
 SPEC_VERSION = "1.0"
 SPEC_URL = "https://github.com/luongnv89/idd/blob/main/SPEC.md"
@@ -348,6 +355,273 @@ def commit_subjects(rev_range: str) -> list[str]:
     return [line for line in out.splitlines() if line.strip()]
 
 
+# --- Stats (evidence report) -----------------------------------------------------
+
+SUCCESS_OUTCOMES = {"success", "merged"}
+SKIP_OUTCOMES = {"skipped", "already_resolved"}
+
+
+def _run_soft(cmd: list[str]) -> str | None:
+    """Run a command, returning stdout or None on any failure (soft probe)."""
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+        return None
+    return proc.stdout if proc.returncode == 0 else None
+
+
+def _gh_json(*args: str) -> object | None:
+    out = _run_soft(["gh", *args])
+    if out is None:
+        return None
+    try:
+        return json.loads(out)
+    except json.JSONDecodeError:
+        return None
+
+
+def _pct(n: int, d: int) -> int | None:
+    return round(100 * n / d) if d else None
+
+
+def _median(values: list) -> float | None:
+    return statistics.median(values) if values else None
+
+
+def detect_default_branch() -> str:
+    out = _run_soft(["git", "rev-parse", "--abbrev-ref", "origin/HEAD"])
+    if out and "/" in out.strip():
+        return out.strip().split("/", 1)[1]
+    for cand in ("main", "master"):
+        if _run_soft(["git", "rev-parse", "--verify", "--quiet", cand]) is not None:
+            return cand
+    return "HEAD"
+
+
+def collect_commit_stats(branch: str, since: str | None) -> dict | None:
+    """Trace-completeness and Decision-Record coverage from local git history."""
+    cmd = ["git", "log", "--no-merges", "--format=%s%x1f%b%x1e", branch]
+    if since:
+        cmd.insert(2, f"--since={since}")
+    out = _run_soft(cmd)
+    if out is None:
+        return None
+    records = [r for r in out.split("\x1e") if r.strip()]
+    total, grammar, issue_ref, squash, dr = len(records), 0, 0, 0, 0
+    for rec in records:
+        subject, _, body = rec.partition("\x1f")
+        subject = subject.strip()
+        if COMMIT_RE.match(subject):
+            grammar += 1
+        if re.search(r"\(#\d+\)", subject):
+            issue_ref += 1
+        if re.search(r"^Closes #\d+", body, re.MULTILINE):
+            squash += 1
+            if "## Decision Record" in body:
+                dr += 1
+    return {
+        "branch": branch,
+        "commits": total,
+        "grammar_ok": grammar,
+        "grammar_pct": _pct(grammar, total),
+        "issue_linked": issue_ref,
+        "trace_pct": _pct(issue_ref, total),
+        "squash_pr_commits": squash,
+        "decision_records": dr,
+        "dr_pct": _pct(dr, squash),
+    }
+
+
+def collect_run_stats(path: Path) -> dict | None:
+    """Outcome/QA/duration aggregates from the append-only run log."""
+    if not path.is_file():
+        return None
+    rows = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(row, dict):
+            rows.append(row)
+    if not rows:
+        return None
+    outcomes: dict[str, int] = {}
+    for r in rows:
+        o = str(r.get("outcome", "unknown"))
+        outcomes[o] = outcomes.get(o, 0) + 1
+    attempted = [r for r in rows if r.get("outcome") not in SKIP_OUTCOMES]
+    succeeded = [r for r in attempted if r.get("outcome") in SUCCESS_OUTCOMES]
+    qa = [r["qa_cycles"] for r in rows if isinstance(r.get("qa_cycles"), int)]
+    dur = [r["duration_s"] for r in rows if isinstance(r.get("duration_s"), (int, float))]
+    by_complexity: dict[str, dict] = {}
+    for level in ("low", "medium", "high"):
+        sub = [r for r in rows if r.get("complexity") == level]
+        if sub:
+            sub_qa = [r["qa_cycles"] for r in sub if isinstance(r.get("qa_cycles"), int)]
+            by_complexity[level] = {"runs": len(sub), "median_qa": _median(sub_qa)}
+    return {
+        "runs": len(rows),
+        "outcomes": dict(sorted(outcomes.items())),
+        "attempted": len(attempted),
+        "succeeded": len(succeeded),
+        "success_pct": _pct(len(succeeded), len(attempted)),
+        "median_qa_cycles": _median(qa),
+        "median_duration_s": _median(dur),
+        "by_complexity": by_complexity,
+        "issues": sorted({r["issue"] for r in rows if isinstance(r.get("issue"), int)}),
+    }
+
+
+def collect_github_stats(limit: int, run_rows_path: Path) -> dict | None:
+    """Optional gh-backed metrics: %% issues normalized, merged-PR linkage,
+    and run outcomes tiered by issue quality (normalized vs not)."""
+    open_issues = _gh_json("issue", "list", "--state", "open", "--limit", str(limit), "--json", "number,body")
+    if open_issues is None:
+        return None  # gh missing, unauthenticated, or offline — skip the whole section
+    normalized_open = sum(1 for i in open_issues if MARKER_RE.search(i.get("body") or ""))
+
+    result: dict = {
+        "open_issues": len(open_issues),
+        "open_normalized": normalized_open,
+        "open_normalized_pct": _pct(normalized_open, len(open_issues)),
+    }
+
+    merged = _gh_json("pr", "list", "--state", "merged", "--limit", str(limit), "--json", "number,body")
+    if merged is not None:
+        closes = sum(1 for p in merged if re.search(r"^Closes #\d+", p.get("body") or "", re.MULTILINE))
+        dr = sum(1 for p in merged if "## Decision Record" in (p.get("body") or ""))
+        result.update({
+            "merged_prs": len(merged),
+            "merged_with_closes": closes,
+            "merged_closes_pct": _pct(closes, len(merged)),
+            "merged_with_dr": dr,
+            "merged_dr_pct": _pct(dr, len(merged)),
+        })
+
+    # Tier run outcomes by issue quality (normalized vs unnormalized issue body).
+    runs = collect_run_stats(run_rows_path)
+    if runs and runs["issues"]:
+        all_issues = _gh_json(
+            "issue", "list", "--state", "all",
+            "--limit", str(max(limit, 500)), "--json", "number,body",
+        )
+        if all_issues is not None:
+            marker_by_issue = {i["number"]: bool(MARKER_RE.search(i.get("body") or "")) for i in all_issues}
+            rows = []
+            for line in run_rows_path.read_text(encoding="utf-8").splitlines():
+                try:
+                    row = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if isinstance(row, dict) and row.get("outcome") not in SKIP_OUTCOMES:
+                    rows.append(row)
+            tiers: dict[str, dict] = {}
+            for name, wanted in (("normalized", True), ("unnormalized", False)):
+                sub = [r for r in rows if marker_by_issue.get(r.get("issue")) is wanted]
+                if sub:
+                    sub_qa = [r["qa_cycles"] for r in sub if isinstance(r.get("qa_cycles"), int)]
+                    won = sum(1 for r in sub if r.get("outcome") in SUCCESS_OUTCOMES)
+                    tiers[name] = {
+                        "runs": len(sub),
+                        "success_pct": _pct(won, len(sub)),
+                        "median_qa": _median(sub_qa),
+                    }
+            if tiers:
+                result["tiers"] = tiers
+                norm, unnorm = tiers.get("normalized"), tiers.get("unnormalized")
+                if norm and unnorm and norm["median_qa"] is not None and unnorm["median_qa"] is not None:
+                    result["qa_cycles_saved"] = unnorm["median_qa"] - norm["median_qa"]
+    return result
+
+
+def _fmt_ratio(pct: int | None, n: int, d: int) -> str:
+    return f"{pct}% ({n}/{d})" if pct is not None else f"n/a (0 of {d})"
+
+
+def render_stats(commit_s: dict | None, run_s: dict | None, gh_s: dict | None, gh_skipped: str | None) -> None:
+    print(f"◆ idd-lint stats — evidence report (IDD Spec v{SPEC_VERSION})")
+    print("┄" * 59)
+
+    if commit_s is None:
+        print("  ○ git history: not a git repository — skipped")
+    else:
+        print(f"  Git history — {commit_s['branch']}, {commit_s['commits']} non-merge commits")
+        print(f"    conventional grammar:    {_fmt_ratio(commit_s['grammar_pct'], commit_s['grammar_ok'], commit_s['commits'])} (§3.2)")
+        print(f"    issue-linked commits:    {_fmt_ratio(commit_s['trace_pct'], commit_s['issue_linked'], commit_s['commits'])} — trace completeness (§5.1)")
+        if commit_s["squash_pr_commits"]:
+            print(f"    Decision-Record coverage: {_fmt_ratio(commit_s['dr_pct'], commit_s['decision_records'], commit_s['squash_pr_commits'])} of squash-merged PR commits (§4)")
+        else:
+            print("    ○ no squash-merged PR commits found (no 'Closes #N' bodies) — Decision-Record coverage n/a (§4)")
+
+    if run_s is None:
+        print("  ○ run log: .gitissue/runs.jsonl not found or empty — skipped")
+    else:
+        print(f"  Run log — .gitissue/runs.jsonl, {run_s['runs']} run{'s' if run_s['runs'] != 1 else ''}")
+        print(f"    outcomes: {' · '.join(f'{k} {v}' for k, v in run_s['outcomes'].items())}")
+        if run_s["attempted"]:
+            print(f"    success rate (attempted): {_fmt_ratio(run_s['success_pct'], run_s['succeeded'], run_s['attempted'])}")
+        if run_s["median_qa_cycles"] is not None:
+            dur = f" · median duration: {round(run_s['median_duration_s'])}s" if run_s["median_duration_s"] is not None else ""
+            print(f"    median QA cycles: {run_s['median_qa_cycles']:g}{dur}")
+        if run_s["by_complexity"]:
+            parts = [
+                f"{lvl} {v['runs']}" + (f" (median QA {v['median_qa']:g})" if v["median_qa"] is not None else "")
+                for lvl, v in run_s["by_complexity"].items()
+            ]
+            print(f"    by complexity: {' · '.join(parts)}")
+
+    if gh_s is None:
+        print(f"  ○ GitHub: {gh_skipped or 'gh unavailable'} — skipped (local metrics above are unaffected)")
+    else:
+        print("  GitHub — via gh")
+        print(f"    open issues normalized:  {_fmt_ratio(gh_s['open_normalized_pct'], gh_s['open_normalized'], gh_s['open_issues'])} (§1.1)")
+        if "merged_prs" in gh_s:
+            print(f"    merged PRs w/ Closes #N: {_fmt_ratio(gh_s['merged_closes_pct'], gh_s['merged_with_closes'], gh_s['merged_prs'])} (§5.1)")
+            print(f"    merged PRs w/ Decision Record: {_fmt_ratio(gh_s['merged_dr_pct'], gh_s['merged_with_dr'], gh_s['merged_prs'])} (§4.1)")
+        tiers = gh_s.get("tiers")
+        if tiers:
+            print("  Issue quality → resolution outcome")
+            for name, t in tiers.items():
+                qa = f", median QA {t['median_qa']:g}" if t["median_qa"] is not None else ""
+                print(f"    {name:<13} n={t['runs']}, success {t['success_pct']}%{qa}")
+            saved = gh_s.get("qa_cycles_saved")
+            if saved is not None and saved > 0:
+                print(f"    ⚡ normalized issues resolve in {saved:g} fewer QA cycle{'s' if saved != 1 else ''} (median)")
+
+    print("┄" * 59)
+
+
+def cmd_stats(args: argparse.Namespace) -> int:
+    root_out = _run_soft(["git", "rev-parse", "--show-toplevel"])
+    root = Path(root_out.strip()) if root_out else Path.cwd()
+    runs_path = root / ".gitissue" / "runs.jsonl"
+
+    branch = args.branch or detect_default_branch()
+    commit_s = collect_commit_stats(branch, args.since)
+    run_s = collect_run_stats(runs_path)
+    gh_s, gh_skipped = None, None
+    if args.no_github:
+        gh_skipped = "--no-github"
+    else:
+        gh_s = collect_github_stats(args.limit, runs_path)
+        if gh_s is None:
+            gh_skipped = "gh unavailable, unauthenticated, or offline"
+
+    if args.json:
+        print(json.dumps(
+            {"spec_version": SPEC_VERSION, "git": commit_s, "runs": run_s, "github": gh_s},
+            indent=2, sort_keys=True,
+        ))
+        return 0
+
+    render_stats(commit_s, run_s, gh_s, gh_skipped)
+    return 0
+
+
 # --- Rendering -----------------------------------------------------------------
 
 
@@ -411,6 +685,13 @@ def main(argv: list[str]) -> int:
     p_repo = sub.add_parser("repo", help="lint current branch name + commits vs --base (L2)")
     p_repo.add_argument("--base", default="main", help="base ref to diff commits against (default: main)")
 
+    p_stats = sub.add_parser("stats", help="evidence report: trace-completeness, DR coverage, run outcomes")
+    p_stats.add_argument("--branch", help="branch to analyze (default: detected default branch)")
+    p_stats.add_argument("--since", help="limit git history, e.g. '6 months ago'")
+    p_stats.add_argument("--limit", type=int, default=200, help="max issues/PRs fetched via gh (default: 200)")
+    p_stats.add_argument("--no-github", action="store_true", help="skip gh-backed metrics (offline mode)")
+    p_stats.add_argument("--json", action="store_true", help="emit machine-readable JSON instead of text")
+
     args = parser.parse_args(argv)
 
     if args.kind == "issue":
@@ -433,6 +714,9 @@ def main(argv: list[str]) -> int:
     if args.kind == "pr":
         findings = lint_pr(read_input(args.file), args.title, args.issue_type, args.level)
         return render(findings, "pull request", args.level, args.quiet)
+
+    if args.kind == "stats":
+        return cmd_stats(args)
 
     if args.kind == "repo":
         branch = git("rev-parse", "--abbrev-ref", "HEAD").strip()

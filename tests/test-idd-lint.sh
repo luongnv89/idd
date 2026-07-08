@@ -199,6 +199,67 @@ else
 fi
 
 # ───────────────────────────────────────────────────────────
+# T22–T25: stats mode (review R4 — evidence loop)
+# ───────────────────────────────────────────────────────────
+(
+  cd "$SYN"
+  git checkout -q main
+  git commit -q --allow-empty \
+    -m "feat(core): add widget (#3)" \
+    -m "Closes #3" \
+    -m "## Decision Record
+
+- **Root cause:** widget was missing.
+- **Options considered:** Option 1 — build it
+- **Options rejected:** none
+- **Selected option:** Option 1
+- **Residual risk:** none identified"
+  mkdir -p .gitissue
+  printf '%s\n%s\n' \
+    '{"ts":"2026-07-09T00:00:00Z","issue":3,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":4,"complexity":"low","qa_cycles":1}' \
+    '{"ts":"2026-07-09T00:01:00Z","issue":9,"mode":"auto","skill":"issue-resolver","outcome":"failed","pr":null,"qa_cycles":3}' \
+    > .gitissue/runs.jsonl
+)
+STATS_OUT="$(cd "$SYN" && python3 "$LINT" stats --no-github 2>&1)" && STATS_EXIT=0 || STATS_EXIT=$?
+if [ "$STATS_EXIT" -eq 0 ]; then
+  pass "T22: stats mode exits 0 on synthetic repo"
+else
+  fail "T22: stats mode exits 0 on synthetic repo (got $STATS_EXIT)"
+fi
+if printf '%s' "$STATS_OUT" | grep -q "100% (2/2)" \
+   && printf '%s' "$STATS_OUT" | grep -q "Decision-Record coverage: 100% (1/1)"; then
+  pass "T23: stats reports trace completeness and DR coverage from git"
+else
+  fail "T23: stats reports trace completeness and DR coverage from git"
+fi
+if printf '%s' "$STATS_OUT" | grep -q "success rate (attempted): 50% (1/2)" \
+   && printf '%s' "$STATS_OUT" | grep -q "median QA cycles: 2"; then
+  pass "T24: stats aggregates runs.jsonl outcomes and QA cycles"
+else
+  fail "T24: stats aggregates runs.jsonl outcomes and QA cycles"
+fi
+if (cd "$SYN" && python3 "$LINT" stats --no-github --json) | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+assert d['git']['commits'] == 2, d['git']
+assert d['git']['dr_pct'] == 100
+assert d['runs']['runs'] == 2 and d['runs']['success_pct'] == 50
+assert d['github'] is None
+" 2>/dev/null; then
+  pass "T25: stats --json emits valid machine-readable metrics"
+else
+  fail "T25: stats --json emits valid machine-readable metrics"
+fi
+
+# stats degrades gracefully outside a git repo
+mkdir -p "$TMP/plain"
+if (cd "$TMP/plain" && python3 "$LINT" stats --no-github 2>&1 | grep -q "not a git repository"); then
+  pass "T26: stats degrades gracefully outside a git repo"
+else
+  fail "T26: stats degrades gracefully outside a git repo"
+fi
+
+# ───────────────────────────────────────────────────────────
 # T21: the repo's own sample issue passes L1 (docs/sample-normalized-issue.md)
 # ───────────────────────────────────────────────────────────
 # Strip the doc's explanatory header (everything before the marker line).
