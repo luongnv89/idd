@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- gitissue:normalized v1 -->
 
+## [v0.18.0] — 2026-07-09
+
+The Fable 5 review release: implement all seven recommendations (R1–R7) of the concept & methodology review — extract the spec, shrink the machinery, prove the methodology without an agent, and measure it.
+
+### Features
+- **lint:** add `scripts/idd-lint.py` — dependency-free IDD Spec conformance checker (issue/PR/commit/branch/repo modes, L1–L3 levels, no LLM) @luongnv89
+- **lint:** add `stats` mode — evidence report with trace completeness, Decision-Record coverage, and resolution outcomes by issue quality, rendered with verdict meters @luongnv89
+
+### Documentation
+- **spec:** extract the tool-neutral IDD Spec (`SPEC.md`, v1.1) — issue contract, dependency + `Part of #N` hierarchy markers, naming grammar, Decision Record with three durable-memory bindings, L1–L3 conformance levels; gitissue repositioned as the reference implementation @luongnv89
+- **methodology:** rewrite under the single name Issue-Driven Development; add Hierarchy of Intent (epics), the manual-IDD quickstart (`docs/manual-idd-quickstart.md`), and read-side retrieval recipes @luongnv89
+
+### Refactoring
+- **platform:** concentrate tracker access behind the GitHub driver doc (`docs/platform-github.md`); retire the unbuilt `gitlab` platform value @luongnv89
+- **prose:** debloat the surface (−305 lines) — drop the stale README version table, dedupe README vs methodology, cut all eight agent personas, state boilerplate once, present a 10-field core config @luongnv89
+- **skills:** skill-auto-improver sweep across issue-* skills (#176) @luongnv89
+
+### Removed
+- **install:** the shell installer (`install.sh`, `scripts/install.sh` — 855 lines, git side effects, npm upsell) and the Claude-only plugin layout (tarball release job, `dist/plugin/`, ~1/3 of build.py). Install via `asm install https://github.com/luongnv89/idd` or manual copy from `skills/`; the curl one-liner and plugin tarball paths no longer exist @luongnv89
+
+**Full Changelog**: https://github.com/luongnv89/idd/compare/v0.17.0...v0.18.0
+
 ## [v0.17.0] — 2026-07-01
 
 ### Features
