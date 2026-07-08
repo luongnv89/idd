@@ -82,19 +82,18 @@ Defaults (full field reference in `docs/config-schema.md`):
 
 The resolve pipeline delegates heavy work to subagents (`shared/agents/`) to keep the main agent's **context window** clean and **token budget** predictable. Main agent stays in Step 0, Step 4 (orchestrates review-fix), and Step 5 (deliver); Steps 1-3 each spawn one subagent. Full diagram in `references/pipeline-steps.md` (*Subagent Architecture Diagram*).
 
-Each subagent's prompt file is listed under *Additional Resources* below, alongside
-its persona. Every agent opens with a persona + role header and a compact I/O
-contract; the conventions they share (spawn note, tool posture, injection boundary,
+Each subagent's prompt file is listed under *Additional Resources* below. Every
+agent opens with a role header and a compact I/O contract; the conventions they share (spawn note, tool posture, injection boundary,
 confidence scale, `gh --json`, autonomous operation) live once in
 `docs/shared-agent-conventions.md`.
 
 ### Spawning a subagent (canonical pattern)
 
-Every step below spawns with the same shape — only persona, description, and prompt file change. `subagent_type` is **always** `"general-purpose"` (never the agent's own name — none are registered agent types):
+Every step below spawns with the same shape — only role, description, and prompt file change. `subagent_type` is **always** `"general-purpose"` (never the agent's own name — none are registered agent types):
 
 ```python
 Agent(
-  description="{Persona} — {action} issue #N",
+  description="{role} — {action} issue #N",
   prompt=<{agent-file}.md prompt with {variables} replaced>,
   subagent_type="general-purpose"  # NEVER the agent's own name (e.g. NOT "code-reviewer")
 )
@@ -104,7 +103,7 @@ Agent(
 
 As the orchestrator, for each spawned step:
 
-1. **Name the persona** in the spawn `description` (e.g. `"Ada Lovelace — research issue #N"`).
+1. **Name the role** in the spawn `description` (e.g. `"researcher — research issue #N"`).
 2. **Size the model/effort** per `docs/agent-model-effort.md` from the most-recent
    complexity signal, falling back to the agent's default tier — advisory, never blocks.
 3. **Monitor before advancing** — verify the agent returned its contract's required
@@ -282,7 +281,7 @@ After preflight:
 
 ## Step 1 — Research
 
-Deeply understand the issue, affected codebase, and possible solutions; also verifies the issue hasn't already been fixed (early-exit path closes it in auto mode). Spawn Ada Lovelace (`shared/agents/codebase-researcher.md`) with the canonical pattern — full delegation payload, phases, early-exit behavior, and inline fallback are in `references/pipeline-steps.md` (*Step 1 — Research*).
+Deeply understand the issue, affected codebase, and possible solutions; also verifies the issue hasn't already been fixed (early-exit path closes it in auto mode). Spawn the researcher (`shared/agents/codebase-researcher.md`) with the canonical pattern — full delegation payload, phases, early-exit behavior, and inline fallback are in `references/pipeline-steps.md` (*Step 1 — Research*).
 
 After research:
 ```
@@ -293,7 +292,7 @@ After research:
 
 ## Step 2 — Plan
 
-Generate implementation options and select one. Spawn Nikola Tesla (`shared/agents/synthesizer.md`) with the canonical pattern.
+Generate implementation options and select one. Spawn the synthesizer (`shared/agents/synthesizer.md`) with the canonical pattern.
 
 It returns 3 options — minimal / balanced / comprehensive — with the balanced option usually recommended.
 
@@ -331,7 +330,7 @@ relevant subset, let the user accept all/some/none into `selected_skills` — th
 implementer always falls back to internal agents, so selecting none is unchanged
 behavior. Full procedure in `references/pipeline-steps.md` (*Step 3 — Propose relevant skills*).
 
-Write code and tests based on the selected plan. Spawn Linus Torvalds (`shared/agents/implementer.md`) with the canonical pattern, passing the plan, branch name, naming conventions, and `selected_skills`.
+Write code and tests based on the selected plan. Spawn the implementer (`shared/agents/implementer.md`) with the canonical pattern, passing the plan, branch name, naming conventions, and `selected_skills`.
 
 For **bug** issues, the implementer first runs the red-capable reproduction checkpoint — reproduce the symptom, confirm it fails red, fix, then convert to a regression test. Surfaced as evidence in the PR Decision Record and acceptance table. Non-bug issues skip it; auto mode never blocks. See `references/bug-verification.md`.
 
@@ -350,9 +349,9 @@ Automated review-fix loop: review → test → fix → repeat until clean or max
 
 ### Spawning the code reviewer
 
-For each QA cycle, spawn a **fresh** Marie Curie (`shared/agents/code-reviewer.md`) with the canonical pattern — fresh each cycle for unbiased review.
+For each QA cycle, spawn a **fresh** reviewer (`shared/agents/code-reviewer.md`) with the canonical pattern — fresh each cycle for unbiased review.
 
-When the reviewer or test/build run returns blocking issues, spawn or re-message Thomas Edison (`shared/agents/fixer.md`) the same way. Pass issue context, branch/base branch, reviewer findings, failing test/build output, commit message `fix({scope}): address review feedback (#N)`, and the pre-commit security convention it MUST run before committing (`docs/pre-commit-security.md`). Collect the fixer's JSON result and decide whether to start another cycle — never apply fixes inline when the Agent tool is available.
+When the reviewer or test/build run returns blocking issues, spawn or re-message the fixer (`shared/agents/fixer.md`) the same way. Pass issue context, branch/base branch, reviewer findings, failing test/build output, commit message `fix({scope}): address review feedback (#N)`, and the pre-commit security convention it MUST run before committing (`docs/pre-commit-security.md`). Collect the fixer's JSON result and decide whether to start another cycle — never apply fixes inline when the Agent tool is available.
 
 ### UI/UX review (auto-detected)
 
@@ -490,28 +489,15 @@ and branch-already-exists are all handled — full behavior for each is in
 
 All tracker access follows the GitHub driver — `--json` with explicit field selection, never parsed text output. The full operation catalog and driver rules live in docs/platform-github.md.
 
-## Terminal Output
+## Output Conventions
 
-Follow DESIGN.md symbol vocabulary:
-- Step counter: `[N/5]` for pipeline steps
-- Symbols: `●` progress, `✓` success, `✗` failure, `◆` header, `⚡` recommendation, `⚠` warning, `○` info
-- Two-space indent, `┄` separators, URLs on own line, max 80 chars
-
-## Error Handling
-
-All errors use rich format from `references/error-messages.md`:
-```
-✗ Short error description
-
-  To fix:  <actionable command>
-  Docs:    <url>
-```
+Terminal output follows the DESIGN.md contract — symbols `● ✓ ✗ ◆ ⚡ ⚠ ○`, two-space indent, `┄` separators, URLs on their own line, ≤80 chars, one blank line between sections, static sequential output (no animation), plus the `[N/5]` pipeline step counter. Errors use the rich format from `references/error-messages.md`: `✗ what failed`, then `To fix:  <command>`, then a docs link when applicable.
 
 ## Additional Resources
 
 Authoritative file list for the *Bundled dependency precheck* above:
 
-**Agents** (`shared/agents/`): `codebase-researcher.md` (Ada Lovelace, Step 1) · `synthesizer.md` (Nikola Tesla, Step 2) · `implementer.md` (Linus Torvalds, Step 3) · `code-reviewer.md` (Marie Curie, Step 4) · `ui-reviewer.md` (Dieter Rams, Step 4) · `fixer.md` (Thomas Edison, Step 4)
+**Agents** (`shared/agents/`): `codebase-researcher.md` (Step 1) · `synthesizer.md` (Step 2) · `implementer.md` (Step 3) · `code-reviewer.md` (Step 4) · `ui-reviewer.md` (Step 4) · `fixer.md` (Step 4)
 
 **References** (`references/`): `pipeline-steps.md` (payloads/phases/fallbacks, Steps 1–4) · `report-templates.md` (PR body, closing summary, expected output) · `bug-verification.md` (reproduction checkpoint, Step 3) · `skill-index.md` (external-skill catalog, Step 3) · `error-messages.md` (error catalog)
 

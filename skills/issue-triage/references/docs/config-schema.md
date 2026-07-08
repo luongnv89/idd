@@ -37,7 +37,11 @@ graph LR
     style GD fill:#2196F3,color:#fff
 ```
 
-## Full Schema
+## Core Fields
+
+Ten fields cover almost every customization in practice — `platform`, `issue.auto_normalize`, `resolve.branch_prefix`, `resolve.auto_test`, `resolve.test_timeout`, `triage.stale_threshold_days`, `autopilot.mode`, `autopilot.review_cycles`, `autopilot.skip_labels`, and `review.require_acceptance_criteria_check`. Start with those (the README shows a ready-to-copy sample); treat everything below as the **advanced reference** — useful when a specific behavior needs tuning, never required.
+
+## Full Schema (advanced reference)
 
 ```yaml
 # Tracker platform driver

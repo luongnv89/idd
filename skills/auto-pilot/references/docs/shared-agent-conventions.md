@@ -15,14 +15,12 @@ reference these conventions adopt.
 Every shared agent opens with a compact identity + contract header:
 
 ```markdown
-# <Title> — <Persona>
+# <Title>
 
-**Persona:** <Figure> — <Role>  ·  **Used by:** <skills>
+**Role:** <Role>  ·  **Used by:** <skills>
 **Tool posture:** <read-only | full-access> — <tool list>  ·  **Default tier:** <XS–XL> (orchestrator-selected — see references/docs/agent-model-effort.md)
 
-> "<persona quote>"
-
-<one-sentence persona voice>
+<one-sentence working style>
 
 ## Contract
 - **Inputs:** …
@@ -30,15 +28,15 @@ Every shared agent opens with a compact identity + contract header:
 - **Stop / fail:** …
 ```
 
-The **persona + role** label is the agent's visible identity. Orchestrators reuse
-it verbatim in the spawn `description` (e.g. `"Ada Lovelace — research issue #42"`)
-so terminal output and audit logs name a recognizable agent.
+The **role** label is the agent's visible identity. Orchestrators reuse it
+verbatim in the spawn `description` (e.g. `"researcher — research issue #42"`)
+so terminal output and audit logs name the responsible role.
 
 ## Spawning (all agents)
 
 ```
 Agent tool parameters:
-  description: "<Persona> — <task> (#N)"
+  description: "<role> — <task> (#N)"
   prompt:      <the agent's prompt with {variables} replaced>
 ```
 

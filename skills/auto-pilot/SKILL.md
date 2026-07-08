@@ -150,7 +150,7 @@ The auto-pilot processes multiple issues in a single session. Without careful co
 
 The solution: the main agent acts as a **lightweight orchestrator** that delegates heavy work to subagents via the Agent tool. Each subagent gets a fresh context window, does its work, and returns a concise result. The main agent never reads code, diffs, or test output directly.
 
-Auto-pilot delegates to the resolver/reviewer **skills**, which spawn the shared agents (Ada Lovelace, Nikola Tesla, Linus Torvalds, Marie Curie, Dieter Rams, Thomas Edison) under their own persona + role identities. Those skills size each agent's model/effort per `references/docs/agent-model-effort.md` and follow the shared conventions in `references/docs/shared-agent-conventions.md`; auto-pilot folds the telemetry they return (`complexity`, `qa_cycles`, `duration_s`) into its single run-log line per issue (see the run-log note below).
+Auto-pilot delegates to the resolver/reviewer **skills**, which spawn the shared agents (researcher, synthesizer, implementer, code reviewer, UI reviewer, fixer) under their role identities. Those skills size each agent's model/effort per `references/docs/agent-model-effort.md` and follow the shared conventions in `references/docs/shared-agent-conventions.md`; auto-pilot folds the telemetry they return (`complexity`, `qa_cycles`, `duration_s`) into its single run-log line per issue (see the run-log note below).
 
 ### Subagent Architecture
 
@@ -294,24 +294,9 @@ Full example runs (happy path, explicit list, invalid issues) and edge-case scen
 
 All tracker access follows the GitHub driver — `--json` with explicit field selection, never parsed text output. The full operation catalog and driver rules live in references/docs/platform-github.md.
 
-## Terminal Output
+## Output Conventions
 
-Follow DESIGN.md for the full symbol vocabulary, separators, table characters, indentation, width, and spacing rules. Auto-pilot-specific additions:
-
-- Iteration counter: `[Iteration {i}/{max}]` for loop progress
-- Step counter: `[N/5]` for resolve pipeline steps (inherited from issue-resolver)
-- Static sequential output — each step prints a new line, no animation
-
-## Error Handling
-
-All errors use the rich format from `references/error-messages.md`:
-
-```
-✗ Short error description
-
-  To fix:  <actionable command>
-  Docs:    <url> (when applicable)
-```
+Terminal output follows the DESIGN.md contract — symbols `● ✓ ✗ ◆ ⚡ ⚠ ○`, two-space indent, `┄` separators, URLs on their own line, ≤80 chars, one blank line between sections, static sequential output (no animation), plus auto-pilot's `[Iteration {i}/{max}]` loop counter and the resolver's inherited `[N/5]` step counter. Errors use the rich format from `references/error-messages.md`: `✗ what failed`, then `To fix:  <command>`, then a docs link when applicable.
 
 ## Prompt Injection Boundary
 

@@ -509,7 +509,7 @@ When `ui: detected`, spawn the `ui-reviewer` subagent in **code** mode (see `sha
 
 ```python
 Agent(
-  description="Dieter Rams — UI/UX code review (#N)",
+  description="ui-reviewer — UI/UX code review (#N)",
   prompt=<ui-reviewer.md prompt with mode=code, {variables} replaced>,
   subagent_type="general-purpose"
 )

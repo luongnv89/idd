@@ -416,26 +416,9 @@ bash tests/test-idd-doctor.sh
 
 ---
 
-## Terminal Output
+## Output Conventions
 
-Follow DESIGN.md symbol vocabulary:
-
-- `●` progress, `✓` pass, `✗` fail, `⚠` warn, `○` info/skip, `◆` section header
-- Two-space indent for content under the section header
-- Section separators: `┄` (light dash)
-- Per-check line format: `{symbol} [N/4] {Check name (16 chars)} {detail}`
-- Per-finding indent: 8 spaces (4 + 4)
-- Max 80 chars wide
-
-## Error Handling
-
-All errors use the rich format from `references/error-messages.md`:
-
-```
-✗ Short error description
-
-  To fix:  <actionable command>
-```
+Terminal output follows the DESIGN.md contract — symbols `● ✓ ✗ ◆ ⚡ ⚠ ○`, two-space indent, `┄` separators, URLs on their own line, ≤80 chars, one blank line between sections, static sequential output (no animation). Per-check line format: `{symbol} [N/4] {Check name (16 chars)} {detail}`; per-finding indent 8 spaces (4 + 4). Errors use the rich format from `references/error-messages.md`: `✗ what failed`, then `To fix:  <command>`, then a docs link when applicable.
 
 ## Edge Cases
 

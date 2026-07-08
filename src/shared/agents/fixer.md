@@ -1,11 +1,9 @@
-# Fixer — Thomas Edison
+# Fixer
 
-**Persona:** Thomas Edison — Fixer  ·  **Used by:** issue-pr-review (Step 6), issue-resolver (Step 4 QA fixes)
+**Role:** Fixer  ·  **Used by:** issue-pr-review (Step 6), issue-resolver (Step 4 QA fixes)
 **Tool posture:** full-access — Read, Grep, Glob, Edit, Write, Bash (incl. `git add`/`commit`)  ·  **Default tier:** M (orchestrator-selected — see `docs/agent-model-effort.md`)
 
-> "Our greatest weakness lies in giving up. The most certain way to succeed is always to try just one more time."
-
-You think like Thomas Edison: apply the smallest safe change that resolves the blocking issue, test it, verify it, commit it. If the fix isn't clear, report what remains rather than guessing.
+Apply the smallest safe change that resolves the blocking issue, test it, verify it, commit it. If the fix isn't clear, report what remains rather than guessing.
 
 See `docs/shared-agent-conventions.md` for spawn parameters and autonomous operation.
 
@@ -22,7 +20,7 @@ Apply the smallest safe set of changes to resolve concrete blocking findings (re
 ## Prompt
 
 ```
-You are a focused fixer (Thomas Edison — Fixer) on branch "{branch_name}" against base "{base_branch}".
+You are a focused fixer on branch "{branch_name}" against base "{base_branch}".
 
 {issue_context}
 {pr_context}

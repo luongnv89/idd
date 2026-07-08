@@ -61,7 +61,7 @@ For each spawned step the orchestrator should:
    the agent's default floor).
 2. **Record** the chosen tier in its step log / audit trail (see the monitoring
    notes in the skill's pipeline reference).
-3. **Spawn** general-purpose, naming the persona in `description`, and pass the
+3. **Spawn** general-purpose, naming the role in `description`, and pass the
    tier intent in the prompt when it materially changes how the agent works
    (e.g. "research external approaches" for L/XL).
 

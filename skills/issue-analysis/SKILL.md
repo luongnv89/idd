@@ -389,32 +389,9 @@ Full example outputs (happy path, view mode, already-closed issue) are kept in `
 
 All tracker access follows the GitHub driver — `--json` with explicit field selection, never parsed text output. The full operation catalog and driver rules live in references/docs/platform-github.md.
 
-## Terminal Output
+## Output Conventions
 
-Follow DESIGN.md symbol vocabulary and output structure for all output. Key rules:
-
-- Step counter: `[N/8]` for pipeline steps
-- Symbols: `●` progress, `✓` success, `✗` failure, `◆` section header, `⚡` recommendation, `⚠` warning, `○` info
-- Two-space indent for content under section headers
-- Section separators: `┄` (light dash)
-- URLs on their own line
-- Max 80 chars wide (truncate with `...`)
-- One blank line between sections
-- Static sequential output — each step prints a new line, no animation
-- Table characters: `│ ─ ┼`
-- Right-align numbers, left-align text in tables
-- Use `—` for empty cells
-
-## Error Handling
-
-All errors use the rich format from `references/error-messages.md`:
-
-```
-✗ Short error description
-
-  To fix:  <actionable command>
-  Docs:    <url> (when applicable)
-```
+Terminal output follows the DESIGN.md contract — symbols `● ✓ ✗ ◆ ⚡ ⚠ ○`, two-space indent, `┄` separators, URLs on their own line, ≤80 chars, one blank line between sections, static sequential output (no animation), plus a `[N/8]` pipeline step counter and `│ ─ ┼` tables (right-align numbers, `—` for empty cells). Errors use the rich format from `references/error-messages.md`: `✗ what failed`, then `To fix:  <command>`, then a docs link when applicable.
 
 ## Additional Resources
 

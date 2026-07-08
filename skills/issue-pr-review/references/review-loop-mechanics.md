@@ -20,7 +20,7 @@ Spawn a new reviewer agent (cold start):
 
 ```python
 Agent(
-  description="Marie Curie — review PR #N",
+  description="reviewer — review PR #N",
   prompt=<code-reviewer.md prompt with {variables} replaced>,
   subagent_type="general-purpose"  # NOT "code-reviewer"
 )
@@ -50,7 +50,7 @@ After the fix cycle reports zero fixable issues, spawn a **fresh** confirmation 
 
 ```python
 Agent(
-  description="Marie Curie — confirmation review for PR #N",
+  description="reviewer — confirmation review for PR #N",
   prompt=<code-reviewer.md prompt with {variables} replaced>,
   subagent_type="general-purpose"  # NOT "code-reviewer"
 )
@@ -73,7 +73,7 @@ Delegate fixes to the fixer subagent instead of applying code changes in the mai
 
 ```python
 Agent(
-  description="Thomas Edison — fix PR #N review issues",
+  description="fixer — fix PR #N review issues",
   prompt=<fixer.md prompt with {variables} replaced>,
   subagent_type="general-purpose"  # NOT "fixer"
 )

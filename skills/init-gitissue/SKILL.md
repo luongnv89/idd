@@ -330,26 +330,9 @@ Full example outputs for three scenarios (TypeScript + Next.js project, minimal 
 ---
 ---
 
-## Terminal Output
+## Output Conventions
 
-Follow DESIGN.md symbol vocabulary and output structure for all output. Key rules:
-
-- Symbols: `●` progress, `✓` success, `✗` failure, `◆` section header, `⚠` warning, `○` info
-- Two-space indent for content under section headers
-- Section separators: `┄` (light dash)
-- Max 80 chars wide (truncate with `...`)
-- One blank line between sections
-- Static sequential output — each step prints a new line, no animation
-
-## Error Handling
-
-All errors use the rich format from `references/error-messages.md`:
-
-```
-✗ Short error description
-
-  To fix:  <actionable command>
-```
+Terminal output follows the DESIGN.md contract — symbols `● ✓ ✗ ◆ ⚡ ⚠ ○`, two-space indent, `┄` separators, URLs on their own line, ≤80 chars, one blank line between sections, static sequential output (no animation). Errors use the rich format from `references/error-messages.md`: `✗ what failed`, then `To fix:  <command>`, then a docs link when applicable.
 
 ## Expected Output
 

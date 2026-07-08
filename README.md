@@ -56,15 +56,17 @@ graph TD
     style H fill:#FF9800,color:#fff
 ```
 
-| Command | What it does | Version | Effort |
-|---------|-------------|---------|--------|
-| `/issue-creator` | Classify type, generate acceptance criteria, create a structured issue | 0.4.1 | medium |
-| `/issue-analysis N` | Root cause, git history, implementation options, complexity and risk | 0.4.1 | high |
-| `/issue-resolver N` | 6-step pipeline: preflight, research, plan, implement, QA, deliver PR with `Closes #N` | 0.7.2 | max |
-| `/issue-triage` | Dependency graph, stale detection, already-fixed detection via commit/PR scanning, priority and execution order | 0.5.2 | medium |
-| `/init-gitissue` | Auto-detect language/framework/test runner, generate `.gitissue.yml` | 0.3.3 | low |
-| `/auto-pilot` | Triage → resolve → review → merge loop. Balanced-by-default merge modes (`conservative`/`balanced`/`aggressive`), explicit issue lists for targeted runs, and a dependency-aware merge gate (`Depends on #N` / `Blocked by #N`) | 2.3.1 | max |
-| `/issue-pr-review` | Review PR end-to-end: script pre-pass (lint/format/test auto-fix), per-criterion AC verification, five-dimension scoring (correctness, acceptance_criteria, traceability, maintainability, safety), reuses reviewer/fixer agents across cycles | 1.0.0 | high |
+| Command | What it does | Effort |
+|---------|-------------|--------|
+| `/issue-creator` | Classify type, generate acceptance criteria, create a structured issue | medium |
+| `/issue-analysis N` | Root cause, git history, implementation options, complexity and risk | high |
+| `/issue-resolver N` | 6-step pipeline: preflight, research, plan, implement, QA, deliver PR with `Closes #N` | max |
+| `/issue-triage` | Dependency graph, stale detection, already-fixed detection via commit/PR scanning, priority and execution order | medium |
+| `/init-gitissue` | Auto-detect language/framework/test runner, generate `.gitissue.yml` | low |
+| `/auto-pilot` | Triage → resolve → review → merge loop. Balanced-by-default merge modes (`conservative`/`balanced`/`aggressive`), explicit issue lists for targeted runs, and a dependency-aware merge gate (`Depends on #N` / `Blocked by #N`) | max |
+| `/issue-pr-review` | Review PR end-to-end: script pre-pass (lint/format/test auto-fix), per-criterion AC verification, five-dimension scoring (correctness, acceptance_criteria, traceability, maintainability, safety), reuses reviewer/fixer agents across cycles | high |
+
+Per-skill versions live in each skill's frontmatter (`skills/<name>/SKILL.md`) — the single version source.
 
 See [`docs/skills.md`](docs/skills.md) for the full skills reference, including every supported input option.
 
@@ -295,50 +297,19 @@ graph TD
 
 ### Capturing Intention
 
-The first phase of IDD solves the hardest problem in the workflow: expressing what you actually want. Even experienced developers struggle to articulate a problem clearly enough for someone else — human or AI — to act on it. Vague descriptions lead to wrong assumptions, wasted effort, and solutions that miss the point.
+The hardest step in the workflow is saying what you actually want. `/issue-creator` runs an iterative clarification loop: you describe the problem loosely, it proposes a structured issue, and you sharpen it until the issue says exactly what you mean — intent only, never guessed file lists. The finished issue is the source of truth every later phase executes against.
 
-`/issue-creator` changes this dynamic. When you describe a problem in plain language, it structures your input into a typed issue with reporter context and acceptance criteria — capturing intent only, never guessing affected files or implementation notes. But the real value isn't the output — it's the **feedback loop**:
-
-1. **You describe the problem** — loosely, incompletely, however it comes to mind
-2. **The agent proposes a structured issue** — classifying the type, filling in context, generating acceptance criteria
-3. **You read back what it captured** — and realize what you actually meant, what's missing, what's wrong
-4. **You refine through conversation** — correcting, adding detail, sharpening the intent until the issue says exactly what you want
-
-This iterative process does something no template or form can do: it helps you **discover your own intention**. By the time the issue is finalized, it accurately represents what the creator wants — expressed in a way that both humans and AI agents can understand and execute.
-
-This matters because understanding user requirements is one of the hardest steps in the software development lifecycle. Most bugs and missed features trace back to requirements that were never clearly stated. IDD makes that step explicit, collaborative, and repeatable — turning an informal complaint into a precise, agent-ready work order.
-
-The structured issue becomes the **single source of truth** for what needs to happen. When `/issue-resolver` picks it up, there's no guesswork — the intention is already captured.
+The full treatment of the loop is in the methodology doc: [Capturing Intention](docs/idd-methodology.md#capturing-intention).
 
 ### Why Good Issues and Commit Messages Matter
 
-A well-defined issue and a well-written commit message are two halves of the same story. Together, they turn your git history into a **searchable, navigable record** of every decision your project has ever made.
+The issue captures the *why*, the commit captures the *how*, and the PR links them — so `git blame` on any line walks back to the original problem report. Structured history compounds: debugging becomes tracing instead of guessing, new contributors read the project's evolution, agents get instant context, and changelogs generate themselves. gitissue enforces the discipline automatically through the [naming conventions](docs/naming-conventions.md).
 
-**The issue captures the _why_** — what was broken, what was needed, what the user actually wanted. **The commit captures the _how_** — what was changed, which approach was chosen, and what trade-offs were made. **The PR links them together** — providing the full narrative from problem to solution.
-
-When these artifacts are well-crafted:
-
-- **Debugging becomes archaeology, not guesswork.** `git log --oneline` tells you which issue motivated each change. `git blame` on any line links to the commit that changed it, which links to the PR, which links to the issue. You can trace any line of code back to the original problem report.
-- **Onboarding accelerates.** New team members read the git history and understand not just *what* the code does, but *why* it does it that way. The history teaches the project's evolution.
-- **AI agents get better context.** When `/issue-analysis` scans git history for related commits, structured commit messages with issue references surface relevant changes instantly. Vague commits like `"fix bug"` are invisible to this analysis.
-- **Reverts and rollbacks are safe.** When every commit is atomic and linked to an issue, you can revert a specific change with confidence — you know exactly what it did and why.
-- **Changelogs write themselves.** Conventional commit messages (`feat:`, `fix:`, `refactor:`) can be parsed automatically into release notes grouped by type.
-
-gitissue enforces this discipline automatically. `/issue-creator` structures the issue. `/issue-resolver` creates branches, commits, and PRs that follow [naming conventions](docs/naming-conventions.md) — linking every artifact back to the issue that started it. The result: a development history that remains useful and valuable for the entire lifetime of the project.
+The full argument — executable project memory, the traceability chain, the compounding effect — lives in the methodology doc: [Executable Project Memory](docs/idd-methodology.md#executable-project-memory).
 
 ### IDD and other methodologies
 
-IDD operates at a different layer than TDD, BDD, or spec-driven development. It structures the *work* before you write the *code or tests*. This makes it complementary, not competitive.
-
-| Aspect | IDD | TDD | BDD | Spec-Driven |
-|--------|-----|-----|-----|-------------|
-| **Source of truth** | GitHub issue | Test suite | Feature specs | Spec documents |
-| **Starts with** | Problem description | Failing test | User story | Detailed spec |
-| **Agent-compatible** | Any agent | Needs framework | Needs framework | Needs parser |
-| **Overhead** | Zero-config CLI | Test setup | Gherkin syntax | Spec authoring |
-| **Best for** | Brownfield, mixed teams | New code | User-facing features | Formal contracts |
-
-Use IDD **with** TDD: structure the issue first, then write tests during resolution. Use IDD **with** BDD: let acceptance criteria inform your Gherkin scenarios. They compose.
+IDD is the outer loop, not a competitor: it structures the *work* before you write the code or tests. Use it **with** TDD (issue first, tests during resolution) or **with** BDD (acceptance criteria feed your scenarios) — they compose. The full comparison table is in the methodology doc: [IDD vs Other Methodologies](docs/idd-methodology.md#idd-vs-other-methodologies).
 
 ---
 
@@ -493,43 +464,32 @@ gitissue works with **zero configuration**. All settings have sensible defaults.
 
 To customize, create `.gitissue.yml` in your repo root (or run `/init-gitissue`):
 
+These ten fields cover almost every customization in practice:
+
 ```yaml
 platform: github                # tracker driver — github is the only implemented one
 
 issue:
   auto_normalize: true          # auto-normalize in /issue-resolver
-  template: default             # default | path to custom template dir
-  labels_auto_suggest: true     # auto-suggest labels based on content
-  normalize_comment: true       # add comment when normalizing
 
 resolve:
-  approval_gate: auto           # auto | comment-and-wait
   branch_prefix: "auto"         # type-based: fix/42-description, feat/15-description
   auto_test: true               # run tests before creating PR
   test_timeout: 300             # abort verify phase after N seconds
-  pr_auto_link: true            # include "Closes #N" in PR body
-  max_commits: 10               # warn if resolve produces >N commits
 
 triage:
   stale_threshold_days: 14      # flag issues with no activity
-  auto_priority: true           # suggest priorities based on type + age + deps
-  include_closed: false         # include recently closed issues in triage
-  scan_timeout_per_issue: 30    # max seconds to scan codebase per issue
 
 autopilot:
-  mode: balanced                 # conservative | balanced | aggressive
-  merge_partial: false          # only meaningful when mode: aggressive
-  max_iterations: 10
+  mode: balanced                # conservative | balanced | aggressive
   review_cycles: 3              # max LLM review-fix cycles per PR
   skip_labels: ["wontfix", "blocked", "do-not-merge"]
-  critical_labels: ["critical", "priority:critical"]
 
 review:
-  require_traceability_check: true        # block soft-pass if Closes #N is missing (covers Decision Record presence)
-  require_acceptance_criteria_check: true # block soft-pass if AC Verification fails
+  require_acceptance_criteria_check: true  # block soft-pass if AC verification fails
 ```
 
-Full schema: [`docs/config-schema.md`](docs/config-schema.md)
+Everything you don't set falls back to a sensible default. The advanced surface — custom templates, approval gates, GitHub Projects sync, analysis and monitoring knobs — lives in the full schema: [`docs/config-schema.md`](docs/config-schema.md)
 
 </details>
 
