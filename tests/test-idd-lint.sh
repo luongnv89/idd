@@ -226,14 +226,14 @@ if [ "$STATS_EXIT" -eq 0 ]; then
 else
   fail "T22: stats mode exits 0 on synthetic repo (got $STATS_EXIT)"
 fi
-if printf '%s' "$STATS_OUT" | grep -q "100% (2/2)" \
-   && printf '%s' "$STATS_OUT" | grep -q "Decision-Record coverage: 100% (1/1)"; then
+if printf '%s' "$STATS_OUT" | grep -qE "trace completeness.*100%.*2/2" \
+   && printf '%s' "$STATS_OUT" | grep -qE "Decision-Record coverage.*100%.*1/1"; then
   pass "T23: stats reports trace completeness and DR coverage from git"
 else
   fail "T23: stats reports trace completeness and DR coverage from git"
 fi
-if printf '%s' "$STATS_OUT" | grep -q "success rate (attempted): 50% (1/2)" \
-   && printf '%s' "$STATS_OUT" | grep -q "median QA cycles: 2"; then
+if printf '%s' "$STATS_OUT" | grep -qE "success rate.*50%.*1/2" \
+   && printf '%s' "$STATS_OUT" | grep -qE "median QA cycles +2"; then
   pass "T24: stats aggregates runs.jsonl outcomes and QA cycles"
 else
   fail "T24: stats aggregates runs.jsonl outcomes and QA cycles"

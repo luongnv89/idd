@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import statistics
 import subprocess
@@ -538,61 +539,120 @@ def collect_github_stats(limit: int, run_rows_path: Path) -> dict | None:
     return result
 
 
-def _fmt_ratio(pct: int | None, n: int, d: int) -> str:
-    return f"{pct}% ({n}/{d})" if pct is not None else f"n/a (0 of {d})"
+# Report layout (DESIGN.md: symbols carry meaning without color; dim = secondary;
+# max width 80). Ratio rows share one rail: verdict symbol, label, 10-cell meter,
+# right-aligned percentage, counts, dim spec citation.
+
+_LABEL_W = 28
+_METER_W = 10
+
+_ANSI = {"bold": "1", "dim": "2", "red": "31", "green": "32", "yellow": "33", "cyan": "36"}
+_COLOR = sys.stdout.isatty() and not os.environ.get("NO_COLOR") and os.environ.get("TERM") != "dumb"
+
+
+def _c(text: str, *styles: str) -> str:
+    if not _COLOR or not styles:
+        return text
+    codes = ";".join(_ANSI[s] for s in styles)
+    return f"\x1b[{codes}m{text}\x1b[0m"
+
+
+def _verdict(pct: int) -> tuple[str, str]:
+    if pct >= 80:
+        return "✓", "green"
+    if pct >= 40:
+        return "⚠", "yellow"
+    return "✗", "red"
+
+
+def _meter(pct: int) -> str:
+    filled = min(_METER_W, round(pct / 100 * _METER_W))
+    return "█" * filled + "░" * (_METER_W - filled)
+
+
+def _ratio_row(label: str, n: int, d: int, cite: str = "") -> str:
+    """`  ✓ label……………………  ██████████  100%    1/1   §4` — pad before coloring."""
+    pct = _pct(n, d)
+    counts = f"{n}/{d}" if d else "—"
+    tail = f"  {_c(cite, 'dim')}" if cite else ""
+    if pct is None:
+        return (f"    {_c('○', 'dim')} {label:<{_LABEL_W}}"
+                f" {_c('░' * _METER_W, 'dim')}     {_c('—', 'dim')}  {counts:>7}{tail}")
+    sym, tone = _verdict(pct)
+    return (f"    {_c(sym, tone)} {label:<{_LABEL_W}}"
+            f" {_c(_meter(pct), tone)}  {_c(f'{pct:>3}%', tone, 'bold')}  {counts:>7}{tail}")
+
+
+def _info_row(label: str, value: str) -> str:
+    return f"      {label:<{_LABEL_W}} {value}"
+
+
+def _section(title: str, context: str = "") -> str:
+    head = f"  {_c(title, 'bold')}"
+    return f"{head} {_c('— ' + context, 'dim')}" if context else head
 
 
 def render_stats(commit_s: dict | None, run_s: dict | None, gh_s: dict | None, gh_skipped: str | None) -> None:
-    print(f"◆ idd-lint stats — evidence report (IDD Spec v{SPEC_VERSION})")
-    print("┄" * 59)
+    out: list[str] = []
+    out.append(f"◆ idd-lint stats {_c('— evidence report · IDD Spec v' + SPEC_VERSION, 'dim')}")
+    out.append(_c("┄" * 59, "dim"))
+    out.append("")
 
     if commit_s is None:
-        print("  ○ git history: not a git repository — skipped")
+        out.append(_c("  ○ git history — skipped: not a git repository", "dim"))
     else:
-        print(f"  Git history — {commit_s['branch']}, {commit_s['commits']} non-merge commits")
-        print(f"    conventional grammar:    {_fmt_ratio(commit_s['grammar_pct'], commit_s['grammar_ok'], commit_s['commits'])} (§3.2)")
-        print(f"    issue-linked commits:    {_fmt_ratio(commit_s['trace_pct'], commit_s['issue_linked'], commit_s['commits'])} — trace completeness (§5.1)")
+        n = commit_s["commits"]
+        out.append(_section("Git history", f"{commit_s['branch']} · {n} non-merge commit{'s' if n != 1 else ''}"))
+        out.append(_ratio_row("conventional grammar", commit_s["grammar_ok"], n, "§3.2"))
+        out.append(_ratio_row("trace completeness", commit_s["issue_linked"], n, "§5.1"))
         if commit_s["squash_pr_commits"]:
-            print(f"    Decision-Record coverage: {_fmt_ratio(commit_s['dr_pct'], commit_s['decision_records'], commit_s['squash_pr_commits'])} of squash-merged PR commits (§4)")
+            out.append(_ratio_row("Decision-Record coverage", commit_s["decision_records"], commit_s["squash_pr_commits"], "§4"))
         else:
-            print("    ○ no squash-merged PR commits found (no 'Closes #N' bodies) — Decision-Record coverage n/a (§4)")
+            out.append(_c("      Decision-Record coverage — no squash-merged PR bodies on this branch (§4)", "dim"))
 
+    out.append("")
     if run_s is None:
-        print("  ○ run log: .gitissue/runs.jsonl not found or empty — skipped")
+        out.append(_c("  ○ run log — skipped: .gitissue/runs.jsonl not found or empty", "dim"))
     else:
-        print(f"  Run log — .gitissue/runs.jsonl, {run_s['runs']} run{'s' if run_s['runs'] != 1 else ''}")
-        print(f"    outcomes: {' · '.join(f'{k} {v}' for k, v in run_s['outcomes'].items())}")
+        out.append(_section("Run log", f".gitissue/runs.jsonl · {run_s['runs']} run{'s' if run_s['runs'] != 1 else ''}"))
+        out.append(_info_row("outcomes", " · ".join(f"{k} {v}" for k, v in run_s["outcomes"].items())))
         if run_s["attempted"]:
-            print(f"    success rate (attempted): {_fmt_ratio(run_s['success_pct'], run_s['succeeded'], run_s['attempted'])}")
+            out.append(_ratio_row("success rate", run_s["succeeded"], run_s["attempted"]))
         if run_s["median_qa_cycles"] is not None:
-            dur = f" · median duration: {round(run_s['median_duration_s'])}s" if run_s["median_duration_s"] is not None else ""
-            print(f"    median QA cycles: {run_s['median_qa_cycles']:g}{dur}")
+            out.append(_info_row("median QA cycles", f"{run_s['median_qa_cycles']:g}"))
+        if run_s["median_duration_s"] is not None:
+            out.append(_info_row("median duration", f"{round(run_s['median_duration_s'])}s"))
         if run_s["by_complexity"]:
             parts = [
                 f"{lvl} {v['runs']}" + (f" (median QA {v['median_qa']:g})" if v["median_qa"] is not None else "")
                 for lvl, v in run_s["by_complexity"].items()
             ]
-            print(f"    by complexity: {' · '.join(parts)}")
+            out.append(_info_row("complexity mix", " · ".join(parts)))
 
+    out.append("")
     if gh_s is None:
-        print(f"  ○ GitHub: {gh_skipped or 'gh unavailable'} — skipped (local metrics above are unaffected)")
+        out.append(_c(f"  ○ GitHub — skipped: {gh_skipped or 'gh unavailable'} (local metrics unaffected)", "dim"))
     else:
-        print("  GitHub — via gh")
-        print(f"    open issues normalized:  {_fmt_ratio(gh_s['open_normalized_pct'], gh_s['open_normalized'], gh_s['open_issues'])} (§1.1)")
+        out.append(_section("GitHub", "via gh"))
+        out.append(_ratio_row("open issues normalized", gh_s["open_normalized"], gh_s["open_issues"], "§1.1"))
         if "merged_prs" in gh_s:
-            print(f"    merged PRs w/ Closes #N: {_fmt_ratio(gh_s['merged_closes_pct'], gh_s['merged_with_closes'], gh_s['merged_prs'])} (§5.1)")
-            print(f"    merged PRs w/ Decision Record: {_fmt_ratio(gh_s['merged_dr_pct'], gh_s['merged_with_dr'], gh_s['merged_prs'])} (§4.1)")
+            out.append(_ratio_row("merged PRs · Closes #N", gh_s["merged_with_closes"], gh_s["merged_prs"], "§5.1"))
+            out.append(_ratio_row("merged PRs · Decision Record", gh_s["merged_with_dr"], gh_s["merged_prs"], "§4.1"))
         tiers = gh_s.get("tiers")
         if tiers:
-            print("  Issue quality → resolution outcome")
+            out.append("")
+            out.append(_section("Issue quality → outcome", "runs joined with issue bodies"))
             for name, t in tiers.items():
-                qa = f", median QA {t['median_qa']:g}" if t["median_qa"] is not None else ""
-                print(f"    {name:<13} n={t['runs']}, success {t['success_pct']}%{qa}")
+                qa = f" · median QA {t['median_qa']:g}" if t["median_qa"] is not None else ""
+                out.append(_info_row(name, f"n={t['runs']} · success {t['success_pct']}%{qa}"))
             saved = gh_s.get("qa_cycles_saved")
             if saved is not None and saved > 0:
-                print(f"    ⚡ normalized issues resolve in {saved:g} fewer QA cycle{'s' if saved != 1 else ''} (median)")
+                cycles = f"{saved:g} fewer QA cycle{'s' if saved != 1 else ''}"
+                out.append(f"    ⚡ normalized issues resolve in {_c(cycles, 'bold')} (median)")
 
-    print("┄" * 59)
+    out.append("")
+    out.append(_c("┄" * 59, "dim"))
+    print("\n".join(out))
 
 
 def cmd_stats(args: argparse.Namespace) -> int:
