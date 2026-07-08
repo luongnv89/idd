@@ -41,8 +41,19 @@ Agent tool parameters:
   prompt:      <the agent's prompt with {variables} replaced>
 ```
 
-**Do NOT set `subagent_type`** — always use the default general-purpose agent.
-The shared agent files are prompt templates, not registered agent types.
+**Claude Code / `agents` tool:** Install `dist/agents/*.md` via
+`./scripts/install.sh` (default claude/agents). Use general-purpose spawn with
+the prompt template unless your harness registers `name:` subagent types.
+
+**Other SKILL.md tools (codex, opencode, pi, openclaw, hermes, antigravity,
+windsurf):** `./scripts/install.sh --tool <name>` installs skills **and**
+`dist/harness-agents/` (typed agent `.md` + runtime `docs/` under each tool's
+home, e.g. `~/.codex/agents/`, `~/.pi/agent/agents/`). Skills still bundle
+`references/agents/` for prompt-only use. **Pi** also gets project `.pi/agents/`
+from `./scripts/build.sh` and `npm:@tintinweb/pi-subagents` in settings when
+you install for `pi` — use `subagent_type` = filename stem where the harness
+supports it (Pi pi-subagents). Spawn with `description: "<Persona> — <task> (#N)"`
+and the filled contract prompt.
 
 ## Tool posture
 

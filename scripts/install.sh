@@ -11,7 +11,8 @@
 #
 #   - Standalone path: copy each `skills/<name>/` (or `dist/skills/<name>/` as
 #                      deprecated fallback) to <tool>/skills/<name>/
-#                      copy `dist/agents/*.md` to <tool>/agents/ (Claude + agents only)
+#                      copy agents: Claude/agents → dist/agents/*.md;
+#                      other tools → dist/harness-agents/ (agents + docs)
 #   - Plugin path:     copy `dist/plugin/` to ~/.claude/plugins/idd/ (Claude only)
 #                      (requires a fresh build — `dist/plugin/` is gitignored)
 #
@@ -22,15 +23,15 @@
 # only apply to the Claude target (and the universal `agents` target).
 #
 # Supported tools (--tool / --tools):
-#   claude       ~/.claude/skills            + agents ~/.claude/agents       (default)
+#   claude       ~/.claude/skills            + agents ~/.claude/agents
 #   agents       ~/.agents/skills            + agents ~/.agents/agents
-#   codex        ~/.codex/skills
-#   opencode     ~/.config/opencode/skills
-#   pi           ~/.pi/skills
-#   openclaw     ~/.openclaw/skills
-#   hermes       ~/.hermes/skills
-#   antigravity  ~/.antigravity/skills
-#   windsurf     ~/.windsurf/rules
+#   codex        ~/.codex/skills             + agents ~/.codex/agents (+ docs)
+#   opencode     ~/.config/opencode/skills   + agents ~/.config/opencode/agents (+ docs)
+#   pi           ~/.pi/skills                + agents ~/.pi/agent/agents (+ docs)
+#   openclaw     ~/.openclaw/skills          + agents ~/.openclaw/agents (+ docs)
+#   hermes       ~/.hermes/skills            + agents ~/.hermes/agents (+ docs)
+#   antigravity  ~/.antigravity/skills       + agents ~/.antigravity/agents (+ docs)
+#   windsurf     ~/.windsurf/rules           + agents ~/.windsurf/agents (+ docs)
 #
 # Idempotent: re-running removes each destination skill directory and copies
 # the full tree again, so upgrades always match the current repo — no stale files.
@@ -96,7 +97,9 @@ fi
 ROOT_SKILLS="$ROOT/skills"
 DIST_SKILLS_FALLBACK="$ROOT/dist/skills"  # deprecated fallback
 DIST_AGENTS="$ROOT/dist/agents"
+DIST_HARNESS_AGENTS="$ROOT/dist/harness-agents"
 DIST_PLUGIN="$ROOT/dist/plugin"
+PI_AGENT_DIR="${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}"
 TARGET="${HOME}/.claude"
 MODE="standalone"   # standalone | agents | plugin | all
 ACTION="install"    # install | uninstall
@@ -105,7 +108,10 @@ DRY_RUN=0
 INSTALL_AGENTS=1
 FORCE_AGENTS=0
 TARGET_SET=0        # 1 once --target is given (only valid for the claude tool)
-TOOLS=""            # space-separated list of selected tools; empty = default (claude)
+TOOLS=""            # space-separated; empty on CLI → interactive default (all tools)
+INSTALL_SCOPE="global"  # global | project
+INSTALL_SCOPE_SET=0
+IDD_TOOLS_SET=0     # 1 when --tool / --tools set on CLI
 SOURCE_SYNCED=0     # 1 after idd_sync_source_tree has prepared ROOT for this run
 
 # All supported tools, in display order. Paths mirror `asm config show`.
@@ -113,6 +119,22 @@ ALL_TOOLS="claude agents codex opencode pi openclaw hermes antigravity windsurf"
 
 # Skills destination directory for a tool. For claude this honors --target;
 # every other tool uses its fixed convention under $HOME.
+# True when install wizard may read from the user (TTY or IDD_FORCE_PROMPT).
+install_prompt_available() {
+  [ "${IDD_FORCE_PROMPT:-0}" = "1" ] || { [ -t 0 ] && [ -r /dev/tty ]; }
+}
+
+prompt_read_line() {
+  local reply
+  printf '%s' "$1" >&2
+  if install_prompt_available; then
+    read -r reply || reply=""
+  else
+    read -r reply </dev/tty 2>/dev/null || reply=""
+  fi
+  printf '%s' "$reply"
+}
+
 tool_skills_dest() {
   case "$1" in
     claude)      printf '%s\n' "$TARGET/skills" ;;
@@ -128,18 +150,107 @@ tool_skills_dest() {
   esac
 }
 
-# Shared-agents destination for a tool, or empty if the tool has no agents
-# layout. Shared agents are a Claude Code concept; the universal `agents`
-# tool mirrors it. Other tools bundle the agents inside each skill instead.
-# NOTE: ~/.agents/agents is an IDD-owned convention (asm tracks only
-# ~/.agents/skills). cleanup_stale_agents treats every IDD-marked .md there
-# as managed, so only IDD should write to this directory.
-tool_agents_dest() {
+# Claude Code / universal agents: dist/agents (name: frontmatter).
+tool_claude_agents_dest() {
   case "$1" in
     claude) printf '%s\n' "$TARGET/agents" ;;
     agents) printf '%s\n' "${HOME}/.agents/agents" ;;
     *)      printf '%s\n' "" ;;
   esac
+}
+
+# Harness home (parent of agents/ + docs/) for SKILL.md-compatible tools.
+tool_harness_home() {
+  case "$1" in
+    codex)       printf '%s\n' "${HOME}/.codex" ;;
+    opencode)    printf '%s\n' "${HOME}/.config/opencode" ;;
+    pi)          printf '%s\n' "$PI_AGENT_DIR" ;;
+    openclaw)    printf '%s\n' "${HOME}/.openclaw" ;;
+    hermes)      printf '%s\n' "${HOME}/.hermes" ;;
+    antigravity) printf '%s\n' "${HOME}/.antigravity" ;;
+    windsurf)    printf '%s\n' "${HOME}/.windsurf" ;;
+    *)           return 1 ;;
+  esac
+}
+
+tool_harness_agents_dest() {
+  local home
+  home="$(tool_harness_home "$1" 2>/dev/null)" || return 1
+  printf '%s\n' "$home/agents"
+}
+
+tool_harness_docs_dest() {
+  local home
+  home="$(tool_harness_home "$1" 2>/dev/null)" || return 1
+  printf '%s\n' "$home/docs"
+}
+
+tool_uses_claude_agent_format() {
+  case "$1" in claude|agents) return 0 ;; *) return 1 ;; esac
+}
+
+# Install destinations respect INSTALL_SCOPE (global = home dirs, project = under $ROOT).
+tool_skills_dest_scoped() {
+  local tool="$1"
+  if [ "$INSTALL_SCOPE" = "project" ]; then
+    case "$tool" in
+      claude)      printf '%s\n' "$ROOT/.claude/skills" ;;
+      agents)      printf '%s\n' "$ROOT/.agents/skills" ;;
+      codex)       printf '%s\n' "$ROOT/.codex/skills" ;;
+      opencode)    printf '%s\n' "$ROOT/.config/opencode/skills" ;;
+      pi)          printf '%s\n' "$ROOT/.pi/skills" ;;
+      openclaw)    printf '%s\n' "$ROOT/.openclaw/skills" ;;
+      hermes)      printf '%s\n' "$ROOT/.hermes/skills" ;;
+      antigravity) printf '%s\n' "$ROOT/.antigravity/skills" ;;
+      windsurf)    printf '%s\n' "$ROOT/.windsurf/rules" ;;
+      *)           return 1 ;;
+    esac
+    return 0
+  fi
+  tool_skills_dest "$tool"
+}
+
+tool_claude_agents_dest_scoped() {
+  local tool="$1"
+  if [ "$INSTALL_SCOPE" = "project" ]; then
+    case "$tool" in
+      claude) printf '%s\n' "$ROOT/.claude/agents" ;;
+      agents) printf '%s\n' "$ROOT/.agents/agents" ;;
+      *)      printf '%s\n' "" ;;
+    esac
+    return 0
+  fi
+  tool_claude_agents_dest "$tool"
+}
+
+tool_harness_home_scoped() {
+  local tool="$1"
+  if [ "$INSTALL_SCOPE" = "global" ]; then
+    tool_harness_home "$tool"
+    return
+  fi
+  case "$tool" in
+    codex)       printf '%s\n' "$ROOT/.codex" ;;
+    opencode)    printf '%s\n' "$ROOT/.config/opencode" ;;
+    pi)          printf '%s\n' "$ROOT/.pi" ;;
+    openclaw)    printf '%s\n' "$ROOT/.openclaw" ;;
+    hermes)      printf '%s\n' "$ROOT/.hermes" ;;
+    antigravity) printf '%s\n' "$ROOT/.antigravity" ;;
+    windsurf)    printf '%s\n' "$ROOT/.windsurf" ;;
+    *)           return 1 ;;
+  esac
+}
+
+tool_harness_agents_dest_scoped() {
+  local home
+  home="$(tool_harness_home_scoped "$1" 2>/dev/null)" || return 1
+  printf '%s\n' "$home/agents"
+}
+
+tool_harness_docs_dest_scoped() {
+  local home
+  home="$(tool_harness_home_scoped "$1" 2>/dev/null)" || return 1
+  printf '%s\n' "$home/docs"
 }
 
 is_valid_tool() {
@@ -164,14 +275,15 @@ USAGE
   ./scripts/install.sh --help
 
 OPTIONS
-  --tool <name>      Install standalone skills for one tool (repeatable). Default: claude
+  --tool <name>      Install for one tool (repeatable). Interactive default: all tools
   --tools <list>     Comma-separated tools, or "all" for every supported tool
                      (note: "--tools all" = every tool; "--all" = Claude skills+plugin)
   --plugin           Install plugin tree to <target>/plugins/idd/ (Claude only)
                      (requires running ./scripts/build.sh first to populate dist/plugin/)
   --all              Install both standalone skills and the plugin tree (Claude)
-  --agents-only      Install shared agents to <target>/agents/ (Claude/agents only)
+  --agents-only      Install shared agents for selected tool(s) (see SUPPORTED TOOLS)
   --skill <name>     Standalone install of a single named skill (e.g. issue-resolver)
+  --scope global|project  Install under home dirs (default) or under this repo
   --target <dir>     Override Claude root (default: \$HOME/.claude; claude tool only)
   --no-agents        Install standalone skills without updating shared agents
   --force-agents     Back up and replace unmanaged agent files with the same names
@@ -183,11 +295,12 @@ OPTIONS
 
 SUPPORTED TOOLS
   claude (default), agents, codex, opencode, pi, openclaw, hermes, antigravity, windsurf
-  Shared agents install only for claude and agents; every other tool gets
-  self-contained skills (the agents are bundled inside each skill).
+  Skills: every tool. Standalone agents: every tool (Claude/agents use dist/agents/;
+  codex, opencode, pi, openclaw, hermes, antigravity, windsurf use dist/harness-agents/
+  with runtime docs). Skills still bundle agents under references/agents/ for all tools.
 
 EXAMPLES
-  ./scripts/install.sh                          # interactive tool picker (TTY); Claude if non-interactive
+  ./scripts/install.sh                          # interactive: all tools + global scope (TTY defaults)
   ./scripts/install.sh --tool codex             # all skills for Codex (skips the picker)
   ./scripts/install.sh --tools claude,codex,pi  # several tools at once
   ./scripts/install.sh --tools all              # every supported tool
@@ -209,7 +322,9 @@ idd_rebind_paths() {
   ROOT_SKILLS="$ROOT/skills"
   DIST_SKILLS_FALLBACK="$ROOT/dist/skills"
   DIST_AGENTS="$ROOT/dist/agents"
+  DIST_HARNESS_AGENTS="$ROOT/dist/harness-agents"
   DIST_PLUGIN="$ROOT/dist/plugin"
+  PI_AGENT_DIR="${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}"
 }
 
 # Ensure skills/ and dist/agents/ reflect the latest default branch (or local
@@ -380,9 +495,7 @@ run_asm_install() {
   exit 0
 }
 
-# Interactively prompt for one or more tools, populating TOOLS. Falls back to
-# the default (claude) on empty input. Reads from /dev/tty so it works even
-# when the script is piped (e.g. curl | bash) as long as a terminal exists.
+# Interactively prompt for tools. Empty input → all tools (default).
 prompt_for_tools() {
   local -a tool_arr
   read -r -a tool_arr <<< "$ALL_TOOLS"
@@ -394,29 +507,21 @@ prompt_for_tools() {
     local i=1
     for t in "${tool_arr[@]}"; do
       local suffix=""
-      [ "$t" = "claude" ] && suffix="  (default)"
+      [ "$t" = "claude" ] && suffix=""
       printf '  %d) %-12s %s%s\n' "$i" "$t" "$(tool_label "$t")" "$suffix"
       i=$((i + 1))
     done
     log "  a) all of the above"
     log ""
-    log "  Enter numbers (e.g. 1 3 4 or 1,3,4), 'a' for all, or press Enter for Claude Code."
+    log "  Enter numbers (e.g. 1 3 4 or 1,3,4), 'a' for all, or press Enter for all tools (default)."
   } >&2
 
-  # Read the reply from stdin when it is a terminal (also lets tests feed a
-  # here-string); otherwise read from /dev/tty so a piped `curl | bash` still
-  # gets an interactive prompt.
   local reply
-  printf '  > ' >&2
-  if [ -t 0 ] || [ "${IDD_FORCE_PROMPT:-0}" = "1" ]; then
-    read -r reply || reply=""
-  else
-    read -r reply </dev/tty || reply=""
-  fi
+  reply="$(prompt_read_line '  > ')"
 
-  # Empty -> default to claude.
+  # Empty -> all tools.
   if [ -z "$(printf '%s' "$reply" | tr -d '[:space:]')" ]; then
-    add_tool "claude"
+    for t in "${tool_arr[@]}"; do add_tool "$t"; done
     return
   fi
 
@@ -441,6 +546,27 @@ prompt_for_tools() {
   done
 }
 
+# Install scope: global (tool homes under ~) or project (under repo $ROOT).
+prompt_for_scope() {
+  {
+    log ""
+    log "◆ Install scope"
+    log "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
+    log "  1) global   — each tool's config under your home directory (default)"
+    log "  2) project  — skills/agents under this repo: $ROOT"
+    log ""
+    log "  Press Enter for global."
+  } >&2
+  local reply
+  reply="$(prompt_read_line '  > ')"
+  case "$(printf '%s' "$reply" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')" in
+    ''|1|g|global) INSTALL_SCOPE="global" ;;
+    2|p|project)   INSTALL_SCOPE="project" ;;
+    *) err "invalid scope: '$reply' — use 1/global or 2/project"; exit 1 ;;
+  esac
+  ok "scope: $INSTALL_SCOPE"
+}
+
 # ---------------------------------------------------------------------------
 # Arg parsing
 # ---------------------------------------------------------------------------
@@ -452,11 +578,12 @@ while [ $# -gt 0 ]; do
     --agents-only) MODE="agents"; shift ;;
     --tool)
       [ $# -ge 2 ] || { err "--tool requires a name"; exit 1; }
-      add_tool "$2"; shift 2 ;;
+      add_tool "$2"; IDD_TOOLS_SET=1; shift 2 ;;
     --tools)
       [ $# -ge 2 ] || { err "--tools requires a comma-separated list or 'all'"; exit 1; }
       [ -n "$(printf '%s' "$2" | tr -d '[:space:]')" ] || \
         { err "--tools requires a non-empty list or 'all'"; exit 1; }
+      IDD_TOOLS_SET=1
       if [ "$(printf '%s' "$2" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')" = "all" ]; then
         for t in $ALL_TOOLS; do add_tool "$t"; done
       else
@@ -473,6 +600,13 @@ while [ $# -gt 0 ]; do
     --target)
       [ $# -ge 2 ] || { err "--target requires a directory"; exit 1; }
       TARGET="$2"; TARGET_SET=1; shift 2 ;;
+    --scope)
+      [ $# -ge 2 ] || { err "--scope requires global or project"; exit 1; }
+      case "$(printf '%s' "$2" | tr '[:upper:]' '[:lower:]')" in
+        global|project) INSTALL_SCOPE="$2"; INSTALL_SCOPE_SET=1 ;;
+        *) err "--scope must be global or project"; exit 1 ;;
+      esac
+      shift 2 ;;
     --no-agents) INSTALL_AGENTS=0; shift ;;
     --force-agents) FORCE_AGENTS=1; shift ;;
     --uninstall) ACTION="uninstall"; shift ;;
@@ -500,17 +634,26 @@ if should_offer_asm && prompt_for_asm; then
   run_asm_install
 fi
 
-# Resolve the tool selection when none was given on the command line.
-# For a standalone install on an interactive terminal, prompt the user to
-# pick one or more tools. Otherwise (non-TTY, or plugin/agents-only modes
-# which are Claude-scoped) fall back to the Claude default silently.
-# IDD_FORCE_PROMPT=1 forces the prompt regardless of TTY (used by tests).
-if [ -z "$TOOLS" ]; then
-  if [ "$MODE" = "standalone" ] && \
-     { [ "${IDD_FORCE_PROMPT:-0}" = "1" ] || { [ -t 0 ] && [ -r /dev/tty ]; }; }; then
+# Interactive wizard: tools (default all) and scope (default global).
+# IDD_FORCE_PROMPT=1 forces prompts (tests). CLI --tool/--tools/--scope skip prompts.
+if [ "$ACTION" = "install" ] && install_prompt_available; then
+  if [ -z "$TOOLS" ] && { [ "$MODE" = "standalone" ] || [ "$MODE" = "agents" ]; }; then
     prompt_for_tools
   fi
-  [ -n "$TOOLS" ] || TOOLS="claude"
+  if [ "$INSTALL_SCOPE_SET" -eq 0 ] && [ "$MODE" != "plugin" ]; then
+    prompt_for_scope
+  fi
+fi
+
+if [ -z "$TOOLS" ]; then
+  case "$MODE" in
+    plugin|all) TOOLS="claude" ;;
+    *) for t in $ALL_TOOLS; do add_tool "$t"; done ;;
+  esac
+fi
+
+if [ "$INSTALL_SCOPE" = "project" ]; then
+  TARGET="$ROOT/.claude"
 fi
 
 # --target only makes sense for the claude tool (other tools use fixed paths).
@@ -530,11 +673,7 @@ case "$MODE" in
       *" claude "*) : ;;
       *) err "--plugin / --all install the Claude plugin tree and only apply to the claude tool"; exit 1 ;;
     esac ;;
-  agents)
-    for t in $TOOLS; do
-      [ -n "$(tool_agents_dest "$t")" ] || {
-        err "--agents-only does not apply to '$t' (no shared-agents layout); use claude or agents"; exit 1; }
-    done ;;
+  agents) : ;;
 esac
 
 # ---------------------------------------------------------------------------
@@ -623,6 +762,12 @@ is_idd_managed_agent() {
     grep -q 'Generated from /src/shared/agents/' "$path" 2>/dev/null
 }
 
+is_idd_managed_pi_doc() {
+  local path="$1"
+  [ -f "$path" ] || return 1
+  grep -q 'Generated from /docs/' "$path" 2>/dev/null
+}
+
 install_one_agent() {
   local src="$1"
   local agents_dest="$2"
@@ -676,12 +821,201 @@ install_agents() {
   done
 }
 
+ensure_harness_project_src() {
+  idd_sync_source_tree
+  local proj="$ROOT/dist/harness-agents-project"
+  if [ ! -d "$proj" ] || [ -z "$(ls -A "$proj" 2>/dev/null)" ]; then
+    run_build "dist/harness-agents-project/ missing or empty" --no-promote-skills
+  fi
+}
+
+ensure_harness_agents_src() {
+  idd_sync_source_tree
+  if [ ! -d "$DIST_HARNESS_AGENTS/agents" ] || \
+     [ -z "$(ls -A "$DIST_HARNESS_AGENTS/agents" 2>/dev/null)" ]; then
+    run_build "dist/harness-agents/ missing or empty" --no-promote-skills
+  fi
+  if [ ! -d "$DIST_HARNESS_AGENTS/agents" ] || \
+     [ -z "$(ls -A "$DIST_HARNESS_AGENTS/agents" 2>/dev/null)" ]; then
+    err "dist/harness-agents/ not found at $DIST_HARNESS_AGENTS"
+    err "  Run: ./scripts/build.sh"
+    exit 1
+  fi
+}
+
+merge_pi_subagents_package() {
+  local settings="${1:-$PI_AGENT_DIR/settings.json}"
+  local pkg='npm:@tintinweb/pi-subagents'
+  run mkdir -p "$(dirname "$settings")"
+  if ! command -v python3 >/dev/null 2>&1; then
+    warn "python3 not found; skip merging $pkg into $settings"
+    return 0
+  fi
+  python3 - "$settings" "$pkg" <<'PY'
+import json, sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+pkg = sys.argv[2]
+data = {}
+if path.is_file():
+    data = json.loads(path.read_text(encoding="utf-8"))
+if not isinstance(data.get("packages"), list):
+    data["packages"] = list(data.get("packages") or [])
+pkgs = data["packages"]
+if pkg not in pkgs:
+    pkgs.append(pkg)
+    data["packages"] = pkgs
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+PY
+  ok "pi settings: $pkg present in $settings"
+}
+
+cleanup_stale_harness_agents() {
+  local agents_dest="$1"
+  if [ ! -d "$agents_dest" ]; then
+    return 0
+  fi
+  for f in "$agents_dest"/*.md; do
+    [ -f "$f" ] || continue
+    is_idd_managed_agent "$f" || continue
+    if [ ! -f "$DIST_HARNESS_AGENTS/agents/$(basename "$f")" ]; then
+      run rm -f "$f"
+      ok "stale harness agent removed: $(basename "$f" .md)"
+    fi
+  done
+}
+
+cleanup_stale_harness_docs() {
+  local docs_dest="$1"
+  if [ ! -d "$docs_dest" ]; then
+    return 0
+  fi
+  for f in "$docs_dest"/*.md; do
+    [ -f "$f" ] || continue
+    is_idd_managed_pi_doc "$f" || continue
+    if [ ! -f "$DIST_HARNESS_AGENTS/docs/$(basename "$f")" ]; then
+      run rm -f "$f"
+      ok "stale harness doc removed: $(basename "$f")"
+    fi
+  done
+}
+
+install_harness_agents_for_tool() {
+  local tool="$1"
+  local agents_dest docs_dest agents_src docs_src
+  agents_dest="$(tool_harness_agents_dest_scoped "$tool")" || return 0
+  docs_dest="$(tool_harness_docs_dest_scoped "$tool")"
+  ensure_harness_agents_src
+  if [ "$INSTALL_SCOPE" = "project" ]; then
+    ensure_harness_project_src
+    agents_src="$ROOT/dist/harness-agents-project"
+    docs_src=""
+  else
+    agents_src="$DIST_HARNESS_AGENTS/agents"
+    docs_src="$DIST_HARNESS_AGENTS/docs"
+  fi
+  if [ "$tool" = pi ]; then
+    if [ "$INSTALL_SCOPE" = "project" ]; then
+      merge_pi_subagents_package "$ROOT/.pi/settings.json"
+    else
+      merge_pi_subagents_package "$PI_AGENT_DIR/settings.json"
+    fi
+  fi
+  info "[$tool] installing harness agents to $agents_dest ($INSTALL_SCOPE)"
+  run mkdir -p "$agents_dest"
+  cleanup_stale_harness_agents "$agents_dest"
+  for f in "$agents_src"/*.md; do
+    [ -f "$f" ] || continue
+    install_one_agent "$f" "$agents_dest"
+  done
+  if [ -n "$docs_src" ] && [ -d "$docs_src" ]; then
+    run mkdir -p "$docs_dest"
+    cleanup_stale_harness_docs "$docs_dest"
+    for f in "$docs_src"/*.md; do
+      [ -f "$f" ] || continue
+      local file dst
+      file="$(basename "$f")"
+      dst="$docs_dest/$file"
+      if [ -f "$dst" ] && ! is_idd_managed_pi_doc "$dst"; then
+        warn "[$tool] doc exists and is not IDD-managed; skipped: $dst"
+        continue
+      fi
+      run cp "$f" "$dst"
+      ok "[$tool] runtime doc installed: $file -> $dst"
+    done
+  elif [ "$INSTALL_SCOPE" = "project" ]; then
+    info "[$tool] project scope: agent docs resolve via repo docs/ (not copied)"
+  fi
+}
+
+uninstall_harness_agents_for_tool() {
+  local tool="$1"
+  local agents_dest docs_dest agents_src docs_src
+  agents_dest="$(tool_harness_agents_dest_scoped "$tool")" || return 0
+  docs_dest="$(tool_harness_docs_dest_scoped "$tool")"
+  if [ "$INSTALL_SCOPE" = "project" ]; then
+    agents_src="$ROOT/dist/harness-agents-project"
+    docs_src=""
+  else
+    agents_src="$DIST_HARNESS_AGENTS/agents"
+    docs_src="$DIST_HARNESS_AGENTS/docs"
+  fi
+  ensure_harness_agents_src
+  if [ -d "$agents_dest" ]; then
+    info "[$tool] removing IDD-managed harness agents from $agents_dest"
+    for src in "$agents_src"/*.md; do
+      [ -f "$src" ] || continue
+      local dst="$agents_dest/$(basename "$src")"
+      if [ -f "$dst" ] && is_idd_managed_agent "$dst"; then
+        run rm -f "$dst"
+        ok "[$tool] agent removed: $(basename "$src" .md)"
+      fi
+    done
+    cleanup_stale_harness_agents "$agents_dest"
+  fi
+  if [ -n "$docs_src" ] && [ -d "$docs_dest" ]; then
+    info "[$tool] removing IDD-managed docs from $docs_dest"
+    for src in "$docs_src"/*.md; do
+      [ -f "$src" ] || continue
+      local dst="$docs_dest/$(basename "$src")"
+      if [ -f "$dst" ] && is_idd_managed_pi_doc "$dst"; then
+        run rm -f "$dst"
+        ok "[$tool] doc removed: $(basename "$src")"
+      fi
+    done
+    cleanup_stale_harness_docs "$docs_dest"
+  fi
+}
+
+install_shared_agents_for_tool() {
+  local tool="$1"
+  if tool_uses_claude_agent_format "$tool"; then
+    local dest
+    dest="$(tool_claude_agents_dest_scoped "$tool")"
+    [ -n "$dest" ] && install_agents "$dest"
+  else
+    install_harness_agents_for_tool "$tool"
+  fi
+}
+
+uninstall_shared_agents_for_tool() {
+  local tool="$1"
+  if tool_uses_claude_agent_format "$tool"; then
+    local dest
+    dest="$(tool_claude_agents_dest_scoped "$tool")"
+    [ -n "$dest" ] && uninstall_agents "$dest"
+  else
+    uninstall_harness_agents_for_tool "$tool"
+  fi
+}
+
 # Install standalone skills (and, where applicable, shared agents) for one tool.
 install_standalone_tool() {
   local tool="$1"
-  local skills_dest agents_dest
+  local skills_dest
   skills_dest="$(tool_skills_dest "$tool")"
-  agents_dest="$(tool_agents_dest "$tool")"
 
   info "[$tool] installing standalone skills to $skills_dest"
   if [ -n "$ONLY_SKILL" ]; then
@@ -693,9 +1027,8 @@ install_standalone_tool() {
     done
   fi
 
-  # Shared agents only for tools that have an agents layout (claude, agents).
-  if [ "$INSTALL_AGENTS" -eq 1 ] && [ -n "$agents_dest" ]; then
-    install_agents "$agents_dest"
+  if [ "$INSTALL_AGENTS" -eq 1 ]; then
+    install_shared_agents_for_tool "$tool"
   fi
 }
 
@@ -756,21 +1089,20 @@ uninstall_agents() {
 # Remove standalone skills (and, where applicable, shared agents) for one tool.
 uninstall_standalone_tool() {
   local tool="$1"
-  local skills_dest agents_dest
+  local skills_dest
   skills_dest="$(tool_skills_dest "$tool")"
-  agents_dest="$(tool_agents_dest "$tool")"
 
   if [ -n "$ONLY_SKILL" ]; then
     remove_path "[$tool] skill" "$skills_dest/$ONLY_SKILL"
-    [ -n "$agents_dest" ] && info "[$tool] agents left installed because --skill targets one skill only"
+    info "[$tool] agents left installed because --skill targets one skill only"
     return
   fi
   for d in "$_SKILLS_SRC"/*/; do
     [ -d "$d" ] || continue
     remove_path "[$tool] skill" "$skills_dest/$(basename "$d")"
   done
-  if [ "$INSTALL_AGENTS" -eq 1 ] && [ -n "$agents_dest" ]; then
-    uninstall_agents "$agents_dest"
+  if [ "$INSTALL_AGENTS" -eq 1 ]; then
+    uninstall_shared_agents_for_tool "$tool"
   fi
 }
 
@@ -792,9 +1124,8 @@ uninstall_plugin() {
 case "$ACTION:$MODE" in
   install:standalone) install_standalone ;;
   install:agents)
-    ensure_agents_src
     for tool in $TOOLS; do
-      install_agents "$(tool_agents_dest "$tool")"
+      install_shared_agents_for_tool "$tool"
     done ;;
   install:plugin)     install_plugin ;;
   install:all)
@@ -804,7 +1135,7 @@ case "$ACTION:$MODE" in
   uninstall:standalone) uninstall_standalone ;;
   uninstall:agents)
     for tool in $TOOLS; do
-      uninstall_agents "$(tool_agents_dest "$tool")"
+      uninstall_shared_agents_for_tool "$tool"
     done ;;
   uninstall:plugin)     uninstall_plugin ;;
   uninstall:all)

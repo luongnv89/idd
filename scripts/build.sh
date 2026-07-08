@@ -275,6 +275,17 @@ run_promote() {
   rm -rf "$ROOT_SKILLS"
   cp -R "$skills_out" "$ROOT_SKILLS"
 
+  local harness_project_out="$out_dir/harness-agents-project"
+  local root_pi_agents="$ROOT/.pi/agents"
+  if [[ -d "$harness_project_out" ]]; then
+    rm -rf "$root_pi_agents"
+    mkdir -p "$ROOT/.pi"
+    cp -R "$harness_project_out" "$root_pi_agents"
+    if [[ "$BUILD_QUIET" -eq 0 ]]; then
+      ok ".pi/agents/ updated → $root_pi_agents (harness agents)"
+    fi
+  fi
+
   if [[ "$BUILD_QUIET" -eq 0 ]]; then
     ok "skills/ updated → $ROOT_SKILLS"
     _log "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
