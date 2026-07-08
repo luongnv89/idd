@@ -22,7 +22,7 @@
 
 Eight terminal commands that structure, analyze, triage, resolve, review, and self-check GitHub issue workflows — so any developer or AI agent can pick up an issue and ship a tested PR.
 
-[**Website**](https://luongnv.com/idd/) · [**Get Started**](#get-started) · [**What is IDD?**](#what-is-idd) · [**Intention-Driven Development**](#idd-as-intention-driven-development) · [**Why Good Issues & Commits Matter**](#why-good-issues-and-commit-messages-matter) · [**Works With Any Tool**](#works-with-any-tool)
+[**Website**](https://luongnv.com/idd/) · [**Get Started**](#get-started) · [**What is IDD?**](#what-is-idd) · [**Capturing Intention**](#capturing-intention) · [**Why Good Issues & Commits Matter**](#why-good-issues-and-commit-messages-matter) · [**Works With Any Tool**](#works-with-any-tool)
 
 ---
 
@@ -294,7 +294,9 @@ Browse the authored source for each skill — these links point to `src/` for re
 
 ## What is IDD?
 
-Issue-Driven Development — also **Intention-Driven Development** — treats GitHub issues as the atomic unit of all development work. Every change starts as a structured issue and ends as a PR linked to that issue.
+Issue-Driven Development treats GitHub issues as the atomic unit of all development work: *capture intention, resolve against current code, remember in git.* Every change starts as a structured issue and ends as a PR linked to that issue.
+
+IDD is a methodology, not a product. Its portable contract — issue format, naming grammar, Decision Records, traceability chain, and L1–L3 conformance levels — is defined in the tool-neutral [**IDD Spec**](SPEC.md). Any tool (or a human with a text editor) can implement it; the gitissue skills in this repo are the reference implementation for Claude Code + GitHub.
 
 The key idea: the gap between "someone describes a problem" and "someone ships a fix" is both a **translation gap** and an **intention gap**. IDD automates that translation — turning vague reports into structured work orders with acceptance criteria — while helping creators discover and articulate what they actually want through iterative refinement.
 
@@ -315,11 +317,9 @@ graph TD
     style I fill:#FF9800,color:#fff
 ```
 
-### IDD as Intention-Driven Development
+### Capturing Intention
 
-IDD is also **Intention-Driven Development** — and that name captures something deeper about what it solves.
-
-Expressing what you actually want is hard. Even experienced developers struggle to articulate a problem clearly enough for someone else — human or AI — to act on it. Vague descriptions lead to wrong assumptions, wasted effort, and solutions that miss the point.
+The first phase of IDD solves the hardest problem in the workflow: expressing what you actually want. Even experienced developers struggle to articulate a problem clearly enough for someone else — human or AI — to act on it. Vague descriptions lead to wrong assumptions, wasted effort, and solutions that miss the point.
 
 `/issue-creator` changes this dynamic. When you describe a problem in plain language, it structures your input into a typed issue with reporter context and acceptance criteria — capturing intent only, never guessing affected files or implementation notes. But the real value isn't the output — it's the **feedback loop**:
 
