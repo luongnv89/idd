@@ -52,7 +52,7 @@ release packaging, but `dist/` is no longer committed.
 
 ```
 src/skills/<skill-name>/              # authored source of truth
-├── SKILL.md            # Skill definition — the "source code"
+├── SKILL.source.md     # Skill definition — the "source code"
 ├── references/
 │   └── error-messages.md   # Standardized error messages
 └── templates/          # (optional) Issue templates

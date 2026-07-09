@@ -523,7 +523,9 @@ src/
 │       ├── implementer.md         # Code + tests implementation
 │       ├── code-reviewer.md       # Confidence-based code review
 │       ├── duplicate-detector.md  # Issue dedup scoring
-│       └── issue-relationship-scanner.md  # File deps + already-fixed detection
+│       ├── issue-relationship-scanner.md  # File deps + already-fixed detection
+│       ├── fixer.md               # Applies fixes during PR review cycles
+│       └── ui-reviewer.md         # UI/visual review for PR changes
 │
 ├── skills/
 │   ├── auto-pilot/         # /auto-pilot
@@ -533,7 +535,7 @@ src/
 │   ├── issue-triage/       # /issue-triage
 │   ├── issue-pr-review/    # /issue-pr-review — review, test, CI, fix, merge
 │   └── init-gitissue/      # /init-gitissue
-│       (each skill has SKILL.md, README.md, references/)
+│       (each skill has SKILL.source.md, README.md, references/)
 │
 ├── internal-skills/
 │   └── idd-doctor/         # /idd-doctor — read-only repo health check
@@ -547,11 +549,11 @@ docs/                             # Single docs tree (issue #81)
 ├── sync-conventions.md
 ├── github-projects-sync.md       # ↑
 ├── ARCHITECTURE.md               # ↓ Project docs — humans only, not bundled
-├── CHANGELOG.md
 ├── DEVELOPMENT.md                # ↑
 ├── decisions/                    # Decision records
 ├── experiments/                  # Experimental design notes
-└── release-notes/                # Per-release smoke-test reports
+└── release-notes/                # Early smoke-test reports (not kept
+                                   # current per release — see CHANGELOG.md)
 ```
 
 </details>
