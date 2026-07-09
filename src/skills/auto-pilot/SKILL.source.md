@@ -156,11 +156,11 @@ Auto-pilot delegates to the resolver/reviewer **skills**, which spawn the shared
 
 Each iteration spawns up to 2 subagents (resolver, then PR reviewer); explicit list mode adds a one-time analyzer upfront. The main agent only tracks: issue number, title, branch name, PR number, and pass/fail status. The full subagent-architecture diagram (each subagent's inputs and returns) lives in `references/orchestration.md` → *Subagent architecture*.
 
-The PR review subagent runs `/issue-pr-review --auto`, which handles the full review-fix cycle internally — reusing the same reviewer and fixer agents across cycles, with a fresh confirmation pass at the end. Merging is always the main agent's responsibility (Phase 5).
+The PR review subagent runs `/issue-pr-review --auto --no-merge`, which handles the full review-fix cycle internally — reusing the same reviewer and fixer agents across cycles, with a fresh confirmation pass at the end. The `--no-merge` flag suppresses auto-merge so the reviewer never steals the merge step from Phase 5. Merging is always the main agent's responsibility (Phase 5).
 
 ### Why Subagents & What the Main Agent Does
 
-**The main agent should never read source files, read PR diffs, run tests, or write code — all of that happens inside subagents.** It handles only the lightweight, sequential orchestration: prerequisites, triage/pick, spawn resolver, spawn PR-review (`/issue-pr-review --auto`), merge fallback, track results, loop. The rationale (fresh context per issue, independent review, isolation between iterations) and the full main-agent task list live in `references/orchestration.md`.
+**The main agent should never read source files, read PR diffs, run tests, or write code — all of that happens inside subagents.** It handles only the lightweight, sequential orchestration: prerequisites, triage/pick, spawn resolver, spawn PR-review (`/issue-pr-review --auto --no-merge`), merge (Phase 5), track results, loop. The rationale (fresh context per issue, independent review, isolation between iterations) and the full main-agent task list live in `references/orchestration.md`.
 
 ---
 
@@ -190,7 +190,7 @@ A continuous loop, 5 phases per iteration, looping back to Phase 1 until the bac
 ┄┄┄┄┄┄┄┄┄┄┄┄
   Phase 1 — Triage       (skipped in explicit list mode)
   Phase 2 — Resolve      subagent: 6-step resolve pipeline
-  Phase 3+4 — Review-Fix /issue-pr-review --auto (review+fix, x3 max)
+  Phase 3+4 — Review-Fix /issue-pr-review --auto --no-merge (review+fix, x3 max)
   Phase 5 — Merge        merge the PR and close the issue
 ```
 
@@ -204,7 +204,7 @@ Each iteration runs 5 phases. For brevity, the full step-by-step per-phase speci
 |-------|------|---------|-----------|
 | 1 | Triage and Pick | Refresh triage, pick the top-priority ready issue | yes (/issue-triage) |
 | 2 | Resolve | Sync to default branch, run the full resolve pipeline | yes (/issue-resolver) |
-| 3-4 | PR Review | Run /issue-pr-review with up to 3 fix cycles + CI monitoring | yes (/issue-pr-review) |
+| 3-4 | PR Review | Run /issue-pr-review --auto --no-merge with up to 3 fix cycles + CI monitoring | yes (/issue-pr-review) |
 | 5 | Merge | Verify mergeability, squash-merge, close the issue, create follow-up if needed | no (main agent) |
 
 See `references/phases.md` for full prompts, error handling, and decision tables.

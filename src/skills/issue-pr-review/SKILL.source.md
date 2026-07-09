@@ -19,10 +19,13 @@ Review a PR end-to-end — analyze, test, fix, check CI, repeat until clean.
 |------------|------|--------------|
 | `/issue-pr-review <N>` | interactive | Review, fix, and repeat until clean; report findings (no auto-merge) |
 | `/issue-pr-review <N> --auto` | auto-pilot | Review, fix, and auto-merge when clean |
+| `/issue-pr-review <N> --auto --no-merge` | auto-pilot | Review, fix, and report — skip auto-merge (use when another agent owns the merge step) |
 | `/issue-pr-review` | detect | Auto-detect PR for current branch |
 | `/issue-pr-review --review-only` | read-only | Review and report, never fix or merge |
 
 The `--auto` flag is set automatically when invoked by `/auto-pilot`. In auto mode, export `IDD_AUTO_MODE=1` before any shell snippet that consults it — the pre-commit security scan reads this to switch from prompt-on-warning to log-and-continue (see `docs/pre-commit-security.md`).
+
+The `--no-merge` flag suppresses auto-merge even when `--auto` is set. Use it when another agent (e.g. auto-pilot's Phase 5) owns the merge step — it runs the full review-fix cycle but stops at the summary report without calling `gh pr merge`.
 
 ## Prerequisites
 
@@ -321,6 +324,8 @@ Print a structured step-by-step summary of the pipeline results, using the templ
 - *Auto-Merge (auto mode only)* — post-report squash merge and block-on-failure handling
 
 In interactive mode: never auto-merge — just report status.
+
+When `--no-merge` is set (even in auto mode): skip the merge step and report status only — equivalent to interactive mode's merge behavior. This flag exists so auto-pilot's reviewer subagent can run the full review-fix cycle without stealing the merge step from Phase 5.
 
 **Review-only mode (`--review-only`):** run Steps 1-5 once, skip Step 6, report in Step 7 — never loop, fix, or merge.
 
