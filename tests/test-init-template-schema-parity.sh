@@ -44,6 +44,37 @@ with tempfile.TemporaryDirectory() as temporary:
         pass
     else:
         raise AssertionError("divergent init template was accepted")
+
+# Self-contained synthetic source fixtures without either parity input must
+# remain buildable, while a partial init contract must still fail clearly.
+with tempfile.TemporaryDirectory() as temporary:
+    fixture = Path(temporary)
+    source = fixture / "src"
+    module._check_init_template_schema_parity(source)
+
+    schema = fixture / "docs" / "config-schema.md"
+    schema.parent.mkdir(parents=True)
+    schema.write_text("# Schema\n", encoding="utf-8")
+    expected_template = source / "skills" / "init-gitissue" / "templates" / "gitissue-template.yml"
+    try:
+        module._check_init_template_schema_parity(source)
+    except module.BuildError as exc:
+        assert "both inputs or neither" in str(exc)
+        assert str(expected_template) in str(exc)
+    else:
+        raise AssertionError("schema-only parity input was accepted")
+
+    schema.unlink()
+    template = expected_template
+    template.parent.mkdir(parents=True)
+    template.write_text("# Template\n", encoding="utf-8")
+    try:
+        module._check_init_template_schema_parity(source)
+    except module.BuildError as exc:
+        assert "both inputs or neither" in str(exc)
+        assert str(schema) in str(exc)
+    else:
+        raise AssertionError("template-only parity input was accepted")
 PY
 }
 

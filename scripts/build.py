@@ -431,10 +431,18 @@ def _check_init_template_schema_parity(src: Path) -> None:
     """
     schema = src.parent / "docs" / "config-schema.md"
     template = src / "skills" / "init-gitissue" / "templates" / "gitissue-template.yml"
-    if not schema.is_file():
-        _abort(f"config schema missing for init-template parity check: {schema}")
-    if not template.is_file():
-        _abort(f"init-gitissue template missing for config parity check: {template}")
+    schema_exists = schema.is_file()
+    template_exists = template.is_file()
+    if not schema_exists and not template_exists:
+        # Self-contained synthetic source fixtures may intentionally omit the
+        # entire init-gitissue contract surface.
+        return
+    if not schema_exists or not template_exists:
+        missing = schema if not schema_exists else template
+        _abort(
+            "init-template/schema parity validation requires both inputs or neither; "
+            f"missing: {missing}"
+        )
 
     documented = _documented_config_defaults(schema)
     rendered_template = _parse_config_mapping(_read_text(template), str(template))
