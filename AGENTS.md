@@ -21,31 +21,31 @@ src/
 │
 ├── skills/
 │   ├── auto-pilot/         # /auto-pilot — triage, resolve, review, merge loop
-│   │   ├── SKILL.md
+│   │   ├── SKILL.source.md
 │   │   └── references/
 │   ├── issue-analysis/     # /issue-analysis N — deep issue investigation
-│   │   ├── SKILL.md
+│   │   ├── SKILL.source.md
 │   │   └── references/
 │   ├── issue-creator/      # /issue-creator — create/normalize/batch issues
-│   │   ├── SKILL.md
+│   │   ├── SKILL.source.md
 │   │   ├── templates/      # Issue templates (bug, feature, improvement)
 │   │   └── references/
 │   ├── issue-resolver/     # /issue-resolver N — 6-step resolve pipeline
-│   │   ├── SKILL.md
+│   │   ├── SKILL.source.md
 │   │   └── references/
 │   ├── issue-triage/       # /issue-triage — prioritize and order issues
-│   │   ├── SKILL.md
+│   │   ├── SKILL.source.md
 │   │   └── references/
 │   ├── issue-pr-review/    # /issue-pr-review — review, test, CI check, fix, merge
-│   │   ├── SKILL.md
+│   │   ├── SKILL.source.md
 │   │   └── references/
 │   └── init-gitissue/      # /init-gitissue — generate .gitissue.yml
-│       ├── SKILL.md
+│       ├── SKILL.source.md
 │       └── references/
 │
 ├── internal-skills/
 │   └── idd-doctor/         # /idd-doctor — read-only repo health check
-│       ├── SKILL.md
+│       ├── SKILL.source.md
 │       └── references/
 │
 docs/                              # All documentation — single tree (issue #81)
