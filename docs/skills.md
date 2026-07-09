@@ -1,6 +1,6 @@
 # gitissue Skills Reference
 
-This page documents every skill shipped by gitissue / IDD, what each skill does, and the supported input forms. Skills are invoked as slash commands in an agent session.
+This page documents every public skill shipped by gitissue / IDD, what each skill does, and the supported input forms. Skills are invoked as slash commands in an agent session. One skill — `/idd-doctor` — is **repo-internal**: it lives in `src/internal-skills/`, is excluded from the built `skills/` and `dist/` surface (see `docs/ARCHITECTURE.md`), and is not distributed for external install.
 
 ## Quick map
 
@@ -13,7 +13,7 @@ This page documents every skill shipped by gitissue / IDD, what each skill does,
 | `/issue-resolver` | Resolve one issue and open an atomic PR | Issue number, optional `--auto` |
 | `/issue-pr-review` | Review a PR, run tests/CI, fix issues in cycles | PR number or current branch PR, optional modes |
 | `/auto-pilot` | Fully autonomous backlog loop | Optional issue list, limit, dry-run, skip |
-| `/idd-doctor` | Read-only IDD repository health check | No arguments |
+| `/idd-doctor` (repo-internal) | Read-only IDD repository health check | No arguments |
 
 ## Shared conventions
 
@@ -63,6 +63,7 @@ Creates structured, intent-focused GitHub issues. It preserves reporter context 
 | `/issue-creator <N>` | Normalize | Rewrites existing issue #N into the standard template. |
 | `/issue-creator <N> --dry-run` | Preview | Shows the normalization preview without applying it. |
 | `/issue-creator <N> --force` | Force normalize | Normalizes even when the issue has security-sensitive labels. |
+| `/issue-creator … --refresh-model-data` | Refresh cache | Force-refreshes the skill-level model-data cache before proceeding (combines with any mode when model suggestion is enabled). |
 | `/issue-creator <multi-item text>` | Batch | Extracts multiple issues from one input and creates them sequentially. |
 | `/issue-creator <image path> [text]` | Screenshot/image issue | Reads visual context, uploads the image to GitHub, embeds it in the issue body, and creates a structured issue. |
 
@@ -134,6 +135,7 @@ Resolves one GitHub issue end-to-end and creates an atomic PR.
 |---|---|---|
 | `/issue-resolver <N>` | Interactive | Resolves issue #N, asks the user to pick an implementation plan, implements, tests, and opens a PR. |
 | `/issue-resolver <N> --auto` | Auto-pilot | Resolves issue #N autonomously with no user prompts. |
+| `/issue-resolver <N> --no-run-log` | Modifier | Suppresses the resolver's own `.gitissue/runs.jsonl` append and returns telemetry to the caller instead. Orthogonal to `--auto`; passed only by `/auto-pilot`, which is the single writer of the run-log line. |
 
 ### Pipeline summary
 
@@ -230,9 +232,11 @@ The loop pauses for critical unresolved review failures and dependency-blocked P
 
 ---
 
-## `/idd-doctor`
+## `/idd-doctor` (repo-internal)
 
 Runs a read-only health check for this IDD repository. It does not modify files, comments, issues, or PRs.
+
+`/idd-doctor` is a **repo-internal** skill: it lives in `src/internal-skills/`, is excluded from the built `skills/` and `dist/` distribution surface (per `docs/ARCHITECTURE.md`), and has no external install command. It is intended to run from a clone of this repository.
 
 ### Input options
 
@@ -247,7 +251,9 @@ Runs a read-only health check for this IDD repository. It does not modify files,
 | Stale skill claims in issue-creator docs | `FAIL` on drift |
 | Forbidden issue-template fields | `FAIL` on forbidden fields |
 | Missing `autopilot.mode` when `.gitissue.yml` exists | `FAIL` |
-| Repository squash-merge default | `WARN` when not squash-only or when unavailable |
+| Repository squash-merge default | `WARN` when not squash-only; skipped (`○`) when `gh` is absent or unauthenticated |
+
+After the four gating checks, the doctor prints one **informational, non-gating** section — a *run-log summary* over the last N runs (default 50) recorded in `.gitissue/runs.jsonl`. It reports resolve rate, median QA cycles, and common skip reasons, and never affects the PASS/WARN/FAIL result. When no runs are recorded, it degrades gracefully to a single `○` line.
 
 ### Requirements
 

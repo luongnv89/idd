@@ -36,17 +36,7 @@ All four checks always run — a fail in Check 1 does not skip Checks 2-4. The o
 
 ## Installation
 
-Install via [npx (Vercel)](https://www.npmjs.com/package/skills):
-
-```bash
-npx skills add https://github.com/luongnv89/idd --skill idd-doctor
-```
-
-Or via [agent-skill-manager (asm)](https://www.npmjs.com/package/agent-skill-manager):
-
-```bash
-asm install https://github.com/luongnv89/idd --skill idd-doctor
-```
+`/idd-doctor` is a **repo-internal** skill. It lives in `src/internal-skills/` and is intentionally excluded from the built `skills/` and `dist/` distribution surface (see [`docs/ARCHITECTURE.md`](../../../docs/ARCHITECTURE.md)), so there is no external `npx` or `asm` install command. Run it from a clone of this repository — the agent discovers it in place under `src/internal-skills/idd-doctor/`.
 
 ## Usage
 
