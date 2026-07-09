@@ -218,6 +218,15 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 
 ## Auto-normalize
 
+### Security-labeled issue (skip)
+```
+⚠ Issue #N has a security label ({label}). Skipping auto-normalization.
+  Rewriting security-sensitive issues requires explicit operator confirmation (SPEC §1.4).
+
+  To normalize first: /issue-creator N   (or /issue-creator N --force after review)
+```
+**Trigger:** Step 0d finds a `security`, `CVE`, or `vulnerability` label (case-insensitive) and the operator has not confirmed a rewrite (auto mode always skips; interactive defaults to skip). Non-fatal — the pipeline continues with the original issue body.
+
 ### Auto-normalization failed
 ```
 ⚠ Auto-normalization failed for issue #N — proceeding without normalization.

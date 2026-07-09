@@ -218,7 +218,22 @@ Stop.
 
 ### 0d — Auto-normalize
 
-If `issue.auto_normalize` is true and not already normalized (no `<!-- gitissue:normalized v1 -->` marker): classify issue type, generate normalized body, add marker, post a backup comment with the original body, update the issue via `gh issue edit`, then re-fetch. If normalization fails, warn and continue with the original body.
+If `issue.auto_normalize` is true and not already normalized (no `<!-- gitissue:normalized v1 -->` marker):
+
+1. **Security label check (SPEC §1.4)** — before any rewrite, scan issue labels for `security`, `CVE`, or `vulnerability` (case-insensitive). If any match:
+   - **Auto mode (`--auto` / `IDD_AUTO_MODE=1`):** print the skip warning below and continue preflight **without** rewriting the issue body.
+   - **Interactive mode:** print the warning and ask for explicit operator confirmation. Default is **no** — do not rewrite unless the operator clearly confirms (e.g. `y` / `yes`). If declined, continue without normalization.
+
+   ```
+   ⚠ Issue #N has a security label ({label}). Skipping auto-normalization.
+     Rewriting security-sensitive issues requires explicit operator confirmation (SPEC §1.4).
+
+     To normalize first: /issue-creator N   (or /issue-creator N --force after review)
+   ```
+
+   Use the first matching label name for `{label}` in the warning line.
+
+2. **Normalize inline** — when no security label blocks (or interactive operator confirmed): classify issue type, generate normalized body, add marker, post a backup comment with the original body, update the issue via `gh issue edit`, then re-fetch. This is the same structure-only flow as `/issue-creator` Normalize mode (`references/modes.md` in the issue-creator skill); the resolver does **not** invoke `/issue-creator` as a subprocess — it performs Step 0d inline. If normalization fails, warn and continue with the original body (see `references/error-messages.md`).
 
 ### 0e — Workspace (interactive only)
 
