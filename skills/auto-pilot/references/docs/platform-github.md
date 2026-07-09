@@ -48,8 +48,10 @@ Skills inline these commands at the step where they run, for execution speed. Th
 | List merged PRs | `gh pr list --state merged --json number,title,body,mergeCommit,headRefName --limit 50` |
 | List open PRs | `gh pr list --state open --json number,title,body,headRefName --limit 20` |
 | Diff / changed files | `gh pr diff {N}` · `gh pr diff {N} --name-only` |
+| Checkout PR head branch | `gh pr checkout {N}` |
 | CI check status | `gh pr checks {N}` |
-| Update PR body | `gh pr edit {N} --body "{body}"` |
+| Read PR body (before edit) | `gh pr view {N} --json body` |
+| Update PR body | `gh pr edit {N} --body "{body}"` — use only after read-modify-write: fetch current body, apply the minimal change (e.g. prepend `Closes #N`), write back, then re-read to verify preserved sections |
 | Squash-merge + clean up | `gh pr merge {N} --squash --delete-branch` |
 | Find PR for an issue | `gh search prs "is:open" "Closes #{N}" --json number,state,url --limit 5` |
 

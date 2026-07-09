@@ -4,7 +4,11 @@ Tool-detection tables and command details for *Step 2 — Script Pre-pass*, *Ste
 
 ## Step 2 — Script Pre-pass detection
 
-Detect available lint/format/test tools from the project, then run each auto-fix command. Capture output but don't block on warnings — only block on errors that prevent the fix from running.
+Detect available lint/format/test tools from the project.
+
+**`--review-only` (detection-only):** run lint/format in check mode only (e.g. `npx eslint .` without `--fix`, `npx prettier --check .`, `ruff check .` without `--fix`) — no `--fix`, `--write`, or equivalent mutating flags. Skip *Commit auto-fixes* entirely.
+
+**Default (fix loop):** run each auto-fix command below. Capture output but don't block on warnings — only block on errors that prevent the fix from running.
 
 | Tool type | Detection | Auto-fix command |
 |-----------|-----------|-----------------|
@@ -32,7 +36,7 @@ npm test          # or pytest, go test ./..., cargo test, etc.
 
 ### Commit auto-fixes
 
-After the pre-commit security scan passes (or warnings are accepted — see the scan contract in SKILL.md and the Primary Pattern in `references/docs/pre-commit-security.md`), commit and push:
+**Not used in `--review-only`.** After the pre-commit security scan passes (or warnings are accepted — see the scan contract in SKILL.md and the Primary Pattern in `references/docs/pre-commit-security.md`), commit and push:
 
 ```bash
 git add -A
