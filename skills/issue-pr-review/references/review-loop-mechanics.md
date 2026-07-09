@@ -22,7 +22,7 @@ Spawn a new reviewer agent (cold start):
 Agent(
   description="reviewer — review PR #N",
   prompt=<code-reviewer.md prompt with {variables} replaced>,
-  subagent_type="general-purpose"  # NOT "code-reviewer"
+  # do NOT set subagent_type — default general-purpose agent, not a custom "code-reviewer" type
 )
 ```
 
@@ -52,7 +52,7 @@ After the fix cycle reports zero fixable issues, spawn a **fresh** confirmation 
 Agent(
   description="reviewer — confirmation review for PR #N",
   prompt=<code-reviewer.md prompt with {variables} replaced>,
-  subagent_type="general-purpose"  # NOT "code-reviewer"
+  # do NOT set subagent_type — default general-purpose agent, not a custom "code-reviewer" type
 )
 ```
 
@@ -75,7 +75,7 @@ Delegate fixes to the fixer subagent instead of applying code changes in the mai
 Agent(
   description="fixer — fix PR #N review issues",
   prompt=<fixer.md prompt with {variables} replaced>,
-  subagent_type="general-purpose"  # NOT "fixer"
+  # do NOT set subagent_type — default general-purpose agent, not a custom "fixer" type
 )
 ```
 
