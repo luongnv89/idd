@@ -416,7 +416,12 @@ Blocked by: #15, #20
 This depends on #8
 ```
 
-Use a regex equivalent to `(?im)\b(?:depends\s+on|blocked\s+by)\b[^\n]*?#(\d+)` and capture every numeric reference on the matching line (handle comma lists like `#12, #15`). Cross-repo references (`org/repo#N`) are explicitly out of scope — match only bare `#N`. If no markers are found, the gate is satisfied; proceed to Step 5.2.
+For each line that matches `(?im)\b(?:depends\s+on|blocked\s+by)\b`, collect **local** issue numbers only (SPEC §2 MUST-ignore for cross-repo):
+
+1. **Strip cross-repo tokens** on that line — remove every `\S+/\S+#\d+` match (e.g. `acme/lib#15`) so its trailing digits are never captured.
+2. **Capture bare refs** on the remainder with a negative lookbehind guard: `(?<![\w/])#(\d+)` — this matches `#12` and comma lists (`#12, #15`) but not the `#15` inside `acme/lib#15` if a token was missed.
+
+Example: `Blocked by: acme/lib#15, #12` → gate on **#12 only**. `Depends on #12, #15` → gate on **#12** and **#15**. The reference implementation is `scripts/dependency_gate_parse.py` (`extract_dependency_issue_numbers`). If no local markers remain, the gate is satisfied; proceed to Step 5.2.
 
 **Cycle guard:** If issue A's body references its own number (`#A`), log a warning and skip the gate (treat as satisfied). The auto-pilot must not pause forever on a self-referential cycle. Multi-hop cycles (A → B → A) are not detected here — they would require traversing each dependency's body, which is out of scope for the per-merge gate; the fail-safe is that any genuinely-cyclic issue set will eventually surface as `blocked_by_dependency` and require user intervention regardless. The check is:
 
