@@ -88,13 +88,13 @@ confidence scale, `gh --json`, autonomous operation) live once in
 
 ### Spawning a subagent (canonical pattern)
 
-Every step below spawns with the same shape — only role, description, and prompt file change. `subagent_type` is **always** `"general-purpose"` (never the agent's own name — none are registered agent types):
+Every step below spawns with the same shape — only role, description, and prompt file change. **Do NOT set `subagent_type`** — always use the default general-purpose agent (never the agent's own name — none are registered agent types):
 
 ```python
 Agent(
   description="{role} — {action} issue #N",
   prompt=<{agent-file}.md prompt with {variables} replaced>,
-  subagent_type="general-purpose"  # NEVER the agent's own name (e.g. NOT "code-reviewer")
+  # do NOT set subagent_type — default general-purpose agent, never a custom type (e.g. NOT "code-reviewer")
 )
 ```
 
