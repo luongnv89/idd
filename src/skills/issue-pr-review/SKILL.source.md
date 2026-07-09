@@ -5,7 +5,7 @@ license: MIT
 compatibility: "Requires git and GitHub CLI (gh) with authentication. Self-contained — uses shared agents from shared/agents/."
 effort: high
 metadata:
-  version: 2.4.0
+  version: 2.4.1
   author: Luong NGUYEN <luongnv89@gmail.com>
 ---
 
@@ -144,15 +144,29 @@ Stop.
                      {files_count} files changed, base: {base_branch}
 ```
 
+### Checkout PR head branch
+
+Before Step 2 or any other step that runs git against the working tree, check out the PR head branch so pre-pass commits and the fixer operate on `{headRefName}`, not whatever branch was active when the skill was invoked (e.g. `main`):
+
+```bash
+gh pr checkout {N}
+```
+
+Use `{headRefName}` from Step 1 as `{branch_name}` for sync, commit, and push. Canonical command: `docs/platform-github.md` (*Pull requests* → Checkout PR head branch).
+
 ---
 
 ## Step 2 — Script Pre-pass [2/7]
 
-Before spawning any LLM reviewer, run deterministic tools to catch and auto-fix mechanical issues — zero LLM tokens, all scripts and CLI tools. Detect the project's lint/format tools, run each auto-fix command (don't block on warnings — only on errors that prevent the fix from running), then run the test suite to catch failures early. The per-tool detection table and example commands are in `references/prepass-tests-ci-mechanics.md` (*Step 2*).
+Before spawning any LLM reviewer, run deterministic tools to catch mechanical issues — zero LLM tokens, all scripts and CLI tools.
+
+**`--review-only`:** detection-only pre-pass — run lint/format **without** `--fix`, `--write`, or other mutating flags; do **not** run *Commit auto-fixes* below. No file edits, commits, or pushes in this mode.
+
+**Default (fix loop):** detect the project's lint/format tools, run each auto-fix command (don't block on warnings — only on errors that prevent the fix from running), then run the test suite to catch failures early. The per-tool detection table and example commands are in `references/prepass-tests-ci-mechanics.md` (*Step 2*).
 
 ### Commit auto-fixes
 
-If any files were modified by the auto-fix tools, you MUST run the pre-commit
+**Skip entirely when `--review-only`.** Otherwise, if any files were modified by the auto-fix tools, you MUST run the pre-commit
 security scan before staging — the authoritative **Primary Pattern** in
 `docs/pre-commit-security.md` (block on real secrets, warn on large files /
 build artifacts / protected branches). Run that exact pattern against the
@@ -259,7 +273,7 @@ Poll GitHub Actions / CI status for the PR (`gh pr checks {N} --json name,state,
 ```
 [5/7] CI Status    ⚠ checks still running after {timeout}s
 ```
-In interactive mode: ask to wait more or proceed. In auto mode: proceed — the next cycle will re-check.
+Pending CI is **not clean** — it never satisfies soft-pass and auto mode must not merge while CI is pending (including when Step 6 finds zero fixables and would otherwise exit the fix loop). In interactive mode: ask to wait more or proceed without merging. In auto mode: do not merge; extend polling or stop with remaining issues — do not assume a later cycle will re-check if the fix loop has already ended.
 
 **No CI configured:**
 ```
@@ -272,14 +286,14 @@ In interactive mode: ask to wait more or proceed. In auto mode: proceed — the 
 
 Collect issues from Steps 3-5, but **only fix those with `action: "fix"`** — `action: "note"` issues (medium code_quality/test_coverage suggestions) are reported in the summary but never trigger a fix cycle. This is the key token optimization. Fixable sources are the same five dimensions from Step 3's *Dimensional review output* (each `fail`/UI `action:"fix"` becomes one fixable issue) plus Step 4 test failures and Step 5 CI failures.
 
-Acceptance-criteria fixes typically need code changes; the traceability `Closes #{N}` fix is a PR-body edit via `gh pr edit {N} --body`. Apply both, then commit and push as usual.
+Acceptance-criteria fixes typically need code changes. The traceability `Closes #{N}` fix is a **read-modify-write** PR-body edit (driver rule 2 in `docs/platform-github.md`): (1) `gh pr view {N} --json body` to fetch the current body; (2) prepend `Closes #{N}` as the **first line** when absent (SPEC §3.3 / `docs/naming-conventions.md`), preserving the rest of the body unchanged — never replace the body from scratch; (3) `gh pr edit {N} --body "{merged_body}"`; (4) re-read with `gh pr view {N} --json body` and confirm `## Decision Record` and the Acceptance Criteria Verification table are still present. Apply code fixes, then commit and push as usual.
 
 ### If no fixable issues
 
 ```
 [6/7] Fix          ○ no fixable issues (noted: {note_count})
 ```
-Exit the loop — PR passes the soft-pass condition.
+Exit the **fix loop** only. Soft-pass is **not** implied — evaluate it next per *Review Loop* controls (tests pass, CI passes or no CI is configured, traceability not `fail`, zero `action: "fix"` issues). Pending CI ⇒ not clean.
 
 ### If fixable issues found
 
@@ -307,11 +321,11 @@ After Step 6, go back to Step 3 — but reuse the same reviewer agent via `SendM
 **Loop controls:**
 - **Max cycles:** `review.max_cycles` (default: 3)
 - **Agent reuse:** Cycles 2+ reuse the existing reviewer and fixer agents. Fresh spawn only for the confirmation pass after fixer reports zero issues.
-- **Soft pass (default):** Stop when ALL hold: zero `action: "fix"` issues remain (across all five dimensions, including `acceptance_criteria`/`traceability` failures) AND tests pass AND CI passes AND traceability is not `fail`. Medium "note" issues (≤ 2) and `partial` dimensions are allowed — they don't block.
+- **Soft pass (default):** Stop when ALL hold: zero `action: "fix"` issues remain (across all five dimensions, including `acceptance_criteria`/`traceability` failures) AND tests pass AND (**CI passes or no CI is configured**) AND traceability is not `fail`. Medium "note" issues (≤ 2) and `partial` dimensions are allowed — they don't block. Zero fixables exiting Step 6 ends the fix loop only; soft-pass still requires this full conjunction (including the CI leg).
 - **Hard-block conditions:** enforce the two #36 hard-blocks from Step 3's *Verification gates* — `traceability: fail` (e.g. missing `Closes #{N}`) and any `acceptance_criteria: fail` block even when every other dimension is clean and tests pass. They are gated on `review.require_traceability_check` / `review.require_acceptance_criteria_check` (both default `true`; `false` → `pass — verification disabled`), with the refactor/chore exemption reporting `traceability: pass — exempt`.
 - **Confirmation pass:** When the fixer reports all fixed, spawn one fresh reviewer for unbiased verification. If clean → PASS. If new issues → back to existing fixer (counts as a cycle).
 - **Exit on stagnation:** If the same issues appear in 2 consecutive cycles, stop and report
-- **Review-only mode:** Run one cycle of Steps 3-5 only, never fix or loop
+- **Review-only mode:** After Step 1 (including PR head checkout), run Step 2 detection-only (no auto-fix commits), then Steps 3-5 once — skip Step 6, never fix, loop, or merge
 
 ---
 
@@ -327,7 +341,7 @@ In interactive mode: never auto-merge — just report status.
 
 When `--no-merge` is set (even in auto mode): skip the merge step and report status only — equivalent to interactive mode's merge behavior. This flag exists so auto-pilot's reviewer subagent can run the full review-fix cycle without stealing the merge step from Phase 5.
 
-**Review-only mode (`--review-only`):** run Steps 1-5 once, skip Step 6, report in Step 7 — never loop, fix, or merge.
+**Review-only mode (`--review-only`):** Step 1 (PR info + `gh pr checkout`), Step 2 detection-only (no commits/pushes), Steps 3-5 once, skip Step 6, report in Step 7 — never loop, fix, or merge.
 
 ---
 
