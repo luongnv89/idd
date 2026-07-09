@@ -44,7 +44,7 @@ Fetch the linked issue and parse its `## Acceptance Criteria` section into indiv
 
 | Status | When |
 |--------|------|
-| `pass` | The PR demonstrably satisfies the criterion. Evidence is required: a file path with line range, a test name, or a one-line description of how the change fulfills the criterion. |
+| `pass` | The PR demonstrably satisfies the criterion. Evidence is required: a file path with line range, a test name, or a one-line description of how the change fulfills the criterion. For **bug** issues, evidence for the fixed-symptom criterion MUST cite the Decision Record **Reproduction** line (command and red→green path), not only a checkmark. |
 | `fail` | The PR does not satisfy the criterion. Evidence is required: what's missing or what contradicts the criterion. |
 | `unverified` | The criterion cannot be verified from the diff alone (e.g., needs production validation, manual user testing, or behavior outside the change set). Explanation is required. |
 
@@ -85,7 +85,7 @@ Per the dual-write rule (see *Analysis Artifacts and Durable Memory* in `docs/id
    git log "{base_branch}..{head_branch}" --grep="#{N}" --oneline
    ```
    The reference may live in the subject or body. A reference inside a `Co-authored-by:` trailer does not count.
-3. **Durable analysis fields in PR body** — the PR body contains a `## Decision Record` section with the five stable labels (`Root cause`, `Options considered`, `Options rejected`, `Selected option`, `Residual risk`) and a `## Acceptance Criteria Verification` section (table or the explicit `No acceptance criteria defined` note). The labels are the contract — match them as exact strings, do not rewrite.
+3. **Durable analysis fields in PR body** — the PR body contains a `## Decision Record` section with the five stable labels (`Root cause`, `Options considered`, `Options rejected`, `Selected option`, `Residual risk`) and a `## Acceptance Criteria Verification` section (table or the explicit `No acceptance criteria defined` note). The labels are the contract — match them as exact strings, do not rewrite. For **bug** issues linked to the PR, the Decision Record MUST also include a **`Reproduction`** line (success or `not reproduced — …` degraded shape). Absence on a bug PR → `traceability: partial` with "Reproduction line missing on bug PR".
 4. **Squash-commit-body assumption** — under squash-merge (the project default per `docs/idd-methodology.md`), GitHub copies the PR body verbatim into the commit message. Treat passing check 3 as evidence the squash commit will carry the durable summary; no separate check is needed pre-merge. Note this assumption explicitly in the report so reviewers know what is and is not verified.
 
 **Pass/partial/fail rule for the dimension:**

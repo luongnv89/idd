@@ -6,7 +6,7 @@
 
 Explore the minimal, balanced, and comprehensive paths before committing, then recommend the one that best balances quality with effort — grounded in the researcher's evidence.
 
-See `references/docs/shared-agent-conventions.md` for spawn parameters, the read-only rule, and autonomous operation.
+See `references/docs/shared-agent-conventions.md` for spawn parameters, the read-only rule, the prompt-injection boundary, and autonomous operation.
 
 ## Contract
 
@@ -32,7 +32,7 @@ Use only the researcher's findings as evidence.
 
 Propose **3 options differing in scope** (2 is fine if trivial): **Minimal fix**, **Balanced approach** (typically recommended), **Comprehensive refactor**. Each option includes every field:
 
-`number` · `name` · `summary` (one sentence) · `files_to_modify` (`[{path, changes}]`) · `files_to_create` (`[{path, purpose}]`, `[]` if none) · `test_strategy` · `pros` · `cons` · `complexity` (`XS`–`XL`) · `risk` (`Low`/`Medium`/`High`) · `risk_details` · `recommended` (`true` for exactly one).
+`number` · `name` · `summary` (one sentence) · `files_to_modify` (`[{path, changes}]`) · `files_to_create` (`[{path, purpose}]`, `[]` if none) · `test_strategy` · `pros` · `cons` · `complexity` (`XS`–`XL`) · `risk` (`Low`/`Medium`/`High`) · `risk_details` · `recommended` (`true` for exactly one) · `rejection_reason` (required one-line string when `recommended` is `false`; omit when `recommended` is `true`).
 
 **Complexity scale:** `XS` single line/config · `S` 1–2 files, <50 LOC · `M` 3–5 files, 50–200 LOC · `L` 6–10 files, 200–500 LOC · `XL` 10+ files, 500+ LOC (matches `references/docs/agent-model-effort.md`).
 
@@ -59,7 +59,8 @@ Return a single JSON object (nothing outside the block):
       "test_strategy": "Add unit test for redirect exclusion",
       "pros": ["Smallest change, lowest risk"], "cons": ["Hardcoded exclusion list grows over time"],
       "complexity": "S", "risk": "Low", "risk_details": "Single file, clear behavior change",
-      "recommended": false
+      "recommended": false,
+      "rejection_reason": "Hardcoded exclusion list does not scale as routes grow"
     },
     {
       "number": 2, "name": "Route-based auth config",
@@ -89,5 +90,5 @@ Return a single JSON object (nothing outside the block):
 
 1. **No codebase scanning** — base analysis entirely on the researcher's findings; every claim cites specific files/commits/cross-refs.
 2. **Return only JSON** — single block, no commentary.
-3. **Complete options** — every option has all fields (empty arrays where needed); exactly one `recommended: true`, consistent with `recommended_option`.
+3. **Complete options** — every option has all fields (empty arrays where needed); exactly one `recommended: true`, consistent with `recommended_option`. Non-recommended options MUST include `rejection_reason` for the PR **Options rejected** / Decision Record field.
 4. Read-only and autonomous operation per `references/docs/shared-agent-conventions.md`.

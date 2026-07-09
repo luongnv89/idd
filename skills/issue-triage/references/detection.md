@@ -8,9 +8,15 @@ Some open issues may have been incidentally fixed by commits or PRs that targete
 
 ### Subagent delegation
 
-**When the Agent tool is available:** Delegate this step to the issue-relationship-scanner subagent (history scan). Read `references/agents/issue-relationship-scanner.md` for the full prompt template. Pass the list of open issues (number and title) from Step 1, along with the repo root path (absolute). The subagent returns a JSON object with a `potentially_fixed` array and `scanned_commits`/`scanned_prs` counts. Spawn this subagent **in the same turn** as the dependency scanner (Step 2) — they are independent and run in parallel.
+**When the Agent tool is available:** Delegate this step to the issue-relationship-scanner subagent (history scan). Read `references/agents/issue-relationship-scanner.md` for the full prompt template. Pass open issues as `{number, title, body}` from Step 1, along with the repo root path (absolute). The subagent returns a JSON object with a `potentially_fixed` array and `scanned_commits`/`scanned_prs` counts. Spawn this subagent **in the same turn** as the dependency scanner (Step 2) — they are independent and run in parallel.
 
-**Note:** The issue-relationship-scanner's history scan only implements the commit-level signal (explicit issue references in commit messages and PR bodies). The file-overlap signal (detecting fixes via shared affected files) requires data from the dependency scan and is handled by the main agent as a post-merge step after the subagent returns. See the merge step after Steps 1b and 2 complete.
+**Note:** The issue-relationship-scanner's history scan only implements the commit-level signal (explicit issue references in commit messages and PR bodies). The file-overlap signal (detecting fixes via shared affected files) requires data from the dependency scan and is handled by the main agent in the **post-merge step** below.
+
+### Post-merge (after Steps 1b and 2 subagents return)
+
+1. Merge `potentially_fixed`, per-issue `affected_files`, and `dependency_edges` from all batches.
+2. For each open issue, if a merged PR's changed files overlap its `affected_files` **and** the PR references that issue number, upgrade `potentially_fixed` confidence per table (c).
+3. Convert undirected scanner edges to **directed** `blocks` / `blocked_by` using creation date (`createdAt`), blocking count, and type precedence (bug before feature/improvement) — same heuristics as the inline Step 2 procedure.
 
 **When the Agent tool is NOT available:** Execute the procedure below inline.
 

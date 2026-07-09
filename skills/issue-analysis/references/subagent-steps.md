@@ -12,7 +12,9 @@ When the Agent tool is available, spawn the explorer subagent to handle Steps 2-
 - Config: max_files, trace_depth, scan_timeout
 - Repo root path (absolute)
 
-The explorer prompt is defined in `references/agents/codebase-researcher.md`. It performs keyword extraction, deep codebase scanning (up to `max_files` files with `trace_depth` levels of import tracing), git history analysis, and cross-reference scanning against other issues and PRs. It returns a structured JSON summary with: extraction results, affected files (with relevance/role), architecture mapping, git history findings, cross-reference insights, and scan stats.
+The explorer prompt is defined in `references/agents/codebase-researcher.md`. When spawning for `/issue-analysis`, instruct the researcher to **skip Phase 0 stop-on-resolve** (closed/fixed issues are valid analysis targets) while still returning `status` fields when detected. Propagate `scan_stats.scan_timed_out` into persisted JSON and surface a timeout warning when true. Map researcher `complexity` to synthesizer tier per `references/docs/agent-model-effort.md`.
+
+It performs keyword extraction, deep codebase scanning (up to `max_files` files with `trace_depth` levels of import tracing), git history analysis, and cross-reference scanning against other issues and PRs. It returns a structured JSON summary with: extraction results, affected files (with relevance/role), architecture mapping, git history findings, cross-reference insights, and scan stats.
 
 After the explorer returns, display progress lines for Steps 2-5 based on its results:
 
@@ -262,7 +264,7 @@ When the Agent tool is available, spawn the synthesizer subagent to handle Steps
 
 - Issue data: number, title, body, labels, type, state, author, createdAt
 - Exploration findings: the full structured JSON returned by the explorer subagent (or collected inline in Steps 2-5)
-- Mode: `"interactive"` (issue-analysis is always interactive)
+- Mode: `"auto"` when `IDD_AUTO_MODE=1` or invoked by `/auto-pilot`; otherwise `"interactive"`
 
 The synthesizer prompt is defined in `references/agents/synthesizer.md`. It produces the root cause / architecture / implementation analysis (Step 6) and proposes 2-3 implementation options with complexity and risk ratings (Step 7). It returns a structured JSON with: analysis text (type-specific), implementation options (with all fields), recommended option, overall complexity, and overall risk.
 

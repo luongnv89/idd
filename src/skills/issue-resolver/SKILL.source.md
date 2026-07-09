@@ -71,7 +71,6 @@ Defaults (full field reference in `docs/config-schema.md`):
 - `resolve.branch_prefix: "auto"`
 - `resolve.auto_test: true`
 - `resolve.test_timeout: 300`
-- `resolve.pr_auto_link: true`
 - `resolve.max_commits: 10`
 - `resolve.qa_max_cycles: 5`
 - `resolve.ui_review.browser_review: "ask"` — gates only the optional browser/screenshot review; the code-level UI review (*Step 4 — UI/UX review*) is auto-detected and always runs.
@@ -279,7 +278,7 @@ The **in-place path** — auto mode, or interactive after declining the worktree
 offer. (Accepted-worktree path already created the branch via `git worktree add -b`
 in 0e; skip this sub-step.)
 
-Create working branch: `{type}/{N}-{short-description}` (see `docs/naming-conventions.md`).
+Create working branch from `resolve.branch_prefix` (see `docs/config-schema.md` and `docs/naming-conventions.md`): when `"auto"`, use `{type}/{N}-{short-description}`; when a custom string (e.g. `issue-`), use `{prefix}{N}-{short-description}`.
 
 **If branch already exists:**
 - Interactive mode: ask `continue` or `fresh`
@@ -385,7 +384,7 @@ Push, create PR, and report.
 
 ### Verify all tests pass
 
-Run the full test suite one final time to confirm everything is clean after QA fixes.
+When `resolve.auto_test` is true (default), run the full test suite one final time to confirm everything is clean after QA fixes. When false, skip this suite (QA Step 4 may still have run tests during the loop).
 
 If tests fail at this point:
 ```
@@ -436,7 +435,9 @@ already fixed (`already_resolved`), or a failed step (`failed`) — append exact
 telemetry to the caller instead. Build the object from values already known
 (`ts`, `issue`, `mode`, `skill`, `outcome`, `pr`, plus optional `complexity`,
 `qa_cycles`, `duration_s`, `skipped_reason`) per the schema in
-`docs/config-schema.md` (*`.gitissue/runs.jsonl` — run log*).
+`docs/config-schema.md` (*`.gitissue/runs.jsonl` — run log*). Collapse researcher
+complexity to the 3-value run-log scale before writing (`trivial`/`low`→`low`,
+`medium`→`medium`, `high`/`complex`→`high`).
 
 > **Suppression rule (single writer under `/auto-pilot`).** `--no-run-log` is
 > passed only by `/auto-pilot`, which runs this resolver as a subagent and writes

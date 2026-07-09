@@ -78,7 +78,7 @@ Load `.gitissue.yml` once. Defaults (full semantics in `references/docs/config-s
 - `review.confidence_threshold: 80`
 - `review.run_tests: true`, `review.check_ci: true`
 - `review.ci_poll_interval: 30`, `review.ci_timeout: 600`, `review.test_timeout: 300` (seconds)
-- `review.soft_pass: true` — pass when zero "fix" issues remain, even with "note" issues (≤ 2 medium allowed)
+- `review.soft_pass: true` — when zero `action: fix` issues remain and tests/CI/traceability legs pass, treat remaining `note` findings as report-only (they never block the loop). When `false`, require a strict pass with no open fixables before exiting.
 - `review.require_acceptance_criteria_check: true` — gate for per-criterion AC verification
 - `review.require_traceability_check: true` — gate for the four traceability checks
 - `review.traceability_exempt_labels: ["refactor", "chore"]` — labels exempting a PR from the `Closes #N` hard-fail
@@ -194,7 +194,7 @@ If tests fail here, continue to the review loop — failures are picked up in St
 
 ### Reviewer agents and cycle reuse
 
-Read `references/agents/code-reviewer.md` for the reviewer prompt and `references/agents/fixer.md` for the fix-cycle prompt. Both spawn with `subagent_type="general-purpose"` (NOT a custom `code-reviewer`/`fixer` type). Pass the reviewer `branch_name`, `base_branch`, `pr_context` (PR title + body), and `diff_command` (`gh pr diff {N}`).
+Read `references/agents/code-reviewer.md` for the reviewer prompt and `references/agents/fixer.md` for the fix-cycle prompt. Both spawn with `subagent_type="general-purpose"` (NOT a custom `code-reviewer`/`fixer` type). Pass the reviewer `branch_name`, `base_branch`, `pr_context` (PR title + body), and `diff_command` (`gh pr diff {N}`). Pass `review.confidence_threshold` (default 80) as the minimum confidence for code-reviewer findings; ui-reviewer keeps its 75 floor.
 
 To minimize tokens, the loop **reuses the same reviewer across cycles**: cycle 1 cold-starts; cycles 2+ re-message it via `SendMessage` to re-review the updated diff; after the fixer reports zero fixable issues, one **fresh** confirmation reviewer does an unbiased final check. The exact spawn calls, the `SendMessage` re-review prompt, and the token-trade rationale live in `references/review-loop-mechanics.md`.
 
@@ -240,7 +240,9 @@ These two hard-blocks are the issue #36 contract: a PR can pass tests and still 
 
 ## Step 4 — Run Tests & Build [4/7]
 
-Detect and run the project's build system, then run all test types (unit, integration, e2e where present), with a `review.test_timeout`-second timeout (default: 300). The build-system detection table and the test-type breakdown are in `references/prepass-tests-ci-mechanics.md` (*Step 4*).
+When `review.run_tests` is false, skip this step and report `○ tests skipped (review.run_tests: false)`; the soft-pass conjunction treats the test leg as satisfied.
+
+When true, detect and run the project's build system, then run all test types (unit, integration, e2e where present), with a `review.test_timeout`-second timeout (default: 300). The build-system detection table and the test-type breakdown are in `references/prepass-tests-ci-mechanics.md` (*Step 4*).
 
 ```
 [4/7] Test         ✓ build ok, {N} tests passed
@@ -256,7 +258,9 @@ Or if failures:
 
 ## Step 5 — Check CI Status [5/7]
 
-Poll GitHub Actions / CI status for the PR (`gh pr checks {N} --json name,state,bucket`): check immediately after tests, then poll every `review.ci_poll_interval` seconds until `review.ci_timeout`. On failure, extract details with `gh run view {run_id} --log-failed`. The polling and failure-extraction detail is in `references/prepass-tests-ci-mechanics.md` (*Step 5*).
+When `review.check_ci` is false, skip polling and report `○ CI skipped (review.check_ci: false)`; the soft-pass conjunction treats the CI leg as satisfied (same pattern as disabled AC/traceability checks).
+
+When true, poll GitHub Actions / CI status for the PR (`gh pr checks {N} --json name,state,bucket`): check immediately after tests, then poll every `review.ci_poll_interval` seconds until `review.ci_timeout`. On failure, extract details with `gh run view {run_id} --log-failed`. The polling and failure-extraction detail is in `references/prepass-tests-ci-mechanics.md` (*Step 5*).
 
 **All checks passed:**
 ```
@@ -321,7 +325,8 @@ After Step 6, go back to Step 3 — but reuse the same reviewer agent via `SendM
 **Loop controls:**
 - **Max cycles:** `review.max_cycles` (default: 3)
 - **Agent reuse:** Cycles 2+ reuse the existing reviewer and fixer agents. Fresh spawn only for the confirmation pass after fixer reports zero issues.
-- **Soft pass (default):** Stop when ALL hold: zero `action: "fix"` issues remain (across all five dimensions, including `acceptance_criteria`/`traceability` failures) AND tests pass AND (**CI passes or no CI is configured**) AND traceability is not `fail`. Medium "note" issues (≤ 2) and `partial` dimensions are allowed — they don't block. Zero fixables exiting Step 6 ends the fix loop only; soft-pass still requires this full conjunction (including the CI leg).
+- **Soft pass (when `review.soft_pass: true`, default):** Stop when ALL hold: zero `action: "fix"` issues remain AND (tests pass or `review.run_tests: false`) AND (CI passes, no CI configured, or `review.check_ci: false`) AND traceability is not `fail`. Medium `note` issues and `partial` dimensions are report-only — they do not block. When `review.soft_pass: false`, do not exit on notes alone; require zero fixables and no traceability `fail`.
+- **`review.auto_merge`:** honored only in `--auto` mode (auto-pilot forces merge when mode permits). Interactive `/issue-pr-review` never merges regardless of this flag.
 - **Hard-block conditions:** enforce the two #36 hard-blocks from Step 3's *Verification gates* — `traceability: fail` (e.g. missing `Closes #{N}`) and any `acceptance_criteria: fail` block even when every other dimension is clean and tests pass. They are gated on `review.require_traceability_check` / `review.require_acceptance_criteria_check` (both default `true`; `false` → `pass — verification disabled`), with the refactor/chore exemption reporting `traceability: pass — exempt`.
 - **Confirmation pass:** When the fixer reports all fixed, spawn one fresh reviewer for unbiased verification. If clean → PASS. If new issues → back to existing fixer (counts as a cycle).
 - **Exit on stagnation:** If the same issues appear in 2 consecutive cycles, stop and report

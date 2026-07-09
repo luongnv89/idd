@@ -40,7 +40,7 @@ When done, report back ONLY these fields:
 - tests_written: count of new tests written (unit + integration + e2e)
 - tests_passed: count of tests passed
 - qa_cycles: number of QA cycles run
-- complexity: the complexity assessed in Research (e.g. low/medium/high), for the run-log line
+- complexity: Research complexity collapsed to the runs.jsonl 3-value scale (see references/docs/config-schema.md — trivial/low→low, medium→medium, high/complex→high)
 - duration_s: wall-clock seconds for the resolve, when measurable, for the run-log line
 - failure_step: which step failed (if status is failure)
 - failure_reason: short error description (if status is failure)

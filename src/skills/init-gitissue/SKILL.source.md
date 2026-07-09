@@ -242,6 +242,22 @@ If the file write fails, output the error from `references/error-messages.md` an
   Check:   do you have write access? ls -la .
 ```
 
+### Merge strategy warning (optional, when `gh` is available)
+
+After a successful write, when `which gh` succeeds and `gh auth status` passes, run the squash-merge preflight from `docs/platform-github.md`:
+
+```bash
+gh repo view --json mergeCommitAllowed,squashMergeAllowed,rebaseMergeAllowed
+```
+
+When squash is not the only allowed strategy (`squashMergeAllowed` false, or merge-commit/rebase allowed), print:
+
+```
+⚠ Merge strategy is not squash-only — squash-merge is required for IDD durable-memory (B1 binding). See docs/idd-methodology.md.
+```
+
+When `gh` is missing or unauthenticated, print `○ Merge strategy check skipped — gh not installed` (or not authenticated) and continue.
+
 If existing issue templates were detected in `.github/ISSUE_TEMPLATE/`, add a comment:
 
 ```yaml
