@@ -222,7 +222,7 @@ See the `{{skill:issue-pr-review}}` skill for the full pipeline.
   ⟶ Spawning PR review subagent...
 ```
 
-Use the **PR Reviewer Subagent** prompt from `references/subagent-prompts.md`, substituting `{pr_number}`. The subagent runs the full `/issue-pr-review --auto` pipeline: review, test, CI check, fix, repeat. It does NOT merge — merging is the main agent's job in Phase 5.
+Use the **PR Reviewer Subagent** prompt from `references/subagent-prompts.md`, substituting `{pr_number}`. The subagent runs the full `/issue-pr-review --auto --no-merge` pipeline: review, test, CI check, fix, repeat. It does NOT merge — merging is the main agent's job in Phase 5. The `--no-merge` flag suppresses auto-merge in `--auto` mode so the reviewer never steals the merge step from Phase 5's mode gate and dependency gate.
 
 ### Step 3.2 — Process Review Result
 

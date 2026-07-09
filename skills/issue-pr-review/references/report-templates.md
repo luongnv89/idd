@@ -119,7 +119,7 @@ The match mechanism (label name or pattern) is logged so reviewers can audit whi
 
 ## Auto-Merge (auto mode only)
 
-If the PR is clean AND `--auto` is set:
+If the PR is clean AND `--auto` is set (and `--no-merge` is **not** set):
 
 ```bash
 gh pr merge {N} --squash --delete-branch
@@ -144,6 +144,8 @@ On merge failure:
 ```
 
 Auto-merge is gated on the same soft-pass condition as the loop exit, including `traceability != fail` and zero `acceptance_criteria: fail`. A PR that passes tests and CI but fails traceability or acceptance criteria is **not** auto-merged.
+
+When `--no-merge` is set (even in auto mode): skip the merge step entirely and report status only. The PR stays open for the owning agent (e.g. auto-pilot Phase 5) to merge through its own mode gate and dependency gate.
 
 In interactive mode: never auto-merge — just report status.
 

@@ -42,9 +42,9 @@ Detailed example runs and edge-case behaviors referenced from SKILL.md.
     Tests:   4 written, 12 passed
 
 ● Reviewing PR #45...
-  ⟶ Spawning PR review subagent (/issue-pr-review --auto)...
+  ⟶ Spawning PR review subagent (/issue-pr-review --auto --no-merge)...
 
-  ✓ PR #45 reviewed and merged
+  ✓ PR #45 reviewed
     Review cycles: 1
     Issues found/fixed: 0/0
     CI: all checks passed
@@ -135,8 +135,8 @@ Detailed example runs and edge-case behaviors referenced from SKILL.md.
     Tests:   3 written, 9 passed
 
 ● Reviewing PR #50...
-  ⟶ Spawning PR review subagent (/issue-pr-review --auto)...
-  ✓ PR #50 reviewed and merged (1 cycle, 0 issues)
+  ⟶ Spawning PR review subagent (/issue-pr-review --auto --no-merge)...
+  ✓ PR #50 reviewed (1 cycle, 0 issues)
 
 ✓ PR #50 merged — #12 closed
   https://github.com/owner/repo/pull/50
@@ -156,8 +156,8 @@ Detailed example runs and edge-case behaviors referenced from SKILL.md.
     Tests:   5 written, 13 passed
 
 ● Reviewing PR #51...
-  ⟶ Spawning PR review subagent (/issue-pr-review --auto)...
-  ✓ PR #51 reviewed and merged (1 cycle, 0 issues)
+  ⟶ Spawning PR review subagent (/issue-pr-review --auto --no-merge)...
+  ✓ PR #51 reviewed (1 cycle, 0 issues)
 
 ✓ PR #51 merged — #5 closed, #8 closed (batched)
   https://github.com/owner/repo/pull/51
@@ -222,9 +222,9 @@ Detailed example runs and edge-case behaviors referenced from SKILL.md.
 
 ```
 ● Reviewing PR #45...
-  ⟶ Spawning PR review subagent (/issue-pr-review --auto)...
+  ⟶ Spawning PR review subagent (/issue-pr-review --auto --no-merge)...
 
-  ✓ PR #45 reviewed and merged
+  ✓ PR #45 reviewed
     Review cycles: 2
     Issues found/fixed: 2/2
     CI: all checks passed
@@ -232,7 +232,7 @@ Detailed example runs and edge-case behaviors referenced from SKILL.md.
 ✓ PR #45 merged — #12 closed
 ```
 
-Note: the `/issue-pr-review --auto` subagent handled the full review-fix-merge cycle internally. It found 2 issues in cycle 1, fixed them, then cycle 2 passed clean — triggering auto-merge via squash.
+Note: the `/issue-pr-review --auto --no-merge` subagent handled the full review-fix cycle internally (review, fix, re-review). It found 2 issues in cycle 1, fixed them, then cycle 2 passed clean. Merge was handled by auto-pilot's Phase 5 after the review returned PASS.
 
 ### All eligible issues are blocked
 
