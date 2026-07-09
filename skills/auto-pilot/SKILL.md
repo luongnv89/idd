@@ -85,13 +85,20 @@ Check these files relative to the skill's directory (the dirname of this SKILL.m
 - `references/subagent-prompts.md` — resolver, reviewer, analyzer, batch-resolver subagent prompts
 - `references/preflight.md` — precheck error outputs and branch-sync procedure
 - `references/orchestration.md` — subagent rationale and main-agent task list
-- `references/docs/idd-methodology.md` — IDD methodology (issue dependencies, etc.)
-- `references/docs/sync-conventions.md` — stash-first sync convention and recovery
-- `references/docs/config-schema.md` — configuration schema reference
 - `references/explicit-list-mode.md` — explicit list mode parsing rules and dependency scan
 - `references/run-log.md` — run-log single-writer and batch fan-out contracts
 - `references/summary-format.md` — final-summary outcome table and template
 - `references/configuration.md` — per-key config rationale and edge-case behavior
+- `references/error-messages.md` — complete error catalog with triggers and exact output
+- `references/examples.md` — worked example runs
+- `references/docs/idd-methodology.md` — IDD methodology (issue dependencies, etc.)
+- `references/docs/sync-conventions.md` — stash-first sync convention and recovery
+- `references/docs/config-schema.md` — configuration schema reference
+- `references/docs/naming-conventions.md` — naming conventions
+- `references/docs/github-projects-sync.md` — GitHub Projects status sync reference
+- `references/docs/platform-github.md` — GitHub platform driver reference
+- `references/docs/shared-agent-conventions.md` — shared subagent conventions
+- `references/docs/agent-model-effort.md` — per-agent model and reasoning-effort mapping
 
 If the working tree is dirty, auto-stash before starting; if not on the default
 branch, auto-switch and rebase on a clean tree. Both procedures (the stash-first

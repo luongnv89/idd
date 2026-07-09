@@ -61,8 +61,7 @@ Before any check, verify the environment. On failure, output the exact error fro
 Verify that this skill's bundled reference files are present.
 If any are missing, stop immediately and print:
 
-```
-text
+```text
 ✗ Missing bundled dependency: {missing_file}
 
   To fix:  asm install https://github.com/luongnv89/idd --skill idd-doctor

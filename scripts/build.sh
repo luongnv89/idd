@@ -192,23 +192,28 @@ run_compile() {
   local log_file="" status=0
   if [[ "$BUILD_QUIET" -eq 1 ]]; then
     log_file="$(mktemp "${TMPDIR:-/tmp}/idd-build.XXXXXX")"
+    # Capture status in the else branch: an if with a false condition and no
+    # else returns 0, so `status=$?` after a bare if/then/fi would read the
+    # if's success, not py_invoke's failure (silently swallowing build aborts).
     if py_invoke ${verbose_args[@]+"${verbose_args[@]}"} "${compile_args[@]}" >"$log_file" 2>&1; then
       rm -f "$log_file"
       return 0
+    else
+      status=$?
+      err "compile failed (exit $status)"
+      sed 's/^/  /' "$log_file" >&2
+      rm -f "$log_file"
+      return "$status"
     fi
-    status=$?
-    err "compile failed (exit $status)"
-    sed 's/^/  /' "$log_file" >&2
-    rm -f "$log_file"
-    return "$status"
   fi
 
   if py_invoke ${verbose_args[@]+"${verbose_args[@]}"} "${compile_args[@]}"; then
     return 0
+  else
+    status=$?
+    err "compile failed (exit $status)"
+    return "$status"
   fi
-  status=$?
-  err "compile failed (exit $status)"
-  return "$status"
 }
 
 run_verify() {
@@ -228,27 +233,31 @@ run_verify() {
   local log_file="" status=0
   if [[ "$BUILD_QUIET" -eq 1 ]]; then
     log_file="$(mktemp "${TMPDIR:-/tmp}/idd-verify.XXXXXX")"
+    # Capture status in the else branch (see run_compile): a false if with no
+    # else returns 0, which would mask verify failures otherwise.
     if bash "$VERIFY_SH" "$skills_out" >"$log_file" 2>&1; then
       rm -f "$log_file"
       if [[ "$BUILD_QUIET" -eq 0 ]]; then ok "skills verification passed"; fi
       return 0
+    else
+      status=$?
+      err "skills verification failed"
+      sed 's/^/  /' "$log_file" >&2
+      rm -f "$log_file"
+      err "  skills/ was not updated (previous tree unchanged)"
+      return "$status"
     fi
-    status=$?
-    err "skills verification failed"
-    sed 's/^/  /' "$log_file" >&2
-    rm -f "$log_file"
-    err "  skills/ was not updated (previous tree unchanged)"
-    return "$status"
   fi
 
   if bash "$VERIFY_SH" "$skills_out"; then
     ok "skills verification passed"
     return 0
+  else
+    status=$?
+    err "skills verification failed"
+    err "  skills/ was not updated (previous tree unchanged)"
+    return "$status"
   fi
-  status=$?
-  err "skills verification failed"
-  err "  skills/ was not updated (previous tree unchanged)"
-  return "$status"
 }
 
 run_promote() {

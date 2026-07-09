@@ -178,9 +178,15 @@ Check these files relative to the skill's directory (the dirname of this SKILL.m
 - `references/agents/synthesizer.md` — Synthesizer subagent prompt (Steps 6-7)
 - `references/subagent-steps.md` — per-step prompts and tool budgets for subagents
 - `references/output-and-persist.md` — terminal report rendering spec and JSON schema
+- `references/error-messages.md` — complete error catalog with triggers and exact output
+- `references/examples.md` — worked example runs
 - `references/docs/sync-conventions.md` — stash-first sync convention and recovery
 - `references/docs/idd-methodology.md` — IDD methodology (durable analysis fields)
 - `references/docs/config-schema.md` — configuration schema reference
+- `references/docs/github-projects-sync.md` — GitHub Projects status sync reference
+- `references/docs/platform-github.md` — GitHub platform driver reference
+- `references/docs/shared-agent-conventions.md` — shared subagent conventions
+- `references/docs/agent-model-effort.md` — per-agent model and reasoning-effort mapping
 
 The steps below include both the subagent delegation path and the inline fallback.
 
