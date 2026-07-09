@@ -293,9 +293,13 @@ EOF
 
 **Step 2 — Mode-gated merge decision:**
 
-If the effective mode is `aggressive` AND `autopilot.merge_partial` is `true`, merge the PR to preserve the partial progress; otherwise leave the PR open. Compute the **effective mode** by reading `autopilot.mode` if set, else applying the legacy mapping (`auto_merge: true` → aggressive+merge_partial; `auto_merge: false` → conservative).
+Compute the **effective mode** by reading `autopilot.mode` if set, else applying the legacy mapping (`auto_merge: true` → aggressive+merge_partial; `auto_merge: false` → conservative). If the effective mode is `aggressive` AND `autopilot.merge_partial` is `true`, the PR may be merged to preserve partial progress after the dependency gate passes; otherwise leave the PR open.
 
-If merging (aggressive + merge_partial: true):
+**Step 2a — Dependency gate (before any merge):**
+
+Whenever Step 2 would merge a PR (aggressive + `merge_partial: true`), run **Step 5.1b — Dependency Gate** first using the originating issue `#{issue_number}`. SPEC §2 requires this check before **any** automated merge, including partial merges. If the gate finds unsatisfied dependencies, do **not** merge: print the structured alert from `references/error-messages.md` (*PR blocked by unmerged dependency*), record the iteration outcome as `blocked_by_dependency`, and stop the loop (same pause semantics as Phase 5). If all dependencies are satisfied, proceed to Step 2b.
+
+**Step 2b — Merge (only when aggressive + merge_partial: true and Step 2a passed):**
 
 ```bash
 gh pr merge {pr_number} --squash --delete-branch
@@ -492,7 +496,7 @@ Continue to Step 5.2.
 
 ### Step 5.2 — Merge (mode-gated)
 
-Merge behavior is controlled by `autopilot.mode`. This step only runs after the PR review returned PASS (clean PR, no unresolved fixable issues). The partial-merge case is handled in Phase 3-4.
+Merge behavior is controlled by `autopilot.mode`. This step runs for clean PRs after review PASS. Partial merges (Phase 3-4 Step 2) use the same Step 5.1b dependency gate before `gh pr merge`.
 
 **Compute the effective mode:**
 

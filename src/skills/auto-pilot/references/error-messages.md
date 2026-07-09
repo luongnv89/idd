@@ -190,7 +190,7 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 
 ## Review
 
-### Review cycles exhausted (non-critical issue)
+### Review cycles exhausted (non-critical issue, aggressive + merge_partial)
 ```
 ⚠ PR #{pr_number} has unresolved issues after {review_cycles} cycles
 
@@ -199,13 +199,32 @@ All errors follow the rich error format: what went wrong + fix command + docs li
     ● {issue_description_2}
 
   ✓ Created follow-up issue #{followup_number}
-  ⟶ Merging PR with partial fix...
-  ✓ PR #{pr_number} merged (partial fix)
+    "Follow-up: unresolved review issues from #{issue_number}"
+  ⟶ mode: aggressive + merge_partial: true — merging partial PR...
+  ✓ PR #{pr_number} merged (partial fix) — #{issue_number} closed
     Unresolved issues tracked in #{followup_number}
+    Outcome: partial_followup
   Continuing to next issue...
 ```
-**Trigger:** All review-fix cycles exhausted and the original issue does NOT have a `critical_labels` label.
-**Action:** Create a follow-up GitHub issue with `auto-pilot-followup` label describing the unresolved problems. Merge the PR to preserve progress. Continue to next issue. Non-fatal.
+**Trigger:** All review-fix cycles exhausted, the original issue does NOT have a `critical_labels` label, and the effective mode is `aggressive` with `autopilot.merge_partial: true`. Step 2a (Step 5.1b dependency gate) must pass before this output is shown.
+**Action:** Create follow-up issue, merge PR only after dependency gate passes. If the gate blocks, use *PR blocked by unmerged dependency* instead (fatal pause). Otherwise continue to next issue. Non-fatal when merged.
+
+### Review cycles exhausted (non-critical issue, PR left open)
+```
+⚠ PR #{pr_number} has unresolved issues after {review_cycles} cycles
+
+  Remaining issues:
+    ● {issue_description_1}
+    ● {issue_description_2}
+
+  ✓ Created follow-up issue #{followup_number}
+    "Follow-up: unresolved review issues from #{issue_number}"
+  ○ mode: {mode} — PR left open for manual merge
+    Outcome: left_open
+  Continuing to next issue...
+```
+**Trigger:** All review-fix cycles exhausted, the original issue does NOT have a `critical_labels` label, and the effective mode is `conservative`, `balanced`, or `aggressive` with `merge_partial: false`.
+**Action:** Create follow-up issue; leave PR open. Continue to next issue. Non-fatal.
 
 ### Review cycles exhausted (critical issue)
 ```
