@@ -4,7 +4,7 @@
 
 ## Intent-Code Boundary
 
-`/issue-resolver` respects the intent-code boundary. The **issue body** owns durable intent: the problem statement, reporter context, and acceptance criteria. The resolver scans the **current codebase** during Research (Step 1) to discover affected files, dependencies, and constraints — it never trusts the issue body for predicted file lists or implementation hints. The atomic PR captures *how* the change was made; the linked issue captures *why* it mattered. If the issue body lacks structure (e.g., no acceptance criteria), the resolver runs `/issue-creator` first to normalize it without inventing technical detail. See `docs/idd-methodology.md` for the full boundary contract.
+`/issue-resolver` respects the intent-code boundary. The **issue body** owns durable intent: the problem statement, reporter context, and acceptance criteria. The resolver scans the **current codebase** during Research (Step 1) to discover affected files, dependencies, and constraints — it never trusts the issue body for predicted file lists or implementation hints. The atomic PR captures *how* the change was made; the linked issue captures *why* it mattered. If the issue body lacks structure (e.g., no acceptance criteria) and `issue.auto_normalize` is enabled, Step 0d normalizes it inline (same structure-only rules as `/issue-creator` Normalize) without inventing technical detail. Security-labeled issues are not rewritten without explicit operator confirmation (SPEC §1.4). See `docs/idd-methodology.md` for the full boundary contract.
 
 ## Highlights
 
