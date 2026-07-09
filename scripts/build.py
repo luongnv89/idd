@@ -13,7 +13,7 @@ Implements the (A-fail, B-fail, C-1) ADR row from
 docs/decisions/cross-skill-invocation.md — sibling-relative paths only.
 
 Per issue #81 consolidation, runtime docs live at the top-level docs/
-alongside human-only project docs (ARCHITECTURE.md, CHANGELOG.md, etc.).
+alongside human-only project docs (ARCHITECTURE.md, DEVELOPMENT.md, etc.).
 The build's transitive-closure scan determines which docs each skill
 needs and bundles only those into the dist outputs. The 9 runtime docs
 bundled by the closure are: config-schema.md, idd-methodology.md,
