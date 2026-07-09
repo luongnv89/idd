@@ -256,10 +256,15 @@ Check these files relative to the skill's directory (the dirname of this SKILL.m
 - `references/agents/issue-relationship-scanner.md` — Combined dependency + history scanner prompt
 - `references/detection.md` — Confidence-scoring rules and merge logic for detection
 - `references/output-and-persist.md` — Terminal report rendering spec and JSON schema
+- `references/error-messages.md` — complete error catalog with triggers and exact output
+- `references/examples.md` — worked example runs
 - `references/docs/sync-conventions.md` — stash-first sync convention and recovery
 - `references/docs/idd-methodology.md` — IDD methodology (durable analysis fields)
 - `references/docs/github-projects-sync.md` — GitHub Projects status sync reference
 - `references/docs/config-schema.md` — configuration schema reference
+- `references/docs/platform-github.md` — GitHub platform driver reference
+- `references/docs/shared-agent-conventions.md` — shared subagent conventions
+- `references/docs/agent-model-effort.md` — per-agent model and reasoning-effort mapping
 
 ---
 

@@ -115,8 +115,7 @@ If not (e.g., Claude.ai or environments without the Agent tool), execute duplica
 Verify that this skill's bundled agent prompt and template files are present.
 If any are missing, stop immediately and print:
 
-```
-text
+```text
 ✗ Missing bundled dependency: {missing_file}
 
   To fix:  asm install https://github.com/luongnv89/idd --skill issue-creator
@@ -131,13 +130,21 @@ Check these files relative to the skill's directory (the dirname of this SKILL.m
 - `templates/bug.md` — bug issue template
 - `templates/feature.md` — feature request template
 - `templates/improvement.md` — improvement request template
-- `references/docs/naming-conventions.md` — issue title and labeling conventions
-- `references/docs/github-projects-sync.md` — GitHub Projects status sync reference
 - `references/modes.md` — Normalize and Batch mode step specs and error paths
 - `references/model-suggestion.md` — model-suggestion cache lifecycle and mapping
 - `references/image-upload.md` — image upload procedure and failure handling
 - `references/confidence-scoring.md` — confidence levels and per-field determination
 - `references/clarify-intent.md` — Step 3.5 clarify-ambiguous-intent full procedure
+- `references/error-messages.md` — complete error catalog with triggers and exact output
+- `references/examples.md` — worked example runs (create, normalize, batch)
+- `references/docs/naming-conventions.md` — issue title and labeling conventions
+- `references/docs/github-projects-sync.md` — GitHub Projects status sync reference
+- `references/docs/config-schema.md` — configuration schema reference
+- `references/docs/idd-methodology.md` — IDD methodology reference
+- `references/docs/sync-conventions.md` — stash-first sync convention and recovery
+- `references/docs/platform-github.md` — GitHub platform driver reference
+- `references/docs/shared-agent-conventions.md` — shared subagent conventions
+- `references/docs/agent-model-effort.md` — per-agent model and reasoning-effort mapping
 
 ---
 

@@ -46,8 +46,7 @@ That is the only prerequisite. This skill does not need `gh` or GitHub authentic
 Verify that this skill's bundled template and reference files are present. If any are missing,
 stop immediately and print:
 
-```
-text
+```text
 ✗ Missing bundled dependency: {missing_file}
 
   To fix:  asm install https://github.com/luongnv89/idd --skill init-gitissue
@@ -59,8 +58,13 @@ text
 Check these files relative to the skill's directory (the dirname of this SKILL.md):
 
 - `templates/gitissue-template.yml` — canonical config template with all schema fields
+- `references/error-messages.md` — complete error catalog with triggers and exact output
+- `references/examples.md` — worked example runs
 - `references/docs/config-schema.md` — full configuration schema
 - `references/docs/naming-conventions.md` — naming conventions (referenced by generated config)
+- `references/docs/idd-methodology.md` — IDD methodology reference
+- `references/docs/github-projects-sync.md` — GitHub Projects status sync reference
+- `references/docs/platform-github.md` — GitHub platform driver reference
 
 ## Configuration Check
 

@@ -58,6 +58,15 @@ STALE_DOC_URL_RE = re.compile(
     r"https://github\.com/luongnv89/idd/[^\s<>'\"\)]*?/src/docs/([a-z][a-z0-9-]+\.md)"
 )
 
+# Phase E: bundled-dependency precheck drift guard (issue #195). Each skill's
+# "Bundled dependency precheck" section lists the references/ files it expects
+# to be bundled. The build reconstructs the real bundled set and fails if the
+# list drifts. This regex extracts every references/<path> token from the
+# precheck block; it deliberately matches both authoring styles (bulleted
+# `- ` references/… ` — desc` and bare ```text fence, one path per line).
+PRECHECK_HEADING_RE = re.compile(r"^\s{0,3}#{2,4}\s+Bundled dependency precheck\s*$")
+PRECHECK_REF_RE = re.compile(r"(?<![\w/])references/[A-Za-z0-9._/-]+\.[A-Za-z0-9]+")
+
 BANNER_TMPL = (
     "<!-- Generated from /{rel}. Do not edit. "
     "Edit source and run ./scripts/build.sh. -->\n"
@@ -472,6 +481,85 @@ def _check_init_template_schema_parity(src: Path) -> None:
         _abort("init-gitissue template/schema parity failed — " + " | ".join(details))
 
 
+# --- Phase E — Bundled-dependency precheck drift guard (issue #195) ----------
+
+
+def _parse_precheck_refs(skill_source_text: str) -> set[str] | None:
+    """Extract the references/ paths named in a skill's 'Bundled dependency
+    precheck' section.
+
+    Returns a set of references/<path> tokens, or None when the skill has no
+    precheck section (such skills are not policed). The section is bounded from
+    its heading to the next top-level '## ' heading or '---' rule, so inline
+    references/ mentions elsewhere in the skill (e.g. an Additional Resources
+    index or prose) are never captured. Both authoring styles are supported: a
+    bulleted list with trailing descriptions and a bare ```text fence with one
+    path per line.
+    """
+    lines = skill_source_text.splitlines()
+    start = None
+    for i, line in enumerate(lines):
+        if PRECHECK_HEADING_RE.match(line):
+            start = i + 1
+            break
+    if start is None:
+        return None
+    body: list[str] = []
+    for line in lines[start:]:
+        if re.match(r"^\s*##\s", line) or re.match(r"^\s*---\s*$", line):
+            break
+        body.append(line)
+    return set(PRECHECK_REF_RE.findall("\n".join(body)))
+
+
+def _bundled_reference_paths(out_skill_dir: Path) -> set[str]:
+    """Return every bundled references/ file under an emitted skill directory
+    as skill-relative POSIX paths (e.g. 'references/docs/config-schema.md')."""
+    refs_root = out_skill_dir / "references"
+    if not refs_root.is_dir():
+        return set()
+    return {
+        f.relative_to(out_skill_dir).as_posix()
+        for f in _walk_files(refs_root)
+    }
+
+
+def _check_precheck_drift(
+    skill_name: str, skill_source: Path, out_skill_dir: Path
+) -> None:
+    """Fail the build when a skill's bundled-dependency precheck list diverges
+    from the files actually bundled under its references/ tree.
+
+    Scope is references/ only — README.md and templates/ are intentionally not
+    policed here (the precheck may name required templates, but templates are
+    not part of the closure-driven references/ bundle this guard verifies).
+    Skills without a precheck section are skipped.
+    """
+    named = _parse_precheck_refs(_read_text(skill_source))
+    if named is None:
+        return
+    bundled = _bundled_reference_paths(out_skill_dir)
+    missing_from_list = sorted(bundled - named)
+    stale_in_list = sorted(named - bundled)
+    if not missing_from_list and not stale_in_list:
+        return
+    details = []
+    if missing_from_list:
+        details.append(
+            "bundled but not in precheck list: " + ", ".join(missing_from_list)
+        )
+    if stale_in_list:
+        details.append(
+            "in precheck list but not bundled: " + ", ".join(stale_in_list)
+        )
+    _abort(
+        f"bundled-dependency precheck drift in skill '{skill_name}' — "
+        + " | ".join(details)
+        + f" (fix the 'Bundled dependency precheck' list in "
+        f"src/skills/{skill_name}/{SOURCE_SKILL_MD})"
+    )
+
+
 # --- Reference rewriting -----------------------------------------------------
 
 
@@ -708,9 +796,18 @@ def build(out: Path, src: Path, *, verbose: bool = False, no_root_skills: bool =
     all_skill_sources = [(name, src / "skills" / name) for name in public_skills]
     for name in deprecated_distributed:
         all_skill_sources.append((name, src / "deprecated-skills" / name))
+    public_skill_set = set(public_skills)
     for skill_name, skill_root in sorted(all_skill_sources, key=lambda x: x[0]):
         agents, docs = _compute_closure(src, skill_name, skill_root)
-        _emit_flattened_skill(src, skill_root, out_skills / skill_name, agents, docs)
+        out_skill_dir = out_skills / skill_name
+        _emit_flattened_skill(src, skill_root, out_skill_dir, agents, docs)
+        # Issue #195: fail the build if the skill's bundled-dependency precheck
+        # list drifts from the references/ files actually bundled. Policed for
+        # public skills only (deprecated-distributed skills are exempt).
+        if skill_name in public_skill_set:
+            _check_precheck_drift(
+                skill_name, skill_root / SOURCE_SKILL_MD, out_skill_dir
+            )
         if verbose:
             print(f"  ✓ flattened: {skill_name} (agents={len(agents)}, docs={len(docs)})")
 

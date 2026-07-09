@@ -140,6 +140,7 @@ references/docs/github-projects-sync.md
 references/docs/config-schema.md
 references/docs/agent-model-effort.md
 references/docs/shared-agent-conventions.md
+references/docs/platform-github.md
 ```
 
 ```
