@@ -2,6 +2,8 @@
 
 These are manual integration tests for `/issue-creator` and `/issue-creator N` (normalization).
 
+> This file covers Sprint 1 (`/issue-creator`) only. See [`README-sprint2.md`](README-sprint2.md) and [`README-sprint3.md`](README-sprint3.md) for later sprints' manual tests. The `tests/` directory also has 23 automated `.sh` integration scripts (build, autopilot, config, sync, etc.) that are not covered by any of these three READMEs — run them directly, e.g. `./tests/test-build-script.sh`.
+
 Updated for the **lean issues architecture**: issues contain only human intent (type, description, acceptance criteria). No codebase scanning during issue creation or normalization.
 
 ## Prerequisites

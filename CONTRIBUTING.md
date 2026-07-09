@@ -57,32 +57,38 @@ graph TD
 src/                        # SOURCE OF TRUTH — hand-edit here
 ├── skills/
 │   ├── issue-creator/      # /issue-creator — create and normalize issues
-│   │   ├── SKILL.md        # Skill definition (the "code")
+│   │   ├── SKILL.source.md # Skill definition (the "code")
 │   │   ├── templates/      # Issue templates (bug, feature, improvement)
 │   │   └── references/     # Error messages, detailed patterns
+│   ├── issue-analysis/     # /issue-analysis N — deep issue investigation
+│   │   ├── SKILL.source.md
+│   │   └── references/
 │   ├── issue-resolver/     # /issue-resolver N — resolve issues end-to-end
-│   │   ├── SKILL.md
+│   │   ├── SKILL.source.md
 │   │   └── references/
 │   ├── issue-triage/       # /issue-triage — backlog analysis
-│   │   ├── SKILL.md
+│   │   ├── SKILL.source.md
+│   │   └── references/
+│   ├── issue-pr-review/    # /issue-pr-review — review, test, CI check, fix, merge
+│   │   ├── SKILL.source.md
+│   │   └── references/
+│   ├── auto-pilot/         # /auto-pilot — triage, resolve, review, merge loop
+│   │   ├── SKILL.source.md
 │   │   └── references/
 │   └── init-gitissue/      # /init-gitissue — config generator
-│       ├── SKILL.md
+│       ├── SKILL.source.md
 │       └── references/
 ├── internal-skills/        # /idd-doctor and other internal-only skills
-├── shared/
-│   └── agents/             # Shared agent definitions used by multiple skills
-└── docs/                   # Runtime docs consumed by skills
-    ├── config-schema.md
-    ├── idd-methodology.md
-    ├── naming-conventions.md
-    └── github-projects-sync.md
+└── shared/
+    └── agents/             # Shared agent definitions used by multiple skills
 
 scripts/
 ├── build.sh                # Thin entrypoint → calls build.py
-└── build.py                # Deterministic builder (src/ → skills/ + dist/)
+└── build.py                # Deterministic builder (src/ + docs/ → skills/ + dist/)
 
-docs/                       # Top-level project documentation (humans only)
+docs/                       # Single top-level docs tree (issue #81) — runtime
+                             # docs bundled into skills at build time plus
+                             # human-only project docs (README-adjacent)
 tests/                      # Integration test scripts
 ```
 

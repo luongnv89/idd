@@ -11,7 +11,7 @@ metadata:
 
 # /auto-pilot
 
-Fully autonomous development loop: triage, pick, resolve, review, fix, merge, repeat — zero user prompts. (Version history lives in `docs/CHANGELOG.md` and `docs/release-notes/`.)
+Fully autonomous development loop: triage, pick, resolve, review, fix, merge, repeat — zero user prompts. (Version history lives in `CHANGELOG.md`; `docs/release-notes/` covers only early smoke-test reports and is not kept current per release.)
 
 The auto-pilot orchestrates existing gitissue skills into a continuous loop that processes the issue backlog with absolute autonomy. Each iteration: triage the backlog, pick the top-priority issue, resolve it via the full pipeline, review the PR with up to 3 token-optimized fix-review cycles (script pre-pass for lint/format, LLM only for critical issues), and merge according to `autopilot.mode`. Clean PRs merge in `balanced` or `aggressive` mode. PRs with unresolved review issues create a follow-up issue and stay open unless `mode: aggressive` and `merge_partial: true` are both explicitly set. For critical issues, the loop stops and asks the user for a decision instead of auto-continuing.
 

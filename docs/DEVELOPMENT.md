@@ -145,5 +145,5 @@ graph TD
 | `docs/naming-conventions.md` | Branch / commit / PR / issue naming |
 | `docs/sample-normalized-issue.md` | Example normalized issue (intent-only) |
 | `docs/ARCHITECTURE.md` | System design, data flow, durable-memory model |
-| `docs/CHANGELOG.md` | Per-release notes |
+| `CHANGELOG.md` | Per-release notes |
 | `src/internal-skills/idd-doctor/SKILL.source.md` | Read-only health check — run before submitting a PR |
