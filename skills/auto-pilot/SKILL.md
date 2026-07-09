@@ -137,7 +137,8 @@ The `autopilot.mode` setting controls when the loop is allowed to merge PRs. The
 **Resolution rules:**
 
 - If `autopilot.mode` is set, it is the source of truth. The legacy `autopilot.auto_merge` field is ignored.
-- If `autopilot.mode` is unset, fall back to the legacy interpretation: `auto_merge: true` ≈ `aggressive` + `merge_partial: true` (preserves the prior 2.1.x behavior); `auto_merge: false` ≈ `conservative`.
+- If `autopilot.mode` is unset and neither `autopilot.mode` nor `autopilot.auto_merge` appears in `.gitissue.yml`, effective mode is `balanced`.
+- If `autopilot.mode` is unset but `autopilot.auto_merge` is **explicitly present** in the file, fall back to legacy interpretation: `auto_merge: true` ≈ `aggressive` + `merge_partial: true` (preserves the prior 2.1.x behavior); `auto_merge: false` ≈ `conservative`.
 - Critical-issue handling is unchanged across all modes — the loop always stops and asks when a critical issue still has unresolved review problems after all cycles.
 
 The full per-phase decision logic lives in `references/phases.md` (Phase 3-4 partial gate, Phase 5 merge gate). Read that file when implementing or debugging a specific merge path.

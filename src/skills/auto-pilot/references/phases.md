@@ -293,7 +293,7 @@ EOF
 
 **Step 2 — Mode-gated merge decision:**
 
-Compute the **effective mode** by reading `autopilot.mode` if set, else applying the legacy mapping (`auto_merge: true` → aggressive+merge_partial; `auto_merge: false` → conservative). If the effective mode is `aggressive` AND `autopilot.merge_partial` is `true`, the PR may be merged to preserve partial progress after the dependency gate passes; otherwise leave the PR open.
+Compute the **effective mode** by reading `autopilot.mode` if set; if unset and `autopilot.auto_merge` is not explicitly present in the file, use `balanced`; if unset but `autopilot.auto_merge` is explicitly present, apply the legacy mapping (`auto_merge: true` → aggressive+merge_partial; `auto_merge: false` → conservative). If the effective mode is `aggressive` AND `autopilot.merge_partial` is `true`, the PR may be merged to preserve partial progress after the dependency gate passes; otherwise leave the PR open.
 
 **Step 2a — Dependency gate (before any merge):**
 
@@ -501,9 +501,10 @@ Merge behavior is controlled by `autopilot.mode`. This step runs for clean PRs a
 **Compute the effective mode:**
 
 1. If `autopilot.mode` is set in `.gitissue.yml`, use it directly (`conservative` | `balanced` | `aggressive`).
-2. If `autopilot.mode` is unset, fall back to legacy interpretation:
+2. If `autopilot.mode` is unset and neither `autopilot.mode` nor `autopilot.auto_merge` appears in the file → effective mode = `balanced` (zero-config default).
+3. If `autopilot.mode` is unset but `autopilot.auto_merge` is **explicitly present** in the file, fall back to legacy interpretation:
    - `autopilot.auto_merge: false` → effective mode = `conservative`
-   - `autopilot.auto_merge: true` (or unset) → effective mode = `aggressive` (with `merge_partial: true`, preserving prior 2.1.x behavior)
+   - `autopilot.auto_merge: true` → effective mode = `aggressive` (with `merge_partial: true`, preserving prior 2.1.x behavior)
 
 **Decision table for clean PRs:**
 
