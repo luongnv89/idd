@@ -104,7 +104,7 @@ and identify opportunities to batch-resolve related issues together.
 Issues to analyze: {issue_numbers_comma_separated}
 
 Steps:
-1. For each issue, use the ../issue-analysis/SKILL.md skill
+1. For each issue, invoke the ../issue-analysis/SKILL.md skill with `--auto` and set `IDD_AUTO_MODE=1` before the invocation. Do not rely on auto-pilot provenance.
 2. Run the analysis pipeline for each issue to identify:
    - Affected files (which source files need changes)
    - Root cause and implementation approach
