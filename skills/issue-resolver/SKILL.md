@@ -236,8 +236,14 @@ If `issue.auto_normalize` is true and not already normalized (no `<!-- gitissue:
 
 ### 0e — Workspace (interactive only)
 
-Decide *where* the resolution work happens. The branch name is the same in both
-cases: `{type}/{N}-{short-description}` (see `references/docs/naming-conventions.md`).
+Before Step 0e or 0f selects a workspace, derive one `{branch_name}` from
+`resolve.branch_prefix`: when it is `"auto"`, use
+`{type}/{N}-{short-description}`; otherwise use the configured prefix verbatim
+as `{configured-prefix}{N}-{short-description}` (for example, `issue-` or
+`team/`). Both paths use this same branch name (see
+`references/docs/naming-conventions.md`).
+
+Then decide *where* the resolution work happens.
 
 **Auto mode (`--auto` / `IDD_AUTO_MODE=1`): skip this offer entirely.** Go
 straight to *0f — Create branch* (in-place). The worktree prompt never appears
@@ -255,8 +261,8 @@ plainly what will be set up and the workspace/branch naming the user can expect:
   This resolution can run in an isolated git worktree instead of your
   current working tree.
 
-    Branch:    {type}/{N}-{short-description}
-    Worktree:  ../{repo}-worktrees/{type}-{N}-{short-description}
+    Branch:    {branch_name}
+    Worktree:  ../{repo}-worktrees/{branch_name with / → -}
     Setup:     copies your gitignored local config (.env*, and similar),
                then runs this project's detected install/bootstrap so the
                workspace is ready to run without manual reconfiguration.
@@ -278,7 +284,10 @@ The **in-place path** — auto mode, or interactive after declining the worktree
 offer. (Accepted-worktree path already created the branch via `git worktree add -b`
 in 0e; skip this sub-step.)
 
-Create working branch from `resolve.branch_prefix` (see `references/docs/config-schema.md` and `references/docs/naming-conventions.md`): when `"auto"`, use `{type}/{N}-{short-description}`; when a custom string (e.g. `issue-`), use `{prefix}{N}-{short-description}`.
+Use the `{branch_name}` already derived before Step 0e/0f from
+`resolve.branch_prefix` (see `references/docs/config-schema.md` and
+`references/docs/naming-conventions.md`): `"auto"` uses `{type}/{N}-{short-description}`;
+a custom prefix is used verbatim as `{configured-prefix}{N}-{short-description}`.
 
 **If branch already exists:**
 - Interactive mode: ask `continue` or `fresh`

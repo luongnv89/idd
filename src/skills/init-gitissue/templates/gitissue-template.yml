@@ -127,6 +127,28 @@ analysis:
   # Max seconds for the full codebase scan phase (30-600)
   scan_timeout: 120
 
+# GitHub Projects board sync settings
+# See docs/github-projects-sync.md for the full integration reference
+projects:
+  # Enable automatic project board status sync
+  # When false, all project sync operations are silently skipped
+  sync_enabled: false
+
+  # Explicit project number (null auto-detects the first linked project)
+  project_number: null
+
+  # Name of the Status field on the project board
+  status_field: "Status"
+
+  # Map of internal status keys to project board option values
+  status_map:
+    # Status for newly created issues
+    todo: "Todo"
+    # Status when work starts (branch created)
+    in_progress: "In Progress"
+    # Status when PR is created
+    done: "Done"
+
 # Model suggestion settings (used by /issue-creator)
 model_suggestion:
   # Suggest a cost-effective model + thinking level per issue, from CursorBench

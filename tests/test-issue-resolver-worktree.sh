@@ -86,20 +86,22 @@ check_contains "$SRC_SKILL" 'no `git worktree add` on the default resolution pat
 # ───────────────────────────────────────────────────────────
 # T3: Worktree branch/path naming and setup are stated before acceptance.
 # ───────────────────────────────────────────────────────────
-check_contains "$SRC_SKILL" 'Branch:[[:space:]]+\{type\}/\{N\}-\{short-description\}' \
-  "T3.1: prompt states branch naming"
-check_contains "$SRC_SKILL" 'Worktree:[[:space:]]+\.\./\{repo\}-worktrees/\{type\}-\{N\}-\{short-description\}' \
-  "T3.2: prompt states worktree naming"
+check_contains "$SRC_SKILL" 'Branch:[[:space:]]+\{branch_name\}' \
+  "T3.1: prompt states the derived branch name"
+check_contains "$SRC_SKILL" 'resolve\.branch_prefix' \
+  "T3.2: prompt derives branch name from resolve.branch_prefix"
+check_contains "$SRC_SKILL" 'Worktree:[[:space:]]+\.\./\{repo\}-worktrees/\{branch_name with / → -\}' \
+  "T3.3: prompt derives worktree naming from the branch name"
 check_contains "$SRC_SKILL" 'copies your gitignored local config \(\.env\*, and similar\)' \
-  "T3.3: prompt states local config/env copy"
+  "T3.4: prompt states local config/env copy"
 check_contains "$SRC_SKILL" 'detected install/bootstrap' \
-  "T3.4: prompt states detected install/bootstrap setup"
+  "T3.5: prompt states detected install/bootstrap setup"
 
 # ───────────────────────────────────────────────────────────
 # T4: Accepted path creates/prepares the worktree generically.
 # ───────────────────────────────────────────────────────────
-check_contains "$SRC_STEPS" 'git worktree add -b "\$branch" "\$wt_dir" "origin/\$\{base\}"' \
-  "T4.1: accepted path creates branch and worktree from fetched base"
+check_contains "$SRC_STEPS" 'git worktree add -b "\$branch_name" "\$wt_dir" "origin/\$\{base\}"' \
+  "T4.1: accepted path uses the derived branch and fetched base"
 check_contains "$SRC_STEPS" 'cd "\$wt_dir"' \
   "T4.2: subsequent resolver steps run inside worktree"
 check_contains "$SRC_STEPS" 'for f in \.env \.env\.local \.env\.development \.env\.test' \

@@ -355,7 +355,14 @@ View mode (`/issue-analysis N view`) reads the JSON and renders the same report 
 
 ### Issue body is empty
 
-If the issue has no body text:
+If the issue has no body text and `IDD_AUTO_MODE=1` or the analysis was
+invoked/delegated by `/auto-pilot`, do not prompt. Warn and proceed with
+title-only keywords:
+```
+⚠ Issue #N has no description. Continuing with title-only analysis (limited confidence).
+```
+
+Otherwise, in interactive mode:
 ```
 ⚠ Issue #N has no description. Analysis may be limited.
 

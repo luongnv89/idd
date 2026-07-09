@@ -28,7 +28,7 @@ For a batch of issues: find which source files each affects, build a dependency 
 ### Part B — History scan
 
 1. **Commits:** `git log --all --oneline --since="3 months ago"`; parse each for closing keywords (`Closes/Fixes/Resolves #N`) and bare `#N` references to the open issue numbers.
-2. **Merged PRs:** `gh pr list --state merged --json number,title,body,mergeCommit,headRefName --limit 50`; extract issue numbers from titles, bodies (closing keywords), and branch names.
+2. **Merged PRs:** `gh pr list --state merged --json number,title,body,mergeCommit,headRefName --limit 50`; extract issue numbers from titles, bodies (closing keywords), and branch names. For each merged PR that references an open issue, run `gh pr view <N> --json files` and retain `files[].path` as `changed_files`. If a file query fails, retain the PR with an empty `changed_files`, set `files_available: false`, and continue.
 3. **Potentially fixed:** open issue #X is potentially fixed when a commit references #X **and** that commit belongs to a merged PR created for a *different* issue.
 4. **Confidence:** `high` = closing keyword for #X in a merged PR for a different issue; `medium` = bare #X mention in such a PR, or PR body mentions #X alongside another issue. Discard lower.
 
@@ -51,6 +51,9 @@ Return a single JSON object (nothing outside the block):
     "potentially_fixed": [
       { "issue_number": 17, "fixed_by_pr": 43, "branch_name": "fix/42-mobile-auth-redirect", "commit_sha": "abc1234", "commit_message": "fix(auth): resolve redirect loop (#42)", "confidence": "high", "confidence_reason": "commit uses Fixes #17", "target_issue": 42 }
     ],
+    "merged_prs": [
+      { "number": 43, "referenced_issues": [17, 42], "changed_files": ["src/auth.py", "src/middleware.py"], "files_available": true }
+    ],
     "scanned_commits": 142,
     "scanned_prs": 23
   }
@@ -60,10 +63,11 @@ Return a single JSON object (nothing outside the block):
 - `dependency_edges[].strength`: `"file"` (exact shared files) or `"directory"` (same directory).
 - `issues[N].timeout`: `true` if the per-issue scan exceeded `scan_timeout`.
 - `history_scan.potentially_fixed`: `[]` if none.
+- `history_scan.merged_prs`: merged PRs that reference an open issue; `changed_files` holds `gh pr view --json files` paths. `files_available: false` means file-overlap detection must skip that PR.
 
 ## Parallel batching (orchestrator)
 
-For 10+ issues, the main agent splits into batches of ~5 and spawns one scanner per batch (same turn). Merge: concatenate the `issues` maps, `dependency_edges`, and `potentially_fixed` arrays, then run a second pass for cross-batch edges (issues from different batches sharing files).
+For 10+ issues, the main agent splits into batches of ~5 and spawns one scanner per batch (same turn). Merge: concatenate the `issues` maps, `dependency_edges`, `potentially_fixed`, and `merged_prs` arrays, then run a second pass for cross-batch edges (issues from different batches sharing files).
 
 ## Constraints
 
