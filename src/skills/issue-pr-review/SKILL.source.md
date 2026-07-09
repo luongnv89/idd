@@ -78,7 +78,7 @@ Load `.gitissue.yml` once. Defaults (full semantics in `docs/config-schema.md`):
 - `review.confidence_threshold: 80`
 - `review.run_tests: true`, `review.check_ci: true`
 - `review.ci_poll_interval: 30`, `review.ci_timeout: 600`, `review.test_timeout: 300` (seconds)
-- `review.soft_pass: true` — when zero `action: fix` issues remain and tests/CI/traceability legs pass, treat remaining `note` findings as report-only (they never block the loop). When `false`, require a strict pass with no open fixables before exiting.
+- `review.soft_pass: true` — when zero `action: fix` issues remain and tests/CI/traceability legs pass, treat remaining `note` findings and `partial` dimensions as report-only. When `false`, strict mode requires no `note` findings and every enabled dimension to be `pass`; remaining notes or partials block a clean result and merge.
 - `review.require_acceptance_criteria_check: true` — gate for per-criterion AC verification
 - `review.require_traceability_check: true` — gate for the four traceability checks
 - `review.traceability_exempt_labels: ["refactor", "chore"]` — labels exempting a PR from the `Closes #N` hard-fail
@@ -325,7 +325,8 @@ After Step 6, go back to Step 3 — but reuse the same reviewer agent via `SendM
 **Loop controls:**
 - **Max cycles:** `review.max_cycles` (default: 3)
 - **Agent reuse:** Cycles 2+ reuse the existing reviewer and fixer agents. Fresh spawn only for the confirmation pass after fixer reports zero issues.
-- **Soft pass (when `review.soft_pass: true`, default):** Stop when ALL hold: zero `action: "fix"` issues remain AND (tests pass or `review.run_tests: false`) AND (CI passes, no CI configured, or `review.check_ci: false`) AND traceability is not `fail`. Medium `note` issues and `partial` dimensions are report-only — they do not block. When `review.soft_pass: false`, do not exit on notes alone; require zero fixables and no traceability `fail`.
+- **Soft pass (when `review.soft_pass: true`, default):** Stop when ALL hold: zero `action: "fix"` issues remain AND (tests pass or `review.run_tests: false`) AND (CI passes, no CI configured, or `review.check_ci: false`) AND traceability is not `fail`. Medium `note` issues and `partial` dimensions are report-only — they do not block.
+- **Strict pass (when `review.soft_pass: false`):** Apply the same tests/CI gates, then require zero `action: "fix"` findings, zero remaining `action: "note"` findings, and `pass` for every enabled dimension. A `partial` dimension or any note is a strict blocker: exit the fix loop, report it under Remaining, and do not report clean or merge. Notes never become fixer inputs — Step 6 still fixes only `action: "fix"` — so strict mode surfaces these for manual remediation rather than looping without a fixable action.
 - **`review.auto_merge`:** honored only in `--auto` mode (auto-pilot forces merge when mode permits). Interactive `/issue-pr-review` never merges regardless of this flag.
 - **Hard-block conditions:** enforce the two #36 hard-blocks from Step 3's *Verification gates* — `traceability: fail` (e.g. missing `Closes #{N}`) and any `acceptance_criteria: fail` block even when every other dimension is clean and tests pass. They are gated on `review.require_traceability_check` / `review.require_acceptance_criteria_check` (both default `true`; `false` → `pass — verification disabled`), with the refactor/chore exemption reporting `traceability: pass — exempt`.
 - **Confirmation pass:** When the fixer reports all fixed, spawn one fresh reviewer for unbiased verification. If clean → PASS. If new issues → back to existing fixer (counts as a cycle).

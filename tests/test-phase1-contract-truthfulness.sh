@@ -20,18 +20,41 @@ check_contains() {
   fi
 }
 
+check_not_contains() {
+  local file="$1"
+  local pattern="$2"
+  local label="$3"
+  if grep -qE "$pattern" "$file"; then
+    fail "$label"
+  else
+    pass "$label"
+  fi
+}
+
 RESOLVER="$REPO_ROOT/src/skills/issue-resolver/references/pipeline-steps.md"
 ANALYSIS="$REPO_ROOT/src/skills/issue-analysis/SKILL.source.md"
+ANALYSIS_STEPS="$REPO_ROOT/src/skills/issue-analysis/references/subagent-steps.md"
+ANALYSIS_OUTPUT="$REPO_ROOT/src/skills/issue-analysis/references/output-and-persist.md"
+REVIEW="$REPO_ROOT/src/skills/issue-pr-review/SKILL.source.md"
+REVIEW_REPORTS="$REPO_ROOT/src/skills/issue-pr-review/references/report-templates.md"
+CONFIG="$REPO_ROOT/docs/config-schema.md"
+TRIAGE_SKILL="$REPO_ROOT/src/skills/issue-triage/SKILL.source.md"
 TRIAGE="$REPO_ROOT/src/skills/issue-triage/references/detection.md"
 SCANNER="$REPO_ROOT/src/shared/agents/issue-relationship-scanner.md"
 TEMPLATE="$REPO_ROOT/src/skills/init-gitissue/templates/gitissue-template.yml"
 DIST_RESOLVER="$REPO_ROOT/skills/issue-resolver/references/pipeline-steps.md"
 DIST_ANALYSIS="$REPO_ROOT/skills/issue-analysis/SKILL.md"
+DIST_ANALYSIS_STEPS="$REPO_ROOT/skills/issue-analysis/references/subagent-steps.md"
+DIST_REVIEW="$REPO_ROOT/skills/issue-pr-review/SKILL.md"
 DIST_TRIAGE="$REPO_ROOT/skills/issue-triage/references/detection.md"
+DIST_TRIAGE_SCANNER="$REPO_ROOT/skills/issue-triage/references/agents/issue-relationship-scanner.md"
 DIST_TEMPLATE="$REPO_ROOT/skills/init-gitissue/templates/gitissue-template.yml"
 
-for file in "$RESOLVER" "$ANALYSIS" "$TRIAGE" "$SCANNER" "$TEMPLATE" \
-            "$DIST_RESOLVER" "$DIST_ANALYSIS" "$DIST_TRIAGE" "$DIST_TEMPLATE"; do
+for file in "$RESOLVER" "$ANALYSIS" "$ANALYSIS_STEPS" "$ANALYSIS_OUTPUT" \
+            "$REVIEW" "$REVIEW_REPORTS" "$CONFIG" "$TRIAGE_SKILL" "$TRIAGE" \
+            "$SCANNER" "$TEMPLATE" "$DIST_RESOLVER" "$DIST_ANALYSIS" \
+            "$DIST_ANALYSIS_STEPS" "$DIST_REVIEW" "$DIST_TRIAGE" \
+            "$DIST_TRIAGE_SCANNER" "$DIST_TEMPLATE"; do
   if [ -f "$file" ]; then
     pass "exists: ${file#$REPO_ROOT/}"
   else
@@ -71,6 +94,49 @@ for file in "$TEMPLATE" "$DIST_TEMPLATE"; do
   check_contains "$file" '^  status_field: "Status"$' "F4 $(basename "$(dirname "$file")") has status_field default"
   check_contains "$file" '^  status_map:$' "F4 $(basename "$(dirname "$file")") has status_map defaults"
 done
+
+check_contains "$REVIEW" 'review\.soft_pass: false.*strict mode' \
+  "F5 review soft_pass false defines strict mode"
+check_contains "$REVIEW" 'zero remaining `action: "note"` findings' \
+  "F5 strict mode blocks note findings"
+check_contains "$REVIEW" '`partial` dimension.*strict blocker' \
+  "F5 strict mode blocks partial dimensions"
+check_contains "$REVIEW_REPORTS" 'strict pass not reached' \
+  "F5 report template renders strict blockers"
+check_contains "$CONFIG" 'partial/note findings remain blockers' \
+  "F5 config schema documents strict false behavior"
+check_contains "$DIST_REVIEW" 'zero remaining `action: "note"` findings' \
+  "F5 generated review preserves strict notes gate"
+
+check_contains "$SCANNER" '"dependency".*"history".*"both"' \
+  "F6 scanner accepts dependency history both scope"
+check_contains "$SCANNER" 'Run this part only when `scope` is `"dependency"` or `"both"`' \
+  "F6 scanner gates dependency work by scope"
+check_contains "$SCANNER" 'Run this part only when `scope` is `"history"` or `"both"`' \
+  "F6 scanner gates history work by scope"
+check_contains "$TRIAGE_SKILL" 'one issue-relationship-scanner subagent per batch' \
+  "F6 triage uses one scanner per batch"
+check_contains "$TRIAGE" 'scope: "both"' \
+  "F6 triage passes full scanner scope"
+check_not_contains "$TRIAGE_SKILL" 'two parallel scans per batch|paired\*\* history' \
+  "F6 triage no longer duplicates scanner work per batch"
+check_contains "$DIST_TRIAGE_SCANNER" 'scope.*"both"' \
+  "F6 generated scanner preserves scope contract"
+
+for status in already_resolved pr_in_progress possibly_already_fixed; do
+  check_contains "$ANALYSIS_STEPS" "status\\.${status}" \
+    "F7 analysis handles researcher status ${status}"
+  check_contains "$ANALYSIS_OUTPUT" "research_status\\.${status}" \
+    "F7 analysis persists researcher status ${status}"
+done
+check_contains "$ANALYSIS_STEPS" 'scan_stats\.scan_timed_out' \
+  "F7 analysis persists and warns on scan timeout"
+check_contains "$ANALYSIS_STEPS" 'docs/agent-model-effort\.md' \
+  "F7 analysis selects synthesizer tier from researcher complexity"
+check_contains "$ANALYSIS_OUTPUT" 'scan_timed_out' \
+  "F7 persisted schema includes timeout flag"
+check_contains "$DIST_ANALYSIS_STEPS" 'status\.already_resolved' \
+  "F7 generated analysis preserves status handling"
 
 echo ""
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"

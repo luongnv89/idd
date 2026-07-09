@@ -8,9 +8,9 @@ Some open issues may have been incidentally fixed by commits or PRs that targete
 
 ### Subagent delegation
 
-**When the Agent tool is available:** Delegate this step to the issue-relationship-scanner subagent (history scan). Read `references/agents/issue-relationship-scanner.md` for the full prompt template. Pass open issues as `{number, title, body}` from Step 1, along with the repo root path (absolute). The subagent returns a JSON object whose `history_scan` contains `potentially_fixed`, `merged_prs` (PR number, referenced issue numbers, and changed-file paths), and `scanned_commits`/`scanned_prs` counts. Spawn this subagent **in the same turn** as the dependency scanner (Step 2) — they are independent and run in parallel.
+**When the Agent tool is available:** Spawn **one** issue-relationship-scanner subagent per batch for both Step 1b and Step 2. Read `references/agents/issue-relationship-scanner.md` for the full prompt template. Pass the full input `{ issues: [{number, title, body}], repo_root, scan_timeout, scope: "both" }`, where `repo_root` is absolute and `scan_timeout` is the `scan_timeout_per_issue` config value. Consume its `history_scan` here: it contains `potentially_fixed`, `merged_prs` (PR number, referenced issue numbers, and changed-file paths), and `scanned_commits`/`scanned_prs` counts.
 
-**Note:** The issue-relationship-scanner's history scan implements the commit-level signal and fetches changed-file paths for merged PRs that explicitly reference an open issue. The file-overlap signal combines those paths with dependency-scan data in the main agent's **post-merge step** below.
+**Note:** The full-scope scanner implements the commit-level signal, fetches changed-file paths for merged PRs that explicitly reference an open issue, and returns the dependency data used by Step 2. The file-overlap signal combines both result sections in the main agent's **post-merge step** below.
 
 ### Post-merge (after Steps 1b and 2 subagents return)
 
@@ -101,9 +101,9 @@ If any are found:
 
 ### Subagent delegation
 
-**When the Agent tool is available:** Delegate this step to the issue-relationship-scanner subagent (dependency scan). Read `references/agents/issue-relationship-scanner.md` for the full prompt template. Pass the list of issues (number, title, body) from Step 1 along with the repo root path and the `scan_timeout_per_issue` config value (passed as `scan_timeout` in the subagent input). Spawn this subagent **in the same turn** as the history scanner (Step 1b) — they are independent and run in parallel.
+**When the Agent tool is available:** Do **not** spawn another scanner for Step 2. Consume `dependency_scan` from the same full-scope (`scope: "both"`) result spawned for Step 1b. It contains the per-issue `affected_files` and `dependency_edges`; the input and output contract is defined in `references/agents/issue-relationship-scanner.md`.
 
-**For 10+ issues:** Split the issues into batches of ~5 and spawn one issue-relationship-scanner subagent (dependency scan) per batch (all in the same turn). After all subagents return, merge their results:
+**For 10+ issues:** Split the issues into batches of ~5 and spawn one full-scope issue-relationship-scanner subagent per batch (all in the same turn). After all subagents return, merge their results:
 1. Concatenate the `issues` maps from each batch into a single map
 2. Concatenate the `dependency_edges` arrays from each batch
 3. Run a cross-batch pass: for any two issues from different batches, check if their `affected_files` overlap. If they do, add a dependency edge. Determine directionality using the same heuristics as the inline procedure: earlier creation date takes precedence, more blocking relationships take precedence, and bug type takes precedence over feature/improvement. If neither issue clearly precedes the other, mark them as co-dependent at the same level. This is a lightweight comparison the main agent does on the merged data.

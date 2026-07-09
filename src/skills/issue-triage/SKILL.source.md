@@ -185,9 +185,9 @@ During a full triage update, the skill delegates the two heaviest phases to suba
 Main Agent (orchestrator)
 ├── Step 1: Fetch Issues (lightweight — stays in main agent)
 │
-├── Spawn: issue-relationship-scanner subagent(s) — **two parallel scans per batch**
-│   (1) history scan (Step 1b) and (2) dependency scan (Step 2), same turn
-│   Pass `{ issues: [{number, title, body}], repo_root, scan_timeout }`
+├── Spawn: one issue-relationship-scanner subagent per batch
+│   Runs history (Step 1b) and dependency (Step 2) in one full scan
+│   Pass `{ issues: [{number, title, body}], repo_root, scan_timeout, scope: "both" }`
 │   For 10+ issues, split into parallel batches (~5 issues each)
 │   Main agent merges batches, adds cross-batch edges + file-overlap signals
 │   Returns: potentially-fixed issues, affected files, directed dependency edges
@@ -205,13 +205,13 @@ Read `shared/agents/issue-relationship-scanner.md` for the combined scanner prom
 
 ### Parallel execution
 
-After fetching issues in Step 1, spawn **paired** history + dependency scanner subagents per batch (see `references/detection.md`). Do not pass title-only stubs — include full `body` for keyword extraction.
+After fetching issues in Step 1, spawn **one full-scope** scanner subagent per batch (see `references/detection.md`). Pass full issue objects — including `body` — with `scope: "both"`; its one result supplies both Step 1b history and Step 2 dependency data.
 
 ```
 Step 1 completes
-    └── Spawn issue-relationship-scanner    ─┐
-                                             │
-    Collect results ◄────────────────────────┘
+    └── Spawn issue-relationship-scanner (scope: both) ─┐
+                                                         │
+    Collect result ◄────────────────────────────────────┘
 Step 3 continues with merged data
 ```
 
@@ -221,10 +221,10 @@ When there are 10+ issues, split into batches of ~5 and spawn multiple scanner s
 
 ```
 Step 1 completes (18 issues)
-    ├── Spawn scanner batch 1 (issues 1-5)
-    ├── Spawn scanner batch 2 (issues 6-10)
-    ├── Spawn scanner batch 3 (issues 11-15)
-    └── Spawn scanner batch 4 (issues 16-18)
+    ├── Spawn scanner batch 1 (issues 1-5, scope: both)
+    ├── Spawn scanner batch 2 (issues 6-10, scope: both)
+    ├── Spawn scanner batch 3 (issues 11-15, scope: both)
+    └── Spawn scanner batch 4 (issues 16-18, scope: both)
 
     Collect all results, merge dependency maps + history results
     Main agent adds cross-batch dependency edges
@@ -300,7 +300,7 @@ Progress output:
 
 ## Steps 1b & 2 — Already-Fixed & Dependency Detection
 
-Two subagents run in parallel: the **history scanner** finds issues already fixed by commits/PRs, and the **dependency scanner** builds a file-overlap dependency map. Full subagent prompts, confidence-scoring rules, and merge logic live in `references/detection.md` — read that file when tuning either scanner.
+One full-scope scanner per batch finds issues already fixed by commits/PRs **and** builds the file-overlap dependency map. Full subagent prompts, confidence-scoring rules, and merge logic live in `references/detection.md` — read that file when tuning either result section.
 
 Summary:
 - **Step 1b** — flags open issues whose titles/bodies match recent commit messages or merged PR descriptions. Marks them `potentially_fixed` with evidence links.

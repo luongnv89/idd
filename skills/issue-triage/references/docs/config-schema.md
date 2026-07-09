@@ -189,9 +189,11 @@ review:
   # Maximum: 3600
   test_timeout: 300
 
-  # Treat soft-pass (no critical issues but minor warnings) as pass
+  # Allow note findings and partial dimensions after all fixables are resolved.
   # Type: boolean
   # Default: true
+  # When false, require every enabled review dimension to pass with no notes;
+  # partial/note findings remain blockers for a clean result and auto-merge.
   soft_pass: true
 
   # Run per-criterion acceptance-criteria verification against the linked issue.
@@ -656,7 +658,7 @@ Config is validated on load at the start of every skill invocation. Errors inclu
 | `review.ci_poll_interval` | `30` | Seconds between CI polls |
 | `review.ci_timeout` | `600` | CI polling timeout |
 | `review.test_timeout` | `300` | Review test timeout |
-| `review.soft_pass` | `true` | Treat soft-pass as pass |
+| `review.soft_pass` | `true` | Allow note findings and partial dimensions after fixables resolve; `false` requires no notes and all enabled dimensions pass |
 | `review.require_acceptance_criteria_check` | `true` | Run per-criterion acceptance-criteria verification; `fail` blocks soft-pass |
 | `review.require_traceability_check` | `true` | Run the four traceability checks; missing `Closes #N` blocks soft-pass |
 | `review.traceability_exempt_labels` | `["refactor", "chore"]` | PR labels that exempt a PR from the `Closes #N` hard-fail (check 1 only; other three checks still run) |
