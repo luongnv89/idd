@@ -17,8 +17,8 @@ The main agent handles only orchestration tasks that are lightweight and sequent
 1. **Prerequisites** — environment checks (git, gh, auth)
 2. **Triage/Pick** — fetch issue list, compute order (or walk explicit list)
 3. **Spawn resolver subagent** — pass issue number, wait for result
-4. **Spawn PR review subagent** — delegates to `/issue-pr-review --auto` which handles review, test, CI, fix, and merge
-5. **Merge fallback** — only if issue-pr-review couldn't auto-merge (branch protection, etc.)
+4. **Spawn PR review subagent** — delegates to `/issue-pr-review --auto --no-merge` which handles review, test, CI, and fix (never merge — merge is Phase 5's job)
+5. **Merge** — apply the mode gate and dependency gate (SPEC §2), then squash-merge via `gh pr merge`
 6. **Track results** — append to the iteration log
 7. **Loop** — advance to next issue
 
@@ -42,7 +42,8 @@ Main Agent (orchestrator)
   │     Runs the full /issue-resolver 6-step pipeline (Preflight → Research → Plan → Implement → QA → Deliver)
   │     Returns: branch_name, pr_number, files_changed, tests_written, tests_passed
   │
-  └── Subagent: PR Reviewer (via /issue-pr-review --auto)
+  └── Subagent: PR Reviewer (via /issue-pr-review --auto --no-merge)
         Script pre-pass (lint/format auto-fix), then LLM review cycles (max 3)
         Returns: PASS/NEEDS_FIX, review_cycles, issues_found, issues_fixed
+        Note: --no-merge suppresses auto-merge; merge is Phase 5's job
 ```
