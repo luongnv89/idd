@@ -137,7 +137,7 @@ The normalization marker `<!-- gitissue:normalized v1 -->` is invisible in the t
 
 ### Confidence Scoring
 
-Inferred fields — type classification, acceptance criteria — carry confidence indicators:
+Inferred fields — type classification, acceptance criteria, and tool-suggested Metadata values (priority, effort, labels) — carry confidence indicators:
 
 | Level | Meaning | Display |
 |-------|---------|---------|
