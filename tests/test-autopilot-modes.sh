@@ -87,14 +87,14 @@ for mode_value in conservative balanced aggressive; do
 done
 
 # Default in defaults table is balanced
-if grep -qE '\| \`autopilot\.mode\` \| \`balanced\`' "$SCHEMA"; then
+if grep -qF '| `autopilot.mode` | `balanced`' "$SCHEMA"; then
   pass "T2.4: defaults table lists balanced as the default mode"
 else
   fail "T2.4: defaults table does not list balanced as the default mode"
 fi
 
 # Default merge_partial is false
-if grep -qE '\| \`autopilot\.merge_partial\` \| \`false\`' "$SCHEMA"; then
+if grep -qF '| `autopilot.merge_partial` | `false`' "$SCHEMA"; then
   pass "T2.5: defaults table lists merge_partial: false as default"
 else
   fail "T2.5: defaults table does not list merge_partial: false as default"
@@ -219,6 +219,34 @@ if grep -qiE 'Default install never merges|never auto-merge' "$SKILL"; then
   pass "T6.2: SKILL.md states default never merges unresolved PRs (AC #2)"
 else
   fail "T6.2: SKILL.md does not explicitly state default never merges unresolved PRs"
+fi
+
+# ───────────────────────────────────────────────────────────
+# T7: Issue #185 — legacy auto_merge unset + pause_on_failure default
+# ───────────────────────────────────────────────────────────
+if ! grep -qF '(or unset)' "$PHASES"; then
+  pass "T7.1: phases.md no longer maps unset auto_merge to aggressive"
+else
+  fail "T7.1: phases.md still contains '(or unset)' auto_merge legacy mapping"
+fi
+
+if grep -qE 'neither.*autopilot\.mode.*nor.*autopilot\.auto_merge|effective mode = `balanced`' "$PHASES"; then
+  pass "T7.2: phases.md documents balanced when mode and auto_merge absent"
+else
+  fail "T7.2: phases.md missing balanced default when neither mode nor auto_merge set"
+fi
+
+if grep -qF '| `autopilot.pause_on_failure` | `false`' "$SCHEMA"; then
+  pass "T7.3: config-schema defaults pause_on_failure to false"
+else
+  fail "T7.3: config-schema does not default pause_on_failure to false"
+fi
+
+CONFIG_REF="$REPO_ROOT/src/skills/auto-pilot/references/configuration.md"
+if grep -qE 'pause_on_failure: false' "$CONFIG_REF" && grep -qE 'pause_on_failure: false' "$SKILL"; then
+  pass "T7.4: auto-pilot docs agree pause_on_failure default is false"
+else
+  fail "T7.4: auto-pilot SKILL/configuration pause_on_failure default mismatch"
 fi
 
 # ───────────────────────────────────────────────────────────

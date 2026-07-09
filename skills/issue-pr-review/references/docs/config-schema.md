@@ -292,15 +292,16 @@ autopilot:
   # Type: boolean
   # Default: true
   # LEGACY: kept for backwards compatibility. Ignored when autopilot.mode is set.
-  # When mode is unset, falling back to legacy interpretation:
+  # When mode is unset and auto_merge is not explicitly present in the file, effective mode is balanced.
+  # When mode is unset but auto_merge is explicitly present, legacy interpretation applies:
   #   auto_merge: true  ≈ mode: aggressive + merge_partial: true (preserves prior 2.1.x behavior)
   #   auto_merge: false ≈ mode: conservative
   auto_merge: true
 
   # Pause loop on failure instead of skipping to next issue
   # Type: boolean
-  # Default: true
-  pause_on_failure: true
+  # Default: false (skip failed issues and continue; set true to halt the loop on failure)
+  pause_on_failure: false
 
   # Labels that cause an issue to be skipped
   # Type: array of strings
@@ -668,7 +669,7 @@ Config is validated on load at the start of every skill invocation. Errors inclu
 | `autopilot.max_iterations` | `10` | Max issues to process |
 | `autopilot.review_cycles` | `3` | Max review-fix cycles per PR |
 | `autopilot.auto_merge` | `true` | LEGACY — auto-merge PRs after review. Ignored when `autopilot.mode` is set |
-| `autopilot.pause_on_failure` | `true` | Pause on failure |
+| `autopilot.pause_on_failure` | `false` | Skip failed issues and continue (`true` pauses the loop) |
 | `autopilot.skip_labels` | `["wontfix", "blocked", "do-not-merge"]` | Labels that skip issues |
 | `autopilot.critical_labels` | `["critical", "priority:critical"]` | Labels that prioritize issues |
 | `autopilot.respect_dependencies` | `true` | Honor `Depends on #N` / `Blocked by #N` markers — pause loop before merging a PR whose dependencies are unmerged |
