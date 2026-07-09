@@ -45,7 +45,9 @@ MARKER_RE = re.compile(r"<!--\s*gitissue:normalized\s+v(\d+)\s*-->")
 SECTION_RE = re.compile(r"^## +(.+?)\s*$")
 CONFIDENCE_RE = re.compile(r"\((?:high|medium) confidence\)|\(needs review\)")
 CHECKBOX_RE = re.compile(r"^\s*[-*] \[[ xX]\] \S", re.MULTILINE)
-DEP_MARKER_RE = re.compile(r"\b(?:depends on|blocked by):?\s*(#\d+(?:\s*,\s*#\d+)*)", re.IGNORECASE)
+DEP_MARKER_RE = re.compile(r"(?i)\b(?:depends on|blocked by)\b")
+CROSS_REPO_TOKEN_RE = re.compile(r"\S+/\S+#\d+")
+BARE_ISSUE_RE = re.compile(r"(?<![\w/])#(\d+)")
 PART_MARKER_RE = re.compile(r"\bpart of:?\s*(#\d+)", re.IGNORECASE)
 
 ISSUE_TYPES = ("bug", "feature", "improvement")
@@ -199,10 +201,18 @@ def lint_issue(body: str) -> list[Finding]:
             else:
                 findings.append(err("I07", f"metadata missing {label} line (§1.1)"))
 
-    # I08 — dependency markers (informational, §2)
+    # I08 — dependency markers (informational, §2; cross-repo ignored)
     deps: list[str] = []
-    for m in DEP_MARKER_RE.finditer(body):
-        deps.extend(re.findall(r"#\d+", m.group(1)))
+    seen_dep: set[str] = set()
+    for line in body.splitlines():
+        if not DEP_MARKER_RE.search(line):
+            continue
+        local_segment = CROSS_REPO_TOKEN_RE.sub("", line)
+        for m in BARE_ISSUE_RE.finditer(local_segment):
+            ref = f"#{m.group(1)}"
+            if ref not in seen_dep:
+                seen_dep.add(ref)
+                deps.append(ref)
     if deps:
         findings.append(info("I08", f"dependency markers found: {', '.join(deps)} (§2)"))
 
