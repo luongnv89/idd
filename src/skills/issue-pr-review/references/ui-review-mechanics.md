@@ -43,7 +43,7 @@ When detection returns `ui: detected`, spawn the `ui-reviewer` subagent in **cod
 Agent(
   description="ui-reviewer — UI/UX code review for PR #{N}",
   prompt=<ui-reviewer.md prompt with mode=code, {variables} replaced>,
-  subagent_type="general-purpose"
+  # do NOT set subagent_type — default general-purpose agent, not a custom "ui-reviewer" type
 )
 ```
 
