@@ -68,6 +68,10 @@ check_contains "$RESOLVER" 'git worktree add -b "\$branch_name"' \
   "F1 source uses the derived branch for git worktree add"
 check_contains "$DIST_RESOLVER" 'git worktree add -b "\$branch_name"' \
   "F1 generated resolver preserves derived worktree branch"
+check_contains "$RESOLVER" 'git branch -D "\$branch_name"' \
+  "F1 source cleanup deletes the derived worktree branch"
+check_contains "$DIST_RESOLVER" 'git branch -D "\$branch_name"' \
+  "F1 generated cleanup deletes the derived worktree branch"
 
 check_contains "$ANALYSIS" 'IDD_AUTO_MODE=1.*auto-pilot|auto-pilot.*IDD_AUTO_MODE=1' \
   "F2 source identifies automated empty-body analysis"
@@ -75,6 +79,12 @@ check_contains "$ANALYSIS" 'Continuing with title-only analysis \(limited confid
   "F2 source continues title-only without an automated prompt"
 check_contains "$DIST_ANALYSIS" 'Continuing with title-only analysis \(limited confidence\)' \
   "F2 generated analysis preserves title-only continuation"
+check_contains "$ANALYSIS_STEPS" '`"auto"` when `IDD_AUTO_MODE=1` or the analysis was delegated by `/auto-pilot`' \
+  "F2 source sends noninteractive synthesis mode under auto delegation"
+check_contains "$ANALYSIS_STEPS" 'otherwise set it to `"interactive"`' \
+  "F2 source retains interactive synthesis mode outside auto delegation"
+check_contains "$DIST_ANALYSIS_STEPS" 'synthesizer must run noninteractively' \
+  "F2 generated analysis preserves noninteractive synthesis behavior"
 
 check_contains "$SCANNER" 'gh pr view <N> --json files' \
   "F3 scanner fetches candidate merged-PR files"
@@ -86,6 +96,18 @@ check_contains "$TRIAGE" 'history_scan\.merged_prs\[\]\.changed_files' \
   "F3 triage consumes changed-file mapping in post-merge"
 check_contains "$DIST_TRIAGE" 'gh pr view <N> --json files' \
   "F3 generated triage preserves changed-file fetch"
+check_contains "$SCANNER" '`references` preserves each reference' \
+  "F3 scanner retains reference-source metadata"
+check_contains "$SCANNER" '`target_issues` identifies the PR' \
+  "F3 scanner retains PR target metadata"
+check_contains "$TRIAGE" 'Never promote a title or branch reference' \
+  "F3 triage rejects title and branch evidence"
+check_contains "$TRIAGE" 'never promote an issue that is itself a PR target' \
+  "F3 triage rejects PR-target self-promotion"
+check_contains "$TRIAGE" 'source: "body"' \
+  "F3 triage permits body evidence only with a distinct target"
+check_contains "$DIST_TRIAGE" 'Never promote a title or branch reference' \
+  "F3 generated triage preserves safe overlap promotion"
 
 for file in "$TEMPLATE" "$DIST_TEMPLATE"; do
   check_contains "$file" '^projects:' "F4 $(basename "$(dirname "$file")") template has projects section"

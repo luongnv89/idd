@@ -15,7 +15,7 @@ Some open issues may have been incidentally fixed by commits or PRs that targete
 ### Post-merge (after Steps 1b and 2 subagents return)
 
 1. Merge `history_scan.potentially_fixed`, `history_scan.merged_prs`, per-issue `affected_files`, and `dependency_edges` from all batches.
-2. For each open issue, compare its `affected_files` with each `history_scan.merged_prs[].changed_files`. If they overlap and that PR's `referenced_issues` includes the issue number, add or upgrade `potentially_fixed` confidence per table (c). If fetching one PR's files failed, warn and skip only that PR's file-overlap signal.
+2. For each open issue, compare its `affected_files` with each `history_scan.merged_prs[].changed_files`. Promote file overlap only when all conditions hold: the PR has a known `target_issues` value different from the open issue; `references` contains that open issue with `source: "body"` (or a correlated commit reference has `reference_source: "commit"`); and the files overlap. Do **not** use `referenced_issues` alone: it is compatibility/traceability metadata and loses source information. Never promote a title or branch reference, and never promote an issue that is itself a PR target. If fetching one PR's files failed, warn and skip only that PR's file-overlap signal.
 3. Convert undirected scanner edges to **directed** `blocks` / `blocked_by` using creation date (`createdAt`), blocking count, and type precedence (bug before feature/improvement) — same heuristics as the inline Step 2 procedure.
 
 **When the Agent tool is NOT available:** Execute the procedure below inline.
@@ -46,7 +46,7 @@ For each merged PR, extract:
 - Issue numbers from the PR body (`Closes #N`, `Fixes #N`, `Resolves #N`)
 - Issue numbers from the branch name (`fix/42-...`)
 
-This gives you a map: **PR → set of issue numbers it explicitly targets**. For every merged PR that references an open issue, fetch its changed files:
+Retain the source for every reference as `body`, `title`, or `branch`. Derive `target_issues` from body closing references when available; otherwise title/branch references may identify the PR target, but are never incidental-fix evidence. For every merged PR that references an open issue, fetch its changed files:
 
 ```bash
 gh pr view <N> --json files
@@ -60,19 +60,19 @@ An open issue `#X` is flagged as **potentially fixed** when:
 
 1. **Commit-level signal**: A commit references `#X` (via `Closes`, `Fixes`, `Resolves`, or bare `#N`) but that commit belongs to a PR that was created for a *different* issue. This means issue `#X` was mentioned in someone else's fix.
 
-2. **File-overlap signal**: A merged PR modified files that overlap with issue `#X`'s affected files (from the keyword scan in Step 2), AND the PR's commit messages or body mention issue `#X` by number.
+2. **File-overlap signal**: A merged PR modified files that overlap with issue `#X`'s affected files (from the keyword scan in Step 2), AND a PR-body or commit reference mentions `#X` by number, AND `#X` is distinct from the PR's known target issue. A title or branch reference is insufficient, even when it names `#X`.
 
-Both signals require an explicit mention of the issue number — pure file overlap without a reference is not enough (that's what dependency analysis in Step 2 handles).
+Both signals require an eligible explicit mention of the issue number and a distinct known PR target — pure file overlap, title/branch references, or a reference to the PR's own target issue are not enough (that is dependency/traceability data, not incidental-fix evidence).
 
 **d) Confidence levels:**
 
 | Confidence | Criteria |
 |-----------|----------|
 | `high` | Commit uses a closing keyword (`Closes #X`, `Fixes #X`, `Resolves #X`) and is in a merged PR for a different issue |
-| `medium` | Commit references `#X` (bare mention) in a merged PR for a different issue, or the PR body mentions `#X` alongside another issue |
-| `low` | Branch name contains `#X`'s number but no explicit commit/PR body reference |
+| `medium` | Commit or PR body references `#X` (bare mention) in a merged PR targeting a different issue |
+| `low` | Title or branch name contains `#X`'s number but no eligible commit/PR-body reference |
 
-Only `high` and `medium` confidence matches are flagged. `low` is too noisy — branch names like `fix/12-auth` could match issue #1 or #12 accidentally.
+Only `high` and `medium` confidence matches are flagged. `low` is too noisy — title/branch references are target/traceability metadata, not incidental-fix evidence.
 
 ### Output
 

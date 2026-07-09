@@ -128,8 +128,10 @@ check_contains "$SRC_STEPS" 'git worktree remove "\$wt_dir" --force' \
   "T5.5: setup failure cleans up partial worktree before fallback"
 check_contains "$SRC_STEPS" 'created_branch_in_step_0e' \
   "T5.6: setup failure only deletes branches created by Step 0e"
+check_contains "$SRC_STEPS" 'git branch -D "\$branch_name"' \
+  "T5.7: setup failure deletes the derived prefix-aware worktree branch"
 check_contains "$SRC_ERRORS" 'Falling back to resolving in the current working tree|falling back to resolving in the[[:space:]]+current working tree' \
-  "T5.7: worktree failures fall back in-place"
+  "T5.8: worktree failures fall back in-place"
 
 # ───────────────────────────────────────────────────────────
 # T6: Root install surface mirrors the contract.

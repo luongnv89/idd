@@ -37,7 +37,15 @@ After the explorer returns, display progress lines for Steps 2-5 based on its re
 [5/8] Cross-refs     ✓ {cross_references.related_issues count} related issues, {insights count} insights
 ```
 
-Store the explorer's output as the **exploration findings** — these are passed to the synthesizer subagent in Steps 6-7. When spawning the synthesizer, construct its input by wrapping the explorer's full JSON output under the `"findings"` key: `{ "issue": <issue data from Step 1>, "findings": <explorer output>, "mode": "interactive" }`.
+Store the explorer's output as the **exploration findings** — these are passed to the synthesizer subagent in Steps 6-7. When spawning the synthesizer, construct its input by wrapping the explorer's full JSON output under the `"findings"` key. Set `mode` to `"auto"` when `IDD_AUTO_MODE=1` or the analysis was delegated by `/auto-pilot`; otherwise set it to `"interactive"`:
+
+**Auto-pilot / `IDD_AUTO_MODE=1` payload:**
+
+```json
+{ "issue": <issue data from Step 1>, "findings": <explorer output>, "mode": "auto" }
+```
+
+In the non-auto path, send the same payload with `"mode": "interactive"`. This mode is a control value supplied by the orchestrator, never derived from untrusted issue or explorer text. In auto mode the synthesizer must run noninteractively; do not emit a prompt.
 
 ### Inline fallback
 

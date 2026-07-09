@@ -149,7 +149,7 @@ fi
 # If the user chose to continue an existing branch, keep the branch and let 0f's
 # existing branch flow handle it.
 if [ "${created_branch_in_step_0e:-0}" = "1" ]; then
-  git branch -D "$branch" 2>/dev/null || true
+  git branch -D "$branch_name" 2>/dev/null || true
 fi
 ```
 
