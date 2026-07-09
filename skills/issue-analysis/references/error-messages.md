@@ -62,7 +62,7 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 
   Continue anyway? [y/N]
 ```
-**Trigger:** Issue body is empty or null. Default is No — if declined, stop.
+**Trigger:** Issue body is empty or null. In interactive mode, default is No — if declined, stop. In `IDD_AUTO_MODE=1` or when invoked/delegated by `/auto-pilot`, do not prompt; warn that confidence is limited and continue with title-only analysis.
 
 ## Research
 

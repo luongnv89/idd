@@ -32,7 +32,7 @@ The five dimensions are reported under **two named axes** that separate *does th
 
 Rationale for the split: `acceptance_criteria` is the literal Spec contract; `correctness` is "does the implementation actually do the right thing"; `safety` (security, crash paths, edge cases) is correctness-of-behavior, so it sits on Spec, not on convention conformance. `traceability` (`Closes #N`, Decision Record, commit references) and `maintainability` (code quality, test coverage, style, a11y/interaction conventions) are conformance to documented project conventions, so they sit on Standards.
 
-**The axes are a presentation grouping only — they change nothing about analysis or gating.** The same findings, the same `action: "fix" | "note"` semantics, the same per-dimension `pass`/`partial`/`fail` status rules, and the same hard-block conditions apply unchanged. In particular the soft-pass gate is still computed per dimension (`acceptance_criteria: fail` and a missing `Closes #N` are the only hard-blocks); it is **not** recomputed as "Spec axis fail" or "Standards axis fail". Do not derive a per-axis verdict that gates the loop — the axis headers organize the report, the per-dimension statuses gate the pass.
+**The axes are a presentation grouping only — they change nothing about analysis or gating.** The same findings, the same `action: "fix" | "note"` semantics, and the same per-dimension `pass`/`partial`/`fail` status rules apply unchanged. With `review.soft_pass: true`, `acceptance_criteria: fail` and a missing `Closes #N` are the only hard-blocks; with `review.soft_pass: false`, every note or partial is also a strict blocker. It is **not** recomputed as "Spec axis fail" or "Standards axis fail". Do not derive a per-axis verdict that gates the loop — the axis headers organize the report, the per-dimension statuses gate the configured pass.
 
 When the verification gates disable a dimension (`review.require_acceptance_criteria_check: false` or `review.require_traceability_check: false`), that dimension still appears under its axis, reported as `pass — verification disabled`. A disabled dimension never changes which axis the others sit under.
 
@@ -44,7 +44,7 @@ Fetch the linked issue and parse its `## Acceptance Criteria` section into indiv
 
 | Status | When |
 |--------|------|
-| `pass` | The PR demonstrably satisfies the criterion. Evidence is required: a file path with line range, a test name, or a one-line description of how the change fulfills the criterion. |
+| `pass` | The PR demonstrably satisfies the criterion. Evidence is required: a file path with line range, a test name, or a one-line description of how the change fulfills the criterion. For **bug** issues, evidence for the fixed-symptom criterion MUST cite the Decision Record **Reproduction** line (command and red→green path), not only a checkmark. |
 | `fail` | The PR does not satisfy the criterion. Evidence is required: what's missing or what contradicts the criterion. |
 | `unverified` | The criterion cannot be verified from the diff alone (e.g., needs production validation, manual user testing, or behavior outside the change set). Explanation is required. |
 
@@ -68,7 +68,7 @@ If the issue has no acceptance criteria:
 **Pass/partial/fail rule for the dimension:**
 - All criteria `pass` → ✓ acceptance_criteria: pass
 - Any criterion `fail` → ✗ acceptance_criteria: fail (blocks soft-pass; treat as fixable)
-- No fails, but at least one `unverified` → ⚠ acceptance_criteria: partial (does not block soft-pass; surfaced in report)
+- No fails, but at least one `unverified` → ⚠ acceptance_criteria: partial (report-only when `review.soft_pass: true`; strict blocker when `false`)
 - No criteria defined → ○ acceptance_criteria: pass (with the "manual review recommended" note)
 
 Each `fail` criterion becomes a fixable issue in Step 6 with `category: acceptance_criteria`, `action: fix`, evidence as the description, and the criterion text as the suggested fix target.
@@ -85,7 +85,7 @@ Per the dual-write rule (see *Analysis Artifacts and Durable Memory* in `referen
    git log "{base_branch}..{head_branch}" --grep="#{N}" --oneline
    ```
    The reference may live in the subject or body. A reference inside a `Co-authored-by:` trailer does not count.
-3. **Durable analysis fields in PR body** — the PR body contains a `## Decision Record` section with the five stable labels (`Root cause`, `Options considered`, `Options rejected`, `Selected option`, `Residual risk`) and a `## Acceptance Criteria Verification` section (table or the explicit `No acceptance criteria defined` note). The labels are the contract — match them as exact strings, do not rewrite.
+3. **Durable analysis fields in PR body** — the PR body contains a `## Decision Record` section with the five stable labels (`Root cause`, `Options considered`, `Options rejected`, `Selected option`, `Residual risk`) and a `## Acceptance Criteria Verification` section (table or the explicit `No acceptance criteria defined` note). The labels are the contract — match them as exact strings, do not rewrite. For **bug** issues linked to the PR, the Decision Record MUST also include a **`Reproduction`** line (success or `not reproduced — …` degraded shape). Absence on a bug PR → `traceability: partial` with "Reproduction line missing on bug PR".
 4. **Squash-commit-body assumption** — under squash-merge (the project default per `references/docs/idd-methodology.md`), GitHub copies the PR body verbatim into the commit message. Treat passing check 3 as evidence the squash commit will carry the durable summary; no separate check is needed pre-merge. Note this assumption explicitly in the report so reviewers know what is and is not verified.
 
 **Pass/partial/fail rule for the dimension:**
@@ -99,7 +99,7 @@ Per the dual-write rule (see *Analysis Artifacts and Durable Memory* in `referen
 | Commit reference absent | check 2 fails but check 1 passes (PR body has Closes #N but no commit references the issue) | ⚠ traceability: partial — "no commit references #{N}" |
 | Acceptance Criteria Verification block absent on a `/issue-resolver` PR | check 3 fails on a PR that does include a Decision Record | ⚠ traceability: partial — "Acceptance Criteria Verification block missing" |
 
-The `Closes #{N}` failure is the only traceability outcome that **blocks** the soft-pass. All other partial outcomes are reported but do not block. This matches issue #36's contract: a PR missing `Closes #N` reports a traceability failure even if tests pass; a human-authored PR without a Decision Record reports `partial`, not `fail`.
+When `review.soft_pass: true`, the `Closes #{N}` failure is the only traceability outcome that **blocks** the soft-pass; other partial outcomes are reported but do not block. When `review.soft_pass: false`, those partial outcomes are strict blockers too (but remain non-fixer `note` findings). This matches issue #36's contract: a PR missing `Closes #N` reports a traceability failure even if tests pass; a human-authored PR without a Decision Record reports `partial`, not `fail`.
 
 When traceability fails on `Closes #{N}`, emit a fixable issue in Step 6 with `category: traceability`, `action: fix`, suggested fix: "Add `Closes #{N}` to the PR body."
 

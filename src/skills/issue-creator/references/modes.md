@@ -58,7 +58,7 @@ Stop.
 
 ### Step 5 — Generate Normalization Content
 
-Classify type from the existing issue content, then use the matching template:
+Classify type from the existing issue content, then resolve templates from `issue.template` (same rule as Create Step 4: `"default"` → bundled `templates/`, else the configured directory):
 
 1. Preserve the entire original issue body in `> **Reporter Context**` blockquote
 2. Fill all template sections from the issue text (type, description, acceptance criteria, metadata)
@@ -106,7 +106,13 @@ gh issue comment {N} --body "<details><summary>Original issue body (backup by gi
 </details>"
 ```
 
-Verify success via the command exit code. If it fails:
+Re-read to verify the backup landed (`docs/platform-github.md` driver rule 2) — do not trust the exit code alone:
+
+```bash
+gh issue view {N} --json comments --jq '.comments[-1].body'
+```
+
+Confirm the output contains the original body inside the `<details>` backup block. If verification fails:
 ```
 ✗ Failed to post backup comment for issue #42
 
@@ -120,6 +126,14 @@ Stop. Do not edit the issue body.
 ```bash
 gh issue edit {N} --body "{normalized_body}"
 ```
+
+Re-read the body and confirm `<!-- gitissue:normalized v1 -->` is the first line:
+
+```bash
+gh issue view {N} --json body --jq '.body' | head -1
+```
+
+If the marker is missing, stop and report — do not claim normalization succeeded.
 
 ### Step 10 — Post Normalization Comment
 

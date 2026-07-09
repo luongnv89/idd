@@ -8,9 +8,15 @@ Some open issues may have been incidentally fixed by commits or PRs that targete
 
 ### Subagent delegation
 
-**When the Agent tool is available:** Delegate this step to the issue-relationship-scanner subagent (history scan). Read `shared/agents/issue-relationship-scanner.md` for the full prompt template. Pass the list of open issues (number and title) from Step 1, along with the repo root path (absolute). The subagent returns a JSON object with a `potentially_fixed` array and `scanned_commits`/`scanned_prs` counts. Spawn this subagent **in the same turn** as the dependency scanner (Step 2) — they are independent and run in parallel.
+**When the Agent tool is available:** Spawn **one** issue-relationship-scanner subagent per batch for both Step 1b and Step 2. Read `shared/agents/issue-relationship-scanner.md` for the full prompt template. Pass the full input `{ issues: [{number, title, body}], repo_root, scan_timeout, scope: "both" }`, where `repo_root` is absolute and `scan_timeout` is the `scan_timeout_per_issue` config value. Consume its `history_scan` here: it contains `potentially_fixed`, `merged_prs` (PR number, referenced issue numbers, and changed-file paths), and `scanned_commits`/`scanned_prs` counts.
 
-**Note:** The issue-relationship-scanner's history scan only implements the commit-level signal (explicit issue references in commit messages and PR bodies). The file-overlap signal (detecting fixes via shared affected files) requires data from the dependency scan and is handled by the main agent as a post-merge step after the subagent returns. See the merge step after Steps 1b and 2 complete.
+**Note:** The full-scope scanner implements the commit-level signal, fetches changed-file paths for merged PRs that explicitly reference an open issue, and returns the dependency data used by Step 2. The file-overlap signal combines both result sections in the main agent's **post-merge step** below.
+
+### Post-merge (after Steps 1b and 2 subagents return)
+
+1. Merge `history_scan.potentially_fixed`, `history_scan.merged_prs`, per-issue `affected_files`, and `dependency_edges` from all batches.
+2. For each open issue, compare its `affected_files` with each `history_scan.merged_prs[].changed_files`. Promote file overlap only when all conditions hold: the PR has a known `target_issues` value different from the open issue; `references` contains that open issue with `source: "body"` (or a correlated commit reference has `reference_source: "commit"`); and the files overlap. Do **not** use `referenced_issues` alone: it is compatibility/traceability metadata and loses source information. Never promote a title or branch reference, and never promote an issue that is itself a PR target. If fetching one PR's files failed, warn and skip only that PR's file-overlap signal.
+3. Convert undirected scanner edges to **directed** `blocks` / `blocked_by` using creation date (`createdAt`), blocking count, and type precedence (bug before feature/improvement) — same heuristics as the inline Step 2 procedure.
 
 **When the Agent tool is NOT available:** Execute the procedure below inline.
 
@@ -40,7 +46,13 @@ For each merged PR, extract:
 - Issue numbers from the PR body (`Closes #N`, `Fixes #N`, `Resolves #N`)
 - Issue numbers from the branch name (`fix/42-...`)
 
-This gives you a map: **PR → set of issue numbers it explicitly targets**.
+Retain the source for every reference as `body`, `title`, or `branch`. Derive `target_issues` from body closing references when available; otherwise title/branch references may identify the PR target, but are never incidental-fix evidence. For every merged PR that references an open issue, fetch its changed files:
+
+```bash
+gh pr view <N> --json files
+```
+
+Store the returned `files[].path` as that PR's `changed_files`. If this fetch fails, warn and skip only that PR's file-overlap signal.
 
 **c) Identify potentially fixed issues:**
 
@@ -48,19 +60,19 @@ An open issue `#X` is flagged as **potentially fixed** when:
 
 1. **Commit-level signal**: A commit references `#X` (via `Closes`, `Fixes`, `Resolves`, or bare `#N`) but that commit belongs to a PR that was created for a *different* issue. This means issue `#X` was mentioned in someone else's fix.
 
-2. **File-overlap signal**: A merged PR modified files that overlap with issue `#X`'s affected files (from the keyword scan in Step 2), AND the PR's commit messages or body mention issue `#X` by number.
+2. **File-overlap signal**: A merged PR modified files that overlap with issue `#X`'s affected files (from the keyword scan in Step 2), AND a PR-body or commit reference mentions `#X` by number, AND `#X` is distinct from the PR's known target issue. A title or branch reference is insufficient, even when it names `#X`.
 
-Both signals require an explicit mention of the issue number — pure file overlap without a reference is not enough (that's what dependency analysis in Step 2 handles).
+Both signals require an eligible explicit mention of the issue number and a distinct known PR target — pure file overlap, title/branch references, or a reference to the PR's own target issue are not enough (that is dependency/traceability data, not incidental-fix evidence).
 
 **d) Confidence levels:**
 
 | Confidence | Criteria |
 |-----------|----------|
 | `high` | Commit uses a closing keyword (`Closes #X`, `Fixes #X`, `Resolves #X`) and is in a merged PR for a different issue |
-| `medium` | Commit references `#X` (bare mention) in a merged PR for a different issue, or the PR body mentions `#X` alongside another issue |
-| `low` | Branch name contains `#X`'s number but no explicit commit/PR body reference |
+| `medium` | Commit or PR body references `#X` (bare mention) in a merged PR targeting a different issue |
+| `low` | Title or branch name contains `#X`'s number but no eligible commit/PR-body reference |
 
-Only `high` and `medium` confidence matches are flagged. `low` is too noisy — branch names like `fix/12-auth` could match issue #1 or #12 accidentally.
+Only `high` and `medium` confidence matches are flagged. `low` is too noisy — title/branch references are target/traceability metadata, not incidental-fix evidence.
 
 ### Output
 
@@ -89,9 +101,9 @@ If any are found:
 
 ### Subagent delegation
 
-**When the Agent tool is available:** Delegate this step to the issue-relationship-scanner subagent (dependency scan). Read `shared/agents/issue-relationship-scanner.md` for the full prompt template. Pass the list of issues (number, title, body) from Step 1 along with the repo root path and the `scan_timeout_per_issue` config value (passed as `scan_timeout` in the subagent input). Spawn this subagent **in the same turn** as the history scanner (Step 1b) — they are independent and run in parallel.
+**When the Agent tool is available:** Do **not** spawn another scanner for Step 2. Consume `dependency_scan` from the same full-scope (`scope: "both"`) result spawned for Step 1b. It contains the per-issue `affected_files` and `dependency_edges`; the input and output contract is defined in `shared/agents/issue-relationship-scanner.md`.
 
-**For 10+ issues:** Split the issues into batches of ~5 and spawn one issue-relationship-scanner subagent (dependency scan) per batch (all in the same turn). After all subagents return, merge their results:
+**For 10+ issues:** Split the issues into batches of ~5 and spawn one full-scope issue-relationship-scanner subagent per batch (all in the same turn). After all subagents return, merge their results:
 1. Concatenate the `issues` maps from each batch into a single map
 2. Concatenate the `dependency_edges` arrays from each batch
 3. Run a cross-batch pass: for any two issues from different batches, check if their `affected_files` overlap. If they do, add a dependency edge. Determine directionality using the same heuristics as the inline procedure: earlier creation date takes precedence, more blocking relationships take precedence, and bug type takes precedence over feature/improvement. If neither issue clearly precedes the other, mark them as co-dependent at the same level. This is a lightweight comparison the main agent does on the merged data.

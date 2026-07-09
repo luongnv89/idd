@@ -60,7 +60,9 @@ After rendering, stop. View mode never writes to the file or makes API calls.
 
 ## Prerequisites
 
-Before any operation, verify the environment. On failure, output the exact error from `references/error-messages.md` and stop.
+**View mode** (`/issue-analysis <N> view`) needs only a local `.gitissue/analysis-<N>.json` — skip the `gh` checks below.
+
+For the full analysis pipeline, verify the environment before any operation. On failure, output the exact error from `references/error-messages.md` and stop.
 
 1. Confirm git repository: `git rev-parse --git-dir`
 2. Confirm `gh` is installed: `which gh`
@@ -78,7 +80,9 @@ Before analyzing, recommend syncing with the remote so codebase analysis uses cu
   Sync now? [Y/n]
 ```
 
-If the user agrees, run the stash-first sync (see `references/docs/sync-conventions.md`):
+In **auto/subagent** mode (`IDD_AUTO_MODE=1` or invoked by `/auto-pilot`), skip this prompt and run the stash-first sync immediately.
+
+If the user agrees (interactive), run the stash-first sync (see `references/docs/sync-conventions.md`):
 
 ```bash
 branch="$(git rev-parse --abbrev-ref HEAD)"
@@ -263,7 +267,7 @@ Step 8 renders the analysis as a structured terminal report following DESIGN.md 
 
 Summary:
 - Terminal report has 8 sections: header, classification, root cause, affected files, options, complexity, risk, recommendation.
-- JSON has keys: `issue`, `keywords`, `files`, `history`, `analysis`, `options`, `complexity`, `risk`, `git_state`, `decision_record`, `generated_at`.
+- JSON top-level keys: `version`, `timestamp`, `source`, `issue`, `extraction`, `affected_files`, `analysis`, `options`, `recommended_option`, `overall_complexity`, `overall_risk`, `history`, `cross_references`, `scan_stats`, `git_state`, `decision_record` — see `references/output-and-persist.md`.
 
 ### Durable analysis fields
 
@@ -351,7 +355,14 @@ View mode (`/issue-analysis N view`) reads the JSON and renders the same report 
 
 ### Issue body is empty
 
-If the issue has no body text:
+If the issue has no body text and `IDD_AUTO_MODE=1` or the analysis was
+invoked/delegated by `/auto-pilot`, do not prompt. Warn and proceed with
+title-only keywords:
+```
+⚠ Issue #N has no description. Continuing with title-only analysis (limited confidence).
+```
+
+Otherwise, in interactive mode:
 ```
 ⚠ Issue #N has no description. Analysis may be limited.
 

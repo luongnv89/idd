@@ -2,7 +2,7 @@
 name: idd-doctor
 description: "Scan an IDD repo for doc drift, missing autopilot mode, and unsafe merge defaults. Use when running idd-doctor or checking the IDD setup. Read-only. Don't use for fixing issues, normalizing issues (use /issue-creator), or non-IDD health checks."
 license: MIT
-compatibility: Requires git and GitHub CLI (gh). Authentication is recommended for the merge-strategy check; the skill degrades gracefully when gh is unavailable.
+compatibility: Requires git. GitHub CLI (gh) is optional — used only for the merge-strategy check; skipped when gh is absent.
 effort: low
 metadata:
   version: 0.2.0
@@ -123,7 +123,7 @@ The skill itself runs inside an agent — there is no real exit code, but the fi
 
 ## Check 1 — Stale skill claims
 
-Scan the `/issue-creator` skill's `README.md` and `SKILL.md` for stale claims about its own scope. The forbidden patterns describe the **old** behavior where the creator allegedly inspected the codebase. The intent-only contract (set in §1a) forbids these claims.
+Scan the `/issue-creator` skill's `README.md` and `SKILL.md` for stale claims about its own scope. The forbidden patterns describe the **old** behavior where the creator allegedly inspected the codebase. The intent-only contract (SPEC.md §1.2 intent–code boundary) forbids these claims.
 
 ### What to scan
 
@@ -200,6 +200,7 @@ src/skills/issue-creator/templates/*.md
 | `root cause` | root-cause analysis is the resolver's job |
 | `implementation hints` | implementation hints belong in the resolver |
 | `implementation notes` | same |
+| `architecture constraints` | architecture constraints belong in analysis/resolver output, not issue templates |
 
 The match is **substring**, case-insensitive. A literal phrase like `Affected Files:` in a template file body counts. Do **not** apply the negation guard from Check 1 here — issue templates are field labels, not prose, so a field named "Affected Files" is unambiguous drift regardless of surrounding text.
 
@@ -233,7 +234,7 @@ Verify that `.gitissue.yml`, when present, sets `autopilot.mode`. The `mode` key
 3. Look for a line matching the regex `^[[:space:]]*mode:[[:space:]]*[^#[:space:]]+` inside an `autopilot:` block. Equivalent shell heuristic:
 
    ```bash
-   awk '/^autopilot:/,/^[a-z]/' .gitissue.yml | grep -E '^[[:space:]]+mode:[[:space:]]*(conservative|balanced|aggressive)\b'
+   awk '/^autopilot:/{f=1;next} /^[^[:space:]#]/{f=0} f' .gitissue.yml | grep -E '^[[:space:]]+mode:[[:space:]]*(conservative|balanced|aggressive)\b'
    ```
 
 4. If a match is found, capture the mode value for the report.

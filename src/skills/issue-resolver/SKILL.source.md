@@ -71,7 +71,6 @@ Defaults (full field reference in `docs/config-schema.md`):
 - `resolve.branch_prefix: "auto"`
 - `resolve.auto_test: true`
 - `resolve.test_timeout: 300`
-- `resolve.pr_auto_link: true`
 - `resolve.max_commits: 10`
 - `resolve.qa_max_cycles: 5`
 - `resolve.ui_review.browser_review: "ask"` — gates only the optional browser/screenshot review; the code-level UI review (*Step 4 — UI/UX review*) is auto-detected and always runs.
@@ -237,8 +236,14 @@ If `issue.auto_normalize` is true and not already normalized (no `<!-- gitissue:
 
 ### 0e — Workspace (interactive only)
 
-Decide *where* the resolution work happens. The branch name is the same in both
-cases: `{type}/{N}-{short-description}` (see `docs/naming-conventions.md`).
+Before Step 0e or 0f selects a workspace, derive one `{branch_name}` from
+`resolve.branch_prefix`: when it is `"auto"`, use
+`{type}/{N}-{short-description}`; otherwise use the configured prefix verbatim
+as `{configured-prefix}{N}-{short-description}` (for example, `issue-` or
+`team/`). Both paths use this same branch name (see
+`docs/naming-conventions.md`).
+
+Then decide *where* the resolution work happens.
 
 **Auto mode (`--auto` / `IDD_AUTO_MODE=1`): skip this offer entirely.** Go
 straight to *0f — Create branch* (in-place). The worktree prompt never appears
@@ -256,8 +261,8 @@ plainly what will be set up and the workspace/branch naming the user can expect:
   This resolution can run in an isolated git worktree instead of your
   current working tree.
 
-    Branch:    {type}/{N}-{short-description}
-    Worktree:  ../{repo}-worktrees/{type}-{N}-{short-description}
+    Branch:    {branch_name}
+    Worktree:  ../{repo}-worktrees/{branch_name with / → -}
     Setup:     copies your gitignored local config (.env*, and similar),
                then runs this project's detected install/bootstrap so the
                workspace is ready to run without manual reconfiguration.
@@ -279,7 +284,10 @@ The **in-place path** — auto mode, or interactive after declining the worktree
 offer. (Accepted-worktree path already created the branch via `git worktree add -b`
 in 0e; skip this sub-step.)
 
-Create working branch: `{type}/{N}-{short-description}` (see `docs/naming-conventions.md`).
+Use the `{branch_name}` already derived before Step 0e/0f from
+`resolve.branch_prefix` (see `docs/config-schema.md` and
+`docs/naming-conventions.md`): `"auto"` uses `{type}/{N}-{short-description}`;
+a custom prefix is used verbatim as `{configured-prefix}{N}-{short-description}`.
 
 **If branch already exists:**
 - Interactive mode: ask `continue` or `fresh`
@@ -385,7 +393,7 @@ Push, create PR, and report.
 
 ### Verify all tests pass
 
-Run the full test suite one final time to confirm everything is clean after QA fixes.
+When `resolve.auto_test` is true (default), run the full test suite one final time to confirm everything is clean after QA fixes. When false, skip this suite (QA Step 4 may still have run tests during the loop).
 
 If tests fail at this point:
 ```
@@ -436,7 +444,9 @@ already fixed (`already_resolved`), or a failed step (`failed`) — append exact
 telemetry to the caller instead. Build the object from values already known
 (`ts`, `issue`, `mode`, `skill`, `outcome`, `pr`, plus optional `complexity`,
 `qa_cycles`, `duration_s`, `skipped_reason`) per the schema in
-`docs/config-schema.md` (*`.gitissue/runs.jsonl` — run log*).
+`docs/config-schema.md` (*`.gitissue/runs.jsonl` — run log*). Collapse researcher
+complexity to the 3-value run-log scale before writing (`trivial`/`low`→`low`,
+`medium`→`medium`, `high`/`complex`→`high`).
 
 > **Suppression rule (single writer under `/auto-pilot`).** `--no-run-log` is
 > passed only by `/auto-pilot`, which runs this resolver as a subagent and writes

@@ -25,7 +25,7 @@ Closes #{issue_number}
 - **Selected option:** Option {N} — {name}
 - **Residual risk:** {what remains uncertain or accepted as known limitation, or "none identified"}
 - **Design-confirm:** {high-complexity issues only — "confirmed Option {N} at design-confirm checkpoint (complexity: {level})" in interactive mode, or "auto-selected Option {N} (complexity: {level})" in auto mode; omit this line for trivial/low/medium complexity}
-- **Reproduction:** {bug issues only — `<command>` confirmed red for the stated reason → regression test `<path>` (or "manual — no seam"); omit this line for non-bug issues}
+- **Reproduction:** {bug issues only — success: `<command>` confirmed red for the stated reason → regression test `<path>` (or "manual — no seam"); degraded: `not reproduced — <one-line reason> (fix applied without confirmed red; criterion marked unverified)`; omit for non-bug issues}
 
 Analyzed at: `{branch} @ {commit_sha_short}` ({YYYY-MM-DD})
 
@@ -59,7 +59,7 @@ The PR title follows `{type}({scope}): {description} (#{issue_number})` — see 
 
 ### Lifting the Decision Record
 
-If a fresh `.gitissue/analysis-<N>.json` exists for this issue, lift its `decision_record` and `git_state` blocks directly into the *Decision Record* section above. Field labels are stable across `/issue-analysis`, `/issue-resolver`, and `/issue-pr-review` because downstream presence checks are string-matched — do not rename them.
+Treat analysis JSON as **fresh** only when `git_state.commit_sha` equals the synced base SHA for this run. When fresh, you may lift `root_cause`, `options_considered`, and `git_state` from the cache; **`selected_option` and `options_rejected` MUST always reflect this run's Step 2 synthesizer outcome** (never a stale cache pick). Field labels are stable across skills — do not rename them.
 
 If no analysis JSON exists (e.g., resolver was invoked without prior analysis), synthesize the same five core fields from the resolver's own Step 1 (Research) and Step 2 (Plan) findings, and use the synced base SHA as `commit_sha_short`. (For bug issues the sixth `Reproduction` line is added separately from the implementer's returned reproduction block — see the bug-verification checkpoint, not the analysis JSON.) Either source produces the same template — what matters is that the durable analysis signal lands in the PR body, where squash-merge will carry it into git history.
 

@@ -41,11 +41,14 @@ resolve:
   # Range: 30-3600
   test_timeout: {timeout_value}
 
-  # Include "Closes #N" in PR body for auto-close on merge
-  pr_auto_link: true
-
   # Warn if resolve produces more than N commits
   max_commits: 10
+
+  # Max QA review-fix cycles during resolve Step 4
+  qa_max_cycles: 5
+
+  ui_review:
+    browser_review: ask
 
 # Triage settings
 triage:
@@ -63,32 +66,23 @@ triage:
 
 # PR review settings (used by /issue-pr-review and /auto-pilot)
 review:
-  # Run per-criterion acceptance-criteria verification against the linked issue.
-  # Default: true — any `fail` criterion blocks soft-pass even on green tests.
-  # Set to false to skip the check (acceptance_criteria reported as `pass`).
+  max_cycles: 3
+  auto_merge: false
+  confidence_threshold: 80
+  run_tests: true
+  check_ci: true
+  ci_poll_interval: 30
+  ci_timeout: 600
+  test_timeout: 300
+  soft_pass: true
   require_acceptance_criteria_check: true
-
-  # Run the four traceability checks (Closes #N, commit ref, Decision Record,
-  # Acceptance Criteria Verification block) against the PR body and commits.
-  # Default: true — missing `Closes #N` blocks soft-pass even on green tests.
-  # Set to false to skip the check (traceability reported as `pass`).
   require_traceability_check: true
-
-  # PR labels that exempt a PR from the `Closes #N` hard-fail (check 1 only;
-  # the other three traceability checks still run).
-  # Default: ["refactor", "chore"] — refactor/chore PRs are exempt by default.
-  # Set to [] to disable label-based exemption.
   traceability_exempt_labels:
     - refactor
     - chore
-
-  # Regex matched against the PR body (multiline-anchored, case-insensitive).
-  # When the body contains a matching line, the PR is exempt from the
-  # `Closes #N` hard-fail (check 1 only).
-  # Default: "^\\s*Type:\\s*(refactor|chore)\\s*$" — recognizes a `Type: refactor`
-  # or `Type: chore` line anywhere in the PR body.
-  # Set to "" to disable pattern-based exemption.
   traceability_exempt_pattern: "^\\s*Type:\\s*(refactor|chore)\\s*$"
+  ui_review:
+    browser_review: ask
 
 # Auto-pilot settings (used by /auto-pilot)
 autopilot:
@@ -109,6 +103,18 @@ autopilot:
   # field is ignored. Combined opt-in (mode=aggressive AND merge_partial=true)
   # is required to reach the prior 2.1.x "merge anyway with follow-up" path.
   merge_partial: false
+  max_iterations: 10
+  review_cycles: 3
+  auto_merge: true
+  pause_on_failure: false
+  skip_labels:
+    - wontfix
+    - blocked
+    - do-not-merge
+  critical_labels:
+    - critical
+    - priority:critical
+  respect_dependencies: true
 
 # Issue analysis settings
 analysis:
@@ -120,6 +126,28 @@ analysis:
 
   # Max seconds for the full codebase scan phase (30-600)
   scan_timeout: 120
+
+# GitHub Projects board sync settings
+# See references/docs/github-projects-sync.md for the full integration reference
+projects:
+  # Enable automatic project board status sync
+  # When false, all project sync operations are silently skipped
+  sync_enabled: false
+
+  # Explicit project number (null auto-detects the first linked project)
+  project_number: null
+
+  # Name of the Status field on the project board
+  status_field: "Status"
+
+  # Map of internal status keys to project board option values
+  status_map:
+    # Status for newly created issues
+    todo: "Todo"
+    # Status when work starts (branch created)
+    in_progress: "In Progress"
+    # Status when PR is created
+    done: "Done"
 
 # Model suggestion settings (used by /issue-creator)
 model_suggestion:

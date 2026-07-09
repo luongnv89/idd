@@ -42,9 +42,15 @@ Full procedure for the worktree offer described in SKILL.md *Step 0e — Workspa
 
 ### The offer
 
+Before Step 0e or 0f selects a workspace, derive `branch_name` from
+`resolve.branch_prefix` exactly once: when it is `"auto"`, use
+`{type}/{N}-{short-description}`; otherwise use the configured prefix verbatim
+as `{configured-prefix}{N}-{short-description}`. Do not re-derive or replace
+this value on either path.
+
 Present the prompt from SKILL.md (*Step 0e — Workspace*). It must state, before the user answers:
 
-- the **branch** name (`{type}/{N}-{short-description}`),
+- the derived **branch** name (`{branch_name}`),
 - the **worktree path** (the naming convention below), and
 - what **setup** will be copied/run (gitignored local config + the project's detected install/bootstrap).
 
@@ -52,11 +58,11 @@ Default is **accept** (`[Y/n]`). This satisfies acceptance criterion 5 (the prop
 
 ### Naming convention
 
-- **Branch:** `{type}/{N}-{short-description}` — identical to the in-place path (`docs/naming-conventions.md`). Unchanged so traceability and the `feat/`, `fix/`, … prefixes stay consistent.
+- **Branch:** `{branch_name}` — the same prefix-derived name used by the in-place path (`docs/naming-conventions.md`).
 - **Worktree directory:** a *sibling* of the repo root, derived from the branch with `/` → `-` so it is a single path segment:
 
   ```
-  ../{repo}-worktrees/{type}-{N}-{short-description}
+  ../{repo}-worktrees/{branch_name with / → -}
   ```
 
   Example: repo `idd`, branch `feat/123-resolver-worktree-prompt` → `../idd-worktrees/feat-123-resolver-worktree-prompt`.
@@ -71,20 +77,22 @@ Default is **accept** (`[Y/n]`). This satisfies acceptance criterion 5 (the prop
 repo_root="$(git rev-parse --show-toplevel)"        # absolute path to the repo
 base="$(git rev-parse --abbrev-ref HEAD)"           # base branch to fork from
 repo="$(basename "$repo_root")"
-branch="{type}/{N}-{short-description}"
+# branch_name was derived once before this step: "auto" →
+# {type}/{N}-{short-description}; custom resolve.branch_prefix →
+# {configured-prefix}{N}-{short-description}.
 # Absolute worktree path (sibling of the repo) — independent of the current
 # directory, so later steps that `cd` into it stay correct.
-wt_dir="$(dirname "$repo_root")/${repo}-worktrees/$(printf '%s' "$branch" | tr '/' '-')"
+wt_dir="$(dirname "$repo_root")/${repo}-worktrees/$(printf '%s' "$branch_name" | tr '/' '-')"
 
 git fetch origin
 created_branch_in_step_0e=1
-git worktree add -b "$branch" "$wt_dir" "origin/${base}"
+git worktree add -b "$branch_name" "$wt_dir" "origin/${base}"
 ```
 
 Keep `repo_root` and `wt_dir` available for the setup step below (both are
 absolute, so the copy works regardless of the current directory).
 
-**If the branch already exists** (`git worktree add -b` fails): in interactive mode ask `continue` (set `created_branch_in_step_0e=0`, then add a worktree for the existing branch with `git worktree add "$wt_dir" "$branch"`) or `fresh` (delete the branch, keep `created_branch_in_step_0e=1`, then retry). See `references/error-messages.md` → *Branch already exists (worktree path — Step 0e)*.
+**If the branch already exists** (`git worktree add -b` fails): in interactive mode ask `continue` (set `created_branch_in_step_0e=0`, then add a worktree for the existing branch with `git worktree add "$wt_dir" "$branch_name"`) or `fresh` (delete the branch, keep `created_branch_in_step_0e=1`, then retry). See `references/error-messages.md` → *Branch already exists (worktree path — Step 0e)*.
 
 **If worktree creation fails for any other reason** (e.g. path exists, disk, locked worktree): warn, print the message from `references/error-messages.md` → *Worktree creation failed*, and **fall back to the in-place path** (Repo Sync + *0f — Create branch*). Never abort the resolution just because the worktree could not be made.
 
@@ -141,7 +149,7 @@ fi
 # If the user chose to continue an existing branch, keep the branch and let 0f's
 # existing branch flow handle it.
 if [ "${created_branch_in_step_0e:-0}" = "1" ]; then
-  git branch -D "$branch" 2>/dev/null || true
+  git branch -D "$branch_name" 2>/dev/null || true
 fi
 ```
 

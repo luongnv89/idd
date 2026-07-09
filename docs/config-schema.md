@@ -106,10 +106,8 @@ resolve:
   # Maximum: 3600
   test_timeout: 300
 
-  # Include "Closes #N" in PR body for auto-close on merge
-  # Type: boolean
-  # Default: true
-  pr_auto_link: true
+  # (Removed) pr_auto_link — deprecated. SPEC §5.1 requires the PR body to open with
+  # `Closes #N`; issue-resolver always includes that line unconditionally.
 
   # Warn if resolve produces more than N commits
   # Type: integer
@@ -190,9 +188,11 @@ review:
   # Maximum: 3600
   test_timeout: 300
 
-  # Treat soft-pass (no critical issues but minor warnings) as pass
+  # Allow note findings and partial dimensions after all fixables are resolved.
   # Type: boolean
   # Default: true
+  # When false, require every enabled review dimension to pass with no notes;
+  # partial/note findings remain blockers for a clean result and auto-merge.
   soft_pass: true
 
   # Run per-criterion acceptance-criteria verification against the linked issue.
@@ -538,7 +538,7 @@ Each line carries at minimum a **timestamp, issue number, mode, outcome**, and t
 | `skill` | string | yes | `issue-resolver` or `auto-pilot` — which skill wrote the line |
 | `outcome` | string | yes | Terminal outcome. Resolver: `success`, `already_resolved`, `failed`. Auto-pilot: one of its six categorical outcomes (`merged`, `left_open`, `partial_followup`, `blocked_by_dependency`, `failed`, `skipped`). |
 | `pr` | integer or null | yes | PR number when a PR was created, else `null` |
-| `complexity` | string | no | Research complexity estimate (`low` / `medium` / `high`) when known |
+| `complexity` | string | no | Research complexity on the **3-value** run-log scale (`low` / `medium` / `high`) when known. Collapse the researcher's 5-value estimate before writing: `trivial` or `low` → `low`; `medium` → `medium`; `high` or `complex` → `high`. Never emit `trivial` or `complex` in runs.jsonl. |
 | `qa_cycles` | integer | no | Number of QA review-fix cycles run (resolver) |
 | `duration_s` | integer | no | Wall-clock duration of the run in seconds, when measurable |
 | `skipped_reason` | string | no | Why the issue was skipped (auto-pilot skips, and any `skipped`/`already_resolved` outcome), e.g. `already_resolved`, `blocked_label`, `blocked_by_dependency`, `in_skip_list`, `assigned_to_other` |
@@ -646,7 +646,7 @@ Config is validated on load at the start of every skill invocation. Errors inclu
 | `resolve.branch_prefix` | `auto` | Type-based branch prefix (fix/, feat/, etc.) |
 | `resolve.auto_test` | `true` | Run tests before PR |
 | `resolve.test_timeout` | `300` | 5 minute test timeout |
-| `resolve.pr_auto_link` | `true` | Auto-close issue on merge |
+| *(removed)* `resolve.pr_auto_link` | — | Deprecated; `Closes #N` is unconditional per SPEC §5.1 |
 | `resolve.max_commits` | `10` | Max commits warning |
 | `resolve.ui_review.browser_review` | `"ask"` | Browser (screenshot) UI review mode; code UI review is auto-detected and always runs |
 | `review.max_cycles` | `3` | Max review-fix cycles |
@@ -657,7 +657,7 @@ Config is validated on load at the start of every skill invocation. Errors inclu
 | `review.ci_poll_interval` | `30` | Seconds between CI polls |
 | `review.ci_timeout` | `600` | CI polling timeout |
 | `review.test_timeout` | `300` | Review test timeout |
-| `review.soft_pass` | `true` | Treat soft-pass as pass |
+| `review.soft_pass` | `true` | Allow note findings and partial dimensions after fixables resolve; `false` requires no notes and all enabled dimensions pass |
 | `review.require_acceptance_criteria_check` | `true` | Run per-criterion acceptance-criteria verification; `fail` blocks soft-pass |
 | `review.require_traceability_check` | `true` | Run the four traceability checks; missing `Closes #N` blocks soft-pass |
 | `review.traceability_exempt_labels` | `["refactor", "chore"]` | PR labels that exempt a PR from the `Closes #N` hard-fail (check 1 only; other three checks still run) |

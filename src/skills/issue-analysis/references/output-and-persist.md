@@ -20,6 +20,20 @@ Display the full analysis following DESIGN.md conventions.
   Created:     {createdAt, YYYY-MM-DD}
 ```
 
+When any explorer status flag is true, render it directly below the header so an
+already-resolved, in-progress, or possibly-fixed result cannot look like an
+ordinary analysis:
+
+```
+  ⚡ Research status: already resolved — {resolution_details}
+  ⚠ Research status: PR in progress — {resolution_details}
+  ⚠ Research status: possibly already fixed — verify before acting
+```
+
+Render each applicable line. If `scan_stats.scan_timed_out` is true, also render
+the timeout warning from `subagent-steps.md` and label the summary result
+`PARTIAL`.
+
 ### Keywords & targets
 
 ```
@@ -239,6 +253,12 @@ This is a warning, not a fatal error — the terminal output from Step 6 was alr
     "createdAt": "2026-03-15T10:00:00Z",
     "updatedAt": "2026-03-20T08:00:00Z"
   },
+  "research_status": {
+    "already_resolved": false,
+    "pr_in_progress": false,
+    "possibly_already_fixed": false,
+    "resolution_details": null
+  },
   "extraction": {
     "error_messages": ["ERR_TOO_MANY_REDIRECTS"],
     "functions": ["handleRedirect", "validateSession"],
@@ -336,7 +356,8 @@ This is a warning, not a fatal error — the terminal output from Step 6 was alr
     "deps_traced": 12,
     "keywords_extracted": 8,
     "file_refs_extracted": 2,
-    "scan_duration_seconds": 45
+    "scan_duration_seconds": 45,
+    "scan_timed_out": false
   },
   "git_state": {
     "branch": "main",
@@ -390,6 +411,11 @@ The `reproduction` object is **optional** and present only for `type: bug` issue
 | `issue.state` | string | `"open"` or `"closed"` |
 | `issue.createdAt` | ISO 8601 string | Issue creation date |
 | `issue.updatedAt` | ISO 8601 string | Last update date |
+| `research_status` | object | Explorer status copied unchanged; always persisted so status findings remain visible |
+| `research_status.already_resolved` | boolean | Research found resolution evidence on the default branch |
+| `research_status.pr_in_progress` | boolean | Research found an open PR targeting this issue |
+| `research_status.possibly_already_fixed` | boolean | Code evidence suggests the reported condition may no longer exist |
+| `research_status.resolution_details` | string or null | Evidence/PR details supplied by the researcher |
 | `extraction.error_messages` | string[] | Error strings found in issue body |
 | `extraction.functions` | string[] | Function/method names extracted |
 | `extraction.classes` | string[] | Class/component names extracted |
@@ -418,6 +444,7 @@ The `reproduction` object is **optional** and present only for `type: bug` issue
 | `recommended_option` | integer | Option number recommended |
 | `overall_complexity` | string | Overall complexity estimate |
 | `overall_risk` | string | Overall risk level |
+| `scan_stats.scan_timed_out` | boolean | `true` when the bounded scan returned partial findings; final result is `PARTIAL` |
 | `history.related_commits[]` | array | Commits related to this issue |
 | `history.related_commits[].sha` | string | Short SHA (7 chars) |
 | `history.related_commits[].message` | string | Commit message (first line) |

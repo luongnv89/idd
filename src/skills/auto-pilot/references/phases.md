@@ -37,7 +37,7 @@ Stop — the loop is complete.
 
 ### Step 1.2 — Pick Next Issue
 
-From the triage execution order, select the first issue that is:
+From `summary.suggested_order` in `.gitissue/triage.json` (the triage execution order), select the first issue that is:
 - **Not blocked** — no unresolved dependencies in the triage graph
 - **Not skipped** — not in the `--skip` list or `skip_labels` set
 - **Not assigned** — not assigned to another user (unless there are no unassigned issues)
@@ -45,7 +45,7 @@ From the triage execution order, select the first issue that is:
 
 ```
 ● Picking next issue from triage order...
-  Candidates: {N} issues in execution order
+  Candidates: {N} issues in summary.suggested_order
   Selected:   #{issue_number} — {issue_title}
 ```
 
@@ -263,30 +263,25 @@ gh issue create \
 <!-- gitissue:normalized v1 -->
 
 ## Type
-Enhancement
-
-## Context
-Auto-pilot resolved #{issue_number} ({issue_title}) but the review-fix loop could not resolve all issues within {review_cycles} cycles.
+Improvement
 
 ## Description
+Auto-pilot resolved #{issue_number} ({issue_title}) but the review-fix loop could not resolve all issues within {review_cycles} cycles.
+
 The following review issues were not resolved:
 
 {remaining_issues_bulleted}
+
+Original issue #{issue_number}; partial fix PR #{pr_number} ({branch_name}); {review_cycles} review cycles; mode {mode} (merge_partial={merge_partial}).
 
 ## Acceptance Criteria
 - [ ] All listed review issues are addressed
 - [ ] Tests pass
 
-## Technical Notes
-- Original issue: #{issue_number}
-- PR with partial fix: #{pr_number}
-- Branch: {branch_name}
-- Review cycles attempted: {review_cycles}
-- Auto-pilot mode at run time: {mode} (merge_partial={merge_partial})
-
 ## Metadata
-- **Priority:** medium
-- **Effort:** small
+**Priority:** P2 (high confidence)
+**Effort:** S (medium confidence)
+**Labels:** auto-pilot-followup
 EOF
 )"
 ```

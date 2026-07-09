@@ -38,6 +38,10 @@ The axes are a presentation grouping only. The status symbol on each dimension l
   {pr_url}
 ```
 
+The `maintainability: partial` and `Issues noted` lines above are valid only when
+`review.soft_pass: true`. With `review.soft_pass: false`, use the remaining-issues
+summary below instead whenever a note or partial remains.
+
 ## Summary — PR With Remaining Issues
 
 ```
@@ -70,6 +74,23 @@ The axes are a presentation grouping only. The status symbol on each dimension l
 ```
 
 Each remaining finding keeps its `[dimension]` tag; the axis sub-headers only group them — a finding's blocking behavior comes from its dimension status, not its axis. The `traceability: fail` line is the one Standards-axis case where tests can be green and the PR is still blocked from soft-pass. Issue #36's contract: missing `Closes #N` always reports a traceability failure even if tests pass.
+
+### Summary — Strict-pass blockers
+
+When `review.soft_pass: false`, any remaining `action: "note"` finding or
+`partial` dimension is a strict blocker even though it is not a fixer input:
+
+```
+  Result:            WARN (strict pass not reached)
+
+  Remaining strict blockers:
+    ● [maintainability] {description} — note (manual remediation required)
+    ● [acceptance_criteria] {description} — partial (manual verification required)
+```
+
+Do not call this result clean or auto-merge it. Step 6 still delegates only
+`action: "fix"` findings, so these blockers are reported rather than retried in a
+non-productive fix loop.
 
 ## Summary — Human-Authored PR (Decision Record absent)
 
@@ -143,7 +164,7 @@ On merge failure:
   Result:            BLOCKED (manual merge required)
 ```
 
-Auto-merge is gated on the same soft-pass condition as the loop exit, including `traceability != fail` and zero `acceptance_criteria: fail`. A PR that passes tests and CI but fails traceability or acceptance criteria is **not** auto-merged.
+Auto-merge is gated on the same configured pass condition as the loop exit, including `traceability != fail` and zero `acceptance_criteria: fail`. With `review.soft_pass: false`, it additionally requires zero notes and no partial dimensions. A PR that passes tests and CI but fails traceability or acceptance criteria — or has a strict-pass blocker — is **not** auto-merged.
 
 When `--no-merge` is set (even in auto mode): skip the merge step entirely and report status only. The PR stays open for the owning agent (e.g. auto-pilot Phase 5) to merge through its own mode gate and dependency gate.
 

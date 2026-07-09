@@ -18,16 +18,18 @@ suggestion by the `issue-creator` skill (its `model-suggestion` reference and th
 `complexity_mapping` table in its bundled `model-data` snapshot). Do **not**
 invent a parallel scale.
 
-| Tier | Label | Thinking / effort | Anthropic model (advisory) |
-|------|-------|-------------------|----------------------------|
-| XS | trivial | low | Opus 4.7 Low |
-| S | simple | low–medium | Opus 4.8 Low |
-| M | moderate | medium | Opus 4.8 Medium |
-| L | complex | high (extra-high) | Opus 4.7 Extra High |
-| XL | super complex | max | Fable 5 Max |
+| Tier | Effort band (issue Metadata) | Thinking / effort | Anthropic model (advisory) |
+|------|-------------------------------|-------------------|----------------------------|
+| XS | XS | low | Opus 4.7 Low |
+| S | S | low–medium | Opus 4.8 Low |
+| M | M | medium | Opus 4.8 Medium |
+| L | L | high (extra-high) | Opus 4.7 Extra High |
+| XL | XL | max | Fable 5 Max |
 
-The analysis pipeline labels complexity `trivial / low / medium / high / complex`;
-map those onto `XS / S / M / L / XL` rather than carrying two scales side by side.
+The research pipeline's 5-value complexity (`trivial / low / medium / high / complex`)
+maps to effort bands `XS / S / M / L / XL` (see `complexity_mapping` in issue-creator
+model-data). For **runs.jsonl** only, collapse to `low / medium / high` per
+`docs/config-schema.md` — do not reuse the word `complex` as a run-log value.
 
 ## Where complexity comes from
 
