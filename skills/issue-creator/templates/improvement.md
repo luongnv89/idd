@@ -2,7 +2,7 @@
 
 ## Type
 
-Improvement
+{type} {type_confidence}
 
 ## Description
 
@@ -26,13 +26,13 @@ Improvement
 
 ## Acceptance Criteria
 
-- [ ] {criterion_1}
-- [ ] {criterion_2}
-- [ ] {criterion_3}
+- [ ] {criterion_1} {criterion_1_confidence}
+- [ ] {criterion_2} {criterion_2_confidence}
+- [ ] {criterion_3} {criterion_3_confidence}
 
 ## Metadata
 
-**Priority:** {priority}
-**Effort:** {effort}
+**Priority:** {priority} {priority_confidence}
+**Effort:** {effort} {effort_confidence}
 **Suggested model:** {openai_model} · {anthropic_model} _(CursorBench {data_version}, {data_date} — advisory)_
-**Labels:** {labels}
+**Labels:** {labels} {labels_confidence}
