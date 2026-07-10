@@ -35,7 +35,7 @@ After the table, output summary recommendations:
   ⚡ Parallelizable: #12 + #8 (independent)
   ⚠  Stale: 1 issue (>14 days inactive)
   ◆  Maybe fixed: 1 issue may already be resolved
-  ○  Suggested order: #12 → #15 → #8 → #3
+  ○  Suggested order: #12 → #8 → #15 → #3
 ```
 
 - **Parallelizable**: List groups of issues that can be worked on simultaneously. If multiple groups exist, show each on its own line. If no parallelizable issues, omit this line.
@@ -118,7 +118,7 @@ After Step 8 (terminal output is always shown regardless of persistence success)
     "stale_count": 1,
     "stale_threshold_days": 14,
     "potentially_fixed_count": 0,
-    "suggested_order": [12, 8, 3, 15],
+    "suggested_order": [12, 8, 15, 3],
     "circular_deps": []
   },
   "history": [

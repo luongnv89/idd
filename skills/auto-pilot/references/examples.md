@@ -54,26 +54,34 @@ Detailed example runs and edge-case behaviors referenced from SKILL.md.
 
 ✓ Iteration 1/3 complete
   Issue:    #12 — Fix auth redirect loop
-  PR:       #45 — merged ✓
+  PR:       #45
+  Outcome:  merged
+  Duration: 4m 05s
   ────────────────────────────────────
   Remaining: 4 eligible issues
 
 ● [Iteration 2/3] Triaging open issues...
   ...
 
-◆ Auto-Pilot Summary
-┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  Status:      limit reached
-  Iterations:  3/3
-  Duration:    12m 30s
+◆ Auto-Pilot Summary — 3/3 iterations
+┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
 
-  Resolved:
-  ✓ #12 — Fix auth redirect loop      →  PR #45 merged
-  ✓ #8  — Add pagination to API       →  PR #46 merged
-  ✓ #15 — Refactor middleware          →  PR #47 merged
+  Iteration 1:       ✓ merged                — #12 Fix auth redirect loop → PR #45
+  Iteration 2:       ✓ merged                — #8 Add pagination to API → PR #46
+  Iteration 3:       ✓ merged                — #15 Refactor middleware → PR #47
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  merged:                  3
+  left_open:               0
+  partial_followup:        0
+  blocked_by_dependency:   0
+  failed:                  0
+  skipped:                 0
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  Result:                  LIMIT REACHED
+  Mode:                    balanced
 
-  Remaining:   5 open issues
-  Next action: /auto-pilot to continue
+  Remaining:               5 open issues
+  Next action:             /auto-pilot to continue
 ```
 
 ---
@@ -143,7 +151,9 @@ Detailed example runs and edge-case behaviors referenced from SKILL.md.
 
 ✓ Issue 1/3 complete
   Issue:    #12 — Refactor auth middleware
-  PR:       #50 — merged ✓
+  PR:       #50
+  Outcome:  merged
+  Duration: 3m 20s
   ────────────────────────────────────
   Remaining: 2 issues in list
 
@@ -164,25 +174,33 @@ Detailed example runs and edge-case behaviors referenced from SKILL.md.
 
 ✓ Issue 2/3 complete (2 issues resolved via batch)
   Issues:   #5 — Fix login crash on mobile, #8 — Add dark mode toggle
-  PR:       #51 — merged ✓
+  PR:       #51
+  Outcome:  merged
+  Duration: 2m 50s
   ────────────────────────────────────
   Remaining: 0 issues in list
 
 ○ [Issue 3/3] #8 — already resolved in batch with #5
 
-◆ Auto-Pilot Summary
-┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  Status:      completed
-  Iterations:  2/3 (1 batch saved an iteration)
-  Duration:    6m 10s
-  Mode:        explicit list (analyzed + optimized)
+◆ Auto-Pilot Summary — 2/3 iterations (batch mode)
+┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  Analysis: ✓ pass (3 issues, 1 batch groups)
 
-  Resolved:
-  ✓ #12 — Refactor auth middleware      →  PR #50 merged
-  ✓ #5  — Fix login crash on mobile    →  PR #51 merged (batch: +#8)
-  ✓ #8  — Add dark mode toggle          →  PR #51 merged (batched with #5)
+  Iteration 1:       ✓ merged                — #12 Refactor auth middleware → PR #50
+  Iteration 2:       ✓ merged                — #5 Fix login crash on mobile → PR #51 (batch: +#8)
+  Iteration 3:       ○ skipped               — #8 Add dark mode toggle (already resolved in batch)
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  merged:                  2
+  left_open:               0
+  partial_followup:        0
+  blocked_by_dependency:   0
+  failed:                  0
+  skipped:                 1
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  Result:                  COMPLETED
+  Mode:                    balanced
 
-  Next action: all requested issues resolved!
+  Next action:             all requested issues resolved!
 ```
 
 ---

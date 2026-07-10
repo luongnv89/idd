@@ -8,9 +8,12 @@
 
 ## Context
 
-The build emits two distribution outputs from one source tree:
-`dist/skills/` (flattened, harness-agnostic) and `dist/plugin/` (Claude Code
-plugin layout). For each cross-skill, shared-agent, and runtime-doc reference
+At the time of this decision the build emitted two distribution outputs from
+one source tree: `dist/skills/` (flattened, harness-agnostic) and
+`dist/plugin/` (Claude Code plugin layout). The `dist/plugin/` output was later
+retired (see the Re-validation log) and the build now emits only the flattened
+`dist/skills/`; the plugin column below is preserved as the historical record
+of the decision. For each cross-skill, shared-agent, and runtime-doc reference
 the build chooses a rendering form. The form depends on which of three
 runtime behaviors actually work in subagent prompts (A, B, C — see plan §6.0
 and the experiment procedure in
@@ -172,8 +175,11 @@ aborts only when the *same* reference type appears in two forms within
 
 - `build.py` (#56) implements exactly the rendering forms in the table above.
   The `${CLAUDE_PLUGIN_ROOT}` form is not used anywhere in skill text.
-- `tests/test-plugin-reference-rendering.sh` (#58) verifies the chosen forms
-  and rejects same-reference-type mixing per §4 Phase E.
+- `tests/test-plugin-reference-rendering.sh` (#58) originally verified the
+  chosen forms and rejected same-reference-type mixing per §4 Phase E. That
+  test was removed together with the `dist/plugin/` output (see the
+  Re-validation log); the flattened-form invariants it covered are now
+  exercised by the standalone build tests.
 - `tests/test-autopilot-portability.sh` (#53) verifies that the
   `{{skill:name}}` tokens in `auto-pilot` are rewritten to the chosen forms
   in both distribution outputs.
@@ -212,3 +218,4 @@ aborts only when the *same* reference type appears in two forms within
 | Date | Triggering change | Outcome | Action taken |
 |------|-------------------|---------|--------------|
 | 2026-04-28 | Initial — first run for #52 | A-fail, B-fail, C-1 | Build implements row (A-fail, B-fail, C-1) per the table above |
+| 2026-07-10 | `dist/plugin/` build output and `tests/test-plugin-reference-rendering.sh` removed (epic #182 conformance cleanup) | Decision unaffected | Re-validated: plugin/ output and test-plugin-reference-rendering.sh no longer exist; the (A-fail, B-fail, C-1) decision and the flattened `dist/skills/` rendering forms stand. Present-tense references to the removed artifacts were past-tensed; the plugin column is retained as historical record. |

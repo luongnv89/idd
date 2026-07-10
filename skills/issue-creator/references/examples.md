@@ -17,7 +17,7 @@ Here are the items from our sprint planning:
 3. Duplicates → none found
 4. Approval:
    ```
-   ● Scanning codebase...
+   ● Parsing input...
      Found 3 items in input
 
    ◆ Batch Preview

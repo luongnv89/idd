@@ -448,14 +448,16 @@ See `references/docs/github-projects-sync.md` for the shared reference on how ot
 A cached view renders instantly from `.gitissue/triage.json`:
 
 ```
-  ◆ Triage Snapshot — 12 open issues
-  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  │ Rank │ Issue │ Title                           │ Status       │
-  ├──────┼───────┼─────────────────────────────────┼──────────────┤
-  │  1   │ #42   │ Fix mobile auth redirect loop   │ ready        │
-  │  2   │ #15   │ Add dark mode toggle            │ ready        │
-  │  3   │ #31   │ Cover auth in unit tests        │ blocked-by #8│
-  ...
+  ◆ Issue Triage
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  #  │ Issue              │ Pri │ Blocks │ Status
+  ───┼────────────────────┼─────┼────────┼───────────
+  1  │ #12 Fix auth       │ P1  │ #15    │ ready
+  2  │ #8  Add pagination │ P2  │ —      │ ready
+  3  │ #15 Refactor DB    │ P2  │ —      │ blocked #12
+  4  │ #3  Old UI bug     │ P3  │ —      │ stale (28d)
+
+  ○  Suggested order: #12 → #8 → #15 → #3
 
   ● Suggestion: git history shows 3 new commits since last triage.
     Run /issue-triage update to refresh.

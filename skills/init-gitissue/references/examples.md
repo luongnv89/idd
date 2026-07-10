@@ -19,20 +19,21 @@ Full example outputs for the three typical scenarios.
 6. Report:
 
 ```
-  ● Scanning repository...
-    Language:    TypeScript (detected from package.json)
-    Framework:   Next.js
-    Test runner: Jest
-    Templates:   .github/ISSUE_TEMPLATE/ found (3 templates)
-    Repo size:   medium (342 files)
+◆ Init Gitissue — setup complete
+┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
 
-  ◆ Configuration
-  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-    Generated .gitissue.yml with project-specific defaults
+  Git repo:          ✓ pass
+  Language:          ✓ TypeScript (from package.json)
+  Framework:         ✓ Next.js
+  Test runner:       ✓ Jest
+  Templates:         ✓ .github/ISSUE_TEMPLATE/ (3 templates)
+  Repo size:         ✓ medium (342 files)
+  Config:            ✓ generated .gitissue.yml
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  Result:            DONE
 
-  ✓ Setup complete
-    Config: .gitissue.yml
-    Run /issue-creator to create your first issue
+  Config: .gitissue.yml
+  Next action: /issue-creator to create your first issue
 ```
 
 ## Example: Minimal Python project
@@ -56,19 +57,21 @@ Full example outputs for the three typical scenarios.
   ○ Could not detect test runner. Setting resolve.auto_test: false.
     Tip: configure your test command in .gitissue.yml after setup.
 
-  ● Scanning repository...
-    Language:    Python (detected from requirements.txt)
-    Test runner: none
-    Templates:   none found
-    Repo size:   small (47 files)
+◆ Init Gitissue — setup complete
+┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
 
-  ◆ Configuration
-  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-    Generated .gitissue.yml with project-specific defaults
+  Git repo:          ✓ pass
+  Language:          ✓ Python (from requirements.txt)
+  Framework:         ○ skip (not detected)
+  Test runner:       ○ skip (not detected)
+  Templates:         ○ skip (none found)
+  Repo size:         ✓ small (47 files)
+  Config:            ✓ generated .gitissue.yml
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  Result:            DONE
 
-  ✓ Setup complete
-    Config: .gitissue.yml
-    Run /issue-creator to create your first issue
+  Config: .gitissue.yml
+  Next action: /issue-creator to create your first issue
 ```
 
 ## Example: Config already exists (merge)
@@ -82,21 +85,21 @@ Full example outputs for the three typical scenarios.
 5. Report:
 
 ```
-  ● Scanning repository...
-    Language:    Go (detected from go.mod)
-    Framework:   Gin
-    Test runner: Go test
-    Templates:   none found
-    Repo size:   large (1847 files)
+◆ Init Gitissue — setup complete
+┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
 
-  ◆ Configuration
-  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-    Merged new fields into existing .gitissue.yml
-    3 new fields added, 8 existing values preserved
+  Git repo:          ✓ pass
+  Language:          ✓ Go (from go.mod)
+  Framework:         ✓ Gin
+  Test runner:       ✓ Go test
+  Templates:         ○ skip (none found)
+  Repo size:         ✓ large (1847 files)
+  Config:            ✓ merged .gitissue.yml (3 new fields, 8 preserved)
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  Result:            DONE
 
-  ✓ Setup complete
-    Config: .gitissue.yml
-    Run /issue-creator to create your first issue
+  Config: .gitissue.yml
+  Next action: /issue-creator to create your first issue
 ```
 
 ---
