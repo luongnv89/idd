@@ -200,7 +200,8 @@ Detailed example runs and edge-case behaviors referenced from SKILL.md.
   Result:                  COMPLETED
   Mode:                    balanced
 
-  Next action:             all requested issues resolved!
+  Remaining:               0 open issues
+  Next action:             /auto-pilot to continue
 ```
 
 ---
