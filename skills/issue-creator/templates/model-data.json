@@ -36,10 +36,10 @@
     }
   },
   "complexity_mapping": {
-    "XS": { "label": "trivial",          "openai": "GPT-5.5 Low",        "anthropic": "Opus 4.7 Low",        "est_cost_per_task_usd": 3.06 },
-    "S":  { "label": "simple",           "openai": "GPT-5.5 Medium",     "anthropic": "Opus 4.8 Low",        "est_cost_per_task_usd": 5.15 },
-    "M":  { "label": "moderate",         "openai": "GPT-5.5 High",       "anthropic": "Opus 4.8 Medium",     "est_cost_per_task_usd": 7.42 },
-    "L":  { "label": "complex",          "openai": "GPT-5.5 Extra High", "anthropic": "Opus 4.7 Extra High", "est_cost_per_task_usd": 11.48 },
-    "XL": { "label": "super complex",    "openai": "GPT-5.5 Extra High", "anthropic": "Fable 5 Max",         "est_cost_per_task_usd": 22.39 }
+    "XS": { "label": "trivial",          "openai": "GPT-5.5 Low",        "anthropic": "Opus 4.7 Low" },
+    "S":  { "label": "simple",           "openai": "GPT-5.5 Medium",     "anthropic": "Opus 4.8 Low" },
+    "M":  { "label": "moderate",         "openai": "GPT-5.5 High",       "anthropic": "Opus 4.8 Medium" },
+    "L":  { "label": "complex",          "openai": "GPT-5.5 Extra High", "anthropic": "Opus 4.7 Extra High" },
+    "XL": { "label": "super complex",    "openai": "GPT-5.5 Extra High", "anthropic": "Fable 5 Max" }
   }
 }
