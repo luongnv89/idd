@@ -405,6 +405,36 @@ def _median(values: list) -> float | None:
     return statistics.median(values) if values else None
 
 
+def _repo_name_from_remote() -> str | None:
+    """Derive owner/repo from the git origin URL (works offline, no gh)."""
+    url = _run_soft(["git", "config", "--get", "remote.origin.url"])
+    if not url:
+        return None
+    url = url.strip().removesuffix(".git")
+    # git@host:owner/repo  or  https://host/owner/repo  or  ssh://host/owner/repo
+    m = re.search(r"[:/]([^/:]+/[^/:]+)$", url)
+    return m.group(1) if m else None
+
+
+def collect_project_info(root: Path, use_github: bool = True) -> dict:
+    """Identify the project being analyzed: filesystem location and a name.
+
+    Name preference: GitHub nameWithOwner (via gh, only when use_github) → origin
+    remote owner/repo → the checkout's directory basename. Never fails — a name
+    is always produced, and offline mode makes no network call.
+    """
+    name = None
+    if use_github:
+        gh = _gh_json("repo", "view", "--json", "nameWithOwner")
+        if isinstance(gh, dict):
+            name = gh.get("nameWithOwner") or None
+    if not name:
+        name = _repo_name_from_remote()
+    if not name:
+        name = root.name
+    return {"name": name, "location": str(root)}
+
+
 def detect_default_branch() -> str:
     out = _run_soft(["git", "rev-parse", "--abbrev-ref", "origin/HEAD"])
     if out and "/" in out.strip():
@@ -608,9 +638,12 @@ def _section(title: str, context: str = "") -> str:
     return f"{head} {_c('— ' + context, 'dim')}" if context else head
 
 
-def render_stats(commit_s: dict | None, run_s: dict | None, gh_s: dict | None, gh_skipped: str | None) -> None:
+def render_stats(commit_s: dict | None, run_s: dict | None, gh_s: dict | None, gh_skipped: str | None, project: dict | None = None) -> None:
     out: list[str] = []
     out.append(f"◆ idd-lint stats {_c('— evidence report · IDD Spec v' + SPEC_VERSION, 'dim')}")
+    if project:
+        out.append(f"  {_c('project', 'bold')}  {project['name']}")
+        out.append(_c(f"  location {project['location']}", "dim"))
     out.append(_c("┄" * 59, "dim"))
     out.append("")
 
@@ -676,6 +709,8 @@ def cmd_stats(args: argparse.Namespace) -> int:
     root = Path(root_out.strip()) if root_out else Path.cwd()
     runs_path = root / ".gitissue" / "runs.jsonl"
 
+    project = collect_project_info(root, use_github=not args.no_github)
+
     branch = args.branch or detect_default_branch()
     commit_s = collect_commit_stats(branch, args.since)
     run_s = collect_run_stats(runs_path)
@@ -689,12 +724,12 @@ def cmd_stats(args: argparse.Namespace) -> int:
 
     if args.json:
         print(json.dumps(
-            {"spec_version": SPEC_VERSION, "git": commit_s, "runs": run_s, "github": gh_s},
+            {"spec_version": SPEC_VERSION, "project": project, "git": commit_s, "runs": run_s, "github": gh_s},
             indent=2, sort_keys=True,
         ))
         return 0
 
-    render_stats(commit_s, run_s, gh_s, gh_skipped)
+    render_stats(commit_s, run_s, gh_s, gh_skipped, project)
     return 0
 
 
