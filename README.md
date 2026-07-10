@@ -187,7 +187,7 @@ Checks are tagged with the spec section they enforce and mapped to the L1–L3 c
 
 #### Run `idd-lint` from anywhere — shell shortcut
 
-`idd-lint` lives in this repo (`scripts/idd-lint.py`) and its `stats` command reads a repo's `.gitissue/runs.jsonl` and git history. You don't have to `cd` into the checkout to run it — add a small shell wrapper once and call `idd-lint` (or the `idd-stats` shortcut) from any directory.
+`idd-lint` lives in this repo (`scripts/idd-lint.py`) and its `stats` command reads a repo's `.gitissue/runs.jsonl` and git history. You don't have to `cd` into the idd checkout to run it — add a small shell wrapper once and call `idd-lint` (or the `idd-stats` shortcut) from any directory. **The wrapper analyzes whatever repository you are currently in**, using the idd checkout only to locate the tool itself.
 
 **Single-command setup** (zsh — appends a wrapper to `~/.zshrc`, idempotent, no clone required beyond having this repo somewhere):
 
@@ -196,21 +196,25 @@ IDD_HOME="$HOME/path/to/idd" bash -c '
   cat >> ~/.zshrc <<EOF
 
 # IDD (gitissue) — run idd-lint from anywhere. Docs: idd/README.md
+# IDD_HOME locates the tool; the repo analyzed is always your current directory.
 export IDD_HOME="\${IDD_HOME:-$IDD_HOME}"
 idd-lint() {
-  local root=""
-  if [ -f "\$IDD_HOME/scripts/idd-lint.py" ]; then root="\$IDD_HOME";
-  elif root="\$(git rev-parse --show-toplevel 2>/dev/null)" && [ -f "\$root/scripts/idd-lint.py" ]; then :;
-  else echo "idd-lint: no IDD repo found. Set IDD_HOME to your idd checkout (currently: \${IDD_HOME:-unset})." >&2; return 1; fi
-  ( cd "\$root" && python3 scripts/idd-lint.py "\$@" )
+  local script=""
+  if [ -f "\$IDD_HOME/scripts/idd-lint.py" ]; then script="\$IDD_HOME/scripts/idd-lint.py";
+  else
+    local here; here="\$(git rev-parse --show-toplevel 2>/dev/null)"
+    if [ -n "\$here" ] && [ -f "\$here/scripts/idd-lint.py" ]; then script="\$here/scripts/idd-lint.py";
+    else echo "idd-lint: tool not found. Set IDD_HOME to your idd checkout (currently: \${IDD_HOME:-unset})." >&2; return 1; fi
+  fi
+  python3 "\$script" "\$@"   # no cd — analyze the repo you are standing in
 }
 idd-stats() { idd-lint stats "\$@"; }
 EOF' && exec zsh
 ```
 
-Set `IDD_HOME` to wherever you cloned this repo. On **bash**, replace `~/.zshrc` with `~/.bashrc` (or `~/.bash_profile` on macOS) and drop the final `exec zsh`. The wrapper prefers `$IDD_HOME`; if that isn't set it falls back to the current git repo when it's an IDD checkout, so `idd-lint stats` also works while you're inside any IDD repo.
+Set `IDD_HOME` to wherever you cloned this repo. On **bash**, replace `~/.zshrc` with `~/.bashrc` (or `~/.bash_profile` on macOS) and drop the final `exec zsh`. `IDD_HOME` points at the idd checkout so the tool can be found; the report always covers the git repository of your **current working directory** — `cd` into any project and `idd-lint stats` analyzes *that* project. Run it from a non-git directory and it reports no git history.
 
-Then, from any directory:
+Then, from within any repository:
 
 ```bash
 idd-lint stats              # full evidence report (git + run log + GitHub)
