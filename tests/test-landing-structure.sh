@@ -62,11 +62,24 @@ else
 fi
 
 # ── #148: model-highlight sits OUTSIDE feat-grid ──
-# The feat-grid must close (</div>) before .model-highlight opens.
-if grep -Pzoq '</div>\s*\n\s*<div class="model-highlight' "$LANDING"; then
+# .feat-grid must fully close before .model-highlight opens. Track <div> depth
+# from the feat-grid opener; if depth has returned to 0 by the time we reach
+# .model-highlight, it is a sibling (correct), not nested. Uses awk rather than
+# `grep -P` so the test is portable to BSD grep (macOS), matching the repo's
+# portability standard.
+mh_nesting=$(awk '
+  /<div class="model-highlight/ { print (depth<=0 ? "SIBLING" : "NESTED"); found=1; exit }
+  /<div class="feat-grid"/ { infg=1 }
+  infg {
+    n=gsub(/<div/,"&"); depth+=n
+    m=gsub(/<\/div>/,"&"); depth-=m
+  }
+  END { if(!found) print "NOTFOUND" }
+' "$LANDING")
+if [ "$mh_nesting" = "SIBLING" ]; then
   pass "T4 (#148): .model-highlight is a sibling of .feat-grid (panel full-width)"
 else
-  fail "T4 (#148): .model-highlight still nested inside .feat-grid"
+  fail "T4 (#148): .model-highlight still nested inside .feat-grid ($mh_nesting)"
 fi
 
 # ── #149: slideshow markup present ──
