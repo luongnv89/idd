@@ -60,10 +60,18 @@ diffs, and a full overwrite on refresh (never append).
     "anthropic": { "families": ["Fable 5", "Opus 4.7", "Opus 4.8"], "models": [ { "name": "...", "family": "...", "thinking": "...", "score": 0.0, "cost_per_task_usd": 0.0, "tokens_per_task": 0 } ] }
   },
   "complexity_mapping": {
-    "XS": { "label": "trivial", "openai": "GPT-5.5 Low", "anthropic": "Opus 4.7 Low", "est_cost_per_task_usd": 3.06 }
+    "XS": { "label": "trivial", "openai": "GPT-5.5 Low", "anthropic": "Opus 4.7 Low" }
   }
 }
 ```
+
+**Per-task cost semantics.** A `complexity_mapping` band names two *alternative*
+picks (one OpenAI, one Anthropic) — you pick one, not both. It therefore carries
+**no** cost field of its own: a single summed figure would misrepresent the cost
+of either pick (roughly doubling it). Per-task cost is instead rendered
+**per-model**, sourced from each named model's own `cost_per_task_usd` in the
+`providers` block. So the M band's cost is `GPT-5.5 High` → `$3.59` and
+`Opus 4.8 Medium` → `$3.83`, shown as two independent figures — never their sum.
 
 ## Cache lifecycle (runs once at skill start, after config load)
 
@@ -182,13 +190,16 @@ Anthropic model — never one and never more**. Map the effort band to its
 `openai` and `anthropic` entries in the cache's `complexity_mapping` (seed
 values shown), and render both:
 
-| Effort | OpenAI | Anthropic | Est. cost/task |
-|--------|--------|-----------|----------------|
-| XS | GPT-5.5 Low | Opus 4.7 Low | $3.06 |
-| S  | GPT-5.5 Medium | Opus 4.8 Low | $5.15 |
-| M  | GPT-5.5 High | Opus 4.8 Medium | $7.42 |
-| L  | GPT-5.5 Extra High | Opus 4.7 Extra High | $11.48 |
-| XL | GPT-5.5 Extra High | Fable 5 Max | $22.39 |
+Each cell shows the pick's own per-task cost — the two are alternatives, so the
+costs are independent, never summed:
+
+| Effort | OpenAI (cost/task) | Anthropic (cost/task) |
+|--------|--------------------|-----------------------|
+| XS | GPT-5.5 Low ($1.19) | Opus 4.7 Low ($1.87) |
+| S  | GPT-5.5 Medium ($2.22) | Opus 4.8 Low ($2.93) |
+| M  | GPT-5.5 High ($3.59) | Opus 4.8 Medium ($3.83) |
+| L  | GPT-5.5 Extra High ($4.37) | Opus 4.7 Extra High ($7.11) |
+| XL | GPT-5.5 Extra High ($4.37) | Fable 5 Max ($18.02) |
 
 Always read the mapping from the cache file, not from this table — the table is
 the seed snapshot and may be refreshed. If the cache omits a band, fall back to
@@ -200,6 +211,13 @@ The suggestion appears in **two** places. In both, render the OpenAI model
 first, then ` · `, then the Anthropic model — e.g. `GPT-5.5 High · Opus 4.8
 Medium`. Both providers are always present; never emit a single model.
 
+In the **ephemeral preview** (Step 5), append each model's own per-task cost in
+parentheses immediately after it, read from that model's `cost_per_task_usd` in
+the `providers` block — e.g. `GPT-5.5 High (~$3.59/task) · Opus 4.8 Medium
+(~$3.83/task)`. The two costs are independent (the picks are alternatives) and
+are **never** added together. The durable `**Suggested model:**` body line omits
+costs (it stays a lean, dated advisory of the two names).
+
 ### Step 5 preview (ephemeral)
 
 Add a `⚡ Model:` line to the `◆ Issue Preview` block:
@@ -210,7 +228,7 @@ Add a `⚡ Model:` line to the `◆ Issue Preview` block:
   Type:     feature (high)
   Title:    Add dark mode toggle to settings
   Effort:   M
-  ⚡ Model:  GPT-5.5 High · Opus 4.8 Medium  (~$7.42/task)
+  ⚡ Model:  GPT-5.5 High (~$3.59/task) · Opus 4.8 Medium (~$3.83/task)
   Labels:   feature, settings
   Criteria: 4 acceptance criteria generated (medium)
 ```
