@@ -40,6 +40,22 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 
 ## Triage
 
+### Insufficient API rate budget (preflight)
+```
+✗ Insufficient GitHub API rate budget for triage
+
+  Remaining: {remaining} calls — below the safe threshold of 100.
+  The update-mode batch loop fetches every open issue and fans out
+  scanner subagents; running now would exhaust the budget mid-scan.
+
+  To fix:  wait for the budget to reset, then retry
+  Check:   gh api rate_limit --jq '.rate.remaining'
+  Docs:    https://github.com/luongnv89/idd/blob/main/docs/platform-github.md
+```
+**Trigger:** Preflight step 5 finds `gh api rate_limit --jq '.rate.remaining'` below 100 before the update-mode batch loop. Fatal — triage stops.
+
+**Low-budget warning (non-fatal):** when `remaining` is between 100 and 200, print the same block with a `⚠` symbol and the line `Proceeding — budget may run low during the scan.` instead of stopping.
+
 ### No open issues
 ```
 ○ No open issues found. Nothing to triage!

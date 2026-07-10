@@ -15,6 +15,7 @@ All errors follow the rich format: symbol + description + fix action.
 
   To fix:  cd into your project directory
   Check:   ls -la .git
+  Docs:    https://github.com/luongnv89/idd/blob/main/docs/platform-github.md
 ```
 
 ### GitHub CLI not installed
@@ -26,6 +27,7 @@ All errors follow the rich format: symbol + description + fix action.
 
   To fix:  brew install gh   (macOS)
            https://cli.github.com (other)
+  Docs:    https://cli.github.com
 ```
 
 ### Not authenticated
@@ -36,6 +38,7 @@ All errors follow the rich format: symbol + description + fix action.
 ✗ Not authenticated with GitHub
 
   To fix:  gh auth login
+  Docs:    https://cli.github.com/manual/gh_auth_login
 ```
 
 ---
@@ -51,6 +54,7 @@ All errors follow the rich format: symbol + description + fix action.
 
   To fix:  gh pr list
   Check:   is this the right repository?
+  Docs:    https://github.com/luongnv89/idd/blob/main/docs/platform-github.md
 ```
 
 ### No PR for current branch
@@ -62,6 +66,7 @@ All errors follow the rich format: symbol + description + fix action.
 
   To fix:  gh pr create
   Or:      /issue-pr-review <PR_NUMBER>
+  Docs:    https://github.com/luongnv89/idd/blob/main/docs/platform-github.md
 ```
 
 ### PR already closed/merged
@@ -87,6 +92,7 @@ All errors follow the rich format: symbol + description + fix action.
 
   To fix:  wait and re-run /issue-pr-review {N}
   Check:   gh pr checks {N}
+  Docs:    https://github.com/luongnv89/idd/blob/main/docs/platform-github.md
 ```
 
 ### CI log fetch failed
@@ -98,6 +104,7 @@ All errors follow the rich format: symbol + description + fix action.
 
   To fix:  gh run view {run_id} --log-failed
   Check:   gh run list
+  Docs:    https://cli.github.com/manual/gh_run_view
 ```
 
 ---
@@ -113,6 +120,7 @@ All errors follow the rich format: symbol + description + fix action.
 
   To fix:  check remote access: git remote -v
   Check:   do you have push permission? gh repo view --json viewerPermission
+  Docs:    https://github.com/luongnv89/idd/blob/main/docs/platform-github.md
 ```
 
 ### Merge failed

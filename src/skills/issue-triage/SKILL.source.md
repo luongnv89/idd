@@ -18,8 +18,8 @@ Analyze open GitHub issues to surface dependencies, suggest priorities, identify
 | Invocation | What happens |
 |------------|--------------|
 | `/issue-triage` | Show cached triage from `.gitissue/triage.json`. If no cache exists, automatically run a full analysis and persist. After rendering, suggest an update if repo changes are detected. |
-| `/issue-triage update` | Force a full re-analysis: run Steps 1-9 and overwrite `.gitissue/triage.json` |
-| `/issue-triage --limit N` | Force a full re-analysis with up to N issues |
+| `/issue-triage update` | Force a full re-analysis: run **Prerequisites** (including the rate-budget preflight), then Steps 1-9, and overwrite `.gitissue/triage.json` |
+| `/issue-triage --limit N` | Force a full re-analysis with up to N issues (runs Prerequisites, then Steps 1-9) |
 
 The design principle: **viewing is cheap and instant, updating is deliberate.** Users see their triage report immediately without waiting for GitHub API calls. Updates only happen when the user explicitly requests one or approves a suggestion.
 
@@ -121,6 +121,13 @@ Before any operation, verify the environment. On failure, output the exact error
 2. Confirm `gh` is installed: `which gh`
 3. Confirm authentication: `gh auth status`
 4. Confirm GitHub remote exists: `git remote -v`
+5. **Check the rate budget** (driver rule 4, `docs/platform-github.md`): update mode runs a batch loop that fetches every open issue and fans out one relationship-scanner subagent per batch, each making its own `gh`/API calls. Before that loop, confirm enough budget remains:
+
+   ```bash
+   gh api rate_limit --jq '.rate.remaining'
+   ```
+
+   **Threshold:** if `remaining` is below **100**, stop and print the `✗ Insufficient API rate budget` error from `references/error-messages.md` — the batch loop would exhaust the budget mid-scan and leave a partial triage. Between 100 and 200, warn with the same message's `⚠` variant but continue. At or above 200, proceed silently. (View mode makes no API calls and skips this check entirely.)
 
 ## Repo Sync (recommended)
 

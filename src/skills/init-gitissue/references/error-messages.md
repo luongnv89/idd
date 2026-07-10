@@ -9,6 +9,7 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 ✗ Not a git repository
 
   To fix:  git init && git remote add origin <url>
+  Docs:    https://github.com/luongnv89/idd/blob/main/docs/platform-github.md
 ```
 **Trigger:** `git rev-parse --git-dir` fails.
 
@@ -51,6 +52,7 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 
   To fix:  check file permissions in the repo root
   Check:   do you have write access? ls -la .
+  Docs:    https://github.com/luongnv89/idd/blob/main/docs/config-schema.md
 ```
 **Trigger:** File write to `.gitissue.yml` fails (permission denied, disk full, read-only filesystem).
 
@@ -60,5 +62,6 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 
   To fix:  check permissions: ls -la .
   Check:   is this a read-only mount?
+  Docs:    https://github.com/luongnv89/idd/blob/main/docs/config-schema.md
 ```
 **Trigger:** The repo root directory does not allow file creation.

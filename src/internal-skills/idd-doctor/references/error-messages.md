@@ -9,6 +9,7 @@ All errors follow the rich error format: what went wrong + fix command (+ docs l
 ✗ Not a git repository
 
   To fix:  cd into a git repository, or run `git init` first
+  Docs:    https://github.com/luongnv89/idd/blob/main/docs/platform-github.md
 ```
 **Trigger:** `git rev-parse --git-dir` exits non-zero.
 
@@ -18,6 +19,7 @@ All errors follow the rich error format: what went wrong + fix command (+ docs l
 
   To fix:  ensure the working directory is the repo root and is readable
   Check:   ls -la .
+  Docs:    https://github.com/luongnv89/idd/blob/main/docs/platform-github.md
 ```
 **Trigger:** The repo root is unreadable (rare — typically a permission misconfiguration on a shared mount).
 
