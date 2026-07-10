@@ -185,6 +185,43 @@ Checks are tagged with the spec section they enforce and mapped to the L1–L3 c
 
 `stats` closes the evidence loop: it measures whether the methodology is paying for itself — what fraction of commits trace to issues, how many merged PRs carry Decision Records into git history, and (when `gh` is available) whether normalized issues actually resolve with fewer QA cycles than unnormalized ones.
 
+#### Run `idd-lint` from anywhere — shell shortcut
+
+`idd-lint` lives in this repo (`scripts/idd-lint.py`) and its `stats` command reads a repo's `.gitissue/runs.jsonl` and git history. You don't have to `cd` into the checkout to run it — add a small shell wrapper once and call `idd-lint` (or the `idd-stats` shortcut) from any directory.
+
+**Single-command setup** (zsh — appends a wrapper to `~/.zshrc`, idempotent, no clone required beyond having this repo somewhere):
+
+```bash
+IDD_HOME="$HOME/path/to/idd" bash -c '
+  cat >> ~/.zshrc <<EOF
+
+# IDD (gitissue) — run idd-lint from anywhere. Docs: idd/README.md
+export IDD_HOME="\${IDD_HOME:-$IDD_HOME}"
+idd-lint() {
+  local root=""
+  if [ -f "\$IDD_HOME/scripts/idd-lint.py" ]; then root="\$IDD_HOME";
+  elif root="\$(git rev-parse --show-toplevel 2>/dev/null)" && [ -f "\$root/scripts/idd-lint.py" ]; then :;
+  else echo "idd-lint: no IDD repo found. Set IDD_HOME to your idd checkout (currently: \${IDD_HOME:-unset})." >&2; return 1; fi
+  ( cd "\$root" && python3 scripts/idd-lint.py "\$@" )
+}
+idd-stats() { idd-lint stats "\$@"; }
+EOF' && exec zsh
+```
+
+Set `IDD_HOME` to wherever you cloned this repo. On **bash**, replace `~/.zshrc` with `~/.bashrc` (or `~/.bash_profile` on macOS) and drop the final `exec zsh`. The wrapper prefers `$IDD_HOME`; if that isn't set it falls back to the current git repo when it's an IDD checkout, so `idd-lint stats` also works while you're inside any IDD repo.
+
+Then, from any directory:
+
+```bash
+idd-lint stats              # full evidence report (git + run log + GitHub)
+idd-lint stats --no-github  # offline: git history + .gitissue/runs.jsonl only
+idd-lint stats --json       # machine-readable
+idd-stats --no-github       # shorthand for `idd-lint stats`
+idd-lint repo --base origin/main   # any idd-lint subcommand works
+```
+
+`idd-lint` requires only Python 3 (standard library) and, for the git/GitHub-aware reports, `git` and optionally the `gh` CLI.
+
 ---
 
 ## Get Started
