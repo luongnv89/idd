@@ -18,8 +18,8 @@ Analyze open GitHub issues to surface dependencies, suggest priorities, identify
 | Invocation | What happens |
 |------------|--------------|
 | `/issue-triage` | Show cached triage from `.gitissue/triage.json`. If no cache exists, automatically run a full analysis and persist. After rendering, suggest an update if repo changes are detected. |
-| `/issue-triage update` | Force a full re-analysis: run Steps 1-9 and overwrite `.gitissue/triage.json` |
-| `/issue-triage --limit N` | Force a full re-analysis with up to N issues |
+| `/issue-triage update` | Force a full re-analysis: run **Prerequisites** (including the rate-budget preflight), then Steps 1-9, and overwrite `.gitissue/triage.json` |
+| `/issue-triage --limit N` | Force a full re-analysis with up to N issues (runs Prerequisites, then Steps 1-9) |
 
 The design principle: **viewing is cheap and instant, updating is deliberate.** Users see their triage report immediately without waiting for GitHub API calls. Updates only happen when the user explicitly requests one or approves a suggestion.
 
