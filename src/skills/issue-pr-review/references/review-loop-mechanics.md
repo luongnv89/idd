@@ -31,6 +31,7 @@ Pass to the reviewer:
 - `base_branch`: PR base branch
 - `pr_context`: PR title and body
 - `diff_command`: `gh pr diff {N}`
+- `confidence_threshold`: `review.confidence_threshold` (default 80) — the reviewer reports only findings scored at or above this floor; ui-reviewer keeps its own 75 floor
 
 ## Cycles 2+ — Re-review via SendMessage
 

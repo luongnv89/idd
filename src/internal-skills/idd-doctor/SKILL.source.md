@@ -64,8 +64,10 @@ If any are missing, stop immediately and print:
 ```text
 ✗ Missing bundled dependency: {missing_file}
 
-  To fix:  asm install https://github.com/luongnv89/idd --skill idd-doctor
-           (or reinstall the full distribution)
+  /idd-doctor is a repo-internal skill (not installed via asm/npx — see README).
+  To fix:  from a clone of https://github.com/luongnv89/idd, run
+           ./scripts/build.sh to regenerate the bundled references,
+           then run /idd-doctor from src/internal-skills/idd-doctor/.
 
   Then restart the agent session and re-run /idd-doctor.
 ```
