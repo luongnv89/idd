@@ -53,3 +53,12 @@ jobs:
 
       - name: test-build-determinism
         run: bash tests/test-build-determinism.sh
+
+      - name: test-issue-triage
+        run: bash tests/test-issue-triage.sh
+
+      - name: test-issue-creator-modes
+        run: bash tests/test-issue-creator-modes.sh
+
+      - name: test-issue-analysis
+        run: bash tests/test-issue-analysis.sh
