@@ -75,7 +75,7 @@ Every IDD skill that performs a sync step MUST:
 
 ## Lint Enforcement
 
-`tests/test-sync-safety.sh` greps `src/skills/**/*.md` and `src/skills/**/references/*.md` for `git pull --rebase` and asserts that each occurrence is preceded (within ~12 lines) by a `git stash` invocation or by a comment that defers to this document. Failing the lint blocks merges. This is the regression guard — without it, future skill edits could silently reintroduce the unsafe form.
+`tests/test-sync-safety.sh` recursively scans every Markdown file under `src/skills/` (both `SKILL.source.md` files and everything under each skill's `references/`). It walks the **fenced code blocks** (```` ``` ````-delimited, e.g. ```` ```bash ````/```` ```sh ````) and checks each one: if a fenced block contains `git pull --rebase`, that **same fenced block** must also contain a preceding `git stash` invocation. There is no line-distance window and no comment escape hatch — the guard is purely per-block. Inline mentions in single backticks and ordinary prose are ignored, because only fenced code blocks are what the skill actually instructs the agent to execute. Failing the lint blocks merges. This is the regression guard — without it, future skill edits could silently reintroduce the unsafe form.
 
 ---
 
