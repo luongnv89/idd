@@ -55,6 +55,34 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 **Trigger:** `git rev-parse --abbrev-ref HEAD` returns a branch that is not `main` or `master`.
 **Action:** Auto-switch with `git checkout {default_branch} && git pull --rebase origin {default_branch}`. Non-fatal — auto-pilot continues.
 
+### Insufficient API rate budget (preflight)
+```
+✗ Insufficient GitHub API rate budget for auto-pilot
+
+  Remaining: {remaining} calls — below the safe threshold of 200.
+  The loop resolves many issues, each fanning out subagents that make
+  their own API calls; running now would strand issues half-resolved.
+
+  To fix:  wait for the budget to reset, then re-run /auto-pilot
+  Check:   gh api rate_limit --jq '.rate.remaining'
+  Docs:    https://github.com/luongnv89/idd/blob/main/docs/platform-github.md
+```
+**Trigger:** Preflight step 8 finds `gh api rate_limit --jq '.rate.remaining'` below 200 before the loop starts. Fatal — auto-pilot stops.
+
+**Low-budget warning (non-fatal):** when `remaining` is between 200 and 500, print the same block with a `⚠` symbol and the line `Proceeding — budget may run low; the loop will skip merges if it hits the limit.` instead of stopping.
+
+### Insufficient merge permission (auto-downgrade)
+```
+⚠ Insufficient merge permission — running in no-merge mode
+
+  Your permission on this repo is {viewerPermission} (need WRITE or higher).
+  Auto-pilot will triage, resolve, and review every issue, then leave each
+  PR open for a maintainer to merge. No issues will be blocked.
+  Docs:    https://github.com/luongnv89/idd/blob/main/docs/platform-github.md
+```
+**Trigger:** Preflight step 9 finds `gh repo view --json viewerPermission` is `READ`, `TRIAGE`, or `NONE`.
+**Action:** Downgrade to no-merge mode — run the full loop but skip Phase 5 (merge), leaving all PRs open. Non-fatal — auto-pilot continues.
+
 ## Explicit List Mode
 
 ### Empty issue list

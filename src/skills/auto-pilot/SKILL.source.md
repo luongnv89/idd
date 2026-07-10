@@ -64,6 +64,20 @@ Before starting the loop, verify the environment. On failure, output the exact e
    - `issue-pr-review`
 6. Confirm clean working tree: `git status --porcelain`
 7. Confirm on default branch: `git rev-parse --abbrev-ref HEAD`
+8. **Check the rate budget** (driver rule 4, `docs/platform-github.md` ~12): auto-pilot processes many issues in a loop, each fanning out resolver and review subagents that make their own `gh`/API calls. Before starting the loop, confirm enough budget remains:
+
+   ```bash
+   gh api rate_limit --jq '.rate.remaining'
+   ```
+
+   **Threshold:** if `remaining` is below **200**, stop and print the `✗ Insufficient API rate budget` error from `references/error-messages.md` — the loop would exhaust the budget partway through and strand issues in a half-resolved state. Between 200 and 500, warn with the `⚠` variant but continue. At or above 500, proceed silently.
+9. **Confirm push/merge permission** (driver `docs/platform-github.md` ~22-23): check the caller's repository permission:
+
+   ```bash
+   gh repo view --json viewerPermission
+   ```
+
+   If `viewerPermission` is `ADMIN`, `MAINTAIN`, or `WRITE`, the caller can push and merge — proceed normally. If it is `READ`, `TRIAGE`, or `NONE`, the caller cannot merge PRs. Rather than fail, **downgrade to no-merge mode**: print the `⚠ Insufficient merge permission — running in no-merge mode` line from `references/error-messages.md`, then run the full triage/resolve/review loop but skip Phase 5 (merge), leaving every PR open for a maintainer to merge. This is consistent with auto-pilot's always-proceed philosophy: leave PRs open rather than failing.
 
 ### Skill dependency precheck
 
@@ -329,7 +343,8 @@ On final stop, the **Final Summary** table (above) lists each iteration's issue,
 
 - **Empty backlog** — loop exits with a green "no work remaining" notice, no error.
 - **Critical issue unresolvable** — loop halts and hands control back to the user with the exact error output.
-- **Merge permission missing** — auto-merge is skipped, PR is left open, loop moves on.
+- **Merge permission missing** — detected upfront by the preflight `viewerPermission` check (Prerequisite 9); auto-pilot downgrades to no-merge mode, runs the full loop, and leaves every PR open for a maintainer. If permission is lost mid-run, auto-merge is skipped for that PR and the loop moves on.
+- **Rate budget too low** — the preflight rate-budget check (Prerequisite 8) stops before the loop starts when `remaining` is below the threshold, rather than stranding issues half-resolved.
 - **Duplicate detection** — if triage marks an issue "already fixed", it is closed with a comment and the loop picks the next one.
 - **Follow-up issue creation fails** — the PR is still merged so progress is never blocked; a warning is printed.
 
