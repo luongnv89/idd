@@ -45,9 +45,12 @@ The model suggestion is the one externally-derived value admitted into the body 
 | `/issue-creator <N> --dry-run` | Preview | Show normalization preview without applying |
 | `/issue-creator <N> --force` | Force | Normalize even if security-labeled |
 | `/issue-creator <multi-item text>` | Batch | Extract multiple issues from one input and create sequentially |
+| `/issue-creator <multi-item text> --parent <N>` | Batch (epic-bound) | Same as Batch, but bind every child to parent epic #N — see `references/modes.md` |
 | `/issue-creator … --refresh-model-data` | Refresh | Force-refresh the skill-level model-data cache, then proceed |
 
 Detect mode: if the argument is a number → Normalize. If the input contains multiple distinct items (numbered list, bullet points, multiple paragraphs describing different problems, or a planning document with several work items) → Batch. Otherwise → Create.
+
+**Epic binding (Batch only):** an explicit `--parent <N>` flag binds every child created in the batch to parent epic #N (the hierarchy marker `Part of #N`, SPEC §2.1 — see `references/docs/idd-methodology.md`). A parent is **only** ever supplied by this explicit flag — a bare number is always Normalize, never a parent. The flag is optional and additive: a batch run **without** `--parent` behaves exactly as it does today. Full flow in `references/modes.md` (Batch Create → Epic binding).
 
 **Image/screenshot input**: When the user provides an image path or screenshot, read the image with the Read tool to extract visual context, then treat extracted information as the input description. Combine visual observations with any accompanying text. Additionally, upload the image to GitHub and embed it in the issue body — see the **Image Upload** section below.
 
