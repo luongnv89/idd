@@ -56,6 +56,7 @@ references/docs/github-projects-sync.md
 references/docs/platform-github.md
 references/docs/shared-agent-conventions.md
 references/docs/agent-model-effort.md
+references/docs/terminal-style.md
 ```
 
 
@@ -358,7 +359,7 @@ When `--no-merge` is set (even in auto mode): skip the merge step and report sta
 ## Conventions
 
 - **Platform driver:** all tracker access follows the GitHub driver — `--json` with explicit field selection, never parsed text output; full catalog in references/docs/platform-github.md.
-- **Terminal output:** follow the DESIGN.md vocabulary — `[N/7]` step counter; symbols `●` progress, `✓` success, `✗` failure, `◆` header, `⚠` warning, `○` info; two-space indent, `┄` separators, URLs on their own line, max 80 chars.
+- **Terminal output:** follow the `references/docs/terminal-style.md` vocabulary — `[N/7]` step counter; symbols `●` progress, `✓` success, `✗` failure, `◆` header, `⚠` warning, `○` info; two-space indent, `┄` separators, URLs on their own line, max 80 chars.
 - **Errors:** rich format from `references/error-messages.md` — `✗ Short description` then `  To fix:  <command>`.
 - **Expected output:** a clean review prints the 7-step tracker and a summary — see *Expected Inline Output* in `references/report-templates.md`.
 
@@ -384,4 +385,4 @@ When `--no-merge` is set (even in auto mode): skip the merge step and report sta
 - **`references/docs/sync-conventions.md`** — Stash-first sync convention and recovery
 - **`references/docs/idd-methodology.md`** — IDD durable-analysis fields (traceability check 3)
 - **`references/docs/naming-conventions.md`** — Naming conventions
-- **`DESIGN.md`** — Terminal output style guide
+- **`references/docs/terminal-style.md`** — Terminal output style contract (bundled at build time; the repo-root `DESIGN.md` is the human-facing companion and is not bundled)

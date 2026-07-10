@@ -15,11 +15,11 @@ docs/decisions/cross-skill-invocation.md — sibling-relative paths only.
 Per issue #81 consolidation, runtime docs live at the top-level docs/
 alongside human-only project docs (ARCHITECTURE.md, DEVELOPMENT.md, etc.).
 The build's transitive-closure scan determines which docs each skill
-needs and bundles only those into the dist outputs. The 9 runtime docs
+needs and bundles only those into the dist outputs. The 10 runtime docs
 bundled by the closure are: config-schema.md, idd-methodology.md,
 naming-conventions.md, sync-conventions.md, github-projects-sync.md,
 platform-github.md, shared-agent-conventions.md, agent-model-effort.md,
-pre-commit-security.md.
+pre-commit-security.md, terminal-style.md.
 """
 
 from __future__ import annotations
