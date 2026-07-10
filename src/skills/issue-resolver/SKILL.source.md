@@ -141,6 +141,7 @@ references/docs/config-schema.md
 references/docs/agent-model-effort.md
 references/docs/shared-agent-conventions.md
 references/docs/platform-github.md
+references/docs/terminal-style.md
 ```
 
 ```
@@ -517,7 +518,7 @@ All tracker access follows the GitHub driver — `--json` with explicit field se
 
 ## Output Conventions
 
-Terminal output follows the DESIGN.md contract — symbols `● ✓ ✗ ◆ ⚡ ⚠ ○`, two-space indent, `┄` separators, URLs on their own line, ≤80 chars, one blank line between sections, static sequential output (no animation), plus the `[N/5]` pipeline step counter. Errors use the rich format from `references/error-messages.md`: `✗ what failed`, then `To fix:  <command>`, then a docs link when applicable.
+Terminal output follows the `docs/terminal-style.md` contract — symbols `● ✓ ✗ ◆ ⚡ ⚠ ○`, two-space indent, `┄` separators, URLs on their own line, ≤80 chars, one blank line between sections, static sequential output (no animation), plus the `[N/5]` pipeline step counter. Errors use the rich format from `references/error-messages.md`: `✗ what failed`, then `To fix:  <command>`, then a docs link when applicable.
 
 ## Additional Resources
 
@@ -527,6 +528,6 @@ Authoritative file list for the *Bundled dependency precheck* above:
 
 **References** (`references/`): `pipeline-steps.md` (payloads/phases/fallbacks, Steps 1–4) · `report-templates.md` (PR body, closing summary, expected output) · `bug-verification.md` (reproduction checkpoint, Step 3) · `skill-index.md` (external-skill catalog, Step 3) · `error-messages.md` (error catalog)
 
-**Docs** (`docs/`): `sync-conventions.md` · `naming-conventions.md` · `pre-commit-security.md` · `idd-methodology.md` · `github-projects-sync.md` · `config-schema.md` · `agent-model-effort.md` · `shared-agent-conventions.md` · `platform-github.md`
+**Docs** (`docs/`): `sync-conventions.md` · `naming-conventions.md` · `pre-commit-security.md` · `idd-methodology.md` · `github-projects-sync.md` · `config-schema.md` · `agent-model-effort.md` · `shared-agent-conventions.md` · `platform-github.md` · `terminal-style.md`
 
-**`DESIGN.md`** — terminal output style guide.
+**`docs/terminal-style.md`** — terminal output style contract (symbols, output structure, table/error formats), bundled at build time. The repo-root `DESIGN.md` is the human-facing companion (color palette, per-command mockups) and is not bundled.

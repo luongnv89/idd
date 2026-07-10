@@ -2,6 +2,14 @@
 
 The terminal is the interface. Every character of output is a design decision.
 
+The canonical output contract that skills consume at runtime — symbol
+vocabulary, output structure, progress patterns, table/error formats, and the
+confirmation/confidence/first-run/empty-state rules — lives in
+`docs/terminal-style.md` (a bundled runtime doc). This guide is the human-facing
+companion: it repeats that contract for reference and adds the color palette and
+per-command output mockups. When the two overlap, `docs/terminal-style.md` is
+authoritative.
+
 ## Principles
 
 1. **Show, don't dump.** Structured output > raw text. Tables > JSON. Sections > walls of text.
@@ -21,6 +29,7 @@ The terminal is the interface. Every character of output is a design decision.
 | `⚡` | Action / recommendation | — | `⚡ Parallelizable: #12 + #8` |
 | `⚠` | Warning | Yellow | `⚠ Stale: 1 issue (>14d)` |
 | `○` | Info / neutral | — | `○ First run — using defaults` |
+| `⟶` | Next action / leads to | — | `⟶ Spawning resolver subagent...` |
 | `+` | Added field | — | `+ Files: auth.py (high)` |
 | `=` | Preserved field | — | `= Original: preserved` |
 
