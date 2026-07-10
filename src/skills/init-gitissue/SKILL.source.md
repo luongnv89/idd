@@ -359,15 +359,21 @@ Terminal output follows the DESIGN.md contract — symbols `● ✓ ✗ ◆ ⚡ 
 After a successful run, the repo root contains a `.gitissue.yml` file and the terminal prints:
 
 ```
-  ✓ Wrote .gitissue.yml (24 lines)
+◆ Init Gitissue — setup complete
+┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
 
-  Detected:
-    language:    TypeScript
-    framework:   Next.js
-    test_runner: vitest
-    repo_size:   medium (42 files)
+  Git repo:          ✓ pass
+  Language:          ✓ TypeScript (from package.json)
+  Framework:         ✓ Next.js
+  Test runner:       ✓ vitest
+  Templates:         ✓ .github/ISSUE_TEMPLATE/ (3 templates)
+  Repo size:         ✓ medium (42 files)
+  Config:            ✓ generated .gitissue.yml (163 lines)
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  Result:            DONE
 
-  Run /auto-pilot to start the loop, or /issue-creator to file a first issue.
+  Config: .gitissue.yml
+  Next action: /issue-creator to create your first issue
 ```
 
 ## Edge Cases

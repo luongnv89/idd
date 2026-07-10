@@ -113,10 +113,23 @@ Full example runs (happy path, view mode, closed issue), extracted from SKILL.md
 
   ✓ Analysis saved to .gitissue/analysis-42.json
 
-  ✓ Done — analysis of issue #42: Fix mobile auth ...
-    Complexity: S │ Risk: Low
-    Recommended: Option 1 — Minimal fix
-    Saved: .gitissue/analysis-42.json
+◆ Issue Analysis: #42 — Fix mobile auth redirect loop
+┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+
+  Fetch:             ✓ pass (issue loaded)
+  Extract targets:   ✓ pass (6 keywords, 2 file refs)
+  Research:          ✓ pass (14 files scanned)
+  Git history:       ✓ pass (3 related commits)
+  Cross-references:  ✓ pass (1 related issue)
+  Root cause:        ✓ pass
+  Options:           ✓ pass (3 approaches proposed)
+  Report:            ✓ pass
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  Result:            DONE
+
+  Complexity: S │ Risk: Low
+  Recommended: Option 1 — Minimal fix
+  Saved: .gitissue/analysis-42.json
 ```
 
 ---
