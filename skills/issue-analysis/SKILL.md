@@ -40,7 +40,7 @@ When invoked as `/issue-analysis <N> view`, skip the entire analysis pipeline (S
      Check:   was the file edited manually?
    ```
 5. Compute report age from the `timestamp` field relative to now
-6. Render the full analysis report to terminal using the same DESIGN.md format as Step 6, with a cache header:
+6. Render the full analysis report to terminal using the same `references/docs/terminal-style.md` format as Step 6, with a cache header:
 
 ```
 ◆ Issue Analysis (cached)
@@ -187,6 +187,7 @@ Check these files relative to the skill's directory (the dirname of this SKILL.m
 - `references/docs/platform-github.md` — GitHub platform driver reference
 - `references/docs/shared-agent-conventions.md` — shared subagent conventions
 - `references/docs/agent-model-effort.md` — per-agent model and reasoning-effort mapping
+- `references/docs/terminal-style.md` — terminal output style contract (symbols, output structure, table/error formats)
 
 The steps below include both the subagent delegation path and the inline fallback.
 
@@ -269,7 +270,7 @@ Quick summary:
 ---
 ## Step 8-9 — Output & Persist
 
-Step 8 renders the analysis as a structured terminal report following DESIGN.md conventions; Step 9 persists the same data to `.gitissue/analysis-<N>.json`. Full rendering spec (section layout, color codes, truncation rules) and JSON schema live in `references/output-and-persist.md` — read that file when implementing or debugging either step.
+Step 8 renders the analysis as a structured terminal report following `references/docs/terminal-style.md` conventions; Step 9 persists the same data to `.gitissue/analysis-<N>.json`. Full rendering spec (section layout, color codes, truncation rules) and JSON schema live in `references/output-and-persist.md` — read that file when implementing or debugging either step.
 
 Summary:
 - Terminal report has 8 sections: header, classification, root cause, affected files, options, complexity, risk, recommendation.
@@ -408,12 +409,12 @@ All tracker access follows the GitHub driver — `--json` with explicit field se
 
 ## Output Conventions
 
-Terminal output follows the DESIGN.md contract — symbols `● ✓ ✗ ◆ ⚡ ⚠ ○`, two-space indent, `┄` separators, URLs on their own line, ≤80 chars, one blank line between sections, static sequential output (no animation), plus a `[N/8]` pipeline step counter and `│ ─ ┼` tables (right-align numbers, `—` for empty cells). Errors use the rich format from `references/error-messages.md`: `✗ what failed`, then `To fix:  <command>`, then a docs link when applicable.
+Terminal output follows the `references/docs/terminal-style.md` contract — symbols `● ✓ ✗ ◆ ⚡ ⚠ ○`, two-space indent, `┄` separators, URLs on their own line, ≤80 chars, one blank line between sections, static sequential output (no animation), plus a `[N/8]` pipeline step counter and `│ ─ ┼` tables (right-align numbers, `—` for empty cells). Errors use the rich format from `references/error-messages.md`: `✗ what failed`, then `To fix:  <command>`, then a docs link when applicable.
 
 ## Additional Resources
 
 - **`references/agents/codebase-researcher.md`** — Codebase Researcher subagent prompt (Steps 2-5 delegation)
 - **`references/agents/synthesizer.md`** — Synthesizer subagent prompt (Steps 6-7 delegation)
 - **`references/error-messages.md`** — Complete error catalog with triggers and exact output
-- **`DESIGN.md`** — Terminal output style guide (repo root)
+- **`references/docs/terminal-style.md`** — Terminal output style contract (bundled at build time; the repo-root `DESIGN.md` is the human-facing companion and is not bundled)
 - **`references/docs/config-schema.md`** — Full configuration schema

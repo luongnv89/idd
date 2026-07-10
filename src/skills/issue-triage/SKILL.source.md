@@ -54,7 +54,7 @@ Read and parse the JSON file. If the JSON is malformed or unparseable, output th
 
 ### 3. Render the cached report
 
-Compute report age from the `updated` timestamp relative to now. Render the triage table to terminal using the same DESIGN.md format as Step 8, with a cache header:
+Compute report age from the `updated` timestamp relative to now. Render the triage table to terminal using the same `docs/terminal-style.md` format as Step 8, with a cache header:
 
 ```
 ◆ Issue Triage (cached)
@@ -272,6 +272,7 @@ Check these files relative to the skill's directory (the dirname of this SKILL.m
 - `references/docs/platform-github.md` — GitHub platform driver reference
 - `references/docs/shared-agent-conventions.md` — shared subagent conventions
 - `references/docs/agent-model-effort.md` — per-agent model and reasoning-effort mapping
+- `references/docs/terminal-style.md` — terminal output style contract (symbols, output structure, table/error formats)
 
 ---
 
@@ -435,7 +436,7 @@ All tracker access follows the GitHub driver — `--json` with explicit field se
 
 ## Output Conventions
 
-Terminal output follows the DESIGN.md contract — symbols `● ✓ ✗ ◆ ⚡ ⚠ ○`, two-space indent, `┄` separators, URLs on their own line, ≤80 chars, one blank line between sections, static sequential output (no animation), plus `│ ─ ┼` tables (right-align numbers, `—` for empty cells). Errors use the rich format from `references/error-messages.md`: `✗ what failed`, then `To fix:  <command>`, then a docs link when applicable. The complete catalog in `references/error-messages.md` covers authentication failures, CLI not found, no remote, no issues, too many issues, circular dependencies, and API rate limits.
+Terminal output follows the `docs/terminal-style.md` contract — symbols `● ✓ ✗ ◆ ⚡ ⚠ ○`, two-space indent, `┄` separators, URLs on their own line, ≤80 chars, one blank line between sections, static sequential output (no animation), plus `│ ─ ┼` tables (right-align numbers, `—` for empty cells). Errors use the rich format from `references/error-messages.md`: `✗ what failed`, then `To fix:  <command>`, then a docs link when applicable. The complete catalog in `references/error-messages.md` covers authentication failures, CLI not found, no remote, no issues, too many issues, circular dependencies, and API rate limits.
 
 ## GitHub Projects Sync
 
@@ -477,5 +478,5 @@ An update (`/issue-triage update`) runs Steps 1–9 and overwrites the cache, en
 
 - **`references/error-messages.md`** — Complete error catalog with triggers and exact output
 - **`docs/github-projects-sync.md`** — Shared GitHub Projects status sync reference
-- **`DESIGN.md`** — Terminal output style guide (repo root)
+- **`docs/terminal-style.md`** — Terminal output style contract (bundled at build time; the repo-root `DESIGN.md` is the human-facing companion and is not bundled)
 - **`docs/config-schema.md`** — Full configuration schema

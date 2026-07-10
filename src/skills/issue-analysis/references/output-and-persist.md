@@ -5,7 +5,7 @@ Full Step 8 terminal rendering spec and Step 9 JSON persistence schema. SKILL.md
 ## Step 8 — Output (Terminal Report)
 
 
-Display the full analysis following DESIGN.md conventions.
+Display the full analysis following `docs/terminal-style.md` conventions.
 
 ### Issue header
 
@@ -60,7 +60,7 @@ Omit categories that have no entries.
     tests/test_auth.py           │ high      │ existing tests
 ```
 
-Table rules (per DESIGN.md): box-drawing characters `│ ─ ┼`, max 80 chars wide, truncate paths with `...` if needed.
+Table rules (per `docs/terminal-style.md`): box-drawing characters `│ ─ ┼`, max 80 chars wide, truncate paths with `...` if needed.
 
 ### Git history
 
