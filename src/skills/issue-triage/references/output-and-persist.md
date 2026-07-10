@@ -5,7 +5,7 @@ Full Step 8 rendering spec and Step 9 JSON schema. SKILL.md shows a summary; rea
 ## Step 8 — Output
 
 
-Display the full triage results following DESIGN.md conventions.
+Display the full triage results following `docs/terminal-style.md` conventions.
 
 ### Triage Table
 
@@ -20,7 +20,7 @@ Display the full triage results following DESIGN.md conventions.
   4  │ #3  Old UI bug     │ P3  │ —      │ stale (28d)
 ```
 
-Table rules (per DESIGN.md):
+Table rules (per `docs/terminal-style.md`):
 - Box-drawing characters: `│ ─ ┼`
 - Right-align numbers, left-align text
 - Max width: 80 characters (truncate issue titles with `...` if needed)

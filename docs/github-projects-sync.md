@@ -259,7 +259,7 @@ No status changes. Triage is read-only with respect to the project board. Future
 
 ## Terminal Output
 
-Follow DESIGN.md conventions for all sync output:
+Follow `docs/terminal-style.md` conventions for all sync output:
 
 - `●` when sync is in progress
 - `✓` on success

@@ -217,7 +217,7 @@ Display all extracted items in a table for review before creating anything:
   3  │ improvement │ Refactor auth middleware             │ L
 ```
 
-Use DESIGN.md table format: box-drawing characters `│ ─ ┼`, right-align numbers, left-align text, max 80 chars wide (truncate titles with `...`).
+Use `references/docs/terminal-style.md` table format: box-drawing characters `│ ─ ┼`, right-align numbers, left-align text, max 80 chars wide (truncate titles with `...`).
 
 ### Step 3 — Duplicate Check
 

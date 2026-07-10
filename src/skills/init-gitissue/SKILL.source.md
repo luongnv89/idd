@@ -65,6 +65,7 @@ Check these files relative to the skill's directory (the dirname of this SKILL.m
 - `references/docs/idd-methodology.md` — IDD methodology reference
 - `references/docs/github-projects-sync.md` — GitHub Projects status sync reference
 - `references/docs/platform-github.md` — GitHub platform driver reference
+- `references/docs/terminal-style.md` — terminal output style contract (symbols, output structure, table/error formats)
 
 ## Configuration Check
 
@@ -352,7 +353,7 @@ Full example outputs for three scenarios (TypeScript + Next.js project, minimal 
 
 ## Output Conventions
 
-Terminal output follows the DESIGN.md contract — symbols `● ✓ ✗ ◆ ⚡ ⚠ ○`, two-space indent, `┄` separators, URLs on their own line, ≤80 chars, one blank line between sections, static sequential output (no animation). Errors use the rich format from `references/error-messages.md`: `✗ what failed`, then `To fix:  <command>`, then a docs link when applicable.
+Terminal output follows the `docs/terminal-style.md` contract — symbols `● ✓ ✗ ◆ ⚡ ⚠ ○`, two-space indent, `┄` separators, URLs on their own line, ≤80 chars, one blank line between sections, static sequential output (no animation). Errors use the rich format from `references/error-messages.md`: `✗ what failed`, then `To fix:  <command>`, then a docs link when applicable.
 
 ## Expected Output
 
@@ -388,4 +389,4 @@ After a successful run, the repo root contains a `.gitissue.yml` file and the te
 - **`references/error-messages.md`** — Complete error catalog with triggers and exact output
 - **`docs/naming-conventions.md`** — Branch, commit, PR, and issue naming conventions (referenced by generated config)
 - **`docs/config-schema.md`** — Full configuration schema that this skill generates
-- **`DESIGN.md`** — Terminal output style guide (repo root)
+- **`docs/terminal-style.md`** — Terminal output style contract (bundled at build time; the repo-root `DESIGN.md` is the human-facing companion and is not bundled)

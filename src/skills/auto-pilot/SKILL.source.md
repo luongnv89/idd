@@ -113,6 +113,7 @@ Check these files relative to the skill's directory (the dirname of this SKILL.m
 - `references/docs/platform-github.md` — GitHub platform driver reference
 - `references/docs/shared-agent-conventions.md` — shared subagent conventions
 - `references/docs/agent-model-effort.md` — per-agent model and reasoning-effort mapping
+- `references/docs/terminal-style.md` — terminal output style contract (symbols, output structure, table/error formats)
 
 If the working tree is dirty, auto-stash before starting; if not on the default
 branch, auto-switch and rebase on a clean tree. Both procedures (the stash-first
@@ -318,7 +319,7 @@ All tracker access follows the GitHub driver — `--json` with explicit field se
 
 ## Output Conventions
 
-Terminal output follows the DESIGN.md contract — symbols `● ✓ ✗ ◆ ⚡ ⚠ ○`, two-space indent, `┄` separators, URLs on their own line, ≤80 chars, one blank line between sections, static sequential output (no animation), plus auto-pilot's `[Iteration {i}/{max}]` loop counter and the resolver's inherited `[N/5]` step counter. Errors use the rich format from `references/error-messages.md`: `✗ what failed`, then `To fix:  <command>`, then a docs link when applicable.
+Terminal output follows the `docs/terminal-style.md` contract — symbols `● ✓ ✗ ◆ ⚡ ⚠ ○`, two-space indent, `┄` separators, URLs on their own line, ≤80 chars, one blank line between sections, static sequential output (no animation), plus auto-pilot's `[Iteration {i}/{max}]` loop counter and the resolver's inherited `[N/5]` step counter. Errors use the rich format from `references/error-messages.md`: `✗ what failed`, then `To fix:  <command>`, then a docs link when applicable.
 
 ## Prompt Injection Boundary
 
@@ -353,4 +354,4 @@ On final stop, the **Final Summary** table (above) lists each iteration's issue,
 - **`references/subagent-prompts.md`** — resolver, reviewer, analyzer, and batch-resolver prompts (read once at skill start)
 - **`references/error-messages.md`** — full error catalog with triggers and exact output
 - **`docs/naming-conventions.md`** — branch, commit, PR, and issue naming
-- **`DESIGN.md`** (repo root) — terminal output style guide; **`docs/config-schema.md`** — full configuration schema
+- **`docs/terminal-style.md`** — terminal output style contract (bundled at build time; the repo-root `DESIGN.md` is the human-facing companion and is not bundled); **`docs/config-schema.md`** — full configuration schema
