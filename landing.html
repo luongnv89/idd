@@ -119,6 +119,9 @@
       --maxw: 1120px;
       --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
       --sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      /* strong custom easings (Emil Kowalski) — built-in CSS curves lack punch */
+      --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+      --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
     }
 
     * { box-sizing: border-box; }
@@ -182,16 +185,23 @@
       display: inline-flex; align-items: center; gap: 10px;
       font-family: var(--mono); font-weight: 600; font-size: 16px;
       padding: 14px 26px; border-radius: 10px;
-      cursor: pointer; transition: all .16s ease; border: 1px solid transparent;
+      cursor: pointer;
+      transition: transform .18s var(--ease-out), box-shadow .18s var(--ease-out), border-color .18s var(--ease-out), background .18s var(--ease-out);
+      border: 1px solid transparent;
       white-space: nowrap;
     }
+    /* press feedback — the UI confirms it heard you */
+    .btn:active { transform: scale(0.97); }
     .btn-primary {
       background: var(--green); color: #001a06;
       box-shadow: 0 0 0 1px rgba(0,255,65,0.4), 0 12px 40px -12px var(--green-glow);
     }
-    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 0 0 1px var(--green), 0 18px 50px -12px var(--green-glow); }
+    .btn-primary:active { transform: translateY(-2px) scale(0.97); }
     .btn-ghost { background: transparent; color: var(--fg); border-color: var(--line); }
     .btn-ghost:hover { border-color: var(--fg-dim); background: rgba(255,255,255,0.03); }
+    @media (hover: hover) and (pointer: fine) {
+      .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 0 0 1px var(--green), 0 18px 50px -12px var(--green-glow); }
+    }
 
     /* ───────────────────────── HERO ───────────────────────── */
     .hero { padding: 92px 0 64px; position: relative; }
@@ -303,15 +313,19 @@
     .feat-card {
       background: linear-gradient(180deg, var(--panel), var(--bg-soft));
       border: 1px solid var(--line-soft); border-radius: var(--radius);
-      padding: 30px 30px 28px; transition: all .2s ease; position: relative; overflow: hidden;
+      padding: 30px 30px 28px;
+      transition: transform .2s var(--ease-out), border-color .2s var(--ease-out);
+      position: relative; overflow: hidden;
     }
     .feat-card::before {
       content: ""; position: absolute; inset: 0 0 auto 0; height: 1px;
       background: linear-gradient(90deg, transparent, var(--green), transparent);
-      opacity: 0; transition: opacity .25s;
+      opacity: 0; transition: opacity .25s var(--ease-out);
     }
-    .feat-card:hover { border-color: rgba(0,255,65,0.3); transform: translateY(-3px); }
-    .feat-card:hover::before { opacity: .7; }
+    @media (hover: hover) and (pointer: fine) {
+      .feat-card:hover { border-color: rgba(0,255,65,0.3); transform: translateY(-3px); }
+      .feat-card:hover::before { opacity: .7; }
+    }
     .feat-cmd {
       font-family: var(--mono); font-size: 14px; font-weight: 600; color: var(--green);
       background: rgba(0,255,65,0.06); border: 1px solid rgba(0,255,65,0.18);
@@ -456,25 +470,34 @@
       display: flex;
       flex-direction: column;
       gap: 12px;
-      transition: border-color .2s, transform .2s;
+      transition: border-color .2s var(--ease-out), transform .2s var(--ease-out);
     }
-    .agent-card:hover {
-      border-color: rgba(0,255,65,0.28);
-      transform: translateY(-2px);
+    @media (hover: hover) and (pointer: fine) {
+      .agent-card:hover {
+        border-color: rgba(0,255,65,0.28);
+        transform: translateY(-2px);
+      }
     }
     .agent-head { display: flex; align-items: center; gap: 14px; }
-    .agent-avatar {
-      width: 56px;
-      height: 56px;
-      border-radius: 50%;
-      object-fit: cover;
-      border: 2px solid rgba(0,255,65,0.35);
+    .agent-icon {
+      width: 46px;
+      height: 46px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--mono);
+      font-size: 20px;
+      color: var(--green);
       flex-shrink: 0;
-      background: var(--panel-2);
+      background: rgba(0,255,65,0.06);
+      border: 1px solid rgba(0,255,65,0.22);
+      transition: transform .2s var(--ease-out), background .2s ease;
     }
+    .agent-card:hover .agent-icon { transform: scale(1.06); background: rgba(0,255,65,0.12); }
     .agent-meta h3 {
       margin: 0;
-      font-size: 1rem;
+      font-size: 1.02rem;
       font-weight: 800;
       letter-spacing: -0.02em;
       line-height: 1.2;
@@ -483,25 +506,14 @@
       margin: 4px 0 0;
       font-family: var(--mono);
       font-size: 11.5px;
-      color: var(--green);
+      color: var(--fg-dim);
       font-weight: 600;
     }
-    .agent-quote {
+    .agent-desc {
       margin: 0;
-      font-size: 0.88rem;
+      font-size: 0.9rem;
       color: var(--fg-muted);
       line-height: 1.55;
-      font-style: italic;
-      border-left: 2px solid rgba(0,255,65,0.35);
-      padding-left: 12px;
-    }
-    .agent-quote cite {
-      display: block;
-      margin-top: 8px;
-      font-style: normal;
-      font-family: var(--mono);
-      font-size: 11px;
-      color: var(--fg-dim);
     }
     .agent-skills {
       margin: 0;
@@ -583,11 +595,32 @@
     .foot-links a:hover { color: var(--green); }
     .foot-note { font-family: var(--mono); font-size: 12.5px; color: var(--fg-dim); }
 
-    /* reveal */
-    .reveal { opacity: 0; transform: translateY(22px); transition: opacity .6s ease, transform .6s ease; }
+    /* reveal — marketing scroll-in; >300ms is fine here (not a UI interaction).
+       Stagger sibling cards via --i (30–80ms steps, Emil Kowalski). */
+    .reveal {
+      opacity: 0; transform: translateY(22px);
+      transition: opacity .6s var(--ease-out), transform .6s var(--ease-out);
+      transition-delay: calc(var(--i, 0) * 55ms);
+    }
     .reveal.in { opacity: 1; transform: none; }
 
+    .copy-btn:active, .nav-cta:active { transform: scale(0.97); }
 
+    /* Reduced motion: keep opacity/color for comprehension, drop movement.
+       Not zero motion — fewer and gentler. */
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+      .reveal { opacity: 1; transform: none; transition-delay: 0ms; }
+      .btn:active, .btn-primary:active, .copy-btn:active, .nav-cta:active,
+      .feat-card:hover, .agent-card:hover, .agent-card:hover .agent-icon { transform: none; }
+      .eyebrow .dot, .cursor { animation: none; }
+    }
   </style>
 </head>
 <body>
@@ -620,7 +653,7 @@
   <section class="hero" id="top">
     <div class="wrap hero-grid">
       <div>
-        <span class="eyebrow">Issue-Driven Development · 8 commands · MIT</span>
+        <span class="eyebrow">Issue-Driven Development · Spec v1.1 · 8 commands · MIT</span>
         <h1 class="hero-title">Issues → <span class="accent">agent-ready work orders.</span></h1>
         <p class="hero-sub">
           Eight terminal commands that <strong>structure, analyze, triage, resolve, and review</strong> your GitHub issues —
@@ -639,6 +672,7 @@
           <span><span class="ok">✓</span> No vendor lock-in</span>
           <span><span class="ok">✓</span> Runs in your terminal</span>
           <span><span class="ok">⚡</span> Model + thinking hints on create</span>
+          <span><span class="ok">✓</span> <code class="mono">idd-lint</code> — spec conformance in CI, no LLM</span>
         </div>
       </div>
 
@@ -673,17 +707,17 @@
       <p class="sec-lead">GitHub issues were designed for humans to read, not for agents to execute. The gap between "someone describes a problem" and "someone ships a fix" is where projects bleed time.</p>
 
       <div class="prob-grid">
-        <div class="prob-card reveal">
+        <div class="prob-card reveal" style="--i:0">
           <div class="glyph">✗</div>
           <h3>30 minutes before line one</h3>
           <p>Someone files "the login is broken on mobile." A developer — human or AI — burns half an hour figuring out which files to even open before writing a single line of code.</p>
         </div>
-        <div class="prob-card reveal">
+        <div class="prob-card reveal" style="--i:1">
           <div class="glyph">✗</div>
           <h3>Agents edit the wrong files</h3>
           <p>Without typed context and acceptance criteria, an AI agent confidently produces changes to the wrong files — because the issue never told it where to look or when it's done.</p>
         </div>
-        <div class="prob-card reveal">
+        <div class="prob-card reveal" style="--i:2">
           <div class="glyph">✗</div>
           <h3>A backlog with no order</h3>
           <p>47 open issues sit untriaged: no dependency awareness, no execution order, no idea which ones are already fixed or which two could ship in parallel.</p>
@@ -724,8 +758,8 @@
         </div>
         <div class="feat-card reveal">
           <span class="feat-cmd">/auto-pilot</span>
-          <h3>Hands-free, conservative by default</h3>
-          <p>Triage → resolve → review → merge, looped across the backlog. Clean PRs merge; partial ones stay open for review unless you opt into aggressive mode. Dependency-aware merge gate keeps order sane.</p>
+          <h3>Hands-free, balanced by default</h3>
+          <p>Triage → resolve → review → merge, looped across the backlog. In the default <code>balanced</code> mode clean PRs merge and partial ones stay open with a follow-up issue; <code>conservative</code> holds every merge, <code>aggressive</code> opts into partial merges. A dependency-aware merge gate keeps order sane.</p>
           <div class="effort">effort <b>max</b></div>
         </div>
       </div>
@@ -780,22 +814,22 @@
       <p class="sec-lead">No new platform to learn. The structured issue format is plain GitHub markdown, and every step is a command you run in the terminal you already live in.</p>
 
       <div class="steps">
-        <div class="step reveal">
+        <div class="step reveal" style="--i:0">
           <div class="num">1</div>
           <h3>Describe</h3>
           <p>Type the problem in plain English. <code>/issue-creator</code> classifies it, estimates effort, suggests model + thinking level, and structures a typed issue with acceptance criteria.</p>
         </div>
-        <div class="step reveal">
+        <div class="step reveal" style="--i:1">
           <div class="num">2</div>
           <h3>Triage</h3>
           <p><code>/issue-triage</code> maps dependencies across the backlog, flags stale and already-fixed issues, and proposes an order.</p>
         </div>
-        <div class="step reveal">
+        <div class="step reveal" style="--i:2">
           <div class="num">3</div>
           <h3>Resolve</h3>
           <p><code>/issue-resolver N</code> researches, plans, implements, and QAs — then opens an atomic PR that closes the issue.</p>
         </div>
-        <div class="step reveal">
+        <div class="step reveal" style="--i:3">
           <div class="num">4</div>
           <h3>Review &amp; ship</h3>
           <p><code>/issue-pr-review</code> verifies each acceptance criterion, scores five dimensions, fixes, and merges when green.</p>
@@ -856,123 +890,142 @@
         <div class="feat-card reveal"><span class="feat-cmd">/issue-resolver N</span><p style="margin-top:2px">6-step pipeline: preflight → research → plan → implement → QA → deliver a PR with <code>Closes #N</code>.</p></div>
         <div class="feat-card reveal"><span class="feat-cmd">/issue-triage</span><p style="margin-top:2px">Dependency graph, stale detection, already-fixed scanning, priority and execution order.</p></div>
         <div class="feat-card reveal"><span class="feat-cmd">/issue-pr-review</span><p style="margin-top:2px">Lint/format/test pre-pass, per-criterion AC verification, five-dimension scoring, and fix cycles. Auto-merge only with <code>--auto</code>.</p></div>
-        <div class="feat-card reveal"><span class="feat-cmd">/auto-pilot</span><p style="margin-top:2px">Triage → resolve → review → merge loop with conservative-by-default merge modes.</p></div>
+        <div class="feat-card reveal"><span class="feat-cmd">/auto-pilot</span><p style="margin-top:2px">Triage → resolve → review → merge loop with balanced-by-default merge modes (<code>conservative</code>/<code>balanced</code>/<code>aggressive</code>).</p></div>
         <div class="feat-card reveal"><span class="feat-cmd">/init-gitissue</span><p style="margin-top:2px">Auto-detect language, framework, and test runner; generate a tuned <code>.gitissue.yml</code>.</p></div>
         <div class="feat-card reveal"><span class="feat-cmd">/idd-doctor</span><p style="margin-top:2px">Read-only health check for your IDD repository invariants. <span class="muted">(maintainer tooling)</span></p></div>
+      </div>
+
+      <div class="model-highlight reveal">
+        <div class="model-panel">
+          <div class="section-tag" style="margin-bottom: 10px;">No agent required</div>
+          <h3><code>idd-lint</code> — enforce the spec in CI</h3>
+          <p><code>scripts/idd-lint.py</code> validates <a class="green" href="https://github.com/luongnv89/idd/blob/main/SPEC.md">IDD Spec</a> conformance from plain data — <strong>no LLM, no network, no dependencies</strong> beyond the Python standard library. Lint issues, PRs, commit messages, branches, or a whole repo; every check is tagged with the spec section it enforces and mapped to <code>L1–L3</code> levels.</p>
+          <p>The <code>stats</code> mode goes further: an evidence report with trace completeness, Decision-Record coverage, and resolution outcomes by issue quality — rendered with verdict meters. Exit code 0/1 makes it CI-native; <code>/idd-doctor</code> stays the deep, agent-powered check.</p>
+          <p class="model-note">Runs on any repo, gitissue skills or not · <code>--level L2</code> skips L3 Decision-Record checks · <code>--json</code> for machines, <code>--no-github</code> for offline</p>
+        </div>
+        <div class="terminal compact">
+          <div class="term-bar">
+            <div class="dots"><i></i><i></i><i></i></div>
+            <span class="title">idd-lint — spec conformance</span>
+          </div>
+          <div class="term-body">
+<div class="ln"><span class="c-prompt">❯</span> idd-lint repo --base origin/main</div>
+<div class="ln"><span class="c-head">◆ idd-lint — repo @ main</span> <span class="c-dim">(IDD Spec v1.1, level L2)</span></div>
+<div class="ln c-dim">┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄</div>
+<div class="ln"><span class="c-ok">✓</span> <span class="c-dim">[B02]</span> branch <span class="c-cyan">fix/42-mobile-auth</span> matches grammar <span class="c-dim">(§3.1)</span></div>
+<div class="ln"><span class="c-ok">✓</span> <span class="c-dim">[C01]</span> 6 commit(s) match the grammar <span class="c-dim">(§3.2)</span></div>
+<div class="ln c-dim">┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄</div>
+<div class="ln">  Passed: 7   <span class="c-dim">Warnings: 0   Errors: 0</span></div>
+<div class="ln"><span class="c-ok">✓</span> conformant at L2 <span class="c-dim">(spec v1.1)</span></div>
+<div class="ln"><span class="c-prompt">❯</span> <span class="cursor"></span></div>
+          </div>
+        </div>
       </div>
     </div>
   </section>
 
   <!-- ───────────────────────── AGENT TEAM ───────────────────────── -->
-  <!--
-    Portrait credits — vendored from Wikimedia Commons into assets/agents/
-    (resolved via each subject's Wikipedia lead image). Sherlock Holmes,
-    Ada Lovelace, Nikola Tesla, Marie Curie, Thomas Edison and Charles Darwin
-    are public domain. "LinuxCon Europe Linus Torvalds 03 (cropped)" (Linus
-    Torvalds) and "Designer-Dieter Rams" (Dieter Rams) are CC BY-SA via
-    Wikimedia Commons — attribution retained here.
-  -->
   <section id="team">
     <div class="wrap">
       <div class="section-tag">Specialists under the hood</div>
-      <h2 class="sec-title">Eight shared agents. Eight famous minds.</h2>
-      <p class="sec-lead">Skills orchestrate the pipeline; sub-agents do the deep work. Each prompt in <code class="mono green">src/shared/agents/</code> carries a <strong>Persona</strong> — a historical figure whose thinking style matches the job — so research, review, and fixes stay focused instead of generic.</p>
+      <h2 class="sec-title">Eight shared agents, one per job.</h2>
+      <p class="sec-lead">Skills orchestrate the pipeline; sub-agents do the deep work. Each prompt in <code class="mono green">src/shared/agents/</code> is a single-responsibility specialist — research, synthesis, implementation, review, fixes — with its model tier and thinking level tuned to the task, so every stage stays focused instead of generic.</p>
 
       <div class="agent-grid">
-        <article class="agent-card reveal">
+        <article class="agent-card reveal" style="--i:0">
           <div class="agent-head">
-            <img class="agent-avatar" src="assets/agents/sherlock-holmes.jpg" alt="Portrait of Sherlock Holmes by Sidney Paget" width="56" height="56" loading="lazy" />
+            <div class="agent-icon" aria-hidden="true">⧉</div>
             <div class="agent-meta">
-              <h3>Sherlock Holmes</h3>
-              <p class="role">Duplicate Detector</p>
+              <h3>Duplicate Detector</h3>
+              <p class="role">issue dedup · scoring</p>
             </div>
           </div>
-          <blockquote class="agent-quote">“When you have eliminated the impossible, whatever remains, however improbable, must be the truth.”<cite>— Arthur Conan Doyle</cite></blockquote>
-          <p class="agent-skills"><span>Used by:</span> /issue-creator — dedupe new issues against the backlog.</p>
+          <p class="agent-desc">Scores a new issue against the open backlog and flags likely duplicates before one more copy lands.</p>
+          <p class="agent-skills"><span>Used by:</span> /issue-creator</p>
         </article>
 
-        <article class="agent-card reveal">
+        <article class="agent-card reveal" style="--i:1">
           <div class="agent-head">
-            <img class="agent-avatar" src="assets/agents/ada-lovelace.jpg" alt="Portrait of Ada Lovelace" width="56" height="56" loading="lazy" />
+            <div class="agent-icon" aria-hidden="true">⌕</div>
             <div class="agent-meta">
-              <h3>Ada Lovelace</h3>
-              <p class="role">Codebase Researcher</p>
+              <h3>Codebase Researcher</h3>
+              <p class="role">deep scan · solution research</p>
             </div>
           </div>
-          <blockquote class="agent-quote">“That brain of mine is something more than merely mortal; as time will show.”<cite>— Ada Lovelace</cite></blockquote>
-          <p class="agent-skills"><span>Used by:</span> /issue-resolver, /issue-analysis, /auto-pilot — map files, deps, and history.</p>
+          <p class="agent-desc">Maps the files, dependencies, and git history an issue touches — and researches how similar problems were solved.</p>
+          <p class="agent-skills"><span>Used by:</span> /issue-resolver · /issue-analysis · /auto-pilot</p>
         </article>
 
-        <article class="agent-card reveal">
+        <article class="agent-card reveal" style="--i:2">
           <div class="agent-head">
-            <img class="agent-avatar" src="assets/agents/nikola-tesla.jpg" alt="Portrait of Nikola Tesla" width="56" height="56" loading="lazy" />
+            <div class="agent-icon" aria-hidden="true">◇</div>
             <div class="agent-meta">
-              <h3>Nikola Tesla</h3>
-              <p class="role">Synthesizer</p>
+              <h3>Synthesizer</h3>
+              <p class="role">analysis · implementation options</p>
             </div>
           </div>
-          <blockquote class="agent-quote">“When I get an idea I start at once building it up in my imagination. I change the construction, make improvements and operate the device in my mind.”<cite>— Nikola Tesla, My Inventions (1919)</cite></blockquote>
-          <p class="agent-skills"><span>Used by:</span> /issue-analysis, /issue-resolver — options, trade-offs, recommended approach.</p>
+          <p class="agent-desc">Turns research into weighed options with trade-offs and a recommended approach — plus an overall complexity read.</p>
+          <p class="agent-skills"><span>Used by:</span> /issue-analysis · /issue-resolver</p>
         </article>
 
-        <article class="agent-card reveal">
+        <article class="agent-card reveal" style="--i:3">
           <div class="agent-head">
-            <img class="agent-avatar" src="assets/agents/linus-torvalds.jpg" alt="Portrait of Linus Torvalds" width="56" height="56" loading="lazy" />
+            <div class="agent-icon" aria-hidden="true">⚡</div>
             <div class="agent-meta">
-              <h3>Linus Torvalds</h3>
-              <p class="role">Implementer</p>
+              <h3>Implementer</h3>
+              <p class="role">code · tests</p>
             </div>
           </div>
-          <blockquote class="agent-quote">“Bad programmers worry about the code. Good programmers worry about data structures and their relationships.”<cite>— Linus Torvalds</cite></blockquote>
-          <p class="agent-skills"><span>Used by:</span> /issue-resolver — ship tested code that matches project conventions.</p>
+          <p class="agent-desc">Ships the change and its tests to match project conventions — data structures first, red-capable verification before bug fixes.</p>
+          <p class="agent-skills"><span>Used by:</span> /issue-resolver</p>
         </article>
 
-        <article class="agent-card reveal">
+        <article class="agent-card reveal" style="--i:4">
           <div class="agent-head">
-            <img class="agent-avatar" src="assets/agents/marie-curie.jpg" alt="Portrait of Marie Curie" width="56" height="56" loading="lazy" />
+            <div class="agent-icon" aria-hidden="true">◎</div>
             <div class="agent-meta">
-              <h3>Marie Curie</h3>
-              <p class="role">Code Reviewer</p>
+              <h3>Code Reviewer</h3>
+              <p class="role">confidence-based review</p>
             </div>
           </div>
-          <blockquote class="agent-quote">“Nothing in life is to be feared, it is only to be understood.”<cite>— Marie Curie</cite></blockquote>
-          <p class="agent-skills"><span>Used by:</span> /issue-pr-review, /issue-resolver, /auto-pilot — evidence-based review, high confidence only.</p>
+          <p class="agent-desc">Evidence-based review that reports only high-confidence findings, grouped under Spec and Standards axes — no nitpick noise.</p>
+          <p class="agent-skills"><span>Used by:</span> /issue-pr-review · /issue-resolver · /auto-pilot</p>
         </article>
 
-        <article class="agent-card reveal">
+        <article class="agent-card reveal" style="--i:5">
           <div class="agent-head">
-            <img class="agent-avatar" src="assets/agents/thomas-edison.jpg" alt="Portrait of Thomas Edison" width="56" height="56" loading="lazy" />
+            <div class="agent-icon" aria-hidden="true">⟳</div>
             <div class="agent-meta">
-              <h3>Thomas Edison</h3>
-              <p class="role">Fixer</p>
+              <h3>Fixer</h3>
+              <p class="role">targeted fixes</p>
             </div>
           </div>
-          <blockquote class="agent-quote">“Our greatest weakness lies in giving up. The most certain way to succeed is always to try just one more time.”<cite>— Thomas Edison</cite></blockquote>
-          <p class="agent-skills"><span>Used by:</span> /issue-pr-review, /issue-resolver — targeted fixes until tests and review pass.</p>
+          <p class="agent-desc">Applies scoped fixes for review, test, CI, and acceptance-criteria failures — cycling until the PR turns green.</p>
+          <p class="agent-skills"><span>Used by:</span> /issue-pr-review · /issue-resolver</p>
         </article>
 
-        <article class="agent-card reveal">
+        <article class="agent-card reveal" style="--i:6">
           <div class="agent-head">
-            <img class="agent-avatar" src="assets/agents/charles-darwin.jpg" alt="Portrait of Charles Darwin" width="56" height="56" loading="lazy" />
+            <div class="agent-icon" aria-hidden="true">⋔</div>
             <div class="agent-meta">
-              <h3>Charles Darwin</h3>
-              <p class="role">Issue Relationship Scanner</p>
+              <h3>Relationship Scanner</h3>
+              <p class="role">deps · already-fixed detection</p>
             </div>
           </div>
-          <blockquote class="agent-quote">“These elaborately constructed forms, so different from each other, and dependent on each other in so complex a manner, have all been produced by laws acting around us.”<cite>— Charles Darwin, On the Origin of Species (1859)</cite></blockquote>
-          <p class="agent-skills"><span>Used by:</span> /issue-triage — file deps, parallel work, already-fixed detection.</p>
+          <p class="agent-desc">Finds file-level dependencies between issues, work that can run in parallel, and issues already fixed by a commit or PR.</p>
+          <p class="agent-skills"><span>Used by:</span> /issue-triage</p>
         </article>
 
-        <article class="agent-card reveal">
+        <article class="agent-card reveal" style="--i:7">
           <div class="agent-head">
-            <img class="agent-avatar" src="assets/agents/dieter-rams.jpg" alt="Portrait of Dieter Rams" width="56" height="56" loading="lazy" />
+            <div class="agent-icon" aria-hidden="true">◈</div>
             <div class="agent-meta">
-              <h3>Dieter Rams</h3>
-              <p class="role">UI/UX Reviewer</p>
+              <h3>UI/UX Reviewer</h3>
+              <p class="role">a11y · screenshot review</p>
             </div>
           </div>
-          <blockquote class="agent-quote">“Good design is as little design as possible. Less, but better — because it concentrates on the essential aspects.”<cite>— Dieter Rams</cite></blockquote>
-          <p class="agent-skills"><span>Used by:</span> /issue-pr-review, /issue-resolver — a11y, responsive layout, honest UI.</p>
+          <p class="agent-desc">Auto-detects UI changes and reviews accessibility, responsive layout, and honest UI against the screenshots in the PR.</p>
+          <p class="agent-skills"><span>Used by:</span> /issue-pr-review · /issue-resolver</p>
         </article>
       </div>
     </div>
@@ -982,21 +1035,19 @@
   <section id="methodology">
     <div class="wrap">
       <div class="section-tag">What is IDD?</div>
-      <h2 class="sec-title">Two names for one idea: issues as the atomic unit of work.</h2>
-      <p class="sec-lead">Every change starts as a structured issue and ends as a PR linked to it. The methodology is plain markdown — issuedev just automates the translation.</p>
-
-
+      <h2 class="sec-title">A tool-neutral spec — issues as the atomic unit of work.</h2>
+      <p class="sec-lead">Issue-Driven Development is a written contract: an issue tracker and git history become executable project memory. <a class="green" href="https://github.com/luongnv89/idd/blob/main/SPEC.md">SPEC.md</a> (v1.1) defines the issue format, dependency and <code class="mono green">Part of #N</code> hierarchy markers, naming grammar, and L1–L3 conformance levels — with RFC-2119 MUST/SHOULD language. It needs no specific AI agent, editor, or host. <strong>issuedev is the reference implementation</strong> for Claude Code + GitHub; a human with a text editor can conform too.</p>
 
       <div class="split">
         <div class="idd-card reveal">
-          <div class="kicker">// Issue-Driven Development</div>
-          <h3>The translation gap</h3>
-          <p>Turning a vague report — "login is broken on mobile" — into a structured work order with acceptance criteria, current-code analysis at execution time, and a clear definition of done. That's the gap between describing a problem and shipping a fix, and IDD automates it.</p>
+          <div class="kicker">// The translation gap</div>
+          <h3>From vague report to work order</h3>
+          <p>Turning a vague report — "login is broken on mobile" — into a structured work order with acceptance criteria, current-code analysis at execution time, and a clear definition of done. That's the gap between describing a problem and shipping a fix, and IDD closes it.</p>
         </div>
         <div class="idd-card reveal">
-          <div class="kicker">// Capturing Intention</div>
-          <h3>The intention gap</h3>
-          <p>Helping creators discover and articulate what they actually want through iterative refinement — so the commit that resolves an issue carries the <em>why</em> forward. Your git history becomes a knowledge base, not noise.</p>
+          <div class="kicker">// The intention gap</div>
+          <h3>Commits that carry the <em>why</em></h3>
+          <p>Every change ends as a PR linked to its issue, so the commit that resolves it carries the <em>why</em> forward. Decision Records bind durable memory to the work. Your git history becomes a knowledge base you can retrieve from — not noise.</p>
         </div>
       </div>
     </div>
@@ -1062,7 +1113,7 @@
         </details>
         <details>
           <summary>Is auto-pilot safe to run on a real repo? <span class="q-ico">+</span></summary>
-          <div class="a">It's conservative by default. Clean PRs are merged; partial PRs are left open for review unless you explicitly opt into <code>aggressive</code> mode. A dependency-aware merge gate respects <code>Depends on #N</code> / <code>Blocked by #N</code>, and you can pass an explicit issue list for targeted runs.</div>
+          <div class="a">It's <code>balanced</code> by default: clean PRs are merged, but a PR with unresolved review issues gets a follow-up issue and stays open — partial merges never happen unless you explicitly opt into <code>aggressive</code> mode with <code>merge_partial: true</code>. Prefer to review everything yourself? <code>conservative</code> mode holds every merge. A dependency-aware merge gate respects <code>Depends on #N</code> / <code>Blocked by #N</code>, and you can pass an explicit issue list for targeted runs.</div>
         </details>
         <details>
           <summary>Do I need to configure anything to start? <span class="q-ico">+</span></summary>
@@ -1075,6 +1126,10 @@
         <details>
           <summary>How much does it cost? <span class="q-ico">+</span></summary>
           <div class="a">issuedev is open source under the MIT license. Clone it, fork it, ship it. You only pay for whatever AI agent you choose to run the skills with.</div>
+        </details>
+        <details>
+          <summary>Can I enforce the spec without running an AI agent? <span class="q-ico">+</span></summary>
+          <div class="a">Yes. <code>scripts/idd-lint.py</code> checks <a class="green" href="https://github.com/luongnv89/idd/blob/main/SPEC.md">IDD Spec</a> conformance from plain data — no LLM, no network, no dependencies beyond the Python standard library. Lint issues, PRs, commits, branches, or a whole repo (<code>--level L2</code> to skip L3 Decision-Record checks), and get an exit code 0/1 that drops straight into CI. Its <code>stats</code> mode prints an evidence report — trace completeness, Decision-Record coverage, and outcomes by issue quality. Any repo can run it, gitissue skills or not; <code>/idd-doctor</code> remains the deeper, agent-powered health check.</div>
         </details>
         <details>
           <summary>What is the suggested model on new issues? <span class="q-ico">+</span></summary>
