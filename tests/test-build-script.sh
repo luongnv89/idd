@@ -94,6 +94,25 @@ done
 rm -rf "$TMP_AGENTS"
 
 # ───────────────────────────────────────────────────────────
+# T5b: every shared source agent is emitted for pi-subagents in .pi/agents/
+# ───────────────────────────────────────────────────────────
+PI_AGENTS="$REPO_ROOT/.pi/agents"
+for src_agent in "$SRC_AGENTS"/*.md; do
+  [ -f "$src_agent" ] || continue
+  name="$(basename "$src_agent")"
+  pi_agent="$PI_AGENTS/$name"
+  if [ -f "$pi_agent" ] && \
+     grep -q '^display_name: ' "$pi_agent" && \
+     grep -q 'Managed by IDD installer (pi-subagents)' "$pi_agent" && \
+     ! grep -q 'display_name:.*—' "$pi_agent" && \
+     ! grep -q 'display_name:.*\\u2014' "$pi_agent"; then
+    pass "T5b: .pi/agents/$name generated (role-only display_name)"
+  else
+    fail "T5b: .pi/agents/$name missing or still has persona display_name"
+  fi
+done
+
+# ───────────────────────────────────────────────────────────
 # T6: internal-skills excluded from generated outputs
 # ───────────────────────────────────────────────────────────
 if [ -d "$REPO_ROOT/src/internal-skills" ]; then

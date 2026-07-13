@@ -26,6 +26,12 @@
    ```
    Each top-level `skills/<name>/` package is a self-contained SKILL.md tree with the shared agents bundled inside it (`references/agents/`), so it runs on any SKILL.md-compatible tool — for tools other than Claude Code, copy into that tool's skills directory (e.g. `~/.codex/skills/`). No build step is needed since `skills/` is committed. Optional Claude Code extra: `./scripts/build.sh && cp dist/agents/*.md ~/.claude/agents/` registers the shared subagents natively; other tools use the bundled copies. See [README → Install](../README.md#install).
 
+   **Pi (pi-subagents):** `./scripts/build.sh` also regenerates committed `.pi/agents/*.md` from `src/shared/agents/` (role-only `display_name`, no persona labels). Enable `npm:@tintinweb/pi-subagents` in Pi settings, then either work from this repo (project agents) or copy to your global agent dir:
+   ```bash
+   cp .pi/agents/*.md ~/.pi/agent/agents/
+   ```
+   Restart the Pi session after updating agent files. Skills still recommend spawning reviewers with `description` + prompt only (no `subagent_type`); if you use `subagent_type: code-reviewer`, the UI shows `.pi/agents/` `display_name`.
+
 3. Verify setup:
    ```bash
    gh auth status        # Must be authenticated
@@ -41,6 +47,7 @@ graph LR
     SRC["src/<br/>(authored)"] -->|"./scripts/build.sh"| DSK["dist/skills/<br/>(gitignored, verified)"]
     DSK -->|"promote on verify pass"| RSK["skills/<br/>(committed root install index)"]
     SRC -->|"./scripts/build.sh"| DAG["dist/agents/<br/>(gitignored, optional)"]
+    SRC -->|"./scripts/build.sh"| PAG[".pi/agents/<br/>(committed, Pi)"]
 
     style SRC fill:#4CAF50,color:#fff
     style RSK fill:#2196F3,color:#fff
