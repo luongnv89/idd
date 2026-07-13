@@ -41,6 +41,7 @@ When done, report back ONLY these fields:
 - tests_passed: count of tests passed
 - qa_cycles: number of QA cycles run
 - complexity: Research complexity collapsed to the runs.jsonl 3-value scale (see references/docs/config-schema.md — trivial/low→low, medium→medium, high/complex→high)
+- profile: the adaptive-effort pipeline profile the resolve selected ("light" or "full"), for the run-log `profile` field; omit/null when resolve.adaptive_effort is false or no profile was selected
 - duration_s: wall-clock seconds for the resolve, when measurable, for the run-log line
 - failure_step: which step failed (if status is failure)
 - failure_reason: short error description (if status is failure)
@@ -204,6 +205,10 @@ When done, report back ONLY these fields:
   primary issue's run-log line only, so a batch is not weighted N-fold)
 - complexity: the complexity assessed in Research (e.g. low/medium/high), shared on
   every fanned-out run-log line
+- profile: the adaptive-effort pipeline profile the batch resolve selected ("light"
+  or "full"), shared on every fanned-out run-log line like complexity; omit/null
+  when resolve.adaptive_effort is false. (A batch of several issues is rarely
+  trivial, so this is usually "full".)
 - duration_s: wall-clock seconds for the batch resolve, when measurable; like
   qa_cycles it is attributed to the primary issue's line only
 - failure_step: which step failed (if status is failure)

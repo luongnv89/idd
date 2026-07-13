@@ -123,6 +123,23 @@ resolve:
   # Maximum: 10
   qa_max_cycles: 5
 
+  # Scale the resolve pipeline to each issue's complexity (adaptive effort).
+  # Type: boolean
+  # Default: true
+  # When true, trivial issues (pre-work Effort band XS/S, asserted) take a
+  # lighter, faster, lower-token path: a lighter Research step (the
+  # already-resolved safety check still runs), the 3-option synthesis in Plan is
+  # skipped for a direct minimal plan, the propose-relevant-skills sub-step is
+  # skipped, and QA is capped at 1 cycle. The Decision Record and Acceptance
+  # Criteria Verification table are always emitted regardless. Complex or
+  # ambiguous issues (M/L/XL, low-confidence, or no band) keep the full pipeline.
+  # When false, every issue gets the full pipeline as before — the profile is
+  # pinned to "full". The chosen profile is surfaced on the [0/5] tracker line
+  # and in the run log's `profile` field. See
+  # https://github.com/luongnv89/idd/blob/main/docs/agent-model-effort.md
+  # (Complexity → pipeline profile).
+  adaptive_effort: true
+
   # UI/UX review settings (Step 4 — QA)
   # Code-level UI review is auto-detected per issue and always runs when UI
   # work is present; it needs no flag and runs in any environment (including
@@ -145,6 +162,21 @@ review:
   # Minimum: 1
   # Maximum: 10
   max_cycles: 3
+
+  # Scale review depth to each PR's complexity (adaptive depth).
+  # Type: boolean
+  # Default: true
+  # When true, /issue-pr-review derives a pre-work complexity signal from the PR
+  # (diff size, files-changed, labels, and the linked issue's Effort band — the
+  # fuller of any that disagree) and, for a trivial PR, caps the review-fix loop
+  # at 1 cycle and skips optional passes. The acceptance-criteria and
+  # traceability hard-blocks always run at full strength. Complex or ambiguous
+  # PRs keep the full max_cycles depth. When false, every PR gets full review
+  # depth as before — the profile is pinned to "full". The chosen depth is
+  # surfaced on the [1/7] tracker line. See
+  # https://github.com/luongnv89/idd/blob/main/docs/agent-model-effort.md
+  # (Complexity → pipeline profile).
+  adaptive_depth: true
 
   # Auto-merge PR when clean (overridden to true in --auto mode)
   # Type: boolean
@@ -464,8 +496,10 @@ graph TD
     RS --> R5["pr_auto_link"]
     RS --> R6["max_commits"]
     RS --> R7["qa_max_cycles"]
+    RS --> R8["adaptive_effort"]
 
     RV --> RV1["max_cycles"]
+    RV --> RV14["adaptive_depth"]
     RV --> RV2["auto_merge"]
     RV --> RV3["confidence_threshold"]
     RV --> RV4["run_tests"]
@@ -540,6 +574,7 @@ Each line carries at minimum a **timestamp, issue number, mode, outcome**, and t
 | `outcome` | string | yes | Terminal outcome. Resolver: `success`, `already_resolved`, `failed`. Auto-pilot: one of its six categorical outcomes (`merged`, `left_open`, `partial_followup`, `blocked_by_dependency`, `failed`, `skipped`). |
 | `pr` | integer or null | yes | PR number when a PR was created, else `null` |
 | `complexity` | string | no | Research complexity on the **3-value** run-log scale (`low` / `medium` / `high`) when known. Collapse the researcher's 5-value estimate before writing: `trivial` or `low` → `low`; `medium` → `medium`; `high` or `complex` → `high`. Never emit `trivial` or `complex` in runs.jsonl. |
+| `profile` | string | no | The adaptive-effort pipeline profile the run selected: `light` (trivial fast path) or `full`. Omitted when `resolve.adaptive_effort` is `false` or the signal was unavailable. Lets `/idd-doctor` and audits see how often the fast path fired. See [agent-model-effort.md](https://github.com/luongnv89/idd/blob/main/docs/agent-model-effort.md) (Complexity → pipeline profile). |
 | `qa_cycles` | integer | no | Number of QA review-fix cycles run (resolver) |
 | `duration_s` | integer | no | Wall-clock duration of the run in seconds, when measurable |
 | `skipped_reason` | string | no | Why the issue was skipped (auto-pilot skips, and any `skipped`/`already_resolved` outcome), e.g. `already_resolved`, `blocked_label`, `blocked_by_dependency`, `in_skip_list`, `assigned_to_other` |
@@ -547,7 +582,8 @@ Each line carries at minimum a **timestamp, issue number, mode, outcome**, and t
 Example lines:
 
 ```jsonl
-{"ts":"2026-06-26T14:31:07Z","issue":141,"mode":"auto","skill":"issue-resolver","complexity":"medium","qa_cycles":2,"outcome":"success","pr":150,"duration_s":372}
+{"ts":"2026-06-26T14:31:07Z","issue":141,"mode":"auto","skill":"issue-resolver","complexity":"medium","profile":"full","qa_cycles":2,"outcome":"success","pr":150,"duration_s":372}
+{"ts":"2026-06-26T15:02:41Z","issue":152,"mode":"auto","skill":"issue-resolver","complexity":"low","profile":"light","qa_cycles":1,"outcome":"success","pr":161,"duration_s":94}
 {"ts":"2026-06-26T14:48:12Z","issue":118,"mode":"balanced","skill":"auto-pilot","outcome":"skipped","pr":null,"skipped_reason":"blocked_by_dependency"}
 ```
 
@@ -649,8 +685,11 @@ Config is validated on load at the start of every skill invocation. Errors inclu
 | `resolve.test_timeout` | `300` | 5 minute test timeout |
 | *(removed)* `resolve.pr_auto_link` | — | Deprecated; `Closes #N` is unconditional per SPEC §5.1 |
 | `resolve.max_commits` | `10` | Max commits warning |
+| `resolve.qa_max_cycles` | `5` | Max QA review-fix cycles during resolve Step 4 |
+| `resolve.adaptive_effort` | `true` | Scale the resolve pipeline to issue complexity — trivial issues (Effort XS/S) take a lighter path (lighter Research, skip 3-option Plan, skip propose-skills, QA capped at 1 cycle); `false` pins every issue to the full pipeline ([agent-model-effort.md](https://github.com/luongnv89/idd/blob/main/docs/agent-model-effort.md)) |
 | `resolve.ui_review.browser_review` | `"ask"` | Browser (screenshot) UI review mode; code UI review is auto-detected and always runs |
 | `review.max_cycles` | `3` | Max review-fix cycles |
+| `review.adaptive_depth` | `true` | Scale review depth to PR complexity — a trivial PR caps the review-fix loop at 1 cycle and skips optional passes (AC + traceability hard-blocks still run); `false` pins every PR to full depth ([agent-model-effort.md](https://github.com/luongnv89/idd/blob/main/docs/agent-model-effort.md)) |
 | `review.auto_merge` | `false` | Auto-merge PR when clean |
 | `review.confidence_threshold` | `80` | Min confidence level for issues |
 | `review.run_tests` | `true` | Run tests during review |

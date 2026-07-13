@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- gitissue:normalized v1 -->
 
+## [Unreleased]
+
+### Features
+- **resolver, review:** adapt effort to task complexity (#240) — `/issue-resolver` picks a pipeline **profile** (`light`/`full`) from the issue's pre-work `Effort` band before any subagent spawn, so trivial issues (XS/S) take a fast path (lighter Research, skipped 3-option Plan, skipped propose-skills, QA capped at 1 cycle) while complex or ambiguous work keeps the full pipeline; `/issue-pr-review` scales review depth from a diff-size/labels/linked-issue signal (fuller-of-disagreeing). The Decision Record + Acceptance Criteria table always emit, and the AC + traceability hard-blocks always run at full strength. The chosen profile is surfaced on the tracker line and in the `runs.jsonl` `profile` field. Opt out with `resolve.adaptive_effort: false` / `review.adaptive_depth: false` (both default `true`). Shared mechanism documented in `docs/agent-model-effort.md` (Complexity → pipeline profile). @luongnv89
+
 ## [v0.18.0] — 2026-07-09
 
 The Fable 5 review release: implement all seven recommendations (R1–R7) of the concept & methodology review — extract the spec, shrink the machinery, prove the methodology without an agent, and measure it.

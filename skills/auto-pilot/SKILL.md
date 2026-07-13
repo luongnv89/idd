@@ -5,7 +5,7 @@ license: MIT
 compatibility: "Requires git and GitHub CLI (gh) with auth and push access. Requires merge permission for auto-merge. Requires issue-triage, issue-resolver, issue-analysis, and issue-pr-review to be installed from the same distribution. Optional: issue-creator for normalizing unstructured issues mid-loop."
 effort: max
 metadata:
-  version: 2.4.0
+  version: 2.4.1
   author: Luong NGUYEN <luongnv89@gmail.com>
 ---
 
@@ -173,7 +173,7 @@ The auto-pilot processes multiple issues in a single session. Without careful co
 
 The solution: the main agent acts as a **lightweight orchestrator** that delegates heavy work to subagents via the Agent tool. Each subagent gets a fresh context window, does its work, and returns a concise result. The main agent never reads code, diffs, or test output directly.
 
-Auto-pilot delegates to the resolver/reviewer **skills**, which spawn the shared agents (researcher, synthesizer, implementer, code reviewer, UI reviewer, fixer) under their role identities. Those skills size each agent's model/effort per `references/docs/agent-model-effort.md` and follow the shared conventions in `references/docs/shared-agent-conventions.md`; auto-pilot folds the telemetry they return (`complexity`, `qa_cycles`, `duration_s`) into its single run-log line per issue (see the run-log note below).
+Auto-pilot delegates to the resolver/reviewer **skills**, which spawn the shared agents (researcher, synthesizer, implementer, code reviewer, UI reviewer, fixer) under their role identities. Those skills size each agent's model/effort per `references/docs/agent-model-effort.md` and follow the shared conventions in `references/docs/shared-agent-conventions.md`; auto-pilot folds the telemetry they return (`complexity`, `profile`, `qa_cycles`, `duration_s`) into its single run-log line per issue (see the run-log note below).
 
 ### Subagent Architecture
 
@@ -263,8 +263,8 @@ the log accurate: the single-writer rule and the batch fan-out. Both live in
 
 Populate from the iteration's known values plus the resolver's returned telemetry
 (`ts`, `issue`, `mode`, `skill`, `outcome`, `pr`, and `qa_cycles` / `complexity` /
-`duration_s` when present). **When the outcome is `skipped`, always include
-`skipped_reason`** — a skip never ran the resolver, so it carries no telemetry.
+`profile` / `duration_s` when present). **When the outcome is `skipped`, always
+include `skipped_reason`** — a skip never ran the resolver, so it carries no telemetry.
 The full field list lives in `references/run-log.md` → *Fields to populate*.
 
 ```bash

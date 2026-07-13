@@ -175,7 +175,7 @@ In interactive mode: never auto-merge — just report status.
 A clean review prints the 7-step tracker and a summary:
 
 ```
-  [1/7] PR Info       ✓ #87 fix(auth): resolve redirect (#42)
+  [1/7] PR Info       ✓ #87 fix(auth): resolve redirect (#42), depth: full
   [2/7] Script Pre    ✓ 3 lint fixes applied
   [3/7] Review        ✓ spec[ac:pass correctness:pass safety:pass]
                         standards[trace:pass maint:pass]

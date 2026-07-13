@@ -14,10 +14,10 @@ is invoked with `--no-run-log` (see *Resolver Subagent* in
 `references/subagent-prompts.md`), so it **does not** append its own line — only
 auto-pilot writes here. Writing in both places would double-write one line per
 issue and skew `/idd-doctor`'s resolve-rate and median-QA metrics. The resolver
-**returns** its telemetry (`qa_cycles`, `complexity`, `duration_s`) in its
-result; fold those into the **single line** auto-pilot writes (enriched with that
-telemetry) so the per-issue QA signal survives even though the resolver stayed
-silent. The resolver's run `status` informs auto-pilot's decision but is **not**
+**returns** its telemetry (`qa_cycles`, `complexity`, `profile`, `duration_s`) in
+its result; fold those into the **single line** auto-pilot writes (enriched with
+that telemetry) so the per-issue QA signal survives even though the resolver
+stayed silent. The resolver's run `status` informs auto-pilot's decision but is **not**
 copied into the row's `outcome` — that field stays auto-pilot's own six
 categorical label (set from the merge result).
 
@@ -41,7 +41,9 @@ telemetry: `ts` (current UTC, ISO 8601), `issue` (the number), `mode` (the
 auto-pilot merge mode — `conservative` / `balanced` / `aggressive`), `skill`
 (`auto-pilot`), `outcome` (one of the six categorical labels), `pr` (the PR
 number when one was created, else `null`), and — from the resolver's report-back
-— `qa_cycles`, `complexity`, and `duration_s` when present. **When the outcome is
-`skipped`, always include `skipped_reason`** (e.g. `already_resolved`,
+— `qa_cycles`, `complexity`, `profile`, and `duration_s` when present (`profile`
+is the adaptive-effort profile the resolve chose, `light` or `full`; omit it when
+the resolver returned none). **When the outcome is `skipped`, always include
+`skipped_reason`** (e.g. `already_resolved`,
 `blocked_label`, `blocked_by_dependency`, `in_skip_list`, `assigned_to_other`); a
 skip never ran the resolver, so it carries no resolver telemetry.

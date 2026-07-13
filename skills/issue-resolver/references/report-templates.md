@@ -24,6 +24,7 @@ Closes #{issue_number}
 - **Options rejected:** Option 1 — {one-line reason}; Option 3 — {reason}
 - **Selected option:** Option {N} — {name}
 - **Residual risk:** {what remains uncertain or accepted as known limitation, or "none identified"}
+- **Effort profile:** {"light — fast path (pre-work Effort {band}); synthesis skipped, QA capped at 1 cycle" when the run used the light profile; omit this line entirely on the full profile — the default — so it appears only when the fast path actually fired}
 - **Design-confirm:** {high-complexity issues only — "confirmed Option {N} at design-confirm checkpoint (complexity: {level})" in interactive mode, or "auto-selected Option {N} (complexity: {level})" in auto mode; omit this line for trivial/low/medium complexity}
 - **Reproduction:** {bug issues only — success: `<command>` confirmed red for the stated reason → regression test `<path>` (or "manual — no seam"); degraded: `not reproduced — <one-line reason> (fix applied without confirmed red; criterion marked unverified)`; omit for non-bug issues}
 
@@ -129,7 +130,7 @@ in the closing block:
 ```
   ◆ Resolve Pipeline
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  [0/5] Preflight    ✓ issue #42 open, not yet resolved
+  [0/5] Preflight    ✓ issue #42 open, not yet resolved, effort: full
   [1/5] Research     ✓ read 12 files, complexity: medium
   [2/5] Plan         ✓ option 2 selected: balanced refactor
   [3/5] Implement    ✓ 3 files changed, 8 unit tests, 2 e2e tests

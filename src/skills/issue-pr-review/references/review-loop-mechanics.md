@@ -2,6 +2,50 @@
 
 Exact spawn calls and the token-trade rationale for the reviewer/fixer agents used in Step 3 and the Review Loop of `/issue-pr-review`. SKILL.md keeps the summary (cold start → SendMessage re-review → fresh confirmation); this file holds the detail.
 
+## Depth gate (adaptive review depth)
+
+The Step 1 *Depth gate* selects a review `profile` — `light` or `full` — from a
+pre-work complexity signal, so a trivial PR is not reviewed as deeply as a
+multi-subsystem one. The mechanism and the shared `XS … XL` scale live in
+`docs/agent-model-effort.md` (*Complexity → pipeline profile*); this section is
+only how the review loop consumes the result.
+
+**Selecting the signal (no researcher here).** Unlike `/issue-resolver`,
+`/issue-pr-review` has no research subagent, so it derives the signal from data
+already fetched in Step 1 and takes the **fuller** of any inputs that disagree:
+
+- **Diff size / files-changed** (`gh pr view {N} --json files`) — small change
+  (≈ ≤ 15 changed lines in 1 file) leans `light`.
+- **Linked-issue `Effort` band** — when the PR body has `Closes #N`, read that
+  issue's `## Metadata` `Effort` (`gh issue view {N} --json body`); `XS`/`S`
+  asserted leans `light`, `M`/`L`/`XL` or low-confidence leans `full`.
+- **Security label** — any `security`/`CVE`/`vulnerability` label forces `full`.
+
+Resolve to `light` **only when every available signal agrees on trivial**; any
+`full` vote, or a missing/ambiguous signal, wins → `full`. When
+`review.adaptive_depth` is `false`, the gate is skipped and `profile = full`.
+
+**What `light` changes in the loop:**
+
+| Aspect | `full` (default) | `light` |
+|--------|------------------|---------|
+| Review-fix cycle cap | `review.max_cycles` (3) | **1** |
+| Optional browser UI review | runs when opted in + reachable | skipped |
+| Code UI review (auto-detected) | runs when UI work present | runs when UI work present (unchanged) |
+| AC + traceability hard-blocks | full strength | **full strength (unchanged)** |
+| Reviewer spawn | yes | yes (depth reduced, never skipped) |
+
+The `light` cap of 1 is a **ceiling that wins** — it is the effective cycle limit
+regardless of the configured value, i.e. `min(1, configured_cap)`. This matters
+under `/auto-pilot`, which overrides `review.max_cycles` with its `review_cycles`
+value (default 3): on the `light` path the effective cap is still **1**, never the
+overridden 3. The cap governs **only** the loop iteration count; the cold-start
+reviewer, the fixer, and the fresh confirmation pass below all still apply — a
+`light` review is one review pass + at most one fix + confirmation, not a skipped
+review. The two #36 hard-blocks (`acceptance_criteria: fail`, missing
+`Closes #N`) are never relaxed by the profile — a trivial PR that fails them still
+blocks soft-pass and does not merge.
+
 ## Why reuse the reviewer
 
 To minimize token usage, the review loop **reuses the same reviewer agent** across fix cycles instead of spawning a fresh one each time. The reviewer already has the codebase context loaded, so subsequent reviews are cheaper.
