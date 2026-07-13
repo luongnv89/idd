@@ -47,6 +47,11 @@ resolve:
   # Max QA review-fix cycles during resolve Step 4
   qa_max_cycles: 5
 
+  # Scale the resolve pipeline to issue complexity (adaptive effort).
+  # true: trivial issues (Effort XS/S) take a lighter, faster path; complex or
+  # ambiguous issues keep the full pipeline. false: full pipeline for every issue.
+  adaptive_effort: true
+
   ui_review:
     browser_review: ask
 
@@ -67,6 +72,10 @@ triage:
 # PR review settings (used by /issue-pr-review and /auto-pilot)
 review:
   max_cycles: 3
+  # Scale review depth to PR complexity (adaptive depth).
+  # true: a trivial PR caps the review-fix loop at 1 cycle and skips optional
+  # passes; complex or ambiguous PRs keep full depth. false: full depth always.
+  adaptive_depth: true
   auto_merge: false
   confidence_threshold: 80
   run_tests: true

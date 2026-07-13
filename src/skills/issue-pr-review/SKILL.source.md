@@ -5,7 +5,7 @@ license: MIT
 compatibility: "Requires git and GitHub CLI (gh) with authentication. Self-contained — uses shared agents from shared/agents/."
 effort: high
 metadata:
-  version: 2.4.1
+  version: 2.5.0
   author: Luong NGUYEN <luongnv89@gmail.com>
 ---
 
@@ -79,6 +79,7 @@ If `origin` is missing or rebase conflicts occur, stop and ask (interactive) or 
 
 Load `.gitissue.yml` once. Defaults (full semantics in `docs/config-schema.md`):
 - `review.max_cycles: 3` — 3 LLM cycles suffice once the script pre-pass handles mechanical issues
+- `review.adaptive_depth: true` — scale review depth to the PR's complexity (see *Step 1 — Depth gate*). When `false`, every PR gets full-depth review (profile pinned to `full`).
 - `review.auto_merge: false` (overridden to `true` in auto mode)
 - `review.confidence_threshold: 80`
 - `review.run_tests: true`, `review.check_ci: true`
@@ -99,7 +100,7 @@ UI/UX **code** review needs no config flag — it is auto-detected per PR (*Step
 ```
   ◆ PR Review Pipeline
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  [1/7] PR Info      ✓ PR #87: fix(auth): resolve redirect (#42)
+  [1/7] PR Info      ✓ PR #87: fix(auth): resolve redirect (#42), depth: full
   [2/7] Pre-pass     ✓ lint clean, format clean, 17 tests passed
   [3/7] Review       ● analyzing changes...
   [4/7] Test         ✓ 17 tests passed, build ok
@@ -158,6 +159,43 @@ gh pr checkout {N}
 ```
 
 Use `{headRefName}` from Step 1 as `{branch_name}` for sync, commit, and push. Canonical command: `docs/platform-github.md` (*Pull requests* → Checkout PR head branch).
+
+### Depth gate (select the review profile)
+
+Decide **how deep** this review goes, so a one-line copy fix is not put through
+the same full-weight review as a multi-subsystem PR. The mechanism and the shared
+`XS … XL` scale it reuses are defined once in `docs/agent-model-effort.md`
+(*Complexity → pipeline profile*); this skill has no researcher, so it derives its
+own **pre-work** complexity signal from data already fetched in Step 1.
+
+When `review.adaptive_depth` is `false`, skip the gate: set `profile = full` and
+review at full depth as before. Otherwise compute the signal from the PR itself
+and take the **fuller** of any inputs that disagree (a "trivial" issue whose diff
+ballooned still earns full review):
+
+- **Diff size / files-changed** — from `statusCheckRollup`/`files` in Step 1
+  (`gh pr view {N} --json files`). Small (e.g. ≤ ~15 changed lines across 1 file)
+  leans `light`; larger leans `full`.
+- **Linked-issue `Effort` band** — when the PR links an issue (`Closes #N`), fetch
+  its `## Metadata` `Effort` (`gh issue view {N} --json body`). `XS`/`S` asserted
+  leans `light`; `M`/`L`/`XL`, or low-confidence, leans `full`.
+- **Labels** — a `security`/`CVE`/`vulnerability` label (case-insensitive) forces
+  `full` regardless of size (security-sensitive changes always get full review).
+
+Resolve to `profile = light` only when **every** available signal agrees on
+trivial; if any signal says `full`, or a signal is missing/ambiguous, use `full`
+(ambiguous → fuller). Surface the decision on the `[1/7]` tracker line:
+
+```
+[1/7] PR Info      ✓ PR #{N}: {title}
+                     {files_count} files changed, base: {base_branch}, depth: {profile}
+```
+
+`{profile}` is `light` or `full`. When `review.adaptive_depth` is `false`, still
+print `depth: full` so the line is uniform. The `light` profile scales the Review
+Loop only — see *Review Loop* (`light` caps cycles at 1 and skips optional passes;
+the acceptance-criteria and traceability hard-blocks always run at full strength).
+Full mechanics in `references/review-loop-mechanics.md` (*Depth gate*).
 
 ---
 
@@ -328,7 +366,16 @@ Cycle {N}:
 After Step 6, go back to Step 3 — but reuse the same reviewer agent via `SendMessage` (not a fresh spawn). Only spawn fresh for the confirmation pass.
 
 **Loop controls:**
-- **Max cycles:** `review.max_cycles` (default: 3)
+- **Max cycles:** `review.max_cycles` (default: 3). **`light` profile (Step 1
+  Depth gate) caps this at 1** — one review pass, one fix cycle if `action: "fix"`
+  issues are found, then the confirmation pass and exit. The reviewer still runs
+  on the `light` path (depth reduced, review never skipped); only the number of
+  review-fix iterations is capped. `full` uses `review.max_cycles` as before.
+- **`light` profile — optional passes:** the `light` depth skips the optional
+  browser UI review (the code UI review still auto-detects and runs when UI work
+  is present) and does not spin extra confirmation cycles. The two #36
+  hard-blocks — `acceptance_criteria: fail` and missing `Closes #N` — **still run
+  at full strength** on every profile; the fast path never relaxes them.
 - **Agent reuse:** Cycles 2+ reuse the existing reviewer and fixer agents. Fresh spawn only for the confirmation pass after fixer reports zero issues.
 - **Soft pass (when `review.soft_pass: true`, default):** Stop when ALL hold: zero `action: "fix"` issues remain AND (tests pass or `review.run_tests: false`) AND (CI passes, no CI configured, or `review.check_ci: false`) AND traceability is not `fail`. Medium `note` issues and `partial` dimensions are report-only — they do not block.
 - **Strict pass (when `review.soft_pass: false`):** Apply the same tests/CI gates, then require zero `action: "fix"` findings, zero remaining `action: "note"` findings, and `pass` for every enabled dimension. A `partial` dimension or any note is a strict blocker: exit the fix loop, report it under Remaining, and do not report clean or merge. Notes never become fixer inputs — Step 6 still fixes only `action: "fix"` — so strict mode surfaces these for manual remediation rather than looping without a fixable action.

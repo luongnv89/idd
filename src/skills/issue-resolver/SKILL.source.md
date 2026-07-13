@@ -5,7 +5,7 @@ license: MIT
 compatibility: "Requires git and GitHub CLI (gh) with authentication and push access. Self-contained — uses shared agents from shared/agents/."
 effort: max
 metadata:
-  version: 0.16.1
+  version: 0.17.0
   author: Luong NGUYEN <luongnv89@gmail.com>
 ---
 
@@ -73,6 +73,7 @@ Defaults (full field reference in `docs/config-schema.md`):
 - `resolve.test_timeout: 300`
 - `resolve.max_commits: 10`
 - `resolve.qa_max_cycles: 5`
+- `resolve.adaptive_effort: true` — scale the pipeline to the issue's complexity (see *Step 0g — Complexity gate*). When `false`, every issue runs the full pipeline (profile pinned to `full`).
 - `resolve.ui_review.browser_review: "ask"` — gates only the optional browser/screenshot review; the code-level UI review (*Step 4 — UI/UX review*) is auto-detected and always runs.
 
 ---
@@ -162,7 +163,7 @@ The resolve pipeline has 6 steps (0-5). Display progress using the `[N/5]` step 
 ```
   ◆ Resolve Pipeline
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  [0/5] Preflight    ✓ issue #42 open, not yet resolved
+  [0/5] Preflight    ✓ issue #42 open, not yet resolved, effort: full
   [1/5] Research     ✓ read 12 files, complexity: medium
   [2/5] Plan         ✓ option 2 selected: balanced refactor
   [3/5] Implement    ✓ 3 files changed, 8 unit tests, 2 e2e tests
@@ -295,18 +296,61 @@ a custom prefix is used verbatim as `{configured-prefix}{N}-{short-description}`
 - Interactive mode: ask `continue` or `fresh`
 - Auto mode: `continue` (checkout existing branch)
 
-After preflight:
+### 0g — Complexity gate (select the pipeline profile)
+
+Decide **before Step 1** how much pipeline this issue earns, so a trivial edit
+does not pay the full orchestration cost. The mechanism, the shared `XS … XL`
+scale it reuses, and the safety rules are defined once in
+`docs/agent-model-effort.md` (*Complexity → pipeline profile*) — apply that
+document here; this sub-step is only the resolver's entry point into it.
+
+When `resolve.adaptive_effort` is `false`, skip the gate entirely: set
+`profile = full` and continue exactly as before. Otherwise select the profile
+from the issue's **pre-work `Effort` band** (the `XS … XL` value in the issue's
+`## Metadata`, written by `/issue-creator`) — never from a later agent output, so
+the saving is real:
+
+- `Effort` `XS`/`S`, asserted (not `(needs review)`/low-confidence) → `profile = light`
+- `Effort` `M`/`L`/`XL` → `profile = full`
+- `Effort` `XS`/`S` but low-confidence, **or** absent/unparseable → `profile = full` (ambiguous → fuller)
+
+The `light` profile changes later steps as follows (each step restates its own
+behavior; the full per-step mechanics are in `references/pipeline-steps.md`):
+
+- **Step 1 Research** — lighter scan, but the already-resolved safety check still runs.
+- **Step 2 Plan** — skip the 3-option synthesis; use a direct minimal plan.
+- **Step 3** — skip the interactive *Propose relevant skills* sub-step.
+- **Step 4 QA** — cap the review-fix loop at **1** cycle (overrides `resolve.qa_max_cycles`).
+
+`full` leaves every step exactly as it is today. Either way, **Deliver (Step 5)
+always emits the Decision Record and Acceptance Criteria Verification table** —
+the profile never removes durable memory.
+
+The profile may only be **revised upward** later (e.g. Step 1 research reports
+`high`/`complex` on what the band called `S` → switch to `full` for the remaining
+steps); never downgrade a `full` run to `light` mid-pipeline.
+
+After preflight (surface the chosen profile so the effort decision is transparent):
 ```
-[0/5] Preflight    ✓ issue #N open, branch: {branch_name}{workspace_note}
+[0/5] Preflight    ✓ issue #N open, branch: {branch_name}{workspace_note}, effort: {profile}
 ```
 
-`{workspace_note}` is ` (worktree)` in a worktree, empty otherwise.
+`{workspace_note}` is ` (worktree)` in a worktree, empty otherwise. `{profile}`
+is `light` or `full`. When `resolve.adaptive_effort` is `false`, still print
+`effort: full` (the pinned profile) so the line is uniform.
 
 ---
 
 ## Step 1 — Research
 
 Deeply understand the issue, affected codebase, and possible solutions; also verifies the issue hasn't already been fixed (early-exit path closes it in auto mode). Spawn the researcher (`shared/agents/codebase-researcher.md`) with the canonical pattern — full delegation payload, phases, early-exit behavior, and inline fallback are in `references/pipeline-steps.md` (*Step 1 — Research*).
+
+**`light` profile:** run a **lighter** research pass — the already-resolved
+safety check and a focused scan of the obviously-affected file(s) still run, but
+skip the broad dependency trace and external solution research (a trivial edit
+does not need them). If this lighter pass nonetheless surfaces `high`/`complex`
+signals, revise the profile **upward** to `full` for the remaining steps (never
+downward) — see *Step 0g* and `references/pipeline-steps.md` (*Step 1 — Research*).
 
 After research:
 ```
@@ -322,6 +366,14 @@ Generate implementation options and select one. Spawn the synthesizer (`shared/a
 It returns 3 options — minimal / balanced / comprehensive — with the balanced option usually recommended.
 
 Selection behavior (interactive auto, interactive comment-and-wait, auto-pilot) and inline fallback are in `references/pipeline-steps.md` (*Step 2 — Plan*).
+
+**`light` profile:** skip the 3-option synthesis entirely — do **not** spawn the
+synthesizer. Derive a **direct minimal plan** inline (the single obvious change
+that satisfies the acceptance criteria) and record it as the selected option, so
+the Decision Record still has a real `Selected option` to lift in Step 5. The
+design-confirm checkpoint does not apply (it is high-complexity only, which the
+`light` path is not). Full procedure in `references/pipeline-steps.md`
+(*Step 2 — Plan → `light` profile*).
 
 After plan selection:
 ```
@@ -355,6 +407,11 @@ relevant subset, let the user accept all/some/none into `selected_skills` — th
 implementer always falls back to internal agents, so selecting none is unchanged
 behavior. Full procedure in `references/pipeline-steps.md` (*Step 3 — Propose relevant skills*).
 
+**`light` profile:** skip this sub-step — set `selected_skills = []` and proceed
+straight to the implementer (a trivial edit does not warrant the extra prompt).
+This mirrors the auto-mode behavior; the implementer's internal-agent fallback is
+unchanged.
+
 Write code and tests based on the selected plan. Spawn the implementer (`shared/agents/implementer.md`) with the canonical pattern, passing the plan, branch name, naming conventions, and `selected_skills`.
 
 For **bug** issues, the implementer first runs the red-capable reproduction checkpoint — reproduce the symptom, confirm it fails red, fix, then convert to a regression test. Surfaced as evidence in the PR Decision Record and acceptance table. Non-bug issues skip it; auto mode never blocks. See `references/bug-verification.md`.
@@ -386,6 +443,11 @@ UI review is **auto-detected per issue** — no config flag enables it. Scan the
 - **Browser UI review** — optional screenshots from a running app; runs only when reachable *and* opted in, else **skips with a warning, code UI review still runs** — fail-soft.
 
 Detection rules, `ui-reviewer` spawns, the `resolve.ui_review.browser_review` gate, and skip/success messages are in `references/pipeline-steps.md` (*Step 4 — UI/UX review*). Cycle mechanics and loop controls (`resolve.qa_max_cycles`, exit-on-clean, exit-on-stagnation) are in the same file (*Step 4 — QA*).
+
+**`light` profile:** cap the review-fix loop at **1** cycle (a single review pass;
+fix once if blocking issues are found, then deliver) instead of
+`resolve.qa_max_cycles`. One reviewer spawn still runs — the fast path reduces
+depth, it does not skip review. UI review remains auto-detected as usual.
 
 ---
 
@@ -445,18 +507,20 @@ already fixed (`already_resolved`), or a failed step (`failed`) — append exact
 (see *Suppression rule*), in which case append **nothing** and return the
 telemetry to the caller instead. Build the object from values already known
 (`ts`, `issue`, `mode`, `skill`, `outcome`, `pr`, plus optional `complexity`,
-`qa_cycles`, `duration_s`, `skipped_reason`) per the schema in
+`profile`, `qa_cycles`, `duration_s`, `skipped_reason`) per the schema in
 `docs/config-schema.md` (*`.gitissue/runs.jsonl` — run log*). Collapse researcher
 complexity to the 3-value run-log scale before writing (`trivial`/`low`→`low`,
-`medium`→`medium`, `high`/`complex`→`high`).
+`medium`→`medium`, `high`/`complex`→`high`). Set `profile` to the pipeline profile
+chosen in *Step 0g* (`light` or `full`); omit it only when `resolve.adaptive_effort`
+is `false` or no profile was selected (e.g. an early failure before Step 0g).
 
 > **Suppression rule (single writer under `/auto-pilot`).** `--no-run-log` is
 > passed only by `/auto-pilot`, which runs this resolver as a subagent and writes
 > the **single** run-log line per issue itself — appending here too would
 > double-write and skew `/idd-doctor`'s metrics. Instead **return** the telemetry
-> (`outcome`, `qa_cycles`, `complexity`, `duration_s`) in the subagent result so
-> the orchestrator folds it into its own line. Independent of `--auto`: a
-> standalone `/issue-resolver <N> --auto` is *not* suppressed and still writes.
+> (`outcome`, `qa_cycles`, `complexity`, `profile`, `duration_s`) in the subagent
+> result so the orchestrator folds it into its own line. Independent of `--auto`:
+> a standalone `/issue-resolver <N> --auto` is *not* suppressed and still writes.
 
 ```bash
 # Only when --no-run-log is NOT set:
@@ -493,6 +557,7 @@ When invoked with `--auto` (or by `/auto-pilot`), the entire pipeline runs witho
 
 - **Environment:** Export `IDD_AUTO_MODE=1` before any shell snippet that consults it (`docs/pre-commit-security.md`).
 - **Workspace:** Always in-place. Skip Step 0e entirely — no `git worktree add` on the default resolution path. Run mandatory Repo Sync, then *0f — Create branch*.
+- **Complexity gate:** *Step 0g* runs in auto mode too — it reads the pre-work `Effort` band (no prompt) and selects `light`/`full` the same way, so trivial issues resolve on the fast path autonomously. Under `/auto-pilot` the selected `profile` is **returned** in the telemetry (with `--no-run-log`) and folded into auto-pilot's single run-log line; a standalone `--auto` run writes `profile` itself.
 - **Preflight:** Skip assignment guard. Log blocking labels as warnings, don't stop.
 - **Research:** If already resolved, close the issue with a comment and exit cleanly.
 - **Plan:** Auto-select the recommended option; design-confirm never appears — log the selection and proceed.

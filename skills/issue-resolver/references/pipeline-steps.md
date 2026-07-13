@@ -206,6 +206,33 @@ If the researcher returns `already_resolved: true` or `pr_in_progress: true`:
 - Auto mode: close the issue with a comment and move on.
 - Interactive mode: inform the user and stop.
 
+### `light` profile — lighter research
+
+When *Step 0g* selected `profile = light` (`resolve.adaptive_effort` on, pre-work
+`Effort` band `XS`/`S` asserted), run a reduced research pass keyed to a trivial
+change:
+
+1. **Keep** the *Verify not already resolved* phase in full — this is
+   safety-critical and runs on every profile (a fast path must never skip the
+   already-fixed check).
+2. **Keep** a focused scan of the file(s) the issue obviously names or points at,
+   enough to write the change and its evidence.
+3. **Skip** the broad dependency trace (`trace_depth`), the git-history
+   domain-expert scan, and external solution research — a single-word/single-file
+   edit does not need them. Lowering this work is the token saving the profile
+   exists for.
+
+**Upgrade, never downgrade.** If the lighter pass still surfaces `high`/`complex`
+signals (the change touches far more than the band implied), revise the profile
+**upward** to `full` for the remaining steps and run Step 2's synthesizer and
+Step 4's full QA loop as usual. Never move a run from `full` down to `light` on a
+mid-pipeline signal — the pre-work gate is the only place `light` is chosen, and
+downgrading could truncate work already underway. Record the upgrade so the
+surfaced profile and the run-log `profile` reflect the final value.
+
+The delegation payload is otherwise unchanged; pass the researcher a note that a
+lighter, targeted scan is expected (mirroring the model/effort tier intent).
+
 ### Inline fallback
 
 If no Agent tool, execute research inline following the same phases described in `references/agents/codebase-researcher.md`.
@@ -229,6 +256,36 @@ The synthesizer returns 3 options differing in scope:
 1. **Minimal fix** — smallest change
 2. **Balanced approach** — proper fix, reasonable scope (usually recommended)
 3. **Comprehensive refactor** — addresses root cause and technical debt
+
+### `light` profile — skip the synthesis
+
+When *Step 0g* selected `profile = light`, do **not** spawn the synthesizer at
+all — the 3-option comparison is overkill for a trivial change, and skipping the
+spawn is a direct token saving. Instead, derive a **direct minimal plan** inline
+from the Step 1 research:
+
+- The plan is the single obvious change that satisfies the acceptance criteria
+  (e.g. "update the copy string in `X`", "bump the timeout constant in `Y`").
+- Record it as the **selected option** with a one-line name and summary, so
+  Step 5's Decision Record has a real `Selected option` to lift and
+  `Options rejected` is simply "n/a — trivial change, direct plan (light profile)".
+- The **design-confirm checkpoint does not apply** — it fires only on
+  `overall_complexity: L`/`XL` or `overall_risk: High`, which the `light` path
+  (band `XS`/`S`) is by definition not.
+- **`approval_gate: comment-and-wait` does not present options on the `light`
+  path.** That gate exists to show the 3 synthesized options and wait for a pick,
+  but the `light` path produces none — so it proceeds with the direct minimal
+  plan **without** an option prompt (the same way the `light` path skips the
+  *Propose relevant skills* prompt). A maintainer who wants to approve every plan
+  regardless of size sets `resolve.adaptive_effort: false`, which pins the full
+  pipeline and restores the `comment-and-wait` option prompt.
+
+If Step 1 upgraded the profile to `full` (a `high`/`complex` signal), run the
+normal synthesizer spawn below instead — the `light` skip is only for runs that
+stayed `light` through research.
+
+The tracker line is unchanged (`[2/5] Plan  ✓ approach: {selected option name}`);
+`{selected option name}` is the direct minimal plan's name.
 
 ### Plan selection
 
@@ -476,7 +533,12 @@ Each cycle:
 
 ### Loop controls
 
-- **Max cycles:** `resolve.qa_max_cycles` (default: 5)
+- **Max cycles:** `resolve.qa_max_cycles` (default: 5). **`light` profile caps
+  this at 1** — a single review pass, one fix if blocking issues are found, then
+  proceed to Deliver. The reviewer spawn still runs on the `light` path (review is
+  reduced in depth, never skipped); only the *number* of review-fix iterations is
+  capped. (A profile upgraded to `full` in Step 1 uses the normal
+  `resolve.qa_max_cycles` cap.)
 - **Exit on clean:** stop as soon as review passes AND tests pass
 - **Exit on stagnation:** if the same issues appear in 2 consecutive cycles, stop and report
 
