@@ -84,6 +84,10 @@ resolve:
   # Default: "auto"
   # "auto": proceed immediately after planning
   # "comment-and-wait": show plan and wait for user approval
+  # Note: with resolve.adaptive_effort: true (default), a light-profile (trivial
+  #   XS/S) issue proceeds on a direct minimal plan without the option prompt —
+  #   it produces no 3-option comparison to wait on. Set adaptive_effort: false
+  #   to force the approval wait on every issue regardless of complexity.
   approval_gate: auto
 
   # Branch naming prefix
