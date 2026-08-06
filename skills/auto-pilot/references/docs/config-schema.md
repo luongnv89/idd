@@ -1,6 +1,8 @@
 <!-- Generated from /docs/config-schema.md. Do not edit. Edit source and run ./scripts/build.sh. -->
 # `.gitissue.yml` Configuration Schema
 
+> **Per-skill excerpt (generated).** Only the configuration sections this skill reads are reproduced here: `autopilot`, `platform`, `resolve`, `review`, `triage`. The complete schema — every section and the full defaults table — is at [config-schema.md](https://github.com/luongnv89/idd/blob/main/docs/config-schema.md).
+
 gitissue works with zero configuration — all settings have sensible defaults. When no `.gitissue.yml` file exists, the first-run hint is shown:
 
 ```
@@ -50,31 +52,6 @@ Ten fields cover almost every customization in practice — `platform`, `issue.a
 #         a new driver becomes valid here once its docs/platform-<name>.md exists
 # Default: "github"
 platform: github
-
-# Issue creation and normalization settings
-issue:
-  # Auto-normalize issues (structure-only, no codebase scan) in /issue-resolver before resolution
-  # Type: boolean
-  # Default: true
-  auto_normalize: true
-
-  # Issue template source
-  # Type: string
-  # Values: "default" | path to custom template directory
-  # Default: "default"
-  # When "default", uses built-in templates (bug.md, feature.md, improvement.md)
-  # When a path, looks for bug.md, feature.md, improvement.md in that directory
-  template: default
-
-  # Auto-suggest labels based on issue content and type
-  # Type: boolean
-  # Default: true
-  labels_auto_suggest: true
-
-  # Post a comment when normalizing an issue
-  # Type: boolean
-  # Default: true
-  normalize_comment: true
 
 # Resolution pipeline settings
 resolve:
@@ -359,7 +336,8 @@ autopilot:
   # open with outcome blocked_by_dependency and the loop continues to the next
   # eligible issue — the run is not paused. When disabled, the merge gate is
   # skipped — useful for repos that do not use the convention. See
-  # references/docs/idd-methodology.md (Issue Dependencies) for the marker syntax.
+  # https://github.com/luongnv89/idd/blob/main/docs/idd-methodology.md
+  # (Issue Dependencies) for the marker syntax.
   # Type: boolean
   # Default: true
   respect_dependencies: true
@@ -388,164 +366,6 @@ triage:
   # Minimum: 5
   # Maximum: 300
   scan_timeout_per_issue: 30
-
-# Issue analysis settings
-analysis:
-  # Max files to read during deep analysis (more thorough than resolver's 20)
-  # Type: integer
-  # Default: 30
-  # Minimum: 5
-  # Maximum: 100
-  max_files: 30
-
-  # How many levels of import dependencies to trace
-  # Type: integer
-  # Default: 3
-  # Minimum: 1
-  # Maximum: 5
-  trace_depth: 3
-
-  # Max seconds for the full codebase scan phase
-  # Type: integer
-  # Default: 120
-  # Minimum: 30
-  # Maximum: 600
-  scan_timeout: 120
-
-# GitHub Projects board sync settings
-# See references/docs/github-projects-sync.md for the full integration reference
-projects:
-  # Enable automatic project board status sync
-  # Type: boolean
-  # Default: false
-  # When false, all project sync operations are silently skipped
-  sync_enabled: false
-
-  # Explicit project number (from the project URL)
-  # Type: integer or null
-  # Default: null (auto-detect first linked project)
-  # Set this if the repo has multiple linked projects
-  project_number: null
-
-  # Name of the Status field on the project board
-  # Type: string
-  # Default: "Status"
-  # Must match the exact field name on the project (case-sensitive)
-  status_field: "Status"
-
-  # Map of internal status keys to project board option values
-  # Type: object
-  # Each value must match an option name in the Status field
-  status_map:
-    # Status for newly created issues
-    # Type: string
-    # Default: "Todo"
-    todo: "Todo"
-
-    # Status when work starts (branch created)
-    # Type: string
-    # Default: "In Progress"
-    in_progress: "In Progress"
-
-    # Status when PR is created
-    # Type: string
-    # Default: "Done"
-    done: "Done"
-
-# Model suggestion settings (used by /issue-creator)
-# See src/skills/issue-creator/references/model-suggestion.md for the full procedure
-model_suggestion:
-  # Suggest a cost-effective model + thinking level per issue, from CursorBench
-  # data cached at the skill level in model-data-<date>.json (shared across all
-  # repos, not per-project; force-refresh with --refresh-model-data)
-  # Type: boolean
-  # Default: true
-  # When false, all model-suggestion behavior is silently skipped and the issue
-  # body / preview are unchanged from the pre-feature behavior
-  enabled: true
-
-  # Source URL refreshed into the cache on opt-in
-  # Type: string
-  # Default: "https://cursor.com/cursorbench"
-  data_url: "https://cursor.com/cursorbench"
-
-  # Days before the cached model data is considered stale (warning + refresh prompt)
-  # Type: integer
-  # Default: 7
-  cache_ttl_days: 7
-```
-
-### Config Section Map
-
-```mermaid
-graph TD
-    R[".gitissue.yml"] --> P["platform<br/>(driver: github)"]
-    R --> I["issue"]
-    R --> RS["resolve"]
-    R --> RV["review"]
-    R --> AP["autopilot"]
-    R --> T["triage"]
-    R --> A["analysis"]
-    R --> PR["projects"]
-    R --> MS["model_suggestion"]
-
-    I --> I1["auto_normalize"]
-    I --> I2["template"]
-    I --> I3["labels_auto_suggest"]
-    I --> I4["normalize_comment"]
-
-    RS --> R1["approval_gate"]
-    RS --> R2["branch_prefix"]
-    RS --> R3["auto_test"]
-    RS --> R4["test_timeout"]
-    RS --> R5["pr_auto_link"]
-    RS --> R6["max_commits"]
-    RS --> R7["qa_max_cycles"]
-    RS --> R8["adaptive_effort"]
-
-    RV --> RV1["max_cycles"]
-    RV --> RV14["adaptive_depth"]
-    RV --> RV2["auto_merge"]
-    RV --> RV3["confidence_threshold"]
-    RV --> RV4["run_tests"]
-    RV --> RV5["check_ci"]
-    RV --> RV6["ci_poll_interval"]
-    RV --> RV7["ci_timeout"]
-    RV --> RV8["test_timeout"]
-    RV --> RV9["soft_pass"]
-    RV --> RV10["require_acceptance_criteria_check"]
-    RV --> RV11["require_traceability_check"]
-    RV --> RV12["traceability_exempt_labels"]
-    RV --> RV13["traceability_exempt_pattern"]
-
-    AP --> AP0["mode"]
-    AP --> AP00["merge_partial"]
-    AP --> AP1["max_iterations"]
-    AP --> AP2["review_cycles"]
-    AP --> AP3["auto_merge<br/>(legacy)"]
-    AP --> AP4["pause_on_failure"]
-    AP --> AP5["skip_labels"]
-    AP --> AP6["critical_labels"]
-
-    T --> T1["stale_threshold_days"]
-    T --> T2["auto_priority"]
-    T --> T3["include_closed"]
-    T --> T4["scan_timeout_per_issue"]
-
-    A --> A1["max_files"]
-    A --> A2["trace_depth"]
-    A --> A3["scan_timeout"]
-
-    PR --> PR1["sync_enabled"]
-    PR --> PR2["project_number"]
-    PR --> PR3["status_field"]
-    PR --> PR4["status_map"]
-
-    MS --> MS1["enabled"]
-    MS --> MS2["data_url"]
-    MS --> MS3["cache_ttl_days"]
-
-    style R fill:#4CAF50,color:#fff
 ```
 
 ## `.gitissue/` Directory
@@ -556,95 +376,7 @@ The `.gitissue/` directory at the repo root stores persistent state generated by
 |------|-----------|-------------|
 | `.gitissue/triage.json` | `/issue-triage` | Cached triage analysis (JSON schema v1) — issue priorities, dependencies, execution order, and history |
 | `.gitissue/analysis-<N>.json` | `/issue-analysis` | Deep analysis of issue #N — affected files, root cause, implementation options, complexity, and risk |
-| `.gitissue/runs.jsonl` | `/issue-resolver`, `/auto-pilot` | Append-only run log — exactly one JSON line per processed issue (under `/auto-pilot`, the resolver runs with `--no-run-log` so only auto-pilot writes; see *Single writer* below). Cross-run telemetry for monitoring. |
-
-### `.gitissue/runs.jsonl` — run log (monitoring)
-
-`runs.jsonl` is the first home for the `monitoring` value. It is an **append-only,
-schema-light, newline-delimited JSON** file: each line is one self-contained JSON
-object describing a single run. It is grep-friendly, diffable, and deletable like
-the rest of `.gitissue/` — nothing reads it back except `/idd-doctor`'s run-log
-summary and `scripts/idd-lint.py stats` (the no-agent evidence report), so
-truncation or deletion only resets the telemetry window.
-
-Each line carries at minimum a **timestamp, issue number, mode, outcome**, and the
-**PR number when one was created**. The full field set:
-
-| Field | Type | Always present | Description |
-|-------|------|----------------|-------------|
-| `ts` | string (ISO 8601 UTC) | yes | When the run finished, e.g. `2026-06-26T14:31:07Z` |
-| `issue` | integer | yes | Issue number the run processed |
-| `mode` | string | yes | `interactive` or `auto` (resolver); the auto-pilot merge mode (`conservative` / `balanced` / `aggressive`) for auto-pilot rows |
-| `skill` | string | yes | `issue-resolver` or `auto-pilot` — which skill wrote the line |
-| `outcome` | string | yes | Terminal outcome. Resolver: `success`, `already_resolved`, `failed`. Auto-pilot: one of its six categorical outcomes (`merged`, `left_open`, `partial_followup`, `blocked_by_dependency`, `failed`, `skipped`). |
-| `pr` | integer or null | yes | PR number when a PR was created, else `null` |
-| `complexity` | string | no | Research complexity on the **3-value** run-log scale (`low` / `medium` / `high`) when known. Collapse the researcher's 5-value estimate before writing: `trivial` or `low` → `low`; `medium` → `medium`; `high` or `complex` → `high`. Never emit `trivial` or `complex` in runs.jsonl. |
-| `profile` | string | no | The adaptive-effort pipeline profile the run selected: `light` (trivial fast path) or `full`. Omitted when `resolve.adaptive_effort` is `false` or the signal was unavailable. Lets `/idd-doctor` and audits see how often the fast path fired. See [agent-model-effort.md](https://github.com/luongnv89/idd/blob/main/docs/agent-model-effort.md) (Complexity → pipeline profile). |
-| `qa_cycles` | integer | no | Number of QA review-fix cycles run (resolver) |
-| `duration_s` | integer | no | Wall-clock duration of the run in seconds, when measurable |
-| `skipped_reason` | string | no | Why the issue was skipped (auto-pilot skips, and any `skipped`/`already_resolved` outcome), e.g. `already_resolved`, `blocked_label`, `blocked_by_dependency`, `in_skip_list`, `assigned_to_other` |
-
-Example lines:
-
-```jsonl
-{"ts":"2026-06-26T14:31:07Z","issue":141,"mode":"auto","skill":"issue-resolver","complexity":"medium","profile":"full","qa_cycles":2,"outcome":"success","pr":150,"duration_s":372}
-{"ts":"2026-06-26T15:02:41Z","issue":152,"mode":"auto","skill":"issue-resolver","complexity":"low","profile":"light","qa_cycles":1,"outcome":"success","pr":161,"duration_s":94}
-{"ts":"2026-06-26T14:48:12Z","issue":118,"mode":"balanced","skill":"auto-pilot","outcome":"skipped","pr":null,"skipped_reason":"blocked_by_dependency"}
-```
-
-**Append rules:**
-- Create `.gitissue/` with `mkdir -p` if it does not exist, then append exactly one
-  line terminated by a single `\n`. Never rewrite or reorder existing lines.
-- Writing the line is **best-effort and non-fatal** — if the append fails, the run
-  still reports its result normally. A run is never failed because telemetry could
-  not be written.
-- There is **no schema migration**: new optional fields may be added over time;
-  readers must tolerate missing keys and unknown keys. Absent optional fields are
-  simply omitted (not written as `null`, except `pr` which is always present).
-
-**Single writer under `/auto-pilot`:** when `/auto-pilot` resolves an issue it
-runs `/issue-resolver` as a subagent, so without coordination *both* skills would
-append — two lines per processed issue, which double-counts that issue in
-`/idd-doctor`'s resolve-rate and median-QA metrics (they aggregate over every
-line). To keep **exactly one line per processed issue**, `/auto-pilot` passes the
-resolver the `--no-run-log` flag: the suppressed resolver does **not** append and
-instead **returns** its telemetry — its run `status` (the `outcome`) plus
-`qa_cycles`, `complexity`, and `duration_s` — to the orchestrator, which folds it into the single enriched
-`auto-pilot` line. The flag is **orthogonal to `--auto`/`IDD_AUTO_MODE`** — a
-standalone `/issue-resolver <N> --auto` is *not* suppressed and remains the single
-writer for that run. So the rule is: the outermost skill is the single writer; an
-inner resolver invoked by `/auto-pilot` stays silent.
-
-**Batch fan-out (one line per attempted issue).** The same single-writer rule
-covers the *Batch Resolver* path (`/auto-pilot --issues`, where the analyzer bundles
-several issues into one PR): the Batch Resolver also runs with `--no-run-log` and
-returns its telemetry, and `/auto-pilot` writes the lines. Because "one line per
-**processed issue**" — not per PR — is the contract, `/auto-pilot` **fans the one
-batch result out into one line per attempted issue** (the set sent into the Batch
-Resolver, *not* the success-only `issues_resolved`, or a failed batch would drop
-fully-attempted issues). The fan-out is *across the run*, not all-at-batch-time:
-at batch time `/auto-pilot` writes a line only for the issues **in**
-`issues_resolved` (their `outcome` is the success outcome — `merged`/`left_open`),
-and re-queues the rest so each unresolved attempted issue gets its one line at its
-individual retry (which sets *its* `outcome`). No `failed` line is written at batch
-time. The shared `pr` and `complexity` go on every line, while the batch-scalar `qa_cycles`
-and `duration_s` are attributed to **one line only** (the primary issue's) so a
-batch is not weighted N-fold in `/idd-doctor`'s medians. On a partial/failed batch,
-`/auto-pilot` writes a line only for the resolved issues now and **re-queues every
-unresolved issue — including the batch's primary (spawn-position) issue — for
-individual resolution**, where that resolve writes its single line; re-queuing the
-primary is mandatory (its `optimized_order` slot is already consumed, so without an
-explicit re-append it would drop to zero lines — the inverse under-count). No
-`failed` batch line is written for an unresolved issue, so a
-batch-failed-then-individually-resolved issue is never double-counted. One further
-carve-out: when the loop later reaches a batch-resolved member it emits an
-`already resolved in batch` skip that is **display only and writes no run-log line**
-(it was already logged at batch time) — the single exception to logging every
-processed issue including skips. Net: exactly one line per attempted issue across
-the run, with no re-resolve double-count and no inverse under-count. The authored
-contract lives in
-`src/skills/auto-pilot/references/explicit-list-mode.md` (*Run-log fan-out for the
-batch*).
+| `.gitissue/runs.jsonl` | `/issue-resolver`, `/auto-pilot` | Append-only run log — exactly one JSON line per processed issue (under `/auto-pilot`, the resolver runs with `--no-run-log` so only auto-pilot writes; see *Single writer* in [run-log-schema.md](https://github.com/luongnv89/idd/blob/main/docs/run-log-schema.md)). Cross-run telemetry for monitoring. |
 
 > **Not in `.gitissue/`:** the model-suggestion cache is **skill-level**, not
 > per-repo. `/issue-creator` caches CursorBench scoring data at the installed
@@ -660,6 +392,13 @@ batch*).
 - A full re-triage overwrites `triage.json` entirely (not append)
 - `runs.jsonl` is **append-only** — skills add one line per run and never edit prior lines; its absence or deletion is non-fatal
 - The directory should be committed to the repo (it contains project state, not secrets)
+
+### `.gitissue/runs.jsonl` — run log (monitoring)
+
+The run log has its own canonical schema document — field set, append rules,
+and the single-writer / `--no-run-log` suppression convention:
+[run-log-schema.md](https://github.com/luongnv89/idd/blob/main/docs/run-log-schema.md).
+Skills that only append a telemetry line read that document instead of this one.
 
 ## Validation
 
@@ -680,10 +419,6 @@ Config is validated on load at the start of every skill invocation. Errors inclu
 | Setting | Default | Description |
 |---------|---------|-------------|
 | `platform` | `github` | Tracker platform driver — `github` is the only implemented driver (references/docs/platform-github.md) |
-| `issue.auto_normalize` | `true` | Auto-normalize in /issue-resolver |
-| `issue.template` | `default` | Built-in templates |
-| `issue.labels_auto_suggest` | `true` | Suggest labels from content |
-| `issue.normalize_comment` | `true` | Comment on normalization |
 | `resolve.approval_gate` | `auto` | No approval wait |
 | `resolve.branch_prefix` | `auto` | Type-based branch prefix (fix/, feat/, etc.) |
 | `resolve.auto_test` | `true` | Run tests before PR |
@@ -721,15 +456,3 @@ Config is validated on load at the start of every skill invocation. Errors inclu
 | `triage.auto_priority` | `true` | Auto-suggest priorities |
 | `triage.include_closed` | `false` | Exclude closed from triage |
 | `triage.scan_timeout_per_issue` | `30` | Max seconds per issue scan |
-| `analysis.max_files` | `30` | Max files to read during analysis |
-| `analysis.trace_depth` | `3` | Import trace depth levels |
-| `analysis.scan_timeout` | `120` | Max seconds for codebase scan |
-| `projects.sync_enabled` | `false` | Enable project board sync |
-| `projects.project_number` | `null` | Explicit project number (null = auto-detect) |
-| `projects.status_field` | `"Status"` | Name of the Status field on the board |
-| `projects.status_map.todo` | `"Todo"` | Status for new issues |
-| `projects.status_map.in_progress` | `"In Progress"` | Status when work starts |
-| `projects.status_map.done` | `"Done"` | Status when PR is created |
-| `model_suggestion.enabled` | `true` | Suggest a model + thinking level per issue |
-| `model_suggestion.data_url` | `"https://cursor.com/cursorbench"` | CursorBench source refreshed into the cache |
-| `model_suggestion.cache_ttl_days` | `7` | Days before cached model data is stale |

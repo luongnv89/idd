@@ -159,12 +159,14 @@ done
 # This validates the algorithm on a controlled tree. Post-#81, runtime
 # docs live at top-level docs/ (sibling of src/), not src/docs/. We
 # create:
-#   src/skills/dia/SKILL.source.md → references shared/agents/B.md and C.md
-#   src/shared/agents/B.md  → references docs/D.md
-#   src/shared/agents/C.md  → references docs/D.md
-#   docs/D.md               → leaf (no further refs)
+#   src/skills/dia/SKILL.source.md → references agents B + C and docs/D.md
+#   src/shared/agents/B.md  → references docs/D.md and docs/E.md
+#   src/shared/agents/C.md  → references docs/D.md and docs/E.md
+#   docs/D.md, docs/E.md    → leaves (no further refs)
 # Expected: D.md appears exactly once in dist/skills/dia/references/docs/,
-#   no cycle warnings, exit 0.
+#   E.md (reachable only through agents, whose emitted prompts render refs as
+#   absolute URLs — issue #249) is validated but never bundled, no cycle
+#   warnings, exit 0.
 mkdir -p "$SYN_TMP/src/skills/dia" "$SYN_TMP/src/shared/agents" "$SYN_TMP/docs"
 cat > "$SYN_TMP/src/skills/dia/SKILL.source.md" <<'EOF'
 ---
@@ -174,22 +176,27 @@ description: diamond test skill
 
 # Dia
 
-Reads `shared/agents/b-agent.md` and `shared/agents/c-agent.md`.
+Reads `shared/agents/b-agent.md`, `shared/agents/c-agent.md`, and `docs/d-doc.md`.
 EOF
 cat > "$SYN_TMP/src/shared/agents/b-agent.md" <<'EOF'
 # B
 
-See `docs/d-doc.md`.
+See `docs/d-doc.md` and `docs/e-doc.md`.
 EOF
 cat > "$SYN_TMP/src/shared/agents/c-agent.md" <<'EOF'
 # C
 
-See `docs/d-doc.md`.
+See `docs/d-doc.md` and `docs/e-doc.md`.
 EOF
 cat > "$SYN_TMP/docs/d-doc.md" <<'EOF'
 # D
 
 Leaf.
+EOF
+cat > "$SYN_TMP/docs/e-doc.md" <<'EOF'
+# E
+
+Agent-only leaf.
 EOF
 # Copy build scripts so the synthetic build runs the same code path.
 mkdir -p "$SYN_TMP/scripts"
@@ -236,6 +243,15 @@ else
   [ -f "$SYN_DIA/references/agents/b-agent.md" ] || missing="$missing b-agent.md"
   [ -f "$SYN_DIA/references/agents/c-agent.md" ] || missing="$missing c-agent.md"
   fail "T7.5: missing transitive agent copy:$missing"
+fi
+
+# T7.6 — a doc reachable only through an agent must NOT be bundled (issue
+# #249): emitted agent prompts render their references as absolute repo URLs,
+# so a bundled copy reached only that way is unreferenceable install weight.
+if [ -f "$SYN_DIA/references/docs/e-doc.md" ]; then
+  fail "T7.6: agent-only doc e-doc.md was bundled into dia/references/docs/"
+else
+  pass "T7.6: agent-only doc e-doc.md validated but not bundled"
 fi
 
 # ───────────────────────────────────────────────────────────

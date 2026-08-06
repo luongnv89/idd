@@ -174,6 +174,7 @@ Some infrastructure procedures are shared across multiple skills as reference do
 | Naming conventions | `docs/naming-conventions.md` | issue-creator, issue-resolver, auto-pilot |
 | IDD methodology + analysis-artifact rule | `docs/idd-methodology.md` | issue-resolver, issue-pr-review, issue-analysis |
 | Configuration schema (autopilot + review) | `docs/config-schema.md` | auto-pilot, issue-pr-review, init-gitissue |
+| Run-log schema (`.gitissue/runs.jsonl`) | `docs/run-log-schema.md` | issue-resolver, auto-pilot, idd-doctor |
 
 ### GitHub Projects Sync
 

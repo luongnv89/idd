@@ -16,11 +16,10 @@ docs/decisions/cross-skill-invocation.md — sibling-relative paths only.
 Per issue #81 consolidation, runtime docs live at the top-level docs/
 alongside human-only project docs (ARCHITECTURE.md, DEVELOPMENT.md, etc.).
 The build's transitive-closure scan determines which docs each skill
-needs and bundles only those into the dist outputs. The 10 runtime docs
-bundled by the closure are: config-schema.md, idd-methodology.md,
-naming-conventions.md, sync-conventions.md, github-projects-sync.md,
-platform-github.md, shared-agent-conventions.md, agent-model-effort.md,
-pre-commit-security.md, terminal-style.md.
+needs and bundles only those into the dist outputs; per issue #249 a doc
+reachable only through a shared agent is validated but not bundled, and
+two docs are emitted in slimmed per-skill forms (see the Phase B2
+section below).
 """
 
 from __future__ import annotations
@@ -301,9 +300,19 @@ def _compute_closure(
 ) -> tuple[set[str], set[str]]:
     """Compute transitive closure of shared agents and docs reachable from
     a skill. DFS with cycle detection (warning, no abort) and diamond-safe
-    visited tracking. Returns sorted-eligible (agent_names, doc_names)."""
+    visited tracking. Returns sorted-eligible (agent_names, doc_names).
+
+    Every reachable reference is resolved and validated, but only docs reachable
+    from the skill's *own* files (directly, or through a doc→doc reference) are
+    bundled. Docs reachable only through a shared agent are not: since issue
+    #245 an emitted agent prompt renders its references as absolute repo URLs
+    (the prompt is injected into a subagent whose working directory is the
+    target repo, where a skill-relative path would dangle), so a bundled copy
+    reached only that way is unreferenceable install weight (issue #249).
+    """
     agents: set[str] = set()
     docs: set[str] = set()
+    agent_only_docs: set[str] = set()
     visited: set[str] = set()
     active: set[str] = set()
 
@@ -315,8 +324,8 @@ def _compute_closure(
             p = src.parent / "docs" / name
         return p if p.is_file() else None
 
-    def _visit(kind: str, name: str, path_chain: list[str]) -> None:
-        key = f"{kind}:{name}"
+    def _visit(kind: str, name: str, path_chain: list[str], bundle: bool) -> None:
+        key = f"{kind}:{name}:{int(bundle)}"
         if key in active:
             chain = " -> ".join(path_chain + [key])
             print(f"⚠ cycle detected: {chain}", file=sys.stderr)
@@ -332,14 +341,18 @@ def _compute_closure(
         active.add(key)
         if kind == "agent":
             agents.add(name)
-        else:
+        elif bundle:
             docs.add(name)
+        else:
+            agent_only_docs.add(name)
         text = _read_text(resolved)
         _, sub_agents, sub_docs = _scan_logical_refs(text)
         for a in sorted(sub_agents):
-            _visit("agent", a, path_chain + [key])
+            # Docs cited by an agent prompt render as absolute URLs; nothing
+            # below an agent is bundled into the skill's references/docs/.
+            _visit("agent", a, path_chain + [key], False)
         for d in sorted(sub_docs):
-            _visit("doc", d, path_chain + [key])
+            _visit("doc", d, path_chain + [key], bundle and kind != "agent")
         active.discard(key)
         visited.add(key)
 
@@ -361,9 +374,9 @@ def _compute_closure(
             )
 
     for a in sorted(seed_agents):
-        _visit("agent", a, [f"skill:{skill_name}"])
+        _visit("agent", a, [f"skill:{skill_name}"], False)
     for d in sorted(seed_docs):
-        _visit("doc", d, [f"skill:{skill_name}"])
+        _visit("doc", d, [f"skill:{skill_name}"], True)
 
     return agents, docs
 
@@ -634,6 +647,348 @@ def _check_precheck_drift(
     )
 
 
+# --- Phase B2 — Per-skill bundled-doc slimming (issue #249) ------------------
+#
+# Bundling whole documents into every skill inflates both the install surface
+# and the per-run context cost: a skill told to read `references/docs/X.md` for
+# one section pays for all of X. Two build-time reductions fix that without
+# touching the authored documents, which stay complete for humans:
+#
+#   1. config-schema.md is emitted as a *per-skill excerpt* — only the top-level
+#      config sections the skill's own text names (plus `platform`, which every
+#      skill resolves on load). Skills that render .gitissue.yml keep it whole.
+#   2. Documents in DOC_SECTION_DIGESTS are emitted as a fixed digest of their
+#      normative sections; the narrative sections no skill reads are dropped.
+#
+# Both keep the emitted file at its original name, so precheck fences and
+# Additional Resources indexes are unaffected. Both are verified: a config
+# excerpt must still document every dotted key the skill mentions
+# (_check_config_excerpt_coverage), and a digest may not drop a section any
+# skill source names (_check_digest_coverage).
+
+CONFIG_SCHEMA_DOC = "config-schema.md"
+
+# /init-gitissue renders .gitissue.yml field by field and needs the whole schema.
+FULL_CONFIG_SCHEMA_SKILLS = frozenset({"init-gitissue"})
+
+# Always kept in an excerpt — the driver selector every skill resolves on load.
+CONFIG_SECTIONS_ALWAYS = frozenset({"platform"})
+
+_CONFIG_EXCERPT_NOTICE = (
+    "> **Per-skill excerpt (generated).** Only the configuration sections this "
+    "skill reads are reproduced here: {sections}. The complete schema — every "
+    "section and the full defaults table — is at "
+    "[config-schema.md](" + _REPO_BLOB_BASE + "docs/config-schema.md).\n"
+)
+
+# Documents emitted as a digest. Values are the `## ` headings every skill
+# keeps, in document order; every other top-level section is dropped unless it
+# is listed in DOC_DIGEST_OPTIONAL_SECTIONS and the skill names it. A heading
+# named here that no longer exists in the document aborts the build.
+DOC_SECTION_DIGESTS: dict[str, tuple[str, ...]] = {
+    "idd-methodology.md": (
+        "Intent-Code Boundary",
+        "Analysis Artifacts and Durable Memory",
+        "Issue Dependencies",
+        "Hierarchy of Intent",
+        "Maintainer Control and Safety",
+        "Principles",
+    ),
+}
+
+# Sections kept only for the skills that name them — by the `## ` heading itself
+# or by any `### ` sub-heading inside it (skills cite the sub-headings, e.g.
+# *Confidence Scoring*, far more often than the parent section).
+DOC_DIGEST_OPTIONAL_SECTIONS: dict[str, tuple[str, ...]] = {
+    "idd-methodology.md": ("Core Concepts",),
+}
+
+_DIGEST_NOTICE = (
+    "> **Runtime digest (generated).** This is the normative subset of "
+    "[{name}](" + _REPO_BLOB_BASE + "docs/{name}) that skills read at run time. "
+    "The narrative sections (rationale, worked example, methodology comparison) "
+    "live in the full document.\n"
+)
+
+# Dropped headings too generic to police for citations — they are sub-headings
+# of an illustrative issue body inside the document, not sections skills cite.
+_DIGEST_GENERIC_HEADINGS = frozenset({"Type", "Description", "Acceptance Criteria"})
+
+_TOP_LEVEL_YAML_KEY_RE = re.compile(r"^([a-z_]+):")
+_DEFAULTS_TABLE_ROW_RE = re.compile(r"^\|.*?`([A-Za-z_][A-Za-z0-9_.]*)`")
+_CONFIG_SECTION_MAP_RE = re.compile(
+    r"^### Config Section Map\n.*?(?=^## )", re.MULTILINE | re.DOTALL
+)
+
+
+def _split_h2_sections(text: str) -> tuple[str, list[tuple[str, str]]]:
+    """Split a markdown document on top-level `## ` headings.
+
+    Returns (preamble, [(heading, block), ...]) where each block includes its own
+    heading line. Fenced code blocks are skipped so a `## ` inside an example is
+    never mistaken for a section boundary.
+    """
+    preamble: list[str] = []
+    sections: list[tuple[str, list[str]]] = []
+    in_fence = False
+    for line in text.splitlines(keepends=True):
+        if line.lstrip().startswith("```"):
+            in_fence = not in_fence
+        elif not in_fence and line.startswith("## "):
+            sections.append((line[3:].strip(), [line]))
+            continue
+        (sections[-1][1] if sections else preamble).append(line)
+    return "".join(preamble), [(h, "".join(b)) for h, b in sections]
+
+
+def _section_names(heading: str, block: str) -> set[str]:
+    """The heading plus every `### ` sub-heading inside a section block."""
+    return {heading} | set(re.findall(r"^### (.+?)\s*$", block, re.MULTILINE))
+
+
+def _doc_digest(name: str, text: str, skill_root: Path) -> str:
+    """Emit the per-skill digest of a document listed in DOC_SECTION_DIGESTS."""
+    keep = DOC_SECTION_DIGESTS[name]
+    preamble, sections = _split_h2_sections(text)
+    present = {heading for heading, _ in sections}
+    missing = [heading for heading in keep if heading not in present]
+    if missing:
+        _abort(
+            f"docs/{name} is missing digest section(s): {', '.join(missing)} "
+            f"(update DOC_SECTION_DIGESTS in scripts/build.py)"
+        )
+    optional = frozenset(DOC_DIGEST_OPTIONAL_SECTIONS.get(name, ()))
+    if optional:
+        skill_text = "\n".join(
+            _read_text(f) for f in _walk_files(skill_root) if _is_text_file(f)
+        )
+        wanted = {
+            heading
+            for heading, block in sections
+            if heading in optional
+            and any(cited in skill_text for cited in _section_names(heading, block))
+        }
+    else:
+        wanted = set()
+    kept = frozenset(keep) | wanted
+    body = "\n".join(
+        block.rstrip("\n") + "\n" for heading, block in sections if heading in kept
+    )
+    return (
+        preamble.rstrip("\n")
+        + "\n\n"
+        + _DIGEST_NOTICE.format(name=name)
+        + "\n"
+        + body
+    )
+
+
+def _check_digest_coverage(src: Path, repo_root: Path) -> None:
+    """Abort when a skill source names a section the digest would drop.
+
+    This is the safety net for the digests: dropping a section only stays
+    correct while nothing points a skill at it by name.
+    """
+    for name, keep in sorted(DOC_SECTION_DIGESTS.items()):
+        doc = repo_root / "docs" / name
+        if not doc.is_file():
+            continue
+        _, sections = _split_h2_sections(_read_text(doc))
+        kept = frozenset(keep) | frozenset(DOC_DIGEST_OPTIONAL_SECTIONS.get(name, ()))
+        dropped = sorted(
+            heading
+            for heading, _ in sections
+            if heading not in kept and heading not in _DIGEST_GENERIC_HEADINGS
+        )
+        if not dropped:
+            continue
+        for f in _walk_files(src):
+            if not _is_text_file(f):
+                continue
+            text = _read_text(f)
+            for heading in dropped:
+                if heading in text:
+                    _abort(
+                        f"{f.relative_to(repo_root)} names "
+                        f"'{heading}' — a section the docs/{name} runtime digest "
+                        f"drops. Add it to DOC_SECTION_DIGESTS in "
+                        f"scripts/build.py or stop citing it from a skill."
+                    )
+
+
+def _split_config_blocks(fence_body: str) -> list[tuple[str, str]]:
+    """Slice the Full Schema YAML fence into (top-level key, block) pairs.
+
+    A block runs from the first line of the comment run introducing its
+    top-level key through the line before the next block's comment run, so the
+    documentation of each section travels with it.
+    """
+    lines = fence_body.splitlines(keepends=True)
+    starts = [i for i, line in enumerate(lines) if _TOP_LEVEL_YAML_KEY_RE.match(line)]
+    if not starts:
+        _abort("Full Schema YAML block has no top-level keys")
+    begins: list[int] = []
+    for start in starts:
+        begin = start
+        while begin > 0 and lines[begin - 1].startswith("#"):
+            begin -= 1
+        begins.append(begin)
+    blocks: list[tuple[str, str]] = []
+    for index, start in enumerate(starts):
+        stop = begins[index + 1] if index + 1 < len(begins) else len(lines)
+        key = lines[start].split(":", 1)[0]
+        blocks.append((key, "".join(lines[begins[index] : stop])))
+    return blocks
+
+
+def _filter_defaults_table(text: str, sections: frozenset[str], known: frozenset[str]) -> str:
+    """Drop Defaults Table rows documenting a section the excerpt omits.
+
+    Scoped to the `## Defaults Table` section: other pipe-delimited tables in
+    the document (notably the `.gitissue/` directory table) must survive intact.
+    Fenced code blocks are skipped, so a `## ` inside an example never flips the
+    section boundary (same rule as `_split_h2_sections`).
+    """
+    out: list[str] = []
+    in_defaults = False
+    in_fence = False
+    for line in text.splitlines(keepends=True):
+        if line.lstrip().startswith("```"):
+            in_fence = not in_fence
+        elif not in_fence and line.startswith("## "):
+            in_defaults = line.strip() == "## Defaults Table"
+        match = _DEFAULTS_TABLE_ROW_RE.match(line) if in_defaults and not in_fence else None
+        if match:
+            key = match.group(1).split(".", 1)[0]
+            if key in known and key not in sections:
+                continue
+        out.append(line)
+    return "".join(out)
+
+
+def _config_schema_excerpt(text: str, sections: frozenset[str]) -> str:
+    """Render the per-skill excerpt of docs/config-schema.md."""
+    match = _FULL_SCHEMA_FENCE_RE.search(text)
+    if match is None:
+        _abort("config schema has no Full Schema YAML block")
+    blocks = _split_config_blocks(match.group(1))
+    known = frozenset(key for key, _ in blocks)
+    unknown = sorted(sections - known)
+    if unknown:
+        _abort(f"unknown config section(s) requested for excerpt: {', '.join(unknown)}")
+    fence = "".join(block for key, block in blocks if key in sections).rstrip("\n") + "\n"
+    out = text[: match.start(1)] + fence + text[match.end(1) :]
+    # The Config Section Map diagrams the *whole* schema; in an excerpt it would
+    # advertise sections the file no longer contains.
+    out = _CONFIG_SECTION_MAP_RE.sub("", out)
+    out = _filter_defaults_table(out, sections, known)
+    notice = _CONFIG_EXCERPT_NOTICE.format(
+        sections=", ".join(f"`{name}`" for name in sorted(sections))
+    )
+    lines = out.splitlines(keepends=True)
+    return "".join(lines[:1]) + "\n" + notice + "".join(lines[1:])
+
+
+def _config_sections_used(skill_root: Path, known: frozenset[str]) -> frozenset[str]:
+    """Top-level config sections a skill's own text references."""
+    pattern = re.compile(
+        r"(?<![\w.-])(" + "|".join(sorted(known)) + r")\.[a-z_]+"
+    )
+    used = set(CONFIG_SECTIONS_ALWAYS & known)
+    for f in _walk_files(skill_root):
+        if _is_text_file(f):
+            used.update(pattern.findall(_read_text(f)))
+    return frozenset(used)
+
+
+def _check_config_excerpt_coverage(
+    skill_name: str, skill_root: Path, excerpt: str, documented: dict[str, object]
+) -> None:
+    """Verify the excerpt still documents every config key the skill mentions.
+
+    Section detection is a heuristic over prose; this closes the loop on it, so a
+    skill that names a key whose section was not detected fails the build instead
+    of shipping an excerpt with a hole in it.
+    """
+    match = _FULL_SCHEMA_FENCE_RE.search(excerpt)
+    if match is None:
+        _abort(f"generated config excerpt for '{skill_name}' lost its Full Schema block")
+    present = set(_parse_config_mapping(match.group(1), f"{skill_name} config excerpt"))
+    mentioned: set[str] = set()
+    key_pattern = re.compile(
+        r"(?<![\w.-])(" + "|".join(sorted(re.escape(k) for k in documented)) + r")(?![\w.-])"
+    )
+    for f in _walk_files(skill_root):
+        if _is_text_file(f):
+            mentioned.update(key_pattern.findall(_read_text(f)))
+    missing = sorted(key for key in mentioned if key not in present)
+    if missing:
+        _abort(
+            f"config excerpt for skill '{skill_name}' omits mentioned key(s): "
+            + ", ".join(missing)
+            + " (widen CONFIG_SECTIONS_ALWAYS or the detection in "
+            "_config_sections_used, scripts/build.py)"
+        )
+
+
+def _slim_doc_for_skill(
+    name: str,
+    text: str,
+    skill_name: str,
+    skill_root: Path,
+    config_defaults: dict[str, object] | None,
+) -> str:
+    """Return the per-skill bundled form of a runtime doc."""
+    if name in DOC_SECTION_DIGESTS:
+        return _doc_digest(name, text, skill_root)
+    if (
+        name == CONFIG_SCHEMA_DOC
+        and skill_name not in FULL_CONFIG_SCHEMA_SKILLS
+        and config_defaults
+    ):
+        known = frozenset(key.split(".", 1)[0] for key in config_defaults)
+        excerpt = _config_schema_excerpt(text, _config_sections_used(skill_root, known))
+        _check_config_excerpt_coverage(skill_name, skill_root, excerpt, config_defaults)
+        return excerpt
+    return text
+
+
+def _zero_mention_bundled_docs(skill_root: Path, docs: set[str]) -> list[str]:
+    """Bundled docs a skill's runtime instructions never point at.
+
+    A doc reaches a skill's bundle through any `docs/X.md` token in its sources,
+    including the *Additional Resources* bibliography and the *Bundled dependency
+    precheck* fence — neither of which is an instruction to read the document.
+    Those two blocks are stripped before the scan so a doc that survives only via
+    its own index entry is reported rather than silently shipped.
+    """
+    mentioned: set[str] = set()
+    for f in _walk_files(skill_root):
+        if not _is_text_file(f):
+            continue
+        text = _strip_bibliography_blocks(_read_text(f))
+        _, _, found = _scan_logical_refs(text)
+        mentioned.update(found)
+    return sorted(docs - mentioned)
+
+
+def _strip_bibliography_blocks(text: str) -> str:
+    """Remove the precheck fence and Additional Resources index from a source."""
+    out: list[str] = []
+    skipping = False
+    for line in text.splitlines(keepends=True):
+        if PRECHECK_HEADING_RE.match(line) or re.match(
+            r"^\s{0,3}#{2,4}\s+Additional Resources\s*$", line
+        ):
+            skipping = True
+            continue
+        if skipping and (re.match(r"^\s*##\s", line) or re.match(r"^\s*---\s*$", line)):
+            skipping = False
+        if not skipping:
+            out.append(line)
+    return "".join(out)
+
+
 # --- Reference rewriting -----------------------------------------------------
 
 
@@ -830,6 +1185,7 @@ def _emit_flattened_skill(
     agents: set[str],
     docs: set[str],
     conventions: dict[str, str] | None = None,
+    config_defaults: dict[str, object] | None = None,
 ) -> None:
     """Copy authored skill content to out_dir, copy transitive deps under
     out_dir/references/, rewrite logical refs throughout."""
@@ -865,7 +1221,9 @@ def _emit_flattened_skill(
     for name in sorted(docs):
         src_path = src.parent / "docs" / name
         dst_path = out_dir / "references" / "docs" / name
-        text = _read_text(src_path)
+        text = _slim_doc_for_skill(
+            name, _read_text(src_path), skill_root.name, skill_root, config_defaults
+        )
         banner = BANNER_TMPL.format(rel=f"docs/{name}")
         _write_text(dst_path, banner + _rewrite_for_standalone(text))
 
@@ -1094,6 +1452,13 @@ def build(out: Path, src: Path, *, verbose: bool = False, no_root_skills: bool =
     _check_stale_doc_urls(src)
     _check_init_template_urls(src)
     _check_init_template_schema_parity(src)
+    # Issue #249: digests drop sections; abort before emitting if any skill
+    # source points at one of them by name.
+    _check_digest_coverage(src, src.parent)
+    config_schema = src.parent / "docs" / CONFIG_SCHEMA_DOC
+    config_defaults = (
+        _documented_config_defaults(config_schema) if config_schema.is_file() else None
+    )
 
     # Issue #245: parse the conventions sections once, before any output is
     # written, so a renamed/emptied section aborts the whole build rather than
@@ -1118,8 +1483,16 @@ def build(out: Path, src: Path, *, verbose: bool = False, no_root_skills: bool =
         agents, docs = _compute_closure(src, skill_name, skill_root)
         out_skill_dir = out_skills / skill_name
         _emit_flattened_skill(
-            src, skill_root, out_skill_dir, agents, docs, conventions
+            src, skill_root, out_skill_dir, agents, docs, conventions, config_defaults
         )
+        # Issue #249: a bundled doc no runtime instruction points at is dead
+        # install weight. Warn (never abort) — the fix is an authoring decision.
+        for unused in _zero_mention_bundled_docs(skill_root, docs):
+            print(
+                f"\u26a0 skill '{skill_name}' bundles docs/{unused} but no runtime "
+                f"instruction references it (only its index/precheck entry)",
+                file=sys.stderr,
+            )
         # Issue #195: fail the build if the skill's bundled-dependency precheck
         # list drifts from the references/ files actually bundled. Policed for
         # public skills only (deprecated-distributed skills are exempt).

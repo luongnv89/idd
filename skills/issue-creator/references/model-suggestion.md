@@ -276,5 +276,6 @@ model_suggestion:
 Force a refresh at any time, independent of `cache_ttl_days`, with
 `/issue-creator … --refresh-model-data`.
 
-See `references/docs/config-schema.md` for the full schema, the Config Section Map, and the
-Defaults Table entries.
+See `references/docs/config-schema.md` for the `model_suggestion` schema and its Defaults
+Table entries; the whole-schema Config Section Map is in the full document at
+[config-schema.md](https://github.com/luongnv89/idd/blob/main/docs/config-schema.md).

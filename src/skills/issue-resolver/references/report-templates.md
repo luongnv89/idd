@@ -161,7 +161,7 @@ actually writing the line.
 Build the object from values already known during the run — `ts`, `issue`,
 `mode`, `skill`, `outcome`, `pr`, plus the optional `complexity`, `profile`,
 `qa_cycles`, `duration_s`, and `skipped_reason` — following the schema in
-`docs/config-schema.md` (*`.gitissue/runs.jsonl` — run log*) rather than
+`docs/run-log-schema.md` rather than
 re-deriving fields here.
 
 Two derivations are the resolver's own:

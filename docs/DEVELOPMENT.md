@@ -147,8 +147,9 @@ graph TD
 |------|---------|
 | `CLAUDE.md` | Project conventions for AI agents |
 | `DESIGN.md` | Terminal output style guide |
-| `docs/config-schema.md` | Full `.gitissue.yml` schema (autopilot + review sections) |
-| `docs/idd-methodology.md` | IDD methodology overview + analysis-artifact dual-write rule |
+| `docs/config-schema.md` | Full `.gitissue.yml` schema (autopilot + review sections) — bundled into skills as a per-skill excerpt (issue #249) |
+| `docs/run-log-schema.md` | `.gitissue/runs.jsonl` run-log schema (fields, append rules, single-writer) |
+| `docs/idd-methodology.md` | IDD methodology overview + analysis-artifact dual-write rule — bundled into skills as a normative-sections digest (issue #249) |
 | `docs/naming-conventions.md` | Branch / commit / PR / issue naming |
 | `docs/sample-normalized-issue.md` | Example normalized issue (intent-only) |
 | `docs/ARCHITECTURE.md` | System design, data flow, durable-memory model |

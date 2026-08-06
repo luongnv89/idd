@@ -332,7 +332,7 @@ otherwise forgets. It is **informational only** — it never changes the
 PASS/WARN/FAIL result, has no exit code, and (like every part of this skill) is
 strictly **read-only**: it reads `runs.jsonl` and writes nothing.
 
-The run-log schema is defined in `docs/config-schema.md` (*`.gitissue/runs.jsonl`
+The run-log schema is defined in `docs/run-log-schema.md` (*`.gitissue/runs.jsonl`
 — run log*): one JSON object per line, with at least `ts`, `issue`, `mode`,
 `outcome`, and `pr`, plus optional `qa_cycles` and `skipped_reason`.
 
@@ -435,4 +435,5 @@ Terminal output follows the DESIGN.md contract — symbols `● ✓ ✗ ◆ ⚡ 
 - **`references/error-messages.md`** — Complete error catalog with triggers and exact output
 - **`docs/naming-conventions.md`** — Branch, commit, PR, and issue naming conventions (referenced for context)
 - **`docs/config-schema.md`** — Full configuration schema (Check 3 references the `autopilot.mode` field)
+- **`docs/run-log-schema.md`** — `.gitissue/runs.jsonl` run-log schema
 - **`DESIGN.md`** — Terminal output style guide (repo root)
