@@ -171,7 +171,12 @@ has_near "$SKILL" "Create issue? [Y/n]" \
   "T9.3: create-preview carve-out auto-approves and logs a ⚠"
 
 # T9.4 — gate 3: batch approval (modes.md Step 4).
-has_near "$MODES" "[A]ll / [e]dit / [c]ancel" "Auto mode" 30 \
+# Window must stop short of Step 4.5, whose epic-offer guard also says
+# "⚠ Auto mode: …". At 30 this assertion stayed GREEN when the batch carve-out
+# was deleted — the epic offer slid into the window and satisfied it, so the
+# assertion did not test what its label claims. 15 reaches the batch carve-out
+# and nothing past it.
+has_near "$MODES" "[A]ll / [e]dit / [c]ancel" "Auto mode" 15 \
   "T9.4: batch approval gate has an auto-mode carve-out"
 has "$MODES" "issues auto-approved and created" \
   "T9.4: batch carve-out logs how many issues were auto-approved"
@@ -204,6 +209,11 @@ has_near "$MODES" "◆ Normalization Preview" "Apply normalization? [Y/n/dry-run
   "T9.6: interactive normalize prompt still in the preview block"
 has "$MODES" "Create 3 issues? [A]ll / [e]dit / [c]ancel" \
   "T9.6: interactive batch prompt unchanged"
+# The batch gate displays TWICE — once up front, once after an [e]dit round.
+# The re-prompt needs its own guard or deleting it leaves the suite green.
+has_near "$MODES" "show the approval prompt again" \
+  "Create {N} issues? [A]ll / [e]dit / [c]ancel" 4 \
+  "T9.6: interactive batch re-prompt after [e]dit unchanged"
 # The declined paths must survive too — auto mode adds a branch, it never
 # removes the interactive one.
 has "$SKILL" "If declined, stop without creating." "T9.6: interactive decline still stops"
