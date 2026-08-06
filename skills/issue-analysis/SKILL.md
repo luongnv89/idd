@@ -152,11 +152,10 @@ Read `references/agents/synthesizer.md` for the full synthesizer prompt.
 
 ### Environment check
 
-If the Agent tool is available, use subagents as described above.
-If not (e.g., Claude.ai), execute each phase inline instead:
-- Steps 2-5: Read files and scan directly in the main conversation
-- Steps 6-7: Perform analysis inline
-- Step 8: Output as normal
+If the Agent tool is available, use subagents as described above. If not (e.g.
+Claude.ai), read `references/inline-fallback.md` — it holds the full Steps 2-7
+procedure for that path, and no delegated run ever needs it. Step 8 is unchanged
+either way.
 
 ### Bundled dependency precheck
 
@@ -177,6 +176,7 @@ Check these files relative to the skill's directory (the dirname of this SKILL.m
 - `references/agents/codebase-researcher.md` — Codebase Researcher subagent prompt (Steps 2-5)
 - `references/agents/synthesizer.md` — Synthesizer subagent prompt (Steps 6-7)
 - `references/subagent-steps.md` — per-step prompts and tool budgets for subagents
+- `references/inline-fallback.md` — Steps 2-7 procedure for runs without the Agent tool
 - `references/output-and-persist.md` — terminal report rendering spec and JSON schema
 - `references/error-messages.md` — complete error catalog with triggers and exact output
 - `references/examples.md` — worked example runs
@@ -187,7 +187,7 @@ Check these files relative to the skill's directory (the dirname of this SKILL.m
 - `references/docs/agent-model-effort.md` — per-agent model and reasoning-effort mapping
 - `references/docs/terminal-style.md` — terminal output style contract (symbols, output structure, table/error formats)
 
-The steps below include both the subagent delegation path and the inline fallback.
+The steps below describe the subagent delegation path; the inline fallback lives in `references/inline-fallback.md`.
 
 ---
 
@@ -255,7 +255,7 @@ After fetch:
 
 ## Steps 2-7 — Explorer & Synthesizer
 
-Steps 2-5 run inside the Codebase Researcher subagent (Explorer phase); Steps 6-7 run inside the Synthesizer subagent. Full per-step prompts, expected outputs, and tool budgets live in `references/subagent-steps.md` — read that file when tuning either subagent.
+Steps 2-5 run inside the Codebase Researcher subagent (Explorer phase); Steps 6-7 run inside the Synthesizer subagent. **Read `references/subagent-steps.md` now** — it carries the delegation payload, the return handling, and the tool budgets every run needs before spawning either subagent. Its inline counterpart, `references/inline-fallback.md`, is gated: read it **only** when the Agent tool is unavailable.
 
 Quick summary:
 - **Step 2** — extract keywords & file refs from the issue.
@@ -268,7 +268,7 @@ Quick summary:
 ---
 ## Step 8-9 — Output & Persist
 
-Step 8 renders the analysis as a structured terminal report following `references/docs/terminal-style.md` conventions; Step 9 persists the same data to `.gitissue/analysis-<N>.json`. Full rendering spec (section layout, color codes, truncation rules) and JSON schema live in `references/output-and-persist.md` — read that file when implementing or debugging either step.
+Step 8 renders the analysis as a structured terminal report following `references/docs/terminal-style.md` conventions; Step 9 persists the same data to `.gitissue/analysis-<N>.json`. **Read `references/output-and-persist.md` now** — the rendering spec (section layout, color codes, truncation rules) and the JSON schema are the only definition of what Steps 8-9 must emit, so every run needs them.
 
 Summary:
 - Terminal report has 8 sections: header, classification, root cause, affected files, options, complexity, risk, recommendation.
@@ -413,6 +413,7 @@ Terminal output follows the `references/docs/terminal-style.md` contract — sym
 
 - **`references/agents/codebase-researcher.md`** — Codebase Researcher subagent prompt (Steps 2-5 delegation)
 - **`references/agents/synthesizer.md`** — Synthesizer subagent prompt (Steps 6-7 delegation)
+- **`references/inline-fallback.md`** — Steps 2-7 procedure for runs without the Agent tool (gated)
 - **`references/error-messages.md`** — Complete error catalog with triggers and exact output
 - **`references/docs/terminal-style.md`** — Terminal output style contract (bundled at build time; the repo-root `DESIGN.md` is the human-facing companion and is not bundled)
 - **`references/docs/config-schema.md`** — Full configuration schema

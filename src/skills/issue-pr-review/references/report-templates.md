@@ -187,3 +187,51 @@ A clean review prints the 7-step tracker and a summary:
 
   ✓ PR #87 passed review (soft-pass: 1 medium note)
 ```
+
+## Step Completion Reports
+
+Every step ends with a completion report — the checkable bar that separates *the
+step ran* from *the step succeeded*. Emit it right after the step's `[N/7]`
+tracker line:
+
+```
+  [4/7] Tests        ✓ 128 passed, 0 failed
+    √ Suite passed   × Build clean
+    Result: FAIL
+```
+
+Rules that make the report worth reading:
+
+- `√` — the check passed. `×` — it did not. One entry per check the step actually
+  validates. Checks are **gates that could have failed**, never restatements of a
+  metric the tracker line already carries (files read, counts, option number) —
+  restating those is the duplication issue #165 removed.
+- `Result: PASS` — every check is `√`; continue.
+- `Result: PARTIAL` — only non-blocking checks are `×`; continue, and carry the
+  gap into the closing summary so it is never silently dropped.
+- `Result: FAIL` — a blocking check is `×`; stop, or enter that step's defined
+  failure path. In auto mode follow the step's documented auto behavior instead
+  of prompting.
+- A step may not be reported complete without a `Result:` line. If a check could
+  not be evaluated (a tool was unavailable, a gate was skipped by config), mark
+  it `×` and use `PARTIAL` — never assume `√`.
+
+`√` and `×` are the completion-report check glyphs defined in
+`docs/terminal-style.md`; the run's own status symbols stay `✓ ✗ ⚠ ○`.
+
+### Per-step checks
+
+| Step | Checks |
+|------|--------|
+| 1 — Get PR Info | `PR fetched` · `Linked issue resolved` · `Diff readable` |
+| 2 — Script Pre-pass | `Pre-pass ran` · `Findings collected` |
+| 3 — Analyze & Review | `Review completed` · `Findings confidence-filtered` |
+| 4 — Run Tests & Build | `Suite passed` · `Build clean` |
+| 5 — Check CI Status | `CI queried` · `Required checks green` |
+| 6 — Fix Issues | `Fixes applied` · `Re-review clean` |
+| 7 — Summary Report | `AC verified` · `Verdict recorded` · `Merge decision stated` |
+
+`PARTIAL` covers the documented soft paths: no CI configured (Step 5), or the
+fix loop exhausting `review_cycles` with only non-blocking findings left (Step
+6). A failing test, a red required check, or an unaddressed blocking finding is
+always `FAIL`.

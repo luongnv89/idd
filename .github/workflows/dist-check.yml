@@ -66,6 +66,9 @@ jobs:
       - name: test-bundled-doc-slimming
         run: bash tests/test-bundled-doc-slimming-249.sh
 
+      - name: test-disclosure-gates
+        run: bash tests/test-disclosure-gates-250.sh
+
       - name: test-issue-triage
         run: bash tests/test-issue-triage.sh
 

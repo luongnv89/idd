@@ -65,3 +65,13 @@ All errors follow the rich error format: what went wrong + fix command + docs li
   Docs:    https://github.com/luongnv89/idd/blob/main/docs/config-schema.md
 ```
 **Trigger:** The repo root directory does not allow file creation.
+
+### Generated config failed validation
+```
+✗ Generated .gitissue.yml failed validation: {yaml_parse_error_or_placeholder_list}
+
+  To fix:  inspect the file, then re-run /init-gitissue to regenerate it
+  Check:   python3 -c "import yaml; yaml.safe_load(open('.gitissue.yml'))"
+  Docs:    https://github.com/luongnv89/idd/blob/main/docs/config-schema.md
+```
+**Trigger:** After writing `.gitissue.yml`, the file does not parse as YAML, still contains an unsubstituted `{placeholder}` token, or is missing the `platform` key. The file is left in place for inspection and setup does not report success.

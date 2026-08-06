@@ -225,6 +225,17 @@ A continuous loop, 5 phases per iteration, looping back to Phase 1 until the bac
 
 ---
 
+### Step completion reports
+
+Each phase closes with a completion report — `√`/`×` per check plus a
+`Result: PASS | PARTIAL | FAIL` line — so "phase done" is checkable rather than
+asserted. The per-phase check names, the `Result` semantics, and the block
+format are in `references/summary-format.md` (*Step Completion Reports*) —
+**read it now**, before the first phase. A phase is not complete until its `Result:`
+line is printed.
+
+---
+
 ## Phase Details
 
 Each iteration runs 5 phases. For brevity, the full step-by-step per-phase specification (including subagent prompts, followup-issue template, merge gates, and force-resolution fallbacks) lives in `references/phases.md`. The summary below lists the phases — read `references/phases.md` when implementing or debugging a specific phase.

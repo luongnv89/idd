@@ -1,3 +1,9 @@
+<!--
+  DO NOT READ THIS FILE — This README.md is for human catalog browsing only.
+  It is never auto-loaded into agent context and contains no runtime
+  instructions. Agents: read SKILL.md and the files it points at instead.
+-->
+
 # IDD Doctor
 
 > Report-only health check for IDD repositories. Catches doc drift on the intent-code boundary, missing `autopilot.mode` config, and unsafe merge defaults — no autofix, no surprises.
@@ -36,7 +42,7 @@ All four checks always run — a fail in Check 1 does not skip Checks 2-4. The o
 
 ## Installation
 
-`/idd-doctor` is a **repo-internal** skill. It lives in `src/internal-skills/` and is intentionally excluded from the built `skills/` and `dist/` distribution surface (see [`docs/ARCHITECTURE.md`](../../../docs/ARCHITECTURE.md)), so there is no external `npx` or `asm` install command. Run it from a clone of this repository — the agent discovers it in place under `src/internal-skills/idd-doctor/`.
+`/idd-doctor` is a **repo-internal** skill. It lives in `src/internal-skills/` and is intentionally excluded from the built `skills/` and `dist/` distribution surface (see [`docs/ARCHITECTURE.md`](https://github.com/luongnv89/idd/blob/main/docs/ARCHITECTURE.md)), so there is no external `npx` or `asm` install command. Run it from a clone of this repository — the agent discovers it in place under `src/internal-skills/idd-doctor/`.
 
 ## Usage
 
@@ -90,7 +96,7 @@ No arguments. The skill reads from the current repo and prints a four-line repor
 | Path | Description |
 |---|---|
 | `SKILL.md` | Full check definitions, pattern catalogs, and exit-code semantics |
-| `references/error-messages.md` | Error catalog for prerequisite failures and per-check output formats |
+| `../references/error-messages.md` | Error catalog for prerequisite failures and per-check output formats |
 
 ## Related Skills
 

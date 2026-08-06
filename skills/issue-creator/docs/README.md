@@ -1,3 +1,9 @@
+<!--
+  DO NOT READ THIS FILE — This README.md is for human catalog browsing only.
+  It is never auto-loaded into agent context and contains no runtime
+  instructions. Agents: read SKILL.md and the files it points at instead.
+-->
+
 # Issue Creator
 
 > Creates structured, intent-focused GitHub issues from text, screenshots, or lists. Preserves reporter context and generates acceptance criteria without guessing implementation details.
@@ -88,7 +94,7 @@ asm install https://github.com/luongnv89/idd --skill issue-creator
 | Path | Description |
 |---|---|
 | `templates/` | Issue templates for bug, feature, and improvement types |
-| `references/` | Error message catalog with exact output format |
+| `../references/` | Error message catalog with exact output format |
 
 ## Output
 

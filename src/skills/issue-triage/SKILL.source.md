@@ -286,6 +286,17 @@ Check these files relative to the skill's directory (the dirname of this SKILL.m
 
 ---
 
+### Step completion reports
+
+Each step closes with a completion report — `√`/`×` per check plus a
+`Result: PASS | PARTIAL | FAIL` line — so "step done" is checkable rather than
+asserted. The per-step check names, the `Result` semantics, and the block
+format are in `references/output-and-persist.md` (*Step Completion Reports*) —
+**read it now**, before Step 1. A step is not complete until its `Result:`
+line is printed.
+
+---
+
 ## Step 1 — Fetch Issues
 
 ```bash
@@ -323,7 +334,7 @@ Progress output:
 
 ## Steps 1b & 2 — Already-Fixed & Dependency Detection
 
-One full-scope scanner per batch finds issues already fixed by commits/PRs **and** builds the file-overlap dependency map. Full subagent prompts, confidence-scoring rules, and merge logic live in `references/detection.md` — read that file when tuning either result section.
+One full-scope scanner per batch finds issues already fixed by commits/PRs **and** builds the file-overlap dependency map. **Read `references/detection.md` now** — the subagent prompts, confidence-scoring rules, and merge logic there are what these steps execute, not optional tuning detail. The `Depends on #N` / `Blocked by #N` body markers this scan may also encounter — their grammar and how each skill treats them — are defined in `docs/idd-methodology.md` (*Issue Dependencies*); consult it when a scanned body carries one, so the directed edges reported here stay consistent with the marker semantics `/auto-pilot`'s merge gate enforces.
 
 Summary:
 - **Step 1b** — flags open issues whose titles/bodies match recent commit messages or merged PR descriptions. Marks them `potentially_fixed` with evidence links.

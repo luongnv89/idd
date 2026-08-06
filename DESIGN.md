@@ -32,8 +32,12 @@ authoritative.
 | `⟶` | Next action / leads to | — | `⟶ Spawning resolver subagent...` |
 | `+` | Added field | — | `+ Files: auth.py (high)` |
 | `=` | Preserved field | — | `= Original: preserved` |
+| `√` | Completion-report check passed | — | `√ Tests written` |
+| `×` | Completion-report check failed | — | `× Build clean` |
 
 All symbols carry meaning without color. Never rely on color alone.
+
+`√` and `×` are reserved for step completion reports — the `Result: PASS | PARTIAL | FAIL` block a skill prints to close each step — and stay distinct from `✓`/`✗`, which report the run's own status.
 
 ## Color Palette
 

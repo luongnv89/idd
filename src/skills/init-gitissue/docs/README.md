@@ -1,3 +1,9 @@
+<!--
+  DO NOT READ THIS FILE — This README.md is for human catalog browsing only.
+  It is never auto-loaded into agent context and contains no runtime
+  instructions. Agents: read SKILL.md and the files it points at instead.
+-->
+
 # Init Gitissue
 
 > Scan your repository and generate a tailored `.gitissue.yml` config with project-specific defaults.
@@ -54,8 +60,8 @@ asm install https://github.com/luongnv89/idd --skill init-gitissue
 
 | Path | Description |
 |---|---|
-| `references/examples.md` | Full example outputs for typical detection and merge scenarios |
-| `references/error-messages.md` | Error catalog for missing git repo, existing config, and detection failures |
+| `../references/examples.md` | Full example outputs for typical detection and merge scenarios |
+| `../references/error-messages.md` | Error catalog for missing git repo, existing config, and detection failures |
 | `templates/gitissue-template.yml` | Annotated `.gitissue.yml` template the skill fills in and writes |
 
 ## Output
