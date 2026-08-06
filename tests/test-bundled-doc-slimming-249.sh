@@ -18,9 +18,11 @@ PASS=0
 FAIL=0
 
 # Measured after the issue #249 build: 467,132 bytes across the 7 built skills,
-# down from 780,400 before. The budget leaves headroom for genuine doc growth
-# while still failing if whole-document bundling is reintroduced.
-BUDGET=560000
+# down from 780,400 before. AC3 asks for a >=300KB drop, i.e. <=480,400 bytes.
+# The budget is set just under that so the assertion still fails if a single
+# whole document (config-schema.md is 27.5KB x 7 skills) is reinstated, while
+# leaving ~13KB of room for genuine doc growth.
+BUDGET=480000
 
 pass() { echo "  ✓ $1"; PASS=$((PASS + 1)); }
 fail() { echo "  ✗ $1"; FAIL=$((FAIL + 1)); }

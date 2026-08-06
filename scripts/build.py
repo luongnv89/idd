@@ -846,13 +846,18 @@ def _filter_defaults_table(text: str, sections: frozenset[str], known: frozenset
 
     Scoped to the `## Defaults Table` section: other pipe-delimited tables in
     the document (notably the `.gitissue/` directory table) must survive intact.
+    Fenced code blocks are skipped, so a `## ` inside an example never flips the
+    section boundary (same rule as `_split_h2_sections`).
     """
     out: list[str] = []
     in_defaults = False
+    in_fence = False
     for line in text.splitlines(keepends=True):
-        if line.startswith("## "):
+        if line.lstrip().startswith("```"):
+            in_fence = not in_fence
+        elif not in_fence and line.startswith("## "):
             in_defaults = line.strip() == "## Defaults Table"
-        match = _DEFAULTS_TABLE_ROW_RE.match(line) if in_defaults else None
+        match = _DEFAULTS_TABLE_ROW_RE.match(line) if in_defaults and not in_fence else None
         if match:
             key = match.group(1).split(".", 1)[0]
             if key in known and key not in sections:
