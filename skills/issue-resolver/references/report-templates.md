@@ -195,7 +195,7 @@ tracker line:
 
 ```
   [3/5] Implement    ✓ 3 files changed, 8 unit tests
-    √ Every AC addressed   √ Tests written   × Build clean
+    √ Every AC addressed   √ Tests written   × Commits conventional
     Result: FAIL
 ```
 

@@ -143,6 +143,41 @@ for entry in \
   else
     fail "AC3.5: $skill has no per-step check table"
   fi
+
+  # The worked example must teach the step's OWN checks: a check borrowed from
+  # a later step tells the run to stop early for a concern that step does not
+  # own — the divergence #250 exists to remove.
+  if python3 - "$owner_file" <<'PY'
+import re, sys
+text = open(sys.argv[1], encoding="utf-8").read()
+sec = text[text.index("## Step Completion Reports"):]
+fence = re.search(r"```\n(.*?)```", sec, re.DOTALL)
+if not fence:
+    print("no worked example block"); sys.exit(1)
+body = fence.group(1)
+checks = re.findall(r"[√×]\s+([A-Za-z][^√×\n]*?)(?=\s{2,}[√×]|\s*$)", body, re.MULTILINE)
+checks = [c.strip() for c in checks if c.strip()]
+if not checks:
+    print("example carries no √/× checks"); sys.exit(1)
+rows = [l for l in sec.splitlines() if l.startswith("| ") and "`" in l]
+for c in checks:
+    owning = [r for r in rows if f"`{c}`" in r]
+    if not owning:
+        print(f"example check '{c}' is in no per-step row"); sys.exit(1)
+    if len(owning) > 1:
+        print(f"example check '{c}' is ambiguous across rows"); sys.exit(1)
+# every example check must come from the SAME row
+rows_used = {next(r for r in rows if f"`{c}`" in r) for c in checks}
+if len(rows_used) != 1:
+    print(f"example mixes checks from {len(rows_used)} different steps: {checks}")
+    sys.exit(1)
+sys.exit(0)
+PY
+  then
+    pass "AC3.7: $skill's worked example uses only that step's own checks"
+  else
+    fail "AC3.7: $skill's worked example borrows checks from another step"
+  fi
 done
 
 if grep -q '`√`' "$REPO_ROOT/docs/terminal-style.md" && grep -q '`×`' "$REPO_ROOT/docs/terminal-style.md"; then

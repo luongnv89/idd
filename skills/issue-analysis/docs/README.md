@@ -69,7 +69,7 @@ asm install https://github.com/luongnv89/idd --skill issue-analysis
 
 | Path | Description |
 |---|---|
-| `references/error-messages.md` | Error catalog for auth failures, missing issues, corrupted cache, and empty states |
+| `../references/error-messages.md` | Error catalog for auth failures, missing issues, corrupted cache, and empty states |
 
 ## Output
 

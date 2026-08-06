@@ -77,7 +77,7 @@ asm install https://github.com/luongnv89/idd --skill issue-triage
 
 | Path | Description |
 |---|---|
-| `references/error-messages.md` | Error catalog for auth failures, rate limits, circular dependencies, and empty states |
+| `../references/error-messages.md` | Error catalog for auth failures, rate limits, circular dependencies, and empty states |
 
 ## Output
 

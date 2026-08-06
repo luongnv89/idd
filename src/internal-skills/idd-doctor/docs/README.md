@@ -96,7 +96,7 @@ No arguments. The skill reads from the current repo and prints a four-line repor
 | Path | Description |
 |---|---|
 | `SKILL.md` | Full check definitions, pattern catalogs, and exit-code semantics |
-| `references/error-messages.md` | Error catalog for prerequisite failures and per-check output formats |
+| `../references/error-messages.md` | Error catalog for prerequisite failures and per-check output formats |
 
 ## Related Skills
 

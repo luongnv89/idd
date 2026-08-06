@@ -73,16 +73,16 @@ When something fails, the auto-pilot skips and continues rather than stopping. A
 
 | Path | Description |
 |---|---|
-| `references/orchestration.md` | Loop orchestration and the top-level control flow |
-| `references/phases.md` | Full per-phase specification for each iteration |
-| `references/preflight.md` | Environment and rate-budget preflight checks |
-| `references/configuration.md` | Auto-pilot config options and merge-mode matrix |
-| `references/explicit-list-mode.md` | Explicit `--issues` list mode: validation, analysis, batching |
-| `references/subagent-prompts.md` | Exact prompts for resolver, reviewer, analyzer, and batch-resolver subagents |
-| `references/summary-format.md` | Final summary template and the six iteration outcomes |
-| `references/run-log.md` | `.gitissue/runs.jsonl` run-log schema and single-writer rules |
-| `references/examples.md` | Full example sessions and edge-case scenarios |
-| `references/error-messages.md` | Complete error catalog with triggers and autonomous recovery actions |
+| `../references/orchestration.md` | Loop orchestration and the top-level control flow |
+| `../references/phases.md` | Full per-phase specification for each iteration |
+| `../references/preflight.md` | Environment and rate-budget preflight checks |
+| `../references/configuration.md` | Auto-pilot config options and merge-mode matrix |
+| `../references/explicit-list-mode.md` | Explicit `--issues` list mode: validation, analysis, batching |
+| `../references/subagent-prompts.md` | Exact prompts for resolver, reviewer, analyzer, and batch-resolver subagents |
+| `../references/summary-format.md` | Final summary template and the six iteration outcomes |
+| `../references/run-log.md` | `.gitissue/runs.jsonl` run-log schema and single-writer rules |
+| `../references/examples.md` | Full example sessions and edge-case scenarios |
+| `../references/error-messages.md` | Complete error catalog with triggers and autonomous recovery actions |
 
 ## Output
 

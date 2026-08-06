@@ -196,7 +196,7 @@ tracker line:
 
 ```
   [4/7] Tests        ✓ 128 passed, 0 failed
-    √ Suite passed   √ Build clean   × CI green
+    √ Suite passed   × Build clean
     Result: FAIL
 ```
 

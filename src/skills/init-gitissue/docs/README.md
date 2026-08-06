@@ -60,8 +60,8 @@ asm install https://github.com/luongnv89/idd --skill init-gitissue
 
 | Path | Description |
 |---|---|
-| `references/examples.md` | Full example outputs for typical detection and merge scenarios |
-| `references/error-messages.md` | Error catalog for missing git repo, existing config, and detection failures |
+| `../references/examples.md` | Full example outputs for typical detection and merge scenarios |
+| `../references/error-messages.md` | Error catalog for missing git repo, existing config, and detection failures |
 | `templates/gitissue-template.yml` | Annotated `.gitissue.yml` template the skill fills in and writes |
 
 ## Output

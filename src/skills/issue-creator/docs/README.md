@@ -94,7 +94,7 @@ asm install https://github.com/luongnv89/idd --skill issue-creator
 | Path | Description |
 |---|---|
 | `templates/` | Issue templates for bug, feature, and improvement types |
-| `references/` | Error message catalog with exact output format |
+| `../references/` | Error message catalog with exact output format |
 
 ## Output
 

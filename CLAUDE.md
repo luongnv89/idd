@@ -82,6 +82,8 @@ All documentation lives in top-level `docs/`. Two kinds coexist there:
 
 When in doubt: if a skill source needs to read it at runtime, it is a runtime doc and goes at the top level of `docs/`. Otherwise it is a project doc.
 
+One deliberate exception: each skill package carries its own human-facing `README.md` at `src/skills/<name>/docs/README.md` (and `src/internal-skills/idd-doctor/docs/README.md`). That is the skill-creator standard location — a README under the skill's `docs/` is never auto-loaded into agent context, so it costs zero runtime tokens — and it carries the `DO NOT READ THIS FILE` AI-skip notice. These are skill-package files, not entries in the top-level `docs/` tree.
+
 ## Conventions
 
 ### GitHub CLI
