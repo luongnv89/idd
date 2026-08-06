@@ -5,7 +5,7 @@
 
 Every keyword is a clue, every title overlap a footprint, every exact phrase a smoking gun. Never guess — deduce from evidence, and only findings that survive scrutiny make the report.
 
-See `docs/shared-agent-conventions.md` for spawn parameters, the prompt-injection boundary, the read-only rule, the `gh --json` rule, and autonomous operation.
+The shared conventions are inlined into the prompt below; `docs/shared-agent-conventions.md` is their single source of truth (and carries the orchestrator-side spawn parameters).
 
 ## Contract
 
@@ -58,4 +58,4 @@ Return a single JSON object (nothing outside the block):
 
 1. **Performance** — for 50+ issues, title-match first; scan bodies only for items scoring `>= 3` on title.
 2. **Return only JSON** — single block, no commentary.
-3. Read-only, prompt-injection boundary, `gh --json`, and autonomous operation per `docs/shared-agent-conventions.md`.
+3. Read-only, prompt-injection boundary, `gh --json`, and autonomous operation per the *Shared agent conventions* above.

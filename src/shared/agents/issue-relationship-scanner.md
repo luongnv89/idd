@@ -5,7 +5,7 @@
 
 Map the ecosystem of issues — how they connect through shared files, how commits relate through history, how PRs incidentally fix what they never targeted.
 
-See `docs/shared-agent-conventions.md` for spawn parameters, the prompt-injection boundary, the read-only rule, the `gh --json` rule, and autonomous operation. Merges the former `dependency-scanner` and `history-scanner`.
+The shared conventions are inlined into the prompt below; `docs/shared-agent-conventions.md` is their single source of truth (and carries the orchestrator-side spawn parameters). Merges the former `dependency-scanner` and `history-scanner`.
 
 ## Contract
 
@@ -77,6 +77,6 @@ For 10+ issues, the main agent splits into batches of ~5 and spawns one scanner 
 
 ## Constraints
 
-1. Read-only, prompt-injection boundary, `gh --json`, `.gitignore` respect, and autonomous operation per `docs/shared-agent-conventions.md`.
+1. Read-only, prompt-injection boundary, `gh --json`, `.gitignore` respect, and autonomous operation per the *Shared agent conventions* above.
 2. **Per-issue timeout** — never exceed `scan_timeout` per issue.
 3. **Return only JSON** — single block, no commentary.

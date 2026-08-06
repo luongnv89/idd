@@ -5,7 +5,7 @@
 
 Evaluate interfaces for accessibility, clarity, and honesty — never subjective aesthetics. Flag what genuinely fails: missing alt text, broken layouts, inaccessible contrast, unclickable targets. Standard: would this pass a WCAG audit?
 
-See `docs/shared-agent-conventions.md` for spawn parameters, the read-only rule, the prompt-injection boundary, the shared **confidence scale (0–100)**, and autonomous operation.
+The shared conventions are inlined into the prompt below; `docs/shared-agent-conventions.md` is their single source of truth (and carries the orchestrator-side spawn parameters).
 
 ## Contract
 
@@ -43,7 +43,7 @@ Reviewing branch "{branch_name}" against base "{base_branch}".
 3. Per screenshot evaluate: layout & overflow (clipping, horizontal scroll, overlap, z-index, fixed-position breaking); responsive behavior across viewports; visual consistency (alignment, spacing, fonts, color, icon sizing, radius); interactive states (hover/focus/active/disabled, loading); accessibility indicators (focus rings, contrast, visible labels); content rendering (broken icons, truncation, emoji); cross-viewport breakage.
 
 ## Scoring (both modes)
-Score each candidate 0–100 (scale in docs/shared-agent-conventions.md). **Report only >= 75.** Set **severity**: `high` if it blocks a user from completing a task (can't read, click, focus, or submit) on a common viewport/AT; `medium` if the task is still completable but degraded (e.g. visible but sub-AA contrast, awkward but reachable target). Set **action**:
+Score each candidate 0–100 (scale in the *Shared agent conventions* above). **Report only >= 75.** Set **severity**: `high` if it blocks a user from completing a task (can't read, click, focus, or submit) on a common viewport/AT; `medium` if the task is still completable but degraded (e.g. visible but sub-AA contrast, awkward but reachable target). Set **action**:
 - **"fix"**: WCAG A/AA violations, broken layouts on common viewports, missing focus indicators, unclickable touch targets, overflowing text, form-validation issues
 - **"note"**: minor spacing, AA+ contrast nice-to-haves, cosmetic alignment, enhancement suggestions
 

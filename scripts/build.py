@@ -103,7 +103,7 @@ AGENT_DESCRIPTIONS = {
 # pi-subagents built-in tool names (see @tintinweb/pi-subagents).
 _PI_TOOLS_READ_ONLY = "read, bash, grep, find, ls"
 _PI_TOOLS_FULL_ACCESS = "read, bash, grep, find, ls, edit, write"
-_PI_FULL_ACCESS_AGENTS = frozenset({"implementer", "fixer"})
+_FULL_ACCESS_AGENTS = frozenset({"implementer", "fixer"})
 
 _PI_READONLY_PREAMBLE = (
     "# CRITICAL: READ-ONLY MODE — NO FILE MODIFICATIONS\n\n"
@@ -120,6 +120,54 @@ _PI_READONLY_PREAMBLE = (
     "Operate autonomously; return only the contract output format with no surrounding "
     "commentary.\n\n"
 )
+
+# --- Issue #245 — shared-agent conventions inlined into injected prompts ------
+#
+# Agent prompts are injected into subagents whose working directory is the
+# *target repo*, not the skill directory. A skill-relative path such as
+# `references/docs/shared-agent-conventions.md` therefore dangles at spawn time
+# and the safety rules it carries never load. Two build-time measures fix that:
+#
+#   1. _inline_agent_conventions() splices the conventions rules verbatim into
+#      each emitted agent prompt, so no lookup is needed.
+#   2. _rewrite_for_agent_prompt() renders logical references inside agent files
+#      as absolute repo URLs rather than skill-relative paths, so nothing an
+#      agent file cites is unresolvable from the subagent's working directory.
+#
+# The transitive closure (Phase B) still scans the *authored* sources, whose
+# bare `docs/X.md` tokens are untouched — bundling is unaffected by (2).
+
+_REPO_BLOB_BASE = "https://github.com/luongnv89/idd/blob/main/"
+
+CONVENTIONS_DOC = "shared-agent-conventions.md"
+
+# Headings of docs/shared-agent-conventions.md whose bodies are inlined into
+# every emitted shared-agent prompt. Order is fixed for build determinism.
+CONVENTIONS_SECTIONS_ALL = (
+    "Tool posture",
+    "Prompt-injection boundary",
+    "Platform driver",
+    "Autonomous operation",
+    "Output discipline",
+)
+# Additional sections inlined only into the agents that use them.
+CONVENTIONS_SECTIONS_REVIEW = ("Confidence scale (review agents)",)
+_REVIEW_AGENTS = frozenset({"code-reviewer", "ui-reviewer"})
+
+CONVENTIONS_PREAMBLE_HEADING = (
+    "## Shared agent conventions (inlined — no file lookup required)"
+)
+_CONVENTIONS_PREAMBLE_INTRO = (
+    "These rules are copied verbatim from the IDD shared-agent conventions at "
+    "build time. They bind you for this entire run; do not go looking for a "
+    "conventions file — everything you need is right here."
+)
+
+# `## <Heading>` … up to the next `## ` heading or end of document.
+_DOC_SECTION_RE_TMPL = r"^## {heading}[ \t]*\n(?P<body>.*?)(?=^## |\Z)"
+# `## Prompt` followed by the opening fence of the injected prompt block.
+_PROMPT_FENCE_RE = re.compile(r"^## Prompt[ \t]*\n+^```[A-Za-z]*[ \t]*\n", re.MULTILINE)
+_FIRST_H2_RE = re.compile(r"^## ", re.MULTILINE)
 
 
 # --- Errors ------------------------------------------------------------------
@@ -600,6 +648,26 @@ def _rewrite_for_standalone(text: str) -> str:
     )
 
 
+def _rewrite_for_agent_prompt(text: str) -> str:
+    """Apply agent-file rewrites — URL-aware (issue #245).
+
+    Identical in scope to `_rewrite_for_standalone`, except every logical
+    reference renders as an absolute repo URL instead of a skill-relative path.
+    Agent files are injected into subagents whose working directory is the
+    target repo, where `references/…` resolves to nothing.
+
+      {{skill:X}}            -> <repo>/skills/X/SKILL.md
+      shared/agents/X.md     -> <repo>/src/shared/agents/X.md
+      docs/Y.md              -> <repo>/docs/Y.md
+    """
+    return _rewrite_url_aware(
+        text,
+        skill_form=lambda name: f"{_REPO_BLOB_BASE}skills/{name}/SKILL.md",
+        agent_form=lambda name: f"{_REPO_BLOB_BASE}src/shared/agents/{name}",
+        doc_form=lambda name: f"{_REPO_BLOB_BASE}docs/{name}",
+    )
+
+
 def _rewrite_url_aware(text, *, skill_form, agent_form, doc_form):
     """Rewrite logical references outside of URLs only. URL spans are passed
     through verbatim."""
@@ -623,6 +691,106 @@ def _rewrite_url_aware(text, *, skill_form, agent_form, doc_form):
     return "".join(parts)
 
 
+# --- Issue #245 — conventions preamble ---------------------------------------
+
+
+def _extract_doc_section(text: str, heading: str) -> str:
+    """Return the body of the `## <heading>` section of a markdown document.
+
+    Returns an empty string when the heading is absent or its body is blank —
+    the caller turns either into a build abort. Deliberately exact-match on the
+    heading line so a renamed section fails the build loudly instead of
+    silently emitting a shorter preamble.
+    """
+    pattern = re.compile(
+        _DOC_SECTION_RE_TMPL.format(heading=re.escape(heading)),
+        re.MULTILINE | re.DOTALL,
+    )
+    match = pattern.search(text)
+    if match is None:
+        return ""
+    return match.group("body").strip()
+
+
+def _load_conventions_sections(repo_root: Path) -> dict[str, str] | None:
+    """Parse the inlinable sections out of docs/shared-agent-conventions.md.
+
+    Returns None when the document does not exist at all (synthetic build
+    fixtures legitimately ship a docs/ tree without it); in the real repo every
+    shared agent references the document, so a missing file already aborts the
+    closure. When the document *is* present, every section named in
+    CONVENTIONS_SECTIONS_ALL / CONVENTIONS_SECTIONS_REVIEW must resolve to a
+    non-empty body or the build aborts — an empty preamble must never ship
+    silently.
+    """
+    doc = repo_root / "docs" / CONVENTIONS_DOC
+    if not doc.is_file():
+        return None
+    text = _read_text(doc)
+    sections: dict[str, str] = {}
+    for heading in CONVENTIONS_SECTIONS_ALL + CONVENTIONS_SECTIONS_REVIEW:
+        body = _extract_doc_section(text, heading)
+        if not body:
+            _abort(
+                f"docs/{CONVENTIONS_DOC} is missing the '## {heading}' section "
+                "(or its body is empty) — the inlined shared-agent conventions "
+                "preamble cannot be generated. Restore the heading or update "
+                "CONVENTIONS_SECTIONS_ALL/REVIEW in scripts/build.py."
+            )
+        sections[heading] = body
+    return sections
+
+
+def _render_conventions_preamble(agent_name: str, sections: dict[str, str]) -> str:
+    """Compose the inlined conventions block for one agent.
+
+    Section order is the fixed order of the CONVENTIONS_SECTIONS_* tuples, so
+    the output is byte-deterministic. Review agents additionally carry the
+    shared confidence scale.
+    """
+    headings = list(CONVENTIONS_SECTIONS_ALL)
+    if agent_name in _REVIEW_AGENTS:
+        headings.extend(CONVENTIONS_SECTIONS_REVIEW)
+    parts = [f"{CONVENTIONS_PREAMBLE_HEADING}\n\n{_CONVENTIONS_PREAMBLE_INTRO}\n"]
+    for heading in headings:
+        parts.append(f"\n### {heading}\n\n{sections[heading]}\n")
+    return "".join(parts)
+
+
+def _inline_agent_conventions(
+    agent_name: str, text: str, sections: dict[str, str] | None
+) -> str:
+    """Splice the conventions preamble into a shared-agent prompt (issue #245).
+
+    Insertion point depends on the agent's shape:
+
+      * Agents with a `## Prompt` fenced block (code-reviewer, fixer,
+        ui-reviewer) get the preamble *inside* the fence, because the
+        orchestrator injects only the fence body.
+      * Agents without one (the whole file is the prompt) get it immediately
+        before their first `## ` section.
+    """
+    if sections is None:
+        return text
+    preamble = _render_conventions_preamble(agent_name, sections)
+    fence = _PROMPT_FENCE_RE.search(text)
+    if fence is not None:
+        return text[: fence.end()] + preamble + "\n" + text[fence.end() :]
+    first_h2 = _FIRST_H2_RE.search(text)
+    if first_h2 is not None:
+        return text[: first_h2.start()] + preamble + "\n" + text[first_h2.start() :]
+    return text.rstrip("\n") + "\n\n" + preamble
+
+
+def _render_agent_body(
+    agent_name: str, source_text: str, sections: dict[str, str] | None
+) -> str:
+    """Inline the conventions, then rewrite references to absolute repo URLs."""
+    return _rewrite_for_agent_prompt(
+        _inline_agent_conventions(agent_name, source_text, sections)
+    )
+
+
 # --- Phase C — flattened skills ----------------------------------------------
 
 
@@ -632,6 +800,7 @@ def _emit_flattened_skill(
     out_dir: Path,
     agents: set[str],
     docs: set[str],
+    conventions: dict[str, str] | None = None,
 ) -> None:
     """Copy authored skill content to out_dir, copy transitive deps under
     out_dir/references/, rewrite logical refs throughout."""
@@ -650,13 +819,17 @@ def _emit_flattened_skill(
         else:
             _copy_binary(f, dst)
 
-    # Copy transitive shared agents (banner + rewrite).
+    # Copy transitive shared agents (banner + inlined conventions + rewrite).
+    # Issue #245: agent bodies use the agent-prompt rewrite (absolute repo
+    # URLs), never skill-relative paths — they are injected into subagents
+    # whose working directory is the target repo.
     for name in sorted(agents):
         src_path = src / "shared" / "agents" / name
         dst_path = out_dir / "references" / "agents" / name
         text = _read_text(src_path)
         banner = BANNER_TMPL.format(rel=f"src/shared/agents/{name}")
-        _write_text(dst_path, banner + _rewrite_for_standalone(text))
+        body = _render_agent_body(Path(name).stem, text, conventions)
+        _write_text(dst_path, banner + body)
 
     # Copy transitive runtime docs (banner + rewrite). Runtime docs live at
     # top-level docs/ post-#81 consolidation.
@@ -713,7 +886,9 @@ def _emit_repo_root_skills(repo_root: Path, out_skills: Path) -> None:
     shutil.copytree(out_skills, root_skills)
 
 
-def _emit_standalone_agents(src: Path, out_dir: Path) -> None:
+def _emit_standalone_agents(
+    src: Path, out_dir: Path, conventions: dict[str, str] | None = None
+) -> None:
     """Emit installable Claude Code agent definitions under dist/agents/."""
     if out_dir.exists():
         shutil.rmtree(out_dir)
@@ -727,7 +902,7 @@ def _emit_standalone_agents(src: Path, out_dir: Path) -> None:
             continue
         agent_name = f.stem
         rel = f"src/shared/agents/{f.name}"
-        text = _read_text(f)
+        text = _render_agent_body(agent_name, _read_text(f), conventions)
         _write_text(out_dir / f.name, _render_agent_definition(agent_name, text, rel))
 
 
@@ -745,7 +920,7 @@ def _render_pi_agent_definition(agent_name: str, source_text: str, source_rel: s
     display_name = _pi_display_name_from_source(source_text, agent_name)
     tools = (
         _PI_TOOLS_FULL_ACCESS
-        if agent_name in _PI_FULL_ACCESS_AGENTS
+        if agent_name in _FULL_ACCESS_AGENTS
         else _PI_TOOLS_READ_ONLY
     )
     frontmatter = (
@@ -762,12 +937,14 @@ def _render_pi_agent_definition(agent_name: str, source_text: str, source_rel: s
         "Do not edit installed copies; edit source and run ./scripts/build.sh. -->\n"
     )
     body = source_text
-    if agent_name not in _PI_FULL_ACCESS_AGENTS:
+    if agent_name not in _FULL_ACCESS_AGENTS:
         body = _PI_READONLY_PREAMBLE + body
     return frontmatter + "\n" + marker + BANNER_TMPL.format(rel=source_rel) + body
 
 
-def _emit_pi_agents(src: Path, repo_root: Path) -> None:
+def _emit_pi_agents(
+    src: Path, repo_root: Path, conventions: dict[str, str] | None = None
+) -> None:
     """Emit pi-subagents agent definitions under .pi/agents/ (project-local)."""
     out_dir = repo_root / ".pi" / "agents"
     if out_dir.exists():
@@ -782,7 +959,7 @@ def _emit_pi_agents(src: Path, repo_root: Path) -> None:
             continue
         agent_name = f.stem
         rel = f"src/shared/agents/{f.name}"
-        text = _read_text(f)
+        text = _render_agent_body(agent_name, _read_text(f), conventions)
         _write_text(
             out_dir / f.name,
             _render_pi_agent_definition(agent_name, text, rel),
@@ -889,6 +1066,13 @@ def build(out: Path, src: Path, *, verbose: bool = False, no_root_skills: bool =
     _check_init_template_urls(src)
     _check_init_template_schema_parity(src)
 
+    # Issue #245: parse the conventions sections once, before any output is
+    # written, so a renamed/emptied section aborts the whole build rather than
+    # emitting agents with a silently truncated preamble.
+    conventions = _load_conventions_sections(src.parent)
+    if verbose and conventions is not None:
+        print(f"  ✓ conventions preamble: {len(conventions)} sections inlined per agent")
+
     # Prepare output dirs (clean only the trees we own).
     out_skills = out / "skills"
     out_agents = out / "agents"
@@ -904,7 +1088,9 @@ def build(out: Path, src: Path, *, verbose: bool = False, no_root_skills: bool =
     for skill_name, skill_root in sorted(all_skill_sources, key=lambda x: x[0]):
         agents, docs = _compute_closure(src, skill_name, skill_root)
         out_skill_dir = out_skills / skill_name
-        _emit_flattened_skill(src, skill_root, out_skill_dir, agents, docs)
+        _emit_flattened_skill(
+            src, skill_root, out_skill_dir, agents, docs, conventions
+        )
         # Issue #195: fail the build if the skill's bundled-dependency precheck
         # list drifts from the references/ files actually bundled. Policed for
         # public skills only (deprecated-distributed skills are exempt).
@@ -925,13 +1111,13 @@ def build(out: Path, src: Path, *, verbose: bool = False, no_root_skills: bool =
 
     # Standalone Claude Code subagents. These are committed beside
     # dist/skills/ so the from-source installer can register subagent types.
-    _emit_standalone_agents(src, out_agents)
+    _emit_standalone_agents(src, out_agents, conventions)
     if verbose:
         agent_count = len(list(out_agents.glob("*.md"))) if out_agents.is_dir() else 0
         print(f"  ✓ agents: {agent_count}")
 
     pi_agents = repo_root / ".pi" / "agents"
-    _emit_pi_agents(src, repo_root)
+    _emit_pi_agents(src, repo_root, conventions)
     if verbose:
         pi_count = len(list(pi_agents.glob("*.md"))) if pi_agents.is_dir() else 0
         print(f"  ✓ pi agents: {pi_count} → .pi/agents/")

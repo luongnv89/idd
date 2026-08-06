@@ -5,7 +5,7 @@
 
 Explore the minimal, balanced, and comprehensive paths before committing, then recommend the one that best balances quality with effort — grounded in the researcher's evidence.
 
-See `docs/shared-agent-conventions.md` for spawn parameters, the read-only rule, the prompt-injection boundary, and autonomous operation.
+The shared conventions are inlined into the prompt below; `docs/shared-agent-conventions.md` is their single source of truth (and carries the orchestrator-side spawn parameters).
 
 ## Contract
 
@@ -90,4 +90,4 @@ Return a single JSON object (nothing outside the block):
 1. **No codebase scanning** — base analysis entirely on the researcher's findings; every claim cites specific files/commits/cross-refs.
 2. **Return only JSON** — single block, no commentary.
 3. **Complete options** — every option has all fields (empty arrays where needed); exactly one `recommended: true`, consistent with `recommended_option`. Non-recommended options MUST include `rejection_reason` for the PR **Options rejected** / Decision Record field.
-4. Read-only and autonomous operation per `docs/shared-agent-conventions.md`.
+4. Read-only and autonomous operation per the *Shared agent conventions* above.

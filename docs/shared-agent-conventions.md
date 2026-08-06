@@ -9,6 +9,23 @@ and the canonical
 [Claude How To — 04-subagents](https://github.com/luongnv89/claude-howto/tree/main/04-subagents)
 reference these conventions adopt.
 
+## How these rules reach a spawned agent
+
+A subagent's working directory is the **target repo**, not the skill directory,
+so a skill-relative path to this file resolves to nothing at spawn time. The
+build therefore copies six sections of this document — *Tool posture*,
+*Prompt-injection boundary*, *Platform driver*, *Autonomous operation*,
+*Output discipline*, and (for `code-reviewer` / `ui-reviewer`)
+*Confidence scale (review agents)* — **verbatim** into every emitted agent
+prompt: the per-skill bundled agent copies, `dist/agents/`, and `.pi/agents/`
+(issue #245). Edit them here and rebuild; never hand-edit a built agent file.
+
+Those six headings are load-bearing: `scripts/build.py` matches them exactly and
+**aborts the build** if one is renamed, removed, or emptied. Renaming a section
+means updating `CONVENTIONS_SECTIONS_ALL` / `CONVENTIONS_SECTIONS_REVIEW` in the
+build script in the same commit. Every other section here is orchestrator-facing
+and is not inlined.
+
 ## Agent header
 
 Every shared agent opens with a compact identity + contract header:
