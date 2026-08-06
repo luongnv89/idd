@@ -29,8 +29,8 @@ work is involved, then run only the review that *can* and *should* run:
 
 Detection runs **once**, before the review cycles.
 
-1. Scan the work item's title + body (issue body for the resolver, PR title/body
-   for the PR reviewer) for UI keywords: `UI`, `frontend`, `component`, `style`,
+1. Scan the work item's title + body (the issue title/body for the resolver, the
+   PR title/body for the PR reviewer) for UI keywords: `UI`, `frontend`, `component`, `style`,
    `css`, `html`, `design`, `layout`, `responsive`, `mobile`, `theme`,
    `dark mode`, `button`, `form`, `page`, `screen`, `visual`, `accessibility`,
    `a11y`, `icon`, `image`, `screenshot`, `dashboard`, `navigation`, `modal`,

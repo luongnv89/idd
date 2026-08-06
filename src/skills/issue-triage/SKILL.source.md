@@ -459,9 +459,10 @@ See `docs/github-projects-sync.md` for the shared reference on how other skills 
 ## Expected Output
 
 A cached view renders instantly from `.gitissue/triage.json` — the rendering
-itself is defined once in *Step 3 — Render the cached report* above (header,
-table, flag lines), followed by the *Step 4* update suggestion when repo changes
-are detected. Full worked runs are in `references/examples.md`.
+itself is defined once in *Default Mode → 3. Render the cached report* above
+(header, table, flag lines), followed by one of the three endings in *Default
+Mode → 4. Detect changes and suggest update* (up-to-date, commits since last
+triage, or issue activity). Full worked runs are in `references/examples.md`.
 
 An update (`/issue-triage update`) runs Steps 1–9 and overwrites the cache, ending with the same snapshot view.
 
