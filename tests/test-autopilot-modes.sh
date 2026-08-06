@@ -250,6 +250,83 @@ else
 fi
 
 # ───────────────────────────────────────────────────────────
+# T8: caller obligation for delegated skills (#244)
+# ───────────────────────────────────────────────────────────
+# #244 gave issue-creator's and issue-triage's interactive gates a defined
+# non-interactive behavior — but that behavior only fires when the CALLER sets
+# a signal. Auto-pilot is the caller that #244's Description names as the live
+# deadlock ("Auto-pilot invokes issue-creator for mid-loop normalization").
+# Fixing the callee gate without the caller signal leaves the deadlock intact,
+# so these assertions pin the caller half of the contract.
+AUTOMODE_DOC="$REPO_ROOT/docs/auto-mode.md"
+
+if [ -f "$AUTOMODE_DOC" ]; then
+  pass "T8.0: docs/auto-mode.md (authoritative convention) exists"
+else
+  fail "T8.0: docs/auto-mode.md missing"
+fi
+
+# The doc must actually state the caller obligation this test enforces.
+if grep -qF 'MUST pass `--auto`' "$AUTOMODE_DOC"; then
+  pass "T8.0: auto-mode doc states the caller obligation"
+else
+  fail "T8.0: auto-mode doc does not state the caller obligation"
+fi
+
+# Auto-pilot must cite the doc and bundle it, or it is bound by a contract it
+# cannot read at runtime.
+if grep -qF 'docs/auto-mode.md' "$SKILL"; then
+  pass "T8.1: auto-pilot cites docs/auto-mode.md"
+else
+  fail "T8.1: auto-pilot does not cite docs/auto-mode.md"
+fi
+
+if grep -qF 'references/docs/auto-mode.md' "$SKILL"; then
+  pass "T8.1: auto-mode doc is in auto-pilot's bundled precheck list"
+else
+  fail "T8.1: auto-mode doc missing from auto-pilot's precheck list"
+fi
+
+# BOTH signals, not just one. Asserted separately so dropping either fails.
+if grep -qF 'IDD_AUTO_MODE=1' "$SKILL"; then
+  pass "T8.2: auto-pilot exports IDD_AUTO_MODE=1 for delegated skills"
+else
+  fail "T8.2: auto-pilot never mentions IDD_AUTO_MODE=1"
+fi
+
+if grep -qF 'Delegated skills inherit the autonomy' "$SKILL"; then
+  pass "T8.2: auto-pilot states the delegated-skill autonomy rule"
+else
+  fail "T8.2: auto-pilot does not state the delegated-skill autonomy rule"
+fi
+
+# The mid-loop issue-creator invocation is the gate that sits IN the loop's
+# path — the specific deadlock #244 reports. Anchor on the optional-skill
+# paragraph so a whole-file grep for the signals cannot satisfy this.
+CREATOR_LN="$(grep -nF '`issue-creator` is optional' "$SKILL" | head -1 | cut -d: -f1 || true)"
+if [ -z "$CREATOR_LN" ]; then
+  fail "T8.3: mid-loop issue-creator paragraph not found in auto-pilot SKILL"
+else
+  if sed -n "${CREATOR_LN},$((CREATOR_LN + 8))p" "$SKILL" | grep -qF 'IDD_AUTO_MODE=1'; then
+    pass "T8.3: mid-loop issue-creator invocation sets IDD_AUTO_MODE=1"
+  else
+    fail "T8.3: mid-loop issue-creator invocation does not set IDD_AUTO_MODE=1"
+  fi
+  if sed -n "${CREATOR_LN},$((CREATOR_LN + 8))p" "$SKILL" | grep -qF -- '--auto'; then
+    pass "T8.3: mid-loop issue-creator invocation passes --auto"
+  else
+    fail "T8.3: mid-loop issue-creator invocation does not pass --auto"
+  fi
+fi
+
+# Provenance must NOT be treated as a substitute for the explicit signals.
+if grep -qF 'Never rely on the callee detecting auto-pilot provenance' "$SKILL"; then
+  pass "T8.4: auto-pilot rules out provenance-based detection"
+else
+  fail "T8.4: auto-pilot does not rule out provenance-based detection"
+fi
+
+# ───────────────────────────────────────────────────────────
 # Summary
 # ───────────────────────────────────────────────────────────
 echo ""

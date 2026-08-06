@@ -62,7 +62,8 @@ docs/                              # All documentation — single tree (issue #8
 ├── shared-agent-conventions.md    #
 ├── agent-model-effort.md          #
 ├── pre-commit-security.md         #
-├── terminal-style.md              # ↑
+├── terminal-style.md              #
+├── auto-mode.md                   # ↑
 ├── ARCHITECTURE.md                # ↓ Human-only project docs (not bundled
 ├── DEVELOPMENT.md                 #   into skills; readable on the
 ├── decisions/                     #   repo's main branch only)

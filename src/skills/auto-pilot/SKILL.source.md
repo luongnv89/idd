@@ -37,6 +37,8 @@ Inspired by the auto-adapt-mode pattern: **always proceed, never block on recove
 
 When in doubt, the auto-pilot proceeds with the safer option rather than stopping to ask. A skipped issue can always be retried; a blocked loop wastes time.
 
+**Delegated skills inherit the autonomy.** Every gitissue skill `/auto-pilot` invokes — `/issue-triage`, `/issue-analysis`, `/issue-resolver`, `/issue-pr-review`, and the optional mid-loop `/issue-creator` normalization — is invoked with `--auto` **and** with `IDD_AUTO_MODE=1` exported before the invocation. Both signals, every time. This is the caller obligation in `docs/auto-mode.md`: a delegated skill's interactive gate has a defined non-interactive behavior, but that behavior only fires when the caller sets the signal, so a caller that sets neither still deadlocks a run with no human at the terminal. **Never rely on the callee detecting auto-pilot provenance** — provenance is not checkable, the flag and the environment variable are.
+
 ## Invocation
 
 | Invocation | What happens |
@@ -87,7 +89,10 @@ If one or more **required** skills (step 5 above) are missing, stop immediately
 and print the exact `✗ Missing required gitissue skill(s)` block from
 `references/preflight.md` — do not continue with partial execution.
 `issue-creator` is optional; if missing, skip mid-loop normalization and warn
-instead of stopping.
+instead of stopping. When it is present, invoke it with `--auto` and with
+`IDD_AUTO_MODE=1` exported, per *Autonomy Philosophy* above — its Normalize
+apply gate is the one delegated gate that sits directly in the loop's path, so
+a caller that omits the signals stalls the whole run.
 
 ### Bundled dependency precheck
 
@@ -114,6 +119,7 @@ Check these files relative to the skill's directory (the dirname of this SKILL.m
 - `references/docs/shared-agent-conventions.md` — shared subagent conventions
 - `references/docs/agent-model-effort.md` — per-agent model and reasoning-effort mapping
 - `references/docs/terminal-style.md` — terminal output style contract (symbols, output structure, table/error formats)
+- `references/docs/auto-mode.md` — auto-mode detection and the caller obligation for delegated skills
 
 If the working tree is dirty, auto-stash before starting; if not on the default
 branch, auto-switch and rebase on a clean tree. Both procedures (the stash-first

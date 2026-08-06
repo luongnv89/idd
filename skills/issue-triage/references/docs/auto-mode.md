@@ -1,12 +1,14 @@
 <!-- Generated from /docs/auto-mode.md. Do not edit. Edit source and run ./scripts/build.sh. -->
 # Auto Mode — non-interactive execution contract
 
-Authoritative definition of **auto mode** for every gitissue skill: how a run is
-detected as non-interactive, and what a skill MUST do when it reaches a gate that
-would otherwise wait for a human.
+Authoritative definition of **auto mode**: how a run is detected as
+non-interactive, and what a skill MUST do when it reaches a gate that would
+otherwise wait for a human.
 
-Skills reference this document instead of restating the rule at each gate. If a
-gate's behavior and this document disagree, this document wins.
+Skills reference this document instead of restating the rule at each gate. For
+any skill that cites it, this document wins where a gate's wording disagrees.
+Skills that predate it use the same `--auto` / `IDD_AUTO_MODE=1` signals — this
+document names the existing convention, it does not introduce a new one.
 
 ## Detection
 
@@ -85,10 +87,11 @@ These still abort the run in auto mode, exactly as in interactive mode:
   regardless of mode.
 - **Missing prerequisites** — no repo, no `gh`, not authenticated, no remote —
   **for the operations that require them.** A prerequisite the skill only
-  *recommends* is not a safety stop: where a step is documented as optional or
-  recommended (e.g. a pre-read repo sync), auto mode degrades to a `⚠` and
-  continues, exactly as the interactive decline path does. Abort only where the
-  interactive path would also have refused to continue.
+  *recommends* is not a safety stop. Abort where the step is **mandatory** —
+  it precedes a write, so proceeding unsynced or unauthenticated would corrupt
+  something. Degrade to a `⚠` and continue where the step is documented as
+  **optional or recommended** (e.g. a pre-read repo sync that only improves
+  accuracy), exactly as the interactive decline path does.
 - **Hard preflight failures** — issue not found, issue closed, rate budget
   exhausted.
 
