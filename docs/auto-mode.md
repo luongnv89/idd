@@ -82,7 +82,12 @@ These still abort the run in auto mode, exactly as in interactive mode:
   that makes it recoverable.
 - **Real-secret detection** in the pre-commit security scan — always blocks,
   regardless of mode.
-- **Missing prerequisites** — no repo, no `gh`, not authenticated, no remote.
+- **Missing prerequisites** — no repo, no `gh`, not authenticated, no remote —
+  **for the operations that require them.** A prerequisite the skill only
+  *recommends* is not a safety stop: where a step is documented as optional or
+  recommended (e.g. a pre-read repo sync), auto mode degrades to a `⚠` and
+  continues, exactly as the interactive decline path does. Abort only where the
+  interactive path would also have refused to continue.
 - **Hard preflight failures** — issue not found, issue closed, rate budget
   exhausted.
 

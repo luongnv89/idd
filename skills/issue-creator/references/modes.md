@@ -298,6 +298,8 @@ Create {N} issues? [A]ll / [e]dit / [c]ancel
 
 Never take `[e]dit` or `[c]ancel` in auto mode: `edit` needs a human to say what to change, and `cancel` discards work the caller explicitly requested. Items flagged as possible duplicates in Step 3 are included in the approved set — they are already logged as `⚠` there and are not silently dropped.
 
+The step summaries below show the interactive run. In auto mode every `✓ approved` line reads `✓ auto-approved` instead — the summary must not report an approval no human gave (`references/docs/auto-mode.md`).
+
 ### Step 4.5 — Epic Binding (optional)
 
 **Skip this entire step unless a parent epic is bound.** When no parent is bound, batch proceeds directly to Step 5 with no epic behavior — identical to today. A parent becomes bound in exactly one of these ways:

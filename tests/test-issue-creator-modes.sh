@@ -175,7 +175,7 @@ has_near "$MODES" "[A]ll / [e]dit / [c]ancel" "Auto mode" 30 \
   "T9.4: batch approval gate has an auto-mode carve-out"
 has "$MODES" "issues auto-approved and created" \
   "T9.4: batch carve-out logs how many issues were auto-approved"
-has "$MODES" "in auto mode" \
+has "$MODES" "Never take \`[e]dit\` or \`[c]ancel\` in auto mode" \
   "T9.4: batch auto path rules out [e]dit / [c]ancel"
 
 # T9.5 — gate 4: normalize apply (modes.md Step 6) — the auto-pilot deadlock.
@@ -192,11 +192,15 @@ has "$MODES" "backup remains mandatory" \
 # so a bare whole-file grep would stay green even if the interactive gate were
 # deleted. Anchoring on the block header proves the prompt still lives in the
 # interactive flow.
-has_near "$SKILL" "⚠ Possible duplicate:" "Continue creating? [Y/n]" 10 \
+# Windows are deliberately TIGHT — just past the prompt, stopping short of the
+# carve-out paragraph that quotes the same prompt string. A looser window is
+# satisfied by that quote alone and stays green when the real prompt is
+# deleted, which is the regression these assertions exist to catch.
+has_near "$SKILL" "⚠ Possible duplicate:" "Continue creating? [Y/n]" 5 \
   "T9.6: interactive duplicate prompt still in its warning block"
-has_near "$SKILL" "◆ Issue Preview" "Create issue? [Y/n]" 15 \
+has_near "$SKILL" "◆ Issue Preview" "Create issue? [Y/n]" 12 \
   "T9.6: interactive create prompt still in the preview block"
-has_near "$MODES" "◆ Normalization Preview" "Apply normalization? [Y/n/dry-run]" 15 \
+has_near "$MODES" "◆ Normalization Preview" "Apply normalization? [Y/n/dry-run]" 10 \
   "T9.6: interactive normalize prompt still in the preview block"
 has "$MODES" "Create 3 issues? [A]ll / [e]dit / [c]ancel" \
   "T9.6: interactive batch prompt unchanged"
@@ -204,6 +208,15 @@ has "$MODES" "Create 3 issues? [A]ll / [e]dit / [c]ancel" \
 # removes the interactive one.
 has "$SKILL" "If declined, stop without creating." "T9.6: interactive decline still stops"
 has "$MODES" "\`n\` → stop."                       "T9.6: interactive normalize decline still stops"
+
+# T9.7 — the SKILL claims EVERY gate has a defined non-interactive behavior;
+# pin the two pre-existing guards that claim depends on, so deleting one makes
+# the claim false AND fails here.
+MODELSUG="$REPO_ROOT/src/skills/issue-creator/references/model-suggestion.md"
+has "$MODES" "Non-interactive contexts never block" \
+  "T9.7: batch epic offer keeps its non-interactive guard"
+has "$MODELSUG" "never prompt" \
+  "T9.7: model-cache refresh keeps its non-interactive guard"
 
 echo ""
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"

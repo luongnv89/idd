@@ -344,6 +344,8 @@ Print a structured step-by-step summary:
   https://github.com/owner/repo/issues/42
 ```
 
+In auto mode the `Preview:` line reads `✓ auto-approved` instead of `✓ approved` — the summary must not report an approval no human gave (`docs/auto-mode.md`).
+
 If duplicates were found but the run proceeded anyway:
 ```
   Duplicates:        ⚠ warn ({N} potential duplicates, {override_source})
