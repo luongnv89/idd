@@ -36,6 +36,15 @@ batch*), since batching only occurs in explicit-list mode.
 
 ## Fields to populate
 
+**`blocked_by_dependency` is an `outcome`, not a `skipped_reason`, when the gate
+fires.** An issue whose PR was created and then refused by the Phase 5.1b
+dependency gate writes **exactly one** line, at that iteration, with
+`outcome: blocked_by_dependency` (no `skipped_reason`) — and is then added to the
+session skip list so the continuing loop cannot re-pick it and log a second line.
+The `skipped_reason: blocked_by_dependency` value is reserved for the different
+case where an issue is skipped **before** resolution starts (Phase 1's triage
+graph marks it blocked, so no PR exists). One line per issue, never both.
+
 Populate from the iteration's known values plus the resolver's returned
 telemetry: `ts` (current UTC, ISO 8601), `issue` (the number), `mode` (the
 auto-pilot merge mode — `conservative` / `balanced` / `aggressive`), `skill`

@@ -11,7 +11,7 @@ categorical outcomes.
 | `merged` | PR passed review and was merged cleanly. |
 | `left_open` | PR was created but not merged — either the mode forbids merge, the merge was blocked (CI/conflicts), or unresolved review issues prevented merge under the current mode. |
 | `partial_followup` | PR was merged with unresolved review issues; a follow-up issue captures the remaining work. Only reachable in `aggressive` mode with `merge_partial: true`. |
-| `blocked_by_dependency` | PR was created and reviewed but cannot merge until a `Depends on #N` / `Blocked by #N` reference is itself merged. PR is left open, the loop pauses, and the user re-runs `/auto-pilot` after merging the dependency. |
+| `blocked_by_dependency` | PR was created and reviewed but cannot merge until a `Depends on #N` / `Blocked by #N` reference is itself merged. PR is left open and unchanged, the issue is skipped for the rest of the session, and **the loop continues to the next eligible issue**. The user merges the dependency and a later `/auto-pilot` run picks the blocked PR back up. |
 | `failed` | The resolver subagent failed before a PR could be created (or another fatal step failed). |
 | `skipped` | Issue was skipped before resolution started — already resolved, blocked by labels/dependencies, in the `--skip` list, or assigned to another user. |
 

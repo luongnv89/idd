@@ -39,7 +39,7 @@ Stop — the loop is complete.
 
 From `summary.suggested_order` in `.gitissue/triage.json` (the triage execution order), select the first issue that is:
 - **Not blocked** — no unresolved dependencies in the triage graph
-- **Not skipped** — not in the `--skip` list or `skip_labels` set
+- **Not skipped** — not in the `--skip` list, the `skip_labels` set, or the **session skip list** (the in-memory list this run appends to: failed issues from Phase 2.3, and dependency-blocked issues from Step 5.1b / Phase 3-4 Step 2a). Consult all three every iteration — the session skip list is what stops a dependency-blocked issue from being re-picked after the loop continues past it.
 - **Not assigned** — not assigned to another user (unless there are no unassigned issues)
 - **Open** — state is `open`
 
@@ -53,13 +53,26 @@ If no eligible issue is found (all blocked, skipped, or assigned):
 ```
 ⚠ No eligible issues to pick
 
-  Blocked:   {blocked_count} issues (waiting on dependencies)
-  Skipped:   {skipped_count} issues (skip labels or --skip)
-  Assigned:  {assigned_count} issues (assigned to others)
+  Blocked:      {blocked_count} issues (waiting on dependencies)
+  Skipped:      {skipped_count} issues (skip labels, --skip, or failed this run)
+  Dep-blocked:  {dep_blocked_count} issues (PR open, waiting on a dependency merge)
+  Assigned:     {assigned_count} issues (assigned to others)
 
-  To unblock: resolve dependency issues first, or use --skip to bypass
+  To unblock: merge the dependency PR(s), resolve dependency issues, or use
+              --skip to bypass
 ```
-Stop.
+Stop. Count the issues this run added to the session skip list from the
+dependency gate on their **own** `Dep-blocked` line rather than folding them into
+`Skipped` — their PRs are open and merge-ready as soon as the dependency lands,
+which is a different next action from a `wontfix` label. Record each session
+skip-list entry with the reason that added it (`failed` from Phase 2.3,
+`blocked_by_dependency` from the gate) so `{dep_blocked_count}` is the count of
+gate-added entries and nothing else; `failed` entries fall under `Skipped`, so
+every filtered issue lands in exactly one bucket and the four counts always sum
+to the candidates Step 1.2 rejected. Omit the `Dep-blocked` line when its count
+is zero. All four labels pad to a common value column, so widening one widens
+the rest. **This is the only place a run ends for dependency reasons** (see
+*Step 5.1b — Dependency Gate*); the gate itself never stops the loop.
 
 ### Step 1.3 — Display Plan and Auto-Start
 
@@ -292,7 +305,7 @@ Compute the **effective mode** by reading `autopilot.mode` if set; if unset and 
 
 **Step 2a — Dependency gate (before any merge):**
 
-Whenever Step 2 would merge a PR (aggressive + `merge_partial: true`), run **Step 5.1b — Dependency Gate** first using the originating issue `#{issue_number}`. SPEC §2 requires this check before **any** automated merge, including partial merges. If the gate finds unsatisfied dependencies, do **not** merge: print the structured alert from `references/error-messages.md` (*PR blocked by unmerged dependency*), record the iteration outcome as `blocked_by_dependency`, and stop the loop (same pause semantics as Phase 5). If all dependencies are satisfied, proceed to Step 2b.
+Whenever Step 2 would merge a PR (aggressive + `merge_partial: true`), run **Step 5.1b — Dependency Gate** first using the originating issue `#{issue_number}`. SPEC §2 requires this check before **any** automated merge, including partial merges. If the gate finds unsatisfied dependencies, do **not** merge: print the structured alert from `references/error-messages.md` (*PR blocked by unmerged dependency*), record the iteration outcome as `blocked_by_dependency`, leave the PR open, add the issue to the session skip list, and **continue to the next eligible issue** (same record-and-continue semantics as Phase 5 — see *Record and continue when any dependency is unsatisfied*). If all dependencies are satisfied, proceed to Step 2b.
 
 **Step 2b — Merge (only when aggressive + merge_partial: true and Step 2a passed):**
 
@@ -418,7 +431,7 @@ For each line that matches `(?im)\b(?:depends\s+on|blocked\s+by)\b`, collect **l
 
 Example: `Blocked by: acme/lib#15, #12` → gate on **#12 only**. `Depends on #12, #15` → gate on **#12** and **#15**. The reference implementation is `scripts/dependency_gate_parse.py` (`extract_dependency_issue_numbers`). If no local markers remain, the gate is satisfied; proceed to Step 5.2.
 
-**Cycle guard:** If issue A's body references its own number (`#A`), log a warning and skip the gate (treat as satisfied). The auto-pilot must not pause forever on a self-referential cycle. Multi-hop cycles (A → B → A) are not detected here — they would require traversing each dependency's body, which is out of scope for the per-merge gate; the fail-safe is that any genuinely-cyclic issue set will eventually surface as `blocked_by_dependency` and require user intervention regardless. The check is:
+**Cycle guard:** If issue A's body references its own number (`#A`), log a warning and skip the gate (treat as satisfied). The auto-pilot must never block a PR on its own issue number. Multi-hop cycles (A → B → A) are not detected here — they would require traversing each dependency's body, which is out of scope for the per-merge gate; the fail-safe is that any genuinely-cyclic issue set surfaces as `blocked_by_dependency` on each affected issue and requires user intervention before those PRs can merge — the loop still advances past them. The check is:
 
 ```
 ⚠ Dependency cycle detected for #{issue_number} — skipping gate
@@ -453,9 +466,9 @@ gh search prs "is:open" "Closes #N" --json number,state,url --limit 5
 
 Collect the unsatisfied set.
 
-#### Pause when any dependency is unsatisfied
+#### Record and continue when any dependency is unsatisfied
 
-If the unsatisfied set is non-empty, do **not** merge. Print the structured alert from `references/error-messages.md` (*PR blocked by unmerged dependency*), record the iteration outcome as `blocked_by_dependency`, and stop the loop. The headline names the dependency's PR directly (when known) so the user's next action is one step:
+If the unsatisfied set is non-empty, do **not** merge. Print the structured alert from `references/error-messages.md` (*PR blocked by unmerged dependency*), record the iteration outcome as `blocked_by_dependency`, and **continue to the next eligible issue**. The headline names the dependency's PR directly (when known) so the user's next action is one step:
 
 ```
 ⚠ BLOCKED — PR #{pr_number} cannot merge until PR #{dep_pr_1} (closing #{dep_n1}) is merged
@@ -466,19 +479,24 @@ If the unsatisfied set is non-empty, do **not** merge. Print the structured aler
     ● #{dep_n1} — {dep_title_1} ({dep_issue_state}; PR #{dep_pr_1} is {dep_pr_state})
     ● #{dep_n2} — {dep_title_2} ({dep_issue_state}; no linked PR)
 
-  ⚠ Auto-pilot paused — merging out of dependency order is irreversible.
+  ⚠ Not merged — merging out of dependency order is irreversible.
+  ○ PR #{pr_number} left open — continuing to next issue.
 
-  To resume:
+  To unblock PR #{pr_number}:
     1. Review and merge the dependency PR(s) above
-    2. Re-run /auto-pilot — the loop will pick up where it left off and
-       re-evaluate the gate for PR #{pr_number}
+    2. Re-run /auto-pilot — a later run re-evaluates the gate for
+       PR #{pr_number} and merges it once the dependency is in
     3. To bypass entirely: set autopilot.respect_dependencies: false in
        .gitissue.yml (not recommended unless the marker is wrong)
 ```
 
 When a dependency issue has no linked PR (`closedByPullRequestsReferences` is empty and the issue is still open), the bullet shows `no linked PR` in place of the PR state — the user knows they need to drive that issue forward, not wait on a PR. When the dependency is open with multiple linked PRs, list each one. The headline picks the first unsatisfied dependency to keep the one-line summary actionable; the bullets enumerate the rest.
 
-Set the iteration outcome to `blocked_by_dependency` and exit the loop cleanly (do not advance to the next issue — the next iteration may share the same dependency, and continuing would just produce more blocked PRs). The PR for the current issue is left open and unchanged.
+Set the iteration outcome to `blocked_by_dependency`, leave the PR for the current issue **open and unchanged**, and **advance to the next eligible issue**. Not merging is already the safe outcome; the rest of the backlog rarely shares this dependency, and halting a 30-issue run at iteration 3 strands every remaining eligible issue.
+
+Before advancing, add `#{issue_number}` to the **session skip list** — the same in-memory list Phase 2.3 uses for failed issues. This is required, not cosmetic: when the dependency issue is `CLOSED` but its PR is still `OPEN` (the race case the gate treats as unsatisfied), Phase 1's triage graph sees the dependency as done and would re-pick `#{issue_number}` on the next iteration; the resolver would then abort on its "PR already targets this issue" guard and the run log would gain a second, bogus `failed` line for an issue that was already recorded. Skipping it for the rest of the session keeps the invariant of **exactly one run-log line per processed issue** (`outcome: blocked_by_dependency`, see `references/run-log.md`). In explicit-list mode Phase 1 does not run and the user-provided list is consumed in order, so re-picking is impossible there — the skip-list append is harmless and the same continue-to-the-next-entry behavior applies.
+
+The loop therefore stops on dependency grounds **only when no eligible issue remains** — through the existing `⚠ No eligible issues to pick` stop condition in Phase 1, never from the gate itself.
 
 If a referenced `#N` does not exist (404 from `gh issue view`), log a warning and treat that single reference as satisfied (skip it). Do not block on a typo.
 

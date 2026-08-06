@@ -28,9 +28,30 @@ fi
 
 # AC2: blocked_by_dependency on partial path when deps open
 if awk '/Step 2a — Dependency gate/{f=1} f && /blocked_by_dependency/{found=1; exit} END{exit !found}' "$PHASES"; then
-  pass "T2: partial-merge path pauses with blocked_by_dependency when gate fails"
+  pass "T2: partial-merge path records blocked_by_dependency when gate fails"
 else
-  fail "T2: partial-merge path missing blocked_by_dependency pause"
+  fail "T2: partial-merge path missing blocked_by_dependency outcome"
+fi
+
+# AC2b (#243): the partial path still refuses the merge, but continues the loop.
+STEP2A="$(awk '/Step 2a — Dependency gate/{f=1; next} f && /^\*\*Step 2b/{exit} f' "$PHASES")"
+
+if printf '%s' "$STEP2A" | grep -qE 'do \*\*not\*\* merge'; then
+  pass "T2.1: Step 2a still refuses to merge out of dependency order"
+else
+  fail "T2.1: Step 2a lost the do-not-merge guarantee"
+fi
+
+if printf '%s' "$STEP2A" | grep -qE 'continue to the next eligible issue'; then
+  pass "T2.2: Step 2a continues to the next eligible issue (#243)"
+else
+  fail "T2.2: Step 2a does not continue the loop after a blocked partial merge"
+fi
+
+if printf '%s' "$STEP2A" | grep -qE 'stop the loop'; then
+  fail "T2.3: Step 2a still stops the loop on a blocked partial merge"
+else
+  pass "T2.3: Step 2a no longer stops the loop (#243)"
 fi
 
 # AC3: error catalog has mode-gated variants, no unconditional partial merge

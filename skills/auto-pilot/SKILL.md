@@ -5,7 +5,7 @@ license: MIT
 compatibility: "Requires git and GitHub CLI (gh) with auth and push access. Requires merge permission for auto-merge. Requires issue-triage, issue-resolver, issue-analysis, and issue-pr-review to be installed from the same distribution. Optional: issue-creator for normalizing unstructured issues mid-loop."
 effort: max
 metadata:
-  version: 2.4.1
+  version: 2.5.0
   author: Luong NGUYEN <luongnv89@gmail.com>
 ---
 
@@ -26,14 +26,14 @@ Inspired by the auto-adapt-mode pattern: **always proceed, never block on recove
    - Retrying after transient failures
    - Merging PRs that pass review (only when `autopilot.mode` permits — see Configuration)
    - Falling back to simpler strategies when optimizations fail
+   - **PR blocked by an unmerged dependency** — if the originating issue has a `Depends on #N` / `Blocked by #N` marker and any referenced issue is still open (or its PR is unmerged), never merge out of order — but never stop the run for it either. Record the outcome as `blocked_by_dependency`, leave the PR open and unchanged, add the issue to the session skip list, and continue to the next eligible issue. Disabled by `autopilot.respect_dependencies: false`.
 
 2. **Confirm with user** (rare, critical) — Only for genuinely irreversible or dangerous actions:
    - Force-pushing to a shared branch (never done automatically)
    - Deleting remote branches that others might depend on
    - Modifying repository settings or branch protection rules
    - Any action that matches the dangerous patterns list (destructive ops, production deployment, package publishing)
-   - **Critical issues with unresolved review problems** — if the issue has a `critical` or `priority:critical` label and the review-fix loop exhausts its cycles without resolving all issues, stop and ask
-   - **PR blocked by an unmerged dependency** — if the originating issue has a `Depends on #N` / `Blocked by #N` marker and any referenced issue is still open (or its PR is unmerged), stop and ask: merging out of dependency order is effectively irreversible. Disabled by `autopilot.respect_dependencies: false`. This is the second documented exception (alongside critical-issue review failures).
+   - **Critical issues with unresolved review problems** — if the issue has a `critical` or `priority:critical` label and the review-fix loop exhausts its cycles without resolving all issues, stop and ask. This is the **only** documented stop-and-ask exception; every other condition — including a dependency-blocked merge — resolves to an automatic decision.
 
 When in doubt, the auto-pilot proceeds with the safer option rather than stopping to ask. A skipped issue can always be retried; a blocked loop wastes time.
 
@@ -281,7 +281,7 @@ Then loop back to Phase 1.
 
 ## Stop Conditions
 
-The loop stops when any of these conditions are met (except "Merge blocked", which leaves the PR open and continues to the next issue):
+The loop stops when any of these conditions are met — except the rows marked *loop continues*, which leave the PR open, record their outcome, and advance to the next eligible issue:
 
 | Condition | Output |
 |-----------|--------|
@@ -290,11 +290,11 @@ The loop stops when any of these conditions are met (except "Merge blocked", whi
 | Explicit list exhausted | `✓ All requested issues resolved!` |
 | No eligible issues (all blocked/skipped) | `⚠ No eligible issues to pick` |
 | Resolution failure (pause_on_failure: true) | `⚠ Auto-pilot paused` |
-| Review exhausted (non-critical, mode-dependent) | Follow-up issue created. PR merged (`partial_followup`) only if `mode: aggressive` and `merge_partial: true`; otherwise PR left open (`left_open`). Loop continues either way. |
+| Review exhausted (non-critical, mode-dependent) | Follow-up issue created. PR merged (`partial_followup`) only if `mode: aggressive` and `merge_partial: true`; otherwise PR left open (`left_open`). (*loop continues* either way) |
 | Review exhausted (critical issue) | `⚠ CRITICAL — auto-pilot requires your decision` (loop pauses) |
-| Merge blocked (CI/conflicts) | `⚠ PR #{pr_number} is not mergeable — PR left open, continuing` (`left_open`) |
-| Mode forbids merge (clean PR in `conservative`) | `○ PR #{pr_number} ready for manual merge (mode: conservative)` (`left_open`) |
-| PR blocked by an unmerged dependency | `⚠ BLOCKED — PR #{pr_number} cannot merge until dependency #{N} is merged` (loop pauses, `blocked_by_dependency`) |
+| Merge blocked (CI/conflicts) | `⚠ PR #{pr_number} is not mergeable — PR left open, continuing` (`left_open`, *loop continues*) |
+| Mode forbids merge (clean PR in `conservative`) | `○ PR #{pr_number} ready for manual merge (mode: conservative)` (`left_open`, *loop continues*) |
+| PR blocked by an unmerged dependency | `⚠ BLOCKED — PR #{pr_number} cannot merge until dependency #{N} is merged` (PR left open, `blocked_by_dependency`, issue added to the session skip list, *loop continues*) |
 | User cancellation | `○ Auto-pilot stopped by user` |
 
 ---

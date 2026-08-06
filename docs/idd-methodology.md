@@ -203,7 +203,7 @@ Multiple dependencies on one line are allowed: `Depends on #12, #15`. Cross-repo
 
 Skills that read the marker:
 
-- `/auto-pilot` — Phase 5 merge gate. Before merging PR-A for issue A, fetch issue A's body and parse `Depends on #N`. If any referenced issue is open, or has an open PR (unmerged), the auto-pilot pauses with a structured alert and leaves PR-A open. The user merges the dependency, then re-runs `/auto-pilot` to resume.
+- `/auto-pilot` — Phase 5 merge gate. Before merging PR-A for issue A, fetch issue A's body and parse `Depends on #N`. If any referenced issue is open, or has an open PR (unmerged), the auto-pilot refuses the merge: it prints a structured alert, records the outcome `blocked_by_dependency`, leaves PR-A open, and continues to the next eligible issue — the run is not paused. The user merges the dependency, and a later `/auto-pilot` run re-evaluates the gate and merges PR-A.
 - `/issue-triage` — may use the marker as an additional dependency-graph signal alongside file-overlap detection (existing behavior unchanged; this is opt-in for future enhancement).
 
 The convention is intentionally lightweight: it lives in plain prose in the issue body, requires no schema, and is grep-friendly for any tool — not just IDD skills.
