@@ -54,7 +54,7 @@ If no eligible issue is found (all blocked, skipped, or assigned):
 ⚠ No eligible issues to pick
 
   Blocked:      {blocked_count} issues (waiting on dependencies)
-  Skipped:      {skipped_count} issues (skip labels or --skip)
+  Skipped:      {skipped_count} issues (skip labels, --skip, or failed this run)
   Dep-blocked:  {dep_blocked_count} issues (PR open, waiting on a dependency merge)
   Assigned:     {assigned_count} issues (assigned to others)
 
@@ -67,8 +67,11 @@ dependency gate on their **own** `Dep-blocked` line rather than folding them int
 which is a different next action from a `wontfix` label. Record each session
 skip-list entry with the reason that added it (`failed` from Phase 2.3,
 `blocked_by_dependency` from the gate) so `{dep_blocked_count}` is the count of
-gate-added entries and nothing else. Omit the line when the count is zero. All
-four labels pad to a common value column, so widening one widens the rest. **This is the only place a run ends for dependency reasons** (see
+gate-added entries and nothing else; `failed` entries fall under `Skipped`, so
+every filtered issue lands in exactly one bucket and the four counts always sum
+to the candidates Step 1.2 rejected. Omit the `Dep-blocked` line when its count
+is zero. All four labels pad to a common value column, so widening one widens
+the rest. **This is the only place a run ends for dependency reasons** (see
 *Step 5.1b — Dependency Gate*); the gate itself never stops the loop.
 
 ### Step 1.3 — Display Plan and Auto-Start

@@ -155,7 +155,7 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 ⚠ No eligible issues to pick
 
   Blocked:      {blocked_count} issues (waiting on dependencies)
-  Skipped:      {skipped_count} issues (skip labels or --skip)
+  Skipped:      {skipped_count} issues (skip labels, --skip, or failed this run)
   Dep-blocked:  {dep_blocked_count} issues (PR open, waiting on a dependency merge)
   Assigned:     {assigned_count} issues (assigned to others)
 
