@@ -6,7 +6,7 @@ Tool-detection tables and command details for *Step 2 — Script Pre-pass*, *Ste
 
 Detect available lint/format/test tools from the project.
 
-**`--review-only` (detection-only):** run lint/format in check mode only (e.g. `npx eslint .` without `--fix`, `npx prettier --check .`, `ruff check .` without `--fix`) — no `--fix`, `--write`, or equivalent mutating flags. Skip *Commit auto-fixes* entirely.
+**When `--review-only` is set:** run the detection-only variant of this step — see *Review-only mode* in SKILL.md for the exact contract.
 
 **Default (fix loop):** run each auto-fix command below. Capture output but don't block on warnings — only block on errors that prevent the fix from running.
 

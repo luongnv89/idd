@@ -60,6 +60,9 @@ jobs:
       - name: test-skill-line-cap
         run: bash tests/test-skill-line-cap-247.sh
 
+      - name: test-consolidated-blocks
+        run: bash tests/test-consolidated-blocks-248.sh
+
       - name: test-issue-triage
         run: bash tests/test-issue-triage.sh
 

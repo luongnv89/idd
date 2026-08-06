@@ -185,10 +185,9 @@ signals, then pick the highest band any signal reaches:
 
 ## Complexity → model mapping (AC #5)
 
-Every suggestion names **exactly two models — one OpenAI model and one
-Anthropic model — never one and never more**. Map the effort band to its
-`openai` and `anthropic` entries in the cache's `complexity_mapping` (seed
-values shown), and render both:
+Map the effort band to its `openai` and `anthropic` entries in the cache's
+`complexity_mapping` (seed values shown), then render both per *the two-model
+rendering rule* under **Rendering** below:
 
 Each cell shows the pick's own per-task cost — the two are alternatives, so the
 costs are independent, never summed:
@@ -207,9 +206,14 @@ the nearest lower band and note `(needs review)`.
 
 ## Rendering the suggestion (AC #6)
 
-The suggestion appears in **two** places. In both, render the OpenAI model
-first, then ` · `, then the Anthropic model — e.g. `GPT-5.5 High · Opus 4.8
-Medium`. Both providers are always present; never emit a single model.
+**The two-model rendering rule (single home).** The suggestion appears in **two**
+places — the Step 5 ephemeral preview and the durable issue-body `## Metadata`
+line. In both, it **always names exactly two models — one OpenAI model and one
+Anthropic model — joined by ` · ` (OpenAI first)** — e.g. `GPT-5.5 High · Opus
+4.8 Medium`. The two names are read from the effort band's `openai` and
+`anthropic` entries in the cache. Both providers are always present; **never**
+collapse it to a single model or a single provider. Every mention of this rule
+elsewhere points here.
 
 In the **ephemeral preview** (Step 5), append each model's own per-task cost in
 parentheses immediately after it, read from that model's `cost_per_task_usd` in
@@ -245,7 +249,8 @@ Add a `**Suggested model:**` line after `**Effort:**` in the body. It is
 The template placeholders fill from the cache: `{openai_model}` and
 `{anthropic_model}` are the effort band's `openai` / `anthropic` entries,
 `{data_version}` is the version portion of `source` (e.g. `3.1` from
-`CursorBench 3.1`), and `{data_date}` is the date portion of `last_fetched`.
+`CursorBench 3.1` — do not repeat the `CursorBench` prefix), and `{data_date}` is
+the date portion of `last_fetched`.
 This is the one piece of externally-derived data the Output Contract admits
 into the body — see the
 **Output Contract** note in `SKILL.source.md`, which records why it is permitted

@@ -559,75 +559,23 @@ If max cycles with remaining issues:
 
 ### Step 4 — UI/UX review (auto-detected)
 
-UI review is **auto-detected per issue** — no config flag enables it. Before the QA cycles, examine the issue body and the working diff to decide whether UI work is involved, then run only the review that *can* and *should* run:
+The full mechanics — contract, keyword list, classification, code-review spawn,
+display-environment label, browser gate + capability checks, and the skip/success
+output — live in one shared home: `docs/ui-review.md`. Read it before running
+this sub-step. Only the resolver's deltas are listed here.
 
-- **Code UI review** is environment-independent — it reads the diff and changed files. It runs whenever UI work is detected, on any machine, **including a headless server with no display**. It is never gated on a GUI, a running app, or a browser.
-- **Browser UI review** is optional and captures screenshots from a running app, so it only runs when there is a reachable running app *and* the user opted in. When it can't run, it **skips with a warning and the code UI review still runs** — fail-soft to code-only, never block.
-
-#### Detection
-
-1. Scan the issue title + body for UI keywords: `UI`, `frontend`, `component`, `style`, `css`, `html`, `design`, `layout`, `responsive`, `mobile`, `theme`, `dark mode`, `button`, `form`, `page`, `screen`, `visual`, `accessibility`, `a11y`, `icon`, `image`, `screenshot`, `dashboard`, `navigation`, `modal`, `dialog`, `card`, `table`, `chart`, `graph`.
-2. Scan the working diff for UI files:
-   ```bash
-   git diff --name-only "origin/${base}"...HEAD | grep -E '\.(html|htm|css|scss|sass|less|styl|tsx|jsx|vue|svelte|astro)$|^(components|pages|views|layouts|app|src/app|screens|routes|templates)/|tailwind\.config\.|theme\.|tokens\.'
-   ```
-3. Classify: **`ui: detected`** (keywords OR UI files) → run the code UI review; **`ui: not detected`** → skip UI review entirely.
-
-#### Code-based review
-
-When `ui: detected`, spawn the `ui-reviewer` subagent in **code** mode (see `shared/agents/ui-reviewer.md`):
-
-```python
-Agent(
-  description="ui-reviewer — UI/UX code review (#N)",
-  prompt=<ui-reviewer.md prompt with mode=code, {variables} replaced>,
-  # do NOT set subagent_type — default general-purpose agent, not a custom "ui-reviewer" type
-)
-```
-
-Pass `{branch_name}`, `{base_branch}`, `{issue_context}` (the linked issue title/body + acceptance criteria), `{pr_context}` (empty — no PR exists yet at QA time), `{diff_command}` (`git diff origin/${base}...HEAD`), and `{confidence_threshold}` (`80` — the resolver has no `resolve.confidence_threshold` knob, so it always passes the default floor). Merge UI reviewer findings into the QA findings — both use the same `action: "fix" | "note"` semantics, so they flow into the fixer loop unchanged.
-
-#### Browser-based review (optional, gated)
-
-Browser review runs only when it both *can* and *should*.
-
-**First, detect the display environment (for the report only — capture is always headless).** Classify the runtime as *no-GUI/server* or *graphical* up front, before the gate and capability checks, so `ui_env` is always defined for every code path below — including the early skip paths. This label never selects the launch mode and never gates the review — Playwright always runs **headless** (the only capture mode this review has ever used), so behavior on a graphical display is unchanged:
-
-```bash
-# Label the environment for reporting. Capture stays headless either way —
-# headless Chromium needs no display, so a no-GUI/server host is fully supported.
-if [ "$(uname)" = "Darwin" ] || [ -n "${DISPLAY:-}" ] || [ -n "${WAYLAND_DISPLAY:-}" ]; then
-  ui_env="graphical"        # a display is present (macOS, or Linux with X11/Wayland)
-else
-  ui_env="no-GUI server"    # no display ($DISPLAY/$WAYLAND_DISPLAY unset on a non-macOS host)
-fi
-```
-
-This detection is **report-only**: it is never a fourth gate, and it never switches Playwright to a headed launch. A no-GUI result does **not** skip the browser review — headless Chromium needs no display, so capture proceeds headless exactly as it does on a graphical host.
-
-Then check `resolve.ui_review.browser_review`:
-
-- **`"false"`** — skip; code review already ran.
-- **`"ask"`** — prompt interactive users; skip silently in auto mode.
-- **`"true"`** — proceed to the capability check.
-
-Then verify the runtime can actually capture screenshots — **all** must hold:
-1. A target app is running and reachable (e.g. `curl -sf {app_url}` succeeds).
-2. A headless browser is available (Playwright/Chromium installed). A headless server with no display is fine — headless Chromium needs no display, only the browser binary and a reachable app.
-3. Capture is safe (not a production URL, no auth wall that would log real traffic).
-
-If the gate or any check fails, print a warning and skip — **without** affecting the code UI review that already ran. Name the environment so a no-GUI host is never mistaken for a silent skip:
-```
-⚠ Browser review skipped — {reason} (environment: {ui_env})
-  Code UI review still ran. Enable browser review with:
-  resolve.ui_review.browser_review: "true"  (and ensure the app is running and reachable)
-```
-
-When all hold, capture screenshots at mobile/tablet/desktop viewports with Playwright launched **headless**, then spawn the UI reviewer in **browser** mode with the screenshot paths and `{app_url}`. **Report the mode and environment** on success so the review output always states that the headless path ran and where:
-```
-✓ Browser review — captured 3 viewports (Playwright: headless; environment: {ui_env})
-```
-UI `action: "fix"` findings join the QA fixable issues handled by the fixer.
+- **When:** before the QA cycles of Step 4, once per run.
+- **Diff command:** `git diff origin/${base}...HEAD` (there is no PR yet), so
+  detection step 2 scans `git diff --name-only "origin/${base}"...HEAD`.
+- **Agent description:** `"ui-reviewer — UI/UX code review (#N)"`.
+- **Variables passed:** `{branch_name}`, `{base_branch}`, `{issue_context}` (the
+  issue title/body + acceptance criteria), `{pr_context}` (**empty** — no PR
+  exists yet at QA time), `{diff_command}`, and `{confidence_threshold}` = `80`
+  (the resolver has no `resolve.confidence_threshold` knob, so it always passes
+  the default floor).
+- **Browser gate config key:** `resolve.ui_review.browser_review`.
+- **Findings flow:** merged into the QA findings and handled by the Step 4 fixer
+  loop.
 
 ## Edge Cases
 

@@ -125,21 +125,21 @@ already deep in the full path.
 
 ### What each consuming skill does with the profile
 
-This document defines the *scale → profile* mapping and the pre-work-signal rule;
-each skill owns exactly *which* of its steps the `light` profile collapses (its
-pipeline reference spells out the per-step mechanics):
+This document defines the *scale → profile* mapping and the pre-work-signal rule.
+**Each skill owns exactly *which* of its steps the `light` profile collapses**, and
+states that in its own SKILL.md at the step where it selects the profile — do not
+restate any skill's per-step collapse list here. Read the consuming skill's own
+complexity/depth gate section for that list.
 
-- **`/issue-resolver`** — `light` keeps a **lighter** Research step (the
-  already-resolved safety check still runs), skips the 3-option synthesis in Plan
-  (a direct minimal plan is used), skips the interactive propose-relevant-skills
-  sub-step, and caps QA at **one** cycle. Implement and Deliver are unchanged, and
-  the durable PR artifacts (Decision Record + Acceptance Criteria Verification
-  table) are **always** emitted — the profile never removes durable memory.
-- **`/issue-pr-review`** — has no researcher, so it derives its own pre-work
-  signal (diff size / files-changed / labels / linked-issue `Effort`, taking the
-  **fuller** of any that disagree) and scales review **depth** — the `light`
-  profile caps the review-fix loop to one cycle and skips optional passes, while
-  the acceptance-criteria and traceability hard-blocks still run at full strength.
+Two cross-skill facts hold regardless of which skill applies the profile:
+
+- **Durable artifacts are never dropped.** Whatever a skill collapses, the
+  artifacts it writes for durable memory (decision records, acceptance-criteria
+  verification, traceability hard-blocks) are still emitted at full strength.
+- **A skill without a researcher derives its own pre-work signal** (e.g. diff
+  size, files changed, labels, the linked issue's `Effort` band), taking the
+  **fuller** of any signals that disagree — consistent with the ambiguous → fuller
+  rule above.
 
 ### Surfacing the profile (transparency)
 

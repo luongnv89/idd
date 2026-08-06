@@ -458,23 +458,10 @@ See `references/docs/github-projects-sync.md` for the shared reference on how ot
 
 ## Expected Output
 
-A cached view renders instantly from `.gitissue/triage.json`:
-
-```
-  ◆ Issue Triage
-  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  #  │ Issue              │ Pri │ Blocks │ Status
-  ───┼────────────────────┼─────┼────────┼───────────
-  1  │ #12 Fix auth       │ P1  │ #15    │ ready
-  2  │ #8  Add pagination │ P2  │ —      │ ready
-  3  │ #15 Refactor DB    │ P2  │ —      │ blocked #12
-  4  │ #3  Old UI bug     │ P3  │ —      │ stale (28d)
-
-  ○  Suggested order: #12 → #8 → #15 → #3
-
-  ● Suggestion: git history shows 3 new commits since last triage.
-    Run /issue-triage update to refresh.
-```
+A cached view renders instantly from `.gitissue/triage.json` — the rendering
+itself is defined once in *Step 3 — Render the cached report* above (header,
+table, flag lines), followed by the *Step 4* update suggestion when repo changes
+are detected. Full worked runs are in `references/examples.md`.
 
 An update (`/issue-triage update`) runs Steps 1–9 and overwrites the cache, ending with the same snapshot view.
 
