@@ -33,6 +33,27 @@ fail() {
   FAIL=$((FAIL + 1))
 }
 
+has_near() {
+  # Proximity assertion: $3 must appear within $4 lines AFTER the first
+  # occurrence of anchor $2. Used for the #244 sync-gate carve-out — a plain
+  # whole-file grep would pass on a doc that mentions auto mode somewhere else
+  # entirely, which is exactly the bug (a gate with no defined auto behavior).
+  # $1 = file, $2 = anchor, $3 = needle, $4 = window (lines), $5 = label
+  local f="$1" anchor="$2" needle="$3" win="$4" label="$5" ln
+  # `|| true` is required: under `set -euo pipefail` a missing anchor makes
+  # grep exit 1, which would kill the whole suite before the check below runs.
+  ln="$(grep -nF -e "$anchor" "$f" 2>/dev/null | head -1 | cut -d: -f1 || true)"
+  if [ -z "$ln" ]; then
+    fail "$label (anchor not found: '$anchor' in ${f#$REPO_ROOT/})"
+    return
+  fi
+  if sed -n "${ln},$((ln + win))p" "$f" | grep -qF -e "$needle"; then
+    pass "$label"
+  else
+    fail "$label (no '$needle' within $win lines of '$anchor' in ${f#$REPO_ROOT/})"
+  fi
+}
+
 # grep helper: assert a fixed-string pattern exists in a file.
 # -e guards patterns that begin with '-' from being parsed as grep options.
 has() {
@@ -129,6 +150,43 @@ has "$SKILL" "/issue-triage update" "T8: SKILL documents update-only re-analysis
 
 # --- T9: overwrite semantics (history is one entry per run) -----------------
 has "$PERSIST" "overwrites the entire file" "T9: full re-triage overwrites the file"
+
+# --- T10: auto-mode carve-out at the repo-sync gate (#244) ------------------
+# `Sync now? [Y/n]` was the only gate in this skill, and it had no defined
+# non-interactive behavior — which made /issue-triage unusable unattended. The
+# carve-out must sit AT the gate and cite the single authoritative convention
+# doc; the interactive prompt must stay unchanged.
+AUTOMODE="$REPO_ROOT/docs/auto-mode.md"
+
+if [ -f "$AUTOMODE" ]; then
+  pass "T10: docs/auto-mode.md (single authoritative convention) exists"
+else
+  fail "T10: docs/auto-mode.md missing"
+fi
+has "$AUTOMODE" '`--auto` flag'          "T10: auto-mode doc defines the --auto signal"
+has "$AUTOMODE" "IDD_AUTO_MODE=1"         "T10: auto-mode doc defines the IDD_AUTO_MODE=1 signal"
+has "$AUTOMODE" "caller provenance"       "T10: doc rules on caller-provenance detection"
+
+has "$SKILL" "--auto"                       "T10: SKILL documents the --auto modifier"
+has "$SKILL" "docs/auto-mode.md"            "T10: SKILL cites the authoritative auto-mode doc"
+has "$SKILL" "references/docs/auto-mode.md" "T10: auto-mode doc is in the precheck list"
+
+has_near "$SKILL" "Sync now? [Y/n]" "Auto mode" 40 \
+  "T10: repo-sync gate has an auto-mode carve-out"
+has_near "$SKILL" "Sync now? [Y/n]" \
+  "⚠ Auto mode: sync confirmation skipped" 40 \
+  "T10: sync carve-out logs a ⚠ instead of prompting"
+has_near "$SKILL" "Sync now? [Y/n]" "stash-first sync immediately" 40 \
+  "T10: auto mode syncs without asking (interactive default is Y)"
+
+# Interactive behavior unchanged (#244 AC4). Anchor on the prompt BLOCK, not on
+# the prompt string: `Sync now? [Y/n]` now also appears quoted inside the
+# carve-out ("Do not show the `Sync now? [Y/n]` prompt"), so a bare whole-file
+# grep would stay green even if the interactive gate were deleted.
+has_near "$SKILL" "Your branch may be behind the remote" "Sync now? [Y/n]" 10 \
+  "T10: interactive sync prompt still in its recommendation block"
+has "$SKILL" "If the user declines the prompt, proceed without syncing." \
+  "T10: interactive decline path unchanged"
 
 echo ""
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"

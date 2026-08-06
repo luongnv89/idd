@@ -35,6 +35,27 @@ fail() {
   FAIL=$((FAIL + 1))
 }
 
+has_near() {
+  # Proximity assertion: $3 must appear within $4 lines AFTER the first
+  # occurrence of anchor $2. Used for the #244 gate carve-outs — a plain
+  # whole-file grep would pass on a doc that mentions auto mode somewhere else
+  # entirely, which is exactly the bug (a gate with no defined auto behavior).
+  # $1 = file, $2 = anchor, $3 = needle, $4 = window (lines), $5 = label
+  local f="$1" anchor="$2" needle="$3" win="$4" label="$5" ln
+  # `|| true` is required: under `set -euo pipefail` a missing anchor makes
+  # grep exit 1, which would kill the whole suite before the check below runs.
+  ln="$(grep -nF -e "$anchor" "$f" 2>/dev/null | head -1 | cut -d: -f1 || true)"
+  if [ -z "$ln" ]; then
+    fail "$label (anchor not found: '$anchor' in ${f#$REPO_ROOT/})"
+    return
+  fi
+  if sed -n "${ln},$((ln + win))p" "$f" | grep -qF -e "$needle"; then
+    pass "$label"
+  else
+    fail "$label (no '$needle' within $win lines of '$anchor' in ${f#$REPO_ROOT/})"
+  fi
+}
+
 has() {
   # $1 = file, $2 = pattern, $3 = label
   if grep -qF -e "$2" "$1" 2>/dev/null; then
@@ -112,6 +133,100 @@ has "$MODES" "without a parent"                 "T7: epic step is skipped when n
 # --- T8: reporter-text-as-untrusted-data boundary ---------------------------
 # Normalize/Batch treat issue bodies + pasted docs as data, never instructions.
 has "$SKILL" "untrusted data"                   "T8: SKILL declares reporter text is untrusted data"
+
+# --- T9: auto-mode carve-outs at every interactive gate (#244) --------------
+# Every interactive gate must have a DEFINED non-interactive behavior stated AT
+# the gate, citing the single authoritative convention doc rather than
+# restating detection logic per gate. Interactive prompts must stay unchanged.
+AUTOMODE="$REPO_ROOT/docs/auto-mode.md"
+
+# T9.0 — the one authoritative place exists and defines detection + the rule.
+if [ -f "$AUTOMODE" ]; then
+  pass "T9.0: docs/auto-mode.md (single authoritative convention) exists"
+else
+  fail "T9.0: docs/auto-mode.md missing"
+fi
+has "$AUTOMODE" '`--auto` flag'           "T9.0: auto-mode doc defines the --auto signal"
+has "$AUTOMODE" "IDD_AUTO_MODE=1"          "T9.0: auto-mode doc defines the IDD_AUTO_MODE=1 signal"
+has "$AUTOMODE" "caller provenance"         "T9.0: doc rules on caller-provenance detection"
+has "$AUTOMODE" "Never block."             "T9.0: auto-mode doc states gates must never block"
+
+# T9.1 — the skill exposes the flag, cites the doc, and bundles it.
+has "$SKILL" "--auto"                       "T9.1: SKILL documents the --auto modifier"
+has "$SKILL" "docs/auto-mode.md"            "T9.1: SKILL cites the authoritative auto-mode doc"
+has "$SKILL" "references/docs/auto-mode.md" "T9.1: auto-mode doc is in the precheck list"
+
+# T9.2 — gate 1: duplicate warning (SKILL Step 3).
+has_near "$SKILL" "Continue creating? [Y/n]" "Auto mode" 20 \
+  "T9.2: duplicate-warning gate has an auto-mode carve-out"
+has_near "$SKILL" "Continue creating? [Y/n]" \
+  "⚠ Auto mode: duplicate confirmation skipped" 20 \
+  "T9.2: duplicate carve-out logs a ⚠ naming the suspected duplicate"
+
+# T9.3 — gate 2: create preview confirmation (SKILL Step 5).
+has_near "$SKILL" "Create issue? [Y/n]" "Auto mode" 25 \
+  "T9.3: create-preview gate has an auto-mode carve-out"
+has_near "$SKILL" "Create issue? [Y/n]" \
+  "⚠ Auto mode: create confirmation skipped" 25 \
+  "T9.3: create-preview carve-out auto-approves and logs a ⚠"
+
+# T9.4 — gate 3: batch approval (modes.md Step 4).
+# Window must stop short of Step 4.5, whose epic-offer guard also says
+# "⚠ Auto mode: …". At 30 this assertion stayed GREEN when the batch carve-out
+# was deleted — the epic offer slid into the window and satisfied it, so the
+# assertion did not test what its label claims. 15 reaches the batch carve-out
+# and nothing past it.
+has_near "$MODES" "[A]ll / [e]dit / [c]ancel" "Auto mode" 15 \
+  "T9.4: batch approval gate has an auto-mode carve-out"
+has "$MODES" "issues auto-approved and created" \
+  "T9.4: batch carve-out logs how many issues were auto-approved"
+has "$MODES" "Never take \`[e]dit\` or \`[c]ancel\` in auto mode" \
+  "T9.4: batch auto path rules out [e]dit / [c]ancel"
+
+# T9.5 — gate 4: normalize apply (modes.md Step 6) — the auto-pilot deadlock.
+has_near "$MODES" "Apply normalization? [Y/n/dry-run]" "Auto mode" 25 \
+  "T9.5: normalize apply gate has an auto-mode carve-out"
+has_near "$MODES" "Apply normalization? [Y/n/dry-run]" "never \`dry-run\`" 25 \
+  "T9.5: normalize auto path always applies (never dry-run)"
+has "$MODES" "backup remains mandatory" \
+  "T9.5: auto-apply does not weaken the mandatory backup safety stop"
+
+# T9.6 — interactive behavior unchanged (#244 AC4). Anchor on the DISPLAY BLOCK
+# that precedes each prompt, not on the prompt string itself: every prompt now
+# also appears quoted inside its own carve-out ("Do not show the `…` prompt"),
+# so a bare whole-file grep would stay green even if the interactive gate were
+# deleted. Anchoring on the block header proves the prompt still lives in the
+# interactive flow.
+# Windows are deliberately TIGHT — just past the prompt, stopping short of the
+# carve-out paragraph that quotes the same prompt string. A looser window is
+# satisfied by that quote alone and stays green when the real prompt is
+# deleted, which is the regression these assertions exist to catch.
+has_near "$SKILL" "⚠ Possible duplicate:" "Continue creating? [Y/n]" 5 \
+  "T9.6: interactive duplicate prompt still in its warning block"
+has_near "$SKILL" "◆ Issue Preview" "Create issue? [Y/n]" 12 \
+  "T9.6: interactive create prompt still in the preview block"
+has_near "$MODES" "◆ Normalization Preview" "Apply normalization? [Y/n/dry-run]" 10 \
+  "T9.6: interactive normalize prompt still in the preview block"
+has "$MODES" "Create 3 issues? [A]ll / [e]dit / [c]ancel" \
+  "T9.6: interactive batch prompt unchanged"
+# The batch gate displays TWICE — once up front, once after an [e]dit round.
+# The re-prompt needs its own guard or deleting it leaves the suite green.
+has_near "$MODES" "show the approval prompt again" \
+  "Create {N} issues? [A]ll / [e]dit / [c]ancel" 4 \
+  "T9.6: interactive batch re-prompt after [e]dit unchanged"
+# The declined paths must survive too — auto mode adds a branch, it never
+# removes the interactive one.
+has "$SKILL" "If declined, stop without creating." "T9.6: interactive decline still stops"
+has "$MODES" "\`n\` → stop."                       "T9.6: interactive normalize decline still stops"
+
+# T9.7 — the SKILL claims EVERY gate has a defined non-interactive behavior;
+# pin the two pre-existing guards that claim depends on, so deleting one makes
+# the claim false AND fails here.
+MODELSUG="$REPO_ROOT/src/skills/issue-creator/references/model-suggestion.md"
+has "$MODES" "Non-interactive contexts never block" \
+  "T9.7: batch epic offer keeps its non-interactive guard"
+has "$MODELSUG" "never prompt" \
+  "T9.7: model-cache refresh keeps its non-interactive guard"
 
 echo ""
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"

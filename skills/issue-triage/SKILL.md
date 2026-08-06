@@ -20,8 +20,11 @@ Analyze open GitHub issues to surface dependencies, suggest priorities, identify
 | `/issue-triage` | Show cached triage from `.gitissue/triage.json`. If no cache exists, automatically run a full analysis and persist. After rendering, suggest an update if repo changes are detected. |
 | `/issue-triage update` | Force a full re-analysis: run **Prerequisites** (including the rate-budget preflight), then Steps 1-9, and overwrite `.gitissue/triage.json` |
 | `/issue-triage --limit N` | Force a full re-analysis with up to N issues (runs Prerequisites, then Steps 1-9) |
+| `/issue-triage … --auto` | (modifier) Run non-interactively — every gate logs a `⚠` and takes its safe default instead of prompting |
 
 The design principle: **viewing is cheap and instant, updating is deliberate.** Users see their triage report immediately without waiting for GitHub API calls. Updates only happen when the user explicitly requests one or approves a suggestion.
+
+**Auto mode.** `--auto` composes with every invocation above. Detection, the log-and-proceed gate rule, the `⚠` line format, and the safety stops that still abort are defined once in `references/docs/auto-mode.md`; this skill's gates cite it rather than restating it. In auto mode `/issue-triage` runs unattended end to end — it has no blocking prompt, so it is safe to drive from an orchestrator or a subagent.
 
 ## Default Mode (View with Smart Suggestions)
 
@@ -161,6 +164,14 @@ fi
 
 If `origin` is missing or rebase conflicts occur, inform the user and continue without syncing. If the user declines the prompt, proceed without syncing.
 
+**Auto mode (`references/docs/auto-mode.md`) — never blocks.** Do not show the `Sync now? [Y/n]` prompt. **Run the stash-first sync immediately** (the interactive default is `Y`), and log:
+
+```
+  ⚠ Auto mode: sync confirmation skipped — syncing with origin before triage.
+```
+
+This matches the same non-interactive sync carve-out `/issue-analysis` already applies. Failure stays non-fatal exactly as above: if `origin` is missing or the rebase conflicts, warn and continue the triage without syncing — a sync problem must never abort an unattended run.
+
 ## Configuration
 
 Load `.gitissue.yml` from the repo root once at skill start. If the file does not exist, use defaults and print:
@@ -272,6 +283,7 @@ Check these files relative to the skill's directory (the dirname of this SKILL.m
 - `references/docs/platform-github.md` — GitHub platform driver reference
 - `references/docs/shared-agent-conventions.md` — shared subagent conventions
 - `references/docs/agent-model-effort.md` — per-agent model and reasoning-effort mapping
+- `references/docs/auto-mode.md` — auto-mode detection and the non-interactive gate rule
 - `references/docs/terminal-style.md` — terminal output style contract (symbols, output structure, table/error formats)
 
 ---
