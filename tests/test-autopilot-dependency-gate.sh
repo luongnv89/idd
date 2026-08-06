@@ -287,6 +287,15 @@ else
   fail "T13.1: phases.md still uses the pause heading for the unsatisfied set"
 fi
 
+# T13.3-T13.7 all read through gate_block. If the heading is ever reworded the
+# block comes back empty and those five would fail for the wrong reason — so
+# report the real cause once instead of five misleading failures.
+if [ -n "$(gate_block)" ]; then
+  pass "T13.2a: Step 5.1b unsatisfied-dependency block is non-empty"
+else
+  fail "T13.2a: Step 5.1b block not found — heading changed? (T13.3-T13.7 unreliable)"
+fi
+
 # The old stop-the-loop rationale must be gone everywhere in the source tree.
 if grep -rqE 'do not advance to the next issue' "$REPO_ROOT/src"; then
   fail "T13.2: 'do not advance to the next issue' still present in src/"
@@ -334,6 +343,15 @@ if grep -qE 'outcome: blocked_by_dependency' "$RUNLOG_REF" \
   pass "T13.8: run-log.md pins one line with outcome blocked_by_dependency"
 else
   fail "T13.8: run-log.md does not pin the single blocked_by_dependency line"
+fi
+
+# config-schema.md legitimately lists blocked_by_dependency under BOTH `outcome`
+# and `skipped_reason`. The two only agree because run-log.md carries the
+# discriminator; without it a future reader could write both lines for one issue.
+if grep -qE 'reserved for' "$RUNLOG_REF" && grep -qE 'never both' "$RUNLOG_REF"; then
+  pass "T13.8a: run-log.md reserves skipped_reason for pre-resolution skips"
+else
+  fail "T13.8a: run-log.md lost the outcome-vs-skipped_reason discriminator"
 fi
 
 # Partial-merge path (Phase 3-4 Step 2a) continues too.
@@ -399,13 +417,31 @@ else
   pass "T13.17: docs/skills.md describes the continue-the-loop gate"
 fi
 
-# Stop Conditions table: every continuing row is marked, matching its preamble.
-if awk '/^\| Condition \| Output \|/{f=1} f && /^\| User cancellation/{exit} f' "$SKILL" \
-  | grep -cE '\*loop continues\*' | grep -qE '^4$'; then
-  pass "T13.18: all four continuing Stop Conditions rows carry the marker"
+# Stop Conditions table: its preamble says "except the rows marked *loop
+# continues*", so every row that actually continues must carry the marker.
+# Assert per known-continuing row rather than an exact total, so the check
+# survives future rows and still catches an unmarked continuing row.
+STOP_TABLE="$(awk '/^\| Condition \| Output \|/{f=1} f && /^\| User cancellation/{exit} f' "$SKILL")"
+
+if printf '%s' "$STOP_TABLE" | grep -qE '\*loop continues\*'; then
+  pass "T13.18: Stop Conditions table uses the *loop continues* marker"
 else
-  fail "T13.18: Stop Conditions table markers disagree with its preamble"
+  fail "T13.18: Stop Conditions table has no *loop continues* marker"
 fi
+
+while IFS='|' read -r label pattern; do
+  [ -z "$label" ] && continue
+  if printf '%s' "$STOP_TABLE" | grep -qE "${pattern}.*\*loop continues\*"; then
+    pass "T13.19.${label}: continuing row '${label}' carries the marker"
+  else
+    fail "T13.19.${label}: continuing row '${label}' is not marked *loop continues*"
+  fi
+done <<'ROWS'
+merge-blocked|^\| Merge blocked \(CI/conflicts\)
+conservative|^\| Mode forbids merge
+review-exhausted|^\| Review exhausted \(non-critical
+dependency|^\| PR blocked by an unmerged dependency
+ROWS
 
 # ───────────────────────────────────────────────────────────
 # Summary
