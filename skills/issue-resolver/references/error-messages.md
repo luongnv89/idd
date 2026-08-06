@@ -38,6 +38,17 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 ```
 **Trigger:** `git rev-parse --git-dir` fails.
 
+### Missing bundled dependency
+```
+✗ Missing bundled dependency: {missing_file}
+
+  To fix:  asm install https://github.com/luongnv89/idd --skill issue-resolver
+           (or reinstall the full distribution)
+
+  Then restart the agent session and re-run /issue-resolver.
+```
+**Trigger:** SKILL.md *Bundled dependency precheck* finds a path in its authoritative list that does not exist relative to the skill directory. Fatal — stop immediately; never continue with an inline or guessed subagent prompt.
+
 ## Issue Fetch
 
 ### Issue not found
@@ -59,6 +70,15 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 **Trigger:** Issue `state` is `closed` in the fetched JSON.
 
 ## Guards
+
+### PR already targets issue
+```
+⚠ PR #{pr_number} already targets issue #N
+  https://github.com/owner/repo/pull/{pr_number}
+
+  Use /issue-pr-review {pr_number} to review it instead.
+```
+**Trigger:** Step 0b finds an open PR whose body contains `Closes #N`, `Fixes #N`, or `Resolves #N`. Stop — the resolve pipeline does not create a second PR for the same issue.
 
 ### Assigned to another user
 ```

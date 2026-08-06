@@ -148,3 +148,41 @@ Every metric the old closing block restated — files read, complexity, option,
 files changed, test counts, QA cycles — is already on a `[N/5]` tracker line
 above. Only the outcome, the `risk_rating`, and the PR reference are new, so only
 those appear below the separator.
+
+## Run-log entry — field derivation and suppression
+
+Full detail for SKILL.md *Step 5 — Deliver → Run-log entry (monitoring)*, which
+owns the trigger (every terminal outcome), the append snippet, and the
+`--no-run-log` switch. This section carries the parts a run only needs once it is
+actually writing the line.
+
+### Fields to populate
+
+Build the object from values already known during the run — `ts`, `issue`,
+`mode`, `skill`, `outcome`, `pr`, plus the optional `complexity`, `profile`,
+`qa_cycles`, `duration_s`, and `skipped_reason` — following the schema in
+`references/docs/config-schema.md` (*`.gitissue/runs.jsonl` — run log*) rather than
+re-deriving fields here.
+
+Two derivations are the resolver's own:
+
+- **`complexity`** — collapse the researcher's 5-value scale to the 3-value
+  run-log scale before writing: `trivial`/`low` → `low`, `medium` → `medium`,
+  `high`/`complex` → `high`.
+- **`profile`** — the pipeline profile chosen in *Step 0g* (`light` or `full`).
+  Omit the field only when `resolve.adaptive_effort` is `false`, or when no
+  profile was selected at all (for example an early failure before Step 0g ran).
+
+`outcome` is one of `success` (a PR was delivered), `already_resolved` (Step 0/1
+found the issue already fixed and exited early), or `failed` (a step failed).
+
+### Suppression rule (single writer under `/auto-pilot`)
+
+`--no-run-log` is passed only by `/auto-pilot`, which runs this resolver as a
+subagent and writes the **single** run-log line per issue itself — appending here
+too would double-write and skew `/idd-doctor`'s metrics. Instead **return** the
+telemetry (`outcome`, `qa_cycles`, `complexity`, `profile`, `duration_s`) in the
+subagent result so the orchestrator folds it into its own line.
+
+The flag is independent of `--auto`: a standalone `/issue-resolver <N> --auto`
+run is *not* suppressed and still writes its own line.
