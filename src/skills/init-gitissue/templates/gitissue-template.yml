@@ -32,6 +32,7 @@ resolve:
   # Branch format: {type}/{issue_number}-{short-description}
   # Examples: fix/42-mobile-auth-redirect, feat/15-add-dark-mode
   # Set a custom string (e.g., "issue-") to override type-based naming
+  # See docs/naming-conventions.md for the full branch/commit/PR grammar
   branch_prefix: "auto"
 
   # Run tests before creating PR

@@ -30,7 +30,7 @@ invent a parallel scale.
 The research pipeline's 5-value complexity (`trivial / low / medium / high / complex`)
 maps to effort bands `XS / S / M / L / XL` (see `complexity_mapping` in issue-creator
 model-data). For **runs.jsonl** only, collapse to `low / medium / high` per
-`references/docs/config-schema.md` — do not reuse the word `complex` as a run-log value.
+[run-log-schema.md](https://github.com/luongnv89/idd/blob/main/docs/run-log-schema.md) — do not reuse the word `complex` as a run-log value.
 
 ## Where complexity comes from
 
@@ -152,7 +152,7 @@ downgrade:
   resolver's `[0/5] Preflight` line names `effort: light` or `effort: full`).
 - In the **run log** (`.gitissue/runs.jsonl`) as the optional `profile` field, so
   `/idd-doctor` and audits can see how often the fast path fired (see
-  `references/docs/config-schema.md`).
+  [run-log-schema.md](https://github.com/luongnv89/idd/blob/main/docs/run-log-schema.md)).
 
 ### Opting out
 
@@ -163,4 +163,4 @@ full pipeline on every issue regardless of band: `resolve.adaptive_effort`
 exactly as it did before this mechanism existed — the profile is pinned to
 `full`. Defaults are **on** so zero-config users get the fast path for trivial
 work automatically; the switch exists for maintainers who prefer uniform
-full-treatment (see `references/docs/config-schema.md`).
+full-treatment (see [config-schema.md](https://github.com/luongnv89/idd/blob/main/docs/config-schema.md)).

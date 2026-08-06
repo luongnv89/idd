@@ -113,8 +113,8 @@ Check these files relative to the skill's directory (the dirname of this SKILL.m
 - `references/docs/idd-methodology.md` — IDD methodology (issue dependencies, etc.)
 - `references/docs/sync-conventions.md` — stash-first sync convention and recovery
 - `references/docs/config-schema.md` — configuration schema reference
+- `references/docs/run-log-schema.md` — `.gitissue/runs.jsonl` run-log schema
 - `references/docs/naming-conventions.md` — naming conventions
-- `references/docs/github-projects-sync.md` — GitHub Projects status sync reference
 - `references/docs/platform-github.md` — GitHub platform driver reference
 - `references/docs/shared-agent-conventions.md` — shared subagent conventions
 - `references/docs/agent-model-effort.md` — per-agent model and reasoning-effort mapping
@@ -260,7 +260,7 @@ After printing the iteration status, append exactly **one JSON line** to
 a `skipped_reason`) — **except** the in-batch `already resolved in batch` skip,
 which writes **no** line (already logged at batch time). This is the same
 append-only run log written by `/issue-resolver`; the schema lives in
-`references/docs/config-schema.md` (*`.gitissue/runs.jsonl` — run log*).
+`references/docs/run-log-schema.md`.
 
 **Auto-pilot is the single writer per processed issue** — the resolver runs with
 `--no-run-log` and returns its telemetry instead of appending. Two contracts keep
@@ -360,4 +360,4 @@ On final stop, the **Final Summary** table (above) lists each iteration's issue,
 - **`references/subagent-prompts.md`** — resolver, reviewer, analyzer, and batch-resolver prompts (read once at skill start)
 - **`references/error-messages.md`** — full error catalog with triggers and exact output
 - **`references/docs/naming-conventions.md`** — branch, commit, PR, and issue naming
-- **`references/docs/terminal-style.md`** — terminal output style contract (bundled at build time; the repo-root `DESIGN.md` is the human-facing companion and is not bundled); **`references/docs/config-schema.md`** — full configuration schema
+- **`references/docs/terminal-style.md`** — terminal output style contract (bundled at build time; the repo-root `DESIGN.md` is the human-facing companion and is not bundled); **`references/docs/config-schema.md`** — full configuration schema; **`references/docs/run-log-schema.md`** — `.gitissue/runs.jsonl` run-log schema

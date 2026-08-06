@@ -244,8 +244,7 @@ of a batch line, not a fresh processed issue. Ordinary skips —
 `blocked_label`, `blocked_by_dependency`, `in_skip_list`, `assigned_to_other` —
 still log their one line with a `skipped_reason`.
 
-Build each written line from `docs/config-schema.md` (*`.gitissue/runs.jsonl` — run
-log*), with these batch attributions:
+Build each written line from `docs/run-log-schema.md`, with these batch attributions:
 
 - **Shared fields on every line:** the batch `pr` (the one PR number) and `complexity`.
 - **Scalar telemetry attributed once:** `qa_cycles` and `duration_s` describe the

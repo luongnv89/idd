@@ -52,9 +52,7 @@ references/docs/sync-conventions.md
 references/docs/idd-methodology.md
 references/docs/config-schema.md
 references/docs/naming-conventions.md
-references/docs/github-projects-sync.md
 references/docs/platform-github.md
-references/docs/shared-agent-conventions.md
 references/docs/agent-model-effort.md
 references/docs/terminal-style.md
 references/docs/ui-review.md

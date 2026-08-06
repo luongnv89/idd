@@ -55,27 +55,30 @@ echo "◆ Run-log (.gitissue/runs.jsonl) Tests"
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 
 CONFIG="$REPO_ROOT/docs/config-schema.md"
+# Issue #249: the runs.jsonl schema now has its own runtime doc so a skill that
+# only appends a telemetry line never reads the full configuration schema.
+RUNLOG="$REPO_ROOT/docs/run-log-schema.md"
 RESOLVER="$REPO_ROOT/src/skills/issue-resolver/SKILL.source.md"
 AUTOPILOT="$REPO_ROOT/src/skills/auto-pilot/SKILL.source.md"
 AUTOPILOT_DIR="$REPO_ROOT/src/skills/auto-pilot"
 DOCTOR="$REPO_ROOT/src/internal-skills/idd-doctor/SKILL.source.md"
 
-# --- T1: canonical schema in config-schema.md -------------------------------
-has "$CONFIG" ".gitissue/runs.jsonl" "T1: config-schema documents .gitissue/runs.jsonl"
-has "$CONFIG" "append-only" "T1: config-schema documents append-only nature"
-has "$CONFIG" "non-fatal" "T1: config-schema documents non-fatal write"
+# --- T1: canonical schema in run-log-schema.md -------------------------------
+has "$RUNLOG" ".gitissue/runs.jsonl" "T1: run-log-schema documents .gitissue/runs.jsonl"
+has "$RUNLOG" "append-only" "T1: run-log-schema documents append-only nature"
+has "$RUNLOG" "non-fatal" "T1: run-log-schema documents non-fatal write"
 for field in "skipped_reason" "qa_cycles" "duration_s" "complexity" "outcome"; do
-  has "$CONFIG" "$field" "T1: config-schema documents field '$field'"
+  has "$RUNLOG" "$field" "T1: run-log-schema documents field '$field'"
 done
 # minimum required fields called out
 for required in "ts" "issue" "mode" "outcome"; do
-  has "$CONFIG" "\`$required\`" "T1: config-schema lists required field '$required'"
+  has "$RUNLOG" "\`$required\`" "T1: run-log-schema lists required field '$required'"
 done
 # an example jsonl line is present
-if grep -q '"skill":"issue-resolver"' "$CONFIG" 2>/dev/null; then
-  pass "T1: config-schema includes an example runs.jsonl line"
+if grep -q '"skill":"issue-resolver"' "$RUNLOG" 2>/dev/null; then
+  pass "T1: run-log-schema includes an example runs.jsonl line"
 else
-  fail "T1: config-schema missing example runs.jsonl line"
+  fail "T1: run-log-schema missing example runs.jsonl line"
 fi
 
 # --- T2: issue-resolver writes one line per run -----------------------------
@@ -143,9 +146,12 @@ else
   fail "T6: --no-run-log should appear exactly twice (single-issue + batch resolver)"
 fi
 
-# config-schema documents the single-writer / suppression convention.
-has "$CONFIG" "--no-run-log" "T6: config-schema documents the --no-run-log suppression convention"
-has "$CONFIG" "single writer" "T6: config-schema documents the single-writer rule under auto-pilot"
+# run-log-schema documents the single-writer / suppression convention.
+has "$RUNLOG" "--no-run-log" "T6: run-log-schema documents the --no-run-log suppression convention"
+has "$RUNLOG" "single writer" "T6: run-log-schema documents the single-writer rule under auto-pilot"
+# The configuration schema must hand off to it rather than re-document it — the
+# point of the split is that appending a line costs no config-schema read.
+has "$CONFIG" "run-log-schema.md" "T6: config-schema points at the run-log schema doc"
 
 # --- T7: batch-resolver run-log fan-out (issue #158) ------------------------
 # A batch resolves N issues in ONE PR. The single-writer contract is one line per
@@ -185,25 +191,25 @@ has "$EXPLICIT" "issues_resolved" "T7: per-issue outcome derives from issues_res
 #     there — not double-logged as a batch 'failed' line.
 has "$EXPLICIT" "double-count this fix removes" "T7: spec guards the re-resolve double-count"
 has "$EXPLICIT" "individual" "T7: failed/partial batch issues re-resolved (and logged) individually"
-has "$CONFIG"   "no inverse under-count" "T7: config-schema documents no inverse under-count"
+has "$RUNLOG"   "no inverse under-count" "T7: run-log-schema documents no inverse under-count"
 # (d.0) Discriminates the batch-TIME write rule: an unresolved attempted issue is
 #       NEVER written a 'failed' line at batch time (it is re-queued and logged at
 #       its retry). Without this, prose that says "iterate the attempted set, absent
 #       -> failed" at batch time would reintroduce the exact per-issue double-count
 #       this fix removes — and the looser greps above would still pass.
 has "$EXPLICIT" "ever written a \`failed\` line at batch time" "T7: spec forbids a 'failed' batch-time line for unresolved issues"
-has "$CONFIG"   "No \`failed\` line is written at batch" "T7: config-schema forbids a 'failed' batch-time line"
+has "$RUNLOG"   "No \`failed\` line is written at batch" "T7: run-log-schema forbids a 'failed' batch-time line"
 # (d.1) The spawn-position (primary) unresolved issue MUST be re-queued, else it is
 #       dropped (zero lines) — the inverse under-count criterion 5 forbids. This is
 #       the subtle hole: the primary's optimized_order slot is already consumed.
 has "$EXPLICIT" "re-queue the primary too" "T7: full-failure path re-queues the primary too"
 has "$EXPLICIT" "Re-queuing the primary is" "T7: fan-out spec mandates re-queuing the primary"
-has "$CONFIG"   "including the batch's primary" "T7: config-schema mandates re-queuing the primary"
+has "$RUNLOG"   "including the batch's primary" "T7: run-log-schema mandates re-queuing the primary"
 # (d.2) An in-batch 'already resolved in batch' skip writes NO run-log line (the
 #       member was already logged at batch time) — else the resolved members get two
 #       lines. The one exception to 'log every processed issue including skips'.
 has "$EXPLICIT" "writes no run-log line" "T7: in-batch skip writes no run-log line (no double-count)"
-has "$CONFIG"   "writes no run-log line" "T7: config-schema notes the in-batch skip writes no line"
+has "$RUNLOG"   "writes no run-log line" "T7: run-log-schema notes the in-batch skip writes no line"
 
 # (e) Scalar telemetry attributed ONCE (primary line), shared fields on every line.
 has "$EXPLICIT" "one line only" "T7: qa_cycles/duration_s attributed to one line only"
@@ -216,7 +222,7 @@ has "$AUTOPILOT" "explicit-list-mode" "T7: auto-pilot SKILL points to the explic
 # --- T5: generated install surface carries the behavior through -------------
 GEN_RESOLVER="$REPO_ROOT/skills/issue-resolver/SKILL.md"
 GEN_AUTOPILOT="$REPO_ROOT/skills/auto-pilot/SKILL.md"
-GEN_CONFIG="$REPO_ROOT/skills/issue-resolver/references/docs/config-schema.md"
+GEN_CONFIG="$REPO_ROOT/skills/issue-resolver/references/docs/run-log-schema.md"
 
 if [ -f "$GEN_RESOLVER" ]; then
   has "$GEN_RESOLVER" "runs.jsonl" "T5: generated issue-resolver SKILL.md has runs.jsonl"
@@ -248,9 +254,9 @@ if [ -f "$GEN_RESOLVER" ]; then
   has "$GEN_RESOLVER" "--no-run-log" "T5: generated issue-resolver SKILL.md documents --no-run-log"
 fi
 if [ -f "$GEN_CONFIG" ]; then
-  has "$GEN_CONFIG" ".gitissue/runs.jsonl" "T5: bundled config-schema carries runs.jsonl schema"
+  has "$GEN_CONFIG" ".gitissue/runs.jsonl" "T5: bundled run-log-schema carries the runs.jsonl schema"
 else
-  fail "T5: bundled config-schema.md not found in generated resolver references"
+  fail "T5: bundled run-log-schema.md not found in generated resolver references"
 fi
 
 echo ""

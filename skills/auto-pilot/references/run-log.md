@@ -2,7 +2,7 @@
 
 `/auto-pilot` appends to `.gitissue/runs.jsonl` — the same append-only run log
 written by `/issue-resolver`. The schema and field list live in
-`references/docs/config-schema.md` (*`.gitissue/runs.jsonl` — run log*); follow it rather
+`references/docs/run-log-schema.md`; follow it rather
 than re-deriving fields. This file documents the two contracts that keep the log
 accurate when auto-pilot orchestrates the resolver: the **single-writer rule**
 and the **batch fan-out**.

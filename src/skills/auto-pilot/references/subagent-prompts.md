@@ -40,7 +40,7 @@ When done, report back ONLY these fields:
 - tests_written: count of new tests written (unit + integration + e2e)
 - tests_passed: count of tests passed
 - qa_cycles: number of QA cycles run
-- complexity: Research complexity collapsed to the runs.jsonl 3-value scale (see docs/config-schema.md — trivial/low→low, medium→medium, high/complex→high)
+- complexity: Research complexity collapsed to the runs.jsonl 3-value scale (see docs/run-log-schema.md — trivial/low→low, medium→medium, high/complex→high)
 - profile: the adaptive-effort pipeline profile the resolve selected ("light" or "full"), for the run-log `profile` field; omit/null when resolve.adaptive_effort is false or no profile was selected
 - duration_s: wall-clock seconds for the resolve, when measurable, for the run-log line
 - failure_step: which step failed (if status is failure)

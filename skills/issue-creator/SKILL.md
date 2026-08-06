@@ -151,8 +151,6 @@ Check these files relative to the skill's directory (the dirname of this SKILL.m
 - `references/docs/idd-methodology.md` — IDD methodology reference
 - `references/docs/sync-conventions.md` — stash-first sync convention and recovery
 - `references/docs/platform-github.md` — GitHub platform driver reference
-- `references/docs/shared-agent-conventions.md` — shared subagent conventions
-- `references/docs/agent-model-effort.md` — per-agent model and reasoning-effort mapping
 - `references/docs/auto-mode.md` — auto-mode detection and the non-interactive gate rule
 - `references/docs/terminal-style.md` — terminal output style contract (symbols, output structure, table/error formats)
 

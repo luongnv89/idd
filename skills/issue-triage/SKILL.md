@@ -180,7 +180,7 @@ Load `.gitissue.yml` from the repo root once at skill start. If the file does no
 ○ First run — using default config. Run /init-gitissue to customize.
 ```
 
-Triage settings and defaults:
+Triage settings and defaults (full semantics in `references/docs/config-schema.md`):
 
 | Setting | Default | Description |
 |---------|---------|-------------|
@@ -281,8 +281,6 @@ Check these files relative to the skill's directory (the dirname of this SKILL.m
 - `references/docs/github-projects-sync.md` — GitHub Projects status sync reference
 - `references/docs/config-schema.md` — configuration schema reference
 - `references/docs/platform-github.md` — GitHub platform driver reference
-- `references/docs/shared-agent-conventions.md` — shared subagent conventions
-- `references/docs/agent-model-effort.md` — per-agent model and reasoning-effort mapping
 - `references/docs/auto-mode.md` — auto-mode detection and the non-interactive gate rule
 - `references/docs/terminal-style.md` — terminal output style contract (symbols, output structure, table/error formats)
 

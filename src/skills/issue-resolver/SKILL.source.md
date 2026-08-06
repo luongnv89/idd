@@ -121,6 +121,7 @@ references/docs/naming-conventions.md
 references/docs/pre-commit-security.md
 references/docs/idd-methodology.md
 references/docs/github-projects-sync.md
+references/docs/run-log-schema.md
 references/docs/config-schema.md
 references/docs/agent-model-effort.md
 references/docs/shared-agent-conventions.md
@@ -477,4 +478,4 @@ Navigation index for the *Bundled dependency precheck* list above (that list, no
 
 **References** (`references/`): `pipeline-steps.md` (payloads/phases/fallbacks, Steps 0e–4, edge cases) · `report-templates.md` (PR body, closing summary, run-log fields, expected output) · `bug-verification.md` (reproduction checkpoint, Step 3) · `skill-index.md` (external-skill catalog, Step 3) · `error-messages.md` (error catalog)
 
-**Docs** (`docs/`): `sync-conventions.md` · `naming-conventions.md` · `pre-commit-security.md` · `idd-methodology.md` · `github-projects-sync.md` · `config-schema.md` · `agent-model-effort.md` · `shared-agent-conventions.md` · `platform-github.md` · `terminal-style.md` · `ui-review.md` — the repo-root `DESIGN.md` is the human-facing companion to the last of these (color palette, per-command mockups) and is **not** bundled.
+**Docs** (`docs/`): `sync-conventions.md` · `naming-conventions.md` · `pre-commit-security.md` · `idd-methodology.md` · `github-projects-sync.md` · `config-schema.md` · `run-log-schema.md` · `agent-model-effort.md` · `shared-agent-conventions.md` · `platform-github.md` · `terminal-style.md` · `ui-review.md` — the repo-root `DESIGN.md` is the human-facing companion to the last of these (color palette, per-command mockups) and is **not** bundled.

@@ -111,7 +111,7 @@ Load `.gitissue.yml` from the repo root once at skill start. If the file does no
 ○ First run — using default config. Run /init-gitissue to customize.
 ```
 
-Analysis settings and defaults:
+Analysis settings and defaults (full semantics in `docs/config-schema.md`):
 
 | Setting | Default | Description |
 |---------|---------|-------------|
@@ -183,9 +183,7 @@ Check these files relative to the skill's directory (the dirname of this SKILL.m
 - `references/docs/sync-conventions.md` — stash-first sync convention and recovery
 - `references/docs/idd-methodology.md` — IDD methodology (durable analysis fields)
 - `references/docs/config-schema.md` — configuration schema reference
-- `references/docs/github-projects-sync.md` — GitHub Projects status sync reference
 - `references/docs/platform-github.md` — GitHub platform driver reference
-- `references/docs/shared-agent-conventions.md` — shared subagent conventions
 - `references/docs/agent-model-effort.md` — per-agent model and reasoning-effort mapping
 - `references/docs/terminal-style.md` — terminal output style contract (symbols, output structure, table/error formats)
 
