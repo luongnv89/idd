@@ -290,10 +290,10 @@ The loop stops when any of these conditions are met — except the rows marked *
 | Explicit list exhausted | `✓ All requested issues resolved!` |
 | No eligible issues (all blocked/skipped) | `⚠ No eligible issues to pick` |
 | Resolution failure (pause_on_failure: true) | `⚠ Auto-pilot paused` |
-| Review exhausted (non-critical, mode-dependent) | Follow-up issue created. PR merged (`partial_followup`) only if `mode: aggressive` and `merge_partial: true`; otherwise PR left open (`left_open`). Loop continues either way. |
+| Review exhausted (non-critical, mode-dependent) | Follow-up issue created. PR merged (`partial_followup`) only if `mode: aggressive` and `merge_partial: true`; otherwise PR left open (`left_open`). (*loop continues* either way) |
 | Review exhausted (critical issue) | `⚠ CRITICAL — auto-pilot requires your decision` (loop pauses) |
 | Merge blocked (CI/conflicts) | `⚠ PR #{pr_number} is not mergeable — PR left open, continuing` (`left_open`, *loop continues*) |
-| Mode forbids merge (clean PR in `conservative`) | `○ PR #{pr_number} ready for manual merge (mode: conservative)` (`left_open`) |
+| Mode forbids merge (clean PR in `conservative`) | `○ PR #{pr_number} ready for manual merge (mode: conservative)` (`left_open`, *loop continues*) |
 | PR blocked by an unmerged dependency | `⚠ BLOCKED — PR #{pr_number} cannot merge until dependency #{N} is merged` (PR left open, `blocked_by_dependency`, issue added to the session skip list, *loop continues*) |
 | User cancellation | `○ Auto-pilot stopped by user` |
 

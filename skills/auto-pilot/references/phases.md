@@ -39,7 +39,7 @@ Stop — the loop is complete.
 
 From `summary.suggested_order` in `.gitissue/triage.json` (the triage execution order), select the first issue that is:
 - **Not blocked** — no unresolved dependencies in the triage graph
-- **Not skipped** — not in the `--skip` list or `skip_labels` set
+- **Not skipped** — not in the `--skip` list, the `skip_labels` set, or the **session skip list** (the in-memory list this run appends to: failed issues from Phase 2.3, and dependency-blocked issues from Step 5.1b / Phase 3-4 Step 2a). Consult all three every iteration — the session skip list is what stops a dependency-blocked issue from being re-picked after the loop continues past it.
 - **Not assigned** — not assigned to another user (unless there are no unassigned issues)
 - **Open** — state is `open`
 
@@ -55,11 +55,18 @@ If no eligible issue is found (all blocked, skipped, or assigned):
 
   Blocked:   {blocked_count} issues (waiting on dependencies)
   Skipped:   {skipped_count} issues (skip labels or --skip)
+  Dep-blocked: {dep_blocked_count} issues (PR open, waiting on a dependency merge)
   Assigned:  {assigned_count} issues (assigned to others)
 
-  To unblock: resolve dependency issues first, or use --skip to bypass
+  To unblock: merge the dependency PR(s), resolve dependency issues, or use
+              --skip to bypass
 ```
-Stop.
+Stop. Count the issues this run added to the session skip list from the
+dependency gate on their **own** `Dep-blocked` line rather than folding them into
+`Skipped` — their PRs are open and merge-ready as soon as the dependency lands,
+which is a different next action from a `wontfix` label. Omit the line when the
+count is zero. **This is the only place a run ends for dependency reasons** (see
+*Step 5.1b — Dependency Gate*); the gate itself never stops the loop.
 
 ### Step 1.3 — Display Plan and Auto-Start
 

@@ -374,6 +374,39 @@ else
   pass "T13.14: idd-methodology.md describes the continue-the-loop gate"
 fi
 
+# The re-pick guard only works if Step 1.2 eligibility consults the session
+# skip list the gate appends to.
+if awk '/^### Step 1\.2 — Pick Next Issue/{f=1; next} f && /^### /{exit} f' "$PHASES" \
+  | grep -qE 'session skip list'; then
+  pass "T13.15: Step 1.2 eligibility consults the session skip list"
+else
+  fail "T13.15: Step 1.2 never consults the session skip list (re-pick hazard)"
+fi
+
+# The 'no eligible issues' terminal surface distinguishes dep-blocked issues.
+if awk '/^### Step 1\.2 — Pick Next Issue/{f=1; next} f && /^### /{exit} f' "$PHASES" \
+  | grep -qE 'Dep-blocked'; then
+  pass "T13.16: terminal 'no eligible issues' block reports dep-blocked issues"
+else
+  fail "T13.16: terminal block folds dep-blocked issues into plain Skipped"
+fi
+
+# Public skills doc must not still claim the loop pauses on the gate.
+SKILLS_DOC="$REPO_ROOT/docs/skills.md"
+if grep -qE 'loop pauses for critical unresolved review failures and dependency-blocked' "$SKILLS_DOC"; then
+  fail "T13.17: docs/skills.md still says the loop pauses on dependency-blocked PRs"
+else
+  pass "T13.17: docs/skills.md describes the continue-the-loop gate"
+fi
+
+# Stop Conditions table: every continuing row is marked, matching its preamble.
+if awk '/^\| Condition \| Output \|/{f=1} f && /^\| User cancellation/{exit} f' "$SKILL" \
+  | grep -cE '\*loop continues\*' | grep -qE '^4$'; then
+  pass "T13.18: all four continuing Stop Conditions rows carry the marker"
+else
+  fail "T13.18: Stop Conditions table markers disagree with its preamble"
+fi
+
 # ───────────────────────────────────────────────────────────
 # Summary
 # ───────────────────────────────────────────────────────────

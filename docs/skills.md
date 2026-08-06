@@ -223,7 +223,7 @@ Controlled by `.gitissue.yml`:
 - `autopilot.mode: balanced` — default; merges clean PRs, leaves unresolved PRs open.
 - `autopilot.mode: aggressive` — may merge partial PRs only when `autopilot.merge_partial: true` is also set.
 
-The loop pauses for critical unresolved review failures and dependency-blocked PRs, because those decisions are not safely reversible.
+The loop pauses only for critical unresolved review failures, because that decision is not safely reversible. A dependency-blocked PR (`Depends on #N` / `Blocked by #N`) is never merged out of order, but it does not halt the run either: the PR is left open with outcome `blocked_by_dependency` and the loop continues to the next eligible issue.
 
 ### Requirements
 
