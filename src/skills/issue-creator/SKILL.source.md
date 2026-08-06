@@ -47,8 +47,11 @@ The model suggestion is the one externally-derived value admitted into the body 
 | `/issue-creator <multi-item text>` | Batch | Extract multiple issues from one input and create sequentially |
 | `/issue-creator <multi-item text> --parent <N>` | Batch (epic-bound) | Same as Batch, but bind every child to parent epic #N — see `references/modes.md` |
 | `/issue-creator … --refresh-model-data` | Refresh | Force-refresh the skill-level model-data cache, then proceed |
+| `/issue-creator … --auto` | (modifier) | Run non-interactively — every gate logs a `⚠` and takes its safe default instead of prompting |
 
 Detect mode: if the argument is a number → Normalize. If the input contains multiple distinct items (numbered list, bullet points, multiple paragraphs describing different problems, or a planning document with several work items) → Batch. Otherwise → Create.
+
+**Auto mode.** `--auto` is orthogonal to the mode — it composes with Create, Normalize, and Batch alike. Detection, the log-and-proceed gate rule, the `⚠` line format, and the safety stops that still abort are defined once in `docs/auto-mode.md`; this skill's gates cite it rather than restating it. Each gate below documents its own safe default. In auto mode this skill has **no** blocking prompt: Step 3 duplicates, Step 3.5 clarify, Step 5 preview, Normalize apply, Batch approval, Batch epic offer, and the model-cache refresh all have a defined non-interactive behavior.
 
 **Epic binding (Batch only):** an explicit `--parent <N>` flag binds every child created in the batch to parent epic #N (the hierarchy marker `Part of #N`, SPEC §2.1 — see `docs/idd-methodology.md`). A parent is **only** ever supplied by this explicit flag — a bare number is always Normalize, never a parent. The flag is optional and additive: a batch run **without** `--parent` behaves exactly as it does today. Full flow in `references/modes.md` (Batch Create → Epic binding).
 
@@ -148,6 +151,7 @@ Check these files relative to the skill's directory (the dirname of this SKILL.m
 - `references/docs/platform-github.md` — GitHub platform driver reference
 - `references/docs/shared-agent-conventions.md` — shared subagent conventions
 - `references/docs/agent-model-effort.md` — per-agent model and reasoning-effort mapping
+- `references/docs/auto-mode.md` — auto-mode detection and the non-interactive gate rule
 - `references/docs/terminal-style.md` — terminal output style contract (symbols, output structure, table/error formats)
 
 ---
@@ -248,6 +252,14 @@ If the subagent (or fallback) found potential duplicates (confidence `medium` or
 
 If no duplicates found, proceed silently.
 
+**Auto mode (`docs/auto-mode.md`) — never blocks.** Do not show the `Continue creating? [Y/n]` prompt. **Proceed with creation** (the interactive default) and log one `⚠` naming the suspected duplicate, so the override is auditable:
+
+```
+  ⚠ Auto mode: duplicate confirmation skipped — proceeding despite possible duplicate #42 "Fix auth redirect loop".
+```
+
+Log one line per flagged duplicate. The duplicate is still reported in the Step 6 summary as `⚠ warn` exactly as an interactive override is.
+
 ### Step 3.5 — Clarify Ambiguous Intent
 
 Active intent capture: when **type classification** or **acceptance-criteria** confidence is `low` — and only in **interactive Create mode** — resolve the ambiguity before drafting. When both are `high`/`medium`, this step is a silent no-op and the one-shot Step 3 → Step 4 path is unchanged.
@@ -292,6 +304,14 @@ Create issue? [Y/n]
 The `Images:` line appears only when images were provided. Show count and upload status. If some failed: `Images: 1/2 uploaded (1 failed)`. The `⚡ Model:` line appears only when `model_suggestion.enabled`, and always pairs one OpenAI model with one Anthropic model joined by ` · ` (OpenAI first) — never a single model — see `references/model-suggestion.md`.
 
 Wait for confirmation. If declined, stop without creating.
+
+**Auto mode (`docs/auto-mode.md`) — never blocks.** Print the preview block (it is the record of what was created), then **auto-approve** it instead of showing `Create issue? [Y/n]`, and log:
+
+```
+  ⚠ Auto mode: create confirmation skipped — issue auto-approved from the preview above.
+```
+
+Proceed to Step 6. There is no auto-mode path that declines — a run that should not create an issue is one that should not have been started.
 
 ### Step 6 — Create Issue
 

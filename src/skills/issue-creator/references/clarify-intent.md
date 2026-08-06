@@ -44,4 +44,4 @@ After at most two questions, proceed to Step 4 regardless — this is targeted d
 
 ## Non-interactive contexts (never block)
 
-In Batch mode and any auto/non-interactive context, **skip this step entirely**. Proceed straight to Step 4, draft with the defaulted assumptions, and mark those fields `(needs review)` in the body exactly as today. The skill never pauses for input outside interactive Create mode.
+In Batch mode and any auto/non-interactive context (auto mode is detected per `docs/auto-mode.md`), **skip this step entirely**. Proceed straight to Step 4, draft with the defaulted assumptions, and mark those fields `(needs review)` in the body exactly as today. The skill never pauses for input outside interactive Create mode.

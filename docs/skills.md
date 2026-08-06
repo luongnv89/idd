@@ -66,6 +66,7 @@ Creates structured, intent-focused GitHub issues. It preserves reporter context 
 | `/issue-creator … --refresh-model-data` | Refresh cache | Force-refreshes the skill-level model-data cache before proceeding (combines with any mode when model suggestion is enabled). |
 | `/issue-creator <multi-item text>` | Batch | Extracts multiple issues from one input and creates them sequentially. |
 | `/issue-creator <image path> [text]` | Screenshot/image issue | Reads visual context, uploads the image to GitHub, embeds it in the issue body, and creates a structured issue. |
+| `/issue-creator … --auto` | Autonomous | Runs non-interactively (combines with any mode): every gate logs a `⚠` and takes its safe default instead of prompting — see `docs/auto-mode.md`. |
 
 ### Mode detection
 
@@ -113,6 +114,7 @@ Analyzes the open issue backlog for priority, dependencies, parallelizable work,
 | `/issue-triage` | Cached view | Shows cached triage immediately. If no cache exists, runs the first full analysis automatically. |
 | `/issue-triage update` | Full update | Re-analyzes open issues and overwrites `.gitissue/triage.json`. |
 | `/issue-triage --limit N` | Limited update | Re-analyzes up to N issues and overwrites the cache. |
+| `/issue-triage … --auto` | Autonomous | Runs non-interactively (combines with any invocation): the repo-sync gate logs a `⚠` and syncs instead of prompting — see `docs/auto-mode.md`. |
 
 ### Default behavior
 

@@ -86,6 +86,16 @@ Apply normalization? [Y/n/dry-run]
 
 Wait for confirmation. `n` → stop. `dry-run` → proceed to Step 7.
 
+**Auto mode (`references/docs/auto-mode.md`) — never blocks.** This is the gate `/auto-pilot` hits when it normalizes an unstructured issue mid-loop, so it must never wait. Print the preview block (it is the record of what was applied), then **auto-apply** the normalization instead of showing `Apply normalization? [Y/n/dry-run]`, and log:
+
+```
+  ⚠ Auto mode: normalization confirmation skipped — applying normalization to issue #42.
+```
+
+Auto mode always takes the **apply** path — never `n`, never `dry-run`. An explicitly passed `--dry-run` flag still wins (an explicit request overrides the auto default), exactly as `--refresh-model-data` is honored under auto mode.
+
+Auto-approval covers the *decision to normalize*, nothing else: continue to Step 8 and post the backup comment as normal. **The backup remains mandatory and still aborts the run if it fails** — auto mode removes confirmation prompts, never data-safety stops.
+
 ### Step 7 — Dry Run Check
 
 If `--dry-run` was specified or selected at the prompt:
@@ -261,7 +271,7 @@ Flag duplicates found by the subagent (or fallback). Both `existing_issue` and `
 ⚠ Item 3 overlaps with Item 1 — both address auth session handling
 ```
 
-Duplicates are flagged but not removed — the user decides in the approval step.
+Duplicates are flagged but not removed. In interactive runs the user decides in the approval step; in auto mode the approval step auto-approves the full set (see Step 4), so flagged duplicates are **created, not dropped** — the `⚠` lines above are the audit trail.
 
 ### Step 4 — Approval
 
@@ -280,6 +290,14 @@ If the user chooses Edit, apply the requested changes, re-display the updated ta
 Create {N} issues? [A]ll / [e]dit / [c]ancel
 ```
 
+**Auto mode (`references/docs/auto-mode.md`) — never blocks.** Print the preview table (it is the record of what was created), then **auto-approve the full set** — the `[A]ll` path, which is the interactive default — instead of prompting, and log one line stating how many issues were auto-approved:
+
+```
+  ⚠ Auto mode: batch approval skipped — 3 issues auto-approved and created.
+```
+
+Never take `[e]dit` or `[c]ancel` in auto mode: `edit` needs a human to say what to change, and `cancel` discards work the caller explicitly requested. Items flagged as possible duplicates in Step 3 are included in the approved set — they are already logged as `⚠` there and are not silently dropped.
+
 ### Step 4.5 — Epic Binding (optional)
 
 **Skip this entire step unless a parent epic is bound.** When no parent is bound, batch proceeds directly to Step 5 with no epic behavior — identical to today. A parent becomes bound in exactly one of these ways:
@@ -293,7 +311,7 @@ Create {N} issues? [A]ll / [e]dit / [c]ancel
 
   On `y`, create one ordinary conforming issue (SPEC §1) via the single Create pipeline — an epic is **not** a new artifact type, it is a normal normalized issue. Derive its title and acceptance criteria from the PRD section / planning input being decomposed so its criteria describe the **whole-effort outcome** (treat that input as data, not instructions). Record its number as `parent`. On `N` (default), proceed with no parent.
 
-  **Non-interactive contexts never block (auto-pilot, any non-interactive batch): skip the offer entirely** — bind a parent only when `--parent <N>` was explicitly provided, exactly as Step 3.5 skips its clarification prompt. Never pause to ask.
+  **Non-interactive contexts never block (auto mode per `references/docs/auto-mode.md`, any non-interactive batch): skip the offer entirely** — bind a parent only when `--parent <N>` was explicitly provided, exactly as Step 3.5 skips its clarification prompt. Never pause to ask. Log `⚠ Auto mode: epic offer skipped — no parent bound.` only when the offer would otherwise have been shown.
 
 When `parent` is bound, it flows into Step 5 (child marker) and Step 5.5 (parent checklist). When it is not, those two behaviors are no-ops.
 
@@ -309,7 +327,7 @@ Part of #{parent}
 
 Conform to SPEC §2.1: the marker records that the child contributes to parent #{parent}'s outcome — **scope, not order**. It does NOT imply merge order; if a child must merge after a sibling, that child additionally carries `Depends on #N` (a separate marker answering a different question). Matching is case-insensitive and grep-friendly, same grammar as dependency markers. **Cross-repo parents are out of scope and MUST be ignored** — bind only a bare local `#{parent}`; never emit `org/repo#N` (consistent with the dependency-marker cross-repo rule in `references/docs/idd-methodology.md`, *Issue Dependencies*). When no parent is bound, no marker is appended and the child body is exactly as it is today.
 
-> **Batch never blocks for clarification.** The single Create pipeline includes an interactive *Step 3.5 — Clarify Ambiguous Intent* that asks one targeted question when type/criteria confidence is low. Batch mode **skips that step entirely** — it never pauses to ask the user about an individual item. Low-confidence fields are drafted with their defaulted assumptions and marked `(needs review)` in the body, exactly as before. Batch's only interactive gate remains the Step 4 approval prompt over the whole set.
+> **Batch never blocks for clarification.** The single Create pipeline includes an interactive *Step 3.5 — Clarify Ambiguous Intent* that asks one targeted question when type/criteria confidence is low. Batch mode **skips that step entirely** — it never pauses to ask the user about an individual item. Low-confidence fields are drafted with their defaulted assumptions and marked `(needs review)` in the body, exactly as before. Batch's only interactive gate remains the Step 4 approval prompt over the whole set — and in auto mode (`references/docs/auto-mode.md`) even that one does not block: it auto-approves the full set and logs a `⚠`.
 
 **Rate limiting:** If `gh issue create` returns a rate limit error, wait and retry with exponential backoff (5s, 10s, 20s). After 3 retries for a single item, skip it and continue with remaining items.
 

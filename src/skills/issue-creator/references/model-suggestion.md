@@ -133,7 +133,7 @@ prunes the rest on the next write (see *Refresh procedure*).
    `Model data unavailable` from `references/error-messages.md`, disable
    suggestions for this run, and continue creating the issue without them.
 
-In auto-pilot contexts (`IDD_AUTO_MODE=1`), never prompt: use cached or seeded
+In auto mode (`docs/auto-mode.md` — `--auto` or `IDD_AUTO_MODE=1`), never prompt: use cached or seeded
 data as-is, log staleness as a warning, and skip the fetch.
 
 ### Forcing a refresh (AC6)
