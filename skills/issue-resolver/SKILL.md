@@ -126,6 +126,7 @@ references/docs/agent-model-effort.md
 references/docs/shared-agent-conventions.md
 references/docs/platform-github.md
 references/docs/terminal-style.md
+references/docs/ui-review.md
 ```
 
 ---
@@ -251,14 +252,22 @@ the saving is real:
 - `Effort` `M`/`L`/`XL` → `profile = full`
 - `Effort` `XS`/`S` but low-confidence, **or** absent/unparseable → `profile = full` (ambiguous → fuller)
 
-`light` reduces Steps 1-4 — each step below restates its own `light` behavior,
-and the full per-step mechanics live in `references/pipeline-steps.md` (*Step N →
-`light` profile*). `full` leaves every step exactly as it is today. Either way,
-**Deliver (Step 5) always emits the Decision Record and Acceptance Criteria
-Verification table** — the profile never removes durable memory. The profile may
-only be **revised upward** later (e.g. Step 1 research reports `high`/`complex`
-on what the band called `S` → switch to `full` for the remaining steps); never
-downgrade a `full` run to `light` mid-pipeline.
+**What `light` collapses — the single home for this rule.** `full` leaves every
+step exactly as it is today. Each step below points back to this table; the full
+per-step mechanics live in `references/pipeline-steps.md` (*Step N → `light`
+profile*).
+
+| Step | `light` behavior |
+|------|------------------|
+| 1 — Research | Lighter pass: the already-resolved safety check and a focused scan of the obviously-affected file(s) still run; skip the broad dependency trace and external solution research. |
+| 2 — Plan | Skip the 3-option synthesis entirely — do **not** spawn the synthesizer. Derive a **direct minimal plan** inline and record it as the selected option, so the Decision Record still has a real `Selected option`; the design-confirm checkpoint does not apply. |
+| 3 — Propose relevant skills | Skip the sub-step — set `selected_skills = []` and go straight to the implementer, mirroring auto-mode behavior. |
+| 4 — QA | Cap the review-fix loop at **1** cycle (a single review pass; fix once if blocking issues are found, then deliver) instead of `resolve.qa_max_cycles`. One reviewer spawn still runs — the fast path reduces depth, it does not skip review. UI review remains auto-detected as usual. |
+| 5 — Deliver | **Unchanged** — always emits the Decision Record and Acceptance Criteria Verification table. The profile never removes durable memory. |
+
+The profile may only be **revised upward** later (e.g. Step 1 research reports
+`high`/`complex` on what the band called `S` → switch to `full` for the remaining
+steps); never downgrade a `full` run to `light` mid-pipeline.
 
 After preflight, surface the chosen profile so the effort decision is
 transparent. `{workspace_note}` is ` (worktree)` in a worktree, empty otherwise;
@@ -274,11 +283,10 @@ still print `effort: full` (the pinned profile) so the line is uniform:
 
 Deeply understand the issue, affected codebase, and possible solutions; also verifies the issue hasn't already been fixed (early-exit path closes it in auto mode). Spawn the researcher (`references/agents/codebase-researcher.md`) with the canonical pattern — full delegation payload, phases, early-exit behavior, and inline fallback are in `references/pipeline-steps.md` (*Step 1 — Research*).
 
-**`light` profile:** run a **lighter** research pass — the already-resolved safety
-check and a focused scan of the obviously-affected file(s) still run; skip the
-broad dependency trace and external solution research. On a `high`/`complex`
-signal, revise the profile **upward** to `full` (never downward) — see *Step 0g*
-and `references/pipeline-steps.md` (*Step 1 — Research → `light` profile*).
+**`light` profile:** run a **lighter** research pass — see the profile table in
+*Step 0g* for what it collapses, and `references/pipeline-steps.md` (*Step 1 —
+Research → `light` profile*) for the mechanics. On a `high`/`complex` signal,
+revise the profile **upward** to `full` (never downward).
 
 After research:
 ```
@@ -293,11 +301,9 @@ Generate implementation options and select one. Spawn the synthesizer (`referenc
 
 Selection behavior (interactive auto, interactive comment-and-wait, auto-pilot) and inline fallback are in `references/pipeline-steps.md` (*Step 2 — Plan*).
 
-**`light` profile:** skip the 3-option synthesis entirely — do **not** spawn the
-synthesizer. Derive a **direct minimal plan** inline and record it as the selected
-option, so the Decision Record still has a real `Selected option` to lift in
-Step 5; the design-confirm checkpoint does not apply. Full procedure in
-`references/pipeline-steps.md` (*Step 2 — Plan → `light` profile*).
+**`light` profile:** skip the 3-option synthesis — see the profile table in
+*Step 0g*; full procedure in `references/pipeline-steps.md` (*Step 2 — Plan →
+`light` profile*).
 
 After plan selection:
 ```
@@ -329,8 +335,7 @@ back to internal agents, so selecting none is unchanged behavior. Detection,
 proposal, the `◆`/`○` block (no own `[N/5]` tracker line), and auto-mode behavior
 are in `references/pipeline-steps.md` (*Step 3 — Propose relevant skills*).
 
-**`light` profile:** skip this sub-step — set `selected_skills = []` and proceed
-straight to the implementer, mirroring auto-mode behavior.
+**`light` profile:** skip this sub-step — see the profile table in *Step 0g*.
 
 Write code and tests based on the selected plan. Spawn the implementer (`references/agents/implementer.md`) with the canonical pattern, passing the plan, branch name, naming conventions, and `selected_skills`.
 
@@ -359,12 +364,10 @@ When the reviewer or test/build run returns blocking issues, spawn or re-message
 
 UI review is **auto-detected per issue** — no config flag enables it. Scan the issue body/diff for UI work before the QA cycles, then run only what *can* and *should* run: the **code UI review** reads the diff, is environment-independent, and runs anywhere including headless (never gated on a GUI/browser); the **browser UI review** takes optional screenshots from a running app and runs only when reachable *and* opted in, else **skips with a warning while the code UI review still runs** — fail-soft.
 
-Detection rules, `ui-reviewer` spawns, the `resolve.ui_review.browser_review` gate, and skip/success messages are in `references/pipeline-steps.md` (*Step 4 — UI/UX review*). Cycle mechanics and loop controls (`resolve.qa_max_cycles`, exit-on-clean, exit-on-stagnation) are in the same file (*Step 4 — QA*).
+Detection rules, the `ui-reviewer` spawn, the `ui_review.browser_review` gate, and skip/success messages are in `references/docs/ui-review.md`; the resolver's own deltas (diff command, variables, `resolve.ui_review.browser_review` as the gate key, findings flow) are in `references/pipeline-steps.md` (*Step 4 — UI/UX review*). Cycle mechanics and loop controls (`resolve.qa_max_cycles`, exit-on-clean, exit-on-stagnation) are in the same file (*Step 4 — QA*).
 
-**`light` profile:** cap the review-fix loop at **1** cycle (a single review pass;
-fix once if blocking issues are found, then deliver) instead of
-`resolve.qa_max_cycles`. One reviewer spawn still runs — the fast path reduces
-depth, it does not skip review. UI review remains auto-detected as usual.
+**`light` profile:** cap the review-fix loop at **1** cycle instead of
+`resolve.qa_max_cycles` — see the profile table in *Step 0g*.
 
 ---
 
@@ -474,4 +477,4 @@ Navigation index for the *Bundled dependency precheck* list above (that list, no
 
 **References** (`references/`): `pipeline-steps.md` (payloads/phases/fallbacks, Steps 0e–4, edge cases) · `report-templates.md` (PR body, closing summary, run-log fields, expected output) · `bug-verification.md` (reproduction checkpoint, Step 3) · `skill-index.md` (external-skill catalog, Step 3) · `error-messages.md` (error catalog)
 
-**Docs** (`docs/`): `sync-conventions.md` · `naming-conventions.md` · `pre-commit-security.md` · `idd-methodology.md` · `github-projects-sync.md` · `config-schema.md` · `agent-model-effort.md` · `shared-agent-conventions.md` · `platform-github.md` · `terminal-style.md` — the repo-root `DESIGN.md` is the human-facing companion to the last of these (color palette, per-command mockups) and is **not** bundled.
+**Docs** (`docs/`): `sync-conventions.md` · `naming-conventions.md` · `pre-commit-security.md` · `idd-methodology.md` · `github-projects-sync.md` · `config-schema.md` · `agent-model-effort.md` · `shared-agent-conventions.md` · `platform-github.md` · `terminal-style.md` · `ui-review.md` — the repo-root `DESIGN.md` is the human-facing companion to the last of these (color palette, per-command mockups) and is **not** bundled.

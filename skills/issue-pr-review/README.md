@@ -74,7 +74,7 @@ asm install https://github.com/luongnv89/idd --skill issue-pr-review
 | `references/review-loop-mechanics.md` | Review-fix cycle mechanics and the up-to-3-cycle loop |
 | `references/prepass-tests-ci-mechanics.md` | Pre-pass lint/format/test and CI check mechanics |
 | `references/verification-checks.md` | Verification checks the reviewer runs against the diff |
-| `references/ui-review-mechanics.md` | UI-review mechanics for front-end changes |
+| `references/ui-review-mechanics.md` | `/issue-pr-review`'s UI-review deltas (shared mechanics: `references/docs/ui-review.md`) |
 | `references/report-templates.md` | Per-cycle and final report templates |
 | `references/error-messages.md` | Error catalog for prerequisite (git, gh CLI, auth), PR, CI, and fix (push, merge) failures, each with a Docs link |
 

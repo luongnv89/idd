@@ -28,7 +28,7 @@ Issues produced by `/issue-creator` capture **durable human intent only**. The s
 
 These four artifacts are the responsibility of `/issue-analysis`, `/issue-triage`, and `/issue-resolver`, which produce them fresh against the current codebase at the moment work begins. Encoding them in the issue body would freeze stale understanding into durable memory.
 
-What the issue body **does** contain: type classification, problem description, reporter context (verbatim), screenshots, acceptance criteria, and metadata (priority, effort, labels, and — when `model_suggestion.enabled` — an advisory **Suggested model:** line naming one OpenAI model and one Anthropic model). Reporter-supplied technical detail is preserved verbatim inside the Reporter Context blockquote — only skill-generated technical content is prohibited.
+What the issue body **does** contain: type classification, problem description, reporter context (verbatim), screenshots, acceptance criteria, and metadata (priority, effort, labels, and — when `model_suggestion.enabled` — an advisory **Suggested model:** line — see the two-model rendering rule in `references/model-suggestion.md`). Reporter-supplied technical detail is preserved verbatim inside the Reporter Context blockquote — only skill-generated technical content is prohibited.
 
 The model suggestion is the one externally-derived value admitted into the body — advisory cost guidance (like effort), not an implementation hint. It always names exactly two models (one OpenAI, one Anthropic, joined by ` · `) and is stamped with its CursorBench data date so staleness is self-documenting — see `references/model-suggestion.md`.
 
@@ -284,7 +284,7 @@ Resolve the template directory from `issue.template`: when `"default"`, use this
 3. **Reporter Context** — user's original text, verbatim, in a blockquote
 4. **Screenshots** — embedded images (only if images were provided and uploaded successfully)
 5. **Acceptance Criteria** — 3-5 testable criteria derived from the problem description, with confidence levels
-6. **Metadata** — suggested priority, estimated effort (XS/S/M/L/XL), and suggested labels, **each with a trailing confidence marker** via `{priority_confidence}`, `{effort_confidence}`, and `{labels_confidence}` in the template, plus an advisory **Suggested model:** line keyed off the effort band — see `references/model-suggestion.md`. The suggestion **always names exactly two models — one OpenAI model and one Anthropic model — joined by ` · ` (OpenAI first)**, read from the effort band's `openai` and `anthropic` entries in the cache. `{data_version}` is the version portion of the cache's `source` (e.g. `3.1` from `CursorBench 3.1` — do not repeat the `CursorBench` prefix) and `{data_date}` is the date portion of `last_fetched`. Never collapse it to a single model or a single provider. When `model_suggestion.enabled` is false, remove the `**Suggested model:**` line from the Metadata section entirely, matching pre-feature behaviour.
+6. **Metadata** — suggested priority, estimated effort (XS/S/M/L/XL), and suggested labels, **each with a trailing confidence marker** via `{priority_confidence}`, `{effort_confidence}`, and `{labels_confidence}` in the template, plus an advisory **Suggested model:** line keyed off the effort band. Render it — and the `{data_version}` / `{data_date}` placeholders — per the two-model rendering rule in `references/model-suggestion.md`, which also defines the disabled behaviour (the line is removed from Metadata entirely).
 
 **Note:** Per the Output Contract above, the issue body MUST NOT include predicted affected files, generated technical notes, root cause, or implementation hints. Acceptance criteria express *what done looks like*, not *how to implement it*.
 
@@ -303,7 +303,7 @@ Resolve the template directory from `issue.template`: when `"default"`, use this
 Create issue? [Y/n]
 ```
 
-The `Images:` line appears only when images were provided. Show count and upload status. If some failed: `Images: 1/2 uploaded (1 failed)`. The `⚡ Model:` line appears only when `model_suggestion.enabled`, and always pairs one OpenAI model with one Anthropic model joined by ` · ` (OpenAI first) — never a single model — see `references/model-suggestion.md`.
+The `Images:` line appears only when images were provided. Show count and upload status. If some failed: `Images: 1/2 uploaded (1 failed)`. The `⚡ Model:` line appears only when `model_suggestion.enabled`; render it per the two-model rendering rule in `references/model-suggestion.md`.
 
 Wait for confirmation. If declined, stop without creating.
 

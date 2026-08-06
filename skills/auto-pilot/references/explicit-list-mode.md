@@ -172,7 +172,7 @@ When advancing to the next item in `optimized_order`:
 1. **If already processed** (in the `processed` set): emit a skip line and advance.
    This skip is **display only** — it writes **no** `.gitissue/runs.jsonl` line,
    because the issue was already logged once at batch time (see *Run-log fan-out for
-   the batch* → *An in-batch skip writes no run-log line*). It is the single
+   the batch* — the last row of its disposition table). It is the single
    exception to logging every processed issue:
    ```
    ○ [Issue {i}/{total}] #{N} — already resolved in batch with #{batch_primary}
@@ -206,87 +206,55 @@ The batch resolver creates a single branch and PR that addresses all issues in t
 #### Run-log fan-out for the batch (one line per attempted issue)
 
 The Batch Resolver runs with `--no-run-log` (see *Batch Resolver Subagent* in
-`references/subagent-prompts.md`), so — exactly like the single-issue resolver —
-it does **not** append to `.gitissue/runs.jsonl` itself. Auto-pilot is the single
-writer here too. But a batch resolves N issues in one PR, and the single-writer
-contract is **one line per processed (attempted) issue**, not one line per PR or
-per batch. So auto-pilot must **fan the one returned result out** so that — **across the whole
-auto-pilot run** — every issue in the **attempted set** (the issue numbers sent into
-the Batch Resolver — what `batch_map` holds when the batch is spawned) ends with
-exactly one line. The across-run invariant is keyed on the attempted set and
-**never** on `issues_resolved` (success-only — keying the invariant there would drop
-fully-processed-but-failed issues, the inverse under-count #156/#158 exist to kill).
+`references/subagent-prompts.md`), so auto-pilot is the single writer here too.
+A batch resolves N issues in one PR, but the contract is **one line per processed
+(attempted) issue**, not per PR or per batch — so auto-pilot fans the one returned
+result out. The **attempted set** is the issue numbers sent into the Batch Resolver
+(what `batch_map` holds at spawn); the invariant is keyed on that set and **never**
+on `issues_resolved` (success-only keying would drop processed-but-failed issues —
+the inverse under-count #156/#158 exist to kill).
 
-That across-run invariant is **not** "write all N lines at batch time." The
-batch-time write is split by disposition (see *Write exactly the issues whose
-terminal disposition is this batch* below): at batch time auto-pilot writes a line
-**only** for the issues in `issues_resolved`; every unresolved attempted issue is
-re-queued and gets its one line later, at its individual retry. So `issues_resolved`
-membership **does** decide whether a *batch-time* line is written — it is the
-attempted set, fanned out over time (batch line now if resolved here, individual
-line later if not), that satisfies the per-attempted-issue invariant.
+The invariant holds **across the whole auto-pilot run**, not at batch time: an
+attempted issue is logged here if it resolved here, and at its individual retry
+otherwise. Never both (double-count) and never neither (drop).
 
-Build each line from `references/docs/config-schema.md` (*`.gitissue/runs.jsonl` — run log*)
-with these batch attributions:
+| Disposition of an attempted issue | Batch-time line? | Where its one line comes from |
+|---|---|---|
+| In `issues_resolved`, batch PR merged this iteration | yes — `outcome: merged` | this batch |
+| In `issues_resolved`, PR left open | yes — `outcome: left_open` | this batch |
+| Not in `issues_resolved` (partial or full failure) | **no** — no unresolved issue is ever written a `failed` line at batch time | its individual retry, after re-queuing |
+| Later skipped as `already resolved in batch` | no — display only | already logged at batch time |
 
-- **Per-issue `outcome` from `issues_resolved`.** An attempted issue resolved in the
-  batch gets the success-class outcome on its batch-time line (`merged` when the
-  batch PR merged this iteration, else `left_open`). An attempted issue **absent**
-  from `issues_resolved` is **not** written a `failed` line at batch time — it is
-  re-queued, and its individual retry sets its outcome. (`issues_resolved` sets the
-  per-issue outcome and, at batch time, also decides *whether* a line is written.)
-- **Shared fields on every line:** the batch `pr` (the one PR number) and
-  `complexity` go on all N lines.
-- **Scalar telemetry attributed once.** `qa_cycles` and `duration_s` describe the
-  *whole batch*, not any single issue. Put them on **one line only — the primary
-  (first) issue's line** — and omit them from the others. Writing them on all N
-  lines would weight one batch N-fold in `/idd-doctor`'s median-QA-cycles and
-  duration aggregates.
+Writing a `failed` batch line for an unresolved issue **and** letting its
+individual retry log it would double-count it — the exact
+double-count this fix removes. It is strictly one-or-the-other, resolved by disposition:
+**resolved-here → logged here; unresolved → logged at its retry, never here.**
 
-**Write exactly the issues whose terminal disposition is this batch — and re-queue
-the rest so none are dropped.** Write a batch line **only** for an issue that stays
-resolved here (an issue **in** `issues_resolved`); every *unresolved* attempted
-issue gets its one line later, at its individual retry. Split by disposition:
+**Re-queue every unresolved attempted issue — including the batch's primary
+(spawn-position) issue. Re-queuing the primary is mandatory and is the half that
+is easy to miss:** the primary sits at the batch's own slot in `optimized_order`,
+which has already been consumed, so without an explicit re-append to the end of
+`optimized_order` it has no later turn and would drop to **zero** lines (the
+inverse under-count criterion 5 forbids, and the failure the #158 Technical Notes
+name: "a failed batch drops fully-processed issues").
 
-- **Full success** (`issues_resolved` = the whole attempted set): every attempted
-  issue's terminal disposition is this batch → write all N lines now.
-- **Partial success / full failure** (some/all attempted issues unresolved):
-  - Write a success-class line for each issue **in** `issues_resolved` now.
-  - Write **no** batch line for an unresolved attempted issue. The
-    partial-/failure-handling above **re-queues all of them — including the batch's
-    primary (spawn-position) issue** — for individual resolution, and that
-    individual resolve writes their single line. **Re-queuing the primary is
-    mandatory and is the half that is easy to miss:** the primary sits at the
-    batch's own slot in `optimized_order` (already consumed), so without the
-    explicit re-append it has no later turn and would drop to **zero** lines — the
-    inverse under-count criterion 5 forbids and the #158 Technical Notes name
-    ("a failed batch drops fully-processed issues").
+**An in-batch skip writes no run-log line.** The last table row is the **one
+exception** to auto-pilot's "log every processed issue including skips" rule: an *in-batch* skip is the already-counted other half
+of a batch line, not a fresh processed issue. Ordinary skips —
+`blocked_label`, `blocked_by_dependency`, `in_skip_list`, `assigned_to_other` —
+still log their one line with a `skipped_reason`.
 
-Writing a `failed` batch line for an unresolved issue **and** letting its individual
-retry log it would double-count it (`failed` + the retry's outcome) — the exact
-double-count this fix removes. So it is strictly one-or-the-other, resolved by
-disposition: **resolved-here → logged here; unresolved → logged at its retry, never
-here.** No unresolved issue is ever written a `failed` line at batch time, because
-every one of them is re-queued. The invariant holds **across the whole auto-pilot
-run**: every attempted issue ends with **exactly one** line — at batch time if it
-resolved in the batch, at its individual retry otherwise. A failed/partial batch
-therefore still records all attempted issues (no inverse under-count); the
-unresolved ones are simply recorded by their individual iteration.
+Build each written line from `references/docs/config-schema.md` (*`.gitissue/runs.jsonl` — run
+log*), with these batch attributions:
 
-> **An in-batch skip writes no run-log line.** A batch member resolved here is added
-> to `processed`, so when the loop later reaches it in `optimized_order` it emits the
-> `○ … already resolved in batch with #{batch_primary}` skip line above. That skip
-> is **display only — it does NOT append to `.gitissue/runs.jsonl`.** The member was
-> already logged once at batch time; a second line at the skip would re-introduce
-> the per-issue double-count. This is the **one exception** to auto-pilot's "log
-> every processed issue including skips" rule: an *in-batch* skip is the
-> already-counted other half of a batch line, not a fresh processed issue. (Ordinary
-> skips — `blocked_label`, `blocked_by_dependency`, `in_skip_list`,
-> `assigned_to_other` — still log their one line with a `skipped_reason`.)
+- **Shared fields on every line:** the batch `pr` (the one PR number) and `complexity`.
+- **Scalar telemetry attributed once:** `qa_cycles` and `duration_s` describe the
+  *whole batch*, so put them on **one line only — the primary (first) issue's
+  line** — and omit them from the others. Writing them on all N lines would weight
+  one batch N-fold in `/idd-doctor`'s median-QA-cycles and duration aggregates.
 
-The Batch Resolver **returns** `qa_cycles`, `complexity`, and `duration_s` (added
-to its report-back for this fan-out) so auto-pilot can populate them; the resolver
-stayed silent on the run log. Each append uses the same best-effort, non-fatal
+The Batch Resolver **returns** `qa_cycles`, `complexity`, and `duration_s` so
+auto-pilot can populate them. Each append uses the same best-effort, non-fatal
 `mkdir -p .gitissue` + single-`\n` rule as everywhere else — a failed append never
 stops the loop. Append only; never rewrite prior lines.
 

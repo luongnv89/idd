@@ -21,7 +21,7 @@ Review a PR end-to-end — analyze, test, fix, check CI, repeat until clean.
 | `/issue-pr-review <N> --auto` | auto-pilot | Review, fix, and auto-merge when clean |
 | `/issue-pr-review <N> --auto --no-merge` | auto-pilot | Review, fix, and report — skip auto-merge (use when another agent owns the merge step) |
 | `/issue-pr-review` | detect | Auto-detect PR for current branch |
-| `/issue-pr-review --review-only` | read-only | Review and report, never fix or merge |
+| `/issue-pr-review --review-only` | read-only | Review and report, never fix or merge (see *Review-only mode*) |
 
 The `--auto` flag is set automatically when invoked by `/auto-pilot`. In auto mode, export `IDD_AUTO_MODE=1` before any shell snippet that consults it — the pre-commit security scan reads this to switch from prompt-on-warning to log-and-continue (see `docs/pre-commit-security.md`).
 
@@ -57,6 +57,7 @@ references/docs/platform-github.md
 references/docs/shared-agent-conventions.md
 references/docs/agent-model-effort.md
 references/docs/terminal-style.md
+references/docs/ui-review.md
 ```
 
 
@@ -203,7 +204,7 @@ Full mechanics in `references/review-loop-mechanics.md` (*Depth gate*).
 
 Before spawning any LLM reviewer, run deterministic tools to catch mechanical issues — zero LLM tokens, all scripts and CLI tools.
 
-**`--review-only`:** detection-only pre-pass — run lint/format **without** `--fix`, `--write`, or other mutating flags; do **not** run *Commit auto-fixes* below. No file edits, commits, or pushes in this mode.
+**When `--review-only` is set:** this pre-pass is detection-only — see *Review-only mode* under Step 7.
 
 **Default (fix loop):** detect the project's lint/format tools, run each auto-fix command (don't block on warnings — only on errors that prevent the fix from running), then run the test suite to catch failures early. The per-tool detection table and example commands are in `references/prepass-tests-ci-mechanics.md` (*Step 2*).
 
@@ -248,7 +249,7 @@ UI review is **auto-detected per PR** — no config flag enables it. The skill s
 - **Code UI review** is environment-independent (reads the diff/changed files). It runs whenever UI work is detected, on any machine **including a no-GUI/server host** — never gated on a GUI, running app, or browser.
 - **Browser UI review** is an optional, additive bonus: it captures screenshots from a running app, so it runs only with a reachable app *and* user opt-in. When it can't run (no app, capture unsafe, or auto mode without opt-in), it **skips with a warning and the code UI review still runs** — fail-soft to code-only, never block.
 
-The full mechanics — detection commands, the interactive proposal prompt, the code-review spawn + cycle-reuse `SendMessage`, the report-only display-environment label (`ui_env`), the browser-review gate + three-part capability check, and the headless capture call — live in `references/ui-review-mechanics.md`. **Read that file and apply it** when `ui: detected`; it preserves the contract above and routes `action: "fix"` UI findings into Step 6 under `category: ui_ux`.
+The shared mechanics — detection commands, the code-review spawn, the report-only display-environment label (`ui_env`), the browser-review gate + three-part capability check, and the headless capture call — live in `docs/ui-review.md`. This skill's own deltas — the PR diff command, the variables it passes, the interactive proposal prompt, and cycle-reuse `SendMessage` — are in `references/ui-review-mechanics.md`. **Read both and apply them** when `ui: detected`; together they preserve the contract above and route `action: "fix"` UI findings into Step 6 under `category: ui_ux`.
 
 Also fetch the linked issue for acceptance-criteria verification: `gh issue view {linked_issue} --json number,title,body,labels`.
 
@@ -399,7 +400,11 @@ In interactive mode: never auto-merge — just report status.
 
 When `--no-merge` is set (even in auto mode): skip the merge step and report status only — equivalent to interactive mode's merge behavior. This flag exists so auto-pilot's reviewer subagent can run the full review-fix cycle without stealing the merge step from Phase 5.
 
-**Review-only mode (`--review-only`):** Step 1 (PR info + `gh pr checkout`), Step 2 detection-only (no commits/pushes), Steps 3-5 once, skip Step 6, report in Step 7 — never loop, fix, or merge.
+**Review-only mode (`--review-only`) — authoritative definition.** This is the single home for the flag's behavior; every other mention is a pointer here.
+
+- **Step flow:** Step 1 (PR info + `gh pr checkout`), Step 2 detection-only, Steps 3-5 **once**, skip Step 6, report in Step 7 — never loop, fix, or merge.
+- **Step 2 is detection-only:** run lint/format in check mode (e.g. `npx eslint .` without `--fix`, `npx prettier --check .`, `ruff check .` without `--fix`) — no `--fix`, `--write`, or other mutating flags.
+- **No writes at all:** skip *Commit auto-fixes* entirely. No file edits, commits, or pushes in this mode.
 
 ---
 
@@ -422,7 +427,7 @@ When `--no-merge` is set (even in auto mode): skip the merge step and report sta
 - **`shared/agents/code-reviewer.md`** — Review subagent prompt
 - **`shared/agents/ui-reviewer.md`** — UI/UX review subagent prompt (Step 3, auto-detected)
 - **`shared/agents/fixer.md`** — Fix subagent prompt
-- **`references/ui-review-mechanics.md`** — UI detection, code/browser review, headless capture (Step 3)
+- **`references/ui-review-mechanics.md`** — `/issue-pr-review`'s UI-review deltas: PR diff command, variables, review-mix prompt, cycle reuse (Step 3)
 - **`references/prepass-tests-ci-mechanics.md`** — tool/build/CI detection tables (Steps 2, 4, 5)
 - **`references/verification-checks.md`** — AC + traceability check procedure (Step 3)
 - **`references/review-loop-mechanics.md`** — reviewer/fixer spawn + reuse mechanics
@@ -432,4 +437,5 @@ When `--no-merge` is set (even in auto mode): skip the merge step and report sta
 - **`docs/sync-conventions.md`** — Stash-first sync convention and recovery
 - **`docs/idd-methodology.md`** — IDD durable-analysis fields (traceability check 3)
 - **`docs/naming-conventions.md`** — Naming conventions
+- **`docs/ui-review.md`** — Shared UI/UX review mechanics: detection, code/browser review, headless capture (Step 3)
 - **`docs/terminal-style.md`** — Terminal output style contract (bundled at build time; the repo-root `DESIGN.md` is the human-facing companion and is not bundled)
