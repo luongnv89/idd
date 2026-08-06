@@ -57,6 +57,9 @@ jobs:
       - name: test-build-determinism
         run: bash tests/test-build-determinism.sh
 
+      - name: test-skill-line-cap
+        run: bash tests/test-skill-line-cap-247.sh
+
       - name: test-issue-triage
         run: bash tests/test-issue-triage.sh
 
