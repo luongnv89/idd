@@ -231,7 +231,7 @@ Each iteration runs 5 phases. For brevity, the full step-by-step per-phase speci
 
 | Phase | Name | Purpose | Subagent? |
 |-------|------|---------|-----------|
-| 1 | Triage and Pick | Refresh triage, pick the top-priority ready issue | yes (/issue-triage) |
+| 1 | Triage and Pick | Refresh triage, pick the top-priority ready issue | no (main agent) |
 | 2 | Resolve | Sync to default branch, run the full resolve pipeline | yes (/issue-resolver) |
 | 3-4 | PR Review | Run /issue-pr-review --auto --no-merge with up to 3 fix cycles + CI monitoring | yes (/issue-pr-review) |
 | 5 | Merge | Verify mergeability, squash-merge, close the issue, create follow-up if needed | no (main agent) |
@@ -352,7 +352,7 @@ On final stop, the **Final Summary** table (above) lists each iteration's issue,
 - **Critical issue unresolvable** — loop halts and hands control back to the user with the exact error output.
 - **Merge permission missing** — detected upfront by the preflight `viewerPermission` check (Prerequisite 9); auto-pilot downgrades to no-merge mode, runs the full loop, and leaves every PR open for a maintainer. If permission is lost mid-run, auto-merge is skipped for that PR and the loop moves on.
 - **Rate budget too low** — the preflight rate-budget check (Prerequisite 8) stops before the loop starts when `remaining` is below the threshold, rather than stranding issues half-resolved.
-- **Duplicate detection** — if triage marks an issue "already fixed", it is closed with a comment and the loop picks the next one.
+- **Already fixed** — triage never closes issues (it only flags them for human review). If a later resolve reports `already_resolved`, the loop records outcome `skipped` and picks the next issue; it does not close it.
 - **Follow-up issue creation fails** — the PR is still merged so progress is never blocked; a warning is printed.
 
 ## Additional Resources

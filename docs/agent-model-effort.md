@@ -18,13 +18,13 @@ suggestion by the `issue-creator` skill (its `model-suggestion` reference and th
 `complexity_mapping` table in its bundled `model-data` snapshot). Do **not**
 invent a parallel scale.
 
-| Tier | Effort band (issue Metadata) | Thinking / effort | Anthropic model (advisory) |
-|------|-------------------------------|-------------------|----------------------------|
-| XS | XS | low | Opus 4.7 Low |
-| S | S | low–medium | Opus 4.8 Low |
-| M | M | medium | Opus 4.8 Medium |
-| L | L | high (extra-high) | Opus 4.7 Extra High |
-| XL | XL | max | Fable 5 Max |
+| Tier | Effort band (issue Metadata) | Thinking / effort | OpenAI model (advisory) | Anthropic model (advisory) |
+|------|-------------|-------------------|--------------------------|----------------------------|
+| XS | XS | low | GPT-5.5 Low | Opus 4.7 Low |
+| S | S | low–medium | GPT-5.5 Medium | Opus 4.8 Low |
+| M | M | medium | GPT-5.5 High | Opus 4.8 Medium |
+| L | L | high (extra-high) | GPT-5.5 Extra High | Opus 4.7 Extra High |
+| XL | XL | max | GPT-5.5 Extra High | Fable 5 Max |
 
 The research pipeline's 5-value complexity (`trivial / low / medium / high / complex`)
 maps to effort bands `XS / S / M / L / XL` (see `complexity_mapping` in issue-creator
