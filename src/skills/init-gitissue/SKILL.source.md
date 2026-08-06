@@ -379,7 +379,7 @@ After a successful run, the repo root contains a `.gitissue.yml` file and the te
 
 ## Edge Cases
 
-- **Config already exists** -- the skill shows an overwrite / merge / cancel prompt; it does not print a diff of detected vs current values.
+- **Config already exists** — the skill shows an overwrite / merge / cancel prompt; it does not print a diff of detected vs current values.
 - **Unrecognized language** — falls back to a minimal generic config with inline comments guiding manual edits.
 - **Not a git repository** — prints the exact error from `references/error-messages.md` and stops; no file is written.
 - **Empty repo (no source files)** — writes a minimal default config and notes that detection was skipped.

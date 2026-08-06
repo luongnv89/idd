@@ -18,7 +18,7 @@ suggestion by the `issue-creator` skill (its `model-suggestion` reference and th
 `complexity_mapping` table in its bundled `model-data` snapshot). Do **not**
 invent a parallel scale.
 
-| Tier | Effort band | Thinking / effort | OpenAI model (advisory) | Anthropic model (advisory) |
+| Tier | Effort band (issue Metadata) | Thinking / effort | OpenAI model (advisory) | Anthropic model (advisory) |
 |------|-------------|-------------------|--------------------------|----------------------------|
 | XS | XS | low | GPT-5.5 Low | Opus 4.7 Low |
 | S | S | low–medium | GPT-5.5 Medium | Opus 4.8 Low |

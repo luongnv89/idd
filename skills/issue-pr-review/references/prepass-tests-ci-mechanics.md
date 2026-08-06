@@ -84,4 +84,4 @@ On failure, extract failure details from the CI log:
 gh run view {run_id} --log-failed
 ```
 
-When checks are still running after `review.ci_timeout`: pending CI is **not clean** -- it never satisfies soft-pass and auto mode must not merge or proceed while CI is pending (including when the fix loop finds zero fixables and would otherwise exit). In interactive mode: ask to wait more or proceed without merging. In auto mode: **do not proceed past an unresolved CI timeout** -- extend polling or stop with remaining issues; do not assume a later cycle will re-check once the fix loop has already ended.
+When checks are still running after `review.ci_timeout`: pending CI is **not clean** — it never satisfies soft-pass and auto mode must not merge or proceed while CI is pending (including when the fix loop finds zero fixables and would otherwise exit). In interactive mode: ask to wait more or proceed without merging. In auto mode: **do not proceed past an unresolved CI timeout** — extend polling or stop with remaining issues; do not assume a later cycle will re-check once the fix loop has already ended.
