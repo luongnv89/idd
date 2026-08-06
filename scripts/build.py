@@ -167,7 +167,11 @@ _CONVENTIONS_PREAMBLE_INTRO = (
 _DOC_SECTION_RE_TMPL = r"^## {heading}[ \t]*\n(?P<body>.*?)(?=^## |\Z)"
 # `## Prompt` followed by the opening fence of the injected prompt block.
 _PROMPT_FENCE_RE = re.compile(r"^## Prompt[ \t]*\n+^```[A-Za-z]*[ \t]*\n", re.MULTILINE)
+# `## Prompt` on its own, fence or not — used to detect an agent whose fence
+# failed to parse, where the preamble would land outside the injected body.
+_PROMPT_HEADING_RE = re.compile(r"^## Prompt[ \t]*$", re.MULTILINE)
 _FIRST_H2_RE = re.compile(r"^## ", re.MULTILINE)
+_FENCE_MARKER = "`" * 3
 
 
 # --- Errors ------------------------------------------------------------------
@@ -737,6 +741,18 @@ def _load_conventions_sections(repo_root: Path) -> dict[str, str] | None:
                 "preamble cannot be generated. Restore the heading or update "
                 "CONVENTIONS_SECTIONS_ALL/REVIEW in scripts/build.py."
             )
+        # An inlined body is spliced *inside* the ``` fence of the
+        # code-reviewer / fixer / ui-reviewer prompts. A fence marker in the
+        # body would close that fence early and silently truncate the injected
+        # prompt, so reject it at parse time rather than shipping it.
+        if _FENCE_MARKER in body:
+            _abort(
+                f"docs/{CONVENTIONS_DOC} section '## {heading}' contains a "
+                "``` code fence. Inlined sections are spliced inside the "
+                "agents' ``` prompt fence, where a nested fence would close it "
+                "early and truncate the injected prompt. Use indented code or "
+                "move the example to a non-inlined section."
+            )
         sections[heading] = body
     return sections
 
@@ -769,6 +785,11 @@ def _inline_agent_conventions(
         orchestrator injects only the fence body.
       * Agents without one (the whole file is the prompt) get it immediately
         before their first `## ` section.
+
+    An agent that declares `## Prompt` but whose fence does not parse aborts the
+    build: the fallback would place the preamble *before* `## Contract`, outside
+    the only region the orchestrator injects, so the conventions would silently
+    never reach the subagent — the exact failure issue #245 exists to fix.
     """
     if sections is None:
         return text
@@ -776,6 +797,14 @@ def _inline_agent_conventions(
     fence = _PROMPT_FENCE_RE.search(text)
     if fence is not None:
         return text[: fence.end()] + preamble + "\n" + text[fence.end() :]
+    if _PROMPT_HEADING_RE.search(text):
+        _abort(
+            f"src/shared/agents/{agent_name}.md has a '## Prompt' section but no "
+            "parsable opening ``` fence, so the inlined conventions preamble "
+            "would land outside the injected prompt body and never reach the "
+            "subagent. Restore the fenced block or update _PROMPT_FENCE_RE in "
+            "scripts/build.py."
+        )
     first_h2 = _FIRST_H2_RE.search(text)
     if first_h2 is not None:
         return text[: first_h2.start()] + preamble + "\n" + text[first_h2.start() :]

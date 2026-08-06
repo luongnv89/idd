@@ -21,6 +21,11 @@
 #        regression where killing the closure edge un-bundles the doc and breaks
 #        the runtime precheck.
 #   T5 — the confidence scale is inlined for review agents only.
+#   T6 — for every agent whose file carries a `## Prompt` fenced block
+#        (code-reviewer / fixer / ui-reviewer), the preamble sits *inside* that
+#        fence. The orchestrator injects only the fence body, so a preamble
+#        emitted above `## Contract` still satisfies T1/T2 while never reaching
+#        the subagent — AC1 would be false with the suite fully green.
 #
 # Operates on the committed skills/ + .pi/agents/ trees (and dist/agents/ when
 # present) so doc→build drift is caught, not masked by a rebuild.
@@ -205,6 +210,38 @@ if review_leak:
     bad(f"T5: confidence scale inlined for review agents only ({review_leak[:4]})")
 else:
     ok("T5: confidence scale is inlined for code-reviewer/ui-reviewer only")
+
+# ── T6 — the preamble is inside the injected prompt fence --------------------
+# T1/T2/T5 anchor on the `## ` heading structure alone, which is satisfied
+# wherever the preamble lands. For the fenced agents only the fence *body* is
+# injected, so placement is the property AC1 actually rests on.
+PROMPT_FENCE_RE = re.compile(r"^## Prompt[ \t]*\n+^(```[A-Za-z]*[ \t]*)\n", re.MULTILINE)
+
+fenced_seen = 0
+outside_fence = []
+for f in agent_files:
+    text = f.read_text(encoding="utf-8")
+    m = PROMPT_FENCE_RE.search(text)
+    if m is None:
+        continue
+    fenced_seen += 1
+    label = f.relative_to(root).as_posix()
+    body_start = m.end()
+    close = re.search(r"^```[ \t]*$", text[body_start:], re.MULTILINE)
+    body_end = body_start + close.start() if close else len(text)
+    at = text.find(PREAMBLE_HEADING)
+    if not (body_start <= at < body_end):
+        where = "absent" if at == -1 else f"offset {at}, fence body {body_start}-{body_end}"
+        outside_fence.append(f"{label} ({where})")
+
+# Non-vacuity: 3 fenced agents × (issue-resolver, issue-pr-review, .pi) = 9,
+# plus dist/agents/ when present.
+if fenced_seen < 9:
+    bad(f"T6: expected >= 9 fenced agent prompts, found {fenced_seen}")
+elif outside_fence:
+    bad(f"T6: preamble inside the injected ## Prompt fence ({len(outside_fence)} outside: {outside_fence[:3]})")
+else:
+    ok(f"T6: preamble is inside the injected prompt fence in all {fenced_seen} fenced agents")
 
 # ── T3 — no unresolvable path in any built agent file ------------------------
 dangling = []

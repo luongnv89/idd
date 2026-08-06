@@ -26,6 +26,14 @@ means updating `CONVENTIONS_SECTIONS_ALL` / `CONVENTIONS_SECTIONS_REVIEW` in the
 build script in the same commit. Every other section here is orchestrator-facing
 and is not inlined.
 
+Two further build aborts protect the placement, because for `code-reviewer` /
+`fixer` / `ui-reviewer` only the body of the `## Prompt` fence is injected and a
+preamble emitted anywhere else silently never reaches the subagent. The build
+fails if an agent declares `## Prompt` without a parsable opening fence, and if
+an inlined section body contains a ``` code fence (which would close the
+agent's prompt fence early). Keep examples in the six inlined sections
+fence-free — use indented code or a non-inlined section.
+
 ## Agent header
 
 Every shared agent opens with a compact identity + contract header:
