@@ -16,10 +16,13 @@ A run is in **auto mode** when **either** of these holds:
 
 Otherwise the run is **interactive**.
 
-Detection is **flag/env only — never caller provenance.** A skill MUST NOT infer
-auto mode from "who invoked me" (being spawned as a subagent, being called by
-`/auto-pilot`, running without a TTY). Provenance is invisible, untestable, and
-silently wrong when a human drives the same code path.
+**Never rely on caller provenance alone.** Both signals above are explicit and
+checkable; "who invoked me" is not. A skill MUST NOT conclude it is interactive
+merely because it cannot detect `/auto-pilot`, and MUST NOT conclude it is
+autonomous merely because it lacks a TTY. A skill MAY treat known-autonomous
+provenance as an *additional* way to enter auto mode — several already do — but
+the flag and the environment variable are the contract, and either one alone is
+sufficient.
 
 The obligation is therefore on the **caller**: any orchestrator that runs a skill
 autonomously MUST pass `--auto` **and** export `IDD_AUTO_MODE=1` before the

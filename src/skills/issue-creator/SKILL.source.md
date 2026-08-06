@@ -51,7 +51,7 @@ The model suggestion is the one externally-derived value admitted into the body 
 
 Detect mode: if the argument is a number → Normalize. If the input contains multiple distinct items (numbered list, bullet points, multiple paragraphs describing different problems, or a planning document with several work items) → Batch. Otherwise → Create.
 
-**Auto mode.** `--auto` is orthogonal to the mode — it composes with Create, Normalize, and Batch alike. Detection, the log-and-proceed gate rule, the `⚠` line format, and the safety stops that still abort are defined once in `docs/auto-mode.md`; this skill's gates cite it rather than restating it. Each gate below documents its own safe default. In auto mode this skill has **no** blocking prompt: Step 3 duplicates, Step 3.5 clarify, Step 5 preview, Normalize apply, Batch approval, Batch epic offer, and the model-cache refresh all have a defined non-interactive behavior.
+**Auto mode.** `--auto` is orthogonal to the mode — it composes with Create, Normalize, and Batch alike. Detection, the log-and-proceed gate rule, the `⚠` line format, and the safety stops that still abort are defined once in `docs/auto-mode.md`; this skill's gates cite it rather than restating it. Each gate below documents its own safe default. In auto mode this skill has **no** blocking prompt: Step 3 duplicates, Step 3.5 clarify, Step 5 preview, Normalize apply, Batch approval, Batch epic offer, the model-cache refresh, and the Repo Sync failure path all have a defined non-interactive behavior. Safety stops still abort (a failed backup, a missing `origin`) — auto mode removes confirmations, never safeguards.
 
 **Epic binding (Batch only):** an explicit `--parent <N>` flag binds every child created in the batch to parent epic #N (the hierarchy marker `Part of #N`, SPEC §2.1 — see `docs/idd-methodology.md`). A parent is **only** ever supplied by this explicit flag — a bare number is always Normalize, never a parent. The flag is optional and additive: a batch run **without** `--parent` behaves exactly as it does today. Full flow in `references/modes.md` (Batch Create → Epic binding).
 
@@ -87,7 +87,9 @@ if [ "$dirty" -eq 1 ]; then
 fi
 ```
 
-If `origin` is missing or rebase conflicts occur, stop and ask the user before continuing. In a pure Create-from-text run with no image upload, this sync is a no-op safeguard and adds negligible cost.
+If `origin` is missing or rebase conflicts occur, stop and ask the user before continuing. **In auto mode (`docs/auto-mode.md`) never ask** — follow the mode contract in `docs/sync-conventions.md`: a missing `origin` aborts with a clear error, and a rebase conflict runs `git rebase --abort` and reports. That is a safety stop, not a confirmation prompt: this sync is mandatory because it precedes a write, so an unsynced run must fail loudly rather than proceed silently.
+
+In a pure Create-from-text run with no image upload, this sync is a no-op safeguard and adds negligible cost.
 
 ## Configuration
 
@@ -342,10 +344,12 @@ Print a structured step-by-step summary:
   https://github.com/owner/repo/issues/42
 ```
 
-If duplicates were found but user proceeded:
+If duplicates were found but the run proceeded anyway:
 ```
-  Duplicates:        ⚠ warn ({N} potential duplicates, user overrode)
+  Duplicates:        ⚠ warn ({N} potential duplicates, {override_source})
 ```
+
+`{override_source}` is `user overrode` in interactive mode and `auto-approved` in auto mode — never report a human decision that no human made (`docs/auto-mode.md`).
 
 On failure, output the matching error from `references/error-messages.md`.
 
@@ -392,9 +396,9 @@ In batch mode, one line per issue is printed followed by a totals footer (`✓ 5
 
 ## Edge Cases
 
-- **Duplicate detection** — if an existing open issue closely matches, the skill asks before filing; the user can dedupe or create anyway.
+- **Duplicate detection** — if an existing open issue closely matches, the skill asks before filing; the user can dedupe or create anyway (interactive; in auto mode see the Step 3 auto-mode carve-out).
 - **Screenshot-only input** — the image is inspected, described in text, and a structured issue is drafted; the image is also attached to the issue body.
-- **Ambiguous batch input** — if item boundaries are unclear, the skill shows a parsed preview and asks for confirmation before creating.
+- **Ambiguous batch input** — if item boundaries are unclear, the skill shows a parsed preview and asks for confirmation before creating (interactive; in auto mode see the Batch Step 4 auto-mode carve-out).
 - **GitHub API rate limit** — creation stops at the last successful issue; the partial result is reported with a resume hint.
 - **Empty body** — the issue is created with only a title; `(needs review)` is noted in the metadata section.
 

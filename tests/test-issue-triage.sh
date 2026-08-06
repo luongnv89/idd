@@ -33,8 +33,6 @@ fail() {
   FAIL=$((FAIL + 1))
 }
 
-# grep helper: assert a fixed-string pattern exists in a file.
-# -e guards patterns that begin with '-' from being parsed as grep options.
 has_near() {
   # Proximity assertion: $3 must appear within $4 lines AFTER the first
   # occurrence of anchor $2. Used for the #244 sync-gate carve-out — a plain
@@ -42,7 +40,9 @@ has_near() {
   # entirely, which is exactly the bug (a gate with no defined auto behavior).
   # $1 = file, $2 = anchor, $3 = needle, $4 = window (lines), $5 = label
   local f="$1" anchor="$2" needle="$3" win="$4" label="$5" ln
-  ln="$(grep -nF -e "$anchor" "$f" 2>/dev/null | head -1 | cut -d: -f1)"
+  # `|| true` is required: under `set -euo pipefail` a missing anchor makes
+  # grep exit 1, which would kill the whole suite before the check below runs.
+  ln="$(grep -nF -e "$anchor" "$f" 2>/dev/null | head -1 | cut -d: -f1 || true)"
   if [ -z "$ln" ]; then
     fail "$label (anchor not found: '$anchor' in ${f#$REPO_ROOT/})"
     return
@@ -54,6 +54,8 @@ has_near() {
   fi
 }
 
+# grep helper: assert a fixed-string pattern exists in a file.
+# -e guards patterns that begin with '-' from being parsed as grep options.
 has() {
   # $1 = file, $2 = pattern, $3 = label
   if grep -qF -e "$2" "$1" 2>/dev/null; then
@@ -163,7 +165,7 @@ else
 fi
 has "$AUTOMODE" '`--auto` flag'          "T10: auto-mode doc defines the --auto signal"
 has "$AUTOMODE" "IDD_AUTO_MODE=1"         "T10: auto-mode doc defines the IDD_AUTO_MODE=1 signal"
-has "$AUTOMODE" "never caller provenance" "T10: detection is flag/env only, never provenance"
+has "$AUTOMODE" "caller provenance"       "T10: doc rules on caller-provenance detection"
 
 has "$SKILL" "--auto"                       "T10: SKILL documents the --auto modifier"
 has "$SKILL" "docs/auto-mode.md"            "T10: SKILL cites the authoritative auto-mode doc"
@@ -174,11 +176,17 @@ has_near "$SKILL" "Sync now? [Y/n]" "Auto mode" 40 \
 has_near "$SKILL" "Sync now? [Y/n]" \
   "⚠ Auto mode: sync confirmation skipped" 40 \
   "T10: sync carve-out logs a ⚠ instead of prompting"
-has "$SKILL" "Run the stash-first sync immediately" \
+has_near "$SKILL" "Sync now? [Y/n]" "stash-first sync immediately" 40 \
   "T10: auto mode syncs without asking (interactive default is Y)"
 
-# Interactive behavior unchanged: the prompt is still there for a human.
-has "$SKILL" "Sync now? [Y/n]" "T10: interactive sync prompt unchanged"
+# Interactive behavior unchanged (#244 AC4). Anchor on the prompt BLOCK, not on
+# the prompt string: `Sync now? [Y/n]` now also appears quoted inside the
+# carve-out ("Do not show the `Sync now? [Y/n]` prompt"), so a bare whole-file
+# grep would stay green even if the interactive gate were deleted.
+has_near "$SKILL" "Your branch may be behind the remote" "Sync now? [Y/n]" 10 \
+  "T10: interactive sync prompt still in its recommendation block"
+has "$SKILL" "If the user declines the prompt, proceed without syncing." \
+  "T10: interactive decline path unchanged"
 
 echo ""
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"

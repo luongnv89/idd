@@ -86,7 +86,7 @@ Apply normalization? [Y/n/dry-run]
 
 Wait for confirmation. `n` → stop. `dry-run` → proceed to Step 7.
 
-**Auto mode (`references/docs/auto-mode.md`) — never blocks.** This is the gate `/auto-pilot` hits when it normalizes an unstructured issue mid-loop, so it must never wait. Print the preview block (it is the record of what was applied), then **auto-apply** the normalization instead of showing `Apply normalization? [Y/n/dry-run]`, and log:
+**Auto mode (`references/docs/auto-mode.md`) — never blocks.** This is the gate an orchestrator hits when it drives `/issue-creator N` to normalize an unstructured issue mid-loop (`/auto-pilot` declares issue-creator as its optional mid-loop normalizer), so it must never wait. Print the preview block (it is the record of what was applied), then **auto-apply** the normalization instead of showing `Apply normalization? [Y/n/dry-run]`, and log:
 
 ```
   ⚠ Auto mode: normalization confirmation skipped — applying normalization to issue #42.
