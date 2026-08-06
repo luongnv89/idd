@@ -1,10 +1,16 @@
+<!--
+  DO NOT READ THIS FILE — This README.md is for human catalog browsing only.
+  It is never auto-loaded into agent context and contains no runtime
+  instructions. Agents: read SKILL.md and the files it points at instead.
+-->
+
 # Issue PR Review
 
 > Review a pull request end-to-end — analyze, test, fix, check CI, and auto-merge when clean — with up to 3 token-optimized fix cycles.
 
 ## Intent-Code Boundary
 
-`/issue-pr-review` respects the intent-code boundary. The reviewer reads the **PR diff** and the **current codebase** for findings — it never relies on a predicted file list embedded in the linked issue body. When the linked issue exists, its **acceptance criteria** are the contract the PR is evaluated against; everything else (root cause, affected files, implementation choices) is verified against the code as it is right now. Findings stay in the PR review thread and per-cycle reports — they are not written back into the issue body. See `references/docs/idd-methodology.md` for the full boundary contract.
+`/issue-pr-review` respects the intent-code boundary. The reviewer reads the **PR diff** and the **current codebase** for findings — it never relies on a predicted file list embedded in the linked issue body. When the linked issue exists, its **acceptance criteria** are the contract the PR is evaluated against; everything else (root cause, affected files, implementation choices) is verified against the code as it is right now. Findings stay in the PR review thread and per-cycle reports — they are not written back into the issue body. See [`idd-methodology.md`](https://github.com/luongnv89/idd/blob/main/docs/idd-methodology.md) for the full boundary contract.
 
 ## Highlights
 
@@ -74,7 +80,7 @@ asm install https://github.com/luongnv89/idd --skill issue-pr-review
 | `references/review-loop-mechanics.md` | Review-fix cycle mechanics and the up-to-3-cycle loop |
 | `references/prepass-tests-ci-mechanics.md` | Pre-pass lint/format/test and CI check mechanics |
 | `references/verification-checks.md` | Verification checks the reviewer runs against the diff |
-| `references/ui-review-mechanics.md` | `/issue-pr-review`'s UI-review deltas (shared mechanics: `references/docs/ui-review.md`) |
+| `references/ui-review-mechanics.md` | `/issue-pr-review`'s UI-review deltas (shared mechanics: [`ui-review.md`](https://github.com/luongnv89/idd/blob/main/docs/ui-review.md)) |
 | `references/report-templates.md` | Per-cycle and final report templates |
 | `references/error-messages.md` | Error catalog for prerequisite (git, gh CLI, auth), PR, CI, and fix (push, merge) failures, each with a Docs link |
 

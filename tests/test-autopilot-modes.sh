@@ -188,7 +188,7 @@ done
 # ───────────────────────────────────────────────────────────
 # T5: README highlights merge modes
 # ───────────────────────────────────────────────────────────
-README="$REPO_ROOT/src/skills/auto-pilot/README.md"
+README="$REPO_ROOT/src/skills/auto-pilot/docs/README.md"
 
 if grep -qiE 'conservative' "$README"; then
   pass "T5.1: README mentions conservative mode"

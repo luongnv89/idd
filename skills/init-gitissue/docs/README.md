@@ -1,3 +1,9 @@
+<!--
+  DO NOT READ THIS FILE — This README.md is for human catalog browsing only.
+  It is never auto-loaded into agent context and contains no runtime
+  instructions. Agents: read SKILL.md and the files it points at instead.
+-->
+
 # Init Gitissue
 
 > Scan your repository and generate a tailored `.gitissue.yml` config with project-specific defaults.

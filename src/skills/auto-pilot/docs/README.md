@@ -1,10 +1,16 @@
+<!--
+  DO NOT READ THIS FILE — This README.md is for human catalog browsing only.
+  It is never auto-loaded into agent context and contains no runtime
+  instructions. Agents: read SKILL.md and the files it points at instead.
+-->
+
 # Auto-Pilot
 
 > Fully autonomous development loop that triages, resolves, reviews, and merges GitHub issues end-to-end with zero user prompts.
 
 ## Intent-Code Boundary
 
-`/auto-pilot` respects the intent-code boundary at every step of the loop. It treats **issues as durable intent contracts** and orchestrates `/issue-triage`, `/issue-resolver`, and `/issue-pr-review` — each of which scans the **current codebase** when it needs file-level information. The auto-pilot itself never reads source files, predicts affected files into issue bodies, or freezes implementation guesses into stored state. When `/issue-creator` is invoked to normalize an unstructured issue mid-loop, it captures intent only — no codebase enrichment. See `docs/idd-methodology.md` for the full boundary contract.
+`/auto-pilot` respects the intent-code boundary at every step of the loop. It treats **issues as durable intent contracts** and orchestrates `/issue-triage`, `/issue-resolver`, and `/issue-pr-review` — each of which scans the **current codebase** when it needs file-level information. The auto-pilot itself never reads source files, predicts affected files into issue bodies, or freezes implementation guesses into stored state. When `/issue-creator` is invoked to normalize an unstructured issue mid-loop, it captures intent only — no codebase enrichment. See [`idd-methodology.md`](https://github.com/luongnv89/idd/blob/main/docs/idd-methodology.md) for the full boundary contract.
 
 ## Highlights
 

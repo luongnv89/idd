@@ -55,7 +55,7 @@ else
   fail "T1.1: SKILL.source.md missing"
 fi
 
-if [ -f "$SKILL_DIR/README.md" ]; then
+if [ -f "$SKILL_DIR/docs/README.md" ]; then
   pass "T1.2: README.md exists"
 else
   fail "T1.2: README.md missing"
@@ -289,7 +289,7 @@ fi
 # Check 1 evidence: /issue-creator README.md and SKILL.md are
 # clean per the intent-only contract (other skills are out of scope).
 DRIFT_FOUND=0
-for f in "$REPO_ROOT/src/skills/issue-creator/README.md" "$REPO_ROOT/src/skills/issue-creator/SKILL.source.md"; do
+for f in "$REPO_ROOT/src/skills/issue-creator/docs/README.md" "$REPO_ROOT/src/skills/issue-creator/SKILL.source.md"; do
   [ -f "$f" ] || continue
   while IFS= read -r line; do
     lower=$(printf '%s' "$line" | tr '[:upper:]' '[:lower:]')
@@ -475,7 +475,7 @@ fi
 # ───────────────────────────────────────────────────────────
 # T15: README.md highlights and structure
 # ───────────────────────────────────────────────────────────
-RM="$SKILL_DIR/README.md"
+RM="$SKILL_DIR/docs/README.md"
 
 if grep -qE '^# IDD Doctor' "$RM"; then
   pass "T15.1: README has '# IDD Doctor' top-level heading"

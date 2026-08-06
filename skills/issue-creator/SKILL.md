@@ -66,30 +66,20 @@ Before any operation, verify the environment. On failure, output the exact error
 3. Confirm authentication: `gh auth status`
 4. Confirm GitHub remote exists: `git remote -v`
 
-## Repo Sync Before Edits (mandatory)
+## Repo Sync (scoped to actual local writes)
 
-This skill can write to the repository: in Normalize mode it edits issue bodies, and when images are supplied it commits them to `.github/issue-assets/` via the GitHub contents API. Before any such write, sync with remote using the stash-first pattern (see `references/docs/sync-conventions.md` for the full convention and recovery procedure):
+Every write this skill performs is **remote**: issue bodies go out through `gh
+issue edit`, and screenshots are committed to `.github/issue-assets/` by the
+GitHub contents API (`references/image-upload.md`), which commits server-side
+rather than from the working tree. A local `git pull --rebase` protects none of
+them, and on a dirty tree it can stop a pure create with a rebase conflict — so
+create, normalize, and image upload run **without** a repo sync.
 
-```bash
-branch="$(git rev-parse --abbrev-ref HEAD)"
-dirty=0
-if [ -n "$(git status --porcelain)" ]; then
-  git stash push -u -m "pre-sync: ${branch}"
-  dirty=1
-fi
-git fetch origin
-git pull --rebase origin "$branch"
-if [ "$dirty" -eq 1 ]; then
-  git stash pop || {
-    echo "✗ Stash pop failed — recover with: git stash list && git stash show -p stash@{0}"
-    exit 1
-  }
-fi
-```
-
-If `origin` is missing or rebase conflicts occur, stop and ask the user before continuing. **In auto mode (`references/docs/auto-mode.md`) never ask** — follow the mode contract in `references/docs/sync-conventions.md`: a missing `origin` aborts with a clear error, and a rebase conflict runs `git rebase --abort` and reports. That is a safety stop, not a confirmation prompt: this sync is mandatory because it precedes a write, so an unsynced run must fail loudly rather than proceed silently.
-
-In a pure Create-from-text run with no image upload, this sync is a no-op safeguard and adds negligible cost.
+If a run does write to the working tree (a mode that scaffolds local template
+files, for example), sync first with the stash-first pattern in
+`references/docs/sync-conventions.md` — immediately before that local write, not at skill
+start. Everything else in that document (auto-mode contract, stash-pop recovery)
+applies unchanged when it does run.
 
 ## Configuration
 

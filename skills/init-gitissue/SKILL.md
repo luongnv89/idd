@@ -247,6 +247,19 @@ If the file write fails, output the error from `references/error-messages.md` an
   Check:   do you have write access? ls -la .
 ```
 
+### Validate the written config (mandatory)
+
+A write that succeeded is not a config that works. Before reporting success,
+re-read the file just written and verify three things:
+
+1. **It parses as YAML.** `python3 -c "import yaml,sys; yaml.safe_load(open('.gitissue.yml'))"` — or, when PyYAML is unavailable, `ruby -ryaml -e "YAML.load_file('.gitissue.yml')"`. If neither parser is available, print `○ Config validation skipped — no YAML parser available` and treat the validation check as `PARTIAL`, never `PASS`.
+2. **No placeholder token survived substitution.** `grep -nE '\{(language|framework|test_runner|repo_size|file_count|true_or_false|timeout_value|stale_value)\}' .gitissue.yml` must return nothing. Any hit means Step 3 substitution missed a token.
+3. **The `platform` key is present** — it is the driver selector every skill resolves on load, so a config without it is unusable.
+
+On a parse error or a surviving placeholder, do **not** report success. Print the
+matching error from `references/error-messages.md` (*Generated config failed
+validation*), leave the file in place for inspection, and stop.
+
 ### Merge strategy warning (optional, when `gh` is available)
 
 After a successful write, when `which gh` succeeds and `gh auth status` passes, run the squash-merge preflight from `references/docs/platform-github.md`:
@@ -288,6 +301,7 @@ Print a structured step-by-step summary showing what was detected and configured
   Templates:         ✓ {template_status}
   Repo size:         ✓ {size} ({count} files)
   Config:            ✓ generated .gitissue.yml
+  Validation:        ✓ parses as YAML, no placeholders left
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Result:            DONE
 
@@ -321,6 +335,12 @@ And earlier in the flow, print:
 ○ Could not detect test runner. Setting resolve.auto_test: false.
   Tip: configure your test command in .gitissue.yml after setup.
 ```
+
+**Validation could not run** — no YAML parser available; show:
+```
+  Validation:        ⚠ warn (skipped — no YAML parser available)
+```
+and set `Result: PARTIAL`.
 
 **No issue templates** — show:
 ```
@@ -357,25 +377,11 @@ Terminal output follows the `references/docs/terminal-style.md` contract — sym
 
 ## Expected Output
 
-After a successful run, the repo root contains a `.gitissue.yml` file and the terminal prints:
-
-```
-◆ Init Gitissue — setup complete
-┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-
-  Git repo:          ✓ pass
-  Language:          ✓ TypeScript (from package.json)
-  Framework:         ✓ Next.js
-  Test runner:       ✓ vitest
-  Templates:         ✓ .github/ISSUE_TEMPLATE/ (3 templates)
-  Repo size:         ✓ medium (42 files)
-  Config:            ✓ generated .gitissue.yml (163 lines)
-  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  Result:            DONE
-
-  Config: .gitissue.yml
-  Next action: /issue-creator to create your first issue
-```
+After a successful run the repo root contains a validated `.gitissue.yml` and the
+terminal prints the *Step 4 — Report* block above — the `Validation:` row is the
+checkable bar: the run only reports `DONE` after the written file parsed as YAML
+with no placeholder tokens left. Variations (merge mode, missing framework,
+missing test runner) are listed under that step.
 
 ## Edge Cases
 

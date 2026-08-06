@@ -33,7 +33,7 @@ summary is **out of scope**:
 
 | # | Check | What it verifies | Failure mode |
 |---|-------|-----------------|--------------|
-| 1 | Stale skill claims | `src/skills/issue-creator/README.md` and `src/skills/issue-creator/SKILL.source.md` are free of language asserting `/issue-creator` scans the codebase, predicts affected files, or generates implementation notes. | `FAIL` |
+| 1 | Stale skill claims | `src/skills/issue-creator/docs/README.md` and `src/skills/issue-creator/SKILL.source.md` are free of language asserting `/issue-creator` scans the codebase, predicts affected files, or generates implementation notes. | `FAIL` |
 | 2 | Issue-template fields | Issue templates under `src/skills/issue-creator/templates/` and `.github/ISSUE_TEMPLATE/` (if present) do not request predicted affected files, generated technical notes, root cause, or implementation hints. | `FAIL` |
 | 3 | Autopilot mode set | If `.gitissue.yml` exists in the repo root, it contains an `autopilot.mode` key. | `FAIL` (only when `.gitissue.yml` exists) |
 | 4 | Squash-merge default | The repository's default merge strategy is squash (squash allowed AND merge-commit and rebase-merge disallowed). | `WARN` |
@@ -129,7 +129,7 @@ Scan the `/issue-creator` skill's `README.md` and `SKILL.md` for stale claims ab
 ### What to scan
 
 ```
-src/skills/issue-creator/README.md
+src/skills/issue-creator/docs/README.md
 src/skills/issue-creator/SKILL.source.md
 ```
 
@@ -428,7 +428,7 @@ Terminal output follows the DESIGN.md contract — symbols `● ✓ ✗ ◆ ⚡ 
 - **`.gitissue.yml` has `autopilot.mode` set to a non-canonical value** (e.g., `mode: yolo`) — Check 3 still passes (any non-empty value satisfies the "key set" requirement); a future v2 may add value validation.
 - **A skill README contains the forbidden pattern inside a code block or fenced quote** — Check 1 still flags it. The intent of v1 is mechanical strictness, not contextual nuance.
 - **GitHub Enterprise repos without `gh` auth** — Check 4 is skipped, never failed.
-- **`/issue-creator` skill is missing** — Check 1 fails with a clear `src/skills/issue-creator/README.md not found` finding (the `/issue-creator` skill is required for an IDD repo).
+- **`/issue-creator` skill is missing** — Check 1 fails with a clear `src/skills/issue-creator/docs/README.md not found` finding (the `/issue-creator` skill is required for an IDD repo).
 
 ## Additional Resources
 

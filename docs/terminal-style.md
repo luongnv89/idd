@@ -31,8 +31,12 @@ overlap, this document is authoritative for what skills emit.
 | `⟶` | Next action / leads to | — | `⟶ Spawning resolver subagent...` |
 | `+` | Added field | — | `+ Files: auth.py (high)` |
 | `=` | Preserved field | — | `= Original: preserved` |
+| `√` | Completion-report check passed | — | `√ Tests written` |
+| `×` | Completion-report check failed | — | `× Build clean` |
 
 All symbols carry meaning without color. Never rely on color alone.
+
+`√` and `×` are reserved for **step completion reports** — the `Result: PASS | PARTIAL | FAIL` blocks a skill prints to close each step. They are deliberately distinct from `✓`/`✗`, which report the run's own status, so a check row is never mistaken for a status line. Each skill defines its own per-step check names in its `references/` report file.
 
 `⟶` marks the transition to the next autonomous action in a loop (auto-pilot):
 what the orchestrator is about to do — spawn a subagent, start immediately,

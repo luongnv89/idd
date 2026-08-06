@@ -1,3 +1,9 @@
+<!--
+  DO NOT READ THIS FILE — This README.md is for human catalog browsing only.
+  It is never auto-loaded into agent context and contains no runtime
+  instructions. Agents: read SKILL.md and the files it points at instead.
+-->
+
 # IDD Doctor
 
 > Report-only health check for IDD repositories. Catches doc drift on the intent-code boundary, missing `autopilot.mode` config, and unsafe merge defaults — no autofix, no surprises.

@@ -142,6 +142,17 @@ sequential output — no animation. Worked example of the full tracker in
 
 ---
 
+### Step completion reports
+
+Each step closes with a completion report — `√`/`×` per check plus a
+`Result: PASS | PARTIAL | FAIL` line — so "step done" is checkable rather than
+asserted. The per-step check names, the `Result` semantics, and the block
+format are in `references/report-templates.md` (*Step Completion Reports*) —
+**read it now**, before Step 0. A step is not complete until its `Result:`
+line is printed.
+
+---
+
 ## Step 0 — Preflight
 
 Check whether this issue should be worked on. Open with `● Preflight check for issue #N...`.

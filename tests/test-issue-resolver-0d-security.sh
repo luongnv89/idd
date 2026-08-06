@@ -21,7 +21,7 @@ echo "◆ Issue-Resolver Step 0d Security Guard Tests (issue #186)"
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 
 SKILL="$REPO_ROOT/src/skills/issue-resolver/SKILL.source.md"
-README="$REPO_ROOT/src/skills/issue-resolver/README.md"
+README="$REPO_ROOT/src/skills/issue-resolver/docs/README.md"
 ERRORS="$REPO_ROOT/src/skills/issue-resolver/references/error-messages.md"
 
 if [ ! -f "$SKILL" ]; then

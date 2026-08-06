@@ -179,3 +179,49 @@ This is a warning, not a fatal error — the terminal output from Step 8 was alr
 
 ---
 
+## Step Completion Reports
+
+Every step ends with a completion report — the checkable bar that separates *the
+step ran* from *the step succeeded*. Emit it right after the step's `[N/9]`
+tracker line:
+
+```
+  [6/9] Stale         ✓ 4 stale issues
+    √ Threshold applied   √ Every open issue scored
+    Result: PASS
+```
+
+Rules that make the report worth reading:
+
+- `√` — the check passed. `×` — it did not. One entry per check the step actually
+  validates. Checks are **gates that could have failed**, never restatements of a
+  metric the tracker line already carries (files read, counts, option number) —
+  restating those is the duplication issue #165 removed.
+- `Result: PASS` — every check is `√`; continue.
+- `Result: PARTIAL` — only non-blocking checks are `×`; continue, and carry the
+  gap into the closing summary so it is never silently dropped.
+- `Result: FAIL` — a blocking check is `×`; stop, or enter that step's defined
+  failure path. In auto mode follow the step's documented auto behavior instead
+  of prompting.
+- A step may not be reported complete without a `Result:` line. If a check could
+  not be evaluated (a tool was unavailable, a gate was skipped by config), mark
+  it `×` and use `PARTIAL` — never assume `√`.
+
+`√` and `×` are the completion-report check glyphs defined in
+`references/docs/terminal-style.md`; the run's own status symbols stay `✓ ✗ ⚠ ○`.
+
+### Per-step checks
+
+| Step | Checks |
+|------|--------|
+| 1 — Fetch Issues | `Issues fetched` · `Config applied` |
+| 1b & 2 — Already-Fixed & Dependencies | `Scanner returned` · `Dependencies mapped` |
+| 4 — Execution Order | `Order computed` · `No cycle left unreported` |
+| 5 — Parallelizable | `Disjoint sets identified` |
+| 6 — Stale Detection | `Threshold applied` · `Every open issue scored` |
+| 7 — Priority Suggestions | `Every issue ranked` · `Rationale attached` |
+| 8-9 — Output & Persist | `Report rendered` · `.gitissue/triage.json written` |
+
+A read-only default-mode run still emits the reports; `PARTIAL` is the right
+result when a step ran with degraded input (for example the dependency scanner
+was unavailable and detection fell back to inline heuristics).
