@@ -306,19 +306,25 @@ Issue #42 declares `Depends on #38` in its body. Auto-pilot resolves both #38 an
   Blocked by:
     ● #38 — Add auth middleware base class (OPEN; PR #84 is OPEN)
 
-  ⚠ Auto-pilot paused — merging out of dependency order is irreversible.
+  ⚠ Not merged — merging out of dependency order is irreversible.
+  ○ PR #87 left open — continuing to next issue.
 
-  To resume:
+  To unblock PR #87:
     1. Review and merge the dependency PR(s) above
-    2. Re-run /auto-pilot — the loop will pick up where it left off and
-       re-evaluate the gate for PR #87
+    2. Re-run /auto-pilot — a later run re-evaluates the gate for
+       PR #87 and merges it once the dependency is in
     3. To bypass entirely: set autopilot.respect_dependencies: false in
        .gitissue.yml (not recommended unless the marker is wrong)
 
   Iteration 2/10:    ⚠ blocked_by_dependency — #42 → PR #87 (dep: #38, PR #84)
+
+● [Iteration 3/10] Triaging open issues...
+  Selected:   #45 — Add rate-limit headers to the API client
 ```
 
-The user reviews and merges PR #84 manually. They re-invoke `/auto-pilot`. The loop re-triages, picks #42 again (since it's still open and PR #87 is still open and waiting), re-evaluates the gate (now satisfied — #38 is CLOSED and PR #84 is MERGED), and merges PR #87. The next iteration continues with the rest of the backlog.
+The run does **not** end here. #42 is recorded as `blocked_by_dependency`, PR #87 stays open and unchanged, #42 is added to the session skip list (so the re-triage cannot pick it again in this run), and iteration 3 starts on the next eligible issue. A 30-issue backlog with one dependency-blocked PR still resolves the other 29.
 
-This is the second and only other place the loop pauses (alongside the critical-issue review-failure case). Both pauses share the same shape: structured alert with concrete next steps, no state file, resume-by-re-invocation.
+Later, the user reviews and merges PR #84 manually and re-invokes `/auto-pilot`. The loop re-triages, picks #42 again (still open, PR #87 still waiting), re-evaluates the gate (now satisfied — #38 is CLOSED and PR #84 is MERGED), and merges PR #87.
+
+The gate never merges out of dependency order, but it also never halts the run: the only dependency-related stop is the ordinary `⚠ No eligible issues to pick` condition, once nothing eligible is left. The one remaining stop-and-ask case is the critical-issue review failure.
 

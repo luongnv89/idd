@@ -235,7 +235,7 @@ All errors follow the rich error format: what went wrong + fix command + docs li
   Continuing to next issue...
 ```
 **Trigger:** All review-fix cycles exhausted, the original issue does NOT have a `critical_labels` label, and the effective mode is `aggressive` with `autopilot.merge_partial: true`. Step 2a (Step 5.1b dependency gate) must pass before this output is shown.
-**Action:** Create follow-up issue, merge PR only after dependency gate passes. If the gate blocks, use *PR blocked by unmerged dependency* instead (fatal pause). Otherwise continue to next issue. Non-fatal when merged.
+**Action:** Create follow-up issue, merge PR only after dependency gate passes. If the gate blocks, use *PR blocked by unmerged dependency* instead (PR left open, outcome `blocked_by_dependency`, loop still continues). Otherwise continue to next issue. Non-fatal either way.
 
 ### Review cycles exhausted (non-critical issue, PR left open)
 ```
@@ -324,17 +324,18 @@ All errors follow the rich error format: what went wrong + fix command + docs li
     ● #{dep_n1} — {dep_title_1} ({dep_issue_state}; PR #{dep_pr_1} is {dep_pr_state})
     ● #{dep_n2} — {dep_title_2} ({dep_issue_state}; no linked PR)
 
-  ⚠ Auto-pilot paused — merging out of dependency order is irreversible.
+  ⚠ Not merged — merging out of dependency order is irreversible.
+  ○ PR #{pr_number} left open — continuing to next issue.
 
-  To resume:
+  To unblock PR #{pr_number}:
     1. Review and merge the dependency PR(s) above
-    2. Re-run /auto-pilot — the loop will pick up where it left off and
-       re-evaluate the gate for PR #{pr_number}
+    2. Re-run /auto-pilot — a later run re-evaluates the gate for
+       PR #{pr_number} and merges it once the dependency is in
     3. To bypass entirely: set autopilot.respect_dependencies: false in
        .gitissue.yml (not recommended unless the marker is wrong)
 ```
 **Trigger:** Phase 5.1b (Dependency Gate) finds at least one `Depends on #N` / `Blocked by #N` reference whose target issue is still open, or whose target issue is closed but has an unmerged linked PR. Only fires when `autopilot.respect_dependencies: true`.
-**Action:** Stop the loop. Leave PR open. Record iteration outcome as `blocked_by_dependency`. Fatal (pauses loop until the user re-invokes `/auto-pilot`). The audit trail consists of the iteration line in the final summary table plus the alert above — together they satisfy AC#5 (pause/resume cycle tracked for audit). Mirrors the critical-issue alert shape — same structured-pause pattern, different trigger.
+**Action:** Do **not** merge. Leave the PR open and unchanged, record iteration outcome as `blocked_by_dependency`, add the issue to the session skip list, and continue to the next eligible issue. **Non-fatal — the run is not paused.** The gate never merges out of order, but it never strands the rest of the backlog either; the loop ends on dependency grounds only when no eligible issue is left (`⚠ No eligible issues to pick`). The audit trail is the iteration line in the final summary table plus the alert above, and exactly one `.gitissue/runs.jsonl` line with `outcome: blocked_by_dependency`.
 
 ### Dependency cycle detected (auto-skip)
 ```

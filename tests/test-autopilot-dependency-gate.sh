@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 # test-autopilot-dependency-gate.sh — Validate the Phase 5.1b dependency gate
 #
-# This script verifies issue #93 acceptance criteria:
+# This script verifies issue #93 acceptance criteria, as amended by issue #243:
 #  - /auto-pilot identifies "Depends on #N" / "Blocked by #N" markers
-#  - When a PR is blocked, the loop pauses with a structured alert
-#  - The alert names the blocking PR, dependency, and how to resume
-#  - Resume waits for the dep PR before retrying (stateless re-evaluation)
-#  - The pause/resume cycle is tracked via the blocked_by_dependency outcome
+#  - When a PR is blocked, the gate refuses the merge with a structured alert
+#  - The alert names the blocking PR, dependency, and how to unblock it
+#  - A later run waits for the dep PR before retrying (stateless re-evaluation)
+#  - The blocked issue is tracked via the blocked_by_dependency outcome
+#  - #243: the loop does NOT stop — it records the outcome, leaves the PR open,
+#    skips the issue for the session, and advances to the next eligible issue
 #
 # Usage: bash tests/test-autopilot-dependency-gate.sh
 # Returns: exit 0 if all tests pass, exit 1 on first failure
@@ -66,12 +68,12 @@ else
 fi
 
 # ───────────────────────────────────────────────────────────
-# T2: AC #2 — structured pause alert exists
+# T2: AC #2 — structured blocked-merge alert exists
 # ───────────────────────────────────────────────────────────
 if grep -qE '^### PR blocked by unmerged dependency' "$ERRORS"; then
   pass "T2.1: error-messages.md has 'PR blocked by unmerged dependency' alert"
 else
-  fail "T2.1: error-messages.md missing the dependency-pause alert"
+  fail "T2.1: error-messages.md missing the dependency-blocked alert"
 fi
 
 if grep -qE 'BLOCKED — PR #\{pr_number\}' "$ERRORS"; then
@@ -89,10 +91,10 @@ else
   fail "T3.1: alert is missing the 'Blocked by:' enumeration"
 fi
 
-if awk '/^### PR blocked by unmerged dependency/{f=1; next} f && /^### /{exit} f' "$ERRORS" | grep -qE 'To resume:'; then
-  pass "T3.2: alert includes 'To resume:' instructions"
+if awk '/^### PR blocked by unmerged dependency/{f=1; next} f && /^### /{exit} f' "$ERRORS" | grep -qE 'To unblock PR'; then
+  pass "T3.2: alert includes 'To unblock PR' instructions"
 else
-  fail "T3.2: alert is missing 'To resume:' instructions"
+  fail "T3.2: alert is missing 'To unblock PR' instructions"
 fi
 
 if awk '/^### PR blocked by unmerged dependency/{f=1; next} f && /^### /{exit} f' "$ERRORS" | grep -qE 'autopilot\.respect_dependencies:\s*false'; then
@@ -117,7 +119,7 @@ else
 fi
 
 # ───────────────────────────────────────────────────────────
-# T5: AC #5 — pause/resume tracked via outcome label
+# T5: AC #5 — blocked issue tracked via outcome label
 # ───────────────────────────────────────────────────────────
 if grep -qE '\bblocked_by_dependency\b' "$SKILL"; then
   pass "T5.1: SKILL.md uses outcome label 'blocked_by_dependency'"
@@ -206,18 +208,34 @@ else
 fi
 
 # ───────────────────────────────────────────────────────────
-# T10: Autonomy-philosophy exception is recorded
+# T10: Autonomy philosophy — dependency-blocking is auto-decided (#243)
 # ───────────────────────────────────────────────────────────
 if grep -qE 'PR blocked by an unmerged dependency' "$SKILL"; then
-  pass "T10.1: SKILL.md autonomy-exception list includes the dependency case"
+  pass "T10.1: SKILL.md autonomy section covers the dependency case"
 else
-  fail "T10.1: SKILL.md autonomy-exception list missing the dependency case"
+  fail "T10.1: SKILL.md autonomy section missing the dependency case"
+fi
+
+# #243: dependency-blocking is no longer a stop-and-ask exception. The bullet
+# must live in the auto-decide list (category 1), above the "Confirm with user"
+# heading, not below it.
+if awk '/^1\. \*\*Auto-decide\*\*/{f=1} /^2\. \*\*Confirm with user\*\*/{f=0} f && /PR blocked by an unmerged dependency/{found=1} END{exit !found}' "$SKILL"; then
+  pass "T10.2: dependency case is listed under Auto-decide, not Confirm with user"
+else
+  fail "T10.2: dependency case is not in the Auto-decide list (#243 regression)"
 fi
 
 if grep -qE 'second documented exception' "$SKILL"; then
-  pass "T10.2: SKILL.md notes this is the second autonomy exception"
+  fail "T10.3: SKILL.md still calls the dependency gate the second stop-and-ask exception"
 else
-  fail "T10.2: SKILL.md does not flag the new exception"
+  pass "T10.3: 'second documented exception' framing removed (#243)"
+fi
+
+# Critical-issue review failure is the remaining stop-and-ask case.
+if grep -qE 'only\*\* documented stop-and-ask exception' "$SKILL"; then
+  pass "T10.4: SKILL.md names critical-issue review failure as the only stop-and-ask case"
+else
+  fail "T10.4: SKILL.md does not name a single remaining stop-and-ask exception"
 fi
 
 # ───────────────────────────────────────────────────────────
@@ -249,6 +267,111 @@ if [ -f "$DIST_SKILL" ] && grep -qE '\bblocked_by_dependency\b' "$DIST_SKILL"; t
   pass "T12.2: dist/ SKILL.md contains blocked_by_dependency outcome"
 else
   fail "T12.2: dist/ SKILL.md missing blocked_by_dependency — run scripts/build.sh"
+fi
+
+# ───────────────────────────────────────────────────────────
+# T13: issue #243 — the gate refuses the merge but the loop continues
+# ───────────────────────────────────────────────────────────
+SUMMARY_FMT="$REPO_ROOT/src/skills/auto-pilot/references/summary-format.md"
+CONFIG_REF="$REPO_ROOT/src/skills/auto-pilot/references/configuration.md"
+RUNLOG_REF="$REPO_ROOT/src/skills/auto-pilot/references/run-log.md"
+
+# Isolate the Step 5.1b unsatisfied-dependency block (ends at the next h4).
+gate_block() {
+  awk '/^#### Record and continue when any dependency is unsatisfied/{f=1; next} f && /^#### /{exit} f' "$PHASES"
+}
+
+if grep -qE '^#### Record and continue when any dependency is unsatisfied' "$PHASES"; then
+  pass "T13.1: phases.md heading states record-and-continue, not pause"
+else
+  fail "T13.1: phases.md still uses the pause heading for the unsatisfied set"
+fi
+
+# The old stop-the-loop rationale must be gone everywhere in the source tree.
+if grep -rqE 'do not advance to the next issue' "$REPO_ROOT/src"; then
+  fail "T13.2: 'do not advance to the next issue' still present in src/"
+else
+  pass "T13.2: stop-the-loop rationale removed from src/"
+fi
+
+if gate_block | grep -qE 'advance to the next eligible issue'; then
+  pass "T13.3: Step 5.1b advances to the next eligible issue"
+else
+  fail "T13.3: Step 5.1b does not advance to the next eligible issue"
+fi
+
+# The gate itself is unchanged — it must still refuse the merge.
+if gate_block | grep -qE 'do \*\*not\*\* merge'; then
+  pass "T13.4: Step 5.1b still refuses to merge out of dependency order"
+else
+  fail "T13.4: Step 5.1b lost the do-not-merge guarantee"
+fi
+
+if gate_block | grep -qE 'open and unchanged'; then
+  pass "T13.5: blocked PR is left open and unchanged"
+else
+  fail "T13.5: Step 5.1b does not state the PR is left open and unchanged"
+fi
+
+# Re-pick guard: the blocked issue joins the session skip list so the
+# continuing loop cannot resolve/log it twice.
+if gate_block | grep -qE 'session skip list'; then
+  pass "T13.6: blocked issue is added to the session skip list"
+else
+  fail "T13.6: no session skip-list guard against re-picking the blocked issue"
+fi
+
+# Dependency-grounded termination happens only via 'no eligible issue left'.
+if gate_block | grep -qE 'only when no eligible issue remains'; then
+  pass "T13.7: loop stops on dependency grounds only when nothing is eligible"
+else
+  fail "T13.7: Step 5.1b does not scope the dependency stop to an empty queue"
+fi
+
+# Exactly one run-log line, keyed on the outcome (not a skipped_reason).
+if grep -qE 'outcome: blocked_by_dependency' "$RUNLOG_REF" \
+  && grep -qE 'exactly one' "$RUNLOG_REF"; then
+  pass "T13.8: run-log.md pins one line with outcome blocked_by_dependency"
+else
+  fail "T13.8: run-log.md does not pin the single blocked_by_dependency line"
+fi
+
+# Partial-merge path (Phase 3-4 Step 2a) continues too.
+if awk '/Step 2a — Dependency gate/{f=1} f && /continue to the next eligible issue/{found=1; exit} END{exit !found}' "$PHASES"; then
+  pass "T13.9: partial-merge path also continues to the next eligible issue"
+else
+  fail "T13.9: partial-merge path still stops the loop"
+fi
+
+# No surface may still claim the run is paused by the dependency gate.
+if grep -qE 'the loop pauses' "$SUMMARY_FMT"; then
+  fail "T13.10: summary-format.md still says the loop pauses"
+else
+  pass "T13.10: summary-format.md no longer claims the loop pauses"
+fi
+
+if grep -qE 'Auto-pilot paused — merging out of dependency order' "$ERRORS" "$EXAMPLES" "$PHASES"; then
+  fail "T13.11: 'Auto-pilot paused' dependency alert still present"
+else
+  pass "T13.11: dependency alert no longer claims auto-pilot is paused"
+fi
+
+if grep -qE 'pause the loop' "$CONFIG_REF"; then
+  fail "T13.12: configuration.md still says respect_dependencies pauses the loop"
+else
+  pass "T13.12: configuration.md describes the non-pausing gate"
+fi
+
+if grep -qE 'pause the loop before merging|pause loop before merging' "$SCHEMA"; then
+  fail "T13.13: config-schema.md still documents a pausing dependency gate"
+else
+  pass "T13.13: config-schema.md documents the non-pausing dependency gate"
+fi
+
+if grep -qE 'the auto-pilot pauses with a structured alert' "$METHODOLOGY"; then
+  fail "T13.14: idd-methodology.md still says auto-pilot pauses on the gate"
+else
+  pass "T13.14: idd-methodology.md describes the continue-the-loop gate"
 fi
 
 # ───────────────────────────────────────────────────────────
