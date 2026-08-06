@@ -53,10 +53,10 @@ If no eligible issue is found (all blocked, skipped, or assigned):
 ```
 ⚠ No eligible issues to pick
 
-  Blocked:   {blocked_count} issues (waiting on dependencies)
-  Skipped:   {skipped_count} issues (skip labels or --skip)
-  Dep-blocked: {dep_blocked_count} issues (PR open, waiting on a dependency merge)
-  Assigned:  {assigned_count} issues (assigned to others)
+  Blocked:      {blocked_count} issues (waiting on dependencies)
+  Skipped:      {skipped_count} issues (skip labels or --skip)
+  Dep-blocked:  {dep_blocked_count} issues (PR open, waiting on a dependency merge)
+  Assigned:     {assigned_count} issues (assigned to others)
 
   To unblock: merge the dependency PR(s), resolve dependency issues, or use
               --skip to bypass
@@ -64,8 +64,11 @@ If no eligible issue is found (all blocked, skipped, or assigned):
 Stop. Count the issues this run added to the session skip list from the
 dependency gate on their **own** `Dep-blocked` line rather than folding them into
 `Skipped` — their PRs are open and merge-ready as soon as the dependency lands,
-which is a different next action from a `wontfix` label. Omit the line when the
-count is zero. **This is the only place a run ends for dependency reasons** (see
+which is a different next action from a `wontfix` label. Record each session
+skip-list entry with the reason that added it (`failed` from Phase 2.3,
+`blocked_by_dependency` from the gate) so `{dep_blocked_count}` is the count of
+gate-added entries and nothing else. Omit the line when the count is zero. All
+four labels pad to a common value column, so widening one widens the rest. **This is the only place a run ends for dependency reasons** (see
 *Step 5.1b — Dependency Gate*); the gate itself never stops the loop.
 
 ### Step 1.3 — Display Plan and Auto-Start

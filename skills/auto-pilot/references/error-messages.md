@@ -154,13 +154,19 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 ```
 ⚠ No eligible issues to pick
 
-  Blocked:   {blocked_count} issues (waiting on dependencies)
-  Skipped:   {skipped_count} issues (skip labels or --skip)
-  Assigned:  {assigned_count} issues (assigned to others)
+  Blocked:      {blocked_count} issues (waiting on dependencies)
+  Skipped:      {skipped_count} issues (skip labels or --skip)
+  Dep-blocked:  {dep_blocked_count} issues (PR open, waiting on a dependency merge)
+  Assigned:     {assigned_count} issues (assigned to others)
 
-  To unblock: resolve dependency issues first, or use --skip to bypass
+  To unblock: merge the dependency PR(s), resolve dependency issues, or use
+              --skip to bypass
 ```
-**Trigger:** All open issues are blocked, skipped, or assigned to other users.
+**Trigger:** All open issues are blocked, skipped, assigned to other users, or
+added to the session skip list by the Phase 5.1b dependency gate. This is the
+**only** place a run ends for dependency reasons — the gate itself never stops
+the loop. Omit the `Dep-blocked` line when that count is zero. Keep this block
+byte-identical to the one in `references/phases.md` (*Step 1.2*).
 
 ### API rate limit during triage
 ```

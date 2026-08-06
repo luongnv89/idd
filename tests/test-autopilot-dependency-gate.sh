@@ -394,19 +394,39 @@ fi
 
 # The re-pick guard only works if Step 1.2 eligibility consults the session
 # skip list the gate appends to.
+# Pin it to the eligibility bullet itself, not merely to the section: prose
+# elsewhere in Step 1.2 also mentions the list, and a section-wide grep would
+# still pass if the criteria bullet dropped it.
 if awk '/^### Step 1\.2 — Pick Next Issue/{f=1; next} f && /^### /{exit} f' "$PHASES" \
-  | grep -qE 'session skip list'; then
-  pass "T13.15: Step 1.2 eligibility consults the session skip list"
+  | grep -E '^- \*\*Not skipped\*\*' | grep -q 'session skip list'; then
+  pass "T13.15: Step 1.2 eligibility criteria names the session skip list"
 else
-  fail "T13.15: Step 1.2 never consults the session skip list (re-pick hazard)"
+  fail "T13.15: Step 1.2 criteria never names the session skip list (re-pick hazard)"
 fi
 
 # The 'no eligible issues' terminal surface distinguishes dep-blocked issues.
+# Pin the rendered output line, not any prose mention of the label.
 if awk '/^### Step 1\.2 — Pick Next Issue/{f=1; next} f && /^### /{exit} f' "$PHASES" \
-  | grep -qE 'Dep-blocked'; then
+  | grep -qE '^ +Dep-blocked: +\{dep_blocked_count\} issues'; then
   pass "T13.16: terminal 'no eligible issues' block reports dep-blocked issues"
 else
   fail "T13.16: terminal block folds dep-blocked issues into plain Skipped"
+fi
+
+# The same terminal block is duplicated verbatim in the error catalog. Adding
+# the Dep-blocked line to one copy and not the other is the drift this asserts
+# against, so compare the two extracted blocks byte-for-byte.
+extract_no_eligible() {
+  awk '/^⚠ No eligible issues to pick$/{f=1} f && /^```$/{exit} f{print}' "$1"
+}
+PHASES_BLOCK=$(extract_no_eligible "$PHASES")
+ERRORS_BLOCK=$(extract_no_eligible "$ERRORS")
+if [ -z "$PHASES_BLOCK" ] || [ -z "$ERRORS_BLOCK" ]; then
+  fail "T13.16b: could not extract the 'No eligible issues' block from both files"
+elif [ "$PHASES_BLOCK" = "$ERRORS_BLOCK" ]; then
+  pass "T13.16b: phases.md and error-messages.md agree on the terminal block"
+else
+  fail "T13.16b: 'No eligible issues' block drifted between phases.md and error-messages.md"
 fi
 
 # Public skills doc must not still claim the loop pauses on the gate.
