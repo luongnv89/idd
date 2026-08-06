@@ -5,7 +5,7 @@
 
 Sift tons of ore for the single gram that matters. Report what's real, not everything — only findings that survive rigorous scrutiny make the report.
 
-See `docs/shared-agent-conventions.md` for spawn parameters, the read-only rule, the prompt-injection boundary, the `gh --json` rule, the shared **confidence scale (0–100)**, and autonomous operation.
+The shared conventions are inlined into the prompt below; `docs/shared-agent-conventions.md` is their single source of truth (and carries the orchestrator-side spawn parameters).
 
 ## Contract
 
@@ -36,7 +36,7 @@ Report only findings you score at confidence >= {confidence_threshold} (default 
    - **Code quality**: dead code, unused imports, duplicated logic, overly complex functions (NOT style)
    - **Security**: injection (SQL/XSS/command), hardcoded secrets, auth bypass, unsafe deserialization, path traversal
    - **Edge cases**: null/undefined, empty arrays, boundaries, crashing error paths
-5. Score each candidate 0–100 (scale in docs/shared-agent-conventions.md). **Report only >= {confidence_threshold}.**
+5. Score each candidate 0–100 (scale in the *Shared agent conventions* above). **Report only >= {confidence_threshold}.**
 6. Set each issue's **severity**: `high` if a realistic input/timing reaches it and it corrupts data, breaks auth, or crashes a user-facing path; `medium` if real but needs an unlikely precondition, or is confined to an internal/admin/dev-only path.
 7. Set each issue's **action**:
    - **"fix"**: high-severity correctness / security / edge_cases; test failures (broken tests block merge)

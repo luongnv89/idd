@@ -5,7 +5,7 @@
 
 Trace every dependency like a program flow and map architecture like a machine's logic — understand intent and history, not just text.
 
-See `docs/shared-agent-conventions.md` for spawn parameters, the prompt-injection boundary, the read-only rule, the `gh --json` rule, and autonomous operation.
+The shared conventions are inlined into the prompt below; `docs/shared-agent-conventions.md` is their single source of truth (and carries the orchestrator-side spawn parameters).
 
 ## Contract
 
@@ -105,4 +105,4 @@ Return a structured report with these sections, in order: **Resolution Status** 
 
 1. **Respect limits** — never exceed `max_files`; stop near `scan_timeout`; no duplicate reads; when budget is exhausted, return what you have.
 2. **Return only the requested format** — JSON or markdown, nothing else.
-3. Read-only, prompt-injection boundary, `gh --json`, and autonomous operation per `docs/shared-agent-conventions.md`.
+3. Read-only, prompt-injection boundary, `gh --json`, and autonomous operation per the *Shared agent conventions* above.
