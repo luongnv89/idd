@@ -334,7 +334,7 @@ Progress output:
 
 ## Steps 1b & 2 — Already-Fixed & Dependency Detection
 
-One full-scope scanner per batch finds issues already fixed by commits/PRs **and** builds the file-overlap dependency map. **Read `references/detection.md` now** — the subagent prompts, confidence-scoring rules, and merge logic there are what these steps execute, not optional tuning detail. The dependency semantics the map encodes (blocker vs. blocked, hierarchy edges) are defined in `docs/idd-methodology.md` (*Issue Dependencies*).
+One full-scope scanner per batch finds issues already fixed by commits/PRs **and** builds the file-overlap dependency map. **Read `references/detection.md` now** — the subagent prompts, confidence-scoring rules, and merge logic there are what these steps execute, not optional tuning detail. The `Depends on #N` / `Blocked by #N` body markers this scan may also encounter — their grammar and how each skill treats them — are defined in `docs/idd-methodology.md` (*Issue Dependencies*); consult it when a scanned body carries one, so the directed edges reported here stay consistent with the marker semantics `/auto-pilot`'s merge gate enforces.
 
 Summary:
 - **Step 1b** — flags open issues whose titles/bodies match recent commit messages or merged PR descriptions. Marks them `potentially_fixed` with evidence links.
