@@ -347,7 +347,7 @@ A successful analysis prints the 8-step tracker and a condensed report, then per
   [5/8] Cross-refs     ✓ 2 related issues, 1 may resolve this
   [6/8] Analysis       ✓ root cause identified
   [7/8] Options        ✓ 3 approaches proposed
-  [8/8] Persist        ✓ .gitissue/analysis-42.json
+  [8/8] Report         ✓ analysis complete
 
   Root cause:      {short summary}
   Affected files:  {count} files, {count} modules
