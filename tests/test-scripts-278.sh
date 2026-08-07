@@ -17,6 +17,8 @@
 #   AC8  gi-stack-detect exits 4 on an unreadable root.
 #   AC9  The bundled model-data seed is inside a guard, and the triage step row
 #        carries its coverage check again.
+#   AC10 gi-triage-graph's tie-breaks are deterministic and match detection.md.
+#   AC11 parallel_groups is sound; assign_priority matches its documented table.
 #
 # Every assertion here was reverse-applied against a scratch copy of the fix and
 # confirmed to fail — the vacuous-guard failure mode this repository has shipped
@@ -142,6 +144,55 @@ for left, right in [("Login crash on mobile Safari", "Login crash on mobile Chro
 value, _, _ = score("Login crash on mobile Safari", "Login crash on mobile Chrome",
                     "the login crash on mobile keeps happening after the update")
 print(f"INDEPENDENT|{band(value)}|{value}")
+
+
+# --- the third signal ------------------------------------------------------
+# `keyword (+2 each)` was the same non-independence bug in the remaining rule:
+# keywords the model lifts out of the item's own title are re-readings of the
+# words `title_overlap` was already paid for. Left alone, it made the medium
+# band *less* reachable than before the first fix — 390 of these 400 pairs
+# auto-decided — which would have undone AC1 through the back door.
+def keyworded(item_title, target_title, target_body=""):
+    lifted = dup.significant(item_title, SW)[:3]
+    item = {"title": item_title, "keywords": lifted, "type": "bug"}
+    return dup.score_pair(item, target_title, target_body, "bug", W, SW)
+
+
+kw_dist = collections.Counter()
+for base in BASES:
+    for mutant in mutations(base):
+        value, _, _ = keyworded(base, mutant)
+        kw_dist[band(value)] += 1
+print(f"KWPAIRS|{sum(kw_dist.values())}|{kw_dist['high']}|{kw_dist['medium']}|{kw_dist['low']}")
+
+# The repro from the review of the first fix.
+value, _, _ = keyworded("Slow query on dashboard load", "Slow dashboard query on first load")
+print(f"KWREPRO|{band(value)}|{value}")
+
+# A keyword naming something no paid signal counted is still an independent
+# observation and must still pay — otherwise the rule is off, not disjoint.
+item = {"title": "Login crash on mobile Safari", "keywords": ["oauth"], "type": "bug"}
+value, shared, _ = dup.score_pair(item, "Login crash on mobile Safari oauth", "", "bug", W, SW)
+print(f"KWNOVEL|{band(value)}|{value}|{len(shared)}")
+
+# And a keyword is the *only* route to the high band when there is no title
+# similarity at all, which must keep working.
+item = {"title": "Sign-in dies", "keywords": ["safari", "redirect", "oauth", "loop"], "type": "bug"}
+value, shared, _ = dup.score_pair(item, "Safari redirect loop on oauth", "", "bug", W, SW)
+print(f"KWONLY|{band(value)}|{value}|{len(shared)}")
+
+# The regions have to stay *separate*, not merged into one counted set. Here a
+# title-located phrase is paid for `auth redirect loop mobile` in the title, and
+# `redirect` and `loop` are sighted AGAIN in the body, which no signal was paid
+# for. Judging those body sightings against the title's counted words would
+# suppress them and drop a conclusive match to the medium band — over-applying
+# the rule is as wrong as not applying it.
+item = {"title": "Fix auth redirect loop on mobile",
+        "keywords": ["auth", "redirect", "loop"], "type": "bug"}
+value, shared, _ = dup.score_pair(
+    item, "Fix auth redirect loop on mobile",
+    "Users hit a redirect loop when logging in from mobile safari.", "bug", W, SW)
+print(f"KWREGION|{band(value)}|{value}|{len(shared)}")
 PY
 
 IFS='|' read -r _ TOTAL HI MED LO BOTH < <(grep '^PAIRS|' "$TMP/independence")
@@ -172,6 +223,42 @@ if [ "$IBAND" = "high" ]; then
   pass "AC1: title overlap plus a body-located phrase still decides (score $IVALUE)"
 else
   fail "AC1: two independent observations no longer reach the high band ($IVALUE)"
+fi
+
+IFS='|' read -r _ KWTOTAL KWHI KWMED KWLO < <(grep '^KWPAIRS|' "$TMP/independence")
+if [ "$KWHI" -eq 0 ]; then
+  pass "AC1: keywords lifted from the item title no longer auto-decide ($KWHI high, $KWMED medium, $KWLO low of $KWTOTAL)"
+else
+  fail "AC1: $KWHI of $KWTOTAL pairs auto-decide on keywords echoing their own title"
+fi
+if [ "$KWMED" -gt 0 ]; then
+  pass "AC1: the medium band stays reachable when keywords are supplied ($KWMED/$KWTOTAL)"
+else
+  fail "AC1: supplying keywords empties the medium band again (0/$KWTOTAL)"
+fi
+IFS='|' read -r _ RBAND RVALUE < <(grep '^KWREPRO|' "$TMP/independence")
+if [ "$RBAND" != "high" ]; then
+  pass "AC1: \"Slow query on dashboard load\" vs \"Slow dashboard query on first load\" scores $RVALUE, not 10"
+else
+  fail "AC1: the keyword repro still auto-decides at $RVALUE"
+fi
+IFS='|' read -r _ NBAND NVALUE NCOUNT < <(grep '^KWNOVEL|' "$TMP/independence")
+if [ "$NCOUNT" -eq 1 ] && [ "$NBAND" = "high" ]; then
+  pass "AC1: a keyword naming a term no signal counted still pays (score $NVALUE)"
+else
+  fail "AC1: the keyword rule is off rather than disjoint ($NCOUNT paid, score $NVALUE)"
+fi
+IFS='|' read -r _ OBAND OVALUE OCOUNT < <(grep '^KWONLY|' "$TMP/independence")
+if [ "$OCOUNT" -eq 4 ] && [ "$OBAND" = "high" ]; then
+  pass "AC1: keywords alone still reach the high band with no title similarity (score $OVALUE)"
+else
+  fail "AC1: keyword-only evidence no longer decides ($OCOUNT paid, score $OVALUE)"
+fi
+IFS='|' read -r _ GBAND GVALUE GCOUNT < <(grep '^KWREGION|' "$TMP/independence")
+if [ "$GCOUNT" -eq 2 ] && [ "$GBAND" = "high" ]; then
+  pass "AC1: a keyword re-sighted in the body is judged against the body, not the title (score $GVALUE)"
+else
+  fail "AC1: the title and body counted sets are merged — $GCOUNT of 3 keywords paid, score $GVALUE"
 fi
 
 # And the same property through the real CLI, not just the scoring function.
@@ -255,16 +342,24 @@ for entry in "the script|$DUP" "the agent prompt|$AGENT" \
   else
     fail "AC3: $label does not state the disjoint-regions rule"
   fi
+  # The keyword half of the same rule. It moved in a second pass, and a site
+  # carrying only the first half is exactly the drift this block exists to
+  # catch — a reader implementing the fallback from it reintroduces the bug.
+  if grep -q "already counted" "$file"; then
+    pass "AC3: $label states the keyword half of the rule"
+  else
+    fail "AC3: $label does not state that an already-counted keyword scores 0"
+  fi
 done
 
 # The built copies are what runs, so assert the rule survived the build.
 for built in "$SKILLS/issue-creator/SKILL.md" \
              "$SKILLS/issue-creator/references/agents/duplicate-detector.md" \
              "$SKILLS/issue-creator/references/docs/config-schema.md"; do
-  if grep -q "disjoint regions" "$built"; then
-    pass "AC3: $(basename "$(dirname "$built")")/$(basename "$built") ships the rule"
+  if grep -q "disjoint regions" "$built" && grep -q "already counted" "$built"; then
+    pass "AC3: $(basename "$(dirname "$built")")/$(basename "$built") ships both halves"
   else
-    fail "AC3: $built does not ship the disjoint-regions rule"
+    fail "AC3: $built does not ship the full disjoint-regions rule"
   fi
 done
 
@@ -676,6 +771,109 @@ sys.exit(0 if ok else 1)
   pass "AC10: a 3-cycle is reported and the emitted order still respects blocks"
 else
   fail "AC10: a dependency cycle produced an order that contradicts its own blocks"
+fi
+
+# ───────────────────────────────────────────────────────────
+# T10 (AC11): parallel_groups and assign_priority vs their documented rules
+# ───────────────────────────────────────────────────────────
+python3 - "$GRAPH" <<'PY' > "$TMP/graph-audit"
+import datetime as dt, importlib.util, itertools, json, random, subprocess, sys
+
+spec = importlib.util.spec_from_file_location("tg", sys.argv[1])
+tg = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(tg)
+
+# --- parallel_groups soundness, including against broken back edges ---------
+# A pair reported as parallelizable must share no edge in the ORIGINAL graph
+# (cycle-breaking removes edges, and a pair whose only link was removed would
+# otherwise look independent) and no affected file.
+random.seed(23)
+edge_violations = file_violations = runs = 0
+for _ in range(200):
+    numbers = list(range(1, random.randint(3, 7) + 1))
+    files = {n: sorted(random.sample(["a", "b", "c"], random.randint(0, 2))) for n in numbers}
+    edges = [{"from": a, "to": b} for a, b in itertools.permutations(numbers, 2)
+             if random.random() < 0.22]
+    payload = {"issues": [{"number": n, "type": "bug",
+                           "createdAt": "2026-05-01T00:00:00Z",
+                           "updatedAt": "2026-05-20T00:00:00Z",
+                           "affected_files": files[n]} for n in numbers],
+               "edges": edges}
+    out = subprocess.run(
+        [sys.executable, sys.argv[1], "--no-config", "--now", "2026-06-01T00:00:00Z"],
+        input=json.dumps(payload), text=True, capture_output=True)
+    if out.returncode != 0:
+        continue
+    runs += 1
+    original = {(e["from"], e["to"]) for e in edges} | {(e["to"], e["from"]) for e in edges}
+    for group in json.loads(out.stdout)["summary"]["parallel_groups"]:
+        for a, b in itertools.combinations(group, 2):
+            if (a, b) in original:
+                edge_violations += 1
+            if set(files[a]) & set(files[b]):
+                file_violations += 1
+print(f"PARALLEL|{runs}|{edge_violations}|{file_violations}")
+
+# Singletons are not groups: "report only sets of two or more".
+index = {1: {"number": 1, "type": "bug", "created": None, "affected_files": ["a"]},
+         2: {"number": 2, "type": "bug", "created": None, "affected_files": ["a"]},
+         3: {"number": 3, "type": "bug", "created": None, "affected_files": []}}
+print("SINGLETON|" + json.dumps(tg.parallel_groups([[1, 2, 3]], [], index)))
+
+# --- assign_priority against every row of detection.md ---------------------
+now = dt.datetime(2026, 6, 1, tzinfo=dt.timezone.utc)
+
+
+def issue(**kw):
+    base = {"number": 1, "type": "bug", "labels": [], "created": None, "updated": None,
+            "affected_files": [], "potentially_fixed_by": None}
+    base.update(kw)
+    return base
+
+
+ROWS = [
+    ("critical label", issue(type="feature", labels=["critical"]), [], "P1"),
+    ("urgent label", issue(type="improvement", labels=["urgent"]), [], "P1"),
+    ("bug that blocks", issue(type="bug"), [2], "P1"),
+    ("bug older than 2x stale", issue(type="bug", created=now - dt.timedelta(days=40)), [], "P1"),
+    ("bug that blocks nothing", issue(type="bug"), [], "P2"),
+    ("feature that blocks one", issue(type="feature"), [2], "P2"),
+    ("improvement blocking two", issue(type="improvement"), [2, 3], "P2"),
+    ("improvement blocking one", issue(type="improvement"), [2], "P3"),
+    ("feature blocking nothing", issue(type="feature"), [], "P3"),
+    ("untyped, blocks nothing", issue(type=None), [], "P3"),
+    ("untyped, blocks three", issue(type=None), [2, 3, 4], "P3"),
+    ("stale feature, no deps", issue(type="feature", updated=now - dt.timedelta(days=90)), [], "P3"),
+    # detection.md lists this under both P2 and P3; the script resolves to P2
+    # and says why in assign_priority's docstring.
+    ("stale bug, no deps", issue(type="bug", updated=now - dt.timedelta(days=90)), [], "P2"),
+]
+wrong = [f"{label}: got {tg.assign_priority(row, blocks, 14, now)}, doc says {want}"
+         for label, row, blocks, want in ROWS
+         if tg.assign_priority(row, blocks, 14, now) != want]
+print("PRIORITY|" + str(len(ROWS)) + "|" + ("; ".join(wrong) if wrong else "-"))
+PY
+IFS='|' read -r _ PRUNS PEDGE PFILE < <(grep '^PARALLEL|' "$TMP/graph-audit")
+if [ "$PEDGE" -eq 0 ] && [ "$PFILE" -eq 0 ]; then
+  pass "AC11: over $PRUNS cyclic graphs, no reported parallel pair shares an original edge or a file"
+else
+  fail "AC11: parallel_groups reported $PEDGE edge-linked and $PFILE file-sharing pairs as parallel"
+fi
+if [ "$(grep '^SINGLETON|' "$TMP/graph-audit" | cut -d'|' -f2)" = "[[1, 3]]" ]; then
+  pass "AC11: parallel_groups reports only sets of two or more, and drops the conflicting pair"
+else
+  fail "AC11: parallel_groups broke the two-or-more rule"
+fi
+IFS='|' read -r _ PROWS PWRONG < <(grep '^PRIORITY|' "$TMP/graph-audit")
+if [ "$PWRONG" = "-" ]; then
+  pass "AC11: assign_priority matches all $PROWS rows of detection.md's documented table"
+else
+  fail "AC11: assign_priority disagrees with detection.md — $PWRONG"
+fi
+if grep -q "Not maximal, on purpose" "$GRAPH" && grep -q "contradicts itself" "$GRAPH"; then
+  pass "AC11: both audited bounds are documented where the next reader will hit them"
+else
+  fail "AC11: the audited bounds of parallel_groups/assign_priority are undocumented"
 fi
 
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"

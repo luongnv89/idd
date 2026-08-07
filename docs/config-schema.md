@@ -64,8 +64,9 @@ issue:
 # Table: title similarity (3+ shared significant words in the target title) +3,
 #   keyword found in an existing title/body +2 each, same type +1, verbatim
 #   multi-word phrase (3+ significant words) +5. The +3 and the +5 cover
-#   disjoint regions of the target, so one observation never pays both: a
-#   phrase in the target title replaces the +3; only a phrase in the body adds.
+#   disjoint regions of the target, so one observation never pays twice: a
+#   phrase in the target title replaces the +3, only a phrase in the body adds,
+#   and a keyword whose every token a title signal already counted scores 0.
 duplicate_detection:
   # Score at or above which a match is reported as a duplicate outright
   # Type: integer

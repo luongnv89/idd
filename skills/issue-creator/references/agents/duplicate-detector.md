@@ -85,7 +85,9 @@ The scoring itself is not your job. The orchestrator ran the fixed table below w
 
 `>= 8` → high (decided) · `5–7` → medium (**your** band) · `< 5` → no match.
 
-The `+3` and the `+5` cover **disjoint regions** of the target, so one observation never pays both: a phrase found in the target *title* **replaces** the `+3` rather than adding to it — a title-located run always implies the shared words it is made of — while a phrase found in the *body* is a second, independent sighting and does add. This is why two near-identical titles reach **your** band instead of auto-deciding: `"Login crash on mobile Safari"` vs `"Login crash on mobile Chrome"` scores 6, not 9.
+The three sightings cover **disjoint regions** of the target, so one observation never pays twice. A phrase found in the target *title* **replaces** the `+3` rather than adding to it — a title-located run always implies the shared words it is made of — while a phrase found in the *body* is a second, independent sighting and does add. A keyword whose every token a paid title signal has **already counted** is that same sighting read again and scores `0`; a keyword contributing a term no paid signal counted still scores `+2`.
+
+This is why two near-identical titles reach **your** band instead of auto-deciding: `"Login crash on mobile Safari"` vs `"Login crash on mobile Chrome"` scores 6, not 9, and `"Slow query on dashboard load"` vs `"Slow dashboard query on first load"` with keywords `slow, query, dashboard` scores 4, not 10. Reaching `>= 8` needs **two independent sightings** — a title overlap plus a phrase in the body, or a title signal plus a keyword naming something that signal did not.
 Stop-words ignored: a, an, the, to, for, in, on, of, and, or, is, it, be, as, at, by, with, from, that, this, not, but, are, was, all, has, its, can, will, should, when, if, add, fix, update, issue, bug, feature, improvement, create, make, get, set.
 
 ## Output

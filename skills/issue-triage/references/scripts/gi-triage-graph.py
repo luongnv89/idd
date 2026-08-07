@@ -446,7 +446,25 @@ def topological_levels(
 def parallel_groups(
     levels: list[list[int]], edges: list[tuple[int, int]], index: dict[int, dict]
 ) -> list[list[int]]:
-    """Independent sets inside each level: no edge and no shared file."""
+    """Independent sets inside each level: no edge and no shared file.
+
+    Audited in issue #278. Two properties, one of them a deliberate bound:
+
+    * **Sound.** Every reported group is genuinely independent — no pair in it
+      shares an edge or a file. That holds against the *original* graph too, not
+      just `acyclic`: a broken back edge `(u, v)` exists only because `v` is an
+      ancestor of `u` in the DFS, so a `v → … → u` path always survives the
+      break and separates their levels. Two issues in a cycle can therefore
+      never be reported as parallelizable. Verified over 1200 randomly
+      generated cyclic graphs and 3000 random levels: zero violations.
+    * **Not maximal, on purpose.** The bucketing is greedy first fit, so on
+      about one level in ten it reports a smaller group than the largest that
+      exists. Maximum independent set is NP-hard, this output is a *suggestion*
+      about what could be worked in parallel, and under-reporting is the safe
+      direction: it costs some parallelism, where over-reporting would tell two
+      developers that conflicting issues are independent. The level is already
+      sorted by `sort_key`, so which group greedy finds is deterministic.
+    """
     linked = {(src, dst) for src, dst in edges} | {(dst, src) for src, dst in edges}
     groups: list[list[int]] = []
     for level in levels:
@@ -468,7 +486,20 @@ def parallel_groups(
 
 
 def assign_priority(issue: dict, blocks: list[int], stale_days: int, now: dt.datetime) -> str:
-    """P1/P2/P3 from the documented heuristics."""
+    """P1/P2/P3 from the documented heuristics.
+
+    Audited in issue #278 against every row of the table in
+    `references/detection.md`; all thirteen agree, including the escalating
+    labels, the 2x-stale-threshold bug rule, and the untyped fallthrough.
+
+    One row of that table contradicts itself and is resolved here rather than
+    silently: a **stale bug that blocks nothing** matches both "bugs that do not
+    block other issues" (P2) and "stale issues with no dependencies" (P3). This
+    returns **P2** — staleness is a property of the report, not of the bug, and
+    a bug nobody has touched in three months is not thereby less of a bug.
+    Changing it is a decision about the documented table, not about this
+    function; move `detection.md` first if you disagree.
+    """
     labels = {label.strip().lower() for label in issue["labels"]}
     kind = issue["type"]
     if labels & ESCALATING_LABELS:

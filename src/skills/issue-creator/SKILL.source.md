@@ -263,7 +263,7 @@ gh issue list --state open --json number,title,body,labels --limit 100
 
 Compare the new issue's title and key terms against existing issues, applying the same table: title similarity (3+ shared significant words in the target title) `+3`, each keyword found in an existing title/body `+2`, same type `+1`, verbatim multi-word phrase (3+ significant words) `+5`; `≥ 8` is a duplicate, `5–7` is a possible one, below `5` is no match.
 
-The `+3` and the `+5` are scored over **disjoint regions** of the target and one observation never pays both: a phrase found in the target *title* **replaces** the `+3` instead of adding to it — a title-located run already implies the shared words — while a phrase found in the *body* is a second, independent sighting and does add. So two near-identical titles score `5–7` and go to the medium band; only title similarity **plus** a body phrase reaches `8`. Stop-words and the full rules live in `shared/agents/duplicate-detector.md`.
+The three sightings are scored over **disjoint regions** of the target and one observation never pays twice: a phrase found in the target *title* **replaces** the `+3` instead of adding to it — a title-located run already implies the shared words — while a phrase found in the *body* is a second, independent sighting and does add; and a keyword whose every token a paid title signal has **already counted** scores `0`, while a keyword contributing a term no paid signal counted still scores `+2`. So two near-identical titles score `5–7` and go to the medium band — repeating their own title words back as keywords does not lift them out of it. Reaching `8` needs two independent sightings. Stop-words and the full rules live in `shared/agents/duplicate-detector.md`.
 
 #### Present results
 

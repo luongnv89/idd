@@ -3,13 +3,17 @@
 
 The scoring table `/issue-creator` uses is fixed arithmetic — +3 for a title
 overlap, +2 per matched keyword, +1 for a shared type, +5 for a verbatim
-phrase, then two thresholds. The +3 and the +5 are scored over disjoint regions
-of the target (title vs. body) so that one observation can never pay both;
-see `score_pair`. Running it inside a language model means reading
-up to 100 issue bodies into a context window (10-20k tokens on every create)
-to compute a sum that has one correct answer. This script computes it, and
-leaves the model the only part that genuinely needs judgement: the medium band,
-where a score is suggestive rather than conclusive.
+phrase, then two thresholds. The three sightings are scored over disjoint
+regions of the target so that one observation can never pay twice: the +3 and
+the +5 split title from body, and a keyword whose every token a title signal
+has **already counted** is that same sighting read again and does not pay. A
+keyword contributing a term no paid signal counted still does. See `score_pair`.
+
+Running it inside a language model means reading up to 100 issue bodies into a
+context window (10-20k tokens on every create) to compute a sum that has one
+correct answer. This script computes it, and leaves the model the only part
+that genuinely needs judgement: the medium band, where a score is suggestive
+rather than conclusive.
 
 Untrusted input never travels on the command line. The proposed items arrive as
 JSON **on stdin**, and the existing issues are fetched by this script calling
@@ -298,21 +302,69 @@ def score_pair(
     # The overlap is paid unless the *only* phrase evidence came from the title.
     overlap_is_independent = body_run is not None or title_run is None
 
+    # The words an already-paid signal has counted, **per region**. Everything
+    # below is scored against these: a later signal whose whole evidence in a
+    # region is words that region has already been paid for is re-reading one
+    # sighting, not making a second one. The two sets stay separate because the
+    # regions are the whole point — the body is precisely what the title
+    # signals cannot see, so a sighting there is never a re-reading of one.
+    counted_title: set[str] = set()
+    counted_body: set[str] = set()
+
     shared_title = sorted(set(item_title_tokens) & set(target_title_tokens))
     if len(shared_title) >= TITLE_OVERLAP_MIN and overlap_is_independent:
         score += weights["title_overlap"]
         reasons.append(f"title overlap: {len(shared_title)} shared words")
+        counted_title |= set(shared_title)
+    if phrase_run:
+        (counted_body if body_run else counted_title).update(phrase_run)
+
+    # The same rule as above, applied to the third signal. A keyword the model
+    # lifted out of the item's own title, sighted in the target *title*, is
+    # literally one of the shared words `title_overlap` has already been paid
+    # for — `"Slow query on dashboard load"` vs `"Slow dashboard query on first
+    # load"` reached 10 and auto-decided on one observation counted three times.
+    #
+    # A keyword pays when **some region sights it that has not already been paid
+    # for those words**. That keeps the rule disjoint without turning it off:
+    # a term the item's title never contained is new wherever it appears, and a
+    # term sighted in the *body* is new when only the title was paid — the body
+    # being unreadable to the title signals is the whole reason the regions are
+    # split. Suppression needs *every* token of the keyword already counted in
+    # every region that sights it, so a multi-word keyword adding one new term
+    # keeps its weight.
+    target_title_words = set(words(target_title))
+    target_body_words = set(words(target_body))
 
     shared_keywords: list[str] = []
+    echoed = 0
     for keyword in item.get("keywords") or []:
         tokens = [w for w in words(str(keyword)) if w]
         if not tokens:
             continue
-        if all(token in target_word_set for token in tokens):
-            shared_keywords.append(str(keyword))
+        if not all(token in target_word_set for token in tokens):
+            continue
+        regions = []
+        if all(token in target_title_words for token in tokens):
+            regions.append(counted_title)
+        if all(token in target_body_words for token in tokens):
+            regions.append(counted_body)
+        if not regions:
+            # The keyword's tokens are split across the two regions, so the
+            # sighting belongs to neither alone; it is new unless both regions
+            # together have already been paid for all of them.
+            regions.append(counted_title | counted_body)
+        if not any(
+            any(token not in counted for token in tokens) for counted in regions
+        ):
+            echoed += 1
+            continue
+        shared_keywords.append(str(keyword))
     if shared_keywords:
         score += weights["keyword"] * len(shared_keywords)
         reasons.append(f"{len(shared_keywords)} keyword match(es)")
+    if echoed:
+        reasons.append(f"{echoed} keyword(s) already counted by a title signal")
 
     if item.get("type") and target_type and item["type"] == target_type:
         score += weights["same_type"]
