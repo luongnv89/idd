@@ -709,6 +709,19 @@ for name in ("issue-resolver", "auto-pilot"):
             "mkdir -p .gitissue" in text,
             f"T5: {name} ({label}) keeps the 'mkdir -p .gitissue' run-log fallback",
         )
+        # Exit 3 rejects the record itself, so the fallback must not fire for
+        # it — an unqualified "best-effort" degrade would append the very
+        # malformed line the script exists to reject.
+        emit(
+            "**Exit 3:**" in text
+            and "Correct the record and re-run, or drop the line." in text,
+            f"T5: {name} ({label}) documents the gi-runlog exit-3 stop clause",
+        )
+        emit(
+            "Fallback when `python3` is unavailable or the script exits 4"
+            in text,
+            f"T5: {name} ({label}) scopes the run-log fallback to exit 4 / no python3",
+        )
 
 # phases.md keeps the manual two-step parse the script replaces.
 for label, path in (

@@ -438,10 +438,12 @@ suppression*), which follows the schema in `references/docs/config-schema.md`
 ```bash
 # Exactly one of these runs. --echo validates the telemetry you return and writes nothing.
 if [ -n "$no_run_log" ]; then printf '%s' "$run_json" | python3 references/scripts/gi-runlog.py --echo; else printf '%s' "$run_json" | python3 references/scripts/gi-runlog.py --append; fi
-# Fallback when the script cannot run: mkdir -p .gitissue && printf '%s\n' "$run_json" >> .gitissue/runs.jsonl
+# Fallback when `python3` is unavailable or the script exits 4: mkdir -p .gitissue && printf '%s\n' "$run_json" >> .gitissue/runs.jsonl
 ```
 
-Best-effort and non-fatal — a failed write never blocks the reported run result. Only append; never rewrite or reorder existing lines.
+**Exit 3:** the record itself is invalid — the script printed the reason on stderr and wrote nothing. This is a stop, not a degrade: never append `$run_json` raw, because that writes the malformed line the script exists to reject. Correct the record and re-run, or drop the line.
+
+Only the *write* is best-effort and non-fatal — a write that cannot happen (no `python3`, exit 4) never blocks the reported run result. A rejected record is never written by any path. Only append; never rewrite or reorder existing lines.
 
 ---
 

@@ -291,11 +291,18 @@ The full field list lives in `references/run-log.md` → *Fields to populate*.
 
 ```bash
 printf '%s' "$run_json" | python3 references/scripts/gi-runlog.py --append
-# Fallback when the script cannot run: mkdir -p .gitissue && printf '%s\n' "$run_json" >> .gitissue/runs.jsonl
+# Fallback when `python3` is unavailable or the script exits 4: mkdir -p .gitissue && printf '%s\n' "$run_json" >> .gitissue/runs.jsonl
 ```
 
-The write is **best-effort and non-fatal** — a failed append never stops the
-loop or changes the iteration outcome. Append only; never rewrite prior lines.
+**Exit 3:** the record itself is invalid — the script printed the reason on
+stderr and wrote nothing. This is a stop, not a degrade: never append
+`$run_json` raw, because that writes the malformed line the script exists to
+reject. Correct the record and re-run, or drop the line.
+
+Only the *write* is **best-effort and non-fatal** — a write that cannot happen
+(no `python3`, exit 4) never stops the loop or changes the iteration outcome. A
+rejected record is never written by any path. Append only; never rewrite prior
+lines.
 
 Then loop back to Phase 1.
 
