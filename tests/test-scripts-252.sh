@@ -392,6 +392,46 @@ else
   fail "AC2: an unmodeled bucket is treated as pending, not as done"
 fi
 
+# `none` is two different answers wearing one label, and telling them apart is a
+# merge-safety property: a repository with no CI reports none forever, while a
+# repository that *does* have CI also reports none for the seconds between a
+# push and GitHub registering the run. Auto-pilot merges on none, so returning
+# it from the first poll after a push merges a PR whose checks never ran.
+run_status out st env GH_FIXTURE='[]' PATH="$STUB:$PATH" \
+  python3 "$CIWAIT" 42 --once
+if [ "$(printf '%s' "$out" | jkey none_confirmed)" = "False" ]; then
+  pass "AC2: a single-poll none is not confirmed — one poll cannot tell the two apart"
+else
+  fail "AC2: --once reported none as confirmed, which is a mergeable verdict"
+fi
+
+run_status out st env GH_FIXTURE='[]' PATH="$STUB:$PATH" \
+  python3 "$CIWAIT" 42 --interval 1 --timeout 30 --none-grace 2
+if [ "$(printf '%s' "$out" | jkey verdict)" = "none" ] \
+   && [ "$(printf '%s' "$out" | jkey none_confirmed)" = "True" ] \
+   && [ "$(printf '%s' "$out" | jkey polls)" -ge 2 ]; then
+  pass "AC2: none is confirmed only after the grace window stays empty"
+else
+  fail "AC2: none was confirmed without the grace window elapsing"
+fi
+
+# The regression guard for the race itself: checks that register on the third
+# poll must be waited for, not raced past.
+SEQ_LATE="$TMP/seq-late"
+{
+  echo '[]'
+  echo '[]'
+  echo '[{"name":"build","state":"SUCCESS","bucket":"pass","link":"u"}]'
+} > "$SEQ_LATE"
+rm -f "$TMP/count-late"
+run_status out st env GH_SEQUENCE="$SEQ_LATE" GH_COUNT_FILE="$TMP/count-late" \
+  PATH="$STUB:$PATH" python3 "$CIWAIT" 42 --interval 1 --timeout 30 --none-grace 10
+if [ "$(printf '%s' "$out" | jkey verdict)" = "pass" ]; then
+  pass "AC2: checks that register on a later poll are waited for, not raced past"
+else
+  fail "AC2: the wait returned before the checks registered — the merge race"
+fi
+
 # The whole wait happens in one invocation: several polls, one process, one
 # verdict. That is the property that removes the per-poll agent tool call.
 SEQ="$TMP/seq"

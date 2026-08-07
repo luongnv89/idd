@@ -13,7 +13,8 @@ Output on success is exactly one line of JSON on stdout:
      "failing": [{"name": ..., "state": ..., "bucket": ..., "link": ...}, ...],
      "counts": {"pass": n, "fail": n, "pending": n, "skipping": n, "cancel": n},
      "elapsed_s": <int>, "polls": <int>,
-     "interval_s": <int>, "timeout_s": <int>, "pr": <int or null>}
+     "interval_s": <int>, "timeout_s": <int>, "pr": <int or null>,
+     "none_grace_s": <int>, "none_confirmed": <bool>}
 
 The four verdicts:
 
@@ -21,7 +22,26 @@ The four verdicts:
   fail     at least one check failed or was cancelled; `failing` lists them
   pending  the timeout elapsed with checks still running. Pending is **not**
            clean — a caller must not merge or soft-pass on it
-  none     the repository reports no checks for this PR at all
+  none     no check was reported for this PR
+
+`none` and `none_confirmed`
+---------------------------
+
+"No checks" has two meanings and they are opposite. A repository that configures
+no CI reports none forever, and blocking on that deadlocks every merge. A
+repository that *does* configure CI also reports none for the first several
+seconds after a push, before GitHub registers the workflow runs — and a caller
+that merges on that verdict has merged a pull request whose checks had not
+started. Asked immediately after a push, the two are indistinguishable from one
+poll.
+
+So an empty check list does not end the wait. It keeps polling until
+`--none-grace` seconds have passed with no check ever appearing, and only then
+is `none_confirmed` true. A `none` verdict with `none_confirmed: false` — the
+grace window did not fit inside the timeout, or `--once` was passed — means
+"nothing has registered *yet*", which is a pending answer wearing a `none`
+label. **Callers must treat `none` as mergeable only when `none_confirmed` is
+true.**
 
 Exit codes
   0  a verdict was reached and printed — including `fail` and `pending`, which
@@ -48,11 +68,22 @@ import time
 DEFAULT_INTERVAL_S = 30
 DEFAULT_TIMEOUT_S = 600
 
+# How long an empty check list has to stay empty before it is believed. Long
+# enough to cover the gap between `git push` and GitHub registering a workflow
+# run, short enough that a repository with no CI at all is not held up for long.
+DEFAULT_NONE_GRACE_S = 60
+
 # `gh pr checks --json` buckets. Anything unrecognized is treated as pending:
 # guessing "done" about a state we do not model is the failure that merges a
 # broken PR, while guessing "running" only costs a wait.
 TERMINAL_OK = frozenset({"pass", "skipping"})
 TERMINAL_BAD = frozenset({"fail", "cancel"})
+
+# Verdicts that end the wait the moment they are seen. `pending` and `none` are
+# both "ask again": the first because a run is still going, the second because
+# nothing has registered yet — and until the grace window closes those are the
+# same situation.
+TERMINAL_VERDICTS = frozenset({"pass", "fail"})
 
 # gh exits non-zero to *report* check status: 8 = still pending, 1 = failing or
 # "no checks". Those are verdicts, so the exit status alone cannot distinguish
@@ -143,10 +174,17 @@ def wait(
     interval: int,
     timeout: int,
     once: bool = False,
+    none_grace: int = DEFAULT_NONE_GRACE_S,
     sleep=time.sleep,
     clock=time.monotonic,
 ) -> dict[str, object]:
-    """Poll until the checks settle, the timeout elapses, or none exist."""
+    """Poll until the checks settle, the timeout elapses, or none exist.
+
+    An empty check list is not an answer on its own — see `none_confirmed` in
+    the module docstring. It is re-polled for `none_grace` seconds, and the
+    verdict says whether that window actually elapsed, so a caller can tell "no
+    CI is configured" from "the checks have not registered yet".
+    """
     started = clock()
     polls = 0
     checks: list[dict[str, object]] = []
@@ -160,7 +198,7 @@ def wait(
         verdict, counts = classify(checks)
         if polled is None:
             verdict = "none"
-        if verdict != "pending" or once:
+        if once or verdict in TERMINAL_VERDICTS:
             break
         elapsed = clock() - started
         # Only sleep when a full further interval still fits inside the budget.
@@ -168,8 +206,13 @@ def wait(
         # never agreed to wait.
         if elapsed + interval > timeout:
             break
+        # An empty list is re-polled only until the grace window closes; a
+        # pending one is re-polled for the whole timeout.
+        if verdict == "none" and elapsed >= none_grace:
+            break
         sleep(interval)
 
+    elapsed_s = clock() - started
     return {
         "verdict": verdict,
         "checks": checks,
@@ -179,11 +222,18 @@ def wait(
             if str(check.get("bucket") or "").lower() in TERMINAL_BAD
         ],
         "counts": counts,
-        "elapsed_s": int(clock() - started),
+        "elapsed_s": int(elapsed_s),
         "polls": polls,
         "interval_s": interval,
         "timeout_s": timeout,
         "pr": int(pr) if pr and pr.isdecimal() else None,
+        "none_grace_s": none_grace,
+        # False unless the grace window genuinely elapsed with nothing ever
+        # registering. `--once` can never confirm it: one poll cannot tell a
+        # repository without CI from a push whose checks are seconds away.
+        "none_confirmed": bool(
+            verdict == "none" and not once and elapsed_s >= none_grace
+        ),
     }
 
 
@@ -207,8 +257,16 @@ def report(result: dict[str, object]) -> None:
             f"(budget {result['timeout_s']}s) — pending is not clean; "
             "do not merge on it\n"
         )
+    elif result["none_confirmed"]:
+        sys.stderr.write(
+            f"○ No CI checks configured for this PR "
+            f"(none seen in {result['none_grace_s']}s)\n"
+        )
     else:
-        sys.stderr.write("○ No CI checks configured for this PR\n")
+        sys.stderr.write(
+            "⚠ No checks reported yet, and the grace window did not elapse — "
+            "this is 'not registered yet', not 'no CI'; do not merge on it\n"
+        )
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -237,6 +295,17 @@ def main(argv: list[str] | None = None) -> int:
         help=f"give up after S seconds (default {DEFAULT_TIMEOUT_S})",
     )
     parser.add_argument(
+        "--none-grace",
+        type=int,
+        default=DEFAULT_NONE_GRACE_S,
+        metavar="S",
+        help=(
+            f"seconds an empty check list must stay empty before it counts as "
+            f"'no CI configured' (default {DEFAULT_NONE_GRACE_S}); until then "
+            "the verdict is none with none_confirmed false"
+        ),
+    )
+    parser.add_argument(
         "--once", action="store_true", help="poll a single time and report"
     )
     parser.add_argument("--quiet", action="store_true", help="suppress the stderr report")
@@ -251,8 +320,15 @@ def main(argv: list[str] | None = None) -> int:
             raise InvalidInput("--interval must be >= 1")
         if args.timeout < 1:
             raise InvalidInput("--timeout must be >= 1")
+        if args.none_grace < 0:
+            raise InvalidInput("--none-grace must be >= 0")
         result = wait(
-            args.pr, args.repo, args.interval, args.timeout, once=args.once
+            args.pr,
+            args.repo,
+            args.interval,
+            args.timeout,
+            once=args.once,
+            none_grace=args.none_grace,
         )
     except InvalidInput as exc:
         sys.stderr.write(f"✗ gi-ci-wait: {exc}\n")
