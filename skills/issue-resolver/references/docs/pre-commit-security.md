@@ -84,7 +84,10 @@ while IFS= read -r f; do
   [ -f "$f" ] || continue
   # Skip binary files.
   file --mime "$f" 2>/dev/null | grep -q 'charset=binary' && continue
-  if grep -E -n "$realkey_patterns" "$f" 2>/dev/null; then
+  # -q, not -n: printing the match would copy the secret into the terminal,
+  # the transcript, and quite possibly a PR comment — a second leak on top of
+  # the first. gi-secscan.py redacts for the same reason.
+  if grep -E -q "$realkey_patterns" "$f" 2>/dev/null; then
     echo "✗ Real API key detected in: $f"
     secrets_found=1
   fi

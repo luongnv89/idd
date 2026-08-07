@@ -283,9 +283,18 @@ python3 shared/scripts/gi-ci-wait.py {pr_number} \
   --interval {review.ci_poll_interval} --timeout {review.ci_timeout}
 ```
 
-Read `verdict`: `pass` proceeds with the merge; `fail` and `pending` both leave the PR open. Exit 3 is a stop; a missing `python3` or exit 4 degrades to polling by hand every `review.ci_poll_interval` seconds with `gh pr view {pr_number} --json statusCheckRollup --jq '.statusCheckRollup[] | select(.status != "COMPLETED")'`.
+Read `verdict`: `pass` proceeds with the merge; `fail` and `pending` both leave the PR open. Exit 3 is a stop; a missing `python3` or exit 4 degrades to polling by hand every `review.ci_poll_interval` seconds with `gh pr view {pr_number} --json statusCheckRollup --jq '.statusCheckRollup[] | select(.status != "COMPLETED" or (.conclusion | IN("SUCCESS","NEUTRAL","SKIPPED") | not))'`.
 
-**The degraded path reaches the same two outcomes, not fewer.** If all checks pass within the timeout, proceed with the merge exactly as `verdict: pass` would — degrading means running the procedure by hand, never declining to act on its result. If timeout:
+The `.conclusion` half of that filter is not optional. A check that finished and
+**failed** still has `status: "COMPLETED"`, so filtering on status alone prints
+nothing for a red build — and empty output reads as "all clear", merging a PR
+whose CI failed.
+
+**The degraded path reaches the same three outcomes, not fewer.** Empty output
+means every check succeeded: proceed with the merge exactly as `verdict: pass`
+would — degrading means running the procedure by hand, never declining to act on
+its result. Any line naming a failed check leaves the PR open, as `verdict: fail`
+would. If timeout:
 ```
 ⚠ CI checks did not complete within {timeout}s — PR left open
   Continuing to next issue...

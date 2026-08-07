@@ -400,7 +400,7 @@ Before merging, verify:
 gh pr view {pr_number} --json mergeable,reviewDecision,statusCheckRollup
 ```
 
-When checks are still pending, do not read `statusCheckRollup` in a loop — run `python3 references/scripts/gi-ci-wait.py {pr_number} --interval {review.ci_poll_interval} --timeout {review.ci_timeout}` once and read its `verdict` (`pass` merges; `fail` and `pending` leave the PR open). Exit 4 or a missing `python3` degrades to the manual poll, which reaches the **same two outcomes** — all-green merges, a timeout leaves the PR open. See `references/examples.md` (*Merge requires CI checks*).
+When checks are still pending, do not read `statusCheckRollup` in a loop — run `python3 references/scripts/gi-ci-wait.py {pr_number} --interval {review.ci_poll_interval} --timeout {review.ci_timeout}` once and read its `verdict`. All four are handled: `pass` merges; **`none` (the repository configures no checks for this PR) also merges** — step 1 above reads "CI passing (*if configured*)", and a repo without CI must not deadlock the loop; `fail` and `pending` both leave the PR open. Exit 4 or a missing `python3` degrades to the manual poll, which reaches the **same outcomes** — all checks green merges, a failed or still-pending check leaves the PR open. See `references/examples.md` (*Merge requires CI checks*).
 
 If not mergeable:
 ```

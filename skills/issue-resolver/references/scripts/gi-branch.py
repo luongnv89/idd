@@ -27,15 +27,24 @@ The second form is a flat name with no `/` component. A configured prefix is a
 literal, and inserting a separator the user did not write would produce a
 different branch than the one they configured.
 
+Untrusted input never travels on the command line. Pass `--from-issue` and the
+script reads the title (and, absent `--type`, the type from the labels) straight
+from GitHub, and `resolve.branch_prefix` from `.gitissue.yml`. Both are
+attacker-controlled — anyone can file an issue on a public repository, and
+`.gitissue.yml` arrives with a pull request's branch — so a value interpolated
+into a shell word could close its quote and append a command, which
+`/auto-pilot` would then run unattended. `--title` and `--prefix` remain for
+tests and programmatic callers that can pass arguments without a shell.
+
 Exit codes
   0  a branch name was derived and printed
   2  usage error
   3  invalid input — a non-numeric issue number, an unknown issue type with no
      mapping, or a `--max-length` too small to hold the prefix and number
      (stderr: `✗ gi-branch: <why>`). Stop.
-  4  never returned: this script reads no files, runs no subprocesses, and has
-     no runtime dependency that can be missing. Callers still handle it, because
-     "any unexpected outcome degrades to the prose rules" is the contract.
+  4  cannot complete — `--from-issue` was given and `gh` is missing or the issue
+     cannot be read (stderr: `⚠ gi-branch: <reason>`). Degrade to the six
+     derivation steps in the naming conventions document.
 
 Authored at src/shared/scripts/gi-branch.py — do not edit installed copies; edit
 the source and run ./scripts/build.sh.
@@ -45,7 +54,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
+import subprocess
 import sys
 
 # The inclusive maximum total length. The naming conventions say the branch
@@ -94,8 +105,116 @@ _LEADING_WORD_RE = re.compile(r"^([a-z0-9]+)-(?=.)")
 FALLBACK_SLUG = "update"
 
 
+CONFIG_NAME = ".gitissue.yml"
+
+# Only `resolve.branch_prefix`. Deliberately not a general YAML parser: it
+# exists so a config value never has to travel on a command line.
+_SECTION_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_-]*):\s*$")
+_PREFIX_RE = re.compile(r"^\s+branch_prefix:[ \t]+(.*?)\s*$")
+
+
 class InvalidInput(Exception):
     """Caller-supplied arguments are unusable — exit 3."""
+
+
+class Unavailable(Exception):
+    """A needed external command could not run — exit 4, caller degrades."""
+
+
+def _unquote(raw: str) -> str:
+    if raw.startswith('"'):
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError:
+            return raw.strip('"')
+    if raw.startswith("'") and raw.endswith("'") and len(raw) >= 2:
+        return raw[1:-1].replace("''", "'")
+    return raw
+
+
+def find_config(explicit: str | None) -> str | None:
+    """Locate `.gitissue.yml`: the explicit path, else upward from the cwd."""
+    if explicit:
+        return explicit
+    here = os.path.abspath(os.getcwd())
+    while True:
+        candidate = os.path.join(here, CONFIG_NAME)
+        if os.path.isfile(candidate):
+            return candidate
+        parent = os.path.dirname(here)
+        if parent == here:
+            return None
+        here = parent
+
+
+def read_branch_prefix(path: str) -> str | None:
+    """Read `resolve.branch_prefix` from a config file, or None."""
+    try:
+        text = open(path, encoding="utf-8", errors="replace").read()
+    except OSError:
+        return None
+    inside = False
+    for line in text.splitlines():
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        section = _SECTION_RE.match(line)
+        if section:
+            inside = section.group(1) == "resolve"
+            continue
+        if inside:
+            found = _PREFIX_RE.match(line)
+            if found:
+                return _unquote(found.group(1))
+    return None
+
+
+def fetch_issue(number: int, repo: str | None) -> tuple[str, list[str]]:
+    """Return (title, label names) straight from GitHub.
+
+    Reading the title here rather than accepting it as an argument is a
+    security decision, not a convenience. An issue title is written by whoever
+    filed the issue — on a public repository, anyone at all — and `/auto-pilot`
+    derives branch names unattended. A title interpolated into a shell word can
+    close the quote and append a command, so the untrusted text must never
+    reach a command line at all.
+    """
+    args = ["issue", "view", str(number), "--json", "title,labels"]
+    if repo:
+        args += ["--repo", repo]
+    try:
+        proc = subprocess.run(
+            ["gh", *args], capture_output=True, text=True, check=False
+        )
+    except FileNotFoundError as exc:
+        raise Unavailable("gh is not installed or not on PATH") from exc
+    except OSError as exc:
+        raise Unavailable(f"cannot run gh — {exc}") from exc
+    if proc.returncode != 0:
+        detail = proc.stderr.strip().splitlines()
+        raise Unavailable(
+            f"gh issue view {number} failed: "
+            + (detail[-1] if detail else f"exit {proc.returncode}")
+        )
+    try:
+        loaded = json.loads(proc.stdout)
+    except json.JSONDecodeError as exc:
+        raise Unavailable(f"gh printed unparsable JSON — {exc}") from exc
+    if not isinstance(loaded, dict):
+        raise Unavailable("gh issue view did not return a JSON object")
+    labels = [
+        str(item.get("name", ""))
+        for item in loaded.get("labels") or []
+        if isinstance(item, dict)
+    ]
+    return str(loaded.get("title") or ""), labels
+
+
+def type_from_labels(labels: list[str], type_map: dict[str, str]) -> str | None:
+    """First label that names a known issue type, or None."""
+    for label in labels:
+        if label.strip().lower() in type_map:
+            return label.strip().lower()
+    return None
 
 
 def slugify(title: str) -> str:
@@ -211,18 +330,40 @@ def main(argv: list[str] | None = None) -> int:
             "Derive a convention-conformant branch name from an issue number, "
             "title, and type. Prints one JSON object on stdout."
         ),
-        epilog=(
-            "Example: python3 gi-branch.py 42 --title 'Add dark mode toggle' "
-            "--type feature"
-        ),
+        epilog="Example: python3 gi-branch.py 42 --from-issue --type feature",
     )
     parser.add_argument("number", help="issue number")
-    parser.add_argument("--title", default="", help="issue title")
+    parser.add_argument(
+        "--from-issue",
+        action="store_true",
+        help=(
+            "read the title (and, failing --type, the type) from GitHub rather "
+            "than the command line — REQUIRED for untrusted issues"
+        ),
+    )
+    parser.add_argument("--repo", metavar="OWNER/NAME")
+    parser.add_argument(
+        "--title",
+        default="",
+        help=(
+            "issue title. Never pass untrusted text here: a title is written "
+            "by whoever filed the issue, and interpolating it into a shell "
+            "word is a command injection. Use --from-issue"
+        ),
+    )
     parser.add_argument("--type", dest="issue_type", help="bug | feature | ...")
     parser.add_argument(
         "--prefix",
-        default="auto",
-        help="resolve.branch_prefix: 'auto' for type-based, else a literal prefix",
+        help=(
+            "resolve.branch_prefix override: 'auto' for type-based, else a "
+            "literal prefix. Default: read from .gitissue.yml, then 'auto'"
+        ),
+    )
+    parser.add_argument(
+        "--config", metavar="PATH", help=f"{CONFIG_NAME} to read resolve.branch_prefix from"
+    )
+    parser.add_argument(
+        "--no-config", action="store_true", help="ignore any config file"
     )
     parser.add_argument(
         "--type-map", help="override the type→prefix map, e.g. 'spike=chore'"
@@ -247,17 +388,35 @@ def main(argv: list[str] | None = None) -> int:
             raise InvalidInput(f"issue must be a number, got {args.number!r}")
         if args.max_length < 1:
             raise InvalidInput("--max-length must be >= 1")
+        number = int(args.number)
+        type_map = parse_type_map(args.type_map)
+
+        title = args.title
+        issue_type = args.issue_type
+        if args.from_issue:
+            title, labels = fetch_issue(number, args.repo)
+            if not issue_type:
+                issue_type = type_from_labels(labels, type_map)
+
+        prefix = args.prefix
+        if prefix is None:
+            prefix = "auto"
+            if not args.no_config:
+                path = find_config(args.config)
+                if path is not None:
+                    prefix = read_branch_prefix(path) or "auto"
+                elif args.config:
+                    raise InvalidInput(f"config file not found: {args.config}")
+
         result = derive(
-            int(args.number),
-            args.title,
-            args.issue_type,
-            args.prefix,
-            parse_type_map(args.type_map),
-            args.max_length,
+            number, title, issue_type, prefix, type_map, args.max_length
         )
     except InvalidInput as exc:
         sys.stderr.write(f"✗ gi-branch: {exc}\n")
         return 3
+    except Unavailable as exc:
+        sys.stderr.write(f"⚠ gi-branch: {exc}\n")
+        return 4
 
     print(json.dumps(result))
     if not result["valid"]:

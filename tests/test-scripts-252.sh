@@ -705,6 +705,76 @@ done < <(grep -rhn --include='*.md' "python3 .*gi-secscan\.py" \
            "$REPO_ROOT/docs/pre-commit-security.md")
 [ "$injected" -eq 0 ] && pass "AC1: no gi-secscan call site puts a config value on the command line"
 
+# Same rule for gi-branch: an issue title is written by whoever filed the issue,
+# so it must never be interpolated into a shell word. Reproduced as arbitrary
+# code execution before this was fixed.
+b_injected=0
+while IFS= read -r hit; do
+  case "$hit" in
+    *--title*|*--prefix*)
+      fail "AC4: gi-branch call site interpolates untrusted text: $hit"
+      b_injected=1 ;;
+  esac
+done < <(grep -rhn --include='*.md' "python3 .*gi-branch\.py" \
+           "$REPO_ROOT/src/skills" "$REPO_ROOT/src/shared/agents" "$REPO_ROOT/docs")
+[ "$b_injected" -eq 0 ] && pass "AC4: no gi-branch call site puts an issue title on the command line"
+
+# And the derivation sites must actually use the safe form.
+if grep -q -- "--from-issue" "$SKILLS/issue-resolver/SKILL.md"; then
+  pass "AC4: the resolver derives the branch with --from-issue"
+else
+  fail "AC4: the resolver does not use --from-issue (title would reach a shell)"
+fi
+
+# A quote-bearing title must be inert data. This is the regression guard.
+INJ="$TMP/inj"
+mkdir -p "$INJ/bin"
+printf '#!/bin/sh\nprintf %%s "$GH_TITLE_JSON"\n' > "$INJ/bin/gh"
+chmod +x "$INJ/bin/gh"
+( cd "$INJ" && PATH="$INJ/bin:$PATH" \
+  GH_TITLE_JSON='{"title":"Fix login\"; touch PWNED; echo \"","labels":[]}' \
+  python3 "$GIBRANCH" 42 --from-issue --type bug >/dev/null 2>&1 ) || true
+if [ ! -e "$INJ/PWNED" ]; then
+  pass "AC4: a quote-bearing issue title cannot execute (never on a command line)"
+else
+  fail "AC4: a crafted issue title executed a command — injection"
+fi
+
+# The subagent spawn bindings must be absolute, or the gate silently never runs.
+for f in "$SKILLS/issue-resolver/references/pipeline-steps.md" \
+         "$SKILLS/issue-pr-review/references/review-loop-mechanics.md"; do
+  if grep -q "absolute" "$f"; then
+    pass "AC1: $(basename "$f") requires an absolute secscan_script path"
+  else
+    fail "AC1: $(basename "$f") binds a skill-relative path a subagent cannot resolve"
+  fi
+done
+
+# Exit 2 (an unresolved path) must degrade, not be read as a pass.
+for f in "$SKILLS/issue-resolver/references/agents/implementer.md" \
+         "$SKILLS/issue-resolver/references/agents/fixer.md"; do
+  if grep -qi "exit .\?2" "$f"; then
+    pass "AC1: $(basename "$f") classifies exit 2 as a degrade"
+  else
+    fail "AC1: $(basename "$f") leaves exit 2 unclassified (a scan that never ran)"
+  fi
+done
+
+# auto-pilot's degraded CI filter must test .conclusion, or a COMPLETED-but-
+# FAILED check prints nothing and empty output reads as all-green.
+if grep -q "conclusion" "$SKILLS/auto-pilot/references/examples.md"; then
+  pass "AC5: auto-pilot's degraded CI filter tests .conclusion, not just .status"
+else
+  fail "AC5: auto-pilot's degraded CI filter would merge a PR with failing checks"
+fi
+
+# gi-ci-wait can return `none`; the merge gate must say what that does.
+if grep -q "none" "$SKILLS/auto-pilot/references/phases.md"; then
+  pass "AC2: auto-pilot's merge gate handles the none verdict"
+else
+  fail "AC2: auto-pilot's merge gate leaves the none verdict unhandled"
+fi
+
 # Every flow that writes an issue must invalidate the cache, or a later read —
 # possibly from another skill, since the cache is repo-wide — is served the
 # pre-write body.

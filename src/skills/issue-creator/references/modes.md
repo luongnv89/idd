@@ -12,7 +12,7 @@ python3 shared/scripts/gi-issue.py {N} \
   --fields number,title,body,labels,assignees,state,comments
 ```
 
-Read `.issue` from the JSON envelope. Normalize mode reads the same issue several more times below; the script serves those from `.gitissue/cache/` instead of the network. Exit 3 is a stop. Exit 4, or no `python3`, degrades to `gh issue view {N} --json number,title,body,labels,assignees,state,comments`.
+Read `.issue` from the JSON envelope. Exit 3 is a stop. Exit 4, or no `python3`, degrades to `gh issue view {N} --json number,title,body,labels,assignees,state,comments`.
 
 **This mode rewrites the issue body**, and the cache is repo-wide — `/issue-resolver` reads the same issue with the same field list, so a stale entry outlives this skill. Every `gh issue edit` below is therefore followed by a **mandatory** `python3 references/scripts/gi-issue.py {N} --invalidate`, and every verify-after-write read goes straight to `gh` rather than through the cache. Verifying a write against a cached pre-write body proves nothing.
 

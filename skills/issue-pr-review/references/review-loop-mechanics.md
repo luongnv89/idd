@@ -17,8 +17,10 @@ already fetched in Step 1 and takes the **fuller** of any inputs that disagree:
 - **Diff size / files-changed** (`gh pr view {N} --json files`) — small change
   (≈ ≤ 15 changed lines in 1 file) leans `light`.
 - **Linked-issue `Effort` band** — when the PR body has `Closes #N`, read that
-  issue's `## Metadata` `Effort` (`python3 references/scripts/gi-issue.py {N} --fields body`,
-  reading `.issue.body`; degrade to `gh issue view {N} --json body`); `XS`/`S`
+  issue's `## Metadata` `Effort` (`python3 references/scripts/gi-issue.py {N}
+  --fields number,title,body,labels` — the same field list Step 3 uses, because
+  the cache key includes the field set; degrade to `gh issue view {N} --json
+  body`); `XS`/`S`
   asserted leans `light`, `M`/`L`/`XL` or low-confidence leans `full`.
 - **Security label** — any `security`/`CVE`/`vulnerability` label forces `full`.
 
@@ -116,7 +118,7 @@ Delegate fixes to the fixer subagent instead of applying code changes in the mai
 - `test_output`: trimmed relevant failure output from Steps 4-5
 - `commit_message`: `fix({scope}): address review feedback` (append `(#{linked_issue})` only if a linked issue exists)
 - `security_convention`: `references/docs/pre-commit-security.md` — the bundled pre-commit security contract, and the fallback procedure when the script cannot run
-- `secscan_script`: `references/scripts/gi-secscan.py` — the bundled script that implements it, and what the fixer MUST run before committing. Only the path is passed; the script reads `security.*` from `.gitissue.yml` itself, so no repo-controlled config value reaches a command line. This and `security_convention` are spawn *variables* rather than references inside `fixer.md`, because an emitted agent prompt renders its own references as absolute repo URLs and so cannot name a path inside this skill's bundle
+- `secscan_script`: the **absolute** path to `references/scripts/gi-secscan.py` — the bundled script that implements it, and what the fixer MUST run before committing. Absolutize it before binding (a subagent's working directory is the target repo, so a skill-relative path resolves to nothing and the gate silently never runs). Only the path is passed; the script reads `security.*` from `.gitissue.yml` itself, so no repo-controlled config value reaches a command line. This and `security_convention` are spawn *variables* rather than references inside `fixer.md`, because an emitted agent prompt renders its own references as absolute repo URLs and so cannot name a path inside this skill's bundle
 
 ```python
 Agent(
