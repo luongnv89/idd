@@ -8,6 +8,10 @@
 #   - Logical references inside the *transitive* copies are themselves
 #     rewritten (a copied agent that references docs/X.md must end up using
 #     references/docs/X.md inside the flattened skill).
+#   - Transitive shared scripts are copied into skills/<name>/references/scripts/
+#     byte-identically and with their source mode, and the pipeline that does so
+#     is generic — scripts/build.py carries no script-name literal, so adding a
+#     new shared script requires no build.py change (issue #251).
 #   - Diamond dependency (A→B, A→C, B→D, C→D) does not produce false cycle
 #     warnings. The repo's existing structure exhibits this:
 #         issue-resolver → docs/naming-conventions.md (direct)
@@ -43,7 +47,17 @@ BUILD_LOG="$(mktemp)"
 SYN_TMP="$(mktemp -d)"
 SYN_OUT="$(mktemp -d)"
 SYN_LOG="$(mktemp)"
-trap 'rm -rf "$TMP_OUT" "$SYN_TMP" "$SYN_OUT"; rm -f "$BUILD_LOG" "$SYN_LOG"' EXIT
+# Scratch space for the two negative fixtures (T7.11 / T7.12), which mutate a
+# copy of the synthetic tree and expect the build to abort.
+NEG_TMP="$(mktemp -d)"
+NEG_OUT="$(mktemp -d)"
+NEG_LOG="$(mktemp)"
+trap 'rm -rf "$TMP_OUT" "$SYN_TMP" "$SYN_OUT" "$NEG_TMP" "$NEG_OUT"; rm -f "$BUILD_LOG" "$SYN_LOG" "$NEG_LOG"' EXIT
+
+# Portable mode read: GNU `stat -c` and BSD `stat -f` disagree, python3 does not.
+mode_of() {
+  python3 -c 'import os,sys;print(oct(os.stat(sys.argv[1]).st_mode & 0o777))' "$1"
+}
 
 if "$BUILD_SH" --out "$TMP_OUT" >"$BUILD_LOG" 2>&1; then
   pass "T1: clean build into temp dir"
@@ -159,15 +173,23 @@ done
 # This validates the algorithm on a controlled tree. Post-#81, runtime
 # docs live at top-level docs/ (sibling of src/), not src/docs/. We
 # create:
-#   src/skills/dia/SKILL.source.md → references agents B + C and docs/D.md
-#   src/shared/agents/B.md  → references docs/D.md and docs/E.md
+#   src/skills/dia/SKILL.source.md → references agents B + C, docs/D.md, and
+#                                    the shared script gi-syn.py
+#   src/shared/agents/B.md  → references docs/D.md, docs/E.md, gi-agentonly.py
 #   src/shared/agents/C.md  → references docs/D.md and docs/E.md
 #   docs/D.md, docs/E.md    → leaves (no further refs)
+#   src/shared/scripts/gi-syn.py, gi-agentonly.py → leaves (never scanned)
 # Expected: D.md appears exactly once in dist/skills/dia/references/docs/,
 #   E.md (reachable only through agents, whose emitted prompts render refs as
-#   absolute URLs — issue #249) is validated but never bundled, no cycle
-#   warnings, exit 0.
-mkdir -p "$SYN_TMP/src/skills/dia" "$SYN_TMP/src/shared/agents" "$SYN_TMP/docs"
+#   absolute URLs — issue #249) is validated but never bundled, gi-syn.py lands
+#   in dia/references/scripts/ byte-identically, gi-agentonly.py follows the
+#   same agent-only rule as E.md, no cycle warnings, exit 0.
+#
+# gi-syn.py is a name scripts/build.py has never heard of. It ships correctly
+# through an unmodified build.py — which, with T7.10, is the executable proof of
+# the issue #251 design constraint: adding a script requires no build.py change.
+mkdir -p "$SYN_TMP/src/skills/dia" "$SYN_TMP/src/shared/agents" \
+         "$SYN_TMP/src/shared/scripts" "$SYN_TMP/docs"
 cat > "$SYN_TMP/src/skills/dia/SKILL.source.md" <<'EOF'
 ---
 name: dia
@@ -177,11 +199,24 @@ description: diamond test skill
 # Dia
 
 Reads `shared/agents/b-agent.md`, `shared/agents/c-agent.md`, and `docs/d-doc.md`.
+
+Runs `python3 shared/scripts/gi-syn.py` for the synthetic determinism check.
+
+## Bundled dependency precheck
+
+```text
+references/agents/b-agent.md
+references/agents/c-agent.md
+references/docs/d-doc.md
+references/scripts/gi-syn.py
+```
 EOF
 cat > "$SYN_TMP/src/shared/agents/b-agent.md" <<'EOF'
 # B
 
 See `docs/d-doc.md` and `docs/e-doc.md`.
+
+Also runs `shared/scripts/gi-agentonly.py`.
 EOF
 cat > "$SYN_TMP/src/shared/agents/c-agent.md" <<'EOF'
 # C
@@ -198,6 +233,18 @@ cat > "$SYN_TMP/docs/e-doc.md" <<'EOF'
 
 Agent-only leaf.
 EOF
+cat > "$SYN_TMP/src/shared/scripts/gi-syn.py" <<'EOF'
+#!/usr/bin/env python3
+"""Synthetic shared script — a name build.py has never heard of."""
+print("gi-syn")
+EOF
+cat > "$SYN_TMP/src/shared/scripts/gi-agentonly.py" <<'EOF'
+#!/usr/bin/env python3
+"""Synthetic shared script reachable only through a shared agent."""
+print("gi-agentonly")
+EOF
+chmod 0755 "$SYN_TMP/src/shared/scripts/gi-syn.py" \
+           "$SYN_TMP/src/shared/scripts/gi-agentonly.py"
 # Copy build scripts so the synthetic build runs the same code path.
 mkdir -p "$SYN_TMP/scripts"
 cp "$REPO_ROOT/scripts/build.py" "$SYN_TMP/scripts/build.py"
@@ -252,6 +299,135 @@ if [ -f "$SYN_DIA/references/docs/e-doc.md" ]; then
   fail "T7.6: agent-only doc e-doc.md was bundled into dia/references/docs/"
 else
   pass "T7.6: agent-only doc e-doc.md validated but not bundled"
+fi
+
+# ───────────────────────────────────────────────────────────
+# T7.7 (issue #251) — a shared script cited by a skill lands under
+# references/scripts/ exactly once, byte-identical, with its source mode.
+# ───────────────────────────────────────────────────────────
+SYN_SCRIPT_SRC="$SYN_TMP/src/shared/scripts/gi-syn.py"
+SYN_SCRIPT_OUT="$SYN_DIA/references/scripts/gi-syn.py"
+if [ -f "$SYN_SCRIPT_OUT" ]; then
+  pass "T7.7.1: synthetic script copied to dia/references/scripts/"
+  syn_script_dups="$(find "$SYN_DIA" -type f -name 'gi-syn.py' | wc -l | tr -d ' ')"
+  if [ "$syn_script_dups" = "1" ]; then
+    pass "T7.7.2: synthetic script appears exactly once in the flattened skill"
+  else
+    fail "T7.7.2: synthetic script appears $syn_script_dups times (expected 1)"
+  fi
+  if cmp -s "$SYN_SCRIPT_SRC" "$SYN_SCRIPT_OUT"; then
+    pass "T7.7.3: emitted script is byte-identical to its source (no banner injected)"
+  else
+    fail "T7.7.3: emitted script differs from its source"
+  fi
+  src_mode="$(mode_of "$SYN_SCRIPT_SRC")"
+  out_mode="$(mode_of "$SYN_SCRIPT_OUT")"
+  if [ "$src_mode" = "$out_mode" ]; then
+    pass "T7.7.4: emitted script keeps the source mode ($out_mode)"
+  else
+    fail "T7.7.4: emitted script is mode $out_mode, source is $src_mode"
+  fi
+else
+  fail "T7.7.1: synthetic script missing from dia/references/scripts/"
+fi
+
+if grep -qF 'references/scripts/gi-syn.py' "$SYN_DIA/SKILL.md"; then
+  pass "T7.7.5: dia/SKILL.md rewrites the bare token to references/scripts/gi-syn.py"
+else
+  fail "T7.7.5: dia/SKILL.md does not render references/scripts/gi-syn.py"
+fi
+if grep -qE '(^|[^/])shared/scripts/gi-syn\.py' "$SYN_DIA/SKILL.md"; then
+  fail "T7.7.6: dia/SKILL.md still carries the unresolved bare shared/scripts token"
+else
+  pass "T7.7.6: dia/SKILL.md carries no unresolved bare shared/scripts token"
+fi
+
+# ───────────────────────────────────────────────────────────
+# T7.8 — a script reachable ONLY through a shared agent must not be bundled.
+# Same rule as e-doc.md (issues #245/#249): an emitted agent prompt renders its
+# references as absolute repo URLs, so a bundled copy would be unreferenceable.
+# ───────────────────────────────────────────────────────────
+if [ -f "$SYN_DIA/references/scripts/gi-agentonly.py" ]; then
+  fail "T7.8: agent-only script gi-agentonly.py was bundled into dia/references/scripts/"
+else
+  pass "T7.8: agent-only script gi-agentonly.py validated but not bundled"
+fi
+
+# ───────────────────────────────────────────────────────────
+# T7.9 — the emitted agent renders the agent-only script as an absolute URL.
+# ───────────────────────────────────────────────────────────
+SYN_AGENT="$SYN_OUT/agents/b-agent.md"
+AGENT_SCRIPT_URL='https://github.com/luongnv89/idd/blob/main/src/shared/scripts/gi-agentonly.py'
+if [ -f "$SYN_AGENT" ] && grep -qF "$AGENT_SCRIPT_URL" "$SYN_AGENT"; then
+  pass "T7.9: emitted agent renders the script reference as an absolute repo URL"
+else
+  fail "T7.9: emitted agent does not render $AGENT_SCRIPT_URL"
+fi
+
+# ───────────────────────────────────────────────────────────
+# T7.10 — THE GENERIC-PIPELINE PROPERTY (issue #251 headline constraint).
+# scripts/build.py must contain no script-name literal. Combined with T7.7 —
+# where gi-syn.py, a name build.py has never seen, ships correctly through an
+# unmodified build.py — this is the executable proof that adding a fourth
+# shared script requires NO build.py change: there is no list to edit.
+# ───────────────────────────────────────────────────────────
+if grep -qE 'gi-[a-z0-9-]+\.py' "$REPO_ROOT/scripts/build.py"; then
+  fail "T7.10: GENERIC-PIPELINE PROPERTY VIOLATED — scripts/build.py names a specific script"
+  grep -nE 'gi-[a-z0-9-]+\.py' "$REPO_ROOT/scripts/build.py" | sed 's/^/    /'
+else
+  pass "T7.10: GENERIC-PIPELINE PROPERTY — scripts/build.py carries no script-name literal, so a new shared script needs no build.py change"
+fi
+
+# ───────────────────────────────────────────────────────────
+# T7.11 — a bare shared/scripts token with no source file aborts the build.
+# ───────────────────────────────────────────────────────────
+cp -R "$SYN_TMP/." "$NEG_TMP/"
+python3 - "$NEG_TMP/src/skills/dia/SKILL.source.md" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text(encoding="utf-8")
+# Only the prose citation carries the bare `shared/scripts/` form; the precheck
+# fence uses the emitted `references/scripts/` form and is left alone.
+path.write_text(
+    text.replace("shared/scripts/gi-syn.py", "shared/scripts/gi-missing.py", 1),
+    encoding="utf-8",
+)
+PY
+if (cd "$NEG_TMP" && bash scripts/build.sh --out "$NEG_OUT") >"$NEG_LOG" 2>&1; then
+  fail "T7.11: build accepted a shared/scripts reference with no source file"
+elif grep -qF "unresolved script reference 'gi-missing.py'" "$NEG_LOG"; then
+  pass "T7.11: an unresolvable shared/scripts token aborts with 'unresolved script reference'"
+else
+  fail "T7.11: build failed, but not with the unresolved-script abort"
+  sed 's/^/    /' "$NEG_LOG" | head -10
+fi
+
+# ───────────────────────────────────────────────────────────
+# T7.12 — a shipped script's `# gi-requires:` declaration must resolve inside
+# the same skill's bundle, or the script would silently degrade forever.
+# ───────────────────────────────────────────────────────────
+rm -rf "$NEG_TMP" "$NEG_OUT"
+mkdir -p "$NEG_TMP" "$NEG_OUT"
+cp -R "$SYN_TMP/." "$NEG_TMP/"
+python3 - "$NEG_TMP/src/shared/scripts/gi-syn.py" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
+lines.insert(1, "# gi-requires: references/docs/absent.md\n")
+path.write_text("".join(lines), encoding="utf-8")
+PY
+if (cd "$NEG_TMP" && bash scripts/build.sh --out "$NEG_OUT") >"$NEG_LOG" 2>&1; then
+  fail "T7.12: build accepted a gi-requires declaration for an unbundled file"
+elif grep -qF "gi-requires: references/docs/absent.md" "$NEG_LOG" \
+     && grep -qF "is not bundled" "$NEG_LOG"; then
+  pass "T7.12: an unresolvable 'gi-requires' declaration aborts the build"
+else
+  fail "T7.12: build failed, but not with the gi-requires abort"
+  sed 's/^/    /' "$NEG_LOG" | head -10
 fi
 
 # ───────────────────────────────────────────────────────────

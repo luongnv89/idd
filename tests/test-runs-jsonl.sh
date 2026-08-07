@@ -219,6 +219,24 @@ has "$SUBAGENT" "primary issue's run-log line only" "T7: subagent prompt notes o
 has "$AUTOPILOT" "fan" "T7: auto-pilot SKILL describes fanning the batch result out"
 has "$AUTOPILOT" "explicit-list-mode" "T7: auto-pilot SKILL points to the explicit-list-mode spec"
 
+# --- T8: the gi-runlog helper (issue #251) ----------------------------------
+# The hand-rolled `mkdir -p .gitissue && printf … >>` append (asserted at T2) is
+# now the *fallback*: the primary path pipes the record to the shipped script,
+# which centralizes required-field validation, the 5→3 complexity collapse, and
+# the canonical key order. `--echo` is the machine form of the `--no-run-log`
+# contract — identical validation and normalization, but nothing is written.
+has "$RUNLOG" "references/scripts/gi-runlog.py" "T8: run-log-schema names the shipped gi-runlog script"
+has "$RUNLOG" "--append" "T8: run-log-schema documents the --append mode"
+has "$RUNLOG" "--echo" "T8: run-log-schema documents the --echo mode"
+has "$RUNLOG" "writes nothing" "T8: run-log-schema documents the --echo no-write contract"
+
+# Skill sources cite the authoring-time `shared/scripts/…` token; the build
+# rewrites it to the shipped `references/scripts/…` path. Assert each tree in
+# its own form so a half-applied rewrite cannot pass both ways.
+has "$RESOLVER" "shared/scripts/gi-runlog.py" "T8: issue-resolver source cites the gi-runlog script"
+has "$RESOLVER" "gi-runlog.py --echo" "T8: issue-resolver uses --echo on the --no-run-log path"
+has "$AUTOPILOT" "shared/scripts/gi-runlog.py" "T8: auto-pilot source cites the gi-runlog script"
+
 # --- T5: generated install surface carries the behavior through -------------
 GEN_RESOLVER="$REPO_ROOT/skills/issue-resolver/SKILL.md"
 GEN_AUTOPILOT="$REPO_ROOT/skills/auto-pilot/SKILL.md"
@@ -255,9 +273,27 @@ if [ -f "$GEN_RESOLVER" ]; then
 fi
 if [ -f "$GEN_CONFIG" ]; then
   has "$GEN_CONFIG" ".gitissue/runs.jsonl" "T5: bundled run-log-schema carries the runs.jsonl schema"
+  has "$GEN_CONFIG" "references/scripts/gi-runlog.py" "T5: bundled run-log-schema names the shipped gi-runlog script"
+  has "$GEN_CONFIG" "writes nothing" "T5: bundled run-log-schema keeps the --echo no-write contract"
 else
   fail "T5: bundled run-log-schema.md not found in generated resolver references"
 fi
+
+# Both writers cite the shipped path in the install surface, and both still ship
+# the script itself — a citation with no bundled file is a dead instruction.
+for writer in issue-resolver auto-pilot; do
+  gen_skill="$REPO_ROOT/skills/$writer/SKILL.md"
+  gen_script="$REPO_ROOT/skills/$writer/references/scripts/gi-runlog.py"
+  if [ -f "$gen_skill" ]; then
+    has "$gen_skill" "references/scripts/gi-runlog.py" \
+      "T5: generated $writer SKILL.md cites the shipped gi-runlog script"
+  fi
+  if [ -f "$gen_script" ]; then
+    pass "T5: skills/$writer bundles references/scripts/gi-runlog.py"
+  else
+    fail "T5: skills/$writer does not bundle references/scripts/gi-runlog.py"
+  fi
+done
 
 echo ""
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"

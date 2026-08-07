@@ -141,10 +141,12 @@ PY
 # Use a portable -name glob group rather than -regex. macOS BSD find defaults
 # to BRE for -regex (no `(`/`|` alternation); GNU find defaults to emacs regex
 # with the same effect. Both produce zero matches for the alternation form.
+PY_SCANNED=0
 for skill_dir in "$SKILLS"/*/; do
   name="$(basename "$skill_dir")"
   errors_in_skill=0
   while IFS= read -r f; do
+    case "$f" in *.py) PY_SCANNED=$((PY_SCANNED + 1)) ;; esac
     if ! scan_file "$f" "$skill_dir"; then
       errors_in_skill=$((errors_in_skill + 1))
     fi
@@ -159,6 +161,18 @@ for skill_dir in "$SKILLS"/*/; do
     fail "T1: skills/$name has $errors_in_skill file(s) with unresolved references"
   fi
 done
+
+# ───────────────────────────────────────────────────────────
+# T2 (issue #251): the .py arm of the find filter is not a no-op.
+# Skills bundle shipped scripts under references/scripts/, and those scripts
+# carry path literals of their own. If the -name "*.py" arm ever regressed, T1
+# would keep passing while scanning nothing — a silent hole, not a failure.
+# ───────────────────────────────────────────────────────────
+if [ "$PY_SCANNED" -gt 0 ]; then
+  pass "T2: the scan actually covered $PY_SCANNED .py file(s) (filter is live)"
+else
+  fail "T2: no .py file was scanned — the find filter's .py arm is a no-op"
+fi
 
 # ───────────────────────────────────────────────────────────
 # Summary
