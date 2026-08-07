@@ -47,6 +47,12 @@ OUTPUT_SKILL_MD = "SKILL.md"
 SKILL_TOKEN_RE = re.compile(r"\{\{skill:([a-z][a-z0-9-]*)\}\}")
 SHARED_AGENT_RE = re.compile(r"(?<![\w/])shared/agents/([a-z][a-z0-9-]+\.md)")
 RUNTIME_DOC_RE = re.compile(r"(?<![\w/])docs/([a-z][a-z0-9-]+\.md)")
+# Shared executable helpers. Directory-scoped like SHARED_AGENT_RE, not
+# filename-prefixed: a bare `scripts/X.py` token collides with the prose
+# mentions of this repo's own scripts/ directory that already sit inside the
+# closure read set, and every one of them would abort the build. Adding a new
+# script requires no change here — discovery is regex + filesystem only.
+SHARED_SCRIPT_RE = re.compile(r"(?<![\w/])shared/scripts/([a-z][a-z0-9-]+\.py)")
 BARE_SKILL_PATH_RE = re.compile(r"(?<![\w/])skills/([a-z][a-z0-9-]+)/SKILL\.md")
 
 URL_RE = re.compile(r"https?://[^\s<>'\"\)]+")
@@ -205,7 +211,9 @@ def _write_text(path: Path, content: str) -> None:
 
 def _copy_binary(src: Path, dst: Path) -> None:
     dst.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(src, dst)
+    # copy2, not copyfile: shared scripts ship 0755 and copyfile drops the mode
+    # to a umask-dependent 0644/0664.
+    shutil.copy2(src, dst)
 
 
 def _sorted_iterdir(path: Path) -> list[Path]:
@@ -283,42 +291,49 @@ def _check_non_markdown_in(root: Path, label: str, *, recursive: bool = True) ->
 # --- Phase B — Transitive closure -------------------------------------------
 
 
-def _scan_logical_refs(text: str) -> tuple[set[str], set[str], set[str]]:
-    """Return (skill_tokens, shared_agents, runtime_docs) from text, ignoring
-    matches inside http(s):// URLs."""
+def _scan_logical_refs(text: str) -> tuple[set[str], set[str], set[str], set[str]]:
+    """Return (skill_tokens, shared_agents, runtime_docs, shared_scripts) from
+    text, ignoring matches inside http(s):// URLs."""
     cleaned = _strip_urls(text)
     skills = set(SKILL_TOKEN_RE.findall(cleaned))
     agents = set(SHARED_AGENT_RE.findall(cleaned))
     docs = set(RUNTIME_DOC_RE.findall(cleaned))
-    return skills, agents, docs
+    scripts = set(SHARED_SCRIPT_RE.findall(cleaned))
+    return skills, agents, docs, scripts
 
 
 def _compute_closure(
     src: Path,
     skill_name: str,
     skill_root: Path,
-) -> tuple[set[str], set[str]]:
-    """Compute transitive closure of shared agents and docs reachable from
-    a skill. DFS with cycle detection (warning, no abort) and diamond-safe
-    visited tracking. Returns sorted-eligible (agent_names, doc_names).
+) -> tuple[set[str], set[str], set[str]]:
+    """Compute transitive closure of shared agents, docs and scripts reachable
+    from a skill. DFS with cycle detection (warning, no abort) and diamond-safe
+    visited tracking. Returns sorted-eligible (agent_names, doc_names,
+    script_names).
 
-    Every reachable reference is resolved and validated, but only docs reachable
-    from the skill's *own* files (directly, or through a doc→doc reference) are
-    bundled. Docs reachable only through a shared agent are not: since issue
-    #245 an emitted agent prompt renders its references as absolute repo URLs
-    (the prompt is injected into a subagent whose working directory is the
-    target repo, where a skill-relative path would dangle), so a bundled copy
-    reached only that way is unreferenceable install weight (issue #249).
+    Every reachable reference is resolved and validated, but only docs and
+    scripts reachable from the skill's *own* files (directly, or through a
+    doc→doc reference) are bundled. Those reachable only through a shared agent
+    are not: since issue #245 an emitted agent prompt renders its references as
+    absolute repo URLs (the prompt is injected into a subagent whose working
+    directory is the target repo, where a skill-relative path would dangle), so
+    a bundled copy reached only that way is unreferenceable install weight
+    (issue #249).
     """
     agents: set[str] = set()
     docs: set[str] = set()
+    scripts: set[str] = set()
     agent_only_docs: set[str] = set()
+    agent_only_scripts: set[str] = set()
     visited: set[str] = set()
     active: set[str] = set()
 
     def _resolve(kind: str, name: str) -> Path | None:
         if kind == "agent":
             p = src / "shared" / "agents" / name
+        elif kind == "script":
+            p = src / "shared" / "scripts" / name
         else:
             # Runtime docs live at top-level docs/ (issue #81 consolidation).
             p = src.parent / "docs" / name
@@ -341,31 +356,40 @@ def _compute_closure(
         active.add(key)
         if kind == "agent":
             agents.add(name)
+        elif kind == "script":
+            (scripts if bundle else agent_only_scripts).add(name)
         elif bundle:
             docs.add(name)
         else:
             agent_only_docs.add(name)
-        text = _read_text(resolved)
-        _, sub_agents, sub_docs = _scan_logical_refs(text)
-        for a in sorted(sub_agents):
-            # Docs cited by an agent prompt render as absolute URLs; nothing
-            # below an agent is bundled into the skill's references/docs/.
-            _visit("agent", a, path_chain + [key], False)
-        for d in sorted(sub_docs):
-            _visit("doc", d, path_chain + [key], bundle and kind != "agent")
+        # Scripts are leaves: a deterministic tool is not a document, and
+        # scanning .py contents would let a comment pull in a doc.
+        if kind != "script":
+            text = _read_text(resolved)
+            _, sub_agents, sub_docs, sub_scripts = _scan_logical_refs(text)
+            for a in sorted(sub_agents):
+                # Docs cited by an agent prompt render as absolute URLs; nothing
+                # below an agent is bundled into the skill's references/docs/.
+                _visit("agent", a, path_chain + [key], False)
+            for d in sorted(sub_docs):
+                _visit("doc", d, path_chain + [key], bundle and kind != "agent")
+            for s in sorted(sub_scripts):
+                _visit("script", s, path_chain + [key], bundle and kind != "agent")
         active.discard(key)
         visited.add(key)
 
     # Seed: scan every text file in the skill root.
     seed_agents: set[str] = set()
     seed_docs: set[str] = set()
+    seed_scripts: set[str] = set()
     for f in _walk_files(skill_root):
         if not _is_text_file(f):
             continue
         text = _read_text(f)
-        skills_in_file, a, d = _scan_logical_refs(text)
+        skills_in_file, a, d, s = _scan_logical_refs(text)
         seed_agents.update(a)
         seed_docs.update(d)
+        seed_scripts.update(s)
         # Any bare skills/<name>/SKILL.md path is illegal in source.
         if BARE_SKILL_PATH_RE.search(_strip_urls(text)):
             _abort(
@@ -377,8 +401,10 @@ def _compute_closure(
         _visit("agent", a, [f"skill:{skill_name}"], False)
     for d in sorted(seed_docs):
         _visit("doc", d, [f"skill:{skill_name}"], True)
+    for s in sorted(seed_scripts):
+        _visit("script", s, [f"skill:{skill_name}"], True)
 
-    return agents, docs
+    return agents, docs, scripts
 
 
 # --- Phase E — Stale URL guard -----------------------------------------------
@@ -645,6 +671,30 @@ def _check_precheck_drift(
         + f" (fix the 'Bundled dependency precheck' list in "
         f"src/skills/{skill_name}/{SOURCE_SKILL_MD})"
     )
+
+
+# --- Phase E — Shipped-script runtime requirements (issue #251) --------------
+
+_SCRIPT_REQUIRES_RE = re.compile(r"^#\s*gi-requires:\s*(\S+)\s*$", re.MULTILINE)
+
+
+def _check_script_requirements(
+    skill_name: str, out_skill_dir: Path, scripts: set[str]
+) -> None:
+    """A shipped script may declare the bundled files it reads at run time with
+    a `# gi-requires: references/...` header. Every declaration must resolve
+    inside the same skill's bundle, or the script silently degrades forever."""
+    bundled = _bundled_reference_paths(out_skill_dir)
+    for name in sorted(scripts):
+        path = out_skill_dir / "references" / "scripts" / name
+        text = path.read_text(encoding="utf-8", errors="replace")
+        for req in sorted(set(_SCRIPT_REQUIRES_RE.findall(text))):
+            if req not in bundled:
+                _abort(
+                    f"script '{name}' in skill '{skill_name}' declares "
+                    f"'gi-requires: {req}' but that file is not bundled — "
+                    f"cite its source document from the skill's runtime prose"
+                )
 
 
 # --- Phase B2 — Per-skill bundled-doc slimming (issue #249) ------------------
@@ -967,9 +1017,26 @@ def _zero_mention_bundled_docs(skill_root: Path, docs: set[str]) -> list[str]:
         if not _is_text_file(f):
             continue
         text = _strip_bibliography_blocks(_read_text(f))
-        _, _, found = _scan_logical_refs(text)
+        _, _, found, _ = _scan_logical_refs(text)
         mentioned.update(found)
     return sorted(docs - mentioned)
+
+
+def _zero_mention_bundled_scripts(skill_root: Path, scripts: set[str]) -> list[str]:
+    """Bundled scripts a skill's runtime instructions never point at.
+
+    Same rule as _zero_mention_bundled_docs: a script that reaches the bundle
+    only through the *Additional Resources* index or the *Bundled dependency
+    precheck* fence is shipped weight nothing tells the agent to run.
+    """
+    mentioned: set[str] = set()
+    for f in _walk_files(skill_root):
+        if not _is_text_file(f):
+            continue
+        text = _strip_bibliography_blocks(_read_text(f))
+        _, _, _, found = _scan_logical_refs(text)
+        mentioned.update(found)
+    return sorted(scripts - mentioned)
 
 
 def _strip_bibliography_blocks(text: str) -> str:
@@ -998,12 +1065,14 @@ def _rewrite_for_standalone(text: str) -> str:
       {{skill:X}}            -> ../X/SKILL.md
       shared/agents/X.md     -> references/agents/X.md
       docs/Y.md              -> references/docs/Y.md
+      shared/scripts/Z.py    -> references/scripts/Z.py
     """
     return _rewrite_url_aware(
         text,
         skill_form=lambda name: f"../{name}/SKILL.md",
         agent_form=lambda name: f"references/agents/{name}",
         doc_form=lambda name: f"references/docs/{name}",
+        script_form=lambda name: f"references/scripts/{name}",
     )
 
 
@@ -1018,16 +1087,18 @@ def _rewrite_for_agent_prompt(text: str) -> str:
       {{skill:X}}            -> <repo>/skills/X/SKILL.md
       shared/agents/X.md     -> <repo>/src/shared/agents/X.md
       docs/Y.md              -> <repo>/docs/Y.md
+      shared/scripts/Z.py    -> <repo>/src/shared/scripts/Z.py
     """
     return _rewrite_url_aware(
         text,
         skill_form=lambda name: f"{_REPO_BLOB_BASE}skills/{name}/SKILL.md",
         agent_form=lambda name: f"{_REPO_BLOB_BASE}src/shared/agents/{name}",
         doc_form=lambda name: f"{_REPO_BLOB_BASE}docs/{name}",
+        script_form=lambda name: f"{_REPO_BLOB_BASE}src/shared/scripts/{name}",
     )
 
 
-def _rewrite_url_aware(text, *, skill_form, agent_form, doc_form):
+def _rewrite_url_aware(text, *, skill_form, agent_form, doc_form, script_form):
     """Rewrite logical references outside of URLs only. URL spans are passed
     through verbatim."""
     parts = []
@@ -1038,6 +1109,7 @@ def _rewrite_url_aware(text, *, skill_form, agent_form, doc_form):
         gap = SKILL_TOKEN_RE.sub(lambda mm: skill_form(mm.group(1)), gap)
         gap = SHARED_AGENT_RE.sub(lambda mm: agent_form(mm.group(1)), gap)
         gap = RUNTIME_DOC_RE.sub(lambda mm: doc_form(mm.group(1)), gap)
+        gap = SHARED_SCRIPT_RE.sub(lambda mm: script_form(mm.group(1)), gap)
         parts.append(gap)
         # Pass URL through unchanged.
         parts.append(m.group(0))
@@ -1046,6 +1118,7 @@ def _rewrite_url_aware(text, *, skill_form, agent_form, doc_form):
     tail = SKILL_TOKEN_RE.sub(lambda mm: skill_form(mm.group(1)), tail)
     tail = SHARED_AGENT_RE.sub(lambda mm: agent_form(mm.group(1)), tail)
     tail = RUNTIME_DOC_RE.sub(lambda mm: doc_form(mm.group(1)), tail)
+    tail = SHARED_SCRIPT_RE.sub(lambda mm: script_form(mm.group(1)), tail)
     parts.append(tail)
     return "".join(parts)
 
@@ -1184,6 +1257,7 @@ def _emit_flattened_skill(
     out_dir: Path,
     agents: set[str],
     docs: set[str],
+    scripts: set[str],
     conventions: dict[str, str] | None = None,
     config_defaults: dict[str, object] | None = None,
 ) -> None:
@@ -1226,6 +1300,15 @@ def _emit_flattened_skill(
         )
         banner = BANNER_TMPL.format(rel=f"docs/{name}")
         _write_text(dst_path, banner + _rewrite_for_standalone(text))
+
+    # Copy transitive shared scripts verbatim. No banner: a .py file has no
+    # HTML comment form, and byte-identity with the source is what makes the
+    # shipped copy auditable. Provenance lives in each script's docstring.
+    for name in sorted(scripts):
+        _copy_binary(
+            src / "shared" / "scripts" / name,
+            out_dir / "references" / "scripts" / name,
+        )
 
 
 def _agent_description(agent_name: str) -> str:
@@ -1375,6 +1458,11 @@ def _scan_dist_skills(out_skills: Path) -> None:
                 )
             if RUNTIME_DOC_RE.search(cleaned):
                 _abort(f"unresolved bare 'docs/Y.md' in {f.relative_to(out_skills.parent)}")
+            if SHARED_SCRIPT_RE.search(cleaned):
+                _abort(
+                    f"unresolved bare 'shared/scripts/X.py' in "
+                    f"{f.relative_to(out_skills.parent)}"
+                )
             if BARE_SKILL_PATH_RE.search(cleaned):
                 _abort(
                     f"unresolved bare 'skills/<name>/SKILL.md' in "
@@ -1480,10 +1568,17 @@ def build(out: Path, src: Path, *, verbose: bool = False, no_root_skills: bool =
         all_skill_sources.append((name, src / "deprecated-skills" / name))
     public_skill_set = set(public_skills)
     for skill_name, skill_root in sorted(all_skill_sources, key=lambda x: x[0]):
-        agents, docs = _compute_closure(src, skill_name, skill_root)
+        agents, docs, scripts = _compute_closure(src, skill_name, skill_root)
         out_skill_dir = out_skills / skill_name
         _emit_flattened_skill(
-            src, skill_root, out_skill_dir, agents, docs, conventions, config_defaults
+            src,
+            skill_root,
+            out_skill_dir,
+            agents,
+            docs,
+            scripts,
+            conventions,
+            config_defaults,
         )
         # Issue #249: a bundled doc no runtime instruction points at is dead
         # install weight. Warn (never abort) — the fix is an authoring decision.
@@ -1493,6 +1588,14 @@ def build(out: Path, src: Path, *, verbose: bool = False, no_root_skills: bool =
                 f"instruction references it (only its index/precheck entry)",
                 file=sys.stderr,
             )
+        # Issue #251: same rule for a shipped script nothing tells the agent to
+        # run. The trailing phrase is deliberately identical to the doc warning.
+        for unused in _zero_mention_bundled_scripts(skill_root, scripts):
+            print(
+                f"⚠ skill '{skill_name}' bundles the script {unused} but no "
+                f"runtime instruction references it (only its index/precheck entry)",
+                file=sys.stderr,
+            )
         # Issue #195: fail the build if the skill's bundled-dependency precheck
         # list drifts from the references/ files actually bundled. Policed for
         # public skills only (deprecated-distributed skills are exempt).
@@ -1500,8 +1603,14 @@ def build(out: Path, src: Path, *, verbose: bool = False, no_root_skills: bool =
             _check_precheck_drift(
                 skill_name, skill_root / SOURCE_SKILL_MD, out_skill_dir
             )
+            # Issue #251: a shipped script's `# gi-requires:` declarations must
+            # resolve inside the same skill's bundle.
+            _check_script_requirements(skill_name, out_skill_dir, scripts)
         if verbose:
-            print(f"  ✓ flattened: {skill_name} (agents={len(agents)}, docs={len(docs)})")
+            print(
+                f"  ✓ flattened: {skill_name} (agents={len(agents)}, "
+                f"docs={len(docs)}, scripts={len(scripts)})"
+            )
 
     # Repo-root skills/ mirror. Prefer ./scripts/build.sh (build → verify →
     # promote). Use --no-root-skills when emitting only to <out>/skills/.

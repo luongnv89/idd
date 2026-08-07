@@ -8,6 +8,8 @@
 #     `references/agents/X.md`).
 #   - Unresolved runtime `docs/X.md` references (must be rewritten to
 #     `references/docs/X.md`).
+#   - Unresolved shared `shared/scripts/X.py` references (must be rewritten to
+#     `references/scripts/X.py`).
 #   - Bare `skills/<name>/SKILL.md` references (must be rewritten per ADR
 #     row to `../<name>/SKILL.md`).
 #   - Unresolved `{{skill:...}}` tokens.
@@ -60,6 +62,8 @@ SHARED_AGENT_RE = re.compile(r"(?<![\w/])shared/agents/([a-z][a-z0-9-]+\.md)")
 RUNTIME_DOC_RE = re.compile(r"(?<![\w/])docs/([a-z][a-z0-9-]+\.md)")
 BARE_SKILL_PATH_RE = re.compile(r"(?<![\w/])skills/([a-z][a-z0-9-]+)/SKILL\.md")
 SKILL_TOKEN_RE = re.compile(r"\{\{skill:([a-z][a-z0-9-]*)\}\}")
+SHARED_SCRIPT_RE = re.compile(r"(?<![\w/])shared/scripts/([a-z][a-z0-9-]+\.py)")
+LOCAL_SCRIPT_RE = re.compile(r"(?<![\w/])references/scripts/([a-z][a-z0-9-]+\.py)")
 
 # Mask all URLs — replace with same-length spaces so character offsets are
 # preserved if they ever matter; we only care about presence.
@@ -79,6 +83,11 @@ for m in SHARED_AGENT_RE.finditer(masked):
 for m in RUNTIME_DOC_RE.finditer(masked):
     line_no = masked[: m.start()].count("\n") + 1
     errors.append(f"unresolved 'docs/{m.group(1)}' at line {line_no}")
+
+for m in SHARED_SCRIPT_RE.finditer(masked):
+    # Reject any bare shared/scripts/*.py — should be references/scripts/...
+    line_no = masked[: m.start()].count("\n") + 1
+    errors.append(f"unresolved 'shared/scripts/{m.group(1)}' at line {line_no}")
 
 for m in BARE_SKILL_PATH_RE.finditer(masked):
     line_no = masked[: m.start()].count("\n") + 1
@@ -112,6 +121,14 @@ for m in LOCAL_DOC_RE.finditer(masked):
             f"missing referenced doc file '{target.name}' at line {line_no}"
         )
 
+for m in LOCAL_SCRIPT_RE.finditer(masked):
+    target = skill_dir / "references" / "scripts" / m.group(1)
+    if not target.is_file():
+        line_no = masked[: m.start()].count("\n") + 1
+        errors.append(
+            f"missing referenced script file '{target.name}' at line {line_no}"
+        )
+
 if errors:
     print(f"FAIL: {filepath}")
     for e in errors:
@@ -134,6 +151,7 @@ for skill_dir in "$SKILLS"/*/; do
   done < <(find "$skill_dir" -type f \( \
       -name "*.md" -o -name "*.txt" -o -name "*.yml" \
       -o -name "*.yaml" -o -name "*.json" -o -name "*.toml" \
+      -o -name "*.py" -o -name "*.sh" \
     \))
   if [ "$errors_in_skill" -eq 0 ]; then
     pass "T1: skills/$name is self-contained"
