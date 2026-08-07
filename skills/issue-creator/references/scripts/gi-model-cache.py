@@ -82,15 +82,26 @@ SEED_REL = os.path.join("templates", "model-data.json")
 MAX_PAYLOAD_BYTES = 256 * 1024
 MAX_TEXT_CHARS = 512
 MAX_NUMBER = 1e9
+# Deeper than any model-data document is, and shallower than the C parser
+# needs to blow the stack.
+MAX_DEPTH = 64
 
 # Control and escape bytes, in every notation that reaches a terminal or a
 # markdown body: C0 (including ESC, CR and LF), DEL and C1, the Unicode line and
 # paragraph separators, and the bidi overrides/isolates that reorder rendered
 # text. No model name, label, source or timestamp needs any of them.
 _UNSAFE_TEXT_RE = re.compile(
-    "[\\x00-\\x1f\\x7f-\\x9f]"
-    "|[\\u2028\\u2029]"
-    "|[\\u202a-\\u202e\\u2066-\\u2069]"
+    "[\\x00-\\x1f\\x7f-\\x9f]"           # C0 controls incl. ESC/CR/LF, DEL, C1
+    "|[\\u2028\\u2029]"                  # line and paragraph separators
+    "|[\\u202a-\\u202e\\u2066-\\u2069]"  # bidi embeddings, overrides, isolates
+    # Zero-width and directional marks. They render as nothing at all, which is
+    # worse than an escape sequence, not better: a model name that reads
+    # identically to a real one in the terminal and in a created issue body is
+    # exactly the payload this boundary exists to refuse. ZWSP/ZWNJ/ZWJ, LRM,
+    # RLM, the Arabic letter mark, the word joiner and its invisible operators,
+    # and the BOM wherever it is not the first byte of a file.
+    "|[\\u200b-\\u200f\\u061c]"
+    "|[\\u2060-\\u2064\\ufeff]"
 )
 
 CONFIG_NAME = ".gitissue.yml"
@@ -241,16 +252,18 @@ def validate_payload(loaded: object, label: str) -> dict:
     """
     if not isinstance(loaded, dict) or "complexity_mapping" not in loaded:
         raise ValueError(f"the {label} is not a model-data document")
-    stack: list[tuple[str, object]] = [(label, loaded)]
+    stack: list[tuple[str, object, int]] = [(label, loaded, 0)]
     while stack:
-        where, node = stack.pop()
+        where, node, depth = stack.pop()
+        if depth > MAX_DEPTH:
+            raise ValueError(f"{where} is nested deeper than {MAX_DEPTH} levels")
         if isinstance(node, dict):
             for key, value in node.items():
                 _check_text(str(key), f"{where}.{key!r} (key)")
-                stack.append((f"{where}.{key}", value))
+                stack.append((f"{where}.{key}", value, depth + 1))
         elif isinstance(node, list):
             for position, value in enumerate(node):
-                stack.append((f"{where}[{position}]", value))
+                stack.append((f"{where}[{position}]", value, depth + 1))
         elif isinstance(node, str):
             _check_text(node, where)
         elif isinstance(node, bool) or node is None:
@@ -286,11 +299,24 @@ def read_capped(path: str | None, label: str) -> str:
 
 
 def parse_model_data(text: str, label: str) -> dict:
-    """Parse and validate — the only way a document enters this script."""
+    """Parse and validate — the only way a document enters this script.
+
+    `RecursionError` is caught beside `ValueError` because it is a
+    `RuntimeError`, not one: a payload nested a few hundred deep is well inside
+    the size cap, blows the parser's stack, and would leave main() as **exit 1**
+    — a code no call site classifies, so a degrade path reads it as "some other
+    failure" and a stop path never runs. That is the same defect the impossible
+    `last_fetched` date had; it is fixed here for the whole parse rather than
+    for one more field.
+    """
     try:
         loaded = json.loads(text, parse_constant=_reject_constant)
     except ValueError as exc:  # JSONDecodeError and _reject_constant alike
         raise ValueError(f"the {label} is corrupt — {exc}") from exc
+    except RecursionError as exc:
+        raise ValueError(
+            f"the {label} is nested too deeply to parse"
+        ) from exc
     return validate_payload(loaded, label)
 
 
@@ -443,7 +469,7 @@ def write_cache(skill_dir: str, payload: dict, date: str) -> tuple[str, list[str
             os.fchmod(handle.fileno(), 0o644)
         os.replace(temp, target)
         temp = None
-    except (OSError, ValueError) as exc:
+    except (OSError, ValueError, RecursionError) as exc:
         raise Unavailable(f"cannot write {target} — {exc}") from exc
     finally:
         if temp is not None:

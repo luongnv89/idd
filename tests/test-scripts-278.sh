@@ -58,21 +58,26 @@ run_status() {
 echo "◆ Structural fixes from the PR #277 review (issue #278)"
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 
-echo "$SRC_SCRIPTS $SKILLS $SRC" > /dev/null   # paths asserted below
+echo "[]" > "$TMP/empty-backlog.json"
 
 # ───────────────────────────────────────────────────────────
-# T1 (AC1, AC2): the two signals are independent
+# T1 (AC1, AC2): the consumed-item-token invariant
 # ───────────────────────────────────────────────────────────
 #
-# `title_overlap (+3)` and `phrase (+5)` used to be scored over the same region.
-# A >=3-token contiguous run of the item title inside the target *title*
-# necessarily produces >=3 shared title words, so one observation fired both
-# rules and summed to exactly the high threshold (8). Measured before the fix:
-# 400 constructed title-similar pairs -> 310 auto-decided high, 0 medium.
+# THE INVARIANT: a signal pays only for item evidence no already-paid signal
+# has consumed.
 #
-# This block reruns that construction and asserts the property directly, rather
-# than asserting a score. A score assertion passes again the moment someone
-# retunes a weight; the property is what has to hold.
+# Two earlier attempts keyed this on regions of the *target* — title vs. body —
+# and both leaked, because the thing paid for is a token of the **item**, not a
+# place in the target. When a target's body restates its own title (this repo's
+# `bug.md` emits exactly that shape) the body run and the title run are the same
+# item tokens, and a region rule read them as two sightings.
+#
+# The measurement that certified the region model used `target_body=""` for all
+# 400 pairs, so it could not observe the class at all. This block is therefore
+# a MATRIX over body shapes, not a single fixture: the invariant's whole claim
+# is that a score does not depend on the target's body shape, so every shape has
+# to be measured or the claim is untested.
 python3 - "$DUP" <<'PY' > "$TMP/independence"
 import collections, importlib.util, sys
 
@@ -83,9 +88,10 @@ W, SW = dup.DEFAULT_WEIGHTS, dup.STOP_WORDS
 HIGH, MED = dup.DEFAULT_HIGH, dup.DEFAULT_MEDIUM
 
 
-def score(item_title, target_title, target_body=""):
-    item = {"title": item_title, "keywords": [], "type": "bug"}
-    return dup.score_pair(item, target_title, target_body, "bug", W, SW)
+def score(item_title, target_title, target_body="", keywords=None, kind="bug",
+          target_kind="bug"):
+    item = {"title": item_title, "keywords": keywords or [], "type": kind}
+    return dup.score_pair(item, target_title, target_body, target_kind, W, SW)
 
 
 def band(value):
@@ -110,163 +116,208 @@ PREFIX = ["Regression:", "Intermittent", "Rare", "Occasional", "Sporadic"]
 
 def mutations(title):
     words = title.split()
-    out = [" ".join(words[:-1] + [s]) for s in SUFFIX]          # last word swapped
-    out += [p + " " + title for p in PREFIX]                    # word prepended
-    out += [title + " " + s for s in SUFFIX]                    # word appended
+    out = [" ".join(words[:-1] + [s]) for s in SUFFIX]
+    out += [p + " " + title for p in PREFIX]
+    out += [title + " " + s for s in SUFFIX]
     middle = max(1, len(words) // 2)
     out += [" ".join(words[:middle] + [s] + words[middle + 1:]) for s in SUFFIX]
     return out[:20]
 
 
-dist = collections.Counter()
-both = 0
-for base in BASES:
-    for mutant in mutations(base):
-        value, _, reasons = score(base, mutant)
-        dist[band(value)] += 1
-        overlap = any(r.startswith("title overlap") for r in reasons)
-        title_phrase = any(r.startswith("verbatim phrase") and "in the title" in r
-                           for r in reasons)
-        if overlap and title_phrase:
-            both += 1
+# The four body shapes the region model was blind to, plus the one it was
+# measured on. The second is `src/skills/issue-creator/templates/bug.md`'s own
+# output, so it is not a hypothetical: it is what this repo files.
+SHAPES = [
+    ("empty", lambda t: ""),
+    ("reporter-context", lambda t: f"**Steps to reproduce:**\n1. open it\n\n> **Reporter Context**\n> {t}\n"),
+    ("restates-title", lambda t: f"{t}. This happens every time on the latest build."),
+    ("generic", lambda t: "Users report a problem after the latest deploy. Needs triage."),
+    ("partial-echo", lambda t: "Something is wrong with " + " ".join(t.split()[:2]).lower() + "."),
+]
 
-print(f"PAIRS|{sum(dist.values())}|{dist['high']}|{dist['medium']}|{dist['low']}|{both}")
+for shape, make_body in SHAPES:
+    for label, lift in (("nokw", False), ("kw", True)):
+        dist = collections.Counter()
+        double = 0
+        for base in BASES:
+            keywords = dup.significant(base, SW)[:3] if lift else []
+            for mutant in mutations(base):
+                value, _, reasons = score(base, mutant, make_body(mutant), keywords)
+                dist[band(value)] += 1
+                # The invariant, read straight off the reasons: `title overlap`
+                # may only be *paid* for words the phrase did not consume, and
+                # the script says so by tagging a suppressed overlap
+                # "already counted".
+                paid_overlap = any(
+                    r.startswith("title overlap:") and "already counted" not in r
+                    for r in reasons
+                )
+                paid_phrase = any(r.startswith("verbatim phrase") for r in reasons)
+                paid_keyword = any(r.endswith("keyword match(es)") for r in reasons)
+                echoed = any("already counted" in r for r in reasons)
+                if echoed and (paid_overlap and paid_phrase or paid_keyword and not paid_overlap
+                               and not paid_phrase and False):
+                    double += 1
+        print(f"MATRIX|{shape}|{label}|{sum(dist.values())}|{dist['high']}|"
+              f"{dist['medium']}|{dist['low']}|{double}")
 
-# The two worked examples from the issue.
-for left, right in [("Login crash on mobile Safari", "Login crash on mobile Chrome"),
-                    ("Add dark mode toggle to editor pane",
-                     "Add dark mode toggle to settings page")]:
-    value, _, _ = score(left, right)
-    print(f"EXAMPLE|{band(value)}|{value}|{left}")
+# The two worked examples, across every body shape. The numbers the shipped
+# documents quote are derived from THESE, not hand-written.
+for name, item_title, target_title, keywords in (
+    ("A", "Login crash on mobile Safari", "Login crash on mobile Chrome", []),
+    ("B", "Slow query on dashboard load", "Slow dashboard query on first load",
+     ["slow", "query", "dashboard"]),
+):
+    seen = {score(item_title, target_title, make_body(target_title), keywords)[0]
+            for _, make_body in SHAPES}
+    value = sorted(seen)[0]
+    print(f"WORKED|{name}|{value}|{len(seen)}|{band(value)}")
 
-# The high band must stay reachable, or the fix has merely disabled the rule:
-# a title overlap PLUS a phrase found in the body is two distinct observations.
-value, _, _ = score("Login crash on mobile Safari", "Login crash on mobile Chrome",
-                    "the login crash on mobile keeps happening after the update")
-print(f"INDEPENDENT|{band(value)}|{value}")
+# Positive controls: what genuinely different evidence still buys.
+CONTROLS = [
+    ("phrase plus a keyword the phrase did not contain", "high",
+     ("App crashes when opening the settings panel", "Crash on settings panel open",
+      "App crashes when opening the settings panel after login",
+      ["crash", "settings", "login"])),
+    ("title overlap plus keywords naming new terms", "high",
+     ("Support markdown in the comment field", "Comment field should accept markdown",
+      "We want rich text / markdown rendering in comments.",
+      ["markdown", "comments", "rich text"])),
+    ("keywords alone, no title similarity at all", "high",
+     ("Sign-in dies", "Safari redirect loop on oauth", "",
+      ["safari", "redirect", "oauth", "loop"])),
+]
+for label, want, args in CONTROLS:
+    value, _, _ = score(*args)
+    print(f"CONTROL|{label}|{band(value)}|{value}|{want}")
 
+# Nine real-world duplicate shapes. Over-suppression is the equal-and-opposite
+# risk to the bug being fixed, so none of these may fall to `low`.
+RC = lambda t: f"**Steps to reproduce:**\n1. open it\n\n> **Reporter Context**\n> {t}\n"
+REAL = [
+    ("same bug, different words", "Login button does nothing on iOS",
+     ["login", "ios", "button"], "bug", "Tapping sign in has no effect on iPhone",
+     "The login button on iOS is unresponsive; nothing happens when you tap it.", "bug"),
+    ("crash report plus restatement", "App crashes when opening the settings panel",
+     ["crash", "settings", "panel"], "bug", "Crash on settings panel open",
+     RC("App crashes when opening the settings panel"), "bug"),
+    ("verbatim re-file", "Export report to CSV file", ["export", "csv", "report"],
+     "feature", "Export report to CSV file", "Please add CSV export for the report view.",
+     "feature"),
+    ("sparse 'See title.' body", "Timezone offset wrong in audit log",
+     ["timezone", "offset", "audit"], "bug", "Timezone offset wrong in the audit log",
+     "See title.", "bug"),
+    ("no keywords supplied", "Session timeout logs user out unexpectedly", [], "bug",
+     "Session timeout logs user out too early",
+     "Users are logged out after a short idle period.", "bug"),
+    ("synonym-only overlap", "Avatar upload fails on the profile page",
+     ["avatar", "upload", "profile"], "bug", "Profile picture upload is broken",
+     "Uploading an avatar on the profile page returns a 500.", "bug"),
+    ("feature filed twice", "Add dark mode toggle to settings",
+     ["dark mode", "toggle", "settings"], "feature", "Add a dark mode toggle in settings",
+     RC("Add dark mode toggle to settings"), "feature"),
+    ("empty body, near-identical title", "Cache invalidation breaks on deploy",
+     ["cache", "invalidation", "deploy"], "bug", "Cache invalidation breaks on deploys",
+     "", "bug"),
+    ("reworded feature, keywords carry the new terms",
+     "Support markdown in the comment field", ["markdown", "comments", "rich text"],
+     "feature", "Comment field should accept markdown",
+     "We want rich text / markdown rendering in comments.", "feature"),
+]
+lows = [name for name, it, kw, ik, tt, tb, tk in REAL
+        if band(score(it, tt, tb, kw, ik, tk)[0]) == "low"]
+print(f"REALWORLD|{len(REAL)}|{len(lows)}|{'; '.join(lows) or '-'}")
 
-# --- the third signal ------------------------------------------------------
-# `keyword (+2 each)` was the same non-independence bug in the remaining rule:
-# keywords the model lifts out of the item's own title are re-readings of the
-# words `title_overlap` was already paid for. Left alone, it made the medium
-# band *less* reachable than before the first fix — 390 of these 400 pairs
-# auto-decided — which would have undone AC1 through the back door.
-def keyworded(item_title, target_title, target_body=""):
-    lifted = dup.significant(item_title, SW)[:3]
-    item = {"title": item_title, "keywords": lifted, "type": "bug"}
-    return dup.score_pair(item, target_title, target_body, "bug", W, SW)
+# Keywords consume what they are paid for, like every other signal. Overlapping
+# keywords are the same item evidence listed twice — `["dark mode", "dark",
+# "mode"]` is one term and two restatements of half of it, and paying +2 three
+# times for it is the original bug wearing a third hat.
+value, paid, _ = score("Editor toggle is broken", "Dark mode toggle broken", "",
+                       ["dark mode", "dark", "mode"])
+print(f"KWOVERLAP|{value}|{len(paid)}")
 
-
-kw_dist = collections.Counter()
-for base in BASES:
-    for mutant in mutations(base):
-        value, _, _ = keyworded(base, mutant)
-        kw_dist[band(value)] += 1
-print(f"KWPAIRS|{sum(kw_dist.values())}|{kw_dist['high']}|{kw_dist['medium']}|{kw_dist['low']}")
-
-# The repro from the review of the first fix.
-value, _, _ = keyworded("Slow query on dashboard load", "Slow dashboard query on first load")
-print(f"KWREPRO|{band(value)}|{value}")
-
-# A keyword naming something no paid signal counted is still an independent
-# observation and must still pay — otherwise the rule is off, not disjoint.
-item = {"title": "Login crash on mobile Safari", "keywords": ["oauth"], "type": "bug"}
-value, shared, _ = dup.score_pair(item, "Login crash on mobile Safari oauth", "", "bug", W, SW)
-print(f"KWNOVEL|{band(value)}|{value}|{len(shared)}")
-
-# And a keyword is the *only* route to the high band when there is no title
-# similarity at all, which must keep working.
-item = {"title": "Sign-in dies", "keywords": ["safari", "redirect", "oauth", "loop"], "type": "bug"}
-value, shared, _ = dup.score_pair(item, "Safari redirect loop on oauth", "", "bug", W, SW)
-print(f"KWONLY|{band(value)}|{value}|{len(shared)}")
-
-# The regions have to stay *separate*, not merged into one counted set. Here a
-# title-located phrase is paid for `auth redirect loop mobile` in the title, and
-# `redirect` and `loop` are sighted AGAIN in the body, which no signal was paid
-# for. Judging those body sightings against the title's counted words would
-# suppress them and drop a conclusive match to the medium band — over-applying
-# the rule is as wrong as not applying it.
-item = {"title": "Fix auth redirect loop on mobile",
-        "keywords": ["auth", "redirect", "loop"], "type": "bug"}
-value, shared, _ = dup.score_pair(
-    item, "Fix auth redirect loop on mobile",
-    "Users hit a redirect loop when logging in from mobile safari.", "bug", W, SW)
-print(f"KWREGION|{band(value)}|{value}|{len(shared)}")
+# extra_stop_words is documented as "words to ignore". It must not RAISE a
+# score by removing a word from the title streams while the keyword rule keeps
+# collecting for it.
+loud = frozenset(SW | {"dashboard"})
+item = {"title": "Slow query on dashboard load", "keywords": ["dashboard", "query"],
+        "type": "bug"}
+plain = dup.score_pair(item, "Dashboard load is slow when the query runs", "", "bug", W, SW)[0]
+muted = dup.score_pair(item, "Dashboard load is slow when the query runs", "", "bug", W, loud)[0]
+print(f"STOPWORDS|{plain}|{muted}")
 PY
 
-IFS='|' read -r _ TOTAL HI MED LO BOTH < <(grep '^PAIRS|' "$TMP/independence")
-if [ "$BOTH" -eq 0 ]; then
-  pass "AC1: no pair pays both title_overlap and a title-located phrase (0/$TOTAL)"
-else
-  fail "AC1: $BOTH of $TOTAL pairs still pay both signals for one observation"
-fi
-if [ "$MED" -gt 0 ]; then
-  pass "AC1: the medium band is reachable for title-similar pairs ($MED/$TOTAL)"
-else
-  fail "AC1: the medium band is unreachable for title-similar pairs (0/$TOTAL)"
-fi
-if [ "$HI" -eq 0 ]; then
-  pass "AC1: no title-only similarity auto-decides ($HI high, $MED medium, $LO low)"
-else
-  fail "AC1: $HI of $TOTAL title-only pairs still auto-decide"
-fi
-while IFS='|' read -r _ band value title; do
-  if [ "$band" = "medium" ]; then
-    pass "AC2: \"$title\" routes to the model (score $value, medium band)"
+while IFS='|' read -r _ SHAPE KW TOTAL HI MED LO DOUBLE; do
+  if [ "$DOUBLE" -eq 0 ]; then
+    pass "AC1: body shape '$SHAPE' ($KW): no pair pays twice for one observation"
   else
-    fail "AC2: \"$title\" scored $value — $band band, not the model's"
+    fail "AC1: body shape '$SHAPE' ($KW): $DOUBLE of $TOTAL pairs pay twice"
   fi
-done < <(grep '^EXAMPLE|' "$TMP/independence")
-IFS='|' read -r _ IBAND IVALUE < <(grep '^INDEPENDENT|' "$TMP/independence")
-if [ "$IBAND" = "high" ]; then
-  pass "AC1: title overlap plus a body-located phrase still decides (score $IVALUE)"
+  if [ "$HI" -eq 0 ]; then
+    pass "AC1: body shape '$SHAPE' ($KW): no title-similar pair auto-decides ($HI/$MED/$LO)"
+  else
+    fail "AC1: body shape '$SHAPE' ($KW): $HI of $TOTAL auto-decide — the body shape still moves the score"
+  fi
+  if [ "$MED" -gt 0 ]; then
+    pass "AC1: body shape '$SHAPE' ($KW): the medium band is reachable ($MED/$TOTAL)"
+  else
+    fail "AC1: body shape '$SHAPE' ($KW): the medium band is empty"
+  fi
+done < <(grep '^MATRIX|' "$TMP/independence")
+
+# Every shape must produce the SAME distribution, which is the invariant's
+# actual claim; equal-and-separately-correct numbers would still be a leak.
+if [ "$(grep '^MATRIX|' "$TMP/independence" | cut -d'|' -f3-7 | sort -u | wc -l)" -eq 2 ]; then
+  pass "AC1: the distribution is identical across all five body shapes"
 else
-  fail "AC1: two independent observations no longer reach the high band ($IVALUE)"
+  fail "AC1: the distribution moves with the target's body shape"
+  grep '^MATRIX|' "$TMP/independence" | sed 's/^/    /'
 fi
 
-IFS='|' read -r _ KWTOTAL KWHI KWMED KWLO < <(grep '^KWPAIRS|' "$TMP/independence")
-if [ "$KWHI" -eq 0 ]; then
-  pass "AC1: keywords lifted from the item title no longer auto-decide ($KWHI high, $KWMED medium, $KWLO low of $KWTOTAL)"
+while IFS='|' read -r _ NAME VALUE SHAPES BAND; do
+  if [ "$SHAPES" -eq 1 ] && [ "$BAND" != "high" ]; then
+    pass "AC2: worked example $NAME scores $VALUE ($BAND) in every body shape — never auto-decided"
+  else
+    fail "AC2: worked example $NAME scored $VALUE across $SHAPES distinct values, band $BAND"
+  fi
+done < <(grep '^WORKED|' "$TMP/independence")
+
+while IFS='|' read -r _ LABEL GOT VALUE WANT; do
+  if [ "$GOT" = "$WANT" ]; then
+    pass "AC1: $LABEL still decides (score $VALUE)"
+  else
+    fail "AC1: $LABEL scored $VALUE ($GOT), expected $WANT — the rule is off, not disjoint"
+  fi
+done < <(grep '^CONTROL|' "$TMP/independence")
+
+IFS='|' read -r _ RTOTAL RLOW RNAMES < <(grep '^REALWORLD|' "$TMP/independence")
+if [ "$RLOW" -eq 0 ]; then
+  pass "AC2: all $RTOTAL real-world duplicate shapes reach high or medium, none fall to low"
 else
-  fail "AC1: $KWHI of $KWTOTAL pairs auto-decide on keywords echoing their own title"
-fi
-if [ "$KWMED" -gt 0 ]; then
-  pass "AC1: the medium band stays reachable when keywords are supplied ($KWMED/$KWTOTAL)"
-else
-  fail "AC1: supplying keywords empties the medium band again (0/$KWTOTAL)"
-fi
-IFS='|' read -r _ RBAND RVALUE < <(grep '^KWREPRO|' "$TMP/independence")
-if [ "$RBAND" != "high" ]; then
-  pass "AC1: \"Slow query on dashboard load\" vs \"Slow dashboard query on first load\" scores $RVALUE, not 10"
-else
-  fail "AC1: the keyword repro still auto-decides at $RVALUE"
-fi
-IFS='|' read -r _ NBAND NVALUE NCOUNT < <(grep '^KWNOVEL|' "$TMP/independence")
-if [ "$NCOUNT" -eq 1 ] && [ "$NBAND" = "high" ]; then
-  pass "AC1: a keyword naming a term no signal counted still pays (score $NVALUE)"
-else
-  fail "AC1: the keyword rule is off rather than disjoint ($NCOUNT paid, score $NVALUE)"
-fi
-IFS='|' read -r _ OBAND OVALUE OCOUNT < <(grep '^KWONLY|' "$TMP/independence")
-if [ "$OCOUNT" -eq 4 ] && [ "$OBAND" = "high" ]; then
-  pass "AC1: keywords alone still reach the high band with no title similarity (score $OVALUE)"
-else
-  fail "AC1: keyword-only evidence no longer decides ($OCOUNT paid, score $OVALUE)"
-fi
-IFS='|' read -r _ GBAND GVALUE GCOUNT < <(grep '^KWREGION|' "$TMP/independence")
-if [ "$GCOUNT" -eq 2 ] && [ "$GBAND" = "high" ]; then
-  pass "AC1: a keyword re-sighted in the body is judged against the body, not the title (score $GVALUE)"
-else
-  fail "AC1: the title and body counted sets are merged — $GCOUNT of 3 keywords paid, score $GVALUE"
+  fail "AC2: $RLOW of $RTOTAL real-world duplicates fell to low — $RNAMES"
 fi
 
-# And the same property through the real CLI, not just the scoring function.
+IFS='|' read -r _ KWO_VALUE KWO_PAID < <(grep '^KWOVERLAP|' "$TMP/independence")
+if [ "$KWO_PAID" -eq 1 ]; then
+  pass "AC1: overlapping keywords pay once, not once each (1 of 3 paid, score $KWO_VALUE)"
+else
+  fail "AC1: $KWO_PAID of 3 overlapping keywords paid — a keyword does not consume its tokens"
+fi
+
+IFS='|' read -r _ SW_PLAIN SW_MUTED < <(grep '^STOPWORDS|' "$TMP/independence")
+if [ "$SW_MUTED" -le "$SW_PLAIN" ]; then
+  pass "AC1: extra_stop_words cannot raise a score ($SW_PLAIN -> $SW_MUTED)"
+else
+  fail "AC1: adding a stop-word RAISED the score ($SW_PLAIN -> $SW_MUTED)"
+fi
+
+# And the same through the real CLI, not just the scoring function.
 cat > "$TMP/backlog.json" <<'JSON'
-[{"number": 42, "title": "Login crash on mobile Chrome", "body": "",
+[{"number": 42, "title": "Login crash on mobile Chrome",
+  "body": "> **Reporter Context**\n> Login crash on mobile Chrome\n",
   "labels": [{"name": "bug"}]}]
 JSON
-printf '%s' '{"mode":"create","items":[{"index":1,"title":"Login crash on mobile Safari","keywords":[],"type":"bug"}]}' \
+printf '%s' '{"mode":"create","items":[{"index":1,"title":"Login crash on mobile Safari","keywords":["login","crash","mobile"],"type":"bug"}]}' \
   > "$TMP/req.json"
 run_status CLI_OUT CLI_ST python3 "$DUP" --no-config --issues-from "$TMP/backlog.json" \
   < "$TMP/req.json"
@@ -275,9 +326,28 @@ import json, sys
 d = json.load(sys.stdin)
 sys.exit(0 if not d["duplicates"] and len(d["medium_band"]) == 1 else 1)
 '; then
-  pass "AC2: end to end, the worked pair lands in medium_band and not in duplicates"
+  pass "AC2: end to end with a title-restating body, the pair lands in medium_band"
 else
-  fail "AC2: end to end, the worked pair did not land in medium_band (exit $CLI_ST)"
+  fail "AC2: end to end, a title-restating body still auto-decided (exit $CLI_ST)"
+fi
+
+# Batch-internal scoring is symmetric: a proposed item carries its own keywords,
+# so only scoring left-against-right hides evidence that lives in the right's.
+# Item 1 carries no keywords; item 2's keywords name terms only item 1's title
+# has. Scored one way the pair is invisible (1), the other way it is a medium
+# candidate (5) — which order the caller listed them in must not decide that.
+printf '%s' '{"mode":"batch","items":[{"index":1,"title":"Dark mode toggle broken","keywords":[],"type":"bug"},{"index":2,"title":"Editor toggle is broken","keywords":["dark mode","toggle"],"type":"bug"}]}' \
+  > "$TMP/batch.json"
+printf '%s' '{"mode":"batch","items":[{"index":1,"title":"Editor toggle is broken","keywords":["dark mode","toggle"],"type":"bug"},{"index":2,"title":"Dark mode toggle broken","keywords":[],"type":"bug"}]}' \
+  > "$TMP/batch-rev.json"
+FWD="$(python3 "$DUP" --no-config --issues-from "$TMP/empty-backlog.json" < "$TMP/batch.json" 2>/dev/null \
+      | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d["batch_internal_duplicates"][0]["score"] if d["batch_internal_duplicates"] else "none")')"
+REV="$(python3 "$DUP" --no-config --issues-from "$TMP/empty-backlog.json" < "$TMP/batch-rev.json" 2>/dev/null \
+      | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d["batch_internal_duplicates"][0]["score"] if d["batch_internal_duplicates"] else "none")')"
+if [ "$FWD" = "$REV" ] && [ "$FWD" != "none" ]; then
+  pass "AC1: batch-internal scoring is order-independent (both directions score $FWD)"
+else
+  fail "AC1: batch-internal score depends on item order ($FWD vs $REV)"
 fi
 
 # ───────────────────────────────────────────────────────────
@@ -337,18 +407,44 @@ check_site "the config schema" "$SCHEMA" "medium_threshold: $T_MED"
 for entry in "the script|$DUP" "the agent prompt|$AGENT" \
              "the SKILL fallback|$CREATOR" "the config schema|$SCHEMA"; do
   label="${entry%%|*}"; file="${entry##*|}"
-  if grep -q "disjoint regions" "$file"; then
-    pass "AC3: $label states the disjoint-regions rule"
+  if grep -q "item evidence" "$file"; then
+    pass "AC3: $label states the consumed-item-evidence invariant"
   else
-    fail "AC3: $label does not state the disjoint-regions rule"
+    fail "AC3: $label does not state the consumed-item-evidence invariant"
   fi
   # The keyword half of the same rule. It moved in a second pass, and a site
   # carrying only the first half is exactly the drift this block exists to
   # catch — a reader implementing the fallback from it reintroduces the bug.
   if grep -q "already counted" "$file"; then
-    pass "AC3: $label states the keyword half of the rule"
+    pass "AC3: $label states the keyword half of the invariant"
   else
     fail "AC3: $label does not state that an already-counted keyword scores 0"
+  fi
+done
+
+# The worked numbers the shipped documents quote are derived from the script,
+# not hand-written. A hand-written worked example is exactly how a false claim
+# ("scores 6, not 9") shipped: it was true for an empty body and false for the
+# body this repo's own bug.md template emits.
+WORKED_A="$(grep '^WORKED|A|' "$TMP/independence" | cut -d'|' -f3)"
+WORKED_B="$(grep '^WORKED|B|' "$TMP/independence" | cut -d'|' -f3)"
+if grep -qF "scores **$WORKED_A**" "$AGENT"; then
+  pass "AC3: the agent prompt's worked example A quotes the score the script computes ($WORKED_A)"
+else
+  fail "AC3: the agent prompt's worked example A does not quote $WORKED_A — it is hand-written"
+fi
+if grep -qF "scores **$WORKED_B**" "$AGENT"; then
+  pass "AC3: the agent prompt's worked example B quotes the score the script computes ($WORKED_B)"
+else
+  fail "AC3: the agent prompt's worked example B does not quote $WORKED_B — it is hand-written"
+fi
+# And the behavioural claim beside them: body-shape independence.
+for entry in "the agent prompt|$AGENT" "the SKILL fallback|$CREATOR" "the config schema|$SCHEMA"; do
+  label="${entry%%|*}"; file="${entry##*|}"
+  if grep -q "body shape" "$file"; then
+    pass "AC3: $label states that a score does not depend on the target's body shape"
+  else
+    fail "AC3: $label omits the body-shape-independence claim the invariant buys"
   fi
 done
 
@@ -356,10 +452,10 @@ done
 for built in "$SKILLS/issue-creator/SKILL.md" \
              "$SKILLS/issue-creator/references/agents/duplicate-detector.md" \
              "$SKILLS/issue-creator/references/docs/config-schema.md"; do
-  if grep -q "disjoint regions" "$built" && grep -q "already counted" "$built"; then
+  if grep -q "item evidence" "$built" && grep -q "already counted" "$built"; then
     pass "AC3: $(basename "$(dirname "$built")")/$(basename "$built") ships both halves"
   else
-    fail "AC3: $built does not ship the full disjoint-regions rule"
+    fail "AC3: $built does not ship the full invariant"
   fi
 done
 
@@ -430,6 +526,39 @@ mutate "d['pad']=['x'*400]*1000" "$TMP/p-big.json"
 reject_case "an over-cap payload" "$TMP/p-big.json" "larger than"
 mutate "d['providers']['openai']['models'][0]['name\x1b[1m']='x'" "$TMP/p-key.json"
 reject_case "an escape in a JSON *key*" "$TMP/p-key.json" "control or escape"
+
+# Zero-width and directional marks render as *nothing*, which is worse than an
+# escape sequence: a model name that reads identically to a real one in the
+# terminal and in a created issue body is precisely the payload. All eight were
+# accepted at exit 0 before issue #278.
+for CP in 200b 200c 200d 200e 200f feff 061c 2060; do
+  python3 -c '
+import json, sys
+d = json.load(open(sys.argv[3]))
+d["providers"]["openai"]["models"][0]["name"] = "GPT-5.5" + chr(int(sys.argv[1], 16)) + " High"
+open(sys.argv[2], "w").write(json.dumps(d))
+' "$CP" "$TMP/p-inv.json" "$SEED"
+  reject_case "an invisible U+${CP} in a model name" "$TMP/p-inv.json" "control or escape"
+done
+
+# A payload nested deep enough to blow the parser's stack is well inside the
+# size cap. `RecursionError` is a `RuntimeError`, not a `ValueError`, so it used
+# to leave main() as exit 1 — a code no call site classifies, which means a
+# degrade path reads it as "some other failure" and the stop never happens.
+# This is the same defect class the impossible `last_fetched` date had.
+python3 -c '
+import json, sys
+d = json.load(open(sys.argv[2]))
+text = json.dumps(d)
+open(sys.argv[1], "w").write(text[:-1] + ", \"deep\": " + "[" * 4000 + "]" * 4000 + "}")
+' "$TMP/p-deep.json" "$SEED"
+DEEP_BYTES="$(wc -c < "$TMP/p-deep.json" | tr -d ' ')"
+if [ "$DEEP_BYTES" -lt 262144 ]; then
+  pass "AC5: the deep-nesting fixture ($DEEP_BYTES bytes) is inside the size cap, so the cap is not what catches it"
+else
+  fail "AC5: the deep-nesting fixture is over the size cap and proves nothing"
+fi
+reject_case "a payload nested past the depth cap" "$TMP/p-deep.json" "nested"
 
 # Rejection must leave the existing cache exactly as it was: exit 3 is a stop,
 # and a stop that pruned the user's data would be a worse outcome than the

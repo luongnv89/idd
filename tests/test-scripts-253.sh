@@ -149,7 +149,14 @@ dup() {
   printf '%s' "$request" | python3 "$DUP" --issues-from "$BACKLOG" --no-config "$@"
 }
 
-HIGH_REQ='{"mode":"create","items":[{"index":1,"title":"Fix auth redirect loop on mobile","keywords":["auth","redirect","loop"],"type":"bug"}]}'
+# A conclusive match needs genuinely different evidence, not one observation
+# restated. Issue #278 replaced the region model with the consumed-item-token
+# invariant, and this fixture moved with it: the keyword list now carries
+# `safari`, a term the title phrase does not contain and #42's body does. The
+# old fixture's keywords were all words of the item's own title, which under
+# the invariant is one observation and correctly scores 6 — pinned below, so
+# the change is a stronger contract rather than a relaxed one.
+HIGH_REQ='{"mode":"create","items":[{"index":1,"title":"Fix auth redirect loop on mobile","keywords":["auth","redirect","loop","safari"],"type":"bug"}]}'
 out="$(dup "$HIGH_REQ")"
 if [ "$(printf '%s' "$out" | jkey 'duplicates.0.confidence')" = "high" ] \
    && [ "$(printf '%s' "$out" | jkey 'duplicates.0.match_number')" = "42" ] \
@@ -157,6 +164,15 @@ if [ "$(printf '%s' "$out" | jkey 'duplicates.0.confidence')" = "high" ] \
   pass "AC1: a conclusive match lands in duplicates, not the medium band"
 else
   fail "AC1: a conclusive match lands in duplicates (got: $out)"
+fi
+
+ECHO_REQ='{"mode":"create","items":[{"index":1,"title":"Fix auth redirect loop on mobile","keywords":["auth","redirect","loop"],"type":"bug"}]}'
+out="$(dup "$ECHO_REQ")"
+if [ "$(printf '%s' "$out" | jkey 'duplicates')" = "[]" ] \
+   && [ "$(printf '%s' "$out" | jkey 'medium_band.0.match_number')" = "42" ]; then
+  pass "AC1: the same match with only its own title words echoed back goes to the model"
+else
+  fail "AC1: keywords echoing the item's title still auto-decide (got: $out)"
 fi
 
 # The medium band is the whole point of the split: 5-7 must NOT be decided here.

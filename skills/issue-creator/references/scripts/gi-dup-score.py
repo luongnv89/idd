@@ -3,11 +3,13 @@
 
 The scoring table `/issue-creator` uses is fixed arithmetic — +3 for a title
 overlap, +2 per matched keyword, +1 for a shared type, +5 for a verbatim
-phrase, then two thresholds. The three sightings are scored over disjoint
-regions of the target so that one observation can never pay twice: the +3 and
-the +5 split title from body, and a keyword whose every token a title signal
-has **already counted** is that same sighting read again and does not pay. A
-keyword contributing a term no paid signal counted still does. See `score_pair`.
+phrase, then two thresholds. One invariant holds the three sightings apart:
+**a signal pays only for item evidence no already-paid signal has consumed.**
+The evidence is a token of the *item*, never a place in the target, so a target
+that restates its own title — which this repo's own `bug.md` does, as a
+`> **Reporter Context**` blockquote — cannot buy a second observation. A term
+the item's title never contained is genuinely new; a term **already counted**
+is the same observation read again and scores 0. See `score_pair`.
 
 Running it inside a language model means reading up to 100 issue bodies into a
 context window (10-20k tokens on every create) to compute a sum that has one
@@ -283,97 +285,96 @@ def score_pair(
     score = 0
     reasons: list[str] = []
 
-    # `title_overlap` and `phrase` are scored over *disjoint regions* of the
-    # target, because they are not independent signals over the same region: a
-    # run of >= PHRASE_MIN item-title tokens inside the target **title**
-    # necessarily also produces >= TITLE_OVERLAP_MIN shared title words, so one
-    # observation would fire both rules and sum to exactly the high threshold.
-    # That is how `"Login crash on mobile Safari"` used to auto-decide against
-    # `"Login crash on mobile Chrome"` with no model consulted.
+    # THE INVARIANT: a signal pays only for **item** evidence that no
+    # already-paid signal has consumed.
     #
-    # So: a run found in the title *replaces* the title-overlap weight (the
-    # stronger reading of the one observation, never the sum of two), while a
-    # run found in the **body** is a genuinely separate sighting and is added on
-    # top of whatever the title overlap earned. Only two distinct observations
-    # can reach the high threshold from these two rules.
+    # Two earlier attempts keyed this on regions of the *target* — title vs.
+    # body — and both leaked, because the thing being paid for is a token of
+    # the **item**, not a place in the target. When a target's body restates
+    # its own title (this repo's own `bug.md` emits exactly that, as a
+    # `> **Reporter Context**` blockquote) the body run and the title run are
+    # the same item tokens, and a region rule reads them as two sightings and
+    # pays twice. Sighting the same item evidence in two places is one
+    # observation; only genuinely different item evidence is a second one.
+    #
+    # So the scoring path below is one loop over the signals in decreasing
+    # order of how much item evidence each explains — a contiguous run explains
+    # more than a set of shared words, which explains more than a single term —
+    # each paying only for what `consumed` does not already hold, then adding
+    # what it paid for to `consumed`. The order is fixed, so the answer is the
+    # same on every run; and no signal can be reached by a target that merely
+    # repeats itself.
+    consumed: set[str] = set()
+
+    # 1. Verbatim phrase. Title and body are searched as separate streams so no
+    #    run can straddle the join between them, but a run is the same item
+    #    evidence wherever it is sighted: the longer one is taken (ties to the
+    #    title, for a stable answer) and it is paid for exactly once.
     title_run = phrase_hit(item_title_tokens, target_title_tokens)
     body_run = phrase_hit(item_title_tokens, target_body_tokens)
-    phrase_run = body_run or title_run
-    # The overlap is paid unless the *only* phrase evidence came from the title.
-    overlap_is_independent = body_run is not None or title_run is None
-
-    # The words an already-paid signal has counted, **per region**. Everything
-    # below is scored against these: a later signal whose whole evidence in a
-    # region is words that region has already been paid for is re-reading one
-    # sighting, not making a second one. The two sets stay separate because the
-    # regions are the whole point — the body is precisely what the title
-    # signals cannot see, so a sighting there is never a re-reading of one.
-    counted_title: set[str] = set()
-    counted_body: set[str] = set()
-
-    shared_title = sorted(set(item_title_tokens) & set(target_title_tokens))
-    if len(shared_title) >= TITLE_OVERLAP_MIN and overlap_is_independent:
-        score += weights["title_overlap"]
-        reasons.append(f"title overlap: {len(shared_title)} shared words")
-        counted_title |= set(shared_title)
+    if title_run and body_run:
+        phrase_run, where = (
+            (body_run, "body") if len(body_run) > len(title_run) else (title_run, "title")
+        )
+    elif title_run:
+        phrase_run, where = title_run, "title"
+    elif body_run:
+        phrase_run, where = body_run, "body"
+    else:
+        phrase_run, where = None, None
     if phrase_run:
-        (counted_body if body_run else counted_title).update(phrase_run)
+        score += weights["phrase"]
+        reasons.append(f'verbatim phrase "{" ".join(phrase_run)}" in the {where}')
+        consumed |= set(phrase_run)
 
-    # The same rule as above, applied to the third signal. A keyword the model
-    # lifted out of the item's own title, sighted in the target *title*, is
-    # literally one of the shared words `title_overlap` has already been paid
-    # for — `"Slow query on dashboard load"` vs `"Slow dashboard query on first
-    # load"` reached 10 and auto-decided on one observation counted three times.
-    #
-    # A keyword pays when **some region sights it that has not already been paid
-    # for those words**. That keeps the rule disjoint without turning it off:
-    # a term the item's title never contained is new wherever it appears, and a
-    # term sighted in the *body* is new when only the title was paid — the body
-    # being unreadable to the title signals is the whole reason the regions are
-    # split. Suppression needs *every* token of the keyword already counted in
-    # every region that sights it, so a multi-word keyword adding one new term
-    # keeps its weight.
-    target_title_words = set(words(target_title))
-    target_body_words = set(words(target_body))
+    # 2. Title overlap, over the shared words the phrase did not already
+    #    explain. The documented threshold is "3+ shared significant words";
+    #    under the invariant those have to be three *new* ones, or the rule is
+    #    being paid a second time for words it is made of.
+    shared_title = sorted(set(item_title_tokens) & set(target_title_tokens))
+    novel_shared = [word for word in shared_title if word not in consumed]
+    if len(novel_shared) >= TITLE_OVERLAP_MIN:
+        score += weights["title_overlap"]
+        reasons.append(f"title overlap: {len(novel_shared)} shared words")
+        consumed |= set(novel_shared)
+    elif len(shared_title) >= TITLE_OVERLAP_MIN:
+        reasons.append(
+            f"title overlap: {len(shared_title)} shared words, already counted"
+        )
 
+    # 3. Keywords, each paying only if it names item evidence still unconsumed.
+    #    Where the term appears in the target is irrelevant — a keyword the
+    #    phrase already consumed is the same observation whether the body
+    #    echoes it, restates it, or quotes it back verbatim.
     shared_keywords: list[str] = []
     echoed = 0
     for keyword in item.get("keywords") or []:
-        tokens = [w for w in words(str(keyword)) if w]
+        # Stop-words are dropped here too, not only from the title streams.
+        # They were not, and `duplicate_detection.extra_stop_words` — an option
+        # documented as "words to ignore" — therefore *raised* a score: adding
+        # `dashboard` removed it from `significant()`, so `title_overlap` no
+        # longer consumed it, while the keyword `dashboard` still matched and
+        # collected +2 that nothing had claimed. 4 became 6. A keyword left
+        # with no significant token is not evidence and is skipped.
+        tokens = [w for w in words(str(keyword)) if w and w not in stop_words]
         if not tokens:
             continue
         if not all(token in target_word_set for token in tokens):
             continue
-        regions = []
-        if all(token in target_title_words for token in tokens):
-            regions.append(counted_title)
-        if all(token in target_body_words for token in tokens):
-            regions.append(counted_body)
-        if not regions:
-            # The keyword's tokens are split across the two regions, so the
-            # sighting belongs to neither alone; it is new unless both regions
-            # together have already been paid for all of them.
-            regions.append(counted_title | counted_body)
-        if not any(
-            any(token not in counted for token in tokens) for counted in regions
-        ):
+        if all(token in consumed for token in tokens):
             echoed += 1
             continue
         shared_keywords.append(str(keyword))
+        consumed |= set(tokens)
     if shared_keywords:
         score += weights["keyword"] * len(shared_keywords)
         reasons.append(f"{len(shared_keywords)} keyword match(es)")
     if echoed:
-        reasons.append(f"{echoed} keyword(s) already counted by a title signal")
+        reasons.append(f"{echoed} keyword(s) already counted")
 
     if item.get("type") and target_type and item["type"] == target_type:
         score += weights["same_type"]
         reasons.append(f"same type ({target_type})")
-
-    if phrase_run:
-        score += weights["phrase"]
-        where = "body" if body_run else "title"
-        reasons.append(f'verbatim phrase "{" ".join(phrase_run)}" in the {where}')
 
     return score, shared_keywords, reasons
 
@@ -598,14 +599,27 @@ def main(argv: list[str] | None = None) -> int:
         for left in range(len(items)):
             for right in range(left + 1, len(items)):
                 other = items[right]
-                score, shared, reasons = score_pair(
-                    items[left],
-                    other["title"],
-                    "",
-                    other["type"],
-                    weights,
-                    stop_words,
+                # Both directions, then the stronger. A proposed item carries
+                # its own keywords, so `A` scored against `B` cannot see the
+                # evidence that lives in `B`'s keyword list — and only the
+                # `left < right` direction was ever computed. On random pairs
+                # the two directions disagree about the *band* 11% of the time,
+                # which is a batch duplicate silently going unreported. Taking
+                # the maximum is the fail-closed reading: it can only surface a
+                # pair, never hide one, and a flagged batch duplicate is
+                # created with a `⚠` rather than dropped.
+                #
+                # `target_body` is `""` in both directions because a proposed
+                # item genuinely has no body yet. That is now provably harmless
+                # rather than accidentally correct: under the consumed-token
+                # invariant a score does not depend on the target's body shape.
+                forward = score_pair(
+                    items[left], other["title"], "", other["type"], weights, stop_words
                 )
+                backward = score_pair(
+                    other, items[left]["title"], "", items[left]["type"], weights, stop_words
+                )
+                score, shared, reasons = max(forward, backward, key=lambda r: r[0])
                 if score < medium:
                     continue
                 internal.append(
