@@ -27,16 +27,23 @@ filename date and `last_fetched` can never disagree.
 
 Refreshed data comes from the network (a WebFetch the agent performs), so it is
 untrusted: pass it as a **file path or on stdin** via `--install`, never
-interpolated into this command line.
+interpolated into this command line. Every document — installed, cached, or
+seeded — goes through one validation boundary (`parse_model_data`) before it is
+used or written: over the size cap, or any control/escape byte, over-long
+string, non-finite number, or negative number anywhere in the tree, and the
+document is refused rather than repaired. The cache stores fetched bytes across
+runs, so anything let in once re-enters on every later run without a refetch.
 
 Exit codes
   0  the cache is in a usable state (`fresh`, `stale`, `seeded`, `installed`)
   2  usage error
   3  invalid input — `--skill-dir` is not a directory, a negative `--ttl-days`,
-     or an `--install` payload that is not a model-data object (stderr:
-     `✗ gi-model-cache: …`). Stop.
+     or an `--install` payload that is not a model-data object or fails
+     validation (stderr: `✗ gi-model-cache: …`). Stop; the old cache is
+     untouched.
   4  cannot complete — no readable cache *and* no readable bundled seed, or the
-     newest cache is corrupt (stderr: `⚠ gi-model-cache: …`). Degrade: disable
+     newest cache is corrupt or fails validation (stderr:
+     `⚠ gi-model-cache: …`). Degrade: disable
      model suggestions for this run and continue creating the issue, exactly as
      the prose lifecycle's *Bundled seed also missing* state already says. A
      corrupt cache is never silently replaced by the seed — that would report a
@@ -51,13 +58,40 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import json
+import math
 import os
 import re
 import sys
+import tempfile
 
 DEFAULT_TTL_DAYS = 7
 CACHE_GLOB_RE = re.compile(r"^model-data-(\d{4}-\d{2}-\d{2})\.json$")
 SEED_REL = os.path.join("templates", "model-data.json")
+
+# --- the validation boundary --------------------------------------------------
+#
+# Every document this script reads is fetched web content or a stored copy of
+# one: the cache persists the fetch across runs with no refetch, so a payload
+# that got in once keeps re-entering. Its strings are rendered into the terminal
+# *and* into created issue bodies that `/auto-pilot` later reads back, so an
+# escape sequence forges output the user just saw and an injected instruction
+# survives in the cache. There is therefore exactly one check, applied to every
+# document at the moment it is parsed, and it walks the **whole tree** rather
+# than a list of fields — a field added to the schema tomorrow is covered the
+# same day, which a per-field list would not be.
+MAX_PAYLOAD_BYTES = 256 * 1024
+MAX_TEXT_CHARS = 512
+MAX_NUMBER = 1e9
+
+# Control and escape bytes, in every notation that reaches a terminal or a
+# markdown body: C0 (including ESC, CR and LF), DEL and C1, the Unicode line and
+# paragraph separators, and the bidi overrides/isolates that reorder rendered
+# text. No model name, label, source or timestamp needs any of them.
+_UNSAFE_TEXT_RE = re.compile(
+    "[\\x00-\\x1f\\x7f-\\x9f]"
+    "|[\\u2028\\u2029]"
+    "|[\\u202a-\\u202e\\u2066-\\u2069]"
+)
 
 CONFIG_NAME = ".gitissue.yml"
 CONFIG_SECTION = "model_suggestion"
@@ -166,25 +200,118 @@ def dated_caches(skill_dir: str) -> list[tuple[str, str]]:
     return sorted(found, reverse=True)
 
 
+def _reject_constant(name: str) -> float:
+    """`json` accepts bare `NaN`/`Infinity` by default; this refuses them.
+
+    Refusing them at the parser means a non-RFC-8259 token can never reach the
+    document at all, rather than being caught by a check someone can forget to
+    call on a new path.
+    """
+    raise ValueError(f"{name} is not a JSON number (RFC 8259 has no {name})")
+
+
+def _check_text(value: str, where: str) -> None:
+    hit = _UNSAFE_TEXT_RE.search(value)
+    if hit:
+        raise ValueError(
+            f"{where} carries a control or escape character (U+{ord(hit.group(0)):04X}) "
+            f"— it would forge terminal output and persist into issue bodies"
+        )
+    if len(value) > MAX_TEXT_CHARS:
+        raise ValueError(
+            f"{where} is {len(value)} characters, over the {MAX_TEXT_CHARS} cap"
+        )
+
+
+def _check_number(value: float, where: str) -> None:
+    if isinstance(value, float) and not math.isfinite(value):
+        raise ValueError(f"{where} is not a finite number ({value!r})")
+    if value < 0:
+        raise ValueError(f"{where} is negative ({value!r}); no field in this schema is")
+    if value > MAX_NUMBER:
+        raise ValueError(f"{where} is out of range ({value!r})")
+
+
+def validate_payload(loaded: object, label: str) -> dict:
+    """Validate one model-data document. The single boundary — see the header.
+
+    The walk is iterative rather than recursive so a deeply nested payload
+    cannot exhaust the stack, and it visits dict *keys* as well as values: a key
+    is rendered the moment anything iterates the document.
+    """
+    if not isinstance(loaded, dict) or "complexity_mapping" not in loaded:
+        raise ValueError(f"the {label} is not a model-data document")
+    stack: list[tuple[str, object]] = [(label, loaded)]
+    while stack:
+        where, node = stack.pop()
+        if isinstance(node, dict):
+            for key, value in node.items():
+                _check_text(str(key), f"{where}.{key!r} (key)")
+                stack.append((f"{where}.{key}", value))
+        elif isinstance(node, list):
+            for position, value in enumerate(node):
+                stack.append((f"{where}[{position}]", value))
+        elif isinstance(node, str):
+            _check_text(node, where)
+        elif isinstance(node, bool) or node is None:
+            continue
+        elif isinstance(node, (int, float)):
+            _check_number(node, where)
+        else:  # unreachable from json.loads, kept so a future loader cannot slip
+            raise ValueError(f"{where} is not a JSON value ({type(node).__name__})")
+    return loaded
+
+
+def read_capped(path: str | None, label: str) -> str:
+    """Read at most MAX_PAYLOAD_BYTES from `path` (or stdin when None).
+
+    The cap is taken before parsing, so an oversized document costs one read
+    rather than a parse, a whole-tree walk, and a permanent place in the cache.
+    """
+    if path is None:
+        buffer = getattr(sys.stdin, "buffer", None)
+        raw = (
+            buffer.read(MAX_PAYLOAD_BYTES + 1)
+            if buffer
+            else sys.stdin.read(MAX_PAYLOAD_BYTES + 1).encode("utf-8", "replace")
+        )
+    else:
+        with open(path, "rb") as handle:
+            raw = handle.read(MAX_PAYLOAD_BYTES + 1)
+    if len(raw) > MAX_PAYLOAD_BYTES:
+        raise ValueError(
+            f"the {label} is larger than the {MAX_PAYLOAD_BYTES}-byte cap"
+        )
+    return raw.decode("utf-8", errors="replace")
+
+
+def parse_model_data(text: str, label: str) -> dict:
+    """Parse and validate — the only way a document enters this script."""
+    try:
+        loaded = json.loads(text, parse_constant=_reject_constant)
+    except ValueError as exc:  # JSONDecodeError and _reject_constant alike
+        raise ValueError(f"the {label} is corrupt — {exc}") from exc
+    return validate_payload(loaded, label)
+
+
 def load_payload(path: str, label: str) -> dict:
     """Read a model-data document, or raise Unavailable.
 
-    A file that exists but cannot be parsed is *not* treated as absent. Falling
-    through to the seed there would report `seeded` while the user's refreshed
-    data sits unreadable on disk — a silent substitution of one data source for
-    another, which is exactly what this contract forbids.
+    A file that exists but cannot be parsed *or does not validate* is not
+    treated as absent. Falling through to the seed there would report `seeded`
+    while the user's refreshed data sits unreadable on disk — a silent
+    substitution of one data source for another, which this contract forbids.
     """
     try:
-        text = open(path, encoding="utf-8", errors="replace").read()
+        text = read_capped(path, f"{label} at {path}")
     except OSError as exc:
         raise Unavailable(f"cannot read the {label} at {path} — {exc}") from exc
+    except ValueError as exc:
+        raise Unavailable(str(exc)) from exc
     try:
-        loaded = json.loads(text)
-    except json.JSONDecodeError as exc:
-        raise Unavailable(f"the {label} at {path} is corrupt — {exc}") from exc
-    if not isinstance(loaded, dict) or "complexity_mapping" not in loaded:
-        raise Unavailable(f"the {label} at {path} is not a model-data document")
-    return loaded
+        return parse_model_data(text, f"{label} at {path}")
+    except ValueError as exc:
+        raise Unavailable(str(exc)) from exc
 
 
 def last_fetched_date(payload: dict, label: str) -> str:
@@ -258,25 +385,69 @@ def render_bands(payload: dict) -> dict[str, dict]:
 
 
 def data_version(payload: dict) -> str | None:
-    """The version portion of `source` — `3.1` from `CursorBench 3.1`."""
+    """The version portion of `source` — `3.1` from `CursorBench 3.1`.
+
+    Scanned backwards in one pass instead of matched with
+    `([0-9]+(?:\\.[0-9]+)*)\\s*$`. That pattern is nested quantification against
+    a right anchor, so a `source` of digits and dots backtracks quadratically —
+    ~13 s at 32 KB, and `source` is attacker-controlled fetched content read on
+    *every* run. This loop is O(len(source)) and returns the same string.
+    """
     source = payload.get("source")
     if not isinstance(source, str):
         return None
-    match = re.search(r"([0-9]+(?:\.[0-9]+)*)\s*$", source.strip())
-    return match.group(1) if match else None
+    text = source.rstrip()
+    end = len(text)
+    # `str.isdigit()` is true for U+00B2 and every Unicode decimal; the pattern
+    # this replaces was `[0-9]`, so the test stays ASCII.
+    digit = "0123456789".__contains__
+    if end == 0 or not digit(text[end - 1]):
+        return None
+    start = end
+    while True:
+        cut = start
+        while cut > 0 and digit(text[cut - 1]):
+            cut -= 1
+        if cut == start:  # no digit run here — the version began at `start`
+            break
+        start = cut
+        # A dot only continues the version when a digit run precedes it.
+        if start > 1 and text[start - 1] == "." and digit(text[start - 2]):
+            start -= 1
+        else:
+            break
+    return text[start:end]
 
 
 def write_cache(skill_dir: str, payload: dict, date: str) -> tuple[str, list[str]]:
     """Write the dated cache and prune every other dated copy."""
     target = os.path.join(skill_dir, f"model-data-{date}.json")
-    temp = target + ".tmp"
+    # `target + ".tmp"` opened with plain `open()` is a predictable path that
+    # follows a symlink planted there, and inherits whatever the umask allows.
+    # `mkstemp` is O_CREAT|O_EXCL|O_RDWR on an unpredictable name at mode 0600
+    # by construction; the mode is then set explicitly rather than left to the
+    # umask. Same directory, so `os.replace` stays atomic.
+    temp = None
     try:
-        with open(temp, "w", encoding="utf-8") as handle:
-            json.dump(payload, handle, indent=2)
+        handle_fd, temp = tempfile.mkstemp(
+            dir=skill_dir, prefix=f".model-data-{date}.", suffix=".tmp"
+        )
+        with os.fdopen(handle_fd, "w", encoding="utf-8") as handle:
+            # `allow_nan=False` keeps the cache RFC 8259 even if a future path
+            # reaches here without going through the validation boundary.
+            json.dump(payload, handle, indent=2, allow_nan=False)
             handle.write("\n")
+        os.chmod(temp, 0o644)
         os.replace(temp, target)
-    except OSError as exc:
+        temp = None
+    except (OSError, ValueError) as exc:
         raise Unavailable(f"cannot write {target} — {exc}") from exc
+    finally:
+        if temp is not None:
+            try:
+                os.remove(temp)
+            except OSError:
+                pass
     pruned = []
     for _, path in dated_caches(skill_dir):
         if os.path.abspath(path) == os.path.abspath(target):
@@ -290,20 +461,18 @@ def write_cache(skill_dir: str, payload: dict, date: str) -> tuple[str, list[str
 
 
 def read_install_payload(source: str) -> dict:
-    if source == "-":
-        buffer = getattr(sys.stdin, "buffer", None)
-        text = buffer.read().decode("utf-8", errors="replace") if buffer else sys.stdin.read()
-    else:
-        try:
-            text = open(source, encoding="utf-8", errors="replace").read()
-        except OSError as exc:
-            raise InvalidInput(f"cannot read --install {source} — {exc}") from exc
     try:
-        loaded = json.loads(text)
-    except json.JSONDecodeError as exc:
-        raise InvalidInput(f"--install payload is not valid JSON — {exc}") from exc
-    if not isinstance(loaded, dict) or "complexity_mapping" not in loaded:
-        raise InvalidInput("--install payload is not a model-data document")
+        text = read_capped(None if source == "-" else source, "--install payload")
+    except OSError as exc:
+        raise InvalidInput(f"cannot read --install {source} — {exc}") from exc
+    except ValueError as exc:
+        raise InvalidInput(str(exc)) from exc
+    # The same boundary the on-disk documents go through — this is where the
+    # bytes are freshest off the network, so it is the one that matters most.
+    try:
+        loaded = parse_model_data(text, "--install payload")
+    except ValueError as exc:
+        raise InvalidInput(str(exc)) from exc
     raw = loaded.get("last_fetched")
     if not isinstance(raw, str):
         raise InvalidInput("--install payload has no last_fetched timestamp")

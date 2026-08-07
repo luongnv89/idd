@@ -33,12 +33,14 @@ The scoring itself is not your job. The orchestrator ran the fixed table below w
 
 | Signal | Score |
 |--------|-------|
-| Title similarity (3+ shared significant words) | +3 |
+| Title similarity (3+ shared significant words in the target title) | +3 |
 | Keyword overlap (keyword in existing title/body) | +2 each |
 | Same type (bug/feature/improvement) | +1 |
-| Exact multi-word phrase match (verbatim) | +5 |
+| Verbatim multi-word phrase (3+ significant words) | +5 |
 
 `>= 8` → high (decided) · `5–7` → medium (**your** band) · `< 5` → no match.
+
+The `+3` and the `+5` cover **disjoint regions** of the target, so one observation never pays both: a phrase found in the target *title* **replaces** the `+3` rather than adding to it — a title-located run always implies the shared words it is made of — while a phrase found in the *body* is a second, independent sighting and does add. This is why two near-identical titles reach **your** band instead of auto-deciding: `"Login crash on mobile Safari"` vs `"Login crash on mobile Chrome"` scores 6, not 9.
 Stop-words ignored: a, an, the, to, for, in, on, of, and, or, is, it, be, as, at, by, with, from, that, this, not, but, are, was, all, has, its, can, will, should, when, if, add, fix, update, issue, bug, feature, improvement, create, make, get, set.
 
 ## Output

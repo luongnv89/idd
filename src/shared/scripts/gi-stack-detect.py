@@ -195,15 +195,31 @@ def list_files(root: str) -> tuple[list[str], str]:
         pass
 
     names = []
+
+    def refuse(exc: OSError) -> None:
+        """Turn a walk error into a failure instead of into a smaller number.
+
+        `os.walk` swallows every `OSError` by default, and `os.path.isdir`
+        succeeds on a `chmod 000` directory, so the old guard let an unreadable
+        root return exit 0 with `file_count: 0` — which `/init-gitissue` reads
+        as a confident `repo_size: small`. A directory this scan could not read
+        is not a directory with nothing in it, and there is no way to tell the
+        two apart from the count. Raising here makes the whole class
+        unreachable: *any* unreadable directory ends the walk as exit 4, at the
+        root or three levels down, because a partial walk fabricates a size
+        just as confidently as an empty one does.
+        """
+        raise exc
+
     try:
-        for base, dirs, files in os.walk(root):
+        for base, dirs, files in os.walk(root, onerror=refuse):
             dirs[:] = sorted(d for d in dirs if d not in EXCLUDED_DIRS)
             for name in sorted(files):
                 rel = os.path.relpath(os.path.join(base, name), root)
                 names.append(rel.replace(os.sep, "/"))
     except OSError as exc:
         raise Unavailable(f"cannot walk {root} — {exc}") from exc
-    if not names and not os.path.isdir(root):
+    if not os.path.isdir(root):
         raise Unavailable(f"cannot read {root}")
     return names, "filesystem walk"
 

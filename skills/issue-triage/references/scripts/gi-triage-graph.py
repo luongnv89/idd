@@ -22,10 +22,24 @@ Input on stdin, one JSON object:
      "edges": [{"from": 12, "to": 15}, {"a": 8, "b": 9}]}
 
 An edge with `from`/`to` is already directed. An edge with `a`/`b` (or a
-two-element array) is undirected and is directed here by the documented
-heuristics: earlier `createdAt` first, then the higher edge count, then bug
-before feature before improvement, then the lower issue number. Two issues that
-tie on all of those are reported in `co_dependent` and get no edge.
+two-element array) is undirected and is directed here by the three heuristics
+`references/detection.md` states, in its order: earlier `createdAt` first, then
+the higher **blocking** count, then bug before feature before improvement. Two
+issues that tie on all three are reported in `co_dependent` and get no edge —
+there is deliberately no fourth tie-break on the issue number, because an order
+invented from an issue number reads as a real dependency to whoever acts on it,
+and `co_dependent` is the honest answer. Determinism does not depend on that
+tie-break: duplicate edges are canonicalized away before anything counts them,
+and every emitted list is sorted.
+
+`summary.circular_deps` reports one closed chain per **broken** edge — the set
+of edges to remove to make the graph acyclic, which is the actionable answer.
+It is not an enumeration of every simple cycle: when two cycles share a broken
+edge, only the chain found first is listed, and a node reachable only through
+an already-broken edge may not appear in any chain. The execution order is
+unaffected (`acyclic` is always genuinely acyclic), and removing the reported
+edge still resolves the cycles that share it. A self-dependency (`{"from": 7,
+"to": 7}`) carries no ordering information and is dropped rather than reported.
 
 Output on stdout (or `--out FILE`) is the `.gitissue/triage.json` payload:
 `version`, `updated`, `source`, `analyzed_count`, `issues[]`, `summary`, and
@@ -243,12 +257,35 @@ def normalize_issues(request: dict) -> list[dict]:
 # --- graph -------------------------------------------------------------------
 
 
-def undirected_degree(edges: list[dict], number: int) -> int:
+def blocking_degree(edges: list[dict], number: int) -> int:
+    """How many edges could make `number` a **blocker** of something else.
+
+    `references/detection.md` states the rule as "more *blocking* relationships
+    take precedence". An edge that already points *at* this issue makes it
+    blocked, not blocking, so counting the `to` end inverted the rule: an issue
+    blocked by three others outranked a peer that blocked nobody and was
+    ordered ahead of it. An undirected end counts, because which way it will be
+    directed is exactly what this number is being used to decide.
+    """
     total = 0
     for edge in edges:
-        if number in (edge.get("a"), edge.get("b"), edge.get("from"), edge.get("to")):
+        if number in (edge.get("a"), edge.get("b"), edge.get("from")):
             total += 1
     return total
+
+
+def _edge_key(edge: dict) -> tuple:
+    """A canonical, hashable identity for one edge.
+
+    `repr` rather than the value itself, because an edge may name anything JSON
+    can hold and an unhashable value must produce this script's exit 3 rather
+    than a `TypeError` out of a `in index` test — exit 1 is a code no call site
+    classifies. An undirected pair is unordered: `{a: 1, b: 2}` and
+    `{a: 2, b: 1}` are one edge.
+    """
+    if "from" in edge or "to" in edge:
+        return ("directed", repr(edge.get("from")), repr(edge.get("to")))
+    return ("undirected", tuple(sorted((repr(edge.get("a")), repr(edge.get("b"))))))
 
 
 def direct_edges(
@@ -256,28 +293,40 @@ def direct_edges(
 ) -> tuple[list[tuple[int, int]], list[list[int]]]:
     """Split the input edges into directed pairs and co-dependent pairs."""
     normalized: list[dict] = []
+    seen_edges: set[tuple] = set()
     for position, edge in enumerate(raw_edges):
         if isinstance(edge, list) and len(edge) == 2:
             edge = {"a": edge[0], "b": edge[1]}
         if not isinstance(edge, dict):
             raise InvalidInput(f"edges[{position}] is not an object or a two-element array")
+        # Canonicalize *before* anything counts it. `blocking_degree` runs over
+        # this list, so a repeated edge used to vote twice on precedence — and
+        # deduplicating `directed` afterwards preserved the flipped direction
+        # rather than undoing it. The same logical graph then produced a
+        # different execution order depending on whether an edge was listed
+        # twice, which the scanner has no reason to guarantee it never is.
+        key = _edge_key(edge)
+        if key in seen_edges:
+            continue
+        seen_edges.add(key)
         normalized.append(edge)
+
+    def known(value: object, position: int) -> int:
+        if not isinstance(value, int) or isinstance(value, bool) or value not in index:
+            raise InvalidInput(f"edges[{position}] names unknown issue {value!r}")
+        return value
 
     directed: list[tuple[int, int]] = []
     co_dependent: list[list[int]] = []
     for position, edge in enumerate(normalized):
         if "from" in edge or "to" in edge:
-            src, dst = edge.get("from"), edge.get("to")
-            for value in (src, dst):
-                if value not in index:
-                    raise InvalidInput(f"edges[{position}] names unknown issue {value!r}")
+            src = known(edge.get("from"), position)
+            dst = known(edge.get("to"), position)
             if src != dst:
                 directed.append((src, dst))
             continue
-        left, right = edge.get("a"), edge.get("b")
-        for value in (left, right):
-            if value not in index:
-                raise InvalidInput(f"edges[{position}] names unknown issue {value!r}")
+        left = known(edge.get("a"), position)
+        right = known(edge.get("b"), position)
         if left == right:
             continue
         winner = precedence(index[left], index[right], normalized)
@@ -293,19 +342,24 @@ def direct_edges(
     for pair in directed:
         if pair not in unique:
             unique.append(pair)
-    return unique, co_dependent
+    # Sorted, not input-ordered: `co_dependent` was the one emitted list whose
+    # value depended on the order the scanner happened to list its edges in.
+    return unique, sorted(co_dependent)
 
 
 def precedence(left: dict, right: dict, edges: list[dict]) -> int | None:
     """Which of two issues should be resolved first, or None when neither does.
 
     The order of the tests is the order the detection reference states them:
-    creation date, then blocking count, then type.
+    creation date, then blocking count, then type. There is no fourth test on
+    the issue number — a pair that ties on all three is reported as
+    `co_dependent`, which is a real answer, where an order derived from an
+    issue number would read as a dependency that nobody observed.
     """
     if left["created"] and right["created"] and left["created"] != right["created"]:
         return left["number"] if left["created"] < right["created"] else right["number"]
-    left_degree = undirected_degree(edges, left["number"])
-    right_degree = undirected_degree(edges, right["number"])
+    left_degree = blocking_degree(edges, left["number"])
+    right_degree = blocking_degree(edges, right["number"])
     if left_degree != right_degree:
         return left["number"] if left_degree > right_degree else right["number"]
     left_rank = TYPE_RANK.get(left["type"] or "", 99)

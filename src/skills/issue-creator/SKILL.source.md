@@ -101,7 +101,7 @@ If `model_suggestion.enabled` is `true` (the default), run the model-data cache 
 python3 shared/scripts/gi-model-cache.py --skill-dir "$skill_dir"
 ```
 
-Exit 0 prints `state` (`fresh` | `stale` | `seeded` | `installed`), `stale`, `age_days`, `data_version`, `data_date`, and `bands` — the effort → two-model mapping with each pick's own per-task cost, which is everything Step 4 and Step 5 need. Exit 3 (a bad `--skill-dir` or `model_suggestion.cache_ttl_days`): stop and print the validation error. Script file absent: stop with the `✗ Missing bundled dependency` block. **Exit 4, no `python3`, exit 2, or unparsable stdout:** print `⚠ gi-model-cache unavailable — model suggestions disabled for this run` and continue creating the issue without the suggestion (or run the lifecycle by hand from `references/model-suggestion.md`, which stays the authoritative prose procedure). `state: "stale"` is a warning, not a failure — in auto mode log it and use the data as-is.
+Exit 0 prints `state` (`fresh` | `stale` | `seeded` | `installed`), `stale`, `age_days`, `data_version`, `data_date`, and `bands` — the effort → two-model mapping with each pick's own per-task cost, which is everything Step 4 and Step 5 need. Exit 3 (a bad `--skill-dir`, a `model_suggestion.cache_ttl_days` out of range, or an `--install` payload that fails validation): stop and print the validation error. **Script file — or `templates/model-data.json` — absent:** stop with the `✗ Missing bundled dependency` block. Both are on the *Bundled dependency precheck* list, so a missing seed is a broken install, not the runtime degrade its exit 4 would otherwise look like. **Exit 4, no `python3`, exit 2, or unparsable stdout:** print `⚠ gi-model-cache unavailable — model suggestions disabled for this run` and continue creating the issue without the suggestion (or run the lifecycle by hand from `references/model-suggestion.md`, which stays the authoritative prose procedure). `state: "stale"` is a warning, not a failure — in auto mode log it and use the data as-is.
 
 `--refresh-model-data` forces a refresh first (WebFetch, then `--install`) — see `references/model-suggestion.md`. When `model_suggestion.enabled` is `false`, skip all model-suggestion steps silently and do not run the script.
 
@@ -135,6 +135,7 @@ If any are missing, stop immediately and print:
 Check these files:
 
 - `references/agents/duplicate-detector.md` — duplicate detection subagent prompt
+- `templates/model-data.json` — bundled model-data seed `gi-model-cache.py` copies on first run
 - `templates/bug.md` — bug issue template
 - `templates/feature.md` — feature request template
 - `templates/improvement.md` — improvement request template
@@ -233,6 +234,8 @@ python3 shared/scripts/gi-dup-score.py < .gitissue/cache/dup-request.json
 
 Exit 0 prints one JSON object: `duplicates` (score ≥ `duplicate_detection.high_threshold` — decided, no model re-reads them), `medium_band` (the only list a model should judge), `batch_internal_duplicates`, `open_issue_count`, `scan_truncated`, `items_checked`. Delete the request file afterwards.
 
+**The auto-decide gate creates anyway.** A match landing in `duplicates` is *flagged*, never dropped — interactively the user answers the prompt below, and in auto mode the item is **still created** with a `⚠` audit line. That default is what bounds the blast radius of a false positive to a duplicate issue someone can close; a change that turns this gate into a drop turns the same false positive into work that silently disappears. Do not make that change without re-deriving the scoring table's false-positive rate.
+
 Classify **every** outcome:
 
 | Outcome | Meaning | Do |
@@ -258,7 +261,9 @@ The prose procedure the script replaced, unchanged. Run inline:
 gh issue list --state open --json number,title,body,labels --limit 100
 ```
 
-Compare the new issue's title and key terms against existing issues, applying the same table: title similarity (3+ shared significant words) `+3`, each keyword found in an existing title/body `+2`, same type `+1`, verbatim multi-word phrase `+5`; `≥ 8` is a duplicate, `5–7` is a possible one, below `5` is no match. Stop-words and the full rules live in `shared/agents/duplicate-detector.md`.
+Compare the new issue's title and key terms against existing issues, applying the same table: title similarity (3+ shared significant words in the target title) `+3`, each keyword found in an existing title/body `+2`, same type `+1`, verbatim multi-word phrase (3+ significant words) `+5`; `≥ 8` is a duplicate, `5–7` is a possible one, below `5` is no match.
+
+The `+3` and the `+5` are scored over **disjoint regions** of the target and one observation never pays both: a phrase found in the target *title* **replaces** the `+3` instead of adding to it — a title-located run already implies the shared words — while a phrase found in the *body* is a second, independent sighting and does add. So two near-identical titles score `5–7` and go to the medium band; only title similarity **plus** a body phrase reaches `8`. Stop-words and the full rules live in `shared/agents/duplicate-detector.md`.
 
 #### Present results
 

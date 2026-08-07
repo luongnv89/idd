@@ -3,7 +3,9 @@
 
 The scoring table `/issue-creator` uses is fixed arithmetic — +3 for a title
 overlap, +2 per matched keyword, +1 for a shared type, +5 for a verbatim
-phrase, then two thresholds. Running it inside a language model means reading
+phrase, then two thresholds. The +3 and the +5 are scored over disjoint regions
+of the target (title vs. body) so that one observation can never pay both;
+see `score_pair`. Running it inside a language model means reading
 up to 100 issue bodies into a context window (10-20k tokens on every create)
 to compute a sum that has one correct answer. This script computes it, and
 leaves the model the only part that genuinely needs judgement: the medium band,
@@ -238,6 +240,11 @@ def phrase_hit(item_tokens: list[str], target_tokens: list[str]) -> list[str] | 
     Compared on the significant-token stream rather than raw characters, so a
     difference in punctuation or casing does not hide a phrase that a reader
     would call identical.
+
+    The title and the body are searched as *separate* streams by the caller, so
+    a run can never straddle the join between them — a "phrase" that exists
+    only because a title's last word abuts a body's first word is an artifact of
+    the concatenation, not something a reader would call a phrase.
     """
     if len(item_tokens) < PHRASE_MIN or len(target_tokens) < PHRASE_MIN:
         return None
@@ -266,14 +273,33 @@ def score_pair(
     """
     item_title_tokens = significant(item["title"], stop_words)
     target_title_tokens = significant(target_title, stop_words)
-    target_all_tokens = significant(f"{target_title}\n{target_body}", stop_words)
+    target_body_tokens = significant(target_body, stop_words)
     target_word_set = set(words(f"{target_title}\n{target_body}"))
 
     score = 0
     reasons: list[str] = []
 
+    # `title_overlap` and `phrase` are scored over *disjoint regions* of the
+    # target, because they are not independent signals over the same region: a
+    # run of >= PHRASE_MIN item-title tokens inside the target **title**
+    # necessarily also produces >= TITLE_OVERLAP_MIN shared title words, so one
+    # observation would fire both rules and sum to exactly the high threshold.
+    # That is how `"Login crash on mobile Safari"` used to auto-decide against
+    # `"Login crash on mobile Chrome"` with no model consulted.
+    #
+    # So: a run found in the title *replaces* the title-overlap weight (the
+    # stronger reading of the one observation, never the sum of two), while a
+    # run found in the **body** is a genuinely separate sighting and is added on
+    # top of whatever the title overlap earned. Only two distinct observations
+    # can reach the high threshold from these two rules.
+    title_run = phrase_hit(item_title_tokens, target_title_tokens)
+    body_run = phrase_hit(item_title_tokens, target_body_tokens)
+    phrase_run = body_run or title_run
+    # The overlap is paid unless the *only* phrase evidence came from the title.
+    overlap_is_independent = body_run is not None or title_run is None
+
     shared_title = sorted(set(item_title_tokens) & set(target_title_tokens))
-    if len(shared_title) >= TITLE_OVERLAP_MIN:
+    if len(shared_title) >= TITLE_OVERLAP_MIN and overlap_is_independent:
         score += weights["title_overlap"]
         reasons.append(f"title overlap: {len(shared_title)} shared words")
 
@@ -292,10 +318,10 @@ def score_pair(
         score += weights["same_type"]
         reasons.append(f"same type ({target_type})")
 
-    run = phrase_hit(item_title_tokens, target_all_tokens)
-    if run:
+    if phrase_run:
         score += weights["phrase"]
-        reasons.append(f'verbatim phrase "{" ".join(run)}"')
+        where = "body" if body_run else "title"
+        reasons.append(f'verbatim phrase "{" ".join(phrase_run)}" in the {where}')
 
     return score, shared_keywords, reasons
 

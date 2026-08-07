@@ -222,7 +222,7 @@ Rules that make the report worth reading:
 |------|--------|
 | 1 — Fetch Issues | `Issues fetched` · `Config applied` |
 | 1b & 2 — Already-Fixed & Dependencies | `Scanner returned` · `Dependencies mapped` |
-| 3-7 — Order, Parallel Sets, Staleness, Priority | `Order computed` · `No cycle left unreported` · `Disjoint sets identified` · `Threshold applied` · `Every issue ranked` |
+| 3-7 — Order, Parallel Sets, Staleness, Priority | `Order computed` · `No cycle left unreported` · `Disjoint sets identified` · `Threshold applied` · `Every open issue scored` · `Every issue ranked` |
 | 8-9 — Output & Persist | `Report rendered` · `.gitissue/triage.json written` |
 
 When the scripted block degraded to the prose procedure, the step still reports —

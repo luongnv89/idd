@@ -902,21 +902,56 @@ expect_grep "AC1: issue-creator's config excerpt carries the duplicate_detection
 # bodies, dependency files, and fetched web content — the most attacker-
 # controlled inputs in the system. So on a wave-3 call line:
 #
-#   * NO placeholder is allowed at all. The wave-2 allowlist exists because
-#     wave-2 scripts legitimately take an integer issue number on the command
-#     line; none of these four take any untrusted value by any route, so the
-#     allowlist collapses to the empty set and every `{x}` is a finding.
+#   * NO placeholder is allowed at all, in any of the three styles skills
+#     actually write — `{name}`, `<name>` and `[name]`. The wave-2 allowlist
+#     exists because wave-2 scripts legitimately take an integer issue number on
+#     the command line; none of these four take any untrusted value by any
+#     route, so the only variable admitted is the one on ALLOWED_VARS below.
 #   * The untrusted value must arrive by stdin redirect, a file path the skill
 #     itself wrote, or a fetch the script performs — asserted below per script.
-#   * The lint must prove it is scanning: it fails if it does not find a call
-#     site for every one of the four scripts.
+#
+# Issue #278 closed five gaps found by adversarial mutation, and each was closed
+# by removing the thing that could be wrong rather than by adding a case:
+#
+#   1. `[name]` was not a placeholder style. It is now (lowercase identifier,
+#      two characters or more — no `[A-Z0-9]` character class or `[e]dit` idiom
+#      looks like that, and unlike wave 2 there is no allowlist to reconcile).
+#   2. A command substitution inside double quotes was skipped, because the
+#      check ran on the quote-stripped text. Quoting stops word-splitting; it
+#      does not stop `$(gh issue view …)` from pasting a reporter-written title
+#      onto the command line. `$(` is now a finding wherever it appears.
+#   3. A placeholder could hide in a later backtick span, because spans were
+#      admitted to the command by a heuristic (opens with an option, a pipe, or
+#      follows a dangling flag). The heuristic is gone: on a line that carries a
+#      wave-3 call, **every** backtick span on that line is inspected.
+#   4. The presence guard was per-script, so deleting one of a script's two call
+#      sites left it satisfied. It is now a pinned per-script *count*.
+#   5. A call site outside the four scanned ROOTS was invisible. There is no
+#      ROOTS list any more: the lint walks every file the repository tracks,
+#      minus the build output, the vendored copies, and this suite's own
+#      fixtures. Adding a call site somewhere new cannot escape it.
 python3 - "$REPO_ROOT" <<'PY' > "$TMP/lint-report"
-import pathlib, re, sys
+import pathlib, re, subprocess, sys
 
 root = pathlib.Path(sys.argv[1])
-ROOTS = ["src/skills", "src/internal-skills", "src/shared/agents", "docs"]
 WAVE3 = ("gi-dup-score.py", "gi-triage-graph.py", "gi-stack-detect.py",
          "gi-model-cache.py")
+
+# Gap 4: a pinned count per script, not "at least one somewhere". Deleting one
+# of `gi-dup-score.py`'s two call sites is a real change to the contract this
+# lint pins, so it must be an explicit edit here and not a silent pass.
+EXPECTED_SITES = {
+    "gi-dup-score.py": 2,
+    "gi-triage-graph.py": 2,
+    "gi-stack-detect.py": 1,
+    "gi-model-cache.py": 2,
+}
+
+# Gap 5: every tracked file, not a list of roots. `skills/` and `dist/` are
+# byte-identical build output of `src/`, `.pi/` is a vendored copy, and
+# `tests/` is where this suite writes its own adversarial fixtures.
+SKIP_PREFIXES = ("skills/", "dist/", ".pi/", "tests/")
+SCAN_SUFFIXES = (".md", ".yml", ".yaml", ".json", ".txt")
 
 _LAUNCH = r"(?:python[0-9.]*|uv\s+run|\"?\$\{?\w+\}?\"?)"
 CALL = re.compile(
@@ -928,9 +963,41 @@ WAVE3_RE = re.compile("|".join(re.escape(name) for name in WAVE3))
 PLACEHOLDER = re.compile(
     r"(?<!\$)\{\s*[A-Za-z_][\w.-]*\s*\}"
     r"|<[A-Za-z_][\w-]*>"
+    # Gap 1. Wave 2 leaves `[name]` out because a square bracket is a glob range
+    # and a regex character class first, and its allowlist has to coexist with
+    # documented `[A-Z0-9]` examples. Here no placeholder is admitted at all, so
+    # the rule can be narrow instead of negotiated: a lowercase identifier of
+    # two or more characters is not `[A-Z0-9]`, not `[e]dit`, and not `[Y/n]`.
+    r"|\[[a-z_][a-z0-9_.-]+\]"
 )
 VAR = re.compile(r"\$\{?[A-Za-z_][A-Za-z0-9_]*\}?")
-SUBST = re.compile(r"\$\(")
+# Gap 2: checked on the raw text. `"$(gh issue view 42 --json title -q .title)"`
+# is quoted and still puts a reporter-written title on the command line. The one
+# substitution that is not a finding is the one that *contains* the call, which
+# is the documented capture idiom `body="$(python3 …gi-issue.py …)"` and puts
+# nothing on anybody's command line.
+
+
+def loose_substitutions(cmd):
+    """(start, end) of every `$(…)` on the line, with naive paren balancing.
+
+    `end` is `len(cmd)` when the substitution never closes, which is itself a
+    finding: an unclosed one swallows whatever follows it.
+    """
+    out, i = [], cmd.find("$(")
+    while i != -1:
+        depth, j = 0, i + 1
+        while j < len(cmd):
+            if cmd[j] == "(":
+                depth += 1
+            elif cmd[j] == ")":
+                depth -= 1
+                if depth == 0:
+                    break
+            j += 1
+        out.append((i, j))
+        i = cmd.find("$(", max(j, i + 2))
+    return out
 REPARSE = re.compile(
     r"(?<![\w.-])(?:sh|bash|zsh|dash|ksh)(?:\s+\S+)*?\s+-[A-Za-z]*c[A-Za-z]*\b"
     r"|\bxargs\b|\beval\b"
@@ -940,13 +1007,15 @@ SQUOTED = re.compile(r"'[^']*'")
 
 # Shell variables permitted on a wave-3 command line, and why each is safe.
 # A variable is only inert while it is quoted; VAR checks that separately.
+# This map is deliberately non-empty and small — "the allowlist is empty" was a
+# claim a reviewer had to check against the code, so the code states it.
 ALLOWED_VARS = {
     "$skill_dir": "path the skill resolves from its own SKILL.md dirname",
 }
 
 
 def logical_lines(path):
-    lines = path.read_text(encoding="utf-8").splitlines()
+    lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
     i = 0
     while i < len(lines):
         joined, j = lines[i], i
@@ -968,70 +1037,96 @@ def logical_lines(path):
 
 
 def commands(text):
+    """Every backtick span on a line that carries a wave-3 call.
+
+    Gap 3. The wave-2 version admits a sibling span only when it opens with an
+    option or a pipe, or when the span before it ended on a flag still waiting
+    for its value. That is a heuristic, and a heuristic that decides what to
+    inspect is a heuristic an attacker writes around — `python3 …gi-dup-score.py`
+    followed by prose followed by `[issue_title]` passed it. Here there is
+    nothing to write around: if one span on the line is a call, all of them are
+    part of the command text.
+    """
     spans = re.findall(r"`([^`]+)`", text)
     if not any(CALL.search(span) for span in spans):
         return [text] if CALL.search(text) else []
-    out, dangling = [], False
-    for span in spans:
-        is_call = bool(CALL.search(span))
-        admitted = bool(is_call or dangling or re.match(r"\s*(-|\||printf\b|echo\b)", span))
-        if admitted:
-            out.append(span)
-        if admitted and not dangling:
-            dangling = bool(re.search(r"(?:^|\s)--?[A-Za-z][\w-]*\s*$", span))
-    return out
+    return spans
 
+
+proc = subprocess.run(
+    ["git", "-C", str(root), "ls-files", "-z"], capture_output=True, check=False
+)
+if proc.returncode != 0:
+    print("FAIL|AC5: cannot enumerate tracked files — the lint is not scanning")
+    raise SystemExit(0)
+tracked = [p for p in proc.stdout.decode("utf-8", "replace").split("\0") if p]
 
 bad = []
-seen = {name: 0 for name in WAVE3}
-for rel in ROOTS:
-    for path in sorted((root / rel).rglob("*.md")):
-        rp = path.relative_to(root)
-        for lineno, text in logical_lines(path):
-            for cmd in commands(text):
-                if not WAVE3_RE.search(cmd):
-                    continue
-                for name in WAVE3:
-                    if name in cmd:
-                        seen[name] += 1
-                if "<<" in cmd:
-                    bad.append(f"{rp}:{lineno}: a heredoc hides its body from this lint")
-                for token in PLACEHOLDER.findall(cmd):
+seen = {name: set() for name in WAVE3}
+for rel in tracked:
+    if rel.startswith(SKIP_PREFIXES) or not rel.endswith(SCAN_SUFFIXES):
+        continue
+    path = root / rel
+    if not path.is_file():
+        continue
+    for lineno, text in logical_lines(path):
+        cmds = commands(text)
+        if not any(WAVE3_RE.search(cmd) for cmd in cmds):
+            continue
+        for name in WAVE3:
+            if any(name in cmd for cmd in cmds):
+                seen[name].add((rel, lineno))
+        for cmd in cmds:
+            if "<<" in cmd:
+                bad.append(f"{rel}:{lineno}: a heredoc hides its body from this lint")
+            for token in PLACEHOLDER.findall(cmd):
+                bad.append(
+                    f"{rel}:{lineno}: {token} is interpolated into a wave-3 "
+                    f"command line — these scripts read untrusted input "
+                    f"themselves, so no placeholder is ever needed there"
+                )
+            if REPARSE.search(cmd):
+                bad.append(
+                    f"{rel}:{lineno}: a wave-3 call inside `sh -c`/`eval`/`xargs` "
+                    f"re-parses its argument, so quoting makes nothing inert"
+                )
+            call = CALL.search(cmd)
+            for start, end in loose_substitutions(cmd):
+                if (
+                    call is not None
+                    and start < call.start()
+                    and call.end() <= end < len(cmd)
+                ):
+                    continue  # the substitution captures the call's own output
+                bad.append(
+                    f"{rel}:{lineno}: a command substitution puts its output on a "
+                    f"wave-3 command line — quoting it does not make it inert"
+                )
+            unquoted = DQUOTED.sub(lambda m: " " * len(m.group(0)), cmd)
+            unquoted = SQUOTED.sub(lambda m: " " * len(m.group(0)), unquoted)
+            for token in VAR.findall(unquoted):
+                bad.append(f"{rel}:{lineno}: {token} is unquoted on a wave-3 command line")
+            for token in set(VAR.findall(cmd)):
+                if token not in ALLOWED_VARS:
                     bad.append(
-                        f"{rp}:{lineno}: {token} is interpolated into a wave-3 "
-                        f"command line — these scripts read untrusted input "
-                        f"themselves, so no placeholder is ever needed there"
+                        f"{rel}:{lineno}: {token} is on a wave-3 command line and "
+                        f"is not on the reviewed variable allowlist"
                     )
-                if REPARSE.search(cmd):
-                    bad.append(
-                        f"{rp}:{lineno}: a wave-3 call inside `sh -c`/`eval`/`xargs` "
-                        f"re-parses its argument, so quoting makes nothing inert"
-                    )
-                unquoted = DQUOTED.sub(lambda m: " " * len(m.group(0)), cmd)
-                unquoted = SQUOTED.sub(lambda m: " " * len(m.group(0)), unquoted)
-                for token in VAR.findall(unquoted):
-                    bad.append(f"{rp}:{lineno}: {token} is unquoted on a wave-3 command line")
-                if SUBST.search(unquoted):
-                    bad.append(
-                        f"{rp}:{lineno}: an unquoted command substitution puts its "
-                        f"output on a wave-3 command line"
-                    )
-                for token in set(VAR.findall(cmd)):
-                    if token not in ALLOWED_VARS:
-                        bad.append(
-                            f"{rp}:{lineno}: {token} is on a wave-3 command line and "
-                            f"is not on the reviewed variable allowlist"
-                        )
 
-missing = sorted(name for name, count in seen.items() if count == 0)
-if missing:
-    print("FAIL|AC5: the wave-3 lint found no call site for: " + ", ".join(missing)
-          + " — it is not scanning")
+drift = [
+    f"{name}: {len(seen[name])} call site(s), pinned at {want}"
+    for name, want in sorted(EXPECTED_SITES.items())
+    if len(seen[name]) != want
+]
+if drift:
+    print("FAIL|AC5: the wave-3 call-site count moved — " + "; ".join(drift)
+          + ". A deleted call site is a contract change; update EXPECTED_SITES "
+          "deliberately or restore the site")
 elif bad:
     for entry in sorted(set(bad)):
         print(f"FAIL|AC5: {entry}")
 else:
-    total = sum(seen.values())
+    total = sum(len(v) for v in seen.values())
     print(f"PASS|AC5: no value is interpolated at any of the {total} wave-3 call sites")
 PY
 while IFS='|' read -r verdict label; do

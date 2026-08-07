@@ -100,6 +100,12 @@ if [ "$TOTAL" -le "$BUDGET" ]; then
   pass "AC3: bundled-doc bytes within budget ($TOTAL ≤ $BUDGET)"
 else
   fail "AC3: bundled-doc bytes over budget ($TOTAL > $BUDGET) — a doc is being bundled whole again"
+  echo "    Every byte added to a doc under docs/ is paid once per skill that"
+  echo "    bundles it: config-schema.md ships to 7, naming-conventions.md to 5."
+  echo "    One added line is therefore 5-7 added lines here. Raising BUDGET is"
+  echo "    not the fix — issue #249's AC3 asked for a >=300,000-byte cumulative"
+  echo "    reduction, and the line has already moved once (480,000 -> 500,000 in"
+  echo "    #252). Compress prose in the doc you grew, or excerpt it per skill."
 fi
 
 # ── Per-skill config excerpts ────────────────────────────────────────────────

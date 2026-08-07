@@ -78,6 +78,9 @@ jobs:
       - name: test-scripts-253
         run: bash tests/test-scripts-253.sh
 
+      - name: test-scripts-278
+        run: bash tests/test-scripts-278.sh
+
       - name: test-secscan-contract-272
         run: bash tests/test-secscan-contract-272.sh
 

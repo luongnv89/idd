@@ -1002,11 +1002,38 @@ fi
 #   * Logical lines are joined across `\` and trailing `|`, so a flag or a
 #     `printf` upstream of the pipe cannot hide on an adjacent line. A heredoc on
 #     a call line is refused outright — its body is unreachable from here.
+#
+# Issue #278 hardened three more properties, each after a mutant walked through
+# the previous shape:
+#   * The scan is over every file the repository *tracks*, not over a list of
+#     four roots. A call site in a file nobody thought to list — the repo root,
+#     a `.yml` template — used to be invisible.
+#   * The non-vacuity guard is per script, and it is a pinned *count*. The old
+#     aggregate `checked >= 25` (currently 76) stayed satisfied when one of a
+#     script's two call sites was deleted.
+#   * A command substitution counts wherever it sits, quoted or not — quoting
+#     stops word-splitting, not `$(gh issue view …)` pasting a reporter-written
+#     title onto the line. The one exception is the substitution that *contains*
+#     the call, which is the documented capture idiom
+#     `body="$(python3 …gi-issue.py …)"` and puts nothing on any command line.
 python3 - "$REPO_ROOT" <<'PY' > "$TMP/injection-report"
-import pathlib, re, sys
+import pathlib, re, subprocess, sys
 
 root = pathlib.Path(sys.argv[1])
-ROOTS = ["src/skills", "src/internal-skills", "src/shared/agents", "docs"]
+# Every file the repository ships, minus the build output (`skills/`,
+# `dist/`), the vendored copy (`.pi/`), and this suite's own fixtures.
+SKIP_PREFIXES = ("skills/", "dist/", ".pi/", "tests/")
+SCAN_SUFFIXES = (".md", ".yml", ".yaml", ".json", ".txt")
+SCRIPT_NAME = re.compile(r"gi-[a-z0-9-]+\.py")
+# Pinned per script: "at least one call site somewhere" stayed true when one
+# of two sites was deleted. A count that moves is a contract change and has
+# to be an explicit edit here.
+EXPECTED_SITES = {
+    "gi-branch.py": 2, "gi-ci-wait.py": 4, "gi-config.py": 6,
+    "gi-deps.py": 1, "gi-dup-score.py": 2, "gi-issue.py": 14,
+    "gi-model-cache.py": 2, "gi-runlog.py": 2, "gi-secscan.py": 4,
+    "gi-stack-detect.py": 1, "gi-triage-graph.py": 2,
+}
 # A call is any mention of a shared script by filename, however it is launched
 # (python3, python3.11, uv run, a bare ./path relying on the exec bit), plus the
 # indirect form where the *script path itself* is a placeholder — `python3
@@ -1052,14 +1079,32 @@ PLACEHOLDER = re.compile(
     # <NAME>: an angle-bracketed identifier is never shell syntax, so any
     # length counts — `<key>` is as much a placeholder as `<FILE-LIST>`.
     r"|<[A-Za-z_][\w-]*>"
-    # `[NAME]` is deliberately absent. A square bracket is a glob range and a
-    # regex character class before it is ever a placeholder, and no form of the
-    # rule separated `[untrusted]` from `[A-Z0-9]` in this repo's own documented
-    # `--extra-secret-value-pattern` examples. `{NAME}` and `<NAME>` are the
-    # styles these skills actually use; a reviewer adding a `[NAME]` call site
-    # is the residual gap, and it is a smaller one than a lint people route
-    # around because it fires on their regexes.
+    # `[name]` — added in issue #278, where it was one of five mutants that
+    # walked through. The earlier draft left the style out because a square
+    # bracket is a glob range and a regex character class before it is ever a
+    # placeholder, and the documented `--extra-secret-value-pattern` examples
+    # contain `[A-Z0-9]`. Narrowing the rule to a *lowercase* identifier of two
+    # or more characters separates the two: `[A-Z0-9]` is uppercase, `[e]dit`
+    # and `[Y/n]` are one character or not identifiers, and `[issue_title]` is
+    # caught. Verified against the whole corpus — it adds no finding today.
+    r"|\[[a-z_][a-z0-9_.-]+\]"
 )
+
+# Shell variables permitted on a shared-script command line, and why each is
+# inert. Quoting stops word-splitting, not the value itself from becoming an
+# argument, so the allowlist is about *provenance*: every entry is either a
+# path the skill composed, a name a script derived, or a value that reaches the
+# script on stdin rather than on the command line.
+ALLOWED_VARS = {
+    "$skill_dir": "path the skill resolves from its own SKILL.md dirname",
+    "$wt_dir": "worktree path the skill composes itself",
+    "$base": "base branch name read from the repo, never reporter text",
+    "${base}": "base branch name read from the repo, never reporter text",
+    "$branch_name": "derived by gi-branch.py --from-issue, which sanitizes it",
+    "$run_json": "run-log JSON the skill composed; reaches gi-runlog on stdin",
+    "$no_run_log": "a flag the skill sets itself, tested by `[ -n … ]`",
+    "$issue_body": "reaches gi-deps on stdin through printf, never as an argument",
+}
 VAR = re.compile(r"\$\{?[A-Za-z_][A-Za-z0-9_]*\}?")
 # Command substitution pastes its output into the command line unquoted. Only
 # the `$(…)` form is checked: a backtick is also the markdown code delimiter in
@@ -1067,6 +1112,28 @@ VAR = re.compile(r"\$\{?[A-Za-z_][A-Za-z0-9_]*\}?")
 # span it is written inside. Anything reachable through a backtick is reachable
 # through `$(…)`, which is checked, so the gap is in notation, not in coverage.
 SUBST = re.compile(r"\$\(")
+
+
+def loose_substitutions(cmd):
+    """(start, end) of every `$(…)` on the line, with naive paren balancing.
+
+    `end` is `len(cmd)` when the substitution never closes, which is itself a
+    finding: an unclosed one swallows whatever follows it.
+    """
+    out, i = [], cmd.find("$(")
+    while i != -1:
+        depth, j = 0, i + 1
+        while j < len(cmd):
+            if cmd[j] == "(":
+                depth += 1
+            elif cmd[j] == ")":
+                depth -= 1
+                if depth == 0:
+                    break
+            j += 1
+        out.append((i, j))
+        i = cmd.find("$(", max(j, i + 2))
+    return out
 # `sh -c "…"` re-parses its argument, so the double-quote reasoning below does
 # not hold inside one.
 REPARSE = re.compile(
@@ -1132,8 +1199,17 @@ def commands(text: str):
         return [text] if CALL.search(text) else []
     out = []
     dangling = False
+    seen_call = False
     for span in spans:
         is_call = bool(CALL.search(span))
+        # Once the call span has been seen, every later span is part of the
+        # command: `…gi-x.py` `then paste` `{untrusted}` walked past the
+        # option-shaped heuristic below. Spans *before* the call stay out —
+        # `git add <file>` in the prose ahead of a call is a different command.
+        if seen_call:
+            out.append(span)
+            continue
+        seen_call = is_call
         # A sibling continues the command line when it opens with an option, a
         # pipe or another command, or when the span before it ended on an option
         # still waiting for its value — `…gi-x.py --allow-pattern` `{untrusted}`
@@ -1153,14 +1229,31 @@ def commands(text: str):
             dangling = bool(re.search(r"(?:^|\s)--?[A-Za-z][\w-]*\s*$", span))
     return out
 
+proc = subprocess.run(
+    ["git", "-C", str(root), "ls-files", "-z"], capture_output=True, check=False
+)
+if proc.returncode != 0:
+    print("FAIL|AC1: cannot enumerate tracked files — the lint is not scanning")
+    raise SystemExit(0)
+tracked = [p for p in proc.stdout.decode("utf-8", "replace").split("\0") if p]
+
 bad = []
 checked = 0
-for rel in ROOTS:
-    for path in sorted((root / rel).rglob("*.md")):
-        rp = path.relative_to(root)
+sites = {name: set() for name in EXPECTED_SITES}
+if True:
+    for rel in tracked:
+        if rel.startswith(SKIP_PREFIXES) or not rel.endswith(SCAN_SUFFIXES):
+            continue
+        path = root / rel
+        if not path.is_file():
+            continue
+        rp = pathlib.Path(rel)
         for lineno, text in logical_lines(path):
             for cmd in commands(text):
                 checked += 1
+                for name in SCRIPT_NAME.findall(cmd):
+                    if name in sites:
+                        sites[name].add((rel, lineno))
                 if "<<" in cmd:
                     bad.append(
                         f"{rp}:{lineno}: a heredoc on a shared-script command "
@@ -1194,15 +1287,35 @@ for rel in ROOTS:
                         f"{rp}:{lineno}: {token} is unquoted on a shared-script "
                         f"command line"
                     )
-                if SUBST.search(unquoted):
+                for token in set(VAR.findall(cmd)):
+                    if token not in ALLOWED_VARS:
+                        bad.append(
+                            f"{rp}:{lineno}: {token} is on a shared-script command "
+                            f"line and is not on the reviewed variable allowlist"
+                        )
+                call = CALL.search(cmd)
+                for start, end in loose_substitutions(cmd):
+                    if (
+                        call is not None
+                        and start < call.start()
+                        and call.end() <= end < len(cmd)
+                    ):
+                        continue  # `body="$(python3 …gi-issue.py …)"` — a capture
                     bad.append(
-                        f"{rp}:{lineno}: an unquoted command substitution puts "
-                        f"its output on a shared-script command line — assign it "
-                        f"to a variable and quote the variable"
+                        f"{rp}:{lineno}: a command substitution puts its output on "
+                        f"a shared-script command line — quoting it does not make "
+                        f"it inert; assign it to a variable the allowlist names"
                     )
 
-if checked < 25:
-    print(f"FAIL|AC1: the injection lint only found {checked} call sites — it is not scanning")
+drift = [
+    f"{name}: {len(sites[name])} call site(s), pinned at {want}"
+    for name, want in sorted(EXPECTED_SITES.items())
+    if len(sites[name]) != want
+]
+if drift:
+    print("FAIL|AC1: the per-script call-site count moved — " + "; ".join(drift)
+          + ". A deleted call site is a contract change; update EXPECTED_SITES "
+          "deliberately or restore the site")
 elif bad:
     for entry in sorted(set(bad)):
         print(f"FAIL|AC1: {entry}")
