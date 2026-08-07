@@ -23,7 +23,11 @@ src/
 │   └── scripts/                   # Shared executable helpers (stdlib-only, mode 0755)
 │       ├── gi-config.py           # Defaults + .gitissue.yml → one JSON line
 │       ├── gi-runlog.py           # Validate/normalize/append a runs.jsonl record
-│       └── gi-deps.py             # Parse local dependency issue numbers
+│       ├── gi-deps.py             # Parse local dependency issue numbers
+│       ├── gi-secscan.py          # Pre-commit secret/artifact scan → JSON verdict
+│       ├── gi-ci-wait.py          # Poll a PR's CI checks to one JSON verdict
+│       ├── gi-issue.py            # TTL-cached `gh issue view` by field set
+│       └── gi-branch.py           # Derive a convention-conformant branch name
 │
 ├── skills/
 │   ├── auto-pilot/         # /auto-pilot — triage, resolve, review, merge loop
@@ -107,6 +111,8 @@ Shared executable helpers are a third closure kind alongside agents and runtime 
 - **Runtime failure → degrade.** No `python3` on PATH, a non-zero exit other than 3, or unparsable stdout is an environment problem, not a broken install. Print a `⚠` line and follow the documented prose procedure the skill keeps beside every invocation. Exit 3 is the exception: it means the *user's input* is invalid (e.g. a malformed `.gitissue.yml`), which is a real stop, not a degrade.
 
 The shared exit-code vocabulary is `0` ok · `2` usage error · `3` invalid input (stop) · `4` cannot complete (degrade to prose).
+
+Code `1` is reserved for a **script-specific verdict** — an answer the script was asked for, not a failure to answer. Only `gi-secscan.py` uses it today (`1` = a real secret was found, the commit must stop). A script that claims `1` must document it in its own docstring **and** at every call site, because the default reading of a non-zero exit is "degrade", and degrading past a verdict inverts it.
 
 ## Conventions
 

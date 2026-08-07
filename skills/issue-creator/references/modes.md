@@ -8,8 +8,13 @@ Full specs for the Normalize and Batch Create modes. SKILL.md keeps a summary; t
 ### Step 1 — Fetch Issue
 
 ```bash
-gh issue view {N} --json number,title,body,labels,assignees,state,comments
+python3 references/scripts/gi-issue.py {N} \
+  --fields number,title,body,labels,assignees,state,comments
 ```
+
+Read `.issue` from the JSON envelope. Exit 3 is a stop. No `python3`, exit 2 (an unresolved script path), or exit 4 degrades to `gh issue view {N} --json number,title,body,labels,assignees,state,comments`.
+
+**This mode rewrites the issue body**, and the cache is repo-wide — `/issue-resolver` reads the same issue with the same field list, so a stale entry outlives this skill. Every `gh issue edit` below is therefore followed by a **mandatory** `python3 references/scripts/gi-issue.py {N} --invalidate`, and every verify-after-write read goes straight to `gh` rather than through the cache. Verifying a write against a cached pre-write body proves nothing.
 
 If not found:
 ```
@@ -135,9 +140,15 @@ Stop. Do not edit the issue body.
 
 ```bash
 gh issue edit {N} --body "{normalized_body}"
+# MANDATORY, not optional: the cache is now stale by construction, and the
+# entry is repo-wide — /issue-resolver reads this issue with the same field
+# list, so a surviving pre-normalization body makes it re-normalize an
+# already-normalized issue (a second backup comment, and the normalized body
+# nested inside a second Reporter Context block).
+python3 references/scripts/gi-issue.py {N} --invalidate
 ```
 
-Re-read the body and confirm `<!-- gitissue:normalized v1 -->` is the first line:
+Re-read the body and confirm `<!-- gitissue:normalized v1 -->` is the first line. Read it straight from `gh`, never from the cache — verifying a write against a cached pre-write body proves nothing:
 
 ```bash
 gh issue view {N} --json body --jq '.body' | head -1
@@ -162,6 +173,7 @@ If `issue.labels_auto_suggest` is true and new labels were suggested:
 
 ```bash
 gh issue edit {N} --add-label "{label1},{label2}"
+python3 references/scripts/gi-issue.py {N} --invalidate   # mandatory: labels just changed
 ```
 
 ### Step 12 — Report
@@ -368,6 +380,7 @@ Conform to SPEC §2.1: the marker records that the child contributes to parent #
 3. **Write** it back:
    ```bash
    gh issue edit {parent} --body "{updated_parent_body}"
+   python3 references/scripts/gi-issue.py {parent} --invalidate   # mandatory: body just changed
    ```
 4. **Verify by re-reading** (`references/docs/platform-github.md` driver rule 2 — mutations are verified by re-reading, established for tracker edits in #218). Confirm each created child appears as a `- [ ] #N —` line:
    ```bash

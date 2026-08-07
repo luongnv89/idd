@@ -475,6 +475,38 @@ model_suggestion:
   # Type: integer
   # Default: 7
   cache_ttl_days: 7
+
+# Pre-commit security scan settings (used by every skill that commits or pushes)
+# The built-in rules always apply; these keys only *extend* them. There is no
+# key that disables a rule — a scan a repository can switch off is not a gate.
+# The rules themselves live in the pre-commit security conventions reference.
+security:
+  # Extra regex ORed onto the built-in secret-bearing *filename* pattern
+  # Type: string (a Python regex; empty means built-ins only)
+  # Default: ""
+  # Example: "(^|/)service-account\\.json$"
+  extra_secret_file_pattern: ""
+
+  # Extra regex ORed onto the built-in real-API-key *value* pattern
+  # Type: string (a Python regex; empty means built-ins only)
+  # Default: ""
+  # Prefer prefix + length over identifier + value — the latter false-positives
+  # on docstrings and tests, which is how a scan gets disabled in practice
+  # Example: "acme_live_[A-Za-z0-9]{24,}"
+  extra_secret_value_pattern: ""
+
+  # Paths matching this regex are skipped entirely (fixtures, golden files)
+  # Type: string (a Python regex; empty means scan everything)
+  # Default: ""
+  # Every path it excludes is a path no rule can block — keep it narrow
+  # Example: "^tests/fixtures/"
+  allow_pattern: ""
+
+  # Warn (never block) when a scanned file exceeds this size, in megabytes
+  # Type: integer
+  # Default: 10
+  # Minimum: 1
+  max_file_size_mb: 10
 ```
 
 ### Config Section Map
@@ -490,6 +522,7 @@ graph TD
     R --> A["analysis"]
     R --> PR["projects"]
     R --> MS["model_suggestion"]
+    R --> SEC["security"]
 
     I --> I1["auto_normalize"]
     I --> I2["template"]
@@ -546,6 +579,11 @@ graph TD
     MS --> MS1["enabled"]
     MS --> MS2["data_url"]
     MS --> MS3["cache_ttl_days"]
+
+    SEC --> SEC1["extra_secret_file_pattern"]
+    SEC --> SEC2["extra_secret_value_pattern"]
+    SEC --> SEC3["allow_pattern"]
+    SEC --> SEC4["max_file_size_mb"]
 
     style R fill:#4CAF50,color:#fff
 ```
@@ -654,3 +692,7 @@ Config is validated on load at the start of every skill invocation. Errors inclu
 | `model_suggestion.enabled` | `true` | Suggest a model + thinking level per issue |
 | `model_suggestion.data_url` | `"https://cursor.com/cursorbench"` | CursorBench source refreshed into the cache |
 | `model_suggestion.cache_ttl_days` | `7` | Days before cached model data is stale |
+| `security.extra_secret_file_pattern` | `""` | Extra regex ORed onto the built-in secret-bearing filename pattern |
+| `security.extra_secret_value_pattern` | `""` | Extra regex ORed onto the built-in real-API-key value pattern |
+| `security.allow_pattern` | `""` | Paths matching this regex are skipped entirely — every exclusion is a path no rule can block |
+| `security.max_file_size_mb` | `10` | Warn (never block) above this file size without Git LFS |

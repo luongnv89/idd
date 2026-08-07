@@ -123,6 +123,8 @@ Check these files relative to the skill's directory (the dirname of this SKILL.m
 - `references/scripts/gi-config.py` — config resolver: merges the documented defaults with `.gitissue.yml` and prints one JSON line
 - `references/scripts/gi-runlog.py` — run-log writer: validates, normalizes, and appends one `.gitissue/runs.jsonl` record
 - `references/scripts/gi-deps.py` — dependency-marker parser for the Phase 5 dependency gate
+- `references/scripts/gi-ci-wait.py` — CI waiter: polls a PR's checks to a verdict in one invocation, for the Phase 5 pre-merge gate
+- `references/scripts/gi-issue.py` — TTL-cached issue fetcher for the repeat reads across Phases 1, 4, and 5
 
 If the working tree is dirty, auto-stash before starting; if not on the default
 branch, auto-switch and rebase on a clean tree. Both procedures (the stash-first
@@ -300,7 +302,9 @@ stderr and wrote nothing. This is a stop, not a degrade: never append
 reject. Correct the record and re-run, or drop the line.
 
 Only the *write* is **best-effort and non-fatal** — a write that cannot happen
-(no `python3`, exit 4) never stops the loop or changes the iteration outcome. A
+(no `python3`, exit 2 for an unresolved script path or a malformed invocation,
+exit 4) never stops the loop or changes the iteration outcome; use the fallback
+append above for any of them, never for exit 3. A
 rejected record is never written by any path. Append only; never rewrite prior
 lines.
 

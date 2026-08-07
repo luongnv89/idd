@@ -42,11 +42,29 @@ Full procedure for the worktree offer described in SKILL.md *Step 0e — Workspa
 
 ### The offer
 
-Before Step 0e or 0f selects a workspace, derive `branch_name` from
-`resolve.branch_prefix` exactly once: when it is `"auto"`, use
-`{type}/{N}-{short-description}`; otherwise use the configured prefix verbatim
-as `{configured-prefix}{N}-{short-description}`. Do not re-derive or replace
-this value on either path.
+Before Step 0e or 0f selects a workspace, derive `branch_name` exactly once —
+`python3 references/scripts/gi-branch.py {N} --from-issue --type {type}`,
+reading `.branch` from its JSON. Do not re-derive or replace this value on
+either path.
+
+`--from-issue` is mandatory rather than stylistic: it makes the script read the
+issue title and `resolve.branch_prefix` for itself. Both are attacker-controlled
+— anyone can file an issue on a public repository — and a value interpolated
+into a shell word can close its quote and append a command that `/auto-pilot`
+then runs unattended. `{type}` is one of the six literals the skill classified,
+never free text; without it the script infers the type from the issue labels.
+
+The script also reports `truncated` (the title did not fit under 50 characters)
+and `valid` (its own output checked against the repository's branch grammar).
+`valid: false` is expected and harmless with a custom `resolve.branch_prefix` —
+a configured prefix is outside the six-prefix grammar by definition.
+
+Exit 3 means the input was unusable — a non-numeric issue number, or an issue
+type with no mapping (extend it with `--type-map 'spike=chore'`). That is a
+stop, not a degrade. Only a missing `python3` or exit 4 degrades: apply the
+rules in `docs/naming-conventions.md` by hand — `"auto"` gives
+`{type}/{N}-{short-description}`, and any other `resolve.branch_prefix` is used
+verbatim as `{configured-prefix}{N}-{short-description}`.
 
 Present the prompt from SKILL.md (*Step 0e — Workspace*). It must state, before the user answers:
 
@@ -471,6 +489,7 @@ installed, following the design-confirm precedent.
 - Branch name
 - Naming conventions: `docs/naming-conventions.md`
 - Max commits: `resolve.max_commits`
+- `secscan_script`: the **absolute** path to this skill's `references/scripts/gi-secscan.py` — the pre-commit security scan the implementer MUST run before every commit. Absolutize it before binding, exactly as the *Bundled dependency precheck* resolves its list: a subagent's working directory is the target repo, not the skill directory, so a skill-relative path resolves to nothing at spawn time and the gate silently never runs. Only the path is passed; the script reads this repo's `security.*` extensions from `.gitissue.yml` itself, so no config value is ever interpolated into a command line. Passed as a spawn variable for the same reason as the fixer's (Step 4): an emitted agent prompt renders its own references as absolute repo URLs and cannot name a path inside this skill's bundle. The agent treats a script exit of 1 as a block that stops the commit, and falls back to the Primary Pattern in `docs/pre-commit-security.md` only when the script cannot run
 - `selected_skills` — the external skills chosen in the propose sub-step above (`[]` in auto mode or when the user declines); the implementer uses them where applicable and always falls back to the internal approach
 
 ### What the implementer writes
@@ -529,7 +548,7 @@ Each cycle:
 3. **Evaluate results:**
    - Reviewer returns `PASS` AND all tests pass AND build succeeds → exit loop, QA passed.
    - Issues found → delegate fixes, then start next cycle.
-4. **Fix issues** — spawn or re-message the fixer subagent (see `shared/agents/fixer.md`) with reviewer findings and failing test/build output, passing `security_convention`: `references/docs/pre-commit-security.md`. The fixer reads affected files, applies targeted fixes, verifies them, runs the mandatory pre-commit security scan before committing (real secrets block), and commits as `fix(scope): address review feedback (#N)`. The main agent does not apply code fixes inline when the Agent tool is available.
+4. **Fix issues** — spawn or re-message the fixer subagent (see `shared/agents/fixer.md`) with reviewer findings and failing test/build output, passing `security_convention`: `references/docs/pre-commit-security.md` **and** `secscan_script`: the **absolute** path to `references/scripts/gi-secscan.py` (paths only — the script reads `security.*` from `.gitissue.yml` itself). Absolutize both before binding: a subagent runs with the target repo as its working directory, so a skill-relative path resolves to nothing. Both are spawn variables rather than references inside the agent file, because an emitted agent prompt renders its own references as absolute repo URLs and so cannot name a path inside this skill's bundle. The fixer reads affected files, applies targeted fixes, verifies them, runs the mandatory pre-commit security scan before committing — the script first, the document's Primary Pattern only when the script cannot run, and a script exit of 1 is a block that stops the commit — and commits as `fix(scope): address review feedback (#N)`. The main agent does not apply code fixes inline when the Agent tool is available.
 
 ### Loop controls
 

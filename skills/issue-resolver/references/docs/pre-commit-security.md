@@ -11,15 +11,64 @@ A leaked API key, private key, or `.env` file pushed to a public remote is a sec
 
 ---
 
+## Script Path: `gi-secscan.py` (preferred)
+
+The gate is shipped as a deterministic script, `references/scripts/gi-secscan.py`. Prefer it everywhere it is available: the rules below are ~90 lines of bash, and a gate re-derived by hand at four or five commit sites per issue eventually gets re-derived slightly wrong — in the one direction (a blocking check that stops blocking) nobody notices until after the leak.
+
+Skills that bundle it invoke the emitted copy, never a source-tree path:
+
+```bash
+# Exactly one input: --staged (index blobs), --working-tree (files on disk),
+# --range BASE (every blob in BASE..HEAD, commit by commit — a secret added and
+# then removed inside the branch is still pushed), --files-from -, or explicit
+# paths. In auto mode export IDD_AUTO_MODE=1 first.
+# Run from the repo root: the script reads the security.* block of
+# .gitissue.yml itself. Never interpolate a config value into this command.
+python3 references/scripts/gi-secscan.py --staged
+```
+
+It applies the same five rules in the same order and prints one JSON verdict on stdout (`verdict`: `clean`, `warn`, or `block`), with the `✗`/`⚠`/`○` lines on stderr. A repository's `security.*` extensions (documented in the configuration schema) apply because the script reads the `security:` block of `.gitissue.yml` itself. **Never pass a config value on the command line** — not as `--config-json`, not as `--allow-pattern`. `.gitissue.yml` is repository-controlled and `/issue-pr-review` runs with a pull request's branch checked out, so a value interpolated into a quoted shell word can close the quote and append a command that executes on the reviewer's machine at the exact moment the gate runs. Only the four documented scalars are read, so this is not a second copy of the configuration resolver.
+
+**Exit contract — the block code is a verdict, not a failure:**
+
+| Exit | Meaning | Caller behavior |
+|------|---------|-----------------|
+| `0` | `clean`, or `warn` with nothing blocking | Proceed. On `warn`, apply the *Mode Contract* below — the script never prompts (it does not own the terminal, and the path list may be arriving on its stdin); `confirm_required` is that decision pre-computed. |
+| `1` | `block` — a real secret was found | **Stop.** Never treat this as the degrade path: degrading past a real secret is the single outcome this gate exists to prevent. Report the path from `blocking[]`. |
+| `2` | Usage error — a malformed invocation, or a script path that did not resolve (`python3` returns 2 for a file it cannot open) | Fix the invocation where you control it. A caller that cannot tell the two apart treats it as **cannot complete**: fall back to the *Primary Pattern* below. A scan that never ran is never a scan that passed. |
+| `3` | Invalid input — a `security.*` value of the wrong type, or a `security.*` regex that does not compile | **Stop.** A scan configured wrongly has not run, so its silence means nothing. |
+| `4` | Cannot complete — no file list, `git` unavailable, or a declared byte source that could not be read | Print `⚠ gi-secscan unavailable — running the documented scan` and fall back to the *Primary Pattern* below. |
+
+The file being **absent from the bundle** is a different failure: a broken install, not a degrade, and the skill stops with its `✗ Missing bundled dependency` block.
+
+---
+
 ## Primary Pattern: Pre-Commit Scan
 
-This is the **only** documented scan path. Every skill that runs `git add`, `git commit`, or `git push` MUST execute it against the staged set (or the about-to-be-staged set) before proceeding.
+This is the canonical statement of the rules, and the **documented fallback** for the script above — run it verbatim when `gi-secscan.py` cannot run (no `python3`, exit `2`, exit `4`) and in any context that does not bundle the script. The script and this block implement the same five **rules**; when they disagree about a rule, this document is the specification and the script is the bug.
+
+They differ in what each can *read*, never in what counts as a secret, and both differences favour the script — this one, and the quoted-path limitation noted inside the block below. This block (and rule 3's `stat`) reads the file on disk; for a **staged** set those are not the bytes being committed — `git add` a key, edit it out, and the file reads clean over a blob that still carries it. `gi-secscan.py --staged` reads the index blob and is the stronger of the two: prefer it wherever it runs.
+
+Every skill that runs `git add`, `git commit`, or `git push` MUST execute one of the two against the staged set (or the about-to-be-staged set) before proceeding — never neither, and never a weaker check improvised inline.
 
 ```bash
 # Pre-commit security scan — canonical procedure (see surrounding prose).
 # Inputs: $files = newline-separated list of paths the skill is about to stage,
-#         commit, or push. If empty, fall back to `git diff --cached --name-only`
-#         (already staged) or `git status --porcelain | awk '{print $2}'` (working tree).
+#         commit, or push. If empty, derive it — and derive it correctly:
+#           staged:       git diff --cached --name-only
+#           working tree: git status --porcelain | sed 's/^...//; s/^.* -> //'
+#         Do NOT use `awk '{print $2}'` here. On a rename (`R  old -> new`) it
+#         yields the *old* path, which no longer exists, so the new file — the
+#         one actually being committed — is never scanned. It also truncates any
+#         path containing a space.
+#         Residual limitation of the shell form: it reads the file on disk, not
+#         the staged blob. See the paragraph above this block — prefer
+#         gi-secscan.py --staged, which reads the index.
+#         Residual limitation of any line-based form: git still quotes a path
+#         containing a space or a non-ASCII byte, and the quoted string names no
+#         file, so its contents go unscanned. That is not fixable in a `while
+#         read` loop, and it is one of the reasons gi-secscan.py exists — it
+#         reads `-z` output, where nothing is ever quoted. Prefer the script.
 secrets_found=0
 warnings=()
 
@@ -42,7 +91,10 @@ while IFS= read -r f; do
   [ -f "$f" ] || continue
   # Skip binary files.
   file --mime "$f" 2>/dev/null | grep -q 'charset=binary' && continue
-  if grep -E -n "$realkey_patterns" "$f" 2>/dev/null; then
+  # -q, not -n: printing the match would copy the secret into the terminal,
+  # the transcript, and quite possibly a PR comment — a second leak on top of
+  # the first. gi-secscan.py redacts for the same reason.
+  if grep -E -q "$realkey_patterns" "$f" 2>/dev/null; then
     echo "✗ Real API key detected in: $f"
     secrets_found=1
   fi
@@ -117,7 +169,7 @@ fi
 
 ## Mode Contract
 
-Both interactive and auto-pilot modes use **the same scan logic**. Real secrets always block. Warnings differ by mode:
+Both interactive and auto-pilot modes use **the same scan logic**, and both scan paths — `gi-secscan.py` and the Primary Pattern — implement the same contract. Real secrets always block. Warnings differ by mode:
 
 | Signal | Interactive mode | Auto mode (`--auto`) |
 |--------|------------------|----------------------|
@@ -136,9 +188,9 @@ In **interactive mode**, when one or more warnings fire, the skill prints them a
 
 Every IDD skill that runs `git add`, `git commit`, or `git push` MUST:
 
-1. **Run the scan above** — execute it against the staged or about-to-be-staged set before each `git commit` and before each `git push`. Skills that batch multiple commits should scan once before each commit, not once per pipeline run.
-2. **Link to this document** — write `(see the pre-commit security conventions reference)` next to the snippet so users find this reference. The build's runtime-doc bundler (`scripts/build.py`) picks up bare `pre-commit-security.md` references with the `docs/` prefix automatically.
-3. **Honor the mode contract** — the scan checks `IDD_AUTO_MODE` to decide whether to prompt on warnings (interactive) or log-and-continue (auto). Skills invoked with `--auto` (or by `/auto-pilot`) MUST `export IDD_AUTO_MODE=1` before running the scan. Real-secret detection always blocks regardless of mode.
+1. **Run the scan** — `gi-secscan.py` where it is bundled, the Primary Pattern otherwise — against the staged or about-to-be-staged set before each `git commit` and before each `git push`. Skills that batch multiple commits should scan once before each commit, not once per pipeline run.
+2. **Cite `pre-commit-security.md` next to the invocation** — even when calling the script, because the document is the script's fallback procedure and its specification. A call site that names only the script leaves an agent with nothing to do on exit `4`. The build's runtime-doc bundler (`scripts/build.py`) picks up bare `pre-commit-security.md` references with the `docs/` prefix automatically, and the shared-script bundler does the same for `gi-secscan.py`.
+3. **Honor the mode contract** — the scan reads `IDD_AUTO_MODE` to decide whether warnings need confirmation (interactive) or are logged and passed (auto). Skills invoked with `--auto` (or by `/auto-pilot`) MUST `export IDD_AUTO_MODE=1` before running the scan. Real-secret detection always blocks regardless of mode. The script reports the decision as `confirm_required` and leaves the prompt to the caller; the Primary Pattern prompts inline.
 4. **Never skip the scan to avoid a false positive** — if the scan flags a literal that is not a secret (e.g., a fixture, a docstring example, a regex pattern), replace it with a placeholder or move it behind a tested guard. Disabling the scan is not an option.
 
 ---
@@ -149,6 +201,8 @@ Every IDD skill that runs `git add`, `git commit`, or `git push` MUST:
 |---------|-------|----------|
 | `✗ Secret-bearing file staged: <path>` | A filename matched the secret-file pattern (`.env*`, `*.key`, etc.) | Add the path to `.gitignore`, unstage with `git reset HEAD <path>`, and remove from disk if the file is genuinely a secret. If it is a fixture/template, rename so it does not match (e.g., `.env.example`). |
 | `✗ Real API key detected in: <path>` | A real-key prefix matched (`sk-...`, `AKIA...`, `ghp_...`, etc.) | **Rotate the key first** (assume the leak window is exploited), then replace the literal in source with a placeholder (`your-key`, `${YOUR_KEY}`, `<your-key>`) and re-stage. If the literal is a fixture or test value, prefix with a non-real marker (`test-`, `fake-`, `example-`) so it no longer matches. |
+| `⚠ gi-secscan: …` and exit `4` | `git` was needed and is unavailable, or no file list could be determined | Not a pass — the scan did not run. Print `⚠ gi-secscan unavailable — running the documented scan` and execute the *Primary Pattern* instead. Never proceed on an exit `4` alone. |
+| `✗ gi-secscan: security.… is not a valid regex` and exit `3` | A `security.*` extension pattern in `.gitissue.yml` does not compile | Fix the regex (or clear the key) and rerun. A misconfigured scan has not run, so its silence is not a pass. |
 | `file: command not found` (no scan output) | `file` is not installed (BSD/macOS coreutils variants) | Install via `brew install file-formula` (macOS) or `apt install file` (Linux). Without `file`, binary files are not skipped — scans run slower but stay correct. |
 | `stat: illegal option -- f` or `stat: invalid option -- 'c'` | Platform mismatch (`-f%z` is BSD/macOS, `-c%s` is GNU/Linux) | The snippet falls through both forms with `2>/dev/null`. If both fail, large-file detection is silently skipped — fix by ensuring at least one `stat` form is available. |
 | Scan blocks on a value that genuinely is not a key | Real-key prefix matched a coincidental literal (rare but possible with `AKIA...` strings or long base64) | Replace the literal with a placeholder, or wrap the value behind a fixture loader (`os.environ["AWS_KEY"]`) so the literal never appears in source. Disabling the scan is not an option. |
@@ -159,7 +213,7 @@ If the scan keeps firing on the same false positive across runs, do not edit the
 
 ## Lint Enforcement
 
-`tests/test-pre-commit-security.sh` greps `src/skills/**/*.md`, `src/skills/**/references/*.md`, `src/internal-skills/**/*.md`, and `src/shared/agents/*.md` for fenced-block invocations of `git commit` and `git push` and asserts that each occurrence is preceded (within the same fenced block, or in the surrounding prose within ~12 lines above) by a reference to this document (`pre-commit-security.md`). Failing the lint blocks merges. This is the regression guard — without it, future skill edits could silently reintroduce ungated commits.
+`tests/test-pre-commit-security.sh` greps `src/skills/**/*.md`, `src/skills/**/references/*.md`, `src/internal-skills/**/*.md`, and `src/shared/agents/*.md` for fenced-block invocations of `git commit` and `git push` and asserts that each occurrence is gated — preceded within the same fenced block, or in the surrounding prose within ~12 lines above, by a reference to **either** this document (`pre-commit-security.md`) **or** the script that implements it (`gi-secscan.py`). Both forms count because both are the gate; a block with neither is an ungated commit and fails. Failing the lint blocks merges. This is the regression guard — without it, future skill edits could silently reintroduce ungated commits.
 
 ---
 

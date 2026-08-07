@@ -18,11 +18,19 @@ PASS=0
 FAIL=0
 
 # Measured after the issue #249 build: 467,132 bytes across the 7 built skills,
-# down from 780,400 before. AC3 asks for a >=300KB drop, i.e. <=480,400 bytes.
-# The budget is set just under that so the assertion still fails if a single
-# whole document (config-schema.md is 27.5KB x 7 skills) is reinstated, while
-# leaving ~13KB of room for genuine doc growth.
-BUDGET=480000
+# down from 780,400 before. AC3 asked for a >=300KB drop, i.e. <=480,400 bytes.
+#
+# Raised to 500,000 in issue #252, which added ~16KB: the pre-commit security
+# document and the naming-conventions document each gained the runtime contract
+# for a shipped script (exit codes, degrade path, invocation), and those two
+# docs are bundled into 2 and 5 skills respectively. That is content the skills
+# execute, not content they merely carry.
+#
+# What the guard is actually for is unchanged and still has a wide margin:
+# reinstating one whole document across the skills that excerpt it costs on the
+# order of 165KB (config-schema.md is 27.5KB x 6 non-init skills), so a
+# regression of that shape fails this assertion by more than 3x the headroom.
+BUDGET=500000
 
 pass() { echo "  ✓ $1"; PASS=$((PASS + 1)); }
 fail() { echo "  ✗ $1"; FAIL=$((FAIL + 1)); }

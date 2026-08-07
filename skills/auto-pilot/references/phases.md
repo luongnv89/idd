@@ -400,6 +400,8 @@ Before merging, verify:
 gh pr view {pr_number} --json mergeable,reviewDecision,statusCheckRollup
 ```
 
+When checks are still pending, do not read `statusCheckRollup` in a loop — run `python3 references/scripts/gi-ci-wait.py {pr_number} --interval {review.ci_poll_interval} --timeout {review.ci_timeout}` once and read its `verdict`. All four are handled: `pass` merges; **`none` merges only when `none_confirmed` is `true`** — that field is the difference between "this repository configures no checks" (step 1 above reads "CI passing (*if configured*)", and a repo without CI must not deadlock the loop) and "the checks have not registered yet", which is what a repository *with* CI reports for the first seconds after a push. A `none` with `none_confirmed: false` is a pending answer wearing a `none` label: leave the PR open, exactly as for `pending`. `fail` and `pending` both leave the PR open. Exit 3 (invalid input — a non-numeric PR number, or a non-positive interval or timeout) is a stop, not a degrade. A missing `python3`, exit 2 (the script path did not resolve), or exit 4 degrades to the manual poll, which reaches the **same outcomes** — all checks green merges, a failed or still-pending check leaves the PR open. See `references/examples.md` (*Merge requires CI checks*).
+
 If not mergeable:
 ```
 ⚠ PR #{pr_number} is not mergeable
@@ -416,7 +418,7 @@ If `autopilot.respect_dependencies` is `true` (default), check whether the origi
 
 #### Parse dependency markers
 
-Fetch the issue body (already cached from Phase 1's triage call to `gh issue list ... --json body`, or re-fetch with `gh issue view N --json body` if running in explicit-list mode) and extract every `Depends on #N` and `Blocked by #N` reference. The match is case-insensitive and tolerates list/sentence/colon shapes:
+Fetch the issue body (already cached from Phase 1's triage call to `gh issue list ... --json body`, or re-fetch with `python3 references/scripts/gi-issue.py N --fields body` — reading `.issue.body`; exit 3 is a stop, while no `python3`, exit 2, or exit 4 degrades to `gh issue view N --json body` — if running in explicit-list mode) and extract every `Depends on #N` and `Blocked by #N` reference. The match is case-insensitive and tolerates list/sentence/colon shapes:
 
 ```
 - Depends on #12
@@ -429,7 +431,30 @@ For each line that matches `(?im)\b(?:depends\s+on|blocked\s+by)\b`, collect **l
 1. **Strip cross-repo tokens** on that line — remove every `\S+/\S+#\d+` match (e.g. `acme/lib#15`) so its trailing digits are never captured.
 2. **Capture bare refs** on the remainder with a negative lookbehind guard: `(?<![\w/])#(\d+)` — this matches `#12` and comma lists (`#12, #15`) but not the `#15` inside `acme/lib#15` if a token was missed.
 
-Run `printf '%s' "$issue_body" | python3 references/scripts/gi-deps.py` — it prints one local issue number per line and always exits 0 (no markers prints nothing). If the script cannot run, apply steps 1–2 above by hand. Example: `Blocked by: acme/lib#15, #12` → gate on **#12 only**. `Depends on #12, #15` → gate on **#12** and **#15**. If no local markers remain, the gate is satisfied; proceed to Step 5.2.
+Feed the body in on **stdin**, never on a command line and never pasted into a
+shell word: an issue body is written by whoever filed the issue, and `/auto-pilot`
+runs unattended, so a body containing `` ` `` or `$(` would execute. Whichever
+source the body came from, it must reach `$issue_body` through a command
+substitution — whose output is never re-evaluated — and never by pasting the text
+you are holding into the assignment:
+
+```bash
+issue_body="$(python3 references/scripts/gi-issue.py N --fields body --jq .issue.body)"
+# Degrade form, when that exits 2 or 4 or there is no python3 — replace the
+# assignment above, do not add a second one:
+#   issue_body="$(gh issue view N --json body --jq .body)"
+printf '%s' "$issue_body" | python3 references/scripts/gi-deps.py
+```
+
+When Phase 1's cached body is the source, re-read it through the first form
+rather than inlining the cached text — the cache is what makes that read free.
+
+`gi-deps.py` prints one local issue number per line; no markers prints nothing.
+**Empty output is only "no dependencies" when the exit status is 0.** A non-zero
+exit — 2 for an unresolved script path or a malformed invocation — is a parse
+that never ran, and reading its silence as "no blockers" merges a PR whose
+dependency is still open. On any non-zero exit, or no `python3`,
+apply steps 1–2 above by hand. Example: `Blocked by: acme/lib#15, #12` → gate on **#12 only**. `Depends on #12, #15` → gate on **#12** and **#15**. If no local markers remain, the gate is satisfied; proceed to Step 5.2.
 
 **Cycle guard:** If issue A's body references its own number (`#A`), log a warning and skip the gate (treat as satisfied). The auto-pilot must never block a PR on its own issue number. Multi-hop cycles (A → B → A) are not detected here — they would require traversing each dependency's body, which is out of scope for the per-merge gate; the fail-safe is that any genuinely-cyclic issue set surfaces as `blocked_by_dependency` on each affected issue and requires user intervention before those PRs can merge — the loop still advances past them. The check is:
 
@@ -443,8 +468,11 @@ Run `printf '%s' "$issue_body" | python3 references/scripts/gi-deps.py` — it p
 For each captured `#N`, ask GitHub: "is this issue closed by a merged PR?" GitHub's GraphQL exposes the linked-PR set directly via `closedByPullRequestsReferences` on the Issue type, which `gh issue view` surfaces:
 
 ```bash
-gh issue view N --json number,state,title,closedByPullRequestsReferences
+python3 references/scripts/gi-issue.py N \
+  --fields number,state,title,closedByPullRequestsReferences
 ```
+
+Read `.issue` from the envelope. Each dependency is checked once per merge gate and often again on a later iteration, so the cache absorbs the repeats. Exit 3 is a stop; no `python3`, exit 2 (an unresolved script path), or exit 4 degrades to `gh issue view N --json number,state,title,closedByPullRequestsReferences`. **A dependency PR merged during this session invalidates the entry** — pass `--refresh` after any merge in this run.
 
 The `closedByPullRequestsReferences.nodes[]` array contains every PR that closes (or would close) issue #N, each with `number`, `state` (`OPEN` / `CLOSED` / `MERGED`), and `url`. This is the authoritative answer — no need to grep PR bodies for `Closes #N`.
 

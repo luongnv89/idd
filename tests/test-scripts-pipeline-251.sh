@@ -523,7 +523,20 @@ else:
         "T4.4: --append wrote exactly one line terminated by a single newline",
     )
     written = raw.decode("utf-8").rstrip("\n")
-    emit(written == echoed, "T4.5: --append and --echo produce the identical line")
+    # Compared field by field with `ts` removed. `ts` is second-resolution and
+    # these are two separate invocations, so a byte comparison fails whenever
+    # the clock ticks between them — roughly once per second of test runs. Both
+    # lines must still *carry* a ts; dropping the field is the thing worth
+    # asserting, not that two clocks agreed.
+    try:
+        left, right = json.loads(written), json.loads(echoed)
+    except json.JSONDecodeError:
+        emit(False, "T4.5: --append or --echo did not produce JSON")
+    else:
+        emit(
+            bool(left.pop("ts", None)) and bool(right.pop("ts", None)) and left == right,
+            "T4.5: --append and --echo produce the identical line (ts aside)",
+        )
     try:
         record = json.loads(written)
     except json.JSONDecodeError as exc:
