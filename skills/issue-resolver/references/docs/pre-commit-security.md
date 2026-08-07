@@ -18,8 +18,10 @@ The gate is shipped as a deterministic script, `references/scripts/gi-secscan.py
 Skills that bundle it invoke the emitted copy, never a source-tree path:
 
 ```bash
-# Exactly one input: --staged, --working-tree, --range BASE, --files-from -, or
-# explicit paths. In auto mode export IDD_AUTO_MODE=1 first.
+# Exactly one input: --staged (index blobs), --working-tree (files on disk),
+# --range BASE (every blob in BASE..HEAD, commit by commit — a secret added and
+# then removed inside the branch is still pushed), --files-from -, or explicit
+# paths. In auto mode export IDD_AUTO_MODE=1 first.
 # Run from the repo root: the script reads the security.* block of
 # .gitissue.yml itself. Never interpolate a config value into this command.
 python3 references/scripts/gi-secscan.py --staged
@@ -35,7 +37,7 @@ It applies the same five rules in the same order and prints one JSON verdict on 
 | `1` | `block` — a real secret was found | **Stop.** Never treat this as the degrade path: degrading past a real secret is the single outcome this gate exists to prevent. Report the path from `blocking[]`. |
 | `2` | Usage error — a malformed invocation, or a script path that did not resolve (`python3` returns 2 for a file it cannot open) | Fix the invocation where you control it. A caller that cannot tell the two apart treats it as **cannot complete**: fall back to the *Primary Pattern* below. A scan that never ran is never a scan that passed. |
 | `3` | Invalid input — a `security.*` value of the wrong type, or a `security.*` regex that does not compile | **Stop.** A scan configured wrongly has not run, so its silence means nothing. |
-| `4` | Cannot complete — no file list, or `git` unavailable | Print `⚠ gi-secscan unavailable — running the documented scan` and fall back to the *Primary Pattern* below. |
+| `4` | Cannot complete — no file list, `git` unavailable, or a declared byte source that could not be read | Print `⚠ gi-secscan unavailable — running the documented scan` and fall back to the *Primary Pattern* below. |
 
 The file being **absent from the bundle** is a different failure: a broken install, not a degrade, and the skill stops with its `✗ Missing bundled dependency` block.
 

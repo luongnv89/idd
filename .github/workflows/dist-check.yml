@@ -75,6 +75,9 @@ jobs:
       - name: test-scripts-252
         run: bash tests/test-scripts-252.sh
 
+      - name: test-secscan-contract-272
+        run: bash tests/test-secscan-contract-272.sh
+
       - name: test-autopilot-dependency-cross-repo-192
         run: bash tests/test-autopilot-dependency-cross-repo-192.sh
 

@@ -29,13 +29,53 @@ Output on success is exactly one line of JSON on stdout:
 Human-readable `✗` / `⚠` / `○` lines go to stderr, so a caller may show them
 verbatim and still parse stdout.
 
-`--staged` scans the bytes in the **index** — the blob `git commit` will write —
-not the file on disk. The two diverge the moment a path is staged and then
-edited, and scanning the working-tree copy of a staged path is a silent false
-negative: `git add secrets.txt` followed by an edit that strips the key leaves a
-clean file over a blob that still carries it. Every other input source (paths,
-`--files-from`, `--working-tree`, `--range`) reads the working tree, which is
-what those sources mean.
+The byte-source contract
+------------------------
+
+Seven separate silent passes were found in this gate before it was written this
+way, and every one of them was the same bug: the scan read bytes that were not
+the bytes being shipped, and then reported the path as scanned and clean. The
+inputs differed — a path with a leading space, a path ending in `\\r`, a path
+carrying an undecodable byte, a path literally named `0:x.txt`, a repository
+directory whose name ended in a space — but the mechanism never did. Patching
+inputs one at a time cannot close that class, because the class is "some path
+shape steers the read"; it is closed only by making the read not depend on the
+path at all.
+
+So each mode declares, per entry, exactly one **byte source**, and the scan
+reads that source and nothing else:
+
+  --staged        the blob object id in the index, from `git diff --cached
+                  --raw`. The object id *is* the content `git commit` will
+                  write. No filename is used to find those bytes, so no
+                  filename shape can redirect them.
+  --range         the blob object id of every entry of every commit in
+                  `BASE..HEAD`, from `git rev-list` plus `git diff-tree --raw`.
+                  Commit by commit, not a net diff: a secret added in one commit
+                  and removed in the next is absent from `BASE...HEAD` yet is
+                  still in the history `git push` sends, so a net diff is a
+                  pre-push hole.
+  --working-tree  the file on disk, because that is what this mode is asking
+                  about. The path comes from `git status --porcelain -z -uall`
+                  byte for byte, and is joined against the working tree root
+                  derived from `git rev-parse --show-cdup` — a string that can
+                  only ever be a run of `../`, so no byte of the repository's
+                  own directory name takes part in resolving it.
+  paths /         the file on disk, relative to the working directory, exactly
+  --files-from    as the caller named it.
+
+Three invariants follow, and the mode x path-shape matrix test enforces each
+of them for every combination:
+
+  1. The bytes scanned for an entry are exactly the bytes that mode ships.
+  2. The path reported for an entry is exactly the path git reported, byte for
+     byte — no strip, no case fold, no re-encode.
+  3. A declared byte source that cannot be read **fails closed** with exit 4.
+     It is never skipped, never counted as scanned, and never reaches a clean
+     verdict. The one exception is a caller-supplied list (`paths`,
+     `--files-from`), where git makes no claim that the path exists: there a
+     missing entry is reported as an `unreadable-path` warning, so it is
+     visible rather than silently counted as clean.
 
 Rule extensions come from the `security:` block of `.gitissue.yml`, which this
 script reads itself. That is a security decision: `.gitissue.yml` is
@@ -43,7 +83,9 @@ repository-controlled, so a design where the caller passes config *values* on
 the command line lets a crafted value break out of its shell quoting and run a
 command — during a pull-request review, on the reviewer's machine, at the moment
 the gate runs. `--config-json` remains for programmatic callers that already
-hold the parsed config and can pass it without a shell.
+hold the parsed config and can pass it without a shell. The search for that file
+stops at the top of the working tree: a `.gitissue.yml` in `$HOME` must not be
+able to set `security.allow_pattern` for every repository underneath it.
 
 `confirm_required` is the mode contract, pre-computed: it is true only when
 warnings fired *and* the run is interactive (`IDD_AUTO_MODE` is not `1`). This
@@ -62,9 +104,11 @@ Exit codes
      `.gitissue.yml` that is the wrong type, or a regex that does not compile
      (stderr: `✗ gi-secscan: <why>`). Stop; a scan configured wrongly has not
      run, so its silence means nothing.
-  4  cannot complete — no file list could be determined, or `git` was needed and
-     is unavailable (stderr: `⚠ gi-secscan: <reason>`). Callers fall back to the
-     Primary Pattern in the pre-commit security conventions document.
+  4  cannot complete — no file list could be determined, a declared byte source
+     could not be read, or `git` was needed and is unavailable (stderr:
+     `⚠ gi-secscan: <reason>`). Callers fall back to the Primary Pattern in the
+     pre-commit security conventions document. This is the fail-closed exit: it
+     is *always* preferred to a clean verdict over bytes that were never read.
 
 Authored at src/shared/scripts/gi-secscan.py — do not edit installed copies;
 edit the source and run ./scripts/build.sh.
@@ -73,11 +117,15 @@ edit the source and run ./scripts/build.sh.
 from __future__ import annotations
 
 import argparse
+import hashlib
+import io
 import json
 import os
 import re
+import stat as statmod
 import subprocess
 import sys
+from typing import NamedTuple
 
 # --- Rule patterns -----------------------------------------------------------
 #
@@ -139,6 +187,30 @@ class Unavailable(Exception):
     """The scan could not run; the caller falls back to prose — exit 4."""
 
 
+class Target(NamedTuple):
+    """One path plus the single source of the bytes that path ships.
+
+    `kind` is the whole contract:
+
+      "blob"      `oid` names a git object; its bytes are the shipped bytes.
+                  The path is never used to find them.
+      "worktree"  the file on disk under the scan's base directory.
+      "absent"    this entry ships no bytes at all — a deletion, or a submodule
+                  gitlink. `reason` says which. The filename rules still run;
+                  there is simply no content or size to read.
+
+    There is no fourth kind and no fallback between kinds. A "blob" whose object
+    cannot be read is exit 4, not a quiet retry against the working tree: that
+    retry is precisely how a tidied working copy came to be scanned in place of
+    the blob a commit was about to write.
+    """
+
+    path: str
+    kind: str
+    oid: str = ""
+    reason: str = ""
+
+
 # --- Inputs ------------------------------------------------------------------
 
 
@@ -182,7 +254,7 @@ def _dedupe(entries: list[str]) -> list[str]:
     are scanned in place of the real one, and where none exists the path
     resolves to nothing and is skipped as a deletion. Both report clean over a
     live key. Only the newline-separated caller list needs line-ending repair,
-    and `_split_paths` does that where the format makes it unambiguous.
+    and `_split_lines` does that where the format makes it unambiguous.
     """
     seen: set[str] = set()
     out: list[str] = []
@@ -198,18 +270,15 @@ def _dedupe(entries: list[str]) -> list[str]:
     return out
 
 
-def _split_paths(text: str) -> list[str]:
-    """Split a NUL-separated (git) or newline-separated (caller) path list.
+def _split_lines(text: str) -> list[str]:
+    """Split a newline-separated path list written by a human or a shell.
 
-    A NUL-separated list is passed through byte for byte: git chose that
-    separator precisely so nothing inside a filename needs escaping. Only the
-    newline form — which a human or a shell wrote — gets its `\r` repaired, and
-    only at the end of a line, where CRLF is a line ending rather than a name.
-    `str.splitlines()` is deliberately not used: it also splits on `\v`, `\f`,
-    `\x85` and `\u2028`, every one of which is a legal filename byte.
+    Only this form gets its `\r` repaired, and only at the end of a line, where
+    CRLF is a line ending rather than a name. `str.splitlines()` is deliberately
+    not used: it also splits on `\v`, `\f`, `\x85` and ` `, every one of
+    which is a legal filename byte. Git-sourced lists never come through here —
+    they are NUL-separated, and `_fields` passes them through byte for byte.
     """
-    if "\0" in text:
-        return _dedupe(text.split("\0"))
     # One `\r`, not a run of them: `x.txt\r\r\n` names a file ending in `\r`,
     # and stripping both would point at a different file with no warning.
     return _dedupe(
@@ -217,56 +286,248 @@ def _split_paths(text: str) -> list[str]:
     )
 
 
-def _porcelain_paths(text: str) -> list[str]:
-    """Extract paths from `git status --porcelain -z` output.
+def _fields(text: str) -> list[str]:
+    """Split `-z` git output into its NUL-separated fields, verbatim.
+
+    Not a heuristic on the *presence* of a NUL: every caller of this function
+    passes `-z` to git, so the separator is known from the invocation rather
+    than sniffed from the payload. The trailing empty field left by git's final
+    NUL is dropped; nothing else is touched.
+    """
+    fields = text.split("\0")
+    if fields and fields[-1] == "":
+        fields.pop()
+    return fields
+
+
+# `:<src-mode> <dst-mode> <src-oid> <dst-oid> <status>[<score>]`, the header of
+# one `--raw -z` record. Anchored and fully specified: a header that does not
+# match is a format this parser does not model, and guessing which bytes ship is
+# the exact move this contract forbids. Combined-diff headers (`::`) do not match
+# either — none of the invocations here ask for one.
+_RAW_HEADER_RE = re.compile(
+    r"^:([0-7]{6}) ([0-7]{6}) ([0-9a-f]+) ([0-9a-f]+) ([A-Z])([0-9]*)$"
+)
+
+_ZERO_OID_RE = re.compile(r"^0+$")
+_OID_RE = re.compile(r"^[0-9a-f]{7,64}$")
+
+# `git rev-parse --show-cdup` can only ever be empty or a run of `../`. Asserting
+# that is what keeps the repository's own directory name — which may end in a
+# space, a tab or a `\r` — out of every path this scan resolves.
+_CDUP_RE = re.compile(r"^(\.\./)*$")
+
+# A gitlink: a submodule pointer, whose "content" is a commit id in another
+# repository. No file bytes ship with it.
+_GITLINK_MODE = "160000"
+
+
+def _target_from_raw(
+    path: str, dst_mode: str, dst_oid: str, status: str, what: str
+) -> Target:
+    """Turn one parsed `--raw` record into its declared byte source."""
+    if status == "D":
+        return Target(path, "absent", reason="deleted — no bytes are shipped")
+    if status not in ("A", "C", "M", "R", "T"):
+        # `U` (unmerged) and `X` (unknown) both mean git cannot tell us what
+        # content this entry carries. Exit 4, so the caller falls back to the
+        # prose gate rather than committing on a scan that skipped an entry.
+        raise Unavailable(
+            f"{what}: {path!r} has status {status!r}, whose shipped content git "
+            "does not report — resolve it and rerun"
+        )
+    if dst_mode == _GITLINK_MODE:
+        return Target(path, "absent", reason="submodule gitlink — no file bytes")
+    if _ZERO_OID_RE.match(dst_oid) or not _OID_RE.match(dst_oid):
+        raise Unavailable(
+            f"{what}: {path!r} reports no destination object id — the bytes it "
+            "ships cannot be read"
+        )
+    return Target(path, "blob", oid=dst_oid)
+
+
+def _raw_targets(text: str, what: str) -> list[Target]:
+    """Parse `git diff/diff-tree --raw -z` into byte-source targets.
+
+    The record shape is a header field followed by one path field — two for a
+    rename or a copy, where the *second* is the destination, the path that is
+    actually being shipped. Path fields are consumed positionally by count, so
+    a filename that happens to look like a header is data, not a record: the
+    parser never has to decide what a field means.
+    """
+    fields = _fields(text)
+    out: list[Target] = []
+    index = 0
+    while index < len(fields):
+        header = fields[index]
+        index += 1
+        if not header:
+            continue
+        match = _RAW_HEADER_RE.match(header)
+        if match is None:
+            raise Unavailable(
+                f"{what}: unparsable raw record {header!r} — refusing to guess "
+                "which bytes are being shipped"
+            )
+        _, dst_mode, _, dst_oid, status, _ = match.groups()
+        wanted = 2 if status in ("R", "C") else 1
+        if index + wanted > len(fields):
+            raise Unavailable(f"{what}: truncated {status} record for {header!r}")
+        path = fields[index + wanted - 1]
+        index += wanted
+        if not path:
+            raise Unavailable(f"{what}: a raw record named an empty path")
+        out.append(_target_from_raw(path, dst_mode, dst_oid, status, what))
+    return out
+
+
+def _porcelain_targets(text: str) -> list[Target]:
+    """Parse `git status --porcelain -z -uall` into byte-source targets.
 
     NUL-separated records, so no path is ever quoted or escaped — a filename
     with a space, a quote, or a non-ASCII character arrives verbatim. In this
     format a rename or copy is `XY <new>\\0<old>\\0`: the *new* path is the one
     about to be committed, and the extra origin field must be consumed rather
-    than parsed as its own record.
+    than parsed as its own record. `-uall` is not optional: without it git
+    collapses a new subtree to `?? a/`, which is not a file, so every path
+    beneath it would be skipped while still being counted — a whole directory of
+    secrets passing as one clean entry.
     """
-    fields = text.split("\0")
-    out: list[str] = []
+    fields = _fields(text)
+    out: list[Target] = []
     index = 0
     while index < len(fields):
         record = fields[index]
         index += 1
-        if len(record) < 4:
+        if not record:
             continue
-        status, path = record[:2], record[3:]
-        if status[0] in ("R", "C") or status[1] in ("R", "C"):
+        if len(record) < 4 or record[2] != " ":
+            raise Unavailable(
+                f"--working-tree: unparsable status record {record!r} — refusing "
+                "to guess which paths are being shipped"
+            )
+        state, path = record[:2], record[3:]
+        if state[0] in ("R", "C") or state[1] in ("R", "C"):
+            if index >= len(fields):
+                raise Unavailable("--working-tree: truncated rename record")
             index += 1  # consume the origin path that follows a rename/copy
-        if path:
-            out.append(path)
-    return _dedupe(out)
+        if state[0] == "U" or state[1] == "U":
+            raise Unavailable(
+                f"--working-tree: {path!r} is unmerged — resolve the conflict "
+                "and rerun"
+            )
+        if state[1] == "D" or (state[0] == "D" and state[1] == " "):
+            out.append(
+                Target(path, "absent", reason="deleted from the working tree")
+            )
+        else:
+            out.append(Target(path, "worktree"))
+    return out
 
 
-def repo_root() -> str:
-    """The working tree's top level, or "" when git cannot say."""
-    try:
-        # rstrip("\n"), not strip(): a trailing space is part of the directory
-        # name, and eating it points `base` at a directory that does not exist —
-        # every content and size rule then misses, on a git-sourced list that
-        # raises no unreadable-path warning. The same silent pass as a mangled
-        # filename, one level up.
-        return _git(["rev-parse", "--show-toplevel"]).rstrip("\n")
-    except Unavailable:
-        return ""
+def _dedupe_targets(targets: list[Target]) -> list[Target]:
+    """Drop exact repeats, preserving first-appearance order.
+
+    A range covering many commits re-lists a path once per commit that touched
+    it; each *distinct* (path, source) pair is still scanned, because two
+    commits shipping two different blobs at one path are two different sets of
+    bytes to check.
+    """
+    seen: set[tuple[str, str, str]] = set()
+    out: list[Target] = []
+    for target in targets:
+        key = (target.path, target.kind, target.oid)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(target)
+    return out
 
 
-def collect_paths(args: argparse.Namespace) -> tuple[list[str], str]:
-    """Resolve the requested source into (paths, base).
+def worktree_base() -> str:
+    """The absolute working-tree root, derived without reading its name.
 
-    `base` is the directory the returned paths are relative to. Git reports
+    `rev-parse --show-cdup` answers "how far up is the top level" as a run of
+    `../` — never as the repository's own path. That matters: `--show-toplevel`
+    hands back a directory name whose trailing bytes are as attacker-controlled
+    as any filename, and one `.strip()` on it points every subsequent
+    `os.path.isfile` at a directory that does not exist. Every content and size
+    rule then misses on a git-sourced list, which raises no unreadable-path
+    warning either — the same silent pass as a mangled filename, one level up.
+    Joining `../` against `os.getcwd()` cannot have that failure mode, because
+    the bytes of the repository's name never enter the computation.
+    """
+    cdup = _git(["rev-parse", "--show-cdup"])
+    if cdup.endswith("\n"):
+        cdup = cdup[:-1]
+    if not _CDUP_RE.match(cdup):
+        raise Unavailable(
+            f"git rev-parse --show-cdup returned {cdup!r}, which is not a run "
+            "of '../' — refusing to resolve paths against it"
+        )
+    here = os.getcwd()
+    return os.path.normpath(os.path.join(here, cdup)) if cdup else here
+
+
+def _range_targets(base: str) -> list[Target]:
+    """Every blob shipped by `base..HEAD`, commit by commit.
+
+    Not `base...HEAD`. A net diff answers "how does the tip differ from the
+    merge base", and a secret added in one commit and removed in the next does
+    not differ — yet `git push` still sends the commit that added it, and the
+    blob stays fetchable from the remote forever. The push is a set of commits,
+    so the gate walks that set.
+    """
+    if base.startswith("-"):
+        # `f"{base}..HEAD"` would otherwise hand git an option instead of a
+        # revision. No shell is involved, but argv injection is still injection.
+        raise UsageError(f"--range value must be a revision, not an option: {base!r}")
+    commits = _split_lines(_git(["rev-list", f"{base}..HEAD", "--"]))
+    targets: list[Target] = []
+    for commit in commits:
+        if not _OID_RE.match(commit):
+            raise Unavailable(f"--range: git rev-list printed {commit!r}, not a commit id")
+        targets += _raw_targets(
+            _git(
+                [
+                    "diff-tree",
+                    "-r",
+                    "-m",
+                    "--root",
+                    "--raw",
+                    "-z",
+                    "--no-abbrev",
+                    "--no-commit-id",
+                    commit,
+                ]
+            ),
+            f"--range (commit {commit[:8]})",
+        )
+    return _dedupe_targets(targets)
+
+
+def collect_targets(args: argparse.Namespace) -> tuple[list[Target], str, bool]:
+    """Resolve the requested source into (targets, base, strict).
+
+    `base` is the directory `worktree` targets are relative to. Git reports
     paths relative to the *repo root* regardless of where it was invoked, so a
     scan started from a subdirectory must join them against the top level —
     without that, every `os.path.isfile` misses and the content and size rules
     silently do not run, which reads as a clean scan. Caller-supplied paths are
     relative to the working directory and get an empty base.
+
+    `strict` is the fail-closed switch. It is true for every git-sourced mode,
+    where git has told us the entry exists and an unreadable byte source is
+    therefore a scan that did not happen. It is false for caller-supplied lists,
+    where a path that resolves to nothing is the caller's typo and is reported
+    as a warning instead.
     """
     if args.paths:
-        return _split_paths("\n".join(args.paths)), ""
+        return (
+            [Target(path, "worktree") for path in _split_lines("\n".join(args.paths))],
+            "",
+            False,
+        )
     if args.files_from:
         if args.files_from == "-":
             buffer = getattr(sys.stdin, "buffer", None)
@@ -283,26 +544,34 @@ def collect_paths(args: argparse.Namespace) -> tuple[list[str], str]:
                     text = os.fsdecode(handle.read())
             except OSError as exc:
                 raise Unavailable(f"cannot read {args.files_from} — {exc}") from exc
-        return _split_paths(text), ""
+        return [Target(path, "worktree") for path in _split_lines(text)], "", False
     # `-z` on every git read: without it git applies core.quotePath and emits
     # `"conf\303\257gs/keys.txt"` for any path with a non-ASCII, quoted, or
     # escaped character. That string names no file on disk, so the file would
     # be counted as scanned while its contents were never read.
     if args.staged:
-        return _split_paths(_git(["diff", "--cached", "-z", "--name-only"])), repo_root()
-    if args.working_tree:
-        # `-uall`: without it git collapses a new subtree to `?? a/`, which is
-        # not a file, so every path beneath it is skipped while still being
-        # counted — a whole directory of secrets scanned as one clean entry.
         return (
-            _porcelain_paths(_git(["status", "--porcelain", "-z", "-uall"])),
-            repo_root(),
+            _dedupe_targets(
+                _raw_targets(
+                    _git(
+                        ["diff", "--cached", "-M", "--raw", "-z", "--no-abbrev"]
+                    ),
+                    "--staged",
+                )
+            ),
+            worktree_base(),
+            True,
+        )
+    if args.working_tree:
+        return (
+            _dedupe_targets(
+                _porcelain_targets(_git(["status", "--porcelain", "-z", "-uall"]))
+            ),
+            worktree_base(),
+            True,
         )
     if args.range:
-        return (
-            _split_paths(_git(["diff", "-z", "--name-only", f"{args.range}...HEAD"])),
-            repo_root(),
-        )
+        return _range_targets(args.range), worktree_base(), True
     raise UsageError(
         "no input selected — pass paths, or one of "
         "--staged / --working-tree / --range / --files-from"
@@ -387,18 +656,38 @@ def read_security_config(path: str) -> dict[str, object]:
     return values
 
 
+def config_search_ceiling() -> str:
+    """The highest directory the config search may look in.
+
+    The top of the working tree, or the working directory itself when there is
+    no working tree to speak of. Without a ceiling the search walks to `/`, so a
+    `.gitissue.yml` in `$HOME` — or in `/tmp`, or anywhere else a repository
+    happens to be checked out under — governs `security.allow_pattern` for every
+    repository beneath it, and `allow_pattern: .` turns this gate off entirely.
+    A file outside the repository under review is not that repository's
+    configuration, so the walk stops at its root. When git cannot say where that
+    root is, the search covers the working directory only: reading nothing above
+    it is the fail-closed answer.
+    """
+    try:
+        return worktree_base()
+    except Unavailable:
+        return os.path.abspath(os.getcwd())
+
+
 def find_config(explicit: str | None) -> str | None:
     """Locate the config file: the explicit path, else `.gitissue.yml` at or
-    above the working directory."""
+    above the working directory but never above the working-tree root."""
     if explicit:
         return explicit
     here = os.path.abspath(os.getcwd())
+    ceiling = os.path.abspath(config_search_ceiling())
     while True:
         candidate = os.path.join(here, CONFIG_NAME)
         if os.path.isfile(candidate):
             return candidate
         parent = os.path.dirname(here)
-        if parent == here:
+        if here == ceiling or parent == here:
             return None
         here = parent
 
@@ -512,93 +801,30 @@ def _looks_binary(head: bytes) -> bool:
     return b"\0" in head
 
 
-def _scan_file_contents(path: str, pattern: re.Pattern[str]) -> str | None:
-    """Scan a working-tree file. See `_scan_stream` for the reporting contract."""
-    try:
-        with open(path, "rb") as handle:
-            return _scan_stream(handle, pattern)[1]
-    except OSError:
-        # Unreadable or vanished between listing and scanning. Not a block: the
-        # file cannot reach the commit either.
-        return None
+class _Tap:
+    """A read-through wrapper that records exactly which bytes were scanned.
 
-
-def _blob_rev(path: str, prefix: str) -> str:
-    """The revision naming `path`'s content under `prefix` (`:0:` or `HEAD:`).
-
-    `:<path>` is ambiguous: git reads `:<n>:<path>` when the character after the
-    colon is a digit, so a staged file literally named `0:x.txt` resolves to
-    stage 0 of `x.txt` — a different file, whose clean contents would be scanned
-    in its place. Naming stage 0 explicitly removes the ambiguity for every
-    path, and filenames are attacker-controlled in the flows that run this gate.
+    This is the observability half of the byte-source contract: without it a
+    test can only assert "the scan blocked", which is satisfied just as well by
+    a scan that read the wrong file and got lucky. With it, the matrix test
+    compares a digest of the bytes this scan actually consumed against a digest
+    of the bytes the mode ships, computed independently. It is off unless
+    `--emit-sources` is passed, and it never changes what is read.
     """
-    return f"{prefix}{path}"
 
+    def __init__(self, handle) -> None:
+        self._handle = handle
+        self._digest = hashlib.sha256()
+        self.count = 0
 
-def _scan_index_blob(
-    path: str, root: str, pattern: re.Pattern[str], prefix: str
-) -> tuple[bool, str | None]:
-    """Scan the *staged* content of `path`, i.e. the blob in the index.
+    def read(self, size: int = -1) -> bytes:
+        data = self._handle.read(size)
+        self._digest.update(data)
+        self.count += len(data)
+        return data
 
-    Returns `(scanned, detail)`. A staged scan must read what `git commit` will
-    write, not what happens to be on disk: `git add secrets.txt` followed by an
-    edit that removes the key leaves a clean working tree over a blob that still
-    carries it, and scanning the file would report clean while the commit takes
-    the secret. `scanned` is False only when the blob could not be read at all (a
-    staged deletion, a gitlink, a git that failed), so the caller can fall back
-    to the working-tree file rather than silently skipping content scanning.
-    Stopping early *by decision* — a match, or a binary sniff — still counts as
-    read, even though closing the pipe leaves git a non-zero status: reporting
-    those as unread drops the size rule for every binary blob over the pipe
-    buffer.
-    """
-    try:
-        proc = subprocess.Popen(
-            ["git", "-C", root or ".", "show", _blob_rev(path, prefix)],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-        )
-    except OSError:
-        return False, None
-    try:
-        assert proc.stdout is not None
-        decided, detail = _scan_stream(proc.stdout, pattern)
-    except (OSError, MemoryError):
-        proc.kill()
-        proc.wait()
-        return False, None
-    finally:
-        if proc.stdout is not None:
-            # Close rather than drain: draining a multi-gigabyte blob to be
-            # polite to the pipe would spend the memory the chunked read was
-            # written to avoid. git takes EPIPE and exits non-zero.
-            proc.stdout.close()
-    status = proc.wait()
-    # `decided` means the scan reached its answer without needing the rest of
-    # the stream — a match, or a binary sniff. Both leave git to die of EPIPE,
-    # so its non-zero status says nothing about whether the blob was readable,
-    # and reading it as "no blob" would drop the size rule for every binary
-    # file larger than the pipe buffer.
-    return (decided or status == 0), detail
-
-
-def _index_blob_size(path: str, root: str, prefix: str) -> int | None:
-    """Byte size of the staged blob, or None when git cannot report it."""
-    try:
-        proc = subprocess.run(
-            ["git", "-C", root or ".", "cat-file", "-s", _blob_rev(path, prefix)],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-    except OSError:
-        return None
-    if proc.returncode != 0:
-        return None
-    try:
-        return int(proc.stdout.strip())
-    except ValueError:
-        return None
+    def hexdigest(self) -> str:
+        return self._digest.hexdigest()
 
 
 def _scan_stream(handle, pattern: re.Pattern[str]) -> tuple[bool, str | None]:
@@ -649,45 +875,216 @@ def _scan_stream(handle, pattern: re.Pattern[str]) -> tuple[bool, str | None]:
     return False, None
 
 
-def _file_size(path: str) -> int | None:
+class Reading(NamedTuple):
+    """The outcome of reading one target's declared byte source.
+
+    `state` is "read" when bytes were actually consumed and "no-bytes" when the
+    source exists but ships no file content — a submodule checkout, a device
+    node. A source that *should* have bytes and could not be read is never a
+    Reading: it raises Unavailable, which is exit 4.
+    """
+
+    state: str
+    detail: str | None
+    size: int | None
+    bytes_read: int
+    digest: str | None
+    decided_early: bool
+
+
+NO_BYTES = Reading("no-bytes", None, None, 0, None, False)
+
+
+def _read_blob(
+    oid: str, pattern: re.Pattern[str], tap: bool, sizes: dict[str, int]
+) -> Reading:
+    """Scan a git object by id. The path is not involved and cannot redirect it.
+
+    A failure here is exit 4, never a fallback: `git show`ing a blob and quietly
+    scanning the working-tree file instead when it fails is how a tidied copy
+    came to be scanned in place of the bytes a commit was about to write.
+    Stopping early *by decision* — a match, or a binary sniff — still counts as
+    a successful read even though closing the pipe leaves git a non-zero status.
+    """
     try:
-        return os.path.getsize(path)
+        proc = subprocess.Popen(
+            ["git", "cat-file", "blob", oid],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+        )
+    except OSError as exc:
+        raise Unavailable(f"cannot read blob {oid} — {exc}") from exc
+    assert proc.stdout is not None
+    meter = _Tap(proc.stdout) if tap else None
+    try:
+        decided, detail = _scan_stream(meter or proc.stdout, pattern)
+    except (OSError, MemoryError) as exc:
+        proc.kill()
+        proc.wait()
+        raise Unavailable(f"cannot read blob {oid} — {exc}") from exc
+    finally:
+        # Close rather than drain: draining a multi-gigabyte blob to be polite
+        # to the pipe would spend the memory the chunked read was written to
+        # avoid. git takes EPIPE and exits non-zero.
+        proc.stdout.close()
+    status = proc.wait()
+    if not decided and status != 0:
+        raise Unavailable(
+            f"git cat-file blob {oid} failed — the bytes this entry ships were "
+            "never read"
+        )
+    return Reading(
+        "read",
+        detail,
+        sizes.get(oid),
+        meter.count if meter else 0,
+        meter.hexdigest() if meter else None,
+        decided,
+    )
+
+
+def _blob_sizes(oids: list[str]) -> dict[str, int]:
+    """Size every object in one `git cat-file --batch-check`, or exit 4.
+
+    One process for the whole scan rather than one per entry: a range covering a
+    few dozen commits would otherwise spend more time forking `cat-file -s` than
+    reading. A `missing` answer is fail-closed — an entry git listed but cannot
+    size is an entry this scan cannot report on.
+    """
+    wanted = sorted(set(oids))
+    if not wanted:
+        return {}
+    try:
+        proc = subprocess.run(
+            ["git", "cat-file", "--batch-check"],
+            input="\n".join(wanted) + "\n",
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except OSError as exc:
+        raise Unavailable(f"cannot size the scanned blobs — {exc}") from exc
+    if proc.returncode != 0:
+        raise Unavailable("git cat-file --batch-check failed — no entry was sized")
+    sizes: dict[str, int] = {}
+    for line in proc.stdout.splitlines():
+        parts = line.split()
+        if len(parts) == 3 and parts[1] == "blob":
+            try:
+                sizes[parts[0]] = int(parts[2])
+            except ValueError:
+                pass
+    for oid in wanted:
+        if oid not in sizes:
+            raise Unavailable(
+                f"git cannot size object {oid} — an entry this scan was asked "
+                "to check is unreadable"
+            )
+    return sizes
+
+
+def _read_worktree(
+    resolved: str, pattern: re.Pattern[str], tap: bool, strict: bool
+) -> Reading | None:
+    """Scan the file on disk, or return None when there is nothing there.
+
+    None means "no bytes at this path". Under `strict` — every git-sourced mode,
+    where git has just told us the entry exists — the caller turns that into
+    exit 4 rather than a skip. A symlink is read as the link target, because
+    that string is exactly what git stores for it; a directory or a device node
+    ships no file bytes at all. Anything else that cannot be opened, including a
+    file whose permissions deny the read, is a source that was declared and not
+    read: exit 4 under strict, an `unreadable-path` warning for a caller list.
+    """
+    try:
+        info = os.lstat(resolved)
     except OSError:
+        # Nothing at this path at all. The caller decides what that means: exit
+        # 4 for a git-sourced entry, a visible warning for a caller's own list.
+        return None
+    if statmod.S_ISLNK(info.st_mode):
+        try:
+            payload = os.fsencode(os.readlink(resolved))
+        except OSError as exc:
+            if strict:
+                raise Unavailable(f"cannot read the symlink {resolved!r} — {exc}")
+            return None
+        handle: object = io.BytesIO(payload)
+        meter = _Tap(handle) if tap else None
+        decided, detail = _scan_stream(meter or handle, pattern)
+        return Reading(
+            "read",
+            detail,
+            len(payload),
+            meter.count if meter else 0,
+            meter.hexdigest() if meter else None,
+            decided,
+        )
+    if not statmod.S_ISREG(info.st_mode):
+        # A directory (a submodule checkout) or a device node. Git lists it, and
+        # it genuinely ships no file bytes — that is an answer, not a failure.
+        return NO_BYTES
+    try:
+        with open(resolved, "rb") as raw:
+            meter = _Tap(raw) if tap else None
+            decided, detail = _scan_stream(meter or raw, pattern)
+            return Reading(
+                "read",
+                detail,
+                info.st_size,
+                meter.count if meter else 0,
+                meter.hexdigest() if meter else None,
+                decided,
+            )
+    except OSError as exc:
+        if strict:
+            # The file is there and git says it ships; we simply could not read
+            # it. Counting that as clean is the silent pass this gate exists to
+            # prevent.
+            raise Unavailable(
+                f"cannot read {resolved!r} — {exc}. Its contents were never "
+                "checked, so this scan has no verdict to give"
+            )
         return None
 
 
 def scan(
-    paths: list[str],
+    targets: list[Target],
     rules: dict[str, object],
     base: str = "",
-    blob_prefix: str = "",
-    caller_supplied: bool = False,
+    strict: bool = False,
+    emit_sources: bool = False,
 ) -> dict[str, object]:
-    """Apply every rule to every path and return the structured verdict.
+    """Apply every rule to every target and return the structured verdict.
 
-    `base` is the directory `paths` are relative to (see `collect_paths`). The
-    reported path stays as given — repo-relative reads better in a commit
-    message than an absolute one — while every filesystem access is resolved
+    `base` is the directory `worktree` targets are relative to (see
+    `collect_targets`). The reported path stays exactly as git gave it —
+    repo-relative reads better in a commit message than an absolute one, and any
+    rewrite of it is a rename — while every filesystem access is resolved
     against `base`.
 
-    `blob_prefix` selects the bytes this mode is actually about to ship, over
-    whatever happens to be on disk: `:0:` for `--staged` (the blob `git commit`
-    will write) and `HEAD:` for `--range` (the tip `git push` will send). Both
-    diverge from the working tree the moment a path is committed or staged and
-    then tidied, and the tidy copy is the one that reads clean. Empty means the
-    working tree, which is what the other sources are asking about.
+    Which bytes get read is decided entirely by `target.kind`. There is no
+    fallback from one kind to another, and under `strict` a declared source that
+    cannot be read raises Unavailable, which `main` turns into exit 4.
     """
     blocking: list[dict[str, str]] = []
     warnings: list[dict[str, str]] = []
+    sources: list[dict[str, object]] = []
     scanned = 0
     skipped = 0
+
+    # One batch-check for every blob the scan will read, up front: sizing each
+    # one with its own process is the difference between a fast gate and one a
+    # caller is tempted to skip.
+    sizes = _blob_sizes([t.oid for t in targets if t.kind == "blob"])
 
     allow: re.Pattern[str] | None = rules["allow"]  # type: ignore[assignment]
     secret_file: re.Pattern[str] = rules["secret_file"]  # type: ignore[assignment]
     secret_value: re.Pattern[str] = rules["secret_value"]  # type: ignore[assignment]
     junk_file: re.Pattern[str] = rules["junk_file"]  # type: ignore[assignment]
 
-    for path in paths:
+    for target in targets:
+        path = target.path
         if allow is not None and allow.search(path):
             skipped += 1
             continue
@@ -712,52 +1109,65 @@ def scan(
             )
 
         resolved = os.path.join(base, path) if base else path
-
-        indexed = False
-        if blob_prefix:
-            indexed, detail = _scan_index_blob(path, base, secret_value, blob_prefix)
-            if indexed and detail is not None:
-                blocking.append(
-                    {"rule": "secret-value", "path": path, "detail": detail}
+        reading: Reading | None = None
+        if target.kind == "blob":
+            reading = _read_blob(target.oid, secret_value, emit_sources, sizes)
+        elif target.kind == "worktree":
+            reading = _read_worktree(resolved, secret_value, emit_sources, strict)
+            if reading is None and strict:
+                raise Unavailable(
+                    f"{path!r} is listed by git but no bytes could be read for "
+                    "it — the scan cannot report on a file it never opened"
+                )
+            if reading is None or (not strict and reading.state == "no-bytes"):
+                # A caller-supplied list has no git guarantee behind it: a typo,
+                # a stray space, or a directory where a file was meant resolves
+                # to no bytes at all, and reporting that as clean is a scan of
+                # zero bytes dressed as a pass. (Under `strict` a "no-bytes"
+                # entry is a submodule gitlink git itself listed, which really
+                # does ship no file content.)
+                warnings.append(
+                    {
+                        "rule": "unreadable-path",
+                        "path": path,
+                        "detail": "listed for scanning but not readable — "
+                        "its contents were never checked",
+                    }
                 )
 
-        if not indexed:
-            # No staged blob (a staged deletion, a gitlink, or a git that could
-            # not answer), or a non-staged mode: fall back to the file on disk.
-            if not os.path.isfile(resolved):
-                # A deletion, or a path outside the working tree. The filename
-                # rules above still applied; there is no content or size here.
-                if caller_supplied:
-                    # git only ever names entries it has, so a missing path
-                    # there is a deletion. A caller-supplied list has no such
-                    # guarantee: a typo or a stray space resolves to nothing,
-                    # and reporting that as clean is a scan of zero bytes
-                    # dressed as a pass.
-                    warnings.append(
-                        {
-                            "rule": "unreadable-path",
-                            "path": path,
-                            "detail": "listed for scanning but not readable — "
-                            "its contents were never checked",
-                        }
-                    )
-                continue
+        if emit_sources:
+            sources.append(
+                {
+                    "path": path,
+                    "kind": (
+                        target.kind
+                        if target.kind == "absent"
+                        else "unread"
+                        if reading is None
+                        else (target.kind if reading.state == "read" else "no-bytes")
+                    ),
+                    "id": target.oid
+                    if target.kind == "blob"
+                    else (os.path.abspath(resolved) if target.kind == "worktree" else ""),
+                    "reason": target.reason,
+                    "bytes_read": reading.bytes_read if reading else 0,
+                    "sha256": reading.digest if reading else None,
+                    "decided_early": bool(reading and reading.decided_early),
+                }
+            )
 
-            detail = _scan_file_contents(resolved, secret_value)
-            if detail is not None:
-                blocking.append(
-                    {"rule": "secret-value", "path": path, "detail": detail}
-                )
-
-        size = _index_blob_size(path, base, blob_prefix) if indexed else None
-        if size is None:
-            size = _file_size(resolved)
-        if size is not None and size > rules["max_bytes"]:  # type: ignore[operator]
+        if reading is None:
+            continue
+        if reading.detail is not None:
+            blocking.append(
+                {"rule": "secret-value", "path": path, "detail": reading.detail}
+            )
+        if reading.size is not None and reading.size > rules["max_bytes"]:  # type: ignore[operator]
             warnings.append(
                 {
                     "rule": "large-file",
                     "path": path,
-                    "detail": f"{size // (1024 * 1024)} MB exceeds "
+                    "detail": f"{reading.size // (1024 * 1024)} MB exceeds "
                     f"{rules['max_mb']} MB without Git LFS",
                 }
             )
@@ -774,7 +1184,7 @@ def scan(
 
     auto = os.environ.get("IDD_AUTO_MODE", "0") == "1"
     verdict = "block" if blocking else ("warn" if warnings else "clean")
-    return {
+    result: dict[str, object] = {
         "verdict": verdict,
         "blocking": blocking,
         "warnings": warnings,
@@ -784,6 +1194,9 @@ def scan(
         "mode": "auto" if auto else "interactive",
         "confirm_required": bool(warnings) and not auto and not blocking,
     }
+    if emit_sources:
+        result["sources"] = sources
+    return result
 
 
 def report(result: dict[str, object]) -> None:
@@ -816,22 +1229,25 @@ def main(argv: list[str] | None = None) -> int:
             "blocking is found."
         ),
         epilog=(
-            "Example: git diff --cached --name-only | "
-            "python3 gi-secscan.py --files-from -"
+            "Example: python3 gi-secscan.py --staged   (scans the blobs the "
+            "commit will write, not the working tree)"
         ),
     )
     source = parser.add_argument_group("input (choose exactly one)")
     source.add_argument("paths", nargs="*", help="paths to scan")
     source.add_argument("--files-from", metavar="FILE", help="path list ('-' = stdin)")
-    source.add_argument("--staged", action="store_true", help="git diff --cached")
+    source.add_argument("--staged", action="store_true", help="the index's blobs")
     source.add_argument("--working-tree", action="store_true", help="git status")
-    source.add_argument("--range", metavar="BASE", help="git diff BASE...HEAD")
+    source.add_argument(
+        "--range", metavar="BASE", help="every blob in BASE..HEAD, commit by commit"
+    )
 
     tuning = parser.add_argument_group("rule configuration")
     tuning.add_argument(
         "--config",
         metavar="PATH",
-        help=f"{CONFIG_NAME} to read security.* from (default: found upward from cwd)",
+        help=f"{CONFIG_NAME} to read security.* from (default: found upward from "
+        "cwd, stopping at the working-tree root)",
     )
     tuning.add_argument(
         "--no-config", action="store_true", help="ignore any config file"
@@ -852,6 +1268,15 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--quiet", action="store_true", help="suppress the stderr report"
     )
+    parser.add_argument(
+        "--emit-sources",
+        action="store_true",
+        help=(
+            "add a 'sources' array recording, per path, the byte source that "
+            "was scanned and a sha256 of the bytes read. Diagnostic only — it "
+            "changes nothing about what is scanned"
+        ),
+    )
     args = parser.parse_args(argv)
 
     chosen = [
@@ -867,7 +1292,10 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         rules = build_rules(load_overrides(args))
-        paths, base = collect_paths(args)
+        targets, base, strict = collect_targets(args)
+        result = scan(
+            targets, rules, base, strict=strict, emit_sources=args.emit_sources
+        )
     except UsageError as exc:
         sys.stderr.write(f"✗ gi-secscan: {exc}\n")
         return 2
@@ -878,16 +1306,6 @@ def main(argv: list[str] | None = None) -> int:
         sys.stderr.write(f"⚠ gi-secscan: {exc}\n")
         return 4
 
-    result = scan(
-        paths,
-        rules,
-        base,
-        # The bytes each mode is about to ship: the index for --staged, the
-        # branch tip for --range. Anything else means the working tree, which
-        # is what those sources are asking about.
-        blob_prefix=":0:" if args.staged else ("HEAD:" if args.range else ""),
-        caller_supplied=bool(args.paths or args.files_from),
-    )
     print(json.dumps(result))
     if not args.quiet:
         report(result)
