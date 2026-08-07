@@ -830,6 +830,36 @@ else
   fail "AC1: a surrogate-escaped path produced unparsable JSON"
 fi
 
+# The repository root is a path too. Stripping trailing whitespace off
+# `rev-parse --show-toplevel` points `base` at a directory that does not exist,
+# so every content and size rule misses — on a git-sourced list, which raises no
+# unreadable-path warning either. The same silent pass, one level above the file.
+for suffix in " " "$(printf '\r')" "$(printf '\t')"; do
+  ROOTDIR="$TMP/root-ws/dir$suffix"
+  mkdir -p "$ROOTDIR"
+  (
+    cd "$ROOTDIR"
+    git init -q .
+    git config user.email t@example.com
+    git config user.name t
+    printf 'id=%s\n' "$AWS_FIXTURE_KEY" > secret.txt
+    git add -A
+  ) >/dev/null 2>&1
+  ok=1
+  for mode in --staged --working-tree; do
+    run_status out st sh -c "cd \"$ROOTDIR\" && python3 '$SECSCAN' $mode --quiet"
+    [ "$st" = "1" ] || ok=0
+  done
+  mkdir -p "$ROOTDIR/sub"
+  run_status out st sh -c "cd \"$ROOTDIR/sub\" && python3 '$SECSCAN' --staged --quiet"
+  [ "$st" = "1" ] || ok=0
+  if [ "$ok" = "1" ]; then
+    pass "AC1: a repo root ending in whitespace still scans (suffix $(printf '%s' "$suffix" | od -An -c | tr -d ' '))"
+  else
+    fail "AC1: a repo root ending in whitespace skipped every content rule"
+  fi
+done
+
 # A caller-supplied list has no git guarantee behind it, so a path that resolves
 # to nothing must be visible rather than counted as scanned and clean.
 UL="$TMP/unreadable-list"
@@ -950,7 +980,10 @@ REPARSE = re.compile(
     # Any shell whose argument is re-parsed: `sh -c`, `bash -lc`, `sh -ce`,
     # `bash -o pipefail -c`. The `-…c…` token may carry other letters and may
     # sit behind options that take arguments of their own.
-    r"\b(?:sh|bash|zsh|dash|ksh)\b(?:\s+\S+)*?\s+-[A-Za-z]*c[A-Za-z]*\b"
+    # The shell must be the command word, not the tail of a path: `\b` alone
+    # matches the `sh` inside `build.sh`, which turned any later `-c` option in
+    # the same region into a false "re-parse".
+    r"(?<![\w./-])(?:sh|bash|zsh|dash|ksh)(?:\s+\S+)*?\s+-[A-Za-z]*c[A-Za-z]*\b"
     # xargs word-splits its input and honours quotes, and turns a filename
     # starting with `-` into an option — the same hazard by another route
     r"|\bxargs\b|\beval\b"
@@ -1016,12 +1049,12 @@ def commands(text: str):
         )
         if admitted:
             out.append(span)
-        # An option left without a value makes every later span on the line
-        # part of the command, and stays pending until the line ends. Consuming
-        # only the next span lets a decoy — `--allow-pattern` `see`
-        # `{untrusted}` — carry the value past the check, and nothing on a line
-        # that already ended mid-option is prose worth protecting.
-        if not dangling:
+        # An option left without a value keeps every later span on the line in
+        # the command. Sticky, because consuming only the next span lets a decoy
+        # — `--allow-pattern` `see` `{untrusted}` — carry the value past the
+        # check; armed only from a span that is already part of the command, so
+        # unrelated prose ending in something option-shaped does not arm it.
+        if admitted and not dangling:
             dangling = bool(re.search(r"(?:^|\s)--?[A-Za-z][\w-]*\s*$", span))
     return out
 

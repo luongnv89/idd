@@ -210,7 +210,11 @@ def _split_paths(text: str) -> list[str]:
     """
     if "\0" in text:
         return _dedupe(text.split("\0"))
-    return _dedupe([line.rstrip("\r") for line in text.split("\n")])
+    # One `\r`, not a run of them: `x.txt\r\r\n` names a file ending in `\r`,
+    # and stripping both would point at a different file with no warning.
+    return _dedupe(
+        [line[:-1] if line.endswith("\r") else line for line in text.split("\n")]
+    )
 
 
 def _porcelain_paths(text: str) -> list[str]:
@@ -241,7 +245,12 @@ def _porcelain_paths(text: str) -> list[str]:
 def repo_root() -> str:
     """The working tree's top level, or "" when git cannot say."""
     try:
-        return _git(["rev-parse", "--show-toplevel"]).strip()
+        # rstrip("\n"), not strip(): a trailing space is part of the directory
+        # name, and eating it points `base` at a directory that does not exist —
+        # every content and size rule then misses, on a git-sourced list that
+        # raises no unreadable-path warning. The same silent pass as a mangled
+        # filename, one level up.
+        return _git(["rev-parse", "--show-toplevel"]).rstrip("\n")
     except Unavailable:
         return ""
 
