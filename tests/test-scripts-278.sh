@@ -446,7 +446,7 @@ if [ "$SYM_ST" -eq 0 ]; then
 else
   fail "AC7: a stale .tmp path broke the write (exit $SYM_ST)"
 fi
-if grep -q "tempfile.mkstemp(" "$MODEL" && grep -q "os.chmod(temp, 0o644)" "$MODEL"; then
+if grep -q "tempfile.mkstemp(" "$MODEL" && grep -q "os.fchmod(handle.fileno(), 0o644)" "$MODEL"; then
   pass "AC7: the write uses mkstemp (O_EXCL, 0600) and sets the mode explicitly"
 else
   fail "AC7: the cache write no longer creates its temp file O_EXCL with a set mode"

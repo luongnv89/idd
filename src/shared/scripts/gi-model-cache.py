@@ -437,7 +437,10 @@ def write_cache(skill_dir: str, payload: dict, date: str) -> tuple[str, list[str
             # reaches here without going through the validation boundary.
             json.dump(payload, handle, indent=2, allow_nan=False)
             handle.write("\n")
-        os.chmod(temp, 0o644)
+            # Through the descriptor, not the path: a path-based chmod names
+            # whatever sits there at that instant, and the point of O_EXCL was
+            # to stop caring what sits there.
+            os.fchmod(handle.fileno(), 0o644)
         os.replace(temp, target)
         temp = None
     except (OSError, ValueError) as exc:
