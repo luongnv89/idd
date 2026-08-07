@@ -71,7 +71,7 @@ else
   fail "T1.AC1.1: schema yaml block missing 'mode: balanced'"
 fi
 
-if grep -qE '\| \`autopilot\.mode\` \| \`balanced\`' "$SCHEMA"; then
+if grep -qE '\| `autopilot\.mode` \| `balanced`' "$SCHEMA"; then
   pass "T1.AC1.2: defaults table lists autopilot.mode = balanced"
 else
   fail "T1.AC1.2: defaults table missing autopilot.mode = balanced"
@@ -84,7 +84,7 @@ else
   fail "T1.AC1.3: schema yaml block missing 'merge_partial: false'"
 fi
 
-if grep -qE '\| \`autopilot\.merge_partial\` \| \`false\`' "$SCHEMA"; then
+if grep -qE '\| `autopilot\.merge_partial` \| `false`' "$SCHEMA"; then
   pass "T1.AC1.4: defaults table lists autopilot.merge_partial = false"
 else
   fail "T1.AC1.4: defaults table missing autopilot.merge_partial = false"
@@ -97,7 +97,7 @@ else
   fail "T1.AC1.5: schema yaml block missing 'require_acceptance_criteria_check: true'"
 fi
 
-if grep -qE '\| \`review\.require_acceptance_criteria_check\` \| \`true\`' "$SCHEMA"; then
+if grep -qE '\| `review\.require_acceptance_criteria_check` \| `true`' "$SCHEMA"; then
   pass "T1.AC1.6: defaults table lists review.require_acceptance_criteria_check = true"
 else
   fail "T1.AC1.6: defaults table missing review.require_acceptance_criteria_check = true"
@@ -110,7 +110,7 @@ else
   fail "T1.AC1.7: schema yaml block missing 'require_traceability_check: true'"
 fi
 
-if grep -qE '\| \`review\.require_traceability_check\` \| \`true\`' "$SCHEMA"; then
+if grep -qE '\| `review\.require_traceability_check` \| `true`' "$SCHEMA"; then
   pass "T1.AC1.8: defaults table lists review.require_traceability_check = true"
 else
   fail "T1.AC1.8: defaults table missing review.require_traceability_check = true"

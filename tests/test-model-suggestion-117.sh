@@ -166,7 +166,7 @@ else
   fail "T5.AC7.2: Config Section Map missing model_suggestion"
 fi
 # Defaults table
-if grep -qE '\| \`model_suggestion\.enabled\` \| \`true\`' "$SCHEMA"; then
+if grep -qE '\| `model_suggestion\.enabled` \| `true`' "$SCHEMA"; then
   pass "T5.AC7.3: defaults table lists model_suggestion.enabled = true"
 else
   fail "T5.AC7.3: defaults table missing model_suggestion.enabled"
