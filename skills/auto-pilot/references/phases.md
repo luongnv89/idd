@@ -439,9 +439,10 @@ substitution — whose output is never re-evaluated — and never by pasting the
 you are holding into the assignment:
 
 ```bash
-# One of these, matching the source named above:
 issue_body="$(python3 references/scripts/gi-issue.py N --fields body --jq .issue.body)"
-issue_body="$(gh issue view N --json body --jq .body)"   # the degrade form
+# Degrade form, when that exits 2 or 4 or there is no python3 — replace the
+# assignment above, do not add a second one:
+#   issue_body="$(gh issue view N --json body --jq .body)"
 printf '%s' "$issue_body" | python3 references/scripts/gi-deps.py
 ```
 

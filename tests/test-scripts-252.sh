@@ -750,6 +750,53 @@ run_status out st sh -c "cd '$DELDIR' && python3 '$SECSCAN' --staged --quiet"
 [ "$st" = "0" ] || [ "$st" = "1" ] && pass "AC1: a staged deletion scans without error" \
                                    || fail "AC1: a staged deletion exited $st"
 
+# A filename is attacker-controlled on a branch under review, and a space is a
+# legal filename character. Normalising the path git reported renames it: the
+# scan then reads a different file's bytes, or none, and reports clean either
+# way. Both shapes below returned exit 0 over a live key before this was fixed.
+WS="$TMP/ws-paths"
+mkdir -p "$WS"
+(
+  cd "$WS"
+  git init -q .
+  git config user.email t@example.com
+  git config user.name t
+  printf 'id=%s\n' "$AWS_FIXTURE_KEY" > " lead.txt"      # sibling exists, clean
+  printf 'clean\n' > "lead.txt"
+  printf 'id=%s\n' "$AWS_FIXTURE_KEY" > " solo.txt"      # no sibling at all
+  git add -A
+) >/dev/null 2>&1
+run_status out st sh -c "cd '$WS' && python3 '$SECSCAN' --staged --quiet"
+if [ "$st" = "1" ]; then
+  pass "AC1: a staged path with leading whitespace is scanned, not renamed"
+else
+  fail "AC1: a whitespace-bearing staged path passed the gate (exit $st)"
+fi
+run_status out st sh -c "cd '$WS' && python3 '$SECSCAN' --working-tree --quiet"
+[ "$st" = "1" ] && pass "AC1: --working-tree scans whitespace-bearing paths too" \
+                || fail "AC1: --working-tree skipped a whitespace-bearing path (exit $st)"
+
+# A binary blob larger than the pipe buffer is decided by the 8 KiB sniff, so
+# the reader stops early and git dies of EPIPE. Reading that non-zero status as
+# "no blob" silently drops the size rule for the staged bytes.
+BIN="$TMP/big-binary"
+mkdir -p "$BIN"
+(
+  cd "$BIN"
+  git init -q .
+  git config user.email t@example.com
+  git config user.name t
+  python3 -c "open('big.bin','wb').write(b'\x00\x01\x02' + bytes(12 * 1024 * 1024))"
+  git add big.bin
+  rm big.bin        # staged only: the size must come from the index, not disk
+) >/dev/null 2>&1
+run_status out st sh -c "cd '$BIN' && python3 '$SECSCAN' --staged --quiet"
+if printf '%s' "$out" | grep -q 'large-file'; then
+  pass "AC1: the size rule reads the staged blob for a binary file"
+else
+  fail "AC1: a 12 MB staged binary blob produced no large-file warning"
+fi
+
 # --- Call-site injection lint (all seven shared scripts) ---------------------
 #
 # Two command injections shipped in this branch one review cycle apart, both of
@@ -778,7 +825,20 @@ import pathlib, re, sys
 
 root = pathlib.Path(sys.argv[1])
 ROOTS = ["src/skills", "src/internal-skills", "src/shared/agents", "docs"]
-CALL = re.compile(r"(?:python3|python)\s+(?:\S*gi-[a-z0-9-]+\.py|\{[^{}]+\}|\"?\$\{?\w+\}?\"?)")
+# A call is any mention of a shared script by filename, however it is launched
+# (python3, python3.11, uv run, a bare ./path relying on the exec bit), plus the
+# indirect form where the *script path itself* is a placeholder — `python3
+# {secscan_script} --staged` in the shared agents is a real invocation.
+_LAUNCH = r"(?:python[0-9.]*|uv\s+run|\"?\$\{?\w+\}?\"?)"
+CALL = re.compile(
+    # launched by an interpreter, whatever its name or version
+    _LAUNCH + r"\s+\S*gi-[a-z0-9-]+\.py"
+    # or executed directly off the exec bit
+    r"|\./\S*gi-[a-z0-9-]+\.py"
+    # or the indirect form, where the script path is itself a placeholder —
+    # `python3 {secscan_script} --staged` in the shared agents is a real call
+    r"|" + _LAUNCH + r"\s+\S*\{[^{}]+\}"
+)
 
 # Placeholders permitted on a shared-script command line, and why each is safe.
 ALLOWED = {
@@ -795,9 +855,25 @@ ALLOWED = {
     "{review.ci_poll_interval}": "gi-config validates it against an int default",
     "{review.ci_timeout}": "gi-config validates it against an int default",
 }
-# `{...}` not preceded by `$` — `${VAR}` is a shell expansion, checked separately.
-PLACEHOLDER = re.compile(r"(?<!\$)\{[^{}]*\}")
+# Placeholder styles the skills actually use. `{...}` must hold at least one
+# non-space character, so `find -exec … {} \;` is not a placeholder, while
+# `{ padded }` still is. `<name>` and `[name]` are constrained to identifiers so
+# a redirection, a glob range, or a markdown link is not mistaken for one.
+# `${VAR}` is a shell expansion, not a paste — VAR checks it.
+PLACEHOLDER = re.compile(
+    r"(?<!\$)\{\s*[^{}\s][^{}]*\}"
+    r"|<[a-z_][a-z0-9_]*>"
+    r"|\[[a-z_][a-z0-9_]*\]"
+)
 VAR = re.compile(r"\$\{?[A-Za-z_][A-Za-z0-9_]*\}?")
+# Command substitution pastes its output into the command line unquoted. Only
+# the `$(…)` form is checked: a backtick cannot appear inside a markdown code
+# span, so the legacy form is unwritable at a call site in these files, and
+# matching a bare backtick would fire on the span delimiters themselves.
+SUBST = re.compile(r"\$\(")
+# `sh -c "…"` re-parses its argument, so the double-quote reasoning below does
+# not hold inside one.
+REPARSE = re.compile(r"\b(?:sh|bash|zsh|eval)\s+(?:-[a-z]+\s+)*-c\b|\beval\b")
 DQUOTED = re.compile(r'"[^"]*"')
 
 def logical_lines(path: pathlib.Path):
@@ -822,16 +898,23 @@ def commands(text: str):
     value sit in the span beside it, unlinted.
     """
     spans = re.findall(r"`([^`]+)`", text)
-    if any(CALL.search(span) for span in spans):
-        # The call's own span, plus any sibling that continues the command line
-        # (an option, a pipe, another command). A sibling naming an output shape
-        # or the variable the call assigns to is prose, not an argument.
-        return [
-            span
-            for span in spans
-            if CALL.search(span) or re.match(r"\s*(-|\||printf\b|echo\b)", span)
-        ]
-    return [text] if CALL.search(text) else []
+    if not any(CALL.search(span) for span in spans):
+        return [text] if CALL.search(text) else []
+    out = []
+    dangling = False
+    for span in spans:
+        is_call = bool(CALL.search(span))
+        # A sibling continues the command line when it opens with an option, a
+        # pipe or another command, or when the span before it ended on an option
+        # still waiting for its value — `…gi-x.py --allow-pattern` `{untrusted}`
+        # is one command split across two spans. A sibling naming an output
+        # shape, or the variable the call assigns to, is prose.
+        if is_call or dangling or re.match(r"\s*(-|\||printf\b|echo\b)", span):
+            out.append(span)
+        dangling = bool(re.search(r"(?:^|\s)--?[A-Za-z][\w-]*\s*$", span)) and (
+            is_call or dangling
+        )
+    return out
 
 bad = []
 checked = 0
@@ -854,13 +937,26 @@ for rel in ROOTS:
                             f"shared-script command line and is not on the "
                             f"reviewed allowlist"
                         )
+                if REPARSE.search(cmd):
+                    bad.append(
+                        f"{rp}:{lineno}: a shared-script call inside `sh -c` or "
+                        f"`eval` re-parses its argument, so quoting no longer "
+                        f"makes a value inert — invoke the script directly"
+                    )
                 # A parameter expansion inside double quotes is inert whatever
-                # it holds; an unquoted one word-splits and globs.
+                # it holds; an unquoted one word-splits and globs, and a command
+                # substitution pastes its output into the command line.
                 unquoted = DQUOTED.sub(lambda m: " " * len(m.group(0)), cmd)
                 for token in VAR.findall(unquoted):
                     bad.append(
                         f"{rp}:{lineno}: {token} is unquoted on a shared-script "
                         f"command line"
+                    )
+                if SUBST.search(unquoted):
+                    bad.append(
+                        f"{rp}:{lineno}: an unquoted command substitution puts "
+                        f"its output on a shared-script command line — assign it "
+                        f"to a variable and quote the variable"
                     )
 
 if checked < 25:

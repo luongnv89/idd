@@ -162,12 +162,22 @@ def _git(args: list[str]) -> str:
 
 
 def _dedupe(entries: list[str]) -> list[str]:
-    """Drop blanks and repeats, preserving first-appearance order."""
+    """Drop blanks and repeats, preserving first-appearance order.
+
+    Only `\\r` and the trailing newline are stripped — never leading or trailing
+    spaces. A space is a legal filename character on every platform this runs
+    on, and filenames are attacker-controlled in the flows that call this gate:
+    stripping ` secrets.env` to `secrets.env` renames the path to a *different*
+    file, so the index blob and the file on disk that get scanned are not the
+    ones being committed. Where a sibling exists, its clean contents are scanned
+    in place of the real one; where it does not, the path resolves to nothing
+    and is skipped as a deletion. Both report clean over a live key.
+    """
     seen: set[str] = set()
     out: list[str] = []
     for entry in entries:
-        path = entry.strip()
-        if not path or path in seen:
+        path = entry.rstrip("\r\n")
+        if not path.strip() or path in seen:
             continue
         seen.add(path)
         out.append(path)
@@ -465,7 +475,7 @@ def _scan_file_contents(path: str, pattern: re.Pattern[str]) -> str | None:
     """Scan a working-tree file. See `_scan_stream` for the reporting contract."""
     try:
         with open(path, "rb") as handle:
-            return _scan_stream(handle, pattern)
+            return _scan_stream(handle, pattern)[1]
     except OSError:
         # Unreadable or vanished between listing and scanning. Not a block: the
         # file cannot reach the commit either.
@@ -493,9 +503,13 @@ def _scan_index_blob(
     write, not what happens to be on disk: `git add secrets.txt` followed by an
     edit that removes the key leaves a clean working tree over a blob that still
     carries it, and scanning the file would report clean while the commit takes
-    the secret. `scanned` is False when the blob cannot be read (a staged
-    deletion, a gitlink, a git that failed) so the caller can fall back to the
-    working-tree file rather than silently skipping content scanning.
+    the secret. `scanned` is False only when the blob could not be read at all (a
+    staged deletion, a gitlink, a git that failed), so the caller can fall back
+    to the working-tree file rather than silently skipping content scanning.
+    Stopping early *by decision* — a match, or a binary sniff — still counts as
+    read, even though closing the pipe leaves git a non-zero status: reporting
+    those as unread drops the size rule for every binary blob over the pipe
+    buffer.
     """
     try:
         proc = subprocess.Popen(
@@ -507,7 +521,7 @@ def _scan_index_blob(
         return False, None
     try:
         assert proc.stdout is not None
-        detail = _scan_stream(proc.stdout, pattern)
+        decided, detail = _scan_stream(proc.stdout, pattern)
     except (OSError, MemoryError):
         proc.kill()
         proc.wait()
@@ -516,11 +530,15 @@ def _scan_index_blob(
         if proc.stdout is not None:
             # Close rather than drain: draining a multi-gigabyte blob to be
             # polite to the pipe would spend the memory the chunked read was
-            # written to avoid. git takes EPIPE and exits; a non-zero status
-            # from that is why the match is captured before `wait()` decides.
+            # written to avoid. git takes EPIPE and exits non-zero.
             proc.stdout.close()
-    matched = detail is not None
-    return (matched or proc.wait() == 0), detail
+    status = proc.wait()
+    # `decided` means the scan reached its answer without needing the rest of
+    # the stream — a match, or a binary sniff. Both leave git to die of EPIPE,
+    # so its non-zero status says nothing about whether the blob was readable,
+    # and reading it as "no blob" would drop the size rule for every binary
+    # file larger than the pipe buffer.
+    return (decided or status == 0), detail
 
 
 def _index_blob_size(path: str, root: str) -> int | None:
@@ -542,16 +560,21 @@ def _index_blob_size(path: str, root: str) -> int | None:
         return None
 
 
-def _scan_stream(handle, pattern: re.Pattern[str]) -> str | None:
-    """Return the matched secret's rule detail, or None.
+def _scan_stream(handle, pattern: re.Pattern[str]) -> tuple[bool, str | None]:
+    """Return `(decided, detail)` for one byte stream.
 
-    Only the *shape* of the match is reported — the prefix and the line number.
-    Echoing the value would copy the secret into a transcript, a log, and quite
-    possibly a PR comment, which is a second leak on top of the first.
+    `detail` is the matched secret's rule detail, or None. Only the *shape* of
+    the match is reported — the prefix and the line number. Echoing the value
+    would copy the secret into a transcript, a log, and quite possibly a PR
+    comment, which is a second leak on top of the first.
+
+    `decided` is True when the answer was reached without consuming the whole
+    stream — a match, or a binary sniff. A caller reading from a pipe needs it
+    to tell "I stopped early on purpose" from "the producer failed".
     """
     head = handle.read(_BINARY_SNIFF)
     if _looks_binary(head):
-        return None
+        return True, None
     line_number = 0
     carry = b""
     chunk = head
@@ -562,7 +585,7 @@ def _scan_stream(handle, pattern: re.Pattern[str]) -> str | None:
             line_number += 1
             match = pattern.search(raw.decode("utf-8", errors="replace"))
             if match:
-                return f"line {line_number}: {match.group(0)[:8]}… (redacted)"
+                return True, f"line {line_number}: {match.group(0)[:8]}… (redacted)"
         if len(carry) > _CHUNK:
             # A single line longer than the buffer. Scan it *before*
             # trimming — dropping the head unscanned would hide a
@@ -571,7 +594,7 @@ def _scan_stream(handle, pattern: re.Pattern[str]) -> str | None:
             # cut is still matched on the next pass.
             match = pattern.search(carry.decode("utf-8", errors="replace"))
             if match:
-                return (
+                return True, (
                     f"line {line_number + 1}: "
                     f"{match.group(0)[:8]}… (redacted)"
                 )
@@ -581,8 +604,8 @@ def _scan_stream(handle, pattern: re.Pattern[str]) -> str | None:
         line_number += 1
         match = pattern.search(carry.decode("utf-8", errors="replace"))
         if match:
-            return f"line {line_number}: {match.group(0)[:8]}… (redacted)"
-    return None
+            return True, f"line {line_number}: {match.group(0)[:8]}… (redacted)"
+    return False, None
 
 
 def _file_size(path: str) -> int | None:

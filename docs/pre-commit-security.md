@@ -32,7 +32,7 @@ It applies the same five rules in the same order and prints one JSON verdict on 
 |------|---------|-----------------|
 | `0` | `clean`, or `warn` with nothing blocking | Proceed. On `warn`, apply the *Mode Contract* below — the script never prompts (it does not own the terminal, and the path list may be arriving on its stdin); `confirm_required` is that decision pre-computed. |
 | `1` | `block` — a real secret was found | **Stop.** Never treat this as the degrade path: degrading past a real secret is the single outcome this gate exists to prevent. Report the path from `blocking[]`. |
-| `2` | Usage error | Fix the invocation. |
+| `2` | Usage error — a malformed invocation, or a script path that did not resolve (`python3` returns 2 for a file it cannot open) | Fix the invocation where you control it. A caller that cannot tell the two apart treats it as **cannot complete**: fall back to the *Primary Pattern* below. A scan that never ran is never a scan that passed. |
 | `3` | Invalid input — a `security.*` value of the wrong type, or a `security.*` regex that does not compile | **Stop.** A scan configured wrongly has not run, so its silence means nothing. |
 | `4` | Cannot complete — no file list, or `git` unavailable | Print `⚠ gi-secscan unavailable — running the documented scan` and fall back to the *Primary Pattern* below. |
 
@@ -44,7 +44,7 @@ The file being **absent from the bundle** is a different failure: a broken insta
 
 This is the canonical statement of the rules, and the **documented fallback** for the script above — run it verbatim when `gi-secscan.py` cannot run (no `python3`, exit `2`, exit `4`) and in any context that does not bundle the script. The script and this block implement the same five **rules**; when they disagree about a rule, this document is the specification and the script is the bug.
 
-They differ in one place, and it is about *which bytes are read*, not about what counts as a secret. This block (and rule 3's `stat`) reads the file on disk; for a **staged** set those are not the bytes being committed — `git add` a key, edit it out, and the file reads clean over a blob that still carries it. `gi-secscan.py --staged` reads the index blob and is the stronger of the two: prefer it wherever it runs.
+They differ in what each can *read*, never in what counts as a secret. Two such differences, both favouring the script. This block (and rule 3's `stat`) reads the file on disk; for a **staged** set those are not the bytes being committed — `git add` a key, edit it out, and the file reads clean over a blob that still carries it. `gi-secscan.py --staged` reads the index blob and is the stronger of the two: prefer it wherever it runs.
 
 Every skill that runs `git add`, `git commit`, or `git push` MUST execute one of the two against the staged set (or the about-to-be-staged set) before proceeding — never neither, and never a weaker check improvised inline.
 

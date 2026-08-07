@@ -49,7 +49,8 @@ def read_body() -> str:
 
     `sys.stdin.read()` raises UnicodeDecodeError — a ValueError, so no OSError
     handler catches it — on an issue body carrying, say, a cp1252 quote. That
-    would exit 1 with a traceback and break the "always exit 0" contract above.
+    would exit 1 with a traceback, which is not one of the codes above and would
+    be read as a verdict rather than a crash.
     Both the markers and the issue numbers this script looks for are ASCII, so
     decoding the raw bytes with `errors="replace"` finds every number a strict
     decode would have found and never fails.
