@@ -166,7 +166,7 @@ Check whether this issue should be worked on. Open with `● Preflight check for
 
 ### 0a — Fetch issue
 
-Run `python3 references/scripts/gi-issue.py {N} --fields number,title,body,labels,assignees,state,comments` and read `.issue`. The same issue is read again in 0d, Step 1, and Step 5; the script serves those repeats from `.gitissue/cache/` rather than the network, and the field list is this skill's choice. Resolve the script path as the *Bundled dependency precheck* resolves its list. Exit 3 is a stop. Exit 4, or no `python3`, degrades: run `gh issue view {N} --json number,title,body,labels,assignees,state,comments` directly — the cache is an optimization, never a dependency. **0d rewrites the body, so it MUST end with `python3 references/scripts/gi-issue.py {N} --invalidate`**; the cache is repo-wide and outlives this skill, so without it Step 1 and Step 5 read the pre-normalization body.
+Run `python3 references/scripts/gi-issue.py {N} --fields number,title,body,labels,assignees,state,comments` and read `.issue`. The same issue is read again in 0d, Step 1, and Step 5; the script serves those repeats from `.gitissue/cache/` rather than the network, and the field list is this skill's choice. Resolve the script path as the *Bundled dependency precheck* resolves its list. Exit 3 is a stop. No `python3`, exit 2 (an unresolved script path), or exit 4 degrades: run `gh issue view {N} --json number,title,body,labels,assignees,state,comments` directly — the cache is an optimization, never a dependency. **0d rewrites the body, so it MUST end with `python3 references/scripts/gi-issue.py {N} --invalidate`**; the cache is repo-wide and outlives this skill, so without it Step 1 and Step 5 read the pre-normalization body.
 
 **If not found:** output error and stop. **If closed:** output warning and stop.
 
@@ -195,7 +195,7 @@ If `issue.auto_normalize` is true and not already normalized (no `<!-- gitissue:
 
 ### 0e — Workspace (interactive only)
 
-Before Step 0e or 0f selects a workspace, derive one `{branch_name}` with `python3 references/scripts/gi-branch.py {N} --from-issue --type {type}` and read `.branch`. **`--from-issue` is mandatory — never put the issue title or the configured prefix on the command line.** A title is written by whoever filed the issue, so interpolating it into a shell word is a command injection that `/auto-pilot` would run unattended; `--from-issue` makes the script read both values itself. `{type}` is one of the six literals this skill classified, never free text. Exit 3 is a stop; no `python3` or exit 4 degrades to deriving the name by hand per `references/docs/naming-conventions.md`. Both workspace paths use this one name — full contract in `references/pipeline-steps.md` (*Step 0e*).
+Before Step 0e or 0f selects a workspace, derive one `{branch_name}` with `python3 references/scripts/gi-branch.py {N} --from-issue --type {type}` and read `.branch`. **`--from-issue` is mandatory — never put the issue title or the configured prefix on the command line.** A title is written by whoever filed the issue, so interpolating it into a shell word is a command injection that `/auto-pilot` would run unattended; `--from-issue` makes the script read both values itself. `{type}` is one of the six literals this skill classified, never free text. Exit 3 is a stop; no `python3`, exit 2 (an unresolved script path), or exit 4 degrades to deriving the name by hand per `references/docs/naming-conventions.md`. Both workspace paths use this one name — full contract in `references/pipeline-steps.md` (*Step 0e*).
 
 Then decide *where* the resolution work happens.
 
@@ -438,7 +438,7 @@ if [ -n "$no_run_log" ]; then printf '%s' "$run_json" | python3 references/scrip
 
 **Exit 3:** the record itself is invalid — the script printed the reason on stderr and wrote nothing. This is a stop, not a degrade: never append `$run_json` raw, because that writes the malformed line the script exists to reject. Correct the record and re-run, or drop the line.
 
-Only the *write* is best-effort and non-fatal — a write that cannot happen (no `python3`, exit 4) never blocks the reported run result. A rejected record is never written by any path. Only append; never rewrite or reorder existing lines.
+Only the *write* is best-effort and non-fatal — a write that cannot happen (no `python3`, exit 2 for an unresolved script path or a malformed invocation, exit 4) never blocks the reported run result; use the fallback append above for any of them, never for exit 3. A rejected record is never written by any path. Only append; never rewrite or reorder existing lines.
 
 ---
 

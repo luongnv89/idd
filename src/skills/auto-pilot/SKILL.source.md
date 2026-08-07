@@ -302,7 +302,9 @@ stderr and wrote nothing. This is a stop, not a degrade: never append
 reject. Correct the record and re-run, or drop the line.
 
 Only the *write* is **best-effort and non-fatal** — a write that cannot happen
-(no `python3`, exit 4) never stops the loop or changes the iteration outcome. A
+(no `python3`, exit 2 for an unresolved script path or a malformed invocation,
+exit 4) never stops the loop or changes the iteration outcome; use the fallback
+append above for any of them, never for exit 3. A
 rejected record is never written by any path. Append only; never rewrite prior
 lines.
 

@@ -283,7 +283,7 @@ python3 references/scripts/gi-ci-wait.py {pr_number} \
   --interval {review.ci_poll_interval} --timeout {review.ci_timeout}
 ```
 
-Read `verdict`: `pass` proceeds with the merge; `fail` and `pending` both leave the PR open. Exit 3 is a stop; a missing `python3` or exit 4 degrades to polling by hand every `review.ci_poll_interval` seconds with `gh pr view {pr_number} --json statusCheckRollup --jq '.statusCheckRollup[] | select(.status != "COMPLETED" or (.conclusion | IN("SUCCESS","NEUTRAL","SKIPPED") | not))'`.
+Read `verdict`: `pass` proceeds with the merge; `fail` and `pending` both leave the PR open. Exit 3 is a stop; a missing `python3`, exit 2 (an unresolved script path), or exit 4 degrades to polling by hand every `review.ci_poll_interval` seconds with `gh pr view {pr_number} --json statusCheckRollup --jq '.statusCheckRollup[] | select(.status != "COMPLETED" or (.conclusion | IN("SUCCESS","NEUTRAL","SKIPPED") | not))'`.
 
 The `.conclusion` half of that filter is not optional. A check that finished and
 **failed** still has `status: "COMPLETED"`, so filtering on status alone prints

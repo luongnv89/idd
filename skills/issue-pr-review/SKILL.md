@@ -304,7 +304,7 @@ UI review is **auto-detected per PR** — no config flag enables it. The skill s
 
 The shared mechanics — detection commands, the code-review spawn, the report-only display-environment label (`ui_env`), the browser-review gate + three-part capability check, and the headless capture call — live in `references/docs/ui-review.md`. This skill's own deltas — the PR diff command, the variables it passes, the interactive proposal prompt, and cycle-reuse `SendMessage` — are in `references/ui-review-mechanics.md`. **Read both and apply them** when `ui: detected`; together they preserve the contract above and route `action: "fix"` UI findings into Step 6 under `category: ui_ux`.
 
-Also fetch the linked issue for acceptance-criteria verification: `python3 references/scripts/gi-issue.py {linked_issue} --fields number,title,body,labels`, reading `.issue`. Step 1's depth gate requested this same field list, so the cache answers without a second network call — the field sets must stay identical for that to hold. Exit 3 is a stop; exit 4 or no `python3` degrades to `gh issue view {linked_issue} --json number,title,body,labels`.
+Also fetch the linked issue for acceptance-criteria verification: `python3 references/scripts/gi-issue.py {linked_issue} --fields number,title,body,labels`, reading `.issue`. Step 1's depth gate requested this same field list, so the cache answers without a second network call — the field sets must stay identical for that to hold. Exit 3 is a stop; no `python3`, exit 2 (an unresolved script path), or exit 4 degrades to `gh issue view {linked_issue} --json number,title,body,labels`.
 
 ```
 [3/7] Review       ✓ spec[ac:pass correctness:pass safety:pass]
