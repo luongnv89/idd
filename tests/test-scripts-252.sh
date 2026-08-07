@@ -830,6 +830,52 @@ else
   fail "AC1: a surrogate-escaped path produced unparsable JSON"
 fi
 
+# Each mode must read the bytes it is about to ship, not whatever is on disk.
+# --range is the pre-push gate: the branch tip is what `git push` sends, so
+# committing a key and then tidying the working copy must still block.
+RANGEDIR="$TMP/range-mode"
+mkdir -p "$RANGEDIR"
+(
+  cd "$RANGEDIR"
+  git init -q -b feat .
+  git config user.email t@example.com
+  git config user.name t
+  echo base > x.txt
+  git add -A
+  git commit -qm base
+  git branch main-base
+  printf 'aws_key = "%s"\n' "$AWS_FIXTURE_KEY" > deploy.py
+  git add -A
+  git commit -qm 'feat: deploy'
+  printf 'aws_key = os.environ["AWS_KEY"]\n' > deploy.py   # tidy, not committed
+) >/dev/null 2>&1
+run_status out st sh -c "cd '$RANGEDIR' && python3 '$SECSCAN' --range main-base --quiet"
+if [ "$st" = "1" ]; then
+  pass "AC1: --range scans the committed blob, not the tidied working copy"
+else
+  fail "AC1: --range passed a secret that is committed and about to be pushed (exit $st)"
+fi
+
+# `git status --porcelain` collapses a new subtree to `?? a/`, which is not a
+# file: every path under it is skipped, and counted, and reported clean.
+UNTRACKED="$TMP/untracked-dir"
+mkdir -p "$UNTRACKED"
+(
+  cd "$UNTRACKED"
+  git init -q -b work .
+  git config user.email t@example.com
+  git config user.name t
+  git commit -q --allow-empty -m init
+  mkdir -p a/b/c
+  printf 'id=%s\n' "$AWS_FIXTURE_KEY" > a/b/c/.env
+) >/dev/null 2>&1
+run_status out st sh -c "cd '$UNTRACKED' && python3 '$SECSCAN' --working-tree --quiet"
+if [ "$st" = "1" ]; then
+  pass "AC1: --working-tree descends into an untracked directory"
+else
+  fail "AC1: an untracked directory hid a secret from --working-tree (exit $st)"
+fi
+
 # The repository root is a path too. Stripping trailing whitespace off
 # `rev-parse --show-toplevel` points `base` at a directory that does not exist,
 # so every content and size rule misses — on a git-sourced list, which raises no
@@ -927,13 +973,15 @@ ROOTS = ["src/skills", "src/internal-skills", "src/shared/agents", "docs"]
 # {secscan_script} --staged` in the shared agents is a real invocation.
 _LAUNCH = r"(?:python[0-9.]*|uv\s+run|\"?\$\{?\w+\}?\"?)"
 CALL = re.compile(
-    # launched by an interpreter, whatever its name or version
-    _LAUNCH + r"\s+\S*gi-[a-z0-9-]+\.py"
+    # launched by an interpreter, whatever its name or version, and with any
+    # a few of the interpreter's own words in between — `python3 -X utf8 …`,
+    # `uv run --no-project …` — which must not hide the call
+    _LAUNCH + r"(?:\s+\S+){0,4}?\s+\S*gi-[a-z0-9-]+\.py"
     # or executed directly off the exec bit
     r"|\./\S*gi-[a-z0-9-]+\.py"
     # or the indirect form, where the script path is itself a placeholder —
     # `python3 {secscan_script} --staged` in the shared agents is a real call
-    r"|" + _LAUNCH + r"\s+\S*\{[^{}]+\}"
+    r"|" + _LAUNCH + r"(?:\s+\S+){0,4}?\s+\S*\{[^{}]+\}"
 )
 
 # Placeholders permitted on a shared-script command line, and why each is safe.
@@ -957,15 +1005,20 @@ ALLOWED = {
 # a redirection, a glob range, or a markdown link is not mistaken for one.
 # `${VAR}` is a shell expansion, not a paste — VAR checks it.
 PLACEHOLDER = re.compile(
-    r"(?<!\$)\{\s*[^{}\s][^{}]*\}"
+    # An identifier in braces. Deliberately not "any braces": `jq '{verdict:
+    # .verdict}'`, `awk '{print $1}'` and a regex `{20,}` are not placeholders,
+    # and flagging them would make the lint something people route around.
+    r"(?<!\$)\{\s*[A-Za-z_][\w.-]*\s*\}"
     # <NAME>: an angle-bracketed identifier is never shell syntax, so any
     # length counts — `<key>` is as much a placeholder as `<FILE-LIST>`.
     r"|<[A-Za-z_][\w-]*>"
-    # [NAME]: a bracket is also a glob range. Require 4+ characters or an
-    # upper-case letter/`-`/`_`, which keeps `[abc]` and `[a-z]` as globs while
-    # catching `[untrusted]`. `[key]` is the residual blind spot; a placeholder
-    # that short and that shell-ambiguous is not worth the false positives.
-    r"|\[(?=[A-Za-z_])(?:[\w-]{4,}|[\w-]*[A-Z_][\w-]*)\]"
+    # `[NAME]` is deliberately absent. A square bracket is a glob range and a
+    # regex character class before it is ever a placeholder, and no form of the
+    # rule separated `[untrusted]` from `[A-Z0-9]` in this repo's own documented
+    # `--extra-secret-value-pattern` examples. `{NAME}` and `<NAME>` are the
+    # styles these skills actually use; a reviewer adding a `[NAME]` call site
+    # is the residual gap, and it is a smaller one than a lint people route
+    # around because it fires on their regexes.
 )
 VAR = re.compile(r"\$\{?[A-Za-z_][A-Za-z0-9_]*\}?")
 # Command substitution pastes its output into the command line unquoted. Only
@@ -980,15 +1033,17 @@ REPARSE = re.compile(
     # Any shell whose argument is re-parsed: `sh -c`, `bash -lc`, `sh -ce`,
     # `bash -o pipefail -c`. The `-…c…` token may carry other letters and may
     # sit behind options that take arguments of their own.
-    # The shell must be the command word, not the tail of a path: `\b` alone
-    # matches the `sh` inside `build.sh`, which turned any later `-c` option in
-    # the same region into a false "re-parse".
-    r"(?<![\w./-])(?:sh|bash|zsh|dash|ksh)(?:\s+\S+)*?\s+-[A-Za-z]*c[A-Za-z]*\b"
+    # The shell must be the command word, not the tail of a filename: `\b`
+    # alone matches the `sh` inside `build.sh`, which turned any later `-c`
+    # option into a false "re-parse". `/` stays out of the lookbehind, so
+    # `/bin/sh -c` and `/usr/bin/bash -lc` are still shells.
+    r"(?<![\w.-])(?:sh|bash|zsh|dash|ksh)(?:\s+\S+)*?\s+-[A-Za-z]*c[A-Za-z]*\b"
     # xargs word-splits its input and honours quotes, and turns a filename
     # starting with `-` into an option — the same hazard by another route
     r"|\bxargs\b|\beval\b"
 )
 DQUOTED = re.compile(r'"(?:[^"\\]|\\.)*"')
+SQUOTED = re.compile(r"'[^']*'")
 
 def logical_lines(path: pathlib.Path):
     """Yield (line_no, text) with `\\`- and `|`-continuations joined."""
@@ -1089,6 +1144,11 @@ for rel in ROOTS:
                 # it holds; an unquoted one word-splits and globs, and a command
                 # substitution pastes its output into the command line.
                 unquoted = DQUOTED.sub(lambda m: " " * len(m.group(0)), cmd)
+                # Single quotes suppress expansion outright, so `'$LIST'` is a
+                # literal. Placeholders are checked before this, on the raw
+                # text, because the agent substitutes those before the shell
+                # ever sees the quotes.
+                unquoted = SQUOTED.sub(lambda m: " " * len(m.group(0)), unquoted)
                 for token in VAR.findall(unquoted):
                     bad.append(
                         f"{rp}:{lineno}: {token} is unquoted on a shared-script "

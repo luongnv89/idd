@@ -291,7 +291,13 @@ def collect_paths(args: argparse.Namespace) -> tuple[list[str], str]:
     if args.staged:
         return _split_paths(_git(["diff", "--cached", "-z", "--name-only"])), repo_root()
     if args.working_tree:
-        return _porcelain_paths(_git(["status", "--porcelain", "-z"])), repo_root()
+        # `-uall`: without it git collapses a new subtree to `?? a/`, which is
+        # not a file, so every path beneath it is skipped while still being
+        # counted — a whole directory of secrets scanned as one clean entry.
+        return (
+            _porcelain_paths(_git(["status", "--porcelain", "-z", "-uall"])),
+            repo_root(),
+        )
     if args.range:
         return (
             _split_paths(_git(["diff", "-z", "--name-only", f"{args.range}...HEAD"])),
@@ -517,8 +523,8 @@ def _scan_file_contents(path: str, pattern: re.Pattern[str]) -> str | None:
         return None
 
 
-def _index_rev(path: str) -> str:
-    """The index revision for `path`, stage-qualified.
+def _blob_rev(path: str, prefix: str) -> str:
+    """The revision naming `path`'s content under `prefix` (`:0:` or `HEAD:`).
 
     `:<path>` is ambiguous: git reads `:<n>:<path>` when the character after the
     colon is a digit, so a staged file literally named `0:x.txt` resolves to
@@ -526,11 +532,11 @@ def _index_rev(path: str) -> str:
     in its place. Naming stage 0 explicitly removes the ambiguity for every
     path, and filenames are attacker-controlled in the flows that run this gate.
     """
-    return f":0:{path}"
+    return f"{prefix}{path}"
 
 
 def _scan_index_blob(
-    path: str, root: str, pattern: re.Pattern[str]
+    path: str, root: str, pattern: re.Pattern[str], prefix: str
 ) -> tuple[bool, str | None]:
     """Scan the *staged* content of `path`, i.e. the blob in the index.
 
@@ -548,7 +554,7 @@ def _scan_index_blob(
     """
     try:
         proc = subprocess.Popen(
-            ["git", "-C", root or ".", "show", _index_rev(path)],
+            ["git", "-C", root or ".", "show", _blob_rev(path, prefix)],
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
         )
@@ -576,11 +582,11 @@ def _scan_index_blob(
     return (decided or status == 0), detail
 
 
-def _index_blob_size(path: str, root: str) -> int | None:
+def _index_blob_size(path: str, root: str, prefix: str) -> int | None:
     """Byte size of the staged blob, or None when git cannot report it."""
     try:
         proc = subprocess.run(
-            ["git", "-C", root or ".", "cat-file", "-s", _index_rev(path)],
+            ["git", "-C", root or ".", "cat-file", "-s", _blob_rev(path, prefix)],
             capture_output=True,
             text=True,
             check=False,
@@ -654,7 +660,7 @@ def scan(
     paths: list[str],
     rules: dict[str, object],
     base: str = "",
-    from_index: bool = False,
+    blob_prefix: str = "",
     caller_supplied: bool = False,
 ) -> dict[str, object]:
     """Apply every rule to every path and return the structured verdict.
@@ -664,9 +670,12 @@ def scan(
     message than an absolute one — while every filesystem access is resolved
     against `base`.
 
-    `from_index` selects the *staged* bytes (the blob `git commit` will write)
-    over the working-tree file. They diverge whenever a path is staged and then
-    edited, and only the index copy is the one about to be committed.
+    `blob_prefix` selects the bytes this mode is actually about to ship, over
+    whatever happens to be on disk: `:0:` for `--staged` (the blob `git commit`
+    will write) and `HEAD:` for `--range` (the tip `git push` will send). Both
+    diverge from the working tree the moment a path is committed or staged and
+    then tidied, and the tidy copy is the one that reads clean. Empty means the
+    working tree, which is what the other sources are asking about.
     """
     blocking: list[dict[str, str]] = []
     warnings: list[dict[str, str]] = []
@@ -705,8 +714,8 @@ def scan(
         resolved = os.path.join(base, path) if base else path
 
         indexed = False
-        if from_index:
-            indexed, detail = _scan_index_blob(path, base, secret_value)
+        if blob_prefix:
+            indexed, detail = _scan_index_blob(path, base, secret_value, blob_prefix)
             if indexed and detail is not None:
                 blocking.append(
                     {"rule": "secret-value", "path": path, "detail": detail}
@@ -740,7 +749,7 @@ def scan(
                     {"rule": "secret-value", "path": path, "detail": detail}
                 )
 
-        size = _index_blob_size(path, base) if indexed else None
+        size = _index_blob_size(path, base, blob_prefix) if indexed else None
         if size is None:
             size = _file_size(resolved)
         if size is not None and size > rules["max_bytes"]:  # type: ignore[operator]
@@ -873,7 +882,10 @@ def main(argv: list[str] | None = None) -> int:
         paths,
         rules,
         base,
-        from_index=bool(args.staged),
+        # The bytes each mode is about to ship: the index for --staged, the
+        # branch tip for --range. Anything else means the working tree, which
+        # is what those sources are asking about.
+        blob_prefix=":0:" if args.staged else ("HEAD:" if args.range else ""),
         caller_supplied=bool(args.paths or args.files_from),
     )
     print(json.dumps(result))
