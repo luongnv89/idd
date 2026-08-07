@@ -29,6 +29,14 @@ Output on success is exactly one line of JSON on stdout:
 Human-readable `✗` / `⚠` / `○` lines go to stderr, so a caller may show them
 verbatim and still parse stdout.
 
+`--staged` scans the bytes in the **index** — the blob `git commit` will write —
+not the file on disk. The two diverge the moment a path is staged and then
+edited, and scanning the working-tree copy of a staged path is a silent false
+negative: `git add secrets.txt` followed by an edit that strips the key leaves a
+clean file over a blob that still carries it. Every other input source (paths,
+`--files-from`, `--working-tree`, `--range`) reads the working tree, which is
+what those sources mean.
+
 Rule extensions come from the `security:` block of `.gitissue.yml`, which this
 script reads itself. That is a security decision: `.gitissue.yml` is
 repository-controlled, so a design where the caller passes config *values* on
@@ -454,51 +462,110 @@ def _looks_binary(head: bytes) -> bool:
 
 
 def _scan_file_contents(path: str, pattern: re.Pattern[str]) -> str | None:
+    """Scan a working-tree file. See `_scan_stream` for the reporting contract."""
+    try:
+        with open(path, "rb") as handle:
+            return _scan_stream(handle, pattern)
+    except OSError:
+        # Unreadable or vanished between listing and scanning. Not a block: the
+        # file cannot reach the commit either.
+        return None
+
+
+def _scan_index_blob(
+    path: str, root: str, pattern: re.Pattern[str]
+) -> tuple[bool, str | None]:
+    """Scan the *staged* content of `path`, i.e. the blob in the index.
+
+    Returns `(scanned, detail)`. A staged scan must read what `git commit` will
+    write, not what happens to be on disk: `git add secrets.txt` followed by an
+    edit that removes the key leaves a clean working tree over a blob that still
+    carries it, and scanning the file would report clean while the commit takes
+    the secret. `scanned` is False when the blob cannot be read (a staged
+    deletion, a gitlink, a git that failed) so the caller can fall back to the
+    working-tree file rather than silently skipping content scanning.
+    """
+    try:
+        proc = subprocess.Popen(
+            ["git", "-C", root or ".", "show", f":{path}"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+        )
+    except OSError:
+        return False, None
+    try:
+        assert proc.stdout is not None
+        detail = _scan_stream(proc.stdout, pattern)
+        proc.stdout.read()  # drain, so git never blocks on a full pipe
+    except OSError:
+        proc.kill()
+        proc.wait()
+        return False, None
+    finally:
+        if proc.stdout is not None:
+            proc.stdout.close()
+    return proc.wait() == 0, detail
+
+
+def _index_blob_size(path: str, root: str) -> int | None:
+    """Byte size of the staged blob, or None when git cannot report it."""
+    try:
+        proc = subprocess.run(
+            ["git", "-C", root or ".", "cat-file", "-s", f":{path}"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except OSError:
+        return None
+    if proc.returncode != 0:
+        return None
+    try:
+        return int(proc.stdout.strip())
+    except ValueError:
+        return None
+
+
+def _scan_stream(handle, pattern: re.Pattern[str]) -> str | None:
     """Return the matched secret's rule detail, or None.
 
     Only the *shape* of the match is reported — the prefix and the line number.
     Echoing the value would copy the secret into a transcript, a log, and quite
     possibly a PR comment, which is a second leak on top of the first.
     """
-    try:
-        with open(path, "rb") as handle:
-            head = handle.read(_BINARY_SNIFF)
-            if _looks_binary(head):
-                return None
-            line_number = 0
-            carry = b""
-            chunk = head
-            while chunk:
-                carry += chunk
-                *lines, carry = carry.split(b"\n")
-                for raw in lines:
-                    line_number += 1
-                    match = pattern.search(raw.decode("utf-8", errors="replace"))
-                    if match:
-                        return f"line {line_number}: {match.group(0)[:8]}… (redacted)"
-                if len(carry) > _CHUNK:
-                    # A single line longer than the buffer. Scan it *before*
-                    # trimming — dropping the head unscanned would hide a
-                    # secret anywhere but the final megabyte of a minified
-                    # bundle — then keep an overlap so a prefix straddling the
-                    # cut is still matched on the next pass.
-                    match = pattern.search(carry.decode("utf-8", errors="replace"))
-                    if match:
-                        return (
-                            f"line {line_number + 1}: "
-                            f"{match.group(0)[:8]}… (redacted)"
-                        )
-                    carry = carry[-_LINE_OVERLAP:]
-                chunk = handle.read(_CHUNK)
-            if carry:
-                line_number += 1
-                match = pattern.search(carry.decode("utf-8", errors="replace"))
-                if match:
-                    return f"line {line_number}: {match.group(0)[:8]}… (redacted)"
-    except OSError:
-        # Unreadable or vanished between listing and scanning. Not a block: the
-        # file cannot reach the commit either.
+    head = handle.read(_BINARY_SNIFF)
+    if _looks_binary(head):
         return None
+    line_number = 0
+    carry = b""
+    chunk = head
+    while chunk:
+        carry += chunk
+        *lines, carry = carry.split(b"\n")
+        for raw in lines:
+            line_number += 1
+            match = pattern.search(raw.decode("utf-8", errors="replace"))
+            if match:
+                return f"line {line_number}: {match.group(0)[:8]}… (redacted)"
+        if len(carry) > _CHUNK:
+            # A single line longer than the buffer. Scan it *before*
+            # trimming — dropping the head unscanned would hide a
+            # secret anywhere but the final megabyte of a minified
+            # bundle — then keep an overlap so a prefix straddling the
+            # cut is still matched on the next pass.
+            match = pattern.search(carry.decode("utf-8", errors="replace"))
+            if match:
+                return (
+                    f"line {line_number + 1}: "
+                    f"{match.group(0)[:8]}… (redacted)"
+                )
+            carry = carry[-_LINE_OVERLAP:]
+        chunk = handle.read(_CHUNK)
+    if carry:
+        line_number += 1
+        match = pattern.search(carry.decode("utf-8", errors="replace"))
+        if match:
+            return f"line {line_number}: {match.group(0)[:8]}… (redacted)"
     return None
 
 
@@ -510,7 +577,10 @@ def _file_size(path: str) -> int | None:
 
 
 def scan(
-    paths: list[str], rules: dict[str, object], base: str = ""
+    paths: list[str],
+    rules: dict[str, object],
+    base: str = "",
+    from_index: bool = False,
 ) -> dict[str, object]:
     """Apply every rule to every path and return the structured verdict.
 
@@ -518,6 +588,10 @@ def scan(
     reported path stays as given — repo-relative reads better in a commit
     message than an absolute one — while every filesystem access is resolved
     against `base`.
+
+    `from_index` selects the *staged* bytes (the blob `git commit` will write)
+    over the working-tree file. They diverge whenever a path is staged and then
+    edited, and only the index copy is the one about to be committed.
     """
     blocking: list[dict[str, str]] = []
     warnings: list[dict[str, str]] = []
@@ -554,16 +628,32 @@ def scan(
             )
 
         resolved = os.path.join(base, path) if base else path
-        if not os.path.isfile(resolved):
-            # A deletion, or a path outside the working tree. The filename rules
-            # above still applied; there is no content or size to look at.
-            continue
 
-        detail = _scan_file_contents(resolved, secret_value)
-        if detail is not None:
-            blocking.append({"rule": "secret-value", "path": path, "detail": detail})
+        indexed = False
+        if from_index:
+            indexed, detail = _scan_index_blob(path, base, secret_value)
+            if indexed and detail is not None:
+                blocking.append(
+                    {"rule": "secret-value", "path": path, "detail": detail}
+                )
 
-        size = _file_size(resolved)
+        if not indexed:
+            # No staged blob (a staged deletion, a gitlink, or a git that could
+            # not answer), or a non-staged mode: fall back to the file on disk.
+            if not os.path.isfile(resolved):
+                # A deletion, or a path outside the working tree. The filename
+                # rules above still applied; there is no content or size here.
+                continue
+
+            detail = _scan_file_contents(resolved, secret_value)
+            if detail is not None:
+                blocking.append(
+                    {"rule": "secret-value", "path": path, "detail": detail}
+                )
+
+        size = _index_blob_size(path, base) if indexed else None
+        if size is None:
+            size = _file_size(resolved)
         if size is not None and size > rules["max_bytes"]:  # type: ignore[operator]
             warnings.append(
                 {
@@ -690,7 +780,7 @@ def main(argv: list[str] | None = None) -> int:
         sys.stderr.write(f"⚠ gi-secscan: {exc}\n")
         return 4
 
-    result = scan(paths, rules, base)
+    result = scan(paths, rules, base, from_index=bool(args.staged))
     print(json.dumps(result))
     if not args.quiet:
         report(result)

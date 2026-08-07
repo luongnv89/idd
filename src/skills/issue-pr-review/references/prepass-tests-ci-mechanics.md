@@ -36,13 +36,21 @@ npm test          # or pytest, go test ./..., cargo test, etc.
 
 ### Commit auto-fixes
 
-**Not used in `--review-only`.** Run the pre-commit security scan first — `python3 references/scripts/gi-secscan.py --working-tree`, run from the repo root so it reads the repo's `security.*` extensions from `.gitissue.yml` itself (never pass a config value on the command line — this skill has a PR's branch checked out), degrading to the Primary Pattern in `docs/pre-commit-security.md` only when the script cannot run. Its exit 1 is a block: stop, do not commit. Only after the scan passes (or warnings are accepted — see the scan contract in SKILL.md), commit and push:
+**Not used in `--review-only`.** Run the pre-commit security scan first — `python3 references/scripts/gi-secscan.py --working-tree`, run from the repo root so it reads the repo's `security.*` extensions from `.gitissue.yml` itself (never pass a config value on the command line — this skill has a PR's branch checked out), The full exit contract is in SKILL.md (*Step 2 — Commit auto-fixes*) and is not
+optional here: **exit 1 is a block** — stop, do not commit, report the path from
+`blocking[]`, never fall through to another scan. **Exit 3 is also a stop**, not
+a degrade: an uncompilable `security.*` regex means the repo's own rules were
+never applied, and a misconfigured scan has not run, so its silence is not a
+pass. Only a missing `python3`, **exit 2** (an unresolved script path or a
+malformed invocation), or **exit 4** degrades to the Primary Pattern in
+`docs/pre-commit-security.md`. Only after the scan passes (or warnings are
+accepted — see the scan contract in SKILL.md), commit and push:
 
 ```bash
 # Gated above by references/scripts/gi-secscan.py (see pre-commit-security.md).
 git add -A
 git commit -m "style: auto-fix lint and format issues"
-git push origin {branch_name}
+git push origin "$branch_name"   # bound in SKILL.md Step 1; never a literal ref name
 ```
 
 ## Step 4 — Build-system detection

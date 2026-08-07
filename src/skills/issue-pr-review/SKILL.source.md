@@ -176,6 +176,16 @@ gh pr checkout {N}
 
 Use `{headRefName}` from Step 1 as `{branch_name}` for sync, commit, and push. Canonical command: `docs/platform-github.md` (*Pull requests* → Checkout PR head branch).
 
+**Bind it to a shell variable — never paste the literal name into a command.** A
+head-ref name is chosen by whoever opened the PR, and git permits `` ` ``, `$`,
+`(`, `;` and `&` in a ref, so ``fix/1-`id` `` in a shell word runs on the
+reviewer's machine; double quotes do not stop `$(…)` or a backtick. Assign once —
+`branch_name="$(gh pr view {N} --json headRefName --jq .headRefName)"` — and use
+`"$branch_name"` everywhere this skill writes `{branch_name}`. Command-substitution
+output is never re-evaluated, so it is inert whatever the name holds. Same rule as
+the `gi-secscan` and `gi-branch` call sites, for the one untrusted value this skill
+cannot hand to a script.
+
 ### Depth gate (select the review profile)
 
 Decide **how deep** this review goes, so a one-line copy fix is not put through
@@ -250,14 +260,18 @@ append a command that runs on the reviewer's machine.
 **Exit 1 is the block verdict — stop, do not stage, do not push, and report the
 path from `blocking[]`.** It is not the degrade path: falling through to another
 scan after a real secret is the one outcome this gate exists to prevent. Exit 3
-(an uncompilable `security.*` regex) is also a stop. Only a missing `python3` or
-exit 4 degrades — print `⚠ gi-secscan unavailable — running the documented scan`
-and run the authoritative **Primary Pattern** in `docs/pre-commit-security.md`
-against the working tree instead. Do not improvise a weaker check.
+(an uncompilable `security.*` regex) is also a stop. A missing `python3`, **exit
+2** (the script path did not resolve, or the invocation was malformed — a scan
+that never ran, never a pass), or exit 4 degrades — print `⚠ gi-secscan
+unavailable — running the documented scan` and run the authoritative **Primary
+Pattern** in `docs/pre-commit-security.md` against the working tree instead. Exit
+1 with no parsable JSON on stdout is a crash, not a verdict: treat it as exit 2
+and degrade. Do not improvise a weaker check, and never treat any non-zero exit
+as a pass.
 
 Only after the scan passes (or warnings are accepted), commit and push (`git add
 -A` → `git commit -m "style: auto-fix lint and format issues"` → `git push
-origin {branch_name}`).
+origin "$branch_name"`, using the variable bound in Step 1).
 
 ```
 [2/7] Pre-pass     ✓ lint clean, format clean, {N} tests passed
@@ -384,7 +398,7 @@ Exit the **fix loop** only. Soft-pass is **not** implied — evaluate it next pe
 
 ### If fixable issues found
 
-Delegate fixes to the fixer subagent (`shared/agents/fixer.md`) — never apply code changes in the main skill context — reusing the same fixer across cycles when possible. The fixer reads affected files, applies targeted changes, runs the mandatory pre-commit security scan against the staged set — `references/scripts/gi-secscan.py`, with the Primary Pattern in `docs/pre-commit-security.md` as its fallback, real secrets blocking the commit either way — then commits. The main agent collects the fixer's JSON result and pushes (`git push origin {branch_name}`); unresolved blocking findings carry to the next cycle. The spawn variables and `Agent(...)` call are in `references/review-loop-mechanics.md`.
+Delegate fixes to the fixer subagent (`shared/agents/fixer.md`) — never apply code changes in the main skill context — reusing the same fixer across cycles when possible. The fixer reads affected files, applies targeted changes, runs the mandatory pre-commit security scan against the staged set — `references/scripts/gi-secscan.py`, with the Primary Pattern in `docs/pre-commit-security.md` as its fallback, real secrets blocking the commit either way — then commits. The main agent collects the fixer's JSON result and pushes (`git push origin "$branch_name"`, the variable bound in Step 1 — never the literal ref name); unresolved blocking findings carry to the next cycle. The spawn variables and `Agent(...)` call are in `references/review-loop-mechanics.md`.
 
 ```
 [6/7] Fix          ✓ fixed {N} issues (noted: {note_count} — not fixed)

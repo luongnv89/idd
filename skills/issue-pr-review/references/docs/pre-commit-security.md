@@ -57,6 +57,12 @@ Every skill that runs `git add`, `git commit`, or `git push` MUST execute one of
 #         yields the *old* path, which no longer exists, so the new file — the
 #         one actually being committed — is never scanned. It also truncates any
 #         path containing a space.
+#         Residual limitation of the shell form: it greps the file on disk. For
+#         a *staged* set those are different bytes the moment a path is staged
+#         and then edited — `git add` a key, strip it, and the file reads clean
+#         while the blob about to be committed still has it. gi-secscan.py
+#         --staged reads the index blob for exactly this reason; if you must run
+#         this block against a staged set, scan `git show ":$f"` rather than "$f".
 #         Residual limitation of any line-based form: git still quotes a path
 #         containing a space or a non-ASCII byte, and the quoted string names no
 #         file, so its contents go unscanned. That is not fixable in a `while

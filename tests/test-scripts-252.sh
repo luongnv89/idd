@@ -689,35 +689,178 @@ for f in "$SKILLS/issue-resolver/SKILL.md" "$SKILLS/issue-pr-review/SKILL.md"; d
   fi
 done
 
-# No call site may interpolate a config VALUE into the command line. .gitissue.yml
-# is repo-controlled and /issue-pr-review reviews with a PR's branch checked out,
-# so a crafted value inside a quoted shell word would run on the reviewer's
-# machine at the moment the gate runs. The script reads the file itself instead.
-injected=0
-while IFS= read -r hit; do
-  case "$hit" in
-    *--config-json*|*--allow-pattern*|*--extra-secret-*|*--max-file-size-mb*)
-      fail "AC1: gi-secscan call site interpolates config into the command line: $hit"
-      injected=1 ;;
-  esac
-done < <(grep -rhn --include='*.md' "python3 .*gi-secscan\.py" \
-           "$REPO_ROOT/src/skills" "$REPO_ROOT/src/shared/agents" \
-           "$REPO_ROOT/docs/pre-commit-security.md")
-[ "$injected" -eq 0 ] && pass "AC1: no gi-secscan call site puts a config value on the command line"
+# A --staged scan must read the bytes `git commit` will write, not the file on
+# disk. They diverge as soon as a path is staged and then edited, and scanning
+# the working-tree copy reports clean over a blob that still carries the key —
+# the one failure mode of a security gate that matters.
+STAGEDIR="$TMP/staged-blob"
+mkdir -p "$STAGEDIR"
+(
+  cd "$STAGEDIR"
+  git init -q .
+  git config user.email t@example.com
+  git config user.name t
+  printf 'id=%s\n' "$AWS_FIXTURE_KEY" > secret.txt
+  git add secret.txt
+  printf 'id=REDACTED\n' > secret.txt   # working tree now clean, blob is not
+) >/dev/null 2>&1
+run_status out st sh -c "cd '$STAGEDIR' && python3 '$SECSCAN' --staged --quiet"
+if [ "$st" = "1" ]; then
+  pass "AC1: --staged blocks on the staged blob after the working tree was cleaned"
+else
+  fail "AC1: --staged missed a secret in the staged blob (exit $st) — it scanned the working tree"
+fi
 
-# Same rule for gi-branch: an issue title is written by whoever filed the issue,
-# so it must never be interpolated into a shell word. Reproduced as arbitrary
-# code execution before this was fixed.
-b_injected=0
-while IFS= read -r hit; do
-  case "$hit" in
-    *--title*|*--prefix*)
-      fail "AC4: gi-branch call site interpolates untrusted text: $hit"
-      b_injected=1 ;;
-  esac
-done < <(grep -rhn --include='*.md' "python3 .*gi-branch\.py" \
-           "$REPO_ROOT/src/skills" "$REPO_ROOT/src/shared/agents" "$REPO_ROOT/docs")
-[ "$b_injected" -eq 0 ] && pass "AC4: no gi-branch call site puts an issue title on the command line"
+# The converse must hold too, or the gate blocks on bytes nobody is committing.
+CONVERSE="$TMP/staged-converse"
+mkdir -p "$CONVERSE"
+(
+  cd "$CONVERSE"
+  git init -q .
+  git config user.email t@example.com
+  git config user.name t
+  printf 'id=clean\n' > f.txt
+  git add f.txt
+  printf 'id=%s\n' "$AWS_FIXTURE_KEY" > f.txt   # unstaged edit, not being committed
+) >/dev/null 2>&1
+run_status out st sh -c "cd '$CONVERSE' && python3 '$SECSCAN' --staged --quiet"
+if [ "$st" != "1" ]; then
+  pass "AC1: --staged ignores an unstaged edit that is not being committed"
+else
+  fail "AC1: --staged blocked on working-tree bytes that are not staged"
+fi
+run_status out st sh -c "cd '$CONVERSE' && python3 '$SECSCAN' --working-tree --quiet"
+[ "$st" = "1" ] && pass "AC1: --working-tree still blocks on the file on disk" \
+                || fail "AC1: --working-tree missed a secret on disk (exit $st)"
+
+# A staged deletion has no blob to read; it must not crash or be misreported.
+DELDIR="$TMP/staged-delete"
+mkdir -p "$DELDIR"
+(
+  cd "$DELDIR"
+  git init -q .
+  git config user.email t@example.com
+  git config user.name t
+  echo hello > a.txt
+  git add a.txt
+  git commit -qm init
+  git rm -q a.txt
+) >/dev/null 2>&1
+run_status out st sh -c "cd '$DELDIR' && python3 '$SECSCAN' --staged --quiet"
+[ "$st" = "0" ] || [ "$st" = "1" ] && pass "AC1: a staged deletion scans without error" \
+                                   || fail "AC1: a staged deletion exited $st"
+
+# --- Call-site injection lint (all seven shared scripts) ---------------------
+#
+# Two command injections shipped in this branch one review cycle apart, both of
+# the same shape: an untrusted value pasted into a shell word on a script's
+# command line. A blocklist of the flag names those two used would not have
+# caught either one before it was written, so this lint is an ALLOWLIST instead:
+# every `{placeholder}` that appears on a shared-script command line must be
+# named below, with a reason it cannot carry attacker text. A new placeholder
+# fails until someone adds it here and states why — that is what makes the class
+# closed by construction rather than patched twice.
+#
+# `$var` expansions are not listed: a double-quoted shell parameter expansion is
+# never re-parsed, so it is inert whatever it holds. The lint requires the quotes.
+#
+# Logical lines are joined across `\` continuations first: the flag that carries
+# the injection is often on the line after the command.
+python3 - "$REPO_ROOT" <<'PY' > "$TMP/injection-report"
+import pathlib, re, sys
+
+root = pathlib.Path(sys.argv[1])
+ROOTS = ["src/skills", "src/internal-skills", "src/shared/agents", "docs"]
+CALL = re.compile(r"(?:python3|python)\s+\S*gi-[a-z0-9-]+\.py")
+
+# Placeholders permitted on a shared-script command line, and why each is safe.
+ALLOWED = {
+    "{N}": "issue/PR number — an integer",
+    "{n}": "issue/PR number — an integer",
+    "{issue_number}": "integer",
+    "{pr_number}": "integer",
+    "{linked_issue}": "integer",
+    "{parent}": "integer",
+    "{run_id}": "CI run id — an integer from the GitHub API",
+    "{type}": "one of six literals the skill classifies, never free text",
+    "{base}": "locally derived from `git rev-parse`, not repo content",
+    "{secscan_script}": "absolute path bound by the orchestrating skill",
+    "{review.ci_poll_interval}": "gi-config validates it against an int default",
+    "{review.ci_timeout}": "gi-config validates it against an int default",
+    "{security_convention}": "bundled doc path bound by the orchestrating skill",
+}
+PLACEHOLDER = re.compile(r"\{[^{}\s][^{}]*\}")
+VAR = re.compile(r"\$\{?[A-Za-z_][A-Za-z0-9_]*\}?")
+DQUOTED = re.compile(r'"[^"]*"')
+
+def regions(path: pathlib.Path):
+    """Yield (line_no, command_text) for every shared-script invocation."""
+    lines = path.read_text(encoding="utf-8").splitlines()
+    fenced = False
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        if line.lstrip().startswith("```"):
+            fenced = not fenced
+            i += 1
+            continue
+        joined, j = line, i
+        while joined.rstrip().endswith("\\") and j + 1 < len(lines):
+            j += 1
+            joined = joined.rstrip()[:-1] + " " + lines[j]
+        if fenced:
+            if CALL.search(joined):
+                yield i + 1, joined
+        else:
+            # Outside a fence, only the inline-code spans are commands; the
+            # surrounding prose legitimately contains braces.
+            for span in re.findall(r"`([^`]+)`", joined):
+                if CALL.search(span):
+                    yield i + 1, span
+        i = j + 1
+
+bad = []
+checked = 0
+scripts = set()
+for rel in ROOTS:
+    for path in sorted((root / rel).rglob("*.md")):
+        for lineno, cmd in regions(path):
+            checked += 1
+            for m in CALL.finditer(cmd):
+                scripts.add(m.group(0).rsplit("/", 1)[-1])
+            rp = path.relative_to(root)
+            for token in PLACEHOLDER.findall(cmd):
+                if token not in ALLOWED:
+                    bad.append(
+                        f"{rp}:{lineno}: {token} is interpolated into a "
+                        f"shared-script command line and is not on the "
+                        f"reviewed allowlist"
+                    )
+            # A parameter expansion inside double quotes is inert whatever it
+            # holds; an unquoted one word-splits and globs. Blank out every
+            # double-quoted region, then anything left is unquoted.
+            unquoted = DQUOTED.sub(lambda m: " " * len(m.group(0)), cmd)
+            for token in VAR.findall(unquoted):
+                bad.append(
+                    f"{rp}:{lineno}: {token} is unquoted on a shared-script "
+                    f"command line"
+                )
+
+if checked == 0:
+    print("FAIL|AC1: the call-site injection lint found no invocations to check")
+elif bad:
+    for entry in bad:
+        print(f"FAIL|AC1: {entry}")
+else:
+    print(
+        f"PASS|AC1: no untrusted value is interpolated at any of the {checked} "
+        f"shared-script call sites ({len(scripts)} scripts)"
+    )
+PY
+while IFS='|' read -r verdict label; do
+  [ -n "$verdict" ] || continue
+  if [ "$verdict" = "PASS" ]; then pass "$label"; else fail "$label"; fi
+done < "$TMP/injection-report"
 
 # And the derivation sites must actually use the safe form.
 if grep -q -- "--from-issue" "$SKILLS/issue-resolver/SKILL.md"; then
