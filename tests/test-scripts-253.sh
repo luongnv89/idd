@@ -709,6 +709,58 @@ else
   fail "AC4: a junk --install payload exits 3 without clobbering (got $st)"
 fi
 
+# ── A shape-valid but IMPOSSIBLE date in the fetched payload ────────────────
+# `2026-02-30` matches `^\d{4}-\d{2}-\d{2}` and is not a date. The payload is
+# fetched web content, so an attacker who controls the fetched bytes picks it.
+# Three separate things must hold, and each one failed before this guard:
+#   1. exit 3, not a bare 1 — no call site classifies 1, so an exit-1 traceback
+#      leaves the agent with no documented instruction at all.
+#   2. the good cache survives, which is what the --install call site in
+#      references/model-suggestion.md promises ("the old cache is untouched").
+#   3. the *next* ordinary run still works. Writing the poison first bricked
+#      the cache permanently: every later run re-read it and re-crashed, and
+#      the script deliberately never reseeds over a cache it cannot read.
+SK5="$TMP/skill5"
+new_skill_dir "$SK5"
+python3 "$MODEL" --skill-dir "$SK5" --no-config --now 2026-06-14 >/dev/null
+python3 -c '
+import json, sys
+d = json.load(open(sys.argv[1]))
+d["last_fetched"] = "2026-02-30T00:00:00Z"
+json.dump(d, open(sys.argv[2], "w"))
+' "$SEED_SRC" "$TMP/impossible-date.json"
+run_status out st python3 "$MODEL" --skill-dir "$SK5" --no-config \
+  --install "$TMP/impossible-date.json"
+[ "$st" = "3" ] && pass "AC4: an impossible last_fetched date in --install exits 3, not 1" \
+                || fail "AC4: an impossible --install date exits 3 (got $st)"
+if [ -f "$SK5/model-data-2026-06-12.json" ] \
+   && [ ! -f "$SK5/model-data-2026-02-30.json" ]; then
+  pass "AC4: an impossible --install date leaves the existing cache untouched"
+else
+  fail "AC4: an impossible --install date clobbered the cache ($(ls "$SK5"))"
+fi
+run_status out st python3 "$MODEL" --skill-dir "$SK5" --no-config --now 2026-06-14
+[ "$st" = "0" ] && pass "AC4: the run after a rejected --install date still succeeds" \
+                || fail "AC4: a rejected --install date bricked the cache (got $st)"
+
+# The same impossible date already sitting in a cache degrades (4), never 1.
+SK6="$TMP/skill6"
+new_skill_dir "$SK6"
+python3 -c '
+import json, sys
+d = json.load(open(sys.argv[1]))
+d["last_fetched"] = "2026-02-30T00:00:00Z"
+json.dump(d, open(sys.argv[2], "w"))
+' "$SEED_SRC" "$SK6/model-data-2026-02-30.json"
+run_status out st python3 "$MODEL" --skill-dir "$SK6" --no-config --now 2026-06-14
+[ "$st" = "4" ] && pass "AC4: an impossible date in an existing cache exits 4, not 1" \
+                || fail "AC4: an impossible cached date exits 4 (got $st)"
+
+# And the same shape on the flag that supplies "today".
+run_status out st python3 "$MODEL" --skill-dir "$SK1" --no-config --now 2026-02-30
+[ "$st" = "3" ] && pass "AC4: an impossible --now date exits 3, not 1" \
+                || fail "AC4: an impossible --now date exits 3 (got $st)"
+
 run_status out st python3 "$MODEL" --skill-dir "$TMP/no-such-skill-dir" --no-config
 [ "$st" = "3" ] && pass "AC4: a non-directory --skill-dir exits 3" \
                 || fail "AC4: a non-directory --skill-dir exits 3 (got $st)"

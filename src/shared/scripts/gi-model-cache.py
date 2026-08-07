@@ -191,10 +191,26 @@ def last_fetched_date(payload: dict, label: str) -> str:
     raw = payload.get("last_fetched")
     if not isinstance(raw, str) or len(raw) < 10 or not re.match(r"^\d{4}-\d{2}-\d{2}", raw):
         raise Unavailable(f"the {label} has no usable last_fetched timestamp")
-    return raw[:10]
+    day = raw[:10]
+    try:
+        parse_day(day)
+    except ValueError as exc:
+        # `2026-02-30` matches the shape and is not a date. It has to be
+        # rejected here, because the `age_days` subtraction in main() runs
+        # *outside* the exit-code guard and would exit 1 over it — a code no
+        # call site classifies.
+        raise Unavailable(
+            f"the {label} has an impossible last_fetched date ({day})"
+        ) from exc
+    return day
 
 
 def parse_day(text: str) -> dt.date:
+    """Parse the `YYYY-MM-DD` prefix of `text`.
+
+    Raises ValueError on a shape-valid but impossible date. Every caller turns
+    that into the exit code its own path documents; letting it escape exits 1.
+    """
     return dt.date(int(text[0:4]), int(text[5:7]), int(text[8:10]))
 
 
@@ -288,8 +304,21 @@ def read_install_payload(source: str) -> dict:
         raise InvalidInput(f"--install payload is not valid JSON — {exc}") from exc
     if not isinstance(loaded, dict) or "complexity_mapping" not in loaded:
         raise InvalidInput("--install payload is not a model-data document")
-    if not isinstance(loaded.get("last_fetched"), str):
+    raw = loaded.get("last_fetched")
+    if not isinstance(raw, str):
         raise InvalidInput("--install payload has no last_fetched timestamp")
+    # The payload is fetched web content. Its date names the cache file and is
+    # subtracted from today's date, so it is validated *here* — before
+    # write_cache() prunes the existing cache — to keep the documented
+    # "exit 3 … the old cache is untouched" contract true for a bad date too.
+    if len(raw) < 10 or not re.match(r"^\d{4}-\d{2}-\d{2}", raw):
+        raise InvalidInput("--install payload has no usable last_fetched timestamp")
+    try:
+        parse_day(raw[:10])
+    except ValueError as exc:
+        raise InvalidInput(
+            f"--install payload's last_fetched is not a real date ({raw[:10]})"
+        ) from exc
     return loaded
 
 
@@ -333,7 +362,12 @@ def main(argv: list[str] | None = None) -> int:
         if args.now:
             if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", args.now):
                 raise InvalidInput(f"--now must be YYYY-MM-DD, got {args.now!r}")
-            today = parse_day(args.now)
+            try:
+                today = parse_day(args.now)
+            except ValueError as exc:
+                raise InvalidInput(
+                    f"--now is not a real calendar date: {args.now}"
+                ) from exc
         else:
             today = dt.datetime.now(dt.timezone.utc).date()
 
