@@ -1,7 +1,7 @@
 <!-- Generated from /docs/config-schema.md. Do not edit. Edit source and run ./scripts/build.sh. -->
 # `.gitissue.yml` Configuration Schema
 
-> **Per-skill excerpt (generated).** Only the configuration sections this skill reads are reproduced here: `platform`, `review`. The complete schema — every section and the full defaults table — is at [config-schema.md](https://github.com/luongnv89/idd/blob/main/docs/config-schema.md).
+> **Per-skill excerpt (generated).** Only the configuration sections this skill reads are reproduced here: `platform`, `review`, `security`. The complete schema — every section and the full defaults table — is at [config-schema.md](https://github.com/luongnv89/idd/blob/main/docs/config-schema.md).
 
 gitissue works with zero configuration — all settings have sensible defaults. When no `.gitissue.yml` file exists, the first-run hint is shown:
 
@@ -183,6 +183,38 @@ review:
     # Note: when enabled it still skips (fail-soft to code-only) if no app is
     #       running/reachable or capture is unsafe — it never blocks code review.
     browser_review: "ask"
+
+# Pre-commit security scan settings (used by every skill that commits or pushes)
+# The built-in rules always apply; these keys only *extend* them. There is no
+# key that disables a rule — a scan a repository can switch off is not a gate.
+# The rules themselves live in the pre-commit security conventions reference.
+security:
+  # Extra regex ORed onto the built-in secret-bearing *filename* pattern
+  # Type: string (a Python regex; empty means built-ins only)
+  # Default: ""
+  # Example: "(^|/)service-account\\.json$"
+  extra_secret_file_pattern: ""
+
+  # Extra regex ORed onto the built-in real-API-key *value* pattern
+  # Type: string (a Python regex; empty means built-ins only)
+  # Default: ""
+  # Prefer prefix + length over identifier + value — the latter false-positives
+  # on docstrings and tests, which is how a scan gets disabled in practice
+  # Example: "acme_live_[A-Za-z0-9]{24,}"
+  extra_secret_value_pattern: ""
+
+  # Paths matching this regex are skipped entirely (fixtures, golden files)
+  # Type: string (a Python regex; empty means scan everything)
+  # Default: ""
+  # Every path it excludes is a path no rule can block — keep it narrow
+  # Example: "^tests/fixtures/"
+  allow_pattern: ""
+
+  # Warn (never block) when a scanned file exceeds this size, in megabytes
+  # Type: integer
+  # Default: 10
+  # Minimum: 1
+  max_file_size_mb: 10
 ```
 
 ## `.gitissue/` Directory
@@ -251,3 +283,7 @@ Config is validated on load at the start of every skill invocation. Errors inclu
 | `review.traceability_exempt_labels` | `["refactor", "chore"]` | PR labels that exempt a PR from the `Closes #N` hard-fail (check 1 only; other three checks still run) |
 | `review.traceability_exempt_pattern` | `"^\\s*Type:\\s*(refactor\|chore)\\s*$"` | Regex (multiline, case-insensitive) matched against PR body for exemption from check 1 |
 | `review.ui_review.browser_review` | `"ask"` | Browser (screenshot) UI review mode; code UI review is auto-detected and always runs |
+| `security.extra_secret_file_pattern` | `""` | Extra regex ORed onto the built-in secret-bearing filename pattern |
+| `security.extra_secret_value_pattern` | `""` | Extra regex ORed onto the built-in real-API-key value pattern |
+| `security.allow_pattern` | `""` | Paths matching this regex are skipped entirely — every exclusion is a path no rule can block |
+| `security.max_file_size_mb` | `10` | Warn (never block) above this file size without Git LFS |

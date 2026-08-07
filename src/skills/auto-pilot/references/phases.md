@@ -400,6 +400,8 @@ Before merging, verify:
 gh pr view {pr_number} --json mergeable,reviewDecision,statusCheckRollup
 ```
 
+When checks are still pending, do not read `statusCheckRollup` in a loop — run `python3 references/scripts/gi-ci-wait.py {pr_number} --interval {review.ci_poll_interval} --timeout {review.ci_timeout}` once and read its `verdict` (`pass` merges; `fail` and `pending` leave the PR open). Exit 4 or a missing `python3` degrades to the manual poll, which reaches the **same two outcomes** — all-green merges, a timeout leaves the PR open. See `references/examples.md` (*Merge requires CI checks*).
+
 If not mergeable:
 ```
 ⚠ PR #{pr_number} is not mergeable
@@ -416,7 +418,7 @@ If `autopilot.respect_dependencies` is `true` (default), check whether the origi
 
 #### Parse dependency markers
 
-Fetch the issue body (already cached from Phase 1's triage call to `gh issue list ... --json body`, or re-fetch with `gh issue view N --json body` if running in explicit-list mode) and extract every `Depends on #N` and `Blocked by #N` reference. The match is case-insensitive and tolerates list/sentence/colon shapes:
+Fetch the issue body (already cached from Phase 1's triage call to `gh issue list ... --json body`, or re-fetch with `python3 shared/scripts/gi-issue.py N --fields body` — reading `.issue.body`, degrading to `gh issue view N --json body` on exit 4 or no `python3` — if running in explicit-list mode) and extract every `Depends on #N` and `Blocked by #N` reference. The match is case-insensitive and tolerates list/sentence/colon shapes:
 
 ```
 - Depends on #12
@@ -443,8 +445,11 @@ Run `printf '%s' "$issue_body" | python3 shared/scripts/gi-deps.py` — it print
 For each captured `#N`, ask GitHub: "is this issue closed by a merged PR?" GitHub's GraphQL exposes the linked-PR set directly via `closedByPullRequestsReferences` on the Issue type, which `gh issue view` surfaces:
 
 ```bash
-gh issue view N --json number,state,title,closedByPullRequestsReferences
+python3 references/scripts/gi-issue.py N \
+  --fields number,state,title,closedByPullRequestsReferences
 ```
+
+Read `.issue` from the envelope. Each dependency is checked once per merge gate and often again on a later iteration, so the cache absorbs the repeats. Exit 3 is a stop; exit 4, or no `python3`, degrades to `gh issue view N --json number,state,title,closedByPullRequestsReferences`. **A dependency PR merged during this session invalidates the entry** — pass `--refresh` after any merge in this run.
 
 The `closedByPullRequestsReferences.nodes[]` array contains every PR that closes (or would close) issue #N, each with `number`, `state` (`OPEN` / `CLOSED` / `MERGED`), and `url`. This is the authoritative answer — no need to grep PR bodies for `Closes #N`.
 

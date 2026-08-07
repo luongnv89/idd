@@ -276,13 +276,16 @@ Note: the `/issue-pr-review --auto --no-merge` subagent handled the full review-
   Waiting for checks to complete... (timeout: 600s)
 ```
 
-Wait up to `review.ci_timeout` seconds for CI checks. Poll every 30 seconds:
+Wait for CI checks in one call, at `review.ci_poll_interval` up to `review.ci_timeout`:
 
 ```bash
-gh pr view {pr_number} --json statusCheckRollup --jq '.statusCheckRollup[] | select(.status != "COMPLETED")'
+python3 references/scripts/gi-ci-wait.py {pr_number} \
+  --interval {review.ci_poll_interval} --timeout {review.ci_timeout}
 ```
 
-If all checks pass within the timeout, proceed with merge. If timeout:
+Read `verdict`: `pass` proceeds with the merge; `fail` and `pending` both leave the PR open. Exit 3 is a stop; a missing `python3` or exit 4 degrades to polling by hand every `review.ci_poll_interval` seconds with `gh pr view {pr_number} --json statusCheckRollup --jq '.statusCheckRollup[] | select(.status != "COMPLETED")'`.
+
+**The degraded path reaches the same two outcomes, not fewer.** If all checks pass within the timeout, proceed with the merge exactly as `verdict: pass` would — degrading means running the procedure by hand, never declining to act on its result. If timeout:
 ```
 ⚠ CI checks did not complete within {timeout}s — PR left open
   Continuing to next issue...

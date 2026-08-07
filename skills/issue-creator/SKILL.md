@@ -146,6 +146,7 @@ Check these files:
 - `references/docs/auto-mode.md` — auto-mode detection and the non-interactive gate rule
 - `references/docs/terminal-style.md` — terminal output style contract (symbols, output structure, table/error formats)
 - `references/scripts/gi-config.py` — config resolver: merges the documented defaults with `.gitissue.yml` and prints one JSON line
+- `references/scripts/gi-issue.py` — TTL-cached issue fetcher for Normalize mode's repeat reads
 
 ---
 

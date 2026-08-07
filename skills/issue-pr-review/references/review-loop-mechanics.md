@@ -17,7 +17,8 @@ already fetched in Step 1 and takes the **fuller** of any inputs that disagree:
 - **Diff size / files-changed** (`gh pr view {N} --json files`) — small change
   (≈ ≤ 15 changed lines in 1 file) leans `light`.
 - **Linked-issue `Effort` band** — when the PR body has `Closes #N`, read that
-  issue's `## Metadata` `Effort` (`gh issue view {N} --json body`); `XS`/`S`
+  issue's `## Metadata` `Effort` (`python3 references/scripts/gi-issue.py {N} --fields body`,
+  reading `.issue.body`; degrade to `gh issue view {N} --json body`); `XS`/`S`
   asserted leans `light`, `M`/`L`/`XL` or low-confidence leans `full`.
 - **Security label** — any `security`/`CVE`/`vulnerability` label forces `full`.
 
@@ -114,7 +115,8 @@ Delegate fixes to the fixer subagent instead of applying code changes in the mai
 - `findings_json`: all blocking findings from reviewer, acceptance-criteria checks, traceability checks, tests, and CI
 - `test_output`: trimmed relevant failure output from Steps 4-5
 - `commit_message`: `fix({scope}): address review feedback` (append `(#{linked_issue})` only if a linked issue exists)
-- `security_convention`: `references/docs/pre-commit-security.md` — the bundled pre-commit security scan the fixer MUST run before committing
+- `security_convention`: `references/docs/pre-commit-security.md` — the bundled pre-commit security contract, and the fallback procedure when the script cannot run
+- `secscan_script`: `references/scripts/gi-secscan.py` — the bundled script that implements it, and what the fixer MUST run before committing. Only the path is passed; the script reads `security.*` from `.gitissue.yml` itself, so no repo-controlled config value reaches a command line. This and `security_convention` are spawn *variables* rather than references inside `fixer.md`, because an emitted agent prompt renders its own references as absolute repo URLs and so cannot name a path inside this skill's bundle
 
 ```python
 Agent(
@@ -124,4 +126,4 @@ Agent(
 )
 ```
 
-The fixer subagent reads affected files, applies targeted changes, stages specific files, runs relevant verification, and — before committing — runs the mandatory pre-commit security scan from `references/docs/pre-commit-security.md` against the staged set (real secrets block the commit). It then commits any changes. The main agent only collects the fixer's JSON result and pushes if changes were committed. If the fixer cannot resolve all blocking findings, keep the remaining items for the next loop/report. After the fixer returns with one or more commits, push: `git push origin {branch_name}`.
+The fixer subagent reads affected files, applies targeted changes, stages specific files, runs relevant verification, and — before committing — runs the mandatory pre-commit security scan against the staged set — `references/scripts/gi-secscan.py`, whose exit 1 is a block that stops the commit, degrading to the Primary Pattern in `references/docs/pre-commit-security.md` only when the script cannot run (real secrets block the commit either way). It then commits any changes. The main agent only collects the fixer's JSON result and pushes if changes were committed. If the fixer cannot resolve all blocking findings, keep the remaining items for the next loop/report. After the fixer returns with one or more commits, push: `git push origin {branch_name}`.

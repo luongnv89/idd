@@ -189,6 +189,7 @@ Check these files:
 - `references/docs/agent-model-effort.md` — per-agent model and reasoning-effort mapping
 - `references/docs/terminal-style.md` — terminal output style contract (symbols, output structure, table/error formats)
 - `references/scripts/gi-config.py` — config resolver: merges the documented defaults with `.gitissue.yml` and prints one JSON line
+- `references/scripts/gi-issue.py` — TTL-cached issue fetcher used by Step 1
 
 The steps below describe the subagent delegation path; the inline fallback lives in `references/inline-fallback.md`.
 
@@ -219,8 +220,11 @@ Each step prints a new line when it starts (with `●`) and updates to `✓` on 
 ```
 
 ```bash
-gh issue view {N} --json number,title,body,labels,assignees,state,comments,createdAt,updatedAt,author
+python3 references/scripts/gi-issue.py {N} \
+  --fields number,title,body,labels,assignees,state,comments,createdAt,updatedAt,author
 ```
+
+Read `.issue` from the JSON envelope. The field list is this skill's choice — the widest of any skill, because analysis reads the whole issue. Exit 3 (a malformed argument) is a stop. Exit 4, or no `python3`, degrades to `gh issue view {N} --json number,title,body,labels,assignees,state,comments,createdAt,updatedAt,author`; the cache is an optimization, never a dependency.
 
 **If not found:**
 ```

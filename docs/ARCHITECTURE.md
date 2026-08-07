@@ -189,6 +189,10 @@ A handful of jobs are worse as prose than as code: restating the same config def
 | `gi-config.py` | Derive the documented defaults from `config-schema.md`, validate and merge `.gitissue.yml`, print one JSON line | auto-pilot, issue-analysis, issue-creator, issue-pr-review, issue-resolver, issue-triage |
 | `gi-runlog.py` | Validate, normalize, and append (or `--echo`) one `.gitissue/runs.jsonl` record | issue-resolver, auto-pilot |
 | `gi-deps.py` | Extract local dependency issue numbers from an issue body, ignoring cross-repo refs | auto-pilot |
+| `gi-secscan.py` | Apply the five pre-commit security rules to a path set and print one JSON verdict (`clean`/`warn`/`block`) | issue-pr-review, issue-resolver |
+| `gi-ci-wait.py` | Poll a PR's CI checks to a settled verdict inside one invocation | auto-pilot, issue-pr-review |
+| `gi-issue.py` | Serve repeat `gh issue view` reads from a TTL cache keyed by issue *and* field set | auto-pilot, issue-analysis, issue-creator, issue-pr-review, issue-resolver |
+| `gi-branch.py` | Derive a branch name from an issue number, title, and type, and self-check it against the branch grammar | issue-resolver |
 
 **Closure kind.** `SHARED_SCRIPT_RE` matches the bare token `shared/scripts/<name>.py` in a skill's own files (and in any runtime doc reachable from them). The matched name resolves against `src/shared/scripts/`; the file is copied with `shutil.copy2` so the committed `0755` mode survives into the install package. Scripts are **leaves** — the build never scans a `.py` body for further references, so a comment can't drag a document into a bundle. Discovery is regex plus filesystem, which means adding a script needs no `build.py` change. The token is directory-scoped (`shared/scripts/`, not a bare `scripts/`) because a bare form collides with the prose mentions of this repo's own `scripts/` directory that already sit inside the closure read set.
 
@@ -205,12 +209,12 @@ Because agent prompts render absolute URLs, a script reached **only** through a 
 
 **`gi-requires`.** A script may declare a bundled file it reads at run time with a `# gi-requires: references/…` header. The build resolves each declaration against the same skill's bundle and fails if it is missing — `gi-config.py` declares `references/docs/config-schema.md`, which is why it derives its defaults instead of hard-coding them.
 
-**Exit-code vocabulary.** Shared across all three scripts: `0` ok · `2` usage error · `3` invalid input, caller should stop · `4` cannot complete, caller should degrade.
+**Exit-code vocabulary.** Shared across every script: `0` ok · `2` usage error · `3` invalid input, caller should stop · `4` cannot complete, caller should degrade. Code `1` is reserved for a script-specific *verdict* — an answer, not a failure. `gi-secscan.py` is the only user: `1` means a real secret was found and the commit must stop. Because the default reading of a non-zero exit is "degrade", a script claiming `1` must say so in its docstring and at every call site — degrading past a block would invert the one check the gate exists for.
 
 **Fatal vs. degrade.** The two failure modes are deliberately not the same:
 
 - **File absent from the bundle → fatal.** Each skill's *Bundled dependency precheck* list names every script it ships, and the build fails in both directions if that list and the real bundle disagree. A missing file therefore means a broken or partial install, not a normal condition — the skill stops with `✗ Missing bundled dependency`.
-- **Runtime failure → degrade.** No `python3`, a non-zero exit other than 3, or unparsable stdout is an environment problem. The skill prints a `⚠` line and follows the prose procedure it keeps beside every invocation — the inline defaults table for `gi-config`, the `mkdir -p` + append for `gi-runlog`, the hand-applied strip/capture steps for `gi-deps`. Exit 3 is the exception: it reports invalid *user* input (a malformed `.gitissue.yml`, a malformed record), so the skill stops rather than degrading.
+- **Runtime failure → degrade.** No `python3`, a non-zero exit other than 3, or unparsable stdout is an environment problem. The skill prints a `⚠` line and follows the prose procedure it keeps beside every invocation — the inline defaults table for `gi-config`, the `mkdir -p` + append for `gi-runlog`, the hand-applied strip/capture steps for `gi-deps`, the Primary Pattern for `gi-secscan`, the manual `gh pr checks` loop for `gi-ci-wait`, a plain `gh issue view` for `gi-issue`, the six derivation steps for `gi-branch`. Exit 3 is the exception: it reports invalid *user* input (a malformed `.gitissue.yml`, a malformed record), so the skill stops rather than degrading — as does `gi-secscan`'s verdict code 1.
 
 Every script is stdlib-only and answers `--help` with exit 0, so a skill can probe for a working interpreter before committing to the fast path.
 

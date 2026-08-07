@@ -171,3 +171,24 @@ model_suggestion:
 
   # Days before cached model data is considered stale
   cache_ttl_days: 7
+
+# Pre-commit security scan settings (every skill that commits or pushes)
+# The built-in rules always apply; these keys only extend them. There is no key
+# that disables a rule — a scan a repository can switch off is not a gate.
+security:
+  # Extra regex ORed onto the built-in secret-bearing filename pattern
+  # Example: "(^|/)service-account\\.json$"
+  extra_secret_file_pattern: ""
+
+  # Extra regex ORed onto the built-in real-API-key value pattern
+  # Prefer prefix + length over identifier + value
+  # Example: "acme_live_[A-Za-z0-9]{24,}"
+  extra_secret_value_pattern: ""
+
+  # Paths matching this regex are skipped entirely (fixtures, golden files)
+  # Every path it excludes is a path no rule can block — keep it narrow
+  # Example: "^tests/fixtures/"
+  allow_pattern: ""
+
+  # Warn (never block) when a scanned file exceeds this size, in megabytes
+  max_file_size_mb: 10

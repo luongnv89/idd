@@ -57,6 +57,9 @@ references/docs/agent-model-effort.md
 references/docs/terminal-style.md
 references/docs/ui-review.md
 references/scripts/gi-config.py
+references/scripts/gi-secscan.py
+references/scripts/gi-ci-wait.py
+references/scripts/gi-issue.py
 ```
 
 
@@ -190,7 +193,9 @@ ballooned still earns full review):
   (`gh pr view {N} --json files`). Small (e.g. ≤ ~15 changed lines across 1 file)
   leans `light`; larger leans `full`.
 - **Linked-issue `Effort` band** — when the PR links an issue (`Closes #N`), fetch
-  its `## Metadata` `Effort` (`gh issue view {N} --json body`). `XS`/`S` asserted
+  its `## Metadata` `Effort` (`python3 references/scripts/gi-issue.py {N} --fields body`,
+  reading `.issue.body`; on exit 4 or no `python3`, `gh issue view {N} --json body`).
+  Step 3 reads the same issue again and the cache serves it. `XS`/`S` asserted
   leans `light`; `M`/`L`/`XL`, or low-confidence, leans `full`.
 - **Labels** — a `security`/`CVE`/`vulnerability` label (case-insensitive) forces
   `full` regardless of size (security-sensitive changes always get full review).
@@ -222,15 +227,35 @@ Before spawning any LLM reviewer, run deterministic tools to catch mechanical is
 
 ### Commit auto-fixes
 
-**Skip entirely when `--review-only`.** Otherwise, if any files were modified by the auto-fix tools, you MUST run the pre-commit
-security scan before staging — the authoritative **Primary Pattern** in
-`references/docs/pre-commit-security.md` (block on real secrets, warn on large files /
-build artifacts / protected branches). Run that exact pattern against the
-working tree; do not improvise a weaker check. In auto mode, export
-`IDD_AUTO_MODE=1` first so the scan logs-and-continues on warnings instead of
-prompting. Only after the scan passes (or warnings are accepted), commit and
-push (`git add -A` → `git commit -m "style: auto-fix lint and format issues"`
-→ `git push origin {branch_name}`).
+**Skip entirely when `--review-only`.** Otherwise, if any files were modified by
+the auto-fix tools, you MUST scan before staging — blocking on real secrets and
+warning on large files / build artifacts / protected branches. In auto mode,
+export `IDD_AUTO_MODE=1` first so warnings are logged rather than needing
+confirmation. Run:
+
+```bash
+python3 references/scripts/gi-secscan.py --working-tree
+```
+
+Run it from the repo root: it finds `.gitissue.yml` there and applies this
+repo's `security.allow_pattern`, `security.extra_secret_file_pattern`,
+`security.extra_secret_value_pattern`, and `security.max_file_size_mb` by
+reading them itself. **Never interpolate a config value into this command.**
+This skill runs with a pull request's branch checked out, so `.gitissue.yml` is
+attacker-controlled; a value pasted into a shell word can close its quote and
+append a command that runs on the reviewer's machine.
+
+**Exit 1 is the block verdict — stop, do not stage, do not push, and report the
+path from `blocking[]`.** It is not the degrade path: falling through to another
+scan after a real secret is the one outcome this gate exists to prevent. Exit 3
+(an uncompilable `security.*` regex) is also a stop. Only a missing `python3` or
+exit 4 degrades — print `⚠ gi-secscan unavailable — running the documented scan`
+and run the authoritative **Primary Pattern** in `references/docs/pre-commit-security.md`
+against the working tree instead. Do not improvise a weaker check.
+
+Only after the scan passes (or warnings are accepted), commit and push (`git add
+-A` → `git commit -m "style: auto-fix lint and format issues"` → `git push
+origin {branch_name}`).
 
 ```
 [2/7] Pre-pass     ✓ lint clean, format clean, {N} tests passed
@@ -263,7 +288,7 @@ UI review is **auto-detected per PR** — no config flag enables it. The skill s
 
 The shared mechanics — detection commands, the code-review spawn, the report-only display-environment label (`ui_env`), the browser-review gate + three-part capability check, and the headless capture call — live in `references/docs/ui-review.md`. This skill's own deltas — the PR diff command, the variables it passes, the interactive proposal prompt, and cycle-reuse `SendMessage` — are in `references/ui-review-mechanics.md`. **Read both and apply them** when `ui: detected`; together they preserve the contract above and route `action: "fix"` UI findings into Step 6 under `category: ui_ux`.
 
-Also fetch the linked issue for acceptance-criteria verification: `gh issue view {linked_issue} --json number,title,body,labels`.
+Also fetch the linked issue for acceptance-criteria verification: `python3 references/scripts/gi-issue.py {linked_issue} --fields number,title,body,labels`, reading `.issue`. Step 1's depth gate already read this issue, so the cache usually answers without a second network call. Exit 3 is a stop; exit 4 or no `python3` degrades to `gh issue view {linked_issue} --json number,title,body,labels`.
 
 ```
 [3/7] Review       ✓ spec[ac:pass correctness:pass safety:pass]
@@ -316,7 +341,7 @@ Or if failures:
 
 When `review.check_ci` is false, skip polling and report `○ CI skipped (review.check_ci: false)`; the soft-pass conjunction treats the CI leg as satisfied (same pattern as disabled AC/traceability checks).
 
-When true, poll GitHub Actions / CI status for the PR (`gh pr checks {N} --json name,state,bucket`): check immediately after tests, then poll every `review.ci_poll_interval` seconds until `review.ci_timeout`. On failure, extract details with `gh run view {run_id} --log-failed`. The polling and failure-extraction detail is in `references/prepass-tests-ci-mechanics.md` (*Step 5*).
+When true, run the whole wait in one call — `python3 references/scripts/gi-ci-wait.py {N} --interval {review.ci_poll_interval} --timeout {review.ci_timeout}` — and read `verdict` from its JSON (`pass` / `fail` / `pending` / `none`). One invocation replaces the poll loop, so a ten-minute wait costs one tool call instead of one per poll. Exit 3 (a malformed argument) is a stop. Exit 4, or no `python3`, degrades to polling by hand: `gh pr checks {N} --json name,state,bucket` immediately after tests, then every `review.ci_poll_interval` seconds until `review.ci_timeout`. Either way, on `fail` extract details with `gh run view {run_id} --log-failed`. The manual polling and failure-extraction detail is in `references/prepass-tests-ci-mechanics.md` (*Step 5*).
 
 **All checks passed:**
 ```
@@ -357,7 +382,7 @@ Exit the **fix loop** only. Soft-pass is **not** implied — evaluate it next pe
 
 ### If fixable issues found
 
-Delegate fixes to the fixer subagent (`references/agents/fixer.md`) — never apply code changes in the main skill context — reusing the same fixer across cycles when possible. The fixer reads affected files, applies targeted changes, runs the mandatory pre-commit security scan from `references/docs/pre-commit-security.md` against the staged set (real secrets block the commit), then commits. The main agent collects the fixer's JSON result and pushes (`git push origin {branch_name}`); unresolved blocking findings carry to the next cycle. The spawn variables and `Agent(...)` call are in `references/review-loop-mechanics.md`.
+Delegate fixes to the fixer subagent (`references/agents/fixer.md`) — never apply code changes in the main skill context — reusing the same fixer across cycles when possible. The fixer reads affected files, applies targeted changes, runs the mandatory pre-commit security scan against the staged set — `references/scripts/gi-secscan.py`, with the Primary Pattern in `references/docs/pre-commit-security.md` as its fallback, real secrets blocking the commit either way — then commits. The main agent collects the fixer's JSON result and pushes (`git push origin {branch_name}`); unresolved blocking findings carry to the next cycle. The spawn variables and `Agent(...)` call are in `references/review-loop-mechanics.md`.
 
 ```
 [6/7] Fix          ✓ fixed {N} issues (noted: {note_count} — not fixed)

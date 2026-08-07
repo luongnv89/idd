@@ -132,6 +132,9 @@ references/docs/terminal-style.md
 references/docs/ui-review.md
 references/scripts/gi-config.py
 references/scripts/gi-runlog.py
+references/scripts/gi-secscan.py
+references/scripts/gi-branch.py
+references/scripts/gi-issue.py
 ```
 
 ---
@@ -163,9 +166,7 @@ Check whether this issue should be worked on. Open with `● Preflight check for
 
 ### 0a — Fetch issue
 
-```bash
-gh issue view {N} --json number,title,body,labels,assignees,state,comments
-```
+Run `python3 shared/scripts/gi-issue.py {N} --fields number,title,body,labels,assignees,state,comments` and read `.issue` from the JSON envelope. The same issue is read again in 0d, Step 1, and Step 5; the script serves those repeats from `.gitissue/cache/` rather than the network, and the field list is this skill's choice, not the script's. Resolve the script path as the *Bundled dependency precheck* resolves its list. Exit 3 (a malformed argument) is a stop. Exit 4, or no `python3`, degrades: run `gh issue view {N} --json number,title,body,labels,assignees,state,comments` directly and continue — the cache is an optimization, never a dependency. **0d rewrites the body, so it MUST end with `python3 shared/scripts/gi-issue.py {N} --invalidate`** — the cache is repo-wide and outlives this skill; without it Step 1 and Step 5 read the pre-normalization body.
 
 **If not found:** output error and stop. **If closed:** output warning and stop.
 
@@ -190,16 +191,17 @@ If `issue.auto_normalize` is true and not already normalized (no `<!-- gitissue:
    - **Auto mode (`--auto` / `IDD_AUTO_MODE=1`):** print the `⚠ … Skipping auto-normalization` warning from `references/error-messages.md` (*Security-labeled issue (skip)*) — using the first matching label name for `{label}` — and continue preflight **without** rewriting the issue body.
    - **Interactive mode:** print the same warning and ask for explicit operator confirmation. Default is **no** — do not rewrite unless the operator clearly confirms (e.g. `y` / `yes`). If declined, continue without normalization.
 
-2. **Normalize inline** — when no security label blocks (or interactive operator confirmed): classify issue type, generate normalized body, add marker, post a backup comment with the original body, update the issue via `gh issue edit`, then re-fetch. This is the same structure-only flow as `/issue-creator` Normalize mode (`references/modes.md` in the issue-creator skill); the resolver does **not** invoke `/issue-creator` as a subprocess — it performs Step 0d inline. If normalization fails, warn and continue with the original body (see `references/error-messages.md`).
+2. **Normalize inline** — when no security label blocks (or interactive operator confirmed): classify issue type, generate normalized body, add marker, post a backup comment with the original body, update the issue via `gh issue edit`, invalidate the cached entry (`python3 shared/scripts/gi-issue.py {N} --invalidate`), then re-fetch. This is the same structure-only flow as `/issue-creator` Normalize mode (`references/modes.md` in the issue-creator skill); the resolver does **not** invoke `/issue-creator` as a subprocess — it performs Step 0d inline. If normalization fails, warn and continue with the original body (see `references/error-messages.md`).
 
 ### 0e — Workspace (interactive only)
 
-Before Step 0e or 0f selects a workspace, derive one `{branch_name}` from
-`resolve.branch_prefix`: when it is `"auto"`, use
-`{type}/{N}-{short-description}`; otherwise use the configured prefix verbatim
-as `{configured-prefix}{N}-{short-description}` (for example, `issue-` or
-`team/`). Both paths use this same branch name (see
-`docs/naming-conventions.md`).
+Before Step 0e or 0f selects a workspace, derive one `{branch_name}` with
+`python3 shared/scripts/gi-branch.py {N} --title "{title}" --type {type} --prefix "{resolve.branch_prefix}"`
+and read `.branch`. Exit 3 (unmapped type, non-numeric number) is a stop; no
+`python3` or exit 4 degrades to deriving it by hand per
+`docs/naming-conventions.md` — `"auto"` gives `{type}/{N}-{short-description}`,
+any other prefix is used verbatim as `{configured-prefix}{N}-{short-description}`.
+Both workspace paths use this one name.
 
 Then decide *where* the resolution work happens.
 
@@ -242,9 +244,8 @@ The **in-place path** — auto mode, or interactive after declining the worktree
 offer. (Accepted-worktree path already created the branch via `git worktree add -b`
 in 0e; skip this sub-step.)
 
-Use the `{branch_name}` already derived from `resolve.branch_prefix` before Step
-0e/0f (see *0e — Workspace* above, `docs/config-schema.md`, and
-`docs/naming-conventions.md`) — never re-derive or replace it here.
+Use the `{branch_name}` already derived before Step 0e/0f (see *0e — Workspace*,
+`docs/config-schema.md`, `docs/naming-conventions.md`) — never re-derive it here.
 
 **If branch already exists:**
 - Interactive mode: ask `continue` or `fresh`
@@ -374,7 +375,7 @@ Automated review-fix loop: review → test → fix → repeat until clean or max
 
 For each QA cycle, spawn a **fresh** reviewer (`shared/agents/code-reviewer.md`) with the canonical pattern — fresh each cycle for unbiased review.
 
-When the reviewer or test/build run returns blocking issues, spawn or re-message the fixer (`shared/agents/fixer.md`) the same way. Pass issue context, branch/base branch, reviewer findings, failing test/build output, commit message `fix({scope}): address review feedback (#N)`, and the pre-commit security convention it MUST run before committing (`docs/pre-commit-security.md`). Collect the fixer's JSON result and decide whether to start another cycle — never apply fixes inline when the Agent tool is available.
+When the reviewer or test/build run returns blocking issues, spawn or re-message the fixer (`shared/agents/fixer.md`) the same way. Pass issue context, branch/base branch, reviewer findings, failing test/build output, commit message `fix({scope}): address review feedback (#N)`, and the pre-commit security gate it MUST run before committing — both `security_convention` (`references/docs/pre-commit-security.md`) and `secscan_script` (`references/scripts/gi-secscan.py`) as spawn variables, because an emitted agent prompt cannot resolve a skill-relative path on its own. Paths only — the script reads `security.*` from `.gitissue.yml` itself. Collect the fixer's JSON result and decide whether to start another cycle — never apply fixes inline when the Agent tool is available.
 
 ### UI/UX review (auto-detected)
 
@@ -403,7 +404,7 @@ If the changes affect documented behavior, update README, inline docs, and CHANG
 
 ### Push branch and create PR
 
-Before pushing, run a final pre-push pass over the whole branch diff (`git diff --name-only "origin/${base}"...HEAD`) — catches secrets that slipped in during QA fixes. Run the **Primary Pattern** in `docs/pre-commit-security.md` (authoritative — do not improvise a weaker check); export `IDD_AUTO_MODE=1` first in auto mode. Only after the scan passes (or warnings are accepted):
+Before pushing, run a final pre-push pass over the whole branch diff — it catches secrets that slipped in during QA fixes. Export `IDD_AUTO_MODE=1` first in auto mode, then run `python3 shared/scripts/gi-secscan.py --range "origin/${base}"` from the repo root. It reads this repo's `security.allow_pattern`, `security.extra_secret_file_pattern`, `security.extra_secret_value_pattern`, and `security.max_file_size_mb` from `.gitissue.yml` itself — never pass a config *value* on the command line, because `.gitissue.yml` is repo-controlled and a crafted value would escape its quoting. **Exit 1 is the block verdict: stop, do not push, and report the path from `blocking[]` — never fall through to the prose scan hoping for a pass.** Exit 3 (an uncompilable `security.*` regex) is also a stop. Only a missing `python3` or exit 4 degrades: print `⚠ gi-secscan unavailable — running the documented scan` and run the **Primary Pattern** in `docs/pre-commit-security.md` over `git diff --name-only "origin/${base}"...HEAD` instead. Do not improvise a weaker check. Only after the scan passes (or warnings are accepted):
 
 ```bash
 git push -u origin {branch_name}

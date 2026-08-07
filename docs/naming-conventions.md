@@ -39,10 +39,13 @@ Standard conventions for naming branches, commits, pull requests, and issues acr
 ### Deriving the Short Description
 
 1. Take the issue title
-2. Convert to lowercase
-3. Replace spaces with hyphens
-4. Remove non-alphanumeric characters (except hyphens)
-5. Truncate to keep total branch name under 50 characters
+2. Drop a redundant leading type label — either the labelled form (`Bug:`, `Feature:`, `Enhancement:`, …) or a bare first word that simply restates the prefix you chose (`Fix mobile auth redirect loop` → `fix/42-mobile-auth-redirect-loop`). A first word that is *not* the chosen prefix stays: it is information, not a duplicate
+3. Convert to lowercase
+4. Replace every run of non-alphanumeric characters with a single hyphen
+5. Trim leading and trailing hyphens
+6. Truncate to keep the total branch name under 50 characters, cutting on a hyphen boundary so the last word stays whole
+
+**Deriving it deterministically.** A skill that ships the branch-name script — `gi-branch.py`, invoked as `<bundled path> {N} --title "..." --type feature`, with `--prefix`, `--type-map`, and `--max-length` — runs it instead of applying the six steps by hand, and names the bundled path in its own instructions (this document is tool-neutral). It prints `{"branch": "feat/42-add-dark-mode-toggle", ...}` and self-checks `valid` against the branch grammar the repository lint enforces. Exit `3` (non-numeric number, unmapped type) is a stop; if it cannot run, apply the steps above by hand — the rules here are the specification and the script is one implementation of them.
 
 ### Issue Type → Branch Prefix Mapping
 
@@ -69,7 +72,9 @@ Standard conventions for naming branches, commits, pull requests, and issues acr
 If the user has configured `resolve.branch_prefix` in `.gitissue.yml` to a string other than `"auto"`, use that fixed prefix instead of type-based prefixes:
 
 - `branch_prefix: "auto"` (default) → type-based: `fix/42-description`
-- `branch_prefix: "issue-"` → fixed: `issue-42/description`
+- `branch_prefix: "issue-"` → fixed: `issue-42-description`
+
+The prefix is used **verbatim**, then `{N}-{short-description}`. No separator is inserted that the user did not write, so a prefix meant to create a path component must end in one: `"team/"` → `team/42-description`. Custom prefixes fall outside the six-prefix grammar the lint validates — expected, since configuring a prefix is opting out of the default convention.
 
 ---
 

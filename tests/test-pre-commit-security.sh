@@ -20,9 +20,11 @@
 # src/skills/**/*.md, src/internal-skills/**/*.md, and
 # src/shared/agents/*.md, looking for `git commit` or `git push`. For each
 # occurrence, the same fenced block — or the 12 lines of prose immediately
-# before the block — must reference `docs/pre-commit-security.md`. The
-# canonical doc itself and `/auto-push` examples that demonstrate failure
-# output are excluded.
+# before the block — must reference the gate: either the canonical document
+# `docs/pre-commit-security.md` or the script that implements it,
+# `gi-secscan.py`. Both forms count because both ARE the gate; a block with
+# neither is an ungated commit. The canonical doc itself and `/auto-push`
+# examples that demonstrate failure output are excluded.
 #
 # Usage: bash tests/test-pre-commit-security.sh
 # Returns: exit 0 if all checks pass, exit 1 on failure
@@ -121,6 +123,11 @@ scan_file() {
       for (i = 0; i < window_size; i++) prose[i] = ""
       window_idx = 0
       window_has_ref = 0
+      # The gate signal, defined once so the prose-window and in-block checks
+      # below cannot drift apart. `gi-secscan.py` carries the `.py` so a
+      # sentence merely naming the script in passing does not satisfy an
+      # in-block gate.
+      gate_re = "(pre-commit-security\\.md|gi-secscan\\.py)"
     }
     /^```/ {
       if (in_block == 0) {
@@ -134,12 +141,12 @@ scan_file() {
         # Snapshot whether the prose window already references the doc.
         window_has_ref = 0
         for (i = 0; i < window_size; i++) {
-          if (prose[i] ~ /pre-commit-security\.md/) window_has_ref = 1
+          if (prose[i] ~ gate_re) window_has_ref = 1
         }
       } else {
         # Closing fence — evaluate the block.
         if (is_shell_block == 1 && block_has_commit_or_push == 1 && block_has_ref == 0 && window_has_ref == 0) {
-          printf("%s:%d: shell block with `git commit` or `git push` is not gated by docs/pre-commit-security.md\n", file, block_start)
+          printf("%s:%d: shell block with `git commit` or `git push` is gated by neither docs/pre-commit-security.md nor gi-secscan.py\n", file, block_start)
         }
         in_block = 0
         is_shell_block = 0
@@ -157,7 +164,7 @@ scan_file() {
         if ($0 ~ /(^|[[:space:]&|;]|^[[:space:]]*)git[[:space:]]+push([[:space:]]|$)/) {
           block_has_commit_or_push = 1
         }
-        if ($0 ~ /pre-commit-security\.md/) {
+        if ($0 ~ gate_re) {
           block_has_ref = 1
         }
       } else {
@@ -184,7 +191,7 @@ if [ -s "$violations" ]; then
     echo "      $line"
   done < "$violations"
 else
-  pass "All fenced \`git commit\` / \`git push\` blocks are gated by pre-commit-security.md"
+  pass "All fenced \`git commit\` / \`git push\` blocks are gated by pre-commit-security.md or gi-secscan.py"
 fi
 
 # ───────────────────────────────────────────────────────────

@@ -36,9 +36,10 @@ npm test          # or pytest, go test ./..., cargo test, etc.
 
 ### Commit auto-fixes
 
-**Not used in `--review-only`.** After the pre-commit security scan passes (or warnings are accepted — see the scan contract in SKILL.md and the Primary Pattern in `docs/pre-commit-security.md`), commit and push:
+**Not used in `--review-only`.** Run the pre-commit security scan first — `python3 references/scripts/gi-secscan.py --working-tree`, run from the repo root so it reads the repo's `security.*` extensions from `.gitissue.yml` itself (never pass a config value on the command line — this skill has a PR's branch checked out), degrading to the Primary Pattern in `docs/pre-commit-security.md` only when the script cannot run. Its exit 1 is a block: stop, do not commit. Only after the scan passes (or warnings are accepted — see the scan contract in SKILL.md), commit and push:
 
 ```bash
+# Gated above by references/scripts/gi-secscan.py (see pre-commit-security.md).
 git add -A
 git commit -m "style: auto-fix lint and format issues"
 git push origin {branch_name}
@@ -66,13 +67,32 @@ Timeout: `review.test_timeout` seconds (default: 300).
 
 ## Step 5 — CI polling and failure extraction
 
-Poll GitHub Actions / CI status for the PR:
+Prefer the script — it performs the entire wait inside one invocation, so the
+main agent spends one tool call on the answer instead of one per poll:
+
+```bash
+python3 references/scripts/gi-ci-wait.py {N} \
+  --interval {review.ci_poll_interval} --timeout {review.ci_timeout}
+```
+
+It prints one JSON object. Read `verdict`:
+
+| `verdict` | Meaning | Step 5 outcome |
+|-----------|---------|----------------|
+| `pass` | every check reached a terminal non-failing bucket | `✓ all checks passed` |
+| `fail` | at least one check failed or was cancelled — see `failing[]` | `✗ {N} checks failed` |
+| `pending` | the budget elapsed with checks still running | `⚠ checks still running` — **not clean** (see below) |
+| `none` | the repository reports no checks for this PR | `○ no CI checks configured` |
+
+Exit 3 (a non-numeric PR, a non-positive interval or timeout) is a stop — a
+misconfigured wait has not run. Only a missing `python3` or exit 4 degrades:
+print `⚠ gi-ci-wait unavailable — polling manually` and apply the loop below.
+
+**Manual fallback.** Poll GitHub Actions / CI status for the PR:
 
 ```bash
 gh pr checks {N} --json name,state,bucket
 ```
-
-Polling behavior:
 
 1. Check immediately after tests.
 2. If checks are still running, poll every `review.ci_poll_interval` seconds.
