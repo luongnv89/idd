@@ -135,7 +135,11 @@ emit(
 )
 for rel in sorted(set(a) & set(b)):
     emit(a[rel] == b[rel], f"T4: {rel} has the same mode in both builds ({a[rel]} vs {b[rel]})")
-    emit(a[rel] == "0o755", f"T4: {rel} is executable (mode {a[rel]})")
+    # Exec bit only. Git stores nothing else, so a checkout materialises the
+    # source as 0777 & ~umask (0o775 under umask 002, 0o755 under 022) and the
+    # build's copy2 faithfully carries that through. Asserting "0o755" would
+    # fail every clone made under a non-022 umask on a perfectly correct build.
+    emit(int(a[rel], 8) & 0o111 != 0, f"T4: {rel} is executable (mode {a[rel]})")
 print("\n".join(lines))
 PY
 

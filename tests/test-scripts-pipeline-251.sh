@@ -62,6 +62,14 @@ mode_of() {
   python3 -c 'import os,sys;print(oct(os.stat(sys.argv[1]).st_mode & 0o777))' "$1"
 }
 
+# Umask-proof executability. Git records only the exec bit, so checkout writes a
+# 100755 blob as 0777 & ~umask: 0o755 under umask 022 (the GitHub runner
+# default), 0o775 under the equally common 002. Absolute-mode assertions turn a
+# correct build red on a contributor's clone — assert `mode & 0o111` instead.
+has_exec_bit() {
+  python3 -c 'import os,sys;sys.exit(0 if os.stat(sys.argv[1]).st_mode & 0o111 else 1)' "$1"
+}
+
 echo "◆ Shared Scripts Pipeline Tests (issue #251)"
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 
@@ -158,14 +166,33 @@ report "$TMP/ac1.txt" "T1: precheck/bundle parity"
 # ───────────────────────────────────────────────────────────
 # T2 (AC2): the dependency parser ships inside auto-pilot
 # ───────────────────────────────────────────────────────────
-if grep -rqF 'dependency_gate_parse' \
-     "$REPO_ROOT/src" "$REPO_ROOT/skills" "$REPO_ROOT/scripts" "$REPO_ROOT/docs" 2>/dev/null; then
-  fail "T2: the 'dependency_gate_parse' dev-tree literal still exists"
-  grep -rlF 'dependency_gate_parse' \
-    "$REPO_ROOT/src" "$REPO_ROOT/skills" "$REPO_ROOT/scripts" "$REPO_ROOT/docs" \
-    2>/dev/null | sed "s|$REPO_ROOT/|    |"
+# Drive the scan from the git index rather than the filesystem. `grep -r … 2>/dev/null`
+# cannot tell "no match" (exit 1) from "directory missing" (exit 2) once stderr is
+# swallowed, so a tree with no skills/ at all would print PASS; and walking the
+# working tree also reads untracked build artifacts (scripts/__pycache__/*.pyc),
+# where stale bytecode of a since-deleted module produces a spurious FAIL.
+GATE_LITERAL='dependency_gate_parse'
+T2_FILES=()
+while IFS= read -r tracked; do
+  T2_FILES+=("$tracked")
+done < <(cd "$REPO_ROOT" && git ls-files -- src skills scripts docs)
+
+if [ "${#T2_FILES[@]}" -eq 0 ]; then
+  fail "T2: git tracks no files under src/, skills/, scripts/, docs/ — the scan would be vacuous"
 else
-  pass "T2: no 'dependency_gate_parse' literal under src/, skills/, scripts/, docs/"
+  pass "T2.0: scanning ${#T2_FILES[@]} tracked file(s) under src/, skills/, scripts/, docs/"
+  set +e
+  gate_hits="$(cd "$REPO_ROOT" && grep -lIFe "$GATE_LITERAL" -- "${T2_FILES[@]}")"
+  gate_rc=$?
+  set -e
+  if [ "$gate_rc" -gt 1 ]; then
+    fail "T2: the '$GATE_LITERAL' scan itself errored (grep exit $gate_rc)"
+  elif [ -n "$gate_hits" ]; then
+    fail "T2: the '$GATE_LITERAL' dev-tree literal still exists"
+    printf '%s\n' "$gate_hits" | sed 's|^|    |'
+  else
+    pass "T2: no '$GATE_LITERAL' literal under src/, skills/, scripts/, docs/"
+  fi
 fi
 
 SHIPPED_DEPS="$SKILLS/auto-pilot/references/scripts/gi-deps.py"
@@ -364,26 +391,97 @@ if [ -n "$REPO_CONFIG_BEFORE" ]; then
 fi
 
 # ───────────────────────────────────────────────────────────
+# T3.12-T3.15: the no-PyYAML branch (the branch CI actually runs)
+# ───────────────────────────────────────────────────────────
+# gi-config has two parsers with deliberately *different* contracts for the same
+# malformed file: with PyYAML a YAML error is a user error (exit 3, skill stops);
+# without it, anything outside the vendored restricted grammar is a parser
+# limitation, not a user error (exit 4, skill degrades to its inline defaults).
+# Whichever branch the host happens to take, the other ships untested — and
+# .github/workflows/dist-check.yml runs actions/setup-python with no pip install,
+# so CI only ever exercises the vendored one. Force it here with a stub module
+# that raises ImportError, so both branches are covered on every host.
+NOYAML_DIR="$TMP/noyaml"
+mkdir -p "$NOYAML_DIR"
+cat > "$NOYAML_DIR/yaml.py" <<'STUB'
+raise ImportError("PyYAML masked by test-scripts-pipeline-251.sh")
+STUB
+
+# Flow mapping: valid YAML that the restricted grammar deliberately rejects.
+printf 'resolve: {max_commits: 7}\n' > "$TMP/flow.yml"
+# Plain block mapping: inside the restricted grammar, must still resolve.
+printf 'resolve:\n  max_commits: 7\n' > "$TMP/plain.yml"
+
+set +e
+PYTHONPATH="$NOYAML_DIR" "$GI_CONFIG" --schema "$GI_SCHEMA" --config "$TMP/plain.yml" \
+  >"$TMP/noyaml-plain.json" 2>"$TMP/noyaml-plain.err"
+noyaml_plain_rc=$?
+PYTHONPATH="$NOYAML_DIR" "$GI_CONFIG" --schema "$GI_SCHEMA" --config "$TMP/flow.yml" \
+  >/dev/null 2>"$TMP/noyaml-flow.err"
+noyaml_flow_rc=$?
+PYTHONPATH="$NOYAML_DIR" "$GI_CONFIG" --schema "$GI_SCHEMA" --config "$TMP/bad.yml" \
+  >/dev/null 2>"$TMP/noyaml-bad.err"
+noyaml_bad_rc=$?
+set -e
+
+# Guard the guard: if the stub did not take effect the three checks below would
+# be silently re-testing the PyYAML branch.
+if PYTHONPATH="$NOYAML_DIR" python3 -c 'import yaml' 2>/dev/null; then
+  fail "T3.12: the PyYAML stub did not mask 'import yaml' — T3.13-T3.15 are vacuous"
+else
+  pass "T3.12: the PyYAML stub masks 'import yaml' for the checks below"
+fi
+
+if [ "$noyaml_plain_rc" -eq 0 ]; then
+  pass "T3.13: without PyYAML, the vendored parser reads a restricted-grammar config (exit 0)"
+else
+  fail "T3.13: without PyYAML, a restricted-grammar config exited $noyaml_plain_rc (expected 0)"
+  sed 's/^/    /' "$TMP/noyaml-plain.err"
+fi
+
+if [ "$noyaml_flow_rc" -eq 4 ]; then
+  pass "T3.14: without PyYAML, YAML outside the restricted grammar degrades (exit 4, not 3)"
+else
+  fail "T3.14: without PyYAML, a flow mapping exited $noyaml_flow_rc (expected 4 — a parser limitation is not a user error)"
+  sed 's/^/    /' "$TMP/noyaml-flow.err"
+fi
+
+if [ "$noyaml_bad_rc" -eq 3 ]; then
+  pass "T3.15: without PyYAML, a type-invalid value is still a user error (exit 3)"
+else
+  fail "T3.15: without PyYAML, resolve.max_commits: \"ten\" exited $noyaml_bad_rc (expected 3)"
+  sed 's/^/    /' "$TMP/noyaml-bad.err"
+fi
+
+# ───────────────────────────────────────────────────────────
 # T4 (AC4): gi-runlog echo/append/normalize/reject
 # ───────────────────────────────────────────────────────────
 GI_RUNLOG="$SKILLS/issue-resolver/references/scripts/gi-runlog.py"
 RECORD='{"issue":251,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":270,"complexity":"complex"}'
 
 ECHO_TARGET="$TMP/echo-must-not-exist/runs.jsonl"
+# Capture to a file, not just to `$( )`: command substitution strips trailing
+# newlines, so zero output and one line are indistinguishable once piped through
+# `printf '%s\n'`. The file preserves the difference for the line count below.
+ECHO_OUT_FILE="$TMP/echo.out"
 set +e
-echo_out="$(printf '%s' "$RECORD" | python3 "$GI_RUNLOG" --echo --path "$ECHO_TARGET" 2>"$TMP/echo.err")"
+printf '%s' "$RECORD" | python3 "$GI_RUNLOG" --echo --path "$ECHO_TARGET" \
+  >"$ECHO_OUT_FILE" 2>"$TMP/echo.err"
 echo_rc=$?
 set -e
+echo_out="$(cat "$ECHO_OUT_FILE")"
 if [ "$echo_rc" -eq 0 ]; then
   pass "T4: gi-runlog --echo exits 0 on a valid record"
 else
   fail "T4: gi-runlog --echo exited $echo_rc (expected 0)"
   sed 's/^/    /' "$TMP/echo.err"
 fi
-if [ "$(printf '%s\n' "$echo_out" | wc -l | tr -d ' ')" = "1" ]; then
+echo_lines="$(wc -l < "$ECHO_OUT_FILE" | tr -d ' ')"
+echo_bytes="$(wc -c < "$ECHO_OUT_FILE" | tr -d ' ')"
+if [ "$echo_lines" = "1" ] && [ -s "$ECHO_OUT_FILE" ]; then
   pass "T4.1: gi-runlog --echo prints exactly one line"
 else
-  fail "T4.1: gi-runlog --echo printed $(printf '%s\n' "$echo_out" | wc -l | tr -d ' ') lines"
+  fail "T4.1: gi-runlog --echo printed $echo_lines newline-terminated line(s) / $echo_bytes byte(s) (expected exactly 1 line)"
 fi
 if [ ! -e "$ECHO_TARGET" ] && [ ! -e "$TMP/echo-must-not-exist" ]; then
   pass "T4.2: gi-runlog --echo created no file (the --no-run-log contract)"
@@ -465,6 +563,48 @@ if [ ! -e "$MISSING_PR_TARGET" ]; then
   pass "T4.9: the exit-3 path wrote nothing"
 else
   fail "T4.9: the exit-3 path still wrote $MISSING_PR_TARGET"
+fi
+
+# `pr` is the only nullable field in the schema. A null in any other required
+# key once sailed through — the type loops skip None and the null-drop pass
+# covers optional keys only — and was emitted verbatim, e.g. `"issue":null`.
+NULL_TARGET="$TMP/null-required/runs.jsonl"
+for null_key in issue mode skill outcome; do
+  record="$(python3 -c '
+import json, sys
+rec = {"issue": 251, "mode": "auto", "skill": "issue-resolver", "outcome": "success", "pr": 270}
+rec[sys.argv[1]] = None
+sys.stdout.write(json.dumps(rec))' "$null_key")"
+  set +e
+  printf '%s' "$record" | python3 "$GI_RUNLOG" --append --path "$NULL_TARGET" \
+    >/dev/null 2>"$TMP/null-$null_key.err"
+  null_rc=$?
+  set -e
+  if [ "$null_rc" -eq 3 ]; then
+    pass "T4.10: a null '$null_key' exits 3 (only 'pr' is nullable)"
+  else
+    fail "T4.10: a null '$null_key' exited $null_rc (expected 3)"
+  fi
+done
+if [ ! -e "$NULL_TARGET" ]; then
+  pass "T4.11: no null-required-key record reached the run log"
+else
+  fail "T4.11: a null-required-key record was written to $NULL_TARGET"
+fi
+
+# The two documented exceptions must keep working: `pr: null` is emitted as-is,
+# and an explicit `ts: null` is treated as absent and filled from the clock.
+set +e
+nullable_out="$(printf '%s' '{"ts":null,"issue":251,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":null}' \
+  | python3 "$GI_RUNLOG" --echo 2>/dev/null)"
+nullable_rc=$?
+set -e
+if [ "$nullable_rc" -eq 0 ] \
+  && printf '%s' "$nullable_out" | grep -qF '"pr":null' \
+  && ! printf '%s' "$nullable_out" | grep -qF '"ts":null'; then
+  pass "T4.12: 'pr: null' survives and 'ts: null' is filled from the clock"
+else
+  fail "T4.12: nullable-field handling regressed (rc=$nullable_rc, out: $nullable_out)"
 fi
 
 # ───────────────────────────────────────────────────────────
@@ -592,11 +732,14 @@ for src_script in "$SRC_SCRIPTS"/*.py; do
   [ -f "$src_script" ] || continue
   src_count=$((src_count + 1))
   name="$(basename "$src_script")"
+  # The exec bit, never the absolute digits: git stores only the exec bit, so
+  # checkout materialises the 100755 blob T6 just verified as 0777 & ~umask —
+  # 0o775 under umask 002, 0o755 under 022. The index mode is the real guard.
   src_mode="$(mode_of "$src_script")"
-  if [ "$src_mode" = "0o755" ]; then
-    pass "T6.1: src/shared/scripts/$name is mode 0755 on disk"
+  if has_exec_bit "$src_script"; then
+    pass "T6.1: src/shared/scripts/$name is executable on disk (mode $src_mode)"
   else
-    fail "T6.1: src/shared/scripts/$name is mode $src_mode (expected 0o755)"
+    fail "T6.1: src/shared/scripts/$name is not executable (mode $src_mode)"
   fi
 
   set +e
@@ -646,7 +789,10 @@ fi
 # skills), so it carries a verbatim copy of build.py's restricted-YAML parser.
 # A silent divergence would make the script resolve different defaults than the
 # build validates — this is the only thing keeping the copy honest.
-python3 - "$REPO_ROOT" > "$TMP/parity.txt" <<'PY'
+# PYTHONDONTWRITEBYTECODE: the importlib exec_module calls below would otherwise
+# drop __pycache__/ directories into src/shared/scripts/ and scripts/. Both are
+# gitignored, but a test has no business writing into src/.
+PYTHONDONTWRITEBYTECODE=1 python3 - "$REPO_ROOT" > "$TMP/parity.txt" <<'PY'
 import importlib.util
 import sys
 from pathlib import Path

@@ -125,6 +125,22 @@ def normalize_record(record: object, *, now: str | None = None) -> dict[str, obj
     if missing:
         raise RecordError("missing required key(s): " + ", ".join(missing))
 
+    # `pr` is the only documented nullable field, and `ts` treats an explicit
+    # null as absent (filled from the clock below). A null anywhere else in the
+    # required set used to sail straight through — the INT_KEYS/STR_KEYS loops
+    # skip None and the null-drop pass covers OPTIONAL_KEYS only — so
+    # `{"issue": null, ...}` was emitted verbatim as `"issue":null`, a line no
+    # reader of this schema accepts.
+    nulled = [
+        key
+        for key in REQUIRED_KEYS
+        if key not in ("pr", "ts") and key in record and record[key] is None
+    ]
+    if nulled:
+        raise RecordError(
+            "null is not a valid value for: " + ", ".join(nulled) + " (only `pr` is nullable)"
+        )
+
     for key in INT_KEYS:
         if key in record and record[key] is not None and not _is_int(record[key]):
             raise RecordError(f"{key} must be an integer")

@@ -287,6 +287,8 @@ for writer in issue-resolver auto-pilot; do
   if [ -f "$gen_skill" ]; then
     has "$gen_skill" "references/scripts/gi-runlog.py" \
       "T5: generated $writer SKILL.md cites the shipped gi-runlog script"
+  else
+    fail "T5: skills/$writer/SKILL.md does not exist — the citation check is vacuous"
   fi
   if [ -f "$gen_script" ]; then
     pass "T5: skills/$writer bundles references/scripts/gi-runlog.py"

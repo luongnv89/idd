@@ -133,9 +133,9 @@ reversible operations — no user confirmation needed; the stash is restored wit
 
 ## Configuration
 
-Load config once at skill start: run `python3 shared/scripts/gi-config.py` from the repo root — it prints `{"config": {…dotted keys…}, "config_file": …, "first_run": …}` as JSON on stdout, merging the defaults below with `.gitissue.yml`. Exit 0: use `config`, and print the `○ First run` line below when `first_run` is `true`. Exit 3: `.gitissue.yml` is invalid — print the validation error from `references/error-messages.md` (*Invalid config*) and stop. Any other outcome (no `python3`, non-zero exit, unparsable stdout): print `⚠ gi-config unavailable — using the inline defaults below` and follow the fallback procedure instead. Never re-read the config after this step.
+Load config once at skill start: run `python3 shared/scripts/gi-config.py` — two independent requirements, both mandatory. **Working directory:** the repo root, because the script resolves `.gitissue.yml` against the working directory; run it from anywhere else and it exits 0 reporting `config_file: null`/`first_run: true`, silently discarding the repo's real config. **Script path:** relative to this SKILL.md's own directory, *not* to the working directory — resolve it to an absolute path exactly as the *Bundled dependency precheck* resolves its list, and pass that absolute path to `python3`. It prints `{"config": {…dotted keys…}, "config_file": …, "first_run": …}` as JSON on stdout, merging the defaults below with `.gitissue.yml`. Exit 0: use `config`, and print the `○ First run` line below when `first_run` is `true`. Exit 3: `.gitissue.yml` is invalid — print the validation error from `references/error-messages.md` (*Invalid config*) and stop. Script file absent: a bundled dependency is missing, which is a broken install and not a degrade — stop and print the `✗ Missing bundled dependency` block the *Bundled dependency precheck* names. Any other outcome (no `python3`, non-zero exit, unparsable stdout): print `⚠ gi-config unavailable — using the inline defaults below` and instead follow the manual fallback procedure that makes up the rest of this section. That procedure is the *alternative* to this script, never an extra step to run alongside it: on exit 0 the script's `config` is the whole answer and the rest of this section is reference material only. Never re-read the config after this step.
 
-Load `.gitissue.yml` from the repo root once at start. If the file does not exist, use defaults and print:
+Otherwise, load `.gitissue.yml` from the repo root once at start. If the file does not exist, use defaults and print:
 
 ```
 ○ First run — using default config. Run /init-gitissue to customize.
@@ -291,8 +291,7 @@ The full field list lives in `references/run-log.md` → *Fields to populate*.
 
 ```bash
 printf '%s' "$run_json" | python3 shared/scripts/gi-runlog.py --append
-# Fallback when the script cannot run:
-mkdir -p .gitissue && printf '%s\n' "$run_json" >> .gitissue/runs.jsonl
+# Fallback when the script cannot run: mkdir -p .gitissue && printf '%s\n' "$run_json" >> .gitissue/runs.jsonl
 ```
 
 The write is **best-effort and non-fatal** — a failed append never stops the

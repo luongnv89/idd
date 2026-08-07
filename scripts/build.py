@@ -53,6 +53,14 @@ RUNTIME_DOC_RE = re.compile(r"(?<![\w/])docs/([a-z][a-z0-9-]+\.md)")
 # closure read set, and every one of them would abort the build. Adding a new
 # script requires no change here — discovery is regex + filesystem only.
 SHARED_SCRIPT_RE = re.compile(r"(?<![\w/])shared/scripts/([a-z][a-z0-9-]+\.py)")
+# Same directory scope, but deliberately name-agnostic: any token at all under a
+# bare `shared/scripts/`. The Phase E scan uses it as a catch-all after
+# SHARED_SCRIPT_RE has done its rewriting, so a token that misses the naming
+# convention above (an underscore, a non-.py suffix, a typo) fails the build
+# instead of shipping verbatim into an installed SKILL.md that then tells the
+# agent to run a path existing nowhere. Still zero script names in this file —
+# adding a script requires no change here.
+ANY_SHARED_SCRIPT_RE = re.compile(r"(?<![\w/])shared/scripts/\S+")
 BARE_SKILL_PATH_RE = re.compile(r"(?<![\w/])skills/([a-z][a-z0-9-]+)/SKILL\.md")
 
 URL_RE = re.compile(r"https?://[^\s<>'\"\)]+")
@@ -1463,6 +1471,18 @@ def _scan_dist_skills(out_skills: Path) -> None:
                     f"unresolved bare 'shared/scripts/X.py' in "
                     f"{f.relative_to(out_skills.parent)}"
                 )
+            stray_script = ANY_SHARED_SCRIPT_RE.search(cleaned)
+            if stray_script:
+                # \S+ is deliberately greedy so nothing escapes detection; trim
+                # the markdown delimiters it swallows before reporting.
+                token = stray_script.group(0).rstrip("`'\".,;:)]}>")
+                _abort(
+                    f"unrewritable bare shared-script token "
+                    f"'{token}' in "
+                    f"{f.relative_to(out_skills.parent)} — the closure resolves "
+                    f"only lowercase hyphenated '.py' names, so this one was "
+                    f"never bundled and would ship as a dead instruction"
+                )
             if BARE_SKILL_PATH_RE.search(cleaned):
                 _abort(
                     f"unresolved bare 'skills/<name>/SKILL.md' in "
@@ -1603,9 +1623,12 @@ def build(out: Path, src: Path, *, verbose: bool = False, no_root_skills: bool =
             _check_precheck_drift(
                 skill_name, skill_root / SOURCE_SKILL_MD, out_skill_dir
             )
-            # Issue #251: a shipped script's `# gi-requires:` declarations must
-            # resolve inside the same skill's bundle.
-            _check_script_requirements(skill_name, out_skill_dir, scripts)
+        # Issue #251: a shipped script's `# gi-requires:` declarations must
+        # resolve inside the same skill's bundle. Unlike precheck drift — an
+        # authoring-list convention public skills opt into — this is a
+        # correctness gate on the script itself: a deprecated-distributed skill
+        # ships the same file to the same agents, so it gets the same check.
+        _check_script_requirements(skill_name, out_skill_dir, scripts)
         if verbose:
             print(
                 f"  ✓ flattened: {skill_name} (agents={len(agents)}, "

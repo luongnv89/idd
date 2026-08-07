@@ -179,11 +179,17 @@ for src_script in "$SRC_SCRIPTS"/*.py; do
     else
       fail "T8: $rel differs from src/shared/scripts/$name"
     fi
+    # Never assert an absolute mode here: git records only the exec bit, so a
+    # fresh checkout materialises a 100755 blob as 0777 & ~umask — 0o775 under
+    # the common umask 002, 0o755 under 022. Compare the shipped copy to its
+    # source instead; that is what catches a copy2 → copyfile regression, and it
+    # holds under every umask.
     shipped_mode="$(mode_of "$shipped")"
-    if [ "$shipped_mode" = "0o755" ]; then
-      pass "T8: $rel is mode 0755"
+    src_mode="$(mode_of "$src_script")"
+    if [ "$shipped_mode" = "$src_mode" ]; then
+      pass "T8: $rel has the source's mode ($shipped_mode)"
     else
-      fail "T8: $rel is mode $shipped_mode (expected 0o755)"
+      fail "T8: $rel is mode $shipped_mode, source is $src_mode"
     fi
     if [ -x "$shipped" ]; then
       pass "T8: $rel is executable"

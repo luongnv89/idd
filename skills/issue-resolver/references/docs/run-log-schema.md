@@ -57,7 +57,8 @@ Example lines:
 should pipe the record to it on stdin rather than hand-rolling the append: the script
 enforces every rule above — required-field and `outcome` validation, the 5→3
 `complexity` collapse, dropping optional keys whose value is `null`, filling an absent
-`ts` from the UTC clock, and emitting the keys in the table's order. `--append` (the
+`ts` from the UTC clock, and emitting the keys in the example lines' order above —
+that order is the canonical one, not the field table's. `--append` (the
 default) creates `.gitissue/` and appends exactly one `\n`-terminated line to `--path`
 (default `.gitissue/runs.jsonl`); `--echo` runs the identical validation and
 normalization, prints the line, and **writes nothing** — the machine form of the
