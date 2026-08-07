@@ -429,7 +429,7 @@ For each line that matches `(?im)\b(?:depends\s+on|blocked\s+by)\b`, collect **l
 1. **Strip cross-repo tokens** on that line — remove every `\S+/\S+#\d+` match (e.g. `acme/lib#15`) so its trailing digits are never captured.
 2. **Capture bare refs** on the remainder with a negative lookbehind guard: `(?<![\w/])#(\d+)` — this matches `#12` and comma lists (`#12, #15`) but not the `#15` inside `acme/lib#15` if a token was missed.
 
-Example: `Blocked by: acme/lib#15, #12` → gate on **#12 only**. `Depends on #12, #15` → gate on **#12** and **#15**. The reference implementation is `scripts/dependency_gate_parse.py` (`extract_dependency_issue_numbers`). If no local markers remain, the gate is satisfied; proceed to Step 5.2.
+Run `printf '%s' "$issue_body" | python3 shared/scripts/gi-deps.py` — it prints one local issue number per line and always exits 0 (no markers prints nothing). If the script cannot run, apply steps 1–2 above by hand. Example: `Blocked by: acme/lib#15, #12` → gate on **#12 only**. `Depends on #12, #15` → gate on **#12** and **#15**. If no local markers remain, the gate is satisfied; proceed to Step 5.2.
 
 **Cycle guard:** If issue A's body references its own number (`#A`), log a warning and skip the gate (treat as satisfied). The auto-pilot must never block a PR on its own issue number. Multi-hop cycles (A → B → A) are not detected here — they would require traversing each dependency's body, which is out of scope for the per-merge gate; the fail-safe is that any genuinely-cyclic issue set surfaces as `blocked_by_dependency` on each affected issue and requires user intervention before those PRs can merge — the loop still advances past them. The check is:
 

@@ -43,6 +43,8 @@ tree. If `origin` is missing or rebase conflicts occur, stop and ask the user
 
 ## Configuration
 
+Load config once at skill start: run `python3 references/scripts/gi-config.py` from the repo root — it prints `{"config": {…dotted keys…}, "config_file": …, "first_run": …}` as JSON on stdout, merging the defaults below with `.gitissue.yml`. Exit 0: use `config`, and print the `○ First run` line below when `first_run` is `true`. Exit 3: `.gitissue.yml` is invalid — print the validation error from `references/error-messages.md` (*Invalid config*) and stop. Any other outcome (no `python3`, non-zero exit, unparsable stdout): print `⚠ gi-config unavailable — using the inline defaults below` and follow the fallback procedure instead. Never re-read the config after this step.
+
 Load `.gitissue.yml` from the repo root once at skill start. If the file does not exist, use defaults and print:
 
 ```
@@ -128,6 +130,8 @@ references/docs/shared-agent-conventions.md
 references/docs/platform-github.md
 references/docs/terminal-style.md
 references/docs/ui-review.md
+references/scripts/gi-config.py
+references/scripts/gi-runlog.py
 ```
 
 ---
@@ -433,8 +437,10 @@ suppression*), which follows the schema in `references/docs/config-schema.md`
 
 ```bash
 # Only when --no-run-log is NOT set:
-mkdir -p .gitissue
-printf '%s\n' "$run_json" >> .gitissue/runs.jsonl
+printf '%s' "$run_json" | python3 references/scripts/gi-runlog.py --append
+# Under --no-run-log, validate the telemetry you return without writing:
+printf '%s' "$run_json" | python3 references/scripts/gi-runlog.py --echo
+# Fallback when the script cannot run: mkdir -p .gitissue && printf '%s\n' "$run_json" >> .gitissue/runs.jsonl
 ```
 
 Best-effort and non-fatal — a failed write never blocks the reported run result. Only append; never rewrite or reorder existing lines.

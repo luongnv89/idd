@@ -56,6 +56,7 @@ references/docs/platform-github.md
 references/docs/agent-model-effort.md
 references/docs/terminal-style.md
 references/docs/ui-review.md
+references/scripts/gi-config.py
 ```
 
 
@@ -75,6 +76,8 @@ Before making any fixes, sync with remote using the **stash-first pattern**: if 
 If `origin` is missing or rebase conflicts occur, stop and ask (interactive) or abort with a clear error (auto).
 
 ## Configuration
+
+Load config once at skill start: run `python3 shared/scripts/gi-config.py` from the repo root — it prints `{"config": {…dotted keys…}, "config_file": …, "first_run": …}` as JSON on stdout, merging the defaults below with `.gitissue.yml`. Exit 0: use `config`; `first_run: true` means no `.gitissue.yml` was found and every value came from the defaults below. Exit 3: `.gitissue.yml` is invalid — print `✗ Invalid config: .gitissue.yml` followed by the offending key and reason the script reported on stderr, and stop. Any other outcome (no `python3`, non-zero exit, unparsable stdout): print `⚠ gi-config unavailable — using the inline defaults below` and follow the fallback procedure instead. Never re-read the config after this step.
 
 Load `.gitissue.yml` once. Defaults (full semantics in `docs/config-schema.md`):
 - `review.max_cycles: 3` — 3 LLM cycles suffice once the script pre-pass handles mechanical issues

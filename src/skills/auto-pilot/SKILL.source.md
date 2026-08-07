@@ -120,6 +120,9 @@ Check these files relative to the skill's directory (the dirname of this SKILL.m
 - `references/docs/agent-model-effort.md` — per-agent model and reasoning-effort mapping
 - `references/docs/terminal-style.md` — terminal output style contract (symbols, output structure, table/error formats)
 - `references/docs/auto-mode.md` — auto-mode detection and the caller obligation for delegated skills
+- `references/scripts/gi-config.py` — config resolver: merges the documented defaults with `.gitissue.yml` and prints one JSON line
+- `references/scripts/gi-runlog.py` — run-log writer: validates, normalizes, and appends one `.gitissue/runs.jsonl` record
+- `references/scripts/gi-deps.py` — dependency-marker parser for the Phase 5 dependency gate
 
 If the working tree is dirty, auto-stash before starting; if not on the default
 branch, auto-switch and rebase on a clean tree. Both procedures (the stash-first
@@ -129,6 +132,8 @@ reversible operations — no user confirmation needed; the stash is restored wit
 `git stash pop` after the run.
 
 ## Configuration
+
+Load config once at skill start: run `python3 shared/scripts/gi-config.py` from the repo root — it prints `{"config": {…dotted keys…}, "config_file": …, "first_run": …}` as JSON on stdout, merging the defaults below with `.gitissue.yml`. Exit 0: use `config`, and print the `○ First run` line below when `first_run` is `true`. Exit 3: `.gitissue.yml` is invalid — print the validation error from `references/error-messages.md` (*Invalid config*) and stop. Any other outcome (no `python3`, non-zero exit, unparsable stdout): print `⚠ gi-config unavailable — using the inline defaults below` and follow the fallback procedure instead. Never re-read the config after this step.
 
 Load `.gitissue.yml` from the repo root once at start. If the file does not exist, use defaults and print:
 
@@ -285,8 +290,9 @@ include `skipped_reason`** — a skip never ran the resolver, so it carries no t
 The full field list lives in `references/run-log.md` → *Fields to populate*.
 
 ```bash
-mkdir -p .gitissue
-printf '%s\n' "$run_json" >> .gitissue/runs.jsonl
+printf '%s' "$run_json" | python3 shared/scripts/gi-runlog.py --append
+# Fallback when the script cannot run:
+mkdir -p .gitissue && printf '%s\n' "$run_json" >> .gitissue/runs.jsonl
 ```
 
 The write is **best-effort and non-fatal** — a failed append never stops the

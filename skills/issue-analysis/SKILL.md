@@ -105,6 +105,8 @@ If `origin` is missing or rebase conflicts occur, inform the user and continue w
 
 ## Configuration
 
+Load config once at skill start: run `python3 references/scripts/gi-config.py` from the repo root — it prints `{"config": {…dotted keys…}, "config_file": …, "first_run": …}` as JSON on stdout, merging the defaults below with `.gitissue.yml`. Exit 0: use `config`, and print the `○ First run` line below when `first_run` is `true`. Exit 3: `.gitissue.yml` is invalid — print the validation error from `references/error-messages.md` (*Invalid config*) and stop. Any other outcome (no `python3`, non-zero exit, unparsable stdout): print `⚠ gi-config unavailable — using the inline defaults below` and follow the fallback procedure instead. Never re-read the config after this step.
+
 Load `.gitissue.yml` from the repo root once at skill start. If the file does not exist, use defaults and print:
 
 ```
@@ -186,6 +188,7 @@ Check these files relative to the skill's directory (the dirname of this SKILL.m
 - `references/docs/platform-github.md` — GitHub platform driver reference
 - `references/docs/agent-model-effort.md` — per-agent model and reasoning-effort mapping
 - `references/docs/terminal-style.md` — terminal output style contract (symbols, output structure, table/error formats)
+- `references/scripts/gi-config.py` — config resolver: merges the documented defaults with `.gitissue.yml` and prints one JSON line
 
 The steps below describe the subagent delegation path; the inline fallback lives in `references/inline-fallback.md`.
 

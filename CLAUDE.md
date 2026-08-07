@@ -6,25 +6,29 @@ gitissue implements Issue-Driven Development (IDD) — a methodology where GitHu
 
 ## Architecture
 
-This is a **skills-only** project. There is no runtime code — each skill is a self-contained Claude Code skill (SKILL.md + references/ + templates/) that instructs the agent how to perform a task. Shared agents live in `src/shared/agents/` and are referenced by multiple skills. All authored skill sources live under `src/`. Per issue #81, all documentation — both runtime docs consumed by skills and human-only project docs — lives in a single top-level `docs/` tree.
+This is a **prompt-first** project. Almost all of it is prose: each skill is a self-contained Claude Code skill (SKILL.md + references/ + templates/) that instructs the agent how to perform a task, and there is no application runtime. The one exception is `src/shared/scripts/` — small, stdlib-only Python helpers that skills shell out to for the few jobs where determinism beats prose (resolving config, validating a run-log record, parsing dependency markers). Every one of them is optional at run time: the skill prose that invokes a script also documents the manual procedure, so a skill still works where the script cannot run. Shared agents live in `src/shared/agents/` and are referenced by multiple skills. All authored skill sources live under `src/`. Per issue #81, all documentation — both runtime docs consumed by skills and human-only project docs — lives in a single top-level `docs/` tree.
 
 ```
 src/
 ├── shared/
-│   └── agents/                    # Shared agent definitions (used by multiple skills)
-│       ├── codebase-researcher.md # Deep codebase scan + solution research
-│       ├── synthesizer.md         # Analysis + implementation options
-│       ├── implementer.md         # Code + tests implementation
-│       ├── code-reviewer.md       # Confidence-based code review
-│       ├── fixer.md               # Targeted fixes for review/test/CI/AC failures
-│       ├── duplicate-detector.md  # Issue dedup scoring
-│       ├── issue-relationship-scanner.md  # File deps + already-fixed detection
-│       └── ui-reviewer.md         # UI/UX + screenshot accessibility review
+│   ├── agents/                    # Shared agent definitions (used by multiple skills)
+│   │   ├── codebase-researcher.md # Deep codebase scan + solution research
+│   │   ├── synthesizer.md         # Analysis + implementation options
+│   │   ├── implementer.md         # Code + tests implementation
+│   │   ├── code-reviewer.md       # Confidence-based code review
+│   │   ├── fixer.md               # Targeted fixes for review/test/CI/AC failures
+│   │   ├── duplicate-detector.md  # Issue dedup scoring
+│   │   ├── issue-relationship-scanner.md  # File deps + already-fixed detection
+│   │   └── ui-reviewer.md         # UI/UX + screenshot accessibility review
+│   └── scripts/                   # Shared executable helpers (stdlib-only, mode 0755)
+│       ├── gi-config.py           # Defaults + .gitissue.yml → one JSON line
+│       ├── gi-runlog.py           # Validate/normalize/append a runs.jsonl record
+│       └── gi-deps.py             # Parse local dependency issue numbers
 │
 ├── skills/
 │   ├── auto-pilot/         # /auto-pilot — triage, resolve, review, merge loop
 │   │   ├── SKILL.source.md
-│   │   └── references/
+│   │   └── references/     # → bundled: references/{agents,docs,scripts}/ at build time
 │   ├── issue-analysis/     # /issue-analysis N — deep issue investigation
 │   │   ├── SKILL.source.md
 │   │   └── references/
@@ -83,6 +87,26 @@ All documentation lives in top-level `docs/`. Two kinds coexist there:
 When in doubt: if a skill source needs to read it at runtime, it is a runtime doc and goes at the top level of `docs/`. Otherwise it is a project doc.
 
 One deliberate exception: each skill package carries its own human-facing `README.md` at `src/skills/<name>/docs/README.md` (and `src/internal-skills/idd-doctor/docs/README.md`). That is the skill-creator standard location — a README under the skill's `docs/` is never auto-loaded into agent context, so it costs zero runtime tokens — and it carries the `DO NOT READ THIS FILE` AI-skip notice. These are skill-package files, not entries in the top-level `docs/` tree.
+
+### Scripts placement rule
+
+Shared executable helpers are a third closure kind alongside agents and runtime docs (issue #251). They follow the same author-once / bundle-per-skill shape:
+
+- **Source** lives at `src/shared/scripts/<name>.py`. Lowercase-hyphen names, `.py` only, committed mode `0755`, stdlib-only, and `--help` must exit 0.
+- **Reference** it from skill prose as the bare token `shared/scripts/<name>.py` — never as a path that already exists on disk. `scripts/build.py` discovers the token by regex (`SHARED_SCRIPT_RE`, directory-scoped exactly like `SHARED_AGENT_RE`, because a bare `scripts/X.py` token would collide with the prose mentions of this repo's own `scripts/` directory).
+- **Emitted** to `references/scripts/<name>.py`, byte-identical to the source and with its mode preserved. The build rewrites the source token to that path in the skill's own files, so the runtime prose reads `references/scripts/<name>.py`.
+- **Invoke** it as `python3 references/scripts/<name>.py`, **never** `./references/scripts/<name>.py`. Zip and tar installs (and some npx-style copies) drop the exec bit; the committed `0755` is a human convenience, not a runtime guarantee.
+- **Scripts are closure leaves.** Their contents are never scanned for further references — a deterministic tool is not a document, and scanning `.py` bodies would let a comment silently pull a doc into a bundle.
+- **Agent reachability.** A script reached only through a shared agent is validated but *not* bundled, for the same reason as docs: since issue #245 an emitted agent prompt renders every reference as an absolute repo URL, so a bundled copy would be unreferenceable. An agent that needs a script must receive its path as a **spawn variable** bound by the orchestrating skill, mirroring today's `{security_convention}`.
+- **Declared inputs.** A script may declare a bundled file it reads at run time with a `# gi-requires: references/…` header line; the build fails if that file is not bundled alongside it in the same skill.
+- **Adding a new script requires no `build.py` change.** Discovery is regex plus filesystem: drop the file in `src/shared/scripts/`, cite it from a skill, add it to that skill's *Bundled dependency precheck* list, and rebuild.
+
+**Fatal vs. degrade.** These are two different failures and the skills treat them differently:
+
+- **File absent from the bundle → fatal.** The precheck list guarantees the script shipped (the build fails both ways if the list and the bundle disagree), so a missing file means a broken or partial install. Stop and print the `✗ Missing bundled dependency` block.
+- **Runtime failure → degrade.** No `python3` on PATH, a non-zero exit other than 3, or unparsable stdout is an environment problem, not a broken install. Print a `⚠` line and follow the documented prose procedure the skill keeps beside every invocation. Exit 3 is the exception: it means the *user's input* is invalid (e.g. a malformed `.gitissue.yml`), which is a real stop, not a degrade.
+
+The shared exit-code vocabulary is `0` ok · `2` usage error · `3` invalid input (stop) · `4` cannot complete (degrade to prose).
 
 ## Conventions
 
@@ -175,6 +199,7 @@ Examples:
 - Each skill follows the skill-creator standard (frontmatter with name/description, progressive disclosure)
 - Each skill has its own `references/error-messages.md`
 - Shared agents live in `src/shared/agents/` — skills reference them by path, not by external agent types
+- Shared scripts live in `src/shared/scripts/` — skills reference them by the bare `shared/scripts/<name>.py` token and run the bundled copy as `python3 references/scripts/<name>.py`, always with a documented prose fallback (see *Scripts placement rule*)
 - All subagents use the default general-purpose agent (no `subagent_type` parameter)
 - In auto-pilot mode, all agents/skills run autonomously without user prompts
 - Static sequential output — each step prints a new line, no terminal animation
