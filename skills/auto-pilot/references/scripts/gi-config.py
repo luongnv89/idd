@@ -201,6 +201,11 @@ def load_schema(path: Path) -> tuple[dict[str, object], frozenset[str], bool]:
         text = path.read_text(encoding="utf-8")
     except OSError as exc:
         raise Unavailable(f"cannot read {path}: {exc}") from exc
+    except UnicodeDecodeError as exc:
+        # UnicodeDecodeError subclasses ValueError, not OSError, so it escapes
+        # the clause above. The schema is a bundled dependency, not user input:
+        # an undecodable one is a broken install, so the caller falls back.
+        raise Unavailable(f"{path} is not valid UTF-8 — {exc.reason}") from exc
     match = _FULL_SCHEMA_FENCE_RE.search(text)
     if match is None:
         raise Unavailable(f"{path} has no Full Schema YAML block")
@@ -240,6 +245,17 @@ def load_user_config(path: Path) -> dict[str, object]:
         text = path.read_text(encoding="utf-8")
     except OSError as exc:
         raise Unavailable(f"cannot read {path}: {exc}") from exc
+    except UnicodeDecodeError as exc:
+        # UnicodeDecodeError subclasses ValueError, not OSError, so it escapes
+        # the clause above and would leave the interpreter to print a traceback
+        # and exit 1 — a code outside this script's 0/2/3/4 contract, which
+        # callers read as "degrade", silently discarding the repo's real config.
+        # The file was found and read: its *bytes* are wrong, which is a user
+        # error (an editor saving cp1252), so it is exit 3, stop and report.
+        raise ConfigError(
+            f"{path} is not valid UTF-8 — {exc.reason} at byte {exc.start}; "
+            "re-save the file as UTF-8"
+        ) from exc
     try:
         import yaml  # type: ignore[import-not-found]
     except ImportError:

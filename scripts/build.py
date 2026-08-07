@@ -60,7 +60,18 @@ SHARED_SCRIPT_RE = re.compile(r"(?<![\w/])shared/scripts/([a-z][a-z0-9-]+\.py)")
 # instead of shipping verbatim into an installed SKILL.md that then tells the
 # agent to run a path existing nowhere. Still zero script names in this file —
 # adding a script requires no change here.
-ANY_SHARED_SCRIPT_RE = re.compile(r"(?<![\w/])shared/scripts/\S+")
+ANY_SHARED_SCRIPT_RE = re.compile(r"(?<![\w/])shared/scripts/(\S+)")
+# ...but documentation legitimately writes the directory without naming a file:
+# a placeholder (`shared/scripts/<name>.py`), a glob (`shared/scripts/*.py`), the
+# backtick-quoted directory (`shared/scripts/`), or the bare directory closing a
+# clause ("live in shared/scripts/." / "under shared/scripts/, one per tool").
+# None of those is an instruction, so none was ever meant to resolve, and a doc
+# explaining this very convention must be bundleable. The two classes separate on
+# the first character after the final slash: a filename starts with a word
+# character, prose never does. Stripping code spans instead would be wrong —
+# real instructions are written inside backticks, which is exactly where the
+# catch-all has to keep working.
+SCRIPT_TOKEN_NAMES_A_FILE_RE = re.compile(r"\w")
 BARE_SKILL_PATH_RE = re.compile(r"(?<![\w/])skills/([a-z][a-z0-9-]+)/SKILL\.md")
 
 URL_RE = re.compile(r"https?://[^\s<>'\"\)]+")
@@ -1471,8 +1482,9 @@ def _scan_dist_skills(out_skills: Path) -> None:
                     f"unresolved bare 'shared/scripts/X.py' in "
                     f"{f.relative_to(out_skills.parent)}"
                 )
-            stray_script = ANY_SHARED_SCRIPT_RE.search(cleaned)
-            if stray_script:
+            for stray_script in ANY_SHARED_SCRIPT_RE.finditer(cleaned):
+                if not SCRIPT_TOKEN_NAMES_A_FILE_RE.match(stray_script.group(1)):
+                    continue  # prose about the directory, not an instruction
                 # \S+ is deliberately greedy so nothing escapes detection; trim
                 # the markdown delimiters it swallows before reporting.
                 token = stray_script.group(0).rstrip("`'\".,;:)]}>")

@@ -682,6 +682,21 @@ for name in WIRED:
             f"T5: {name} ({label}) Configuration keeps the "
             "'gi-config unavailable' degrade path",
         )
+        # The degrade path is only safe while these two clauses bound it. Run
+        # gi-config from anywhere but the repo root and it exits 0 reporting
+        # first_run, silently discarding the repo's real config; treat a missing
+        # script file as a degrade and a broken install silently runs on
+        # defaults. Both are the same silent-config-discard hole.
+        emit(
+            "**Working directory:** the repo root" in block,
+            f"T5: {name} ({label}) Configuration keeps the "
+            "'Working directory: the repo root' requirement",
+        )
+        emit(
+            "Script file absent" in block and "broken install and not a degrade" in block,
+            f"T5: {name} ({label}) Configuration keeps the "
+            "'script absent = broken install, not a degrade' fatal branch",
+        )
 
 # Both run-log writers keep the hand-rolled append as the script's fallback.
 for name in ("issue-resolver", "auto-pilot"):

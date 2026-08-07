@@ -436,10 +436,8 @@ suppression*), which follows the schema in `references/docs/config-schema.md`
 (*`.gitissue/runs.jsonl` — run log*).
 
 ```bash
-# Only when --no-run-log is NOT set:
-printf '%s' "$run_json" | python3 references/scripts/gi-runlog.py --append
-# Under --no-run-log, validate the telemetry you return without writing:
-printf '%s' "$run_json" | python3 references/scripts/gi-runlog.py --echo
+# Exactly one of these runs. --echo validates the telemetry you return and writes nothing.
+if [ -n "$no_run_log" ]; then printf '%s' "$run_json" | python3 references/scripts/gi-runlog.py --echo; else printf '%s' "$run_json" | python3 references/scripts/gi-runlog.py --append; fi
 # Fallback when the script cannot run: mkdir -p .gitissue && printf '%s\n' "$run_json" >> .gitissue/runs.jsonl
 ```
 

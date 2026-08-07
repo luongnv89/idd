@@ -259,7 +259,7 @@ When the Agent tool is available and there are 10+ issues, split dependency scan
 
 ### Bundled dependency precheck
 
-Verify that this skill's bundled subagent prompts and reference files are present.
+Verify that this skill's bundled subagent prompts and reference files are present, resolving each path below relative to the skill's directory (the dirname of this SKILL.md).
 If any are missing, stop immediately and print:
 
 ```
@@ -271,7 +271,7 @@ If any are missing, stop immediately and print:
   Then restart the agent session and re-run /issue-triage.
 ```
 
-Check these files relative to the skill's directory (the dirname of this SKILL.md):
+Check these files:
 
 - `references/agents/issue-relationship-scanner.md` — Combined dependency + history scanner prompt
 - `references/detection.md` — Confidence-scoring rules and merge logic for detection

@@ -112,7 +112,7 @@ If not (e.g., Claude.ai or environments without the Agent tool), execute duplica
 
 ### Bundled dependency precheck
 
-Verify that this skill's bundled agent prompt and template files are present.
+Verify that this skill's bundled agent prompt and template files are present, resolving each path below relative to the skill's directory (the dirname of this SKILL.md).
 If any are missing, stop immediately and print:
 
 ```text
@@ -124,7 +124,7 @@ If any are missing, stop immediately and print:
   Then restart the agent session and re-run /issue-creator.
 ```
 
-Check these files relative to the skill's directory (the dirname of this SKILL.md):
+Check these files:
 
 - `references/agents/duplicate-detector.md` — duplicate detection subagent prompt
 - `templates/bug.md` — bug issue template

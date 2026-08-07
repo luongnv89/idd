@@ -240,7 +240,18 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    raw = sys.stdin.read()
+    try:
+        raw = sys.stdin.read()
+    except UnicodeDecodeError as exc:
+        # UnicodeDecodeError subclasses ValueError, not OSError, so nothing else
+        # here would catch it and the interpreter would exit 1 with a traceback —
+        # a code outside this script's 0/2/3/4 contract. Undecodable stdin can
+        # never be a valid JSON record, so it is exit 3: nothing written.
+        print(
+            f"✗ gi-runlog: stdin is not valid UTF-8 — {exc.reason} at byte {exc.start}",
+            file=sys.stderr,
+        )
+        return 3
     try:
         submitted = json.loads(raw)
     except json.JSONDecodeError as exc:

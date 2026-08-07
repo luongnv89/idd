@@ -39,6 +39,22 @@ def extract_dependency_issue_numbers(body: str) -> list[int]:
     return found
 
 
+def read_body() -> str:
+    """Read the issue body from stdin, tolerating bytes that are not UTF-8.
+
+    `sys.stdin.read()` raises UnicodeDecodeError — a ValueError, so no OSError
+    handler catches it — on an issue body carrying, say, a cp1252 quote. That
+    would exit 1 with a traceback and break the "always exit 0" contract above.
+    Both the markers and the issue numbers this script looks for are ASCII, so
+    decoding the raw bytes with `errors="replace"` finds every number a strict
+    decode would have found and never fails.
+    """
+    buffer = getattr(sys.stdin, "buffer", None)
+    if buffer is None:  # stdin replaced by a text-only stream (in-process use)
+        return sys.stdin.read()
+    return buffer.read().decode("utf-8", errors="replace")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="gi-deps.py",
@@ -49,7 +65,7 @@ def main(argv: list[str] | None = None) -> int:
         epilog="Example: printf '%s' \"$issue_body\" | python3 gi-deps.py",
     )
     parser.parse_args(argv)
-    for n in extract_dependency_issue_numbers(sys.stdin.read()):
+    for n in extract_dependency_issue_numbers(read_body()):
         print(n)
     return 0
 

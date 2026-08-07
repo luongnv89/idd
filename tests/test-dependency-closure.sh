@@ -47,8 +47,8 @@ BUILD_LOG="$(mktemp)"
 SYN_TMP="$(mktemp -d)"
 SYN_OUT="$(mktemp -d)"
 SYN_LOG="$(mktemp)"
-# Scratch space for the two negative fixtures (T7.11 / T7.12), which mutate a
-# copy of the synthetic tree and expect the build to abort.
+# Scratch space for the fixtures that mutate a copy of the synthetic tree and
+# expect the build to abort (T7.11 / T7.12 / T7.13) or to stay clean (T7.14).
 NEG_TMP="$(mktemp -d)"
 NEG_OUT="$(mktemp -d)"
 NEG_LOG="$(mktemp)"
@@ -427,6 +427,58 @@ elif grep -qF "gi-requires: references/docs/absent.md" "$NEG_LOG" \
   pass "T7.12: an unresolvable 'gi-requires' declaration aborts the build"
 else
   fail "T7.12: build failed, but not with the gi-requires abort"
+  sed 's/^/    /' "$NEG_LOG" | head -10
+fi
+
+# ───────────────────────────────────────────────────────────
+# T7.13 — the name-agnostic catch-all. A `shared/scripts/` token that *names a
+# file* the closure can never resolve (underscore, non-.py suffix, capitals) must
+# abort: it was never bundled, so it would ship telling the agent to run a path
+# that exists nowhere. T7.11 covers only a well-formed name with no source file,
+# which the closure resolver rejects on its own — without T7.13 the whole
+# ANY_SHARED_SCRIPT_RE guard could be deleted and this suite would stay green.
+# ───────────────────────────────────────────────────────────
+for bad_script in 'gi_underscore.py' 'gi-wrong.sh' 'GiCapital.py'; do
+  rm -rf "$NEG_TMP" "$NEG_OUT"
+  mkdir -p "$NEG_TMP" "$NEG_OUT"
+  cp -R "$SYN_TMP/." "$NEG_TMP/"
+  printf '\nAlso runs `python3 shared/scripts/%s` for the malformed-name trial.\n' \
+    "$bad_script" >> "$NEG_TMP/src/skills/dia/SKILL.source.md"
+  if (cd "$NEG_TMP" && bash scripts/build.sh --out "$NEG_OUT") >"$NEG_LOG" 2>&1; then
+    fail "T7.13: build shipped the unrewritable token shared/scripts/$bad_script"
+  elif grep -qF "unrewritable bare shared-script token 'shared/scripts/$bad_script'" "$NEG_LOG"; then
+    pass "T7.13: shared/scripts/$bad_script aborts instead of shipping as a dead instruction"
+  else
+    fail "T7.13: build failed on shared/scripts/$bad_script, but not with the unrewritable-token abort"
+    sed 's/^/    /' "$NEG_LOG" | head -10
+  fi
+done
+
+# ───────────────────────────────────────────────────────────
+# T7.14 — the other direction. The catch-all must not fire on documentation:
+# a bundled doc that *explains* the convention names no file, so a placeholder,
+# a glob, the backtick-quoted directory, a trailing comma and a sentence-final
+# period all have to build clean. Pairs with T7.13 — one guards the hole, the
+# other guards against the guard swallowing the prose that describes it.
+# ───────────────────────────────────────────────────────────
+rm -rf "$NEG_TMP" "$NEG_OUT"
+mkdir -p "$NEG_TMP" "$NEG_OUT"
+cp -R "$SYN_TMP/." "$NEG_TMP/"
+cat >> "$NEG_TMP/docs/d-doc.md" <<'EOF'
+
+Source lives at `shared/scripts/<name>.py`; the directory is `shared/scripts/`.
+The glob shared/scripts/*.py matches them all, under shared/scripts/, one per tool.
+Every shared helper lives in shared/scripts/.
+EOF
+if (cd "$NEG_TMP" && bash scripts/build.sh --out "$NEG_OUT") >"$NEG_LOG" 2>&1; then
+  pass "T7.14: a bundled doc documenting the shared/scripts convention builds clean"
+  if grep -qF 'shared/scripts/<name>.py' "$NEG_OUT/skills/dia/references/docs/d-doc.md"; then
+    pass "T7.14.1: the placeholder prose ships verbatim into the bundled doc"
+  else
+    fail "T7.14.1: the placeholder prose did not survive into the bundled doc"
+  fi
+else
+  fail "T7.14: the catch-all aborted on legitimate shared/scripts documentation"
   sed 's/^/    /' "$NEG_LOG" | head -10
 fi
 
