@@ -46,12 +46,18 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
+import subprocess
 import sys
 from pathlib import Path
 
 SCHEMA_NAME = "config-schema.md"
 DEFAULT_CONFIG_NAME = ".gitissue.yml"
+
+# `git rev-parse --show-cdup` can only ever be empty or a run of `../`. Anything
+# else is not an answer this script will resolve a path against.
+_CDUP_RE = re.compile(r"^(\.\./)*$")
 
 # --- Vendored config parsing -------------------------------------------------
 #
@@ -171,6 +177,35 @@ def _parse_config_mapping(text: str, label: str) -> dict[str, object]:
 # --- Schema ------------------------------------------------------------------
 
 
+def search_ceiling() -> Path:
+    """The highest directory an upward search may look in.
+
+    The top of the working tree, or the working directory itself when there is
+    none. Without a ceiling an upward walk leaves the repository entirely, and
+    then a file in `$HOME` — or in whatever directory the checkout happens to
+    sit under — governs the run. gi-secscan bounds its `.gitissue.yml` search
+    the same way and for the same reason: a `security.allow_pattern` an
+    ancestor directory can set is a security gate an ancestor directory can
+    switch off. The two searches are kept identical on purpose; letting them
+    diverge would be worse than either gap.
+    """
+    try:
+        proc = subprocess.run(
+            ["git", "rev-parse", "--show-cdup"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except OSError:
+        return Path.cwd().resolve()
+    cdup = proc.stdout.rstrip("\n")
+    if proc.returncode != 0 or not _CDUP_RE.match(cdup):
+        return Path.cwd().resolve()
+    # `--show-cdup` is empty or a run of `../` — never the repository's own name,
+    # whose trailing bytes are as attacker-controlled as any other path's.
+    return Path(os.path.normpath(os.path.join(os.getcwd(), cdup))) if cdup else Path.cwd().resolve()
+
+
 def find_schema(explicit: str | None) -> Path:
     """Locate the schema document: explicit path, bundled copy, then repo tree."""
     if explicit:
@@ -183,15 +218,20 @@ def find_schema(explicit: str | None) -> Path:
     bundled = Path(__file__).resolve().parent.parent / "docs" / SCHEMA_NAME
     if bundled.is_file():
         return bundled
-    # Source tree: walk up from the working directory.
+    # Source tree: walk up from the working directory, stopping at the top of
+    # the working tree. A schema above the repository is not this repository's
+    # schema, and it decides which keys are valid and which are tombstoned.
     cwd = Path.cwd().resolve()
+    ceiling = search_ceiling().resolve()
     for base in (cwd, *cwd.parents):
         candidate = base / "docs" / SCHEMA_NAME
         if candidate.is_file():
             return candidate
+        if base == ceiling:
+            break
     raise Unavailable(
-        f"no {SCHEMA_NAME} beside this script or above the working directory "
-        "(pass --schema)"
+        f"no {SCHEMA_NAME} beside this script or between the working directory "
+        "and the top of the working tree (pass --schema)"
     )
 
 
