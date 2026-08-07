@@ -83,7 +83,9 @@ applies unchanged when it does run.
 
 ## Configuration
 
-Load `.gitissue.yml` from the repo root once at skill start. If the file does not exist, use defaults and print:
+Load config once at skill start: run `python3 shared/scripts/gi-config.py` — two independent requirements, both mandatory. **Working directory:** the repo root, because the script resolves `.gitissue.yml` against the working directory; run it from anywhere else and it exits 0 reporting `config_file: null`/`first_run: true`, silently discarding the repo's real config. **Script path:** relative to this SKILL.md's own directory, *not* to the working directory — resolve it to an absolute path exactly as the *Bundled dependency precheck* resolves its list, and pass that absolute path to `python3`. It prints `{"config": {…dotted keys…}, "config_file": …, "first_run": …}` as JSON on stdout, merging the defaults below with `.gitissue.yml`. Exit 0: use `config`, and print the `○ First run` line below when `first_run` is `true`. Exit 3: `.gitissue.yml` is invalid — print the validation error from `references/error-messages.md` (*Invalid config*) and stop. Script file absent: a bundled dependency is missing, which is a broken install and not a degrade — stop and print the `✗ Missing bundled dependency` block the *Bundled dependency precheck* names. Any other outcome (no `python3`, non-zero exit, unparsable stdout): print `⚠ gi-config unavailable — using the inline defaults below` and instead follow the manual fallback procedure that makes up the rest of this section. That procedure is the *alternative* to this script, never an extra step to run alongside it: on exit 0 the script's `config` is the whole answer and the rest of this section is reference material only. Never re-read the config after this step.
+
+Otherwise, load `.gitissue.yml` from the repo root once at skill start. If the file does not exist, use defaults and print:
 
 ```
 ○ First run — using default config. Run /init-gitissue to customize.
@@ -110,7 +112,7 @@ If not (e.g., Claude.ai or environments without the Agent tool), execute duplica
 
 ### Bundled dependency precheck
 
-Verify that this skill's bundled agent prompt and template files are present.
+Verify that this skill's bundled agent prompt and template files are present, resolving each path below relative to the skill's directory (the dirname of this SKILL.md).
 If any are missing, stop immediately and print:
 
 ```text
@@ -122,7 +124,7 @@ If any are missing, stop immediately and print:
   Then restart the agent session and re-run /issue-creator.
 ```
 
-Check these files relative to the skill's directory (the dirname of this SKILL.md):
+Check these files:
 
 - `references/agents/duplicate-detector.md` — duplicate detection subagent prompt
 - `templates/bug.md` — bug issue template
@@ -143,6 +145,7 @@ Check these files relative to the skill's directory (the dirname of this SKILL.m
 - `references/docs/platform-github.md` — GitHub platform driver reference
 - `references/docs/auto-mode.md` — auto-mode detection and the non-interactive gate rule
 - `references/docs/terminal-style.md` — terminal output style contract (symbols, output structure, table/error formats)
+- `references/scripts/gi-config.py` — config resolver: merges the documented defaults with `.gitissue.yml` and prints one JSON line
 
 ---
 

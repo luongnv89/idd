@@ -53,6 +53,21 @@ Example lines:
   readers must tolerate missing keys and unknown keys. Absent optional fields are
   simply omitted (not written as `null`, except `pr` which is always present).
 
+**The `gi-runlog` helper.** A skill that bundles `references/scripts/gi-runlog.py`
+should pipe the record to it on stdin rather than hand-rolling the append: the script
+enforces every rule above — required-field and `outcome` validation, the 5→3
+`complexity` collapse, dropping optional keys whose value is `null`, filling an absent
+`ts` from the UTC clock, and emitting the keys in the example lines' order above —
+that order is the canonical one, not the field table's. `--append` (the
+default) creates `.gitissue/` and appends exactly one `\n`-terminated line to `--path`
+(default `.gitissue/runs.jsonl`); `--echo` runs the identical validation and
+normalization, prints the line, and **writes nothing** — the machine form of the
+`--no-run-log` contract below. Exit `0` wrote or printed the line; `2` is a usage
+error; `3` means the record was invalid and nothing was written; `4` means the record
+was valid but the append itself failed. Only `3` signals a caller bug — `4` stays
+best-effort and non-fatal per the rules above, and a caller that cannot run the script
+at all falls back to the `mkdir -p` + append described here.
+
 **Single writer under `/auto-pilot`:** when `/auto-pilot` resolves an issue it
 runs `/issue-resolver` as a subagent, so without coordination *both* skills would
 append — two lines per processed issue, which double-counts that issue in

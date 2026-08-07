@@ -56,6 +56,7 @@ references/docs/platform-github.md
 references/docs/agent-model-effort.md
 references/docs/terminal-style.md
 references/docs/ui-review.md
+references/scripts/gi-config.py
 ```
 
 
@@ -76,7 +77,9 @@ If `origin` is missing or rebase conflicts occur, stop and ask (interactive) or 
 
 ## Configuration
 
-Load `.gitissue.yml` once. Defaults (full semantics in `docs/config-schema.md`):
+Load config once at skill start: run `python3 shared/scripts/gi-config.py` — two independent requirements, both mandatory. **Working directory:** the repo root, because the script resolves `.gitissue.yml` against the working directory; run it from anywhere else and it exits 0 reporting `config_file: null`/`first_run: true`, silently discarding the repo's real config. **Script path:** relative to this SKILL.md's own directory, *not* to the working directory — resolve it to an absolute path exactly as the *Bundled dependency precheck* resolves its list, and pass that absolute path to `python3`. It prints `{"config": {…dotted keys…}, "config_file": …, "first_run": …}` as JSON on stdout, merging the defaults below with `.gitissue.yml`. Exit 0: use `config`; `first_run: true` means no `.gitissue.yml` was found and every value came from the defaults below. Exit 3: `.gitissue.yml` is invalid — print `✗ Invalid config: .gitissue.yml` followed by the offending key and reason the script reported on stderr, and stop. Script file absent: a bundled dependency is missing, which is a broken install and not a degrade — stop and print the `✗ Missing bundled dependency` block the *Bundled dependency precheck* names. Any other outcome (no `python3`, non-zero exit, unparsable stdout): print `⚠ gi-config unavailable — using the inline defaults below` and instead follow the manual fallback procedure that makes up the rest of this section. That procedure is the *alternative* to this script, never an extra step to run alongside it: on exit 0 the script's `config` is the whole answer and the rest of this section is reference material only. Never re-read the config after this step.
+
+Otherwise, load `.gitissue.yml` once. Defaults (full semantics in `docs/config-schema.md`):
 - `review.max_cycles: 3` — 3 LLM cycles suffice once the script pre-pass handles mechanical issues
 - `review.adaptive_depth: true` — scale review depth to the PR's complexity (see *Step 1 — Depth gate*). When `false`, every PR gets full-depth review (profile pinned to `full`).
 - `review.auto_merge: false` (overridden to `true` in auto mode)

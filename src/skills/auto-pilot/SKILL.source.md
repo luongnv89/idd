@@ -120,6 +120,9 @@ Check these files relative to the skill's directory (the dirname of this SKILL.m
 - `references/docs/agent-model-effort.md` — per-agent model and reasoning-effort mapping
 - `references/docs/terminal-style.md` — terminal output style contract (symbols, output structure, table/error formats)
 - `references/docs/auto-mode.md` — auto-mode detection and the caller obligation for delegated skills
+- `references/scripts/gi-config.py` — config resolver: merges the documented defaults with `.gitissue.yml` and prints one JSON line
+- `references/scripts/gi-runlog.py` — run-log writer: validates, normalizes, and appends one `.gitissue/runs.jsonl` record
+- `references/scripts/gi-deps.py` — dependency-marker parser for the Phase 5 dependency gate
 
 If the working tree is dirty, auto-stash before starting; if not on the default
 branch, auto-switch and rebase on a clean tree. Both procedures (the stash-first
@@ -130,7 +133,9 @@ reversible operations — no user confirmation needed; the stash is restored wit
 
 ## Configuration
 
-Load `.gitissue.yml` from the repo root once at start. If the file does not exist, use defaults and print:
+Load config once at skill start: run `python3 shared/scripts/gi-config.py` — two independent requirements, both mandatory. **Working directory:** the repo root, because the script resolves `.gitissue.yml` against the working directory; run it from anywhere else and it exits 0 reporting `config_file: null`/`first_run: true`, silently discarding the repo's real config. **Script path:** relative to this SKILL.md's own directory, *not* to the working directory — resolve it to an absolute path exactly as the *Bundled dependency precheck* resolves its list, and pass that absolute path to `python3`. It prints `{"config": {…dotted keys…}, "config_file": …, "first_run": …}` as JSON on stdout, merging the defaults below with `.gitissue.yml`. Exit 0: use `config`, and print the `○ First run` line below when `first_run` is `true`. Exit 3: `.gitissue.yml` is invalid — print the validation error from `references/error-messages.md` (*Invalid config*) and stop. Script file absent: a bundled dependency is missing, which is a broken install and not a degrade — stop and print the `✗ Missing bundled dependency` block the *Bundled dependency precheck* names. Any other outcome (no `python3`, non-zero exit, unparsable stdout): print `⚠ gi-config unavailable — using the inline defaults below` and instead follow the manual fallback procedure that makes up the rest of this section. That procedure is the *alternative* to this script, never an extra step to run alongside it: on exit 0 the script's `config` is the whole answer and the rest of this section is reference material only. Never re-read the config after this step.
+
+Otherwise, load `.gitissue.yml` from the repo root once at start. If the file does not exist, use defaults and print:
 
 ```
 ○ First run — using default config. Run /init-gitissue to customize.
@@ -285,12 +290,19 @@ include `skipped_reason`** — a skip never ran the resolver, so it carries no t
 The full field list lives in `references/run-log.md` → *Fields to populate*.
 
 ```bash
-mkdir -p .gitissue
-printf '%s\n' "$run_json" >> .gitissue/runs.jsonl
+printf '%s' "$run_json" | python3 shared/scripts/gi-runlog.py --append
+# Fallback when `python3` is unavailable or the script exits 4: mkdir -p .gitissue && printf '%s\n' "$run_json" >> .gitissue/runs.jsonl
 ```
 
-The write is **best-effort and non-fatal** — a failed append never stops the
-loop or changes the iteration outcome. Append only; never rewrite prior lines.
+**Exit 3:** the record itself is invalid — the script printed the reason on
+stderr and wrote nothing. This is a stop, not a degrade: never append
+`$run_json` raw, because that writes the malformed line the script exists to
+reject. Correct the record and re-run, or drop the line.
+
+Only the *write* is **best-effort and non-fatal** — a write that cannot happen
+(no `python3`, exit 4) never stops the loop or changes the iteration outcome. A
+rejected record is never written by any path. Append only; never rewrite prior
+lines.
 
 Then loop back to Phase 1.
 

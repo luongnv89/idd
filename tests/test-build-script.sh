@@ -7,6 +7,8 @@
 #   - Every shared source agent is emitted as a standalone Claude Code agent
 #   - Internal skills (src/internal-skills/) and deprecated skills
 #     (src/deprecated-skills/) without a distribute flag are excluded.
+#   - Every shared script (src/shared/scripts/) ships into at least one skill,
+#     byte-identically, executable, and runnable (issue #251).
 #
 # Usage: bash tests/test-build-script.sh
 # Returns: exit 0 on pass, exit 1 on failure.
@@ -17,6 +19,7 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 BUILD_SH="$REPO_ROOT/scripts/build.sh"
 SRC_SKILLS="$REPO_ROOT/src/skills"
 SRC_AGENTS="$REPO_ROOT/src/shared/agents"
+SRC_SCRIPTS="$REPO_ROOT/src/shared/scripts"
 ROOT_SKILLS="$REPO_ROOT/skills"
 
 PASS=0
@@ -24,6 +27,11 @@ FAIL=0
 
 pass() { echo "  ✓ $1"; PASS=$((PASS + 1)); }
 fail() { echo "  ✗ $1"; FAIL=$((FAIL + 1)); }
+
+# Portable mode read: GNU `stat -c` and BSD `stat -f` disagree, python3 does not.
+mode_of() {
+  python3 -c 'import os,sys;print(oct(os.stat(sys.argv[1]).st_mode & 0o777))' "$1"
+}
 
 echo "◆ Build Script Tests (issue #58)"
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
@@ -148,6 +156,68 @@ if [ -d "$REPO_ROOT/src/deprecated-skills" ]; then
       fi
     fi
   done
+fi
+
+# ───────────────────────────────────────────────────────────
+# T8: every shared script ships into at least one skill, unchanged and runnable
+# (issue #251). The build copies these with copy2 rather than copyfile — a
+# regression to copyfile drops the mode to a umask-dependent 0644 and the
+# shipped script silently stops being executable.
+# ───────────────────────────────────────────────────────────
+script_count=0
+for src_script in "$SRC_SCRIPTS"/*.py; do
+  [ -f "$src_script" ] || continue
+  script_count=$((script_count + 1))
+  name="$(basename "$src_script")"
+
+  copies=0
+  while IFS= read -r shipped; do
+    copies=$((copies + 1))
+    rel="${shipped#"$REPO_ROOT/"}"
+    if cmp -s "$src_script" "$shipped"; then
+      pass "T8: $rel is byte-identical to src/shared/scripts/$name"
+    else
+      fail "T8: $rel differs from src/shared/scripts/$name"
+    fi
+    # Never assert an absolute mode here: git records only the exec bit, so a
+    # fresh checkout materialises a 100755 blob as 0777 & ~umask — 0o775 under
+    # the common umask 002, 0o755 under 022. Compare the shipped copy to its
+    # source instead; that is what catches a copy2 → copyfile regression, and it
+    # holds under every umask.
+    shipped_mode="$(mode_of "$shipped")"
+    src_mode="$(mode_of "$src_script")"
+    if [ "$shipped_mode" = "$src_mode" ]; then
+      pass "T8: $rel has the source's mode ($shipped_mode)"
+    else
+      fail "T8: $rel is mode $shipped_mode, source is $src_mode"
+    fi
+    if [ -x "$shipped" ]; then
+      pass "T8: $rel is executable"
+    else
+      fail "T8: $rel is not executable"
+    fi
+    set +e
+    python3 "$shipped" --help >/dev/null 2>&1
+    help_rc=$?
+    set -e
+    if [ "$help_rc" -eq 0 ]; then
+      pass "T8: $rel --help exits 0"
+    else
+      fail "T8: $rel --help exited $help_rc"
+    fi
+  done < <(find "$ROOT_SKILLS" -type f -path '*/references/scripts/*' -name "$name" | sort)
+
+  if [ "$copies" -gt 0 ]; then
+    pass "T8: src/shared/scripts/$name ships into $copies skill(s)"
+  else
+    fail "T8: src/shared/scripts/$name ships into no skill — nothing cites it"
+  fi
+done
+
+if [ "$script_count" -gt 0 ]; then
+  pass "T8: src/shared/scripts/ holds $script_count script(s) to verify"
+else
+  fail "T8: src/shared/scripts/ is empty — T8 would pass vacuously"
 fi
 
 # ───────────────────────────────────────────────────────────
