@@ -145,12 +145,15 @@ class Unavailable(Exception):
 def _git(args: list[str]) -> str:
     """Run a read-only git command, or raise Unavailable.
 
-    Decoding is done here rather than by `text=True`, which turns on universal
-    newlines: that rewrites a lone `\r` inside a *filename* to `\n`, so a path
-    like `keys.txt\r` arrives as `keys.txt` and names a different file — or no
-    file — while still being counted as scanned. `-z` output exists precisely so
-    no byte of a filename is reinterpreted, and translating it here would undo
-    that before the path is ever used.
+    Decoding is `os.fsdecode`, not `text=True` and not a plain `.decode()`.
+    `text=True` turns on universal newlines, which rewrites a lone `\r` inside a
+    *filename* to `\n`; `errors="replace"` turns an undecodable byte into U+FFFD.
+    Either one names a different file — or no file — while the path is still
+    counted as scanned, which is a clean verdict over a secret. `os.fsdecode`
+    uses surrogateescape, the same round-tripping the `os` module applies to
+    every path it hands out, so `b"notes\xff.txt"` decodes to something that
+    reopens the very same file. `-z` output exists precisely so that no byte of
+    a filename is reinterpreted; anything else here undoes that.
     """
     try:
         proc = subprocess.run(
@@ -165,7 +168,7 @@ def _git(args: list[str]) -> str:
         raise Unavailable(
             "git " + " ".join(args) + " failed: " + (detail[-1] if detail else "unknown")
         )
-    return proc.stdout.decode("utf-8", errors="replace")
+    return os.fsdecode(proc.stdout)
 
 
 def _dedupe(entries: list[str]) -> list[str]:
@@ -184,7 +187,11 @@ def _dedupe(entries: list[str]) -> list[str]:
     seen: set[str] = set()
     out: list[str] = []
     for entry in entries:
-        if not entry or not entry.strip() or entry in seen:
+        # `not entry` alone is the separator artefact: a trailing NUL or a
+        # final newline yields an empty field. A name that is only spaces is a
+        # legal file, and dropping it would be the normalisation this docstring
+        # says does not happen here.
+        if not entry or entry in seen:
             continue
         seen.add(entry)
         out.append(entry)
@@ -254,15 +261,17 @@ def collect_paths(args: argparse.Namespace) -> tuple[list[str], str]:
     if args.files_from:
         if args.files_from == "-":
             buffer = getattr(sys.stdin, "buffer", None)
+            # os.fsdecode, as in _git: a listed path with an undecodable byte
+            # must round-trip to the same file, not to U+FFFD.
             text = (
-                buffer.read().decode("utf-8", errors="replace")
+                os.fsdecode(buffer.read())
                 if buffer is not None
                 else sys.stdin.read()
             )
         else:
             try:
                 with open(args.files_from, "rb") as handle:
-                    text = handle.read().decode("utf-8", errors="replace")
+                    text = os.fsdecode(handle.read())
             except OSError as exc:
                 raise Unavailable(f"cannot read {args.files_from} — {exc}") from exc
         return _split_paths(text), ""

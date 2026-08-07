@@ -794,6 +794,42 @@ run_status out st sh -c "cd '$CR' && python3 '$SECSCAN' --staged --quiet"
 [ "$st" = "1" ] && pass "AC1: a filename containing a carriage return is scanned as named" \
                 || fail "AC1: a carriage-return filename passed the gate (exit $st)"
 
+# A filename is a byte string, not text. An undecodable byte must round-trip
+# (os.fsdecode/surrogateescape) — `errors="replace"` would turn it into U+FFFD
+# and name a different file, and a strict decode would abort the whole scan. A
+# name that is only spaces is a legal file too.
+BYTES="$TMP/byte-paths"
+mkdir -p "$BYTES"
+(
+  cd "$BYTES"
+  git init -q .
+  git config user.email t@example.com
+  git config user.name t
+  python3 -c "
+import os, sys
+key = os.environ['AWS_FIXTURE_KEY']
+for name in (b'notes\xff.txt', b'bad\xc3(name.txt', b'   '):
+    open(os.fsdecode(name), 'w').write('id=' + key + chr(10))
+open('readme.md', 'w').write('clean' + chr(10))
+"
+  git add -A
+) >/dev/null 2>&1
+for mode in --staged --working-tree; do
+  run_status out st sh -c "cd '$BYTES' && python3 '$SECSCAN' $mode --quiet"
+  if [ "$st" = "1" ]; then
+    pass "AC1: $mode scans undecodable and whitespace-only filenames"
+  else
+    fail "AC1: $mode passed a secret in an undecodable filename (exit $st)"
+  fi
+done
+# The verdict must still be machine-readable with such a path in it.
+run_status out st sh -c "cd '$BYTES' && python3 '$SECSCAN' --staged --quiet"
+if printf '%s' "$out" | python3 -c "import json,sys; json.load(sys.stdin)" 2>/dev/null; then
+  pass "AC1: the JSON verdict stays parsable with a surrogate-escaped path"
+else
+  fail "AC1: a surrogate-escaped path produced unparsable JSON"
+fi
+
 # A caller-supplied list has no git guarantee behind it, so a path that resolves
 # to nothing must be visible rather than counted as scanned and clean.
 UL="$TMP/unreadable-list"
@@ -892,11 +928,14 @@ ALLOWED = {
 # `${VAR}` is a shell expansion, not a paste — VAR checks it.
 PLACEHOLDER = re.compile(
     r"(?<!\$)\{\s*[^{}\s][^{}]*\}"
-    # <NAME> / [NAME]: an identifier of 4+ characters, or any with an upper
-    # case letter, `-` or `_`. `[abc]` stays a glob range; `<FILE-LIST>` and
-    # `<files>` are placeholders.
-    r"|<(?=[A-Za-z_])(?:[\w-]{4,}|[\w-]*[A-Z_-][\w-]*)>"
-    r"|\[(?=[A-Za-z_])(?:[\w-]{4,}|[\w-]*[A-Z_-][\w-]*)\]"
+    # <NAME>: an angle-bracketed identifier is never shell syntax, so any
+    # length counts — `<key>` is as much a placeholder as `<FILE-LIST>`.
+    r"|<[A-Za-z_][\w-]*>"
+    # [NAME]: a bracket is also a glob range. Require 4+ characters or an
+    # upper-case letter/`-`/`_`, which keeps `[abc]` and `[a-z]` as globs while
+    # catching `[untrusted]`. `[key]` is the residual blind spot; a placeholder
+    # that short and that shell-ambiguous is not worth the false positives.
+    r"|\[(?=[A-Za-z_])(?:[\w-]{4,}|[\w-]*[A-Z_][\w-]*)\]"
 )
 VAR = re.compile(r"\$\{?[A-Za-z_][A-Za-z0-9_]*\}?")
 # Command substitution pastes its output into the command line unquoted. Only
@@ -908,8 +947,10 @@ SUBST = re.compile(r"\$\(")
 # `sh -c "…"` re-parses its argument, so the double-quote reasoning below does
 # not hold inside one.
 REPARSE = re.compile(
-    # `sh -c`, `bash -lc`, `zsh -ec` … any shell whose argument is re-parsed
-    r"\b(?:sh|bash|zsh|dash|ksh)\s+(?:-\S+\s+)*-\S*c\b"
+    # Any shell whose argument is re-parsed: `sh -c`, `bash -lc`, `sh -ce`,
+    # `bash -o pipefail -c`. The `-…c…` token may carry other letters and may
+    # sit behind options that take arguments of their own.
+    r"\b(?:sh|bash|zsh|dash|ksh)\b(?:\s+\S+)*?\s+-[A-Za-z]*c[A-Za-z]*\b"
     # xargs word-splits its input and honours quotes, and turns a filename
     # starting with `-` into an option — the same hazard by another route
     r"|\bxargs\b|\beval\b"
@@ -975,12 +1016,13 @@ def commands(text: str):
         )
         if admitted:
             out.append(span)
-        # An option with no value yet makes the NEXT span its value. The state
-        # has to survive a span that carries only the option, or a command
-        # split three ways slips the value past the check.
-        dangling = admitted and bool(
-            re.search(r"(?:^|\s)--?[A-Za-z][\w-]*\s*$", span)
-        )
+        # An option left without a value makes every later span on the line
+        # part of the command, and stays pending until the line ends. Consuming
+        # only the next span lets a decoy — `--allow-pattern` `see`
+        # `{untrusted}` — carry the value past the check, and nothing on a line
+        # that already ended mid-option is prose worth protecting.
+        if not dangling:
+            dangling = bool(re.search(r"(?:^|\s)--?[A-Za-z][\w-]*\s*$", span))
     return out
 
 bad = []
