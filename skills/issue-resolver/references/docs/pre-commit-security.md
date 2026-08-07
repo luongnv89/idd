@@ -45,7 +45,7 @@ The file being **absent from the bundle** is a different failure: a broken insta
 
 This is the canonical statement of the rules, and the **documented fallback** for the script above — run it verbatim when `gi-secscan.py` cannot run (no `python3`, exit `2`, exit `4`) and in any context that does not bundle the script. The script and this block implement the same five **rules**; when they disagree about a rule, this document is the specification and the script is the bug.
 
-They differ in what each can *read*, never in what counts as a secret. Two such differences, both favouring the script. This block (and rule 3's `stat`) reads the file on disk; for a **staged** set those are not the bytes being committed — `git add` a key, edit it out, and the file reads clean over a blob that still carries it. `gi-secscan.py --staged` reads the index blob and is the stronger of the two: prefer it wherever it runs.
+They differ in what each can *read*, never in what counts as a secret, and both differences favour the script — this one, and the quoted-path limitation noted inside the block below. This block (and rule 3's `stat`) reads the file on disk; for a **staged** set those are not the bytes being committed — `git add` a key, edit it out, and the file reads clean over a blob that still carries it. `gi-secscan.py --staged` reads the index blob and is the stronger of the two: prefer it wherever it runs.
 
 Every skill that runs `git add`, `git commit`, or `git push` MUST execute one of the two against the staged set (or the about-to-be-staged set) before proceeding — never neither, and never a weaker check improvised inline.
 

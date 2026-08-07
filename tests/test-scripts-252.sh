@@ -776,6 +776,36 @@ run_status out st sh -c "cd '$WS' && python3 '$SECSCAN' --working-tree --quiet"
 [ "$st" = "1" ] && pass "AC1: --working-tree scans whitespace-bearing paths too" \
                 || fail "AC1: --working-tree skipped a whitespace-bearing path (exit $st)"
 
+# A carriage return is as legal in a filename as a space, and `text=True` on the
+# git read would translate it to a newline — renaming the path before it is used.
+CR="$TMP/cr-paths"
+mkdir -p "$CR"
+(
+  cd "$CR"
+  git init -q .
+  git config user.email t@example.com
+  git config user.name t
+  printf 'id=%s\n' "$AWS_FIXTURE_KEY" > "$(printf 'solo.txt\r')"
+  printf 'id=%s\n' "$AWS_FIXTURE_KEY" > "$(printf 'cr.txt\r')"
+  printf 'clean\n' > cr.txt
+  git add -A
+) >/dev/null 2>&1
+run_status out st sh -c "cd '$CR' && python3 '$SECSCAN' --staged --quiet"
+[ "$st" = "1" ] && pass "AC1: a filename containing a carriage return is scanned as named" \
+                || fail "AC1: a carriage-return filename passed the gate (exit $st)"
+
+# A caller-supplied list has no git guarantee behind it, so a path that resolves
+# to nothing must be visible rather than counted as scanned and clean.
+UL="$TMP/unreadable-list"
+mkdir -p "$UL"
+printf 'no-such-file.txt\n' > "$UL/list.txt"
+run_status out st sh -c "cd '$UL' && python3 '$SECSCAN' --files-from list.txt --quiet"
+if printf '%s' "$out" | grep -q 'unreadable-path'; then
+  pass "AC1: a listed path that cannot be read is reported, not silently skipped"
+else
+  fail "AC1: an unreadable listed path was reported as a clean scan"
+fi
+
 # A binary blob larger than the pipe buffer is decided by the 8 KiB sniff, so
 # the reader stops early and git dies of EPIPE. Reading that non-zero status as
 # "no blob" silently drops the size rule for the staged bytes.
@@ -862,19 +892,29 @@ ALLOWED = {
 # `${VAR}` is a shell expansion, not a paste — VAR checks it.
 PLACEHOLDER = re.compile(
     r"(?<!\$)\{\s*[^{}\s][^{}]*\}"
-    r"|<[a-z_][a-z0-9_]*>"
-    r"|\[[a-z_][a-z0-9_]*\]"
+    # <NAME> / [NAME]: an identifier of 4+ characters, or any with an upper
+    # case letter, `-` or `_`. `[abc]` stays a glob range; `<FILE-LIST>` and
+    # `<files>` are placeholders.
+    r"|<(?=[A-Za-z_])(?:[\w-]{4,}|[\w-]*[A-Z_-][\w-]*)>"
+    r"|\[(?=[A-Za-z_])(?:[\w-]{4,}|[\w-]*[A-Z_-][\w-]*)\]"
 )
 VAR = re.compile(r"\$\{?[A-Za-z_][A-Za-z0-9_]*\}?")
 # Command substitution pastes its output into the command line unquoted. Only
-# the `$(…)` form is checked: a backtick cannot appear inside a markdown code
-# span, so the legacy form is unwritable at a call site in these files, and
-# matching a bare backtick would fire on the span delimiters themselves.
+# the `$(…)` form is checked: a backtick is also the markdown code delimiter in
+# these files, so matching one cannot tell a legacy `…` substitution from the
+# span it is written inside. Anything reachable through a backtick is reachable
+# through `$(…)`, which is checked, so the gap is in notation, not in coverage.
 SUBST = re.compile(r"\$\(")
 # `sh -c "…"` re-parses its argument, so the double-quote reasoning below does
 # not hold inside one.
-REPARSE = re.compile(r"\b(?:sh|bash|zsh|eval)\s+(?:-[a-z]+\s+)*-c\b|\beval\b")
-DQUOTED = re.compile(r'"[^"]*"')
+REPARSE = re.compile(
+    # `sh -c`, `bash -lc`, `zsh -ec` … any shell whose argument is re-parsed
+    r"\b(?:sh|bash|zsh|dash|ksh)\s+(?:-\S+\s+)*-\S*c\b"
+    # xargs word-splits its input and honours quotes, and turns a filename
+    # starting with `-` into an option — the same hazard by another route
+    r"|\bxargs\b|\beval\b"
+)
+DQUOTED = re.compile(r'"(?:[^"\\]|\\.)*"')
 
 def logical_lines(path: pathlib.Path):
     """Yield (line_no, text) with `\\`- and `|`-continuations joined."""
@@ -882,9 +922,30 @@ def logical_lines(path: pathlib.Path):
     i = 0
     while i < len(lines):
         joined, j = lines[i], i
-        while j + 1 < len(lines) and re.search(r"(\\|\|)\s*$", joined):
+        # A trailing `|` continues a shell pipeline — unless the line also
+        # opens with one, which makes it a markdown table row.
+        while (
+            j + 1 < len(lines)
+            and re.search(r"(\\|\|)\s*$", joined)
+            and not (joined.lstrip().startswith("|") and joined.rstrip().endswith("|"))
+        ):
             j += 1
             joined = re.sub(r"\\\s*$", " ", joined) + " " + lines[j].strip()
+        # An odd backtick count means an inline code span was hard-wrapped
+        # mid-command. Pull in following lines until it closes, so the span can
+        # be extracted as one region instead of falling back to the raw line.
+        pulled = 0
+        # A fence marker is backticks too — never treat one as an open span.
+        is_fence = joined.lstrip().startswith("```") or joined.lstrip().startswith("~~~")
+        while (
+            not is_fence
+            and joined.count("`") % 2
+            and j + 1 < len(lines)
+            and pulled < 4
+        ):
+            j += 1
+            pulled += 1
+            joined += " " + lines[j].strip()
         yield i + 1, joined
         i = j + 1
 
@@ -909,10 +970,16 @@ def commands(text: str):
         # still waiting for its value — `…gi-x.py --allow-pattern` `{untrusted}`
         # is one command split across two spans. A sibling naming an output
         # shape, or the variable the call assigns to, is prose.
-        if is_call or dangling or re.match(r"\s*(-|\||printf\b|echo\b)", span):
+        admitted = bool(
+            is_call or dangling or re.match(r"\s*(-|\||printf\b|echo\b)", span)
+        )
+        if admitted:
             out.append(span)
-        dangling = bool(re.search(r"(?:^|\s)--?[A-Za-z][\w-]*\s*$", span)) and (
-            is_call or dangling
+        # An option with no value yet makes the NEXT span its value. The state
+        # has to survive a span that carries only the option, or a command
+        # split three ways slips the value past the check.
+        dangling = admitted and bool(
+            re.search(r"(?:^|\s)--?[A-Za-z][\w-]*\s*$", span)
         )
     return out
 

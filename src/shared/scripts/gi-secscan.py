@@ -143,50 +143,67 @@ class Unavailable(Exception):
 
 
 def _git(args: list[str]) -> str:
-    """Run a read-only git command, or raise Unavailable."""
+    """Run a read-only git command, or raise Unavailable.
+
+    Decoding is done here rather than by `text=True`, which turns on universal
+    newlines: that rewrites a lone `\r` inside a *filename* to `\n`, so a path
+    like `keys.txt\r` arrives as `keys.txt` and names a different file — or no
+    file — while still being counted as scanned. `-z` output exists precisely so
+    no byte of a filename is reinterpreted, and translating it here would undo
+    that before the path is ever used.
+    """
     try:
         proc = subprocess.run(
             ["git", *args],
             capture_output=True,
-            text=True,
             check=False,
         )
     except (OSError, ValueError) as exc:  # git missing, or a bad argv
         raise Unavailable(f"cannot run git — {exc}") from exc
     if proc.returncode != 0:
-        detail = proc.stderr.strip().splitlines()
+        detail = proc.stderr.decode("utf-8", errors="replace").strip().splitlines()
         raise Unavailable(
             "git " + " ".join(args) + " failed: " + (detail[-1] if detail else "unknown")
         )
-    return proc.stdout
+    return proc.stdout.decode("utf-8", errors="replace")
 
 
 def _dedupe(entries: list[str]) -> list[str]:
-    """Drop blanks and repeats, preserving first-appearance order.
+    """Drop blank and repeated entries, preserving first-appearance order.
 
-    Only `\\r` and the trailing newline are stripped — never leading or trailing
-    spaces. A space is a legal filename character on every platform this runs
-    on, and filenames are attacker-controlled in the flows that call this gate:
-    stripping ` secrets.env` to `secrets.env` renames the path to a *different*
-    file, so the index blob and the file on disk that get scanned are not the
-    ones being committed. Where a sibling exists, its clean contents are scanned
-    in place of the real one; where it does not, the path resolves to nothing
-    and is skipped as a deletion. Both report clean over a live key.
+    Nothing is normalised here. Every byte that was not used as a separator is
+    part of the filename — spaces, tabs and `\r` are all legal on the platforms
+    this runs on — and filenames are attacker-controlled in the flows that call
+    this gate. Rewriting ` secrets.env` to `secrets.env`, or `x.txt\r` to
+    `x.txt`, names a *different* file: where a sibling exists its clean bytes
+    are scanned in place of the real one, and where none exists the path
+    resolves to nothing and is skipped as a deletion. Both report clean over a
+    live key. Only the newline-separated caller list needs line-ending repair,
+    and `_split_paths` does that where the format makes it unambiguous.
     """
     seen: set[str] = set()
     out: list[str] = []
     for entry in entries:
-        path = entry.rstrip("\r\n")
-        if not path.strip() or path in seen:
+        if not entry or not entry.strip() or entry in seen:
             continue
-        seen.add(path)
-        out.append(path)
+        seen.add(entry)
+        out.append(entry)
     return out
 
 
 def _split_paths(text: str) -> list[str]:
-    """Split a newline- or NUL-separated path list."""
-    return _dedupe(text.split("\0") if "\0" in text else text.splitlines())
+    """Split a NUL-separated (git) or newline-separated (caller) path list.
+
+    A NUL-separated list is passed through byte for byte: git chose that
+    separator precisely so nothing inside a filename needs escaping. Only the
+    newline form — which a human or a shell wrote — gets its `\r` repaired, and
+    only at the end of a line, where CRLF is a line ending rather than a name.
+    `str.splitlines()` is deliberately not used: it also splits on `\v`, `\f`,
+    `\x85` and `\u2028`, every one of which is a legal filename byte.
+    """
+    if "\0" in text:
+        return _dedupe(text.split("\0"))
+    return _dedupe([line.rstrip("\r") for line in text.split("\n")])
 
 
 def _porcelain_paths(text: str) -> list[str]:
@@ -620,6 +637,7 @@ def scan(
     rules: dict[str, object],
     base: str = "",
     from_index: bool = False,
+    caller_supplied: bool = False,
 ) -> dict[str, object]:
     """Apply every rule to every path and return the structured verdict.
 
@@ -682,6 +700,20 @@ def scan(
             if not os.path.isfile(resolved):
                 # A deletion, or a path outside the working tree. The filename
                 # rules above still applied; there is no content or size here.
+                if caller_supplied:
+                    # git only ever names entries it has, so a missing path
+                    # there is a deletion. A caller-supplied list has no such
+                    # guarantee: a typo or a stray space resolves to nothing,
+                    # and reporting that as clean is a scan of zero bytes
+                    # dressed as a pass.
+                    warnings.append(
+                        {
+                            "rule": "unreadable-path",
+                            "path": path,
+                            "detail": "listed for scanning but not readable — "
+                            "its contents were never checked",
+                        }
+                    )
                 continue
 
             detail = _scan_file_contents(resolved, secret_value)
@@ -819,7 +851,13 @@ def main(argv: list[str] | None = None) -> int:
         sys.stderr.write(f"⚠ gi-secscan: {exc}\n")
         return 4
 
-    result = scan(paths, rules, base, from_index=bool(args.staged))
+    result = scan(
+        paths,
+        rules,
+        base,
+        from_index=bool(args.staged),
+        caller_supplied=bool(args.paths or args.files_from),
+    )
     print(json.dumps(result))
     if not args.quiet:
         report(result)
