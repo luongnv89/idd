@@ -813,11 +813,24 @@ def logical_lines(path: pathlib.Path):
         i = j + 1
 
 def commands(text: str):
-    """The command region(s) of a logical line that invoke a shared script."""
+    """The command region(s) of a logical line that invoke a shared script.
+
+    When any backtick span on the line is a call, *every* span on that line is
+    part of the command text. Prose splits one command across spans — "run
+    `python3 …gi-secscan.py` with `--allow-pattern "{x}"`" — and inspecting only
+    the span holding the executable would let the flag carrying the untrusted
+    value sit in the span beside it, unlinted.
+    """
     spans = re.findall(r"`([^`]+)`", text)
-    hits = [span for span in spans if CALL.search(span)]
-    if hits:
-        return hits
+    if any(CALL.search(span) for span in spans):
+        # The call's own span, plus any sibling that continues the command line
+        # (an option, a pipe, another command). A sibling naming an output shape
+        # or the variable the call assigns to is prose, not an argument.
+        return [
+            span
+            for span in spans
+            if CALL.search(span) or re.match(r"\s*(-|\||printf\b|echo\b)", span)
+        ]
     return [text] if CALL.search(text) else []
 
 bad = []
