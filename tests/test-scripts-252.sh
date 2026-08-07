@@ -755,23 +755,30 @@ run_status out st sh -c "cd '$DELDIR' && python3 '$SECSCAN' --staged --quiet"
 # Two command injections shipped in this branch one review cycle apart, both of
 # the same shape: an untrusted value pasted into a shell word on a script's
 # command line. A blocklist of the flag names those two used would not have
-# caught either one before it was written, so this lint is an ALLOWLIST instead:
-# every `{placeholder}` that appears on a shared-script command line must be
-# named below, with a reason it cannot carry attacker text. A new placeholder
-# fails until someone adds it here and states why — that is what makes the class
-# closed by construction rather than patched twice.
+# caught either one before it was written, so this lint is an ALLOWLIST: every
+# `{placeholder}` on a shared-script command line must be named below with a
+# reason it cannot carry attacker text. A new placeholder fails until someone
+# adds it and says why — that is what closes the class by construction rather
+# than patching it twice.
 #
-# `$var` expansions are not listed: a double-quoted shell parameter expansion is
-# never re-parsed, so it is inert whatever it holds. The lint requires the quotes.
-#
-# Logical lines are joined across `\` continuations first: the flag that carries
-# the injection is often on the line after the command.
+# Three deliberate choices, each closing a bypass that was demonstrated against
+# an earlier draft of this lint:
+#   * A call is recognized by `python3 <anything>` where the argument is a
+#     gi-*.py path OR a {placeholder} path — `python3 {secscan_script} --staged`
+#     in the shared agents is a real invocation and must be linted.
+#   * Markdown fence state is not tracked at all. A fence toggle can be lost to a
+#     line continuation, and `~~~` and 4-space-indented blocks are code too, so
+#     any logical line carrying a call is inspected, narrowed to the backtick
+#     span when the line has one.
+#   * Logical lines are joined across `\` and trailing `|`, so a flag or a
+#     `printf` upstream of the pipe cannot hide on an adjacent line. A heredoc on
+#     a call line is refused outright — its body is unreachable from here.
 python3 - "$REPO_ROOT" <<'PY' > "$TMP/injection-report"
 import pathlib, re, sys
 
 root = pathlib.Path(sys.argv[1])
 ROOTS = ["src/skills", "src/internal-skills", "src/shared/agents", "docs"]
-CALL = re.compile(r"(?:python3|python)\s+\S*gi-[a-z0-9-]+\.py")
+CALL = re.compile(r"(?:python3|python)\s+(?:\S*gi-[a-z0-9-]+\.py|\{[^{}]+\}|\"?\$\{?\w+\}?\"?)")
 
 # Placeholders permitted on a shared-script command line, and why each is safe.
 ALLOWED = {
@@ -783,78 +790,75 @@ ALLOWED = {
     "{parent}": "integer",
     "{run_id}": "CI run id — an integer from the GitHub API",
     "{type}": "one of six literals the skill classifies, never free text",
-    "{base}": "locally derived from `git rev-parse`, not repo content",
     "{secscan_script}": "absolute path bound by the orchestrating skill",
+    "{security_convention}": "bundled doc path bound by the orchestrating skill",
     "{review.ci_poll_interval}": "gi-config validates it against an int default",
     "{review.ci_timeout}": "gi-config validates it against an int default",
-    "{security_convention}": "bundled doc path bound by the orchestrating skill",
 }
-PLACEHOLDER = re.compile(r"\{[^{}\s][^{}]*\}")
+# `{...}` not preceded by `$` — `${VAR}` is a shell expansion, checked separately.
+PLACEHOLDER = re.compile(r"(?<!\$)\{[^{}]*\}")
 VAR = re.compile(r"\$\{?[A-Za-z_][A-Za-z0-9_]*\}?")
 DQUOTED = re.compile(r'"[^"]*"')
 
-def regions(path: pathlib.Path):
-    """Yield (line_no, command_text) for every shared-script invocation."""
+def logical_lines(path: pathlib.Path):
+    """Yield (line_no, text) with `\\`- and `|`-continuations joined."""
     lines = path.read_text(encoding="utf-8").splitlines()
-    fenced = False
     i = 0
     while i < len(lines):
-        line = lines[i]
-        if line.lstrip().startswith("```"):
-            fenced = not fenced
-            i += 1
-            continue
-        joined, j = line, i
-        while joined.rstrip().endswith("\\") and j + 1 < len(lines):
+        joined, j = lines[i], i
+        while j + 1 < len(lines) and re.search(r"(\\|\|)\s*$", joined):
             j += 1
-            joined = joined.rstrip()[:-1] + " " + lines[j]
-        if fenced:
-            if CALL.search(joined):
-                yield i + 1, joined
-        else:
-            # Outside a fence, only the inline-code spans are commands; the
-            # surrounding prose legitimately contains braces.
-            for span in re.findall(r"`([^`]+)`", joined):
-                if CALL.search(span):
-                    yield i + 1, span
+            joined = re.sub(r"\\\s*$", " ", joined) + " " + lines[j].strip()
+        yield i + 1, joined
         i = j + 1
+
+def commands(text: str):
+    """The command region(s) of a logical line that invoke a shared script."""
+    spans = re.findall(r"`([^`]+)`", text)
+    hits = [span for span in spans if CALL.search(span)]
+    if hits:
+        return hits
+    return [text] if CALL.search(text) else []
 
 bad = []
 checked = 0
-scripts = set()
 for rel in ROOTS:
     for path in sorted((root / rel).rglob("*.md")):
-        for lineno, cmd in regions(path):
-            checked += 1
-            for m in CALL.finditer(cmd):
-                scripts.add(m.group(0).rsplit("/", 1)[-1])
-            rp = path.relative_to(root)
-            for token in PLACEHOLDER.findall(cmd):
-                if token not in ALLOWED:
+        rp = path.relative_to(root)
+        for lineno, text in logical_lines(path):
+            for cmd in commands(text):
+                checked += 1
+                if "<<" in cmd:
                     bad.append(
-                        f"{rp}:{lineno}: {token} is interpolated into a "
-                        f"shared-script command line and is not on the "
-                        f"reviewed allowlist"
+                        f"{rp}:{lineno}: a heredoc on a shared-script command "
+                        f"line hides its body from this lint — pass the value "
+                        f"through a quoted variable instead"
                     )
-            # A parameter expansion inside double quotes is inert whatever it
-            # holds; an unquoted one word-splits and globs. Blank out every
-            # double-quoted region, then anything left is unquoted.
-            unquoted = DQUOTED.sub(lambda m: " " * len(m.group(0)), cmd)
-            for token in VAR.findall(unquoted):
-                bad.append(
-                    f"{rp}:{lineno}: {token} is unquoted on a shared-script "
-                    f"command line"
-                )
+                for token in PLACEHOLDER.findall(cmd):
+                    if token.strip() not in ALLOWED:
+                        bad.append(
+                            f"{rp}:{lineno}: {token} is interpolated into a "
+                            f"shared-script command line and is not on the "
+                            f"reviewed allowlist"
+                        )
+                # A parameter expansion inside double quotes is inert whatever
+                # it holds; an unquoted one word-splits and globs.
+                unquoted = DQUOTED.sub(lambda m: " " * len(m.group(0)), cmd)
+                for token in VAR.findall(unquoted):
+                    bad.append(
+                        f"{rp}:{lineno}: {token} is unquoted on a shared-script "
+                        f"command line"
+                    )
 
-if checked == 0:
-    print("FAIL|AC1: the call-site injection lint found no invocations to check")
+if checked < 25:
+    print(f"FAIL|AC1: the injection lint only found {checked} call sites — it is not scanning")
 elif bad:
-    for entry in bad:
+    for entry in sorted(set(bad)):
         print(f"FAIL|AC1: {entry}")
 else:
     print(
         f"PASS|AC1: no untrusted value is interpolated at any of the {checked} "
-        f"shared-script call sites ({len(scripts)} scripts)"
+        f"shared-script call sites"
     )
 PY
 while IFS='|' read -r verdict label; do

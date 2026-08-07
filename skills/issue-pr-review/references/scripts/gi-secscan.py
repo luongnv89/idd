@@ -472,6 +472,18 @@ def _scan_file_contents(path: str, pattern: re.Pattern[str]) -> str | None:
         return None
 
 
+def _index_rev(path: str) -> str:
+    """The index revision for `path`, stage-qualified.
+
+    `:<path>` is ambiguous: git reads `:<n>:<path>` when the character after the
+    colon is a digit, so a staged file literally named `0:x.txt` resolves to
+    stage 0 of `x.txt` — a different file, whose clean contents would be scanned
+    in its place. Naming stage 0 explicitly removes the ambiguity for every
+    path, and filenames are attacker-controlled in the flows that run this gate.
+    """
+    return f":0:{path}"
+
+
 def _scan_index_blob(
     path: str, root: str, pattern: re.Pattern[str]
 ) -> tuple[bool, str | None]:
@@ -487,7 +499,7 @@ def _scan_index_blob(
     """
     try:
         proc = subprocess.Popen(
-            ["git", "-C", root or ".", "show", f":{path}"],
+            ["git", "-C", root or ".", "show", _index_rev(path)],
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
         )
@@ -496,22 +508,26 @@ def _scan_index_blob(
     try:
         assert proc.stdout is not None
         detail = _scan_stream(proc.stdout, pattern)
-        proc.stdout.read()  # drain, so git never blocks on a full pipe
-    except OSError:
+    except (OSError, MemoryError):
         proc.kill()
         proc.wait()
         return False, None
     finally:
         if proc.stdout is not None:
+            # Close rather than drain: draining a multi-gigabyte blob to be
+            # polite to the pipe would spend the memory the chunked read was
+            # written to avoid. git takes EPIPE and exits; a non-zero status
+            # from that is why the match is captured before `wait()` decides.
             proc.stdout.close()
-    return proc.wait() == 0, detail
+    matched = detail is not None
+    return (matched or proc.wait() == 0), detail
 
 
 def _index_blob_size(path: str, root: str) -> int | None:
     """Byte size of the staged blob, or None when git cannot report it."""
     try:
         proc = subprocess.run(
-            ["git", "-C", root or ".", "cat-file", "-s", f":{path}"],
+            ["git", "-C", root or ".", "cat-file", "-s", _index_rev(path)],
             capture_output=True,
             text=True,
             check=False,

@@ -5,8 +5,13 @@ Reads the issue body on stdin and prints one local issue number per line, in
 first-appearance order, deduplicated. Cross-repo references (`org/repo#N`) MUST
 be ignored per SPEC §2 — only issues in the current repository can gate a merge.
 
-Exit code is always 0: an issue body with no dependency markers is the normal
-case, not an error, and prints nothing.
+Exit codes
+  0  parsed — including the normal case of a body with no dependency markers,
+     which is not an error and prints nothing
+  2  usage error (an unrecognized option). `python3` also returns 2 when the
+     script path itself does not resolve, so a caller cannot distinguish the
+     two — and must not: both mean nothing was parsed. Empty output is only
+     "no dependencies" when the exit status is 0.
 
 Authored at src/shared/scripts/gi-deps.py — do not edit installed copies; edit
 the source and run ./scripts/build.sh.

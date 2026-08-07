@@ -36,7 +36,9 @@ npm test          # or pytest, go test ./..., cargo test, etc.
 
 ### Commit auto-fixes
 
-**Not used in `--review-only`.** Run the pre-commit security scan first — `python3 references/scripts/gi-secscan.py --working-tree`, run from the repo root so it reads the repo's `security.*` extensions from `.gitissue.yml` itself (never pass a config value on the command line — this skill has a PR's branch checked out), The full exit contract is in SKILL.md (*Step 2 — Commit auto-fixes*) and is not
+**Not used in `--review-only`.** Run the pre-commit security scan first — `python3 references/scripts/gi-secscan.py --working-tree`, run from the repo root so it reads the repo's `security.*` extensions from `.gitissue.yml` itself (never pass a config value on the command line — this skill has a PR's branch checked out).
+
+The full exit contract is in SKILL.md (*Step 2 — Commit auto-fixes*) and is not
 optional here: **exit 1 is a block** — stop, do not commit, report the path from
 `blocking[]`, never fall through to another scan. **Exit 3 is also a stop**, not
 a degrade: an uncompilable `security.*` regex means the repo's own rules were

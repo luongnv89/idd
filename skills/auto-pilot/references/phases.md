@@ -400,7 +400,7 @@ Before merging, verify:
 gh pr view {pr_number} --json mergeable,reviewDecision,statusCheckRollup
 ```
 
-When checks are still pending, do not read `statusCheckRollup` in a loop — run `python3 references/scripts/gi-ci-wait.py {pr_number} --interval {review.ci_poll_interval} --timeout {review.ci_timeout}` once and read its `verdict`. All four are handled: `pass` merges; **`none` (the repository configures no checks for this PR) also merges** — step 1 above reads "CI passing (*if configured*)", and a repo without CI must not deadlock the loop; `fail` and `pending` both leave the PR open. Exit 3 (a malformed argument) is a stop, not a degrade. A missing `python3`, exit 2 (the script path did not resolve), or exit 4 degrades to the manual poll, which reaches the **same outcomes** — all checks green merges, a failed or still-pending check leaves the PR open. See `references/examples.md` (*Merge requires CI checks*).
+When checks are still pending, do not read `statusCheckRollup` in a loop — run `python3 references/scripts/gi-ci-wait.py {pr_number} --interval {review.ci_poll_interval} --timeout {review.ci_timeout}` once and read its `verdict`. All four are handled: `pass` merges; **`none` (the repository configures no checks for this PR) also merges** — step 1 above reads "CI passing (*if configured*)", and a repo without CI must not deadlock the loop; `fail` and `pending` both leave the PR open. Exit 3 (invalid input — a non-numeric PR number, or a non-positive interval or timeout) is a stop, not a degrade. A missing `python3`, exit 2 (the script path did not resolve), or exit 4 degrades to the manual poll, which reaches the **same outcomes** — all checks green merges, a failed or still-pending check leaves the PR open. See `references/examples.md` (*Merge requires CI checks*).
 
 If not mergeable:
 ```
@@ -433,21 +433,27 @@ For each line that matches `(?im)\b(?:depends\s+on|blocked\s+by)\b`, collect **l
 
 Feed the body in on **stdin**, never on a command line and never pasted into a
 shell word: an issue body is written by whoever filed the issue, and `/auto-pilot`
-runs unattended, so a body containing `` ` `` or `$(` would execute. Bind it with
-a command substitution — whose output is never re-evaluated — and pipe the
-variable:
+runs unattended, so a body containing `` ` `` or `$(` would execute. Whichever
+source the body came from, it must reach `$issue_body` through a command
+substitution — whose output is never re-evaluated — and never by pasting the text
+you are holding into the assignment:
 
 ```bash
-issue_body="$(gh issue view N --json body --jq .body)"
+# One of these, matching the source named above:
+issue_body="$(python3 references/scripts/gi-issue.py N --fields body --jq .issue.body)"
+issue_body="$(gh issue view N --json body --jq .body)"   # the degrade form
 printf '%s' "$issue_body" | python3 references/scripts/gi-deps.py
 ```
 
-Do **not** inline the body text cached from Phase 1 into that `printf`. It prints
-one local issue number per line; no markers prints nothing. **Empty output is
-only "no dependencies" when the exit status is 0.** A non-zero exit — 2 when the
-script path did not resolve, 4 when it cannot complete — is a scan that never
-ran, and reading its silence as "no blockers" merges a PR whose dependency is
-still open. On any non-zero exit, or no `python3`, apply steps 1–2 above by hand. Example: `Blocked by: acme/lib#15, #12` → gate on **#12 only**. `Depends on #12, #15` → gate on **#12** and **#15**. If no local markers remain, the gate is satisfied; proceed to Step 5.2.
+When Phase 1's cached body is the source, re-read it through the first form
+rather than inlining the cached text — the cache is what makes that read free.
+
+`gi-deps.py` prints one local issue number per line; no markers prints nothing.
+**Empty output is only "no dependencies" when the exit status is 0.** A non-zero
+exit — 2 for an unresolved script path or a malformed invocation — is a parse
+that never ran, and reading its silence as "no blockers" merges a PR whose
+dependency is still open. On any non-zero exit, or no `python3`,
+apply steps 1–2 above by hand. Example: `Blocked by: acme/lib#15, #12` → gate on **#12 only**. `Depends on #12, #15` → gate on **#12** and **#15**. If no local markers remain, the gate is satisfied; proceed to Step 5.2.
 
 **Cycle guard:** If issue A's body references its own number (`#A`), log a warning and skip the gate (treat as satisfied). The auto-pilot must never block a PR on its own issue number. Multi-hop cycles (A → B → A) are not detected here — they would require traversing each dependency's body, which is out of scope for the per-merge gate; the fail-safe is that any genuinely-cyclic issue set surfaces as `blocked_by_dependency` on each affected issue and requires user intervention before those PRs can merge — the loop still advances past them. The check is:
 

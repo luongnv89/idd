@@ -181,7 +181,8 @@ head-ref name is chosen by whoever opened the PR, and git permits `` ` ``, `$`,
 `(`, `;` and `&` in a ref, so ``fix/1-`id` `` in a shell word runs on the
 reviewer's machine; double quotes do not stop `$(…)` or a backtick. Assign once —
 `branch_name="$(gh pr view {N} --json headRefName --jq .headRefName)"` — and use
-`"$branch_name"` everywhere this skill writes `{branch_name}`. Command-substitution
+`"$branch_name"` wherever this skill puts `{branch_name}` in a **shell command**
+(display templates and spawn-variable lists still show the plain name). Command-substitution
 output is never re-evaluated, so it is inert whatever the name holds. Same rule as
 the `gi-secscan` and `gi-branch` call sites, for the one untrusted value this skill
 cannot hand to a script.

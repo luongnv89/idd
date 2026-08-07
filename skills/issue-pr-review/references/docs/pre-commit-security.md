@@ -43,7 +43,9 @@ The file being **absent from the bundle** is a different failure: a broken insta
 
 ## Primary Pattern: Pre-Commit Scan
 
-This is the canonical statement of the rules, and the **documented fallback** for the script above — run it verbatim when `gi-secscan.py` cannot run (no `python3`, exit `4`) and in any context that does not bundle the script. The script and this block implement the same five rules; when they disagree, this document is the specification and the script is the bug.
+This is the canonical statement of the rules, and the **documented fallback** for the script above — run it verbatim when `gi-secscan.py` cannot run (no `python3`, exit `2`, exit `4`) and in any context that does not bundle the script. The script and this block implement the same five **rules**; when they disagree about a rule, this document is the specification and the script is the bug.
+
+They differ in one place, and it is about *which bytes are read*, not about what counts as a secret. This block (and rule 3's `stat`) reads the file on disk; for a **staged** set those are not the bytes being committed — `git add` a key, edit it out, and the file reads clean over a blob that still carries it. `gi-secscan.py --staged` reads the index blob and is the stronger of the two: prefer it wherever it runs.
 
 Every skill that runs `git add`, `git commit`, or `git push` MUST execute one of the two against the staged set (or the about-to-be-staged set) before proceeding — never neither, and never a weaker check improvised inline.
 
@@ -57,12 +59,9 @@ Every skill that runs `git add`, `git commit`, or `git push` MUST execute one of
 #         yields the *old* path, which no longer exists, so the new file — the
 #         one actually being committed — is never scanned. It also truncates any
 #         path containing a space.
-#         Residual limitation of the shell form: it greps the file on disk. For
-#         a *staged* set those are different bytes the moment a path is staged
-#         and then edited — `git add` a key, strip it, and the file reads clean
-#         while the blob about to be committed still has it. gi-secscan.py
-#         --staged reads the index blob for exactly this reason; if you must run
-#         this block against a staged set, scan `git show ":$f"` rather than "$f".
+#         Residual limitation of the shell form: it reads the file on disk, not
+#         the staged blob. See the paragraph above this block — prefer
+#         gi-secscan.py --staged, which reads the index.
 #         Residual limitation of any line-based form: git still quotes a path
 #         containing a space or a non-ASCII byte, and the quoted string names no
 #         file, so its contents go unscanned. That is not fixable in a `while
