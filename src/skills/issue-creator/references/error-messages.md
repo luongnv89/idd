@@ -204,7 +204,25 @@ All errors follow the rich error format: what went wrong + fix command + docs li
   To fix:  edit .gitissue.yml and correct the values above
   Docs:    https://github.com/luongnv89/idd/blob/main/docs/config-schema.md
 ```
-**Trigger:** Config file exists but contains invalid values (wrong type, out of range, unknown field).
+**Trigger:** Config file exists but contains invalid values (wrong type, out of range, unknown field) — including `gi-dup-score.py` or `gi-model-cache.py` exiting 3 on an out-of-range `duplicate_detection.*` / `model_suggestion.*` value.
+
+### Duplicate scoring cannot run
+```
+✗ Duplicate scoring cannot run
+
+  {reason from gi-dup-score on stderr}
+
+  To fix:  correct the request or the duplicate_detection.* values above
+  Docs:    https://github.com/luongnv89/idd/blob/main/docs/config-schema.md
+```
+**Trigger:** `gi-dup-score.py` exits 3 — a malformed item (no title, non-array keywords) or an out-of-range `duplicate_detection.*` value. A **stop**, never a degrade.
+
+### Duplicate scoring degraded
+```
+⚠ gi-dup-score unavailable — scoring duplicates inline
+  {reason}
+```
+**Trigger:** No `python3`, exit 2, exit 4 (the backlog could not be read), or unparsable stdout. The Step 3 fallback runs instead. Exit 4 never means "no duplicates found" — the scan did not happen, and the summary must report it as such.
 
 ## Model Suggestion
 

@@ -286,6 +286,7 @@ Check these files:
 - `references/docs/auto-mode.md` — auto-mode detection and the non-interactive gate rule
 - `references/docs/terminal-style.md` — terminal output style contract (symbols, output structure, table/error formats)
 - `references/scripts/gi-config.py` — config resolver: merges the documented defaults with `.gitissue.yml` and prints one JSON line
+- `references/scripts/gi-triage-graph.py` — cycle detection, execution order, parallel sets, staleness, and priority
 
 ---
 
@@ -342,66 +343,66 @@ One full-scope scanner per batch finds issues already fixed by commits/PRs **and
 Summary:
 - **Step 1b** — flags open issues whose titles/bodies match recent commit messages or merged PR descriptions. Marks them `potentially_fixed` with evidence links.
 - **Step 2** — for each issue, extracts keywords from the title and body and scans the current codebase to discover affected files, then computes pairwise overlap to produce a `dependencies[]` graph. Affected files are derived from the codebase scan, never read from the issue body.
-- **Step 3** — detects circular dependency cycles in the graph and breaks them before the topological sort.
+- **Step 3** — circular-dependency detection; folded into the scripted block below, which breaks each cycle and reports it.
 
 ---
-## Step 4 — Compute Execution Order
+## Steps 3-7 — Order, Parallel Sets, Staleness, Priority
 
-Perform a topological sort on the dependency graph (after breaking any cycles from Step 3).
+Cycle detection, the topological sort and its tie-breaks, the independent-set
+grouping, the date subtraction behind staleness, and the P1/P2/P3 buckets are
+all arithmetic over the scanner's structured result. There is one correct answer
+for each, so run `shared/scripts/gi-triage-graph.py` rather than recomputing
+them from prose — a recomputed order is a *plausible* one, and a triage that
+reorders itself between identical runs is not actionable.
 
-- Issues with no incoming dependencies come first — they are "ready" to work on.
-- Issues blocked by other issues are ordered after their blockers.
-- Within the same topological level, sort by: bugs before features before improvements, then by age (oldest first).
+Write the merged scan to `.gitissue/cache/triage-scan.json` with the Write tool
+— **never** put an issue title on a command line; titles are reporter-written
+text and this skill runs unattended under `/auto-pilot`:
 
-Assign a status to each issue:
-- **ready** — no unresolved dependencies
-- **blocked #N** — depends on issue #N being resolved first
-- **maybe-fixed** — flagged in Step 1b as potentially already resolved (high or medium confidence)
-- **stale (Nd)** — flagged in Step 6 (added later, but the status column reflects it)
+```json
+{"issues": [{"number": 12, "title": "…", "type": "bug", "labels": ["bug"],
+             "createdAt": "…", "updatedAt": "…",
+             "affected_files": ["auth.py"], "potentially_fixed_by": null}],
+ "edges": [{"a": 12, "b": 15}]}
+```
 
-Issues flagged as `maybe-fixed` are sorted to the bottom of the execution order — there's no point working on them until someone verifies whether the fix actually landed. They still appear in the triage table so the team can review and close them.
+`edges` entries are the scanner's undirected pairs (`a`/`b`); the script directs
+them by the documented heuristics. Pass an already-directed pair as `from`/`to`.
+Then, from the repo root (resolve the script path relative to this SKILL.md
+exactly as the *Bundled dependency precheck* resolves its list):
 
-## Step 5 — Identify Parallelizable Issues
+```bash
+python3 shared/scripts/gi-triage-graph.py --source /issue-triage --out .gitissue/triage.json < .gitissue/cache/triage-scan.json
+```
 
-Find sets of issues at the same topological level that are independent of each other (no shared affected files, no dependency edges between them).
+Exit 0 prints — and `--out` persists — the full `.gitissue/triage.json` payload,
+which is Step 9 done: top-level `version`, `updated`, `source`,
+`analyzed_count`, `issues[]`, `summary` (`parallel_groups`, `stale_count`,
+`stale_threshold_days`, `potentially_fixed_count`, `suggested_order`,
+`circular_deps`, `co_dependent`), and `history[]`. Each `issues[]` entry carries
+a `status` of `ready`, `blocked`, `stale`, or `maybe-fixed` — in that precedence
+order, `maybe-fixed` first — which the table renders as `ready`, `blocked #N`,
+`stale (Nd)`, and `maybe-fixed`. Delete the scan file afterwards. Classify
+**every** outcome:
 
-These issues can be worked on simultaneously by different developers.
+| Outcome | Meaning | Do |
+|---------|---------|----|
+| exit 0 | computed and persisted | render Step 8 from the payload |
+| exit 3 | invalid input — an issue without a number, an edge naming an unknown issue, an unparsable timestamp, or an out-of-range `triage.*` value | **stop**; print the validation error from `references/error-messages.md`. Never degrade past exit 3 |
+| script file absent | broken install, not a runtime problem | stop with the `✗ Missing bundled dependency` block above |
+| exit 4 | the payload was computed but `--out` could not be written | it is still on stdout — warn per `references/error-messages.md` (*triage.json write failure*) and continue to Step 8 |
+| no `python3`, exit 2, unparsable stdout | environment problem | print `⚠ gi-triage-graph unavailable — computing the order inline` and run the prose procedure in `references/detection.md` (*Steps 3-7 — the prose procedure*), then persist per `references/output-and-persist.md` |
 
-Group them for the recommendation output in Step 8.
+The prose procedure in `references/detection.md` is the authoritative statement
+of the rules the script implements — cycle breaking, tie-breaks, the stale
+threshold, and the priority buckets — and stays runnable by hand.
 
-## Step 6 — Stale Detection
-
-For each issue, compare `updatedAt` to today's date. If the difference exceeds `triage.stale_threshold_days` (default: 14 days), flag the issue as stale.
-
-The stale flag is reflected in both:
-- The Status column of the triage table (e.g., `stale (28d)`)
-- The summary warning line
-
-## Step 7 — Priority Suggestions
-
-If `triage.auto_priority` is true, assign a suggested priority to each issue based on these heuristics:
-
-**P1 (Critical)**:
-- Bugs that block other issues
-- Issues with the `critical` or `urgent` label
-- Bugs older than 2x the stale threshold
-
-**P2 (Standard)**:
-- Bugs that do not block other issues
-- Features that block other issues
-- Improvements that block multiple (2+) issues
-
-**P3 (Low)**:
-- Features and improvements that do not block other issues
-- Stale issues with no dependencies (may be obsolete)
-
-Within each priority level, sort by: number of issues blocked (descending), then age (oldest first).
-
-If `triage.auto_priority` is false, omit the Pri column from the table and skip priority suggestions.
+If `triage.auto_priority` is false, every `priority` comes back `null`; omit the
+Pri column from the table and skip priority suggestions.
 
 ## Step 8-9 — Output & Persist
 
-Step 8 renders the full triage table (rank, issue, priority, blockers, status, parallelizable flag, stale flag) and a suggested execution order. Step 9 persists the structured data to `.gitissue/triage.json` with top-level keys: `version`, `updated`, `source`, `analyzed_count`, `issues[]`, `summary` (`parallel_groups`, `stale_count`, `stale_threshold_days`, `potentially_fixed_count`, `suggested_order`, `circular_deps`), and `history[]` — see `references/output-and-persist.md`.
+Step 8 renders the full triage table (rank, issue, priority, blockers, status, parallelizable flag, stale flag) and a suggested execution order from the payload above. Step 9 is the `--out` write; when the script degraded, write the same schema by hand — see `references/output-and-persist.md`.
 
 Full rendering spec (column widths, sort order, color rules) and JSON schema live in `references/output-and-persist.md`.
 

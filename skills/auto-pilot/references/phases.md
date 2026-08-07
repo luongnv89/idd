@@ -20,7 +20,25 @@ Execute the equivalent of `/issue-triage update`:
 gh issue list --state open --json number,title,body,labels,assignees --limit 100
 ```
 
-Build the dependency graph and compute execution order (same algorithm as issue-triage). Persist to `.gitissue/triage.json`.
+Build the dependency graph, then compute the execution order with the **same
+script** `/issue-triage` uses — not the same algorithm reimplemented, which is
+how two consumers drift apart. Write the merged scan to
+`.gitissue/cache/triage-scan.json` with the Write tool (never put an issue title
+on a command line — this loop runs unattended), then:
+
+```bash
+python3 references/scripts/gi-triage-graph.py --source /auto-pilot --out .gitissue/triage.json < .gitissue/cache/triage-scan.json
+```
+
+Exit 0 persists the payload — `summary.suggested_order` is what Step 1.2 picks
+from. Exit 3 is invalid input: **stop** the iteration and report it, never
+degrade past it. Exit 4 means only the write failed — the payload is on stdout,
+so warn and carry on with it in memory. Script file absent is a broken install:
+stop with the `✗ Missing bundled dependency` block. No `python3`, exit 2, or
+unparsable stdout: warn `⚠ gi-triage-graph unavailable — computing the order
+inline` and apply the prose rules in the issue-triage skill's
+`references/detection.md` (*Steps 3-7 — the prose procedure*). Delete the scan
+file afterwards.
 
 If no open issues remain:
 ```

@@ -77,21 +77,36 @@ of either pick (roughly doubling it). Per-task cost is instead rendered
 
 Only when `model_suggestion.enabled` is `true`.
 
+> **This section is refresh- and debug-only reading.** The default run does not
+> execute it: SKILL.md's *Configuration* step runs
+> `references/scripts/gi-model-cache.py`, which performs the whole lifecycle —
+> locate, seed, prune, age against the TTL — and returns `state`, `stale`,
+> `age_days`, `data_version`, `data_date`, and the resolved `bands` mapping.
+> What follows is the authoritative description of what that script does, the
+> procedure to run by hand when it degrades, and the refresh path (which still
+> needs WebFetch and therefore still needs an agent).
+
 ### Locating the cache (skill-level, dated)
 
-The cache lives in the installed skill folder, not per-repo. Discover it by
-listing the skill root for `model-data-*.json` and selecting the newest by its
-filename date:
+The cache lives in the installed skill folder, not per-repo. The script lists
+the skill root for `model-data-*.json` and selects the newest by its filename
+date; by hand, that is:
 
 ```bash
 # Newest skill-level cache, or empty if none exists yet.
-cache="$(ls -1 "{skill_dir}"/model-data-*.json 2>/dev/null | sort | tail -n1)"
+cache="$(ls -1 "$skill_dir"/model-data-*.json 2>/dev/null | sort | tail -n1)"
 ```
 
 The filename date (`model-data-{YYYY-MM-DD}.json`) is the human-glance signal;
 the authoritative staleness check is always the cache's internal `last_fetched`.
 If several dated files are somehow present, the newest wins and the lifecycle
 prunes the rest on the next write (see *Refresh procedure*).
+
+A cache file that exists but does not parse is **not** treated as missing: the
+script exits 4 and says so rather than seeding over it, because reseeding there
+would silently replace the user's refreshed data with the bundled snapshot and
+report success. On exit 4 the skill disables model suggestions for the run and
+creates the issue without them — the same outcome as state 4 below.
 
 > **Per-repo legacy cache (AC7).** A pre-existing `.gitissue/model-data.json`
 > from an older skill version is **ignored** — the skill neither reads nor
@@ -114,22 +129,23 @@ prunes the rest on the next write (see *Refresh procedure*).
      Refresh now? [y/N]
    ```
 
-3. **Cache missing** → seed it from the bundled `templates/model-data.json` into
-   the skill folder under a dated name, then offer a fresh fetch:
+3. **Cache missing** (script `state: "seeded"`) → seed it from the bundled
+   `templates/model-data.json` into the skill folder under a dated name, then
+   offer a fresh fetch. By hand:
    ```bash
    # Date portion of the seed's own last_fetched — NOT today's date — so the
    # filename date and the cache's last_fetched can never disagree (AC5).
    seed_date="$(grep -o '"last_fetched": *"[0-9-]\{10\}' \
-     "{skill_dir}/templates/model-data.json" | grep -o '[0-9-]\{10\}$')"
-   cp "{skill_dir}/templates/model-data.json" \
-      "{skill_dir}/model-data-${seed_date}.json"
+     "$skill_dir/templates/model-data.json" | grep -o '[0-9-]\{10\}$')"
+   cp "$skill_dir/templates/model-data.json" \
+      "$skill_dir/model-data-${seed_date}.json"
    ```
    ```
    ○ Seeded model data from bundled CursorBench 3.1 snapshot.
      Fetch the latest now? [y/N]
    ```
 
-4. **Bundled seed also missing** → emit the rich error
+4. **Bundled seed also missing** (script exit 4) → emit the rich error
    `Model data unavailable` from `references/error-messages.md`, disable
    suggestions for this run, and continue creating the issue without them.
 
@@ -152,10 +168,23 @@ fetch the source URL with the **WebFetch** tool and ask it to extract the model
 scoring tables. On success:
 
 1. Build the parsed data with a new `last_fetched` set to the current time.
-2. Write it to `{skill_dir}/model-data-{YYYY-MM-DD}.json`, where the date is the
-   date portion of that new `last_fetched`.
-3. **Delete every other `model-data-*.json` in the skill folder** so exactly one
-   dated cache remains (the filename never accumulates stale copies).
+2. Write it to a scratch file with the Write tool — **never** paste fetched web
+   content into a command line — and install it:
+
+   ```bash
+   python3 references/scripts/gi-model-cache.py --skill-dir "$skill_dir" --install .gitissue/cache/model-data-new.json
+   ```
+
+   The script names the file from the date portion of the payload's own
+   `last_fetched` and **deletes every other `model-data-*.json` in the skill
+   folder**, so exactly one dated cache remains and the filename can never
+   disagree with the timestamp inside it. Exit 3 means the payload is not a
+   model-data document — stop and warn; the old cache is untouched. Delete the
+   scratch file afterwards.
+
+By hand, when the script is unavailable: write the parsed data to
+`$skill_dir/model-data-{YYYY-MM-DD}.json` using the date portion of the new
+`last_fetched`, then delete every other `model-data-*.json` in the skill folder.
 
 On any failure (network, parse, empty result), warn with
 `Model data refresh failed` from `references/error-messages.md` and keep the

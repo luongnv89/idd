@@ -10,31 +10,16 @@ Place `.gitissue.yml` in the repository root to customize behavior.
 
 ### Config Loading Flow
 
-```mermaid
-graph TD
-    A["Skill invoked<br/>(e.g. /issue-resolver)"] --> B{".gitissue.yml<br/>exists?"}
-    B -- Yes --> C["Load & validate config"]
-    B -- No --> D["Use defaults<br/>○ First run hint"]
-    C --> E{Valid?}
-    E -- Yes --> F["Proceed with<br/>skill execution"]
-    E -- No --> G["✗ Show validation<br/>errors with line numbers"]
-    D --> F
-
-    style A fill:#4CAF50,color:#fff
-    style F fill:#2196F3,color:#fff
-```
+A skill loads the file once at start. Present and valid → use it. Present and
+invalid → stop with the line-numbered errors under *Validation* below. Absent →
+use the defaults and print the first-run hint above.
 
 ### Config Hierarchy
 
-```mermaid
-graph LR
-    GY[".gitissue.yml<br/>(configuration)"] --- |"read once<br/>at start"| SK["Skills"]
-    GD[".gitissue/<br/>(state directory)"] --- |"read/write<br/>during execution"| SK
-    SD["Skill defaults<br/>(built-in)"] --- |"fallback when<br/>no config"| SK
-
-    style GY fill:#4CAF50,color:#fff
-    style GD fill:#2196F3,color:#fff
-```
+Three inputs, each with its own lifetime: `.gitissue.yml` is configuration, read
+**once** at skill start; `.gitissue/` is state, read and written **during**
+execution; the built-in skill defaults are the **fallback** when no config file
+exists.
 
 ## Core Fields
 
@@ -74,6 +59,25 @@ issue:
   # Type: boolean
   # Default: true
   normalize_comment: true
+
+# Deterministic duplicate scoring (gi-dup-score.py)
+duplicate_detection:
+  # Score at or above which a match is reported as a duplicate outright
+  # Type: integer
+  # Default: 8
+  # Minimum: 1
+  high_threshold: 8
+
+  # Score at or above which a match is handed to the LLM to judge
+  # Type: integer
+  # Default: 5
+  # Minimum: 1, and never above high_threshold
+  medium_threshold: 5
+
+  # Extra comma-separated stop-words, on top of the built-in list
+  # Type: string
+  # Default: ""
+  extra_stop_words: ""
 
 # Resolution pipeline settings
 resolve:
@@ -514,6 +518,7 @@ security:
 graph TD
     R[".gitissue.yml"] --> P["platform<br/>(driver: github)"]
     R --> I["issue"]
+    R --> DD["duplicate_detection"]
     R --> RS["resolve"]
     R --> RV["review"]
     R --> AP["autopilot"]
@@ -527,6 +532,10 @@ graph TD
     I --> I2["template"]
     I --> I3["labels_auto_suggest"]
     I --> I4["normalize_comment"]
+
+    DD --> DD1["high_threshold"]
+    DD --> DD2["medium_threshold"]
+    DD --> DD3["extra_stop_words"]
 
     RS --> R1["approval_gate"]
     RS --> R2["branch_prefix"]
@@ -642,6 +651,9 @@ Config is validated on load at the start of every skill invocation. Errors inclu
 | `issue.template` | `default` | Built-in templates |
 | `issue.labels_auto_suggest` | `true` | Suggest labels from content |
 | `issue.normalize_comment` | `true` | Comment on normalization |
+| `duplicate_detection.high_threshold` | `8` | Reported as a duplicate |
+| `duplicate_detection.medium_threshold` | `5` | Handed to the LLM to judge |
+| `duplicate_detection.extra_stop_words` | `""` | Extra ignored words |
 | `resolve.approval_gate` | `auto` | No approval wait |
 | `resolve.branch_prefix` | `auto` | Type-based branch prefix (fix/, feat/, etc.) |
 | `resolve.auto_test` | `true` | Run tests before PR |

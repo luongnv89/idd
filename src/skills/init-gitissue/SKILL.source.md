@@ -66,6 +66,7 @@ Check these files relative to the skill's directory (the dirname of this SKILL.m
 - `references/docs/github-projects-sync.md` — GitHub Projects status sync reference
 - `references/docs/platform-github.md` — GitHub platform driver reference
 - `references/docs/terminal-style.md` — terminal output style contract (symbols, output structure, table/error formats)
+- `references/scripts/gi-stack-detect.py` — language, framework, test-runner, and size detection
 
 ## Configuration Check
 
@@ -105,6 +106,41 @@ If the file already exists, show the prompt from `references/error-messages.md`:
 ## Step 1 — Scan Repository
 
 Detect project characteristics by checking for specific files and directories.
+That is file-existence and dependency-name lookup, not reasoning, so run
+`shared/scripts/gi-stack-detect.py` from the repo root (resolve the script path
+relative to this SKILL.md exactly as the *Bundled dependency precheck* resolves
+its list):
+
+```bash
+python3 shared/scripts/gi-stack-detect.py --root .
+```
+
+Exit 0 prints one JSON object: `language`, `framework`, `test_runner` (each with
+its `_source` file), `repo_size`, `file_count`, `file_count_source`,
+`issue_templates`, a `derived` block carrying the Step 2 values
+(`auto_test`, `test_timeout`, `stale_threshold_days`), and `unresolved`.
+
+**`unresolved` is the LLM fallback trigger, and the only one.** It names the
+fields nothing in the table matched. A `null` there is a real answer ("no marker
+file is present"), not a failure — the script never guesses. For each field it
+names, and *only* those, work it out yourself from the tables below; leave every
+resolved field exactly as the script reported it. `file_count_source` says
+whether the count came from `git ls-files` or a filesystem walk; report the
+count as given rather than re-deriving it.
+
+Classify **every** outcome:
+
+| Outcome | Meaning | Do |
+|---------|---------|----|
+| exit 0 | detected | use the output; resolve `unresolved` fields from the tables below |
+| exit 3 | invalid input — a bad `--root` or `--rules` file | **stop**; print the error from `references/error-messages.md` (*Stack detection failed*). Never degrade past exit 3 |
+| script file absent | broken install, not a runtime problem | stop with the `✗ Missing bundled dependency` block above |
+| no `python3`, exit 2, exit 4, unparsable stdout | environment problem | print `⚠ gi-stack-detect unavailable — detecting inline` and run the whole of the tables below by hand |
+
+Pass `--rules FILE` to replace a built-in table for a repository the defaults do
+not describe — a JSON object of `{"language": [[glob, name]], "framework":
+[[dependency, name]], "test_runner": [[kind, pattern, name]]}`, where each key
+replaces the matching table outright.
 
 ### Language Detection
 
@@ -188,7 +224,10 @@ Use `git ls-files` for an efficient count (only tracked files), or fall back to 
 
 ## Step 2 — Suggest Defaults
 
-Based on detections, customize defaults from the base schema (see `docs/config-schema.md`):
+The script's `derived` block already carries these three values; the tables
+below are what it computed them from, and what to apply by hand when Step 1
+degraded. Everything else is customized from the base schema (see
+`docs/config-schema.md`):
 
 ### Test Timeout (`resolve.test_timeout`)
 

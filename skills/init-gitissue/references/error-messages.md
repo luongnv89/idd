@@ -44,6 +44,17 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 **Trigger:** No recognized test runner configuration files found in the repository.
 **Note:** This is an informational message, not an error.
 
+### Stack detection failed
+```
+✗ Stack detection cannot run
+
+  {reason from gi-stack-detect on stderr}
+
+  To fix:  run /init-gitissue from the repository root
+  Docs:    https://github.com/luongnv89/idd/blob/main/docs/config-schema.md
+```
+**Trigger:** `gi-stack-detect.py` exits 3 — `--root` is not a directory, or a `--rules` file is not the documented shape. This is a **stop**, not a degrade: the caller pointed the scan at something it cannot scan, and detecting inline would scan the same wrong place. Exit 4 (the repository could not be read at all) *is* a degrade — warn and run the detection tables by hand.
+
 ## File Write
 
 ### Write failed
