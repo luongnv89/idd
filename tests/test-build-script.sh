@@ -279,6 +279,17 @@ excluded_reason() {
     return 1
   fi
   for entry in "${EXCLUDED[@]}"; do
+    # An entry with no `|` carries no reason, and must not excuse anything.
+    # `${entry#*|}` returns the subject unchanged when there is no separator,
+    # so a bare "tests/test-x.sh" would hand back the *path* as its own reason —
+    # non-empty, so the caller's `[ -n "$reason" ]` accepts it and the file is
+    # reported excluded with a self-referential justification. Skipping the
+    # entry here is what makes the written reason mandatory rather than
+    # advisory; the format itself is reported by the EXCLUDED audit below.
+    case "$entry" in
+      *"|"*) ;;
+      *) continue ;;
+    esac
     if [ "${entry%%|*}" = "$want" ]; then
       printf '%s' "${entry#*|}"
       return 0
@@ -319,6 +330,12 @@ fi
 # line of the step it disables.
 strip_dead_steps() {
   awk '
+    # Characters discarded before reading an `if:` value. Both YAML quote forms
+    # belong here: the bare, double-quoted and single-quoted spellings of false
+    # are the same dead step to GitHub, and stripping only the double quote left
+    # the single-quoted one counted as live. The single quote is built with
+    # sprintf rather than written, because this program is itself single-quoted.
+    BEGIN { sq = sprintf("%c", 39); if_strip_re = "[[:space:]\"" sq "]" }
     function flush(   i) {
       if (n > 0 && disabled == 0) for (i = 1; i <= n; i++) print buf[i]
       n = 0; disabled = 0
@@ -341,7 +358,7 @@ strip_dead_steps() {
       if ($0 ~ /^[[:space:]]*if:/) {
         v = $0
         sub(/^[[:space:]]*if:[[:space:]]*/, "", v)
-        gsub(/[[:space:]"]/, "", v)
+        gsub(if_strip_re, "", v)
         sub(/^\$\{\{/, "", v)
         sub(/\}\}$/, "", v)
         if (tolower(v) == "false") disabled = 1
@@ -368,32 +385,59 @@ strip_dead_steps() {
 # `run:` body (`# TODO: wire bash tests/test-x.sh`), which is right: a commented
 # command invokes nothing either way.
 #
-# Residual: a line carrying an unbalanced quote leaves the scanner inside a
-# quote and under-strips the rest of that line. That can only keep text, never
-# delete an invocation, so it cannot cause a false failure.
+# Two corrections to the naive character scan, each for an input that a
+# quote-aware pass gets wrong in the *opposite* direction to the sed rule:
+#
+#   1. Inside a double-quoted run, a backslash escapes the next character. Both
+#      YAML double-quoted scalars and the shell of a `run:` body work that way,
+#      so `\"` continues the run rather than ending it. Reading it as a closing
+#      quote leaves the scanner unquoted for the rest of the line, where the
+#      next ` #` truncates — deleting the invocation behind it. Single quotes
+#      have no backslash escape in either language, so this applies to double
+#      quotes only.
+#   2. A line that reaches its end still inside a quote usually never held a
+#      quoted run at all — the common cause is an apostrophe in a YAML plain
+#      scalar, as in `- name: Verify the build's drift gate  # ...`, which reads
+#      here as an opening quote and hides everything after it, comment
+#      included. Such a line is re-cut by the quoting-blind rule, which is what
+#      the sed rule applied to every line and got right on this one. The cost is
+#      a genuinely multi-line quoted scalar carrying a ` #`, which this
+#      over-strips; no workflow in this repo has one.
 strip_comments() {
   awk '
     BEGIN { sq = sprintf("%c", 39) }
+    # Index of the `#` that opens a comment when quoting is ignored, or 0.
+    function naive_cut(line,   i, n, c) {
+      n = length(line)
+      for (i = 1; i <= n; i++) {
+        c = substr(line, i, 1)
+        if (c == "#" && (i == 1 || substr(line, i - 1, 1) ~ /[[:space:]]/)) return i
+      }
+      return 0
+    }
     {
       line = $0
-      out = line
       inq = ""
+      cut = 0
       n = length(line)
       for (i = 1; i <= n; i++) {
         c = substr(line, i, 1)
         if (inq != "") {
+          if (inq == "\"" && c == "\\") { i++; continue }
           if (c == inq) inq = ""
           continue
         }
         if (c == "\"" || c == sq) { inq = c; continue }
         if (c == "#" && (i == 1 || substr(line, i - 1, 1) ~ /[[:space:]]/)) {
-          # i-2, not i-1: consume the separating space too, so the reduced text
-          # is byte-identical to the sed rule this replaced on every input the
-          # sed rule handled correctly.
-          out = substr(line, 1, i - 2)
+          cut = i
           break
         }
       }
+      if (inq != "") cut = naive_cut(line)
+      # cut-2, not cut-1: consume the separating space too, so the reduced text
+      # is byte-identical to the sed rule this replaced on every input the sed
+      # rule handled correctly. A `#` in column 1 yields the empty string.
+      out = (cut > 0) ? substr(line, 1, cut - 2) : line
       print out
     }
   '
@@ -458,8 +502,11 @@ else
     echo "      'continue-on-error: true' (any case), does not count as wiring."
   fi
 
-  # A stale exclusion outlives the test it names and would silently excuse a
-  # future file that reuses the name.
+  # Every EXCLUDED entry is audited on two counts. A stale exclusion outlives
+  # the test it names and would silently excuse a future file that reuses the
+  # name. An entry with no `|`, or with nothing after it, excuses a file
+  # without saying why — excluded_reason() already refuses to honour it, and
+  # this is where the author is told what is wrong with it.
   if [ "${#EXCLUDED[@]}" -gt 0 ]; then
     for entry in "${EXCLUDED[@]}"; do
       name="${entry%%|*}"
@@ -468,6 +515,16 @@ else
       else
         fail "T9: EXCLUDED entry '$name' names no such file — stale exclusion"
       fi
+      case "$entry" in
+        *"|"?*)
+          pass "T9: EXCLUDED entry '$name' carries a written reason"
+          ;;
+        *)
+          fail "T9: EXCLUDED entry '$name' has no written reason"
+          echo "      Write it as '<repo-relative path>|<reason>'. Without the"
+          echo "      reason the entry is ignored and the file counts as unwired."
+          ;;
+      esac
     done
   fi
 fi
