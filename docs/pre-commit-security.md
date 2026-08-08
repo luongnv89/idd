@@ -212,7 +212,22 @@ If the scan keeps firing on the same false positive across runs, do not edit the
 
 ## Lint Enforcement
 
-`tests/test-pre-commit-security.sh` greps `src/skills/**/*.md`, `src/skills/**/references/*.md`, `src/internal-skills/**/*.md`, and `src/shared/agents/*.md` for fenced-block invocations of `git commit` and `git push` and asserts that each occurrence is gated — preceded within the same fenced block, or in the surrounding prose within ~12 lines above, by a reference to **either** this document (`pre-commit-security.md`) **or** the script that implements it (`gi-secscan.py`). Both forms count because both are the gate; a block with neither is an ungated commit and fails. Failing the lint blocks merges. This is the regression guard — without it, future skill edits could silently reintroduce ungated commits.
+`tests/test-pre-commit-security.sh` walks every `*.md` under `src/skills/`, `src/internal-skills/`, and `src/shared/agents/`. Every fenced **shell** block (info string `bash`, `sh`, `shell`, `zsh`, `ksh`, `console`, …) that runs `git commit` or `git push` is a *subject* and must be gated. Failing the lint blocks merges — it is the regression guard that keeps future skill edits from silently reintroducing an ungated commit.
+
+Two gate forms are accepted, and they are not interchangeable. An *invocation* below means a `gi-secscan.py` **command line** — the script name preceded on the same line by the interpreter, the form every call site in this document uses:
+
+| Where | What counts | What does not |
+|-------|-------------|---------------|
+| **Inside the block** | An invocation, **or** a citation of this document (`pre-commit-security.md`) — normally as a shell comment written for that block. | Anything else. |
+| **Within 12 lines above** | An invocation **only**. | A citation of this document. Every `SKILL.source.md` ends with an "Additional Resources" index naming `pre-commit-security.md`; accepting it from prose would auto-gate anything appended near the end of a file by proximity to a table of contents. |
+
+Three rules decide whether a line is an invocation at all:
+
+- **A command, not a mention.** The bare path `references/scripts/gi-secscan.py` is this repo's documented way of *citing* a shared script (CLAUDE.md, *Scripts placement rule*), and appears in prose that runs nothing. Only the command form gates. Write the call site so the command itself is visible.
+- **Not commented out.** A line whose first non-blank character is `#` cannot supply the invocation gate: a call commented out `# for debugging` is still not a call. (The in-block *document* citation is exempt; that form is a comment by design.)
+- **Adjacent, in physical lines.** The 12-line window counts every line, including fenced blocks. An invocation separated from the commit block by an unrelated code listing is not adjacent to it and does not gate it.
+
+Two non-vacuity guards sit under the scan, because "all subjects are gated" is also true of zero subjects. The fence parser handles indented fences, backtick and tilde fences of any length, and info strings (```` ```bash title="x" ````), so no fence form escapes it; and the test pins the exact list of files the subjects live in — not merely how many there are, which any two blocks would satisfy. When a skill legitimately gains or loses a `git commit`/`git push` block, update `EXPECTED_SUBJECT_FILES` in `tests/test-pre-commit-security.sh` in the same commit.
 
 ---
 
