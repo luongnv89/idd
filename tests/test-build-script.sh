@@ -240,12 +240,34 @@ fi
 # To deliberately keep a test out of CI: add it to EXCLUDED below WITH a reason.
 # The reason is the whole point of the array — an exclusion nobody can justify
 # is indistinguishable from the rot this check exists to prevent.
+#
+# "Wired" is decided against a reduced view of the workflows, not their raw
+# text. Two reductions, each closing a way a test can look wired while running
+# nothing:
+#
+#   1. YAML comments are stripped. A raw-text grep counted a comment as
+#      wiring — including this check's own explanatory note in dist-check.yml,
+#      which named tests/test-build-script.sh and so kept T9 green even with
+#      the test-build-script step deleted: the guard could not detect its own
+#      unwiring. Generalised, any test could be retired behind a leftover
+#      `# TODO: wire bash tests/test-X.sh`.
+#   2. Steps carrying `if: false` or `continue-on-error: true` are dropped
+#      whole. A step that cannot run, or whose failure cannot fail the job, is
+#      not a gate: marking a flaky test `continue-on-error: true` stops it
+#      gating PRs, and nothing should still call it wired.
+#
+# Deliberately NOT covered, because closing them needs real YAML semantics:
+# job-level `if:`/`continue-on-error:`, an expression that is falsy without
+# being the literal `false`, and a reference inside a non-invoking command
+# (`run: echo "see tests/test-X.sh"`). PyYAML is not in the stdlib and
+# actions/setup-python does not install it, so a yaml.safe_load check would
+# silently no-op on the very runner it has to bite on.
 # ───────────────────────────────────────────────────────────
 WORKFLOW_DIR="$REPO_ROOT/.github/workflows"
 
-# Format: "<basename>|<reason>". Empty today — every tests/*.sh runs in CI.
+# Format: "<repo-relative path>|<reason>". Empty today — every test runs in CI.
 EXCLUDED=(
-  # "test-example.sh|needs a live GitHub token; run locally with GH_TOKEN set"
+  # "tests/test-example.sh|needs a live GitHub token; run locally with GH_TOKEN set"
 )
 
 excluded_reason() {
@@ -262,17 +284,72 @@ excluded_reason() {
   return 1
 }
 
+# Repo-relative paths, not basenames: `git ls-files 'tests/*.sh'` matches
+# tests/unit/test-x.sh too (git's `*` crosses `/`), and a basename comparison
+# would report a correctly-wired nested test as unwired.
 TEST_FILES=()
 while IFS= read -r tracked; do
   TEST_FILES+=("$tracked")
 done < <(cd "$REPO_ROOT" && git ls-files 'tests/*.sh')
 
-# Scan every workflow, not just dist-check.yml: a test wired from any of them is
-# wired. `grep -rho … || true` because grep exits 1 on no match under `set -e`.
-WIRED=""
+# Scan every workflow, not just dist-check.yml: a test wired from any of them
+# is wired.
+WORKFLOW_FILES=()
 if [ -d "$WORKFLOW_DIR" ]; then
-  WIRED="$(grep -rhoE 'tests/[A-Za-z0-9._-]+\.sh' "$WORKFLOW_DIR" | sort -u || true)"
+  while IFS= read -r wf; do
+    WORKFLOW_FILES+=("$wf")
+  done < <(find "$WORKFLOW_DIR" -maxdepth 1 -type f \( -name '*.yml' -o -name '*.yaml' \) | sort)
 fi
+
+# Drop every step block that cannot gate. A step begins at a line starting with
+# `- ` at any indent; everything up to the next such line belongs to it.
+# Mis-splitting can only *shrink* a block, so a disabling marker is at worst
+# not attributed — the check fails open, never green-lights a live step.
+strip_dead_steps() {
+  awk '
+    function flush(   i) {
+      if (n > 0 && disabled == 0) for (i = 1; i <= n; i++) print buf[i]
+      n = 0; disabled = 0
+    }
+    /^[[:space:]]*-[[:space:]]/ { flush() }
+    {
+      buf[++n] = $0
+      if ($0 ~ /^[[:space:]]*continue-on-error:[[:space:]]*[^[:alnum:]]?true[^[:alnum:]]*$/) disabled = 1
+      if ($0 ~ /^[[:space:]]*if:/) {
+        v = $0
+        sub(/^[[:space:]]*if:[[:space:]]*/, "", v)
+        gsub(/[[:space:]"]/, "", v)
+        sub(/^\$\{\{/, "", v)
+        sub(/\}\}$/, "", v)
+        if (tolower(v) == "false") disabled = 1
+      }
+    }
+    END { flush() }
+  '
+}
+
+WIRING_TEXT=""
+if [ "${#WORKFLOW_FILES[@]}" -gt 0 ]; then
+  for wf in "${WORKFLOW_FILES[@]}"; do
+    # `(^|[[:space:]])#` is YAML comment syntax: a `#` only opens a comment at
+    # line start or after whitespace. Over-stripping would only lose wiring
+    # (a loud failure); under-stripping would restore the hole.
+    WIRING_TEXT+="$(sed -E 's/(^|[[:space:]])#.*$//' "$wf" | strip_dead_steps)"$'\n'
+  done
+fi
+
+# Is $1 (a repo-relative path) referenced by a live step? Compared as a whole
+# path so tests/unit/x.sh and `tests/test zz space.sh` work, with boundaries so
+# tests/test-x.sh is not matched by xtests/test-x.sh or tests/test-x.shell.
+path_wired() {
+  local rel="$1" esc
+  esc="$(printf '%s' "$rel" | sed -E 's/[][\.^$*+?(){}|]/\\&/g')"
+  printf '%s\n' "$WIRING_TEXT" | grep -qE "(^|[^A-Za-z0-9._-])${esc}([^A-Za-z0-9._-]|$)"
+}
+
+# For the stat line and the all-or-nothing vacuity guard only; per-file
+# decisions go through path_wired.
+WIRED="$(printf '%s\n' "$WIRING_TEXT" | grep -oE 'tests/[A-Za-z0-9._/-]+\.sh' | LC_ALL=C sort -u || true)"
 
 if [ "${#TEST_FILES[@]}" -eq 0 ]; then
   fail "T9: git tracks no tests/*.sh — the wiring check would be vacuous"
@@ -284,15 +361,14 @@ else
 
   unwired=0
   for rel in "${TEST_FILES[@]}"; do
-    base="$(basename "$rel")"
-    if printf '%s\n' "$WIRED" | grep -qxF "tests/$base"; then
+    if path_wired "$rel"; then
       continue
     fi
-    if reason="$(excluded_reason "$base")" && [ -n "$reason" ]; then
-      pass "T9: $base excluded from CI — $reason"
+    if reason="$(excluded_reason "$rel")" && [ -n "$reason" ]; then
+      pass "T9: $rel excluded from CI — $reason"
     else
       unwired=$((unwired + 1))
-      fail "T9: $base is not invoked by any workflow and has no EXCLUDED reason"
+      fail "T9: $rel is not invoked by any live workflow step and has no EXCLUDED reason"
     fi
   done
 
@@ -301,6 +377,8 @@ else
   else
     echo "      Add a step to .github/workflows/dist-check.yml, or add the file"
     echo "      to EXCLUDED in tests/test-build-script.sh with a written reason."
+    echo "      A mention in a comment, or in a step disabled by 'if: false' or"
+    echo "      'continue-on-error: true', does not count as wiring."
   fi
 
   # A stale exclusion outlives the test it names and would silently excuse a
@@ -308,10 +386,10 @@ else
   if [ "${#EXCLUDED[@]}" -gt 0 ]; then
     for entry in "${EXCLUDED[@]}"; do
       name="${entry%%|*}"
-      if [ -f "$REPO_ROOT/tests/$name" ]; then
+      if [ -f "$REPO_ROOT/$name" ]; then
         pass "T9: EXCLUDED entry '$name' names an existing test"
       else
-        fail "T9: EXCLUDED entry '$name' names no tests/$name — stale exclusion"
+        fail "T9: EXCLUDED entry '$name' names no such file — stale exclusion"
       fi
     done
   fi

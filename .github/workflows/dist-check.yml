@@ -18,8 +18,11 @@ jobs:
 
       # ─── Source-level checks — read src/ and docs/ only, so they run before
       # the build and fail fast. A new test belongs here unless it reads dist/
-      # or skills/. Every tests/*.sh must appear in this file: tests/test-build-script.sh
-      # (T9) fails the build for any that does not.
+      # or skills/. Every tracked test under tests/ must be invoked by a live
+      # step in some workflow under .github/workflows/ — normally this one. The
+      # T9 check in the build-script test fails the build for any that is not,
+      # and does not count a mention in a comment or in a step disabled by
+      # `if: false` / `continue-on-error: true`.
       - name: Source-level checks (fast fail before build)
         run: bash tests/test-init-template-doc-urls-source.sh
 
