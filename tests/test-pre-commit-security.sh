@@ -47,14 +47,35 @@
 #      `# DISABLED for debugging: python3 … gi-secscan.py` gates. (The in-block
 #      *document* citation is exempt: that form is deliberately written as a
 #      shell comment beside the block it gates.)
-#   3. Every fence form must be seen. The parser handles indented fences,
-#      backtick and tilde fences of any length ≥ 3, and info strings
-#      (```bash title="x"). src/ contains dozens of indented fences; a parser
-#      blind to them never toggles `in_block`, so their bodies leak into the
-#      prose window and can act as a false gate for a later, ungated block.
-#      A fence left *open* at EOF is a valid CommonMark block that renders
-#      normally, so the END clause must evaluate it; otherwise a `git push` in
-#      the last fence of a file is never looked at.
+#   3. Every fence form must be seen — and nothing else may be mistaken for one.
+#      (a) A fence is indented at most *three* spaces (CommonMark). Both halves
+#          of that bound are load-bearing. src/ contains dozens of indented
+#          fences (at 2 and 3 spaces), and a parser blind to them never toggles
+#          `in_block`, so their bodies leak into the prose window and can act as
+#          a false gate for a later, ungated block. But a backtick run indented
+#          4+ spaces is block *content*, and reading it as a fence is the worse
+#          failure: it closes the enclosing ```bash block early, that block's
+#          real closing fence then *opens* a phantom one, and the inverted fence
+#          parity swallows every later ```bash block in the file as phantom
+#          content — an ungated `git push` below it is never evaluated at all.
+#          Both directions are pinned by T3c.
+#      (b) Backtick and tilde fences of any length ≥ 3 count, as do info strings
+#          (```bash title="x").
+#      (c) A fence left *open* at EOF is a valid CommonMark block that renders
+#          normally, so the END clause must evaluate it; otherwise a `git push`
+#          in the last fence of a file is never looked at.
+#      (d) Residue, left open deliberately: an unclosed non-shell fence
+#          (```text …, no closing ```) still shadows what follows it. Only a
+#          same-character run of length ≥ open_len with an *empty* info string
+#          closes a block, so the next ```bash line is read as content and that
+#          block's closing ``` is consumed as the text block's terminator — one
+#          real subject is swallowed per stray open fence. Closing this needs a
+#          heuristic ("a same-length fence carrying an info string ends the open
+#          block"), which is a deliberate deviation from CommonMark and would
+#          misparse a legitimately nested same-length fence. The authoring rule
+#          — do not leave a fence unclosed — is cheaper than the misparse, and
+#          T3b pins the subject *set*, so a swallowed real subject shows up
+#          there as a missing file rather than as a silent pass.
 #   4. In a session-transcript fence (```console, ```shell-session), a leading
 #      `#` is the root prompt, not a comment — property 2's `comment_re` would
 #      throw away a real command. Such a line gates only when the interpreter
@@ -161,12 +182,28 @@ scan_file() {
   awk -v file="$file" '
     # Parse a fence line into (fence_ch, fence_len, fence_info). Returns 1 if
     # the line is fence-shaped, 0 otherwise. CommonMark: a fence is a run of
-    # three or more backticks or tildes, indented by any amount; the info
-    # string of a backtick fence may not itself contain a backtick.
-    function parse_fence(line,   t, c, k) {
+    # three or more backticks or tildes, indented by at most *three* spaces; the
+    # info string of a backtick fence may not itself contain a backtick.
+    function parse_fence(line,   t, c, k, indent, i, ch) {
       fence_ch = ""; fence_len = 0; fence_info = ""
       t = line
-      sub(/^[[:space:]]+/, "", t)
+      # The 3-space limit is load-bearing, not pedantry (header note 3a): a run
+      # of backticks indented 4+ spaces is *content* of the enclosing block. Read
+      # as a fence it closes an open ```bash block early, whereupon the real
+      # closing fence of that block *opens* a phantom one — fence parity inverts
+      # and every later ```bash block in the file is swallowed as phantom-block
+      # content, never evaluated as a subject.
+      indent = 0
+      i = 1
+      while (i <= length(t)) {
+        ch = substr(t, i, 1)
+        if (ch == " ") indent += 1
+        else if (ch == "\t") indent += 4   # a tab advances to the next tab stop
+        else break
+        i += 1
+      }
+      if (indent > 3) return 0
+      t = substr(t, i)
       c = substr(t, 1, 1)
       if (c != "`" && c != "~") return 0
       k = 0
@@ -419,6 +456,71 @@ else
   else
     echo "        (none)"
   fi
+fi
+
+# ───────────────────────────────────────────────────────────
+# T3c: The fence parser honors CommonMark's 3-space indentation limit — in both
+#      directions (header note 3a). T3 and T3b both pass over a scan that saw
+#      the wrong *blocks* only if the subject files change, and neither notices
+#      a parity inversion that happens to leave today's two subjects intact. So
+#      the parser is exercised directly against two synthetic fixtures whose
+#      expected verdict is known:
+#
+#        A. An ungated `git push` that a 4-space-indented ``` run inside the
+#           enclosing ```bash block tries to hide. Read as a fence, that run
+#           closes the block early; the block's real closing fence then opens a
+#           phantom, non-shell block that swallows the push. Read correctly as
+#           block content, the push is a subject and is reported. Fails if the
+#           indent limit is dropped.
+#        B. An ungated `git push` inside a legitimately 3-space-indented
+#           ```bash block. Fails if the limit is tightened past CommonMark, or
+#           if indented fences stop being recognised at all.
+#
+#      Both fixtures live in a mktemp -d scratch directory and are removed on
+#      exit; nothing is written inside the repo.
+# ───────────────────────────────────────────────────────────
+fixture_dir="$(mktemp -d)"
+trap 'rm -f "$scan_out" "$violations"; rm -rf "$fixture_dir"' EXIT
+
+cat > "$fixture_dir/indent-4-defeat.md" <<'FIXTURE_A'
+## Appendix
+
+```bash
+echo "an example"
+    ```
+git push origin main
+```
+FIXTURE_A
+
+cat > "$fixture_dir/indent-3-legit.md" <<'FIXTURE_B'
+## Appendix
+
+   ```bash
+   git push origin main
+   ```
+FIXTURE_B
+
+fixture_violations() {
+  scan_file "$1" | grep -c '^VIOLATION' || true
+}
+
+if [ "$(fixture_violations "$fixture_dir/indent-4-defeat.md")" = "1" ]; then
+  pass "fence parser treats a 4-space-indented \`\`\` as block content, not a fence"
+else
+  fail "fence parser accepted a 4+ space indented fence — CommonMark allows at most 3"
+  echo "      A run of backticks indented 4 or more spaces is *content* of the"
+  echo "      enclosing block. Closing the block on it inverts fence parity for"
+  echo "      the rest of the file, so every later \`\`\`bash block is swallowed"
+  echo "      and an ungated \`git push\` is never evaluated. See header note 3a."
+fi
+
+if [ "$(fixture_violations "$fixture_dir/indent-3-legit.md")" = "1" ]; then
+  pass "fence parser still recognises a legitimately indented (≤3 space) fence"
+else
+  fail "fence parser missed a 3-space-indented fence — CommonMark allows up to 3"
+  echo "      src/ contains dozens of fences indented 2 or 3 spaces. A parser"
+  echo "      blind to them never toggles in_block, so their bodies leak into the"
+  echo "      prose window and can falsely gate a later, ungated block."
 fi
 
 # ───────────────────────────────────────────────────────────
