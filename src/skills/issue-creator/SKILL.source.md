@@ -107,16 +107,16 @@ Exit 0 prints `state` (`fresh` | `stale` | `seeded` | `installed`), `stale`, `ag
 
 ## Subagent Architecture
 
-The skill delegates the **judgement half of duplicate detection (Step 3)** to a subagent so the main agent's **context window** stays clean and the **token budget** stays predictable. The scoring half is not delegated at all — `shared/scripts/gi-dup-score.py` computes it, so no agent ever reads the backlog. Every other step stays in the main agent: parse input (Step 1) and classify (Step 2) are lightweight; clarify ambiguous intent (Step 3.5), generate content (Step 4), preview (Step 5), and create (Step 6) run inline.
+The skill delegates **duplicate detection (Step 3)** to a subagent so the main agent's **context window** stays clean and the **token budget** stays predictable. Every other step stays in the main agent: parse input (Step 1) and classify (Step 2) are lightweight; clarify ambiguous intent (Step 3.5), generate content (Step 4), preview (Step 5), and create (Step 6) run inline.
 
-In **batch mode**, one script run scores all batch items — including the internal cross-checks — and at most one subagent spawn judges the pooled medium band, so the spawn count is one regardless of batch size and stays zero when nothing lands in that band.
+In **batch mode**, the duplicate detector checks all batch items — including internal cross-checks — in a single pass, so only one subagent spawn is needed regardless of batch size, and duplicate checking runs in parallel with template generation.
 
 Read `shared/agents/duplicate-detector.md` for the full duplicate detector prompt.
 
 ### Environment check
 
-If the Agent tool is available, use the duplicate-detector subagent as described above for the Step 3 medium band.
-If not (e.g., Claude.ai or environments without the Agent tool), the script's `medium_band` entries are reported as possible duplicates without a verdict; if the script itself is unavailable too, execute duplicate checking inline using the fallback instructions included in Step 3.
+If the Agent tool is available, use the duplicate-detector subagent as described above for Step 3.
+If not (e.g., Claude.ai or environments without the Agent tool), execute duplicate checking inline using the fallback instructions included in Step 3.
 
 ### Bundled dependency precheck
 
@@ -156,7 +156,6 @@ Check these files:
 - `references/docs/terminal-style.md` — terminal output style contract (symbols, output structure, table/error formats)
 - `references/scripts/gi-config.py` — config resolver: merges the documented defaults with `.gitissue.yml` and prints one JSON line
 - `references/scripts/gi-issue.py` — TTL-cached issue fetcher for Normalize mode's repeat reads
-- `references/scripts/gi-dup-score.py` — deterministic duplicate scorer (Step 3)
 - `references/scripts/gi-model-cache.py` — model-data cache lifecycle
 
 ---
@@ -213,57 +212,36 @@ Assign confidence to the type classification:
 
 ### Step 3 — Check for Duplicates
 
-#### Score deterministically
+#### Subagent delegation
 
-The `+3 / +2 / +1 / +5` table and its two thresholds are arithmetic over the open backlog, not judgement — and running them in a model means reading up to 100 issue bodies to compute a sum with one correct answer. Run `shared/scripts/gi-dup-score.py` instead.
-
-**Never put an issue title on a command line.** It is reporter-written text, this skill runs unattended under `/auto-pilot`, and a quote in a title that reaches a shell word is arbitrary code execution. Write the request with the Write tool, then feed it in on stdin. The script fetches the open issues itself for the same reason.
-
-Write `.gitissue/cache/dup-request.json`:
+Spawn the duplicate-detector subagent with:
 
 ```json
-{"mode": "create",
- "items": [{"index": 1, "title": "…", "keywords": ["…"], "type": "bug|feature|improvement"}]}
+{
+  "mode": "create",
+  "items": [
+    {
+      "index": 1,
+      "title": "{classified_title}",
+      "keywords": ["{keyword1}", "{keyword2}"],
+      "type": "{bug|feature|improvement}"
+    }
+  ],
+  "repo_root": "{repo_root}"
+}
 ```
 
-Then, from the repo root (resolve the script path relative to this SKILL.md exactly as the *Bundled dependency precheck* resolves its list):
+Read `shared/agents/duplicate-detector.md` for the full prompt. The subagent returns a `duplicates` array with scored matches.
 
-```bash
-python3 shared/scripts/gi-dup-score.py < .gitissue/cache/dup-request.json
-```
+#### Fallback (no Agent tool)
 
-Exit 0 prints one JSON object: `duplicates` (score ≥ `duplicate_detection.high_threshold` — decided, no model re-reads them), `medium_band` (the only list a model should judge), `batch_internal_duplicates`, `open_issue_count`, `scan_truncated`, `items_checked`. Delete the request file afterwards.
-
-**The auto-decide gate creates anyway.** A match landing in `duplicates` is *flagged*, never dropped — interactively the user answers the prompt below, and in auto mode the item is **still created** with a `⚠` audit line. That default is what bounds the blast radius of a false positive to a duplicate issue someone can close; a change that turns this gate into a drop turns the same false positive into work that silently disappears. Do not make that change without re-deriving the scoring table's false-positive rate.
-
-Classify **every** outcome:
-
-| Outcome | Meaning | Do |
-|---------|---------|----|
-| exit 0 | scored | use the output |
-| exit 3 | invalid input — a malformed item or an out-of-range `duplicate_detection.*` value | **stop**; print the validation error from `references/error-messages.md`. Never degrade past exit 3 |
-| script file absent | broken install, not a runtime problem | stop with the `✗ Missing bundled dependency` block above |
-| no `python3`, exit 2, exit 4, unparsable stdout | environment problem | print `⚠ gi-dup-score unavailable — scoring duplicates inline` and run the *Fallback* below |
-
-Exit 4 means the backlog **could not be read**. It never means "no duplicates found" — reporting a clean scan over an unreadable backlog is the one failure of this step that matters.
-
-#### Judge the medium band (subagent)
-
-Spawn the duplicate-detector subagent **only when `medium_band` is non-empty**, passing `{ "mode": "create"|"batch", "candidates": <the medium_band array>, "items": <the same items> }`. It re-reads just those few issues and returns a confirm/reject verdict per candidate; high-band matches need no spawn, and an empty medium band means no spawn at all. Read `shared/agents/duplicate-detector.md` for the full prompt.
-
-Merge the confirmed candidates into `duplicates` before presenting results.
-
-#### Fallback (script unavailable, or no Agent tool)
-
-The prose procedure the script replaced, unchanged. Run inline:
+If the Agent tool is not available, run inline:
 
 ```bash
 gh issue list --state open --json number,title,body,labels --limit 100
 ```
 
-Compare the new issue's title and key terms against existing issues, applying the same table: title similarity (3+ shared significant words in the target title) `+3`, each keyword found in an existing title/body `+2`, same type `+1`, verbatim multi-word phrase (3+ significant words) `+5`; `≥ 8` is a duplicate, `5–7` is a possible one, below `5` is no match.
-
-One invariant holds the three apart: **a signal pays only for item evidence no already-paid signal has consumed.** The evidence is a token of the proposed item, never a place in the existing issue, so a target that restates its own title — the `bug.md` `> **Reporter Context**` shape — buys nothing. A verbatim run consumes its tokens; `title_overlap` then needs three shared words that run did not contain; a keyword whose tokens are all **already counted** scores `0`, one naming a new term scores `+2`. So a score does not depend on the existing issue's body shape, near-identical titles land in the medium band, and `8` takes genuinely different evidence. Stop-words and the full rules live in `shared/agents/duplicate-detector.md`.
+Compare the new issue's title and key terms against existing issues.
 
 #### Present results
 

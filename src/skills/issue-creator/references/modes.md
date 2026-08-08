@@ -243,43 +243,34 @@ Use `docs/terminal-style.md` table format: box-drawing characters `│ ─ ┼`,
 
 ### Step 3 — Duplicate Check
 
-#### Score deterministically
+#### Subagent delegation
 
-One script run covers the whole batch — every item against the open backlog **and** against every other item. Write `.gitissue/cache/dup-request.json` with the Write tool (never put an item title on a command line — batch input is pasted, untrusted text):
+Spawn the duplicate-detector subagent with all batch items:
 
 ```json
 {
   "mode": "batch",
   "items": [
-    { "index": 1, "title": "...", "keywords": [], "type": "bug" },
-    { "index": 2, "title": "...", "keywords": [], "type": "feature" }
-  ]
+    { "index": 1, "title": "...", "keywords": [...], "type": "bug" },
+    { "index": 2, "title": "...", "keywords": [...], "type": "feature" }
+  ],
+  "repo_root": "{repo_root}"
 }
 ```
 
-Then, from the repo root:
+Read `shared/agents/duplicate-detector.md` for the full prompt. The subagent checks each item against existing open issues AND cross-checks items against each other in a single pass.
 
-```bash
-python3 shared/scripts/gi-dup-score.py < .gitissue/cache/dup-request.json
-```
+**Parallel execution:** In batch mode, spawn the duplicate-detector at the same time as pre-generating template content — both results are ready by Step 4 (Approval) and consumed at Step 5 (Create Issues).
 
-`mode: "batch"` adds the `batch_internal_duplicates` array to the output. The exit-code contract, the four outcomes, and the degrade rule are the same as SKILL.md *Step 3 — Check for Duplicates*; follow them there rather than restating them here. Delete the request file afterwards.
+#### Fallback (no Agent tool)
 
-#### Judge the medium band (subagent)
-
-Spawn the duplicate-detector subagent once for the **pooled** medium band across all items, only when it is non-empty. Read `shared/agents/duplicate-detector.md` for the full prompt.
-
-**Parallel execution:** run the scoring script and pre-generate template content in the same turn — both results are ready by Step 4 (Approval) and consumed at Step 5 (Create Issues).
-
-#### Fallback (script unavailable, or no Agent tool)
-
-Run inline:
+If the Agent tool is not available, run inline:
 
 ```bash
 gh issue list --state open --json number,title,body,labels --limit 100
 ```
 
-Check each batch item against existing issues AND against other items in the batch, using the scoring table in `shared/agents/duplicate-detector.md`.
+Check each batch item against existing issues AND against other items in the batch.
 
 #### Present results
 

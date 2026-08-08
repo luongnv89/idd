@@ -21,17 +21,6 @@ issue:
   # Post a comment when normalizing an issue
   normalize_comment: true
 
-# Deterministic duplicate scoring
-duplicate_detection:
-  # Score at or above which a match is reported as a duplicate outright
-  high_threshold: 8
-
-  # Score at or above which a match is handed to the LLM to judge
-  medium_threshold: 5
-
-  # Extra comma-separated stop-words, on top of the built-in list
-  extra_stop_words: ""
-
 # Resolution pipeline settings
 resolve:
   # Approval gate for the plan phase

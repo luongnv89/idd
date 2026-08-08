@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 # test-scripts-253.sh — Issue #253 acceptance checks for the third wave of
-# shared scripts (gi-dup-score, gi-triage-graph, gi-stack-detect, gi-model-cache).
+# shared scripts (gi-triage-graph, gi-stack-detect, gi-model-cache).
+#
+# AC1 (deterministic duplicate scoring) is deliberately not covered here:
+# `gi-dup-score.py` was removed from this change set and stays open on #253,
+# to be redone against a corrected scoring model. Nothing below refers to it.
 #
 # Acceptance criteria covered:
-#   AC1  Duplicate scoring is deterministic and reproducible; the LLM judges
-#        only medium-band candidates.
 #   AC2  Triage ordering is produced by a script emitting the same cache payload
 #        shape; keyword extraction stays with the agents.
 #   AC3  init-gitissue detection runs scripted with an LLM fallback on unknown
@@ -28,12 +30,11 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SRC_SCRIPTS="$REPO_ROOT/src/shared/scripts"
 SKILLS="$REPO_ROOT/skills"
 SRC="$REPO_ROOT/src"
-DUP="$SRC_SCRIPTS/gi-dup-score.py"
 GRAPH="$SRC_SCRIPTS/gi-triage-graph.py"
 STACK="$SRC_SCRIPTS/gi-stack-detect.py"
 MODEL="$SRC_SCRIPTS/gi-model-cache.py"
 
-NEW_SCRIPTS="gi-dup-score gi-triage-graph gi-stack-detect gi-model-cache"
+NEW_SCRIPTS="gi-triage-graph gi-stack-detect gi-model-cache"
 
 PASS=0
 FAIL=0
@@ -69,7 +70,7 @@ echo "◆ Shared Scripts, Wave 3 (issue #253)"
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 
 # ───────────────────────────────────────────────────────────
-# T0: all four scripts exist, are executable, and --help exits 0
+# T0: all three scripts exist, are executable, and --help exits 0
 # ───────────────────────────────────────────────────────────
 for s in $NEW_SCRIPTS; do
   path="$SRC_SCRIPTS/$s.py"
@@ -101,7 +102,7 @@ while IFS= read -r line; do
   mode="${line%% *}"
   file="${line##*	}"
   case "$file" in
-    *gi-dup-score.py|*gi-triage-graph.py|*gi-stack-detect.py|*gi-model-cache.py)
+    *gi-triage-graph.py|*gi-stack-detect.py|*gi-model-cache.py)
       if [ "$mode" = "100755" ]; then
         pass "$(basename "$file") is committed 0755"
       else
@@ -110,214 +111,6 @@ while IFS= read -r line; do
       ;;
   esac
 done < <(cd "$REPO_ROOT" && git ls-files -s src/shared/scripts/)
-
-# A `gh` stub whose payload is scripted, and a PATH with python3 but no gh.
-STUB="$TMP/bin"
-mkdir -p "$STUB"
-cat > "$STUB/gh" <<'STUBEOF'
-#!/usr/bin/env bash
-if [ -n "${GH_FAIL:-}" ]; then
-  echo "HTTP 502: Bad gateway" >&2
-  exit 1
-fi
-printf '%s' "${GH_FIXTURE:-[]}"
-STUBEOF
-chmod +x "$STUB/gh"
-NOGH="$TMP/nogh"
-mkdir -p "$NOGH"
-ln -sf "$(command -v python3)" "$NOGH/python3"
-
-# ───────────────────────────────────────────────────────────
-# T1 (AC1): gi-dup-score — the fixed table, the two bands, fail-closed
-# ───────────────────────────────────────────────────────────
-BACKLOG="$TMP/backlog.json"
-cat > "$BACKLOG" <<'EOF'
-[
- {"number":42,"title":"Fix auth redirect loop on mobile",
-  "body":"Users hit a redirect loop when logging in from mobile safari.",
-  "labels":[{"name":"bug"}]},
- {"number":8,"title":"Add pagination to the issue list",
-  "body":"Long lists need pages. The pagination control belongs in the footer.",
-  "labels":[{"name":"feature"}]},
- {"number":99,"title":"Update the deployment runbook",
-  "body":"Nothing to do with any of this.","labels":[{"name":"documentation"}]}
-]
-EOF
-
-dup() {
-  local request="$1"; shift
-  printf '%s' "$request" | python3 "$DUP" --issues-from "$BACKLOG" --no-config "$@"
-}
-
-# A conclusive match needs genuinely different evidence, not one observation
-# restated. Issue #278 replaced the region model with the consumed-item-token
-# invariant, and this fixture moved with it: the keyword list now carries
-# `safari`, a term the title phrase does not contain and #42's body does. The
-# old fixture's keywords were all words of the item's own title, which under
-# the invariant is one observation and correctly scores 6 — pinned below, so
-# the change is a stronger contract rather than a relaxed one.
-HIGH_REQ='{"mode":"create","items":[{"index":1,"title":"Fix auth redirect loop on mobile","keywords":["auth","redirect","loop","safari"],"type":"bug"}]}'
-out="$(dup "$HIGH_REQ")"
-if [ "$(printf '%s' "$out" | jkey 'duplicates.0.confidence')" = "high" ] \
-   && [ "$(printf '%s' "$out" | jkey 'duplicates.0.match_number')" = "42" ] \
-   && [ "$(printf '%s' "$out" | jkey 'medium_band')" = "[]" ]; then
-  pass "AC1: a conclusive match lands in duplicates, not the medium band"
-else
-  fail "AC1: a conclusive match lands in duplicates (got: $out)"
-fi
-
-ECHO_REQ='{"mode":"create","items":[{"index":1,"title":"Fix auth redirect loop on mobile","keywords":["auth","redirect","loop"],"type":"bug"}]}'
-out="$(dup "$ECHO_REQ")"
-if [ "$(printf '%s' "$out" | jkey 'duplicates')" = "[]" ] \
-   && [ "$(printf '%s' "$out" | jkey 'medium_band.0.match_number')" = "42" ]; then
-  pass "AC1: the same match with only its own title words echoed back goes to the model"
-else
-  fail "AC1: keywords echoing the item's title still auto-decide (got: $out)"
-fi
-
-# The medium band is the whole point of the split: 5-7 must NOT be decided here.
-MED_REQ='{"mode":"create","items":[{"index":1,"title":"Footer control for long lists","keywords":["pagination","footer"],"type":"feature"}]}'
-out="$(dup "$MED_REQ")"
-if [ "$(printf '%s' "$out" | jkey 'duplicates')" = "[]" ] \
-   && [ "$(printf '%s' "$out" | jkey 'medium_band.0.match_number')" = "8" ] \
-   && [ "$(printf '%s' "$out" | jkey 'medium_band.0.confidence')" = "medium" ]; then
-  pass "AC1: a 5-7 score is handed to the medium band, never decided"
-else
-  fail "AC1: a 5-7 score is handed to the medium band (got: $out)"
-fi
-
-# Below the medium threshold nothing is reported at all.
-LOW_REQ='{"mode":"create","items":[{"index":1,"title":"Rewrite the deployment runbook","keywords":[],"type":"improvement"}]}'
-out="$(dup "$LOW_REQ")"
-if [ "$(printf '%s' "$out" | jkey 'duplicates')" = "[]" ] \
-   && [ "$(printf '%s' "$out" | jkey 'medium_band')" = "[]" ]; then
-  pass "AC1: a sub-threshold score is not reported"
-else
-  fail "AC1: a sub-threshold score leaked into a band (got: $out)"
-fi
-
-# Reproducible: the same input twice must produce identical bytes. A score that
-# moves between runs is not a score anyone can act on.
-a="$(dup "$HIGH_REQ")"
-b="$(dup "$HIGH_REQ")"
-if [ "$a" = "$b" ]; then
-  pass "AC1: scoring is reproducible (identical bytes across runs)"
-else
-  fail "AC1: scoring is not reproducible"
-fi
-
-# The published weights travel with the answer, so a reader can re-derive it.
-if [ "$(printf '%s' "$a" | jkey 'weights.title_overlap')" = "3" ] \
-   && [ "$(printf '%s' "$a" | jkey 'weights.keyword')" = "2" ] \
-   && [ "$(printf '%s' "$a" | jkey 'weights.same_type')" = "1" ] \
-   && [ "$(printf '%s' "$a" | jkey 'weights.phrase')" = "5" ]; then
-  pass "AC1: the +3/+2/+1/+5 table is the one documented, and is reported"
-else
-  fail "AC1: the reported weights do not match the documented table"
-fi
-
-# Thresholds are config-overridable through .gitissue.yml, not just flags — the
-# path every call site actually takes.
-CFG="$TMP/dupcfg"
-mkdir -p "$CFG"
-printf 'duplicate_detection:\n  high_threshold: 40\n  medium_threshold: 30\n' > "$CFG/.gitissue.yml"
-out="$(printf '%s' "$HIGH_REQ" | python3 "$DUP" --issues-from "$BACKLOG" --config "$CFG/.gitissue.yml")"
-if [ "$(printf '%s' "$out" | jkey 'duplicates')" = "[]" ] \
-   && [ "$(printf '%s' "$out" | jkey 'thresholds.high')" = "40" ]; then
-  pass "AC1: duplicate_detection.* from .gitissue.yml moves the bands"
-else
-  fail "AC1: duplicate_detection.* from .gitissue.yml is ignored"
-fi
-
-printf 'duplicate_detection:\n  extra_stop_words: "auth,redirect,loop,mobile,fix"\n' > "$CFG/stop.yml"
-out="$(printf '%s' "$HIGH_REQ" | python3 "$DUP" --issues-from "$BACKLOG" --config "$CFG/stop.yml")"
-if [ "$(printf '%s' "$out" | jkey 'duplicates')" = "[]" ]; then
-  pass "AC1: duplicate_detection.extra_stop_words extends the stop-word list"
-else
-  fail "AC1: duplicate_detection.extra_stop_words is ignored"
-fi
-
-printf 'duplicate_detection:\n  high_threshold: 3\n  medium_threshold: 9\n' > "$CFG/inverted.yml"
-run_status out st python3 "$DUP" --issues-from "$BACKLOG" --config "$CFG/inverted.yml"
-[ "$st" = "3" ] && pass "AC1: medium_threshold above high_threshold exits 3" \
-                || fail "AC1: an inverted threshold pair exits 3 (got $st)"
-printf 'duplicate_detection:\n  high_threshold: "eight"\n' > "$CFG/badtype.yml"
-run_status out st python3 "$DUP" --issues-from "$BACKLOG" --config "$CFG/badtype.yml"
-[ "$st" = "3" ] && pass "AC1: a non-integer duplicate_detection.* value exits 3" \
-                || fail "AC1: a non-integer threshold exits 3 (got $st)"
-
-# ── Fail closed: an unreadable backlog is never an empty backlog ─────────────
-# This is the one failure of this script that matters. `gh` missing, or `gh`
-# erroring, must exit 4 — reporting exit 0 with `duplicates: []` would file a
-# duplicate over an outage and call the scan clean.
-run_status out st bash -c "printf '%s' '$HIGH_REQ' | env PATH='$NOGH' python3 '$DUP' --no-config"
-[ "$st" = "4" ] && pass "AC1: a missing gh exits 4, never exit 0 with an empty backlog" \
-                || fail "AC1: a missing gh exits 4 (got $st, out=$out)"
-run_status out st bash -c "printf '%s' '$HIGH_REQ' | env GH_FAIL=1 PATH='$STUB:$PATH' python3 '$DUP' --no-config"
-[ "$st" = "4" ] && pass "AC1: a gh API error exits 4, never a clean scan" \
-                || fail "AC1: a gh API error exits 4 (got $st, out=$out)"
-# The converse: a *successful* fetch of an empty backlog is a real answer.
-out="$(printf '%s' "$HIGH_REQ" | env GH_FIXTURE='[]' PATH="$STUB:$PATH" python3 "$DUP" --no-config)"
-if [ "$(printf '%s' "$out" | jkey open_issue_count)" = "0" ] \
-   && [ "$(printf '%s' "$out" | jkey issue_source)" = "gh" ]; then
-  pass "AC1: an empty backlog that WAS read is exit 0 with open_issue_count 0"
-else
-  fail "AC1: an empty backlog that was read is not reported as such"
-fi
-
-# Truncation must be visible: silently scoring against the first 100 of 300
-# issues and reporting "no duplicates" is the same silent pass by another route.
-BIG="$TMP/big.json"
-python3 -c '
-import json, sys
-json.dump([{"number": n, "title": "t%d" % n, "body": "", "labels": []} for n in range(1, 6)],
-          open(sys.argv[1], "w"))
-' "$BIG"
-out="$(printf '%s' "$HIGH_REQ" | python3 "$DUP" --issues-from "$BIG" --no-config --limit 2)"
-if [ "$(printf '%s' "$out" | jkey scan_truncated)" = "True" ]; then
-  pass "AC1: a truncated scan sets scan_truncated"
-else
-  fail "AC1: a truncated scan is reported as complete"
-fi
-
-# Batch mode cross-checks the items against each other.
-BATCH_REQ='{"mode":"batch","items":[
- {"index":1,"title":"Add dark mode toggle to settings","keywords":["dark","mode","toggle"],"type":"feature"},
- {"index":2,"title":"Add dark mode toggle to settings page","keywords":["dark","mode","toggle"],"type":"feature"}]}'
-out="$(dup "$BATCH_REQ")"
-if [ "$(printf '%s' "$out" | jkey 'batch_internal_duplicates.0.match_index')" = "2" ]; then
-  pass "AC1: batch mode cross-checks items against each other"
-else
-  fail "AC1: batch mode does not report internal duplicates (got: $out)"
-fi
-
-# Exit-code vocabulary.
-run_status out st bash -c "printf 'not json' | python3 '$DUP' --issues-from '$BACKLOG' --no-config"
-[ "$st" = "3" ] && pass "AC1: unparsable stdin exits 3" \
-                || fail "AC1: unparsable stdin exits 3 (got $st)"
-run_status out st bash -c "printf '{\"items\":[{\"keywords\":[]}]}' | python3 '$DUP' --issues-from '$BACKLOG' --no-config"
-[ "$st" = "3" ] && pass "AC1: an item without a title exits 3" \
-                || fail "AC1: an item without a title exits 3 (got $st)"
-run_status out st bash -c "printf '\\xff\\xfe' | python3 '$DUP' --issues-from '$BACKLOG' --no-config"
-[ "$st" = "3" ] && pass "AC1: non-UTF-8 stdin exits 3, not a traceback" \
-                || fail "AC1: non-UTF-8 stdin exits 3 (got $st)"
-run_status out st python3 "$DUP" --nonsense
-[ "$st" = "2" ] && pass "AC1: an unknown flag exits 2 (usage)" \
-                || fail "AC1: an unknown flag exits 2 (got $st)"
-
-# ── Injection: a crafted title is data, never syntax ─────────────────────────
-INJ="$TMP/inj-dup"
-mkdir -p "$INJ"
-(
-  cd "$INJ"
-  printf '{"mode":"create","items":[{"index":1,"title":"Fix login\\"; touch PWNED; echo \\"","keywords":["$(touch PWNED2)"],"type":"bug"}]}' \
-    | python3 "$DUP" --issues-from "$BACKLOG" --no-config >/dev/null 2>&1
-) || true
-if [ ! -e "$INJ/PWNED" ] && [ ! -e "$INJ/PWNED2" ]; then
-  pass "AC1: a quote-bearing title/keyword cannot execute (stdin, never a command line)"
-else
-  fail "AC1: a crafted item executed a command — injection"
-fi
 
 # ───────────────────────────────────────────────────────────
 # T2 (AC2): gi-triage-graph — the documented payload, computed
@@ -814,7 +607,6 @@ expect_bundled() {
     fail "AC5: $skill bundles $script"
   fi
 }
-expect_bundled issue-creator gi-dup-score.py
 expect_bundled issue-creator gi-model-cache.py
 expect_bundled issue-triage gi-triage-graph.py
 expect_bundled auto-pilot gi-triage-graph.py
@@ -828,10 +620,6 @@ expect_grep() {
     fail "$label"
   fi
 }
-expect_grep "AC1: issue-creator Step 3 calls gi-dup-score" \
-  "references/scripts/gi-dup-score.py" "$SKILLS/issue-creator/SKILL.md"
-expect_grep "AC1: issue-creator batch mode calls gi-dup-score too" \
-  "references/scripts/gi-dup-score.py" "$SKILLS/issue-creator/references/modes.md"
 expect_grep "AC2: issue-triage's ordering step calls gi-triage-graph" \
   "references/scripts/gi-triage-graph.py" "$SKILLS/issue-triage/SKILL.md"
 expect_grep "AC2: auto-pilot Phase 1 calls the SAME script, not a reimplementation" \
@@ -842,10 +630,6 @@ expect_grep "AC4: issue-creator's config step calls gi-model-cache" \
   "references/scripts/gi-model-cache.py" "$SKILLS/issue-creator/SKILL.md"
 
 # AC5: every replaced procedure survives as a documented fallback.
-expect_grep "AC5: issue-creator keeps the inline gh issue list dedup fallback" \
-  "gh issue list --state open" "$SKILLS/issue-creator/SKILL.md"
-expect_grep "AC5: issue-creator keeps the scoring table for the fallback" \
-  "verbatim multi-word phrase" "$SKILLS/issue-creator/SKILL.md"
 expect_grep "AC5: issue-triage keeps the ordering rules as a runnable procedure" \
   "Steps 3-7 — the prose procedure" "$SKILLS/issue-triage/references/detection.md"
 expect_grep "AC5: the prose procedure still carries the priority buckets" \
@@ -861,7 +645,6 @@ expect_grep "AC4: the model-suggestion doc keeps the by-hand lifecycle" \
 
 # Exit 3 must never be swallowed by a degrade path, and exit 4 must be named.
 for entry in \
-  "issue-creator|SKILL.md" \
   "issue-triage|SKILL.md" \
   "init-gitissue|SKILL.md" \
 ; do
@@ -879,33 +662,20 @@ for entry in \
 done
 expect_grep "AC5: auto-pilot classifies exit 3 and exit 4 at its call site" \
   "Exit 4 means only the write failed" "$SKILLS/auto-pilot/references/phases.md"
+# issue-creator's only wave-3 call site is gi-model-cache, whose exit-3 stop is
+# stated in the call-site prose rather than in the shared exit-code table.
+expect_grep "AC4: issue-creator's gi-model-cache call site stops on exit 3" \
+  "stop and print the validation error" "$SKILLS/issue-creator/SKILL.md"
+expect_grep "AC4: issue-creator classifies gi-model-cache exit 4" \
+  "exit 4" "$SKILLS/issue-creator/SKILL.md"
 
 # An agent prompt renders its references as absolute URLs, so it must NOT carry
-# a skill-relative script path (issue #245). The medium-band split means the
-# duplicate detector needs no script path at all.
+# a skill-relative script path (issue #245).
 if grep -q "references/scripts/" "$SKILLS/issue-creator/references/agents/duplicate-detector.md"; then
   fail "AC5: duplicate-detector.md cites a skill-relative script path (issue #245)"
 else
   pass "AC5: duplicate-detector.md cites no skill-relative script path"
 fi
-expect_grep "AC1: the detector's contract is the medium band, not the backlog" \
-  "candidates" "$SKILLS/issue-creator/references/agents/duplicate-detector.md"
-expect_grep "AC1: the detector is told not to re-score the backlog" \
-  "Never re-score the whole backlog" "$SKILLS/issue-creator/references/agents/duplicate-detector.md"
-expect_grep "AC1: the spawn is conditional on a non-empty medium band" \
-  "only when \`medium_band\` is non-empty" "$SKILLS/issue-creator/SKILL.md"
-
-# The new config keys exist in both parity surfaces.
-for key in high_threshold medium_threshold extra_stop_words; do
-  if grep -q "^  $key:" "$SRC/skills/init-gitissue/templates/gitissue-template.yml" \
-     && grep -q "duplicate_detection\.$key" "$REPO_ROOT/docs/config-schema.md"; then
-    pass "AC1: duplicate_detection.$key is documented and present in the init template"
-  else
-    fail "AC1: duplicate_detection.$key is missing from the schema or the init template"
-  fi
-done
-expect_grep "AC1: issue-creator's config excerpt carries the duplicate_detection section" \
-  "^duplicate_detection:" "$SKILLS/issue-creator/references/docs/config-schema.md"
 
 # ───────────────────────────────────────────────────────────
 # T6 (AC5): call-site injection lint, extended to the wave-3 scripts
@@ -950,14 +720,12 @@ python3 - "$REPO_ROOT" <<'PY' > "$TMP/lint-report"
 import pathlib, re, subprocess, sys
 
 root = pathlib.Path(sys.argv[1])
-WAVE3 = ("gi-dup-score.py", "gi-triage-graph.py", "gi-stack-detect.py",
-         "gi-model-cache.py")
+WAVE3 = ("gi-triage-graph.py", "gi-stack-detect.py", "gi-model-cache.py")
 
 # Gap 4: a pinned count per script, not "at least one somewhere". Deleting one
-# of `gi-dup-score.py`'s two call sites is a real change to the contract this
+# of `gi-triage-graph.py`'s two call sites is a real change to the contract this
 # lint pins, so it must be an explicit edit here and not a silent pass.
 EXPECTED_SITES = {
-    "gi-dup-score.py": 2,
     "gi-triage-graph.py": 2,
     "gi-stack-detect.py": 1,
     "gi-model-cache.py": 2,
@@ -1058,7 +826,7 @@ def commands(text):
     Gap 3. The wave-2 version admits a sibling span only when it opens with an
     option or a pipe, or when the span before it ended on a flag still waiting
     for its value. That is a heuristic, and a heuristic that decides what to
-    inspect is a heuristic an attacker writes around — `python3 …gi-dup-score.py`
+    inspect is a heuristic an attacker writes around — `python3 …gi-model-cache.py`
     followed by prose followed by `[issue_title]` passed it. Here there is
     nothing to write around: if one span on the line is a call, all of them are
     part of the command text.
@@ -1164,7 +932,7 @@ done
 
 # And the positive statement: each script's own docstring names where its
 # untrusted input comes from, so a reader of the script sees the contract.
-for entry in "gi-dup-score|on stdin" "gi-triage-graph|on stdin" \
+for entry in "gi-triage-graph|on stdin" \
              "gi-stack-detect|it reads the repository" "gi-model-cache|stdin"; do
   s="${entry%%|*}"; needle="${entry##*|}"
   if head -80 "$SRC_SCRIPTS/$s.py" | grep -q -- "$needle"; then
@@ -1175,8 +943,6 @@ for entry in "gi-dup-score|on stdin" "gi-triage-graph|on stdin" \
 done
 
 # The skills must say so too, at the call site, where an author will read it.
-expect_grep "AC5: issue-creator forbids an issue title on a command line" \
-  "Never put an issue title on a command line" "$SKILLS/issue-creator/SKILL.md"
 expect_grep "AC5: issue-triage forbids an issue title on a command line" \
   "never\*\* put an issue title on a command line" "$SKILLS/issue-triage/SKILL.md"
 

@@ -1,7 +1,7 @@
 <!-- Generated from /docs/config-schema.md. Do not edit. Edit source and run ./scripts/build.sh. -->
 # `.gitissue.yml` Configuration Schema
 
-> **Per-skill excerpt (generated).** Only the configuration sections this skill reads are reproduced here: `duplicate_detection`, `issue`, `model_suggestion`, `platform`, `projects`, `triage`. The complete schema — every section and the full defaults table — is at [config-schema.md](https://github.com/luongnv89/idd/blob/main/docs/config-schema.md).
+> **Per-skill excerpt (generated).** Only the configuration sections this skill reads are reproduced here: `issue`, `model_suggestion`, `platform`, `projects`, `triage`. The complete schema — every section and the full defaults table — is at [config-schema.md](https://github.com/luongnv89/idd/blob/main/docs/config-schema.md).
 
 gitissue works with zero configuration — all settings have sensible defaults. When no `.gitissue.yml` file exists, the first-run hint is shown:
 
@@ -62,32 +62,6 @@ issue:
   # Type: boolean
   # Default: true
   normalize_comment: true
-
-# Deterministic duplicate scoring (gi-dup-score.py)
-# Table: title similarity (3+ shared significant words in the target title) +3,
-#   keyword found in an existing title/body +2 each, same type +1, verbatim
-#   multi-word phrase (3+ significant words) +5. Each signal pays only for
-#   item evidence no already-paid signal consumed, so one observation never
-#   pays twice: a phrase consumes its tokens, title_overlap then needs three
-#   shared words it did not contain, and a keyword already counted scores 0.
-#   Scores do not depend on the existing issue's body shape.
-duplicate_detection:
-  # Score at or above which a match is reported as a duplicate outright
-  # Type: integer
-  # Default: 8
-  # Minimum: 1
-  high_threshold: 8
-
-  # Score at or above which a match is handed to the LLM to judge
-  # Type: integer
-  # Default: 5
-  # Minimum: 1, and never above high_threshold
-  medium_threshold: 5
-
-  # Extra comma-separated stop-words, on top of the built-in list
-  # Type: string
-  # Default: ""
-  extra_stop_words: ""
 
 # Triage settings
 triage:
@@ -233,9 +207,6 @@ Config is validated on load at the start of every skill invocation. Errors inclu
 | `issue.template` | `default` | Built-in templates |
 | `issue.labels_auto_suggest` | `true` | Suggest labels from content |
 | `issue.normalize_comment` | `true` | Comment on normalization |
-| `duplicate_detection.high_threshold` | `8` | Reported as a duplicate |
-| `duplicate_detection.medium_threshold` | `5` | Handed to the LLM to judge |
-| `duplicate_detection.extra_stop_words` | `""` | Extra ignored words |
 | `triage.stale_threshold_days` | `14` | Stale issue threshold |
 | `triage.auto_priority` | `true` | Auto-suggest priorities |
 | `triage.include_closed` | `false` | Exclude closed from triage |
