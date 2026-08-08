@@ -245,16 +245,19 @@ fi
 # text. Two reductions, each closing a way a test can look wired while running
 # nothing:
 #
-#   1. YAML comments are stripped. A raw-text grep counted a comment as
-#      wiring — including this check's own explanatory note in dist-check.yml,
-#      which named tests/test-build-script.sh and so kept T9 green even with
-#      the test-build-script step deleted: the guard could not detect its own
-#      unwiring. Generalised, any test could be retired behind a leftover
-#      `# TODO: wire bash tests/test-X.sh`.
-#   2. Steps carrying `if: false` or `continue-on-error: true` are dropped
-#      whole. A step that cannot run, or whose failure cannot fail the job, is
-#      not a gate: marking a flaky test `continue-on-error: true` stops it
-#      gating PRs, and nothing should still call it wired.
+#   1. Comments are stripped — quote-aware, so an unquoted `#` at line start or
+#      after whitespace opens a comment and a quoted one does not. A raw-text
+#      grep counted a comment as wiring — including this check's own explanatory
+#      note in dist-check.yml, which named tests/test-build-script.sh and so
+#      kept T9 green even with the test-build-script step deleted: the guard
+#      could not detect its own unwiring. Generalised, any test could be retired
+#      behind a leftover `# TODO: wire bash tests/test-X.sh`.
+#   2. Steps carrying `if: false` or `continue-on-error: true` (any case) are
+#      dropped whole. A step that cannot run, or whose failure cannot fail the
+#      job, is not a gate: marking a flaky test `continue-on-error: true` stops
+#      it gating PRs, and nothing should still call it wired. A step ends at the
+#      next `- ` line indented no deeper than its own, so bullets inside a
+#      `run:` body or a `with:` sequence cannot split it away from its marker.
 #
 # Deliberately NOT covered, because closing them needs real YAML semantics:
 # job-level `if:`/`continue-on-error:`, an expression that is falsy without
@@ -301,20 +304,40 @@ if [ -d "$WORKFLOW_DIR" ]; then
   done < <(find "$WORKFLOW_DIR" -maxdepth 1 -type f \( -name '*.yml' -o -name '*.yaml' \) | sort)
 fi
 
-# Drop every step block that cannot gate. A step begins at a line starting with
-# `- ` at any indent; everything up to the next such line belongs to it.
-# Mis-splitting can only *shrink* a block, so a disabling marker is at worst
-# not attributed — the check fails open, never green-lights a live step.
+# Drop every step block that cannot gate. A step begins at a `- ` line whose
+# indent is no deeper than the current step's; a `- ` line indented *further* is
+# step content — a bullet inside a `run:` heredoc, or a YAML sequence under
+# `with:` — and must not split the step.
+#
+# Splitting on a `- ` at *any* indent, as this did before, is not a conservative
+# approximation. flush() resets `disabled`, so the remainder of a mis-split step
+# becomes a NEW, UNDISABLED block: a step marked `continue-on-error: true` whose
+# `run:` body contained a bullet line survived the reduction intact, and T9
+# reported a disabled test as wired — precisely the failure this reduction
+# exists to catch. The invariant is not "mis-splitting only shrinks a block"; it
+# is the one enforced below, that a disabling marker stays attributed to every
+# line of the step it disables.
 strip_dead_steps() {
   awk '
     function flush(   i) {
       if (n > 0 && disabled == 0) for (i = 1; i <= n; i++) print buf[i]
       n = 0; disabled = 0
     }
-    /^[[:space:]]*-[[:space:]]/ { flush() }
+    /^[[:space:]]*-[[:space:]]/ {
+      match($0, /^[[:space:]]*/)
+      if (in_step == 0 || RLENGTH <= step_indent) {
+        flush()
+        in_step = 1
+        step_indent = RLENGTH
+      }
+    }
     {
       buf[++n] = $0
-      if ($0 ~ /^[[:space:]]*continue-on-error:[[:space:]]*[^[:alnum:]]?true[^[:alnum:]]*$/) disabled = 1
+      # tolower() first: a case-sensitive literal let `continue-on-error: TRUE`
+      # through. Lowercasing the key too can only over-strip (a key GitHub would
+      # not honour), and over-stripping loses wiring loudly; under-stripping
+      # silently restores the hole.
+      if (tolower($0) ~ /^[[:space:]]*continue-on-error:[[:space:]]*[^[:alnum:]]?true[^[:alnum:]]*$/) disabled = 1
       if ($0 ~ /^[[:space:]]*if:/) {
         v = $0
         sub(/^[[:space:]]*if:[[:space:]]*/, "", v)
@@ -328,13 +351,58 @@ strip_dead_steps() {
   '
 }
 
+# Strip comments without touching quoted text. A `#` opens a comment only when
+# it is unquoted AND at line start or preceded by whitespace — the same rule in
+# YAML and in the shell of a `run:` body, which is why one pass covers both.
+#
+# The quoting half is not optional. `sed -E 's/(^|[[:space:]])#.*$//'` applied
+# YAML's *plain-scalar* rule to every line, including block scalars where `#` is
+# literal, and deleted the rest of valid input:
+#
+#   run: |
+#     echo "gate for issue #275" && bash tests/test-pre-commit-security.sh
+#
+# lost its invocation, so T9 failed a correctly-wired repo — and neither reason
+# in the failure hint ("a comment", "a disabled step") applied, leaving the
+# author no path to the cause. Note this still strips a *shell* comment inside a
+# `run:` body (`# TODO: wire bash tests/test-x.sh`), which is right: a commented
+# command invokes nothing either way.
+#
+# Residual: a line carrying an unbalanced quote leaves the scanner inside a
+# quote and under-strips the rest of that line. That can only keep text, never
+# delete an invocation, so it cannot cause a false failure.
+strip_comments() {
+  awk '
+    BEGIN { sq = sprintf("%c", 39) }
+    {
+      line = $0
+      out = line
+      inq = ""
+      n = length(line)
+      for (i = 1; i <= n; i++) {
+        c = substr(line, i, 1)
+        if (inq != "") {
+          if (c == inq) inq = ""
+          continue
+        }
+        if (c == "\"" || c == sq) { inq = c; continue }
+        if (c == "#" && (i == 1 || substr(line, i - 1, 1) ~ /[[:space:]]/)) {
+          # i-2, not i-1: consume the separating space too, so the reduced text
+          # is byte-identical to the sed rule this replaced on every input the
+          # sed rule handled correctly.
+          out = substr(line, 1, i - 2)
+          break
+        }
+      }
+      print out
+    }
+  '
+}
+
 WIRING_TEXT=""
 if [ "${#WORKFLOW_FILES[@]}" -gt 0 ]; then
   for wf in "${WORKFLOW_FILES[@]}"; do
-    # `(^|[[:space:]])#` is YAML comment syntax: a `#` only opens a comment at
-    # line start or after whitespace. Over-stripping would only lose wiring
-    # (a loud failure); under-stripping would restore the hole.
-    WIRING_TEXT+="$(sed -E 's/(^|[[:space:]])#.*$//' "$wf" | strip_dead_steps)"$'\n'
+    WIRING_TEXT+="$(strip_comments < "$wf" | strip_dead_steps)"$'\n'
   done
 fi
 
@@ -369,6 +437,15 @@ else
     else
       unwired=$((unwired + 1))
       fail "T9: $rel is not invoked by any live workflow step and has no EXCLUDED reason"
+      # Distinguish "never wired" from "wired, but the reduction removed it".
+      # Without this the two are indistinguishable in the output, and an author
+      # staring at a step they can see in the file has nothing to go on.
+      raw_hits="$(grep -n -F -- "$rel" "${WORKFLOW_FILES[@]}" 2>/dev/null || true)"
+      if [ -n "$raw_hits" ]; then
+        echo "        A workflow does name it — but not from a live step, so the"
+        echo "        reduction below dropped it. Raw occurrence(s):"
+        printf '%s\n' "$raw_hits" | sed 's/^/          /'
+      fi
     fi
   done
 
@@ -378,7 +455,7 @@ else
     echo "      Add a step to .github/workflows/dist-check.yml, or add the file"
     echo "      to EXCLUDED in tests/test-build-script.sh with a written reason."
     echo "      A mention in a comment, or in a step disabled by 'if: false' or"
-    echo "      'continue-on-error: true', does not count as wiring."
+    echo "      'continue-on-error: true' (any case), does not count as wiring."
   fi
 
   # A stale exclusion outlives the test it names and would silently excuse a
