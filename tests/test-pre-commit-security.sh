@@ -24,9 +24,11 @@
 #     gi-secscan.py` command line — or a citation of the canonical document
 #     `docs/pre-commit-security.md`;
 #   - within 12 lines above the block: an invocation ONLY. It may sit in prose
-#     or in a preceding fenced block — a command is a command either way, and
-#     "scan in one block, push in the next" is the pattern authors reach for.
-#     A bare doc name does not gate from above, because every SKILL.source.md
+#     or in a preceding *shell* fenced block, because "scan in one block, push
+#     in the next" is the pattern authors reach for. A display-only fence
+#     (```text, ```json, ```markdown, bare ```) does not gate from above: those
+#     carry transcripts and templates, and a transcript of the scan is not the
+#     scan. A bare doc name does not gate from above, because every SKILL.source.md
 #     ends with an "Additional Resources" navigation index that lists
 #     `pre-commit-security.md`. That index sits inside the 12-line window of
 #     anything appended near the end of the file, so accepting it would
@@ -248,6 +250,16 @@ scan_file() {
       # The subset of those whose lines are a transcript: a leading `#` is the
       # root prompt rather than a comment.
       session_lang_re = "^(console|shell-session|bash-session)$"
+      # A *subject*: a `git commit` or `git push` command. `git` takes global
+      # options before the subcommand, so the subject is not always the two
+      # words verbatim — /issue-resolver works from a worktree and reaches it
+      # as `git -C <dir> push`. Accept a run of `-opt` words between `git` and
+      # the subcommand, each optionally followed by its value (the `-C` in
+      # `git -C /path push` takes one; the `--no-pager` in
+      # `git --no-pager -C /path commit` does not).
+      git_opt_re = "([[:space:]]+-[^[:space:]]+([[:space:]]+[^-][^[:space:]]*)?)*"
+      commit_re = "(^|[[:space:]&|;])git" git_opt_re "[[:space:]]+commit([[:space:]]|$)"
+      push_re = "(^|[[:space:]&|;])git" git_opt_re "[[:space:]]+push([[:space:]]|$)"
     }
     {
       if (parse_fence($0)) {
@@ -275,25 +287,36 @@ scan_file() {
         # block content (a ```bash sample nested in a ````markdown wrapper).
         # Fall through.
       }
-      # Remember where the most recent live invocation was, wherever it sits.
-      # Deliberately NOT restricted to prose: an invocation inside a fenced
-      # block is a real command, so the most natural authoring pattern — a
-      # ```bash block that runs the scan, immediately followed by a ```bash
-      # block that pushes — gates correctly. Only the *document citation* is
-      # restricted to in-block use, and for a reason that does not apply here:
-      # the "Additional Resources" navigation index would otherwise gate by
-      # proximity (see nav_re). The 12-line physical window still bounds
-      # adjacency, so an invocation in an unrelated listing further up does not
-      # reach.
-      if (is_invocation($0)) last_inv_line = NR
+      # Remember where the most recent live invocation was. Two places count:
+      # prose, and a *shell* fence. Counting shell fences is deliberate — the
+      # most natural authoring pattern is a ```bash block that runs the scan
+      # immediately followed by a ```bash block that pushes, and that gates.
+      #
+      # A non-shell fence does not count. The same info-string test that makes a
+      # ```text/```json/```markdown/bare fence inert as a *subject*
+      # (shell_lang_re, see its comment) makes it inert as a *gate*: those
+      # fences carry sample transcripts, error messages and templates, and a
+      # transcript of the scan running is not the scan running. Counting them
+      # let a ```text transcript of a blocked scan gate an ungated ```bash push
+      # block below it.
+      #
+      # Only the *document citation* is restricted further, to in-block use, and
+      # for a reason that does not apply here: the "Additional Resources"
+      # navigation index would otherwise gate by proximity (see nav_re). The
+      # 12-line physical window still bounds adjacency, so an invocation in an
+      # unrelated listing further up does not reach.
+      #
+      # Not closed: inside a ```bash fence the invocation counts even when the
+      # fence is a negative example ("do NOT do this") or a heredoc that only
+      # *writes* the command into a file. Both hold the real command text in a
+      # shell fence; separating them from a command that runs needs a shell
+      # parser, not a fence test.
+      if ((in_block == 0 || is_shell_block == 1) && is_invocation($0)) last_inv_line = NR
       if (in_block == 1) {
         # Match `git commit` or `git push` as actual commands, not in comments
-        # or inline-code mentions. We look for either at start of line (after
-        # optional whitespace) or after a shell separator.
-        if ($0 ~ /(^|[[:space:]&|;]|^[[:space:]]*)git[[:space:]]+commit([[:space:]]|$)/) {
-          block_has_commit_or_push = 1
-        }
-        if ($0 ~ /(^|[[:space:]&|;]|^[[:space:]]*)git[[:space:]]+push([[:space:]]|$)/) {
+        # or inline-code mentions: at start of line or after a shell separator,
+        # with any global options in between (see commit_re / push_re).
+        if ($0 ~ commit_re || $0 ~ push_re) {
           block_has_commit_or_push = 1
         }
         if (is_invocation($0) || ($0 ~ doc_re && $0 !~ nav_re)) {
