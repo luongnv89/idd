@@ -16,6 +16,10 @@ jobs:
         with:
           python-version: "3.11"
 
+      # ─── Source-level checks — read src/ and docs/ only, so they run before
+      # the build and fail fast. A new test belongs here unless it reads dist/
+      # or skills/. Every tests/*.sh must appear in this file: tests/test-build-script.sh
+      # (T9) fails the build for any that does not.
       - name: Source-level checks (fast fail before build)
         run: bash tests/test-init-template-doc-urls-source.sh
 
@@ -24,6 +28,45 @@ jobs:
 
       - name: test-idd-lint-stats-project
         run: bash tests/test-idd-lint-stats-project.sh
+
+      - name: test-autopilot-modes
+        run: bash tests/test-autopilot-modes.sh
+
+      - name: test-autopilot-partial-merge-dependency-gate
+        run: bash tests/test-autopilot-partial-merge-dependency-gate.sh
+
+      - name: test-config-schema-38
+        run: bash tests/test-config-schema-38.sh
+
+      - name: test-idd-doctor
+        run: bash tests/test-idd-doctor.sh
+
+      - name: test-init-template-schema-parity
+        run: bash tests/test-init-template-schema-parity.sh
+
+      - name: test-issue-creator-confidence-191
+        run: bash tests/test-issue-creator-confidence-191.sh
+
+      - name: test-issue-pr-review-traceability
+        run: bash tests/test-issue-pr-review-traceability.sh
+
+      - name: test-issue-resolver-0d-security
+        run: bash tests/test-issue-resolver-0d-security.sh
+
+      - name: test-landing-structure
+        run: bash tests/test-landing-structure.sh
+
+      - name: test-model-suggestion-124
+        run: bash tests/test-model-suggestion-124.sh
+
+      - name: test-pre-commit-security
+        run: bash tests/test-pre-commit-security.sh
+
+      - name: test-projects-sync
+        run: bash tests/test-projects-sync.sh
+
+      - name: test-sync-safety
+        run: bash tests/test-sync-safety.sh
 
       # build.sh: compile → verify dist/skills → promote skills/ only on success
       - name: Build and verify skills (update skills/ on success)
@@ -36,6 +79,8 @@ jobs:
             exit 1
           fi
 
+      # ─── Built-output checks — these read dist/ or skills/, so they must run
+      # after the build above.
       - name: test-build-script
         run: bash tests/test-build-script.sh
 
@@ -92,3 +137,25 @@ jobs:
 
       - name: test-issue-analysis
         run: bash tests/test-issue-analysis.sh
+
+      - name: test-agent-conventions-inline-245
+        run: bash tests/test-agent-conventions-inline-245.sh
+
+      # Reads dist/ — fails on a fresh checkout if run before the build.
+      - name: test-autopilot-dependency-gate
+        run: bash tests/test-autopilot-dependency-gate.sh
+
+      - name: test-issue-resolver-worktree
+        run: bash tests/test-issue-resolver-worktree.sh
+
+      - name: test-model-suggestion-117
+        run: bash tests/test-model-suggestion-117.sh
+
+      - name: test-phase1-contract-truthfulness
+        run: bash tests/test-phase1-contract-truthfulness.sh
+
+      - name: test-root-skills-install-surface
+        run: bash tests/test-root-skills-install-surface.sh
+
+      - name: test-runs-jsonl
+        run: bash tests/test-runs-jsonl.sh

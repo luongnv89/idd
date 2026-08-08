@@ -9,6 +9,12 @@
 #     (src/deprecated-skills/) without a distribute flag are excluded.
 #   - Every shared script (src/shared/scripts/) ships into at least one skill,
 #     byte-identically, executable, and runnable (issue #251).
+#   - Every tests/*.sh is invoked by a GitHub Actions workflow, or is listed in
+#     this file's EXCLUDED array with a written reason (T9, issue #275).
+#
+# T9 lives here, in an already-wired test, on purpose: a standalone
+# tests/test-ci-wiring.sh would itself need wiring, which is the failure mode it
+# exists to catch.
 #
 # Usage: bash tests/test-build-script.sh
 # Returns: exit 0 on pass, exit 1 on failure.
@@ -218,6 +224,97 @@ if [ "$script_count" -gt 0 ]; then
   pass "T8: src/shared/scripts/ holds $script_count script(s) to verify"
 else
   fail "T8: src/shared/scripts/ is empty — T8 would pass vacuously"
+fi
+
+# ───────────────────────────────────────────────────────────
+# T9: every tests/*.sh is invoked by a workflow (issue #275)
+#
+# A test nobody runs is not a test. Issue #275 found 20 of 42 test files that no
+# workflow ever invoked — including the pre-commit security lint. Nothing
+# asserted the wiring, so the gap grew silently, one unwired file at a time.
+#
+# To add a test: create tests/test-<name>.sh and add a named step for it in
+# .github/workflows/dist-check.yml — before the build if it reads only src/ and
+# docs/, after the build if it reads dist/ or skills/.
+#
+# To deliberately keep a test out of CI: add it to EXCLUDED below WITH a reason.
+# The reason is the whole point of the array — an exclusion nobody can justify
+# is indistinguishable from the rot this check exists to prevent.
+# ───────────────────────────────────────────────────────────
+WORKFLOW_DIR="$REPO_ROOT/.github/workflows"
+
+# Format: "<basename>|<reason>". Empty today — every tests/*.sh runs in CI.
+EXCLUDED=(
+  # "test-example.sh|needs a live GitHub token; run locally with GH_TOKEN set"
+)
+
+excluded_reason() {
+  local want="$1" entry
+  if [ "${#EXCLUDED[@]}" -eq 0 ]; then
+    return 1
+  fi
+  for entry in "${EXCLUDED[@]}"; do
+    if [ "${entry%%|*}" = "$want" ]; then
+      printf '%s' "${entry#*|}"
+      return 0
+    fi
+  done
+  return 1
+}
+
+TEST_FILES=()
+while IFS= read -r tracked; do
+  TEST_FILES+=("$tracked")
+done < <(cd "$REPO_ROOT" && git ls-files 'tests/*.sh')
+
+# Scan every workflow, not just dist-check.yml: a test wired from any of them is
+# wired. `grep -rho … || true` because grep exits 1 on no match under `set -e`.
+WIRED=""
+if [ -d "$WORKFLOW_DIR" ]; then
+  WIRED="$(grep -rhoE 'tests/[A-Za-z0-9._-]+\.sh' "$WORKFLOW_DIR" | sort -u || true)"
+fi
+
+if [ "${#TEST_FILES[@]}" -eq 0 ]; then
+  fail "T9: git tracks no tests/*.sh — the wiring check would be vacuous"
+elif [ -z "$WIRED" ]; then
+  fail "T9: no workflow under .github/workflows/ invokes any tests/*.sh"
+else
+  wired_count="$(printf '%s\n' "$WIRED" | wc -l | tr -d ' ')"
+  pass "T9.0: checking ${#TEST_FILES[@]} tracked test(s) against $wired_count workflow reference(s)"
+
+  unwired=0
+  for rel in "${TEST_FILES[@]}"; do
+    base="$(basename "$rel")"
+    if printf '%s\n' "$WIRED" | grep -qxF "tests/$base"; then
+      continue
+    fi
+    if reason="$(excluded_reason "$base")" && [ -n "$reason" ]; then
+      pass "T9: $base excluded from CI — $reason"
+    else
+      unwired=$((unwired + 1))
+      fail "T9: $base is not invoked by any workflow and has no EXCLUDED reason"
+    fi
+  done
+
+  if [ "$unwired" -eq 0 ]; then
+    pass "T9: every tests/*.sh is invoked by a workflow or excluded with a reason"
+  else
+    echo "      Add a step to .github/workflows/dist-check.yml, or add the file"
+    echo "      to EXCLUDED in tests/test-build-script.sh with a written reason."
+  fi
+
+  # A stale exclusion outlives the test it names and would silently excuse a
+  # future file that reuses the name.
+  if [ "${#EXCLUDED[@]}" -gt 0 ]; then
+    for entry in "${EXCLUDED[@]}"; do
+      name="${entry%%|*}"
+      if [ -f "$REPO_ROOT/tests/$name" ]; then
+        pass "T9: EXCLUDED entry '$name' names an existing test"
+      else
+        fail "T9: EXCLUDED entry '$name' names no tests/$name — stale exclusion"
+      fi
+    done
+  fi
 fi
 
 # ───────────────────────────────────────────────────────────
