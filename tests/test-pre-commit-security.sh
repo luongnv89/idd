@@ -306,11 +306,22 @@ scan_file() {
       # 12-line physical window still bounds adjacency, so an invocation in an
       # unrelated listing further up does not reach.
       #
-      # Not closed: inside a ```bash fence the invocation counts even when the
-      # fence is a negative example ("do NOT do this") or a heredoc that only
-      # *writes* the command into a file. Both hold the real command text in a
-      # shell fence; separating them from a command that runs needs a shell
-      # parser, not a fence test.
+      # Not closed, for two different reasons:
+      #
+      #   - A ```bash fence that is a negative example ("do NOT do this") is
+      #     *indistinguishable* from a legitimate scan-then-push pair at this
+      #     level: strip the prose marker and the two inputs are byte-identical
+      #     below it. Only prose keywords could tell them apart, and "Never push
+      #     without running this first" carries the same keywords as "do NOT do
+      #     this" with the opposite intent — so that discriminator would break
+      #     real gates. Authoring rule instead, documented in the doc.
+      #   - A heredoc that only *writes* the command into a file IS separable
+      #     (a heredoc-terminator tracker is ~10 lines). It is left open because
+      #     the same tracker also flags a heredoc installing the scan as a
+      #     .git/hooks/pre-commit hook, which is a strictly *stronger* gate than
+      #     an inline call. The discriminator points the wrong way, so closing
+      #     this trades a benign false negative for a false positive against the
+      #     best available pattern.
       if ((in_block == 0 || is_shell_block == 1) && is_invocation($0)) last_inv_line = NR
       if (in_block == 1) {
         # Match `git commit` or `git push` as actual commands, not in comments

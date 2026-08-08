@@ -767,9 +767,9 @@ DOC_SECTION_DIGESTS: dict[str, tuple[str, ...]] = {
     # contributor CI check (tests/test-pre-commit-security.sh) over its own
     # src/skills/** sources. A skill resolving an issue in a *user's* repo never
     # runs that lint and cannot act on it, yet the section shipped into both
-    # bundling skills. It is 3,488 bytes of the authored document; dropping it
-    # takes each emitted copy from 21,757 to 18,529 bytes — 3,228 per skill,
-    # 6,456 over the two, the shortfall against 3,488 being the 260-byte digest
+    # bundling skills. It is 4,435 bytes of the authored document; dropping it
+    # takes each emitted copy from 22,704 to 18,529 bytes — 4,175 per skill,
+    # 8,350 over the two, the shortfall against 4,435 being the 260-byte digest
     # notice the emitted copy gains. The authored document keeps the section
     # whole for the contributors it is written for.
     "pre-commit-security.md": (
