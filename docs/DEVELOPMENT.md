@@ -107,11 +107,16 @@ Issue templates are in `src/skills/issue-creator/templates/`. Each template must
 
 ## Testing
 
-Integration tests are in `tests/`. They verify skill behavior against GitHub repositories.
+The automated suite is `tests/*.sh` — shell scripts that assert on `src/`, `docs/`, and the built `skills/`. They need no GitHub repo and no setup.
+
+`.github/workflows/dist-check.yml` is the authoritative list of what runs and in what order: one named step per script, source-level checks first, then `./scripts/build.sh` and the drift gate, then the checks that read the build output. `tests/test-build-script.sh` (T9) fails if any `tests/*.sh` is missing from that workflow, so a new test is not "done" until it has a step there.
 
 ```bash
-# See tests/README.md for setup and execution instructions
+bash tests/test-build-script.sh          # run one
+git ls-files 'tests/*.sh' | xargs -n1 bash   # run all
 ```
+
+`tests/README.md`, `README-sprint2.md`, and `README-sprint3.md` are something else: manual, human-driven test cases that do need a scratch GitHub repo.
 
 When testing manually:
 1. Create a test repository (or use an existing one)
