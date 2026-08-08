@@ -74,12 +74,11 @@
 #              as phantom content — an ungated `git push` below it is never
 #              evaluated at all. Fixture A pins it.
 #
-#          Residue of accepting any opener indent: a top-level *indented code
-#          block* (four spaces, no fence) containing a ``` line is read as a
-#          fence. Without container tracking that shape is byte-identical to a
-#          list-nested fence, so it cannot be told apart here — and the error
-#          direction is a false alarm rather than a missed gate, which is the
-#          right way for a security lint to be wrong.
+#          Accepting any opener indent has a cost of its own — a top-level
+#          *indented code block* (four spaces, no fence) containing a ``` line
+#          opens a block that was never there. Without container tracking that
+#          shape is byte-identical to a list-nested fence, so it cannot be told
+#          apart here. It is not left as a residue: note 3(d) recovers from it.
 #
 #          src/ carries fences at 0, 2 and 3 columns only, so neither rule moves
 #          a real subject today; T3c is what keeps them from drifting.
@@ -88,18 +87,29 @@
 #      (c) A fence left *open* at EOF is a valid CommonMark block that renders
 #          normally, so the END clause must evaluate it; otherwise a `git push`
 #          in the last fence of a file is never looked at.
-#      (d) Residue, left open deliberately: an unclosed non-shell fence
-#          (```text …, no closing ```) still shadows what follows it. Only a
-#          same-character run of length ≥ open_len with an *empty* info string
-#          closes a block, so the next ```bash line is read as content and that
-#          block's closing ``` is consumed as the text block's terminator — one
-#          real subject is swallowed per stray open fence. Closing this needs a
-#          heuristic ("a same-length fence carrying an info string ends the open
-#          block"), which is a deliberate deviation from CommonMark and would
-#          misparse a legitimately nested same-length fence. The authoring rule
-#          — do not leave a fence unclosed — is cheaper than the misparse, and
-#          T3b pins the subject *set*, so a swallowed real subject shows up
-#          there as a missing file rather than as a silent pass.
+#      (d) A *phantom* open block must be recoverable. Every defeat this parser
+#          has suffered is one shape — a block the parser believes is open
+#          swallowing a real ```bash block whole — reached three different ways:
+#          a false close (a run indented past its opener, note 3a), a false open
+#          (a top-level indented code block containing a ``` run), and a fence
+#          the author never closed. Patching the three entrances one at a time
+#          is what let the third survive two rounds of fixing the first two, so
+#          the exit is guarded instead.
+#
+#          The recovery: a same-character run of length ≥ open_len that carries
+#          a *non-empty info string* cannot occur inside a genuinely open fence,
+#          because an open fence containing one would have to be longer — and a
+#          longer opener is handled as content. So the shape is proof the open
+#          block is a phantom. Evaluate the phantom and open the real block from
+#          this fence. The ````markdown-wraps-```bash idiom is untouched: there
+#          open_len (4) > fence_len (3), so the branch never fires. Measured
+#          against the whole of src/: zero blocks change hands.
+#
+#          Order matters — the recovery is tested *before* the note 3(a) indent
+#          bound, because that bound reasons "a run this deep is content of the
+#          enclosing block", which is void when the enclosing block is a
+#          phantom. Behind the bound, a phantom opened at column 0 still eats a
+#          list-nested ```bash block. Fixtures E, F and G pin the three.
 #   4. In a session-transcript fence (```console, ```shell-session), a leading
 #      `#` is the root prompt, not a comment — property 2's `comment_re` would
 #      throw away a real command. Such a line gates only when the interpreter
@@ -255,6 +265,25 @@ scan_file() {
       is_shell_block = 0
       is_session_block = 0
     }
+    # Open a block from the fence parse_fence() just performed. A function for
+    # the same reason as evaluate_block(): two paths reach it — a fence found in
+    # prose, and the spurious-open recovery below — and a second, copy-pasted
+    # body is exactly the thing that drifts.
+    function open_block(   lang) {
+      in_block = 1
+      open_ch = fence_ch
+      open_len = fence_len
+      open_indent = fence_indent
+      lang = fence_info
+      sub(/[[:space:]].*$/, "", lang)   # first word of the info string
+      is_shell_block = (tolower(lang) ~ shell_lang_re) ? 1 : 0
+      is_session_block = (tolower(lang) ~ session_lang_re) ? 1 : 0
+      block_start = NR
+      block_has_commit_or_push = 0
+      block_has_gate = 0
+      # Snapshot whether an invocation sits within window_size lines above.
+      window_has_inv = (last_inv_line > 0 && NR - last_inv_line <= window_size) ? 1 : 0
+    }
     # Is this line a live invocation of the scanner?
     function is_invocation(line) {
       if (line ~ inv_re && line !~ comment_re) return 1
@@ -322,33 +351,39 @@ scan_file() {
       push_re = "(^|[[:space:]&|;])git" git_opt_re "[[:space:]]+push([[:space:]]|$)"
     }
     {
-      # The indentation bound, applied where the container is known (note 3a).
-      # No bound on an *opening* fence: a fence nested in a `10. ` list item
-      # starts at column 4 and is indented 0 relative to its own container, so an
-      # absolute limit erases it. Once a block is open its opener fixes the
-      # reference column, and a closing fence is never more than 3 columns past
-      # it — anything further indented is block content.
-      if (parse_fence($0) && (in_block == 0 || fence_indent <= open_indent + 3)) {
-        if (in_block == 0) {
-          in_block = 1
-          open_ch = fence_ch
-          open_len = fence_len
-          open_indent = fence_indent
-          lang = fence_info
-          sub(/[[:space:]].*$/, "", lang)   # first word of the info string
-          is_shell_block = (tolower(lang) ~ shell_lang_re) ? 1 : 0
-          is_session_block = (tolower(lang) ~ session_lang_re) ? 1 : 0
-          block_start = NR
-          block_has_commit_or_push = 0
-          block_has_gate = 0
-          # Snapshot whether an invocation sits within window_size lines above.
-          window_has_inv = (last_inv_line > 0 && NR - last_inv_line <= window_size) ? 1 : 0
+      if (parse_fence($0)) {
+        # Spurious-open recovery, and the reason it comes first (note 3d).
+        # CommonMark cannot put a same-character run of length >= open_len
+        # *carrying an info string* inside a genuinely open fence — the open
+        # fence would have to be longer, and a longer one is handled as content
+        # below. So when this shape appears, the block we believe is open never
+        # was: it is a phantom, and everything since has been mis-attributed to
+        # it. Close the phantom out and open the real block here.
+        #
+        # This is checked before the indentation bound because that bound argues
+        # "a run this deep is *content* of the enclosing block" — reasoning that
+        # is void when the enclosing block does not exist.
+        if (in_block == 1 && fence_ch == open_ch && fence_len >= open_len && fence_info != "") {
+          evaluate_block()
+          open_block()
           next
         }
-        if (fence_ch == open_ch && fence_len >= open_len && fence_info == "") {
-          # Closing fence — evaluate the block.
-          evaluate_block()
-          next
+        # The indentation bound, applied where the container is known (note 3a).
+        # No bound on an *opening* fence: a fence nested in a `10. ` list item
+        # starts at column 4 and is indented 0 relative to its own container, so
+        # an absolute limit erases it. Once a block is open its opener fixes the
+        # reference column, and a closing fence is never more than 3 columns past
+        # it — anything further indented is block content.
+        if (in_block == 0 || fence_indent <= open_indent + 3) {
+          if (in_block == 0) {
+            open_block()
+            next
+          }
+          if (fence_ch == open_ch && fence_len >= open_len && fence_info == "") {
+            # Closing fence — evaluate the block.
+            evaluate_block()
+            next
+          }
         }
         # A shorter or differently-charactered fence inside an open block is
         # block content (a ```bash sample nested in a ````markdown wrapper).
@@ -489,12 +524,15 @@ else
 fi
 
 # ───────────────────────────────────────────────────────────
-# T3c: The fence parser applies CommonMark's indentation bound relative to the
-#      enclosing fence (header note 3a). T3 and T3b notice a scan that saw the
-#      wrong *files*, but neither notices a mis-parse that happens to leave
-#      today's two subjects intact — so the parser is exercised directly against
-#      four synthetic fixtures whose expected verdict is known. Each pins one
-#      way of getting the bound wrong; every one reports exactly 1 VIOLATION.
+# T3c: The fence parser must not let a phantom open block swallow a real one.
+#      T3 and T3b notice a scan that saw the wrong *files*, but neither notices
+#      a mis-parse that happens to leave today's two subjects intact — and a
+#      swallowed block is exactly that: the push never becomes a subject, so the
+#      pinned set is unchanged and nothing fires. So the parser is exercised
+#      directly against seven synthetic fixtures whose expected verdict is
+#      known. A–D pin the indentation bound (note 3a) and E–G the phantom-block
+#      recovery (note 3d); each fixture fails for one specific wrong model, and
+#      every one of them reports exactly 1 VIOLATION.
 #
 #        A. Too loose (no bound). An ungated `git push` that a 4-column ``` run
 #           *inside* the enclosing ```bash block tries to hide. Read as a fence
@@ -512,6 +550,17 @@ fi
 #           absolute limit makes the ```text fence invisible, so the transcript
 #           reads as prose and gates the push it has nothing to do with. This is
 #           the more dangerous half: it turns a violation into a silent pass.
+#        E. Phantom from a false *open*. A top-level 4-column indented code
+#           block containing a ``` run — no unclosed fence anywhere, so the END
+#           clause cannot help — followed by a real ```bash block with an
+#           ungated push. Fails if the note 3d recovery is removed.
+#        F. Phantom from an unclosed fence. A ```text fence the author never
+#           closed, followed by a ```bash push. Same recovery, third entrance.
+#        G. Recovery ordering. A phantom opened at column 0, then a list-nested
+#           (column 4) ```bash push. Fails if the recovery is tested *behind*
+#           the note 3a indent bound rather than before it — the bound rejects
+#           the column-4 fence as "content of the enclosing block", which is
+#           reasoning about a block that does not exist.
 #
 #      All fixtures live in a mktemp -d scratch directory and are removed on
 #      exit; nothing is written inside the repo.
@@ -564,6 +613,52 @@ git push origin main
 ```
 FIXTURE_D
 
+cat > "$fixture_dir/phantom-from-indented-code.md" <<'FIXTURE_E'
+## Appendix
+
+The scanner prints a verdict line that looks like this:
+
+    ```text
+    verdict: clean
+
+Once you are satisfied, publish the branch:
+
+```bash
+git commit -am "wip"
+git push origin main
+```
+FIXTURE_E
+
+cat > "$fixture_dir/phantom-from-unclosed-fence.md" <<'FIXTURE_F'
+## Appendix
+
+An unclosed display fence:
+
+```text
+verdict: clean
+
+Now publish:
+
+```bash
+git push origin main
+```
+FIXTURE_F
+
+cat > "$fixture_dir/phantom-swallows-list-nested.md" <<'FIXTURE_G'
+## Appendix
+
+```text
+verdict: clean
+
+Some prose in between.
+
+1.  Publish the branch:
+
+    ```bash
+    git push origin main
+    ```
+FIXTURE_G
+
 fixture_violations() {
   scan_file "$1" | grep -c '^VIOLATION' || true
 }
@@ -607,6 +702,38 @@ else
   echo "      and lands in the 12-line window above an unrelated \`\`\`bash push"
   echo "      block — which it then gates. A transcript of the scan running is"
   echo "      not the scan running. See header note 3a."
+fi
+
+if [ "$(fixture_violations "$fixture_dir/phantom-from-indented-code.md")" = "1" ]; then
+  pass "a phantom block opened by an indented code block does not swallow a push"
+else
+  fail "a \`\`\`bash push block was swallowed by a phantom open block"
+  echo "      A top-level 4-column indented code block containing a \`\`\` run"
+  echo "      opens a block that CommonMark never opened. Nothing here is an"
+  echo "      unclosed fence, so the END clause does not help: the phantom eats"
+  echo "      the next real \`\`\`bash block whole, the push never becomes a"
+  echo "      subject, and T3b's pinned file set is unchanged. See note 3d."
+fi
+
+if [ "$(fixture_violations "$fixture_dir/phantom-from-unclosed-fence.md")" = "1" ]; then
+  pass "an unclosed display fence does not swallow the next \`\`\`bash block"
+else
+  fail "an unclosed \`\`\`text fence swallowed the following \`\`\`bash push block"
+  echo "      Only a same-character run with an *empty* info string closes a"
+  echo "      block, so without the note 3d recovery the following \`\`\`bash line"
+  echo "      reads as content and that block's closing \`\`\` is consumed as the"
+  echo "      text block's terminator — one real subject lost per stray fence."
+fi
+
+if [ "$(fixture_violations "$fixture_dir/phantom-swallows-list-nested.md")" = "1" ]; then
+  pass "phantom recovery is tested before the indent bound, not behind it"
+else
+  fail "a phantom at column 0 swallowed a list-nested \`\`\`bash push block"
+  echo "      The note 3d recovery must be checked BEFORE the note 3a indent"
+  echo "      bound. That bound reasons \"a run this deep is content of the"
+  echo "      enclosing block\" — which is void when the enclosing block is a"
+  echo "      phantom. Behind the bound, a phantom opened at column 0 still eats"
+  echo "      every list-nested block below it."
 fi
 
 # ───────────────────────────────────────────────────────────
