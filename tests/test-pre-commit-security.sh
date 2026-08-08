@@ -48,17 +48,41 @@
 #      *document* citation is exempt: that form is deliberately written as a
 #      shell comment beside the block it gates.)
 #   3. Every fence form must be seen — and nothing else may be mistaken for one.
-#      (a) A fence is indented at most *three* spaces (CommonMark). Both halves
-#          of that bound are load-bearing. src/ contains dozens of indented
-#          fences (at 2 and 3 spaces), and a parser blind to them never toggles
-#          `in_block`, so their bodies leak into the prose window and can act as
-#          a false gate for a later, ungated block. But a backtick run indented
-#          4+ spaces is block *content*, and reading it as a fence is the worse
-#          failure: it closes the enclosing ```bash block early, that block's
-#          real closing fence then *opens* a phantom one, and the inverted fence
-#          parity swallows every later ```bash block in the file as phantom
-#          content — an ungated `git push` below it is never evaluated at all.
-#          Both directions are pinned by T3c.
+#      (a) CommonMark bounds a fence's indentation at three spaces — but three
+#          past its *container*, not past column zero. This parser tracks no
+#          containers, so it applies the bound only where the container column is
+#          knowable, and the two cases come out differently:
+#
+#            · An *opening* fence is accepted at any indent. A `10. ` list item
+#              puts its content at column 4, so a fence nested in one sits at
+#              column 4 while being indented 0 relative to its own container —
+#              perfectly ordinary markup. An absolute 3-column limit makes every
+#              list-nested fence invisible, which fails in both directions at
+#              once: an ungated `git push` in a list-nested ```bash block is
+#              neither subject nor violation, and an invocation inside a
+#              list-nested display-only ```text fence is no longer *in* a block,
+#              so it leaks into the 12-line prose window and falsely gates a
+#              later ungated block. Fixtures C and D pin the two.
+#            · A *closing* fence is rejected beyond `open_indent + 3`. Here the
+#              reference column is known: the opener sits 0–3 past the container
+#              and a closer may sit 0–3 past the container too, so a closer is
+#              never more than 3 columns past its opener. A run indented further
+#              is block *content*, and reading it as a fence is the worst failure
+#              of the three: it closes the enclosing ```bash block early, the
+#              real closing fence of that block then *opens* a phantom one, and
+#              the inverted parity swallows every later ```bash block in the file
+#              as phantom content — an ungated `git push` below it is never
+#              evaluated at all. Fixture A pins it.
+#
+#          Residue of accepting any opener indent: a top-level *indented code
+#          block* (four spaces, no fence) containing a ``` line is read as a
+#          fence. Without container tracking that shape is byte-identical to a
+#          list-nested fence, so it cannot be told apart here — and the error
+#          direction is a false alarm rather than a missed gate, which is the
+#          right way for a security lint to be wrong.
+#
+#          src/ carries fences at 0, 2 and 3 columns only, so neither rule moves
+#          a real subject today; T3c is what keeps them from drifting.
 #      (b) Backtick and tilde fences of any length ≥ 3 count, as do info strings
 #          (```bash title="x").
 #      (c) A fence left *open* at EOF is a valid CommonMark block that renders
@@ -180,29 +204,28 @@ trap 'rm -f "$scan_out" "$violations"' EXIT
 scan_file() {
   local file="$1"
   awk -v file="$file" '
-    # Parse a fence line into (fence_ch, fence_len, fence_info). Returns 1 if
-    # the line is fence-shaped, 0 otherwise. CommonMark: a fence is a run of
-    # three or more backticks or tildes, indented by at most *three* spaces; the
-    # info string of a backtick fence may not itself contain a backtick.
-    function parse_fence(line,   t, c, k, indent, i, ch) {
-      fence_ch = ""; fence_len = 0; fence_info = ""
+    # Parse a fence line into (fence_ch, fence_len, fence_info, fence_indent).
+    # Returns 1 if the line is fence-shaped, 0 otherwise. CommonMark: a fence is
+    # a run of three or more backticks or tildes; the info string of a backtick
+    # fence may not itself contain a backtick.
+    #
+    # The indentation *bound* is deliberately not applied here. CommonMark
+    # measures it relative to the enclosing container, and only the caller knows
+    # what that is (header note 3a) — this function just measures the indent and
+    # reports it in fence_indent.
+    function parse_fence(line,   t, c, k, i, ch) {
+      fence_ch = ""; fence_len = 0; fence_info = ""; fence_indent = 0
       t = line
-      # The 3-space limit is load-bearing, not pedantry (header note 3a): a run
-      # of backticks indented 4+ spaces is *content* of the enclosing block. Read
-      # as a fence it closes an open ```bash block early, whereupon the real
-      # closing fence of that block *opens* a phantom one — fence parity inverts
-      # and every later ```bash block in the file is swallowed as phantom-block
-      # content, never evaluated as a subject.
-      indent = 0
+      # Indentation in *columns*, not characters: a tab advances to the next
+      # 4-column tab stop, which is how CommonMark measures it.
       i = 1
       while (i <= length(t)) {
         ch = substr(t, i, 1)
-        if (ch == " ") indent += 1
-        else if (ch == "\t") indent += 4   # a tab advances to the next tab stop
+        if (ch == " ") fence_indent += 1
+        else if (ch == "\t") fence_indent += 4 - (fence_indent % 4)
         else break
         i += 1
       }
-      if (indent > 3) return 0
       t = substr(t, i)
       c = substr(t, 1, 1)
       if (c != "`" && c != "~") return 0
@@ -299,11 +322,18 @@ scan_file() {
       push_re = "(^|[[:space:]&|;])git" git_opt_re "[[:space:]]+push([[:space:]]|$)"
     }
     {
-      if (parse_fence($0)) {
+      # The indentation bound, applied where the container is known (note 3a).
+      # No bound on an *opening* fence: a fence nested in a `10. ` list item
+      # starts at column 4 and is indented 0 relative to its own container, so an
+      # absolute limit erases it. Once a block is open its opener fixes the
+      # reference column, and a closing fence is never more than 3 columns past
+      # it — anything further indented is block content.
+      if (parse_fence($0) && (in_block == 0 || fence_indent <= open_indent + 3)) {
         if (in_block == 0) {
           in_block = 1
           open_ch = fence_ch
           open_len = fence_len
+          open_indent = fence_indent
           lang = fence_info
           sub(/[[:space:]].*$/, "", lang)   # first word of the info string
           is_shell_block = (tolower(lang) ~ shell_lang_re) ? 1 : 0
@@ -459,24 +489,31 @@ else
 fi
 
 # ───────────────────────────────────────────────────────────
-# T3c: The fence parser honors CommonMark's 3-space indentation limit — in both
-#      directions (header note 3a). T3 and T3b both pass over a scan that saw
-#      the wrong *blocks* only if the subject files change, and neither notices
-#      a parity inversion that happens to leave today's two subjects intact. So
-#      the parser is exercised directly against two synthetic fixtures whose
-#      expected verdict is known:
+# T3c: The fence parser applies CommonMark's indentation bound relative to the
+#      enclosing fence (header note 3a). T3 and T3b notice a scan that saw the
+#      wrong *files*, but neither notices a mis-parse that happens to leave
+#      today's two subjects intact — so the parser is exercised directly against
+#      four synthetic fixtures whose expected verdict is known. Each pins one
+#      way of getting the bound wrong; every one reports exactly 1 VIOLATION.
 #
-#        A. An ungated `git push` that a 4-space-indented ``` run inside the
-#           enclosing ```bash block tries to hide. Read as a fence, that run
-#           closes the block early; the block's real closing fence then opens a
-#           phantom, non-shell block that swallows the push. Read correctly as
-#           block content, the push is a subject and is reported. Fails if the
-#           indent limit is dropped.
-#        B. An ungated `git push` inside a legitimately 3-space-indented
-#           ```bash block. Fails if the limit is tightened past CommonMark, or
-#           if indented fences stop being recognised at all.
+#        A. Too loose (no bound). An ungated `git push` that a 4-column ``` run
+#           *inside* the enclosing ```bash block tries to hide. Read as a fence
+#           it closes the block early, the block's real closing fence then opens
+#           a phantom non-shell block, and the push is swallowed. Read correctly
+#           as block content, the push is a subject.
+#        B. Too tight (bound below 3). An ungated `git push` in a legitimately
+#           3-column-indented ```bash block, which CommonMark allows.
+#        C. Bound made *absolute* — false-negative half. An ungated `git push`
+#           in a ```bash block nested in a `10. ` list item, which puts the
+#           fence at column 4 while leaving it indented 0 within its container.
+#        D. Bound made *absolute* — false-gate half. A `python3 … gi-secscan.py`
+#           transcript inside a list-nested, display-only ```text fence,
+#           followed within the 12-line window by an ungated ```bash push. An
+#           absolute limit makes the ```text fence invisible, so the transcript
+#           reads as prose and gates the push it has nothing to do with. This is
+#           the more dangerous half: it turns a violation into a silent pass.
 #
-#      Both fixtures live in a mktemp -d scratch directory and are removed on
+#      All fixtures live in a mktemp -d scratch directory and are removed on
 #      exit; nothing is written inside the repo.
 # ───────────────────────────────────────────────────────────
 fixture_dir="$(mktemp -d)"
@@ -500,27 +537,76 @@ cat > "$fixture_dir/indent-3-legit.md" <<'FIXTURE_B'
    ```
 FIXTURE_B
 
+cat > "$fixture_dir/list-nested-subject.md" <<'FIXTURE_C'
+## Appendix
+
+10. Push the branch when the review is done:
+
+    ```bash
+    git push origin main
+    ```
+FIXTURE_C
+
+cat > "$fixture_dir/list-nested-false-gate.md" <<'FIXTURE_D'
+## Appendix
+
+1.  Run the scan first:
+
+    ```text
+    $ python3 references/scripts/gi-secscan.py --staged
+    verdict: clean
+    ```
+
+Then push:
+
+```bash
+git push origin main
+```
+FIXTURE_D
+
 fixture_violations() {
   scan_file "$1" | grep -c '^VIOLATION' || true
 }
 
 if [ "$(fixture_violations "$fixture_dir/indent-4-defeat.md")" = "1" ]; then
-  pass "fence parser treats a 4-space-indented \`\`\` as block content, not a fence"
+  pass "fence parser treats a \`\`\` run 4 columns past its opener as block content"
 else
-  fail "fence parser accepted a 4+ space indented fence — CommonMark allows at most 3"
-  echo "      A run of backticks indented 4 or more spaces is *content* of the"
-  echo "      enclosing block. Closing the block on it inverts fence parity for"
+  fail "fence parser closed a block on a run indented 4+ columns past its opener"
+  echo "      A closing fence is never more than 3 columns past its opening"
+  echo "      fence. Closing the block on a deeper run inverts fence parity for"
   echo "      the rest of the file, so every later \`\`\`bash block is swallowed"
   echo "      and an ungated \`git push\` is never evaluated. See header note 3a."
 fi
 
 if [ "$(fixture_violations "$fixture_dir/indent-3-legit.md")" = "1" ]; then
-  pass "fence parser still recognises a legitimately indented (≤3 space) fence"
+  pass "fence parser still recognises a legitimately indented (≤3 column) fence"
 else
-  fail "fence parser missed a 3-space-indented fence — CommonMark allows up to 3"
-  echo "      src/ contains dozens of fences indented 2 or 3 spaces. A parser"
+  fail "fence parser missed a 3-column-indented fence — CommonMark allows up to 3"
+  echo "      src/ contains dozens of fences indented 2 or 3 columns. A parser"
   echo "      blind to them never toggles in_block, so their bodies leak into the"
   echo "      prose window and can falsely gate a later, ungated block."
+fi
+
+if [ "$(fixture_violations "$fixture_dir/list-nested-subject.md")" = "1" ]; then
+  pass "fence parser sees a \`\`\`bash block nested in a list item (opener at column 4)"
+else
+  fail "fence parser missed a list-nested \`\`\`bash block — the indent bound is absolute"
+  echo "      A \`10. \` list item puts its content at column 4, so a fence nested"
+  echo "      in one is indented 0 relative to its own container. Bounding the"
+  echo "      opener at an absolute 3 columns erases every such block, and an"
+  echo "      ungated \`git push\` inside one is neither subject nor violation."
+  echo "      The bound belongs on the closing fence, relative to its opener."
+fi
+
+if [ "$(fixture_violations "$fixture_dir/list-nested-false-gate.md")" = "1" ]; then
+  pass "a transcript in a list-nested display-only fence does not gate a later push"
+else
+  fail "a \`\`\`text transcript nested in a list item falsely gated an ungated push"
+  echo "      With the indent bound applied absolutely, the list-nested \`\`\`text"
+  echo "      fence is invisible, so its transcript of the scan is read as prose"
+  echo "      and lands in the 12-line window above an unrelated \`\`\`bash push"
+  echo "      block — which it then gates. A transcript of the scan running is"
+  echo "      not the scan running. See header note 3a."
 fi
 
 # ───────────────────────────────────────────────────────────
