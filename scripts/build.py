@@ -767,8 +767,11 @@ DOC_SECTION_DIGESTS: dict[str, tuple[str, ...]] = {
     # contributor CI check (tests/test-pre-commit-security.sh) over its own
     # src/skills/** sources. A skill resolving an issue in a *user's* repo never
     # runs that lint and cannot act on it, yet the section shipped into both
-    # bundling skills — 2,653 bytes x 2. The authored document keeps it whole
-    # for the contributors it is written for.
+    # bundling skills. It is 3,488 bytes of the authored document; dropping it
+    # takes each emitted copy from 21,757 to 18,529 bytes — 3,228 per skill,
+    # 6,456 over the two, the shortfall against 3,488 being the 260-byte digest
+    # notice the emitted copy gains. The authored document keeps the section
+    # whole for the contributors it is written for.
     "pre-commit-security.md": (
         "Why This Matters",
         # Deliberately script-name-free: T7.10 in tests/test-dependency-closure.sh
@@ -870,11 +873,39 @@ def _doc_digest(name: str, text: str, skill_root: Path) -> str:
     )
 
 
+def _shared_doc_headings(repo_root: Path, name: str) -> frozenset[str]:
+    """`## ` headings docs/<name> shares with another top-level docs/*.md.
+
+    A bare mention of one of these cannot be attributed to a document by its
+    text alone. *Lint Enforcement* is a section of both pre-commit-security.md
+    (digested) and sync-conventions.md (bundled whole into six skills), so a
+    skill citing the second reads, to a substring scan, exactly like a skill
+    citing the first.
+    """
+    docs_dir = repo_root / "docs"
+    own = {heading for heading, _ in _split_h2_sections(_read_text(docs_dir / name))[1]}
+    others: set[str] = set()
+    for other in sorted(docs_dir.glob("*.md")):
+        if other.name == name:
+            continue
+        others |= {
+            heading for heading, _ in _split_h2_sections(_read_text(other))[1]
+        }
+    return frozenset(own & others)
+
+
 def _check_digest_coverage(src: Path, repo_root: Path) -> None:
     """Abort when a skill source names a section the digest would drop.
 
     This is the safety net for the digests: dropping a section only stays
     correct while nothing points a skill at it by name.
+
+    A dropped heading that another docs/*.md also uses is checked only in files
+    that name the digested document as well, because those are the files whose
+    mention can be attributed to it. Without that condition the scan reported
+    the wrong document: naming sync-conventions' *Lint Enforcement* section
+    aborted the build with a message about pre-commit-security.md and two
+    remedies, neither of which applied to what the author had written.
     """
     for name, keep in sorted(DOC_SECTION_DIGESTS.items()):
         doc = repo_root / "docs" / name
@@ -889,18 +920,22 @@ def _check_digest_coverage(src: Path, repo_root: Path) -> None:
         )
         if not dropped:
             continue
+        ambiguous = _shared_doc_headings(repo_root, name)
         for f in _walk_files(src):
             if not _is_text_file(f):
                 continue
             text = _read_text(f)
             for heading in dropped:
-                if heading in text:
-                    _abort(
-                        f"{f.relative_to(repo_root)} names "
-                        f"'{heading}' — a section the docs/{name} runtime digest "
-                        f"drops. Add it to DOC_SECTION_DIGESTS in "
-                        f"scripts/build.py or stop citing it from a skill."
-                    )
+                if heading not in text:
+                    continue
+                if heading in ambiguous and name not in text:
+                    continue
+                _abort(
+                    f"{f.relative_to(repo_root)} names "
+                    f"'{heading}' — a section the docs/{name} runtime digest "
+                    f"drops. Add it to DOC_SECTION_DIGESTS in "
+                    f"scripts/build.py or stop citing it from a skill."
+                )
 
 
 def _split_config_blocks(fence_body: str) -> list[tuple[str, str]]:
