@@ -87,29 +87,53 @@
 #      (c) A fence left *open* at EOF is a valid CommonMark block that renders
 #          normally, so the END clause must evaluate it; otherwise a `git push`
 #          in the last fence of a file is never looked at.
-#      (d) A *phantom* open block must be recoverable. Every defeat this parser
-#          has suffered is one shape — a block the parser believes is open
-#          swallowing a real ```bash block whole — reached three different ways:
-#          a false close (a run indented past its opener, note 3a), a false open
-#          (a top-level indented code block containing a ``` run), and a fence
-#          the author never closed. Patching the three entrances one at a time
-#          is what let the third survive two rounds of fixing the first two, so
-#          the exit is guarded instead.
+#      (d) A *phantom* open block should be recoverable. The recurring defeat
+#          here is one shape — a block the parser believes is open swallowing a
+#          real ```bash block whole — reached several ways: a false close (a run
+#          indented past its opener, note 3a), a false open (a top-level
+#          indented code block containing a ``` run), and a fence the author
+#          never closed. Blocking the entrances one at a time is what let the
+#          third survive two rounds of fixing the first two, so there is also a
+#          guard at the exit.
 #
-#          The recovery: a same-character run of length ≥ open_len that carries
-#          a *non-empty info string* cannot occur inside a genuinely open fence,
-#          because an open fence containing one would have to be longer — and a
-#          longer opener is handled as content. So the shape is proof the open
-#          block is a phantom. Evaluate the phantom and open the real block from
-#          this fence. The ````markdown-wraps-```bash idiom is untouched: there
-#          open_len (4) > fence_len (3), so the branch never fires. Measured
-#          against the whole of src/: zero blocks change hands.
+#          The recovery: when the open block is *display-only*, a same-character
+#          run of length ≥ open_len carrying a non-empty info string is taken to
+#          mean the open block was a phantom. Evaluate it and open the real block
+#          from this fence.
+#
+#          This is a heuristic and it is worth being exact about why, because an
+#          earlier version of this note claimed otherwise and the false claim
+#          cost a live gate. CommonMark does *not* forbid that shape inside an
+#          open fence: every line inside a fenced block is literal content, info
+#          string or not, and only an empty-info run can close. So the shape
+#          proves nothing on its own. What makes acting on it safe is the
+#          restriction to a non-shell open block — abandoning a display-only
+#          block early costs nothing, because subjects only ever live in shell
+#          blocks. Applied to a genuinely open ```bash block the same guess is
+#          destructive: a heredoc writing a fenced snippet ends the block before
+#          its `git push` is reached, and the push becomes neither subject nor
+#          violation, which is silent. Fixtures H and I pin that. The
+#          ````markdown-wraps-```bash idiom is untouched for a second reason:
+#          there open_len (4) > fence_len (3), so the branch never fires.
+#          Measured against the whole of src/: zero blocks change hands.
 #
 #          Order matters — the recovery is tested *before* the note 3(a) indent
 #          bound, because that bound reasons "a run this deep is content of the
 #          enclosing block", which is void when the enclosing block is a
 #          phantom. Behind the bound, a phantom opened at column 0 still eats a
 #          list-nested ```bash block. Fixtures E, F and G pin the three.
+#
+#          Accepted residues — the class is *narrowed*, not closed. The recovery
+#          keys on `fence_ch == open_ch && fence_len >= open_len`, so it does not
+#          fire when the phantom is a `~~~text` fence, nor when it is a 4-backtick
+#          ````text fence, and either one still swallows a following ```bash
+#          block with an ungated push. Both are latent rather than live: src/
+#          carries zero tilde fences and zero 4-backtick fences today. Widening
+#          the match would mean recovering across fence characters and lengths,
+#          which is where the ````markdown wrapper idiom lives — so the trade is
+#          a real false positive against two shapes nothing in this repo writes.
+#          If either shape ever appears in src/, revisit this rather than
+#          assuming the guard covers it.
 #   4. In a session-transcript fence (```console, ```shell-session), a leading
 #      `#` is the root prompt, not a comment — property 2's `comment_re` would
 #      throw away a real command. Such a line gates only when the interpreter
@@ -352,18 +376,21 @@ scan_file() {
     }
     {
       if (parse_fence($0)) {
-        # Spurious-open recovery, and the reason it comes first (note 3d).
-        # CommonMark cannot put a same-character run of length >= open_len
-        # *carrying an info string* inside a genuinely open fence — the open
-        # fence would have to be longer, and a longer one is handled as content
-        # below. So when this shape appears, the block we believe is open never
-        # was: it is a phantom, and everything since has been mis-attributed to
-        # it. Close the phantom out and open the real block here.
+        # Phantom-block recovery — a heuristic, not a deduction (note 3d).
+        # CommonMark makes *every* line inside an open fence literal content,
+        # info string or not, so a same-character run carrying one is not proof
+        # of anything. What makes the guess safe is the `is_shell_block == 0`
+        # clause: it is only ever applied to a *display-only* open block, where
+        # abandoning early costs nothing because such a block holds no subjects.
+        # Inside a genuinely open ```bash block the same shape is ordinary
+        # content — a heredoc writing a fenced snippet — and acting on it would
+        # end the block before its `git push` is seen, losing the subject
+        # entirely. That is the one thing this gate must never do.
         #
-        # This is checked before the indentation bound because that bound argues
-        # "a run this deep is *content* of the enclosing block" — reasoning that
-        # is void when the enclosing block does not exist.
-        if (in_block == 1 && fence_ch == open_ch && fence_len >= open_len && fence_info != "") {
+        # Checked before the indentation bound, because that bound argues "a run
+        # this deep is *content* of the enclosing block" — reasoning that is void
+        # when the enclosing block does not exist.
+        if (in_block == 1 && is_shell_block == 0 && fence_ch == open_ch && fence_len >= open_len && fence_info != "") {
           evaluate_block()
           open_block()
           next
@@ -529,18 +556,28 @@ fi
 #      a mis-parse that happens to leave today's two subjects intact — and a
 #      swallowed block is exactly that: the push never becomes a subject, so the
 #      pinned set is unchanged and nothing fires. So the parser is exercised
-#      directly against seven synthetic fixtures whose expected verdict is
-#      known. A–D pin the indentation bound (note 3a) and E–G the phantom-block
-#      recovery (note 3d); each fixture fails for one specific wrong model, and
-#      every one of them reports exactly 1 VIOLATION.
+#      directly against nine synthetic fixtures whose expected verdict is known.
+#      A–D pin the indentation bound (note 3a); E–G pin the phantom-block
+#      recovery and H–I pin its *limits* (note 3d). Each fixture fails for one
+#      specific wrong model, and every one of them reports exactly 1 VIOLATION.
+#      A fixture only earns its place if some mutation makes it fail — B did not
+#      until it was rebuilt, having been written for an absolute bound and left
+#      trivially true when the bound became relative.
 #
 #        A. Too loose (no bound). An ungated `git push` that a 4-column ``` run
 #           *inside* the enclosing ```bash block tries to hide. Read as a fence
 #           it closes the block early, the block's real closing fence then opens
 #           a phantom non-shell block, and the push is swallowed. Read correctly
 #           as block content, the push is a subject.
-#        B. Too tight (bound below 3). An ungated `git push` in a legitimately
-#           3-column-indented ```bash block, which CommonMark allows.
+#        B. Too tight (bound below +3). A gated ```bash block whose closing
+#           fence sits 3 columns past its opener — which CommonMark allows —
+#           followed by a second, ungated ```bash push. Only the second is a
+#           violation. Tighten the bound and the first block never closes: it
+#           swallows the second, and because the merged block carries the first
+#           block's in-block citation it reads as *gated*, so the violation
+#           disappears rather than moving. The opener and closer must sit at
+#           different columns or this fixture is vacuous — with both at column 3
+#           every bound from +0 up holds and no mutation can fail it.
 #        C. Bound made *absolute* — false-negative half. An ungated `git push`
 #           in a ```bash block nested in a `10. ` list item, which puts the
 #           fence at column 4 while leaving it indented 0 within its container.
@@ -561,6 +598,18 @@ fi
 #           the note 3a indent bound rather than before it — the bound rejects
 #           the column-4 fence as "content of the enclosing block", which is
 #           reasoning about a block that does not exist.
+#        H. Recovery misfire, indented form. Fixture A's shape with `text`
+#           appended to the indented run, so the run now carries an info string.
+#           Inside a genuinely open ```bash block that is ordinary content; an
+#           unrestricted recovery ends the block before its push and re-opens
+#           the remainder as non-shell, so the push is silently lost. Fails if
+#           the `is_shell_block == 0` clause is dropped. A and H are three
+#           characters apart and must stay adjacent — they are the two readings
+#           of the same line, and the distinction between them is the whole
+#           content of that clause.
+#        I. Recovery misfire, realistic form. A ```bash block whose heredoc
+#           writes a fenced snippet, then pushes. Same clause, but a shape an
+#           author would plausibly write.
 #
 #      All fixtures live in a mktemp -d scratch directory and are removed on
 #      exit; nothing is written inside the repo.
@@ -578,12 +627,19 @@ git push origin main
 ```
 FIXTURE_A
 
-cat > "$fixture_dir/indent-3-legit.md" <<'FIXTURE_B'
+cat > "$fixture_dir/closer-deeper-than-opener.md" <<'FIXTURE_B'
 ## Appendix
 
-   ```bash
-   git push origin main
+```bash
+# see docs/pre-commit-security.md
+git push origin main
    ```
+
+Later, an unrelated block:
+
+```bash
+git push origin main
+```
 FIXTURE_B
 
 cat > "$fixture_dir/list-nested-subject.md" <<'FIXTURE_C'
@@ -659,6 +715,30 @@ Some prose in between.
     ```
 FIXTURE_G
 
+cat > "$fixture_dir/recovery-misfire-in-shell-block.md" <<'FIXTURE_H'
+## Appendix
+
+```bash
+echo "an example"
+    ```text
+git push origin main
+```
+FIXTURE_H
+
+cat > "$fixture_dir/recovery-misfire-on-heredoc.md" <<'FIXTURE_I'
+## Appendix
+
+Record the release note, then publish:
+
+```bash
+cat >> notes.md <<'NOTE'
+```text
+verdict: clean
+NOTE
+git push origin main
+```
+FIXTURE_I
+
 fixture_violations() {
   scan_file "$1" | grep -c '^VIOLATION' || true
 }
@@ -673,13 +753,16 @@ else
   echo "      and an ungated \`git push\` is never evaluated. See header note 3a."
 fi
 
-if [ "$(fixture_violations "$fixture_dir/indent-3-legit.md")" = "1" ]; then
-  pass "fence parser still recognises a legitimately indented (≤3 column) fence"
+if [ "$(fixture_violations "$fixture_dir/closer-deeper-than-opener.md")" = "1" ]; then
+  pass "fence parser accepts a closing fence up to 3 columns past its opener"
 else
-  fail "fence parser missed a 3-column-indented fence — CommonMark allows up to 3"
-  echo "      src/ contains dozens of fences indented 2 or 3 columns. A parser"
-  echo "      blind to them never toggles in_block, so their bodies leak into the"
-  echo "      prose window and can falsely gate a later, ungated block."
+  fail "fence parser rejected a closing fence within 3 columns of its opener"
+  echo "      CommonMark allows a closing fence 0–3 columns past its opener, and"
+  echo "      rejecting one does not merely mislabel a line: the block stays"
+  echo "      open and swallows the ungated \`\`\`bash block below it. Because the"
+  echo "      swallowing block carries its own in-block citation, the merged"
+  echo "      block reads as gated and the violation vanishes rather than"
+  echo "      moving. See header note 3a."
 fi
 
 if [ "$(fixture_violations "$fixture_dir/list-nested-subject.md")" = "1" ]; then
@@ -734,6 +817,28 @@ else
   echo "      enclosing block\" — which is void when the enclosing block is a"
   echo "      phantom. Behind the bound, a phantom opened at column 0 still eats"
   echo "      every list-nested block below it."
+fi
+
+if [ "$(fixture_violations "$fixture_dir/recovery-misfire-in-shell-block.md")" = "1" ]; then
+  pass "phantom recovery does not fire inside a genuinely open shell block"
+else
+  fail "phantom recovery abandoned an open \`\`\`bash block and lost its push"
+  echo "      This is fixture A's shape with an info string appended to the"
+  echo "      indented run. Inside an open shell block that run is ordinary"
+  echo "      content, but an ungated recovery reads it as proof of a phantom,"
+  echo "      ends the block before the \`git push\` is reached, and re-opens the"
+  echo "      remainder as non-shell — so the push becomes neither subject nor"
+  echo "      violation and the scan output is empty. See header note 3d."
+fi
+
+if [ "$(fixture_violations "$fixture_dir/recovery-misfire-on-heredoc.md")" = "1" ]; then
+  pass "phantom recovery survives a heredoc that writes a fence inside a block"
+else
+  fail "phantom recovery abandoned a \`\`\`bash block at a heredoc's fenced text"
+  echo "      A shell block whose heredoc writes a fenced snippet contains a"
+  echo "      \`\`\`text line as plain content. Recovering on it drops the rest of"
+  echo "      the block, including the \`git push\` below the heredoc. Only the"
+  echo "      is_shell_block == 0 clause keeps this block intact."
 fi
 
 # ───────────────────────────────────────────────────────────
