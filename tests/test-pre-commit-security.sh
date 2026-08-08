@@ -18,13 +18,27 @@
 #
 # Strategy: walk every fenced code block (```bash / ```sh) in
 # src/skills/**/*.md, src/internal-skills/**/*.md, and
-# src/shared/agents/*.md, looking for `git commit` or `git push`. For each
-# occurrence, the same fenced block — or the 12 lines of prose immediately
-# before the block — must reference the gate: either the canonical document
-# `docs/pre-commit-security.md` or the script that implements it,
-# `gi-secscan.py`. Both forms count because both ARE the gate; a block with
-# neither is an ungated commit. The canonical doc itself and `/auto-push`
-# examples that demonstrate failure output are excluded.
+# src/shared/agents/*.md, looking for `git commit` or `git push`. Every such
+# block is a *subject* and must be gated:
+#
+#   - inside the block: an invocation of the scanner — a `python3 … gi-secscan.py`
+#     command line, or the script's bundled/source path
+#     (`references/scripts/gi-secscan.py`, `shared/scripts/gi-secscan.py`) — or a
+#     citation of the canonical document `docs/pre-commit-security.md`;
+#   - in the 12 lines of prose immediately above the block: an invocation ONLY.
+#     A bare doc name does not gate from prose, because every SKILL.source.md
+#     ends with an "Additional Resources" navigation index that lists
+#     `pre-commit-security.md`. That index sits inside the 12-line window of
+#     anything appended near the end of the file, so accepting it would
+#     auto-gate an ungated commit block by proximity to a table of contents.
+#
+# A subject with neither is an ungated commit. Both the scan and the pin below
+# are non-vacuity guards: T3 can only report "all gated" over blocks it actually
+# looked at, so T3b pins the number of subjects. Without that pin, downgrading
+# every ```bash fence to a plain ``` fence scans zero blocks and still passes.
+#
+# The canonical doc is not in the scan set (SCAN_DIRS is src/ only), so its own
+# demonstration snippets never appear here.
 #
 # Usage: bash tests/test-pre-commit-security.sh
 # Returns: exit 0 if all checks pass, exit 1 on failure
@@ -94,10 +108,11 @@ fi
 
 # ───────────────────────────────────────────────────────────
 # T3: Every fenced block containing `git commit` or `git push` in
-#     skill sources is gated by a reference to
-#     docs/pre-commit-security.md — either inside the block, or in
-#     the 12 lines of prose immediately preceding the block.
-#     The canonical doc itself is excluded.
+#     skill sources is gated — by a gi-secscan.py invocation or a
+#     docs/pre-commit-security.md citation inside the block, or by a
+#     gi-secscan.py invocation in the 12 lines of prose immediately
+#     preceding it. See the strategy note in the file header for why
+#     prose accepts only the invocation form.
 # ───────────────────────────────────────────────────────────
 
 SCAN_DIRS=(
@@ -106,8 +121,9 @@ SCAN_DIRS=(
   "$REPO_ROOT/src/shared/agents"
 )
 
+scan_out="$(mktemp)"
 violations="$(mktemp)"
-trap 'rm -f "$violations"' EXIT
+trap 'rm -f "$scan_out" "$violations"' EXIT
 
 scan_file() {
   local file="$1"
@@ -117,17 +133,26 @@ scan_file() {
       is_shell_block = 0
       block_start = 0
       block_has_commit_or_push = 0
-      block_has_ref = 0
+      block_has_gate = 0
       # Rolling window of recent prose lines (outside fenced blocks).
       window_size = 12
       for (i = 0; i < window_size; i++) prose[i] = ""
       window_idx = 0
-      window_has_ref = 0
-      # The gate signal, defined once so the prose-window and in-block checks
-      # below cannot drift apart. `gi-secscan.py` carries the `.py` so a
-      # sentence merely naming the script in passing does not satisfy an
-      # in-block gate.
-      gate_re = "(pre-commit-security\\.md|gi-secscan\\.py)"
+      window_has_inv = 0
+      # An *invocation* of the scanner: a `python3 … gi-secscan.py` command
+      # line, or the path the skills run it by. This is the only signal the
+      # prose window accepts. A sentence that merely names the script does not
+      # match, which is the point — "see gi-secscan.py sometime" is not a gate.
+      inv_re = "(python3[^\n]*gi-secscan\\.py|(references|shared)/scripts/gi-secscan\\.py)"
+      # A citation of the canonical document. Accepted inside a block only:
+      # a comment in the block is written for that block. In prose it would be
+      # satisfied by any nearby navigation index (see nav_re).
+      doc_re = "pre-commit-security\\.md"
+      # A skill navigation index ("**Docs** (`docs/`): … pre-commit-security.md
+      # …") is a table of contents, not a gate. Every SKILL.source.md ends with
+      # one, so it falls inside the prose window of anything appended at the end
+      # of the file. Never let one satisfy a gate.
+      nav_re = "^\\*\\*(Docs|References|Agents|Scripts)\\*\\*"
     }
     /^```/ {
       if (in_block == 0) {
@@ -137,16 +162,21 @@ scan_file() {
         is_shell_block = ($0 ~ /^```(bash|sh)[[:space:]]*$/) ? 1 : 0
         block_start = NR
         block_has_commit_or_push = 0
-        block_has_ref = 0
-        # Snapshot whether the prose window already references the doc.
-        window_has_ref = 0
+        block_has_gate = 0
+        # Snapshot whether the prose window invokes the scanner.
+        window_has_inv = 0
         for (i = 0; i < window_size; i++) {
-          if (prose[i] ~ gate_re) window_has_ref = 1
+          if (prose[i] ~ inv_re) window_has_inv = 1
         }
       } else {
         # Closing fence — evaluate the block.
-        if (is_shell_block == 1 && block_has_commit_or_push == 1 && block_has_ref == 0 && window_has_ref == 0) {
-          printf("%s:%d: shell block with `git commit` or `git push` is gated by neither docs/pre-commit-security.md nor gi-secscan.py\n", file, block_start)
+        if (is_shell_block == 1 && block_has_commit_or_push == 1) {
+          # Every subject is recorded, gated or not: T3b pins how many there are
+          # so an empty scan cannot report success.
+          printf("SUBJECT\t%s:%d\n", file, block_start)
+          if (block_has_gate == 0 && window_has_inv == 0) {
+            printf("VIOLATION\t%s:%d: shell block with `git commit` or `git push` is gated by neither a gi-secscan.py invocation (in-block or in the 12 lines of prose above) nor an in-block docs/pre-commit-security.md citation\n", file, block_start)
+          }
         }
         in_block = 0
         is_shell_block = 0
@@ -164,8 +194,8 @@ scan_file() {
         if ($0 ~ /(^|[[:space:]&|;]|^[[:space:]]*)git[[:space:]]+push([[:space:]]|$)/) {
           block_has_commit_or_push = 1
         }
-        if ($0 ~ gate_re) {
-          block_has_ref = 1
+        if ($0 ~ inv_re || ($0 ~ doc_re && $0 !~ nav_re)) {
+          block_has_gate = 1
         }
       } else {
         # Update prose window (ring buffer of last N lines).
@@ -181,17 +211,54 @@ for dir in "${SCAN_DIRS[@]}"; do
     continue
   fi
   while IFS= read -r -d '' file; do
-    scan_file "$file" >> "$violations"
+    scan_file "$file" >> "$scan_out"
   done < <(find "$dir" -type f -name "*.md" -print0)
 done
+
+grep '^VIOLATION' "$scan_out" > "$violations" || true
+SCANNED="$(grep -c '^SUBJECT' "$scan_out" || true)"
 
 if [ -s "$violations" ]; then
   fail "Ungated \`git commit\` or \`git push\` found in fenced code blocks:"
   while IFS= read -r line; do
-    echo "      $line"
+    echo "      ${line#VIOLATION	}"
   done < "$violations"
 else
-  pass "All fenced \`git commit\` / \`git push\` blocks are gated by pre-commit-security.md or gi-secscan.py"
+  pass "All $SCANNED fenced \`git commit\` / \`git push\` block(s) are gated"
+fi
+
+# ───────────────────────────────────────────────────────────
+# T3b: T3 is non-vacuous — it looked at the blocks we know exist.
+#     "All blocks are gated" is also true of zero blocks, so the number of
+#     subjects is pinned. A fence written as ``` instead of ```bash, a renamed
+#     scan directory, or a find/awk regression all empty the scan while T3
+#     keeps printing PASS; this is the assertion that catches them.
+#
+#     Today's subjects (both gated, verified by T3):
+#       src/skills/issue-resolver/SKILL.source.md          (Step 5 — push + PR)
+#       src/skills/issue-pr-review/references/
+#         prepass-tests-ci-mechanics.md                    (Step 3 — auto-fixes)
+#
+#     When a skill legitimately gains or loses a `git commit`/`git push` block,
+#     update this number in the same commit — deliberately, not by deleting the
+#     check.
+# ───────────────────────────────────────────────────────────
+EXPECTED_SUBJECTS=2
+
+if [ "$SCANNED" -eq "$EXPECTED_SUBJECTS" ]; then
+  pass "T3 scanned $SCANNED \`git commit\`/\`git push\` block(s), as expected"
+else
+  fail "T3 scanned $SCANNED \`git commit\`/\`git push\` block(s), expected $EXPECTED_SUBJECTS"
+  echo "      A scan that saw no blocks reports PASS without checking anything."
+  echo "      If a skill gained or lost such a block, update EXPECTED_SUBJECTS."
+  echo "      Subjects found:"
+  if grep -q '^SUBJECT' "$scan_out"; then
+    while IFS= read -r line; do
+      echo "        ${line#SUBJECT	}"
+    done < <(grep '^SUBJECT' "$scan_out")
+  else
+    echo "        (none)"
+  fi
 fi
 
 # ───────────────────────────────────────────────────────────
