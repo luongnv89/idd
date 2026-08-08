@@ -23,14 +23,16 @@
 #   - inside the block: an *invocation* of the scanner — a `python3 …
 #     gi-secscan.py` command line — or a citation of the canonical document
 #     `docs/pre-commit-security.md`;
-#   - within 12 lines above the block: an invocation ONLY.
-#     A bare doc name does not gate from prose, because every SKILL.source.md
+#   - within 12 lines above the block: an invocation ONLY. It may sit in prose
+#     or in a preceding fenced block — a command is a command either way, and
+#     "scan in one block, push in the next" is the pattern authors reach for.
+#     A bare doc name does not gate from above, because every SKILL.source.md
 #     ends with an "Additional Resources" navigation index that lists
 #     `pre-commit-security.md`. That index sits inside the 12-line window of
 #     anything appended near the end of the file, so accepting it would
 #     auto-gate an ungated commit block by proximity to a table of contents.
 #
-# Three properties the gate recogniser must hold, each learned from a defeat:
+# Four properties the gate recogniser must hold, each learned from a defeat:
 #
 #   1. An invocation must be a *command*, not a mention. The bare path
 #      `references/scripts/gi-secscan.py` is this repo's documented citation
@@ -48,6 +50,14 @@
 #      (```bash title="x"). src/ contains dozens of indented fences; a parser
 #      blind to them never toggles `in_block`, so their bodies leak into the
 #      prose window and can act as a false gate for a later, ungated block.
+#      A fence left *open* at EOF is a valid CommonMark block that renders
+#      normally, so the END clause must evaluate it; otherwise a `git push` in
+#      the last fence of a file is never looked at.
+#   4. In a session-transcript fence (```console, ```shell-session), a leading
+#      `#` is the root prompt, not a comment — property 2's `comment_re` would
+#      throw away a real command. Such a line gates only when the interpreter
+#      comes first after the prompt, which keeps property 2 intact inside those
+#      fences: `# DISABLED: python3 … gi-secscan.py` still gates nothing.
 #
 # A subject with neither gate is an ungated commit. Both the scan and the pin
 # below are non-vacuity guards: T3 can only report "all gated" over blocks it
@@ -168,9 +178,37 @@ scan_file() {
       if (c == "`" && index(fence_info, "`") > 0) return 0
       return 1
     }
+    # Evaluate the block that just ended (or that EOF ended). Kept as a function
+    # so the closing-fence path and the END path cannot drift apart.
+    function evaluate_block() {
+      if (is_shell_block == 1 && block_has_commit_or_push == 1) {
+        # Every subject is recorded, gated or not: T3b pins which files they
+        # live in, so an empty scan cannot report success.
+        printf("SUBJECT\t%s:%d\n", file, block_start)
+        if (block_has_gate == 0 && window_has_inv == 0) {
+          printf("VIOLATION\t%s:%d: shell block with `git commit` or `git push` is gated by neither a `python3 … gi-secscan.py` invocation (in-block or in the 12 lines above) nor an in-block docs/pre-commit-security.md citation\n", file, block_start)
+        }
+      }
+      in_block = 0
+      is_shell_block = 0
+      is_session_block = 0
+    }
+    # Is this line a live invocation of the scanner?
+    function is_invocation(line) {
+      if (line ~ inv_re && line !~ comment_re) return 1
+      # In a session-transcript fence (```console, ```shell-session) a leading
+      # `#` is the *root prompt*, not a comment — comment_re would disqualify a
+      # real command. Accept it only when the text after the prompt *begins*
+      # with the interpreter, which is what separates a transcribed command from
+      # a commented-out one: `# DISABLED for debugging: python3 … gi-secscan.py`
+      # still does not gate (header note 2 holds inside these fences too).
+      if (is_session_block == 1 && line ~ prompt_inv_re) return 1
+      return 0
+    }
     BEGIN {
       in_block = 0
       is_shell_block = 0
+      is_session_block = 0
       block_start = 0
       block_has_commit_or_push = 0
       block_has_gate = 0
@@ -187,6 +225,9 @@ scan_file() {
       # *cites* a shared script, and appears in prose that runs nothing
       # (see header note 1).
       inv_re = "python3[[:space:]][^\n]*gi-secscan\\.py"
+      # The same command behind a session prompt (`# ` or `$ `). The interpreter
+      # must come first — see is_invocation().
+      prompt_inv_re = "^[[:space:]]*[#$][[:space:]]+python3[[:space:]][^\n]*gi-secscan\\.py"
       # A commented-out command is not a command (header note 2). Applies to
       # inv_re only; the in-block doc citation is written as a comment on
       # purpose.
@@ -204,6 +245,9 @@ scan_file() {
       # else (```json, ```text, or a bare ```) is display-only: error messages,
       # sample output, templates.
       shell_lang_re = "^(bash|sh|shell|zsh|ksh|console|shell-session|bash-session)$"
+      # The subset of those whose lines are a transcript: a leading `#` is the
+      # root prompt rather than a comment.
+      session_lang_re = "^(console|shell-session|bash-session)$"
     }
     {
       if (parse_fence($0)) {
@@ -214,6 +258,7 @@ scan_file() {
           lang = fence_info
           sub(/[[:space:]].*$/, "", lang)   # first word of the info string
           is_shell_block = (tolower(lang) ~ shell_lang_re) ? 1 : 0
+          is_session_block = (tolower(lang) ~ session_lang_re) ? 1 : 0
           block_start = NR
           block_has_commit_or_push = 0
           block_has_gate = 0
@@ -223,22 +268,24 @@ scan_file() {
         }
         if (fence_ch == open_ch && fence_len >= open_len && fence_info == "") {
           # Closing fence — evaluate the block.
-          if (is_shell_block == 1 && block_has_commit_or_push == 1) {
-            # Every subject is recorded, gated or not: T3b pins which files they
-            # live in, so an empty scan cannot report success.
-            printf("SUBJECT\t%s:%d\n", file, block_start)
-            if (block_has_gate == 0 && window_has_inv == 0) {
-              printf("VIOLATION\t%s:%d: shell block with `git commit` or `git push` is gated by neither a `python3 … gi-secscan.py` invocation (in-block or in the 12 lines above) nor an in-block docs/pre-commit-security.md citation\n", file, block_start)
-            }
-          }
-          in_block = 0
-          is_shell_block = 0
+          evaluate_block()
           next
         }
         # A shorter or differently-charactered fence inside an open block is
         # block content (a ```bash sample nested in a ````markdown wrapper).
         # Fall through.
       }
+      # Remember where the most recent live invocation was, wherever it sits.
+      # Deliberately NOT restricted to prose: an invocation inside a fenced
+      # block is a real command, so the most natural authoring pattern — a
+      # ```bash block that runs the scan, immediately followed by a ```bash
+      # block that pushes — gates correctly. Only the *document citation* is
+      # restricted to in-block use, and for a reason that does not apply here:
+      # the "Additional Resources" navigation index would otherwise gate by
+      # proximity (see nav_re). The 12-line physical window still bounds
+      # adjacency, so an invocation in an unrelated listing further up does not
+      # reach.
+      if (is_invocation($0)) last_inv_line = NR
       if (in_block == 1) {
         # Match `git commit` or `git push` as actual commands, not in comments
         # or inline-code mentions. We look for either at start of line (after
@@ -249,13 +296,17 @@ scan_file() {
         if ($0 ~ /(^|[[:space:]&|;]|^[[:space:]]*)git[[:space:]]+push([[:space:]]|$)/) {
           block_has_commit_or_push = 1
         }
-        if (($0 ~ inv_re && $0 !~ comment_re) || ($0 ~ doc_re && $0 !~ nav_re)) {
+        if (is_invocation($0) || ($0 ~ doc_re && $0 !~ nav_re)) {
           block_has_gate = 1
         }
-      } else {
-        # Prose line. Remember where the most recent live invocation was.
-        if ($0 ~ inv_re && $0 !~ comment_re) last_inv_line = NR
       }
+    }
+    END {
+      # A fence left open at EOF is a *valid* CommonMark code block — it renders
+      # exactly like a closed one, so nothing looks wrong to the author — and
+      # without this clause it was never evaluated at all. A `git push` in the
+      # last, unclosed fence of a file escaped the gate silently.
+      if (in_block == 1) evaluate_block()
     }
   ' "$file"
 }
