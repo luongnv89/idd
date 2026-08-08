@@ -10,7 +10,7 @@ A leaked API key, private key, or `.env` file pushed to a public remote is a sec
 
 ---
 
-## Script Path: `gi-secscan.py` (preferred)
+## Script Path (preferred)
 
 The gate is shipped as a deterministic script, `shared/scripts/gi-secscan.py`. Prefer it everywhere it is available: the rules below are ~90 lines of bash, and a gate re-derived by hand at four or five commit sites per issue eventually gets re-derived slightly wrong — in the one direction (a blocking check that stops blocking) nobody notices until after the leak.
 

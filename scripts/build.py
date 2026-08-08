@@ -763,6 +763,25 @@ DOC_SECTION_DIGESTS: dict[str, tuple[str, ...]] = {
         "Maintainer Control and Safety",
         "Principles",
     ),
+    # Everything except *Lint Enforcement*, which documents this repo's own
+    # contributor CI check (tests/test-pre-commit-security.sh) over its own
+    # src/skills/** sources. A skill resolving an issue in a *user's* repo never
+    # runs that lint and cannot act on it, yet the section shipped into both
+    # bundling skills — 2,653 bytes x 2. The authored document keeps it whole
+    # for the contributors it is written for.
+    "pre-commit-security.md": (
+        "Why This Matters",
+        # Deliberately script-name-free: T7.10 in tests/test-dependency-closure.sh
+        # forbids any `gi-*.py` literal in this file, so that adding a shared
+        # script never requires a build.py edit. A digest keep-list is matched by
+        # heading text, so the heading must not carry a script name either.
+        "Script Path (preferred)",
+        "Primary Pattern: Pre-Commit Scan",
+        "Mode Contract",
+        "Skill-Side Responsibilities",
+        "When the Scan Blocks",
+        "Quick Reference (Copy-Paste Snippet)",
+    ),
 }
 
 # Sections kept only for the skills that name them — by the `## ` heading itself
@@ -775,8 +794,7 @@ DOC_DIGEST_OPTIONAL_SECTIONS: dict[str, tuple[str, ...]] = {
 _DIGEST_NOTICE = (
     "> **Runtime digest (generated).** This is the normative subset of "
     "[{name}](" + _REPO_BLOB_BASE + "docs/{name}) that skills read at run time. "
-    "The narrative sections (rationale, worked example, methodology comparison) "
-    "live in the full document.\n"
+    "The sections a skill run never acts on live in the full document.\n"
 )
 
 # Dropped headings too generic to police for citations — they are sub-headings

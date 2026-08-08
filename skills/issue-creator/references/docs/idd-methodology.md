@@ -5,7 +5,7 @@
 
 > **Normative contract:** this document explains the *why* of IDD. The precise, tool-neutral *what* — issue format, dependency markers, naming grammar, Decision Record fields, traceability requirements, and L1–L3 conformance levels — is versioned separately in [`SPEC.md`](https://github.com/luongnv89/idd/blob/main/SPEC.md) at the repository root. Where prose here and the spec disagree, the spec wins.
 
-> **Runtime digest (generated).** This is the normative subset of [idd-methodology.md](https://github.com/luongnv89/idd/blob/main/docs/idd-methodology.md) that skills read at run time. The narrative sections (rationale, worked example, methodology comparison) live in the full document.
+> **Runtime digest (generated).** This is the normative subset of [idd-methodology.md](https://github.com/luongnv89/idd/blob/main/docs/idd-methodology.md) that skills read at run time. The sections a skill run never acts on live in the full document.
 
 ## Core Concepts
 

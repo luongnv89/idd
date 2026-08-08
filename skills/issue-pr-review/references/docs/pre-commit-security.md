@@ -5,13 +5,15 @@ Standard convention for scanning a working tree for secrets, credentials, and ri
 
 The checks below are adopted from the `auto-push` skill and codified here as the canonical reference for this project.
 
+> **Runtime digest (generated).** This is the normative subset of [pre-commit-security.md](https://github.com/luongnv89/idd/blob/main/docs/pre-commit-security.md) that skills read at run time. The sections a skill run never acts on live in the full document.
+
 ## Why This Matters
 
 A leaked API key, private key, or `.env` file pushed to a public remote is a security incident: the key must be rotated, the history must be rewritten, and the leak window must be assumed exploited. The fix is mechanical — scan staged changes for known secret patterns and refuse to proceed when one is detected. This document is the single source of truth; skills should link here rather than copy-pasting the snippet, so the rules can be tightened in one place.
 
 ---
 
-## Script Path: `gi-secscan.py` (preferred)
+## Script Path (preferred)
 
 The gate is shipped as a deterministic script, `references/scripts/gi-secscan.py`. Prefer it everywhere it is available: the rules below are ~90 lines of bash, and a gate re-derived by hand at four or five commit sites per issue eventually gets re-derived slightly wrong — in the one direction (a blocking check that stops blocking) nobody notices until after the leak.
 
@@ -208,28 +210,6 @@ Every IDD skill that runs `git add`, `git commit`, or `git push` MUST:
 | Scan blocks on a value that genuinely is not a key | Real-key prefix matched a coincidental literal (rare but possible with `AKIA...` strings or long base64) | Replace the literal with a placeholder, or wrap the value behind a fixture loader (`os.environ["AWS_KEY"]`) so the literal never appears in source. Disabling the scan is not an option. |
 
 If the scan keeps firing on the same false positive across runs, do not edit the scan to suppress it — fix the source so it stops matching. The scan rules are in this document; if a rule is genuinely wrong, propose an update here so it applies project-wide.
-
----
-
-## Lint Enforcement
-
-`tests/test-pre-commit-security.sh` walks every `*.md` under `src/skills/`, `src/internal-skills/`, and `src/shared/agents/`. Every fenced **shell** block (info string `bash`, `sh`, `shell`, `zsh`, `ksh`, `console`, …) that runs `git commit` or `git push` is a *subject* and must be gated. Failing the lint blocks merges — it is the regression guard that keeps future skill edits from silently reintroducing an ungated commit.
-
-Two gate forms are accepted, and they are not interchangeable. An *invocation* below means a **command line** that runs `gi-secscan.py` — the script path preceded on the same line by `python3`, literally that interpreter and no other. Every call site in this document is written that way, and CLAUDE.md mandates it for a bundled script; a bare `python` prefix is rejected.
-
-| Where | What counts | What does not |
-|-------|-------------|---------------|
-| **Inside the block** | An invocation, **or** a citation of this document (`pre-commit-security.md`) — normally as a shell comment written for that block. | Anything else. |
-| **Within 12 lines above** | An invocation **only** — in prose *or* in a preceding fenced block. Two adjacent blocks, "scan" then "push", is a gated pattern. | A citation of this document. Every `SKILL.source.md` ends with an "Additional Resources" index naming `pre-commit-security.md`; accepting it from above would auto-gate anything appended near the end of a file by proximity to a table of contents. |
-
-Four rules decide whether a line is an invocation at all:
-
-- **A command, not a mention.** The bare path `references/scripts/gi-secscan.py` is this repo's documented way of *citing* a shared script (CLAUDE.md, *Scripts placement rule*), and appears in prose that runs nothing. Only the command form gates. Write the call site so the command itself is visible.
-- **Not commented out.** A line whose first non-blank character is `#` cannot supply the invocation gate: a call commented out `# for debugging` is still not a call. (The in-block *document* citation is exempt; that form is a comment by design.)
-- **Adjacent, in physical lines.** The 12-line window counts every line, including fenced blocks. An invocation separated from the commit block by an unrelated code listing is not adjacent to it and does not gate it.
-- **Session transcripts read `#` as a prompt.** In a `console`, `shell-session`, or `bash-session` fence a leading `#` is the root prompt, not a comment, so it does not disqualify the line — but only when the interpreter is the first word after it. A prompt line beginning with `python3` gates; one beginning with anything else, such as `# DISABLED for debugging: …`, does not, because the previous rule still holds inside these fences.
-
-Two non-vacuity guards sit under the scan, because "all subjects are gated" is also true of zero subjects. The fence parser handles indented fences, backtick and tilde fences of any length, info strings (```` ```bash title="x" ````), and a fence left unclosed at end of file — which CommonMark renders as an ordinary code block, so an ungated `git push` in the last fence of a file would otherwise never be looked at. And the test pins the exact list of files the subjects live in — not merely how many there are, which any two blocks would satisfy. When a skill legitimately gains or loses a `git commit`/`git push` block, update `EXPECTED_SUBJECT_FILES` in `tests/test-pre-commit-security.sh` in the same commit.
 
 ---
 
