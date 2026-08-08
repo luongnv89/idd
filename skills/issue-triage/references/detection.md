@@ -132,9 +132,20 @@ Progress output:
 ● Scanning codebase for issue dependencies...
 ```
 
-## Step 3 — Detect Circular Dependencies
+## Steps 3-7 — the prose procedure
+
+`references/scripts/gi-triage-graph.py` implements everything in this section, and
+SKILL.md runs it. What follows is the authoritative statement of the rules it
+applies — read it to understand or audit an ordering, and **run** it by hand
+only on the documented degrade path (no `python3`, exit 2, or unparsable
+stdout). Exit 3 is not a degrade: it means the scan handed to the script was
+invalid, and the fix is the scan, not this procedure.
+
+### Step 3 — Detect Circular Dependencies
 
 Walk the dependency graph and check for cycles using a depth-first traversal.
+Visit nodes, and each node's successors, in ascending issue order, so the same
+graph always yields the same cycle list and the same broken edges.
 
 If a cycle is found, warn using the format from `references/error-messages.md`:
 
@@ -148,4 +159,56 @@ If a cycle is found, warn using the format from `references/error-messages.md`:
 The suggestion should recommend resolving the issue in the cycle that has the fewest outgoing dependencies. If tied, prefer the older issue.
 
 Do not abort on circular dependencies — break the cycle by removing the back-edge, note the cycle in the output, and continue with the remaining graph.
+
+### Step 4 — Compute Execution Order
+
+Perform a topological sort on the dependency graph (after breaking any cycles from Step 3).
+
+- Issues with no incoming dependencies come first — they are "ready" to work on.
+- Issues blocked by other issues are ordered after their blockers.
+- Within the same topological level, sort by: bugs before features before improvements, then by age (oldest first), then by issue number.
+
+Assign a status to each issue, in this precedence order:
+- **maybe-fixed** — flagged in Step 1b as potentially already resolved (high or medium confidence)
+- **blocked #N** — depends on issue #N being resolved first
+- **stale (Nd)** — no activity beyond the threshold (Step 6)
+- **ready** — none of the above
+
+Issues flagged as `maybe-fixed` are sorted to the bottom of the execution order — there's no point working on them until someone verifies whether the fix actually landed. They still appear in the triage table so the team can review and close them.
+
+### Step 5 — Identify Parallelizable Issues
+
+Find sets of issues at the same topological level that are independent of each other (no shared affected files, no dependency edges between them). Report only sets of two or more.
+
+These issues can be worked on simultaneously by different developers. Group them for the recommendation output in Step 8.
+
+### Step 6 — Stale Detection
+
+For each issue, compare `updatedAt` to today's date. If the difference exceeds `triage.stale_threshold_days` (default: 14 days), flag the issue as stale.
+
+The stale flag is reflected in both:
+- The Status column of the triage table (e.g., `stale (28d)`)
+- The summary warning line
+
+### Step 7 — Priority Suggestions
+
+If `triage.auto_priority` is true, assign a suggested priority to each issue based on these heuristics:
+
+**P1 (Critical)**:
+- Issues with the `critical` or `urgent` label
+- Bugs that block other issues
+- Bugs created more than 2x the stale threshold ago
+
+**P2 (Standard)**:
+- Bugs that do not block other issues
+- Features that block other issues
+- Improvements that block multiple (2+) issues
+
+**P3 (Low)**:
+- Features and improvements that do not block other issues
+- Stale issues with no dependencies (may be obsolete)
+
+Within each priority level, sort by: number of issues blocked (descending), then age (oldest first).
+
+If `triage.auto_priority` is false, set every priority to null, omit the Pri column from the table, and skip priority suggestions.
 

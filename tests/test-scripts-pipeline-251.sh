@@ -86,6 +86,8 @@ from pathlib import Path
 skills_root = Path(sys.argv[1])
 WIRED = [
     "auto-pilot",
+    # init-gitissue joined the wired set in issue #253 (gi-stack-detect.py).
+    "init-gitissue",
     "issue-analysis",
     "issue-creator",
     "issue-pr-review",
@@ -637,6 +639,8 @@ WIRED = [
     "issue-resolver",
     "issue-triage",
 ]
+# init-gitissue is deliberately absent: it *generates* .gitissue.yml and has no
+# '## Configuration' block to keep a gi-config degrade path in.
 DOTTED_RE = re.compile(r"^[a-z_][a-z0-9_]*(?:\.[a-z0-9_]+)+$")
 out = []
 

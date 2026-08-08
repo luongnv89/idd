@@ -95,7 +95,15 @@ Defaults: `issue.template: "default"`, `issue.labels_auto_suggest: true`, `issue
 
 If the config file exists but contains invalid values, output the validation error from `references/error-messages.md` and stop. Do not re-read the config at each step.
 
-If `model_suggestion.enabled` is `true` (the default), run the model-data cache lifecycle (check / seed / staleness-refresh) once now, before Step 1 — see `references/model-suggestion.md`. The cache is **skill-level** (a dated `model-data-<date>.json` in the installed skill folder, shared across all repos), not per-repo; `--refresh-model-data` forces a refresh first. When `false`, skip all model-suggestion steps silently.
+If `model_suggestion.enabled` is `true` (the default), run the model-data cache lifecycle (locate / seed / age) once now, before Step 1, with `references/scripts/gi-model-cache.py`. Set `skill_dir` to the absolute dirname of this SKILL.md — the cache is **skill-level** (a dated `model-data-<date>.json` in the installed skill folder, shared across all repos), never per-repo:
+
+```bash
+python3 references/scripts/gi-model-cache.py --skill-dir "$skill_dir"
+```
+
+Exit 0 prints `state` (`fresh` | `stale` | `seeded` | `installed`), `stale`, `age_days`, `data_version`, `data_date`, and `bands` — the effort → two-model mapping with each pick's own per-task cost, which is everything Step 4 and Step 5 need. Exit 3 (a bad `--skill-dir`, a `model_suggestion.cache_ttl_days` out of range, or an `--install` payload that fails validation): stop and print the validation error. **Script file — or `templates/model-data.json` — absent:** stop with the `✗ Missing bundled dependency` block. Both are on the *Bundled dependency precheck* list, so a missing seed is a broken install, not the runtime degrade its exit 4 would otherwise look like. **Exit 4, no `python3`, exit 2, or unparsable stdout:** print `⚠ gi-model-cache unavailable — model suggestions disabled for this run` and continue creating the issue without the suggestion (or run the lifecycle by hand from `references/model-suggestion.md`, which stays the authoritative prose procedure). `state: "stale"` is a warning, not a failure — in auto mode log it and use the data as-is.
+
+`--refresh-model-data` forces a refresh first (WebFetch, then `--install`) — see `references/model-suggestion.md`. When `model_suggestion.enabled` is `false`, skip all model-suggestion steps silently and do not run the script.
 
 ## Subagent Architecture
 
@@ -127,6 +135,7 @@ If any are missing, stop immediately and print:
 Check these files:
 
 - `references/agents/duplicate-detector.md` — duplicate detection subagent prompt
+- `templates/model-data.json` — bundled model-data seed `gi-model-cache.py` copies on first run
 - `templates/bug.md` — bug issue template
 - `templates/feature.md` — feature request template
 - `templates/improvement.md` — improvement request template
@@ -147,6 +156,7 @@ Check these files:
 - `references/docs/terminal-style.md` — terminal output style contract (symbols, output structure, table/error formats)
 - `references/scripts/gi-config.py` — config resolver: merges the documented defaults with `.gitissue.yml` and prints one JSON line
 - `references/scripts/gi-issue.py` — TTL-cached issue fetcher for Normalize mode's repeat reads
+- `references/scripts/gi-model-cache.py` — model-data cache lifecycle
 
 ---
 

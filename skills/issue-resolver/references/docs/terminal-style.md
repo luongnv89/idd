@@ -1,14 +1,11 @@
 <!-- Generated from /docs/terminal-style.md. Do not edit. Edit source and run ./scripts/build.sh. -->
 # Terminal Output Style Contract
 
-The canonical terminal-output contract that gitissue skills consume at runtime:
-the symbol vocabulary, output structure, progress patterns, table and error
-formats, and the behavioral rules for confirmations, confidence, first-run, and
-empty states. This is the single source of truth for skill output.
-
-`DESIGN.md` (repo root) is the human-facing style guide — it adds the color
-palette and per-command output mockups on top of this contract. When the two
-overlap, this document is authoritative for what skills emit.
+The single source of truth for what gitissue skills emit: symbol vocabulary,
+output structure, progress patterns, table and error formats, and the rules for
+confirmations, confidence, first-run, and empty states. `DESIGN.md` (repo root)
+is the human-facing guide layered on top — colors and per-command mockups; where
+the two overlap, this document wins.
 
 ## Principles
 

@@ -140,7 +140,18 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 
   To fix:  check file permissions in the .gitissue/ directory
 ```
-**Trigger:** File write to `.gitissue/triage.json` fails (permission denied, disk full, etc.).
+**Trigger:** File write to `.gitissue/triage.json` fails (permission denied, disk full, etc.) — including `gi-triage-graph.py` exiting 4, which still printed the payload on stdout.
+
+### Invalid triage scan
+```
+✗ Invalid triage scan — the ordering step cannot run
+
+  {reason from gi-triage-graph on stderr}
+
+  To fix:  re-run /issue-triage update so the scanner rebuilds the scan
+  Docs:    https://github.com/luongnv89/idd/blob/main/docs/config-schema.md
+```
+**Trigger:** `gi-triage-graph.py` exits 3 — an issue without a number, an edge naming an unknown issue, an unparsable timestamp, or an out-of-range `triage.*` value. This is a **stop**, never a degrade: the scan is wrong, and computing the same order by hand would compute it from the same wrong input.
 
 ## Configuration
 

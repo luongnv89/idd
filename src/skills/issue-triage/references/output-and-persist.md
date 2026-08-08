@@ -83,6 +83,11 @@ After Step 8 (terminal output is always shown regardless of persistence success)
 
 ### Write process
 
+`shared/scripts/gi-triage-graph.py --out .gitissue/triage.json` does steps 1-4
+below in one call — it emits exactly this schema, so the payload and the
+document cannot drift. Do them by hand only when that script degraded (see
+SKILL.md, *Steps 3-7*):
+
 1. Create the directory if it doesn't exist: `mkdir -p .gitissue/`
 2. Build the JSON object from Steps 1-8 analysis results using the schema below
 3. Append one entry to the `history` array
@@ -157,7 +162,8 @@ After Step 8 (terminal output is always shown regardless of persistence success)
 | `summary.stale_threshold_days` | integer | Threshold used for stale detection |
 | `summary.potentially_fixed_count` | integer | Number of issues flagged as potentially already fixed |
 | `summary.suggested_order` | integer[] | Execution order by issue number |
-| `summary.circular_deps` | integer[][] | Detected circular dependency chains |
+| `summary.circular_deps` | integer[][] | Detected circular dependency chains (each closes on its own first node) |
+| `summary.co_dependent` | integer[][] | Pairs that shared files but where neither issue precedes the other — no edge was created |
 | `history[]` | array | One entry per triage run |
 | `history[].time` | ISO 8601 string | When this entry was created |
 | `history[].source` | string | Skill that wrote this entry |
@@ -186,8 +192,8 @@ step ran* from *the step succeeded*. Emit it right after the step's `[N/9]`
 tracker line:
 
 ```
-  [6/9] Stale         ✓ 4 stale issues
-    √ Threshold applied   √ Every open issue scored
+  [3-7/9] Ordering    ✓ 12 issues ordered, 4 stale
+    √ Order computed   √ Threshold applied
     Result: PASS
 ```
 
@@ -216,11 +222,11 @@ Rules that make the report worth reading:
 |------|--------|
 | 1 — Fetch Issues | `Issues fetched` · `Config applied` |
 | 1b & 2 — Already-Fixed & Dependencies | `Scanner returned` · `Dependencies mapped` |
-| 4 — Execution Order | `Order computed` · `No cycle left unreported` |
-| 5 — Parallelizable | `Disjoint sets identified` |
-| 6 — Stale Detection | `Threshold applied` · `Every open issue scored` |
-| 7 — Priority Suggestions | `Every issue ranked` · `Rationale attached` |
+| 3-7 — Order, Parallel Sets, Staleness, Priority | `Order computed` · `No cycle left unreported` · `Disjoint sets identified` · `Threshold applied` · `Every open issue scored` · `Every issue ranked` |
 | 8-9 — Output & Persist | `Report rendered` · `.gitissue/triage.json written` |
+
+When the scripted block degraded to the prose procedure, the step still reports —
+mark the checks it could not evaluate `×` and use `PARTIAL`, never `√`.
 
 A read-only default-mode run still emits the reports; `PARTIAL` is the right
 result when a step ran with degraded input (for example the dependency scanner

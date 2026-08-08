@@ -204,7 +204,7 @@ All errors follow the rich error format: what went wrong + fix command + docs li
   To fix:  edit .gitissue.yml and correct the values above
   Docs:    https://github.com/luongnv89/idd/blob/main/docs/config-schema.md
 ```
-**Trigger:** Config file exists but contains invalid values (wrong type, out of range, unknown field).
+**Trigger:** Config file exists but contains invalid values (wrong type, out of range, unknown field) — including `gi-model-cache.py` exiting 3 on an out-of-range `model_suggestion.*` value.
 
 ## Model Suggestion
 

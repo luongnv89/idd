@@ -13,31 +13,16 @@ Place `.gitissue.yml` in the repository root to customize behavior.
 
 ### Config Loading Flow
 
-```mermaid
-graph TD
-    A["Skill invoked<br/>(e.g. /issue-resolver)"] --> B{".gitissue.yml<br/>exists?"}
-    B -- Yes --> C["Load & validate config"]
-    B -- No --> D["Use defaults<br/>○ First run hint"]
-    C --> E{Valid?}
-    E -- Yes --> F["Proceed with<br/>skill execution"]
-    E -- No --> G["✗ Show validation<br/>errors with line numbers"]
-    D --> F
-
-    style A fill:#4CAF50,color:#fff
-    style F fill:#2196F3,color:#fff
-```
+A skill loads the file once at start. Present and valid → use it. Present and
+invalid → stop with the line-numbered errors under *Validation* below. Absent →
+use the defaults and print the first-run hint above.
 
 ### Config Hierarchy
 
-```mermaid
-graph LR
-    GY[".gitissue.yml<br/>(configuration)"] --- |"read once<br/>at start"| SK["Skills"]
-    GD[".gitissue/<br/>(state directory)"] --- |"read/write<br/>during execution"| SK
-    SD["Skill defaults<br/>(built-in)"] --- |"fallback when<br/>no config"| SK
-
-    style GY fill:#4CAF50,color:#fff
-    style GD fill:#2196F3,color:#fff
-```
+Three inputs, each with its own lifetime: `.gitissue.yml` is configuration, read
+**once** at skill start; `.gitissue/` is state, read and written **during**
+execution; the built-in skill defaults are the **fallback** when no config file
+exists.
 
 ## Core Fields
 
