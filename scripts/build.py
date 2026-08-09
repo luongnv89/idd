@@ -767,16 +767,16 @@ DOC_SECTION_DIGESTS: dict[str, tuple[str, ...]] = {
     # contributor CI check (tests/test-pre-commit-security.sh) over its own
     # src/skills/** sources. A skill resolving an issue in a *user's* repo never
     # runs that lint and cannot act on it, yet the section shipped into both
-    # bundling skills. It is 7,685 bytes of the authored document; dropping it
-    # takes each emitted copy from 25,954 to 18,529 bytes — 7,425 per skill,
-    # 14,850 over the two, the shortfall against 7,685 being the 260-byte digest
+    # bundling skills. It is 8,818 bytes of the authored document; dropping it
+    # takes each emitted copy from 27,087 to 18,529 bytes — 8,558 per skill,
+    # 17,116 over the two, the shortfall against 8,818 being the 260-byte digest
     # notice the emitted copy gains. The authored document keeps the section
     # whole for the contributors it is written for.
     #
     # These figures track the section's size, so they go stale whenever it is
-    # edited — they have now done so three times. Re-measure rather than adjust
+    # edited — they have now done so four times. Re-measure rather than adjust
     # by eye: disable this entry, rebuild to a scratch --out, and diff the
-    # emitted byte counts against the current build. (Issue #275, cycle 4.)
+    # emitted byte counts against the current build. (Issue #275, cycle 5.)
     "pre-commit-security.md": (
         "Why This Matters",
         # Deliberately script-name-free: T7.10 in tests/test-dependency-closure.sh

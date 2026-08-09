@@ -78,7 +78,10 @@
 #          *indented code block* (four spaces, no fence) containing a ``` line
 #          opens a block that was never there. Without container tracking that
 #          shape is byte-identical to a list-nested fence, so it cannot be told
-#          apart here. It is not left as a residue: note 3(d) recovers from it.
+#          apart here. Note 3(d) recovers from it when the run it opens is
+#          display-only; when the run carries a shell info string (```bash) the
+#          phantom is a shell block and nothing recovers — see the residues
+#          under 3(d).
 #
 #          src/ carries fences at 0, 2 and 3 columns only, so neither rule moves
 #          a real subject today; T3c is what keeps them from drifting.
@@ -92,9 +95,11 @@
 #          real ```bash block whole — reached several ways: a false close (a run
 #          indented past its opener, note 3a), a false open (a top-level
 #          indented code block containing a ``` run), and a fence the author
-#          never closed. Blocking the entrances one at a time is what let the
+#          never closed. Only the first is blocked at the entrance, by note
+#          3(a)'s closing bound; blocking them one at a time is what let the
 #          third survive two rounds of fixing the first two, so there is also a
-#          guard at the exit.
+#          guard at the exit — and for entrances 2 and 3 that guard is the only
+#          cover there is.
 #
 #          The recovery: when the open block is *display-only*, a same-character
 #          run of length ≥ open_len carrying a non-empty info string is taken to
@@ -106,16 +111,24 @@
 #          cost a live gate. CommonMark does *not* forbid that shape inside an
 #          open fence: every line inside a fenced block is literal content, info
 #          string or not, and only an empty-info run can close. So the shape
-#          proves nothing on its own. What makes acting on it safe is the
-#          restriction to a non-shell open block — abandoning a display-only
-#          block early costs nothing, because subjects only ever live in shell
-#          blocks. Applied to a genuinely open ```bash block the same guess is
-#          destructive: a heredoc writing a fenced snippet ends the block before
-#          its `git push` is reached, and the push becomes neither subject nor
-#          violation, which is silent. Fixtures H and I pin that. The
-#          ````markdown-wraps-```bash idiom is untouched for a second reason:
-#          there open_len (4) > fence_len (3), so the branch never fires.
-#          Measured against the whole of src/: zero blocks change hands.
+#          proves nothing on its own. What bounds acting on it is the
+#          restriction to a non-shell open block — but "bounds", not "makes
+#          free", and the difference is worth stating exactly. The recovery does
+#          not merely abandon the open block: it calls open_block() on that
+#          fence. So a genuine three-backtick ```text wrapper quoting a nested
+#          ```bash sample has the sample *promoted* to a real shell block, and a
+#          `git push` inside the sample is reported as a violation — a false
+#          positive. (The ````markdown-wraps-```bash idiom escapes that for a
+#          second reason: there open_len (4) > fence_len (3), so the branch
+#          never fires. A three-backtick display wrapper has no such exemption.)
+#          What justifies the restriction is the asymmetry of the two misfires.
+#          On a display-only block the misfire is a false positive: loud, and
+#          the author can rewrite the wrapper. Applied to a genuinely open
+#          ```bash block the same guess is silent: a heredoc writing a fenced
+#          snippet ends the block before its `git push` is reached, and the push
+#          becomes neither subject nor violation. Fixtures H and I pin that.
+#          Measured against the whole of src/: the branch fires zero times, so
+#          zero blocks change hands either way today.
 #
 #          Order matters — the recovery is tested *before* the note 3(a) indent
 #          bound, because that bound reasons "a run this deep is content of the
@@ -123,17 +136,39 @@
 #          phantom. Behind the bound, a phantom opened at column 0 still eats a
 #          list-nested ```bash block. Fixtures E, F and G pin the three.
 #
-#          Accepted residues — the class is *narrowed*, not closed. The recovery
-#          keys on `fence_ch == open_ch && fence_len >= open_len`, so it does not
-#          fire when the phantom is a `~~~text` fence, nor when it is a 4-backtick
-#          ````text fence, and either one still swallows a following ```bash
-#          block with an ungated push. Both are latent rather than live: src/
-#          carries zero tilde fences and zero 4-backtick fences today. Widening
-#          the match would mean recovering across fence characters and lengths,
-#          which is where the ````markdown wrapper idiom lives — so the trade is
-#          a real false positive against two shapes nothing in this repo writes.
-#          If either shape ever appears in src/, revisit this rather than
-#          assuming the guard covers it.
+#          Accepted residues — the class is *narrowed*, not closed, and there
+#          are three of them. The recovery keys on `fence_ch == open_ch &&
+#          fence_len >= open_len`, so it does not fire when the phantom is a
+#          `~~~text` fence, nor when it is a 4-backtick ````text fence; and it
+#          keys on `is_shell_block == 0`, so it does not fire when the phantom
+#          is one this parser reads as a *shell* block — an unclosed ```bash or
+#          ```console fence, or an indented code block carrying a ```bash run
+#          (note 3a). Each of the three still swallows a following ```bash block
+#          whole.
+#
+#          The first two are latent: src/ carries zero tilde fences and zero
+#          4-backtick fences today. The third is LIVE — src/ carries 96
+#          bash-class fences, so one missing closing fence reaches it — and it
+#          is the worst of the three, because the merged block is itself a shell
+#          block. A swallowed `git push` is recorded as a subject at the
+#          *phantom's* line, in the phantom's file, so T3b's file pin does not
+#          move; and the merged block carries one block_has_gate flag, so an
+#          invocation anywhere in the merged span reads as gating the swallowed
+#          push. Verified end to end: drop the closing fence of the gated push
+#          block in src/skills/issue-resolver/SKILL.source.md, append an ungated
+#          `git push --force-with-lease`, and this suite still reports 19
+#          passed, 0 failed.
+#
+#          That third residue predates this guard rather than being introduced
+#          by it — it is present at the merge base too — and closing it is
+#          tracked as its own issue, because the fix is not a wider match.
+#          Widening the character/length match would mean recovering across
+#          fence characters and lengths, which is where the ````markdown wrapper
+#          idiom lives, so that trade is a real false positive against two
+#          shapes nothing in this repo writes; the shell-block case needs
+#          something else (a bounded lookahead, or a same-file fence-parity
+#          check). If a tilde or 4-backtick fence ever appears in src/, revisit
+#          this rather than assuming the guard covers it.
 #   4. In a session-transcript fence (```console, ```shell-session), a leading
 #      `#` is the root prompt, not a comment — property 2's `comment_re` would
 #      throw away a real command. Such a line gates only when the interpreter
@@ -379,13 +414,16 @@ scan_file() {
         # Phantom-block recovery — a heuristic, not a deduction (note 3d).
         # CommonMark makes *every* line inside an open fence literal content,
         # info string or not, so a same-character run carrying one is not proof
-        # of anything. What makes the guess safe is the `is_shell_block == 0`
+        # of anything. What bounds the guess is the `is_shell_block == 0`
         # clause: it is only ever applied to a *display-only* open block, where
-        # abandoning early costs nothing because such a block holds no subjects.
-        # Inside a genuinely open ```bash block the same shape is ordinary
-        # content — a heredoc writing a fenced snippet — and acting on it would
-        # end the block before its `git push` is seen, losing the subject
-        # entirely. That is the one thing this gate must never do.
+        # a wrong guess is loud rather than silent. It is not free even there —
+        # open_block() below promotes the run to a real block, so a ```text
+        # wrapper quoting a ```bash sample gets the sample scanned as shell (a
+        # false positive; header note 3d). Inside a genuinely open ```bash block
+        # the same shape is ordinary content — a heredoc writing a fenced
+        # snippet — and acting on it would end the block before its `git push`
+        # is seen, losing the subject entirely. That is the one thing this gate
+        # must never do.
         #
         # Checked before the indentation bound, because that bound argues "a run
         # this deep is *content* of the enclosing block" — reasoning that is void
