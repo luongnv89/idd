@@ -306,8 +306,9 @@ while IFS= read -r tracked; do
   TEST_FILES+=("$tracked")
 done < <(cd "$REPO_ROOT" && git ls-files 'tests/*.sh')
 
-# Scan every workflow, not just dist-check.yml: a test wired from any of them
-# is wired.
+# Inventory every workflow for diagnostics. Only pull-request-triggered workflows
+# count as wiring: a test moved to a push-only or workflow_dispatch-only file no
+# longer gates a PR, which is the gap this check exists to prevent.
 WORKFLOW_FILES=()
 if [ -d "$WORKFLOW_DIR" ]; then
   while IFS= read -r wf; do
@@ -443,10 +444,163 @@ strip_comments() {
   '
 }
 
+# Return success only when the workflow top-level `on` declaration includes
+# pull_request. Block children are matched at the first indentation level only,
+# so nested input keys or sequences under workflow_call do not qualify. Scalar,
+# flow-list, block-map, and simple block-sequence forms are supported without
+# PyYAML; unsupported or malformed list forms are rejected conservatively.
+workflow_gates_pull_requests() {
+  strip_comments < "$1" | awk '
+    function trim(value) {
+      sub(/^[[:space:]]+/, "", value)
+      sub(/[[:space:]]+$/, "", value)
+      return value
+    }
+    # Deliberately support only the simple event-name subset of YAML flow
+    # sequences. Requiring both brackets, non-empty comma-separated items, and
+    # plain event names makes malformed scalar/list input fail closed.
+    function scalar_or_flow_has_pr(value,   inner, count, i, item, has_pr, items) {
+      value = trim(value)
+      if (value == "pull_request") return 1
+      if (substr(value, 1, 1) != "[" || substr(value, length(value), 1) != "]") return 0
+      inner = substr(value, 2, length(value) - 2)
+      if (trim(inner) == "") return 0
+      count = split(inner, items, ",")
+      for (i = 1; i <= count; i++) {
+        item = trim(items[i])
+        if (item == "" || item !~ /^[A-Za-z0-9_-]+$/) return 0
+        if (item == "pull_request") has_pr = 1
+      }
+      return has_pr
+    }
+    /^[^[:space:]][^:]*:/ {
+      if ($0 ~ /^on[[:space:]]*:/) {
+        # Duplicate top-level keys are invalid YAML for this detector. In
+        # particular, do not let a first pull_request declaration leave `found`
+        # sticky when a later `on` declaration replaces it in some parsers.
+        if (seen_on) invalid = 1
+        seen_on = 1
+        event_indent = -1
+        block_style = ""
+        value = $0
+        sub(/^on[[:space:]]*:[[:space:]]*/, "", value)
+        value = trim(value)
+        if (scalar_or_flow_has_pr(value)) found = 1
+        # Only an empty declaration can own indented block children. Treating
+        # children of a scalar or flow value as events would accept bad YAML.
+        in_on = (value == "")
+      } else {
+        in_on = 0
+      }
+      next
+    }
+    in_on && /^[[:space:]]+[^[:space:]]/ {
+      match($0, /^[[:space:]]*/)
+      indent = RLENGTH
+      if (event_indent < 0) event_indent = indent
+      if (indent < event_indent) {
+        invalid = 1
+        next
+      }
+      # A simple event sequence contains scalar items, so deeper indentation
+      # cannot be valid continuation data. A map event may own nested config
+      # only when its direct value was empty; `{}` is already a complete value.
+      if (indent > event_indent) {
+        if (block_style == "sequence" || !event_allows_nested) invalid = 1
+        next
+      }
+      line = $0
+      sub(/^[[:space:]]*/, "", line)
+      if (line ~ /^-[[:space:]]+/) {
+        if (block_style == "map") invalid = 1
+        block_style = "sequence"
+        event_allows_nested = 0
+        item = line
+        sub(/^-[[:space:]]+/, "", item)
+        item = trim(item)
+        if (item !~ /^[A-Za-z0-9_-]+$/) {
+          invalid = 1
+        } else if (item == "pull_request") {
+          found = 1
+        }
+      } else if (line ~ /^[A-Za-z0-9_-]+[[:space:]]*:/) {
+        if (block_style == "sequence") invalid = 1
+        block_style = "map"
+        key = line
+        sub(/[[:space:]]*:.*$/, "", key)
+        value = line
+        sub(/^[^:]*:[[:space:]]*/, "", value)
+        value = trim(value)
+        # GitHub event-map entries are null or mappings. Support the common
+        # empty/nested form and an empty flow map; reject every other direct
+        # value rather than treating malformed YAML as a PR gate.
+        if (value != "" && value !~ /^\{[[:space:]]*\}$/) invalid = 1
+        if (seen_event[key]) invalid = 1
+        seen_event[key] = 1
+        event_allows_nested = (value == "")
+        if (key == "pull_request") found = 1
+      } else {
+        invalid = 1
+      }
+    }
+    END { exit(found && !invalid ? 0 : 1) }
+  '
+}
+
+# Pin the trigger detector so neither manual-only wiring, malformed YAML, nor a
+# nested input name/sequence can become a second, non-PR source of truth.
+trigger_fixtures="$TMP_OUT/workflow-trigger-fixtures"
+mkdir -p "$trigger_fixtures"
+printf '%s\n' 'name: manual' 'on: workflow_dispatch' > "$trigger_fixtures/manual.yml"
+printf '%s\n' 'name: scalar' 'on: pull_request' > "$trigger_fixtures/scalar.yml"
+printf '%s\n' 'name: flow' 'on: [push, pull_request]' > "$trigger_fixtures/flow.yml"
+printf '%s\n' 'name: block' 'on:' '  push:' '  pull_request:' > "$trigger_fixtures/block.yml"
+printf '%s\n' 'name: block sequence' 'on:' '  - push' '  - pull_request' > "$trigger_fixtures/block-sequence.yml"
+printf '%s\n' 'name: empty event' 'on:' '  pull_request:' > "$trigger_fixtures/empty-event.yml"
+printf '%s\n' 'name: empty event map' 'on:' '  pull_request: {}' > "$trigger_fixtures/empty-event-map.yml"
+printf '%s\n' 'name: nested event map' 'on:' '  pull_request:' \
+  '    branches: [main]' > "$trigger_fixtures/nested-event-map.yml"
+printf '%s\n' 'name: malformed scalar' 'on: pull_request, push' > "$trigger_fixtures/malformed-scalar.yml"
+printf '%s\n' 'name: duplicate trigger' 'on: pull_request' 'on: push' > "$trigger_fixtures/duplicate-on.yml"
+printf '%s\n' 'name: malformed event value' 'on:' \
+  '  pull_request: [' > "$trigger_fixtures/malformed-event-value.yml"
+printf '%s\n' 'name: duplicate event key' 'on:' '  pull_request:' \
+  '  pull_request: {}' > "$trigger_fixtures/duplicate-event-key.yml"
+printf '%s\n' 'name: malformed flow' 'on: [push, pull_request' > "$trigger_fixtures/malformed-flow.yml"
+printf '%s\n' 'name: malformed block sequence' 'on:' '  - push' \
+  '  - [pull_request' > "$trigger_fixtures/malformed-block-sequence.yml"
+printf '%s\n' 'name: nested' 'on:' '  workflow_call:' '    inputs:' \
+  '      pull_request:' '        type: boolean' > "$trigger_fixtures/nested.yml"
+printf '%s\n' 'name: nested sequence' 'on:' '  workflow_call:' '    inputs:' \
+  '      events:' '        default:' '          - push' \
+  '          - pull_request' > "$trigger_fixtures/nested-sequence.yml"
+if ! workflow_gates_pull_requests "$trigger_fixtures/manual.yml" && \
+   ! workflow_gates_pull_requests "$trigger_fixtures/malformed-scalar.yml" && \
+   ! workflow_gates_pull_requests "$trigger_fixtures/duplicate-on.yml" && \
+   ! workflow_gates_pull_requests "$trigger_fixtures/malformed-event-value.yml" && \
+   ! workflow_gates_pull_requests "$trigger_fixtures/duplicate-event-key.yml" && \
+   ! workflow_gates_pull_requests "$trigger_fixtures/malformed-flow.yml" && \
+   ! workflow_gates_pull_requests "$trigger_fixtures/malformed-block-sequence.yml" && \
+   ! workflow_gates_pull_requests "$trigger_fixtures/nested.yml" && \
+   ! workflow_gates_pull_requests "$trigger_fixtures/nested-sequence.yml" && \
+   workflow_gates_pull_requests "$trigger_fixtures/scalar.yml" && \
+   workflow_gates_pull_requests "$trigger_fixtures/flow.yml" && \
+   workflow_gates_pull_requests "$trigger_fixtures/block.yml" && \
+   workflow_gates_pull_requests "$trigger_fixtures/block-sequence.yml" && \
+   workflow_gates_pull_requests "$trigger_fixtures/empty-event.yml" && \
+   workflow_gates_pull_requests "$trigger_fixtures/empty-event-map.yml" && \
+   workflow_gates_pull_requests "$trigger_fixtures/nested-event-map.yml"; then
+  pass "T9: only valid direct pull_request triggers qualify as CI wiring"
+else
+  fail "T9: workflow trigger detector accepted invalid/non-PR wiring or rejected pull_request"
+fi
+
 WIRING_TEXT=""
 if [ "${#WORKFLOW_FILES[@]}" -gt 0 ]; then
   for wf in "${WORKFLOW_FILES[@]}"; do
-    WIRING_TEXT+="$(strip_comments < "$wf" | strip_dead_steps)"$'\n'
+    if workflow_gates_pull_requests "$wf"; then
+      WIRING_TEXT+="$(strip_comments < "$wf" | strip_dead_steps)"$'\n'
+    fi
   done
 fi
 
@@ -466,7 +620,7 @@ WIRED="$(printf '%s\n' "$WIRING_TEXT" | grep -oE 'tests/[A-Za-z0-9._/-]+\.sh' | 
 if [ "${#TEST_FILES[@]}" -eq 0 ]; then
   fail "T9: git tracks no tests/*.sh — the wiring check would be vacuous"
 elif [ -z "$WIRED" ]; then
-  fail "T9: no workflow under .github/workflows/ invokes any tests/*.sh"
+  fail "T9: no pull_request workflow under .github/workflows/ invokes any tests/*.sh"
 else
   wired_count="$(printf '%s\n' "$WIRED" | wc -l | tr -d ' ')"
   pass "T9.0: checking ${#TEST_FILES[@]} tracked test(s) against $wired_count workflow reference(s)"
@@ -480,7 +634,7 @@ else
       pass "T9: $rel excluded from CI — $reason"
     else
       unwired=$((unwired + 1))
-      fail "T9: $rel is not invoked by any live workflow step and has no EXCLUDED reason"
+      fail "T9: $rel is not invoked by any live pull-request workflow step and has no EXCLUDED reason"
       # Distinguish "never wired" from "wired, but the reduction removed it".
       # Without this the two are indistinguishable in the output, and an author
       # staring at a step they can see in the file has nothing to go on.
@@ -498,8 +652,8 @@ else
   else
     echo "      Add a step to .github/workflows/dist-check.yml, or add the file"
     echo "      to EXCLUDED in tests/test-build-script.sh with a written reason."
-    echo "      A mention in a comment, or in a step disabled by 'if: false' or"
-    echo "      'continue-on-error: true' (any case), does not count as wiring."
+    echo "      A mention in a comment, a non-pull-request workflow, or a step"
+    echo "      disabled by 'if: false' / 'continue-on-error: true' does not count."
   fi
 
   # Every EXCLUDED entry is audited on two counts. A stale exclusion outlives

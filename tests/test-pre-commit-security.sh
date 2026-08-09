@@ -63,16 +63,14 @@
 #              list-nested display-only ```text fence is no longer *in* a block,
 #              so it leaks into the 12-line prose window and falsely gates a
 #              later ungated block. Fixtures C and D pin the two.
-#            · A *closing* fence is rejected beyond `open_indent + 3`. Here the
-#              reference column is known: the opener sits 0–3 past the container
-#              and a closer may sit 0–3 past the container too, so a closer is
-#              never more than 3 columns past its opener. A run indented further
-#              is block *content*, and reading it as a fence is the worst failure
-#              of the three: it closes the enclosing ```bash block early, the
-#              real closing fence of that block then *opens* a phantom one, and
-#              the inverted parity swallows every later ```bash block in the file
-#              as phantom content — an ungated `git push` below it is never
-#              evaluated at all. Fixture A pins it.
+#            · A *closing* fence is accepted only 0–3 columns past its
+#              container content column, independently of the opener indent.
+#              CommonMark applies that relative limit to both fences. Using
+#              `open_indent + 3` accepts an illegal six-space run after a
+#              top-level three-space opener; using an absolute three-column cap
+#              rejects a legal five-space closer in a list whose content starts
+#              at column 2. The scanner tracks active list content columns so
+#              both cases parse correctly. Fixtures A, J, and K pin the limits.
 #
 #          Accepting any opener indent has a cost of its own — a top-level
 #          *indented code block* (four spaces, no fence) containing a ``` line
@@ -273,6 +271,69 @@ trap 'rm -f "$scan_out" "$violations"' EXIT
 scan_file() {
   local file="$1"
   awk -v file="$file" '
+    # Return the indentation in columns (tabs advance to a 4-column stop).
+    function line_indent(line,   i, col, ch) {
+      col = 0
+      for (i = 1; i <= length(line); i++) {
+        ch = substr(line, i, 1)
+        if (ch == " ") col += 1
+        else if (ch == "\t") col += 4 - (col % 4)
+        else break
+      }
+      return col
+    }
+    # Return a list marker content column, or -1 when the line is not a marker.
+    # CommonMark gives an empty marker (for example `-` followed by EOL) an
+    # implicit one-column padding even though there is no whitespace to count.
+    function marker_content_column(line,   i, col, ch, next_ch, t, j, marker_end, saw_digit, empty_marker) {
+      col = line_indent(line)
+      i = 1
+      while (i <= length(line) && (substr(line, i, 1) == " " || substr(line, i, 1) == "\t")) i++
+      t = substr(line, i)
+      marker_end = 0
+      empty_marker = 0
+      ch = substr(t, 1, 1)
+      next_ch = substr(t, 2, 1)
+      if ((ch == "-" || ch == "+" || ch == "*") && (next_ch == "" || next_ch == " " || next_ch == "\t")) {
+        marker_end = 1
+        if (next_ch == "") empty_marker = 1
+      } else {
+        j = 1
+        saw_digit = 0
+        while (j <= 10 && index("0123456789", substr(t, j, 1)) > 0) { saw_digit = 1; j++ }
+        ch = substr(t, j, 1)
+        next_ch = substr(t, j + 1, 1)
+        if (saw_digit && (ch == "." || ch == ")") && (next_ch == "" || next_ch == " " || next_ch == "\t")) {
+          marker_end = j
+          if (next_ch == "") empty_marker = 1
+        }
+      }
+      if (marker_end == 0) return -1
+      col += marker_end
+      if (empty_marker) return col + 1
+      i += marker_end
+      while (i <= length(line)) {
+        ch = substr(line, i, 1)
+        if (ch == " ") col += 1
+        else if (ch == "\t") col += 4 - (col % 4)
+        else break
+        i++
+      }
+      return col
+    }
+    # Maintain the active Markdown list container stack while outside fences.
+    # A fence uses the deepest content column not beyond its own indentation.
+    function update_list_containers(line,   indent, marker_col) {
+      indent = line_indent(line)
+      marker_col = marker_content_column(line)
+      if (marker_col >= 0) {
+        while (list_depth > 0 && indent < list_content[list_depth]) list_depth--
+        list_content[++list_depth] = marker_col
+        return
+      }
+      if (line ~ /^[[:space:]]*$/) return
+      while (list_depth > 0 && indent < list_content[list_depth]) list_depth--
+    }
     # Parse a fence line into (fence_ch, fence_len, fence_info, fence_indent).
     # Returns 1 if the line is fence-shaped, 0 otherwise. CommonMark: a fence is
     # a run of three or more backticks or tildes; the info string of a backtick
@@ -333,6 +394,8 @@ scan_file() {
       open_ch = fence_ch
       open_len = fence_len
       open_indent = fence_indent
+      open_container_indent = (list_depth > 0 && list_content[list_depth] <= fence_indent) ? list_content[list_depth] : 0
+      open_indent_is_valid = (fence_indent - open_container_indent >= 0 && fence_indent - open_container_indent <= 3)
       lang = fence_info
       sub(/[[:space:]].*$/, "", lang)   # first word of the info string
       is_shell_block = (tolower(lang) ~ shell_lang_re) ? 1 : 0
@@ -410,6 +473,15 @@ scan_file() {
       push_re = "(^|[[:space:]&|;])git" git_opt_re "[[:space:]]+push([[:space:]]|$)"
     }
     {
+      # An outdented non-blank line ends the list container that owns an open
+      # fence, and therefore ends the fence even without an explicit closer.
+      # Evaluate that block first, then let the same physical line continue
+      # through normal outside-block parsing; it may itself start a new fence.
+      if (in_block == 1 && open_container_indent > 0 &&
+          $0 !~ /^[[:space:]]*$/ && line_indent($0) < open_container_indent) {
+        evaluate_block()
+      }
+      if (in_block == 0) update_list_containers($0)
       if (parse_fence($0)) {
         # Phantom-block recovery — a heuristic, not a deduction (note 3d).
         # CommonMark makes *every* line inside an open fence literal content,
@@ -433,13 +505,13 @@ scan_file() {
           open_block()
           next
         }
-        # The indentation bound, applied where the container is known (note 3a).
-        # No bound on an *opening* fence: a fence nested in a `10. ` list item
-        # starts at column 4 and is indented 0 relative to its own container, so
-        # an absolute limit erases it. Once a block is open its opener fixes the
-        # reference column, and a closing fence is never more than 3 columns past
-        # it — anything further indented is block content.
-        if (in_block == 0 || fence_indent <= open_indent + 3) {
+        # A valid closer is indented 0–3 columns past the same container content
+        # column as its opener (note 3a). For an intentionally over-indented
+        # phantom opener, retain the relative approximation used by recovery.
+        valid_fence_indent = (in_block == 0 ||
+          (open_indent_is_valid && fence_indent >= open_container_indent && fence_indent <= open_container_indent + 3) ||
+          (!open_indent_is_valid && fence_indent <= open_indent + 3))
+        if (valid_fence_indent) {
           if (in_block == 0) {
             open_block()
             next
@@ -594,8 +666,8 @@ fi
 #      a mis-parse that happens to leave today's two subjects intact — and a
 #      swallowed block is exactly that: the push never becomes a subject, so the
 #      pinned set is unchanged and nothing fires. So the parser is exercised
-#      directly against nine synthetic fixtures whose expected verdict is known.
-#      A–D pin the indentation bound (note 3a); E–G pin the phantom-block
+#      directly against thirteen synthetic fixtures whose expected verdict is known.
+#      A–D and J–M pin list/container indentation (note 3a); E–G pin the phantom-block
 #      recovery and H–I pin its *limits* (note 3d). Each fixture fails for one
 #      specific wrong model, and every one of them reports exactly 1 VIOLATION.
 #      A fixture only earns its place if some mutation makes it fail — B did not
@@ -648,6 +720,21 @@ fi
 #        I. Recovery misfire, realistic form. A ```bash block whose heredoc
 #           writes a fenced snippet, then pushes. Same clause, but a shape an
 #           author would plausibly write.
+#        J. Top-level false close. A three-space opener followed by a six-space
+#           fence-shaped run. CommonMark treats that run as block content, not a
+#           closer; accepting `open_indent + 3` at top level drops the push that
+#           follows it from the subject set.
+#        K. List-relative legal close. A bullet content column at 2, an opener at
+#           2, and a legal closer at 5. An absolute three-column cap rejects it
+#           and lets the gated block swallow the unrelated violation below.
+#        L. Empty-list-marker legal close. Same shape as K, but the bullet marker
+#           is alone on its line. CommonMark supplies one implicit padding column,
+#           so its content also starts at column 2. Missing that rule rejects the
+#           legal closer and swallows the later ungated push.
+#        M. Outdent ends a list-contained fence. A gated list-nested fence has no
+#           explicit closer before an outdented paragraph ends its container. The
+#           later top-level ungated push must be parsed as its own shell block,
+#           not swallowed into the already-gated list block.
 #
 #      All fixtures live in a mktemp -d scratch directory and are removed on
 #      exit; nothing is written inside the repo.
@@ -777,6 +864,62 @@ git push origin main
 ```
 FIXTURE_I
 
+cat > "$fixture_dir/top-level-overindented-false-close.md" <<'FIXTURE_J'
+## Appendix
+
+   ```bash
+      ```
+   git push origin main
+   ```
+FIXTURE_J
+
+cat > "$fixture_dir/list-relative-closer.md" <<'FIXTURE_K'
+## Appendix
+
+- First block:
+  ```bash
+  # see docs/pre-commit-security.md
+  git push origin main
+     ```
+
+Later, an unrelated block:
+
+```bash
+git push origin main
+```
+FIXTURE_K
+
+cat > "$fixture_dir/empty-list-marker-closer.md" <<'FIXTURE_L'
+## Appendix
+
+-
+  ```bash
+  # see docs/pre-commit-security.md
+  git push origin main
+     ```
+
+Later, an unrelated block:
+
+```bash
+git push origin main
+```
+FIXTURE_L
+
+cat > "$fixture_dir/list-fence-ended-by-outdent.md" <<'FIXTURE_M'
+## Appendix
+
+- First, publish the reviewed branch:
+  ```bash
+  # see docs/pre-commit-security.md
+  git push origin reviewed
+
+This paragraph ends the list container and its fenced block.
+
+```bash
+git push origin main
+```
+FIXTURE_M
+
 fixture_violations() {
   scan_file "$1" | grep -c '^VIOLATION' || true
 }
@@ -877,6 +1020,42 @@ else
   echo "      \`\`\`text line as plain content. Recovering on it drops the rest of"
   echo "      the block, including the \`git push\` below the heredoc. Only the"
   echo "      is_shell_block == 0 clause keeps this block intact."
+fi
+
+if [ "$(fixture_violations "$fixture_dir/top-level-overindented-false-close.md")" = "1" ]; then
+  pass "top-level fence closers are independently limited to three columns"
+else
+  fail "a six-space run falsely closed a top-level block opened at three spaces"
+  echo "      CommonMark permits each top-level fence at columns 0–3; the closing"
+  echo "      bound is not relative to the opener. Treating open_indent + 3 as"
+  echo "      legal here closes early and drops the following \`git push\`."
+fi
+
+if [ "$(fixture_violations "$fixture_dir/list-relative-closer.md")" = "1" ]; then
+  pass "list-nested fence closers use the container-relative three-column limit"
+else
+  fail "a legal list-nested closer was rejected by an absolute indent bound"
+  echo "      The list content begins at column 2, so CommonMark permits its closer"
+  echo "      through column 5. Rejecting it merges the next block into the first"
+  echo "      gated block and hides the unrelated \`git push\` violation."
+fi
+
+if [ "$(fixture_violations "$fixture_dir/empty-list-marker-closer.md")" = "1" ]; then
+  pass "empty list markers supply CommonMark's implicit content indentation"
+else
+  fail "an empty list marker lost its implicit one-column content padding"
+  echo "      A marker alone on its line still puts list content at column 2."
+  echo "      Missing that implicit column rejects the legal closer at column 5,"
+  echo "      merging the later ungated \`git push\` into the first gated block."
+fi
+
+if [ "$(fixture_violations "$fixture_dir/list-fence-ended-by-outdent.md")" = "1" ]; then
+  pass "an outdent ends a list-contained fence before a later top-level block"
+else
+  fail "a list-contained gated fence swallowed a top-level ungated push"
+  echo "      An outdented non-blank line ends the list container and its open"
+  echo "      fence. The line must then be parsed again outside that block, or the"
+  echo "      later top-level \`\`\`bash push is absorbed by the already-gated fence."
 fi
 
 # ───────────────────────────────────────────────────────────
