@@ -763,6 +763,33 @@ DOC_SECTION_DIGESTS: dict[str, tuple[str, ...]] = {
         "Maintainer Control and Safety",
         "Principles",
     ),
+    # Everything except *Lint Enforcement*, which documents this repo's own
+    # contributor CI check (tests/test-pre-commit-security.sh) over its own
+    # src/skills/** sources. A skill resolving an issue in a *user's* repo never
+    # runs that lint and cannot act on it, yet the section shipped into both
+    # bundling skills. It is 8,818 bytes of the authored document; dropping it
+    # takes each emitted copy from 27,087 to 18,529 bytes — 8,558 per skill,
+    # 17,116 over the two, the shortfall against 8,818 being the 260-byte digest
+    # notice the emitted copy gains. The authored document keeps the section
+    # whole for the contributors it is written for.
+    #
+    # These figures track the section's size, so they go stale whenever it is
+    # edited — they have now done so four times. Re-measure rather than adjust
+    # by eye: disable this entry, rebuild to a scratch --out, and diff the
+    # emitted byte counts against the current build. (Issue #275, cycle 5.)
+    "pre-commit-security.md": (
+        "Why This Matters",
+        # Deliberately script-name-free: T7.10 in tests/test-dependency-closure.sh
+        # forbids any `gi-*.py` literal in this file, so that adding a shared
+        # script never requires a build.py edit. A digest keep-list is matched by
+        # heading text, so the heading must not carry a script name either.
+        "Script Path (preferred)",
+        "Primary Pattern: Pre-Commit Scan",
+        "Mode Contract",
+        "Skill-Side Responsibilities",
+        "When the Scan Blocks",
+        "Quick Reference (Copy-Paste Snippet)",
+    ),
 }
 
 # Sections kept only for the skills that name them — by the `## ` heading itself
@@ -775,8 +802,7 @@ DOC_DIGEST_OPTIONAL_SECTIONS: dict[str, tuple[str, ...]] = {
 _DIGEST_NOTICE = (
     "> **Runtime digest (generated).** This is the normative subset of "
     "[{name}](" + _REPO_BLOB_BASE + "docs/{name}) that skills read at run time. "
-    "The narrative sections (rationale, worked example, methodology comparison) "
-    "live in the full document.\n"
+    "The sections a skill run never acts on live in the full document.\n"
 )
 
 # Dropped headings too generic to police for citations — they are sub-headings
@@ -852,11 +878,39 @@ def _doc_digest(name: str, text: str, skill_root: Path) -> str:
     )
 
 
+def _shared_doc_headings(repo_root: Path, name: str) -> frozenset[str]:
+    """`## ` headings docs/<name> shares with another top-level docs/*.md.
+
+    A bare mention of one of these cannot be attributed to a document by its
+    text alone. *Lint Enforcement* is a section of both pre-commit-security.md
+    (digested) and sync-conventions.md (bundled whole into six skills), so a
+    skill citing the second reads, to a substring scan, exactly like a skill
+    citing the first.
+    """
+    docs_dir = repo_root / "docs"
+    own = {heading for heading, _ in _split_h2_sections(_read_text(docs_dir / name))[1]}
+    others: set[str] = set()
+    for other in sorted(docs_dir.glob("*.md")):
+        if other.name == name:
+            continue
+        others |= {
+            heading for heading, _ in _split_h2_sections(_read_text(other))[1]
+        }
+    return frozenset(own & others)
+
+
 def _check_digest_coverage(src: Path, repo_root: Path) -> None:
     """Abort when a skill source names a section the digest would drop.
 
     This is the safety net for the digests: dropping a section only stays
     correct while nothing points a skill at it by name.
+
+    A dropped heading that another docs/*.md also uses is checked only in files
+    that name the digested document as well, because those are the files whose
+    mention can be attributed to it. Without that condition the scan reported
+    the wrong document: naming sync-conventions' *Lint Enforcement* section
+    aborted the build with a message about pre-commit-security.md and two
+    remedies, neither of which applied to what the author had written.
     """
     for name, keep in sorted(DOC_SECTION_DIGESTS.items()):
         doc = repo_root / "docs" / name
@@ -871,18 +925,22 @@ def _check_digest_coverage(src: Path, repo_root: Path) -> None:
         )
         if not dropped:
             continue
+        ambiguous = _shared_doc_headings(repo_root, name)
         for f in _walk_files(src):
             if not _is_text_file(f):
                 continue
             text = _read_text(f)
             for heading in dropped:
-                if heading in text:
-                    _abort(
-                        f"{f.relative_to(repo_root)} names "
-                        f"'{heading}' — a section the docs/{name} runtime digest "
-                        f"drops. Add it to DOC_SECTION_DIGESTS in "
-                        f"scripts/build.py or stop citing it from a skill."
-                    )
+                if heading not in text:
+                    continue
+                if heading in ambiguous and name not in text:
+                    continue
+                _abort(
+                    f"{f.relative_to(repo_root)} names "
+                    f"'{heading}' — a section the docs/{name} runtime digest "
+                    f"drops. Add it to DOC_SECTION_DIGESTS in "
+                    f"scripts/build.py or stop citing it from a skill."
+                )
 
 
 def _split_config_blocks(fence_body: str) -> list[tuple[str, str]]:

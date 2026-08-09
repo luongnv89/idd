@@ -5,13 +5,15 @@ Standard convention for scanning a working tree for secrets, credentials, and ri
 
 The checks below are adopted from the `auto-push` skill and codified here as the canonical reference for this project.
 
+> **Runtime digest (generated).** This is the normative subset of [pre-commit-security.md](https://github.com/luongnv89/idd/blob/main/docs/pre-commit-security.md) that skills read at run time. The sections a skill run never acts on live in the full document.
+
 ## Why This Matters
 
 A leaked API key, private key, or `.env` file pushed to a public remote is a security incident: the key must be rotated, the history must be rewritten, and the leak window must be assumed exploited. The fix is mechanical — scan staged changes for known secret patterns and refuse to proceed when one is detected. This document is the single source of truth; skills should link here rather than copy-pasting the snippet, so the rules can be tightened in one place.
 
 ---
 
-## Script Path: `gi-secscan.py` (preferred)
+## Script Path (preferred)
 
 The gate is shipped as a deterministic script, `references/scripts/gi-secscan.py`. Prefer it everywhere it is available: the rules below are ~90 lines of bash, and a gate re-derived by hand at four or five commit sites per issue eventually gets re-derived slightly wrong — in the one direction (a blocking check that stops blocking) nobody notices until after the leak.
 
@@ -208,12 +210,6 @@ Every IDD skill that runs `git add`, `git commit`, or `git push` MUST:
 | Scan blocks on a value that genuinely is not a key | Real-key prefix matched a coincidental literal (rare but possible with `AKIA...` strings or long base64) | Replace the literal with a placeholder, or wrap the value behind a fixture loader (`os.environ["AWS_KEY"]`) so the literal never appears in source. Disabling the scan is not an option. |
 
 If the scan keeps firing on the same false positive across runs, do not edit the scan to suppress it — fix the source so it stops matching. The scan rules are in this document; if a rule is genuinely wrong, propose an update here so it applies project-wide.
-
----
-
-## Lint Enforcement
-
-`tests/test-pre-commit-security.sh` greps `src/skills/**/*.md`, `src/skills/**/references/*.md`, `src/internal-skills/**/*.md`, and `src/shared/agents/*.md` for fenced-block invocations of `git commit` and `git push` and asserts that each occurrence is gated — preceded within the same fenced block, or in the surrounding prose within ~12 lines above, by a reference to **either** this document (`pre-commit-security.md`) **or** the script that implements it (`gi-secscan.py`). Both forms count because both are the gate; a block with neither is an ungated commit and fails. Failing the lint blocks merges. This is the regression guard — without it, future skill edits could silently reintroduce ungated commits.
 
 ---
 

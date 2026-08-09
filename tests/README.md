@@ -2,7 +2,9 @@
 
 These are manual integration tests for `/issue-creator` and `/issue-creator N` (normalization).
 
-> This file covers Sprint 1 (`/issue-creator`) only. See [`README-sprint2.md`](README-sprint2.md) and [`README-sprint3.md`](README-sprint3.md) for later sprints' manual tests. The `tests/` directory also has 23 automated `.sh` integration scripts (build, autopilot, config, sync, etc.) that are not covered by any of these three READMEs — run them directly, e.g. `./tests/test-build-script.sh`.
+> This file covers Sprint 1 (`/issue-creator`) only. See [`README-sprint2.md`](README-sprint2.md) and [`README-sprint3.md`](README-sprint3.md) for later sprints' manual tests.
+>
+> **The automated suite is separate from all three READMEs.** The `.sh` scripts in this directory (build, autopilot, config, sync, security, …) need no setup and no GitHub repo — they read `src/`, `docs/`, and the built `skills/`. Every one of them runs in CI, and [`.github/workflows/dist-check.yml`](../.github/workflows/dist-check.yml) is the authoritative list: one named step per script, in the order CI runs them. Run one locally from the repo root with `bash tests/<name>.sh`; run them all with `git ls-files 'tests/*.sh' | xargs -n1 bash`. `tests/test-build-script.sh` (T9) fails if any script in this directory is missing from that workflow, so the list cannot silently fall behind.
 
 Updated for the **lean issues architecture**: issues contain only human intent (type, description, acceptance criteria). No codebase scanning during issue creation or normalization.
 

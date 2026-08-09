@@ -113,7 +113,7 @@ Each skill should be tested against a real (or test) GitHub repository:
 3. Verify the terminal output matches expected patterns from `DESIGN.md`
 4. Check that `gh` CLI calls use `--json` with explicit field selection
 
-See `tests/` for integration test scripts and setup instructions.
+The automated suite is `tests/*.sh` and needs no test repo at all — those scripts assert on `src/`, `docs/`, and the built `skills/`. `.github/workflows/dist-check.yml` is the authoritative list of what runs and in what order; run one locally with `bash tests/<name>.sh`, or all of them with `git ls-files 'tests/*.sh' | xargs -n1 bash`. A new test is not done until it has a named step in that workflow — `tests/test-build-script.sh` (T9) fails otherwise.
 
 ## Commit Conventions
 

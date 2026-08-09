@@ -211,5 +211,6 @@ Examples:
 - Static sequential output — each step prints a new line, no terminal animation
 
 ### Testing
-- Integration tests in `tests/` directory
-- Shell scripts that verify skill behavior against real or mock GitHub repos
+- The automated suite is `tests/*.sh` — shell scripts that assert on `src/`, `docs/`, and the built `skills/`. They need no GitHub repo, no token, and no setup. Run one with `bash tests/<name>.sh`; run them all with `git ls-files 'tests/*.sh' | xargs -n1 bash`
+- `.github/workflows/dist-check.yml` is the authoritative list of the suite: one named step per script, in the order CI runs them. `tests/test-build-script.sh` (T9) fails if a tracked `tests/*.sh` is missing from it, so the list cannot silently fall behind
+- `tests/README.md`, `README-sprint2.md`, and `README-sprint3.md` are something else: manual, human-driven test cases that do need a scratch GitHub repo

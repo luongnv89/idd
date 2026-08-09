@@ -9,6 +9,12 @@
 #     (src/deprecated-skills/) without a distribute flag are excluded.
 #   - Every shared script (src/shared/scripts/) ships into at least one skill,
 #     byte-identically, executable, and runnable (issue #251).
+#   - Every tests/*.sh is invoked by a GitHub Actions workflow, or is listed in
+#     this file's EXCLUDED array with a written reason (T9, issue #275).
+#
+# T9 lives here, in an already-wired test, on purpose: a standalone
+# tests/test-ci-wiring.sh would itself need wiring, which is the failure mode it
+# exists to catch.
 #
 # Usage: bash tests/test-build-script.sh
 # Returns: exit 0 on pass, exit 1 on failure.
@@ -218,6 +224,463 @@ if [ "$script_count" -gt 0 ]; then
   pass "T8: src/shared/scripts/ holds $script_count script(s) to verify"
 else
   fail "T8: src/shared/scripts/ is empty — T8 would pass vacuously"
+fi
+
+# ───────────────────────────────────────────────────────────
+# T9: every tests/*.sh is invoked by a workflow (issue #275)
+#
+# A test nobody runs is not a test. Issue #275 found 20 of 42 test files that no
+# workflow ever invoked — including the pre-commit security lint. Nothing
+# asserted the wiring, so the gap grew silently, one unwired file at a time.
+#
+# To add a test: create tests/test-<name>.sh and add a named step for it in
+# .github/workflows/dist-check.yml — before the build if it reads only src/ and
+# docs/, after the build if it reads dist/ or skills/.
+#
+# To deliberately keep a test out of CI: add it to EXCLUDED below WITH a reason.
+# The reason is the whole point of the array — an exclusion nobody can justify
+# is indistinguishable from the rot this check exists to prevent.
+#
+# "Wired" is decided against a reduced view of the workflows, not their raw
+# text. Two reductions, each closing a way a test can look wired while running
+# nothing:
+#
+#   1. Comments are stripped — quote-aware, so an unquoted `#` at line start or
+#      after whitespace opens a comment and a quoted one does not. A raw-text
+#      grep counted a comment as wiring — including this check's own explanatory
+#      note in dist-check.yml, which named tests/test-build-script.sh and so
+#      kept T9 green even with the test-build-script step deleted: the guard
+#      could not detect its own unwiring. Generalised, any test could be retired
+#      behind a leftover `# TODO: wire bash tests/test-X.sh`.
+#   2. Steps carrying `if: false` or `continue-on-error: true` (any case) are
+#      dropped whole. A step that cannot run, or whose failure cannot fail the
+#      job, is not a gate: marking a flaky test `continue-on-error: true` stops
+#      it gating PRs, and nothing should still call it wired. A step ends at the
+#      next `- ` line indented no deeper than its own, so bullets inside a
+#      `run:` body or a `with:` sequence cannot split it away from its marker.
+#
+# Deliberately NOT covered, because closing them needs real YAML semantics:
+# job-level `if:`/`continue-on-error:`, an expression that is falsy without
+# being the literal `false`, and a reference inside a non-invoking command
+# (`run: echo "see tests/test-X.sh"`). PyYAML is not in the stdlib and
+# actions/setup-python does not install it, so a yaml.safe_load check would
+# silently no-op on the very runner it has to bite on.
+# ───────────────────────────────────────────────────────────
+WORKFLOW_DIR="$REPO_ROOT/.github/workflows"
+
+# Format: "<repo-relative path>|<reason>". Empty today — every test runs in CI.
+EXCLUDED=(
+  # "tests/test-example.sh|needs a live GitHub token; run locally with GH_TOKEN set"
+)
+
+excluded_reason() {
+  local want="$1" entry
+  if [ "${#EXCLUDED[@]}" -eq 0 ]; then
+    return 1
+  fi
+  for entry in "${EXCLUDED[@]}"; do
+    # An entry with no `|` carries no reason, and must not excuse anything.
+    # `${entry#*|}` returns the subject unchanged when there is no separator,
+    # so a bare "tests/test-x.sh" would hand back the *path* as its own reason —
+    # non-empty, so the caller's `[ -n "$reason" ]` accepts it and the file is
+    # reported excluded with a self-referential justification. Skipping the
+    # entry here is what makes the written reason mandatory rather than
+    # advisory; the format itself is reported by the EXCLUDED audit below.
+    case "$entry" in
+      *"|"*) ;;
+      *) continue ;;
+    esac
+    if [ "${entry%%|*}" = "$want" ]; then
+      printf '%s' "${entry#*|}"
+      return 0
+    fi
+  done
+  return 1
+}
+
+# Repo-relative paths, not basenames: `git ls-files 'tests/*.sh'` matches
+# tests/unit/test-x.sh too (git's `*` crosses `/`), and a basename comparison
+# would report a correctly-wired nested test as unwired.
+TEST_FILES=()
+while IFS= read -r tracked; do
+  TEST_FILES+=("$tracked")
+done < <(cd "$REPO_ROOT" && git ls-files 'tests/*.sh')
+
+# Inventory every workflow for diagnostics. Only pull-request-triggered workflows
+# count as wiring: a test moved to a push-only or workflow_dispatch-only file no
+# longer gates a PR, which is the gap this check exists to prevent.
+WORKFLOW_FILES=()
+if [ -d "$WORKFLOW_DIR" ]; then
+  while IFS= read -r wf; do
+    WORKFLOW_FILES+=("$wf")
+  done < <(find "$WORKFLOW_DIR" -maxdepth 1 -type f \( -name '*.yml' -o -name '*.yaml' \) | sort)
+fi
+
+# Drop every step block that cannot gate. A step begins at a `- ` line whose
+# indent is no deeper than the current step's; a `- ` line indented *further* is
+# step content — a bullet inside a `run:` heredoc, or a YAML sequence under
+# `with:` — and must not split the step.
+#
+# Splitting on a `- ` at *any* indent, as this did before, is not a conservative
+# approximation. flush() resets `disabled`, so the remainder of a mis-split step
+# becomes a NEW, UNDISABLED block: a step marked `continue-on-error: true` whose
+# `run:` body contained a bullet line survived the reduction intact, and T9
+# reported a disabled test as wired — precisely the failure this reduction
+# exists to catch. The invariant is not "mis-splitting only shrinks a block"; it
+# is the one enforced below, that a disabling marker stays attributed to every
+# line of the step it disables.
+strip_dead_steps() {
+  awk '
+    # Characters discarded before reading an `if:` value. Both YAML quote forms
+    # belong here: the bare, double-quoted and single-quoted spellings of false
+    # are the same dead step to GitHub, and stripping only the double quote left
+    # the single-quoted one counted as live. The single quote is built with
+    # sprintf rather than written, because this program is itself single-quoted.
+    BEGIN { sq = sprintf("%c", 39); if_strip_re = "[[:space:]\"" sq "]" }
+    function flush(   i) {
+      if (n > 0 && disabled == 0) for (i = 1; i <= n; i++) print buf[i]
+      n = 0; disabled = 0
+    }
+    /^[[:space:]]*-[[:space:]]/ {
+      match($0, /^[[:space:]]*/)
+      if (in_step == 0 || RLENGTH <= step_indent) {
+        flush()
+        in_step = 1
+        step_indent = RLENGTH
+      }
+    }
+    {
+      buf[++n] = $0
+      # tolower() first: a case-sensitive literal let `continue-on-error: TRUE`
+      # through. Lowercasing the key too can only over-strip (a key GitHub would
+      # not honour), and over-stripping loses wiring loudly; under-stripping
+      # silently restores the hole.
+      if (tolower($0) ~ /^[[:space:]]*continue-on-error:[[:space:]]*[^[:alnum:]]?true[^[:alnum:]]*$/) disabled = 1
+      if ($0 ~ /^[[:space:]]*if:/) {
+        v = $0
+        sub(/^[[:space:]]*if:[[:space:]]*/, "", v)
+        gsub(if_strip_re, "", v)
+        sub(/^\$\{\{/, "", v)
+        sub(/\}\}$/, "", v)
+        if (tolower(v) == "false") disabled = 1
+      }
+    }
+    END { flush() }
+  '
+}
+
+# Strip comments without touching quoted text. A `#` opens a comment only when
+# it is unquoted AND at line start or preceded by whitespace — the same rule in
+# YAML and in the shell of a `run:` body, which is why one pass covers both.
+#
+# The quoting half is not optional. `sed -E 's/(^|[[:space:]])#.*$//'` applied
+# YAML's *plain-scalar* rule to every line, including block scalars where `#` is
+# literal, and deleted the rest of valid input:
+#
+#   run: |
+#     echo "gate for issue #275" && bash tests/test-pre-commit-security.sh
+#
+# lost its invocation, so T9 failed a correctly-wired repo — and neither reason
+# in the failure hint ("a comment", "a disabled step") applied, leaving the
+# author no path to the cause. Note this still strips a *shell* comment inside a
+# `run:` body (`# TODO: wire bash tests/test-x.sh`), which is right: a commented
+# command invokes nothing either way.
+#
+# Two corrections to the naive character scan, each for an input that a
+# quote-aware pass gets wrong in the *opposite* direction to the sed rule:
+#
+#   1. Inside a double-quoted run, a backslash escapes the next character. Both
+#      YAML double-quoted scalars and the shell of a `run:` body work that way,
+#      so `\"` continues the run rather than ending it. Reading it as a closing
+#      quote leaves the scanner unquoted for the rest of the line, where the
+#      next ` #` truncates — deleting the invocation behind it. Single quotes
+#      have no backslash escape in either language, so this applies to double
+#      quotes only.
+#   2. A line that reaches its end still inside a quote usually never held a
+#      quoted run at all — the common cause is an apostrophe in a YAML plain
+#      scalar, as in `- name: Verify the build's drift gate  # ...`, which reads
+#      here as an opening quote and hides everything after it, comment
+#      included. Such a line is re-cut by the quoting-blind rule, which is what
+#      the sed rule applied to every line and got right on this one. The cost is
+#      a genuinely multi-line quoted scalar carrying a ` #`, which this
+#      over-strips; no workflow in this repo has one.
+strip_comments() {
+  awk '
+    BEGIN { sq = sprintf("%c", 39) }
+    # Index of the `#` that opens a comment when quoting is ignored, or 0.
+    function naive_cut(line,   i, n, c) {
+      n = length(line)
+      for (i = 1; i <= n; i++) {
+        c = substr(line, i, 1)
+        if (c == "#" && (i == 1 || substr(line, i - 1, 1) ~ /[[:space:]]/)) return i
+      }
+      return 0
+    }
+    {
+      line = $0
+      inq = ""
+      cut = 0
+      n = length(line)
+      for (i = 1; i <= n; i++) {
+        c = substr(line, i, 1)
+        if (inq != "") {
+          if (inq == "\"" && c == "\\") { i++; continue }
+          if (c == inq) inq = ""
+          continue
+        }
+        if (c == "\"" || c == sq) { inq = c; continue }
+        if (c == "#" && (i == 1 || substr(line, i - 1, 1) ~ /[[:space:]]/)) {
+          cut = i
+          break
+        }
+      }
+      if (inq != "") cut = naive_cut(line)
+      # cut-2, not cut-1: consume the separating space too, so the reduced text
+      # is byte-identical to the sed rule this replaced on every input the sed
+      # rule handled correctly. A `#` in column 1 yields the empty string.
+      out = (cut > 0) ? substr(line, 1, cut - 2) : line
+      print out
+    }
+  '
+}
+
+# Return success only when the workflow top-level `on` declaration includes
+# pull_request. Block children are matched at the first indentation level only,
+# so nested input keys or sequences under workflow_call do not qualify. Scalar,
+# flow-list, block-map, and simple block-sequence forms are supported without
+# PyYAML; unsupported or malformed list forms are rejected conservatively.
+workflow_gates_pull_requests() {
+  strip_comments < "$1" | awk '
+    function trim(value) {
+      sub(/^[[:space:]]+/, "", value)
+      sub(/[[:space:]]+$/, "", value)
+      return value
+    }
+    # Deliberately support only the simple event-name subset of YAML flow
+    # sequences. Requiring both brackets, non-empty comma-separated items, and
+    # plain event names makes malformed scalar/list input fail closed.
+    function scalar_or_flow_has_pr(value,   inner, count, i, item, has_pr, items) {
+      value = trim(value)
+      if (value == "pull_request") return 1
+      if (substr(value, 1, 1) != "[" || substr(value, length(value), 1) != "]") return 0
+      inner = substr(value, 2, length(value) - 2)
+      if (trim(inner) == "") return 0
+      count = split(inner, items, ",")
+      for (i = 1; i <= count; i++) {
+        item = trim(items[i])
+        if (item == "" || item !~ /^[A-Za-z0-9_-]+$/) return 0
+        if (item == "pull_request") has_pr = 1
+      }
+      return has_pr
+    }
+    /^[^[:space:]][^:]*:/ {
+      if ($0 ~ /^on[[:space:]]*:/) {
+        # Duplicate top-level keys are invalid YAML for this detector. In
+        # particular, do not let a first pull_request declaration leave `found`
+        # sticky when a later `on` declaration replaces it in some parsers.
+        if (seen_on) invalid = 1
+        seen_on = 1
+        event_indent = -1
+        block_style = ""
+        value = $0
+        sub(/^on[[:space:]]*:[[:space:]]*/, "", value)
+        value = trim(value)
+        if (scalar_or_flow_has_pr(value)) found = 1
+        # Only an empty declaration can own indented block children. Treating
+        # children of a scalar or flow value as events would accept bad YAML.
+        in_on = (value == "")
+      } else {
+        in_on = 0
+      }
+      next
+    }
+    in_on && /^[[:space:]]+[^[:space:]]/ {
+      match($0, /^[[:space:]]*/)
+      indent = RLENGTH
+      if (event_indent < 0) event_indent = indent
+      if (indent < event_indent) {
+        invalid = 1
+        next
+      }
+      # A simple event sequence contains scalar items, so deeper indentation
+      # cannot be valid continuation data. A map event may own nested config
+      # only when its direct value was empty; `{}` is already a complete value.
+      if (indent > event_indent) {
+        if (block_style == "sequence" || !event_allows_nested) invalid = 1
+        next
+      }
+      line = $0
+      sub(/^[[:space:]]*/, "", line)
+      if (line ~ /^-[[:space:]]+/) {
+        if (block_style == "map") invalid = 1
+        block_style = "sequence"
+        event_allows_nested = 0
+        item = line
+        sub(/^-[[:space:]]+/, "", item)
+        item = trim(item)
+        if (item !~ /^[A-Za-z0-9_-]+$/) {
+          invalid = 1
+        } else if (item == "pull_request") {
+          found = 1
+        }
+      } else if (line ~ /^[A-Za-z0-9_-]+[[:space:]]*:/) {
+        if (block_style == "sequence") invalid = 1
+        block_style = "map"
+        key = line
+        sub(/[[:space:]]*:.*$/, "", key)
+        value = line
+        sub(/^[^:]*:[[:space:]]*/, "", value)
+        value = trim(value)
+        # GitHub event-map entries are null or mappings. Support the common
+        # empty/nested form and an empty flow map; reject every other direct
+        # value rather than treating malformed YAML as a PR gate.
+        if (value != "" && value !~ /^\{[[:space:]]*\}$/) invalid = 1
+        if (seen_event[key]) invalid = 1
+        seen_event[key] = 1
+        event_allows_nested = (value == "")
+        if (key == "pull_request") found = 1
+      } else {
+        invalid = 1
+      }
+    }
+    END { exit(found && !invalid ? 0 : 1) }
+  '
+}
+
+# Pin the trigger detector so neither manual-only wiring, malformed YAML, nor a
+# nested input name/sequence can become a second, non-PR source of truth.
+trigger_fixtures="$TMP_OUT/workflow-trigger-fixtures"
+mkdir -p "$trigger_fixtures"
+printf '%s\n' 'name: manual' 'on: workflow_dispatch' > "$trigger_fixtures/manual.yml"
+printf '%s\n' 'name: scalar' 'on: pull_request' > "$trigger_fixtures/scalar.yml"
+printf '%s\n' 'name: flow' 'on: [push, pull_request]' > "$trigger_fixtures/flow.yml"
+printf '%s\n' 'name: block' 'on:' '  push:' '  pull_request:' > "$trigger_fixtures/block.yml"
+printf '%s\n' 'name: block sequence' 'on:' '  - push' '  - pull_request' > "$trigger_fixtures/block-sequence.yml"
+printf '%s\n' 'name: empty event' 'on:' '  pull_request:' > "$trigger_fixtures/empty-event.yml"
+printf '%s\n' 'name: empty event map' 'on:' '  pull_request: {}' > "$trigger_fixtures/empty-event-map.yml"
+printf '%s\n' 'name: nested event map' 'on:' '  pull_request:' \
+  '    branches: [main]' > "$trigger_fixtures/nested-event-map.yml"
+printf '%s\n' 'name: malformed scalar' 'on: pull_request, push' > "$trigger_fixtures/malformed-scalar.yml"
+printf '%s\n' 'name: duplicate trigger' 'on: pull_request' 'on: push' > "$trigger_fixtures/duplicate-on.yml"
+printf '%s\n' 'name: malformed event value' 'on:' \
+  '  pull_request: [' > "$trigger_fixtures/malformed-event-value.yml"
+printf '%s\n' 'name: duplicate event key' 'on:' '  pull_request:' \
+  '  pull_request: {}' > "$trigger_fixtures/duplicate-event-key.yml"
+printf '%s\n' 'name: malformed flow' 'on: [push, pull_request' > "$trigger_fixtures/malformed-flow.yml"
+printf '%s\n' 'name: malformed block sequence' 'on:' '  - push' \
+  '  - [pull_request' > "$trigger_fixtures/malformed-block-sequence.yml"
+printf '%s\n' 'name: nested' 'on:' '  workflow_call:' '    inputs:' \
+  '      pull_request:' '        type: boolean' > "$trigger_fixtures/nested.yml"
+printf '%s\n' 'name: nested sequence' 'on:' '  workflow_call:' '    inputs:' \
+  '      events:' '        default:' '          - push' \
+  '          - pull_request' > "$trigger_fixtures/nested-sequence.yml"
+if ! workflow_gates_pull_requests "$trigger_fixtures/manual.yml" && \
+   ! workflow_gates_pull_requests "$trigger_fixtures/malformed-scalar.yml" && \
+   ! workflow_gates_pull_requests "$trigger_fixtures/duplicate-on.yml" && \
+   ! workflow_gates_pull_requests "$trigger_fixtures/malformed-event-value.yml" && \
+   ! workflow_gates_pull_requests "$trigger_fixtures/duplicate-event-key.yml" && \
+   ! workflow_gates_pull_requests "$trigger_fixtures/malformed-flow.yml" && \
+   ! workflow_gates_pull_requests "$trigger_fixtures/malformed-block-sequence.yml" && \
+   ! workflow_gates_pull_requests "$trigger_fixtures/nested.yml" && \
+   ! workflow_gates_pull_requests "$trigger_fixtures/nested-sequence.yml" && \
+   workflow_gates_pull_requests "$trigger_fixtures/scalar.yml" && \
+   workflow_gates_pull_requests "$trigger_fixtures/flow.yml" && \
+   workflow_gates_pull_requests "$trigger_fixtures/block.yml" && \
+   workflow_gates_pull_requests "$trigger_fixtures/block-sequence.yml" && \
+   workflow_gates_pull_requests "$trigger_fixtures/empty-event.yml" && \
+   workflow_gates_pull_requests "$trigger_fixtures/empty-event-map.yml" && \
+   workflow_gates_pull_requests "$trigger_fixtures/nested-event-map.yml"; then
+  pass "T9: only valid direct pull_request triggers qualify as CI wiring"
+else
+  fail "T9: workflow trigger detector accepted invalid/non-PR wiring or rejected pull_request"
+fi
+
+WIRING_TEXT=""
+if [ "${#WORKFLOW_FILES[@]}" -gt 0 ]; then
+  for wf in "${WORKFLOW_FILES[@]}"; do
+    if workflow_gates_pull_requests "$wf"; then
+      WIRING_TEXT+="$(strip_comments < "$wf" | strip_dead_steps)"$'\n'
+    fi
+  done
+fi
+
+# Is $1 (a repo-relative path) referenced by a live step? Compared as a whole
+# path so tests/unit/x.sh and `tests/test zz space.sh` work, with boundaries so
+# tests/test-x.sh is not matched by xtests/test-x.sh or tests/test-x.shell.
+path_wired() {
+  local rel="$1" esc
+  esc="$(printf '%s' "$rel" | sed -E 's/[][\.^$*+?(){}|]/\\&/g')"
+  printf '%s\n' "$WIRING_TEXT" | grep -qE "(^|[^A-Za-z0-9._-])${esc}([^A-Za-z0-9._-]|$)"
+}
+
+# For the stat line and the all-or-nothing vacuity guard only; per-file
+# decisions go through path_wired.
+WIRED="$(printf '%s\n' "$WIRING_TEXT" | grep -oE 'tests/[A-Za-z0-9._/-]+\.sh' | LC_ALL=C sort -u || true)"
+
+if [ "${#TEST_FILES[@]}" -eq 0 ]; then
+  fail "T9: git tracks no tests/*.sh — the wiring check would be vacuous"
+elif [ -z "$WIRED" ]; then
+  fail "T9: no pull_request workflow under .github/workflows/ invokes any tests/*.sh"
+else
+  wired_count="$(printf '%s\n' "$WIRED" | wc -l | tr -d ' ')"
+  pass "T9.0: checking ${#TEST_FILES[@]} tracked test(s) against $wired_count workflow reference(s)"
+
+  unwired=0
+  for rel in "${TEST_FILES[@]}"; do
+    if path_wired "$rel"; then
+      continue
+    fi
+    if reason="$(excluded_reason "$rel")" && [ -n "$reason" ]; then
+      pass "T9: $rel excluded from CI — $reason"
+    else
+      unwired=$((unwired + 1))
+      fail "T9: $rel is not invoked by any live pull-request workflow step and has no EXCLUDED reason"
+      # Distinguish "never wired" from "wired, but the reduction removed it".
+      # Without this the two are indistinguishable in the output, and an author
+      # staring at a step they can see in the file has nothing to go on.
+      raw_hits="$(grep -n -F -- "$rel" "${WORKFLOW_FILES[@]}" 2>/dev/null || true)"
+      if [ -n "$raw_hits" ]; then
+        echo "        A workflow does name it — but not from a live step, so the"
+        echo "        reduction below dropped it. Raw occurrence(s):"
+        printf '%s\n' "$raw_hits" | sed 's/^/          /'
+      fi
+    fi
+  done
+
+  if [ "$unwired" -eq 0 ]; then
+    pass "T9: every tests/*.sh is invoked by a workflow or excluded with a reason"
+  else
+    echo "      Add a step to .github/workflows/dist-check.yml, or add the file"
+    echo "      to EXCLUDED in tests/test-build-script.sh with a written reason."
+    echo "      A mention in a comment, a non-pull-request workflow, or a step"
+    echo "      disabled by 'if: false' / 'continue-on-error: true' does not count."
+  fi
+
+  # Every EXCLUDED entry is audited on two counts. A stale exclusion outlives
+  # the test it names and would silently excuse a future file that reuses the
+  # name. An entry with no `|`, or with nothing after it, excuses a file
+  # without saying why — excluded_reason() already refuses to honour it, and
+  # this is where the author is told what is wrong with it.
+  if [ "${#EXCLUDED[@]}" -gt 0 ]; then
+    for entry in "${EXCLUDED[@]}"; do
+      name="${entry%%|*}"
+      if [ -f "$REPO_ROOT/$name" ]; then
+        pass "T9: EXCLUDED entry '$name' names an existing test"
+      else
+        fail "T9: EXCLUDED entry '$name' names no such file — stale exclusion"
+      fi
+      case "$entry" in
+        *"|"?*)
+          pass "T9: EXCLUDED entry '$name' carries a written reason"
+          ;;
+        *)
+          fail "T9: EXCLUDED entry '$name' has no written reason"
+          echo "      Write it as '<repo-relative path>|<reason>'. Without the"
+          echo "      reason the entry is ignored and the file counts as unwired."
+          ;;
+      esac
+    done
+  fi
 fi
 
 # ───────────────────────────────────────────────────────────
