@@ -35,7 +35,15 @@ Modes
   --lock    create `.gitissue/run.lock` with O_CREAT|O_EXCL; refuse a lock held
             by a live run, reclaim one that is stale. Mints a fresh run id, so
             a leftover state file from a finished run cannot lend its id to an
-            unrelated one; `--lock --resume` adopts the recorded id instead
+            unrelated one; `--lock --resume` adopts the recorded id instead.
+            `--pid` records who owns the run and defaults to 0, meaning "no
+            liveness signal" — such a lock is retired by `--ttl` or `--force`
+            only, never by the dead-pid rule. Pass a pid that outlives the
+            single command (`--pid "$PPID"` from an agent shell) to get the
+            prompt dead-pid reclaim after a crash. Defaulting to the invoking
+            process would be worse than useless: a one-shot shell exits the
+            moment the lock is written, so the next run would read its own
+            lock as dead and reclaim it
   --unlock  release the lock (only this run's, unless --force)
   --report  read `{run_id, markdown}` on stdin, write the final run report
 
@@ -160,13 +168,24 @@ def _new_run_id() -> str:
     return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ") + f"-{os.getpid()}"
 
 
+def _pid_known(pid: object) -> bool:
+    """True when `pid` is a usable liveness signal.
+
+    Absent, non-integer, or zero means the caller could not name a durable
+    owner process — liveness is *unknown*, which is not the same as dead.
+    """
+    return _is_int(pid) and pid > 0
+
+
 def _pid_alive(pid: object) -> bool:
     """True when `pid` names a running process on this host.
 
     A permission error means the process exists and belongs to someone else, so
-    it counts as alive — the fail-safe direction for a lock.
+    it counts as alive — the fail-safe direction for a lock. Callers must screen
+    the pid with `_pid_known` first: an unknown pid answers `False` here and
+    that answer means "nothing to check", never "the owner is gone".
     """
-    if not _is_int(pid) or pid <= 0:
+    if not _pid_known(pid):
         return False
     try:
         os.kill(pid, 0)
@@ -463,14 +482,22 @@ def lock_status(lock: dict[str, object], ttl: int, *, now: str | None = None) ->
     if started is not None and stamp is not None:
         age = max(0, int((stamp - started).total_seconds()))
     same_host = lock.get("host") == socket.gethostname()
-    alive = _pid_alive(lock.get("pid"))
+    # A lock whose owner pid is unknown — absent, unparsable, or the 0 recorded
+    # when the caller could not name a durable process — carries no liveness
+    # signal: `pid_alive` is null and only the TTL (or --force) retires it.
+    # Reading "unknown" as "dead" is what lets a run reclaim the lock it took
+    # moments ago from a shell that has since exited, and that is no mutual
+    # exclusion at all. When in doubt the lock is held.
+    known = _pid_known(lock.get("pid"))
+    alive = _pid_alive(lock.get("pid")) if known else None
+    dead_here = same_host and known and not alive
     if age is None:
         # A lock with no readable timestamp cannot be aged; only a dead pid on
         # this host can retire it, or --force.
-        reason = "dead-pid" if (same_host and not alive) else None
+        reason = "dead-pid" if dead_here else None
     elif age >= ttl:
         reason = "ttl"
-    elif same_host and not alive:
+    elif dead_here:
         reason = "dead-pid"
     else:
         reason = None
@@ -698,10 +725,11 @@ def _classify_lock(args, paths) -> tuple[dict, dict, tuple | None]:
 
 
 def _emit_held(holder: dict, status: dict) -> int:
+    pid = holder.get("pid")
+    owner = f"pid {pid}" if _pid_known(pid) else "pid unknown"
     print(
         "✗ gi-state: the run lock is held by run "
-        f"{holder.get('run_id')} (pid {holder.get('pid')} on "
-        f"{holder.get('host')})",
+        f"{holder.get('run_id')} ({owner} on {holder.get('host')})",
         file=sys.stderr,
     )
     _emit({"status": "held", "holder": holder, **status})
@@ -912,8 +940,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--pid",
         type=int,
-        default=os.getppid(),
-        help="pid recorded in the lock (default: the invoking process)",
+        default=0,
+        help=(
+            "pid of the process that owns the run, recorded in the lock; pass a "
+            "durable one (\"$PPID\" in an agent shell) so a crashed run's lock "
+            "retires on the dead-pid path (default: 0 — no liveness signal, the "
+            "lock is retired by --ttl or --force only)"
+        ),
     )
     parser.add_argument(
         "--force",

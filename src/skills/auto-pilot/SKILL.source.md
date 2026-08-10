@@ -133,9 +133,12 @@ Check these files relative to the skill's directory (the dirname of this SKILL.m
 
 **Acquire the run lock before the first mutation.** The auto-stash below writes
 to the repository, so the lock precedes it — run
-`python3 shared/scripts/gi-state.py --lock` from the repo root (add `--resume`
-to that call when `/auto-pilot --resume` was invoked, so the continued run keeps
-its recorded run id instead of minting a second one), exactly as the
+`python3 shared/scripts/gi-state.py --lock --pid "$PPID"` from the repo root
+(`$PPID` is the durable agent process, not this one-shot shell — a lock owned by
+a shell that has already exited reads as dead and reclaims itself; add
+`--resume` to that call when `/auto-pilot --resume` was invoked, so the
+continued run keeps its recorded run id instead of minting a second one),
+exactly as the
 *Configuration* step resolves this skill's own script path. Exit 0 acquired — a
 `reclaimed` status prints the script's own `⚠ gi-state: reclaimed a … lock`
 line and is evidence about the *lock*, never about the recorded run state

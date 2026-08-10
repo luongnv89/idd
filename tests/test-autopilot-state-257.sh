@@ -283,6 +283,42 @@ else
   fail "AC3: a dead-pid lock was not reclaimed (exit $st)"
 fi
 
+# Regression: the lock must NOT retire itself on the shell that took it. Every
+# documented invocation is a one-shot command whose shell exits the instant it
+# returns, so a --pid defaulting to the invoking process would leave a lock
+# whose owner is already gone — read as dead-pid, silently reclaimed, and AC3
+# defeated for every real run. `--pid` is therefore omitted here exactly as the
+# fallback prose allows, and the taking subshell is gone before the second call.
+D3B="$(new_dir d3b)"
+bash -c "python3 '$STATE' --lock --dir '$D3B' --run-id runOwnerless" >/dev/null
+run_status out st bash -c "python3 '$STATE' --lock --dir '$D3B' --run-id runNext"
+if [ "$st" = "3" ] && [ "$(printf '%s' "$out" | jkey status)" = "held" ] \
+   && [ "$(printf '%s' "$out" | jkey stale)" = "False" ]; then
+  pass "AC3: a lock taken with no --pid is held, not self-reclaimed, once its shell exits"
+else
+  fail "AC3: an ownerless lock was reclaimed by the next run (exit $st)"
+fi
+
+# The refusal is on stderr with the ✗ vocabulary, and reports the owner as
+# unknown rather than as the meaningless pid 0.
+held_err="$(bash -c "python3 '$STATE' --lock --dir '$D3B' --run-id runNext2" 2>&1 >/dev/null || true)"
+case "$held_err" in
+  "✗ gi-state: the run lock is held by run runOwnerless (pid unknown on "*)
+    pass "AC3: the ownerless refusal prints the ✗ held line naming the holder" ;;
+  *)
+    fail "AC3: the ownerless refusal printed '$held_err'" ;;
+esac
+
+# Unknown liveness is not immortality: the TTL still retires an ownerless lock,
+# so a crashed run that could not name an owner clears on its own.
+run_status out st python3 "$STATE" --lock --dir "$D3B" --run-id runTtl --ttl 0
+if [ "$st" = "0" ] && [ "$(printf '%s' "$out" | jkey status)" = "reclaimed" ] \
+   && [ "$(printf '%s' "$out" | jkey stale_reason)" = "ttl" ]; then
+  pass "AC3: an ownerless lock past --ttl is still retired (never immortal)"
+else
+  fail "AC3: an ownerless lock survived its TTL (exit $st)"
+fi
+
 # --force is the --force-unlock path past a live-looking holder.
 D4="$(new_dir d4)"
 python3 "$STATE" --lock --dir "$D4" --run-id runE --pid $$ >/dev/null
