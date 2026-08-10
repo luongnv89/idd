@@ -152,12 +152,27 @@ run was given. **It has two derivations, one per call site.** Mid-run it is
 disagree. At **Prerequisite 8** there is no run state to read it from — `--init`
 writes `started_at` in `references/phases.md` (*Step 1.0*), which runs after the
 prerequisites — so derive it from the clock: `now + autopilot.max_runtime_minutes
-× 60`, with the minutes taken from the one config load. That is the *same*
-instant, because a run that has not started has spent none of its budget. Either
+× 60`, with the minutes taken from the one config load. At the first probe that
+is the *same* instant, because a run that has not started has spent none of its
+budget — and the paragraph below is why the first probe is the only one. Either
 way `0` means unbounded. Never substitute a `{run_state.started_at}` that does
 not exist and never fabricate one: an unsatisfiable deadline degrades into an
 unbounded pause, which is exactly the promise SKILL.md's Prerequisite 8 makes —
 that the pause fits inside `autopilot.max_runtime_minutes` — broken silently.
+
+**At Prerequisite 8 that clock is read once.** Compute `{budget_deadline_epoch}`
+at the **first** probe of this section and reuse that one epoch verbatim — in
+every re-probe the `wait` row loops back to, and in every `--wait` chunk of every
+pause that follows, for the whole of the prerequisites. Re-deriving it from `now`
+on each pass would push the deadline forward by exactly as long as the pause that
+just ended, so each pause would fit the budget on its own while the sequence of
+them had no bound at all: the `wait` → pause → re-probe loop could idle
+indefinitely and never once see `action: stop`. The pinned epoch is the fixed
+anchor `run_state.started_at` gives the mid-run site, and it is what makes the
+`stop` branch reachable — once it is past, the next verdict is `stop` and the
+prerequisites end cleanly. Mid-run nothing needs pinning: `run_state.started_at`
+is already written down, so re-reading it yields the same instant every time.
+
 The one JSON line carries `action`, `remaining`, `reset`, `wait_s` and
 `resume_at`:
 
@@ -165,7 +180,7 @@ The one JSON line carries `action`, `remaining`, `reset`, `wait_s` and
 |----------|--------------------|
 | `proceed` | continue silently |
 | `warn` | print the `⚠` low-budget variant from `references/error-messages.md` and continue |
-| `wait` | print the `○ Rate budget exhausted — pausing until {resume_at}` block, run the chunked pause below, then **re-probe from the top of this section** |
+| `wait` | print the `○ Rate budget exhausted — pausing until {resume_at}` block, run the chunked pause below, then **re-probe from the top of this section** — carrying the `{budget_deadline_epoch}` this section already computed, never a freshly derived one |
 | `stop` | print the `✗ Insufficient API rate budget` block, persist the report, release the lock (mid-run only — at Prerequisite 8 none is held yet), and stop cleanly |
 
 **The pause is chunked, and that is not cosmetic.** The run lock's TTL is 3600s
@@ -203,12 +218,16 @@ Prerequisite 8:
   the refresh between chunks drops away.
 - the bracketing *Runtime budget check* does not apply either — it measures from
   a `started_at` that does not exist yet. The `--deadline` above **is** the
-  enforcement at this site, and it is exact rather than approximate, because the
-  run's elapsed time is zero.
+  enforcement at this site, and the once-computed epoch is what keeps it exact
+  rather than approximate: it is measured from the instant this section first
+  ran, so time already spent in an earlier preflight pause is time the deadline
+  has already counted.
 - the `stop` branch's *release the lock* is the mid-run half of that row. Here
   there is nothing to release, so the clean stop is the `✗ Insufficient API rate
   budget` block plus the persisted report and nothing else — and the report is
   written with no recorded `run_id`, which `gi-state.py --report` already handles.
+  That report is a zero-iteration summary reporting `Result: RATE LIMITED`
+  (`references/summary-format.md`), the same value the mid-run stop reports.
 - a pause that finishes resumes nothing: it re-probes, and on `proceed` or `warn`
   the prerequisites simply carry on to the run lock.
 
@@ -220,7 +239,8 @@ releases the lock on the stop path.
 `python3`, exit 2, or exit 4: print
 `⚠ gi-ratelimit unavailable — computing the pause by hand` and do the same
 arithmetic — `wait_s = reset - now`; if `max_runtime_minutes` is set and
-`now + wait_s` falls past the deadline, stop cleanly instead; otherwise sleep in
+`now + wait_s` falls past the deadline — at Prerequisite 8 the one epoch pinned
+at the first probe, never a fresh one — stop cleanly instead; otherwise sleep in
 slices no longer than 300s, refreshing the heartbeat between them (mid-run only,
 per the paragraph above), then re-read `gh api rate_limit` and decide again. Exit 3 is invalid input (an unparsable
 payload) — a stop for this probe, not a degrade. Exit 0 carrying

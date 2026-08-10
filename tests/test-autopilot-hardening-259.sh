@@ -903,10 +903,10 @@ expect_grep "AC3: Stop Conditions carries the runtime-budget row" \
 # The row count is the invariant: a table row deleted in a later edit is exactly
 # the failure this pin exists to catch.
 stop_rows="$(awk '/^## Stop Conditions/{f=1} f && /^\| /' "$AP_SKILL" | grep -cv '^| Condition' || true)"
-if [ "$stop_rows" = "13" ]; then
-  pass "AC3: Stop Conditions has 12 condition rows (plus its separator)"
+if [ "$stop_rows" = "14" ]; then
+  pass "AC3: Stop Conditions has 13 condition rows (plus its separator)"
 else
-  fail "AC3: Stop Conditions has $((stop_rows - 1)) condition rows, expected 12"
+  fail "AC3: Stop Conditions has $((stop_rows - 1)) condition rows, expected 13"
 fi
 expect_grep "AC3: phases.md owns a named runtime budget check" \
   '### Runtime budget check' "$AP_PHASES"
@@ -931,7 +931,7 @@ expect_grep "AC3: the error catalog carries the clean-stop block" \
 expect_grep "AC3: the summary carries a fourth Result value for a budget stop" \
   'BUDGET REACHED' "$AP_SUMMARY"
 expect_grep "AC3: the Result line enumerates the budget stop alongside the others" \
-  '{COMPLETED / PAUSED / LIMIT REACHED / BUDGET REACHED}' "$AP_SUMMARY"
+  '{COMPLETED / PAUSED / LIMIT REACHED / BUDGET REACHED / RATE LIMITED}' "$AP_SUMMARY"
 # "Stops cleanly with a persisted report" is two obligations, and the report is
 # the half that is easy to drop.
 expect_grep "AC3: the budget stop persists the final summary with --report" \
@@ -1186,6 +1186,111 @@ expect_grep "AC2: the fatal block scopes its lock release to the mid-run case" \
   '**At Prerequisite 8 there is no lock yet**' "$AP_ERRORS"
 expect_grep "AC2: the fatal block still requires the persisted report at both sites" \
   'the preflight stop is the report and this block alone' "$AP_ERRORS"
+
+# ───────────────────────────────────────────────────────────
+# T13 (AC2/AC3, QA cycle 3): consecutive preflight pauses share one
+#      deadline, and the stop they end at has a name
+# ───────────────────────────────────────────────────────────
+# Cycle 2 gave Prerequisite 8 its own deadline derivation but left it re-derived
+# from `now`. Since the `wait` row loops back to the top of the section, each
+# re-probe would then move the deadline forward by the length of the pause that
+# just ended: every pause fits the budget on its own and the sequence of them has
+# no bound at all. The mid-run site converges only because `run_state.started_at`
+# is a fixed anchor; the preflight site needs one pinned value to match it.
+expect_block "AC2: the preflight deadline is pinned at the first probe" \
+  "$PAUSE_BLOCK" '**At Prerequisite 8 that clock is read once.**'
+expect_block "AC2: the pinned epoch is reused verbatim, not recomputed" \
+  "$PAUSE_BLOCK" 'reuse that one epoch verbatim'
+expect_block "AC2: the reuse covers every re-probe the wait row loops back to" \
+  "$PAUSE_BLOCK" 'every re-probe the `wait` row loops back to'
+expect_block "AC2: the reuse covers every --wait chunk of every following pause" \
+  "$PAUSE_BLOCK" '`--wait` chunk of every'
+expect_block "AC2: re-deriving is named as the defect, with its mechanism" \
+  "$PAUSE_BLOCK" 'push the deadline forward by exactly as long as the pause that'
+expect_block "AC2: each pause fitting alone is distinguished from the sequence fitting" \
+  "$PAUSE_BLOCK" 'so each pause would fit the budget on its own while the sequence of'
+expect_block "AC2: the unbounded-aggregate consequence is spelled out" \
+  "$PAUSE_BLOCK" 'them had no bound at all'
+expect_block "AC2: the pin is equated with the mid-run started_at anchor" \
+  "$PAUSE_BLOCK" 'anchor `run_state.started_at` gives the mid-run site'
+expect_block "AC2: the pin is what keeps the stop branch reachable" \
+  "$PAUSE_BLOCK" '`stop` branch reachable'
+expect_block "AC2: mid-run is stated to need no pin, so the fix cannot be read as global" \
+  "$PAUSE_BLOCK" 'Mid-run nothing needs pinning'
+# The wait row is what a re-probing reader actually follows, so the carry-forward
+# has to be on the row, not only in the paragraph above it.
+expect_block "AC2: the wait row itself carries the already-computed deadline forward" \
+  "$PAUSE_BLOCK" 'carrying the `{budget_deadline_epoch}` this section already computed, never a freshly derived one'
+expect_block "AC2: the prose fallback pins the deadline the same way" \
+  "$PAUSE_BLOCK" 'at Prerequisite 8 the one epoch pinned'
+expect_block "AC2: the exactness claim rests on the pin, not on zero elapsed time" \
+  "$PAUSE_BLOCK" 'the once-computed epoch is what keeps it exact'
+# Structural, not lexical: the pin has to be stated where the derivation is —
+# above the action table — or the reader meets the `wait` loop first and
+# re-derives before ever reaching it.
+# `|| true` on every one: a missing anchor must fail this check, not abort the
+# suite through `set -e`/`pipefail` before it can report.
+deadline_ln="$(grep -nF -m1 'derive it from the clock: `now + autopilot.max_runtime_minutes' "$AP_PREFLIGHT" | cut -d: -f1 || true)"
+pin_ln="$(grep -nF -m1 '**At Prerequisite 8 that clock is read once.**' "$AP_PREFLIGHT" | cut -d: -f1 || true)"
+wait_row_ln="$(grep -nF -m1 '| `wait` | print the' "$AP_PREFLIGHT" | cut -d: -f1 || true)"
+if [ -n "$deadline_ln" ] && [ -n "$pin_ln" ] && [ -n "$wait_row_ln" ] \
+   && [ "$deadline_ln" -lt "$pin_ln" ] && [ "$pin_ln" -lt "$wait_row_ln" ]; then
+  pass "AC2: the pin sits between the derivation and the wait row that re-probes"
+else
+  fail "AC2: the pin is not between the deadline derivation and the wait row (${deadline_ln:-?}/${pin_ln:-?}/${wait_row_ln:-?})"
+fi
+expect_grep "AC2: Prerequisite 8 in SKILL.md says the clock is read once" \
+  'that clock is read **once**, at the first probe' "$AP_SKILL"
+expect_grep "AC2: SKILL.md names the shared-deadline property the pin buys" \
+  'every consecutive pause shares one deadline instead of pushing it forward' "$AP_SKILL"
+
+# The Result: vocabulary declares itself exhaustive, so a stop with no value is
+# a hole in it — and the preflight variant reports zero iterations, which none of
+# the original four describes.
+expect_grep "AC3: the Result vocabulary is now declared as five values" \
+  '`Result:` takes exactly one of five values' "$AP_SUMMARY"
+if grep -qF -- 'exactly one of four values' "$AP_SUMMARY"; then
+  fail "AC3: summary-format.md still claims a four-value Result vocabulary"
+else
+  pass "AC3: no stale four-value Result claim survives in the built summary"
+fi
+expect_grep "AC3: RATE LIMITED is the value for the insufficient-rate-budget stop" \
+  '**`RATE LIMITED`** — the `✗ Insufficient API rate' "$AP_SUMMARY"
+expect_grep "AC3: RATE LIMITED is stated to cover both call sites of that block" \
+  'covers **both** call sites of that block' "$AP_SUMMARY"
+expect_grep "AC3: the preflight variant is described as a zero-iteration report" \
+  '`0/{max}` summary with every count' "$AP_SUMMARY"
+expect_grep "AC3: the other four values are ruled out for the preflight variant" \
+  '`LIMIT REACHED` (no iteration ran) and `BUDGET REACHED`' "$AP_SUMMARY"
+expect_grep "AC3: BUDGET REACHED is explicitly not the value for a rate-limit stop" \
+  'the wall clock had time left; it was the API budget that did not' "$AP_SUMMARY"
+expect_grep "AC3: Next action for a rate-limit stop names the reset instant" \
+  're-run /auto-pilot after {resume_at}' "$AP_SUMMARY"
+expect_grep "AC3: the persisted-report paragraph covers the rate-limit stop too" \
+  'stopped by the rate-limit **`stop` verdict** ends early too and reports' "$AP_SUMMARY"
+expect_grep "AC3: Stop Conditions carries the rate-limit stop alongside the budget stop" \
+  '| API rate budget too low to wait out | `✗ Insufficient GitHub API rate budget for auto-pilot`' \
+  "$AP_SKILL"
+expect_grep "AC3: that stop row names the persisted report and its Result value" \
+  'the summary is persisted with `--report` and reports `Result: RATE LIMITED`' "$AP_SKILL"
+expect_grep "AC3: preflight's stop branch names the same Result value" \
+  'zero-iteration summary reporting `Result: RATE LIMITED`' "$AP_PREFLIGHT"
+expect_grep "AC3: the fatal error block names the same Result value" \
+  'it reports `Result: RATE LIMITED`' "$AP_ERRORS"
+
+# The fatal block serves two call sites; a claim true at only one inverts at the
+# other. This sentence was written for Prerequisite 8 and left unscoped.
+if grep -qF -- 'stop. Nothing is left half-resolved because nothing was started.' "$AP_ERRORS"; then
+  fail "AC3: the unscoped 'nothing was started' claim still ships in the fatal block"
+else
+  pass "AC3: the fatal block no longer claims nothing was started at both sites"
+fi
+expect_grep "AC3: the half-resolved claim is scoped to Prerequisite 8" \
+  'At Prerequisite 8 nothing is left half-resolved because nothing was started;' "$AP_ERRORS"
+expect_grep "AC3: the mid-run truth is stated beside it" \
+  'mid-run the stop lands between units of work' "$AP_ERRORS"
+expect_grep "AC3: the mid-run case says what happens to work already done" \
+  'what merged stays merged, and a PR left open carries the outcome' "$AP_ERRORS"
 
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 echo "  Results: $PASS passed, $FAIL failed"
