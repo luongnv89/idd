@@ -151,6 +151,9 @@ jobs:
       - name: test-issue-resolver-worktree
         run: bash tests/test-issue-resolver-worktree.sh
 
+      - name: test-analysis-reuse-254
+        run: bash tests/test-analysis-reuse-254.sh
+
       - name: test-model-suggestion-117
         run: bash tests/test-model-suggestion-117.sh
 
