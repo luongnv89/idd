@@ -313,6 +313,99 @@ else
 fi
 
 # ───────────────────────────────────────────────────────────
+# T2b (AC1/AC3): the documented run sequence is ONE run
+# ───────────────────────────────────────────────────────────
+# The three calls exactly as the skill documents them, with no --run-id
+# anywhere: preflight.md's `--lock`, phases.md Step 1.0's `--init`, and the
+# closing `--unlock` from SKILL.md's *Stop Conditions*. A `--init` that minted
+# its own id would leave the final `--unlock` refusing a lock it does not
+# recognise, and the lock file would outlive the run that took it — blocking
+# the next run for a full TTL.
+D9="$(new_dir d9)"
+run_status out st python3 "$STATE" --lock --dir "$D9"
+lock_id="$(printf '%s' "$out" | jkey lock.run_id)"
+[ "$st" = "0" ] || fail "AC3: the documented --lock call failed (exit $st)"
+
+SEQ_INIT='{"mode":"balanced","invocation":"/auto-pilot","queue":[42],"limit":10}'
+run_status out st bash -c "printf '%s' '$SEQ_INIT' | python3 '$STATE' --init --dir '$D9'"
+if [ "$st" = "0" ] && [ "$(printf '%s' "$out" | jkey run_id)" = "$lock_id" ]; then
+  pass "AC1: --init with no run_id adopts the run id of the lock this run holds"
+else
+  fail "AC1: --init minted a second run id — the documented sequence orphans the lock"
+fi
+
+run_status out st python3 "$STATE" --unlock --dir "$D9"
+if [ "$st" = "0" ] && [ ! -f "$D9/run.lock" ]; then
+  pass "AC3: lock → init → unlock exits 0 and removes .gitissue/run.lock"
+else
+  fail "AC3: the documented unlock exited $st and left the lock behind"
+fi
+
+# An explicit run_id in the payload still wins — adoption is a default, not an
+# override.
+D9B="$(new_dir d9b)"
+python3 "$STATE" --lock --dir "$D9B" --run-id lock-run --pid $$ >/dev/null
+run_status out st bash -c "printf '%s' '{\"run_id\":\"payload-run\"}' | python3 '$STATE' --init --dir '$D9B'"
+if [ "$(printf '%s' "$out" | jkey run_id)" = "payload-run" ]; then
+  pass "AC1: an explicit payload run_id still wins over the lock's"
+else
+  fail "AC1: --init overrode the run_id the payload supplied"
+fi
+
+# ───────────────────────────────────────────────────────────
+# T2c (AC3): concurrent reclaim has exactly one winner
+# ───────────────────────────────────────────────────────────
+# Six runs classify one dead-pid lock as stale at the same instant. Reclaiming
+# with a plain atomic write lets every one of them succeed — os.replace never
+# refuses an existing file — and the mutual exclusion the lock exists for is
+# gone. The winner writes a lock naming this live shell, so every loser that
+# re-reads must see a live holder and stop with exit 3.
+D11="$(new_dir d11)"
+DEAD_PID2="$(python3 -c '
+import subprocess, sys
+p = subprocess.Popen([sys.executable, "-c", "pass"])
+p.wait()
+print(p.pid)
+')"
+python3 "$STATE" --lock --dir "$D11" --run-id stale-run --pid "$DEAD_PID2" >/dev/null
+RACE="$TMP/race"
+mkdir -p "$RACE"
+for i in 1 2 3 4 5 6; do
+  (
+    racer_status=0
+    python3 "$STATE" --lock --dir "$D11" --run-id "racer$i" --pid $$ \
+      > "$RACE/$i.out" 2>/dev/null || racer_status=$?
+    echo "$racer_status" > "$RACE/$i.st"
+  ) &
+done
+wait
+winners=0
+zero_exits=0
+losers=0
+for i in 1 2 3 4 5 6; do
+  # `reclaimed` and `acquired` are the same win: a racer whose read lands in the
+  # instant between the winner's retire and its create sees no lock at all and
+  # takes the ordinary fresh-lock path. What must never happen is two of them.
+  if grep -qE '"status": "(reclaimed|acquired)"' "$RACE/$i.out"; then
+    winners=$((winners + 1))
+  fi
+  case "$(cat "$RACE/$i.st")" in
+    0) zero_exits=$((zero_exits + 1)) ;;
+    3) losers=$((losers + 1)) ;;
+  esac
+done
+if [ "$winners" = "1" ] && [ "$zero_exits" = "1" ] && [ "$losers" = "5" ]; then
+  pass "AC3: concurrent reclaim of one stale lock has exactly one winner"
+else
+  fail "AC3: $winners run(s) reclaimed the same stale lock ($zero_exits exit-0, $losers exit-3)"
+fi
+if [ -f "$D11/run.lock" ] && [ "$(find "$D11" -name 'run.lock.retired-*' | wc -l | tr -d ' ')" = "0" ]; then
+  pass "AC3: the contended reclaim leaves one lock and no retired leftovers"
+else
+  fail "AC3: the contended reclaim left the lock directory inconsistent"
+fi
+
+# ───────────────────────────────────────────────────────────
 # T3 (AC4): the persisted report, and --dry-run writes nothing
 # ───────────────────────────────────────────────────────────
 D6="$(new_dir d6)"
@@ -371,6 +464,27 @@ extra="$(cd "$D7" && ls | grep -cv '^run-state.json$' || true)"
 [ "$extra" = "0" ] && pass "AC4: a dry run leaves no artifact behind at all" \
                    || fail "AC4: a dry run left $extra unexpected file(s)"
 
+# --unlock is a mutating mode too: a dry run must not release a real lock.
+D12="$(new_dir d12)"
+python3 "$STATE" --lock --dir "$D12" --run-id r257 --pid $$ >/dev/null
+run_status out st python3 "$STATE" --unlock --dir "$D12" --run-id r257 --dry-run
+if [ "$st" = "0" ] && [ "$(printf '%s' "$out" | jkey status)" = "would_release" ] \
+   && [ -f "$D12/run.lock" ]; then
+  pass "AC4: --unlock --dry-run reports the release and leaves the lock in place"
+else
+  fail "AC4: --unlock --dry-run released the lock (exit $st)"
+fi
+
+# A dry run reports who holds the lock — but a live holder is still a stop, or a
+# dry run would be the documented way to pretend the lock is free.
+run_status out st python3 "$STATE" --lock --dir "$D12" --run-id other --pid $$ --dry-run
+if [ "$st" = "3" ] && [ "$(printf '%s' "$out" | jkey status)" = "held" ] \
+   && [ "$(printf '%s' "$out" | jkey holder.run_id)" = "r257" ]; then
+  pass "AC4: --lock --dry-run against a live holder still exits 3 and names it"
+else
+  fail "AC4: --lock --dry-run against a live holder must exit 3 (got $st)"
+fi
+
 # ───────────────────────────────────────────────────────────
 # T4: the exit-code vocabulary — 2 usage, 3 invalid input, 4 degrade
 # ───────────────────────────────────────────────────────────
@@ -388,6 +502,15 @@ run_status out st bash -c "printf '{\"current\":{\"issue\":\"not-an-int\"}}' | p
 run_status out st bash -c "printf '{\"markdown\":\"\"}' | python3 '$STATE' --report --dir '$D8'"
 [ "$st" = "3" ] && pass "T4: an empty report markdown exits 3" \
                 || fail "T4: an empty report markdown exits 3 (got $st)"
+# generated_at is interpolated into the `<!-- gitissue:run-report v1 … -->`
+# marker, so a value carrying `-->` would end the marker early: it is
+# pattern-checked exactly like run_id, not passed through.
+run_status out st bash -c "printf '%s' '{\"markdown\":\"x\",\"generated_at\":\"--> oops\"}' | python3 '$STATE' --report --dir '$D8'"
+if [ "$st" = "3" ] && [ ! -f "$D8/last-run-report.md" ]; then
+  pass "T4: a marker-breaking generated_at exits 3 and writes no report"
+else
+  fail "T4: an unvalidated generated_at reached the report marker (exit $st)"
+fi
 run_status out st bash -c "printf '{\"phase\":\"x\"}' | python3 '$STATE' --update --dir '$TMP/no-such-dir'"
 [ "$st" = "3" ] && pass "T4: --update with no run state exits 3 (run --init first)" \
                 || fail "T4: --update with no run state exits 3 (got $st)"
@@ -457,6 +580,22 @@ expect_grep "AC1: the state file is documented as a hint, never an authority" \
   "hint, never an authority" "$AP_PHASES"
 expect_grep "AC1: the checkpoint procedure calls gi-state --update" \
   "references/scripts/gi-state.py --update" "$AP_PHASES"
+# Step 1.0 must ship an executable --init, not only prose about one: --update
+# exits 3 until the state file exists, so a loop that never runs --init is a
+# loop that can never be resumed.
+expect_grep "AC1: Step 1.0 ships an executable --init invocation" \
+  "references/scripts/gi-state.py --init" "$AP_PHASES"
+expect_grep "AC1: the --init payload is written to a file, never a command line" \
+  "state-init.json" "$AP_PHASES"
+expect_grep "AC1: the SKILL phase table makes Phase 0 discoverable" \
+  "^| 0 | Run state |" "$AP_SKILL"
+# A reclaimed lock is stale-lock evidence, never stale-state evidence: on every
+# genuine --resume the interrupted run is dead, so its lock is always reclaimed.
+if grep -q "A reclaimed lock (TTL elapsed, or the holder's pid is gone) prints this line too" "$AP_ERRORS"; then
+  fail "AC1: a reclaimed lock still drives the resume gate to stale — --resume would init over the state it needs"
+else
+  pass "AC1: a reclaimed lock no longer drives the resume gate to stale"
+fi
 
 # Four phase-boundary checkpoints: post-resolve, post-review, post-fix-cycle,
 # post-merge. A count, not a presence check — deleting one silently loses the
@@ -512,16 +651,28 @@ expect_grep "AC3: preflight.md documents --force-unlock" \
   "force-unlock" "$AP_PREFLIGHT"
 
 # Every invocation keeps a documented fallback beside it — the house rule for a
-# script that can always be absent from the environment.
-for f in "$AP_SKILL" "$AP_PHASES" "$AP_PREFLIGHT" "$AP_SUMMARY"; do
-  if grep -q "gi-state.py" "$f"; then
-    if grep -q "gi-state unavailable" "$f"; then
-      pass "AC3: $(basename "$f") keeps a documented fallback beside its gi-state calls"
-    else
-      fail "AC3: $(basename "$f") calls gi-state.py with no documented fallback"
-    fi
+# script that can always be absent from the environment. The file set is
+# asserted explicitly rather than filtered by an `if grep`: a guard that skips
+# the file it cannot match asserts nothing the day that file stops naming the
+# script, which is exactly when it should fail.
+for f in "$AP_SKILL" "$AP_PHASES" "$AP_PREFLIGHT"; do
+  base="$(basename "$f")"
+  if ! grep -q "gi-state.py" "$f"; then
+    fail "AC3: $base no longer invokes gi-state.py — the fallback check below would assert nothing"
+  elif grep -q "gi-state unavailable" "$f"; then
+    pass "AC3: $base keeps a documented fallback beside its gi-state calls"
+  else
+    fail "AC3: $base calls gi-state.py with no documented fallback"
   fi
 done
+# summary-format.md is the other shape: it documents the --report payload while
+# SKILL.md carries the invocation, so it must carry the degrade line even though
+# it never names the script.
+if grep -q "gi-state unavailable" "$AP_SUMMARY"; then
+  pass "AC3: summary-format.md documents the gi-state degrade for the run report"
+else
+  fail "AC3: summary-format.md drops the gi-state degrade for the run report"
+fi
 expect_grep "AC3: the error catalog carries the concurrent-run block" \
   "Another /auto-pilot run is in progress" "$AP_ERRORS"
 expect_grep "AC1: the error catalog carries the resume line" \

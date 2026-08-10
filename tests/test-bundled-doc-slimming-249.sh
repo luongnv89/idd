@@ -78,13 +78,14 @@ FAIL=0
 # reinstating one whole document across the skills that excerpt it costs on the
 # order of 165KB (config-schema.md is 27.5KB x 6 non-init skills), so a
 # regression of that shape fails this assertion by more than 3x the headroom.
-# Raised to 512,100 in issue #257, which documents three new `.gitissue/`
+# Raised to 512,029 in issue #257, which documents three new `.gitissue/`
 # artifacts — `run-state.json`, `run.lock`, `last-run-report.md` — and the
 # carve-out saying they are machine-local and gitignored, contradicting the
 # blanket "the directory should be committed" line directly above them. Measured,
 # not estimated: config-schema.md is the only bundled doc that grew, by 447
-# authored bytes, and it ships to 7 skills = +2,841 (excerpts differ, so this is
-# the measured total, not 447 x 7). It is the only raise in the change: the run
+# authored bytes, and it ships to 7 skills = +3,129 measured across the bundle,
+# 508,612 -> 511,741 (excerpts differ, so this is the measured total, not
+# 447 x 7). It is the only raise in the change: the run
 # lock, the resume gate and the checkpoints are all documented in auto-pilot's
 # own references/, which this budget does not cover.
 #
@@ -97,9 +98,10 @@ FAIL=0
 # document 7 skills carry. Four neighbours were compressed to the same standard
 # on the way past: the `runs.jsonl` row (which restated the single-writer rule
 # its own subsection already owns), that subsection, the model-suggestion
-# blockquote, and the section intro. The headroom lands at ~359, against the 288
-# that preceded it — the ratchet is not widened.
-BUDGET=512100
+# blockquote, and the section intro. The budget holds the 288 bytes of headroom
+# that preceded it, byte for byte — 511,741 + 288 — so the ratchet is not
+# widened and the next addition still has to compress something first.
+BUDGET=512029
 
 pass() { echo "  ✓ $1"; PASS=$((PASS + 1)); }
 fail() { echo "  ✗ $1"; FAIL=$((FAIL + 1)); }
