@@ -54,9 +54,59 @@ Analyzed at: `{branch} @ {commit_sha_short}` ({YYYY-MM-DD})
 Use `pass`, `fail`, or `unverified` per criterion. Always cite evidence (a file path, a test name, or a one-line explanation). If the issue has no acceptance criteria, replace the table with `> **Note:** No acceptance criteria defined — manual review recommended.`
 
 **Bug issues — reproduction evidence.** When the issue `type` is `bug`, the Evidence column must cite the reproduction command from the Step 3 bug-verification checkpoint (`references/bug-verification.md`), not just a checkmark. Format the cell as `Verified red: <command> → fixed → <regression test path>` (or `… → manual repro, no seam` when no test seam exists). If the symptom could not be reproduced, mark that criterion `unverified` and note `not reproduced: <reason>`.
+
+<!-- gitissue:qa v1 head={head_sha} profile={profile} cycles={qa_cycles} review=clean tests={test_count}@{tests_sha} ui={ui_legs}:{ui_result}@{ui_sha} --> {omit this entire line unless QA exited clean, and omit the ` tests=…` field when no final suite ran — see *QA handoff marker* below}
 ```
 
 The PR title follows `{type}({scope}): {description} (#{issue_number})` — see `docs/naming-conventions.md`.
+
+### QA handoff marker
+
+The last line of the body is a machine-readable **QA handoff** — the resolver's
+statement that this PR already went through a clean QA loop, so
+`/issue-pr-review` can collapse its duplicate of that work into one confirmation
+pass instead of re-running the identical review on an unchanged diff. The
+consumer is `/issue-pr-review`'s *QA handoff gate*
+(`references/review-loop-mechanics.md` in that skill); this section is the
+**producer** contract.
+
+```
+<!-- gitissue:qa v1 head=<sha40> profile=<light|full> cycles=<n> review=clean tests=<count>@<sha40> ui=<none|code|code+browser>:<clean|noted>@<sha40> -->
+```
+
+| Field | Value | Derivation |
+|-------|-------|------------|
+| `head` | full 40-char lowercase hex SHA | `git rev-parse HEAD` taken **after the last commit and immediately before `git push`** — the exact commit the PR will point at |
+| `profile` | `light` or `full` | the pipeline profile *Step 0g* selected. On `light`, QA is capped at 1 cycle, so `review=clean` is a strictly shallower claim and the consumer treats it as such |
+| `cycles` | integer | QA cycles run in *Step 4* |
+| `review` | always `clean` | emitted **only** on the clean QA exit — there is no dirty spelling of this field |
+| `tests` | `<count>@<sha40>` | the final suite's passing count and the SHA it actually ran against. That suite runs **before** *Update documentation*, which may commit, so the two SHAs can differ — write the real one, never `head` by assumption. Both values are captured where the suite runs (`references/pipeline-steps.md`, *Step 4 — QA*, item 2), because they cannot be recovered afterwards. **Omit the whole field** when `resolve.auto_test` is `false`, or when no capture was recorded: no suite ran, or none was asserted, so there is nothing to assert |
+| `ui` | `<legs>:<result>@<sha40>` | legs are `none` (no UI review ran), `code` (code UI review only), or `code+browser` (both). Result is `clean` or `noted`. The legs are named separately because the code review is environment-independent while the browser leg is fail-soft and skips on a headless host — a flat verdict would let the consumer trust a leg that never ran. The SHA is the commit the UI review **actually ran against** — `git rev-parse HEAD` at the moment it ran, never `head` by assumption: *Step 4*'s UI review precedes that step's QA cycles, so every QA fix commit, and *Update documentation* after them, lands later. It is captured where that review is spawned (`references/pipeline-steps.md`, *Step 4 — UI/UX review*, *SHA capture*). Omit the `@<sha40>` on `ui=none`, where there is no review to bind, and whenever no capture was recorded; the consumer reads an unbound `ui=` as parsable but never skippable |
+
+**Two absolute rules.**
+
+1. **No secret-scan field, ever.** The marker never reports the outcome of
+   `gi-secscan` or any other security gate, in any spelling. Its only possible
+   consumer would be a safety gate, and a marker that can gate safety is a
+   safety gate an attacker can write: the PR body is editable by whoever opened
+   the PR (`gh pr edit --body`). Issue #274 — a PR disabling the secret-scanning
+   gate through its own `.gitissue.yml` — is the standing proof this repo can
+   lose a security gate to repo-controlled input. A field nobody is allowed to
+   act on is a field a future edit eventually acts on, so it is not written at
+   all.
+2. **No marker on a non-clean exit.** On the `⚠ {N} issues remain` stagnation /
+   max-cycles path, emit **no marker line**. Absent and dirty must take the
+   identical path in the consumer, and the only way to guarantee that is to
+   never emit a marker the consumer would have to interpret.
+
+**The marker goes last, and exactly once.** The *PR Body Template* above already
+carries it as the fence's final line — fill that line in, or delete it on a
+non-clean exit. Never append a second copy on top of it: a body carrying two
+markers is unparsable to the consumer and falls back to the full pipeline,
+silently costing exactly the work the marker exists to save.
+`/issue-pr-review`'s traceability fix prepends `Closes #N` to line 1 via
+read-modify-write, so a marker on the final line is untouched by that edit by
+construction.
 
 ### Lifting the Decision Record
 

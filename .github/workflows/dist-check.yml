@@ -154,6 +154,9 @@ jobs:
       - name: test-analysis-reuse-254
         run: bash tests/test-analysis-reuse-254.sh
 
+      - name: test-qa-handoff-255
+        run: bash tests/test-qa-handoff-255.sh
+
       - name: test-model-suggestion-117
         run: bash tests/test-model-suggestion-117.sh
 

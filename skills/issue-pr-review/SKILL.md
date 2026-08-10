@@ -62,7 +62,6 @@ references/scripts/gi-ci-wait.py
 references/scripts/gi-issue.py
 ```
 
-
 ```text
 ✗ Missing bundled dependency: {missing_file}
 
@@ -105,7 +104,7 @@ UI/UX **code** review needs no config flag — it is auto-detected per PR (*Step
 ```
   ◆ PR Review Pipeline
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  [1/7] PR Info      ✓ PR #87: fix(auth): resolve redirect (#42), depth: full
+  [1/7] PR Info      ✓ PR #87: fix(auth): resolve redirect (#42), depth: full, qa: absent
   [2/7] Pre-pass     ✓ lint clean, format clean, 17 tests passed
   [3/7] Review       ● analyzing changes...
   [4/7] Test         ✓ 17 tests passed, build ok
@@ -122,10 +121,10 @@ Step 2 (Pre-pass) runs once before the loop; Steps 3-6 repeat up to `review.max_
 
 Each step closes with a completion report — `√`/`×` per check plus a
 `Result: PASS | PARTIAL | FAIL` line — so "step done" is checkable rather than
-asserted. The per-step check names, the `Result` semantics, and the block
-format are in `references/report-templates.md` (*Step Completion Reports*) —
-**read it now**, before Step 1. A step is not complete until its `Result:`
-line is printed.
+asserted, and a step is not complete until its `Result:` line is printed. The
+per-step check names, the `Result` semantics, and the block format are in
+`references/report-templates.md` (*Step Completion Reports*) — **read it now**,
+before Step 1.
 
 ---
 
@@ -150,21 +149,16 @@ If no PR exists for the current branch:
 ### Fetch PR details
 
 ```bash
-gh pr view {N} --json number,title,body,baseRefName,headRefName,state,url,labels,reviews,statusCheckRollup,files
+gh pr view {N} --json number,title,body,baseRefName,headRefName,headRefOid,state,url,labels,reviews,statusCheckRollup,files
 ```
 
-Extract the PR number/title/URL, base and head branches, linked issue numbers (from `Closes #N` in the body), current CI status, and changed files.
+Extract the PR number/title/URL, base and head branches, the head commit SHA (`headRefOid` — the *QA handoff gate* below binds against it), linked issue numbers (from `Closes #N` in the body), current CI status, and changed files.
 
 **If PR is closed/merged:**
 ```
 ⚠ PR #{N} is already {state}
 ```
 Stop.
-
-```
-[1/7] PR Info      ✓ PR #{N}: {title}
-                     {files_count} files changed, base: {base_branch}
-```
 
 ### Checkout PR head branch
 
@@ -190,43 +184,62 @@ cannot hand to a script.
 ### Depth gate (select the review profile)
 
 Decide **how deep** this review goes, so a one-line copy fix is not put through
-the same full-weight review as a multi-subsystem PR. The mechanism and the shared
-`XS … XL` scale it reuses are defined once in `references/docs/agent-model-effort.md`
-(*Complexity → pipeline profile*); this skill has no researcher, so it derives its
-own **pre-work** complexity signal from data already fetched in Step 1.
+the same full-weight review as a multi-subsystem PR: `profile = light | full`.
+The signal, the shared `XS … XL` scale, and everything `light` changes are defined
+once — in `references/docs/agent-model-effort.md` (*Complexity → pipeline profile*) and
+`references/review-loop-mechanics.md` (*Depth gate*), which you **read now and
+apply**. Three inputs feed the signal: diff size / files-changed (Step 1's
+`files`); the linked issue's `## Metadata` `Effort` band (`python3
+references/scripts/gi-issue.py {N} --fields number,title,body,labels`, reading
+`.issue.body`; on exit 4 or no `python3`, `gh issue view {N} --json body` — that
+exact field list, because the cache is keyed by issue **and** field set, so a
+narrower ask here would make Step 3's read a guaranteed miss); and labels (any
+`security`/`CVE`/`vulnerability` label forces `full`). Resolve to `light` only when
+**every** available signal agrees on trivial; any `full` vote, or a missing or
+ambiguous signal, wins → `full`. When `review.adaptive_depth` is `false`, skip the
+gate and set `profile = full`.
 
-When `review.adaptive_depth` is `false`, skip the gate: set `profile = full` and
-review at full depth as before. Otherwise compute the signal from the PR itself
-and take the **fuller** of any inputs that disagree (a "trivial" issue whose diff
-ballooned still earns full review):
+### QA handoff gate (trust an already-QA'd PR)
 
-- **Diff size / files-changed** — from `statusCheckRollup`/`files` in Step 1
-  (`gh pr view {N} --json files`). Small (e.g. ≤ ~15 changed lines across 1 file)
-  leans `light`; larger leans `full`.
-- **Linked-issue `Effort` band** — when the PR links an issue (`Closes #N`), fetch
-  its `## Metadata` `Effort` (`python3 references/scripts/gi-issue.py {N} --fields
-  number,title,body,labels`, reading `.issue.body`; on exit 4 or no `python3`,
-  `gh issue view {N} --json body`). Request that exact field list, not just
-  `body`: the cache is keyed by issue **and** field set, so asking narrowly here
-  would make Step 3's read a guaranteed miss. `XS`/`S` asserted
-  leans `light`; `M`/`L`/`XL`, or low-confidence, leans `full`.
-- **Labels** — a `security`/`CVE`/`vulnerability` label (case-insensitive) forces
-  `full` regardless of size (security-sensitive changes always get full review).
+`/issue-resolver` ends a clean QA loop — review clean, tests green — by writing
+`<!-- gitissue:qa v1 head=… -->` as the PR body's last line. This gate decides
+whether to believe it, so an already-QA'd PR is reviewed **once, by a fresh
+agent**, and skips the local suite that already passed on this exact commit.
+It runs **after** the Depth gate and sets one state variable — `qa_handoff = trusted | stale | absent`:
 
-Resolve to `profile = light` only when **every** available signal agrees on
-trivial; if any signal says `full`, or a signal is missing/ambiguous, use `full`
-(ambiguous → fuller). Surface the decision on the `[1/7]` tracker line:
+| Value | When | Effect |
+|-------|------|--------|
+| `trusted` | the marker parses **and** its `head=` equals Step 1's `headRefOid` | the narrowed loop — *What `trusted` skips* |
+| `stale` | a marker is present but any condition fails | today's full pipeline, unchanged |
+| `absent` | the body carries no marker | today's full pipeline, unchanged |
+
+`stale` and `absent` are distinguished for the operator only; both take the identical path, the one that already exists.
+**Fail-safe: any doubt is `stale`** — an unparsable or duplicated marker included; an unknown extra field is *not* doubt (mechanics, *Parsing the marker*).
+**A marker is never authentication:** a PR body is attacker-controlled (`gh pr edit --body`) and `head=` binds without
+authenticating it, so this verdict may gate **only duplicated work**, never a safety gate. The reasoning, the parse,
+*What `trusted` skips*, and the binding *Never gated* list live in `references/review-loop-mechanics.md`
+(*QA handoff gate*) — **read it now**.
+
+When `review.adaptive_depth` is `false`, skip this gate: set `qa_handoff = absent`.
+That key already pins the review to full depth and this is the same class of
+saving, so one key disables both. **No new config key is introduced.**
+**Precedence, stated once:** `qa_handoff` is computed *after* `profile`, and its
+power is bounded **relative to the ungated pipeline** — it may only **narrow**
+what a `stale`/`absent` PR already gets, and never make this review do more than
+that. The bound is per verdict, not monotonic across the run: this skill
+recomputes `qa_handoff` after every push it makes (*Review Loop*), and a flip to
+`stale` that restores the full cap is a return to the ungated pipeline, not a
+widening. The one asymmetric case is a marker `profile=light` against a pr-review
+`profile=full`, where the fuller wins — the review collapse **and** the cycle cap
+are **refused**, while the duplicate-test skip still applies, because a test run
+is a test run at any depth.
+
+Surface both on the `[1/7]` tracker line; with `review.adaptive_depth: false` print `depth: full, qa: absent` so it stays uniform:
 
 ```
 [1/7] PR Info      ✓ PR #{N}: {title}
-                     {files_count} files changed, base: {base_branch}, depth: {profile}
+                     {files_count} files changed, base: {base_branch}, depth: {profile}, qa: {qa_handoff}
 ```
-
-`{profile}` is `light` or `full`. When `review.adaptive_depth` is `false`, still
-print `depth: full` so the line is uniform. The `light` profile scales the Review
-Loop only — see *Review Loop* (`light` caps cycles at 1 and skips optional passes;
-the acceptance-criteria and traceability hard-blocks always run at full strength).
-Full mechanics in `references/review-loop-mechanics.md` (*Depth gate*).
 
 ---
 
@@ -236,7 +249,7 @@ Before spawning any LLM reviewer, run deterministic tools to catch mechanical is
 
 **When `--review-only` is set:** this pre-pass is detection-only — see *Review-only mode* under Step 7.
 
-**Default (fix loop):** detect the project's lint/format tools, run each auto-fix command (don't block on warnings — only on errors that prevent the fix from running), then run the test suite to catch failures early. The per-tool detection table and example commands are in `references/prepass-tests-ci-mechanics.md` (*Step 2*).
+**Default (fix loop):** detect the project's lint/format tools, run each auto-fix command (don't block on warnings — only on errors that prevent the fix from running), then run the test suite to catch failures early. The per-tool detection table and example commands are in `references/prepass-tests-ci-mechanics.md` (*Step 2*). **Under `qa_handoff = trusted`, skip only the test run**, and only when the marker carries a `tests=` field whose SHA equals `head` — that suite already ran on this exact commit. The lint/format auto-fix still runs (it mutates the tree, so skipping it changes the PR, not just the review's cost), and the `gi-secscan` gate below is **never** gated on `qa_handoff`. When that auto-fix commits and pushes, the head moves off the marker: recompute the verdict then, before Step 3 — this skill re-evaluates after **any** push it makes, not only the fixer's (*Review Loop*) — so Step 4 runs the suite in full on the commit the auto-fix produced.
 
 ### Commit auto-fixes
 
@@ -294,7 +307,7 @@ If tests fail here, continue to the review loop — failures are picked up in St
 
 Read `references/agents/code-reviewer.md` for the reviewer prompt and `references/agents/fixer.md` for the fix-cycle prompt. Both spawn with the default general-purpose agent (do NOT set `subagent_type`; not a custom `code-reviewer`/`fixer` type). Pass the reviewer `branch_name`, `base_branch`, `pr_context` (PR title + body), and `diff_command` (`gh pr diff {N}`). Pass `review.confidence_threshold` (default 80) as the minimum confidence for code-reviewer findings; ui-reviewer keeps its 75 floor.
 
-To minimize tokens, the loop **reuses the same reviewer across cycles**: cycle 1 cold-starts; cycles 2+ re-message it via `SendMessage` to re-review the updated diff; after the fixer reports zero fixable issues, one **fresh** confirmation reviewer does an unbiased final check. The exact spawn calls, the `SendMessage` re-review prompt, and the token-trade rationale live in `references/review-loop-mechanics.md`.
+To minimize tokens, the loop **reuses the same reviewer across cycles**: cycle 1 cold-starts; cycles 2+ re-message it via `SendMessage` to re-review the updated diff; after the fixer reports zero fixable issues, one **fresh** confirmation reviewer does an unbiased final check. Under `qa_handoff = trusted`, the cycle-1 cold-start reviewer is **collapsed into** that fresh confirmation pass rather than skipped — the PR still receives exactly one independent, full-strength review, from an agent with no memory of the resolver's own — and the loop cap drops to `min(1, configured_cap)`. The collapse **saves no reviewer spawn**: the confirmation pass is itself fix-conditional, so an unmarked clean PR already gets exactly one cold-start pass and no confirmation. What `trusted` changes is *which* single pass runs — the unbiased one; the measured saving is the duplicated local test legs at Steps 2 and 4. Both are refused by Step 1's *Precedence* carve-out when the marker says `profile=light` and this review resolved `profile=full`. The exact spawn calls, the `SendMessage` re-review prompt, and the token-trade rationale live in `references/review-loop-mechanics.md`.
 
 ### UI/UX Review (Step 3 — auto-detected)
 
@@ -303,7 +316,7 @@ UI review is **auto-detected per PR** — no config flag enables it. The skill s
 - **Code UI review** is environment-independent (reads the diff/changed files). It runs whenever UI work is detected, on any machine **including a no-GUI/server host** — never gated on a GUI, running app, or browser.
 - **Browser UI review** is an optional, additive bonus: it captures screenshots from a running app, so it runs only with a reachable app *and* user opt-in. When it can't run (no app, capture unsafe, or auto mode without opt-in), it **skips with a warning and the code UI review still runs** — fail-soft to code-only, never block.
 
-The shared mechanics — detection commands, the code-review spawn, the report-only display-environment label (`ui_env`), the browser-review gate + three-part capability check, and the headless capture call — live in `references/docs/ui-review.md`. This skill's own deltas — the PR diff command, the variables it passes, the interactive proposal prompt, and cycle-reuse `SendMessage` — are in `references/ui-review-mechanics.md`. **Read both and apply them** when `ui: detected`; together they preserve the contract above and route `action: "fix"` UI findings into Step 6 under `category: ui_ux`.
+The shared mechanics — detection commands, the code-review spawn, the report-only display-environment label (`ui_env`), the browser-review gate + three-part capability check, and the headless capture call — live in `references/docs/ui-review.md`. This skill's own deltas — the PR diff command, the variables it passes, the interactive proposal prompt, and cycle-reuse `SendMessage` — are in `references/ui-review-mechanics.md`. **Read both and apply them** when `ui: detected`; together they preserve the contract above and route `action: "fix"` UI findings into Step 6 under `category: ui_ux`. Under `qa_handoff = trusted` the **code** UI review is skipped only when the marker's `ui=` leg says it already ran (`ui=code…` or `ui=code+browser…`) **and** carries an `@<sha40>` equal to `head` — never on `ui=none`, never on an unsuffixed `ui=` (well-formed, but not commit-bound), and never for the browser leg, which is opt-in and fail-soft on both sides.
 
 Also fetch the linked issue for acceptance-criteria verification: `python3 references/scripts/gi-issue.py {linked_issue} --fields number,title,body,labels`, reading `.issue`. Step 1's depth gate requested this same field list, so the cache answers without a second network call — the field sets must stay identical for that to hold. Exit 3 is a stop; no `python3`, exit 2 (an unresolved script path), or exit 4 degrades to `gh issue view {linked_issue} --json number,title,body,labels`.
 
@@ -340,7 +353,7 @@ These two hard-blocks are the issue #36 contract: a PR can pass tests and still 
 
 When `review.run_tests` is false, skip this step and report `○ tests skipped (review.run_tests: false)`; the soft-pass conjunction treats the test leg as satisfied.
 
-When true, detect and run the project's build system, then run all test types (unit, integration, e2e where present), with a `review.test_timeout`-second timeout (default: 300). The build-system detection table and the test-type breakdown are in `references/prepass-tests-ci-mechanics.md` (*Step 4*).
+When true, detect and run the project's build system, then run all test types (unit, integration, e2e where present), with a `review.test_timeout`-second timeout (default: 300). The build-system detection table and the test-type breakdown are in `references/prepass-tests-ci-mechanics.md` (*Step 4*). **Under `qa_handoff = trusted`, skip this step** and report `○ tests skipped (qa handoff @ {commit_sha_short})` — `{commit_sha_short}` is the first 7 characters of Step 1's `headRefOid` — but only when the marker carries a `tests=` field whose SHA equals `head`; with no `tests=` field, or a SHA that differs, run the step in full. The verdict is `trusted` only against the **live** head — it is recomputed after any push this skill makes (*Review Loop*) — so the suite it stands in for did run on this exact commit; the soft-pass conjunction therefore treats the test leg as satisfied, the same clause the two sibling skips state. A skipped step evaluated neither of its checks, so its completion report is `× Suite passed` / `× Build clean` with `Result: PARTIAL`, and the closing summary carries the gap — never a silent `√`/`✓ pass` (rule and rendering: *Step Completion Reports* in `references/report-templates.md`). Step 5's CI is a separate leg and is never skipped: it runs on the remote against the merge result, and nothing in a PR body is evidence about it.
 
 ```
 [4/7] Test         ✓ build ok, {N} tests passed
@@ -388,7 +401,7 @@ Pending CI is **not clean** — it never satisfies soft-pass and auto mode must 
 
 Collect issues from Steps 3-5, but **only fix those with `action: "fix"`** — `action: "note"` issues (medium code_quality/test_coverage suggestions) are reported in the summary but never trigger a fix cycle. This is the key token optimization. Fixable sources are the same five dimensions from Step 3's *Dimensional review output* (each `fail`/UI `action:"fix"` becomes one fixable issue) plus Step 4 test failures and Step 5 CI failures.
 
-Acceptance-criteria fixes typically need code changes. The traceability `Closes #{N}` fix is a **read-modify-write** PR-body edit (driver rule 2 in `references/docs/platform-github.md`): (1) `gh pr view {N} --json body` to fetch the current body; (2) prepend `Closes #{N}` as the **first line** when absent (SPEC §3.3 / `references/docs/naming-conventions.md`), preserving the rest of the body unchanged — never replace the body from scratch; (3) `gh pr edit {N} --body "{merged_body}"`; (4) re-read with `gh pr view {N} --json body` and confirm `## Decision Record` and the Acceptance Criteria Verification table are still present. Apply code fixes, then commit and push as usual.
+Acceptance-criteria fixes typically need code changes. The traceability `Closes #{N}` fix is a **read-modify-write** PR-body edit (driver rule 2 in `references/docs/platform-github.md`): (1) `gh pr view {N} --json body` to fetch the current body; (2) prepend `Closes #{N}` as the **first line** when absent (SPEC §3.3 / `references/docs/naming-conventions.md`), preserving the rest of the body unchanged — never replace the body from scratch; (3) `gh pr edit {N} --body "{merged_body}"`; (4) re-read with `gh pr view {N} --json body` and confirm `## Decision Record`, the Acceptance Criteria Verification table, and any trailing `<!-- gitissue:qa v1 … -->` marker are still present — prepending to line 1 leaves a trailing marker untouched by construction, and this re-read is what proves it. Apply code fixes, then commit and push as usual.
 
 ### If no fixable issues
 
@@ -421,16 +434,7 @@ Cycle {N}:
 After Step 6, go back to Step 3 — but reuse the same reviewer agent via `SendMessage` (not a fresh spawn). Only spawn fresh for the confirmation pass.
 
 **Loop controls:**
-- **Max cycles:** `review.max_cycles` (default: 3). **`light` profile (Step 1
-  Depth gate) caps this at 1** — one review pass, one fix cycle if `action: "fix"`
-  issues are found, then the confirmation pass and exit. The reviewer still runs
-  on the `light` path (depth reduced, review never skipped); only the number of
-  review-fix iterations is capped. `full` uses `review.max_cycles` as before.
-- **`light` profile — optional passes:** the `light` depth skips the optional
-  browser UI review (the code UI review still auto-detects and runs when UI work
-  is present) and does not spin extra confirmation cycles. The two #36
-  hard-blocks — `acceptance_criteria: fail` and missing `Closes #N` — **still run
-  at full strength** on every profile; the fast path never relaxes them.
+- **Max cycles:** `review.max_cycles` (default: 3). Step 1's `light` profile and `qa_handoff = trusted` each cap it at `min(1, configured_cap)` — the `trusted` cap subject to the depth carve-out in Step 1's *Precedence*. The `light` profile also skips the optional browser UI review; `trusted` never does — it reaches only the **code** leg (Step 3), because the browser leg is opt-in and fail-soft on both sides. Neither skips the reviewer, and neither relaxes the two #36 hard-blocks (`acceptance_criteria: fail`, missing `Closes #N`), which run at full strength on every path. **Re-evaluate `qa_handoff` after any push this skill makes** — Step 2's auto-fix commit as much as every fixer push — re-read `headRefOid` and recompute the verdict before the next step that reads it, because the push moved the head the marker binds to; nothing else re-reads it, and the loop re-enters at Step 3, never Step 1. Full mechanics in `references/review-loop-mechanics.md` (*Depth gate*, *QA handoff gate*, *Re-evaluation after a push*).
 - **Agent reuse:** Cycles 2+ reuse the existing reviewer and fixer agents. Fresh spawn only for the confirmation pass after fixer reports zero issues.
 - **Soft pass (when `review.soft_pass: true`, default):** Stop when ALL hold: zero `action: "fix"` issues remain AND (tests pass or `review.run_tests: false`) AND (CI passes, no CI configured, or `review.check_ci: false`) AND traceability is not `fail`. Medium `note` issues and `partial` dimensions are report-only — they do not block.
 - **Strict pass (when `review.soft_pass: false`):** Apply the same tests/CI gates, then require zero `action: "fix"` findings, zero remaining `action: "note"` findings, and `pass` for every enabled dimension. A `partial` dimension or any note is a strict blocker: exit the fix loop, report it under Remaining, and do not report clean or merge. Notes never become fixer inputs — Step 6 still fixes only `action: "fix"` — so strict mode surfaces these for manual remediation rather than looping without a fixable action.
