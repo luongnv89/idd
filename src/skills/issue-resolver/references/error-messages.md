@@ -214,7 +214,7 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 ✗ GitHub API rate limit reached
 
   To fix:  wait a few minutes, then retry
-  Check:   gh api rate_limit --jq '.rate.remaining'
+  Check:   gh api rate_limit --jq '{remaining: .rate.remaining, reset: .rate.reset}'
 ```
 **Trigger:** HTTP 403 with rate limit headers during `gh pr create`.
 

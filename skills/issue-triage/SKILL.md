@@ -127,7 +127,7 @@ Before any operation, verify the environment. On failure, output the exact error
 5. **Check the rate budget** (driver rule 4, `references/docs/platform-github.md`): update mode runs a batch loop that fetches every open issue and fans out one relationship-scanner subagent per batch, each making its own `gh`/API calls. Before that loop, confirm enough budget remains:
 
    ```bash
-   gh api rate_limit --jq '.rate.remaining'
+   gh api rate_limit --jq '{remaining: .rate.remaining, reset: .rate.reset}'
    ```
 
    **Threshold:** if `remaining` is below **100**, stop and print the `✗ Insufficient API rate budget` error from `references/error-messages.md` — the batch loop would exhaust the budget mid-scan and leave a partial triage. Between 100 and 200, warn with the same message's `⚠` variant but continue. At or above 200, proceed silently. (View mode makes no API calls and skips this check entirely.)
