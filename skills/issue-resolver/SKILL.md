@@ -271,7 +271,7 @@ profile*).
 | Step | `light` behavior |
 |------|------------------|
 | 1 — Research | Lighter pass: the already-resolved safety check and a focused scan of the obviously-affected file(s) still run; skip the broad dependency trace and external solution research. |
-| 2 — Plan | Skip the 3-option synthesis entirely — do **not** spawn the synthesizer. Derive a **direct minimal plan** inline and record it as the selected option, so the Decision Record still has a real `Selected option`; the design-confirm checkpoint does not apply. |
+| 2 — Plan | Skip the 3-option synthesis entirely — do **not** spawn the synthesizer. Derive a **direct minimal plan** inline and record it as the selected option, so the Decision Record still has a real `Selected option`; the design-confirm checkpoint does not apply — **unless *0h* set `analysis_reuse = fresh`**, in which case *Step 2 — Plan → `reuse`* governs instead: options are **lifted** from the analysis, not derived, and the design-confirm checkpoint **does** apply. |
 | 3 — Propose relevant skills | Skip the sub-step — set `selected_skills = []` and go straight to the implementer, mirroring auto-mode behavior. |
 | 4 — QA | Cap the review-fix loop at **1** cycle (a single review pass; fix once if blocking issues are found, then deliver) instead of `resolve.qa_max_cycles`. One reviewer spawn still runs — the fast path reduces depth, it does not skip review. UI review remains auto-detected as usual. |
 | 5 — Deliver | **Unchanged** — always emits the Decision Record and Acceptance Criteria Verification table. The profile never removes durable memory. |
@@ -318,7 +318,7 @@ Selection behavior (interactive auto, interactive comment-and-wait, auto-pilot) 
 
 **`light` profile:** skip the 3-option synthesis — see the profile table in
 *Step 0g*; full procedure in `references/pipeline-steps.md` (*Step 2 — Plan →
-`light` profile*). **`analysis_reuse = fresh`** (*0h*) also skips the synthesizer spawn, lifting `options[]`, `recommended_option`, `overall_complexity` and `overall_risk` from the analysis and deriving each `rejection_reason` from `decision_record.options_rejected[]` (*Step 2 — Plan → `reuse`*).
+`light` profile*). **`analysis_reuse = fresh`** (*0h*) skips the same spawn but **wins Step 2 when both apply** — not an addition to the `light` skip, a replacement for it: lift `options[]`, `recommended_option`, `overall_complexity` and `overall_risk` from the analysis instead of deriving a minimal plan, deriving each `rejection_reason` from `decision_record.options_rejected[]` (*Step 2 — Plan → `reuse`*).
 
 After plan selection:
 ```

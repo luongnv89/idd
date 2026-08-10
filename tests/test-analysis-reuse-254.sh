@@ -376,6 +376,28 @@ check_block_has "$PLAN_BLOCK" '.light. profile too|precedence over the .light. s
 check_has "$BUILT_STEPS" '.reuse. wins Step 2' \
   "T11.6: the built pipeline-steps.md ships the precedence rule"
 
+# SKILL.md is the file an agent reads FIRST, and its Step 0g profile table
+# self-declares as "the single home" for what `light` collapses. If that table's
+# Step 2 row still says the design-confirm checkpoint never applies, a reader who
+# stops there gets the opposite of the rule pipeline-steps.md states. Assert the
+# carve-out in the row itself, on the source AND on the installed copy.
+for pair in "src:$SRC_SKILL" "built:$BUILT_SKILL"; do
+  tag="${pair%%:*}"
+  skill_file="${pair#*:}"
+  plan_row="$(grep -E '^\| 2 — Plan \|' "$skill_file" 2>/dev/null || true)"
+
+  check_block_has "$plan_row" 'analysis_reuse = fresh' \
+    "T11.7 ($tag): the Step 0g light table's Step 2 row carries the fresh carve-out"
+  check_block_has "$plan_row" 'Step 2 — Plan → .reuse.' \
+    "T11.8 ($tag): that row names the reuse sub-section that governs instead"
+  check_block_has "$plan_row" '[Ll]ifted' \
+    "T11.9 ($tag): that row says the options are lifted, not derived"
+  check_block_has "$plan_row" 'design-confirm checkpoint \*\*does\*\* apply' \
+    "T11.10 ($tag): that row states the design-confirm checkpoint does apply under fresh"
+  check_has "$skill_file" '.?wins Step 2' \
+    "T11.11 ($tag): the SKILL's Step 2 pointer states precedence, not addition"
+done
+
 # ───────────────────────────────────────────────────────────
 # T12 (security): the analysis artifact is a NEW untrusted input
 # channel — it is derived from issue text and its options become
@@ -394,6 +416,77 @@ check_has "$BUILT_STEPS" 'untrusted local data' \
   "T12.5: the built pipeline-steps.md ships the untrusted-artifact rule"
 check_has "$BUILT_RESEARCHER" 'untrusted local data' \
   "T12.6: the bundled researcher prompt ships the untrusted-artifact rule"
+
+# ───────────────────────────────────────────────────────────
+# T13 (AC1): producer ↔ consumer key contract. The gate can only
+# answer `fresh` if /issue-analysis writes the exact keys it reads.
+# Artifacts written before this contract carried `git_state.sha`,
+# no `issue.updatedAt`, and a midnight-rounded invented timestamp —
+# so conditions 2 and 5 failed on every real file and AC1's saving
+# never materialised. The producer is where that is fixed: bind
+# every captured value to its exact key, and capture the clock.
+# ───────────────────────────────────────────────────────────
+SRC_PERSIST="$REPO_ROOT/src/skills/issue-analysis/references/output-and-persist.md"
+BUILT_PERSIST="$REPO_ROOT/skills/issue-analysis/references/output-and-persist.md"
+SRC_ANALYSIS_SKILL="$REPO_ROOT/src/skills/issue-analysis/SKILL.source.md"
+BUILT_ANALYSIS_SKILL="$REPO_ROOT/skills/issue-analysis/SKILL.md"
+
+for pair in "src:$SRC_PERSIST" "built:$BUILT_PERSIST"; do
+  tag="${pair%%:*}"
+  persist_file="${pair#*:}"
+  if [ ! -f "$persist_file" ]; then
+    fail "T13 ($tag): missing ${persist_file#$REPO_ROOT/}"
+    continue
+  fi
+  # Only the Persist step — the schema example below it is illustrative.
+  persist_block="$(awk '/^## Persist/,/^### JSON Schema/' "$persist_file")"
+
+  check_block_has "$persist_block" 'git rev-parse HEAD.*git_state\.commit_sha' \
+    "T13.1 ($tag): the capture binds \`git rev-parse HEAD\` to git_state.commit_sha"
+  check_block_has "$persist_block" 'git rev-parse --short=7 HEAD.*git_state\.commit_sha_short' \
+    "T13.2 ($tag): the short SHA is bound to its own display-only key"
+  check_block_has "$persist_block" 'never write it as .sha.' \
+    "T13.3 ($tag): the drifted key name git_state.sha is explicitly forbidden"
+  check_block_has "$persist_block" 'date -u \+%Y-%m-%dT%H:%M:%SZ' \
+    "T13.4 ($tag): the Persist step carries a deterministic clock command"
+  check_block_has "$persist_block" 'git_state\.captured_at AND the top-level' \
+    "T13.5 ($tag): that one clock feeds captured_at and the top-level timestamp"
+  check_block_has "$persist_block" 'never invented' \
+    "T13.6 ($tag): both timestamps are captured by command, never invented"
+  check_block_has "$persist_block" 'issue\.updatedAt.*(\*\*required\*\*|verbatim)' \
+    "T13.7 ($tag): issue.updatedAt is required and copied verbatim from the fetch"
+  check_block_has "$persist_block" 'Step 0h — Analysis reuse gate' \
+    "T13.8 ($tag): the Persist step names the resolver gate as the consumer"
+done
+
+# The two sides must name the SAME key — read it out of each file rather than
+# trusting a literal repeated in this test.
+GATE_KEY="$(grep -oE 'get\("git_state",\{\}\)\.get\("[a-z_]+"' "$SRC_STEPS" \
+  | head -1 | grep -oE '[a-z_]+"$' | tr -d '"' || true)"
+PRODUCER_KEY="$(grep -oE 'git rev-parse HEAD[^|]*git_state\.[a-z_]+' "$SRC_PERSIST" \
+  | head -1 | grep -oE 'git_state\.[a-z_]+' | sed 's/^git_state\.//' || true)"
+if [ -n "$GATE_KEY" ] && [ "$GATE_KEY" = "$PRODUCER_KEY" ]; then
+  pass "T13.9: the gate reads git_state.$GATE_KEY and the producer writes git_state.$PRODUCER_KEY"
+else
+  fail "T13.9: producer/consumer key drift — the gate reads 'git_state.${GATE_KEY:-<none>}' but the producer binds 'git_state.${PRODUCER_KEY:-<none>}'"
+fi
+
+check_has "$SRC_PERSIST" '\| .timestamp. \| ISO 8601 string \|.*never invented' \
+  "T13.10: the schema field table pins timestamp to the captured clock"
+check_has "$SRC_PERSIST" '\| .issue\.updatedAt. \|.*\*\*required\*\*' \
+  "T13.11: the schema field table marks issue.updatedAt required"
+check_has "$SRC_ANALYSIS_SKILL" 'git_state\.commit_sha. \(never .sha.\)' \
+  "T13.12: the analysis SKILL source names the exact key, first read wins"
+check_has "$SRC_ANALYSIS_SKILL" 'Step 0h — Analysis reuse gate' \
+  "T13.13: the analysis SKILL source names the downstream consumer of the pin"
+if [ -f "$BUILT_ANALYSIS_SKILL" ]; then
+  check_has "$BUILT_ANALYSIS_SKILL" 'git_state\.commit_sha. \(never .sha.\)' \
+    "T13.14: the built analysis SKILL.md ships the exact-key rule"
+  check_has "$BUILT_ANALYSIS_SKILL" 'Step 0h — Analysis reuse gate' \
+    "T13.15: the built analysis SKILL.md ships the consumer reference"
+else
+  fail "T13.14: missing skills/issue-analysis/SKILL.md — run ./scripts/build.sh"
+fi
 
 # ───────────────────────────────────────────────────────────
 # Summary
