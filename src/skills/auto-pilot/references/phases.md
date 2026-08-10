@@ -322,9 +322,11 @@ Parse the subagent's response. Extract: `result`, `review_cycles`, `issues_found
 
 **Retain `ci_status` verbatim** — the string exactly as returned (`passed@<sha40>`,
 `failed@<sha40>`, `no_ci`, or a bare value), never re-derived and never summarised
-to a boolean. It is the **only** input to *Step 5.1a — CI verdict gate* two phases
-later, and it is the one returned field nothing in this step prints, so it is the
-one an executing agent is likeliest to drop. Dropping it is not unsafe — the gate
+to a boolean. It is the only input to *Step 5.1a — CI verdict gate* that **this
+step** supplies — the gate's other inputs, `headRefOid` and `statusCheckRollup`,
+it reads live in Phase 5, and it decides on its own conditions; never restate
+them here. It is also the one returned field nothing in this step prints, so it is
+the one an executing agent is likeliest to drop. Dropping it is not unsafe — the gate
 reads a missing field as `absent` and runs today's full wait — but the run then
 re-polls CI the reviewer already waited on, and the gate does nothing on every
 iteration while appearing to be in force.
