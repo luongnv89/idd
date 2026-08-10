@@ -9,7 +9,8 @@ Skills inline these commands at the step where they run, for execution speed. Th
 1. **Data retrieval always uses `--json` with explicit field selection.** Never parse `gh` text output — it is unstable across versions and locales. The field lists below are supersets; a skill selects only the fields it needs.
 2. **Mutations are verified by re-reading.** After an edit/create, confirm with the corresponding read operation rather than trusting the exit code alone.
 3. **Auth failures produce rich errors.** When `gh` is missing or unauthenticated: state what failed, then `To fix:  gh auth login`, then the docs link.
-4. **Check the rate budget before batch loops** (triage, auto-pilot): `gh api rate_limit --jq '.rate.remaining'`.
+4. **Check the rate budget before batch loops** (triage, auto-pilot): `gh api rate_limit --jq '{remaining: .rate.remaining, reset: .rate.reset}'`. Both fields, one call: `remaining` decides whether to start, and `reset` — when the budget returns — is what lets an unattended loop pause and resume instead of stopping. Nobody is there to act on "try again later"; a timestamp needs no one.
+5. **Retry transient failures on bounded exponential backoff — 2s, 4s, 8s, 16s, then stop.** The single home for the retry contract; other documents point here rather than restate it. Four attempts, no fifth, 30s of added latency at worst (`gi-ratelimit.py --backoff --attempt N` implements it deterministically where a skill bundles it; apply the schedule by hand where it does not). **Retry** 5xx, a connection reset or timeout, and a *secondary* rate-limit 403 carrying `Retry-After` — honour that header when it asks for longer. **Never retry** 401 or 404, since attempts cannot change an auth or existence answer, nor *primary* rate-limit exhaustion, which takes rule 4's pause-until-`reset` path instead. Past the cap the caller falls back to whatever it already does when a call cannot complete: the contract adds attempts *before* that fallback, never replaces it, and never turns a degrade into a stop.
 
 ## Operation catalog
 
@@ -18,7 +19,7 @@ Skills inline these commands at the step where they run, for execution speed. Th
 | Operation | Canonical command |
 |-----------|-------------------|
 | Verify authentication | `gh auth status` |
-| Remaining API budget | `gh api rate_limit --jq '.rate.remaining'` |
+| Remaining API budget | `gh api rate_limit --jq '{remaining: .rate.remaining, reset: .rate.reset}'` — both fields, one call (driver rule 4) |
 | Repo merge strategy | `gh repo view --json mergeCommitAllowed,squashMergeAllowed,rebaseMergeAllowed` |
 | Caller's permission | `gh repo view --json viewerPermission` |
 

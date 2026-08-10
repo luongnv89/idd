@@ -13,9 +13,16 @@ which describes `.gitissue.yml` and the rest of the `.gitissue/` state directory
 `runs.jsonl` is the first home for the `monitoring` value. It is an **append-only,
 schema-light, newline-delimited JSON** file: each line is one self-contained JSON
 object describing a single run. It is grep-friendly, diffable, and deletable like
-the rest of `.gitissue/` — nothing reads it back except `/idd-doctor`'s run-log
-summary and `scripts/idd-lint.py stats` (the no-agent evidence report), so
+the rest of `.gitissue/` — it is read back only by `/idd-doctor`'s run-log
+summary, `scripts/idd-lint.py stats` (the no-agent evidence report), and
+`gi-runlog.py --failure-streak` (`/auto-pilot`'s consecutive-failure count), so
 truncation or deletion only resets the telemetry window.
+
+That last reader is **best-effort by design**. The durable record of a
+quarantine is the label `/auto-pilot` puts on the issue; the streak counted here
+is only *progress toward* one. A truncated log therefore loses progress toward a
+quarantine, never an existing one, and an unreadable log reports a streak of `0`
+— nothing is ever quarantined on evidence nobody read.
 
 Each line carries at minimum a **timestamp, issue number, mode, outcome**, and the
 **PR number when one was created**. The full field set:
@@ -32,7 +39,7 @@ Each line carries at minimum a **timestamp, issue number, mode, outcome**, and t
 | `profile` | string | no | The adaptive-effort pipeline profile the run selected: `light` (trivial fast path) or `full`. Omitted when `resolve.adaptive_effort` is `false` or the signal was unavailable. Lets `/idd-doctor` and audits see how often the fast path fired. See [agent-model-effort.md](https://github.com/luongnv89/idd/blob/main/docs/agent-model-effort.md) (Complexity → pipeline profile). |
 | `qa_cycles` | integer | no | Number of QA review-fix cycles run (resolver) |
 | `duration_s` | integer | no | Wall-clock duration of the run in seconds, when measurable |
-| `skipped_reason` | string | no | Why the issue was skipped (auto-pilot skips, and any `skipped`/`already_resolved` outcome), e.g. `already_resolved`, `blocked_label`, `blocked_by_dependency`, `in_skip_list`, `assigned_to_other` |
+| `skipped_reason` | string | no | Why the issue was skipped (auto-pilot skips, and any `skipped`/`already_resolved` outcome), e.g. `already_resolved`, `blocked_label`, `blocked_by_dependency`, `in_skip_list`, `assigned_to_other`, `quarantined` |
 
 Example lines:
 
@@ -66,6 +73,17 @@ error; `3` means the record was invalid and nothing was written; `4` means the r
 was valid but the append itself failed. Only `3` signals a caller bug — `4` stays
 best-effort and non-fatal per the rules above, and a caller that cannot run the script
 at all falls back to the `mkdir -p` + append described here.
+
+The same helper serves the one read. `--failure-streak N [--threshold F] [--log PATH]`
+takes no stdin, writes nothing, and prints
+`{"mode":"failure_streak","issue":N,"streak":N,"threshold":F,"quarantine":bool}` — the
+consecutive most-recent `failed` records for that issue, stopping at its first record
+with any other outcome (`--threshold 0` disables quarantine). Exit `0` read the log;
+exit `4` means it was missing or unreadable and **the line is printed anyway** with
+`streak: 0`, so a caller that ignores the exit code still cannot quarantine on missing
+evidence. Malformed lines are skipped, not fatal — the tolerance the
+no-schema-migration rule asks of every reader. Without the script, count by hand:
+bottom-up, skipping other issues, stopping at this one's first non-`failed` record.
 
 **Single writer under `/auto-pilot`:** when `/auto-pilot` resolves an issue it
 runs `/issue-resolver` as a subagent, so without coordination *both* skills would

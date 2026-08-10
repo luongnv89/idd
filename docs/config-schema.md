@@ -357,6 +357,19 @@ autopilot:
   # one regardless. Type: integer. Default: 0 (never).
   retriage_every: 0
 
+  # Quarantine an issue after this many consecutive failed runs: apply
+  # quarantine_label, which the effective skip_labels set then skips until a
+  # human removes it. The label is the durable state; the count derives from
+  # .gitissue/runs.jsonl and fails open. Type: integer. Default: 3. 0 disables.
+  quarantine_after: 3
+  quarantine_label: "auto-pilot-quarantined"
+  # Wall-clock budget for one run, from the run state's started_at: at the
+  # budget the loop starts nothing new, writes its report, releases the lock,
+  # and stops cleanly. It also bounds a rate-limit pause — a reset past the
+  # budget stops instead of sleeping through it. Type: integer minutes.
+  # Default: 0 (unbounded).
+  max_runtime_minutes: 0
+
 # Triage settings
 triage:
   # Flag issues with no activity beyond this threshold (days)
@@ -675,6 +688,9 @@ Config is validated on load at the start of every skill invocation. Errors inclu
 | `autopilot.respect_dependencies` | `true` | Honor `Depends on #N` / `Blocked by #N` markers — never merge a PR whose dependencies are unmerged; the PR is left open (`blocked_by_dependency`) and the loop continues |
 | `autopilot.triage_cache_max_age_minutes` | `60` | Max age of a reusable `triage.json` (also requires no commit since); `0` disables reuse |
 | `autopilot.retriage_every` | `0` | Force a full re-triage every Nth iteration after a merge (`0` = never) |
+| `autopilot.quarantine_after` | `3` | Consecutive failed runs before an issue is quarantined — labelled, then skipped until a human removes the label; the count derives from `runs.jsonl` and fails open (`0` disables) |
+| `autopilot.quarantine_label` | `"auto-pilot-quarantined"` | Label applied at the quarantine threshold; honored through the effective `skip_labels` set |
+| `autopilot.max_runtime_minutes` | `0` | Wall-clock budget for one run in minutes, from the run state's `started_at` — at the budget the loop stops cleanly with its report written (`0` = unbounded) |
 | `triage.stale_threshold_days` | `14` | Stale issue threshold |
 | `triage.auto_priority` | `true` | Auto-suggest priorities |
 | `triage.include_closed` | `false` | Exclude closed from triage |

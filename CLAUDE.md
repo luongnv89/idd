@@ -27,7 +27,8 @@ src/
 │       ├── gi-secscan.py          # Pre-commit secret/artifact scan → JSON verdict
 │       ├── gi-ci-wait.py          # Poll a PR's CI checks to one JSON verdict
 │       ├── gi-issue.py            # TTL-cached `gh issue view` by field set
-│       └── gi-branch.py           # Derive a convention-conformant branch name
+│       ├── gi-branch.py           # Derive a convention-conformant branch name
+│       └── gi-ratelimit.py        # Rate-limit verdict, chunked pause, backoff, runtime budget
 │
 ├── skills/
 │   ├── auto-pilot/         # /auto-pilot — triage, resolve, review, merge loop
