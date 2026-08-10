@@ -55,7 +55,7 @@ Use `pass`, `fail`, or `unverified` per criterion. Always cite evidence (a file 
 
 **Bug issues — reproduction evidence.** When the issue `type` is `bug`, the Evidence column must cite the reproduction command from the Step 3 bug-verification checkpoint (`references/bug-verification.md`), not just a checkmark. Format the cell as `Verified red: <command> → fixed → <regression test path>` (or `… → manual repro, no seam` when no test seam exists). If the symptom could not be reproduced, mark that criterion `unverified` and note `not reproduced: <reason>`.
 
-<!-- gitissue:qa v1 head={head_sha} profile={profile} cycles={qa_cycles} review=clean tests={test_count}@{tests_sha} ui={ui_legs}:{ui_result} --> {omit this entire line unless QA exited clean, and omit the ` tests=…` field when no final suite ran — see *QA handoff marker* below}
+<!-- gitissue:qa v1 head={head_sha} profile={profile} cycles={qa_cycles} review=clean tests={test_count}@{tests_sha} ui={ui_legs}:{ui_result}@{ui_sha} --> {omit this entire line unless QA exited clean, and omit the ` tests=…` field when no final suite ran — see *QA handoff marker* below}
 ```
 
 The PR title follows `{type}({scope}): {description} (#{issue_number})` — see `references/docs/naming-conventions.md`.
@@ -71,7 +71,7 @@ consumer is `/issue-pr-review`'s *QA handoff gate*
 **producer** contract.
 
 ```
-<!-- gitissue:qa v1 head=<sha40> profile=<light|full> cycles=<n> review=clean tests=<count>@<sha40> ui=<none|code|code+browser>:<clean|noted> -->
+<!-- gitissue:qa v1 head=<sha40> profile=<light|full> cycles=<n> review=clean tests=<count>@<sha40> ui=<none|code|code+browser>:<clean|noted>@<sha40> -->
 ```
 
 | Field | Value | Derivation |
@@ -81,7 +81,7 @@ consumer is `/issue-pr-review`'s *QA handoff gate*
 | `cycles` | integer | QA cycles run in *Step 4* |
 | `review` | always `clean` | emitted **only** on the clean QA exit — there is no dirty spelling of this field |
 | `tests` | `<count>@<sha40>` | the final suite's passing count and the SHA it actually ran against. That suite runs **before** *Update documentation*, which may commit, so the two SHAs can differ — write the real one, never `head` by assumption. **Omit the whole field** when `resolve.auto_test` is `false`: no suite ran, so there is nothing to assert |
-| `ui` | `<legs>:<result>` | legs are `none` (no UI review ran), `code` (code UI review only), or `code+browser` (both). Result is `clean` or `noted`. The legs are named separately because the code review is environment-independent while the browser leg is fail-soft and skips on a headless host — a flat verdict would let the consumer trust a leg that never ran |
+| `ui` | `<legs>:<result>@<sha40>` | legs are `none` (no UI review ran), `code` (code UI review only), or `code+browser` (both). Result is `clean` or `noted`. The legs are named separately because the code review is environment-independent while the browser leg is fail-soft and skips on a headless host — a flat verdict would let the consumer trust a leg that never ran. The SHA is the commit the UI review **actually ran against** — `git rev-parse HEAD` at the moment it ran, never `head` by assumption: *Step 4*'s UI review precedes that step's QA cycles, so every QA fix commit, and *Update documentation* after them, lands later. Omit the `@<sha40>` on `ui=none`, where there is no review to bind; the consumer reads an unbound `ui=` as parsable but never skippable |
 
 **Two absolute rules.**
 

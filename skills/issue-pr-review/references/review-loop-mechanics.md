@@ -89,10 +89,12 @@ The binding is on code, not on prose.
 Read it out of the `body` already fetched in Step 1 — no extra API call:
 
 ```bash
-grep -oE '<!-- gitissue:qa v1 [^>]*-->' <<<"$body"
+grep -oE '<!-- gitissue:qa v[0-9]+ [^>]*-->' <<<"$body"
 ```
 
-- **Zero matches** ⇒ `absent`.
+- **Zero matches** ⇒ `absent`. The version is matched loosely on purpose — a
+  future `v2` marker must reach the version rule below and resolve `stale`,
+  not disappear into `absent`.
 - **More than one match** ⇒ `stale`. A body carrying two markers is ambiguous,
   and "first match wins" is exactly how a prepended forgery would beat a genuine
   trailing one. Ambiguity is never resolved in the marker's favour.
@@ -120,7 +122,7 @@ every particular.
 | `cycles=<n>` | QA cycles the resolver ran | reported only |
 | `review=clean` | the resolver's QA exited clean | required — there is no dirty spelling, because a non-clean resolver run emits no marker at all |
 | `tests=<count>@<sha40>` | the final suite's passing count and the SHA it ran against | the two test skips below apply **only** when this field is present and its SHA equals `head` |
-| `ui=<none\|code\|code+browser>:<clean\|noted>` | which UI legs ran, and their result | the code UI review is skipped only on `code`/`code+browser`; `ui=none` skips nothing |
+| `ui=<none\|code\|code+browser>:<clean\|noted>@<sha40>` | which UI legs ran, their result, and the SHA the UI review ran against | the code UI review is skipped only on `code`/`code+browser` **and** an `@<sha40>` equal to `head`; a value with no `@<sha40>` suffix is well-formed but not commit-bound, so it never permits the skip; `ui=none` skips nothing |
 
 `tests=` carries its own SHA because the resolver's final suite runs *before* its
 *Update documentation* step, which may commit — so the suite's commit and the
@@ -131,7 +133,13 @@ full, whatever else the marker says.
 
 `ui=` is split into legs because the code UI review is environment-independent
 while the browser leg is fail-soft and skips on a headless host. A flat verdict
-would let this skill trust a leg that never ran.
+would let this skill trust a leg that never ran. It carries its own SHA for the
+same reason `tests=` does, and more sharply: the resolver's UI review runs
+*before* its QA cycles, so every QA fix commit — and the later *Update
+documentation* commit — lands after the diff that review saw. A marker written
+without the `@<sha40>` suffix is not malformed (it stays parsable, and stays
+`trusted` for everything else); it is simply never commit-bound, so the code UI
+review runs in full.
 
 **There is no security-scan field, in any spelling, and none may be added.** Its
 only possible consumer would be a safety gate — see *The trust model* above.
@@ -142,7 +150,7 @@ only possible consumer would be a safety gate — see *The trust model* above.
 |------|-----------------|-----------|
 | 2 — pre-pass test run | skipped | `tests=` present **and** its SHA equals `head` |
 | 3 — cycle-1 cold-start reviewer | **collapsed into** the fresh confirmation pass | every `trusted` marker **except** the depth carve-out — a marker `profile=light` against this review's `profile=full` refuses the collapse (*Precedence* in SKILL.md owns that rule — not restated here) |
-| 3 — code UI review | skipped | `ui=code…` or `ui=code+browser…`; never on `ui=none` |
+| 3 — code UI review | skipped | `ui=code…` or `ui=code+browser…` **and** its `@<sha40>` present and equal to `head`; never on `ui=none`, and never on an unsuffixed `ui=` |
 | 4 — local test + build run | skipped | `tests=` present **and** its SHA equals `head` |
 | Loop cycle cap | `min(1, configured_cap)` — the same ceiling idiom the `light` profile uses, and it wins over an `/auto-pilot` `review_cycles` override for the same reason | **the same carve-out as the reviewer-collapse row**: a `profile=light` marker against a `profile=full` review refuses the cap too, leaving it at `review.max_cycles`. Both levers are review depth, so they answer to the carve-out together |
 

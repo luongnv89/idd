@@ -62,7 +62,7 @@ Instructions:
 1. Use the {{skill:issue-pr-review}} skill
 2. Use --auto --no-merge for full autonomous review-fix cycle (review, fix, report — do NOT merge)
 3. The skill will:
-   - Run script pre-pass first: lint/format auto-fix + tests (zero LLM tokens)
+   - Run script pre-pass first: lint/format auto-fix (always) + tests (zero LLM tokens) — that test run is skipped when the PR carries a valid QA handoff marker bound to the current head SHA
    - Analyze the PR changes (code quality, security, correctness)
    - Classify issues as "fix" (critical/high: correctness, security, edge cases) or "note" (medium: code quality, test coverage suggestions)
    - Only fix "fix" issues — "note" issues are reported but don't consume fix cycles

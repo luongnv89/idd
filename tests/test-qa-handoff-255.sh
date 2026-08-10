@@ -653,6 +653,100 @@ check_lacks "$AP_PHASES" 'full-strength review instead of two' \
   "T14.14: auto-pilot's old instead-of-two claim is gone"
 
 # ───────────────────────────────────────────────────────────
+# T15 (AC1/AC2): `ui=` is commit-bound exactly like `tests=`.
+# The resolver's UI review runs BEFORE its QA cycles, so every QA
+# fix commit — and the later documentation commit — lands after
+# the diff that review saw. Without its own SHA, a `trusted`
+# marker would skip pr-review's code UI review on a diff no
+# ui-reviewer ever read. An unsuffixed `ui=` (an older marker) is
+# well-formed, never malformed — it simply never permits the skip.
+# ───────────────────────────────────────────────────────────
+# Consumer: the field vocabulary and the skips table both require the SHA.
+VOCAB_ROW="$(grep -E '^\| .ui=<none' "$SRC_LOOP" || true)"
+check_block_has "$VOCAB_ROW" 'ui=<none\\\|code\\\|code\+browser>:<clean\\\|noted>@<sha40>' \
+  "T15.1: the field vocabulary grammar for ui= carries an @<sha40>"
+check_block_has "$VOCAB_ROW" '@<sha40>. equal to .head' \
+  "T15.2: the skip requires that SHA to equal head"
+check_block_has "$VOCAB_ROW" 'no .@<sha40>. suffix is well-formed but not commit-bound' \
+  "T15.3: an unsuffixed ui= is well-formed, not malformed (back-compat)"
+UI_SKIP_ROW="$(printf '%s\n' "$SKIPS_BLOCK" | grep -E '^\|[^|]*code UI review' || true)"
+check_block_has "$UI_SKIP_ROW" '@<sha40>. present and equal to .head' \
+  "T15.4: the skips table's code-UI row is conditioned on the ui= SHA"
+check_block_has "$UI_SKIP_ROW" 'never on an unsuffixed .ui=' \
+  "T15.5: an unsuffixed ui= never permits the code UI skip"
+check_has "$SRC_LOOP" '\*before\* its QA cycles' \
+  "T15.6: the rationale names the drift the SHA closes"
+# The built consumer ships the same binding — a src-only contract installs nothing.
+BUILT_UI_SKIP_ROW="$(awk '/^### What .trusted. skips/,/^### Never gated/' "$BUILT_LOOP" | grep -E '^\|[^|]*code UI review' || true)"
+check_block_has "$BUILT_UI_SKIP_ROW" '@<sha40>. present and equal to .head' \
+  "T15.7: the built mechanics ship the commit-bound code-UI condition"
+# SKILL.md is read first and must carry the same condition, in src and built.
+for pair in "src:$SRC_PR" "built:$BUILT_PR"; do
+  tag="${pair%%:*}"
+  f="${pair#*:}"
+  ui_clause="$(grep -E 'the \*\*code\*\* UI review is skipped only when' "$f" | head -1 || true)"
+  check_block_has "$ui_clause" 'carries an .@<sha40>. equal to .head' \
+    "T15.8 ($tag): SKILL.md gates the code UI skip on the ui= SHA"
+  check_block_has "$ui_clause" 'never on an unsuffixed .ui=' \
+    "T15.9 ($tag): SKILL.md keeps an unsuffixed ui= unskippable"
+done
+# Producer: the grammar, the template line, and the derivation row all agree.
+for pair in "src:$SRC_TEMPLATES" "built:$BUILT_TEMPLATES"; do
+  tag="${pair%%:*}"
+  f="${pair#*:}"
+  check_has "$f" 'ui=<none\|code\|code\+browser>:<clean\|noted>@<sha40>' \
+    "T15.10 ($tag): the producer grammar binds ui= to a SHA"
+  check_has "$f" 'ui=\{ui_legs\}:\{ui_result\}@\{ui_sha\}' \
+    "T15.11 ($tag): the PR body template emits that SHA"
+  ui_row="$(grep -E '^\| .ui. \|' "$f" | head -1 || true)"
+  check_block_has "$ui_row" '<legs>:<result>@<sha40>' \
+    "T15.12 ($tag): the derivation row's value column carries the SHA"
+  check_block_has "$ui_row" 'git rev-parse HEAD. at the moment it ran' \
+    "T15.13 ($tag): derived from the commit the UI review actually ran against"
+  check_block_has "$ui_row" 'never .head. by assumption' \
+    "T15.14 ($tag): and never head by assumption"
+done
+
+# ───────────────────────────────────────────────────────────
+# T16 (AC2): the parse grep matches any marker version, so the
+# documented "a version other than v1 ⇒ stale" rule is reachable.
+# A grep hard-pinned to v1 would make a v2 marker yield zero
+# matches — i.e. `absent` — and that rule dead prose.
+# ───────────────────────────────────────────────────────────
+for pair in "src:$SRC_LOOP" "built:$BUILT_LOOP"; do
+  tag="${pair%%:*}"
+  f="${pair#*:}"
+  grep_line="$(grep -E "grep -oE .<!-- gitissue:qa" "$f" | head -1 || true)"
+  check_block_has "$grep_line" 'gitissue:qa v\[0-9\]\+ ' \
+    "T16.1 ($tag): the parse grep matches any version, not just v1"
+  check_has "$f" 'version other than .v1.' \
+    "T16.2 ($tag): the version rule the wider grep feeds is still stated"
+done
+# The regexes must actually behave that way: v2 reaches the parser, v1 matches,
+# and a non-marker comment does not.
+PARSE_RE='<!-- gitissue:qa v[0-9]+ [^>]*-->'
+V_OK=1
+printf '%s\n' '<!-- gitissue:qa v2 head=abc review=clean -->' | grep -qE "$PARSE_RE" || V_OK=0
+printf '%s\n' '<!-- gitissue:qa v1 head=abc review=clean -->' | grep -qE "$PARSE_RE" || V_OK=0
+printf '%s\n' '<!-- gitissue:normalized v1 -->' | grep -qE "$PARSE_RE" && V_OK=0
+if [ "$V_OK" = "1" ]; then
+  pass "T16.3: the documented grep reaches a v2 marker and ignores other markers"
+else
+  fail "T16.3: the documented grep does not behave as the version rule requires"
+fi
+
+# ───────────────────────────────────────────────────────────
+# T17 (F3/F4 narration + schema): auto-pilot's pre-pass line and
+# the config schema tell the truth about what the marker changes.
+# ───────────────────────────────────────────────────────────
+check_has "$AP_PHASES" '^1\. \*\*Script pre-pass\*\*.*QA handoff marker' \
+  "T17.1: auto-pilot's pre-pass narration qualifies its test run"
+check_has "$AP_PROMPTS" 'script pre-pass first.*QA handoff marker' \
+  "T17.2: the reviewer prompt qualifies the pre-pass test run too"
+check_has "$SRC_CONFIG_SCHEMA" 'QA handoff gate' \
+  "T17.3: the schema tells an operator adaptive_depth=false also disables the gate"
+
+# ───────────────────────────────────────────────────────────
 # T12 (install surface): both capped SKILL.md files stay inside
 # the skill-creator 500-line cap after this change.
 # ───────────────────────────────────────────────────────────

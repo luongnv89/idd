@@ -138,8 +138,9 @@ review:
   # at 1 cycle and skips optional passes. The acceptance-criteria and
   # traceability hard-blocks always run at full strength. Complex or ambiguous
   # PRs keep the full max_cycles depth. When false, every PR gets full review
-  # depth as before — the profile is pinned to "full". The chosen depth is
-  # surfaced on the [1/7] tracker line. See
+  # depth as before — the profile is pinned to "full", and the QA handoff gate
+  # is disabled too, so a resolver-marked PR also gets the full pipeline. The
+  # chosen depth is surfaced on the [1/7] tracker line. See
   # https://github.com/luongnv89/idd/blob/main/docs/agent-model-effort.md
   # (Complexity → pipeline profile).
   adaptive_depth: true
@@ -414,7 +415,7 @@ Config is validated on load at the start of every skill invocation. Errors inclu
 | `resolve.adaptive_effort` | `true` | Scale the resolve pipeline to issue complexity — trivial issues (Effort XS/S) take a lighter path (lighter Research, skip 3-option Plan, skip propose-skills, QA capped at 1 cycle); `false` pins every issue to the full pipeline ([agent-model-effort.md](https://github.com/luongnv89/idd/blob/main/docs/agent-model-effort.md)) |
 | `resolve.ui_review.browser_review` | `"ask"` | Browser (screenshot) UI review mode; code UI review is auto-detected and always runs |
 | `review.max_cycles` | `3` | Max review-fix cycles |
-| `review.adaptive_depth` | `true` | Scale review depth to PR complexity — a trivial PR caps the review-fix loop at 1 cycle and skips optional passes (AC + traceability hard-blocks still run); `false` pins every PR to full depth ([agent-model-effort.md](https://github.com/luongnv89/idd/blob/main/docs/agent-model-effort.md)) |
+| `review.adaptive_depth` | `true` | Scale review depth to PR complexity — a trivial PR caps the review-fix loop at 1 cycle and skips optional passes (AC + traceability hard-blocks still run); `false` pins every PR to full depth and disables the QA handoff gate too ([agent-model-effort.md](https://github.com/luongnv89/idd/blob/main/docs/agent-model-effort.md)) |
 | `review.auto_merge` | `false` | Auto-merge PR when clean |
 | `review.confidence_threshold` | `80` | Min confidence level for issues |
 | `review.run_tests` | `true` | Run tests during review |
