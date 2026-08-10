@@ -44,11 +44,41 @@ FAIL=0
 # does not widen it: this line is a ratchet, and the next addition should have
 # to justify itself exactly as hard as this one did.
 #
+# Raised to 508,900 in issue #256, which added the *Caller-supplied context
+# payloads* section to shared-agent-conventions.md — the single home of the rule
+# that a caller-supplied payload field may gate duplicated work but never a
+# safety gate, plus that document's exclusion list. Measured, not estimated:
+# 1,960 authored bytes, which land as 1,971 in each bundled copy — the section
+# cites docs/terminal-style.md once and the build rewrites that token to
+# references/docs/…, +11 — bundled into 2 skills (auto-pilot, issue-resolver)
+# = +3,942. Two smaller rows ride along: +11 to platform-github.md, bundled into
+# 7 skills = +77; and +123 to config-schema.md — the adaptive_effort row (+96,
+# carried by 3 excerpts) and the adaptive_depth row (+27, carried by 3) now
+# disclosing the four #256 behaviours they switch off — = +369.
+# Total +4,388 measured, from 504,224 to 508,612. That is content
+# the skills execute: every #256 injection site points at the conventions
+# section instead of restating the rule, so the alternative was the same
+# paragraph duplicated across five files and drifting.
+#
+# One trap paid for part of it first, in the same shape #255 documented: the
+# resolver's new triage prose originally spelled the artifact path
+# `.gitissue/triage.json`, and _config_sections_used in scripts/build.py reads
+# `triage.json` as a `triage.<key>` config reference — pulling the entire
+# `triage` config section into the resolver's per-skill excerpt for +1,194
+# bytes, none of which the resolver reads. The prose now names the triage graph
+# without its filename; the researcher agent, which performs the read, still
+# carries the exact path.
+#
+# The raise leaves 288 bytes of headroom, against the 1,776 that existed on main
+# under the 506,000 line — this ratchet is tighter than the one it replaces, not
+# a restored margin. The next addition does not fit without compressing
+# something first, which is the whole point of the line.
+#
 # What the guard is actually for is unchanged and still has a wide margin:
 # reinstating one whole document across the skills that excerpt it costs on the
 # order of 165KB (config-schema.md is 27.5KB x 6 non-init skills), so a
 # regression of that shape fails this assertion by more than 3x the headroom.
-BUDGET=506000
+BUDGET=508900
 
 pass() { echo "  ✓ $1"; PASS=$((PASS + 1)); }
 fail() { echo "  ✗ $1"; FAIL=$((FAIL + 1)); }

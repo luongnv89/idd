@@ -43,7 +43,7 @@ Skills inline these commands at the step where they run, for execution speed. Th
 |-----------|-------------------|
 | Create PR | `gh pr create --title "{pr_title}" --body "{pr_body}"` |
 | Read one PR | `gh pr view {N} --json number,title,body,baseRefName,headRefName,headRefOid,state,url,labels,reviews,statusCheckRollup,files` |
-| Merge readiness | `gh pr view {N} --json mergeable,reviewDecision,statusCheckRollup` |
+| Merge readiness | `gh pr view {N} --json mergeable,reviewDecision,statusCheckRollup,headRefOid` |
 | List merged PRs | `gh pr list --state merged --json number,title,body,mergeCommit,headRefName --limit 50` |
 | List open PRs | `gh pr list --state open --json number,title,body,headRefName --limit 20` |
 | Diff / changed files | `gh pr diff {N}` · `gh pr diff {N} --name-only` |

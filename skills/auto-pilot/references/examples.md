@@ -269,6 +269,27 @@ Note: the `/issue-pr-review --auto --no-merge` subagent handled the full review-
 
 ### Merge requires CI checks
 
+First consult *Step 5.1a — CI verdict gate*. The reviewer subagent already
+waited on this PR's CI and returned `ci_status` bound to the commit it waited
+on. That verdict is `trusted` only on **both** of the gate's conditions: the SHA
+still equals the live head, **and** `statusCheckRollup` from the same read is
+non-empty with every check in it green. Both are already requested by Step 5.1's
+single
+`gh pr view {pr_number} --json mergeable,reviewDecision,statusCheckRollup,headRefOid`,
+so no second read is issued. A rollup that shows nothing — empty, absent or
+unreadable — is `absent`, not `trusted`, and the full wait below runs.
+`mergeable` from the same call catches a base that moved **into conflict** and
+nothing else; it does not cover a clean base advance, so the moved-base residual
+*Step 5.1a* names is unchanged here. With both conditions met there is nothing
+left to wait for *on this head*, and the merge proceeds:
+
+```
+○ CI verdict: trusted (passed @ 9f2c1ab) — head unchanged, checks green, no re-poll
+```
+
+On `stale` or `absent` — a moved head, a bare or missing value, a `failed@…`, or
+`review.adaptive_depth: false` — the full wait below runs, unchanged:
+
 ```
 ⚠ PR #45 is not mergeable
 
