@@ -19,7 +19,7 @@ resume_state = resumable | stale | absent
 
 | Value | When | Effect |
 |-------|------|--------|
-| `resumable` | `--resume` was passed, the read returned a state object whose `run_id` matches the lock this run just acquired **or** whose lock is gone, and GitHub confirms its `current.branch` / `current.pr` still exist | Re-enter at `current.phase` for `current.issue`, reusing the recorded branch and PR; seed `processed[]` and `skip_list[]` from the state so nothing is redone |
+| `resumable` | `--resume` was passed, the read returned a state object whose `run_id` matches the lock this run now holds — freshly acquired, reclaimed, or re-acquired in place — **or** whose lock is gone, and GitHub confirms its `current.branch` / `current.pr` still exist | Re-enter at `current.phase` for `current.issue`, reusing the recorded branch and PR; seed `processed[]` and `skip_list[]` from the state so nothing is redone |
 | `stale` | a state exists but does not reconcile — `--fresh` was passed, the read reported `corrupt`, the recorded phase is unknown, or GitHub disagrees with the recorded branch/PR | Print `⚠ Recorded run state is stale — starting fresh`, then `--init` over it |
 | `absent` | the read printed `{}`, or **anything at all is in doubt** | Start a fresh run: `--init` and proceed to Phase 1 |
 
@@ -69,7 +69,7 @@ python3 shared/scripts/gi-state.py --init < .gitissue/cache/state-init.json
 
 | Key | Value |
 |-----|-------|
-| `run_id` | **omit it.** `--init` adopts the run id of the lock *Run lock* just acquired, which is what makes the lock, every checkpoint and the closing `--unlock` one run. Pass one only when re-initializing outside a lock this run holds |
+| `run_id` | **omit it.** `--init` adopts the run id of the lock *Run lock* left this run holding, which is what makes the lock, every checkpoint and the closing `--unlock` one run. Pass one only when re-initializing outside a lock this run holds |
 | `mode` | the effective merge mode — `conservative` / `balanced` / `aggressive` |
 | `invocation` | the command line as invoked, e.g. `/auto-pilot --limit 5` |
 | `queue` | the issue numbers this run intends to process: `summary.suggested_order` in triage mode, the `--issues` list in explicit list mode, `[]` when Phase 1 has not run yet |

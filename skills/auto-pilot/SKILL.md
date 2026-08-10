@@ -139,9 +139,11 @@ a shell that has already exited reads as dead and reclaims itself; add
 `--resume` to that call when `/auto-pilot --resume` was invoked, so the
 continued run keeps its recorded run id instead of minting a second one),
 exactly as the
-*Configuration* step resolves this skill's own script path. Exit 0 acquired — a
-`reclaimed` status prints the script's own `⚠ gi-state: reclaimed a … lock`
-line and is evidence about the *lock*, never about the recorded run state
+*Configuration* step resolves this skill's own script path. Exit 0 means this
+run holds the lock — `acquired`, `reclaimed` (which prints the script's own
+`⚠ gi-state: reclaimed a … lock` line), or, on a `--resume` that finds its own
+lock still live, `reacquired`. All three are evidence about the *lock*, never
+about the recorded run state
 (`references/error-messages.md` → *Recorded run state is stale*); **exit 3
 means another run holds it** — stop and print `✗ Another /auto-pilot run is in
 progress` from `references/error-messages.md`, never degrade past it. No

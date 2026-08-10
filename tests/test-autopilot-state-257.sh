@@ -288,10 +288,21 @@ fi
 # returns, so a --pid defaulting to the invoking process would leave a lock
 # whose owner is already gone — read as dead-pid, silently reclaimed, and AC3
 # defeated for every real run. `--pid` is therefore omitted here exactly as the
-# fallback prose allows, and the taking subshell is gone before the second call.
+# fallback prose allows, and the taking shell is gone before the second call.
+#
+# The trailing `; exit 0` on the *taking* call is load-bearing: `bash -c "one
+# command"` execs into that command, so python's parent would be this long-lived
+# test shell and the throwaway wrapper this case is built on would never exist.
+# A second command forces bash to fork, so the recorded pid really does die. The
+# calls that are asserted on run unwrapped — `exit 0` would mask their status.
 D3B="$(new_dir d3b)"
-bash -c "python3 '$STATE' --lock --dir '$D3B' --run-id runOwnerless" >/dev/null
-run_status out st bash -c "python3 '$STATE' --lock --dir '$D3B' --run-id runNext"
+bash -c "python3 '$STATE' --lock --dir '$D3B' --run-id runOwnerless >/dev/null; exit 0"
+if [ "$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["pid"])' "$D3B/run.lock")" = "0" ]; then
+  pass "AC3: the documented --lock records pid 0 — no owner, so no liveness signal"
+else
+  fail "AC3: --lock recorded an owner pid nobody passed"
+fi
+run_status out st python3 "$STATE" --lock --dir "$D3B" --run-id runNext
 if [ "$st" = "3" ] && [ "$(printf '%s' "$out" | jkey status)" = "held" ] \
    && [ "$(printf '%s' "$out" | jkey stale)" = "False" ]; then
   pass "AC3: a lock taken with no --pid is held, not self-reclaimed, once its shell exits"
@@ -301,7 +312,7 @@ fi
 
 # The refusal is on stderr with the ✗ vocabulary, and reports the owner as
 # unknown rather than as the meaningless pid 0.
-held_err="$(bash -c "python3 '$STATE' --lock --dir '$D3B' --run-id runNext2" 2>&1 >/dev/null || true)"
+held_err="$(python3 "$STATE" --lock --dir "$D3B" --run-id runNext2 2>&1 >/dev/null || true)"
 case "$held_err" in
   "✗ gi-state: the run lock is held by run runOwnerless (pid unknown on "*)
     pass "AC3: the ownerless refusal prints the ✗ held line naming the holder" ;;
@@ -317,6 +328,64 @@ if [ "$st" = "0" ] && [ "$(printf '%s' "$out" | jkey status)" = "reclaimed" ] \
   pass "AC3: an ownerless lock past --ttl is still retired (never immortal)"
 else
   fail "AC3: an ownerless lock survived its TTL (exit $st)"
+fi
+
+# A resumed run must be able to take back its OWN live lock. The common
+# interruption is the loop dying inside an agent process that is still alive, so
+# the recorded owner pid is the pid the resume passes: refusing that would let
+# the lock lock its own run out. Exclusivity is preserved by matching BOTH
+# halves — the run id and a known owner pid.
+D3C="$(new_dir d3c)"
+python3 "$STATE" --lock --dir "$D3C" --run-id runOwner --pid $$ >/dev/null
+run_status out st python3 "$STATE" --lock --resume --dir "$D3C" --run-id runOwner --pid $$
+if [ "$st" = "0" ] && [ "$(printf '%s' "$out" | jkey status)" = "reacquired" ] \
+   && [ "$(printf '%s' "$out" | jkey lock.run_id)" = "runOwner" ]; then
+  pass "AC3: --resume re-acquires its own live lock and keeps the recorded run id"
+else
+  fail "AC3: --resume was refused its own live lock (exit $st)"
+fi
+
+# The same re-acquire with NO state file: the run died before --init ever wrote
+# one, so there is no recorded id to adopt. The lock this process owns supplies
+# it — minting a fresh id here would orphan the very lock the run is holding and
+# leave the closing --unlock refusing it.
+D3D="$(new_dir d3d)"
+own_id="$(python3 "$STATE" --lock --dir "$D3D" --pid $$ | jkey lock.run_id)"
+run_status out st python3 "$STATE" --lock --resume --dir "$D3D" --pid $$
+if [ "$st" = "0" ] && [ "$(printf '%s' "$out" | jkey status)" = "reacquired" ] \
+   && [ "$(printf '%s' "$out" | jkey lock.run_id)" = "$own_id" ]; then
+  pass "AC3: --resume with no recorded state adopts the id of the lock it owns"
+else
+  fail "AC3: --resume minted a second id over the lock it already held (exit $st)"
+fi
+
+# A different live process resuming the same recorded run is still a second run.
+run_status out st python3 "$STATE" --lock --resume --dir "$D3C" --run-id runOwner --pid 1
+if [ "$st" = "3" ] && [ "$(printf '%s' "$out" | jkey status)" = "held" ]; then
+  pass "AC3: --resume from a different owner pid is still refused (exit 3)"
+else
+  fail "AC3: --resume re-acquired a lock owned by another process (exit $st)"
+fi
+
+# Two ownerless locks must not answer to each other: pid 0 is "unknown", and
+# unknown matching unknown would re-open the self-reclaim hole on the --resume
+# path instead of the plain one.
+run_status out st python3 "$STATE" --lock --resume --dir "$D3B" --run-id runTtl
+if [ "$st" = "3" ] && [ "$(printf '%s' "$out" | jkey status)" = "held" ]; then
+  pass "AC3: --resume never re-acquires an ownerless lock on a pid-0 match"
+else
+  fail "AC3: an ownerless lock was re-acquired by an unrelated resume (exit $st)"
+fi
+
+# The re-acquire is a mutation like any other, so --dry-run must not perform it.
+lock_before="$(cat "$D3C/run.lock")"
+run_status out st python3 "$STATE" --lock --resume --dir "$D3C" --run-id runOwner --pid $$ --dry-run
+if [ "$st" = "0" ] && [ "$(printf '%s' "$out" | jkey status)" = "would_reacquire" ] \
+   && [ "$(printf '%s' "$out" | jkey dry_run)" = "True" ] \
+   && [ "$(cat "$D3C/run.lock")" = "$lock_before" ]; then
+  pass "AC4: --lock --resume --dry-run reports would_reacquire and writes nothing"
+else
+  fail "AC4: the dry-run re-acquire did not report would_reacquire (exit $st)"
 fi
 
 # --force is the --force-unlock path past a live-looking holder.
@@ -746,8 +815,9 @@ expect_grep "AC1: the --init payload is written to a file, never a command line"
   "state-init.json" "$AP_PHASES"
 expect_grep "AC1: the SKILL phase table makes Phase 0 discoverable" \
   "^| 0 | Run state |" "$AP_SKILL"
-# A reclaimed lock is stale-lock evidence, never stale-state evidence: on every
-# genuine --resume the interrupted run is dead, so its lock is always reclaimed.
+# A reclaimed lock is stale-lock evidence, never stale-state evidence: a genuine
+# --resume either reclaims its dead lock or re-acquires its own live one, and
+# neither says anything about the state file it is about to read.
 if grep -q "A reclaimed lock (TTL elapsed, or the holder's pid is gone) prints this line too" "$AP_ERRORS"; then
   fail "AC1: a reclaimed lock still drives the resume gate to stale — --resume would init over the state it needs"
 else

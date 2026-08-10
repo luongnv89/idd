@@ -35,15 +35,17 @@ Modes
   --lock    create `.gitissue/run.lock` with O_CREAT|O_EXCL; refuse a lock held
             by a live run, reclaim one that is stale. Mints a fresh run id, so
             a leftover state file from a finished run cannot lend its id to an
-            unrelated one; `--lock --resume` adopts the recorded id instead.
-            `--pid` records who owns the run and defaults to 0, meaning "no
-            liveness signal" — such a lock is retired by `--ttl` or `--force`
-            only, never by the dead-pid rule. Pass a pid that outlives the
-            single command (`--pid "$PPID"` from an agent shell) to get the
-            prompt dead-pid reclaim after a crash. Defaulting to the invoking
-            process would be worse than useless: a one-shot shell exits the
-            moment the lock is written, so the next run would read its own
-            lock as dead and reclaim it
+            unrelated one; `--lock --resume` adopts the recorded id instead and
+            *re-acquires in place* (`reacquired`, a heartbeat refresh) when the
+            lock is this run's own — same run id, same known owner pid — which
+            is the common resume: the loop died, the agent process holding the
+            lock did not. `--pid` records that owner and defaults to 0, "no
+            liveness signal": such a lock is retired by `--ttl` or `--force`
+            only, never by the dead-pid rule. Pass a pid outliving the single
+            command (`--pid "$PPID"`) for the prompt post-crash reclaim.
+            Defaulting to the invoking process would be worse than useless: a
+            one-shot shell exits as the lock is written, so the next run would
+            read its own lock as dead
   --unlock  release the lock (only this run's, unless --force)
   --report  read `{run_id, markdown}` on stdin, write the final run report
 
@@ -533,6 +535,35 @@ def _lock_identity(lock: object) -> tuple | None:
     return (lock.get("run_id"), lock.get("started_at"), lock.get("pid"))
 
 
+def _pid_owns(lock: object, pid: int) -> bool:
+    """True when `lock` records `pid` as its owner, and that pid is knowable.
+
+    This is the half of the ownership test that carries exclusivity across
+    processes: a different agent process passes a different pid and fails it.
+    An unknown owner (`pid 0`) never satisfies it — otherwise every ownerless
+    lock would answer to every ownerless caller, which is exactly the
+    self-reclaim the run lock exists to prevent.
+    """
+    if not isinstance(lock, dict):
+        return False
+    recorded = lock.get("pid")
+    return _pid_known(pid) and _pid_known(recorded) and recorded == pid
+
+
+def _owns_lock(lock: object, run_id: str, pid: int) -> bool:
+    """True when `lock` is *this* run's own lock, resumable in place.
+
+    Both halves are required: an unrelated run resuming in the same tree
+    carries a different run id, and a different agent process carries a
+    different owner pid, so neither passes.
+    """
+    return (
+        isinstance(lock, dict)
+        and lock.get("run_id") == run_id
+        and _pid_owns(lock, pid)
+    )
+
+
 def _retire_lock(path: Path, observed: tuple | None) -> str:
     """Take the *observed* stale lock out of the way, atomically.
 
@@ -743,14 +774,43 @@ def run_lock(args, paths) -> int:
     # `--lock --resume` — the caller saying "I am continuing the recorded run" —
     # takes the id off disk. `--init` then adopts whichever id this lock holds,
     # so the documented lock → init → unlock sequence stays one run either way.
+    existing, error = _read_json_file(paths["lock"])
+    own_lock = args.resume and error is None and _pid_owns(existing, args.pid)
     run_id = args.run_id or (
-        (_resolve_run_id(args, paths) if args.resume else None) or _new_run_id()
+        (_resolve_run_id(args, paths) if args.resume else None)
+        # A resume that finds no recorded id but does find a lock this very
+        # process owns adopts the lock's id: the interrupted run died before
+        # `--init` ever wrote a state, and minting a second id here would orphan
+        # the lock this run is holding — the id would then disagree with the
+        # `--unlock` that ends the run.
+        or (existing.get("run_id") if own_lock and isinstance(existing, dict) else None)
+        or _new_run_id()
     )
     if not RUN_ID_RE.match(run_id):
         raise InputError(f"run_id '{run_id}' is not a valid run id")
     payload = _lock_payload(run_id, args.pid)
 
-    existing, error = _read_json_file(paths["lock"])
+    if own_lock and _owns_lock(existing, run_id, args.pid):
+        # A genuine `--resume` usually finds its OWN lock still there and still
+        # live: what was interrupted is the loop, inside an agent process that
+        # is itself alive, so the owner pid recorded in that lock is the very
+        # pid this call passes. Refusing it would deny a run its own lock and
+        # make `--resume` unusable in the common case. Re-acquiring is a
+        # heartbeat refresh, not a reclaim: the file is never taken out of the
+        # way, so no window opens for a third run.
+        if args.dry_run:
+            _emit({"dry_run": True, "status": "would_reacquire", "lock": existing})
+            return 0
+        _touch_lock_heartbeat(paths["lock"], run_id)
+        refreshed, _ = _read_json_file(paths["lock"])
+        _emit(
+            {
+                "status": "reacquired",
+                "lock": refreshed if isinstance(refreshed, dict) else existing,
+            }
+        )
+        return 0
+
     if existing is not None or error is not None:
         holder, status, observed = _classify_lock(args, paths)
         if not status["stale"] and not args.force:
@@ -956,7 +1016,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--resume",
         action="store_true",
-        help="--lock only: continue the recorded run, adopting its run id",
+        help=(
+            "--lock only: continue the recorded run, adopting its run id and "
+            "re-acquiring the lock in place when this run already owns it"
+        ),
     )
     parser.add_argument(
         "--dry-run",

@@ -66,8 +66,14 @@ plain `--lock` mints a fresh run id, so a state file left behind by a run that
 already finished cannot lend its id to an unrelated one — two runs sharing an id
 would file two reports and two `runs.jsonl` rows under the same name.
 `--lock --resume` is the caller saying "I am continuing the recorded run", and
-only then is the id read off disk. Either way `--init` adopts the id of the lock
-this run holds, so lock → init → unlock stays one run.
+only then is the id read off disk. It is also the only call that can take a lock
+that is still **live**, and only its own: when the lock records this run's id
+*and* this run's owner pid, `--resume` re-acquires it in place (`reacquired`,
+exit 0, a heartbeat refresh and nothing else). That is the ordinary interruption
+— the loop stopped, the agent process holding the lock did not — and without it
+a resume would be refused by the lock it is resuming. Any other id or any other
+pid is still a live holder: exit 3. Either way `--init` adopts the id of the
+lock this run holds, so lock → init → unlock stays one run.
 
 The lock is `.gitissue/run.lock`, created with `O_CREAT|O_EXCL` so two runs
 racing for it cannot both win, and it records four fields:
