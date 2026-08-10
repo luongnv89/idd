@@ -55,21 +55,79 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 **Trigger:** `git rev-parse --abbrev-ref HEAD` returns a branch that is not `main` or `master`.
 **Action:** Auto-switch with `git checkout {default_branch} && git pull --rebase origin {default_branch}`. Non-fatal — auto-pilot continues.
 
-### Insufficient API rate budget (preflight)
+### Rate budget exhausted — pausing until reset (non-fatal)
+```
+○ Rate budget exhausted — pausing until {resume_at}
+
+  Remaining: {remaining} calls — below the safe threshold of 200.
+  Waiting {wait_s}s for the budget to reset, then re-probing. The run
+  lock is refreshed every 300s so no other run can reclaim it mid-pause.
+```
+**Trigger:** `gi-ratelimit.py --verdict` returns `action: "wait"` — `remaining` is below the threshold and `reset` falls inside `autopilot.max_runtime_minutes`. Non-fatal.
+**Action:** Run the chunked pause in `references/preflight.md` (*Rate-limit pause*), refreshing the run-lock heartbeat between chunks, then re-probe and continue. Nobody is at the terminal, so a timestamp is the remedy, not an instruction to a reader.
+**`{resume_at}` is always an instant here, so this block has no second form.** `action: "wait"` is never emitted with a `wait_s` of 0 or less — a `reset` that is unknown or already past reads as `stop` or `warn` instead — and `resume_at` is null only when `wait_s` is. The `stop` block below is the one that needs two renderings.
+
+### Insufficient API rate budget (fatal — the wait does not fit)
 ```
 ✗ Insufficient GitHub API rate budget for auto-pilot
 
   Remaining: {remaining} calls — below the safe threshold of 200.
-  The loop resolves many issues, each fanning out subagents that make
-  their own API calls; running now would strand issues half-resolved.
+  The budget resets at {resume_at}, which is past this run's budget
+  of {max_runtime_minutes} min, so pausing for it would strand issues
+  half-resolved.
 
-  To fix:  wait for the budget to reset, then re-run /auto-pilot
-  Check:   gh api rate_limit --jq '.rate.remaining'
+  To fix:  re-run /auto-pilot after {resume_at}, or raise
+           autopilot.max_runtime_minutes
+  Check:   gh api rate_limit --jq '{remaining: .rate.remaining, reset: .rate.reset}'
   Docs:    https://github.com/luongnv89/idd/blob/main/docs/platform-github.md
 ```
-**Trigger:** Preflight step 8 finds `gh api rate_limit --jq '.rate.remaining'` below 200 before the loop starts. Fatal — auto-pilot stops.
+**Trigger:** `gi-ratelimit.py --verdict` returns `action: "stop"` — the pause would run past the runtime budget, or `reset` is unknown. Fatal.
+**Action:** Persist the final summary with `gi-state.py --report` — it reports `Result: RATE LIMITED` (`references/summary-format.md`) — release the run lock, and stop. At Prerequisite 8 nothing is left half-resolved because nothing was started; mid-run the stop lands between units of work, so nothing is abandoned there either — what merged stays merged, and a PR left open carries the outcome its own iteration already recorded. **At Prerequisite 8 there is no lock yet** — it is taken further down the prerequisites — so the release is the mid-run half of this action and the preflight stop is the report and this block alone; the deadline the verdict was given comes from the clock, read once at the first probe, rather than from a run state that does not exist. Both variants are in `references/preflight.md` (*Rate-limit pause*).
 
-**Low-budget warning (non-fatal):** when `remaining` is between 200 and 500, print the same block with a `⚠` symbol and the line `Proceeding — budget may run low; the loop will skip merges if it hits the limit.` instead of stopping.
+**Two renderings, chosen by `resume_at`.** The block above is the **known-reset**
+form, and it is the only one that may carry `{resume_at}`. The `stop` verdict has
+two triggers, and `gi-ratelimit.py` derives `resume_at` from `wait_s`, which an
+unknown `reset` leaves at `0` — so on that trigger `resume_at` is `null` and both
+`{resume_at}` sentences above would render `after null`, an instant nobody can
+wait for. Print this **unknown-reset** form instead, and never mix the two:
+
+```
+✗ Insufficient GitHub API rate budget for auto-pilot
+
+  Remaining: {remaining} calls — below the safe threshold of 200.
+  GitHub reported no reset instant, so there is nothing to wait for and
+  pausing would strand issues half-resolved.
+
+  To fix:  re-run /auto-pilot once the API budget resets — the Check
+           command below reports the instant once GitHub sends one
+  Check:   gh api rate_limit --jq '{remaining: .rate.remaining, reset: .rate.reset}'
+  Docs:    https://github.com/luongnv89/idd/blob/main/docs/platform-github.md
+```
+
+Raising `autopilot.max_runtime_minutes` is offered by the known-reset form only:
+with no reset instant the verdict is `stop` whatever the budget is, so a bigger
+one would change nothing. `references/summary-format.md` splits `Result: RATE
+LIMITED`'s `Next action:` line on the same value for the same reason.
+
+**Low-budget warning (non-fatal):** on `action: "warn"` — `remaining` between 200 and 500 — print the same block with a `⚠` symbol and the line `Proceeding — budget may run low; the loop will pause and resume if it hits the limit.` instead of stopping. Drop **both** `{resume_at}` sentences from it as the unknown-reset form does: `warn` leaves `wait_s` at `0` too, so `resume_at` is `null` here as well — and nothing is being waited for in the first place.
+
+### gi-ratelimit unavailable (degrade)
+```
+⚠ gi-ratelimit unavailable — computing the pause by hand
+```
+**Trigger:** No `python3`, exit 2 (the script path did not resolve), or exit 4 from any `gi-ratelimit.py` call. A **missing bundled file** is different — that is a broken install, and the `✗ Missing bundled dependency` block above is the answer. Exit 3 is invalid input: a stop for that one probe, never a degrade.
+**Action:** Follow the prose fallback beside the call site in `references/preflight.md` (*Rate-limit pause*, *Transient-failure retry*) or `references/phases.md` (*Runtime budget check*). For the budget check the wording is `⚠ gi-ratelimit unavailable — the runtime budget is not enforced` and the run continues unbounded. Never read a degrade as an expiry or as a `stop` verdict.
+
+### Runtime budget reached (clean stop)
+```
+○ Runtime budget reached ({max_runtime_minutes} min) — stopping cleanly
+
+  Elapsed:   {elapsed_s}s since {started_at}
+  Processed: {n} issue(s) this run
+  Remaining work is untouched — re-run /auto-pilot to continue.
+```
+**Trigger:** `gi-ratelimit.py --budget` returns `expired: true` at the top of an iteration or around a rate-limit pause (`references/phases.md` → *Runtime budget check*). Not an error — the run did what it was told.
+**Action:** Start nothing new, print the Final Summary, persist it with `gi-state.py --report`, release the run lock, and stop. An iteration already in flight is never abandoned: the budget gates when work may start, not how long it may run.
 
 ### Insufficient merge permission (auto-downgrade)
 ```
@@ -221,22 +279,24 @@ with all-zero counts. This is a success message, not an error.
 **Trigger:** All open issues are blocked, skipped, assigned to other users, or
 added to the session skip list — by the Phase 5.1b dependency gate
 (`blocked_by_dependency`), by a Phase 2.3 resolution failure (`failed`), or by
-Step 1.2b's post-pick re-check (`not_eligible`). This is the
+Step 1.2b's post-pick re-check (`not_eligible` when the issue is closed or
+assigned elsewhere; `quarantined` or `blocked_label` when its live labels are in
+the effective `skip_labels` set). This is the
 **only** place a run ends for dependency reasons — the gate itself never stops
 the loop. Omit the `Dep-blocked` line when that count is zero. Keep this block
 byte-identical to the one in `references/phases.md` (*Step 1.2*), and take which
 bucket each reason counts under from that step's reason-to-bucket table — it is
 the single home of that mapping, never restated here.
 
-### API rate limit during triage
+### API rate limit during a loop read
 ```
-✗ GitHub API rate limit reached while fetching issues
+⚠ GitHub API rate limit reached while fetching issues
 
-  Fetched {count}/{total} issues before limit.
-  To fix:  wait a few minutes, then retry
-  Check:   gh api rate_limit --jq '.rate.remaining'
+  Fetched {count}/{total} issues before the limit.
+  Check:   gh api rate_limit --jq '{remaining: .rate.remaining, reset: .rate.reset}'
 ```
-**Trigger:** HTTP 403 with rate limit headers during issue fetch.
+**Trigger:** HTTP 403 with rate-limit headers during an issue fetch, mid-run.
+**Action:** Classify it by driver rule 5 in `docs/platform-github.md`. A *secondary* limit carrying `Retry-After` is recoverable: retry on the bounded backoff in `references/preflight.md` (*Transient-failure retry*). *Primary* exhaustion is not retryable — take the *Rate-limit pause* in that same file, which either pauses until `reset` and resumes or stops cleanly. Only when both are exhausted does the read fall through to its documented degrade (`live_backlog = unavailable`, `references/phases.md` → *Step 1.1b*). There is no remedy addressed to a reader here: an unattended run has none.
 
 ## Resolve
 
@@ -246,6 +306,30 @@ the single home of that mapping, never restated here.
   Continuing to next issue...
 ```
 **Trigger:** Issue resolver fails at any step. Default behavior: log failure, skip issue, continue loop.
+
+### Issue quarantined after repeated failures
+```
+⚠ #{issue_number} quarantined after {streak} consecutive failed runs
+
+  Label:  {quarantine_label} — remove it to let /auto-pilot try again
+  The streak comes from .gitissue/runs.jsonl; the label is the durable
+  state, so deleting that file never clears a quarantine.
+  Continuing to next issue...
+```
+**Trigger:** After a Phase 2.3 failure, `gi-runlog.py --failure-streak` reports `quarantine: true` — `autopilot.quarantine_after` consecutive `failed` records for this issue (`0` disables the check entirely).
+**Action:** `gh issue edit {issue_number} --add-label "{quarantine_label}"` — only after the label passes the `^[A-Za-z0-9._:-]+$` check in `references/phases.md`, since a config string reaching a command line is not metacharacter-checked by `gi-config.py` — then record the skip-list reason `quarantined` and **continue to the next issue**: record-and-continue, never a stop. The label is in the effective `skip_labels` set, so later runs skip the issue with no extra gate. Missing or unreadable log (exit 4, `streak: 0`): print `⚠ gi-runlog unavailable — skipping the quarantine check` and never quarantine on evidence nobody read.
+
+### Quarantine label could not be applied (degrade)
+```
+⚠ Quarantine label could not be applied to #{issue_number}
+
+  Your permission on this repo is {viewerPermission} (need WRITE or higher).
+  The issue is skipped for the rest of this run, but the quarantine will
+  not persist — the next run will try it again.
+  Docs:    https://github.com/luongnv89/idd/blob/main/docs/platform-github.md
+```
+**Trigger:** `gh issue edit --add-label` is refused for lack of repository write permission (the `READ` / `TRIAGE` / `NONE` case Prerequisite 9 already downgrades for).
+**Action:** Skip the write and continue — the same downgrade-rather-than-fail choice as no-merge mode. The issue stays in this run's session skip list, so the current run still stops re-picking it.
 
 ### Issue already resolved
 ```

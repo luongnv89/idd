@@ -45,7 +45,7 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 ✗ GitHub API rate limit reached
 
   To fix:  wait a few minutes, then retry
-  Check:   gh api rate_limit --jq '.rate.remaining'
+  Check:   gh api rate_limit --jq '{remaining: .rate.remaining, reset: .rate.reset}'
 ```
 **Trigger:** HTTP 403 with rate limit headers.
 
@@ -120,16 +120,16 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 ```
 ● Rate limited (issue {N}/{total}: {title}) — retrying in {wait}s...
 ```
-**Trigger:** `gh issue create` returns HTTP 403 with rate limit headers during batch creation. Auto-retries up to 3 times with exponential backoff (5s, 10s, 20s).
+**Trigger:** `gh issue create` returns HTTP 403 with rate limit headers during batch creation. Retries only when driver rule 5 in `references/docs/platform-github.md` classifies it as recoverable — a *secondary* limit carrying `Retry-After` — on the shared bounded schedule of 2s, 4s, 8s, 16s (four attempts), or the longer `Retry-After` when one is given. *Primary* exhaustion is not retryable and stops with the *Rate limited* block above.
 
 ### Batch item skipped after retries
 ```
-✗ Skipped issue {N}/{total} after 3 retries: {title}
+✗ Skipped issue {N}/{total} after 4 retry attempts: {title}
 
   Reason:  rate limited
   Resume:  /issue-creator {title}
 ```
-**Trigger:** A batch item fails all 3 retry attempts. The item is skipped and batch continues with remaining items.
+**Trigger:** A batch item is still rate limited after all four attempts (`references/modes.md` → Step 5, *Rate limiting*). The item is skipped and batch continues with remaining items.
 
 ### No items detected
 ```

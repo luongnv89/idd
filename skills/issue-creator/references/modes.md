@@ -343,7 +343,7 @@ Conform to SPEC §2.1: the marker records that the child contributes to parent #
 
 > **Batch never blocks for clarification.** The single Create pipeline includes an interactive *Step 3.5 — Clarify Ambiguous Intent* that asks one targeted question when type/criteria confidence is low. Batch mode **skips that step entirely** — it never pauses to ask the user about an individual item. Low-confidence fields are drafted with their defaulted assumptions and marked `(needs review)` in the body, exactly as before. Batch's only interactive gate remains the Step 4 approval prompt over the whole set — and in auto mode (`references/docs/auto-mode.md`) even that one does not block: it auto-approves the full set and logs a `⚠`.
 
-**Rate limiting:** If `gh issue create` returns a rate limit error, wait and retry with exponential backoff (5s, 10s, 20s). After 3 retries for a single item, skip it and continue with remaining items.
+**Rate limiting:** If `gh issue create` returns a *secondary* rate limit, retry it — driver rule 5 in `references/docs/platform-github.md` is what classifies the failure as retryable. The schedule is the shared bounded one: **2s, 4s, 8s, 16s — four attempts**, 30s of added latency at worst. It is written out here because this skill bundles no `gi-ratelimit.py` to compute it. Honour a longer `Retry-After` when the response carries one. Once the four attempts are spent, skip the item and continue with the remaining ones. *Primary* rate-limit exhaustion is not retryable — stop and print the *Rate limited* error.
 
 **Progress output:** Show per-item progress:
 

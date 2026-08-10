@@ -777,6 +777,24 @@ DOC_SECTION_DIGESTS: dict[str, tuple[str, ...]] = {
     # edited — they have now done so four times. Re-measure rather than adjust
     # by eye: disable this entry, rebuild to a scratch --out, and diff the
     # emitted byte counts against the current build. (Issue #275, cycle 5.)
+    # Everything except *Adding a driver*, which tells a contributor how to port
+    # IDD to a second tracker: write docs/platform-<name>.md, then update the
+    # skills' inlined commands. A skill run reads this document to look a
+    # command up, never to author a driver, so the section shipped into all
+    # seven bundling skills for no runtime reader — the same shape as the
+    # pre-commit-security.md carve-out below. It is 561 bytes of the authored
+    # document; dropping it takes each emitted copy from 5,090 to 4,780 bytes —
+    # 310 per skill, 2,170 over the seven, the shortfall against 561 being the
+    # 251-byte digest notice the emitted copy gains. The authored document keeps
+    # the section whole for the contributors it is written for.
+    #
+    # These figures track the section's size, so re-measure rather than adjust
+    # by eye when it is edited: disable this entry, rebuild to a scratch --out,
+    # and diff the emitted byte counts against the current build. (Issue #259.)
+    "platform-github.md": (
+        "Driver rules",
+        "Operation catalog",
+    ),
     "pre-commit-security.md": (
         "Why This Matters",
         # Deliberately script-name-free: T7.10 in tests/test-dependency-closure.sh

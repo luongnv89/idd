@@ -49,10 +49,10 @@ All errors follow the rich error format: what went wrong + fix command + docs li
   scanner subagents; running now would exhaust the budget mid-scan.
 
   To fix:  wait for the budget to reset, then retry
-  Check:   gh api rate_limit --jq '.rate.remaining'
+  Check:   gh api rate_limit --jq '{remaining: .rate.remaining, reset: .rate.reset}'
   Docs:    https://github.com/luongnv89/idd/blob/main/docs/platform-github.md
 ```
-**Trigger:** Preflight step 5 finds `gh api rate_limit --jq '.rate.remaining'` below 100 before the update-mode batch loop. Fatal — triage stops.
+**Trigger:** Preflight step 5 finds `gh api rate_limit --jq '{remaining: .rate.remaining, reset: .rate.reset}'` below 100 before the update-mode batch loop. Fatal — triage stops.
 
 **Low-budget warning (non-fatal):** when `remaining` is between 100 and 200, print the same block with a `⚠` symbol and the line `Proceeding — budget may run low during the scan.` instead of stopping.
 
@@ -102,7 +102,7 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 ⚠ GitHub API rate limit reached during fix-scan
 
   Skipping already-fixed detection. Triage continues without it.
-  Check:   gh api rate_limit --jq '.rate.remaining'
+  Check:   gh api rate_limit --jq '{remaining: .rate.remaining, reset: .rate.reset}'
 ```
 **Trigger:** HTTP 403 with rate limit headers during the merged PR fetch in Step 1b.
 
@@ -112,7 +112,7 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 
   Fetched {count}/{total} issues before limit.
   To fix:  wait a few minutes, then retry
-  Check:   gh api rate_limit --jq '.rate.remaining'
+  Check:   gh api rate_limit --jq '{remaining: .rate.remaining, reset: .rate.reset}'
 ```
 **Trigger:** HTTP 403 with rate limit headers during issue fetch.
 

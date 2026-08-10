@@ -1,15 +1,14 @@
 # Platform Driver: GitHub
 
-IDD skills talk to the issue tracker through a **platform driver** — a documented mapping from the abstract operations the workflow needs to one tool's concrete commands. This document is the **GitHub driver**, implemented with the [GitHub CLI](https://cli.github.com) (`gh`). It is the only implemented driver; `.gitissue.yml` selects it with `platform: github`.
-
-Skills inline these commands at the step where they run, for execution speed. This catalog is the contract those inlined commands must match — when a command here changes, the skills follow.
+IDD skills reach the issue tracker through a **platform driver** — the workflow's operations mapped to one tool's commands. This is the **GitHub driver**, implemented with the [GitHub CLI](https://cli.github.com) (`gh`) and the only one implemented; `.gitissue.yml` selects it with `platform: github`. Skills inline these commands at the step where they run; this catalog is the contract they must match — when a command here changes, the skills follow.
 
 ## Driver rules
 
-1. **Data retrieval always uses `--json` with explicit field selection.** Never parse `gh` text output — it is unstable across versions and locales. The field lists below are supersets; a skill selects only the fields it needs.
-2. **Mutations are verified by re-reading.** After an edit/create, confirm with the corresponding read operation rather than trusting the exit code alone.
+1. **Data retrieval always uses `--json` with explicit field selection.** Never parse `gh` text output — it is unstable across versions and locales. The field lists below are supersets; a skill selects only what it needs.
+2. **Mutations are verified by re-reading.** After an edit/create, confirm with the corresponding read rather than trusting the exit code.
 3. **Auth failures produce rich errors.** When `gh` is missing or unauthenticated: state what failed, then `To fix:  gh auth login`, then the docs link.
-4. **Check the rate budget before batch loops** (triage, auto-pilot): `gh api rate_limit --jq '.rate.remaining'`.
+4. **Check the rate budget before batch loops** (triage, auto-pilot): `gh api rate_limit --jq '{remaining: .rate.remaining, reset: .rate.reset}'` — one call, both fields; `reset` is what an unattended loop pauses until.
+5. **Retry only transient failures, on bounded exponential backoff.** Recoverable: 5xx, connection reset or timeout, a *secondary* rate-limit 403 (honour `Retry-After`). Not recoverable: 401, 404, *primary* rate-limit exhaustion — rule 4's pause path, never backoff. `gi-ratelimit.py --backoff` computes the schedule; the loop lives with the caller.
 
 ## Operation catalog
 
@@ -18,7 +17,7 @@ Skills inline these commands at the step where they run, for execution speed. Th
 | Operation | Canonical command |
 |-----------|-------------------|
 | Verify authentication | `gh auth status` |
-| Remaining API budget | `gh api rate_limit --jq '.rate.remaining'` |
+| Remaining API budget | `gh api rate_limit --jq '{remaining: .rate.remaining, reset: .rate.reset}'` |
 | Repo merge strategy | `gh repo view --json mergeCommitAllowed,squashMergeAllowed,rebaseMergeAllowed` |
 | Caller's permission | `gh repo view --json viewerPermission` |
 
@@ -50,22 +49,14 @@ Skills inline these commands at the step where they run, for execution speed. Th
 | Checkout PR head branch | `gh pr checkout {N}` |
 | CI check status | `gh pr checks {N}` |
 | Read PR body (before edit) | `gh pr view {N} --json body` |
-| Update PR body | `gh pr edit {N} --body "{body}"` — use only after read-modify-write: fetch current body, apply the minimal change (e.g. prepend `Closes #N`), write back, then re-read to verify preserved sections |
+| Update PR body | `gh pr edit {N} --body "{body}"` — read-modify-write only: fetch the body, apply the minimal change (e.g. prepend `Closes #N`), write back, verify per rule 2 |
 | Squash-merge + clean up | `gh pr merge {N} --squash --delete-branch` |
 | Find PR for an issue | `gh search prs "is:open" "Closes #{N}" --json number,state,url --limit 5` |
 
 ### Raw API (escape hatch)
 
-For operations without a first-class `gh` subcommand — e.g. uploading issue assets — use `gh api` directly and note the endpoint inline:
-
-```
-gh api repos/{owner}/{repo}/contents/.github/issue-assets/{filename} ...
-```
-
-Prefer a catalog operation whenever one exists.
+For operations with no first-class `gh` subcommand — uploading issue assets, say — use `gh api` directly and note the endpoint inline (`gh api repos/{owner}/{repo}/contents/.github/issue-assets/{filename} ...`). Prefer a catalog operation when one exists.
 
 ## Adding a driver
 
-Porting IDD to another tracker (GitLab, Gitea, …) is deliberately scoped: write the equivalent driver document — `docs/platform-<name>.md` mapping every operation in this catalog to the new tool (e.g. `glab issue view`), then update the inlined commands in the skills to match it. The catalog above defines exactly which operations must exist; anything the new tool cannot express is a documented gap, not a silent one.
-
-Until a second driver document exists, `github` is the only valid `platform` value — the config schema does not advertise drivers that have not been written.
+Porting IDD to another tracker (GitLab, Gitea, …) is deliberately scoped: write the equivalent driver document — `docs/platform-<name>.md` mapping every operation in this catalog to the new tool (e.g. `glab issue view`), then update the inlined commands in the skills to match it. The catalog above defines exactly which operations must exist; anything the new tool cannot express is a documented gap, not a silent one. Until that second document exists, the preamble's "only implemented driver" is also the only valid `platform` value.

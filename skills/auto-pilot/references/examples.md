@@ -415,7 +415,77 @@ Issue #42 declares `Depends on #38` in its body. Auto-pilot resolves both #38 an
 
 The run does **not** end here. #42 is recorded as `blocked_by_dependency`, PR #87 stays open and unchanged, #42 is added to the session skip list (so the pick cannot select it again in this run — the skip list is consulted on every pick, cached or freshly triaged), and iteration 3 starts on the next eligible issue. A 30-issue backlog with one dependency-blocked PR still resolves the other 29. Nothing was merged here, so *Step 1.6* does not run and the cached order is untouched; #42 stays in `summary.suggested_order` and the skip list is what keeps it from being re-picked.
 
-Later, the user reviews and merges PR #84 manually and re-invokes `/auto-pilot`. That new run starts with an empty skip list and its own *Step 1.1a* gate — a commit landed since the cached triage, so the cache reads `stale` and the run triages afresh — picks #42 again (still open, PR #87 still waiting), re-evaluates the gate (now satisfied — #38 is CLOSED and PR #84 is MERGED), and merges PR #87.
+Later, the user reviews and merges PR #84 manually and re-invokes `/auto-pilot`. That new run starts with an empty **session** skip list and its own *Step 1.1a* gate — a commit landed since the cached triage, so the cache reads `stale` and the run triages afresh — picks #42 again (still open, PR #87 still waiting), re-evaluates the gate (now satisfied — #38 is CLOSED and PR #84 is MERGED), and merges PR #87.
 
 The gate never merges out of dependency order, but it also never halts the run: the only dependency-related stop is the ordinary `⚠ No eligible issues to pick` condition, once nothing eligible is left. The one remaining stop-and-ask case is the critical-issue review failure.
+
+**"Empty skip list" is about the session list only.** A quarantined issue is not
+in that list on a new run either — it is filtered *earlier*, by its
+`autopilot.quarantine_label` in the effective `skip_labels` set, before the
+session skip list is ever consulted. So an issue skipped for a dependency comes
+back on the next run, while one skipped for a quarantine does not, and neither
+fact contradicts the other.
+
+---
+
+## Unattended hardening: quarantine, rate-limit pause, runtime budget
+
+One run showing all three of issue #259's behaviors, with
+`autopilot.max_runtime_minutes: 90` and the default `quarantine_after: 3`.
+
+A resolve fails for the third run in a row, so the issue is labelled and the loop
+carries on — record-and-continue, never a stop:
+
+```
+✗ Resolution failed for #61 at step 4
+
+  Test suite fails on an unrelated fixture the resolver cannot repair
+  Outcome: failed
+
+⚠ #61 quarantined after 3 consecutive failed runs
+  Label:  auto-pilot-quarantined — remove it to let /auto-pilot try again
+  Continuing to next issue...
+
+● [Iteration 4/10] Picking next issue from triage order...
+  Selected:   #66 — Cache the model catalogue between runs
+```
+
+Two iterations later the API budget runs out. The reset is 22 minutes away and
+the run still has 51 minutes of its 90, so the wait fits: the loop pauses,
+refreshes the run lock every 300s so no other run can reclaim it, and resumes
+where it stopped. Nobody was asked anything.
+
+```
+○ Rate budget exhausted — pausing until 2026-08-10T14:52:00Z
+
+  Remaining: 143 calls — below the safe threshold of 200.
+  Waiting 1320s for the budget to reset, then re-probing. The run
+  lock is refreshed every 300s so no other run can reclaim it mid-pause.
+
+○ Rate budget restored — 4998 calls; resuming at iteration 6/10
+```
+
+At the top of iteration 8 the wall clock is spent. The check runs *before* the
+pick, so nothing is started and no PR is left half-reviewed; the report is
+persisted and the lock released on the way out:
+
+```
+○ Runtime budget reached (90 min) — stopping cleanly
+  Elapsed:   5412s since 2026-08-10T13:22:00Z
+  Processed: 7 issue(s) this run
+  Remaining work is untouched — re-run /auto-pilot to continue.
+
+◆ Auto-Pilot Summary — 7/10 iterations
+┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  Result:                  BUDGET REACHED
+  Mode:                    balanced
+
+  Remaining:               12 open issues
+  Next action:             /auto-pilot to continue
+  Report:                  .gitissue/last-run-report.md
+```
+
+The next run picks up from exactly there — #61 is skipped by its label without
+costing a resolve, and the other 12 are untouched.
 

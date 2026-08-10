@@ -130,6 +130,16 @@ autopilot:
   # iteration after a merge (0 = never — a pick miss forces one regardless).
   triage_cache_max_age_minutes: 60
   retriage_every: 0
+  # Quarantine an issue after this many consecutive failed runs by applying
+  # quarantine_label; every later run then skips it until a human removes the
+  # label (0 disables quarantine). The label is the durable state — the count
+  # is derived from .gitissue/runs.jsonl and fails open.
+  quarantine_after: 3
+  quarantine_label: "auto-pilot-quarantined"
+  # Wall-clock budget for one /auto-pilot run in minutes, measured from the run
+  # state's started_at: at the budget the loop stops cleanly with its report
+  # written and its lock released (0 = unbounded).
+  max_runtime_minutes: 0
 
 # Issue analysis settings
 analysis:

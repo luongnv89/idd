@@ -1033,7 +1033,9 @@ EXPECTED_SITES = {
     # 15 since issue #258: /auto-pilot Step 1.2b fetches the picked issue's
     # record on demand, because Phase 1's bulk list no longer carries `body`.
     "gi-deps.py": 1, "gi-issue.py": 15,
-    "gi-model-cache.py": 2, "gi-runlog.py": 2, "gi-secscan.py": 4,
+    # 3 since issue #259: /auto-pilot's Phase 2.3 quarantine check calls
+    # --failure-streak, the script's one read mode, beside the two appends.
+    "gi-model-cache.py": 2, "gi-runlog.py": 3, "gi-secscan.py": 4,
     "gi-stack-detect.py": 1, "gi-triage-graph.py": 2,
 }
 # A call is any mention of a shared script by filename, however it is launched
@@ -1056,7 +1058,7 @@ CALL = re.compile(
 # Placeholders permitted on a shared-script command line, and why each is safe.
 ALLOWED = {
     "{N}": "issue/PR number — an integer",
-    "{n}": "issue/PR number — an integer",
+    "{n}": "loop-controlled integer — an issue/PR number, or a retry attempt",
     "{issue_number}": "integer",
     "{pr_number}": "integer",
     "{linked_issue}": "integer",
@@ -1067,6 +1069,17 @@ ALLOWED = {
     "{security_convention}": "bundled doc path bound by the orchestrating skill",
     "{review.ci_poll_interval}": "gi-config validates it against an int default",
     "{review.ci_timeout}": "gi-config validates it against an int default",
+    "{autopilot.quarantine_after}": "gi-config validates it against an int default",
+    "{autopilot.max_runtime_minutes}": "gi-config validates it against an int default",
+    # Issue #259. `started_at` is neither an --init key nor a --update key, so no
+    # caller ever supplies it: gi-state writes it from its own UTC clock. The
+    # file is still on disk and hand-editable, so the call site re-checks the
+    # YYYY-MM-DDTHH:MM:SSZ form before substituting — the same
+    # check-before-you-substitute rule Step 1.0 applies to current.branch, the
+    # only other recorded field that reaches a shell word.
+    "{run_state.started_at}": "script-written UTC stamp, re-checked at the call site",
+    "{budget_deadline_epoch}": "integer epoch the loop computes itself; 0 when unbounded",
+    "{reset_epoch}": "integer epoch — the .rate.reset field of the rate_limit payload",
 }
 # Placeholder styles the skills actually use. `{...}` must hold at least one
 # non-space character, so `find -exec … {} \;` is not a placeholder, while

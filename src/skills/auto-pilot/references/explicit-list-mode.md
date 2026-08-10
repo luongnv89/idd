@@ -36,13 +36,21 @@ gh issue view {N} --json number,title,state,labels,assignees
 For each issue, check:
 - **Exists** — if not found, warn and remove from list
 - **Open** — if closed, warn and remove from list
-- **Not skip-labeled** — if labeled with a `skip_labels` value, warn and remove
+- **Not skip-labeled** — if labeled with a `skip_labels` value, warn and remove.
+  **One exemption: `autopilot.quarantine_label`.** It is in the effective
+  `skip_labels` set SKILL.md's *Configuration* step builds, so removing it here
+  is what this step would otherwise do — and that would answer an issue the user
+  named by hand with a line in a validation banner and nothing else. Keep a
+  quarantined issue in the list; *Loop behavior* below owns that skip, and owning
+  it there is what gives it an `[Issue {i}/{total}]` slot and its one run-log
+  line. Nothing else is exempt: `wontfix` and the rest are still removed here.
 
 ```
 ● Validating issue list...
   ✓ #5  — Fix login crash (open)
   ⚠ #10 — Add dark mode (closed, removing)
   ✓ #12 — Refactor auth module (open)
+  ○ #14 — Flaky import path (quarantined, keeping — skipped at its turn)
 ```
 
 If all issues are invalid:
@@ -184,6 +192,59 @@ mid-batch does not re-resolve issues that already landed. When `gi-state.py` is
 unavailable they degrade to exactly what they were before: in-memory sets that
 do not survive the run.
 
+**Quarantine is honored in this mode too — and this loop is the single step that
+applies it.** Explicit list mode bypasses Phase 1 entirely, so nothing here
+inherits *Step 1.2*'s pick predicate, and *Validate issues upfront* deliberately
+exempts `autopilot.quarantine_label` from the removal it applies to every other
+skip label. That leaves exactly one owner, which is the point: two steps skipping
+the same input would give it two dispositions and two different
+`[Issue {i}/{total}]` totals. Before resolving any listed issue, check its labels
+for `autopilot.quarantine_label` and, if present, skip it with
+`skipped_reason: quarantined` — one slot in the counter and **one** run-log line,
+the disposition every ordinary skip gets (*Run-log fan-out for the batch* names
+`quarantined` among them). A user who explicitly lists a quarantined issue is
+telling the loop to try it again, so say so in the skip line — removing the label
+is the documented way to do that:
+
+```
+○ [Issue {i}/{total}] #{N} — quarantined ({quarantine_label}); remove the label to retry
+```
+
+**The gate covers a batch's co-members, not only the slot's own issue.** A
+quarantined issue that *Validate issues upfront* kept in the list can also sit in
+an analyzer batch group, and a batch resolves **every** member at the spawn
+position's turn — so a gate that read only the slot's own number would let a
+quarantined co-member be resolved at another issue's turn and never reach its own
+gate at all. Run the check over the whole set the Batch Resolver would receive —
+the slot's issue plus every co-batch number `batch_map` holds for it — **before**
+the spawn (*Batch detection* step 3), and give each quarantined number exactly one
+disposition:
+
+- **Remove it from its batch group in `batch_map`** first, so no later spawn can
+  pull it back in either. Because the removal happens before the spawn, the
+  *attempted set* the run-log fan-out is keyed on never contains it and that
+  invariant needs no exception.
+- **The slot's own issue** — the skip is this slot: print the line above, write
+  its one run-log line, and advance. Whatever is left of the group keeps its
+  batch; the next unprocessed member's slot becomes its spawn position.
+- **A co-batch member** — nothing is printed or logged here, it is only dropped
+  from the batch. Its own `optimized_order` slot is where the line above and its
+  single run-log line are produced. That slot is always still ahead: the spawn
+  position is the **first** member of the group `optimized_order` reaches, so
+  every co-member sits later and none has had its slot consumed.
+- **Fewer than two issues left after the drops** — there is no batch to resolve.
+  Use the standard single-issue Resolver on the survivor (step 4), not the Batch
+  Resolver.
+
+`[Issue {i}/{total}]` still adds up: `total` is the validated issue count and a
+drop removes no slot from `optimized_order`, so a quarantined issue consumes
+exactly one `i` and writes exactly one run-log line — never zero (silently
+resolved inside someone else's batch) and never two (skipped at the spawn *and*
+at its own turn).
+
+The write side is unchanged: a failure inside this mode runs the same *Quarantine
+after repeated failures* procedure in `references/phases.md`.
+
 When advancing to the next item in `optimized_order`:
 1. **If already processed** (in the `processed` set): emit a skip line and advance.
    This skip is **display only** — it writes **no** `.gitissue/runs.jsonl` line,
@@ -194,7 +255,14 @@ When advancing to the next item in `optimized_order`:
    ○ [Issue {i}/{total}] #{N} — already resolved in batch with #{batch_primary}
    ```
 2. Check `batch_map` — is this issue number part of a batch?
-3. **If yes**: collect all co-batch issue numbers, use the **Batch Resolver Subagent** (see `references/subagent-prompts.md`). Do NOT pre-mark issues as processed — wait for the resolver result (see "Processing batch resolver results" below) to determine which issues were actually resolved.
+3. **If yes**: collect all co-batch issue numbers and **run the quarantine gate
+   above over that whole set before spawning anything** — every quarantined
+   number is dropped from `batch_map` and is never sent to the resolver. Then use
+   the **Batch Resolver Subagent** (see `references/subagent-prompts.md`) on what
+   is left, or step 4's single-issue Resolver if the drops left only one. Do NOT
+   pre-mark issues as processed — wait for the resolver result (see "Processing
+   batch resolver results" below) to determine which issues were actually
+   resolved.
 4. **If no**: use the standard Resolver Subagent for a single issue. On success, add the issue to the `processed` set.
 
 For batched issues, the resolver subagent receives all issue numbers in the batch:
@@ -257,8 +325,8 @@ name: "a failed batch drops fully-processed issues").
 **An in-batch skip writes no run-log line.** The last table row is the **one
 exception** to auto-pilot's "log every processed issue including skips" rule: an *in-batch* skip is the already-counted other half
 of a batch line, not a fresh processed issue. Ordinary skips —
-`blocked_label`, `blocked_by_dependency`, `in_skip_list`, `assigned_to_other` —
-still log their one line with a `skipped_reason`.
+`blocked_label`, `blocked_by_dependency`, `in_skip_list`, `assigned_to_other`,
+`quarantined` — still log their one line with a `skipped_reason`.
 
 Build each written line from `docs/run-log-schema.md`, with these batch attributions:
 
