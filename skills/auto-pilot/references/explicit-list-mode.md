@@ -149,7 +149,13 @@ If `--dry-run`:
 ```
 ○ Dry run complete. No issues resolved.
 ```
-Stop.
+Stop. **The stop belongs ahead of the first persisted write, not after it** — the
+same reordering Phase 1 applies (`references/phases.md` → *Step 1.1*): under
+`--dry-run` the analysis is computed and printed but nothing is persisted, the
+run lock is taken with `--dry-run` (reporting a holder, creating nothing), and
+every run-state write carries `--dry-run` too. A dry run leaves the repository
+byte-identical apart from the transient scratch file under `.gitissue/cache/`
+that the same step deletes.
 
 ### Loop behavior
 
@@ -167,6 +173,16 @@ for batch in analyzer.batches:
 ```
 
 Also maintain a `processed` set (initially empty) that tracks which issues have been resolved — either individually or as part of a batch.
+
+**`processed` and the session skip list are run-state fields, not pure memory.**
+Both live in `.gitissue/run-state.json` (`processed[]`, `skip_list[]`) and are
+appended de-duplicated at each end-of-iteration checkpoint
+(`references/phases.md` → *Step 1.0b*, *End-of-iteration checkpoint*). The
+in-memory copies stay the working set — every lookup above reads them — but a
+resumed run seeds them from the state file, which is the only reason a crash
+mid-batch does not re-resolve issues that already landed. When `gi-state.py` is
+unavailable they degrade to exactly what they were before: in-memory sets that
+do not survive the run.
 
 When advancing to the next item in `optimized_order`:
 1. **If already processed** (in the `processed` set): emit a skip line and advance.

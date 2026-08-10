@@ -195,9 +195,16 @@ check_has "$SRC_TRIAGE_SKILL" 'gh issue list [^`]*body' \
 # ───────────────────────────────────────────────────────────
 # T2 (AC1): a triage-cache gate sits above the loop
 # ───────────────────────────────────────────────────────────
-check_has "$SRC_PHASES" '^### Step 1\.0 — Triage cache gate' \
+check_has "$SRC_PHASES" '^### Step 1\.1a — Triage cache gate' \
   "T2.1: auto-pilot has a named triage-cache gate"
-GATE_BLOCK="$(awk '/^### Step 1\.0 — Triage cache gate/,/^### Step 1\.1 — Triage/' "$SRC_PHASES")"
+# Renamed from `Step 1.0` when #257's run-state work landed a *different*
+# `Step 1.0 — Resume entry gate` in the new Phase 0. `1.1a` is the gate that
+# decides whether `Step 1.1` runs, so it letters onto 1.1 beside `Step 1.1b`.
+check_lacks "$SRC_PHASES" '^### Step 1\.0 — Triage cache gate' \
+  "T2.1b: the old colliding heading is gone"
+check_has "$SRC_PHASES" '^### Step 1\.0 — Resume entry gate' \
+  "T2.1c: #257's Step 1.0 keeps its name"
+GATE_BLOCK="$(awk '/^### Step 1\.1a — Triage cache gate/,/^### Step 1\.1 — Triage/' "$SRC_PHASES")"
 check_block_has "$GATE_BLOCK" 'triage_cache = fresh \| stale \| absent' \
   "T2.2: the gate sets exactly one three-state variable"
 for state in fresh stale absent; do
@@ -225,12 +232,12 @@ check_block_has "$GATE_BLOCK" 'worst case is exactly today.s behavior' \
 # Step 1.1 must stop claiming a fresh triage every iteration.
 check_lacks "$SRC_PHASES" 'Run a fresh triage to get current priorities' \
   "T2.11: Step 1.1 no longer promises a fresh triage every iteration"
-check_block_has "$STEP11_BLOCK" 'Step 1\.0 already skipped this on a .fresh. cache' \
+check_block_has "$STEP11_BLOCK" 'Step 1\.1a already skipped this on a .fresh. cache' \
   "T2.12: Step 1.1 defers to the gate above it"
 
 # The 'no open issues remain' stop has to be reachable without a scan, or a
 # reuse run with an emptied backlog never terminates through it.
-check_has "$SRC_PHASES" '.summary\.suggested_order. in a cache Step 1\.0 reused' \
+check_has "$SRC_PHASES" '.summary\.suggested_order. in a cache Step 1\.1a reused' \
   "T2.13: the no-issues-remain stop is reachable from a reused cache"
 
 # ───────────────────────────────────────────────────────────
@@ -386,7 +393,7 @@ check_block_has "$UPDATE_BLOCK" '\*\*in the same iteration\*\*' \
 check_block_lacks "$UPDATE_BLOCK" 'Two triggers, both cheap to evaluate' \
   "T5.16: Step 1.6 no longer claims two triggers of its own"
 
-# The `0` off-switch configuration.md used to advertise does not exist: Step 1.0
+# The `0` off-switch configuration.md used to advertise does not exist: Step 1.1a
 # is evaluated once per run, so `0` only forces a full triage on iteration 1.
 check_lacks "$SRC_CONFIG" 'disable reuse and triage on every iteration' \
   "T5.17: configuration.md dropped the per-iteration off-switch that never existed"
@@ -677,8 +684,10 @@ check_block_has "$LIVEREAD_BLOCK" '\*\*non\*\*-empty live backlog is a' \
 # ───────────────────────────────────────────────────────────
 # T9 (install surface): the built tree carries the same contract
 # ───────────────────────────────────────────────────────────
-check_has "$BUILT_PHASES" '^### Step 1\.0 — Triage cache gate' \
+check_has "$BUILT_PHASES" '^### Step 1\.1a — Triage cache gate' \
   "T9.1: built phases.md ships the triage cache gate"
+check_lacks "$BUILT_PHASES" '^### Step 1\.0 — Triage cache gate' \
+  "T9.1b: built phases.md ships no colliding Step 1.0 heading"
 check_has "$BUILT_PHASES" '^### Step 1\.6 — Update the triage cache after a merge' \
   "T9.2: built phases.md ships the incremental update"
 check_has "$BUILT_PHASES" 'gh issue list --state open --json [a-zA-Z,]*state,updatedAt' \
@@ -760,7 +769,7 @@ check_block_has "$OVERVIEW" 'update the cached order in place' \
 # The phase summary table's own restatement of the same rule.
 check_lacks "$SRC_SKILL" 'a full triage on the first iteration' \
   "T11.4: the Phase 1 table row no longer asserts a triage on iteration 1"
-check_has "$SRC_SKILL" '\*Step 1\.0\* reuses a .fresh. one' \
+check_has "$SRC_SKILL" '\*Step 1\.1a\* reuses a .fresh. one' \
   "T11.5: the Phase 1 table row defers to the cache gate"
 # ...and the loop diagram, which labels the phase an iteration repeats.
 check_lacks "$SRC_SKILL" '^  Phase 1 — Triage +\(skipped in explicit list mode\)' \
@@ -998,6 +1007,170 @@ check_block_lacks "$B_CAPTURE_BLOCK" 'This record is live' \
   "T12.31: built phases.md ships the corrected freshness claim"
 check_block_has "$B_CAPTURE_BLOCK" 'gh issue view N --json state,comments,updatedAt' \
   "T12.32: built phases.md ships the named backstop"
+
+# ───────────────────────────────────────────────────────────
+# T13 (#257 merge reconciliation): the two features coexist
+# ───────────────────────────────────────────────────────────
+# #257 landed a run-state Phase 0 carrying its own `Step 1.0 — Resume entry
+# gate` and `Step 1.0b — Checkpoint procedure`. Four things had to be settled
+# where the two features touch, and every one of them is prose that no other
+# assertion would notice rotting:
+#   R1 the name collision (this file's T2.1/T2.1b/T2.1c above, plus the
+#      cross-file references below),
+#   R2 `queue` in run-state.json vs `summary.suggested_order` in triage.json,
+#   R3 what a `--resume` does to the cached order and to the pick filter,
+#   R4 `--dry-run` for the two steps #258 added that touch a file.
+
+# --- R1: every cross-file reference to the cache gate moved with it. ---
+# `Step 1.0` still exists and still means #257's resume gate, so a blanket
+# rename would have been wrong in both directions. Each file is pinned to the
+# reference it should now carry.
+check_has "$SRC_SKILL" '\*Step 1\.1a\*.s cache gate reads .fresh.' \
+  "T13.1: SKILL.md's Mode Detection points at the renamed gate"
+check_has "$SRC_CONFIG" 'reused by \*Step 1\.1a\*.s cache gate' \
+  "T13.2: configuration.md points at the renamed gate"
+check_has "$SRC_CONFIG" '\*Step 1\.1a\* is evaluated once' \
+  "T13.3: configuration.md's off-switch note points at the renamed gate"
+check_has "$SRC_ERRORS" 'because \*Step 1\.1a\* read the cache as .fresh.' \
+  "T13.4: the error catalog points at the renamed gate"
+check_has "$SRC_EXAMPLES" 'its own \*Step 1\.1a\* gate' \
+  "T13.5: the examples narration points at the renamed gate"
+check_has "$SRC_PROMPTS" 'reused unchanged by \*Step 1\.1a\*.s cache gate' \
+  "T13.6: subagent-prompts.md points at the renamed gate"
+check_has "$SRC_SUMMARY" 'a cache \*Step 1\.1a\* read as .fresh.' \
+  "T13.7: summary-format.md points at the renamed gate"
+# #257's own references must NOT have been renamed with it.
+check_has "$SRC_ERRORS" '\*Step 1\.0\*.s gate resolved to .resumable.' \
+  "T13.8: #257's resume-gate reference is untouched"
+check_has "$SRC_SKILL" 'The resume entry gate, the run lock, and the checkpoints' \
+  "T13.9: SKILL.md still points at Step 1.0 for the resume gate"
+# Exactly one `### Step 1.0` heading in the file — the collision is what R1 fixed.
+STEP10_HEADINGS="$(grep -cE '^### Step 1\.0 — ' "$SRC_PHASES" || true)"
+if [ "$STEP10_HEADINGS" = "1" ]; then
+  pass "T13.10: phases.md has exactly one '### Step 1.0 — ' heading"
+else
+  fail "T13.10: phases.md has $STEP10_HEADINGS '### Step 1.0 — ' headings, expected 1"
+fi
+# The rename has to explain itself where the step is defined, or the next reader
+# renumbers it back.
+check_block_has "$GATE_BLOCK" 'Lettered onto \*Step 1\.1\*' \
+  "T13.11: the gate says why it is lettered onto 1.1"
+check_block_has "$GATE_BLOCK" 'are a different thing entirely' \
+  "T13.12: the gate disambiguates itself from Phase 0's Step 1.0"
+check_block_has "$GATE_BLOCK" 'run-state\.json., not .\.gitissue/triage\.json' \
+  "T13.13: the gate names the file each feature owns"
+
+# --- R2: `queue` and `summary.suggested_order` are two facts, not two copies. ---
+# #257's `--init` writes `queue` from `summary.suggested_order`; #258's Step 1.6
+# mutates `summary.suggested_order` after every merge. Nothing syncs them, and
+# nothing should: the fix is a declared authority, not a second writer.
+check_block_has "$UPDATE_BLOCK" 'Two lists, two facts — never sync them' \
+  "T13.14: Step 1.6 declares the two-list rule"
+check_block_has "$UPDATE_BLOCK" 'live pick order' \
+  "T13.15: Step 1.6 names summary.suggested_order as the live pick order"
+check_block_has "$UPDATE_BLOCK" 'recorded intent at' \
+  "T13.16: Step 1.6 names queue as the run's recorded intent"
+check_block_has "$UPDATE_BLOCK" 'deliberately \*\*not\*\* re-derived here' \
+  "T13.17: Step 1.6 states that it does not re-derive queue"
+check_block_has "$UPDATE_BLOCK" 'this step never patches the run state' \
+  "T13.18: Step 1.6 states that it never writes run-state.json"
+check_block_has "$UPDATE_BLOCK" 'that difference is correct, not drift' \
+  "T13.19: Step 1.6 says the divergence is expected"
+check_block_has "$UPDATE_BLOCK" 'divergence by writing one into the other' \
+  "T13.20: Step 1.6 forbids the sync a reader would otherwise add"
+check_block_has "$UPDATE_BLOCK" 'never from .queue., so re-deriving' \
+  "T13.21: Step 1.6 names what a resume actually reads instead"
+# The cross-reference has to exist at the OTHER home too, or a reader of
+# Step 1.0's payload table never learns the rule.
+RESUME_BLOCK="$(awk '/^### Step 1\.0 — Resume entry gate/,/^### Step 1\.0b/' "$SRC_PHASES")"
+check_block_has "$RESUME_BLOCK" '\| .queue. \|' \
+  "T13.22: Step 1.0 still documents the queue key"
+check_block_has "$RESUME_BLOCK" 'Two lists, two facts' \
+  "T13.23: Step 1.0's queue row points at Step 1.6's rule"
+check_block_has "$RESUME_BLOCK" 're-derived when \*Step 1\.6\*' \
+  "T13.24: Step 1.0's queue row states it is not re-derived per merge"
+
+# --- R3: a resume still runs the gate, and the pick filters the seeded lists. ---
+# A resumed run needs an order, so Step 1.1a runs on that path too; and the
+# cached order it judges may predate merges the interrupted run already made, so
+# only the seeded processed[]/skip_list[] keep those from being re-picked.
+check_block_has "$GATE_BLOCK" 'every path into Phase 1, including .--resume.' \
+  "T13.25: the gate runs on the resume path too"
+check_block_has "$GATE_BLOCK" 'never the order itself' \
+  "T13.26: the gate says the run state does not record the pick order"
+STEP12_BLOCK="$(awk '/^### Step 1\.2 — Pick Next Issue/,/^### Step 1\.2b/' "$SRC_PHASES")"
+check_block_has "$STEP12_BLOCK" 'resume-seeded' \
+  "T13.27: Step 1.2 names the resume-seeded lists"
+check_block_has "$STEP12_BLOCK" '.skip_list\[\]. is seeded straight into the session skip list' \
+  "T13.28: Step 1.2 says the seeded skip list IS the session skip list"
+check_block_has "$STEP12_BLOCK" 'seeded .processed\[\]. rejects an issue the interrupted run already finished' \
+  "T13.29: Step 1.2 states the re-pick hazard the seeding closes"
+check_block_has "$STEP12_BLOCK" 'still four — a resume changes' \
+  "T13.30: the resume clause does not invent a fifth eligibility criterion"
+# tests/test-autopilot-dependency-gate.sh T13.15 pins `session skip list` to the
+# `- **Not skipped**` bullet itself. Mirror that here so a rewrite of the bullet
+# fails in this suite too, not only in the other one.
+if printf '%s' "$STEP12_BLOCK" | grep -E '^- \*\*Not skipped\*\*' | grep -q 'session skip list'; then
+  pass "T13.31: the Not-skipped bullet still names the session skip list"
+else
+  fail "T13.31: the Not-skipped bullet lost the session skip list"
+fi
+# Four buckets, and the resume seeding folds into one of them rather than adding
+# a fifth — the sum is the property the table exists to hold.
+check_block_has "$STEP12_BLOCK" '\| .resumed. \|.*\| .Skipped. \|' \
+  "T13.32: the reason table maps resume seeding to the Skipped bucket"
+check_block_has "$STEP12_BLOCK" 'adds no fifth bucket \*\*on purpose\*\*' \
+  "T13.33: the table says why resume seeding gets no bucket of its own"
+check_block_has "$STEP12_BLOCK" 'counts sum to the candidates' \
+  "T13.34: the bucket sum is still stated as the invariant"
+
+# --- R4: --dry-run for the two steps #258 added. ---
+# #257's convention: every state-mutating call takes `--dry-run`, and Step 1.1
+# drops `--out` so nothing is persisted ahead of the dry-run stop. Step 1.6
+# writes `.gitissue/triage.json`, so it owes the same rule; Step 1.1a only reads.
+check_block_has "$UPDATE_BLOCK" 'Under .--dry-run., compute the removal and print it, but write nothing' \
+  "T13.35: Step 1.6 states the dry-run rule"
+check_block_has "$UPDATE_BLOCK" 'never write .\.gitissue/triage\.json' \
+  "T13.36: Step 1.6 names the file it must not write under --dry-run"
+check_block_has "$GATE_BLOCK" 'read-only, so .--dry-run. does not change it' \
+  "T13.37: Step 1.1a states that it is unaffected by --dry-run"
+check_block_has "$GATE_BLOCK" 'writes nothing at all' \
+  "T13.38: Step 1.1a states that it writes nothing"
+
+# --- Verification: Step 1.6 and Step 5.3's checkpoint own different files. ---
+# My conflict resolution put #257's end-of-iteration checkpoint at the end of
+# Step 5.3 and Step 1.6 immediately after it. Two adjacent post-merge writers is
+# exactly the shape a reader collapses into one.
+check_block_has "$UPDATE_BLOCK" 'End-of-iteration checkpoint' \
+  "T13.39: Step 1.6 names the checkpoint it runs alongside"
+check_block_has "$UPDATE_BLOCK" 'different files' \
+  "T13.40: Step 1.6 says the two own different files"
+CLEANUP_BLOCK="$(awk '/^### Step 5\.3 — Cleanup/,/^### Step 1\.6/' "$SRC_PHASES")"
+check_block_has "$CLEANUP_BLOCK" 'append this issue to .processed\[\]. with its final' \
+  "T13.41: Step 5.3 still carries #257's end-of-iteration checkpoint"
+check_block_lacks "$CLEANUP_BLOCK" 'summary\.suggested_order' \
+  "T13.42: that checkpoint does not duplicate Step 1.6's job"
+
+# --- The built tree ships all of it. ---
+B_GATE_BLOCK="$(awk '/^### Step 1\.1a — Triage cache gate/,/^### Step 1\.1 — Triage/' "$BUILT_PHASES")"
+B_UPDATE_BLOCK="$(awk '/^### Step 1\.6 — Update the triage cache after a merge/,0' "$BUILT_PHASES")"
+B_STEP12_BLOCK="$(awk '/^### Step 1\.2 — Pick Next Issue/,/^### Step 1\.2b/' "$BUILT_PHASES")"
+check_block_has "$B_GATE_BLOCK" 'every path into Phase 1, including .--resume.' \
+  "T13.43: built phases.md ships the resume clause"
+check_block_has "$B_GATE_BLOCK" 'read-only, so .--dry-run. does not change it' \
+  "T13.44: built phases.md ships the gate's dry-run clause"
+check_block_has "$B_UPDATE_BLOCK" 'Two lists, two facts — never sync them' \
+  "T13.45: built phases.md ships the two-list rule"
+check_block_has "$B_UPDATE_BLOCK" 'Under .--dry-run., compute the removal and print it, but write nothing' \
+  "T13.46: built phases.md ships Step 1.6's dry-run rule"
+check_block_has "$B_STEP12_BLOCK" 'resume-seeded' \
+  "T13.47: built phases.md ships the resume-seeded pick filter"
+check_has "$BUILT_CONFIG" 'reused by \*Step 1\.1a\*.s cache gate' \
+  "T13.48: built configuration.md ships the renamed reference"
+check_has "$BUILT_SKILL" '\*Step 1\.1a\*.s cache gate reads .fresh.' \
+  "T13.49: built SKILL.md ships the renamed reference"
+check_has "$BUILT_SUMMARY" 'a cache \*Step 1\.1a\* read as .fresh.' \
+  "T13.50: built summary-format.md ships the renamed reference"
 
 # ───────────────────────────────────────────────────────────
 # Summary

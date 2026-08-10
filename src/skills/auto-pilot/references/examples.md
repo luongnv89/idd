@@ -326,6 +326,60 @@ would. If timeout:
 ```
 Leave PR open, continue to next issue. Non-fatal.
 
+### Interrupted run, resumed
+
+A run is killed (terminal closed, machine rebooted) during Phase 3 of its second
+issue. Re-invoking `/auto-pilot` alone would re-triage, re-pick #42, and the
+resolver would find its own PR — the case that used to end as `skipped`, and,
+worse, as a closed issue behind an unreviewed PR. `--resume` re-enters the run
+instead. Nothing about this depends on the loop *remembering* anything: the
+memory is `.gitissue/run-state.json`, written at each phase boundary.
+
+```
+$ /auto-pilot --resume
+
+● Preflight...
+  ⚠ gi-state: reclaimed a dead-pid lock from run 20260810T0914Z-4471
+  ✓ Run lock acquired (run 20260810T0914Z-4471)
+● Reading recorded run state...
+
+○ Resuming run 20260810T0914Z-4471 — interrupted at phase review
+  Issue:   #42 — Apply new auth middleware to checkout
+  Branch:  fix/42-auth-middleware-checkout (confirmed on GitHub)
+  PR:      #87 (OPEN)
+  Done:    1 issue(s) already processed this run
+
+● Reviewing PR #87...
+  ✓ PR #87 review passed (clean in 1 cycle)
+● Pre-merge: dependency gate... ○ Dependency gate passed
+  ✓ PR #87 merged — #42 closed
+  Outcome: merged
+
+● [Iteration 3/10] Triaging open issues...
+  Selected:   #45 — Add rate-limit headers to the API client
+```
+
+Three things in that transcript are the whole mechanism:
+
+1. **The lock was reclaimed, not refused.** The dead run's `pid` is gone, so the
+   lock is stale and this run takes it with a `⚠`. Had the original run still
+   been alive, the same call would have exited 3 with
+   `✗ Another /auto-pilot run is in progress` and mutated nothing.
+2. **The checkpoint supplied the branch and PR.** Phase 2.3 wrote
+   `{"phase": "review", "current": {"issue": 42, "branch": "fix/42-…", "pr": 87}}`
+   the moment the resolver returned, so the resume knows what exists.
+3. **GitHub, not the file, confirmed it.** The resume ran
+   `gh pr list --head fix/42-auth-middleware-checkout --json number,state` and
+   got `[{"number": 87, "state": "OPEN"}]`. Had that come back empty — branch
+   deleted, PR closed by someone — the gate would have fallen to `absent` and
+   started a fresh run. The state file is a hint; GitHub is the authority. Had
+   it come back `MERGED`, #42 would have gone straight to `processed[]` and the
+   loop to the next issue.
+
+The first issue is not re-processed: it is in `processed[]`, so the resumed run
+skips it and writes no second `runs.jsonl` line for it. The invariant of exactly
+one run-log line per processed issue survives the interruption.
+
 ### PR blocked by an unmerged dependency
 
 Issue #42 declares `Depends on #38` in its body. Auto-pilot resolves both #38 and #42 in the same session, but #38's PR is still open when #42's PR reaches Phase 5:
@@ -361,7 +415,7 @@ Issue #42 declares `Depends on #38` in its body. Auto-pilot resolves both #38 an
 
 The run does **not** end here. #42 is recorded as `blocked_by_dependency`, PR #87 stays open and unchanged, #42 is added to the session skip list (so the pick cannot select it again in this run — the skip list is consulted on every pick, cached or freshly triaged), and iteration 3 starts on the next eligible issue. A 30-issue backlog with one dependency-blocked PR still resolves the other 29. Nothing was merged here, so *Step 1.6* does not run and the cached order is untouched; #42 stays in `summary.suggested_order` and the skip list is what keeps it from being re-picked.
 
-Later, the user reviews and merges PR #84 manually and re-invokes `/auto-pilot`. That new run starts with an empty skip list and its own *Step 1.0* gate — a commit landed since the cached triage, so the cache reads `stale` and the run triages afresh — picks #42 again (still open, PR #87 still waiting), re-evaluates the gate (now satisfied — #38 is CLOSED and PR #84 is MERGED), and merges PR #87.
+Later, the user reviews and merges PR #84 manually and re-invokes `/auto-pilot`. That new run starts with an empty skip list and its own *Step 1.1a* gate — a commit landed since the cached triage, so the cache reads `stale` and the run triages afresh — picks #42 again (still open, PR #87 still waiting), re-evaluates the gate (now satisfied — #38 is CLOSED and PR #84 is MERGED), and merges PR #87.
 
 The gate never merges out of dependency order, but it also never halts the run: the only dependency-related stop is the ordinary `⚠ No eligible issues to pick` condition, once nothing eligible is left. The one remaining stop-and-ask case is the critical-issue review failure.
 

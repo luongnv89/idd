@@ -1106,6 +1106,7 @@ ALLOWED_VARS = {
     "$run_json": "run-log JSON the skill composed; reaches gi-runlog on stdin",
     "$no_run_log": "a flag the skill sets itself, tested by `[ -n … ]`",
     "$issue_body": "reaches gi-deps on stdin through printf, never as an argument",
+    "$PPID": "shell built-in integer pid; reaches gi-state --pid, parsed as int",
 }
 VAR = re.compile(r"\$\{?[A-Za-z_][A-Za-z0-9_]*\}?")
 # Command substitution pastes its output into the command line unquoted. Only

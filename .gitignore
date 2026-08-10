@@ -59,3 +59,9 @@ fable-5-review-*.md
 # regenerable, and can carry issue bodies that are not yet public
 .gitissue/analysis-*.json
 .gitissue/cache/
+
+# /auto-pilot run state, run lock, and last-run report — machine-local, single-run,
+# and regenerated on the next run (docs/config-schema.md → `.gitissue/` carve-out)
+.gitissue/run.lock
+.gitissue/run-state.json
+.gitissue/last-run-report.md

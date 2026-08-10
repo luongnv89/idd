@@ -48,8 +48,11 @@ When in doubt, the auto-pilot proceeds with the safer option rather than stoppin
 | `/auto-pilot --limit N` | Process at most N issues, then stop |
 | `/auto-pilot --dry-run` | Run triage/show execution plan without resolving anything |
 | `/auto-pilot --skip N` | Skip issue #N (add to skip list for this session) |
+| `/auto-pilot --resume` | Resume the interrupted run recorded in `.gitissue/run-state.json` at its recorded phase, reusing the existing branch/PR |
+| `/auto-pilot --fresh` | Ignore any recorded run state and start a new run (the default when no state exists) |
+| `/auto-pilot --force-unlock` | Reclaim a run lock held by a run that is no longer alive, then start |
 
-**Combining flags:** `--issues` can combine with `--dry-run` and `--skip`. It cannot combine with `--limit` (the issue list itself is the limit). Example: `/auto-pilot --issues 5,10,12 --skip 10 --dry-run`
+**Combining flags:** `--issues` can combine with `--dry-run` and `--skip`. It cannot combine with `--limit` (the issue list itself is the limit). Example: `/auto-pilot --issues 5,10,12 --skip 10 --dry-run`. `--resume` cannot combine with `--dry-run` (a resume advances a real run; a dry run mutates nothing) and it cannot combine with `--fresh` (they are opposite answers to the same question). The resume entry gate, the run lock, and the checkpoints live in `references/phases.md` (*Step 1.0*) and `references/preflight.md` (*Run lock*).
 
 ## Prerequisites
 
@@ -126,6 +129,29 @@ Check these files relative to the skill's directory (the dirname of this SKILL.m
 - `references/scripts/gi-ci-wait.py` — CI waiter: polls a PR's checks to a verdict in one invocation, for the Phase 5 pre-merge gate
 - `references/scripts/gi-issue.py` — TTL-cached issue fetcher for the repeat reads across Phases 1, 4, and 5
 - `references/scripts/gi-triage-graph.py` — Phase 1 execution order, status, staleness, and priority
+- `references/scripts/gi-state.py` — run-state, run-lock, and final-report writer (resume, `--force-unlock`, and the `--dry-run` no-mutation guarantee)
+
+**Acquire the run lock before the first mutation.** The auto-stash below writes
+to the repository, so the lock precedes it — run
+`python3 shared/scripts/gi-state.py --lock --pid "$PPID"` from the repo root
+(`$PPID` is the durable agent process, not this one-shot shell — a lock owned by
+a shell that has already exited reads as dead and reclaims itself; add
+`--resume` to that call when `/auto-pilot --resume` was invoked, so the
+continued run keeps its recorded run id instead of minting a second one),
+exactly as the
+*Configuration* step resolves this skill's own script path. Exit 0 means this
+run holds the lock — `acquired`, `reclaimed` (which prints the script's own
+`⚠ gi-state: reclaimed a … lock` line), or, on a `--resume` that finds its own
+lock still live, `reacquired`. All three are evidence about the *lock*, never
+about the recorded run state
+(`references/error-messages.md` → *Recorded run state is stale*); **exit 3
+means another run holds it** — stop and print `✗ Another /auto-pilot run is in
+progress` from `references/error-messages.md`, never degrade past it. No
+`python3`, exit 2, or exit 4: print `⚠ gi-state unavailable` and continue
+unlocked and un-resumable, per the fallback beside every call site in
+`references/preflight.md` (*Run lock*). Release it on **every** exit path. Under
+`--dry-run`, pass `--dry-run` to the lock call as well — a dry run reports who
+holds the lock and acquires nothing.
 
 If the working tree is dirty, auto-stash before starting; if not on the default
 branch, auto-switch and rebase on a clean tree. Both procedures (the stash-first
@@ -205,7 +231,7 @@ The PR review subagent runs `/issue-pr-review --auto --no-merge`, which handles 
 
 The auto-pilot operates in one of two modes based on the invocation:
 
-- **Triage mode** (default) — `/auto-pilot` with no `--issues` flag. Triages **once** at loop start (reusing `.gitissue/triage.json` when *Step 1.0*'s cache gate reads `fresh`), picks the next issue by priority, and updates the cache in place after each merge (*Step 1.6*); a full re-triage runs again only on a pick miss or every `autopilot.retriage_every` iterations. Phase 1 executes normally.
+- **Triage mode** (default) — `/auto-pilot` with no `--issues` flag. Triages **once** at loop start (reusing `.gitissue/triage.json` when *Step 1.1a*'s cache gate reads `fresh`), picks the next issue by priority, and updates the cache in place after each merge (*Step 1.6*); a full re-triage runs again only on a pick miss or every `autopilot.retriage_every` iterations. Phase 1 executes normally.
 - **Explicit list mode** — `/auto-pilot --issues 5,10,12`. The user provides the issues to process. Phase 1 (Triage and Pick) is replaced by an analysis phase that examines all issues, identifies dependencies and shared files, detects batching opportunities, and computes the optimal resolution order.
 
 Detect mode by checking whether `--issues` was provided. If yes, parse the comma-separated list into an ordered array of issue numbers. The list defines both **which** issues to process and **in what order**.
@@ -220,11 +246,12 @@ When the user passes `--issues N1,N2,...`, the triage phase is replaced by an an
 
 ## Loop Overview
 
-A continuous loop, 5 phases per iteration, looping back to Phase 1 until the backlog is done or the limit is reached:
+Phase 0 once, then a continuous loop of 5 phases per iteration, looping back to Phase 1 until the backlog is done or the limit is reached:
 
 ```
 ◆ Auto-Pilot
 ┄┄┄┄┄┄┄┄┄┄┄┄
+  Phase 0 — Run state    once, before the loop: resume gate, then --init
   Phase 1 — Triage/Pick  (triage once at start; skipped in explicit list mode)
   Phase 2 — Resolve      subagent: 6-step resolve pipeline
   Phase 3+4 — Review-Fix /issue-pr-review --auto --no-merge (review+fix, x3 max)
@@ -246,11 +273,12 @@ line is printed.
 
 ## Phase Details
 
-Each iteration runs 5 phases. For brevity, the full step-by-step per-phase specification (including subagent prompts, followup-issue template, merge gates, and force-resolution fallbacks) lives in `references/phases.md`. The summary below lists the phases — read `references/phases.md` when implementing or debugging a specific phase.
+Phase 0 runs **once**, before the loop; each iteration then runs 5 phases. For brevity, the full step-by-step per-phase specification (including subagent prompts, followup-issue template, merge gates, and force-resolution fallbacks) lives in `references/phases.md`. The summary below lists the phases — read `references/phases.md` when implementing or debugging a specific phase.
 
 | Phase | Name | Purpose | Subagent? |
 |-------|------|---------|-----------|
-| 1 | Triage and Pick | Pick from the triage cache (*Step 1.0* reuses a `fresh` one; a full triage runs only when it does not, or on a forced re-triage), capture `{issue_payload}` (trimmed to `{issue_payload_ids}` for the reviewer) + `{triage_context}` for the spawns (*Step 1.2b*) | no (main agent) |
+| 0 | Run state | **Mandatory, before Phase 1** (and before the first entry in explicit list mode): resolve the resume gate to `resumable`/`stale`/`absent`, then `--init` the run state a later `--resume` reads. Every phase below checkpoints into it (*Step 1.0*, *Step 1.0b*) | no (main agent) |
+| 1 | Triage and Pick | Pick from the triage cache (*Step 1.1a* reuses a `fresh` one; a full triage runs only when it does not, or on a forced re-triage), capture `{issue_payload}` (trimmed to `{issue_payload_ids}` for the reviewer) + `{triage_context}` for the spawns (*Step 1.2b*) | no (main agent) |
 | 2 | Resolve | Sync to default branch, run the full resolve pipeline | yes (/issue-resolver) |
 | 3-4 | PR Review | Run /issue-pr-review --auto --no-merge with up to 3 fix cycles + CI monitoring | yes (/issue-pr-review) |
 | 5 | Merge | Verify mergeability (*Step 5.1a* decides on its own conditions whether the reviewer's `ci_status` may stand in for the CI wait — never restate them here), squash-merge, close the issue, create follow-up if needed | no (main agent) |
@@ -296,6 +324,13 @@ a `skipped_reason`) — **except** the in-batch `already resolved in batch` skip
 which writes **no** line (already logged at batch time). This is the same
 append-only run log written by `/issue-resolver`; the schema lives in
 `docs/run-log-schema.md`.
+
+**The run log is not the run state.** `.gitissue/runs.jsonl` is append-only
+cross-run telemetry, one line per processed issue, and nothing rewrites a prior
+line; `.gitissue/run-state.json` is a mutable, single-run, machine-local
+checkpoint that the next run overwrites. Writing a checkpoint never writes a
+run-log line and vice versa — the single-writer rule below is unchanged by
+resume support.
 
 **Auto-pilot is the single writer per processed issue** — the resolver runs with
 `--no-run-log` and returns its telemetry instead of appending. Two contracts keep
@@ -345,7 +380,14 @@ The loop stops when any of these conditions are met — except the rows marked *
 | Merge blocked (CI/conflicts) | `⚠ PR #{pr_number} is not mergeable — PR left open, continuing` (`left_open`, *loop continues*) |
 | Mode forbids merge (clean PR in `conservative`) | `○ PR #{pr_number} ready for manual merge (mode: conservative)` (`left_open`, *loop continues*) |
 | PR blocked by an unmerged dependency | `⚠ BLOCKED — PR #{pr_number} cannot merge until dependency #{N} is merged` (PR left open, `blocked_by_dependency`, issue added to the session skip list, *loop continues*) |
+| Run lock held by a live run | `✗ Another /auto-pilot run is in progress` (the loop never starts; nothing is mutated) |
 | User cancellation | `○ Auto-pilot stopped by user` |
+
+**Release the run lock on every exit path** — every row above, the critical-issue
+pause, and any unhandled failure. The last action of the run is
+`python3 shared/scripts/gi-state.py --unlock`; a lock left behind blocks the
+next run until its TTL expires or `--force-unlock` reclaims it. When the script
+is unavailable, delete `.gitissue/run.lock` by hand.
 
 ---
 
@@ -353,7 +395,7 @@ The loop stops when any of these conditions are met — except the rows marked *
 
 When the loop ends (for any reason), print a structured step-by-step summary showing each iteration's outcome. Each iteration is tagged with one of six categorical outcomes: **`merged`**, **`left_open`**, **`partial_followup`**, **`blocked_by_dependency`**, **`failed`**, **`skipped`**.
 
-The full outcome-meaning table, the summary template, and the batch-mode delta live in `references/summary-format.md` — read that file when printing the final summary.
+The full outcome-meaning table, the summary template, and the batch-mode delta live in `references/summary-format.md` — read that file when printing the final summary. **Persist it**: after printing, write the same summary to `.gitissue/last-run-report.md` by piping the report payload into `python3 shared/scripts/gi-state.py --report` (the markdown arrives on stdin, never on a command line — it carries issue titles), then release the run lock. A dry run skips both writes. The payload schema and the degrade-to-`Write`-tool fallback are in `references/summary-format.md` (*Persisted run report*).
 
 ---
 

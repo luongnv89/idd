@@ -78,7 +78,38 @@ FAIL=0
 # reinstating one whole document across the skills that excerpt it costs on the
 # order of 165KB (config-schema.md is 27.5KB x 6 non-init skills), so a
 # regression of that shape fails this assertion by more than 3x the headroom.
-BUDGET=508900
+# Raised to 512,029 in issue #257, which documents three new `.gitissue/`
+# artifacts — `run-state.json`, `run.lock`, `last-run-report.md` — and the
+# carve-out saying they are machine-local and gitignored, contradicting the
+# blanket "the directory should be committed" line directly above them. Measured,
+# not estimated: config-schema.md is the only bundled doc that grew, by 447
+# authored bytes, and it ships to 7 skills = +3,129 measured across the bundle,
+# 508,612 -> 511,741 (excerpts differ, so this is the measured total, not
+# 447 x 7). It is the only raise in the change: the run
+# lock, the resume gate and the checkpoints are all documented in auto-pilot's
+# own references/, which this budget does not cover.
+#
+# Compression paid for most of it first, in this same document, exactly as the
+# failure message below asks. The first draft cost +1,556 authored bytes
+# (+10,604 here) with one table row per artifact and a nine-line carve-out; it
+# now costs 447, because the three artifacts share **one** row that points at
+# `references/preflight.md` and `references/phases.md` for the lock mechanics
+# rather than restating the TTL, the pid rule and the O_EXCL create in a
+# document 7 skills carry. Four neighbours were compressed to the same standard
+# on the way past: the `runs.jsonl` row (which restated the single-writer rule
+# its own subsection already owns), that subsection, the model-suggestion
+# blockquote, and the section intro. The budget holds the 288 bytes of headroom
+# that preceded it, byte for byte — 511,741 + 288 — so the ratchet is not
+# widened and the next addition still has to compress something first.
+#
+# Issue #258 merged into that line without moving it. Both branches had
+# compressed the SAME prose in this document to pay for their own additions, so
+# the merge kept one payment and both sets of additions — #258's two
+# `autopilot.*` keys plus its `/auto-pilot` writer note on `triage.json`, +2,140
+# measured across the bundle against 288 bytes of headroom. The overrun was paid
+# the way this message asks, by compressing the `.gitissue/` section again rather
+# than by raising the line: 512,222 -> 512,012, and the ratchet still holds.
+BUDGET=512029
 
 pass() { echo "  ✓ $1"; PASS=$((PASS + 1)); }
 fail() { echo "  ✗ $1"; FAIL=$((FAIL + 1)); }
