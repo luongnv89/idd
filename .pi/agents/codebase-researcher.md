@@ -127,7 +127,16 @@ Read-only reconnaissance: extract search targets from the issue, scan the codeba
 ### Phase 0 — Already resolved?
 
 - **0a — git history:** `git log --all --oneline --grep="Closes #N" --grep="Fixes #N" --grep="Resolves #N" --since="6 months ago"`. If a matching commit is on the default branch (`git branch --contains <sha> | grep -E "(main|master)"`), report `already_resolved: true` with details and **stop**.
-- **0b — open PRs:** `gh pr list --state open --json number,title,body,headRefName --limit 20`. If a PR body has `Closes/Fixes/Resolves #N`, report `pr_in_progress: true` with the PR number and **stop**.
+- **0b — PRs targeting this issue:** two scoped reads, never one `--state all`:
+
+  ```bash
+  gh pr list --state open   --json number,title,body,headRefName,baseRefName,state --limit 20
+  gh pr list --state merged --json number,title,body,headRefName,baseRefName,state --limit 20
+  ```
+
+  `gh pr list` returns the *most recent* N matches, so a single `--state all --limit 20` lets merged PRs consume the window and drop the one open PR targeting this issue out of it on a busy repo. Each window is dedicated to the question it answers: the first to "is someone working on it", the second to "is it done".
+
+  If a PR body has `Closes/Fixes/Resolves #N`, report the match with its **`pr_number`, `branch_name` (`headRefName`) and `pr_state`** — the state, never a bare boolean, because the caller must tell "someone is working on it" from "it is done". A `MERGED` PR is closing evidence **only when its `baseRefName` is the default branch** (`git symbolic-ref --short refs/remotes/origin/HEAD` → the trailing name, or `gh repo view --json defaultBranchRef`): report `already_resolved: true`. This is the same rule 0a applies to a closing commit, and it matters more here — `already_resolved` is the one status that still auto-closes the issue, so a PR merged into a feature or release branch must not close it. A `MERGED` PR on any other base is noted and the scan continues. An `OPEN` PR is work in flight: report `pr_in_progress: true` and let the caller decide (it must **not** close the issue). A `CLOSED` unmerged PR is neither — note it and continue the scan. **Stop** on either report.
 - **0c — code evidence:** if the bug's error message / failing condition no longer exists in the code, set `possibly_already_fixed: true` but **continue** (caller decides).
 
 ### Phase 1 — Extract targets
@@ -173,6 +182,7 @@ Return a single JSON object (nothing outside the block):
   "status": {
     "already_resolved": false,
     "pr_in_progress": false,
+    "matched_pr": { "number": null, "state": null, "branch_name": null },
     "possibly_already_fixed": false,
     "resolution_details": null
   },

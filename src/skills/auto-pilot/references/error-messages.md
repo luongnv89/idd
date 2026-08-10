@@ -83,6 +83,53 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 **Trigger:** Preflight step 9 finds `gh repo view --json viewerPermission` is `READ`, `TRIAGE`, or `NONE`.
 **Action:** Downgrade to no-merge mode — run the full loop but skip Phase 5 (merge), leaving all PRs open. Non-fatal — auto-pilot continues.
 
+## Run State & Lock
+
+### Another run is in progress (fatal)
+```
+✗ Another /auto-pilot run is in progress
+
+  Holder:  run {run_id} — pid {pid} on {host}, started {age} ago
+  Nothing was mutated: the lock is taken before the first stash, branch,
+  or push, so this run stopped before touching the working tree.
+
+  To fix:  wait for that run to finish, or — if it is gone —
+           /auto-pilot --force-unlock
+  Docs:    https://github.com/luongnv89/idd/blob/main/docs/config-schema.md
+```
+**Trigger:** `--lock` exits 3 — `.gitissue/run.lock` exists, is younger than the TTL (default 3600s), and its `pid` is alive on this host (or the lock was taken on another host, where liveness cannot be checked).
+**Action:** Stop before any mutation. Exit 3 is a stop, never a degrade: starting anyway is the concurrent-mutation case the lock exists to prevent.
+
+### Resuming an interrupted run
+```
+○ Resuming run {run_id} — interrupted at phase {phase}
+  Issue:   #{issue_number} — {issue_title}
+  Branch:  {branch_name} (confirmed on GitHub)
+  PR:      #{pr_number} ({pr_state})
+  Done:    {processed_count} issue(s) already processed this run
+```
+**Trigger:** `/auto-pilot --resume` and *Step 1.0*'s gate resolved to `resumable` — the recorded state parsed, and `gh pr list --head "{branch_name}"` confirms the recorded PR.
+**Action:** Re-enter at the recorded phase on the recorded branch/PR; never re-resolve the issue and never open a second PR.
+
+### Recorded run state is stale
+```
+⚠ Recorded run state is stale — starting fresh
+
+  Reason: {corrupt state file | recorded branch has no PR | --fresh requested}
+  The recorded state is a hint, never an authority: when GitHub disagrees
+  with it, GitHub wins.
+```
+**Trigger:** *Step 1.0*'s gate resolved to `stale` — the read reported `corrupt`, the recorded phase is unknown, `--fresh` was passed, or the branch/PR reconciliation failed. Those four conditions are the whole list. A **reclaimed or re-acquired lock is not one of them**: a genuine `--resume` either finds its own lock still live and re-acquires it in place (`reacquired` — the agent process outlived the loop) or finds it dead-pid stale and reclaims it (`reclaimed` — the whole process is gone). Both are ordinary, both exit 0, and treating either as stale *state* would `--init` over the very state the resume is about to read. A reclaimed lock prints the script's own `⚠ gi-state: reclaimed a … lock` line; a re-acquired one prints nothing at all. Neither says anything about the recorded state.
+**Action:** `--init` over the old state and run the full loop from Phase 1. Non-fatal.
+
+### gi-state unavailable (degrade)
+```
+⚠ gi-state unavailable — running without the run lock
+  This run is not resumable; checkpoints are skipped.
+```
+**Trigger:** No `python3`, exit 2 (the script path did not resolve), or exit 4 (the write failed) from any `gi-state.py` call. A **missing bundled file** is different — that is a broken install, and the `✗ Missing bundled dependency` block above is the answer.
+**Action:** Follow the prose fallback beside the call site in `references/preflight.md` (*Run lock*) and continue. The loop's own work is unaffected; only resume is lost.
+
 ## Explicit List Mode
 
 ### Empty issue list
@@ -191,8 +238,16 @@ byte-identical to the one in `references/phases.md` (*Step 1.2*).
 ```
 ○ #{issue_number} already resolved — skipping
 ```
-**Trigger:** Resolver subagent returns `already_resolved` status.
+**Trigger:** Resolver subagent returns `already_resolved` status — closing evidence, meaning a **merged** PR or a closing commit on the default branch.
 **Action:** Skip review/fix/merge phases, continue to next iteration.
+
+### Issue already has an open PR (review it)
+```
+○ #{issue_number} already has PR #{pr_number} — reviewing the existing PR
+  Branch: {branch_name}
+```
+**Trigger:** Resolver subagent returns `pr_in_progress` with a `pr_number` — an open, unmerged PR already targets this issue (often one an interrupted run created).
+**Action:** Route into Phase 3 review of that PR, reusing the reported branch and PR; the iteration then reaches its ordinary outcome. **Never close the issue** — an unreviewed, unmerged PR is not a resolution. With no `pr_number` in the report-back, record `skipped` with `skipped_reason: pr_in_progress` and leave the issue open.
 
 ### Resolve failure (pause mode — opt-in)
 ```
