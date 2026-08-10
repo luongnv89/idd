@@ -760,6 +760,26 @@ expect_grep "AC2: the researcher reports the matched PR's merge state" \
 expect_grep "AC2: the researcher returns the matched PR in its status block" \
   "matched_pr" "$RESEARCHER"
 
+# `gh pr list` returns the most recent N matches, so one --state all window lets
+# merged PRs crowd out the open PR targeting this issue. Two scoped reads keep
+# each window dedicated to the question it answers.
+# The prose still names `--state all` to say why it is wrong, so the negative
+# is on the invocation, not on the mention.
+if grep -q -- "gh pr list --state all" "$RESEARCHER"; then
+  fail "AC2: the researcher still reads PRs with a single --state all window"
+else
+  pass "AC2: the researcher no longer spends one window on both PR questions"
+fi
+expect_grep "AC2: the researcher reads open PRs in their own window" \
+  "gh pr list --state open" "$RESEARCHER"
+expect_grep "AC2: the researcher reads merged PRs in their own window" \
+  "gh pr list --state merged" "$RESEARCHER"
+# already_resolved is the one status that still auto-closes, so a MERGED PR is
+# closing evidence only on the default branch — the rule Phase 0a already
+# applies to a closing commit.
+expect_grep "AC2: closing evidence from a MERGED PR is gated on the base branch" \
+  "baseRefName" "$RESEARCHER"
+
 # The report-back must carry the identifiers Phase 2.3 routes on.
 expect_grep "AC2: the resolver spawn prompt reports pr_in_progress" \
   "pr_in_progress" "$AP_PROMPTS"
