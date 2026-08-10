@@ -111,6 +111,7 @@ echo "◆ Auto-Pilot Triage Cache Tests (issue #258)"
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 
 SRC_PHASES="$REPO_ROOT/src/skills/auto-pilot/references/phases.md"
+SRC_CONFIG="$REPO_ROOT/src/skills/auto-pilot/references/configuration.md"
 SRC_SKILL="$REPO_ROOT/src/skills/auto-pilot/SKILL.source.md"
 SRC_PROMPTS="$REPO_ROOT/src/skills/auto-pilot/references/subagent-prompts.md"
 SRC_SUMMARY="$REPO_ROOT/src/skills/auto-pilot/references/summary-format.md"
@@ -119,15 +120,16 @@ SRC_TRIAGE_SKILL="$REPO_ROOT/src/skills/issue-triage/SKILL.source.md"
 SCHEMA="$REPO_ROOT/docs/config-schema.md"
 
 BUILT_PHASES="$REPO_ROOT/skills/auto-pilot/references/phases.md"
+BUILT_CONFIG="$REPO_ROOT/skills/auto-pilot/references/configuration.md"
 BUILT_SKILL="$REPO_ROOT/skills/auto-pilot/SKILL.md"
 BUILT_PROMPTS="$REPO_ROOT/skills/auto-pilot/references/subagent-prompts.md"
 BUILT_SUMMARY="$REPO_ROOT/skills/auto-pilot/references/summary-format.md"
 BUILT_PERSIST="$REPO_ROOT/skills/issue-triage/references/output-and-persist.md"
 
-for file in "$SRC_PHASES" "$SRC_SKILL" "$SRC_PROMPTS" "$SRC_SUMMARY" \
+for file in "$SRC_PHASES" "$SRC_CONFIG" "$SRC_SKILL" "$SRC_PROMPTS" "$SRC_SUMMARY" \
             "$SRC_PERSIST" "$SRC_TRIAGE_SKILL" "$SCHEMA" "$GRAPH" \
-            "$BUILT_PHASES" "$BUILT_SKILL" "$BUILT_PROMPTS" "$BUILT_SUMMARY" \
-            "$BUILT_PERSIST"; do
+            "$BUILT_PHASES" "$BUILT_CONFIG" "$BUILT_SKILL" "$BUILT_PROMPTS" \
+            "$BUILT_SUMMARY" "$BUILT_PERSIST"; do
   if [ -f "$file" ]; then
     pass "exists: ${file#$REPO_ROOT/}"
   else
@@ -227,8 +229,16 @@ check_block_has "$UPDATE_BLOCK" 'counting the records that remain' \
   "T3.9: counts are recomputed by counting, not by arithmetic"
 check_block_has "$UPDATE_BLOCK" 'Could not update the triage cache' \
   "T3.10: a failed update degrades to a re-triage rather than stopping the loop"
-check_block_has "$UPDATE_BLOCK" 'only after \*Step 5\.2\* merged' \
-  "T3.11: the update runs only after a merge actually closed an issue"
+# The trigger is "a merge closed an issue", not "Step 5.2 ran". Scoping it to
+# Step 5.2 alone leaves the Phase 3-4 partial-merge path (`aggressive` +
+# `merge_partial: true`) closing an issue that stays in `summary.suggested_order`
+# and on no skip list — Step 1.2 re-picks it on the next iteration.
+check_block_has "$UPDATE_BLOCK" 'Run it after \*\*any step that merged a PR and closed its issue\*\*' \
+  "T3.11: the update runs after ANY step that merged and closed an issue"
+check_block_has "$UPDATE_BLOCK" '\*Phase 3-4 Step 2b\*.s .partial_followup. merge' \
+  "T3.11b: the update names the Phase 3-4 partial merge beside Step 5.2"
+check_block_has "$UPDATE_BLOCK" 'Fail-safe: any doubt is .run it' \
+  "T3.11c: the update states which way it fail-safes"
 
 # The persisted schema is /issue-triage's. A second writer is only safe while it
 # adds no field, so the cross-skill contract lives in the schema's own document.
@@ -240,6 +250,17 @@ check_has "$SRC_PERSIST" 'Exactly one appended .history' \
   "T3.14: the schema doc states the one-history-entry invariant"
 check_has "$SRC_PERSIST" 'no field is added, none is removed' \
   "T3.15: the schema doc states that the schema itself is unchanged"
+
+# The widened trigger is only real if the OTHER merge site points back at it.
+# Step 1.6 sits at the far end of the file, so a reader working through Phase 3-4
+# would otherwise never learn that its merge owes the cache an update.
+STEP2B_BLOCK="$(awk '/^\*\*Step 2b — Merge/,/^#### Critical issues/' "$SRC_PHASES")"
+check_block_has "$STEP2B_BLOCK" 'run \*Step 1\.6 — Update the triage cache after a merge\*' \
+  "T3.16: the Phase 3-4 partial merge points at the cache update"
+check_block_has "$STEP2B_BLOCK" 'for \*Step 1\.2\* to pick again next iteration' \
+  "T3.17: that pointer names the re-pick hazard a skipped update creates"
+check_block_has "$STEP2B_BLOCK" 'failed-merge path below closed nothing' \
+  "T3.18: a failed partial merge is excluded — it closed no issue"
 
 # ───────────────────────────────────────────────────────────
 # T4 (#256 regression guard): the body comes from one post-pick fetch
@@ -312,6 +333,38 @@ check_lacks "$SRC_SUMMARY" 'Triage refreshed' \
   "T5.9: the Phase 1 check no longer asserts a per-iteration refresh"
 check_has "$SRC_SUMMARY" 'Triage current' \
   "T5.10: the Phase 1 check is true for a reused cache too"
+
+# `retriage_required` is a flag, and a flag needs a clear as much as a set.
+# Set at Step 1.2's pick miss and at Step 1.6 (trigger + degrade), cleared
+# nowhere, a single degrade would re-triage on every remaining iteration —
+# contradicting Step 1.6's own "costs one full triage" claim.
+check_block_has "$STEP11_BLOCK" 'clears .retriage_required. as it runs' \
+  "T5.11: Step 1.1 clears retriage_required as it runs"
+check_block_has "$STEP11_BLOCK" 'Set in two places' \
+  "T5.12: Step 1.1 is the single home of the flag's whole lifecycle"
+check_block_has "$UPDATE_BLOCK" 'costs \*\*one\*\* full triage' \
+  "T5.13: the degrade costs one triage, not one per remaining iteration"
+
+# One timing per trigger. Step 1.2 retries in-iteration; Step 1.6 runs only
+# after a merge, so a pick miss cannot reach it at all — restating it there as a
+# next-iteration trigger is two answers to one question.
+check_block_has "$UPDATE_BLOCK" 'A pick miss is not a trigger here' \
+  "T5.14: Step 1.6 defers the pick miss to Step 1.2 instead of restating it"
+check_block_has "$UPDATE_BLOCK" '\*\*in the same iteration\*\*' \
+  "T5.15: Step 1.6 records the pick-miss retry's real timing"
+check_block_lacks "$UPDATE_BLOCK" 'Two triggers, both cheap to evaluate' \
+  "T5.16: Step 1.6 no longer claims two triggers of its own"
+
+# The `0` off-switch configuration.md used to advertise does not exist: Step 1.0
+# is evaluated once per run, so `0` only forces a full triage on iteration 1.
+check_lacks "$SRC_CONFIG" 'disable reuse and triage on every iteration' \
+  "T5.17: configuration.md dropped the per-iteration off-switch that never existed"
+check_has "$SRC_CONFIG" 'refuse any pre-existing cache' \
+  "T5.18: configuration.md matches config-schema's '0 disables reuse'"
+check_has "$SRC_CONFIG" '.retriage_every: 1. is the key that forces a full triage every iteration' \
+  "T5.19: configuration.md points at the key that does re-triage every iteration"
+check_has "$SCHEMA" '0 disables reuse' \
+  "T5.20: config-schema still states the same meaning for 0"
 
 # ───────────────────────────────────────────────────────────
 # T6: the ordering engine keeps exactly its two call sites
@@ -504,6 +557,16 @@ check_has "$BUILT_SUMMARY" 'Triage current' \
   "T9.10: built summary-format.md ships the reuse-safe check name"
 check_has "$BUILT_PERSIST" 'Cross-skill incremental updates' \
   "T9.11: built output-and-persist.md ships the cross-skill writer contract"
+check_has "$BUILT_PHASES" 'Run it after \*\*any step that merged a PR and closed its issue\*\*' \
+  "T9.12: built phases.md ships the widened cache-update trigger"
+check_has "$BUILT_PHASES" 'run \*Step 1\.6 — Update the triage cache after a merge\*' \
+  "T9.13: built phases.md ships the Phase 3-4 partial-merge pointer"
+check_has "$BUILT_PHASES" 'clears .retriage_required. as it runs' \
+  "T9.14: built phases.md ships the retriage_required clear"
+check_has "$BUILT_PHASES" 'A pick miss is not a trigger here' \
+  "T9.15: built phases.md ships one timing for the pick-miss retry"
+check_has "$BUILT_CONFIG" 'refuse any pre-existing cache' \
+  "T9.16: built configuration.md ships the corrected off-switch wording"
 
 # ───────────────────────────────────────────────────────────
 # Summary

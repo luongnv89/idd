@@ -68,6 +68,15 @@ Run a full triage. Step 1.0 already skipped this on a `fresh` cache, and Step
 ● [Iteration {i}/{max}] Triaging open issues...
 ```
 
+**When this step runs — and the one flag's whole lifecycle.** Step 1.1 runs
+when `triage_cache` was not `fresh` on the first iteration, or when
+`retriage_required` is set, and it **clears `retriage_required` as it runs**.
+Set in two places (*Step 1.2*'s pick-miss retry, and *Step 1.6*'s
+`retriage_every` trigger and degrade path), cleared in this one, and nowhere
+else — that is the entire lifecycle. Clearing it here is what makes those two
+places cost *one* full triage each: a flag left set would re-triage on every
+remaining iteration, which is the duplicated work *Step 1.0* exists to remove.
+
 That banner belongs to the scan, so it prints only on an iteration that
 actually triages — the first one, plus any later one a pick miss or
 `autopilot.retriage_every` forces. On a reuse iteration the `[Iteration
@@ -530,6 +539,13 @@ gh pr merge {pr_number} --squash --delete-branch
   Continuing to next issue...
 ```
 
+**Before continuing, run *Step 1.6 — Update the triage cache after a merge*.**
+This merge closed `#{issue_number}` exactly as finally as Step 5.2's does, and
+Step 1.6 is the only thing that takes a closed issue back out of
+`summary.suggested_order` — a partial merge that skips it leaves the issue in
+the cached order, on no skip list, for *Step 1.2* to pick again next iteration.
+The failed-merge path below closed nothing, so it runs nothing.
+
 If the merge command itself fails (branch protection, etc.):
 ```
   ⚠ Merge failed for PR #{pr_number} — PR left open
@@ -908,11 +924,19 @@ git branch -d {branch_name} 2>/dev/null
 ### Step 1.6 — Update the triage cache after a merge
 
 Numbered in Phase 1 because it maintains Phase 1's payload; executed here
-because a merge is what makes it necessary. Run it only after *Step 5.2* merged
-the PR and closed the issue. A PR left open, a failed resolve, a
+because a merge is what makes it necessary.
+
+Run it after **any step that merged a PR and closed its issue** —
+*Step 5.2*'s clean merge, and *Phase 3-4 Step 2b*'s `partial_followup` merge,
+which closes the issue exactly as finally. A PR left open, a failed resolve, a
 dependency-blocked gate: none of those closed an issue, so none of them changes
 the backlog and none of them runs this step — the session skip list is already
 what keeps the loop from re-picking them.
+
+**Fail-safe: any doubt is "run it."** The update is removal-only and keyed to
+the one number this run just closed, so applying it to an issue the payload no
+longer carries is a no-op; skipping it leaves a closed issue in
+`summary.suggested_order`, on no skip list, for *Step 1.2* to pick again.
 
 Read `.gitissue/triage.json`, apply **removal only**, and write it back with the
 Write tool:
@@ -951,17 +975,21 @@ un-satisfy a constraint on any node that remains. Anything beyond deletion — a
 newly filed issue, a new dependency marker, a changed label — is outside what
 this step can honestly do and goes through a full re-triage instead.
 
-**When a full re-triage runs instead.** Two triggers, both cheap to evaluate:
+**When a full re-triage runs instead.** One trigger lives here, and it is cheap
+to evaluate:
 
-- **A pick miss** — *Step 1.2* found nothing eligible while unresolved,
-  non-skipped issues remain. That is the order having drifted from the backlog,
-  which is exactly what a re-triage repairs.
 - **`autopilot.retriage_every`** (default `0`, meaning never) — when set to `N`,
   force a full triage on every `N`-th iteration after a merge, so a long
   unattended run periodically re-reads a backlog other people may be filing into.
 
-Either one sets `retriage_required`, and *Step 1.1* runs in full on the next
-iteration.
+It sets `retriage_required`, and *Step 1.1* runs in full on the next iteration
+and clears the flag as it runs.
+
+**A pick miss is not a trigger here.** *Step 1.2* owns it, and handles it
+**in the same iteration** — re-enter Step 1.1 once, re-run the pick. A pick miss
+cannot reach this step in any case, because this step runs only after a merge.
+Stating it in both places with two different timings is how the two steps drift
+apart; *Step 1.2* is the single home of that retry.
 
 **Degrade.** If the file cannot be parsed, or the write-back fails, print
 
@@ -970,8 +998,9 @@ iteration.
 ```
 
 set `retriage_required`, and carry on. This step never stops the loop: a cache
-that could not be updated costs one full triage, which is what every iteration
-paid before this gate existed.
+that could not be updated costs **one** full triage — *Step 1.1* clears the flag
+as it runs, so the cost is the next iteration's scan and not every iteration's
+from here on — which is what every iteration paid before this gate existed.
 
 ```
 ✓ Triage cache updated — #{issue_number} resolved, {n} remain
