@@ -172,6 +172,28 @@ check_block_has "$PAYLOAD_BLOCK" 'gh issue view N --json state' \
 check_has "$SRC_CONV" 'Step 0a closed / not-found stops' \
   "T1.14: the exclusion list's home names 0a's two stops"
 
+# The payload is Phase 1's list record, which does NOT carry `comments` — while
+# 0a's own fetch does, and Step 1 hands `comments` to the researcher, whose
+# Phase 1 parses them for error text and file paths. And a payload's `updatedAt`
+# has exactly the staleness window the gate already refuses to trust for `state`:
+# an issue edited between the caller's list and this spawn would read as unedited
+# and #254's Step 0h would call a superseded analysis `fresh`. One widened live
+# read covers both at no extra call.
+check_block_has "$PAYLOAD_BLOCK" 'gh issue view N --json state,comments,updatedAt' \
+  "T1.15: the live re-verify covers state, comments AND updatedAt in one call"
+check_block_has "$PAYLOAD_BLOCK" "condition 5 compares this live value, never the payload's" \
+  "T1.16: Step 0h's condition 5 reads the LIVE updatedAt, never the payload's"
+check_block_has "$PAYLOAD_BLOCK" 'except .comments.' \
+  "T1.17: the supplied row states the payload carries 0a's fields except comments"
+check_has "$SRC_RES_SKILL" 'gh issue view N --json state,comments,updatedAt' \
+  "T1.18: the SKILL clause names the same widened live read, first read wins"
+# The batch spawn hands over one record per batched issue, which can never parse
+# as the single object the `supplied` row describes. Without a per-issue reading
+# rule the gate is unreachable for every batch, and the batch prompt's claim to
+# use the block contradicts it.
+check_block_has "$PAYLOAD_BLOCK" 'Batched spawns carry one record per issue' \
+  "T1.19: the gate says how a multi-record batch block is read — per issue"
+
 # ───────────────────────────────────────────────────────────
 # T2 (AC2): triage_context is a sibling payload key with a
 # WEAKER guarantee than prior_analysis, and the difference is
@@ -250,6 +272,17 @@ check_block_has  "$ABSENT_ROW" 'failed@' \
   "T3.6c: the absent row is where a failed verdict lands"
 check_block_has "$CI_GATE_BLOCK" 'Head-SHA equality does not cover a moved base' \
   "T3.6d: the gate scopes its claim to this head and names the moved-base gap"
+# The corroboration must be POSITIVE. "no red check in the rollup" is satisfied by
+# a rollup that shows NOTHING — empty, absent, or unreadable — and that is exactly
+# the case the wait it replaces treats as not-clean (`gi-ci-wait.py`'s `none`
+# counts as clean only when `none_confirmed` is true). A negative reading fails
+# OPEN on a merge decision; every other gate in #256 fails toward more work.
+check_block_has "$TRUSTED_ROW" 'statusCheckRollup. is non-empty with every check in it green' \
+  "T3.6e: the trusted row itself requires a non-empty, all-green rollup"
+check_block_has "$CI_GATE_BLOCK" 'empty, absent from the reply, or unreadable' \
+  "T3.6f: an empty or unreadable rollup is absent, not trusted"
+check_block_has "$CI_GATE_BLOCK" 'harder to forge than a PR-body marker' \
+  "T3.6g: the provenance claim is bounded — harder to forge, not attacker-free"
 check_block_has "$CI_GATE_BLOCK" 'review\.adaptive_depth: false. disables this gate' \
   "T3.7: the existing adaptive switch is the off-switch — no new config key"
 # #255's literal must survive: CI is never skipped by the QA handoff marker.
@@ -319,6 +352,13 @@ check_block_has "$STATE_BLOCK" 'new config key is introduced' \
   "T4.8: the existing adaptive switch is the off-switch — no new config key"
 check_has "$SRC_RES_SKILL" 'Under .auto_test., not over it' \
   "T4.9: the SKILL's Step 5 clause states the layering, first read wins"
+# The single home above declares itself the only place either definition is
+# stated, then SKILL.md restates the comparison inline — and SKILL.md is the
+# always-loaded file while pipeline-steps.md is progressive disclosure, so the
+# restatement is the copy an agent acts on. A restatement that gives only SHA
+# equality IS the looser second definition the home exists to prevent.
+check_has "$SRC_RES_SKILL" 'equals .git rev-parse HEAD. \*\*and .git status --porcelain. is empty\*\*' \
+  "T4.9b: the SKILL's restatement carries the clean-tree rule, not SHA equality alone"
 # #255 captures tests_sha where the suite runs; promoting it to run state must
 # not move or soften that capture.
 check_block_has "$QA_BLOCK" 'tests_sha. = .git rev-parse HEAD' \
@@ -404,6 +444,18 @@ check_has "$SRC_AP_PHASES" '\*\*.\{issue_payload_ids\}.\*\* — the same record 
 check_has "$SRC_AP_PHASES" 'reviewer reads identifying fields from that payload only' \
   "T5.22: the spawn site states the same scope as the prompt it substitutes into"
 
+# The batch prompt restates Step 0i for N issues at once. "use it and fetch
+# nothing" is a BROADER licence than the gate grants: it reads as permission to
+# skip the live state re-verify the gate makes mandatory under `supplied`, which
+# is what keeps 0a's closed / not-found stops — named by exclusion in the home —
+# at full strength. Restatement is downward only.
+check_block_has "$BATCH_PROMPT" 'gh issue view <number> --json state,comments,updatedAt' \
+  "T5.23: the batch prompt carries the same live-state re-verify as the resolver"
+check_block_lacks "$BATCH_PROMPT" 'use it and fetch nothing' \
+  "T5.24: the batch prompt no longer licenses fetching nothing at all"
+check_block_has "$RESOLVER_PROMPT" 'gh issue view N --json state,comments,updatedAt' \
+  "T5.25: the resolver prompt names the widened live read the gate mandates"
+
 # T5.4 pins one string that no paraphrase would ever trip. The home now
 # authorises SUBSET restatement, so also assert (a) that authorisation exists and
 # (b) that no spawn prompt names a safety term the home does not state.
@@ -414,15 +466,20 @@ check_has "$SRC_CONV" 'may carry the subset that applies to their consumer, neve
 # home, so its `! grep ... "$SRC_CONV"` half could never be true — it could not
 # fail. What can fail, and is the real risk, is a prompt that names one of the
 # home's safety items and then licenses skipping it.
+# Match against a WHITESPACE-FLATTENED copy: these prompts are hard-wrapped, so a
+# line-oriented grep misses any weakening whose verb and object land on different
+# lines ("skip the already-resolved\ncheck") — the one guard protecting this
+# boundary must not be defeatable by reflowing a paragraph.
 WEAKEN='(skip|skips|skipped|bypass|bypasses|omit|omits|shorten|shortens|soften|softens|relax|relaxes) (the |both |either )?(Repo Sync|gi-secscan|already-resolved check|Step 5 CI wait|#36 hard-block)'
 for pair in "resolver:$RESOLVER_PROMPT" "reviewer:$REVIEWER_PROMPT" "batch:$BATCH_PROMPT"; do
   tag="${pair%%:*}"
   blk="${pair#*:}"
+  blk_flat="$(printf '%s' "$blk" | tr '\n' ' ' | tr -s ' ')"
   if [ -z "$blk" ]; then
     fail "T5.4c ($tag): block is empty — the extraction anchor no longer matches"
-  elif printf '%s' "$blk" | grep -qEi "$WEAKEN"; then
+  elif printf '%s' "$blk_flat" | grep -qEi "$WEAKEN"; then
     fail "T5.4c ($tag): prompt licenses skipping a safety item the home excludes"
-    printf '%s' "$blk" | grep -Ei "$WEAKEN" | sed 's/^/      /'
+    printf '%s' "$blk_flat" | grep -oEi "$WEAKEN" | sed 's/^/      /'
   else
     pass "T5.4c ($tag): the prompt restates a subset of the home, never a weaker rule"
   fi
@@ -547,6 +604,30 @@ check_has "$BUILT_AP_PHASES" 'gh pr view \{pr_number\} --json mergeable,reviewDe
   "T7.39: built phases.md ships the single widened --json read"
 check_has "$BUILT_CONV" 'may carry the subset that applies to their consumer, never a different rule' \
   "T7.40: the bundled conventions doc ships the subset-restatement rule"
+
+# Built-tree twins of the corrections above: the widened live read (comments +
+# updatedAt), the per-issue batch reading rule, the clean-tree restatement in the
+# always-loaded SKILL, and the positive rollup corroboration.
+check_block_has "$B_PAYLOAD_BLOCK" 'gh issue view N --json state,comments,updatedAt' \
+  "T7.41: built payload gate ships the widened live re-verify"
+check_block_has "$B_PAYLOAD_BLOCK" "condition 5 compares this live value, never the payload's" \
+  "T7.42: built payload gate feeds Step 0h's condition 5 the live updatedAt"
+check_block_has "$B_PAYLOAD_BLOCK" 'Batched spawns carry one record per issue' \
+  "T7.43: built payload gate ships the per-issue rule for batch blocks"
+check_has "$BUILT_RES_SKILL" 'equals .git rev-parse HEAD. \*\*and .git status --porcelain. is empty\*\*' \
+  "T7.44: built resolver SKILL.md ships the clean-tree rule in its restatement"
+check_has "$BUILT_RES_SKILL" 'gh issue view N --json state,comments,updatedAt' \
+  "T7.45: built resolver SKILL.md ships the widened live re-verify"
+check_block_has "$B_CI_GATE_BLOCK" 'statusCheckRollup. is non-empty with every check in it green' \
+  "T7.46: built CI verdict gate requires a non-empty, all-green rollup"
+check_block_has "$B_CI_GATE_BLOCK" 'empty, absent from the reply, or unreadable' \
+  "T7.47: built CI verdict gate treats an empty or unreadable rollup as absent"
+check_block_has "$B_CI_GATE_BLOCK" 'harder to forge than a PR-body marker' \
+  "T7.48: built CI verdict gate bounds its provenance claim"
+check_block_has "$B_BATCH_PROMPT" 'gh issue view <number> --json state,comments,updatedAt' \
+  "T7.49: built batch prompt carries the live-state re-verify"
+check_block_lacks "$B_BATCH_PROMPT" 'use it and fetch nothing' \
+  "T7.50: built batch prompt no longer licenses fetching nothing at all"
 
 # ───────────────────────────────────────────────────────────
 # Summary

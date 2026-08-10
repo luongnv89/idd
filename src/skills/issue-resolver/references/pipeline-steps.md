@@ -337,14 +337,34 @@ issue_payload = supplied | partial | absent
 
 | State | When | Effect |
 |-------|------|--------|
-| `supplied` | the prompt carries an `issue_payload` block that parses as one JSON object and holds **every** field 0a's own fetch requests — `number`, `title`, `body`, `labels`, `assignees`, `state`, `updatedAt` — with `number` equal to `N` | 0a uses it in place of its read |
+| `supplied` | the prompt carries an `issue_payload` block that parses as one JSON object and holds every field 0a's own fetch requests **except `comments`** — `number`, `title`, `body`, `labels`, `assignees`, `state`, `updatedAt` — with `number` equal to `N` | 0a uses it in place of its read, plus the one live read below |
 | `partial` | it parses but a required field is missing, empty, or `number` does not match `N` | 0a fetches, as today |
 | `absent` | no block, or it does not parse | 0a fetches, as today |
 
-`updatedAt` is **required, not decorative**: 0a captures it pre-normalization for
-*Step 0h*'s condition 5, so a payload without it would make every `/auto-pilot`
-run report `stale` and silently retire the reuse gate. A payload missing it is
-`partial`, never `supplied`.
+**`comments` is the one field of 0a's list a payload never carries**, by design:
+`/auto-pilot`'s Phase 1 lists up to 100 open issues, and asking that call for
+every issue's comments to serve the one issue this iteration resolves costs more
+than the fetch it saves. The single live read below picks it up instead, so
+*Step 1*'s delegation payload — whose researcher parses title, body **and
+comments** for error text, stack traces and paths — is unchanged in shape.
+
+`updatedAt` is **required, not decorative** — though not for its value. Under
+`supplied`, *Step 0h*'s condition 5 reads the **live** `updatedAt` from the
+re-verify below, never the payload's: a payload's timestamp is only as fresh as
+the caller's list, so an issue edited between that list and this spawn would read
+as unedited and 0h would call a superseded analysis `fresh`. What the field does
+here is mark the block as the whole record Phase 1's widened list call returns —
+a block missing it was not built by *Step 1.2b*, so nothing in it can be taken as
+verbatim. A payload missing it is `partial`, never `supplied`, and 0a fetches
+exactly as today; the gate is not retired by its absence, only unused.
+
+**Batched spawns carry one record per issue.** `/auto-pilot`'s batch-resolver
+receives an array of records rather than one object. Evaluate this gate **per
+issue**: for issue `N`, the state is `supplied` when exactly one record in the
+block has `number` equal to `N` and that record satisfies the `supplied` row
+above. A record that is missing or fails the row leaves that issue `partial` or
+`absent` and 0a fetches *that* issue, with no effect on the others. Everything
+below — the live re-verify included — then applies once per batched issue.
 
 ### Scope — 0a's read only
 
@@ -363,14 +383,22 @@ The payload substitutes for **Step 0a's fetch and nothing else**:
   still reads `open` in it, and 0b and 0c do not catch that, so the resolve would
   open a PR for a closed issue. A payload therefore never carries a
   *live-verified* open: any `state` other than `open` is `partial`, and under
-  `supplied` re-verify the live state once with `gh issue view N --json state`
-  before Step 0b, stopping with 0a's own closed / not-found message if it comes
-  back anything but `open`. That single-field read is the one part of 0a a
+  `supplied` **run one live read before Step 0b** —
+  `gh issue view N --json state,comments,updatedAt` — stopping with 0a's own
+  closed / not-found message if `state` comes back anything but `open`. Three
+  fields, one call, and the other two are there because the payload cannot supply
+  them either: `comments` is the field the payload never carries, and `updatedAt`
+  has exactly `state`'s staleness window, so **under `supplied` *Step 0h*'s
+  condition 5 compares this live value, never the payload's**. This read runs
+  before 0d, so that `updatedAt` is still the pre-normalization value condition 5
+  requires. Payload plus this read together reconstitute 0a's full field set, so
+  nothing downstream of 0a changes shape.
+  That read is the one part of 0a a
   payload cannot buy back; the body, title, labels and assignees it still does.
   It is also the one issue read in this skill that deliberately bypasses the
-  `gi-issue.py` cache: a cached `state` is an older answer by design, and an
-  older answer is precisely the staleness this stop exists to catch. Going
-  through the cache here would also register the narrow one-field key as a
+  `gi-issue.py` cache: a cached answer is an older answer by design, and an
+  older answer is precisely the staleness these two fields exist to catch. Going
+  through the cache here would also register the narrow three-field key as a
   separate cache entry, buying nothing.
 - **0b's existing-work guard, 0c's already-resolved check and the mandatory Repo
   Sync run in full**, on every path.
@@ -396,7 +424,7 @@ already disables *0g* and *0h*: treat `issue_payload` as `absent` and fetch.
 One `○` line, per docs/terminal-style.md:
 
 ```
-○ Issue payload: supplied by the caller — 0a fetch skipped
+○ Issue payload: supplied by the caller — 0a fetch skipped, live state re-verified
 ○ Issue payload: partial (no updatedAt) — fetching
 ○ Issue payload: absent — fetching
 ```

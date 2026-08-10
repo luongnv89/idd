@@ -34,13 +34,16 @@ Instructions:
 9. Follow all naming conventions from references/docs/naming-conventions.md
 10. AUTONOMY: Make every decision yourself. If you encounter an ambiguous choice, pick the safer/simpler option. Never stop to ask the user anything.
 11. When an issue_payload block is present it is this issue's record as GitHub
-    returned it, complete with updatedAt. Use it in place of Step 0a's fetch only
+    returned it to Phase 1's list call, complete with updatedAt but WITHOUT
+    comments. Use it in place of Step 0a's fetch only
     (Step 0i — Caller payload gate); 0d still rewrites the body and still
     invalidates the cache, and Step 1 and Step 5 still read through it. Anything
     missing, short, or that does not parse: fetch as usual. 0a's own closed and
-    not-found stops are NOT part of what the payload buys: under supplied,
-    re-verify live state once with `gh issue view N --json state` before Step 0b
-    and decide those two stops from that reply.
+    not-found stops are NOT part of what the payload buys, and neither is a fresh
+    updatedAt: under supplied, run one live read before Step 0b —
+    `gh issue view N --json state,comments,updatedAt` — decide those two stops
+    from that state, and give Step 0h's condition 5 that live updatedAt rather
+    than the payload's.
 12. When a triage_context block is present, pass it to the researcher as the
     triage_context key. It has no commit pin, so it may only reorder a scan —
     never skip a phase.
@@ -224,10 +227,17 @@ Step 1.2b captured nothing):
 
 Instructions:
 1. Use the ../issue-resolver/SKILL.md skill
-2. Understand each issue. When an issue_payload block is present it already
-   carries every batched issue's record — use it and fetch nothing. For any
-   issue it does not cover (and only those), run:
-   gh issue view <number> --json number,title,body,labels,assignees,state,updatedAt
+2. Understand each issue. When an issue_payload block is present it carries one
+   record per batched issue: use it in place of Step 0a's fetch for each issue it
+   covers (Step 0i — Caller payload gate reads the block per issue), and fetch
+   only what it does not cover. For any issue it does not cover (and only those),
+   run:
+   gh issue view <number> --json number,title,body,labels,assignees,state,comments,updatedAt
+   The block never decides Step 0a's closed and not-found stops for any issue,
+   and never supplies a fresh updatedAt. For each issue it does cover, run one
+   live read before that issue's Step 0b —
+   gh issue view <number> --json state,comments,updatedAt — decide those two
+   stops from that state, and give Step 0h's condition 5 that live updatedAt.
 3. Create a SINGLE branch named after the primary (first) issue:
    Follow naming conventions from references/docs/naming-conventions.md
 4. Research and plan a unified fix that addresses ALL issues together.
@@ -294,8 +304,8 @@ Replace these placeholders before passing to the Agent tool:
 | `{review_cycles}` | Value of `autopilot.review_cycles` config (default: 3) |
 | `{batch_reason}` | Reason for batching from analyzer |
 | `{shared_files}` | Shared file paths from analyzer |
-| `{issue_payload}` | The issue record(s) captured in *Step 1.2b — Capture the caller payload*, verbatim from Phase 1's `gh issue list` — `number`, `title`, `body`, `labels`, `assignees`, `state`, `updatedAt`. **Optional:** when nothing was captured, drop the whole labelled block from the prompt rather than substituting an empty value — every consumer treats an absent block as "fetch it yourself", which is today's behavior. **Goes to the resolver and batch-resolver spawns only**, and each substitutes it for Step 0a's read and nothing else (Step 0i) |
-| `{issue_payload_ids}` | The same record trimmed by *Step 1.2b* to `number`, `title` and `labels` — the **reviewer spawn's** block, and the only one it gets. `body`, `assignees`, `state` and `updatedAt` are dropped, not merely fenced off in prose: the reviewer must never read acceptance criteria out of a Phase 1 body (the resolver's Step 0d rewrites that body before the reviewer runs), and a block that carries no body cannot be misread — nor can it carry untrusted issue text into that prompt. **Optional**, dropped the same way. It saves no read: the reviewer fetches the live body regardless, and these three fields arrive with it |
+| `{issue_payload}` | The issue record(s) captured in *Step 1.2b — Capture the caller payload*, verbatim from Phase 1's `gh issue list` — `number`, `title`, `body`, `labels`, `assignees`, `state`, `updatedAt`. That is Step 0a's field list **minus `comments`**, which the list call does not request; Step 0i picks `comments` up in the live read it makes anyway, so nothing downstream loses it. **Optional:** when nothing was captured, drop the whole labelled block from the prompt rather than substituting an empty value — every consumer treats an absent block as "fetch it yourself", which is today's behavior. **Goes to the resolver and batch-resolver spawns only**, and each substitutes it for Step 0a's read and nothing else (Step 0i) |
+| `{issue_payload_ids}` | The same record trimmed by *Step 1.2b* to `number`, `title` and `labels` — the **reviewer spawn's** block, and the only one it gets. `body`, `assignees`, `state` and `updatedAt` are dropped, not merely fenced off in prose: the reviewer must never read acceptance criteria out of a Phase 1 body (the resolver's Step 0d rewrites that body before the reviewer runs), and a block that carries no body cannot be misread — nor can it carry an untrusted issue *body* into that prompt. The `title` it does carry is still attacker-authored issue text, and the reviewer prompt's own untrusted-data paragraph is what covers it; the trimming is a structural control over the body, not a substitute for that paragraph. **Optional**, dropped the same way. It saves no read: the reviewer fetches the live body regardless, and these three fields arrive with it |
 | `{triage_context}` | The issue's row(s) from `.gitissue/triage.json` — `type`, `priority`, `blocks`, `blocked_by`, `affected_files`, `status`, plus the file's `updated` timestamp. **Optional**, dropped the same way |
 
 **All three payload variables carry untrusted local data with exactly the status
