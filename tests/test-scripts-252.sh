@@ -1030,7 +1030,9 @@ SCRIPT_NAME = re.compile(r"gi-[a-z0-9-]+\.py")
 # to be an explicit edit here.
 EXPECTED_SITES = {
     "gi-branch.py": 2, "gi-ci-wait.py": 4, "gi-config.py": 6,
-    "gi-deps.py": 1, "gi-issue.py": 14,
+    # 15 since issue #258: /auto-pilot Step 1.2b fetches the picked issue's
+    # record on demand, because Phase 1's bulk list no longer carries `body`.
+    "gi-deps.py": 1, "gi-issue.py": 15,
     "gi-model-cache.py": 2, "gi-runlog.py": 2, "gi-secscan.py": 4,
     "gi-stack-detect.py": 1, "gi-triage-graph.py": 2,
 }
