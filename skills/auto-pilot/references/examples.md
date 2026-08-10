@@ -272,8 +272,10 @@ Note: the `/issue-pr-review --auto --no-merge` subagent handled the full review-
 First consult *Step 5.1a — CI verdict gate*. The reviewer subagent already
 waited on this PR's CI and returned `ci_status` bound to the commit it waited
 on, so when that SHA still equals the live head there is nothing left to wait
-for — one `gh pr view {pr_number} --json headRefOid` confirms it and the merge
-proceeds:
+for *on this head* — the `headRefOid` already requested by Step 5.1's single
+`gh pr view {pr_number} --json mergeable,reviewDecision,statusCheckRollup,headRefOid`
+confirms it (no second read is issued), `mergeable` from the same call is what
+catches a base branch that moved, and the merge proceeds:
 
 ```
 ○ CI verdict: trusted (passed @ 9f2c1ab) — head unchanged, no re-poll

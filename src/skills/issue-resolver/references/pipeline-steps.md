@@ -356,6 +356,17 @@ The payload substitutes for **Step 0a's fetch and nothing else**:
   post-rewrite re-read.
 - **Step 1 and Step 5 still read through the cache**, unchanged — those reads are
   already served from `.gitissue/cache/` and are what the invalidation exists for.
+- **0a's own two stops are never decided from the payload.** 0a stops when the
+  issue is **not found** and stops when it is **closed**. Both are freshness
+  judgements, and a payload's `state` is only as fresh as the caller's list that
+  produced it — an issue closed externally between that list and this spawn
+  still reads `open` in it, and 0b and 0c do not catch that, so the resolve would
+  open a PR for a closed issue. A payload therefore never carries a
+  *live-verified* open: any `state` other than `open` is `partial`, and under
+  `supplied` re-verify the live state once with `gh issue view N --json state`
+  before Step 0b, stopping with 0a's own closed / not-found message if it comes
+  back anything but `open`. That single-field read is the one part of 0a a
+  payload cannot buy back; the body, title, labels and assignees it still does.
 - **0b's existing-work guard, 0c's already-resolved check and the mandatory Repo
   Sync run in full**, on every path.
   A caller-supplied field may gate duplicated work, never a safety gate — the
@@ -884,7 +895,13 @@ Each cycle:
 1. **Code review** — spawn a *fresh* code-reviewer subagent per cycle (see `shared/agents/code-reviewer.md`) so each pass is unbiased.
 2. **Run tests** — unit, integration, e2e (if present), build/compile. Record
    `tests_state` — the passing count paired with `tests_sha` = `git rev-parse HEAD`,
-   see *Last-green test state* below — **at the moment the suite runs**, and carry
+   see *Last-green test state* below — **at the moment the suite runs**.
+   **Record it only for a green run on a clean tree:** a suite that reported any
+   failure, that did not complete, or that ran with `git status --porcelain`
+   non-empty records *nothing* and leaves any earlier value untouched.
+   `tests_state` stores a passing count with no pass/fail flag, so a red run is
+   not even representable in it — recording one would hand a later consumer a
+   failure dressed as a pass. Carry
    it from the cycle that exits clean to Deliver: the QA handoff
    marker's `tests=<count>@<sha40>` is this variable rendered, it names the commit
    the suite actually ran on, and *Update documentation* commits after this point,
@@ -915,13 +932,30 @@ its definition.
 
 Two consumers, and no others:
 
-1. **Step 4, cycle N+1.** Before running the suite again, compare `tests_state`'s
-   SHA to `git rev-parse HEAD`. Equal means the previous cycle's fixer committed
+1. **Step 4, cycle N+1.** **Only against a recorded green run** — cycle N+1
+   exists precisely because the reviewer *or* the suite failed, so the previous
+   run is usually red, and a red run recorded nothing at all under the capture
+   rule above, which leaves nothing to carry and the suite runs. Given a
+   recorded green state, compare `tests_state`'s
+   SHA to `git rev-parse HEAD`. Equal — and the tree clean, see *Both sides
+   require a clean tree* below — means the previous cycle's fixer committed
    nothing, so the suite would run on the identical tree — skip it and carry the
-   recorded count into this cycle's evaluation. Any difference, and it runs.
+   recorded **green** count into this cycle's evaluation. Any difference, and it runs.
+   A carried count never satisfies "all tests pass" by itself: it is an earlier
+   green run restated, and only for the identical tree.
 2. **Step 5, *Verify all tests pass*.** Same comparison at the Verify moment. A
    QA cycle that exited clean with no commit after it has already run this exact
    suite on this exact commit; re-running it is duplicated work, not verification.
+
+**Both sides require a clean tree.** HEAD equality does not imply an identical
+tree. A fixer can edit files and stop without committing — `shared/agents/fixer.md`
+makes a real-secret block in the security scan exactly that path: `FAILED`, no
+commit, edits already on disk. So `git status --porcelain` must be empty **both**
+when `tests_state` is captured and at every comparison against it; any dirt at
+either moment ⇒ `run`. Without this, a suite that went green only because of an
+uncommitted edit gets recorded against `sha_A`, the next cycle skips on
+`HEAD == sha_A`, and `sha_A` ships on the strength of a run that was never
+about `sha_A`.
 
 Both consumers layer **under `resolve.auto_test`**, never over it: when
 `resolve.auto_test` is `false` the suite is skipped for that reason alone and

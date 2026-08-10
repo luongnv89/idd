@@ -291,7 +291,7 @@ See the `{{skill:issue-pr-review}}` skill for the full pipeline.
   ⟶ Spawning PR review subagent...
 ```
 
-Use the **PR Reviewer Subagent** prompt from `references/subagent-prompts.md`, substituting `{pr_number}` and, when Step 1.2b captured it, `{issue_payload}` for the issue this PR closes. The subagent runs the full `/issue-pr-review --auto --no-merge` pipeline: review, test, CI check, fix, repeat. It does NOT merge — merging is the main agent's job in Phase 5. The `--no-merge` flag suppresses auto-merge in `--auto` mode so the reviewer never steals the merge step from Phase 5's mode gate and dependency gate.
+Use the **PR Reviewer Subagent** prompt from `references/subagent-prompts.md`, substituting `{pr_number}` and, when Step 1.2b captured it, `{issue_payload}` for the issue this PR closes. **The reviewer reads identifying fields from that payload only.** This spawn happens strictly *after* Phase 2's resolver ran its Step 0d normalization (`gh issue edit` + re-read), so the Phase-1 body in the payload is superseded by construction — on an unnormalized backlog issue, 0d is what *creates* the structured Acceptance Criteria section. The reviewer's acceptance-criteria verification therefore always re-fetches the live body, and the #36 `acceptance_criteria` hard-block is never evaluated against the payload. The subagent runs the full `/issue-pr-review --auto --no-merge` pipeline: review, test, CI check, fix, repeat. It does NOT merge — merging is the main agent's job in Phase 5. The `--no-merge` flag suppresses auto-merge in `--auto` mode so the reviewer never steals the merge step from Phase 5's mode gate and dependency gate.
 
 ### Step 3.2 — Process Review Result
 
@@ -453,8 +453,10 @@ Before merging, verify:
 2. **No blocking reviews** — no "request changes" reviews from other humans
 
 ```bash
-gh pr view {pr_number} --json mergeable,reviewDecision,statusCheckRollup
+gh pr view {pr_number} --json mergeable,reviewDecision,statusCheckRollup,headRefOid
 ```
+
+`headRefOid` rides along on this one read because *Step 5.1a* needs it and a second `gh pr view` three lines later would be the duplicated work this whole phase exists to remove. `statusCheckRollup` is likewise already in hand at that instant, so the gate can corroborate a `trusted` verdict for free.
 
 **Consult *Step 5.1a — CI verdict gate* first.** Under `ci_verdict = trusted` the whole wait below is already answered and is skipped; on `stale` or `absent` it runs exactly as written.
 
@@ -491,14 +493,22 @@ ci_verdict = trusted | stale | absent
 | `stale` | the returned SHA differs from the live head | run the full wait below, unchanged |
 | `absent` | no `ci_status` field, a bare or unparsable value, `no_ci`, `failed@…`, or `review.check_ci: false` | run the full wait below, unchanged |
 
-The one verification, which replaces the poll:
+The one verification, which replaces the poll: read `headRefOid` from **Step
+5.1's own `gh pr view {pr_number} --json mergeable,reviewDecision,statusCheckRollup,headRefOid`** — the
+field is requested there precisely so this gate costs nothing. Issue no second
+`gh pr view`. One `--json` read against one PR, shared with the pre-merge checks
+— not a poll loop, not a second `gi-ci-wait.py`
+run. If that read fails, or the field is absent, the answer is `absent`.
+`statusCheckRollup` from the same read is free corroboration: a `trusted`
+verdict whose rollup already shows a failed or pending check is `absent`.
 
-```bash
-gh pr view {pr_number} --json headRefOid
-```
-
-One `--json` read against one PR — not a poll loop, not a second `gi-ci-wait.py`
-run. If it fails for any reason, the answer is `absent`.
+**Head-SHA equality does not cover a moved base.** `pull_request` checks run
+against the merge result, so a base branch that advanced under this PR since the
+reviewer's wait can change the answer with `headRefOid` unchanged. This is
+today's exposure, not something this gate introduces — but read "nothing left to
+wait for" as "nothing left to wait for *on this head*", and let Step 5.1's
+`mergeable` (which GitHub recomputes against the current base) be the check that
+catches a base that moved.
 
 **`failed@<sha40>` is never `trusted`.** A failing verdict already leaves the PR
 open under Step 5.1's own rules; routing it through this gate would only let a

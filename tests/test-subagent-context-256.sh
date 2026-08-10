@@ -76,6 +76,21 @@ check_block_has() {
   fi
 }
 
+check_block_lacks() {
+  local block="$1"
+  local pattern="$2"
+  local label="$3"
+  if [ -z "$block" ]; then
+    fail "$label"
+    echo "      block is empty — the extraction anchor no longer matches"
+  elif printf '%s' "$block" | grep -qE "$pattern"; then
+    fail "$label"
+    echo "      forbidden pattern still present: $pattern"
+  else
+    pass "$label"
+  fi
+}
+
 echo "◆ Subagent Context Passing Contract Tests (issue #256)"
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 
@@ -146,6 +161,16 @@ check_block_has "$PAYLOAD_BLOCK" 'Step 0h' \
   "T1.10: the gate names the sibling gate that consumes updatedAt"
 check_has "$SRC_RES_SKILL" 'issue_payload = supplied \| partial \| absent' \
   "T1.11: the SKILL pointer carries the three states, first read wins"
+# 0a ends "if not found: stop; if closed: stop". Both are freshness judgements,
+# and a payload's `state` is only as fresh as the caller's list — an issue closed
+# externally between that list and this spawn still reads `open`, and 0b/0c do
+# not catch it, so the resolve would open a PR for a closed issue.
+check_block_has "$PAYLOAD_BLOCK" '0a.s own two stops are never decided from the payload' \
+  "T1.12: the closed / not-found stops are never decided from the payload"
+check_block_has "$PAYLOAD_BLOCK" 'gh issue view N --json state' \
+  "T1.13: the gate names the one live read that keeps those stops at full strength"
+check_has "$SRC_CONV" 'Step 0a closed / not-found stops' \
+  "T1.14: the exclusion list's home names 0a's two stops"
 
 # ───────────────────────────────────────────────────────────
 # T2 (AC2): triage_context is a sibling payload key with a
@@ -193,14 +218,38 @@ check_has "$SRC_AP_PHASES" '^### Step 5\.1a — CI verdict gate' \
   "T3.2: auto-pilot owns a named gate for the returned verdict"
 check_has "$SRC_AP_PHASES" 'ci_verdict = trusted \| stale \| absent' \
   "T3.3: the gate sets exactly one three-state variable"
-check_has "$SRC_AP_PHASES" 'gh pr view \{pr_number\} --json headRefOid' \
-  "T3.4: the gate re-verifies with one cheap read, not a second poll"
+# One widened --json read serves both the pre-merge checks and the gate. A
+# separate `gh pr view --json headRefOid` three lines after Step 5.1's own read
+# is two calls where the gate's selling point is one.
+check_has "$SRC_AP_PHASES" 'gh pr view \{pr_number\} --json mergeable,reviewDecision,statusCheckRollup,headRefOid' \
+  "T3.4: one widened --json read serves the pre-merge checks and the gate"
+GATE_EXTRA_READS="$(grep -cE '^gh pr view \{pr_number\} --json headRefOid$' "$SRC_AP_PHASES" || true)"
+if [ "$GATE_EXTRA_READS" = "0" ]; then
+  pass "T3.4b: the gate issues no second gh pr view of its own"
+else
+  fail "T3.4b: the gate still issues a standalone headRefOid read ($GATE_EXTRA_READS)"
+fi
 
 CI_GATE_BLOCK="$(awk '/^### Step 5\.1a — CI verdict gate/,/^### Step 5\.1b — Dependency Gate/' "$SRC_AP_PHASES")"
 check_block_has "$CI_GATE_BLOCK" 'subagent return value, not a PR-body marker' \
   "T3.5: the gate distinguishes an in-process return value from a PR-body marker"
 check_block_has "$CI_GATE_BLOCK" '.failed@<sha40>. is never .trusted.' \
   "T3.6: a failing verdict is never trusted — it can only leave the PR open"
+
+# T3.6 above asserts the *paragraph*. Widening the state table's `trusted` row
+# while leaving that paragraph in place would pass it, so pin the rows too: the
+# `trusted` row must require live-head SHA equality and must not mention a
+# failed verdict, and the `absent` row is where a failed verdict lands.
+TRUSTED_ROW="$(printf '%s\n' "$CI_GATE_BLOCK" | grep -E '^\| .trusted. \|' || true)"
+ABSENT_ROW="$(printf '%s\n' "$CI_GATE_BLOCK" | grep -E '^\| .absent. \|' || true)"
+check_block_has  "$TRUSTED_ROW" 'passed@<sha40>.*equals the PR.s live head' \
+  "T3.4c: the trusted row itself requires SHA equality against the live head"
+check_block_lacks "$TRUSTED_ROW" 'failed@' \
+  "T3.6b: the trusted row itself excludes a failed verdict"
+check_block_has  "$ABSENT_ROW" 'failed@' \
+  "T3.6c: the absent row is where a failed verdict lands"
+check_block_has "$CI_GATE_BLOCK" 'Head-SHA equality does not cover a moved base' \
+  "T3.6d: the gate scopes its claim to this head and names the moved-base gap"
 check_block_has "$CI_GATE_BLOCK" 'review\.adaptive_depth: false. disables this gate' \
   "T3.7: the existing adaptive switch is the off-switch — no new config key"
 # #255's literal must survive: CI is never skipped by the QA handoff marker.
@@ -233,9 +282,33 @@ else
   printf '      %s\n' $STATE_HITS
 fi
 
+QA_BLOCK="$(awk '/^## Step 4 — QA/,/^### Step 4 — UI\/UX review/' "$SRC_RES_STEPS")"
+QA_BLOCK_CAPTURE="$(printf '%s\n' "$QA_BLOCK" | awk '/^2\. \*\*Run tests\*\*/,/^3\. \*\*Evaluate results/')"
 STATE_BLOCK="$(awk '/^### Last-green test state/,/^### Loop controls/' "$SRC_RES_STEPS")"
 check_block_has "$STATE_BLOCK" 'Step 4, cycle N\+1' \
   "T4.4: consumer 1 is Step 4's next cycle after a no-commit fixer"
+# Consumer 1 sits exactly where the previous run is USUALLY red — cycle N+1 only
+# exists when the reviewer or the suite failed. `tests_state` stores a count with
+# no pass/fail flag, so a carried red state is not representable: an agent told
+# to carry it into an "all tests pass" evaluation can exit QA on a red suite, and
+# Step 5's Verify then skips on the same HEAD and ships the PR.
+CONSUMER_1="$(printf '%s\n' "$STATE_BLOCK" | awk '/^1\. \*\*Step 4, cycle N\+1/,/^2\. \*\*Step 5/')"
+check_block_has "$CONSUMER_1" 'recorded green run' \
+  "T4.4b: consumer 1 is conditioned on a recorded GREEN run, like consumer 2"
+check_block_has "$CONSUMER_1" 'a red run recorded nothing' \
+  "T4.4c: consumer 1 states that a red run left nothing to carry"
+# The capture rule is the single normative home of the green predicate — a
+# consumer-side condition alone would leave a red state recorded and reachable.
+check_block_has "$QA_BLOCK_CAPTURE" 'Record it only for a green run on a clean tree' \
+  "T4.4d: the capture rule records nothing for a red or dirty run"
+check_block_has "$QA_BLOCK_CAPTURE" 'no pass/fail flag' \
+  "T4.4e: the capture rule says why a red state is not representable"
+# HEAD equality does not imply an identical tree: fixer.md's real-secret block
+# leaves HEAD unchanged and the working tree dirty.
+check_block_has "$STATE_BLOCK" 'Both sides require a clean tree' \
+  "T4.4f: capture and comparison both require an empty git status --porcelain"
+check_block_has "$STATE_BLOCK" 'git status --porcelain. must be empty \*\*both\*\*' \
+  "T4.4g: the clean-tree requirement binds capture AND comparison, not just one"
 check_block_has "$STATE_BLOCK" 'Step 5, \*Verify all tests pass\*' \
   "T4.5: consumer 2 is Step 5's final verification run"
 check_block_has "$STATE_BLOCK" 'under .resolve\.auto_test.\*\*, never over it' \
@@ -248,7 +321,6 @@ check_has "$SRC_RES_SKILL" 'Under .auto_test., not over it' \
   "T4.9: the SKILL's Step 5 clause states the layering, first read wins"
 # #255 captures tests_sha where the suite runs; promoting it to run state must
 # not move or soften that capture.
-QA_BLOCK="$(awk '/^## Step 4 — QA/,/^### Step 4 — UI\/UX review/' "$SRC_RES_STEPS")"
 check_block_has "$QA_BLOCK" 'tests_sha. = .git rev-parse HEAD' \
   "T4.10: the capture command #255 pinned is unchanged"
 
@@ -299,6 +371,42 @@ check_block_has "$PAYLOAD_BLOCK"   "$SAFETY" "T5.15: the resolver's Step 0i carr
 check_block_has "$TRIAGE_BLOCK"    "$SAFETY" "T5.16: the triage_context section carries the never-a-safety-gate rule"
 check_has "$SRC_AP_SKILL"          "$SAFETY" \
   "T5.17: auto-pilot's SKILL states the rule where an agent reads it first"
+
+# The reviewer is spawned in Phase 3-4, STRICTLY AFTER Phase 2's resolver ran
+# Step 0d (`gh issue edit` + normalize). Step 1.2b's payload is therefore the
+# PRE-normalization body — and on an unnormalized backlog issue 0d is what
+# CREATES the structured Acceptance Criteria section. Reading acceptance criteria
+# from it evaluates the #36 hard-block against superseded evidence, which is
+# "running a gate in full" on the wrong input.
+check_block_has "$REVIEWER_PROMPT" 'identifying fields only' \
+  "T5.19: the reviewer payload is scoped to identifying fields"
+check_block_lacks "$REVIEWER_PROMPT" 'acceptance criteria from it' \
+  "T5.20: the reviewer never reads acceptance criteria out of the payload"
+check_block_has "$REVIEWER_PROMPT" 'always re-fetches the live issue body' \
+  "T5.21: the #36 acceptance_criteria hard-block always re-fetches the live body"
+check_has "$SRC_AP_PHASES" 'reviewer reads identifying fields from that payload only' \
+  "T5.22: the spawn site states the same scope as the prompt it substitutes into"
+
+# T5.4 pins one string that no paraphrase would ever trip. The home now
+# authorises SUBSET restatement, so also assert (a) that authorisation exists and
+# (b) that no spawn prompt names a safety term the home does not state.
+check_has "$SRC_CONV" 'may carry the subset that applies to their consumer, never a different rule' \
+  "T5.4b: the home authorises subset restatement and forbids a divergent rule"
+for pair in "resolver:$RESOLVER_PROMPT" "reviewer:$REVIEWER_PROMPT" "batch:$BATCH_PROMPT"; do
+  tag="${pair%%:*}"
+  blk="${pair#*:}"
+  bad=""
+  for term in 'Repo Sync' 'gi-secscan' 'already-resolved check' 'Step 5 CI wait' '#36 hard-blocks'; do
+    if printf '%s' "$blk" | grep -qF "$term" && ! grep -qF "$term" "$SRC_CONV"; then
+      bad="$bad [$term]"
+    fi
+  done
+  if [ -z "$bad" ]; then
+    pass "T5.4c ($tag): every exclusion term the prompt restates is stated in the home"
+  else
+    fail "T5.4c ($tag): prompt names terms absent from the home:$bad"
+  fi
+done
 
 # A new freshness check must use SHA equality, never ancestry: #254's T1.1 pins
 # `merge-base --is-ancestor` to exactly one src/ file, and a second predicate
@@ -355,6 +463,65 @@ check_has "$BUILT_PR_CI" '^### Binding the verdict to a commit' \
   "T7.14: built pr-review mechanics ship the verdict binding"
 check_has "$BUILT_AP_EXAMPLES" 'Step 5\.1a — CI verdict gate' \
   "T7.15: built examples.md ships the updated narration"
+
+# The twins below are the groups that shipped only in src/ before: the
+# untrusted-data boundary (T5.5-T5.7, the security-critical group), every
+# fail-safe clause (T6.1-T6.5), the tests_state layering (T4.6-T4.8), and the
+# reviewer payload scope. A boundary that ships only in src/ protects nobody.
+B_RESOLVER_PROMPT="$(awk '/^## Resolver Subagent/,/^## PR Reviewer Subagent/' "$BUILT_AP_PROMPTS")"
+B_REVIEWER_PROMPT="$(awk '/^## PR Reviewer Subagent/,/^## Analyzer Subagent/' "$BUILT_AP_PROMPTS")"
+B_BATCH_PROMPT="$(awk '/^## Batch Resolver Subagent/,/^## Template Variables/' "$BUILT_AP_PROMPTS")"
+B_CAPTURE_BLOCK="$(awk '/^### Step 1\.2b — Capture the caller payload/,/^### Step 1\.3/' "$BUILT_AP_PHASES")"
+B_PAYLOAD_BLOCK="$(awk '/^## Step 0i — Caller payload gate/,/^## Step 1 — Research/' "$BUILT_RES_STEPS")"
+B_TRIAGE_BLOCK="$(awk '/^### .triage_context. \(when supplied\)/,/^### What the researcher does/' "$BUILT_RES_STEPS")"
+B_STATE_BLOCK="$(awk '/^### Last-green test state/,/^### Loop controls/' "$BUILT_RES_STEPS")"
+B_QA_CAPTURE="$(awk '/^## Step 4 — QA/,/^### Step 4 — UI\/UX review/' "$BUILT_RES_STEPS" | awk '/^2\. \*\*Run tests\*\*/,/^3\. \*\*Evaluate results/')"
+B_CI_GATE_BLOCK="$(awk '/^### Step 5\.1a — CI verdict gate/,/^### Step 5\.1b — Dependency Gate/' "$BUILT_AP_PHASES")"
+
+check_block_has "$B_RESOLVER_PROMPT" "$UNTRUSTED" "T7.16: built resolver prompt marks its payloads untrusted"
+check_block_has "$B_REVIEWER_PROMPT" "$UNTRUSTED" "T7.17: built reviewer prompt marks its payload untrusted"
+check_block_has "$B_BATCH_PROMPT"    "$UNTRUSTED" "T7.18: built batch prompt marks its payloads untrusted"
+check_block_has "$B_CAPTURE_BLOCK"   "$UNTRUSTED" "T7.19: built capture step marks both blocks untrusted"
+check_block_has "$B_PAYLOAD_BLOCK"   "$UNTRUSTED" "T7.20: built Step 0i marks the payload untrusted"
+check_block_has "$B_TRIAGE_BLOCK"    "$UNTRUSTED" "T7.21: built triage_context section marks the row untrusted"
+check_block_has "$B_RESOLVER_PROMPT" "$SAFETY"    "T7.22: built resolver prompt carries the never-a-safety-gate rule"
+check_block_has "$B_REVIEWER_PROMPT" "$SAFETY"    "T7.23: built reviewer prompt carries the never-a-safety-gate rule"
+check_block_has "$B_BATCH_PROMPT"    "$SAFETY"    "T7.24: built batch prompt carries the never-a-safety-gate rule"
+
+check_block_has "$B_PAYLOAD_BLOCK" 'Any doubt is .absent.' \
+  "T7.25: built payload gate degrades to today's 0a fetch on any doubt"
+check_block_has "$B_PAYLOAD_BLOCK" '0a.s own two stops are never decided from the payload' \
+  "T7.26: built payload gate keeps 0a's closed / not-found stops live"
+check_block_has "$B_TRIAGE_BLOCK" '^Degrade:' \
+  "T7.27: built triage_context key names its degrade path"
+check_block_has "$B_CI_GATE_BLOCK" 'Fail-safe: any doubt is .absent.' \
+  "T7.28: built CI verdict gate degrades to today's full wait on any doubt"
+check_block_has "$B_CAPTURE_BLOCK" 'omit that block entirely and spawn without it' \
+  "T7.29: built capture step omits an uncapturable payload"
+
+check_block_has "$B_STATE_BLOCK" 'under .resolve\.auto_test.\*\*, never over it' \
+  "T7.30: built last-green state layers under resolve.auto_test"
+check_block_has "$B_STATE_BLOCK" 'Fail-safe is .run.' \
+  "T7.31: built last-green state fail-safes to running the suite"
+check_block_has "$B_STATE_BLOCK" 'new config key is introduced' \
+  "T7.32: built last-green state introduces no new config key"
+check_block_has "$B_STATE_BLOCK" 'Both sides require a clean tree' \
+  "T7.33: built last-green state requires a clean tree on capture and comparison"
+check_block_has "$B_STATE_BLOCK" 'recorded green run' \
+  "T7.34: built consumer 1 is conditioned on a recorded green run"
+check_block_has "$B_QA_CAPTURE" 'Record it only for a green run on a clean tree' \
+  "T7.35: built capture rule records nothing for a red or dirty run"
+
+check_block_has "$B_REVIEWER_PROMPT" 'identifying fields only' \
+  "T7.36: built reviewer prompt scopes the payload to identifying fields"
+check_block_lacks "$B_REVIEWER_PROMPT" 'acceptance criteria from it' \
+  "T7.37: built reviewer prompt never reads acceptance criteria from the payload"
+check_block_has "$B_REVIEWER_PROMPT" 'always re-fetches the live issue body' \
+  "T7.38: built reviewer prompt re-fetches the live body for the #36 hard-block"
+check_has "$BUILT_AP_PHASES" 'gh pr view \{pr_number\} --json mergeable,reviewDecision,statusCheckRollup,headRefOid' \
+  "T7.39: built phases.md ships the single widened --json read"
+check_has "$BUILT_CONV" 'may carry the subset that applies to their consumer, never a different rule' \
+  "T7.40: the bundled conventions doc ships the subset-restatement rule"
 
 # ───────────────────────────────────────────────────────────
 # Summary
