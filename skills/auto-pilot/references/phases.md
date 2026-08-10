@@ -313,7 +313,18 @@ Use the **PR Reviewer Subagent** prompt from `references/subagent-prompts.md`, s
 
 ### Step 3.2 — Process Review Result
 
-Parse the subagent's response:
+Parse the subagent's response. Extract: `result`, `review_cycles`, `issues_found`,
+`issues_fixed`, `issues_noted`, `remaining_issues`, `pre_pass_fixes`,
+`tests_passed`, `ci_status`.
+
+**Retain `ci_status` verbatim** — the string exactly as returned (`passed@<sha40>`,
+`failed@<sha40>`, `no_ci`, or a bare value), never re-derived and never summarised
+to a boolean. It is the **only** input to *Step 5.1a — CI verdict gate* two phases
+later, and it is the one returned field nothing in this step prints, so it is the
+one an executing agent is likeliest to drop. Dropping it is not unsafe — the gate
+reads a missing field as `absent` and runs today's full wait — but the run then
+re-polls CI the reviewer already waited on, and the gate does nothing on every
+iteration while appearing to be in force.
 
 **On PASS:**
 ```
@@ -531,9 +542,14 @@ Corroborating positively keeps this gate's answer on the same side of that line.
 against the merge result, so a base branch that advanced under this PR since the
 reviewer's wait can change the answer with `headRefOid` unchanged. This is
 today's exposure, not something this gate introduces — but read "nothing left to
-wait for" as "nothing left to wait for *on this head*", and let Step 5.1's
-`mergeable` (which GitHub recomputes against the current base) be the check that
-catches a base that moved.
+wait for" as "nothing left to wait for *on this head*", and do **not** read Step
+5.1's `mergeable` as covering it. `mergeable` answers MERGEABLE / CONFLICTING /
+UNKNOWN: GitHub does recompute it against the current base, so it catches a base
+that moved **into conflict**, and nothing else — a clean, fast-forwardable
+advance leaves it MERGEABLE. The full wait this gate skips would not catch it
+either, since GitHub does not re-run a PR's checks merely because its base
+advanced, so the poll would read the same rollup this gate already read. The
+residual is unchanged from today; this gate neither widens nor closes it.
 
 **`failed@<sha40>` is never `trusted`.** A failing verdict already leaves the PR
 open under Step 5.1's own rules; routing it through this gate would only let a

@@ -297,6 +297,27 @@ check_has "$SRC_PR_SKILL" 'ci_sha' \
 check_has "$SRC_AP_EXAMPLES" 'Step 5\.1a — CI verdict gate' \
   "T3.11: the examples narration is updated in lockstep with phases.md"
 
+# A gate whose only input is never captured is inert. Step 2.3 enumerates the
+# resolver fields it keeps; Step 3.2 must do the same for the reviewer, because
+# `ci_status` is the one returned field nothing in that step prints — an
+# un-enumerated field is a plausible drop, and dropping it forces `absent` on
+# every iteration while the gate appears to be in force.
+STEP32_BLOCK="$(awk '/^### Step 3\.2 — Process Review Result/,/^## Phase 5 — Merge/' "$SRC_AP_PHASES")"
+check_block_has "$STEP32_BLOCK" 'Extract: .result., .review_cycles.' \
+  "T3.12: Step 3.2 enumerates the reviewer fields it keeps, like Step 2.3"
+check_block_has "$STEP32_BLOCK" '\*\*Retain .ci_status. verbatim\*\*' \
+  "T3.13: Step 3.2 retains ci_status verbatim for the CI verdict gate"
+check_block_has "$STEP32_BLOCK" 'Step 5\.1a — CI verdict gate' \
+  "T3.14: Step 3.2 names the consumer that reads the field it retains"
+# `mergeable` is MERGEABLE / CONFLICTING / UNKNOWN — a textual-conflict answer. It
+# cannot see a clean base advance that changes a merge-result check on an
+# unchanged head, so naming it as the check that catches a moved base would tell
+# a reader the residual is covered when nothing covers it.
+check_block_has "$CI_GATE_BLOCK" 'that moved \*\*into conflict\*\*, and nothing else' \
+  "T3.15: the moved-base residual is scoped to what mergeable actually detects"
+check_block_has "$CI_GATE_BLOCK" 'this gate neither widens nor closes it' \
+  "T3.16: the section states the residual is open, not mitigated"
+
 # ───────────────────────────────────────────────────────────
 # T4 (AC4): last-green test state has ONE home and TWO consumers,
 # and it layers UNDER resolve.auto_test. Over it, a `false` config
@@ -628,6 +649,16 @@ check_block_has "$B_BATCH_PROMPT" 'gh issue view <number> --json state,comments,
   "T7.49: built batch prompt carries the live-state re-verify"
 check_block_lacks "$B_BATCH_PROMPT" 'use it and fetch nothing' \
   "T7.50: built batch prompt no longer licenses fetching nothing at all"
+
+B_STEP32_BLOCK="$(awk '/^### Step 3\.2 — Process Review Result/,/^## Phase 5 — Merge/' "$BUILT_AP_PHASES")"
+check_block_has "$B_STEP32_BLOCK" '\*\*Retain .ci_status. verbatim\*\*' \
+  "T7.51: built Step 3.2 retains ci_status verbatim — the gate's only input"
+check_block_has "$B_STEP32_BLOCK" 'Step 5\.1a — CI verdict gate' \
+  "T7.52: built Step 3.2 names the gate that consumes it"
+check_block_has "$B_CI_GATE_BLOCK" 'that moved \*\*into conflict\*\*, and nothing else' \
+  "T7.53: built CI verdict gate scopes the moved-base residual to mergeable's real answer"
+check_block_has "$B_CI_GATE_BLOCK" 'this gate neither widens nor closes it' \
+  "T7.54: built CI verdict gate states the residual is open, not mitigated"
 
 # ───────────────────────────────────────────────────────────
 # Summary
