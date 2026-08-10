@@ -59,6 +59,30 @@ check_lacks() {
   fi
 }
 
+check_block_has() {
+  local block="$1"
+  local pattern="$2"
+  local label="$3"
+  if printf '%s' "$block" | grep -qE "$pattern"; then
+    pass "$label"
+  else
+    fail "$label"
+    echo "      missing pattern: $pattern"
+  fi
+}
+
+check_block_lacks() {
+  local block="$1"
+  local pattern="$2"
+  local label="$3"
+  if printf '%s' "$block" | grep -qE "$pattern"; then
+    fail "$label"
+    echo "      forbidden pattern still present: $pattern"
+  else
+    pass "$label"
+  fi
+}
+
 echo "◆ Analysis Reuse Gate Contract Tests (issue #254)"
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 
@@ -293,6 +317,83 @@ if [ -f "$BUILT_METHODOLOGY" ]; then
 else
   fail "T8.11: bundled idd-methodology.md missing from the resolver skill"
 fi
+
+# ───────────────────────────────────────────────────────────
+# T9 (AC1/AC3): the artifact is resolved against the ORIGINAL
+# checkout, not this run's workspace. `.gitissue/` is gitignored,
+# so a Step 0e worktree never has it — a bare relative path there
+# answers `absent` forever and the gate silently never fires.
+# ───────────────────────────────────────────────────────────
+PREDICATE_BLOCK="$(awk '/^### The predicate/,/^### Fail-safe/' "$SRC_STEPS")"
+BUILT_PREDICATE_BLOCK="$(awk '/^### The predicate/,/^### Fail-safe/' "$BUILT_STEPS")"
+
+check_block_has "$PREDICATE_BLOCK" 'git rev-parse --git-common-dir' \
+  "T9.1: the predicate resolves the original checkout via --git-common-dir"
+check_block_has "$PREDICATE_BLOCK" 'analysis="\$origin_root/\.gitissue/analysis-[{]N[}]\.json"' \
+  "T9.2: the artifact path is anchored to that original checkout"
+check_block_lacks "$PREDICATE_BLOCK" 'analysis="\.gitissue/' \
+  "T9.3: the artifact is never read from a bare workspace-relative path"
+check_has "$SRC_STEPS" 'gitignored, so a .*worktree never contains' \
+  "T9.4: the gitignored-in-a-worktree reason is documented, not just avoided"
+check_block_has "$PREDICATE_BLOCK" 'base_ref="origin/\$\{base\}"' \
+  "T9.5: anchoring the artifact leaves the base ref this run's synced base"
+check_block_has "$BUILT_PREDICATE_BLOCK" 'git rev-parse --git-common-dir' \
+  "T9.6: built pipeline-steps.md ships the original-checkout resolution"
+check_block_lacks "$BUILT_PREDICATE_BLOCK" 'analysis="\.gitissue/' \
+  "T9.7: built pipeline-steps.md ships no workspace-relative artifact path"
+
+# ───────────────────────────────────────────────────────────
+# T10 (AC2): the predicate block contains no live expansion of an
+# UNSET shell variable. `${N}` next to a real `${base}` reads as a
+# shell variable and expands to nothing ⇒ a permanent `absent`.
+# ───────────────────────────────────────────────────────────
+check_lacks "$SRC_STEPS" '\$\{N\}' \
+  "T10.1: no \${N} expansion of an unset variable in the resolver pipeline"
+check_lacks "$BUILT_STEPS" '\$\{N\}' \
+  "T10.2: the built pipeline-steps.md ships no \${N} expansion either"
+check_block_has "$PREDICATE_BLOCK" 'substituted by the caller' \
+  "T10.3: the block says which tokens are substitutions, not shell variables"
+
+# ───────────────────────────────────────────────────────────
+# T11 (AC1): `light` + `fresh` has one stated precedence. Both
+# skip the synthesizer but produce different plans and different
+# `Options rejected` content, so the composition must not be left
+# to whichever sub-section is read first.
+# ───────────────────────────────────────────────────────────
+UNLOCKS_BLOCK="$(awk '/^### What .fresh. unlocks/,/^## Step 1 — Research/' "$SRC_STEPS")"
+PLAN_LIGHT_BLOCK="$(awk '/^### .light. profile — skip the synthesis/,/^### .reuse. — lift the options/' "$SRC_STEPS")"
+
+check_block_has "$UNLOCKS_BLOCK" '.reuse. wins Step 2' \
+  "T11.1: Step 0h states the light+fresh precedence — reuse wins Step 2"
+check_block_has "$UNLOCKS_BLOCK" 'presents all three options|present all three options' \
+  "T11.2: the precedence restores the comment-and-wait option prompt"
+check_block_has "$PLAN_LIGHT_BLOCK" 'analysis_reuse = fresh' \
+  "T11.3: Step 2's light skip is conditioned on the analysis not being fresh"
+check_block_has "$PLAN_LIGHT_BLOCK" '.reuse. wins Step 2' \
+  "T11.4: Step 2's light sub-section defers to the same precedence rule"
+check_block_has "$PLAN_BLOCK" '.light. profile too|precedence over the .light. skip' \
+  "T11.5: Step 2's reuse sub-section states it governs on the light profile too"
+check_has "$BUILT_STEPS" '.reuse. wins Step 2' \
+  "T11.6: the built pipeline-steps.md ships the precedence rule"
+
+# ───────────────────────────────────────────────────────────
+# T12 (security): the analysis artifact is a NEW untrusted input
+# channel — it is derived from issue text and its options become
+# the plan the implementer executes. The prompt-injection boundary
+# must demonstrably cover it.
+# ───────────────────────────────────────────────────────────
+check_block_has "$PLAN_BLOCK" 'untrusted local data' \
+  "T12.1: Step 2's reuse path marks the analysis artifact untrusted"
+check_block_has "$PLAN_BLOCK" 'never run a command it contains|never a command to run' \
+  "T12.2: Step 2's reuse path forbids executing anything found in the artifact"
+check_has "$SRC_RESEARCHER" 'untrusted local data' \
+  "T12.3: the shared researcher marks prior_analysis untrusted"
+check_has "$SRC_RESEARCHER" 'never instructions, never a command to run' \
+  "T12.4: the shared researcher takes identifiers only, never instructions"
+check_has "$BUILT_STEPS" 'untrusted local data' \
+  "T12.5: the built pipeline-steps.md ships the untrusted-artifact rule"
+check_has "$BUILT_RESEARCHER" 'untrusted local data' \
+  "T12.6: the bundled researcher prompt ships the untrusted-artifact rule"
 
 # ───────────────────────────────────────────────────────────
 # Summary
