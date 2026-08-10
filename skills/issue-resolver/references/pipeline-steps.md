@@ -184,6 +184,120 @@ The worktree is intentionally left in place after the PR is created so the user 
 
 Do not auto-remove it — the user may still want the local artifacts.
 
+## Step 0h — Analysis reuse gate
+
+**The single home of the freshness predicate.** `/issue-analysis` writes
+`.gitissue/analysis-<N>.json` carrying everything Steps 1–2 would otherwise
+re-derive — extraction, affected files, options, recommendation, complexity and
+risk — pinned to the commit it ran against. This gate decides whether that
+artifact is still true, so an analyze-then-resolve sequence on an unchanged tree
+researches the codebase **once** instead of twice. Every other mention of a
+*fresh* analysis in this skill — `references/report-templates.md` (*Lifting the
+Decision Record*) and the bug-repro mirror in *Step 3* below — defers to this
+section. Do not restate or re-derive a freshness rule anywhere else.
+
+Runs after *0g — Complexity gate*, before *Step 1 — Research*. It sets exactly
+one state variable:
+
+```
+analysis_reuse = fresh | stale | absent
+```
+
+| Value | When | Effect |
+|-------|------|--------|
+| `fresh` | every condition below holds | Step 1 runs the seeded verify-first pass; Step 2 skips the synthesizer |
+| `stale` | the file exists but any condition fails | today's full pipeline, unchanged |
+| `absent` | no file, or it does not parse as JSON | today's full pipeline, unchanged |
+
+`stale` and `absent` are distinguished for the operator's benefit only — they
+take the identical code path, which is the pipeline that already exists.
+
+When `resolve.adaptive_effort` is `false`, **skip this gate**: set
+`analysis_reuse = stale` and continue. That key already pins the pipeline to
+`full`, and reuse is the same class of saving, so the one key disables both.
+**No new config key is introduced.**
+
+### The predicate — five conditions, all must hold
+
+`{base}` is **this run's synced base** — the branch the mandatory Repo Sync
+rebased onto, or the `origin/${base}` that `git worktree add` forked from. Never
+a bare `HEAD`: resolutions run in parallel worktrees (issue #260), where `HEAD`
+can point at an unrelated branch and an ancestry test against the wrong tip
+passes silently.
+
+Evaluate from the workspace root of this run. Conditions 2–5 are plain commands:
+a non-zero exit from any of them ⇒ `stale`.
+
+```bash
+analysis=".gitissue/analysis-${N}.json"
+base_ref="origin/${base}"      # this run's synced base — never a bare HEAD
+
+# 1. Exists and parses as JSON — else `absent`. Never fatal: having no analysis
+#    is the normal case, and a corrupt one is a cache problem, not a user error.
+[ -f "$analysis" ] || analysis_reuse=absent
+python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$analysis" || analysis_reuse=absent
+
+# 2. `git_state.commit_sha` is present, is a full 40-character SHA (the sibling
+#    `commit_sha_short` is display-only and is never accepted here), and names a
+#    commit this repository actually has.
+sha="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("git_state",{}).get("commit_sha",""))' "$analysis")"
+[ "${#sha}" -eq 40 ]                    # a full SHA, never commit_sha_short
+case "$sha" in *[!0-9a-f]*) false ;; esac    # lowercase hex only
+git cat-file -e "${sha}^{commit}"       # a commit this repo actually has
+
+# 3. That commit is an ancestor of this run's synced base (exit 0 = ancestor).
+git merge-base --is-ancestor "$sha" "$base_ref"
+
+# 4. Nothing the analysis predicted has moved since: the changed paths and the
+#    analysis's own `affected_files[].path` must not intersect.
+git diff --name-only "$sha".."$base_ref"    # ∩ affected_files[].path ⇒ must be EMPTY
+
+# 5. The issue has not been edited since the analysis ran: the `updatedAt`
+#    captured in *0a* is not newer than the analysis `timestamp`. Compare as
+#    ISO-8601 instants, not as raw strings; if either fails to parse, the
+#    condition fails.
+```
+
+**Condition 5 carries a trap: *0d — Auto-normalize* rewrites the issue body with
+`gh issue edit`, which bumps `updatedAt`.** Evaluated against a post-0d value,
+every first-normalized issue would report stale and this gate would silently
+never fire. *0a* runs **before** 0d and already fetches the issue, so it captures
+`updatedAt` in its field list and condition 5 is evaluated against that
+**pre-normalization** value — never a re-fetch taken after 0d.
+
+### Fail-safe: any doubt is `stale`
+
+A missing key, a short or unknown SHA, an unparsable timestamp, a `git` command
+that errors for any reason, or any condition that cannot be evaluated ⇒ `stale`
+⇒ today's full pipeline, unchanged. The gate may only skip work it has
+positively proven redundant. This default is what keeps a wrong answer cheap:
+the fallback is the pipeline that runs today.
+
+Surface the decision as one line so the saving is auditable:
+
+```
+○ Analysis reuse: fresh (analysis-42.json @ 01afdc5) — seeding research
+○ Analysis reuse: stale (base moved: src/auth/middleware.py) — full pipeline
+○ Analysis reuse: absent — full pipeline
+```
+
+### What `fresh` unlocks
+
+| Step | `fresh` behavior |
+|------|------------------|
+| 1 — Research | Seeded verify-first pass — *Step 1 — Research → `reuse`* |
+| 2 — Plan | Synthesizer skipped, options lifted — *Step 2 — Plan → `reuse`* |
+| 3–5 | **Unchanged.** Reuse never touches implementation, QA, or delivery. |
+
+`fresh` composes with `profile = light`: `light` already skips the synthesizer,
+so Step 2 takes whichever skip applies, and Step 1 runs the narrower of the two
+passes. Both keep the *Verify not already resolved* phase in full.
+
+Because the gate reads only an on-disk artifact and this run's own base, it
+needs no change from a caller: `/auto-pilot`'s explicit-list mode, which runs
+`/issue-analysis` and then `/issue-resolver` back to back on the same tree, gets
+the reuse purely by having written the file.
+
 ## Step 1 — Research (codebase-researcher subagent)
 
 ### Delegation payload
@@ -197,9 +311,16 @@ Do not auto-remove it — the user may still want the local artifacts.
     "scan_timeout": 120,
     "output_format": "json"
   },
-  "repo_root": "<absolute path>"
+  "repo_root": "<absolute path>",
+  "prior_analysis": null
 }
 ```
+
+`prior_analysis` is optional and is populated **only** when *Step 0h* set
+`analysis_reuse = fresh` — with the parsed `.gitissue/analysis-<N>.json` (its
+`extraction`, `affected_files`, `architecture`, `code_patterns`, `test_files`,
+`history` and `cross_references` blocks are the useful part). On every other
+path pass `null` or omit the key, so the payload is byte-for-byte today's.
 
 ### What the researcher does
 
@@ -250,6 +371,34 @@ surfaced profile and the run-log `profile` reflect the final value.
 
 The delegation payload is otherwise unchanged; pass the researcher a note that a
 lighter, targeted scan is expected (mirroring the model/effort tier intent).
+
+### `reuse` — seeded, verify-first research
+
+When *Step 0h* set `analysis_reuse = fresh`, populate `prior_analysis` in the
+payload above and run a **reduced, verify-first** pass:
+
+1. **Keep** the *Verify not already resolved* phase **in full**. It is
+   safety-critical, and it is the one phase whose answer changes with time rather
+   than with code — the analysis cannot have observed a commit or PR that landed
+   after it ran. No reuse path ever skips it, on any profile.
+2. **Confirm or refute** the persisted `affected_files[]`: open them, check they
+   still exist and still play the role the analysis recorded. Persisted hints are
+   **verify-first hints to confirm or refute, never assertions to trust** — a
+   hint that no longer holds is dropped and the ordinary scan fills the gap,
+   exactly as if it had never been supplied.
+3. **Skip** the broad dependency trace (`trace_depth`), the git-history
+   domain-expert scan, and external solution research. The analysis already
+   performed each of them against a commit that condition 3 proved is an ancestor
+   of this run's base, and condition 4 proved none of its predicted files moved
+   since.
+4. **Upgrade, never downgrade** — the same rule the `light` profile follows. If
+   verification refutes enough of the analysis that the picture no longer holds
+   (files gone, role changed, a `high`/`complex` signal on what the analysis
+   called small), set `analysis_reuse = stale` from here on, run the full research
+   pass, and let Step 2 spawn the synthesizer as usual.
+
+The saving is real but bounded, and worth stating plainly: the codebase is
+researched once and *verified* once, rather than researched twice.
 
 ### Inline fallback
 
@@ -304,6 +453,40 @@ stayed `light` through research.
 
 The tracker line is unchanged (`[2/5] Plan  ✓ approach: {selected option name}`);
 `{selected option name}` is the direct minimal plan's name.
+
+### `reuse` — lift the options, skip the synthesis
+
+When *Step 0h* set `analysis_reuse = fresh` and Step 1 did not revise it to
+`stale`, do **not** spawn the synthesizer: the analysis already ran it, against a
+commit the predicate proved is an ancestor of this run's base. Lift its output
+instead:
+
+| Plan value | Lifted from `.gitissue/analysis-<N>.json` |
+|------------|-------------------------------------------|
+| the options | `options[]` |
+| the selected option | `options[recommended_option - 1]` |
+| complexity | `overall_complexity` |
+| risk | `overall_risk` |
+
+**Derive the one field the artifact does not carry.** `options[]` in the analysis
+JSON has no `rejection_reason` — the field `references/agents/synthesizer.md`
+(constraint 3) makes mandatory for the PR's *Options rejected* line. For each
+non-selected option, take it from `decision_record.options_rejected[]`, matching
+on `number` and reading `reason`. With no matching entry (or no
+`options_rejected` block), fall back to that option's own `cons[0]`, then
+`risk_details`; only when all three are empty write
+`"no reason recorded in the reused analysis"`. Never emit an option without a
+reason, and never drop the *Options rejected* line.
+
+Everything downstream is unchanged. *Plan selection* below still applies — and
+unlike the `light` path, `approval_gate: comment-and-wait` **does** present all
+three options here, because lifted options are real options. The design-confirm
+checkpoint still fires on the lifted `overall_complexity`/`overall_risk`, and the
+tracker line is still `[2/5] Plan  ✓ approach: {selected option name}`.
+
+Provenance is already durable: the Decision Record's
+`Analyzed at: {branch} @ {commit_sha_short}` line carries the analysis's own
+`git_state` — precisely the commit these options were produced against.
 
 ### Plan selection
 
@@ -520,9 +703,10 @@ For a bug issue, the implementer (per `references/agents/implementer.md` Task 1.
 The implementer **returns** a `reproduction` block (command, red status, stated-reason
 match, regression-test path or "manual — no seam"). The main agent folds it into the PR
 body's Decision Record and Acceptance Criteria Verification table (durable home — see
-`references/report-templates.md`); if a fresh `.gitissue/analysis-<N>.json` exists, the
-same data also lives in its `decision_record.reproduction` field (optional cache mirror,
-written by `/issue-analysis`, never created by the resolver).
+`references/report-templates.md`); when `.gitissue/analysis-<N>.json` is **fresh** by the
+predicate in *Step 0h — Analysis reuse gate* above (its single home — "fresh" is never
+used undefined), the same data also lives in its `decision_record.reproduction` field
+(optional cache mirror, written by `/issue-analysis`, never created by the resolver).
 
 **Auto mode never blocks** (`--auto` / `IDD_AUTO_MODE=1`): a missing or failed
 reproduction is logged, recorded as `not_reproduced`, and the pipeline continues to

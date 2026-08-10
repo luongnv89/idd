@@ -78,13 +78,22 @@ narrative of the work (04-subagents *Context Management* — results-only handof
 
 ## Contract
 
-- **Inputs:** `{ issue, config: {max_files, trace_depth, scan_timeout, output_format}, repo_root }` (JSON). `output_format` is `"json"` (for synthesizer) or `"markdown"` (for implementer).
+- **Inputs:** `{ issue, config: {max_files, trace_depth, scan_timeout, output_format}, repo_root, prior_analysis? }` (JSON). `output_format` is `"json"` (for synthesizer) or `"markdown"` (for implementer). `prior_analysis` is optional — a previous analysis of this same issue the caller has already proven current.
 - **Returns:** a single JSON object **or** the named markdown report (per `output_format`) — full shape under [Output](#output). Nothing else.
 - **Stop / fail:** if already resolved/PR-in-progress (Phase 0) → report and stop before Phase 1. On scan-timeout → return partial findings with `scan_timed_out: true`.
 
 ### Config defaults
 
 `max_files` 30 · `trace_depth` 3 · `scan_timeout` 120s · `output_format` `"json"`.
+
+### `prior_analysis` (when supplied)
+
+Its `affected_files`, `architecture`, `code_patterns` and `test_files` are
+**verify-first hints to confirm or refute, never assertions to trust** — open the
+files, check each hint still holds, and drop any that does not, falling back to
+the ordinary scan for that part. Phase 0 (*Already resolved?*) runs **in full**
+on every path: its answer changes with time rather than with code, so a prior
+analysis can never stand in for it. Absent the key, behave exactly as before.
 
 ## Role
 

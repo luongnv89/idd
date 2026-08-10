@@ -60,7 +60,7 @@ The PR title follows `{type}({scope}): {description} (#{issue_number})` — see 
 
 ### Lifting the Decision Record
 
-Treat analysis JSON as **fresh** only when `git_state.commit_sha` equals the synced base SHA for this run. When fresh, you may lift `root_cause`, `options_considered`, and `git_state` from the cache; **`selected_option` and `options_rejected` MUST always reflect this run's Step 2 synthesizer outcome** (never a stale cache pick). Field labels are stable across skills — do not rename them.
+Analysis JSON is **fresh** exactly when the predicate in `references/pipeline-steps.md` (*Step 0h — Analysis reuse gate*) says so — five checkable conditions, any doubt ⇒ stale. That section is the single home of the definition: do not restate, tighten, or re-derive a freshness rule here. When fresh, you may lift `root_cause`, `options_considered`, and `git_state` from the cache; **`selected_option` and `options_rejected` MUST always reflect this run's Step 2 outcome** — the synthesizer's options, or the options Step 2 lifted under `analysis_reuse = fresh` (*Step 2 — Plan → `reuse`*) — never a pick from an analysis this run did not prove fresh. Field labels are stable across skills — do not rename them.
 
 If no analysis JSON exists (e.g., resolver was invoked without prior analysis), synthesize the same five core fields from the resolver's own Step 1 (Research) and Step 2 (Plan) findings, and use the synced base SHA as `commit_sha_short`. (For bug issues the sixth `Reproduction` line is added separately from the implementer's returned reproduction block — see the bug-verification checkpoint, not the analysis JSON.) Either source produces the same template — what matters is that the durable analysis signal lands in the PR body, where squash-merge will carry it into git history.
 
@@ -214,6 +214,13 @@ Rules that make the report worth reading:
 - A step may not be reported complete without a `Result:` line. If a check could
   not be evaluated (a tool was unavailable, a gate was skipped by config), mark
   it `×` and use `PARTIAL` — never assume `√`.
+- One clarification of that rule, because two paths reach Step 2 without spawning
+  the synthesizer: *Step 2 — Plan*'s `Options produced` check is `√` whenever
+  options are in hand at the end of the step — synthesized this run, lifted from
+  a fresh analysis (`analysis_reuse = fresh`), or replaced by the `light`
+  profile's direct minimal plan — and `×`/`PARTIAL` only when the step ends with
+  no plan at all. The check asks whether the plan exists, not which machinery
+  produced it.
 
 `√` and `×` are the completion-report check glyphs defined in
 `references/docs/terminal-style.md`; the run's own status symbols stay `✓ ✗ ⚠ ○`.
