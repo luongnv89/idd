@@ -36,13 +36,21 @@ gh issue view {N} --json number,title,state,labels,assignees
 For each issue, check:
 - **Exists** — if not found, warn and remove from list
 - **Open** — if closed, warn and remove from list
-- **Not skip-labeled** — if labeled with a `skip_labels` value, warn and remove
+- **Not skip-labeled** — if labeled with a `skip_labels` value, warn and remove.
+  **One exemption: `autopilot.quarantine_label`.** It is in the effective
+  `skip_labels` set SKILL.md's *Configuration* step builds, so removing it here
+  is what this step would otherwise do — and that would answer an issue the user
+  named by hand with a line in a validation banner and nothing else. Keep a
+  quarantined issue in the list; *Loop behavior* below owns that skip, and owning
+  it there is what gives it an `[Issue {i}/{total}]` slot and its one run-log
+  line. Nothing else is exempt: `wontfix` and the rest are still removed here.
 
 ```
 ● Validating issue list...
   ✓ #5  — Fix login crash (open)
   ⚠ #10 — Add dark mode (closed, removing)
   ✓ #12 — Refactor auth module (open)
+  ○ #14 — Flaky import path (quarantined, keeping — skipped at its turn)
 ```
 
 If all issues are invalid:
@@ -184,20 +192,26 @@ mid-batch does not re-resolve issues that already landed. When `gi-state.py` is
 unavailable they degrade to exactly what they were before: in-memory sets that
 do not survive the run.
 
-**Quarantine is honored in this mode too — the label filter is not Phase 1's.**
-Explicit list mode bypasses Phase 1 entirely, so nothing here inherits *Step
-1.2*'s pick predicate; the quarantine skip has to be applied on its own. Before
-resolving any listed issue, check its labels for `autopilot.quarantine_label`
-(the same effective `skip_labels` membership SKILL.md's *Configuration* step
-establishes) and skip it with `skipped_reason: quarantined` if present. The write
-side is unchanged: a failure inside this mode runs the same *Quarantine after
-repeated failures* procedure in `references/phases.md`. A user who explicitly
-lists a quarantined issue is telling the loop to try it again, so say so in the
-skip line — removing the label is the documented way to do that:
+**Quarantine is honored in this mode too — and this loop is the single step that
+applies it.** Explicit list mode bypasses Phase 1 entirely, so nothing here
+inherits *Step 1.2*'s pick predicate, and *Validate issues upfront* deliberately
+exempts `autopilot.quarantine_label` from the removal it applies to every other
+skip label. That leaves exactly one owner, which is the point: two steps skipping
+the same input would give it two dispositions and two different
+`[Issue {i}/{total}]` totals. Before resolving any listed issue, check its labels
+for `autopilot.quarantine_label` and, if present, skip it with
+`skipped_reason: quarantined` — one slot in the counter and **one** run-log line,
+the disposition every ordinary skip gets (*Run-log fan-out for the batch* names
+`quarantined` among them). A user who explicitly lists a quarantined issue is
+telling the loop to try it again, so say so in the skip line — removing the label
+is the documented way to do that:
 
 ```
 ○ [Issue {i}/{total}] #{N} — quarantined ({quarantine_label}); remove the label to retry
 ```
+
+The write side is unchanged: a failure inside this mode runs the same *Quarantine
+after repeated failures* procedure in `references/phases.md`.
 
 When advancing to the next item in `optimized_order`:
 1. **If already processed** (in the `processed` set): emit a skip line and advance.

@@ -844,6 +844,16 @@ On `quarantine: true`, apply the label and record it:
 gh issue edit {issue_number} --add-label "{autopilot.quarantine_label}"
 ```
 
+**Check the label before you substitute it**, exactly as *Step 1.0* checks a
+recorded branch and the *Runtime budget check* checks a recorded `started_at`:
+it must match `^[A-Za-z0-9._:-]+$`. `gi-config.py` validates that
+`autopilot.quarantine_label` is a *string*, never that it is free of shell
+metacharacters, and it is the only config **string** in the distribution that
+reaches a command line — every other substituted config value is an integer. The
+double quotes above stop word-splitting and globbing but do **not** neutralize
+`$(…)` or a backtick, so the check is what makes the substitution safe. Anything
+else is the first degrade path below: skip the write and continue.
+
 ```
 ⚠ #{issue_number} quarantined after {streak} consecutive failed runs
   Label:  {autopilot.quarantine_label} — remove it to let /auto-pilot try again
@@ -865,8 +875,13 @@ machine, and a deleted `.gitissue/`, a human can see it and remove it, and
 perspective there is no new gate to consult — the label is in the effective
 `skip_labels` set (SKILL.md → *Configuration*), so *Step 1.2* already skips it.
 
-**Two degrade paths, both non-fatal.**
+**Three degrade paths, all non-fatal.**
 
+- **The label is unusable.** `autopilot.quarantine_label` failed the format
+  check above. Print `⚠ Quarantine label is not a usable label name — skipping
+  the label write`, never substitute the value, and continue. The streak stays
+  in the run log, so a run started with a corrected `.gitissue.yml` quarantines
+  on this issue's very next failure.
 - **The count is unavailable.** No `python3`, or exit 4 (the log is missing or
   unreadable — note the script still prints its line, with `streak: 0`): print
   `⚠ gi-runlog unavailable — skipping the quarantine check` and continue without

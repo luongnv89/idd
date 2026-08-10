@@ -80,7 +80,9 @@ Exit codes
   2  usage error
   3  invalid input — unparsable JSON on stdin, a payload with no numeric
      `.rate.remaining`, a negative `--max-minutes`, an `--attempt` below 1, or a
-     malformed instant (stderr: `✗ gi-ratelimit: <why>`). Stop.
+     malformed instant, which includes one outside the years `datetime` can
+     represent — a millisecond `reset` is how that arrives in the wild
+     (stderr: `✗ gi-ratelimit: <why>`). Stop.
   4  cannot complete — stdin could not be read, or a sleep was interrupted
      before its chunk finished (stderr: `⚠ gi-ratelimit: <reason>`). Callers
      fall back to the documented prose procedure beside the call site.
@@ -163,7 +165,20 @@ def parse_instant(value: str, flag: str) -> int:
 
 def iso(epoch: int) -> str:
     """The repo's canonical UTC instant for an epoch second."""
-    return datetime.fromtimestamp(epoch, timezone.utc).strftime(TS_FMT)
+    try:
+        return datetime.fromtimestamp(epoch, timezone.utc).strftime(TS_FMT)
+    except (ValueError, OverflowError, OSError) as exc:
+        # `datetime` spans years 1..9999 only, and `fromtimestamp` raises
+        # ValueError, OverflowError or OSError outside it depending on the
+        # platform. None of those is caught anywhere else, so the interpreter
+        # would exit 1 with a traceback — a code outside this script's 0/2/3/4
+        # contract, and the one code reserved for a script-specific verdict.
+        # The same defence `_read_stdin()` applies to UnicodeDecodeError, for
+        # the same reason: an instant that far out (a millisecond `reset`, say)
+        # is a malformed payload, not a clock anyone could wait for.
+        raise InvalidInput(
+            f"instant {epoch} is outside the representable date range"
+        ) from exc
 
 
 def read_rate(payload: object) -> tuple[int, int | None]:

@@ -422,6 +422,14 @@ fi
 assert_json "AC2: the resources.core form of the payload is accepted too" \
   "$(printf '{"resources":{"core":{"remaining":10,"reset":%s}}}' "$RESET" \
     | python3 "$RL" --verdict --now "$NOW" --quiet 2>/dev/null)" action=wait wait_s=600
+# …and the flat form, which is what the *documented call site* actually
+# produces: `--jq '{remaining: .rate.remaining, reset: .rate.reset}'` yields
+# neither `.rate` nor `.resources.core`, only read_rate's last fallback. T7
+# asserts that command string ships; this asserts the two halves fit.
+assert_json "AC2: the flat {remaining, reset} form the shipped --jq produces is accepted" \
+  "$(printf '{"remaining":10,"reset":%s}' "$RESET" \
+    | python3 "$RL" --verdict --now "$NOW" --quiet 2>/dev/null)" \
+  action=wait wait_s=600 remaining=10 reset="$RESET"
 # A raised floor keeps a proportional band rather than collapsing it.
 assert_json "AC2: a raised --threshold scales the warn band with it" \
   "$(verdict 900 "$RESET" --threshold 400)" action=warn
@@ -437,6 +445,36 @@ run_status out st bash -c "printf '{\"rate\":{\"remaining\":true}}' | python3 '$
 expect_status "AC2: a boolean remaining is not an integer — exit 3" 3 "$st"
 run_status out st bash -c "printf '[]' | python3 '$RL' --verdict --now $NOW"
 expect_status "AC2: a JSON array payload exits 3" 3 "$st"
+
+# A `reset` outside the years `datetime` can represent — a millisecond epoch is
+# how that arrives in the wild — is invalid input, not a crash. Formatting
+# `resume_at` raises ValueError, which nothing else catches, so the interpreter
+# would exit 1 with a traceback: the one code reserved for a script-specific
+# verdict, which every call site reading non-zero as "degrade" would sail past.
+OOR=99999999999999
+run_status out st bash -c "printf '{\"remaining\":10,\"reset\":$OOR}' | python3 '$RL' --verdict --now $NOW"
+expect_status "AC2: an out-of-range reset exits 3 (invalid input), never the reserved 1" 3 "$st"
+if [ -z "$out" ]; then
+  pass "AC2: the rejected payload prints no half-formed verdict on stdout"
+else
+  fail "AC2: the rejected payload printed a verdict anyway: $out"
+fi
+oor_err="$(printf '{"remaining":10,"reset":%s}' "$OOR" \
+  | python3 "$RL" --verdict --now "$NOW" 2>&1 >/dev/null || true)"
+if printf '%s' "$oor_err" | grep -qF '✗ gi-ratelimit:' \
+   && ! printf '%s' "$oor_err" | grep -q 'Traceback'; then
+  pass "AC2: it reports the documented '✗ gi-ratelimit: …' line, with no traceback"
+else
+  fail "AC2: an out-of-range reset did not report the documented error line"
+  printf '      stderr: %s\n' "$oor_err"
+fi
+# The same instant reaches the other modes that parse one. None of them formats
+# an instant, so none can raise — assert it rather than assume it, so a mode that
+# starts printing one comes back here.
+run_status out st python3 "$RL" --wait --until "$OOR" --now "$NOW" --chunk-s 1 --quiet
+expect_status "AC2: an out-of-range --until is answered at exit 0, never a traceback" 0 "$st"
+run_status out st bash -c "printf '{\"remaining\":9999}' | python3 '$RL' --verdict --now $OOR --quiet"
+expect_status "AC2: an out-of-range --now is answered at exit 0, never a traceback" 0 "$st"
 
 # The pause. One chunk per invocation, so the caller can refresh the run-lock
 # heartbeat between chunks — the lock's TTL is what a single long sleep breaks.
@@ -530,6 +568,12 @@ run_status out st python3 "$RL" --budget --max-minutes 10 --now "$NOW"
 expect_status "AC3: --budget with no --started-at exits 3" 3 "$st"
 run_status out st python3 "$RL" --budget --started-at "yesterday" --max-minutes 10 --now "$NOW"
 expect_status "AC3: a malformed --started-at exits 3" 3 "$st"
+# The out-of-range instant again: this mode never formats one, so it answers
+# instead of raising — and a future edit that made it print an instant would
+# have to keep the 0/2/3/4 contract rather than exit 1.
+run_status out st python3 "$RL" --budget --started-at 99999999999999 --max-minutes 10 \
+  --now "$NOW" --quiet
+expect_status "AC3: an out-of-range --started-at is answered, never a traceback" 0 "$st"
 
 # The budget is measured from the `started_at` gi-state.py writes at --init, so
 # the two scripts have to agree on the instant format. Generate a real stamp
@@ -721,6 +765,17 @@ expect_grep "AC1: the threshold is substituted from the configured key" \
   '--threshold {autopilot.quarantine_after}' "$AP_PHASES"
 expect_grep "AC1: the label is applied with gh issue edit --add-label" \
   'gh issue edit {issue_number} --add-label "{autopilot.quarantine_label}"' "$AP_PHASES"
+# That label is the only config *string* in the distribution that reaches a
+# command line, and gi-config only checks its type — so the substitution site
+# has to check its shape, exactly as the recorded branch and started_at do.
+expect_grep "AC1: the quarantine label is format-checked before it is substituted" \
+  '**Check the label before you substitute it**' "$AP_PHASES"
+expect_grep "AC1: the check states the characters a label may contain" \
+  '`^[A-Za-z0-9._:-]+$`' "$AP_PHASES"
+expect_grep "AC1: a label failing the check skips the write instead of stopping the run" \
+  '⚠ Quarantine label is not a usable label name — skipping' "$AP_PHASES"
+expect_grep "AC1: the unusable label is one of the enumerated non-fatal degrades" \
+  '**Three degrade paths, all non-fatal.**' "$AP_PHASES"
 expect_grep "AC1: a quarantined issue is recorded and the loop continues" \
   '**continue to the next issue**' "$AP_PHASES"
 expect_grep "AC1: the quarantine path is explicitly record-and-continue, never a stop" \
@@ -754,15 +809,31 @@ expect_grep "AC1: run-log.md adds quarantined to the skipped_reason vocabulary" 
 expect_grep "AC1: configuration.md explains why the label, not a state file, is the truth" \
   'quarantine_after' "$AP_CONFIG"
 
-# Explicit-list mode bypasses Phase 1 entirely, so the label filter it relies on
-# is not there — the skip has to be applied on its own or AC1 has a hole.
+# Explicit-list mode bypasses Phase 1, so AC1 needs the skip applied somewhere —
+# and applied by exactly one step. Two steps skipping the same input would give it
+# two dispositions: two different output lines, two different [Issue i/total]
+# totals, and a run-log line that either exists or does not.
 expect_grep "AC1: quarantine is honored in explicit-list mode too" \
-  '**Quarantine is honored in this mode too — the label filter is not Phase 1'"'"'s.**' \
+  '**Quarantine is honored in this mode too — and this loop is the single step that' \
   "$AP_EXPLICIT"
 expect_grep "AC1: explicit-list mode checks the label before resolving a listed issue" \
   'autopilot.quarantine_label' "$AP_EXPLICIT"
 expect_grep "AC1: explicit-list mode records the quarantined skip reason" \
   'skipped_reason: quarantined' "$AP_EXPLICIT"
+# …and the step that would otherwise have removed it first says it does not, so
+# the two steps cannot both claim the same input.
+expect_grep "AC1: upfront validation exempts the quarantine label from its removal" \
+  '**One exemption: `autopilot.quarantine_label`.**' "$AP_EXPLICIT"
+expect_grep "AC1: the exemption is scoped — every other skip label is still removed" \
+  'Nothing else is exempt' "$AP_EXPLICIT"
+expect_grep "AC1: the counter slot and the run-log line are stated, not left implied" \
+  'one slot in the counter and **one** run-log line' "$AP_EXPLICIT"
+# The disposition has to match the vocabulary the fan-out section already fixed,
+# or a quarantined skip logs differently from every other ordinary skip.
+expect_grep "AC1: the fan-out section still lists quarantined among ordinary skips" \
+  '`quarantined` — still log their one line with a `skipped_reason`' "$AP_EXPLICIT"
+expect_grep "AC1: run-log.md agrees the later, skipping run is what carries the reason" \
+  'belongs to the **later** run that skips the issue' "$AP_RUNLOG"
 
 # ───────────────────────────────────────────────────────────
 # T7 (AC2): the rate-limit probe, the pause, and the resume

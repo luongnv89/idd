@@ -289,7 +289,7 @@ the single home of that mapping, never restated here.
   Continuing to next issue...
 ```
 **Trigger:** After a Phase 2.3 failure, `gi-runlog.py --failure-streak` reports `quarantine: true` — `autopilot.quarantine_after` consecutive `failed` records for this issue (`0` disables the check entirely).
-**Action:** `gh issue edit {issue_number} --add-label "{quarantine_label}"`, record the skip-list reason `quarantined`, and **continue to the next issue** — record-and-continue, never a stop. The label is in the effective `skip_labels` set, so later runs skip the issue with no extra gate. Missing or unreadable log (exit 4, `streak: 0`): print `⚠ gi-runlog unavailable — skipping the quarantine check` and never quarantine on evidence nobody read.
+**Action:** `gh issue edit {issue_number} --add-label "{quarantine_label}"` — only after the label passes the `^[A-Za-z0-9._:-]+$` check in `references/phases.md`, since a config string reaching a command line is not metacharacter-checked by `gi-config.py` — then record the skip-list reason `quarantined` and **continue to the next issue**: record-and-continue, never a stop. The label is in the effective `skip_labels` set, so later runs skip the issue with no extra gate. Missing or unreadable log (exit 4, `streak: 0`): print `⚠ gi-runlog unavailable — skipping the quarantine check` and never quarantine on evidence nobody read.
 
 ### Quarantine label could not be applied (degrade)
 ```
