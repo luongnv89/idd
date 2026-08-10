@@ -19,7 +19,11 @@ does not `exec`, and never shells out.
 
 Modes
   --init    read `{run_id, mode, invocation, queue, limit}` on stdin, write the
-            run state, print the normalized state
+            run state, print the normalized state. Every key is optional; when
+            `run_id` is omitted the id of the lock this run already holds is
+            adopted, so the documented `--lock` → `--init` → `--unlock` sequence
+            shares one run id instead of minting a second one that `--unlock`
+            would then refuse
   --read    print the current state, or `{}` when absent. Never fails: absence
             and corruption are both answers, and both mean "start fresh"
   --update  read a patch on stdin, merge it into the state, write atomically
@@ -62,6 +66,12 @@ REPORT_NAME = "last-run-report.md"
 
 STATE_VERSION = 1
 DEFAULT_TTL_S = 3600
+
+# How many times a reclaim re-classifies and retries before giving up. A reclaim
+# only ever loses its race to another reclaim of the same lock, and each loss
+# leaves a *new* lock behind, so the retries converge; the bound is what turns a
+# pathological contention loop into an ordinary exit 3.
+RECLAIM_ATTEMPTS = 3
 
 # An issue title is unbounded reporter-authored text; the state file only needs
 # enough of it to name the issue in a resume line.
@@ -294,8 +304,19 @@ def _normalize_processed(value: object) -> list[dict[str, object]]:
     return out
 
 
-def normalize_init(submitted: object, *, now: str | None = None) -> dict[str, object]:
-    """Build a fresh run state from the `--init` payload."""
+def normalize_init(
+    submitted: object,
+    *,
+    now: str | None = None,
+    default_run_id: str | None = None,
+) -> dict[str, object]:
+    """Build a fresh run state from the `--init` payload.
+
+    `default_run_id` is the id of a lock this run already holds. A fresh run
+    takes the lock *before* the first mutation, which is before any state file
+    exists, so `--lock` has to mint the id; adopting it here is what makes the
+    documented lock → init → unlock sequence one run rather than two.
+    """
     if not isinstance(submitted, dict):
         raise InputError("stdin must be a single JSON object")
     unknown = sorted(set(submitted) - INIT_KEYS)
@@ -311,7 +332,7 @@ def normalize_init(submitted: object, *, now: str | None = None) -> dict[str, ob
     stamp = now or _now()
     return {
         "version": STATE_VERSION,
-        "run_id": submitted.get("run_id") or _new_run_id(),
+        "run_id": submitted.get("run_id") or default_run_id or _new_run_id(),
         "started_at": stamp,
         "updated_at": stamp,
         "invocation": submitted.get("invocation"),
@@ -445,21 +466,83 @@ def _lock_payload(run_id: str, pid: int, *, now: str | None = None) -> dict:
     }
 
 
-def _create_lock_exclusive(path: Path, payload: dict) -> bool:
-    """True when the lock was created, False when it already existed."""
-    _ensure_dir(path.parent)
+def _lock_identity(lock: object) -> tuple | None:
+    """What makes one lock file a *different* lock from another.
+
+    `None` for anything unreadable — an unreadable lock is never "the same lock"
+    as a readable one, which is what keeps a reclaim from retiring a file it
+    never classified.
+    """
+    if not isinstance(lock, dict):
+        return None
+    return (lock.get("run_id"), lock.get("started_at"), lock.get("pid"))
+
+
+def _retire_lock(path: Path, observed: tuple | None) -> str:
+    """Take the *observed* stale lock out of the way, atomically.
+
+    `os.rename` is the exclusion primitive: of two processes racing to retire
+    one stale lock, exactly one rename can find the path, so exactly one of them
+    goes on to create the replacement. Returns `retired` (this process removed
+    the lock it classified), `gone` (another process got there first), or
+    `changed` (the file was somebody else's newer lock — it is put back, and the
+    caller must re-classify rather than reclaim on a stale verdict).
+    """
+    retired = path.with_name(f"{path.name}.retired-{os.getpid()}")
     try:
-        fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
-    except FileExistsError:
-        return False
+        os.rename(path, retired)
+    except FileNotFoundError:
+        return "gone"
     except OSError as exc:
-        raise WriteError(f"cannot create {path} — {exc}") from exc
+        raise WriteError(f"cannot retire {path} — {exc}") from exc
+    parsed, _ = _read_json_file(retired)
+    if _lock_identity(parsed) != observed:
+        try:
+            os.replace(retired, path)
+        except OSError:
+            pass
+        return "changed"
     try:
+        os.unlink(retired)
+    except OSError:
+        pass
+    return "retired"
+
+
+def _create_lock_exclusive(path: Path, payload: dict) -> bool:
+    """True when the lock was created, False when it already existed.
+
+    The payload is written in full under a private name and then hard-linked
+    into place. `os.link` refuses an existing destination, so it excludes
+    exactly like `O_EXCL` — and unlike an empty `O_EXCL` create followed by a
+    write, it publishes a **complete** file. That window is not theoretical: a
+    concurrent run that read the half-written lock would parse it as corrupt and
+    reclaim a lock that was in the middle of being taken.
+    """
+    _ensure_dir(path.parent)
+    staged = None
+    try:
+        fd, staged = tempfile.mkstemp(
+            prefix=f".{path.name}.", suffix=".new", dir=str(path.parent)
+        )
         with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as fh:
             fh.write(_render_json(payload))
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.chmod(staged, 0o644)
+        try:
+            os.link(staged, path)
+        except FileExistsError:
+            return False
+        return True
     except OSError as exc:
-        raise WriteError(f"cannot write {path} — {exc}") from exc
-    return True
+        raise WriteError(f"cannot create {path} — {exc}") from exc
+    finally:
+        if staged is not None:
+            try:
+                os.unlink(staged)
+            except OSError:
+                pass
 
 
 # --- modes ------------------------------------------------------------------
@@ -470,7 +553,9 @@ def _emit(obj: object) -> None:
 
 
 def run_init(args, paths) -> int:
-    state = normalize_init(_read_stdin_json())
+    state = normalize_init(
+        _read_stdin_json(), default_run_id=_lock_run_id(paths["lock"])
+    )
     if args.dry_run:
         _emit({"dry_run": True, "would_write": str(paths["state"]), "state": state})
         return 0
@@ -529,6 +614,22 @@ def _touch_lock_heartbeat(lock_path: Path, run_id: object) -> None:
         pass
 
 
+def _lock_run_id(lock_path: Path) -> str | None:
+    """The run id recorded in an existing lock, when it is readable and valid.
+
+    The mirror image of `_resolve_run_id`: that one reads the state to serve the
+    lock, this one reads the lock to serve the state. Only one of the two can
+    answer on a fresh run, and on a fresh run it is always this one.
+    """
+    parsed, error = _read_json_file(lock_path)
+    if error is not None or not isinstance(parsed, dict):
+        return None
+    run_id = parsed.get("run_id")
+    if isinstance(run_id, str) and RUN_ID_RE.match(run_id):
+        return run_id
+    return None
+
+
 def _resolve_run_id(args, paths) -> str | None:
     if args.run_id:
         return args.run_id
@@ -540,6 +641,27 @@ def _resolve_run_id(args, paths) -> str | None:
     return None
 
 
+def _classify_lock(args, paths) -> tuple[dict, dict, tuple | None]:
+    """(holder, status, identity) for whatever is at the lock path right now."""
+    existing, error = _read_json_file(paths["lock"])
+    if error is not None or not isinstance(existing, dict):
+        # An unreadable lock cannot name a live run, and leaving it in place
+        # would block every future run forever. Reclaim it, loudly.
+        return {}, {"stale": True, "stale_reason": "corrupt", "age_s": None}, None
+    return existing, lock_status(existing, args.ttl), _lock_identity(existing)
+
+
+def _emit_held(holder: dict, status: dict) -> int:
+    print(
+        "✗ gi-state: the run lock is held by run "
+        f"{holder.get('run_id')} (pid {holder.get('pid')} on "
+        f"{holder.get('host')})",
+        file=sys.stderr,
+    )
+    _emit({"status": "held", "holder": holder, **status})
+    return 3
+
+
 def run_lock(args, paths) -> int:
     run_id = _resolve_run_id(args, paths) or _new_run_id()
     if not RUN_ID_RE.match(run_id):
@@ -548,23 +670,9 @@ def run_lock(args, paths) -> int:
 
     existing, error = _read_json_file(paths["lock"])
     if existing is not None or error is not None:
-        if error is not None or not isinstance(existing, dict):
-            # An unreadable lock cannot name a live run, and leaving it in place
-            # would block every future run forever. Reclaim it, loudly.
-            status = {"stale": True, "stale_reason": "corrupt", "age_s": None}
-            holder: dict[str, object] = {}
-        else:
-            status = lock_status(existing, args.ttl)
-            holder = existing
+        holder, status, observed = _classify_lock(args, paths)
         if not status["stale"] and not args.force:
-            print(
-                "✗ gi-state: the run lock is held by run "
-                f"{holder.get('run_id')} (pid {holder.get('pid')} on "
-                f"{holder.get('host')})",
-                file=sys.stderr,
-            )
-            _emit({"status": "held", "holder": holder, **status})
-            return 3
+            return _emit_held(holder, status)
         if args.dry_run:
             _emit(
                 {
@@ -576,14 +684,40 @@ def run_lock(args, paths) -> int:
                 }
             )
             return 0
-        _atomic_write(paths["lock"], _render_json(payload))
-        print(
-            f"⚠ gi-state: reclaimed a {status['stale_reason'] or 'forced'} lock "
-            f"from run {holder.get('run_id')}",
-            file=sys.stderr,
-        )
-        _emit({"status": "reclaimed", "previous": holder, "lock": payload, **status})
-        return 0
+        # Reclaiming is not a plain write. `_atomic_write` here would let two
+        # runs that both classified the same stale lock both "win", because
+        # os.replace never refuses an existing file: retire the exact lock this
+        # run classified, then create the replacement with O_CREAT|O_EXCL, and
+        # re-classify whenever either step loses the race.
+        for _ in range(RECLAIM_ATTEMPTS):
+            if not status["stale"] and not args.force:
+                break
+            if _retire_lock(paths["lock"], observed) != "changed":
+                if _create_lock_exclusive(paths["lock"], payload):
+                    print(
+                        f"⚠ gi-state: reclaimed a "
+                        f"{status['stale_reason'] or 'forced'} lock from run "
+                        f"{holder.get('run_id')}",
+                        file=sys.stderr,
+                    )
+                    _emit(
+                        {
+                            "status": "reclaimed",
+                            "previous": holder,
+                            "lock": payload,
+                            **status,
+                        }
+                    )
+                    return 0
+            holder, status, current = _classify_lock(args, paths)
+            if current != observed:
+                # A *different* lock is at the path now. This invocation
+                # classified the one it was asked to reclaim, and a stale
+                # verdict about that file says nothing about this one — so the
+                # race has a single winner even at `--ttl 0`, where every lock
+                # is stale the instant it is written.
+                break
+        return _emit_held(holder, status)
 
     if args.dry_run:
         _emit({"dry_run": True, "status": "would_acquire", "lock": payload})
@@ -642,6 +776,10 @@ def run_report(args, paths) -> int:
     if not isinstance(markdown, str) or not markdown.strip():
         raise InputError("markdown must be a non-empty string")
     _check_str(submitted, "run_id", pattern=RUN_ID_RE)
+    # Both header values are interpolated into the `<!-- … -->` marker below, so
+    # both are pattern-checked: a `generated_at` carrying `-->` would end the
+    # marker early and leave the rest of it as visible report text.
+    _check_str(submitted, "generated_at", pattern=TS_RE)
     header = {
         "run_id": submitted.get("run_id") or _resolve_run_id(args, paths),
         "generated_at": submitted.get("generated_at") or _now(),
