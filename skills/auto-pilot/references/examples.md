@@ -62,6 +62,7 @@ Detailed example runs and edge-case behaviors referenced from SKILL.md.
   ────────────────────────────────────
   Remaining: 4 eligible issues
 
+○ Live backlog: 7 open issues — 1 assigned to others
 ● [Iteration 2/3] Picking next issue from triage order...
   Selected: #8 — Add pagination to API
   ...

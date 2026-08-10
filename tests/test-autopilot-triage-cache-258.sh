@@ -112,6 +112,7 @@ echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄�
 
 SRC_PHASES="$REPO_ROOT/src/skills/auto-pilot/references/phases.md"
 SRC_CONFIG="$REPO_ROOT/src/skills/auto-pilot/references/configuration.md"
+SRC_ERRORS="$REPO_ROOT/src/skills/auto-pilot/references/error-messages.md"
 SRC_SKILL="$REPO_ROOT/src/skills/auto-pilot/SKILL.source.md"
 SRC_PROMPTS="$REPO_ROOT/src/skills/auto-pilot/references/subagent-prompts.md"
 SRC_SUMMARY="$REPO_ROOT/src/skills/auto-pilot/references/summary-format.md"
@@ -121,15 +122,16 @@ SCHEMA="$REPO_ROOT/docs/config-schema.md"
 
 BUILT_PHASES="$REPO_ROOT/skills/auto-pilot/references/phases.md"
 BUILT_CONFIG="$REPO_ROOT/skills/auto-pilot/references/configuration.md"
+BUILT_ERRORS="$REPO_ROOT/skills/auto-pilot/references/error-messages.md"
 BUILT_SKILL="$REPO_ROOT/skills/auto-pilot/SKILL.md"
 BUILT_PROMPTS="$REPO_ROOT/skills/auto-pilot/references/subagent-prompts.md"
 BUILT_SUMMARY="$REPO_ROOT/skills/auto-pilot/references/summary-format.md"
 BUILT_PERSIST="$REPO_ROOT/skills/issue-triage/references/output-and-persist.md"
 
-for file in "$SRC_PHASES" "$SRC_CONFIG" "$SRC_SKILL" "$SRC_PROMPTS" "$SRC_SUMMARY" \
-            "$SRC_PERSIST" "$SRC_TRIAGE_SKILL" "$SCHEMA" "$GRAPH" \
-            "$BUILT_PHASES" "$BUILT_CONFIG" "$BUILT_SKILL" "$BUILT_PROMPTS" \
-            "$BUILT_SUMMARY" "$BUILT_PERSIST"; do
+for file in "$SRC_PHASES" "$SRC_CONFIG" "$SRC_ERRORS" "$SRC_SKILL" "$SRC_PROMPTS" \
+            "$SRC_SUMMARY" "$SRC_PERSIST" "$SRC_TRIAGE_SKILL" "$SCHEMA" "$GRAPH" \
+            "$BUILT_PHASES" "$BUILT_CONFIG" "$BUILT_ERRORS" "$BUILT_SKILL" \
+            "$BUILT_PROMPTS" "$BUILT_SUMMARY" "$BUILT_PERSIST"; do
   if [ -f "$file" ]; then
     pass "exists: ${file#$REPO_ROOT/}"
   else
@@ -138,18 +140,24 @@ for file in "$SRC_PHASES" "$SRC_CONFIG" "$SRC_SKILL" "$SRC_PROMPTS" "$SRC_SUMMAR
 done
 
 # ───────────────────────────────────────────────────────────
-# T1 (AC2): the orchestrator's one bulk fetch carries no bodies
+# T1 (AC2): every bulk fetch in the orchestrator carries no bodies
 # ───────────────────────────────────────────────────────────
 # Two halves, and both matter. The list must still END in `state,updatedAt` —
 # #256's T1.1 pins that shape, and both fields are structural inputs to the
-# resolver's Step 0i gate — while `body` must be gone from it.
+# resolver's Step 0i gate — while `body` must be gone from it. T1.2 is
+# file-wide on purpose: since Step 1.1b there are two `gh issue list` sites in
+# the orchestrator (the triage scan and the live eligibility read), and neither
+# may carry a body.
 check_has "$SRC_PHASES" 'gh issue list --state open --json [a-zA-Z,]*state,updatedAt' \
   "T1.1: Phase 1's list call still ends in state,updatedAt"
 check_lacks "$SRC_PHASES" 'gh issue list --state open --json [a-zA-Z,]*body' \
   "T1.2: Phase 1's list call no longer requests body"
 check_has "$SRC_PHASES" '--limit 100' \
   "T1.3: the bulk list is still bounded by an explicit limit"
-STEP11_BLOCK="$(awk '/^### Step 1\.1 — Triage/,/^### Step 1\.2 — Pick Next Issue/' "$SRC_PHASES")"
+# Bounded at Step 1.1b, not at Step 1.2: Step 1.1b sits between them and also
+# talks about bodies and about Step 1.2b, so a block that swallowed it would let
+# its prose satisfy assertions that are about Step 1.1 alone.
+STEP11_BLOCK="$(awk '/^### Step 1\.1 — Triage/,/^### Step 1\.1b — Live eligibility read/' "$SRC_PHASES")"
 check_block_has "$STEP11_BLOCK" 'No .body' \
   "T1.4: Step 1.1 states that the list carries no body, and why"
 check_block_has "$STEP11_BLOCK" 'Step 1\.2b' \
@@ -533,6 +541,117 @@ while IFS='|' read -r status name detail; do
 done < "$TMP/removal-report"
 
 # ───────────────────────────────────────────────────────────
+# T10 (QA cycle 2): the gate removed the per-iteration triage, not
+#      the orchestrator's live view of the backlog
+# ───────────────────────────────────────────────────────────
+# Phase 1's bulk list used to be the ONLY live read in the loop, so making it
+# once-per-run (or zero, on a `fresh` cache) silently unplugged three rules that
+# still read from it: Step 1.2's `Open` and `Not assigned` criteria, the
+# pick-miss predicate, and the `✓ All issues resolved` stop. Step 1.1b restores
+# a body-less two-field read that answers all three.
+
+check_has "$SRC_PHASES" '^### Step 1\.1b — Live eligibility read' \
+  "T10.1: a named step supplies the live open-issue set the pick needs"
+LIVEREAD_BLOCK="$(awk '/^### Step 1\.1b — Live eligibility read/,/^### Step 1\.2 — Pick Next Issue/' "$SRC_PHASES")"
+check_block_has "$LIVEREAD_BLOCK" 'gh issue list --state open --json number,assignees --limit 100' \
+  "T10.2: the live read asks for exactly the two fields the cache cannot answer"
+check_block_has "$LIVEREAD_BLOCK" 'neither a GitHub .state. nor an .assignees. field' \
+  "T10.3: the step states why the cache cannot answer those two criteria"
+check_block_has "$LIVEREAD_BLOCK" 'Evaluated every iteration' \
+  "T10.4: the live read runs every iteration, unlike the triage above it"
+check_block_has "$LIVEREAD_BLOCK" 'no second call' \
+  "T10.5: a triage iteration reuses Step 1.1's list instead of listing twice"
+# AC2/AC4 are the reason this fix is a two-field list and not a re-added `body`.
+# T1.2 already forbids the body file-wide; this pins the stated rationale, so a
+# later edit cannot quietly widen the field set without contradicting itself.
+check_block_has "$LIVEREAD_BLOCK" 'Two scalar fields, and no .body' \
+  "T10.6: the live read states it carries no body (AC2)"
+check_block_has "$LIVEREAD_BLOCK" 'exactly one body per iteration' \
+  "T10.7: the live read states the per-iteration body budget is untouched (AC4)"
+check_block_has "$LIVEREAD_BLOCK" 'any doubt is .unavailable' \
+  "T10.8: the live read states which way it fail-safes"
+check_block_has "$LIVEREAD_BLOCK" 'Never read a failed read as .no open issues' \
+  "T10.9: a failed read is never mistaken for an empty backlog"
+
+# The two criteria must name their source on the criteria bullets themselves —
+# the same pin shape T5.8 uses, because prose elsewhere in Step 1.2 also
+# mentions Step 1.1b and a section-wide grep would survive losing the bullet.
+check_bullet() {
+  local file="$1" bullet="$2" pattern="$3" label="$4"
+  if awk '/^### Step 1\.2 — Pick Next Issue/{f=1; next} f && /^### /{exit} f' "$file" \
+    | grep -E -- "$bullet" | grep -qE -- "$pattern"; then
+    pass "$label"
+  else
+    fail "$label"
+    echo "      bullet $bullet never matches: $pattern"
+    echo "      in file: ${file#$REPO_ROOT/}"
+  fi
+}
+check_bullet "$SRC_PHASES" '^- \*\*Open\*\*' 'Step 1\.1b' \
+  "T10.10: the Open criterion reads the live set, not the cache"
+check_bullet "$SRC_PHASES" '^- \*\*Not assigned\*\*' 'Step 1\.1b' \
+  "T10.11: the Not assigned criterion reads the live set, not the cache"
+
+PICK_BLOCK="$(awk '/^### Step 1\.2 — Pick Next Issue/{f=1; next} f && /^### /{exit} f' "$SRC_PHASES")"
+check_block_has "$PICK_BLOCK" 'skip the last two' \
+  "T10.12: an unavailable live read defers the two criteria rather than guessing"
+
+# The post-pick fetch is the second half of the same fix: it is live, so it both
+# closes the race against Step 1.1b and enforces the criteria when Step 1.1b
+# could not run. Without it, an `unavailable` read would drop them entirely.
+check_block_has "$CAPTURE_BLOCK" 'Post-pick eligibility re-check' \
+  "T10.13: 1.2b re-checks eligibility against the live record it just fetched"
+check_block_has "$CAPTURE_BLOCK" '\*\*do not spawn\*\*' \
+  "T10.14: a closed or foreign-assigned pick never reaches a resolver spawn"
+check_block_has "$CAPTURE_BLOCK" 'session skip list' \
+  "T10.15: the re-check skip-lists the issue so the re-pick terminates"
+
+# F2: the pick-miss predicate must be evaluable on a reuse iteration, or the
+# recovery configuration.md promises for newly filed issues can never fire.
+check_block_has "$PICK_BLOCK" 'eligible issue in .summary\.suggested_order. while at least one issue in' \
+  "T10.16: the miss is defined over the cached order AND a live set"
+check_block_has "$PICK_BLOCK" '\*Step 1\.1b\*.s live open set' \
+  "T10.17: the live open set is what supplies the miss predicate"
+check_block_has "$PICK_BLOCK" 'makes the predicate evaluable on a reuse iteration' \
+  "T10.18: the step says why a reuse iteration can evaluate the predicate at all"
+check_block_has "$PICK_BLOCK" 'the predicate narrows' \
+  "T10.19: an unavailable live read narrows the miss to the cached order alone"
+check_has "$SRC_CONFIG" 'Step 1\.1b' \
+  "T10.20: configuration.md's retriage_every rationale names the read it relies on"
+
+# F3: the third merge-and-close site. Step 1.6 sits at the far end of the file,
+# so each site that closes an issue carries its own pointer back to it.
+CRITICAL_BLOCK="$(awk '/^#### Critical issues: stop and ask the user/,/^## Phase 5 — Merge/' "$SRC_PHASES")"
+check_block_has "$CRITICAL_BLOCK" 'run \*Step 1\.6 — Update the triage cache after a merge\*' \
+  "T10.21: the critical-issue Option 1 merge points at the cache update"
+check_block_has "$CRITICAL_BLOCK" 'for \*Step 1\.2\* to pick again next iteration' \
+  "T10.22: that pointer names the re-pick hazard a skipped update creates"
+check_block_has "$CRITICAL_BLOCK" 'Options 2 and 3 merged nothing' \
+  "T10.23: the non-merging options are excluded — they closed no issue"
+check_block_has "$UPDATE_BLOCK" '\*Phase 3-4 Option 1\*' \
+  "T10.24: Step 1.6's enumeration names the critical-issue merge site"
+check_block_has "$UPDATE_BLOCK" 'Three sites, one rule' \
+  "T10.25: the enumeration is complete and says so"
+
+# F4: the clean-finish message needs BOTH a second documented trigger and a home
+# that a reuse iteration actually executes — Step 1.1 is the step it skips.
+NOISSUES_ENTRY="$(awk '/^### No open issues/,/^### No eligible issues/' "$SRC_ERRORS")"
+check_block_has "$NOISSUES_ENTRY" 'Step 1\.1b' \
+  "T10.26: the error catalog documents the reuse-iteration trigger"
+check_block_has "$NOISSUES_ENTRY" 'reuse' \
+  "T10.27: the catalog entry names the iteration kind that reaches it"
+check_block_has "$NOISSUES_ENTRY" 'all-zero counts' \
+  "T10.28: the catalog says what a missing second trigger would print instead"
+check_block_has "$LIVEREAD_BLOCK" '✓ All issues resolved' \
+  "T10.29: the empty-backlog stop has a home a reuse iteration executes"
+check_block_has "$STEP11_BLOCK" 'Two entry points, one block' \
+  "T10.30: the message keeps one rendering reached from two steps"
+# An emptied cached order over a NON-empty live backlog is a pick miss, not a
+# clean finish — conflating them would end a run with newly filed work in it.
+check_block_has "$LIVEREAD_BLOCK" '\*\*non\*\*-empty live backlog is a' \
+  "T10.31: an empty order over a live backlog is a miss, not a finish"
+
+# ───────────────────────────────────────────────────────────
 # T9 (install surface): the built tree carries the same contract
 # ───────────────────────────────────────────────────────────
 check_has "$BUILT_PHASES" '^### Step 1\.0 — Triage cache gate' \
@@ -567,6 +686,30 @@ check_has "$BUILT_PHASES" 'A pick miss is not a trigger here' \
   "T9.15: built phases.md ships one timing for the pick-miss retry"
 check_has "$BUILT_CONFIG" 'refuse any pre-existing cache' \
   "T9.16: built configuration.md ships the corrected off-switch wording"
+# T10's rules, on the installed surface. A live-eligibility read that ships only
+# in src/ leaves every install picking closed and foreign-assigned issues.
+check_has "$BUILT_PHASES" '^### Step 1\.1b — Live eligibility read' \
+  "T9.17: built phases.md ships the live eligibility read"
+check_has "$BUILT_PHASES" 'gh issue list --state open --json number,assignees --limit 100' \
+  "T9.18: built phases.md ships the body-less two-field live read"
+check_has "$BUILT_PHASES" 'any doubt is .unavailable' \
+  "T9.19: built phases.md ships the live read's fail-safe"
+check_bullet "$BUILT_PHASES" '^- \*\*Open\*\*' 'Step 1\.1b' \
+  "T9.20: built phases.md sources the Open criterion from the live read"
+check_bullet "$BUILT_PHASES" '^- \*\*Not assigned\*\*' 'Step 1\.1b' \
+  "T9.21: built phases.md sources the Not assigned criterion from the live read"
+check_has "$BUILT_PHASES" '\*Step 1\.1b\*.s live open set' \
+  "T9.22: built phases.md ships the evaluable pick-miss predicate"
+check_has "$BUILT_PHASES" 'Post-pick eligibility re-check' \
+  "T9.23: built phases.md ships the post-pick eligibility re-check"
+check_has "$BUILT_PHASES" '\*Phase 3-4 Option 1\*' \
+  "T9.24: built phases.md ships the third merge-and-close site"
+B_CRITICAL_BLOCK="$(awk '/^#### Critical issues: stop and ask the user/,/^## Phase 5 — Merge/' "$BUILT_PHASES")"
+check_block_has "$B_CRITICAL_BLOCK" 'run \*Step 1\.6 — Update the triage cache after a merge\*' \
+  "T9.25: built phases.md ships Option 1's pointer at the cache update"
+B_NOISSUES_ENTRY="$(awk '/^### No open issues/,/^### No eligible issues/' "$BUILT_ERRORS")"
+check_block_has "$B_NOISSUES_ENTRY" 'Step 1\.1b' \
+  "T9.26: built error-messages.md ships the reuse-iteration trigger"
 
 # ───────────────────────────────────────────────────────────
 # Summary
