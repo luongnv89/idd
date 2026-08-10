@@ -536,18 +536,29 @@ def _lock_identity(lock: object) -> tuple | None:
 
 
 def _pid_owns(lock: object, pid: int) -> bool:
-    """True when `lock` records `pid` as its owner, and that pid is knowable.
+    """True when `lock` records `pid`, on this host, as its owner.
 
     This is the half of the ownership test that carries exclusivity across
     processes: a different agent process passes a different pid and fails it.
     An unknown owner (`pid 0`) never satisfies it — otherwise every ownerless
     lock would answer to every ownerless caller, which is exactly the
     self-reclaim the run lock exists to prevent.
+
+    The host must match for the same reason `lock_status` checks it before
+    believing a dead pid: a pid only means something on the machine that
+    recorded it, and two machines hand out the same numbers. Without this,
+    `--resume` would be *weaker* than a plain `--lock`, which already refuses
+    a foreign-host lock — a pid collision would hand one lock to two runs.
     """
     if not isinstance(lock, dict):
         return False
     recorded = lock.get("pid")
-    return _pid_known(pid) and _pid_known(recorded) and recorded == pid
+    return (
+        lock.get("host") == socket.gethostname()
+        and _pid_known(pid)
+        and _pid_known(recorded)
+        and recorded == pid
+    )
 
 
 def _owns_lock(lock: object, run_id: str, pid: int) -> bool:
@@ -710,6 +721,21 @@ def _touch_lock_heartbeat(lock_path: Path, run_id: object) -> None:
         pass
 
 
+def _screen_run_id(value: object) -> str | None:
+    """`value` when it is a conformant run id, else None.
+
+    The single screen every **disk-sourced** id goes through. A file on disk is
+    still input: it can hold a number where a string belongs (an unscreened id
+    reaching `RUN_ID_RE.match` is a `TypeError`, and an uncaught one exits 1 —
+    the code this script reserves for a verdict), or a string carrying `-->`
+    that would end the report marker early. Non-conformant is dropped, never
+    repaired, so the caller falls back to minting a fresh id.
+    """
+    if isinstance(value, str) and RUN_ID_RE.match(value):
+        return value
+    return None
+
+
 def _lock_run_id(lock_path: Path) -> str | None:
     """The run id recorded in an existing lock, when it is readable and valid.
 
@@ -720,10 +746,7 @@ def _lock_run_id(lock_path: Path) -> str | None:
     parsed, error = _read_json_file(lock_path)
     if error is not None or not isinstance(parsed, dict):
         return None
-    run_id = parsed.get("run_id")
-    if isinstance(run_id, str) and RUN_ID_RE.match(run_id):
-        return run_id
-    return None
+    return _screen_run_id(parsed.get("run_id"))
 
 
 def _resolve_run_id(args, paths) -> str | None:
@@ -739,9 +762,7 @@ def _resolve_run_id(args, paths) -> str | None:
         return args.run_id
     parsed, error = _read_json_file(paths["state"])
     if error is None and isinstance(parsed, dict):
-        run_id = parsed.get("run_id")
-        if isinstance(run_id, str) and RUN_ID_RE.match(run_id):
-            return run_id
+        return _screen_run_id(parsed.get("run_id"))
     return None
 
 
@@ -782,8 +803,10 @@ def run_lock(args, paths) -> int:
         # process owns adopts the lock's id: the interrupted run died before
         # `--init` ever wrote a state, and minting a second id here would orphan
         # the lock this run is holding — the id would then disagree with the
-        # `--unlock` that ends the run.
-        or (existing.get("run_id") if own_lock and isinstance(existing, dict) else None)
+        # `--unlock` that ends the run. Screened like every other disk-sourced
+        # id: a lock carrying a non-string id falls through to a fresh one
+        # (and so to the ordinary held/reclaim paths), never to a crash.
+        or (_screen_run_id(existing.get("run_id")) if own_lock else None)
         or _new_run_id()
     )
     if not RUN_ID_RE.match(run_id):

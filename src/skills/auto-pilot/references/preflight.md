@@ -68,12 +68,14 @@ would file two reports and two `runs.jsonl` rows under the same name.
 `--lock --resume` is the caller saying "I am continuing the recorded run", and
 only then is the id read off disk. It is also the only call that can take a lock
 that is still **live**, and only its own: when the lock records this run's id
-*and* this run's owner pid, `--resume` re-acquires it in place (`reacquired`,
-exit 0, a heartbeat refresh and nothing else). That is the ordinary interruption
-— the loop stopped, the agent process holding the lock did not — and without it
-a resume would be refused by the lock it is resuming. Any other id or any other
-pid is still a live holder: exit 3. Either way `--init` adopts the id of the
-lock this run holds, so lock → init → unlock stays one run.
+*and* this run's owner pid *and* this host, `--resume` re-acquires it in place
+(`reacquired`, exit 0, a heartbeat refresh and nothing else). That is the
+ordinary interruption — the loop stopped, the agent process holding the lock did
+not — and without it a resume would be refused by the lock it is resuming. Any
+other id, any other pid, or any other machine is still a live holder: exit 3.
+A pid means nothing off the host that recorded it, so dropping the host check
+would let a pid collision hand one lock to two runs. Either way `--init` adopts
+the id of the lock this run holds, so lock → init → unlock stays one run.
 
 The lock is `.gitissue/run.lock`, created with `O_CREAT|O_EXCL` so two runs
 racing for it cannot both win, and it records four fields:

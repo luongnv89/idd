@@ -367,6 +367,45 @@ else
   fail "AC3: --resume re-acquired a lock owned by another process (exit $st)"
 fi
 
+# Ownership is scoped to one host. A pid only means something on the machine
+# that recorded it and two machines hand out the same numbers, so a foreign-host
+# lock whose pid and run id both match must still be refused — otherwise
+# --resume would be *weaker* than a plain --lock, which already refuses it, and
+# a pid collision would hand one lock to two runs. `--force` stays the escape.
+write_lock() {  # dir, run_id (JSON), pid, host — a hand-built lock, timestamped now
+  python3 -c '
+import json, sys, datetime
+now = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+json.dump(
+    {"run_id": json.loads(sys.argv[2]), "pid": int(sys.argv[3]), "host": sys.argv[4],
+     "started_at": now, "heartbeat": now},
+    open(sys.argv[1] + "/run.lock", "w"),
+)
+' "$@"
+}
+D3E="$(new_dir d3e)"
+write_lock "$D3E" '"20260810T090000Z-1"' $$ "not-this-host"
+run_status out st python3 "$STATE" --lock --resume --dir "$D3E" --run-id 20260810T090000Z-1 --pid $$
+if [ "$st" = "3" ] && [ "$(printf '%s' "$out" | jkey status)" = "held" ]; then
+  pass "AC3: --resume refuses a foreign-host lock even when pid and run id match"
+else
+  fail "AC3: --resume re-acquired a lock recorded on another host (exit $st)"
+fi
+
+# A lock file is still input. A non-string run_id reaching RUN_ID_RE is a
+# TypeError, and an uncaught one exits 1 — the code this script reserves for a
+# verdict, so every call site would read the crash as an answer. It must be
+# screened like every other disk-sourced id and fall through to a documented
+# exit instead.
+D3F="$(new_dir d3f)"
+write_lock "$D3F" '42' $$ "$(python3 -c 'import socket;print(socket.gethostname())')"
+run_status out st python3 "$STATE" --lock --resume --dir "$D3F" --pid $$
+if { [ "$st" = "0" ] || [ "$st" = "3" ]; } && [ "$st" != "1" ]; then
+  pass "AC3: a lock with a non-string run_id exits 0/3, never the reserved code 1"
+else
+  fail "AC3: a malformed lock run_id crashed the script (exit $st)"
+fi
+
 # Two ownerless locks must not answer to each other: pid 0 is "unknown", and
 # unknown matching unknown would re-open the self-reclaim hole on the --resume
 # path instead of the plain one.
