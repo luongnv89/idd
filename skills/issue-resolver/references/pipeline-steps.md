@@ -502,9 +502,16 @@ today. `resolve.adaptive_effort: false` also treats it as absent. One `○` line
 5. **Analyze git history** — prior attempts, regressions, domain experts (via `git blame`).
 6. **Cross-reference issues** — duplicates, blockers, related work.
 
-### Early exit: already resolved
+### Early exit: already resolved — or already in flight
 
-If the researcher returns `already_resolved: true` or `pr_in_progress: true`:
+These are **two different answers and two different exits.** They shared one
+branch once, and that is how an issue got closed behind a PR nobody had reviewed
+or merged.
+
+**`already_resolved: true` — closing evidence.** The researcher may set this only
+when the evidence *closes* the issue: a **merged** PR (Phase 0b reports each
+matched PR's `state`), or a closing commit already on the default branch (Phase
+0a). Nothing weaker qualifies.
 
 ```
 ✓ Issue #N appears to already be resolved
@@ -515,6 +522,29 @@ If the researcher returns `already_resolved: true` or `pr_in_progress: true`:
 
 - Auto mode: close the issue with a comment and move on.
 - Interactive mode: inform the user and stop.
+
+**`pr_in_progress: true` — someone is working on it.** An **open** PR targets
+this issue. Return `status: pr_in_progress` with its `pr_number` and
+`branch_name` and stop — and **never close the issue**. An unreviewed, unmerged
+PR is not a resolution; closing the issue behind it loses the tracking while the
+work is still in flight, and if that PR is later closed unmerged the bug is
+simply gone from the backlog. This aligns the researcher's path with the
+resolver's own *Step 0b* guard in SKILL.md, which already stops rather than
+closes when `gh pr list` finds a PR whose body carries `Closes #N`.
+
+```
+○ Issue #N already has an open PR — not closing the issue
+  PR:      #{pr_number} ({branch_name})
+  Status:  OPEN — review or merge it, or close it to re-resolve #N
+```
+
+- Auto mode: return `status: pr_in_progress` with `pr_number` / `branch_name` and
+  stop. A caller that can review — `/auto-pilot` Phase 2.3 — routes it into
+  review of that PR instead of skipping the issue.
+- Interactive mode: inform the user and stop.
+
+A PR whose state is `MERGED` is **not** this case: it is closing evidence, so it
+belongs to `already_resolved` above.
 
 ### `light` profile — lighter research
 

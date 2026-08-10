@@ -103,7 +103,7 @@ Read-only reconnaissance: extract search targets from the issue, scan the codeba
 ### Phase 0 — Already resolved?
 
 - **0a — git history:** `git log --all --oneline --grep="Closes #N" --grep="Fixes #N" --grep="Resolves #N" --since="6 months ago"`. If a matching commit is on the default branch (`git branch --contains <sha> | grep -E "(main|master)"`), report `already_resolved: true` with details and **stop**.
-- **0b — open PRs:** `gh pr list --state open --json number,title,body,headRefName --limit 20`. If a PR body has `Closes/Fixes/Resolves #N`, report `pr_in_progress: true` with the PR number and **stop**.
+- **0b — PRs targeting this issue:** `gh pr list --state all --json number,title,body,headRefName,state --limit 20`. If a PR body has `Closes/Fixes/Resolves #N`, report the match with its **`pr_number`, `branch_name` (`headRefName`) and `pr_state`** — the state, never a bare boolean, because the caller must tell "someone is working on it" from "it is done". A `MERGED` PR is closing evidence: report `already_resolved: true`. An `OPEN` PR is work in flight: report `pr_in_progress: true` and let the caller decide (it must **not** close the issue). A `CLOSED` unmerged PR is neither — note it and continue the scan. **Stop** on either report.
 - **0c — code evidence:** if the bug's error message / failing condition no longer exists in the code, set `possibly_already_fixed: true` but **continue** (caller decides).
 
 ### Phase 1 — Extract targets
@@ -149,6 +149,7 @@ Return a single JSON object (nothing outside the block):
   "status": {
     "already_resolved": false,
     "pr_in_progress": false,
+    "matched_pr": { "number": null, "state": null, "branch_name": null },
     "possibly_already_fixed": false,
     "resolution_details": null
   },
