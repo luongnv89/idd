@@ -122,6 +122,8 @@ SRC_CONFIG="$REPO_ROOT/src/skills/auto-pilot/references/configuration.md"
 SRC_ERRORS="$REPO_ROOT/src/skills/auto-pilot/references/error-messages.md"
 SRC_SKILL="$REPO_ROOT/src/skills/auto-pilot/SKILL.source.md"
 SRC_PROMPTS="$REPO_ROOT/src/skills/auto-pilot/references/subagent-prompts.md"
+SRC_EXPLICIT="$REPO_ROOT/src/skills/auto-pilot/references/explicit-list-mode.md"
+SRC_EXAMPLES="$REPO_ROOT/src/skills/auto-pilot/references/examples.md"
 SRC_SUMMARY="$REPO_ROOT/src/skills/auto-pilot/references/summary-format.md"
 SRC_PERSIST="$REPO_ROOT/src/skills/issue-triage/references/output-and-persist.md"
 SRC_TRIAGE_SKILL="$REPO_ROOT/src/skills/issue-triage/SKILL.source.md"
@@ -138,16 +140,20 @@ BUILT_CONFIG="$REPO_ROOT/skills/auto-pilot/references/configuration.md"
 BUILT_ERRORS="$REPO_ROOT/skills/auto-pilot/references/error-messages.md"
 BUILT_SKILL="$REPO_ROOT/skills/auto-pilot/SKILL.md"
 BUILT_PROMPTS="$REPO_ROOT/skills/auto-pilot/references/subagent-prompts.md"
+BUILT_EXPLICIT="$REPO_ROOT/skills/auto-pilot/references/explicit-list-mode.md"
+BUILT_EXAMPLES="$REPO_ROOT/skills/auto-pilot/references/examples.md"
 BUILT_SUMMARY="$REPO_ROOT/skills/auto-pilot/references/summary-format.md"
 BUILT_PERSIST="$REPO_ROOT/skills/issue-triage/references/output-and-persist.md"
 BUILT_RES_STEPS="$REPO_ROOT/skills/issue-resolver/references/pipeline-steps.md"
 BUILT_RES_SKILL="$REPO_ROOT/skills/issue-resolver/SKILL.md"
 
 for file in "$SRC_PHASES" "$SRC_CONFIG" "$SRC_ERRORS" "$SRC_SKILL" "$SRC_PROMPTS" \
+            "$SRC_EXPLICIT" "$SRC_EXAMPLES" \
             "$SRC_SUMMARY" "$SRC_PERSIST" "$SRC_TRIAGE_SKILL" "$SCHEMA" "$GRAPH" \
             "$SRC_RES_STEPS" "$SRC_RES_SKILL" "$SRC_CONV" \
             "$BUILT_PHASES" "$BUILT_CONFIG" "$BUILT_ERRORS" "$BUILT_SKILL" \
-            "$BUILT_PROMPTS" "$BUILT_SUMMARY" "$BUILT_PERSIST" \
+            "$BUILT_PROMPTS" "$BUILT_EXPLICIT" "$BUILT_EXAMPLES" \
+            "$BUILT_SUMMARY" "$BUILT_PERSIST" \
             "$BUILT_RES_STEPS" "$BUILT_RES_SKILL"; do
   if [ -f "$file" ]; then
     pass "exists: ${file#$REPO_ROOT/}"
@@ -863,6 +869,135 @@ check_has "$BUILT_PHASES" '^\| .not_eligible. \|.*\| .Assigned. \|$' \
   "T11.43: built phases.md ships the reason-to-bucket table"
 check_has "$BUILT_ERRORS" 'single home of that mapping, never restated here' \
   "T11.44: built error-messages.md ships the deferred bucket mapping"
+
+# ───────────────────────────────────────────────────────────
+# T12 (QA cycle 4): the four surviving findings, each a claim
+#      that had two homes and only one of them updated
+# ───────────────────────────────────────────────────────────
+
+# H1 — the spawn prompt BODIES, not just the table that documents them.
+# `subagent-prompts.md` states the payload's provenance twice: in the
+# `## Template Variables` table (pinned by T4.11/T9.9) and inside the fenced
+# prompt each subagent is actually handed. Cycle 4 found the table updated and
+# the resolver BODY still telling the subagent its record was "as GitHub
+# returned it to Phase 1's list call" — a list that has not requested `body`
+# since T1.2. The injected text is the one an agent acts on, so pin it directly.
+#
+# The fenced block inside a `## <Name> Subagent` section is that injected text,
+# as distinct from the prose around it. Matched whitespace-FLATTENED, so a
+# reflow of the hard-wrapped prompt cannot silently un-assert this the way it
+# would defeat a line-oriented grep.
+prompt_body() {
+  awk -v s="$2" -v e="$3" '
+    $0 ~ s { sec = 1; next }
+    sec && $0 ~ e { exit }
+    sec && /^```/ { fence = !fence; next }
+    sec && fence { print }
+  ' "$1"
+}
+
+# Every way the prompts used to attribute the payload to the bulk list. None may
+# survive in a prompt body — the record comes from Step 1.2b's single-issue fetch.
+STALE_PROVENANCE='returned it to Phase 1|as Phase 1 listed them|Phase 1.s list call'
+
+for pair in "src:$SRC_PROMPTS" "built:$BUILT_PROMPTS"; do
+  tag="${pair%%:*}"
+  file="${pair#*:}"
+
+  RES_BODY="$(prompt_body "$file" '^## Resolver Subagent' '^## PR Reviewer Subagent')"
+  REV_BODY="$(prompt_body "$file" '^## PR Reviewer Subagent' '^## Analyzer Subagent')"
+  RES_FLAT="$(printf '%s' "$RES_BODY" | tr '\n' ' ' | tr -s ' ')"
+  REV_FLAT="$(printf '%s' "$REV_BODY" | tr '\n' ' ' | tr -s ' ')"
+
+  # Non-vacuity: an anchor that stopped matching would make every check below
+  # trivially pass, so prove each body was extracted and is the right one first.
+  check_block_has "$RES_FLAT" 'issue_payload' \
+    "T12.1 ($tag): the resolver prompt body was extracted from its fenced block"
+  check_block_has "$REV_FLAT" 'issue_payload_ids' \
+    "T12.2 ($tag): the reviewer prompt body was extracted from its fenced block"
+
+  check_block_has "$RES_FLAT" "record verbatim from Step 1\.2b.s post-pick single-issue fetch" \
+    "T12.3 ($tag): the resolver prompt BODY sources the payload from Step 1.2b's fetch"
+  check_block_has "$RES_FLAT" 'complete with updatedAt but WITHOUT comments' \
+    "T12.4 ($tag): the resolver body keeps the field-set clause the rewrite sits on"
+  check_block_has "$RES_FLAT" "Phase 1.s bulk list carries no body" \
+    "T12.5 ($tag): the resolver body says why the list is not the payload's source"
+  check_block_lacks "$RES_FLAT" "$STALE_PROVENANCE" \
+    "T12.6 ($tag): the resolver body never attributes the payload to the bulk list"
+
+  check_block_has "$REV_FLAT" "trimmed from Step 1\.2b.s post-pick single-issue fetch" \
+    "T12.7 ($tag): the reviewer prompt BODY sources its block from the same fetch"
+  check_block_has "$REV_FLAT" "Step 1\.2b.s post-pick single-issue fetch — captured BEFORE" \
+    "T12.8 ($tag): instruction 6 names the same provenance as the block header"
+  check_block_lacks "$REV_FLAT" "$STALE_PROVENANCE" \
+    "T12.9 ($tag): the reviewer body never attributes its block to the bulk list"
+done
+
+# H2 — Step 1.6 in explicit list mode. `explicit-list-mode.md` says the other
+# phases "run identically", Step 1.6 executes in Phase 5, and its own fail-safe
+# says any doubt is "run it" — so a `--issues` run on a never-triaged repo would
+# print `⚠ Could not update the triage cache` after EVERY merge and set a flag
+# that mode has no Step 1.1 to clear. Three homes, one rule.
+check_block_has "$UPDATE_BLOCK" 'Skipped in explicit list mode \(.--issues.\)' \
+  "T12.10: Step 1.6 states it is skipped in explicit list mode"
+check_block_has "$UPDATE_BLOCK" 'not a degrade' \
+  "T12.11: Step 1.6 says a missing cache in that mode is not a degrade"
+check_block_has "$UPDATE_BLOCK" 'no .retriage_required., which that mode has no' \
+  "T12.12: Step 1.6 says why the flag must not be set in that mode"
+check_block_has "$UPDATE_BLOCK" 'explicit-list skip above is the one thing this does not cover' \
+  "T12.13: the fail-safe is scoped so the skip is not read as a doubt"
+check_has "$SRC_EXPLICIT" '\*Step 1\.6 — Update the triage cache after a merge\* is skipped here' \
+  "T12.14: explicit-list-mode.md points at the skip instead of implying the step runs"
+check_has "$SRC_EXPLICIT" 'run identically to triage mode,' \
+  "T12.15: the run-identically claim now carries its one exception"
+check_lacks "$SRC_EXPLICIT" 'run identically to triage mode\.$' \
+  "T12.16: the unqualified run-identically claim is gone"
+check_has "$BUILT_EXPLICIT" '\*Step 1\.6 — Update the triage cache after a merge\* is skipped here' \
+  "T12.17: built explicit-list-mode.md ships the skip"
+check_lacks "$BUILT_EXPLICIT" 'run identically to triage mode\.$' \
+  "T12.18: built explicit-list-mode.md ships the qualified claim"
+check_has "$BUILT_PHASES" 'Skipped in explicit list mode \(.--issues.\)' \
+  "T12.19: built phases.md ships Step 1.6's mode note"
+
+# H3 — Step 1.1b suppresses its own `○ Live backlog` line on a triage iteration
+# because Step 1.1 "already reported the count". Step 1.1 specified no such
+# line: `/issue-triage` prints `✓ Triage saved to …` instead, and
+# `✓ Triage updated — {n} open issues` existed only in examples.md. Give the
+# suppressed-for line a home in the step that is supposed to print it.
+check_block_has "$STEP11_BLOCK" '^✓ Triage updated — \{n\} open issues$' \
+  "T12.20: Step 1.1 prints the count line Step 1.1b suppresses itself for"
+check_block_has "$STEP11_BLOCK" 'why \*Step 1\.1b\* prints no .○ Live backlog. line' \
+  "T12.21: Step 1.1 names the suppression its line pays for"
+check_block_has "$LIVEREAD_BLOCK" '\*Step 1\.1\*.s own .✓ Triage updated. line' \
+  "T12.22: Step 1.1b still defers to that line rather than printing a second count"
+check_has "$SRC_EXAMPLES" '^✓ Triage updated — [0-9]+ open issues$' \
+  "T12.23: the examples narration renders the line phases.md now specifies"
+check_has "$BUILT_PHASES" '^✓ Triage updated — \{n\} open issues$' \
+  "T12.24: built phases.md ships the count line"
+check_has "$BUILT_EXAMPLES" '^✓ Triage updated — [0-9]+ open issues$' \
+  "T12.25: built examples.md still renders it"
+
+# H4 — Step 1.2b called its record "live". It is fetched through `gi-issue.py`,
+# whose TTL cache the resolver's Step 0i (T11.16) and Step 5.1b both name. When
+# Step 1.1b is `unavailable` this re-check is the ONLY place Open/Not-assigned
+# are enforced, so the claim has to match what the read can promise — and the
+# real last word on `state` has to be named. Accuracy, not a new call site: T6.1
+# and tests/test-scripts-252.sh's pinned gi-issue.py count both still hold.
+check_block_lacks "$CAPTURE_BLOCK" 'This record is live' \
+  "T12.26: 1.2b no longer calls a TTL-cached read live"
+check_block_has "$CAPTURE_BLOCK" 'as fresh as .gi-issue\.py' \
+  "T12.27: 1.2b bounds the record's freshness by the fetcher's TTL"
+check_block_has "$CAPTURE_BLOCK" 'never "live"' \
+  "T12.28: 1.2b says outright that the record is not live"
+check_block_has "$CAPTURE_BLOCK" 'gh issue view N --json state,comments,updatedAt' \
+  "T12.29: 1.2b names the resolver's live re-verify as the backstop"
+check_block_has "$CAPTURE_BLOCK" 'last word on .state.' \
+  "T12.30: 1.2b says which read is the last word on state, and it is not this one"
+B_CAPTURE_BLOCK="$(awk '/^### Step 1\.2b — Capture the caller payload/,/^### Step 1\.3/' "$BUILT_PHASES")"
+check_block_lacks "$B_CAPTURE_BLOCK" 'This record is live' \
+  "T12.31: built phases.md ships the corrected freshness claim"
+check_block_has "$B_CAPTURE_BLOCK" 'gh issue view N --json state,comments,updatedAt' \
+  "T12.32: built phases.md ships the named backstop"
 
 # ───────────────────────────────────────────────────────────
 # Summary

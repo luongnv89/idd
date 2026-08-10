@@ -33,9 +33,11 @@ Instructions:
 8. The QA step (Step 4) runs up to 3 review-fix cycles autonomously. Fix all issues you can; report any you can't.
 9. Follow all naming conventions from docs/naming-conventions.md
 10. AUTONOMY: Make every decision yourself. If you encounter an ambiguous choice, pick the safer/simpler option. Never stop to ask the user anything.
-11. When an issue_payload block is present it is this issue's record as GitHub
-    returned it to Phase 1's list call, complete with updatedAt but WITHOUT
-    comments. Use it in place of Step 0a's fetch only
+11. When an issue_payload block is present it is this issue's record verbatim
+    from Step 1.2b's post-pick single-issue fetch, complete with updatedAt but
+    WITHOUT comments. Phase 1's bulk list carries no body, so that one post-pick
+    read — not the list — is where every field here came from.
+    Use it in place of Step 0a's fetch only
     (Step 0i — Caller payload gate); 0d still rewrites the body and still
     invalidates the cache, and Step 1 and Step 5 still read through it. Anything
     missing, short, or that does not parse: fetch as usual. 0a's own closed and
@@ -84,8 +86,9 @@ When done, report back ONLY these fields:
 Review pull request #{pr_number} in this repository using the {{skill:issue-pr-review}} skill.
 
 issue_payload_ids (optional — the identifying fields of the issue this PR closes,
-as Phase 1 listed them: number, title and labels, and nothing else; see
-instruction 6; omit this whole block when Step 1.2b captured nothing):
+trimmed from Step 1.2b's post-pick single-issue fetch: number, title and labels,
+and nothing else; see instruction 6; omit this whole block when Step 1.2b
+captured nothing):
 {issue_payload_ids}
 
 Instructions:
@@ -108,8 +111,8 @@ Instructions:
    block carries. Step 1.2b trims the record to those three fields before this
    spawn, so no issue body reaches you here: you can
    never take acceptance criteria out of it, structurally, and not because a rule
-   told you not to. It is trimmed because the record is a Phase 1 snapshot,
-   captured BEFORE Phase 2's
+   told you not to. It is trimmed because the record is a Phase 1 snapshot —
+   Step 1.2b's post-pick single-issue fetch — captured BEFORE Phase 2's
    resolver ran its Step 0d normalization — on an unnormalized issue 0d is what
    CREATES the Acceptance Criteria section, so that body is superseded by
    construction. Your Step 3 acceptance-criteria verification therefore

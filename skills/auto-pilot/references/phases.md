@@ -119,6 +119,17 @@ inline` and apply the prose rules in the issue-triage skill's
 `references/detection.md` (*Steps 3-7 — the prose procedure*). Delete the scan
 file afterwards.
 
+One `✓` line closes the scan, per `references/docs/terminal-style.md`. It carries the open
+count, and carrying it here is why *Step 1.1b* prints no `○ Live backlog` line
+on a triage iteration — one count, one line, whichever step read it:
+
+```
+✓ Triage updated — {n} open issues
+```
+
+On an empty backlog print the block below instead: zero open issues is the
+clean finish, not a triage result to report.
+
 If no open issues remain — an empty `issues[]` from this scan, or an empty
 `summary.suggested_order` in a cache Step 1.0 reused or Step 1.6 updated over an
 equally empty live backlog (*Step 1.1b*), which is the same condition reached
@@ -315,9 +326,14 @@ today's behavior. Never emit a body-less partial: a block missing `body` reads
 as `partial` there, which costs the resolver the fetch *and* hides the failure
 behind a payload that looks captured.
 
-**Post-pick eligibility re-check.** This record is live, so it is also the last
-word on the two criteria *Step 1.2* could answer only from a list read moments
-earlier. If `.issue.state` is not `open`, or the issue is assigned to another
+**Post-pick eligibility re-check.** This record is as fresh as `gi-issue.py`'s
+TTL allows — a real read at pick time in practice, since this loop fetches each
+issue once per run, so the TTL has nothing of its own to serve back. Call it
+that, never "live": it is the same TTL-cached read the resolver's *Step 0i*
+already describes as possibly old before the caller ever held it. On that
+footing it is still the freshest answer this step has to the two criteria
+*Step 1.2* could otherwise take only from a list read moments earlier.
+If `.issue.state` is not `open`, or the issue is assigned to another
 user and *Step 1.2*'s **Not assigned** criterion would therefore have rejected it
 (that criterion, escape clause included, stays the single home of the rule),
 **do not spawn**: add `#{issue_number}` to the session skip list with the reason
@@ -327,8 +343,13 @@ for the next candidate. Every re-pick appends to that list, so the candidate set
 shrinks by one each time and this cannot spin.
 When *Step 1.1b*'s read succeeded this closes the narrow race between it and this
 fetch; when it was `unavailable` this is where **Open** and **Not assigned** are
-enforced at all. If the fetch itself degraded to nothing there is no record to
-check — spawn as before, which is the behavior that shipped before *Step 1.0*
+enforced at all. Either way one backstop sits behind it: under a supplied payload
+the resolver's *Step 0i* runs a live `gh issue view N --json state,comments,updatedAt`
+before its Step 0b — deliberately bypassing this cache — and stops on any `state`
+but `open`. That read is the last word on `state`; this check is what keeps an
+ineligible pick from spending a spawn to reach it, and it is not the reason the
+resolver's stops hold. If the fetch itself degraded to nothing there is no record
+to check — spawn as before, which is the behavior that shipped before *Step 1.0*
 existed.
 
 ```
@@ -1054,6 +1075,13 @@ git branch -d {branch_name} 2>/dev/null
 Numbered in Phase 1 because it maintains Phase 1's payload; executed here
 because a merge is what makes it necessary.
 
+> **Note:** Skipped in explicit list mode (`--issues`), with the rest of Phase 1
+> (the note at the top of this file). That mode never triages, so there is no
+> payload to maintain: a `.gitissue/triage.json` this run neither wrote nor read
+> is not a cache that went stale, and a missing one there is not a degrade. Skip
+> the step silently — no `⚠`, no `retriage_required`, which that mode has no
+> *Step 1.1* to clear. The fail-safe below governs triage mode alone.
+
 Run it after **any step that merged a PR and closed its issue** —
 *Step 5.2*'s clean merge, *Phase 3-4 Step 2b*'s `partial_followup` merge,
 which closes the issue exactly as finally, and *Phase 3-4 Option 1*'s
@@ -1068,7 +1096,9 @@ what keeps the loop from re-picking them.
 **Fail-safe: any doubt is "run it."** The update is removal-only and keyed to
 the one number this run just closed, so applying it to an issue the payload no
 longer carries is a no-op; skipping it leaves a closed issue in
-`summary.suggested_order`, on no skip list, for *Step 1.2* to pick again.
+`summary.suggested_order`, on no skip list, for *Step 1.2* to pick again. The
+explicit-list skip above is the one thing this does not cover, and it is not an
+exception to it: the mode is known at invocation, so it is never a doubt.
 
 Read `.gitissue/triage.json`, apply **removal only**, and write it back with the
 Write tool:
