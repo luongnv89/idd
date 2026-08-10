@@ -181,7 +181,7 @@ The one JSON line carries `action`, `remaining`, `reset`, `wait_s` and
 | `proceed` | continue silently |
 | `warn` | print the `⚠` low-budget variant from `references/error-messages.md` and continue |
 | `wait` | print the `○ Rate budget exhausted — pausing until {resume_at}` block, run the chunked pause below, then **re-probe from the top of this section** — carrying the `{budget_deadline_epoch}` this section already computed, never a freshly derived one |
-| `stop` | print the `✗ Insufficient API rate budget` block, persist the report, release the lock (mid-run only — at Prerequisite 8 none is held yet), and stop cleanly |
+| `stop` | print the `✗ Insufficient API rate budget` block — the form matching this line's `resume_at`, since `references/error-messages.md` carries one for a known reset and one for a `null` — persist the report, release the lock (mid-run only — at Prerequisite 8 none is held yet), and stop cleanly |
 
 **The pause is chunked, and that is not cosmetic.** The run lock's TTL is 3600s
 (*Run lock* above) and its `heartbeat` is refreshed only at checkpoints, so one

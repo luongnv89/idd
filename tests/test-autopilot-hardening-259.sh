@@ -409,6 +409,17 @@ assert_json "AC2: a reset already in the past warns rather than waiting 0s forev
   "$(verdict 10 $((NOW - 1000)))" action=warn wait_s=0
 assert_json "AC2: an unknown reset stops — there is nothing to wait for" \
   "$(verdict 10 '')" action=stop reset=null wait_s=0
+# …and `resume_at` is derived from `wait_s`, so that trigger carries no instant
+# at all while the other one does. Both stop rows land in the same shipped block,
+# which is why that block needs two renderings rather than one `{resume_at}`.
+assert_json "AC2: the unknown-reset stop carries a null resume_at, not an instant" \
+  "$(verdict 10 '')" action=stop resume_at=null
+assert_json "AC2: the deadline-overshoot stop does carry a resume_at instant" \
+  "$(verdict 10 "$RESET" --deadline $((RESET - 1)))" \
+  action=stop resume_at=2001-09-09T01:56:40Z
+# `warn` reaches the same block through its ⚠ variant, and it is null there too.
+assert_json "AC2: the warn verdict has no resume_at either" \
+  "$(verdict 499 "$RESET")" action=warn resume_at=null
 # `action: wait` with a non-positive `wait_s` would be an infinite loop at the
 # call site, so it must be unreachable by construction.
 if [ "$(verdict 10 "$NOW" | jkey action)" != "wait" ]; then
@@ -835,6 +846,60 @@ expect_grep "AC1: the fan-out section still lists quarantined among ordinary ski
 expect_grep "AC1: run-log.md agrees the later, skipping run is what carries the reason" \
   'belongs to the **later** run that skips the issue' "$AP_RUNLOG"
 
+# The gate above is written per turn, but a batch resolves **every** member at
+# the spawn position's turn — so a quarantined issue kept in the list could be
+# pulled into someone else's batch and resolved without ever reaching its own
+# slot. That is AC1 failing on the headline criterion, so assert the property
+# rather than the sentence: the one instruction that spawns the Batch Resolver
+# must itself carry the gate, the drop must happen before the spawn, and the
+# quarantined member's single line must land at its own optimized_order slot.
+if grep -qF 'collect all co-batch issue numbers, use the **Batch Resolver Subagent**' "$AP_EXPLICIT"; then
+  fail "AC1: Batch detection step 3 still spawns the Batch Resolver with no quarantine gate"
+else
+  pass "AC1: the ungated batch-spawn instruction no longer ships"
+fi
+expect_grep "AC1: the spawn step gates itself on the quarantine check" \
+  'run the quarantine gate' "$AP_EXPLICIT"
+expect_grep "AC1: nothing quarantined is ever sent to the Batch Resolver" \
+  'is never sent to the resolver' "$AP_EXPLICIT"
+expect_grep "AC1: the co-batch bypass is closed by name" \
+  '**The gate covers a batch'"'"'s co-members, not only the slot'"'"'s own issue.**' \
+  "$AP_EXPLICIT"
+expect_grep "AC1: the check runs over the whole set the Batch Resolver would receive" \
+  'the slot'"'"'s issue plus every co-batch number `batch_map` holds for it' \
+  "$AP_EXPLICIT"
+expect_grep "AC1: a quarantined member is dropped from batch_map before the spawn" \
+  '**Remove it from its batch group in `batch_map`** first' "$AP_EXPLICIT"
+# Dropping before the spawn is what keeps the fan-out invariant keyed on the
+# attempted set true without an exception for quarantine.
+expect_grep "AC1: the drop leaves the attempted-set fan-out invariant untouched" \
+  'the run-log fan-out is keyed on never contains it' "$AP_EXPLICIT"
+expect_grep "AC1: a dropped co-member is disposed of at its own optimized_order slot" \
+  'Its own `optimized_order` slot is where the line above and its' "$AP_EXPLICIT"
+expect_grep "AC1: that slot is shown to still exist when the batch spawned" \
+  'position is the **first** member of the group `optimized_order` reaches' \
+  "$AP_EXPLICIT"
+expect_grep "AC1: a drop that empties the batch falls back to the single-issue Resolver" \
+  '**Fewer than two issues left after the drops**' "$AP_EXPLICIT"
+# The counter and the log have to keep summing after a member leaves a batch.
+expect_grep "AC1: [Issue i/total] still adds up after a member is dropped" \
+  'drop removes no slot from `optimized_order`' "$AP_EXPLICIT"
+expect_grep "AC1: the exactly-one-line invariant names both failure directions" \
+  'never zero (silently' "$AP_EXPLICIT"
+expect_grep "AC1: …including the double-count direction" \
+  'never two (skipped at the spawn' "$AP_EXPLICIT"
+
+# Ordering is the property that makes the gate unmissable: a reader walking the
+# Batch detection list must have read the gate before reaching the only line
+# that spawns the resolver.
+gate_ln="$(grep -nF -m1 '**The gate covers a batch'"'"'s co-members' "$AP_EXPLICIT" | cut -d: -f1 || true)"
+spawn_ln="$(grep -nF -m1 'the **Batch Resolver Subagent** (see `references/subagent-prompts.md`)' "$AP_EXPLICIT" | cut -d: -f1 || true)"
+if [ -n "$gate_ln" ] && [ -n "$spawn_ln" ] && [ "$gate_ln" -lt "$spawn_ln" ]; then
+  pass "AC1: the co-batch gate is stated before the only Batch Resolver spawn"
+else
+  fail "AC1: the co-batch gate does not precede the batch spawn (${gate_ln:-?}/${spawn_ln:-?})"
+fi
+
 # ───────────────────────────────────────────────────────────
 # T7 (AC2): the rate-limit probe, the pause, and the resume
 # ───────────────────────────────────────────────────────────
@@ -890,6 +955,51 @@ expect_grep "AC2: the catalog carries the gi-ratelimit degrade block" \
 expect_grep "AC2: a stop verdict has its own fatal block" \
   '### Insufficient API rate budget (fatal — the wait does not fit)' "$AP_ERRORS"
 
+# That one block serves both stop triggers, and only one of them has an instant
+# to name (T2 pins which). A single `{resume_at}` rendering therefore prints
+# `after null` half the time, so the block ships two forms.
+expect_grep "AC2: the fatal block declares two renderings keyed on resume_at" \
+  '**Two renderings, chosen by `resume_at`.**' "$AP_ERRORS"
+expect_grep "AC2: it says which of the two triggers leaves resume_at null" \
+  'unknown `reset` leaves at `0`' "$AP_ERRORS"
+expect_grep "AC2: the unknown-reset form ships as its own block" \
+  'GitHub reported no reset instant, so there is nothing to wait for' "$AP_ERRORS"
+expect_grep "AC2: its To fix line names no instant it does not have" \
+  're-run /auto-pilot once the API budget resets — the Check' "$AP_ERRORS"
+expect_grep "AC2: raising the runtime budget is scoped to the known-reset form" \
+  'the verdict is `stop` whatever the budget is' "$AP_ERRORS"
+# The old single form folded "or is unknown" into a sentence that then went on
+# to substitute {resume_at} anyway — the hole itself.
+if grep -qF 'of {max_runtime_minutes} min (or is unknown), so pausing for it' "$AP_ERRORS"; then
+  fail "AC2: the single-form stop block still ships — an unknown reset renders 'after null'"
+else
+  pass "AC2: no single-form stop block survives in the built catalog"
+fi
+# The property: the unknown-reset rendering carries no {resume_at} placeholder
+# at all, so there is nothing left for a null to be substituted into.
+unknown_form="$(awk '
+  /Print this \*\*unknown-reset\*\* form instead/ { seen = 1; next }
+  seen && /^```/ { if (inblock) { exit } ; inblock = 1; next }
+  seen && inblock { print }
+' "$AP_ERRORS")"
+expect_block "AC2: the unknown-reset block is extractable and is the stop block" \
+  "$unknown_form" '✗ Insufficient GitHub API rate budget for auto-pilot'
+if [ -n "$unknown_form" ] && ! printf '%s' "$unknown_form" | grep -qF '{resume_at}'; then
+  pass "AC2: the unknown-reset rendering substitutes no {resume_at} anywhere"
+else
+  fail "AC2: the unknown-reset rendering still carries a {resume_at} to print as null"
+fi
+# The warn variant reuses the same block and is null there too.
+expect_grep "AC2: the warn variant drops both {resume_at} sentences as well" \
+  'Drop **both** `{resume_at}` sentences from it' "$AP_ERRORS"
+# The pause block is the one place `{resume_at}` is always an instant; say so,
+# so a later editor does not "fix" a hole that is not there.
+expect_grep "AC2: the wait block records why it needs no second form" \
+  '`{resume_at}` is always an instant here, so this block has no second form.' \
+  "$AP_ERRORS"
+expect_grep "AC2: preflight's stop row picks the form by this line's resume_at" \
+  'the form matching this line'"'"'s `resume_at`' "$AP_PREFLIGHT"
+
 # ───────────────────────────────────────────────────────────
 # T8 (AC3): the runtime budget stops the run cleanly, with a report
 # ───────────────────────────────────────────────────────────
@@ -904,9 +1014,9 @@ expect_grep "AC3: Stop Conditions carries the runtime-budget row" \
 # the failure this pin exists to catch.
 stop_rows="$(awk '/^## Stop Conditions/{f=1} f && /^\| /' "$AP_SKILL" | grep -cv '^| Condition' || true)"
 if [ "$stop_rows" = "14" ]; then
-  pass "AC3: Stop Conditions has 13 condition rows (plus its separator)"
+  pass "AC3: Stop Conditions has 14 condition rows"
 else
-  fail "AC3: Stop Conditions has $((stop_rows - 1)) condition rows, expected 13"
+  fail "AC3: Stop Conditions has $stop_rows condition rows, expected 14"
 fi
 expect_grep "AC3: phases.md owns a named runtime budget check" \
   '### Runtime budget check' "$AP_PHASES"
@@ -1266,6 +1376,27 @@ expect_grep "AC3: BUDGET REACHED is explicitly not the value for a rate-limit st
   'the wall clock had time left; it was the API budget that did not' "$AP_SUMMARY"
 expect_grep "AC3: Next action for a rate-limit stop names the reset instant" \
   're-run /auto-pilot after {resume_at}' "$AP_SUMMARY"
+# …but only for the trigger that has one. The other trigger — an unknown reset —
+# is exactly the verdict T2 pins at `resume_at: null`, so a single Next-action
+# form would render `Next action: re-run /auto-pilot after null`.
+expect_grep "AC3: Next action takes one form per trigger, not one for both" \
+  'takes **one form per trigger**' "$AP_SUMMARY"
+expect_grep "AC3: it says why the unknown-reset trigger has no instant" \
+  'an unknown `reset` leaves the verdict'"'"'s `wait_s` at `0`' "$AP_SUMMARY"
+expect_grep "AC3: the null-resume_at row carries an instant-free Next action" \
+  '| `reset` is unknown (`resume_at` is `null`) | `re-run /auto-pilot once the API budget resets` |' \
+  "$AP_SUMMARY"
+expect_grep "AC3: substituting a null resume_at is forbidden outright" \
+  'Never substitute a null `resume_at` into the first form' "$AP_SUMMARY"
+expect_grep "AC3: the summary and the error catalog are said to split on one value" \
+  'splits on the same value for the same reason' "$AP_SUMMARY"
+# The property: the row for the null trigger holds no {resume_at} placeholder.
+null_row="$(grep -F -m1 '| `reset` is unknown (`resume_at` is `null`) |' "$AP_SUMMARY" || true)"
+if [ -n "$null_row" ] && ! printf '%s' "$null_row" | grep -qF '{resume_at}'; then
+  pass "AC3: the unknown-reset Next action substitutes no {resume_at}"
+else
+  fail "AC3: the unknown-reset Next action still substitutes a {resume_at}"
+fi
 expect_grep "AC3: the persisted-report paragraph covers the rate-limit stop too" \
   'stopped by the rate-limit **`stop` verdict** ends early too and reports' "$AP_SUMMARY"
 expect_grep "AC3: Stop Conditions carries the rate-limit stop alongside the budget stop" \

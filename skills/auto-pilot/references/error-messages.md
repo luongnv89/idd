@@ -65,6 +65,7 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 ```
 **Trigger:** `gi-ratelimit.py --verdict` returns `action: "wait"` — `remaining` is below the threshold and `reset` falls inside `autopilot.max_runtime_minutes`. Non-fatal.
 **Action:** Run the chunked pause in `references/preflight.md` (*Rate-limit pause*), refreshing the run-lock heartbeat between chunks, then re-probe and continue. Nobody is at the terminal, so a timestamp is the remedy, not an instruction to a reader.
+**`{resume_at}` is always an instant here, so this block has no second form.** `action: "wait"` is never emitted with a `wait_s` of 0 or less — a `reset` that is unknown or already past reads as `stop` or `warn` instead — and `resume_at` is null only when `wait_s` is. The `stop` block below is the one that needs two renderings.
 
 ### Insufficient API rate budget (fatal — the wait does not fit)
 ```
@@ -72,8 +73,8 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 
   Remaining: {remaining} calls — below the safe threshold of 200.
   The budget resets at {resume_at}, which is past this run's budget
-  of {max_runtime_minutes} min (or is unknown), so pausing for it
-  would strand issues half-resolved.
+  of {max_runtime_minutes} min, so pausing for it would strand issues
+  half-resolved.
 
   To fix:  re-run /auto-pilot after {resume_at}, or raise
            autopilot.max_runtime_minutes
@@ -83,7 +84,32 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 **Trigger:** `gi-ratelimit.py --verdict` returns `action: "stop"` — the pause would run past the runtime budget, or `reset` is unknown. Fatal.
 **Action:** Persist the final summary with `gi-state.py --report` — it reports `Result: RATE LIMITED` (`references/summary-format.md`) — release the run lock, and stop. At Prerequisite 8 nothing is left half-resolved because nothing was started; mid-run the stop lands between units of work, so nothing is abandoned there either — what merged stays merged, and a PR left open carries the outcome its own iteration already recorded. **At Prerequisite 8 there is no lock yet** — it is taken further down the prerequisites — so the release is the mid-run half of this action and the preflight stop is the report and this block alone; the deadline the verdict was given comes from the clock, read once at the first probe, rather than from a run state that does not exist. Both variants are in `references/preflight.md` (*Rate-limit pause*).
 
-**Low-budget warning (non-fatal):** on `action: "warn"` — `remaining` between 200 and 500 — print the same block with a `⚠` symbol and the line `Proceeding — budget may run low; the loop will pause and resume if it hits the limit.` instead of stopping.
+**Two renderings, chosen by `resume_at`.** The block above is the **known-reset**
+form, and it is the only one that may carry `{resume_at}`. The `stop` verdict has
+two triggers, and `gi-ratelimit.py` derives `resume_at` from `wait_s`, which an
+unknown `reset` leaves at `0` — so on that trigger `resume_at` is `null` and both
+`{resume_at}` sentences above would render `after null`, an instant nobody can
+wait for. Print this **unknown-reset** form instead, and never mix the two:
+
+```
+✗ Insufficient GitHub API rate budget for auto-pilot
+
+  Remaining: {remaining} calls — below the safe threshold of 200.
+  GitHub reported no reset instant, so there is nothing to wait for and
+  pausing would strand issues half-resolved.
+
+  To fix:  re-run /auto-pilot once the API budget resets — the Check
+           command below reports the instant once GitHub sends one
+  Check:   gh api rate_limit --jq '{remaining: .rate.remaining, reset: .rate.reset}'
+  Docs:    https://github.com/luongnv89/idd/blob/main/docs/platform-github.md
+```
+
+Raising `autopilot.max_runtime_minutes` is offered by the known-reset form only:
+with no reset instant the verdict is `stop` whatever the budget is, so a bigger
+one would change nothing. `references/summary-format.md` splits `Result: RATE
+LIMITED`'s `Next action:` line on the same value for the same reason.
+
+**Low-budget warning (non-fatal):** on `action: "warn"` — `remaining` between 200 and 500 — print the same block with a `⚠` symbol and the line `Proceeding — budget may run low; the loop will pause and resume if it hits the limit.` instead of stopping. Drop **both** `{resume_at}` sentences from it as the unknown-reset form does: `warn` leaves `wait_s` at `0` too, so `resume_at` is `null` here as well — and nothing is being waited for in the first place.
 
 ### gi-ratelimit unavailable (degrade)
 ```

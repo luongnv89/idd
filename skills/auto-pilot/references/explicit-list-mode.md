@@ -210,6 +210,38 @@ is the documented way to do that:
 ○ [Issue {i}/{total}] #{N} — quarantined ({quarantine_label}); remove the label to retry
 ```
 
+**The gate covers a batch's co-members, not only the slot's own issue.** A
+quarantined issue that *Validate issues upfront* kept in the list can also sit in
+an analyzer batch group, and a batch resolves **every** member at the spawn
+position's turn — so a gate that read only the slot's own number would let a
+quarantined co-member be resolved at another issue's turn and never reach its own
+gate at all. Run the check over the whole set the Batch Resolver would receive —
+the slot's issue plus every co-batch number `batch_map` holds for it — **before**
+the spawn (*Batch detection* step 3), and give each quarantined number exactly one
+disposition:
+
+- **Remove it from its batch group in `batch_map`** first, so no later spawn can
+  pull it back in either. Because the removal happens before the spawn, the
+  *attempted set* the run-log fan-out is keyed on never contains it and that
+  invariant needs no exception.
+- **The slot's own issue** — the skip is this slot: print the line above, write
+  its one run-log line, and advance. Whatever is left of the group keeps its
+  batch; the next unprocessed member's slot becomes its spawn position.
+- **A co-batch member** — nothing is printed or logged here, it is only dropped
+  from the batch. Its own `optimized_order` slot is where the line above and its
+  single run-log line are produced. That slot is always still ahead: the spawn
+  position is the **first** member of the group `optimized_order` reaches, so
+  every co-member sits later and none has had its slot consumed.
+- **Fewer than two issues left after the drops** — there is no batch to resolve.
+  Use the standard single-issue Resolver on the survivor (step 4), not the Batch
+  Resolver.
+
+`[Issue {i}/{total}]` still adds up: `total` is the validated issue count and a
+drop removes no slot from `optimized_order`, so a quarantined issue consumes
+exactly one `i` and writes exactly one run-log line — never zero (silently
+resolved inside someone else's batch) and never two (skipped at the spawn *and*
+at its own turn).
+
 The write side is unchanged: a failure inside this mode runs the same *Quarantine
 after repeated failures* procedure in `references/phases.md`.
 
@@ -223,7 +255,14 @@ When advancing to the next item in `optimized_order`:
    ○ [Issue {i}/{total}] #{N} — already resolved in batch with #{batch_primary}
    ```
 2. Check `batch_map` — is this issue number part of a batch?
-3. **If yes**: collect all co-batch issue numbers, use the **Batch Resolver Subagent** (see `references/subagent-prompts.md`). Do NOT pre-mark issues as processed — wait for the resolver result (see "Processing batch resolver results" below) to determine which issues were actually resolved.
+3. **If yes**: collect all co-batch issue numbers and **run the quarantine gate
+   above over that whole set before spawning anything** — every quarantined
+   number is dropped from `batch_map` and is never sent to the resolver. Then use
+   the **Batch Resolver Subagent** (see `references/subagent-prompts.md`) on what
+   is left, or step 4's single-issue Resolver if the drops left only one. Do NOT
+   pre-mark issues as processed — wait for the resolver result (see "Processing
+   batch resolver results" below) to determine which issues were actually
+   resolved.
 4. **If no**: use the standard Resolver Subagent for a single issue. On success, add the issue to the `processed` set.
 
 For batched issues, the resolver subagent receives all issue numbers in the batch:

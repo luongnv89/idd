@@ -65,9 +65,21 @@ iteration boundary with nothing in flight, so `Next action:` is the ordinary
 `/auto-pilot to continue`. **`RATE LIMITED`** — the `✗ Insufficient API rate
 budget` stop fired: the API budget ran out and waiting for `reset` would not fit
 the runtime budget, or `reset` is unknown (`references/preflight.md` →
-*Rate-limit pause*, the `stop` row). Here `Next action:` names the instant the
-budget returns — `re-run /auto-pilot after {resume_at}` — because the ordinary
-`/auto-pilot to continue` would walk straight back into the same stop.
+*Rate-limit pause*, the `stop` row). Here `Next action:` is never the ordinary
+`/auto-pilot to continue` — that would walk straight back into the same stop —
+and it takes **one form per trigger**, because `resume_at` is `null` in exactly
+one of the two: an unknown `reset` leaves the verdict's `wait_s` at `0`, and
+`gi-ratelimit.py` derives `resume_at` from `wait_s`, so there is no instant to
+name.
+
+| Which trigger fired | `Next action:` |
+|---------------------|----------------|
+| the reset does not fit the runtime budget (`resume_at` is an instant) | `re-run /auto-pilot after {resume_at}` |
+| `reset` is unknown (`resume_at` is `null`) | `re-run /auto-pilot once the API budget resets` |
+
+Never substitute a null `resume_at` into the first form — `after null` names no
+instant anyone could wait for. The `✗ Insufficient API rate budget` block in
+`references/error-messages.md` splits on the same value for the same reason.
 
 `RATE LIMITED` covers **both** call sites of that block, which is why it is its
 own value rather than a reading of one of the other four. Mid-run the stop lands
