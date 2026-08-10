@@ -63,6 +63,13 @@ reaches the script on **stdin**, never on a command line:
 | `markdown` | string | the rendered summary — the same text just printed |
 | `generated_at` | string | optional UTC instant, exactly `YYYY-MM-DDTHH:MM:SSZ`; defaults to now. Pattern-checked like `run_id`, because both are interpolated into the marker below and a value carrying `-->` would end it early |
 
+Both header values are pattern-checked on **every** path that can produce one —
+the value submitted here, and the `run_id` the script falls back to reading out
+of `.gitissue/run-state.json`. A state file is machine-local but it is still
+input: a recorded `run_id` that does not conform is dropped from the marker
+rather than passed through, so the marker cannot be broken by editing the state
+file.
+
 The file it writes opens with a `<!-- gitissue:run-report v1 {…} -->` marker
 carrying `run_id` and `generated_at`, so a later reader can tell which run it
 describes. Each run overwrites it — there is one *last* run report, not a

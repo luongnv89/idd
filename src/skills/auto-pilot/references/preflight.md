@@ -51,6 +51,14 @@ corrupt each other's state long before either reaches a PR.
 python3 shared/scripts/gi-state.py --lock
 ```
 
+**When this run was invoked with `--resume`, add `--resume` to that call.** A
+plain `--lock` mints a fresh run id, so a state file left behind by a run that
+already finished cannot lend its id to an unrelated one — two runs sharing an id
+would file two reports and two `runs.jsonl` rows under the same name.
+`--lock --resume` is the caller saying "I am continuing the recorded run", and
+only then is the id read off disk. Either way `--init` adopts the id of the lock
+this run holds, so lock → init → unlock stays one run.
+
 The lock is `.gitissue/run.lock`, created with `O_CREAT|O_EXCL` so two runs
 racing for it cannot both win, and it records four fields:
 
@@ -77,14 +85,21 @@ python3 shared/scripts/gi-state.py --lock --force
 
 That is what `/auto-pilot --force-unlock` runs. It is the only documented way
 past a live-looking lock; deleting `.gitissue/run.lock` by hand is the same
-thing without the audit line.
+thing without the audit line. **`--force` is a single-operator escape hatch, not
+a concurrency-safe mode**: it says "reclaim regardless of who holds this", so
+several `--lock --force` calls issued at once all succeed and the mutual
+exclusion is gone for that instant. Run it once, deliberately, when you know the
+other run is dead — never as a way to make a contended lock go away.
 
 **Under `--dry-run`, add `--dry-run`** — the call reports who holds the lock and
 creates nothing.
 
 **Release on every exit path.** `python3 shared/scripts/gi-state.py --unlock` is
 the run's last action, on success, on every stop condition, and after the
-critical-issue pause.
+critical-issue pause. It releases only a lock whose id matches the run state's,
+so in the one case where `--init` never wrote a state for this run (its exit-3
+path in `references/phases.md` *Step 1.0*) the recorded id belongs to some other
+run and the release needs `--unlock --force`.
 
 **Fallback when the script cannot run.** A missing bundled file is a broken
 install: stop with the `✗ Missing bundled dependency` block above. But no

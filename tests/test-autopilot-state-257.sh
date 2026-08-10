@@ -527,6 +527,103 @@ run_status out st bash -c "printf '{\"run_id\":\"r257\"}' | python3 '$STATE' --i
 [ "$st" = "4" ] && pass "T4: an unwritable directory exits 4 (degrade to prose)" \
                 || fail "T4: an unwritable directory exits 4 (got $st)"
 
+# current.branch is the one recorded field a later step interpolates into a
+# shell word (`gh pr list --head …` in the resume gate), and a branch name can
+# come from a PR somebody else opened. Git and GitHub permit `$()`, backticks,
+# `;`, `&&`, `|`, a leading `-`, whitespace and newlines in a ref, so every one
+# of them must be refused at write time — exit 3, and nothing on disk changes.
+D13="$(new_dir d13)"
+printf '{"run_id":"r257"}' | python3 "$STATE" --init --dir "$D13" >/dev/null
+branch_before="$(python3 -c 'import hashlib,sys;print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "$D13/run-state.json")"
+inj_fail=0
+# The payloads carry backticks and `$(…)`: they are read into a variable and
+# piped, never spliced into a `bash -c` string, or the *test* would run them.
+while IFS= read -r payload; do
+  st=0
+  printf '%s' "$payload" | python3 "$STATE" --update --dir "$D13" >/dev/null 2>&1 || st=$?
+  [ "$st" = "3" ] || { inj_fail=$((inj_fail + 1)); echo "    (branch payload accepted: $payload → exit $st)"; }
+done <<'PAYLOADS'
+{"current":{"branch":"fix/1-x$(id)"}}
+{"current":{"branch":"fix/1-x`id`"}}
+{"current":{"branch":"fix/1-x;id"}}
+{"current":{"branch":"fix/1-x&&id"}}
+{"current":{"branch":"fix/1-x|id"}}
+{"current":{"branch":"-fix/1-x"}}
+{"current":{"branch":"fix/1-x\ny"}}
+{"current":{"branch":"fix/1 -x"}}
+{"current":{"branch":"fix/1-x>out"}}
+PAYLOADS
+branch_after="$(python3 -c 'import hashlib,sys;print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "$D13/run-state.json")"
+if [ "$inj_fail" = "0" ] && [ "$branch_before" = "$branch_after" ]; then
+  pass "B4: a shell-metacharacter current.branch exits 3 and writes nothing"
+else
+  fail "B4: $inj_fail injection payload(s) reached the run state"
+fi
+# …and a conventional branch still round-trips, or the gate would be useless.
+run_status out st bash -c "printf '%s' '{\"current\":{\"issue\":7,\"branch\":\"fix/7-mobile-auth-redirect\",\"phase\":\"review\"}}' | python3 '$STATE' --update --dir '$D13'"
+if [ "$st" = "0" ] && [ "$(printf '%s' "$out" | jkey current.branch)" = "fix/7-mobile-auth-redirect" ]; then
+  pass "B4: a docs/naming-conventions.md branch name still round-trips"
+else
+  fail "B4: a conventional branch name was refused (exit $st)"
+fi
+
+# `$` in Python also matches before a trailing newline, so the patterns must end
+# in `\Z`: `fix/1-x\n` in a shell word is two words, not one.
+if grep -q 'BRANCH_RE = re.compile' "$STATE" && ! grep -qE '^(RUN_ID|PHASE|BRANCH|TS)_RE = re\.compile\(r"\^.*\$"\)' "$STATE"; then
+  pass "B4: the validation patterns are anchored with \\Z, not \$"
+else
+  fail "B4: a validation pattern still ends in \$ — a trailing newline slips through"
+fi
+
+# L1: the report marker's run_id fallback comes off disk, so it is pattern-
+# checked like the submitted one. An unchecked `-->` ends the marker early and
+# leaves the rest of the header as visible report text.
+D14="$(new_dir d14)"
+printf '{"run_id":"r257"}' | python3 "$STATE" --init --dir "$D14" >/dev/null
+python3 - "$D14/run-state.json" <<'PY'
+import json, sys
+path = sys.argv[1]
+state = json.load(open(path, encoding="utf-8"))
+state["run_id"] = "x --> evil"
+json.dump(state, open(path, "w", encoding="utf-8"))
+PY
+run_status out st bash -c "printf '%s' '{\"markdown\":\"body\"}' | python3 '$STATE' --report --dir '$D14'"
+marker="$(head -1 "$D14/last-run-report.md" 2>/dev/null || true)"
+if [ "$st" = "0" ] && ! printf '%s' "$marker" | grep -q 'evil'; then
+  pass "L1: a marker-breaking run_id on disk never reaches the report marker"
+else
+  fail "L1: the state file's run_id broke the report marker ($marker)"
+fi
+
+# L2: two sequential, unrelated runs must not share a run id. Run 1 leaves its
+# state file behind; run 2's plain --lock must mint a fresh id rather than
+# inheriting it, or both runs' reports and telemetry carry the same name.
+D15="$(new_dir d15)"
+python3 "$STATE" --lock --dir "$D15" --pid $$ >/dev/null
+printf '{}' | python3 "$STATE" --init --dir "$D15" >/dev/null
+run1="$(python3 "$STATE" --read --dir "$D15" | jkey run_id)"
+python3 "$STATE" --unlock --dir "$D15" >/dev/null
+run_status out st python3 "$STATE" --lock --dir "$D15" --pid $$
+run2="$(printf '%s' "$out" | jkey lock.run_id)"
+if [ "$st" = "0" ] && [ -n "$run1" ] && [ "$run1" != "$run2" ]; then
+  pass "L2: a plain --lock over a leftover state mints a fresh run id"
+else
+  fail "L2: the second run inherited run id $run1 from the finished run's state"
+fi
+# …and the resume path still adopts it on purpose, so a continued run keeps its
+# identity across the interruption.
+run_status out st python3 "$STATE" --unlock --dir "$D15" --force
+run_status out st python3 "$STATE" --lock --resume --dir "$D15" --pid $$
+if [ "$st" = "0" ] && [ "$(printf '%s' "$out" | jkey lock.run_id)" = "$run1" ]; then
+  pass "L2: --lock --resume adopts the recorded run id"
+else
+  fail "L2: --lock --resume did not continue run $run1 (exit $st)"
+fi
+python3 "$STATE" --unlock --dir "$D15" --force >/dev/null 2>&1 || true
+run_status out st python3 "$STATE" --read --resume --dir "$D15"
+[ "$st" = "2" ] && pass "L2: --resume outside --lock is a usage error (exit 2)" \
+                || fail "L2: --resume on a non-lock mode should exit 2 (got $st)"
+
 # A crafted issue title must be inert data: it arrives on stdin and is never
 # evaluated. This loop runs unattended, so the title is attacker-authored text.
 INJ="$(new_dir inj)"
@@ -578,6 +675,30 @@ expect_grep "AC1: a resume reconciles the recorded branch against GitHub" \
   "gh pr list --head" "$AP_PHASES"
 expect_grep "AC1: the state file is documented as a hint, never an authority" \
   "hint, never an authority" "$AP_PHASES"
+
+# B4: the reconciliation line puts a recorded branch into a shell word. No
+# shipped skill may leave that substitution bare — quotes stop word-splitting,
+# and the prose beside it must say what stops `$(…)`: the write-time check.
+if python3 - "$SKILLS" <<'PY'
+import pathlib, re, sys
+bad = []
+for path in pathlib.Path(sys.argv[1]).rglob("*.md"):
+    for n, line in enumerate(path.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
+        if "gh pr list --head" not in line:
+            continue
+        if re.search(r'--head\s+(?!["\'])\S*\{', line):
+            bad.append(f"{path}:{n}: unquoted branch substitution — {line.strip()}")
+for entry in bad:
+    print(entry)
+sys.exit(1 if bad else 0)
+PY
+then
+  pass "B4: no shipped skill interpolates a recorded branch into an unquoted shell word"
+else
+  fail "B4: a shipped skill still passes {branch_name} to gh pr list --head unquoted"
+fi
+expect_grep "B4: the resume gate requires a conventional branch before substituting it" \
+  "docs/naming-conventions.md" "$AP_PHASES"
 expect_grep "AC1: the checkpoint procedure calls gi-state --update" \
   "references/scripts/gi-state.py --update" "$AP_PHASES"
 # Step 1.0 must ship an executable --init, not only prose about one: --update
@@ -649,6 +770,20 @@ expect_grep "AC3: preflight.md documents the TTL and liveness rule" \
   "TTL and liveness" "$AP_PREFLIGHT"
 expect_grep "AC3: preflight.md documents --force-unlock" \
   "force-unlock" "$AP_PREFLIGHT"
+# --force reclaims regardless of the holder, so concurrent --force calls all
+# win. That is the documented human escape hatch, not a bug — but a reader who
+# mistakes it for a safe way past contention loses the mutual exclusion.
+if grep -q "single-operator escape hatch" "$AP_PREFLIGHT"; then
+  pass "AC3: preflight.md marks --force as a single-operator escape hatch"
+else
+  fail "AC3: preflight.md does not warn that --force is not concurrency-safe"
+fi
+# L2: the resume path is the only one that inherits a recorded run id.
+if grep -q -- "--lock --resume\|add \`--resume\` to that call" "$AP_PREFLIGHT"; then
+  pass "L2: preflight.md documents --lock --resume for a continued run"
+else
+  fail "L2: preflight.md does not document how a resumed run keeps its run id"
+fi
 
 # Every invocation keeps a documented fallback beside it — the house rule for a
 # script that can always be absent from the environment. The file set is

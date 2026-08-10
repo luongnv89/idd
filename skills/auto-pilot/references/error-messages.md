@@ -108,7 +108,7 @@ All errors follow the rich error format: what went wrong + fix command + docs li
   PR:      #{pr_number} ({pr_state})
   Done:    {processed_count} issue(s) already processed this run
 ```
-**Trigger:** `/auto-pilot --resume` and *Step 1.0*'s gate resolved to `resumable` — the recorded state parsed, and `gh pr list --head {branch_name}` confirms the recorded PR.
+**Trigger:** `/auto-pilot --resume` and *Step 1.0*'s gate resolved to `resumable` — the recorded state parsed, and `gh pr list --head "{branch_name}"` confirms the recorded PR.
 **Action:** Re-enter at the recorded phase on the recorded branch/PR; never re-resolve the issue and never open a second PR.
 
 ### Recorded run state is stale

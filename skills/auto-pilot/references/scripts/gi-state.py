@@ -26,9 +26,16 @@ Modes
             would then refuse
   --read    print the current state, or `{}` when absent. Never fails: absence
             and corruption are both answers, and both mean "start fresh"
-  --update  read a patch on stdin, merge it into the state, write atomically
+  --update  read a patch on stdin, merge it into the state, write atomically.
+            `current.branch` is pattern-checked against the repo's branch
+            naming convention because the resume gate puts it in a shell word;
+            `current.phase` and `run_id` are pattern-checked for the same
+            reason. Free text — `title`, `outcome` — never reaches a command,
+            so it is only length-bounded
   --lock    create `.gitissue/run.lock` with O_CREAT|O_EXCL; refuse a lock held
-            by a live run, reclaim one that is stale
+            by a live run, reclaim one that is stale. Mints a fresh run id, so
+            a leftover state file from a finished run cannot lend its id to an
+            unrelated one; `--lock --resume` adopts the recorded id instead
   --unlock  release the lock (only this run's, unless --force)
   --report  read `{run_id, markdown}` on stdin, write the final run report
 
@@ -103,10 +110,22 @@ CURRENT_KEYS = frozenset(
 PROCESSED_KEYS = frozenset({"issue", "outcome", "pr"})
 REPORT_KEYS = frozenset({"run_id", "markdown", "generated_at"})
 
-RUN_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+# Every pattern below ends in `\Z`, never `$`: in Python `$` also matches just
+# before a trailing newline, so `^…$` would accept `fix/1-x\n` — a value that
+# reaches a shell as two words.
+RUN_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}\Z")
 # A phase name is an identifier the skill chooses, never reporter text.
-PHASE_RE = re.compile(r"^[a-z][a-z0-9_.-]{0,31}$")
-TS_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
+PHASE_RE = re.compile(r"^[a-z][a-z0-9_.-]{0,31}\Z")
+# A branch name is *not* an identifier the skill chooses: it can arrive from a
+# PR someone else opened (`headRefName`), and git and GitHub both permit `$`,
+# backticks, `;`, `&&`, `|`, spaces and newlines in a ref. The resume gate
+# interpolates the recorded branch into a `gh pr list --head …` word, and double
+# quotes do not neutralize `$(…)` or a backtick — so the write is the gate: a
+# branch that does not match the repo's naming convention (see the
+# naming-conventions reference) is refused here, at exit 3, and never reaches
+# the state file.
+BRANCH_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/-]{0,200}\Z")
+TS_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z\Z")
 
 
 class InputError(ValueError):
@@ -276,6 +295,15 @@ def _normalize_current(value: object) -> dict[str, object] | None:
         out[key] = value.get(key)
     if isinstance(out.get("phase"), str) and not PHASE_RE.match(out["phase"]):
         raise InputError(f"current.phase '{out['phase']}' is not a phase name")
+    if isinstance(out.get("branch"), str) and not BRANCH_RE.match(out["branch"]):
+        # The one recorded field a later step puts in a shell word. Refusing the
+        # write is what keeps `gh pr list --head "…"` from running `$(…)`.
+        raise InputError(
+            f"current.branch '{out['branch']}' is not a conventional branch "
+            "name (see the naming-conventions reference)"
+        )
+    # `title` and `outcome` are display-only — they are truncated and escaped
+    # into JSON, never interpolated into a command — so they stay unconstrained.
     title = out.get("title")
     if isinstance(title, str) and len(title) > TITLE_MAX:
         out["title"] = title[:TITLE_MAX]
@@ -497,8 +525,18 @@ def _retire_lock(path: Path, observed: tuple | None) -> str:
         raise WriteError(f"cannot retire {path} — {exc}") from exc
     parsed, _ = _read_json_file(retired)
     if _lock_identity(parsed) != observed:
+        # Put it back — but never *over* whatever is at the path now. A third
+        # process can find the path empty in the window since the rename and
+        # take the lock legitimately; `os.replace` would silently overwrite that
+        # fresh holder. `os.link` refuses an existing destination, exactly like
+        # the publish path in `_create_lock_exclusive`, so the newer lock wins
+        # and this stray copy is simply dropped.
         try:
-            os.replace(retired, path)
+            os.link(retired, path)
+        except OSError:
+            pass
+        try:
+            os.unlink(retired)
         except OSError:
             pass
         return "changed"
@@ -631,12 +669,20 @@ def _lock_run_id(lock_path: Path) -> str | None:
 
 
 def _resolve_run_id(args, paths) -> str | None:
+    """This run's id: the submitted one, else the one the state file records.
+
+    The disk-sourced fallback is pattern-checked exactly like the submitted one.
+    It reaches the report marker, and a state file carrying `run_id: "x --> y"`
+    would end that `<!-- … -->` marker early — the file is machine-local, but it
+    is still input, and "it came off disk" is not a reason to trust it less
+    carefully than stdin. A non-conformant id is dropped, not repaired.
+    """
     if args.run_id:
         return args.run_id
     parsed, error = _read_json_file(paths["state"])
     if error is None and isinstance(parsed, dict):
         run_id = parsed.get("run_id")
-        if isinstance(run_id, str):
+        if isinstance(run_id, str) and RUN_ID_RE.match(run_id):
             return run_id
     return None
 
@@ -663,7 +709,15 @@ def _emit_held(holder: dict, status: dict) -> int:
 
 
 def run_lock(args, paths) -> int:
-    run_id = _resolve_run_id(args, paths) or _new_run_id()
+    # A plain `--lock` starts a *new* run, so it mints a new id even when a
+    # previous run left its state file behind: adopting that id would give two
+    # unrelated runs one id in both the report marker and `runs.jsonl`. Only
+    # `--lock --resume` — the caller saying "I am continuing the recorded run" —
+    # takes the id off disk. `--init` then adopts whichever id this lock holds,
+    # so the documented lock → init → unlock sequence stays one run either way.
+    run_id = args.run_id or (
+        (_resolve_run_id(args, paths) if args.resume else None) or _new_run_id()
+    )
     if not RUN_ID_RE.match(run_id):
         raise InputError(f"run_id '{run_id}' is not a valid run id")
     payload = _lock_payload(run_id, args.pid)
@@ -713,9 +767,13 @@ def run_lock(args, paths) -> int:
             if current != observed:
                 # A *different* lock is at the path now. This invocation
                 # classified the one it was asked to reclaim, and a stale
-                # verdict about that file says nothing about this one — so the
-                # race has a single winner even at `--ttl 0`, where every lock
-                # is stale the instant it is written.
+                # verdict about that file says nothing about this one, so it
+                # stops instead of reclaiming on somebody else's evidence. At
+                # the default TTL that leaves exactly one winner: the run that
+                # published the replacement. At `--ttl 0`, where every lock is
+                # stale the instant it is written, contended reclaimers can all
+                # stop and the round has *no* winner — the fail-safe direction,
+                # and no shipped prose passes `--ttl`.
                 break
         return _emit_held(holder, status)
 
@@ -777,8 +835,11 @@ def run_report(args, paths) -> int:
         raise InputError("markdown must be a non-empty string")
     _check_str(submitted, "run_id", pattern=RUN_ID_RE)
     # Both header values are interpolated into the `<!-- … -->` marker below, so
-    # both are pattern-checked: a `generated_at` carrying `-->` would end the
-    # marker early and leave the rest of it as visible report text.
+    # every path that can produce one is pattern-checked — the submitted value
+    # here, and equally the state-file fallback inside `_resolve_run_id`, which
+    # drops a non-conformant id rather than passing it through. A `run_id` or
+    # `generated_at` carrying `-->` would end the marker early and leave the
+    # rest of it as visible report text.
     _check_str(submitted, "generated_at", pattern=TS_RE)
     header = {
         "run_id": submitted.get("run_id") or _resolve_run_id(args, paths),
@@ -860,6 +921,11 @@ def main(argv: list[str] | None = None) -> int:
         help="reclaim or release a lock unconditionally",
     )
     parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="--lock only: continue the recorded run, adopting its run id",
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="validate and print what would be written, but write nothing",
@@ -872,6 +938,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.pid < 0:
         print("✗ gi-state: --pid must be zero or greater", file=sys.stderr)
         return 3
+    if args.resume and not args.lock:
+        print("✗ gi-state: --resume applies to --lock only", file=sys.stderr)
+        return 2
     if args.run_id is not None and not RUN_ID_RE.match(args.run_id):
         print(f"✗ gi-state: --run-id '{args.run_id}' is not a valid run id", file=sys.stderr)
         return 3
