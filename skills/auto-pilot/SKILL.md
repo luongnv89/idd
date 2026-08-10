@@ -48,8 +48,11 @@ When in doubt, the auto-pilot proceeds with the safer option rather than stoppin
 | `/auto-pilot --limit N` | Process at most N issues, then stop |
 | `/auto-pilot --dry-run` | Run triage/show execution plan without resolving anything |
 | `/auto-pilot --skip N` | Skip issue #N (add to skip list for this session) |
+| `/auto-pilot --resume` | Resume the interrupted run recorded in `.gitissue/run-state.json` at its recorded phase, reusing the existing branch/PR |
+| `/auto-pilot --fresh` | Ignore any recorded run state and start a new run (the default when no state exists) |
+| `/auto-pilot --force-unlock` | Reclaim a run lock held by a run that is no longer alive, then start |
 
-**Combining flags:** `--issues` can combine with `--dry-run` and `--skip`. It cannot combine with `--limit` (the issue list itself is the limit). Example: `/auto-pilot --issues 5,10,12 --skip 10 --dry-run`
+**Combining flags:** `--issues` can combine with `--dry-run` and `--skip`. It cannot combine with `--limit` (the issue list itself is the limit). Example: `/auto-pilot --issues 5,10,12 --skip 10 --dry-run`. `--resume` cannot combine with `--dry-run` (a resume advances a real run; a dry run mutates nothing) and it cannot combine with `--fresh` (they are opposite answers to the same question). The resume entry gate, the run lock, and the checkpoints live in `references/phases.md` (*Step 1.0*) and `references/preflight.md` (*Run lock*).
 
 ## Prerequisites
 
@@ -126,6 +129,20 @@ Check these files relative to the skill's directory (the dirname of this SKILL.m
 - `references/scripts/gi-ci-wait.py` — CI waiter: polls a PR's checks to a verdict in one invocation, for the Phase 5 pre-merge gate
 - `references/scripts/gi-issue.py` — TTL-cached issue fetcher for the repeat reads across Phases 1, 4, and 5
 - `references/scripts/gi-triage-graph.py` — Phase 1 execution order, status, staleness, and priority
+- `references/scripts/gi-state.py` — run-state, run-lock, and final-report writer (resume, `--force-unlock`, and the `--dry-run` no-mutation guarantee)
+
+**Acquire the run lock before the first mutation.** The auto-stash below writes
+to the repository, so the lock precedes it — run
+`python3 references/scripts/gi-state.py --lock` from the repo root, exactly as the
+*Configuration* step resolves this skill's own script path. Exit 0 acquired (a
+`reclaimed` status prints the `⚠ Recorded run state is stale` line); **exit 3
+means another run holds it** — stop and print `✗ Another /auto-pilot run is in
+progress` from `references/error-messages.md`, never degrade past it. No
+`python3`, exit 2, or exit 4: print `⚠ gi-state unavailable` and continue
+unlocked and un-resumable, per the fallback beside every call site in
+`references/preflight.md` (*Run lock*). Release it on **every** exit path. Under
+`--dry-run`, pass `--dry-run` to the lock call as well — a dry run reports who
+holds the lock and acquires nothing.
 
 If the working tree is dirty, auto-stash before starting; if not on the default
 branch, auto-switch and rebase on a clean tree. Both procedures (the stash-first
@@ -297,6 +314,13 @@ which writes **no** line (already logged at batch time). This is the same
 append-only run log written by `/issue-resolver`; the schema lives in
 `references/docs/run-log-schema.md`.
 
+**The run log is not the run state.** `.gitissue/runs.jsonl` is append-only
+cross-run telemetry, one line per processed issue, and nothing rewrites a prior
+line; `.gitissue/run-state.json` is a mutable, single-run, machine-local
+checkpoint that the next run overwrites. Writing a checkpoint never writes a
+run-log line and vice versa — the single-writer rule below is unchanged by
+resume support.
+
 **Auto-pilot is the single writer per processed issue** — the resolver runs with
 `--no-run-log` and returns its telemetry instead of appending. Two contracts keep
 the log accurate: the single-writer rule and the batch fan-out. Both live in
@@ -345,7 +369,14 @@ The loop stops when any of these conditions are met — except the rows marked *
 | Merge blocked (CI/conflicts) | `⚠ PR #{pr_number} is not mergeable — PR left open, continuing` (`left_open`, *loop continues*) |
 | Mode forbids merge (clean PR in `conservative`) | `○ PR #{pr_number} ready for manual merge (mode: conservative)` (`left_open`, *loop continues*) |
 | PR blocked by an unmerged dependency | `⚠ BLOCKED — PR #{pr_number} cannot merge until dependency #{N} is merged` (PR left open, `blocked_by_dependency`, issue added to the session skip list, *loop continues*) |
+| Run lock held by a live run | `✗ Another /auto-pilot run is in progress` (the loop never starts; nothing is mutated) |
 | User cancellation | `○ Auto-pilot stopped by user` |
+
+**Release the run lock on every exit path** — every row above, the critical-issue
+pause, and any unhandled failure. The last action of the run is
+`python3 references/scripts/gi-state.py --unlock`; a lock left behind blocks the
+next run until its TTL expires or `--force-unlock` reclaims it. When the script
+is unavailable, delete `.gitissue/run.lock` by hand.
 
 ---
 
@@ -353,7 +384,7 @@ The loop stops when any of these conditions are met — except the rows marked *
 
 When the loop ends (for any reason), print a structured step-by-step summary showing each iteration's outcome. Each iteration is tagged with one of six categorical outcomes: **`merged`**, **`left_open`**, **`partial_followup`**, **`blocked_by_dependency`**, **`failed`**, **`skipped`**.
 
-The full outcome-meaning table, the summary template, and the batch-mode delta live in `references/summary-format.md` — read that file when printing the final summary.
+The full outcome-meaning table, the summary template, and the batch-mode delta live in `references/summary-format.md` — read that file when printing the final summary. **Persist it**: after printing, write the same summary to `.gitissue/last-run-report.md` by piping the report payload into `python3 references/scripts/gi-state.py --report` (the markdown arrives on stdin, never on a command line — it carries issue titles), then release the run lock. A dry run skips both writes. The payload schema and the degrade-to-`Write`-tool fallback are in `references/summary-format.md` (*Persisted run report*).
 
 ---
 

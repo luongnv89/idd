@@ -40,6 +40,60 @@ precheck*) is missing, stop immediately and print:
   Then restart the agent session and re-run /auto-pilot.
 ```
 
+## Run lock
+
+**The lock is taken before the first mutation.** The `git stash push -u` in
+*Auto-stash and branch sync* below is that first mutation, so the lock precedes
+it — two concurrent runs stashing, rebasing and branching in one working tree
+corrupt each other's state long before either reaches a PR.
+
+```bash
+python3 shared/scripts/gi-state.py --lock
+```
+
+The lock is `.gitissue/run.lock`, created with `O_CREAT|O_EXCL` so two runs
+racing for it cannot both win, and it records four fields:
+
+| Field | Why it is there |
+|-------|-----------------|
+| `run_id` | identifies the holder; `--unlock` releases only a matching lock unless `--force` |
+| `pid` | the invoking process, so a lock left by a run that is gone can be retired |
+| `host` | liveness is only checkable on the machine that took the lock |
+| `started_at` (+ `heartbeat`) | the age the TTL is measured against; each checkpoint refreshes `heartbeat`, so a long run never ages itself out |
+
+**TTL and liveness.** A held lock is **stale** — and is reclaimed with a `⚠`
+line — when its age reaches `--ttl` seconds (default 3600) **or** when it names
+this host and its `pid` is no longer running. Anything else is a live holder:
+the call exits **3** and this run stops. Exit 3 is a stop, never a degrade —
+"another run is in progress" is an answer, not a failure to answer, and starting
+anyway is exactly the concurrent-mutation case the lock exists to prevent.
+
+**`--force-unlock`.** When a run really is dead but its lock still looks live
+(a reused pid, a lock taken on another machine, a clock skew), reclaim it:
+
+```bash
+python3 shared/scripts/gi-state.py --lock --force
+```
+
+That is what `/auto-pilot --force-unlock` runs. It is the only documented way
+past a live-looking lock; deleting `.gitissue/run.lock` by hand is the same
+thing without the audit line.
+
+**Under `--dry-run`, add `--dry-run`** — the call reports who holds the lock and
+creates nothing.
+
+**Release on every exit path.** `python3 shared/scripts/gi-state.py --unlock` is
+the run's last action, on success, on every stop condition, and after the
+critical-issue pause.
+
+**Fallback when the script cannot run.** A missing bundled file is a broken
+install: stop with the `✗ Missing bundled dependency` block above. But no
+`python3`, exit 2, or exit 4 is an environment problem — print
+`⚠ gi-state unavailable — running without the run lock` and continue: check for
+`.gitissue/run.lock` with `test -f`, treat a file younger than an hour as a live
+holder and stop, otherwise proceed and skip every checkpoint. The run is then
+correct but not resumable, which is exactly today's behavior.
+
 ## Auto-stash and branch sync
 
 If the working tree is dirty, auto-stash and continue:

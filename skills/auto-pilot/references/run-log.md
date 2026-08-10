@@ -7,6 +7,25 @@ than re-deriving fields. This file documents the two contracts that keep the log
 accurate when auto-pilot orchestrates the resolver: the **single-writer rule**
 and the **batch fan-out**.
 
+## Run log vs. run state
+
+They are different files with opposite lifetimes, and neither substitutes for
+the other:
+
+| | `.gitissue/runs.jsonl` (run log) | `.gitissue/run-state.json` (run state) |
+|---|---|---|
+| Shape | append-only, one JSON line per processed issue | one mutable JSON object, rewritten at each checkpoint |
+| Scope | cross-run telemetry, grows forever | this run only; the next run overwrites it |
+| Audience | `/idd-doctor` metrics, humans reading history | this loop, resuming itself after an interruption |
+| Lifetime | committed history of what ran | machine-local and gitignored, alongside `run.lock` and `last-run-report.md` |
+
+A checkpoint is **not** a run-log line: it records where the loop is, not what an
+issue's run concluded. Reading the run state to reconstruct telemetry would
+double-count (it holds `processed[]` for every issue this run touched), and
+reading the run log to resume would be wrong (it has no phase, no branch, and no
+PR-in-flight). Everything below is about the run log and is unchanged by resume
+support.
+
 ## Single-writer rule (per processed issue)
 
 **Auto-pilot is the single writer per processed issue.** The resolver subagent
