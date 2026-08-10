@@ -119,7 +119,7 @@ All errors follow the rich error format: what went wrong + fix command + docs li
   The recorded state is a hint, never an authority: when GitHub disagrees
   with it, GitHub wins.
 ```
-**Trigger:** *Step 1.0*'s gate resolved to `stale` — the read reported `corrupt`, the recorded phase is unknown, `--fresh` was passed, or the branch/PR reconciliation failed. A reclaimed lock (TTL elapsed, or the holder's pid is gone) prints this line too.
+**Trigger:** *Step 1.0*'s gate resolved to `stale` — the read reported `corrupt`, the recorded phase is unknown, `--fresh` was passed, or the branch/PR reconciliation failed. Those four conditions are the whole list. A **reclaimed lock is not one of them**: a lock is reclaimed on every genuine `--resume`, because the interrupted run is dead and its lock is dead-pid stale, so treating that as stale *state* would `--init` over the very state the resume is about to read. A reclaimed lock prints the script's own `⚠ gi-state: reclaimed a … lock` line and says nothing about the recorded state.
 **Action:** `--init` over the old state and run the full loop from Phase 1. Non-fatal.
 
 ### gi-state unavailable (degrade)

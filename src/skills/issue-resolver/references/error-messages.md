@@ -78,7 +78,8 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 
   Use /issue-pr-review {pr_number} to review it instead.
 ```
-**Trigger:** Step 0b finds an open PR whose body contains `Closes #N`, `Fixes #N`, or `Resolves #N`. Stop — the resolve pipeline does not create a second PR for the same issue.
+**Trigger:** Step 0b finds an open PR whose body contains `Closes #N`, `Fixes #N`, or `Resolves #N`.
+**Action:** Stop — the resolve pipeline does not create a second PR for the same issue. Return `status: pr_in_progress` with that PR's `pr_number` and `branch_name`, and **never close the issue**: an unreviewed, unmerged PR is not a resolution, and the caller routes those identifiers into a review of the existing PR (SKILL.md → *0b*, `references/pipeline-steps.md` → *Early exit*).
 
 ### Assigned to another user
 ```

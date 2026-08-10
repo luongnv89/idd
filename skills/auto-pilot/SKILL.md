@@ -134,8 +134,10 @@ Check these files relative to the skill's directory (the dirname of this SKILL.m
 **Acquire the run lock before the first mutation.** The auto-stash below writes
 to the repository, so the lock precedes it — run
 `python3 references/scripts/gi-state.py --lock` from the repo root, exactly as the
-*Configuration* step resolves this skill's own script path. Exit 0 acquired (a
-`reclaimed` status prints the `⚠ Recorded run state is stale` line); **exit 3
+*Configuration* step resolves this skill's own script path. Exit 0 acquired — a
+`reclaimed` status prints the script's own `⚠ gi-state: reclaimed a … lock`
+line and is evidence about the *lock*, never about the recorded run state
+(`references/error-messages.md` → *Recorded run state is stale*); **exit 3
 means another run holds it** — stop and print `✗ Another /auto-pilot run is in
 progress` from `references/error-messages.md`, never degrade past it. No
 `python3`, exit 2, or exit 4: print `⚠ gi-state unavailable` and continue
@@ -237,11 +239,12 @@ When the user passes `--issues N1,N2,...`, the triage phase is replaced by an an
 
 ## Loop Overview
 
-A continuous loop, 5 phases per iteration, looping back to Phase 1 until the backlog is done or the limit is reached:
+Phase 0 once, then a continuous loop of 5 phases per iteration, looping back to Phase 1 until the backlog is done or the limit is reached:
 
 ```
 ◆ Auto-Pilot
 ┄┄┄┄┄┄┄┄┄┄┄┄
+  Phase 0 — Run state    once, before the loop: resume gate, then --init
   Phase 1 — Triage       (skipped in explicit list mode)
   Phase 2 — Resolve      subagent: 6-step resolve pipeline
   Phase 3+4 — Review-Fix /issue-pr-review --auto --no-merge (review+fix, x3 max)
@@ -263,10 +266,11 @@ line is printed.
 
 ## Phase Details
 
-Each iteration runs 5 phases. For brevity, the full step-by-step per-phase specification (including subagent prompts, followup-issue template, merge gates, and force-resolution fallbacks) lives in `references/phases.md`. The summary below lists the phases — read `references/phases.md` when implementing or debugging a specific phase.
+Phase 0 runs **once**, before the loop; each iteration then runs 5 phases. For brevity, the full step-by-step per-phase specification (including subagent prompts, followup-issue template, merge gates, and force-resolution fallbacks) lives in `references/phases.md`. The summary below lists the phases — read `references/phases.md` when implementing or debugging a specific phase.
 
 | Phase | Name | Purpose | Subagent? |
 |-------|------|---------|-----------|
+| 0 | Run state | **Mandatory, before Phase 1** (and before the first entry in explicit list mode): resolve the resume gate to `resumable`/`stale`/`absent`, then `--init` the run state a later `--resume` reads. Every phase below checkpoints into it (*Step 1.0*, *Step 1.0b*) | no (main agent) |
 | 1 | Triage and Pick | Refresh triage, pick the top-priority ready issue, capture `{issue_payload}` (trimmed to `{issue_payload_ids}` for the reviewer) + `{triage_context}` for the spawns (*Step 1.2b*) | no (main agent) |
 | 2 | Resolve | Sync to default branch, run the full resolve pipeline | yes (/issue-resolver) |
 | 3-4 | PR Review | Run /issue-pr-review --auto --no-merge with up to 3 fix cycles + CI monitoring | yes (/issue-pr-review) |

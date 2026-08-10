@@ -61,7 +61,7 @@ reaches the script on **stdin**, never on a command line:
 |-------|------|---------|
 | `run_id` | string | the run this report belongs to (defaults to the run state's) |
 | `markdown` | string | the rendered summary — the same text just printed |
-| `generated_at` | string | optional ISO-8601 UTC instant; defaults to now |
+| `generated_at` | string | optional UTC instant, exactly `YYYY-MM-DDTHH:MM:SSZ`; defaults to now. Pattern-checked like `run_id`, because both are interpolated into the marker below and a value carrying `-->` would end it early |
 
 The file it writes opens with a `<!-- gitissue:run-report v1 {…} -->` marker
 carrying `run_id` and `generated_at`, so a later reader can tell which run it
