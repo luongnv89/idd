@@ -17,6 +17,7 @@ the other:
 | Shape | append-only, one JSON line per processed issue | one mutable JSON object, rewritten at each checkpoint |
 | Scope | cross-run telemetry, grows forever | this run only; the next run overwrites it |
 | Audience | `/idd-doctor` metrics, humans reading history | this loop, resuming itself after an interruption |
+| Read by the loop? | yes, in one place only: `gi-runlog.py --failure-streak` counts an issue's consecutive `failed` records for *Phase 2.3*'s quarantine. Best-effort **by design** — the log is gitignored and deletable, so the streak is *progress toward* a quarantine and the durable state is the label on the issue. A missing or unreadable log reports `streak: 0` and quarantines nothing | yes, by *Step 1.0*'s resume gate |
 | Lifetime | committed history of what ran | machine-local and gitignored, alongside `run.lock` and `last-run-report.md` |
 
 A checkpoint is **not** a run-log line: it records where the loop is, not what an
@@ -73,5 +74,14 @@ number when one was created, else `null`), and — from the resolver's report-ba
 is the adaptive-effort profile the resolve chose, `light` or `full`; omit it when
 the resolver returned none). **When the outcome is `skipped`, always include
 `skipped_reason`** (e.g. `already_resolved`,
-`blocked_label`, `blocked_by_dependency`, `in_skip_list`, `assigned_to_other`); a
-skip never ran the resolver, so it carries no resolver telemetry.
+`blocked_label`, `blocked_by_dependency`, `in_skip_list`, `assigned_to_other`,
+`quarantined`); a skip never ran the resolver, so it carries no resolver
+telemetry.
+
+**`quarantined` is a `skipped_reason`, never an `outcome`, and never doubles a
+line.** The iteration that *applies* the quarantine label is a `failed`
+iteration and writes its one `failed` line as usual — the quarantine is decided
+from that line, so no second line is written for it. `skipped_reason:
+quarantined` belongs to the **later** run that skips the issue because it carries
+`autopilot.quarantine_label`, which is an ordinary skip before resolution
+started. One line per processed issue, unchanged.

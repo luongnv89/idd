@@ -15,6 +15,14 @@ categorical outcomes.
 | `failed` | The resolver subagent failed before a PR could be created (or another fatal step failed). |
 | `skipped` | Issue was skipped before resolution started — already resolved, blocked by labels/dependencies, in the `--skip` list, or assigned to another user. |
 
+The one `skipped_reason` worth calling out separately is **`quarantined`**: the
+issue failed `autopilot.quarantine_after` runs in a row and now carries
+`autopilot.quarantine_label`, so it is skipped until a human removes that label.
+It is recorded on the iteration that *applied* the label, which is a `failed`
+iteration — the quarantine is the consequence of that failure, not a seventh
+outcome. Later runs skip the issue as an ordinary label skip.
+
+
 ## Summary template
 
 ```
@@ -35,7 +43,7 @@ categorical outcomes.
   failed:                  {failed_count}
   skipped:                 {skipped_count}
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  Result:                  {COMPLETED / PAUSED / LIMIT REACHED}
+  Result:                  {COMPLETED / PAUSED / LIMIT REACHED / BUDGET REACHED}
   Mode:                    {conservative / balanced / aggressive}
 
   Remaining:               {remaining_count} open issues
@@ -46,6 +54,15 @@ categorical outcomes.
 The `Report:` line is the path the summary was **persisted** to, printed after
 the write succeeds and omitted when it did not (or under `--dry-run`, which
 writes nothing).
+
+`Result:` takes exactly one of four values. `COMPLETED` — the backlog or the
+explicit list is done. `PAUSED` — the loop stopped for a decision it may not make
+alone (a critical issue with unresolved review problems, `pause_on_failure`).
+`LIMIT REACHED` — `autopilot.max_iterations` was hit. **`BUDGET REACHED`** — the
+wall-clock budget `autopilot.max_runtime_minutes` expired
+(`references/phases.md` → *Runtime budget check*); the run stopped cleanly at an
+iteration boundary with nothing in flight, so `Next action:` is the ordinary
+`/auto-pilot to continue`.
 
 ## Persisted run report
 
@@ -80,6 +97,17 @@ Exit 0 prints the path. Exit 3 is a stop — the payload is invalid (an empty
 hand. No `python3`, exit 2, or exit 4: print `⚠ gi-state unavailable` and write
 the same markdown to `.gitissue/last-run-report.md` with the **Write** tool
 instead. Either way the run is over, so neither path changes an outcome.
+
+**Two runs that end early still leave a complete report.** A run that *paused*
+for a rate limit and then resumed is not an early end at all — the pause happens
+inside the run, the lock is held across it, and the summary describes the whole
+run including the iterations that came after the pause; nothing about the report
+records that a pause occurred. A run stopped by the **runtime budget** does end
+early, and the report is written on that path exactly as on every other: the
+budget check stops before starting new work, so the summary is composed from
+completed iterations only and persisted before the lock is released. There is no
+partial-report path — a report that exists is always a report of finished
+iterations.
 
 If batch analysis was used (explicit issue list), use the same layout with two
 deltas: suffix the header with `(batch mode)` and add an
@@ -123,6 +151,18 @@ a refresh would mark every reuse iteration `×` and turn a working loop into a
 wall of `PARTIAL`. It is `×` only when the gate degraded and the pick ran against
 an order nothing could vouch for.
 
+`Runtime budget` is `√` when the check ran and the budget had time left, and
+`×` when it could not be evaluated (`gi-ratelimit` degraded) — an expired budget
+is not a `×`, it ends the run before the phase reports at all. With
+`max_runtime_minutes: 0` the check is inapplicable, not skipped-and-failed: omit
+the entry rather than marking it `×`.
+
+`Quarantine checked` is `√` on any iteration that did not fail (nothing to
+check), and on a failing one when `gi-runlog.py --failure-streak` answered. It is
+`×` when the streak could not be read or the label write was refused — both
+non-blocking, so the phase is `PARTIAL` and the loop continues. With
+`quarantine_after: 0` the check is inapplicable: omit the entry.
+
 `√` and `×` are the completion-report check glyphs defined in
 `references/docs/terminal-style.md`; the run's own status symbols stay `✓ ✗ ⚠ ○`.
 
@@ -130,8 +170,8 @@ an order nothing could vouch for.
 
 | Phase | Checks |
 |-------|--------|
-| 1 — Triage and Pick | `Triage current` · `Issue picked` · `Dependencies clear` |
-| 2 — Resolve | `Resolver returned` · `PR created` · `Telemetry returned` |
+| 1 — Triage and Pick | `Runtime budget` · `Triage current` · `Issue picked` · `Dependencies clear` |
+| 2 — Resolve | `Resolver returned` · `PR created` · `Telemetry returned` · `Quarantine checked` |
 | 3-4 — PR Review | `Review ran` · `Fix cycles converged` · `CI green` |
 | 5 — Merge | `Mergeable` · `Squash-merged` · `Issue closed` · `Follow-up filed when partial` |
 

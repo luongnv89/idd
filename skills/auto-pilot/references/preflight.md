@@ -130,6 +130,89 @@ install: stop with the `✗ Missing bundled dependency` block above. But no
 holder and stop, otherwise proceed and skip every checkpoint. The run is then
 correct but not resumable, which is exactly today's behavior.
 
+## Rate-limit pause
+
+Prerequisite 8 reads the budget with driver rule 4's single call; this section is
+what to do with the answer, and it is where a mid-run 403 lands too
+(`references/error-messages.md` → *API rate limit during a loop read*). Pipe the
+payload straight in — the script never touches the network, it only decides what
+the numbers mean:
+
+```bash
+gh api rate_limit --jq '{remaining: .rate.remaining, reset: .rate.reset}' \
+  | python3 references/scripts/gi-ratelimit.py --verdict \
+      --threshold 200 --deadline "{budget_deadline_epoch}"
+```
+
+`{budget_deadline_epoch}` is the epoch at which `autopilot.max_runtime_minutes`
+expires — `0` when it is unbounded — so a pause can never outlive the budget the
+run was given. The one JSON line carries `action`, `remaining`, `reset`,
+`wait_s` and `resume_at`:
+
+| `action` | What the loop does |
+|----------|--------------------|
+| `proceed` | continue silently |
+| `warn` | print the `⚠` low-budget variant from `references/error-messages.md` and continue |
+| `wait` | print the `○ Rate budget exhausted — pausing until {resume_at}` block, run the chunked pause below, then **re-probe from the top of this section** |
+| `stop` | print the `✗ Insufficient API rate budget` block, persist the report, release the lock, and stop cleanly |
+
+**The pause is chunked, and that is not cosmetic.** The run lock's TTL is 3600s
+(*Run lock* above) and its `heartbeat` is refreshed only at checkpoints, so one
+uninterrupted sleep past the TTL would let a second run read this live run's lock
+as stale and reclaim it mid-pause — the exact concurrent-mutation case the lock
+exists to prevent. Sleeping one chunk at a time gives the loop somewhere to
+refresh from:
+
+```bash
+python3 references/scripts/gi-ratelimit.py --wait \
+    --until "{reset_epoch}" --deadline "{budget_deadline_epoch}" --chunk-s 300
+```
+
+After **every** chunk, refresh the heartbeat with the ordinary checkpoint of
+`references/phases.md` (*Step 1.0b*) — `gi-state.py` stays the single writer of
+`.gitissue/run.lock`, and nothing here may touch that file directly. Repeat until
+the line reports `done: true`, then re-probe. A line with `done: false` and
+`waited_s: 0` means a further chunk would run past the deadline: stop cleanly,
+exactly as `action: stop` does. Check the runtime budget before and after the
+pause (`references/phases.md` → *Runtime budget check*).
+
+**Prose fallback**, per the rule that every script call site documents one. No
+`python3`, exit 2, or exit 4: print
+`⚠ gi-ratelimit unavailable — computing the pause by hand` and do the same
+arithmetic — `wait_s = reset - now`; if `max_runtime_minutes` is set and
+`now + wait_s` falls past the deadline, stop cleanly instead; otherwise sleep in
+slices no longer than 300s, refreshing the heartbeat between them, then re-read
+`gh api rate_limit` and decide again. Exit 3 is invalid input (an unparsable
+payload) — a stop for this probe, not a degrade. Exit 0 carrying
+`action: "stop"` is an **answer**, never a degrade: do not retry past it.
+
+## Transient-failure retry
+
+Driver rule 5 in `references/docs/platform-github.md` is the single home of *which* failures
+are recoverable — 5xx, a connection reset or timeout, and a *secondary*
+rate-limit 403 carrying `Retry-After`; never 401, 404, or primary rate-limit
+exhaustion, which takes *Rate-limit pause* above instead. This section is the
+loop that acts on that classification, and it wraps any single `gh` call the
+orchestrator makes directly:
+
+```bash
+python3 references/scripts/gi-ratelimit.py --backoff --attempt {n}
+```
+
+Start at attempt 1, sleep the returned `delay_s`, retry the call, increment.
+The schedule is 2s, 4s, 8s, 16s — four attempts, 30s of added latency at worst.
+When the line reports `exhausted: true` (attempt 5 and beyond, `delay_s: 0`, and
+exit **0**, because exhaustion is an answer and not a failure to answer),
+**fall through to the degrade the call site already documents** — never to a new
+stop. The contract adds attempts *before* an existing fallback and never replaces
+it: for *Step 1.1b*'s live eligibility read that fallback is
+`live_backlog = unavailable` (`references/phases.md`), and for a `gh issue edit`
+it is that call's own no-write path. Honour a `Retry-After` header when it asks
+for longer than the computed delay.
+
+**Prose fallback:** without the script, apply the same 2s/4s/8s/16s schedule by
+hand and give up after the fourth attempt, into the same documented degrade.
+
 ## Auto-stash and branch sync
 
 If the working tree is dirty, auto-stash and continue:

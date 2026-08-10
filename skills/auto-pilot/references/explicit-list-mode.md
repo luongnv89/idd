@@ -184,6 +184,21 @@ mid-batch does not re-resolve issues that already landed. When `gi-state.py` is
 unavailable they degrade to exactly what they were before: in-memory sets that
 do not survive the run.
 
+**Quarantine is honored in this mode too — the label filter is not Phase 1's.**
+Explicit list mode bypasses Phase 1 entirely, so nothing here inherits *Step
+1.2*'s pick predicate; the quarantine skip has to be applied on its own. Before
+resolving any listed issue, check its labels for `autopilot.quarantine_label`
+(the same effective `skip_labels` membership SKILL.md's *Configuration* step
+establishes) and skip it with `skipped_reason: quarantined` if present. The write
+side is unchanged: a failure inside this mode runs the same *Quarantine after
+repeated failures* procedure in `references/phases.md`. A user who explicitly
+lists a quarantined issue is telling the loop to try it again, so say so in the
+skip line — removing the label is the documented way to do that:
+
+```
+○ [Issue {i}/{total}] #{N} — quarantined ({quarantine_label}); remove the label to retry
+```
+
 When advancing to the next item in `optimized_order`:
 1. **If already processed** (in the `processed` set): emit a skip line and advance.
    This skip is **display only** — it writes **no** `.gitissue/runs.jsonl` line,
@@ -257,8 +272,8 @@ name: "a failed batch drops fully-processed issues").
 **An in-batch skip writes no run-log line.** The last table row is the **one
 exception** to auto-pilot's "log every processed issue including skips" rule: an *in-batch* skip is the already-counted other half
 of a batch line, not a fresh processed issue. Ordinary skips —
-`blocked_label`, `blocked_by_dependency`, `in_skip_list`, `assigned_to_other` —
-still log their one line with a `skipped_reason`.
+`blocked_label`, `blocked_by_dependency`, `in_skip_list`, `assigned_to_other`,
+`quarantined` — still log their one line with a `skipped_reason`.
 
 Build each written line from `references/docs/run-log-schema.md`, with these batch attributions:
 

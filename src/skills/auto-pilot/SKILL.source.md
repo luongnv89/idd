@@ -23,7 +23,7 @@ Inspired by the auto-adapt-mode pattern: **always proceed, never block on recove
    - Switching branches, stashing changes, syncing with remote
    - Choosing resolution strategies, picking implementation approaches
    - Skipping failed issues and moving to the next one
-   - Retrying after transient failures
+   - Retrying after transient failures — which failures are recoverable is driver rule 5 in `docs/platform-github.md`; the bounded retry loop that acts on it is in `references/preflight.md` (*Transient-failure retry*)
    - Merging PRs that pass review (only when `autopilot.mode` permits — see Configuration)
    - Falling back to simpler strategies when optimizations fail
    - **PR blocked by an unmerged dependency** — if the originating issue has a `Depends on #N` / `Blocked by #N` marker and any referenced issue is still open (or its PR is unmerged), never merge out of order — but never stop the run for it either. Record the outcome as `blocked_by_dependency`, leave the PR open and unchanged, add the issue to the session skip list, and continue to the next eligible issue. Disabled by `autopilot.respect_dependencies: false`.
@@ -72,10 +72,10 @@ Before starting the loop, verify the environment. On failure, output the exact e
 8. **Check the rate budget** (driver rule 4, `docs/platform-github.md` ~12): auto-pilot processes many issues in a loop, each fanning out resolver and review subagents that make their own `gh`/API calls. Before starting the loop, confirm enough budget remains:
 
    ```bash
-   gh api rate_limit --jq '.rate.remaining'
+   gh api rate_limit --jq '{remaining: .rate.remaining, reset: .rate.reset}'
    ```
 
-   **Threshold:** if `remaining` is below **200**, stop and print the `✗ Insufficient API rate budget` error from `references/error-messages.md` — the loop would exhaust the budget partway through and strand issues in a half-resolved state. Between 200 and 500, warn with the `⚠` variant but continue. At or above 500, proceed silently.
+   **Threshold:** at or above 500, proceed silently; between 200 and 500, warn with the `⚠` variant and continue. Below **200** the run does **not** stop dead — it **pauses until `reset` and then re-probes**, provided that instant fits inside `autopilot.max_runtime_minutes`; when it does not fit, or `reset` is unknown, stop cleanly with the persisted report rather than stranding issues half-resolved. The verdict, the chunked pause that keeps the run lock alive across it, and the prose fallback are in `references/preflight.md` (*Rate-limit pause*) — read it before acting on a low budget.
 9. **Confirm push/merge permission** (driver `docs/platform-github.md` ~22-23): check the caller's repository permission:
 
    ```bash
@@ -130,6 +130,7 @@ Check these files relative to the skill's directory (the dirname of this SKILL.m
 - `references/scripts/gi-issue.py` — TTL-cached issue fetcher for the repeat reads across Phases 1, 4, and 5
 - `references/scripts/gi-triage-graph.py` — Phase 1 execution order, status, staleness, and priority
 - `references/scripts/gi-state.py` — run-state, run-lock, and final-report writer (resume, `--force-unlock`, and the `--dry-run` no-mutation guarantee)
+- `references/scripts/gi-ratelimit.py` — rate-limit verdict, chunked pause, transient-failure backoff, and the run's wall-clock budget
 
 **Acquire the run lock before the first mutation.** The auto-stash below writes
 to the repository, so the lock precedes it — run
@@ -181,6 +182,9 @@ Defaults (values the loop reads; per-key rationale and edge-case behavior live i
 - `autopilot.skip_labels: ["wontfix", "blocked", "do-not-merge"]`
 - `autopilot.critical_labels: ["critical", "priority:critical"]` — critical with unresolved review → stop and ask
 - `autopilot.respect_dependencies: true` — honor `Depends on #N` / `Blocked by #N` markers (Phase 5 gate)
+- `autopilot.quarantine_after: 3` — consecutive failed runs before an issue is quarantined; `0` disables quarantine
+- `autopilot.quarantine_label: "auto-pilot-quarantined"` — **append it to the effective `skip_labels` set as part of this config load**, so the pick predicate skips a quarantined issue without a second gate
+- `autopilot.max_runtime_minutes: 0` — wall-clock budget for the whole run; `0` = unbounded
 - All `resolve.*` and `triage.*` settings are inherited by the sub-skills
 
 Do not re-read the config at each iteration.
@@ -381,6 +385,7 @@ The loop stops when any of these conditions are met — except the rows marked *
 | Mode forbids merge (clean PR in `conservative`) | `○ PR #{pr_number} ready for manual merge (mode: conservative)` (`left_open`, *loop continues*) |
 | PR blocked by an unmerged dependency | `⚠ BLOCKED — PR #{pr_number} cannot merge until dependency #{N} is merged` (PR left open, `blocked_by_dependency`, issue added to the session skip list, *loop continues*) |
 | Run lock held by a live run | `✗ Another /auto-pilot run is in progress` (the loop never starts; nothing is mutated) |
+| Runtime budget reached (`autopilot.max_runtime_minutes`) | `○ Runtime budget reached ({max} min) — stopping cleanly` — checked at the top of each iteration and around every rate-limit pause (`references/phases.md` → *Runtime budget check*); nothing new is started, the final summary is persisted with `--report`, and the lock is released |
 | User cancellation | `○ Auto-pilot stopped by user` |
 
 **Release the run lock on every exit path** — every row above, the critical-issue
@@ -437,7 +442,8 @@ On final stop, the **Final Summary** table (above) lists each iteration's issue,
 - **Empty backlog** — loop exits with a green "no work remaining" notice, no error.
 - **Critical issue unresolvable** — loop halts and hands control back to the user with the exact error output.
 - **Merge permission missing** — detected upfront by the preflight `viewerPermission` check (Prerequisite 9); auto-pilot downgrades to no-merge mode, runs the full loop, and leaves every PR open for a maintainer. If permission is lost mid-run, auto-merge is skipped for that PR and the loop moves on.
-- **Rate budget too low** — the preflight rate-budget check (Prerequisite 8) stops before the loop starts when `remaining` is below the threshold, rather than stranding issues half-resolved.
+- **Rate budget too low** — the preflight rate-budget check (Prerequisite 8) pauses until `reset` and re-probes when that instant fits the runtime budget; it stops cleanly before the loop starts only when the wait would not fit or `reset` is unknown, rather than stranding issues half-resolved.
+- **Issue fails every run** — after `autopilot.quarantine_after` consecutive `failed` runs the issue is labelled `autopilot.quarantine_label` and skipped by the pick predicate until a human removes the label; the run itself continues to the next issue.
 - **Already fixed** — triage never closes issues (it only flags them for human review). If a later resolve reports `already_resolved`, the loop records outcome `skipped` and picks the next issue; it does not close it.
 - **Follow-up issue creation fails** — the PR is still merged so progress is never blocked; a warning is printed.
 

@@ -103,9 +103,76 @@ and continue; the loop's own work is unaffected, only resume is lost. Under
 `--dry-run` add `--dry-run` to the call — it validates and prints, and writes
 nothing. Delete the patch file afterwards.
 
+### Runtime budget check
+
+`autopilot.max_runtime_minutes` bounds the whole run by the wall clock, measured
+from the `started_at` that *Step 1.0*'s `--init` wrote into
+`.gitissue/run-state.json`. `0` — the default — means unbounded: skip this check
+entirely and never invoke the script.
+
+```bash
+python3 references/scripts/gi-ratelimit.py --budget \
+    --started-at "{run_state.started_at}" \
+    --max-minutes {autopilot.max_runtime_minutes}
+```
+
+**Check `started_at` before you substitute it**, exactly as *Step 1.0* checks a
+recorded branch: it must be `YYYY-MM-DDTHH:MM:SSZ`. `gi-state.py` writes it from
+its own UTC clock and accepts it from no caller — it is neither an `--init` nor
+an `--update` key — but the file is on disk and hand-editable, and this is the
+second recorded field to reach a shell word. Anything else is a doubt: treat the
+budget as unenforced rather than substituting it.
+
+The one JSON line reports `{"elapsed_s": N, "remaining_s": N|null,
+"expired": bool}`. `expired: true` arrives at exit **0** — it is an answer, not a
+failure to answer.
+
+**Evaluate it at exactly these points, and nowhere else:**
+
+1. At the **top of every iteration** — before Phase 1 picks in triage mode,
+   before taking the next entry in explicit list mode.
+2. **Before** entering a rate-limit pause and **again after** it returns
+   (`references/preflight.md` → *Rate-limit pause*), because a pause is the one
+   place a run spends its budget without doing any work.
+
+That list is exhaustive because the orchestrator **cannot interrupt a running
+subagent**: once `/issue-resolver` or `/issue-pr-review` is spawned, the next
+moment the main agent holds control again is when that subagent returns. A check
+anywhere else would either be unreachable or would abandon an in-flight PR
+half-reviewed. So the budget bounds *when a new unit of work may start*, never
+how long one already started may run — an iteration that begins inside the budget
+always finishes.
+
+On `expired: true`, stop cleanly:
+
+```
+○ Runtime budget reached ({autopilot.max_runtime_minutes} min) — stopping cleanly
+  Elapsed:   {elapsed_s}s since {run_state.started_at}
+  Processed: {n} issue(s) this run
+  Remaining work is untouched — re-run /auto-pilot to continue.
+```
+
+Then print the Final Summary, persist it by piping the report payload into
+`gi-state.py --report`, release the lock with `--unlock`, and stop — the same
+clean-exit sequence every other stop condition uses (SKILL.md → *Stop
+Conditions*). Nothing new is started and no PR is abandoned, so the next run
+picks up a backlog that is exactly where this one left it.
+
+**Degrade:** no `python3`, exit 2, or exit 4 — print
+`⚠ gi-ratelimit unavailable — the runtime budget is not enforced` and continue,
+or do the arithmetic by hand: `elapsed = now - started_at`, expired once that
+passes `max_runtime_minutes × 60`. Exit 3 means the inputs are invalid (a
+malformed `started_at`, a negative `--max-minutes`): stop *this check*, and treat
+the budget as unenforced rather than as expired — a broken clock must never
+manufacture a stop.
+
 ## Phase 1 — Triage and Pick
 
 > **Note:** This entire phase is skipped in explicit list mode (`--issues`). The next issue is simply taken from the user-provided list in order. Jump directly to Phase 2.
+
+**Before anything else in this phase, evaluate the *Runtime budget check* above.**
+It is the top of the iteration, and a budget already spent means this iteration
+never starts.
 
 ### Step 1.1a — Triage cache gate
 
@@ -330,13 +397,18 @@ stop. An empty `summary.suggested_order` over a **non**-empty live backlog is a
 different answer — new issues exist that the cached order never carried — and is
 *Step 1.2*'s pick miss, which re-triages once and picks them.
 
-**Fail-safe: any doubt is `unavailable`.** A `gh` call that errors, a rate limit,
-a reply that will not parse — every one of them sets
-`live_backlog = unavailable` rather than an empty or a partial set, because an
-empty set read as an answer would stop a run with work left in it and a partial
-one would silently narrow the pick. On `unavailable`, *Step 1.2* keeps its other
-two criteria, defers **Open** and **Not assigned** to *Step 1.2b*'s post-pick
-re-check, and defines a miss over the cached order alone.
+**Fail-safe: any doubt is `unavailable` — after the retries, not instead of
+them.** A `gh` call that errors, a rate limit, a reply that will not parse — every
+one of them ends at `live_backlog = unavailable` rather than at an empty or a
+partial set, because an empty set read as an answer would stop a run with work
+left in it and a partial one would silently narrow the pick. But `unavailable` is
+the **post-retry terminal fallback**, not the first response: a recoverable
+failure is retried on the bounded backoff in `references/preflight.md`
+(*Transient-failure retry*), and a primary rate limit takes *Rate-limit pause*
+there instead. Only an exhausted retry budget, a pause that will not fit the
+runtime budget, or a non-recoverable class lands here. On `unavailable`,
+*Step 1.2* keeps its other two criteria, defers **Open** and **Not assigned** to
+*Step 1.2b*'s post-pick re-check, and defines a miss over the cached order alone.
 **Never read a failed read as "no open issues".**
 
 The numbers and assignee logins this read returns are untrusted local data with
@@ -364,6 +436,17 @@ lists; the last two only from *Step 1.1b*'s live read. When that read is
 `unavailable`, evaluate the first two here as usual, skip the last two, and let
 *Step 1.2b*'s post-pick re-check catch a closed or foreign-assigned pick — it
 holds the same two fields, live, for the one issue that matters.
+
+**Quarantine is honored here, and only because the label is in the set.** An
+issue quarantined by *Step 2.3* carries `autopilot.quarantine_label`, and
+**SKILL.md's *Configuration* step appends that label to the effective
+`skip_labels` set as part of the one config load** — the shipped default
+`skip_labels` is `["wontfix", "blocked", "do-not-merge"]` and does not contain
+it, so without that append the label would be inert and quarantine would do
+nothing across runs. There is no separate quarantine gate to evaluate: **Not
+skipped** above already asks the question. The append happens once, at config
+load, so a run that starts with the label removed picks the issue again on its
+very next pass.
 
 **On a resumed run, "this run's own lists" start non-empty.** *Step 1.0* seeds
 `processed[]` and `skip_list[]` from the recorded state on a `resumable` resume,
@@ -410,18 +493,27 @@ one bucket** — this is the single home of that mapping:
 | Reason | Added by | Bucket |
 |--------|----------|--------|
 | `failed` | Phase 2.3's resolution failure | `Skipped` |
+| `quarantined` | Phase 2.3's quarantine threshold (*Quarantine after repeated failures*) | `Skipped` |
 | `blocked_by_dependency` | Step 5.1b / Phase 3-4 Step 2a's gate | `Dep-blocked` |
 | `not_eligible` | *Step 1.2b*'s post-pick re-check (closed) | `Skipped` |
 | `not_eligible` | *Step 1.2b*'s post-pick re-check (assigned to another user) | `Assigned` |
 | `resumed` | *Step 1.0*'s resume seeding of `processed[]` / `skip_list[]` | `Skipped` |
 
+`quarantined` counts under `Skipped` rather than earning a fifth bucket for the
+same reason `wontfix` does: from this step's point of view it is a label in the
+effective `skip_labels` set, and it is only ever *recorded* as its own reason so
+the run log and the summary can tell it apart from an ordinary failure. A
+quarantined issue reached on a **later** run is filtered by its label before this
+table is consulted at all, so it is counted as an ordinary label skip.
+
 The `resumed` row adds no fifth bucket **on purpose**. A seeded entry is an issue
 this run will not process, which is exactly what `Skipped` already counts, and
 splitting it out would break the one property this table exists to hold: the four
-counts sum to the candidates *Step 1.2* rejected. A seeded `skip_list[]` entry
-also keeps the reason it was recorded with, so a `blocked_by_dependency` entry
-restored by a resume still lands in `Dep-blocked` — the `resumed` row covers only
-entries whose original reason the state did not carry.
+counts sum to the candidates *Step 1.2* rejected. Note what a seeded entry does
+**not** carry: `gi-state.py` validates `skip_list` as bare integers, so the
+reason an entry was recorded with is not persisted and cannot be restored. Every
+entry the state seeds is therefore `resumed` — the row is not a remainder for
+entries whose reason was lost, it is the reason for all of them.
 
 So `{dep_blocked_count}` is the count of gate-added entries and nothing else, and
 every filtered issue lands in exactly one bucket — which is what keeps the four
@@ -727,6 +819,69 @@ not identify), there is nothing to review: record `skipped` with
 ⚠ Skipping #{issue_number} — will retry on next run.
   Continuing to next issue...
 ```
+
+#### Quarantine after repeated failures
+
+"Retry on next run" is only true while retrying is still worth the tokens. After
+the run-log line for this failure has been appended (*Run-log entry* in
+SKILL.md — the streak is counted **from** that line, so counting before the
+append is off by one), ask how many times in a row this issue has failed:
+
+```bash
+python3 references/scripts/gi-runlog.py --failure-streak {issue_number} \
+    --threshold {autopilot.quarantine_after}
+```
+
+The one JSON line reports `{"streak": N, "threshold": F, "quarantine": bool}` —
+the most recent consecutive `failed` records for this issue, stopping at its
+first record with any other outcome, so one success anywhere in between resets
+the count. `autopilot.quarantine_after: 0` disables quarantine entirely: skip
+this whole subsection, never invoke the script.
+
+On `quarantine: true`, apply the label and record it:
+
+```bash
+gh issue edit {issue_number} --add-label "{autopilot.quarantine_label}"
+```
+
+```
+⚠ #{issue_number} quarantined after {streak} consecutive failed runs
+  Label:  {autopilot.quarantine_label} — remove it to let /auto-pilot try again
+  Continuing to next issue...
+```
+
+Then record the skip-list entry with reason `quarantined`, write
+`skipped_reason: quarantined` on **no** additional run-log line — this iteration
+already wrote its `failed` line — and **continue to the next issue**. Quarantine
+is record-and-continue, exactly like the dependency-blocked merge: it never stops
+the run. The reason exists so *Step 1.2*'s no-eligible-issues block can attribute
+the skip; see the reason-to-bucket table there.
+
+**Why the label is the state.** `.gitissue/runs.jsonl` is deletable, gitignored
+telemetry, so the streak it yields is *progress toward* a quarantine and never
+the quarantine itself. The label lives on the issue: it survives a clone, a new
+machine, and a deleted `.gitissue/`, a human can see it and remove it, and
+"until the label is removed" is then literally true. From the next run's
+perspective there is no new gate to consult — the label is in the effective
+`skip_labels` set (SKILL.md → *Configuration*), so *Step 1.2* already skips it.
+
+**Two degrade paths, both non-fatal.**
+
+- **The count is unavailable.** No `python3`, or exit 4 (the log is missing or
+  unreadable — note the script still prints its line, with `streak: 0`): print
+  `⚠ gi-runlog unavailable — skipping the quarantine check` and continue without
+  quarantining. Counting by hand is the documented fallback if the log is
+  readable at all: read `.gitissue/runs.jsonl` bottom-up, skip other issues, and
+  stop at this issue's first non-`failed` record. **Never quarantine on missing
+  evidence** — the failure direction is deliberate, because an unquarantined
+  issue costs tokens while a wrongly quarantined one costs a fix nobody is
+  watching for.
+- **The label write is refused.** A repo the caller only has `READ`/`TRIAGE` on
+  cannot be labelled. Print the `⚠ Quarantine label could not be applied` block
+  from `references/error-messages.md`, skip the write, and continue — the same
+  downgrade-rather-than-fail choice Prerequisite 9 makes for merge permission
+  (SKILL.md → *Prerequisites*). The issue stays in this run's session skip list,
+  so the current run still stops re-picking it.
 
 If `autopilot.pause_on_failure` is explicitly set to `true` in config, stop the loop instead:
 ```
