@@ -493,12 +493,24 @@ commit the predicate proved is an ancestor of this run's base. This governs Step
 on the `light` profile too — `reuse` takes precedence over the `light` skip above
 (*Step 0h → What `fresh` unlocks*). Lift its output instead:
 
-| Plan value | Lifted from `.gitissue/analysis-<N>.json` |
-|------------|-------------------------------------------|
+**Lift from the artifact *Step 0h* already resolved**, carried forward in run
+state — never by a bare relative `.gitissue/…` path. On the *0e* worktree path
+that path does not exist, and re-deriving it here would re-open the trap *Step 0h
+→ Resolve the artifact against the original checkout* defuses; if this step must
+read the file again, resolve it the one way that section resolves it.
+
+| Plan value | Lifted from the resolved analysis |
+|------------|-----------------------------------|
 | the options | `options[]` |
 | the selected option | `options[recommended_option - 1]` |
 | complexity | `overall_complexity` |
 | risk | `overall_risk` |
+
+**Fail-safe: an unreadable artifact here is `stale`.** If the analysis cannot be
+read or parsed at this point — for any reason, including a path that resolved
+wrong — set `analysis_reuse = stale` from here on and spawn the synthesizer as
+usual, exactly as *Step 0h*'s *any doubt is `stale`* rule prescribes. Step 2 never
+ends without a plan.
 
 **Derive the one field the artifact does not carry.** `options[]` in the analysis
 JSON has no `rejection_reason` — the field `references/agents/synthesizer.md`
