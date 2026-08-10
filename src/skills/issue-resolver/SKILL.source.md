@@ -166,7 +166,7 @@ Check whether this issue should be worked on. Open with `● Preflight check for
 
 ### 0a — Fetch issue
 
-Run `python3 shared/scripts/gi-issue.py {N} --fields number,title,body,labels,assignees,state,comments` and read `.issue`. The same issue is read again in 0d, Step 1, and Step 5; the script serves those repeats from `.gitissue/cache/` rather than the network, and the field list is this skill's choice. Resolve the script path as the *Bundled dependency precheck* resolves its list. Exit 3 is a stop. No `python3`, exit 2 (an unresolved script path), or exit 4 degrades: run `gh issue view {N} --json number,title,body,labels,assignees,state,comments` directly — the cache is an optimization, never a dependency. **0d rewrites the body, so it MUST end with `python3 shared/scripts/gi-issue.py {N} --invalidate`**; the cache is repo-wide and outlives this skill, so without it Step 1 and Step 5 read the pre-normalization body.
+Run `python3 shared/scripts/gi-issue.py {N} --fields number,title,body,labels,assignees,state,comments,updatedAt` and read `.issue`. **Capture `updatedAt` here** — 0d's `gh issue edit` bumps it, so *0h* must compare against this pre-normalization value or it reports stale on every first-normalized issue. The same issue is read again in 0d, Step 1, and Step 5; the script serves those repeats from `.gitissue/cache/` rather than the network, and the field list is this skill's choice. Resolve the script path as the *Bundled dependency precheck* resolves its list. Exit 3 is a stop. No `python3`, exit 2 (an unresolved script path), or exit 4 degrades: run `gh issue view {N} --json number,title,body,labels,assignees,state,comments,updatedAt` directly — the cache is an optimization, never a dependency. **0d rewrites the body, so it MUST end with `python3 shared/scripts/gi-issue.py {N} --invalidate`**; the cache is repo-wide and outlives this skill, so without it Step 1 and Step 5 read the pre-normalization body.
 
 **If not found:** output error and stop. **If closed:** output warning and stop.
 
@@ -288,6 +288,10 @@ still print `effort: full` (the pinned profile) so the line is uniform:
 [0/5] Preflight    ✓ issue #N open, branch: {branch_name}{workspace_note}, effort: {profile}
 ```
 
+### 0h — Analysis reuse gate
+
+Set `analysis_reuse` to `fresh`, `stale`, or `absent` by the five-condition predicate in `references/pipeline-steps.md` (*Step 0h — Analysis reuse gate*) — its **single home**; never define "fresh" anywhere else. `fresh` seeds Step 1's research and skips Step 2's synthesizer; `stale`/`absent` run today's full pipeline unchanged. Any doubt — missing key, short SHA, unparsable timestamp, failed `git` call — is `stale` (fail-safe). Skipped, like *0g*, when `resolve.adaptive_effort` is `false`; no new config key.
+
 ---
 
 ## Step 1 — Research
@@ -297,7 +301,7 @@ Deeply understand the issue, affected codebase, and possible solutions; also ver
 **`light` profile:** run a **lighter** research pass — see the profile table in
 *Step 0g* for what it collapses, and `references/pipeline-steps.md` (*Step 1 —
 Research → `light` profile*) for the mechanics. On a `high`/`complex` signal,
-revise the profile **upward** to `full` (never downward).
+revise the profile **upward** to `full` (never downward). **`analysis_reuse = fresh`** (*0h*): pass `prior_analysis` and run the seeded **verify-first** pass — hints to confirm or refute, never to trust; the already-resolved check still runs in full (*Step 1 — Research → `reuse`*).
 
 After research:
 ```
@@ -314,7 +318,7 @@ Selection behavior (interactive auto, interactive comment-and-wait, auto-pilot) 
 
 **`light` profile:** skip the 3-option synthesis — see the profile table in
 *Step 0g*; full procedure in `references/pipeline-steps.md` (*Step 2 — Plan →
-`light` profile*).
+`light` profile*). **`analysis_reuse = fresh`** (*0h*) also skips the synthesizer spawn, lifting `options[]`, `recommended_option`, `overall_complexity` and `overall_risk` from the analysis and deriving each `rejection_reason` from `decision_record.options_rejected[]` (*Step 2 — Plan → `reuse`*).
 
 After plan selection:
 ```
