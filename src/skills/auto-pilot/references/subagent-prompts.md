@@ -66,8 +66,8 @@ Instructions:
    - Analyze the PR changes (code quality, security, correctness)
    - Classify issues as "fix" (critical/high: correctness, security, edge cases) or "note" (medium: code quality, test coverage suggestions)
    - Only fix "fix" issues — "note" issues are reported but don't consume fix cycles
-   - Run all tests (unit, integration, e2e, build/compile)
-   - Check CI status
+   - Run all tests (unit, integration, e2e, build/compile) — skipped only when the PR carries a valid QA handoff marker bound to the current head SHA (the resolver already ran that exact suite on that exact commit)
+   - Check CI status (always — never skipped by the QA handoff marker)
    - Reuse the same reviewer/fixer agents across cycles (SendMessage), only spawn fresh for the final confirmation pass
    - Repeat up to {review_cycles} cycles (default: 3, override review.max_cycles with this value)
    - Soft pass: stop when zero "fix" issues remain (≤ 2 medium "note" issues allowed)

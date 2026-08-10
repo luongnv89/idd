@@ -26,11 +26,29 @@ FAIL=0
 # docs are bundled into 2 and 5 skills respectively. That is content the skills
 # execute, not content they merely carry.
 #
+# Raised to 506,000 in issue #255, which added the QA handoff marker: +610 bytes
+# to idd-methodology.md (the marker as a durable-memory field, inside the
+# digested *Analysis Artifacts* section), +228 to terminal-style.md (one line of
+# marker vocabulary beside `gitissue:normalized`), +11 to platform-github.md
+# (`headRefOid` in the canonical `gh pr view` field list). All three are bundled
+# into 7 skills, so 849 authored bytes cost 5,943 here — and 5,943 is what the
+# raise is for, measured, not estimated. Two things paid for part of it first:
+# the marker prose deliberately names no `resolve.*` key inside
+# /issue-pr-review (one mention would have pulled that whole config-schema
+# section into its per-skill excerpt: +4,298 bytes, five times the change
+# itself), and the *Analysis Artifacts* paragraph that restated #254's
+# freshness predicate — a predicate it points at as living in one place — was
+# compressed to the pointer.
+#
+# The raise deliberately restores the headroom that existed before, ~2.1KB, and
+# does not widen it: this line is a ratchet, and the next addition should have
+# to justify itself exactly as hard as this one did.
+#
 # What the guard is actually for is unchanged and still has a wide margin:
 # reinstating one whole document across the skills that excerpt it costs on the
 # order of 165KB (config-schema.md is 27.5KB x 6 non-init skills), so a
 # regression of that shape fails this assertion by more than 3x the headroom.
-BUDGET=500000
+BUDGET=506000
 
 pass() { echo "  ✓ $1"; PASS=$((PASS + 1)); }
 fail() { echo "  ✗ $1"; FAIL=$((FAIL + 1)); }

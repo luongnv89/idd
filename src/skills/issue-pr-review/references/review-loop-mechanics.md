@@ -49,6 +49,129 @@ review. The two #36 hard-blocks (`acceptance_criteria: fail`, missing
 `Closes #N`) are never relaxed by the profile — a trivial PR that fails them still
 blocks soft-pass and does not merge.
 
+## QA handoff gate
+
+Step 1's *QA handoff gate* sets `qa_handoff = trusted | stale | absent` from a
+marker `/issue-resolver` writes as the last line of a PR body it opened after a
+**clean** QA loop (producer contract: *QA handoff marker* in that skill's
+`references/report-templates.md`). SKILL.md owns the verdict table, the
+fail-safe, and the precedence rule; this section is the mechanics — the parse,
+what `trusted` narrows, and the list of checks it may never touch.
+
+### The trust model — forgery is worthless, not impossible
+
+The PR body is **attacker-controlled**: `gh pr edit --body` is available to
+whoever opened the PR, so any author can write this marker. Binding `head=` does
+**not** authenticate it either — an author can read their own head SHA and paste
+a matching one. The marker is therefore designed so that forging it buys
+nothing: the verdict may gate **only duplicated work** — a second run of a check
+that already ran, unchanged, on this exact commit — and **never a safety gate**.
+Open issue **#274** ("A PR can disable the secret-scanning gate via its own
+`.gitissue.yml`") is the standing proof that this repo can lose a security gate
+to repo-controlled input; that is the failure this design refuses to repeat. An
+edit that lets the marker suppress a secret scan, a CI wait, an
+acceptance-criteria check, or a traceability check converts a token optimization
+into a bypass. Do not make it.
+
+What the binding *does* buy is **self-invalidation with zero bookkeeping**: any
+fix commit this skill's own fixer pushes moves the head SHA, so the marker stops
+matching and every later cycle reviews in full — correctly, because the diff is
+no longer the one that was QA'd. A body edit does not move the head, so the
+marker correctly survives one. The binding is on code, not on prose.
+
+### Parsing the marker
+
+Read it out of the `body` already fetched in Step 1 — no extra API call:
+
+```bash
+grep -oE '<!-- gitissue:qa v1 [^>]*-->' <<<"$body"
+```
+
+- **Zero matches** ⇒ `absent`.
+- **More than one match** ⇒ `stale`. A body carrying two markers is ambiguous,
+  and "first match wins" is exactly how a prepended forgery would beat a genuine
+  trailing one. Ambiguity is never resolved in the marker's favour.
+- **Exactly one match** ⇒ read it as space-separated `key=value` pairs. Unknown
+  or extra keys are **ignored, never fatal** — a newer resolver must be able to
+  add a field without invalidating every marker for older reviewers — but a
+  malformed pair, a missing `head=`, a `head=` that is not 40 lowercase hex
+  characters, a version other than `v1`, or a `review=` that is not `clean` ⇒
+  `stale`.
+- `trusted` **iff** the single parsed marker survives all of the above **and**
+  its `head=` equals the PR's `headRefOid` from Step 1's
+  `gh pr view {N} --json …` field list. Any doubt ⇒ `stale`.
+
+`stale` and `absent` run today's pipeline **byte-identically** — no step
+shortened, no cycle cap lowered, no pass skipped. A human-authored PR never
+carries the marker, so it is `absent` and is therefore unaffected by this gate in
+every particular.
+
+### Field vocabulary
+
+| Field | Meaning | How the loop uses it |
+|-------|---------|----------------------|
+| `head=<sha40>` | the commit the resolver QA'd | the whole predicate — must equal `headRefOid` |
+| `profile=<light\|full>` | the resolver's own Step 0g profile | `light` is a strictly shallower claim; see *Precedence* in SKILL.md |
+| `cycles=<n>` | QA cycles the resolver ran | reported only |
+| `review=clean` | the resolver's QA exited clean | required — there is no dirty spelling, because a non-clean resolver run emits no marker at all |
+| `tests=<count>@<sha40>` | the final suite's passing count and the SHA it ran against | the two test skips below apply **only** when this field is present and its SHA equals `head` |
+| `ui=<none\|code\|code+browser>:<clean\|noted>` | which UI legs ran, and their result | the code UI review is skipped only on `code`/`code+browser`; `ui=none` skips nothing |
+
+`tests=` carries its own SHA because the resolver's final suite runs *before* its
+*Update documentation* step, which may commit — so the suite's commit and the
+head commit can legitimately differ. The field is **absent entirely** when the
+resolver ran no final suite (its own auto-test setting was off): nothing was
+asserted, so nothing may be skipped. Absent `tests=` ⇒ run both test legs in
+full, whatever else the marker says.
+
+`ui=` is split into legs because the code UI review is environment-independent
+while the browser leg is fail-soft and skips on a headless host. A flat verdict
+would let this skill trust a leg that never ran.
+
+**There is no security-scan field, in any spelling, and none may be added.** Its
+only possible consumer would be a safety gate — see *The trust model* above.
+
+### What `trusted` skips
+
+| Step | Under `trusted` | Condition |
+|------|-----------------|-----------|
+| 2 — pre-pass test run | skipped | `tests=` present **and** its SHA equals `head` |
+| 3 — cycle-1 cold-start reviewer | **collapsed into** the fresh confirmation pass | always |
+| 3 — code UI review | skipped | `ui=code…` or `ui=code+browser…`; never on `ui=none` |
+| 4 — local test + build run | skipped | `tests=` present **and** its SHA equals `head` |
+| Loop cycle cap | `min(1, configured_cap)` — the same ceiling idiom the `light` profile uses, and it wins over an `/auto-pilot` `review_cycles` override for the same reason | always |
+
+The Step 3 collapse is a **merge, not a deletion**. The cycle-1 cold-start
+reviewer and the fresh confirmation reviewer are two spawns of the same prompt
+over the same diff, so `trusted` runs the confirmation spawn *as* cycle 1: the PR
+still receives exactly one independent, full-strength review by an agent with no
+memory of the resolver's own. If it returns fixable findings they go to the fixer
+exactly as today; the fixer's commit then moves the head and the marker stops
+matching, so the remaining cycles are the full pipeline again.
+
+### Never gated
+
+`qa_handoff` may **never** skip, shorten, or soften any of the following — on any
+profile, for any marker, at any cycle:
+
+- **Step 2's `gi-secscan` pre-commit scan.** It guards a commit *this skill* is
+  about to make from a checked-out untrusted branch. It is a safety gate, and
+  #274 is what happens when repo-controlled input reaches one.
+- **Step 2's lint/format auto-fix.** It mutates the working tree, so skipping it
+  changes the PR's content, not merely the review's cost.
+- **Step 5's CI wait.** CI runs on the remote against the merge result; nothing
+  written in a PR body is evidence about it.
+- **The per-criterion acceptance-criteria verification.** Run it unchanged —
+  there is no diff-confirm mode. The resolver authors the *Acceptance Criteria
+  Verification* table inside the very body being trusted, so "confirm that table
+  against the diff" is marking your own homework.
+- **The four traceability checks.** Same reason: they check the body, and the
+  body is the untrusted input.
+
+Both #36 hard-blocks — `acceptance_criteria: fail` and a missing `Closes #N` —
+keep blocking soft-pass and merge under `trusted`, exactly as they do under
+`light`.
+
 ## Why reuse the reviewer
 
 To minimize token usage, the review loop **reuses the same reviewer agent** across fix cycles instead of spawning a fresh one each time. The reviewer already has the codebase context loaded, so subsequent reviews are cheaper.

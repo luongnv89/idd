@@ -411,7 +411,7 @@ gh pr create --title "{pr_title}" --body "{pr_body}"
 
 **PR title:** `{type}({scope}): {description} (#{issue_number})` (see `docs/naming-conventions.md`)
 
-**PR body:** Fill the template in `references/report-templates.md` (*PR Body Template*) — Summary, Approach, **Decision Record** (from `.gitissue/analysis-<N>.json` if present, else synthesized), Changes table, Test Results, **Acceptance Criteria Verification** table. The last two are the durable analysis signal surviving squash-merge; never omit them (see `docs/idd-methodology.md`).
+**PR body:** Fill the template in `references/report-templates.md` (*PR Body Template*) — Summary, Approach, **Decision Record** (from `.gitissue/analysis-<N>.json` if present, else synthesized), Changes table, Test Results, **Acceptance Criteria Verification** table. The last two are the durable analysis signal surviving squash-merge; never omit them (see `docs/idd-methodology.md`). Then, **only when QA exited clean**, append the `<!-- gitissue:qa v1 … -->` handoff marker as the body's **last line** — field derivation, the omit-on-a-non-clean-exit rule, and the no-secret-scan-field rule are in `references/report-templates.md` (*QA handoff marker*); `head=` is `git rev-parse HEAD` taken after the last commit and immediately before `git push`.
 
 ### Project board sync
 
