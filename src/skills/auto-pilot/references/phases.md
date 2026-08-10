@@ -237,7 +237,7 @@ After the PR is created, the auto-pilot delegates review, testing, CI checking, 
 ### What issue-pr-review does in auto mode
 
 1. **Script pre-pass** — runs lint/format auto-fix tools, then tests (zero LLM tokens)
-2. Analyzes PR changes (cycle 1: fresh reviewer; cycles 2+: reuses same reviewer via SendMessage). On a resolver-authored PR still carrying a valid QA handoff marker bound to the current head SHA, cycle 1 collapses into the fresh confirmation pass — one independent full-strength review instead of two
+2. Analyzes PR changes (cycle 1: fresh reviewer; cycles 2+: reuses same reviewer via SendMessage). On a resolver-authored PR still carrying a valid QA handoff marker bound to the current head SHA, cycle 1 collapses into the fresh confirmation pass, so the one independent full-strength review the PR gets is the unbiased one — no reviewer spawn is saved (the confirmation pass is fix-conditional, so a clean PR gets one pass either way); the saving is the skipped local test runs in step 3
 3. Runs all tests (unit, integration, e2e) and build/compile — skipped only when that same marker records the suite already passing on this exact commit
 4. Checks CI status (polls GitHub Actions until complete) — always, never skipped by the marker
 5. Fixes only `action: "fix"` issues — reuses the same fixer agent across cycles

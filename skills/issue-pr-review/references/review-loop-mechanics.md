@@ -75,12 +75,13 @@ acceptance-criteria check, or a traceability check converts a token optimization
 into a bypass. Do not make it.
 
 What the binding *does* buy is **self-invalidation for the price of one
-recomputation**: any fix commit this skill's own fixer pushes moves the head SHA,
-so the marker stops matching and every later cycle reviews in full — correctly,
-because the diff is no longer the one that was QA'd. That is a property of the
-predicate, not an automatic one: the verdict is a variable, so the loop has to
-recompute it after each push (*Re-evaluation after a fix*) for the property to
-hold. A body edit does not move the head, so the marker correctly survives one.
+recomputation**: any commit this skill pushes — Step 2's lint/format auto-fix as
+much as a fixer's fix — moves the head SHA, so the marker stops matching and
+everything after it runs in full — correctly, because the diff is no longer the
+one that was QA'd. That is a property of the predicate, not an automatic one: the
+verdict is a variable, so this skill has to recompute it after each of its own
+pushes (*Re-evaluation after a push*) for the property to hold. A body edit does
+not move the head, so the marker correctly survives one.
 The binding is on code, not on prose.
 
 ### Parsing the marker
@@ -145,21 +146,45 @@ only possible consumer would be a safety gate — see *The trust model* above.
 | 4 — local test + build run | skipped | `tests=` present **and** its SHA equals `head` |
 | Loop cycle cap | `min(1, configured_cap)` — the same ceiling idiom the `light` profile uses, and it wins over an `/auto-pilot` `review_cycles` override for the same reason | **the same carve-out as the reviewer-collapse row**: a `profile=light` marker against a `profile=full` review refuses the cap too, leaving it at `review.max_cycles`. Both levers are review depth, so they answer to the carve-out together |
 
+The table has **no browser-UI row, deliberately**. The `light` profile skips the
+optional browser review; `trusted` does not, because that leg is opt-in and
+fail-soft on both sides and `ui=` exists precisely to keep the two legs
+separate — a `trusted` skip that flattened them would discard the distinction the
+field was added for. Only the code leg above is ever skipped by this verdict.
+
 The Step 3 collapse is a **merge, not a deletion**. The cycle-1 cold-start
 reviewer and the fresh confirmation reviewer are two spawns of the same prompt
 over the same diff, so `trusted` runs the confirmation spawn *as* cycle 1: the PR
 still receives exactly one independent, full-strength review by an agent with no
-memory of the resolver's own. If it returns fixable findings they go to the fixer
-exactly as today; the fixer's commit then moves the head, so the next
-re-evaluation turns the verdict `stale` and the remaining cycles are the full
-pipeline again.
+memory of the resolver's own. It **saves no reviewer spawn**, and must not be
+advertised as one: the confirmation pass is fix-conditional (*Confirmation pass*
+below — it runs only "after the fix cycle reports zero fixable issues"), so an
+unmarked clean PR already gets exactly one cold-start pass and no confirmation.
+What `trusted` changes is *which* single pass a clean PR gets — the unbiased,
+cold-memory one — not how many. The measured saving is the two duplicated local
+test legs. If the pass returns fixable findings they go to the fixer exactly as
+today; the fixer's commit then moves the head, so the next re-evaluation turns
+the verdict `stale` and the remaining cycles are the full pipeline again.
 
-### Re-evaluation after a fix
+### Re-evaluation after a push
 
 `qa_handoff` is a **per-cycle** verdict, not a once-per-run constant. Step 1
 computes it, but the Review Loop re-enters at **Step 3, not Step 1** — so nothing
 would otherwise re-read the head, and a head SHA is the marker's entire
-predicate. After every fixer push, and before the next cycle's Step 3:
+predicate. Recompute it after **any push this skill makes**, and before the next
+step that reads the verdict. There are exactly two such pushes:
+
+- **Step 2's lint/format auto-fix commit** (*Commit auto-fixes*). It lands
+  before Step 3 and Step 4 ever consult the verdict, and the resolver runs no
+  lint/format of its own, so this is the *likely* case, not an exotic one. Miss
+  it and both test legs are skipped on a commit no local suite has run — Step
+  2's leg is skipped before the auto-fix is even committed, Step 4's afterwards
+  — leaving only Step 5's CI, which soft-passes when no CI is configured or
+  `review.check_ci` is `false`. An auto-merge could then land untested code.
+- **Every fixer push in the Review Loop** (Step 6). The same predicate, one
+  cycle later.
+
+The procedure is the same for both:
 
 1. Re-read the head — `gh pr view {N} --json headRefOid` — because the push just
    moved it.
@@ -171,14 +196,14 @@ predicate. After every fixer push, and before the next cycle's Step 3:
    pipeline — the full cycle cap, the Step 2 and Step 4 test legs, the code UI
    review, and a cold-start cycle-1 reviewer if one is still to come.
 
-A cycle that pushed nothing leaves the head where it was, so there is nothing to
-recompute.
+A step or cycle that pushed nothing leaves the head where it was, so there is
+nothing to recompute.
 
 Skipping this recomputation is the one way the *self-invalidation* property fails
-in practice: the variable stays `trusted` after the fixer moved the head, so Step
-4 keeps comparing `tests=` against the marker's own now-stale `head=` and the
-local suite never runs on the fixed commit — precisely the commit that most needs
-it. Restoring the full pipeline is **not** a widening of what `qa_handoff` may
+in practice: the variable stays `trusted` after a push moved the head, so Step 4
+keeps comparing `tests=` against the marker's own now-stale `head=` and the local
+suite never runs on the pushed commit — precisely the commit that most needs it.
+Restoring the full pipeline is **not** a widening of what `qa_handoff` may
 do: its power is bounded against the ungated pipeline, and the ungated pipeline
 is exactly what `stale` runs (*Precedence* in SKILL.md owns that rule).
 

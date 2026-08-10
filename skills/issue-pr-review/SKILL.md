@@ -203,9 +203,9 @@ gate and set `profile = full`.
 
 `/issue-resolver` ends a clean QA loop — review clean, tests green — by writing
 `<!-- gitissue:qa v1 head=… -->` as the PR body's last line. This gate decides
-whether to believe it, so an already-QA'd PR gets **one** confirmation review
-instead of a second full one on a byte-identical diff. It runs **after** the
-Depth gate and sets one state variable — `qa_handoff = trusted | stale | absent`:
+whether to believe it, so an already-QA'd PR is reviewed **once, by a fresh
+agent**, and skips the local suite that already passed on this exact commit.
+It runs **after** the Depth gate and sets one state variable — `qa_handoff = trusted | stale | absent`:
 
 | Value | When | Effect |
 |-------|------|--------|
@@ -214,7 +214,7 @@ Depth gate and sets one state variable — `qa_handoff = trusted | stale | absen
 | `absent` | the body carries no marker | today's full pipeline, unchanged |
 
 `stale` and `absent` are distinguished for the operator only; both take the identical path, the one that already exists.
-**Fail-safe: any doubt is `stale`** — an unparsable, duplicated, or unknown-field marker included.
+**Fail-safe: any doubt is `stale`** — an unparsable or duplicated marker included; an unknown extra field is *not* doubt (mechanics, *Parsing the marker*).
 **A marker is never authentication:** a PR body is attacker-controlled (`gh pr edit --body`) and `head=` binds without
 authenticating it, so this verdict may gate **only duplicated work**, never a safety gate. The reasoning, the parse,
 *What `trusted` skips*, and the binding *Never gated* list live in `references/review-loop-mechanics.md`
@@ -226,10 +226,10 @@ saving, so one key disables both. **No new config key is introduced.**
 **Precedence, stated once:** `qa_handoff` is computed *after* `profile`, and its
 power is bounded **relative to the ungated pipeline** — it may only **narrow**
 what a `stale`/`absent` PR already gets, and never make this review do more than
-that. The bound is per verdict, not monotonic across the run: the loop recomputes
-`qa_handoff` after every fixer push (*Review Loop*), and a flip to `stale` that
-restores the full cap is a return to the ungated pipeline, not a widening. The
-one asymmetric case is a marker `profile=light` against a pr-review
+that. The bound is per verdict, not monotonic across the run: this skill
+recomputes `qa_handoff` after every push it makes (*Review Loop*), and a flip to
+`stale` that restores the full cap is a return to the ungated pipeline, not a
+widening. The one asymmetric case is a marker `profile=light` against a pr-review
 `profile=full`, where the fuller wins — the review collapse **and** the cycle cap
 are **refused**, while the duplicate-test skip still applies, because a test run
 is a test run at any depth.
@@ -249,7 +249,7 @@ Before spawning any LLM reviewer, run deterministic tools to catch mechanical is
 
 **When `--review-only` is set:** this pre-pass is detection-only — see *Review-only mode* under Step 7.
 
-**Default (fix loop):** detect the project's lint/format tools, run each auto-fix command (don't block on warnings — only on errors that prevent the fix from running), then run the test suite to catch failures early. The per-tool detection table and example commands are in `references/prepass-tests-ci-mechanics.md` (*Step 2*). **Under `qa_handoff = trusted`, skip only the test run**, and only when the marker carries a `tests=` field whose SHA equals `head` — that suite already ran on this exact commit. The lint/format auto-fix still runs (it mutates the tree, so skipping it changes the PR, not just the review's cost), and the `gi-secscan` gate below is **never** gated on `qa_handoff`.
+**Default (fix loop):** detect the project's lint/format tools, run each auto-fix command (don't block on warnings — only on errors that prevent the fix from running), then run the test suite to catch failures early. The per-tool detection table and example commands are in `references/prepass-tests-ci-mechanics.md` (*Step 2*). **Under `qa_handoff = trusted`, skip only the test run**, and only when the marker carries a `tests=` field whose SHA equals `head` — that suite already ran on this exact commit. The lint/format auto-fix still runs (it mutates the tree, so skipping it changes the PR, not just the review's cost), and the `gi-secscan` gate below is **never** gated on `qa_handoff`. When that auto-fix commits and pushes, the head moves off the marker: recompute the verdict then, before Step 3 — this skill re-evaluates after **any** push it makes, not only the fixer's (*Review Loop*) — so Step 4 runs the suite in full on the commit the auto-fix produced.
 
 ### Commit auto-fixes
 
@@ -307,7 +307,7 @@ If tests fail here, continue to the review loop — failures are picked up in St
 
 Read `references/agents/code-reviewer.md` for the reviewer prompt and `references/agents/fixer.md` for the fix-cycle prompt. Both spawn with the default general-purpose agent (do NOT set `subagent_type`; not a custom `code-reviewer`/`fixer` type). Pass the reviewer `branch_name`, `base_branch`, `pr_context` (PR title + body), and `diff_command` (`gh pr diff {N}`). Pass `review.confidence_threshold` (default 80) as the minimum confidence for code-reviewer findings; ui-reviewer keeps its 75 floor.
 
-To minimize tokens, the loop **reuses the same reviewer across cycles**: cycle 1 cold-starts; cycles 2+ re-message it via `SendMessage` to re-review the updated diff; after the fixer reports zero fixable issues, one **fresh** confirmation reviewer does an unbiased final check. Under `qa_handoff = trusted`, the cycle-1 cold-start reviewer is **collapsed into** that fresh confirmation pass rather than skipped — the PR still receives exactly one independent, full-strength review, just not two — and the loop cap drops to `min(1, configured_cap)`. Both are refused by Step 1's *Precedence* carve-out when the marker says `profile=light` and this review resolved `profile=full`. The exact spawn calls, the `SendMessage` re-review prompt, and the token-trade rationale live in `references/review-loop-mechanics.md`.
+To minimize tokens, the loop **reuses the same reviewer across cycles**: cycle 1 cold-starts; cycles 2+ re-message it via `SendMessage` to re-review the updated diff; after the fixer reports zero fixable issues, one **fresh** confirmation reviewer does an unbiased final check. Under `qa_handoff = trusted`, the cycle-1 cold-start reviewer is **collapsed into** that fresh confirmation pass rather than skipped — the PR still receives exactly one independent, full-strength review, from an agent with no memory of the resolver's own — and the loop cap drops to `min(1, configured_cap)`. The collapse **saves no reviewer spawn**: the confirmation pass is itself fix-conditional, so an unmarked clean PR already gets exactly one cold-start pass and no confirmation. What `trusted` changes is *which* single pass runs — the unbiased one; the measured saving is the duplicated local test legs at Steps 2 and 4. Both are refused by Step 1's *Precedence* carve-out when the marker says `profile=light` and this review resolved `profile=full`. The exact spawn calls, the `SendMessage` re-review prompt, and the token-trade rationale live in `references/review-loop-mechanics.md`.
 
 ### UI/UX Review (Step 3 — auto-detected)
 
@@ -353,7 +353,7 @@ These two hard-blocks are the issue #36 contract: a PR can pass tests and still 
 
 When `review.run_tests` is false, skip this step and report `○ tests skipped (review.run_tests: false)`; the soft-pass conjunction treats the test leg as satisfied.
 
-When true, detect and run the project's build system, then run all test types (unit, integration, e2e where present), with a `review.test_timeout`-second timeout (default: 300). The build-system detection table and the test-type breakdown are in `references/prepass-tests-ci-mechanics.md` (*Step 4*). **Under `qa_handoff = trusted`, skip this step** and report `○ tests skipped (qa handoff @ {commit_sha_short})` — `{commit_sha_short}` is the first 7 characters of Step 1's `headRefOid` — but only when the marker carries a `tests=` field whose SHA equals `head`; with no `tests=` field, or a SHA that differs, run the step in full. A skipped step evaluated neither of its checks, so its completion report is `× Suite passed` / `× Build clean` with `Result: PARTIAL`, and the closing summary carries the gap — never a silent `√`/`✓ pass` (rule and rendering: *Step Completion Reports* in `references/report-templates.md`). Step 5's CI is a separate leg and is never skipped: it runs on the remote against the merge result, and nothing in a PR body is evidence about it.
+When true, detect and run the project's build system, then run all test types (unit, integration, e2e where present), with a `review.test_timeout`-second timeout (default: 300). The build-system detection table and the test-type breakdown are in `references/prepass-tests-ci-mechanics.md` (*Step 4*). **Under `qa_handoff = trusted`, skip this step** and report `○ tests skipped (qa handoff @ {commit_sha_short})` — `{commit_sha_short}` is the first 7 characters of Step 1's `headRefOid` — but only when the marker carries a `tests=` field whose SHA equals `head`; with no `tests=` field, or a SHA that differs, run the step in full. The verdict is `trusted` only against the **live** head — it is recomputed after any push this skill makes (*Review Loop*) — so the suite it stands in for did run on this exact commit; the soft-pass conjunction therefore treats the test leg as satisfied, the same clause the two sibling skips state. A skipped step evaluated neither of its checks, so its completion report is `× Suite passed` / `× Build clean` with `Result: PARTIAL`, and the closing summary carries the gap — never a silent `√`/`✓ pass` (rule and rendering: *Step Completion Reports* in `references/report-templates.md`). Step 5's CI is a separate leg and is never skipped: it runs on the remote against the merge result, and nothing in a PR body is evidence about it.
 
 ```
 [4/7] Test         ✓ build ok, {N} tests passed
@@ -434,7 +434,7 @@ Cycle {N}:
 After Step 6, go back to Step 3 — but reuse the same reviewer agent via `SendMessage` (not a fresh spawn). Only spawn fresh for the confirmation pass.
 
 **Loop controls:**
-- **Max cycles:** `review.max_cycles` (default: 3). Step 1's `light` profile and `qa_handoff = trusted` each cap it at `min(1, configured_cap)` — the `trusted` cap subject to the depth carve-out in Step 1's *Precedence* — and skip the optional browser UI review; neither skips the reviewer, and neither relaxes the two #36 hard-blocks (`acceptance_criteria: fail`, missing `Closes #N`), which run at full strength on every path. **Re-evaluate `qa_handoff` after every fixer push** — re-read `headRefOid` and recompute the verdict before re-entering Step 3, because the push moved the head the marker binds to; the loop re-enters at Step 3, so nothing else would. Full mechanics in `references/review-loop-mechanics.md` (*Depth gate*, *QA handoff gate*, *Re-evaluation after a fix*).
+- **Max cycles:** `review.max_cycles` (default: 3). Step 1's `light` profile and `qa_handoff = trusted` each cap it at `min(1, configured_cap)` — the `trusted` cap subject to the depth carve-out in Step 1's *Precedence*. The `light` profile also skips the optional browser UI review; `trusted` never does — it reaches only the **code** leg (Step 3), because the browser leg is opt-in and fail-soft on both sides. Neither skips the reviewer, and neither relaxes the two #36 hard-blocks (`acceptance_criteria: fail`, missing `Closes #N`), which run at full strength on every path. **Re-evaluate `qa_handoff` after any push this skill makes** — Step 2's auto-fix commit as much as every fixer push — re-read `headRefOid` and recompute the verdict before the next step that reads it, because the push moved the head the marker binds to; nothing else re-reads it, and the loop re-enters at Step 3, never Step 1. Full mechanics in `references/review-loop-mechanics.md` (*Depth gate*, *QA handoff gate*, *Re-evaluation after a push*).
 - **Agent reuse:** Cycles 2+ reuse the existing reviewer and fixer agents. Fresh spawn only for the confirmation pass after fixer reports zero issues.
 - **Soft pass (when `review.soft_pass: true`, default):** Stop when ALL hold: zero `action: "fix"` issues remain AND (tests pass or `review.run_tests: false`) AND (CI passes, no CI configured, or `review.check_ci: false`) AND traceability is not `fail`. Medium `note` issues and `partial` dimensions are report-only — they do not block.
 - **Strict pass (when `review.soft_pass: false`):** Apply the same tests/CI gates, then require zero `action: "fix"` findings, zero remaining `action: "note"` findings, and `pass` for every enabled dimension. A `partial` dimension or any note is a strict blocker: exit the fix loop, report it under Remaining, and do not report clean or merge. Notes never become fixer inputs — Step 6 still fixes only `action: "fix"` — so strict mode surfaces these for manual remediation rather than looping without a fixable action.

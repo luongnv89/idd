@@ -199,6 +199,16 @@ for pair in "src:$SRC_PR" "built:$BUILT_PR"; do
     "T4.1 ($tag): the trusted predicate is head= equals headRefOid"
   check_has "$f" '[Ff]ail-safe: any doubt is .stale' \
     "T4.2 ($tag): the fail-safe rule is stated verbatim"
+  # SKILL.md is read before the mechanics and owns the fail-safe, so an
+  # unknown-field entry on this list would silently kill forward compatibility —
+  # every extended marker rejected — while the mechanics say the opposite
+  # ("ignored, never fatal"). The list is unparsable + duplicated, nothing else.
+  check_lacks "$f" 'unparsable, duplicated, or unknown-field' \
+    "T4.2b ($tag): an unknown field is not on the stale fail-safe list"
+  check_has "$f" 'unparsable or duplicated marker included' \
+    "T4.2c ($tag): the fail-safe list is unparsable + duplicated only"
+  check_has "$f" 'unknown extra field is \*not\* doubt' \
+    "T4.2d ($tag): SKILL.md says so explicitly rather than leaving it ambiguous"
   check_has "$f" "today's full pipeline, unchanged" \
     "T4.3 ($tag): stale and absent run today's full pipeline unchanged"
 done
@@ -224,10 +234,39 @@ check_has "$SRC_LOOP" 'binding is on code, not on prose' \
 # T5 (AC3, security-critical): nothing safety-shaped is gated.
 # This is the group that must never be weakened.
 # ───────────────────────────────────────────────────────────
-# 5a. The scan field the reporter asked for does not exist, anywhere.
-SCAN_HITS="$(grep -rlE 'scan=' "$REPO_ROOT/src" "$REPO_ROOT/skills" "$REPO_ROOT/docs" 2>/dev/null || true)"
+# 5a. The scan field the reporter asked for does not exist, anywhere. The grep is
+#     deliberately wider than the single `scan=` spelling that was proposed:
+#     `secrets=`, `security=`, `sec=`, `secscan=` or `audit=` would each be the
+#     same field under another name, and the prose rule must not be defeated by a
+#     rename. The rule in review-loop-mechanics.md is the real defense; this is
+#     the tripwire that notices when it is broken.
+SCAN_FIELD_RE='\b(scan|scanned|scanning|secscan|secrets?|security|sec|safety|audit|verified|signed)='
+# A tripwire that matches nothing is worthless — prove the regex fires on every
+# spelling it claims to cover, and stays off innocuous lookalikes.
+TRIPWIRE_OK=1
+for spelling in 'scan=clean' 'scanned=1' 'scanning=1' 'secscan=pass' 'secret=none' \
+                'secrets=none' 'security=clean' 'sec=ok' 'safety=ok' 'audit=clean' \
+                'verified=1' 'signed=1'; do
+  if ! printf '%s\n' "$spelling" | grep -qE "$SCAN_FIELD_RE"; then
+    TRIPWIRE_OK=0
+    echo "      spelling not matched: $spelling"
+  fi
+done
+for innocuous in 'exec=1' 'parsec=1' 'codec=h264'; do
+  if printf '%s\n' "$innocuous" | grep -qE "$SCAN_FIELD_RE"; then
+    TRIPWIRE_OK=0
+    echo "      false positive: $innocuous"
+  fi
+done
+if [ "$TRIPWIRE_OK" = "1" ]; then
+  pass "T5.0: the security-field tripwire matches every spelling it claims to cover"
+else
+  fail "T5.0: the security-field tripwire is vacuous or over-broad"
+fi
+
+SCAN_HITS="$(grep -rlE "$SCAN_FIELD_RE" "$REPO_ROOT/src" "$REPO_ROOT/skills" "$REPO_ROOT/docs" 2>/dev/null || true)"
 if [ -z "$SCAN_HITS" ]; then
-  pass "T5.1: no secret-scan field exists in src/, skills/ or docs/"
+  pass "T5.1: no secret-scan field exists in src/, skills/ or docs/ (any spelling)"
 else
   fail "T5.1: a secret-scan marker field appeared — its only consumer would be a safety gate"
   printf '      %s\n' $SCAN_HITS
@@ -474,15 +513,16 @@ check_has "$AP_PHASES" 'never skipped by the marker' \
   "T11.5: auto-pilot states CI is never skipped by the marker"
 
 # ───────────────────────────────────────────────────────────
-# T13 (AC2): the verdict is recomputed after every fixer push.
-# The loop re-enters at Step 3, so a once-computed `trusted`
-# would survive the very commit that invalidates it — and Step 4
-# would skip the suite on the pre-fix commit and never run it on
-# the fixed one.
+# T13 (AC2): the verdict is recomputed after EVERY push this
+# skill makes — Step 2's lint/format auto-fix commit as well as
+# the fixer's. The loop re-enters at Step 3, so a once-computed
+# `trusted` would survive the very commit that invalidates it,
+# and both test legs would then be skipped on a commit no local
+# suite has ever run.
 # ───────────────────────────────────────────────────────────
-check_has "$SRC_LOOP" '^### Re-evaluation after a fix' \
-  "T13.1: the mechanics own a re-evaluation section"
-check_has "$BUILT_LOOP" '^### Re-evaluation after a fix' \
+check_has "$SRC_LOOP" '^### Re-evaluation after a push' \
+  "T13.1: the mechanics own a re-evaluation section, scoped to any push"
+check_has "$BUILT_LOOP" '^### Re-evaluation after a push' \
   "T13.2: the built mechanics ship it"
 check_has "$SRC_LOOP" 'per-cycle\*\* verdict, not a once-per-run constant' \
   "T13.3: qa_handoff is documented as a per-cycle verdict"
@@ -491,10 +531,32 @@ check_has "$SRC_LOOP" 're-enters at \*\*Step 3, not Step 1\*\*' \
 for pair in "src:$SRC_PR" "built:$BUILT_PR"; do
   tag="${pair%%:*}"
   f="${pair#*:}"
-  check_has "$f" 'Re-evaluate .qa_handoff. after every fixer push' \
-    "T13.5 ($tag): the Review Loop re-evaluates the verdict after every fixer push"
+  check_has "$f" 'Re-evaluate .qa_handoff. after any push this skill makes' \
+    "T13.5 ($tag): the Review Loop re-evaluates after ANY push, not just the fixer's"
+  check_lacks "$f" 'Re-evaluate .qa_handoff. after every fixer push' \
+    "T13.5b ($tag): the trigger is no longer scoped to the fixer alone"
+  check_has "$f" "Step 2's auto-fix commit as much as every fixer push" \
+    "T13.5c ($tag): Step 2's own push is named as a re-evaluation trigger"
   check_has "$f" 're-read .headRefOid. and recompute' \
     "T13.6 ($tag): re-evaluation is spelled out as re-read headRefOid + recompute"
+done
+
+# Step 2 is where the missed trigger bit: it commits and pushes its lint/format
+# auto-fix (the resolver runs no formatter, so this is the likely path), moving
+# head off the marker before Step 3 or Step 4 ever consult the verdict.
+REEVAL_BLOCK="$(awk '/^### Re-evaluation after a push/,/^### Never gated/' "$SRC_LOOP")"
+check_block_has "$REEVAL_BLOCK" "Step 2's lint/format auto-fix commit" \
+  "T13.5d: the mechanics enumerate Step 2's auto-fix commit as a trigger"
+check_block_has "$REEVAL_BLOCK" '[Ee]very fixer push in the Review Loop' \
+  "T13.5e: the mechanics enumerate the fixer push as the other trigger"
+check_block_has "$REEVAL_BLOCK" 'any push this skill makes' \
+  "T13.5f: (guard) the re-evaluation block was actually located"
+for pair in "src:$SRC_PR" "built:$BUILT_PR"; do
+  tag="${pair%%:*}"
+  f="${pair#*:}"
+  step2="$(awk '/^## Step 2 — Script Pre-pass/,/^## Step 3 — Analyze/' "$f")"
+  check_block_has "$step2" 'recompute the verdict then, before Step 3' \
+    "T13.5g ($tag): Step 2 instructs a recompute after its own auto-fix push"
 done
 
 # The producer template supplies the marker line itself — one marker, never two.
@@ -535,6 +597,60 @@ for pair in "src:$SRC_PR" "built:$BUILT_PR"; do
   check_has "$f" 'tests skipped \(qa handoff @ \{commit_sha_short\}\)' \
     "T13.18 ($tag): the skip line uses the defined {commit_sha_short} variable"
 done
+
+# ───────────────────────────────────────────────────────────
+# T14 (AC1 accuracy): the claims a reader acts on must match what
+# the pipeline actually does.
+#   a) `trusted` reaches the CODE UI leg only. The browser leg is
+#      opt-in and fail-soft on both sides, and `ui=` exists to keep
+#      the two legs apart — a `trusted` browser skip would flatten
+#      exactly the split that field was added for.
+#   b) the collapse saves no reviewer spawn: the confirmation pass
+#      is fix-conditional, so an unmarked clean PR already gets
+#      exactly one cold-start pass and no confirmation.
+#   c) Step 4's trusted skip states the soft-pass clause both of
+#      its sibling skips state — without it the conjunction has no
+#      satisfied branch and a clean resolver PR could never be
+#      reported clean, defeating AC1.
+# ───────────────────────────────────────────────────────────
+for pair in "src:$SRC_PR" "built:$BUILT_PR"; do
+  tag="${pair%%:*}"
+  f="${pair#*:}"
+  # (a) the browser-UI skip belongs to the light profile alone.
+  check_has "$f" 'The .light. profile also skips the optional browser UI review; .trusted. never does' \
+    "T14.1 ($tag): only the light profile skips the browser UI review"
+  check_lacks "$f" 'and skip the optional browser UI review' \
+    "T14.2 ($tag): the loop bullet no longer distributes that skip over both subjects"
+  # (b) no reviewer spawn is saved on the clean path.
+  check_has "$f" 'saves no reviewer spawn' \
+    "T14.3 ($tag): SKILL.md states the collapse saves no reviewer spawn"
+  check_has "$f" 'confirmation pass is itself fix-conditional' \
+    "T14.4 ($tag): it states why — the confirmation pass only runs after a fix"
+  check_lacks "$f" 'just not two|instead of two|rather than two' \
+    "T14.5 ($tag): the false one-review-instead-of-two claim is gone"
+  # (c) Step 4's trusted skip carries the soft-pass clause.
+  trusted_skip="$(grep -E 'Under .qa_handoff = trusted., skip this step' "$f" | head -1 || true)"
+  check_block_has "$trusted_skip" 'soft-pass conjunction therefore treats the test leg as satisfied' \
+    "T14.6 ($tag): Step 4's trusted skip states the soft-pass clause"
+  check_block_has "$trusted_skip" 'only against the \*\*live\*\* head' \
+    "T14.7 ($tag): and binds it to the live head, not the marker's own head="
+done
+
+check_has "$SRC_LOOP" 'no browser-UI row, deliberately' \
+  "T14.8: the skips table's browser omission is documented as deliberate"
+SKIPS_TABLE_ROWS="$(printf '%s\n' "$SKIPS_BLOCK" | grep -E '^\|' || true)"
+check_block_has "$SKIPS_TABLE_ROWS" '^\|[^|]*code UI review[^|]*\|' \
+  "T14.9: (guard) the skips table rows were located and still hold the code UI leg"
+check_block_lacks "$SKIPS_TABLE_ROWS" '^\|[^|]*browser[^|]*\|' \
+  "T14.10: no table row skips a browser review under trusted"
+check_has "$SRC_LOOP" 'saves no reviewer spawn' \
+  "T14.11: the mechanics state the collapse saves no reviewer spawn"
+check_has "$BUILT_LOOP" 'saves no reviewer spawn' \
+  "T14.12: the built mechanics ship it"
+check_has "$AP_PHASES" 'no reviewer spawn is saved' \
+  "T14.13: auto-pilot's narration does not promise a saved spawn"
+check_lacks "$AP_PHASES" 'full-strength review instead of two' \
+  "T14.14: auto-pilot's old instead-of-two claim is gone"
 
 # ───────────────────────────────────────────────────────────
 # T12 (install surface): both capped SKILL.md files stay inside
