@@ -27,6 +27,7 @@ Detailed example runs and edge-case behaviors referenced from SKILL.md.
 
   ⟶ Starting immediately...
 
+○ Triage cache absent — running a full triage
 ● [Iteration 1/3] Triaging open issues...
 ✓ Triage updated — 8 open issues
 
@@ -51,6 +52,7 @@ Detailed example runs and edge-case behaviors referenced from SKILL.md.
 
 ✓ PR #45 merged — #12 closed
   https://github.com/owner/repo/pull/45
+✓ Triage cache updated — #12 resolved, 7 remain
 
 ✓ Iteration 1/3 complete
   Issue:    #12 — Fix auth redirect loop
@@ -60,7 +62,9 @@ Detailed example runs and edge-case behaviors referenced from SKILL.md.
   ────────────────────────────────────
   Remaining: 4 eligible issues
 
-● [Iteration 2/3] Triaging open issues...
+○ Live backlog: 7 open issues — 1 assigned to others
+● [Iteration 2/3] Picking next issue from triage order...
+  Selected: #8 — Add pagination to API
   ...
 
 ◆ Auto-Pilot Summary — 3/3 iterations
@@ -405,13 +409,13 @@ Issue #42 declares `Depends on #38` in its body. Auto-pilot resolves both #38 an
 
   Iteration 2/10:    ⚠ blocked_by_dependency — #42 → PR #87 (dep: #38, PR #84)
 
-● [Iteration 3/10] Triaging open issues...
+● [Iteration 3/10] Picking next issue from triage order...
   Selected:   #45 — Add rate-limit headers to the API client
 ```
 
-The run does **not** end here. #42 is recorded as `blocked_by_dependency`, PR #87 stays open and unchanged, #42 is added to the session skip list (so the re-triage cannot pick it again in this run), and iteration 3 starts on the next eligible issue. A 30-issue backlog with one dependency-blocked PR still resolves the other 29.
+The run does **not** end here. #42 is recorded as `blocked_by_dependency`, PR #87 stays open and unchanged, #42 is added to the session skip list (so the pick cannot select it again in this run — the skip list is consulted on every pick, cached or freshly triaged), and iteration 3 starts on the next eligible issue. A 30-issue backlog with one dependency-blocked PR still resolves the other 29. Nothing was merged here, so *Step 1.6* does not run and the cached order is untouched; #42 stays in `summary.suggested_order` and the skip list is what keeps it from being re-picked.
 
-Later, the user reviews and merges PR #84 manually and re-invokes `/auto-pilot`. The loop re-triages, picks #42 again (still open, PR #87 still waiting), re-evaluates the gate (now satisfied — #38 is CLOSED and PR #84 is MERGED), and merges PR #87.
+Later, the user reviews and merges PR #84 manually and re-invokes `/auto-pilot`. That new run starts with an empty skip list and its own *Step 1.1a* gate — a commit landed since the cached triage, so the cache reads `stale` and the run triages afresh — picks #42 again (still open, PR #87 still waiting), re-evaluates the gate (now satisfied — #38 is CLOSED and PR #84 is MERGED), and merges PR #87.
 
 The gate never merges out of dependency order, but it also never halts the run: the only dependency-related stop is the ordinary `⚠ No eligible issues to pick` condition, once nothing eligible is left. The one remaining stop-and-ask case is the critical-issue review failure.
 

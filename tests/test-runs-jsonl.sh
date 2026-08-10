@@ -167,8 +167,16 @@ EXPLICIT="$REPO_ROOT/src/skills/auto-pilot/references/explicit-list-mode.md"
 #     Assert --no-run-log lives specifically inside the Batch Resolver Subagent
 #     section (not just somewhere in the file) so the count check above can't pass
 #     on the single-issue occurrence alone.
-if awk '/^## Batch Resolver Subagent/,/^## Template Variables/' "$SUBAGENT" \
-     | grep -qiF -e '--no-run-log'; then
+#     Capture the section first, then match it — never `awk … | grep -q`. The
+#     range expression above kept awk reading to EOF, so `grep -q` exiting on the
+#     first match left awk writing into a closed pipe: under `set -o pipefail`
+#     that SIGPIPE failed the assertion on a match that had *succeeded*. The
+#     window scales with the tail after the section, so issue #258 lengthening
+#     subagent-prompts.md turned it from latent into an intermittent CI failure.
+#     Bounding awk with `{exit}` and feeding grep a here-string removes both the
+#     unbounded read and the pipe.
+batch_block="$(awk '/^## Batch Resolver Subagent/{f=1; next} f && /^## Template Variables/{exit} f' "$SUBAGENT")"
+if grep -qiF -e '--no-run-log' <<< "$batch_block"; then
   pass "T7: Batch Resolver prompt passes --no-run-log (suppressed like single-issue)"
 else
   fail "T7: Batch Resolver prompt missing --no-run-log in its section"

@@ -101,6 +101,14 @@ FAIL=0
 # blockquote, and the section intro. The budget holds the 288 bytes of headroom
 # that preceded it, byte for byte — 511,741 + 288 — so the ratchet is not
 # widened and the next addition still has to compress something first.
+#
+# Issue #258 merged into that line without moving it. Both branches had
+# compressed the SAME prose in this document to pay for their own additions, so
+# the merge kept one payment and both sets of additions — #258's two
+# `autopilot.*` keys plus its `/auto-pilot` writer note on `triage.json`, +2,140
+# measured across the bundle against 288 bytes of headroom. The overrun was paid
+# the way this message asks, by compressing the `.gitissue/` section again rather
+# than by raising the line: 512,222 -> 512,012, and the ratchet still holds.
 BUDGET=512029
 
 pass() { echo "  ✓ $1"; PASS=$((PASS + 1)); }

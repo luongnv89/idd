@@ -324,8 +324,8 @@ the reuse purely by having written the file.
 ## Step 0i — Caller payload gate
 
 **Single home of the caller-payload rules for this skill.** A caller that already
-holds this issue's record — `/auto-pilot`'s Phase 1 lists every open issue before
-it picks one — may hand it over in the spawn prompt instead of making Step 0a
+holds this issue's record — `/auto-pilot` fetches it once, after the pick, in its
+own *Step 1.2b* — may hand it over in the spawn prompt instead of making Step 0a
 fetch the same record a second time (issue #256). Everything below is the whole
 of what that buys.
 
@@ -342,21 +342,22 @@ issue_payload = supplied | partial | absent
 | `absent` | no block, or it does not parse | 0a fetches, as today |
 
 **`comments` is the one field of 0a's list a payload never carries**, by design:
-`/auto-pilot`'s Phase 1 lists up to 100 open issues, and asking that call for
-every issue's comments to serve the one issue this iteration resolves costs more
-than the fetch it saves. The single live read below picks it up instead, so
-*Step 1*'s delegation payload — whose researcher parses title, body **and
-comments** for error text, stack traces and paths — is unchanged in shape.
+the caller's single-issue fetch deliberately does not request it, because the
+live re-verify below — which this gate mandates anyway, for `state` — picks it up
+in the same call at no extra cost. So *Step 1*'s delegation payload — whose
+researcher parses title, body **and comments** for error text, stack traces and
+paths — is unchanged in shape.
 
 `updatedAt` is **required, not decorative** — though not for its value. Under
 `supplied`, *Step 0h*'s condition 5 reads the **live** `updatedAt` from the
 re-verify below, never the payload's: a payload's timestamp is only as fresh as
-the caller's list, so an issue edited between that list and this spawn would read
-as unedited and 0h would call a superseded analysis `fresh`. What the field does
-here is mark the block as the whole record Phase 1's widened list call returns —
-a block missing it was not built by *Step 1.2b*, so nothing in it can be taken as
-verbatim. A payload missing it is `partial`, never `supplied`, and 0a fetches
-exactly as today; the gate is not retired by its absence, only unused.
+the caller's fetch — which is TTL-cached, so it may already have been old when
+the caller read it — and an issue edited between that fetch and this spawn would
+read as unedited, so 0h would call a superseded analysis `fresh`. What the field
+does here is mark the block as the whole record *Step 1.2b*'s single-issue fetch
+returns — a block missing it was not built by *Step 1.2b*, so nothing in it can
+be taken as verbatim. A payload missing it is `partial`, never `supplied`, and
+0a fetches exactly as today; the gate is not retired by its absence, only unused.
 
 **Batched spawns carry one record per issue.** `/auto-pilot`'s batch-resolver
 receives an array of records rather than one object. Evaluate this gate **per
@@ -378,11 +379,12 @@ The payload substitutes for **Step 0a's fetch and nothing else**:
   already served from `.gitissue/cache/` and are what the invalidation exists for.
 - **0a's own two stops are never decided from the payload.** 0a stops when the
   issue is **not found** and stops when it is **closed**. Both are freshness
-  judgements, and a payload's `state` is only as fresh as the caller's list that
-  produced it — an issue closed externally between that list and this spawn
-  still reads `open` in it, and 0b and 0c do not catch that, so the resolve would
-  open a PR for a closed issue. A payload therefore never carries a
-  *live-verified* open: any `state` other than `open` is `partial`, and under
+  judgements, and a payload's `state` is only as fresh as the caller's fetch that
+  produced it — a TTL-cached read, so an issue closed externally before that
+  fetch or between it and this spawn still reads `open` in the payload, and 0b
+  and 0c do not catch that, so the resolve would open a PR for a closed issue.
+  A payload therefore never carries a *live-verified* open: any `state` other
+  than `open` is `partial`, and under
   `supplied` **run one live read before Step 0b** —
   `gh issue view N --json state,comments,updatedAt` — stopping with 0a's own
   closed / not-found message if `state` comes back anything but `open`. Three

@@ -278,7 +278,16 @@ RUNLOG_REF="$REPO_ROOT/src/skills/auto-pilot/references/run-log.md"
 
 # Isolate the Step 5.1b unsatisfied-dependency block (ends at the next h4).
 gate_block() {
-  awk '/^#### Record and continue when any dependency is unsatisfied/{f=1; next} f && /^#### /{exit} f' "$PHASES"
+  # The terminator is any heading, not only a `####` one. This section is
+  # followed by `### Step 5.2`, so a `^#### ` guard never fires and awk streams
+  # to EOF — which is both a block wider than the step it claims to scope (every
+  # assertion below could be satisfied by prose from a later phase) and, under
+  # `set -o pipefail`, a flake: `grep -q` exits on the first match, awk takes
+  # SIGPIPE, and the pipeline reports failure on a match that succeeded. The
+  # odds scale with how much file trails the anchor, so issue #258 appending
+  # `### Step 1.6` at the end of phases.md turned a latent bug into an
+  # intermittent CI failure.
+  awk '/^#### Record and continue when any dependency is unsatisfied/{f=1; next} f && /^###/{exit} f' "$PHASES"
 }
 
 if grep -qE '^#### Record and continue when any dependency is unsatisfied' "$PHASES"; then

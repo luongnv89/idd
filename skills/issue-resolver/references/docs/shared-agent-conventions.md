@@ -126,7 +126,7 @@ narrative of the work (04-subagents *Context Management* — results-only handof
 ## Caller-supplied context payloads
 
 An orchestrator may hand a spawn a fact it already holds — the issue record it
-listed, the triage row it wrote, a verdict a sibling subagent returned — instead
+read, the triage row it wrote, a verdict a sibling subagent returned — instead
 of making the spawn derive it again (issue #256). **This section is the single
 home** of the three rules governing every such field; injection sites point here.
 A spawn prompt cannot read this bundle, so restating is defensible — downward
@@ -138,7 +138,7 @@ in for a read whose only cost is repeating it. It may **never** skip, shorten or
 soften, on any path: the resolver's mandatory **Repo Sync**;
 either `gi-secscan` pass (pre-commit and pre-push); the **already-resolved check**;
 the resolver's **Step 0a closed / not-found stops** (a payload's `state` is only
-as fresh as the list that produced it, so it is never a live-verified open);
+as fresh as the read that produced it, so it is never a live-verified open);
 **`/issue-pr-review`'s own Step 5 CI wait**; or the **two #36 hard-blocks**
 (`acceptance_criteria: fail`, a missing `Closes #N`) — whose evidence is fetched
 live, never lifted from a pre-normalization payload. #274 is the standing proof

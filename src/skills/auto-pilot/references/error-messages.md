@@ -195,14 +195,23 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 ```
 ✓ All issues resolved — nothing left to triage!
 ```
-**Trigger:** `gh issue list --state open` returns an empty array. This is a success message, not an error.
+**Trigger:** the backlog is empty, reached two ways. On a triage iteration,
+*Step 1.1*'s scan returns an empty `issues[]`. On a **reuse** iteration — one
+that skipped Step 1.1 because *Step 1.1a* read the cache as `fresh` — *Step 1.1b*'s
+live `gh issue list --state open --json number,assignees` returns an empty array,
+which is the same condition reached without a scan (equivalently, an empty
+`summary.suggested_order` in a cache Step 1.1a reused or Step 1.6 updated). Both
+entry points print the one block in `references/phases.md` (*Step 1.1*). The
+second trigger is not optional: a reuse iteration never runs Step 1.1, so without
+it a backlog that empties mid-run falls through to `⚠ No eligible issues to pick`
+with all-zero counts. This is a success message, not an error.
 
 ### No eligible issues
 ```
 ⚠ No eligible issues to pick
 
   Blocked:      {blocked_count} issues (waiting on dependencies)
-  Skipped:      {skipped_count} issues (skip labels, --skip, or failed this run)
+  Skipped:      {skipped_count} issues (skip labels, --skip, failed, or ineligible)
   Dep-blocked:  {dep_blocked_count} issues (PR open, waiting on a dependency merge)
   Assigned:     {assigned_count} issues (assigned to others)
 
@@ -210,10 +219,14 @@ All errors follow the rich error format: what went wrong + fix command + docs li
               --skip to bypass
 ```
 **Trigger:** All open issues are blocked, skipped, assigned to other users, or
-added to the session skip list by the Phase 5.1b dependency gate. This is the
+added to the session skip list — by the Phase 5.1b dependency gate
+(`blocked_by_dependency`), by a Phase 2.3 resolution failure (`failed`), or by
+Step 1.2b's post-pick re-check (`not_eligible`). This is the
 **only** place a run ends for dependency reasons — the gate itself never stops
 the loop. Omit the `Dep-blocked` line when that count is zero. Keep this block
-byte-identical to the one in `references/phases.md` (*Step 1.2*).
+byte-identical to the one in `references/phases.md` (*Step 1.2*), and take which
+bucket each reason counts under from that step's reason-to-bucket table — it is
+the single home of that mapping, never restated here.
 
 ### API rate limit during triage
 ```

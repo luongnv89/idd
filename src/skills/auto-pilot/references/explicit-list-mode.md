@@ -281,9 +281,17 @@ For non-batched issues, the flow is identical to before:
 
 The `[Issue {i}/{total}]` counter reflects total issues (not batches), so the user can track overall progress.
 
-All other phases (Resolve, Review, Fix, Merge) run identically to triage mode.
+All other phases (Resolve, Review, Fix, Merge) run identically to triage mode,
+with one exception, and it is Phase 1 work rather than a fourth phase changing:
+*Step 1.6 — Update the triage cache after a merge* is numbered in Phase 1 and
+merely *executed* after a merge, so it is skipped here with the rest of Phase 1
+(see *Re-triage between iterations* below).
 
 ### Re-triage between iterations
 
 Explicit list mode does **not** re-triage between iterations. The analysis determined the order upfront — respect it. The only per-iteration pre-work is syncing to the default branch (Step 2.1).
+
+Triage mode no longer re-triages every iteration either (issue #258): it triages once, reuses a `fresh` `.gitissue/triage.json`, and updates that payload in place after each merge. Explicit list mode remains the stronger form of the same property — it never triages at all, so there is no cache to keep current and no pick miss to recover from.
+
+That is why *Step 1.6 — Update the triage cache after a merge* is skipped here, and the step's own note says so: with no payload this run wrote or read, a `.gitissue/triage.json` that is missing, stale, or absent is not a degrade. Skip it silently — no `⚠ Could not update the triage cache` line, and no `retriage_required` flag, which this mode has no *Step 1.1* to clear. Step 1.6's `Fail-safe: any doubt is "run it."` is a triage-mode rule; the mode is known at invocation, so reaching it here is never a doubt.
 

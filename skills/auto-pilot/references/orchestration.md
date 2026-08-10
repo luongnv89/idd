@@ -15,7 +15,7 @@ or test output). This file expands the rationale and the main-agent task list.
 The main agent handles only orchestration tasks that are lightweight and sequential:
 
 1. **Prerequisites** — environment checks (git, gh, auth)
-2. **Triage/Pick** — fetch issue list, compute order (or walk explicit list)
+2. **Triage/Pick** — pick from the triage cache; the full issue list is fetched and the order computed on the first iteration or a forced re-triage, not every time round the loop. In between, *Step 1.1b* reads two scalar fields per open issue (`number,assignees`, no bodies) — the live checks the pick cannot make from a cache (or walk the explicit list)
 3. **Spawn resolver subagent** — pass issue number, wait for result
 4. **Spawn PR review subagent** — delegates to `/issue-pr-review --auto --no-merge` which handles review, test, CI, and fix (never merge — merge is Phase 5's job)
 5. **Merge** — apply the mode gate and dependency gate (SPEC §2), then squash-merge via `gh pr merge`

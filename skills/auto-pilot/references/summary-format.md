@@ -115,6 +115,14 @@ Rules that make the report worth reading:
   not be evaluated (a tool was unavailable, a gate was skipped by config), mark
   it `×` and use `PARTIAL` — never assume `√`.
 
+`Triage current` is `√` when the order the pick used is current — a full triage
+this iteration ran, a cache *Step 1.1a* read as `fresh`, or a cache *Step 1.6*
+updated after the last merge. It is not "a triage ran this iteration": under
+issue #258 a run triages once and updates incrementally, so a name that asserted
+a refresh would mark every reuse iteration `×` and turn a working loop into a
+wall of `PARTIAL`. It is `×` only when the gate degraded and the pick ran against
+an order nothing could vouch for.
+
 `√` and `×` are the completion-report check glyphs defined in
 `references/docs/terminal-style.md`; the run's own status symbols stay `✓ ✗ ⚠ ○`.
 
@@ -122,7 +130,7 @@ Rules that make the report worth reading:
 
 | Phase | Checks |
 |-------|--------|
-| 1 — Triage and Pick | `Triage refreshed` · `Issue picked` · `Dependencies clear` |
+| 1 — Triage and Pick | `Triage current` · `Issue picked` · `Dependencies clear` |
 | 2 — Resolve | `Resolver returned` · `PR created` · `Telemetry returned` |
 | 3-4 — PR Review | `Review ran` · `Fix cycles converged` · `CI green` |
 | 5 — Merge | `Mergeable` · `Squash-merged` · `Issue closed` · `Follow-up filed when partial` |
