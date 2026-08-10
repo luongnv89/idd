@@ -269,6 +269,19 @@ Note: the `/issue-pr-review --auto --no-merge` subagent handled the full review-
 
 ### Merge requires CI checks
 
+First consult *Step 5.1a — CI verdict gate*. The reviewer subagent already
+waited on this PR's CI and returned `ci_status` bound to the commit it waited
+on, so when that SHA still equals the live head there is nothing left to wait
+for — one `gh pr view {pr_number} --json headRefOid` confirms it and the merge
+proceeds:
+
+```
+○ CI verdict: trusted (passed @ 9f2c1ab) — head unchanged, no re-poll
+```
+
+On `stale` or `absent` — a moved head, a bare or missing value, a `failed@…`, or
+`review.adaptive_depth: false` — the full wait below runs, unchanged:
+
 ```
 ⚠ PR #45 is not mergeable
 

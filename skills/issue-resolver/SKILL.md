@@ -166,7 +166,7 @@ Check whether this issue should be worked on. Open with `● Preflight check for
 
 ### 0a — Fetch issue
 
-Run `python3 references/scripts/gi-issue.py {N} --fields number,title,body,labels,assignees,state,comments,updatedAt` and read `.issue`. **Capture `updatedAt` here** — 0d's `gh issue edit` bumps it, so *0h* must compare against this pre-normalization value or it reports stale on every first-normalized issue. The same issue is read again in 0d, Step 1, and Step 5; the script serves those repeats from `.gitissue/cache/` rather than the network, and the field list is this skill's choice. Resolve the script path as the *Bundled dependency precheck* resolves its list. Exit 3 is a stop. No `python3`, exit 2 (an unresolved script path), or exit 4 degrades: run `gh issue view {N} --json number,title,body,labels,assignees,state,comments,updatedAt` directly — the cache is an optimization, never a dependency. **0d rewrites the body, so it MUST end with `python3 references/scripts/gi-issue.py {N} --invalidate`**; the cache is repo-wide and outlives this skill, so without it Step 1 and Step 5 read the pre-normalization body.
+Run `python3 references/scripts/gi-issue.py {N} --fields number,title,body,labels,assignees,state,comments,updatedAt` and read `.issue`. **Capture `updatedAt` here** — 0d's `gh issue edit` bumps it, so *0h* must compare against this pre-normalization value or it reports stale on every first-normalized issue. The same issue is read again in 0d, Step 1, and Step 5; the script serves those repeats from `.gitissue/cache/` rather than the network, and the field list is this skill's choice. Resolve the script path as the *Bundled dependency precheck* resolves its list. Exit 3 is a stop. No `python3`, exit 2 (an unresolved script path), or exit 4 degrades: run `gh issue view {N} --json number,title,body,labels,assignees,state,comments,updatedAt` directly — the cache is an optimization, never a dependency. **0d rewrites the body, so it MUST end with `python3 references/scripts/gi-issue.py {N} --invalidate`**; the cache is repo-wide and outlives this skill, so without it Step 1 and Step 5 read the pre-normalization body. **Caller payload:** when the spawn prompt carries a complete `issue_payload` for this issue (`/auto-pilot` already listed it), use it **in place of this read only** — `issue_payload = supplied | partial | absent`, `updatedAt` required, any doubt is `absent` and this fetch runs; 0d still rewrites and still invalidates, and no safety check is ever gated on it (*Step 0i — Caller payload gate* in `references/pipeline-steps.md`).
 
 **If not found:** output error and stop. **If closed:** output warning and stop.
 
@@ -301,7 +301,7 @@ Deeply understand the issue, affected codebase, and possible solutions; also ver
 **`light` profile:** run a **lighter** research pass — see the profile table in
 *Step 0g* for what it collapses, and `references/pipeline-steps.md` (*Step 1 —
 Research → `light` profile*) for the mechanics. On a `high`/`complex` signal,
-revise the profile **upward** to `full` (never downward). **`analysis_reuse = fresh`** (*0h*): pass `prior_analysis` and run the seeded **verify-first** pass — hints to confirm or refute, never to trust; the already-resolved check still runs in full (*Step 1 — Research → `reuse`*).
+revise the profile **upward** to `full` (never downward). **`analysis_reuse = fresh`** (*0h*): pass `prior_analysis` and run the seeded **verify-first** pass — hints to confirm or refute, never to trust; the already-resolved check still runs in full (*Step 1 — Research → `reuse`*). Also pass the optional sibling key **`triage_context`** (this issue's triage row, from the caller or from the triage graph): unlike `prior_analysis` it carries **no commit pin**, so it may only **reorder** a scan, never authorise skipping a phase (*Step 1 — Research → `triage_context`*).
 
 After research:
 ```
@@ -392,7 +392,7 @@ Push, create PR, and report.
 
 ### Verify all tests pass
 
-When `resolve.auto_test` is true (default), run the full test suite one final time to confirm everything is clean after QA fixes. When false, skip this suite (QA Step 4 may still have run tests during the loop).
+When `resolve.auto_test` is true (default), run the full test suite one final time to confirm everything is clean after QA fixes. When false, skip this suite (QA Step 4 may still have run tests during the loop). **Under `auto_test`, not over it:** when `tests_state`'s SHA equals `git rev-parse HEAD` at this moment, a clean QA cycle already ran this exact suite on this exact commit — skip it and print `○ Test suite: skipped (last green {count}@{sha_short} == HEAD)`. Nothing recorded, or any doubt, runs it (`references/pipeline-steps.md`, *Step 4 — QA → Last-green test state*, the single home of the variable and both consumers).
 
 If tests fail at this point, print `✗ Final test run failed — PR not created` with the failure details and stop — even in auto mode, a failing PR is worse than no PR.
 
