@@ -359,8 +359,11 @@ check_has "$SCHEMA" '\.gitissue/triage\.json. \| ./issue-triage., ./auto-pilot' 
 # The eligibility criteria must keep naming the session skip list — the pick
 # miss is defined against it, and a cached order makes re-picking easier, not
 # harder (pinned in the same shape by tests/test-autopilot-dependency-gate.sh).
-if awk '/^### Step 1\.2 — Pick Next Issue/{f=1; next} f && /^### /{exit} f' "$SRC_PHASES" \
-  | grep -E '^- \*\*Not skipped\*\*' | grep -q 'session skip list'; then
+# Capture the section before matching it — an `awk … | grep -q` pipeline lets
+# grep exit on the first match and leaves awk writing into a closed pipe, which
+# under `set -o pipefail` fails the assertion on a match that succeeded.
+pick_block="$(awk '/^### Step 1\.2 — Pick Next Issue/{f=1; next} f && /^### /{exit} f' "$SRC_PHASES")"
+if grep -E '^- \*\*Not skipped\*\*' <<< "$pick_block" | grep -q 'session skip list'; then
   pass "T5.8: Step 1.2 eligibility criteria still names the session skip list"
 else
   fail "T5.8: Step 1.2 criteria lost the session skip list (re-pick hazard)"
@@ -608,8 +611,10 @@ check_block_has "$LIVEREAD_BLOCK" 'Never read a failed read as .no open issues' 
 # mentions Step 1.1b and a section-wide grep would survive losing the bullet.
 check_bullet() {
   local file="$1" bullet="$2" pattern="$3" label="$4"
-  if awk '/^### Step 1\.2 — Pick Next Issue/{f=1; next} f && /^### /{exit} f' "$file" \
-    | grep -E -- "$bullet" | grep -qE -- "$pattern"; then
+  local block
+  # Same reason as T5.8: capture, then match — never pipe awk into `grep -q`.
+  block="$(awk '/^### Step 1\.2 — Pick Next Issue/{f=1; next} f && /^### /{exit} f' "$file")"
+  if grep -E -- "$bullet" <<< "$block" | grep -qE -- "$pattern"; then
     pass "$label"
   else
     fail "$label"
