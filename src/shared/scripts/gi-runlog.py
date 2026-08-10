@@ -14,12 +14,37 @@ value is null are dropped rather than written, a missing `ts` is filled from the
 UTC clock, and the keys are emitted in the canonical order so the file stays
 greppable and diffable.
 
+`--failure-streak N` is the one **read** mode. It scans the log backwards and
+counts the issue's leading run of `failed` outcomes — the consecutive
+most-recent records for that issue — stopping at the first record for that
+issue whose outcome is anything else. Records for other issues are stepped over
+and never reset the count. It prints one JSON line and writes nothing:
+
+    {"mode":"failure_streak","issue":N,"streak":N,"threshold":F,"quarantine":bool}
+
+`quarantine` is `streak >= threshold` and `threshold > 0`; `--threshold 0`
+disables quarantine outright, so it is always false.
+
+The count is deliberately **soft**. The run log is gitignored, best-effort and
+deletable, so it can only ever carry *progress toward* quarantine — the durable
+state is the label `/auto-pilot` applies at the threshold. That asymmetry sets
+the failure behavior: a log that cannot be opened at all is not an error that
+stops a run, it is exit 4 with a `streak` of 0 and `quarantine` false, printed
+anyway so a caller that ignores the exit code still cannot quarantine an issue
+on evidence it never read. Losing the log loses progress toward a quarantine,
+never an existing one. Malformed individual lines are skipped rather than
+fatal, for the same reason a reader must tolerate unknown keys: this file has
+no schema migration.
+
 Exit codes
-  0  record valid; appended (--append) or printed (--echo)
+  0  record valid; appended (--append) or printed (--echo). With
+     --failure-streak: the log was read and the streak printed
   2  usage error
   3  record invalid — nothing was written
   4  the append itself failed — the record was valid; writing the run log is
-     best-effort and non-fatal, so a caller must not fail its run on this
+     best-effort and non-fatal, so a caller must not fail its run on this.
+     With --failure-streak: the log is missing or unreadable — the fail-open
+     `streak: 0` line is still printed
 
 Authored at src/shared/scripts/gi-runlog.py — do not edit installed copies;
 edit the source and run ./scripts/build.sh.
@@ -35,6 +60,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 DEFAULT_LOG_PATH = ".gitissue/runs.jsonl"
+
+# Consecutive failed runs before `/auto-pilot` quarantines an issue. Mirrors the
+# documented `autopilot.quarantine_after` default so an omitted --threshold
+# answers exactly what the skill's default configuration would have asked for.
+DEFAULT_QUARANTINE_AFTER = 3
+
+# The one outcome that extends a streak. Every skill writes `failed` with the
+# same meaning, so the count does not have to know which skill wrote the line.
+FAILURE_OUTCOME = "failed"
 
 # Canonical emission order. Every optional key that survives normalization is
 # written in this position, so lines from different writers stay comparable.
@@ -209,17 +243,73 @@ def append_line(path: Path, line: str) -> None:
         fh.write(line + "\n")
 
 
+def count_failure_streak(lines: list[str], issue: int) -> int:
+    """Leading run of `failed` outcomes for `issue`, newest record first.
+
+    Scanning backwards is what makes this a *streak* rather than a total: the
+    first record for the issue that is not a failure ends the count, so a single
+    success clears every failure before it. Lines for other issues are stepped
+    over — an unrelated issue's success must not clear this one's streak — and a
+    line that does not parse, or that parses to something other than an object,
+    is skipped in the same way a reader of this file tolerates unknown keys.
+    """
+    streak = 0
+    for raw in reversed(lines):
+        raw = raw.strip()
+        if not raw:
+            continue
+        try:
+            record = json.loads(raw)
+        except (json.JSONDecodeError, ValueError):
+            continue
+        if not isinstance(record, dict) or record.get("issue") != issue:
+            continue
+        if record.get("outcome") != FAILURE_OUTCOME:
+            break
+        streak += 1
+    return streak
+
+
+def failure_streak(path: Path, issue: int, threshold: int) -> tuple[dict[str, object], bool]:
+    """Return the streak verdict for `issue` and whether the log was readable.
+
+    The boolean is the exit code's business, not the verdict's: an unreadable
+    log still produces a printable line, and that line says `streak: 0` so the
+    caller cannot quarantine on evidence nobody read.
+    """
+    readable = True
+    lines: list[str] = []
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except (OSError, UnicodeDecodeError):
+        readable = False
+
+    streak = count_failure_streak(lines, issue) if readable else 0
+    return (
+        {
+            "mode": "failure_streak",
+            "issue": issue,
+            "streak": streak,
+            "threshold": threshold,
+            "quarantine": threshold > 0 and streak >= threshold,
+        },
+        readable,
+    )
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="gi-runlog.py",
         description=(
             "Validate and normalize one run-log record read as JSON on stdin, "
             "then append it to .gitissue/runs.jsonl (--append) or print it "
-            "without writing (--echo)."
+            "without writing (--echo); or read the log back to count an issue's "
+            "consecutive-failure streak (--failure-streak)."
         ),
         epilog=(
             "Exit codes: 0 ok; 2 usage; 3 invalid record (nothing written); "
-            "4 append failed (non-fatal — telemetry is best-effort)."
+            "4 append failed, or the log could not be read (non-fatal — "
+            "telemetry is best-effort)."
         ),
     )
     mode = parser.add_mutually_exclusive_group()
@@ -233,12 +323,55 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="print the normalized line to stdout and write nothing",
     )
+    mode.add_argument(
+        "--failure-streak",
+        type=int,
+        metavar="ISSUE",
+        help=(
+            "read the log and print this issue's leading run of failed "
+            "outcomes; reads no stdin and writes nothing"
+        ),
+    )
     parser.add_argument(
         "--path",
+        "--log",
         default=DEFAULT_LOG_PATH,
-        help=f"run-log file to append to (default: {DEFAULT_LOG_PATH})",
+        help=(
+            f"run-log file to append to, or read with --failure-streak "
+            f"(default: {DEFAULT_LOG_PATH})"
+        ),
+    )
+    parser.add_argument(
+        "--threshold",
+        type=int,
+        default=DEFAULT_QUARANTINE_AFTER,
+        metavar="F",
+        help=(
+            f"--failure-streak: streak at which quarantine is true "
+            f"(default {DEFAULT_QUARANTINE_AFTER}; 0 disables quarantine)"
+        ),
     )
     args = parser.parse_args(argv)
+
+    if args.failure_streak is not None:
+        if args.threshold < 0:
+            print("✗ gi-runlog: --threshold must be >= 0", file=sys.stderr)
+            return 3
+        result, readable = failure_streak(
+            Path(args.path), args.failure_streak, args.threshold
+        )
+        # The line is printed either way. An exit-4 caller that reads stdout
+        # anyway must land on "no streak", never on a stale or invented one.
+        print(json.dumps(result, separators=(",", ":"), ensure_ascii=False))
+        if not readable:
+            print(
+                f"⚠ gi-runlog: could not read {args.path} — "
+                "reporting a streak of 0 (quarantine progress only, never an "
+                "existing quarantine)",
+                file=sys.stderr,
+            )
+            return 4
+        return 0
 
     try:
         raw = sys.stdin.read()
