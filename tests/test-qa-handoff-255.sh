@@ -87,6 +87,9 @@ echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄�
 
 SRC_PR="$REPO_ROOT/src/skills/issue-pr-review/SKILL.source.md"
 SRC_LOOP="$REPO_ROOT/src/skills/issue-pr-review/references/review-loop-mechanics.md"
+SRC_PR_TEMPLATES="$REPO_ROOT/src/skills/issue-pr-review/references/report-templates.md"
+SRC_VERIFY="$REPO_ROOT/src/skills/issue-pr-review/references/verification-checks.md"
+SRC_PREPASS="$REPO_ROOT/src/skills/issue-pr-review/references/prepass-tests-ci-mechanics.md"
 SRC_RESOLVER="$REPO_ROOT/src/skills/issue-resolver/SKILL.source.md"
 SRC_TEMPLATES="$REPO_ROOT/src/skills/issue-resolver/references/report-templates.md"
 SRC_PLATFORM="$REPO_ROOT/docs/platform-github.md"
@@ -99,10 +102,18 @@ BUILT_PR="$REPO_ROOT/skills/issue-pr-review/SKILL.md"
 BUILT_LOOP="$REPO_ROOT/skills/issue-pr-review/references/review-loop-mechanics.md"
 BUILT_RESOLVER="$REPO_ROOT/skills/issue-resolver/SKILL.md"
 BUILT_TEMPLATES="$REPO_ROOT/skills/issue-resolver/references/report-templates.md"
+BUILT_PR_TEMPLATES="$REPO_ROOT/skills/issue-pr-review/references/report-templates.md"
+BUILT_VERIFY="$REPO_ROOT/skills/issue-pr-review/references/verification-checks.md"
+BUILT_PREPASS="$REPO_ROOT/skills/issue-pr-review/references/prepass-tests-ci-mechanics.md"
 
+# Every file an assertion reads is proved to exist first. A check_lacks against a
+# path that does not exist passes vacuously, so this loop is what makes the
+# forbidden-pattern guards below mean anything.
 for file in "$SRC_PR" "$SRC_LOOP" "$SRC_RESOLVER" "$SRC_TEMPLATES" "$SRC_PLATFORM" \
-            "$SRC_TERMINAL" "$SRC_METHODOLOGY" "$BUILT_PR" "$BUILT_LOOP" \
-            "$BUILT_RESOLVER" "$BUILT_TEMPLATES"; do
+            "$SRC_TERMINAL" "$SRC_METHODOLOGY" "$SRC_PR_TEMPLATES" "$SRC_VERIFY" \
+            "$SRC_PREPASS" "$BUILT_PR" "$BUILT_LOOP" \
+            "$BUILT_RESOLVER" "$BUILT_TEMPLATES" "$BUILT_PR_TEMPLATES" \
+            "$BUILT_VERIFY" "$BUILT_PREPASS"; do
   if [ -f "$file" ]; then
     pass "exists: ${file#$REPO_ROOT/}"
   else
@@ -285,6 +296,31 @@ check_block_lacks "$BUILT_VERIFY_BLOCK" 'qa_handoff' \
 check_has "$BUILT_LOOP" '^### Never gated' \
   "T5.24: the built mechanics ship the Never gated list"
 
+# 5d. The blocks above only cover SKILL.md. The procedures they gate are written
+#     down elsewhere: verification-checks.md holds the per-criterion AC check and
+#     the four traceability checks, prepass-tests-ci-mechanics.md holds the Step
+#     2/4 test runs and the Step 5 CI polling fallback. The gate decision belongs
+#     in SKILL.md alone — neither delegated file may grow a marker conditional,
+#     or the guard above becomes a guard over a pointer.
+for pair in "src:$SRC_VERIFY" "src:$SRC_PREPASS" "built:$BUILT_VERIFY" "built:$BUILT_PREPASS"; do
+  tag="${pair%%:*}"
+  f="${pair#*:}"
+  check_lacks "$f" 'qa_handoff' \
+    "T5.25 ($tag): ${f##*/} carries no qa_handoff conditional"
+done
+# (guard) each delegated file is the one we think it is, so the check_lacks above
+# cannot pass on an emptied or renamed file.
+check_has "$SRC_VERIFY" '^## Acceptance-criteria verification \(per criterion\)' \
+  "T5.26: (guard) verification-checks.md still owns the per-criterion AC check"
+check_has "$SRC_VERIFY" '^## Traceability checks' \
+  "T5.27: (guard) verification-checks.md still owns the traceability checks"
+check_has "$SRC_PREPASS" '^## Step 5 — CI polling and failure extraction' \
+  "T5.28: (guard) prepass-tests-ci-mechanics.md still owns the CI polling fallback"
+check_has "$BUILT_VERIFY" '^## Traceability checks' \
+  "T5.29: (guard) the built verification-checks.md is the same document"
+check_has "$BUILT_PREPASS" '^## Step 5 — CI polling and failure extraction' \
+  "T5.30: (guard) the built prepass-tests-ci-mechanics.md is the same document"
+
 # ───────────────────────────────────────────────────────────
 # T6 (AC4): a human-authored PR carries no marker, so the gate
 # answers `absent` and changes nothing about its review.
@@ -322,12 +358,20 @@ else
   fail "T7.6: the precedence rule must live in exactly one src/ file — found $PRECEDENCE_COUNT"
   printf '      %s\n' $PRECEDENCE_HITS
 fi
-check_has "$SRC_PR" '\*\*narrow\*\* work and never widen it' \
-  "T7.7: qa_handoff may only narrow work, never widen it"
-check_has "$SRC_PR" 'review collapse is \*\*refused\*\*' \
-  "T7.8: marker profile=light against pr-review full refuses the review collapse"
+check_has "$SRC_PR" 'bounded \*\*relative to the ungated pipeline\*\*' \
+  "T7.7: qa_handoff's power is bounded against the ungated pipeline"
+check_has "$SRC_PR" 'may only \*\*narrow\*\*' \
+  "T7.7b: it may only narrow what a stale/absent PR already gets"
+check_has "$SRC_PR" 'per verdict, not monotonic across the run' \
+  "T7.7c: the bound is per verdict, so re-evaluation is not a widening"
+check_has "$SRC_PR" 'review collapse \*\*and\*\* the cycle cap' \
+  "T7.8: profile=light against pr-review full refuses the collapse AND the cap"
 check_has "$SRC_PR" 'duplicate-test skip still applies' \
   "T7.9: that same asymmetric case still allows the duplicate-test skip"
+check_block_has "$SKIPS_BLOCK" 'the same carve-out as the reviewer-collapse row' \
+  "T7.10: the skips table's cycle-cap row names the same carve-out, not 'always'"
+check_block_has "$SKIPS_BLOCK" 'refuses the collapse \(\*Precedence\* in SKILL.md owns that rule' \
+  "T7.11: the skips table points at SKILL.md instead of restating the rule"
 
 # ───────────────────────────────────────────────────────────
 # T8 (AC1/AC2): headRefOid is actually fetched — the predicate is
@@ -428,6 +472,69 @@ check_has "$AP_PHASES" 'QA handoff marker' \
   "T11.4: auto-pilot phases.md qualifies its run-tests narration"
 check_has "$AP_PHASES" 'never skipped by the marker' \
   "T11.5: auto-pilot states CI is never skipped by the marker"
+
+# ───────────────────────────────────────────────────────────
+# T13 (AC2): the verdict is recomputed after every fixer push.
+# The loop re-enters at Step 3, so a once-computed `trusted`
+# would survive the very commit that invalidates it — and Step 4
+# would skip the suite on the pre-fix commit and never run it on
+# the fixed one.
+# ───────────────────────────────────────────────────────────
+check_has "$SRC_LOOP" '^### Re-evaluation after a fix' \
+  "T13.1: the mechanics own a re-evaluation section"
+check_has "$BUILT_LOOP" '^### Re-evaluation after a fix' \
+  "T13.2: the built mechanics ship it"
+check_has "$SRC_LOOP" 'per-cycle\*\* verdict, not a once-per-run constant' \
+  "T13.3: qa_handoff is documented as a per-cycle verdict"
+check_has "$SRC_LOOP" 're-enters at \*\*Step 3, not Step 1\*\*' \
+  "T13.4: the mechanics name the re-entry point that makes this necessary"
+for pair in "src:$SRC_PR" "built:$BUILT_PR"; do
+  tag="${pair%%:*}"
+  f="${pair#*:}"
+  check_has "$f" 'Re-evaluate .qa_handoff. after every fixer push' \
+    "T13.5 ($tag): the Review Loop re-evaluates the verdict after every fixer push"
+  check_has "$f" 're-read .headRefOid. and recompute' \
+    "T13.6 ($tag): re-evaluation is spelled out as re-read headRefOid + recompute"
+done
+
+# The producer template supplies the marker line itself — one marker, never two.
+# Two markers read as `stale`, silently disabling the whole feature.
+for pair in "src:$SRC_TEMPLATES" "built:$BUILT_TEMPLATES"; do
+  tag="${pair%%:*}"
+  f="${pair#*:}"
+  check_has "$f" 'omit this entire line unless QA exited clean' \
+    "T13.7 ($tag): the PR body template carries an inline omit conditional"
+  check_has "$f" 'goes last, and exactly once' \
+    "T13.8 ($tag): the producer states one-marker-only"
+  check_has "$f" '[Nn]ever append a second copy' \
+    "T13.9 ($tag): appending a second marker is forbidden"
+done
+check_has "$SRC_RESOLVER" 'never append a second copy' \
+  "T13.10: the resolver SKILL does not instruct an append of the template's own line"
+check_has "$BUILT_RESOLVER" 'never append a second copy' \
+  "T13.11: the built resolver SKILL ships the same wording"
+
+# A skipped Step 4 evaluated neither check, so it renders PARTIAL — never a
+# silent pass — and {head7} was never a defined template variable.
+BUILT_STEP4_BLOCK="$(awk '/^## Step 4 — Run Tests/,/^## Step 5 — Check CI/' "$BUILT_PR")"
+check_block_has "$STEP4_BLOCK" 'Result: PARTIAL' \
+  "T13.12: Step 4's trusted skip states its completion rendering"
+check_block_has "$STEP4_BLOCK" '× Suite passed. / .× Build clean' \
+  "T13.13: both Step 4 checks render × on the skip path"
+check_block_has "$BUILT_STEP4_BLOCK" 'Result: PARTIAL' \
+  "T13.14: the built SKILL.md ships the PARTIAL rendering"
+check_has "$SRC_PR_TEMPLATES" 'qa_handoff = trusted' \
+  "T13.15: the PARTIAL enumeration lists Step 4's qa-handoff skip"
+check_has "$BUILT_PR_TEMPLATES" 'qa_handoff = trusted' \
+  "T13.16: the built templates ship that enumeration entry"
+for pair in "src:$SRC_PR" "built:$BUILT_PR"; do
+  tag="${pair%%:*}"
+  f="${pair#*:}"
+  check_lacks "$f" '\{head7\}' \
+    "T13.17 ($tag): the undefined {head7} template variable is gone"
+  check_has "$f" 'tests skipped \(qa handoff @ \{commit_sha_short\}\)' \
+    "T13.18 ($tag): the skip line uses the defined {commit_sha_short} variable"
+done
 
 # ───────────────────────────────────────────────────────────
 # T12 (install surface): both capped SKILL.md files stay inside

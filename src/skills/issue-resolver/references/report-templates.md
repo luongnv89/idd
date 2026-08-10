@@ -55,7 +55,7 @@ Use `pass`, `fail`, or `unverified` per criterion. Always cite evidence (a file 
 
 **Bug issues — reproduction evidence.** When the issue `type` is `bug`, the Evidence column must cite the reproduction command from the Step 3 bug-verification checkpoint (`references/bug-verification.md`), not just a checkmark. Format the cell as `Verified red: <command> → fixed → <regression test path>` (or `… → manual repro, no seam` when no test seam exists). If the symptom could not be reproduced, mark that criterion `unverified` and note `not reproduced: <reason>`.
 
-<!-- gitissue:qa v1 head={head_sha} profile={profile} cycles={qa_cycles} review=clean tests={test_count}@{tests_sha} ui={ui_legs}:{ui_result} -->
+<!-- gitissue:qa v1 head={head_sha} profile={profile} cycles={qa_cycles} review=clean tests={test_count}@{tests_sha} ui={ui_legs}:{ui_result} --> {omit this entire line unless QA exited clean, and omit the ` tests=…` field when no final suite ran — see *QA handoff marker* below}
 ```
 
 The PR title follows `{type}({scope}): {description} (#{issue_number})` — see `docs/naming-conventions.md`.
@@ -99,10 +99,14 @@ consumer is `/issue-pr-review`'s *QA handoff gate*
    identical path in the consumer, and the only way to guarantee that is to
    never emit a marker the consumer would have to interpret.
 
-**The marker goes last.** `/issue-pr-review`'s traceability fix prepends
-`Closes #N` to line 1 via read-modify-write, so a marker on the final line is
-untouched by that edit by construction. Emit exactly one marker line; a body
-carrying two is unparsable to the consumer and falls back to the full pipeline.
+**The marker goes last, and exactly once.** The *PR Body Template* above already
+carries it as the fence's final line — fill that line in, or delete it on a
+non-clean exit. Never append a second copy on top of it: a body carrying two
+markers is unparsable to the consumer and falls back to the full pipeline,
+silently costing exactly the work the marker exists to save.
+`/issue-pr-review`'s traceability fix prepends `Closes #N` to line 1 via
+read-modify-write, so a marker on the final line is untouched by that edit by
+construction.
 
 ### Lifting the Decision Record
 

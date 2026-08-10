@@ -42,6 +42,14 @@ The `maintainability: partial` and `Issues noted` lines above are valid only whe
 `review.soft_pass: true`. With `review.soft_pass: false`, use the remaining-issues
 summary below instead whenever a note or partial remains.
 
+When Step 4 was skipped under `qa_handoff = trusted`, its `Result: PARTIAL` is
+carried here rather than dropped — the `Tests:` line reports the skip and the
+commit it is inherited from, never `✓ pass`:
+
+```
+  Tests:             ○ skipped (qa handoff @ {commit_sha_short})
+```
+
 ## Summary — PR With Remaining Issues
 
 ```
@@ -231,7 +239,16 @@ Rules that make the report worth reading:
 | 6 — Fix Issues | `Fixes applied` · `Re-review clean` |
 | 7 — Summary Report | `AC verified` · `Verdict recorded` · `Merge decision stated` |
 
-`PARTIAL` covers the documented soft paths: no CI configured (Step 5), or the
-fix loop exhausting `review_cycles` with only non-blocking findings left (Step
-6). A failing test, a red required check, or an unaddressed blocking finding is
+`PARTIAL` covers the documented soft paths: no CI configured (Step 5); the fix
+loop exhausting `review_cycles` with only non-blocking findings left (Step 6); or
+Step 4's test + build run skipped under `qa_handoff = trusted`, which evaluates
+neither of that step's checks and so renders
+
+```
+  [4/7] Tests        ○ tests skipped (qa handoff @ {commit_sha_short})
+    × Suite passed   × Build clean
+    Result: PARTIAL
+```
+
+A failing test, a red required check, or an unaddressed blocking finding is
 always `FAIL`.

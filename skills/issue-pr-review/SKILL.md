@@ -223,11 +223,16 @@ authenticating it, so this verdict may gate **only duplicated work**, never a sa
 When `review.adaptive_depth` is `false`, skip this gate: set `qa_handoff = absent`.
 That key already pins the review to full depth and this is the same class of
 saving, so one key disables both. **No new config key is introduced.**
-**Precedence, stated once:** `qa_handoff` is computed *after* `profile`, may only
-**narrow** work and never widen it; the one asymmetric case is a marker
-`profile=light` against a pr-review `profile=full`, where the fuller wins — the
-review collapse is **refused**, while the duplicate-test skip still applies,
-because a test run is a test run at any depth.
+**Precedence, stated once:** `qa_handoff` is computed *after* `profile`, and its
+power is bounded **relative to the ungated pipeline** — it may only **narrow**
+what a `stale`/`absent` PR already gets, and never make this review do more than
+that. The bound is per verdict, not monotonic across the run: the loop recomputes
+`qa_handoff` after every fixer push (*Review Loop*), and a flip to `stale` that
+restores the full cap is a return to the ungated pipeline, not a widening. The
+one asymmetric case is a marker `profile=light` against a pr-review
+`profile=full`, where the fuller wins — the review collapse **and** the cycle cap
+are **refused**, while the duplicate-test skip still applies, because a test run
+is a test run at any depth.
 
 Surface both on the `[1/7]` tracker line; with `review.adaptive_depth: false` print `depth: full, qa: absent` so it stays uniform:
 
@@ -302,7 +307,7 @@ If tests fail here, continue to the review loop — failures are picked up in St
 
 Read `references/agents/code-reviewer.md` for the reviewer prompt and `references/agents/fixer.md` for the fix-cycle prompt. Both spawn with the default general-purpose agent (do NOT set `subagent_type`; not a custom `code-reviewer`/`fixer` type). Pass the reviewer `branch_name`, `base_branch`, `pr_context` (PR title + body), and `diff_command` (`gh pr diff {N}`). Pass `review.confidence_threshold` (default 80) as the minimum confidence for code-reviewer findings; ui-reviewer keeps its 75 floor.
 
-To minimize tokens, the loop **reuses the same reviewer across cycles**: cycle 1 cold-starts; cycles 2+ re-message it via `SendMessage` to re-review the updated diff; after the fixer reports zero fixable issues, one **fresh** confirmation reviewer does an unbiased final check. Under `qa_handoff = trusted`, the cycle-1 cold-start reviewer is **collapsed into** that fresh confirmation pass rather than skipped — the PR still receives exactly one independent, full-strength review, just not two — and the loop cap drops to `min(1, configured_cap)`. The exact spawn calls, the `SendMessage` re-review prompt, and the token-trade rationale live in `references/review-loop-mechanics.md`.
+To minimize tokens, the loop **reuses the same reviewer across cycles**: cycle 1 cold-starts; cycles 2+ re-message it via `SendMessage` to re-review the updated diff; after the fixer reports zero fixable issues, one **fresh** confirmation reviewer does an unbiased final check. Under `qa_handoff = trusted`, the cycle-1 cold-start reviewer is **collapsed into** that fresh confirmation pass rather than skipped — the PR still receives exactly one independent, full-strength review, just not two — and the loop cap drops to `min(1, configured_cap)`. Both are refused by Step 1's *Precedence* carve-out when the marker says `profile=light` and this review resolved `profile=full`. The exact spawn calls, the `SendMessage` re-review prompt, and the token-trade rationale live in `references/review-loop-mechanics.md`.
 
 ### UI/UX Review (Step 3 — auto-detected)
 
@@ -348,7 +353,7 @@ These two hard-blocks are the issue #36 contract: a PR can pass tests and still 
 
 When `review.run_tests` is false, skip this step and report `○ tests skipped (review.run_tests: false)`; the soft-pass conjunction treats the test leg as satisfied.
 
-When true, detect and run the project's build system, then run all test types (unit, integration, e2e where present), with a `review.test_timeout`-second timeout (default: 300). The build-system detection table and the test-type breakdown are in `references/prepass-tests-ci-mechanics.md` (*Step 4*). **Under `qa_handoff = trusted`, skip this step** and report `○ tests skipped (qa handoff @ {head7})` — but only when the marker carries a `tests=` field whose SHA equals `head`; with no `tests=` field, or a SHA that differs, run the step in full. Step 5's CI is a separate leg and is never skipped: it runs on the remote against the merge result, and nothing in a PR body is evidence about it.
+When true, detect and run the project's build system, then run all test types (unit, integration, e2e where present), with a `review.test_timeout`-second timeout (default: 300). The build-system detection table and the test-type breakdown are in `references/prepass-tests-ci-mechanics.md` (*Step 4*). **Under `qa_handoff = trusted`, skip this step** and report `○ tests skipped (qa handoff @ {commit_sha_short})` — `{commit_sha_short}` is the first 7 characters of Step 1's `headRefOid` — but only when the marker carries a `tests=` field whose SHA equals `head`; with no `tests=` field, or a SHA that differs, run the step in full. A skipped step evaluated neither of its checks, so its completion report is `× Suite passed` / `× Build clean` with `Result: PARTIAL`, and the closing summary carries the gap — never a silent `√`/`✓ pass` (rule and rendering: *Step Completion Reports* in `references/report-templates.md`). Step 5's CI is a separate leg and is never skipped: it runs on the remote against the merge result, and nothing in a PR body is evidence about it.
 
 ```
 [4/7] Test         ✓ build ok, {N} tests passed
@@ -429,12 +434,7 @@ Cycle {N}:
 After Step 6, go back to Step 3 — but reuse the same reviewer agent via `SendMessage` (not a fresh spawn). Only spawn fresh for the confirmation pass.
 
 **Loop controls:**
-- **Max cycles:** `review.max_cycles` (default: 3). Step 1's `light` profile and
-  `qa_handoff = trusted` each cap it at `min(1, configured_cap)` and skip the
-  optional browser UI review; neither skips the reviewer, and neither relaxes the
-  two #36 hard-blocks (`acceptance_criteria: fail`, missing `Closes #N`), which
-  run at full strength on every path. Full mechanics in
-  `references/review-loop-mechanics.md` (*Depth gate*, *QA handoff gate*).
+- **Max cycles:** `review.max_cycles` (default: 3). Step 1's `light` profile and `qa_handoff = trusted` each cap it at `min(1, configured_cap)` — the `trusted` cap subject to the depth carve-out in Step 1's *Precedence* — and skip the optional browser UI review; neither skips the reviewer, and neither relaxes the two #36 hard-blocks (`acceptance_criteria: fail`, missing `Closes #N`), which run at full strength on every path. **Re-evaluate `qa_handoff` after every fixer push** — re-read `headRefOid` and recompute the verdict before re-entering Step 3, because the push moved the head the marker binds to; the loop re-enters at Step 3, so nothing else would. Full mechanics in `references/review-loop-mechanics.md` (*Depth gate*, *QA handoff gate*, *Re-evaluation after a fix*).
 - **Agent reuse:** Cycles 2+ reuse the existing reviewer and fixer agents. Fresh spawn only for the confirmation pass after fixer reports zero issues.
 - **Soft pass (when `review.soft_pass: true`, default):** Stop when ALL hold: zero `action: "fix"` issues remain AND (tests pass or `review.run_tests: false`) AND (CI passes, no CI configured, or `review.check_ci: false`) AND traceability is not `fail`. Medium `note` issues and `partial` dimensions are report-only — they do not block.
 - **Strict pass (when `review.soft_pass: false`):** Apply the same tests/CI gates, then require zero `action: "fix"` findings, zero remaining `action: "note"` findings, and `pass` for every enabled dimension. A `partial` dimension or any note is a strict blocker: exit the fix loop, report it under Remaining, and do not report clean or merge. Notes never become fixer inputs — Step 6 still fixes only `action: "fix"` — so strict mode surfaces these for manual remediation rather than looping without a fixable action.
