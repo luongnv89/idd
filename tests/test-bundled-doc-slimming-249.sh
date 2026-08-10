@@ -44,11 +44,32 @@ FAIL=0
 # does not widen it: this line is a ratchet, and the next addition should have
 # to justify itself exactly as hard as this one did.
 #
+# Raised to 508,900 in issue #256, which added the *Caller-supplied context
+# payloads* section to shared-agent-conventions.md — the single home of the rule
+# that a caller-supplied payload field may gate duplicated work but never a
+# safety gate, plus that document's exclusion list. 1,469 authored bytes,
+# bundled into 2 skills (auto-pilot, issue-resolver) = +2,938 measured, from
+# 504,224 to 507,162. That is content both skills execute: every #256 injection
+# site points here instead of restating the rule, so the alternative was the same
+# paragraph duplicated across five files and drifting.
+#
+# One trap paid for part of it first, in the same shape #255 documented: the
+# resolver's new triage prose originally spelled the artifact path
+# `.gitissue/triage.json`, and _config_sections_used in scripts/build.py reads
+# `triage.json` as a `triage.<key>` config reference — pulling the entire
+# `triage` config section into the resolver's per-skill excerpt for +1,194
+# bytes, none of which the resolver reads. The prose now names the triage graph
+# without its filename; the researcher agent, which performs the read, still
+# carries the exact path.
+#
+# The raise keeps the headroom at ~1.7KB, matching what existed before it, and
+# does not widen it.
+#
 # What the guard is actually for is unchanged and still has a wide margin:
 # reinstating one whole document across the skills that excerpt it costs on the
 # order of 165KB (config-schema.md is 27.5KB x 6 non-init skills), so a
 # regression of that shape fails this assertion by more than 3x the headroom.
-BUDGET=506000
+BUDGET=508900
 
 pass() { echo "  ✓ $1"; PASS=$((PASS + 1)); }
 fail() { echo "  ✗ $1"; FAIL=$((FAIL + 1)); }

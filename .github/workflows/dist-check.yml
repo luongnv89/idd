@@ -157,6 +157,9 @@ jobs:
       - name: test-qa-handoff-255
         run: bash tests/test-qa-handoff-255.sh
 
+      - name: test-subagent-context-256
+        run: bash tests/test-subagent-context-256.sh
+
       - name: test-model-suggestion-117
         run: bash tests/test-model-suggestion-117.sh
 
