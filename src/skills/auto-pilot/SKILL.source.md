@@ -253,7 +253,7 @@ Each iteration runs 5 phases. For brevity, the full step-by-step per-phase speci
 | 1 | Triage and Pick | Refresh triage, pick the top-priority ready issue, capture `{issue_payload}` (trimmed to `{issue_payload_ids}` for the reviewer) + `{triage_context}` for the spawns (*Step 1.2b*) | no (main agent) |
 | 2 | Resolve | Sync to default branch, run the full resolve pipeline | yes (/issue-resolver) |
 | 3-4 | PR Review | Run /issue-pr-review --auto --no-merge with up to 3 fix cycles + CI monitoring | yes (/issue-pr-review) |
-| 5 | Merge | Verify mergeability (trusting the reviewer's SHA-bound `ci_status` when the head has not moved — *Step 5.1a*), squash-merge, close the issue, create follow-up if needed | no (main agent) |
+| 5 | Merge | Verify mergeability (*Step 5.1a* decides on its own conditions whether the reviewer's `ci_status` may stand in for the CI wait — never restate them here), squash-merge, close the issue, create follow-up if needed | no (main agent) |
 
 See `references/phases.md` for full prompts, error handling, and decision tables.
 
@@ -261,7 +261,7 @@ See `references/phases.md` for full prompts, error handling, and decision tables
 issue's record and the triage graph it just wrote, so it hands them to the
 subagents it spawns. What that removes is one named duplicate read — the
 resolver's Step 0a fetch of the record Phase 1 just listed, which becomes a
-single-field `gh issue view N --json state` re-verify (*Step 0i*). It is not a
+three-field `gh issue view N --json state,comments,updatedAt` re-verify (*Step 0i*, which is also where the live `state` and `updatedAt` that gate 0a's stops and *Step 0h*'s condition 5 come from). It is not a
 per-lifecycle fetch count: Step 0d still re-reads the body it rewrote, and the
 reviewer still fetches the live body its acceptance-criteria hard-block is
 judged on — its trimmed `number`/`title`/`labels` block is context it would

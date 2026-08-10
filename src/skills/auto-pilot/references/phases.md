@@ -106,8 +106,11 @@ subagent derive them again (issue #256) — one per consumer shape:
   fetching up to 100 issues' comments to serve the one issue this iteration
   resolves costs more than it saves, and the resolver's *Step 0i* picks
   `comments` up in the single live read it already makes. `state` and `updatedAt`
-  are why the list call requests them: *Step 0h* compares `updatedAt`, and a
-  payload without it is `partial` and buys nothing. Never trim, summarize, or
+  are requested **structurally, not for their values**: a block missing either was
+  not built by this step, so *Step 0i* reads it as `partial` and the resolver
+  fetches. Neither value is trusted downstream — that same live re-verify is
+  where 0a's closed / not-found stops get their `state` and where *Step 0h*'s
+  condition 5 gets the `updatedAt` it compares. Never trim, summarize, or
   re-order the fields — a hand-edited payload is a different issue. **This block, and this rule, govern the resolver and
   batch-resolver spawns only** — they are the only spawns that receive it.
 - **`{issue_payload_ids}`** — the same record reduced to `number`, `title` and
@@ -508,7 +511,9 @@ If not mergeable:
 commit it waited on** — `passed@<sha40>` / `failed@<sha40>`, or a bare `no_ci`
 (*Binding the verdict to a commit* in that skill's
 `references/prepass-tests-ci-mechanics.md`). Re-running the whole wait here is
-duplicated work whenever the head has not moved since (issue #256).
+duplicated work whenever the head has not moved since **and** the live rollup
+already reports every check green — both conditions, never the first alone
+(issue #256).
 
 Set exactly one variable:
 
@@ -584,7 +589,7 @@ already disables the QA handoff gate — and forces `absent`.
 One `○` line, per `docs/terminal-style.md`:
 
 ```
-○ CI verdict: trusted (passed @ 9f2c1ab) — head unchanged, no re-poll
+○ CI verdict: trusted (passed @ 9f2c1ab) — head unchanged, checks green, no re-poll
 ○ CI verdict: stale (head moved) — waiting on CI
 ○ CI verdict: absent — waiting on CI
 ```

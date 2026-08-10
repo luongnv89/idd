@@ -318,6 +318,25 @@ check_block_has "$CI_GATE_BLOCK" 'that moved \*\*into conflict\*\*, and nothing 
 check_block_has "$CI_GATE_BLOCK" 'this gate neither widens nor closes it' \
   "T3.16: the section states the residual is open, not mitigated"
 
+# SIBLING PARITY. The home above is not the only place this gate is narrated:
+# examples.md walks the merge path and SKILL.md summarises it in the phase table.
+# A correction that lands in the home and not in its siblings leaves the OLD,
+# looser condition standing where an agent reads it — and here the looser form
+# ("SHA equality alone") fails OPEN on a merge decision. Pin both siblings.
+EXAMPLES_CI_BLOCK="$(awk '/^### Merge requires CI checks/{f=1;print;next} f&&/^#/{exit} f{print}' "$SRC_AP_EXAMPLES")"
+check_block_has "$EXAMPLES_CI_BLOCK" 'non-empty with every check in it green' \
+  "T3.17: the examples narration carries the rollup conjunct, not SHA equality alone"
+check_block_has "$EXAMPLES_CI_BLOCK" 'unreadable — is .absent., not .trusted.' \
+  "T3.18: the examples narration says an empty rollup is absent, not trusted"
+check_block_has "$EXAMPLES_CI_BLOCK" 'does not cover a clean base advance' \
+  "T3.19: the examples narration no longer claims mergeable catches a moved base"
+check_lacks "$SRC_AP_SKILL" 'ci_status. when the head has not moved' \
+  "T3.20: the SKILL phase table states no half-condition for the CI verdict gate"
+check_has "$SRC_AP_SKILL" 'gh issue view N --json state,comments,updatedAt' \
+  "T3.21: the SKILL names the widened live re-verify, not the old single-field read"
+check_lacks "$SRC_AP_SKILL" 'single-field .gh issue view' \
+  "T3.22: no site still calls the Step 0i re-verify single-field"
+
 # ───────────────────────────────────────────────────────────
 # T4 (AC4): last-green test state has ONE home and TWO consumers,
 # and it layers UNDER resolve.auto_test. Over it, a `false` config
@@ -659,6 +678,16 @@ check_block_has "$B_CI_GATE_BLOCK" 'that moved \*\*into conflict\*\*, and nothin
   "T7.53: built CI verdict gate scopes the moved-base residual to mergeable's real answer"
 check_block_has "$B_CI_GATE_BLOCK" 'this gate neither widens nor closes it' \
   "T7.54: built CI verdict gate states the residual is open, not mitigated"
+
+B_EXAMPLES_CI_BLOCK="$(awk '/^### Merge requires CI checks/{f=1;print;next} f&&/^#/{exit} f{print}' "$BUILT_AP_EXAMPLES")"
+check_block_has "$B_EXAMPLES_CI_BLOCK" 'non-empty with every check in it green' \
+  "T7.55: built examples narration carries the rollup conjunct"
+check_block_has "$B_EXAMPLES_CI_BLOCK" 'does not cover a clean base advance' \
+  "T7.56: built examples narration no longer claims mergeable catches a moved base"
+check_has "$BUILT_AP_SKILL" 'gh issue view N --json state,comments,updatedAt' \
+  "T7.57: built auto-pilot SKILL.md names the widened live re-verify"
+check_lacks "$BUILT_AP_SKILL" 'ci_status. when the head has not moved' \
+  "T7.58: built auto-pilot SKILL.md states no half-condition for the CI verdict gate"
 
 # ───────────────────────────────────────────────────────────
 # Summary
