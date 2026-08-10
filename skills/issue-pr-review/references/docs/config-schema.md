@@ -255,7 +255,7 @@ Config is validated on load at the start of every skill invocation. Errors inclu
 |---------|---------|-------------|
 | `platform` | `github` | Tracker platform driver — `github` is the only implemented driver (references/docs/platform-github.md) |
 | `review.max_cycles` | `3` | Max review-fix cycles |
-| `review.adaptive_depth` | `true` | Scale review depth to PR complexity — a trivial PR caps the review-fix loop at 1 cycle and skips optional passes (AC + traceability hard-blocks still run); `false` pins every PR to full depth and disables the QA handoff gate too ([agent-model-effort.md](https://github.com/luongnv89/idd/blob/main/docs/agent-model-effort.md)) |
+| `review.adaptive_depth` | `true` | Scale review depth to PR complexity — a trivial PR caps the review-fix loop at 1 cycle and skips optional passes (AC + traceability hard-blocks still run); `false` pins every PR to full depth and disables the QA handoff gate and #256's CI verdict gate too ([agent-model-effort.md](https://github.com/luongnv89/idd/blob/main/docs/agent-model-effort.md)) |
 | `review.auto_merge` | `false` | Auto-merge PR when clean |
 | `review.confidence_threshold` | `80` | Min confidence level for issues |
 | `review.run_tests` | `true` | Run tests during review |

@@ -367,6 +367,11 @@ The payload substitutes for **Step 0a's fetch and nothing else**:
   before Step 0b, stopping with 0a's own closed / not-found message if it comes
   back anything but `open`. That single-field read is the one part of 0a a
   payload cannot buy back; the body, title, labels and assignees it still does.
+  It is also the one issue read in this skill that deliberately bypasses the
+  `gi-issue.py` cache: a cached `state` is an older answer by design, and an
+  older answer is precisely the staleness this stop exists to catch. Going
+  through the cache here would also register the narrow one-field key as a
+  separate cache entry, buying nothing.
 - **0b's existing-work guard, 0c's already-resolved check and the mandatory Repo
   Sync run in full**, on every path.
   A caller-supplied field may gate duplicated work, never a safety gate — the

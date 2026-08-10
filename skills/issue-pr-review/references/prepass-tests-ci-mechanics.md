@@ -119,11 +119,18 @@ When checks are still running after `review.ci_timeout`: pending CI is **not cle
 ### Binding the verdict to a commit
 
 A CI verdict is a statement about **one commit**, not about a PR. Record
-`ci_sha` = the head this wait ran against, read once with
-`gh pr view {N} --json headRefOid` immediately before the wait starts (the
-script path and the manual loop alike), and report the outcome to the caller as
-`ci_status` = `passed@<sha40>` or `failed@<sha40>`. Full 40-character SHA; the
-short form is display-only.
+`ci_sha` = the head this wait ran against — and take it from the `headRefOid`
+**already in hand**, on the script path and the manual loop alike. Issue no
+second `gh pr view` for it: Step 1's PR read fetched that field, and the
+*Re-evaluation after a push* rule re-reads it after every push this skill makes
+(Step 2's auto-fix commit as much as any fixer push), so the value held when the
+wait starts is this skill's current head. `/auto-pilot`'s Step 5.1a is held to
+the same rule — one widened read, no standalone `headRefOid` call — and the two
+must not diverge. The one case a reused value misses is a head moved by
+something other than this skill; that costs the caller a stale SHA, which
+re-verifies as `absent` and re-polls, never a wrong merge. Report the outcome to
+the caller as `ci_status` = `passed@<sha40>` or `failed@<sha40>`. Full
+40-character SHA; the short form is display-only.
 
 Three cases stay **bare**, with no `@` suffix, because there is no commit-bound
 claim to make: `no_ci` (nothing ran), `review.check_ci: false` (nothing was

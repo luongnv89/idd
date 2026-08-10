@@ -378,12 +378,29 @@ check_has "$SRC_AP_SKILL"          "$SAFETY" \
 # CREATES the structured Acceptance Criteria section. Reading acceptance criteria
 # from it evaluates the #36 hard-block against superseded evidence, which is
 # "running a gate in full" on the wrong input.
-check_block_has "$REVIEWER_PROMPT" 'identifying fields only' \
-  "T5.19: the reviewer payload is scoped to identifying fields"
-check_block_lacks "$REVIEWER_PROMPT" 'acceptance criteria from it' \
-  "T5.20: the reviewer never reads acceptance criteria out of the payload"
-check_block_has "$REVIEWER_PROMPT" 'always re-fetches the live issue body' \
+# These three must pin instruction 6 ITSELF, not the reviewer block around it.
+# Two mutations proved the wider form vacuous: `identifying fields only` also
+# occurs in the block's own header (so rewriting the instruction to include the
+# body still matched), and the old lacks-assertion pinned `acceptance criteria
+# from it` — a string the text has never contained and no weakening would
+# introduce. Extract instruction 6 and assert both clauses inside it, positively.
+REVIEWER_INSTR6="$(printf '%s\n' "$REVIEWER_PROMPT" | awk '/^6\. When an issue_payload/,/^CRITICAL:/')"
+check_block_has "$REVIEWER_INSTR6" 'identifying fields only' \
+  "T5.19: instruction 6 itself scopes the reviewer payload to identifying fields"
+check_block_has "$REVIEWER_INSTR6" 'never take acceptance criteria out of it' \
+  "T5.20: instruction 6 itself forbids taking acceptance criteria from the payload"
+check_block_has "$REVIEWER_INSTR6" 'always re-fetches the live issue body' \
   "T5.21: the #36 acceptance_criteria hard-block always re-fetches the live body"
+# An instruction is only as good as the reader. The reviewer's block is TRIMMED
+# to number/title/labels at the spawn site, so "identifying fields only" is a
+# property of the data, not a rule an agent has to keep — and no untrusted issue
+# body reaches that prompt to be misread in the first place.
+check_block_has  "$REVIEWER_PROMPT" '\{issue_payload_ids\}' \
+  "T5.19b: the reviewer prompt substitutes the trimmed identifying-fields block"
+check_block_lacks "$REVIEWER_PROMPT" '\{issue_payload\}' \
+  "T5.19c: the reviewer prompt never substitutes the full verbatim payload"
+check_has "$SRC_AP_PHASES" '\*\*.\{issue_payload_ids\}.\*\* — the same record reduced to' \
+  "T5.19d: Step 1.2b builds the trimmed reviewer block, separately from the full one"
 check_has "$SRC_AP_PHASES" 'reviewer reads identifying fields from that payload only' \
   "T5.22: the spawn site states the same scope as the prompt it substitutes into"
 
@@ -392,19 +409,22 @@ check_has "$SRC_AP_PHASES" 'reviewer reads identifying fields from that payload 
 # (b) that no spawn prompt names a safety term the home does not state.
 check_has "$SRC_CONV" 'may carry the subset that applies to their consumer, never a different rule' \
   "T5.4b: the home authorises subset restatement and forbids a divergent rule"
+# The home permits FEWER items, never weaker words. The previous form of this
+# check iterated the same five terms T5.3 has just asserted are present in the
+# home, so its `! grep ... "$SRC_CONV"` half could never be true — it could not
+# fail. What can fail, and is the real risk, is a prompt that names one of the
+# home's safety items and then licenses skipping it.
+WEAKEN='(skip|skips|skipped|bypass|bypasses|omit|omits|shorten|shortens|soften|softens|relax|relaxes) (the |both |either )?(Repo Sync|gi-secscan|already-resolved check|Step 5 CI wait|#36 hard-block)'
 for pair in "resolver:$RESOLVER_PROMPT" "reviewer:$REVIEWER_PROMPT" "batch:$BATCH_PROMPT"; do
   tag="${pair%%:*}"
   blk="${pair#*:}"
-  bad=""
-  for term in 'Repo Sync' 'gi-secscan' 'already-resolved check' 'Step 5 CI wait' '#36 hard-blocks'; do
-    if printf '%s' "$blk" | grep -qF "$term" && ! grep -qF "$term" "$SRC_CONV"; then
-      bad="$bad [$term]"
-    fi
-  done
-  if [ -z "$bad" ]; then
-    pass "T5.4c ($tag): every exclusion term the prompt restates is stated in the home"
+  if [ -z "$blk" ]; then
+    fail "T5.4c ($tag): block is empty — the extraction anchor no longer matches"
+  elif printf '%s' "$blk" | grep -qEi "$WEAKEN"; then
+    fail "T5.4c ($tag): prompt licenses skipping a safety item the home excludes"
+    printf '%s' "$blk" | grep -Ei "$WEAKEN" | sed 's/^/      /'
   else
-    fail "T5.4c ($tag): prompt names terms absent from the home:$bad"
+    pass "T5.4c ($tag): the prompt restates a subset of the home, never a weaker rule"
   fi
 done
 
@@ -512,12 +532,17 @@ check_block_has "$B_STATE_BLOCK" 'recorded green run' \
 check_block_has "$B_QA_CAPTURE" 'Record it only for a green run on a clean tree' \
   "T7.35: built capture rule records nothing for a red or dirty run"
 
-check_block_has "$B_REVIEWER_PROMPT" 'identifying fields only' \
-  "T7.36: built reviewer prompt scopes the payload to identifying fields"
-check_block_lacks "$B_REVIEWER_PROMPT" 'acceptance criteria from it' \
-  "T7.37: built reviewer prompt never reads acceptance criteria from the payload"
-check_block_has "$B_REVIEWER_PROMPT" 'always re-fetches the live issue body' \
+B_REVIEWER_INSTR6="$(printf '%s\n' "$B_REVIEWER_PROMPT" | awk '/^6\. When an issue_payload/,/^CRITICAL:/')"
+check_block_has "$B_REVIEWER_INSTR6" 'identifying fields only' \
+  "T7.36: built instruction 6 scopes the payload to identifying fields"
+check_block_has "$B_REVIEWER_INSTR6" 'never take acceptance criteria out of it' \
+  "T7.37: built instruction 6 forbids taking acceptance criteria from the payload"
+check_block_has "$B_REVIEWER_INSTR6" 'always re-fetches the live issue body' \
   "T7.38: built reviewer prompt re-fetches the live body for the #36 hard-block"
+check_block_has  "$B_REVIEWER_PROMPT" '\{issue_payload_ids\}' \
+  "T7.36b: built reviewer prompt substitutes the trimmed identifying-fields block"
+check_block_lacks "$B_REVIEWER_PROMPT" '\{issue_payload\}' \
+  "T7.36c: built reviewer prompt never substitutes the full verbatim payload"
 check_has "$BUILT_AP_PHASES" 'gh pr view \{pr_number\} --json mergeable,reviewDecision,statusCheckRollup,headRefOid' \
   "T7.39: built phases.md ships the single widened --json read"
 check_has "$BUILT_CONV" 'may carry the subset that applies to their consumer, never a different rule' \

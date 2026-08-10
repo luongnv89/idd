@@ -47,10 +47,17 @@ FAIL=0
 # Raised to 508,900 in issue #256, which added the *Caller-supplied context
 # payloads* section to shared-agent-conventions.md — the single home of the rule
 # that a caller-supplied payload field may gate duplicated work but never a
-# safety gate, plus that document's exclusion list. 1,469 authored bytes,
-# bundled into 2 skills (auto-pilot, issue-resolver) = +2,938 measured, from
-# 504,224 to 507,162. That is content both skills execute: every #256 injection
-# site points here instead of restating the rule, so the alternative was the same
+# safety gate, plus that document's exclusion list. Measured, not estimated:
+# 1,960 authored bytes, which land as 1,971 in each bundled copy — the section
+# cites docs/terminal-style.md once and the build rewrites that token to
+# references/docs/…, +11 — bundled into 2 skills (auto-pilot, issue-resolver)
+# = +3,942. Two smaller rows ride along: +11 to platform-github.md, bundled into
+# 7 skills = +77; and +123 to config-schema.md — the adaptive_effort row (+96,
+# carried by 3 excerpts) and the adaptive_depth row (+27, carried by 3) now
+# disclosing the four #256 behaviours they switch off — = +369.
+# Total +4,388 measured, from 504,224 to 508,612. That is content
+# the skills execute: every #256 injection site points at the conventions
+# section instead of restating the rule, so the alternative was the same
 # paragraph duplicated across five files and drifting.
 #
 # One trap paid for part of it first, in the same shape #255 documented: the
@@ -62,8 +69,10 @@ FAIL=0
 # without its filename; the researcher agent, which performs the read, still
 # carries the exact path.
 #
-# The raise keeps the headroom at ~1.7KB, matching what existed before it, and
-# does not widen it.
+# The raise leaves 288 bytes of headroom, against the 1,776 that existed on main
+# under the 506,000 line — this ratchet is tighter than the one it replaces, not
+# a restored margin. The next addition does not fit without compressing
+# something first, which is the whole point of the line.
 #
 # What the guard is actually for is unchanged and still has a wide margin:
 # reinstating one whole document across the skills that excerpt it costs on the
