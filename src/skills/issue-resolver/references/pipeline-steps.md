@@ -420,6 +420,11 @@ payload above and run a **reduced, verify-first** pass:
    called small), set `analysis_reuse = stale` from here on, run the full research
    pass, and let Step 2 spawn the synthesizer as usual.
 
+Beyond `prior_analysis` the delegation payload is unchanged; say in the spawn
+prompt which phases the prior analysis already covers, so the researcher applies
+its own `prior_analysis` contract and skips exactly the work item 3 names instead
+of re-running it.
+
 The saving is real but bounded, and worth stating plainly: the codebase is
 researched once and *verified* once, rather than researched twice.
 
