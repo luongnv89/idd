@@ -427,7 +427,7 @@ iteration *Step 1.1*'s own `✓ Triage updated` line already reported the count:
 
 From `summary.suggested_order` in `.gitissue/triage.json` (the triage execution order), select the first issue that is:
 - **Not blocked** — no unresolved dependencies in the triage graph
-- **Not skipped** — not in the `--skip` list, the `skip_labels` set, or the **session skip list** (the in-memory list this run appends to: failed issues from Phase 2.3, dependency-blocked issues from Step 5.1b / Phase 3-4 Step 2a, and issues *Step 1.2b*'s post-pick re-check rejected as closed or assigned to another user), and not in the run state's **resume-seeded `processed[]`**. Consult all of them every iteration — the session skip list is what stops a dependency-blocked issue from being re-picked after the loop continues past it.
+- **Not skipped** — not in the `--skip` list, the `skip_labels` set (as the triage row records the issue's labels, which is why *Step 1.2b* re-asks this one against live labels after the pick), or the **session skip list** (the in-memory list this run appends to: failed issues from Phase 2.3, dependency-blocked issues from Step 5.1b / Phase 3-4 Step 2a, and issues *Step 1.2b*'s post-pick re-check rejected as closed, assigned to another user, or carrying a live skip label), and not in the run state's **resume-seeded `processed[]`**. Consult all of them every iteration — the session skip list is what stops a dependency-blocked issue from being re-picked after the loop continues past it.
 - **Not assigned** — not assigned to another user (unless there are no unassigned issues). The `assignees` array comes from *Step 1.1b*'s live read and from nowhere else: `.gitissue/triage.json` has no `assignees` field, so a cached order cannot answer this criterion at all.
 - **Open** — the issue is in *Step 1.1b*'s live `--state open` set. Same source, same reason: the cache carries no GitHub `state`. An issue closed since the cached triage — including one closed as `not planned`, which lands no commit for *Step 1.1a*'s commits-since check to notice — is still sitting in `summary.suggested_order`.
 
@@ -435,7 +435,9 @@ The first two criteria are answered from the triage graph and this run's own
 lists; the last two only from *Step 1.1b*'s live read. When that read is
 `unavailable`, evaluate the first two here as usual, skip the last two, and let
 *Step 1.2b*'s post-pick re-check catch a closed or foreign-assigned pick — it
-holds the same two fields, live, for the one issue that matters.
+holds those two fields, live, for the one issue that matters. It holds that
+issue's `labels` too, and re-asks **Not skipped**'s label half against them on
+every pick, `unavailable` or not (see below).
 
 **Quarantine is honored here, and only because the label is in the set.** An
 issue quarantined by *Step 2.3* carries `autopilot.quarantine_label`, and
@@ -447,6 +449,19 @@ nothing across runs. There is no separate quarantine gate to evaluate: **Not
 skipped** above already asks the question. The append happens once, at config
 load, so a run that starts with the label removed picks the issue again on its
 very next pass.
+
+**But the labels this step reads are the triage row's, so a reused cache answers
+with old ones.** *Step 1.1*'s scan reads `labels` live and `gi-triage-graph.py`
+records them on every row, so a **triage** iteration honors a quarantine the
+moment it is applied. A **reuse** iteration cannot: *Step 1.1a* already judged
+that cache `fresh`, and *Phase 2.3* applies the label mid-run **without landing a
+commit** for the gate's commits-since check to notice — a run that merges nothing
+is exactly the repeated-failure run quarantine exists for, so the cache stays
+`fresh` and its row still shows the issue unlabelled. The set is therefore asked
+twice: here, against the row, and once more **live** in *Step 1.2b*'s post-pick
+re-check, against the record that step already fetches. Same effective
+`skip_labels` set, same question, two readings of it — and only one of them can
+be stale.
 
 **On a resumed run, "this run's own lists" start non-empty.** *Step 1.0* seeds
 `processed[]` and `skip_list[]` from the recorded state on a `resumable` resume,
@@ -497,14 +512,22 @@ one bucket** — this is the single home of that mapping:
 | `blocked_by_dependency` | Step 5.1b / Phase 3-4 Step 2a's gate | `Dep-blocked` |
 | `not_eligible` | *Step 1.2b*'s post-pick re-check (closed) | `Skipped` |
 | `not_eligible` | *Step 1.2b*'s post-pick re-check (assigned to another user) | `Assigned` |
+| `quarantined` | *Step 1.2b*'s post-pick re-check (live `autopilot.quarantine_label`) | `Skipped` |
+| `blocked_label` | *Step 1.2b*'s post-pick re-check (any other live `skip_labels` value) | `Skipped` |
 | `resumed` | *Step 1.0*'s resume seeding of `processed[]` / `skip_list[]` | `Skipped` |
 
 `quarantined` counts under `Skipped` rather than earning a fifth bucket for the
 same reason `wontfix` does: from this step's point of view it is a label in the
 effective `skip_labels` set, and it is only ever *recorded* as its own reason so
-the run log and the summary can tell it apart from an ordinary failure. A
-quarantined issue reached on a **later** run is filtered by its label before this
-table is consulted at all, so it is counted as an ordinary label skip.
+the run log and the summary can tell it apart from an ordinary failure.
+`blocked_label` is the same answer for every other label in that set, and both
+land in `Skipped` for the same reason — which is what keeps the sum intact no
+matter which of the two readings above caught the label. A quarantined issue
+reached on a **later** run is normally filtered by its label before this table is
+consulted at all, off a triage row whose labels are live, and is then counted as
+an ordinary label skip; when that row's labels are *not* live it is *Step 1.2b*
+that catches it, one of these two rows records it, and the four counts read
+identically either way.
 
 The `resumed` row adds no fifth bucket **on purpose**. A seeded entry is an issue
 this run will not process, which is exactly what `Skipped` already counts, and
@@ -577,16 +600,55 @@ TTL allows — a real read at pick time in practice, since this loop fetches eac
 issue once per run, so the TTL has nothing of its own to serve back. Call it
 that, never "live": it is the same TTL-cached read the resolver's *Step 0i*
 already describes as possibly old before the caller ever held it. On that
-footing it is still the freshest answer this step has to the two criteria
-*Step 1.2* could otherwise take only from a list read moments earlier.
-If `.issue.state` is not `open`, or the issue is assigned to another
-user and *Step 1.2*'s **Not assigned** criterion would therefore have rejected it
-(that criterion, escape clause included, stays the single home of the rule),
-**do not spawn**: add `#{issue_number}` to the session skip list with the reason
-`not_eligible` (*Step 1.2*'s reason-to-bucket table is the single home of which
-of its four counts that lands in), print the line below, and return to *Step 1.2*
-for the next candidate. Every re-pick appends to that list, so the candidate set
-shrinks by one each time and this cannot spin.
+footing it is still the freshest answer this step has to criteria *Step 1.2*
+could otherwise take only from a list read moments earlier or from a cached
+triage row.
+Reject the pick on any one of three readings of this record — `.issue.state` is
+not `open`; the issue is assigned to another user and *Step 1.2*'s **Not
+assigned** criterion would therefore have rejected it (that criterion, escape
+clause included, stays the single home of the rule); or a name in
+`.issue.labels[].name` is in the effective `skip_labels` set (*Live labels close
+the reused cache's blind spot* below). On any of them **do not spawn**: add
+`#{issue_number}` to the session skip list with the reason this table gives,
+print the matching line below, and return to *Step 1.2* for the next candidate.
+Every re-pick appends to that list, so the candidate set shrinks by one each time
+and this cannot spin.
+
+| Rejected because | Reason recorded |
+|------------------|-----------------|
+| `.issue.state` is not `open` | `not_eligible` |
+| assigned to another user | `not_eligible` |
+| a live label matches `autopilot.quarantine_label` | `quarantined` |
+| a live label matches any other `skip_labels` value | `blocked_label` |
+
+*Step 1.2*'s reason-to-bucket table is the single home of which of its four
+counts each of those lands in — never restated here.
+
+**Live labels close the reused cache's blind spot.** *Step 1.2*'s **Not skipped**
+criterion answers `skip_labels` from the triage row, and on a reuse iteration
+that row's `labels` are as old as the cache *Step 1.1a* read as `fresh`.
+Quarantine is that case by construction: *Phase 2.3* applies
+`autopilot.quarantine_label` mid-run, and a run that merged nothing lands no
+commit for the gate's commits-since check to notice, so the very run that
+quarantines an issue would re-pick and re-resolve it on its next pass. Asking the
+record fetched above closes it for **every** value in the set, not just the
+quarantine label — a `wontfix`, `blocked` or `do-not-merge` a human adds while
+the loop is running is honored from the next pick onward — and it costs no extra
+call, because `labels` is already in the field list this step requests. The
+effective set is the one SKILL.md's *Configuration* step built, quarantine label
+included; this step never rebuilds it. Match on the label **name** exactly as
+*Step 1.2* does, and treat a label name as untrusted issue text: it is compared,
+never interpolated into a shell word.
+
+**Disposition, so nothing is counted twice.** A rejection here is a re-pick
+*inside* the same iteration, exactly like the two above it: no
+`[Iteration {i}/{max}]` slot is consumed, no iteration outcome is recorded, and
+**no `.gitissue/runs.jsonl` line is written** — the invariant is one line per
+*processed* issue (`references/run-log.md`), and a candidate rejected before the
+spawn was never processed. That is also precisely what a full triage would have
+done with the same labels, since it filters them out ahead of *Step 1.2*, so the
+reuse path and the triage path reach the same disposition rather than two.
+
 When *Step 1.1b*'s read succeeded this closes the narrow race between it and this
 fetch; when it was `unavailable` this is where **Open** and **Not assigned** are
 enforced at all. Either way one backstop sits behind it: under a supplied payload
@@ -596,11 +658,21 @@ but `open`. That read is the last word on `state`; this check is what keeps an
 ineligible pick from spending a spawn to reach it, and it is not the reason the
 resolver's stops hold. If the fetch itself degraded to nothing there is no record
 to check — spawn as before, which is the behavior that shipped before *Step 1.1a*
-existed.
+existed. That degrade covers the label reading too: with no record, the only
+answer available is the one *Step 1.2* already took from the triage row. Note
+that it takes **both** the script and the `gh` fallback beside it failing to get
+there, and that a stale-cache quarantine costs one wasted resolve, never a
+lost one — the label stays on the issue for the next pick.
 
 ```
-○ #{issue_number} no longer eligible ({closed | assigned to @{login}}) — picking again
+○ #{issue_number} no longer eligible ({closed | assigned to @{login} | quarantined ({autopilot.quarantine_label}) | labelled {matched_label}}) — picking again
 ```
+
+One reason per line, chosen by the table above: `quarantined (…)` names the
+quarantine label so an unattended log says *why* the issue is parked and what to
+remove, and `labelled {matched_label}` names whichever other `skip_labels` value
+matched. Check the labels in the order the table lists them, so an issue carrying
+both the quarantine label and `wontfix` reports the quarantine.
 
 Capture three blocks for the spawn prompts rather than making each
 subagent derive them again (issue #256) — one per consumer shape:

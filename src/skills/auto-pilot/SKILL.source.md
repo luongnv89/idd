@@ -75,7 +75,7 @@ Before starting the loop, verify the environment. On failure, output the exact e
    gh api rate_limit --jq '{remaining: .rate.remaining, reset: .rate.reset}'
    ```
 
-   **Threshold:** at or above 500, proceed silently; between 200 and 500, warn with the `⚠` variant and continue. Below **200** the run does **not** stop dead — it **pauses until `reset` and then re-probes**, provided that instant fits inside `autopilot.max_runtime_minutes`; when it does not fit, or `reset` is unknown, stop cleanly with the persisted report rather than stranding issues half-resolved. The verdict, the chunked pause that keeps the run lock alive across it, and the prose fallback are in `references/preflight.md` (*Rate-limit pause*) — read it before acting on a low budget.
+   **Threshold:** at or above 500, proceed silently; between 200 and 500, warn with the `⚠` variant and continue. Below **200** the run does **not** stop dead — it **pauses until `reset` and then re-probes**, provided that instant fits inside `autopilot.max_runtime_minutes`; when it does not fit, or `reset` is unknown, stop cleanly with the persisted report rather than stranding issues half-resolved. The fit is measured from the clock here — no run has started, so no `started_at` exists to measure from — and this site holds **no run lock yet**, so the pause neither refreshes a heartbeat nor releases anything on the stop path. The verdict, that preflight variant, the chunked pause that keeps the run lock alive across a *mid-run* pause, and the prose fallback are in `references/preflight.md` (*Rate-limit pause*) — read it before acting on a low budget.
 9. **Confirm push/merge permission** (driver `docs/platform-github.md` ~22-23): check the caller's repository permission:
 
    ```bash

@@ -1055,6 +1055,138 @@ expect_grep "T10: phases.md names the consequence — every seeded entry is 'res
 expect_grep "T10: a worked example covers all three hardening behaviors" \
   '## Unattended hardening: quarantine, rate-limit pause, runtime budget' "$AP_EXAMPLES"
 
+# ───────────────────────────────────────────────────────────
+# T11 (AC1, QA cycle 2): the quarantine label is honored on a
+#      reused-cache iteration, where the triage row's labels are stale
+# ───────────────────────────────────────────────────────────
+# The hole this pins: Step 1.2's `skip_labels` criterion is answered from the
+# triage graph, whose per-issue `labels` are as old as the cached payload. Phase
+# 2.3 applies the quarantine label mid-run and lands NO commit, so Step 1.1a's
+# commits-since check keeps reading that cache as `fresh` — and the very run that
+# quarantined the issue re-picks and re-resolves it. The close is Step 1.2b's
+# post-pick re-check, which already holds the picked issue's live `labels`.
+PICK_BLOCK="$(awk '/^### Step 1.2 — Pick Next Issue/{f=1;next} f && /^### /{exit} f' "$AP_PHASES")"
+CAPTURE_BLOCK="$(awk '/^### Step 1.2b — Capture the caller payload/{f=1;next} f && /^### /{exit} f' "$AP_PHASES")"
+AP_RUNSCHEMA="$AP/references/docs/run-log-schema.md"
+
+# The re-check is the enforcement point, so the criterion has to live in *that*
+# block — not merely somewhere in phases.md, which was already true and still let
+# a quarantined issue through.
+expect_block "AC1: Step 1.2b rejects a pick whose live labels are in skip_labels" \
+  "$CAPTURE_BLOCK" 'is in the effective `skip_labels` set'
+expect_block "AC1: the re-check reads the label names off the fetched record" \
+  "$CAPTURE_BLOCK" '`.issue.labels[].name`'
+expect_block "AC1: the re-check names the reused-cache blind spot it closes" \
+  "$CAPTURE_BLOCK" '**Live labels close the reused cache'
+expect_block "AC1: it states the no-commit reason the cache stays fresh" \
+  "$CAPTURE_BLOCK" 'a run that merged nothing lands no'
+expect_block "AC1: the close is stated for the whole skip_labels set, not just quarantine" \
+  "$CAPTURE_BLOCK" 'closes it for **every** value in the set'
+expect_block "AC1: the live check costs no extra call — labels are already fetched" \
+  "$CAPTURE_BLOCK" 'because `labels` is already in the field list this step requests'
+
+# The disposition, which is what keeps the counts and the telemetry honest: a
+# reason per rejection, one bucket each, no run-log line, no iteration slot.
+expect_block "AC1: a quarantine-label rejection records the reason 'quarantined'" \
+  "$CAPTURE_BLOCK" '| a live label matches `autopilot.quarantine_label` | `quarantined` |'
+expect_block "AC1: any other skip label records the reason 'blocked_label'" \
+  "$CAPTURE_BLOCK" '| a live label matches any other `skip_labels` value | `blocked_label` |'
+expect_block "AC1: 1.2b still defers the bucket to Step 1.2's table" \
+  "$CAPTURE_BLOCK" 'reason-to-bucket table is the single home'
+expect_block "AC1: a label rejection writes no run-log line" \
+  "$CAPTURE_BLOCK" '**no `.gitissue/runs.jsonl` line is written**'
+expect_block "AC1: a label rejection consumes no iteration slot" \
+  "$CAPTURE_BLOCK" '`[Iteration {i}/{max}]` slot is consumed'
+expect_block "AC1: the reuse path is stated to match what a full triage would do" \
+  "$CAPTURE_BLOCK" 'reuse path and the triage path reach the same disposition'
+expect_block "AC1: the skip line names the quarantine label so an unattended log says why" \
+  "$CAPTURE_BLOCK" 'quarantined ({autopilot.quarantine_label})'
+
+# Step 1.2 keeps the read side, but must no longer claim the cached answer is
+# sufficient — a reader who stops there is the reader who shipped the bug.
+expect_block "AC1: Step 1.2 admits its labels come from the triage row" \
+  "$PICK_BLOCK" '**But the labels this step reads are the triage row'
+expect_block "AC1: Step 1.2 names the reuse iteration as the stale case" \
+  "$PICK_BLOCK" 'A **reuse** iteration cannot'
+expect_block "AC1: Step 1.2 points the live reading at Step 1.2b" \
+  "$PICK_BLOCK" 'once more **live** in *Step 1.2b*'
+expect_block "AC1: the Not skipped criterion says the label half is re-asked live" \
+  "$PICK_BLOCK" 're-asks this one against live labels after the pick'
+# Every reason still maps to a bucket, or the four counts stop summing.
+expect_block "AC1: the bucket table carries the 1.2b quarantined row" \
+  "$PICK_BLOCK" '| `quarantined` | *Step 1.2b*'"'"'s post-pick re-check (live `autopilot.quarantine_label`) | `Skipped` |'
+expect_block "AC1: the bucket table carries the 1.2b blocked_label row" \
+  "$PICK_BLOCK" '| `blocked_label` | *Step 1.2b*'"'"'s post-pick re-check (any other live `skip_labels` value) | `Skipped` |'
+expect_block "AC1: the sum invariant survives the two added rows" \
+  "$PICK_BLOCK" 'every filtered issue lands in exactly one bucket'
+
+# Cross-file agreement — cycle 1's lesson was that one claim with three homes
+# gets two of them updated.
+expect_grep "AC1: run-log.md says a triage-mode label skip writes no line at all" \
+  '**no** line at all, exactly as a `wontfix` issue does today' "$AP_RUNLOG"
+expect_grep "AC1: run-log.md still gives explicit-list mode its counter slot and line" \
+  'it gets an `[Issue {i}/{total}]` slot and its' "$AP_RUNLOG"
+expect_grep "AC1: the No-eligible catalog names the two new skip-list reasons" \
+  '`quarantined` or `blocked_label` when its live labels are in' "$AP_ERRORS"
+for reason in 'quarantined' 'blocked_label'; do
+  expect_grep "AC1: the bundled run-log schema already admits skipped_reason $reason" \
+    "$reason" "$AP_RUNSCHEMA"
+done
+
+# ───────────────────────────────────────────────────────────
+# T12 (AC2, QA cycle 2): the Prerequisite 8 pause is satisfiable
+#      as written — no run state and no lock exist there yet
+# ───────────────────────────────────────────────────────────
+# The pause procedure is shared by two call sites. Written for the mid-run one it
+# asks Prerequisite 8 for three things it cannot have: a deadline derived from
+# run_state.started_at, a heartbeat refresh between chunks, and a lock to release
+# on the stop branch. Unstated, the deadline silently becomes unbounded — which
+# is the promise SKILL.md's Prerequisite 8 makes, broken.
+PAUSE_BLOCK="$(awk '/^## Rate-limit pause/{f=1;next} f && /^## /{exit} f' "$AP_PREFLIGHT")"
+
+expect_block "AC2: the deadline is stated to have one derivation per call site" \
+  "$PAUSE_BLOCK" '**It has two derivations, one per call site.**'
+expect_block "AC2: mid-run it is still measured from the recorded started_at" \
+  "$PAUSE_BLOCK" '`run_state.started_at + autopilot.max_runtime_minutes × 60`'
+expect_block "AC2: at Prerequisite 8 it comes from the clock instead" \
+  "$PAUSE_BLOCK" 'derive it from the clock: `now + autopilot.max_runtime_minutes'
+expect_block "AC2: the preflight derivation says why no run state exists yet" \
+  "$PAUSE_BLOCK" 'writes `started_at` in `references/phases.md` (*Step 1.0*), which runs after the'
+expect_block "AC2: 0 still means unbounded at both sites" \
+  "$PAUSE_BLOCK" '`0` means unbounded'
+expect_block "AC2: fabricating a started_at is ruled out, with the consequence named" \
+  "$PAUSE_BLOCK" 'an unsatisfiable deadline degrades into an'
+
+expect_block "AC2: the preflight site is stated to hold no lock and no run state" \
+  "$PAUSE_BLOCK" '**The preflight site holds no lock and has no run state'
+expect_block "AC2: the between-chunk heartbeat refresh is scoped out of preflight" \
+  "$PAUSE_BLOCK" 'the between-chunk heartbeat refresh **does not apply**'
+expect_block "AC2: the pause may not create run-state.json ahead of --init" \
+  "$PAUSE_BLOCK" 'ahead of the `--init` that owns creating it'
+expect_block "AC2: chunking itself is unchanged — only the refresh drops away" \
+  "$PAUSE_BLOCK" 'The chunked `--wait` call itself is unchanged'
+expect_block "AC2: the bracketing runtime-budget check is scoped out too" \
+  "$PAUSE_BLOCK" 'the bracketing *Runtime budget check* does not apply either'
+expect_block "AC2: the deadline is named as the enforcement at the preflight site" \
+  "$PAUSE_BLOCK" 'The `--deadline` above **is** the'
+expect_block "AC2: 'release the lock' is scoped to the mid-run case in the prose" \
+  "$PAUSE_BLOCK" 'is the mid-run half of that row'
+expect_block "AC2: the stop row itself carries the scope, not just the prose below it" \
+  "$PAUSE_BLOCK" 'release the lock (mid-run only — at Prerequisite 8 none is held yet)'
+expect_block "AC2: mid-run behavior is restated so the scoping cannot be read as a removal" \
+  "$PAUSE_BLOCK" 'Mid-run every one of those reads normally'
+
+# All three files have to tell the same story — SKILL.md makes the promise, the
+# catalog prints the stop, preflight.md owns the procedure.
+expect_grep "AC2: Prerequisite 8 says the fit is measured from the clock" \
+  'The fit is measured from the clock here' "$AP_SKILL"
+expect_grep "AC2: Prerequisite 8 says no run lock is held at that site" \
+  '**no run lock yet**' "$AP_SKILL"
+expect_grep "AC2: the fatal block scopes its lock release to the mid-run case" \
+  '**At Prerequisite 8 there is no lock yet**' "$AP_ERRORS"
+expect_grep "AC2: the fatal block still requires the persisted report at both sites" \
+  'the preflight stop is the report and this block alone' "$AP_ERRORS"
+
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 echo "  Results: $PASS passed, $FAIL failed"
 if [ "$FAIL" -gt 0 ]; then

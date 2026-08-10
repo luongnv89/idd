@@ -81,7 +81,7 @@ All errors follow the rich error format: what went wrong + fix command + docs li
   Docs:    https://github.com/luongnv89/idd/blob/main/docs/platform-github.md
 ```
 **Trigger:** `gi-ratelimit.py --verdict` returns `action: "stop"` — the pause would run past the runtime budget, or `reset` is unknown. Fatal.
-**Action:** Persist the final summary with `gi-state.py --report`, release the run lock, and stop. Nothing is left half-resolved because nothing was started.
+**Action:** Persist the final summary with `gi-state.py --report`, release the run lock, and stop. Nothing is left half-resolved because nothing was started. **At Prerequisite 8 there is no lock yet** — it is taken further down the prerequisites — so the release is the mid-run half of this action and the preflight stop is the report and this block alone; the deadline the verdict was given comes from the clock rather than from a run state that does not exist. Both variants are in `references/preflight.md` (*Rate-limit pause*).
 
 **Low-budget warning (non-fatal):** on `action: "warn"` — `remaining` between 200 and 500 — print the same block with a `⚠` symbol and the line `Proceeding — budget may run low; the loop will pause and resume if it hits the limit.` instead of stopping.
 
@@ -253,7 +253,9 @@ with all-zero counts. This is a success message, not an error.
 **Trigger:** All open issues are blocked, skipped, assigned to other users, or
 added to the session skip list — by the Phase 5.1b dependency gate
 (`blocked_by_dependency`), by a Phase 2.3 resolution failure (`failed`), or by
-Step 1.2b's post-pick re-check (`not_eligible`). This is the
+Step 1.2b's post-pick re-check (`not_eligible` when the issue is closed or
+assigned elsewhere; `quarantined` or `blocked_label` when its live labels are in
+the effective `skip_labels` set). This is the
 **only** place a run ends for dependency reasons — the gate itself never stops
 the loop. Omit the `Dep-blocked` line when that count is zero. Keep this block
 byte-identical to the one in `references/phases.md` (*Step 1.2*), and take which

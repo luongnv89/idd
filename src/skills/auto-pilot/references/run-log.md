@@ -85,3 +85,14 @@ from that line, so no second line is written for it. `skipped_reason:
 quarantined` belongs to the **later** run that skips the issue because it carries
 `autopilot.quarantine_label`, which is an ordinary skip before resolution
 started. One line per processed issue, unchanged.
+
+**Which later run writes that line, and which writes none.** In **explicit list
+mode** the user named the issue, so it gets an `[Issue {i}/{total}]` slot and its
+one `skipped` line with `skipped_reason: quarantined`
+(`references/explicit-list-mode.md` → *Loop behavior*). In **triage mode** the
+label is a pick filter: *Step 1.2* drops the issue from the candidates, or — on a
+reused cache whose labels predate the label — *Step 1.2b*'s post-pick re-check
+rejects it and re-picks. Either way the issue is never processed, so it writes
+**no** line at all, exactly as a `wontfix` issue does today. Both are the same
+rule: one line per *processed* issue, and a candidate filtered before the spawn
+was not one.
