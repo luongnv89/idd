@@ -104,7 +104,7 @@ UI/UX **code** review needs no config flag — it is auto-detected per PR (*Step
 ```
   ◆ PR Review Pipeline
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  [1/7] PR Info      ✓ PR #87: fix(auth): resolve redirect (#42), depth: full
+  [1/7] PR Info      ✓ PR #87: fix(auth): resolve redirect (#42), depth: full, qa: absent
   [2/7] Pre-pass     ✓ lint clean, format clean, 17 tests passed
   [3/7] Review       ● analyzing changes...
   [4/7] Test         ✓ 17 tests passed, build ok
