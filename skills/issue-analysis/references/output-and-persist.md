@@ -208,12 +208,14 @@ After output:
 After Step 8, save the analysis to `.gitissue/analysis-<N>.json`.
 
 1. Create the directory if it doesn't exist: `mkdir -p .gitissue/`
-2. Capture `git_state` so the analysis is pinned to a specific point in time:
+2. Capture `git_state` so the analysis is pinned to a specific point in time. Run each command and write its output to the **exact JSON key named beside it** — the key names are a contract, not a suggestion, so never rename one on the way in:
    ```bash
-   git rev-parse --abbrev-ref HEAD            # branch
-   git rev-parse HEAD                         # commit_sha
-   git rev-parse --short=7 HEAD               # commit_sha_short
+   git rev-parse --abbrev-ref HEAD            # → git_state.branch
+   git rev-parse HEAD                         # → git_state.commit_sha (full 40 chars — never write it as `sha`)
+   git rev-parse --short=7 HEAD               # → git_state.commit_sha_short (display only)
+   date -u +%Y-%m-%dT%H:%M:%SZ                # → git_state.captured_at AND the top-level `timestamp`
    ```
+   Run the clock command **once** and write that one value to both timestamp keys. Both are **captured by running that command** — never invented, estimated, inferred from the conversation's idea of the date, or rounded to midnight; a `T00:00:00Z` value is the signature of a guessed clock.
    If the working tree is detached or the branch cannot be resolved, fall back to `branch: "(detached)"` and continue.
 3. Build the `decision_record` block by lifting fields from Steps 6 and 7:
    - `root_cause` ← `analysis.summary` (one paragraph; use `analysis.details` first paragraph if `summary` is empty)
@@ -221,9 +223,11 @@ After Step 8, save the analysis to `.gitissue/analysis-<N>.json`.
    - `options_rejected` ← every option whose number is not `recommended_option`, each with a one-line reason derived from `options[].cons[0]` or `options[].risk_details`
    - `selected_option` ← `options[recommended_option - 1]` reduced to number + name + summary
    - `residual_risk` ← the highest-severity con of the selected option, or `"none identified"` if none
-4. Build the full JSON object from Steps 1-8 analysis results plus `git_state` and `decision_record` using the schema below
+4. Build the full JSON object from Steps 1-8 analysis results plus `git_state` and `decision_record` using the schema below. `issue.updatedAt` is **required**: copy it verbatim from the Step 1 issue fetch (whose field list already requests `updatedAt`) — never omit it, never re-derive it, and never substitute the capture time.
 5. Write `.gitissue/analysis-<N>.json` with formatted JSON (readable diffs in git)
 6. Print: `✓ Analysis saved to .gitissue/analysis-<N>.json`
+
+**These key names are a consumer contract.** `/issue-resolver`'s *Step 0h — Analysis reuse gate* reads `git_state.commit_sha` and `issue.updatedAt` to decide whether this analysis is still true — the commit-SHA pin exists precisely so that check is possible, and `issue.updatedAt` is the GitHub-clock value the resolver compares its own fresh fetch against. The top-level `timestamp` and `git_state.captured_at` record when the analysis was taken; they are the *local* clock and the gate never compares them against GitHub's. Renaming a key (writing `git_state.sha` instead of `commit_sha`), omitting one, or inventing the clock does not fail loudly: it silently answers `stale` forever, so the resolver re-runs the very research this file was written to save.
 
 If writing fails:
 ```
@@ -363,7 +367,7 @@ This is a warning, not a fatal error — the terminal output from Step 6 was alr
     "branch": "main",
     "commit_sha": "01afdc5ba2a1f856f116d46168f870d35b549789",
     "commit_sha_short": "01afdc5",
-    "captured_at": "2026-04-27T05:35:43Z"
+    "captured_at": "2026-03-21T14:30:00Z"
   },
   "decision_record": {
     "root_cause": "One-paragraph diagnosis lifted from analysis.summary or analysis.details.",
@@ -399,7 +403,7 @@ The `reproduction` object is **optional** and present only for `type: bug` issue
 | Field | Type | Description |
 |-------|------|-------------|
 | `version` | integer | Schema version, always `1` |
-| `timestamp` | ISO 8601 string | When this analysis was generated |
+| `timestamp` | ISO 8601 string | When this analysis was generated — captured with `date -u +%Y-%m-%dT%H:%M:%SZ`, never invented |
 | `source` | string | Always `"/issue-analysis"` |
 | `issue.number` | integer | GitHub issue number |
 | `issue.title` | string | Issue title |
@@ -410,7 +414,7 @@ The `reproduction` object is **optional** and present only for `type: bug` issue
 | `issue.labels` | string[] | GitHub labels |
 | `issue.state` | string | `"open"` or `"closed"` |
 | `issue.createdAt` | ISO 8601 string | Issue creation date |
-| `issue.updatedAt` | ISO 8601 string | Last update date |
+| `issue.updatedAt` | ISO 8601 string | Last update date, copied verbatim from the issue fetch — **required**, never omitted |
 | `research_status` | object | Explorer status copied unchanged; always persisted so status findings remain visible |
 | `research_status.already_resolved` | boolean | Research found resolution evidence on the default branch |
 | `research_status.pr_in_progress` | boolean | Research found an open PR targeting this issue |
