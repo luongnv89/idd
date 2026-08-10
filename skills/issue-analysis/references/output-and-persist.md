@@ -227,7 +227,7 @@ After Step 8, save the analysis to `.gitissue/analysis-<N>.json`.
 5. Write `.gitissue/analysis-<N>.json` with formatted JSON (readable diffs in git)
 6. Print: `✓ Analysis saved to .gitissue/analysis-<N>.json`
 
-**These key names are a consumer contract.** `/issue-resolver`'s *Step 0h — Analysis reuse gate* reads `git_state.commit_sha`, the top-level `timestamp`, and `issue.updatedAt` to decide whether this analysis is still true — the commit-SHA pin exists precisely so that check is possible. Renaming a key (writing `git_state.sha` instead of `commit_sha`), omitting one, or inventing the clock does not fail loudly: it silently answers `stale` forever, so the resolver re-runs the very research this file was written to save.
+**These key names are a consumer contract.** `/issue-resolver`'s *Step 0h — Analysis reuse gate* reads `git_state.commit_sha` and `issue.updatedAt` to decide whether this analysis is still true — the commit-SHA pin exists precisely so that check is possible, and `issue.updatedAt` is the GitHub-clock value the resolver compares its own fresh fetch against. The top-level `timestamp` and `git_state.captured_at` record when the analysis was taken; they are the *local* clock and the gate never compares them against GitHub's. Renaming a key (writing `git_state.sha` instead of `commit_sha`), omitting one, or inventing the clock does not fail loudly: it silently answers `stale` forever, so the resolver re-runs the very research this file was written to save.
 
 If writing fails:
 ```
@@ -367,7 +367,7 @@ This is a warning, not a fatal error — the terminal output from Step 6 was alr
     "branch": "main",
     "commit_sha": "01afdc5ba2a1f856f116d46168f870d35b549789",
     "commit_sha_short": "01afdc5",
-    "captured_at": "2026-04-27T05:35:43Z"
+    "captured_at": "2026-03-21T14:30:00Z"
   },
   "decision_record": {
     "root_cause": "One-paragraph diagnosis lifted from analysis.summary or analysis.details.",

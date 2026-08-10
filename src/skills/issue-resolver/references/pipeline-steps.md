@@ -267,9 +267,12 @@ git merge-base --is-ancestor "$sha" "$base_ref"
 git diff --name-only "$sha".."$base_ref"    # ∩ affected_files[].path ⇒ must be EMPTY
 
 # 5. The issue has not been edited since the analysis ran: the `updatedAt`
-#    captured in *0a* is not newer than the analysis `timestamp`. Compare as
-#    ISO-8601 instants, not as raw strings; if either fails to parse, the
-#    condition fails.
+#    captured in *0a* is not newer than the `issue.updatedAt` the analysis
+#    recorded. Both sides are GitHub's own clock — never compare against the
+#    analysis `timestamp`, which is the *local* capture clock, so skew between
+#    the two could read an edited issue as unedited. Compare as ISO-8601
+#    instants, not as raw strings; a missing or unparsable value on either
+#    side fails the condition.
 ```
 
 **Condition 5 carries a trap: *0d — Auto-normalize* rewrites the issue body with

@@ -155,8 +155,10 @@ check_has "$SRC_STEPS" 'affected_files' \
   "T2.8: condition 4 intersects those paths with the analysis affected_files"
 check_has "$SRC_STEPS" 'updatedAt' \
   "T2.9: condition 5 compares the issue updatedAt"
-check_has "$SRC_STEPS" 'analysis `timestamp`|analysis .timestamp' \
-  "T2.10: condition 5 compares updatedAt against the analysis timestamp"
+check_has "$SRC_STEPS" '`issue\.updatedAt` the analysis|issue\.updatedAt. the analysis' \
+  "T2.10: condition 5 compares it against the recorded issue.updatedAt"
+check_has "$SRC_STEPS" 'never compare against the|analysis .timestamp., which is the \*local\*' \
+  "T2.10b: condition 5 forbids comparing against the local-clock analysis timestamp"
 check_has "$SRC_STEPS" "base_ref=\"origin/\\\$\{base\}\"" \
   "T2.11: the predicate evaluates against this run's synced base ref"
 check_has "$SRC_STEPS" '[Nn]ever a bare .?HEAD' \
