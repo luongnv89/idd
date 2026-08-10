@@ -747,6 +747,81 @@ check_has "$SRC_CONFIG_SCHEMA" 'QA handoff gate' \
   "T17.3: the schema tells an operator adaptive_depth=false also disables the gate"
 
 # ───────────────────────────────────────────────────────────
+# T18 (producer, AC1/AC2): each SHA the marker carries has an
+# anchored capture instruction at the step that produces it. A
+# contract that says "write the SHA the suite actually ran
+# against" without telling the agent to record it at that moment
+# is unimplementable: by Deliver, HEAD has moved past both, and
+# the only value still in reach is `head` — the exact assumption
+# the contract forbids. Every capture therefore states the
+# omit-rather-than-default fail-safe too.
+# ───────────────────────────────────────────────────────────
+SRC_PIPELINE="$REPO_ROOT/src/skills/issue-resolver/references/pipeline-steps.md"
+BUILT_PIPELINE="$REPO_ROOT/skills/issue-resolver/references/pipeline-steps.md"
+for f in "$SRC_PIPELINE" "$BUILT_PIPELINE"; do
+  if [ -f "$f" ]; then
+    pass "T18.0: exists: ${f#$REPO_ROOT/}"
+  else
+    fail "T18.0: missing: ${f#$REPO_ROOT/}"
+  fi
+done
+
+for pair in "src:$SRC_PIPELINE" "built:$BUILT_PIPELINE"; do
+  tag="${pair%%:*}"
+  f="${pair#*:}"
+  # tests_sha — captured in the QA loop's Run tests item, before the
+  # documentation commit that would otherwise make it unrecoverable.
+  qa_block="$(awk '/^## Step 4 — QA/,/^### Step 4 — UI\/UX review/' "$f")"
+  check_block_has "$qa_block" 'tests_sha. = .git rev-parse HEAD' \
+    "T18.1 ($tag): the QA loop captures tests_sha with an explicit command"
+  check_block_has "$qa_block" 'at the moment the suite runs' \
+    "T18.2 ($tag): the capture is anchored to when the suite runs"
+  check_block_has "$qa_block" 'omit the whole .tests=. field; never substitute' \
+    "T18.3 ($tag): an uncaptured tests_sha omits the field instead of defaulting"
+  # ui_sha — captured where the ui-reviewer is spawned, which precedes the QA
+  # cycles, so every fix commit those cycles produce lands after it.
+  ui_block="$(awk '/^### Step 4 — UI\/UX review/,/^## Edge Cases/' "$f")"
+  check_block_has "$ui_block" 'ui_sha. = .git rev-parse HEAD' \
+    "T18.4 ($tag): the UI review sub-step captures ui_sha with an explicit command"
+  check_block_has "$ui_block" 'ui-reviewer is spawned\*\*' \
+    "T18.5 ($tag): the capture is anchored to the ui-reviewer spawn"
+  check_block_has "$ui_block" 'omit the .@<sha40>. suffix; never' \
+    "T18.6 ($tag): an uncaptured ui_sha omits the suffix instead of defaulting"
+  check_block_has "$ui_block" 'Browser gate config key' \
+    "T18.7 ($tag): (guard) the UI review sub-step block was actually located"
+done
+
+# The producer contract points at both capture sites rather than restating them,
+# and repeats the fail-safe where the value is written.
+for pair in "src:$SRC_TEMPLATES" "built:$BUILT_TEMPLATES"; do
+  tag="${pair%%:*}"
+  f="${pair#*:}"
+  tests_row="$(grep -E '^\| .tests. \|' "$f" | head -1 || true)"
+  ui_row="$(grep -E '^\| .ui. \|' "$f" | head -1 || true)"
+  check_block_has "$tests_row" 'references/pipeline-steps\.md' \
+    "T18.8 ($tag): the tests= row points at its capture site"
+  check_block_has "$tests_row" 'when no capture was recorded' \
+    "T18.9 ($tag): and omits the field when nothing was captured"
+  check_block_has "$ui_row" 'references/pipeline-steps\.md' \
+    "T18.10 ($tag): the ui= row points at its capture site"
+  check_block_has "$ui_row" 'whenever no capture was recorded' \
+    "T18.11 ($tag): and omits the suffix when nothing was captured"
+done
+
+# ───────────────────────────────────────────────────────────
+# T19 (release record): the CHANGELOG entry documents the grammar
+# that actually ships, SHA binding included.
+# ───────────────────────────────────────────────────────────
+CHANGELOG="$REPO_ROOT/CHANGELOG.md"
+CL_ENTRY="$(grep -E 'add a QA handoff marker so' "$CHANGELOG" | head -1 || true)"
+check_block_has "$CL_ENTRY" 'ui=<none\|code\|code\+browser>:<clean\|noted>@<sha40>' \
+  "T19.1: the changelog grammar carries the ui= SHA"
+check_block_has "$CL_ENTRY" 'its own .@<sha40>. equals .head' \
+  "T19.2: it states the code-UI skip requires that SHA to equal head"
+check_block_has "$CL_ENTRY" 'unsuffixed .ui=. stays parsable but is never skippable' \
+  "T19.3: and that an unsuffixed ui= is parsable but never skippable"
+
+# ───────────────────────────────────────────────────────────
 # T12 (install surface): both capped SKILL.md files stay inside
 # the skill-creator 500-line cap after this change.
 # ───────────────────────────────────────────────────────────

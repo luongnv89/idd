@@ -778,7 +778,14 @@ If no Agent tool, implement inline following `shared/agents/implementer.md`.
 Each cycle:
 
 1. **Code review** — spawn a *fresh* code-reviewer subagent per cycle (see `shared/agents/code-reviewer.md`) so each pass is unbiased.
-2. **Run tests** — unit, integration, e2e (if present), build/compile.
+2. **Run tests** — unit, integration, e2e (if present), build/compile. Record
+   `tests_sha` = `git rev-parse HEAD` **at the moment the suite runs**, alongside
+   its passing count, and carry the pair from the cycle that exits clean to
+   Deliver: the QA handoff marker's `tests=<count>@<sha40>` names the commit the
+   suite actually ran on, and *Update documentation* commits after this point, so
+   the value is unrecoverable later (`references/report-templates.md`, *QA handoff
+   marker*). Nothing recorded ⇒ omit the whole `tests=` field; never substitute
+   the head SHA.
 3. **Evaluate results:**
    - Reviewer returns `PASS` AND all tests pass AND build succeeds → exit loop, QA passed.
    - Issues found → delegate fixes, then start next cycle.
@@ -829,6 +836,13 @@ this sub-step. Only the resolver's deltas are listed here.
 - **Browser gate config key:** `resolve.ui_review.browser_review`.
 - **Findings flow:** merged into the QA findings and handled by the Step 4 fixer
   loop.
+- **SHA capture:** record `ui_sha` = `git rev-parse HEAD` **at the moment the
+  ui-reviewer is spawned** and carry it to Deliver. The QA handoff marker's
+  `ui=…@<sha40>` names the commit this review actually saw, and — because this
+  sub-step runs before the QA cycles — every fix commit those cycles produce, and
+  *Update documentation* after them, lands later (`references/report-templates.md`,
+  *QA handoff marker*). Nothing recorded ⇒ omit the `@<sha40>` suffix; never
+  substitute the head SHA.
 
 ## Edge Cases
 
