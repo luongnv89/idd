@@ -185,7 +185,7 @@ The full per-phase decision logic lives in `references/phases.md` (Phase 3-4 par
 
 The auto-pilot processes multiple issues in a single session. Without careful context management, the main agent's context window fills up with codebase details, diffs, and review findings from earlier iterations — degrading performance on later issues.
 
-The solution: the main agent acts as a **lightweight orchestrator** that delegates heavy work to subagents via the Agent tool. Each subagent gets a fresh context window, does its work, and returns a concise result. The main agent never reads code, diffs, or test output directly.
+The solution: the main agent acts as a **lightweight orchestrator** that delegates heavy work to subagents via the Agent tool. Each subagent gets a fresh context window, does its work, and returns a concise result. The main agent never reads code, diffs, or test output directly — and never bulk-reads issue bodies either: Phase 1's list call carries no `body`, so exactly one body per iteration enters this context, fetched for the picked issue alone in *Step 1.2b*.
 
 Auto-pilot delegates to the resolver/reviewer **skills**, which spawn the shared agents (researcher, synthesizer, implementer, code reviewer, UI reviewer, fixer) under their role identities. Those skills size each agent's model/effort per `docs/agent-model-effort.md` and follow the shared conventions in `docs/shared-agent-conventions.md`; auto-pilot folds the telemetry they return (`complexity`, `profile`, `qa_cycles`, `duration_s`) into its single run-log line per issue (see the run-log note below).
 
@@ -205,7 +205,7 @@ The PR review subagent runs `/issue-pr-review --auto --no-merge`, which handles 
 
 The auto-pilot operates in one of two modes based on the invocation:
 
-- **Triage mode** (default) — `/auto-pilot` with no `--issues` flag. Runs a full triage each iteration and picks the next issue by priority. Phase 1 executes normally.
+- **Triage mode** (default) — `/auto-pilot` with no `--issues` flag. Triages **once** at loop start (reusing `.gitissue/triage.json` when *Step 1.0*'s cache gate reads `fresh`), picks the next issue by priority, and updates the cache in place after each merge (*Step 1.6*); a full re-triage runs again only on a pick miss or every `autopilot.retriage_every` iterations. Phase 1 executes normally.
 - **Explicit list mode** — `/auto-pilot --issues 5,10,12`. The user provides the issues to process. Phase 1 (Triage and Pick) is replaced by an analysis phase that examines all issues, identifies dependencies and shared files, detects batching opportunities, and computes the optimal resolution order.
 
 Detect mode by checking whether `--issues` was provided. If yes, parse the comma-separated list into an ordered array of issue numbers. The list defines both **which** issues to process and **in what order**.
@@ -250,17 +250,17 @@ Each iteration runs 5 phases. For brevity, the full step-by-step per-phase speci
 
 | Phase | Name | Purpose | Subagent? |
 |-------|------|---------|-----------|
-| 1 | Triage and Pick | Refresh triage, pick the top-priority ready issue, capture `{issue_payload}` (trimmed to `{issue_payload_ids}` for the reviewer) + `{triage_context}` for the spawns (*Step 1.2b*) | no (main agent) |
+| 1 | Triage and Pick | Pick from the triage cache (a full triage on the first iteration, or a forced re-triage), capture `{issue_payload}` (trimmed to `{issue_payload_ids}` for the reviewer) + `{triage_context}` for the spawns (*Step 1.2b*) | no (main agent) |
 | 2 | Resolve | Sync to default branch, run the full resolve pipeline | yes (/issue-resolver) |
 | 3-4 | PR Review | Run /issue-pr-review --auto --no-merge with up to 3 fix cycles + CI monitoring | yes (/issue-pr-review) |
 | 5 | Merge | Verify mergeability (*Step 5.1a* decides on its own conditions whether the reviewer's `ci_status` may stand in for the CI wait — never restate them here), squash-merge, close the issue, create follow-up if needed | no (main agent) |
 
 See `references/phases.md` for full prompts, error handling, and decision tables.
 
-**Caller-supplied context (issue #256).** Phase 1 already holds every open
-issue's record and the triage graph it just wrote, so it hands them to the
-subagents it spawns. What that removes is one named duplicate read — the
-resolver's Step 0a fetch of the record Phase 1 just listed, which becomes a
+**Caller-supplied context (issue #256).** Phase 1 holds the triage graph and,
+after *Step 1.2b*'s single-issue fetch, the picked issue's own record — so it
+hands them to the subagents it spawns. What that removes is one named duplicate
+read — the resolver's Step 0a fetch of the record 1.2b just read, which becomes a
 three-field `gh issue view N --json state,comments,updatedAt` re-verify (*Step 0i*, which is also where the live `state` and `updatedAt` that gate 0a's stops and *Step 0h*'s condition 5 come from). It is not a
 per-lifecycle fetch count: Step 0d still re-reads the body it rewrote, and the
 reviewer still fetches the live body its acceptance-criteria hard-block is
@@ -271,7 +271,7 @@ optional — an absent block means the consumer fetches, which is today's behavi
 — and every one may gate duplicated work, never a safety gate: the rule and its
 exclusion list have one home, in `docs/shared-agent-conventions.md`
 (*Caller-supplied context payloads*). `review.adaptive_depth: false` turns off the CI verdict gate, as it
-already turns off the QA handoff gate; no new config key is introduced.
+already turns off the QA handoff gate; that gate introduces no config key of its own.
 
 ---
 ## Iteration Report

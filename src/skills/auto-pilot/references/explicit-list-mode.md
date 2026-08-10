@@ -271,3 +271,5 @@ All other phases (Resolve, Review, Fix, Merge) run identically to triage mode.
 
 Explicit list mode does **not** re-triage between iterations. The analysis determined the order upfront — respect it. The only per-iteration pre-work is syncing to the default branch (Step 2.1).
 
+Triage mode no longer re-triages every iteration either (issue #258): it triages once, reuses a `fresh` `.gitissue/triage.json`, and updates that payload in place after each merge. Explicit list mode remains the stronger form of the same property — it never triages at all, so there is no cache to keep current and no pick miss to recover from.
+
