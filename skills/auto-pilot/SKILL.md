@@ -13,7 +13,7 @@ metadata:
 
 Fully autonomous development loop: triage, pick, resolve, review, fix, merge, repeat — zero user prompts. (Version history lives in `CHANGELOG.md`; `docs/release-notes/` covers only early smoke-test reports and is not kept current per release.)
 
-The auto-pilot orchestrates existing gitissue skills into a continuous loop that processes the issue backlog with absolute autonomy. Each iteration: triage the backlog, pick the top-priority issue, resolve it via the full pipeline, review the PR with up to 3 token-optimized fix-review cycles (script pre-pass for lint/format, LLM only for critical issues), and merge according to `autopilot.mode`. Clean PRs merge in `balanced` or `aggressive` mode. PRs with unresolved review issues create a follow-up issue and stay open unless `mode: aggressive` and `merge_partial: true` are both explicitly set. For critical issues, the loop stops and asks the user for a decision instead of auto-continuing.
+The auto-pilot orchestrates existing gitissue skills into a continuous loop that processes the issue backlog with absolute autonomy. It triages **once** at loop start — reusing a fresh `.gitissue/triage.json` when there is one (*Mode Detection*) — then each iteration: pick the top-priority issue from that order, resolve it via the full pipeline, review the PR with up to 3 token-optimized fix-review cycles (script pre-pass for lint/format, LLM only for critical issues), merge according to `autopilot.mode`, and update the cached order in place. Clean PRs merge in `balanced` or `aggressive` mode. PRs with unresolved review issues create a follow-up issue and stay open unless `mode: aggressive` and `merge_partial: true` are both explicitly set. For critical issues, the loop stops and asks the user for a decision instead of auto-continuing.
 
 ## Autonomy Philosophy
 
@@ -225,7 +225,7 @@ A continuous loop, 5 phases per iteration, looping back to Phase 1 until the bac
 ```
 ◆ Auto-Pilot
 ┄┄┄┄┄┄┄┄┄┄┄┄
-  Phase 1 — Triage       (skipped in explicit list mode)
+  Phase 1 — Triage/Pick  (triage once at start; skipped in explicit list mode)
   Phase 2 — Resolve      subagent: 6-step resolve pipeline
   Phase 3+4 — Review-Fix /issue-pr-review --auto --no-merge (review+fix, x3 max)
   Phase 5 — Merge        merge the PR and close the issue
@@ -250,7 +250,7 @@ Each iteration runs 5 phases. For brevity, the full step-by-step per-phase speci
 
 | Phase | Name | Purpose | Subagent? |
 |-------|------|---------|-----------|
-| 1 | Triage and Pick | Pick from the triage cache (a full triage on the first iteration, or a forced re-triage), capture `{issue_payload}` (trimmed to `{issue_payload_ids}` for the reviewer) + `{triage_context}` for the spawns (*Step 1.2b*) | no (main agent) |
+| 1 | Triage and Pick | Pick from the triage cache (*Step 1.0* reuses a `fresh` one; a full triage runs only when it does not, or on a forced re-triage), capture `{issue_payload}` (trimmed to `{issue_payload_ids}` for the reviewer) + `{triage_context}` for the spawns (*Step 1.2b*) | no (main agent) |
 | 2 | Resolve | Sync to default branch, run the full resolve pipeline | yes (/issue-resolver) |
 | 3-4 | PR Review | Run /issue-pr-review --auto --no-merge with up to 3 fix cycles + CI monitoring | yes (/issue-pr-review) |
 | 5 | Merge | Verify mergeability (*Step 5.1a* decides on its own conditions whether the reviewer's `ci_status` may stand in for the CI wait — never restate them here), squash-merge, close the issue, create follow-up if needed | no (main agent) |

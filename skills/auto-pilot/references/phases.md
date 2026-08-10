@@ -211,7 +211,7 @@ iteration *Step 1.1*'s own `✓ Triage updated` line already reported the count:
 
 From `summary.suggested_order` in `.gitissue/triage.json` (the triage execution order), select the first issue that is:
 - **Not blocked** — no unresolved dependencies in the triage graph
-- **Not skipped** — not in the `--skip` list, the `skip_labels` set, or the **session skip list** (the in-memory list this run appends to: failed issues from Phase 2.3, and dependency-blocked issues from Step 5.1b / Phase 3-4 Step 2a). Consult all three every iteration — the session skip list is what stops a dependency-blocked issue from being re-picked after the loop continues past it.
+- **Not skipped** — not in the `--skip` list, the `skip_labels` set, or the **session skip list** (the in-memory list this run appends to: failed issues from Phase 2.3, dependency-blocked issues from Step 5.1b / Phase 3-4 Step 2a, and issues *Step 1.2b*'s post-pick re-check rejected as closed or assigned to another user). Consult all three every iteration — the session skip list is what stops a dependency-blocked issue from being re-picked after the loop continues past it.
 - **Not assigned** — not assigned to another user (unless there are no unassigned issues). The `assignees` array comes from *Step 1.1b*'s live read and from nowhere else: `.gitissue/triage.json` has no `assignees` field, so a cached order cannot answer this criterion at all.
 - **Open** — the issue is in *Step 1.1b*'s live `--state open` set. Same source, same reason: the cache carries no GitHub `state`. An issue closed since the cached triage — including one closed as `not planned`, which lands no commit for *Step 1.0*'s commits-since check to notice — is still sitting in `summary.suggested_order`.
 
@@ -237,7 +237,7 @@ If no eligible issue is found (all blocked, skipped, or assigned):
 ⚠ No eligible issues to pick
 
   Blocked:      {blocked_count} issues (waiting on dependencies)
-  Skipped:      {skipped_count} issues (skip labels, --skip, or failed this run)
+  Skipped:      {skipped_count} issues (skip labels, --skip, failed, or ineligible)
   Dep-blocked:  {dep_blocked_count} issues (PR open, waiting on a dependency merge)
   Assigned:     {assigned_count} issues (assigned to others)
 
@@ -247,15 +247,25 @@ If no eligible issue is found (all blocked, skipped, or assigned):
 Stop. Count the issues this run added to the session skip list from the
 dependency gate on their **own** `Dep-blocked` line rather than folding them into
 `Skipped` — their PRs are open and merge-ready as soon as the dependency lands,
-which is a different next action from a `wontfix` label. Record each session
-skip-list entry with the reason that added it (`failed` from Phase 2.3,
-`blocked_by_dependency` from the gate) so `{dep_blocked_count}` is the count of
-gate-added entries and nothing else; `failed` entries fall under `Skipped`, so
-every filtered issue lands in exactly one bucket and the four counts always sum
-to the candidates Step 1.2 rejected. Omit the `Dep-blocked` line when its count
-is zero. All four labels pad to a common value column, so widening one widens
-the rest. **This is the only place a run ends for dependency reasons** (see
-*Step 5.1b — Dependency Gate*); the gate itself never stops the loop.
+which is a different next action from a `wontfix` label. **Record each session
+skip-list entry with the reason that added it, and every reason maps to exactly
+one bucket** — this is the single home of that mapping:
+
+| Reason | Added by | Bucket |
+|--------|----------|--------|
+| `failed` | Phase 2.3's resolution failure | `Skipped` |
+| `blocked_by_dependency` | Step 5.1b / Phase 3-4 Step 2a's gate | `Dep-blocked` |
+| `not_eligible` | *Step 1.2b*'s post-pick re-check (closed) | `Skipped` |
+| `not_eligible` | *Step 1.2b*'s post-pick re-check (assigned to another user) | `Assigned` |
+
+So `{dep_blocked_count}` is the count of gate-added entries and nothing else, and
+every filtered issue lands in exactly one bucket — which is what keeps the four
+counts summing to the candidates Step 1.2 rejected. A reason with no bucket would
+break that sum silently, so a new skip-list writer adds a row here. Omit the
+`Dep-blocked` line when its count is zero. All four labels pad to a common value
+column, so widening one widens the rest. **This is the only place a run ends for
+dependency reasons** (see *Step 5.1b — Dependency Gate*); the gate itself never
+stops the loop.
 
 **Pick miss — one re-triage, then that stop.** A *miss* is this step finding no
 eligible issue in `summary.suggested_order` while at least one issue in
@@ -310,9 +320,11 @@ word on the two criteria *Step 1.2* could answer only from a list read moments
 earlier. If `.issue.state` is not `open`, or the issue is assigned to another
 user and *Step 1.2*'s **Not assigned** criterion would therefore have rejected it
 (that criterion, escape clause included, stays the single home of the rule),
-**do not spawn**: add `#{issue_number}` to the session skip list, print the line
-below, and return to *Step 1.2* for the next candidate. Every re-pick appends to
-that list, so the candidate set shrinks by one each time and this cannot spin.
+**do not spawn**: add `#{issue_number}` to the session skip list with the reason
+`not_eligible` (*Step 1.2*'s reason-to-bucket table is the single home of which
+of its four counts that lands in), print the line below, and return to *Step 1.2*
+for the next candidate. Every re-pick appends to that list, so the candidate set
+shrinks by one each time and this cannot spin.
 When *Step 1.1b*'s read succeeded this closes the narrow race between it and this
 fetch; when it was `unavailable` this is where **Open** and **Not assigned** are
 enforced at all. If the fetch itself degraded to nothing there is no record to

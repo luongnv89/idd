@@ -25,6 +25,13 @@
 #     `created_at` while the ordering engine tie-breaks on it. T8 proves the
 #     weaker claim the design actually makes — deletion preserves the order.
 #
+# T11 guards a third failure mode, and it is the one this change is most exposed
+# to: several of the rules it rewrites live in two or three files each (SKILL.md's
+# Overview beside *Mode Detection*, the resolver's Step 0i beside its own SKILL.md
+# and the shared conventions, Step 1.2's bucket accounting beside the error
+# catalog). Updating one home and leaving the other is issue #248's failure class,
+# and the stale copy is the one an agent acts on when it is the always-loaded file.
+#
 # The #256 trap is silent by design: dropping `body` from Phase 1's list without
 # rewriting Step 1.2b degrades every resolver spawn from `supplied` to `partial`
 # (the resolver's Step 0i), which restores the per-issue fetch #256 deleted
@@ -119,6 +126,12 @@ SRC_SUMMARY="$REPO_ROOT/src/skills/auto-pilot/references/summary-format.md"
 SRC_PERSIST="$REPO_ROOT/src/skills/issue-triage/references/output-and-persist.md"
 SRC_TRIAGE_SKILL="$REPO_ROOT/src/skills/issue-triage/SKILL.source.md"
 SCHEMA="$REPO_ROOT/docs/config-schema.md"
+# T11's second homes: the resolver states this loop's payload provenance in two
+# of its own files, and the shared conventions state the staleness rule once for
+# every skill.
+SRC_RES_STEPS="$REPO_ROOT/src/skills/issue-resolver/references/pipeline-steps.md"
+SRC_RES_SKILL="$REPO_ROOT/src/skills/issue-resolver/SKILL.source.md"
+SRC_CONV="$REPO_ROOT/docs/shared-agent-conventions.md"
 
 BUILT_PHASES="$REPO_ROOT/skills/auto-pilot/references/phases.md"
 BUILT_CONFIG="$REPO_ROOT/skills/auto-pilot/references/configuration.md"
@@ -127,11 +140,15 @@ BUILT_SKILL="$REPO_ROOT/skills/auto-pilot/SKILL.md"
 BUILT_PROMPTS="$REPO_ROOT/skills/auto-pilot/references/subagent-prompts.md"
 BUILT_SUMMARY="$REPO_ROOT/skills/auto-pilot/references/summary-format.md"
 BUILT_PERSIST="$REPO_ROOT/skills/issue-triage/references/output-and-persist.md"
+BUILT_RES_STEPS="$REPO_ROOT/skills/issue-resolver/references/pipeline-steps.md"
+BUILT_RES_SKILL="$REPO_ROOT/skills/issue-resolver/SKILL.md"
 
 for file in "$SRC_PHASES" "$SRC_CONFIG" "$SRC_ERRORS" "$SRC_SKILL" "$SRC_PROMPTS" \
             "$SRC_SUMMARY" "$SRC_PERSIST" "$SRC_TRIAGE_SKILL" "$SCHEMA" "$GRAPH" \
+            "$SRC_RES_STEPS" "$SRC_RES_SKILL" "$SRC_CONV" \
             "$BUILT_PHASES" "$BUILT_CONFIG" "$BUILT_ERRORS" "$BUILT_SKILL" \
-            "$BUILT_PROMPTS" "$BUILT_SUMMARY" "$BUILT_PERSIST"; do
+            "$BUILT_PROMPTS" "$BUILT_SUMMARY" "$BUILT_PERSIST" \
+            "$BUILT_RES_STEPS" "$BUILT_RES_SKILL"; do
   if [ -f "$file" ]; then
     pass "exists: ${file#$REPO_ROOT/}"
   else
@@ -670,6 +687,11 @@ check_has "$BUILT_SKILL" 'Triages \*\*once\*\* at loop start' \
   "T9.7: built SKILL.md no longer promises a triage per iteration"
 check_lacks "$BUILT_SKILL" 'Runs a full triage each iteration' \
   "T9.8: built SKILL.md dropped the per-iteration triage claim"
+# SKILL.md's Overview is the always-loaded paragraph an agent reads first, so a
+# per-iteration triage promised there outranks the corrected *Mode Detection*
+# text further down the same file — an agent that follows it fails AC1 outright.
+check_lacks "$BUILT_SKILL" 'Each iteration: triage the backlog' \
+  "T9.8b: built SKILL.md's Overview dropped the per-iteration triage claim too"
 check_has "$BUILT_PROMPTS" 'verbatim from that step.s single-issue fetch' \
   "T9.9: built subagent-prompts.md ships the new payload provenance"
 check_has "$BUILT_SUMMARY" 'Triage current' \
@@ -710,6 +732,137 @@ check_block_has "$B_CRITICAL_BLOCK" 'run \*Step 1\.6 — Update the triage cache
 B_NOISSUES_ENTRY="$(awk '/^### No open issues/,/^### No eligible issues/' "$BUILT_ERRORS")"
 check_block_has "$B_NOISSUES_ENTRY" 'Step 1\.1b' \
   "T9.26: built error-messages.md ships the reuse-iteration trigger"
+
+# ───────────────────────────────────────────────────────────
+# T11 (QA cycle 3): every home of a rule this issue changed says
+#      the same thing. A rename pass that updates one home and
+#      leaves the other is issue #248's failure class, and the
+#      surviving copy is the one an agent acts on.
+# ───────────────────────────────────────────────────────────
+
+# G1 — SKILL.md's Overview is the always-loaded first paragraph, so a
+# per-iteration triage promised there outranks the corrected *Mode Detection*
+# text further down the same file. It must state the same rule, not a summary of
+# the behavior this issue removed.
+OVERVIEW="$(awk '/^# \/auto-pilot/,/^## Autonomy Philosophy/' "$SRC_SKILL")"
+check_block_lacks "$OVERVIEW" 'Each iteration: triage the backlog' \
+  "T11.1: the Overview no longer promises a triage per iteration"
+check_block_has "$OVERVIEW" 'triages \*\*once\*\* at loop start' \
+  "T11.2: the Overview states the triage-once rule *Mode Detection* owns"
+check_block_has "$OVERVIEW" 'update the cached order in place' \
+  "T11.3: the Overview names the incremental update as the per-merge work"
+# The phase summary table's own restatement of the same rule.
+check_lacks "$SRC_SKILL" 'a full triage on the first iteration' \
+  "T11.4: the Phase 1 table row no longer asserts a triage on iteration 1"
+check_has "$SRC_SKILL" '\*Step 1\.0\* reuses a .fresh. one' \
+  "T11.5: the Phase 1 table row defers to the cache gate"
+# ...and the loop diagram, which labels the phase an iteration repeats.
+check_lacks "$SRC_SKILL" '^  Phase 1 — Triage +\(skipped in explicit list mode\)' \
+  "T11.6: the loop diagram no longer labels the repeated phase 'Triage'"
+check_has "$SRC_SKILL" '^  Phase 1 — Triage/Pick  \(triage once at start;' \
+  "T11.7: the loop diagram separates the once-per-run triage from the pick"
+
+# G2 — the resolver's Step 0i is the second home of THIS loop's payload
+# provenance. It described a bulk Phase 1 list that no longer exists, including
+# the comments rationale auto-pilot's own Step 1.2b deliberately dropped.
+PAYLOAD_GATE="$(awk '/^## Step 0i — Caller payload gate/,/^## Step 1 — Research/' "$SRC_RES_STEPS")"
+check_block_lacks "$PAYLOAD_GATE" 'Phase 1 lists every open issue' \
+  "T11.8: Step 0i no longer sources the payload from a bulk open-issue list"
+check_block_lacks "$PAYLOAD_GATE" 'lists up to 100 open issues' \
+  "T11.9: Step 0i dropped the hundred-issue list the caller no longer makes"
+check_block_lacks "$PAYLOAD_GATE" 'than the fetch it saves' \
+  "T11.10: Step 0i dropped the comments rationale that argued against that list"
+check_block_lacks "$PAYLOAD_GATE" 'Phase 1.s widened list call' \
+  "T11.11: Step 0i no longer calls the payload a widened list record"
+check_block_has "$PAYLOAD_GATE" 'fetches it once, after the pick, in its' \
+  "T11.12: Step 0i sources the payload from the caller's post-pick fetch"
+check_block_has "$PAYLOAD_GATE" 'caller.s single-issue fetch deliberately does not request it' \
+  "T11.13: the comments rationale is now the fetch's own field choice"
+# The staleness argument gets STRONGER under the new provenance, not weaker:
+# gi-issue.py is TTL-cached, so the payload may have been old before the caller
+# ever held it. A gate that dropped this would read as newly safe and is not.
+check_block_lacks "$PAYLOAD_GATE" 'only as fresh as the caller.s list' \
+  "T11.14: Step 0i no longer measures staleness against a list"
+check_block_has "$PAYLOAD_GATE" 'only as fresh as the caller.s fetch that' \
+  "T11.15: 0a's two stops measure staleness against the caller's fetch"
+check_block_has "$PAYLOAD_GATE" 'the caller.s fetch — which is TTL-cached' \
+  "T11.16: condition 5's argument names the TTL cache that makes it stronger"
+check_block_has "$PAYLOAD_GATE" 'a TTL-cached read, so an issue closed externally' \
+  "T11.17: the closed-issue argument names the same cache"
+# The resolver restates the gate in its always-loaded SKILL.md, and the shared
+# conventions own the rule for every skill — three homes, one claim.
+check_lacks "$SRC_RES_SKILL" 'already listed it' \
+  "T11.18: the resolver SKILL clause no longer says the caller listed the record"
+check_has "$SRC_RES_SKILL" 'already fetched it, in its \*Step 1\.2b\*' \
+  "T11.19: the resolver SKILL clause names the caller's post-pick fetch"
+check_lacks "$SRC_RES_SKILL" 'as fresh as the caller.s list' \
+  "T11.20: the resolver SKILL clause measures staleness against that fetch"
+check_lacks "$SRC_CONV" 'as fresh as the list that produced it' \
+  "T11.21: the shared conventions no longer say a payload comes from a list"
+check_has "$SRC_CONV" 'as fresh as the read that produced it' \
+  "T11.22: the shared conventions state the read-neutral staleness rule"
+check_lacks "$SRC_CONV" '^listed, the triage row it wrote' \
+  "T11.23: the conventions' opening example is no longer a listed record"
+
+# G3 — Step 1.2's four buckets are stated to always sum to the rejected
+# candidates, so a skip-list writer with no bucket breaks that sum silently.
+# Step 1.2b became the third writer.
+check_block_has "$PICK_BLOCK" '^\| Reason \| Added by \| Bucket \|' \
+  "T11.24: Step 1.2 owns a reason-to-bucket table"
+check_block_has "$PICK_BLOCK" '^\| .failed. \|.*\| .Skipped. \|$' \
+  "T11.25: the table maps failed → Skipped"
+check_block_has "$PICK_BLOCK" '^\| .blocked_by_dependency. \|.*\| .Dep-blocked. \|$' \
+  "T11.26: the table maps blocked_by_dependency → Dep-blocked"
+check_block_has "$PICK_BLOCK" '^\| .not_eligible. \|.*\(closed\) \| .Skipped. \|$' \
+  "T11.27: the table maps a closed post-pick rejection → Skipped"
+check_block_has "$PICK_BLOCK" '^\| .not_eligible. \|.*\(assigned to another user\) \| .Assigned. \|$' \
+  "T11.28: the table maps an assigned post-pick rejection → Assigned"
+# A survivor pin: this sentence predates the table, and adding the table is
+# exactly the kind of edit that drops the claim it was added to preserve.
+check_block_has "$PICK_BLOCK" 'every filtered issue lands in exactly one bucket' \
+  "T11.29: the sum invariant survives the rewrite that added the table"
+check_block_has "$PICK_BLOCK" 'a new skip-list writer adds a row here' \
+  "T11.29b: the table states what a future skip-list writer owes the invariant"
+check_bullet "$SRC_PHASES" '^- \*\*Not skipped\*\*' 'Step 1\.2b' \
+  "T11.30: the Not skipped criterion names Step 1.2b as a skip-list writer"
+check_block_has "$CAPTURE_BLOCK" 'session skip list with the reason' \
+  "T11.31: 1.2b records a reason rather than a bare entry"
+check_block_has "$CAPTURE_BLOCK" 'reason-to-bucket table is the single home' \
+  "T11.32: 1.2b defers the bucket to Step 1.2 instead of restating it"
+check_has "$SRC_PHASES" 'skip labels, --skip, failed, or ineligible' \
+  "T11.33: the rendered Skipped bucket admits the post-pick rejection"
+# The catalog entry enumerates the same writers. Both copies of the rendered
+# block stay byte-identical (pinned by tests/test-autopilot-dependency-gate.sh).
+NOELIGIBLE_ENTRY="$(awk '/^### No eligible issues/,/^### API rate limit during triage/' "$SRC_ERRORS")"
+for reason in 'blocked_by_dependency' 'failed' 'not_eligible'; do
+  check_block_has "$NOELIGIBLE_ENTRY" "\`$reason\`" \
+    "T11.34: the catalog trigger names the $reason writer"
+done
+check_block_has "$NOELIGIBLE_ENTRY" 'single home of that mapping, never restated here' \
+  "T11.35: the catalog defers the bucket mapping instead of copying it"
+check_block_has "$NOELIGIBLE_ENTRY" 'skip labels, --skip, failed, or ineligible' \
+  "T11.36: the catalog's rendered block matches phases.md byte-for-byte"
+
+# T11 on the installed surface — a drift fix that ships only in src/ is not
+# installed for anyone, which is the whole reason T9 exists.
+B_OVERVIEW="$(awk '/^# \/auto-pilot/,/^## Autonomy Philosophy/' "$BUILT_SKILL")"
+check_block_has "$B_OVERVIEW" 'triages \*\*once\*\* at loop start' \
+  "T11.37: built SKILL.md's Overview ships the triage-once rule"
+check_lacks "$BUILT_SKILL" 'a full triage on the first iteration' \
+  "T11.38: built SKILL.md's Phase 1 table row ships the corrected wording"
+B_PAYLOAD_GATE="$(awk '/^## Step 0i — Caller payload gate/,/^## Step 1 — Research/' "$BUILT_RES_STEPS")"
+check_block_lacks "$B_PAYLOAD_GATE" 'Phase 1 lists every open issue' \
+  "T11.39: built pipeline-steps.md ships the corrected payload provenance"
+check_block_lacks "$B_PAYLOAD_GATE" 'than the fetch it saves' \
+  "T11.40: built pipeline-steps.md ships the corrected comments rationale"
+check_block_has "$B_PAYLOAD_GATE" 'the caller.s fetch — which is TTL-cached' \
+  "T11.41: built pipeline-steps.md ships the stronger staleness argument"
+check_has "$BUILT_RES_SKILL" 'already fetched it, in its \*Step 1\.2b\*' \
+  "T11.42: built resolver SKILL.md ships the corrected provenance clause"
+check_has "$BUILT_PHASES" '^\| .not_eligible. \|.*\| .Assigned. \|$' \
+  "T11.43: built phases.md ships the reason-to-bucket table"
+check_has "$BUILT_ERRORS" 'single home of that mapping, never restated here' \
+  "T11.44: built error-messages.md ships the deferred bucket mapping"
 
 # ───────────────────────────────────────────────────────────
 # Summary

@@ -164,7 +164,7 @@ with all-zero counts. This is a success message, not an error.
 ⚠ No eligible issues to pick
 
   Blocked:      {blocked_count} issues (waiting on dependencies)
-  Skipped:      {skipped_count} issues (skip labels, --skip, or failed this run)
+  Skipped:      {skipped_count} issues (skip labels, --skip, failed, or ineligible)
   Dep-blocked:  {dep_blocked_count} issues (PR open, waiting on a dependency merge)
   Assigned:     {assigned_count} issues (assigned to others)
 
@@ -172,10 +172,14 @@ with all-zero counts. This is a success message, not an error.
               --skip to bypass
 ```
 **Trigger:** All open issues are blocked, skipped, assigned to other users, or
-added to the session skip list by the Phase 5.1b dependency gate. This is the
+added to the session skip list — by the Phase 5.1b dependency gate
+(`blocked_by_dependency`), by a Phase 2.3 resolution failure (`failed`), or by
+Step 1.2b's post-pick re-check (`not_eligible`). This is the
 **only** place a run ends for dependency reasons — the gate itself never stops
 the loop. Omit the `Dep-blocked` line when that count is zero. Keep this block
-byte-identical to the one in `references/phases.md` (*Step 1.2*).
+byte-identical to the one in `references/phases.md` (*Step 1.2*), and take which
+bucket each reason counts under from that step's reason-to-bucket table — it is
+the single home of that mapping, never restated here.
 
 ### API rate limit during triage
 ```
