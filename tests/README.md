@@ -5,6 +5,8 @@ These are manual integration tests for `/issue-creator` and `/issue-creator N` (
 > This file covers Sprint 1 (`/issue-creator`) only. See [`README-sprint2.md`](README-sprint2.md) and [`README-sprint3.md`](README-sprint3.md) for later sprints' manual tests.
 >
 > **The automated suite is separate from all three READMEs.** The `.sh` scripts in this directory (build, autopilot, config, sync, security, …) need no setup and no GitHub repo — they read `src/`, `docs/`, and the built `skills/`. Every one of them runs in CI, and [`.github/workflows/dist-check.yml`](../.github/workflows/dist-check.yml) is the authoritative list: one named step per script, in the order CI runs them. Run one locally from the repo root with `bash tests/<name>.sh`; run them all with `git ls-files 'tests/*.sh' | xargs -n1 bash`. `tests/test-build-script.sh` (T9) fails if any script in this directory is missing from that workflow, so the list cannot silently fall behind.
+>
+> **Behavioral evals** live under [`evals/`](../evals/) — hermetic skill stand-ins graded with `idd-lint` and `gi-runlog` under a PATH-shimmed `gh` (no network, no auth). Entry points: `tests/test-eval-harness.sh`, `tests/test-eval-creator.sh`, `tests/test-eval-resolver.sh`, `tests/test-eval-pr-review.sh`. See [evals/README.md](../evals/README.md).
 
 Updated for the **lean issues architecture**: issues contain only human intent (type, description, acceptance criteria). No codebase scanning during issue creation or normalization.
 
