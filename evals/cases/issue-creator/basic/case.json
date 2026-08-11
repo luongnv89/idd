@@ -10,10 +10,10 @@
       "label": "normalized issue body passes idd-lint"
     },
     {
-      "tool": "idd-lint",
-      "args": ["branch", "fix/1-mobile-login-redirect"],
+      "tool": "shell",
+      "args": ["python3 scripts/idd-lint.py branch \"$(tr -d '\\n' < OUT/branch.txt)\""],
       "expect_exit": 0,
-      "label": "branch name convention"
+      "label": "branch name from subject artifact passes idd-lint"
     },
     {
       "tool": "file-exists",

@@ -4,24 +4,21 @@
   "prompt": "Fix the always-false login bug; prove red→green; open a conforming PR",
   "grade": [
     {
-      "tool": "idd-lint",
-      "args": ["branch", "fix/1-login-always-false"],
+      "tool": "shell",
+      "args": ["python3 scripts/idd-lint.py branch \"$(tr -d '\\n' < OUT/branch.txt)\""],
       "expect_exit": 0,
-      "label": "branch name passes idd-lint"
+      "label": "branch name from subject artifact passes idd-lint"
     },
     {
-      "tool": "idd-lint",
-      "args": ["commit", "fix(auth): return true when credentials match (#1)"],
+      "tool": "shell",
+      "args": ["python3 scripts/idd-lint.py commit \"$(tr -d '\\n' < OUT/commit.txt)\""],
       "expect_exit": 0,
-      "label": "commit message passes idd-lint"
+      "label": "commit message from subject artifact passes idd-lint"
     },
     {
-      "tool": "idd-lint",
+      "tool": "shell",
       "args": [
-        "pr",
-        "OUT/pr-body.md",
-        "--title",
-        "fix(auth): return true when credentials match (#1)"
+        "python3 scripts/idd-lint.py pr OUT/pr-body.md --title \"$(tr -d '\\n' < OUT/commit.txt)\""
       ],
       "expect_exit": 0,
       "label": "PR body passes idd-lint (Closes + DR + AC + Reproduction)"

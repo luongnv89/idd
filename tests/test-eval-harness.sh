@@ -210,6 +210,87 @@ else
   fail "T11: pr list without --json exits 2 (got $P)"
 fi
 
+# ─── T12: exact match preferred over earlier prefix entry ──
+cat > "$TMP/cassettes-order.json" <<'EOF'
+{
+  "version": 1,
+  "calls": [
+    {
+      "match": "prefix",
+      "argv": ["pr"],
+      "stdout": "PREFIX\n",
+      "exit": 0
+    },
+    {
+      "argv": ["pr", "view", "8", "--json", "number,title,body,state"],
+      "stdout": "{\"number\":8}\n",
+      "exit": 0
+    }
+  ]
+}
+EOF
+export EVAL_CASSETTES="$TMP/cassettes-order.json"
+OUT12="$(python3 "$SHIM" pr view 8 --json number,title,body,state)"
+if [ "$OUT12" = '{"number":8}' ]; then
+  pass "T12: exact cassette beats earlier prefix match"
+else
+  fail "T12: exact cassette beats earlier prefix match (got $OUT12)"
+fi
+
+# ─── T13: OUT token substitution does not corrupt OUTPUT ──
+set +e
+python3 - "$REPO_ROOT/evals/harness/grade.py" <<'PY'
+import importlib.util
+import sys
+from pathlib import Path
+
+spec = importlib.util.spec_from_file_location("grade", sys.argv[1])
+grade = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(grade)
+out = Path("/tmp/eval-out-dir")
+got = grade._sub_out("OUT/issue.md and also OUTPUT.md and TIMEOUT", out)
+assert "OUTPUT.md" in got, got
+assert "TIMEOUT" in got, got
+assert str(out) + "/issue.md" in got, got
+assert "OUT/" not in got.replace(str(out), ""), got
+print("ok")
+PY
+T13=$?
+set -e
+if [ "$T13" -eq 0 ]; then
+  pass "T13: OUT substitution preserves OUTPUT.md and TIMEOUT"
+else
+  fail "T13: OUT substitution preserves OUTPUT.md and TIMEOUT"
+fi
+
+# ─── T14: broken branch artifact fails grade ───────────────
+# Subject-written branch must be what is graded, not a constant.
+mkdir -p "$TMP/art-branch"
+printf '%s\n' "Bad/Branch_Name" > "$TMP/art-branch/branch.txt"
+cat > "$CASE/case.json" <<'EOF'
+{
+  "name": "harness/branch-from-artifact",
+  "skill": "issue-creator",
+  "grade": [
+    {
+      "tool": "shell",
+      "args": ["python3 scripts/idd-lint.py branch \"$(tr -d '\\n' < OUT/branch.txt)\""],
+      "expect_exit": 0,
+      "label": "must fail on bad branch artifact"
+    }
+  ]
+}
+EOF
+set +e
+REPO_ROOT="$REPO_ROOT" python3 "$GRADE" --case "$CASE" --out "$TMP/art-branch" >/dev/null 2>&1
+G3=$?
+set -e
+if [ "$G3" -eq 1 ]; then
+  pass "T14: grade fails when subject branch artifact is invalid"
+else
+  fail "T14: grade fails when subject branch artifact is invalid (got $G3)"
+fi
+
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 echo "Results: $PASS passed, $FAIL failed"
 if [ "$FAIL" -gt 0 ]; then

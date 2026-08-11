@@ -134,8 +134,14 @@ def _load_cassettes(path: Path) -> dict[str, Any]:
 
 
 def _match_call(argv: list[str], calls: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """Match argv against cassettes — exact entries always beat prefix entries.
+
+    Two-pass on purpose: a leading ``match: "prefix"`` cassette must not steal a
+    later exact match for a longer command (e.g. prefix ``["pr"]`` vs exact
+    ``["pr", "view", "1", ...]``).
+    """
     norm = _normalize_argv(argv)
-    # Prefer exact matches.
+    # Pass 1: exact matches only.
     for call in calls:
         if not isinstance(call, dict):
             continue
@@ -145,13 +151,26 @@ def _match_call(argv: list[str], calls: list[dict[str, Any]]) -> dict[str, Any] 
         c_norm = _normalize_argv([str(x) for x in c_argv])
         match_mode = call.get("match", "exact")
         if match_mode == "prefix":
-            if len(norm) >= len(c_norm) and norm[: len(c_norm)] == c_norm:
-                return call
-        else:
-            if norm == c_norm:
-                return call
-    # Second pass: prefix-only entries that lost to exact ordering (already handled).
-    return None
+            continue
+        if norm == c_norm:
+            return call
+    # Pass 2: prefix matches (longest-prefix wins among prefix entries).
+    best: dict[str, Any] | None = None
+    best_len = -1
+    for call in calls:
+        if not isinstance(call, dict):
+            continue
+        c_argv = call.get("argv")
+        if not isinstance(c_argv, list):
+            continue
+        c_norm = _normalize_argv([str(x) for x in c_argv])
+        if call.get("match", "exact") != "prefix":
+            continue
+        if len(norm) >= len(c_norm) and norm[: len(c_norm)] == c_norm:
+            if len(c_norm) > best_len:
+                best = call
+                best_len = len(c_norm)
+    return best
 
 
 def _state_dir() -> Path | None:

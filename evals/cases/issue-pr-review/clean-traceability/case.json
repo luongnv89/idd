@@ -15,10 +15,10 @@
       "label": "conforming PR body passes idd-lint"
     },
     {
-      "tool": "idd-lint",
-      "args": ["branch", "fix/42-mobile-auth-redirect"],
+      "tool": "shell",
+      "args": ["python3 scripts/idd-lint.py branch \"$(tr -d '\\n' < OUT/branch.txt)\""],
       "expect_exit": 0,
-      "label": "branch name passes idd-lint"
+      "label": "branch name from subject artifact passes idd-lint"
     }
   ]
 }

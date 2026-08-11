@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -28,7 +29,15 @@ def _repo_root() -> Path:
 
 
 def _sub_out(value: str, out_dir: Path) -> str:
-    return value.replace("OUT", str(out_dir))
+    """Replace the OUT path token only as a path root, not as a bare substring.
+
+    Matches ``OUT`` at the start of the string or after a non-identifier char,
+    and only when followed by ``/``, end-of-string, or a path-ish boundary.
+    Avoids corrupting tokens like ``OUTPUT.md`` or ``TIMEOUT``.
+    """
+    out = str(out_dir)
+    # OUT/… or standalone OUT (not OUTPUTish, not embedded in identifiers)
+    return re.sub(r"(?<![A-Za-z0-9_])OUT(?=/|$|[^A-Za-z0-9_])", out, value)
 
 
 def _run(cmd: list[str], *, stdin_data: str | None = None, cwd: Path) -> int:
