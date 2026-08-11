@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "calls": [
+    {
+      "match": "prefix",
+      "argv": ["auth", "status"],
+      "stdout": "github.com\n  ✓ Logged in to github.com as eval-bot (key)\n",
+      "stderr": "",
+      "exit": 0
+    },
+    {
+      "argv": ["issue", "view", "1", "--json", "number,title,body,labels,assignees,state"],
+      "stdout": "{\"number\":1,\"title\":\"Bug: login always returns false\",\"body\":\"<!-- gitissue:normalized v1 -->\\n\\n## Type\\n\\nBug\\n\\n## Description\\n\\n**Current behavior:**\\nlogin() always returns False.\\n\\n**Expected behavior:**\\nlogin() returns True when credentials match.\\n\\n## Acceptance Criteria\\n\\n- [ ] login returns True for matching credentials\\n- [ ] login returns False for mismatched credentials\\n\\n## Metadata\\n\\n**Priority:** P1\\n**Effort:** S\\n**Labels:** bug, auth\\n\",\"labels\":[{\"name\":\"bug\"}],\"assignees\":[],\"state\":\"OPEN\"}\n",
+      "stderr": "",
+      "exit": 0
+    },
+    {
+      "match": "prefix",
+      "argv": ["pr", "create"],
+      "stdout": "https://github.com/eval/harness/pull/1\n",
+      "stderr": "",
+      "exit": 0
+    },
+    {
+      "argv": ["pr", "view", "1", "--json", "number,title,body,state,url"],
+      "stdout": "{\"number\":1,\"title\":\"fix(auth): return true when credentials match (#1)\",\"body\":\"Closes #1\\n\",\"state\":\"OPEN\",\"url\":\"https://github.com/eval/harness/pull/1\"}\n",
+      "stderr": "",
+      "exit": 0
+    }
+  ]
+}

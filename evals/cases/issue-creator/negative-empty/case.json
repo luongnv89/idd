@@ -1,0 +1,13 @@
+{
+  "name": "issue-creator/negative-empty",
+  "skill": "issue-creator",
+  "prompt": "Create an issue with an empty unstructured body (negative trigger)",
+  "grade": [
+    {
+      "tool": "idd-lint",
+      "args": ["issue", "OUT/issue.md"],
+      "expect_exit": 1,
+      "label": "empty/unstructured body fails idd-lint (negative)"
+    }
+  ]
+}

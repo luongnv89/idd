@@ -1038,7 +1038,8 @@ EXPECTED_SITES = {
     # 4 since issue #260: parallel failed-lane quarantine and the serialized
     # drain both call --append-once, beside the legacy --append and the
     # --failure-streak read from issue #259.
-    "gi-model-cache.py": 2, "gi-runlog.py": 4, "gi-secscan.py": 4,
+    # 5 since issue #261: the behavioral eval grader invokes gi-runlog.py.
+    "gi-model-cache.py": 2, "gi-runlog.py": 5, "gi-secscan.py": 4,
     "gi-stack-detect.py": 1, "gi-triage-graph.py": 2,
 }
 # A call is any mention of a shared script by filename, however it is launched

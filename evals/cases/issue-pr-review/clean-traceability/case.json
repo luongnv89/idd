@@ -1,0 +1,24 @@
+{
+  "name": "issue-pr-review/clean-traceability",
+  "skill": "issue-pr-review",
+  "prompt": "Positive: conforming PR body with Closes #N and Decision Record",
+  "grade": [
+    {
+      "tool": "idd-lint",
+      "args": [
+        "pr",
+        "OUT/pr-body.md",
+        "--title",
+        "fix(auth): resolve mobile redirect loop (#42)"
+      ],
+      "expect_exit": 0,
+      "label": "conforming PR body passes idd-lint"
+    },
+    {
+      "tool": "shell",
+      "args": ["python3 scripts/idd-lint.py branch \"$(tr -d '\\n' < OUT/branch.txt)\""],
+      "expect_exit": 0,
+      "label": "branch name from subject artifact passes idd-lint"
+    }
+  ]
+}

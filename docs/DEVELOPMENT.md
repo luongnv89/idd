@@ -118,6 +118,20 @@ git ls-files 'tests/*.sh' | xargs -n1 bash   # run all
 
 `tests/README.md`, `README-sprint2.md`, and `README-sprint3.md` are something else: manual, human-driven test cases that do need a scratch GitHub repo.
 
+### Behavioral eval harness
+
+`evals/` is a hermetic, network-free behavioral suite for skill *outcomes* (issue bodies, PR bodies, branch/commit names, `runs.jsonl` records). Cases run a deterministic subject under a PATH-fronted `gh` record/replay shim (`evals/harness/gh_shim.py`), then grade artifacts with `scripts/idd-lint.py` and `src/shared/scripts/gi-runlog.py` — not prose greps of skill source.
+
+```bash
+bash evals/harness/run_eval.sh evals/cases/issue-creator/basic
+bash tests/test-eval-harness.sh
+bash tests/test-eval-creator.sh
+bash tests/test-eval-resolver.sh
+bash tests/test-eval-pr-review.sh
+```
+
+No `gh` auth and no network. `EVAL_RECORD=1` is for local cassette capture only and is fail-closed in `run_eval.sh` / CI. How to add cases, cassette format, and grading: [evals/README.md](../evals/README.md).
+
 When testing manually:
 1. Create a test repository (or use an existing one)
 2. Run the skill you modified

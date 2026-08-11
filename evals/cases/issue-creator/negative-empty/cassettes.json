@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "calls": [
+    {
+      "match": "prefix",
+      "argv": ["auth", "status"],
+      "stdout": "github.com\n  ✓ Logged in to github.com as eval-bot (key)\n",
+      "stderr": "",
+      "exit": 0
+    },
+    {
+      "match": "prefix",
+      "argv": ["issue", "create"],
+      "stdout": "https://github.com/eval/harness/issues/99\n",
+      "stderr": "",
+      "exit": 0
+    }
+  ]
+}

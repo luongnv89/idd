@@ -1,0 +1,18 @@
+{
+  "name": "issue-pr-review/missing-closes",
+  "skill": "issue-pr-review",
+  "prompt": "Negative: PR body without Closes #N must fail idd-lint pr",
+  "grade": [
+    {
+      "tool": "idd-lint",
+      "args": [
+        "pr",
+        "OUT/pr-body.md",
+        "--title",
+        "fix(auth): resolve mobile redirect loop (#42)"
+      ],
+      "expect_exit": 1,
+      "label": "PR without Closes #N fails idd-lint (negative)"
+    }
+  ]
+}

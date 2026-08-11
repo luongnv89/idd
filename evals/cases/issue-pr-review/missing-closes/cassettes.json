@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "calls": [
+    {
+      "match": "prefix",
+      "argv": ["auth", "status"],
+      "stdout": "github.com\n  ✓ Logged in to github.com as eval-bot (key)\n",
+      "stderr": "",
+      "exit": 0
+    },
+    {
+      "argv": ["pr", "view", "7", "--json", "number,title,body,state"],
+      "stdout": "{\"number\":7,\"title\":\"fix(auth): resolve mobile redirect loop (#42)\",\"body\":\"This PR fixes things.\\n\\n## Summary\\n\\nFix the mobile redirect loop.\\n\",\"state\":\"OPEN\"}\n",
+      "stderr": "",
+      "exit": 0
+    }
+  ]
+}
