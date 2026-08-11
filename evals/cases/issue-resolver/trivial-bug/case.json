@@ -1,0 +1,48 @@
+{
+  "name": "issue-resolver/trivial-bug",
+  "skill": "issue-resolver",
+  "prompt": "Fix the always-false login bug; prove red→green; open a conforming PR",
+  "grade": [
+    {
+      "tool": "idd-lint",
+      "args": ["branch", "fix/1-login-always-false"],
+      "expect_exit": 0,
+      "label": "branch name passes idd-lint"
+    },
+    {
+      "tool": "idd-lint",
+      "args": ["commit", "fix(auth): return true when credentials match (#1)"],
+      "expect_exit": 0,
+      "label": "commit message passes idd-lint"
+    },
+    {
+      "tool": "idd-lint",
+      "args": [
+        "pr",
+        "OUT/pr-body.md",
+        "--title",
+        "fix(auth): return true when credentials match (#1)"
+      ],
+      "expect_exit": 0,
+      "label": "PR body passes idd-lint (Closes + DR + AC + Reproduction)"
+    },
+    {
+      "tool": "gi-runlog-echo",
+      "file": "OUT/run.json",
+      "expect_exit": 0,
+      "label": "runs.jsonl record validates via gi-runlog --echo"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/red-green.txt",
+      "expect_exit": 0,
+      "label": "red→green evidence file present"
+    },
+    {
+      "tool": "shell",
+      "args": ["grep -q 'red→green\\|red -> green\\|red->green' OUT/pr-body.md"],
+      "expect_exit": 0,
+      "label": "PR AC table or Reproduction mentions red→green"
+    }
+  ]
+}
