@@ -90,8 +90,9 @@ else
   fail "AC1: gi-state could not clear a completed lane batch"
 fi
 
-# Real git-worktree fixture: distinct registered branches, structural cwd/
-# branch validation, dirty owned resume, blocked ambiguity, and safe cleanup.
+# Real git-worktree fixture executes the documented caller-managed validation:
+# registered path/branch/base/lane identity, fresh cleanliness, safe dirty resume,
+# and rejection of active Git state or any mismatched identity.
 FIX="$(cd "$TMP" && pwd -P)/worktree-fixture"
 mkdir -p "$FIX/repo"
 (
@@ -105,31 +106,57 @@ mkdir -p "$FIX/repo"
   git worktree add -q -b feat/42-a "$FIX/lane-42" HEAD
   git worktree add -q -b fix/45-b "$FIX/lane-45" HEAD
 )
-if [ "$(git -C "$FIX/repo" worktree list --porcelain | grep -c '^worktree ')" = 3 ] \
-   && [ "$(git -C "$FIX/lane-42" branch --show-current)" = feat/42-a ] \
-   && [ "$(git -C "$FIX/lane-45" branch --show-current)" = fix/45-b ]; then
-  pass "AC1: real git worktrees use distinct registered branches"
+base_sha="$(git -C "$FIX/repo" rev-parse HEAD)"
+validate_lane() {
+  lane_root=$1 expected_branch=$2 expected_base=$3 lane_id=$4 event_id=$5 resume=$6
+  actual_root="$(git -C "$lane_root" rev-parse --show-toplevel 2>/dev/null)" || return 1
+  actual_branch="$(git -C "$lane_root" branch --show-current 2>/dev/null)" || return 1
+  git_dir="$(cd "$(git -C "$lane_root" rev-parse --git-dir)" && pwd)" || return 1
+  common_dir="$(cd "$(git -C "$lane_root" rev-parse --git-common-dir)" && pwd)" || return 1
+  [ "$actual_root" = "$lane_root" ] || return 1
+  [ "$actual_branch" = "$expected_branch" ] || return 1
+  [ "$git_dir" != "$common_dir" ] || return 1
+  [ -n "$lane_id" ] && [ "$lane_id" = "$event_id" ] || return 1
+  git -C "$lane_root" cat-file -e "${expected_base}^{commit}" 2>/dev/null || return 1
+  git -C "$lane_root" merge-base --is-ancestor "$expected_base" HEAD || return 1
+  git -C "$FIX/repo" worktree list --porcelain | awk -v p="$lane_root" -v b="refs/heads/$expected_branch" '
+    $1=="worktree" {path=$2; branch=""}
+    $1=="branch" {branch=$2}
+    path==p && branch==b {found=1}
+    END {exit !found}
+  ' || return 1
+  for marker in MERGE_HEAD REBASE_HEAD CHERRY_PICK_HEAD BISECT_LOG; do
+    [ ! -e "$git_dir/$marker" ] || return 1
+  done
+  [ ! -d "$git_dir/rebase-merge" ] && [ ! -d "$git_dir/rebase-apply" ] || return 1
+  [ -z "$(git -C "$lane_root" status --porcelain)" ] || [ "$resume" = 1 ]
+}
+
+validate_lane "$FIX/lane-42" feat/42-a "$base_sha" r260:42 r260:42 0 \
+  && pass "AC1: exact validation accepts a fresh owned worktree" \
+  || fail "AC1: exact validation rejected a fresh owned worktree"
+if validate_lane "$FIX/lane-45" feat/42-a "$base_sha" r260:42 r260:42 0 \
+   || validate_lane "$FIX/lane-42" feat/42-a 0000000000000000000000000000000000000000 r260:42 r260:42 0 \
+   || validate_lane "$FIX/lane-42" feat/42-a "$base_sha" r260:42 wrong:event 0; then
+  fail "AC1: exact validation accepted wrong path/branch, base, or lane identity"
 else
-  fail "AC1: real git worktree isolation was not established"
-fi
-actual42="$(git -C "$FIX/lane-42" rev-parse --show-toplevel)"
-if [ "$actual42" = "$FIX/lane-42" ] && [ "$actual42" != "$FIX/lane-45" ]; then
-  pass "AC1: structural cwd accepts the owned lane and rejects the wrong path"
-else
-  fail "AC1: structural cwd validation did not distinguish lanes"
+  pass "AC1: exact validation rejects wrong path/branch, base, and lane identity"
 fi
 printf 'interrupted\n' > "$FIX/lane-42/resume.txt"
-if [ -n "$(git -C "$FIX/lane-42" status --porcelain)" ] \
-   && [ "$(git -C "$FIX/lane-42" branch --show-current)" = feat/42-a ]; then
-  pass "AC1: dirty owned lane remains resumable without discarding edits"
+if ! validate_lane "$FIX/lane-42" feat/42-a "$base_sha" r260:42 r260:42 0 \
+   && validate_lane "$FIX/lane-42" feat/42-a "$base_sha" r260:42 r260:42 1; then
+  pass "AC1: only an identity-owned resume preserves dirty edits"
 else
-  fail "AC1: dirty owned lane identity was not preserved"
+  fail "AC1: dirty fresh/resume validation did not follow the contract"
 fi
-if [ "$(git -C "$FIX/lane-45" branch --show-current)" != feat/42-a ]; then
-  pass "AC1: mismatched lane ownership is blocked instead of resumed"
+git_dir42="$(cd "$(git -C "$FIX/lane-42" rev-parse --git-dir)" && pwd)"
+touch "$git_dir42/MERGE_HEAD"
+if validate_lane "$FIX/lane-42" feat/42-a "$base_sha" r260:42 r260:42 1; then
+  fail "AC1: exact validation accepted an active Git operation"
 else
-  fail "AC1: ambiguous branch ownership was accepted"
+  pass "AC1: exact validation blocks active Git operations"
 fi
+rm -f "$git_dir42/MERGE_HEAD"
 # A blocked dirty lane must not keep its ready sibling from a serialized drain.
 printf '%s' '{"lanes":[{"issue":42,"phase":"blocked_dirty"},{"issue":45,"phase":"returned","pr":87}]}' \
   | python3 "$STATE" --update --dir "$TMP/state" >/dev/null
@@ -149,14 +176,30 @@ git -C "$FIX/repo" worktree remove "$FIX/lane-45"
 [ ! -d "$FIX/lane-45" ] && pass "AC2: clean terminal sibling cleanup succeeds" \
                            || fail "AC2: clean sibling cleanup failed"
 
-# Crash after append but before checkpoint: the stable event is one physical line.
+# Concurrent crash retries: all processes race on one stable event, but the
+# advisory lock makes the read/check/append/fsync transaction one physical line.
 RUNLOG_HELPER="$REPO_ROOT/src/shared/scripts/gi-runlog.py"
 run_record='{"ts":"2026-01-01T00:00:00Z","event_id":"run-260:45","issue":45,"mode":"balanced","skill":"auto-pilot","outcome":"merged","pr":87}'
-printf '%s' "$run_record" | python3 "$RUNLOG_HELPER" --append-once --path "$TMP/runs.jsonl" >/dev/null
-printf '%s' "$run_record" | python3 "$RUNLOG_HELPER" --append-once --path "$TMP/runs.jsonl" >/dev/null
-[ "$(wc -l < "$TMP/runs.jsonl" | tr -d ' ')" = 1 ] \
-  && pass "AC3: append-before-checkpoint resume writes one line" \
-  || fail "AC3: append-before-checkpoint resume duplicated telemetry"
+pids=""
+for _ in 1 2 3 4 5 6 7 8; do
+  (printf '%s' "$run_record" | python3 "$RUNLOG_HELPER" --append-once --path "$TMP/runs.jsonl" >/dev/null) &
+  pids="$pids $!"
+done
+race_ok=1
+for pid in $pids; do wait "$pid" || race_ok=0; done
+if [ "$race_ok" = 1 ] && [ "$(wc -l < "$TMP/runs.jsonl" | tr -d ' ')" = 1 ]; then
+  pass "AC3: concurrent append-before-checkpoint retries write one line"
+else
+  fail "AC3: concurrent append-once retries duplicated or rejected telemetry"
+fi
+conflict='{"ts":"2026-01-01T00:00:00Z","event_id":"run-260:45","issue":45,"mode":"balanced","skill":"auto-pilot","outcome":"failed","pr":87}'
+set +e
+printf '%s' "$conflict" | python3 "$RUNLOG_HELPER" --append-once --path "$TMP/runs.jsonl" >/dev/null 2>&1
+conflict_rc=$?
+set -e
+[ "$conflict_rc" = 3 ] \
+  && pass "AC3: concurrent event identity rejects conflicting payload" \
+  || fail "AC3: conflicting event payload exited $conflict_rc instead of 3"
 
 echo ""
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"

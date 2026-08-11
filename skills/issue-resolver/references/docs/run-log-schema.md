@@ -64,9 +64,9 @@ that order is the canonical one, not the field table's. `--append` (the
 default) creates `.gitissue/` and appends exactly one `\n`-terminated line to `--path`
 (default `.gitissue/runs.jsonl`); `--echo` runs the identical validation and
 normalization, prints the line, and **writes nothing** — the machine form of the
-`--no-run-log` contract below. `--append-once` requires `event_id`, fsyncs a new
-line, succeeds without writing when the same normalized event already exists,
-and exits `3` if that id exists with conflicting data. Exit `0` wrote, found, or
+`--no-run-log` contract below. `--append-once` requires `event_id`, locks its
+cross-process read/check/append/fsync transaction, reuses an identical event,
+and exits `3` on conflicting data. Exit `0` wrote, found, or
 printed the line; `2` is usage; `3` is invalid/conflicting; `4` is an I/O failure.
 Legacy callers may use the documented raw fallback on `4`; parallel lanes must
 leave `log_pending` and retry instead.

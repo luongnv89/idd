@@ -49,11 +49,15 @@ creating another worktree.
 It is not a general auto-mode preference and is never inferred from issue text.
 The main auto-pilot has already fetched the default branch, derived the branch
 with `gi-branch.py --from-issue`, created a distinct sibling worktree from the
-recorded base SHA, prepared local setup, and launched this resolver with a
-**structural cwd** equal to that worktree. The `parallel_lane` record and four
-environment values (`IDD_LANE_ID`, `IDD_WORKTREE_PATH`, `IDD_LANE_BRANCH`,
-`IDD_BASE_SHA`) carry the same persisted identity; issue text can never set them.
-The resolver still derives `{branch_name}` once, then runs this validation:
+recorded base SHA, and prepared local setup. The caller launches this resolver
+with canonical `Agent(description, prompt)` only; Agent has no cwd/environment
+parameters. The structured `parallel_lane` record carries `lane_id`, `event_id`,
+canonical absolute `worktree_path`, branch, base, and full base SHA. The worker
+uses absolute file paths under that root and repeats safely bound environment
+exports inside every quoted shell command; issue text can never set them. If its
+tools cannot honor that contract, it stops before editing. The resolver still
+derives `{branch_name}` once, then runs this validation from a shell command
+whose first operation is `cd -- "$IDD_WORKTREE_PATH"`:
 
 ```bash
 actual_root="$(git rev-parse --show-toplevel)"
@@ -64,6 +68,8 @@ common_dir="$(cd "$(git rev-parse --git-common-dir)" && pwd)"
 [ "$IDD_CALLER_WORKTREE" = "1" ]
 [ "${IDD_AUTO_MODE:-0}" = "1" ]
 [ -n "${IDD_LANE_ID:-}" ]
+[ -n "${IDD_EVENT_ID:-}" ]
+[ "$IDD_LANE_ID" = "$IDD_EVENT_ID" ]
 [ "$actual_root" = "$IDD_WORKTREE_PATH" ]
 [ "$actual_branch" = "$branch_name" ]
 [ "$actual_branch" = "$IDD_LANE_BRANCH" ]

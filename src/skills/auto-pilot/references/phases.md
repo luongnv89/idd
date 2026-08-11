@@ -954,15 +954,30 @@ Then launch **all** prepared resolver calls before waiting for any one of them:
   ⟶ #45  fix/45-b   (worktree)
 ```
 
-Use one concurrent fan-out whose spawn API has a **structural `cwd` field**. The
-ordinary `Agent(description, prompt)` primitive has no cwd parameter and is not
-sufficient. Prefer the host's documented cwd-capable workflow primitive (for
-example a run entry shaped as `{agent, task, cwd: lane.worktree_path}`), and set
-one unique lane per run. If no such primitive is available, capability-gate the
-feature: print `⚠ Parallel resolver cwd isolation unavailable — using the
-legacy sequential path`, set the effective bound to 1, clear the planned batch,
-and execute the byte-for-byte legacy path. Never emulate cwd by telling a worker
-to run `cd` inside a prompt.
+Launch each lane with the canonical supported shape only:
+`Agent(description="resolver — resolve issue #N", prompt=<lane prompt>)`. Do not
+invent `cwd`, environment, or `subagent_type` fields. The validated lane record
+is structured prompt data and is the worker's complete workspace authority.
+
+Before fan-out, capability-gate the host: parallel mode requires workers whose
+Read/Edit/Write tools accept absolute paths and whose Bash tool can execute one
+quoted command at a time. If either capability is unavailable, print
+`⚠ Parallel resolver absolute-path isolation unavailable — using the legacy
+sequential path`, remove only the unstarted worktrees this batch created, clear
+the planned batch, and execute the byte-for-byte legacy path. This fallback is
+permitted only before any worker starts.
+
+A parallel worker may not use its ambient root for any repository operation.
+Every file tool call names an absolute path under the canonical
+`parallel_lane.worktree_path`. Every shell call is one quoted command that first
+binds the validated path as data and then uses
+`cd -- "$lane_root" && ...`; git-only calls may instead use
+`git -C "$lane_root" ...`. Quote/bind values as arguments — never paste a path,
+branch, or SHA into executable shell syntax. The first command re-verifies
+`--show-toplevel`, branch, registered worktree ownership, lane/event identity,
+and base ancestry. On any mismatch the lane stops before resolver logic. These
+rules give the ordinary Agent primitive worktree isolation without claiming a
+spawn parameter it does not support.
 
 Substitute its own payload/context plus the persisted structural record:
 
@@ -972,13 +987,13 @@ Substitute its own payload/context plus the persisted structural record:
  "base_sha":"0123456789abcdef0123456789abcdef01234567","base":"main"}
 ```
 
-Set the worker environment from that record: `IDD_AUTO_MODE=1`,
-`IDD_CALLER_WORKTREE=1`, `IDD_LANE_ID`, `IDD_WORKTREE_PATH`,
-`IDD_LANE_BRANCH`, and `IDD_BASE_SHA`. A resumed resolver also receives
-`IDD_RESUME_LANE=1`. Before invoking the resolver the worker must verify cwd,
-branch, registered path/branch ownership, lane identity, and base ancestry; it
-then runs Step 0e's caller-managed validation rather than skipping it. Every lane
-still uses `--auto --no-run-log`; the caller
+Within every quoted shell command, export from that already-validated record:
+`IDD_AUTO_MODE=1`, `IDD_CALLER_WORKTREE=1`, `IDD_LANE_ID`,
+`IDD_EVENT_ID`, `IDD_WORKTREE_PATH`, `IDD_LANE_BRANCH`, and `IDD_BASE_SHA`; a resumed resolver
+also exports `IDD_RESUME_LANE=1`. Exports are repeated per command because Agent
+shell calls do not share process state. Before invoking resolver logic the
+worker runs Step 0e's caller-managed validation in full rather than skipping it.
+Every lane still uses `--auto --no-run-log`; the caller
 worktree changes only workspace setup, never issue-state checks, QA, tests,
 secret scans, push, or PR delivery. Wait for **all started lanes** to return. Do
 not cancel successful siblings when one fails, and do not start PR review until

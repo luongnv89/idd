@@ -57,8 +57,14 @@ import json
 import os
 import re
 import sys
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
+
+try:
+    import fcntl
+except ImportError:  # pragma: no cover - non-POSIX hosts fail closed at runtime
+    fcntl = None
 
 DEFAULT_LOG_PATH = ".gitissue/runs.jsonl"
 
@@ -263,44 +269,70 @@ def append_line(path: Path, line: str) -> None:
         os.fsync(fh.fileno())
 
 
-def append_once(path: Path, record: dict[str, object], *, ts_was_supplied: bool) -> bool:
-    """Append `record` once by event_id; return False for an identical retry.
+@contextmanager
+def _append_once_lock(path: Path):
+    """Hold a portable POSIX advisory lock for an append-once transaction."""
+    if fcntl is None:
+        raise OSError("portable advisory locking is unavailable on this host")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    lock_path = path.with_name(path.name + ".lock")
+    try:
+        lock_fh = open(lock_path, "a", encoding="utf-8")
+    except OSError as exc:
+        raise OSError(f"cannot open append-once lock {lock_path} — {exc}") from exc
+    locked = False
+    try:
+        try:
+            fcntl.flock(lock_fh.fileno(), fcntl.LOCK_EX)
+            locked = True
+        except OSError as exc:
+            raise OSError(f"cannot acquire append-once lock {lock_path} — {exc}") from exc
+        yield
+    finally:
+        try:
+            if locked:
+                fcntl.flock(lock_fh.fileno(), fcntl.LOCK_UN)
+        finally:
+            lock_fh.close()
 
-    The auto-pilot lane persists the event id and payload before calling this
-    mode. A retry that omitted `ts` may adopt the already-written timestamp;
-    every other field must be byte-for-byte equivalent after normalization.
-    A reused id with different telemetry is rejected rather than silently
-    corrupting the run log.
+
+def append_once(path: Path, record: dict[str, object], *, ts_was_supplied: bool) -> bool:
+    """Atomically append by event_id; return False for an identical retry.
+
+    The advisory lock covers the whole cross-process transaction: read,
+    identical/conflict decision, append, flush, and fsync. A lock failure is an
+    OSError so the caller exits 4 and leaves the lane log_pending for resume.
     """
     event_id = record.get("event_id")
     if not isinstance(event_id, str):
         raise RecordError("--append-once requires event_id")
 
-    try:
-        lines = path.read_text(encoding="utf-8").splitlines()
-    except FileNotFoundError:
-        lines = []
-    except (OSError, UnicodeDecodeError) as exc:
-        raise OSError(f"cannot read existing log for append-once — {exc}") from exc
-
-    for raw in lines:
+    with _append_once_lock(path):
         try:
-            existing = json.loads(raw)
-        except (json.JSONDecodeError, ValueError):
-            continue
-        if not isinstance(existing, dict) or existing.get("event_id") != event_id:
-            continue
-        candidate = dict(record)
-        if not ts_was_supplied:
-            candidate["ts"] = existing.get("ts")
-        if existing == candidate:
-            return False
-        raise RecordError(
-            f"event_id '{event_id}' already exists with a conflicting payload"
-        )
+            lines = path.read_text(encoding="utf-8").splitlines()
+        except FileNotFoundError:
+            lines = []
+        except (OSError, UnicodeDecodeError) as exc:
+            raise OSError(f"cannot read existing log for append-once — {exc}") from exc
 
-    append_line(path, render(record))
-    return True
+        for raw in lines:
+            try:
+                existing = json.loads(raw)
+            except (json.JSONDecodeError, ValueError):
+                continue
+            if not isinstance(existing, dict) or existing.get("event_id") != event_id:
+                continue
+            candidate = dict(record)
+            if not ts_was_supplied:
+                candidate["ts"] = existing.get("ts")
+            if existing == candidate:
+                return False
+            raise RecordError(
+                f"event_id '{event_id}' already exists with a conflicting payload"
+            )
+
+        append_line(path, render(record))
+        return True
 
 
 def count_failure_streak(lines: list[str], issue: int) -> int:
