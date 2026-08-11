@@ -1,0 +1,25 @@
+{
+  "name": "issue-creator/basic",
+  "skill": "issue-creator",
+  "prompt": "Create a bug issue for mobile login redirect loop",
+  "grade": [
+    {
+      "tool": "idd-lint",
+      "args": ["issue", "OUT/issue.md"],
+      "expect_exit": 0,
+      "label": "normalized issue body passes idd-lint"
+    },
+    {
+      "tool": "idd-lint",
+      "args": ["branch", "fix/1-mobile-login-redirect"],
+      "expect_exit": 0,
+      "label": "branch name convention"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/issue-url.txt",
+      "expect_exit": 0,
+      "label": "gh issue create returned a URL"
+    }
+  ]
+}
