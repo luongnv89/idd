@@ -155,14 +155,39 @@ elif [ "$OS_NAME" = "Linux" ]; then
     echo "✗ no supported Linux network sandbox (unshare)" >&2
     exit 2
   fi
-  "$UNSHARE" --user --map-current-user --net true >/dev/null 2>&1
-  PROBE_EXIT=$?
-  if [ "$PROBE_EXIT" -ne 0 ]; then
-    echo "✗ Linux user+network namespace unavailable; refusing unsandboxed eval" >&2
-    exit 2
+
+  # Hosted Linux runners often disable unprivileged user namespaces even though
+  # they permit a passwordless sudo. Prefer the unprivileged path, then fall
+  # back to a root-created network namespace while dropping back to the caller
+  # UID/GID before the subject starts. Never run the subject as root.
+  HOST_UID="$(id -u)"
+  HOST_GID="$(id -g)"
+  if "$UNSHARE" --user --map-current-user --net true >/dev/null 2>&1; then
+    "$UNSHARE" --user --map-current-user --net "$SUBJECT_CMD"
+    SUBJECT_EXIT=$?
+  else
+    SUDO="$(command -v sudo || true)"
+    SETPRIV="$(command -v setpriv || true)"
+    UID_PROBE="$WORK/uid-probe.sh"
+    if [ -z "$SUDO" ] || [ -z "$SETPRIV" ]; then
+      echo "✗ Linux user+network namespace unavailable; refusing unsandboxed eval" >&2
+      exit 2
+    fi
+    cat > "$UID_PROBE" <<EOF
+#!/bin/sh
+test "\$(/usr/bin/id -u)" = "$HOST_UID" && test "\$(/usr/bin/id -g)" = "$HOST_GID"
+EOF
+    chmod 755 "$UID_PROBE"
+    if ! "$SUDO" -n "$UNSHARE" --net --fork "$SETPRIV" \
+      --reuid="$HOST_UID" --regid="$HOST_GID" --clear-groups "$UID_PROBE" \
+      >/dev/null 2>&1; then
+      echo "✗ Linux user+network namespace unavailable; refusing unsandboxed eval" >&2
+      exit 2
+    fi
+    "$SUDO" -n "$UNSHARE" --net --fork "$SETPRIV" \
+      --reuid="$HOST_UID" --regid="$HOST_GID" --clear-groups "$SUBJECT_CMD"
+    SUBJECT_EXIT=$?
   fi
-  "$UNSHARE" --user --map-current-user --net "$SUBJECT_CMD"
-  SUBJECT_EXIT=$?
 else
   echo "✗ unsupported OS $OS_NAME; refusing unsandboxed eval" >&2
   exit 2
