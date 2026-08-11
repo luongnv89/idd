@@ -41,6 +41,36 @@ stayed silent. The resolver's run `status` informs auto-pilot's decision but is 
 copied into the row's `outcome` — that field stays auto-pilot's own six
 categorical label (set from the merge result).
 
+## Parallel resolver lanes (`autopilot.max_parallel > 1`)
+
+Parallelism does not change the single-writer boundary. Every resolver lane is
+invoked with `--no-run-log` and may only return telemetry. After all resolvers
+fan in, the main agent runs one **serialized drain** in deterministic triage
+order. Each lane gets a stable `event_id` at scheduling. The append uses the same
+exactly-once transition either way: persist the normalized record as
+`log_pending`, call `gi-runlog.py --append-once`, checkpoint `logged`, then
+continue. The helper fsyncs a new line, treats an identical existing event as
+success, and rejects an event-id collision with different payload. A crash after
+append but before `logged` therefore retries without a second line. The parallel
+path never uses a raw fallback; helper failure leaves the lane pending while
+ready siblings continue. **When the append runs depends on the outcome:**
+
+- **Success path** — finish review and the Phase 5 outcome first, then append
+  that issue's **one** line (*Step 5.3*), update the triage cache if a merge
+  closed the issue, and clean up the worktree before moving to the next lane.
+- **Failed-resolve path** — at *Phase 2.3* quarantine, **before**
+  `gi-runlog.py --failure-streak`, so the current failure is already in the log
+  when the streak is counted (counting first is off by one). The same
+  `log_pending` → `--append-once` → `logged` contract applies; quarantine then
+  proceeds only after `logged`. Worktree cleanup for that failed lane follows
+  the ordinary failed-lane rules in `references/phases.md`.
+
+No two appends overlap, and a worker never appends on failure or success.
+
+This differs from batch fan-out below: parallel lanes produce separate PRs and
+separate terminal outcomes. There is no shared-result fan-out and no scalar
+telemetry attribution rule; each lane contributes only its own returned values.
+
 ## Batch fan-out (Batch Resolver path)
 
 **Batch iterations** (the *Batch Resolver* path resolves several issues in one
@@ -66,7 +96,8 @@ case where an issue is skipped **before** resolution starts (Phase 1's triage
 graph marks it blocked, so no PR exists). One line per issue, never both.
 
 Populate from the iteration's known values plus the resolver's returned
-telemetry: `ts` (current UTC, ISO 8601), `issue` (the number), `mode` (the
+telemetry: `ts` (current UTC, ISO 8601), `event_id` (parallel lanes only — the
+stable run/lane identifier persisted at scheduling), `issue` (the number), `mode` (the
 auto-pilot merge mode — `conservative` / `balanced` / `aggressive`), `skill`
 (`auto-pilot`), `outcome` (one of the six categorical labels), `pr` (the PR
 number when one was created, else `null`), and — from the resolver's report-back

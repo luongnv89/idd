@@ -1029,13 +1029,16 @@ SCRIPT_NAME = re.compile(r"gi-[a-z0-9-]+\.py")
 # of two sites was deleted. A count that moves is a contract change and has
 # to be an explicit edit here.
 EXPECTED_SITES = {
-    "gi-branch.py": 2, "gi-ci-wait.py": 4, "gi-config.py": 6,
+    # 3 since issue #260: /auto-pilot parallel worktree prep also derives the
+    # lane branch via gi-branch.py (beside the two issue-resolver sites).
+    "gi-branch.py": 3, "gi-ci-wait.py": 4, "gi-config.py": 6,
     # 15 since issue #258: /auto-pilot Step 1.2b fetches the picked issue's
     # record on demand, because Phase 1's bulk list no longer carries `body`.
     "gi-deps.py": 1, "gi-issue.py": 15,
-    # 3 since issue #259: /auto-pilot's Phase 2.3 quarantine check calls
-    # --failure-streak, the script's one read mode, beside the two appends.
-    "gi-model-cache.py": 2, "gi-runlog.py": 3, "gi-secscan.py": 4,
+    # 4 since issue #260: parallel failed-lane quarantine and the serialized
+    # drain both call --append-once, beside the legacy --append and the
+    # --failure-streak read from issue #259.
+    "gi-model-cache.py": 2, "gi-runlog.py": 4, "gi-secscan.py": 4,
     "gi-stack-detect.py": 1, "gi-triage-graph.py": 2,
 }
 # A call is any mention of a shared script by filename, however it is launched

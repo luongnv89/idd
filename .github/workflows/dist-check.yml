@@ -169,6 +169,9 @@ jobs:
       - name: test-autopilot-hardening-259
         run: bash tests/test-autopilot-hardening-259.sh
 
+      - name: test-autopilot-parallel-260
+        run: bash tests/test-autopilot-parallel-260.sh
+
       - name: test-model-suggestion-117
         run: bash tests/test-model-suggestion-117.sh
 

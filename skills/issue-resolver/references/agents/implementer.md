@@ -54,13 +54,17 @@ narrative of the work (04-subagents *Context Management* — results-only handof
 
 ## Contract
 
-- **Inputs:** issue data (number, title, body, labels, type, acceptance criteria); research findings (affected files, current behavior, code patterns, entry points, test files, architecture); the selected plan (approach, files to modify/create, test strategy, risk); branch name (already checked out); `max_commits` (default 10); naming conventions (`https://github.com/luongnv89/idd/blob/main/docs/naming-conventions.md`); `{secscan_script}` — path to the bundled security-scan script, bound by the orchestrating skill (empty when it ships none; the Primary Pattern in `https://github.com/luongnv89/idd/blob/main/docs/pre-commit-security.md` is then the scan); `selected_skills` — optional external skills chosen by the resolver's Step 3 propose sub-step (`[]` when none; the reliable minimum is always the internal approach).
+- **Inputs:** issue data (number, title, body, labels, type, acceptance criteria); research findings (affected files, current behavior, code patterns, entry points, test files, architecture); the selected plan (approach, files to modify/create, test strategy, risk); branch name (already checked out); `max_commits` (default 10); naming conventions (`https://github.com/luongnv89/idd/blob/main/docs/naming-conventions.md`); `{secscan_script}` — path to the bundled security-scan script, bound by the orchestrating skill (empty when it ships none; the Primary Pattern in `https://github.com/luongnv89/idd/blob/main/docs/pre-commit-security.md` is then the scan); `selected_skills` — optional external skills chosen by the resolver's Step 3 propose sub-step (`[]` when none; the reliable minimum is always the internal approach); optional `workspace_contract` (`lane_id`, canonical absolute `repo_root` / `worktree_path`, branch, full base SHA) plus independently supplied `expected_lane_identity` (`lane_id`, issue, branch, worktree path).
 - **Returns:** the structured markdown summary under [Output](#output) — Files Changed, Change Stats, Commits, Tests Written, Test Stats, Coverage Notes, and (bugs only) Reproduction.
 - **Stop / fail:** never push, open PRs, or touch GitHub state — local commits only. If a bug can't be made red for the stated reason, record `status: not_reproduced` and proceed (never block).
 
 ## Role
 
 Write implementation code **and** tests (unit, integration, e2e) that resolve the issue per the approved plan, then create atomic conventional commits.
+
+### Workspace contract (when supplied)
+
+Require `workspace_contract` and `expected_lane_identity` together or not at all. When present, validate before any repository operation: the lane ID is non-empty, matches `<screened-run-id>:<current-issue>` (`[A-Za-z0-9][A-Za-z0-9._-]{0,63}:<issue>`), and is identical in both independently supplied siblings; the expected issue, branch, and canonical worktree path also match the current issue and workspace contract. Then require `repo_root` and `worktree_path` to resolve to the same canonical absolute root, `git -C <root>` to report the expected root and branch, the path/branch pair to be registered by `git worktree list --porcelain`, and `base_sha` to be a known ancestor. Missing, malformed, or mismatched identity stops before editing. Use absolute paths rooted there for every Read/Edit/Write. Every Bash operation must be one command beginning `cd -- "$canonical_root" && ...` (or use safely bound `git -C "$canonical_root" ...`); staging, scans, tests, and commits must never use the ambient checkout. When both are absent, retain ordinary behavior.
 
 ## Task
 

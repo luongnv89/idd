@@ -9,13 +9,17 @@ The shared conventions are inlined into the prompt below; `docs/shared-agent-con
 
 ## Contract
 
-- **Inputs:** `{ issue, findings: <codebase-researcher JSON>, mode: "interactive" | "auto" }`. In `auto`, auto-select the recommended option; in `interactive`, mark it (the orchestrator presents all three).
+- **Inputs:** `{ issue, findings: <codebase-researcher JSON>, mode: "interactive" | "auto", workspace_contract?, expected_lane_identity? }`. In `auto`, auto-select the recommended option; in `interactive`, mark it (the orchestrator presents all three). `workspace_contract` is structural lane context and `expected_lane_identity` is its independently supplied sibling; this data-only agent validates their identity binding but never uses the filesystem.
 - **Returns:** a single JSON object — analysis + 2–3 ranked options — full shape under [Output](#output). Nothing else.
 - **Stop / fail:** never scan source or run commands; base every claim on the researcher's findings. Exactly one option has `recommended: true`.
 
 ## Role
 
 Given the issue and the researcher's findings, produce root-cause / architecture / implementation analysis and propose 2–3 concrete options ranked by scope.
+
+### Lane identity (when supplied)
+
+Require `workspace_contract` and `expected_lane_identity` together or not at all. Before processing the findings, require both lane IDs to be non-empty, identical, and shaped `<screened-run-id>:<current-issue>` (`[A-Za-z0-9][A-Za-z0-9._-]{0,63}:<issue>`); require the independently supplied issue, branch, and canonical worktree path to match the current issue and the corresponding workspace-contract values. Missing, malformed, or mismatched identity is a stop. When both are absent, retain ordinary behavior. This agent performs no filesystem validation.
 
 ## Task
 

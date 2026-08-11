@@ -31,9 +31,10 @@ Verify before any operation — git repository (`git rev-parse --git-dir`), `gh`
 
 ## Repo Sync Before Edits (mandatory)
 
-Applies to the **in-place path** only (auto mode, or interactive when the user
-declines the Step 0e worktree offer) — the worktree path starts current already.
-Sync with remote using the **stash-first pattern**: stash uncommitted work
+Applies to the **in-place path** only (ordinary auto mode, or interactive after
+declining Step 0e). Accepted interactive and validated caller-managed worktrees
+start from the fetched base; an invalid `IDD_CALLER_WORKTREE=1` is a stop, never
+a sync bypass or in-place fallback. Sync in-place with the **stash-first pattern**:
 (including untracked) → fetch → rebase-pull the current branch → pop the stash,
 aborting with the recovery hint if the pop conflicts. Copy the exact snippet and
 the full recovery procedure from `docs/sync-conventions.md` (*Quick Reference
@@ -199,9 +200,10 @@ Before Step 0e or 0f selects a workspace, derive one `{branch_name}` with `pytho
 
 Then decide *where* the resolution work happens.
 
-**Auto mode (`--auto` / `IDD_AUTO_MODE=1`): skip this offer entirely.** Go
-straight to *0f — Create branch* (in-place). The worktree prompt never appears
-in auto mode (acceptance criterion 4).
+**Auto mode (`--auto` / `IDD_AUTO_MODE=1`): skip this offer entirely.** A set
+`IDD_CALLER_WORKTREE=1` uses the validated caller-managed path in
+`references/pipeline-steps.md`; otherwise go to *0f* (legacy in-place). Neither
+auto path shows the prompt.
 
 **Interactive mode:** offer to run the resolution in a dedicated git *worktree*
 — an isolated checkout in a separate directory — so branch creation,
@@ -234,9 +236,9 @@ without a working resolution.
 
 ### 0f — Create branch
 
-The **in-place path** — auto mode, or interactive after declining the worktree
-offer. (Accepted-worktree path already created the branch via `git worktree add -b`
-in 0e; skip this sub-step.)
+The **in-place path** — ordinary auto mode, or interactive after declining the
+offer. Accepted interactive and validated caller-managed paths already checked
+out the branch and skip this sub-step.
 
 Use the `{branch_name}` already derived before Step 0e/0f (see *0e — Workspace*,
 `docs/config-schema.md`, `docs/naming-conventions.md`) — never re-derive it here.
@@ -466,7 +468,7 @@ in the same file shows the tracker and closing block together.
 When invoked with `--auto` (or by `/auto-pilot`), the entire pipeline runs without user interaction. Each step above already states its own auto behavior; these are the cross-cutting invariants:
 
 - **Environment:** Export `IDD_AUTO_MODE=1` before any shell snippet that consults it (`docs/pre-commit-security.md`).
-- **Workspace:** Always in-place. Skip Step 0e entirely — no `git worktree add` on the default resolution path. Run mandatory Repo Sync, then *0f — Create branch*.
+- **Workspace:** The default resolution path is in-place. Skip Step 0e and allow no `git worktree add` on the default resolution path; ordinary standalone auto mode and auto-pilot's default single-lane path run mandatory Repo Sync, then *0f*, exactly as before. A resolver launched by auto-pilot with `max_parallel > 1` may receive `IDD_CALLER_WORKTREE=1`; after the linked-worktree/branch validation in `references/pipeline-steps.md`, it uses that already-current workspace without creating, falling back from, or cleaning it up. The prompt never appears on either path.
 - **Never blocks:** *0c* skips the assignment guard and logs blocking labels as warnings; *0g* still runs (reads the pre-work `Effort` band, no prompt); *Step 1* closes an already-resolved issue with a comment and exits cleanly; *Step 2* auto-selects the recommended option and design-confirm never appears; *Step 3* continues past the max-commits guard with a warning and never prompts for skills (internal agents only); *Step 4* runs its cycles autonomously and delivers with known issues on stagnation.
 - **Deliver:** Create PR. Do NOT merge — merging is `/auto-pilot` or `/issue-pr-review`'s job. Under `/auto-pilot` the selected `profile` is **returned** in the telemetry (with `--no-run-log`) and folded into auto-pilot's single run-log line; a standalone `--auto` run writes `profile` itself.
 

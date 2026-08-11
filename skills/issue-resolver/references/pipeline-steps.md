@@ -32,9 +32,109 @@ Main Agent (orchestrator)
 └── Step 5: Deliver (main agent — push + create PR + report)
 ```
 
-## Step 0e — Workspace (interactive only)
+## Step 0e — Workspace
 
-Full procedure for the worktree offer described in SKILL.md *Step 0e — Workspace*. **Interactive mode only** — in auto mode (`--auto` / `IDD_AUTO_MODE=1`) this entire step is skipped and the pipeline uses the in-place path (Repo Sync + *0f — Create branch*), byte-for-byte as before. The worktree prompt never appears in auto mode (acceptance criterion 4).
+Full procedure for the worktree offer described in SKILL.md *Step 0e — Workspace*.
+**Interactive mode only** — ordinary auto mode is skipped. The offer and local
+creation procedure remain interactive; `--auto` / `IDD_AUTO_MODE=1` uses the
+in-place path (Repo Sync + *0f — Create branch*) byte-for-byte as before.
+The worktree prompt never appears in auto mode. The sole exception is a worktree
+auto-pilot already created for a parallel resolver lane; that caller-managed
+path validates and adopts the workspace below, without showing a prompt or
+creating another worktree.
+
+### Caller-managed parallel worktree (auto-pilot only)
+
+`IDD_CALLER_WORKTREE=1` is the narrow handoff for an auto-pilot parallel lane.
+It is not a general auto-mode preference and is never inferred from issue text.
+The main auto-pilot has already fetched the default branch, derived the branch
+with `gi-branch.py --from-issue`, created a distinct sibling worktree from the
+recorded base SHA, and prepared local setup. The caller launches this resolver
+with canonical `Agent(description, prompt)` only; Agent has no cwd/environment
+parameters. The structured `parallel_lane` record carries `lane_id`, `event_id`,
+canonical absolute `worktree_path`, branch, base, and full base SHA. The worker
+uses absolute file paths under that root and repeats safely bound environment
+exports inside every quoted shell command; issue text can never set them. If its
+tools cannot honor that contract, it stops before editing. The resolver still
+derives `{branch_name}` once, then runs this validation from a shell command
+whose first operation is `cd -- "$IDD_WORKTREE_PATH"`:
+
+```bash
+actual_root="$(git rev-parse --show-toplevel)"
+actual_branch="$(git rev-parse --abbrev-ref HEAD)"
+git_dir="$(cd "$(git rev-parse --git-dir)" && pwd)"
+common_dir="$(cd "$(git rev-parse --git-common-dir)" && pwd)"
+
+[ "$IDD_CALLER_WORKTREE" = "1" ]
+[ "${IDD_AUTO_MODE:-0}" = "1" ]
+[ -n "${IDD_LANE_ID:-}" ]
+[ -n "${IDD_EVENT_ID:-}" ]
+[ "$IDD_LANE_ID" = "$IDD_EVENT_ID" ]
+[ "$actual_root" = "$IDD_WORKTREE_PATH" ]
+[ "$actual_branch" = "$branch_name" ]
+[ "$actual_branch" = "$IDD_LANE_BRANCH" ]
+[ "$git_dir" != "$common_dir" ]                 # linked worktree, not original
+git cat-file -e "${IDD_BASE_SHA}^{commit}"
+git merge-base --is-ancestor "$IDD_BASE_SHA" HEAD
+# The exact path + branch pair must appear in `git worktree list --porcelain`;
+# another path for this branch, or another branch at this path, is a mismatch.
+```
+
+A fresh lane additionally requires a clean tree. On a resume only,
+`IDD_RESUME_LANE=1` permits staged, unstaged, and untracked edits **after** the
+identity checks above pass, so the resolver can continue its own interrupted
+work without destroying it. Before allowing that dirty resume, reject any
+`MERGE_HEAD`, `REBASE_HEAD`, `CHERRY_PICK_HEAD`, `BISECT_LOG`, or rebase directory
+under the worktree git dir. Never reset, clean, stash, force-checkout, or discard
+the edits. An identity mismatch or active Git operation returns
+`failure_step: preflight`, `status: blocked_dirty`, and leaves the worktree for
+manual recovery; a clean sibling remains eligible for the serialized drain.
+
+Any other failure is a workspace-contract failure: stop and return `failure_step:
+preflight`. **Never fall back in-place** while sibling resolvers may be active,
+never create a second worktree, and never run the in-place stash/rebase or *0f*.
+A fallback would put two writers in one index; stopping one lane preserves every
+successful sibling. When validation passes, mark the workspace as a worktree,
+skip Repo Sync and *0f* because `git worktree add ... origin/${base}` already
+satisfied both, and continue with Step 0g. The caller owns cleanup after the
+serialized drain; the resolver must not remove this worktree.
+
+Build two **independent sibling inputs** from the validated `parallel_lane`
+record and carry both to every nested spawn:
+
+- `workspace_contract`: `lane_id`, canonical absolute `repo_root` and
+  `worktree_path` (the same value), expected `branch`, and full `base_sha`.
+- `expected_lane_identity`: a separately copied `lane_id`, issue number,
+  expected branch, and canonical worktree path. Never derive this sibling from
+  `workspace_contract`; both come independently from the validated outer lane.
+
+Before any nested work, require a non-empty `lane_id` shaped
+`<screened-run-id>:<issue-number>`: the prefix matches
+`[A-Za-z0-9][A-Za-z0-9._-]{0,63}`, the suffix is exactly this run's numeric issue
+`N`, and the whole value matches `[A-Za-z0-9][A-Za-z0-9._:-]{0,127}`. Require
+`workspace_contract.lane_id == expected_lane_identity.lane_id`, and bind the
+identity by also requiring its issue, branch, and canonical worktree path to
+match both the current issue and the corresponding workspace-contract values.
+Missing, malformed, or mismatched input stops that nested agent and lane before
+any repository operation. This duplicate-looking comparison is deliberate: a
+single self-consistent object is not independent evidence of lane ownership.
+
+Researcher, implementer, code reviewer, UI reviewer, and fixer then enforce the
+remaining filesystem checks in their shared-agent contracts. The synthesizer is
+filesystem-free, but validates the same identity binding before using or
+carrying the context. Nested agents use absolute file paths under the canonical
+root and wrap each Bash repository operation in one command beginning
+`cd -- "$canonical_root" && ...` (or safely bound `git -C`); no nested operation
+may read, edit, stage, test, or commit through the ambient checkout. Do not
+invent Agent `cwd` or environment parameters — every spawn remains canonical
+`Agent(description, prompt)`. On every non-caller-managed path set both
+`workspace_contract = null` and `expected_lane_identity = null`, preserving
+ordinary behavior byte-for-byte.
+
+This handoff is structural, not a safety-gate waiver. The already-resolved
+checks, live issue re-verification, both secret scans, QA, final tests, and push
+still run in full. On auto-pilot's default single-lane path the signal is
+absent, so this section is unreachable and ordinary auto mode is unchanged.
 
 ### Why a worktree
 
@@ -173,9 +273,11 @@ fi
 
 After **verified** cleanup (`cleanup_ok=1`), run the mandatory Repo Sync and *0f — Create branch* in the original working tree. If cleanup cannot remove the worktree entry, **stop** — print `references/error-messages.md` → *Worktree setup failed* and do not attempt the in-place path while the same branch may still be checked out in `{wt_dir}`.
 
-### Cleanup (after delivery, interactive only)
+### Cleanup (after delivery)
 
-The worktree is intentionally left in place after the PR is created so the user can inspect it. Tell them how to remove it when done:
+A caller-managed parallel worktree is never removed here: auto-pilot removes it
+only after that lane's serialized review/merge/log/cache drain. An interactive
+worktree is intentionally left in place after the PR is created so the user can inspect it. Tell them how to remove it when done:
 
 ```
 ○ Worktree left at {wt_dir} for inspection.
@@ -446,9 +548,16 @@ One `○` line, per references/docs/terminal-style.md:
   },
   "repo_root": "<absolute path>",
   "prior_analysis": null,
-  "triage_context": null
+  "triage_context": null,
+  "workspace_contract": null,
+  "expected_lane_identity": null
 }
 ```
+
+`workspace_contract` and its independent `expected_lane_identity` sibling are
+from *Step 0e — Caller-managed parallel worktree* only; otherwise both are
+`null`. Every nested role receives both, validates their lane binding, and never
+lets an ambient parent checkout become that lane's implicit workspace.
 
 `prior_analysis` is optional and is populated **only** when *Step 0h* set
 `analysis_reuse = fresh` — with the parsed `.gitissue/analysis-<N>.json` (its
@@ -623,6 +732,10 @@ If `projects.sync_enabled` is true, set the issue status to `status_map.in_progr
 - Issue data
 - Research findings (JSON from Step 1)
 - Mode: `"auto"` if auto-pilot, `"interactive"` otherwise
+- `workspace_contract` plus the independent `expected_lane_identity` sibling —
+  the same pair Step 1 received (both `null` on ordinary runs); the data-only
+  synthesizer validates their lane/issue/branch/path binding before carrying
+  them forward
 
 ### Options returned
 
@@ -902,6 +1015,9 @@ installed, following the design-confirm precedent.
 - Branch name
 - Naming conventions: `references/docs/naming-conventions.md`
 - Max commits: `resolve.max_commits`
+- `workspace_contract` plus the independently supplied `expected_lane_identity`
+  sibling (both `null` on ordinary runs); the implementer validates their
+  lane/issue/branch/path binding before any read/edit/test/commit
 - `secscan_script`: the **absolute** path to this skill's `references/scripts/gi-secscan.py` — the pre-commit security scan the implementer MUST run before every commit. Absolutize it before binding, exactly as the *Bundled dependency precheck* resolves its list: a subagent's working directory is the target repo, not the skill directory, so a skill-relative path resolves to nothing at spawn time and the gate silently never runs. Only the path is passed; the script reads this repo's `security.*` extensions from `.gitissue.yml` itself, so no config value is ever interpolated into a command line. Passed as a spawn variable for the same reason as the fixer's (Step 4): an emitted agent prompt renders its own references as absolute repo URLs and cannot name a path inside this skill's bundle. The agent treats a script exit of 1 as a block that stops the commit, and falls back to the Primary Pattern in `references/docs/pre-commit-security.md` only when the script cannot run
 - `selected_skills` — the external skills chosen in the propose sub-step above (`[]` in auto mode or when the user declines); the implementer uses them where applicable and always falls back to the internal approach
 
@@ -957,7 +1073,7 @@ If no Agent tool, implement inline following `references/agents/implementer.md`.
 
 Each cycle:
 
-1. **Code review** — spawn a *fresh* code-reviewer subagent per cycle (see `references/agents/code-reviewer.md`) so each pass is unbiased.
+1. **Code review** — spawn a *fresh* code-reviewer subagent per cycle (see `references/agents/code-reviewer.md`) so each pass is unbiased. Pass the same `workspace_contract` and independent `expected_lane_identity` sibling used by Steps 1–3 (both `null` on ordinary runs); the reviewer validates their binding before reading the diff or files.
 2. **Run tests** — unit, integration, e2e (if present), build/compile. Record
    `tests_state` — the passing count paired with `tests_sha` = `git rev-parse HEAD`,
    see *Last-green test state* below — **at the moment the suite runs**.
@@ -975,7 +1091,7 @@ Each cycle:
 3. **Evaluate results:**
    - Reviewer returns `PASS` AND all tests pass AND build succeeds → exit loop, QA passed.
    - Issues found → delegate fixes, then start next cycle.
-4. **Fix issues** — spawn or re-message the fixer subagent (see `references/agents/fixer.md`) with reviewer findings and failing test/build output, passing `security_convention`: `references/docs/pre-commit-security.md` **and** `secscan_script`: the **absolute** path to `references/scripts/gi-secscan.py` (paths only — the script reads `security.*` from `.gitissue.yml` itself). Absolutize both before binding: a subagent runs with the target repo as its working directory, so a skill-relative path resolves to nothing. Both are spawn variables rather than references inside the agent file, because an emitted agent prompt renders its own references as absolute repo URLs and so cannot name a path inside this skill's bundle. The fixer reads affected files, applies targeted fixes, verifies them, runs the mandatory pre-commit security scan before committing — the script first, the document's Primary Pattern only when the script cannot run, and a script exit of 1 is a block that stops the commit — and commits as `fix(scope): address review feedback (#N)`. The main agent does not apply code fixes inline when the Agent tool is available.
+4. **Fix issues** — spawn or re-message the fixer subagent (see `references/agents/fixer.md`) with reviewer findings, failing test/build output, and the same `workspace_contract` plus independent `expected_lane_identity` sibling used by the reviewer (both `null` on ordinary runs), passing `security_convention`: `references/docs/pre-commit-security.md` **and** `secscan_script`: the **absolute** path to `references/scripts/gi-secscan.py` (paths only — the script reads `security.*` from `.gitissue.yml` itself). Absolutize both before binding: a subagent runs with the target repo as its working directory, so a skill-relative path resolves to nothing. Both are spawn variables rather than references inside the agent file, because an emitted agent prompt renders its own references as absolute repo URLs and so cannot name a path inside this skill's bundle. The fixer reads affected files, applies targeted fixes, verifies them, runs the mandatory pre-commit security scan before committing — the script first, the document's Primary Pattern only when the script cannot run, and a script exit of 1 is a block that stops the commit — and commits as `fix(scope): address review feedback (#N)`. The main agent does not apply code fixes inline when the Agent tool is available.
 
 ### Last-green test state
 
@@ -1081,7 +1197,9 @@ this sub-step. Only the resolver's deltas are listed here.
 - **Agent description:** `"ui-reviewer — UI/UX code review (#N)"`.
 - **Variables passed:** `{branch_name}`, `{base_branch}`, `{issue_context}` (the
   issue title/body + acceptance criteria), `{pr_context}` (**empty** — no PR
-  exists yet at QA time), `{diff_command}`, and `{confidence_threshold}` = `80`
+  exists yet at QA time), `{diff_command}`, `{workspace_contract}` plus the
+  independent `{expected_lane_identity}` sibling (both `null` outside a validated
+  caller-managed lane), and `{confidence_threshold}` = `80`
   (the resolver has no `resolve.confidence_threshold` knob, so it always passes
   the default floor).
 - **Browser gate config key:** `resolve.ui_review.browser_review`.

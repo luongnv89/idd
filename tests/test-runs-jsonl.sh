@@ -135,6 +135,12 @@ has "$SUBAGENT" "duration_s" "T6: auto-pilot subagent prompt collects duration_s
 # Auto-pilot SKILL documents that it is the single writer and enriches its line.
 has "$AUTOPILOT" "--no-run-log" "T6: auto-pilot documents suppressing the resolver via --no-run-log"
 has_skill "$AUTOPILOT_DIR" "single line" "T6: auto-pilot documents writing the single enriched line per issue"
+has "$AUTOPILOT_DIR/references/run-log.md" "Parallel resolver lanes" \
+  "T6 (#260): run-log contract has a parallel-lane section"
+has "$AUTOPILOT_DIR/references/run-log.md" "worker never appends on failure or success" \
+  "T6 (#260): parallel resolver workers never append"
+has "$AUTOPILOT_DIR/references/run-log.md" "serialized drain" \
+  "T6 (#260): parallel lane records append only in the serialized drain"
 
 # --no-run-log now applies to BOTH the single-issue Resolver Subagent AND the Batch
 # Resolver Subagent (#158 made auto-pilot the single writer on the batch path too).
@@ -304,6 +310,27 @@ for writer in issue-resolver auto-pilot; do
     fail "T5: skills/$writer does not bundle references/scripts/gi-runlog.py"
   fi
 done
+
+# --- T9: parallel-lane append is crash-safe and idempotent (issue #260) -----
+TMP_RUNLOG="$(mktemp -d)"
+trap 'rm -rf "$TMP_RUNLOG"' EXIT
+HELPER="$REPO_ROOT/src/shared/scripts/gi-runlog.py"
+record='{"ts":"2026-01-01T00:00:00Z","event_id":"run-260:42","issue":42,"mode":"balanced","skill":"auto-pilot","outcome":"merged","pr":87}'
+printf '%s' "$record" | python3 "$HELPER" --append-once --path "$TMP_RUNLOG/runs.jsonl" >/dev/null
+# Simulate a crash before the lane checkpoint, then retry the same pending event.
+printf '%s' "$record" | python3 "$HELPER" --append-once --path "$TMP_RUNLOG/runs.jsonl" >/dev/null
+if [ "$(wc -l < "$TMP_RUNLOG/runs.jsonl" | tr -d ' ')" = 1 ]; then
+  pass "T9: append-once retry after crash keeps exactly one line"
+else
+  fail "T9: append-once duplicated an event"
+fi
+conflict='{"ts":"2026-01-01T00:00:00Z","event_id":"run-260:42","issue":42,"mode":"balanced","skill":"auto-pilot","outcome":"failed","pr":87}'
+if printf '%s' "$conflict" | python3 "$HELPER" --append-once --path "$TMP_RUNLOG/runs.jsonl" >/dev/null 2>&1; then
+  fail "T9: append-once accepted a conflicting payload"
+else
+  [ "$?" = 3 ] && pass "T9: append-once rejects event-id payload conflicts" \
+               || fail "T9: append-once conflict returned the wrong exit"
+fi
 
 echo ""
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
