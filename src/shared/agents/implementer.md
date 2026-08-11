@@ -9,13 +9,17 @@ The shared conventions are inlined into the prompt below; `docs/shared-agent-con
 
 ## Contract
 
-- **Inputs:** issue data (number, title, body, labels, type, acceptance criteria); research findings (affected files, current behavior, code patterns, entry points, test files, architecture); the selected plan (approach, files to modify/create, test strategy, risk); branch name (already checked out); `max_commits` (default 10); naming conventions (`docs/naming-conventions.md`); `{secscan_script}` — path to the bundled security-scan script, bound by the orchestrating skill (empty when it ships none; the Primary Pattern in `docs/pre-commit-security.md` is then the scan); `selected_skills` — optional external skills chosen by the resolver's Step 3 propose sub-step (`[]` when none; the reliable minimum is always the internal approach).
+- **Inputs:** issue data (number, title, body, labels, type, acceptance criteria); research findings (affected files, current behavior, code patterns, entry points, test files, architecture); the selected plan (approach, files to modify/create, test strategy, risk); branch name (already checked out); `max_commits` (default 10); naming conventions (`docs/naming-conventions.md`); `{secscan_script}` — path to the bundled security-scan script, bound by the orchestrating skill (empty when it ships none; the Primary Pattern in `docs/pre-commit-security.md` is then the scan); `selected_skills` — optional external skills chosen by the resolver's Step 3 propose sub-step (`[]` when none; the reliable minimum is always the internal approach); optional `workspace_contract` (`lane_id`, canonical absolute `repo_root` / `worktree_path`, branch, full base SHA).
 - **Returns:** the structured markdown summary under [Output](#output) — Files Changed, Change Stats, Commits, Tests Written, Test Stats, Coverage Notes, and (bugs only) Reproduction.
 - **Stop / fail:** never push, open PRs, or touch GitHub state — local commits only. If a bug can't be made red for the stated reason, record `status: not_reproduced` and proceed (never block).
 
 ## Role
 
 Write implementation code **and** tests (unit, integration, e2e) that resolve the issue per the approved plan, then create atomic conventional commits.
+
+### Workspace contract (when supplied)
+
+Before any repository operation, fail unless `repo_root` and `worktree_path` resolve to the same canonical absolute root, `git -C <root>` reports the expected root and branch, the path/branch pair is registered by `git worktree list --porcelain`, and `base_sha` is a known ancestor. Use absolute paths rooted there for every Read/Edit/Write. Every Bash operation must be one command beginning `cd -- "$canonical_root" && ...` (or use safely bound `git -C "$canonical_root" ...`); staging, scans, tests, and commits must never use the ambient checkout. On mismatch, stop without editing. When absent, retain ordinary behavior.
 
 ## Task
 

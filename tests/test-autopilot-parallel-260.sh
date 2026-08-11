@@ -9,6 +9,12 @@ PROMPTS="$REPO_ROOT/src/skills/auto-pilot/references/subagent-prompts.md"
 RUNLOG="$REPO_ROOT/src/skills/auto-pilot/references/run-log.md"
 RESOLVER="$REPO_ROOT/src/skills/issue-resolver/SKILL.source.md"
 RESOLVER_STEPS="$REPO_ROOT/src/skills/issue-resolver/references/pipeline-steps.md"
+RESEARCHER="$REPO_ROOT/src/shared/agents/codebase-researcher.md"
+SYNTHESIZER="$REPO_ROOT/src/shared/agents/synthesizer.md"
+IMPLEMENTER="$REPO_ROOT/src/shared/agents/implementer.md"
+REVIEWER="$REPO_ROOT/src/shared/agents/code-reviewer.md"
+UI_REVIEWER="$REPO_ROOT/src/shared/agents/ui-reviewer.md"
+FIXER="$REPO_ROOT/src/shared/agents/fixer.md"
 SCHEMA="$REPO_ROOT/docs/config-schema.md"
 TEMPLATE="$REPO_ROOT/src/skills/init-gitissue/templates/gitissue-template.yml"
 PASS=0
@@ -46,6 +52,24 @@ has "$RESOLVER" 'IDD_CALLER_WORKTREE=1' \
   "AC1: resolver accepts only the narrow caller-managed carve-out"
 has "$RESOLVER_STEPS" 'Never fall back in-place' \
   "AC1: a failed parallel worktree cannot fall back to the shared index"
+has "$RESOLVER_STEPS" 'structured input to every nested spawn' \
+  "AC1: resolver propagates one validated workspace contract to nested agents"
+has "$RESOLVER_STEPS" 'Agent\(description, prompt\)' \
+  "AC1: nested isolation does not invent unsupported Agent cwd/env arguments"
+for entry in \
+  "$RESEARCHER:researcher" \
+  "$IMPLEMENTER:implementer" \
+  "$REVIEWER:reviewer" \
+  "$UI_REVIEWER:ui reviewer" \
+  "$FIXER:fixer"; do
+  file="${entry%%:*}"; role="${entry#*:}"
+  has "$file" 'workspace_contract' \
+    "AC1: nested $role receives the workspace contract"
+  has "$file" 'cd -- "\$canonical_root"|git -C "\$canonical_root"' \
+    "AC1: nested $role rejects ambient-root repository operations"
+done
+has "$SYNTHESIZER" 'workspace_contract.*structural lane context' \
+  "AC1: data-only synthesizer preserves structural lane context"
 
 # Serialized drain and single writer.
 has "$PHASES" 'No reviewer, merge, run-log append, triage-cache update' \
@@ -135,6 +159,22 @@ validate_lane() {
 validate_lane "$FIX/lane-42" feat/42-a "$base_sha" r260:42 r260:42 0 \
   && pass "AC1: exact validation accepts a fresh owned worktree" \
   || fail "AC1: exact validation rejected a fresh owned worktree"
+# Simulate the nested-agent contract: validate the lane, then perform its edit
+# through an absolute path rooted in that worktree. The original checkout must
+# stay byte-identical and clean.
+original_before="$(cat "$FIX/repo/tracked.txt")"
+if validate_lane "$FIX/lane-42" feat/42-a "$base_sha" r260:42 r260:42 0; then
+  canonical_root="$(cd "$FIX/lane-42" && pwd -P)"
+  (cd -- "$canonical_root" && printf 'nested lane edit\n' > nested-output.txt)
+fi
+if [ -f "$FIX/lane-42/nested-output.txt" ] \
+   && [ ! -e "$FIX/repo/nested-output.txt" ] \
+   && [ "$(cat "$FIX/repo/tracked.txt")" = "$original_before" ] \
+   && [ -z "$(git -C "$FIX/repo" status --porcelain)" ]; then
+  pass "AC1: nested mutation is confined to the validated real worktree"
+else
+  fail "AC1: nested mutation reached or dirtied the original checkout"
+fi
 if validate_lane "$FIX/lane-45" feat/42-a "$base_sha" r260:42 r260:42 0 \
    || validate_lane "$FIX/lane-42" feat/42-a 0000000000000000000000000000000000000000 r260:42 r260:42 0 \
    || validate_lane "$FIX/lane-42" feat/42-a "$base_sha" r260:42 wrong:event 0; then

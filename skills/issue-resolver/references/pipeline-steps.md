@@ -99,6 +99,21 @@ skip Repo Sync and *0f* because `git worktree add ... origin/${base}` already
 satisfied both, and continue with Step 0g. The caller owns cleanup after the
 serialized drain; the resolver must not remove this worktree.
 
+Build one `workspace_contract` from the **validated** lane record and carry it as
+structured input to every nested spawn: `lane_id`, canonical absolute
+`repo_root` and `worktree_path` (the same value), expected `branch`, and full
+`base_sha`. Researcher, implementer, code reviewer, UI reviewer, and fixer must
+validate and enforce it per their shared-agent contracts; synthesizer is
+filesystem-free, so it receives the context only for structural continuity and
+the resolver carries it forward unchanged. Nested agents use absolute file paths
+under the canonical root and wrap each Bash repository operation in one command
+beginning `cd -- "$canonical_root" && ...` (or safely bound `git -C`); no nested
+operation may read, edit, stage, test, or commit through the ambient checkout.
+A mismatch stops that nested agent and the lane. Do not invent Agent `cwd` or
+environment parameters — every spawn remains canonical
+`Agent(description, prompt)`. On every non-caller-managed path set
+`workspace_contract = null`, preserving ordinary behavior byte-for-byte.
+
 This handoff is structural, not a safety-gate waiver. The already-resolved
 checks, live issue re-verification, both secret scans, QA, final tests, and push
 still run in full. On auto-pilot's default single-lane path the signal is
@@ -516,9 +531,15 @@ One `○` line, per references/docs/terminal-style.md:
   },
   "repo_root": "<absolute path>",
   "prior_analysis": null,
-  "triage_context": null
+  "triage_context": null,
+  "workspace_contract": null
 }
 ```
+
+`workspace_contract` is the validated object from *Step 0e — Caller-managed
+parallel worktree* only; otherwise it is `null`. It is passed unchanged to every
+nested role so an ambient parent checkout can never become that lane's implicit
+workspace.
 
 `prior_analysis` is optional and is populated **only** when *Step 0h* set
 `analysis_reuse = fresh` — with the parsed `.gitissue/analysis-<N>.json` (its
@@ -693,6 +714,9 @@ If `projects.sync_enabled` is true, set the issue status to `status_map.in_progr
 - Issue data
 - Research findings (JSON from Step 1)
 - Mode: `"auto"` if auto-pilot, `"interactive"` otherwise
+- `workspace_contract` — the same validated object Step 1 received (`null` on
+  ordinary runs); the synthesizer is data-only and the resolver carries it
+  forward unchanged
 
 ### Options returned
 
@@ -972,6 +996,8 @@ installed, following the design-confirm precedent.
 - Branch name
 - Naming conventions: `references/docs/naming-conventions.md`
 - Max commits: `resolve.max_commits`
+- `workspace_contract` — the same validated caller-managed object (`null` on
+  ordinary runs); the implementer enforces it before any read/edit/test/commit
 - `secscan_script`: the **absolute** path to this skill's `references/scripts/gi-secscan.py` — the pre-commit security scan the implementer MUST run before every commit. Absolutize it before binding, exactly as the *Bundled dependency precheck* resolves its list: a subagent's working directory is the target repo, not the skill directory, so a skill-relative path resolves to nothing at spawn time and the gate silently never runs. Only the path is passed; the script reads this repo's `security.*` extensions from `.gitissue.yml` itself, so no config value is ever interpolated into a command line. Passed as a spawn variable for the same reason as the fixer's (Step 4): an emitted agent prompt renders its own references as absolute repo URLs and cannot name a path inside this skill's bundle. The agent treats a script exit of 1 as a block that stops the commit, and falls back to the Primary Pattern in `references/docs/pre-commit-security.md` only when the script cannot run
 - `selected_skills` — the external skills chosen in the propose sub-step above (`[]` in auto mode or when the user declines); the implementer uses them where applicable and always falls back to the internal approach
 
@@ -1027,7 +1053,7 @@ If no Agent tool, implement inline following `references/agents/implementer.md`.
 
 Each cycle:
 
-1. **Code review** — spawn a *fresh* code-reviewer subagent per cycle (see `references/agents/code-reviewer.md`) so each pass is unbiased.
+1. **Code review** — spawn a *fresh* code-reviewer subagent per cycle (see `references/agents/code-reviewer.md`) so each pass is unbiased. Pass the same `workspace_contract` used by Steps 1–3 (`null` on ordinary runs); the reviewer validates it before reading the diff or files.
 2. **Run tests** — unit, integration, e2e (if present), build/compile. Record
    `tests_state` — the passing count paired with `tests_sha` = `git rev-parse HEAD`,
    see *Last-green test state* below — **at the moment the suite runs**.
@@ -1045,7 +1071,7 @@ Each cycle:
 3. **Evaluate results:**
    - Reviewer returns `PASS` AND all tests pass AND build succeeds → exit loop, QA passed.
    - Issues found → delegate fixes, then start next cycle.
-4. **Fix issues** — spawn or re-message the fixer subagent (see `references/agents/fixer.md`) with reviewer findings and failing test/build output, passing `security_convention`: `references/docs/pre-commit-security.md` **and** `secscan_script`: the **absolute** path to `references/scripts/gi-secscan.py` (paths only — the script reads `security.*` from `.gitissue.yml` itself). Absolutize both before binding: a subagent runs with the target repo as its working directory, so a skill-relative path resolves to nothing. Both are spawn variables rather than references inside the agent file, because an emitted agent prompt renders its own references as absolute repo URLs and so cannot name a path inside this skill's bundle. The fixer reads affected files, applies targeted fixes, verifies them, runs the mandatory pre-commit security scan before committing — the script first, the document's Primary Pattern only when the script cannot run, and a script exit of 1 is a block that stops the commit — and commits as `fix(scope): address review feedback (#N)`. The main agent does not apply code fixes inline when the Agent tool is available.
+4. **Fix issues** — spawn or re-message the fixer subagent (see `references/agents/fixer.md`) with reviewer findings, failing test/build output, and the same `workspace_contract` used by the reviewer (`null` on ordinary runs), passing `security_convention`: `references/docs/pre-commit-security.md` **and** `secscan_script`: the **absolute** path to `references/scripts/gi-secscan.py` (paths only — the script reads `security.*` from `.gitissue.yml` itself). Absolutize both before binding: a subagent runs with the target repo as its working directory, so a skill-relative path resolves to nothing. Both are spawn variables rather than references inside the agent file, because an emitted agent prompt renders its own references as absolute repo URLs and so cannot name a path inside this skill's bundle. The fixer reads affected files, applies targeted fixes, verifies them, runs the mandatory pre-commit security scan before committing — the script first, the document's Primary Pattern only when the script cannot run, and a script exit of 1 is a block that stops the commit — and commits as `fix(scope): address review feedback (#N)`. The main agent does not apply code fixes inline when the Agent tool is available.
 
 ### Last-green test state
 
@@ -1151,7 +1177,8 @@ this sub-step. Only the resolver's deltas are listed here.
 - **Agent description:** `"ui-reviewer — UI/UX code review (#N)"`.
 - **Variables passed:** `{branch_name}`, `{base_branch}`, `{issue_context}` (the
   issue title/body + acceptance criteria), `{pr_context}` (**empty** — no PR
-  exists yet at QA time), `{diff_command}`, and `{confidence_threshold}` = `80`
+  exists yet at QA time), `{diff_command}`, `{workspace_contract}` (validated
+  caller-managed object, otherwise `null`), and `{confidence_threshold}` = `80`
   (the resolver has no `resolve.confidence_threshold` knob, so it always passes
   the default floor).
 - **Browser gate config key:** `resolve.ui_review.browser_review`.

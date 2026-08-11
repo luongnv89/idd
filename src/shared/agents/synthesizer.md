@@ -9,7 +9,7 @@ The shared conventions are inlined into the prompt below; `docs/shared-agent-con
 
 ## Contract
 
-- **Inputs:** `{ issue, findings: <codebase-researcher JSON>, mode: "interactive" | "auto" }`. In `auto`, auto-select the recommended option; in `interactive`, mark it (the orchestrator presents all three).
+- **Inputs:** `{ issue, findings: <codebase-researcher JSON>, mode: "interactive" | "auto", workspace_contract? }`. In `auto`, auto-select the recommended option; in `interactive`, mark it (the orchestrator presents all three). `workspace_contract` is structural lane context only; this data-only agent neither validates nor uses the filesystem, and the orchestrator carries it forward unchanged.
 - **Returns:** a single JSON object — analysis + 2–3 ranked options — full shape under [Output](#output). Nothing else.
 - **Stop / fail:** never scan source or run commands; base every claim on the researcher's findings. Exactly one option has `recommended: true`.
 

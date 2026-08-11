@@ -54,7 +54,7 @@ narrative of the work (04-subagents *Context Management* — results-only handof
 
 ## Contract
 
-- **Inputs:** `{ issue, findings: <codebase-researcher JSON>, mode: "interactive" | "auto" }`. In `auto`, auto-select the recommended option; in `interactive`, mark it (the orchestrator presents all three).
+- **Inputs:** `{ issue, findings: <codebase-researcher JSON>, mode: "interactive" | "auto", workspace_contract? }`. In `auto`, auto-select the recommended option; in `interactive`, mark it (the orchestrator presents all three). `workspace_contract` is structural lane context only; this data-only agent neither validates nor uses the filesystem, and the orchestrator carries it forward unchanged.
 - **Returns:** a single JSON object — analysis + 2–3 ranked options — full shape under [Output](#output). Nothing else.
 - **Stop / fail:** never scan source or run commands; base every claim on the researcher's findings. Exactly one option has `recommended: true`.
 
