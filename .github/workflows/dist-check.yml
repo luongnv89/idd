@@ -32,6 +32,18 @@ jobs:
       - name: test-idd-lint-stats-project
         run: bash tests/test-idd-lint-stats-project.sh
 
+      - name: test-eval-harness
+        run: bash tests/test-eval-harness.sh
+
+      - name: test-eval-creator
+        run: bash tests/test-eval-creator.sh
+
+      - name: test-eval-resolver
+        run: bash tests/test-eval-resolver.sh
+
+      - name: test-eval-pr-review
+        run: bash tests/test-eval-pr-review.sh
+
       - name: test-autopilot-modes
         run: bash tests/test-autopilot-modes.sh
 
