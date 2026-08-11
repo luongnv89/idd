@@ -1104,10 +1104,29 @@ not identify), there is nothing to review: record `skipped` with
 
 #### Quarantine after repeated failures
 
-"Retry on next run" is only true while retrying is still worth the tokens. After
-the run-log line for this failure has been appended (*Run-log entry* in
-SKILL.md — the streak is counted **from** that line, so counting before the
-append is off by one), ask how many times in a row this issue has failed:
+"Retry on next run" is only true while retrying is still worth the tokens. The
+streak is counted **from** this failure's own run-log line, so counting before
+that line is appended is off by one. Ensure the failed line is durable **before**
+`--failure-streak`:
+
+- **Sequential path (`max_parallel = 1`):** the failed line is already appended
+  by SKILL.md → *Run-log entry* (`gi-runlog.py --append`) before this subsection
+  runs. Leave that path unchanged.
+- **Parallel path (`max_parallel > 1`):** failed lanes do **not** wait for Step
+  5.3's success-path drain. **Before** the streak check below, run the same
+  exactly-once log transition Step 5.3 documents (*Parallel lane — exactly-once
+  log transition*): construct the normalized `failed` record with the lane's
+  persisted `event_id` and resolver telemetry, checkpoint it as
+  `telemetry.run_log` with phase `log_pending`, then append with
+  `--append-once`. Exit 0 (new line or identical event already present) →
+  checkpoint `logged`, then continue into the streak check. Exit 3
+  (conflicting/invalid event) stops that lane without quarantining. No
+  `python3`, exit 2, or exit 4 leaves `log_pending` for resume and **skips**
+  the streak check this pass — never raw-append, never quarantine on missing
+  evidence. A later resume retries `--append-once` from `log_pending`
+  (*Step 1.0*), then re-enters this subsection only after `logged`. This
+  write must complete before `--failure-streak` so the current failure is
+  included in the consecutive count.
 
 ```bash
 python3 references/scripts/gi-runlog.py --failure-streak {issue_number} \

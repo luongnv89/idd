@@ -46,18 +46,26 @@ categorical label (set from the merge result).
 Parallelism does not change the single-writer boundary. Every resolver lane is
 invoked with `--no-run-log` and may only return telemetry. After all resolvers
 fan in, the main agent runs one **serialized drain** in deterministic triage
-order. For each lane
-it finishes review and the Phase 5 outcome first, then appends that issue's
-**one** line, checkpoints the lane, updates the triage cache if a merge closed
-the issue, and cleans up the worktree before moving to the next lane. No two
-appends overlap, and a worker never appends on failure or success. Each lane gets
-a stable `event_id` at scheduling. The drain persists its normalized record as
-`log_pending`, calls `gi-runlog.py --append-once`, checkpoints `logged`, then
-updates processed/cache/cleanup. The helper fsyncs a new line, treats an identical
-existing event as success, and rejects an event-id collision with different
-payload. A crash after append but before `logged` therefore retries without a
-second line. The parallel path never uses a raw fallback; helper failure leaves
-the lane pending while ready siblings continue.
+order. Each lane gets a stable `event_id` at scheduling. The append uses the same
+exactly-once transition either way: persist the normalized record as
+`log_pending`, call `gi-runlog.py --append-once`, checkpoint `logged`, then
+continue. The helper fsyncs a new line, treats an identical existing event as
+success, and rejects an event-id collision with different payload. A crash after
+append but before `logged` therefore retries without a second line. The parallel
+path never uses a raw fallback; helper failure leaves the lane pending while
+ready siblings continue. **When the append runs depends on the outcome:**
+
+- **Success path** — finish review and the Phase 5 outcome first, then append
+  that issue's **one** line (*Step 5.3*), update the triage cache if a merge
+  closed the issue, and clean up the worktree before moving to the next lane.
+- **Failed-resolve path** — at *Phase 2.3* quarantine, **before**
+  `gi-runlog.py --failure-streak`, so the current failure is already in the log
+  when the streak is counted (counting first is off by one). The same
+  `log_pending` → `--append-once` → `logged` contract applies; quarantine then
+  proceeds only after `logged`. Worktree cleanup for that failed lane follows
+  the ordinary failed-lane rules in `references/phases.md`.
+
+No two appends overlap, and a worker never appends on failure or success.
 
 This differs from batch fan-out below: parallel lanes produce separate PRs and
 separate terminal outcomes. There is no shared-result fan-out and no scalar

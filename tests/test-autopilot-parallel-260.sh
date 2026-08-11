@@ -270,6 +270,38 @@ git -C "$FIX/repo" worktree remove "$FIX/lane-45"
 [ ! -d "$FIX/lane-45" ] && pass "AC2: clean terminal sibling cleanup succeeds" \
                            || fail "AC2: clean sibling cleanup failed"
 
+# Parallel failed-lane quarantine must append the failed line before counting
+# the streak — otherwise quarantine_after is off-by-one under max_parallel > 1.
+# Source of truth is authored phases.md (built skills/ mirrors after build.py).
+if python3 - "$PHASES" <<'PY'
+import re, sys
+from pathlib import Path
+text = Path(sys.argv[1]).read_text()
+start = text.find("#### Quarantine after repeated failures")
+if start < 0:
+    raise SystemExit("quarantine heading missing")
+rest = text[start:]
+# The real invocation, not a prose backtick mention of the flag.
+m = re.search(r"python3\s+\S*gi-runlog\.py\s+--failure-streak", rest)
+if not m:
+    raise SystemExit("failure-streak invocation missing under quarantine")
+block = rest[: m.start()]
+# Parallel failed path must require append-once / log_pending before the streak.
+needles = ("append-once", "log_pending", "max_parallel")
+missing = [n for n in needles if n not in block]
+if missing:
+    raise SystemExit(f"quarantine preamble missing {missing} before --failure-streak")
+# Sequential path must remain the SKILL.md --append path (unchanged).
+if "max_parallel = 1" not in block and "max_parallel=1" not in block:
+    raise SystemExit("sequential max_parallel=1 path not called out before streak")
+print("ok")
+PY
+then
+  pass "AC3: parallel failed-lane quarantine appends (append-once/log_pending) before --failure-streak"
+else
+  fail "AC3: parallel failed-lane quarantine does not require append-once before --failure-streak"
+fi
+
 # Concurrent crash retries: all processes race on one stable event, but the
 # advisory lock makes the read/check/append/fsync transaction one physical line.
 RUNLOG_HELPER="$REPO_ROOT/src/shared/scripts/gi-runlog.py"

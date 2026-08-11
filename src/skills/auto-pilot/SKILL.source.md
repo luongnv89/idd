@@ -343,10 +343,13 @@ with `--no-run-log` and returns telemetry instead of appending. Under parallel
 resolution, retain each lane's telemetry and stable `event_id` in run state until
 its turn in the serialized drain. Persist the normalized line as `log_pending`,
 append with `--append-once`, then checkpoint `logged` before processed/cache/
-cleanup updates. This closes the append-before-checkpoint crash window; a
-`processed[]` check alone does not. Never overlap appends. The single-writer,
-parallel-lane, and batch fan-out contracts live in
-`references/run-log.md` — read that file before writing the line.
+cleanup updates. On a **failed** parallel lane, that append happens at *Phase
+2.3* **before** the quarantine `--failure-streak` check so the current failure
+is counted; success lanes still append in *Step 5.3* after review/merge. This
+closes the append-before-checkpoint crash window; a `processed[]` check alone
+does not. Never overlap appends. The single-writer, parallel-lane, and batch
+fan-out contracts live in `references/run-log.md` — read that file before
+writing the line.
 
 Populate from the iteration's known values plus the resolver's returned telemetry
 (`ts`, `issue`, `mode`, `skill`, `outcome`, `pr`, and `qa_cycles` / `complexity` /
