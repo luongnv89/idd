@@ -45,14 +45,19 @@ categorical label (set from the merge result).
 
 Parallelism does not change the single-writer boundary. Every resolver lane is
 invoked with `--no-run-log` and may only return telemetry. After all resolvers
-fan in, the main agent drains lanes in deterministic triage order. For each lane
+fan in, the main agent runs one **serialized drain** in deterministic triage
+order. For each lane
 it finishes review and the Phase 5 outcome first, then appends that issue's
 **one** line, checkpoints the lane, updates the triage cache if a merge closed
 the issue, and cleans up the worktree before moving to the next lane. No two
-appends overlap, and a worker never appends on failure or success. A crash after
-a resolver returns leaves its telemetry in `run-state.json.lanes[].telemetry`;
-resume still writes only during the serialized drain and checks `processed[]`
-before appending, so it never reconstructs a second line from the lane cache.
+appends overlap, and a worker never appends on failure or success. Each lane gets
+a stable `event_id` at scheduling. The drain persists its normalized record as
+`log_pending`, calls `gi-runlog.py --append-once`, checkpoints `logged`, then
+updates processed/cache/cleanup. The helper fsyncs a new line, treats an identical
+existing event as success, and rejects an event-id collision with different
+payload. A crash after append but before `logged` therefore retries without a
+second line. The parallel path never uses a raw fallback; helper failure leaves
+the lane pending while ready siblings continue.
 
 This differs from batch fan-out below: parallel lanes produce separate PRs and
 separate terminal outcomes. There is no shared-result fan-out and no scalar
@@ -83,7 +88,8 @@ case where an issue is skipped **before** resolution starts (Phase 1's triage
 graph marks it blocked, so no PR exists). One line per issue, never both.
 
 Populate from the iteration's known values plus the resolver's returned
-telemetry: `ts` (current UTC, ISO 8601), `issue` (the number), `mode` (the
+telemetry: `ts` (current UTC, ISO 8601), `event_id` (parallel lanes only — the
+stable run/lane identifier persisted at scheduling), `issue` (the number), `mode` (the
 auto-pilot merge mode — `conservative` / `balanced` / `aggressive`), `skill`
 (`auto-pilot`), `outcome` (one of the six categorical labels), `pr` (the PR
 number when one was created, else `null`), and — from the resolver's report-back

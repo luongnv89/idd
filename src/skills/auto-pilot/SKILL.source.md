@@ -340,10 +340,12 @@ resume support.
 
 **Auto-pilot is the single writer per processed issue** — every resolver runs
 with `--no-run-log` and returns telemetry instead of appending. Under parallel
-resolution, retain each lane's telemetry in run state until its turn in the
-serialized drain; append only after that lane has reached its terminal Phase 5
-outcome, and never overlap appends. Check `processed[]` before a resumed append.
-The single-writer, parallel-lane, and batch fan-out contracts live in
+resolution, retain each lane's telemetry and stable `event_id` in run state until
+its turn in the serialized drain. Persist the normalized line as `log_pending`,
+append with `--append-once`, then checkpoint `logged` before processed/cache/
+cleanup updates. This closes the append-before-checkpoint crash window; a
+`processed[]` check alone does not. Never overlap appends. The single-writer,
+parallel-lane, and batch fan-out contracts live in
 `references/run-log.md` — read that file before writing the line.
 
 Populate from the iteration's known values plus the resolver's returned telemetry
@@ -353,8 +355,14 @@ include `skipped_reason`** — a skip never ran the resolver, so it carries no t
 The full field list lives in `references/run-log.md` → *Fields to populate*.
 
 ```bash
+# Sequential/batch path — legacy behavior:
 printf '%s' "$run_json" | python3 shared/scripts/gi-runlog.py --append
-# Fallback when `python3` is unavailable or the script exits 4: mkdir -p .gitissue && printf '%s\n' "$run_json" >> .gitissue/runs.jsonl
+# Fallback when `python3` is unavailable or the script exits 4 (legacy only):
+# mkdir -p .gitissue && printf '%s\n' "$run_json" >> .gitissue/runs.jsonl
+
+# Parallel lane — event_id is persisted before this call:
+printf '%s' "$run_json" | python3 shared/scripts/gi-runlog.py --append-once
+# No raw fallback: leave the lane log_pending and retry on resume.
 ```
 
 **Exit 3:** the record itself is invalid — the script printed the reason on
@@ -362,12 +370,12 @@ stderr and wrote nothing. This is a stop, not a degrade: never append
 `$run_json` raw, because that writes the malformed line the script exists to
 reject. Correct the record and re-run, or drop the line.
 
-Only the *write* is **best-effort and non-fatal** — a write that cannot happen
-(no `python3`, exit 2 for an unresolved script path or a malformed invocation,
-exit 4) never stops the loop or changes the iteration outcome; use the fallback
-append above for any of them, never for exit 3. A
-rejected record is never written by any path. Append only; never rewrite prior
-lines.
+On the legacy sequential/batch path only, the write is best-effort and non-fatal:
+no `python3`, exit 2, or exit 4 uses the raw fallback; exit 3 never does. On a
+parallel lane, any unavailable/failed `--append-once` leaves `log_pending` and
+continues with ready siblings but does not mark that lane processed or remove its
+worktree; resume retries it. A rejected record is never written by any path.
+Append only; never rewrite prior lines.
 
 Then loop back to Phase 1.
 

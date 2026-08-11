@@ -24,6 +24,7 @@ The full field set — the *Always present* column is the required minimum:
 | Field | Type | Always present | Description |
 |-------|------|----------------|-------------|
 | `ts` | string (ISO 8601 UTC) | yes | When the run finished, e.g. `2026-06-26T14:31:07Z` |
+| `event_id` | string | no | Stable idempotency key for a parallel lane. Created at scheduling; used only with `--append-once`; omitted on legacy writers. |
 | `issue` | integer | yes | Issue number the run processed |
 | `mode` | string | yes | `interactive` or `auto` (resolver); the auto-pilot merge mode (`conservative` / `balanced` / `aggressive`) for auto-pilot rows |
 | `skill` | string | yes | `issue-resolver` or `auto-pilot` — which skill wrote the line |
@@ -46,8 +47,9 @@ Example lines:
 **Append rules:**
 - Create `.gitissue/` with `mkdir -p` if it does not exist, then append exactly one
   line terminated by a single `\n`. Never rewrite or reorder existing lines.
-- Writing the line is **best-effort and non-fatal** — if the append fails the run
-  still reports its result normally, and is never failed over telemetry.
+- Legacy `--append` writes are **best-effort and non-fatal**. A parallel lane's
+  `--append-once` failure instead leaves its durable state at `log_pending`; it
+  never raw-appends and resume retries the same event.
 - There is **no schema migration**: new optional fields may be added over time;
   readers must tolerate missing keys and unknown keys. Absent optional fields are
   simply omitted (not written as `null`, except `pr` which is always present).
@@ -61,11 +63,12 @@ that order is the canonical one, not the field table's. `--append` (the
 default) creates `.gitissue/` and appends exactly one `\n`-terminated line to `--path`
 (default `.gitissue/runs.jsonl`); `--echo` runs the identical validation and
 normalization, prints the line, and **writes nothing** — the machine form of the
-`--no-run-log` contract below. Exit `0` wrote or printed the line; `2` is a usage
-error; `3` means the record was invalid and nothing was written; `4` means the record
-was valid but the append itself failed. Only `3` signals a caller bug; `4` stays
-best-effort per the rules above, and a caller that cannot run the script at all falls
-back to the `mkdir -p` + append described here.
+`--no-run-log` contract below. `--append-once` requires `event_id`, fsyncs a new
+line, succeeds without writing when the same normalized event already exists,
+and exits `3` if that id exists with conflicting data. Exit `0` wrote, found, or
+printed the line; `2` is usage; `3` is invalid/conflicting; `4` is an I/O failure.
+Legacy callers may use the documented raw fallback on `4`; parallel lanes must
+leave `log_pending` and retry instead.
 
 The same helper serves the one read. `--failure-streak N [--threshold F] [--log PATH]`
 prints `{"mode":"failure_streak","issue":N,"streak":N,"threshold":F,"quarantine":bool}`:

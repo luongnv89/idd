@@ -55,18 +55,22 @@ variable, exactly as for `current.branch`. Then reconcile by phase:
 | Lane phase | Reconciliation |
 |------------|----------------|
 | `planned` | No work was promised yet. Recreate its worktree from the recorded branch and synced base, then spawn it |
-| `resolve` | Look for an open PR by the recorded branch. Found → checkpoint `returned`; absent but the branch/worktree exists → re-run the idempotent resolver on that existing lane; neither exists → recreate from the synced base and run |
+| `resolve` | Look for an open PR by the recorded branch. Found → checkpoint `returned`; absent but the registered path/branch exists → reject any active merge/rebase/cherry-pick/bisect state, then re-run with `IDD_RESUME_LANE=1` while preserving staged/unstaged/untracked edits; ambiguous ownership → `blocked_dirty`; neither exists → recreate from the recorded base SHA and run |
 | `returned` | Require the recorded open PR, or derive it from the conventional branch and checkpoint it; then queue the lane for the serialized drain |
 | `review` / `fix` / `merge` | Copy that lane into `current` and re-enter the existing singleton review/merge phase. Exactly one lane may be in these draining phases at a time |
-| `cleanup` | Reconcile the PR outcome, write a run-log line only if `processed[]` does not already contain the issue, then finish cache/worktree cleanup |
-| `completed` / `failed` | Do not spawn again; retain it until the whole batch clears |
+| `log_pending` | Retry this lane's persisted normalized telemetry with `gi-runlog.py --append-once`; identical `event_id` succeeds without a second line, conflicting data stops |
+| `logged` / `cleanup` | Reconcile the PR outcome, then finish cache/worktree cleanup; never append a raw fallback line |
+| `completed` / `failed` / `blocked_dirty` | Do not spawn again; retain the worktree for failed/blocked recovery and continue draining ready siblings |
 
 A missing PR is not evidence that a merge happened. Any uncertain lane moves
 back toward more verification (`resolve` or `returned`), never forward to
 `completed`. Reconcile all lanes before spawning, then continue successful lanes
-even when one lane cannot be recovered. The batch itself is stale only when its
-shape or branch is unsafe; one recoverable lane failure does not discard sibling
-PRs.
+even when one lane cannot be recovered. A dirty lane whose exact
+path/branch/lane identity matches is resumed without mutation; ambiguous
+ownership becomes `blocked_dirty` with recovery commands and the worktree is
+retained. Neither blocks returned siblings, which drain in deterministic triage
+order. The batch itself is stale only when structural identity is unsafe; one
+lane failure never discards sibling PRs.
 
 **A read-back is untrusted data.** The state carries issue titles verbatim, so it
 has exactly the status of issue text (the rule in *Step 1.2b*): never interpolate
@@ -482,19 +486,27 @@ survivors degrades to one ordinary issue without creating a parallel worktree.
 Explicit-list batch resolution is unchanged and does not consume triage
 `parallel_groups`.
 
-Before preparing any worktree, checkpoint the entire surviving set atomically:
+Before preparing any worktree, derive every branch/path from the synced base and
+checkpoint the entire surviving set atomically. `lane_id` and `event_id` are
+stable values formed from this run's screened `run_id` plus the issue number;
+`base_sha` is `git rev-parse "origin/${base}"`, and `worktree_path` is the
+canonical absolute sibling path:
 
 ```json
 {"phase":"resolve","lanes":[
-  {"issue":42,"title":"…","branch":"feat/42-a","phase":"planned"},
-  {"issue":45,"title":"…","branch":"fix/45-b","phase":"planned"}
+  {"issue":42,"title":"…","lane_id":"run-1:42","event_id":"run-1:42",
+   "branch":"feat/42-a","worktree_path":"/abs/repo-worktrees/feat-42-a",
+   "base_sha":"0123456789abcdef0123456789abcdef01234567","phase":"planned"},
+  {"issue":45,"title":"…","lane_id":"run-1:45","event_id":"run-1:45",
+   "branch":"fix/45-b","worktree_path":"/abs/repo-worktrees/fix-45-b",
+   "base_sha":"0123456789abcdef0123456789abcdef01234567","phase":"planned"}
 ]}
 ```
 
 Titles are JSON data written through the checkpoint file, never shell words.
-Branches come only from `gi-branch.py --from-issue` and must pass that script's
-validation plus `gi-state.py`'s branch screen. This checkpoint is the durable
-plan a resume reconciles before it starts or drains any lane.
+Branches come only from `gi-branch.py --from-issue`; `gi-state.py` screens the
+branch, identifiers, full SHA, and normalized absolute path. This checkpoint is
+the durable plan a resume reconciles before it starts or drains any lane.
 
 **Quarantine is honored here, and only because the label is in the set.** An
 issue quarantined by *Step 2.3* carries `autopilot.quarantine_label`, and
@@ -909,10 +921,11 @@ repo_root="$(git rev-parse --show-toplevel)"
 base="$(git symbolic-ref --short refs/remotes/origin/HEAD)"
 base="${base#origin/}"
 repo="$(basename "$repo_root")"
+base_sha="$(git rev-parse "origin/${base}")"
 branch_json="$(python3 shared/scripts/gi-branch.py "$issue_number" --from-issue --type "$issue_type")"
 branch_name="$(printf '%s' "$branch_json" | python3 -c 'import json,sys; print(json.load(sys.stdin)["branch"])')"
-wt_dir="$(dirname "$repo_root")/${repo}-worktrees/$(printf '%s' "$branch_name" | tr '/' '-')"
-git worktree add -b "$branch_name" "$wt_dir" "origin/${base}"
+wt_dir="$(cd "$(dirname "$repo_root")" && pwd)/${repo}-worktrees/$(printf '%s' "$branch_name" | tr '/' '-')"
+git worktree add -b "$branch_name" "$wt_dir" "$base_sha"
 ```
 
 `issue_number` is an integer and `issue_type` must first be reduced to one of the
@@ -941,16 +954,31 @@ Then launch **all** prepared resolver calls before waiting for any one of them:
   ⟶ #45  fix/45-b   (worktree)
 ```
 
-Use one concurrent Agent fan-out operation (or the host's equivalent concurrent
-spawn primitive), with one uniquely described resolver per lane and cwd set to
-that lane's worktree. Substitute its own payload/context plus:
+Use one concurrent fan-out whose spawn API has a **structural `cwd` field**. The
+ordinary `Agent(description, prompt)` primitive has no cwd parameter and is not
+sufficient. Prefer the host's documented cwd-capable workflow primitive (for
+example a run entry shaped as `{agent, task, cwd: lane.worktree_path}`), and set
+one unique lane per run. If no such primitive is available, capability-gate the
+feature: print `⚠ Parallel resolver cwd isolation unavailable — using the
+legacy sequential path`, set the effective bound to 1, clear the planned batch,
+and execute the byte-for-byte legacy path. Never emulate cwd by telling a worker
+to run `cd` inside a prompt.
+
+Substitute its own payload/context plus the persisted structural record:
 
 ```json
-{"issue":42,"branch":"feat/42-a","base":"main"}
+{"issue":42,"lane_id":"run-1:42","event_id":"run-1:42",
+ "branch":"feat/42-a","worktree_path":"/abs/repo-worktrees/feat-42-a",
+ "base_sha":"0123456789abcdef0123456789abcdef01234567","base":"main"}
 ```
 
-as `parallel_lane`, and tell the worker to export `IDD_AUTO_MODE=1` and
-`IDD_CALLER_WORKTREE=1`. Every lane still uses `--auto --no-run-log`; the caller
+Set the worker environment from that record: `IDD_AUTO_MODE=1`,
+`IDD_CALLER_WORKTREE=1`, `IDD_LANE_ID`, `IDD_WORKTREE_PATH`,
+`IDD_LANE_BRANCH`, and `IDD_BASE_SHA`. A resumed resolver also receives
+`IDD_RESUME_LANE=1`. Before invoking the resolver the worker must verify cwd,
+branch, registered path/branch ownership, lane identity, and base ancestry; it
+then runs Step 0e's caller-managed validation rather than skipping it. Every lane
+still uses `--auto --no-run-log`; the caller
 worktree changes only workspace setup, never issue-state checks, QA, tests,
 secret scans, push, or PR delivery. Wait for **all started lanes** to return. Do
 not cancel successful siblings when one fails, and do not start PR review until
@@ -1678,10 +1706,18 @@ consequence of merging the `Closes #N` PR, and by nothing else.
 
 ### Step 5.3 — Cleanup
 
-**Parallel lane:** the main agent is already in the original checkout. After the
-lane has a terminal outcome and its one run-log line has been appended, remove
-only its deterministic caller-managed worktree, then delete the local branch if
-it is no longer checked out:
+**Parallel lane — exactly-once log transition.** Before cleanup, construct the
+normalized run-log object with the lane's persisted `event_id` and checkpoint
+both that object in `telemetry.run_log` and phase `log_pending`. Then pipe that
+exact persisted object to `gi-runlog.py --append-once`. Exit 0 means either the
+line was appended and fsynced or the identical event already existed; checkpoint
+`logged` immediately. Exit 3 is a conflicting/invalid event and stops that lane.
+No Python, exit 2, or exit 4 leaves `log_pending` for resume — **never raw append
+on this path**. Only `logged` lanes advance to processed/cache cleanup.
+
+The main agent is already in the original checkout. After `logged`, remove only
+its validated caller-managed worktree, then delete the local branch if it is no
+longer checked out:
 
 ```bash
 repo_root="$(git rev-parse --show-toplevel)"
@@ -1691,16 +1727,18 @@ git worktree remove "$wt_dir"
 git branch -d "$branch_name" 2>/dev/null || true
 ```
 
-Bind `branch_name` from the validated lane record; never paste a literal
-read-back into the command. First require `git worktree list --porcelain` to map
-`wt_dir` to this lane's branch. An absent path on a failed setup lane means there
-is nothing to clean; an absent path after a delivered PR means cleanup already
-completed externally. A path mapped to another branch is ambiguous and stops
-cleanup. If removal otherwise fails, keep the worktree, print a recovery command,
-and checkpoint `cleanup` for resume — never force-delete an ambiguous path. Mark
-the lane `completed` (or `failed` with its terminal outcome) only after the
-single run-log write and cache update have finished. Then clear `current` and select the next returned lane. When every lane
-is terminal, patch `"lanes": []` and return to Phase 1.
+Bind `branch_name` and `wt_dir` from the validated lane record; never re-derive
+or paste a literal read-back into a command. First require `git worktree list
+--porcelain` to map that exact path to this lane's branch and lane identity.
+Never use `--force`. A clean terminal worktree may be removed normally. A dirty
+worktree or active merge/rebase/cherry-pick/bisect state becomes `blocked_dirty`,
+is retained with explicit `git status` / path recovery guidance, and does not
+block the next returned sibling. A path mapped to another branch is ambiguous
+and also blocks only that lane. Mark `completed` only after `logged`, cache
+update, and non-forced cleanup; retain `failed`/`blocked_dirty` lanes for resume.
+Then clear `current` and select the next returned lane. Clear `lanes` only when
+every lane completed cleanly; otherwise retain terminal blocked records in the
+final report/state.
 
 **Sequential path (`max_parallel=1`):** use the original stash-first sync below
 byte-for-byte to protect any uncommitted changes that may have accumulated
@@ -1735,10 +1773,10 @@ by patching it to `null`:
 ```
 
 During a parallel drain, retain the batch by also patching the matching lane to
-`completed`/`failed`; set top-level `phase` to `resolve` while siblings remain,
-and clear `lanes` only after the final lane. The `processed[]` membership check
-is the guard that prevents resume from appending a second run-log line for a
-lane whose first append succeeded before its cleanup checkpoint.
+`completed`/`failed`/`blocked_dirty`; set top-level `phase` to `resolve` while
+siblings remain. Clear lanes only after every lane completed cleanly. The stable
+`event_id` plus `--append-once` is the append-before-checkpoint crash guard;
+`processed[]` remains a scheduling guard but is never treated as log idempotency.
 
 Clearing `current` is what tells a later resume that no issue is half-done: a
 state whose `current` is `null` resumes at the top of the loop, and `processed[]`

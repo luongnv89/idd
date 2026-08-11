@@ -311,6 +311,27 @@ for writer in issue-resolver auto-pilot; do
   fi
 done
 
+# --- T9: parallel-lane append is crash-safe and idempotent (issue #260) -----
+TMP_RUNLOG="$(mktemp -d)"
+trap 'rm -rf "$TMP_RUNLOG"' EXIT
+HELPER="$REPO_ROOT/src/shared/scripts/gi-runlog.py"
+record='{"ts":"2026-01-01T00:00:00Z","event_id":"run-260:42","issue":42,"mode":"balanced","skill":"auto-pilot","outcome":"merged","pr":87}'
+printf '%s' "$record" | python3 "$HELPER" --append-once --path "$TMP_RUNLOG/runs.jsonl" >/dev/null
+# Simulate a crash before the lane checkpoint, then retry the same pending event.
+printf '%s' "$record" | python3 "$HELPER" --append-once --path "$TMP_RUNLOG/runs.jsonl" >/dev/null
+if [ "$(wc -l < "$TMP_RUNLOG/runs.jsonl" | tr -d ' ')" = 1 ]; then
+  pass "T9: append-once retry after crash keeps exactly one line"
+else
+  fail "T9: append-once duplicated an event"
+fi
+conflict='{"ts":"2026-01-01T00:00:00Z","event_id":"run-260:42","issue":42,"mode":"balanced","skill":"auto-pilot","outcome":"failed","pr":87}'
+if printf '%s' "$conflict" | python3 "$HELPER" --append-once --path "$TMP_RUNLOG/runs.jsonl" >/dev/null 2>&1; then
+  fail "T9: append-once accepted a conflicting payload"
+else
+  [ "$?" = 3 ] && pass "T9: append-once rejects event-id payload conflicts" \
+               || fail "T9: append-once conflict returned the wrong exit"
+fi
+
 echo ""
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 echo "  Results: $PASS passed, $FAIL failed"

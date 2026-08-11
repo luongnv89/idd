@@ -131,7 +131,11 @@ LANE_KEYS = frozenset(
     {
         "issue",
         "title",
+        "lane_id",
         "branch",
+        "worktree_path",
+        "base_sha",
+        "event_id",
         "pr",
         "phase",
         "outcome",
@@ -157,6 +161,8 @@ PHASE_RE = re.compile(r"^[a-z][a-z0-9_.-]{0,31}\Z")
 # naming-conventions reference) is refused here, at exit 3, and never reaches
 # the state file.
 BRANCH_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/-]{0,200}\Z")
+LANE_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\Z")
+SHA_RE = re.compile(r"^[0-9a-f]{40}\Z")
 TS_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z\Z")
 
 
@@ -367,7 +373,17 @@ def _normalize_lane(value: object, *, partial: bool = False) -> dict[str, object
         if value["pr"] is not None and not _is_int(value["pr"]):
             raise InputError("lanes.pr must be an integer or null")
         out["pr"] = value["pr"]
-    for key in ("title", "branch", "phase", "outcome", "started_at"):
+    for key in (
+        "title",
+        "lane_id",
+        "branch",
+        "worktree_path",
+        "base_sha",
+        "event_id",
+        "phase",
+        "outcome",
+        "started_at",
+    ):
         if key not in value:
             continue
         if value[key] is not None and not isinstance(value[key], str):
@@ -380,6 +396,17 @@ def _normalize_lane(value: object, *, partial: bool = False) -> dict[str, object
             f"lanes.branch '{out['branch']}' is not a conventional branch "
             "name (see the naming-conventions reference)"
         )
+    for key in ("lane_id", "event_id"):
+        if isinstance(out.get(key), str) and not LANE_ID_RE.match(out[key]):
+            raise InputError(f"lanes.{key} '{out[key]}' is not a safe identifier")
+    if isinstance(out.get("base_sha"), str) and not SHA_RE.match(out["base_sha"]):
+        raise InputError("lanes.base_sha must be a full lowercase commit SHA")
+    if isinstance(out.get("worktree_path"), str):
+        path = out["worktree_path"]
+        if not Path(path).is_absolute() or "\x00" in path or "\n" in path or "\r" in path:
+            raise InputError("lanes.worktree_path must be a canonical absolute path")
+        if str(Path(path)) != path:
+            raise InputError("lanes.worktree_path must be normalized")
     title = out.get("title")
     if isinstance(title, str) and len(title) > TITLE_MAX:
         out["title"] = title[:TITLE_MAX]

@@ -54,6 +54,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
 from datetime import datetime, timezone
@@ -74,6 +75,7 @@ FAILURE_OUTCOME = "failed"
 # written in this position, so lines from different writers stay comparable.
 KEY_ORDER = (
     "ts",
+    "event_id",
     "issue",
     "mode",
     "skill",
@@ -87,11 +89,19 @@ KEY_ORDER = (
 )
 
 REQUIRED_KEYS = ("ts", "issue", "mode", "skill", "outcome", "pr")
-OPTIONAL_KEYS = ("complexity", "profile", "qa_cycles", "duration_s", "skipped_reason")
+OPTIONAL_KEYS = (
+    "event_id",
+    "complexity",
+    "profile",
+    "qa_cycles",
+    "duration_s",
+    "skipped_reason",
+)
 
 # `ts` is absent-or-valid: absent is filled from the clock, present must be an
 # ISO-8601 UTC instant to the second, exactly as the schema's examples show.
 TS_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
+EVENT_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
 
 # Terminal outcomes, per writing skill. A resolver row can never carry an
 # auto-pilot merge outcome and vice versa — that mix-up is what silently
@@ -124,6 +134,7 @@ COMPLEXITY_COLLAPSE = {
 INT_KEYS = ("issue", "qa_cycles", "duration_s")
 STR_KEYS = (
     "ts",
+    "event_id",
     "mode",
     "skill",
     "outcome",
@@ -217,6 +228,13 @@ def normalize_record(record: object, *, now: str | None = None) -> dict[str, obj
             )
         out["complexity"] = COMPLEXITY_COLLAPSE[complexity]
 
+    event_id = out.get("event_id")
+    if event_id is not None and not EVENT_ID_RE.match(event_id):
+        raise RecordError(
+            "event_id must be 1-128 safe identifier characters "
+            "([A-Za-z0-9._:-])"
+        )
+
     profile = out.get("profile")
     if profile is not None and profile not in PROFILES:
         raise RecordError(
@@ -241,6 +259,48 @@ def append_line(path: Path, line: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "a", encoding="utf-8", newline="\n") as fh:
         fh.write(line + "\n")
+        fh.flush()
+        os.fsync(fh.fileno())
+
+
+def append_once(path: Path, record: dict[str, object], *, ts_was_supplied: bool) -> bool:
+    """Append `record` once by event_id; return False for an identical retry.
+
+    The auto-pilot lane persists the event id and payload before calling this
+    mode. A retry that omitted `ts` may adopt the already-written timestamp;
+    every other field must be byte-for-byte equivalent after normalization.
+    A reused id with different telemetry is rejected rather than silently
+    corrupting the run log.
+    """
+    event_id = record.get("event_id")
+    if not isinstance(event_id, str):
+        raise RecordError("--append-once requires event_id")
+
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except FileNotFoundError:
+        lines = []
+    except (OSError, UnicodeDecodeError) as exc:
+        raise OSError(f"cannot read existing log for append-once — {exc}") from exc
+
+    for raw in lines:
+        try:
+            existing = json.loads(raw)
+        except (json.JSONDecodeError, ValueError):
+            continue
+        if not isinstance(existing, dict) or existing.get("event_id") != event_id:
+            continue
+        candidate = dict(record)
+        if not ts_was_supplied:
+            candidate["ts"] = existing.get("ts")
+        if existing == candidate:
+            return False
+        raise RecordError(
+            f"event_id '{event_id}' already exists with a conflicting payload"
+        )
+
+    append_line(path, render(record))
+    return True
 
 
 def count_failure_streak(lines: list[str], issue: int) -> int:
@@ -324,6 +384,14 @@ def main(argv: list[str] | None = None) -> int:
         help="print the normalized line to stdout and write nothing",
     )
     mode.add_argument(
+        "--append-once",
+        action="store_true",
+        help=(
+            "append once by required event_id; an identical retry succeeds "
+            "without writing, while a conflicting reuse exits 3"
+        ),
+    )
+    mode.add_argument(
         "--failure-streak",
         type=int,
         metavar="ISSUE",
@@ -391,6 +459,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"✗ gi-runlog: stdin is not valid JSON — {exc.msg}", file=sys.stderr)
         return 3
 
+    ts_was_supplied = isinstance(submitted, dict) and submitted.get("ts") is not None
     try:
         record = normalize_record(submitted)
     except RecordError as exc:
@@ -403,7 +472,24 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     try:
-        append_line(Path(args.path), line)
+        if args.append_once:
+            written = append_once(
+                Path(args.path), record, ts_was_supplied=ts_was_supplied
+            )
+            print(
+                json.dumps(
+                    {
+                        "status": "appended" if written else "already_present",
+                        "event_id": record["event_id"],
+                    },
+                    separators=(",", ":"),
+                )
+            )
+        else:
+            append_line(Path(args.path), line)
+    except RecordError as exc:
+        print(f"✗ gi-runlog: {exc}", file=sys.stderr)
+        return 3
     except OSError as exc:
         print(f"⚠ gi-runlog: could not append to {args.path} — {exc}", file=sys.stderr)
         return 4

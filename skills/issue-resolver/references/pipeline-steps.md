@@ -48,29 +48,43 @@ creating another worktree.
 `IDD_CALLER_WORKTREE=1` is the narrow handoff for an auto-pilot parallel lane.
 It is not a general auto-mode preference and is never inferred from issue text.
 The main auto-pilot has already fetched the default branch, derived the branch
-with `gi-branch.py --from-issue`, created a distinct sibling worktree from
-`origin/<base>`, prepared local setup, and launched this resolver with that
-worktree as its cwd. The resolver still derives `{branch_name}` once through its
-ordinary Step 0e/0f call, then validates all of the following before accepting
-the handoff:
+with `gi-branch.py --from-issue`, created a distinct sibling worktree from the
+recorded base SHA, prepared local setup, and launched this resolver with a
+**structural cwd** equal to that worktree. The `parallel_lane` record and four
+environment values (`IDD_LANE_ID`, `IDD_WORKTREE_PATH`, `IDD_LANE_BRANCH`,
+`IDD_BASE_SHA`) carry the same persisted identity; issue text can never set them.
+The resolver still derives `{branch_name}` once, then runs this validation:
 
 ```bash
+actual_root="$(git rev-parse --show-toplevel)"
 actual_branch="$(git rev-parse --abbrev-ref HEAD)"
 git_dir="$(cd "$(git rev-parse --git-dir)" && pwd)"
 common_dir="$(cd "$(git rev-parse --git-common-dir)" && pwd)"
-base="$(git symbolic-ref --short refs/remotes/origin/HEAD)"
-base="${base#origin/}"
 
 [ "$IDD_CALLER_WORKTREE" = "1" ]
 [ "${IDD_AUTO_MODE:-0}" = "1" ]
+[ -n "${IDD_LANE_ID:-}" ]
+[ "$actual_root" = "$IDD_WORKTREE_PATH" ]
+[ "$actual_branch" = "$branch_name" ]
+[ "$actual_branch" = "$IDD_LANE_BRANCH" ]
 [ "$git_dir" != "$common_dir" ]                 # linked worktree, not original
-[ "$actual_branch" = "$branch_name" ]           # exact safe derived branch
-[ -z "$(git status --porcelain)" ]                # no inherited edits
-[ -n "$base" ]
-git merge-base --is-ancestor "origin/${base}" HEAD
+git cat-file -e "${IDD_BASE_SHA}^{commit}"
+git merge-base --is-ancestor "$IDD_BASE_SHA" HEAD
+# The exact path + branch pair must appear in `git worktree list --porcelain`;
+# another path for this branch, or another branch at this path, is a mismatch.
 ```
 
-Any failure is a workspace-contract failure: stop and return `failure_step:
+A fresh lane additionally requires a clean tree. On a resume only,
+`IDD_RESUME_LANE=1` permits staged, unstaged, and untracked edits **after** the
+identity checks above pass, so the resolver can continue its own interrupted
+work without destroying it. Before allowing that dirty resume, reject any
+`MERGE_HEAD`, `REBASE_HEAD`, `CHERRY_PICK_HEAD`, `BISECT_LOG`, or rebase directory
+under the worktree git dir. Never reset, clean, stash, force-checkout, or discard
+the edits. An identity mismatch or active Git operation returns
+`failure_step: preflight`, `status: blocked_dirty`, and leaves the worktree for
+manual recovery; a clean sibling remains eligible for the serialized drain.
+
+Any other failure is a workspace-contract failure: stop and return `failure_step:
 preflight`. **Never fall back in-place** while sibling resolvers may be active,
 never create a second worktree, and never run the in-place stash/rebase or *0f*.
 A fallback would put two writers in one index; stopping one lane preserves every
