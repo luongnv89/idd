@@ -52,8 +52,8 @@ has "$RESOLVER" 'IDD_CALLER_WORKTREE=1' \
   "AC1: resolver accepts only the narrow caller-managed carve-out"
 has "$RESOLVER_STEPS" 'Never fall back in-place' \
   "AC1: a failed parallel worktree cannot fall back to the shared index"
-has "$RESOLVER_STEPS" 'structured input to every nested spawn' \
-  "AC1: resolver propagates one validated workspace contract to nested agents"
+has "$RESOLVER_STEPS" 'carry both to every nested spawn' \
+  "AC1: resolver propagates contract and independent identity to nested agents"
 has "$RESOLVER_STEPS" 'Agent\(description, prompt\)' \
   "AC1: nested isolation does not invent unsupported Agent cwd/env arguments"
 for entry in \
@@ -65,11 +65,65 @@ for entry in \
   file="${entry%%:*}"; role="${entry#*:}"
   has "$file" 'workspace_contract' \
     "AC1: nested $role receives the workspace contract"
+  has "$file" 'expected_lane_identity' \
+    "AC1: nested $role receives an independent expected lane identity"
+  has "$file" 'non-empty, identical.*<screened-run-id>:<current-issue>|non-empty.*<screened-run-id>:<current-issue>.*identical' \
+    "AC1: nested $role rejects missing, malformed, or mismatched lane IDs"
+  has "$file" 'expected issue, branch, and canonical.*path.*match' \
+    "AC1: nested $role binds identity to issue, branch, and worktree"
   has "$file" 'cd -- "\$canonical_root"|git -C "\$canonical_root"' \
     "AC1: nested $role rejects ambient-root repository operations"
 done
-has "$SYNTHESIZER" 'workspace_contract.*structural lane context' \
-  "AC1: data-only synthesizer preserves structural lane context"
+has "$SYNTHESIZER" 'workspace_contract.*expected_lane_identity.*independently supplied' \
+  "AC1: data-only synthesizer receives independent lane identity"
+has "$SYNTHESIZER" 'Missing, malformed, or mismatched identity is a stop' \
+  "AC1: data-only synthesizer validates lane identity before planning"
+has "$RESOLVER_STEPS" 'Never derive this sibling from' \
+  "AC1: expected lane identity is not derived from the contract"
+has "$RESOLVER_STEPS" 'both come independently from the validated outer lane' \
+  "AC1: both lane inputs are copied independently from the outer lane"
+has "$RESOLVER_STEPS" 'workspace_contract\.lane_id == expected_lane_identity\.lane_id' \
+  "AC1: resolver requires both structural lane IDs to match"
+
+# The nested identity predicate has one valid shape and fails closed for each
+# missing, malformed, cross-issue, branch, and path mismatch independently.
+if python3 - <<'PY'
+import re
+run_re = re.compile(r'^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$')
+lane_re = re.compile(r'^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$')
+
+def valid(contract, expected, issue):
+    if not isinstance(contract, dict) or not isinstance(expected, dict):
+        return False
+    lane = contract.get('lane_id')
+    if not isinstance(lane, str) or not lane or not lane_re.fullmatch(lane):
+        return False
+    prefix, sep, suffix = lane.rpartition(':')
+    if not sep or not run_re.fullmatch(prefix) or suffix != str(issue):
+        return False
+    return (
+        lane == expected.get('lane_id')
+        and expected.get('issue') == issue
+        and expected.get('branch') == contract.get('branch')
+        and expected.get('worktree_path') == contract.get('worktree_path')
+    )
+
+contract = {'lane_id':'r260:42','branch':'feat/42-a','worktree_path':'/tmp/lane-42'}
+expected = {'lane_id':'r260:42','issue':42,'branch':'feat/42-a','worktree_path':'/tmp/lane-42'}
+assert valid(contract, expected, 42)
+assert not valid(contract, None, 42)
+assert not valid({**contract, 'lane_id':''}, expected, 42)
+assert not valid({**contract, 'lane_id':'bad/lane:42'}, expected, 42)
+assert not valid(contract, {**expected, 'lane_id':'r260:45'}, 42)
+assert not valid(contract, {**expected, 'issue':45}, 42)
+assert not valid(contract, {**expected, 'branch':'fix/42-b'}, 42)
+assert not valid(contract, {**expected, 'worktree_path':'/tmp/other'}, 42)
+PY
+then
+  pass "AC1: nested identity accepts valid input and rejects missing/malformed/mismatched inputs"
+else
+  fail "AC1: nested identity predicate did not fail closed"
+fi
 
 # Serialized drain and single writer.
 has "$PHASES" 'No reviewer, merge, run-log append, triage-cache update' \

@@ -9,7 +9,7 @@ The shared conventions are inlined into the prompt below; `docs/shared-agent-con
 
 ## Contract
 
-- **Inputs:** `{branch_name}`, `{base_branch}`, `{issue_context}`, `{pr_context}`, `{findings_json}` (fixable findings from reviewer/AC/traceability/test/CI), `{test_output}` (trimmed), `{commit_message}`, `{security_convention}` (path to the pre-commit security scan document — mandatory before committing), `{secscan_script}` (path to the bundled script that implements it; empty when the orchestrator ships none), and optional `{workspace_contract}` (`lane_id`, canonical absolute `repo_root` / `worktree_path`, branch, full base SHA).
+- **Inputs:** `{branch_name}`, `{base_branch}`, `{issue_context}`, `{pr_context}`, `{findings_json}` (fixable findings from reviewer/AC/traceability/test/CI), `{test_output}` (trimmed), `{commit_message}`, `{security_convention}` (path to the pre-commit security scan document — mandatory before committing), `{secscan_script}` (path to the bundled script that implements it; empty when the orchestrator ships none), and optional `{workspace_contract}` (`lane_id`, canonical absolute `repo_root` / `worktree_path`, branch, full base SHA) plus independently supplied `{expected_lane_identity}` (`lane_id`, issue, branch, worktree path).
 - **Returns:** a single JSON block — `result` + fixed/remaining — full shape under [Output](#output). Nothing else.
 - **Stop / fail:** return `PARTIAL`/`FAILED` with a precise remaining item rather than guessing; never push; a real-secret block in the security scan → `FAILED` with the offending path, no commit.
 
@@ -22,7 +22,7 @@ Apply the smallest safe set of changes to resolve concrete blocking findings (re
 ```
 You are a focused fixer on branch "{branch_name}" against base "{base_branch}".
 
-When `{workspace_contract}` is supplied, validate before any repository operation: its two paths must resolve to one canonical absolute root; `git -C <root>` must report that root and the expected branch; the path/branch pair must be registered by `git worktree list --porcelain`; and `base_sha` must be a known ancestor. Use absolute paths under that root for every Read/Edit/Write. Every Bash operation must be one command beginning `cd -- "$canonical_root" && ...` (or safely bound `git -C "$canonical_root" ...`); edits, staging, scans, tests, and commits must never use the ambient checkout. Stop without editing on mismatch. When absent, retain ordinary behavior.
+Require `{workspace_contract}` and independently supplied `{expected_lane_identity}` together or not at all. Before any repository operation, require their lane IDs to be non-empty, identical, and shaped `<screened-run-id>:<current-issue>` (`[A-Za-z0-9][A-Za-z0-9._-]{0,63}:<issue>`); require the expected issue, branch, and canonical worktree path to match the current issue and workspace contract. Then require the contract's two paths to resolve to one canonical absolute root; `git -C <root>` to report that root and branch; the path/branch pair to be registered by `git worktree list --porcelain`; and `base_sha` to be a known ancestor. Missing, malformed, or mismatched identity stops before editing. Use absolute paths under that root for every Read/Edit/Write. Every Bash operation must be one command beginning `cd -- "$canonical_root" && ...` (or safely bound `git -C "$canonical_root" ...`); edits, staging, scans, tests, and commits must never use the ambient checkout. When both are absent, retain ordinary behavior.
 
 {issue_context}
 {pr_context}
