@@ -121,7 +121,7 @@ State written by gitissue skills, at the repo root beside `.gitissue.yml`, creat
 | `.gitissue/triage.json` | `/issue-triage`, `/auto-pilot` | Cached triage analysis (JSON schema v1) — priorities, dependencies, execution order, history |
 | `.gitissue/analysis-<N>.json` | `/issue-analysis` | Deep analysis of issue #N — affected files, root cause, implementation options, complexity, and risk |
 | `.gitissue/runs.jsonl` | `/issue-resolver`, `/auto-pilot` | Append-only run log — one JSON line per processed issue. Schema and single-writer rule: the subsection below |
-| `.gitissue/run-state.json`, `run.lock`, `last-run-report.md` | `/auto-pilot` | One run's resumable state (phase, the in-flight issue with its branch/PR, `processed[]`, `skip_list[]`), the lock against a second concurrent run, and the final summary. Machine-local — see the carve-out below; mechanics in the skill's `references/preflight.md` and `references/phases.md` |
+| `.gitissue/run-state.json`, `run.lock`, `last-run-report.md` | `/auto-pilot` | Mutable resume state (current/lane phases and PRs, processed/skips), run lock, and final report. Machine-local; mechanics: auto-pilot preflight/phases |
 
 > **Not in `.gitissue/`:** the model-suggestion cache is **skill-level** —
 > `/issue-creator` caches CursorBench data in the installed skill folder as

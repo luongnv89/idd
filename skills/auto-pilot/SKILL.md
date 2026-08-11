@@ -13,7 +13,7 @@ metadata:
 
 Fully autonomous development loop: triage, pick, resolve, review, fix, merge, repeat — zero user prompts. (Version history lives in `CHANGELOG.md`; `docs/release-notes/` covers only early smoke-test reports and is not kept current per release.)
 
-The auto-pilot orchestrates existing gitissue skills into a continuous loop that processes the issue backlog with absolute autonomy. It triages **once** at loop start — reusing a fresh `.gitissue/triage.json` when there is one (*Mode Detection*) — then each iteration: pick the top-priority issue from that order, resolve it via the full pipeline, review the PR with up to 3 token-optimized fix-review cycles (script pre-pass for lint/format, LLM only for critical issues), merge according to `autopilot.mode`, and update the cached order in place. Clean PRs merge in `balanced` or `aggressive` mode. PRs with unresolved review issues create a follow-up issue and stay open unless `mode: aggressive` and `merge_partial: true` are both explicitly set. For critical issues, the loop stops and asks the user for a decision instead of auto-continuing.
+The auto-pilot orchestrates existing gitissue skills into a continuous loop that processes the issue backlog with absolute autonomy. It triages **once** at loop start — reusing a fresh `.gitissue/triage.json` when there is one (*Mode Detection*) — then picks from that order. By default (`autopilot.max_parallel: 1`) it follows the original sequence exactly. When `max_parallel > 1`, it may resolve independent members of one persisted `parallel_groups` entry concurrently in isolated worktrees, then reviews and merges their PRs strictly one at a time. Every lane's run-log append stays in that serialized drain; after each merge, update the cached order in place. Clean PRs merge in `balanced` or `aggressive` mode. PRs with unresolved review issues create a follow-up issue and stay open unless `mode: aggressive` and `merge_partial: true` are both explicitly set. For critical issues, the loop stops and asks the user for a decision instead of auto-continuing.
 
 ## Autonomy Philosophy
 
@@ -128,6 +128,7 @@ Check these files relative to the skill's directory (the dirname of this SKILL.m
 - `references/scripts/gi-deps.py` — dependency-marker parser for the Phase 5 dependency gate
 - `references/scripts/gi-ci-wait.py` — CI waiter: polls a PR's checks to a verdict in one invocation, for the Phase 5 pre-merge gate
 - `references/scripts/gi-issue.py` — TTL-cached issue fetcher for the repeat reads across Phases 1, 4, and 5
+- `references/scripts/gi-branch.py` — safe branch derivation for caller-managed parallel worktrees
 - `references/scripts/gi-triage-graph.py` — Phase 1 execution order, status, staleness, and priority
 - `references/scripts/gi-state.py` — run-state, run-lock, and final-report writer (resume, `--force-unlock`, and the `--dry-run` no-mutation guarantee)
 - `references/scripts/gi-ratelimit.py` — rate-limit verdict, chunked pause, transient-failure backoff, and the run's wall-clock budget
@@ -176,6 +177,7 @@ Defaults (values the loop reads; per-key rationale and edge-case behavior live i
 - `autopilot.mode: balanced` — merge mode (see **Merge Modes** below)
 - `autopilot.merge_partial: false` — only honored when `mode: aggressive`
 - `autopilot.max_iterations: 10` — issues to process before stopping
+- `autopilot.max_parallel: 1` — resolver lanes to fan out from one triage `parallel_groups` entry; valid range `1..8`. **Validate this value after config load** because the shared config view passes the `autopilot` section through: a boolean, non-integer, or out-of-range value is invalid config and stops before Phase 0. The value `1` takes the legacy sequential path byte-for-byte.
 - `autopilot.review_cycles: 3` — fix attempts per PR (a cycle = one fix + one review; confirmation-only passes don't count)
 - `autopilot.auto_merge: true` — **legacy**; ignored when `mode` is set
 - `autopilot.pause_on_failure: false` — skip failed issues and continue
@@ -221,13 +223,13 @@ Auto-pilot delegates to the resolver/reviewer **skills**, which spawn the shared
 
 ### Subagent Architecture
 
-Each iteration spawns up to 2 subagents (resolver, then PR reviewer); explicit list mode adds a one-time analyzer upfront. The main agent only tracks: issue number, title, branch name, PR number, and pass/fail status. The full subagent-architecture diagram (each subagent's inputs and returns) lives in `references/orchestration.md` → *Subagent architecture*.
+At `autopilot.max_parallel: 1`, each iteration spawns up to 2 subagents (resolver, then PR reviewer), exactly as before; explicit list mode adds a one-time analyzer upfront. At values above 1, one iteration may spawn up to `max_parallel` **resolver-only** lanes concurrently from one persisted independent `parallel_groups` entry. After every resolver returns, the main agent drains those lanes in deterministic triage order, one at a time: PR review, merge gate, merge, run-log append, checkpoint, triage-cache update, and worktree cleanup are all strictly serialized. The main agent tracks each lane's issue, title, branch, PR, phase, and result in `run-state.json`. The full diagram and ownership rules live in `references/orchestration.md` → *Subagent architecture*.
 
 The PR review subagent runs `/issue-pr-review --auto --no-merge`, which handles the full review-fix cycle internally — reusing the same reviewer and fixer agents across cycles, with a fresh confirmation pass at the end. The `--no-merge` flag suppresses auto-merge so the reviewer never steals the merge step from Phase 5. Merging is always the main agent's responsibility (Phase 5).
 
 ### Why Subagents & What the Main Agent Does
 
-**The main agent should never read source files, read PR diffs, run tests, or write code — all of that happens inside subagents.** It handles only the lightweight, sequential orchestration: prerequisites, triage/pick, spawn resolver, spawn PR-review (`/issue-pr-review --auto --no-merge`), merge (Phase 5), track results, loop. The rationale (fresh context per issue, independent review, isolation between iterations) and the full main-agent task list live in `references/orchestration.md`.
+**The main agent should never read source files, read PR diffs, run tests, or write code — all of that happens inside subagents.** It handles lightweight orchestration: prerequisites, triage/pick, optional bounded resolver fan-out, and then the strictly sequential PR-review (`/issue-pr-review --auto --no-merge`), merge (Phase 5), run-log, checkpoint, cache-update, and cleanup drain. The rationale, isolation rules, and full main-agent task list live in `references/orchestration.md`.
 
 ---
 
@@ -250,16 +252,16 @@ When the user passes `--issues N1,N2,...`, the triage phase is replaced by an an
 
 ## Loop Overview
 
-Phase 0 once, then a continuous loop of 5 phases per iteration, looping back to Phase 1 until the backlog is done or the limit is reached:
+Phase 0 once, then a continuous loop of 5 phases per iteration, looping back to Phase 1 until the backlog is done or the limit is reached. With `max_parallel > 1`, Phase 1 may plan one independent batch and Phase 2 fans out only its resolvers; Phases 3–5 still run once per lane, serially:
 
 ```
 ◆ Auto-Pilot
 ┄┄┄┄┄┄┄┄┄┄┄┄
   Phase 0 — Run state    once, before the loop: resume gate, then --init
   Phase 1 — Triage/Pick  (triage once at start; skipped in explicit list mode)
-  Phase 2 — Resolve      subagent: 6-step resolve pipeline
-  Phase 3+4 — Review-Fix /issue-pr-review --auto --no-merge (review+fix, x3 max)
-  Phase 5 — Merge        merge the PR and close the issue
+  Phase 2 — Resolve      1 resolver, or bounded resolver-only fan-out
+  Phase 3+4 — Review-Fix serialized /issue-pr-review --auto --no-merge
+  Phase 5 — Merge        serialized merge, log, cache update, lane cleanup
 ```
 
 ---
@@ -282,10 +284,10 @@ Phase 0 runs **once**, before the loop; each iteration then runs 5 phases. For b
 | Phase | Name | Purpose | Subagent? |
 |-------|------|---------|-----------|
 | 0 | Run state | **Mandatory, before Phase 1** (and before the first entry in explicit list mode): resolve the resume gate to `resumable`/`stale`/`absent`, then `--init` the run state a later `--resume` reads. Every phase below checkpoints into it (*Step 1.0*, *Step 1.0b*) | no (main agent) |
-| 1 | Triage and Pick | Pick from the triage cache (*Step 1.1a* reuses a `fresh` one; a full triage runs only when it does not, or on a forced re-triage), capture `{issue_payload}` (trimmed to `{issue_payload_ids}` for the reviewer) + `{triage_context}` for the spawns (*Step 1.2b*) | no (main agent) |
-| 2 | Resolve | Sync to default branch, run the full resolve pipeline | yes (/issue-resolver) |
-| 3-4 | PR Review | Run /issue-pr-review --auto --no-merge with up to 3 fix cycles + CI monitoring | yes (/issue-pr-review) |
-| 5 | Merge | Verify mergeability (*Step 5.1a* decides on its own conditions whether the reviewer's `ci_status` may stand in for the CI wait — never restate them here), squash-merge, close the issue, create follow-up if needed | no (main agent) |
+| 1 | Triage and Pick | Pick from the triage cache (*Step 1.1a* reuses a `fresh` one; a full triage runs only when it does not, or on a forced re-triage). With `max_parallel > 1`, select up to that bound from one persisted independent group. Capture each lane's `{issue_payload}` (trimmed to `{issue_payload_ids}` for its reviewer) + `{triage_context}` (*Step 1.2b*) | no (main agent) |
+| 2 | Resolve | Sync the default branch once; run one in-place resolver when `max_parallel=1`, otherwise create isolated caller-managed worktrees and fan out resolver-only lanes | yes (/issue-resolver) |
+| 3-4 | PR Review | After fan-in, drain one lane at a time through /issue-pr-review --auto --no-merge with up to 3 fix cycles + CI monitoring | yes (/issue-pr-review) |
+| 5 | Merge | Still one lane at a time: verify mergeability (*Step 5.1a* owns whether the reviewer's `ci_status` may stand in for the CI wait), squash-merge, close the issue, append its one run-log record, update state/cache, and clean up its worktree | no (main agent) |
 
 See `references/phases.md` for full prompts, error handling, and decision tables.
 
@@ -336,9 +338,12 @@ checkpoint that the next run overwrites. Writing a checkpoint never writes a
 run-log line and vice versa — the single-writer rule below is unchanged by
 resume support.
 
-**Auto-pilot is the single writer per processed issue** — the resolver runs with
-`--no-run-log` and returns its telemetry instead of appending. Two contracts keep
-the log accurate: the single-writer rule and the batch fan-out. Both live in
+**Auto-pilot is the single writer per processed issue** — every resolver runs
+with `--no-run-log` and returns telemetry instead of appending. Under parallel
+resolution, retain each lane's telemetry in run state until its turn in the
+serialized drain; append only after that lane has reached its terminal Phase 5
+outcome, and never overlap appends. Check `processed[]` before a resumed append.
+The single-writer, parallel-lane, and batch fan-out contracts live in
 `references/run-log.md` — read that file before writing the line.
 
 Populate from the iteration's known values plus the resolver's returned telemetry

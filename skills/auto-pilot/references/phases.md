@@ -19,7 +19,7 @@ resume_state = resumable | stale | absent
 
 | Value | When | Effect |
 |-------|------|--------|
-| `resumable` | `--resume` was passed, the read returned a state object whose `run_id` matches the lock this run now holds — freshly acquired, reclaimed, or re-acquired in place — **or** whose lock is gone, and GitHub confirms its `current.branch` / `current.pr` still exist | Re-enter at `current.phase` for `current.issue`, reusing the recorded branch and PR; seed `processed[]` and `skip_list[]` from the state so nothing is redone |
+| `resumable` | `--resume` was passed, the read returned a state object whose `run_id` matches the lock this run now holds — freshly acquired, reclaimed, or re-acquired in place — **or** whose lock is gone, and GitHub confirms its singleton `current` **or every unfinished `lanes[]` record** still reconciles | Re-enter at `current.phase` for a serialized lane already draining, or reconcile the durable lane batch and resume its earliest safe phase; seed `processed[]` and `skip_list[]` so nothing is redone |
 | `stale` | a state exists but does not reconcile — `--fresh` was passed, the read reported `corrupt`, the recorded phase is unknown, or GitHub disagrees with the recorded branch/PR | Print `⚠ Recorded run state is stale — starting fresh`, then `--init` over it |
 | `absent` | the read printed `{}`, or **anything at all is in doubt** | Start a fresh run: `--init` and proceed to Phase 1 |
 
@@ -44,8 +44,29 @@ a doubt and fall back to `absent`. Same rule as `/issue-pr-review` applies to
 
 A PR that is `MERGED` means the issue was finished after the checkpoint — record
 it in `processed[]` and move to the next issue, never re-resolve it. A PR that is
-`OPEN` is the PR to review in Phase 3. No PR for that branch, or a read that
-fails, is a doubt: fall back to `absent`.
+`OPEN` is the PR to review in Phase 3. No PR for a singleton `current.branch`, or
+a read that fails, is a doubt: fall back to `absent`.
+
+**Parallel-lane reconciliation.** When `lanes[]` is non-empty, validate every
+record before advancing any of them. `gi-state.py` already rejects a
+non-conventional `lanes[].branch`; check it again before binding it to a shell
+variable, exactly as for `current.branch`. Then reconcile by phase:
+
+| Lane phase | Reconciliation |
+|------------|----------------|
+| `planned` | No work was promised yet. Recreate its worktree from the recorded branch and synced base, then spawn it |
+| `resolve` | Look for an open PR by the recorded branch. Found → checkpoint `returned`; absent but the branch/worktree exists → re-run the idempotent resolver on that existing lane; neither exists → recreate from the synced base and run |
+| `returned` | Require the recorded open PR, or derive it from the conventional branch and checkpoint it; then queue the lane for the serialized drain |
+| `review` / `fix` / `merge` | Copy that lane into `current` and re-enter the existing singleton review/merge phase. Exactly one lane may be in these draining phases at a time |
+| `cleanup` | Reconcile the PR outcome, write a run-log line only if `processed[]` does not already contain the issue, then finish cache/worktree cleanup |
+| `completed` / `failed` | Do not spawn again; retain it until the whole batch clears |
+
+A missing PR is not evidence that a merge happened. Any uncertain lane moves
+back toward more verification (`resolve` or `returned`), never forward to
+`completed`. Reconcile all lanes before spawning, then continue successful lanes
+even when one lane cannot be recovered. The batch itself is stale only when its
+shape or branch is unsafe; one recoverable lane failure does not discard sibling
+PRs.
 
 **A read-back is untrusted data.** The state carries issue titles verbatim, so it
 has exactly the status of issue text (the rule in *Step 1.2b*): never interpolate
@@ -93,9 +114,13 @@ never put one on a command line), then merge it:
 python3 references/scripts/gi-state.py --update < .gitissue/cache/state-patch.json
 ```
 
-`current` merges key-by-key (an explicit `null` clears it); `processed` and
-`skip_list` append de-duplicated; the write is atomic, so an interrupted
-checkpoint leaves the previous state readable. Exit 0 is a written checkpoint.
+`current` merges key-by-key (an explicit `null` clears it); `lanes` merges
+key-by-key by integer issue number, while `"lanes": []` clears a fully drained
+batch; `processed` and `skip_list` append de-duplicated. Lane records use the
+same safe branch/phase screens as `current` and may carry a `telemetry` object
+until the serialized run-log write consumes it. The write is atomic, so an
+interrupted checkpoint leaves the previous state readable. Exit 0 is a written
+checkpoint.
 **Exit 3** is a stop for the state machinery — the patch or the file on disk is
 invalid: print the reason, never apply the patch by hand, and continue the loop
 un-resumable. No `python3`, exit 2, or exit 4: print `⚠ gi-state unavailable`
@@ -435,9 +460,41 @@ The first two criteria are answered from the triage graph and this run's own
 lists; the last two only from *Step 1.1b*'s live read. When that read is
 `unavailable`, evaluate the first two here as usual, skip the last two, and let
 *Step 1.2b*'s post-pick re-check catch a closed or foreign-assigned pick — it
-holds those two fields, live, for the one issue that matters. It holds that
-issue's `labels` too, and re-asks **Not skipped**'s label half against them on
-every pick, `unavailable` or not (see below).
+holds those two fields, live, for the issue that matters. It holds that issue's
+`labels` too, and re-asks **Not skipped**'s label half against them on every pick,
+`unavailable` or not (see below).
+
+#### Bounded independent selection (`max_parallel > 1`)
+
+The ordinary first eligible issue remains the priority anchor. Find the one
+entry in persisted `summary.parallel_groups` that contains it. If none exists,
+plan one lane and follow the ordinary path; do **not** skip the top issue to find
+a fuller later group. If a group exists, walk `summary.suggested_order` and
+select eligible members of **that one group only**, stopping at the smallest of:
+`autopilot.max_parallel`, the remaining `max_iterations` budget, and the number
+of group members. Never combine two groups and never infer independence from
+file names here — `/issue-triage` already computed the group.
+
+Apply all four eligibility checks independently to every proposed member, then
+run *Step 1.2b* for each. A rejected member is removed before any spawn; another
+eligible member of the same group may fill the slot. A group with fewer than two
+survivors degrades to one ordinary issue without creating a parallel worktree.
+Explicit-list batch resolution is unchanged and does not consume triage
+`parallel_groups`.
+
+Before preparing any worktree, checkpoint the entire surviving set atomically:
+
+```json
+{"phase":"resolve","lanes":[
+  {"issue":42,"title":"…","branch":"feat/42-a","phase":"planned"},
+  {"issue":45,"title":"…","branch":"fix/45-b","phase":"planned"}
+]}
+```
+
+Titles are JSON data written through the checkpoint file, never shell words.
+Branches come only from `gi-branch.py --from-issue` and must pass that script's
+validation plus `gi-state.py`'s branch screen. This checkpoint is the durable
+plan a resume reconciles before it starts or drains any lane.
 
 **Quarantine is honored here, and only because the label is in the set.** An
 issue quarantined by *Step 2.3* carries `autopilot.quarantine_label`, and
@@ -480,6 +537,11 @@ questions asked.
   Candidates: {N} issues in summary.suggested_order
   Selected:   #{issue_number} — {issue_title}
 ```
+
+For a parallel selection, replace `Selected:` with `Selected lanes: #42, #45
+({lane_count}/{autopilot.max_parallel})`; each lane still consumes one iteration
+slot only when its terminal outcome is drained, so `max_iterations` counts
+processed issues rather than fan-out batches.
 
 The `[Iteration {i}/{max}]` prefix appears **only on a reuse iteration** — one
 that printed no *Step 1.1* banner. *Step 1.1* is the single home of that rule
@@ -567,6 +629,12 @@ block. The retry never repeats — at most one re-triage per iteration, ever —
 a backlog that genuinely has nothing eligible cannot spin.
 
 ### Step 1.2b — Capture the caller payload
+
+Repeat this whole step for every proposed parallel lane **before** the fan-out.
+Each record is fetched and post-pick-checked separately; keep its three prompt
+blocks attached to that lane. A rejected lane is never processed and writes no
+run-log line. On the sequential path this loop has one member, so behavior and
+fetch count are unchanged.
 
 The picked issue's triage row is already in hand — Step 1.1a reused the graph or
 Step 1.1 wrote it. Its **body** is not: Step 1.1's list carries no bodies, so
@@ -739,6 +807,7 @@ On the first iteration, display the execution plan and immediately begin — no 
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Issues to process:  {eligible_count} (of {total_open} open)
   Limit:              {max_iterations}
+  Resolver lanes:     {autopilot.max_parallel} (review/merge serialized)
   Review cycles:      {review_cycles}
   Merge mode:         {conservative | balanced | aggressive}
   First issue:        #{number} — {title}
@@ -764,7 +833,11 @@ Stop.
 
 ### Step 2.1 — Sync to Default Branch
 
-The main agent syncs to the default branch directly (this is lightweight — no code reading). Use the stash-first pattern to protect any uncommitted work that may have appeared since the pre-flight stash (see `references/docs/sync-conventions.md`):
+The main agent syncs the original checkout to the default branch directly (this
+is lightweight — no code reading). Run this **once per sequential issue or once
+before a parallel fan-out**, never concurrently inside resolver workers. Use the
+stash-first pattern to protect any uncommitted work that may have appeared since
+the pre-flight stash (see `references/docs/sync-conventions.md`):
 
 ```bash
 git checkout {default_branch}
@@ -803,20 +876,111 @@ This is safe because the auto-pilot always pushes work to remote PRs before clea
   Then:    /auto-pilot to resume
 ```
 
-### Step 2.2 — Spawn Resolver Subagent
+### Step 2.2 — Spawn Resolver Subagent(s)
 
-Launch a subagent using the Agent tool to perform the entire resolve pipeline. This keeps all codebase reading, code writing, and test execution out of the main agent's context. Pass only `description` and `prompt` — do NOT set `subagent_type`. The resolver is a **skill** invoked from inside the prompt (via `../issue-resolver/SKILL.md`), not an agent type; passing `subagent_type: "issue-resolver"` fails with `Agent type 'issue-resolver' not found`.
+Launch default general-purpose subagents to perform the resolve pipeline. Pass
+only `description` and `prompt` — do NOT set `subagent_type`. The resolver is a
+**skill** invoked from inside the prompt (via `../issue-resolver/SKILL.md`), not an
+agent type; passing `subagent_type: "issue-resolver"` fails.
+
+#### Legacy sequential path (`max_parallel = 1`)
+
+Run the original path exactly:
 
 ```
 ● [Iteration {i}/{max}] Resolving #{issue_number}...
   ⟶ Spawning resolver subagent...
 ```
 
-Use the **Resolver Subagent** prompt from `references/subagent-prompts.md`, substituting `{issue_number}` and — when Step 1.2b captured them — `{issue_payload}` and `{triage_context}`. The subagent runs the full /issue-resolver pipeline and returns only: status, branch_name, pr_number, pr_url, files_changed, tests_written, tests_passed (and failure_step/failure_reason on failure).
+Use the **Resolver Subagent** prompt from `references/subagent-prompts.md`,
+substituting `{issue_number}` and the optional payload/context. Omit the
+`parallel_lane` block, launch from the original checkout, and wait for this one
+result before Step 2.3. No caller-managed worktree or `lanes[]` checkpoint is
+created.
+
+#### Parallel path (`max_parallel > 1` and at least two lanes)
+
+Prepare every worktree **sequentially before any resolver starts**, from the same
+fetched base. For each planned lane, derive the branch without putting issue text
+on a command line, then create the deterministic sibling worktree:
+
+```bash
+repo_root="$(git rev-parse --show-toplevel)"
+base="$(git symbolic-ref --short refs/remotes/origin/HEAD)"
+base="${base#origin/}"
+repo="$(basename "$repo_root")"
+branch_json="$(python3 references/scripts/gi-branch.py "$issue_number" --from-issue --type "$issue_type")"
+branch_name="$(printf '%s' "$branch_json" | python3 -c 'import json,sys; print(json.load(sys.stdin)["branch"])')"
+wt_dir="$(dirname "$repo_root")/${repo}-worktrees/$(printf '%s' "$branch_name" | tr '/' '-')"
+git worktree add -b "$branch_name" "$wt_dir" "origin/${base}"
+```
+
+`issue_number` is an integer and `issue_type` must first be reduced to one of the
+six resolver literals. Treat script exit 3, an unparsable result, or `valid:
+false` under the standard `auto` prefix as a lane failure. On resume, an existing
+conventional branch may be attached with
+`git worktree add "$wt_dir" "$branch_name"` only after
+`git worktree list --porcelain` proves it is not
+already attached elsewhere. A path collision or ambiguous branch is a lane
+failure, never permission to delete an unknown directory.
+
+Prepare the workspace with the same detected procedure as resolver Step 0e:
+copy existing gitignored local config from `repo_root`, install dependencies with
+the detected package manager, and run a documented setup/bootstrap target when
+present. Record only commands actually run. If creation or setup fails, remove
+only the partial worktree/branch this lane created, checkpoint the lane as
+`failed`, and continue preparing siblings. **Never fall back in-place** while a
+parallel batch exists.
+
+After each setup succeeds, checkpoint its phase from `planned` to `resolve`.
+Then launch **all** prepared resolver calls before waiting for any one of them:
+
+```
+● [Iterations {first}-{last}/{max}] Resolving independent lanes...
+  ⟶ #42  feat/42-a  (worktree)
+  ⟶ #45  fix/45-b   (worktree)
+```
+
+Use one concurrent Agent fan-out operation (or the host's equivalent concurrent
+spawn primitive), with one uniquely described resolver per lane and cwd set to
+that lane's worktree. Substitute its own payload/context plus:
+
+```json
+{"issue":42,"branch":"feat/42-a","base":"main"}
+```
+
+as `parallel_lane`, and tell the worker to export `IDD_AUTO_MODE=1` and
+`IDD_CALLER_WORKTREE=1`. Every lane still uses `--auto --no-run-log`; the caller
+worktree changes only workspace setup, never issue-state checks, QA, tests,
+secret scans, push, or PR delivery. Wait for **all started lanes** to return. Do
+not cancel successful siblings when one fails, and do not start PR review until
+fan-in is complete.
+
+Checkpoint every returned result immediately, including the resolver telemetry
+needed by the single writer:
+
+```json
+{"lanes":[{"issue":42,"branch":"feat/42-a","pr":87,"phase":"returned",
+  "telemetry":{"status":"success","qa_cycles":2,"complexity":"high",
+               "profile":"full","duration_s":420}}]}
+```
+
+A failed return uses `phase: failed` and stores its failure fields in telemetry.
+After all returns are durable, order lanes by `summary.suggested_order` and begin
+the serialized drain. No reviewer, merge, run-log append, triage-cache update,
+or worktree cleanup overlaps another lane's.
 
 ### Step 2.3 — Process Resolver Result
 
-Parse the subagent's response. Extract: `status`, `branch_name`, `pr_number`, `pr_url`, `tests_written`, `failure_step`, `failure_reason`.
+On the sequential path, process the sole result as before. On the parallel path,
+choose the next `returned`/`failed` lane in original triage order and copy it
+into singleton `current`. A returned lane advances to `review`. A failed lane
+advances to `cleanup` only when its deterministic path is still registered by
+`git worktree list --porcelain`; otherwise log/checkpoint the terminal failure
+without a cleanup attempt. Only then apply the existing result handling below.
+Finish this lane before choosing the next one.
+
+Parse the subagent's response. Extract: `status`, `branch_name`, `pr_number`, `pr_url`, `tests_written`, `failure_step`, `failure_reason`. For a parallel lane, require the returned `branch_name` to equal its validated planned branch and verify `gh pr view {pr_number} --json headRefName,state` reports that same head and `OPEN` before queuing review. Bind both returned values to shell variables rather than pasting them. A mismatch is a failed lane and never reaches review or merge.
 
 **Checkpoint (post-resolve).** As soon as `branch_name` and `pr_number` are
 known — before Phase 3 spawns anything — record them with the *Step 1.0b*
@@ -825,6 +989,9 @@ checkpoint procedure:
 ```json
 {"phase": "review", "current": {"issue": 42, "title": "…", "branch": "fix/42-…", "pr": 87, "phase": "review"}}
 ```
+
+For a parallel drain, the same atomic patch also advances that issue's lane:
+`"lanes": [{"issue": 42, "phase": "review"}]`. At `max_parallel=1` omit it.
 
 This is the checkpoint that makes AC1 work: a run interrupted anywhere in Phase
 3-5 resumes onto **this** branch and **this** PR instead of re-resolving the
@@ -1027,8 +1194,9 @@ iteration while appearing to be in force.
 **Checkpoint (post-review).** Before acting on the result, record it with the
 *Step 1.0b* procedure — `{"phase": "merge", "current": {"phase": "merge"}}` on a
 PASS, `{"phase": "fix", "current": {"phase": "fix"}}` when the fix cycles are
-still running. A resume that lands here re-enters at review or merge on the
-recorded PR rather than re-running the resolve.
+still running. During a parallel drain, include the same phase update for the
+matching `lanes[]` entry. A resume that lands here re-enters at review or merge
+on the recorded PR rather than re-running the resolve.
 
 **On PASS:**
 ```
@@ -1501,7 +1669,8 @@ mode gate declines to merge — with the *Step 1.0b* procedure:
 {"phase": "cleanup", "current": {"phase": "cleanup", "outcome": "merged"}}
 ```
 
-A resume that reads `outcome: merged` never re-merges and never re-opens: the PR
+During a parallel drain, include `"lanes": [{"issue": 42, "phase":
+"cleanup", "outcome": "merged"}]` in the same patch. A resume that reads `outcome: merged` never re-merges and never re-opens: the PR
 is gone and the issue is closed, so the iteration is finished and the loop moves
 to Step 5.3. **AC2 holds here too** — nothing in this phase closes an issue whose
 PR is still open and unreviewed; the issue is closed by GitHub, as the
@@ -1509,7 +1678,33 @@ consequence of merging the `Closes #N` PR, and by nothing else.
 
 ### Step 5.3 — Cleanup
 
-Use the stash-first sync to protect any uncommitted changes that may have accumulated between iterations (see `references/docs/sync-conventions.md`):
+**Parallel lane:** the main agent is already in the original checkout. After the
+lane has a terminal outcome and its one run-log line has been appended, remove
+only its deterministic caller-managed worktree, then delete the local branch if
+it is no longer checked out:
+
+```bash
+repo_root="$(git rev-parse --show-toplevel)"
+repo="$(basename "$repo_root")"
+wt_dir="$(dirname "$repo_root")/${repo}-worktrees/$(printf '%s' "$branch_name" | tr '/' '-')"
+git worktree remove "$wt_dir"
+git branch -d "$branch_name" 2>/dev/null || true
+```
+
+Bind `branch_name` from the validated lane record; never paste a literal
+read-back into the command. First require `git worktree list --porcelain` to map
+`wt_dir` to this lane's branch. An absent path on a failed setup lane means there
+is nothing to clean; an absent path after a delivered PR means cleanup already
+completed externally. A path mapped to another branch is ambiguous and stops
+cleanup. If removal otherwise fails, keep the worktree, print a recovery command,
+and checkpoint `cleanup` for resume — never force-delete an ambiguous path. Mark
+the lane `completed` (or `failed` with its terminal outcome) only after the
+single run-log write and cache update have finished. Then clear `current` and select the next returned lane. When every lane
+is terminal, patch `"lanes": []` and return to Phase 1.
+
+**Sequential path (`max_parallel=1`):** use the original stash-first sync below
+byte-for-byte to protect any uncommitted changes that may have accumulated
+between iterations (see `references/docs/sync-conventions.md`):
 
 ```bash
 git checkout {default_branch}
@@ -1538,6 +1733,12 @@ by patching it to `null`:
 ```json
 {"phase": "triage", "current": null, "processed": [{"issue": 42, "outcome": "merged", "pr": 87}]}
 ```
+
+During a parallel drain, retain the batch by also patching the matching lane to
+`completed`/`failed`; set top-level `phase` to `resolve` while siblings remain,
+and clear `lanes` only after the final lane. The `processed[]` membership check
+is the guard that prevents resume from appending a second run-log line for a
+lane whose first append succeeded before its cleanup checkpoint.
 
 Clearing `current` is what tells a later resume that no issue is half-done: a
 state whose `current` is `null` resumes at the top of the loop, and `processed[]`

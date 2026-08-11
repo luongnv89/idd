@@ -114,6 +114,10 @@ autopilot:
   # is required to reach the prior 2.1.x "merge anyway with follow-up" path.
   merge_partial: false
   max_iterations: 10
+  # Resolver-only concurrency for one independent triage group (1..8). Review,
+  # merge, run-log, state/cache writes, and cleanup always remain serialized.
+  # The default 1 preserves the original in-place sequential path exactly.
+  max_parallel: 1
   review_cycles: 3
   auto_merge: true
   pause_on_failure: false

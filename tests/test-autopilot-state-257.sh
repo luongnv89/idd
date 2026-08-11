@@ -220,6 +220,25 @@ else
   fail "AC1: a checkpoint left $leftovers temp file(s) behind"
 fi
 
+# Issue #260 extends the same atomic state with durable resolver lanes. Entries
+# merge by issue so one returning worker cannot erase a still-active sibling.
+LANES='{"phase":"resolve","lanes":[{"issue":50,"branch":"feat/50-a","phase":"resolve"},{"issue":51,"branch":"fix/51-b","phase":"planned"}]}'
+run_status out st bash -c "printf '%s' '$LANES' | python3 '$STATE' --update --dir '$D1'"
+run_status out st bash -c "printf '%s' '{\"lanes\":[{\"issue\":50,\"pr\":90,\"phase\":\"returned\",\"telemetry\":{\"status\":\"success\"}}]}' | python3 '$STATE' --update --dir '$D1'"
+if [ "$st" = "0" ] \
+   && [ "$(printf '%s' "$out" | jkey lanes.0.phase)" = "returned" ] \
+   && [ "$(printf '%s' "$out" | jkey lanes.1.phase)" = "planned" ]; then
+  pass "AC1 (#260): a returned lane merges without erasing its sibling"
+else
+  fail "AC1 (#260): durable lane merge lost or corrupted a sibling (exit $st)"
+fi
+run_status out st bash -c "printf '%s' '{\"lanes\":[]}' | python3 '$STATE' --update --dir '$D1'"
+if [ "$st" = "0" ] && [ "$(printf '%s' "$out" | python3 -c 'import json,sys;print(len(json.load(sys.stdin)["lanes"]))')" = "0" ]; then
+  pass "AC1 (#260): an empty lanes patch clears a fully drained batch"
+else
+  fail "AC1 (#260): a completed lane batch could not be cleared"
+fi
+
 # ───────────────────────────────────────────────────────────
 # T2 (AC3): the run lock refuses a live holder, reclaims a stale one
 # ───────────────────────────────────────────────────────────

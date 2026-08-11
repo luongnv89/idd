@@ -1177,6 +1177,20 @@ check_has "$BUILT_SKILL" '\*Step 1\.1a\*.s cache gate reads .fresh.' \
 check_has "$BUILT_SUMMARY" 'a cache \*Step 1\.1a\* read as .fresh.' \
   "T13.50: built summary-format.md ships the renamed reference"
 
+# Issue #260 consumes, rather than recomputes, the independent groups this
+# payload already persists. The priority anchor stays first and one fan-out may
+# draw from one group only.
+check_block_has "$STEP12_BLOCK" 'first eligible issue remains the priority anchor' \
+  "T14.1 (#260): parallel selection keeps the triage priority anchor"
+check_block_has "$STEP12_BLOCK" 'members of \*\*that one group only\*\*' \
+  "T14.2 (#260): a fan-out cannot combine parallel groups"
+check_block_has "$STEP12_BLOCK" 'summary\.suggested_order' \
+  "T14.3 (#260): lane order still derives from the persisted suggested order"
+check_block_has "$STEP12_BLOCK" 'remaining .max_iterations. budget' \
+  "T14.4 (#260): lane selection cannot exceed the run iteration budget"
+check_block_has "$B_STEP12_BLOCK" 'members of \*\*that one group only\*\*' \
+  "T14.5 (#260): built phases ship the one-group selection rule"
+
 # ───────────────────────────────────────────────────────────
 # Summary
 # ───────────────────────────────────────────────────────────

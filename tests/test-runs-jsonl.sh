@@ -135,6 +135,12 @@ has "$SUBAGENT" "duration_s" "T6: auto-pilot subagent prompt collects duration_s
 # Auto-pilot SKILL documents that it is the single writer and enriches its line.
 has "$AUTOPILOT" "--no-run-log" "T6: auto-pilot documents suppressing the resolver via --no-run-log"
 has_skill "$AUTOPILOT_DIR" "single line" "T6: auto-pilot documents writing the single enriched line per issue"
+has "$AUTOPILOT_DIR/references/run-log.md" "Parallel resolver lanes" \
+  "T6 (#260): run-log contract has a parallel-lane section"
+has "$AUTOPILOT_DIR/references/run-log.md" "worker never appends on failure or success" \
+  "T6 (#260): parallel resolver workers never append"
+has "$AUTOPILOT_DIR/references/run-log.md" "serialized drain" \
+  "T6 (#260): parallel lane records append only in the serialized drain"
 
 # --no-run-log now applies to BOTH the single-issue Resolver Subagent AND the Batch
 # Resolver Subagent (#158 made auto-pilot the single writer on the batch path too).

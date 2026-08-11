@@ -32,9 +32,57 @@ Main Agent (orchestrator)
 └── Step 5: Deliver (main agent — push + create PR + report)
 ```
 
-## Step 0e — Workspace (interactive only)
+## Step 0e — Workspace
 
-Full procedure for the worktree offer described in SKILL.md *Step 0e — Workspace*. **Interactive mode only** — in auto mode (`--auto` / `IDD_AUTO_MODE=1`) this entire step is skipped and the pipeline uses the in-place path (Repo Sync + *0f — Create branch*), byte-for-byte as before. The worktree prompt never appears in auto mode (acceptance criterion 4).
+Full procedure for the worktree offer described in SKILL.md *Step 0e — Workspace*.
+**Interactive mode only** — ordinary auto mode is skipped. The offer and local
+creation procedure remain interactive; `--auto` / `IDD_AUTO_MODE=1` uses the
+in-place path (Repo Sync + *0f — Create branch*) byte-for-byte as before.
+The worktree prompt never appears in auto mode. The sole exception is a worktree
+auto-pilot already created for a parallel resolver lane; that caller-managed
+path validates and adopts the workspace below, without showing a prompt or
+creating another worktree.
+
+### Caller-managed parallel worktree (auto-pilot only)
+
+`IDD_CALLER_WORKTREE=1` is the narrow handoff for an auto-pilot parallel lane.
+It is not a general auto-mode preference and is never inferred from issue text.
+The main auto-pilot has already fetched the default branch, derived the branch
+with `gi-branch.py --from-issue`, created a distinct sibling worktree from
+`origin/<base>`, prepared local setup, and launched this resolver with that
+worktree as its cwd. The resolver still derives `{branch_name}` once through its
+ordinary Step 0e/0f call, then validates all of the following before accepting
+the handoff:
+
+```bash
+actual_branch="$(git rev-parse --abbrev-ref HEAD)"
+git_dir="$(cd "$(git rev-parse --git-dir)" && pwd)"
+common_dir="$(cd "$(git rev-parse --git-common-dir)" && pwd)"
+base="$(git symbolic-ref --short refs/remotes/origin/HEAD)"
+base="${base#origin/}"
+
+[ "$IDD_CALLER_WORKTREE" = "1" ]
+[ "${IDD_AUTO_MODE:-0}" = "1" ]
+[ "$git_dir" != "$common_dir" ]                 # linked worktree, not original
+[ "$actual_branch" = "$branch_name" ]           # exact safe derived branch
+[ -z "$(git status --porcelain)" ]                # no inherited edits
+[ -n "$base" ]
+git merge-base --is-ancestor "origin/${base}" HEAD
+```
+
+Any failure is a workspace-contract failure: stop and return `failure_step:
+preflight`. **Never fall back in-place** while sibling resolvers may be active,
+never create a second worktree, and never run the in-place stash/rebase or *0f*.
+A fallback would put two writers in one index; stopping one lane preserves every
+successful sibling. When validation passes, mark the workspace as a worktree,
+skip Repo Sync and *0f* because `git worktree add ... origin/${base}` already
+satisfied both, and continue with Step 0g. The caller owns cleanup after the
+serialized drain; the resolver must not remove this worktree.
+
+This handoff is structural, not a safety-gate waiver. The already-resolved
+checks, live issue re-verification, both secret scans, QA, final tests, and push
+still run in full. On auto-pilot's default single-lane path the signal is
+absent, so this section is unreachable and ordinary auto mode is unchanged.
 
 ### Why a worktree
 
@@ -173,9 +221,11 @@ fi
 
 After **verified** cleanup (`cleanup_ok=1`), run the mandatory Repo Sync and *0f — Create branch* in the original working tree. If cleanup cannot remove the worktree entry, **stop** — print `references/error-messages.md` → *Worktree setup failed* and do not attempt the in-place path while the same branch may still be checked out in `{wt_dir}`.
 
-### Cleanup (after delivery, interactive only)
+### Cleanup (after delivery)
 
-The worktree is intentionally left in place after the PR is created so the user can inspect it. Tell them how to remove it when done:
+A caller-managed parallel worktree is never removed here: auto-pilot removes it
+only after that lane's serialized review/merge/log/cache drain. An interactive
+worktree is intentionally left in place after the PR is created so the user can inspect it. Tell them how to remove it when done:
 
 ```
 ○ Worktree left at {wt_dir} for inspection.

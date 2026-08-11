@@ -7,7 +7,8 @@
 #   AC #3: declined path keeps current in-place behavior.
 #   AC #4: auto-pilot / IDD_AUTO_MODE=1 never shows the worktree prompt.
 #   AC #5: prompt states copied/setup artifacts and branch/workspace naming.
-#   #129: auto mode in-place default is explicit; auto-pilot resolver prompt matches.
+#   #129: ordinary auto mode and max_parallel=1 keep the in-place default.
+#   #260: caller-managed parallel worktrees are validated and never fall back.
 #
 # Usage: bash tests/test-issue-resolver-worktree.sh
 # Returns: exit 0 if all checks pass, exit 1 on failure.
@@ -142,12 +143,18 @@ for file in "$ROOT_SKILL" "$ROOT_STEPS" "$ROOT_ERRORS"; do
 done
 
 # ───────────────────────────────────────────────────────────
-# T7 (#129): Auto-pilot resolver subagent uses in-place auto contract.
+# T7 (#129/#260): legacy auto remains in-place; parallel lanes are caller-owned.
 # ───────────────────────────────────────────────────────────
-check_contains "$SRC_AUTOPILOT_PROMPTS" 'Workspace is in-place only: skip Step 0e' \
-  "T7.1 (#129): auto-pilot resolver prompt skips worktree"
+check_contains "$SRC_AUTOPILOT_PROMPTS" 'Block absent \(`autopilot\.max_parallel: 1`\): use the legacy in-place path exactly' \
+  "T7.1 (#129): max_parallel=1 keeps the legacy in-place resolver"
 check_contains "$SRC_AUTOPILOT_PROMPTS" 'no `git worktree add`' \
-  "T7.2 (#129): auto-pilot forbids worktree add on resolve path"
+  "T7.2 (#129): legacy auto-pilot prompt still forbids worktree add"
+check_contains "$SRC_AUTOPILOT_PROMPTS" 'IDD_CALLER_WORKTREE=1' \
+  "T7.3 (#260): parallel lane marks the caller-managed worktree"
+check_contains "$SRC_STEPS" 'Caller-managed parallel worktree' \
+  "T7.4 (#260): resolver documents the validated caller-managed path"
+check_contains "$SRC_STEPS" 'Never fall back in-place' \
+  "T7.5 (#260): a parallel lane never falls back to the shared index"
 
 # ───────────────────────────────────────────────────────────
 # Summary

@@ -12,6 +12,7 @@ The three artifacts are machine-local and gitignored. They are **not** the run
 log: `.gitissue/runs.jsonl` is append-only cross-run telemetry written once per
 processed issue, while the run state is mutable, single-run, and deleted or
 overwritten by the next run. Neither substitutes for the other.
+There is no verdict exit code 1.
 
 Untrusted values — issue titles above all — arrive only as JSON on **stdin**,
 never on a command line, and are never evaluated: this script does not `eval`,
@@ -27,11 +28,13 @@ Modes
   --read    print the current state, or `{}` when absent. Never fails: absence
             and corruption are both answers, and both mean "start fresh"
   --update  read a patch on stdin, merge it into the state, write atomically.
-            `current.branch` is pattern-checked against the repo's branch
-            naming convention because the resume gate puts it in a shell word;
-            `current.phase` and `run_id` are pattern-checked for the same
-            reason. Free text — `title`, `outcome` — never reaches a command,
-            so it is only length-bounded
+            `current.branch` and every `lanes[].branch` are pattern-checked
+            against the repo's branch naming convention because the resume
+            gate can put them in shell words; phases and `run_id` are checked
+            for the same reason. Free text — `title`, `outcome` — never reaches
+            a command, so it is only length-bounded. `lanes` is the durable
+            parallel-resolver queue: entries merge by issue, while `[]` clears
+            the completed batch
   --lock    create `.gitissue/run.lock` with O_CREAT|O_EXCL; refuse a lock held
             by a live run, reclaim one that is stale. Mints a fresh run id, so
             a leftover state file from a finished run cannot lend its id to an
@@ -105,6 +108,7 @@ STATE_KEYS = (
     "limit",
     "queue",
     "phase",
+    "lanes",
     "current",
     "processed",
     "skip_list",
@@ -113,9 +117,27 @@ STATE_KEYS = (
 
 INIT_KEYS = frozenset({"run_id", "mode", "invocation", "queue", "limit"})
 PATCH_SCALARS = ("phase", "mode", "invocation", "limit", "queue", "report_path")
-PATCH_KEYS = frozenset(set(PATCH_SCALARS) | {"current", "processed", "skip_list"})
+PATCH_KEYS = frozenset(
+    set(PATCH_SCALARS) | {"lanes", "current", "processed", "skip_list"}
+)
 CURRENT_KEYS = frozenset(
     {"issue", "title", "branch", "pr", "phase", "outcome", "started_at"}
+)
+# Parallel lanes deliberately mirror `current`: the serialized drain copies one
+# lane into `current` and then follows the established review/merge path. The
+# optional `telemetry` object carries the resolver's result until that drain
+# writes the single runs.jsonl line; it is JSON data and never shell input.
+LANE_KEYS = frozenset(
+    {
+        "issue",
+        "title",
+        "branch",
+        "pr",
+        "phase",
+        "outcome",
+        "started_at",
+        "telemetry",
+    }
 )
 PROCESSED_KEYS = frozenset({"issue", "outcome", "pr"})
 REPORT_KEYS = frozenset({"run_id", "markdown", "generated_at"})
@@ -331,6 +353,61 @@ def _normalize_current(value: object) -> dict[str, object] | None:
     return {key: out[key] for key in sorted(out)}
 
 
+def _normalize_lane(value: object, *, partial: bool = False) -> dict[str, object]:
+    if not isinstance(value, dict):
+        raise InputError("each lanes entry must be an object")
+    unknown = sorted(set(value) - LANE_KEYS)
+    if unknown:
+        raise InputError("unknown key(s) in lanes: " + ", ".join(unknown))
+    if not _is_int(value.get("issue")):
+        raise InputError("lanes entries need an integer issue")
+
+    out: dict[str, object] = {"issue": value["issue"]}
+    if "pr" in value:
+        if value["pr"] is not None and not _is_int(value["pr"]):
+            raise InputError("lanes.pr must be an integer or null")
+        out["pr"] = value["pr"]
+    for key in ("title", "branch", "phase", "outcome", "started_at"):
+        if key not in value:
+            continue
+        if value[key] is not None and not isinstance(value[key], str):
+            raise InputError(f"lanes.{key} must be a string or null")
+        out[key] = value[key]
+    if isinstance(out.get("phase"), str) and not PHASE_RE.match(out["phase"]):
+        raise InputError(f"lanes.phase '{out['phase']}' is not a phase name")
+    if isinstance(out.get("branch"), str) and not BRANCH_RE.match(out["branch"]):
+        raise InputError(
+            f"lanes.branch '{out['branch']}' is not a conventional branch "
+            "name (see the naming-conventions reference)"
+        )
+    title = out.get("title")
+    if isinstance(title, str) and len(title) > TITLE_MAX:
+        out["title"] = title[:TITLE_MAX]
+    if "telemetry" in value:
+        if value["telemetry"] is not None and not isinstance(value["telemetry"], dict):
+            raise InputError("lanes.telemetry must be an object or null")
+        out["telemetry"] = value["telemetry"]
+    if not partial:
+        # Full records may omit every optional field. Keeping absent fields
+        # absent makes a v1 singleton state and a v1+lanes state coexist.
+        return {key: out[key] for key in sorted(out)}
+    return out
+
+
+def _normalize_lanes(value: object, *, partial: bool = False) -> list[dict[str, object]]:
+    if not isinstance(value, list):
+        raise InputError("lanes must be a list of objects")
+    out = []
+    seen = set()
+    for entry in value:
+        lane = _normalize_lane(entry, partial=partial)
+        if lane["issue"] in seen:
+            raise InputError(f"lanes contains duplicate issue {lane['issue']}")
+        seen.add(lane["issue"])
+        out.append(lane)
+    return out
+
+
 def _normalize_processed(value: object) -> list[dict[str, object]]:
     if not isinstance(value, list):
         raise InputError("processed must be a list of objects")
@@ -389,6 +466,7 @@ def normalize_init(
         "limit": limit,
         "queue": list(submitted.get("queue") or []),
         "phase": "init",
+        "lanes": [],
         "current": None,
         "processed": [],
         "skip_list": [],
@@ -413,8 +491,9 @@ def merge_patch(
 ) -> dict[str, object]:
     """Apply one `--update` patch to `state` and return the merged result.
 
-    `current` merges key-by-key (an explicit null clears it), `processed` and
-    `skip_list` append de-duplicated, and every other key is replaced.
+    `current` merges key-by-key (an explicit null clears it), `lanes` merges
+    key-by-key per issue (an empty list clears a completed batch), `processed`
+    and `skip_list` append de-duplicated, and every other key is replaced.
     """
     if not isinstance(patch, dict):
         raise InputError("stdin must be a single JSON object")
@@ -435,6 +514,24 @@ def merge_patch(
     for key in PATCH_SCALARS:
         if key in patch:
             out[key] = patch[key]
+
+    if "lanes" in patch:
+        incoming_lanes = _normalize_lanes(patch["lanes"], partial=True)
+        if not incoming_lanes:
+            out["lanes"] = []
+        else:
+            existing_lanes = _normalize_lanes(out.get("lanes") or [])
+            by_issue = {entry["issue"]: entry for entry in existing_lanes}
+            order = [entry["issue"] for entry in existing_lanes]
+            for lane in incoming_lanes:
+                issue = lane["issue"]
+                if issue not in by_issue:
+                    by_issue[issue] = {}
+                    order.append(issue)
+                merged_lane = dict(by_issue[issue])
+                merged_lane.update(lane)
+                by_issue[issue] = _normalize_lane(merged_lane)
+            out["lanes"] = [by_issue[number] for number in order]
 
     if "current" in patch:
         incoming = _normalize_current(patch["current"])

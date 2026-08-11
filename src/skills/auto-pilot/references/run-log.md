@@ -41,6 +41,23 @@ stayed silent. The resolver's run `status` informs auto-pilot's decision but is 
 copied into the row's `outcome` — that field stays auto-pilot's own six
 categorical label (set from the merge result).
 
+## Parallel resolver lanes (`autopilot.max_parallel > 1`)
+
+Parallelism does not change the single-writer boundary. Every resolver lane is
+invoked with `--no-run-log` and may only return telemetry. After all resolvers
+fan in, the main agent drains lanes in deterministic triage order. For each lane
+it finishes review and the Phase 5 outcome first, then appends that issue's
+**one** line, checkpoints the lane, updates the triage cache if a merge closed
+the issue, and cleans up the worktree before moving to the next lane. No two
+appends overlap, and a worker never appends on failure or success. A crash after
+a resolver returns leaves its telemetry in `run-state.json.lanes[].telemetry`;
+resume still writes only during the serialized drain and checks `processed[]`
+before appending, so it never reconstructs a second line from the lane cache.
+
+This differs from batch fan-out below: parallel lanes produce separate PRs and
+separate terminal outcomes. There is no shared-result fan-out and no scalar
+telemetry attribution rule; each lane contributes only its own returned values.
+
 ## Batch fan-out (Batch Resolver path)
 
 **Batch iterations** (the *Batch Resolver* path resolves several issues in one
