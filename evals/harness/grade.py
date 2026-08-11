@@ -96,6 +96,33 @@ def _grade_one(
             return False
         path = Path(_sub_out(str(file_rel), out_dir))
         got = 0 if path.is_file() else 1
+    elif tool == "red-green":
+        file_rel = assertion.get("file")
+        if not file_rel:
+            print(f"  ✗ {label} — red-green requires 'file'")
+            return False
+        path = Path(_sub_out(str(file_rel), out_dir))
+        try:
+            evidence = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            print(f"  ✗ {label} — invalid red-green JSON: {exc}")
+            return False
+        if not isinstance(evidence, dict):
+            print(f"  ✗ {label} — red-green evidence must be a JSON object")
+            return False
+        expected = {"red_exit": 1, "green_exit": 0}
+        got_evidence = {
+            "red_exit": evidence.get("red_exit"),
+            "green_exit": evidence.get("green_exit"),
+        }
+        valid_types = all(type(evidence.get(key)) is int for key in expected)
+        got = (
+            0
+            if valid_types
+            and got_evidence == expected
+            and set(evidence) == set(expected)
+            else 1
+        )
     elif tool == "shell":
         # Escape hatch for rare hermetic checks (e.g. red→green evidence).
         # Args is a single shell command string run under bash -c.

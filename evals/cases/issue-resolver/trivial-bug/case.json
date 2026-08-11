@@ -30,16 +30,10 @@
       "label": "runs.jsonl record validates via gi-runlog --echo"
     },
     {
-      "tool": "file-exists",
-      "file": "OUT/red-green.txt",
+      "tool": "red-green",
+      "file": "OUT/red-green.json",
       "expect_exit": 0,
-      "label": "red→green evidence file present"
-    },
-    {
-      "tool": "shell",
-      "args": ["grep -q 'red→green\\|red -> green\\|red->green' OUT/pr-body.md"],
-      "expect_exit": 0,
-      "label": "PR AC table or Reproduction mentions red→green"
+      "label": "red→green evidence has exact test exit values"
     }
   ]
 }

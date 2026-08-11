@@ -292,6 +292,63 @@ else
 fi
 
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
+# ─── T15/T16: structured red→green evidence ───────────────
+mkdir -p "$TMP/red-green-out"
+cat > "$CASE/case.json" <<'EOF'
+{
+  "name": "harness/red-green-evidence",
+  "skill": "issue-resolver",
+  "grade": [
+    {
+      "tool": "red-green",
+      "file": "OUT/red-green.json",
+      "expect_exit": 0,
+      "label": "exact red and green exit values"
+    }
+  ]
+}
+EOF
+printf '%s\n' '{"red_exit": 1, "green_exit": 0}' > "$TMP/red-green-out/red-green.json"
+set +e
+REPO_ROOT="$REPO_ROOT" python3 "$GRADE" --case "$CASE" --out "$TMP/red-green-out" >/dev/null 2>&1
+RG=$?
+set -e
+if [ "$RG" -eq 0 ]; then
+  pass "T15: valid structured red→green evidence passes"
+else
+  fail "T15: valid structured red→green evidence passes (got $RG)"
+fi
+printf '%s\n' '{"red_exit": 0, "green_exit": 1}' > "$TMP/red-green-out/red-green.json"
+set +e
+REPO_ROOT="$REPO_ROOT" python3 "$GRADE" --case "$CASE" --out "$TMP/red-green-out" >/dev/null 2>&1
+RG_BAD=$?
+set -e
+if [ "$RG_BAD" -eq 1 ]; then
+  pass "T16: invalid structured red→green evidence fails"
+else
+  fail "T16: invalid structured red→green evidence fails (got $RG_BAD)"
+fi
+printf '%s\n' '[]' > "$TMP/red-green-out/red-green.json"
+set +e
+REPO_ROOT="$REPO_ROOT" python3 "$GRADE" --case "$CASE" --out "$TMP/red-green-out" >/dev/null 2>&1
+RG_ARRAY=$?
+set -e
+if [ "$RG_ARRAY" -eq 1 ]; then
+  pass "T17: non-object structured red→green evidence fails"
+else
+  fail "T17: non-object structured red→green evidence fails (got $RG_ARRAY)"
+fi
+printf '%s\n' '{not-json' > "$TMP/red-green-out/red-green.json"
+set +e
+REPO_ROOT="$REPO_ROOT" python3 "$GRADE" --case "$CASE" --out "$TMP/red-green-out" >/dev/null 2>&1
+RG_MALFORMED=$?
+set -e
+if [ "$RG_MALFORMED" -eq 1 ]; then
+  pass "T18: malformed structured red→green evidence fails"
+else
+  fail "T18: malformed structured red→green evidence fails (got $RG_MALFORMED)"
+fi
+
 echo "Results: $PASS passed, $FAIL failed"
 if [ "$FAIL" -gt 0 ]; then
   exit 1

@@ -3,15 +3,12 @@
 #
 # Usage: bash evals/harness/run_eval.sh <case-dir>
 #
-# 1. Create temp work dir + STATE + OUT
-# 2. Build PATH bin with `gh` wrapper → python3 gh_shim.py
-# 3. Export EVAL_CASSETTES, EVAL_STATE_DIR, REPO_ROOT, EVAL_OUT
-# 4. Optionally seed a git fixture if case has fixture_repo/ or case.json seed
-# 5. Run subject.sh
-# 6. Run grade.py
-# 7. Clean temp on exit (trap)
+# The subject is copied into WORK, given a disposable workspace and minimal
+# environment, then run inside an OS-level network sandbox.  Grading runs
+# outside that sandbox so it can resolve repository tools.
 #
-# Fail closed: EVAL_RECORD must be unset (never record in CI).
+# Fail closed: EVAL_RECORD must be unset (never record in CI), and no
+# supported OS-level network sandbox means no subject execution.
 
 set -euo pipefail
 
@@ -48,60 +45,128 @@ trap cleanup EXIT
 STATE="$WORK/state"
 OUT="$WORK/out"
 BIN="$WORK/bin"
-mkdir -p "$STATE" "$OUT" "$BIN"
+CASE_COPY="$WORK/case"
+SUBJECT_WORK="$WORK/repo"
+HOME_DIR="$WORK/home"
+GH_CONFIG="$WORK/gh-config"
+GH_SHIM_COPY="$WORK/gh_shim.py"
+mkdir -p "$STATE" "$OUT" "$BIN" "$CASE_COPY" "$SUBJECT_WORK" "$HOME_DIR" "$GH_CONFIG"
 
-# gh wrapper — execs the Python shim with original argv
+# Copy the complete case, including subject.sh, before execution. This keeps
+# $0, case-relative paths, and the working directory outside the checkout.
+cp -R "$CASE_DIR"/. "$CASE_COPY"/
+chmod 755 "$CASE_COPY/subject.sh"
+
+# Copy the shim too, so the subject cannot discover or mutate the checkout
+# through a wrapper pointing back into the harness source tree.
+cp "$HARNESS_DIR/gh_shim.py" "$GH_SHIM_COPY"
+
+# gh wrapper — uses the harness interpreter directly, so PATH need not expose
+# the directory that may contain a real gh executable.
+PYTHON_BIN="$(command -v python3 || true)"
+if [ -z "$PYTHON_BIN" ] || [ ! -x "$PYTHON_BIN" ]; then
+  echo "✗ python3 is required for eval execution" >&2
+  exit 2
+fi
 cat > "$BIN/gh" <<EOF
 #!/usr/bin/env bash
-exec python3 "$HARNESS_DIR/gh_shim.py" "\$@"
+exec "$PYTHON_BIN" "$GH_SHIM_COPY" "\$@"
 EOF
-chmod 755 "$BIN/gh"
+cat > "$BIN/python3" <<EOF
+#!/usr/bin/env bash
+exec "$PYTHON_BIN" "\$@"
+EOF
+chmod 755 "$BIN/gh" "$BIN/python3"
+# Subjects use git for fixture work. Wrap it too, avoiding a PATH entry that
+# could expose unrelated host executables.
+GIT_BIN="$(command -v git || true)"
+if [ -n "$GIT_BIN" ] && [ -x "$GIT_BIN" ]; then
+  cat > "$BIN/git" <<EOF
+#!/usr/bin/env bash
+exec "$GIT_BIN" "\$@"
+EOF
+  chmod 755 "$BIN/git"
+fi
 
-# Prefer case-local cassettes; fall back to empty calls list if absent
-CASSETTES="$CASE_DIR/cassettes.json"
-if [ ! -f "$CASSETTES" ]; then
+# Keep cassette input under WORK so a subject cannot alter checkout data.
+if [ -f "$CASE_DIR/cassettes.json" ]; then
+  CASSETTES="$WORK/cassettes.json"
+  cp "$CASE_DIR/cassettes.json" "$CASSETTES"
+else
   CASSETTES="$WORK/empty-cassettes.json"
   printf '%s\n' '{"version":1,"calls":[]}' > "$CASSETTES"
 fi
 
-export PATH="$BIN:$PATH"
-export EVAL_CASSETTES="$CASSETTES"
-export EVAL_STATE_DIR="$STATE"
-export REPO_ROOT
-export EVAL_OUT="$OUT"
-export EVAL_CASE_DIR="$CASE_DIR"
-export EVAL_WORK="$WORK"
-# Ensure real network-facing GH is not preferred: our BIN is first.
-# Subjects must not re-export PATH past the shim.
-
-# Optional fixture_repo seed: copy into WORK/repo and init git if needed
+# Optional fixture_repo seed: copy into WORK/repo. Without a fixture this is
+# still a disposable workspace, never the checkout case directory.
 if [ -d "$CASE_DIR/fixture_repo" ]; then
-  REPO_FIXTURE="$WORK/repo"
-  mkdir -p "$REPO_FIXTURE"
-  # Copy contents (including hidden files except . and ..)
-  cp -R "$CASE_DIR/fixture_repo"/. "$REPO_FIXTURE"/ 2>/dev/null || true
-  export EVAL_FIXTURE_REPO="$REPO_FIXTURE"
+  cp -R "$CASE_DIR/fixture_repo"/. "$SUBJECT_WORK"/ 2>/dev/null || true
 fi
 
-CASE_NAME="$(python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('name',''))" "$CASE_DIR/case.json" 2>/dev/null || basename "$CASE_DIR")"
+CASE_NAME="$("$PYTHON_BIN" -c "import json,sys; print(json.load(open(sys.argv[1])).get('name',''))" "$CASE_DIR/case.json" 2>/dev/null || basename "$CASE_DIR")"
 echo "◆ eval $CASE_NAME"
-echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
+echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 echo "  case: $CASE_DIR"
 echo "  out:  $OUT"
-echo "  gh:   $(command -v gh)"
+echo "  gh:   $BIN/gh"
 
-# subject runs with EVAL_OUT; cwd is case dir unless fixture set
-SUBJECT_CWD="$CASE_DIR"
-if [ -n "${EVAL_FIXTURE_REPO:-}" ]; then
-  SUBJECT_CWD="$EVAL_FIXTURE_REPO"
+# The subject gets only variables needed to run an eval. In particular, do
+# not pass credentials, proxies, or Git worktree variables from the host.
+SUBJECT_CMD="$WORK/run-subject.sh"
+cat > "$SUBJECT_CMD" <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$SUBJECT_WORK"
+exec env -i \\
+  HOME="$HOME_DIR" \\
+  GH_CONFIG_DIR="$GH_CONFIG" \\
+  PATH="$BIN:/usr/bin:/bin" \\
+  EVAL_CASSETTES="$CASSETTES" \\
+  EVAL_STATE_DIR="$STATE" \\
+  EVAL_OUT="$OUT" \\
+  EVAL_CASE_DIR="$CASE_COPY" \\
+  EVAL_WORK="$WORK" \\
+  bash "$CASE_COPY/subject.sh"
+EOF
+chmod 755 "$SUBJECT_CMD"
+
+# PATH isolation and proxy/DNS tricks are not network isolation. Use the
+# native macOS sandbox or a Linux user+network namespace, and fail closed when
+# neither is available. map-current-user ensures the subject is never root.
+OS_NAME="$(uname -s)"
+if [ "$(id -u)" -eq 0 ]; then
+  echo "✗ refusing to run eval subject as root" >&2
+  exit 2
 fi
-
 set +e
-(
-  cd "$SUBJECT_CWD"
-  bash "$CASE_DIR/subject.sh"
-)
-SUBJECT_EXIT=$?
+if [ "$OS_NAME" = "Darwin" ]; then
+  SANDBOX_EXEC="$(command -v sandbox-exec || true)"
+  if [ -z "$SANDBOX_EXEC" ]; then
+    echo "✗ no supported macOS network sandbox (sandbox-exec)" >&2
+    exit 2
+  fi
+  SANDBOX_PROFILE="$WORK/network.sb"
+  printf '%s\n' '(version 1)' '(allow default)' '(deny network*)' > "$SANDBOX_PROFILE"
+  "$SANDBOX_EXEC" -f "$SANDBOX_PROFILE" "$SUBJECT_CMD"
+  SUBJECT_EXIT=$?
+elif [ "$OS_NAME" = "Linux" ]; then
+  UNSHARE="$(command -v unshare || true)"
+  if [ -z "$UNSHARE" ]; then
+    echo "✗ no supported Linux network sandbox (unshare)" >&2
+    exit 2
+  fi
+  "$UNSHARE" --user --map-current-user --net true >/dev/null 2>&1
+  PROBE_EXIT=$?
+  if [ "$PROBE_EXIT" -ne 0 ]; then
+    echo "✗ Linux user+network namespace unavailable; refusing unsandboxed eval" >&2
+    exit 2
+  fi
+  "$UNSHARE" --user --map-current-user --net "$SUBJECT_CMD"
+  SUBJECT_EXIT=$?
+else
+  echo "✗ unsupported OS $OS_NAME; refusing unsandboxed eval" >&2
+  exit 2
+fi
 set -e
 
 if [ "$SUBJECT_EXIT" -ne 0 ]; then
@@ -111,7 +176,7 @@ fi
 echo "  ✓ subject completed"
 
 set +e
-python3 "$HARNESS_DIR/grade.py" --case "$CASE_DIR" --out "$OUT"
+REPO_ROOT="$REPO_ROOT" "$PYTHON_BIN" "$HARNESS_DIR/grade.py" --case "$CASE_DIR" --out "$OUT"
 GRADE_EXIT=$?
 set -e
 

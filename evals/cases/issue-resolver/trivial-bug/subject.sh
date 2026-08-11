@@ -84,7 +84,9 @@ if [ "$GREEN_EXIT" -ne 0 ]; then
 fi
 echo "  ○ green confirmed (test exit 0)"
 
-printf 'red→green: test_login.py exit %s → 0\n' "$RED_EXIT" > "$EVAL_OUT/red-green.txt"
+cat > "$EVAL_OUT/red-green.json" <<EOF
+{"red_exit": $RED_EXIT, "green_exit": $GREEN_EXIT}
+EOF
 
 BRANCH="fix/1-login-always-false"
 git checkout -qb "$BRANCH"
@@ -95,7 +97,8 @@ git commit -qm "$COMMIT_MSG"
 printf '%s\n' "$BRANCH" > "$EVAL_OUT/branch.txt"
 printf '%s\n' "$COMMIT_MSG" > "$EVAL_OUT/commit.txt"
 
-# PR body matching report-templates (Closes, Decision Record, AC table, Reproduction)
+# PR body matching report-templates (Closes, Decision Record, AC table, Reproduction).
+# The machine-readable red→green evidence is graded separately.
 cat > "$EVAL_OUT/pr-body.md" <<'EOF'
 Closes #1
 
