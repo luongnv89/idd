@@ -773,8 +773,11 @@ subagent derive them again (issue #256) — one per consumer shape:
   fetches. Neither value is trusted downstream — that same live re-verify is
   where 0a's closed / not-found stops get their `state` and where *Step 0h*'s
   condition 5 gets the `updatedAt` it compares. Never trim, summarize, or
-  re-order the fields — a hand-edited payload is a different issue. **This block, and this rule, govern the resolver and
-  batch-resolver spawns only** — they are the only spawns that receive it.
+  re-order the fields — a hand-edited payload is a different issue. This block
+  goes to the analyzer, resolver, and batch-resolver spawns. The analyzer has a
+  separate coherence gate: it live-reads metadata, requires an exact parseable
+  `updatedAt` match before reusing retained content, and otherwise performs its
+  complete `--refresh` fallback so persisted body and metadata are one snapshot.
 - **`{issue_payload_ids}`** — the same record reduced to `number`, `title` and
   `labels`, for the **reviewer spawn** and no other. This is not an exception to
   *Never trim* above: it is a second, separately built block, and what it leaves

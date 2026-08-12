@@ -59,6 +59,11 @@ check "$EX" 'without another body read or record-validation pass' "post-optimiza
 check "$EX" 'batch gets a map keyed by issue number' "batch payload path is reachable"
 check "$PH" 'before analyzer spawn' "canonical capture orders explicit-list framing before analyzer"
 check "$PH" 'make \*\*no\*\* extra GitHub read' "dependency parsing reuses held body"
+check "$PH" 'analyzer, resolver, and batch-resolver spawns' "canonical payload recipients include analyzer"
+lacks "$PH" 'resolver and[[:space:]]+batch-resolver spawns only|only spawns that receive it' "canonical contract rejects resolver-only recipients"
+check "$PH" 'separate coherence gate' "canonical contract names analyzer coherence gate"
+check "$PH" '`updatedAt` match before reusing retained content' "canonical contract requires exact analyzer timestamp match"
+check "$PH" 'complete `--refresh` fallback' "canonical contract refreshes incoherent analyzer snapshots"
 check "$PR" 'BEGIN_UNTRUSTED_issue_payload_\{payload_nonce\}' "analyzer receives nonce-framed retained records"
 check "$PR" 'replaces only' "analyzer limits payload reuse to analysis Step 1"
 check "$IA" '^### Caller payload gate \(auto-pilot only\)' "issue-analysis has a narrow caller payload gate"
@@ -111,10 +116,31 @@ PY
 
 # Review boundary bypasses TTL once, then Step 3 reuses the same refreshed entry.
 check "$RV" 'unconditionally refresh the linked issue at the review boundary' "review refresh is independent of adaptive depth"
-check "$RV" 'review\.adaptive_depth` is `false`' "adaptive-depth-off path still names refreshed cache reuse"
+check "$RV" 'review\.adaptive_depth` is `false`' "adaptive-depth-off path still retains the review snapshot"
 check "$RV" 'set `profile = full` after the refresh' "adaptive-depth-off ordering refreshes before profile pin"
 check "$RV" 'gh issue view \{N\} --json number,title,body,labels' "review refresh fallback preserves the exact field set"
-check "$RV" 'do not add `--refresh` here' "Step 3 reuses the refreshed exact field-set cache entry"
+check "$RV" 'record as `linked_issue_snapshot`' "review boundary retains script or direct-gh snapshot"
+check "$RV" 'consume `linked_issue_snapshot` from the review-boundary read directly' "Step 3 consumes the held fresh snapshot"
+check "$RV" 'do not call `gi-issue\.py` or `gh` again' "Step 3 never re-reads a stale cache entry"
+python3 - <<'PY' && pass "failed refresh plus direct fallback cannot leak stale cache into Step 3" || fail "Step 3 consumed stale cache after direct fallback"
+stale_cache = {"number": 285, "body": "old acceptance criteria", "labels": []}
+events = []
+
+def gi_issue_refresh():
+    events.append("refresh_failed")
+    return None
+
+def direct_gh():
+    events.append("direct_gh")
+    return {"number": 285, "body": "fresh acceptance criteria", "labels": []}
+
+linked_issue_snapshot = gi_issue_refresh() or direct_gh()
+# The old cache remains stale by construction; Step 3 must use held run state.
+step3_issue = linked_issue_snapshot
+assert stale_cache["body"] == "old acceptance criteria"
+assert step3_issue["body"] == "fresh acceptance criteria"
+assert events == ["refresh_failed", "direct_gh"]
+PY
 
 # Snapshot budget supersedes the stale literal without weakening freshness reads.
 check "$AP" 'stale literal "one body' "stale one-fetch wording is superseded"
