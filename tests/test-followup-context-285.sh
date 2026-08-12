@@ -46,10 +46,13 @@ assert len([x for x in lines if x == f"END_UNTRUSTED_issue_payload_{nonce}"]) ==
 PY
 
 # Capture is mode-neutral and explicit-list reuses its retained body record.
-check "$PH" 'mode-neutral post-selection, pre-spawn capture' "capture is mode-neutral"
+check "$PH" 'mode-neutral pre-spawn capture' "capture is mode-neutral"
 check "$EX" 'explicit_issue_records\[N\]' "explicit-list retains complete issue records"
-check "$EX" 'body again' "explicit-list forbids duplicate body reads"
+check "$EX" '\*\*Before spawning the' "explicit-list captures retained map before analyzer spawn"
+check "$EX" 'complete retained map' "analyzer receives the complete retained map"
+check "$EX" 'without another body read or record-validation pass' "post-optimization projection does not refetch or revalidate"
 check "$EX" 'batch gets a map keyed by issue number' "batch payload path is reachable"
+check "$PH" 'before analyzer spawn' "canonical capture orders explicit-list framing before analyzer"
 check "$PH" 'make \*\*no\*\* extra GitHub read' "dependency parsing reuses held body"
 check "$PR" 'BEGIN_UNTRUSTED_issue_payload_\{payload_nonce\}' "analyzer receives nonce-framed retained records"
 check "$PR" 'replaces only' "analyzer limits payload reuse to analysis Step 1"
@@ -69,7 +72,10 @@ assert not (payload.get("284") and payload["284"].get("number") == 285)
 PY
 
 # Review boundary bypasses TTL once, then Step 3 reuses the same refreshed entry.
-check "$RV" 'gi-issue.py \{N\} --fields number,title,body,labels --refresh' "review boundary forces a fresh linked-issue body read"
+check "$RV" 'unconditionally refresh the linked issue at the review boundary' "review refresh is independent of adaptive depth"
+check "$RV" 'review\.adaptive_depth` is `false`' "adaptive-depth-off path still names refreshed cache reuse"
+check "$RV" 'set `profile = full` after the refresh' "adaptive-depth-off ordering refreshes before profile pin"
+check "$RV" 'gh issue view \{N\} --json number,title,body,labels' "review refresh fallback preserves the exact field set"
 check "$RV" 'do not add `--refresh` here' "Step 3 reuses the refreshed exact field-set cache entry"
 
 # Snapshot budget supersedes the stale literal without weakening freshness reads.

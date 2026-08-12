@@ -642,11 +642,13 @@ a backlog that genuinely has nothing eligible cannot spin.
 
 ### Step 1.2b — Capture the caller payload
 
-This is the **mode-neutral post-selection, pre-spawn capture**. Run it after
-triage selection or after explicit-list validation/optimization, and repeat it
-for every issue a resolver or batch-resolver spawn will receive. Keep each
-record's prompt blocks attached to its lane or batch map. An incomplete record
-degrades per issue, without affecting siblings.
+This is the **mode-neutral pre-spawn capture**. In triage mode run it after
+selection. In explicit-list mode run it against the complete retained map after
+validation and **before analyzer spawn**, because the analyzer consumes the same
+validated records; after optimization, project selected entries into each
+resolver/batch spawn without re-validating or reading a body again. Keep each
+record attached to its lane or batch map. An incomplete record degrades per
+issue, without affecting siblings.
 
 - **Triage mode:** the selected row has no body, so fetch the resolution snapshot
   once for the picked issue:
@@ -655,9 +657,10 @@ degrades per issue, without affecting siblings.
   python3 references/scripts/gi-issue.py {issue_number} --fields number,title,body,labels,assignees,state,updatedAt
   ```
 - **Explicit-list mode:** validation already obtained the same complete field set
-  (see `references/explicit-list-mode.md`). Project that held record into this
-  step; do **not** issue a second body-bearing read. A batch receives a map keyed
-  by issue number; an individual resolver receives its one record.
+  (see `references/explicit-list-mode.md`). Validate and compact-serialize the
+  complete retained map before the analyzer spawn; do **not** issue a second
+  body-bearing read. Later, project the selected entries without re-validation:
+  a batch receives a map keyed by issue number, an individual its one record.
 
 Read `.issue` out of the triage-mode envelope, or the matching explicit-list map
 entry; that record is `{issue_payload}`. The field set is identical on both paths.

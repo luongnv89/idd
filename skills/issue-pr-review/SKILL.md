@@ -185,21 +185,20 @@ cannot hand to a script.
 
 Decide **how deep** this review goes, so a one-line copy fix is not put through
 the same full-weight review as a multi-subsystem PR: `profile = light | full`.
-The signal, the shared `XS … XL` scale, and everything `light` changes are defined
-once — in `references/docs/agent-model-effort.md` (*Complexity → pipeline profile*) and
-`references/review-loop-mechanics.md` (*Depth gate*), which you **read now and
-apply**. Three inputs feed the signal: diff size / files-changed (Step 1's
-`files`); the linked issue's `## Metadata` `Effort` band (`python3
-references/scripts/gi-issue.py {N} --fields number,title,body,labels --refresh`, reading
-`.issue.body`; on exit 4 or no `python3`, `gh issue view {N} --json body` — that
-exact field list, because the cache is keyed by issue **and** field set, so a
-narrower ask here would make Step 3's read a guaranteed miss); and labels (any
-`security`/`CVE`/`vulnerability` label forces `full`). `--refresh` is mandatory
-on this review-boundary read: cached ACs are not current evidence, and Step 3
-reuses this refreshed entry. Resolve to `light` only when
-**every** available signal agrees on trivial; any `full` vote, or a missing or
-ambiguous signal, wins → `full`. When `review.adaptive_depth` is `false`, skip the
-gate and set `profile = full`.
+The signal, shared scale, and `light` changes are defined in `references/docs/agent-model-effort.md` (*Complexity → pipeline profile*) and
+`references/review-loop-mechanics.md` (*Depth gate*); **read and apply both**.
+First, unconditionally refresh the linked issue at the review boundary:
+`python3 references/scripts/gi-issue.py {N} --fields number,title,body,labels --refresh`,
+reading `.issue`; on exit 4 or no `python3`, use
+`gh issue view {N} --json number,title,body,labels`. The exact field set is
+load-bearing: Step 3 reuses this fresh cache entry, including when
+`review.adaptive_depth` is `false`. Then, when adaptive depth is enabled, feed
+three signals to the gate: diff size / files changed (Step 1's `files`), the
+refreshed issue body's `## Metadata` `Effort` band, and labels (any
+`security`/`CVE`/`vulnerability` label forces `full`). Resolve to `light` only
+when **every** signal agrees on trivial; any `full`, missing, or ambiguous signal
+wins → `full`. When `review.adaptive_depth` is `false`, do not
+interpret those effort signals; set `profile = full` after the refresh.
 
 ### QA handoff gate (trust an already-QA'd PR)
 
