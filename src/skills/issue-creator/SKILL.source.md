@@ -226,13 +226,17 @@ mkdir -p .gitissue/cache
 {"mode":"create","items":[{"index":1,"title":"…","keywords":["…"],"type":"bug"}],"config":{"duplicate_detection.weights.phrase":2}}
 ```
 
-Run the scorer with cleanup armed before the invocation, so success, a classified exit, an interrupt, and an unexpected stop all remove the transient request:
+Run the scorer with cleanup armed before the invocation, so success, a classified exit, an interrupt, and an unexpected stop all remove the transient request. The signal handlers must exit with the conventional `128 + signal` status; handling a signal by cleanup alone suppresses cancellation and can let issue creation continue. Each signal exits through the single `EXIT` cleanup, while the normal path cleans once before disarming every trap:
 
 ```bash
-trap 'rm -f .gitissue/cache/dup-request.json' EXIT HUP INT TERM
+cleanup_dup_request() { rm -f .gitissue/cache/dup-request.json; }
+trap cleanup_dup_request EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
 dup_output="$(python3 shared/scripts/gi-dup-score.py < .gitissue/cache/dup-request.json)"
 dup_status=$?
-rm -f .gitissue/cache/dup-request.json
+cleanup_dup_request
 trap - EXIT HUP INT TERM
 ```
 

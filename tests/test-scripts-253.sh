@@ -628,9 +628,15 @@ expect_grep "AC1: issue-creator creates the ignored scorer cache on first run" \
 expect_grep "AC1: issue-creator sends the scorer request on stdin" \
   "< .gitissue/cache/dup-request.json" "$SKILLS/issue-creator/SKILL.md"
 expect_grep "AC1: scorer request cleanup is armed before invocation" \
-  "trap 'rm -f .gitissue/cache/dup-request.json' EXIT HUP INT TERM" "$SKILLS/issue-creator/SKILL.md"
+  "trap cleanup_dup_request EXIT" "$SKILLS/issue-creator/SKILL.md"
+expect_grep "AC1: HUP preserves cancellation status" \
+  "trap 'exit 129' HUP" "$SKILLS/issue-creator/SKILL.md"
+expect_grep "AC1: INT preserves cancellation status" \
+  "trap 'exit 130' INT" "$SKILLS/issue-creator/SKILL.md"
+expect_grep "AC1: TERM preserves cancellation status" \
+  "trap 'exit 143' TERM" "$SKILLS/issue-creator/SKILL.md"
 expect_grep "AC1: scorer request is removed after the invocation" \
-  "rm -f .gitissue/cache/dup-request.json" "$SKILLS/issue-creator/SKILL.md"
+  "cleanup_dup_request" "$SKILLS/issue-creator/SKILL.md"
 expect_grep "AC1: fallback validates the resolved backlog limit" \
   "duplicate_detection.backlog_limit must be a positive integer" "$SKILLS/issue-creator/SKILL.md"
 expect_grep "AC1: fallback probes one beyond the configured backlog limit" \
@@ -642,21 +648,66 @@ if grep -q -- 'gh issue list --state open --json number,title,body,labels --limi
 else
   pass "AC1: issue-creator fallback has no hardcoded backlog limit"
 fi
-# Execute the first-run/cache-cleanup shell contract with a mock scorer, then
-# exercise a non-default fallback limit through a mock gh argument recorder.
+# Execute the cleanup contract rather than merely grepping it. Success and a
+# classified scorer failure use the real scorer. HUP/INT/TERM are delivered to
+# the shell after the traps are armed; each must terminate with 128+signal,
+# remove the request through EXIT, and never reach the continuation marker.
 FLOW="$TMP/dup-flow"; mkdir -p "$FLOW/references/scripts"; cp "$SKILLS/issue-creator/references/scripts/gi-dup-score.py" "$FLOW/references/scripts/"
 printf '[]\n' > "$FLOW/issues.json"
+cat > "$FLOW/run-cleanup.sh" <<'EOF'
+#!/usr/bin/env bash
+mode="$1"
+mkdir -p .gitissue/cache
+printf '%s' '{"mode":"create","items":[{"index":1,"title":"x","keywords":[],"type":"feature"}]}' > .gitissue/cache/dup-request.json
+cleanup_dup_request() { rm -f .gitissue/cache/dup-request.json; }
+trap cleanup_dup_request EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
+case "$mode" in
+  success)
+    dup_output="$(python3 references/scripts/gi-dup-score.py --issues-from issues.json < .gitissue/cache/dup-request.json)"
+    dup_status=$?
+    ;;
+  failure)
+    dup_output="$(python3 references/scripts/gi-dup-score.py --issues-from missing.json < .gitissue/cache/dup-request.json 2>/dev/null)"
+    dup_status=$?
+    ;;
+  HUP|INT|TERM)
+    kill -s "$mode" "$$"
+    printf 'signal was suppressed\n' > continued
+    dup_status=0
+    ;;
+esac
+cleanup_dup_request
+trap - EXIT HUP INT TERM
+[ ! -e .gitissue/cache/dup-request.json ] || exit 99
+if [ "$mode" = success ]; then
+  printf '%s' "$dup_output" | python3 -c 'import json,sys; json.load(sys.stdin)'
+fi
+exit "$dup_status"
+EOF
+chmod +x "$FLOW/run-cleanup.sh"
 (
   cd "$FLOW"
-  mkdir -p .gitissue/cache
-  printf '%s' '{"mode":"create","items":[{"index":1,"title":"x","keywords":[],"type":"feature"}]}' > .gitissue/cache/dup-request.json
-  trap 'rm -f .gitissue/cache/dup-request.json' EXIT HUP INT TERM
-  dup_output="$(python3 references/scripts/gi-dup-score.py --issues-from issues.json < .gitissue/cache/dup-request.json)"
-  dup_status=$?
-  rm -f .gitissue/cache/dup-request.json
-  trap - EXIT HUP INT TERM
-  [ "$dup_status" = 0 ] && [ ! -e .gitissue/cache/dup-request.json ] && printf '%s' "$dup_output" | python3 -c 'import json,sys; json.load(sys.stdin)'
-) && pass "AC1: first-run cache creation and success cleanup execute" || fail "AC1: first-run cache/cleanup flow"
+  ./run-cleanup.sh success
+) && pass "AC1: first-run cache creation and success cleanup execute" || fail "AC1: first-run/cache success cleanup flow"
+run_status out st bash -c "cd '$FLOW' && ./run-cleanup.sh failure"
+if [ "$st" = 4 ] && [ ! -e "$FLOW/.gitissue/cache/dup-request.json" ]; then
+  pass "AC1: classified scorer failure preserves status and cleans request"
+else
+  fail "AC1: scorer failure cleanup/status contract (got $st)"
+fi
+for signal_case in HUP INT TERM; do
+  rm -f "$FLOW/continued"
+  case "$signal_case" in HUP) want=129 ;; INT) want=130 ;; TERM) want=143 ;; esac
+  run_status out st bash -c "cd '$FLOW' && ./run-cleanup.sh '$signal_case'"
+  if [ "$st" = "$want" ] && [ ! -e "$FLOW/.gitissue/cache/dup-request.json" ] && [ ! -e "$FLOW/continued" ]; then
+    pass "AC1: $signal_case exits $want, cleans once through EXIT, and cannot continue"
+  else
+    fail "AC1: $signal_case interruption contract (exit $st, expected $want)"
+  fi
+done
 MOCK="$TMP/mock-gh"; mkdir -p "$MOCK"; cat > "$MOCK/gh" <<'EOF'
 #!/bin/sh
 printf '%s\n' "$@" > "$GH_ARGS"
