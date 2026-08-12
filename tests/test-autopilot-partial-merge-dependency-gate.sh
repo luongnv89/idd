@@ -93,6 +93,20 @@ else
   fail "T4.1: Step 5.2 does not document partial path dependency gate"
 fi
 
+# AC5/#273: the executable fallback must inspect the complete current-head
+# rollup and explicitly preserve the waiter safety invariants.
+EXAMPLES="$REPO_ROOT/src/skills/auto-pilot/references/examples.md"
+if grep -qE 'gh pr view \{pr_number\} --json headRefOid,statusCheckRollup' "$EXAMPLES" \
+  && grep -qE 'non-empty, entirely green `statusCheckRollup`' "$EXAMPLES" \
+  && grep -qE 'settle window' "$EXAMPLES" \
+  && grep -qE 'head (changes|change invalidates)' "$EXAMPLES" \
+  && grep -qE 'no check (was ever observed|has ever appeared)' "$EXAMPLES" \
+  && grep -qE 'Do not claim a manual result is commit-bound' "$EXAMPLES"; then
+  pass "T5: manual CI fallback requires current-head rollup, stability, and head binding"
+else
+  fail "T5: manual CI fallback is missing merge-safety invariants"
+fi
+
 echo ""
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 echo "  Result: $PASS passed, $FAIL failed"

@@ -308,16 +308,38 @@ python3 shared/scripts/gi-ci-wait.py {pr_number} \
   --interval {review.ci_poll_interval} --timeout {review.ci_timeout}
 ```
 
-Read `verdict`: `pass` proceeds with the merge; `fail` and `pending` both leave the PR open. Exit 3 is a stop; a missing `python3`, exit 2 (an unresolved script path), or exit 4 degrades to polling by hand every `review.ci_poll_interval` seconds with `gh pr view {pr_number} --json statusCheckRollup --jq '.statusCheckRollup[] | select(.status != "COMPLETED" or (.conclusion | IN("SUCCESS","NEUTRAL","SKIPPED") | not))'`.
+Read `verdict`: `pass` proceeds with the merge only when `settled: true`; `fail`
+and `pending` both leave the PR open. `none` proceeds only when
+`none_confirmed: true`, which requires that no check was ever observed during
+the full none-grace. Exit 3 is a stop; a missing `python3`, exit 2 (an unresolved
+script path), or exit 4 degrades to the manual procedure below.
 
-The `.conclusion` half of that filter is not optional. A check that finished and
-**failed** still has `status: "COMPLETED"`, so filtering on status alone prints
-nothing for a red build — and empty output must never be treated as "all clear".
+**Manual fallback (same safety contract).** First use a trusted `ci_status` only
+when it is `passed@<sha40>` and the live `headRefOid` still equals that SHA with
+a non-empty, entirely green `statusCheckRollup`. Otherwise poll the full current-
+head rollup, not a filtered list that turns all-green or absent output into an
+empty success:
 
-**The degraded path reaches the same three outcomes, not fewer.** Empty output
-means no checks have registered yet, so keep polling until the configured settle
-window confirms that no CI is configured; do not merge on the first empty poll.
-Any line naming a failed check leaves the PR open, as `verdict: fail` would. If timeout:
+```bash
+gh pr view {pr_number} --json headRefOid,statusCheckRollup
+```
+
+At each `review.ci_poll_interval`, record the returned `headRefOid` and complete
+`statusCheckRollup`. Re-read and compare `headRefOid` before merging; any head
+change invalidates the result and leaves the PR open. For every non-empty rollup,
+require every check to have `status: "COMPLETED"` and `conclusion` in
+`SUCCESS`, `NEUTRAL`, or `SKIPPED`; a failed, cancelled, pending, or unknown
+check leaves the PR open. The normalized check-name membership must remain
+unchanged for the configured settle window before a terminal result is trusted;
+additions, removals, and a terminal-to-pending or terminal-to-empty transition
+reset the window. An empty, absent, or unreadable rollup is not success on its
+first observation: keep polling through the none-grace only when no check has
+ever appeared, and leave the PR open for an unconfirmed none or any fallback
+failure. Do not claim a manual result is commit-bound when `headRefOid` cannot
+be read.
+
+If the timeout expires before a non-empty, all-green membership settles, or the
+head changes, leave the PR open:
 ```
 ⚠ CI checks did not complete within {timeout}s — PR left open
   Continuing to next issue...

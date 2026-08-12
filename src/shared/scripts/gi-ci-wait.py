@@ -206,6 +206,7 @@ def wait(
     checks: list[dict[str, object]] = []
     verdict = "none"
     counts = {"pass": 0, "fail": 0, "pending": 0, "skipping": 0, "cancel": 0}
+    checks_ever_seen = False
     stable_membership: tuple[str, ...] | None = None
     stable_since: float | None = None
     settled = False
@@ -214,6 +215,8 @@ def wait(
         polled = poll_once(pr, repo)
         polls += 1
         checks = polled or []
+        if checks:
+            checks_ever_seen = True
         verdict, counts = classify(checks)
         if polled is None:
             verdict = "none"
@@ -283,7 +286,10 @@ def wait(
         # registering. `--once` can never confirm it: one poll cannot tell a
         # repository without CI from a push whose checks are seconds away.
         "none_confirmed": bool(
-            verdict == "none" and not once and elapsed_s >= none_grace
+            verdict == "none"
+            and not once
+            and not checks_ever_seen
+            and elapsed_s >= none_grace
         ),
         "settle_window_s": settle_window,
         "settled": settled,

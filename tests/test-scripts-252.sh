@@ -415,6 +415,25 @@ else
   fail "AC2: none was confirmed without the grace window elapsing"
 fi
 
+# A transient empty snapshot after checks appeared must not be relabeled as
+# confirmed no-CI. The latest empty snapshot is retained, but none_confirmed
+# remains false because a check set was observed earlier.
+SEQ_TERMINAL_EMPTY="$TMP/seq-terminal-empty"
+{
+  echo '[{"name":"build","state":"SUCCESS","bucket":"pass","link":"u"}]'
+  echo '[]'
+  echo '[]'
+} > "$SEQ_TERMINAL_EMPTY"
+rm -f "$TMP/count-terminal-empty"
+run_status out st env GH_SEQUENCE="$SEQ_TERMINAL_EMPTY" GH_COUNT_FILE="$TMP/count-terminal-empty" \
+  PATH="$STUB:$PATH" python3 "$CIWAIT" 42 --interval 1 --timeout 3 --none-grace 1 --settle-window 1
+if [ "$(printf '%s' "$out" | jkey verdict)" = "none" ] \
+   && [ "$(printf '%s' "$out" | jkey none_confirmed)" = "False" ]; then
+  pass "AC2/#273: terminal-to-empty transition never confirms no CI"
+else
+  fail "AC2/#273: transient empty snapshot was treated as confirmed no CI"
+fi
+
 # The regression guard for the race itself: checks that register on the third
 # poll must be waited for, not raced past.
 SEQ_LATE="$TMP/seq-late"
