@@ -809,8 +809,20 @@ expect_grep "AC5: the security scan keeps its Primary Pattern fallback" \
   "Primary Pattern" "$SKILLS/issue-resolver/references/docs/pre-commit-security.md"
 expect_grep "AC5: the resolver keeps a gh issue view fallback" \
   "gh issue view" "$SKILLS/issue-resolver/SKILL.md"
-expect_grep "AC5: pr-review keeps the manual CI poll" \
-  "gh pr checks" "$SKILLS/issue-pr-review/references/prepass-tests-ci-mechanics.md"
+# The issue-pr-review fallback must preserve the waiter's merge-safety contract,
+# not merely mention a generic status poll.
+PR_CI_FALLBACK="$SKILLS/issue-pr-review/references/prepass-tests-ci-mechanics.md"
+if grep -qF '**Manual fallback (same merge-safe contract).' "$PR_CI_FALLBACK" \
+  && grep -qF 'gh pr view {N} --json headRefOid,statusCheckRollup' "$PR_CI_FALLBACK" \
+  && grep -qF 'non-empty rollup has ever appeared' "$PR_CI_FALLBACK" \
+  && grep -qF 'normalized check-name' "$PR_CI_FALLBACK" \
+  && grep -qF 'none-grace' "$PR_CI_FALLBACK" \
+  && grep -qF 're-read `headRefOid`' "$PR_CI_FALLBACK" \
+  && grep -qF 'leaves the PR open' "$PR_CI_FALLBACK"; then
+  pass "AC5/#273: pr-review manual fallback enforces rollup, stability, none-grace, head binding, and leave-open semantics"
+else
+  fail "AC5/#273: pr-review manual fallback omits one or more merge-safety invariants"
+fi
 expect_grep "AC5: the branch rules remain applicable by hand" \
   "Deriving the Short Description" "$SKILLS/issue-resolver/references/docs/naming-conventions.md"
 expect_grep "AC5: auto-pilot keeps the manual statusCheckRollup poll" \
