@@ -406,8 +406,11 @@ gh issue list --state open --json number,assignees --limit 100
 
 **Two scalar fields, and no `body`.** The orchestrator still bulk-fetches no
 issue bodies — this list cannot carry one — so the body budget is untouched:
-exactly one body per iteration, fetched for the picked issue alone in
-*Step 1.2b*. A hundred `{number, assignees}` rows is a few kilobytes against the
+exactly one body per iteration in triage mode, fetched for the picked issue
+alone in *Step 1.2b*; explicit-list mode retains the same snapshot shape at
+validation and reuses it from the mode-neutral capture, so no body enters this
+context from the analyzer path either. A hundred `{number, assignees}` rows is a
+few kilobytes against the
 ~150KB a hundred bodies would cost, so the per-iteration context saving survives
 intact. Nothing here is a triage: no graph is built, no order is computed, and
 `.gitissue/triage.json` is neither read nor written.

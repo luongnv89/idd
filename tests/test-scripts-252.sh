@@ -1166,7 +1166,11 @@ EXPECTED_SITES = {
     # /auto-pilot's phases.md no longer re-reads the body it is already
     # holding — Step 1.2b's resolution-boundary snapshot is parsed as data on
     # stdin instead, so that `--fields body` re-read site is gone by design.
-    "gi-deps.py": 1, "gi-issue.py": 14,
+    # 13 since issue #296: pr-review's Depth gate reads the `Effort` band out of
+    # `linked_issue_snapshot` — the record SKILL.md already retained at the
+    # review boundary — so review-loop-mechanics.md no longer restates the fetch
+    # it had inherited from before that boundary existed.
+    "gi-deps.py": 1, "gi-issue.py": 13,
     # 4 since issue #260: parallel failed-lane quarantine and the serialized
     # drain both call --append-once, beside the legacy --append and the
     # --failure-streak read from issue #259.

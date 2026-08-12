@@ -25,6 +25,11 @@ BSK="$ROOT/skills/issue-resolver/SKILL.md"
 BEX="$ROOT/skills/auto-pilot/references/explicit-list-mode.md"
 BIA="$ROOT/skills/issue-analysis/SKILL.md"
 BPR="$ROOT/skills/auto-pilot/references/subagent-prompts.md"
+BRV="$ROOT/skills/issue-pr-review/SKILL.md"
+RVM="$ROOT/src/skills/issue-pr-review/references/review-loop-mechanics.md"
+BRVM="$ROOT/skills/issue-pr-review/references/review-loop-mechanics.md"
+RVE="$ROOT/src/skills/issue-pr-review/references/error-messages.md"
+BRVE="$ROOT/skills/issue-pr-review/references/error-messages.md"
 
 printf '◆ Follow-up Context Contract Tests (issue #285)\n'
 
@@ -115,7 +120,9 @@ assert not (payload.get("284") and payload["284"].get("number") == 285)
 PY
 
 # Review boundary bypasses TTL once, then Step 3 reuses the same refreshed entry.
-check "$RV" 'unconditionally refresh the linked issue at the review boundary' "review refresh is independent of adaptive depth"
+check "$RV" 'when the PR body links an issue, refresh it at the review boundary' "review refresh is conditional on a linked issue (#296)"
+check "$RV" 'even when `review\.adaptive_depth` is `false`' "review refresh is independent of adaptive depth"
+lacks "$RV" 'unconditionally refresh the linked issue' "the stale unconditional claim is gone (#296)"
 check "$RV" 'review\.adaptive_depth` is `false`' "adaptive-depth-off path still retains the review snapshot"
 check "$RV" 'set `profile = full` after the refresh' "adaptive-depth-off ordering refreshes before profile pin"
 check "$RV" 'gh issue view \{N\} --json number,title,body,labels' "review refresh fallback preserves the exact field set"
@@ -141,6 +148,33 @@ assert stale_cache["body"] == "old acceptance criteria"
 assert step3_issue["body"] == "fresh acceptance criteria"
 assert events == ["refresh_failed", "direct_gh"]
 PY
+
+# The empty-record fail-safe stops only when a linked issue could not be read (#296).
+for f in "$RV" "$BRV"; do
+  check "$f" 'apply the empty-record fail-safe in' "SKILL points at the fail-safe: ${f#"$ROOT/"}"
+  check "$f" 'never review a linked issue on an empty snapshot' "fail-safe pointer is scoped to a linked issue: ${f#"$ROOT/"}"
+  check "$f" 'A PR with \*\*no\*\* linked issue is a different state' "Step 3 exempts no-linked-issue PRs from the fail-safe: ${f#"$ROOT/"}"
+done
+for f in "$RVM" "$BRVM"; do
+  n="${f#"$ROOT/"}"
+  check "$f" 'Re-run the refresh once' "fail-safe retries exactly once: $n"
+  check "$f" 'both paths in the original order' "the retry names both paths and their order: $n"
+  check "$f" 'Never proceed with an empty `linked_issue_snapshot` for a PR' "never-proceed is scoped to a linked issue: $n"
+  check "$f" 'Never fall back to a cached record' "never-cache prohibition survives: $n"
+  check "$f" 'this fail-safe \*\*never\*\* stops it' "no-linked-issue PRs are never stopped: $n"
+  check "$f" 'n/a — no linked issue' "carve-out matches verification-checks handling: $n"
+  check "$f" '✗ Cannot read linked issue' "the stop prints a rich error: $n"
+  check "$f" 'only the signal selection above is skipped' "adaptive_depth off skips selection, not the refresh: $n"
+  lacks "$f" 'idd-methodology' "review boundary is not attributed to a doc that lacks it: $n"
+  check "$f" 'Then:    /issue-pr-review \{PR\}' "the stop resumes on the PR, not the issue number: $n"
+  lacks "$f" '/issue-pr-review \{N\}' "no resume command takes the issue number: $n"
+done
+for f in "$RVE" "$BRVE"; do
+  check "$f" '✗ Cannot read linked issue' "error-messages carries the stop entry: ${f#"$ROOT/"}"
+  check "$f" 'To fix:  gh issue view \{N\} --json number,title,body,labels' "stop entry offers a fix command: ${f#"$ROOT/"}"
+  check "$f" 'Then:    /issue-pr-review \{PR\}' "stop entry resumes on the PR, not the issue number: ${f#"$ROOT/"}"
+  check "$f" '`\{N\}` is \*\*not\*\* the' "stop entry documents its placeholder binding: ${f#"$ROOT/"}"
+done
 
 # Snapshot budget supersedes the stale literal without weakening freshness reads.
 check "$AP" 'stale literal "one body' "stale one-fetch wording is superseded"
