@@ -1162,7 +1162,11 @@ EXPECTED_SITES = {
     "gi-branch.py": 3, "gi-ci-wait.py": 4, "gi-config.py": 6,
     # 15 since issue #258: /auto-pilot Step 1.2b fetches the picked issue's
     # record on demand, because Phase 1's bulk list no longer carries `body`.
-    "gi-deps.py": 1, "gi-issue.py": 15,
+    # 14 since issue #285: the dependency-parsing step in
+    # /auto-pilot's phases.md no longer re-reads the body it is already
+    # holding — Step 1.2b's resolution-boundary snapshot is parsed as data on
+    # stdin instead, so that `--fields body` re-read site is gone by design.
+    "gi-deps.py": 1, "gi-issue.py": 14,
     # 4 since issue #260: parallel failed-lane quarantine and the serialized
     # drain both call --append-once, beside the legacy --append and the
     # --failure-streak read from issue #259.
