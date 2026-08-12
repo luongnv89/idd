@@ -48,9 +48,10 @@ Non-empty terminal results use a separate settle window. Once a terminal
 snapshot appears, its normalized check-name set must remain unchanged for
 `--settle-window` seconds before `pass` or `fail` is returned. Additions and
 removals reset that window; a pending snapshot also resets it. This catches a
-check that registers after an initially green snapshot. `--once` is an explicit
-single-poll diagnostic escape hatch and therefore reports the first snapshot
-without claiming that it settled.
+check that registers after an initially green snapshot. Even with
+`--settle-window 0`, at least two unchanged terminal observations are required;
+`--once` is an explicit single-poll diagnostic escape hatch and therefore
+reports the first snapshot without claiming that it settled.
 
 Exit codes
   0  a verdict was reached and printed — including `fail` and `pending`, which
@@ -209,6 +210,7 @@ def wait(
     checks_ever_seen = False
     stable_membership: tuple[str, ...] | None = None
     stable_since: float | None = None
+    terminal_observations = 0
     settled = False
 
     while True:
@@ -242,9 +244,12 @@ def wait(
             if membership != stable_membership:
                 stable_membership = membership
                 stable_since = clock()
+                terminal_observations = 1
+            else:
+                terminal_observations += 1
             assert stable_since is not None
             stable_elapsed = clock() - stable_since
-            if stable_elapsed >= settle_window:
+            if terminal_observations >= 2 and stable_elapsed >= settle_window:
                 settled = True
                 break
         else:
@@ -252,6 +257,7 @@ def wait(
             # terminal snapshot must establish a fresh settle window.
             stable_membership = None
             stable_since = None
+            terminal_observations = 0
 
         # Only sleep when a full further interval still fits inside the budget.
         # Sleeping past the deadline would report an elapsed time the caller
@@ -371,7 +377,8 @@ def main(argv: list[str] | None = None) -> int:
         metavar="S",
         help=(
             f"seconds a terminal check-name set must remain unchanged before "
-            f"its verdict is trusted (default {DEFAULT_SETTLE_WINDOW_S})"
+            f"its verdict is trusted (default {DEFAULT_SETTLE_WINDOW_S}); "
+            "even zero requires two observations"
         ),
     )
     parser.add_argument(

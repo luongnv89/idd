@@ -528,6 +528,25 @@ assert result["settled"] is False, result
 print("pass: AC2/#273: exact deadline wins over zero-width settlement")
 PY
 
+# A zero-width settle window still requires a second unchanged observation.
+# The first green poll must not win before a newly registered failing check.
+SEQ_ZERO_WINDOW="$TMP/seq-zero-window"
+{
+  echo '[{"name":"lint","state":"SUCCESS","bucket":"pass","link":"u"}]'
+  echo '[{"name":"lint","state":"SUCCESS","bucket":"pass","link":"u"},{"name":"security","state":"FAILURE","bucket":"fail","link":"u"}]'
+  echo '[{"name":"lint","state":"SUCCESS","bucket":"pass","link":"u"},{"name":"security","state":"FAILURE","bucket":"fail","link":"u"}]'
+} > "$SEQ_ZERO_WINDOW"
+rm -f "$TMP/count-zero-window"
+run_status out st env GH_SEQUENCE="$SEQ_ZERO_WINDOW" GH_COUNT_FILE="$TMP/count-zero-window" \
+  PATH="$STUB:$PATH" python3 "$CIWAIT" 42 --interval 1 --timeout 10 --settle-window 0
+if [ "$(printf '%s' "$out" | jkey verdict)" = "fail" ] \
+   && [ "$(printf '%s' "$out" | jkey settled)" = "True" ] \
+   && [ "$(printf '%s' "$out" | jkey polls)" -ge 3 ]; then
+  pass "AC2/#273: zero settle window still waits for a second terminal observation"
+else
+  fail "AC2/#273: zero settle window trusted the first terminal observation"
+fi
+
 # The whole wait happens in one invocation: several polls, one process, one
 # verdict. That is the property that removes the per-poll agent tool call.
 SEQ="$TMP/seq"
