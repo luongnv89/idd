@@ -93,6 +93,17 @@ else
   fail "T4.1: Step 5.2 does not document partial path dependency gate"
 fi
 
+# AC5/#273: the active Step 5.1 gate must require settled pass output, not
+# merely the terminal verdict name. Generated output must retain the contract.
+STEP51A="$(awk '/When checks are still pending, do not read `statusCheckRollup`/{f=1} f && /^If not mergeable:/{exit} f' "$PHASES")"
+if printf '%s' "$STEP51A" | grep -qE 'pass.*mergeable only when `settled: true`' \
+  && printf '%s' "$STEP51A" | grep -qE 'unsettled terminal snapshot' \
+  && printf '%s' "$STEP51A" | grep -qE 'current-head, complete-rollup, check-set stability'; then
+  pass "T4.2: Step 5.1 requires settled pass and merge-safe manual fallback"
+else
+  fail "T4.2: Step 5.1 can still merge an unsettled or unsafe CI verdict"
+fi
+
 # AC5/#273: the executable fallback must inspect the complete current-head
 # rollup and explicitly preserve the waiter safety invariants.
 EXAMPLES="$REPO_ROOT/src/skills/auto-pilot/references/examples.md"
