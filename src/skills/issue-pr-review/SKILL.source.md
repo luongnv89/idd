@@ -185,19 +185,20 @@ cannot hand to a script.
 
 Decide **how deep** this review goes, so a one-line copy fix is not put through
 the same full-weight review as a multi-subsystem PR: `profile = light | full`.
-The signal, the shared `XS … XL` scale, and everything `light` changes are defined
-once — in `docs/agent-model-effort.md` (*Complexity → pipeline profile*) and
-`references/review-loop-mechanics.md` (*Depth gate*), which you **read now and
-apply**. Three inputs feed the signal: diff size / files-changed (Step 1's
-`files`); the linked issue's `## Metadata` `Effort` band (`python3
-shared/scripts/gi-issue.py {N} --fields number,title,body,labels`, reading
-`.issue.body`; on exit 4 or no `python3`, `gh issue view {N} --json body` — that
-exact field list, because the cache is keyed by issue **and** field set, so a
-narrower ask here would make Step 3's read a guaranteed miss); and labels (any
-`security`/`CVE`/`vulnerability` label forces `full`). Resolve to `light` only when
-**every** available signal agrees on trivial; any `full` vote, or a missing or
-ambiguous signal, wins → `full`. When `review.adaptive_depth` is `false`, skip the
-gate and set `profile = full`.
+The signal and `light` changes are defined in `docs/agent-model-effort.md` (*Complexity → pipeline profile*) and `references/review-loop-mechanics.md` (*Depth gate*); **read and apply both**.
+First, unconditionally refresh the linked issue at the review boundary:
+`python3 shared/scripts/gi-issue.py {N} --fields number,title,body,labels --refresh`,
+reading `.issue`; on exit 4 or no `python3`, use
+`gh issue view {N} --json number,title,body,labels`. Retain either successful
+record as `linked_issue_snapshot`; Step 3 consumes that variable directly, so a
+direct-`gh` fallback cannot expose an older cache entry. This also applies when
+`review.adaptive_depth` is `false`. When adaptive depth is enabled, feed three
+signals to the gate: diff size / files changed (Step 1's `files`), the retained
+issue body's `## Metadata` `Effort` band, and labels (any
+`security`/`CVE`/`vulnerability` label forces `full`). Resolve to `light` only
+when **every** signal agrees on trivial; any `full`, missing, or ambiguous signal
+wins → `full`. When `review.adaptive_depth` is `false`, do not
+interpret those effort signals; set `profile = full` after the refresh.
 
 ### QA handoff gate (trust an already-QA'd PR)
 
@@ -318,7 +319,7 @@ UI review is **auto-detected per PR** — no config flag enables it. The skill s
 
 The shared mechanics — detection commands, the code-review spawn, the report-only display-environment label (`ui_env`), the browser-review gate + three-part capability check, and the headless capture call — live in `docs/ui-review.md`. This skill's own deltas — the PR diff command, the variables it passes, the interactive proposal prompt, and cycle-reuse `SendMessage` — are in `references/ui-review-mechanics.md`. **Read both and apply them** when `ui: detected`; together they preserve the contract above and route `action: "fix"` UI findings into Step 6 under `category: ui_ux`. Under `qa_handoff = trusted` the **code** UI review is skipped only when the marker's `ui=` leg says it already ran (`ui=code…` or `ui=code+browser…`) **and** carries an `@<sha40>` equal to `head` — never on `ui=none`, never on an unsuffixed `ui=` (well-formed, but not commit-bound), and never for the browser leg, which is opt-in and fail-soft on both sides.
 
-Also fetch the linked issue for acceptance-criteria verification: `python3 shared/scripts/gi-issue.py {linked_issue} --fields number,title,body,labels`, reading `.issue`. Step 1's depth gate requested this same field list, so the cache answers without a second network call — the field sets must stay identical for that to hold. Exit 3 is a stop; no `python3`, exit 2 (an unresolved script path), or exit 4 degrades to `gh issue view {linked_issue} --json number,title,body,labels`.
+For acceptance-criteria verification, consume `linked_issue_snapshot` from the review-boundary read directly; do not call `gi-issue.py` or `gh` again. This preserves the fresh record even when `gi-issue.py --refresh` failed and the successful direct-`gh` fallback could not update a stale cache entry.
 
 ```
 [3/7] Review       ✓ spec[ac:pass correctness:pass safety:pass]

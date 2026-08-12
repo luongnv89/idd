@@ -217,7 +217,7 @@ The full per-phase decision logic lives in `references/phases.md` (Phase 3-4 par
 
 The auto-pilot processes multiple issues in a single session. Without careful context management, the main agent's context window fills up with codebase details, diffs, and review findings from earlier iterations — degrading performance on later issues.
 
-The solution: the main agent acts as a **lightweight orchestrator** that delegates heavy work to subagents via the Agent tool. Each subagent gets a fresh context window, does its work, and returns a concise result. The main agent never reads code, diffs, or test output directly — and never bulk-reads issue bodies either: Phase 1's list call carries no `body`, so exactly one body per iteration enters this context, fetched for the picked issue alone in *Step 1.2b*.
+The solution: the main agent acts as a **lightweight orchestrator** that delegates heavy work to subagents via the Agent tool. Each subagent gets a fresh context window, does its work, and returns a concise result. The main agent never reads code, diffs, or test output directly — and never bulk-reads issue bodies in triage mode. Each selected issue gets one reusable resolution-boundary body snapshot in *Step 1.2b*; explicit-list validation retains that same snapshot shape for later capture.
 
 Auto-pilot delegates to the resolver/reviewer **skills**, which spawn the shared agents (researcher, synthesizer, implementer, code reviewer, UI reviewer, fixer) under their role identities. Those skills size each agent's model/effort per `docs/agent-model-effort.md` and follow the shared conventions in `docs/shared-agent-conventions.md`; auto-pilot folds the telemetry they return (`complexity`, `profile`, `qa_cycles`, `duration_s`) into its single run-log line per issue (see the run-log note below).
 
@@ -284,22 +284,25 @@ Phase 0 runs **once**, before the loop; each iteration then runs 5 phases. For b
 | Phase | Name | Purpose | Subagent? |
 |-------|------|---------|-----------|
 | 0 | Run state | **Mandatory, before Phase 1** (and before the first entry in explicit list mode): resolve the resume gate to `resumable`/`stale`/`absent`, then `--init` the run state a later `--resume` reads. Every phase below checkpoints into it (*Step 1.0*, *Step 1.0b*) | no (main agent) |
-| 1 | Triage and Pick | Pick from the triage cache (*Step 1.1a* reuses a `fresh` one; a full triage runs only when it does not, or on a forced re-triage). With `max_parallel > 1`, select up to that bound from one persisted independent group. Capture each lane's `{issue_payload}` (trimmed to `{issue_payload_ids}` for its reviewer) + `{triage_context}` (*Step 1.2b*) | no (main agent) |
+| 1 | Triage and Pick | Pick from the triage cache (*Step 1.1a* reuses a `fresh` one; a full triage runs only when it does not, or on a forced re-triage). With `max_parallel > 1`, select up to that bound from one persisted independent group. The mode-neutral post-selection *Step 1.2b* captures each lane's `{issue_payload}` (trimmed to `{issue_payload_ids}` for its reviewer) + `{triage_context}`; explicit-list mode invokes the same step from its held validation records | no (main agent) |
 | 2 | Resolve | Sync the default branch once; run one in-place resolver when `max_parallel=1`, otherwise create isolated caller-managed worktrees and fan out resolver-only lanes | yes (/issue-resolver) |
 | 3-4 | PR Review | After fan-in, drain one lane at a time through /issue-pr-review --auto --no-merge with up to 3 fix cycles + CI monitoring | yes (/issue-pr-review) |
 | 5 | Merge | Still one lane at a time: verify mergeability (*Step 5.1a* owns whether the reviewer's `ci_status` may stand in for the CI wait), squash-merge, close the issue, append its one run-log record, update state/cache, and clean up its worktree | no (main agent) |
 
 See `references/phases.md` for full prompts, error handling, and decision tables.
 
-**Caller-supplied context (issue #256).** Phase 1 holds the triage graph and,
-after *Step 1.2b*'s single-issue fetch, the picked issue's own record — so it
-hands them to the subagents it spawns. What that removes is one named duplicate
-read — the resolver's Step 0a fetch of the record 1.2b just read, which becomes a
-three-field `gh issue view N --json state,comments,updatedAt` re-verify (*Step 0i*, which is also where the live `state` and `updatedAt` that gate 0a's stops and *Step 0h*'s condition 5 come from). It is not a
-per-lifecycle fetch count: Step 0d still re-reads the body it rewrote, and the
-reviewer still fetches the live body its acceptance-criteria hard-block is
-judged on — its trimmed `number`/`title`/`labels` block is context it would
-otherwise have to be told, not a read it skips. Every such
+**Caller-supplied context (issues #256 and #285).** The stale literal "one body
+fetch per lifecycle" is superseded by a measurable body-snapshot budget with
+three freshness boundaries: (1) **resolution** — at most one body-bearing snapshot
+per issue, reused by resolver/batch resolver, researcher, analysis and dependency
+parsing; (2) **mutation** — one refresh only after successful normalization/body
+mutation; (3) **review** — one independent fresh body read per linked issue for
+current acceptance-criteria verification. Measure body-returning reads by issue
+and boundary/reason, not total `gh` calls. The resolver's required non-body probe
+`gh issue view N --json state,comments,updatedAt` preserves 0a's stops and 0h's
+freshness check and does not count as a body snapshot. PR #284 is merged, and
+#293 already fixed the degraded CI poll, so this contract does not alter CI
+polling. Every such
 field is untrusted local data with exactly the status of issue text, every one is
 optional — an absent block means the consumer fetches, which is today's behavior
 — and every one may gate duplicated work, never a safety gate: the rule and its

@@ -27,11 +27,27 @@ Stop.
 
 ### Validate issues upfront
 
-Before starting the loop, validate all issues in one batch:
+Before starting the loop, validate every issue and retain the complete resolution
+snapshot that the canonical post-selection capture step consumes:
 
 ```bash
-gh issue view {N} --json number,title,state,labels,assignees
+gh issue view {N} --json number,title,body,state,labels,assignees,updatedAt
 ```
+
+Store successful replies in `explicit_issue_records[N]`. This is explicit-list
+mode's one **resolution-boundary body snapshot**. **Before spawning the
+analyzer**, invoke the canonical mode-neutral *Step 1.2b — Capture
+the caller payload* in `references/phases.md` once for the complete retained map:
+validate every record, compact-serialize the map, and nonce-frame it for that
+spawn. The analyzer and dependency ordering project from this captured map rather
+than fetching bodies again. After optimization selects an individual or batch,
+project its already-validated matching record(s) into a newly nonce-framed spawn
+block without another body read or record-validation pass. An individual gets one
+record; a batch gets a map keyed by issue number. This projection is still only
+tentative: analyzer time creates a concurrent-edit window, so resolver Step 0i
+compares each retained `updatedAt` with its mandatory live probe before any body
+rewrite. A mismatch/missing/unparsable timestamp discards only that record and
+runs the ordinary complete refreshed 0a fetch; siblings are unaffected.
 
 For each issue, check:
 - **Exists** — if not found, warn and remove from list
@@ -167,7 +183,7 @@ that the same step deletes.
 
 ### Loop behavior
 
-In explicit list mode, the loop iterates through the **optimized** order (not the original user order). Phase 1 is replaced: instead of triaging and picking, advance to the next issue (or batch) in the optimized list.
+In explicit list mode, the loop iterates through the **optimized** order (not the original user order). Phase 1 triage is replaced: advance to the next issue (or batch), then project the selected record(s) from the complete map that *Step 1.2b* captured before analyzer spawn. Reframe for the new spawn nonce, but do not validate or read a body again.
 
 #### Batch detection
 
