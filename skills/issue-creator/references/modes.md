@@ -247,9 +247,9 @@ Use `references/docs/terminal-style.md` table format: box-drawing characters `â”
 
 Write all batch items and the once-loaded resolved config to the same stdin request described by Create Step 3, with `mode: "batch"`, then run `references/scripts/gi-dup-score.py` once. The scorer checks every item against the open backlog and every unordered internal pair in **both directions**; its record retains `directional_scores`, and the stronger direction controls the band without duplicating the pair.
 
-`duplicates` and `batch_internal_duplicates` are deterministic high-band warnings. Spawn the duplicate-detector at most once, and only when `medium_band` is non-empty, with `{mode: "batch", items, candidates: medium_band}`. The agent judges semantic intent from the supplied records; it neither fetches nor recomputes arithmetic. With no Agent tool, retain medium entries as possible-duplicate warnings. With an empty band, skip the spawn.
+`duplicates` and `batch_internal_duplicates` are deterministic high-band warnings. When `medium_band` is non-empty, apply the scorer's deterministic `medium_judgement.selected_count` limit and `batch_size`: spawn the duplicate-detector sequentially for each selected chunk, passing only the referenced rows from the deduplicated `medium_issue_context` table. The agent judges semantic intent from those supplied records; it neither fetches nor recomputes arithmetic. Retain every deferred medium entry (and every medium entry when no Agent tool exists) as a possible-duplicate warning without an LLM verdict â€” bounded judgement never silently drops ambiguity. With an empty band, skip the spawn.
 
-**Parallel execution:** script scoring can run alongside template pre-generation. Medium judgement, when needed, begins after the score result and is consumed at Step 4.
+**Parallel execution:** script scoring can run alongside template pre-generation. Bounded medium judgement, when needed, begins after the score result and is consumed at Step 4.
 
 If the scorer cannot run, follow Create Step 3's classified fallback and compare each item against existing issues and other batch items bidirectionally. Exit 3 stops; an unreadable backlog never becomes a clean scan.
 

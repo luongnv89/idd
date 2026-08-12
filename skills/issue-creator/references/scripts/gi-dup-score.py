@@ -49,6 +49,9 @@ TYPE_ALIASES = {
     "improvement": "improvement", "refactor": "improvement",
 }
 CONFIG_PREFIX = "duplicate_detection."
+MEDIUM_BODY_CHAR_LIMIT = 1000
+MEDIUM_JUDGEMENT_BATCH_SIZE = 20
+MEDIUM_JUDGEMENT_LIMIT = 200
 
 
 class InvalidInput(Exception):
@@ -127,6 +130,10 @@ def resolve_config(raw: object, args: argparse.Namespace) -> dict[str, Any]:
     if values["medium_threshold"] > values["high_threshold"]:
         raise InvalidInput(
             "duplicate_detection.medium_threshold must not exceed high_threshold"
+        )
+    if values["weights.phrase"] < values["weights.title_overlap"]:
+        raise InvalidInput(
+            "duplicate_detection.weights.phrase must be >= weights.title_overlap"
         )
     extra = values["extra_stop_words"]
     if isinstance(extra, str):
@@ -379,7 +386,6 @@ def record_for(
     if match_type == "existing_issue":
         record.update({
             "match_number": target["number"],
-            "match_body": str(target.get("body") or ""),
             "match_labels": target.get("labels") or [],
         })
     else:
@@ -433,7 +439,15 @@ def main(argv: list[str] | None = None) -> int:
                 continue
             record = record_for(item, issue, scored, "existing_issue")
             record["confidence"] = level
-            (high_matches if level == "high" else medium_matches).append(record)
+            if level == "high":
+                record["match_labels"] = issue.get("labels") or []
+                high_matches.append(record)
+            else:
+                # Medium candidates reference the deduplicated context table.
+                # Repeating title/body/labels for every item × issue pair makes
+                # the supported 100 × 100 request unusably large.
+                record.pop("match_title", None)
+                medium_matches.append(record)
 
     if mode == "batch":
         for left_pos, left in enumerate(items):
@@ -470,9 +484,37 @@ def main(argv: list[str] | None = None) -> int:
             record.get("match_number", record.get("match_index", 0)),
         )
 
+    ordered_medium = sorted(medium_matches, key=order)
+    medium_issue_numbers = {
+        record["match_number"]
+        for record in ordered_medium
+        if record["match_type"] == "existing_issue"
+    }
+    medium_issue_context = []
+    for issue in issues:
+        if issue.get("number") not in medium_issue_numbers:
+            continue
+        body = str(issue.get("body") or "")
+        medium_issue_context.append({
+            "number": issue["number"],
+            "title": str(issue.get("title") or ""),
+            "body": body[:MEDIUM_BODY_CHAR_LIMIT],
+            "body_truncated": len(body) > MEDIUM_BODY_CHAR_LIMIT,
+            "labels": issue.get("labels") or [],
+        })
+    medium_issue_context.sort(key=lambda issue: issue["number"])
+    selected_count = min(len(ordered_medium), MEDIUM_JUDGEMENT_LIMIT)
+
     output = {
         "duplicates": sorted(high_matches, key=order),
-        "medium_band": sorted(medium_matches, key=order),
+        "medium_band": ordered_medium,
+        "medium_issue_context": medium_issue_context,
+        "medium_judgement": {
+            "selected_count": selected_count,
+            "deferred_count": len(ordered_medium) - selected_count,
+            "batch_size": MEDIUM_JUDGEMENT_BATCH_SIZE,
+            "body_char_limit": MEDIUM_BODY_CHAR_LIMIT,
+        },
         "batch_internal_duplicates": sorted(internal_high, key=order),
         "open_issue_count": len(issues),
         "scan_truncated": truncated,

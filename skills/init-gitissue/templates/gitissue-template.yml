@@ -25,6 +25,7 @@ issue:
 # canonical item tokens; extra stop words extend (never replace) built-ins.
 duplicate_detection:
   weights:
+    # Keep phrase >= title_overlap so extra stop words cannot raise scores.
     phrase: 2
     title_overlap: 2
     keyword: 1

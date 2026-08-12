@@ -721,6 +721,14 @@ expect_grep "AC1: an empty medium band skips the judgement agent" \
   'empty `medium_band` skips the agent' "$SKILLS/issue-creator/SKILL.md"
 expect_grep "AC1: duplicate-detector is medium-band judgement only" \
   "No deterministic rescoring" "$SKILLS/issue-creator/references/agents/duplicate-detector.md"
+expect_grep "AC1: medium issue bodies are deduplicated and bounded" \
+  'deduplicated `medium_issue_context`' "$SKILLS/issue-creator/SKILL.md"
+expect_grep "AC1: deferred medium candidates remain visible warnings" \
+  'retained as possible-duplicate warnings without an LLM verdict' "$SKILLS/issue-creator/SKILL.md"
+expect_grep "AC1: duplicate-detector resolves deduplicated issue context" \
+  'reference `issue_context` by `match_number`' "$SKILLS/issue-creator/references/agents/duplicate-detector.md"
+expect_grep "AC1: schema enforces monotone phrase weight ordering" \
+  'must be >= `weights.title_overlap`' "$REPO_ROOT/docs/config-schema.md"
 for key in weights.phrase weights.title_overlap weights.keyword weights.same_type high_threshold medium_threshold min_token_length phrase_min_tokens backlog_limit max_items extra_stop_words; do
   if grep -q "duplicate_detection.$key" "$REPO_ROOT/docs/config-schema.md"; then
     pass "AC1: duplicate_detection.$key is documented"

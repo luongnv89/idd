@@ -106,6 +106,22 @@ splice_target={"title":"alpha other beta gamma","body":"","type":"feature"}
 normal=m.score_pair(splice_item,splice_target,cfg)["score"]
 bridge=m.resolve_config({"duplicate_detection":{"extra_stop_words":"bridge,other"}},type("A",(),{"limit":None,"high":None,"medium":None})())
 assert m.score_pair(splice_item,splice_target,bridge)["score"] <= normal
+# The historical counterexample is invalid by contract: otherwise stopping
+# "beta" moves two tokens from phrase=1 to overlap=2 and raises 3 -> 4.
+try:
+    m.resolve_config({"duplicate_detection":{"weights":{"phrase":1,"title_overlap":2}}},type("A",(),{"limit":None,"high":None,"medium":None})())
+except m.InvalidInput as exc:
+    assert "weights.phrase must be >= weights.title_overlap" in str(exc)
+else:
+    raise AssertionError("phrase=1/title_overlap=2 counterexample was accepted")
+# A non-default valid ordering remains monotone for the same concrete pair.
+custom=m.resolve_config({"duplicate_detection":{"weights":{"phrase":3,"title_overlap":2}}},type("A",(),{"limit":None,"high":None,"medium":None})())
+concrete_item={"index":1,"title":"alpha beta gamma","keywords":[],"type":None}
+concrete_target={"title":"alpha beta gamma","body":"","type":None}
+custom_before=m.score_pair(concrete_item,concrete_target,custom)["score"]
+custom_stopped=m.resolve_config({"duplicate_detection":{"weights":{"phrase":3,"title_overlap":2},"extra_stop_words":"beta"}},type("A",(),{"limit":None,"high":None,"medium":None})())
+assert custom_before==9
+assert m.score_pair(concrete_item,concrete_target,custom_stopped)["score"]==4 <= custom_before
 # <=2 significant words still score high when identical.
 sym_item={"index":1,"title":"CI cache","keywords":[],"type":"feature"}
 sym_target={"title":"CI cache","body":"","type":"feature"}
@@ -135,6 +151,31 @@ d=json.load(open(sys.argv[1])); rows=[r for r in d["medium_band"] if r["match_ty
 assert len(rows)==1, rows
 assert set(rows[0]["directional_scores"])=={"1","2"}
 assert rows[0]["pair"]==[1,2]
+PY
+
+# Worst supported 100x100 medium set: bodies are deduplicated, truncated, and
+# the judgement slice is bounded without silently discarding the other warnings.
+python3 - "$TMP/worst-issues.json" "$TMP/worst-request.json" <<'PY'
+import json,sys
+body="x"*10000
+json.dump([{"number":n,"title":"shared","body":body,"labels":[{"name":"feature"}]} for n in range(1,101)],open(sys.argv[1],"w"))
+json.dump({"mode":"batch","items":[{"index":n,"title":"shared","keywords":[],"type":"feature"} for n in range(1,101)]},open(sys.argv[2],"w"))
+PY
+python3 "$SCRIPT" --issues-from "$TMP/worst-issues.json" --high 99 <"$TMP/worst-request.json" >"$TMP/worst-output.json"
+python3 - "$TMP/worst-output.json" <<'PY' && pass "worst-case medium prompt input is deduplicated and bounded" || fail "worst-case medium prompt bound"
+import json,sys
+d=json.load(open(sys.argv[1]))
+existing=[row for row in d["medium_band"] if row["match_type"]=="existing_issue"]
+assert len(existing)==10000, len(existing)
+assert d["medium_judgement"]=={"batch_size":20,"body_char_limit":1000,"deferred_count":len(d["medium_band"])-200,"selected_count":200}
+assert len(d["medium_issue_context"])==100
+assert all(len(row["body"])==1000 and row["body_truncated"] for row in d["medium_issue_context"])
+assert all("match_body" not in row and "match_title" not in row for row in existing)
+# The bounded semantic prompt (one 20-candidate chunk plus referenced context)
+# is small even though all 10,000 ambiguous matches remain visible as warnings.
+first=d["medium_band"][:20]; refs={row["match_number"] for row in first}
+prompt={"candidates":first,"issue_context":[row for row in d["medium_issue_context"] if row["number"] in refs]}
+assert len(json.dumps(prompt)) < 50000
 PY
 
 # Config override and malformed/unavailable exit vocabulary.

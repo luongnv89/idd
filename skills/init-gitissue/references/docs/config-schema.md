@@ -463,7 +463,9 @@ projects:
 # the built-in list; it never replaces it.
 duplicate_detection:
   weights:
-    # Per-token weights; each must be an integer >= 0
+    # Per-token weights; each must be an integer >= 0. Phrase must be >=
+    # title_overlap so adding a stop word can never move evidence to a
+    # higher-paying lower-precedence signal and raise the score.
     phrase: 2
     title_overlap: 2
     keyword: 1
@@ -734,8 +736,8 @@ Config is validated on load at the start of every skill invocation. Errors inclu
 | `projects.status_map.todo` | `"Todo"` | Status for new issues |
 | `projects.status_map.in_progress` | `"In Progress"` | Status when work starts |
 | `projects.status_map.done` | `"Done"` | Status when PR is created |
-| `duplicate_detection.weights.phrase` | `2` | Per newly consumed phrase token |
-| `duplicate_detection.weights.title_overlap` | `2` | Per newly consumed shared-title token |
+| `duplicate_detection.weights.phrase` | `2` | Per newly consumed phrase token; must be >= `weights.title_overlap` |
+| `duplicate_detection.weights.title_overlap` | `2` | Per newly consumed shared-title token; must not exceed `weights.phrase` |
 | `duplicate_detection.weights.keyword` | `1` | Per newly consumed canonical keyword token |
 | `duplicate_detection.weights.same_type` | `1` | One-time same-type payment |
 | `duplicate_detection.high_threshold` | `5` | Deterministic high-band warning |

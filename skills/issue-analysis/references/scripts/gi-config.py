@@ -387,9 +387,24 @@ def merge(
         warnings.append(
             "section(s) outside this schema view, passed through unvalidated: " + listed
         )
+
+    merged = {**defaults, **accepted}
+    phrase_weight = merged.get("duplicate_detection.weights.phrase")
+    overlap_weight = merged.get("duplicate_detection.weights.title_overlap")
+    if (
+        isinstance(phrase_weight, int)
+        and not isinstance(phrase_weight, bool)
+        and isinstance(overlap_weight, int)
+        and not isinstance(overlap_weight, bool)
+        and phrase_weight < overlap_weight
+    ):
+        errors.append(
+            "duplicate_detection.weights.phrase — must be greater than or equal "
+            "to duplicate_detection.weights.title_overlap"
+        )
     if errors:
         raise ConfigError("\n".join(errors))
-    return {**defaults, **accepted}, warnings
+    return merged, warnings
 
 
 # --- CLI ---------------------------------------------------------------------
