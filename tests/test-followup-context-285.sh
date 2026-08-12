@@ -18,6 +18,8 @@ AP="$ROOT/src/skills/auto-pilot/SKILL.source.md"
 RS="$ROOT/src/skills/issue-resolver/references/pipeline-steps.md"
 SK="$ROOT/src/skills/issue-resolver/SKILL.source.md"
 RT="$ROOT/src/skills/issue-resolver/references/report-templates.md"
+IA="$ROOT/src/skills/issue-analysis/SKILL.source.md"
+RV="$ROOT/src/skills/issue-pr-review/SKILL.source.md"
 
 printf '◆ Follow-up Context Contract Tests (issue #285)\n'
 
@@ -49,6 +51,26 @@ check "$EX" 'explicit_issue_records\[N\]' "explicit-list retains complete issue 
 check "$EX" 'body again' "explicit-list forbids duplicate body reads"
 check "$EX" 'batch gets a map keyed by issue number' "batch payload path is reachable"
 check "$PH" 'make \*\*no\*\* extra GitHub read' "dependency parsing reuses held body"
+check "$PR" 'BEGIN_UNTRUSTED_issue_payload_\{payload_nonce\}' "analyzer receives nonce-framed retained records"
+check "$PR" 'replaces only' "analyzer limits payload reuse to analysis Step 1"
+check "$IA" '^### Caller payload gate \(auto-pilot only\)' "issue-analysis has a narrow caller payload gate"
+check "$IA" 'gh issue view N --json state,comments,createdAt,updatedAt,author' "analysis payload path preserves live issue metadata"
+check "$IA" 'Every repository, git-history, already-resolved and cross-reference' "analysis safety phases still run in full"
+
+# The explicit-list keyed producer and resolver consumer agree operationally.
+check "$RS" 'object map keyed by decimal issue number' "resolver accepts explicit-list keyed batch maps"
+check "$RS" 'key/number mismatch' "keyed-map lookup validates its record number"
+python3 - <<'PY' && pass "keyed batch map selects exactly one matching complete record" || fail "keyed batch map contract is incompatible"
+required = {"number", "title", "body", "labels", "assignees", "state", "updatedAt"}
+payload = {"284": {"number": 284}, "285": {"number": 285, "title": "x", "body": "y", "labels": [], "assignees": [], "state": "OPEN", "updatedAt": "2026-01-01T00:00:00Z"}}
+record = payload.get("285")
+assert record and record["number"] == 285 and required <= record.keys()
+assert not (payload.get("284") and payload["284"].get("number") == 285)
+PY
+
+# Review boundary bypasses TTL once, then Step 3 reuses the same refreshed entry.
+check "$RV" 'gi-issue.py \{N\} --fields number,title,body,labels --refresh' "review boundary forces a fresh linked-issue body read"
+check "$RV" 'do not add `--refresh` here' "Step 3 reuses the refreshed exact field-set cache entry"
 
 # Snapshot budget supersedes the stale literal without weakening freshness reads.
 check "$AP" 'stale literal "one body' "stale one-fetch wording is superseded"

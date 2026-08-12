@@ -466,12 +466,15 @@ be taken as verbatim. A payload missing it is `partial`, never `supplied`, and
 0a fetches exactly as today; the gate is not retired by its absence, only unused.
 
 **Batched spawns carry one record per issue.** `/auto-pilot`'s batch-resolver
-receives an array of records rather than one object. Evaluate this gate **per
-issue**: for issue `N`, the state is `supplied` when exactly one record in the
-block has `number` equal to `N` and that record satisfies the `supplied` row
-above. A record that is missing or fails the row leaves that issue `partial` or
-`absent` and 0a fetches *that* issue, with no effect on the others. Everything
-below — the live re-verify included — then applies once per batched issue.
+accepts either the existing array of records or the explicit-list producer's
+object map keyed by decimal issue number. Evaluate this gate **per issue**: for
+issue `N`, select array entries whose `number` equals `N`, or the map entry at
+key `"N"` whose own `number` also equals `N`. The state is `supplied` only when
+that lookup yields exactly one record and it satisfies the `supplied` row above;
+a duplicate array match, key/number mismatch, missing entry, or incomplete
+record is `partial` or `absent`. Then 0a fetches *that* issue, with no effect on
+siblings. Everything below — the live re-verify included — applies once per
+batched issue.
 
 ### Scope — 0a's read only
 

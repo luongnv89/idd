@@ -190,11 +190,13 @@ once — in `references/docs/agent-model-effort.md` (*Complexity → pipeline pr
 `references/review-loop-mechanics.md` (*Depth gate*), which you **read now and
 apply**. Three inputs feed the signal: diff size / files-changed (Step 1's
 `files`); the linked issue's `## Metadata` `Effort` band (`python3
-references/scripts/gi-issue.py {N} --fields number,title,body,labels`, reading
+references/scripts/gi-issue.py {N} --fields number,title,body,labels --refresh`, reading
 `.issue.body`; on exit 4 or no `python3`, `gh issue view {N} --json body` — that
 exact field list, because the cache is keyed by issue **and** field set, so a
 narrower ask here would make Step 3's read a guaranteed miss); and labels (any
-`security`/`CVE`/`vulnerability` label forces `full`). Resolve to `light` only when
+`security`/`CVE`/`vulnerability` label forces `full`). `--refresh` is mandatory
+on this review-boundary read: cached ACs are not current evidence, and Step 3
+reuses this refreshed entry. Resolve to `light` only when
 **every** available signal agrees on trivial; any `full` vote, or a missing or
 ambiguous signal, wins → `full`. When `review.adaptive_depth` is `false`, skip the
 gate and set `profile = full`.
@@ -318,7 +320,7 @@ UI review is **auto-detected per PR** — no config flag enables it. The skill s
 
 The shared mechanics — detection commands, the code-review spawn, the report-only display-environment label (`ui_env`), the browser-review gate + three-part capability check, and the headless capture call — live in `references/docs/ui-review.md`. This skill's own deltas — the PR diff command, the variables it passes, the interactive proposal prompt, and cycle-reuse `SendMessage` — are in `references/ui-review-mechanics.md`. **Read both and apply them** when `ui: detected`; together they preserve the contract above and route `action: "fix"` UI findings into Step 6 under `category: ui_ux`. Under `qa_handoff = trusted` the **code** UI review is skipped only when the marker's `ui=` leg says it already ran (`ui=code…` or `ui=code+browser…`) **and** carries an `@<sha40>` equal to `head` — never on `ui=none`, never on an unsuffixed `ui=` (well-formed, but not commit-bound), and never for the browser leg, which is opt-in and fail-soft on both sides.
 
-Also fetch the linked issue for acceptance-criteria verification: `python3 references/scripts/gi-issue.py {linked_issue} --fields number,title,body,labels`, reading `.issue`. Step 1's depth gate requested this same field list, so the cache answers without a second network call — the field sets must stay identical for that to hold. Exit 3 is a stop; no `python3`, exit 2 (an unresolved script path), or exit 4 degrades to `gh issue view {linked_issue} --json number,title,body,labels`.
+Also load the linked issue for acceptance-criteria verification: `python3 references/scripts/gi-issue.py {linked_issue} --fields number,title,body,labels`, reading `.issue`. Step 1's depth gate already requested this exact field list with `--refresh`, so this call reuses that fresh review-boundary cache entry without a second network call — do not add `--refresh` here, and keep the field sets identical. Exit 3 is a stop; no `python3`, exit 2 (an unresolved script path), or exit 4 degrades to `gh issue view {linked_issue} --json number,title,body,labels`.
 
 ```
 [3/7] Review       ✓ spec[ac:pass correctness:pass safety:pass]

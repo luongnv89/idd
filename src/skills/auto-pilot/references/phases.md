@@ -809,8 +809,11 @@ A missing or mismatched boundary makes that payload unusable. Framing prevents
 accidental delimiter collision; it does **not** authenticate or validate the
 contents, which remain untrusted issue text.
 
+Substitute the complete explicit-list payload map into the analyzer prompt;
+its per-issue `/issue-analysis` invocation forwards only the matching record.
 Substitute `{issue_payload}` + `{triage_context}` into resolver and batch-resolver
-prompts, `{issue_payload_ids}` into the reviewer prompt. The resolver passes
+prompts, `{issue_payload_ids}` into the reviewer prompt. The resolver accepts the
+explicit-list keyed map as well as the legacy batch array. The resolver passes
 `triage_context` onward to the codebase-researcher, which uses it to order Phase
 2b and seed Phase 5. Step 5.1b's dependency read takes the body directly from the
 held resolution snapshot — it is already here.
