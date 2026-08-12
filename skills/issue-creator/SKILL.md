@@ -66,20 +66,22 @@ Before any operation, verify the environment. On failure, output the exact error
 3. Confirm authentication: `gh auth status`
 4. Confirm GitHub remote exists: `git remote -v`
 
-## Repo Sync (scoped to actual local writes)
+## Repo Sync (scoped to actual source-tree writes)
 
-Every write this skill performs is **remote**: issue bodies go out through `gh
-issue edit`, and screenshots are committed to `.github/issue-assets/` by the
-GitHub contents API (`references/image-upload.md`), which commits server-side
-rather than from the working tree. A local `git pull --rebase` protects none of
-them, and on a dirty tree it can stop a pure create with a rebase conflict — so
-create, normalize, and image upload run **without** a repo sync.
+Every durable write this skill performs is **remote**: issue bodies go out through
+`gh issue edit`, and screenshots are committed to `.github/issue-assets/` by the
+GitHub contents API (`references/image-upload.md`), which commits server-side.
+Duplicate scoring briefly writes an ignored request under `.gitissue/cache/` and
+removes it on every outcome; that transient runtime state is not source work and
+does not warrant syncing the repository. A local `git pull --rebase` protects
+none of these writes, and on a dirty tree it can stop a pure create with a rebase
+conflict — so create, normalize, and image upload run **without** a repo sync.
 
-If a run does write to the working tree (a mode that scaffolds local template
-files, for example), sync first with the stash-first pattern in
-`references/docs/sync-conventions.md` — immediately before that local write, not at skill
-start. Everything else in that document (auto-mode contract, stash-pop recovery)
-applies unchanged when it does run.
+If a run does write durable files to the working tree (a mode that scaffolds
+local template files, for example), sync first with the stash-first pattern in
+`references/docs/sync-conventions.md` — immediately before that source-tree write, not at
+skill start. Everything else in that document (auto-mode contract, stash-pop
+recovery) applies unchanged when it does run.
 
 ## Configuration
 
@@ -214,19 +216,39 @@ Assign confidence to the type classification:
 
 #### Score deterministically
 
-Write a request object to `.gitissue/cache/dup-request.json` with the classified `items` plus the `config` object returned at skill start. Feed it on stdin; never put an issue title, keyword, body, or config value on the command line:
+Create the ignored cache directory **before** writing the request, then write `.gitissue/cache/dup-request.json` with the classified `items` plus the `config` object returned at skill start. Feed it on stdin; never put an issue title, keyword, body, or config value on the command line:
+
+```bash
+mkdir -p .gitissue/cache
+```
 
 ```json
 {"mode":"create","items":[{"index":1,"title":"…","keywords":["…"],"type":"bug"}],"config":{"duplicate_detection.weights.phrase":2}}
 ```
 
+Run the scorer with cleanup armed before the invocation, so success, a classified exit, an interrupt, and an unexpected stop all remove the transient request:
+
 ```bash
-python3 references/scripts/gi-dup-score.py < .gitissue/cache/dup-request.json
+trap 'rm -f .gitissue/cache/dup-request.json' EXIT HUP INT TERM
+dup_output="$(python3 references/scripts/gi-dup-score.py < .gitissue/cache/dup-request.json)"
+dup_status=$?
+rm -f .gitissue/cache/dup-request.json
+trap - EXIT HUP INT TERM
 ```
 
-Resolve the script relative to this SKILL.md as the dependency precheck does, and delete the request after the call. Exit 0 returns `duplicates` (deterministic high band), `medium_band`, and `batch_internal_duplicates`. An empty `medium_band` skips the agent. When non-empty, spawn the duplicate-detector with `{mode, items, candidates: medium_band}`; it returns semantic confirm/reject verdicts without fetching or rescoring. Merge confirmed verdicts into the presented warnings. High matches are warnings too — the scorer never silently drops requested work.
+Resolve the script relative to this SKILL.md as the dependency precheck does, and interpret `dup_output` only after `dup_status` is classified. Exit 0 returns `duplicates` (deterministic high band), `medium_band`, and `batch_internal_duplicates`. An empty `medium_band` skips the agent. When non-empty, spawn the duplicate-detector with `{mode, items, candidates: medium_band}`; it returns semantic confirm/reject verdicts without fetching or rescoring. Merge confirmed verdicts into the presented warnings. High matches are warnings too — the scorer never silently drops requested work.
 
-Exit 3 is invalid request/config: stop with the validation error. A missing script is a broken install: stop with the dependency error. For no `python3`, exit 2/4, or unparsable stdout, print `⚠ gi-dup-score unavailable — scoring duplicates inline`; exit 4 means the backlog was unreadable, never empty. The inline fallback fetches `gh issue list --state open --json number,title,body,labels --limit 100` and applies the documented canonical rules: NFKC/case-fold tokens; one minimum-length and additive stop-word policy; fixed phrase → title-overlap → keyword precedence; each payment derived only from newly consumed item tokens; one same-type payment; configured weights and thresholds. Apply internal batch pairs in both directions and keep the stronger direction.
+Exit 3 is invalid request/config: stop with the validation error. A missing script is a broken install: stop with the dependency error. For no `python3`, exit 2/4, or unparsable stdout, print `⚠ gi-dup-score unavailable — scoring duplicates inline`; exit 4 means the backlog was unreadable, never empty. For that fallback, take `backlog_limit` from the once-loaded `duplicate_detection.backlog_limit` and validate it before use. Run this block as written; the extra record is a truncation probe, not a record to score:
+
+```bash
+case "$backlog_limit" in
+  ''|*[!0-9]*|0) echo "✗ Invalid config: duplicate_detection.backlog_limit must be a positive integer"; exit 3 ;;
+esac
+probe_limit=$((backlog_limit + 1))
+fallback_issues="$(gh issue list --state open --json number,title,body,labels --limit "$probe_limit")" || exit 4
+```
+
+Parse `fallback_issues` as JSON, score only its first `backlog_limit` records, and report the scan as truncated when the extra record exists. Quoting the validated digits-only value is mandatory; never use `eval`, shell re-parsing, or an issue-derived value on this command line. Apply the documented canonical rules: NFKC/case-fold tokens; one minimum-length and additive stop-word policy; fixed phrase → title-overlap → keyword precedence; each payment derived only from newly consumed item tokens; one same-type payment; configured weights and thresholds. Apply internal batch pairs in both directions and keep the stronger direction.
 
 #### Present results
 

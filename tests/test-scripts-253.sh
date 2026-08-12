@@ -623,8 +623,49 @@ expect_grep() {
 }
 expect_grep "AC1: issue-creator calls gi-dup-score from its own orchestrator" \
   "references/scripts/gi-dup-score.py" "$SKILLS/issue-creator/SKILL.md"
+expect_grep "AC1: issue-creator creates the ignored scorer cache on first run" \
+  "mkdir -p .gitissue/cache" "$SKILLS/issue-creator/SKILL.md"
 expect_grep "AC1: issue-creator sends the scorer request on stdin" \
   "< .gitissue/cache/dup-request.json" "$SKILLS/issue-creator/SKILL.md"
+expect_grep "AC1: scorer request cleanup is armed before invocation" \
+  "trap 'rm -f .gitissue/cache/dup-request.json' EXIT HUP INT TERM" "$SKILLS/issue-creator/SKILL.md"
+expect_grep "AC1: scorer request is removed after the invocation" \
+  "rm -f .gitissue/cache/dup-request.json" "$SKILLS/issue-creator/SKILL.md"
+expect_grep "AC1: fallback validates the resolved backlog limit" \
+  "duplicate_detection.backlog_limit must be a positive integer" "$SKILLS/issue-creator/SKILL.md"
+expect_grep "AC1: fallback probes one beyond the configured backlog limit" \
+  'probe_limit=$((backlog_limit + 1))' "$SKILLS/issue-creator/SKILL.md"
+expect_grep "AC1: fallback passes the validated configured limit to gh" \
+  'gh issue list --state open --json number,title,body,labels --limit \"$probe_limit\"' "$SKILLS/issue-creator/SKILL.md"
+if grep -q -- 'gh issue list --state open --json number,title,body,labels --limit 100' "$SKILLS/issue-creator/SKILL.md"; then
+  fail "AC1: issue-creator fallback still hardcodes backlog limit 100"
+else
+  pass "AC1: issue-creator fallback has no hardcoded backlog limit"
+fi
+# Execute the first-run/cache-cleanup shell contract with a mock scorer, then
+# exercise a non-default fallback limit through a mock gh argument recorder.
+FLOW="$TMP/dup-flow"; mkdir -p "$FLOW/references/scripts"; cp "$SKILLS/issue-creator/references/scripts/gi-dup-score.py" "$FLOW/references/scripts/"
+printf '[]\n' > "$FLOW/issues.json"
+(
+  cd "$FLOW"
+  mkdir -p .gitissue/cache
+  printf '%s' '{"mode":"create","items":[{"index":1,"title":"x","keywords":[],"type":"feature"}]}' > .gitissue/cache/dup-request.json
+  trap 'rm -f .gitissue/cache/dup-request.json' EXIT HUP INT TERM
+  dup_output="$(python3 references/scripts/gi-dup-score.py --issues-from issues.json < .gitissue/cache/dup-request.json)"
+  dup_status=$?
+  rm -f .gitissue/cache/dup-request.json
+  trap - EXIT HUP INT TERM
+  [ "$dup_status" = 0 ] && [ ! -e .gitissue/cache/dup-request.json ] && printf '%s' "$dup_output" | python3 -c 'import json,sys; json.load(sys.stdin)'
+) && pass "AC1: first-run cache creation and success cleanup execute" || fail "AC1: first-run cache/cleanup flow"
+MOCK="$TMP/mock-gh"; mkdir -p "$MOCK"; cat > "$MOCK/gh" <<'EOF'
+#!/bin/sh
+printf '%s\n' "$@" > "$GH_ARGS"
+printf '[]\n'
+EOF
+chmod +x "$MOCK/gh"
+backlog_limit=7; case "$backlog_limit" in ''|*[!0-9]*|0) fail "AC1: valid non-default backlog limit rejected";; esac
+probe_limit=$((backlog_limit + 1)); GH_ARGS="$TMP/gh-args" PATH="$MOCK:$PATH" gh issue list --state open --json number,title,body,labels --limit "$probe_limit" >/dev/null
+[ "$(tail -1 "$TMP/gh-args")" = 8 ] && pass "AC1: non-default backlog limit 7 fetches an 8-record truncation probe" || fail "AC1: fallback ignored non-default backlog limit"
 expect_grep "AC1: an empty medium band skips the judgement agent" \
   'empty `medium_band` skips the agent' "$SKILLS/issue-creator/SKILL.md"
 expect_grep "AC1: duplicate-detector is medium-band judgement only" \

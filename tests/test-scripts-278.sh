@@ -24,30 +24,75 @@ for case in data["cases"]:
 base={"index":1,"title":"Ship Python 3 café duplicate scorer","keywords":["python 3","café","outside"],"type":"feature"}
 target={"title":"Ship python 3 CAFÉ duplicate scorer","body":"outside; Ship python 3 café duplicate scorer","type":"feature"}
 expected=m.score_pair(base,target,cfg)
-# Each guard proves its trigger and is applied in both item->target and reverse
-# target->item directions. A count alone cannot pass: each mutation is asserted.
-applied={k:0 for k in ("permutation","grouping","duplicates","overlap","short","unicode","outside","body","reverse")}
-def check(name,item,tgt,want=expected):
-    assert item["title"] and tgt["title"]
-    got=m.score_pair(item,tgt,cfg)
-    assert got["score"]==want["score"], (name,got,want)
-    assert got["payments"]==want["payments"], (name,got,want)
-    applied[name]+=1
+# Every invariant below has a distinct mutation and a reverse-axis application.
+# `check_equal` proves the mutation differs from its baseline before comparing
+# payment evidence; `check_delta` proves added evidence pays exactly once.
+applied={k:{"forward":0,"reverse":0} for k in ("permutation","grouping","duplicates","overlap","short","unicode","outside","body")}
+def swapped(item,tgt):
+    return ({"index":2,"title":tgt["title"],"keywords":item.get("keywords",[]),"type":tgt.get("type")},
+            {"title":item["title"],"body":tgt.get("body",""),"type":item.get("type")})
+def check_equal(name,baseline_item,mutant_item,tgt,direction):
+    assert mutant_item != baseline_item, (name,"vacuous mutation")
+    want=m.score_pair(baseline_item,tgt,cfg); got=m.score_pair(mutant_item,tgt,cfg)
+    assert (got["score"],got["payments"]) == (want["score"],want["payments"]), (name,direction,got,want)
+    applied[name][direction]+=1
 for kws in itertools.permutations(base["keywords"]):
-    check("permutation",{**base,"keywords":list(kws)},target)
-check("grouping",{**base,"keywords":["python","3 café","outside"]},target)
-check("duplicates",{**base,"keywords":base["keywords"]*2},target)
-check("overlap",{**base,"keywords":["python 3 café","python","3","café","outside"]},target)
-check("short",{**base,"keywords":["python 3","café","outside"]},target)
-check("unicode",{**base,"title":"ＳＨＩＰ PYTHON 3 CAFE\u0301 DUPLICATE SCORER"},target)
-check("outside",base,target)
-check("body",base,{**target,"body":"outside"})
-# Reverse proof uses a symmetric pair without item-only keyword evidence.
-sym_item={"index":1,"title":"CI cache","keywords":[],"type":"feature"}
-sym_target={"title":"CI cache","body":"","type":"feature"}
-f=m.score_pair(sym_item,sym_target,cfg); r=m.score_pair({**sym_item,"title":sym_target["title"]},{"title":sym_item["title"],"body":"","type":"feature"},cfg)
-assert f==r and f["score"]>0; applied["reverse"]+=1
-assert all(value>0 for value in applied.values()), applied
+    mutant={**base,"keywords":list(kws)}
+    if mutant != base:
+        check_equal("permutation",base,mutant,target,"forward")
+        rb,rt=swapped(base,target); rm,_=swapped(mutant,target)
+        check_equal("permutation",rb,rm,rt,"reverse")
+for name,kws in (("grouping",["python","3 café","outside"]),
+                 ("duplicates",base["keywords"]*2),
+                 ("overlap",["python 3 café","python","3","café","outside"])):
+    mutant={**base,"keywords":kws}
+    check_equal(name,base,mutant,target,"forward")
+    rb,rt=swapped(base,target); rm,_=swapped(mutant,target)
+    check_equal(name,rb,rm,rt,"reverse")
+# One-character evidence is a real newly-paid keyword, not an unchanged list.
+short_base={"index":1,"title":"Python runtime","keywords":["python"],"type":"feature"}
+short_mut={**short_base,"keywords":["python 3"]}
+short_target={"title":"Runtime guide","body":"python 3","type":"feature"}
+for direction in ("forward","reverse"):
+    bi,mi,tg=short_base,short_mut,short_target
+    if direction=="reverse":
+        bi,tg=swapped(short_base,short_target); mi,_=swapped(short_mut,short_target)
+    before=m.score_pair(bi,tg,cfg); after=m.score_pair(mi,tg,cfg)
+    assert "3" not in before["consumed_tokens"] and "3" in after["shared_keywords"]
+    assert after["score"]-before["score"]==cfg["weights.keyword"]
+    applied["short"][direction]+=1
+# Compatibility Unicode/case is a distinct title mutation on both axes.
+unicode_mut={**base,"title":"ＳＨＩＰ PYTHON 3 CAFE\u0301 DUPLICATE SCORER"}
+check_equal("unicode",base,unicode_mut,target,"forward")
+rb,rt=swapped(base,target)
+rmut_target={**rt,"title":unicode_mut["title"]}
+assert rmut_target != rt
+before=m.score_pair(rb,rt,cfg); after=m.score_pair(rb,rmut_target,cfg)
+assert (after["score"],after["payments"]) == (before["score"],before["payments"])
+applied["unicode"]["reverse"]+=1
+# A keyword absent from the item title must still pay from target-body evidence.
+out_base={"index":1,"title":"Build account view","keywords":[],"type":"feature"}
+out_mut={**out_base,"keywords":["dashboard"]}
+out_target={"title":"Create profile page","body":"dashboard account","type":"feature"}
+for direction in ("forward","reverse"):
+    bi,mi,tg=out_base,out_mut,out_target
+    if direction=="reverse":
+        bi,tg=swapped(out_base,out_target); mi,_=swapped(out_mut,out_target)
+    before=m.score_pair(bi,tg,cfg); after=m.score_pair(mi,tg,cfg)
+    assert "dashboard" not in m.active_tokens(bi["title"],m.STOP_WORDS,cfg["min_token_length"])
+    assert after["shared_keywords"]==["dashboard"] and after["score"]-before["score"]==cfg["weights.keyword"]
+    applied["outside"][direction]+=1
+# Repeating title evidence in the target body must not create another payment.
+body_sparse={**target,"body":"outside"}
+for direction in ("forward","reverse"):
+    bi,tg=base,body_sparse; repeated=target
+    if direction=="reverse":
+        bi,tg=swapped(base,body_sparse); _,repeated=swapped(base,target)
+    before=m.score_pair(bi,tg,cfg); after=m.score_pair(bi,repeated,cfg)
+    assert repeated["body"] != tg["body"]
+    assert (after["score"],after["payments"]) == (before["score"],before["payments"])
+    applied["body"][direction]+=1
+assert all(counts[axis]>0 for counts in applied.values() for axis in ("forward","reverse")), applied
 # Every paid token is unique across token-bearing payments.
 paid=[t for p in expected["payments"] for t in p["tokens"]]
 assert len(paid)==len(set(paid)), paid
@@ -62,6 +107,8 @@ normal=m.score_pair(splice_item,splice_target,cfg)["score"]
 bridge=m.resolve_config({"duplicate_detection":{"extra_stop_words":"bridge,other"}},type("A",(),{"limit":None,"high":None,"medium":None})())
 assert m.score_pair(splice_item,splice_target,bridge)["score"] <= normal
 # <=2 significant words still score high when identical.
+sym_item={"index":1,"title":"CI cache","keywords":[],"type":"feature"}
+sym_target={"title":"CI cache","body":"","type":"feature"}
 assert m.band(m.score_pair(sym_item,sym_target,cfg)["score"],cfg)=="high"
 print(json.dumps({"applied":applied,"calibration_cases":len(data["cases"])}))
 PY
