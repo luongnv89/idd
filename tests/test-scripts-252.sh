@@ -406,7 +406,7 @@ else
 fi
 
 run_status out st env GH_FIXTURE='[]' PATH="$STUB:$PATH" \
-  python3 "$CIWAIT" 42 --interval 1 --timeout 30 --none-grace 2
+  python3 "$CIWAIT" 42 --interval 1 --timeout 30 --none-grace 2 --settle-window 1
 if [ "$(printf '%s' "$out" | jkey verdict)" = "none" ] \
    && [ "$(printf '%s' "$out" | jkey none_confirmed)" = "True" ] \
    && [ "$(printf '%s' "$out" | jkey polls)" -ge 2 ]; then
@@ -422,14 +422,34 @@ SEQ_LATE="$TMP/seq-late"
   echo '[]'
   echo '[]'
   echo '[{"name":"build","state":"SUCCESS","bucket":"pass","link":"u"}]'
+  echo '[{"name":"build","state":"SUCCESS","bucket":"pass","link":"u"}]'
 } > "$SEQ_LATE"
 rm -f "$TMP/count-late"
 run_status out st env GH_SEQUENCE="$SEQ_LATE" GH_COUNT_FILE="$TMP/count-late" \
-  PATH="$STUB:$PATH" python3 "$CIWAIT" 42 --interval 1 --timeout 30 --none-grace 10
+  PATH="$STUB:$PATH" python3 "$CIWAIT" 42 --interval 1 --timeout 30 --none-grace 10 --settle-window 1
 if [ "$(printf '%s' "$out" | jkey verdict)" = "pass" ]; then
   pass "AC2: checks that register on a later poll are waited for, not raced past"
 else
   fail "AC2: the wait returned before the checks registered — the merge race"
+fi
+
+# A terminal snapshot is not trusted until its normalized membership settles.
+# The second poll adds a failing check; returning pass from poll one would
+# recreate issue #273's early-verdict race.
+SEQ_GROWING="$TMP/seq-growing"
+{
+  echo '[{"name":"lint","state":"SUCCESS","bucket":"pass","link":"u"}]'
+  echo '[{"name":"lint","state":"SUCCESS","bucket":"pass","link":"u"},{"name":"security","state":"FAILURE","bucket":"fail","link":"u"}]'
+  echo '[{"name":"lint","state":"SUCCESS","bucket":"pass","link":"u"},{"name":"security","state":"FAILURE","bucket":"fail","link":"u"}]'
+} > "$SEQ_GROWING"
+rm -f "$TMP/count-growing"
+run_status out st env GH_SEQUENCE="$SEQ_GROWING" GH_COUNT_FILE="$TMP/count-growing" \
+  PATH="$STUB:$PATH" python3 "$CIWAIT" 42 --interval 1 --timeout 10 --settle-window 1
+if [ "$(printf '%s' "$out" | jkey verdict)" = "fail" ] \
+   && [ "$(printf '%s' "$out" | jkey settled)" = "True" ]; then
+  pass "AC2/#273: terminal verdict waits for a stable check set before returning"
+else
+  fail "AC2/#273: terminal verdict trusted a check set that was still growing"
 fi
 
 # The whole wait happens in one invocation: several polls, one process, one
@@ -439,11 +459,12 @@ SEQ="$TMP/seq"
   echo '[{"name":"build","state":"IN_PROGRESS","bucket":"pending","link":"u"}]'
   echo '[{"name":"build","state":"IN_PROGRESS","bucket":"pending","link":"u"}]'
   echo '[{"name":"build","state":"SUCCESS","bucket":"pass","link":"u"}]'
+  echo '[{"name":"build","state":"SUCCESS","bucket":"pass","link":"u"}]'
 } > "$SEQ"
 run_status out st env GH_SEQUENCE="$SEQ" GH_COUNT_FILE="$TMP/count" \
-  PATH="$STUB:$PATH" python3 "$CIWAIT" 42 --interval 1 --timeout 30
+  PATH="$STUB:$PATH" python3 "$CIWAIT" 42 --interval 1 --timeout 30 --settle-window 1
 polls="$(printf '%s' "$out" | jkey polls)"
-if [ "$(printf '%s' "$out" | jkey verdict)" = "pass" ] && [ "$polls" -ge 3 ]; then
+if [ "$(printf '%s' "$out" | jkey verdict)" = "pass" ] && [ "$polls" -ge 4 ]; then
   pass "AC2: a multi-poll wait resolves inside one invocation ($polls polls, 1 call)"
 else
   fail "AC2: a multi-poll wait resolves inside one invocation (verdict/polls wrong)"
@@ -1420,8 +1441,10 @@ for f in "$REPO_ROOT/src/skills/issue-creator/references/modes.md" \
   fi
 done
 
-# A degrade must reach the same outcomes as the fast path, not fewer.
-if grep -q "proceed with the merge" "$SKILLS/auto-pilot/references/examples.md"; then
+# A degrade must reach the same outcomes as the fast path, not fewer. The
+# success wording remains in the primary CI path; the degraded path itself must
+# not merge on an empty or unsettled snapshot.
+if grep -q "proceeds with the merge" "$SKILLS/auto-pilot/references/examples.md"; then
   pass "AC5: auto-pilot's degraded CI poll can still reach a merge"
 else
   fail "AC5: auto-pilot's degraded CI poll documents no success outcome"

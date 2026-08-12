@@ -89,10 +89,16 @@ It prints one JSON object. Read `verdict`:
 
 | `verdict` | Meaning | Step 5 outcome |
 |-----------|---------|----------------|
-| `pass` | every check reached a terminal non-failing bucket | `✓ all checks passed` |
-| `fail` | at least one check failed or was cancelled — see `failing[]` | `✗ {N} checks failed` |
-| `pending` | the budget elapsed with checks still running | `⚠ checks still running` — **not clean** (see below) |
+| `pass` | every check reached a terminal non-failing bucket and the normalized check-name set settled | `✓ all checks passed` |
+| `fail` | at least one check failed or was cancelled after the set settled — see `failing[]` | `✗ {N} checks failed` |
+| `pending` | checks still run, or the terminal set never settled before timeout | `⚠ checks still running` — **not clean** (see below) |
 | `none` | the repository reports no checks for this PR | `○ no CI checks configured` |
+
+The waiter uses an elapsed `--settle-window` (default 30 seconds) for every
+non-empty terminal snapshot. A check-name addition or removal resets that window;
+this prevents a green first poll from authorizing a merge before a later failing
+check registers. The explicit `--once` diagnostic mode reports one snapshot
+without claiming settlement.
 
 Exit 3 (a non-numeric PR, a non-positive interval or timeout) is a stop — a
 misconfigured wait has not run. Only a missing `python3` or exit 4 degrades:

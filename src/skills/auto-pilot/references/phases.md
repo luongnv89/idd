@@ -1322,11 +1322,11 @@ EOF
 
 Compute the **effective mode** per the *Resolution rules* under *Merge Modes* in SKILL.md. If the effective mode is `aggressive` AND `autopilot.merge_partial` is `true`, the PR may be merged to preserve partial progress after the dependency gate passes; otherwise leave the PR open.
 
-**Step 2a — Dependency gate (before any merge):**
+**Step 2a — Dependency and CI gates (before any merge):**
 
-Whenever Step 2 would merge a PR (aggressive + `merge_partial: true`), run **Step 5.1b — Dependency Gate** first using the originating issue `#{issue_number}`. SPEC §2 requires this check before **any** automated merge, including partial merges. If the gate finds unsatisfied dependencies, do **not** merge: print the structured alert from `references/error-messages.md` (*PR blocked by unmerged dependency*), record the iteration outcome as `blocked_by_dependency`, leave the PR open, add the issue to the session skip list, and **continue to the next eligible issue** (same record-and-continue semantics as Phase 5 — see *Record and continue when any dependency is unsatisfied*). If all dependencies are satisfied, proceed to Step 2b.
+Whenever Step 2 would merge a PR (aggressive + `merge_partial: true`), run **Step 5.1b — Dependency Gate** first using the originating issue `#{issue_number}`, then run the shared **Step 5.1a — CI verdict gate** against the current PR head. SPEC §2 requires these checks before **any** automated merge, including partial merges. The CI waiter must return `pass`, or `none` with `none_confirmed: true`; `fail`, `pending`, an unsettled terminal snapshot, or an unavailable/manual-poll result leaves the PR open. If either gate finds an unsatisfied dependency or non-mergeable CI, do **not** merge: print the structured alert from `references/error-messages.md`, record the iteration outcome as `blocked_by_dependency` or `left_open`, leave the PR open, add the issue to the session skip list, and **continue to the next eligible issue** (same record-and-continue semantics as Phase 5). Only when both gates pass may the flow proceed to Step 2b.
 
-**Step 2b — Merge (only when aggressive + merge_partial: true and Step 2a passed):**
+**Step 2b — Merge (only when aggressive + merge_partial: true and both gates passed):**
 
 ```bash
 gh pr merge {pr_number} --squash --delete-branch

@@ -312,14 +312,12 @@ Read `verdict`: `pass` proceeds with the merge; `fail` and `pending` both leave 
 
 The `.conclusion` half of that filter is not optional. A check that finished and
 **failed** still has `status: "COMPLETED"`, so filtering on status alone prints
-nothing for a red build — and empty output reads as "all clear", merging a PR
-whose CI failed.
+nothing for a red build — and empty output must never be treated as "all clear".
 
 **The degraded path reaches the same three outcomes, not fewer.** Empty output
-means every check succeeded: proceed with the merge exactly as `verdict: pass`
-would — degrading means running the procedure by hand, never declining to act on
-its result. Any line naming a failed check leaves the PR open, as `verdict: fail`
-would. If timeout:
+means no checks have registered yet, so keep polling until the configured settle
+window confirms that no CI is configured; do not merge on the first empty poll.
+Any line naming a failed check leaves the PR open, as `verdict: fail` would. If timeout:
 ```
 ⚠ CI checks did not complete within {timeout}s — PR left open
   Continuing to next issue...
