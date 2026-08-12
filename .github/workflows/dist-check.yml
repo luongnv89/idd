@@ -172,6 +172,9 @@ jobs:
       - name: test-subagent-context-256
         run: bash tests/test-subagent-context-256.sh
 
+      - name: test-followup-context-285
+        run: bash tests/test-followup-context-285.sh
+
       - name: test-autopilot-state-257
         run: bash tests/test-autopilot-state-257.sh
 

@@ -344,7 +344,7 @@ check_lacks "$SRC_AP_SKILL" 'single-field .gh issue view' \
 # ───────────────────────────────────────────────────────────
 check_has "$SRC_RES_STEPS" '^### Last-green test state' \
   "T4.1: pipeline-steps.md owns the last-green test state section"
-check_has "$SRC_RES_STEPS" 'Single home of .tests_state. and of both its consumers' \
+check_has "$SRC_RES_STEPS" 'Single home of .tests_state. and of its two run-state consumers' \
   "T4.2: that section declares itself the single home"
 STATE_HITS="$(grep -rlE 'tests_state = ' "$REPO_ROOT/src" 2>/dev/null || true)"
 STATE_COUNT="$(printf '%s\n' "$STATE_HITS" | grep -c . || true)"
@@ -378,10 +378,10 @@ check_block_has "$QA_BLOCK_CAPTURE" 'no pass/fail flag' \
   "T4.4e: the capture rule says why a red state is not representable"
 # HEAD equality does not imply an identical tree: fixer.md's real-secret block
 # leaves HEAD unchanged and the working tree dirty.
-check_block_has "$STATE_BLOCK" 'Both sides require a clean tree' \
-  "T4.4f: capture and comparison both require an empty git status --porcelain"
-check_block_has "$STATE_BLOCK" 'git status --porcelain. must be empty \*\*both\*\*' \
-  "T4.4g: the clean-tree requirement binds capture AND comparison, not just one"
+check_block_has "$STATE_BLOCK" 'Both sides require a commit-relevant clean tree' \
+  "T4.4f: capture and comparison both require a commit-relevant clean tree"
+check_block_has "$STATE_BLOCK" 'git status --porcelain=v1 --untracked-files=all' \
+  "T4.4g: the canonical clean-tree command binds capture AND comparison"
 check_block_has "$STATE_BLOCK" 'Step 5, \*Verify all tests pass\*' \
   "T4.5: consumer 2 is Step 5's final verification run"
 check_block_has "$STATE_BLOCK" 'under .resolve\.auto_test.\*\*, never over it' \
@@ -397,8 +397,8 @@ check_has "$SRC_RES_SKILL" 'Under .auto_test., not over it' \
 # always-loaded file while pipeline-steps.md is progressive disclosure, so the
 # restatement is the copy an agent acts on. A restatement that gives only SHA
 # equality IS the looser second definition the home exists to prevent.
-check_has "$SRC_RES_SKILL" 'equals .git rev-parse HEAD. \*\*and .git status --porcelain. is empty\*\*' \
-  "T4.9b: the SKILL's restatement carries the clean-tree rule, not SHA equality alone"
+check_has "$SRC_RES_SKILL" 'equals .git rev-parse HEAD. \*\*and .git status --porcelain=v1 --untracked-files=all. is empty\*\*' \
+  "T4.9b: the SKILL's restatement carries the canonical clean-tree rule"
 # #255 captures tests_sha where the suite runs; promoting it to run state must
 # not move or soften that capture.
 check_block_has "$QA_BLOCK" 'tests_sha. = .git rev-parse HEAD' \
@@ -622,8 +622,8 @@ check_block_has "$B_STATE_BLOCK" 'Fail-safe is .run.' \
   "T7.31: built last-green state fail-safes to running the suite"
 check_block_has "$B_STATE_BLOCK" 'new config key is introduced' \
   "T7.32: built last-green state introduces no new config key"
-check_block_has "$B_STATE_BLOCK" 'Both sides require a clean tree' \
-  "T7.33: built last-green state requires a clean tree on capture and comparison"
+check_block_has "$B_STATE_BLOCK" 'Both sides require a commit-relevant clean tree' \
+  "T7.33: built last-green state requires a commit-relevant clean tree"
 check_block_has "$B_STATE_BLOCK" 'recorded green run' \
   "T7.34: built consumer 1 is conditioned on a recorded green run"
 check_block_has "$B_QA_CAPTURE" 'Record it only for a green run on a clean tree' \
@@ -654,8 +654,8 @@ check_block_has "$B_PAYLOAD_BLOCK" "condition 5 compares this live value, never 
   "T7.42: built payload gate feeds Step 0h's condition 5 the live updatedAt"
 check_block_has "$B_PAYLOAD_BLOCK" 'Batched spawns carry one record per issue' \
   "T7.43: built payload gate ships the per-issue rule for batch blocks"
-check_has "$BUILT_RES_SKILL" 'equals .git rev-parse HEAD. \*\*and .git status --porcelain. is empty\*\*' \
-  "T7.44: built resolver SKILL.md ships the clean-tree rule in its restatement"
+check_has "$BUILT_RES_SKILL" 'equals .git rev-parse HEAD. \*\*and .git status --porcelain=v1 --untracked-files=all. is empty\*\*' \
+  "T7.44: built resolver SKILL.md ships the canonical clean-tree rule"
 check_has "$BUILT_RES_SKILL" 'gh issue view N --json state,comments,updatedAt' \
   "T7.45: built resolver SKILL.md ships the widened live re-verify"
 check_block_has "$B_CI_GATE_BLOCK" 'statusCheckRollup. is non-empty with every check in it green' \

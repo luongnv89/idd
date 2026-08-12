@@ -27,11 +27,21 @@ Stop.
 
 ### Validate issues upfront
 
-Before starting the loop, validate all issues in one batch:
+Before starting the loop, validate every issue and retain the complete resolution
+snapshot that the canonical post-selection capture step consumes:
 
 ```bash
-gh issue view {N} --json number,title,state,labels,assignees
+gh issue view {N} --json number,title,body,state,labels,assignees,updatedAt
 ```
+
+Store successful replies in `explicit_issue_records[N]`. This is explicit-list
+mode's one **resolution-boundary body snapshot**; analysis, dependency ordering,
+and the later resolver/batch-resolver prompt project from it rather than fetching
+the body again. After optimization selects an issue or batch, invoke the canonical
+mode-neutral *Step 1.2b — Capture the caller payload* in
+`references/phases.md`, passing the matching held record(s). An individual gets
+one record; a batch gets a map keyed by issue number. A missing/incomplete entry
+degrades for that issue only to the ordinary fetch path.
 
 For each issue, check:
 - **Exists** — if not found, warn and remove from list
@@ -167,7 +177,7 @@ that the same step deletes.
 
 ### Loop behavior
 
-In explicit list mode, the loop iterates through the **optimized** order (not the original user order). Phase 1 is replaced: instead of triaging and picking, advance to the next issue (or batch) in the optimized list.
+In explicit list mode, the loop iterates through the **optimized** order (not the original user order). Phase 1 triage is replaced: advance to the next issue (or batch), then run the shared post-selection *Step 1.2b* capture against `explicit_issue_records` before spawning. Capture is mode-neutral and is not skipped with triage.
 
 #### Batch detection
 

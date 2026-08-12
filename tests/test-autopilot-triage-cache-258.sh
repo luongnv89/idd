@@ -328,16 +328,16 @@ check_block_has "$CAPTURE_BLOCK" '\*\*.\{issue_payload_ids\}.\*\* — the same r
 # Nothing in 1.2b may still claim the record came from the bulk list.
 check_block_lacks "$CAPTURE_BLOCK" 'this issue.s object from the Step 1\.1 list' \
   "T4.10: 1.2b no longer sources the payload from the Phase 1 list"
-check_has "$SRC_PROMPTS" 'verbatim from that step.s single-issue fetch' \
-  "T4.11: the Template Variables table records the new provenance"
+check_has "$SRC_PROMPTS" 'captured in mode-neutral .Step 1.2b.' \
+  "T4.11: the Template Variables table records mode-neutral provenance"
 check_has "$SRC_PROMPTS" 'number., .title., .body., .labels., .assignees., .state., .updatedAt' \
   "T4.12: the Template Variables field list is unchanged"
 
 # The dependency gate's body source claim moves with it.
 check_lacks "$SRC_PHASES" "Phase 1's cached body is the source" \
   "T4.13: Step 5.1b no longer sources the body from Phase 1's list"
-check_has "$SRC_PHASES" 'keys its cache by issue number' \
-  "T4.14: Step 5.1b states what the re-read actually costs"
+check_has "$SRC_PHASES" 'make \*\*no\*\* extra GitHub read' \
+  "T4.14: Step 5.1b reuses the held resolution snapshot"
 
 # ───────────────────────────────────────────────────────────
 # T5 (AC1): both re-triage triggers are named, and only those
@@ -712,8 +712,8 @@ check_lacks "$BUILT_SKILL" 'Runs a full triage each iteration' \
 # text further down the same file — an agent that follows it fails AC1 outright.
 check_lacks "$BUILT_SKILL" 'Each iteration: triage the backlog' \
   "T9.8b: built SKILL.md's Overview dropped the per-iteration triage claim too"
-check_has "$BUILT_PROMPTS" 'verbatim from that step.s single-issue fetch' \
-  "T9.9: built subagent-prompts.md ships the new payload provenance"
+check_has "$BUILT_PROMPTS" 'captured in mode-neutral .Step 1.2b.' \
+  "T9.9: built subagent-prompts.md ships mode-neutral payload provenance"
 check_has "$BUILT_SUMMARY" 'Triage current' \
   "T9.10: built summary-format.md ships the reuse-safe check name"
 check_has "$BUILT_PERSIST" 'Cross-skill incremental updates' \
@@ -794,8 +794,8 @@ check_block_lacks "$PAYLOAD_GATE" 'than the fetch it saves' \
   "T11.10: Step 0i dropped the comments rationale that argued against that list"
 check_block_lacks "$PAYLOAD_GATE" 'Phase 1.s widened list call' \
   "T11.11: Step 0i no longer calls the payload a widened list record"
-check_block_has "$PAYLOAD_GATE" 'fetches it once, after the pick, in its' \
-  "T11.12: Step 0i sources the payload from the caller's post-pick fetch"
+check_block_has "$PAYLOAD_GATE" 'captures it in its' \
+  "T11.12: Step 0i sources the payload from mode-neutral capture"
 check_block_has "$PAYLOAD_GATE" 'caller.s single-issue fetch deliberately does not request it' \
   "T11.13: the comments rationale is now the fetch's own field choice"
 # The staleness argument gets STRONGER under the new provenance, not weaker:
@@ -813,8 +813,8 @@ check_block_has "$PAYLOAD_GATE" 'a TTL-cached read, so an issue closed externall
 # conventions own the rule for every skill — three homes, one claim.
 check_lacks "$SRC_RES_SKILL" 'already listed it' \
   "T11.18: the resolver SKILL clause no longer says the caller listed the record"
-check_has "$SRC_RES_SKILL" 'already fetched it, in its \*Step 1\.2b\*' \
-  "T11.19: the resolver SKILL clause names the caller's post-pick fetch"
+check_has "$SRC_RES_SKILL" 'captured it in mode-neutral \*Step 1\.2b\*' \
+  "T11.19: the resolver SKILL clause names mode-neutral capture"
 check_lacks "$SRC_RES_SKILL" 'as fresh as the caller.s list' \
   "T11.20: the resolver SKILL clause measures staleness against that fetch"
 check_lacks "$SRC_CONV" 'as fresh as the list that produced it' \
@@ -877,8 +877,8 @@ check_block_lacks "$B_PAYLOAD_GATE" 'than the fetch it saves' \
   "T11.40: built pipeline-steps.md ships the corrected comments rationale"
 check_block_has "$B_PAYLOAD_GATE" 'the caller.s fetch — which is TTL-cached' \
   "T11.41: built pipeline-steps.md ships the stronger staleness argument"
-check_has "$BUILT_RES_SKILL" 'already fetched it, in its \*Step 1\.2b\*' \
-  "T11.42: built resolver SKILL.md ships the corrected provenance clause"
+check_has "$BUILT_RES_SKILL" 'captured it in mode-neutral \*Step 1\.2b\*' \
+  "T11.42: built resolver SKILL.md ships mode-neutral provenance"
 check_has "$BUILT_PHASES" '^\| .not_eligible. \|.*\| .Assigned. \|$' \
   "T11.43: built phases.md ships the reason-to-bucket table"
 check_has "$BUILT_ERRORS" 'single home of that mapping, never restated here' \
@@ -930,19 +930,19 @@ for pair in "src:$SRC_PROMPTS" "built:$BUILT_PROMPTS"; do
   check_block_has "$REV_FLAT" 'issue_payload_ids' \
     "T12.2 ($tag): the reviewer prompt body was extracted from its fenced block"
 
-  check_block_has "$RES_FLAT" "record verbatim from Step 1\.2b.s post-pick single-issue fetch" \
-    "T12.3 ($tag): the resolver prompt BODY sources the payload from Step 1.2b's fetch"
+  check_block_has "$RES_FLAT" "compact-JSON resolution snapshot" \
+    "T12.3 ($tag): the resolver prompt BODY sources the mode-neutral snapshot"
   check_block_has "$RES_FLAT" 'complete with updatedAt but WITHOUT comments' \
     "T12.4 ($tag): the resolver body keeps the field-set clause the rewrite sits on"
-  check_block_has "$RES_FLAT" "Phase 1.s bulk list carries no body" \
-    "T12.5 ($tag): the resolver body says why the list is not the payload's source"
+  check_block_has "$RES_FLAT" "mode-neutral capture" \
+    "T12.5 ($tag): the resolver body names mode-neutral capture"
   check_block_lacks "$RES_FLAT" "$STALE_PROVENANCE" \
     "T12.6 ($tag): the resolver body never attributes the payload to the bulk list"
 
-  check_block_has "$REV_FLAT" "trimmed from Step 1\.2b.s post-pick single-issue fetch" \
-    "T12.7 ($tag): the reviewer prompt BODY sources its block from the same fetch"
-  check_block_has "$REV_FLAT" "Step 1\.2b.s post-pick single-issue fetch — captured BEFORE" \
-    "T12.8 ($tag): instruction 6 names the same provenance as the block header"
+  check_block_has "$REV_FLAT" "BEGIN_UNTRUSTED_issue_payload_ids" \
+    "T12.7 ($tag): the reviewer prompt BODY carries the framed trimmed block"
+  check_block_has "$REV_FLAT" "resolution-boundary snapshot captured BEFORE" \
+    "T12.8 ($tag): instruction 6 names the mode-neutral freshness boundary"
   check_block_lacks "$REV_FLAT" "$STALE_PROVENANCE" \
     "T12.9 ($tag): the reviewer body never attributes its block to the bulk list"
 done
@@ -1040,8 +1040,8 @@ check_has "$SRC_ERRORS" 'because \*Step 1\.1a\* read the cache as .fresh.' \
   "T13.4: the error catalog points at the renamed gate"
 check_has "$SRC_EXAMPLES" 'its own \*Step 1\.1a\* gate' \
   "T13.5: the examples narration points at the renamed gate"
-check_has "$SRC_PROMPTS" 'reused unchanged by \*Step 1\.1a\*.s cache gate' \
-  "T13.6: subagent-prompts.md points at the renamed gate"
+check_has "$SRC_PROMPTS" 'mode-neutral .Step 1.2b.' \
+  "T13.6: subagent-prompts.md points at mode-neutral capture"
 check_has "$SRC_SUMMARY" 'a cache \*Step 1\.1a\* read as .fresh.' \
   "T13.7: summary-format.md points at the renamed gate"
 # #257's own references must NOT have been renamed with it.
