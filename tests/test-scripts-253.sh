@@ -727,6 +727,80 @@ expect_grep "AC1: deferred medium candidates remain visible warnings" \
   'retained as possible-duplicate warnings without an LLM verdict' "$SKILLS/issue-creator/SKILL.md"
 expect_grep "AC1: duplicate-detector resolves deduplicated issue context" \
   'reference `issue_context` by `match_number`' "$SKILLS/issue-creator/references/agents/duplicate-detector.md"
+expect_grep "AC1: duplicate-detector uses a tri-state decision" \
+  'exactly `confirmed`, `rejected`, or `ambiguous`' "$SKILLS/issue-creator/references/agents/duplicate-detector.md"
+expect_grep "AC1: truncated context is explicit ambiguity" \
+  'truncated body may hide the deciding context' "$SKILLS/issue-creator/references/agents/duplicate-detector.md"
+expect_grep "AC1: malformed or failed judgement remains a warning" \
+  'missing, duplicate, malformed, incomplete, unknown-decision, wrong-identity, or failed-agent verdict' "$SKILLS/issue-creator/SKILL.md"
+expect_grep "AC1: batch malformed or failed judgement remains a warning" \
+  'failed agent/chunk or a missing, duplicate, malformed, incomplete, unknown-decision, or wrong-identity verdict' "$SKILLS/issue-creator/references/modes.md"
+
+# Executable consumer contract: only one complete, identity-matched rejection may
+# remove a medium warning. Ambiguous/truncated evidence and every malformed,
+# missing, duplicate, or failed-agent path retain the deterministic candidate.
+python3 - "$SRC/skills/issue-creator/SKILL.source.md" "$SRC/shared/agents/duplicate-detector.md" <<'PY'
+import pathlib, sys
+skill = pathlib.Path(sys.argv[1]).read_text()
+agent = pathlib.Path(sys.argv[2]).read_text()
+assert "failed-agent verdict is fail-safe ambiguity" in skill
+assert "A truncated body is partial evidence" in agent
+assert "Ambiguity is never a rejection" in agent
+
+candidate = {
+    "item_index": 1, "match_type": "existing_issue", "match_number": 42,
+    "score": 4, "payments": [{"signal": "keyword", "amount": 2}],
+    "reason": "keyword +2; same_type +1",
+}
+identity = (1, "existing_issue", 42)
+
+def retained(verdicts, failed=False):
+    if failed or not isinstance(verdicts, list):
+        return True
+    matched = []
+    for verdict in verdicts:
+        if not isinstance(verdict, dict):
+            continue
+        key = (verdict.get("item_index"), verdict.get("match_type"),
+               verdict.get("match_number"))
+        if key == identity:
+            matched.append(verdict)
+    if len(matched) != 1:
+        return True
+    verdict = matched[0]
+    return not (
+        verdict.get("decision") == "rejected"
+        and isinstance(verdict.get("reason"), str)
+        and bool(verdict["reason"].strip())
+        and set(verdict) >= {"item_index", "match_type", "match_number",
+                            "decision", "reason"}
+    )
+
+cases = {
+    "confirmed": ([{"item_index":1,"match_type":"existing_issue","match_number":42,"decision":"confirmed","reason":"same outcome"}], False, True),
+    "truncated ambiguity": ([{"item_index":1,"match_type":"existing_issue","match_number":42,"decision":"ambiguous","reason":"body truncated before outcome"}], False, True),
+    "evidence-backed rejection": ([{"item_index":1,"match_type":"existing_issue","match_number":42,"decision":"rejected","reason":"different requested outcomes"}], False, False),
+    "missing verdict": ([], False, True),
+    "malformed boolean": ([{"item_index":1,"match_type":"existing_issue","match_number":42,"confirmed":False,"reason":"legacy"}], False, True),
+    "incomplete reason": ([{"item_index":1,"match_type":"existing_issue","match_number":42,"decision":"rejected","reason":""}], False, True),
+    "wrong identity": ([{"item_index":1,"match_type":"existing_issue","match_number":99,"decision":"rejected","reason":"different"}], False, True),
+    "duplicate verdict": ([{"item_index":1,"match_type":"existing_issue","match_number":42,"decision":"rejected","reason":"different"},{"item_index":1,"match_type":"existing_issue","match_number":42,"decision":"confirmed","reason":"same"}], False, True),
+    "unknown decision": ([{"item_index":1,"match_type":"existing_issue","match_number":42,"decision":"maybe","reason":"unsure"}], False, True),
+    "agent failure": ([], True, True),
+}
+for name, (verdicts, failed, expected) in cases.items():
+    actual = retained(verdicts, failed)
+    assert actual is expected, (name, actual, expected)
+    if actual:
+        # Fail-safe handling preserves deterministic evidence, not just identity.
+        assert candidate["score"] == 4 and candidate["payments"] and candidate["reason"]
+print(f"tri-state contract: {len(cases)} paths passed")
+PY
+if [ "$?" -eq 0 ]; then
+  pass "AC1: tri-state consumer preserves all ambiguous/malformed/failure warnings"
+else
+  fail "AC1: tri-state consumer silently drops an uncertain medium candidate"
+fi
 expect_grep "AC1: schema enforces monotone phrase weight ordering" \
   'must be >= `weights.title_overlap`' "$REPO_ROOT/docs/config-schema.md"
 for key in weights.phrase weights.title_overlap weights.keyword weights.same_type high_threshold medium_threshold min_token_length phrase_min_tokens backlog_limit max_items extra_stop_words; do
