@@ -452,6 +452,63 @@ else
   fail "AC2/#273: terminal verdict trusted a check set that was still growing"
 fi
 
+# A slow poll that crosses the timeout must not win over the deadline. This
+# invokes the implementation directly with deterministic poll and clock hooks.
+python3 - "$CIWAIT" <<'PY'
+import importlib.util
+import sys
+
+path = sys.argv[1]
+spec = importlib.util.spec_from_file_location("ciwait_timeout", path)
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+class Clock:
+    def __init__(self):
+        self.now = 0.0
+    def __call__(self):
+        return self.now
+
+clock = Clock()
+polls = iter([
+    [{"name": "lint", "bucket": "pass"}],
+])
+
+def poll_once(_pr, _repo):
+    clock.now = 11.0  # gh returned after the ten-second timeout
+    return next(polls)
+
+mod.poll_once = poll_once
+result = mod.wait("42", None, interval=1, timeout=10, settle_window=0,
+                  sleep=lambda _seconds: None, clock=clock)
+assert result["verdict"] == "pending", result
+assert result["settled"] is False, result
+assert result["checks"] == [{"name": "lint", "bucket": "pass"}], result
+print("pass: AC2/#273: timeout wins when a poll completes after deadline")
+PY
+
+# Exact-boundary timeout also wins over a zero-width settle window.
+python3 - "$CIWAIT" <<'PY'
+import importlib.util
+import sys
+
+spec = importlib.util.spec_from_file_location("ciwait_boundary", sys.argv[1])
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+clock_now = [0.0]
+def clock():
+    return clock_now[0]
+def poll_once(_pr, _repo):
+    clock_now[0] = 10.0
+    return [{"name": "lint", "bucket": "pass"}]
+mod.poll_once = poll_once
+result = mod.wait("42", None, interval=1, timeout=10, settle_window=0,
+                  sleep=lambda _seconds: None, clock=clock)
+assert result["verdict"] == "pending", result
+assert result["settled"] is False, result
+print("pass: AC2/#273: exact deadline wins over zero-width settlement")
+PY
+
 # The whole wait happens in one invocation: several polls, one process, one
 # verdict. That is the property that removes the per-poll agent tool call.
 SEQ="$TMP/seq"

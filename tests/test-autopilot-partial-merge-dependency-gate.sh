@@ -26,6 +26,19 @@ else
   fail "T1: Phase 3-4 missing Step 2a dependency gate before merge"
 fi
 
+STEP2A="$(awk '/Step 2a — Dependency and CI gates/{f=1; next} f && /^\*\*Step 2b/{exit} f' "$PHASES")"
+if printf '%s' "$STEP2A" | grep -qE 'Step 5\.1a — CI verdict gate' \
+  && printf '%s' "$STEP2A" | grep -qE 'trusted' \
+  && printf '%s' "$STEP2A" | grep -qE 'settled `pass`' \
+  && printf '%s' "$STEP2A" | grep -qE 'none_confirmed' \
+  && printf '%s' "$STEP2A" | grep -qE 'manual fallback' \
+  && printf '%s' "$STEP2A" | grep -qE 'stale|absent' \
+  && printf '%s' "$STEP2A" | grep -qE 'unsettled|unconfirmed'; then
+  pass "T1.1: partial path accepts only fresh trusted/settled CI outcomes"
+else
+  fail "T1.1: partial path CI gate semantics are incomplete"
+fi
+
 # AC2: blocked_by_dependency on partial path when deps open
 if awk '/Step 2a — Dependency and CI gates/{f=1} f && /blocked_by_dependency/{found=1; exit} END{exit !found}' "$PHASES"; then
   pass "T2: partial-merge path records blocked_by_dependency when gate fails"
@@ -34,8 +47,6 @@ else
 fi
 
 # AC2b (#243): the partial path still refuses the merge, but continues the loop.
-STEP2A="$(awk '/Step 2a — Dependency and CI gates/{f=1; next} f && /^\*\*Step 2b/{exit} f' "$PHASES")"
-
 if printf '%s' "$STEP2A" | grep -qE 'do \*\*not\*\* merge'; then
   pass "T2.1: Step 2a still refuses to merge out of dependency order"
 else

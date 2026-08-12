@@ -223,7 +223,15 @@ def wait(
             # establish that the returned snapshot has settled.
             break
 
+        # Re-read the clock after the poll returns and before considering any
+        # terminal verdict. A slow gh call may cross the deadline; timeout wins
+        # over settlement so a late snapshot can never authorize a merge.
         elapsed = clock() - started
+        if elapsed >= timeout:
+            verdict = "pending"
+            settled = False
+            break
+
         if verdict in TERMINAL_VERDICTS:
             membership = tuple(
                 sorted(str(check.get("name") or "") for check in checks)
