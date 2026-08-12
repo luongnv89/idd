@@ -1,0 +1,35 @@
+{
+  "source": "Representative labels derived from the public IDD backlog; labels are human-assigned before scorer output.",
+  "cases": [
+    {
+      "id": "exact-scorer-scope",
+      "label": "high",
+      "item": {"index": 1, "title": "Ship deterministic duplicate scorer", "keywords": ["duplicate scorer"], "type": "feature"},
+      "target": {"number": 253, "title": "Ship deterministic duplicate scorer", "body": "Mechanize duplicate scoring.", "labels": [{"name": "feature"}]}
+    },
+    {
+      "id": "same-component-ambiguous",
+      "label": "medium",
+      "item": {"index": 1, "title": "Tune duplicate thresholds", "keywords": ["thresholds"], "type": "improvement"},
+      "target": {"number": 278, "title": "Recalibrate duplicate bands", "body": "Adjust thresholds after measuring the backlog.", "labels": [{"name": "improvement"}]}
+    },
+    {
+      "id": "unrelated-runtime-scripts",
+      "label": "low",
+      "item": {"index": 1, "title": "Ship duplicate scorer", "keywords": ["duplicate"], "type": "feature"},
+      "target": {"number": 260, "title": "Add resolver worktree isolation", "body": "Use a separate checkout.", "labels": [{"name": "feature"}]}
+    },
+    {
+      "id": "short-title-duplicate",
+      "label": "high",
+      "item": {"index": 1, "title": "CI cache", "keywords": [], "type": "feature"},
+      "target": {"number": 275, "title": "CI cache", "body": "Cache CI state.", "labels": [{"name": "feature"}]}
+    },
+    {
+      "id": "keyword-only-ambiguity",
+      "label": "medium",
+      "item": {"index": 1, "title": "Document release checks", "keywords": ["secscan", "release"], "type": "improvement"},
+      "target": {"number": 252, "title": "Ship security scan release script", "body": "Run secscan before release pushes.", "labels": [{"name": "feature"}]}
+    }
+  ]
+}

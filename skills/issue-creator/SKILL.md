@@ -91,7 +91,7 @@ Otherwise, load `.gitissue.yml` from the repo root once at skill start. If the f
 ○ First run — using default config. Run /init-gitissue to customize.
 ```
 
-Defaults: `issue.template: "default"`, `issue.labels_auto_suggest: true`, `issue.normalize_comment: true`, `model_suggestion.enabled: true`
+Defaults: `issue.template: "default"`, `issue.labels_auto_suggest: true`, `issue.normalize_comment: true`, `model_suggestion.enabled: true`; duplicate scoring defaults come from the once-loaded `duplicate_detection.*` keys (`weights.phrase: 2`, `weights.title_overlap: 2`, `weights.keyword: 1`, `weights.same_type: 1`, `high_threshold: 5`, `medium_threshold: 3`, `min_token_length: 1`, `phrase_min_tokens: 3`, `backlog_limit: 100`, `max_items: 100`, `extra_stop_words: ""`).
 
 If the config file exists but contains invalid values, output the validation error from `references/error-messages.md` and stop. Do not re-read the config at each step.
 
@@ -107,16 +107,15 @@ Exit 0 prints `state` (`fresh` | `stale` | `seeded` | `installed`), `stale`, `ag
 
 ## Subagent Architecture
 
-The skill delegates **duplicate detection (Step 3)** to a subagent so the main agent's **context window** stays clean and the **token budget** stays predictable. Every other step stays in the main agent: parse input (Step 1) and classify (Step 2) are lightweight; clarify ambiguous intent (Step 3.5), generate content (Step 4), preview (Step 5), and create (Step 6) run inline.
+The deterministic half of duplicate detection runs in `references/scripts/gi-dup-score.py`; it reads the proposed items and the once-loaded resolved `duplicate_detection.*` mapping on stdin, then self-fetches the backlog. The skill delegates **only the medium-band judgement (Step 3)** to the duplicate-detector subagent, so the model never recomputes scores or reads up to 100 issue bodies. Every other step stays in the main agent.
 
-In **batch mode**, the duplicate detector checks all batch items — including internal cross-checks — in a single pass, so only one subagent spawn is needed regardless of batch size, and duplicate checking runs in parallel with template generation.
+In **batch mode**, one script run scores all existing and internal pairs bidirectionally. At most one subagent spawn judges the pooled `medium_band`, and an empty band skips the spawn entirely.
 
-Read `references/agents/duplicate-detector.md` for the full duplicate detector prompt.
+Read `references/agents/duplicate-detector.md` for the medium-band prompt.
 
 ### Environment check
 
-If the Agent tool is available, use the duplicate-detector subagent as described above for Step 3.
-If not (e.g., Claude.ai or environments without the Agent tool), execute duplicate checking inline using the fallback instructions included in Step 3.
+If the Agent tool is available, use it only when Step 3 has medium candidates. Without the Agent tool, report medium candidates as possible duplicates without pretending an LLM verdict occurred. If the script itself cannot run, execute the documented inline fallback.
 
 ### Bundled dependency precheck
 
@@ -156,6 +155,7 @@ Check these files:
 - `references/docs/terminal-style.md` — terminal output style contract (symbols, output structure, table/error formats)
 - `references/scripts/gi-config.py` — config resolver: merges the documented defaults with `.gitissue.yml` and prints one JSON line
 - `references/scripts/gi-issue.py` — TTL-cached issue fetcher for Normalize mode's repeat reads
+- `references/scripts/gi-dup-score.py` — deterministic duplicate scorer (Step 3)
 - `references/scripts/gi-model-cache.py` — model-data cache lifecycle
 
 ---
@@ -212,36 +212,21 @@ Assign confidence to the type classification:
 
 ### Step 3 — Check for Duplicates
 
-#### Subagent delegation
+#### Score deterministically
 
-Spawn the duplicate-detector subagent with:
+Write a request object to `.gitissue/cache/dup-request.json` with the classified `items` plus the `config` object returned at skill start. Feed it on stdin; never put an issue title, keyword, body, or config value on the command line:
 
 ```json
-{
-  "mode": "create",
-  "items": [
-    {
-      "index": 1,
-      "title": "{classified_title}",
-      "keywords": ["{keyword1}", "{keyword2}"],
-      "type": "{bug|feature|improvement}"
-    }
-  ],
-  "repo_root": "{repo_root}"
-}
+{"mode":"create","items":[{"index":1,"title":"…","keywords":["…"],"type":"bug"}],"config":{"duplicate_detection.weights.phrase":2}}
 ```
-
-Read `references/agents/duplicate-detector.md` for the full prompt. The subagent returns a `duplicates` array with scored matches.
-
-#### Fallback (no Agent tool)
-
-If the Agent tool is not available, run inline:
 
 ```bash
-gh issue list --state open --json number,title,body,labels --limit 100
+python3 references/scripts/gi-dup-score.py < .gitissue/cache/dup-request.json
 ```
 
-Compare the new issue's title and key terms against existing issues.
+Resolve the script relative to this SKILL.md as the dependency precheck does, and delete the request after the call. Exit 0 returns `duplicates` (deterministic high band), `medium_band`, and `batch_internal_duplicates`. An empty `medium_band` skips the agent. When non-empty, spawn the duplicate-detector with `{mode, items, candidates: medium_band}`; it returns semantic confirm/reject verdicts without fetching or rescoring. Merge confirmed verdicts into the presented warnings. High matches are warnings too — the scorer never silently drops requested work.
+
+Exit 3 is invalid request/config: stop with the validation error. A missing script is a broken install: stop with the dependency error. For no `python3`, exit 2/4, or unparsable stdout, print `⚠ gi-dup-score unavailable — scoring duplicates inline`; exit 4 means the backlog was unreadable, never empty. The inline fallback fetches `gh issue list --state open --json number,title,body,labels --limit 100` and applies the documented canonical rules: NFKC/case-fold tokens; one minimum-length and additive stop-word policy; fixed phrase → title-overlap → keyword precedence; each payment derived only from newly consumed item tokens; one same-type payment; configured weights and thresholds. Apply internal batch pairs in both directions and keep the stronger direction.
 
 #### Present results
 

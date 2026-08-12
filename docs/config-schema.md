@@ -456,6 +456,30 @@ projects:
     # Default: "Done"
     done: "Done"
 
+# Deterministic duplicate scoring (used by /issue-creator)
+# All textual evidence uses one NFKC/case-folded tokenizer. A signal pays per
+# newly consumed item token, never per keyword string. extra_stop_words extends
+# the built-in list; it never replaces it.
+duplicate_detection:
+  weights:
+    # Per-token weights; each must be an integer >= 0
+    phrase: 2
+    title_overlap: 2
+    keyword: 1
+    # Paid once, not per token
+    same_type: 1
+  # Calibrated from tests/fixtures/gi-dup-score-backlog.json. High is decided
+  # deterministically; medium alone is sent to the duplicate-detector agent.
+  high_threshold: 5
+  medium_threshold: 3
+  # Shared tokenizer and detection bounds (integers >= 1)
+  min_token_length: 1
+  phrase_min_tokens: 3
+  backlog_limit: 100
+  max_items: 100
+  # Additive ignored terms. Unicode normalization/case folding happens first.
+  extra_stop_words: ""
+
 # Model suggestion settings (used by /issue-creator)
 # See src/skills/issue-creator/references/model-suggestion.md for the full procedure
 model_suggestion:
@@ -523,6 +547,7 @@ graph TD
     R --> T["triage"]
     R --> A["analysis"]
     R --> PR["projects"]
+    R --> DD["duplicate_detection"]
     R --> MS["model_suggestion"]
     R --> SEC["security"]
 
@@ -578,6 +603,11 @@ graph TD
     PR --> PR2["project_number"]
     PR --> PR3["status_field"]
     PR --> PR4["status_map"]
+
+    DD --> DD1["weights"]
+    DD --> DD2["high_threshold / medium_threshold"]
+    DD --> DD3["token + detection limits"]
+    DD --> DD4["extra_stop_words"]
 
     MS --> MS1["enabled"]
     MS --> MS2["data_url"]
@@ -703,6 +733,17 @@ Config is validated on load at the start of every skill invocation. Errors inclu
 | `projects.status_map.todo` | `"Todo"` | Status for new issues |
 | `projects.status_map.in_progress` | `"In Progress"` | Status when work starts |
 | `projects.status_map.done` | `"Done"` | Status when PR is created |
+| `duplicate_detection.weights.phrase` | `2` | Per newly consumed phrase token |
+| `duplicate_detection.weights.title_overlap` | `2` | Per newly consumed shared-title token |
+| `duplicate_detection.weights.keyword` | `1` | Per newly consumed canonical keyword token |
+| `duplicate_detection.weights.same_type` | `1` | One-time same-type payment |
+| `duplicate_detection.high_threshold` | `5` | Deterministic high-band warning |
+| `duplicate_detection.medium_threshold` | `3` | Only band handed to the LLM for judgement |
+| `duplicate_detection.min_token_length` | `1` | Canonical tokenizer minimum, including one-character evidence |
+| `duplicate_detection.phrase_min_tokens` | `3` | Minimum contiguous phrase length |
+| `duplicate_detection.backlog_limit` | `100` | Maximum open issues scored |
+| `duplicate_detection.max_items` | `100` | Maximum proposed items per scorer request |
+| `duplicate_detection.extra_stop_words` | `""` | Additive comma-separated canonical stop words; never raises a score |
 | `model_suggestion.enabled` | `true` | Suggest a model + thinking level per issue |
 | `model_suggestion.data_url` | `"https://cursor.com/cursorbench"` | CursorBench source refreshed into the cache |
 | `model_suggestion.cache_ttl_days` | `7` | Days before cached model data is stale |

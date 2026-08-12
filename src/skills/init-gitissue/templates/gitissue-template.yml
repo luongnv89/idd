@@ -21,6 +21,22 @@ issue:
   # Post a comment when normalizing an issue
   normalize_comment: true
 
+# Deterministic duplicate scoring. Payments come only from newly consumed,
+# canonical item tokens; extra stop words extend (never replace) built-ins.
+duplicate_detection:
+  weights:
+    phrase: 2
+    title_overlap: 2
+    keyword: 1
+    same_type: 1
+  high_threshold: 5
+  medium_threshold: 3
+  min_token_length: 1
+  phrase_min_tokens: 3
+  backlog_limit: 100
+  max_items: 100
+  extra_stop_words: ""
+
 # Resolution pipeline settings
 resolve:
   # Approval gate for the plan phase

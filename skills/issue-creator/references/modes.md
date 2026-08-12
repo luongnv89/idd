@@ -243,34 +243,15 @@ Use `references/docs/terminal-style.md` table format: box-drawing characters `�
 
 ### Step 3 — Duplicate Check
 
-#### Subagent delegation
+#### Deterministic scoring and medium-band judgement
 
-Spawn the duplicate-detector subagent with all batch items:
+Write all batch items and the once-loaded resolved config to the same stdin request described by Create Step 3, with `mode: "batch"`, then run `references/scripts/gi-dup-score.py` once. The scorer checks every item against the open backlog and every unordered internal pair in **both directions**; its record retains `directional_scores`, and the stronger direction controls the band without duplicating the pair.
 
-```json
-{
-  "mode": "batch",
-  "items": [
-    { "index": 1, "title": "...", "keywords": [...], "type": "bug" },
-    { "index": 2, "title": "...", "keywords": [...], "type": "feature" }
-  ],
-  "repo_root": "{repo_root}"
-}
-```
+`duplicates` and `batch_internal_duplicates` are deterministic high-band warnings. Spawn the duplicate-detector at most once, and only when `medium_band` is non-empty, with `{mode: "batch", items, candidates: medium_band}`. The agent judges semantic intent from the supplied records; it neither fetches nor recomputes arithmetic. With no Agent tool, retain medium entries as possible-duplicate warnings. With an empty band, skip the spawn.
 
-Read `references/agents/duplicate-detector.md` for the full prompt. The subagent checks each item against existing open issues AND cross-checks items against each other in a single pass.
+**Parallel execution:** script scoring can run alongside template pre-generation. Medium judgement, when needed, begins after the score result and is consumed at Step 4.
 
-**Parallel execution:** In batch mode, spawn the duplicate-detector at the same time as pre-generating template content — both results are ready by Step 4 (Approval) and consumed at Step 5 (Create Issues).
-
-#### Fallback (no Agent tool)
-
-If the Agent tool is not available, run inline:
-
-```bash
-gh issue list --state open --json number,title,body,labels --limit 100
-```
-
-Check each batch item against existing issues AND against other items in the batch.
+If the scorer cannot run, follow Create Step 3's classified fallback and compare each item against existing issues and other batch items bidirectionally. Exit 3 stops; an unreadable backlog never becomes a clean scan.
 
 #### Present results
 

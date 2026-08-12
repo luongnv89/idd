@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 # test-scripts-253.sh — Issue #253 acceptance checks for the third wave of
-# shared scripts (gi-triage-graph, gi-stack-detect, gi-model-cache).
+# shared scripts (gi-dup-score, gi-triage-graph, gi-stack-detect, gi-model-cache).
 #
-# AC1 (deterministic duplicate scoring) is deliberately not covered here:
-# `gi-dup-score.py` was removed from this change set and stays open on #253,
-# to be redone against a corrected scoring model. Nothing below refers to it.
+# AC1's deep scorer properties live in test-scripts-278.sh; this suite pins the
+# distribution, config, and issue-creator wiring so the tested scorer ships.
 #
 # Acceptance criteria covered:
 #   AC2  Triage ordering is produced by a script emitting the same cache payload
@@ -33,8 +32,9 @@ SRC="$REPO_ROOT/src"
 GRAPH="$SRC_SCRIPTS/gi-triage-graph.py"
 STACK="$SRC_SCRIPTS/gi-stack-detect.py"
 MODEL="$SRC_SCRIPTS/gi-model-cache.py"
+DUP="$SRC_SCRIPTS/gi-dup-score.py"
 
-NEW_SCRIPTS="gi-triage-graph gi-stack-detect gi-model-cache"
+NEW_SCRIPTS="gi-dup-score gi-triage-graph gi-stack-detect gi-model-cache"
 
 PASS=0
 FAIL=0
@@ -102,7 +102,7 @@ while IFS= read -r line; do
   mode="${line%% *}"
   file="${line##*	}"
   case "$file" in
-    *gi-triage-graph.py|*gi-stack-detect.py|*gi-model-cache.py)
+    *gi-dup-score.py|*gi-triage-graph.py|*gi-stack-detect.py|*gi-model-cache.py)
       if [ "$mode" = "100755" ]; then
         pass "$(basename "$file") is committed 0755"
       else
@@ -607,6 +607,7 @@ expect_bundled() {
     fail "AC5: $skill bundles $script"
   fi
 }
+expect_bundled issue-creator gi-dup-score.py
 expect_bundled issue-creator gi-model-cache.py
 expect_bundled issue-triage gi-triage-graph.py
 expect_bundled auto-pilot gi-triage-graph.py
@@ -620,6 +621,26 @@ expect_grep() {
     fail "$label"
   fi
 }
+expect_grep "AC1: issue-creator calls gi-dup-score from its own orchestrator" \
+  "references/scripts/gi-dup-score.py" "$SKILLS/issue-creator/SKILL.md"
+expect_grep "AC1: issue-creator sends the scorer request on stdin" \
+  "< .gitissue/cache/dup-request.json" "$SKILLS/issue-creator/SKILL.md"
+expect_grep "AC1: an empty medium band skips the judgement agent" \
+  'empty `medium_band` skips the agent' "$SKILLS/issue-creator/SKILL.md"
+expect_grep "AC1: duplicate-detector is medium-band judgement only" \
+  "No deterministic rescoring" "$SKILLS/issue-creator/references/agents/duplicate-detector.md"
+for key in weights.phrase weights.title_overlap weights.keyword weights.same_type high_threshold medium_threshold min_token_length phrase_min_tokens backlog_limit max_items extra_stop_words; do
+  if grep -q "duplicate_detection.$key" "$REPO_ROOT/docs/config-schema.md"; then
+    pass "AC1: duplicate_detection.$key is documented"
+  else
+    fail "AC1: duplicate_detection.$key is missing from config schema"
+  fi
+done
+expect_grep "AC1: init template emits duplicate_detection" \
+  "duplicate_detection:" "$REPO_ROOT/src/skills/init-gitissue/templates/gitissue-template.yml"
+expect_grep "AC1: dedicated non-vacuous scorer suite is CI-wired" \
+  "bash tests/test-scripts-278.sh" "$REPO_ROOT/.github/workflows/dist-check.yml"
+
 expect_grep "AC2: issue-triage's ordering step calls gi-triage-graph" \
   "references/scripts/gi-triage-graph.py" "$SKILLS/issue-triage/SKILL.md"
 expect_grep "AC2: auto-pilot Phase 1 calls the SAME script, not a reimplementation" \
@@ -720,12 +741,13 @@ python3 - "$REPO_ROOT" <<'PY' > "$TMP/lint-report"
 import pathlib, re, subprocess, sys
 
 root = pathlib.Path(sys.argv[1])
-WAVE3 = ("gi-triage-graph.py", "gi-stack-detect.py", "gi-model-cache.py")
+WAVE3 = ("gi-dup-score.py", "gi-triage-graph.py", "gi-stack-detect.py", "gi-model-cache.py")
 
 # Gap 4: a pinned count per script, not "at least one somewhere". Deleting one
 # of `gi-triage-graph.py`'s two call sites is a real change to the contract this
 # lint pins, so it must be an explicit edit here and not a silent pass.
 EXPECTED_SITES = {
+    "gi-dup-score.py": 1,
     "gi-triage-graph.py": 2,
     "gi-stack-detect.py": 1,
     "gi-model-cache.py": 2,
@@ -932,7 +954,7 @@ done
 
 # And the positive statement: each script's own docstring names where its
 # untrusted input comes from, so a reader of the script sees the contract.
-for entry in "gi-triage-graph|on stdin" \
+for entry in "gi-dup-score|on stdin" "gi-triage-graph|on stdin" \
              "gi-stack-detect|it reads the repository" "gi-model-cache|stdin"; do
   s="${entry%%|*}"; needle="${entry##*|}"
   if head -80 "$SRC_SCRIPTS/$s.py" | grep -q -- "$needle"; then
