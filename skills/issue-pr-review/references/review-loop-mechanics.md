@@ -26,31 +26,61 @@ already fetched in Step 1 and takes the **fuller** of any inputs that disagree:
 
 Resolve to `light` **only when every available signal agrees on trivial**; any
 `full` vote, or a missing/ambiguous signal, wins → `full`. When
-`review.adaptive_depth` is `false`, the gate is skipped and `profile = full`.
+`review.adaptive_depth` is `false`, only the signal selection above is skipped
+and `profile = full`; the review-boundary refresh and the fail-safe below still
+run, because they are about the freshness of the record Step 3 reads, not about
+how deep this review goes.
 
 ### The empty-record fail-safe
 
 SKILL.md's review-boundary refresh has two paths — the script, then a direct
 `gh` degrade. This is what happens when **neither** returns a usable record.
 
-**Re-run the refresh once. If the second attempt also fails, stop the review.**
-Print the failure and the issue number; do not continue to Step 3.
+**Scope — one state, and only one: a linked issue exists *and* its record could
+not be read.** The refresh is conditional in exactly the way the `Effort` bullet
+above is — **when the PR body has `Closes #N`**. A PR with no linked issue has
+nothing to refresh, so its empty `linked_issue_snapshot` is the correct state
+rather than a failed read, and this fail-safe **never** stops it. It proceeds to
+Step 3 like any other PR, where `references/verification-checks.md` already
+answers for it: `acceptance_criteria` reports `○ pass — none defined; manual
+review recommended`, traceability check 1 **fails** on the missing `Closes #N`
+(issue #36's canonical case — Step 6 fixes it by editing the PR body) unless the
+*Refactor/chore exemption* applies, and check 2 reports `n/a — no linked issue`.
+Stopping those PRs would suppress the exact finding they exist to produce.
+
+**Re-run the refresh once — the whole refresh, both paths in the original order:
+`gi-issue.py … --refresh` first, then the direct-`gh` degrade if it fails.**
+Retrying only the path that failed can miss a transient fault in the other. If
+the second attempt also yields no usable record, stop the review; do not
+continue to Step 3. Print the rich error (*Linked issue unreadable at the review
+boundary* in `references/error-messages.md`):
+
+```
+✗ Cannot read linked issue #{N} — review stopped
+
+  To fix:  gh issue view {N} --json number,title,body,labels
+  Then:    /issue-pr-review {N}
+  Docs:    https://github.com/luongnv89/idd/blob/main/docs/platform-github.md
+```
 
 Two things are forbidden on this path, and they are the whole reason it is
 written down:
 
-- **Never proceed with an empty `linked_issue_snapshot`.** Step 3 verifies
-  acceptance criteria against that variable, and `acceptance_criteria` is one of
-  the two issue #36 hard-blocks. A dimension whose input is empty reports no
-  failed criterion, so it renders as `pass` — turning a hard-block into a no-op
-  while the report still shows five green dimensions. An unverifiable criterion
-  is `unverified` at best; an unread issue is not a passing one.
+- **Never proceed with an empty `linked_issue_snapshot` for a PR that links an
+  issue.** Step 3 verifies acceptance criteria against that variable, and
+  `acceptance_criteria` is one of the two issue #36 hard-blocks. A dimension
+  whose input is empty reports no failed criterion, so it renders as `pass` —
+  turning a hard-block into a no-op while the report still shows five green
+  dimensions. That `pass` is *correct* for a PR that defines no criteria and a
+  *false* one for a PR whose criteria exist and merely could not be read, which
+  is why the scope above is the whole fix. An unverifiable criterion is
+  `unverified` at best; an unread issue is not a passing one.
 - **Never fall back to a cached record.** The `--refresh` is not an optimization
-  to be relaxed under pressure: the review boundary is defined as an
-  independently fresh read (`references/docs/idd-methodology.md`), and the resolver's Step
-  0d rewrites the very body this snapshot carries. A cache entry predating that
-  rewrite can be missing the Acceptance Criteria section 0d created, which is
-  the one section Step 3 exists to check.
+  to be relaxed under pressure: the review boundary earns its name only by being
+  an independently fresh read, and the resolver's Step 0d rewrites the very body
+  this snapshot carries. A cache entry predating that rewrite can be missing the
+  Acceptance Criteria section 0d created, which is the one section Step 3 exists
+  to check.
 
 Stopping is the safe outcome here, not the disruptive one: the alternative is a
 review that reports a hard-block dimension as passing without having read the
