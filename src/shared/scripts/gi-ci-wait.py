@@ -14,7 +14,8 @@ Output on success is exactly one line of JSON on stdout:
      "counts": {"pass": n, "fail": n, "pending": n, "skipping": n, "cancel": n},
      "elapsed_s": <int>, "polls": <int>,
      "interval_s": <int>, "timeout_s": <int>, "pr": <int or null>,
-     "none_grace_s": <int>, "none_confirmed": <bool>}
+     "none_grace_s": <int>, "none_confirmed": <bool>,
+     "settle_window_s": <int>, "settled": <bool>}
 
 The four verdicts:
 
@@ -42,6 +43,15 @@ grace window did not fit inside the timeout, or `--once` was passed — means
 "nothing has registered *yet*", which is a pending answer wearing a `none`
 label. **Callers must treat `none` as mergeable only when `none_confirmed` is
 true.**
+
+Non-empty terminal results use a separate settle window. Once a terminal
+snapshot appears, its normalized check-name set must remain unchanged for
+`--settle-window` seconds before `pass` or `fail` is returned. Additions and
+removals reset that window; a pending snapshot also resets it. This catches a
+check that registers after an initially green snapshot. Even with
+`--settle-window 0`, at least two unchanged terminal observations are required;
+`--once` is an explicit single-poll diagnostic escape hatch and therefore
+reports the first snapshot without claiming that it settled.
 
 Exit codes
   0  a verdict was reached and printed — including `fail` and `pending`, which
@@ -72,6 +82,12 @@ DEFAULT_TIMEOUT_S = 600
 # enough to cover the gap between `git push` and GitHub registering a workflow
 # run, short enough that a repository with no CI at all is not held up for long.
 DEFAULT_NONE_GRACE_S = 60
+
+# How long a terminal check-name set must remain unchanged before its verdict
+# is trusted. This is intentionally one polling interval at the default cadence:
+# a check that registers on the next poll is observed before merge callers see a
+# terminal verdict.
+DEFAULT_SETTLE_WINDOW_S = 30
 
 # `gh pr checks --json` buckets. Anything unrecognized is treated as pending:
 # guessing "done" about a state we do not model is the failure that merges a
@@ -175,6 +191,7 @@ def wait(
     timeout: int,
     once: bool = False,
     none_grace: int = DEFAULT_NONE_GRACE_S,
+    settle_window: int = DEFAULT_SETTLE_WINDOW_S,
     sleep=time.sleep,
     clock=time.monotonic,
 ) -> dict[str, object]:
@@ -190,24 +207,67 @@ def wait(
     checks: list[dict[str, object]] = []
     verdict = "none"
     counts = {"pass": 0, "fail": 0, "pending": 0, "skipping": 0, "cancel": 0}
+    checks_ever_seen = False
+    stable_membership: tuple[str, ...] | None = None
+    stable_since: float | None = None
+    terminal_observations = 0
+    settled = False
 
     while True:
         polled = poll_once(pr, repo)
         polls += 1
         checks = polled or []
+        if checks:
+            checks_ever_seen = True
         verdict, counts = classify(checks)
         if polled is None:
             verdict = "none"
-        if once or verdict in TERMINAL_VERDICTS:
+
+        if once:
+            # --once is intentionally a diagnostic escape hatch. It cannot
+            # establish that the returned snapshot has settled.
             break
+
+        # Re-read the clock after the poll returns and before considering any
+        # terminal verdict. A slow gh call may cross the deadline; timeout wins
+        # over settlement so a late snapshot can never authorize a merge.
         elapsed = clock() - started
+        if elapsed >= timeout:
+            verdict = "pending"
+            settled = False
+            break
+
+        if verdict in TERMINAL_VERDICTS:
+            membership = tuple(
+                sorted(str(check.get("name") or "") for check in checks)
+            )
+            if membership != stable_membership:
+                stable_membership = membership
+                stable_since = clock()
+                terminal_observations = 1
+            else:
+                terminal_observations += 1
+            assert stable_since is not None
+            stable_elapsed = clock() - stable_since
+            if terminal_observations >= 2 and stable_elapsed >= settle_window:
+                settled = True
+                break
+        else:
+            # Pending and empty snapshots are not terminal evidence. A later
+            # terminal snapshot must establish a fresh settle window.
+            stable_membership = None
+            stable_since = None
+            terminal_observations = 0
+
         # Only sleep when a full further interval still fits inside the budget.
         # Sleeping past the deadline would report an elapsed time the caller
-        # never agreed to wait.
+        # never agreed to wait. A terminal set that has not settled is reported
+        # as pending at the deadline, never as an early pass/fail.
         if elapsed + interval > timeout:
+            verdict = "pending"
             break
         # An empty list is re-polled only until the grace window closes; a
-        # pending one is re-polled for the whole timeout.
+        # pending or terminal list is re-polled for the whole timeout.
         if verdict == "none" and elapsed >= none_grace:
             break
         sleep(interval)
@@ -232,8 +292,13 @@ def wait(
         # registering. `--once` can never confirm it: one poll cannot tell a
         # repository without CI from a push whose checks are seconds away.
         "none_confirmed": bool(
-            verdict == "none" and not once and elapsed_s >= none_grace
+            verdict == "none"
+            and not once
+            and not checks_ever_seen
+            and elapsed_s >= none_grace
         ),
+        "settle_window_s": settle_window,
+        "settled": settled,
     }
 
 
@@ -306,6 +371,17 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     parser.add_argument(
+        "--settle-window",
+        type=int,
+        default=DEFAULT_SETTLE_WINDOW_S,
+        metavar="S",
+        help=(
+            f"seconds a terminal check-name set must remain unchanged before "
+            f"its verdict is trusted (default {DEFAULT_SETTLE_WINDOW_S}); "
+            "even zero requires two observations"
+        ),
+    )
+    parser.add_argument(
         "--once", action="store_true", help="poll a single time and report"
     )
     parser.add_argument("--quiet", action="store_true", help="suppress the stderr report")
@@ -322,6 +398,8 @@ def main(argv: list[str] | None = None) -> int:
             raise InvalidInput("--timeout must be >= 1")
         if args.none_grace < 0:
             raise InvalidInput("--none-grace must be >= 0")
+        if args.settle_window < 0:
+            raise InvalidInput("--settle-window must be >= 0")
         result = wait(
             args.pr,
             args.repo,
@@ -329,6 +407,7 @@ def main(argv: list[str] | None = None) -> int:
             args.timeout,
             once=args.once,
             none_grace=args.none_grace,
+            settle_window=args.settle_window,
         )
     except InvalidInput as exc:
         sys.stderr.write(f"✗ gi-ci-wait: {exc}\n")

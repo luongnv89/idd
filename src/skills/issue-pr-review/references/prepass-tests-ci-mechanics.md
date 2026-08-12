@@ -89,24 +89,53 @@ It prints one JSON object. Read `verdict`:
 
 | `verdict` | Meaning | Step 5 outcome |
 |-----------|---------|----------------|
-| `pass` | every check reached a terminal non-failing bucket | `✓ all checks passed` |
-| `fail` | at least one check failed or was cancelled — see `failing[]` | `✗ {N} checks failed` |
-| `pending` | the budget elapsed with checks still running | `⚠ checks still running` — **not clean** (see below) |
+| `pass` | every check reached a terminal non-failing bucket and the normalized check-name set settled | `✓ all checks passed` |
+| `fail` | at least one check failed or was cancelled after the set settled — see `failing[]` | `✗ {N} checks failed` |
+| `pending` | checks still run, or the terminal set never settled before timeout | `⚠ checks still running` — **not clean** (see below) |
 | `none` | the repository reports no checks for this PR | `○ no CI checks configured` |
+
+The waiter uses an elapsed `--settle-window` (default 30 seconds) for every
+non-empty terminal snapshot. A check-name addition or removal resets that window;
+this prevents a green first poll from authorizing a merge before a later failing
+check registers. The explicit `--once` diagnostic mode reports one snapshot
+without claiming settlement.
 
 Exit 3 (a non-numeric PR, a non-positive interval or timeout) is a stop — a
 misconfigured wait has not run. Only a missing `python3` or exit 4 degrades:
 print `⚠ gi-ci-wait unavailable — polling manually` and apply the loop below.
 
-**Manual fallback.** Poll GitHub Actions / CI status for the PR:
+**Manual fallback (same merge-safe contract).** If the waiter cannot run, do
+not replace it with a filtered `gh pr checks` list: that loses the complete
+current-head rollup and makes an empty result look successful. A trusted
+`ci_status` may be accepted without polling only when it is exactly
+`passed@<sha40>`, the live `headRefOid` still equals that SHA, and the same
+live `statusCheckRollup` is non-empty and entirely green. Otherwise, poll the
+complete rollup at every `review.ci_poll_interval`:
 
 ```bash
-gh pr checks {N} --json name,state,bucket
+gh pr view {N} --json headRefOid,statusCheckRollup
 ```
 
-1. Check immediately after tests.
-2. If checks are still running, poll every `review.ci_poll_interval` seconds.
-3. Timeout after `review.ci_timeout` seconds.
+For each observation, retain its `headRefOid` and complete rollup. A non-empty
+rollup is terminal only when every check has `status: "COMPLETED"` and
+`conclusion` in `SUCCESS`, `NEUTRAL`, or `SKIPPED`; a failed, cancelled,
+pending, unknown, or unreadable check leaves the PR open. Track whether any
+non-empty rollup has ever appeared, and require the normalized check-name
+membership to remain unchanged for the configured `--settle-window` before
+trusting a terminal result. Additions, removals, and terminal-to-pending or
+terminal-to-empty transitions reset that window. An empty, absent, or unreadable
+rollup is not success on its first observation: apply the none-grace only while
+no check has ever appeared, and leave the PR open for an unconfirmed empty
+result. Before acting, re-read `headRefOid`; any head change invalidates the
+observation and the manual verdict, so restart polling for the new head. If the
+head is missing or cannot be read, the fallback is unavailable and must not
+report clean or merge.
+
+1. Start the observation immediately after tests.
+2. Poll every `review.ci_poll_interval` seconds, retaining complete rollups.
+3. Timeout after `review.ci_timeout` seconds; timeout, failure, pending,
+   unsettled, unconfirmed-empty, head change, or fallback error leaves the PR
+   open and is not a clean result.
 
 On failure, extract failure details from the CI log:
 

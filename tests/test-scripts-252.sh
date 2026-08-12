@@ -406,13 +406,32 @@ else
 fi
 
 run_status out st env GH_FIXTURE='[]' PATH="$STUB:$PATH" \
-  python3 "$CIWAIT" 42 --interval 1 --timeout 30 --none-grace 2
+  python3 "$CIWAIT" 42 --interval 1 --timeout 30 --none-grace 2 --settle-window 1
 if [ "$(printf '%s' "$out" | jkey verdict)" = "none" ] \
    && [ "$(printf '%s' "$out" | jkey none_confirmed)" = "True" ] \
    && [ "$(printf '%s' "$out" | jkey polls)" -ge 2 ]; then
   pass "AC2: none is confirmed only after the grace window stays empty"
 else
   fail "AC2: none was confirmed without the grace window elapsing"
+fi
+
+# A transient empty snapshot after checks appeared must not be relabeled as
+# confirmed no-CI. The latest empty snapshot is retained, but none_confirmed
+# remains false because a check set was observed earlier.
+SEQ_TERMINAL_EMPTY="$TMP/seq-terminal-empty"
+{
+  echo '[{"name":"build","state":"SUCCESS","bucket":"pass","link":"u"}]'
+  echo '[]'
+  echo '[]'
+} > "$SEQ_TERMINAL_EMPTY"
+rm -f "$TMP/count-terminal-empty"
+run_status out st env GH_SEQUENCE="$SEQ_TERMINAL_EMPTY" GH_COUNT_FILE="$TMP/count-terminal-empty" \
+  PATH="$STUB:$PATH" python3 "$CIWAIT" 42 --interval 1 --timeout 3 --none-grace 1 --settle-window 1
+if [ "$(printf '%s' "$out" | jkey verdict)" = "none" ] \
+   && [ "$(printf '%s' "$out" | jkey none_confirmed)" = "False" ]; then
+  pass "AC2/#273: terminal-to-empty transition never confirms no CI"
+else
+  fail "AC2/#273: transient empty snapshot was treated as confirmed no CI"
 fi
 
 # The regression guard for the race itself: checks that register on the third
@@ -422,14 +441,110 @@ SEQ_LATE="$TMP/seq-late"
   echo '[]'
   echo '[]'
   echo '[{"name":"build","state":"SUCCESS","bucket":"pass","link":"u"}]'
+  echo '[{"name":"build","state":"SUCCESS","bucket":"pass","link":"u"}]'
 } > "$SEQ_LATE"
 rm -f "$TMP/count-late"
 run_status out st env GH_SEQUENCE="$SEQ_LATE" GH_COUNT_FILE="$TMP/count-late" \
-  PATH="$STUB:$PATH" python3 "$CIWAIT" 42 --interval 1 --timeout 30 --none-grace 10
+  PATH="$STUB:$PATH" python3 "$CIWAIT" 42 --interval 1 --timeout 30 --none-grace 10 --settle-window 1
 if [ "$(printf '%s' "$out" | jkey verdict)" = "pass" ]; then
   pass "AC2: checks that register on a later poll are waited for, not raced past"
 else
   fail "AC2: the wait returned before the checks registered — the merge race"
+fi
+
+# A terminal snapshot is not trusted until its normalized membership settles.
+# The second poll adds a failing check; returning pass from poll one would
+# recreate issue #273's early-verdict race.
+SEQ_GROWING="$TMP/seq-growing"
+{
+  echo '[{"name":"lint","state":"SUCCESS","bucket":"pass","link":"u"}]'
+  echo '[{"name":"lint","state":"SUCCESS","bucket":"pass","link":"u"},{"name":"security","state":"FAILURE","bucket":"fail","link":"u"}]'
+  echo '[{"name":"lint","state":"SUCCESS","bucket":"pass","link":"u"},{"name":"security","state":"FAILURE","bucket":"fail","link":"u"}]'
+} > "$SEQ_GROWING"
+rm -f "$TMP/count-growing"
+run_status out st env GH_SEQUENCE="$SEQ_GROWING" GH_COUNT_FILE="$TMP/count-growing" \
+  PATH="$STUB:$PATH" python3 "$CIWAIT" 42 --interval 1 --timeout 10 --settle-window 1
+if [ "$(printf '%s' "$out" | jkey verdict)" = "fail" ] \
+   && [ "$(printf '%s' "$out" | jkey settled)" = "True" ]; then
+  pass "AC2/#273: terminal verdict waits for a stable check set before returning"
+else
+  fail "AC2/#273: terminal verdict trusted a check set that was still growing"
+fi
+
+# A slow poll that crosses the timeout must not win over the deadline. This
+# invokes the implementation directly with deterministic poll and clock hooks.
+python3 - "$CIWAIT" <<'PY'
+import importlib.util
+import sys
+
+path = sys.argv[1]
+spec = importlib.util.spec_from_file_location("ciwait_timeout", path)
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+class Clock:
+    def __init__(self):
+        self.now = 0.0
+    def __call__(self):
+        return self.now
+
+clock = Clock()
+polls = iter([
+    [{"name": "lint", "bucket": "pass"}],
+])
+
+def poll_once(_pr, _repo):
+    clock.now = 11.0  # gh returned after the ten-second timeout
+    return next(polls)
+
+mod.poll_once = poll_once
+result = mod.wait("42", None, interval=1, timeout=10, settle_window=0,
+                  sleep=lambda _seconds: None, clock=clock)
+assert result["verdict"] == "pending", result
+assert result["settled"] is False, result
+assert result["checks"] == [{"name": "lint", "bucket": "pass"}], result
+print("pass: AC2/#273: timeout wins when a poll completes after deadline")
+PY
+
+# Exact-boundary timeout also wins over a zero-width settle window.
+python3 - "$CIWAIT" <<'PY'
+import importlib.util
+import sys
+
+spec = importlib.util.spec_from_file_location("ciwait_boundary", sys.argv[1])
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+clock_now = [0.0]
+def clock():
+    return clock_now[0]
+def poll_once(_pr, _repo):
+    clock_now[0] = 10.0
+    return [{"name": "lint", "bucket": "pass"}]
+mod.poll_once = poll_once
+result = mod.wait("42", None, interval=1, timeout=10, settle_window=0,
+                  sleep=lambda _seconds: None, clock=clock)
+assert result["verdict"] == "pending", result
+assert result["settled"] is False, result
+print("pass: AC2/#273: exact deadline wins over zero-width settlement")
+PY
+
+# A zero-width settle window still requires a second unchanged observation.
+# The first green poll must not win before a newly registered failing check.
+SEQ_ZERO_WINDOW="$TMP/seq-zero-window"
+{
+  echo '[{"name":"lint","state":"SUCCESS","bucket":"pass","link":"u"}]'
+  echo '[{"name":"lint","state":"SUCCESS","bucket":"pass","link":"u"},{"name":"security","state":"FAILURE","bucket":"fail","link":"u"}]'
+  echo '[{"name":"lint","state":"SUCCESS","bucket":"pass","link":"u"},{"name":"security","state":"FAILURE","bucket":"fail","link":"u"}]'
+} > "$SEQ_ZERO_WINDOW"
+rm -f "$TMP/count-zero-window"
+run_status out st env GH_SEQUENCE="$SEQ_ZERO_WINDOW" GH_COUNT_FILE="$TMP/count-zero-window" \
+  PATH="$STUB:$PATH" python3 "$CIWAIT" 42 --interval 1 --timeout 10 --settle-window 0
+if [ "$(printf '%s' "$out" | jkey verdict)" = "fail" ] \
+   && [ "$(printf '%s' "$out" | jkey settled)" = "True" ] \
+   && [ "$(printf '%s' "$out" | jkey polls)" -ge 3 ]; then
+  pass "AC2/#273: zero settle window still waits for a second terminal observation"
+else
+  fail "AC2/#273: zero settle window trusted the first terminal observation"
 fi
 
 # The whole wait happens in one invocation: several polls, one process, one
@@ -439,11 +554,12 @@ SEQ="$TMP/seq"
   echo '[{"name":"build","state":"IN_PROGRESS","bucket":"pending","link":"u"}]'
   echo '[{"name":"build","state":"IN_PROGRESS","bucket":"pending","link":"u"}]'
   echo '[{"name":"build","state":"SUCCESS","bucket":"pass","link":"u"}]'
+  echo '[{"name":"build","state":"SUCCESS","bucket":"pass","link":"u"}]'
 } > "$SEQ"
 run_status out st env GH_SEQUENCE="$SEQ" GH_COUNT_FILE="$TMP/count" \
-  PATH="$STUB:$PATH" python3 "$CIWAIT" 42 --interval 1 --timeout 30
+  PATH="$STUB:$PATH" python3 "$CIWAIT" 42 --interval 1 --timeout 30 --settle-window 1
 polls="$(printf '%s' "$out" | jkey polls)"
-if [ "$(printf '%s' "$out" | jkey verdict)" = "pass" ] && [ "$polls" -ge 3 ]; then
+if [ "$(printf '%s' "$out" | jkey verdict)" = "pass" ] && [ "$polls" -ge 4 ]; then
   pass "AC2: a multi-poll wait resolves inside one invocation ($polls polls, 1 call)"
 else
   fail "AC2: a multi-poll wait resolves inside one invocation (verdict/polls wrong)"
@@ -712,8 +828,20 @@ expect_grep "AC5: the security scan keeps its Primary Pattern fallback" \
   "Primary Pattern" "$SKILLS/issue-resolver/references/docs/pre-commit-security.md"
 expect_grep "AC5: the resolver keeps a gh issue view fallback" \
   "gh issue view" "$SKILLS/issue-resolver/SKILL.md"
-expect_grep "AC5: pr-review keeps the manual CI poll" \
-  "gh pr checks" "$SKILLS/issue-pr-review/references/prepass-tests-ci-mechanics.md"
+# The issue-pr-review fallback must preserve the waiter's merge-safety contract,
+# not merely mention a generic status poll.
+PR_CI_FALLBACK="$SKILLS/issue-pr-review/references/prepass-tests-ci-mechanics.md"
+if grep -qF '**Manual fallback (same merge-safe contract).' "$PR_CI_FALLBACK" \
+  && grep -qF 'gh pr view {N} --json headRefOid,statusCheckRollup' "$PR_CI_FALLBACK" \
+  && grep -qF 'non-empty rollup has ever appeared' "$PR_CI_FALLBACK" \
+  && grep -qF 'normalized check-name' "$PR_CI_FALLBACK" \
+  && grep -qF 'none-grace' "$PR_CI_FALLBACK" \
+  && grep -qF 're-read `headRefOid`' "$PR_CI_FALLBACK" \
+  && grep -qF 'leaves the PR open' "$PR_CI_FALLBACK"; then
+  pass "AC5/#273: pr-review manual fallback enforces rollup, stability, none-grace, head binding, and leave-open semantics"
+else
+  fail "AC5/#273: pr-review manual fallback omits one or more merge-safety invariants"
+fi
 expect_grep "AC5: the branch rules remain applicable by hand" \
   "Deriving the Short Description" "$SKILLS/issue-resolver/references/docs/naming-conventions.md"
 expect_grep "AC5: auto-pilot keeps the manual statusCheckRollup poll" \
@@ -1420,8 +1548,10 @@ for f in "$REPO_ROOT/src/skills/issue-creator/references/modes.md" \
   fi
 done
 
-# A degrade must reach the same outcomes as the fast path, not fewer.
-if grep -q "proceed with the merge" "$SKILLS/auto-pilot/references/examples.md"; then
+# A degrade must reach the same outcomes as the fast path, not fewer. The
+# success wording remains in the primary CI path; the degraded path itself must
+# not merge on an empty or unsettled snapshot.
+if grep -q "proceeds with the merge" "$SKILLS/auto-pilot/references/examples.md"; then
   pass "AC5: auto-pilot's degraded CI poll can still reach a merge"
 else
   fail "AC5: auto-pilot's degraded CI poll documents no success outcome"

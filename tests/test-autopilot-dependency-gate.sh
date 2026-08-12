@@ -366,7 +366,7 @@ fi
 # Partial-merge path (Phase 3-4 Step 2a) continues too. Bound the slice at
 # Step 2b: unterminated, the scan runs to EOF and is satisfied by the identical
 # phrase in Step 5.1b, so the assertion could never fail for its own section.
-STEP2A_BLOCK=$(awk '/^\*\*Step 2a — Dependency gate/{f=1; next} f && /^\*\*Step 2b/{exit} f' "$PHASES")
+STEP2A_BLOCK=$(awk '/^\*\*Step 2a — /{f=1; next} f && /^\*\*Step 2b/{exit} f' "$PHASES")
 if [ -z "$STEP2A_BLOCK" ]; then
   fail "T13.9: could not extract the Step 2a block from phases.md"
 elif printf '%s' "$STEP2A_BLOCK" | grep -qE 'continue to the next eligible issue'; then
