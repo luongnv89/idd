@@ -492,6 +492,12 @@ The payload substitutes for **Step 0a's fetch and nothing else**:
   post-rewrite re-read.
 - **Step 1 and Step 5 still read through the cache**, unchanged — those reads are
   already served from `.gitissue/cache/` and are what the invalidation exists for.
+  On the `supplied` path only, 0a writes no cache entry of its own (the caller's
+  capture used a different field set), so a later repeat read for the same issue
+  may be a one-time miss-and-refetch: still served fresh, gated by the same
+  freshness rules, and still in the same resolution boundary and reason — it
+  costs a read, never correctness. The budget is measured per issue and
+  boundary/reason, not per `gh` call.
 - **0a's own two stops are never decided from the payload.** 0a stops when the
   issue is **not found** and stops when it is **closed**. Both are freshness
   judgements, and a payload's `state` is only as fresh as the caller's fetch that
