@@ -20,6 +20,9 @@ SK="$ROOT/src/skills/issue-resolver/SKILL.source.md"
 RT="$ROOT/src/skills/issue-resolver/references/report-templates.md"
 IA="$ROOT/src/skills/issue-analysis/SKILL.source.md"
 RV="$ROOT/src/skills/issue-pr-review/SKILL.source.md"
+BRS="$ROOT/skills/issue-resolver/references/pipeline-steps.md"
+BSK="$ROOT/skills/issue-resolver/SKILL.md"
+BEX="$ROOT/skills/auto-pilot/references/explicit-list-mode.md"
 
 printf '◆ Follow-up Context Contract Tests (issue #285)\n'
 
@@ -88,7 +91,53 @@ lacks "$PH" 'One extra read of one issue is the price' "dependency path no longe
 
 # Step 0i ordering and triage continuation.
 check "$RS" 'classify the framed payload \*\*before Step 0a\*\*' "Step 0i ordering starts before 0a"
-check "$RS" 'carry that live pre-normalization `updatedAt` forward into Step 0h' "live updatedAt continues into 0h"
+check "$RS" 'carry the live pre-normalization `updatedAt` forward into Step 0h' "live updatedAt continues into 0h"
+check "$RS" 'require the live `updatedAt` to exactly match the retained' "retained and live timestamps must match before reuse"
+check "$RS" 'mismatch, missing value, or unparsable timestamp discards the payload' "timestamp doubt discards the stale payload"
+check "$RS" 'complete 0a fetch with `--refresh`' "concurrent edit triggers a fresh full 0a record"
+check "$RS" 'fresh full record for normalization and Step 0h condition 5' "fresh full record replaces stale body before normalization"
+check "$RS" 'individual record, array entry, or keyed-map entry' "concurrent-edit fallback covers every payload shape"
+check "$EX" 'analyzer time creates a concurrent-edit window' "explicit-list documents analyzer concurrent-edit window"
+check "$SK" 'exact match between retained and live `updatedAt`' "top-level resolver contract carries concurrency guard"
+check "$SK" 'individual, array, and keyed-map payloads' "top-level resolver guard covers all payload shapes"
+for f in "$BRS" "$BSK" "$BEX"; do check "$f" 'concurrent|mismatch' "generated copy carries concurrent-edit fallback: ${f#"$ROOT/"}"; done
+python3 - <<'PY' && pass "changed updatedAt forces full fetch before normalization for every shape" || fail "concurrent edit did not force full fetch before normalization"
+from datetime import datetime
+
+def parse(value):
+    return datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+def select(payload, number):
+    if isinstance(payload, list):
+        matches = [r for r in payload if r.get("number") == number]
+        return matches[0] if len(matches) == 1 else None
+    if isinstance(payload, dict) and "number" in payload:
+        return payload if payload.get("number") == number else None
+    if isinstance(payload, dict):
+        record = payload.get(str(number))
+        return record if record and record.get("number") == number else None
+
+def run(payload):
+    events = []
+    retained = select(payload, 285)
+    live = {"updatedAt": "2026-01-02T00:00:00Z", "body": "edited"}
+    events.append("live_probe")
+    try:
+        match = parse(retained["updatedAt"]) and parse(live["updatedAt"]) and retained["updatedAt"] == live["updatedAt"]
+    except (KeyError, TypeError, ValueError):
+        match = False
+    record = retained
+    if not match:
+        events.append("full_fetch")
+        record = live
+    events.append("normalize")
+    assert events == ["live_probe", "full_fetch", "normalize"]
+    assert record["body"] == "edited"
+
+old = {"number": 285, "updatedAt": "2026-01-01T00:00:00Z", "body": "stale"}
+for shape in (old, [old], {"285": old}):
+    run(shape)
+PY
 check "$PR" 'codebase-researcher as the `triage_context` key' "resolver-to-researcher triage flow is explicit"
 check "$PR" 'order Phase 2b and seed Phase 5' "researcher continuation names both phases"
 

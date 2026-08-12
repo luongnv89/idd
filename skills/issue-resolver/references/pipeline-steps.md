@@ -425,9 +425,15 @@ the reuse purely by having written the file.
 
 ## Step 0i — Caller payload gate
 
-**Ordering:** classify the framed payload **before Step 0a**, consume a supplied
-snapshot in 0a, run the mandatory live `state,comments,updatedAt` probe there,
-then carry that live pre-normalization `updatedAt` forward into Step 0h.
+**Ordering:** classify the framed payload **before Step 0a**, tentatively consume
+a supplied snapshot in 0a, then run the mandatory live
+`state,comments,updatedAt` probe there. Before any 0d body rewrite, parse both
+timestamps and require the live `updatedAt` to exactly match the retained
+record's `updatedAt`. Only that match confirms the body snapshot is still
+current. A mismatch, missing value, or unparsable timestamp discards the payload
+and runs the complete 0a fetch with `--refresh` (or the direct `gh` fallback),
+using that fresh full record for normalization and Step 0h condition 5. On a
+match, carry the live pre-normalization `updatedAt` forward into Step 0h.
 
 **Single home of the caller-payload rules for this skill.** A caller that already
 holds this issue's resolution snapshot — `/auto-pilot` captures it in its
@@ -454,16 +460,16 @@ in the same call at no extra cost. So *Step 1*'s delegation payload — whose
 researcher parses title, body **and comments** for error text, stack traces and
 paths — is unchanged in shape.
 
-`updatedAt` is **required, not decorative** — though not for its value. Under
-`supplied`, *Step 0h*'s condition 5 reads the **live** `updatedAt` from the
-re-verify below, never the payload's: a payload's timestamp is only as fresh as
-the caller's fetch — which is TTL-cached, so it may already have been old when
-the caller read it — and an issue edited between that fetch and this spawn would
-read as unedited, so 0h would call a superseded analysis `fresh`. What the field
-does here is mark the block as the whole record *Step 1.2b*'s single-issue fetch
-returns — a block missing it was not built by *Step 1.2b*, so nothing in it can
-be taken as verbatim. A payload missing it is `partial`, never `supplied`, and
-0a fetches exactly as today; the gate is not retired by its absence, only unused.
+`updatedAt` is **required and load-bearing**. The caller's fetch may be
+TTL-cached, so under `supplied`, parse it and the mandatory probe's live
+`updatedAt` as ISO-8601 instants, then require their raw
+GitHub values to match exactly. A match permits snapshot reuse and supplies Step
+0h condition 5's live pre-normalization value. A mismatch proves the issue moved
+since capture — including during explicit-list analyzer optimization — so the
+retained title/body/labels/assignees are discarded before 0d can rewrite the
+body, and the complete refreshed 0a record replaces them. Missing or unparsable
+either side fails the same way. A payload missing `updatedAt` is `partial`, never
+`supplied`; the gate is not retired by its absence, only unused.
 
 **Batched spawns carry one record per issue.** `/auto-pilot`'s batch-resolver
 accepts either the existing array of records or the explicit-list producer's
@@ -499,11 +505,14 @@ The payload substitutes for **Step 0a's fetch and nothing else**:
   closed / not-found message if `state` comes back anything but `open`. Three
   fields, one call, and the other two are there because the payload cannot supply
   them either: `comments` is the field the payload never carries, and `updatedAt`
-  has exactly `state`'s staleness window, so **under `supplied` *Step 0h*'s
-  condition 5 compares this live value, never the payload's**. This read runs
-  before 0d, so that `updatedAt` is still the pre-normalization value condition 5
-  requires. Payload plus this read together reconstitute 0a's full field set, so
-  nothing downstream of 0a changes shape.
+  detects whether the retained full snapshot moved. Before 0d, parse both
+  timestamps and require an exact match. Match: combine the retained record with
+  live comments, and give Step 0h condition 5 the live value. Mismatch, missing,
+  or unparsable: discard the retained record and run the complete 0a command with
+  `--refresh` (falling back to the direct full-field `gh issue view`), then use
+  that fresh full record for every downstream consumer. This per-issue fallback
+  is identical for an individual record, array entry, or keyed-map entry and has
+  no effect on siblings.
   That read is the one part of 0a a
   payload cannot buy back; the body, title, labels and assignees it still does.
   It is also the one issue read in this skill that deliberately bypasses the
@@ -537,7 +546,8 @@ already disables *0g* and *0h*: treat `issue_payload` as `absent` and fetch.
 One `○` line, per references/docs/terminal-style.md:
 
 ```
-○ Issue payload: supplied by the caller — 0a fetch skipped, live state re-verified
+○ Issue payload: supplied by the caller — timestamps match, 0a fetch skipped
+○ Issue payload: stale (updatedAt changed) — refreshing complete 0a record
 ○ Issue payload: partial (no updatedAt) — fetching
 ○ Issue payload: absent — fetching
 ```

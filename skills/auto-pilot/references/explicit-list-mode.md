@@ -43,8 +43,11 @@ spawn. The analyzer and dependency ordering project from this captured map rathe
 than fetching bodies again. After optimization selects an individual or batch,
 project its already-validated matching record(s) into a newly nonce-framed spawn
 block without another body read or record-validation pass. An individual gets one
-record; a batch gets a map keyed by issue number. A missing/incomplete entry
-degrades for that issue only to the ordinary fetch path.
+record; a batch gets a map keyed by issue number. This projection is still only
+tentative: analyzer time creates a concurrent-edit window, so resolver Step 0i
+compares each retained `updatedAt` with its mandatory live probe before any body
+rewrite. A mismatch/missing/unparsable timestamp discards only that record and
+runs the ordinary complete refreshed 0a fetch; siblings are unaffected.
 
 For each issue, check:
 - **Exists** — if not found, warn and remove from list

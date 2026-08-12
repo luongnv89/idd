@@ -155,8 +155,8 @@ check_has "$SRC_RES_STEPS" '^### Scope — 0a.s read only' \
 PAYLOAD_BLOCK="$(awk '/^## Step 0i — Caller payload gate/,/^## Step 1 — Research/' "$SRC_RES_STEPS")"
 check_block_has "$PAYLOAD_BLOCK" '0d still rewrites the body' \
   "T1.8: 0d still rewrites the body and still invalidates the cache"
-check_block_has "$PAYLOAD_BLOCK" 'updatedAt. is \*\*required, not decorative\*\*' \
-  "T1.9: updatedAt is required, and the reason (0h condition 5) is stated"
+check_block_has "$PAYLOAD_BLOCK" 'updatedAt. is \*\*required and load-bearing\*\*' \
+  "T1.9: updatedAt is required, and the concurrency/0h reason is stated"
 check_block_has "$PAYLOAD_BLOCK" 'Step 0h' \
   "T1.10: the gate names the sibling gate that consumes updatedAt"
 check_has "$SRC_RES_SKILL" 'issue_payload = supplied \| partial \| absent' \
@@ -181,8 +181,8 @@ check_has "$SRC_CONV" 'Step 0a closed / not-found stops' \
 # read covers both at no extra call.
 check_block_has "$PAYLOAD_BLOCK" 'gh issue view N --json state,comments,updatedAt' \
   "T1.15: the live re-verify covers state, comments AND updatedAt in one call"
-check_block_has "$PAYLOAD_BLOCK" "condition 5 compares this live value, never the payload's" \
-  "T1.16: Step 0h's condition 5 reads the LIVE updatedAt, never the payload's"
+check_block_has "$PAYLOAD_BLOCK" '0h condition 5.s live pre-normalization value' \
+  "T1.16: Step 0h's condition 5 receives the live updatedAt after the match gate"
 check_block_has "$PAYLOAD_BLOCK" 'except .comments.' \
   "T1.17: the supplied row states the payload carries 0a's fields except comments"
 check_has "$SRC_RES_SKILL" 'gh issue view N --json state,comments,updatedAt' \
@@ -650,7 +650,7 @@ check_has "$BUILT_CONV" 'may carry the subset that applies to their consumer, ne
 # always-loaded SKILL, and the positive rollup corroboration.
 check_block_has "$B_PAYLOAD_BLOCK" 'gh issue view N --json state,comments,updatedAt' \
   "T7.41: built payload gate ships the widened live re-verify"
-check_block_has "$B_PAYLOAD_BLOCK" "condition 5 compares this live value, never the payload's" \
+check_block_has "$B_PAYLOAD_BLOCK" '0h condition 5.s live pre-normalization value' \
   "T7.42: built payload gate feeds Step 0h's condition 5 the live updatedAt"
 check_block_has "$B_PAYLOAD_BLOCK" 'Batched spawns carry one record per issue' \
   "T7.43: built payload gate ships the per-issue rule for batch blocks"

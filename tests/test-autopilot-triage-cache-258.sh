@@ -805,7 +805,7 @@ check_block_lacks "$PAYLOAD_GATE" 'only as fresh as the caller.s list' \
   "T11.14: Step 0i no longer measures staleness against a list"
 check_block_has "$PAYLOAD_GATE" 'only as fresh as the caller.s fetch that' \
   "T11.15: 0a's two stops measure staleness against the caller's fetch"
-check_block_has "$PAYLOAD_GATE" 'the caller.s fetch — which is TTL-cached' \
+check_block_has "$PAYLOAD_GATE" 'caller.s fetch may be' \
   "T11.16: condition 5's argument names the TTL cache that makes it stronger"
 check_block_has "$PAYLOAD_GATE" 'a TTL-cached read, so an issue closed externally' \
   "T11.17: the closed-issue argument names the same cache"
@@ -875,7 +875,7 @@ check_block_lacks "$B_PAYLOAD_GATE" 'Phase 1 lists every open issue' \
   "T11.39: built pipeline-steps.md ships the corrected payload provenance"
 check_block_lacks "$B_PAYLOAD_GATE" 'than the fetch it saves' \
   "T11.40: built pipeline-steps.md ships the corrected comments rationale"
-check_block_has "$B_PAYLOAD_GATE" 'the caller.s fetch — which is TTL-cached' \
+check_block_has "$B_PAYLOAD_GATE" 'caller.s fetch may be' \
   "T11.41: built pipeline-steps.md ships the stronger staleness argument"
 check_has "$BUILT_RES_SKILL" 'captured it in mode-neutral \*Step 1\.2b\*' \
   "T11.42: built resolver SKILL.md ships mode-neutral provenance"
