@@ -1252,6 +1252,7 @@ PLACEHOLDER = re.compile(
 # script on stdin rather than on the command line.
 ALLOWED_VARS = {
     "$skill_dir": "path the skill resolves from its own SKILL.md dirname",
+    "$dup_request": "mktemp path under .gitissue/cache/; exclusive, never issue text",
     "$wt_dir": "worktree path the skill composes itself",
     "$base": "base branch name read from the repo, never reporter text",
     "${base}": "base branch name read from the repo, never reporter text",

@@ -625,8 +625,19 @@ expect_grep "AC1: issue-creator calls gi-dup-score from its own orchestrator" \
   "references/scripts/gi-dup-score.py" "$SKILLS/issue-creator/SKILL.md"
 expect_grep "AC1: issue-creator creates the ignored scorer cache on first run" \
   "mkdir -p .gitissue/cache" "$SKILLS/issue-creator/SKILL.md"
-expect_grep "AC1: issue-creator sends the scorer request on stdin" \
-  "< .gitissue/cache/dup-request.json" "$SKILLS/issue-creator/SKILL.md"
+expect_grep "AC1: issue-creator refuses a planted cache symlink" \
+  ".gitissue/cache is a symlink" "$SKILLS/issue-creator/SKILL.md"
+expect_grep "AC1: issue-creator creates a unique exclusive scorer request" \
+  'mktemp .gitissue/cache/dup-request.XXXXXX' "$SKILLS/issue-creator/SKILL.md"
+expect_grep "AC1: unique scorer request is owner-only" \
+  'chmod 600 "$dup_request"' "$SKILLS/issue-creator/SKILL.md"
+expect_grep "AC1: issue-creator sends the unique scorer request on stdin" \
+  '< "$dup_request"' "$SKILLS/issue-creator/SKILL.md"
+if grep -q -- '< .gitissue/cache/dup-request.json' "$SKILLS/issue-creator/SKILL.md"; then
+  fail "AC1: issue-creator still uses a shared dup-request.json path"
+else
+  pass "AC1: issue-creator no longer uses a shared dup-request.json path"
+fi
 expect_grep "AC1: scorer request cleanup is armed before invocation" \
   "trap cleanup_dup_request EXIT" "$SKILLS/issue-creator/SKILL.md"
 expect_grep "AC1: HUP preserves cancellation status" \
@@ -657,20 +668,31 @@ printf '[]\n' > "$FLOW/issues.json"
 cat > "$FLOW/run-cleanup.sh" <<'EOF'
 #!/usr/bin/env bash
 mode="$1"
+if [ -L .gitissue/cache ]; then
+  echo "✗ .gitissue/cache is a symlink — refusing to write the scorer request"
+  exit 1
+fi
 mkdir -p .gitissue/cache
-printf '%s' '{"mode":"create","items":[{"index":1,"title":"x","keywords":[],"type":"feature"}]}' > .gitissue/cache/dup-request.json
-cleanup_dup_request() { rm -f .gitissue/cache/dup-request.json; }
+if [ -L .gitissue/cache ]; then
+  echo "✗ .gitissue/cache is a symlink — refusing to write the scorer request"
+  exit 1
+fi
+dup_request="$(mktemp .gitissue/cache/dup-request.XXXXXX)"
+chmod 600 "$dup_request"
+printf '%s\n' "$dup_request" > request.path
+printf '%s' '{"mode":"create","items":[{"index":1,"title":"x","keywords":[],"type":"feature"}]}' > "$dup_request"
+cleanup_dup_request() { rm -f "$dup_request"; }
 trap cleanup_dup_request EXIT
 trap 'exit 129' HUP
 trap 'exit 130' INT
 trap 'exit 143' TERM
 case "$mode" in
   success)
-    dup_output="$(python3 references/scripts/gi-dup-score.py --issues-from issues.json < .gitissue/cache/dup-request.json)"
+    dup_output="$(python3 references/scripts/gi-dup-score.py --issues-from issues.json < "$dup_request")"
     dup_status=$?
     ;;
   failure)
-    dup_output="$(python3 references/scripts/gi-dup-score.py --issues-from missing.json < .gitissue/cache/dup-request.json 2>/dev/null)"
+    dup_output="$(python3 references/scripts/gi-dup-score.py --issues-from missing.json < "$dup_request" 2>/dev/null)"
     dup_status=$?
     ;;
   HUP|INT|TERM)
@@ -681,7 +703,7 @@ case "$mode" in
 esac
 cleanup_dup_request
 trap - EXIT HUP INT TERM
-[ ! -e .gitissue/cache/dup-request.json ] || exit 99
+[ ! -e "$dup_request" ] || exit 99
 if [ "$mode" = success ]; then
   printf '%s' "$dup_output" | python3 -c 'import json,sys; json.load(sys.stdin)'
 fi
@@ -693,7 +715,8 @@ chmod +x "$FLOW/run-cleanup.sh"
   ./run-cleanup.sh success
 ) && pass "AC1: first-run cache creation and success cleanup execute" || fail "AC1: first-run/cache success cleanup flow"
 run_status out st bash -c "cd '$FLOW' && ./run-cleanup.sh failure"
-if [ "$st" = 4 ] && [ ! -e "$FLOW/.gitissue/cache/dup-request.json" ]; then
+fail_path="$(cat "$FLOW/request.path" 2>/dev/null || true)"
+if [ "$st" = 4 ] && [ -n "$fail_path" ] && [ ! -e "$fail_path" ]; then
   pass "AC1: classified scorer failure preserves status and cleans request"
 else
   fail "AC1: scorer failure cleanup/status contract (got $st)"
@@ -702,12 +725,47 @@ for signal_case in HUP INT TERM; do
   rm -f "$FLOW/continued"
   case "$signal_case" in HUP) want=129 ;; INT) want=130 ;; TERM) want=143 ;; esac
   run_status out st bash -c "cd '$FLOW' && ./run-cleanup.sh '$signal_case'"
-  if [ "$st" = "$want" ] && [ ! -e "$FLOW/.gitissue/cache/dup-request.json" ] && [ ! -e "$FLOW/continued" ]; then
+  sig_path="$(cat "$FLOW/request.path" 2>/dev/null || true)"
+  if [ "$st" = "$want" ] && [ -n "$sig_path" ] && [ ! -e "$sig_path" ] && [ ! -e "$FLOW/continued" ]; then
     pass "AC1: $signal_case exits $want, cleans once through EXIT, and cannot continue"
   else
     fail "AC1: $signal_case interruption contract (exit $st, expected $want)"
   fi
 done
+# Unique exclusive files: two mktemp names must differ, and mode must be 0600.
+(
+  cd "$FLOW"
+  rm -rf .gitissue/cache
+  mkdir -p .gitissue/cache
+  a="$(mktemp .gitissue/cache/dup-request.XXXXXX)"
+  b="$(mktemp .gitissue/cache/dup-request.XXXXXX)"
+  chmod 600 "$a" "$b"
+  mode_a="$(python3 -c 'import os,sys; print(oct(os.stat(sys.argv[1]).st_mode & 0o777))' "$a")"
+  if [ "$a" != "$b" ] && [ "$mode_a" = "0o600" ]; then
+    exit 0
+  fi
+  exit 1
+) && pass "AC1: concurrent request files are unique and owner-only" \
+  || fail "AC1: concurrent request files are unique and owner-only"
+# Planted cache symlink must be refused before any write.
+SYMLINK_FLOW="$TMP/dup-symlink"; rm -rf "$SYMLINK_FLOW"
+mkdir -p "$SYMLINK_FLOW/.gitissue" "$SYMLINK_FLOW/outside"
+ln -s "$SYMLINK_FLOW/outside" "$SYMLINK_FLOW/.gitissue/cache"
+run_status out st bash -c "
+  cd '$SYMLINK_FLOW'
+  if [ -L .gitissue/cache ]; then
+    echo '✗ .gitissue/cache is a symlink — refusing to write the scorer request'
+    exit 1
+  fi
+  mkdir -p .gitissue/cache
+  mktemp .gitissue/cache/dup-request.XXXXXX >/dev/null
+  exit 0
+"
+if [ "$st" = 1 ] && [ -z "$(ls -A "$SYMLINK_FLOW/outside" 2>/dev/null)" ]; then
+  pass "AC1: planted cache symlink is refused and not followed"
+else
+  fail "AC1: planted cache symlink is refused and not followed (exit $st)"
+fi
 MOCK="$TMP/mock-gh"; mkdir -p "$MOCK"; cat > "$MOCK/gh" <<'EOF'
 #!/bin/sh
 printf '%s\n' "$@" > "$GH_ARGS"
@@ -991,6 +1049,7 @@ SQUOTED = re.compile(r"'[^']*'")
 # claim a reviewer had to check against the code, so the code states it.
 ALLOWED_VARS = {
     "$skill_dir": "path the skill resolves from its own SKILL.md dirname",
+    "$dup_request": "mktemp path under .gitissue/cache/; exclusive, never issue text",
 }
 
 
