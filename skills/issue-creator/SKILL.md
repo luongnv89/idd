@@ -71,9 +71,9 @@ Before any operation, verify the environment. On failure, output the exact error
 Every durable write this skill performs is **remote**: issue bodies go out through
 `gh issue edit`, and screenshots are committed to `.github/issue-assets/` by the
 GitHub contents API (`references/image-upload.md`), which commits server-side.
-Duplicate scoring briefly writes an ignored request under `.gitissue/cache/` and
-removes it on every outcome; that transient runtime state is not source work and
-does not warrant syncing the repository. A local `git pull --rebase` protects
+Duplicate scoring briefly writes a unique ignored request under `.gitissue/cache/`
+and removes it on every outcome; that transient runtime state is not source work
+and does not warrant syncing the repository. A local `git pull --rebase` protects
 none of these writes, and on a dirty tree it can stop a pure create with a rebase
 conflict — so create, normalize, and image upload run **without** a repo sync.
 
@@ -216,25 +216,40 @@ Assign confidence to the type classification:
 
 #### Score deterministically
 
-Create the ignored cache directory **before** writing the request, then write `.gitissue/cache/dup-request.json` with the classified `items` plus the `config` object returned at skill start. Feed it on stdin; never put an issue title, keyword, body, or config value on the command line:
+Refuse a planted `.gitissue/cache` symlink, create that ignored directory only
+when it is a real directory, then create a unique exclusive request file
+(`mktemp`, mode 0600). Write the classified `items` plus the once-loaded
+`config` into that file. Feed `"$dup_request"` on stdin; never put an issue
+title, keyword, body, or config value on the command line, and never reuse a
+shared `.gitissue/cache/dup-request.json` path.
 
 ```bash
+if [ -L .gitissue/cache ]; then
+  echo "✗ .gitissue/cache is a symlink — refusing to write the scorer request"
+  exit 1
+fi
 mkdir -p .gitissue/cache
+if [ -L .gitissue/cache ]; then
+  echo "✗ .gitissue/cache is a symlink — refusing to write the scorer request"
+  exit 1
+fi
+dup_request="$(mktemp .gitissue/cache/dup-request.XXXXXX)"
+chmod 600 "$dup_request"
 ```
 
 ```json
 {"mode":"create","items":[{"index":1,"title":"…","keywords":["…"],"type":"bug"}],"config":{"duplicate_detection.weights.phrase":2}}
 ```
 
-Run the scorer with cleanup armed before the invocation, so success, a classified exit, an interrupt, and an unexpected stop all remove the transient request. The signal handlers must exit with the conventional `128 + signal` status; handling a signal by cleanup alone suppresses cancellation and can let issue creation continue. Each signal exits through the single `EXIT` cleanup, while the normal path cleans once before disarming every trap:
+Run the scorer with cleanup armed before the invocation, so success, a classified exit, an interrupt, and an unexpected stop all remove **this run's** request. The signal handlers must exit with the conventional `128 + signal` status; handling a signal by cleanup alone suppresses cancellation and can let issue creation continue. Each signal exits through the single `EXIT` cleanup, while the normal path cleans once before disarming every trap:
 
 ```bash
-cleanup_dup_request() { rm -f .gitissue/cache/dup-request.json; }
+cleanup_dup_request() { rm -f "$dup_request"; }
 trap cleanup_dup_request EXIT
 trap 'exit 129' HUP
 trap 'exit 130' INT
 trap 'exit 143' TERM
-dup_output="$(python3 references/scripts/gi-dup-score.py < .gitissue/cache/dup-request.json)"
+dup_output=$(python3 references/scripts/gi-dup-score.py < "$dup_request")
 dup_status=$?
 cleanup_dup_request
 trap - EXIT HUP INT TERM
