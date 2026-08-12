@@ -23,6 +23,8 @@ RV="$ROOT/src/skills/issue-pr-review/SKILL.source.md"
 BRS="$ROOT/skills/issue-resolver/references/pipeline-steps.md"
 BSK="$ROOT/skills/issue-resolver/SKILL.md"
 BEX="$ROOT/skills/auto-pilot/references/explicit-list-mode.md"
+BIA="$ROOT/skills/issue-analysis/SKILL.md"
+BPR="$ROOT/skills/auto-pilot/references/subagent-prompts.md"
 
 printf '◆ Follow-up Context Contract Tests (issue #285)\n'
 
@@ -61,7 +63,40 @@ check "$PR" 'BEGIN_UNTRUSTED_issue_payload_\{payload_nonce\}' "analyzer receives
 check "$PR" 'replaces only' "analyzer limits payload reuse to analysis Step 1"
 check "$IA" '^### Caller payload gate \(auto-pilot only\)' "issue-analysis has a narrow caller payload gate"
 check "$IA" 'gh issue view N --json state,comments,createdAt,updatedAt,author' "analysis payload path preserves live issue metadata"
-check "$IA" 'Every repository, git-history, already-resolved and cross-reference' "analysis safety phases still run in full"
+check "$IA" 'raw `updatedAt`' "analysis retains the payload timestamp for comparison"
+check "$IA" 'raw GitHub strings to match exactly' "analysis requires parseable exact timestamps before body reuse"
+check "$IA" 'complete full-field fetch below with `--refresh`' "analysis concurrent edit forces a refreshed full record"
+check "$IA" 'Never combine retained content with newer live metadata' "analysis forbids mixed-generation snapshots"
+check "$IA" 'already-resolved and cross-reference' "analysis safety phases still run in full"
+check "$PR" 'extraction and the persisted analysis timestamp must come from that' "analyzer prompt carries the coherent snapshot rule"
+for f in "$BIA" "$BPR"; do check "$f" 'coherent|raw GitHub strings' "generated copy carries coherent analysis snapshot rule: ${f#"$ROOT/"}"; done
+python3 - <<'PY' && pass "explicit-list analyzer rejects stale body and persists one refreshed snapshot" || fail "analysis combined stale body with fresh metadata"
+from datetime import datetime
+
+def instant(value):
+    if not isinstance(value, str):
+        raise TypeError
+    return datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+events = []
+retained = {"number": 285, "body": "stale acceptance criteria", "updatedAt": "2026-01-01T00:00:00Z"}
+live_metadata = {"state": "OPEN", "comments": [], "createdAt": "2025-12-01T00:00:00Z", "updatedAt": "2026-01-02T00:00:00Z", "author": {"login": "reporter"}}
+events.append("live_metadata")
+try:
+    reusable = instant(retained["updatedAt"]) and instant(live_metadata["updatedAt"]) and retained["updatedAt"] == live_metadata["updatedAt"]
+except (KeyError, TypeError, ValueError):
+    reusable = False
+assert not reusable
+if not reusable:
+    events.append("full_refresh")
+    accepted = {"number": 285, "title": "edited", "body": "fresh acceptance criteria", "labels": [], "assignees": [], **live_metadata}
+extracted_body = accepted["body"]
+persisted_issue = {"body": accepted["body"], "updatedAt": accepted["updatedAt"]}
+assert events == ["live_metadata", "full_refresh"]
+assert extracted_body == persisted_issue["body"] == "fresh acceptance criteria"
+assert persisted_issue["updatedAt"] == "2026-01-02T00:00:00Z"
+assert retained["body"] not in (extracted_body, persisted_issue["body"])
+PY
 
 # The explicit-list keyed producer and resolver consumer agree operationally.
 check "$RS" 'object map keyed by decimal issue number' "resolver accepts explicit-list keyed batch maps"

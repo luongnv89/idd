@@ -183,10 +183,13 @@ Steps:
 1. For each issue, invoke the {{skill:issue-analysis}} skill with `--auto` and set `IDD_AUTO_MODE=1`
    before the invocation. Pass that issue's matching record from
    the correctly framed issue_payload map through to the skill; it replaces only
-   issue-analysis Step 1's duplicate body-bearing fetch. The skill still performs
-   its live state/metadata read and every code/history/cross-reference safety
-   check. A missing, mismatched, incomplete, or non-unique record is absent and
-   runs the ordinary full fetch. Do not rely on auto-pilot provenance.
+   issue-analysis Step 1's duplicate body-bearing fetch only when its raw
+   `updatedAt` exactly matches the parseable live metadata value. A concurrent
+   edit, missing/unparsable timestamp, incomplete/non-unique record, or live-read
+   failure discards the whole record and runs one complete refreshed full-field
+   fetch; extraction and the persisted analysis timestamp must come from that
+   coherent snapshot. The skill still performs every live safety and
+   code/history/cross-reference check. Do not rely on auto-pilot provenance.
 2. Run the analysis pipeline for each issue to identify:
    - Affected files (which source files need changes)
    - Root cause and implementation approach
