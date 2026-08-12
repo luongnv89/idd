@@ -93,11 +93,17 @@ the `acceptance_criteria` hard-block as `pass`. A PR with **no** linked issue is
 not this error and is never stopped by it — see *The empty-record fail-safe* in
 `references/review-loop-mechanics.md`.
 
+**Placeholders:** this is the one entry in this file where `{N}` is **not** the
+PR number. Here `{N}` is the **linked issue** being read — the number `Closes #N`
+names — and `{PR}` is the pull request under review. The resume command takes
+`{PR}`; re-running the review against the issue number reviews the wrong PR, or
+none.
+
 ```
 ✗ Cannot read linked issue #{N} — review stopped
 
   To fix:  gh issue view {N} --json number,title,body,labels
-  Then:    /issue-pr-review {N}
+  Then:    /issue-pr-review {PR}
   Docs:    https://github.com/luongnv89/idd/blob/main/docs/platform-github.md
 ```
 

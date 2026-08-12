@@ -120,7 +120,9 @@ assert not (payload.get("284") and payload["284"].get("number") == 285)
 PY
 
 # Review boundary bypasses TTL once, then Step 3 reuses the same refreshed entry.
-check "$RV" 'unconditionally refresh the linked issue at the review boundary' "review refresh is independent of adaptive depth"
+check "$RV" 'when the PR body links an issue, refresh it at the review boundary' "review refresh is conditional on a linked issue (#296)"
+check "$RV" 'even when `review\.adaptive_depth` is `false`' "review refresh is independent of adaptive depth"
+lacks "$RV" 'unconditionally refresh the linked issue' "the stale unconditional claim is gone (#296)"
 check "$RV" 'review\.adaptive_depth` is `false`' "adaptive-depth-off path still retains the review snapshot"
 check "$RV" 'set `profile = full` after the refresh' "adaptive-depth-off ordering refreshes before profile pin"
 check "$RV" 'gh issue view \{N\} --json number,title,body,labels' "review refresh fallback preserves the exact field set"
@@ -164,10 +166,14 @@ for f in "$RVM" "$BRVM"; do
   check "$f" '✗ Cannot read linked issue' "the stop prints a rich error: $n"
   check "$f" 'only the signal selection above is skipped' "adaptive_depth off skips selection, not the refresh: $n"
   lacks "$f" 'idd-methodology' "review boundary is not attributed to a doc that lacks it: $n"
+  check "$f" 'Then:    /issue-pr-review \{PR\}' "the stop resumes on the PR, not the issue number: $n"
+  lacks "$f" '/issue-pr-review \{N\}' "no resume command takes the issue number: $n"
 done
 for f in "$RVE" "$BRVE"; do
   check "$f" '✗ Cannot read linked issue' "error-messages carries the stop entry: ${f#"$ROOT/"}"
   check "$f" 'To fix:  gh issue view \{N\} --json number,title,body,labels' "stop entry offers a fix command: ${f#"$ROOT/"}"
+  check "$f" 'Then:    /issue-pr-review \{PR\}' "stop entry resumes on the PR, not the issue number: ${f#"$ROOT/"}"
+  check "$f" '`\{N\}` is \*\*not\*\* the' "stop entry documents its placeholder binding: ${f#"$ROOT/"}"
 done
 
 # Snapshot budget supersedes the stale literal without weakening freshness reads.

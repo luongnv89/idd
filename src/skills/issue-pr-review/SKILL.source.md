@@ -186,7 +186,7 @@ cannot hand to a script.
 Decide **how deep** this review goes, so a one-line copy fix is not put through
 the same full-weight review as a multi-subsystem PR: `profile = light | full`.
 The signal and `light` changes are defined in `docs/agent-model-effort.md` (*Complexity → pipeline profile*) and `references/review-loop-mechanics.md` (*Depth gate*); **read and apply both**.
-First, unconditionally refresh the linked issue at the review boundary:
+First, when the PR body links an issue, refresh it at the review boundary:
 `python3 shared/scripts/gi-issue.py {N} --fields number,title,body,labels --refresh`,
 reading `.issue`. Exit 3 stops; no `python3`, exit 2, or exit 4 degrades to
 `gh issue view {N} --json number,title,body,labels`. Retain either successful

@@ -53,13 +53,15 @@ Stopping those PRs would suppress the exact finding they exist to produce.
 Retrying only the path that failed can miss a transient fault in the other. If
 the second attempt also yields no usable record, stop the review; do not
 continue to Step 3. Print the rich error (*Linked issue unreadable at the review
-boundary* in `references/error-messages.md`):
+boundary* in `references/error-messages.md`). In this block alone, `{N}` is the
+**linked issue** number and `{PR}` is the pull request — the resume command takes
+the PR, because `/issue-pr-review` reviews a PR, not an issue:
 
 ```
 ✗ Cannot read linked issue #{N} — review stopped
 
   To fix:  gh issue view {N} --json number,title,body,labels
-  Then:    /issue-pr-review {N}
+  Then:    /issue-pr-review {PR}
   Docs:    https://github.com/luongnv89/idd/blob/main/docs/platform-github.md
 ```
 
