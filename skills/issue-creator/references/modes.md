@@ -243,34 +243,15 @@ Use `references/docs/terminal-style.md` table format: box-drawing characters `�
 
 ### Step 3 — Duplicate Check
 
-#### Subagent delegation
+#### Deterministic scoring and medium-band judgement
 
-Spawn the duplicate-detector subagent with all batch items:
+Write all batch items and the once-loaded resolved config to the same stdin request described by Create Step 3, with `mode: "batch"`, then run `references/scripts/gi-dup-score.py` once. The scorer checks every item against the open backlog and every unordered internal pair in **both directions**; its record retains `directional_scores`, and the stronger direction controls the band without duplicating the pair.
 
-```json
-{
-  "mode": "batch",
-  "items": [
-    { "index": 1, "title": "...", "keywords": [...], "type": "bug" },
-    { "index": 2, "title": "...", "keywords": [...], "type": "feature" }
-  ],
-  "repo_root": "{repo_root}"
-}
-```
+`duplicates` and `batch_internal_duplicates` are deterministic high-band warnings. When `medium_band` is non-empty, apply the scorer's deterministic `medium_judgement.selected_count` limit and `batch_size`: spawn the duplicate-detector sequentially for each selected chunk, passing only the referenced rows from the deduplicated `medium_issue_context` table. The agent judges semantic intent from those supplied records; it neither fetches nor recomputes arithmetic. Match its tri-state verdicts by complete candidate identity, never array position. Remove a medium warning only for exactly one well-formed `decision: rejected` verdict with the same identity and a non-empty evidence-based reason. Retain `confirmed` and `ambiguous` candidates; label ambiguity `(needs review)`. A failed agent/chunk or a missing, duplicate, malformed, incomplete, unknown-decision, or wrong-identity verdict retains the original candidate with its deterministic score/payments/reason as a `(needs review)` warning — partial failed output is never authority. Retain every deferred medium entry (and every medium entry when no Agent tool exists) as a possible-duplicate warning without an LLM verdict. Bounded judgement never silently drops ambiguity. With an empty band, skip the spawn.
 
-Read `references/agents/duplicate-detector.md` for the full prompt. The subagent checks each item against existing open issues AND cross-checks items against each other in a single pass.
+**Parallel execution:** script scoring can run alongside template pre-generation. Bounded medium judgement, when needed, begins after the score result and is consumed at Step 4.
 
-**Parallel execution:** In batch mode, spawn the duplicate-detector at the same time as pre-generating template content — both results are ready by Step 4 (Approval) and consumed at Step 5 (Create Issues).
-
-#### Fallback (no Agent tool)
-
-If the Agent tool is not available, run inline:
-
-```bash
-gh issue list --state open --json number,title,body,labels --limit 100
-```
-
-Check each batch item against existing issues AND against other items in the batch.
+If the scorer cannot run, follow Create Step 3's classified fallback and compare each item against existing issues and other batch items bidirectionally. Exit 3 stops; an unreadable backlog never becomes a clean scan.
 
 #### Present results
 

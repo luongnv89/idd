@@ -1,7 +1,7 @@
 <!-- Generated from /docs/config-schema.md. Do not edit. Edit source and run ./scripts/build.sh. -->
 # `.gitissue.yml` Configuration Schema
 
-> **Per-skill excerpt (generated).** Only the configuration sections this skill reads are reproduced here: `issue`, `model_suggestion`, `platform`, `projects`, `triage`. The complete schema — every section and the full defaults table — is at [config-schema.md](https://github.com/luongnv89/idd/blob/main/docs/config-schema.md).
+> **Per-skill excerpt (generated).** Only the configuration sections this skill reads are reproduced here: `duplicate_detection`, `issue`, `model_suggestion`, `platform`, `projects`, `triage`. The complete schema — every section and the full defaults table — is at [config-schema.md](https://github.com/luongnv89/idd/blob/main/docs/config-schema.md).
 
 gitissue works with zero configuration — all settings have sensible defaults. When no `.gitissue.yml` file exists, the first-run hint is shown:
 
@@ -13,20 +13,13 @@ Place `.gitissue.yml` in the repository root to customize behavior.
 
 ### Config Loading Flow
 
-A skill loads the file once at start. Present and valid → use it. Present and
-invalid → stop with the line-numbered errors under *Validation* below. Absent →
-use the defaults and print the first-run hint above.
-
-### Config Hierarchy
-
-Three inputs, each with its own lifetime: `.gitissue.yml` is configuration, read
-**once** at skill start; `.gitissue/` is state, read and written **during**
-execution; the built-in skill defaults are the **fallback** when no config file
-exists.
+Loaded **once** at skill start. Valid file → use it. Invalid → stop with the
+line-numbered *Validation* errors. Absent → defaults + first-run hint above.
+`.gitissue.yml` is config; `.gitissue/` is runtime state; built-ins are fallback.
 
 ## Core Fields
 
-Ten fields cover almost every customization in practice — `platform`, `issue.auto_normalize`, `resolve.branch_prefix`, `resolve.auto_test`, `resolve.test_timeout`, `triage.stale_threshold_days`, `autopilot.mode`, `autopilot.review_cycles`, `autopilot.skip_labels`, and `review.require_acceptance_criteria_check`. Start with those (the README shows a ready-to-copy sample); treat everything below as the **advanced reference** — useful when a specific behavior needs tuning, never required.
+Everyday knobs: `platform`, `issue.auto_normalize`, `resolve.branch_prefix`, `resolve.auto_test`, `resolve.test_timeout`, `triage.stale_threshold_days`, `autopilot.mode`, `autopilot.review_cycles`, `autopilot.skip_labels`, `review.require_acceptance_criteria_check`. Everything below is the advanced reference.
 
 ## Full Schema (advanced reference)
 
@@ -88,106 +81,83 @@ triage:
   # Maximum: 300
   scan_timeout_per_issue: 30
 
-# GitHub Projects board sync settings
+# GitHub Projects board sync
 # See https://github.com/luongnv89/idd/blob/main/docs/github-projects-sync.md
-# for the full integration reference
 projects:
-  # Enable automatic project board status sync
-  # Type: boolean
-  # Default: false
-  # When false, all project sync operations are silently skipped
+  # Type: boolean. Default: false. When false, sync is silently skipped.
   sync_enabled: false
-
-  # Explicit project number (from the project URL)
-  # Type: integer or null
-  # Default: null (auto-detect first linked project)
-  # Set this if the repo has multiple linked projects
+  # Type: integer or null. Default: null (first linked project).
   project_number: null
-
-  # Name of the Status field on the project board
-  # Type: string
-  # Default: "Status"
-  # Must match the exact field name on the project (case-sensitive)
+  # Type: string. Default: "Status". Must match the board field (case-sensitive).
   status_field: "Status"
-
-  # Map of internal status keys to project board option values
-  # Type: object
-  # Each value must match an option name in the Status field
+  # Internal key → board option name (must match an option in status_field).
   status_map:
-    # Status for newly created issues
-    # Type: string
-    # Default: "Todo"
+    # Defaults: Todo / In Progress / Done (new issue / work started / PR created)
     todo: "Todo"
-
-    # Status when work starts (branch created)
-    # Type: string
-    # Default: "In Progress"
     in_progress: "In Progress"
-
-    # Status when PR is created
-    # Type: string
-    # Default: "Done"
     done: "Done"
 
-# Model suggestion settings (used by /issue-creator)
-# See src/skills/issue-creator/references/model-suggestion.md for the full procedure
+# Deterministic dup scoring (/issue-creator). One NFKC/case-folded tokenizer;
+# a signal pays per newly consumed item token. extra_stop_words extends the
+# built-in list (never replaces it) and cannot raise a score.
+duplicate_detection:
+  # Integers >= 0. phrase must be >= `weights.title_overlap` so a stop word
+  # cannot promote evidence onto a higher-paying lower-precedence signal.
+  weights:
+    phrase: 2
+    title_overlap: 2
+    keyword: 1
+    # Paid once, not per token
+    same_type: 1
+  # Integers. High is deterministic; medium alone is sent to the LLM.
+  high_threshold: 5
+  medium_threshold: 3
+  # Tokenizer and detection bounds — all integers >= 1
+  min_token_length: 1
+  phrase_min_tokens: 3
+  backlog_limit: 100
+  max_items: 100
+  # Additive comma-separated terms; folded after NFKC. Never raises a score.
+  extra_stop_words: ""
+
+# Model suggestion (/issue-creator). Procedure: references/model-suggestion.md
 model_suggestion:
-  # Suggest a cost-effective model + thinking level per issue, from CursorBench
-  # data cached at the skill level in model-data-<date>.json (shared across all
-  # repos, not per-project; force-refresh with --refresh-model-data)
-  # Type: boolean
-  # Default: true
-  # When false, all model-suggestion behavior is silently skipped and the issue
-  # body / preview are unchanged from the pre-feature behavior
+  # Type: boolean. Default: true. false skips suggestion; body/preview unchanged.
+  # Cache is skill-level model-data-<date>.json (all repos); --refresh-model-data.
   enabled: true
-
-  # Source URL refreshed into the cache on opt-in
-  # Type: string
-  # Default: "https://cursor.com/cursorbench"
+  # Type: string. Default: "https://cursor.com/cursorbench"
   data_url: "https://cursor.com/cursorbench"
-
-  # Days before the cached model data is considered stale (warning + refresh prompt)
-  # Type: integer
-  # Default: 7
+  # Type: integer. Default: 7. Days before the cache is stale.
   cache_ttl_days: 7
 ```
 
 ## `.gitissue/` Directory
 
-State written by gitissue skills, at the repo root beside `.gitissue.yml`, created on first use.
+Repo-root state beside `.gitissue.yml`, created on first use.
 
 | File | Written by | Description |
 |------|-----------|-------------|
-| `.gitissue/triage.json` | `/issue-triage`, `/auto-pilot` | Cached triage analysis (JSON schema v1) — priorities, dependencies, execution order, history |
-| `.gitissue/analysis-<N>.json` | `/issue-analysis` | Deep analysis of issue #N — affected files, root cause, implementation options, complexity, and risk |
-| `.gitissue/runs.jsonl` | `/issue-resolver`, `/auto-pilot` | Append-only run log — one JSON line per processed issue. Schema and single-writer rule: the subsection below |
-| `.gitissue/run-state.json`, `run.lock`, `last-run-report.md` | `/auto-pilot` | Mutable resume state (current/lane phases and PRs, processed/skips), run lock, and final report. Machine-local; mechanics: auto-pilot preflight/phases |
+| `.gitissue/triage.json` | `/issue-triage`, `/auto-pilot` | Cached triage (schema v1): priorities, deps, order, history |
+| `.gitissue/analysis-<N>.json` | `/issue-analysis` | Deep analysis of issue #N |
+| `.gitissue/runs.jsonl` | `/issue-resolver`, `/auto-pilot` | Append-only run log (one JSON line per issue). See subsection |
+| `.gitissue/run-state.json`, `run.lock`, `last-run-report.md` | `/auto-pilot` | Resume state, lock, final report. Machine-local; auto-pilot preflight/phases |
 
-> **Not in `.gitissue/`:** the model-suggestion cache is **skill-level** —
-> `/issue-creator` caches CursorBench data in the installed skill folder as
-> `model-data-<date>.json` (one per machine, all repos); a legacy
-> `.gitissue/model-data.json` is ignored. See
-> `src/skills/issue-creator/references/model-suggestion.md`.
+> **Not in `.gitissue/`:** the model-suggestion cache is **skill-level**
+> (`model-data-<date>.json` in the installed skill, all repos). A legacy
+> `.gitissue/model-data.json` is ignored.
 
 **Conventions:**
-- Skills create `.gitissue/` via `mkdir -p`
-- JSON files are formatted for readable git diffs
-- A full re-triage overwrites `triage.json`; `/auto-pilot` instead updates it in place after a merge, removing the resolved issue and appending one history entry
-- `runs.jsonl` is **append-only** — one line per run, never edited; its absence or deletion is non-fatal
+- Create via `mkdir -p`; format JSON for readable diffs
+- Full re-triage overwrites `triage.json`; `/auto-pilot` updates it in place after a merge
+- `runs.jsonl` is **append-only**; absence is non-fatal
 - Commit the directory (project state, not secrets)
-- **Carve-out — `run-state.json`, `run.lock` and `last-run-report.md` are
-  machine-local and gitignored.** They describe one machine's in-flight run: a
-  committed lock makes every clone look busy, a committed state offers a resume
-  onto branches another machine lacks, and both carry titles of work in flight.
-  Only `src/shared/scripts/gi-state.py` writes them — the single writer that
-  makes `--dry-run` leave no mutation.
+- **Carve-out — `run-state.json`, `run.lock` and `last-run-report.md` are machine-local and gitignored.** Only `src/shared/scripts/gi-state.py` writes them; `--dry-run` mutates nothing.
 
 ### `.gitissue/runs.jsonl` — run log (monitoring)
 
 Field set, append rules, and the single-writer / `--no-run-log` convention live
 in
 [run-log-schema.md](https://github.com/luongnv89/idd/blob/main/docs/run-log-schema.md).
-Skills that only append a telemetry line read that document, not this one.
 
 ## Validation
 
@@ -222,6 +192,17 @@ Config is validated on load at the start of every skill invocation. Errors inclu
 | `projects.status_map.todo` | `"Todo"` | Status for new issues |
 | `projects.status_map.in_progress` | `"In Progress"` | Status when work starts |
 | `projects.status_map.done` | `"Done"` | Status when PR is created |
+| `duplicate_detection.weights.phrase` | `2` | Per newly consumed phrase token; must be >= `weights.title_overlap` |
+| `duplicate_detection.weights.title_overlap` | `2` | Per newly consumed shared-title token; ≤ `weights.phrase` |
+| `duplicate_detection.weights.keyword` | `1` | Per newly consumed keyword token |
+| `duplicate_detection.weights.same_type` | `1` | One-time same-type payment |
+| `duplicate_detection.high_threshold` | `5` | Deterministic high-band |
+| `duplicate_detection.medium_threshold` | `3` | Only band sent to the LLM |
+| `duplicate_detection.min_token_length` | `1` | Tokenizer minimum |
+| `duplicate_detection.phrase_min_tokens` | `3` | Minimum phrase length |
+| `duplicate_detection.backlog_limit` | `100` | Max open issues scored |
+| `duplicate_detection.max_items` | `100` | Max proposed items per request |
+| `duplicate_detection.extra_stop_words` | `""` | Additive stop words; never raises a score |
 | `model_suggestion.enabled` | `true` | Suggest a model + thinking level per issue |
 | `model_suggestion.data_url` | `"https://cursor.com/cursorbench"` | CursorBench source refreshed into the cache |
 | `model_suggestion.cache_ttl_days` | `7` | Days before cached model data is stale |

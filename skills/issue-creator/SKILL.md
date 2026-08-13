@@ -66,20 +66,22 @@ Before any operation, verify the environment. On failure, output the exact error
 3. Confirm authentication: `gh auth status`
 4. Confirm GitHub remote exists: `git remote -v`
 
-## Repo Sync (scoped to actual local writes)
+## Repo Sync (scoped to actual source-tree writes)
 
-Every write this skill performs is **remote**: issue bodies go out through `gh
-issue edit`, and screenshots are committed to `.github/issue-assets/` by the
-GitHub contents API (`references/image-upload.md`), which commits server-side
-rather than from the working tree. A local `git pull --rebase` protects none of
-them, and on a dirty tree it can stop a pure create with a rebase conflict — so
-create, normalize, and image upload run **without** a repo sync.
+Every durable write this skill performs is **remote**: issue bodies go out through
+`gh issue edit`, and screenshots are committed to `.github/issue-assets/` by the
+GitHub contents API (`references/image-upload.md`), which commits server-side.
+Duplicate scoring briefly writes a unique ignored request under `.gitissue/cache/`
+and removes it on every outcome; that transient runtime state is not source work
+and does not warrant syncing the repository. A local `git pull --rebase` protects
+none of these writes, and on a dirty tree it can stop a pure create with a rebase
+conflict — so create, normalize, and image upload run **without** a repo sync.
 
-If a run does write to the working tree (a mode that scaffolds local template
-files, for example), sync first with the stash-first pattern in
-`references/docs/sync-conventions.md` — immediately before that local write, not at skill
-start. Everything else in that document (auto-mode contract, stash-pop recovery)
-applies unchanged when it does run.
+If a run does write durable files to the working tree (a mode that scaffolds
+local template files, for example), sync first with the stash-first pattern in
+`references/docs/sync-conventions.md` — immediately before that source-tree write, not at
+skill start. Everything else in that document (auto-mode contract, stash-pop
+recovery) applies unchanged when it does run.
 
 ## Configuration
 
@@ -91,7 +93,7 @@ Otherwise, load `.gitissue.yml` from the repo root once at skill start. If the f
 ○ First run — using default config. Run /init-gitissue to customize.
 ```
 
-Defaults: `issue.template: "default"`, `issue.labels_auto_suggest: true`, `issue.normalize_comment: true`, `model_suggestion.enabled: true`
+Defaults: `issue.template: "default"`, `issue.labels_auto_suggest: true`, `issue.normalize_comment: true`, `model_suggestion.enabled: true`; duplicate scoring defaults come from the once-loaded `duplicate_detection.*` keys (`weights.phrase: 2`, `weights.title_overlap: 2`, `weights.keyword: 1`, `weights.same_type: 1`, `high_threshold: 5`, `medium_threshold: 3`, `min_token_length: 1`, `phrase_min_tokens: 3`, `backlog_limit: 100`, `max_items: 100`, `extra_stop_words: ""`).
 
 If the config file exists but contains invalid values, output the validation error from `references/error-messages.md` and stop. Do not re-read the config at each step.
 
@@ -107,16 +109,15 @@ Exit 0 prints `state` (`fresh` | `stale` | `seeded` | `installed`), `stale`, `ag
 
 ## Subagent Architecture
 
-The skill delegates **duplicate detection (Step 3)** to a subagent so the main agent's **context window** stays clean and the **token budget** stays predictable. Every other step stays in the main agent: parse input (Step 1) and classify (Step 2) are lightweight; clarify ambiguous intent (Step 3.5), generate content (Step 4), preview (Step 5), and create (Step 6) run inline.
+The deterministic half of duplicate detection runs in `references/scripts/gi-dup-score.py`; it reads the proposed items and the once-loaded resolved `duplicate_detection.*` mapping on stdin, then self-fetches the backlog. The skill delegates **only the medium-band judgement (Step 3)** to the duplicate-detector subagent, so the model never recomputes scores or reads up to 100 issue bodies. Every other step stays in the main agent.
 
-In **batch mode**, the duplicate detector checks all batch items — including internal cross-checks — in a single pass, so only one subagent spawn is needed regardless of batch size, and duplicate checking runs in parallel with template generation.
+In **batch mode**, one script run scores all existing and internal pairs bidirectionally. At most one subagent spawn judges the pooled `medium_band`, and an empty band skips the spawn entirely.
 
-Read `references/agents/duplicate-detector.md` for the full duplicate detector prompt.
+Read `references/agents/duplicate-detector.md` for the medium-band prompt.
 
 ### Environment check
 
-If the Agent tool is available, use the duplicate-detector subagent as described above for Step 3.
-If not (e.g., Claude.ai or environments without the Agent tool), execute duplicate checking inline using the fallback instructions included in Step 3.
+If the Agent tool is available, use it only when Step 3 has medium candidates. Without the Agent tool, report medium candidates as possible duplicates without pretending an LLM verdict occurred. If the script itself cannot run, execute the documented inline fallback.
 
 ### Bundled dependency precheck
 
@@ -156,6 +157,7 @@ Check these files:
 - `references/docs/terminal-style.md` — terminal output style contract (symbols, output structure, table/error formats)
 - `references/scripts/gi-config.py` — config resolver: merges the documented defaults with `.gitissue.yml` and prints one JSON line
 - `references/scripts/gi-issue.py` — TTL-cached issue fetcher for Normalize mode's repeat reads
+- `references/scripts/gi-dup-score.py` — deterministic duplicate scorer (Step 3)
 - `references/scripts/gi-model-cache.py` — model-data cache lifecycle
 
 ---
@@ -212,36 +214,60 @@ Assign confidence to the type classification:
 
 ### Step 3 — Check for Duplicates
 
-#### Subagent delegation
+#### Score deterministically
 
-Spawn the duplicate-detector subagent with:
-
-```json
-{
-  "mode": "create",
-  "items": [
-    {
-      "index": 1,
-      "title": "{classified_title}",
-      "keywords": ["{keyword1}", "{keyword2}"],
-      "type": "{bug|feature|improvement}"
-    }
-  ],
-  "repo_root": "{repo_root}"
-}
-```
-
-Read `references/agents/duplicate-detector.md` for the full prompt. The subagent returns a `duplicates` array with scored matches.
-
-#### Fallback (no Agent tool)
-
-If the Agent tool is not available, run inline:
+Refuse a planted `.gitissue/cache` symlink, create that ignored directory only
+when it is a real directory, then create a unique exclusive request file
+(`mktemp`, mode 0600). Write the classified `items` plus the once-loaded
+`config` into that file. Feed `"$dup_request"` on stdin; never put an issue
+title, keyword, body, or config value on the command line, and never reuse a
+shared `.gitissue/cache/dup-request.json` path.
 
 ```bash
-gh issue list --state open --json number,title,body,labels --limit 100
+if [ -L .gitissue/cache ]; then
+  echo "✗ .gitissue/cache is a symlink — refusing to write the scorer request"
+  exit 1
+fi
+mkdir -p .gitissue/cache
+if [ -L .gitissue/cache ]; then
+  echo "✗ .gitissue/cache is a symlink — refusing to write the scorer request"
+  exit 1
+fi
+dup_request="$(mktemp .gitissue/cache/dup-request.XXXXXX)"
+chmod 600 "$dup_request"
 ```
 
-Compare the new issue's title and key terms against existing issues.
+```json
+{"mode":"create","items":[{"index":1,"title":"…","keywords":["…"],"type":"bug"}],"config":{"duplicate_detection.weights.phrase":2}}
+```
+
+Run the scorer with cleanup armed before the invocation, so success, a classified exit, an interrupt, and an unexpected stop all remove **this run's** request. The signal handlers must exit with the conventional `128 + signal` status; handling a signal by cleanup alone suppresses cancellation and can let issue creation continue. Each signal exits through the single `EXIT` cleanup, while the normal path cleans once before disarming every trap:
+
+```bash
+cleanup_dup_request() { rm -f "$dup_request"; }
+trap cleanup_dup_request EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
+dup_output=$(python3 references/scripts/gi-dup-score.py < "$dup_request")
+dup_status=$?
+cleanup_dup_request
+trap - EXIT HUP INT TERM
+```
+
+Resolve the script relative to this SKILL.md as the dependency precheck does, and interpret `dup_output` only after `dup_status` is classified. Exit 0 returns `duplicates` (deterministic high band), `medium_band`, deduplicated `medium_issue_context`, `medium_judgement`, and `batch_internal_duplicates`. An empty `medium_band` skips the agent. When non-empty, take the first `medium_judgement.selected_count` candidates in their script-defined order and spawn the duplicate-detector in chunks of `medium_judgement.batch_size` with `{mode, items, candidates: chunk, issue_context: only the medium_issue_context rows referenced by that chunk}`. It returns one tri-state `decision` (`confirmed` | `rejected` | `ambiguous`) per candidate without fetching or rescoring. Match verdicts to candidates by the complete identity (`item_index`, `match_type`, and `match_number` or `match_index`), never by array position. A candidate is removed from the possible-duplicate warnings **only** by exactly one well-formed `rejected` verdict carrying the same identity and a non-empty evidence-based reason. Keep `confirmed` and `ambiguous` candidates as warnings, distinguishing `ambiguous` as `(needs review)`. A missing, duplicate, malformed, incomplete, unknown-decision, wrong-identity, or failed-agent verdict is fail-safe ambiguity: retain the original candidate and its deterministic `score`, `payments`, and `reason` as a `(needs review)` warning. Do not use partial output from a failed chunk as authority. Any remaining `medium_judgement.deferred_count` candidates are **retained as possible-duplicate warnings without an LLM verdict** — bounded judgement may defer ambiguity, never turn it into "no duplicate." High matches are warnings too; their title and labels remain directly on each record, and the scorer never silently drops requested work.
+
+Exit 3 is invalid request/config: stop with the validation error. A missing script is a broken install: stop with the dependency error. For no `python3`, exit 2/4, or unparsable stdout, print `⚠ gi-dup-score unavailable — scoring duplicates inline`; exit 4 means the backlog was unreadable, never empty. For that fallback, take `backlog_limit` from the once-loaded `duplicate_detection.backlog_limit` and validate it before use. Run this block as written; the extra record is a truncation probe, not a record to score:
+
+```bash
+case "$backlog_limit" in
+  ''|*[!0-9]*|0) echo "✗ Invalid config: duplicate_detection.backlog_limit must be a positive integer"; exit 3 ;;
+esac
+probe_limit=$((backlog_limit + 1))
+fallback_issues="$(gh issue list --state open --json number,title,body,labels --limit "$probe_limit")" || exit 4
+```
+
+Parse `fallback_issues` as JSON, score only its first `backlog_limit` records, and report the scan as truncated when the extra record exists. Quoting the validated digits-only value is mandatory; never use `eval`, shell re-parsing, or an issue-derived value on this command line. Apply the documented canonical rules: NFKC/case-fold tokens; one minimum-length and additive stop-word policy; fixed phrase → title-overlap → keyword precedence; each payment derived only from newly consumed item tokens; one same-type payment; configured weights and thresholds. The phrase per-token weight must be greater than or equal to title-overlap weight, so removing evidence with an extra stop word cannot move a token into a higher-paying lower-precedence signal. Apply internal batch pairs in both directions and keep the stronger direction. Inline fallback uses the same bounded medium-judgement protocol above; a candidate outside the bounded LLM slice remains a warning.
 
 #### Present results
 

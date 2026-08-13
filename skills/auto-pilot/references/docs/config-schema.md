@@ -13,20 +13,13 @@ Place `.gitissue.yml` in the repository root to customize behavior.
 
 ### Config Loading Flow
 
-A skill loads the file once at start. Present and valid → use it. Present and
-invalid → stop with the line-numbered errors under *Validation* below. Absent →
-use the defaults and print the first-run hint above.
-
-### Config Hierarchy
-
-Three inputs, each with its own lifetime: `.gitissue.yml` is configuration, read
-**once** at skill start; `.gitissue/` is state, read and written **during**
-execution; the built-in skill defaults are the **fallback** when no config file
-exists.
+Loaded **once** at skill start. Valid file → use it. Invalid → stop with the
+line-numbered *Validation* errors. Absent → defaults + first-run hint above.
+`.gitissue.yml` is config; `.gitissue/` is runtime state; built-ins are fallback.
 
 ## Core Fields
 
-Ten fields cover almost every customization in practice — `platform`, `issue.auto_normalize`, `resolve.branch_prefix`, `resolve.auto_test`, `resolve.test_timeout`, `triage.stale_threshold_days`, `autopilot.mode`, `autopilot.review_cycles`, `autopilot.skip_labels`, and `review.require_acceptance_criteria_check`. Start with those (the README shows a ready-to-copy sample); treat everything below as the **advanced reference** — useful when a specific behavior needs tuning, never required.
+Everyday knobs: `platform`, `issue.auto_normalize`, `resolve.branch_prefix`, `resolve.auto_test`, `resolve.test_timeout`, `triage.stale_threshold_days`, `autopilot.mode`, `autopilot.review_cycles`, `autopilot.skip_labels`, `review.require_acceptance_criteria_check`. Everything below is the advanced reference.
 
 ## Full Schema (advanced reference)
 
@@ -373,40 +366,31 @@ triage:
 
 ## `.gitissue/` Directory
 
-State written by gitissue skills, at the repo root beside `.gitissue.yml`, created on first use.
+Repo-root state beside `.gitissue.yml`, created on first use.
 
 | File | Written by | Description |
 |------|-----------|-------------|
-| `.gitissue/triage.json` | `/issue-triage`, `/auto-pilot` | Cached triage analysis (JSON schema v1) — priorities, dependencies, execution order, history |
-| `.gitissue/analysis-<N>.json` | `/issue-analysis` | Deep analysis of issue #N — affected files, root cause, implementation options, complexity, and risk |
-| `.gitissue/runs.jsonl` | `/issue-resolver`, `/auto-pilot` | Append-only run log — one JSON line per processed issue. Schema and single-writer rule: the subsection below |
-| `.gitissue/run-state.json`, `run.lock`, `last-run-report.md` | `/auto-pilot` | Mutable resume state (current/lane phases and PRs, processed/skips), run lock, and final report. Machine-local; mechanics: auto-pilot preflight/phases |
+| `.gitissue/triage.json` | `/issue-triage`, `/auto-pilot` | Cached triage (schema v1): priorities, deps, order, history |
+| `.gitissue/analysis-<N>.json` | `/issue-analysis` | Deep analysis of issue #N |
+| `.gitissue/runs.jsonl` | `/issue-resolver`, `/auto-pilot` | Append-only run log (one JSON line per issue). See subsection |
+| `.gitissue/run-state.json`, `run.lock`, `last-run-report.md` | `/auto-pilot` | Resume state, lock, final report. Machine-local; auto-pilot preflight/phases |
 
-> **Not in `.gitissue/`:** the model-suggestion cache is **skill-level** —
-> `/issue-creator` caches CursorBench data in the installed skill folder as
-> `model-data-<date>.json` (one per machine, all repos); a legacy
-> `.gitissue/model-data.json` is ignored. See
-> `src/skills/issue-creator/references/model-suggestion.md`.
+> **Not in `.gitissue/`:** the model-suggestion cache is **skill-level**
+> (`model-data-<date>.json` in the installed skill, all repos). A legacy
+> `.gitissue/model-data.json` is ignored.
 
 **Conventions:**
-- Skills create `.gitissue/` via `mkdir -p`
-- JSON files are formatted for readable git diffs
-- A full re-triage overwrites `triage.json`; `/auto-pilot` instead updates it in place after a merge, removing the resolved issue and appending one history entry
-- `runs.jsonl` is **append-only** — one line per run, never edited; its absence or deletion is non-fatal
+- Create via `mkdir -p`; format JSON for readable diffs
+- Full re-triage overwrites `triage.json`; `/auto-pilot` updates it in place after a merge
+- `runs.jsonl` is **append-only**; absence is non-fatal
 - Commit the directory (project state, not secrets)
-- **Carve-out — `run-state.json`, `run.lock` and `last-run-report.md` are
-  machine-local and gitignored.** They describe one machine's in-flight run: a
-  committed lock makes every clone look busy, a committed state offers a resume
-  onto branches another machine lacks, and both carry titles of work in flight.
-  Only `src/shared/scripts/gi-state.py` writes them — the single writer that
-  makes `--dry-run` leave no mutation.
+- **Carve-out — `run-state.json`, `run.lock` and `last-run-report.md` are machine-local and gitignored.** Only `src/shared/scripts/gi-state.py` writes them; `--dry-run` mutates nothing.
 
 ### `.gitissue/runs.jsonl` — run log (monitoring)
 
 Field set, append rules, and the single-writer / `--no-run-log` convention live
 in
 [run-log-schema.md](https://github.com/luongnv89/idd/blob/main/docs/run-log-schema.md).
-Skills that only append a telemetry line read that document, not this one.
 
 ## Validation
 

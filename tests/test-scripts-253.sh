@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 # test-scripts-253.sh — Issue #253 acceptance checks for the third wave of
-# shared scripts (gi-triage-graph, gi-stack-detect, gi-model-cache).
+# shared scripts (gi-dup-score, gi-triage-graph, gi-stack-detect, gi-model-cache).
 #
-# AC1 (deterministic duplicate scoring) is deliberately not covered here:
-# `gi-dup-score.py` was removed from this change set and stays open on #253,
-# to be redone against a corrected scoring model. Nothing below refers to it.
+# AC1's deep scorer properties live in test-scripts-278.sh; this suite pins the
+# distribution, config, and issue-creator wiring so the tested scorer ships.
 #
 # Acceptance criteria covered:
 #   AC2  Triage ordering is produced by a script emitting the same cache payload
@@ -33,8 +32,9 @@ SRC="$REPO_ROOT/src"
 GRAPH="$SRC_SCRIPTS/gi-triage-graph.py"
 STACK="$SRC_SCRIPTS/gi-stack-detect.py"
 MODEL="$SRC_SCRIPTS/gi-model-cache.py"
+DUP="$SRC_SCRIPTS/gi-dup-score.py"
 
-NEW_SCRIPTS="gi-triage-graph gi-stack-detect gi-model-cache"
+NEW_SCRIPTS="gi-dup-score gi-triage-graph gi-stack-detect gi-model-cache"
 
 PASS=0
 FAIL=0
@@ -102,7 +102,7 @@ while IFS= read -r line; do
   mode="${line%% *}"
   file="${line##*	}"
   case "$file" in
-    *gi-triage-graph.py|*gi-stack-detect.py|*gi-model-cache.py)
+    *gi-dup-score.py|*gi-triage-graph.py|*gi-stack-detect.py|*gi-model-cache.py)
       if [ "$mode" = "100755" ]; then
         pass "$(basename "$file") is committed 0755"
       else
@@ -607,6 +607,7 @@ expect_bundled() {
     fail "AC5: $skill bundles $script"
   fi
 }
+expect_bundled issue-creator gi-dup-score.py
 expect_bundled issue-creator gi-model-cache.py
 expect_bundled issue-triage gi-triage-graph.py
 expect_bundled auto-pilot gi-triage-graph.py
@@ -620,6 +621,258 @@ expect_grep() {
     fail "$label"
   fi
 }
+expect_grep "AC1: issue-creator calls gi-dup-score from its own orchestrator" \
+  "references/scripts/gi-dup-score.py" "$SKILLS/issue-creator/SKILL.md"
+expect_grep "AC1: issue-creator creates the ignored scorer cache on first run" \
+  "mkdir -p .gitissue/cache" "$SKILLS/issue-creator/SKILL.md"
+expect_grep "AC1: issue-creator refuses a planted cache symlink" \
+  ".gitissue/cache is a symlink" "$SKILLS/issue-creator/SKILL.md"
+expect_grep "AC1: issue-creator creates a unique exclusive scorer request" \
+  'mktemp .gitissue/cache/dup-request.XXXXXX' "$SKILLS/issue-creator/SKILL.md"
+expect_grep "AC1: unique scorer request is owner-only" \
+  'chmod 600 "$dup_request"' "$SKILLS/issue-creator/SKILL.md"
+expect_grep "AC1: issue-creator sends the unique scorer request on stdin" \
+  '< "$dup_request"' "$SKILLS/issue-creator/SKILL.md"
+if grep -q -- '< .gitissue/cache/dup-request.json' "$SKILLS/issue-creator/SKILL.md"; then
+  fail "AC1: issue-creator still uses a shared dup-request.json path"
+else
+  pass "AC1: issue-creator no longer uses a shared dup-request.json path"
+fi
+expect_grep "AC1: scorer request cleanup is armed before invocation" \
+  "trap cleanup_dup_request EXIT" "$SKILLS/issue-creator/SKILL.md"
+expect_grep "AC1: HUP preserves cancellation status" \
+  "trap 'exit 129' HUP" "$SKILLS/issue-creator/SKILL.md"
+expect_grep "AC1: INT preserves cancellation status" \
+  "trap 'exit 130' INT" "$SKILLS/issue-creator/SKILL.md"
+expect_grep "AC1: TERM preserves cancellation status" \
+  "trap 'exit 143' TERM" "$SKILLS/issue-creator/SKILL.md"
+expect_grep "AC1: scorer request is removed after the invocation" \
+  "cleanup_dup_request" "$SKILLS/issue-creator/SKILL.md"
+expect_grep "AC1: fallback validates the resolved backlog limit" \
+  "duplicate_detection.backlog_limit must be a positive integer" "$SKILLS/issue-creator/SKILL.md"
+expect_grep "AC1: fallback probes one beyond the configured backlog limit" \
+  'probe_limit=$((backlog_limit + 1))' "$SKILLS/issue-creator/SKILL.md"
+expect_grep "AC1: fallback passes the validated configured limit to gh" \
+  'gh issue list --state open --json number,title,body,labels --limit \"$probe_limit\"' "$SKILLS/issue-creator/SKILL.md"
+if grep -q -- 'gh issue list --state open --json number,title,body,labels --limit 100' "$SKILLS/issue-creator/SKILL.md"; then
+  fail "AC1: issue-creator fallback still hardcodes backlog limit 100"
+else
+  pass "AC1: issue-creator fallback has no hardcoded backlog limit"
+fi
+# Execute the cleanup contract rather than merely grepping it. Success and a
+# classified scorer failure use the real scorer. HUP/INT/TERM are delivered to
+# the shell after the traps are armed; each must terminate with 128+signal,
+# remove the request through EXIT, and never reach the continuation marker.
+FLOW="$TMP/dup-flow"; mkdir -p "$FLOW/references/scripts"; cp "$SKILLS/issue-creator/references/scripts/gi-dup-score.py" "$FLOW/references/scripts/"
+printf '[]\n' > "$FLOW/issues.json"
+cat > "$FLOW/run-cleanup.sh" <<'EOF'
+#!/usr/bin/env bash
+mode="$1"
+if [ -L .gitissue/cache ]; then
+  echo "✗ .gitissue/cache is a symlink — refusing to write the scorer request"
+  exit 1
+fi
+mkdir -p .gitissue/cache
+if [ -L .gitissue/cache ]; then
+  echo "✗ .gitissue/cache is a symlink — refusing to write the scorer request"
+  exit 1
+fi
+dup_request="$(mktemp .gitissue/cache/dup-request.XXXXXX)"
+chmod 600 "$dup_request"
+printf '%s\n' "$dup_request" > request.path
+printf '%s' '{"mode":"create","items":[{"index":1,"title":"x","keywords":[],"type":"feature"}]}' > "$dup_request"
+cleanup_dup_request() { rm -f "$dup_request"; }
+trap cleanup_dup_request EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
+case "$mode" in
+  success)
+    dup_output="$(python3 references/scripts/gi-dup-score.py --issues-from issues.json < "$dup_request")"
+    dup_status=$?
+    ;;
+  failure)
+    dup_output="$(python3 references/scripts/gi-dup-score.py --issues-from missing.json < "$dup_request" 2>/dev/null)"
+    dup_status=$?
+    ;;
+  HUP|INT|TERM)
+    kill -s "$mode" "$$"
+    printf 'signal was suppressed\n' > continued
+    dup_status=0
+    ;;
+esac
+cleanup_dup_request
+trap - EXIT HUP INT TERM
+[ ! -e "$dup_request" ] || exit 99
+if [ "$mode" = success ]; then
+  printf '%s' "$dup_output" | python3 -c 'import json,sys; json.load(sys.stdin)'
+fi
+exit "$dup_status"
+EOF
+chmod +x "$FLOW/run-cleanup.sh"
+(
+  cd "$FLOW"
+  ./run-cleanup.sh success
+) && pass "AC1: first-run cache creation and success cleanup execute" || fail "AC1: first-run/cache success cleanup flow"
+run_status out st bash -c "cd '$FLOW' && ./run-cleanup.sh failure"
+fail_path="$(cat "$FLOW/request.path" 2>/dev/null || true)"
+if [ "$st" = 4 ] && [ -n "$fail_path" ] && [ ! -e "$fail_path" ]; then
+  pass "AC1: classified scorer failure preserves status and cleans request"
+else
+  fail "AC1: scorer failure cleanup/status contract (got $st)"
+fi
+for signal_case in HUP INT TERM; do
+  rm -f "$FLOW/continued"
+  case "$signal_case" in HUP) want=129 ;; INT) want=130 ;; TERM) want=143 ;; esac
+  run_status out st bash -c "cd '$FLOW' && ./run-cleanup.sh '$signal_case'"
+  sig_path="$(cat "$FLOW/request.path" 2>/dev/null || true)"
+  if [ "$st" = "$want" ] && [ -n "$sig_path" ] && [ ! -e "$sig_path" ] && [ ! -e "$FLOW/continued" ]; then
+    pass "AC1: $signal_case exits $want, cleans once through EXIT, and cannot continue"
+  else
+    fail "AC1: $signal_case interruption contract (exit $st, expected $want)"
+  fi
+done
+# Unique exclusive files: two mktemp names must differ, and mode must be 0600.
+(
+  cd "$FLOW"
+  rm -rf .gitissue/cache
+  mkdir -p .gitissue/cache
+  a="$(mktemp .gitissue/cache/dup-request.XXXXXX)"
+  b="$(mktemp .gitissue/cache/dup-request.XXXXXX)"
+  chmod 600 "$a" "$b"
+  mode_a="$(python3 -c 'import os,sys; print(oct(os.stat(sys.argv[1]).st_mode & 0o777))' "$a")"
+  if [ "$a" != "$b" ] && [ "$mode_a" = "0o600" ]; then
+    exit 0
+  fi
+  exit 1
+) && pass "AC1: concurrent request files are unique and owner-only" \
+  || fail "AC1: concurrent request files are unique and owner-only"
+# Planted cache symlink must be refused before any write.
+SYMLINK_FLOW="$TMP/dup-symlink"; rm -rf "$SYMLINK_FLOW"
+mkdir -p "$SYMLINK_FLOW/.gitissue" "$SYMLINK_FLOW/outside"
+ln -s "$SYMLINK_FLOW/outside" "$SYMLINK_FLOW/.gitissue/cache"
+run_status out st bash -c "
+  cd '$SYMLINK_FLOW'
+  if [ -L .gitissue/cache ]; then
+    echo '✗ .gitissue/cache is a symlink — refusing to write the scorer request'
+    exit 1
+  fi
+  mkdir -p .gitissue/cache
+  mktemp .gitissue/cache/dup-request.XXXXXX >/dev/null
+  exit 0
+"
+if [ "$st" = 1 ] && [ -z "$(ls -A "$SYMLINK_FLOW/outside" 2>/dev/null)" ]; then
+  pass "AC1: planted cache symlink is refused and not followed"
+else
+  fail "AC1: planted cache symlink is refused and not followed (exit $st)"
+fi
+MOCK="$TMP/mock-gh"; mkdir -p "$MOCK"; cat > "$MOCK/gh" <<'EOF'
+#!/bin/sh
+printf '%s\n' "$@" > "$GH_ARGS"
+printf '[]\n'
+EOF
+chmod +x "$MOCK/gh"
+backlog_limit=7; case "$backlog_limit" in ''|*[!0-9]*|0) fail "AC1: valid non-default backlog limit rejected";; esac
+probe_limit=$((backlog_limit + 1)); GH_ARGS="$TMP/gh-args" PATH="$MOCK:$PATH" gh issue list --state open --json number,title,body,labels --limit "$probe_limit" >/dev/null
+[ "$(tail -1 "$TMP/gh-args")" = 8 ] && pass "AC1: non-default backlog limit 7 fetches an 8-record truncation probe" || fail "AC1: fallback ignored non-default backlog limit"
+expect_grep "AC1: an empty medium band skips the judgement agent" \
+  'empty `medium_band` skips the agent' "$SKILLS/issue-creator/SKILL.md"
+expect_grep "AC1: duplicate-detector is medium-band judgement only" \
+  "No deterministic rescoring" "$SKILLS/issue-creator/references/agents/duplicate-detector.md"
+expect_grep "AC1: medium issue bodies are deduplicated and bounded" \
+  'deduplicated `medium_issue_context`' "$SKILLS/issue-creator/SKILL.md"
+expect_grep "AC1: deferred medium candidates remain visible warnings" \
+  'retained as possible-duplicate warnings without an LLM verdict' "$SKILLS/issue-creator/SKILL.md"
+expect_grep "AC1: duplicate-detector resolves deduplicated issue context" \
+  'reference `issue_context` by `match_number`' "$SKILLS/issue-creator/references/agents/duplicate-detector.md"
+expect_grep "AC1: duplicate-detector uses a tri-state decision" \
+  'exactly `confirmed`, `rejected`, or `ambiguous`' "$SKILLS/issue-creator/references/agents/duplicate-detector.md"
+expect_grep "AC1: truncated context is explicit ambiguity" \
+  'truncated body may hide the deciding context' "$SKILLS/issue-creator/references/agents/duplicate-detector.md"
+expect_grep "AC1: malformed or failed judgement remains a warning" \
+  'missing, duplicate, malformed, incomplete, unknown-decision, wrong-identity, or failed-agent verdict' "$SKILLS/issue-creator/SKILL.md"
+expect_grep "AC1: batch malformed or failed judgement remains a warning" \
+  'failed agent/chunk or a missing, duplicate, malformed, incomplete, unknown-decision, or wrong-identity verdict' "$SKILLS/issue-creator/references/modes.md"
+
+# Executable consumer contract: only one complete, identity-matched rejection may
+# remove a medium warning. Ambiguous/truncated evidence and every malformed,
+# missing, duplicate, or failed-agent path retain the deterministic candidate.
+python3 - "$SRC/skills/issue-creator/SKILL.source.md" "$SRC/shared/agents/duplicate-detector.md" <<'PY'
+import pathlib, sys
+skill = pathlib.Path(sys.argv[1]).read_text()
+agent = pathlib.Path(sys.argv[2]).read_text()
+assert "failed-agent verdict is fail-safe ambiguity" in skill
+assert "A truncated body is partial evidence" in agent
+assert "Ambiguity is never a rejection" in agent
+
+candidate = {
+    "item_index": 1, "match_type": "existing_issue", "match_number": 42,
+    "score": 4, "payments": [{"signal": "keyword", "amount": 2}],
+    "reason": "keyword +2; same_type +1",
+}
+identity = (1, "existing_issue", 42)
+
+def retained(verdicts, failed=False):
+    if failed or not isinstance(verdicts, list):
+        return True
+    matched = []
+    for verdict in verdicts:
+        if not isinstance(verdict, dict):
+            continue
+        key = (verdict.get("item_index"), verdict.get("match_type"),
+               verdict.get("match_number"))
+        if key == identity:
+            matched.append(verdict)
+    if len(matched) != 1:
+        return True
+    verdict = matched[0]
+    return not (
+        verdict.get("decision") == "rejected"
+        and isinstance(verdict.get("reason"), str)
+        and bool(verdict["reason"].strip())
+        and set(verdict) >= {"item_index", "match_type", "match_number",
+                            "decision", "reason"}
+    )
+
+cases = {
+    "confirmed": ([{"item_index":1,"match_type":"existing_issue","match_number":42,"decision":"confirmed","reason":"same outcome"}], False, True),
+    "truncated ambiguity": ([{"item_index":1,"match_type":"existing_issue","match_number":42,"decision":"ambiguous","reason":"body truncated before outcome"}], False, True),
+    "evidence-backed rejection": ([{"item_index":1,"match_type":"existing_issue","match_number":42,"decision":"rejected","reason":"different requested outcomes"}], False, False),
+    "missing verdict": ([], False, True),
+    "malformed boolean": ([{"item_index":1,"match_type":"existing_issue","match_number":42,"confirmed":False,"reason":"legacy"}], False, True),
+    "incomplete reason": ([{"item_index":1,"match_type":"existing_issue","match_number":42,"decision":"rejected","reason":""}], False, True),
+    "wrong identity": ([{"item_index":1,"match_type":"existing_issue","match_number":99,"decision":"rejected","reason":"different"}], False, True),
+    "duplicate verdict": ([{"item_index":1,"match_type":"existing_issue","match_number":42,"decision":"rejected","reason":"different"},{"item_index":1,"match_type":"existing_issue","match_number":42,"decision":"confirmed","reason":"same"}], False, True),
+    "unknown decision": ([{"item_index":1,"match_type":"existing_issue","match_number":42,"decision":"maybe","reason":"unsure"}], False, True),
+    "agent failure": ([], True, True),
+}
+for name, (verdicts, failed, expected) in cases.items():
+    actual = retained(verdicts, failed)
+    assert actual is expected, (name, actual, expected)
+    if actual:
+        # Fail-safe handling preserves deterministic evidence, not just identity.
+        assert candidate["score"] == 4 and candidate["payments"] and candidate["reason"]
+print(f"tri-state contract: {len(cases)} paths passed")
+PY
+if [ "$?" -eq 0 ]; then
+  pass "AC1: tri-state consumer preserves all ambiguous/malformed/failure warnings"
+else
+  fail "AC1: tri-state consumer silently drops an uncertain medium candidate"
+fi
+expect_grep "AC1: schema enforces monotone phrase weight ordering" \
+  'must be >= `weights.title_overlap`' "$REPO_ROOT/docs/config-schema.md"
+for key in weights.phrase weights.title_overlap weights.keyword weights.same_type high_threshold medium_threshold min_token_length phrase_min_tokens backlog_limit max_items extra_stop_words; do
+  if grep -q "duplicate_detection.$key" "$REPO_ROOT/docs/config-schema.md"; then
+    pass "AC1: duplicate_detection.$key is documented"
+  else
+    fail "AC1: duplicate_detection.$key is missing from config schema"
+  fi
+done
+expect_grep "AC1: init template emits duplicate_detection" \
+  "duplicate_detection:" "$REPO_ROOT/src/skills/init-gitissue/templates/gitissue-template.yml"
+expect_grep "AC1: dedicated non-vacuous scorer suite is CI-wired" \
+  "bash tests/test-scripts-278.sh" "$REPO_ROOT/.github/workflows/dist-check.yml"
+
 expect_grep "AC2: issue-triage's ordering step calls gi-triage-graph" \
   "references/scripts/gi-triage-graph.py" "$SKILLS/issue-triage/SKILL.md"
 expect_grep "AC2: auto-pilot Phase 1 calls the SAME script, not a reimplementation" \
@@ -720,12 +973,13 @@ python3 - "$REPO_ROOT" <<'PY' > "$TMP/lint-report"
 import pathlib, re, subprocess, sys
 
 root = pathlib.Path(sys.argv[1])
-WAVE3 = ("gi-triage-graph.py", "gi-stack-detect.py", "gi-model-cache.py")
+WAVE3 = ("gi-dup-score.py", "gi-triage-graph.py", "gi-stack-detect.py", "gi-model-cache.py")
 
 # Gap 4: a pinned count per script, not "at least one somewhere". Deleting one
 # of `gi-triage-graph.py`'s two call sites is a real change to the contract this
 # lint pins, so it must be an explicit edit here and not a silent pass.
 EXPECTED_SITES = {
+    "gi-dup-score.py": 1,
     "gi-triage-graph.py": 2,
     "gi-stack-detect.py": 1,
     "gi-model-cache.py": 2,
@@ -795,6 +1049,7 @@ SQUOTED = re.compile(r"'[^']*'")
 # claim a reviewer had to check against the code, so the code states it.
 ALLOWED_VARS = {
     "$skill_dir": "path the skill resolves from its own SKILL.md dirname",
+    "$dup_request": "mktemp path under .gitissue/cache/; exclusive, never issue text",
 }
 
 
@@ -932,7 +1187,7 @@ done
 
 # And the positive statement: each script's own docstring names where its
 # untrusted input comes from, so a reader of the script sees the contract.
-for entry in "gi-triage-graph|on stdin" \
+for entry in "gi-dup-score|on stdin" "gi-triage-graph|on stdin" \
              "gi-stack-detect|it reads the repository" "gi-model-cache|stdin"; do
   s="${entry%%|*}"; needle="${entry##*|}"
   if head -80 "$SRC_SCRIPTS/$s.py" | grep -q -- "$needle"; then
