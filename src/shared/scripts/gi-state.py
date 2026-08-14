@@ -994,6 +994,8 @@ def _emit_held(holder: dict, status: dict) -> int:
 
 
 def run_lock(args, paths) -> int:
+    if args.dry_run:
+        return _run_lock_locked(args, paths)
     with _lock_guard(paths["lock"]):
         return _run_lock_locked(args, paths)
 
@@ -1118,6 +1120,8 @@ def _run_lock_locked(args, paths) -> int:
 
 
 def run_unlock(args, paths) -> int:
+    if args.dry_run:
+        return _run_unlock_locked(args, paths)
     with _lock_guard(paths["lock"]):
         return _run_unlock_locked(args, paths)
 

@@ -813,6 +813,21 @@ if [ "$st" = "0" ] && [ ! -f "$D7/run.lock" ]; then
 else
   fail "AC4: --lock --dry-run created a lock file (exit $st)"
 fi
+D7_ABSENT="$TMP/dry-run-absent"
+run_status out st python3 "$STATE" --lock --dir "$D7_ABSENT" --run-id r257 --dry-run
+if [ "$st" = "0" ] && [ "$(printf '%s' "$out" | jkey status)" = "would_acquire" ] \
+   && [ ! -e "$D7_ABSENT" ]; then
+  pass "AC4: --lock --dry-run does not create an absent lock directory"
+else
+  fail "AC4: --lock --dry-run created an absent lock directory (exit $st)"
+fi
+run_status out st python3 "$STATE" --unlock --dir "$D7_ABSENT" --run-id r257 --dry-run
+if [ "$st" = "0" ] && [ "$(printf '%s' "$out" | jkey status)" = "absent" ] \
+   && [ ! -e "$D7_ABSENT" ]; then
+  pass "AC4: --unlock --dry-run does not create an absent lock directory"
+else
+  fail "AC4: --unlock --dry-run created an absent lock directory (exit $st)"
+fi
 run_status out st bash -c "printf '%s' '$REPORT' | python3 '$STATE' --report --dir '$D7' --dry-run"
 if [ "$st" = "0" ] && [ ! -f "$D7/last-run-report.md" ]; then
   pass "AC4: --report --dry-run writes no report"
