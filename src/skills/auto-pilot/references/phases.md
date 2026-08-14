@@ -203,6 +203,16 @@ manufacture a stop.
 It is the top of the iteration, and a budget already spent means this iteration
 never starts.
 
+**Then evaluate `autopilot.retriage_every`.** The counter is the same 1-based
+`{i}` the `[Iteration {i}/{max}]` banner already uses — not a second variable,
+and not "merges since the last triage". `0` (default) means never. When `N > 0`
+and `i % N == 0`, set `retriage_required` so *Step 1.1* runs in full **this**
+iteration: on a `fresh` cache, under `mode: conservative` (which merges
+nothing), and on every non-merging iteration. `N: 1` therefore forces a full
+triage every iteration, which is what `references/configuration.md` claims.
+This check does **not** live in *Step 1.6* — that step runs only after a merge,
+so a trigger there cannot fire on a non-merging iteration.
+
 ### Step 1.1a — Triage cache gate
 
 **Evaluated once, before the first iteration** — never per iteration. Re-running
@@ -290,11 +300,12 @@ Run a full triage. Step 1.1a already skipped this on a `fresh` cache, and Step
 **When this step runs — and the one flag's whole lifecycle.** Step 1.1 runs
 when `triage_cache` was not `fresh` on the first iteration, or when
 `retriage_required` is set, and it **clears `retriage_required` as it runs**.
-Set in two places (*Step 1.2*'s pick-miss retry, and *Step 1.6*'s
-`retriage_every` trigger and degrade path), cleared in this one, and nowhere
-else — that is the entire lifecycle. Clearing it here is what makes those two
-places cost *one* full triage each: a flag left set would re-triage on every
-remaining iteration, which is the duplicated work *Step 1.1a* exists to remove.
+Set in three places (*Step 1.2*'s pick-miss retry, the `retriage_every` check
+at the top of each iteration, and *Step 1.6*'s degrade path), cleared in this
+one, and nowhere else — that is the entire lifecycle. Clearing it here is what
+makes those three places cost *one* full triage each: a flag left set would
+re-triage on every remaining iteration, which is the duplicated work
+*Step 1.1a* exists to remove.
 
 That banner belongs to the scan, so it prints only on an iteration that
 actually triages — the first one, plus any later one a pick miss or
@@ -587,8 +598,8 @@ one bucket** — this is the single home of that mapping:
 | `failed` | Phase 2.3's resolution failure | `Skipped` |
 | `quarantined` | Phase 2.3's quarantine threshold (*Quarantine after repeated failures*) | `Skipped` |
 | `blocked_by_dependency` | Step 5.1b / Phase 3-4 Step 2a's gate | `Dep-blocked` |
-| `not_eligible` | *Step 1.2b*'s post-pick re-check (closed) | `Skipped` |
-| `not_eligible` | *Step 1.2b*'s post-pick re-check (assigned to another user) | `Assigned` |
+| `closed` | *Step 1.2b*'s post-pick re-check (not open) | `Skipped` |
+| `assigned` | *Step 1.2b*'s post-pick re-check (assigned to another user) | `Assigned` |
 | `quarantined` | *Step 1.2b*'s post-pick re-check (live `autopilot.quarantine_label`) | `Skipped` |
 | `blocked_label` | *Step 1.2b*'s post-pick re-check (any other live `skip_labels` value) | `Skipped` |
 | `resumed` | *Step 1.0*'s resume seeding of `processed[]` / `skip_list[]` | `Skipped` |
@@ -657,7 +668,7 @@ issue, without affecting siblings.
   once for the picked issue:
 
   ```bash
-  python3 references/scripts/gi-issue.py {issue_number} --fields number,title,body,labels,assignees,state,updatedAt
+  python3 shared/scripts/gi-issue.py {issue_number} --fields number,title,body,labels,assignees,state,updatedAt
   ```
 - **Explicit-list mode:** validation already obtained the same complete field set
   (see `references/explicit-list-mode.md`). Validate and compact-serialize the
@@ -704,8 +715,8 @@ and this cannot spin.
 
 | Rejected because | Reason recorded |
 |------------------|-----------------|
-| `.issue.state` is not `open` | `not_eligible` |
-| assigned to another user | `not_eligible` |
+| `.issue.state` is not `open` | `closed` |
+| assigned to another user | `assigned` |
 | a live label matches `autopilot.quarantine_label` | `quarantined` |
 | a live label matches any other `skip_labels` value | `blocked_label` |
 
@@ -1638,7 +1649,7 @@ apply steps 1–2 above by hand. Example: `Blocked by: acme/lib#15, #12` → gat
 For each captured `#N`, ask GitHub: "is this issue closed by a merged PR?" GitHub's GraphQL exposes the linked-PR set directly via `closedByPullRequestsReferences` on the Issue type, which `gh issue view` surfaces:
 
 ```bash
-python3 references/scripts/gi-issue.py N \
+python3 shared/scripts/gi-issue.py N \
   --fields number,state,title,closedByPullRequestsReferences
 ```
 
@@ -1903,7 +1914,7 @@ exception to it: the mode is known at invocation, so it is never a doubt.
 **Under `--dry-run`, compute the removal and print it, but write nothing.** This
 step is the one place in #258's work that persists anything, so it takes the same
 rule *Step 1.1*'s `--out` and every `gi-state.py` call take: a dry run mutates no
-file on disk. Apply the seven rules below in memory, print the `✓ Triage cache
+file on disk. Apply the nine rules below in memory, print the `✓ Triage cache
 updated` line with the counts the update *would* have produced, and skip the
 write-back — never write `.gitissue/triage.json`. Nothing downstream is harmed:
 `--dry-run` stops at *Step 1.3* before any merge, so in practice this step is
@@ -1921,15 +1932,21 @@ Write tool:
    consumer reads these directly.
 4. Drop it from every remaining issue's `blocked_by` and from every remaining
    issue's `blocks`.
-5. Flip any issue whose `blocked_by` just became empty from `blocked` to
+5. Drop it from every `summary.circular_deps` chain and every
+   `summary.co_dependent` pair, and drop any chain or pair that then has fewer
+   than two members — a one-node cycle or a one-issue pair is not a report.
+6. If a remaining issue's `potentially_fixed_by.target_issue` is the resolved
+   number, set that `potentially_fixed_by` to `null`. Reporting data only;
+   nothing here feeds the pick.
+7. Flip any issue whose `blocked_by` just became empty from `blocked` to
    `ready`. **This is the one derived change permitted** — it is the direct
    consequence of step 4, not a recomputation.
-6. Recompute `analyzed_count`, `summary.stale_count` and
+8. Recompute `analyzed_count`, `summary.stale_count` and
    `summary.potentially_fixed_count` by **counting the records that remain**,
    never by subtracting one from the old number. A count reached by arithmetic
    drifts the first time an assumption behind it is wrong; a count reached by
    counting cannot.
-7. Append exactly **one** `history[]` entry naming the removed issue —
+9. Append exactly **one** `history[]` entry naming the removed issue —
    `time` now, `source` `/auto-pilot`, `changes` `Incremental update (#N
    resolved)` — and set the file's `updated` to that same timestamp.
 
@@ -1948,15 +1965,10 @@ un-satisfy a constraint on any node that remains. Anything beyond deletion — a
 newly filed issue, a new dependency marker, a changed label — is outside what
 this step can honestly do and goes through a full re-triage instead.
 
-**When a full re-triage runs instead.** One trigger lives here, and it is cheap
-to evaluate:
-
-- **`autopilot.retriage_every`** (default `0`, meaning never) — when set to `N`,
-  force a full triage on every `N`-th iteration after a merge, so a long
-  unattended run periodically re-reads a backlog other people may be filing into.
-
-It sets `retriage_required`, and *Step 1.1* runs in full on the next iteration
-and clears the flag as it runs.
+**When a full re-triage runs instead.** The `autopilot.retriage_every` trigger
+does **not** live here — it is evaluated at the top of every iteration from the
+1-based `{i}` counter, so it fires on non-merging iterations too. This step's
+only remaining `retriage_required` write is the degrade path below.
 
 **A pick miss is not a trigger here.** *Step 1.2* owns it, and handles it
 **in the same iteration** — re-enter Step 1.1 once, re-run the pick. A pick miss

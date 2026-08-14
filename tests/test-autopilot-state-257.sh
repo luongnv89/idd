@@ -97,6 +97,10 @@ if python3 "$STATE" --help >/dev/null 2>&1; then
 else
   fail "T0: gi-state.py --help exits 0"
 fi
+expect_grep "T0: --lock --resume re-acquire names the host in the module docstring" \
+  "same known owner pid, same" "$STATE"
+expect_grep "T0: ownerless+unparseable-timestamp locks are retired by --force only" \
+  "With no readable timestamp" "$STATE"
 if grep -qE '^(import|from) (yaml|requests|jinja2|numpy|pydantic)\b' "$STATE"; then
   fail "T0: gi-state.py imports a third-party package"
 else
@@ -210,6 +214,21 @@ if [ "$(printf '%s' "$out" | jkey current)" = "None" ] \
   pass "AC1: processed/skip_list append de-duplicated and null clears current"
 else
   fail "AC1: the end-of-iteration checkpoint duplicated entries or kept current"
+fi
+
+# `queue` is recorded intent at --init. An --update patch that names it used
+# to rewrite the run's original scope; the two-lists invariant forbids that.
+run_status out st bash -c "printf '%s' '{\"queue\":[99]}' | python3 '$STATE' --update --dir '$D1'"
+if [ "$st" = "3" ]; then
+  pass "AC1: --update refuses a queue patch (recorded intent is --init only)"
+else
+  fail "AC1: --update accepted a queue patch (exit $st)"
+fi
+run_status out st python3 "$STATE" --read --dir "$D1"
+if [ "$(printf '%s' "$out" | python3 -c 'import json,sys;print(json.load(sys.stdin)["queue"])')" = "[42, 45]" ]; then
+  pass "AC1: a refused queue patch left the --init queue untouched"
+else
+  fail "AC1: the --init queue was rewritten despite the refused patch"
 fi
 
 # Atomicity: no temp file survives a checkpoint, and the file always parses.
@@ -423,6 +442,99 @@ if { [ "$st" = "0" ] || [ "$st" = "3" ]; } && [ "$st" != "1" ]; then
   pass "AC3: a lock with a non-string run_id exits 0/3, never the reserved code 1"
 else
   fail "AC3: a malformed lock run_id crashed the script (exit $st)"
+fi
+
+# A lock file that is literal JSON `null` is valid JSON and used to parse as
+# "file absent" (`(None, None)`), which wedged the lock: `--lock` and
+# `--lock --force` both exited 3 (exclusive create found the file), and
+# `--unlock --force` reported absent and left it. It is corrupt, not absent.
+D3N="$(new_dir d3n)"
+printf 'null\n' > "$D3N/run.lock"
+run_status out st python3 "$STATE" --lock --dir "$D3N" --run-id runNull --pid $$
+if [ "$st" = "0" ] && [ "$(printf '%s' "$out" | jkey status)" = "reclaimed" ] \
+   && [ "$(printf '%s' "$out" | jkey stale_reason)" = "corrupt" ] \
+   && [ -f "$D3N/run.lock" ]; then
+  pass "AC3: a JSON-null lock is reclaimed as corrupt, not treated as absent"
+else
+  fail "AC3: a JSON-null lock was not reclaimed (exit $st)"
+fi
+D3NF="$(new_dir d3nf)"
+printf 'null\n' > "$D3NF/run.lock"
+run_status out st python3 "$STATE" --lock --dir "$D3NF" --run-id runNullF --pid $$ --force
+if [ "$st" = "0" ] && [ "$(printf '%s' "$out" | jkey status)" = "reclaimed" ]; then
+  pass "AC3: --lock --force reclaims a JSON-null lock"
+else
+  fail "AC3: --lock --force left a JSON-null lock in place (exit $st)"
+fi
+D3NU="$(new_dir d3nu)"
+printf 'null\n' > "$D3NU/run.lock"
+run_status out st python3 "$STATE" --unlock --dir "$D3NU" --force
+if [ "$st" = "0" ] && [ "$(printf '%s' "$out" | jkey status)" = "released" ] \
+   && [ ! -f "$D3NU/run.lock" ]; then
+  pass "AC3: --unlock --force releases a JSON-null lock rather than reporting absent"
+else
+  fail "AC3: --unlock --force did not remove a JSON-null lock (exit $st)"
+fi
+
+# An ownerless lock with no readable timestamp cannot be aged, so TTL cannot
+# retire it — only --force can. The prose used to claim "TTL or --force".
+D3TS="$(new_dir d3ts)"
+python3 -c '
+import json, socket, sys
+json.dump(
+    {"run_id": "runNoTs", "pid": 0, "host": socket.gethostname(),
+     "started_at": "not-a-timestamp", "heartbeat": "also-bad"},
+    open(sys.argv[1], "w"),
+)
+' "$D3TS/run.lock"
+run_status out st python3 "$STATE" --lock --dir "$D3TS" --run-id runNoTsNext
+if [ "$st" = "3" ] && [ "$(printf '%s' "$out" | jkey status)" = "held" ]; then
+  pass "AC3: an ownerless lock with an unparsable timestamp is held (TTL cannot age it)"
+else
+  fail "AC3: an unageable ownerless lock was not held (exit $st)"
+fi
+run_status out st python3 "$STATE" --lock --dir "$D3TS" --run-id runNoTsForce --force --pid $$
+if [ "$st" = "0" ] && [ "$(printf '%s' "$out" | jkey status)" = "reclaimed" ]; then
+  pass "AC3: --force retires an ownerless lock with an unparsable timestamp"
+else
+  fail "AC3: --force did not retire the unageable ownerless lock (exit $st)"
+fi
+
+# Re-acquire must re-check ownership after the heartbeat. A concurrent
+# `--lock --force` in that window used to be reported as `reacquired`.
+D3R="$(new_dir d3r)"
+python3 "$STATE" --lock --dir "$D3R" --run-id runRace --pid $$ >/dev/null
+run_status out st python3 - "$STATE" "$D3R" $$ <<'PY'
+import json, os, socket, sys, importlib.util
+from datetime import datetime, timezone
+from pathlib import Path
+
+spec = importlib.util.spec_from_file_location("gi_state", sys.argv[1])
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+stolen = {
+    "run_id": "runThief",
+    "pid": os.getpid() + 99999,
+    "host": socket.gethostname(),
+    "started_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    "heartbeat": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+}
+orig = mod._touch_lock_heartbeat
+
+def steal(lock_path, run_id, pid=None):
+    orig(lock_path, run_id, pid=pid)
+    Path(lock_path).write_text(json.dumps(stolen) + "\n", encoding="utf-8")
+
+mod._touch_lock_heartbeat = steal
+sys.argv = ["gi-state.py", "--lock", "--resume", "--dir", sys.argv[2],
+            "--run-id", "runRace", "--pid", sys.argv[3]]
+raise SystemExit(mod.main())
+PY
+if [ "$st" = "3" ] && [ "$(printf '%s' "$out" | jkey status)" = "held" ]; then
+  pass "AC3: re-acquire reports held when the lock is stolen during the heartbeat"
+else
+  fail "AC3: a stolen lock during re-acquire was reported as success (exit $st)"
 fi
 
 # Two ownerless locks must not answer to each other: pid 0 is "unknown", and

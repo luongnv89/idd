@@ -155,7 +155,7 @@ LIMITED`'s `Next action:` line on the same value for the same reason.
            /auto-pilot --force-unlock
   Docs:    https://github.com/luongnv89/idd/blob/main/docs/config-schema.md
 ```
-**Trigger:** `--lock` exits 3 — `.gitissue/run.lock` exists, is younger than the TTL (default 3600s), and its `pid` is alive on this host (or the lock was taken on another host, where liveness cannot be checked).
+**Trigger:** `--lock` exits 3 — `.gitissue/run.lock` exists, is younger than the TTL (default 3600s), and either its `pid` is alive on this host, the lock was taken on another host (liveness cannot be checked), or its owner is unknown (`pid` 0 — the default when `--pid` is absent, which carries no liveness signal and is never read as dead).
 **Action:** Stop before any mutation. Exit 3 is a stop, never a degrade: starting anyway is the concurrent-mutation case the lock exists to prevent.
 
 ### Resuming an interrupted run
@@ -279,8 +279,8 @@ with all-zero counts. This is a success message, not an error.
 **Trigger:** All open issues are blocked, skipped, assigned to other users, or
 added to the session skip list — by the Phase 5.1b dependency gate
 (`blocked_by_dependency`), by a Phase 2.3 resolution failure (`failed`), or by
-Step 1.2b's post-pick re-check (`not_eligible` when the issue is closed or
-assigned elsewhere; `quarantined` or `blocked_label` when its live labels are in
+Step 1.2b's post-pick re-check (`closed` when the issue is not open;
+`assigned` when it is assigned elsewhere; `quarantined` or `blocked_label` when its live labels are in
 the effective `skip_labels` set). This is the
 **only** place a run ends for dependency reasons — the gate itself never stops
 the loop. Omit the `Dep-blocked` line when that count is zero. Keep this block

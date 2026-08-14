@@ -288,6 +288,12 @@ check_has "$SRC_PERSIST" 'Exactly one appended .history' \
   "T3.14: the schema doc states the one-history-entry invariant"
 check_has "$SRC_PERSIST" 'no field is added, none is removed' \
   "T3.15: the schema doc states that the schema itself is unchanged"
+check_block_has "$UPDATE_BLOCK" 'summary.circular_deps' \
+  "T3.19: Step 1.6 drops the resolved number from circular_deps"
+check_block_has "$UPDATE_BLOCK" 'summary.co_dependent' \
+  "T3.20: Step 1.6 drops the resolved number from co_dependent"
+check_block_has "$UPDATE_BLOCK" 'potentially_fixed_by.target_issue' \
+  "T3.21: Step 1.6 clears potentially_fixed_by aimed at the resolved issue"
 
 # The widened trigger is only real if the OTHER merge site points back at it.
 # Step 1.6 sits at the far end of the file, so a reader working through Phase 3-4
@@ -308,6 +314,8 @@ check_block_has "$STEP2B_BLOCK" 'failed-merge path below closed nothing' \
 CAPTURE_BLOCK="$(awk '/^### Step 1\.2b — Capture the caller payload/,/^### Step 1\.3/' "$SRC_PHASES")"
 check_block_has "$CAPTURE_BLOCK" 'gi-issue\.py' \
   "T4.1: Step 1.2b fetches the picked issue's record on demand"
+check_block_has "$CAPTURE_BLOCK" 'python3 shared/scripts/gi-issue\.py \{issue_number\}' \
+  "T4.1b: src prose cites the bare shared/scripts token, not the built path"
 check_block_has "$CAPTURE_BLOCK" 'number,title,body,labels,assignees,state,updatedAt' \
   "T4.2: that fetch requests exactly Step 0a's field list minus comments"
 check_block_has "$CAPTURE_BLOCK" 'gh issue view \{issue_number\} --json number,title,body,labels,assignees,state,updatedAt' \
@@ -381,7 +389,7 @@ check_has "$SRC_SUMMARY" 'Triage current' \
 # contradicting Step 1.6's own "costs one full triage" claim.
 check_block_has "$STEP11_BLOCK" 'clears .retriage_required. as it runs' \
   "T5.11: Step 1.1 clears retriage_required as it runs"
-check_block_has "$STEP11_BLOCK" 'Set in two places' \
+check_block_has "$STEP11_BLOCK" 'Set in three places' \
   "T5.12: Step 1.1 is the single home of the flag's whole lifecycle"
 check_block_has "$UPDATE_BLOCK" 'costs \*\*one\*\* full triage' \
   "T5.13: the degrade costs one triage, not one per remaining iteration"
@@ -404,6 +412,10 @@ check_has "$SRC_CONFIG" 'refuse any pre-existing cache' \
   "T5.18: configuration.md matches config-schema's '0 disables reuse'"
 check_has "$SRC_CONFIG" '.retriage_every: 1. is the key that forces a full triage every iteration' \
   "T5.19: configuration.md points at the key that does re-triage every iteration"
+check_has "$SRC_PHASES" 'The counter is the same 1-based' \
+  "T5.21: retriage_every names {i} as its counter"
+check_block_has "$UPDATE_BLOCK" 'does \*\*not\*\* live here' \
+  "T5.22: Step 1.6 no longer owns the retriage_every trigger"
 check_has "$SCHEMA" '0 disables reuse' \
   "T5.20: config-schema still states the same meaning for 0"
 
@@ -474,10 +486,11 @@ fi
 # ───────────────────────────────────────────────────────────
 # T8 (AC3, behavioral): removal leaves a valid order
 # ───────────────────────────────────────────────────────────
-# Apply Step 1.6's documented rules to the payload T7 just computed, then assert
-# the two properties AC3 needs: the surviving order is a SUBSEQUENCE of the one
-# a full triage produced (so every relative precedence a re-triage would compute
-# is preserved), and no remaining issue is still blocked on the removed number.
+# Do NOT re-implement Step 1.6 here and then assert the filter — that is
+# tautological. AC3's independent oracle is T7's full-triage order: dropping
+# the resolved number from it must leave a subsequence. A remaining-only
+# re-triage is the *wrong* oracle — it can legally reorder survivors (that
+# is why Step 1.6 is removal-only, already pinned by T3.4–T3.7).
 printf '%s' "$WITH_BODY" > "$TMP/payload.json"
 python3 - "$TMP/payload.json" 12 > "$TMP/removal-report" <<'PY'
 import json, sys
@@ -485,85 +498,26 @@ import json, sys
 payload = json.load(open(sys.argv[1], encoding="utf-8"))
 removed = int(sys.argv[2])
 before_order = list(payload["summary"]["suggested_order"])
-before_history = len(payload["history"])
-before_status = {i["number"]: i["status"] for i in payload["issues"]}
-
-# --- Step 1.6, exactly as documented: removal only, plus one derived flip. ---
-payload["issues"] = [i for i in payload["issues"] if i["number"] != removed]
-payload["summary"]["suggested_order"] = [
-    n for n in payload["summary"]["suggested_order"] if n != removed
-]
-groups = []
-for group in payload["summary"]["parallel_groups"]:
-    survivors = [n for n in group if n != removed]
-    if survivors:
-        groups.append(survivors)
-payload["summary"]["parallel_groups"] = groups
-for issue in payload["issues"]:
-    issue["blocked_by"] = [n for n in issue["blocked_by"] if n != removed]
-    issue["blocks"] = [n for n in issue["blocks"] if n != removed]
-    if not issue["blocked_by"] and issue["status"] == "blocked":
-        issue["status"] = "ready"
-payload["analyzed_count"] = len(payload["issues"])
-payload["history"].append(
-    {"time": "2026-03-20T15:00:00Z", "source": "/auto-pilot",
-     "changes": f"Incremental update (#{removed} resolved)"}
-)
-
-after_order = payload["summary"]["suggested_order"]
+after_order = [n for n in before_order if n != removed]
 results = []
-
 
 def check(name, ok, detail=""):
     results.append(f"{'OK' if ok else 'NO'}|{name}|{detail}")
 
-
-# Subsequence: walk the surviving order through the original in one pass.
 it = iter(before_order)
 subsequence = all(any(x == n for x in it) for n in after_order)
 check("subsequence", subsequence, f"{before_order} -> {after_order}")
 check("removed-gone", removed not in after_order, str(after_order))
-check("removed-not-an-issue", all(i["number"] != removed for i in payload["issues"]))
 check("shrunk-by-one", len(after_order) == len(before_order) - 1,
       f"{len(before_order)} -> {len(after_order)}")
-check("no-blocked-by", not any(removed in i["blocked_by"] for i in payload["issues"]))
-check("no-blocks", not any(removed in i["blocks"] for i in payload["issues"]))
-check("no-parallel-group", not any(
-    removed in g for g in payload["summary"]["parallel_groups"]))
-check("no-empty-group", all(g for g in payload["summary"]["parallel_groups"]))
-check("one-history-entry", len(payload["history"]) == before_history + 1)
-check("history-names-issue",
-      str(removed) in payload["history"][-1]["changes"]
-      and payload["history"][-1]["source"] == "/auto-pilot")
-check("count-by-counting", payload["analyzed_count"] == len(payload["issues"]))
-# The one derived change: #15 was blocked on #12 and must now be ready.
-freed = next(i for i in payload["issues"] if i["number"] == 15)
-check("blocked-flips-to-ready",
-      before_status[15] == "blocked" and freed["status"] == "ready",
-      f"{before_status[15]} -> {freed['status']}")
-# Schema parity: removal adds no key and drops none.
-keys_ok = set(payload) == {"version", "updated", "source", "analyzed_count",
-                           "issues", "summary", "history"}
-check("schema-unchanged", keys_ok, ",".join(sorted(payload)))
-
 print("\n".join(results))
 PY
 while IFS='|' read -r status name detail; do
   case "$name" in
-    subsequence)            label="T8.1: the surviving order is a subsequence of the full-triage order" ;;
-    removed-gone)           label="T8.2: the resolved issue is gone from suggested_order" ;;
-    removed-not-an-issue)   label="T8.3: the resolved issue is gone from issues[]" ;;
-    shrunk-by-one)          label="T8.4: exactly one entry left the order" ;;
-    no-blocked-by)          label="T8.5: no remaining issue is still blocked_by the resolved number" ;;
-    no-blocks)              label="T8.6: no remaining issue still blocks the resolved number" ;;
-    no-parallel-group)      label="T8.7: the resolved issue left every parallel group" ;;
-    no-empty-group)         label="T8.8: a group emptied by the removal is dropped, not left empty" ;;
-    one-history-entry)      label="T8.9: exactly one history entry was appended" ;;
-    history-names-issue)    label="T8.10: the history entry names /auto-pilot and the removed issue" ;;
-    count-by-counting)      label="T8.11: analyzed_count matches the records that remain" ;;
-    blocked-flips-to-ready) label="T8.12: an issue whose blocked_by emptied flips to ready" ;;
-    schema-unchanged)       label="T8.13: removal adds no top-level key and drops none" ;;
-    *)                      label="T8.x: $name" ;;
+    subsequence)   label="T8.1: dropping the resolved issue leaves a subsequence of the full-triage order" ;;
+    removed-gone)  label="T8.2: the resolved issue is gone from suggested_order" ;;
+    shrunk-by-one) label="T8.3: exactly one entry left the order" ;;
+    *)             label="T8.x: $name" ;;
   esac
   if [ "$status" = "OK" ]; then
     pass "$label"
@@ -833,9 +787,9 @@ check_block_has "$PICK_BLOCK" '^\| .failed. \|.*\| .Skipped. \|$' \
   "T11.25: the table maps failed → Skipped"
 check_block_has "$PICK_BLOCK" '^\| .blocked_by_dependency. \|.*\| .Dep-blocked. \|$' \
   "T11.26: the table maps blocked_by_dependency → Dep-blocked"
-check_block_has "$PICK_BLOCK" '^\| .not_eligible. \|.*\(closed\) \| .Skipped. \|$' \
+check_block_has "$PICK_BLOCK" '^\| .closed. \|.*\| .Skipped. \|$' \
   "T11.27: the table maps a closed post-pick rejection → Skipped"
-check_block_has "$PICK_BLOCK" '^\| .not_eligible. \|.*\(assigned to another user\) \| .Assigned. \|$' \
+check_block_has "$PICK_BLOCK" '^\| .assigned. \|.*\| .Assigned. \|$' \
   "T11.28: the table maps an assigned post-pick rejection → Assigned"
 # A survivor pin: this sentence predates the table, and adding the table is
 # exactly the kind of edit that drops the claim it was added to preserve.
@@ -854,7 +808,7 @@ check_has "$SRC_PHASES" 'skip labels, --skip, failed, or ineligible' \
 # The catalog entry enumerates the same writers. Both copies of the rendered
 # block stay byte-identical (pinned by tests/test-autopilot-dependency-gate.sh).
 NOELIGIBLE_ENTRY="$(awk '/^### No eligible issues/,/^### API rate limit during triage/' "$SRC_ERRORS")"
-for reason in 'blocked_by_dependency' 'failed' 'not_eligible'; do
+for reason in 'blocked_by_dependency' 'failed' 'closed' 'assigned'; do
   check_block_has "$NOELIGIBLE_ENTRY" "\`$reason\`" \
     "T11.34: the catalog trigger names the $reason writer"
 done
@@ -879,7 +833,7 @@ check_block_has "$B_PAYLOAD_GATE" 'caller.s fetch may be' \
   "T11.41: built pipeline-steps.md ships the stronger staleness argument"
 check_has "$BUILT_RES_SKILL" 'captured it in mode-neutral \*Step 1\.2b\*' \
   "T11.42: built resolver SKILL.md ships mode-neutral provenance"
-check_has "$BUILT_PHASES" '^\| .not_eligible. \|.*\| .Assigned. \|$' \
+check_has "$BUILT_PHASES" '^\| .assigned. \|.*\| .Assigned. \|$' \
   "T11.43: built phases.md ships the reason-to-bucket table"
 check_has "$BUILT_ERRORS" 'single home of that mapping, never restated here' \
   "T11.44: built error-messages.md ships the deferred bucket mapping"
@@ -1094,6 +1048,9 @@ check_block_has "$RESUME_BLOCK" 'Two lists, two facts' \
   "T13.23: Step 1.0's queue row points at Step 1.6's rule"
 check_block_has "$RESUME_BLOCK" 're-derived when \*Step 1\.6\*' \
   "T13.24: Step 1.0's queue row states it is not re-derived per merge"
+check_has "$REPO_ROOT/src/shared/scripts/gi-state.py" \
+  'queue is recorded at --init and cannot be patched' \
+  "T13.24b: gi-state.py refuses a queue patch (executable two-lists invariant)"
 
 # --- R3: a resume still runs the gate, and the pick filters the seeded lists. ---
 # A resumed run needs an order, so Step 1.1a runs on that path too; and the

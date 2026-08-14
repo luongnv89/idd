@@ -58,8 +58,9 @@ already gone — the next run would read it as a dead-pid corpse and reclaim it,
 and there would be no mutual exclusion at all. `"$PPID"` is the agent process
 driving the whole run, which is why it is the owner to record. Where no durable
 pid is available, drop the flag: the lock then records `pid 0`, meaning *owner
-unknown*, and is retired by the TTL or `--force` only — slower to clear after a
-crash, but never self-reclaiming.
+unknown*, and is retired by the TTL (when the timestamp is readable) or
+`--force` only — slower to clear after a crash, but never self-reclaiming.
+With no readable timestamp *and* no known owner, only `--force` retires it.
 
 **When this run was invoked with `--resume`, add `--resume` to that call.** A
 plain `--lock` mints a fresh run id, so a state file left behind by a run that
@@ -90,8 +91,10 @@ racing for it cannot both win, and it records four fields:
 **TTL and liveness.** A held lock is **stale** — and is reclaimed with a `⚠`
 line — when its age reaches `--ttl` seconds (default 3600) **or** when it names
 this host and a recorded `pid` that is no longer running. A lock with no
-recorded owner (`pid 0`) has no liveness signal at all, so only the TTL or
-`--force` retires it: unknown is never read as dead. Anything else is a live
+recorded owner (`pid 0`) has no liveness signal at all, so only the TTL (when
+the timestamp is readable) or `--force` retires it: unknown is never read as
+dead. A lock that is also missing a readable timestamp cannot be aged, so only
+`--force` retires that combination. Anything else is a live
 holder: the call exits **3** and this run stops. Exit 3 is a stop, never a
 degrade —
 "another run is in progress" is an answer, not a failure to answer, and starting
