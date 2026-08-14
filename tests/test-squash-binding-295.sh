@@ -143,6 +143,20 @@ expect_grep "T2: report template renders the defeated line" \
 expect_grep "T2: report template renders the unverified line" \
   'squash-merge binding unverified' "$PR_REVIEW_TEMPLATES"
 
+# The refactor/chore exemption relaxes check 1 only. If it could also swallow a
+# non-pass check 4, an exempt PR would render `pass` over a defeated binding —
+# the exact "report pass on an unread binding" this issue is about.
+expect_grep "T2: check 4 is not swallowed by the refactor/chore exemption" \
+  'non-.?pass.? check 4 keeps the dimension at .?partial.? even on an exempt PR|not exempt-able' \
+  "$VERIFICATION_CHECKS"
+expect_grep "T2: the exempt outcome row says so too" \
+  'not exempt-able and holds the dimension at' "$VERIFICATION_CHECKS"
+
+# Check 4 tests B1. A repo that declared B2 or B3 is not defeated by a
+# non-PR_BODY value, so it must not collect a permanent, factually wrong partial.
+expect_grep "T2: a declared B2/B3 binding is not reported as defeated" \
+  'B2 \(merge-commit body\) or B3 \(git notes\)' "$VERIFICATION_CHECKS"
+
 # ───────────────────────────────────────────────────────────
 # T3: AC3 — the claim sites are conditional
 # ───────────────────────────────────────────────────────────
@@ -165,6 +179,21 @@ expect_grep "T3: methodology widens the /init-gitissue warning to the sub-settin
   'squash_merge_commit_\*' "$METHODOLOGY"
 expect_grep "T3: resolver template still tells the resolver to write the body anyway" \
   'Write the template in full regardless' "$RESOLVER_TEMPLATES"
+
+# Secondary restatements. A file fixed in one paragraph and left unconditional
+# 100 lines down teaches an agent reading top-to-bottom the defect, not the fix.
+# Each of these carried the unconditional claim before issue #295.
+refute_fixed "T3: no leftover 'squash-merge will carry it into git history'" \
+  "where squash-merge will carry it into git history" "$RESOLVER_TEMPLATES"
+expect_grep "T3: bug-verification conditions its git-history claim" \
+  'when the repo.?s squash commit message is .?PR_BODY' \
+  "$SRC/skills/issue-resolver/references/bug-verification.md"
+expect_fixed "T3: pipeline-steps conditions its durable-memory claim" \
+  "$SETTING" "$SRC/skills/issue-resolver/references/pipeline-steps.md"
+expect_fixed "T3: README stops inferring the binding from the strategy alone" \
+  "$SETTING" "$REPO_ROOT/README.md"
+expect_fixed "T3: ARCHITECTURE's dual-write item names the setting" \
+  "$SETTING" "$DOCS/ARCHITECTURE.md"
 
 # SPEC.md is the normative source the methodology doc cites; leaving it
 # unconditional would leave the authority wrong.
@@ -195,11 +224,14 @@ expect_grep "T4: an unreadable setting is skipped, never reported satisfied" \
 # ───────────────────────────────────────────────────────────
 echo "T5: AC1 — the repo-settings remedy is documented"
 
-REMEDY="gh api -X PATCH repos/{owner}/{repo} -f ${SETTING}=${VALUE}"
+# Matched as a normalized pattern rather than a byte-exact string: the command
+# must be present and complete, but a reflowed line or a reordered flag is not a
+# regression and should not break CI in three files at once.
+REMEDY_RE='gh api .*-X PATCH .*repos/.*-f *'"${SETTING}"'='"${VALUE}"
 for f in "$INIT_SKILL" "$VERIFICATION_CHECKS" "$PR_REVIEW_TEMPLATES"; do
   rel="${f#"$REPO_ROOT"/}"
-  if grep -qF -- "$REMEDY" "$f"; then
-    pass "T5: $rel documents the exact fix command"
+  if grep -qE -- "$REMEDY_RE" "$f"; then
+    pass "T5: $rel documents the fix command"
   else
     fail "T5: $rel warns without stating the fix command"
   fi
@@ -217,7 +249,7 @@ expect_fixed "T6: the row uses the REST endpoint" \
 expect_grep "T6: the REST exception to driver rule 1 is justified" \
   'Unknown JSON field' "$PLATFORM"
 expect_grep "T6: the catalog distinguishes the two reads" \
-  'rows are \*{0,2}not\*{0,2} interchangeable' "$PLATFORM"
+  '\*{0,2}not\*{0,2} interchangeable' "$PLATFORM"
 
 # ───────────────────────────────────────────────────────────
 # T7: AC5 — the backfill decision is recorded, explicitly
@@ -227,8 +259,12 @@ echo "T7: AC5 — backfill decision recorded"
 expect_grep "T7: the ADR states the decision explicitly as no backfill" \
   '\*\*No backfill\.\*\*' "$ADR"
 expect_grep "T7: the ADR cites issue #295" 'issues/295' "$ADR"
-expect_grep "T7: the ADR records why rewriting main was rejected" \
-  'Rejected' "$ADR"
+# Anchored on the rewrite option and its substantive objection. A bare
+# "Rejected" would also be satisfied by the git-notes option, and would pass on
+# an ADR that never considered rewriting history at all.
+expect_fixed "T7: the ADR weighs rewriting history as an option" "filter-repo" "$ADR"
+expect_grep "T7: the ADR records the SHA-stability objection to rewriting" \
+  'changes the SHA of every' "$ADR"
 expect_grep "T7: the ADR is linked from the methodology doc" \
   'no-backfill-merged-decision-records' "$METHODOLOGY"
 

@@ -225,5 +225,5 @@ Every script is stdlib-only and answers `--help` with exit 0, so a skill can pro
 3. **Static sequential output** — each step prints a new line, no terminal animation
 4. **Agent-agnostic** — structured issues are plain GitHub Markdown, consumable by any tool
 5. **Lean issues** — issues capture human intent only; codebase analysis is performed by consumer skills (resolver, triage, analysis) at execution time against current code
-6. **Durable memory in git** — every resolution dual-writes its Decision Record and AC verification into both the PR body and (via squash merge) the commit body, so `git log -p` is a self-contained project history independent of `.gitissue/` files
+6. **Durable memory in git** — every resolution dual-writes its Decision Record and AC verification into both the PR body and (via squash merge, where `squash_merge_commit_message` is `PR_BODY` — see item 2 above) the commit body, so `git log -p` is a self-contained project history independent of `.gitissue/` files
 7. **Balanced by default** — `/auto-pilot` auto-merges clean PRs (review passed); PRs with unresolved issues get a follow-up and stay open. Users can opt into `conservative` (never merge) or `aggressive` modes. Critical-labeled issues always pause for human review on partial fixes

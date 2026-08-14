@@ -143,7 +143,7 @@ Both lines are `note` findings: they are never handed to the fixer in Step 6, be
 
 ## Summary — Refactor/Chore Exempt PR
 
-Refactor or chore PRs (skill quality passes, dependency bumps, doc-only updates) are exempt from the `Closes #N` hard-fail when they match `review.traceability_exempt_labels` or `review.traceability_exempt_pattern`. Check 1 is skipped; checks 2-4 still run and report `partial` if absent.
+Refactor or chore PRs (skill quality passes, dependency bumps, doc-only updates) are exempt from the `Closes #N` hard-fail when they match `review.traceability_exempt_labels` or `review.traceability_exempt_pattern`. Check 1 is skipped; checks 2-4 still run and report `partial` if absent. Check 4 is the exception to the rendering below: a defeated or unverified binding is a repository finding, not a PR one, so it holds the dimension at `partial` rather than being appended to an exempt `pass`.
 
 ```
   Review dimensions:
