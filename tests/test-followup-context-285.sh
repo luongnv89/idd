@@ -30,6 +30,8 @@ RVM="$ROOT/src/skills/issue-pr-review/references/review-loop-mechanics.md"
 BRVM="$ROOT/skills/issue-pr-review/references/review-loop-mechanics.md"
 RVE="$ROOT/src/skills/issue-pr-review/references/error-messages.md"
 BRVE="$ROOT/skills/issue-pr-review/references/error-messages.md"
+RVC="$ROOT/src/skills/issue-pr-review/references/verification-checks.md"
+BRVC="$ROOT/skills/issue-pr-review/references/verification-checks.md"
 
 printf '◆ Follow-up Context Contract Tests (issue #285)\n'
 
@@ -187,6 +189,20 @@ for f in "$RV" "$BRV"; do
   # placeholders in one paragraph, so its Closes target must name the issue.
   check "$f" 'prepend `Closes #\{linked_issue\}` as the \*\*first line\*\*' "the body-edit fix prepends the linked issue, not the PR: $n"
   lacks "$f" 'prepend `Closes #\{N\}`' "the body-edit fix cannot render Closes #<PR>: $n"
+  # The suggested-fix string is the text that reaches the fixer, so it must name
+  # the issue too — the body-edit procedure alone never leaves SKILL.md.
+  check "$f" 'Add `Closes #\{linked_issue\}` to the PR body' "the traceability fix string names the linked issue: $n"
+  lacks "$f" 'Add `Closes #\{N\}` to the PR body' "the traceability fix string cannot render Closes #<PR>: $n"
+done
+
+# verification-checks.md holds the canonical copy of that fix string (#298).
+for f in "$RVC" "$BRVC"; do
+  n="${f#"$ROOT/"}"
+  check "$f" 'suggested fix: "Add `Closes #\{linked_issue\}` to the PR body\."' "the canonical fix string names the linked issue: $n"
+  lacks "$f" 'Add `Closes #\{N\}` to the PR body' "the canonical fix string cannot render Closes #<PR>: $n"
+  check "$f" 'findings_json' "the canonical fix string says why it breaks with the file's \{N\}: $n"
+  # The detection side still reads {N} — this file binds it to the issue throughout.
+  check "$f" '`Closes #\{N\}` absent \| check 1 fails' "the detection outcome table is left on the file's own token: $n"
 done
 
 # The fail-safe decides the require_acceptance_criteria_check: false path (#298).
@@ -200,6 +216,8 @@ for f in "$RVM" "$BRVM"; do
   check "$f" 'is `false`, the stop still applies' "the flag-false path keeps the stop: $n"
   check "$f" 'governs reporting, not reading' "the kept stop states why the flag does not decide it: $n"
   check "$f" 'Placeholder binding at the Depth gate' "the depth gate placeholder binding is written down: $n"
+  # The binding is per file; no claim that every issue-bound {N} announces itself.
+  lacks "$f" 'each says so where it is used' "the binding note claims no per-use announcement it cannot keep: $n"
   # The flag-false path must not claim the Depth gate signals are the only
   # remaining readers: issue_context reaches the fixer and ui-reviewer ungated.
   check "$f" 'issue_context' "the flag-false path names the ungated snapshot consumers: $n"

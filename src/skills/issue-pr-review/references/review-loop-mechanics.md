@@ -126,10 +126,35 @@ three reasons:
 
 **Placeholder binding at the Depth gate.** SKILL.md's two review-boundary
 command lines take `{linked_issue}` — the linked issue's number — because `{N}`
-is the PR number at every other command site in SKILL.md. Two places in this
-skill's references bind it to an issue instead, and each says so where it is
-used: the rendered stop above, and traceability check 2's `git log … --grep`
-in `references/verification-checks.md`.
+is the PR number at every other command site in SKILL.md. Step 6's `Closes`
+body edit and the Step 3 gate bullet that states it take `{linked_issue}` for
+the same reason: each names a number that gets written into the PR body, and
+`{N}` there would write the PR's own.
+
+The binding is decided per file, not once for the skill, so read every `{N}`
+against the document it sits in. Below, `{N}` means an issue or PR number; the
+counting uses that share the braces — `{N} tests passed`, `{N} checks failed`,
+`Cycle {N}` — are a different placeholder and are not catalogued here.
+
+- `references/verification-checks.md` — the linked issue throughout. That
+  uniformity is exactly why the one string the file hands outward, traceability
+  check 1's suggested fix, has to break with it and say `{linked_issue}`: the
+  fixer receives that string inside `findings_json`, where `{N}` is the PR.
+- `references/ui-review-mechanics.md` and
+  `references/prepass-tests-ci-mechanics.md` — the PR throughout.
+- This file, `references/error-messages.md`, and
+  `references/report-templates.md` — both bindings, mixed. The first two say so
+  where the issue-bound use appears (the rendered stop above; the *Linked issue
+  unreadable* entry's **Placeholders** paragraph).
+  `references/report-templates.md` does not: its `Closes #{N}` and
+  `no commit references #{N}` rows are the issue while `gh pr merge {N}` is the
+  PR, and only the surrounding line distinguishes them. None of it is the
+  suggested-fix payload the fixer receives — these are the report's rendered
+  lines plus the merge command, each read beside the row that names its number
+  — so the ambiguity costs a reader a moment, not a false-passing gate.
+- SKILL.md — the PR, with one prose exception: the *Review Loop*'s restatement
+  of the hard-block, "missing `Closes #{N}`". It names the condition, not a
+  command or a fix string, so nothing downstream substitutes it.
 
 **What `light` changes in the loop:**
 

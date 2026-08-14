@@ -101,7 +101,7 @@ Per the dual-write rule (see *Analysis Artifacts and Durable Memory* in `referen
 
 When `review.soft_pass: true`, the `Closes #{N}` failure is the only traceability outcome that **blocks** the soft-pass; other partial outcomes are reported but do not block. When `review.soft_pass: false`, those partial outcomes are strict blockers too (but remain non-fixer `note` findings). This matches issue #36's contract: a PR missing `Closes #N` reports a traceability failure even if tests pass; a human-authored PR without a Decision Record reports `partial`, not `fail`.
 
-When traceability fails on `Closes #{N}`, emit a fixable issue in Step 6 with `category: traceability`, `action: fix`, suggested fix: "Add `Closes #{N}` to the PR body."
+When traceability fails on `Closes #{N}`, emit a fixable issue in Step 6 with `category: traceability`, `action: fix`, suggested fix: "Add `Closes #{linked_issue}` to the PR body." The fix string names `{linked_issue}` and not `{N}` on purpose. It is the one `{N}` in this file that is emitted into `findings_json` and handed to the fixer (`references/agents/fixer.md`), which carries no copy of this procedure and reads the string as written; there `{N}` is the PR number, and check 1's `#\d+` accepts any number, so a rendered `Closes #<PR>` would silently false-pass the gate that emitted the finding.
 
 ## Refactor/chore exemption
 

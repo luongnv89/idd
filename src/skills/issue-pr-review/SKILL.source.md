@@ -343,7 +343,7 @@ Two dimensions — `acceptance_criteria` and `traceability` — are produced by 
 
 - `review.require_acceptance_criteria_check` (default `true`) gates the AC check; `review.require_traceability_check` (default `true`) gates traceability. When either is `false`, that dimension reports `pass — verification disabled` and never blocks soft-pass.
 - **Any `acceptance_criteria: fail`** (a criterion the PR does not satisfy) → fixable issue in Step 6, `category: acceptance_criteria`. **Hard-blocks** soft-pass.
-- **`Closes #{N}` absent** (traceability check 1, unless the PR is refactor/chore-exempt) → fixable issue in Step 6, `category: traceability`, suggested fix "Add `Closes #{N}` to the PR body." **Hard-blocks** soft-pass.
+- **`Closes #{linked_issue}` absent** (traceability check 1, unless the PR is refactor/chore-exempt) → fixable issue in Step 6, `category: traceability`, suggested fix "Add `Closes #{linked_issue}` to the PR body." **Hard-blocks** soft-pass.
 - All other traceability outcomes (missing commit ref, missing Decision Record on a human-authored PR, etc.) report `partial` and do **not** block.
 
 These two hard-blocks are the issue #36 contract: a PR can pass tests and still be blocked on `acceptance_criteria: fail` or a missing `Closes #N`.
