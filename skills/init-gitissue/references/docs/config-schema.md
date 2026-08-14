@@ -469,6 +469,10 @@ security:
   extra_secret_value_pattern: ""
   # Type: string (Python regex; "" = scan all). Default: "". Keep narrow.
   # Example: "^tests/fixtures/"
+  # Suppresses SCANNING, not findings: a matching path reaches no rule at all.
+  # This file is repo-controlled, so a skill reviewing a branch it does not
+  # control reads security.* from a trusted ref instead (--policy-ref) and
+  # ignores this value. Editing it cannot weaken the review of your own PR.
   allow_pattern: ""
   # Type: integer. Default: 10. Minimum: 1. Warn (never block) above this MB.
   max_file_size_mb: 10
@@ -679,5 +683,5 @@ Config is validated on load at the start of every skill invocation. Errors inclu
 | `model_suggestion.cache_ttl_days` | `7` | Days before cached model data is stale |
 | `security.extra_secret_file_pattern` | `""` | Extra regex ORed onto the built-in secret-bearing filename pattern |
 | `security.extra_secret_value_pattern` | `""` | Extra regex ORed onto the built-in real-API-key value pattern |
-| `security.allow_pattern` | `""` | Paths matching this regex are skipped entirely — every exclusion is a path no rule can block |
+| `security.allow_pattern` | `""` | Paths matching this regex are skipped entirely — every exclusion is a path no rule can block. Repo-controlled, so a review of a branch you do not control reads it from a trusted ref instead (`--policy-ref`), never from the branch under review |
 | `security.max_file_size_mb` | `10` | Warn (never block) above this file size without Git LFS |

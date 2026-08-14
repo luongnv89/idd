@@ -36,7 +36,40 @@ npm test          # or pytest, go test ./..., cargo test, etc.
 
 ### Commit auto-fixes
 
-**Not used in `--review-only`.** Run the pre-commit security scan first — `python3 references/scripts/gi-secscan.py --working-tree`, run from the repo root so it reads the repo's `security.*` extensions from `.gitissue.yml` itself (never pass a config value on the command line — this skill has a PR's branch checked out).
+**Not used in `--review-only`.** Run the pre-commit security scan first — `python3 references/scripts/gi-secscan.py --working-tree --policy-ref "origin/${base}"`, run from the repo root so it reads the `security.*` extensions from `.gitissue.yml` itself (never pass a config value on the command line — this skill has a PR's branch checked out).
+
+#### Reading the verdict — the four-part pass condition
+
+`.gitissue.yml` is repo-controlled and this skill reviews the branch that wrote
+it, so the artifact under review would otherwise supply the policy governing its
+own review. `security.allow_pattern` suppresses **scanning**, not findings: a
+branch committing `allow_pattern: "."` makes every path skip before any rule
+fires, and the scan reports `verdict: clean` with `scanned: 0`. `--policy-ref`
+moves the policy to a ref the branch cannot write; `policy_source` reports which
+one was actually used. Bind `base` separately —
+`base="$(gh repo view --json defaultBranchRef --jq .defaultBranchRef.name)"` —
+and use the **repository's default branch**, never the PR's `baseRefName`, which
+its author chose.
+
+Treat exit 0 as a pass only when **all four** hold:
+
+| Check | Pass when | Why |
+|-------|-----------|-----|
+| exit code | `0` | 1 blocks, 3 stops, 2/4 degrade — see below |
+| `policy_source` | exactly `ref:origin/<default-branch>` | `file:…` means the branch's own config governed its review |
+| `verdict` | not `block` | the rules found nothing |
+| `scanned` / `skipped` | **not** (`scanned == 0` and `skipped > 0`) | a scan that examined nothing is not a clean scan |
+
+Do **not** require `skipped == 0`: under `--policy-ref` a skip is authorized by
+the trusted ref, which is the allow-list feature working as designed. And do not
+reduce this to `scanned > 0` — a *narrow* allow pattern naming only the
+secret-bearing file leaves `scanned` healthy and still hides the secret. The
+provenance check, not the count, is what closes that variant.
+
+When the PR **adds or modifies `.gitissue.yml`**, say so in the review report
+and treat its `security:` block as a reviewable change on its own. It is a
+warning, not a hard stop — `--policy-ref` already denies it any effect on this
+scan, and legitimate config PRs must stay mergeable.
 
 The full exit contract is in SKILL.md (*Step 2 — Commit auto-fixes*) and is not
 optional here: **exit 1 is a block** — stop, do not commit, report the path from

@@ -119,12 +119,11 @@ Step 2 (Pre-pass) runs once before the loop; Steps 3-6 repeat up to `review.max_
 
 ### Step completion reports
 
-Each step closes with a completion report — `√`/`×` per check plus a
-`Result: PASS | PARTIAL | FAIL` line — so "step done" is checkable rather than
-asserted, and a step is not complete until its `Result:` line is printed. The
-per-step check names, the `Result` semantics, and the block format are in
-`references/report-templates.md` (*Step Completion Reports*) — **read it now**,
-before Step 1.
+Each step closes with a completion report — `√`/`×` per check plus a `Result:
+PASS | PARTIAL | FAIL` line — so "step done" is checkable rather than asserted,
+and a step is not complete until its `Result:` line is printed. The per-step
+check names, the `Result` semantics, and the block format are in
+`references/report-templates.md` (*Step Completion Reports*) — **read it now**.
 
 ---
 
@@ -261,28 +260,29 @@ export `IDD_AUTO_MODE=1` first so warnings are logged rather than needing
 confirmation. Run:
 
 ```bash
-python3 references/scripts/gi-secscan.py --working-tree
+python3 references/scripts/gi-secscan.py --working-tree --policy-ref "origin/${base}"
 ```
 
-Run it from the repo root: it finds `.gitissue.yml` there and applies this
-repo's `security.allow_pattern`, `security.extra_secret_file_pattern`,
-`security.extra_secret_value_pattern`, and `security.max_file_size_mb` by
-reading them itself. **Never interpolate a config value into this command.**
-This skill runs with a pull request's branch checked out, so `.gitissue.yml` is
-attacker-controlled; a value pasted into a shell word can close its quote and
-append a command that runs on the reviewer's machine.
+Run it from the repo root, and **never interpolate a config value into this
+command** — the script reads `security.allow_pattern` and its siblings itself.
+`--policy-ref` is the trust boundary: this skill has the PR's branch checked out,
+so that branch's own `.gitissue.yml` would otherwise govern its own review, and
+`allow_pattern: "."` skips every path so the gate reports clean having scanned
+nothing. Bind `base` from `gh repo view --json defaultBranchRef --jq
+.defaultBranchRef.name` — never the PR's author-chosen `baseRefName`.
 
-**Exit 1 is the block verdict — stop, do not stage, do not push, and report the
-path from `blocking[]`.** It is not the degrade path: falling through to another
-scan after a real secret is the one outcome this gate exists to prevent. Exit 3
-(an uncompilable `security.*` regex) is also a stop. A missing `python3`, **exit
-2** (the script path did not resolve, or the invocation was malformed — a scan
-that never ran, never a pass), or exit 4 degrades — print `⚠ gi-secscan
-unavailable — running the documented scan` and run the authoritative **Primary
-Pattern** in `references/docs/pre-commit-security.md` against the working tree instead. Exit
-1 with no parsable JSON on stdout is a crash, not a verdict: treat it as exit 2
-and degrade. Do not improvise a weaker check, and never treat any non-zero exit
-as a pass.
+**A pass is all four: exit 0, `policy_source` exactly the `ref:origin/…` asked
+for, `verdict` not `block`, and not (`scanned` 0 with `skipped` above 0)** — full
+procedure in `references/prepass-tests-ci-mechanics.md`. **Exit 1 is the block
+verdict: stop, do not stage, do not push, report the path from `blocking[]`.** It
+is not the degrade path — falling through to another scan after a real secret is
+what this gate exists to prevent. Exit 3 (an uncompilable `security.*` regex) is
+also a stop. A missing `python3`, **exit 2** (the path did not resolve, or the
+invocation was malformed — a scan that never ran, never a pass), or exit 4
+degrades: print `⚠ gi-secscan unavailable — running the documented scan` and run
+the **Primary Pattern** in `references/docs/pre-commit-security.md` against the working tree.
+Exit 1 with no parsable JSON is a crash, not a verdict — treat it as exit 2.
+Never treat any non-zero exit as a pass.
 
 Only after the scan passes (or warnings are accepted), commit and push (`git add
 -A` → `git commit -m "style: auto-fix lint and format issues"` → `git push
@@ -413,7 +413,7 @@ Exit the **fix loop** only. Soft-pass is **not** implied — evaluate it next pe
 
 ### If fixable issues found
 
-Delegate fixes to the fixer subagent (`references/agents/fixer.md`) — never apply code changes in the main skill context — reusing the same fixer across cycles when possible. The fixer reads affected files, applies targeted changes, runs the mandatory pre-commit security scan against the staged set — `references/scripts/gi-secscan.py`, with the Primary Pattern in `references/docs/pre-commit-security.md` as its fallback, real secrets blocking the commit either way — then commits. The main agent collects the fixer's JSON result and pushes (`git push origin "$branch_name"`, the variable bound in Step 1 — never the literal ref name); unresolved blocking findings carry to the next cycle. The spawn variables and `Agent(...)` call are in `references/review-loop-mechanics.md`.
+Delegate fixes to the fixer subagent (`references/agents/fixer.md`) — never apply code changes in the main skill context — reusing the same fixer across cycles when possible. The fixer reads affected files, applies targeted changes, runs the mandatory pre-commit security scan against the staged set — `references/scripts/gi-secscan.py` under the same `--policy-ref` base ref Step 2 used, with the Primary Pattern in `references/docs/pre-commit-security.md` as its fallback, real secrets blocking the commit either way — then commits. The main agent collects the fixer's JSON result and pushes (`git push origin "$branch_name"`, the variable bound in Step 1 — never the literal ref name); unresolved blocking findings carry to the next cycle. The spawn variables and `Agent(...)` call are in `references/review-loop-mechanics.md`.
 
 ```
 [6/7] Fix          ✓ fixed {N} issues (noted: {note_count} — not fixed)
