@@ -21,6 +21,13 @@
 #   2. `skipped == 0` is NOT the test either. Under `--policy-ref` a skip is
 #      authorized by the trusted ref — the allow-list feature working as
 #      designed — so requiring zero would break every repo that uses it.
+#   3. Naming the trusted ref is not the same as reaching it. A short
+#      `origin/<branch>` is a *search*, and git tries `refs/heads/<ref>` before
+#      `refs/remotes/<ref>`; `gh pr checkout` materialises the pull request's
+#      attacker-chosen head-ref name as a local branch. A11 builds that
+#      collision, so a PR branch literally named `origin/main` cannot re-supply
+#      its own policy while `policy_source` still reports the ref the caller
+#      asked for.
 #
 # Phase B covers the related `refs/replace` defect: `--no-replace-objects` is a
 # git TOP-LEVEL option. Written the way the issue's AC #3 literally spells it —
@@ -247,6 +254,59 @@ emit(
 shutil.rmtree(repo, ignore_errors=True)
 
 
+def build_shadow_repo():
+    """A repo where the SHORT policy ref `origin/main` names two different refs.
+
+    `refs/remotes/origin/main` is the clean reviewing side. `refs/heads/origin/main`
+    is the artifact: /issue-pr-review Step 1 runs `gh pr checkout`, which
+    materialises the pull request's own — attacker-chosen — `headRefName` as a
+    *local branch*, and gitrevisions consults `refs/heads/<ref>` before
+    `refs/remotes/<ref>`. So a PR branch literally named `origin/main` wins the
+    lookup and hands its own narrow `allow_pattern` back as the trusted policy.
+    """
+    repo = build_repo(r"^leak\\.txt$")
+    base = subprocess.run(
+        ["git", "rev-parse", "main"], cwd=repo, capture_output=True, text=True,
+        check=True,
+    ).stdout.strip()
+    git(["update-ref", "refs/remotes/origin/main", base], repo)
+    git(["branch", "origin/main", "feature"], repo)
+    return repo
+
+
+# A11: the narrow-pattern variant again, reached through ref ambiguity instead
+# of through the work tree. Every one of the four documented pass legs held —
+# exit 0, `policy_source` exactly the ref the caller named, verdict not block,
+# and `scanned` healthy — while the key shipped. Exit code only: on Unavailable
+# the script returns 4 *before* printing its JSON, so there is no verdict to
+# read and subscripting one would take the whole suite down with a TypeError.
+repo = build_shadow_repo()
+code, _ = run(
+    ["--range", "refs/remotes/origin/main", "--policy-ref", "origin/main"], repo
+)
+emit(
+    code == 4,
+    "A11: a local branch shadowing the short remote policy ref is exit 4, never "
+    f"a clean scan under the artifact's own allow_pattern (exit {code}, "
+    "expected 4)",
+)
+# The other half: with no shadowing branch the very same short form must still
+# resolve. A check that fails closed on every ordinary repo is not a fix.
+git(["checkout", "-q", "main"], repo)
+git(["branch", "-D", "origin/main"], repo)
+git(["checkout", "-q", "feature"], repo)
+code, verdict = run(
+    ["--range", "refs/remotes/origin/main", "--policy-ref", "origin/main"], repo
+)
+named = verdict.get("policy_source") if verdict else None
+emit(
+    code == 1 and named == "ref:origin/main",
+    "A11: with no shadowing branch the same short ref still resolves and blocks "
+    f"(exit {code}, expected 1; policy_source {named})",
+)
+shutil.rmtree(repo, ignore_errors=True)
+
+
 # ── Phase B: refs/replace must not redirect the bytes the gate reads ─────────
 
 
@@ -380,15 +440,23 @@ shutil.rmtree(repo, ignore_errors=True)
 # usage error and become a scan governed by the branch's own config — the #274
 # defect reached by supplying nothing rather than by supplying a ref.
 TRUTHY_ANCHOR = "    if args.policy_ref is not None:"
+GUARD_ANCHOR = "    if args.policy_ref is not None and ("
 emit(
     TRUTHY_ANCHOR in source,
     "C3: the presence test is present to reverse-apply",
+)
+# Both substitutions are guarded, not just the first: an unguarded `.replace`
+# whose anchor has drifted is a silent no-op, and the cell would then be
+# asserting against unmodified source while still reporting a pass.
+emit(
+    GUARD_ANCHOR in source,
+    "C3: the conflict guard's presence test is present to reverse-apply",
 )
 reverted = os.path.join(SCRATCH, "policy_truthy.py")
 with open(reverted, "w", encoding="utf-8") as handle:
     handle.write(
         source.replace(TRUTHY_ANCHOR, "    if args.policy_ref:").replace(
-            "    if args.policy_ref is not None and (", "    if args.policy_ref and ("
+            GUARD_ANCHOR, "    if args.policy_ref and ("
         )
     )
 repo = build_repo(".")
@@ -399,6 +467,33 @@ emit(
     and str(verdict["policy_source"]).startswith("file:"),
     "C3: reverse-applying the presence test makes A8 fail — an empty ref falls "
     f"back to the branch's own config (exit {code})",
+)
+shutil.rmtree(repo, ignore_errors=True)
+
+# C4: drop the ambiguity check. A11 must then go clean/exit 0 — the shadowing
+# local branch wins the short-ref lookup again and re-supplies its own narrow
+# allow_pattern, with `policy_source` still naming the ref the caller asked for.
+AMBIGUITY_ANCHOR = "    _reject_ambiguous_ref(ref)\n"
+emit(
+    AMBIGUITY_ANCHOR in source,
+    "C4: the policy-ref ambiguity check is present to reverse-apply",
+)
+reverted = os.path.join(SCRATCH, "policy_ambiguous.py")
+with open(reverted, "w", encoding="utf-8") as handle:
+    handle.write(source.replace(AMBIGUITY_ANCHOR, "", 1))
+repo = build_shadow_repo()
+code, verdict = run(
+    ["--range", "refs/remotes/origin/main", "--policy-ref", "origin/main"],
+    repo,
+    script=reverted,
+)
+emit(
+    code == 0
+    and verdict is not None
+    and verdict["verdict"] == "clean"
+    and verdict.get("policy_source") == "ref:origin/main",
+    "C4: reverse-applying the ambiguity check makes A11 fail — the PR's own "
+    f"branch shadows the trusted remote ref and governs its review (exit {code})",
 )
 shutil.rmtree(repo, ignore_errors=True)
 shutil.rmtree(SCRATCH, ignore_errors=True)

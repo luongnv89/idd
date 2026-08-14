@@ -736,6 +736,67 @@ def find_config(explicit: str | None) -> str | None:
         here = parent
 
 
+# The gitrevisions lookup order for a non-fully-qualified `<refname>`, minus
+# rule 1 (`$GIT_DIR/<refname>`): git only honours that form for a handful of
+# all-caps root refs (`HEAD`, `FETCH_HEAD`, `ORIG_HEAD`, ...), which
+# `_reject_ambiguous_ref` returns early on, and `for-each-ref` does not list
+# them anyway. The remaining five are the forms two different refs can both
+# claim — and the order matters: `refs/heads/<ref>` is consulted *before*
+# `refs/remotes/<ref>`, which is the whole of the defect below.
+_REF_LOOKUP_RULES = (
+    "refs/{ref}",
+    "refs/tags/{ref}",
+    "refs/heads/{ref}",
+    "refs/remotes/{ref}",
+    "refs/remotes/{ref}/HEAD",
+)
+
+
+def _reject_ambiguous_ref(ref: str) -> None:
+    """Fail closed when `ref` could name more than one ref — exit 4.
+
+    A short `<refname>` is not a name, it is a *search*: git tries the five
+    forms above in order and takes the first hit. So `refs/heads/origin/main`
+    shadows `refs/remotes/origin/main`, and every caller of this script binds
+    the short `origin/<default-branch>` form. `/issue-pr-review` Step 1 runs
+    `gh pr checkout`, which materialises the pull request's own — attacker
+    chosen — `headRefName` as a *local branch*: a branch literally named
+    `origin/main` therefore wins the lookup and re-supplies the reviewed
+    branch's `.gitissue.yml` as the "trusted" policy, while `policy_source`
+    still reports `ref:origin/main`, exactly the ref the caller asked for.
+
+    Detected mechanically rather than by reading git's `warning: refname ... is
+    ambiguous` line: that text is localizable, version-dependent, and lands on
+    a stderr this script discards. A ref that resolves to anything other than
+    exactly one ref was never read from the reviewing side, so it raises
+    Unavailable rather than being scanned under.
+
+    A fully-qualified `refs/...` name and `HEAD` both resolve unambiguously and
+    are returned early; zero matches fall through to the caller's existing
+    absent-versus-unreadable split, which is unchanged.
+    """
+    if ref.startswith("refs/") or ref == "HEAD":
+        return
+    candidates = [rule.format(ref=ref) for rule in _REF_LOOKUP_RULES]
+    # `_git`, not a raw `subprocess.run`: it places `--no-replace-objects` as
+    # the top-level option it has to be, and turns a git failure into
+    # Unavailable — which is the fail-closed direction this check wants anyway.
+    listed = _git(["for-each-ref", "--format=%(refname)", *candidates])
+    # Exact membership, because a `for-each-ref` pattern matches "completely or
+    # from the beginning up to a slash": a bare prefix hit is not a ref this
+    # lookup would ever reach, and counting it would degrade a healthy repo.
+    wanted = set(candidates)
+    found = {line for line in listed.split("\n") if line in wanted}
+    if len(found) > 1:
+        raise Unavailable(
+            f"--policy-ref {ref} is ambiguous — it names "
+            + ", ".join(sorted(found))
+            + ". The reviewing side's policy could not be identified, so "
+            "nothing was scanned under it; pass the fully-qualified name of "
+            "the one you mean"
+        )
+
+
 def read_policy_ref(ref: str) -> tuple[dict[str, object], str]:
     """Read `security.*` from `<ref>:.gitissue.yml`, never from the work tree.
 
@@ -748,12 +809,18 @@ def read_policy_ref(ref: str) -> tuple[dict[str, object], str]:
     policy at a ref the reviewed branch cannot write makes the reviewing side
     supply the policy.
 
-    Fail-closed in both directions. A ref that resolves but carries no
+    Fail-closed in three directions. A ref that resolves but carries no
     `.gitissue.yml` yields the built-in defaults (no allow pattern at all) —
     never a silent fall back to the branch's file, which would hand the decision
     straight back to the artifact. A ref that does not resolve is `Unavailable`
     (exit 4, the documented degrade), because a policy that could not be read is
-    not a policy that permitted anything.
+    not a policy that permitted anything. And a ref that resolves to *more than
+    one* ref is `Unavailable` too: the short `origin/<branch>` form every call
+    site binds is resolved by git as `refs/heads/` before `refs/remotes/`, and
+    `gh pr checkout` materialises the pull request's attacker-chosen head-ref
+    name as a local branch — so a branch named `origin/main` re-supplies its own
+    policy while `policy_source` still names the ref the caller asked for. See
+    `_reject_ambiguous_ref`.
     """
     if not ref:
         # An empty value is a malformed invocation, not an opt-out. Treating it
@@ -766,6 +833,10 @@ def read_policy_ref(ref: str) -> tuple[dict[str, object], str]:
         # a revision. Same rule as `--range` — no shell is involved, but argv
         # injection is still injection.
         raise UsageError(f"--policy-ref value must be a revision, not an option: {ref!r}")
+    # After both usage guards and before `spec`: an empty or option-shaped value
+    # is a malformed invocation (exit 2), while an ambiguous one is a policy that
+    # could not be identified (exit 4). Reordering these flips a pinned contract.
+    _reject_ambiguous_ref(ref)
     spec = f"{ref}:{CONFIG_NAME}"
     # Ask whether a blob exists at that path *before* reading it, so the two
     # non-zero outcomes below stay distinguishable. Without this probe every
