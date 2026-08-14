@@ -290,6 +290,12 @@ check_has "$SRC_PERSIST" 'no field is added, none is removed' \
   "T3.15: the schema doc states that the schema itself is unchanged"
 check_block_has "$UPDATE_BLOCK" 'summary.circular_deps' \
   "T3.19: Step 1.6 drops the resolved number from circular_deps"
+check_block_has "$UPDATE_BLOCK" 'last entry equals the first' \
+  "T3.19b: Step 1.6 retains only closed circular-dependency chains"
+check_block_has "$UPDATE_BLOCK" 'at least two distinct issue members' \
+  "T3.19c: Step 1.6 requires two distinct circular-dependency members"
+check_block_has "$UPDATE_BLOCK" '\[1,2,3,1\].*\[2,3\]' \
+  "T3.19d: Step 1.6 rejects a broken cycle after removing its first node"
 check_block_has "$UPDATE_BLOCK" 'summary.co_dependent' \
   "T3.20: Step 1.6 drops the resolved number from co_dependent"
 check_block_has "$UPDATE_BLOCK" 'potentially_fixed_by.target_issue' \

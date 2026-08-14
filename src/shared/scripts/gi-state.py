@@ -79,8 +79,14 @@ import re
 import socket
 import sys
 import tempfile
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
+
+try:
+    import fcntl
+except ImportError:  # pragma: no cover - non-POSIX hosts fail closed at runtime
+    fcntl = None
 
 DEFAULT_DIR = ".gitissue"
 STATE_NAME = "run-state.json"
@@ -239,6 +245,32 @@ def _ensure_dir(directory: Path) -> None:
         os.makedirs(directory, exist_ok=True)
     except OSError as exc:
         raise WriteError(f"cannot create {directory} — {exc}") from exc
+
+
+@contextmanager
+def _lock_guard(lock_path: Path):
+    """Serialize every lock-path mutation and its ownership read.
+
+    The lock file is deliberately replaced by rename, so locking the file
+    itself would not coordinate a process that has already replaced its inode.
+    The stable parent directory is the mutex: reclaim, force, unlock, and
+    heartbeat all take it before reading and publishing a lock.
+    """
+    if fcntl is None:
+        raise OSError("portable advisory locking is unavailable on this host")
+    _ensure_dir(lock_path.parent)
+    fd = os.open(lock_path.parent, os.O_RDONLY)
+    locked = False
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        locked = True
+        yield
+    finally:
+        try:
+            if locked:
+                fcntl.flock(fd, fcntl.LOCK_UN)
+        finally:
+            os.close(fd)
 
 
 def _atomic_write(path: Path, text: str) -> None:
@@ -674,7 +706,12 @@ def _lock_identity(lock: object) -> tuple | None:
     """
     if not isinstance(lock, dict):
         return None
-    return (lock.get("run_id"), lock.get("started_at"), lock.get("pid"))
+    return (
+        lock.get("run_id"),
+        lock.get("started_at"),
+        lock.get("pid"),
+        lock.get("host"),
+    )
 
 
 def _pid_owns(lock: object, pid: int) -> bool:
@@ -846,7 +883,11 @@ def run_update(args, paths) -> int:
 
 
 def _touch_lock_heartbeat(
-    lock_path: Path, run_id: object, pid: int | None = None
+    lock_path: Path,
+    run_id: object,
+    pid: int | None = None,
+    *,
+    _lock_held: bool = False,
 ) -> None:
     """Refresh this run's lock timestamp so a long run never ages itself out.
 
@@ -854,19 +895,32 @@ def _touch_lock_heartbeat(
     failure here is not worth failing a checkpoint that already succeeded.
     When `pid` is given the write also requires ownership on this host, so a
     `--lock --force` that published a new lock with the same run id is not
-    overwritten by a stale heartbeat.
+    overwritten by a stale heartbeat. The identity is compared again immediately
+    before publishing while the stable directory guard is held, so a replacement
+    cannot be overwritten by this stale heartbeat.
     """
-    parsed, error = _read_json_file(lock_path)
-    if error is not None or not isinstance(parsed, dict):
-        return
-    if pid is None:
-        if parsed.get("run_id") != run_id:
+    def refresh() -> None:
+        parsed, error = _read_json_file(lock_path)
+        if error is not None or not isinstance(parsed, dict):
             return
-    elif not _owns_lock(parsed, run_id, pid):
-        return
-    parsed["heartbeat"] = _now()
-    try:
+        if pid is None:
+            if parsed.get("run_id") != run_id:
+                return
+        elif not _owns_lock(parsed, run_id, pid):
+            return
+        observed = _lock_identity(parsed)
+        current, current_error = _read_json_file(lock_path)
+        if current_error is not None or _lock_identity(current) != observed:
+            return
+        parsed["heartbeat"] = _now()
         _atomic_write(lock_path, _render_json(parsed))
+
+    try:
+        if _lock_held:
+            refresh()
+        else:
+            with _lock_guard(lock_path):
+                refresh()
     except OSError:
         pass
 
@@ -939,6 +993,11 @@ def _emit_held(holder: dict, status: dict) -> int:
 
 
 def run_lock(args, paths) -> int:
+    with _lock_guard(paths["lock"]):
+        return _run_lock_locked(args, paths)
+
+
+def _run_lock_locked(args, paths) -> int:
     # A plain `--lock` starts a *new* run, so it mints a new id even when a
     # previous run left its state file behind: adopting that id would give two
     # unrelated runs one id in both the report marker and `runs.jsonl`. Only
@@ -974,7 +1033,9 @@ def run_lock(args, paths) -> int:
         if args.dry_run:
             _emit({"dry_run": True, "status": "would_reacquire", "lock": existing})
             return 0
-        _touch_lock_heartbeat(paths["lock"], run_id, pid=args.pid)
+        _touch_lock_heartbeat(
+            paths["lock"], run_id, pid=args.pid, _lock_held=True
+        )
         refreshed, _ = _read_json_file(paths["lock"])
         # The heartbeat is a best-effort write. A concurrent TTL reclaim or
         # `--lock --force` in that window can replace the file; reporting
@@ -1056,6 +1117,11 @@ def run_lock(args, paths) -> int:
 
 
 def run_unlock(args, paths) -> int:
+    with _lock_guard(paths["lock"]):
+        return _run_unlock_locked(args, paths)
+
+
+def _run_unlock_locked(args, paths) -> int:
     existing, error = _read_json_file(paths["lock"])
     if existing is None and error is None:
         _emit({"status": "absent"})

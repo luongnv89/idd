@@ -1932,9 +1932,14 @@ Write tool:
    consumer reads these directly.
 4. Drop it from every remaining issue's `blocked_by` and from every remaining
    issue's `blocks`.
-5. Drop it from every `summary.circular_deps` chain and every
-   `summary.co_dependent` pair, and drop any chain or pair that then has fewer
-   than two members — a one-node cycle or a one-issue pair is not a report.
+5. Remove it from every `summary.circular_deps` chain and every
+   `summary.co_dependent` pair. For each circular-dependency chain, retain it
+   only when the removal leaves a closed chain whose last entry equals the first
+   and it has at least two distinct issue members; for example,
+   `[1,2,3,1]` becomes `[2,3]` after resolving issue 1 and is discarded because
+   it is no longer a cycle. Drop every other chain, and drop any pair with
+   fewer than two distinct members — a one-node cycle or a one-issue pair is
+   not a report.
 6. If a remaining issue's `potentially_fixed_by.target_issue` is the resolved
    number, set that `potentially_fixed_by` to `null`. Reporting data only;
    nothing here feeds the pick.

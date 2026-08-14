@@ -522,8 +522,8 @@ stolen = {
 }
 orig = mod._touch_lock_heartbeat
 
-def steal(lock_path, run_id, pid=None):
-    orig(lock_path, run_id, pid=pid)
+def steal(lock_path, run_id, pid=None, _lock_held=False):
+    orig(lock_path, run_id, pid=pid, _lock_held=_lock_held)
     Path(lock_path).write_text(json.dumps(stolen) + "\n", encoding="utf-8")
 
 mod._touch_lock_heartbeat = steal
@@ -535,6 +535,57 @@ if [ "$st" = "3" ] && [ "$(printf '%s' "$out" | jkey status)" = "held" ]; then
   pass "AC3: re-acquire reports held when the lock is stolen during the heartbeat"
 else
   fail "AC3: a stolen lock during re-acquire was reported as success (exit $st)"
+fi
+
+# The heartbeat must also refuse a replacement that appears after its first
+# ownership read but before the atomic publish. This models the exact stale
+# heartbeat overwrite window independently of the post-heartbeat re-check.
+D3S="$(new_dir d3s)"
+python3 "$STATE" --lock --dir "$D3S" --run-id runRace --pid $$ >/dev/null
+run_status out st python3 - "$STATE" "$D3S" $$ <<'PY'
+import importlib.util
+import json
+import os
+import socket
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+spec = importlib.util.spec_from_file_location("gi_state", sys.argv[1])
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+stolen = {
+    "run_id": "runThief",
+    "pid": os.getpid() + 99999,
+    "host": socket.gethostname(),
+    "started_at": now,
+    "heartbeat": now,
+}
+orig_read = mod._read_json_file
+reads = 0
+
+def replace_after_ownership_read(path):
+    global reads
+    result = orig_read(path)
+    if path.name == "run.lock" and reads == 0:
+        staged = path.with_name("replacement.lock")
+        staged.write_text(json.dumps(stolen) + "\n", encoding="utf-8")
+        os.replace(staged, path)
+    reads += 1
+    return result
+
+mod._read_json_file = replace_after_ownership_read
+mod._touch_lock_heartbeat(Path(sys.argv[2]) / "run.lock", "runRace", pid=int(sys.argv[3]))
+actual = json.loads((Path(sys.argv[2]) / "run.lock").read_text(encoding="utf-8"))
+if actual.get("run_id") != "runThief":
+    raise SystemExit(f"stale heartbeat overwrote replacement: {actual}")
+PY
+if [ "$st" = "0" ]; then
+  pass "AC3: heartbeat refuses a lock replacement between ownership read and publish"
+else
+  fail "AC3: heartbeat CAS regression test failed (exit $st, $out)"
 fi
 
 # Two ownerless locks must not answer to each other: pid 0 is "unknown", and
