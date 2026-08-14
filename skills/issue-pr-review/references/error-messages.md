@@ -89,9 +89,17 @@ All errors follow the rich format: symbol + description + fix action.
 *Depth gate* refresh nor its direct-`gh` degrade returns a usable record — on the
 first attempt or on the single re-run. This is a **stop**, not a degrade: Step 3
 would otherwise verify acceptance criteria against an empty snapshot and report
-the `acceptance_criteria` hard-block as `pass`. A PR with **no** linked issue is
-not this error and is never stopped by it — see *The empty-record fail-safe* in
-`references/review-loop-mechanics.md`.
+the `acceptance_criteria` hard-block as `pass`. That describes the default
+configuration, and the stop is **not** conditional on it. When
+`review.require_acceptance_criteria_check` is `false` the hard-block does not
+run at all — Step 3 reports `pass — verification disabled` for that dimension —
+yet this error is still raised, because the flag governs how the dimension is
+reported, not whether the linked issue was read. Printing that note past a
+failed read would credit a deliberate opt-out for a gap nobody opted into.
+Full reasoning, including why the stop is kept rather than relaxed:
+*The empty-record fail-safe* in `references/review-loop-mechanics.md`. A PR
+with **no** linked issue is not this error and is never stopped by it — same
+section.
 
 **Placeholders:** this is the one entry in this file where `{N}` is **not** the
 PR number. Here `{N}` is the **linked issue** being read — the number `Closes #N`

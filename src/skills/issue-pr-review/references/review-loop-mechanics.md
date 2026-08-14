@@ -90,6 +90,47 @@ criteria it claims to have checked. This is a **stop**, not a degrade — the sa
 class as an exit-3 invalid input, and unlike the missing-`python3` case, which
 has a working second path and therefore degrades.
 
+**When `review.require_acceptance_criteria_check` is `false`, the stop still applies.**
+The paragraphs above are written for the default configuration, and on the
+opt-out path their reasoning does not hold on its own terms — so this branch is
+decided here rather than left as an unstated consequence. With that flag
+`false`, `references/verification-checks.md` (*Acceptance-criteria
+verification*) skips per-criterion verification entirely and reports
+`○ acceptance_criteria: pass — verification disabled`, so the hard-block cited
+above never runs. That does not leave the record unread. It still feeds the
+Depth gate signals this same refresh supplies — the `Effort` band taken out of
+`linked_issue_snapshot`, and the labels fetched alongside it — and those do
+fail safe on their own, a missing or ambiguous signal winning → `profile =
+full`. It also still feeds `issue_context`, the linked issue's details and
+acceptance criteria, which both the fixer spawn below and the ui-reviewer spawn
+in `references/ui-review-mechanics.md` receive; neither is gated on this flag,
+and the field is specified as *empty if none*. An unread issue therefore
+reaches them looking exactly like a PR that links no issue — the conflation the
+scope rule at the top of this section exists to prevent. The stop is kept, for
+three reasons:
+
+- **The flag governs reporting, not reading.** It is an opt-out from *verifying*
+  acceptance criteria, not a statement that the linked issue no longer matters
+  to the review. Whether the review boundary's read succeeded is a different
+  question from how one dimension is reported, and no flag answers it.
+- **It keeps the disabled note truthful.** `pass — verification disabled` names
+  exactly one reason the criteria went unverified: the operator switched the
+  check off. Continuing past an unreadable record would print that note while a
+  second, unchosen reason also applied, crediting a deliberate opt-out for a gap
+  nobody opted into. Stopping is what makes the note's single stated cause the
+  whole cause — the consistency `references/verification-checks.md` requires.
+- **The scope distinction is about the read, not the config.** This fail-safe
+  separates *nothing to read* (no linked issue — proceed) from *the read failed*
+  (stop). A configuration flag does not move a PR between those two states, so
+  it is not the thing that decides this branch.
+
+**Placeholder binding at the Depth gate.** SKILL.md's two review-boundary
+command lines take `{linked_issue}` — the linked issue's number — because `{N}`
+is the PR number at every other command site in SKILL.md. Two places in this
+skill's references bind it to an issue instead, and each says so where it is
+used: the rendered stop above, and traceability check 2's `git log … --grep`
+in `references/verification-checks.md`.
+
 **What `light` changes in the loop:**
 
 | Aspect | `full` (default) | `light` |
