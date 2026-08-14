@@ -34,18 +34,21 @@ Modes
             for the same reason. Free text — `title`, `outcome` — never reaches
             a command, so it is only length-bounded. `lanes` is the durable
             parallel-resolver queue: entries merge by issue, while `[]` clears
-            the completed batch
+            the completed batch. `queue` is `--init` only: it is the run's
+            recorded intent, and a patch that names it is refused
   --lock    create `.gitissue/run.lock` with O_CREAT|O_EXCL; refuse a lock held
             by a live run, reclaim one that is stale. Mints a fresh run id, so
             a leftover state file from a finished run cannot lend its id to an
             unrelated one; `--lock --resume` adopts the recorded id instead and
             *re-acquires in place* (`reacquired`, a heartbeat refresh) when the
-            lock is this run's own — same run id, same known owner pid — which
-            is the common resume: the loop died, the agent process holding the
-            lock did not. `--pid` records that owner and defaults to 0, "no
-            liveness signal": such a lock is retired by `--ttl` or `--force`
-            only, never by the dead-pid rule. Pass a pid outliving the single
-            command (`--pid "$PPID"`) for the prompt post-crash reclaim.
+            lock is this run's own — same run id, same known owner pid, same
+            host — which is the common resume: the loop died, the agent process
+            holding the lock did not. `--pid` records that owner and defaults
+            to 0, "no liveness signal": such a lock is retired by `--ttl` (when
+            the timestamp is readable) or `--force` only, never by the dead-pid
+            rule. With no readable timestamp *and* no known owner, only
+            `--force` retires it. Pass a pid outliving the single command
+            (`--pid "$PPID"`) for the prompt post-crash reclaim.
             Defaulting to the invoking process would be worse than useless: a
             one-shot shell exits as the lock is written, so the next run would
             read its own lock as dead
@@ -76,8 +79,14 @@ import re
 import socket
 import sys
 import tempfile
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
+
+try:
+    import fcntl
+except ImportError:  # pragma: no cover - non-POSIX hosts fail closed at runtime
+    fcntl = None
 
 DEFAULT_DIR = ".gitissue"
 STATE_NAME = "run-state.json"
@@ -116,7 +125,7 @@ STATE_KEYS = (
 )
 
 INIT_KEYS = frozenset({"run_id", "mode", "invocation", "queue", "limit"})
-PATCH_SCALARS = ("phase", "mode", "invocation", "limit", "queue", "report_path")
+PATCH_SCALARS = ("phase", "mode", "invocation", "limit", "report_path")
 PATCH_KEYS = frozenset(
     set(PATCH_SCALARS) | {"lanes", "current", "processed", "skip_list"}
 )
@@ -238,6 +247,32 @@ def _ensure_dir(directory: Path) -> None:
         raise WriteError(f"cannot create {directory} — {exc}") from exc
 
 
+@contextmanager
+def _lock_guard(lock_path: Path):
+    """Serialize every lock-path mutation and its ownership read.
+
+    The lock file is deliberately replaced by rename, so locking the file
+    itself would not coordinate a process that has already replaced its inode.
+    The stable parent directory is the mutex: reclaim, force, unlock, and
+    heartbeat all take it before reading and publishing a lock.
+    """
+    if fcntl is None:
+        raise OSError("portable advisory locking is unavailable on this host")
+    _ensure_dir(lock_path.parent)
+    fd = os.open(lock_path.parent, os.O_RDONLY)
+    locked = False
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        locked = True
+        yield
+    finally:
+        try:
+            if locked:
+                fcntl.flock(fd, fcntl.LOCK_UN)
+        finally:
+            os.close(fd)
+
+
 def _atomic_write(path: Path, text: str) -> None:
     """Write `text` to `path` via a temp file in the same directory + replace.
 
@@ -282,9 +317,17 @@ def _read_json_file(path: Path) -> tuple[object | None, str | None]:
     except UnicodeDecodeError as exc:
         return None, f"{path} is not valid UTF-8 — {exc.reason}"
     try:
-        return json.loads(raw), None
+        parsed = json.loads(raw)
     except json.JSONDecodeError as exc:
         return None, f"{path} is not valid JSON — {exc.msg}"
+    # JSON `null` is valid JSON and parses to Python None — the same pair
+    # `(None, None)` that means "file does not exist". A lock (or state) file
+    # that is literally `null` therefore has to be an error of its own, or
+    # `--lock` treats the path as empty, `_create_lock_exclusive` refuses the
+    # existing file, and `--unlock --force` reports absent while leaving it.
+    if parsed is None:
+        return None, f"{path} is JSON null"
+    return parsed, None
 
 
 def _read_stdin_json() -> object:
@@ -524,6 +567,11 @@ def merge_patch(
     """
     if not isinstance(patch, dict):
         raise InputError("stdin must be a single JSON object")
+    if "queue" in patch:
+        # Recorded intent at `--init` (*Two lists, two facts* in phases.md).
+        # Accepting a patch here would let a caller silently rewrite the run's
+        # original scope, which is the one fact `queue` exists to keep.
+        raise InputError("queue is recorded at --init and cannot be patched")
     unknown = sorted(set(patch) - PATCH_KEYS)
     if unknown:
         raise InputError("unknown key(s): " + ", ".join(unknown))
@@ -535,7 +583,6 @@ def merge_patch(
     _check_str(patch, "mode")
     _check_str(patch, "invocation")
     _check_str(patch, "report_path")
-    _check_int_list(patch, "queue")
     if "limit" in patch and patch["limit"] is not None and not _is_int(patch["limit"]):
         raise InputError("limit must be an integer or null")
     for key in PATCH_SCALARS:
@@ -610,7 +657,9 @@ def lock_status(lock: dict[str, object], ttl: int, *, now: str | None = None) ->
     same_host = lock.get("host") == socket.gethostname()
     # A lock whose owner pid is unknown — absent, unparsable, or the 0 recorded
     # when the caller could not name a durable process — carries no liveness
-    # signal: `pid_alive` is null and only the TTL (or --force) retires it.
+    # signal: `pid_alive` is null and the dead-pid rule never retires it.
+    # The TTL still can, but only when the timestamp is readable; with neither
+    # a known owner nor a parseable timestamp, only --force retires it.
     # Reading "unknown" as "dead" is what lets a run reclaim the lock it took
     # moments ago from a shell that has since exited, and that is no mutual
     # exclusion at all. When in doubt the lock is held.
@@ -619,7 +668,8 @@ def lock_status(lock: dict[str, object], ttl: int, *, now: str | None = None) ->
     dead_here = same_host and known and not alive
     if age is None:
         # A lock with no readable timestamp cannot be aged; only a dead pid on
-        # this host can retire it, or --force.
+        # this host can retire it, or --force. An ownerless lock in this
+        # state is held until --force.
         reason = "dead-pid" if dead_here else None
     elif age >= ttl:
         reason = "ttl"
@@ -656,7 +706,12 @@ def _lock_identity(lock: object) -> tuple | None:
     """
     if not isinstance(lock, dict):
         return None
-    return (lock.get("run_id"), lock.get("started_at"), lock.get("pid"))
+    return (
+        lock.get("run_id"),
+        lock.get("started_at"),
+        lock.get("pid"),
+        lock.get("host"),
+    )
 
 
 def _pid_owns(lock: object, pid: int) -> bool:
@@ -822,25 +877,51 @@ def run_update(args, paths) -> int:
         _emit({"dry_run": True, "would_write": str(paths["state"]), "state": merged})
         return 0
     _atomic_write(paths["state"], _render_json(merged))
-    _touch_lock_heartbeat(paths["lock"], merged.get("run_id"))
+    _touch_lock_heartbeat(paths["lock"], merged.get("run_id"), pid=args.pid)
     _emit(merged)
     return 0
 
 
-def _touch_lock_heartbeat(lock_path: Path, run_id: object) -> None:
+def _touch_lock_heartbeat(
+    lock_path: Path,
+    run_id: object,
+    pid: int | None = None,
+    *,
+    _lock_held: bool = False,
+) -> None:
     """Refresh this run's lock timestamp so a long run never ages itself out.
 
     Best-effort by design: a missing or foreign lock is left alone, and a write
-    failure here is not worth failing a checkpoint that already succeeded.
+    failure here is not worth failing a checkpoint that already succeeded. A
+    valid owner pid is required; without one the heartbeat is a no-op. The write
+    also requires ownership on this host, so a `--lock --force` that published a
+    new lock with the same run id is not overwritten by a stale heartbeat. The
+    identity is compared again immediately before publishing while the stable
+    directory guard is held, so a replacement cannot be overwritten by this
+    stale heartbeat.
     """
-    parsed, error = _read_json_file(lock_path)
-    if error is not None or not isinstance(parsed, dict):
+    if not _pid_known(pid):
         return
-    if parsed.get("run_id") != run_id:
-        return
-    parsed["heartbeat"] = _now()
-    try:
+
+    def refresh() -> None:
+        parsed, error = _read_json_file(lock_path)
+        if error is not None or not isinstance(parsed, dict):
+            return
+        if not _owns_lock(parsed, run_id, pid):
+            return
+        observed = _lock_identity(parsed)
+        current, current_error = _read_json_file(lock_path)
+        if current_error is not None or _lock_identity(current) != observed:
+            return
+        parsed["heartbeat"] = _now()
         _atomic_write(lock_path, _render_json(parsed))
+
+    try:
+        if _lock_held:
+            refresh()
+        else:
+            with _lock_guard(lock_path):
+                refresh()
     except OSError:
         pass
 
@@ -913,6 +994,13 @@ def _emit_held(holder: dict, status: dict) -> int:
 
 
 def run_lock(args, paths) -> int:
+    if args.dry_run:
+        return _run_lock_locked(args, paths)
+    with _lock_guard(paths["lock"]):
+        return _run_lock_locked(args, paths)
+
+
+def _run_lock_locked(args, paths) -> int:
     # A plain `--lock` starts a *new* run, so it mints a new id even when a
     # previous run left its state file behind: adopting that id would give two
     # unrelated runs one id in both the report marker and `runs.jsonl`. Only
@@ -948,14 +1036,20 @@ def run_lock(args, paths) -> int:
         if args.dry_run:
             _emit({"dry_run": True, "status": "would_reacquire", "lock": existing})
             return 0
-        _touch_lock_heartbeat(paths["lock"], run_id)
-        refreshed, _ = _read_json_file(paths["lock"])
-        _emit(
-            {
-                "status": "reacquired",
-                "lock": refreshed if isinstance(refreshed, dict) else existing,
-            }
+        _touch_lock_heartbeat(
+            paths["lock"], run_id, pid=args.pid, _lock_held=True
         )
+        refreshed, _ = _read_json_file(paths["lock"])
+        # The heartbeat is a best-effort write. A concurrent TTL reclaim or
+        # `--lock --force` in that window can replace the file; reporting
+        # `reacquired` from the re-read without re-checking ownership would
+        # publish someone else's lock as this run's success.
+        if not _owns_lock(refreshed, run_id, args.pid):
+            holder, status, _ = _classify_lock(args, paths)
+            if not holder and isinstance(refreshed, dict):
+                holder = refreshed
+            return _emit_held(holder, status)
+        _emit({"status": "reacquired", "lock": refreshed})
         return 0
 
     if existing is not None or error is not None:
@@ -1026,6 +1120,13 @@ def run_lock(args, paths) -> int:
 
 
 def run_unlock(args, paths) -> int:
+    if args.dry_run:
+        return _run_unlock_locked(args, paths)
+    with _lock_guard(paths["lock"]):
+        return _run_unlock_locked(args, paths)
+
+
+def _run_unlock_locked(args, paths) -> int:
     existing, error = _read_json_file(paths["lock"])
     if existing is None and error is None:
         _emit({"status": "absent"})
@@ -1152,7 +1253,8 @@ def main(argv: list[str] | None = None) -> int:
             "pid of the process that owns the run, recorded in the lock; pass a "
             "durable one (\"$PPID\" in an agent shell) so a crashed run's lock "
             "retires on the dead-pid path (default: 0 — no liveness signal, the "
-            "lock is retired by --ttl or --force only)"
+            "lock is retired by --ttl when the timestamp is readable, or --force; "
+            "with no readable timestamp, only --force)"
         ),
     )
     parser.add_argument(

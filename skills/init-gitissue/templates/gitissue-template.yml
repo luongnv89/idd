@@ -148,7 +148,7 @@ autopilot:
   respect_dependencies: true
   # Reuse .gitissue/triage.json when younger than this many minutes and no
   # commit landed since (0 disables reuse); force a full re-triage every Nth
-  # iteration after a merge (0 = never — a pick miss forces one regardless).
+  # iteration (0 = never — a pick miss forces one regardless).
   triage_cache_max_age_minutes: 60
   retriage_every: 0
   # Quarantine an issue after this many consecutive failed runs by applying

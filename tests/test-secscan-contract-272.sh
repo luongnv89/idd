@@ -47,6 +47,7 @@ trap 'rm -f "$RESULTS"' EXIT
 python3 - > "$RESULTS" <<'PY'
 """The mode x path-shape matrix, its fail-closed cells, and its non-vacuity proof."""
 
+import errno
 import hashlib
 import json
 import os
@@ -130,16 +131,43 @@ def init_repo(repo):
 
 
 # ── The path shapes ──────────────────────────────────────────────────────────
-# Every one of these is a legal filename on the platforms this gate runs on, and
+def supports_non_utf8_filenames():
+    """Probe the exact raw-byte filename capability used by one matrix shape."""
+    workdir = tempfile.mkdtemp()
+    probe = os.path.join(os.fsencode(workdir), b"probe\xff")
+    created = False
+    try:
+        with open(os.fsdecode(probe), "x"):
+            pass
+        created = True
+    except OSError as exc:
+        if exc.errno in {
+            errno.EILSEQ,
+            errno.EINVAL,
+            errno.ENOTSUP,
+            errno.EOPNOTSUPP,
+        }:
+            return False
+        raise
+    finally:
+        if created:
+            os.unlink(os.fsdecode(probe))
+        shutil.rmtree(workdir, ignore_errors=True)
+    return True
+
+
+NON_UTF8_FILENAMES = supports_non_utf8_filenames()
+
+# Every shape below is a legal filename on the platforms this gate runs on, and
 # every one is attacker-controlled on a branch under review. `decoys` are clean
 # siblings that a normalising scan would read *instead* — the shape's entire
-# point is that the two must never be confused.
+# point is that the two must never be confused. The raw non-UTF-8 shape is added
+# only when this filesystem supports the bytes it exercises.
 SHAPES = [
     ("leading-space", b" lead.txt", [b"lead.txt"]),
     ("trailing-space", b"trail.txt ", [b"trail.txt"]),
     ("embedded-newline", b"two\nlines.txt", [b"two", b"lines.txt"]),
     ("carriage-return", b"cr.txt\r", [b"cr.txt"]),
-    ("non-utf8-byte", b"notes\xff.txt", [b"notes.txt"]),
     ("colon-prefixed", b":colon.txt", [b"colon.txt"]),
     ("stage-alias", b"0:x.txt", [b"x.txt"]),
     ("quoted-octal", "confïgs/kéys.txt".encode("utf-8"), [b"configs/keys.txt"]),
@@ -151,6 +179,14 @@ SHAPES = [
     ("rename-origin", b" renamed.txt", []),
     ("untracked-dir", b"u/v/w/hidden.txt", []),
 ]
+if NON_UTF8_FILENAMES:
+    SHAPES.insert(4, ("non-utf8-byte", b"notes\xff.txt", [b"notes.txt"]))
+    RESULTS.append("PASS|capability: raw non-UTF-8 filename shape is included")
+else:
+    RESULTS.append(
+        "SKIP|capability: raw non-UTF-8 filename shape skipped "
+        "(filesystem rejects raw non-UTF-8 names)"
+    )
 
 MODES = ["--staged", "--working-tree", "--range"]
 
@@ -632,6 +668,12 @@ original = open(SCRIPT, encoding="utf-8").read()
 scratch_dir = tempfile.mkdtemp()
 try:
     for label, edits, addendum, (mode, shape_name) in MECHANISMS:
+        if shape_name == "non-utf8-byte" and not NON_UTF8_FILENAMES:
+            RESULTS.append(
+                "SKIP|non-vacuity: " + label + " skipped "
+                "(filesystem rejects raw non-UTF-8 names)"
+            )
+            continue
         broken = original
         missing = [old for old, _ in edits if old not in broken]
         if missing:
@@ -659,7 +701,13 @@ PY
 
 while IFS='|' read -r verdict label; do
   [ -n "${verdict:-}" ] || continue
-  if [ "$verdict" = "PASS" ]; then pass "$label"; else fail "$label"; fi
+  if [ "$verdict" = "PASS" ]; then
+    pass "$label"
+  elif [ "$verdict" = "SKIP" ]; then
+    echo "  ○ $label"
+  else
+    fail "$label"
+  fi
 done < "$RESULTS"
 
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"

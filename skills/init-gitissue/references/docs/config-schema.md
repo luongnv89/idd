@@ -348,8 +348,8 @@ autopilot:
   # Reuse .gitissue/triage.json when it is younger than this many minutes AND
   # no commit landed since. Type: integer. Default: 60. 0 disables reuse.
   triage_cache_max_age_minutes: 60
-  # Force a full re-triage every Nth iteration after a merge; a pick miss forces
-  # one regardless. Type: integer. Default: 0 (never).
+  # Force a full re-triage every Nth iteration (1-based i % N == 0); a pick
+  # miss forces one regardless. Type: integer. Default: 0 (never).
   retriage_every: 0
 
   # Quarantine an issue after this many consecutive failed runs by applying
@@ -646,7 +646,7 @@ Config is validated on load at the start of every skill invocation. Errors inclu
 | `autopilot.critical_labels` | `["critical", "priority:critical"]` | Labels that prioritize issues |
 | `autopilot.respect_dependencies` | `true` | Honor `Depends on #N` / `Blocked by #N` markers — never merge a PR whose dependencies are unmerged; the PR is left open (`blocked_by_dependency`) and the loop continues |
 | `autopilot.triage_cache_max_age_minutes` | `60` | Max age of a reusable `triage.json` (also requires no commit since); `0` disables reuse |
-| `autopilot.retriage_every` | `0` | Force a full re-triage every Nth iteration after a merge (`0` = never) |
+| `autopilot.retriage_every` | `0` | Force a full re-triage every Nth iteration (`0` = never) |
 | `autopilot.quarantine_after` | `3` | Consecutive failed runs before an issue is labelled and skipped until a human removes the label (`0` disables) |
 | `autopilot.quarantine_label` | `"auto-pilot-quarantined"` | The quarantine label; honored through the effective `skip_labels` set |
 | `autopilot.max_runtime_minutes` | `0` | Wall-clock budget for one run in minutes, from the run state's `started_at`; at the budget the loop stops cleanly (`0` = unbounded) |
