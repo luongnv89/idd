@@ -30,6 +30,8 @@ RVM="$ROOT/src/skills/issue-pr-review/references/review-loop-mechanics.md"
 BRVM="$ROOT/skills/issue-pr-review/references/review-loop-mechanics.md"
 RVE="$ROOT/src/skills/issue-pr-review/references/error-messages.md"
 BRVE="$ROOT/skills/issue-pr-review/references/error-messages.md"
+RVC="$ROOT/src/skills/issue-pr-review/references/verification-checks.md"
+BRVC="$ROOT/skills/issue-pr-review/references/verification-checks.md"
 
 printf '◆ Follow-up Context Contract Tests (issue #285)\n'
 
@@ -125,7 +127,7 @@ check "$RV" 'even when `review\.adaptive_depth` is `false`' "review refresh is i
 lacks "$RV" 'unconditionally refresh the linked issue' "the stale unconditional claim is gone (#296)"
 check "$RV" 'review\.adaptive_depth` is `false`' "adaptive-depth-off path still retains the review snapshot"
 check "$RV" 'set `profile = full` after the refresh' "adaptive-depth-off ordering refreshes before profile pin"
-check "$RV" 'gh issue view \{N\} --json number,title,body,labels' "review refresh fallback preserves the exact field set"
+check "$RV" 'gh issue view \{linked_issue\} --json number,title,body,labels' "review refresh fallback preserves the exact field set"
 check "$RV" 'record as `linked_issue_snapshot`' "review boundary retains script or direct-gh snapshot"
 check "$RV" 'consume `linked_issue_snapshot` from the review-boundary read directly' "Step 3 consumes the held fresh snapshot"
 check "$RV" 'do not call `gi-issue\.py` or `gh` again' "Step 3 never re-reads a stale cache entry"
@@ -174,6 +176,55 @@ for f in "$RVE" "$BRVE"; do
   check "$f" 'To fix:  gh issue view \{N\} --json number,title,body,labels' "stop entry offers a fix command: ${f#"$ROOT/"}"
   check "$f" 'Then:    /issue-pr-review \{PR\}' "stop entry resumes on the PR, not the issue number: ${f#"$ROOT/"}"
   check "$f" '`\{N\}` is \*\*not\*\* the' "stop entry documents its placeholder binding: ${f#"$ROOT/"}"
+done
+
+# The Depth gate names the linked issue with a token that is not the PR's (#298).
+for f in "$RV" "$BRV"; do
+  n="${f#"$ROOT/"}"
+  check "$f" 'gi-issue\.py \{linked_issue\} --fields number,title,body,labels --refresh' "depth gate refresh takes the linked-issue token: $n"
+  check "$f" 'gh issue view \{linked_issue\} --json number,title,body,labels' "depth gate degrade takes the linked-issue token: $n"
+  lacks "$f" 'gi-issue\.py \{N\}' "no script call site binds \{N\} to a linked issue: $n"
+  lacks "$f" 'gh issue view \{N\}' "no gh call site binds \{N\} to a linked issue: $n"
+  # AC 4: the Step 6 read-modify-write procedure mixes PR-bound and issue-bound
+  # placeholders in one paragraph, so its Closes target must name the issue.
+  check "$f" 'prepend `Closes #\{linked_issue\}` as the \*\*first line\*\*' "the body-edit fix prepends the linked issue, not the PR: $n"
+  lacks "$f" 'prepend `Closes #\{N\}`' "the body-edit fix cannot render Closes #<PR>: $n"
+  # The suggested-fix string is the text that reaches the fixer, so it must name
+  # the issue too — the body-edit procedure alone never leaves SKILL.md.
+  check "$f" 'Add `Closes #\{linked_issue\}` to the PR body' "the traceability fix string names the linked issue: $n"
+  lacks "$f" 'Add `Closes #\{N\}` to the PR body' "the traceability fix string cannot render Closes #<PR>: $n"
+done
+
+# verification-checks.md holds the canonical copy of that fix string (#298).
+for f in "$RVC" "$BRVC"; do
+  n="${f#"$ROOT/"}"
+  check "$f" 'suggested fix: "Add `Closes #\{linked_issue\}` to the PR body\."' "the canonical fix string names the linked issue: $n"
+  lacks "$f" 'Add `Closes #\{N\}` to the PR body' "the canonical fix string cannot render Closes #<PR>: $n"
+  check "$f" 'findings_json' "the canonical fix string says why it breaks with the file's \{N\}: $n"
+  # The detection side still reads {N} — this file binds it to the issue throughout.
+  check "$f" '`Closes #\{N\}` absent \| check 1 fails' "the detection outcome table is left on the file's own token: $n"
+done
+
+# The fail-safe decides the require_acceptance_criteria_check: false path (#298).
+for f in "$RVM" "$BRVM" "$RVE" "$BRVE"; do
+  n="${f#"$ROOT/"}"
+  check "$f" 'review\.require_acceptance_criteria_check' "the fail-safe names the verification flag: $n"
+  check "$f" 'pass — verification disabled' "the flag-false path cites the disabled-verification contract: $n"
+done
+for f in "$RVM" "$BRVM"; do
+  n="${f#"$ROOT/"}"
+  check "$f" 'is `false`, the stop still applies' "the flag-false path keeps the stop: $n"
+  check "$f" 'governs reporting, not reading' "the kept stop states why the flag does not decide it: $n"
+  check "$f" 'Placeholder binding at the Depth gate' "the depth gate placeholder binding is written down: $n"
+  # The binding is per file; no claim that every issue-bound {N} announces itself.
+  lacks "$f" 'each says so where it is used' "the binding note claims no per-use announcement it cannot keep: $n"
+  # The flag-false path must not claim the Depth gate signals are the only
+  # remaining readers: issue_context reaches the fixer and ui-reviewer ungated.
+  check "$f" 'issue_context' "the flag-false path names the ungated snapshot consumers: $n"
+  check "$f" 'empty if none' "the flag-false path names the empty-vs-unread conflation: $n"
+done
+for f in "$RVE" "$BRVE"; do
+  check "$f" 'yet this error is still raised' "the stop entry is not conditional on the flag: ${f#"$ROOT/"}"
 done
 
 # Snapshot budget supersedes the stale literal without weakening freshness reads.

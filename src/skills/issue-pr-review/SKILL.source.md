@@ -187,9 +187,9 @@ Decide **how deep** this review goes, so a one-line copy fix is not put through
 the same full-weight review as a multi-subsystem PR: `profile = light | full`.
 The signal and `light` changes are defined in `docs/agent-model-effort.md` (*Complexity → pipeline profile*) and `references/review-loop-mechanics.md` (*Depth gate*); **read and apply both**.
 First, when the PR body links an issue, refresh it at the review boundary:
-`python3 shared/scripts/gi-issue.py {N} --fields number,title,body,labels --refresh`,
+`python3 shared/scripts/gi-issue.py {linked_issue} --fields number,title,body,labels --refresh`,
 reading `.issue`. Exit 3 stops; no `python3`, exit 2, or exit 4 degrades to
-`gh issue view {N} --json number,title,body,labels`. Retain either successful
+`gh issue view {linked_issue} --json number,title,body,labels`. Retain either successful
 record as `linked_issue_snapshot`; Step 3 consumes it directly, so a direct-`gh`
 fallback cannot expose an older cache entry. **If neither path yields a usable
 record, apply the empty-record fail-safe in `references/review-loop-mechanics.md`
@@ -343,7 +343,7 @@ Two dimensions — `acceptance_criteria` and `traceability` — are produced by 
 
 - `review.require_acceptance_criteria_check` (default `true`) gates the AC check; `review.require_traceability_check` (default `true`) gates traceability. When either is `false`, that dimension reports `pass — verification disabled` and never blocks soft-pass.
 - **Any `acceptance_criteria: fail`** (a criterion the PR does not satisfy) → fixable issue in Step 6, `category: acceptance_criteria`. **Hard-blocks** soft-pass.
-- **`Closes #{N}` absent** (traceability check 1, unless the PR is refactor/chore-exempt) → fixable issue in Step 6, `category: traceability`, suggested fix "Add `Closes #{N}` to the PR body." **Hard-blocks** soft-pass.
+- **`Closes #{linked_issue}` absent** (traceability check 1, unless the PR is refactor/chore-exempt) → fixable issue in Step 6, `category: traceability`, suggested fix "Add `Closes #{linked_issue}` to the PR body." **Hard-blocks** soft-pass.
 - All other traceability outcomes (missing commit ref, missing Decision Record on a human-authored PR, etc.) report `partial` and do **not** block.
 
 These two hard-blocks are the issue #36 contract: a PR can pass tests and still be blocked on `acceptance_criteria: fail` or a missing `Closes #N`.
@@ -402,7 +402,7 @@ Pending CI is **not clean** — it never satisfies soft-pass and auto mode must 
 
 Collect issues from Steps 3-5, but **only fix those with `action: "fix"`** — `action: "note"` issues (medium code_quality/test_coverage suggestions) are reported in the summary but never trigger a fix cycle. This is the key token optimization. Fixable sources are the same five dimensions from Step 3's *Dimensional review output* (each `fail`/UI `action:"fix"` becomes one fixable issue) plus Step 4 test failures and Step 5 CI failures.
 
-Acceptance-criteria fixes typically need code changes. The traceability `Closes #{N}` fix is a **read-modify-write** PR-body edit (driver rule 2 in `docs/platform-github.md`): (1) `gh pr view {N} --json body` to fetch the current body; (2) prepend `Closes #{N}` as the **first line** when absent (SPEC §3.3 / `docs/naming-conventions.md`), preserving the rest of the body unchanged — never replace the body from scratch; (3) `gh pr edit {N} --body "{merged_body}"`; (4) re-read with `gh pr view {N} --json body` and confirm `## Decision Record`, the Acceptance Criteria Verification table, and any trailing `<!-- gitissue:qa v1 … -->` marker are still present — prepending to line 1 leaves a trailing marker untouched by construction, and this re-read is what proves it. Apply code fixes, then commit and push as usual.
+Acceptance-criteria fixes typically need code changes. The traceability `Closes #{linked_issue}` fix is a **read-modify-write** PR-body edit (driver rule 2 in `docs/platform-github.md`): (1) `gh pr view {N} --json body` to fetch the current body; (2) prepend `Closes #{linked_issue}` as the **first line** when absent (SPEC §3.3 / `docs/naming-conventions.md`), preserving the rest of the body unchanged — never replace the body from scratch; (3) `gh pr edit {N} --body "{merged_body}"`; (4) re-read with `gh pr view {N} --json body` and confirm `## Decision Record`, the Acceptance Criteria Verification table, and any trailing `<!-- gitissue:qa v1 … -->` marker are still present — prepending to line 1 leaves a trailing marker untouched by construction, and this re-read is what proves it. Apply code fixes, then commit and push as usual.
 
 ### If no fixable issues
 
