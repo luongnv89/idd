@@ -965,18 +965,60 @@ run_status out st sh -c "cd '$CR' && python3 '$SECSCAN' --staged --quiet"
 # A filename is a byte string, not text. An undecodable byte must round-trip
 # (os.fsdecode/surrogateescape) — `errors="replace"` would turn it into U+FFFD
 # and name a different file, and a strict decode would abort the whole scan. A
-# name that is only spaces is a legal file too.
+# name that is only spaces is a legal file too. Some filesystems (including
+# macOS APFS) reject raw non-UTF-8 filename bytes, so probe this exact capability
+# and skip only those names when the filesystem gives the documented error.
 BYTES="$TMP/byte-paths"
 mkdir -p "$BYTES"
+BYTE_PATHS_SUPPORTED=0
+if python3 - "$BYTES" <<'PY'
+import errno
+import os
+import sys
+
+root = os.fsencode(sys.argv[1])
+probe = os.path.join(root, b"probe\xff")
+created = False
+try:
+    with open(os.fsdecode(probe), "x"):
+        pass
+    created = True
+except OSError as exc:
+    if exc.errno in {
+        errno.EILSEQ,
+        errno.EINVAL,
+        errno.ENOTSUP,
+        errno.EOPNOTSUPP,
+    }:
+        raise SystemExit(1)
+    raise SystemExit(2)
+finally:
+    if created:
+        os.unlink(os.fsdecode(probe))
+PY
+then
+  BYTE_PATHS_SUPPORTED=1
+else
+  probe_status=$?
+  if [ "$probe_status" = "1" ]; then
+    echo "  ○ AC1: undecodable filename-byte fixtures skipped (filesystem rejects raw non-UTF-8 names)"
+  else
+    fail "AC1: probing undecodable filename-byte support failed unexpectedly"
+  fi
+fi
+export BYTE_PATHS_SUPPORTED
 (
   cd "$BYTES"
   git init -q .
   git config user.email t@example.com
   git config user.name t
   python3 -c "
-import os, sys
+import os
 key = os.environ['AWS_FIXTURE_KEY']
-for name in (b'notes\xff.txt', b'bad\xc3(name.txt', b'   '):
+names = [b'   ']
+if os.environ['BYTE_PATHS_SUPPORTED'] == '1':
+    names[0:0] = [b'notes\xff.txt', b'bad\xc3(name.txt']
+for name in names:
     open(os.fsdecode(name), 'w').write('id=' + key + chr(10))
 open('readme.md', 'w').write('clean' + chr(10))
 "
@@ -985,17 +1027,25 @@ open('readme.md', 'w').write('clean' + chr(10))
 for mode in --staged --working-tree; do
   run_status out st sh -c "cd '$BYTES' && python3 '$SECSCAN' $mode --quiet"
   if [ "$st" = "1" ]; then
-    pass "AC1: $mode scans undecodable and whitespace-only filenames"
+    if [ "$BYTE_PATHS_SUPPORTED" = "1" ]; then
+      pass "AC1: $mode scans undecodable and whitespace-only filenames"
+    else
+      pass "AC1: $mode scans the supported whitespace-only filename"
+    fi
   else
-    fail "AC1: $mode passed a secret in an undecodable filename (exit $st)"
+    fail "AC1: $mode missed a secret in a supported byte-path fixture (exit $st)"
   fi
 done
-# The verdict must still be machine-readable with such a path in it.
+# The verdict must still be machine-readable with the supported path shapes.
 run_status out st sh -c "cd '$BYTES' && python3 '$SECSCAN' --staged --quiet"
 if printf '%s' "$out" | python3 -c "import json,sys; json.load(sys.stdin)" 2>/dev/null; then
-  pass "AC1: the JSON verdict stays parsable with a surrogate-escaped path"
+  if [ "$BYTE_PATHS_SUPPORTED" = "1" ]; then
+    pass "AC1: the JSON verdict stays parsable with a surrogate-escaped path"
+  else
+    pass "AC1: the JSON verdict stays parsable with supported filenames"
+  fi
 else
-  fail "AC1: a surrogate-escaped path produced unparsable JSON"
+  fail "AC1: a byte-path fixture produced unparsable JSON"
 fi
 
 # Each mode must read the bytes it is about to ship, not whatever is on disk.
