@@ -23,11 +23,35 @@ Output on success is exactly one line of JSON on stdout:
     {"verdict": "clean" | "warn" | "block",
      "blocking": [{"rule": ..., "path": ..., "detail": ...}, ...],
      "warnings": [{"rule": ..., "path": ..., "detail": ...}, ...],
-     "scanned": <int>, "skipped": <int>, "branch": <str or null>,
+     "scanned": <int>, "skipped": <int>, "policy_source": <str>,
+     "branch": <str or null>,
      "mode": "auto" | "interactive", "confirm_required": <bool>}
 
 Human-readable `✗` / `⚠` / `○` lines go to stderr, so a caller may show them
 verbatim and still parse stdout.
+
+The policy-provenance contract
+------------------------------
+
+`security.allow_pattern` suppresses **scanning**, not findings: a path it
+matches is skipped before any rule runs. That is correct for the pre-commit
+caller, where the repository is the operator's own. It is wrong for a caller
+reviewing a branch it does not control, because `.gitissue.yml` is repository
+data: a pull request committing `allow_pattern: "."` skips every path, and the
+gate reports `verdict: clean` with `scanned: 0` having examined nothing. A
+*narrow* pattern naming only the file that carries the key is the same hole with
+a healthy-looking `scanned`, so a threshold on `scanned` does not close it.
+
+`--policy-ref REF` closes it by provenance: `security.*` is read from
+`REF:.gitissue.yml`, a ref the reviewed branch cannot write, and the work tree's
+own file is not consulted at all. `policy_source` reports what was actually
+used — `ref:<REF>`, `file:<path>`, or `defaults` — so a caller can assert it got
+the policy it asked for. The flag is opt-in and changes nothing when absent: the
+default remains the documented upward search from the working directory.
+
+Callers reviewing code they do not control should treat exit 0 as a pass only
+when `policy_source` is the ref they named, `verdict` is not `block`, and
+`scanned` is not 0 while `skipped` is above 0.
 
 The byte-source contract
 ------------------------
@@ -226,10 +250,19 @@ def _git(args: list[str]) -> str:
     every path it hands out, so `b"notes\xff.txt"` decodes to something that
     reopens the very same file. `-z` output exists precisely so that no byte of
     a filename is reinterpreted; anything else here undoes that.
+
+    `--no-replace-objects` is a **top-level** git option and is passed here, not
+    on the subcommand: `git cat-file --no-replace-objects …` is rejected with
+    `error: unknown option`, which this helper would raise as Unavailable and
+    every caller would read as exit 4 — a gate that degrades to prose on every
+    run. A `refs/replace` entry otherwise rewrites what git reports: it can
+    remap a *commit*, so `rev-list` and `diff-tree` enumerate a tree that never
+    shipped, and the entry the secret lives in is never listed to begin with.
+    Setting it once here covers every enumeration this scan performs.
     """
     try:
         proc = subprocess.run(
-            ["git", *args],
+            ["git", "--no-replace-objects", *args],
             capture_output=True,
             check=False,
         )
@@ -639,6 +672,17 @@ def read_security_config(path: str) -> dict[str, object]:
     except OSError:
         # No config file is the normal zero-config case, not an error.
         return {}
+    return parse_security_config(text)
+
+
+def parse_security_config(text: str) -> dict[str, object]:
+    """Parse the `security:` block out of `.gitissue.yml` text.
+
+    Split from `read_security_config` so the same restricted parser serves both
+    byte sources — the file on disk, and the blob `--policy-ref` reads out of a
+    git ref. One parser, so the two sources can never disagree about what a
+    value means.
+    """
     values: dict[str, object] = {}
     inside = False
     for line in text.splitlines():
@@ -692,7 +736,155 @@ def find_config(explicit: str | None) -> str | None:
         here = parent
 
 
-def load_overrides(args: argparse.Namespace) -> dict[str, object]:
+# The gitrevisions lookup order for a non-fully-qualified `<refname>`, minus
+# rule 1 (`$GIT_DIR/<refname>`): git only honours that form for a handful of
+# all-caps root refs (`HEAD`, `FETCH_HEAD`, `ORIG_HEAD`, ...), which
+# `_reject_ambiguous_ref` returns early on, and `for-each-ref` does not list
+# them anyway. The remaining five are the forms two different refs can both
+# claim — and the order matters: `refs/heads/<ref>` is consulted *before*
+# `refs/remotes/<ref>`, which is the whole of the defect below.
+_REF_LOOKUP_RULES = (
+    "refs/{ref}",
+    "refs/tags/{ref}",
+    "refs/heads/{ref}",
+    "refs/remotes/{ref}",
+    "refs/remotes/{ref}/HEAD",
+)
+
+
+def _reject_ambiguous_ref(ref: str) -> None:
+    """Fail closed when `ref` could name more than one ref — exit 4.
+
+    A short `<refname>` is not a name, it is a *search*: git tries the five
+    forms above in order and takes the first hit. So `refs/heads/origin/main`
+    shadows `refs/remotes/origin/main`, and every caller of this script binds
+    the short `origin/<default-branch>` form. `/issue-pr-review` Step 1 runs
+    `gh pr checkout`, which materialises the pull request's own — attacker
+    chosen — `headRefName` as a *local branch*: a branch literally named
+    `origin/main` therefore wins the lookup and re-supplies the reviewed
+    branch's `.gitissue.yml` as the "trusted" policy, while `policy_source`
+    still reports `ref:origin/main`, exactly the ref the caller asked for.
+
+    Detected mechanically rather than by reading git's `warning: refname ... is
+    ambiguous` line: that text is localizable, version-dependent, and lands on
+    a stderr this script discards. A ref that resolves to anything other than
+    exactly one ref was never read from the reviewing side, so it raises
+    Unavailable rather than being scanned under.
+
+    A fully-qualified `refs/...` name and `HEAD` both resolve unambiguously and
+    are returned early; zero matches fall through to the caller's existing
+    absent-versus-unreadable split, which is unchanged.
+    """
+    if ref.startswith("refs/") or ref == "HEAD":
+        return
+    candidates = [rule.format(ref=ref) for rule in _REF_LOOKUP_RULES]
+    # `_git`, not a raw `subprocess.run`: it places `--no-replace-objects` as
+    # the top-level option it has to be, and turns a git failure into
+    # Unavailable — which is the fail-closed direction this check wants anyway.
+    listed = _git(["for-each-ref", "--format=%(refname)", *candidates])
+    # Exact membership, because a `for-each-ref` pattern matches "completely or
+    # from the beginning up to a slash": a bare prefix hit is not a ref this
+    # lookup would ever reach, and counting it would degrade a healthy repo.
+    wanted = set(candidates)
+    found = {line for line in listed.split("\n") if line in wanted}
+    if len(found) > 1:
+        raise Unavailable(
+            f"--policy-ref {ref} is ambiguous — it names "
+            + ", ".join(sorted(found))
+            + ". The reviewing side's policy could not be identified, so "
+            "nothing was scanned under it; pass the fully-qualified name of "
+            "the one you mean"
+        )
+
+
+def read_policy_ref(ref: str) -> tuple[dict[str, object], str]:
+    """Read `security.*` from `<ref>:.gitissue.yml`, never from the work tree.
+
+    The trust boundary this closes. `.gitissue.yml` is repository-controlled and
+    `/issue-pr-review` runs with the pull request's branch checked out, so the
+    file the ordinary upward walk finds is written by the author of the artifact
+    under review. A branch that commits `allow_pattern: "."` — or a narrow
+    pattern naming just the file carrying the key — governs its own review, and
+    the gate reports `clean` having examined nothing that matters. Pointing the
+    policy at a ref the reviewed branch cannot write makes the reviewing side
+    supply the policy.
+
+    Fail-closed in three directions. A ref that resolves but carries no
+    `.gitissue.yml` yields the built-in defaults (no allow pattern at all) —
+    never a silent fall back to the branch's file, which would hand the decision
+    straight back to the artifact. A ref that does not resolve is `Unavailable`
+    (exit 4, the documented degrade), because a policy that could not be read is
+    not a policy that permitted anything. And a ref that resolves to *more than
+    one* ref is `Unavailable` too: the short `origin/<branch>` form every call
+    site binds is resolved by git as `refs/heads/` before `refs/remotes/`, and
+    `gh pr checkout` materialises the pull request's attacker-chosen head-ref
+    name as a local branch — so a branch named `origin/main` re-supplies its own
+    policy while `policy_source` still names the ref the caller asked for. See
+    `_reject_ambiguous_ref`.
+    """
+    if not ref:
+        # An empty value is a malformed invocation, not an opt-out. Treating it
+        # as "no policy ref" would send the scan back to the work tree — the
+        # branch's own file — which is the entire defect this flag exists to
+        # close, reached by supplying nothing rather than by supplying a ref.
+        raise UsageError("--policy-ref value must not be empty")
+    if ref.startswith("-"):
+        # `f"{ref}:{CONFIG_NAME}"` would otherwise hand git an option instead of
+        # a revision. Same rule as `--range` — no shell is involved, but argv
+        # injection is still injection.
+        raise UsageError(f"--policy-ref value must be a revision, not an option: {ref!r}")
+    # After both usage guards and before `spec`: an empty or option-shaped value
+    # is a malformed invocation (exit 2), while an ambiguous one is a policy that
+    # could not be identified (exit 4). Reordering these flips a pinned contract.
+    _reject_ambiguous_ref(ref)
+    spec = f"{ref}:{CONFIG_NAME}"
+    # Ask whether a blob exists at that path *before* reading it, so the two
+    # non-zero outcomes below stay distinguishable. Without this probe every
+    # failure to read collapses into "the ref has no config": a `.gitissue.yml`
+    # that is a tree, a blobless or shallow clone that has the commit but not
+    # the blob, and a corrupt object would each silently drop the trusted ref's
+    # real `security.*` — including its extra secret patterns — while the
+    # verdict still claimed `policy_source: ref:<REF>`.
+    try:
+        present = subprocess.run(
+            ["git", "--no-replace-objects", "rev-parse", "--verify", "--quiet", spec],
+            capture_output=True,
+            check=False,
+        ).returncode == 0
+    except OSError as exc:
+        raise Unavailable(f"cannot read {spec} — {exc}") from exc
+    if not present:
+        # Either the ref itself is absent — exit 4, because a policy that could
+        # not be read permitted nothing — or it resolves and simply ships no
+        # config, which is the built-in defaults and never the work-tree file.
+        try:
+            _git(["rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}"])
+        except Unavailable as exc:
+            raise Unavailable(
+                f"--policy-ref {ref} does not resolve — the reviewing side's "
+                "policy could not be read, so nothing was scanned under it"
+            ) from exc
+        return {}, f"ref:{ref}"
+    try:
+        proc = subprocess.run(
+            ["git", "--no-replace-objects", "cat-file", "blob", spec],
+            capture_output=True,
+            check=False,
+        )
+    except OSError as exc:
+        raise Unavailable(f"cannot read {spec} — {exc}") from exc
+    if proc.returncode != 0:
+        # The path names a blob that cannot be read. Every other byte source in
+        # this script fails closed here rather than substituting something else.
+        raise Unavailable(
+            f"{spec} exists but could not be read — the reviewing side's policy "
+            "was never applied"
+        )
+    text = proc.stdout.decode("utf-8", errors="replace")
+    return parse_security_config(text), f"ref:{ref}"
+
+
+def load_overrides(args: argparse.Namespace) -> tuple[dict[str, object], str]:
     """Resolve the rule extensions: config file, then `--config-json`, then flags.
 
     This script reads `.gitissue.yml` itself rather than taking the resolved
@@ -708,14 +900,32 @@ def load_overrides(args: argparse.Namespace) -> dict[str, object]:
     Only the four documented `security.*` scalars are read, so this is not a
     second copy of the configuration resolver; every other key stays the config
     resolver's business.
+
+    Returns the values and the `policy_source` string naming where they came
+    from, so a caller reviewing code it does not control can assert that the
+    policy it got is the one it asked for rather than the branch's own.
     """
     values: dict[str, object] = {}
-    if not args.no_config:
+    # Presence, never truthiness: `--policy-ref ""` must not fall through to the
+    # filesystem search. `read_policy_ref` rejects the empty value as a usage
+    # error, so an orchestrator that renders an unset spawn variable into the
+    # flag gets exit 2 instead of a scan governed by the branch's own config.
+    if args.policy_ref is not None:
+        # `--policy-ref` replaces the filesystem search outright. Consulting the
+        # work tree as well would re-admit the branch's own file through the
+        # merge, which is the whole hole this flag exists to close.
+        values, source = read_policy_ref(args.policy_ref)
+    elif not args.no_config:
         path = find_config(args.config)
         if path is not None:
             values.update(read_security_config(path))
+            source = f"file:{path}"
         elif args.config:
             raise InvalidInput(f"config file not found: {args.config}")
+        else:
+            source = "defaults"
+    else:
+        source = "defaults"
 
     if args.config_json:
         try:
@@ -751,7 +961,7 @@ def load_overrides(args: argparse.Namespace) -> dict[str, object]:
         values["allow_pattern"] = args.allow_pattern
     if args.max_file_size_mb is not None:
         values["max_file_size_mb"] = args.max_file_size_mb
-    return values
+    return values, source
 
 
 def build_rules(overrides: dict[str, object]) -> dict[str, object]:
@@ -905,10 +1115,16 @@ def _read_blob(
     came to be scanned in place of the bytes a commit was about to write.
     Stopping early *by decision* — a match, or a binary sniff — still counts as
     a successful read even though closing the pipe leaves git a non-zero status.
+
+    `--no-replace-objects` goes before `cat-file`, never after it: it is a git
+    top-level option, and as a `cat-file` option git rejects it outright. Without
+    it a `refs/replace` entry pointing the secret-bearing blob at a clean one
+    makes this read return the clean bytes, and the scan reports on a blob the
+    commit does not ship.
     """
     try:
         proc = subprocess.Popen(
-            ["git", "cat-file", "blob", oid],
+            ["git", "--no-replace-objects", "cat-file", "blob", oid],
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
         )
@@ -950,13 +1166,17 @@ def _blob_sizes(oids: list[str]) -> dict[str, int]:
     few dozen commits would otherwise spend more time forking `cat-file -s` than
     reading. A `missing` answer is fail-closed — an entry git listed but cannot
     size is an entry this scan cannot report on.
+
+    `--no-replace-objects` is passed as a top-level option for the reason given
+    in `_read_blob`: a replaced blob would otherwise be sized as its stand-in,
+    and an oversized artifact would pass the size rule on a smaller substitute.
     """
     wanted = sorted(set(oids))
     if not wanted:
         return {}
     try:
         proc = subprocess.run(
-            ["git", "cat-file", "--batch-check"],
+            ["git", "--no-replace-objects", "cat-file", "--batch-check"],
             input="\n".join(wanted) + "\n",
             capture_output=True,
             text=True,
@@ -1054,6 +1274,7 @@ def scan(
     base: str = "",
     strict: bool = False,
     emit_sources: bool = False,
+    policy_source: str = "defaults",
 ) -> dict[str, object]:
     """Apply every rule to every target and return the structured verdict.
 
@@ -1190,6 +1411,12 @@ def scan(
         "warnings": warnings,
         "scanned": scanned,
         "skipped": skipped,
+        # Where `security.*` came from: `ref:<REF>`, `file:<path>`, or
+        # `defaults`. A caller reviewing code it does not control asserts this
+        # is the ref it named — `scanned`/`skipped` say what was examined, and
+        # this says who decided. An allow pattern suppresses *scanning*, not
+        # findings, so a verdict is only as trustworthy as its policy's source.
+        "policy_source": policy_source,
         "branch": branch,
         "mode": "auto" if auto else "interactive",
         "confirm_required": bool(warnings) and not auto and not blocking,
@@ -1253,6 +1480,16 @@ def main(argv: list[str] | None = None) -> int:
         "--no-config", action="store_true", help="ignore any config file"
     )
     tuning.add_argument(
+        "--policy-ref",
+        metavar="REF",
+        help=(
+            f"read security.* from REF:{CONFIG_NAME} instead of the work tree. "
+            "For callers reviewing code they do not control: the checked-out "
+            "config is written by the branch under review and can allow-list "
+            "its own secrets. Reported as policy_source"
+        ),
+    )
+    tuning.add_argument(
         "--config-json",
         metavar="JSON",
         help=(
@@ -1290,11 +1527,29 @@ def main(argv: list[str] | None = None) -> int:
         sys.stderr.write("✗ gi-secscan: choose exactly one input source\n")
         return 2
 
+    # `--policy-ref` names *the* policy source. Silently merging a second one
+    # would let the branch's own file back in through the side door, and would
+    # make `policy_source` a claim the verdict does not support.
+    if args.policy_ref is not None and (
+        args.config or args.no_config or args.config_json
+    ):
+        sys.stderr.write(
+            "✗ gi-secscan: --policy-ref conflicts with --config/--no-config/"
+            "--config-json — choose one policy source\n"
+        )
+        return 2
+
     try:
-        rules = build_rules(load_overrides(args))
+        overrides, policy_source = load_overrides(args)
+        rules = build_rules(overrides)
         targets, base, strict = collect_targets(args)
         result = scan(
-            targets, rules, base, strict=strict, emit_sources=args.emit_sources
+            targets,
+            rules,
+            base,
+            strict=strict,
+            emit_sources=args.emit_sources,
+            policy_source=policy_source,
         )
     except UsageError as exc:
         sys.stderr.write(f"✗ gi-secscan: {exc}\n")

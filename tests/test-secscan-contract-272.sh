@@ -601,8 +601,12 @@ def _legacy_show(path, pattern, tap, sizes):
 '''
 
 BLOB_CALL = "reading = _read_blob(target.oid, secret_value, emit_sources, sizes)"
+# Carries `--no-replace-objects` since issue #274: it is a git TOP-LEVEL option,
+# so it sits before the subcommand, and this anchor tracks the line it is on.
+# Re-anchoring only — the mechanism this phase reverse-applies (universal
+# newlines rewriting a `\r` inside a filename) is unchanged.
 GIT_RUN = """        proc = subprocess.run(
-            ["git", *args],
+            ["git", "--no-replace-objects", *args],
             capture_output=True,
             check=False,
         )"""

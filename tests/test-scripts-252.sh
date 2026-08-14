@@ -1257,6 +1257,13 @@ ALLOWED = {
     "{type}": "one of six literals the skill classifies, never free text",
     "{secscan_script}": "absolute path bound by the orchestrating skill",
     "{security_convention}": "bundled doc path bound by the orchestrating skill",
+    # Issue #274. A ref name, never a config value and never author text: the
+    # resolver binds `origin/${base}` (this run's synced base, already blessed
+    # below) and pr-review binds `origin/<default-branch>` read from
+    # `gh repo view --json defaultBranchRef` — explicitly NOT the PR's
+    # author-chosen baseRefName. Same provenance class as `$base`: composed by
+    # the skill from what the repository reports about itself.
+    "{secscan_policy_ref}": "ref name the orchestrating skill reads from the repo",
     "{review.ci_poll_interval}": "gi-config validates it against an int default",
     "{review.ci_timeout}": "gi-config validates it against an int default",
     "{autopilot.quarantine_after}": "gi-config validates it against an int default",
