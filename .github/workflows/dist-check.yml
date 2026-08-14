@@ -181,6 +181,9 @@ jobs:
       - name: test-followup-context-285
         run: bash tests/test-followup-context-285.sh
 
+      - name: test-squash-binding-295
+        run: bash tests/test-squash-binding-295.sh
+
       - name: test-autopilot-state-257
         run: bash tests/test-autopilot-state-257.sh
 

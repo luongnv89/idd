@@ -118,6 +118,29 @@ When a human-authored PR (one not produced by `/issue-resolver`) is reviewed, th
 
 Acceptance-criteria checks still apply at full strength — they do not relax for human PRs. `Closes #{N}` checks also still apply at full strength — a human PR missing the issue link still fails traceability, **unless** the PR matches the refactor/chore exemption described below.
 
+## Summary — Squash-Merge Binding Defeated or Unverified
+
+Traceability check 4 reads the repo's squash-commit message source rather than assuming it (`references/verification-checks.md` → *Traceability checks*). When that read comes back as anything but `PR_BODY`, the PR body is complete but nothing will carry it into git history, so the dimension reports `partial` — a **repository** finding, not a PR defect:
+
+```
+    Standards axis (follows project conventions?):
+      traceability:        ⚠ partial — squash-merge binding defeated
+                             (squash_merge_commit_message: {value}); the durable
+                             record will not reach git history
+      maintainability:     ✓ pass
+
+  To fix (repo admin):
+    gh api -X PATCH repos/{owner}/{repo} -f squash_merge_commit_message=PR_BODY
+```
+
+When the read itself does not answer — no `gh`, unauthenticated, 404, insufficient permission, or the field is absent — the wording names the reason and the status is still `partial`, never `pass`:
+
+```
+      traceability:        ⚠ partial — squash-merge binding unverified ({reason})
+```
+
+Both lines are `note` findings: they are never handed to the fixer in Step 6, because no edit to this PR can change a repo setting. Under `review.soft_pass: true` (default) they are report-only; under `soft_pass: false` they block like any other partial dimension.
+
 ## Summary — Refactor/Chore Exempt PR
 
 Refactor or chore PRs (skill quality passes, dependency bumps, doc-only updates) are exempt from the `Closes #N` hard-fail when they match `review.traceability_exempt_labels` or `review.traceability_exempt_pattern`. Check 1 is skipped; checks 2-4 still run and report `partial` if absent.

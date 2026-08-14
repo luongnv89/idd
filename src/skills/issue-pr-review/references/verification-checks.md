@@ -77,7 +77,7 @@ Each `fail` criterion becomes a fixable issue in Step 6 with `category: acceptan
 
 > Run only when `review.require_traceability_check` is `true`. When `false`, skip this entire subsection and emit `○ traceability: pass — verification disabled (review.require_traceability_check: false)`.
 
-Per the dual-write rule (see *Analysis Artifacts and Durable Memory* in `docs/idd-methodology.md`), the durable analysis signal must survive the squash-merge into git history. Run the following four checks against the PR body and the commits in the PR:
+Per the dual-write rule (see *Analysis Artifacts and Durable Memory* in `docs/idd-methodology.md`), the durable analysis signal must survive the squash-merge into git history. Run the following four checks against the PR body, the commits in the PR, and the repo's merge configuration:
 
 1. **Issue link** — PR body contains `Closes #{N}`, `Fixes #{N}`, or `Resolves #{N}` for the linked issue. Detected with the same regex used by GitHub itself: `(?i)(close[sd]?|fix(e[sd])?|resolve[sd]?)\s+#\d+`. See *Refactor/chore exemption* below — the `Closes #N` requirement is relaxed for refactor/chore PRs (the other three checks still run).
 2. **Commit references issue** — at least one commit between base and head references the issue number:
@@ -86,20 +86,31 @@ Per the dual-write rule (see *Analysis Artifacts and Durable Memory* in `docs/id
    ```
    The reference may live in the subject or body. A reference inside a `Co-authored-by:` trailer does not count.
 3. **Durable analysis fields in PR body** — the PR body contains a `## Decision Record` section with the five stable labels (`Root cause`, `Options considered`, `Options rejected`, `Selected option`, `Residual risk`) and a `## Acceptance Criteria Verification` section (table or the explicit `No acceptance criteria defined` note). The labels are the contract — match them as exact strings, do not rewrite. For **bug** issues linked to the PR, the Decision Record MUST also include a **`Reproduction`** line (success or `not reproduced — …` degraded shape). Absence on a bug PR → `traceability: partial` with "Reproduction line missing on bug PR".
-4. **Squash-commit-body assumption** — under squash-merge (the project default per `docs/idd-methodology.md`), GitHub copies the PR body verbatim into the commit message. Treat passing check 3 as evidence the squash commit will carry the durable summary; no separate check is needed pre-merge. Note this assumption explicitly in the report so reviewers know what is and is not verified.
+4. **Squash-commit binding** — check 3 proves the durable record is in the PR body; only the platform's squash-commit *message source* decides whether it reaches git history. On GitHub that is the repo's `squash_merge_commit_message` setting, and its default (`COMMIT_MESSAGES`) writes the list of commit subjects, not the PR body. **Read it; never infer it from check 3 or from the merge strategy** — that inference is the defect this check replaced (issue #295):
+   ```bash
+   gh api repos/{owner}/{repo} --jq '{squash_merge_commit_title, squash_merge_commit_message}'
+   ```
+   This is the one catalogued read that uses the REST endpoint rather than `--json` field selection, because `gh repo view --json squashMergeCommitMessage` returns `Unknown JSON field` (`docs/platform-github.md` → *Operation catalog* → *Preflight*). Outcomes:
+   - `squash_merge_commit_message == PR_BODY` → the binding holds; check 4 passes and check 3's fields are the durable record.
+   - Any other value → the binding is **defeated**: report `partial`, name the observed value, and state that the record will stay on the tracker only.
+   - **A read that does not answer is not a pass.** If the call fails (no `gh`, unauthenticated, 404, insufficient permission) or the response carries no such field, report `partial — squash-merge binding unverified` with the reason. Never degrade to `pass`: asserting an unread binding is exactly the failure this check exists to catch.
+
+   Both non-`pass` outcomes are properties of the **repository**, not of the PR. They are `note` findings only — never emit them as `action: fix` findings, because no change to this PR can satisfy them and the remedy is a repo-settings mutation an unattended fixer must not make. Name the fix in the report for a human instead: `gh api -X PATCH repos/{owner}/{repo} -f squash_merge_commit_message=PR_BODY`.
 
 **Pass/partial/fail rule for the dimension:**
 
 | Outcome | Conditions | Status |
 |---------|-----------|--------|
-| All four checks pass | Closes #N + commit ref + Decision Record + AC Verification block all present | ✓ traceability: pass |
+| All four checks pass | Closes #N + commit ref + Decision Record + AC Verification block all present, **and** check 4 read `squash_merge_commit_message: PR_BODY` | ✓ traceability: pass |
+| Squash-merge binding defeated | checks 1-3 pass; check 4 read a `squash_merge_commit_message` other than `PR_BODY` | ⚠ traceability: partial — "squash-merge binding defeated (`squash_merge_commit_message: {value}`) — the durable record will not reach git history" |
+| Squash-merge binding unverified | check 4's read did not answer: no `gh`, unauthenticated, 404, insufficient permission, or the field is absent | ⚠ traceability: partial — "squash-merge binding unverified ({reason})" |
 | `Closes #{N}` absent on a refactor/chore-exempt PR | check 1 skipped via the *Refactor/chore exemption* below; checks 2-4 still run | ○ traceability: pass — exempt (refactor/chore PR; no Closes #N required), with any check 2-4 partial findings appended |
 | `Closes #{N}` absent | check 1 fails (regardless of other checks) | ✗ traceability: fail (blocking — see below) |
 | Decision Record absent on a human-authored PR | check 3 partially fails: PR was not produced by `/issue-resolver` and has no Decision Record | ⚠ traceability: partial — "PR not produced by `/issue-resolver`; Decision Record absent" |
 | Commit reference absent | check 2 fails but check 1 passes (PR body has Closes #N but no commit references the issue) | ⚠ traceability: partial — "no commit references #{N}" |
 | Acceptance Criteria Verification block absent on a `/issue-resolver` PR | check 3 fails on a PR that does include a Decision Record | ⚠ traceability: partial — "Acceptance Criteria Verification block missing" |
 
-When `review.soft_pass: true`, the `Closes #{N}` failure is the only traceability outcome that **blocks** the soft-pass; other partial outcomes are reported but do not block. When `review.soft_pass: false`, those partial outcomes are strict blockers too (but remain non-fixer `note` findings). This matches issue #36's contract: a PR missing `Closes #N` reports a traceability failure even if tests pass; a human-authored PR without a Decision Record reports `partial`, not `fail`.
+When `review.soft_pass: true`, the `Closes #{N}` failure is the only traceability outcome that **blocks** the soft-pass; other partial outcomes are reported but do not block. When `review.soft_pass: false`, those partial outcomes are strict blockers too (but remain non-fixer `note` findings). The two check-4 outcomes get **no exception** from that rule: under strict mode a defeated or unverified binding blocks, and it is meant to — a repo that has opted into strict review has said an unsatisfied convention is not shippable, and this one is unsatisfied at the repo level. The remedy is the one-line `gh api -X PATCH` in check 4, run by someone with admin rights; a repo that would rather not gate on it sets `review.soft_pass: true` (the default) or `review.require_traceability_check: false`. This matches issue #36's contract: a PR missing `Closes #N` reports a traceability failure even if tests pass; a human-authored PR without a Decision Record reports `partial`, not `fail`.
 
 When traceability fails on `Closes #{N}`, emit a fixable issue in Step 6 with `category: traceability`, `action: fix`, suggested fix: "Add `Closes #{linked_issue}` to the PR body." The fix string names `{linked_issue}` and not `{N}` on purpose. It is the one `{N}` in this file that is emitted into `findings_json` and handed to the fixer (`shared/agents/fixer.md`), which carries no copy of this procedure and reads the string as written; there `{N}` is the PR number, and check 1's `#\d+` accepts any number, so a rendered `Closes #<PR>` would silently false-pass the gate that emitted the finding.
 

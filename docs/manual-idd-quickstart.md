@@ -67,7 +67,7 @@ Types: `fix` `feat` `refactor` `docs` `test` `chore`. Descriptions imperative, l
 
 ## 3. Remember the reasoning (L3)
 
-Before merging, add a `## Decision Record` to the PR body — five bullet lines: **Root cause**, **Options considered**, **Options rejected**, **Selected option**, **Residual risk** (plus **Reproduction** for bugs). Then **squash-merge**: GitHub copies the PR body into the commit that lands on the default branch, so the reasoning survives in `git log -p` even if the tracker disappears.
+Before merging, add a `## Decision Record` to the PR body — five bullet lines: **Root cause**, **Options considered**, **Options rejected**, **Selected option**, **Residual risk** (plus **Reproduction** for bugs). Then **squash-merge**: GitHub copies the PR body into the commit that lands on the default branch, so the reasoning survives in `git log -p` even if the tracker disappears. That copy happens only when the repo's squash commit message is set to the PR body — check it once with `gh api repos/{owner}/{repo} --jq .squash_merge_commit_message` and fix it with `gh api -X PATCH repos/{owner}/{repo} -f squash_merge_commit_message=PR_BODY`, because GitHub's default (`COMMIT_MESSAGES`) writes the commit subjects instead and silently drops the record.
 
 **That's L3.** Six months from now, "why does this code exist?" is answered offline:
 
