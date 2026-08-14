@@ -119,10 +119,10 @@ Step 2 (Pre-pass) runs once before the loop; Steps 3-6 repeat up to `review.max_
 
 ### Step completion reports
 
-Each step closes with a completion report — `√`/`×` per check plus a `Result:
-PASS | PARTIAL | FAIL` line — so "step done" is checkable rather than asserted,
-and a step is not complete until its `Result:` line is printed. The per-step
-check names, the `Result` semantics, and the block format are in
+Each step closes with a completion report — `√`/`×` per check plus a
+`Result: PASS | PARTIAL | FAIL` line — so "step done" is checkable rather than
+asserted, and a step is not complete until its `Result:` line is printed. The
+per-step check names, `Result` semantics, and block format are in
 `references/report-templates.md` (*Step Completion Reports*) — **read it now**.
 
 ---
