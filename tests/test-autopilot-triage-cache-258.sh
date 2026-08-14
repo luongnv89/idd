@@ -289,13 +289,17 @@ check_has "$SRC_PERSIST" 'Exactly one appended .history' \
 check_has "$SRC_PERSIST" 'no field is added, none is removed' \
   "T3.15: the schema doc states that the schema itself is unchanged"
 check_block_has "$UPDATE_BLOCK" 'summary.circular_deps' \
-  "T3.19: Step 1.6 drops the resolved number from circular_deps"
-check_block_has "$UPDATE_BLOCK" 'last entry equals the first' \
-  "T3.19b: Step 1.6 retains only closed circular-dependency chains"
-check_block_has "$UPDATE_BLOCK" 'at least two distinct issue members' \
-  "T3.19c: Step 1.6 requires two distinct circular-dependency members"
-check_block_has "$UPDATE_BLOCK" '\[1,2,3,1\].*\[2,3\]' \
-  "T3.19d: Step 1.6 rejects a broken cycle after removing its first node"
+  "T3.19: Step 1.6 handles circular_deps incrementally"
+check_block_has "$UPDATE_BLOCK" 'Discard the entire .summary.circular_deps. chain when it contains the' \
+  "T3.19b: Step 1.6 discards a chain containing the resolved issue"
+check_block_has "$UPDATE_BLOCK" 'preserve unrelated valid closed cycles unchanged' \
+  "T3.19c: Step 1.6 preserves unrelated valid cycles"
+check_block_has "$UPDATE_BLOCK" 'middle node 2 from .\[1,2,3,1\].' \
+  "T3.19d: Step 1.6 covers removing a middle node"
+check_block_has "$UPDATE_BLOCK" 'resulting .\[1,3,1\].*not a recorded cycle' \
+  "T3.19e: Step 1.6 identifies the fabricated middle-node cycle"
+check_block_has "$UPDATE_BLOCK" 'discard the whole chain' \
+  "T3.19f: Step 1.6 discards the broken middle-node chain"
 check_block_has "$UPDATE_BLOCK" 'summary.co_dependent' \
   "T3.20: Step 1.6 drops the resolved number from co_dependent"
 check_block_has "$UPDATE_BLOCK" 'potentially_fixed_by.target_issue' \
@@ -1131,6 +1135,10 @@ check_block_has "$B_UPDATE_BLOCK" 'Two lists, two facts — never sync them' \
   "T13.45: built phases.md ships the two-list rule"
 check_block_has "$B_UPDATE_BLOCK" 'Under .--dry-run., compute the removal and print it, but write nothing' \
   "T13.46: built phases.md ships Step 1.6's dry-run rule"
+check_block_has "$B_UPDATE_BLOCK" 'Discard the entire .summary.circular_deps. chain when it contains the' \
+  "T13.47a: built phases.md discards cycles containing the resolved issue"
+check_block_has "$B_UPDATE_BLOCK" 'preserve unrelated valid closed cycles unchanged' \
+  "T13.47b: built phases.md preserves unrelated valid cycles"
 check_block_has "$B_STEP12_BLOCK" 'resume-seeded' \
   "T13.47: built phases.md ships the resume-seeded pick filter"
 check_has "$BUILT_CONFIG" 'reused by \*Step 1\.1a\*.s cache gate' \

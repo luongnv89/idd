@@ -115,7 +115,7 @@ Every checkpoint below is the same two steps: write the patch object with the
 never put one on a command line), then merge it:
 
 ```bash
-python3 references/scripts/gi-state.py --update < .gitissue/cache/state-patch.json
+python3 references/scripts/gi-state.py --update --pid "$PPID" < .gitissue/cache/state-patch.json
 ```
 
 `current` merges key-by-key (an explicit `null` clears it); `lanes` merges
@@ -1932,14 +1932,13 @@ Write tool:
    consumer reads these directly.
 4. Drop it from every remaining issue's `blocked_by` and from every remaining
    issue's `blocks`.
-5. Remove it from every `summary.circular_deps` chain and every
-   `summary.co_dependent` pair. For each circular-dependency chain, retain it
-   only when the removal leaves a closed chain whose last entry equals the first
-   and it has at least two distinct issue members; for example,
-   `[1,2,3,1]` becomes `[2,3]` after resolving issue 1 and is discarded because
-   it is no longer a cycle. Drop every other chain, and drop any pair with
-   fewer than two distinct members — a one-node cycle or a one-issue pair is
-   not a report.
+5. Discard the entire `summary.circular_deps` chain when it contains the
+   resolved number; preserve unrelated valid closed cycles unchanged. Do not
+   remove the resolved number from a chain and then accept the result: resolving
+   middle node 2 from `[1,2,3,1]` must discard the whole chain, because the
+   resulting `[1,3,1]` is not a recorded cycle. For every
+   `summary.co_dependent` pair, drop the resolved member and retain only pairs
+   with at least two distinct members — a one-issue pair is not a report.
 6. If a remaining issue's `potentially_fixed_by.target_issue` is the resolved
    number, set that `potentially_fixed_by` to `null`. Reporting data only;
    nothing here feeds the pick.

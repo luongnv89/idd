@@ -239,6 +239,51 @@ else
   fail "AC1: a checkpoint left $leftovers temp file(s) behind"
 fi
 
+# A checkpoint heartbeat must be authorized by the durable owner pid, not just
+# by a matching run id. This is sequential coverage of the flock-serialized
+# update path, not a raw-writer race test.
+D1HB="$(new_dir d1-heartbeat)"
+printf '%s' '{"run_id":"runHeartbeat"}' | python3 "$STATE" --init --dir "$D1HB" >/dev/null
+write_heartbeat_lock() {
+  python3 - "$1" <<'PY'
+import json, socket, sys
+json.dump({
+    "run_id": "runHeartbeat",
+    "pid": 4242,
+    "host": socket.gethostname(),
+    "started_at": "2000-01-01T00:00:00Z",
+    "heartbeat": "2000-01-01T00:00:00Z",
+}, open(sys.argv[1], "w", encoding="utf-8"))
+PY
+}
+write_heartbeat_lock "$D1HB/run.lock"
+heartbeat_before="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["heartbeat"])' "$D1HB/run.lock")"
+run_status out st bash -c "printf '%s' '{\"phase\":\"checkpoint\"}' | python3 '$STATE' --update --dir '$D1HB'"
+heartbeat_after="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["heartbeat"])' "$D1HB/run.lock")"
+if [ "$st" = "0" ] && [ "$heartbeat_after" = "$heartbeat_before" ]; then
+  pass "AC3: update without --pid does not refresh a same-run-id foreign lock"
+else
+  fail "AC3: update without --pid refreshed a foreign lock (exit $st)"
+fi
+write_heartbeat_lock "$D1HB/run.lock"
+heartbeat_before="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["heartbeat"])' "$D1HB/run.lock")"
+run_status out st bash -c "printf '%s' '{\"phase\":\"checkpoint\"}' | python3 '$STATE' --update --dir '$D1HB' --pid 4243"
+heartbeat_after="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["heartbeat"])' "$D1HB/run.lock")"
+if [ "$st" = "0" ] && [ "$heartbeat_after" = "$heartbeat_before" ]; then
+  pass "AC3: update with a different pid does not refresh a same-run-id foreign lock"
+else
+  fail "AC3: update with a different pid refreshed a foreign lock (exit $st)"
+fi
+write_heartbeat_lock "$D1HB/run.lock"
+heartbeat_before="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["heartbeat"])' "$D1HB/run.lock")"
+run_status out st bash -c "printf '%s' '{\"phase\":\"checkpoint\"}' | python3 '$STATE' --update --dir '$D1HB' --pid 4242"
+heartbeat_after="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["heartbeat"])' "$D1HB/run.lock")"
+if [ "$st" = "0" ] && [ "$heartbeat_after" != "$heartbeat_before" ]; then
+  pass "AC3: update with the correct owner pid refreshes the lock heartbeat"
+else
+  fail "AC3: update with the correct owner pid did not refresh the lock (exit $st)"
+fi
+
 # Issue #260 extends the same atomic state with durable resolver lanes. Entries
 # merge by issue so one returning worker cannot erase a still-active sibling.
 LANES='{"phase":"resolve","lanes":[{"issue":50,"branch":"feat/50-a","phase":"resolve"},{"issue":51,"branch":"fix/51-b","phase":"planned"}]}'

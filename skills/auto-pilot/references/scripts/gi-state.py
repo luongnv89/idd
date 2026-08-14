@@ -877,7 +877,7 @@ def run_update(args, paths) -> int:
         _emit({"dry_run": True, "would_write": str(paths["state"]), "state": merged})
         return 0
     _atomic_write(paths["state"], _render_json(merged))
-    _touch_lock_heartbeat(paths["lock"], merged.get("run_id"))
+    _touch_lock_heartbeat(paths["lock"], merged.get("run_id"), pid=args.pid)
     _emit(merged)
     return 0
 
@@ -892,21 +892,22 @@ def _touch_lock_heartbeat(
     """Refresh this run's lock timestamp so a long run never ages itself out.
 
     Best-effort by design: a missing or foreign lock is left alone, and a write
-    failure here is not worth failing a checkpoint that already succeeded.
-    When `pid` is given the write also requires ownership on this host, so a
-    `--lock --force` that published a new lock with the same run id is not
-    overwritten by a stale heartbeat. The identity is compared again immediately
-    before publishing while the stable directory guard is held, so a replacement
-    cannot be overwritten by this stale heartbeat.
+    failure here is not worth failing a checkpoint that already succeeded. A
+    valid owner pid is required; without one the heartbeat is a no-op. The write
+    also requires ownership on this host, so a `--lock --force` that published a
+    new lock with the same run id is not overwritten by a stale heartbeat. The
+    identity is compared again immediately before publishing while the stable
+    directory guard is held, so a replacement cannot be overwritten by this
+    stale heartbeat.
     """
+    if not _pid_known(pid):
+        return
+
     def refresh() -> None:
         parsed, error = _read_json_file(lock_path)
         if error is not None or not isinstance(parsed, dict):
             return
-        if pid is None:
-            if parsed.get("run_id") != run_id:
-                return
-        elif not _owns_lock(parsed, run_id, pid):
+        if not _owns_lock(parsed, run_id, pid):
             return
         observed = _lock_identity(parsed)
         current, current_error = _read_json_file(lock_path)
