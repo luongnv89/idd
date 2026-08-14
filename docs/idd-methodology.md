@@ -318,7 +318,8 @@ The memory story is only half-done at write time — the payoff is retrieval, an
 # Every commit that touched issue #42
 git log --oneline --grep "(#42)"
 
-# The full story of #42's resolution — the squash commit body carries the
+# The full story of #42's resolution — with squash_merge_commit_message=PR_BODY,
+# the squash commit body carries the
 # PR body: Summary, Decision Record, acceptance verification
 git log -p --grep "Closes #42" --format=fuller
 

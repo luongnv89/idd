@@ -126,7 +126,7 @@ Traceability check 4 reads the repo's squash-commit message source rather than a
     Standards axis (follows project conventions?):
       traceability:        ⚠ partial — squash-merge binding defeated
                              (squash_merge_commit_message: {value}); the durable
-                             record will not reach git history
+                             record will not reach git history via B1
       maintainability:     ✓ pass
 
   To fix (repo admin):
@@ -158,7 +158,7 @@ Refactor or chore PRs (skill quality passes, dependency bumps, doc-only updates)
 
 The `acceptance_criteria` line above shows the common case for refactor/chore PRs (no linked issue, so no AC defined). When a refactor PR does have a linked issue with acceptance criteria, those criteria still verify normally — the refactor exemption relaxes only check 1 of traceability, never AC. The "verification disabled" wording appears only when `review.require_acceptance_criteria_check: false` is explicitly set.
 
-When checks 2-4 produce partial findings on an exempt PR, append them inline:
+When checks 2-3 produce partial findings on an exempt PR, append them inline (check 4 is not appended — a non-`pass` check 4 holds the dimension at `partial`, as above):
 
 ```
     traceability:        ○ pass — exempt (refactor/chore PR; no Closes #N required);

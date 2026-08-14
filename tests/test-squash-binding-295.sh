@@ -152,9 +152,12 @@ expect_grep "T2: check 4 is not swallowed by the refactor/chore exemption" \
 expect_grep "T2: the exempt outcome row says so too" \
   'not exempt-able and holds the dimension at' "$VERIFICATION_CHECKS"
 
-# Check 4 tests B1. A repo that declared B2 or B3 is not defeated by a
-# non-PR_BODY value, so it must not collect a permanent, factually wrong partial.
-expect_grep "T2: a declared B2/B3 binding is not reported as defeated" \
+# Check 4 can only test B1. A repo keeping durable memory through B2 or B3 is
+# not defeated by a non-PR_BODY value, so the finding must be scoped to B1
+# rather than claiming the record reaches git history by no route at all.
+expect_grep "T2: the defeated finding is scoped to the B1 binding" \
+  'will not reach git history \*?via B1' "$VERIFICATION_CHECKS" "$PR_REVIEW_TEMPLATES"
+expect_grep "T2: B2/B3 repos are named as out of this check's reach" \
   'B2 \(merge-commit body\) or B3 \(git notes\)' "$VERIFICATION_CHECKS"
 
 # ───────────────────────────────────────────────────────────
@@ -192,8 +195,8 @@ expect_fixed "T3: pipeline-steps conditions its durable-memory claim" \
   "$SETTING" "$SRC/skills/issue-resolver/references/pipeline-steps.md"
 expect_fixed "T3: README stops inferring the binding from the strategy alone" \
   "$SETTING" "$REPO_ROOT/README.md"
-expect_fixed "T3: ARCHITECTURE's dual-write item names the setting" \
-  "$SETTING" "$DOCS/ARCHITECTURE.md"
+expect_grep "T3: ARCHITECTURE's dual-write principle names the setting" \
+  'via squash merge, where .?'"$SETTING" "$DOCS/ARCHITECTURE.md"
 
 # SPEC.md is the normative source the methodology doc cites; leaving it
 # unconditional would leave the authority wrong.
