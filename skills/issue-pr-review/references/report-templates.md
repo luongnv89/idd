@@ -120,7 +120,7 @@ Acceptance-criteria checks still apply at full strength — they do not relax fo
 
 ## Summary — Squash-Merge Binding Defeated or Unverified
 
-Traceability check 4 reads the repo's squash-commit message source rather than assuming it (`references/verification-checks.md` → *Traceability checks*). When that read comes back as anything but `PR_BODY`, the PR body is complete but nothing will carry it into git history, so the dimension reports `partial` — a **repository** finding, not a PR defect:
+Traceability check 4 reads the repo's squash-commit message source rather than assuming it (`references/verification-checks.md` → *Traceability checks*). When that read comes back as anything but `PR_BODY`, the PR body is complete but the durable record will not reach git history via B1, so the dimension reports `partial` — a **repository** finding, not a PR defect:
 
 ```
     Standards axis (follows project conventions?):

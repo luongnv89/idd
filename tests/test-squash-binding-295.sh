@@ -151,6 +151,10 @@ expect_grep "T2: check 4 is not swallowed by the refactor/chore exemption" \
   "$VERIFICATION_CHECKS"
 expect_grep "T2: the exempt outcome row says so too" \
   'not exempt-able and holds the dimension at' "$VERIFICATION_CHECKS"
+refute_fixed "T2: no leftover rule appending check 4 to an exempt pass" \
+  "checks 2-4 produce partial findings on an exempt PR" "$VERIFICATION_CHECKS"
+refute_fixed "T2: no leftover unscoped 'nothing will carry it into git history'" \
+  "nothing will carry it into git history" "$PR_REVIEW_TEMPLATES"
 
 # Check 4 can only test B1. A repo keeping durable memory through B2 or B3 is
 # not defeated by a non-PR_BODY value, so the finding must be scoped to B1

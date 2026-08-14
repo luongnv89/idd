@@ -129,7 +129,7 @@ Report wording:
 traceability:        ○ pass — exempt (refactor/chore PR; no Closes #N required)
 ```
 
-If checks 2-4 produce partial findings on an exempt PR, append them as in the human-authored case:
+If checks 2-3 produce partial findings on an exempt PR, append them as in the human-authored case (check 4 is not appended — a non-`pass` check 4 holds the dimension at `partial`):
 
 ```
 traceability:        ○ pass — exempt (refactor/chore PR; no Closes #N required);
