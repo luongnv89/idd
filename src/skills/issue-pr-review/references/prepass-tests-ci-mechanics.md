@@ -36,7 +36,21 @@ npm test          # or pytest, go test ./..., cargo test, etc.
 
 ### Commit auto-fixes
 
-**Not used in `--review-only`.** Run the pre-commit security scan first — `python3 references/scripts/gi-secscan.py --working-tree --policy-ref "origin/${base}"`, run from the repo root so it reads the `security.*` extensions from `.gitissue.yml` itself (never pass a config value on the command line — this skill has a PR's branch checked out).
+**Not used in `--review-only`.** Run the pre-commit security scan first, binding
+`base` **first** and in the same shell as the scan:
+
+```bash
+base="$(gh repo view --json defaultBranchRef --jq .defaultBranchRef.name)"
+python3 references/scripts/gi-secscan.py --working-tree --policy-ref "origin/${base}"
+```
+
+The order is the gate: with `base` unset the ref expands to `origin/`, which does
+not resolve, so the script exits 4 and this gate degrades to the prose Primary
+Pattern on every run. Take `base` from the **repository's default branch**, never
+from the PR's `baseRefName`, which its author chose. Run the scan from the repo
+root so it reads the `security.*` extensions from `.gitissue.yml` itself (never
+pass a config value on the command line — this skill has a PR's branch checked
+out).
 
 #### Reading the verdict — the four-part pass condition
 
@@ -46,10 +60,9 @@ own review. `security.allow_pattern` suppresses **scanning**, not findings: a
 branch committing `allow_pattern: "."` makes every path skip before any rule
 fires, and the scan reports `verdict: clean` with `scanned: 0`. `--policy-ref`
 moves the policy to a ref the branch cannot write; `policy_source` reports which
-one was actually used. Bind `base` separately —
-`base="$(gh repo view --json defaultBranchRef --jq .defaultBranchRef.name)"` —
-and use the **repository's default branch**, never the PR's `baseRefName`, which
-its author chose.
+one was actually used. `base` is bound above, in the same shell as the scan, and
+always from the **repository's default branch** — never the PR's `baseRefName`,
+which its author chose.
 
 Treat exit 0 as a pass only when **all four** hold:
 
