@@ -260,29 +260,29 @@ export `IDD_AUTO_MODE=1` first so warnings are logged rather than needing
 confirmation. Run:
 
 ```bash
+base="$(gh repo view --json defaultBranchRef --jq .defaultBranchRef.name)"
 python3 references/scripts/gi-secscan.py --working-tree --policy-ref "origin/${base}"
 ```
 
-Run it from the repo root, and **never interpolate a config value into this
-command** — the script reads `security.allow_pattern` and its siblings itself.
-`--policy-ref` is the trust boundary: this skill has the PR's branch checked out,
-so that branch's own `.gitissue.yml` would otherwise govern its own review, and
-`allow_pattern: "."` skips every path so the gate reports clean having scanned
-nothing. Bind `base` from `gh repo view --json defaultBranchRef --jq
-.defaultBranchRef.name` — never the PR's author-chosen `baseRefName`.
+Run it from the repo root; the script reads `security.allow_pattern` and its
+siblings itself, so **never interpolate a config value into this command**.
+`--policy-ref` is the trust boundary — this skill has the PR's branch checked
+out, so without it that branch's own `.gitissue.yml` governs its review, and
+`allow_pattern: "."` reports clean having scanned nothing. Bind `base` **first**
+from the repository's default branch, never the PR's `baseRefName`: unset makes
+the ref `origin/`, and exit 4 then degrades this gate on every run.
 
 **A pass is all four: exit 0, `policy_source` exactly the `ref:origin/…` asked
 for, `verdict` not `block`, and not (`scanned` 0 with `skipped` above 0)** — full
 procedure in `references/prepass-tests-ci-mechanics.md`. **Exit 1 is the block
-verdict: stop, do not stage, do not push, report the path from `blocking[]`.** It
-is not the degrade path — falling through to another scan after a real secret is
+verdict: stop, do not stage, do not push, report the path from `blocking[]`** —
+never the degrade path: falling through to another scan after a real secret is
 what this gate exists to prevent. Exit 3 (an uncompilable `security.*` regex) is
 also a stop. A missing `python3`, **exit 2** (the path did not resolve, or the
-invocation was malformed — a scan that never ran, never a pass), or exit 4
-degrades: print `⚠ gi-secscan unavailable — running the documented scan` and run
-the **Primary Pattern** in `references/docs/pre-commit-security.md` against the working tree.
-Exit 1 with no parsable JSON is a crash, not a verdict — treat it as exit 2.
-Never treat any non-zero exit as a pass.
+invocation was malformed — a scan that never ran), or exit 4 degrades: print
+`⚠ gi-secscan unavailable — running the documented scan` and run the **Primary
+Pattern** in `references/docs/pre-commit-security.md` instead. Exit 1 without parsable JSON
+is a crash: treat it as exit 2, and never read a non-zero exit as a pass.
 
 Only after the scan passes (or warnings are accepted), commit and push (`git add
 -A` → `git commit -m "style: auto-fix lint and format issues"` → `git push

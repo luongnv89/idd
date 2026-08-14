@@ -202,6 +202,48 @@ emit(
     and str(verdict.get("policy_source", "")).startswith("file:"),
     "A7: policy_source is 'file:<path>' on the unchanged default path",
 )
+
+# A8: presence, not truthiness. An empty value must be a usage error, never a
+# silent fall-through to the work tree — an orchestrator rendering an unset
+# spawn variable into the flag would otherwise re-open the exact #274 hole.
+code, verdict = run(["--range", "main", "--policy-ref", ""], repo)
+emit(
+    code == 2,
+    f"A8: an empty --policy-ref is a usage error, not a fall-back to the "
+    f"branch's own config (exit {code}, expected 2)",
+)
+
+# A9: a value starting with `-` reaches git in an option position. Same guard
+# `--range` already carries; argv injection does not need a shell.
+code, _ = run(["--range", "main", "--policy-ref=-p"], repo)
+emit(code == 2, f"A9: --policy-ref rejects an option-shaped revision (exit {code})")
+shutil.rmtree(repo, ignore_errors=True)
+
+# A10: the trusted ref carries `.gitissue.yml` as a TREE, not a blob. "Exists
+# but unreadable" must be exit 4 like every other byte source in this script —
+# collapsing it into "the ref has no config" would silently drop the trusted
+# ref's real security.* (its extra secret patterns included) while the verdict
+# still claimed policy_source: ref:<REF>.
+repo = tempfile.mkdtemp()
+git(["init", "-q", "-b", "main", "."], repo)
+git(["config", "user.email", "t@example.invalid"], repo)
+git(["config", "user.name", "t"], repo)
+os.makedirs(os.path.join(repo, ".gitissue.yml"))
+with open(os.path.join(repo, ".gitissue.yml", "inner"), "wb") as handle:
+    handle.write(b"x\n")
+git(["add", "-A"], repo)
+git(["commit", "-qm", "base"], repo)
+git(["checkout", "-q", "-b", "feature"], repo)
+with open(os.path.join(repo, "leak.txt"), "wb") as handle:
+    handle.write(SECRET)
+git(["add", "-A"], repo)
+git(["commit", "-qm", "work"], repo)
+code, _ = run(["--range", "main", "--policy-ref", "main"], repo)
+emit(
+    code == 4,
+    "A10: a .gitissue.yml that exists as a tree is exit 4, not a silent "
+    f"defaults answer (exit {code}, expected 4)",
+)
 shutil.rmtree(repo, ignore_errors=True)
 
 
@@ -333,6 +375,32 @@ emit(
     f"branch's own config governs its review again (exit {code})",
 )
 shutil.rmtree(repo, ignore_errors=True)
+
+# C3: revert the presence test to a truthiness test. A8 must then stop being a
+# usage error and become a scan governed by the branch's own config — the #274
+# defect reached by supplying nothing rather than by supplying a ref.
+TRUTHY_ANCHOR = "    if args.policy_ref is not None:"
+emit(
+    TRUTHY_ANCHOR in source,
+    "C3: the presence test is present to reverse-apply",
+)
+reverted = os.path.join(SCRATCH, "policy_truthy.py")
+with open(reverted, "w", encoding="utf-8") as handle:
+    handle.write(
+        source.replace(TRUTHY_ANCHOR, "    if args.policy_ref:").replace(
+            "    if args.policy_ref is not None and (", "    if args.policy_ref and ("
+        )
+    )
+repo = build_repo(".")
+code, verdict = run(["--range", "main", "--policy-ref", ""], repo, script=reverted)
+emit(
+    code == 0
+    and verdict["verdict"] == "clean"
+    and str(verdict["policy_source"]).startswith("file:"),
+    "C3: reverse-applying the presence test makes A8 fail — an empty ref falls "
+    f"back to the branch's own config (exit {code})",
+)
+shutil.rmtree(repo, ignore_errors=True)
 shutil.rmtree(SCRATCH, ignore_errors=True)
 
 
@@ -365,6 +433,16 @@ CALLERS = {
         "scanned",
         "skipped",
     ],
+    # The implementer runs the gate per commit on a branch it built from an
+    # untrusted issue body. `pipeline-steps.md` binds `secscan_policy_ref` for
+    # it, so the agent must actually consume the variable — a binding with no
+    # consumer reads as protection that is not there.
+    os.path.join("src", "shared", "agents", "implementer.md"): [
+        "secscan_policy_ref",
+        "policy_source",
+        "scanned",
+        "skipped",
+    ],
     os.path.join("docs", "pre-commit-security.md"): [
         "--policy-ref",
         "policy_source",
@@ -383,20 +461,38 @@ for rel, needles in CALLERS.items():
 
 # The two orchestrators must BIND the fixer's ref, or the agent variable is
 # never set and the agent silently takes the unprotected path.
+# Proximity, not mere presence. Each of these files enumerates the spawn
+# variables an agent receives; `secscan_script` is the anchor that marks the
+# enumeration. A `secscan_policy_ref` mention anywhere else in the file — a
+# rationale paragraph, a changelog-style note — would satisfy a bare substring
+# check while the variable is never actually bound, and the agent would take
+# the unprotected path with the prose in `fixer.md`/`implementer.md`
+# unreachable. Requiring the two within one window ties the mention to the
+# binding site. `pipeline-steps.md` binds at two spawn sites (fixer and
+# implementer), so `expected` records how many windows must contain both.
 BINDERS = {
     os.path.join(
         "src", "skills", "issue-pr-review", "references", "review-loop-mechanics.md"
-    ): "secscan_policy_ref",
+    ): 1,
     os.path.join(
         "src", "skills", "issue-resolver", "references", "pipeline-steps.md"
-    ): "secscan_policy_ref",
-    os.path.join("src", "skills", "issue-resolver", "SKILL.source.md"): (
-        "secscan_policy_ref"
-    ),
+    ): 2,
+    os.path.join("src", "skills", "issue-resolver", "SKILL.source.md"): 1,
 }
-for rel, needle in BINDERS.items():
+WINDOW = 1200
+for rel, expected in BINDERS.items():
     text = open(os.path.join(ROOT, rel), encoding="utf-8").read()
-    emit(needle in text, f"D: {rel} binds {needle} for the fixer subagent")
+    paired = 0
+    start = text.find("secscan_script")
+    while start != -1:
+        if "secscan_policy_ref" in text[start : start + WINDOW]:
+            paired += 1
+        start = text.find("secscan_script", start + 1)
+    emit(
+        paired >= expected,
+        f"D: {rel} binds secscan_policy_ref beside secscan_script at "
+        f"{expected} spawn site(s) (found {paired})",
+    )
 
 print("\n".join(OUT))
 PY

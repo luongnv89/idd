@@ -755,7 +755,45 @@ def read_policy_ref(ref: str) -> tuple[dict[str, object], str]:
     (exit 4, the documented degrade), because a policy that could not be read is
     not a policy that permitted anything.
     """
+    if not ref:
+        # An empty value is a malformed invocation, not an opt-out. Treating it
+        # as "no policy ref" would send the scan back to the work tree — the
+        # branch's own file — which is the entire defect this flag exists to
+        # close, reached by supplying nothing rather than by supplying a ref.
+        raise UsageError("--policy-ref value must not be empty")
+    if ref.startswith("-"):
+        # `f"{ref}:{CONFIG_NAME}"` would otherwise hand git an option instead of
+        # a revision. Same rule as `--range` — no shell is involved, but argv
+        # injection is still injection.
+        raise UsageError(f"--policy-ref value must be a revision, not an option: {ref!r}")
     spec = f"{ref}:{CONFIG_NAME}"
+    # Ask whether a blob exists at that path *before* reading it, so the two
+    # non-zero outcomes below stay distinguishable. Without this probe every
+    # failure to read collapses into "the ref has no config": a `.gitissue.yml`
+    # that is a tree, a blobless or shallow clone that has the commit but not
+    # the blob, and a corrupt object would each silently drop the trusted ref's
+    # real `security.*` — including its extra secret patterns — while the
+    # verdict still claimed `policy_source: ref:<REF>`.
+    try:
+        present = subprocess.run(
+            ["git", "--no-replace-objects", "rev-parse", "--verify", "--quiet", spec],
+            capture_output=True,
+            check=False,
+        ).returncode == 0
+    except OSError as exc:
+        raise Unavailable(f"cannot read {spec} — {exc}") from exc
+    if not present:
+        # Either the ref itself is absent — exit 4, because a policy that could
+        # not be read permitted nothing — or it resolves and simply ships no
+        # config, which is the built-in defaults and never the work-tree file.
+        try:
+            _git(["rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}"])
+        except Unavailable as exc:
+            raise Unavailable(
+                f"--policy-ref {ref} does not resolve — the reviewing side's "
+                "policy could not be read, so nothing was scanned under it"
+            ) from exc
+        return {}, f"ref:{ref}"
     try:
         proc = subprocess.run(
             ["git", "--no-replace-objects", "cat-file", "blob", spec],
@@ -765,16 +803,12 @@ def read_policy_ref(ref: str) -> tuple[dict[str, object], str]:
     except OSError as exc:
         raise Unavailable(f"cannot read {spec} — {exc}") from exc
     if proc.returncode != 0:
-        # Distinguish "the ref is fine, it just has no config" from "the ref is
-        # not there". Only the first is a defaults answer; the second is exit 4.
-        try:
-            _git(["rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}"])
-        except Unavailable as exc:
-            raise Unavailable(
-                f"--policy-ref {ref} does not resolve — the reviewing side's "
-                "policy could not be read, so nothing was scanned under it"
-            ) from exc
-        return {}, f"ref:{ref}"
+        # The path names a blob that cannot be read. Every other byte source in
+        # this script fails closed here rather than substituting something else.
+        raise Unavailable(
+            f"{spec} exists but could not be read — the reviewing side's policy "
+            "was never applied"
+        )
     text = proc.stdout.decode("utf-8", errors="replace")
     return parse_security_config(text), f"ref:{ref}"
 
@@ -801,7 +835,11 @@ def load_overrides(args: argparse.Namespace) -> tuple[dict[str, object], str]:
     policy it got is the one it asked for rather than the branch's own.
     """
     values: dict[str, object] = {}
-    if args.policy_ref:
+    # Presence, never truthiness: `--policy-ref ""` must not fall through to the
+    # filesystem search. `read_policy_ref` rejects the empty value as a usage
+    # error, so an orchestrator that renders an unset spawn variable into the
+    # flag gets exit 2 instead of a scan governed by the branch's own config.
+    if args.policy_ref is not None:
         # `--policy-ref` replaces the filesystem search outright. Consulting the
         # work tree as well would re-admit the branch's own file through the
         # merge, which is the whole hole this flag exists to close.
@@ -1421,7 +1459,9 @@ def main(argv: list[str] | None = None) -> int:
     # `--policy-ref` names *the* policy source. Silently merging a second one
     # would let the branch's own file back in through the side door, and would
     # make `policy_source` a claim the verdict does not support.
-    if args.policy_ref and (args.config or args.no_config or args.config_json):
+    if args.policy_ref is not None and (
+        args.config or args.no_config or args.config_json
+    ):
         sys.stderr.write(
             "✗ gi-secscan: --policy-ref conflicts with --config/--no-config/"
             "--config-json — choose one policy source\n"

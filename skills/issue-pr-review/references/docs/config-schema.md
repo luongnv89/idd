@@ -176,8 +176,10 @@ security:
   # Example: "^tests/fixtures/"
   # Suppresses SCANNING, not findings: a matching path reaches no rule at all.
   # This file is repo-controlled, so a skill reviewing a branch it does not
-  # control reads security.* from a trusted ref instead (--policy-ref) and
-  # ignores this value. Editing it cannot weaken the review of your own PR.
+  # control passes --policy-ref to read security.* from a trusted ref, and then
+  # ignores this value. That protection is opt-in and travels with the call
+  # site: a review that asserts policy_source cannot be weakened by editing
+  # this key, while any caller that omits --policy-ref still honours it.
   allow_pattern: ""
   # Type: integer. Default: 10. Minimum: 1. Warn (never block) above this MB.
   max_file_size_mb: 10
