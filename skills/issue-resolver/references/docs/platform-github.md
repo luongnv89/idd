@@ -25,7 +25,7 @@ IDD skills reach the issue tracker through a **platform driver** — the workflo
 | Squash-commit message source | `gh api repos/{owner}/{repo} --jq '{squash_merge_commit_title, squash_merge_commit_message}'` |
 | Caller's permission | `gh repo view --json viewerPermission` |
 
-That row goes through `gh api` rather than `--json` field selection — the second such read, after rule 4's rate-limit call — because `gh repo view --json squashMergeCommitMessage` returns `Unknown JSON field`. Rule 1 still holds: `gh api --jq` selects named fields from JSON and never parses text. It is **not** interchangeable with the strategy row above: that answers *is squash allowed*, this *does the squash commit carry the PR body* (`PR_BODY`) or the commit subjects (`COMMIT_MESSAGES`, the default). Only the second decides whether B1 lands; reading one and reporting the other is issue #295.
+REST, not `--json`: `gh repo view --json squashMergeCommitMessage` answers `Unknown JSON field`. It is **not** interchangeable with the strategy row above — that answers *is squash allowed*, this whether the squash commit carries the PR body (`PR_BODY`) or the commit subjects (`COMMIT_MESSAGES`, the default); only this one decides whether B1 lands (#295). Writing `PR_BODY` requires title source `PR_TITLE`.
 
 ### Issues
 

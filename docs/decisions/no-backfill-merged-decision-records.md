@@ -15,12 +15,13 @@ the default branch. This repo declares binding **B1 — squash-merge body**
 commit that lands on `main`.
 
 That copy is conditional on a per-repo GitHub setting nothing in this project
-read until #295: `squash_merge_commit_message`. This repo's value has been
-`COMMIT_MESSAGES` — GitHub's default — for its whole history, so every squash
-commit on `main` carries the list of commit subjects instead of the PR body:
+read until #295: `squash_merge_commit_message`. This repo's value was
+`COMMIT_MESSAGES` — GitHub's default — for its whole history up to 2026-08-15,
+so every squash commit that landed on `main` before that date carries the list
+of commit subjects instead of the PR body:
 
 ```console
-$ gh api repos/luongnv89/idd --jq .squash_merge_commit_message
+$ gh api repos/luongnv89/idd --jq .squash_merge_commit_message   # before 2026-08-15
 COMMIT_MESSAGES
 
 $ git log -1 --format='%B' 5eb1cfb
@@ -30,9 +31,16 @@ refactor(context): define freshness boundaries (#285) (#294)
 * fix(context): address review feedback (#285)
 ```
 
-The reasoning is not lost — it is intact in each PR body on GitHub — but the
-git-history half of the dual write has never landed. The question this ADR
-answers is what to do about the commits that already merged.
+The binding was repaired on **2026-08-15** under [#305](https://github.com/luongnv89/idd/issues/305):
+the repo now sets `squash_merge_commit_title=PR_TITLE` **and**
+`squash_merge_commit_message=PR_BODY` — both, because GitHub pairs `PR_BODY`
+only with `PR_TITLE` and rejects the message on its own with HTTP 422. Commits
+landing from that date forward carry the PR body.
+
+The reasoning in the earlier commits is not lost — it is intact in each PR body
+on GitHub — but for them the git-history half of the dual write never landed.
+The question this ADR answers is what to do about those already-merged commits;
+the repair above is what makes their set final rather than still growing.
 
 ## Decision
 

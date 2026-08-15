@@ -130,8 +130,10 @@ Traceability check 4 reads the repo's squash-commit message source rather than a
       maintainability:     ✓ pass
 
   To fix (repo admin):
-    gh api -X PATCH repos/{owner}/{repo} -f squash_merge_commit_message=PR_BODY
+    gh api -X PATCH repos/{owner}/{repo} -f squash_merge_commit_title=PR_TITLE -f squash_merge_commit_message=PR_BODY
 ```
+
+Both flags are required: GitHub pairs `PR_BODY` only with `PR_TITLE`, so a PATCH naming the message alone against the default `COMMIT_OR_PR_TITLE` is rejected with HTTP 422 `invalid_squash_commit_setting_combo`.
 
 When the read itself does not answer — no `gh`, unauthenticated, 404, insufficient permission, or the field is absent — the wording names the reason and the status is still `partial`, never `pass`:
 
@@ -143,7 +145,7 @@ Both lines are `note` findings: they are never handed to the fixer in Step 6, be
 
 ## Summary — Refactor/Chore Exempt PR
 
-Refactor or chore PRs (skill quality passes, dependency bumps, doc-only updates) are exempt from the `Closes #N` hard-fail when they match `review.traceability_exempt_labels` or `review.traceability_exempt_pattern`. Check 1 is skipped; checks 2-4 still run and report `partial` if absent. Check 4 is the exception to the rendering below: a defeated or unverified binding is a repository finding, not a PR one, so it holds the dimension at `partial` rather than being appended to an exempt `pass`.
+Refactor or chore PRs (skill quality passes, dependency bumps, doc-only updates) are exempt from the `Closes #N` hard-fail when they match `review.traceability_exempt_labels` or `review.traceability_exempt_pattern`. Check 1 is skipped; checks 2-4 still run — a missing commit reference or Decision Record (checks 2-3) reports `partial`, never `fail`. Check 4 has no "absent" mode, and is the exception to the rendering below: a defeated or unverified binding is a repository finding, not a PR one, so it holds the dimension at `partial` rather than being appended to an exempt `pass`.
 
 ```
   Review dimensions:

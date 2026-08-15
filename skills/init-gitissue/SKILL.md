@@ -322,8 +322,10 @@ When `squash_merge_commit_message` is anything other than `PR_BODY`, warn separa
 ⚠ Squash commit message is {value}, not PR_BODY — the PR body will not reach git
   history, defeating the B1 durable-memory binding. See references/docs/idd-methodology.md.
 
-To fix:  gh api -X PATCH repos/{owner}/{repo} -f squash_merge_commit_message=PR_BODY
+To fix:  gh api -X PATCH repos/{owner}/{repo} -f squash_merge_commit_title=PR_TITLE -f squash_merge_commit_message=PR_BODY
 ```
+
+Both flags are required. GitHub accepts only four title/message combinations, and `PR_BODY` pairs solely with `PR_TITLE` — sending the message alone against the common default `COMMIT_OR_PR_TITLE` fails with HTTP 422 `invalid_squash_commit_setting_combo`, so a remedy naming one flag cannot work.
 
 Warn on each condition independently: a repo can fail both, and reporting only the strategy is the blind spot that hid this for the whole life of the project.
 
