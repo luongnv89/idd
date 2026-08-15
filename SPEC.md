@@ -156,11 +156,11 @@ The git-history half of the dual write is satisfied by exactly one **declared bi
 
 | Binding | Mechanism | Notes |
 |---------|-----------|-------|
-| **B1 — Squash-merge body** | The platform copies the PR body verbatim into the squash commit that lands on the default branch | Zero extra tooling; requires squash-merge as the repo's merge strategy |
+| **B1 — Squash-merge body** | The platform copies the PR body verbatim into the squash commit that lands on the default branch — **only where the platform is configured to use the PR body as the squash commit message** | Zero extra tooling; requires squash-merge as the repo's merge strategy **and** that message source. On GitHub the setting is `squash_merge_commit_message`, whose default (`COMMIT_MESSAGES`) defeats the binding while leaving the strategy intact |
 | **B2 — Merge-commit body** | The Decision Record is appended to the merge commit message (body or trailer block) at merge time | Works with true merge commits; needs merge automation or discipline |
 | **B3 — Git notes** | The Decision Record is attached to the landing commit under a documented notes ref (e.g. `refs/notes/idd`) | Merge-strategy-independent; notes must be explicitly pushed/fetched |
 
-A repo claiming L3 conformance (§6) MUST declare which binding it uses. Tooling SHOULD warn when the repo's merge strategy silently defeats the declared binding (e.g. B1 declared, merge-commit strategy configured).
+A repo claiming L3 conformance (§6) MUST declare which binding it uses. Tooling SHOULD warn when the repo's merge configuration silently defeats the declared binding — both at the **strategy** level (e.g. B1 declared, merge-commit strategy configured) and at the narrower **message-source** level (e.g. B1 declared, squash strategy configured, but the squash commit message taken from the commit subjects rather than the PR body). Tooling MUST NOT report the binding as satisfied on the strength of the strategy alone, and MUST NOT report it satisfied when the configuration cannot be read.
 
 ## 5. Traceability
 

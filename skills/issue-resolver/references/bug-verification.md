@@ -99,7 +99,7 @@ the durable artifacts, with the local-cache JSON as an optional mirror:
      column for the relevant criterion (e.g. `Verified red: <command> → fixed → <test>`).
 
    This is the always-present home — the resolver writes the PR body whether or not a
-   prior `/issue-analysis` ran. Under squash-merge it carries into git history.
+   prior `/issue-analysis` ran. Under squash-merge it carries into git history when the repo's squash commit message is `PR_BODY`.
 
 3. **Optional cache mirror.** The `decision_record.reproduction` field in
    `.gitissue/analysis-<N>.json` is defined in `/issue-analysis`'s output schema

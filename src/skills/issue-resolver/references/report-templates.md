@@ -4,7 +4,7 @@ Templates for the PR body, the single closing summary, and the expected pipeline
 
 ## PR Body Template (Step 5 — Deliver)
 
-This template is the load-bearing artifact for durable project memory. Under squash-merge, GitHub copies the PR body verbatim into the commit message that lands on the default branch, so every section here is preserved in `git log -p` after merge. Repos using merge-commit or rebase-merge keep this content only on GitHub. See *Analysis Artifacts and Durable Memory* in `docs/idd-methodology.md`.
+This template is the load-bearing artifact for durable project memory. Under squash-merge, GitHub copies the PR body verbatim into the commit message that lands on the default branch **only when the repo's `squash_merge_commit_message` is `PR_BODY`** — that is a per-repo setting, not platform behavior, and GitHub's default (`COMMIT_MESSAGES`) writes the list of commit subjects instead, dropping everything below at the merge boundary (issue #295). Read it with `gh api repos/{owner}/{repo} --jq .squash_merge_commit_message`; `gh repo view --json` cannot report it. Repos using merge-commit or rebase-merge — or squash-merge with any other message source — keep this content only on GitHub. Write the template in full regardless: the PR body is the half of the dual write this skill controls, and `/issue-pr-review` reports the binding's real status separately. See *Analysis Artifacts and Durable Memory* in `docs/idd-methodology.md`.
 
 ```markdown
 Closes #{issue_number}
@@ -112,7 +112,7 @@ construction.
 
 Analysis JSON is **fresh** exactly when the predicate in `references/pipeline-steps.md` (*Step 0h — Analysis reuse gate*) says so — five checkable conditions, any doubt ⇒ stale. That section is the single home of the definition: do not restate, tighten, or re-derive a freshness rule here. When fresh, you may lift `root_cause`, `options_considered`, and `git_state` from the cache; **`selected_option` and `options_rejected` MUST always reflect this run's Step 2 outcome** — the synthesizer's options, or the options Step 2 lifted under `analysis_reuse = fresh` (*Step 2 — Plan → `reuse`*) — never a pick from an analysis this run did not prove fresh. Field labels are stable across skills — do not rename them.
 
-If no analysis JSON exists (e.g., resolver was invoked without prior analysis), synthesize the same five core fields from the resolver's own Step 1 (Research) and Step 2 (Plan) findings, and use the synced base SHA as `commit_sha_short`. (For bug issues the sixth `Reproduction` line is added separately from the implementer's returned reproduction block — see the bug-verification checkpoint, not the analysis JSON.) Either source produces the same template — what matters is that the durable analysis signal lands in the PR body, where squash-merge will carry it into git history.
+If no analysis JSON exists (e.g., resolver was invoked without prior analysis), synthesize the same five core fields from the resolver's own Step 1 (Research) and Step 2 (Plan) findings, and use the synced base SHA as `commit_sha_short`. (For bug issues the sixth `Reproduction` line is added separately from the implementer's returned reproduction block — see the bug-verification checkpoint, not the analysis JSON.) Either source produces the same template — what matters is that the durable analysis signal lands in the PR body, the half of the dual write this skill controls, from which squash-merge carries it into git history under the repo-setting condition stated at the top of this file.
 
 ## Closing Summary
 

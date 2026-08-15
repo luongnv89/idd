@@ -948,7 +948,8 @@ auditable, then proceed to Step 3:
 Whether confirmed interactively or auto-selected, record the decision — selected option
 and complexity — in the PR **Decision Record** via the conditional *Design-confirm* line
 (`references/report-templates.md`). No separate artifact or config key is introduced; the
-decision rides the existing durable-memory channel into git history on squash-merge.
+decision rides the existing durable-memory channel into git history on squash-merge, under the
+`squash_merge_commit_message` condition in `references/docs/idd-methodology.md`.
 
 ### Inline fallback
 

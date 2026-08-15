@@ -19,7 +19,10 @@ IDD skills reach the issue tracker through a **platform driver** — the workflo
 | Verify authentication | `gh auth status` |
 | Remaining API budget | `gh api rate_limit --jq '{remaining: .rate.remaining, reset: .rate.reset}'` |
 | Repo merge strategy | `gh repo view --json mergeCommitAllowed,squashMergeAllowed,rebaseMergeAllowed` |
+| Squash-commit message source | `gh api repos/{owner}/{repo} --jq '{squash_merge_commit_title, squash_merge_commit_message}'` |
 | Caller's permission | `gh repo view --json viewerPermission` |
+
+REST, not `--json`: `gh repo view --json squashMergeCommitMessage` answers `Unknown JSON field`. It is **not** interchangeable with the strategy row above — that answers *is squash allowed*, this whether the squash commit carries the PR body (`PR_BODY`) or the commit subjects (`COMMIT_MESSAGES`, the default); only this one decides whether B1 lands (#295). Writing `PR_BODY` requires title source `PR_TITLE`.
 
 ### Issues
 
