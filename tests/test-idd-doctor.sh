@@ -206,6 +206,29 @@ else
   fail "T7: Check 4 does not specify the gh JSON field selection"
 fi
 
+# SPEC §4.3 requires the message-source level too. `squashMergeCommitMessage`
+# is not a `gh repo view` field (it errors with `Unknown JSON field`), so this
+# must be a second, separate REST read.
+if grep -qE 'gh api repos/\{owner\}/\{repo\}.*squash_merge_commit_message' "$SKILL"; then
+  pass "T7: Check 4 reads squash_merge_commit_message via gh api"
+else
+  fail "T7: Check 4 does not read the squash message source"
+fi
+
+if grep -qE 'squash_merge_commit_message == "PR_BODY"' "$SKILL"; then
+  pass "T7: Check 4 pass predicate requires message source PR_BODY"
+else
+  fail "T7: Check 4 pass predicate does not require PR_BODY"
+fi
+
+# SPEC §4.3: MUST NOT report the binding satisfied when the configuration
+# cannot be read. An unreadable message source is a WARN, never a PASS.
+if grep -qE 'binding unverified' "$SKILL"; then
+  pass "T7: Check 4 documents the unreadable-message-source WARN"
+else
+  fail "T7: Check 4 does not document 'binding unverified'"
+fi
+
 if grep -qE 'warn \(not fail\)|⚠ \[4/4\]' "$SKILL"; then
   pass "T7: Check 4 explicitly produces a WARN, not a FAIL"
 else
@@ -438,38 +461,65 @@ fi
 # ───────────────────────────────────────────────────────────
 
 merge_check_classifier() {
-  # Args: squash mergeCommit rebase  (each "true" or "false")
-  # Mirrors the classifier documented in SKILL.md Check 4.
-  local squash="$1" mc="$2" rebase="$3"
-  if [ "$squash" = "true" ] && [ "$mc" = "false" ] && [ "$rebase" = "false" ]; then
+  # Args: squash mergeCommit rebase msg_source
+  #   squash/mergeCommit/rebase — "true" or "false"
+  #   msg_source — PR_BODY | COMMIT_MESSAGES | BLANK | unreadable
+  # Mirrors the classifier documented in SKILL.md Check 4. Both levels must
+  # hold (SPEC §4.3): strategy AND message source. An unreadable message
+  # source warns rather than passes — an unread setting is not a satisfied
+  # binding — but it is still not a *skip*, which belongs to a missing gh.
+  local squash="$1" mc="$2" rebase="$3" msg="$4"
+  if [ "$squash" = "true" ] && [ "$mc" = "false" ] && [ "$rebase" = "false" ] \
+     && [ "$msg" = "PR_BODY" ]; then
     echo "PASS"
   else
     echo "WARN"
   fi
 }
 
-if [ "$(merge_check_classifier true false false)" = "PASS" ]; then
-  pass "T14.1: AC #4 — squash-only PASSes"
+if [ "$(merge_check_classifier true false false PR_BODY)" = "PASS" ]; then
+  pass "T14.1: AC #4 — squash-only + PR_BODY PASSes"
 else
-  fail "T14.1: AC #4 — squash-only did not PASS"
+  fail "T14.1: AC #4 — squash-only + PR_BODY did not PASS"
 fi
 
-if [ "$(merge_check_classifier true true true)" = "WARN" ]; then
+if [ "$(merge_check_classifier true true true COMMIT_MESSAGES)" = "WARN" ]; then
   pass "T14.2: AC #4 — all three strategies → WARN"
 else
   fail "T14.2: AC #4 — all three strategies did not WARN"
 fi
 
-if [ "$(merge_check_classifier true true false)" = "WARN" ]; then
+if [ "$(merge_check_classifier true true false PR_BODY)" = "WARN" ]; then
   pass "T14.3: AC #4 — squash + merge-commit → WARN"
 else
   fail "T14.3: AC #4 — squash + merge-commit did not WARN"
 fi
 
-if [ "$(merge_check_classifier false true false)" = "WARN" ]; then
+if [ "$(merge_check_classifier false true false COMMIT_MESSAGES)" = "WARN" ]; then
   pass "T14.4: AC #4 — merge-commit only (no squash) → WARN"
 else
   fail "T14.4: AC #4 — merge-commit only did not WARN"
+fi
+
+# #180 — the message-source level. Strategy alone must never carry a PASS.
+if [ "$(merge_check_classifier true false false COMMIT_MESSAGES)" = "WARN" ]; then
+  pass "T14.5: AC #4 — squash-only but COMMIT_MESSAGES → WARN (§4.3)"
+else
+  fail "T14.5: AC #4 — squash-only + COMMIT_MESSAGES wrongly PASSed"
+fi
+
+# #180 — this repo's current state: message source repaired, strategies not.
+if [ "$(merge_check_classifier true true true PR_BODY)" = "WARN" ]; then
+  pass "T14.6: AC #4 — PR_BODY but non-squash strategies allowed → WARN"
+else
+  fail "T14.6: AC #4 — PR_BODY with merge-commit/rebase wrongly PASSed"
+fi
+
+# #180 — SPEC §4.3: MUST NOT report satisfied when the config cannot be read.
+if [ "$(merge_check_classifier true false false unreadable)" = "WARN" ]; then
+  pass "T14.7: AC #4 — unreadable message source → WARN, never PASS (§4.3)"
+else
+  fail "T14.7: AC #4 — unreadable message source wrongly PASSed"
 fi
 
 # ───────────────────────────────────────────────────────────
