@@ -43,6 +43,7 @@ import statistics
 import subprocess
 import sys
 from datetime import datetime, timezone
+from typing import NamedTuple
 from pathlib import Path
 
 SPEC_VERSION = "1.1"
@@ -456,6 +457,41 @@ def _since_epoch(since: str | None) -> tuple[int | None, str | None]:
     return epoch, None
 
 
+class SinceWindow(NamedTuple):
+    """One resolution of `--since`, shared by every section of the report.
+
+    `stats` feeds `--since` to two independent consumers — the local git
+    history and the PR-side B1 join. Resolving it separately in each let them
+    disagree: git's approxidate accepts `garbage-typo` as *now* and zeroed the
+    git section, while the join detected the same string as unparseable and
+    printed "window not applied". One report, two answers.
+
+    So the string is resolved exactly once, in `cmd_stats`, and this is what
+    both consumers receive. `cutoff is None` means the window could not be
+    applied *anywhere*: every section falls back to lifetime and the caller
+    renders `error` once, at the top of the report.
+    """
+
+    since: str          # the normalized string, as it will be shown to the reader
+    cutoff: int | None  # Unix timestamp, or None when the window did not resolve
+    error: str | None   # why it did not resolve; None when `cutoff` is set
+
+
+def resolve_since(raw: str | None) -> SinceWindow | None:
+    """Normalize and resolve `--since` once. None means no window was asked for.
+
+    A returned window with `cutoff is None` is a *requested* window that failed
+    to resolve — deliberately distinct from this returning None, which means the
+    reader never asked for one. Rendering the two alike would advise them to run
+    with the flag they just ran with.
+    """
+    since = normalize_since(raw)
+    if since is None:
+        return None
+    cutoff, error = _since_epoch(since)
+    return SinceWindow(since, cutoff, error)
+
+
 def _merged_at_epoch(value: object) -> int | None:
     """`2026-08-14T19:33:53Z` → Unix timestamp; None when unparsable."""
     if not isinstance(value, str):
@@ -639,7 +675,7 @@ def classify_merge_commit(oid: str | None) -> str:
     return "landed" if DR_HEADING in body else "lost"
 
 
-def collect_dr_binding(merged: list, limit: int, since: str | None) -> dict:
+def collect_dr_binding(merged: list, limit: int, window: SinceWindow | None) -> dict:
     """Join each merged PR to its own landing commit to measure SPEC §4.3 B1.
 
     The local git-side ratio can only guess which commits came from a PR. This
@@ -651,6 +687,10 @@ def collect_dr_binding(merged: list, limit: int, since: str | None) -> dict:
     only repaired on 2026-08-15 and
     `docs/decisions/no-backfill-merged-decision-records.md` accepts the
     historical gap. A `--since` window is what makes a loss actionable.
+
+    `window` arrives already resolved (see `SinceWindow`). Re-resolving it here
+    is what let this section and the git-history section disagree about the same
+    string, so this must never call `_since_epoch` itself.
     """
     with_dr = [p for p in merged if DR_HEADING in ((p or {}).get("body") or "")]
     counts = {"no_sha": 0, "not_in_clone": 0, "landed": 0, "lost": 0}
@@ -678,21 +718,25 @@ def collect_dr_binding(merged: list, limit: int, since: str | None) -> dict:
         # a capped page under-reports without saying so, so say so.
         "truncated": len(merged) == limit,
         "window": None,
+        # Present on every binding, exactly like `window` above. Absent-on-
+        # success made the two siblings behave differently: `b["window"]` is
+        # always safe to subscript while `b["window_error"]` raised KeyError on
+        # the common path, so consumers had to know which one they were holding.
+        "window_error": None,
         "adr": ADR_NO_BACKFILL,
     }
 
-    if since:
+    if window:
         # `gh pr list` has no merged-date flag, so the window is applied here.
-        cutoff, error = _since_epoch(since)
-        if cutoff is None:
+        if window.cutoff is None:
             # Say so in the document, not only on the terminal: the caller most
             # likely to be misled is a JSON consumer gating on `dr_lost > 0`,
             # and an absent window is indistinguishable from a clean one.
-            binding["window_error"] = {"since": since, "reason": error}
+            binding["window_error"] = {"since": window.since, "reason": window.error}
         else:
             in_window = [
                 p for p in with_dr
-                if (_merged_at_epoch(p.get("mergedAt")) or -1) >= cutoff
+                if (_merged_at_epoch(p.get("mergedAt")) or -1) >= window.cutoff
             ]
             # Same buckets and the same key names as the lifetime numbers above,
             # so the denominator is `landed + lost` on both sides. Counting the
@@ -700,7 +744,7 @@ def collect_dr_binding(merged: list, limit: int, since: str | None) -> dict:
             # in a shallow clone every oid is `not_in_clone`.
             w = {v: [p for p in in_window if verdict_by_pr[p["number"]] == v] for v in counts}
             binding["window"] = {
-                "since": since,
+                "since": window.since,
                 "prs_with_dr": len(in_window),
                 "merge_commit_resolved": len(w["landed"]) + len(w["lost"]),
                 "unresolved_no_sha": len(w["no_sha"]),
@@ -711,7 +755,7 @@ def collect_dr_binding(merged: list, limit: int, since: str | None) -> dict:
     return binding
 
 
-def collect_github_stats(limit: int, run_rows_path: Path, since: str | None = None) -> dict | None:
+def collect_github_stats(limit: int, run_rows_path: Path, window: SinceWindow | None = None) -> dict | None:
     """Optional gh-backed metrics: %% issues normalized, merged-PR linkage,
     the SPEC §4.3 B1 durable-memory join, and run outcomes tiered by issue
     quality (normalized vs not)."""
@@ -741,7 +785,7 @@ def collect_github_stats(limit: int, run_rows_path: Path, since: str | None = No
             "merged_closes_pct": _pct(closes, len(merged)),
             "merged_with_dr": dr,
             "merged_dr_pct": _pct(dr, len(merged)),
-            "dr_binding": collect_dr_binding(merged, limit, since),
+            "dr_binding": collect_dr_binding(merged, limit, window),
         })
 
     # Tier run outcomes by issue quality (normalized vs unnormalized issue body).
@@ -875,13 +919,14 @@ def _render_dr_binding(b: dict | None) -> list[str]:
         # The ADR path gets its own line: it is a URL-shaped token, and the
         # joined form ran to 121 columns against this report's 80-column rail.
         lines.append(_c(f"      {b['adr']}", "dim"))
-        we = b.get("window_error")
-        if we:
+        if b.get("window_error"):
             # A window was asked for and could not be applied. Saying nothing
             # here would print the "run with --since" hint below, advising the
-            # reader to do the thing they just did.
-            lines.append(f"    {_c('⚠', 'yellow')} --since {we['since']!r} {we['reason']}")
-            lines.append(_c("      window not applied — this is the lifetime row", "dim"))
+            # reader to do the thing they just did. The ⚠ itself belongs at the
+            # top of the report, not here: the failure degrades *every* section
+            # to lifetime, so pinning it to this one row would read as a B1
+            # problem rather than an unusable argument.
+            lines.append(_c("      window not applied — see the note at the top", "dim"))
         else:
             lines.append(_c("      run with --since to judge the binding as it stands today", "dim"))
 
@@ -903,7 +948,7 @@ def _render_dr_binding(b: dict | None) -> list[str]:
     return lines
 
 
-def render_stats(commit_s: dict | None, run_s: dict | None, gh_s: dict | None, gh_skipped: str | None, project: dict | None = None) -> None:
+def render_stats(commit_s: dict | None, run_s: dict | None, gh_s: dict | None, gh_skipped: str | None, project: dict | None = None, window: SinceWindow | None = None) -> None:
     out: list[str] = []
     out.append(f"◆ idd-lint stats {_c('— evidence report · IDD Spec v' + SPEC_VERSION, 'dim')}")
     if project:
@@ -911,6 +956,16 @@ def render_stats(commit_s: dict | None, run_s: dict | None, gh_s: dict | None, g
         out.append(_c(f"  location {project['location']}", "dim"))
     out.append(_c("┄" * 59, "dim"))
     out.append("")
+
+    if window and window.cutoff is None:
+        # Top of the report, once, before any number it invalidates. A window
+        # that did not resolve is not applied to *any* section, so a reader who
+        # sees this knows every ratio below is lifetime — including the
+        # git-history section, which has no row of its own to warn on and under
+        # --no-github is the only section there is.
+        out.append(f"  {_c('⚠', 'yellow')} --since {window.since!r} {window.error}")
+        out.append(_c("    window not applied — every section below is lifetime", "dim"))
+        out.append("")
 
     if commit_s is None:
         out.append(_c("  ○ git history — skipped: not a git repository", "dim"))
@@ -979,14 +1034,23 @@ def cmd_stats(args: argparse.Namespace) -> int:
     project = collect_project_info(root, use_github=not args.no_github)
 
     branch = args.branch or detect_default_branch()
-    since = normalize_since(args.since)
-    commit_s = collect_commit_stats(branch, since)
+    # Resolve `--since` once, here, and hand the same verdict to both consumers.
+    # Passing the raw string to `git log --since` while the PR join re-resolved
+    # it independently is what produced a zeroed git section underneath a
+    # warning saying the window had not been applied: git's approxidate reads an
+    # unparseable string as *now*, so the "window" it applied was empty.
+    window = resolve_since(args.since)
+    # An unresolved window degrades to lifetime everywhere rather than refusing
+    # to run: `--since '1 second ago'` is a legitimate approxidate this cannot
+    # distinguish from a typo, and a false positive must not cost the report.
+    git_since = window.since if window and window.cutoff is not None else None
+    commit_s = collect_commit_stats(branch, git_since)
     run_s = collect_run_stats(runs_path)
     gh_s, gh_skipped = None, None
     if args.no_github:
         gh_skipped = "--no-github"
     else:
-        gh_s = collect_github_stats(args.limit, runs_path, since)
+        gh_s = collect_github_stats(args.limit, runs_path, window)
         if gh_s is None:
             gh_skipped = "gh unavailable, unauthenticated, or offline"
 
@@ -997,7 +1061,7 @@ def cmd_stats(args: argparse.Namespace) -> int:
         ))
         return 0
 
-    render_stats(commit_s, run_s, gh_s, gh_skipped, project)
+    render_stats(commit_s, run_s, gh_s, gh_skipped, project, window)
     return 0
 
 

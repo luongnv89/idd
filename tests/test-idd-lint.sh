@@ -385,7 +385,7 @@ m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
 
 DR = "## Decision Record\n\n- **Root cause:** none."
 # mergedAt values sit months apart at midday UTC, so no local-timezone offset
-# on the `git rev-parse --since` side can move a PR across the boundary.
+# on the \`git rev-parse --since\` side can move a PR across the boundary.
 merged = [
     {"number": 1, "body": DR, "mergedAt": "2026-01-10T12:00:00Z",
      "mergeCommit": {"oid": "$LANDED_OID"}},
@@ -406,14 +406,17 @@ assert b["merge_commit_resolved"] == 2, b
 assert (b["unresolved_no_sha"], b["unresolved_not_in_clone"]) == (1, 1), b
 assert b["landed_pct"] == 50, b
 assert b["truncated"] is False, b
-assert b["window"] is None and "window_error" not in b, b
+# Both window keys are present on every binding: a consumer subscripting
+# b["window_error"] must not raise on the success path while b["window"] is safe.
+assert b["window"] is None, b
+assert "window_error" in b and b["window_error"] is None, b
 assert m.collect_dr_binding(merged, 5, None)["truncated"] is True
 
 # A window holding only unresolvable PRs. The denominator is landed+lost, so it
 # is 0 — "unknown" — and _ratio_row renders a dim dash. Using prs_with_dr would
 # print a red 0% built from data nobody has: in a shallow clone every oid is
 # not_in_clone, so that is the CI default, not a corner case.
-b6 = m.collect_dr_binding(merged, 200, "2026-06-01 00:00:00")
+b6 = m.collect_dr_binding(merged, 200, m.resolve_since("2026-06-01 00:00:00"))
 w = b6["window"]
 assert w is not None, "window did not resolve — is this a git repo?"
 assert w["prs_with_dr"] == 2, w
@@ -424,13 +427,13 @@ head = m._render_dr_binding(b6)[0]
 assert "✗" not in head and "0%" not in head, head
 
 # A wider window holds every PR, so it must mirror the lifetime numbers.
-w2 = m.collect_dr_binding(merged, 200, "2026-01-01 00:00:00")["window"]
+w2 = m.collect_dr_binding(merged, 200, m.resolve_since("2026-01-01 00:00:00"))["window"]
 assert (w2["prs_with_dr"], w2["merge_commit_resolved"]) == (4, 2), w2
 assert (w2["dr_landed"], w2["dr_lost"]) == (1, 1), w2
 
 # An unparsable --since resolves to *now* in git's approxidate, which would
 # otherwise report an empty-and-therefore-clean window to a JSON consumer.
-bad = m.collect_dr_binding(merged, 200, "garbage-typo")
+bad = m.collect_dr_binding(merged, 200, m.resolve_since("garbage-typo"))
 assert bad["window"] is None, bad
 assert bad["window_error"]["since"] == "garbage-typo", bad
 PY
@@ -469,6 +472,33 @@ PY
   pass "T25g: collect_github_stats carries dr_binding into the report"
 else
   fail "T25g: collect_github_stats dropped the dr_binding join"
+fi
+
+# ───────────────────────────────────────────────────────────
+# T25h: an unresolvable --since degrades both sections (#180)
+# ───────────────────────────────────────────────────────────
+# `--since` feeds two consumers: the local git history and the PR-side B1 join.
+# Validating it for the join alone left git's approxidate to read the same
+# string as *now*, so the report showed "0 non-merge commits" — a window that
+# WAS applied — directly above a warning saying the window was not applied.
+# One resolution, one verdict: both sections fall back to lifetime, and the ⚠
+# is printed once, at the top, where it also covers --no-github (which has no
+# dr_binding row to carry it).
+LIFETIME="$( (cd "$SINCE_REPO" && python3 "$LINT" stats --no-github --json) \
+             | python3 -c "import json,sys; print(json.load(sys.stdin)['git']['commits'])" )"
+BAD_SINCE="$( (cd "$SINCE_REPO" && python3 "$LINT" stats --no-github --since garbage-typo --json) \
+             | python3 -c "import json,sys; print(json.load(sys.stdin)['git']['commits'])" )"
+BAD_TEXT="$( cd "$SINCE_REPO" && python3 "$LINT" stats --no-github --since garbage-typo )"
+BAD_EXIT=0
+(cd "$SINCE_REPO" && python3 "$LINT" stats --no-github --since garbage-typo >/dev/null) || BAD_EXIT=$?
+if [ "$BAD_SINCE" = "$LIFETIME" ] && [ "$LIFETIME" != "0" ] \
+   && printf '%s\n' "$BAD_TEXT" | grep -qF "⚠ --since 'garbage-typo' did not parse as a date" \
+   && printf '%s\n' "$BAD_TEXT" | grep -qF "window not applied — every section below is lifetime" \
+   && [ "$BAD_EXIT" -eq 0 ]; then
+  pass "T25h: unresolvable --since degrades to lifetime with one ⚠ (exit 0)"
+else
+  fail "T25h: unresolvable --since gave $BAD_SINCE commits (lifetime $LIFETIME), exit $BAD_EXIT"
+  printf '%s\n' "$BAD_TEXT" | sed 's/^/      /'
 fi
 
 # stats degrades gracefully outside a git repo
