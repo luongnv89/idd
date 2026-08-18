@@ -156,6 +156,16 @@ When either read does not answer — no `gh`, unauthenticated, 404, insufficient
 
 All three lines are `note` findings: they are never handed to the fixer in Step 6, because no edit to this PR can change a repo setting. Under `review.soft_pass: true` (default) they are report-only; under `soft_pass: false` they block like any other partial dimension.
 
+When check 4 read `squash_merge_commit_message: PR_BODY` and the merge-effective keyword set (raw body, no markdown strip) diverges from the markdown-aware PR-link set, append a `note` line naming the issues that will close at squash-merge under B1:
+
+```
+      traceability:        ⚠ partial — merge-effective closers under B1
+                             differ from the PR-link surface; will close at
+                             squash-merge: #{extra_ids}
+```
+
+Under `COMMIT_MESSAGES` (or any non-`PR_BODY` value) do not treat code-span or blockquote keywords as merge-effective; omit this divergence line.
+
 ## Summary — Refactor/Chore Exempt PR
 
 Refactor or chore PRs (skill quality passes, dependency bumps, doc-only updates) are exempt from the `Closes #N` hard-fail when they match `review.traceability_exempt_labels` or `review.traceability_exempt_pattern`. Check 1 is skipped; checks 2-4 still run — a missing commit reference or Decision Record (checks 2-3) reports `partial`, never `fail`. Check 4 has no "absent" mode, and is the exception to the rendering below: a qualified-only, defeated, or unverified binding is a repository finding, not a PR one, so it holds the dimension at `partial` rather than being appended to an exempt `pass`.
