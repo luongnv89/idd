@@ -79,7 +79,10 @@ Each `fail` criterion becomes a fixable issue in Step 6 with `category: acceptan
 
 Per the dual-write rule (see *Analysis Artifacts and Durable Memory* in `references/docs/idd-methodology.md`), the durable analysis signal must survive the squash-merge into git history. Run the following four checks against the PR body, the commits in the PR, and the repo's merge configuration:
 
-1. **Issue link** — PR body contains `Closes #{N}`, `Fixes #{N}`, or `Resolves #{N}` for the linked issue. Detected with the same regex used by GitHub itself: `(?i)(close[sd]?|fix(e[sd])?|resolve[sd]?)\s+#\d+`. See *Refactor/chore exemption* below — the `Closes #N` requirement is relaxed for refactor/chore PRs (the other three checks still run).
+1. **Issue link** — the PR-link surface still requires `Closes #{N}`, `Fixes #{N}`, or `Resolves #{N}` for the linked issue (issue #36 hard-fail when absent, unless the *Refactor/chore exemption* below applies). Detect with the same regex GitHub uses: `(?i)(close[sd]?|fix(e[sd])?|resolve[sd]?)\s+#\d+`. Reuse check 4's already-read `squash_merge_commit_message` — do not issue a second API call — to choose which body surface is merge-effective:
+   - `PR_BODY` (B1): evaluate the regex against the **raw** PR body. Do **not** strip markdown. Keywords that appear only inside fenced code, inline code spans, or blockquotes **are** merge-effective — GitHub copies the body bytes into the squash commit message, and commit-message closing keywords do not honour markdown.
+   - Any other value, including `COMMIT_MESSAGES`, or an unread check-4 field: evaluate the regex with **markdown-aware** PR-body rules (ignore matches that live only in fenced code, inline code spans, or blockquotes). Those matches are not GitHub PR-timeline closers.
+   Collect every issue number the merge-effective surface would close. If that set differs from the markdown-aware PR-link set, report a `note` (never `action: fix`) naming the extra and/or missing numbers as issues that will close — or will not close — at squash-merge under B1. The #36 hard-fail still keys off the PR-link requirement for `{N}`, not off extra merge-only numbers.
 2. **Commit references issue** — at least one commit between base and head references the issue number:
    ```bash
    git log "{base_branch}..{head_branch}" --grep="#{N}" --oneline

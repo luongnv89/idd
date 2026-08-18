@@ -184,6 +184,9 @@ jobs:
       - name: test-squash-binding-295
         run: bash tests/test-squash-binding-295.sh
 
+      - name: test-pr-body-closing-keywords-312
+        run: bash tests/test-pr-body-closing-keywords-312.sh
+
       - name: test-autopilot-state-257
         run: bash tests/test-autopilot-state-257.sh
 
