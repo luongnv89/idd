@@ -25,7 +25,7 @@ The axes are a presentation grouping only. The status symbol on each dimension l
       correctness:         ✓ pass
       safety:              ✓ pass
     Standards axis (follows project conventions?):
-      traceability:        ✓ pass (Closes #{N}, commit ref, Decision Record, AC block)
+      traceability:        ✓ pass (Closes #{N}, commit ref, Decision Record, AC block, B1/squash: squash-only + PR_BODY)
       maintainability:     ○ partial ({note_count} note-level findings)
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Tests:             ✓ pass ({count} passed)
@@ -118,9 +118,25 @@ When a human-authored PR (one not produced by `/issue-resolver`) is reviewed, th
 
 Acceptance-criteria checks still apply at full strength — they do not relax for human PRs. `Closes #{N}` checks also still apply at full strength — a human PR missing the issue link still fails traceability, **unless** the PR matches the refactor/chore exemption described below.
 
-## Summary — Squash-Merge Binding Defeated or Unverified
+## Summary — Squash-Only Binding Qualified, Defeated, or Unverified
 
-Traceability check 4 reads the repo's squash-commit message source rather than assuming it (`references/verification-checks.md` → *Traceability checks*). When that read comes back as anything but `PR_BODY`, the PR body is complete but the durable record will not reach git history via B1, so the dimension reports `partial` — a **repository** finding, not a PR defect:
+Traceability check 4 combines two independent repository reads: the merge strategy and the squash-commit message source (`references/verification-checks.md` → *Traceability checks*). A clean traceability pass needs squash-only + `PR_BODY`; anything else is a **repository** finding, not a PR defect.
+
+When `squash_merge_commit_message` is `PR_BODY` but merge-commit and/or rebase remain enabled, B1 holds only for squash merges, so the dimension reports `partial`:
+
+```
+    Standards axis (follows project conventions?):
+      traceability:        ⚠ partial — B1/squash qualified only
+                             ({strategy_summary};
+                             squash_merge_commit_message: PR_BODY) — merge-commit
+                             and/or rebase can bypass the durable record
+      maintainability:     ✓ pass
+
+  To fix (repo admin):
+    gh api -X PATCH repos/{owner}/{repo} -f allow_squash_merge=true -f allow_merge_commit=false -f allow_rebase_merge=false -f squash_merge_commit_title=PR_TITLE -f squash_merge_commit_message=PR_BODY
+```
+
+When the message-source read answers with anything but `PR_BODY`, the PR body is complete but the durable record will not reach git history via B1, so the dimension is still `partial`:
 
 ```
     Standards axis (follows project conventions?):
@@ -128,24 +144,21 @@ Traceability check 4 reads the repo's squash-commit message source rather than a
                              (squash_merge_commit_message: {value}); the durable
                              record will not reach git history via B1
       maintainability:     ✓ pass
-
-  To fix (repo admin):
-    gh api -X PATCH repos/{owner}/{repo} -f squash_merge_commit_title=PR_TITLE -f squash_merge_commit_message=PR_BODY
 ```
 
-Both flags are required: GitHub pairs `PR_BODY` only with `PR_TITLE`, so a PATCH naming the message alone against the default `COMMIT_OR_PR_TITLE` is rejected with HTTP 422 `invalid_squash_commit_setting_combo`.
+The repo-settings patch above fixes both partials. Both `squash_merge_commit_*` flags are required: GitHub pairs `PR_BODY` only with `PR_TITLE`, so a PATCH naming the message alone against the default `COMMIT_OR_PR_TITLE` is rejected with HTTP 422 `invalid_squash_commit_setting_combo`.
 
-When the read itself does not answer — no `gh`, unauthenticated, 404, insufficient permission, or the field is absent — the wording names the reason and the status is still `partial`, never `pass`:
+When either read does not answer — no `gh`, unauthenticated, 404, insufficient permission, or the field is absent — the wording names the reason and the status is still `partial`, never `pass`:
 
 ```
       traceability:        ⚠ partial — squash-merge binding unverified ({reason})
 ```
 
-Both lines are `note` findings: they are never handed to the fixer in Step 6, because no edit to this PR can change a repo setting. Under `review.soft_pass: true` (default) they are report-only; under `soft_pass: false` they block like any other partial dimension.
+All three lines are `note` findings: they are never handed to the fixer in Step 6, because no edit to this PR can change a repo setting. Under `review.soft_pass: true` (default) they are report-only; under `soft_pass: false` they block like any other partial dimension.
 
 ## Summary — Refactor/Chore Exempt PR
 
-Refactor or chore PRs (skill quality passes, dependency bumps, doc-only updates) are exempt from the `Closes #N` hard-fail when they match `review.traceability_exempt_labels` or `review.traceability_exempt_pattern`. Check 1 is skipped; checks 2-4 still run — a missing commit reference or Decision Record (checks 2-3) reports `partial`, never `fail`. Check 4 has no "absent" mode, and is the exception to the rendering below: a defeated or unverified binding is a repository finding, not a PR one, so it holds the dimension at `partial` rather than being appended to an exempt `pass`.
+Refactor or chore PRs (skill quality passes, dependency bumps, doc-only updates) are exempt from the `Closes #N` hard-fail when they match `review.traceability_exempt_labels` or `review.traceability_exempt_pattern`. Check 1 is skipped; checks 2-4 still run — a missing commit reference or Decision Record (checks 2-3) reports `partial`, never `fail`. Check 4 has no "absent" mode, and is the exception to the rendering below: a qualified-only, defeated, or unverified binding is a repository finding, not a PR one, so it holds the dimension at `partial` rather than being appended to an exempt `pass`.
 
 ```
   Review dimensions:
