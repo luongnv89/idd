@@ -104,7 +104,7 @@ Expected output for a clean repo (verify against this when testing the skill):
     ✓ [3/4] Autopilot mode        autopilot.mode = conservative
 
     ● [4/4] Squash-merge default...
-    ✓ [4/4] Squash-merge default  squash-only
+    ✓ [4/4] Squash-merge default  squash-only · squash message source PR_BODY
 
     ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
     Result: PASS  (4 checks, 0 failed, 0 warned)
@@ -405,7 +405,7 @@ The skill MUST NOT modify any file in the repo, create branches or commits, open
 - Edit issue bodies or post comments
 - Mutate `.gitissue.yml` or any config file
 
-The implementation reads files (via `Read` / `cat`) and runs read-only `gh` queries (`gh repo view --json …`, `gh auth status`). Test fixtures (see *Testing*) assert that the working tree is unchanged after a doctor run.
+The implementation reads files (via `Read` / `cat`) and runs read-only `gh` queries (`gh repo view --json …`, `gh api repos/{owner}/{repo}`, `gh auth status`). Test fixtures (see *Testing*) assert that the working tree is unchanged after a doctor run.
 
 ---
 
