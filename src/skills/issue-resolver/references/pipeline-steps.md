@@ -971,8 +971,8 @@ type in interactive mode (it is interactive-gated, not complexity-gated).
 
 The skill index is treated as a **swappable candidate list**: the detection logic
 reads the skill names + lifecycle phases from `references/skill-index.md` and never
-hardcodes the source repo, so a future issue (#170) can swap the index contents to
-a different source without changing this step's logic.
+hardcodes the source repo, so the catalog can be re-pointed at a different source
+without changing this step's logic.
 
 #### Detect — which catalogued skills are installed
 

@@ -13,17 +13,17 @@ It does **not** record which are installed — that is detected at runtime again
 installed set). Keep the two concerns separate: this file is the *catalog*, the
 filesystem is the *availability* signal.
 
-## Source-agnostic by design (the #170 seam)
+## Source-agnostic by design
 
 The detection and proposal logic must never hardcode `luongnv89/skills`
 assumptions. It treats this file as the **swappable candidate list**: it reads
-the skill names + lifecycle phases below, intersects them with what is installed,
-and proposes the relevant subset. A future issue (#170) that sources skills from
-a different index (e.g. the asm skill index) is then a *contents swap of this
-file*, not a rewrite of the step logic. Each entry's **name == the installable /
-invocable skill name** (the `luongnv89/skills` directory name and `name:`
-frontmatter), so runtime detection (`~/.claude/skills/<name>`) and invocation
-(`/<name>`) match without translation.
+the skill names + lifecycle phases below, intersects them with what is
+installed, and proposes the relevant subset. Re-pointing the catalog at a
+different upstream is then a *contents swap of this file*, not a rewrite of the
+step logic. Each entry's **name == the installable / invocable skill name** (the
+`luongnv89/skills` directory name and `name:` frontmatter), so runtime detection
+(`~/.claude/skills/<name>`) and invocation (`/<name>`) match without
+translation.
 
 ## Lifecycle coverage
 

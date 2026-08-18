@@ -1,78 +1,260 @@
 {
   "version": 1,
-  "updated": "2026-03-25T00:00:00Z",
+  "updated": "2026-08-18T11:08:56Z",
   "source": "/issue-triage",
-  "analyzed_count": 2,
+  "analyzed_count": 8,
   "issues": [
     {
-      "number": 16,
-      "title": "Add shared GitHub Projects status sync utility for all skills",
+      "number": 177,
+      "title": "feat: harness agents for all tools and interactive install wizard",
       "type": "feature",
-      "priority": "P3",
-      "blocks": [],
-      "blocked_by": [],
-      "status": "ready",
-      "stale_days": null,
-      "labels": ["feature"],
-      "affected_files": [
-        "README.md",
-        "prd.md",
-        "validate.md",
-        "skills/issue-creator/SKILL.md",
-        "skills/issue-resolver/SKILL.md",
-        "skills/issue-triage/SKILL.md",
-        "skills/review-fix-loop/SKILL.md"
+      "priority": "P2",
+      "blocks": [
+        307
       ],
-      "updated_at": "2026-03-23T06:20:01Z",
+      "blocked_by": [],
+      "status": "stale",
+      "stale_days": 41,
+      "labels": [],
+      "affected_files": [
+        "scripts/build.py",
+        "src/skills/auto-pilot/docs/README.md",
+        "src/skills/init-gitissue/docs/README.md",
+        "src/skills/issue-analysis/docs/README.md",
+        "src/skills/issue-creator/docs/README.md",
+        "src/skills/issue-pr-review/docs/README.md",
+        "src/skills/issue-resolver/docs/README.md",
+        "src/skills/issue-triage/docs/README.md"
+      ],
+      "updated_at": "2026-07-08T06:53:34Z",
       "potentially_fixed_by": null
     },
     {
-      "number": 19,
-      "title": "Add sub-agent architecture to all skills for better context management",
+      "number": 180,
+      "title": "Make merges carry Decision Records into git history",
+      "type": "improvement",
+      "priority": "P2",
+      "blocks": [
+        283,
+        307,
+        308,
+        309
+      ],
+      "blocked_by": [],
+      "status": "stale",
+      "stale_days": 40,
+      "labels": [
+        "improvement"
+      ],
+      "affected_files": [
+        "scripts/idd-lint.py",
+        "docs/idd-methodology.md",
+        "src/skills/issue-pr-review/SKILL.source.md",
+        "src/skills/issue-resolver/SKILL.source.md"
+      ],
+      "updated_at": "2026-07-08T22:57:50Z",
+      "potentially_fixed_by": null
+    },
+    {
+      "number": 276,
+      "title": "Decide whether the binary-file scan skip should stay",
       "type": "improvement",
       "priority": "P3",
-      "blocks": [],
+      "blocks": [
+        280
+      ],
       "blocked_by": [],
       "status": "ready",
       "stale_days": null,
-      "labels": ["improvement"],
-      "affected_files": [
-        "README.md",
-        "CLAUDE.md",
-        "docs/CHANGELOG.md",
-        "skills/auto-pilot/SKILL.md",
-        "skills/auto-pilot/references/subagent-prompts.md",
-        "skills/issue-analysis/SKILL.md",
-        "skills/issue-analysis/agents/explorer.md",
-        "skills/issue-analysis/agents/synthesizer.md",
-        "skills/issue-resolver/SKILL.md",
-        "skills/issue-resolver/agents/researcher.md",
-        "skills/issue-resolver/agents/implementer.md",
-        "skills/issue-resolver/agents/test-writer.md",
-        "skills/issue-triage/SKILL.md",
-        "skills/issue-triage/agents/dependency-scanner.md",
-        "skills/issue-triage/agents/history-scanner.md",
-        "skills/issue-creator/SKILL.md",
-        "skills/issue-creator/agents/duplicate-detector.md",
-        "skills/review-fix-loop/SKILL.md"
+      "labels": [
+        "improvement",
+        "skills"
       ],
-      "updated_at": "2026-03-24T11:54:28Z",
+      "affected_files": [
+        "src/shared/scripts/gi-secscan.py",
+        "docs/pre-commit-security.md",
+        "tests/test-pre-commit-security.sh"
+      ],
+      "updated_at": "2026-08-07T13:27:45Z",
+      "potentially_fixed_by": null
+    },
+    {
+      "number": 280,
+      "title": "Close the phantom-block class in the pre-commit security lint's fence parser",
+      "type": "improvement",
+      "priority": "P3",
+      "blocks": [],
+      "blocked_by": [
+        276
+      ],
+      "status": "blocked",
+      "stale_days": null,
+      "labels": [
+        "testing",
+        "improvement",
+        "skills"
+      ],
+      "affected_files": [
+        "tests/test-pre-commit-security.sh"
+      ],
+      "updated_at": "2026-08-09T04:29:23Z",
+      "potentially_fixed_by": null
+    },
+    {
+      "number": 283,
+      "title": "Honor a QA handoff tests= skip only when a CI leg can actually run",
+      "type": "improvement",
+      "priority": "P2",
+      "blocks": [
+        307,
+        308
+      ],
+      "blocked_by": [
+        180
+      ],
+      "status": "blocked",
+      "stale_days": null,
+      "labels": [
+        "improvement"
+      ],
+      "affected_files": [
+        "src/skills/issue-pr-review/SKILL.source.md",
+        "src/skills/issue-pr-review/references/review-loop-mechanics.md",
+        "src/skills/issue-pr-review/references/prepass-tests-ci-mechanics.md",
+        "src/shared/scripts/gi-ci-wait.py"
+      ],
+      "updated_at": "2026-08-10T04:24:36Z",
+      "potentially_fixed_by": null
+    },
+    {
+      "number": 307,
+      "title": "Reconcile the effort: SKILL.md frontmatter key with the skill-creator standard",
+      "type": "improvement",
+      "priority": "P2",
+      "blocks": [
+        308,
+        309
+      ],
+      "blocked_by": [
+        177,
+        180,
+        283
+      ],
+      "status": "blocked",
+      "stale_days": null,
+      "labels": [
+        "improvement",
+        "skills",
+        "conformance-review"
+      ],
+      "affected_files": [
+        "scripts/build.py",
+        "docs/agent-model-effort.md",
+        ".github/workflows/dist-check.yml",
+        "src/internal-skills/idd-doctor/SKILL.source.md",
+        "src/skills/auto-pilot/SKILL.source.md",
+        "src/skills/init-gitissue/SKILL.source.md",
+        "src/skills/issue-analysis/SKILL.source.md",
+        "src/skills/issue-creator/SKILL.source.md",
+        "src/skills/issue-pr-review/SKILL.source.md",
+        "src/skills/issue-resolver/SKILL.source.md",
+        "src/skills/issue-triage/SKILL.source.md"
+      ],
+      "updated_at": "2026-08-18T10:40:48Z",
+      "potentially_fixed_by": null
+    },
+    {
+      "number": 308,
+      "title": "Reconcile and enforce the two-review-pass ceiling stated by epic #242 AC3",
+      "type": "improvement",
+      "priority": "P3",
+      "blocks": [
+        309
+      ],
+      "blocked_by": [
+        180,
+        283,
+        307
+      ],
+      "status": "blocked",
+      "stale_days": null,
+      "labels": [
+        "resolver",
+        "improvement",
+        "auto-pilot-followup"
+      ],
+      "affected_files": [
+        "scripts/idd-lint.py",
+        "src/shared/scripts/gi-runlog.py",
+        "src/skills/issue-resolver/SKILL.source.md",
+        "src/skills/issue-pr-review/SKILL.source.md",
+        ".github/workflows/dist-check.yml"
+      ],
+      "updated_at": "2026-08-18T10:40:49Z",
+      "potentially_fixed_by": null
+    },
+    {
+      "number": 309,
+      "title": "Borrow and release catalogued skills for the duration of one task",
+      "type": "feature",
+      "priority": "P3",
+      "blocks": [],
+      "blocked_by": [
+        180,
+        307,
+        308
+      ],
+      "status": "blocked",
+      "stale_days": null,
+      "labels": [
+        "feature",
+        "resolver",
+        "skills"
+      ],
+      "affected_files": [
+        "src/skills/issue-resolver/SKILL.source.md",
+        "src/skills/issue-resolver/references/pipeline-steps.md",
+        "src/skills/issue-resolver/references/skill-index.md",
+        "src/shared/scripts/gi-state.py",
+        "docs/config-schema.md"
+      ],
+      "updated_at": "2026-08-18T11:05:20Z",
       "potentially_fixed_by": null
     }
   ],
   "summary": {
-    "parallel_groups": [],
-    "stale_count": 0,
+    "parallel_groups": [
+      [
+        177,
+        180,
+        276
+      ],
+      [
+        280,
+        283
+      ]
+    ],
+    "stale_count": 2,
     "stale_threshold_days": 14,
     "potentially_fixed_count": 0,
-    "suggested_order": [16, 19],
-    "circular_deps": []
+    "suggested_order": [
+      177,
+      180,
+      276,
+      280,
+      283,
+      307,
+      308,
+      309
+    ],
+    "circular_deps": [],
+    "co_dependent": []
   },
   "history": [
     {
-      "time": "2026-03-25T00:00:00Z",
+      "time": "2026-08-18T11:08:56Z",
       "source": "/issue-triage",
-      "changes": "Full re-triage (2 issues)"
+      "changes": "Full re-triage (8 issues)"
     }
   ]
 }
