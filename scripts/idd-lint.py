@@ -840,7 +840,9 @@ def _render_dr_binding(b: dict | None) -> list[str]:
             f"      {unresolved} unresolved ({b['unresolved_no_sha']} no merge sha, "
             f"{b['unresolved_not_in_clone']} not in this clone) — excluded, not counted as misses", "dim"))
     if b["truncated"]:
-        lines.append(_c("      ⚠ PR page hit --limit — older merges are not in this sample", "dim"))
+        # No symbol: in this report ⚠ is a verdict glyph carrying a tone, and
+        # this is a scope caveat on a continuation line, not a verdict.
+        lines.append(_c("      PR page hit --limit — older merges are not in this sample", "dim"))
     return lines
 
 
