@@ -326,12 +326,30 @@ BARE="$( (cd "$SINCE_REPO" && python3 "$LINT" stats --no-github --since "$TODAY"
          | python3 -c "import json,sys; print(json.load(sys.stdin)['git']['commits'])" )"
 EXPLICIT="$( (cd "$SINCE_REPO" && python3 "$LINT" stats --no-github --since "$TODAY 00:00:00" --json) \
          | python3 -c "import json,sys; print(json.load(sys.stdin)['git']['commits'])" )"
-# 2, not just "equal": the 00:30 commit is the one an unnormalized bare date
+# The counts alone stopped being able to see this regression once an
+# unresolvable window began degrading to lifetime: a *today* bare date always
+# resolves to within a second of now, so with `normalize_since` reverted the
+# now-detection in `_since_epoch` reads it as a typo, drops the window, and
+# reports the same lifetime 2 the correct midnight window reports. The window
+# error is the signal that survives — so compare the two forms on that too.
+#
+# Compared, not asserted absent: for the two seconds after local midnight the
+# normalized `$TODAY 00:00:00` is itself within the ±2s now-band and both forms
+# warn. That is the documented `NOW_TOKENS` residual, not a normalization bug.
+# Equality is the real claim: a bare date must behave like explicit midnight.
+BARE_TEXT="$( cd "$SINCE_REPO" && python3 "$LINT" stats --no-github --since "$TODAY" )"
+EXPLICIT_TEXT="$( cd "$SINCE_REPO" && python3 "$LINT" stats --no-github --since "$TODAY 00:00:00" )"
+BARE_WARN="$( printf '%s\n' "$BARE_TEXT" | grep -cF "⚠ --since" || true )"
+EXPLICIT_WARN="$( printf '%s\n' "$EXPLICIT_TEXT" | grep -cF "⚠ --since" || true )"
+# 2, not just "equal": the 00:00:01 commit is the one an unnormalized bare date
 # drops, so an equal-but-short pair is the regression, not a pass.
-if [ "$BARE" = "$EXPLICIT" ] && [ "$BARE" = "2" ]; then
+if [ "$BARE" = "$EXPLICIT" ] && [ "$BARE" = "2" ] \
+   && [ "$BARE_WARN" = "$EXPLICIT_WARN" ]; then
   pass "T25d: bare --since $TODAY matches '$TODAY 00:00:00' ($BARE commits)"
 else
   fail "T25d: bare --since gave $BARE commits, explicit midnight gave $EXPLICIT (want 2/2)"
+  echo "      window warnings — bare $BARE_WARN, explicit midnight $EXPLICIT_WARN"
+  printf '%s\n' "$BARE_TEXT" | grep -F "⚠ --since" | sed 's/^/      /' || true
 fi
 
 # ───────────────────────────────────────────────────────────
