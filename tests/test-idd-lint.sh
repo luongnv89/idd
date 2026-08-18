@@ -298,15 +298,35 @@ fi
 # git approxidate fills an unstated time of day from the current wall clock,
 # so `--since 2026-08-15` used to mean "2026-08-15 at whatever o'clock it is
 # now" and the same command returned different windows through the day.
-SINCE_DAY="$(date -u -d '1 day ago' '+%Y-%m-%d' 2>/dev/null || date -u -v-1d '+%Y-%m-%d')"
-BARE="$( (cd "$SYN" && python3 "$LINT" stats --no-github --since "$SINCE_DAY" --json) \
+#
+# The fixture is what makes this a test rather than a tautology: it needs a
+# commit *earlier today* than the moment the test runs. A repo whose commits are
+# all made at `now` gives the same count either way, so the assertion would hold
+# with `normalize_since` reverted to `return since`. Dates are all local — git
+# reads both GIT_COMMITTER_DATE and `--since` in the local zone, so `date -u`
+# here would misplace the commit relative to the window near midnight.
+SINCE_REPO="$TMP/since"
+mkdir -p "$SINCE_REPO"
+TODAY="$(date '+%Y-%m-%d')"
+(
+  cd "$SINCE_REPO"
+  git init -q -b main
+  git config user.email t@t
+  git config user.name t
+  GIT_COMMITTER_DATE="$TODAY 00:30:00" GIT_AUTHOR_DATE="$TODAY 00:30:00" \
+    git commit -q --allow-empty -m "chore(init): scaffold repo (#1)"
+  git commit -q --allow-empty -m "fix(core): repair broken thing (#2)"
+)
+BARE="$( (cd "$SINCE_REPO" && python3 "$LINT" stats --no-github --since "$TODAY" --json) \
          | python3 -c "import json,sys; print(json.load(sys.stdin)['git']['commits'])" )"
-EXPLICIT="$( (cd "$SYN" && python3 "$LINT" stats --no-github --since "$SINCE_DAY 00:00:00" --json) \
+EXPLICIT="$( (cd "$SINCE_REPO" && python3 "$LINT" stats --no-github --since "$TODAY 00:00:00" --json) \
          | python3 -c "import json,sys; print(json.load(sys.stdin)['git']['commits'])" )"
-if [ "$BARE" = "$EXPLICIT" ] && [ "$BARE" -gt 0 ]; then
-  pass "T25d: bare --since $SINCE_DAY matches '$SINCE_DAY 00:00:00' ($BARE commits)"
+# 2, not just "equal": the 00:30 commit is the one an unnormalized bare date
+# drops, so an equal-but-short pair is the regression, not a pass.
+if [ "$BARE" = "$EXPLICIT" ] && [ "$BARE" = "2" ]; then
+  pass "T25d: bare --since $TODAY matches '$TODAY 00:00:00' ($BARE commits)"
 else
-  fail "T25d: bare --since gave $BARE commits, explicit midnight gave $EXPLICIT"
+  fail "T25d: bare --since gave $BARE commits, explicit midnight gave $EXPLICIT (want 2/2)"
 fi
 
 # ───────────────────────────────────────────────────────────
@@ -348,6 +368,107 @@ assert m.classify_merge_commit('0' * 40) == 'not_in_clone'
   pass "T25e: classify_merge_commit sorts landed/lost/no_sha/not_in_clone"
 else
   fail "T25e: classify_merge_commit misclassified a merge commit"
+fi
+
+# ───────────────────────────────────────────────────────────
+# T25f: the per-PR B1 join — buckets, window, denominator (#180)
+# ───────────────────────────────────────────────────────────
+# T25e pins the verdict for a single oid; this pins what collect_dr_binding
+# does with a whole page of them. It runs inside $JOIN because the window
+# resolves its --since through `git rev-parse`, which needs a repository —
+# outside one the window would never apply and the assertions below would
+# quietly test nothing.
+if (cd "$JOIN" && python3 - <<PY
+import importlib.util
+spec = importlib.util.spec_from_file_location('idd_lint', '$LINT')
+m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+
+DR = "## Decision Record\n\n- **Root cause:** none."
+# mergedAt values sit months apart at midday UTC, so no local-timezone offset
+# on the `git rev-parse --since` side can move a PR across the boundary.
+merged = [
+    {"number": 1, "body": DR, "mergedAt": "2026-01-10T12:00:00Z",
+     "mergeCommit": {"oid": "$LANDED_OID"}},
+    {"number": 2, "body": DR, "mergedAt": "2026-01-11T12:00:00Z",
+     "mergeCommit": {"oid": "$LOST_OID"}},
+    {"number": 3, "body": DR, "mergedAt": "2026-06-10T12:00:00Z",
+     "mergeCommit": None},
+    {"number": 4, "body": DR, "mergedAt": "2026-06-11T12:00:00Z",
+     "mergeCommit": {"oid": "0" * 40}},
+    {"number": 5, "body": "no decision record here",
+     "mergedAt": "2026-06-12T12:00:00Z", "mergeCommit": {"oid": "$LANDED_OID"}},
+]
+
+b = m.collect_dr_binding(merged, 200, None)
+assert b["prs_with_dr"] == 4, b
+assert (b["dr_landed"], b["dr_lost"]) == (1, 1), b
+assert b["merge_commit_resolved"] == 2, b
+assert (b["unresolved_no_sha"], b["unresolved_not_in_clone"]) == (1, 1), b
+assert b["landed_pct"] == 50, b
+assert b["truncated"] is False, b
+assert b["window"] is None and "window_error" not in b, b
+assert m.collect_dr_binding(merged, 5, None)["truncated"] is True
+
+# A window holding only unresolvable PRs. The denominator is landed+lost, so it
+# is 0 — "unknown" — and _ratio_row renders a dim dash. Using prs_with_dr would
+# print a red 0% built from data nobody has: in a shallow clone every oid is
+# not_in_clone, so that is the CI default, not a corner case.
+b6 = m.collect_dr_binding(merged, 200, "2026-06-01 00:00:00")
+w = b6["window"]
+assert w is not None, "window did not resolve — is this a git repo?"
+assert w["prs_with_dr"] == 2, w
+assert w["merge_commit_resolved"] == 0, w
+assert (w["dr_landed"], w["dr_lost"]) == (0, 0), w
+assert (w["unresolved_no_sha"], w["unresolved_not_in_clone"]) == (1, 1), w
+head = m._render_dr_binding(b6)[0]
+assert "✗" not in head and "0%" not in head, head
+
+# A wider window holds every PR, so it must mirror the lifetime numbers.
+w2 = m.collect_dr_binding(merged, 200, "2026-01-01 00:00:00")["window"]
+assert (w2["prs_with_dr"], w2["merge_commit_resolved"]) == (4, 2), w2
+assert (w2["dr_landed"], w2["dr_lost"]) == (1, 1), w2
+
+# An unparsable --since resolves to *now* in git's approxidate, which would
+# otherwise report an empty-and-therefore-clean window to a JSON consumer.
+bad = m.collect_dr_binding(merged, 200, "garbage-typo")
+assert bad["window"] is None, bad
+assert bad["window_error"]["since"] == "garbage-typo", bad
+PY
+) 2>/dev/null; then
+  pass "T25f: collect_dr_binding buckets, windows, and excludes unresolved PRs"
+else
+  fail "T25f: collect_dr_binding mis-bucketed or mis-windowed the B1 join"
+fi
+
+# ───────────────────────────────────────────────────────────
+# T25g: dr_binding is wired into collect_github_stats (#180)
+# ───────────────────────────────────────────────────────────
+# Deleting the `"dr_binding": collect_dr_binding(...)` line left the whole
+# suite green, because every other B1 test called the collector directly.
+# Stubbing the gh boundary is what makes the wiring itself assertable.
+if (cd "$JOIN" && python3 - <<PY
+import importlib.util, pathlib
+spec = importlib.util.spec_from_file_location('idd_lint', '$LINT')
+m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+
+DR = "## Decision Record\n\n- **Root cause:** none."
+def fake_gh(*args):
+    if args[0] == "issue":
+        return [{"number": 1, "body": "<!-- gitissue:normalized v1 -->"}]
+    return [{"number": 9, "body": "Closes #9\n\n" + DR,
+             "mergedAt": "2026-01-10T12:00:00Z",
+             "mergeCommit": {"oid": "$LANDED_OID"}}]
+m._gh_json = fake_gh
+
+r = m.collect_github_stats(200, pathlib.Path("no-such-runs.jsonl"))
+assert r is not None and "dr_binding" in r, r
+assert r["dr_binding"]["dr_landed"] == 1, r["dr_binding"]
+assert r["dr_binding"]["merge_commit_resolved"] == 1, r["dr_binding"]
+PY
+) 2>/dev/null; then
+  pass "T25g: collect_github_stats carries dr_binding into the report"
+else
+  fail "T25g: collect_github_stats dropped the dr_binding join"
 fi
 
 # stats degrades gracefully outside a git repo

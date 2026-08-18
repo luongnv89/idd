@@ -23,6 +23,8 @@ Exit codes: 0 = conformant (warnings allowed), 1 = errors found, 2 = usage.
 `--since '2026-08-15 00:00:00'`. A bare `YYYY-MM-DD` is normalized to midnight
 before it reaches git, because git otherwise fills the time of day from the
 current wall clock and the window silently shifts with the hour you run it.
+git reads that date in the *local* zone while a PR's `mergedAt` is UTC, so a PR
+merged at `2026-08-14T23:00Z` is inside a `2026-08-15` window in UTC+2.
 
 CI example (GitHub Actions):
 
@@ -69,6 +71,9 @@ COMMIT_RE = re.compile(
 
 DR_HEADING = "## Decision Record"
 BARE_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+# Approxidate spellings that legitimately resolve to *now*, so a resolved
+# timestamp of ~now from one of these is an answer, not a parse failure.
+NOW_TOKENS = {"now", "today", "@now"}
 ADR_NO_BACKFILL = "docs/decisions/no-backfill-merged-decision-records.md"
 
 DR_FIELDS = ("Root cause", "Options considered", "Options rejected", "Selected option", "Residual risk")
@@ -421,20 +426,34 @@ def normalize_since(since: str | None) -> str | None:
     return f"{stripped} 00:00:00" if BARE_DATE_RE.match(stripped) else since
 
 
-def _since_epoch(since: str | None) -> int | None:
+def _since_epoch(since: str | None) -> tuple[int | None, str | None]:
     """Resolve a git approxidate to a Unix timestamp via `git rev-parse --since=`.
 
     Using git itself keeps the PR-side `mergedAt` filter and the git-side
-    `--since` window on exactly one date grammar. Returns None when git is
-    unavailable (the caller then declines to claim a window).
+    `--since` window on exactly one date grammar.
+
+    Returns `(epoch, error)`. `error` is None when no window was asked for or
+    the window resolved; otherwise it is the reason the window could not be
+    applied. The two must stay distinguishable: a window that was requested and
+    failed to resolve is not the same report as one that was never requested,
+    and rendering them alike advises the reader to do what they just did.
+
+    git's approxidate never rejects input — `--since=garbage-typo` silently
+    resolves to *now*, which yields an empty window and a green report built
+    from nothing. Anything landing within a couple of seconds of now, from a
+    string that is not itself a now-token, is read as a parse failure.
     """
     if not since:
-        return None
+        return None, None
     out = _run_soft(["git", "rev-parse", f"--since={since}"])
-    if not out:
-        return None
-    m = re.search(r"--max-age=(\d+)", out)
-    return int(m.group(1)) if m else None
+    m = re.search(r"--max-age=(\d+)", out) if out else None
+    if not m:
+        return None, "could not be resolved (not a git repository?)"
+    epoch = int(m.group(1))
+    now = int(datetime.now(timezone.utc).timestamp())
+    if since.strip().lower() not in NOW_TOKENS and abs(now - epoch) <= 2:
+        return None, "did not parse as a date"
+    return epoch, None
 
 
 def _merged_at_epoch(value: object) -> int | None:
@@ -641,7 +660,10 @@ def collect_dr_binding(merged: list, limit: int, since: str | None) -> dict:
         oid = mc.get("oid") if isinstance(mc, dict) else None
         verdict = classify_merge_commit(oid)
         counts[verdict] += 1
-        verdict_by_pr[id(pr)] = verdict
+        # Keyed on the PR number, not `id(pr)`: identity is only stable while
+        # this exact list of dicts is alive, and a future refactor that copies
+        # or re-parses a PR would silently miss every lookup.
+        verdict_by_pr[pr["number"]] = verdict
 
     resolved = counts["landed"] + counts["lost"]
     binding = {
@@ -661,17 +683,30 @@ def collect_dr_binding(merged: list, limit: int, since: str | None) -> dict:
 
     if since:
         # `gh pr list` has no merged-date flag, so the window is applied here.
-        cutoff = _since_epoch(since)
-        if cutoff is not None:
+        cutoff, error = _since_epoch(since)
+        if cutoff is None:
+            # Say so in the document, not only on the terminal: the caller most
+            # likely to be misled is a JSON consumer gating on `dr_lost > 0`,
+            # and an absent window is indistinguishable from a clean one.
+            binding["window_error"] = {"since": since, "reason": error}
+        else:
             in_window = [
                 p for p in with_dr
                 if (_merged_at_epoch(p.get("mergedAt")) or -1) >= cutoff
             ]
+            # Same buckets and the same key names as the lifetime numbers above,
+            # so the denominator is `landed + lost` on both sides. Counting the
+            # unresolved PRs as misses would render `✗ 0%` from unknown data —
+            # in a shallow clone every oid is `not_in_clone`.
+            w = {v: [p for p in in_window if verdict_by_pr[p["number"]] == v] for v in counts}
             binding["window"] = {
                 "since": since,
                 "prs_with_dr": len(in_window),
-                "dr_landed": sum(1 for p in in_window if verdict_by_pr[id(p)] == "landed"),
-                "dr_lost": sum(1 for p in in_window if verdict_by_pr[id(p)] == "lost"),
+                "merge_commit_resolved": len(w["landed"]) + len(w["lost"]),
+                "unresolved_no_sha": len(w["no_sha"]),
+                "unresolved_not_in_clone": len(w["not_in_clone"]),
+                "dr_landed": len(w["landed"]),
+                "dr_lost": len(w["lost"]),
             }
     return binding
 
@@ -815,30 +850,52 @@ def _render_dr_binding(b: dict | None) -> list[str]:
     win = b.get("window")
 
     if win:
-        lines.append(_ratio_row("DR landed in git (window)", win["dr_landed"], win["prs_with_dr"], "§4.3"))
+        # Denominator is `landed + lost`, exactly as the lifetime row computes
+        # it. `prs_with_dr` would fold the unresolved PRs in as misses and paint
+        # a red `✗ 0%` directly above the caveat line saying they are excluded.
+        # At a zero denominator `_ratio_row` falls to its `○ … —` branch, which
+        # is the intended reading: unknown, not a miss.
+        lines.append(_ratio_row("DR landed in git (window)", win["dr_landed"],
+                                win["merge_commit_resolved"], "§4.3"))
         lines.append(_c(f"      window — merged since {win['since']}", "dim"))
         if win["dr_lost"]:
             n = win["dr_lost"]
             lines.append(
-                f"    {_c('⚠', 'yellow')} {n} merged PR{'s' if n != 1 else ''} in this window "
-                f"lost the Decision Record at merge — binding B1 is being defeated (§4.3)"
+                f"    {_c('⚠', 'yellow')} {n} merged PR{'s' if n != 1 else ''} "
+                f"in this window lost the Decision Record at merge"
             )
+            lines.append(_c("      binding B1 is being defeated (§4.3)", "yellow"))
     else:
         counts = f"{landed}/{resolved}" if resolved else "—"
         lines.append(
             f"    {_c('○', 'dim')} {'DR landed in git (lifetime)':<{_LABEL_W}}"
             f" {_c('░' * _METER_W, 'dim')}     {_c('—', 'dim')}  {counts:>7}  {_c('§4.3', 'dim')}"
         )
-        lines.append(_c(f"      lifetime shortfall is a recorded decision, not a regression — {b['adr']}", "dim"))
-        lines.append(_c("      run with --since to judge the binding as it stands today", "dim"))
+        lines.append(_c("      lifetime shortfall is a recorded decision, not a regression", "dim"))
+        # The ADR path gets its own line: it is a URL-shaped token, and the
+        # joined form ran to 121 columns against this report's 80-column rail.
+        lines.append(_c(f"      {b['adr']}", "dim"))
+        we = b.get("window_error")
+        if we:
+            # A window was asked for and could not be applied. Saying nothing
+            # here would print the "run with --since" hint below, advising the
+            # reader to do the thing they just did.
+            lines.append(f"    {_c('⚠', 'yellow')} --since {we['since']!r} {we['reason']}")
+            lines.append(_c("      window not applied — this is the lifetime row", "dim"))
+        else:
+            lines.append(_c("      run with --since to judge the binding as it stands today", "dim"))
 
     if lost and not win:
         lines.append(_c(f"      {lost} of {b['prs_with_dr']} PRs with a Decision Record lost it at merge", "dim"))
-    unresolved = b["unresolved_no_sha"] + b["unresolved_not_in_clone"]
+    # Read the caveat from whichever population the row above counted, or the
+    # printed numbers describe a different set of PRs than the ratio does.
+    src = win or b
+    unresolved = src["unresolved_no_sha"] + src["unresolved_not_in_clone"]
     if unresolved:
         lines.append(_c(
-            f"      {unresolved} unresolved ({b['unresolved_no_sha']} no merge sha, "
-            f"{b['unresolved_not_in_clone']} not in this clone) — excluded, not counted as misses", "dim"))
+            f"      {unresolved} unresolved ({src['unresolved_no_sha']} no merge sha, "
+            f"{src['unresolved_not_in_clone']} not in this clone)", "dim"))
+        lines.append(_c("      excluded from the ratio, not counted as misses", "dim"))
     if b["truncated"]:
         # No symbol: in this report ⚠ is a verdict glyph carrying a tone, and
         # this is a scope caveat on a continuation line, not a verdict.
@@ -1013,7 +1070,9 @@ def main(argv: list[str]) -> int:
         "--since",
         help="limit the window to commits/merges after DATE, e.g. '2026-08-15 00:00:00' "
              "or '6 months ago'; a bare YYYY-MM-DD is normalized to midnight so the "
-             "window does not drift with the wall clock",
+             "window does not drift with the wall clock. DATE is read in the local "
+             "timezone while a PR's mergedAt is UTC, so a PR merged 2026-08-14T23:00Z "
+             "falls inside a 2026-08-15 window in UTC+2",
     )
     p_stats.add_argument("--limit", type=int, default=200, help="max issues/PRs fetched via gh (default: 200)")
     p_stats.add_argument("--no-github", action="store_true", help="skip gh-backed metrics (offline mode)")
