@@ -158,6 +158,8 @@ This is a **warn, never a pass**, even when the strategy half is perfect (`squas
 
 ### `{summary}` enumeration
 
+`{summary}` belongs to the **warn** lines only. The pass line has its own fixed wording — `squash-only · squash message source PR_BODY`, joined with `·` — because a pass has exactly one shape and needs no enumeration. Everything below describes the warn lines, which join their clauses with `;`.
+
 `{summary}` is the strategy clause, then — when the message source was read — a `; squash message source {value}` clause appended.
 
 | Strategy state | Strategy clause |
