@@ -443,6 +443,15 @@ def _since_epoch(since: str | None) -> tuple[int | None, str | None]:
     resolves to *now*, which yields an empty window and a green report built
     from nothing. Anything landing within a couple of seconds of now, from a
     string that is not itself a now-token, is read as a parse failure.
+
+    Residual, accepted: approxidate's spellings of *now* are open-ended, so
+    `NOW_TOKENS` cannot be completed. `1 second ago` and `2 seconds ago` land
+    inside the ±2s band without being listed there, and are therefore reported
+    as unparseable. That is the safe direction of the error — the report
+    degrades to lifetime and says so, rather than claiming a window it did not
+    apply — and it is why this returns an error the caller renders instead of
+    exiting non-zero. Do not try to enumerate more tokens; widening the list
+    only moves the boundary, it does not remove it.
     """
     if not since:
         return None, None

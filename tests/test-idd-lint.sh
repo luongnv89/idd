@@ -305,6 +305,11 @@ fi
 # with `normalize_since` reverted to `return since`. Dates are all local — git
 # reads both GIT_COMMITTER_DATE and `--since` in the local zone, so `date -u`
 # here would misplace the commit relative to the window near midnight.
+#
+# 00:00:01, not 00:30:00: the backdated commit only exercises the bug while the
+# unnormalized bare date resolves *later in the day* than it. At 00:30 the test
+# tautologized for the first half-hour of every local day; at 00:00:01 the blind
+# spot is one second wide.
 SINCE_REPO="$TMP/since"
 mkdir -p "$SINCE_REPO"
 TODAY="$(date '+%Y-%m-%d')"
@@ -313,7 +318,7 @@ TODAY="$(date '+%Y-%m-%d')"
   git init -q -b main
   git config user.email t@t
   git config user.name t
-  GIT_COMMITTER_DATE="$TODAY 00:30:00" GIT_AUTHOR_DATE="$TODAY 00:30:00" \
+  GIT_COMMITTER_DATE="$TODAY 00:00:01" GIT_AUTHOR_DATE="$TODAY 00:00:01" \
     git commit -q --allow-empty -m "chore(init): scaffold repo (#1)"
   git commit -q --allow-empty -m "fix(core): repair broken thing (#2)"
 )
@@ -378,6 +383,7 @@ fi
 # resolves its --since through `git rev-parse`, which needs a repository —
 # outside one the window would never apply and the assertions below would
 # quietly test nothing.
+T25F_ERR="$TMP/t25f.err"
 if (cd "$JOIN" && python3 - <<PY
 import importlib.util
 spec = importlib.util.spec_from_file_location('idd_lint', '$LINT')
@@ -385,7 +391,10 @@ m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
 
 DR = "## Decision Record\n\n- **Root cause:** none."
 # mergedAt values sit months apart at midday UTC, so no local-timezone offset
-# on the \`git rev-parse --since\` side can move a PR across the boundary.
+# on the \`git rev-parse --since\` side can move a PR across the boundary. The
+# two unresolvable PRs (3: no sha, 4: not in this clone) sit in *different*
+# quarters on purpose — a window that catches only one of them is what makes
+# the rendered caveat differ between the window and lifetime populations.
 merged = [
     {"number": 1, "body": DR, "mergedAt": "2026-01-10T12:00:00Z",
      "mergeCommit": {"oid": "$LANDED_OID"}},
@@ -393,7 +402,7 @@ merged = [
      "mergeCommit": {"oid": "$LOST_OID"}},
     {"number": 3, "body": DR, "mergedAt": "2026-06-10T12:00:00Z",
      "mergeCommit": None},
-    {"number": 4, "body": DR, "mergedAt": "2026-06-11T12:00:00Z",
+    {"number": 4, "body": DR, "mergedAt": "2026-09-11T12:00:00Z",
      "mergeCommit": {"oid": "0" * 40}},
     {"number": 5, "body": "no decision record here",
      "mergedAt": "2026-06-12T12:00:00Z", "mergeCommit": {"oid": "$LANDED_OID"}},
@@ -431,16 +440,39 @@ w2 = m.collect_dr_binding(merged, 200, m.resolve_since("2026-01-01 00:00:00"))["
 assert (w2["prs_with_dr"], w2["merge_commit_resolved"]) == (4, 2), w2
 assert (w2["dr_landed"], w2["dr_lost"]) == (1, 1), w2
 
+# The unresolved caveat must count the population the row above counted. This
+# window holds PR 4 alone, so its caveat reads 0 no-sha / 1 not-in-clone against
+# a lifetime of 1 / 1 — reading the lifetime numbers here would describe a
+# different set of PRs than the ratio directly above them.
+b7 = m.collect_dr_binding(merged, 200, m.resolve_since("2026-08-01 00:00:00"))
+assert b7["window"]["prs_with_dr"] == 1, b7["window"]
+assert (b7["window"]["unresolved_no_sha"],
+        b7["window"]["unresolved_not_in_clone"]) == (0, 1), b7["window"]
+win_lines = "\n".join(m._render_dr_binding(b7))
+assert "1 unresolved (0 no merge sha, 1 not in this clone)" in win_lines, win_lines
+assert "2 unresolved" not in win_lines, win_lines
+assert "excluded from the ratio, not counted as misses" in win_lines, win_lines
+
 # An unparsable --since resolves to *now* in git's approxidate, which would
 # otherwise report an empty-and-therefore-clean window to a JSON consumer.
 bad = m.collect_dr_binding(merged, 200, m.resolve_since("garbage-typo"))
 assert bad["window"] is None, bad
 assert bad["window_error"]["since"] == "garbage-typo", bad
+
+# The lifetime row must not then print the "run with --since" hint: the reader
+# just did that. The ⚠ itself lives at the top of the report (T25h), not here.
+bad_lines = "\n".join(m._render_dr_binding(bad))
+assert "window not applied — see the note at the top" in bad_lines, bad_lines
+assert "run with --since" not in bad_lines, bad_lines
+assert "⚠" not in bad_lines, bad_lines
 PY
-) 2>/dev/null; then
+) 2>"$T25F_ERR"; then
   pass "T25f: collect_dr_binding buckets, windows, and excludes unresolved PRs"
 else
   fail "T25f: collect_dr_binding mis-bucketed or mis-windowed the B1 join"
+  # Print what actually broke. Swallowing this made an unset LANDED_OID or a
+  # missing python3 indistinguishable from a real mis-bucketing.
+  sed 's/^/      /' "$T25F_ERR"
 fi
 
 # ───────────────────────────────────────────────────────────
@@ -449,6 +481,7 @@ fi
 # Deleting the `"dr_binding": collect_dr_binding(...)` line left the whole
 # suite green, because every other B1 test called the collector directly.
 # Stubbing the gh boundary is what makes the wiring itself assertable.
+T25G_ERR="$TMP/t25g.err"
 if (cd "$JOIN" && python3 - <<PY
 import importlib.util, pathlib
 spec = importlib.util.spec_from_file_location('idd_lint', '$LINT')
@@ -468,10 +501,11 @@ assert r is not None and "dr_binding" in r, r
 assert r["dr_binding"]["dr_landed"] == 1, r["dr_binding"]
 assert r["dr_binding"]["merge_commit_resolved"] == 1, r["dr_binding"]
 PY
-) 2>/dev/null; then
+) 2>"$T25G_ERR"; then
   pass "T25g: collect_github_stats carries dr_binding into the report"
 else
   fail "T25g: collect_github_stats dropped the dr_binding join"
+  sed 's/^/      /' "$T25G_ERR"
 fi
 
 # ───────────────────────────────────────────────────────────
