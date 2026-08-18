@@ -62,30 +62,39 @@ no-backfill ADR.
 
 ## Residual risk
 
-The repair fixed the message source. It did **not** make squash the only way to
-land a change:
+The 2026-08-15 repair fixed the message source. Closing the two non-squash merge
+paths was a separate change, and it has since been made:
 
 ```console
 $ gh repo view --json mergeCommitAllowed,squashMergeAllowed,rebaseMergeAllowed
-{"mergeCommitAllowed":true,"rebaseMergeAllowed":true,"squashMergeAllowed":true}
+{"mergeCommitAllowed":false,"rebaseMergeAllowed":false,"squashMergeAllowed":true}
 ```
 
-Both bypasses are one click away in the GitHub merge-button dropdown:
+Squash is the only button, and its message source is `PR_BODY`, so the full
+check-4 predicate holds: B1 is in force rather than merely declared.
+
+What remains is not a merge path but a mutability. All three flags are
+repository settings, not files — nothing in the tree records them, no review
+gates a change to them, and re-enabling either bypass is a checkbox under
+Settings → General → Pull Requests. Were that to happen, the two paths would
+behave exactly as they did before:
 
 - **Merge commit.** `merge_commit_message` is `PR_TITLE`, so the merge commit
-  carries the title and no body. The Decision Record does not land.
+  would carry the title and no body. The Decision Record would not land.
 - **Rebase.** The PR body is never consulted at all; the branch's own commit
-  messages are replayed. The Decision Record does not land.
+  messages are replayed. The Decision Record would not land.
 
 Neither bypass leaves a mark distinguishable from an ordinary merge in the button
 UI, so this is not a risk discipline can carry on its own — which is why
-`/idd-doctor` check 4 now reads both levels and warns when either is wrong, and
-why it reports `binding unverified` rather than a pass when the message source
-cannot be read at all.
+`/idd-doctor` check 4 reads both levels and warns when either is wrong, and why
+it reports `binding unverified` rather than a pass when the message source
+cannot be read at all. That check is what turns an unreviewable setting into
+something a routine doctor run surfaces.
 
-## The remedy is a recommendation, not an action
+## Enforcement is the owner's, not the tool's
 
-The fix is one call:
+The lockdown above was applied by the repository owner. This project does not
+apply it, then or now:
 
 ```bash
 gh api -X PATCH repos/:owner/:repo \
@@ -93,17 +102,18 @@ gh api -X PATCH repos/:owner/:repo \
   -f allow_rebase_merge=false
 ```
 
-This project does not run it. Repository settings are owner-controlled, and the
-same stance governs the tooling: `/idd-doctor` warns rather than fails on check 4
-precisely because "repo settings are owner-controlled and the doctor only nudges"
+Repository settings are owner-controlled, and the same stance governs the
+tooling: `/idd-doctor` warns rather than fails on check 4 precisely because
+"repo settings are owner-controlled and the doctor only nudges"
 (`src/internal-skills/idd-doctor/SKILL.source.md`, Check 4). A tool that mutated
 an owner's repository to make its own check pass would be a worse defect than the
-one it fixed. The command is recorded here, and in the doctor's fix hint, so the
-owner meets it at the moment the warning appears.
+one it fixed. The command stays recorded here, and in the doctor's fix hint, so
+that an owner whose repo drifts back meets it at the moment the warning appears.
 
-Until it is run, this repo's B1 binding is **satisfied for squash merges and
-bypassable by two other merge buttons**. That is the honest statement, and it is
-the one the tooling now prints.
+As of this declaration this repo's B1 binding is **in force** — squash-only,
+`PR_BODY` message source, both bypasses closed. That is the honest statement,
+and it is the one the tooling now prints: check 4 reports a pass rather than a
+warning.
 
 ## Consequences
 

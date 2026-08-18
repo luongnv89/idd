@@ -179,7 +179,7 @@ This is a **warn, never a pass**, even when the strategy half is perfect (`squas
 | `BLANK` | `; squash message source BLANK` |
 | Unreadable | `; squash message source unreadable — binding unverified` |
 
-This repo today reads `squash + merge-commit + rebase enabled; squash message source PR_BODY` — the message source was repaired under #295, but a one-click merge-commit or rebase still bypasses B1. See `docs/decisions/b1-binding-declaration.md`.
+This repo today reads `squash-only · squash message source PR_BODY` — the message source was repaired under #295 and the merge-commit and rebase strategies were disabled afterwards, so the full predicate holds and check 4 passes. See `docs/decisions/b1-binding-declaration.md`.
 
 ---
 
