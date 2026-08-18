@@ -104,7 +104,7 @@ Expected output for a clean repo (verify against this when testing the skill):
     ✓ [3/4] Autopilot mode        autopilot.mode = conservative
 
     ● [4/4] Squash-merge default...
-    ✓ [4/4] Squash-merge default  squash-only
+    ✓ [4/4] Squash-merge default  squash-only · squash message source PR_BODY
 
     ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
     Result: PASS  (4 checks, 0 failed, 0 warned)
@@ -259,48 +259,64 @@ The fail line is followed by a fix hint indented one extra level:
 
 ## Check 4 — Squash-merge default
 
-Verify that the repository's default merge strategy is squash. IDD uses one-commit-per-PR semantics, so any non-squash strategy is a footgun.
+Verify that the repository's merge configuration actually carries the SPEC §4.3 **B1** binding: squash is the only strategy, **and** the squash commit message is the PR body. IDD uses one-commit-per-PR semantics, so any non-squash strategy is a footgun — and a squash-only repo still defeats B1 if `squash_merge_commit_message` is GitHub's default `COMMIT_MESSAGES`, which writes the list of commit subjects and drops the Decision Record at the merge boundary.
+
+SPEC §4.3 requires warning at **both** levels, and forbids reporting the binding satisfied on the strategy alone or when the configuration cannot be read.
 
 ### Procedure
 
 1. Confirm `gh` is on `PATH` and authenticated.
    - If `gh` is missing: skip with `○ [4/4] Squash-merge default  skipped — gh not installed`.
    - If `gh auth status` fails: skip with `○ [4/4] Squash-merge default  skipped — gh not authenticated`.
-2. Run:
+2. Read the **strategy**:
 
    ```bash
    gh repo view --json mergeCommitAllowed,squashMergeAllowed,rebaseMergeAllowed
    ```
 
-3. Parse the JSON. The check **passes** iff:
+3. Read the **message source** — a second, separate call. It is not a `gh repo view` field (`gh repo view --json squashMergeCommitMessage` fails with `Unknown JSON field`), so read it from the REST API:
+
+   ```bash
+   gh api repos/{owner}/{repo} --jq '{squash_merge_commit_title,squash_merge_commit_message}'
+   ```
+
+4. Parse both. The check **passes** iff:
 
    ```
    squashMergeAllowed == true
      AND mergeCommitAllowed == false
      AND rebaseMergeAllowed == false
+     AND squash_merge_commit_message == "PR_BODY"
    ```
 
-4. Otherwise, **warn** (not fail) — repo settings are owner-controlled and the doctor only nudges.
+5. If step 2 succeeded but step 3 did not — the call 404s, the token lacks the permission, or the field is absent — the message source is **unknown**. Warn with `binding unverified`. Never pass: an unread configuration is not a satisfied binding (SPEC §4.3). A missing or unauthenticated `gh` still **skips** (step 1) — a skip claims nothing about the binding, which is not the same as claiming it holds.
+6. Otherwise, **warn** (not fail) — repo settings are owner-controlled and the doctor only nudges.
 
 ### Output
 
 | Outcome | Line |
 |---------|------|
 | Skip | `○ [4/4] Squash-merge default  skipped — gh not installed` (or *not authenticated*) |
-| Pass | `✓ [4/4] Squash-merge default  squash-only` |
+| Pass | `✓ [4/4] Squash-merge default  squash-only · squash message source PR_BODY` |
 | Warn | `⚠ [4/4] Squash-merge default  {summary} — recommend squash-only` |
+| Warn (unread) | `⚠ [4/4] Squash-merge default  {summary}; squash message source unreadable — binding unverified` |
 
-The summary text lists which strategies are currently allowed, e.g. `squash + merge-commit + rebase enabled`.
+`{summary}` lists the strategies currently allowed, then — when step 3 succeeded — the message-source clause. For example `squash + merge-commit + rebase enabled; squash message source PR_BODY`, or `squash-only; squash message source COMMIT_MESSAGES`. The full enumeration is in `references/error-messages.md`.
 
 The warn line is followed by a fix hint indented one extra level:
 
 ```
-        Fix: in repo Settings → General → Pull Requests, allow only "Squash merging"
+        Fix: in repo Settings → General → Pull Requests, allow only "Squash merging",
+             and set the squash commit message to "Pull request title and description"
         Or:  gh api -X PATCH repos/:owner/:repo \
                -f allow_squash_merge=true \
                -f allow_merge_commit=false \
-               -f allow_rebase_merge=false
+               -f allow_rebase_merge=false \
+               -f squash_merge_commit_title=PR_TITLE \
+               -f squash_merge_commit_message=PR_BODY
 ```
+
+Both `squash_merge_commit_*` fields go in one call: GitHub pairs `PR_BODY` only with `PR_TITLE` and rejects the message on its own with HTTP 422.
 
 ---
 
@@ -389,7 +405,7 @@ The skill MUST NOT modify any file in the repo, create branches or commits, open
 - Edit issue bodies or post comments
 - Mutate `.gitissue.yml` or any config file
 
-The implementation reads files (via `Read` / `cat`) and runs read-only `gh` queries (`gh repo view --json …`, `gh auth status`). Test fixtures (see *Testing*) assert that the working tree is unchanged after a doctor run.
+The implementation reads files (via `Read` / `cat`) and runs read-only `gh` queries (`gh repo view --json …`, `gh api repos/{owner}/{repo}`, `gh auth status`). Test fixtures (see *Testing*) assert that the working tree is unchanged after a doctor run.
 
 ---
 

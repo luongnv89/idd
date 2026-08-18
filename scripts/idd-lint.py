@@ -11,7 +11,7 @@ Validates Issue-Driven Development artifacts against the IDD Spec
   idd-lint pr     [FILE|-] [--title T] [--type bug|...]
                                         lint a PR body (+ title)     (L2 §5, L3 §4)
   idd-lint repo   [--base REF]          lint current branch + commits vs base
-  idd-lint stats  [--branch REF] [--no-github] [--json]
+  idd-lint stats  [--branch REF] [--since DATE] [--no-github] [--json]
                                         evidence report: trace-completeness,
                                         Decision-Record coverage, run outcomes
 
@@ -19,6 +19,12 @@ FILE of `-` (or omitted) reads stdin. `--level L1|L2|L3` (default L3) selects
 the conformance level to enforce; checks above the selected level are skipped.
 Exit codes: 0 = conformant (warnings allowed), 1 = errors found, 2 = usage.
 `stats` is a report, not a gate — it exits 0 unless the data is unreadable.
+`--since` accepts any git approxidate. Prefer an unambiguous absolute form —
+`--since '2026-08-15 00:00:00'`. A bare `YYYY-MM-DD` is normalized to midnight
+before it reaches git, because git otherwise fills the time of day from the
+current wall clock and the window silently shifts with the hour you run it.
+git reads that date in the *local* zone while a PR's `mergedAt` is UTC, so a PR
+merged at `2026-08-14T23:00Z` is inside a `2026-08-15` window in UTC+2.
 
 CI example (GitHub Actions):
 
@@ -36,6 +42,8 @@ import re
 import statistics
 import subprocess
 import sys
+from datetime import datetime, timezone
+from typing import NamedTuple
 from pathlib import Path
 
 SPEC_VERSION = "1.1"
@@ -61,6 +69,13 @@ COMMIT_RE = re.compile(
     r"(?:\(([a-z0-9._-]+)\))?"                          # optional scope
     r": (.+?) \(#(\d+)\)$"                              # description + issue ref
 )
+
+DR_HEADING = "## Decision Record"
+BARE_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+# Approxidate spellings that legitimately resolve to *now*, so a resolved
+# timestamp of ~now from one of these is an answer, not a parse failure.
+NOW_TOKENS = {"now", "today", "@now"}
+ADR_NO_BACKFILL = "docs/decisions/no-backfill-merged-decision-records.md"
 
 DR_FIELDS = ("Root cause", "Options considered", "Options rejected", "Selected option", "Residual risk")
 AC_STATUSES = ("pass", "fail", "unverified")
@@ -397,6 +412,106 @@ def _gh_json(*args: str) -> object | None:
         return None
 
 
+def normalize_since(since: str | None) -> str | None:
+    """Pin a bare `YYYY-MM-DD` to midnight.
+
+    Git's approxidate parser fills an unstated time of day from the *current*
+    wall clock, so `--since 2026-08-15` means "2026-08-15 at whatever o'clock it
+    is now" and the same command returns different windows through the day.
+    Anything else (an explicit time, `6 months ago`, a ref-ish date) is passed
+    through untouched — git owns that grammar.
+    """
+    if since is None:
+        return None
+    stripped = since.strip()
+    return f"{stripped} 00:00:00" if BARE_DATE_RE.match(stripped) else since
+
+
+def _since_epoch(since: str | None) -> tuple[int | None, str | None]:
+    """Resolve a git approxidate to a Unix timestamp via `git rev-parse --since=`.
+
+    Using git itself keeps the PR-side `mergedAt` filter and the git-side
+    `--since` window on exactly one date grammar.
+
+    Returns `(epoch, error)`. `error` is None when no window was asked for or
+    the window resolved; otherwise it is the reason the window could not be
+    applied. The two must stay distinguishable: a window that was requested and
+    failed to resolve is not the same report as one that was never requested,
+    and rendering them alike advises the reader to do what they just did.
+
+    git's approxidate never rejects input — `--since=garbage-typo` silently
+    resolves to *now*, which yields an empty window and a green report built
+    from nothing. Anything landing within a couple of seconds of now, from a
+    string that is not itself a now-token, is read as a parse failure.
+
+    Residual, accepted: approxidate's spellings of *now* are open-ended, so
+    `NOW_TOKENS` cannot be completed. `1 second ago` and `2 seconds ago` land
+    inside the ±2s band without being listed there, and are therefore reported
+    as unparseable. That is the safe direction of the error — the report
+    degrades to lifetime and says so, rather than claiming a window it did not
+    apply — and it is why this returns an error the caller renders instead of
+    exiting non-zero. Do not try to enumerate more tokens; widening the list
+    only moves the boundary, it does not remove it.
+    """
+    if not since:
+        return None, None
+    out = _run_soft(["git", "rev-parse", f"--since={since}"])
+    m = re.search(r"--max-age=(\d+)", out) if out else None
+    if not m:
+        return None, "could not be resolved (not a git repository?)"
+    epoch = int(m.group(1))
+    now = int(datetime.now(timezone.utc).timestamp())
+    if since.strip().lower() not in NOW_TOKENS and abs(now - epoch) <= 2:
+        return None, "did not parse as a date"
+    return epoch, None
+
+
+class SinceWindow(NamedTuple):
+    """One resolution of `--since`, shared by every section of the report.
+
+    `stats` feeds `--since` to two independent consumers — the local git
+    history and the PR-side B1 join. Resolving it separately in each let them
+    disagree: git's approxidate accepts `garbage-typo` as *now* and zeroed the
+    git section, while the join detected the same string as unparseable and
+    printed "window not applied". One report, two answers.
+
+    So the string is resolved exactly once, in `cmd_stats`, and this is what
+    both consumers receive. `cutoff is None` means the window could not be
+    applied *anywhere*: every section falls back to lifetime and the caller
+    renders `error` once, at the top of the report.
+    """
+
+    since: str          # the normalized string, as it will be shown to the reader
+    cutoff: int | None  # Unix timestamp, or None when the window did not resolve
+    error: str | None   # why it did not resolve; None when `cutoff` is set
+
+
+def resolve_since(raw: str | None) -> SinceWindow | None:
+    """Normalize and resolve `--since` once. None means no window was asked for.
+
+    A returned window with `cutoff is None` is a *requested* window that failed
+    to resolve — deliberately distinct from this returning None, which means the
+    reader never asked for one. Rendering the two alike would advise them to run
+    with the flag they just ran with.
+    """
+    since = normalize_since(raw)
+    if since is None:
+        return None
+    cutoff, error = _since_epoch(since)
+    return SinceWindow(since, cutoff, error)
+
+
+def _merged_at_epoch(value: object) -> int | None:
+    """`2026-08-14T19:33:53Z` → Unix timestamp; None when unparsable."""
+    if not isinstance(value, str):
+        return None
+    try:
+        dt = datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ")
+    except ValueError:
+        return None
+    return int(dt.replace(tzinfo=timezone.utc).timestamp())
+
+
 def _pct(n: int, d: int) -> int | None:
     return round(100 * n / d) if d else None
 
@@ -446,7 +561,24 @@ def detect_default_branch() -> str:
 
 
 def collect_commit_stats(branch: str, since: str | None) -> dict | None:
-    """Trace-completeness and Decision-Record coverage from local git history."""
+    """Trace-completeness and Decision-Record coverage from local git history.
+
+    The Decision-Record denominator is every **PR-derived** commit: one whose
+    subject carries a `(#N)` reference *or* whose body opens with `Closes #N`.
+    Keying it on `Closes #N` alone — as this did before #180 — silently drops
+    the failures out of the sample: a squash landed under GitHub's default
+    `squash_merge_commit_message=COMMIT_MESSAGES` carries a bullet list of
+    commit subjects and no `Closes #N`, so exactly the commits that *lost* their
+    Decision Record at the merge boundary left the denominator instead of
+    counting as misses, and the ratio measured the survivors against themselves.
+
+    This is a local proxy, not the verdict: a `(#N)` subject with no `Closes`
+    body may be a direct-to-main commit rather than a defeated merge. The
+    authoritative measurement is the per-PR join in `collect_dr_binding`.
+
+    `--no-merges` is deliberate. `grammar_pct` and `trace_pct` are claims about
+    *authored* commits; folding merge commits in would corrupt both.
+    """
     cmd = ["git", "log", "--no-merges", "--format=%s%x1f%b%x1e", branch]
     if since:
         cmd.insert(2, f"--since={since}")
@@ -454,28 +586,35 @@ def collect_commit_stats(branch: str, since: str | None) -> dict | None:
     if out is None:
         return None
     records = [r for r in out.split("\x1e") if r.strip()]
-    total, grammar, issue_ref, squash, dr = len(records), 0, 0, 0, 0
+    total, grammar = len(records), 0
+    subject_ref = closes_body = both = pr_derived = dr = 0
     for rec in records:
         subject, _, body = rec.partition("\x1f")
         subject = subject.strip()
         if COMMIT_RE.match(subject):
             grammar += 1
-        if re.search(r"\(#\d+\)", subject):
-            issue_ref += 1
-        if re.search(r"^Closes #\d+", body, re.MULTILINE):
-            squash += 1
-            if "## Decision Record" in body:
+        has_subject_ref = bool(re.search(r"\(#\d+\)", subject))
+        has_closes = bool(re.search(r"^Closes #\d+", body, re.MULTILINE))
+        subject_ref += has_subject_ref
+        closes_body += has_closes
+        both += has_subject_ref and has_closes
+        if has_subject_ref or has_closes:
+            pr_derived += 1
+            if DR_HEADING in body:
                 dr += 1
     return {
         "branch": branch,
         "commits": total,
         "grammar_ok": grammar,
         "grammar_pct": _pct(grammar, total),
-        "issue_linked": issue_ref,
-        "trace_pct": _pct(issue_ref, total),
-        "squash_pr_commits": squash,
+        "issue_linked": subject_ref,
+        "trace_pct": _pct(subject_ref, total),
+        "subject_ref_commits": subject_ref,
+        "closes_body_commits": closes_body,
+        "subject_and_closes_commits": both,
+        "pr_derived_commits": pr_derived,
         "decision_records": dr,
-        "dr_pct": _pct(dr, squash),
+        "dr_pct": _pct(dr, pr_derived),
     }
 
 
@@ -523,9 +662,112 @@ def collect_run_stats(path: Path) -> dict | None:
     }
 
 
-def collect_github_stats(limit: int, run_rows_path: Path) -> dict | None:
+def classify_merge_commit(oid: str | None) -> str:
+    """Did the Decision Record survive the merge? — one PR, one landing commit.
+
+    Returns exactly one of:
+      `no_sha`        the PR reports no merge commit (unmerged, or squashed away
+                      by a platform that did not report an oid)
+      `not_in_clone`  the oid is real to GitHub but absent from this checkout
+                      (shallow clone, unfetched branch) — unknown, not a miss
+      `landed`        the landing commit's message carries the Decision Record
+      `lost`          it does not — SPEC §4.3 binding B1 was defeated at merge
+
+    Never raises and never exits: `_run_soft` swallows the non-zero `git log`
+    that an unknown oid produces, which is why this must not use `git()`.
+    """
+    if not oid:
+        return "no_sha"
+    body = _run_soft(["git", "log", "-1", "--format=%B", oid])
+    if body is None:
+        return "not_in_clone"
+    return "landed" if DR_HEADING in body else "lost"
+
+
+def collect_dr_binding(merged: list, limit: int, window: SinceWindow | None) -> dict:
+    """Join each merged PR to its own landing commit to measure SPEC §4.3 B1.
+
+    The local git-side ratio can only guess which commits came from a PR. This
+    joins the two sides directly — PR body → `mergeCommit.oid` → commit message
+    — so `dr_lost` is a count of Decision Records demonstrably dropped at the
+    merge boundary rather than an inference from message shape.
+
+    Lifetime numbers are informational by design: this repo's B1 binding was
+    only repaired on 2026-08-15 and
+    `docs/decisions/no-backfill-merged-decision-records.md` accepts the
+    historical gap. A `--since` window is what makes a loss actionable.
+
+    `window` arrives already resolved (see `SinceWindow`). Re-resolving it here
+    is what let this section and the git-history section disagree about the same
+    string, so this must never call `_since_epoch` itself.
+    """
+    with_dr = [p for p in merged if DR_HEADING in ((p or {}).get("body") or "")]
+    counts = {"no_sha": 0, "not_in_clone": 0, "landed": 0, "lost": 0}
+    verdict_by_pr: dict = {}
+    for pr in with_dr:
+        mc = pr.get("mergeCommit")
+        oid = mc.get("oid") if isinstance(mc, dict) else None
+        verdict = classify_merge_commit(oid)
+        counts[verdict] += 1
+        # Keyed on the PR number, not `id(pr)`: identity is only stable while
+        # this exact list of dicts is alive, and a future refactor that copies
+        # or re-parses a PR would silently miss every lookup.
+        verdict_by_pr[pr["number"]] = verdict
+
+    resolved = counts["landed"] + counts["lost"]
+    binding = {
+        "prs_with_dr": len(with_dr),
+        "merge_commit_resolved": resolved,
+        "unresolved_no_sha": counts["no_sha"],
+        "unresolved_not_in_clone": counts["not_in_clone"],
+        "dr_landed": counts["landed"],
+        "dr_lost": counts["lost"],
+        "landed_pct": _pct(counts["landed"], resolved),
+        # `gh pr list --limit N` returns the newest N. A client-side window over
+        # a capped page under-reports without saying so, so say so.
+        "truncated": len(merged) == limit,
+        "window": None,
+        # Present on every binding, exactly like `window` above. Absent-on-
+        # success made the two siblings behave differently: `b["window"]` is
+        # always safe to subscript while `b["window_error"]` raised KeyError on
+        # the common path, so consumers had to know which one they were holding.
+        "window_error": None,
+        "adr": ADR_NO_BACKFILL,
+    }
+
+    if window:
+        # `gh pr list` has no merged-date flag, so the window is applied here.
+        if window.cutoff is None:
+            # Say so in the document, not only on the terminal: the caller most
+            # likely to be misled is a JSON consumer gating on `dr_lost > 0`,
+            # and an absent window is indistinguishable from a clean one.
+            binding["window_error"] = {"since": window.since, "reason": window.error}
+        else:
+            in_window = [
+                p for p in with_dr
+                if (_merged_at_epoch(p.get("mergedAt")) or -1) >= window.cutoff
+            ]
+            # Same buckets and the same key names as the lifetime numbers above,
+            # so the denominator is `landed + lost` on both sides. Counting the
+            # unresolved PRs as misses would render `✗ 0%` from unknown data —
+            # in a shallow clone every oid is `not_in_clone`.
+            w = {v: [p for p in in_window if verdict_by_pr[p["number"]] == v] for v in counts}
+            binding["window"] = {
+                "since": window.since,
+                "prs_with_dr": len(in_window),
+                "merge_commit_resolved": len(w["landed"]) + len(w["lost"]),
+                "unresolved_no_sha": len(w["no_sha"]),
+                "unresolved_not_in_clone": len(w["not_in_clone"]),
+                "dr_landed": len(w["landed"]),
+                "dr_lost": len(w["lost"]),
+            }
+    return binding
+
+
+def collect_github_stats(limit: int, run_rows_path: Path, window: SinceWindow | None = None) -> dict | None:
     """Optional gh-backed metrics: %% issues normalized, merged-PR linkage,
-    and run outcomes tiered by issue quality (normalized vs not)."""
+    the SPEC §4.3 B1 durable-memory join, and run outcomes tiered by issue
+    quality (normalized vs not)."""
     open_issues = _gh_json("issue", "list", "--state", "open", "--limit", str(limit), "--json", "number,body")
     if open_issues is None:
         return None  # gh missing, unauthenticated, or offline — skip the whole section
@@ -537,16 +779,22 @@ def collect_github_stats(limit: int, run_rows_path: Path) -> dict | None:
         "open_normalized_pct": _pct(normalized_open, len(open_issues)),
     }
 
-    merged = _gh_json("pr", "list", "--state", "merged", "--limit", str(limit), "--json", "number,body")
+    # One page, three metrics: `truncated` below is only meaningful because
+    # merged_prs, merged_with_dr and dr_binding all read the same fetch.
+    merged = _gh_json(
+        "pr", "list", "--state", "merged", "--limit", str(limit),
+        "--json", "number,body,mergedAt,mergeCommit",
+    )
     if merged is not None:
         closes = sum(1 for p in merged if re.search(r"^Closes #\d+", p.get("body") or "", re.MULTILINE))
-        dr = sum(1 for p in merged if "## Decision Record" in (p.get("body") or ""))
+        dr = sum(1 for p in merged if DR_HEADING in (p.get("body") or ""))
         result.update({
             "merged_prs": len(merged),
             "merged_with_closes": closes,
             "merged_closes_pct": _pct(closes, len(merged)),
             "merged_with_dr": dr,
             "merged_dr_pct": _pct(dr, len(merged)),
+            "dr_binding": collect_dr_binding(merged, limit, window),
         })
 
     # Tier run outcomes by issue quality (normalized vs unnormalized issue body).
@@ -638,7 +886,78 @@ def _section(title: str, context: str = "") -> str:
     return f"{head} {_c('— ' + context, 'dim')}" if context else head
 
 
-def render_stats(commit_s: dict | None, run_s: dict | None, gh_s: dict | None, gh_skipped: str | None, project: dict | None = None) -> None:
+def _render_dr_binding(b: dict | None) -> list[str]:
+    """The §4.3 B1 headline: did each merged PR's Decision Record reach git?
+
+    A *lifetime* shortfall renders `○` informational, never `⚠`. This repo's
+    binding was defeated by a repo setting until 2026-08-15 and
+    `docs/decisions/no-backfill-merged-decision-records.md` accepts that history
+    as final; a permanent warning over a decided-and-closed gap is noise that
+    trains readers to ignore the row. Only an explicit `--since` window — where
+    a loss means the binding is being defeated *now* — escalates to `⚠`.
+    """
+    if not b:
+        return []
+    lines: list[str] = []
+    resolved, landed, lost = b["merge_commit_resolved"], b["dr_landed"], b["dr_lost"]
+    win = b.get("window")
+
+    if win:
+        # Denominator is `landed + lost`, exactly as the lifetime row computes
+        # it. `prs_with_dr` would fold the unresolved PRs in as misses and paint
+        # a red `✗ 0%` directly above the caveat line saying they are excluded.
+        # At a zero denominator `_ratio_row` falls to its `○ … —` branch, which
+        # is the intended reading: unknown, not a miss.
+        lines.append(_ratio_row("DR landed in git (window)", win["dr_landed"],
+                                win["merge_commit_resolved"], "§4.3"))
+        lines.append(_c(f"      window — merged since {win['since']}", "dim"))
+        if win["dr_lost"]:
+            n = win["dr_lost"]
+            lines.append(
+                f"    {_c('⚠', 'yellow')} {n} merged PR{'s' if n != 1 else ''} "
+                f"in this window lost the Decision Record at merge"
+            )
+            lines.append(_c("      binding B1 is being defeated (§4.3)", "yellow"))
+    else:
+        counts = f"{landed}/{resolved}" if resolved else "—"
+        lines.append(
+            f"    {_c('○', 'dim')} {'DR landed in git (lifetime)':<{_LABEL_W}}"
+            f" {_c('░' * _METER_W, 'dim')}     {_c('—', 'dim')}  {counts:>7}  {_c('§4.3', 'dim')}"
+        )
+        lines.append(_c("      lifetime shortfall is a recorded decision, not a regression", "dim"))
+        # The ADR path gets its own line: it is a URL-shaped token, and the
+        # joined form ran to 121 columns against this report's 80-column rail.
+        lines.append(_c(f"      {b['adr']}", "dim"))
+        if b.get("window_error"):
+            # A window was asked for and could not be applied. Saying nothing
+            # here would print the "run with --since" hint below, advising the
+            # reader to do the thing they just did. The ⚠ itself belongs at the
+            # top of the report, not here: the failure degrades *every* section
+            # to lifetime, so pinning it to this one row would read as a B1
+            # problem rather than an unusable argument.
+            lines.append(_c("      window not applied — see the note at the top", "dim"))
+        else:
+            lines.append(_c("      run with --since to judge the binding as it stands today", "dim"))
+
+    if lost and not win:
+        lines.append(_c(f"      {lost} of {b['prs_with_dr']} PRs with a Decision Record lost it at merge", "dim"))
+    # Read the caveat from whichever population the row above counted, or the
+    # printed numbers describe a different set of PRs than the ratio does.
+    src = win or b
+    unresolved = src["unresolved_no_sha"] + src["unresolved_not_in_clone"]
+    if unresolved:
+        lines.append(_c(
+            f"      {unresolved} unresolved ({src['unresolved_no_sha']} no merge sha, "
+            f"{src['unresolved_not_in_clone']} not in this clone)", "dim"))
+        lines.append(_c("      excluded from the ratio, not counted as misses", "dim"))
+    if b["truncated"]:
+        # No symbol: in this report ⚠ is a verdict glyph carrying a tone, and
+        # this is a scope caveat on a continuation line, not a verdict.
+        lines.append(_c("      PR page hit --limit — older merges are not in this sample", "dim"))
+    return lines
+
+
+def render_stats(commit_s: dict | None, run_s: dict | None, gh_s: dict | None, gh_skipped: str | None, project: dict | None = None, window: SinceWindow | None = None) -> None:
     out: list[str] = []
     out.append(f"◆ idd-lint stats {_c('— evidence report · IDD Spec v' + SPEC_VERSION, 'dim')}")
     if project:
@@ -647,6 +966,16 @@ def render_stats(commit_s: dict | None, run_s: dict | None, gh_s: dict | None, g
     out.append(_c("┄" * 59, "dim"))
     out.append("")
 
+    if window and window.cutoff is None:
+        # Top of the report, once, before any number it invalidates. A window
+        # that did not resolve is not applied to *any* section, so a reader who
+        # sees this knows every ratio below is lifetime — including the
+        # git-history section, which has no row of its own to warn on and under
+        # --no-github is the only section there is.
+        out.append(f"  {_c('⚠', 'yellow')} --since {window.since!r} {window.error}")
+        out.append(_c("    window not applied — every section below is lifetime", "dim"))
+        out.append("")
+
     if commit_s is None:
         out.append(_c("  ○ git history — skipped: not a git repository", "dim"))
     else:
@@ -654,10 +983,11 @@ def render_stats(commit_s: dict | None, run_s: dict | None, gh_s: dict | None, g
         out.append(_section("Git history", f"{commit_s['branch']} · {n} non-merge commit{'s' if n != 1 else ''}"))
         out.append(_ratio_row("conventional grammar", commit_s["grammar_ok"], n, "§3.2"))
         out.append(_ratio_row("trace completeness", commit_s["issue_linked"], n, "§5.1"))
-        if commit_s["squash_pr_commits"]:
-            out.append(_ratio_row("Decision-Record coverage", commit_s["decision_records"], commit_s["squash_pr_commits"], "§4"))
+        if commit_s["pr_derived_commits"]:
+            out.append(_ratio_row("DR coverage (local proxy)", commit_s["decision_records"], commit_s["pr_derived_commits"], "§4"))
+            out.append(_c("      proxy — subject (#N) or `Closes #N` body; the GitHub join is authoritative", "dim"))
         else:
-            out.append(_c("      Decision-Record coverage — no squash-merged PR bodies on this branch (§4)", "dim"))
+            out.append(_c("      DR coverage (local proxy) — no PR-derived commits on this branch (§4)", "dim"))
 
     out.append("")
     if run_s is None:
@@ -687,6 +1017,7 @@ def render_stats(commit_s: dict | None, run_s: dict | None, gh_s: dict | None, g
         if "merged_prs" in gh_s:
             out.append(_ratio_row("merged PRs · Closes #N", gh_s["merged_with_closes"], gh_s["merged_prs"], "§5.1"))
             out.append(_ratio_row("merged PRs · Decision Record", gh_s["merged_with_dr"], gh_s["merged_prs"], "§4.1"))
+        out.extend(_render_dr_binding(gh_s.get("dr_binding")))
         tiers = gh_s.get("tiers")
         if tiers:
             out.append("")
@@ -712,13 +1043,23 @@ def cmd_stats(args: argparse.Namespace) -> int:
     project = collect_project_info(root, use_github=not args.no_github)
 
     branch = args.branch or detect_default_branch()
-    commit_s = collect_commit_stats(branch, args.since)
+    # Resolve `--since` once, here, and hand the same verdict to both consumers.
+    # Passing the raw string to `git log --since` while the PR join re-resolved
+    # it independently is what produced a zeroed git section underneath a
+    # warning saying the window had not been applied: git's approxidate reads an
+    # unparseable string as *now*, so the "window" it applied was empty.
+    window = resolve_since(args.since)
+    # An unresolved window degrades to lifetime everywhere rather than refusing
+    # to run: `--since '1 second ago'` is a legitimate approxidate this cannot
+    # distinguish from a typo, and a false positive must not cost the report.
+    git_since = window.since if window and window.cutoff is not None else None
+    commit_s = collect_commit_stats(branch, git_since)
     run_s = collect_run_stats(runs_path)
     gh_s, gh_skipped = None, None
     if args.no_github:
         gh_skipped = "--no-github"
     else:
-        gh_s = collect_github_stats(args.limit, runs_path)
+        gh_s = collect_github_stats(args.limit, runs_path, window)
         if gh_s is None:
             gh_skipped = "gh unavailable, unauthenticated, or offline"
 
@@ -729,7 +1070,7 @@ def cmd_stats(args: argparse.Namespace) -> int:
         ))
         return 0
 
-    render_stats(commit_s, run_s, gh_s, gh_skipped, project)
+    render_stats(commit_s, run_s, gh_s, gh_skipped, project, window)
     return 0
 
 
@@ -798,7 +1139,14 @@ def main(argv: list[str]) -> int:
 
     p_stats = sub.add_parser("stats", help="evidence report: trace-completeness, DR coverage, run outcomes")
     p_stats.add_argument("--branch", help="branch to analyze (default: detected default branch)")
-    p_stats.add_argument("--since", help="limit git history, e.g. '6 months ago'")
+    p_stats.add_argument(
+        "--since",
+        help="limit the window to commits/merges after DATE, e.g. '2026-08-15 00:00:00' "
+             "or '6 months ago'; a bare YYYY-MM-DD is normalized to midnight so the "
+             "window does not drift with the wall clock. DATE is read in the local "
+             "timezone while a PR's mergedAt is UTC, so a PR merged 2026-08-14T23:00Z "
+             "falls inside a 2026-08-15 window in UTC+2",
+    )
     p_stats.add_argument("--limit", type=int, default=200, help="max issues/PRs fetched via gh (default: 200)")
     p_stats.add_argument("--no-github", action="store_true", help="skip gh-backed metrics (offline mode)")
     p_stats.add_argument("--json", action="store_true", help="emit machine-readable JSON instead of text")
