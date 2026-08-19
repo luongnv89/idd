@@ -3,10 +3,10 @@ name: issue-triage
 description: "Scan open GitHub issues for dependencies, priority, parallel work, and staleness. Use to prioritize the backlog or pick what to do next. Don't use for one-issue analysis (/issue-analysis), resolving (/issue-resolver), or creating (/issue-creator)."
 license: MIT
 compatibility: "Requires git and GitHub CLI (gh) with authentication. Default mode (cached view) needs only local file access — no gh required."
-effort: medium
 metadata:
   version: 0.5.5
   author: Luong NGUYEN <luongnv89@gmail.com>
+  effort: medium
 ---
 
 # /issue-triage

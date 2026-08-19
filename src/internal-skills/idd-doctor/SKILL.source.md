@@ -3,10 +3,10 @@ name: idd-doctor
 description: "Scan an IDD repo for doc drift, missing autopilot mode, and unsafe merge defaults. Use when running idd-doctor or checking the IDD setup. Read-only. Don't use for fixing issues, normalizing issues (use /issue-creator), or non-IDD health checks."
 license: MIT
 compatibility: Requires git. GitHub CLI (gh) is optional — used only for the merge-strategy check; skipped when gh is absent.
-effort: low
 metadata:
   version: 0.2.0
   author: Luong NGUYEN <luongnv89@gmail.com>
+  effort: low
 ---
 
 # /idd-doctor

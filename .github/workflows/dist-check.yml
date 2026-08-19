@@ -120,6 +120,9 @@ jobs:
       - name: test-skill-line-cap
         run: bash tests/test-skill-line-cap-247.sh
 
+      - name: test-skill-frontmatter-keys-307
+        run: bash tests/test-skill-frontmatter-keys-307.sh
+
       - name: test-consolidated-blocks
         run: bash tests/test-consolidated-blocks-248.sh
 

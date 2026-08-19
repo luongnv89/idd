@@ -3,10 +3,10 @@ name: issue-creator
 description: "Create structured GitHub issues from text, screenshots, or lists, with acceptance criteria and preserved reporter context. Use for filing bugs/features, batch creation, or template cleanup. Don't use for resolving, triaging, or deep issue analysis."
 license: MIT
 compatibility: "Requires git and GitHub CLI (gh) with authentication. Run `gh auth status` to verify."
-effort: medium
 metadata:
   version: 0.8.0
   author: Luong NGUYEN <luongnv89@gmail.com>
+  effort: medium
 ---
 
 # /issue-creator
