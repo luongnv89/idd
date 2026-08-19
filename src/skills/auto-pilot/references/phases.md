@@ -86,7 +86,9 @@ advances a real run.
 if `borrowed_skills` lists any `origin: borrowed` entries, run the resolver's
 teardown (`references` in `/issue-resolver` → *Step 3 — Propose relevant
 skills* → *Teardown*): uninstall only those names from `~/.claude/skills/`,
-then `--update` `{"borrowed_skills": []}`. A crashed resolve can leave a
+then write the record back with `--update` exactly as that section
+specifies — the payload rule lives there and is deliberately not restated
+here, so a failed uninstall keeps its retry. A crashed resolve can leave a
 borrowed copy behind; resume must not keep it. Missing key / `[]` / `{}` /
 corrupt: nothing to tear down. Never remove `origin: preinstalled`.
 The read-back rule above binds here too: skip any entry whose `name` does not

@@ -39,6 +39,15 @@ expect_grep() {
   fi
 }
 
+expect_no_grep() {
+  local label="$1" pattern="$2" file="$3"
+  if grep -qE -- "$pattern" "$file"; then
+    fail "$label"
+  else
+    pass "$label"
+  fi
+}
+
 jkey() {
   python3 -c '
 import json, sys
@@ -105,6 +114,8 @@ expect_grep "T2: record intent before install" \
   'Accept, record, install' "$STEPS"
 expect_grep "T2: teardown requires the borrow marker" \
   '\.gitissue-borrowed' "$STEPS"
+expect_grep "T2: teardown carries back only the failed removals" \
+  'entries whose `rm -rf` failed' "$STEPS"
 expect_grep "T2: teardown re-screens read-back names" \
   '\^\[a-z\]\[a-z0-9-\]\{0,63\}\$' "$STEPS"
 expect_grep "T2: gi-state --update records" \
@@ -135,6 +146,8 @@ expect_grep "T5: auto-pilot leftover teardown is dry-run safe" \
   'no uninstall, no `--update`' "$AP_PHASES"
 expect_grep "T5: auto-pilot leftover teardown requires the marker" \
   '\.gitissue-borrowed' "$AP_PHASES"
+expect_no_grep "T5: auto-pilot does not restate an unconditional write-back" \
+  'borrowed_skills\": \[\]' "$AP_PHASES"
 
 # T6: resolver precheck bundles gi-state
 expect_grep "T6: precheck lists gi-state.py" \
