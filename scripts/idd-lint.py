@@ -18,7 +18,8 @@ Validates Issue-Driven Development artifacts against the IDD Spec
 FILE of `-` (or omitted) reads stdin. `--level L1|L2|L3` (default L3) selects
 the conformance level to enforce; checks above the selected level are skipped.
 Exit codes: 0 = conformant (warnings allowed), 1 = errors found, 2 = usage.
-`stats` is a report, not a gate — it exits 0 unless the data is unreadable.
+`stats` is a report, not a lint of issue/PR text — it exits 0 unless a run-log
+row exceeds its class QA-cycle ceiling without `breach_reason` (issue #308).
 `--since` accepts any git approxidate. Prefer an unambiguous absolute form —
 `--since '2026-08-15 00:00:00'`. A bare `YYYY-MM-DD` is normalized to midnight
 before it reaches git, because git otherwise fills the time of day from the
@@ -618,6 +619,35 @@ def collect_commit_stats(branch: str, since: str | None) -> dict | None:
     }
 
 
+DEFAULT_HIGH_CEILING = 5  # default resolve.qa_max_cycles; high-class policy cap
+
+
+def policy_ceiling(profile: object, complexity: object, *, high: int = DEFAULT_HIGH_CEILING) -> int:
+    """light → 1; full+high → high (default 5); omitted profile/complexity → 2."""
+    if profile == "light":
+        return 1
+    if complexity == "high":
+        return high
+    return 2
+
+
+def row_ceiling(row: dict) -> int:
+    recorded = row.get("ceiling")
+    if isinstance(recorded, int) and not isinstance(recorded, bool) and recorded >= 1:
+        return recorded
+    return policy_ceiling(row.get("profile"), row.get("complexity"))
+
+
+def _unexplained_ceiling_breach(row: dict) -> bool:
+    qa = row.get("qa_cycles")
+    if not isinstance(qa, int) or isinstance(qa, bool):
+        return False
+    if qa <= row_ceiling(row):
+        return False
+    reason = row.get("breach_reason")
+    return not (isinstance(reason, str) and reason.strip())
+
+
 def collect_run_stats(path: Path) -> dict | None:
     """Outcome/QA/duration aggregates from the append-only run log."""
     if not path.is_file():
@@ -649,6 +679,7 @@ def collect_run_stats(path: Path) -> dict | None:
         if sub:
             sub_qa = [r["qa_cycles"] for r in sub if isinstance(r.get("qa_cycles"), int)]
             by_complexity[level] = {"runs": len(sub), "median_qa": _median(sub_qa)}
+    unexplained = [r for r in rows if _unexplained_ceiling_breach(r)]
     return {
         "runs": len(rows),
         "outcomes": dict(sorted(outcomes.items())),
@@ -659,6 +690,10 @@ def collect_run_stats(path: Path) -> dict | None:
         "median_duration_s": _median(dur),
         "by_complexity": by_complexity,
         "issues": sorted({r["issue"] for r in rows if isinstance(r.get("issue"), int)}),
+        "unexplained_ceiling_breaches": len(unexplained),
+        "ceiling_breach_issues": sorted(
+            {r["issue"] for r in unexplained if isinstance(r.get("issue"), int)}
+        ),
     }
 
 
@@ -999,6 +1034,13 @@ def render_stats(commit_s: dict | None, run_s: dict | None, gh_s: dict | None, g
             out.append(_ratio_row("success rate", run_s["succeeded"], run_s["attempted"]))
         if run_s["median_qa_cycles"] is not None:
             out.append(_info_row("median QA cycles", f"{run_s['median_qa_cycles']:g}"))
+        breaches = run_s.get("unexplained_ceiling_breaches") or 0
+        if breaches:
+            issues = run_s.get("ceiling_breach_issues") or []
+            issue_bit = f" (#{', #'.join(str(n) for n in issues)})" if issues else ""
+            out.append(
+                f"  {_c('✗', 'red')} unexplained QA ceiling breaches  {breaches}{issue_bit}"
+            )
         if run_s["median_duration_s"] is not None:
             out.append(_info_row("median duration", f"{round(run_s['median_duration_s'])}s"))
         if run_s["by_complexity"]:
@@ -1063,15 +1105,19 @@ def cmd_stats(args: argparse.Namespace) -> int:
         if gh_s is None:
             gh_skipped = "gh unavailable, unauthenticated, or offline"
 
+    unexplained = 0
+    if run_s:
+        unexplained = int(run_s.get("unexplained_ceiling_breaches") or 0)
+
     if args.json:
         print(json.dumps(
             {"spec_version": SPEC_VERSION, "project": project, "git": commit_s, "runs": run_s, "github": gh_s},
             indent=2, sort_keys=True,
         ))
-        return 0
+        return 1 if unexplained else 0
 
     render_stats(commit_s, run_s, gh_s, gh_skipped, project, window)
-    return 0
+    return 1 if unexplained else 0
 
 
 # --- Rendering -----------------------------------------------------------------
