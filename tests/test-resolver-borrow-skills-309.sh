@@ -182,6 +182,20 @@ else
   fail "T8: invalid origin should exit 3 (got $st)"
 fi
 
+# unhashable origin (array/object) must be an input error, not a traceback
+run_status out st bash -c "printf '%s' '{\"borrowed_skills\":[{\"name\":\"x\",\"origin\":[]}]}' | python3 '$STATE' --update --dir '$D'"
+if [ "$st" = "3" ]; then
+  pass "T8: unhashable origin exits 3"
+else
+  fail "T8: unhashable origin should exit 3 (got $st)"
+fi
+run_status out st bash -c "printf '%s' '{\"borrowed_skills\":[{\"name\":\"x\",\"origin\":{\"k\":\"v\"}}]}' | python3 '$STATE' --update --dir '$D'"
+if [ "$st" = "3" ]; then
+  pass "T8: object origin exits 3"
+else
+  fail "T8: object origin should exit 3 (got $st)"
+fi
+
 # invalid name
 run_status out st bash -c "printf '%s' '{\"borrowed_skills\":[{\"name\":\"Bad_Name\",\"origin\":\"borrowed\"}]}' | python3 '$STATE' --update --dir '$D'"
 if [ "$st" = "3" ]; then

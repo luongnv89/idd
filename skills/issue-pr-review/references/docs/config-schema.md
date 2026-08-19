@@ -191,27 +191,22 @@ Repo-root state beside `.gitissue.yml`, created on first use.
 
 | File | Written by | Description |
 |------|-----------|-------------|
-| `.gitissue/triage.json` | `/issue-triage`, `/auto-pilot` | Cached triage (schema v1): priorities, deps, order, history |
+| `.gitissue/triage.json` | `/issue-triage`, `/auto-pilot` | Cached triage: priorities, deps, order, history |
 | `.gitissue/analysis-<N>.json` | `/issue-analysis` | Deep analysis of issue #N |
-| `.gitissue/runs.jsonl` | `/issue-resolver`, `/auto-pilot` | Append-only run log (one JSON line per issue). See subsection |
-| `.gitissue/run-state.json`, `run.lock`, `last-run-report.md` | `/auto-pilot`; `/issue-resolver` patches `borrowed_skills` only | Resume state, lock, final report; resolver borrow/teardown records. Machine-local |
+| `.gitissue/runs.jsonl` | `/issue-resolver`, `/auto-pilot` | Append-only run log (one line per issue) |
+| `.gitissue/run-state.json`, `run.lock`, `last-run-report.md` | `/auto-pilot` | Resume state, lock, report. Machine-local |
 
-> **Not in `.gitissue/`:** the model-suggestion cache is **skill-level**
-> (`model-data-<date>.json` in the installed skill, all repos). A legacy
-> `.gitissue/model-data.json` is ignored.
+> **Not in `.gitissue/`:** the model-suggestion cache is **skill-level** (`model-data-<date>.json` in the installed skill, all repos).
 
 **Conventions:**
-- Create via `mkdir -p`; format JSON for readable diffs
-- Full re-triage overwrites `triage.json`; `/auto-pilot` updates it in place after a merge
-- `runs.jsonl` is **append-only**; absence is non-fatal
-- Commit the directory (project state, not secrets)
-- **Carve-out — `run-state.json`, `run.lock` and `last-run-report.md` are machine-local and gitignored.** Only `src/shared/scripts/gi-state.py` writes them; `--dry-run` mutates nothing.
+- Create via `mkdir -p`
+- Re-triage overwrites `triage.json`; `/auto-pilot` updates after a merge
+- `runs.jsonl` is **append-only**; absence non-fatal
+- **Carve-out — `run-state.json`, `run.lock`, `last-run-report.md` are machine-local and gitignored**; only `src/shared/scripts/gi-state.py` writes them, and `--dry-run` mutates nothing.
 
-### `.gitissue/runs.jsonl` — run log (monitoring)
+### `.gitissue/runs.jsonl` — run log
 
-Field set, append rules, and the single-writer / `--no-run-log` convention live
-in
-[run-log-schema.md](https://github.com/luongnv89/idd/blob/main/docs/run-log-schema.md).
+Field set, append rules, and the single-writer / `--no-run-log` convention in [run-log-schema.md](https://github.com/luongnv89/idd/blob/main/docs/run-log-schema.md).
 
 ## Validation
 

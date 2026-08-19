@@ -508,7 +508,7 @@ def _normalize_borrowed_skills(value: object) -> list[dict[str, object]]:
             raise InputError(
                 "borrowed_skills.name must be a lowercase skill identifier"
             )
-        if origin not in BORROWED_ORIGIN:
+        if not isinstance(origin, str) or origin not in BORROWED_ORIGIN:
             raise InputError(
                 "borrowed_skills.origin must be 'borrowed' or 'preinstalled'"
             )
