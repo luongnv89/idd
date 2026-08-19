@@ -355,9 +355,10 @@ fan-out contracts live in `references/run-log.md` — read that file before
 writing the line.
 
 Populate from the iteration's known values plus the resolver's returned telemetry
-(`ts`, `issue`, `mode`, `skill`, `outcome`, `pr`, and `qa_cycles` / `complexity` /
-`profile` / `duration_s` when present). **When the outcome is `skipped`, always
-include `skipped_reason`** — a skip never ran the resolver, so it carries no telemetry.
+(`ts`, `issue`, `mode`, `skill`, `outcome`, `pr`, and `qa_cycles` / `ceiling` /
+`breach_reason` / `complexity` / `profile` / `duration_s` when present). **When
+the outcome is `skipped`, always include `skipped_reason`** — a skip never ran
+the resolver, so it carries no telemetry.
 The full field list lives in `references/run-log.md` → *Fields to populate*.
 
 ```bash

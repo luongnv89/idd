@@ -100,7 +100,11 @@ resolve:
   # Minimum: 1
   max_commits: 10
 
-  # Max QA review-fix cycles during resolve Step 4
+  # Max QA review-fix cycles during resolve Step 4 (hard loop bound).
+  # Policy ceiling by class (issue #308): light=1; full+low/medium=2;
+  # full+high/complex = this value (default 5). A run may use more than 2
+  # only on the high class, and must record breach_reason if it exceeds
+  # its class ceiling.
   # Type: integer
   # Default: 5
   # Minimum: 1
@@ -233,7 +237,7 @@ Config is validated on load at the start of every skill invocation. Errors inclu
 | `resolve.test_timeout` | `300` | 5 minute test timeout |
 | *(removed)* `resolve.pr_auto_link` | — | Deprecated; `Closes #N` is unconditional per SPEC §5.1 |
 | `resolve.max_commits` | `10` | Max commits warning |
-| `resolve.qa_max_cycles` | `5` | Max QA review-fix cycles during resolve Step 4 |
+| `resolve.qa_max_cycles` | `5` | Hard max QA review-fix cycles in resolve Step 4; also the high-class policy ceiling (light=1, full+low/medium=2) |
 | `resolve.adaptive_effort` | `true` | Scale the resolve pipeline to issue complexity — trivial issues (Effort XS/S) take a lighter path (lighter Research, skip 3-option Plan, skip propose-skills, QA capped at 1 cycle); `false` pins every issue to the full pipeline, and turns off #256's caller context: the payload gate, `triage_context`, last-green test reuse ([agent-model-effort.md](https://github.com/luongnv89/idd/blob/main/docs/agent-model-effort.md)) |
 | `resolve.ui_review.browser_review` | `"ask"` | Browser (screenshot) UI review mode; code UI review is auto-detected and always runs |
 | `projects.sync_enabled` | `false` | Enable project board sync |
