@@ -3,10 +3,10 @@ name: issue-analysis
 description: "Analyze one GitHub issue for root cause, complexity, and risk into .gitissue/analysis-N.json. Use when you need to analyze or scope issue #N. Don't use for creating issues (/issue-creator), triaging (/issue-triage), or resolving (/issue-resolver)."
 license: MIT
 compatibility: "Requires git and GitHub CLI (gh) with authentication. View mode (`/issue-analysis N view`) needs only local file access — no gh required."
-effort: high
 metadata:
   version: 0.5.2
   author: Luong NGUYEN <luongnv89@gmail.com>
+  effort: high
 ---
 
 # /issue-analysis N

@@ -3,10 +3,10 @@ name: auto-pilot
 description: "Run an autonomous triage-resolve-review-merge loop to auto-pilot the GitHub issue backlog, resolving everything until done with zero prompts. Don't use for single-issue work (/issue-resolver), triage (/issue-triage), or PR review (/issue-pr-review)."
 license: MIT
 compatibility: "Requires git and GitHub CLI (gh) with auth and push access. Requires merge permission for auto-merge. Requires issue-triage, issue-resolver, issue-analysis, and issue-pr-review to be installed from the same distribution. Optional: issue-creator for normalizing unstructured issues mid-loop."
-effort: max
 metadata:
   version: 2.5.0
   author: Luong NGUYEN <luongnv89@gmail.com>
+  effort: max
 ---
 
 # /auto-pilot

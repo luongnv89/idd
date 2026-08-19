@@ -3,10 +3,10 @@ name: issue-pr-review
 description: "Review a PR end-to-end with CI checks, fix cycles, and optional auto-merge. Use for PR review, cleanup, or readiness checks. Don't use for creating PRs, raw issue analysis, or non-PR code review."
 license: MIT
 compatibility: "Requires git and GitHub CLI (gh) with authentication. Self-contained — uses shared agents from shared/agents/."
-effort: high
 metadata:
   version: 2.5.0
   author: Luong NGUYEN <luongnv89@gmail.com>
+  effort: high
 ---
 
 # /issue-pr-review [PR_NUMBER]

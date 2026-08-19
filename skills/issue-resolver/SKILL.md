@@ -3,10 +3,10 @@ name: issue-resolver
 description: "Create an atomic PR closing a GitHub issue end-to-end via a 6-step pipeline. Use to resolve, fix, or implement issue #N. Don't use for analysis without fixing (/issue-analysis), reviewing a PR (/issue-pr-review), or bulk backlog work (/auto-pilot)."
 license: MIT
 compatibility: "Requires git and GitHub CLI (gh) with authentication and push access. Self-contained — uses shared agents from shared/agents/."
-effort: max
 metadata:
   version: 0.17.0
   author: Luong NGUYEN <luongnv89@gmail.com>
+  effort: max
 ---
 
 # /issue-resolver N

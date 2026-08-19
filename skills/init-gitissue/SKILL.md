@@ -3,10 +3,10 @@ name: init-gitissue
 description: "Generate a .gitissue.yml by auto-detecting a repo's stack, test runner, and size. Use to init, setup, or configure gitissue, or set up IDD. Don't use for editing an existing .gitissue.yml, creating issues (use /issue-creator), or plain git/npm init."
 license: MIT
 compatibility: "Requires git. No GitHub CLI or authentication needed — generates a local config file only."
-effort: low
 metadata:
   version: 0.3.6
   author: Luong NGUYEN <luongnv89@gmail.com>
+  effort: low
 ---
 
 # /init-gitissue
