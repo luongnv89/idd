@@ -48,6 +48,22 @@ expect_no_grep() {
   fi
 }
 
+# Extract a markdown section (start heading .. next heading at the same level)
+# into a file, so an assertion is anchored to the RULE'S LOCATION, not to a word
+# that could survive anywhere in the document.
+section_file() {
+  local src="$1" start="$2" end="$3" out="$TMP/section-$4.md"
+  awk -v s="$start" -v e="$end" '
+    BEGIN { on = 0 }
+    { if (!on && $0 ~ s) { on = 1; print; next }
+      if (on && $0 ~ e) { on = 0 }
+      if (on) print }' "$src" > "$out"
+  if [ ! -s "$out" ]; then
+    fail "section extraction produced nothing for /$start/ in $(basename "$src")"
+  fi
+  printf '%s' "$out"
+}
+
 jkey() {
   python3 -c '
 import json, sys
@@ -148,6 +164,34 @@ expect_grep "T5: auto-pilot leftover teardown requires the marker" \
   '\.gitissue-borrowed' "$AP_PHASES"
 expect_no_grep "T5: auto-pilot does not restate an unconditional write-back" \
   'borrowed_skills\": \[\]' "$AP_PHASES"
+
+# T9/T10/T11: rules anchored to their own section, not to loose vocabulary.
+BORROW_SEC="$(section_file "$STEPS" '^### Step 3 — Propose relevant skills' '^### ' borrow)"
+ACCEPT_SEC="$(section_file "$STEPS" '^#### Accept, record, install' '^#### ' accept)"
+
+# T9: a parallel lane never owns the global skills dir (finding A)
+expect_grep "T9: borrow section carves out the parallel lane" \
+  'IDD_CALLER_WORKTREE=1' "$BORROW_SEC"
+expect_grep "T9: lane borrowing is disabled regardless of the config key" \
+  'disabled for that lane regardless of `resolve\.borrow_skills`' "$BORROW_SEC"
+expect_grep "T9: the per-checkout vs global scope mismatch is named" \
+  'global.*but the borrow record is \*\*per-checkout\*\*' "$BORROW_SEC"
+expect_grep "T9: the concurrent-run hazard is documented, not hidden" \
+  'Residual hazard' "$BORROW_SEC"
+
+# T10: corrupt state never stops the resolve (finding B)
+expect_grep "T10: the record step handles a corrupt read at exit 0" \
+  'corrupt.*true' "$ACCEPT_SEC"
+expect_grep "T10: corrupt does not reach --update (which would exit 3)" \
+  '`--update` \(that exits 3\)' "$ACCEPT_SEC"
+
+# T11: the borrow marker carries no read-back value (finding C)
+expect_grep "T11: the marker is written empty" \
+  'create the \*\*empty\*\* file' "$ACCEPT_SEC"
+expect_no_grep "T11: the marker never carries the run id" \
+  'marker.*containing this run|containing this run.{0,4}s `run_id`' "$ACCEPT_SEC"
+expect_grep "T11: teardown never reads the marker contents" \
+  'never reads its contents' "$STEPS"
 
 # T6: resolver precheck bundles gi-state
 expect_grep "T6: precheck lists gi-state.py" \

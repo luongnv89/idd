@@ -969,7 +969,8 @@ Optionally augment the implementer with **optional external skills** from
 unchanged), exactly like the design-confirm checkpoint. In interactive mode it runs
 for **every** issue type — it is not complexity-gated. In auto mode the propose/install
 half runs only when `resolve.borrow_skills` is `true` (see *Auto mode* below), while
-**leftover teardown runs on every path**, `light` and auto included.
+**leftover teardown runs on every path** — `light` and auto included — with the
+single carve-out of a parallel lane (*Parallel lanes* below).
 
 The skill index is treated as a **swappable candidate list**: the detection logic
 reads the skill names + lifecycle phases from `references/skill-index.md` and never
@@ -979,6 +980,37 @@ without changing this step's logic.
 Gated by `resolve.borrow_skills` (default `false`). When false, the propose set
 is **installed-only** — today's path. When true, the propose set is the **full
 catalog**, each entry marked `installed` or `available to borrow`.
+
+#### Parallel lanes — borrowing is off (`IDD_CALLER_WORKTREE=1`)
+
+`~/.claude/skills/` is **global**, but the borrow record is **per-checkout**:
+`gi-state.py --dir` defaults to `.gitissue` under the current directory, and
+under `/auto-pilot` running parallel lanes that directory is the lane
+**worktree**, which is deleted at lane cleanup. A record written there dies with
+the worktree while the installed skill survives in the global directory — a leak
+no leftover teardown can ever find, because auto-pilot reads the repo-root state
+that never saw those records. Worse, a lane that *did* tear down could `rm -rf` a
+marked borrow a sibling lane is still using.
+
+So when this resolver is launched with `IDD_CALLER_WORKTREE=1`, **borrowing is
+disabled for that lane regardless of `resolve.borrow_skills`**: installed-only
+propose, no install, no record, no teardown — exactly the `borrow_skills: false`
+path, and the *Leftover teardown* and *Teardown* sections below do not run. This
+is the `--no-run-log` single-writer rule (*Step 5 — Deliver* → *Run-log entry*)
+applied to a second shared resource: a lane never owns state whose scope is wider
+than its own worktree, so the serialized repo-root path owns it instead. Audit:
+
+```
+○ Skill proposal (lane): borrow disabled — parallel lane, installed-only
+```
+
+A documented capability gap, not a silent one: to borrow skills under
+`/auto-pilot`, run it single-lane (its own parallelism key), or call `/issue-resolver`
+directly.
+
+**Residual hazard, stated rather than hidden:** `~/.claude/skills/` is per-user,
+so two *concurrent* borrowing runs in different checkouts still share it and one
+run's teardown can remove the other's borrow. Borrow in one run at a time.
 
 #### Leftover teardown (always, before detect)
 
@@ -1032,8 +1064,15 @@ complexity, affected files, UI detection, lifecycle grouping). Illustrative:
   `{ "name": "<name>", "origin": "borrowed" | "preinstalled" }`, with `borrowed`
   for every selected name that is **not** already installed — *before* running
   any install command. If
-  `--read` was `{}`, `--init` `{}` first so a standalone resolver does not
-  invent a second file format. `origin` is decided at record time from whether
+  `--read` answered `{}` (absent state), `--init` `{}` first so a standalone
+  resolver does not invent a second file format. If `--read` answered
+  `{"corrupt": true, …}` — an **answer at exit 0**, not a failure — do not
+  `--update` (that exits 3) and do not `--init` over a file the caller may own:
+  borrow nothing this run, keep the propose set installed-only, print
+  `⚠ gi-state unavailable — skipping leftover borrow teardown`, and continue.
+  Corrupt is treated exactly as *Leftover teardown* treats it, and for the same
+  reason: an opt-in sub-step never stops a resolve over a machine-local,
+  gitignored file. `origin` is decided at record time from whether
   the directory **already existed** before this run's install, never inferred
   at teardown. Recording first is what closes the crash window: an interruption
   between record and install leaves a record whose directory does not exist,
@@ -1047,10 +1086,16 @@ complexity, affected files, UI detection, lifecycle grouping). Illustrative:
   --skill <name>`). Never install a name absent from the index. Never
   interpolate the issue body into the command.
 - **Drop the borrow marker — same breath as the install.** Immediately after a
-  successful install, write `~/.claude/skills/<name>/.gitissue-borrowed`
-  containing this run's `run_id` (the literal `unknown` when no state run id is
-  available). This file, not the record, is what authorises teardown to delete
-  the directory. Install and mark are one atomic step: if the marker cannot be
+  successful install, create the **empty** file
+  `~/.claude/skills/<name>/.gitissue-borrowed`. Empty is deliberate and is part
+  of the contract: teardown checks existence only, so the marker needs no
+  content, and writing this run's `run_id` into it would put an **unscreened
+  disk-sourced value** into a shell word the agent composes — the hazard
+  `gi-state.py`'s `_screen_run_id` exists for (a state file can carry
+  `run_id: "x --> y"`, or a `$(…)`/backtick string that quoting does not
+  neutralise). Never write a `run_id`, an issue field, or any other read-back
+  value into this file. This file, not the record, is what authorises teardown
+  to delete the directory. Install and mark are one atomic step: if the marker cannot be
   written, `rm -rf` the just-installed directory and treat the whole thing as
   an install failure — a marker-less borrowed copy would otherwise become
   permanent under the teardown rule below.
@@ -1075,9 +1120,12 @@ Skip — do not remove, do not repair — any entry whose `name` does not match
 For each surviving name, `rm -rf "$HOME/.claude/skills/<name>"` **only if**
 that directory exists **and** it carries the `.gitissue-borrowed` marker
 written at install time. Teardown checks the marker's **existence only** and
-never compares the run id inside it: leftover teardown legitimately releases a
-*different* (crashed) run's borrow, so an id comparison would silently break
-cross-run cleanup. A directory with no marker is the operator's own copy no
+never reads its contents — which is why it is written empty. Leftover teardown
+legitimately releases a *different* (crashed) run's borrow, so an owner
+comparison would silently break cross-run cleanup, and reading the file at all
+would re-introduce the unscreened-value hazard the empty marker removes.
+
+A directory with no marker is the operator's own copy no
 matter what the record says — a stale `borrowed` record outlives a failed
 uninstall, and the operator may have installed that skill deliberately since —
 so print `references/error-messages.md` (*Borrow marker absent*), drop the
@@ -1099,10 +1147,12 @@ Prompt never appears.
 - `resolve.borrow_skills: true`: no prompt; auto-select the relevant
   catalog subset (installed + available-to-borrow), install missing,
   record, then the implementer. This is the only auto path that mutates
-  `~/.claude/skills/`. Leftover teardown still runs on every auto path.
+  `~/.claude/skills/` — and not on a parallel lane, where *Parallel lanes*
+  above disables borrowing outright. Leftover teardown still runs on every
+  auto path except a lane.
 
 The `light` profile still skips this sub-step (`selected_skills = []`, no
-install) but **still runs leftover teardown**.
+install) but **still runs leftover teardown** (outside a parallel lane).
 
 ### Delegation payload
 
