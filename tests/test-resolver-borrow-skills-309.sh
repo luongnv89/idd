@@ -435,6 +435,8 @@ expect_grep "T13: auto-pilot tears down leftovers before --init" \
   'before any `--init`' "$AP_PHASES"
 expect_grep "T13: the stale gate row names the teardown-first order" \
   'release any leftover borrows' "$AP_PHASES"
+expect_grep "T13: the teardown write-back follows the borrow rule, not the checkpoint rule" \
+  "borrow-path exit-code rule, not the checkpoint rule" "$AP_PHASES"
 if grep -E '^\| 3 — Propose relevant skills \|' "$RESOLVER" | grep -q 'IDD_CALLER_WORKTREE=1'; then
   pass "T13: the light profile row names the parallel-lane carve-out"
 else

@@ -89,7 +89,11 @@ teardown (`references` in `/issue-resolver` → *Step 3 — Propose relevant
 skills* → *Teardown*): uninstall only those names from `~/.claude/skills/`,
 then write the record back with `--update` exactly as that section
 specifies — the payload rule lives there and is deliberately not restated
-here, so a failed uninstall keeps its retry. A crashed resolve can leave a
+here, so a failed uninstall keeps its retry. **That one `--update` follows the
+resolver's borrow-path exit-code rule, not the checkpoint rule below:** every
+non-zero exit, 3 included, prints `⚠ gi-state unavailable — skipping leftover
+borrow teardown` and the loop continues resumable, because a borrow record is
+an opt-in sub-step's bookkeeping rather than this run's resume state. A crashed resolve can leave a
 borrowed copy behind; resume must not keep it. Missing key / `[]` / `{}` /
 corrupt: nothing to tear down. Never remove `origin: preinstalled`.
 **Order matters on the `stale` path.** `--init` resets `borrowed_skills` to
