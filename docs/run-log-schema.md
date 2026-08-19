@@ -32,7 +32,9 @@ The full field set — the *Always present* column is the required minimum:
 | `pr` | integer or null | yes | PR number when a PR was created, else `null` |
 | `complexity` | string | no | Research complexity on the **3-value** run-log scale (`low` / `medium` / `high`) when known. Collapse the researcher's 5-value estimate before writing: `trivial` or `low` → `low`; `medium` → `medium`; `high` or `complex` → `high`. Never emit `trivial` or `complex` in runs.jsonl. |
 | `profile` | string | no | The adaptive-effort pipeline profile the run selected: `light` (trivial fast path) or `full`. Omitted when `resolve.adaptive_effort` is `false` or the signal was unavailable. See [agent-model-effort.md](https://github.com/luongnv89/idd/blob/main/docs/agent-model-effort.md) (Complexity → pipeline profile). |
-| `qa_cycles` | integer | no | QA cycles. Optional `ceiling`/`breach_reason`. |
+| `qa_cycles` | integer | no | Number of QA review-fix cycles run |
+| `ceiling` | integer | no | The class QA-cycle policy ceiling for the run: 1 for `light`, `resolve.qa_max_cycles` (default 5) for `full` + `high`, else 2. Omit when not recorded; a recorded value overrides the computed ceiling and must be a positive integer. |
+| `breach_reason` | string | no | Why `qa_cycles` exceeded the ceiling. Required when `qa_cycles` > `ceiling`; omit otherwise. `gi-runlog` rejects an over-ceiling row without it (exit 3); `idd-lint stats` exits 1 on such rows. |
 | `duration_s` | integer | no | Wall-clock duration of the run in seconds, when measurable |
 | `skipped_reason` | string | no | Why the issue was skipped (auto-pilot skips, and any `skipped`/`already_resolved` outcome), e.g. `already_resolved`, `blocked_label`, `blocked_by_dependency`, `in_skip_list`, `assigned_to_other`, `quarantined` |
 
@@ -84,8 +86,9 @@ skipping other issues, stopping at this one's first non-`failed` record.
 lines per processed issue, double-counting it in `/idd-doctor`'s metrics. To keep
 **exactly one line per processed issue**, `/auto-pilot` passes the resolver
 `--no-run-log`: the suppressed resolver does **not** append and instead **returns**
-its telemetry — run `status` (the `outcome`), `qa_cycles`, `complexity`,
-`duration_s` — for the orchestrator to fold into its single enriched line. The flag
+its telemetry — run `status` (the `outcome`), `qa_cycles`, `ceiling`,
+`breach_reason`, `complexity`, `duration_s` — for the orchestrator to fold into
+its single enriched line. The flag
 is **orthogonal to `--auto`/`IDD_AUTO_MODE`**: a standalone
 `/issue-resolver <N> --auto` is *not* suppressed. The rule: the outermost skill is
 the single writer; an inner resolver stays silent.
