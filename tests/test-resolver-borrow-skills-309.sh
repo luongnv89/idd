@@ -305,6 +305,163 @@ else
   fail "T8: unknown entry key should exit 3 (got $st)"
 fi
 
+# ── T12: the borrow/teardown cycle, behaviorally (AC6, issue #324) ───────────
+# Every other check in this file greps prose. AC6 asked for the *cycle* to be
+# pinned, so the four steps the prose specifies — record, install+mark,
+# teardown, carry-back — run here for real against a throwaway skills
+# directory. The real ~/.claude/skills is never touched: SKILLS_ROOT is under
+# $TMP and every helper takes it as an argument.
+SKILLS_ROOT="$TMP/home/.claude/skills"
+CYCLE_DIR="$TMP/cycle"
+mkdir -p "$SKILLS_ROOT" "$CYCLE_DIR"
+printf '%s' '{}' | python3 "$STATE" --init --dir "$CYCLE_DIR" >/dev/null
+
+# The prose's own procedure, transcribed. install_and_mark is one atomic step
+# (pipeline-steps.md → "Install and mark are one atomic step"); teardown_one
+# screens the name, requires the marker, and reports whether it removed.
+install_and_mark() {  # name -> 0 installed+marked, 1 install failed
+  local name="$1"
+  mkdir -p "$SKILLS_ROOT/$name" || return 1
+  printf 'stub\n' > "$SKILLS_ROOT/$name/SKILL.md" || return 1
+  : > "$SKILLS_ROOT/$name/.gitissue-borrowed" || return 1
+  return 0
+}
+teardown_one() {  # name origin -> 0 removed, 1 skipped (screen/marker/absent)
+  local name="$1" origin="$2"
+  printf '%s' "$name" | grep -qE '^[a-z][a-z0-9-]{0,63}$' || return 1
+  [ "$origin" = "borrowed" ] || return 1
+  [ -d "$SKILLS_ROOT/$name" ] || return 1
+  [ -f "$SKILLS_ROOT/$name/.gitissue-borrowed" ] || return 1
+  rm -rf "$SKILLS_ROOT/$name"
+  return 0
+}
+state_borrowed() { python3 "$STATE" --read --dir "$CYCLE_DIR" | jkey borrowed_skills; }
+
+# 1. Full cycle: record before install, install+mark, teardown, empty write-back.
+printf '%s' '{"borrowed_skills":[{"name":"test-coverage","origin":"borrowed"}]}' \
+  | python3 "$STATE" --update --dir "$CYCLE_DIR" >/dev/null
+install_and_mark test-coverage
+if [ -f "$SKILLS_ROOT/test-coverage/.gitissue-borrowed" ]; then
+  pass "T12: install drops the borrow marker in the same step"
+else
+  fail "T12: install did not drop the borrow marker"
+fi
+if teardown_one test-coverage borrowed && [ ! -d "$SKILLS_ROOT/test-coverage" ]; then
+  pass "T12: teardown removes a marked borrow"
+else
+  fail "T12: teardown did not remove a marked borrow"
+fi
+printf '%s' '{"borrowed_skills":[]}' | python3 "$STATE" --update --dir "$CYCLE_DIR" >/dev/null
+if [ "$(state_borrowed)" = "[]" ]; then
+  pass "T12: a clean teardown writes back an empty list"
+else
+  fail "T12: clean teardown left $(state_borrowed)"
+fi
+
+# 2. The operator's own copy: recorded preinstalled, and unmarked on disk.
+mkdir -p "$SKILLS_ROOT/code-review"; printf 'mine\n' > "$SKILLS_ROOT/code-review/SKILL.md"
+if ! teardown_one code-review preinstalled && [ -d "$SKILLS_ROOT/code-review" ]; then
+  pass "T12: origin preinstalled is never removed"
+else
+  fail "T12: teardown removed a preinstalled skill"
+fi
+if ! teardown_one code-review borrowed && [ -d "$SKILLS_ROOT/code-review" ]; then
+  pass "T12: an unmarked directory survives even a borrowed record"
+else
+  fail "T12: teardown removed an unmarked directory"
+fi
+
+# 3. Crash cleanup: a record and a marked directory outlive the run that made
+#    them; the next run's leftover teardown releases it.
+install_and_mark frontend-design
+printf '%s' '{"borrowed_skills":[{"name":"frontend-design","origin":"borrowed"},{"name":"code-review","origin":"preinstalled"}]}' \
+  | python3 "$STATE" --update --dir "$CYCLE_DIR" >/dev/null
+leftovers="$(python3 - "$CYCLE_DIR/run-state.json" <<'PYEOF'
+import json, sys
+d = json.load(open(sys.argv[1]))
+print(" ".join(e["name"] for e in d.get("borrowed_skills", []) if e.get("origin") == "borrowed"))
+PYEOF
+)"
+removed=0
+for n in $leftovers; do teardown_one "$n" borrowed && removed=$((removed + 1)); done
+if [ "$removed" = "1" ] && [ ! -d "$SKILLS_ROOT/frontend-design" ] && [ -d "$SKILLS_ROOT/code-review" ]; then
+  pass "T12: leftover teardown releases a crashed run's borrow, keeps preinstalled"
+else
+  fail "T12: crash cleanup wrong (removed=$removed)"
+fi
+
+# 4. A failed removal is carried back, and the record step that follows must
+#    carry it forward rather than replacing the list with its own entries
+#    (issue #324 — the "record remains so the next resolve retries" promise).
+carried='{"name":"stuck-skill","origin":"borrowed"}'
+printf '%s' "{\"borrowed_skills\":[$carried]}" | python3 "$STATE" --update --dir "$CYCLE_DIR" >/dev/null
+printf '%s' "{\"borrowed_skills\":[$carried,{\"name\":\"docs-sync\",\"origin\":\"borrowed\"}]}" \
+  | python3 "$STATE" --update --dir "$CYCLE_DIR" >/dev/null
+names="$(python3 - "$CYCLE_DIR/run-state.json" <<'PYEOF'
+import json, sys
+d = json.load(open(sys.argv[1]))
+print(",".join(sorted(e["name"] for e in d.get("borrowed_skills", []))))
+PYEOF
+)"
+if [ "$names" = "docs-sync,stuck-skill" ]; then
+  pass "T12: the record step carries a failed removal forward, not just its own borrows"
+else
+  fail "T12: leftover dropped by the record step (got $names)"
+fi
+# ...and the negative half, which is why the rule has to be written down: the
+# same --update carrying only this run's borrow deletes the leftover by omission.
+printf '%s' '{"borrowed_skills":[{"name":"docs-sync","origin":"borrowed"}]}' \
+  | python3 "$STATE" --update --dir "$CYCLE_DIR" >/dev/null
+names_after="$(python3 - "$CYCLE_DIR/run-state.json" <<'PYEOF'
+import json, sys
+d = json.load(open(sys.argv[1]))
+print(",".join(sorted(e["name"] for e in d.get("borrowed_skills", []))))
+PYEOF
+)"
+if [ "$names_after" = "docs-sync" ]; then
+  pass "T12: omitting the leftover deletes it — whole-list replace, as documented"
+else
+  fail "T12: --update did not replace the whole list (got $names_after)"
+fi
+
+# ── T13: the rules issue #324 added are written down, not just implemented ───
+expect_grep "T13: one exit-code rule scopes exit 3 to the borrow path" \
+  'borrow-path stop' "$STEPS"
+expect_grep "T13: the record step carries leftover entries forward" \
+  'just carried back' "$STEPS"
+expect_grep "T13: --init is never written over an existing state object" \
+  'never `--init`s over a state object' "$STEPS"
+expect_grep "T13: auto-pilot tears down leftovers before --init" \
+  'before any `--init`' "$AP_PHASES"
+expect_grep "T13: the stale gate row names the teardown-first order" \
+  'release any leftover borrows' "$AP_PHASES"
+expect_grep "T13: the teardown write-back follows the borrow rule, not the checkpoint rule" \
+  "borrow-path exit-code rule, not the checkpoint rule" "$AP_PHASES"
+if grep -E '^\| 3 — Propose relevant skills \|' "$RESOLVER" | grep -q 'IDD_CALLER_WORKTREE=1'; then
+  pass "T13: the light profile row names the parallel-lane carve-out"
+else
+  fail "T13: the light profile row omits the parallel-lane carve-out"
+fi
+
+# 5. Install failure leaves nothing untracked behind (the #322 fix).
+mkdir -p "$SKILLS_ROOT/half-installed"   # tool died before the marker
+if [ ! -f "$SKILLS_ROOT/half-installed/.gitissue-borrowed" ]; then
+  printf '%s' "half-installed" | grep -qE '^[a-z][a-z0-9-]{0,63}$' \
+    && rm -rf "$SKILLS_ROOT/half-installed"
+fi
+if [ ! -d "$SKILLS_ROOT/half-installed" ]; then
+  pass "T12: a failed install leaves no marker-less directory behind"
+else
+  fail "T12: partial install survived the failure path"
+fi
+
+# 6. The name screen stands between a hand-edited state file and rm -rf.
+if ! teardown_one "../../evil" borrowed && ! teardown_one "" borrowed; then
+  pass "T12: teardown refuses names that fail the screen"
+else
+  fail "T12: an unscreened name reached the removal path"
+fi
+
 echo
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 echo "  $PASS passed, $FAIL failed"

@@ -301,7 +301,7 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 ```
 ⚠ gi-state unavailable — skipping leftover borrow teardown
 ```
-**Trigger:** No `python3`, exit 2, or exit 4 from `gi-state.py --read` / `--update` / `--init` on the borrow-record path. Degrade: do not invent a second writer for `.gitissue/run-state.json`. A missing bundled file is fatal (`✗ Missing bundled dependency`). Exit 3 is a stop (invalid patch or corrupt state).
+**Trigger:** Any failure of `gi-state.py --read` / `--update` / `--init` on the borrow-record path — no `python3`, exit 2, exit 4, or **exit 3** (invalid patch or corrupt state). All of them degrade the same way, because borrowing is an opt-in sub-step over a machine-local, gitignored file: borrow nothing, tear nothing down, continue the resolve (`references/pipeline-steps.md` → *Step 3 — Propose relevant skills*, the exit-code rule at the head of the sub-step — the one scoped exception to `3` = stop). Do not invent a second writer for `.gitissue/run-state.json` and never repair it by hand. A missing bundled file is still fatal (`✗ Missing bundled dependency`).
 
 ## Configuration
 

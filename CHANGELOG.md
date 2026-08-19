@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixes
+- **resolver, auto-pilot:** close the four review notes the borrow-and-release merge left open (#324) — one exit-code rule for the whole borrow sub-step (exit 3 there is a borrow-path stop, never a resolve stop), the record step now carries a failed removal forward instead of replacing the list with its own borrows, `/auto-pilot` releases leftover borrows *before* a `stale` gate's `--init` resets the record, and the `light` profile row names the parallel-lane (`IDD_CALLER_WORKTREE=1`) carve-out. #309's AC6 is now exercised behaviorally: install-and-mark, teardown, preinstalled untouched, crash cleanup, carry-forward, failed-install cleanup, and the name screen all run against a throwaway skills directory.
 - **resolver, lint:** reconcile the two-review-pass policy ceiling (epic #242 AC3) as a class cap, not a second loop bound (#308) — `resolve.qa_max_cycles` (5) and `review.max_cycles` (3) stay the hard loop caps. Policy: light=1; full+low/medium=2; full+high=`qa_max_cycles`. Optional run-log `ceiling` / `breach_reason`; `gi-runlog` requires a reason when `qa_cycles` exceeds the class ceiling. `idd-lint stats` fails only unexplained over-ceiling rows (median QA is unchanged). Traces: #260=5, #273=7, #253=5, #295=3.
 
 ### Features
