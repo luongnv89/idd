@@ -67,7 +67,7 @@ DOCTOR="$REPO_ROOT/src/internal-skills/idd-doctor/SKILL.source.md"
 has "$RUNLOG" ".gitissue/runs.jsonl" "T1: run-log-schema documents .gitissue/runs.jsonl"
 has "$RUNLOG" "append-only" "T1: run-log-schema documents append-only nature"
 has "$RUNLOG" "non-fatal" "T1: run-log-schema documents non-fatal write"
-for field in "skipped_reason" "qa_cycles" "duration_s" "complexity" "outcome"; do
+for field in "skipped_reason" "qa_cycles" "ceiling" "breach_reason" "duration_s" "complexity" "outcome"; do
   has "$RUNLOG" "$field" "T1: run-log-schema documents field '$field'"
 done
 # minimum required fields called out
@@ -330,6 +330,26 @@ if printf '%s' "$conflict" | python3 "$HELPER" --append-once --path "$TMP_RUNLOG
 else
   [ "$?" = 3 ] && pass "T9: append-once rejects event-id payload conflicts" \
                || fail "T9: append-once conflict returned the wrong exit"
+fi
+
+# --- T10: class ceiling + required breach_reason (issue #308) ---------------
+over='{"ts":"2026-01-01T00:00:00Z","issue":42,"mode":"auto","skill":"issue-resolver","complexity":"medium","profile":"full","qa_cycles":3,"outcome":"success","pr":1}'
+if printf '%s' "$over" | python3 "$HELPER" --echo >/dev/null 2>&1; then
+  fail "T10: gi-runlog accepted medium qa_cycles=3 without breach_reason"
+else
+  pass "T10: gi-runlog rejects unexplained over-ceiling qa_cycles"
+fi
+ok_high='{"ts":"2026-01-01T00:00:00Z","issue":260,"mode":"auto","skill":"issue-resolver","complexity":"high","profile":"full","qa_cycles":5,"outcome":"success","pr":1}'
+if printf '%s' "$ok_high" | python3 "$HELPER" --echo >/dev/null 2>&1; then
+  pass "T10b: high-class qa_cycles=5 within default ceiling is valid"
+else
+  fail "T10b: high-class qa_cycles=5 should be valid without breach_reason"
+fi
+explained='{"ts":"2026-01-01T00:00:00Z","issue":273,"mode":"auto","skill":"issue-resolver","complexity":"high","profile":"full","qa_cycles":7,"ceiling":5,"breach_reason":"CI flake after stagnation","outcome":"success","pr":1}'
+if printf '%s' "$explained" | python3 "$HELPER" --echo >/dev/null 2>&1; then
+  pass "T10c: over-ceiling with breach_reason is valid"
+else
+  fail "T10c: explained over-ceiling should be valid"
 fi
 
 echo ""

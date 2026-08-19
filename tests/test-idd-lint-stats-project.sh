@@ -102,6 +102,30 @@ else
   fail "T5: gh was called in --no-github mode (should be offline)"
 fi
 
+# ── T6: unexplained QA ceiling breach is a distinct stats failure (#308) ──
+R6="$(make_repo ceil-repo git@github.com:acme/ceil.git)"
+mkdir -p "$R6/.gitissue"
+printf '%s\n' \
+  '{"ts":"2026-07-09T00:00:00Z","issue":10,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":1,"complexity":"medium","qa_cycles":3}' \
+  > "$R6/.gitissue/runs.jsonl"
+set +e
+( cd "$R6" && python3 scripts/idd-lint.py stats --no-github >/dev/null 2>&1 )
+RC6=$?
+set -e
+if [ "$RC6" -eq 1 ]; then
+  pass "T6: unexplained class-ceiling breach exits 1"
+else
+  fail "T6: expected exit 1 for unexplained qa_cycles>2, got $RC6"
+fi
+printf '%s\n' \
+  '{"ts":"2026-07-09T00:00:00Z","issue":260,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":1,"complexity":"high","qa_cycles":5}' \
+  > "$R6/.gitissue/runs.jsonl"
+if ( cd "$R6" && python3 scripts/idd-lint.py stats --no-github >/dev/null 2>&1 ); then
+  pass "T6b: high-class qa_cycles=5 without reason still passes"
+else
+  fail "T6b: high-class within qa_max should pass"
+fi
+
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 echo "Results: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

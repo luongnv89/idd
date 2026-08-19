@@ -217,7 +217,7 @@ fi
   mkdir -p .gitissue
   printf '%s\n%s\n' \
     '{"ts":"2026-07-09T00:00:00Z","issue":3,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":4,"complexity":"low","qa_cycles":1}' \
-    '{"ts":"2026-07-09T00:01:00Z","issue":9,"mode":"auto","skill":"issue-resolver","outcome":"failed","pr":null,"qa_cycles":3}' \
+    '{"ts":"2026-07-09T00:01:00Z","issue":9,"mode":"auto","skill":"issue-resolver","outcome":"failed","pr":null,"complexity":"high","qa_cycles":3}' \
     > .gitissue/runs.jsonl
 )
 STATS_OUT="$(cd "$SYN" && python3 "$LINT" stats --no-github 2>&1)" && STATS_EXIT=0 || STATS_EXIT=$?
@@ -254,6 +254,60 @@ assert d['github'] is None
 else
   fail "T25: stats --json emits valid machine-readable metrics"
 fi
+
+# ───────────────────────────────────────────────────────────
+# T26: class QA-cycle ceiling (#308)
+# ───────────────────────────────────────────────────────────
+# High-class qa_cycles=5 without breach_reason stays inside the high ceiling.
+# Medium qa_cycles=3 without reason is an unexplained breach (exit 1).
+# High qa_cycles=7 without reason exceeds default qa_max (5) → fail.
+# Medium qa_cycles=3 with breach_reason → pass.
+(
+  cd "$SYN"
+  mkdir -p .gitissue
+  printf '%s\n' \
+    '{"ts":"2026-07-09T00:00:00Z","issue":260,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":1,"complexity":"high","qa_cycles":5}' \
+    '{"ts":"2026-07-09T00:01:00Z","issue":253,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":2,"complexity":"high","qa_cycles":5}' \
+    '{"ts":"2026-07-09T00:02:00Z","issue":295,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":3,"complexity":"medium","qa_cycles":3}' \
+    > .gitissue/runs.jsonl
+)
+if (cd "$SYN" && python3 "$LINT" stats --no-github >/dev/null 2>&1); then
+  fail "T26: unexplained medium>2 must fail stats"
+else
+  pass "T26: unexplained medium>2 fails stats (exit 1)"
+fi
+(
+  cd "$SYN"
+  printf '%s\n' \
+    '{"ts":"2026-07-09T00:00:00Z","issue":260,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":1,"complexity":"high","qa_cycles":5}' \
+    '{"ts":"2026-07-09T00:01:00Z","issue":273,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":2,"complexity":"high","qa_cycles":7}' \
+    > .gitissue/runs.jsonl
+)
+if (cd "$SYN" && python3 "$LINT" stats --no-github >/dev/null 2>&1); then
+  fail "T26b: high qa_cycles=7 without reason must fail"
+else
+  pass "T26b: high qa_cycles=7 without reason fails (exceeds default 5)"
+fi
+(
+  cd "$SYN"
+  printf '%s\n' \
+    '{"ts":"2026-07-09T00:00:00Z","issue":260,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":1,"complexity":"high","qa_cycles":5}' \
+    '{"ts":"2026-07-09T00:01:00Z","issue":273,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":2,"complexity":"high","qa_cycles":7,"breach_reason":"stagnation plus CI flake"}' \
+    '{"ts":"2026-07-09T00:02:00Z","issue":295,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":3,"complexity":"medium","qa_cycles":3,"breach_reason":"reviewer loop on squash-binding"}' \
+    > .gitissue/runs.jsonl
+)
+if (cd "$SYN" && python3 "$LINT" stats --no-github >/dev/null 2>&1); then
+  pass "T26c: explained over-ceiling rows do not fail stats"
+else
+  fail "T26c: explained over-ceiling rows should pass"
+fi
+(
+  cd "$SYN"
+  printf '%s\n' \
+    '{"ts":"2026-07-09T00:00:00Z","issue":3,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":4,"complexity":"low","qa_cycles":1}' \
+    '{"ts":"2026-07-09T00:01:00Z","issue":9,"mode":"auto","skill":"issue-resolver","outcome":"failed","pr":null,"complexity":"high","qa_cycles":3}' \
+    > .gitissue/runs.jsonl
+)
 
 # ───────────────────────────────────────────────────────────
 # T25b: bucket identity — the union is a real union (#180)
