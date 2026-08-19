@@ -249,7 +249,7 @@ every particular.
 | `profile=<light\|full>` | the resolver's own Step 0g profile | `light` is a strictly shallower claim; see *Precedence* in SKILL.md |
 | `cycles=<n>` | QA cycles the resolver ran | reported only |
 | `review=clean` | the resolver's QA exited clean | required — there is no dirty spelling, because a non-clean resolver run emits no marker at all |
-| `tests=<count>@<sha40>` | the final suite's passing count and the SHA it ran against | the two test skips below apply **only** when this field is present and its SHA equals `head` |
+| `tests=<count>@<sha40>` | the final suite's passing count and the SHA it ran against | the two test skips below apply **only** when this field is present, its SHA equals `head`, **and `ci_leg_runnable`** (`review.check_ci` is `true` and Step 1's `statusCheckRollup` is non-empty). Refuse the skip when no CI (`no_ci`) or `review.check_ci` is `false` |
 | `ui=<none\|code\|code+browser>:<clean\|noted>@<sha40>` | which UI legs ran, their result, and the SHA the UI review ran against | the code UI review is skipped only on `code`/`code+browser` **and** an `@<sha40>` equal to `head`; a value with no `@<sha40>` suffix is well-formed but not commit-bound, so it never permits the skip; `ui=none` skips nothing |
 
 `tests=` carries its own SHA because the resolver's final suite runs *before* its
@@ -258,6 +258,16 @@ head commit can legitimately differ. The field is **absent entirely** when the
 resolver ran no final suite (its own auto-test setting was off): nothing was
 asserted, so nothing may be skipped. Absent `tests=` ⇒ run both test legs in
 full, whatever else the marker says.
+
+The skip is a three-part AND, decided from loaded config plus Step 1's
+already-fetched `statusCheckRollup` — **never** from Step 5's later wait:
+`qa_handoff = trusted` AND the field is present with a SHA that equals `head`
+AND `ci_leg_runnable`. `ci_leg_runnable` is true only when `review.check_ci`
+is `true` AND that rollup is non-empty; otherwise false (`review.check_ci:
+false`, or an empty/absent/unreadable rollup — the early `no_ci`). An empty
+rollup is ambiguous (just-pushed vs no CI) and fail-safes to RUN the suite.
+When `ci_leg_runnable` is false, ignore `tests=` and run both local test legs
+as if the PR were unmarked. No new config key; Step 5's CI wait stays ungated.
 
 `ui=` is split into legs because the code UI review is environment-independent
 while the browser leg is fail-soft and skips on a headless host. A flat verdict
@@ -276,10 +286,10 @@ only possible consumer would be a safety gate — see *The trust model* above.
 
 | Step | Under `trusted` | Condition |
 |------|-----------------|-----------|
-| 2 — pre-pass test run | skipped | `tests=` present **and** its SHA equals `head` |
+| 2 — pre-pass test run | skipped | `tests=` present **and** its SHA equals `head` **and `ci_leg_runnable`** |
 | 3 — cycle-1 cold-start reviewer | **collapsed into** the fresh confirmation pass | every `trusted` marker **except** the depth carve-out — a marker `profile=light` against this review's `profile=full` refuses the collapse (*Precedence* in SKILL.md owns that rule — not restated here) |
 | 3 — code UI review | skipped | `ui=code…` or `ui=code+browser…` **and** its `@<sha40>` present and equal to `head`; never on `ui=none`, and never on an unsuffixed `ui=` |
-| 4 — local test + build run | skipped | `tests=` present **and** its SHA equals `head` |
+| 4 — local test + build run | skipped | `tests=` present **and** its SHA equals `head` **and `ci_leg_runnable`** |
 | Loop cycle cap | `min(1, configured_cap)` — the same ceiling idiom the `light` profile uses, and it wins over an `/auto-pilot` `review_cycles` override for the same reason | **the same carve-out as the reviewer-collapse row**: a `profile=light` marker against a `profile=full` review refuses the cap too, leaving it at `review.max_cycles`. Both levers are review depth, so they answer to the carve-out together |
 
 The table has **no browser-UI row, deliberately**. The `light` profile skips the
@@ -313,10 +323,13 @@ step that reads the verdict. There are exactly two such pushes:
 - **Step 2's lint/format auto-fix commit** (*Commit auto-fixes*). It lands
   before Step 3 and Step 4 ever consult the verdict, and the resolver runs no
   lint/format of its own, so this is the *likely* case, not an exotic one. Miss
-  it and both test legs are skipped on a commit no local suite has run — Step
-  2's leg is skipped before the auto-fix is even committed, Step 4's afterwards
-  — leaving only Step 5's CI, which soft-passes when no CI is configured or
-  `review.check_ci` is `false`. An auto-merge could then land untested code.
+  it and, when CI is runnable, both test legs are skipped on a commit no local
+  suite has run — Step 2's leg is skipped before the auto-fix is even
+  committed, Step 4's afterwards — leaving only Step 5's CI. Keep this
+  recompute: it is still required when CI is runnable. Independently, the
+  `tests=` skip is refused when `ci_leg_runnable` is false, so a missed
+  recompute on a no-CI / `review.check_ci: false` path cannot auto-merge on
+  zero test evidence.
 - **Every fixer push in the Review Loop** (Step 6). The same predicate, one
   cycle later.
 
