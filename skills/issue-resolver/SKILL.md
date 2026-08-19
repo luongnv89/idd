@@ -276,7 +276,7 @@ profile*).
 |------|------------------|
 | 1 — Research | Lighter pass: the already-resolved safety check and a focused scan of the obviously-affected file(s) still run; skip the broad dependency trace and external solution research. |
 | 2 — Plan | Skip the 3-option synthesis entirely — do **not** spawn the synthesizer. Derive a **direct minimal plan** inline and record it as the selected option, so the Decision Record still has a real `Selected option`; the design-confirm checkpoint does not apply — **unless *0h* set `analysis_reuse = fresh`**, in which case *Step 2 — Plan → `reuse`* governs instead: options are **lifted** from the analysis, not derived, and the design-confirm checkpoint **does** apply. |
-| 3 — Propose relevant skills | Skip the sub-step — set `selected_skills = []` and go straight to the implementer, mirroring auto-mode behavior. |
+| 3 — Propose relevant skills | Skip the **propose/install** — set `selected_skills = []` and go straight to the implementer, mirroring auto-mode behavior. **Leftover teardown still runs** (`references/pipeline-steps.md` → *Step 3 — Propose relevant skills*): a `light` run must still release skills a crashed earlier run borrowed. |
 | 4 — QA | Cap the review-fix loop at **1** cycle (a single review pass; fix once if blocking issues are found, then deliver) instead of `resolve.qa_max_cycles`. One reviewer spawn still runs — the fast path reduces depth, it does not skip review. UI review remains auto-detected as usual. |
 | 5 — Deliver | **Unchanged** — always emits the Decision Record and Acceptance Criteria Verification table. The profile never removes durable memory. |
 
@@ -354,7 +354,7 @@ via `references/scripts/gi-state.py`, teardown of `origin: borrowed` only, the
 `◆`/`○` block, leftover cleanup, and auto-mode are in
 `references/pipeline-steps.md` (*Step 3 — Propose relevant skills*).
 
-**`light` profile:** skip this sub-step — see the profile table in *Step 0g*.
+**`light` profile:** skip the propose/install — see the profile table in *Step 0g* — but **still run the leftover teardown** in `references/pipeline-steps.md`.
 
 Write code and tests based on the selected plan. Spawn the implementer (`references/agents/implementer.md`) with the canonical pattern, passing the plan, branch name, naming conventions, and `selected_skills`.
 

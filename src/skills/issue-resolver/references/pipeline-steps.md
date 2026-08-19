@@ -966,8 +966,10 @@ Optionally augment the implementer with **optional external skills** from
 `references/skill-index.md` (the skills published at
 `https://github.com/luongnv89/skills`). This is a sub-step of Step 3 — it emits a
 `◆`/`○` block and prints **no** `[N/5]` tracker line (the `[3/5]` Implement line is
-unchanged), exactly like the design-confirm checkpoint. It runs for **every** issue
-type in interactive mode (it is interactive-gated, not complexity-gated).
+unchanged), exactly like the design-confirm checkpoint. In interactive mode it runs
+for **every** issue type — it is not complexity-gated. In auto mode the propose/install
+half runs only when `resolve.borrow_skills` is `true` (see *Auto mode* below), while
+**leftover teardown runs on every path**, `light` and auto included.
 
 The skill index is treated as a **swappable candidate list**: the detection logic
 reads the skill names + lifecycle phases from `references/skill-index.md` and never
@@ -1022,31 +1024,70 @@ complexity, affected files, UI detection, lifecycle grouping). Illustrative:
   Select skills to use — all, a subset (e.g. 1,2), or none [default: none]:
 ```
 
-#### Accept, install, record
+#### Accept, record, install
 
 - **All / subset / none (default none)** as today → `selected_skills`.
-- For each selected name that was **not** installed: install into
-  `~/.claude/skills/<name>/` with the same tools the skill README already
-  names (`npx skills add https://github.com/luongnv89/skills --skill <name>`
-  or `asm install … --skill <name>`). Never install a name absent from the
-  index. Never interpolate the issue body into the command.
-- **Record before the implementer spawn** — write the whole list (replace,
-  do not append) via `gi-state.py --update`. If `--read` was `{}`, `--init`
-  `{}` first so a standalone resolver does not invent a second file format.
-  Each entry is `{ "name": "<name>", "origin": "borrowed" | "preinstalled" }`.
-  `origin` is decided at record time from whether the directory **already
-  existed** before this run's install, never inferred at teardown.
+- **Record intent *before* installing.** Write the whole list (replace, do not
+  append) via `gi-state.py --update` — each entry
+  `{ "name": "<name>", "origin": "borrowed" | "preinstalled" }`, with `borrowed`
+  for every selected name that is **not** already installed — *before* running
+  any install command. If
+  `--read` was `{}`, `--init` `{}` first so a standalone resolver does not
+  invent a second file format. `origin` is decided at record time from whether
+  the directory **already existed** before this run's install, never inferred
+  at teardown. Recording first is what closes the crash window: an interruption
+  between record and install leaves a record whose directory does not exist,
+  and teardown is already a no-op there ("only if that directory exists").
+  Installing first would leave an untracked copy that leftover teardown can
+  never find and that the next run's detect misclassifies as `preinstalled` —
+  making it permanent.
+- Install each recorded-borrowed name into `~/.claude/skills/<name>/` with the
+  same tools the skill README already names (`npx skills add
+  https://github.com/luongnv89/skills --skill <name>` or `asm install …
+  --skill <name>`). Never install a name absent from the index. Never
+  interpolate the issue body into the command.
+- **Drop the borrow marker — same breath as the install.** Immediately after a
+  successful install, write `~/.claude/skills/<name>/.gitissue-borrowed`
+  containing this run's `run_id` (the literal `unknown` when no state run id is
+  available). This file, not the record, is what authorises teardown to delete
+  the directory. Install and mark are one atomic step: if the marker cannot be
+  written, `rm -rf` the just-installed directory and treat the whole thing as
+  an install failure — a marker-less borrowed copy would otherwise become
+  permanent under the teardown rule below.
 - Install failure: print `references/error-messages.md` (*Borrow install
-  failed*), leave that name out of `selected_skills`, do not record it as
-  borrowed.
+  failed*), leave that name out of `selected_skills`, and `--update` again with
+  that entry **dropped** from `borrowed_skills`.
 
 #### Teardown (every terminal outcome)
 
-After Deliver, already-resolved, failed, or operator stop: for each recorded
-`origin: borrowed` name, `rm -rf "$HOME/.claude/skills/<name>"` **only if**
-that directory exists **and** origin is `borrowed`. Never remove
-`preinstalled`. Then `--update` `{"borrowed_skills": []}`. Fail-soft on
-uninstall errors: warn, leave the record so a later run retries.
+Runs after Deliver, already-resolved, failed, or operator stop — and as
+*Leftover teardown* above.
+
+**Re-screen every entry before it reaches a command.** `--read` deliberately
+never fails and echoes the state back verbatim, so the write-path skill-name
+validation is **not** a guarantee about what teardown reads — the same rule
+`/auto-pilot`'s *phases.md* states for `current.branch`, and quoting does not
+neutralise `$(…)` or backticks because the agent composes the command text.
+Skip — do not remove, do not repair — any entry whose `name` does not match
+`^[a-z][a-z0-9-]{0,63}$` or whose `origin` is not exactly the string
+`borrowed`. Never remove `preinstalled`.
+
+For each surviving name, `rm -rf "$HOME/.claude/skills/<name>"` **only if**
+that directory exists **and** it carries the `.gitissue-borrowed` marker
+written at install time. Teardown checks the marker's **existence only** and
+never compares the run id inside it: leftover teardown legitimately releases a
+*different* (crashed) run's borrow, so an id comparison would silently break
+cross-run cleanup. A directory with no marker is the operator's own copy no
+matter what the record says — a stale `borrowed` record outlives a failed
+uninstall, and the operator may have installed that skill deliberately since —
+so print `references/error-messages.md` (*Borrow marker absent*), drop the
+entry, and delete nothing.
+
+Then `--update` `{"borrowed_skills": [...]}` carrying back **exactly** the
+entries whose `rm -rf` failed — `[]` in the normal case. `--update` replaces the
+whole list, so removed entries and marker-absent entries are both dropped by
+omission, while a failed uninstall is fail-soft: warn (*Borrow teardown
+leftover*) and leave that one entry so a later run retries.
 
 #### Auto mode
 

@@ -101,6 +101,12 @@ expect_grep "T2: auto+borrow payload is not always empty" \
   'auto \+ `borrow_skills: true` passes the auto-selected set' "$STEPS"
 expect_grep "T2: light still leftover teardown" \
   'still runs leftover teardown' "$STEPS"
+expect_grep "T2: record intent before install" \
+  'Accept, record, install' "$STEPS"
+expect_grep "T2: teardown requires the borrow marker" \
+  '\.gitissue-borrowed' "$STEPS"
+expect_grep "T2: teardown re-screens read-back names" \
+  '\^\[a-z\]\[a-z0-9-\]\{0,63\}\$' "$STEPS"
 expect_grep "T2: gi-state --update records" \
   'gi-state.py --update' "$STEPS"
 expect_grep "T2: standalone --init \{\} if read is empty" \
@@ -113,6 +119,8 @@ expect_grep "T3: borrow teardown leftover" \
   'Borrow teardown leftover' "$ERR"
 expect_grep "T3: gi-state unavailable borrow" \
   'gi-state unavailable' "$ERR"
+expect_grep "T3: borrow marker absent" \
+  'Borrow marker absent' "$ERR"
 
 # T4: skill-index catalog vs availability
 expect_grep "T4: catalog vs filesystem" \
@@ -123,6 +131,10 @@ expect_grep "T4: index does not record installs" \
 # T5: auto-pilot leftover teardown on resume
 expect_grep "T5: auto-pilot leftover borrowed skills" \
   'Leftover borrowed skills' "$AP_PHASES"
+expect_grep "T5: auto-pilot leftover teardown is dry-run safe" \
+  'no uninstall, no `--update`' "$AP_PHASES"
+expect_grep "T5: auto-pilot leftover teardown requires the marker" \
+  '\.gitissue-borrowed' "$AP_PHASES"
 
 # T6: resolver precheck bundles gi-state
 expect_grep "T6: precheck lists gi-state.py" \

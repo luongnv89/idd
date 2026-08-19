@@ -89,6 +89,13 @@ skills* → *Teardown*): uninstall only those names from `~/.claude/skills/`,
 then `--update` `{"borrowed_skills": []}`. A crashed resolve can leave a
 borrowed copy behind; resume must not keep it. Missing key / `[]` / `{}` /
 corrupt: nothing to tear down. Never remove `origin: preinstalled`.
+The read-back rule above binds here too: skip any entry whose `name` does not
+match `^[a-z][a-z0-9-]{0,63}$` or whose `origin` is not exactly the string
+`borrowed` before it reaches an `rm -rf`, and remove a directory only when it
+carries the resolver's `.gitissue-borrowed` marker — an unmarked directory is
+the operator's own copy, so drop the record and warn instead of deleting.
+Under `--dry-run`, compute the removal and print the leftover names, but write
+nothing: no uninstall, no `--update`.
 
 **`stale` and `absent` both write a fresh state, and this is the call that does
 it** — the state every later checkpoint patches and every later resume reads

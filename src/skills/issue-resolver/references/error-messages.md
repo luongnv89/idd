@@ -277,6 +277,16 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 ```
 **Trigger:** Teardown `rm -rf` of an `origin: borrowed` skill failed. Fail-soft — never remove `preinstalled` skills. Leave the `borrowed_skills` record so leftover teardown on the next run retries.
 
+### Borrow marker absent
+```
+⚠ Skill {name} is recorded as borrowed but carries no borrow marker — not removing
+
+  Path:    ~/.claude/skills/{name}
+  Missing: ~/.claude/skills/{name}/.gitissue-borrowed
+  Treated as your own install; the stale record is dropped.
+```
+**Trigger:** Teardown found a recorded `origin: borrowed` directory with no `.gitissue-borrowed` marker. A stale record can outlive a failed uninstall, and the operator may have installed that skill deliberately since. Never `rm -rf` an unmarked directory — drop the `borrowed_skills` entry and warn instead.
+
 ### gi-state unavailable (borrow record)
 ```
 ⚠ gi-state unavailable — skipping leftover borrow teardown
