@@ -27,7 +27,7 @@ Main Agent (orchestrator)
 │   Spawns Code Reviewer subagent per cycle
 │   Spawns/reuses Fixer subagent for blocking findings
 │   Runs tests/build between cycles
-│   Max 5 cycles
+│   Policy ceiling by class (≤ resolve.qa_max_cycles)
 │
 └── Step 5: Deliver (main agent — push + create PR + report)
 ```
@@ -1191,12 +1191,15 @@ One `○` line per skip, per docs/terminal-style.md:
 
 ### Loop controls
 
-- **Max cycles:** `resolve.qa_max_cycles` (default: 5). **`light` profile caps
-  this at 1** — a single review pass, one fix if blocking issues are found, then
-  proceed to Deliver. The reviewer spawn still runs on the `light` path (review is
-  reduced in depth, never skipped); only the *number* of review-fix iterations is
-  capped. (A profile upgraded to `full` in Step 1 uses the normal
-  `resolve.qa_max_cycles` cap.)
+- **Max cycles (hard bound):** `resolve.qa_max_cycles` (default: 5). Never
+  exceed this configured cap.
+- **Policy ceiling by class** (issue #308; distinct from the hard bound):
+  `light` → **1**; `full` + low/medium complexity → **2**; `full` + high/complex
+  → `resolve.qa_max_cycles`. Missing profile/complexity fail-safe as full +
+  medium (ceiling **2**). The reviewer spawn still runs on the `light` path
+  (review is reduced in depth, never skipped). A profile upgraded to `full` in
+  Step 1 uses the matching class ceiling. Record `ceiling` and, if `qa_cycles`
+  exceeds it, a `breach_reason` on the run-log line.
 - **Exit on clean:** stop as soon as review passes AND tests pass
 - **Exit on stagnation:** if the same issues appear in 2 consecutive cycles, stop and report
 
