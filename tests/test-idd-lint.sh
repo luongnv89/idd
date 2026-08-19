@@ -217,7 +217,7 @@ fi
   mkdir -p .gitissue
   printf '%s\n%s\n' \
     '{"ts":"2026-07-09T00:00:00Z","issue":3,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":4,"complexity":"low","qa_cycles":1}' \
-    '{"ts":"2026-07-09T00:01:00Z","issue":9,"mode":"auto","skill":"issue-resolver","outcome":"failed","pr":null,"qa_cycles":3}' \
+    '{"ts":"2026-07-09T00:01:00Z","issue":9,"mode":"auto","skill":"issue-resolver","outcome":"failed","pr":null,"complexity":"high","qa_cycles":3}' \
     > .gitissue/runs.jsonl
 )
 STATS_OUT="$(cd "$SYN" && python3 "$LINT" stats --no-github 2>&1)" && STATS_EXIT=0 || STATS_EXIT=$?
@@ -253,6 +253,86 @@ assert d['github'] is None
   pass "T25: stats --json emits valid machine-readable metrics"
 else
   fail "T25: stats --json emits valid machine-readable metrics"
+fi
+
+# ───────────────────────────────────────────────────────────
+# T26: class QA-cycle ceiling (#308)
+# ───────────────────────────────────────────────────────────
+# High-class qa_cycles=5 without breach_reason stays inside the high ceiling.
+# Medium qa_cycles=3 without reason is an unexplained breach (exit 1).
+# High qa_cycles=7 without reason exceeds default qa_max (5) → fail.
+# Medium qa_cycles=3 with breach_reason → pass.
+(
+  cd "$SYN"
+  mkdir -p .gitissue
+  printf '%s\n' \
+    '{"ts":"2026-07-09T00:00:00Z","issue":260,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":1,"complexity":"high","qa_cycles":5}' \
+    '{"ts":"2026-07-09T00:01:00Z","issue":253,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":2,"complexity":"high","qa_cycles":5}' \
+    '{"ts":"2026-07-09T00:02:00Z","issue":295,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":3,"complexity":"medium","qa_cycles":3}' \
+    > .gitissue/runs.jsonl
+)
+if (cd "$SYN" && python3 "$LINT" stats --no-github >/dev/null 2>&1); then
+  fail "T26: unexplained medium>2 must fail stats"
+else
+  pass "T26: unexplained medium>2 fails stats (exit 1)"
+fi
+(
+  cd "$SYN"
+  printf '%s\n' \
+    '{"ts":"2026-07-09T00:00:00Z","issue":260,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":1,"complexity":"high","qa_cycles":5}' \
+    '{"ts":"2026-07-09T00:01:00Z","issue":273,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":2,"complexity":"high","qa_cycles":7}' \
+    > .gitissue/runs.jsonl
+)
+if (cd "$SYN" && python3 "$LINT" stats --no-github >/dev/null 2>&1); then
+  fail "T26b: high qa_cycles=7 without reason must fail"
+else
+  pass "T26b: high qa_cycles=7 without reason fails (exceeds default 5)"
+fi
+(
+  cd "$SYN"
+  printf '%s\n' \
+    '{"ts":"2026-07-09T00:00:00Z","issue":260,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":1,"complexity":"high","qa_cycles":5}' \
+    '{"ts":"2026-07-09T00:01:00Z","issue":273,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":2,"complexity":"high","qa_cycles":7,"breach_reason":"stagnation plus CI flake"}' \
+    '{"ts":"2026-07-09T00:02:00Z","issue":295,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":3,"complexity":"medium","qa_cycles":3,"breach_reason":"reviewer loop on squash-binding"}' \
+    > .gitissue/runs.jsonl
+)
+if (cd "$SYN" && python3 "$LINT" stats --no-github >/dev/null 2>&1); then
+  pass "T26c: explained over-ceiling rows do not fail stats"
+else
+  fail "T26c: explained over-ceiling rows should pass"
+fi
+(
+  cd "$SYN"
+  printf '%s\n' \
+    '{"ts":"2026-07-09T00:00:00Z","issue":3,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":4,"complexity":"low","qa_cycles":1}' \
+    '{"ts":"2026-07-09T00:01:00Z","issue":9,"mode":"auto","skill":"issue-resolver","outcome":"failed","pr":null,"complexity":"high","qa_cycles":3}' \
+    > .gitissue/runs.jsonl
+)
+# Light profile qa_cycles=2 without reason is an unexplained breach
+# (light ceiling is 1) → exit 1.
+(
+  cd "$SYN"
+  printf '%s\n' \
+    '{"ts":"2026-07-09T00:00:00Z","issue":260,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":1,"profile":"light","qa_cycles":2}' \
+    > .gitissue/runs.jsonl
+)
+if (cd "$SYN" && python3 "$LINT" stats --no-github >/dev/null 2>&1); then
+  fail "T26d: unexplained light-profile qa_cycles=2 must fail stats"
+else
+  pass "T26d: light ceiling is 1; qa_cycles=2 without reason fails (exit 1)"
+fi
+# A recorded ceiling override wins over the computed policy ceiling: a high
+# row with ceiling=7 sits at qa_cycles=6, inside the recorded ceiling → pass.
+(
+  cd "$SYN"
+  printf '%s\n' \
+    '{"ts":"2026-07-09T00:00:00Z","issue":260,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":1,"complexity":"high","ceiling":7,"qa_cycles":6}' \
+    > .gitissue/runs.jsonl
+)
+if (cd "$SYN" && python3 "$LINT" stats --no-github >/dev/null 2>&1); then
+  pass "T26e: recorded ceiling=7 allows qa_cycles=6 without breach_reason"
+else
+  fail "T26e: recorded ceiling override should pass stats (exit 0)"
 fi
 
 # ───────────────────────────────────────────────────────────

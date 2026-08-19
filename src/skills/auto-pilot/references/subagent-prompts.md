@@ -82,6 +82,8 @@ When done, report back ONLY these fields:
 - tests_written: count of new tests written (unit + integration + e2e)
 - tests_passed: count of tests passed
 - qa_cycles: number of QA cycles run
+- ceiling: the class QA-cycle policy ceiling for this run (light=1; full+low/medium=2; full+high=resolve.qa_max_cycles, default 5); omit when not recorded
+- breach_reason: why qa_cycles exceeded the ceiling; required only when it did
 - complexity: Research complexity collapsed to the runs.jsonl 3-value scale (see docs/run-log-schema.md — trivial/low→low, medium→medium, high/complex→high)
 - profile: the adaptive-effort pipeline profile the resolve selected ("light" or "full"), for the run-log `profile` field; omit/null when resolve.adaptive_effort is false or no profile was selected
 - duration_s: wall-clock seconds for the resolve, when measurable, for the run-log line
@@ -311,6 +313,8 @@ When done, report back ONLY these fields:
 - tests_passed: count of tests passed
 - qa_cycles: number of QA cycles run (batch total — auto-pilot attributes it to the
   primary issue's run-log line only, so a batch is not weighted N-fold)
+- ceiling: the class QA-cycle policy ceiling for this run (light=1; full+low/medium=2; full+high=resolve.qa_max_cycles, default 5); omit when not recorded
+- breach_reason: why qa_cycles exceeded the ceiling; required only when it did
 - complexity: the complexity assessed in Research (e.g. low/medium/high), shared on
   every fanned-out run-log line
 - profile: the adaptive-effort pipeline profile the batch resolve selected ("light"

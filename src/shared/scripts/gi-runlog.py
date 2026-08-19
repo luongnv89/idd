@@ -88,6 +88,8 @@ KEY_ORDER = (
     "complexity",
     "profile",
     "qa_cycles",
+    "ceiling",
+    "breach_reason",
     "outcome",
     "pr",
     "duration_s",
@@ -100,9 +102,16 @@ OPTIONAL_KEYS = (
     "complexity",
     "profile",
     "qa_cycles",
+    "ceiling",
+    "breach_reason",
     "duration_s",
     "skipped_reason",
 )
+
+# Policy QA-cycle ceiling by class (issue #308). Loop caps (`resolve.qa_max_cycles`
+# default 5, `review.max_cycles` default 3) stay the hard bound. Missing
+# profile/complexity fail-safe to full + medium → 2.
+DEFAULT_HIGH_CEILING = 5
 
 # `ts` is absent-or-valid: absent is filled from the clock, present must be an
 # ISO-8601 UTC instant to the second, exactly as the schema's examples show.
@@ -137,7 +146,7 @@ COMPLEXITY_COLLAPSE = {
     "complex": "high",
 }
 
-INT_KEYS = ("issue", "qa_cycles", "duration_s")
+INT_KEYS = ("issue", "qa_cycles", "ceiling", "duration_s")
 STR_KEYS = (
     "ts",
     "event_id",
@@ -147,7 +156,17 @@ STR_KEYS = (
     "profile",
     "complexity",
     "skipped_reason",
+    "breach_reason",
 )
+
+
+def policy_ceiling(profile: object, complexity: object, *, high: int = DEFAULT_HIGH_CEILING) -> int:
+    """Class ceiling: light=1, full+high=high (default 5), else 2."""
+    if profile == "light":
+        return 1
+    if complexity == "high":
+        return high
+    return 2
 
 
 class RecordError(ValueError):
@@ -252,6 +271,29 @@ def normalize_record(record: object, *, now: str | None = None) -> dict[str, obj
     for key in OPTIONAL_KEYS:
         if key in out and out[key] is None:
             del out[key]
+
+    qa_cycles = out.get("qa_cycles")
+    if qa_cycles is not None and _is_int(qa_cycles) and qa_cycles < 0:
+        raise RecordError("qa_cycles must be a non-negative integer")
+
+    ceiling = out.get("ceiling")
+    if ceiling is not None:
+        if not _is_int(ceiling) or ceiling < 1:
+            raise RecordError("ceiling must be a positive integer")
+    else:
+        ceiling = policy_ceiling(out.get("profile"), out.get("complexity"))
+
+    if (
+        qa_cycles is not None
+        and _is_int(qa_cycles)
+        and qa_cycles > ceiling
+    ):
+        reason = out.get("breach_reason")
+        if not isinstance(reason, str) or not reason.strip():
+            raise RecordError(
+                f"qa_cycles {qa_cycles} exceeds class ceiling {ceiling}; "
+                "breach_reason is required"
+            )
 
     return {key: out[key] for key in KEY_ORDER if key in out}
 

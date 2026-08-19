@@ -384,7 +384,8 @@ UI review is **auto-detected per issue** — no config flag enables it. Scan the
 Detection rules, the `ui-reviewer` spawn, the `ui_review.browser_review` gate, and skip/success messages are in `docs/ui-review.md`; the resolver's own deltas (diff command, variables, `resolve.ui_review.browser_review` as the gate key, findings flow) are in `references/pipeline-steps.md` (*Step 4 — UI/UX review*). Cycle mechanics and loop controls (`resolve.qa_max_cycles`, exit-on-clean, exit-on-stagnation) are in the same file (*Step 4 — QA*).
 
 **`light` profile:** cap the review-fix loop at **1** cycle instead of
-`resolve.qa_max_cycles` — see the profile table in *Step 0g*.
+`resolve.qa_max_cycles` — see the profile table in *Step 0g*. Class policy:
+light=1; full+low/medium=2; full+high=`qa_max_cycles`. Record `ceiling`/`breach_reason`.
 
 ---
 

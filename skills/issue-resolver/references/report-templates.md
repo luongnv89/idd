@@ -210,9 +210,9 @@ actually writing the line.
 
 Build the object from values already known during the run — `ts`, `issue`,
 `mode`, `skill`, `outcome`, `pr`, plus the optional `complexity`, `profile`,
-`qa_cycles`, `duration_s`, and `skipped_reason` — following the schema in
-`references/docs/run-log-schema.md` rather than
-re-deriving fields here.
+`qa_cycles`, `ceiling`, `breach_reason`, `duration_s`, and `skipped_reason` —
+following the schema in `references/docs/run-log-schema.md` rather than re-deriving fields
+here.
 
 Two derivations are the resolver's own:
 
@@ -222,6 +222,11 @@ Two derivations are the resolver's own:
 - **`profile`** — the pipeline profile chosen in *Step 0g* (`light` or `full`).
   Omit the field only when `resolve.adaptive_effort` is `false`, or when no
   profile was selected at all (for example an early failure before Step 0g ran).
+- **`ceiling`** — class policy: `1` if `profile` is `light`; `resolve.qa_max_cycles`
+  (default 5) if complexity is `high`; otherwise `2`. Fail-safe omitted
+  profile/complexity as full + medium (`2`).
+- **`breach_reason`** — required when `qa_cycles` exceeds `ceiling`; omit
+  otherwise. `gi-runlog.py` rejects an over-ceiling row without it (exit 3).
 
 `outcome` is one of `success` (a PR was delivered), `already_resolved` (Step 0/1
 found the issue already fixed and exited early), or `failed` (a step failed).
@@ -231,7 +236,7 @@ found the issue already fixed and exited early), or `failed` (a step failed).
 `--no-run-log` is passed only by `/auto-pilot`, which runs this resolver as a
 subagent and writes the **single** run-log line per issue itself — appending here
 too would double-write and skew `/idd-doctor`'s metrics. Instead **return** the
-telemetry (`outcome`, `qa_cycles`, `complexity`, `profile`, `duration_s`) in the
+telemetry (`outcome`, `qa_cycles`, `ceiling`, `breach_reason`, `complexity`, `profile`, `duration_s`) in the
 subagent result so the orchestrator folds it into its own line.
 
 The flag is independent of `--auto`: a standalone `/issue-resolver <N> --auto`
