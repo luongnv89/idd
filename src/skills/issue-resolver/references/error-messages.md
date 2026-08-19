@@ -265,7 +265,17 @@ All errors follow the rich error format: what went wrong + fix command + docs li
   To fix:  npx skills add https://github.com/luongnv89/skills --skill {name}
   Or:      asm install https://github.com/luongnv89/skills --skill {name}
 ```
-**Trigger:** Step 3 selected a catalogued-but-not-installed skill and the install command failed. Non-fatal — omit that name from `selected_skills` and do not record it as `origin: borrowed`. Internal agents remain the fallback.
+**Trigger:** Step 3 selected a catalogued-but-not-installed skill and the install command failed. Non-fatal — remove any partial `~/.claude/skills/{name}` the tool left behind, omit that name from `selected_skills`, and do not record it as `origin: borrowed`. Internal agents remain the fallback.
+
+### Borrow cleanup failed
+```
+⚠ Partial install of {name} could not be removed
+
+  Path:    ~/.claude/skills/{name}
+  Remove it by hand — it carries no borrow marker, so teardown will not
+  touch it and the next resolve reads it as your own installed skill.
+```
+**Trigger:** A borrow install failed and the follow-up `rm -rf` of the partial directory also failed. Non-fatal — the entry is dropped from `borrowed_skills` either way; only a manual removal clears it.
 
 ### Borrow teardown leftover
 ```

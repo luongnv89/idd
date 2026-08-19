@@ -191,7 +191,7 @@ Repo-root state beside `.gitissue.yml`, created on first use.
 | `.gitissue/triage.json` | `/issue-triage`, `/auto-pilot` | Cached triage: priorities, deps, order, history |
 | `.gitissue/analysis-<N>.json` | `/issue-analysis` | Deep analysis of issue #N |
 | `.gitissue/runs.jsonl` | `/issue-resolver`, `/auto-pilot` | Append-only run log (one line per issue) |
-| `.gitissue/run-state.json`, `run.lock`, `last-run-report.md` | `/auto-pilot` | Resume state, lock, report. Machine-local |
+| `.gitissue/run-state.json`, `run.lock`, `last-run-report.md` | `/auto-pilot`; `/issue-resolver` (`borrowed_skills` only) | Resume state, lock, report |
 
 > **Not in `.gitissue/`:** the model-suggestion cache is **skill-level** (`model-data-<date>.json` in the installed skill, all repos).
 
@@ -199,7 +199,7 @@ Repo-root state beside `.gitissue.yml`, created on first use.
 - Create via `mkdir -p`
 - Re-triage overwrites `triage.json`; `/auto-pilot` updates after a merge
 - `runs.jsonl` is **append-only**; absence non-fatal
-- **Carve-out — `run-state.json`, `run.lock`, `last-run-report.md` are machine-local and gitignored**; only `src/shared/scripts/gi-state.py` writes them, and `--dry-run` mutates nothing.
+- **Carve-out** — commit the directory (project state, not secrets), never the three machine-local files: gitignored, `gi-state.py` the only writer, `--dry-run` mutates nothing
 
 ### `.gitissue/runs.jsonl` — run log
 

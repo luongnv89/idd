@@ -144,10 +144,26 @@ expect_grep "T3: borrow install failed" \
   'Borrow install failed' "$ERR"
 expect_grep "T3: borrow teardown leftover" \
   'Borrow teardown leftover' "$ERR"
+expect_grep "T3: borrow cleanup failed (partial install left behind)" \
+  'Borrow cleanup failed' "$ERR"
+expect_grep "T3: install failure removes the partial directory" \
+  'rm -rf "\$HOME/\.claude/skills/<name>"' "$STEPS"
+expect_grep "T3: install-failure removal cites Borrow cleanup failed" \
+  'Borrow cleanup failed' "$STEPS"
 expect_grep "T3: gi-state unavailable borrow" \
   'gi-state unavailable' "$ERR"
 expect_grep "T3: borrow marker absent" \
   'Borrow marker absent' "$ERR"
+
+# T3b: the bundled config-schema the resolver ships names it as a run-state writer
+BUNDLED_SCHEMA="$REPO_ROOT/skills/issue-resolver/references/docs/config-schema.md"
+for f in "$SCHEMA" "$BUNDLED_SCHEMA"; do
+  if grep -qE '^\| `\.gitissue/run-state\.json`.*/issue-resolver' "$f"; then
+    pass "T3b: run-state.json row names /issue-resolver (${f#$REPO_ROOT/})"
+  else
+    fail "T3b: run-state.json row omits /issue-resolver (${f#$REPO_ROOT/})"
+  fi
+done
 
 # T4: skill-index catalog vs availability
 expect_grep "T4: catalog vs filesystem" \

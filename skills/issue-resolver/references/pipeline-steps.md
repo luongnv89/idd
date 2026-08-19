@@ -1095,13 +1095,26 @@ complexity, affected files, UI detection, lifecycle grouping). Illustrative:
   `run_id: "x --> y"`, or a `$(…)`/backtick string that quoting does not
   neutralise). Never write a `run_id`, an issue field, or any other read-back
   value into this file. This file, not the record, is what authorises teardown
-  to delete the directory. Install and mark are one atomic step: if the marker cannot be
-  written, `rm -rf` the just-installed directory and treat the whole thing as
-  an install failure — a marker-less borrowed copy would otherwise become
-  permanent under the teardown rule below.
-- Install failure: print `references/error-messages.md` (*Borrow install
-  failed*), leave that name out of `selected_skills`, and `--update` again with
-  that entry **dropped** from `borrowed_skills`.
+  to delete the directory. Install and mark are one atomic step: if the marker
+  cannot be written, treat the whole thing as an install failure — the bullet
+  below removes the just-installed directory, because a marker-less borrowed
+  copy would otherwise become permanent under the teardown rule below.
+- Install failure: first remove whatever the tool left behind — a half-written
+  directory carries no marker, so leftover teardown can never claim it and the
+  next run's detect reads it as `preinstalled`, exactly the permanent orphan
+  the marker rule above exists to prevent. Screen the name before it reaches
+  the command, the same rule teardown states: only when `<name>` matches
+  `^[a-z][a-z0-9-]{0,63}$` run `rm -rf "$HOME/.claude/skills/<name>"` — an
+  empty or unscreened name would make that command `rm -rf
+  "$HOME/.claude/skills/"`, and quoting does not neutralise `$(…)` or
+  backticks because the agent composes the command text. A name that fails the
+  screen was never installable, so print *Borrow cleanup failed* and delete
+  nothing. Then print `references/error-messages.md` (*Borrow install failed*),
+  leave that name out of `selected_skills`, and `--update` again with that
+  entry **dropped** from `borrowed_skills`. If the `rm -rf` itself fails, still
+  drop the entry — a marker-less directory is one teardown refuses to touch, so
+  the record buys nothing — and print `references/error-messages.md` (*Borrow
+  cleanup failed*) so the operator sees the path to remove by hand.
 
 #### Teardown (every terminal outcome)
 

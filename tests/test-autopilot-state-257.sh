@@ -1222,6 +1222,10 @@ for f in run-state.json run.lock last-run-report.md; do
 done
 expect_grep "AC4: config-schema.md carries the machine-local carve-out" \
   "Carve-out" "$REPO_ROOT/docs/config-schema.md"
+# The carve-out is only meaningful beside the rule it carves out of: the rest of
+# .gitissue/ is committed. A byte-budget squeeze dropped this line once already.
+expect_grep "AC4: config-schema.md still states the commit-the-directory rule" \
+  "commit the directory (project state, not secrets)" "$REPO_ROOT/docs/config-schema.md"
 
 # No new config key: the defaults table and the init template stay untouched.
 if grep -q "run_state\|resume_ttl\|autopilot.lock" "$REPO_ROOT/docs/config-schema.md" \

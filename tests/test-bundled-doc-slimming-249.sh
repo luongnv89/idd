@@ -109,6 +109,14 @@ FAIL=0
 # measured across the bundle against 288 bytes of headroom. The overrun was paid
 # the way this message asks, by compressing the `.gitissue/` section again rather
 # than by raising the line: 512,222 -> 512,012, and the ratchet still holds.
+# Issue #309's review fixes moved it again without raising it. Two additions to
+# the `.gitissue/` section: the `run-state.json` row now names `/issue-resolver`
+# as a writer (`borrowed_skills` only), and the carve-out bullet regained the
+# `commit the directory (project state, not secrets)` rule that 34b56a0's own
+# compression had deleted. Both were paid for inside the same section — the
+# carve-out bullet dropped the repeated `src/shared/scripts/` path and the row
+# dropped the `Machine-local` the bullet already states: 512,100 -> 512,023.
+# The line does not move; six bytes of headroom remain.
 BUDGET=512029
 
 pass() { echo "  ✓ $1"; PASS=$((PASS + 1)); }
