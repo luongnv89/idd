@@ -32,17 +32,15 @@ The full field set — the *Always present* column is the required minimum:
 | `pr` | integer or null | yes | PR number when a PR was created, else `null` |
 | `complexity` | string | no | Research complexity on the **3-value** run-log scale (`low` / `medium` / `high`) when known. Collapse the researcher's 5-value estimate before writing: `trivial` or `low` → `low`; `medium` → `medium`; `high` or `complex` → `high`. Never emit `trivial` or `complex` in runs.jsonl. |
 | `profile` | string | no | The adaptive-effort pipeline profile the run selected: `light` (trivial fast path) or `full`. Omitted when `resolve.adaptive_effort` is `false` or the signal was unavailable. See [agent-model-effort.md](https://github.com/luongnv89/idd/blob/main/docs/agent-model-effort.md) (Complexity → pipeline profile). |
-| `qa_cycles` | integer | no | Number of QA review-fix cycles run (resolver) |
-| `ceiling` | integer | no | Policy QA-cycle ceiling for this row's class. `1` when `profile` is `light`; `resolve.qa_max_cycles` (default `5`) when complexity is `high`; otherwise `2` (full + low/medium, and the fail-safe when `profile`/`complexity` are omitted). Loop caps stay the hard bound. Omit on historical rows. |
-| `breach_reason` | string | no | Required when `qa_cycles` exceeds the class ceiling. Explains a high-class over-2 (or any over-ceiling) run. Omit when the run stayed within its ceiling. |
+| `qa_cycles` | integer | no | QA cycles. Optional `ceiling`/`breach_reason`. |
 | `duration_s` | integer | no | Wall-clock duration of the run in seconds, when measurable |
 | `skipped_reason` | string | no | Why the issue was skipped (auto-pilot skips, and any `skipped`/`already_resolved` outcome), e.g. `already_resolved`, `blocked_label`, `blocked_by_dependency`, `in_skip_list`, `assigned_to_other`, `quarantined` |
 
 Example lines:
 
 ```jsonl
-{"ts":"2026-06-26T14:31:07Z","issue":141,"mode":"auto","skill":"issue-resolver","complexity":"medium","profile":"full","qa_cycles":2,"ceiling":2,"outcome":"success","pr":150,"duration_s":372}
-{"ts":"2026-06-26T15:02:41Z","issue":152,"mode":"auto","skill":"issue-resolver","complexity":"low","profile":"light","qa_cycles":1,"ceiling":1,"outcome":"success","pr":161,"duration_s":94}
+{"ts":"2026-06-26T14:31:07Z","issue":141,"mode":"auto","skill":"issue-resolver","complexity":"medium","profile":"full","qa_cycles":2,"outcome":"success","pr":150,"duration_s":372}
+{"ts":"2026-06-26T15:02:41Z","issue":152,"mode":"auto","skill":"issue-resolver","complexity":"low","profile":"light","qa_cycles":1,"outcome":"success","pr":161,"duration_s":94}
 {"ts":"2026-06-26T14:48:12Z","issue":118,"mode":"balanced","skill":"auto-pilot","outcome":"skipped","pr":null,"skipped_reason":"blocked_by_dependency"}
 ```
 
@@ -59,8 +57,7 @@ Example lines:
 **The `gi-runlog` helper.** A skill that bundles `references/scripts/gi-runlog.py`
 should pipe the record to it on stdin rather than hand-rolling the append: the script
 enforces every rule above — required-field and `outcome` validation, the 5→3
-`complexity` collapse, the class QA-cycle ceiling (`qa_cycles` above `ceiling`
-requires `breach_reason`), dropping optional keys whose value is `null`, filling an absent
+`complexity` collapse, dropping optional keys whose value is `null`, filling an absent
 `ts` from the UTC clock, and emitting the keys in the example lines' order above —
 that order is the canonical one, not the field table's. `--append` (the
 default) creates `.gitissue/` and appends exactly one `\n`-terminated line to `--path`
