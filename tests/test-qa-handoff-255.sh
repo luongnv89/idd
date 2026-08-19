@@ -822,6 +822,100 @@ check_block_has "$CL_ENTRY" 'unsuffixed .ui=. stays parsable but is never skippa
   "T19.3: and that an unsuffixed ui= is parsable but never skippable"
 
 # ───────────────────────────────────────────────────────────
+# T20 (issue #283): honor a tests= skip only when a CI leg can
+# actually run. Three-part AND: qa_handoff=trusted AND tests=
+# SHA equals head AND ci_leg_runnable. The skip is refused when
+# no CI (empty/absent rollup / no_ci) or review.check_ci is false.
+# ───────────────────────────────────────────────────────────
+# AC1: with CI configured and enabled, a valid tests= skip still
+# exists — the existing T3.1–T3.5 greps stay; this block pins the
+# third conjunct on src and the built copies.
+for pair in "src:$SRC_PR" "built:$BUILT_PR"; do
+  tag="${pair%%:*}"
+  f="${pair#*:}"
+  step2="$(awk '/^## Step 2 — Script Pre-pass/,/^## Step 3 — Analyze/' "$f")"
+  step4="$(awk '/^## Step 4 — Run Tests/,/^## Step 5 — Check CI/' "$f")"
+  check_block_has "$step2" 'qa_handoff = trusted' \
+    "T20.1 ($tag): Step 2 still names the trusted verdict"
+  check_block_has "$step2" 'tests=. field whose SHA equals .head|tests=.*SHA equals' \
+    "T20.2 ($tag): Step 2 still names the tests= SHA-equals-head conjunct"
+  check_block_has "$step2" 'ci_leg_runnable' \
+    "T20.3 ($tag): Step 2's skip also names ci_leg_runnable"
+  check_block_has "$step2" 'review.check_ci|statusCheckRollup' \
+    "T20.4 ($tag): Step 2 names check_ci / statusCheckRollup"
+  check_block_has "$step4" 'qa_handoff = trusted' \
+    "T20.5 ($tag): Step 4 still names the trusted verdict"
+  check_block_has "$step4" 'tests=. field whose SHA equals .head|tests=.*SHA equals' \
+    "T20.6 ($tag): Step 4 still names the tests= SHA-equals-head conjunct"
+  check_block_has "$step4" 'ci_leg_runnable' \
+    "T20.7 ($tag): Step 4's skip also names ci_leg_runnable"
+  check_block_has "$step4" 'review.check_ci|statusCheckRollup' \
+    "T20.8 ($tag): Step 4 names check_ci / statusCheckRollup"
+done
+
+# AC2: with no CI configured, a tests= marker does not skip the suite.
+# AC3: with review.check_ci: false, a tests= marker does not skip either.
+# SKILL Step 2/4 and the mechanics contract site name both refusals.
+for pair in "src:$SRC_PR" "built:$BUILT_PR"; do
+  tag="${pair%%:*}"
+  f="${pair#*:}"
+  step2="$(awk '/^## Step 2 — Script Pre-pass/,/^## Step 3 — Analyze/' "$f")"
+  step4="$(awk '/^## Step 4 — Run Tests/,/^## Step 5 — Check CI/' "$f")"
+  check_block_has "$step2" 'ignore .tests=. and run the local suite as unmarked' \
+    "T20.9 ($tag): Step 2 ignores tests= and runs the suite when ci_leg_runnable is false"
+  check_block_has "$step2" 'no CI' \
+    "T20.10 ($tag): Step 2 names the no-CI refusal"
+  check_block_has "$step2" 'empty .statusCheckRollup.|no_ci' \
+    "T20.11 ($tag): Step 2 names empty rollup / no_ci"
+  check_block_has "$step2" 'review.check_ci: false' \
+    "T20.12 ($tag): Step 2 names review.check_ci: false"
+  check_block_has "$step4" 'ignore .tests=. and run the local suite as unmarked' \
+    "T20.13 ($tag): Step 4 ignores tests= and runs the suite when ci_leg_runnable is false"
+  check_block_has "$step4" 'no CI' \
+    "T20.14 ($tag): Step 4 names the no-CI refusal"
+  check_block_has "$step4" 'empty .statusCheckRollup.|no_ci' \
+    "T20.15 ($tag): Step 4 names empty rollup / no_ci"
+  check_block_has "$step4" 'review.check_ci: false' \
+    "T20.16 ($tag): Step 4 names review.check_ci: false"
+done
+
+for pair in "src:$SRC_LOOP" "built:$BUILT_LOOP"; do
+  tag="${pair%%:*}"
+  f="${pair#*:}"
+  vocab_row="$(grep -E '^\| .tests=<count>' "$f" | head -1 || true)"
+  check_block_has "$vocab_row" 'ci_leg_runnable' \
+    "T20.17 ($tag): the tests= field-vocab row names ci_leg_runnable"
+  check_block_has "$vocab_row" 'review.check_ci. is .true|statusCheckRollup' \
+    "T20.18 ($tag): it defines ci_leg_runnable from check_ci + statusCheckRollup"
+  check_block_has "$vocab_row" 'Refuse the skip when no CI' \
+    "T20.19 ($tag): it refuses the skip when no CI (no_ci)"
+  check_block_has "$vocab_row" 'review.check_ci. is .false' \
+    "T20.20 ($tag): it refuses the skip when review.check_ci is false"
+  check_has "$f" 'three-part AND' \
+    "T20.21 ($tag): the contract site states the three-part AND"
+  check_has "$f" 'never.*from Step 5' \
+    "T20.22 ($tag): ci_leg_runnable is never decided from Step 5's wait"
+  skips="$(awk '/^### What .trusted. skips/,/^### Re-evaluation after a push/' "$f")"
+  check_block_has "$skips" 'and .ci_leg_runnable' \
+    "T20.23 ($tag): the skips table's test rows add and ci_leg_runnable"
+  reeval="$(awk '/^### Re-evaluation after a push/,/^### Never gated/' "$f")"
+  check_block_has "$reeval" 'tests=. skip is refused when .ci_leg_runnable. is false' \
+    "T20.24 ($tag): re-evaluation notes the independent tests= refusal"
+done
+
+for pair in "src:$SRC_TEMPLATES" "built:$BUILT_TEMPLATES"; do
+  tag="${pair%%:*}"
+  f="${pair#*:}"
+  tests_row="$(grep -E '^\| .tests. \|' "$f" | head -1 || true)"
+  check_block_has "$tests_row" 'consumer honors this field only when a CI leg can actually run' \
+    "T20.25 ($tag): the producer notes the consumer's CI-leg precondition"
+  check_block_has "$tests_row" 'ci_leg_runnable' \
+    "T20.26 ($tag): it names ci_leg_runnable"
+  check_block_has "$tests_row" 'produce the field the same way regardless' \
+    "T20.27 ($tag): the producer still emits tests= the same way"
+done
+
+# ───────────────────────────────────────────────────────────
 # T12 (install surface): both capped SKILL.md files stay inside
 # the skill-creator 500-line cap after this change.
 # ───────────────────────────────────────────────────────────
