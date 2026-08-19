@@ -124,6 +124,12 @@ resolve:
   # (Complexity → pipeline profile).
   adaptive_effort: true
 
+  # Borrow catalogued-but-not-installed skills for one task (issue #309).
+  # Type: boolean. Default: false (installed-only). true installs selected
+  # missing skills, records {name, origin} in run-state, uninstalls only
+  # origin: borrowed; auto never installs unless this key is true.
+  borrow_skills: false
+
   # UI/UX review settings (Step 4 — QA)
   # Code-level UI review is auto-detected per issue and always runs when UI
   # work is present; it needs no flag and runs in any environment (including
@@ -182,27 +188,22 @@ Repo-root state beside `.gitissue.yml`, created on first use.
 
 | File | Written by | Description |
 |------|-----------|-------------|
-| `.gitissue/triage.json` | `/issue-triage`, `/auto-pilot` | Cached triage (schema v1): priorities, deps, order, history |
+| `.gitissue/triage.json` | `/issue-triage`, `/auto-pilot` | Cached triage: priorities, deps, order, history |
 | `.gitissue/analysis-<N>.json` | `/issue-analysis` | Deep analysis of issue #N |
-| `.gitissue/runs.jsonl` | `/issue-resolver`, `/auto-pilot` | Append-only run log (one JSON line per issue). See subsection |
-| `.gitissue/run-state.json`, `run.lock`, `last-run-report.md` | `/auto-pilot` | Resume state, lock, final report. Machine-local; auto-pilot preflight/phases |
+| `.gitissue/runs.jsonl` | `/issue-resolver`, `/auto-pilot` | Append-only run log (one line per issue) |
+| `.gitissue/run-state.json`, `run.lock`, `last-run-report.md` | `/auto-pilot`; `/issue-resolver` (`borrowed_skills` only) | Resume state, lock, report |
 
-> **Not in `.gitissue/`:** the model-suggestion cache is **skill-level**
-> (`model-data-<date>.json` in the installed skill, all repos). A legacy
-> `.gitissue/model-data.json` is ignored.
+> **Not in `.gitissue/`:** the model-suggestion cache is **skill-level** (`model-data-<date>.json` in the installed skill, all repos).
 
 **Conventions:**
-- Create via `mkdir -p`; format JSON for readable diffs
-- Full re-triage overwrites `triage.json`; `/auto-pilot` updates it in place after a merge
-- `runs.jsonl` is **append-only**; absence is non-fatal
-- Commit the directory (project state, not secrets)
-- **Carve-out — `run-state.json`, `run.lock` and `last-run-report.md` are machine-local and gitignored.** Only `src/shared/scripts/gi-state.py` writes them; `--dry-run` mutates nothing.
+- Create via `mkdir -p`
+- Re-triage overwrites `triage.json`; `/auto-pilot` updates after a merge
+- `runs.jsonl` is **append-only**; absence non-fatal
+- **Carve-out** — commit the directory (project state, not secrets), never the three machine-local files: gitignored, `gi-state.py` the only writer, `--dry-run` mutates nothing
 
-### `.gitissue/runs.jsonl` — run log (monitoring)
+### `.gitissue/runs.jsonl` — run log
 
-Field set, append rules, and the single-writer / `--no-run-log` convention live
-in
-[run-log-schema.md](https://github.com/luongnv89/idd/blob/main/docs/run-log-schema.md).
+Field set, append rules, and the single-writer / `--no-run-log` convention in [run-log-schema.md](https://github.com/luongnv89/idd/blob/main/docs/run-log-schema.md).
 
 ## Validation
 
@@ -235,6 +236,7 @@ Config is validated on load at the start of every skill invocation. Errors inclu
 | `resolve.max_commits` | `10` | Max commits warning |
 | `resolve.qa_max_cycles` | `5` | Max QA review-fix cycles during resolve Step 4 |
 | `resolve.adaptive_effort` | `true` | Scale the resolve pipeline to issue complexity — trivial issues (Effort XS/S) take a lighter path (lighter Research, skip 3-option Plan, skip propose-skills, QA capped at 1 cycle); `false` pins every issue to the full pipeline, and turns off #256's caller context: the payload gate, `triage_context`, last-green test reuse ([agent-model-effort.md](https://github.com/luongnv89/idd/blob/main/docs/agent-model-effort.md)) |
+| `resolve.borrow_skills` | `false` | Off by default. true: full catalog; install selected missing, record {name, origin} in run-state, uninstall only `origin: borrowed`; auto never installs unless true |
 | `resolve.ui_review.browser_review` | `"ask"` | Browser (screenshot) UI review mode; code UI review is auto-detected and always runs |
 | `projects.sync_enabled` | `false` | Enable project board sync |
 | `projects.project_number` | `null` | Explicit project number (null = auto-detect) |

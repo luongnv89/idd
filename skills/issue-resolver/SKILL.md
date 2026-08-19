@@ -62,6 +62,7 @@ Defaults (full field reference in `references/docs/config-schema.md`):
 - `resolve.qa_max_cycles: 5`
 - `resolve.adaptive_effort: true` — scale the pipeline to the issue's complexity (see *Step 0g — Complexity gate*). When `false`, every issue runs the full pipeline (profile pinned to `full`).
 - `resolve.ui_review.browser_review: "ask"` — gates only the optional browser/screenshot review; the code-level UI review (*Step 4 — UI/UX review*) is auto-detected and always runs.
+- `resolve.borrow_skills: false` — installed-only propose; `true` may borrow catalogued skills (`references/pipeline-steps.md`).
 
 ---
 
@@ -136,6 +137,7 @@ references/scripts/gi-runlog.py
 references/scripts/gi-secscan.py
 references/scripts/gi-branch.py
 references/scripts/gi-issue.py
+references/scripts/gi-state.py
 ```
 
 ---
@@ -274,7 +276,7 @@ profile*).
 |------|------------------|
 | 1 — Research | Lighter pass: the already-resolved safety check and a focused scan of the obviously-affected file(s) still run; skip the broad dependency trace and external solution research. |
 | 2 — Plan | Skip the 3-option synthesis entirely — do **not** spawn the synthesizer. Derive a **direct minimal plan** inline and record it as the selected option, so the Decision Record still has a real `Selected option`; the design-confirm checkpoint does not apply — **unless *0h* set `analysis_reuse = fresh`**, in which case *Step 2 — Plan → `reuse`* governs instead: options are **lifted** from the analysis, not derived, and the design-confirm checkpoint **does** apply. |
-| 3 — Propose relevant skills | Skip the sub-step — set `selected_skills = []` and go straight to the implementer, mirroring auto-mode behavior. |
+| 3 — Propose relevant skills | Skip the **propose/install** — set `selected_skills = []` and go straight to the implementer, mirroring auto-mode behavior. **Leftover teardown still runs** (`references/pipeline-steps.md` → *Step 3 — Propose relevant skills*): a `light` run must still release skills a crashed earlier run borrowed. |
 | 4 — QA | Cap the review-fix loop at **1** cycle (a single review pass; fix once if blocking issues are found, then deliver) instead of `resolve.qa_max_cycles`. One reviewer spawn still runs — the fast path reduces depth, it does not skip review. UI review remains auto-detected as usual. |
 | 5 — Deliver | **Unchanged** — always emits the Decision Record and Acceptance Criteria Verification table. The profile never removes durable memory. |
 
@@ -342,17 +344,17 @@ Plan → Design-confirm checkpoint*).
 
 ## Step 3 — Implement
 
-### Propose relevant skills (interactive only)
+### Propose relevant skills
 
 Before spawning the implementer, optionally augment it with external skills from
-the index in `references/skill-index.md` (`https://github.com/luongnv89/skills`).
-Detect installed skills against the catalog, propose the relevant subset, let the
-user accept all/some/none into `selected_skills` — the implementer always falls
-back to internal agents, so selecting none is unchanged behavior. Detection,
-proposal, the `◆`/`○` block (no own `[N/5]` tracker line), and auto-mode behavior
-are in `references/pipeline-steps.md` (*Step 3 — Propose relevant skills*).
+`references/skill-index.md`. Detect (installed vs available-to-borrow when
+`resolve.borrow_skills` is true), propose, accept into `selected_skills`;
+internal agents remain the fallback. Borrow/install, `{name, origin}` records
+via `references/scripts/gi-state.py`, teardown of `origin: borrowed` only, the
+`◆`/`○` block, leftover cleanup, and auto-mode are in
+`references/pipeline-steps.md` (*Step 3 — Propose relevant skills*).
 
-**`light` profile:** skip this sub-step — see the profile table in *Step 0g*.
+**`light` profile:** skip the propose/install — see the profile table in *Step 0g* — but **still run the leftover teardown** in `references/pipeline-steps.md`.
 
 Write code and tests based on the selected plan. Spawn the implementer (`references/agents/implementer.md`) with the canonical pattern, passing the plan, branch name, naming conventions, and `selected_skills`.
 
@@ -470,18 +472,14 @@ When invoked with `--auto` (or by `/auto-pilot`), the entire pipeline runs witho
 
 - **Environment:** Export `IDD_AUTO_MODE=1` before any shell snippet that consults it (`references/docs/pre-commit-security.md`).
 - **Workspace:** The default resolution path is in-place. Skip Step 0e and allow no `git worktree add` on the default resolution path; ordinary standalone auto mode and auto-pilot's default single-lane path run mandatory Repo Sync, then *0f*, exactly as before. A resolver launched by auto-pilot with `max_parallel > 1` may receive `IDD_CALLER_WORKTREE=1`; after the linked-worktree/branch validation in `references/pipeline-steps.md`, it uses that already-current workspace without creating, falling back from, or cleaning it up. The prompt never appears on either path.
-- **Never blocks:** *0c* skips the assignment guard and logs blocking labels as warnings; *0g* still runs (reads the pre-work `Effort` band, no prompt); *Step 1* closes an already-resolved issue with a comment and exits cleanly; *Step 2* auto-selects the recommended option and design-confirm never appears; *Step 3* continues past the max-commits guard with a warning and never prompts for skills (internal agents only); *Step 4* runs its cycles autonomously and delivers with known issues on stagnation.
+- **Never blocks:** *0c* skips the assignment guard and logs blocking labels as warnings; *0g* still runs (reads the pre-work `Effort` band, no prompt); *Step 1* closes an already-resolved issue with a comment and exits cleanly; *Step 2* auto-selects the recommended option and design-confirm never appears; *Step 3* continues past the max-commits guard with a warning and never prompts for skills (internal agents only unless `resolve.borrow_skills` is true — then auto-selects/borrows); *Step 4* runs its cycles autonomously and delivers with known issues on stagnation. Every terminal outcome still runs borrow teardown.
 - **Deliver:** Create PR. Do NOT merge — merging is `/auto-pilot` or `/issue-pr-review`'s job. Under `/auto-pilot` the selected `profile` is **returned** in the telemetry (with `--no-run-log`) and folded into auto-pilot's single run-log line; a standalone `--auto` run writes `profile` itself.
 
 No `[y/N]` prompts, no `Choose:` prompts, no `Continue?` prompts. Every decision point has a defined auto behavior.
 
----
-
 ## Edge Cases
 
 No acceptance criteria, empty issue body, large issues (20+ files), test failure/timeout, and branch-already-exists are all handled — full behavior for each is in `references/pipeline-steps.md` (*Edge Cases*).
-
----
 
 ## Platform Driver and Output Conventions
 

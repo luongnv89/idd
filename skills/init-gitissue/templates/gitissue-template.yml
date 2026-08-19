@@ -70,6 +70,11 @@ resolve:
   # ambiguous issues keep the full pipeline. false: full pipeline for every issue.
   adaptive_effort: true
 
+  # Borrow catalogued-but-not-installed skills for one resolve task.
+  # false: propose only already-installed skills. true: offer the catalog,
+  # install selected missing skills, record in run-state, teardown borrowed only.
+  borrow_skills: false
+
   ui_review:
     browser_review: ask
 
