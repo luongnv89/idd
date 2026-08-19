@@ -79,8 +79,12 @@
 #          apart here. Note 3(d) recovers from it on either arm: when the run it
 #          opens is display-only, and — since issue #280 — when that run carries
 #          a shell info string (```bash), which is the case that used to have no
-#          guard at either end. Note 3(e) reports the file as malformed from the
-#          other direction, independently of what 3(d) makes of it.
+#          guard at either end. Note 3(e) looks at the same shape from the
+#          other direction, independently of what 3(d) makes of it — but only
+#          its EOF half is a deduction there. Its parity half counts an
+#          indented-code-block ``` run like any other run, so a file carrying
+#          one is reported UNBALANCED even when the parse is right. Fixture E
+#          is such a file. See 3(e).
 #
 #          src/ carries fences at 0, 2 and 3 columns only, so neither rule moves
 #          a real subject today; T3c is what keeps them from drifting.
@@ -174,9 +178,12 @@
 #          The other two are closed from the other end, by note 3(e) rather than
 #          by the recovery. A `~~~text` or ````text phantom cannot be closed by
 #          any ``` run, so it leaves the file both unbalanced and open at EOF,
-#          and 3(e) reports it. That is a weaker verdict than the shell arm's —
-#          "this file is malformed" rather than "this push is ungated" — but it
-#          is loud, and it is a deduction rather than a guess. A *closed*
+#          and 3(e) reports it, on both halves. That is a weaker verdict than
+#          the shell arm's — "this file is malformed" rather than "this push is
+#          ungated" — but it is loud, and here the sound half carries it: a
+#          block still open at EOF is proof the parser never saw a terminator,
+#          whatever the parity count says (3(e) is exact about which half
+#          deduces and which half only measures). A *closed*
 #          ````markdown wrapper quoting a ```bash sample stays balanced and is
 #          not reported, which is the behaviour that idiom needs.
 #
@@ -185,32 +192,61 @@
 #          a real false positive against two shapes nothing here writes. If a
 #          tilde or 4-backtick fence ever appears in src/, revisit this rather
 #          than assuming the guard covers it.
-#      (e) A file's fences must *account* for each other, and two independent
-#          deductions say so. Both were added by issue #280, and unlike 3(d)
-#          neither is a heuristic: they are statements about the file, not
-#          guesses about the parse.
+#      (e) A file's fences should *account* for each other, and two independent
+#          checks say so. Both were added by issue #280, and they are not the
+#          same kind of statement — an earlier version of this note called both
+#          of them deductions, which was false of one of them:
 #
-#            · Every fenced block contributes exactly two fence runs — one
-#              opener, one closer — however the parser reads them, so a file's
-#              total run count is even. An odd count means one fence has no
-#              partner. This is the deduction that catches a dropped closer
-#              whose damage is repaired before EOF: the next unrelated bare ```
-#              closes the merged block, parity re-syncs on the pair after it,
-#              and the file ends clean while every line between the two has been
-#              swallowed into a block carrying a single gate flag. That is the
-#              exact reproduction issue #280 opens with. Fixture O pins it.
-#            · A block still open at EOF is reported in its own right. Parity
-#              does not subsume this: a run *inside* an open block is counted but
+#            · **Fence-run parity — an empirical guard, not a deduction.** The
+#              scanner counts every fence-shaped run in the file and reports an
+#              odd total. The reasoning behind it is that a fenced block
+#              contributes two runs, one opener and one closer, so a dropped
+#              closer leaves a run without a partner. That is what catches a
+#              phantom whose damage is repaired before EOF: the next unrelated
+#              bare ``` closes the merged block, parity re-syncs on the pair
+#              after it, and the file ends clean while every line between the
+#              two has been swallowed into a block carrying a single gate flag.
+#              That is the exact reproduction issue #280 opens with, and fixture
+#              O pins it.
+#
+#              What the count does *not* do is prove the file malformed, because
+#              a run is counted whether or not the parser acts on it. Three
+#              shapes make a correctly-parsed file odd:
+#                — a fence-shaped line that is block *content* (an over-indented
+#                  ``` run inside an open block, note 3a; a heredoc that writes
+#                  a fence line; a nested sample inside a wrapper of a different
+#                  character or length);
+#                — a top-level *indented code block* containing a ``` run, which
+#                  this parser has to read as an opener (note 3a) and which the
+#                  count therefore charges to the file;
+#                — a fence closed by the end of its list container rather than
+#                  by an explicit closer.
+#              Ten of T3c's own sixteen fixtures are reported UNBALANCED, and
+#              six of those (A, E, H, I, J, M) have a *correct* parse — they are
+#              odd for exactly the three reasons above. Only the other four (F,
+#              G, N, O) are files a maintainer would call broken. Counting only
+#              the runs the parser acts on would
+#              make the check sound and useless in the same move: it would then
+#              be even by construction everywhere the EOF half is silent, and
+#              fixture O — where the extra run is *content* — would stop firing.
+#              So the check is kept as measured, not as proved.
+#
+#              What makes it worth keeping is the measurement, not the
+#              argument: over the whole scanned tree the count is 1,314 runs
+#              across 67 files with zero odd, so it reports nothing today and
+#              any report is a change. It fires the moment one of the three
+#              shapes above is written into src/. When that happens, pair the
+#              fence, or add an exemption for that file here — do not delete the
+#              check, because a false positive is loud and everything it exists
+#              to catch is silent.
+#            · **A block still open at EOF — a deduction.** This one is sound:
+#              the parser reached EOF with a fence it never saw terminated, so
+#              the file is malformed however the rest of it is read. Parity does
+#              not subsume it: a run *inside* an open block is counted but
 #              toggles nothing, so a file can end with a block open and an even
 #              run count. Fixture P pins it, and note 3(c) still evaluates that
-#              block rather than discarding it.
-#
-#          Measured over the scanned tree: 1,314 runs across 67 files, zero odd
-#          and zero files ending open, so both report nothing today. The known
-#          false positive of the parity half is a heredoc that deliberately
-#          writes an unpaired fence line; src/ contains none. Pair it or exempt
-#          the file rather than deleting the check — a false positive here is
-#          loud, and everything this pair exists to catch is silent.
+#              block rather than discarding it. Measured over the scanned tree:
+#              zero files end with a block open.
 #   4. In a session-transcript fence (```console, ```shell-session), a leading
 #      `#` is the root prompt, not a comment — property 2's `comment_re` would
 #      throw away a real command. Such a line gates only when the interpreter
@@ -541,16 +577,29 @@ scan_file() {
         # Phantom-block recovery — a heuristic, not a deduction (note 3d).
         # CommonMark makes *every* line inside an open fence literal content,
         # info string or not, so a same-character run carrying one is not proof
-        # of anything. What bounds the guess is the `is_shell_block == 0`
-        # clause: it is only ever applied to a *display-only* open block, where
-        # a wrong guess is loud rather than silent. It is not free even there —
-        # open_block() below promotes the run to a real block, so a ```text
-        # wrapper quoting a ```bash sample gets the sample scanned as shell (a
-        # false positive; header note 3d). Inside a genuinely open ```bash block
-        # the same shape is ordinary content — a heredoc writing a fenced
-        # snippet — and acting on it would end the block before its `git push`
-        # is seen, losing the subject entirely. That is the one thing this gate
-        # must never do.
+        # of anything. Two clauses bound the guess, and the condition below
+        # fires on either:
+        #
+        #   - `is_shell_block == 0` — the open block is *display-only*, where a
+        #     wrong guess is loud rather than silent. Not free even there:
+        #     open_block() below promotes the run to a real block, so a ```text
+        #     wrapper quoting a ```bash sample gets the sample scanned as shell
+        #     (a false positive; header note 3d).
+        #   - `fence_lang() ~ shell_lang_re` — the *incoming* run names a shell
+        #     language. Added by issue #280. Inside an open shell block that
+        #     shape is the signature of a swallowed real block: an author writes
+        #     ```bash to open a command block, never as the content of one.
+        #     Measured over the scanned tree there are zero fence runs of any
+        #     info string inside an open shell block, so this arm costs nothing
+        #     written here today; its known false positive is a heredoc that
+        #     writes a ```bash fence, and there are none.
+        #
+        # What neither clause may do is act on a *non-shell* run inside a
+        # genuinely open ```bash block — there the shape is ordinary content, a
+        # heredoc writing a fenced snippet, and ending the block would drop its
+        # `git push` before it is seen, losing the subject entirely. That is the
+        # one thing this gate must never do; fixtures H and I are both `text`
+        # and pin it.
         #
         # Checked before the indentation bound, because that bound argues "a run
         # this deep is *content* of the enclosing block" — reasoning that is void
@@ -650,14 +699,20 @@ scan_file() {
         printf("UNCLOSED\t%s:%d\n", file, block_start)
         evaluate_block()
       }
-      # Note 3(e). Fence parity is the deduction that survives a phantom whose
+      # Note 3(e). Fence parity is the check that survives a phantom whose
       # damage is repaired before EOF. A missing closer does not always leave a
       # block open: the next unrelated bare ``` closes the merged block, parity
       # re-syncs on the pair after it, and the file ends balanced — while every
       # line between the two has been swallowed into a block that carries one
-      # gate flag. Counting runs catches it where the EOF state cannot, because
-      # each block contributes exactly two runs however the parser reads them.
-      # Measured over the scanned tree: 1,314 runs across 67 files, zero odd.
+      # gate flag. Counting runs catches it where the EOF state cannot.
+      #
+      # Unlike the UNCLOSED report above, this is an *empirical* guard, not a
+      # deduction: a run is counted whether or not the parser acts on it, so a
+      # correctly-parsed file whose content happens to contain a fence-shaped
+      # line is odd too (note 3e lists the three shapes; six of the sixteen
+      # T3c fixtures are odd with a right parse). What justifies it is the
+      # measurement, not the argument — over the scanned tree the count is
+      # 1,314 runs across 67 files with zero odd, so any report is a change.
       if (fence_runs % 2 == 1) {
         printf("UNBALANCED\t%s\t%d\n", file, fence_runs)
       }
@@ -698,18 +753,25 @@ fi
 #     in the same file. That is the note 3(d) shell-block residue, and this is
 #     the assertion that closes it.
 #
-#     A well-formed markdown file closes the fences it opens, so this is a
-#     deduction about the file rather than a guess about the parse. It also
-#     covers the two residues the recovery cannot reach — a `~~~text` phantom
-#     and a 4-backtick ````text phantom both leave their block open at EOF,
-#     because no ``` run can close either.
+#     A well-formed markdown file closes the fences it opens, so the *open at
+#     EOF* half is a deduction about the file rather than a guess about the
+#     parse. It also covers the two residues the recovery cannot reach — a
+#     `~~~text` phantom and a 4-backtick ````text phantom both leave their block
+#     open at EOF, because no ``` run can close either.
 #
-#     Two independent deductions, because a phantom does not always reach EOF:
-#     the next unrelated bare ``` closes the merged block and parity re-syncs on
-#     the pair after it, leaving the file balanced at EOF with everything
-#     between the two fences already swallowed. The *run count* still shows it,
-#     since each block contributes exactly two runs however the parser reads
-#     them. See note 3(e).
+#     A second check, because a phantom does not always reach EOF: the next
+#     unrelated bare ``` closes the merged block and parity re-syncs on the pair
+#     after it, leaving the file balanced at EOF with everything between the two
+#     fences already swallowed. The *run count* still shows that one.
+#
+#     The two are not the same kind of statement, and note 3(e) is exact about
+#     the difference: the EOF half is sound, the parity half is an empirical
+#     guard. Parity counts every fence-shaped run, acted on or not, so a
+#     correctly-parsed file containing a fence-shaped *content* line, an
+#     indented-code-block ``` run, or a fence closed by its container is odd as
+#     well — six of T3c's sixteen fixtures are. It is kept because it is
+#     measured at zero over src/ and because the thing it catches is otherwise
+#     silent, not because an odd count proves the file broken.
 #
 #     Today both expect zero: no scanned file ends with an open block, and all
 #     1,314 fence runs across the 67 scanned files pair up.
@@ -732,12 +794,17 @@ if [ -z "$unbalanced_files" ]; then
 else
   fail "a scanned file has an odd number of fence runs (file: count):"
   printf '%s\n' "$unbalanced_files" | sed 's/^/      /'
-  echo "      Each fenced block contributes exactly two runs, so an odd total"
-  echo "      means one fence is missing its partner — and a missing closer"
-  echo "      merges two blocks into one that carries a single gate flag. The"
-  echo "      known false positive is a heredoc that writes an unpaired fence"
-  echo "      line; src/ contains none today. If one is added deliberately,"
-  echo "      pair it or exempt the file here rather than deleting this check."
+  echo "      A fenced block normally contributes two runs, so an odd total"
+  echo "      usually means one fence is missing its partner — and a missing"
+  echo "      closer merges two blocks into one that carries a single gate flag."
+  echo "      This is a measured guard, not a proof: every fence-shaped run is"
+  echo "      counted, acted on or not, so a correct file is odd too if it"
+  echo "      carries a fence-shaped *content* line (a heredoc writing a fence,"
+  echo "      an over-indented run inside a block), a top-level indented code"
+  echo "      block containing a \`\`\` run, or a fence closed by its list"
+  echo "      container. src/ carries none of those today. Check the file first;"
+  echo "      if the parse is right, pair the fence or add an exemption for that"
+  echo "      file here rather than deleting this check."
 fi
 
 # ───────────────────────────────────────────────────────────
