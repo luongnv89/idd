@@ -82,6 +82,14 @@ validated at write time, checked again here, quoted at the call site.
 `--resume` is refused with `--dry-run` (SKILL.md → *Invocation*): a resume
 advances a real run.
 
+**Leftover borrowed skills.** After a successful `--read` of a state object,
+if `borrowed_skills` lists any `origin: borrowed` entries, run the resolver's
+teardown (`references` in `/issue-resolver` → *Step 3 — Propose relevant
+skills* → *Teardown*): uninstall only those names from `~/.claude/skills/`,
+then `--update` `{"borrowed_skills": []}`. A crashed resolve can leave a
+borrowed copy behind; resume must not keep it. Missing key / `[]` / `{}` /
+corrupt: nothing to tear down. Never remove `origin: preinstalled`.
+
 **`stale` and `absent` both write a fresh state, and this is the call that does
 it** — the state every later checkpoint patches and every later resume reads
 exists only because this step ran. Write the payload with the **Write** tool to
@@ -120,7 +128,8 @@ python3 shared/scripts/gi-state.py --update --pid "$PPID" < .gitissue/cache/stat
 
 `current` merges key-by-key (an explicit `null` clears it); `lanes` merges
 key-by-key by integer issue number, while `"lanes": []` clears a fully drained
-batch; `processed` and `skip_list` append de-duplicated. Lane records use the
+batch; `processed` and `skip_list` append de-duplicated; `borrowed_skills`
+replaces the whole list (`[]` = teardown complete). Lane records use the
 same safe branch/phase screens as `current` and may carry a `telemetry` object
 until the serialized run-log write consumes it. The write is atomic, so an
 interrupted checkpoint leaves the previous state readable. Exit 0 is a written

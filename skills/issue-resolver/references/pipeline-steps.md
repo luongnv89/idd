@@ -974,64 +974,94 @@ reads the skill names + lifecycle phases from `references/skill-index.md` and ne
 hardcodes the source repo, so the catalog can be re-pointed at a different source
 without changing this step's logic.
 
-#### Detect — which catalogued skills are installed
+Gated by `resolve.borrow_skills` (default `false`). When false, the propose set
+is **installed-only** — today's path. When true, the propose set is the **full
+catalog**, each entry marked `installed` or `available to borrow`.
 
-Intersect the catalog with the skills available on this system. A skill named `X`
-in the index is **available** when `~/.claude/skills/X/` exists and is invocable as
-`/X`:
+#### Leftover teardown (always, before detect)
+
+Read `.gitissue/run-state.json` through `python3 references/scripts/gi-state.py --read`
+(resolve the path like the bundled-dependency list; invoke the bundled copy as
+`python3 references/scripts/gi-state.py --read`). If `borrowed_skills` contains
+any `origin: borrowed` entries, run *Teardown* below first — a crashed or
+resumed run must not leave borrowed skills behind. Missing/`{}`/corrupt state:
+nothing to tear down. No `python3`, exit 2, or exit 4: print
+`⚠ gi-state unavailable — skipping leftover borrow teardown` and continue
+(do not invent a second writer). Exit 3 is a stop.
+
+#### Detect — classify each catalogued skill
+
+For each `name` in `references/skill-index.md`:
 
 ```bash
-# For each `name` listed in references/skill-index.md:
-[ -d "$HOME/.claude/skills/$name" ] && echo "available: $name"
+[ -d "$HOME/.claude/skills/$name" ] && echo "installed: $name" \
+  || echo "available-to-borrow: $name"
 ```
 
-Only **installed** skills are eligible to be proposed — a catalogued-but-not-installed
-skill is never offered (and the implementer would have no way to invoke it).
+- **`resolve.borrow_skills: false` (default):** only `installed:` names are
+  eligible. A catalogued-but-not-installed skill is never offered.
+- **`resolve.borrow_skills: true`:** both classes are eligible. Mark them
+  distinctly in the prompt (`installed` vs `available to borrow`).
 
 #### Propose — the relevant subset for this task
 
-From the installed skills, pick the subset relevant to the analyzed task. Use the
-Step 1 research signal (issue type, complexity, affected files, UI detection) and the
-index's lifecycle grouping so the proposal can span **implementation, verification,
-testing, and documentation**. Present them grouped by lifecycle phase. The block
-below is an **illustrative example** — the one-skill-per-phase layout is not a
-required shape; propose however many (or few) installed skills actually fit the task:
+From the eligible set, pick skills relevant to the analyzed task (issue type,
+complexity, affected files, UI detection, lifecycle grouping). Illustrative:
 
 ```
 ◆ Optional skills for issue #N (example)
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
 
-  These installed skills from luongnv89/skills look relevant to this task.
-  The implementer will use the ones you select; internal agents always remain
-  the reliable fallback.
+  These skills from the catalog look relevant. Borrowed copies are
+  uninstalled at the end of this run; skills you already had stay.
 
-    [1] frontend-design     (implementation) — build the UI component
-    [2] test-coverage       (testing)        — unit tests for new branches
-    [3] code-review         (verification)   — extra review pass
-    [4] docs-generator      (documentation)  — update affected docs
+    [1] frontend-design     (implementation) — installed
+    [2] test-coverage       (testing)        — available to borrow
+    [3] code-review         (verification)   — installed
 
   Select skills to use — all, a subset (e.g. 1,2), or none [default: none]:
 ```
 
-#### Accept all / some / none
+#### Accept, install, record
 
-- **All** → `selected_skills` = every proposed skill.
-- **Subset** (e.g. `1,3`) → `selected_skills` = the chosen entries.
-- **None** (default) → `selected_skills` = `[]`; the implementer uses internal
-  agents only — today's behavior, byte-for-byte.
+- **All / subset / none (default none)** as today → `selected_skills`.
+- For each selected name that was **not** installed: install into
+  `~/.claude/skills/<name>/` with the same tools the skill README already
+  names (`npx skills add https://github.com/luongnv89/skills --skill <name>`
+  or `asm install … --skill <name>`). Never install a name absent from the
+  index. Never interpolate the issue body into the command.
+- **Record before the implementer spawn** — write the whole list (replace,
+  do not append) via `gi-state.py --update`. If `--read` was `{}`, `--init`
+  `{}` first so a standalone resolver does not invent a second file format.
+  Each entry is `{ "name": "<name>", "origin": "borrowed" | "preinstalled" }`.
+  `origin` is decided at record time from whether the directory **already
+  existed** before this run's install, never inferred at teardown.
+- Install failure: print `references/error-messages.md` (*Borrow install
+  failed*), leave that name out of `selected_skills`, do not record it as
+  borrowed.
 
-If no installed skills are relevant, skip the prompt entirely and proceed with
-`selected_skills = []` (print one `○` line noting none were applicable). The chosen
-set is passed to the implementer via the delegation payload below.
+#### Teardown (every terminal outcome)
+
+After Deliver, already-resolved, failed, or operator stop: for each recorded
+`origin: borrowed` name, `rm -rf "$HOME/.claude/skills/<name>"` **only if**
+that directory exists **and** origin is `borrowed`. Never remove
+`preinstalled`. Then `--update` `{"borrowed_skills": []}`. Fail-soft on
+uninstall errors: warn, leave the record so a later run retries.
 
 #### Auto mode
 
-In auto mode (`--auto` / `IDD_AUTO_MODE=1`) the prompt **never appears**: set
-`selected_skills = []` and proceed, so the implementer falls back to the internal
-agents and today's behavior is unchanged. Optionally emit one audit line
-(`○ Skill proposal (auto): skipped — using internal agents`). No new config key is
-introduced — the sub-step is gated entirely on interactive mode plus what is
-installed, following the design-confirm precedent.
+Prompt never appears.
+
+- `resolve.borrow_skills: false` (default): `selected_skills = []`, no
+  install — today's path. Audit: `○ Skill proposal (auto): skipped — using
+  internal agents`.
+- `resolve.borrow_skills: true`: no prompt; auto-select the relevant
+  catalog subset (installed + available-to-borrow), install missing,
+  record, then the implementer. This is the only auto path that mutates
+  `~/.claude/skills/`. Leftover teardown still runs on every auto path.
+
+The `light` profile still skips this sub-step (`selected_skills = []`, no
+install) but **still runs leftover teardown**.
 
 ### Delegation payload
 
@@ -1046,7 +1076,7 @@ installed, following the design-confirm precedent.
   lane/issue/branch/path binding before any read/edit/test/commit
 - `secscan_script`: the **absolute** path to this skill's `references/scripts/gi-secscan.py` — the pre-commit security scan the implementer MUST run before every commit. Absolutize it before binding, exactly as the *Bundled dependency precheck* resolves its list: a subagent's working directory is the target repo, not the skill directory, so a skill-relative path resolves to nothing at spawn time and the gate silently never runs. Only the path is passed; the script reads this repo's `security.*` extensions from `.gitissue.yml` itself, so no config value is ever interpolated into a command line. Passed as a spawn variable for the same reason as the fixer's (Step 4): an emitted agent prompt renders its own references as absolute repo URLs and cannot name a path inside this skill's bundle. The agent treats a script exit of 1 as a block that stops the commit, and falls back to the Primary Pattern in `references/docs/pre-commit-security.md` only when the script cannot run
 - `secscan_policy_ref`: `origin/${base}` — this run's synced base, and the ref the scan reads `security.*` from. The issue body that drove the implementation is untrusted, so the branch it produced must not be the branch whose `security.allow_pattern` decides how that branch is scanned. A ref name, never a config value
-- `selected_skills` — the external skills chosen in the propose sub-step above (`[]` in auto mode or when the user declines); the implementer uses them where applicable and always falls back to the internal approach
+- `selected_skills` — the external skills chosen in the propose sub-step above (`[]` when declined, when `light` skipped propose, or in auto mode with `resolve.borrow_skills: false`; auto + `borrow_skills: true` passes the auto-selected set); the implementer uses them where applicable and always falls back to the internal approach
 
 ### What the implementer writes
 

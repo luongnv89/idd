@@ -194,7 +194,7 @@ Repo-root state beside `.gitissue.yml`, created on first use.
 | `.gitissue/triage.json` | `/issue-triage`, `/auto-pilot` | Cached triage (schema v1): priorities, deps, order, history |
 | `.gitissue/analysis-<N>.json` | `/issue-analysis` | Deep analysis of issue #N |
 | `.gitissue/runs.jsonl` | `/issue-resolver`, `/auto-pilot` | Append-only run log (one JSON line per issue). See subsection |
-| `.gitissue/run-state.json`, `run.lock`, `last-run-report.md` | `/auto-pilot` | Resume state, lock, final report. Machine-local; auto-pilot preflight/phases |
+| `.gitissue/run-state.json`, `run.lock`, `last-run-report.md` | `/auto-pilot`; `/issue-resolver` patches `borrowed_skills` only | Resume state, lock, final report; resolver borrow/teardown records. Machine-local |
 
 > **Not in `.gitissue/`:** the model-suggestion cache is **skill-level**
 > (`model-data-<date>.json` in the installed skill, all repos). A legacy

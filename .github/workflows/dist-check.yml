@@ -193,6 +193,9 @@ jobs:
       - name: test-autopilot-state-257
         run: bash tests/test-autopilot-state-257.sh
 
+      - name: test-resolver-borrow-skills-309
+        run: bash tests/test-resolver-borrow-skills-309.sh
+
       - name: test-autopilot-triage-cache-258
         run: bash tests/test-autopilot-triage-cache-258.sh
 

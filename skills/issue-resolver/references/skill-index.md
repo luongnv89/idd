@@ -9,9 +9,13 @@ inline the catalog back into SKILL.md.
 
 The index answers one question: **what skills exist, and what is each one for?**
 It does **not** record which are installed — that is detected at runtime against
-`~/.claude/skills/` (the propose sub-step intersects this catalog with the
-installed set). Keep the two concerns separate: this file is the *catalog*, the
-filesystem is the *availability* signal.
+`~/.claude/skills/`. Keep the two concerns separate: this file is the *catalog*,
+the filesystem is the *availability* signal.
+
+Default (`resolve.borrow_skills: false`): the propose set is **installed-only**.
+When `resolve.borrow_skills: true`, a catalogued-but-missing name is
+**available to borrow** for one task (install, record origin, uninstall only
+`origin: borrowed` — `references/pipeline-steps.md`).
 
 ## Source-agnostic by design
 

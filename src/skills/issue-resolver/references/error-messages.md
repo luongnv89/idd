@@ -256,6 +256,33 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 ```
 **Trigger:** Any failure during the auto-normalize step (backup comment fails, API error, etc.). Non-fatal — the pipeline continues with the original issue body.
 
+## Borrowed skills
+
+### Borrow install failed
+```
+⚠ Could not borrow skill {name} — continuing without it
+
+  To fix:  npx skills add https://github.com/luongnv89/skills --skill {name}
+  Or:      asm install https://github.com/luongnv89/skills --skill {name}
+```
+**Trigger:** Step 3 selected a catalogued-but-not-installed skill and the install command failed. Non-fatal — omit that name from `selected_skills` and do not record it as `origin: borrowed`. Internal agents remain the fallback.
+
+### Borrow teardown leftover
+```
+⚠ Borrowed skill {name} could not be uninstalled
+
+  Path:    ~/.claude/skills/{name}
+  Record remains in run-state so the next resolve retries teardown.
+  To fix:  rm -rf ~/.claude/skills/{name}
+```
+**Trigger:** Teardown `rm -rf` of an `origin: borrowed` skill failed. Fail-soft — never remove `preinstalled` skills. Leave the `borrowed_skills` record so leftover teardown on the next run retries.
+
+### gi-state unavailable (borrow record)
+```
+⚠ gi-state unavailable — skipping leftover borrow teardown
+```
+**Trigger:** No `python3`, exit 2, or exit 4 from `gi-state.py --read` / `--update` / `--init` on the borrow-record path. Degrade: do not invent a second writer for `.gitissue/run-state.json`. A missing bundled file is fatal (`✗ Missing bundled dependency`). Exit 3 is a stop (invalid patch or corrupt state).
+
 ## Configuration
 
 ### Invalid config

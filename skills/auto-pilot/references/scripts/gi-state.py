@@ -122,13 +122,18 @@ STATE_KEYS = (
     "processed",
     "skip_list",
     "report_path",
+    "borrowed_skills",
 )
 
 INIT_KEYS = frozenset({"run_id", "mode", "invocation", "queue", "limit"})
 PATCH_SCALARS = ("phase", "mode", "invocation", "limit", "report_path")
 PATCH_KEYS = frozenset(
-    set(PATCH_SCALARS) | {"lanes", "current", "processed", "skip_list"}
+    set(PATCH_SCALARS)
+    | {"lanes", "current", "processed", "skip_list", "borrowed_skills"}
 )
+BORROWED_SKILL_KEYS = frozenset({"name", "origin"})
+SKILL_NAME_RE = re.compile(r"^[a-z][a-z0-9-]{0,63}\Z")
+BORROWED_ORIGIN = frozenset({"borrowed", "preinstalled"})
 CURRENT_KEYS = frozenset(
     {"issue", "title", "branch", "pr", "phase", "outcome", "started_at"}
 )
@@ -478,6 +483,42 @@ def _normalize_lanes(value: object, *, partial: bool = False) -> list[dict[str, 
     return out
 
 
+def _normalize_borrowed_skills(value: object) -> list[dict[str, object]]:
+    """Replace-on-patch list of per-skill borrow records (issue #309).
+
+    `origin` is recorded at install time and is the only teardown signal:
+    `borrowed` may be uninstalled; `preinstalled` must never be removed.
+    An empty list clears leftover records after teardown.
+    """
+    if not isinstance(value, list):
+        raise InputError("borrowed_skills must be a list of objects")
+    out: list[dict[str, object]] = []
+    seen: set[str] = set()
+    for entry in value:
+        if not isinstance(entry, dict):
+            raise InputError("each borrowed_skills entry must be an object")
+        unknown = sorted(set(entry) - BORROWED_SKILL_KEYS)
+        if unknown:
+            raise InputError(
+                "unknown key(s) in borrowed_skills: " + ", ".join(unknown)
+            )
+        name = entry.get("name")
+        origin = entry.get("origin")
+        if not isinstance(name, str) or not SKILL_NAME_RE.match(name):
+            raise InputError(
+                "borrowed_skills.name must be a lowercase skill identifier"
+            )
+        if origin not in BORROWED_ORIGIN:
+            raise InputError(
+                "borrowed_skills.origin must be 'borrowed' or 'preinstalled'"
+            )
+        if name in seen:
+            raise InputError(f"borrowed_skills contains duplicate name {name}")
+        seen.add(name)
+        out.append({"name": name, "origin": origin})
+    return out
+
+
 def _normalize_processed(value: object) -> list[dict[str, object]]:
     if not isinstance(value, list):
         raise InputError("processed must be a list of objects")
@@ -541,6 +582,7 @@ def normalize_init(
         "processed": [],
         "skip_list": [],
         "report_path": None,
+        "borrowed_skills": [],
     }
 
 
@@ -563,7 +605,8 @@ def merge_patch(
 
     `current` merges key-by-key (an explicit null clears it), `lanes` merges
     key-by-key per issue (an empty list clears a completed batch), `processed`
-    and `skip_list` append de-duplicated, and every other key is replaced.
+    and `skip_list` append de-duplicated, `borrowed_skills` replaces the whole
+    list (empty list = teardown complete), and every other key is replaced.
     """
     if not isinstance(patch, dict):
         raise InputError("stdin must be a single JSON object")
@@ -636,6 +679,9 @@ def merge_patch(
             if number not in merged_skips:
                 merged_skips.append(number)
         out["skip_list"] = merged_skips
+
+    if "borrowed_skills" in patch:
+        out["borrowed_skills"] = _normalize_borrowed_skills(patch["borrowed_skills"])
 
     out["version"] = STATE_VERSION
     out["updated_at"] = now or _now()
