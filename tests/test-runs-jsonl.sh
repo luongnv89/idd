@@ -351,6 +351,18 @@ if printf '%s' "$explained" | python3 "$HELPER" --echo >/dev/null 2>&1; then
 else
   fail "T10c: explained over-ceiling should be valid"
 fi
+light_over='{"ts":"2026-01-01T00:00:00Z","issue":300,"mode":"auto","skill":"issue-resolver","profile":"light","qa_cycles":2,"outcome":"success","pr":1}'
+if printf '%s' "$light_over" | python3 "$HELPER" --echo >/dev/null 2>&1; then
+  fail "T10d: gi-runlog accepted light qa_cycles=2 without breach_reason"
+else
+  pass "T10d: gi-runlog rejects unexplained light-profile over-ceiling qa_cycles"
+fi
+recorded_ok='{"ts":"2026-01-01T00:00:00Z","issue":301,"mode":"auto","skill":"issue-resolver","complexity":"high","ceiling":7,"qa_cycles":6,"outcome":"success","pr":1}'
+if printf '%s' "$recorded_ok" | python3 "$HELPER" --echo >/dev/null 2>&1; then
+  pass "T10e: recorded ceiling=7 allows qa_cycles=6 without breach_reason"
+else
+  fail "T10e: recorded ceiling override should be valid"
+fi
 
 echo ""
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"

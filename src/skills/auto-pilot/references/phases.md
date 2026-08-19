@@ -1051,7 +1051,7 @@ needed by the single writer:
 {"lanes":[{"issue":42,"branch":"feat/42-a","pr":87,"phase":"returned",
   "telemetry":{"status":"success","qa_cycles":3,"ceiling":2,
                "breach_reason":"extra re-review cycle after reviewer collapse",
-               "complexity":"high","profile":"full","duration_s":420}}]}
+               "complexity":"medium","profile":"full","duration_s":420}}]}
 ```
 
 A failed return uses `phase: failed` and stores its failure fields in telemetry.

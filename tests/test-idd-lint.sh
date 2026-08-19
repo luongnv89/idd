@@ -308,6 +308,32 @@ fi
     '{"ts":"2026-07-09T00:01:00Z","issue":9,"mode":"auto","skill":"issue-resolver","outcome":"failed","pr":null,"complexity":"high","qa_cycles":3}' \
     > .gitissue/runs.jsonl
 )
+# Light profile qa_cycles=2 without reason is an unexplained breach
+# (light ceiling is 1) → exit 1.
+(
+  cd "$SYN"
+  printf '%s\n' \
+    '{"ts":"2026-07-09T00:00:00Z","issue":260,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":1,"profile":"light","qa_cycles":2}' \
+    > .gitissue/runs.jsonl
+)
+if (cd "$SYN" && python3 "$LINT" stats --no-github >/dev/null 2>&1); then
+  fail "T26d: unexplained light-profile qa_cycles=2 must fail stats"
+else
+  pass "T26d: light ceiling is 1; qa_cycles=2 without reason fails (exit 1)"
+fi
+# A recorded ceiling override wins over the computed policy ceiling: a high
+# row with ceiling=7 sits at qa_cycles=6, inside the recorded ceiling → pass.
+(
+  cd "$SYN"
+  printf '%s\n' \
+    '{"ts":"2026-07-09T00:00:00Z","issue":260,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":1,"complexity":"high","ceiling":7,"qa_cycles":6}' \
+    > .gitissue/runs.jsonl
+)
+if (cd "$SYN" && python3 "$LINT" stats --no-github >/dev/null 2>&1); then
+  pass "T26e: recorded ceiling=7 allows qa_cycles=6 without breach_reason"
+else
+  fail "T26e: recorded ceiling override should pass stats (exit 0)"
+fi
 
 # ───────────────────────────────────────────────────────────
 # T25b: bucket identity — the union is a real union (#180)
