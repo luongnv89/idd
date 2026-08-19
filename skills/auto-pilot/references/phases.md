@@ -20,7 +20,7 @@ resume_state = resumable | stale | absent
 | Value | When | Effect |
 |-------|------|--------|
 | `resumable` | `--resume` was passed, the read returned a state object whose `run_id` matches the lock this run now holds — freshly acquired, reclaimed, or re-acquired in place — **or** whose lock is gone, and GitHub confirms its singleton `current` **or every unfinished `lanes[]` record** still reconciles | Re-enter at `current.phase` for a serialized lane already draining, or reconcile the durable lane batch and resume its earliest safe phase; seed `processed[]` and `skip_list[]` so nothing is redone |
-| `stale` | a state exists but does not reconcile — `--fresh` was passed, the read reported `corrupt`, the recorded phase is unknown, or GitHub disagrees with the recorded branch/PR | Print `⚠ Recorded run state is stale — starting fresh`, then `--init` over it |
+| `stale` | a state exists but does not reconcile — `--fresh` was passed, the read reported `corrupt`, the recorded phase is unknown, or GitHub disagrees with the recorded branch/PR | Print `⚠ Recorded run state is stale — starting fresh`, release any leftover borrows (*Leftover borrowed skills* below) **first**, then `--init` over it |
 | `absent` | the read printed `{}`, or **anything at all is in doubt** | Start a fresh run: `--init` and proceed to Phase 1 |
 
 **The state file is a hint, never an authority.** Before trusting a recorded
@@ -82,8 +82,9 @@ validated at write time, checked again here, quoted at the call site.
 `--resume` is refused with `--dry-run` (SKILL.md → *Invocation*): a resume
 advances a real run.
 
-**Leftover borrowed skills.** After a successful `--read` of a state object,
-if `borrowed_skills` lists any `origin: borrowed` entries, run the resolver's
+**Leftover borrowed skills.** After a successful `--read` of a state object —
+**on every gate outcome, and before any `--init`** — if `borrowed_skills`
+lists any `origin: borrowed` entries, run the resolver's
 teardown (`references` in `/issue-resolver` → *Step 3 — Propose relevant
 skills* → *Teardown*): uninstall only those names from `~/.claude/skills/`,
 then write the record back with `--update` exactly as that section
@@ -91,6 +92,13 @@ specifies — the payload rule lives there and is deliberately not restated
 here, so a failed uninstall keeps its retry. A crashed resolve can leave a
 borrowed copy behind; resume must not keep it. Missing key / `[]` / `{}` /
 corrupt: nothing to tear down. Never remove `origin: preinstalled`.
+**Order matters on the `stale` path.** `--init` resets `borrowed_skills` to
+`[]`, so a `stale` gate that re-initialises first deletes the record while the
+borrowed directory survives in the global `~/.claude/skills/` — the untracked
+orphan the resolver's marker rule exists to prevent, and one no later run
+can find. Tear down (or carry the failures back) before `--init` writes; a state
+object too damaged to read for `borrowed_skills` has nothing to tear down and
+proceeds to `--init` as before.
 The read-back rule above binds here too: skip any entry whose `name` does not
 match `^[a-z][a-z0-9-]{0,63}$` or whose `origin` is not exactly the string
 `borrowed` before it reaches an `rm -rf`, and remove a directory only when it

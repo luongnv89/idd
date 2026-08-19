@@ -981,6 +981,19 @@ Gated by `resolve.borrow_skills` (default `false`). When false, the propose set
 is **installed-only** — today's path. When true, the propose set is the **full
 catalog**, each entry marked `installed` or `available to borrow`.
 
+**One exit-code rule for this whole sub-step — the single home.** Every
+`gi-state.py` call below (`--read`, `--init`, `--update`) is a call about a
+machine-local, gitignored file on an **opt-in** path, so no exit code here
+stops the resolve. Exit 3 included: it is a **borrow-path stop, not a resolve
+stop** — print `⚠ gi-state unavailable — skipping leftover borrow teardown`,
+borrow nothing this run, tear nothing down, keep the propose set
+installed-only, and continue the pipeline. This is the one documented
+exception to the repo-wide `3` = *invalid input, stop* vocabulary, and it is
+scoped to this sub-step: the same exit 3 from the run-log or config path is
+still a stop. Never repair the state file by hand and never invent a second
+writer for it. `--read` reporting `{"corrupt": true, …}` at exit **0** is an
+answer, not a failure, and takes the same path.
+
 #### Parallel lanes — borrowing is off (`IDD_CALLER_WORKTREE=1`)
 
 `~/.claude/skills/` is **global**, but the borrow record is **per-checkout**:
@@ -1019,9 +1032,9 @@ Read `.gitissue/run-state.json` through `python3 references/scripts/gi-state.py 
 `python3 references/scripts/gi-state.py --read`). If `borrowed_skills` contains
 any `origin: borrowed` entries, run *Teardown* below first — a crashed or
 resumed run must not leave borrowed skills behind. Missing/`{}`/corrupt state:
-nothing to tear down. No `python3`, exit 2, or exit 4: print
-`⚠ gi-state unavailable — skipping leftover borrow teardown` and continue
-(do not invent a second writer). Exit 3 is a stop.
+nothing to tear down. No `python3`, any non-zero exit including 3, or
+unparsable stdout: the exit-code rule above applies — print
+`⚠ gi-state unavailable — skipping leftover borrow teardown` and continue.
 
 #### Detect — classify each catalogued skill
 
@@ -1063,16 +1076,26 @@ complexity, affected files, UI detection, lifecycle grouping). Illustrative:
   append) via `gi-state.py --update` — each entry
   `{ "name": "<name>", "origin": "borrowed" | "preinstalled" }`, with `borrowed`
   for every selected name that is **not** already installed — *before* running
-  any install command. If
-  `--read` answered `{}` (absent state), `--init` `{}` first so a standalone
-  resolver does not invent a second file format. If `--read` answered
-  `{"corrupt": true, …}` — an **answer at exit 0**, not a failure — do not
-  `--update` (that exits 3) and do not `--init` over a file the caller may own:
-  borrow nothing this run, keep the propose set installed-only, print
-  `⚠ gi-state unavailable — skipping leftover borrow teardown`, and continue.
-  Corrupt is treated exactly as *Leftover teardown* treats it, and for the same
-  reason: an opt-in sub-step never stops a resolve over a machine-local,
-  gitignored file. `origin` is decided at record time from whether
+  any install command. **The list you write is this run's entries plus every
+  entry *Leftover teardown* just carried back**, never this run's alone.
+  `--update` replaces the whole list, so an entry omitted here is deleted, and
+  the one entry class that reaches this point is the leftover whose `rm -rf`
+  failed minutes ago — the entry whose whole purpose is to outlive this run
+  (*Borrow teardown leftover* in `references/error-messages.md` promises the
+  operator exactly that). Carry it forward by name and `origin` unchanged: it
+  stays in the record until some run's `rm -rf` succeeds, and this run's own
+  terminal *Teardown* is the next pass that retries it.
+  If `--read` answered `{}` (absent state), `--init` `{}` first so a standalone
+  resolver does not invent a second file format — `--init` resets
+  `borrowed_skills` to `[]`, which is correct only because an absent state had
+  no leftovers to lose. The resolver never `--init`s over a state object that
+  already exists — that file belongs to whoever created it, and re-initialising
+  it would drop both the caller's run state and any leftover record with it. If `--read`
+  answered `{"corrupt": true, …}` — an **answer at exit 0**, not a failure —
+  do not `--update` (that exits 3) and do not `--init` over a file the caller
+  may own: borrow nothing this run, keep the propose set installed-only, print
+  `⚠ gi-state unavailable — skipping leftover borrow teardown`, and continue,
+  per the exit-code rule above. `origin` is decided at record time from whether
   the directory **already existed** before this run's install, never inferred
   at teardown. Recording first is what closes the crash window: an interruption
   between record and install leaves a record whose directory does not exist,
