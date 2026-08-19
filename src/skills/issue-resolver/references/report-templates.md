@@ -236,7 +236,7 @@ found the issue already fixed and exited early), or `failed` (a step failed).
 `--no-run-log` is passed only by `/auto-pilot`, which runs this resolver as a
 subagent and writes the **single** run-log line per issue itself — appending here
 too would double-write and skew `/idd-doctor`'s metrics. Instead **return** the
-telemetry (`outcome`, `qa_cycles`, `complexity`, `profile`, `duration_s`) in the
+telemetry (`outcome`, `qa_cycles`, `ceiling`, `breach_reason`, `complexity`, `profile`, `duration_s`) in the
 subagent result so the orchestrator folds it into its own line.
 
 The flag is independent of `--auto`: a standalone `/issue-resolver <N> --auto`
