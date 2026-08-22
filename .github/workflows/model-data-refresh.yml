@@ -49,12 +49,19 @@ jobs:
             exit "$rc"
           fi
           cat refresh-out.json
+          # Exit 4 writes nothing to stdout, so the file may be empty — only
+          # set `updated` when it parses; otherwise degrade to updated=false.
           python3 - "$GITHUB_OUTPUT" <<'PY'
           import json, sys
 
-          out = json.load(open("refresh-out.json"))
+          updated = False
+          try:
+              out = json.load(open("refresh-out.json"))
+              updated = bool(out.get("updated"))
+          except (OSError, ValueError):
+              pass
           with open(sys.argv[1], "a") as fh:
-              fh.write(f"updated={str(bool(out.get('updated'))).lower()}\n")
+              fh.write(f"updated={str(updated).lower()}\n")
           PY
 
       - name: Commit refreshed seed

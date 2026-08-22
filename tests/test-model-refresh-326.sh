@@ -60,6 +60,19 @@ print("" if value is None else str(value).lower() if isinstance(value, bool) els
 ' "$2"
 }
 
+# make_seed <dest> <last-fetched> — copy the shipped seed to <dest> and pin its
+# last_fetched to an explicit test date. Hermetic: the tests must not depend on
+# the seed's real last_fetched, which this very feature rewrites every week.
+make_seed() {
+  python3 - "$SEED_SRC" "$1" "$2" <<'PY'
+import json, sys
+
+data = json.load(open(sys.argv[1]))
+data["last_fetched"] = sys.argv[3]
+json.dump(data, open(sys.argv[2], "w"), indent=2)
+PY
+}
+
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
@@ -89,7 +102,7 @@ fi
 # T1 (AC2): a fresh seed skips the update, cleanly
 # ───────────────────────────────────────────────────────────
 SEED1="$TMP/fresh.json"
-cp "$SEED_SRC" "$SEED1"
+make_seed "$SEED1" "2026-06-12T00:00:00Z"   # 4 days before the injected --now
 BEFORE="$(cat "$SEED1")"
 
 run_case "$TMP/t1.out" "$TMP/t1.err" \
@@ -138,6 +151,9 @@ data["marker"] = "refresh-fixture"
 data["last_fetched"] = "2026-01-01T00:00:00Z"
 json.dump(data, open(sys.argv[2], "w"), indent=2)
 PY
+
+# Re-pin the seed to a stale date relative to the injected --now 2026-07-01.
+make_seed "$SEED1" "2026-06-12T00:00:00Z"
 
 run_case "$TMP/t3.out" "$TMP/t3.err" \
   python3 "$SCRIPT" --seed "$SEED1" --from-file "$FIXTURE" --now 2026-07-01
