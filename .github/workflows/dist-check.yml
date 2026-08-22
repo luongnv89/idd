@@ -74,6 +74,9 @@ jobs:
       - name: test-model-suggestion-124
         run: bash tests/test-model-suggestion-124.sh
 
+      - name: test-model-refresh-326
+        run: bash tests/test-model-refresh-326.sh
+
       - name: test-pre-commit-security
         run: bash tests/test-pre-commit-security.sh
 
