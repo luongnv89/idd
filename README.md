@@ -461,7 +461,7 @@ Quick read-only diagnostic that verifies the IDD invariants of the current repo.
 1. `/issue-creator` keeps its intent-only contract (no `affected_files` / `technical_notes` / `architecture_constraints` in templates or output)
 2. Every `gh` invocation in skills uses `--json` with explicit field selection
 3. Each skill has a `references/error-messages.md` using the three-part format
-4. Repo merge strategy is set to squash, a precondition for PR bodies landing in `git log` (durable analysis-artifact rule from #35). This check reads the strategy only; squash alone is **not** sufficient — the repo's `squash_merge_commit_message` must also be `PR_BODY`, which `/issue-pr-review` verifies and this check does not yet (#295)
+4. Repo merge strategy carries the full squash-merge binding: squash-only **and** the repo's `squash_merge_commit_message` is set to `PR_BODY` — squash alone is not sufficient, since GitHub's default (`COMMIT_MESSAGES`) drops PR-body content (Decision Record, AC verification) at the merge boundary (durable analysis-artifact rule from #35; message-source enforcement from #295)
 
 Read-only by design — never modifies files, branches, or remote state.
 
