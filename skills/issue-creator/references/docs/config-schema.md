@@ -129,6 +129,10 @@ model_suggestion:
   data_url: "https://cursor.com/cursorbench"
   # Type: integer. Default: 7. Days before the cache is stale.
   cache_ttl_days: 7
+  # data_url and cache_ttl_days also drive this repo's automated weekly refresh
+  # (.github/workflows/model-data-refresh.yml): the workflow skips while the
+  # bundled seed is younger than cache_ttl_days and pushes a new snapshot only
+  # when it is stale.
 ```
 
 ## `.gitissue/` Directory
