@@ -3,13 +3,13 @@
 
 > **Per-skill excerpt (generated).** Only the configuration sections this skill reads are reproduced here: `duplicate_detection`, `issue`, `model_suggestion`, `platform`, `projects`, `triage`. The complete schema — every section and the full defaults table — is at [config-schema.md](https://github.com/luongnv89/idd/blob/main/docs/config-schema.md).
 
-gitissue works with zero configuration — all settings have sensible defaults. When no `.gitissue.yml` file exists, the first-run hint is shown:
+gitissue works with zero configuration — every setting has a default. With no `.gitissue.yml`, the first-run hint is shown:
 
 ```
 ○ First run — using default config. Run /init-gitissue to customize.
 ```
 
-Place `.gitissue.yml` in the repository root to customize behavior.
+Place `.gitissue.yml` at the repo root to customize behavior.
 
 ### Config Loading Flow
 
@@ -19,7 +19,7 @@ line-numbered *Validation* errors. Absent → defaults + first-run hint above.
 
 ## Core Fields
 
-Everyday knobs: `platform`, `issue.auto_normalize`, `resolve.branch_prefix`, `resolve.auto_test`, `resolve.test_timeout`, `triage.stale_threshold_days`, `autopilot.mode`, `autopilot.review_cycles`, `autopilot.skip_labels`, `review.require_acceptance_criteria_check`. Everything below is the advanced reference.
+Everyday knobs: `platform`, `issue.auto_normalize`, `resolve.branch_prefix`, `resolve.auto_test`, `resolve.test_timeout`, `triage.stale_threshold_days`, `autopilot.mode`, `autopilot.review_cycles`, `autopilot.skip_labels`, `review.require_acceptance_criteria_check`. Below is the advanced reference.
 
 ## Full Schema (advanced reference)
 
@@ -129,10 +129,9 @@ model_suggestion:
   data_url: "https://cursor.com/cursorbench"
   # Type: integer. Default: 7. Days before the cache is stale.
   cache_ttl_days: 7
-  # data_url and cache_ttl_days also drive this repo's automated weekly refresh
-  # (.github/workflows/model-data-refresh.yml): the workflow skips while the
-  # bundled seed is younger than cache_ttl_days and pushes a new snapshot only
-  # when it is stale.
+  # Also drive the weekly refresh (scripts/gi-model-refresh.py via
+  # .github/workflows/model-data-refresh.yml): skips while the bundled
+  # seed is younger than cache_ttl_days.
 ```
 
 ## `.gitissue/` Directory
@@ -146,7 +145,7 @@ Repo-root state beside `.gitissue.yml`, created on first use.
 | `.gitissue/runs.jsonl` | `/issue-resolver`, `/auto-pilot` | Append-only run log (one line per issue) |
 | `.gitissue/run-state.json`, `run.lock`, `last-run-report.md` | `/auto-pilot`; `/issue-resolver` (`borrowed_skills` only) | Resume state, lock, report |
 
-> **Not in `.gitissue/`:** the model-suggestion cache is **skill-level** (`model-data-<date>.json` in the installed skill, all repos).
+> **Not in `.gitissue/`:** the model-suggestion cache is **skill-level** (`model-data-<date>.json`, all repos).
 
 **Conventions:**
 - Create via `mkdir -p`
@@ -160,7 +159,7 @@ Field set, append rules, and the single-writer / `--no-run-log` convention in [r
 
 ## Validation
 
-Config is validated on load at the start of every skill invocation. Errors include line numbers:
+Config is validated at every skill start; errors include line numbers:
 
 ```
 ✗ Invalid config: .gitissue.yml
