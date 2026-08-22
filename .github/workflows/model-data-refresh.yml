@@ -50,18 +50,31 @@ jobs:
           fi
           cat refresh-out.json
           # Exit 4 writes nothing to stdout, so the file may be empty — only
-          # set `updated` when it parses; otherwise degrade to updated=false.
-          python3 - "$GITHUB_OUTPUT" <<'PY'
+          # set outputs when it parses; otherwise degrade to updated=false /
+          # outcome=degraded.
+          python3 - "$GITHUB_OUTPUT" "$rc" <<'PY'
           import json, sys
 
           updated = False
+          ttl = ""
           try:
               out = json.load(open("refresh-out.json"))
               updated = bool(out.get("updated"))
+              raw_ttl = out.get("ttl_days")
+              if raw_ttl is not None:
+                  ttl = str(raw_ttl)
           except (OSError, ValueError):
               pass
+          rc = int(sys.argv[2])
+          if rc == 0:
+              outcome = "updated" if updated else "fresh"
+          else:
+              outcome = "degraded"
           with open(sys.argv[1], "a") as fh:
               fh.write(f"updated={str(updated).lower()}\n")
+              fh.write(f"outcome={outcome}\n")
+              if ttl:
+                  fh.write(f"ttl={ttl}\n")
           PY
 
       - name: Commit refreshed seed
@@ -78,15 +91,21 @@ jobs:
         if: always()
         env:
           UPDATED: ${{ steps.refresh.outputs.updated }}
+          OUTCOME: ${{ steps.refresh.outputs.outcome }}
+          TTL: ${{ steps.refresh.outputs.ttl }}
         run: |
           set -euo pipefail
           {
             echo "## Model data refresh"
+            echo ""
             if [ "$UPDATED" = "true" ]; then
-              echo ""
               echo "✓ CursorBench seed was stale — refreshed and pushed."
+            elif [ "$OUTCOME" = "fresh" ]; then
+              ttl="${TTL:-7}"
+              echo "✓ Model data fresher than ${ttl} days — skipping update."
+            elif [ "$OUTCOME" = "degraded" ]; then
+              echo "⚠ Refresh attempted but the current seed was kept — see logs above."
             else
-              echo ""
-              echo "✓ Model data fresher than 7 days — skipping update."
+              echo "✗ Model data refresh failed — see logs."
             fi
           } >> "$GITHUB_STEP_SUMMARY"
