@@ -1,0 +1,85 @@
+name: model-data-refresh
+
+# Weekly freshness check for the CursorBench model data bundled with
+# /issue-creator (issue #326). scripts/gi-model-refresh.py reads the seed's
+# last_fetched and only fetches a replacement when it is older than the TTL;
+# when the seed is fresher than 1 week the job succeeds while skipping the
+# update, and when the fetch or validation fails (exit 4) the job degrades to
+# a warning and keeps the current seed.
+
+on:
+  schedule:
+    - cron: "23 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: model-data-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
+        with:
+          python-version: "3.11"
+
+      - name: Refresh model data when older than 1 week
+        id: refresh
+        run: |
+          set -euo pipefail
+          set +e
+          python3 scripts/gi-model-refresh.py \
+            --seed src/skills/issue-creator/templates/model-data.json \
+            > refresh-out.json
+          rc=$?
+          set -e
+          # Exit 4 is the documented degrade (fetch failed or payload did not
+          # validate): keep the current seed, warn, succeed. Any other
+          # non-zero code is a real failure.
+          if [ "$rc" -ne 0 ] && [ "$rc" -ne 4 ]; then
+            cat refresh-out.json >&2 || true
+            exit "$rc"
+          fi
+          cat refresh-out.json
+          python3 - "$GITHUB_OUTPUT" <<'PY'
+          import json, sys
+
+          out = json.load(open("refresh-out.json"))
+          with open(sys.argv[1], "a") as fh:
+              fh.write(f"updated={str(bool(out.get('updated'))).lower()}\n")
+          PY
+
+      - name: Commit refreshed seed
+        if: steps.refresh.outputs.updated == 'true'
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/skills/issue-creator/templates/model-data.json
+          git commit -m "chore(model-data): weekly cursorbench refresh [skip ci]"
+          git push
+
+      - name: Summarize outcome
+        if: always()
+        env:
+          UPDATED: ${{ steps.refresh.outputs.updated }}
+        run: |
+          set -euo pipefail
+          {
+            echo "## Model data refresh"
+            if [ "$UPDATED" = "true" ]; then
+              echo ""
+              echo "✓ CursorBench seed was stale — refreshed and pushed."
+            else
+              echo ""
+              echo "✓ Model data fresher than 7 days — skipping update."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
