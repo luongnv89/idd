@@ -1,13 +1,13 @@
 <!-- Generated from /docs/config-schema.md. Do not edit. Edit source and run ./scripts/build.sh. -->
 # `.gitissue.yml` Configuration Schema
 
-gitissue works with zero configuration — all settings have sensible defaults. When no `.gitissue.yml` file exists, the first-run hint is shown:
+gitissue works with zero configuration — every setting has a default. With no `.gitissue.yml`, the first-run hint is shown:
 
 ```
 ○ First run — using default config. Run /init-gitissue to customize.
 ```
 
-Place `.gitissue.yml` in the repository root to customize behavior.
+Place `.gitissue.yml` at the repo root to customize behavior.
 
 ### Config Loading Flow
 
@@ -17,7 +17,7 @@ line-numbered *Validation* errors. Absent → defaults + first-run hint above.
 
 ## Core Fields
 
-Everyday knobs: `platform`, `issue.auto_normalize`, `resolve.branch_prefix`, `resolve.auto_test`, `resolve.test_timeout`, `triage.stale_threshold_days`, `autopilot.mode`, `autopilot.review_cycles`, `autopilot.skip_labels`, `review.require_acceptance_criteria_check`. Everything below is the advanced reference.
+Everyday knobs: `platform`, `issue.auto_normalize`, `resolve.branch_prefix`, `resolve.auto_test`, `resolve.test_timeout`, `triage.stale_threshold_days`, `autopilot.mode`, `autopilot.review_cycles`, `autopilot.skip_labels`, `review.require_acceptance_criteria_check`. Below is the advanced reference.
 
 ## Full Schema (advanced reference)
 
@@ -463,6 +463,9 @@ model_suggestion:
   data_url: "https://cursor.com/cursorbench"
   # Type: integer. Default: 7. Days before the cache is stale.
   cache_ttl_days: 7
+  # Also drive the weekly refresh (scripts/gi-model-refresh.py via
+  # .github/workflows/model-data-refresh.yml): skips while the bundled
+  # seed is younger than cache_ttl_days.
 
 # Pre-commit scan extensions (built-ins always apply; no key disables a rule).
 # Rules live in the pre-commit security conventions reference.
@@ -584,7 +587,7 @@ Repo-root state beside `.gitissue.yml`, created on first use.
 | `.gitissue/runs.jsonl` | `/issue-resolver`, `/auto-pilot` | Append-only run log (one line per issue) |
 | `.gitissue/run-state.json`, `run.lock`, `last-run-report.md` | `/auto-pilot`; `/issue-resolver` (`borrowed_skills` only) | Resume state, lock, report |
 
-> **Not in `.gitissue/`:** the model-suggestion cache is **skill-level** (`model-data-<date>.json` in the installed skill, all repos).
+> **Not in `.gitissue/`:** the model-suggestion cache is **skill-level** (`model-data-<date>.json`, all repos).
 
 **Conventions:**
 - Create via `mkdir -p`
@@ -598,7 +601,7 @@ Field set, append rules, and the single-writer / `--no-run-log` convention in [r
 
 ## Validation
 
-Config is validated on load at the start of every skill invocation. Errors include line numbers:
+Config is validated at every skill start; errors include line numbers:
 
 ```
 ✗ Invalid config: .gitissue.yml
@@ -627,7 +630,7 @@ Config is validated on load at the start of every skill invocation. Errors inclu
 | `resolve.max_commits` | `10` | Max commits warning |
 | `resolve.qa_max_cycles` | `5` | Max QA review-fix cycles during resolve Step 4 |
 | `resolve.adaptive_effort` | `true` | Scale the resolve pipeline to issue complexity — trivial issues (Effort XS/S) take a lighter path (lighter Research, skip 3-option Plan, skip propose-skills, QA capped at 1 cycle); `false` pins every issue to the full pipeline, and turns off #256's caller context: the payload gate, `triage_context`, last-green test reuse ([agent-model-effort.md](https://github.com/luongnv89/idd/blob/main/docs/agent-model-effort.md)) |
-| `resolve.borrow_skills` | `false` | Off by default. true: full catalog; install selected missing, record {name, origin} in run-state, uninstall only `origin: borrowed`; auto never installs unless true |
+| `resolve.borrow_skills` | `false` | Off by default. true: install selected missing skills, record {name, origin} in run-state, uninstall only `origin: borrowed`; auto never installs unless true |
 | `resolve.ui_review.browser_review` | `"ask"` | Browser (screenshot) UI review mode; code UI review is auto-detected and always runs |
 | `review.max_cycles` | `3` | Max review-fix cycles |
 | `review.adaptive_depth` | `true` | Scale review depth to PR complexity — a trivial PR caps the review-fix loop at 1 cycle and skips optional passes (AC + traceability hard-blocks still run); `false` pins every PR to full depth and disables the QA handoff gate and #256's CI verdict gate too ([agent-model-effort.md](https://github.com/luongnv89/idd/blob/main/docs/agent-model-effort.md)) |
@@ -644,8 +647,8 @@ Config is validated on load at the start of every skill invocation. Errors inclu
 | `review.traceability_exempt_labels` | `["refactor", "chore"]` | PR labels that exempt a PR from the `Closes #N` hard-fail (check 1 only; other three checks still run) |
 | `review.traceability_exempt_pattern` | `"^\\s*Type:\\s*(refactor\|chore)\\s*$"` | Regex (multiline, case-insensitive) matched against PR body for exemption from check 1 |
 | `review.ui_review.browser_review` | `"ask"` | Browser (screenshot) UI review mode; code UI review is auto-detected and always runs |
-| `autopilot.mode` | `balanced` | Merge mode: `balanced` (auto-merge clean PRs), `conservative` (never merge), `aggressive` (merge clean + partial w/ `merge_partial: true`) |
-| `autopilot.merge_partial` | `false` | Allow merging PRs with unresolved review issues. Only honored when `mode: aggressive` |
+| `autopilot.mode` | `balanced` | Merge mode: `balanced` auto-merges clean PRs, `conservative` never merges, `aggressive` also merges partials (`merge_partial: true`) |
+| `autopilot.merge_partial` | `false` | Allow merging PRs with unresolved review issues. Only honored at `mode: aggressive` |
 | `autopilot.max_iterations` | `10` | Max issues to process |
 | `autopilot.max_parallel` | `1` | Resolver concurrency `1..8`; only independent resolves overlap, and `1` preserves the sequential path |
 | `autopilot.review_cycles` | `3` | Max review-fix cycles per PR |
@@ -653,12 +656,12 @@ Config is validated on load at the start of every skill invocation. Errors inclu
 | `autopilot.pause_on_failure` | `false` | Skip failed issues and continue (`true` pauses the loop) |
 | `autopilot.skip_labels` | `["wontfix", "blocked", "do-not-merge"]` | Labels that skip issues |
 | `autopilot.critical_labels` | `["critical", "priority:critical"]` | Labels that prioritize issues |
-| `autopilot.respect_dependencies` | `true` | Honor `Depends on #N` / `Blocked by #N` markers — never merge a PR whose dependencies are unmerged; the PR is left open (`blocked_by_dependency`) and the loop continues |
-| `autopilot.triage_cache_max_age_minutes` | `60` | Max age of a reusable `triage.json` (also requires no commit since); `0` disables reuse |
+| `autopilot.respect_dependencies` | `true` | Honor `Depends on #N`/`Blocked by #N` markers — never merge a PR whose dependencies are unmerged; it stays open (`blocked_by_dependency`) |
+| `autopilot.triage_cache_max_age_minutes` | `60` | Max age of a reusable `triage.json` (also needs no commit since); `0` disables |
 | `autopilot.retriage_every` | `0` | Force a full re-triage every Nth iteration (`0` = never) |
-| `autopilot.quarantine_after` | `3` | Consecutive failed runs before an issue is labelled and skipped until a human removes the label (`0` disables) |
+| `autopilot.quarantine_after` | `3` | Consecutive failed runs before labelling + skipping until human removal (`0` disables) |
 | `autopilot.quarantine_label` | `"auto-pilot-quarantined"` | The quarantine label; honored through the effective `skip_labels` set |
-| `autopilot.max_runtime_minutes` | `0` | Wall-clock budget for one run in minutes, from the run state's `started_at`; at the budget the loop stops cleanly (`0` = unbounded) |
+| `autopilot.max_runtime_minutes` | `0` | Wall-clock run budget in minutes, from run state's `started_at`; loop stops cleanly at the budget (`0` = unbounded) |
 | `triage.stale_threshold_days` | `14` | Stale issue threshold |
 | `triage.auto_priority` | `true` | Auto-suggest priorities |
 | `triage.include_closed` | `false` | Exclude closed from triage |
@@ -688,5 +691,5 @@ Config is validated on load at the start of every skill invocation. Errors inclu
 | `model_suggestion.cache_ttl_days` | `7` | Days before cached model data is stale |
 | `security.extra_secret_file_pattern` | `""` | Extra regex ORed onto the built-in secret-bearing filename pattern |
 | `security.extra_secret_value_pattern` | `""` | Extra regex ORed onto the built-in real-API-key value pattern |
-| `security.allow_pattern` | `""` | Paths matching this regex are skipped entirely — every exclusion is a path no rule can block. Repo-controlled, so a review of a branch you do not control reads it from a trusted ref instead (`--policy-ref`), never from the branch under review |
+| `security.allow_pattern` | `""` | Matching paths skip every rule — an exclusion is a path no rule can block. Repo-controlled, so reviews of branches you don't control read it from a trusted ref (`--policy-ref`) instead |
 | `security.max_file_size_mb` | `10` | Warn (never block) above this file size without Git LFS |

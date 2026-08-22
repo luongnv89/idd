@@ -3,13 +3,13 @@
 
 > **Per-skill excerpt (generated).** Only the configuration sections this skill reads are reproduced here: `issue`, `platform`, `projects`, `resolve`, `security`. The complete schema — every section and the full defaults table — is at [config-schema.md](https://github.com/luongnv89/idd/blob/main/docs/config-schema.md).
 
-gitissue works with zero configuration — all settings have sensible defaults. When no `.gitissue.yml` file exists, the first-run hint is shown:
+gitissue works with zero configuration — every setting has a default. With no `.gitissue.yml`, the first-run hint is shown:
 
 ```
 ○ First run — using default config. Run /init-gitissue to customize.
 ```
 
-Place `.gitissue.yml` in the repository root to customize behavior.
+Place `.gitissue.yml` at the repo root to customize behavior.
 
 ### Config Loading Flow
 
@@ -19,7 +19,7 @@ line-numbered *Validation* errors. Absent → defaults + first-run hint above.
 
 ## Core Fields
 
-Everyday knobs: `platform`, `issue.auto_normalize`, `resolve.branch_prefix`, `resolve.auto_test`, `resolve.test_timeout`, `triage.stale_threshold_days`, `autopilot.mode`, `autopilot.review_cycles`, `autopilot.skip_labels`, `review.require_acceptance_criteria_check`. Everything below is the advanced reference.
+Everyday knobs: `platform`, `issue.auto_normalize`, `resolve.branch_prefix`, `resolve.auto_test`, `resolve.test_timeout`, `triage.stale_threshold_days`, `autopilot.mode`, `autopilot.review_cycles`, `autopilot.skip_labels`, `review.require_acceptance_criteria_check`. Below is the advanced reference.
 
 ## Full Schema (advanced reference)
 
@@ -193,7 +193,7 @@ Repo-root state beside `.gitissue.yml`, created on first use.
 | `.gitissue/runs.jsonl` | `/issue-resolver`, `/auto-pilot` | Append-only run log (one line per issue) |
 | `.gitissue/run-state.json`, `run.lock`, `last-run-report.md` | `/auto-pilot`; `/issue-resolver` (`borrowed_skills` only) | Resume state, lock, report |
 
-> **Not in `.gitissue/`:** the model-suggestion cache is **skill-level** (`model-data-<date>.json` in the installed skill, all repos).
+> **Not in `.gitissue/`:** the model-suggestion cache is **skill-level** (`model-data-<date>.json`, all repos).
 
 **Conventions:**
 - Create via `mkdir -p`
@@ -207,7 +207,7 @@ Field set, append rules, and the single-writer / `--no-run-log` convention in [r
 
 ## Validation
 
-Config is validated on load at the start of every skill invocation. Errors include line numbers:
+Config is validated at every skill start; errors include line numbers:
 
 ```
 ✗ Invalid config: .gitissue.yml
@@ -236,7 +236,7 @@ Config is validated on load at the start of every skill invocation. Errors inclu
 | `resolve.max_commits` | `10` | Max commits warning |
 | `resolve.qa_max_cycles` | `5` | Max QA review-fix cycles during resolve Step 4 |
 | `resolve.adaptive_effort` | `true` | Scale the resolve pipeline to issue complexity — trivial issues (Effort XS/S) take a lighter path (lighter Research, skip 3-option Plan, skip propose-skills, QA capped at 1 cycle); `false` pins every issue to the full pipeline, and turns off #256's caller context: the payload gate, `triage_context`, last-green test reuse ([agent-model-effort.md](https://github.com/luongnv89/idd/blob/main/docs/agent-model-effort.md)) |
-| `resolve.borrow_skills` | `false` | Off by default. true: full catalog; install selected missing, record {name, origin} in run-state, uninstall only `origin: borrowed`; auto never installs unless true |
+| `resolve.borrow_skills` | `false` | Off by default. true: install selected missing skills, record {name, origin} in run-state, uninstall only `origin: borrowed`; auto never installs unless true |
 | `resolve.ui_review.browser_review` | `"ask"` | Browser (screenshot) UI review mode; code UI review is auto-detected and always runs |
 | `projects.sync_enabled` | `false` | Enable project board sync |
 | `projects.project_number` | `null` | Explicit project number (null = auto-detect) |
@@ -246,5 +246,5 @@ Config is validated on load at the start of every skill invocation. Errors inclu
 | `projects.status_map.done` | `"Done"` | Status when PR is created |
 | `security.extra_secret_file_pattern` | `""` | Extra regex ORed onto the built-in secret-bearing filename pattern |
 | `security.extra_secret_value_pattern` | `""` | Extra regex ORed onto the built-in real-API-key value pattern |
-| `security.allow_pattern` | `""` | Paths matching this regex are skipped entirely — every exclusion is a path no rule can block. Repo-controlled, so a review of a branch you do not control reads it from a trusted ref instead (`--policy-ref`), never from the branch under review |
+| `security.allow_pattern` | `""` | Matching paths skip every rule — an exclusion is a path no rule can block. Repo-controlled, so reviews of branches you don't control read it from a trusted ref (`--policy-ref`) instead |
 | `security.max_file_size_mb` | `10` | Warn (never block) above this file size without Git LFS |

@@ -161,6 +161,13 @@ proceeds normally. The flag is honored even under `IDD_AUTO_MODE=1` (an explicit
 request overrides the no-prompt-no-fetch default); a failed forced refresh
 degrades to a warning and the existing cache, like any other refresh.
 
+> **Automated seed refresh (CI).** The bundled `templates/model-data.json`
+> snapshot itself is refreshed weekly by this repository's
+> `.github/workflows/model-data-refresh.yml`, which skips while the seed is
+> younger than `cache_ttl_days` and pushes a new snapshot only when it is
+> stale. That automation updates installed skill copies only via skill
+> reinstalls — the manual procedure below remains the runtime fallback.
+
 ### Refresh procedure
 
 When a refresh runs (accepted prompt, fresh-seed fetch, or `--refresh-model-data`),
