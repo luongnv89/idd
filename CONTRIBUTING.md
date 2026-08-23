@@ -60,20 +60,21 @@ bash scripts/install-hooks.sh
 ```
 
 The installer requires Git and Python 3, makes `.githooks/pre-commit`
-executable, and sets this checkout's `core.hooksPath` to `.githooks`. The hook
-runs `gi-secscan.py --staged` before each commit, preserving the scanner's
-output and blocking the commit when it finds a secret or invalid policy. Verify
-the installation with:
+executable, and sets this checkout's worktree-specific `core.hooksPath` to
+`.githooks`. Other linked worktrees are not opted in. The hook runs
+`gi-secscan.py --staged` before each commit, preserving the scanner's output
+and blocking the commit when it finds a secret or invalid policy. Verify the
+installation with:
 
 ```bash
-git config --local --get core.hooksPath
+git config --worktree --get core.hooksPath
 ```
 
 The installer is idempotent and will not replace a different hooks path. To
 remove this hook configuration, run
-`git config --local --unset core.hooksPath`. Like every local Git hook, it can
-be bypassed with `--no-verify`; it protects contributors but does not replace
-CI security checks. Review tracked hook changes before installing them.
+`git config --worktree --unset core.hooksPath`. Like every local Git hook, it
+can be bypassed with `--no-verify`; it protects contributors but does not
+replace CI security checks. Review tracked hook changes before installing them.
 
 ### Project Structure
 

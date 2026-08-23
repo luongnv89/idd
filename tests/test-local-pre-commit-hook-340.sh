@@ -45,8 +45,13 @@ git -C "$fixture" config commit.gpgsign false
 install_output="$(cd "$outside" && sh "$fixture/scripts/install-hooks.sh")"
 check "documented installer works outside the repository" \
   test "$install_output" = "✓ Local pre-commit hook installed (.githooks/pre-commit)"
-check "installer sets the repository-local hooks path" \
-  test "$(git -C "$fixture" config --local --get core.hooksPath)" = ".githooks"
+check "installer sets the worktree-specific hooks path" \
+  test "$(git -C "$fixture" config --worktree --get core.hooksPath)" = ".githooks"
+if git -C "$fixture" config --local --get core.hooksPath >/dev/null 2>&1; then
+  fail "installer leaves the shared hooks path unset"
+else
+  pass "installer leaves the shared hooks path unset"
+fi
 check "installer restores the hook executable bit" \
   test -x "$fixture/.githooks/pre-commit"
 if sh "$fixture/scripts/install-hooks.sh" >/dev/null; then
@@ -54,6 +59,35 @@ if sh "$fixture/scripts/install-hooks.sh" >/dev/null; then
 else
   fail "installer is idempotent"
 fi
+
+multi="$TMP/multi"
+sibling="$TMP/sibling"
+mkdir -p "$multi/.githooks" "$multi/scripts" "$multi/src/shared/scripts"
+cp "$REPO_ROOT/.githooks/pre-commit" "$multi/.githooks/pre-commit"
+cp "$REPO_ROOT/scripts/install-hooks.sh" "$multi/scripts/install-hooks.sh"
+cp "$REPO_ROOT/src/shared/scripts/gi-secscan.py" \
+  "$multi/src/shared/scripts/gi-secscan.py"
+git -C "$multi" init -q
+git -C "$multi" config user.name "Hook Test"
+git -C "$multi" config user.email "hook-test@example.invalid"
+git -C "$multi" config commit.gpgsign false
+git -C "$multi" add .
+git -C "$multi" commit -q -m "test: initialize linked worktrees"
+git -C "$multi" worktree add -q -b sibling "$sibling"
+sh "$multi/scripts/install-hooks.sh" >/dev/null
+check "installing one linked worktree does not configure its sibling" \
+  test -z "$(git -C "$sibling" config --get core.hooksPath 2>/dev/null || true)"
+printf '%s\n' '#!/bin/sh' 'touch sibling-hook-ran' 'exit 1' \
+  > "$sibling/.githooks/pre-commit"
+printf '%s\n' "safe sibling" > "$sibling/safe-sibling.txt"
+git -C "$sibling" add safe-sibling.txt
+if (cd "$sibling" && git commit -q -m "test: sibling stays unconfigured"); then
+  pass "installing one linked worktree does not execute its sibling hook"
+else
+  fail "installing one linked worktree does not execute its sibling hook"
+fi
+check "unconfigured sibling hook did not run" \
+  test ! -e "$sibling/sibling-hook-ran"
 
 printf '%s\n' "safe fixture" > "$fixture/safe.txt"
 git -C "$fixture" add safe.txt
@@ -125,7 +159,7 @@ check "invalid policy preserves the scanner diagnostic" \
 rm "$fixture/.gitissue.yml"
 
 mkdir -p "$fixture/custom-hooks"
-git -C "$fixture" config --local --unset core.hooksPath
+git -C "$fixture" config --worktree --unset core.hooksPath
 git config --global core.hooksPath custom-hooks
 set +e
 sh "$fixture/scripts/install-hooks.sh" >"$TMP/conflict.out" 2>"$TMP/conflict.err"
