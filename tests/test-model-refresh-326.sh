@@ -258,6 +258,8 @@ fi
 
 if grep -q 'gh pr create' "$WORKFLOW" \
    && grep -q 'gh pr list.*--state open' "$WORKFLOW" \
+   && grep -q 'git diff --name-only HEAD' "$WORKFLOW" \
+   && grep -q 'git diff --cached --name-only' "$WORKFLOW" \
    && grep -q 'HEAD:refs/heads/chore/model-data-refresh' "$WORKFLOW" \
    && ! grep -Eq '^[[:space:]]*git push[[:space:]]*$|git push[^#]*(refs/heads/)?main([[:space:]"]|$)' "$WORKFLOW"; then
   pass "T8: refreshed data is pushed to a bot branch and opened as a PR"

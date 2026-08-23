@@ -101,11 +101,13 @@ jobs:
           BRANCH: chore/model-data-refresh
         run: |
           set -euo pipefail
-          unexpected="$(git diff --name-only | grep -Ev \
-            '^(src/skills/issue-creator/templates/model-data.json|skills/issue-creator/templates/model-data.json)$' || true)"
-          if [ -n "$unexpected" ]; then
-            echo "Unexpected tracked changes after refresh/tests:" >&2
-            printf '  %s\n' "$unexpected" >&2
+          expected="$(printf '%s\n' \
+            skills/issue-creator/templates/model-data.json \
+            src/skills/issue-creator/templates/model-data.json | sort)"
+          changed="$(git diff --name-only HEAD | sort)"
+          if [ "$changed" != "$expected" ]; then
+            echo "Refresh/build changed an unexpected tracked-file set:" >&2
+            printf '%s\n' "$changed" >&2
             exit 1
           fi
 
@@ -115,6 +117,12 @@ jobs:
           git add \
             src/skills/issue-creator/templates/model-data.json \
             skills/issue-creator/templates/model-data.json
+          staged="$(git diff --cached --name-only | sort)"
+          if [ "$staged" != "$expected" ]; then
+            echo "Refusing to commit an unexpected staged-file set:" >&2
+            printf '%s\n' "$staged" >&2
+            exit 1
+          fi
           git commit -m "chore(model-data): weekly cursorbench refresh"
 
           # This static branch is automation-owned. Fetch its exact current tip
