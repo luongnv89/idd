@@ -2,7 +2,8 @@
 # test-eval-harness.sh — unit tests for gh_shim + grade hermeticity (#261)
 #
 # Covers: exact cassette match, --json enforcement, no network (shim only),
-# grade fails when expect_exit mismatches, EVAL_RECORD fail-closed.
+# concurrent issue IDs, corrupt counter recovery, shell assertion allowlisting,
+# grade exit matching, and EVAL_RECORD fail-closed.
 #
 # Usage: bash tests/test-eval-harness.sh
 
@@ -347,6 +348,80 @@ if [ "$RG_MALFORMED" -eq 1 ]; then
   pass "T18: malformed structured red→green evidence fails"
 else
   fail "T18: malformed structured red→green evidence fails (got $RG_MALFORMED)"
+fi
+
+# ─── T19: parallel issue creates allocate unique numbers ───
+PARALLEL_STATE="$TMP/parallel-state"
+mkdir -p "$PARALLEL_STATE"
+export EVAL_CASSETTES="$TMP/cassettes.json"
+pids=""
+for i in $(seq 1 200); do
+  EVAL_STATE_DIR="$PARALLEL_STATE" python3 "$SHIM" issue create \
+    --title "parallel-$i" --body "body-$i" > "$TMP/parallel-$i.out" \
+    2> "$TMP/parallel-$i.err" &
+  pids="$pids $!"
+done
+parallel_ok=1
+for pid in $pids; do
+  wait "$pid" || parallel_ok=0
+done
+unique_count="$(cat "$TMP"/parallel-*.out | sort -u | wc -l | tr -d ' ')"
+final_counter="$(cat "$PARALLEL_STATE/issue_counter" 2>/dev/null || true)"
+issue_files="$(find "$PARALLEL_STATE" -name 'issue_*.json' -type f | wc -l | tr -d ' ')"
+if [ "$parallel_ok" -eq 1 ] && [ "$unique_count" -eq 200 ] \
+  && [ "$final_counter" = "200" ] && [ "$issue_files" -eq 200 ]; then
+  pass "T19: parallel issue creates allocate 200 unique numbers"
+else
+  fail "T19: parallel issue creates are unique (urls=$unique_count counter=$final_counter files=$issue_files)"
+fi
+
+# ─── T20: corrupt counter warns and resets without traceback ─
+CORRUPT_STATE="$TMP/corrupt-state"
+mkdir -p "$CORRUPT_STATE"
+printf '%s\n' 'not-a-number' > "$CORRUPT_STATE/issue_counter"
+set +e
+EVAL_STATE_DIR="$CORRUPT_STATE" python3 "$SHIM" issue create \
+  --title "after-corruption" --body "body" > "$TMP/corrupt.out" 2> "$TMP/corrupt.err"
+CORRUPT_EXIT=$?
+set -e
+if [ "$CORRUPT_EXIT" -eq 0 ] \
+  && grep -q 'invalid issue counter' "$TMP/corrupt.err" \
+  && ! grep -q 'Traceback' "$TMP/corrupt.err" \
+  && grep -q '/issues/1$' "$TMP/corrupt.out" \
+  && [ "$(cat "$CORRUPT_STATE/issue_counter")" = "1" ]; then
+  pass "T20: corrupt issue counter warns and resets to issue 1"
+else
+  fail "T20: corrupt issue counter recovers without traceback (exit $CORRUPT_EXIT)"
+fi
+
+# ─── T21: non-allowlisted shell assertion is never executed ─
+MALICIOUS_CASE="$TMP/malicious-shell-case"
+MALICIOUS_OUT="$TMP/malicious-shell-out"
+mkdir -p "$MALICIOUS_CASE" "$MALICIOUS_OUT"
+cat > "$MALICIOUS_CASE/case.json" <<'EOF'
+{
+  "name": "harness/reject-shell-command",
+  "grade": [
+    {
+      "tool": "shell",
+      "args": ["touch OUT/executed"],
+      "expect_exit": 0,
+      "label": "non-allowlisted command"
+    }
+  ]
+}
+EOF
+set +e
+REPO_ROOT="$REPO_ROOT" python3 "$GRADE" --case "$MALICIOUS_CASE" \
+  --out "$MALICIOUS_OUT" > "$TMP/malicious-grade.out" 2>&1
+MALICIOUS_EXIT=$?
+set -e
+if [ "$MALICIOUS_EXIT" -eq 1 ] \
+  && grep -q 'rejected before execution' "$TMP/malicious-grade.out" \
+  && [ ! -e "$MALICIOUS_OUT/executed" ]; then
+  pass "T21: non-allowlisted shell assertion is rejected before execution"
+else
+  fail "T21: non-allowlisted shell assertion is rejected (exit $MALICIOUS_EXIT)"
 fi
 
 echo "Results: $PASS passed, $FAIL failed"
