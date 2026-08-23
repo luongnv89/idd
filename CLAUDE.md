@@ -4,6 +4,15 @@
 
 gitissue implements Issue-Driven Development (IDD) — a methodology where GitHub issues are the single source of truth for all development work. The product is a set of Claude Code skills that create, normalize, resolve, and triage GitHub issues.
 
+## Commands
+
+Recorded build/test commands (verified in `docs/agent-environment.md` — see that file for toolchain requirements, environment variables, and verification notes):
+
+- Build: `bash scripts/build.sh --out <tmp-dir> --quiet`
+- Test of record: `git ls-files 'tests/*.sh' | xargs -n1 bash`
+
+Never hand-edit `skills/` — edit sources under `src/`, then rebuild with the command above.
+
 ## Architecture
 
 This is a **prompt-first** project. Almost all of it is prose: each skill is a self-contained Claude Code skill (SKILL.md + references/ + templates/) that instructs the agent how to perform a task, and there is no application runtime. The one exception is `src/shared/scripts/` — small, stdlib-only Python helpers that skills shell out to for the few jobs where determinism beats prose (resolving config, validating a run-log record, parsing dependency markers). Every one of them is optional at run time: the skill prose that invokes a script also documents the manual procedure, so a skill still works where the script cannot run. Shared agents live in `src/shared/agents/` and are referenced by multiple skills. All authored skill sources live under `src/`. Per issue #81, all documentation — both runtime docs consumed by skills and human-only project docs — lives in a single top-level `docs/` tree.
@@ -59,8 +68,6 @@ src/
 │       ├── SKILL.source.md
 │       └── references/
 │
-CHANGELOG.md                       # Project changelog (repo root, not under docs/)
-
 docs/                              # All documentation — single tree (issue #81)
 ├── config-schema.md               # ↓ Runtime docs (skills reference these via
 ├── idd-methodology.md             #   bare `docs/X.md` tokens; build.py
