@@ -6,18 +6,29 @@ gitissue implements Issue-Driven Development (IDD) — a methodology where GitHu
 
 ## Architecture
 
-This is a **skills-only** project. There is no runtime code — each skill is a self-contained Codex skill (SKILL.md + references/ + templates/) that instructs the agent how to perform a task. Shared agents live in `src/shared/agents/` and are referenced by multiple skills. All authored skill sources live under `src/`. Per issue #81, all documentation — both runtime docs consumed by skills and human-only project docs — lives in a single top-level `docs/` tree.
+This is a **prompt-first** project. Almost all of it is prose: each skill is a self-contained Codex skill (SKILL.md + references/ + templates/) that instructs the agent how to perform a task, and there is no application runtime. The one exception is `src/shared/scripts/` — small, stdlib-only Python helpers that skills shell out to for the few jobs where determinism beats prose. Every one of them is optional at run time: the skill prose that invokes a script also documents the manual procedure, so a skill still works where the script cannot run. Shared agents live in `src/shared/agents/` and are referenced by multiple skills. All authored skill sources live under `src/`. Per issue #81, all documentation — both runtime docs consumed by skills and human-only project docs — lives in a single top-level `docs/` tree.
 
 ```
 src/
 ├── shared/
-│   └── agents/                    # Shared agent definitions (used by multiple skills)
-│       ├── codebase-researcher.md # Deep codebase scan + solution research
-│       ├── synthesizer.md         # Analysis + implementation options
-│       ├── implementer.md         # Code + tests implementation
-│       ├── code-reviewer.md       # Confidence-based code review
-│       ├── duplicate-detector.md  # Issue dedup scoring
-│       └── issue-relationship-scanner.md  # File deps + already-fixed detection
+│   ├── agents/                    # Shared agent definitions (used by multiple skills)
+│   │   ├── codebase-researcher.md # Deep codebase scan + solution research
+│   │   ├── synthesizer.md         # Analysis + implementation options
+│   │   ├── implementer.md         # Code + tests implementation
+│   │   ├── code-reviewer.md       # Confidence-based code review
+│   │   ├── fixer.md               # Targeted fixes for review/test/CI/AC failures
+│   │   ├── duplicate-detector.md  # Issue dedup scoring
+│   │   ├── issue-relationship-scanner.md  # File deps + already-fixed detection
+│   │   └── ui-reviewer.md         # UI/UX + screenshot accessibility review
+│   └── scripts/                   # Shared executable helpers (stdlib-only, mode 0755)
+│       ├── gi-config.py           # Defaults + .gitissue.yml → one JSON line
+│       ├── gi-runlog.py           # Validate/normalize/append a runs.jsonl record
+│       ├── gi-deps.py             # Parse local dependency issue numbers
+│       ├── gi-secscan.py          # Pre-commit secret/artifact scan → JSON verdict
+│       ├── gi-ci-wait.py          # Poll a PR's CI checks to one JSON verdict
+│       ├── gi-issue.py            # TTL-cached `gh issue view` by field set
+│       ├── gi-branch.py           # Derive a convention-conformant branch name
+│       └── gi-ratelimit.py        # Rate-limit verdict, chunked pause, backoff, runtime budget
 │
 ├── skills/
 │   ├── auto-pilot/         # /auto-pilot — triage, resolve, review, merge loop
@@ -50,27 +61,41 @@ src/
 │
 docs/                              # All documentation — single tree (issue #81)
 ├── config-schema.md               # ↓ Runtime docs (skills reference these via
-├── idd-methodology.md             #   bare `docs/X.md` tokens; build.py
-├── naming-conventions.md          #   bundles them into each skill's
-├── sync-conventions.md            #   references/docs/ at build time)
+├── run-log-schema.md              #   bare `docs/X.md` tokens; build.py
+├── idd-methodology.md             #   bundles them into each skill's
+├── naming-conventions.md          #   references/docs/ at build time)
+├── sync-conventions.md            #
 ├── github-projects-sync.md        #
-├── platform-github.md             # ↑
+├── platform-github.md             #
+├── shared-agent-conventions.md    #
+├── agent-model-effort.md          #
+├── pre-commit-security.md         #
+├── terminal-style.md              #
+├── auto-mode.md                   #
+├── ui-review.md                   # ↑
 ├── ARCHITECTURE.md                # ↓ Human-only project docs (not bundled
-├── CHANGELOG.md                   #   into skills; readable on the
-├── DEVELOPMENT.md                 #   repo's main branch only)
-├── decisions/                     # ↑
-├── experiments/
-└── release-notes/
+├── DEVELOPMENT.md                 #   into skills; readable on the
+├── decisions/                     #   repo's main branch only)
+├── experiments/                   #
+└── release-notes/                 # ↑
 ```
 
 ### Docs placement rule
 
 All documentation lives in top-level `docs/`. Two kinds coexist there:
 
-1. **Runtime docs** — read by skills at execution time. A skill source file references them as bare `docs/X.md` tokens. `scripts/build.py` discovers these references via transitive-closure scan and copies the matching files into each skill's `references/docs/`. To add a runtime doc: drop the new `.md` file at `docs/<name>.md` and reference it from a skill or shared agent — the build picks it up automatically. Today's runtime docs include: `config-schema.md`, `idd-methodology.md`, `naming-conventions.md`, `sync-conventions.md`, `github-projects-sync.md`, `platform-github.md`.
+1. **Runtime docs** — read by skills at execution time. A skill source file references them as bare `docs/X.md` tokens. `scripts/build.py` discovers these references via transitive-closure scan and copies the matching files into each skill's `references/docs/`. To add a runtime doc: drop the new `.md` file at `docs/<name>.md` and reference it from a skill or shared agent — the build picks it up automatically. Today's runtime docs — all 13 bundled by the closure — are: `config-schema.md`, `run-log-schema.md`, `idd-methodology.md`, `naming-conventions.md`, `sync-conventions.md`, `github-projects-sync.md`, `platform-github.md`, `shared-agent-conventions.md`, `agent-model-effort.md`, `pre-commit-security.md`, `terminal-style.md`, `auto-mode.md`, `ui-review.md`.
 2. **Project docs** — read by humans only. Architecture, changelog, dev guide, decision records, experiments, release notes. They are not referenced by any skill, so the build does not bundle them. Place new project docs at `docs/<name>.md` (top-level) or under a topical subdirectory (`docs/decisions/`, `docs/experiments/`, `docs/release-notes/`).
 
 When in doubt: if a skill source needs to read it at runtime, it is a runtime doc and goes at the top level of `docs/`. Otherwise it is a project doc.
+
+### Scripts placement rule
+
+Shared executable helpers are a third closure kind alongside agents and runtime docs (issue #251):
+
+- **Source** lives at `src/shared/scripts/<name>.py` — stdlib-only, committed mode `0755`, invoked as `python3 references/scripts/<name>.py` (never `./references/scripts/<name>.py`; zip/tar installs drop the exec bit).
+- **Emitted** byte-identical to each skill's `references/scripts/<name>.py` by `scripts/build.py`, which discovers the bare `shared/scripts/<name>.py` token in skill prose.
+- **Never hand-edit `skills/` output** — edit sources under `src/`, then rebuild with `bash scripts/build.sh --out <tmp-dir> --quiet`.
 
 ## Conventions
 
@@ -89,7 +114,7 @@ When in doubt: if a skill source needs to read it at runtime, it is a runtime do
 
 ### Issue Templates
 - Normalization marker: `<!-- gitissue:normalized v1 -->`
-- Standard sections: Type, Context, Description, Acceptance Criteria, Technical Notes, Metadata
+- Standard sections (SPEC §1.1): Type, Description, Screenshots, Acceptance Criteria, Metadata
 - Reporter's original text preserved in `> Reporter Context` blockquote
 - Confidence markers: `(high confidence)`, `(needs review)`
 
