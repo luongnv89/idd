@@ -1,0 +1,19 @@
+#!/bin/sh
+# Run the repository's staged-byte secret scanner before every local commit.
+set -eu
+
+fail() {
+  printf '%s\n' "✗ pre-commit: $1" >&2
+  exit 1
+}
+
+command -v git >/dev/null 2>&1 || fail "git is required"
+command -v python3 >/dev/null 2>&1 || fail "python3 is required to run gi-secscan"
+
+repo_root="$(git rev-parse --show-toplevel 2>/dev/null)" || \
+  fail "cannot locate the repository root"
+scanner="$repo_root/src/shared/scripts/gi-secscan.py"
+[ -f "$scanner" ] || fail "scanner not found at $scanner"
+
+# exec preserves gi-secscan's stdout, stderr, and exit code verbatim.
+exec python3 "$scanner" --staged
