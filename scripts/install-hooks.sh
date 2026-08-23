@@ -21,19 +21,23 @@ scanner="$repo_root/src/shared/scripts/gi-secscan.py"
 [ -f "$scanner" ] || fail "missing src/shared/scripts/gi-secscan.py"
 
 set +e
-existing="$(git -C "$repo_root" config --local --get core.hooksPath 2>/dev/null)"
+existing="$(git -C "$repo_root" config --get core.hooksPath 2>/dev/null)"
 config_status=$?
 set -e
 if [ "$config_status" -eq 0 ] && [ "$existing" != ".githooks" ]; then
-  fail "core.hooksPath is already '$existing'; unset it before installing"
+  fail "effective core.hooksPath is already '$existing'; unset it before installing"
 fi
 if [ "$config_status" -ne 0 ] && [ "$config_status" -ne 1 ]; then
-  fail "cannot read the local core.hooksPath setting"
+  fail "cannot read the effective core.hooksPath setting"
 fi
 
 # Archive downloads may drop executable bits. Repair the hook before enabling it.
 chmod +x "$hook" || fail "cannot make .githooks/pre-commit executable"
 git -C "$repo_root" config --local core.hooksPath .githooks || \
   fail "cannot set the local core.hooksPath"
+configured="$(git -C "$repo_root" config --get core.hooksPath 2>/dev/null)" || \
+  fail "cannot verify the effective core.hooksPath"
+[ "$configured" = ".githooks" ] || \
+  fail "effective core.hooksPath is '$configured', not '.githooks'"
 
 printf '%s\n' "✓ Local pre-commit hook installed (.githooks/pre-commit)"

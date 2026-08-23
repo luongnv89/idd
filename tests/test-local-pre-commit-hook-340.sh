@@ -33,7 +33,8 @@ chmod 0644 "$fixture/.githooks/pre-commit"
 export HOME="$TMP/home"
 export XDG_CONFIG_HOME="$TMP/xdg"
 export GIT_CONFIG_NOSYSTEM=1
-export GIT_CONFIG_GLOBAL=/dev/null
+export GIT_CONFIG_GLOBAL="$TMP/global.gitconfig"
+: > "$GIT_CONFIG_GLOBAL"
 
 git -C "$fixture" init -q
 git -C "$fixture" symbolic-ref HEAD refs/heads/feature/hook-test
@@ -41,14 +42,14 @@ git -C "$fixture" config user.name "Hook Test"
 git -C "$fixture" config user.email "hook-test@example.invalid"
 git -C "$fixture" config commit.gpgsign false
 
-install_output="$(cd "$outside" && bash "$fixture/scripts/install-hooks.sh")"
+install_output="$(cd "$outside" && sh "$fixture/scripts/install-hooks.sh")"
 check "documented installer works outside the repository" \
   test "$install_output" = "✓ Local pre-commit hook installed (.githooks/pre-commit)"
 check "installer sets the repository-local hooks path" \
   test "$(git -C "$fixture" config --local --get core.hooksPath)" = ".githooks"
 check "installer restores the hook executable bit" \
   test -x "$fixture/.githooks/pre-commit"
-if bash "$fixture/scripts/install-hooks.sh" >/dev/null; then
+if sh "$fixture/scripts/install-hooks.sh" >/dev/null; then
   pass "installer is idempotent"
 else
   fail "installer is idempotent"
@@ -124,14 +125,21 @@ check "invalid policy preserves the scanner diagnostic" \
 rm "$fixture/.gitissue.yml"
 
 mkdir -p "$fixture/custom-hooks"
-git -C "$fixture" config --local core.hooksPath custom-hooks
+git -C "$fixture" config --local --unset core.hooksPath
+git config --global core.hooksPath custom-hooks
 set +e
-bash "$fixture/scripts/install-hooks.sh" >"$TMP/conflict.out" 2>"$TMP/conflict.err"
+sh "$fixture/scripts/install-hooks.sh" >"$TMP/conflict.out" 2>"$TMP/conflict.err"
 conflict_status=$?
 set -e
-check "installer refuses to overwrite another hooks path" test "$conflict_status" -ne 0
-check "conflicting hooks path remains unchanged" \
-  test "$(git -C "$fixture" config --local --get core.hooksPath)" = "custom-hooks"
+check "installer refuses to mask another effective hooks path" \
+  test "$conflict_status" -ne 0
+check "conflicting global hooks path remains effective" \
+  test "$(git -C "$fixture" config --get core.hooksPath)" = "custom-hooks"
+if git -C "$fixture" config --local --get core.hooksPath >/dev/null 2>&1; then
+  fail "refused installation leaves local core.hooksPath unset"
+else
+  pass "refused installation leaves local core.hooksPath unset"
+fi
 
 check "CONTRIBUTING documents the exact one-command installer" \
   grep -q '^bash scripts/install-hooks\.sh$' "$REPO_ROOT/CONTRIBUTING.md"
