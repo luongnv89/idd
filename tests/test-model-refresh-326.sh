@@ -256,6 +256,20 @@ else
   fail "T8: checkout can use a workflow_dispatch-selected ref"
 fi
 
+if grep -q 'persist-credentials: false' "$WORKFLOW" \
+   && grep -q 'gh auth setup-git' "$WORKFLOW"; then
+  persist_line="$(grep -n 'persist-credentials: false' "$WORKFLOW" | cut -d: -f1)"
+  auth_line="$(grep -n 'gh auth setup-git' "$WORKFLOW" | cut -d: -f1)"
+  test_line="$(grep -n "git ls-files 'tests/\\*.sh'" "$WORKFLOW" | cut -d: -f1)"
+  if [ "$persist_line" -lt "$test_line" ] && [ "$test_line" -lt "$auth_line" ]; then
+    pass "T8: write credentials are unavailable while repository tests run"
+  else
+    fail "T8: write credentials are installed before repository tests finish"
+  fi
+else
+  fail "T8: checkout persists write credentials outside the publication boundary"
+fi
+
 if grep -q 'gh pr create' "$WORKFLOW" \
    && grep -q 'gh pr list.*--state open' "$WORKFLOW" \
    && grep -q 'git diff --name-only HEAD' "$WORKFLOW" \
