@@ -1226,7 +1226,9 @@ def main(argv: list[str]) -> int:
     if args.kind == "repo":
         branch = git("rev-parse", "--abbrev-ref", "HEAD").strip()
         findings: list[Finding] = []
-        if branch in ("main", "master", args.base.split("/")[-1]):
+        if branch in ("main", "master", args.base.split("/")[-1], "HEAD"):
+            # "HEAD" = detached checkout (actions/checkout on pull_request):
+            # no branch name to check, so skip like the default branch above.
             findings.append(info("B01", f"on '{branch}' — branch name check skipped (§3.1)"))
         else:
             findings.extend(lint_branch(branch))
