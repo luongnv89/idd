@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Features
+- **ci:** measure Python coverage over the shared script entry points and pin the floor in CI (#333) — ~3.5 kLOC of stdlib helpers in `src/shared/scripts/` had zero coverage measurement (F-TEST-001, plan task 0.1). `.coveragerc` scopes the measurement to that tree and pins `fail_under = 40` — the first measured value; raising it is deliberate Sprint 6 work, and a regression now fails CI. `scripts/coverage-run.sh` exercises every entry point hermetically and offline (`--help` everywhere plus behavioral invocations with payloads copied from `tests/`: config merge, dependency parsing, dup-score stdin request, run-log echo and failure-streak, stack detection over this repo, run-state init/read/report, the documented triage-graph payload, model-cache lifecycle, rate-limit arithmetic, branch derivation), then enforces the floor through `coverage report` itself and publishes text, XML, and HTML reports. A dedicated `coverage` job in `dist-check.yml` installs coverage.py on Python 3.11, runs the runner, and uploads `coverage-report/` as a run artifact. `tests/test-coverage-floor-333.sh` pins the wiring structurally: scoping, integer pin, committed-0755 runner covering every entry point, enforcement via `coverage report`, artifact upload, and no diverging command-line override.
+
 ## [v0.19.0] — 2026-08-19
 
 ### Fixes

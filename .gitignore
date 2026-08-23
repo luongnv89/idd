@@ -29,6 +29,11 @@ __pycache__/
 venv/
 env/
 
+# Coverage artifacts (issue #333) — measured in CI, published as run artifacts
+.coverage
+.coverage.*
+coverage-report/
+
 # Test artifacts
 tests/tmp/
 tests/output/
