@@ -131,6 +131,9 @@ jobs:
       - name: test-pre-commit-security
         run: bash tests/test-pre-commit-security.sh
 
+      - name: test-local-pre-commit-hook-340
+        run: bash tests/test-local-pre-commit-hook-340.sh
+
       - name: test-projects-sync
         run: bash tests/test-projects-sync.sh
 

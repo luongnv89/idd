@@ -51,6 +51,30 @@ graph TD
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) or any SKILL.md-compatible agent
 - Git 2.30+
 
+### Local pre-commit security hook
+
+Install the repository's staged-secret gate in this checkout with one command:
+
+```bash
+bash scripts/install-hooks.sh
+```
+
+The installer requires Git and Python 3, makes `.githooks/pre-commit`
+executable, and sets this checkout's `core.hooksPath` to `.githooks`. The hook
+runs `gi-secscan.py --staged` before each commit, preserving the scanner's
+output and blocking the commit when it finds a secret or invalid policy. Verify
+the installation with:
+
+```bash
+git config --local --get core.hooksPath
+```
+
+The installer is idempotent and will not replace a different hooks path. To
+remove this hook configuration, run
+`git config --local --unset core.hooksPath`. Like every local Git hook, it can
+be bypassed with `--no-verify`; it protects contributors but does not replace
+CI security checks. Review tracked hook changes before installing them.
+
 ### Project Structure
 
 ```
