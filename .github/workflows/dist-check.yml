@@ -140,6 +140,9 @@ jobs:
       - name: test-coverage-floor-333
         run: bash tests/test-coverage-floor-333.sh
 
+      - name: test-config-search-ceiling-parity-339
+        run: bash tests/test-config-search-ceiling-parity-339.sh
+
       # build.sh: compile → verify dist/skills → promote skills/ only on success
       - name: Build and verify skills (update skills/ on success)
         run: ./scripts/build.sh
