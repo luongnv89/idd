@@ -1,0 +1,12 @@
+# Coverage measurement for the shared stdlib Python helpers
+# (issue #333 / F-TEST-001). The floor is pinned to the first measured value;
+# raising it is Sprint 6 work feeding M3 — never lower it to turn CI green.
+[run]
+source = src/shared/scripts
+
+[report]
+precision = 0
+fail_under = 40
+show_missing = True
+exclude_also =
+    if __name__ == .__main__.:
