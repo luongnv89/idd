@@ -26,6 +26,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SCRIPT="$REPO_ROOT/scripts/gi-model-refresh.py"
 SEED_SRC="$REPO_ROOT/src/skills/issue-creator/templates/model-data.json"
+WORKFLOW="$REPO_ROOT/.github/workflows/model-data-refresh.yml"
 
 PASS=0
 FAIL=0
@@ -235,6 +236,62 @@ if python3 -c 'import json,sys; json.loads(open(sys.argv[1]).read())' "$TMP/t3.o
   pass "T7: success output is a single JSON object line"
 else
   fail "T7: success output is not a single JSON object"
+fi
+
+# ───────────────────────────────────────────────────────────
+# T8 (issue #341): refresh publication is PR-gated and least-privilege scoped
+# ───────────────────────────────────────────────────────────
+if ! grep -q '^permissions:' "$WORKFLOW" \
+   && [ "$(grep -c '^    permissions:' "$WORKFLOW")" -eq 1 ] \
+   && grep -q '^      contents: write$' "$WORKFLOW" \
+   && grep -q '^      pull-requests: write$' "$WORKFLOW"; then
+  pass "T8: write permissions are declared once at refresh-job level"
+else
+  fail "T8: permissions are not scoped to the refresh job"
+fi
+
+if grep -q 'ref:.*github.event.repository.default_branch' "$WORKFLOW"; then
+  pass "T8: checkout is pinned to the repository default branch"
+else
+  fail "T8: checkout can use a workflow_dispatch-selected ref"
+fi
+
+if grep -q 'gh pr create' "$WORKFLOW" \
+   && grep -q 'gh pr list.*--state open' "$WORKFLOW" \
+   && grep -q 'HEAD:refs/heads/${BRANCH}' "$WORKFLOW" \
+   && ! grep -Eq '^[[:space:]]*git push[[:space:]]*$|git push[^#]*(refs/heads/)?main([[:space:]"]|$)' "$WORKFLOW"; then
+  pass "T8: refreshed data is pushed to a bot branch and opened as a PR"
+else
+  fail "T8: refresh publication does not enforce the PR branch flow"
+fi
+
+if ! grep -qi '\[skip ci\]' "$WORKFLOW"; then
+  pass "T8: generated commits do not suppress CI"
+else
+  fail "T8: generated commit still contains [skip ci]"
+fi
+
+if grep -q "git ls-files 'tests/\\*.sh' | xargs -n1 bash" "$WORKFLOW"; then
+  pass "T8: the refreshed tree must pass the full suite before publication"
+else
+  fail "T8: refreshed data can be published without the full suite"
+fi
+
+# ───────────────────────────────────────────────────────────
+# T9 (issue #341): private regenerable state stays local-only
+# ───────────────────────────────────────────────────────────
+PRIVATE_STATE=(.gitissue/analysis-19.json .gitissue/triage.json)
+if [ -z "$(git -C "$REPO_ROOT" ls-files -- "${PRIVATE_STATE[@]}")" ]; then
+  pass "T9: private analysis and triage state are absent from the index"
+else
+  fail "T9: private analysis or triage state remains tracked"
+fi
+
+if git -C "$REPO_ROOT" check-ignore --no-index -q -- "${PRIVATE_STATE[0]}" \
+   && git -C "$REPO_ROOT" check-ignore --no-index -q -- "${PRIVATE_STATE[1]}"; then
+  pass "T9: both private state paths are covered by ignore policy"
+else
+  fail "T9: private analysis or triage state is not ignored"
 fi
 
 # ───────────────────────────────────────────────────────────

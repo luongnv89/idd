@@ -12,9 +12,6 @@ on:
     - cron: "23 4 * * 1"
   workflow_dispatch:
 
-permissions:
-  contents: write
-
 concurrency:
   group: model-data-refresh
   cancel-in-progress: false
@@ -22,10 +19,15 @@ concurrency:
 jobs:
   refresh:
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      pull-requests: write
     steps:
-      - name: Checkout
+      - name: Checkout default branch
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
 
       - name: Set up Python
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
@@ -77,16 +79,82 @@ jobs:
               if ttl:
                   fh.write(f"ttl={ttl}\n")
           PY
+          rm -f refresh-out.json
 
-      - name: Commit refreshed seed
+      # GITHUB_TOKEN-authored push/PR events do not start another workflow run.
+      # Gate publication on the repository's full suite here so refreshed data
+      # cannot bypass the same tests required of contributor PRs.
+      - name: Test refreshed tree
         if: steps.refresh.outputs.updated == 'true'
+        run: git ls-files 'tests/*.sh' | xargs -n1 bash
+
+      - name: Open or update refresh pull request
+        id: publish
+        if: steps.refresh.outputs.updated == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE_BRANCH: ${{ github.event.repository.default_branch }}
+          BRANCH: chore/model-data-refresh
         run: |
           set -euo pipefail
+          target="src/skills/issue-creator/templates/model-data.json"
+          unexpected="$(git diff --name-only -- . ":(exclude)$target")"
+          if [ -n "$unexpected" ]; then
+            echo "Unexpected tracked changes after refresh/tests:" >&2
+            printf '  %s\n' "$unexpected" >&2
+            exit 1
+          fi
+
+          git switch -c "$BRANCH"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/skills/issue-creator/templates/model-data.json
-          git commit -m "chore(model-data): weekly cursorbench refresh [skip ci]"
-          git push
+          git add "$target"
+          git commit -m "chore(model-data): weekly cursorbench refresh"
+
+          # This static branch is automation-owned. Bind the force lease to the
+          # exact remote OID observed immediately before push so concurrent or
+          # manual changes cannot be overwritten silently.
+          remote_oid="$(git ls-remote --heads origin "refs/heads/${BRANCH}" | awk 'NR == 1 {print $1}')"
+          git push \
+            --force-with-lease="refs/heads/${BRANCH}:${remote_oid}" \
+            origin "HEAD:refs/heads/${BRANCH}"
+
+          prs="$(gh pr list --state open --head "$BRANCH" --base "$BASE_BRANCH" --limit 2 --json number,url)"
+          pr_count="$(printf '%s' "$prs" | python3 -c 'import json,sys; print(len(json.load(sys.stdin)))')"
+          if [ "$pr_count" -eq 0 ]; then
+            body_file="$RUNNER_TEMP/model-data-refresh-pr.md"
+            cat > "$body_file" <<'EOF'
+          ## Summary
+
+          Refresh the bundled CursorBench model data after its configured TTL expired.
+
+          ## Test Results
+
+          - Full tracked shell suite passed before publication.
+          EOF
+            gh pr create \
+              --base "$BASE_BRANCH" \
+              --head "$BRANCH" \
+              --title "chore(model-data): weekly cursorbench refresh" \
+              --body-file "$body_file"
+            action=created
+          elif [ "$pr_count" -eq 1 ]; then
+            action=updated
+          else
+            echo "Multiple open refresh PRs target $BRANCH" >&2
+            exit 1
+          fi
+
+          # Mutations are verified by a fresh JSON read.
+          prs="$(gh pr list --state open --head "$BRANCH" --base "$BASE_BRANCH" --limit 2 --json number,url)"
+          pr_count="$(printf '%s' "$prs" | python3 -c 'import json,sys; print(len(json.load(sys.stdin)))')"
+          if [ "$pr_count" -ne 1 ]; then
+            echo "Expected exactly one open refresh PR, found $pr_count" >&2
+            exit 1
+          fi
+          pr_url="$(printf '%s' "$prs" | python3 -c 'import json,sys; print(json.load(sys.stdin)[0]["url"])')"
+          echo "action=$action" >> "$GITHUB_OUTPUT"
+          echo "url=$pr_url" >> "$GITHUB_OUTPUT"
 
       - name: Summarize outcome
         if: always()
@@ -94,13 +162,17 @@ jobs:
           UPDATED: ${{ steps.refresh.outputs.updated }}
           OUTCOME: ${{ steps.refresh.outputs.outcome }}
           TTL: ${{ steps.refresh.outputs.ttl }}
+          PR_ACTION: ${{ steps.publish.outputs.action }}
+          PR_URL: ${{ steps.publish.outputs.url }}
         run: |
           set -euo pipefail
           {
             echo "## Model data refresh"
             echo ""
-            if [ "$UPDATED" = "true" ]; then
-              echo "✓ CursorBench seed was stale — refreshed and pushed."
+            if [ "$UPDATED" = "true" ] && [ -n "$PR_URL" ]; then
+              echo "✓ CursorBench seed was stale — refresh PR ${PR_ACTION}: ${PR_URL}"
+            elif [ "$UPDATED" = "true" ]; then
+              echo "✗ CursorBench seed refreshed locally but PR publication failed."
             elif [ "$OUTCOME" = "fresh" ]; then
               ttl="${TTL:-7}"
               echo "✓ Model data fresher than ${ttl} days — skipping update."
