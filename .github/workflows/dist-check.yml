@@ -119,6 +119,9 @@ jobs:
       - name: test-landing-structure
         run: bash tests/test-landing-structure.sh
 
+      - name: test-webpage-hardening-338
+        run: bash tests/test-webpage-hardening-338.sh
+
       - name: test-model-suggestion-124
         run: bash tests/test-model-suggestion-124.sh
 

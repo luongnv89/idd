@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self'; connect-src https://api.github.com" />
   <title>Changelog — issuedev</title>
   <meta name="description" content="issuedev changelog — every release documented. Issue-Driven Development for GitHub." />
   <link rel="canonical" href="https://luongnv.com/idd/changelog.html" />
@@ -335,44 +336,88 @@
         { tag: 'v0.1.0', date: '2026-03-21', summary: 'Initial release: /issue-creator, /issue-resolver, /issue-triage', changes: [{ type: 'added', text: '/issue-creator — classify and structure GitHub issues' }, { type: 'added', text: '/issue-resolver — resolve issues into tested PRs' }, { type: 'added', text: '/issue-triage — prioritize and order the backlog' }] }
       ];
 
+      // A release tag is promoted to an href only when it passes this
+      // predicate — alphanumerics, dots, dashes, underscores, no path or
+      // URL syntax. Anything else renders as inert text (F-BUG-002/F-SEC-002).
+      var TAG_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+      function isValidReleaseTag(tag) {
+        return typeof tag === 'string' && TAG_PATTERN.test(tag) && tag.indexOf('..') === -1;
+      }
+
+      function el(tagName, className, text) {
+        var node = document.createElement(tagName);
+        if (className) node.className = className;
+        if (text !== undefined && text !== null) node.textContent = String(text);
+        return node;
+      }
+
+      var CHANGE_SECTIONS = [
+        { type: 'added', label: 'Added' },
+        { type: 'changed', label: 'Changed' },
+        { type: 'fixed', label: 'Fixed' },
+        { type: 'broken', label: 'Breaking' }
+      ];
+
       function renderTimeline(releases) {
-        timeline.innerHTML = '';
+        timeline.replaceChildren();
         releases.forEach(function (rel, i) {
           var isFirst = i === 0; // latest first
-          var html = '<div class="tl-item">';
-          html += '<div class="tl-dot' + (isFirst ? ' latest' : '') + '"></div>';
-          html += '<div class="tl-card">';
-          html += '<div class="tl-header">';
-          html += '<span class="tl-version">';
-          html += '<a href="https://github.com/luongnv89/idd/releases/tag/' + rel.tag + '" target="_blank" rel="noopener">' + rel.tag + '</a>';
-          if (isFirst) html += '<span class="tl-tag added" style="margin-left:4px;">latest</span>';
-          html += '</span>';
-          html += '<span class="tl-date">' + formatDate(rel.date) + '</span>';
-          html += '</div>';
-          html += '<div class="tl-tags">';
-          var seenTypes = {};
-          rel.changes.forEach(function (c) { seenTypes[c.type] = true; });
-          var typeLabels = { added: 'Added', changed: 'Changed', fixed: 'Fixed', broken: 'Breaking' };
-          Object.keys(seenTypes).forEach(function (t) {
-            if (typeLabels[t]) html += '<span class="tl-tag ' + t + '">' + typeLabels[t] + '</span>';
+
+          var item = el('div', 'tl-item');
+          item.appendChild(el('div', isFirst ? 'tl-dot latest' : 'tl-dot'));
+
+          var card = el('div', 'tl-card');
+
+          var header = el('div', 'tl-header');
+          var version = el('span', 'tl-version');
+          if (isValidReleaseTag(rel.tag)) {
+            var link = el('a', null, rel.tag);
+            link.href = 'https://github.com/luongnv89/idd/releases/tag/' + rel.tag;
+            link.target = '_blank';
+            link.rel = 'noopener';
+            version.appendChild(link);
+          } else {
+            version.appendChild(el('span', null, rel.tag));
+          }
+          if (isFirst) version.appendChild(el('span', 'tl-tag added', 'latest'));
+          header.appendChild(version);
+          header.appendChild(el('span', 'tl-date', formatDate(rel.date)));
+          card.appendChild(header);
+
+          var tagsRow = el('div', 'tl-tags');
+          CHANGE_SECTIONS.forEach(function (section) {
+            var hasType = rel.changes.some(function (c) { return c.type === section.type; });
+            if (hasType) tagsRow.appendChild(el('span', 'tl-tag ' + section.type, section.label));
           });
-          html += '</div>';
-          html += '<div class="tl-body"><p>' + rel.summary + '</p></div>';
-          html += '<button class="tl-expand" onclick="this.nextElementSibling.classList.toggle(\'open\'); this.textContent = this.nextElementSibling.classList.contains(\'open\') ? \'Less ▴\' : \'Details ▾\'">Details ▾</button>';
-          html += '<div class="tl-detail">';
-          var sections = { added: 'Added', changed: 'Changed', fixed: 'Fixed', broken: 'Breaking' };
-          Object.keys(sections).forEach(function (t) {
-            var items = rel.changes.filter(function (c) { return c.type === t; });
+          card.appendChild(tagsRow);
+
+          var body = el('div', 'tl-body');
+          body.appendChild(el('p', null, rel.summary));
+          card.appendChild(body);
+
+          var detail = el('div', 'tl-detail');
+          var expand = el('button', 'tl-expand', 'Details ▾');
+          expand.addEventListener('click', function () {
+            detail.classList.toggle('open');
+            expand.textContent = detail.classList.contains('open') ? 'Less ▴' : 'Details ▾';
+          });
+          card.appendChild(expand);
+
+          CHANGE_SECTIONS.forEach(function (section) {
+            var items = rel.changes.filter(function (c) { return c.type === section.type; });
             if (items.length > 0) {
-              html += '<div class="tl-section">';
-              html += '<div class="tl-section-title ' + t + '">' + sections[t] + '</div>';
-              html += '<ul>';
-              items.forEach(function (c) { html += '<li>' + c.text + '</li>'; });
-              html += '</ul></div>';
+              var sec = el('div', 'tl-section');
+              sec.appendChild(el('div', 'tl-section-title ' + section.type, section.label));
+              var list = el('ul');
+              items.forEach(function (c) { list.appendChild(el('li', null, c.text)); });
+              sec.appendChild(list);
+              detail.appendChild(sec);
             }
           });
-          html += '</div></div></div>';
-          timeline.innerHTML += html;
+          card.appendChild(detail);
+
+          item.appendChild(card);
+          timeline.appendChild(item);
         });
       }
 
