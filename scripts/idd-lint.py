@@ -1158,9 +1158,9 @@ def render(findings: list[Finding], label: str, level: str, quiet: bool) -> int:
 
 
 def read_input(path: str | None) -> str:
-    if path is None or path == "-":
-        return sys.stdin.read()
     try:
+        if path is None or path == "-":
+            return sys.stdin.read()
         with open(path, encoding="utf-8") as fh:
             return fh.read()
     except (OSError, UnicodeDecodeError) as exc:

@@ -129,6 +129,18 @@ else
   fail "T2: non-UTF-8 input → exit $BIN_STATUS (want 2), stderr: $BIN_OUT"
 fi
 
+BIN_STDIN_ERR="$(printf '\xff' | python3 "$LINT" issue - 2>&1 >/dev/null)" && BIN_STDIN_STATUS=0 || BIN_STDIN_STATUS=$?
+if [ "$BIN_STDIN_STATUS" -eq 2 ] && printf '%s' "$BIN_STDIN_ERR" | grep -q "cannot read input"; then
+  pass "T2: non-UTF-8 stdin → exit 2 with an error message"
+else
+  fail "T2: non-UTF-8 stdin → exit $BIN_STDIN_STATUS (want 2), stderr: $BIN_STDIN_ERR"
+fi
+if printf '%s' "$BIN_STDIN_ERR" | grep -q "Traceback"; then
+  fail "T2: non-UTF-8 stdin still prints a traceback"
+else
+  pass "T2: non-UTF-8 stdin produces no traceback"
+fi
+
 # ───────────────────────────────────────────────────────────
 # T3 — F-BUG-006: P03 position-independent ACV rows
 # ───────────────────────────────────────────────────────────

@@ -134,6 +134,10 @@ def write_cache(path: Path, payload: dict) -> None:
             os.replace(temp, path)
         except BaseException:
             try:
+                os.close(fd)  # no-op if fdopen already took ownership
+            except OSError:
+                pass
+            try:
                 os.unlink(temp)
             except OSError:
                 pass
