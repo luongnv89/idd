@@ -84,6 +84,10 @@ jobs:
       # GITHUB_TOKEN-authored push/PR events do not start another workflow run.
       # Gate publication on the repository's full suite here so refreshed data
       # cannot bypass the same tests required of contributor PRs.
+      - name: Build refreshed skills
+        if: steps.refresh.outputs.updated == 'true'
+        run: bash scripts/build.sh
+
       - name: Test refreshed tree
         if: steps.refresh.outputs.updated == 'true'
         run: git ls-files 'tests/*.sh' | xargs -n1 bash
@@ -97,8 +101,8 @@ jobs:
           BRANCH: chore/model-data-refresh
         run: |
           set -euo pipefail
-          target="src/skills/issue-creator/templates/model-data.json"
-          unexpected="$(git diff --name-only -- . ":(exclude)$target")"
+          unexpected="$(git diff --name-only | grep -Ev \
+            '^(src/skills/issue-creator/templates/model-data.json|skills/issue-creator/templates/model-data.json)$' || true)"
           if [ -n "$unexpected" ]; then
             echo "Unexpected tracked changes after refresh/tests:" >&2
             printf '  %s\n' "$unexpected" >&2
@@ -108,7 +112,9 @@ jobs:
           git switch -c "$BRANCH"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add "$target"
+          git add \
+            src/skills/issue-creator/templates/model-data.json \
+            skills/issue-creator/templates/model-data.json
           git commit -m "chore(model-data): weekly cursorbench refresh"
 
           # This static branch is automation-owned. Fetch its exact current tip

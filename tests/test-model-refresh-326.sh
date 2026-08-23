@@ -271,10 +271,12 @@ else
   fail "T8: generated commit still contains [skip ci]"
 fi
 
-if grep -q "git ls-files 'tests/\\*.sh' | xargs -n1 bash" "$WORKFLOW"; then
-  pass "T8: the refreshed tree must pass the full suite before publication"
+if grep -q 'run: bash scripts/build.sh' "$WORKFLOW" \
+   && grep -q 'skills/issue-creator/templates/model-data.json' "$WORKFLOW" \
+   && grep -q "git ls-files 'tests/\\*.sh' | xargs -n1 bash" "$WORKFLOW"; then
+  pass "T8: source and built seeds must pass the full suite before publication"
 else
-  fail "T8: refreshed data can be published without the full suite"
+  fail "T8: refreshed source/built data can be published without the full suite"
 fi
 
 # ───────────────────────────────────────────────────────────
