@@ -28,7 +28,12 @@ src/
 │       ├── gi-ci-wait.py          # Poll a PR's CI checks to one JSON verdict
 │       ├── gi-issue.py            # TTL-cached `gh issue view` by field set
 │       ├── gi-branch.py           # Derive a convention-conformant branch name
-│       └── gi-ratelimit.py        # Rate-limit verdict, chunked pause, backoff, runtime budget
+│       ├── gi-ratelimit.py        # Rate-limit verdict, chunked pause, backoff, runtime budget
+│       ├── gi-dup-score.py        # Score stdin issue items for duplicate pairs
+│       ├── gi-model-cache.py      # Locate/seed/read the skill-level model-data cache
+│       ├── gi-stack-detect.py     # Detect repo stack, test runner, size, issue templates
+│       ├── gi-state.py            # /auto-pilot resumable run state + run lock
+│       └── gi-triage-graph.py     # Triage execution order, status, staleness, priority
 │
 ├── skills/
 │   ├── auto-pilot/         # /auto-pilot — triage, resolve, review, merge loop
