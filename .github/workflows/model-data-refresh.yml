@@ -111,13 +111,17 @@ jobs:
           git add "$target"
           git commit -m "chore(model-data): weekly cursorbench refresh"
 
-          # This static branch is automation-owned. Bind the force lease to the
-          # exact remote OID observed immediately before push so concurrent or
-          # manual changes cannot be overwritten silently.
-          remote_oid="$(git ls-remote --heads origin "refs/heads/${BRANCH}" | awk 'NR == 1 {print $1}')"
+          # This static branch is automation-owned. Fetch its exact current tip
+          # immediately before push so --force-with-lease rejects concurrent or
+          # manual changes instead of overwriting them silently.
+          if git ls-remote --exit-code --heads origin \
+            refs/heads/chore/model-data-refresh >/dev/null; then
+            git fetch --no-tags origin \
+              +refs/heads/chore/model-data-refresh:refs/remotes/origin/chore/model-data-refresh
+          fi
           git push \
-            --force-with-lease="refs/heads/${BRANCH}:${remote_oid}" \
-            origin "HEAD:refs/heads/${BRANCH}"
+            --force-with-lease=refs/heads/chore/model-data-refresh \
+            origin HEAD:refs/heads/chore/model-data-refresh
 
           prs="$(gh pr list --state open --head "$BRANCH" --base "$BASE_BRANCH" --limit 2 --json number,url)"
           pr_count="$(printf '%s' "$prs" | python3 -c 'import json,sys; print(len(json.load(sys.stdin)))')"
