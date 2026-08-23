@@ -198,6 +198,19 @@ else
   pass "T20: repo mode fails on non-conforming commit"
 fi
 
+# T20b: repo mode tolerates a detached HEAD — actions/checkout leaves HEAD
+# detached on pull_request events, where there is no branch name to check.
+(
+  cd "$SYN"
+  git checkout -q --detach main
+  echo d > d.txt && git add d.txt && git commit -qm "feat(ui): add thing (#4)"
+)
+if (cd "$SYN" && python3 "$LINT" repo --base main >/dev/null 2>&1); then
+  pass "T20b: repo mode passes on detached HEAD (CI PR checkout)"
+else
+  fail "T20b: repo mode passes on detached HEAD (CI PR checkout)"
+fi
+
 # ───────────────────────────────────────────────────────────
 # T22–T25: stats mode (review R4 — evidence loop)
 # ───────────────────────────────────────────────────────────

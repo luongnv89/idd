@@ -43,6 +43,19 @@ jobs:
         with:
           python-version: "3.11"
 
+      # F-CI-002 / F-CI-009 (issue #335): syntax-gate every tracked Python
+      # helper, then lint IDD naming conventions (§3.1 branch, §3.2 commit)
+      # against the base. checkout is shallow, so fetch main first or
+      # origin/main does not exist on pull_request runs; idd-lint skips its
+      # branch-name check there (detached HEAD) and on the default branch.
+      - name: Compile-check Python sources
+        run: python3 -m compileall scripts/ src/shared/scripts/
+
+      - name: IDD lint — branch and commit conventions vs base
+        run: |
+          git fetch --no-tags --depth=1 origin main
+          python3 scripts/idd-lint.py repo --base origin/main
+
       # ─── Source-level checks — read src/ and docs/ only, so they run before
       # the build and fail fast. A new test belongs here unless it reads dist/
       # or skills/. Every tracked test under tests/ must be invoked by a live
