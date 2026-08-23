@@ -150,6 +150,11 @@ jobs:
       - name: test-build-determinism
         run: bash tests/test-build-determinism.sh
 
+      # F-TEST-002 (issue #334): negative mutations must fail build.py, not
+      # just positive paths pass.
+      - name: test-build-negative-mutations
+        run: bash tests/test-build-negative-mutations.sh
+
       - name: test-skill-line-cap
         run: bash tests/test-skill-line-cap-247.sh
 
