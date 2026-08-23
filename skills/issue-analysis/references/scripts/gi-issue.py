@@ -47,6 +47,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -118,11 +119,25 @@ def write_cache(path: Path, payload: dict) -> None:
     ratio of zero, not a failure."""
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        temp = path.with_suffix(".tmp")
-        # Written then renamed so a concurrent reader never sees half a file.
-        with open(os.open(temp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, _CACHE_MODE), "w", encoding="utf-8") as handle:
-            json.dump(payload, handle)
-        os.replace(temp, path)
+        # mkstemp gives every writer its own temp name: two concurrent fetches
+        # writing the same entry can no longer tear each other's temp file the
+        # way a shared fixed `.tmp` name let them. Written then renamed so a
+        # concurrent reader never sees half a file.
+        fd, temp = tempfile.mkstemp(
+            prefix=f".{path.name}.", suffix=".tmp", dir=str(path.parent)
+        )
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                json.dump(payload, handle)
+            # mkstemp creates 0600; keep the documented _CACHE_MODE.
+            os.chmod(temp, _CACHE_MODE)
+            os.replace(temp, path)
+        except BaseException:
+            try:
+                os.unlink(temp)
+            except OSError:
+                pass
+            raise
     except OSError:
         return
 
