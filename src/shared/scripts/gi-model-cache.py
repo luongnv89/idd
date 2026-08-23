@@ -61,6 +61,7 @@ import json
 import math
 import os
 import re
+import subprocess
 import sys
 import tempfile
 
@@ -107,6 +108,10 @@ _UNSAFE_TEXT_RE = re.compile(
 CONFIG_NAME = ".gitissue.yml"
 CONFIG_SECTION = "model_suggestion"
 CONFIG_KEYS = ("cache_ttl_days", "enabled")
+
+# `git rev-parse --show-cdup` is empty at the working-tree root and otherwise
+# consists only of `../` segments. Refuse to resolve any other output as a path.
+_CDUP_RE = re.compile(r"^(\.\./)*$")
 
 _SECTION_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_-]*):\s*$")
 _ENTRY_RE = re.compile(r"^\s+([a-z_][a-z0-9_]*):[ \t]+(.*?)\s*$")
@@ -162,17 +167,39 @@ def read_config(path: str) -> dict[str, object]:
     return values
 
 
+def config_search_ceiling() -> str:
+    """Return the working-tree root, or cwd when git cannot identify one."""
+    try:
+        proc = subprocess.run(
+            ["git", "rev-parse", "--show-cdup"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except OSError:
+        return os.path.abspath(os.getcwd())
+    cdup = proc.stdout.rstrip("\n")
+    if proc.returncode != 0 or not _CDUP_RE.match(cdup):
+        return os.path.abspath(os.getcwd())
+    return (
+        os.path.normpath(os.path.join(os.getcwd(), cdup))
+        if cdup
+        else os.path.abspath(os.getcwd())
+    )
+
+
 def find_config(explicit: str | None) -> str | None:
-    """The explicit path (only when it is a file), else the upward search."""
+    """The explicit file, else search upward to the working-tree root."""
     if explicit:
         return explicit if os.path.isfile(explicit) else None
     here = os.path.abspath(os.getcwd())
+    ceiling = os.path.abspath(config_search_ceiling())
     while True:
         candidate = os.path.join(here, CONFIG_NAME)
         if os.path.isfile(candidate):
             return candidate
         parent = os.path.dirname(here)
-        if parent == here:
+        if here == ceiling or parent == here:
             return None
         here = parent
 

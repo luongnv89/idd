@@ -107,6 +107,10 @@ FALLBACK_SLUG = "update"
 
 CONFIG_NAME = ".gitissue.yml"
 
+# `git rev-parse --show-cdup` is empty at the working-tree root and otherwise
+# consists only of `../` segments. Refuse to resolve any other output as a path.
+_CDUP_RE = re.compile(r"^(\.\./)*$")
+
 # Only `resolve.branch_prefix`. Deliberately not a general YAML parser: it
 # exists so a config value never has to travel on a command line.
 _SECTION_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_-]*):\s*$")
@@ -132,17 +136,39 @@ def _unquote(raw: str) -> str:
     return raw
 
 
+def config_search_ceiling() -> str:
+    """Return the working-tree root, or cwd when git cannot identify one."""
+    try:
+        proc = subprocess.run(
+            ["git", "rev-parse", "--show-cdup"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except OSError:
+        return os.path.abspath(os.getcwd())
+    cdup = proc.stdout.rstrip("\n")
+    if proc.returncode != 0 or not _CDUP_RE.match(cdup):
+        return os.path.abspath(os.getcwd())
+    return (
+        os.path.normpath(os.path.join(os.getcwd(), cdup))
+        if cdup
+        else os.path.abspath(os.getcwd())
+    )
+
+
 def find_config(explicit: str | None) -> str | None:
-    """Locate `.gitissue.yml`: the explicit path, else upward from the cwd."""
+    """Locate config explicitly or upward, never above the working-tree root."""
     if explicit:
         return explicit
     here = os.path.abspath(os.getcwd())
+    ceiling = os.path.abspath(config_search_ceiling())
     while True:
         candidate = os.path.join(here, CONFIG_NAME)
         if os.path.isfile(candidate):
             return candidate
         parent = os.path.dirname(here)
-        if parent == here:
+        if here == ceiling or parent == here:
             return None
         here = parent
 
