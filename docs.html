@@ -35,9 +35,10 @@
       --line-soft: #181c1f;
       --fg: #FAFAFA;
       --muted: #a7b0b4;
-      /* F-UX-006: 4.15:1 on --bg failed AA; #8a949a is 6.40:1. Named --dim
-         here, --fg-dim on the other two pages — same value, same fix. */
-      --dim: #8a949a;
+      /* F-UX-006: 4.15:1 on --bg failed AA; #808a90 is 5.61:1 and stays
+         1.60:1 clear of --muted. Named --dim here, --fg-dim on the other
+         two pages — same value, same fix. */
+      --dim: #808a90;
       --cyan: #4fd0e3;
       --yellow: #ffcb47;
       --red: #ff5d52;
@@ -83,15 +84,16 @@
     .brand b:last-child { color: var(--green); }
     .nav-links { display: flex; gap: 24px; align-items: center; }
     /* F-UX-009: 44px hit area on every nav target, .cta included. */
-    .nav-links a { display: inline-flex; align-items: center; min-width: 44px; min-height: 44px; color: var(--muted); font-size: 15px; }
-    .nav-links a:hover { color: var(--fg); }
-    .nav-links a.active { color: var(--green); }
+    .nav-links > a { display: inline-flex; align-items: center; min-width: 44px; min-height: 44px; color: var(--muted); font-size: 15px; }
+    .nav-links > a:hover { color: var(--fg); }
+    .nav-links > a.active { color: var(--green); }
     .cta {
       font-family: var(--mono);
       color: var(--green) !important;
       border: 1px solid rgba(0,255,65,.35);
       padding: 8px 14px;
       border-radius: 8px;
+      white-space: nowrap;
     }
     .hero { padding: 72px 0 42px; }
     .eyebrow { font-family: var(--mono); color: var(--green); font-size: 13px; font-weight: 700; margin-bottom: 18px; }
@@ -104,9 +106,16 @@
     h1 span { color: var(--green); }
     .lead { font-size: 1.22rem; color: var(--muted); max-width: 70ch; margin: 0; }
     .grid { display: grid; grid-template-columns: 260px 1fr; gap: 32px; align-items: start; padding: 34px 0 80px; }
+    /* F-UX-012, second half: a grid item defaults to min-width:auto, so the
+       column grew to each table's min-content width and .table-scroll never
+       scrolled — the page scrolled sideways instead. This is what makes the
+       overflow-x:auto above actually take effect. */
+    .grid > * { min-width: 0; }
     .toc {
       position: sticky;
       top: 84px;
+      max-height: calc(100vh - 104px);
+      overflow-y: auto;
       border: 1px solid var(--line);
       background: linear-gradient(180deg, #111315, #0d0f10);
       border-radius: var(--radius);
@@ -132,9 +141,10 @@
     .card { border: 1px solid var(--line); background: var(--panel2); border-radius: 12px; padding: 16px; }
     .card h3 { margin: 0 0 6px !important; font-size: 1rem; }
     .card p { margin: 0; color: var(--muted); font-size: 14px; }
-    /* F-UX-012: every table scrolls inside its own box instead of pushing
-       the page sideways. tabindex keeps the scroll container reachable by
-       keyboard (WCAG 2.1.1) now that it scrolls. */
+    /* F-UX-012: a wide table scrolls inside its own box instead of pushing the
+       page sideways. tabindex="0" keeps that scroll container reachable by
+       keyboard (WCAG 2.1.1) — measured in Firefox at 320px, 7 of the 9 docs
+       tables and the landing model table really do overflow their box. */
     .table-scroll { max-width: 100%; overflow-x: auto; }
     table { width: 100%; border-collapse: collapse; margin: 14px 0 8px; overflow: hidden; border-radius: 12px; }
     th, td { text-align: left; vertical-align: top; border: 1px solid var(--line); padding: 12px 13px; }
@@ -150,7 +160,9 @@
     }
     footer { border-top: 1px solid var(--line); padding: 28px 0; color: var(--dim); }
     .foot-inner { display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
-    .foot-links { display: flex; gap: 26px; font-size: 14px; }
+    /* Wrap: five links plus four 26px gaps do not fit 320px, and the 44px
+       target floor widened them further. Overflowed even before #360. */
+    .foot-links { display: flex; flex-wrap: wrap; gap: 26px; font-size: 14px; }
     .foot-links a { display: inline-flex; align-items: center; min-width: 44px; min-height: 44px; color: var(--muted); transition: color .15s; }
     .foot-links a:hover { color: var(--green); }
     .foot-note { font-family: var(--mono); font-size: 12.5px; color: var(--dim); }
@@ -182,20 +194,34 @@
       padding: 0 14px; border-radius: 8px;
       color: var(--muted); font-size: 15px; font-weight: 500;
     }
-    .nav-menu-panel a:hover, .nav-menu-panel a:focus { color: var(--green); background: rgba(0,255,65,.07); }
+    .nav-menu-panel a:hover, .nav-menu-panel a:focus-visible { color: var(--green); background: rgba(0,255,65,.07); }
+    .nav-menu-panel a.active { color: var(--green); }
     @media (max-width: 860px) {
       .grid { grid-template-columns: 1fr; }
       .toc { position: static; }
       .cards { grid-template-columns: 1fr; }
-      .nav-links a:not(.cta) { display: none; }
+      /* Child combinator, not descendant — a descendant selector here is
+         (0,2,1) and also hid the disclosure panel's own links. */
+      .nav-links > a:not(.cta) { display: none; }
       .nav-links { gap: 12px; }
       .nav-menu { display: block; }
       td:first-child { white-space: normal; }
     }
+    /* Review follow-up: the 44px floors plus the new Menu button consume the
+       header's slack, and below ~360px the CTA wrapped onto a second line and
+       collided with the wordmark. Tighten the header's own gutter and control
+       padding here — WCAG 1.4.10 Reflow is specified at 320 CSS px, and
+       docs.html has no body { overflow-x: hidden } to hide a mistake. */
+    @media (max-width: 400px) {
+      .wrap.nav-inner { padding: 0 16px; }
+      .brand { font-size: 18px; }
+      .cta { padding: 8px 10px; }
+      .nav-menu > summary { padding: 0 10px; }
+    }
   </style>
 </head>
 <body>
-<header><div class="wrap nav nav-inner"><a class="brand" href="./"><svg width="26" height="26" viewBox="0 0 120 120"><path fill-rule="evenodd" fill="#00FF41" d="M60 12 L108 60 L60 108 L12 60 Z M48 46 L80 60 L48 74 Z"/></svg><span><b>issue</b><b>dev</b></span></a><nav class="nav-links"><a href="./">Home</a><a href="./#how">How it works</a><a href="./#commands">Commands</a><a href="docs.html" class="active">Docs</a><a href="changelog.html">Changelog</a><a href="./#install">Install</a><a class="cta" href="https://github.com/luongnv89/idd">GitHub ↗</a><details class="nav-menu" id="nav-menu"><summary>Menu</summary><div class="nav-menu-panel"><a href="./">Home</a><a href="./#how">How it works</a><a href="./#commands">Commands</a><a href="docs.html">Docs</a><a href="changelog.html">Changelog</a><a href="./#install">Install</a></div></details></nav></div></header>
+<header><div class="wrap nav nav-inner"><a class="brand" href="./"><svg width="26" height="26" viewBox="0 0 120 120"><path fill-rule="evenodd" fill="#00FF41" d="M60 12 L108 60 L60 108 L12 60 Z M48 46 L80 60 L48 74 Z"/></svg><span><b>issue</b><b>dev</b></span></a><nav class="nav-links"><a href="./">Home</a><a href="./#how">How it works</a><a href="./#commands">Commands</a><a href="docs.html" class="active" aria-current="page">Docs</a><a href="changelog.html">Changelog</a><a href="./#install">Install</a><a class="cta" href="https://github.com/luongnv89/idd">GitHub ↗</a><details class="nav-menu" id="nav-menu"><summary>Menu</summary><div class="nav-menu-panel"><a href="./">Home</a><a href="./#how">How it works</a><a href="./#commands">Commands</a><a href="docs.html" class="active" aria-current="page">Docs</a><a href="changelog.html">Changelog</a><a href="./#install">Install</a></div></details></nav></div></header>
 <main>
   <div class="wrap hero"><div class="eyebrow">◆ Documentation</div><h1>Skills reference and <span>input options.</span></h1><p class="lead">Every issuedev / gitissue command in one place: what it does, accepted inputs, execution modes, and requirements.</p></div>
   <div class="wrap grid">

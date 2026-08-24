@@ -265,9 +265,10 @@ PAGES = {
         'text_tokens': ['--fg', '--fg-muted', '--fg-dim', '--green', '--cyan', '--yellow', '--red'],
         'backgrounds': ['--bg', '--panel', '--panel-2', '#0c0e0f', '#131618', '#0b0c0d', '#0e0f10'],
         'header_selector': '.nav-inner',
-        'collapse_rule': '.nav-links a:not(.nav-cta)',
+        'collapse_rule': '.nav-links > a:not(.nav-cta)',
+        'shrink': ['.model-highlight > *'],
         'controls': [
-            ('.nav-links a', 'header nav links (GitHub CTA included)', True),
+            ('.nav-links > a', 'header nav links (GitHub CTA included)', True),
             ('.brand', 'brand / home link', False),
             ('.btn', 'hero and CTA buttons', False),
             ('.copy-btn', 'install copy button', True),
@@ -283,9 +284,10 @@ PAGES = {
         'text_tokens': ['--fg', '--muted', '--dim', '--green', '--cyan', '--yellow', '--red'],
         'backgrounds': ['--bg', '--panel', '--panel2', '#15191b', '#0e1011', '#0d0f10'],
         'header_selector': '.nav',
-        'collapse_rule': '.nav-links a:not(.cta)',
+        'collapse_rule': '.nav-links > a:not(.cta)',
+        'shrink': ['.grid > *'],
         'controls': [
-            ('.nav-links a', 'header nav links (GitHub CTA included)', True),
+            ('.nav-links > a', 'header nav links (GitHub CTA included)', True),
             ('.brand', 'brand / home link', False),
             ('.toc a', 'table-of-contents links', False),
             ('.foot-links a', 'footer links', True),
@@ -297,9 +299,10 @@ PAGES = {
         'text_tokens': ['--fg', '--fg-muted', '--fg-dim', '--green', '--cyan', '--yellow', '--red'],
         'backgrounds': ['--bg', '--panel', '--panel-2', '#0e0f10'],
         'header_selector': '.nav-inner',
-        'collapse_rule': '.nav-links a:not(.nav-cta)',
+        'collapse_rule': '.nav-links > a:not(.nav-cta)',
+        'shrink': [],
         'controls': [
-            ('.nav-links a', 'header nav links (GitHub CTA included)', True),
+            ('.nav-links > a', 'header nav links (GitHub CTA included)', True),
             ('.brand', 'brand / home link', False),
             ('.tl-expand', 'release Details toggle', True),
             ('.foot-links a', 'footer links', True),
@@ -441,6 +444,23 @@ for name, spec in PAGES.items():
             emit(True, '%s F-UX-012: all %d table(s) wrapped in a focusable overflow-x:auto box'
                        % (name, len(tables)))
 
+        # overflow-x:auto alone is not enough: a grid/flex item defaults to
+        # min-width:auto, so the COLUMN grows to the table's min-content and the
+        # wrapper never scrolls — the page scrolls sideways instead. Measured in
+        # Firefox: without this, docs.html is 416px wide in a 320px viewport.
+        for sel in spec['shrink']:
+            got = resolve(rules, sel).get('min-width')
+            emit(px(got) == 0,
+                 '%s F-UX-012: %s has min-width:0 so the scroll container can '
+                 'actually scroll (got %r)' % (name, sel, got))
+
+    # The footer link row overflowed 320px even before #360, and the 44px width
+    # floor widened it further.
+    fl = resolve(rules, '.foot-links')
+    emit(fl.get('flex-wrap') == 'wrap',
+         '%s F-UX-012: .foot-links wraps instead of overflowing (flex-wrap: %r)'
+         % (name, fl.get('flex-wrap')))
+
 # ── Handed forward (a): the install copy row's min-content floor ──────────
 _, _, rules = load(paths['landing.html'])
 row = resolve(rules, '.copy-row')
@@ -473,6 +493,332 @@ else
   while IFS="$(printf '\t')" read -r status label; do
     if [ "$status" = "PASS" ]; then pass "C ($label)"; else fail "C ($label)"; fi
   done < "$TMP/css.txt"
+fi
+
+echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
+echo "Nav reachability (specificity-aware cascade over real element paths)"
+echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
+
+python3 - "$LANDING" "$DOCS" "$CHANGELOG" >"$TMP/reach.txt" 2>"$TMP/reach.err" <<'REACH_EOF'
+"""Does a rule elsewhere in the sheet win `display` on the menu's own links?
+
+The scan above resolves declarations by *selector-string equality*, which
+cannot see a competing rule that also matches the element. That blind spot is
+not hypothetical: `.nav-links a:not(.nav-cta)` is (0,2,1) and matches the
+disclosure panel's links, beating `.nav-menu-panel a` at (0,1,1) — so the menu
+opened onto an empty box while every selector-equality assertion stayed green.
+
+This section therefore walks a real element path, matches every selector
+against it, orders the matches by (specificity, source order), and reports the
+winning value — a small cascade engine, stdlib only.
+
+Modelled: type / class / id / attribute / :not() simple selectors, descendant
+and child combinators, and width-based @media. NOT modelled: sibling
+combinators, structural pseudo-classes, and non-width media — a rule using one
+is treated as not matching and is counted in the `unmodelled` tally, which is
+printed so a silent skip cannot hide behind a pass.
+"""
+import io
+import re
+import sys
+
+STATE_PC = {'hover', 'focus', 'focus-visible', 'focus-within', 'active', 'visited', 'target'}
+
+TOKEN = re.compile(r"""
+    (?P<pe>::[-\w]+)
+  | :not\((?P<notarg>[^()]*)\)
+  | (?P<pc>:[-\w]+)
+  | \[(?P<attr>[^\]]*)\]
+  | \.(?P<cls>[-\w]+)
+  | \#(?P<id>[-\w]+)
+  | (?P<tag>\*|[-\w]+)
+""", re.X)
+
+unmodelled = set()
+results = []
+
+
+def emit(ok, label):
+    results.append(('PASS' if ok else 'FAIL', label))
+
+
+def parse_compound(text):
+    c = {'tag': None, 'ids': [], 'classes': [], 'attrs': [], 'pcs': [], 'pes': [], 'nots': []}
+    pos = 0
+    while pos < len(text):
+        m = TOKEN.match(text, pos)
+        if not m:
+            raise ValueError('unparsable compound %r' % text)
+        pos = m.end()
+        if m.group('pe'):
+            c['pes'].append(m.group('pe'))
+        elif m.group('notarg') is not None:
+            c['nots'].append(parse_compound(m.group('notarg').strip()))
+        elif m.group('pc'):
+            c['pcs'].append(m.group('pc')[1:])
+        elif m.group('attr'):
+            c['attrs'].append(m.group('attr').split('=')[0].strip())
+        elif m.group('cls'):
+            c['classes'].append(m.group('cls'))
+        elif m.group('id'):
+            c['ids'].append(m.group('id'))
+        else:
+            c['tag'] = m.group('tag')
+    return c
+
+
+def split_combinators(sel):
+    out, buf, i = [], '', 0
+    while i < len(sel):
+        ch = sel[i]
+        if ch in '>+~':
+            out.append(parse_compound(buf.strip()))
+            out.append(ch)
+            buf = ''
+        elif ch == ' ':
+            j = i
+            while j < len(sel) and sel[j] == ' ':
+                j += 1
+            if j < len(sel) and sel[j] in '>+~':
+                i = j
+                continue
+            if buf.strip():
+                out.append(parse_compound(buf.strip()))
+                out.append(' ')
+                buf = ''
+            i = j
+            continue
+        else:
+            buf += ch
+        i += 1
+    if buf.strip():
+        out.append(parse_compound(buf.strip()))
+    return out
+
+
+def compound_matches(c, el):
+    if c['pes']:
+        return False                     # targets a pseudo-element, not the element
+    for pc in c['pcs']:
+        if pc not in STATE_PC:
+            unmodelled.add(pc)
+        return False                     # at-rest state only
+    if c['tag'] and c['tag'] != '*' and c['tag'] != el['tag']:
+        return False
+    if any(i not in el.get('ids', []) for i in c['ids']):
+        return False
+    if any(k not in el['classes'] for k in c['classes']):
+        return False
+    if any(a not in el.get('attrs', []) for a in c['attrs']):
+        return False
+    return not any(compound_matches(n, el) for n in c['nots'])
+
+
+def selector_matches(sel, path):
+    parts = split_combinators(sel)
+    i, e = len(parts) - 1, len(path) - 1
+    if not compound_matches(parts[i], path[e]):
+        return False
+    i -= 1
+    while i >= 0:
+        comb, comp = parts[i], parts[i - 1]
+        i -= 2
+        if comb == '>':
+            e -= 1
+            if e < 0 or not compound_matches(comp, path[e]):
+                return False
+        elif comb == ' ':
+            j, found = e - 1, False
+            while j >= 0:
+                if compound_matches(comp, path[j]):
+                    e, found = j, True
+                    break
+                j -= 1
+            if not found:
+                return False
+        else:
+            unmodelled.add(comb)
+            return False
+    return True
+
+
+def spec_of(c):
+    return (len(c['ids']),
+            len(c['classes']) + len(c['attrs']) + len(c['pcs']),
+            len(c['pes']) + (1 if c['tag'] and c['tag'] != '*' else 0))
+
+
+def specificity(sel):
+    a = b = c = 0
+    for part in split_combinators(sel):
+        if isinstance(part, str):
+            continue
+        pa, pb, pc = spec_of(part)
+        a, b, c = a + pa, b + pb, c + pc
+        for n in part['nots']:
+            na, nb, nc = spec_of(n)
+            a, b, c = a + na, b + nb, c + nc
+    return (a, b, c)
+
+
+def media_applies(cond, width):
+    if not cond:
+        return True
+    for clause in cond.split(' && '):
+        found = re.findall(r'\((max|min)-width:\s*(\d+)px\)', clause)
+        if not found:
+            return False                 # non-width media: not modelled
+        for kind, n in found:
+            n = int(n)
+            if kind == 'max' and width > n:
+                return False
+            if kind == 'min' and width < n:
+                return False
+    return True
+
+
+def parse_rules(css):
+    css = re.sub(r'/\*.*?\*/', '', css, flags=re.S)
+    out, buf, stack, i, n = [], '', [], 0, len(css)
+    while i < n:
+        ch = css[i]
+        if ch == '{':
+            head = ' '.join(buf.split())
+            buf = ''
+            if head.startswith('@media'):
+                stack.append(head)
+                i += 1
+                continue
+            depth, j = 1, i + 1
+            while j < n and depth:
+                if css[j] == '{':
+                    depth += 1
+                elif css[j] == '}':
+                    depth -= 1
+                j += 1
+            out.append((' && '.join(stack), head, css[i + 1:j - 1]))
+            i = j
+            continue
+        if ch == '}':
+            if stack:
+                stack.pop()
+            buf = ''
+            i += 1
+            continue
+        buf += ch
+        i += 1
+    return out
+
+
+def computed(rules, path, prop, width):
+    cands = []
+    for order, (media, sel_list, body) in enumerate(rules):
+        val = None
+        for m in re.finditer(r'(?:^|;)\s*' + re.escape(prop) + r'\s*:\s*([^;]+)', body):
+            val = m.group(1).strip()
+        if val is None:
+            continue
+        if not media_applies(media, width):
+            continue
+        for sel in sel_list.split(','):
+            sel = ' '.join(sel.split())
+            if not sel or sel.startswith('@') or sel.startswith('%'):
+                continue
+            try:
+                if not selector_matches(sel, path):
+                    continue
+            except ValueError:
+                continue
+            cands.append((specificity(sel), order, val))
+    if not cands:
+        return None
+    cands.sort(key=lambda t: (t[0], t[1]))
+    return cands[-1][2]
+
+
+def el(tag, classes=(), ids=(), attrs=()):
+    """Class names are stored bare, exactly as parse_compound() records them."""
+    return {'tag': tag, 'classes': list(classes),
+            'ids': list(ids), 'attrs': list(attrs)}
+
+
+PAGES = {
+    'landing.html': {'header_classes': ['nav'], 'wrap_classes': ['wrap', 'nav-inner'],
+                     'cta': 'nav-cta', 'breakpoint': 760},
+    'docs.html': {'header_classes': [], 'wrap_classes': ['wrap', 'nav', 'nav-inner'],
+                  'cta': 'cta', 'breakpoint': 860},
+    'changelog.html': {'header_classes': ['nav'], 'wrap_classes': ['wrap', 'nav-inner'],
+                       'cta': 'nav-cta', 'breakpoint': 760},
+}
+
+paths = {}
+for arg in sys.argv[1:]:
+    paths[arg.rsplit('/', 1)[-1]] = arg
+
+DESKTOP = 1280
+
+for name, cfg in PAGES.items():
+    html = io.open(paths[name], encoding='utf-8').read()
+    html = re.sub(r'<!--.*?-->', lambda c: ' ' * len(c.group(0)), html, flags=re.S)
+    rules = parse_rules('\n'.join(re.findall(r'<style>(.*?)</style>', html, re.S)))
+    mobile = cfg['breakpoint'] - 1
+
+    base = [el('html'), el('body'), el('header', cfg['header_classes']),
+            el('div', cfg['wrap_classes']), el('nav', ['nav-links'])]
+    inline_link = base + [el('a')]
+    inline_cta = base + [el('a', [cfg['cta']])]
+    menu = base + [el('details', ['nav-menu'], ['nav-menu'], ['open'])]
+    panel = menu + [el('div', ['nav-menu-panel'])]
+    panel_link = panel + [el('a')]
+
+    # Desktop: inline links carry navigation; the menu must not duplicate them.
+    d = computed(rules, inline_link, 'display', DESKTOP)
+    emit(d is not None and d != 'none',
+         '%s @%dpx: inline nav links are visible (display: %r)' % (name, DESKTOP, d))
+    emit(computed(rules, menu, 'display', DESKTOP) == 'none',
+         '%s @%dpx: the disclosure menu is hidden — no duplicate tab stops' % (name, DESKTOP))
+
+    # Mobile: the inline links collapse and the menu takes over.
+    emit(computed(rules, inline_link, 'display', mobile) == 'none',
+         '%s @%dpx: inline nav links collapse' % (name, mobile))
+    d = computed(rules, inline_cta, 'display', mobile)
+    emit(d is not None and d != 'none',
+         '%s @%dpx: the GitHub CTA survives the collapse (display: %r)' % (name, mobile, d))
+    d = computed(rules, menu, 'display', mobile)
+    emit(d is not None and d != 'none',
+         '%s @%dpx: the disclosure menu is shown (display: %r)' % (name, mobile, d))
+
+    # The assertion the selector-equality scan structurally could not make.
+    bad = []
+    for label, node in (('panel', panel), ('panel link', panel_link)):
+        d = computed(rules, node, 'display', mobile)
+        v = computed(rules, node, 'visibility', mobile)
+        if d is None:
+            bad.append('%s matched no display rule at all (engine or markup drift)' % label)
+        elif d == 'none':
+            bad.append('%s display:none' % label)
+        if v == 'hidden':
+            bad.append('%s visibility:hidden' % label)
+    emit(not bad,
+         '%s @%dpx: the menu\'s own links are NOT hidden by any rule that also '
+         'matches them%s' % (name, mobile, (' — ' + '; '.join(bad)) if bad else ''))
+
+emit(not unmodelled,
+     'the cascade engine met no unmodelled selector feature on the nav paths%s'
+     % ((' — saw: ' + ', '.join(sorted(unmodelled))) if unmodelled else ''))
+
+for status, label in results:
+    sys.stdout.write('%s\t%s\n' % (status, label))
+sys.exit(0)
+REACH_EOF
+
+if [ ! -s "$TMP/reach.txt" ]; then
+  fail "R0: the reachability scanner produced no output"
+  sed 's/^/      /' "$TMP/reach.err" || true
+else
+  while IFS="$(printf '\t')" read -r status label; do
+    if [ "$status" = "PASS" ]; then pass "R ($label)"; else fail "R ($label)"; fi
+  done < "$TMP/reach.txt"
 fi
 
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"

@@ -116,9 +116,10 @@
       --fg: #FAFAFA;
       --fg-muted: #a7b0b4;
       /* F-UX-006: #6b7479 measured 4.15:1 on --bg and 3.90:1 on --panel —
-         under the 4.5:1 AA floor for the body copy that uses it. #8a949a
-         is 6.40:1 on --bg and 6.02:1 on --panel. */
-      --fg-dim: #8a949a;
+         under the 4.5:1 AA floor for the body copy that uses it. #808a90
+         is 5.61:1 on --bg and 5.28:1 on --panel, and keeps 1.60:1 against
+         --fg-muted so the three-step type ramp still reads as three. */
+      --fg-dim: #808a90;
       /* Semantic colors from the CLI style guide */
       --cyan: #4fd0e3;
       --yellow: #ffcb47;
@@ -183,16 +184,17 @@
     .nav-links { display: flex; align-items: center; gap: 28px; }
     /* F-UX-009: a 15px link is ~24px tall on its own; inline-flex + a 44px
        floor gives every nav target (the CTA included) a real hit area. */
-    .nav-links a {
+    .nav-links > a {
       display: inline-flex; align-items: center; min-width: 44px; min-height: 44px;
       color: var(--fg-muted); font-size: 15px; font-weight: 500; transition: color .15s;
     }
-    .nav-links a:hover { color: var(--fg); }
-    .nav-links a.active { color: var(--green); }
+    .nav-links > a:hover { color: var(--fg); }
+    .nav-links > a.active { color: var(--green); }
     .nav-cta {
       font-family: var(--mono); font-size: 14px; font-weight: 600;
       color: var(--green); border: 1px solid rgba(0,255,65,0.35);
       padding: 8px 16px; border-radius: 8px; transition: all .15s;
+      white-space: nowrap;
     }
     .nav-cta:hover { background: rgba(0,255,65,0.1); border-color: var(--green); }
 
@@ -224,11 +226,26 @@
       padding: 0 14px; border-radius: 8px;
       color: var(--fg-muted); font-size: 15px; font-weight: 500;
     }
-    .nav-menu-panel a:hover, .nav-menu-panel a:focus { color: var(--green); background: rgba(0,255,65,0.07); }
+    .nav-menu-panel a:hover, .nav-menu-panel a:focus-visible { color: var(--green); background: rgba(0,255,65,0.07); }
+    .nav-menu-panel a.active { color: var(--green); }
     @media (max-width: 760px) {
-      .nav-links a:not(.nav-cta) { display: none; }
+      /* Child combinator, not descendant: `.nav-links a:not(.nav-cta)` is
+         (0,2,1) and also matched the disclosure panel's own links, which
+         are (0,1,1) — the menu opened onto an empty box. */
+      .nav-links > a:not(.nav-cta) { display: none; }
       .nav-links { gap: 12px; }
       .nav-menu { display: block; }
+    }
+    /* Review follow-up: the 44px floors plus the new Menu button consume the
+       header's slack, and below ~360px the CTA wrapped onto a second line and
+       collided with the wordmark. Tighten the header's own gutter and control
+       padding here — WCAG 1.4.10 Reflow is specified at 320 CSS px, and
+       docs.html has no body { overflow-x: hidden } to hide a mistake. */
+    @media (max-width: 400px) {
+      .wrap.nav-inner { padding: 0 16px; }
+      .brand { font-size: 18px; }
+      .nav-cta { padding: 8px 10px; }
+      .nav-menu > summary { padding: 0 10px; }
     }
 
     /* ───────────────────────── BUTTONS ───────────────────────── */
@@ -395,6 +412,7 @@
       gap: 28px;
       align-items: stretch;
     }
+    .model-highlight > * { min-width: 0; }
     @media (max-width: 940px) { .model-highlight { grid-template-columns: 1fr; } }
     .model-panel {
       border: 1px solid rgba(0,255,65,0.22);
@@ -415,9 +433,10 @@
     .model-table td:first-child { color: var(--yellow); font-weight: 700; }
     .model-table td:nth-child(2) { color: var(--fg-muted); }
     .model-table td:last-child { color: var(--green); }
-    /* F-UX-012: a wide table scrolls inside its own box rather than pushing
-       the page sideways. tabindex on the wrapper keeps it keyboard-reachable
-       (WCAG 2.1.1) now that it is a scroll container. */
+    /* F-UX-012: a wide table scrolls inside its own box instead of pushing the
+       page sideways. tabindex="0" keeps that scroll container reachable by
+       keyboard (WCAG 2.1.1) — measured in Firefox at 320px, 7 of the 9 docs
+       tables and the landing model table really do overflow their box. */
     .table-scroll { max-width: 100%; overflow-x: auto; }
     .model-note { margin-top: 16px; font-family: var(--mono); font-size: 12px; color: var(--fg-dim); line-height: 1.55; }
     .terminal.compact .term-body { padding: 16px 18px; font-size: 12.5px; line-height: 1.75; }
@@ -664,7 +683,9 @@
       border-top: 1px solid var(--line-soft); padding: 44px 0 56px;
     }
     .foot-inner { display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
-    .foot-links { display: flex; gap: 26px; font-size: 14px; }
+    /* Wrap: five links plus four 26px gaps do not fit 320px, and the 44px
+       target floor widened them further. Overflowed even before #360. */
+    .foot-links { display: flex; flex-wrap: wrap; gap: 26px; font-size: 14px; }
     .foot-links a { display: inline-flex; align-items: center; min-width: 44px; min-height: 44px; color: var(--fg-dim); transition: color .15s; }
     .foot-links a:hover { color: var(--green); }
     .foot-note { font-family: var(--mono); font-size: 12.5px; color: var(--fg-dim); }
@@ -713,7 +734,7 @@
         <span><span class="b-issue">issue</span><span class="b-dev">dev</span></span>
       </a>
       <nav class="nav-links">
-        <a href="./" class="active">Home</a>
+        <a href="./" class="active" aria-current="page">Home</a>
         <a href="./#how">How it works</a>
         <a href="./#commands">Commands</a>
         <a href="./#team">Team</a>
@@ -726,7 +747,7 @@
         <details class="nav-menu" id="nav-menu">
           <summary>Menu</summary>
           <div class="nav-menu-panel">
-            <a href="./">Home</a>
+            <a href="./" class="active" aria-current="page">Home</a>
             <a href="./#how">How it works</a>
             <a href="./#commands">Commands</a>
             <a href="./#team">Team</a>
