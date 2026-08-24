@@ -82,6 +82,13 @@ issue:
   auto_normalize: false
 YML
 
+# Control for the reject paths: a *valid* flow mapping. Quoted keys so the
+# JSON-subset stand-in reads it too, which keeps the T1.x column from being a
+# column that only ever says no.
+fixture flowok <<'YML'
+{"issue": {"auto_normalize": false}}
+YML
+
 # ─── Parser worlds ──────────────────────────────────────────
 # WITH: real PyYAML when the interpreter has it, else the JSON-subset stand-in.
 # WITHOUT: an importable module that raises ImportError, which is what
@@ -163,10 +170,11 @@ echo "  ┄ with a YAML parser — $WITH_LABEL"
 
 # Vacuity guard: if `import yaml` fails here, every check below silently tests
 # the degrade path instead and the exit-3 branches go unvisited.
-if (export PYTHONPATH="$WITH_PYTHONPATH"; python3 -c 'import yaml') 2>/dev/null; then
+if ( [ -n "$WITH_PYTHONPATH" ] && export PYTHONPATH="$WITH_PYTHONPATH"
+     python3 -c 'import yaml' ) 2>/dev/null; then
   pass "T1.0: a YAML parser is importable — the exit-3 branches are reachable"
 else
-  fail "T1.0: no YAML parser importable — T1.1-T1.3 would be vacuous"
+  fail "T1.0: no YAML parser importable — T1.1-T1.4 would be vacuous"
 fi
 
 RC="$(run_case with malformed)"
@@ -180,6 +188,18 @@ check "T1.2: non-UTF-8 bytes are invalid config (exit 3)" 3 "$RC" \
 RC="$(run_case with toplist)"
 check "T1.3: a top-level sequence is invalid config (exit 3)" 3 "$RC" \
   "✗ Invalid .gitissue.yml:" "must contain a mapping at the top level"
+
+RC="$(run_case with flowok)"
+if [ "$RC" = "0" ] && python3 -c '
+import json, sys
+payload = json.load(open(sys.argv[1], encoding="utf-8"))
+assert payload["config"]["issue.auto_normalize"] is False, payload["config"]["issue.auto_normalize"]
+' "$TMP/out.txt" 2>/dev/null; then
+  pass "T1.4: a valid mapping still loads through the YAML parser (exit 0)"
+else
+  fail "T1.4: valid flow-style config exited $RC without applying its override"
+  sed 's/^/      /' "$TMP/err.txt" | head -5
+fi
 
 # ─── Part 1b: without PyYAML — a parser limit degrades (exit 4), not exit 3 ──
 echo "  ┄ without PyYAML — the vendored restricted parser"
@@ -252,15 +272,48 @@ else
   sed 's/^/      /' "$TMP/deriv.txt" | head -5
 fi
 
+# T3.1b: T25d.0 guards the pin by comparing libc's reported offset against the
+# offset the pin derived, so this checks that guard has teeth at every hour —
+# the run above can only ever exercise the one hour it happens to be. A zone
+# string libc rejects reports +0000, so the guard catches it at every hour
+# except UTC 12, where +0000 *is* the wanted zone and the fallback lands on the
+# same local noon the pin was asking for. 23 of 24, and the one blind hour
+# harmless, is the exact claim — assert it rather than assume it.
+if python3 - <<'PY' > "$TMP/guard.txt" 2>&1
+import os, time
+
+mismatched, blind = [], []
+for hour in range(24):
+    want = f"{12 - hour:+03d}00"
+    os.environ["TZ"] = f"IDD{hour - 12}"
+    time.tzset()
+    # What `date '+%z'` reports for the derived zone, from libc.
+    got = time.strftime("%z")
+    if got != want:
+        mismatched.append(f"UTC {hour:02d}: libc says {got}, pin derived {want}")
+    if want == "+0000":
+        blind.append(hour)
+print("mismatched:", mismatched)
+print("blind hours (a UTC fallback is indistinguishable):", blind)
+raise SystemExit(0 if not mismatched and blind == [12] else 1)
+PY
+then
+  pass "T3.1b: the T25d.0 offset guard detects a failed pin at 23 of 24 hours"
+else
+  fail "T3.1b: the T25d.0 offset guard does not agree with libc at every hour"
+  sed 's/^/      /' "$TMP/guard.txt" | head -5
+fi
+
 # T3.2: the pin is actually wired into T25d, and released afterwards. Without
 # this the derivation above could keep passing while the suite went back to
 # reading the wall clock.
-if grep -qF 'export TZ="IDD$(( 10#$(date -u '"'"'+%H'"'"') - 12 ))"' "$LINT_TEST" \
+if grep -qF 'export TZ="IDD' "$LINT_TEST" \
    && grep -qF 'SINCE_TZ_WAS="${TZ+set}"' "$LINT_TEST" \
+   && grep -qF 'SINCE_GOT_OFF' "$LINT_TEST" \
    && grep -qF 'if [ -n "$SINCE_TZ_WAS" ]; then export TZ="$SINCE_TZ_OLD"; else unset TZ; fi' "$LINT_TEST"; then
-  pass "T3.2: test-idd-lint.sh pins the clock for T25d and restores TZ after it"
+  pass "T3.2: test-idd-lint.sh pins the clock for T25d, guards it, and restores TZ"
 else
-  fail "T3.2: the T25d clock pin or its TZ restore is missing from test-idd-lint.sh"
+  fail "T3.2: the T25d clock pin, its offset guard, or its TZ restore is missing"
 fi
 
 # T3.3: the pin sits *before* the fixture it protects — a pin applied after
@@ -273,7 +326,7 @@ def first(needle):
         if needle in line:
             return i
     raise SystemExit(f"marker not found: {needle}")
-pin = first('export TZ="IDD$((')
+pin = first('export TZ="IDD')
 today = first('TODAY="$(date ')
 release = first('if [ -n "$SINCE_TZ_WAS" ];')
 bare = first('--since "$TODAY" --json')
@@ -299,10 +352,10 @@ for z in "$MIDNIGHT_TZ" "$ROLLOVER_TZ"; do
     fail "T3.4: test-idd-lint.sh failed with ambient local time $ambient (TZ=$z)"
     grep -E '✗' "$TMP/lint-$z.txt" | sed 's/^/      /' | head -5
   fi
-  if grep -qF "T25d.0: clock pinned to 12:" "$TMP/lint-$z.txt"; then
-    pass "T3.5: T25d ran at pinned 12:xx despite ambient $ambient"
+  if grep -qE "T25d\.0: clock pinned — TZ=IDD.* offset" "$TMP/lint-$z.txt"; then
+    pass "T3.5: T25d ran on its own pinned zone despite ambient $ambient"
   else
-    fail "T3.5: T25d did not report the pinned 12:xx clock under ambient $ambient"
+    fail "T3.5: T25d did not report a pinned zone under ambient $ambient"
   fi
 done
 

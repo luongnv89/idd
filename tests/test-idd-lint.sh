@@ -416,14 +416,23 @@ fi
 # TZ is restored afterwards so no later test inherits the pin.
 SINCE_TZ_WAS="${TZ+set}"
 SINCE_TZ_OLD="${TZ-}"
-export TZ="IDD$(( 10#$(date -u '+%H') - 12 ))"
-SINCE_HOUR=$(( 10#$(date '+%H') ))
-# The guard is the pin's own regression test: a broken sign or a zone string
-# glibc rejects silently falls back to UTC, and the blind spot returns unseen.
-if [ "$SINCE_HOUR" -ge 2 ] && [ "$SINCE_HOUR" -le 22 ]; then
-  pass "T25d.0: clock pinned to ${SINCE_HOUR}:xx local (TZ=$TZ) — midnight window closed"
+# One clock read, and everything below derives from it: no hour boundary can
+# fall between two reads and leave them disagreeing about what was pinned.
+SINCE_UTC_H=$(( 10#$(date -u '+%H') ))
+export TZ="IDD$(( SINCE_UTC_H - 12 ))"
+# The guard is the pin's own regression test: a wrong sign, or a zone string
+# this libc rejects, falls back to UTC silently and the blind spot returns
+# unseen. It checks the resulting *offset*, not the resulting hour. An hour is
+# the weaker claim — a UTC fallback still reads 02..22 for twenty-one hours of
+# the day, so a range over hours would miss the very failure this exists to
+# catch. The offset is a property of TZ alone, so it is both exact and immune
+# to the clock moving underneath the check.
+SINCE_WANT_OFF="$(printf '%+03d00' "$(( 12 - SINCE_UTC_H ))")"
+SINCE_GOT_OFF="$(date '+%z')"
+if [ "$SINCE_GOT_OFF" = "$SINCE_WANT_OFF" ]; then
+  pass "T25d.0: clock pinned — TZ=$TZ gives offset $SINCE_GOT_OFF, local noon not midnight"
 else
-  fail "T25d.0: clock pin left local hour at $SINCE_HOUR (want 2-22, TZ=$TZ)"
+  fail "T25d.0: clock pin not applied — TZ=$TZ gave offset $SINCE_GOT_OFF, want $SINCE_WANT_OFF"
 fi
 SINCE_REPO="$TMP/since"
 mkdir -p "$SINCE_REPO"
