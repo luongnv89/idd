@@ -190,6 +190,11 @@ class PreparedCalls:
     normalized every entry again before discarding the exact ones — so a miss
     over n entries cost 2n normalizations of work that never changes. Doing it
     at load makes it n, once, and turns the exact pass into a dict lookup.
+
+    `frozen` here means the two fields are never rebound after construction —
+    not that `exact` is immutable, since it is an ordinary dict. Nothing
+    mutates or hashes an instance; `_prepare_calls` builds one and hands it
+    straight to `match`.
     """
 
     exact: dict[tuple[str, ...], dict[str, Any]]
@@ -450,14 +455,23 @@ def _buffer_record(cassette_path: Path, record: dict[str, Any]) -> None:
     """Queue one captured call; the cassette is rewritten once, at exit.
 
     Recording used to reload, append to, and rewrite the entire cassette for
-    every captured call, so a session of n calls rewrote O(n^2) bytes — 74 MB
-    of writes to produce a 294 KB cassette at n=500. Buffering makes it one
-    rewrite per process however many calls that process captures.
+    every captured call — O(n^2) bytes for n calls in one process, 74 MB of
+    writes to produce a 294 KB cassette at n=500. Buffering makes that one
+    rewrite however many calls the process captures.
+
+    Read that bound literally. ``run_eval.sh`` fronts this script on PATH as
+    ``gh``, so a normal capture run is one process per call, each buffering
+    exactly one record: the amplification *across* processes is unchanged and
+    cannot be fixed from inside one of them. What this does fix is the
+    in-process case — ``main()`` is importable and callable in a loop — and it
+    is what lets the flush publish atomically, below, instead of truncating a
+    committed fixture mid-write.
 
     A process that dies on a signal now loses its buffer where it used to have
-    written each call already. That is an accepted trade: ``EVAL_RECORD=1`` is
-    local capture only — ``run_eval.sh`` and CI fail closed on it — and the
-    session is re-runnable.
+    written each call already. Normal return, ``sys.exit``, an uncaught
+    exception and SIGINT all still flush; SIGTERM, SIGKILL and ``os._exit`` do
+    not. That is an accepted trade: ``EVAL_RECORD=1`` is local capture only —
+    ``run_eval.sh`` and CI fail closed on it — and the session is re-runnable.
     """
     global _FLUSH_REGISTERED
     _PENDING_RECORDS.setdefault(str(cassette_path), []).append(record)
@@ -492,8 +506,10 @@ def _flush_records() -> None:
                 prefix=f".{path.name}.",
                 delete=False,
             ) as tmp:
-                tmp.write(json.dumps(data, indent=2) + "\n")
+                # Name first: the write is what can fail, and the `finally`
+                # below can only clean up a temp file it has been told about.
                 tmp_name = tmp.name
+                tmp.write(json.dumps(data, indent=2) + "\n")
             # NamedTemporaryFile is 0600; a cassette is a committed fixture, so
             # replacing one must not quietly narrow who can read it.
             os.chmod(tmp_name, mode)

@@ -287,11 +287,17 @@ _LISTING_CACHE: dict[str, tuple[int, list[Path]]] = {}
 
 
 def _forget(path: Path) -> None:
-    """Drop what a write to `path` just invalidated."""
-    key = str(path)
-    _READ_CACHE.pop(key, None)
-    # A new entry also changes what the parent directory lists.
-    _LISTING_CACHE.pop(str(path.parent), None)
+    """Drop what a write to `path` just invalidated.
+
+    Every ancestor, not just the parent: the writers call
+    `mkdir(parents=True)` first, so one write can add an entry to several
+    directories at once. The mtime stamp already catches those, but relying on
+    it alone would encode the current phase order — emit, then scan — as a
+    requirement, which is exactly what keying on a stamp was meant to avoid.
+    """
+    _READ_CACHE.pop(str(path), None)
+    for parent in path.parents:
+        _LISTING_CACHE.pop(str(parent), None)
 
 
 def _reset_io_caches() -> None:

@@ -265,6 +265,13 @@ class RepoIndex:
     Nothing here is derived from the marker tables: the index answers whatever
     pattern it is handed, so a `--rules` override that replaces a table outright
     is resolved exactly like a built-in one.
+
+    Both memos trade memory for the repeats they remove, and hold it for the
+    process. The reads are bounded by what the markers can open — the two
+    `content-any` budgets plus the dependency files — times `MAX_READ_BYTES`;
+    the name index holds about two entries per tracked path. A detection pass
+    is one short-lived process, so the peak is transient, but it is a peak the
+    transient reads it replaces did not have.
     """
 
     def __init__(self, root: str, files: list[str]) -> None:
