@@ -106,6 +106,123 @@ else
   fail "T1: concurrent writers tore the cache write"
 fi
 
+ATOMIC_STATUS=0
+python3 - "$GIISSUE" "$CACHE" <<'EOF' || ATOMIC_STATUS=$?
+import importlib.util
+import json
+import os
+import sys
+import threading
+from pathlib import Path
+
+spec = importlib.util.spec_from_file_location("gi_issue", sys.argv[1])
+m = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(m)
+cache_dir = Path(sys.argv[2])
+target = cache_dir / "observed.json"
+target.write_text('{"writer":"old"}', encoding="utf-8")
+
+# Force two writers to overlap. With the old shared `.tmp` path, writer B's
+# descriptor follows writer A's rename onto the live cache and corrupts what a
+# reader sees. Unique mkstemp files keep B's partial write private.
+original_dump = m.json.dump
+b_open = threading.Event()
+a_done = threading.Event()
+b_partial = threading.Event()
+reader_checked = threading.Event()
+thread_errors = []
+
+def controlled_dump(payload, handle):
+    if payload["writer"] == "A":
+        if not b_open.wait(2):
+            raise RuntimeError("writer B did not open")
+        handle.write('{"writer":"A"}')
+        return
+    b_open.set()
+    if not a_done.wait(2):
+        raise RuntimeError("writer A did not publish")
+    handle.write("X")
+    handle.flush()
+    b_partial.set()
+    if not reader_checked.wait(2):
+        raise RuntimeError("reader did not inspect partial write")
+    handle.seek(0)
+    handle.truncate()
+    handle.write('{"writer":"B"}')
+
+def write_a():
+    try:
+        m.write_cache(target, {"writer": "A"})
+    except BaseException as exc:
+        thread_errors.append(exc)
+    finally:
+        a_done.set()
+
+def write_b():
+    try:
+        m.write_cache(target, {"writer": "B"})
+    except BaseException as exc:
+        thread_errors.append(exc)
+
+m.json.dump = controlled_dump
+a = threading.Thread(target=write_a)
+b = threading.Thread(target=write_b)
+a.start()
+b.start()
+if not b_partial.wait(3):
+    thread_errors.append(RuntimeError("writer B never reached partial write"))
+try:
+    visible = json.loads(target.read_text(encoding="utf-8"))
+    visible_valid = visible.get("writer") == "A"
+except (OSError, ValueError):
+    visible_valid = False
+reader_checked.set()
+a.join(3)
+b.join(3)
+m.json.dump = original_dump
+
+# A failed publish is best-effort: preserve the old cache and remove the temp.
+target.write_text('{"writer":"stable"}', encoding="utf-8")
+original_replace = m.os.replace
+m.os.replace = lambda *_args: (_ for _ in ()).throw(OSError("forced replace failure"))
+m.write_cache(target, {"writer": "new"})
+m.os.replace = original_replace
+preserved = json.loads(target.read_text(encoding="utf-8")) == {"writer": "stable"}
+no_strays = not list(cache_dir.glob(f".{target.name}.*.tmp"))
+
+# If fdopen itself fails, write_cache must close the raw mkstemp descriptor.
+original_mkstemp = m.tempfile.mkstemp
+original_fdopen = m.os.fdopen
+captured = []
+def capture_mkstemp(*args, **kwargs):
+    fd, name = original_mkstemp(*args, **kwargs)
+    captured.append((fd, name))
+    return fd, name
+m.tempfile.mkstemp = capture_mkstemp
+m.os.fdopen = lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("forced fdopen failure"))
+m.write_cache(cache_dir / "fdopen.json", {"writer": "new"})
+m.tempfile.mkstemp = original_mkstemp
+m.os.fdopen = original_fdopen
+fd_closed = bool(captured)
+for fd, name in captured:
+    try:
+        os.fstat(fd)
+    except OSError:
+        pass
+    else:
+        fd_closed = False
+    if Path(name).exists():
+        fd_closed = False
+
+ok = visible_valid and not thread_errors and preserved and no_strays and fd_closed
+sys.exit(0 if ok else 1)
+EOF
+if [ "$ATOMIC_STATUS" -eq 0 ]; then
+  pass "T1: readers see only complete JSON; failed writes preserve cache and clean resources"
+else
+  fail "T1: atomic visibility or failure cleanup regression"
+fi
+
 # ─────────────────────────────────────────────────────────--
 # T2 — F-BUG-005: read_input exit contract
 # ───────────────────────────────────────────────────────────
@@ -185,7 +302,43 @@ fi
 STATE_DIR="$TMP/state"
 mkdir -p "$STATE_DIR"
 printf '%s\n' '{"run_id": "ghost", "pid": 0}' > "$STATE_DIR/run.lock.retired-999999"
-SWEEP_OUT="$(python3 "$GISTATE" --dir "$STATE_DIR" --run-id sweep-a --lock 2>&1)" && SWEEP_STATUS=0 || SWEEP_STATUS=$?
+printf '%s\n' 'keep' > "$STATE_DIR/run.lock.retiredness-123"
+
+# Hold the stable-directory flock while --lock starts. The retired stray must
+# remain until the guard is released; deleting it early would prove the sweep
+# ran outside _lock_guard.
+READY="$TMP/guard-ready"
+python3 - "$STATE_DIR" "$READY" <<'EOF' &
+import fcntl
+import os
+import sys
+import time
+from pathlib import Path
+
+fd = os.open(sys.argv[1], os.O_RDONLY)
+fcntl.flock(fd, fcntl.LOCK_EX)
+Path(sys.argv[2]).write_text("ready", encoding="utf-8")
+time.sleep(0.8)
+fcntl.flock(fd, fcntl.LOCK_UN)
+os.close(fd)
+EOF
+GUARD_PID=$!
+for _ in 1 2 3 4 5 6 7 8 9 10; do
+  [ -e "$READY" ] && break
+  sleep 0.05
+done
+SWEEP_FILE="$TMP/sweep-out"
+python3 "$GISTATE" --dir "$STATE_DIR" --run-id sweep-a --lock >"$SWEEP_FILE" 2>&1 &
+SWEEP_PID=$!
+sleep 0.15
+if [ -e "$STATE_DIR/run.lock.retired-999999" ]; then
+  pass "T4: retired-lock sweep waits for _lock_guard"
+else
+  fail "T4: retired-lock sweep ran before acquiring _lock_guard"
+fi
+wait "$GUARD_PID"
+wait "$SWEEP_PID" && SWEEP_STATUS=0 || SWEEP_STATUS=$?
+SWEEP_OUT="$(cat "$SWEEP_FILE")"
 if [ "$SWEEP_STATUS" -eq 0 ] && printf '%s' "$SWEEP_OUT" | grep -q '"status": "acquired"'; then
   pass "T4: lock acquired over a stray retired lock"
 else
@@ -196,8 +349,20 @@ if [ ! -e "$STATE_DIR/run.lock.retired-999999" ]; then
 else
   fail "T4: stray run.lock.retired-* survived a guarded --lock"
 fi
+if [ -e "$STATE_DIR/run.lock.retiredness-123" ]; then
+  pass "T4: similarly named non-retired file is preserved"
+else
+  fail "T4: sweep removed a similarly named unrelated file"
+fi
 
-python3 "$GISTATE" --dir "$STATE_DIR" --run-id sweep-a --unlock >/dev/null 2>&1 || true
+printf '%s\n' '{"run_id": "ghost-unlock", "pid": 0}' > "$STATE_DIR/run.lock.retired-777777"
+UNLOCK_OUT="$(python3 "$GISTATE" --dir "$STATE_DIR" --run-id sweep-a --unlock 2>&1)" && UNLOCK_STATUS=0 || UNLOCK_STATUS=$?
+if [ "$UNLOCK_STATUS" -eq 0 ] && printf '%s' "$UNLOCK_OUT" | grep -q '"status": "released"' \
+   && [ ! -e "$STATE_DIR/run.lock.retired-777777" ]; then
+  pass "T4: guarded --unlock also sweeps retired strays"
+else
+  fail "T4: --unlock did not release and sweep: $UNLOCK_OUT"
+fi
 
 printf '%s\n' '{"run_id": "ghost2", "pid": 0}' > "$STATE_DIR/run.lock.retired-888888"
 python3 "$GISTATE" --dir "$STATE_DIR" --run-id sweep-b --lock --dry-run >/dev/null 2>&1 || true
