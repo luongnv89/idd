@@ -53,9 +53,7 @@ dist/agents/
 .asm-improver/
 
 # Local review/analysis artifacts (session outputs, not project docs)
-IDD-REVIEW-*.md
-competitor-analysis-*.md
-fable-5-review-*.md
+/local/
 
 # Autopilot/resolver run log (local activity, not committed)
 .gitissue/runs.jsonl

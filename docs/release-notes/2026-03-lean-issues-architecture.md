@@ -1,12 +1,14 @@
-# TODOS — gitissue / IDD
+# March 2026 — Lean Issues Architecture
 
-> **Historical document.** All P1 items in this file shipped in Sprints 1-3 (2026-03) and the lean-issue / methodology updates from issues #31-#38 (2026-04). For current open work, see GitHub issues. For methodology, see [`idd-methodology.md`](idd-methodology.md). For the configuration schema, see [`config-schema.md`](config-schema.md).
+This historical release note preserves the completed planning record for Sprints
+1–4 and the lean-issue architecture shipped through issues #31–#38. GitHub
+issues are the source of truth for current work. See
+[`../idd-methodology.md`](../idd-methodology.md) for the methodology and
+[`../config-schema.md`](../config-schema.md) for configuration.
 
-Generated from /plan-ceo-review on 2026-03-20.
-Updated from /plan-eng-review on 2026-03-20.
-Updated from /plan-design-review on 2026-03-20.
-Updated: 2026-03-20 — Sprint 1-4 complete.
-Updated: 2026-03-21 — Lean Issues Architecture (P1) implemented.
+Source reviews: `/plan-ceo-review`, `/plan-eng-review`, and
+`/plan-design-review` on 2026-03-20. Sprint 1–4 completion was recorded on
+2026-03-20; the Lean Issues Architecture P1 was recorded complete on 2026-03-21.
 
 ## Completed
 

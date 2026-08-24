@@ -149,6 +149,9 @@ jobs:
       - name: test-gh-invocation-helper-344
         run: bash tests/test-gh-invocation-helper-344.sh
 
+      - name: test-orphaned-doc-cleanup-345
+        run: bash tests/test-orphaned-doc-cleanup-345.sh
+
       # build.sh: compile → verify dist/skills → promote skills/ only on success
       - name: Build and verify skills (update skills/ on success)
         run: ./scripts/build.sh
