@@ -152,6 +152,12 @@ jobs:
       - name: test-config-search-ceiling-parity-339
         run: bash tests/test-config-search-ceiling-parity-339.sh
 
+      # F-TEST-003 / F-TEST-006 (issue #356): gi-config's four bad-config
+      # branches, and the clock pin that keeps test-idd-lint.sh's T25d
+      # meaningful at any hour.
+      - name: test-config-errors-clock-pin-356
+        run: bash tests/test-config-errors-clock-pin-356.sh
+
       - name: test-gh-invocation-helper-344
         run: bash tests/test-gh-invocation-helper-344.sh
 
