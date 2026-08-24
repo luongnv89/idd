@@ -13,9 +13,10 @@
 #     M2  dropped digest section             → missing digest section(s)
 #     M3  drifted config default (init's
 #         .gitissue.yml template vs schema)  → template/schema parity failed
+#     M4  perturbed digest byte-size budget  → measured size drift
 #
 #   A T0 baseline first builds an unmutated copy so a broken main-branch tree
-#   is reported as such instead of as three bogus validator failures.
+#   is reported as such instead of as four bogus validator failures.
 #
 # Usage: bash tests/test-build-negative-mutations.sh
 # Returns: exit 0 on pass, exit 1 on failure.
@@ -23,7 +24,6 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-BUILD_PY="$REPO_ROOT/scripts/build.py"
 TMP_BASE="$(mktemp -d)"
 trap 'rm -rf "$TMP_BASE"' EXIT
 
@@ -33,13 +33,17 @@ FAIL=0
 pass() { echo "  ✓ $1"; PASS=$((PASS + 1)); }
 fail() { echo "  ✗ $1"; FAIL=$((FAIL + 1)); }
 
-# make_copy <name> — fresh copy of src/ + docs/ under $TMP_BASE/<name>.
+# make_copy <name> — fresh src/, docs/, and build entry point/package under
+# $TMP_BASE/<name>. Mutations run through the scratch public entry point so they
+# can safely change build implementation constants as well as build inputs.
 make_copy() {
   local copy="$TMP_BASE/$1"
   rm -rf "$copy"
-  mkdir -p "$copy"
+  mkdir -p "$copy/scripts"
   cp -R "$REPO_ROOT/src" "$copy/src"
   cp -R "$REPO_ROOT/docs" "$copy/docs"
+  cp "$REPO_ROOT/scripts/build.py" "$copy/scripts/build.py"
+  cp -R "$REPO_ROOT/scripts/build" "$copy/scripts/build"
   printf '%s' "$copy"
 }
 
@@ -47,7 +51,8 @@ make_copy() {
 # Returns the build's exit code; never trips set -e.
 run_build() {
   local copy="$1" log="$2" rc=0
-  python3 "$BUILD_PY" --out "$copy/dist" --src "$copy/src" --no-root-skills \
+  PYTHONDONTWRITEBYTECODE=1 python3 "$copy/scripts/build.py" \
+    --out "$copy/dist" --src "$copy/src" --no-root-skills \
     >"$log.stdout" 2>"$log.stderr" || rc=$?
   cat "$log.stdout" "$log.stderr" >"$log"
   return "$rc"
@@ -133,6 +138,42 @@ elif ! sed -i.bak 's/^  max_commits: 10$/  max_commits: 99/' "$template"; then
 else
   rm -f "$template.bak"
   assert_build_fails m3 "M3: drifted config excerpt vs .gitissue.yml" "$copy"
+fi
+
+# ───────────────────────────────────────────────────────────
+# M4: perturbed digest byte-size budget
+# Changing a reviewed digest size in the scratch build package must fail with a
+# clear measured-vs-expected diagnostic from the real build entry point.
+# ───────────────────────────────────────────────────────────
+copy="$(make_copy m4-digest-size)"
+common="$copy/scripts/build/common.py"
+python3 - "$common" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text(encoding="utf-8")
+pattern = r'("platform-github\.md": \(\d+, )(\d+)(\),)'
+new, count = re.subn(
+    pattern,
+    lambda match: match.group(1) + str(int(match.group(2)) + 1) + match.group(3),
+    text,
+)
+if count != 1:
+    sys.exit(f"mutation failed: expected exactly one digest budget, found {count}")
+path.write_text(new, encoding="utf-8")
+PY
+log="$TMP_BASE/m4.log"
+rc=0
+run_build "$copy" "$log" || rc=$?
+if [ "$rc" -eq 0 ]; then
+  fail "M4: perturbed digest byte-size budget: build exited 0"
+elif grep -q "platform-github.md digest byte-size drift" "$log" && \
+     grep -q "expected source=.*bytes and digest=.*bytes; measured source=.*bytes and digest=.*bytes" "$log"; then
+  pass "M4: perturbed digest byte-size budget: build reported expected and measured bytes"
+else
+  fail "M4: perturbed digest byte-size budget: build failed without a clear size diagnostic"
 fi
 
 # ───────────────────────────────────────────────────────────

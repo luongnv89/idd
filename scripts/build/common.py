@@ -204,6 +204,15 @@ _CONFIG_EXCERPT_NOTICE = (
     "[config-schema.md](" + _REPO_BLOB_BASE + "docs/config-schema.md).\n"
 )
 
+# Byte-size invariants for documents whose runtime digests deliberately omit
+# contributor-only sections. The build measures both sides and fails on drift,
+# keeping the size accounting executable instead of burying it in comments.
+DOC_DIGEST_EXPECTED_BYTES: dict[str, tuple[int, int]] = {
+    # document: (authored document, emitted runtime digest)
+    "platform-github.md": (5529, 5219),
+    "pre-commit-security.md": (28277, 19719),
+}
+
 DOC_SECTION_DIGESTS: dict[str, tuple[str, ...]] = {
     "idd-methodology.md": (
         "Intent-Code Boundary",
@@ -213,34 +222,11 @@ DOC_SECTION_DIGESTS: dict[str, tuple[str, ...]] = {
         "Maintainer Control and Safety",
         "Principles",
     ),
-    # Everything except *Lint Enforcement*, which documents this repo's own
-    # contributor CI check (tests/test-pre-commit-security.sh) over its own
-    # src/skills/** sources. A skill resolving an issue in a *user's* repo never
-    # runs that lint and cannot act on it, yet the section shipped into both
-    # bundling skills. It is 8,818 bytes of the authored document; dropping it
-    # takes each emitted copy from 27,087 to 18,529 bytes — 8,558 per skill,
-    # 17,116 over the two, the shortfall against 8,818 being the 260-byte digest
-    # notice the emitted copy gains. The authored document keeps the section
-    # whole for the contributors it is written for.
-    #
-    # These figures track the section's size, so they go stale whenever it is
-    # edited — they have now done so four times. Re-measure rather than adjust
-    # by eye: disable this entry, rebuild to a scratch --out, and diff the
-    # emitted byte counts against the current build. (Issue #275, cycle 5.)
-    # Everything except *Adding a driver*, which tells a contributor how to port
-    # IDD to a second tracker: write docs/platform-<name>.md, then update the
-    # skills' inlined commands. A skill run reads this document to look a
-    # command up, never to author a driver, so the section shipped into all
-    # seven bundling skills for no runtime reader — the same shape as the
-    # pre-commit-security.md carve-out below. It is 561 bytes of the authored
-    # document; dropping it takes each emitted copy from 5,090 to 4,780 bytes —
-    # 310 per skill, 2,170 over the seven, the shortfall against 561 being the
-    # 251-byte digest notice the emitted copy gains. The authored document keeps
-    # the section whole for the contributors it is written for.
-    #
-    # These figures track the section's size, so re-measure rather than adjust
-    # by eye when it is edited: disable this entry, rebuild to a scratch --out,
-    # and diff the emitted byte counts against the current build. (Issue #259.)
+    # *Lint Enforcement* documents this repo's contributor CI check, not a
+    # runtime action for skills operating in another repository. *Adding a
+    # driver* likewise belongs to contributor documentation, not the runtime
+    # operation catalog. Keep both sections in authored docs and omit them from
+    # emitted digests; DOC_DIGEST_EXPECTED_BYTES guards the measured footprint.
     "platform-github.md": (
         "Driver rules",
         "Operation catalog",
