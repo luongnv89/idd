@@ -44,7 +44,7 @@ import statistics
 import subprocess
 import sys
 from datetime import datetime, timezone
-from typing import NamedTuple
+from typing import Callable, NamedTuple
 from pathlib import Path
 
 SPEC_VERSION = "1.1"
@@ -83,6 +83,16 @@ AC_STATUSES = ("pass", "fail", "unverified")
 NO_AC_NOTE_RE = re.compile(r"no acceptance criteria defined", re.IGNORECASE)
 
 LEVELS = ("L1", "L2", "L3")
+
+BRANCH_NAME_WARN_LENGTH = 50
+COMMIT_SUBJECT_WARN_LENGTH = 72
+COMMIT_LABEL_MAX_LENGTH = 60
+SOFT_COMMAND_TIMEOUT_SECONDS = 60
+APPROXIDATE_NOW_TOLERANCE_SECONDS = 2
+MIN_ISSUE_FETCH_LIMIT = 500
+PASS_PERCENT_THRESHOLD = 80
+WARN_PERCENT_THRESHOLD = 40
+DEFAULT_GITHUB_FETCH_LIMIT = 200
 
 
 class Finding:
@@ -146,98 +156,122 @@ def first_content_line(text: str) -> str:
 # --- Issue checks (L1, §1–§2) ---------------------------------------------------
 
 
-def lint_issue(body: str) -> list[Finding]:
-    findings: list[Finding] = []
-    sections = split_sections(body)
+class IssueLintContext:
+    def __init__(self, body: str) -> None:
+        self.body = body
+        self.sections = split_sections(body)
+        self.issue_type: str | None = None
 
-    # I01 — normalization marker (§1.1.1)
-    m = MARKER_RE.search(body)
+
+def _check_issue_marker(context: IssueLintContext) -> list[Finding]:
+    m = MARKER_RE.search(context.body)
     if not m:
-        findings.append(err("I01", "normalization marker '<!-- gitissue:normalized v1 -->' missing (§1.1)"))
-    else:
-        first_line = first_content_line(body)
-        if not MARKER_RE.search(first_line):
-            findings.append(warn("I01", "normalization marker present but not on the first line (§1.1)"))
-        else:
-            findings.append(ok("I01", f"normalization marker present (v{m.group(1)}) (§1.1)"))
+        return [err("I01", "normalization marker '<!-- gitissue:normalized v1 -->' missing (§1.1)")]
+    if not MARKER_RE.search(first_content_line(context.body)):
+        return [warn("I01", "normalization marker present but not on the first line (§1.1)")]
+    return [ok("I01", f"normalization marker present (v{m.group(1)}) (§1.1)")]
 
-    # I02 — ## Type with a known value (§1.1.2)
-    issue_type = None
-    if "Type" not in sections:
-        findings.append(err("I02", "missing '## Type' section (§1.1)"))
-    else:
-        raw = strip_confidence(first_content_line(sections["Type"]))
-        issue_type = raw.lower()
-        if issue_type in ISSUE_TYPES:
-            findings.append(ok("I02", f"type is '{raw}' (§1.1)"))
-        elif raw:
-            findings.append(warn("I02", f"type '{raw}' is not one of Bug/Feature/Improvement — allowed only as a documented implementation extension (§1.1)"))
-        else:
-            findings.append(err("I02", "'## Type' section is empty (§1.1)"))
 
-    # I03 — ## Description (§1.1.3)
-    if "Description" not in sections:
-        findings.append(err("I03", "missing '## Description' section (§1.1)"))
-    else:
-        findings.append(ok("I03", "description section present (§1.1)"))
+def _check_issue_type(context: IssueLintContext) -> list[Finding]:
+    if "Type" not in context.sections:
+        return [err("I02", "missing '## Type' section (§1.1)")]
+    raw = strip_confidence(first_content_line(context.sections["Type"]))
+    context.issue_type = raw.lower()
+    if context.issue_type in ISSUE_TYPES:
+        return [ok("I02", f"type is '{raw}' (§1.1)")]
+    if raw:
+        return [warn("I02", f"type '{raw}' is not one of Bug/Feature/Improvement — allowed only as a documented implementation extension (§1.1)")]
+    return [err("I02", "'## Type' section is empty (§1.1)")]
 
-    # I04 — type-specific fields (§1.1.3)
+
+def _check_issue_description(context: IssueLintContext) -> list[Finding]:
+    if "Description" not in context.sections:
+        return [err("I03", "missing '## Description' section (§1.1)")]
+    return [ok("I03", "description section present (§1.1)")]
+
+
+def _check_issue_type_fields(context: IssueLintContext) -> list[Finding]:
     required_fields = {
         "bug": ("**Current behavior:**", "**Expected behavior:**"),
         "improvement": ("**Current state:**", "**Proposed change:**"),
-    }.get(issue_type or "", ())
+    }.get(context.issue_type or "", ())
+    findings: list[Finding] = []
     for field in required_fields:
-        if field in body:
+        if field in context.body:
             findings.append(ok("I04", f"{field} present (§1.1)"))
         else:
-            findings.append(err("I04", f"{issue_type} issue missing required field {field} (§1.1)"))
+            findings.append(err("I04", f"{context.issue_type} issue missing required field {field} (§1.1)"))
+    return findings
 
-    # I05 — Reporter Context blockquote (§1.1.4; SHOULD when authored directly)
-    if "> **Reporter Context**" in body:
-        findings.append(ok("I05", "Reporter Context blockquote present (§1.1)"))
-    else:
-        findings.append(warn("I05", "no '> **Reporter Context**' blockquote — required when normalizing, recommended always (§1.1)"))
 
-    # I06 — ## Acceptance Criteria with >=1 checkbox (§1.1.6)
-    if "Acceptance Criteria" not in sections:
-        findings.append(err("I06", "missing '## Acceptance Criteria' section (§1.1)"))
-    elif not CHECKBOX_RE.search(sections["Acceptance Criteria"]):
-        findings.append(err("I06", "'## Acceptance Criteria' has no '- [ ]' checkbox items (§1.1)"))
-    else:
-        n = len(CHECKBOX_RE.findall(sections["Acceptance Criteria"]))
-        findings.append(ok("I06", f"acceptance criteria present ({n} checkbox{'es' if n != 1 else ''}) (§1.1)"))
+def _check_reporter_context(context: IssueLintContext) -> list[Finding]:
+    if "> **Reporter Context**" in context.body:
+        return [ok("I05", "Reporter Context blockquote present (§1.1)")]
+    return [warn("I05", "no '> **Reporter Context**' blockquote — required when normalizing, recommended always (§1.1)")]
 
-    # I07 — ## Metadata with Priority/Effort/Labels (§1.1.7)
-    if "Metadata" not in sections:
-        findings.append(err("I07", "missing '## Metadata' section (§1.1)"))
-    else:
-        for label in ("**Priority:**", "**Effort:**", "**Labels:**"):
-            if label in sections["Metadata"]:
-                findings.append(ok("I07", f"metadata field {label} present (§1.1)"))
-            else:
-                findings.append(err("I07", f"metadata missing {label} line (§1.1)"))
 
-    # I08 — dependency markers (informational, §2; cross-repo ignored)
+def _check_acceptance_criteria(context: IssueLintContext) -> list[Finding]:
+    section = context.sections.get("Acceptance Criteria")
+    if section is None:
+        return [err("I06", "missing '## Acceptance Criteria' section (§1.1)")]
+    if not CHECKBOX_RE.search(section):
+        return [err("I06", "'## Acceptance Criteria' has no '- [ ]' checkbox items (§1.1)")]
+    count = len(CHECKBOX_RE.findall(section))
+    return [ok("I06", f"acceptance criteria present ({count} checkbox{'es' if count != 1 else ''}) (§1.1)")]
+
+
+def _check_issue_metadata(context: IssueLintContext) -> list[Finding]:
+    section = context.sections.get("Metadata")
+    if section is None:
+        return [err("I07", "missing '## Metadata' section (§1.1)")]
+    findings: list[Finding] = []
+    for label in ("**Priority:**", "**Effort:**", "**Labels:**"):
+        if label in section:
+            findings.append(ok("I07", f"metadata field {label} present (§1.1)"))
+        else:
+            findings.append(err("I07", f"metadata missing {label} line (§1.1)"))
+    return findings
+
+
+def _check_issue_dependencies(context: IssueLintContext) -> list[Finding]:
     deps: list[str] = []
     seen_dep: set[str] = set()
-    for line in body.splitlines():
+    for line in context.body.splitlines():
         if not DEP_MARKER_RE.search(line):
             continue
         local_segment = CROSS_REPO_TOKEN_RE.sub("", line)
-        for m in BARE_ISSUE_RE.finditer(local_segment):
-            ref = f"#{m.group(1)}"
+        for match in BARE_ISSUE_RE.finditer(local_segment):
+            ref = f"#{match.group(1)}"
             if ref not in seen_dep:
                 seen_dep.add(ref)
                 deps.append(ref)
-    if deps:
-        findings.append(info("I08", f"dependency markers found: {', '.join(deps)} (§2)"))
+    return [info("I08", f"dependency markers found: {', '.join(deps)} (§2)")] if deps else []
 
-    # I09 — hierarchy marker (informational, §2.1)
-    parents = [m.group(1) for m in PART_MARKER_RE.finditer(body)]
-    if parents:
-        findings.append(info("I09", f"hierarchy marker: Part of {', '.join(parents)} (§2.1)"))
 
-    return findings
+def _check_issue_hierarchy(context: IssueLintContext) -> list[Finding]:
+    parents = [match.group(1) for match in PART_MARKER_RE.finditer(context.body)]
+    if not parents:
+        return []
+    return [info("I09", f"hierarchy marker: Part of {', '.join(parents)} (§2.1)")]
+
+
+IssueCheck = Callable[[IssueLintContext], list[Finding]]
+ISSUE_CHECKS: tuple[IssueCheck, ...] = (
+    _check_issue_marker,
+    _check_issue_type,
+    _check_issue_description,
+    _check_issue_type_fields,
+    _check_reporter_context,
+    _check_acceptance_criteria,
+    _check_issue_metadata,
+    _check_issue_dependencies,
+    _check_issue_hierarchy,
+)
+
+
+def lint_issue(body: str) -> list[Finding]:
+    context = IssueLintContext(body)
+    return [finding for check in ISSUE_CHECKS for finding in check(context)]
 
 
 # --- Branch checks (L2, §3.1) ---------------------------------------------------
@@ -251,8 +285,8 @@ def lint_branch(name: str) -> list[Finding]:
         findings.append(ok("B01", f"'{name}' matches <type>/<issue>-<description> (§3.1)"))
     else:
         findings.append(err("B01", f"'{name}' does not match <type>/<issue-number>-<short-description> with type in {'/'.join(BRANCH_TYPES)} — lowercase, hyphen-separated (§3.1)"))
-    if len(name) > 50:
-        findings.append(warn("B02", f"branch name is {len(name)} chars — should stay under 50 (§3.1)"))
+    if len(name) > BRANCH_NAME_WARN_LENGTH:
+        findings.append(warn("B02", f"branch name is {len(name)} chars — should stay under {BRANCH_NAME_WARN_LENGTH} (§3.1)"))
     return findings
 
 
@@ -262,7 +296,11 @@ def lint_branch(name: str) -> list[Finding]:
 def lint_commit(subject: str) -> list[Finding]:
     findings: list[Finding] = []
     subject = subject.strip().splitlines()[0] if subject.strip() else ""
-    label = subject if len(subject) <= 60 else subject[:57] + "..."
+    label = (
+        subject
+        if len(subject) <= COMMIT_LABEL_MAX_LENGTH
+        else subject[:COMMIT_LABEL_MAX_LENGTH - len("...")] + "..."
+    )
 
     if subject.startswith(("Merge ", "Revert ")):
         findings.append(info("C01", f"'{label}' — merge/revert commit, skipped (§3.2)"))
@@ -279,8 +317,8 @@ def lint_commit(subject: str) -> list[Finding]:
         findings.append(err("C02", f"'{label}' — description must be lowercase (§3.2)"))
     if desc.rstrip().endswith("."):
         findings.append(err("C03", f"'{label}' — description must not end with a period (§3.2)"))
-    if len(subject) > 72:
-        findings.append(warn("C04", f"'{label}' — first line is {len(subject)} chars, keep under 72 (§3.2)"))
+    if len(subject) > COMMIT_SUBJECT_WARN_LENGTH:
+        findings.append(warn("C04", f"'{label}' — first line is {len(subject)} chars, keep under {COMMIT_SUBJECT_WARN_LENGTH} (§3.2)"))
     if not scope:
         findings.append(info("C05", f"'{label}' — no scope; scope is optional but recommended (§3.2)"))
     return findings
@@ -408,7 +446,9 @@ SKIP_OUTCOMES = {"skipped", "already_resolved"}
 def _run_soft(cmd: list[str]) -> str | None:
     """Run a command, returning stdout or None on any failure (soft probe)."""
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+        proc = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=SOFT_COMMAND_TIMEOUT_SECONDS
+        )
     except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
         return None
     return proc.stdout if proc.returncode == 0 else None
@@ -473,7 +513,10 @@ def _since_epoch(since: str | None) -> tuple[int | None, str | None]:
         return None, "could not be resolved (not a git repository?)"
     epoch = int(m.group(1))
     now = int(datetime.now(timezone.utc).timestamp())
-    if since.strip().lower() not in NOW_TOKENS and abs(now - epoch) <= 2:
+    if (
+        since.strip().lower() not in NOW_TOKENS
+        and abs(now - epoch) <= APPROXIDATE_NOW_TOLERANCE_SECONDS
+    ):
         return None, "did not parse as a date"
     return epoch, None
 
@@ -810,77 +853,135 @@ def collect_dr_binding(merged: list, limit: int, window: SinceWindow | None) -> 
     return binding
 
 
-def collect_github_stats(limit: int, run_rows_path: Path, window: SinceWindow | None = None) -> dict | None:
-    """Optional gh-backed metrics: %% issues normalized, merged-PR linkage,
-    the SPEC §4.3 B1 durable-memory join, and run outcomes tiered by issue
-    quality (normalized vs not)."""
-    open_issues = _gh_json("issue", "list", "--state", "open", "--limit", str(limit), "--json", "number,body")
+def collect_issue_normalization_stats(limit: int) -> dict | None:
+    """Collect open-issue normalization metrics, or None when gh is unavailable."""
+    open_issues = _gh_json(
+        "issue", "list", "--state", "open", "--limit", str(limit),
+        "--json", "number,body",
+    )
     if open_issues is None:
-        return None  # gh missing, unauthenticated, or offline — skip the whole section
-    normalized_open = sum(1 for i in open_issues if MARKER_RE.search(i.get("body") or ""))
-
-    result: dict = {
+        return None
+    normalized = sum(
+        1 for issue in open_issues if MARKER_RE.search(issue.get("body") or "")
+    )
+    return {
         "open_issues": len(open_issues),
-        "open_normalized": normalized_open,
-        "open_normalized_pct": _pct(normalized_open, len(open_issues)),
+        "open_normalized": normalized,
+        "open_normalized_pct": _pct(normalized, len(open_issues)),
     }
 
+
+def collect_merged_pr_stats(
+    limit: int, window: SinceWindow | None = None
+) -> dict | None:
+    """Collect merged-PR linkage and durable Decision-Record binding metrics."""
     # One page, three metrics: `truncated` below is only meaningful because
     # merged_prs, merged_with_dr and dr_binding all read the same fetch.
     merged = _gh_json(
         "pr", "list", "--state", "merged", "--limit", str(limit),
         "--json", "number,body,mergedAt,mergeCommit",
     )
-    if merged is not None:
-        closes = sum(1 for p in merged if re.search(r"^Closes #\d+", p.get("body") or "", re.MULTILINE))
-        dr = sum(1 for p in merged if DR_HEADING in (p.get("body") or ""))
-        result.update({
-            "merged_prs": len(merged),
-            "merged_with_closes": closes,
-            "merged_closes_pct": _pct(closes, len(merged)),
-            "merged_with_dr": dr,
-            "merged_dr_pct": _pct(dr, len(merged)),
-            "dr_binding": collect_dr_binding(merged, limit, window),
-        })
+    if merged is None:
+        return None
+    closes = sum(
+        1
+        for pr in merged
+        if re.search(r"^Closes #\d+", pr.get("body") or "", re.MULTILINE)
+    )
+    with_dr = sum(1 for pr in merged if DR_HEADING in (pr.get("body") or ""))
+    return {
+        "merged_prs": len(merged),
+        "merged_with_closes": closes,
+        "merged_closes_pct": _pct(closes, len(merged)),
+        "merged_with_dr": with_dr,
+        "merged_dr_pct": _pct(with_dr, len(merged)),
+        "dr_binding": collect_dr_binding(merged, limit, window),
+    }
 
-    # Tier run outcomes by issue quality (normalized vs unnormalized issue body).
+
+def collect_run_tier_stats(limit: int, run_rows_path: Path) -> dict | None:
+    """Join resolver outcomes to normalized and unnormalized issue bodies."""
     runs = collect_run_stats(run_rows_path)
-    if runs and runs["issues"]:
-        all_issues = _gh_json(
-            "issue", "list", "--state", "all",
-            "--limit", str(max(limit, 500)), "--json", "number,body",
+    if not runs or not runs["issues"]:
+        return None
+    all_issues = _gh_json(
+        "issue", "list", "--state", "all",
+        "--limit", str(max(limit, MIN_ISSUE_FETCH_LIMIT)),
+        "--json", "number,body",
+    )
+    if all_issues is None:
+        return None
+
+    marker_by_issue = {
+        issue["number"]: bool(MARKER_RE.search(issue.get("body") or ""))
+        for issue in all_issues
+    }
+    rows = []
+    for line in run_rows_path.read_text(encoding="utf-8").splitlines():
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(row, dict) and row.get("outcome") not in SKIP_OUTCOMES:
+            rows.append(row)
+
+    tiers: dict[str, dict] = {}
+    for name, wanted in (("normalized", True), ("unnormalized", False)):
+        selected = [
+            row for row in rows
+            if marker_by_issue.get(row.get("issue")) is wanted
+        ]
+        if not selected:
+            continue
+        qa_cycles = [
+            row["qa_cycles"]
+            for row in selected
+            if isinstance(row.get("qa_cycles"), int)
+        ]
+        succeeded = sum(
+            1 for row in selected if row.get("outcome") in SUCCESS_OUTCOMES
         )
-        if all_issues is not None:
-            marker_by_issue = {i["number"]: bool(MARKER_RE.search(i.get("body") or "")) for i in all_issues}
-            rows = []
-            for line in run_rows_path.read_text(encoding="utf-8").splitlines():
-                try:
-                    row = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-                if isinstance(row, dict) and row.get("outcome") not in SKIP_OUTCOMES:
-                    rows.append(row)
-            tiers: dict[str, dict] = {}
-            for name, wanted in (("normalized", True), ("unnormalized", False)):
-                sub = [r for r in rows if marker_by_issue.get(r.get("issue")) is wanted]
-                if sub:
-                    sub_qa = [r["qa_cycles"] for r in sub if isinstance(r.get("qa_cycles"), int)]
-                    won = sum(1 for r in sub if r.get("outcome") in SUCCESS_OUTCOMES)
-                    tiers[name] = {
-                        "runs": len(sub),
-                        "success_pct": _pct(won, len(sub)),
-                        "median_qa": _median(sub_qa),
-                    }
-            if tiers:
-                result["tiers"] = tiers
-                norm, unnorm = tiers.get("normalized"), tiers.get("unnormalized")
-                if norm and unnorm and norm["median_qa"] is not None and unnorm["median_qa"] is not None:
-                    result["qa_cycles_saved"] = unnorm["median_qa"] - norm["median_qa"]
+        tiers[name] = {
+            "runs": len(selected),
+            "success_pct": _pct(succeeded, len(selected)),
+            "median_qa": _median(qa_cycles),
+        }
+    if not tiers:
+        return None
+
+    result: dict = {"tiers": tiers}
+    normalized = tiers.get("normalized")
+    unnormalized = tiers.get("unnormalized")
+    if (
+        normalized
+        and unnormalized
+        and normalized["median_qa"] is not None
+        and unnormalized["median_qa"] is not None
+    ):
+        result["qa_cycles_saved"] = (
+            unnormalized["median_qa"] - normalized["median_qa"]
+        )
+    return result
+
+
+def collect_github_stats(
+    limit: int, run_rows_path: Path, window: SinceWindow | None = None
+) -> dict | None:
+    """Orchestrate the three independent gh-backed stats collectors."""
+    result = collect_issue_normalization_stats(limit)
+    if result is None:
+        return None  # gh missing, unauthenticated, or offline — skip the section
+    merged = collect_merged_pr_stats(limit, window)
+    if merged is not None:
+        result.update(merged)
+    tiers = collect_run_tier_stats(limit, run_rows_path)
+    if tiers is not None:
+        result.update(tiers)
     return result
 
 
 # Report layout (DESIGN.md: symbols carry meaning without color; dim = secondary;
-# max width 80). Ratio rows share one rail: verdict symbol, label, 10-cell meter,
+# bounded width). Ratio rows share one rail: verdict symbol, label, 10-cell meter,
 # right-aligned percentage, counts, dim spec citation.
 
 _LABEL_W = 28
@@ -898,9 +999,9 @@ def _c(text: str, *styles: str) -> str:
 
 
 def _verdict(pct: int) -> tuple[str, str]:
-    if pct >= 80:
+    if pct >= PASS_PERCENT_THRESHOLD:
         return "✓", "green"
-    if pct >= 40:
+    if pct >= WARN_PERCENT_THRESHOLD:
         return "⚠", "yellow"
     return "✗", "red"
 
@@ -972,7 +1073,7 @@ def _render_dr_binding(b: dict | None) -> list[str]:
         )
         lines.append(_c("      lifetime shortfall is a recorded decision, not a regression", "dim"))
         # The ADR path gets its own line: it is a URL-shaped token, and the
-        # joined form ran to 121 columns against this report's 80-column rail.
+        # joined form exceeded this report's bounded-width rail.
         lines.append(_c(f"      {b['adr']}", "dim"))
         if b.get("window_error"):
             # A window was asked for and could not be applied. Saying nothing
@@ -1003,88 +1104,171 @@ def _render_dr_binding(b: dict | None) -> list[str]:
     return lines
 
 
-def render_stats(commit_s: dict | None, run_s: dict | None, gh_s: dict | None, gh_skipped: str | None, project: dict | None = None, window: SinceWindow | None = None) -> None:
-    out: list[str] = []
-    out.append(f"◆ idd-lint stats {_c('— evidence report · IDD Spec v' + SPEC_VERSION, 'dim')}")
+def _render_stats_header(project: dict | None) -> list[str]:
+    lines = [
+        f"◆ idd-lint stats {_c('— evidence report · IDD Spec v' + SPEC_VERSION, 'dim')}"
+    ]
     if project:
-        out.append(f"  {_c('project', 'bold')}  {project['name']}")
-        out.append(_c(f"  location {project['location']}", "dim"))
-    out.append(_c("┄" * 59, "dim"))
-    out.append("")
+        lines.append(f"  {_c('project', 'bold')}  {project['name']}")
+        lines.append(_c(f"  location {project['location']}", "dim"))
+    lines.extend((_c("┄" * 59, "dim"), ""))
+    return lines
 
-    if window and window.cutoff is None:
-        # Top of the report, once, before any number it invalidates. A window
-        # that did not resolve is not applied to *any* section, so a reader who
-        # sees this knows every ratio below is lifetime — including the
-        # git-history section, which has no row of its own to warn on and under
-        # --no-github is the only section there is.
-        out.append(f"  {_c('⚠', 'yellow')} --since {window.since!r} {window.error}")
-        out.append(_c("    window not applied — every section below is lifetime", "dim"))
-        out.append("")
 
+def _render_window_warning(window: SinceWindow | None) -> list[str]:
+    if not window or window.cutoff is not None:
+        return []
+    # Top of the report, once, before any number it invalidates. A window that
+    # did not resolve is not applied to *any* section, so a reader knows every
+    # ratio below is lifetime, including the git-history section.
+    return [
+        f"  {_c('⚠', 'yellow')} --since {window.since!r} {window.error}",
+        _c("    window not applied — every section below is lifetime", "dim"),
+        "",
+    ]
+
+
+def _render_git_history_stats(commit_s: dict | None) -> list[str]:
     if commit_s is None:
-        out.append(_c("  ○ git history — skipped: not a git repository", "dim"))
+        return [_c("  ○ git history — skipped: not a git repository", "dim")]
+    count = commit_s["commits"]
+    lines = [
+        _section(
+            "Git history",
+            f"{commit_s['branch']} · {count} non-merge commit{'s' if count != 1 else ''}",
+        ),
+        _ratio_row("conventional grammar", commit_s["grammar_ok"], count, "§3.2"),
+        _ratio_row("trace completeness", commit_s["issue_linked"], count, "§5.1"),
+    ]
+    if commit_s["pr_derived_commits"]:
+        lines.extend((
+            _ratio_row(
+                "DR coverage (local proxy)",
+                commit_s["decision_records"],
+                commit_s["pr_derived_commits"],
+                "§4",
+            ),
+            _c(
+                "      proxy — subject (#N) or `Closes #N` body; the GitHub join is authoritative",
+                "dim",
+            ),
+        ))
     else:
-        n = commit_s["commits"]
-        out.append(_section("Git history", f"{commit_s['branch']} · {n} non-merge commit{'s' if n != 1 else ''}"))
-        out.append(_ratio_row("conventional grammar", commit_s["grammar_ok"], n, "§3.2"))
-        out.append(_ratio_row("trace completeness", commit_s["issue_linked"], n, "§5.1"))
-        if commit_s["pr_derived_commits"]:
-            out.append(_ratio_row("DR coverage (local proxy)", commit_s["decision_records"], commit_s["pr_derived_commits"], "§4"))
-            out.append(_c("      proxy — subject (#N) or `Closes #N` body; the GitHub join is authoritative", "dim"))
-        else:
-            out.append(_c("      DR coverage (local proxy) — no PR-derived commits on this branch (§4)", "dim"))
+        lines.append(_c(
+            "      DR coverage (local proxy) — no PR-derived commits on this branch (§4)",
+            "dim",
+        ))
+    return lines
 
-    out.append("")
+
+def _render_run_log_stats(run_s: dict | None) -> list[str]:
     if run_s is None:
-        out.append(_c("  ○ run log — skipped: .gitissue/runs.jsonl not found or empty", "dim"))
-    else:
-        out.append(_section("Run log", f".gitissue/runs.jsonl · {run_s['runs']} run{'s' if run_s['runs'] != 1 else ''}"))
-        out.append(_info_row("outcomes", " · ".join(f"{k} {v}" for k, v in run_s["outcomes"].items())))
-        if run_s["attempted"]:
-            out.append(_ratio_row("success rate", run_s["succeeded"], run_s["attempted"]))
-        if run_s["median_qa_cycles"] is not None:
-            out.append(_info_row("median QA cycles", f"{run_s['median_qa_cycles']:g}"))
-        breaches = run_s.get("unexplained_ceiling_breaches") or 0
-        if breaches:
-            issues = run_s.get("ceiling_breach_issues") or []
-            issue_bit = f" (#{', #'.join(str(n) for n in issues)})" if issues else ""
-            out.append(
-                f"  {_c('✗', 'red')} unexplained QA ceiling breaches  {breaches}{issue_bit}"
+        return [_c(
+            "  ○ run log — skipped: .gitissue/runs.jsonl not found or empty", "dim"
+        )]
+    lines = [
+        _section(
+            "Run log",
+            f".gitissue/runs.jsonl · {run_s['runs']} run{'s' if run_s['runs'] != 1 else ''}",
+        ),
+        _info_row(
+            "outcomes", " · ".join(f"{key} {value}" for key, value in run_s["outcomes"].items())
+        ),
+    ]
+    if run_s["attempted"]:
+        lines.append(_ratio_row("success rate", run_s["succeeded"], run_s["attempted"]))
+    if run_s["median_qa_cycles"] is not None:
+        lines.append(_info_row("median QA cycles", f"{run_s['median_qa_cycles']:g}"))
+    breaches = run_s.get("unexplained_ceiling_breaches") or 0
+    if breaches:
+        issues = run_s.get("ceiling_breach_issues") or []
+        issue_bit = f" (#{', #'.join(str(number) for number in issues)})" if issues else ""
+        lines.append(
+            f"  {_c('✗', 'red')} unexplained QA ceiling breaches  {breaches}{issue_bit}"
+        )
+    if run_s["median_duration_s"] is not None:
+        lines.append(_info_row("median duration", f"{round(run_s['median_duration_s'])}s"))
+    if run_s["by_complexity"]:
+        parts = [
+            f"{level} {values['runs']}"
+            + (
+                f" (median QA {values['median_qa']:g})"
+                if values["median_qa"] is not None
+                else ""
             )
-        if run_s["median_duration_s"] is not None:
-            out.append(_info_row("median duration", f"{round(run_s['median_duration_s'])}s"))
-        if run_s["by_complexity"]:
-            parts = [
-                f"{lvl} {v['runs']}" + (f" (median QA {v['median_qa']:g})" if v["median_qa"] is not None else "")
-                for lvl, v in run_s["by_complexity"].items()
-            ]
-            out.append(_info_row("complexity mix", " · ".join(parts)))
+            for level, values in run_s["by_complexity"].items()
+        ]
+        lines.append(_info_row("complexity mix", " · ".join(parts)))
+    return lines
 
-    out.append("")
+
+def _render_github_stats(gh_s: dict | None, skipped: str | None) -> list[str]:
     if gh_s is None:
-        out.append(_c(f"  ○ GitHub — skipped: {gh_skipped or 'gh unavailable'} (local metrics unaffected)", "dim"))
-    else:
-        out.append(_section("GitHub", "via gh"))
-        out.append(_ratio_row("open issues normalized", gh_s["open_normalized"], gh_s["open_issues"], "§1.1"))
-        if "merged_prs" in gh_s:
-            out.append(_ratio_row("merged PRs · Closes #N", gh_s["merged_with_closes"], gh_s["merged_prs"], "§5.1"))
-            out.append(_ratio_row("merged PRs · Decision Record", gh_s["merged_with_dr"], gh_s["merged_prs"], "§4.1"))
-        out.extend(_render_dr_binding(gh_s.get("dr_binding")))
-        tiers = gh_s.get("tiers")
-        if tiers:
-            out.append("")
-            out.append(_section("Issue quality → outcome", "runs joined with issue bodies"))
-            for name, t in tiers.items():
-                qa = f" · median QA {t['median_qa']:g}" if t["median_qa"] is not None else ""
-                out.append(_info_row(name, f"n={t['runs']} · success {t['success_pct']}%{qa}"))
-            saved = gh_s.get("qa_cycles_saved")
-            if saved is not None and saved > 0:
-                cycles = f"{saved:g} fewer QA cycle{'s' if saved != 1 else ''}"
-                out.append(f"    ⚡ normalized issues resolve in {_c(cycles, 'bold')} (median)")
+        return [_c(
+            f"  ○ GitHub — skipped: {skipped or 'gh unavailable'} (local metrics unaffected)",
+            "dim",
+        )]
+    lines = [
+        _section("GitHub", "via gh"),
+        _ratio_row(
+            "open issues normalized", gh_s["open_normalized"], gh_s["open_issues"], "§1.1"
+        ),
+    ]
+    if "merged_prs" in gh_s:
+        lines.extend((
+            _ratio_row(
+                "merged PRs · Closes #N",
+                gh_s["merged_with_closes"],
+                gh_s["merged_prs"],
+                "§5.1",
+            ),
+            _ratio_row(
+                "merged PRs · Decision Record",
+                gh_s["merged_with_dr"],
+                gh_s["merged_prs"],
+                "§4.1",
+            ),
+        ))
+    lines.extend(_render_dr_binding(gh_s.get("dr_binding")))
+    tiers = gh_s.get("tiers")
+    if tiers:
+        lines.extend(("", _section(
+            "Issue quality → outcome", "runs joined with issue bodies"
+        )))
+        for name, tier in tiers.items():
+            qa = (
+                f" · median QA {tier['median_qa']:g}"
+                if tier["median_qa"] is not None
+                else ""
+            )
+            lines.append(_info_row(
+                name, f"n={tier['runs']} · success {tier['success_pct']}%{qa}"
+            ))
+        saved = gh_s.get("qa_cycles_saved")
+        if saved is not None and saved > 0:
+            cycles = f"{saved:g} fewer QA cycle{'s' if saved != 1 else ''}"
+            lines.append(
+                f"    ⚡ normalized issues resolve in {_c(cycles, 'bold')} (median)"
+            )
+    return lines
 
+
+def render_stats(
+    commit_s: dict | None,
+    run_s: dict | None,
+    gh_s: dict | None,
+    gh_skipped: str | None,
+    project: dict | None = None,
+    window: SinceWindow | None = None,
+) -> None:
+    out = _render_stats_header(project)
+    out.extend(_render_window_warning(window))
+    out.extend(_render_git_history_stats(commit_s))
     out.append("")
-    out.append(_c("┄" * 59, "dim"))
+    out.extend(_render_run_log_stats(run_s))
+    out.append("")
+    out.extend(_render_github_stats(gh_s, gh_skipped))
+    out.extend(("", _c("┄" * 59, "dim")))
     print("\n".join(out))
 
 
@@ -1215,7 +1399,12 @@ def main(argv: list[str]) -> int:
              "timezone while a PR's mergedAt is UTC, so a PR merged 2026-08-14T23:00Z "
              "falls inside a 2026-08-15 window in UTC+2",
     )
-    p_stats.add_argument("--limit", type=int, default=200, help="max issues/PRs fetched via gh (default: 200)")
+    p_stats.add_argument(
+        "--limit",
+        type=int,
+        default=DEFAULT_GITHUB_FETCH_LIMIT,
+        help=f"max issues/PRs fetched via gh (default: {DEFAULT_GITHUB_FETCH_LIMIT})",
+    )
     p_stats.add_argument("--no-github", action="store_true", help="skip gh-backed metrics (offline mode)")
     p_stats.add_argument("--json", action="store_true", help="emit machine-readable JSON instead of text")
 
