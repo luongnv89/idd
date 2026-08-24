@@ -41,14 +41,18 @@ def _sub_out(value: str, out_dir: Path) -> str:
     return re.sub(r"(?<![A-Za-z0-9_])OUT(?=/|$|[^A-Za-z0-9_])", out, value)
 
 
-def _run(cmd: list[str], *, stdin_data: str | None = None, cwd: Path) -> int:
-    proc = subprocess.run(  # noqa: S603
-        cmd,
-        input=stdin_data,
-        text=True,
-        capture_output=True,
-        cwd=str(cwd),
-    )
+def _run(cmd: list[str], *, stdin_data: str | None = None, cwd: Path) -> int | None:
+    try:
+        proc = subprocess.run(  # noqa: S603
+            cmd,
+            input=stdin_data,
+            text=True,
+            capture_output=True,
+            cwd=str(cwd),
+        )
+    except (OSError, UnicodeError, ValueError) as exc:
+        print(f"    │ unable to run grading tool: {exc}")
+        return None
     # Surface tool output lightly for debugging failed grades.
     if proc.returncode != 0 and (proc.stdout or proc.stderr):
         for line in (proc.stdout + proc.stderr).splitlines()[:20]:
@@ -68,6 +72,23 @@ def _out_artifact(token: str, out_dir: Path) -> Path | None:
     if ".." in Path(token).parts:
         return None
     return path
+
+
+def _read_shell_artifact_value(artifact: Path) -> tuple[str | None, str | None]:
+    """Read a small UTF-8 artifact safely before placing it in an argv entry."""
+    try:
+        data = artifact.read_bytes()
+    except OSError as exc:
+        return None, f"cannot read OUT artifact: {exc}"
+    if len(data) > 64 * 1024:
+        return None, "OUT artifact exceeds the 64 KiB argv limit"
+    try:
+        value = data.decode("utf-8")
+    except UnicodeDecodeError:
+        return None, "OUT artifact is not valid UTF-8"
+    if "\0" in value:
+        return None, "OUT artifact contains a NUL byte"
+    return value.replace("\n", ""), None
 
 
 def _allowlisted_shell_command(
@@ -93,7 +114,9 @@ def _allowlisted_shell_command(
         artifact = _out_artifact(match.group(1), out_dir) if match else None
         if artifact is None or not artifact.is_file():
             return None, "branch/commit assertion requires a readable OUT artifact"
-        value = artifact.read_text(encoding="utf-8").replace("\n", "")
+        value, error = _read_shell_artifact_value(artifact)
+        if value is None:
+            return None, error
         return [*lint, tokens[2], value], None
 
     if len(tokens) == 6 and tokens[:3] == [*prefix, "pr"] and tokens[4] == "--title":
@@ -102,7 +125,9 @@ def _allowlisted_shell_command(
         title = _out_artifact(match.group(1), out_dir) if match else None
         if body is None or title is None or not body.is_file() or not title.is_file():
             return None, "PR assertion requires readable body and title OUT artifacts"
-        title_value = title.read_text(encoding="utf-8").replace("\n", "")
+        title_value, error = _read_shell_artifact_value(title)
+        if title_value is None:
+            return None, error
         return [*lint, "pr", str(body), "--title", title_value], None
 
     return None, "command is not in the shell assertion allowlist"

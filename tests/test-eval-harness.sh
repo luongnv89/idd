@@ -424,6 +424,52 @@ else
   fail "T21: non-allowlisted shell assertion is rejected (exit $MALICIOUS_EXIT)"
 fi
 
+# ─── T22: malformed argv artifacts fail without traceback ──
+MALFORMED_OUT="$TMP/malformed-artifact-out"
+mkdir -p "$MALFORMED_OUT"
+printf 'fix/342-safe\0suffix\n' > "$MALFORMED_OUT/nul.txt"
+printf '\377\n' > "$MALFORMED_OUT/non-utf8.txt"
+printf 'fix/342-safe\n' > "$MALFORMED_OUT/valid.txt"
+cat > "$CASE/case.json" <<'EOF'
+{
+  "name": "harness/reject-malformed-artifacts",
+  "grade": [
+    {
+      "tool": "shell",
+      "args": ["python3 scripts/idd-lint.py branch \"$(tr -d '\\n' < OUT/nul.txt)\""],
+      "expect_exit": 0,
+      "label": "NUL artifact"
+    },
+    {
+      "tool": "shell",
+      "args": ["python3 scripts/idd-lint.py commit \"$(tr -d '\\n' < OUT/non-utf8.txt)\""],
+      "expect_exit": 0,
+      "label": "non-UTF-8 artifact"
+    },
+    {
+      "tool": "shell",
+      "args": ["python3 scripts/idd-lint.py branch \"$(tr -d '\\n' < OUT/valid.txt)\""],
+      "expect_exit": 0,
+      "label": "valid artifact still runs"
+    }
+  ]
+}
+EOF
+set +e
+REPO_ROOT="$REPO_ROOT" python3 "$GRADE" --case "$CASE" \
+  --out "$MALFORMED_OUT" > "$TMP/malformed-grade.out" 2>&1
+MALFORMED_EXIT=$?
+set -e
+if [ "$MALFORMED_EXIT" -eq 1 ] \
+  && grep -q 'NUL byte' "$TMP/malformed-grade.out" \
+  && grep -q 'not valid UTF-8' "$TMP/malformed-grade.out" \
+  && grep -q '✓ valid artifact still runs' "$TMP/malformed-grade.out" \
+  && ! grep -q 'Traceback' "$TMP/malformed-grade.out"; then
+  pass "T22: malformed argv artifacts fail cleanly and grading continues"
+else
+  fail "T22: malformed argv artifacts fail cleanly (exit $MALFORMED_EXIT)"
+fi
+
 echo "Results: $PASS passed, $FAIL failed"
 if [ "$FAIL" -gt 0 ]; then
   exit 1
