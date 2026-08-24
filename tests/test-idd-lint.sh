@@ -401,8 +401,39 @@ fi
 #
 # 00:00:01, not 00:30:00: the backdated commit only exercises the bug while the
 # unnormalized bare date resolves *later in the day* than it. At 00:30 the test
-# tautologized for the first half-hour of every local day; at 00:00:01 the blind
-# spot is one second wide.
+# tautologized for the first half-hour of every local day.
+#
+# The clock is pinned rather than read (F-TEST-006, issue #356). Backdating to
+# 00:00:01 narrowed the blind spot to one second but did not close it: for the
+# second after local midnight the fixture commit is not earlier than "now", so
+# the assertion below holds whatever normalize_since does, and the suite's
+# meaning depended on what time it happened to run. Nothing here needs the
+# machine's real zone, so the block runs in a synthetic fixed-offset one chosen
+# to put local now at 12:xx. `date -u '+%H'` is the UTC hour; a POSIX TZ offset
+# states what to ADD TO LOCAL to reach UTC, so the sign inverts and `hour - 12`
+# names exactly the zone whose local noon is now. git reads TZ for both
+# GIT_COMMITTER_DATE and --since, so fixture and window stay in one frame, and
+# TZ is restored afterwards so no later test inherits the pin.
+SINCE_TZ_WAS="${TZ+set}"
+SINCE_TZ_OLD="${TZ-}"
+# One clock read, and everything below derives from it: no hour boundary can
+# fall between two reads and leave them disagreeing about what was pinned.
+SINCE_UTC_H=$(( 10#$(date -u '+%H') ))
+export TZ="IDD$(( SINCE_UTC_H - 12 ))"
+# The guard is the pin's own regression test: a wrong sign, or a zone string
+# this libc rejects, falls back to UTC silently and the blind spot returns
+# unseen. It checks the resulting *offset*, not the resulting hour. An hour is
+# the weaker claim — a UTC fallback still reads 02..22 for twenty-one hours of
+# the day, so a range over hours would miss the very failure this exists to
+# catch. The offset is a property of TZ alone, so it is both exact and immune
+# to the clock moving underneath the check.
+SINCE_WANT_OFF="$(printf '%+03d00' "$(( 12 - SINCE_UTC_H ))")"
+SINCE_GOT_OFF="$(date '+%z')"
+if [ "$SINCE_GOT_OFF" = "$SINCE_WANT_OFF" ]; then
+  pass "T25d.0: clock pinned — TZ=$TZ gives offset $SINCE_GOT_OFF, local noon not midnight"
+else
+  fail "T25d.0: clock pin not applied — TZ=$TZ gave offset $SINCE_GOT_OFF, want $SINCE_WANT_OFF"
+fi
 SINCE_REPO="$TMP/since"
 mkdir -p "$SINCE_REPO"
 TODAY="$(date '+%Y-%m-%d')"
@@ -426,10 +457,11 @@ EXPLICIT="$( (cd "$SINCE_REPO" && python3 "$LINT" stats --no-github --since "$TO
 # reports the same lifetime 2 the correct midnight window reports. The window
 # error is the signal that survives — so compare the two forms on that too.
 #
-# Compared, not asserted absent: for the two seconds after local midnight the
-# normalized `$TODAY 00:00:00` is itself within the ±2s now-band and both forms
-# warn. That is the documented `NOW_TOKENS` residual, not a normalization bug.
-# Equality is the real claim: a bare date must behave like explicit midnight.
+# Compared, not asserted absent: within the ±2s now-band the normalized
+# `$TODAY 00:00:00` itself trips the now-detection and both forms warn. The pin
+# above puts local now at 12:xx, so that band is unreachable here — the
+# comparison stays because equality, not absence, is the real claim: a bare date
+# must behave like explicit midnight.
 BARE_TEXT="$( cd "$SINCE_REPO" && python3 "$LINT" stats --no-github --since "$TODAY" )"
 EXPLICIT_TEXT="$( cd "$SINCE_REPO" && python3 "$LINT" stats --no-github --since "$TODAY 00:00:00" )"
 BARE_WARN="$( printf '%s\n' "$BARE_TEXT" | grep -cF "⚠ --since" || true )"
@@ -444,6 +476,8 @@ else
   echo "      window warnings — bare $BARE_WARN, explicit midnight $EXPLICIT_WARN"
   printf '%s\n' "$BARE_TEXT" | grep -F "⚠ --since" | sed 's/^/      /' || true
 fi
+# Drop the pin — every check after this one reads the machine's real zone.
+if [ -n "$SINCE_TZ_WAS" ]; then export TZ="$SINCE_TZ_OLD"; else unset TZ; fi
 
 # ───────────────────────────────────────────────────────────
 # T25e: merge-commit join predicate (#180)
