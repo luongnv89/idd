@@ -83,6 +83,9 @@ jobs:
       - name: test-idd-lint-structure-350
         run: bash tests/test-idd-lint-structure-350.sh
 
+      - name: test-git-batching-352
+        run: bash tests/test-git-batching-352.sh
+
       - name: test-eval-harness
         run: bash tests/test-eval-harness.sh
 

@@ -443,11 +443,15 @@ SUCCESS_OUTCOMES = {"success", "merged"}
 SKIP_OUTCOMES = {"skipped", "already_resolved"}
 
 
-def _run_soft(cmd: list[str]) -> str | None:
+def _run_soft(cmd: list[str], input_text: str | None = None) -> str | None:
     """Run a command, returning stdout or None on any failure (soft probe)."""
     try:
         proc = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=SOFT_COMMAND_TIMEOUT_SECONDS
+            cmd,
+            input=input_text,
+            capture_output=True,
+            text=True,
+            timeout=SOFT_COMMAND_TIMEOUT_SECONDS,
         )
     except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
         return None
@@ -751,20 +755,44 @@ def collect_run_stats(path: Path) -> dict | None:
     }
 
 
-def classify_merge_commit(oid: str | None) -> str:
-    """Did the Decision Record survive the merge? — one PR, one landing commit.
+def classify_merge_commits(oids: list[str | None]) -> list[str]:
+    """Classify all landing commits with one soft `git log --stdin` probe.
 
-    Returns exactly one of:
-      `no_sha`        the PR reports no merge commit (unmerged, or squashed away
-                      by a platform that did not report an oid)
-      `not_in_clone`  the oid is real to GitHub but absent from this checkout
-                      (shallow clone, unfetched branch) — unknown, not a miss
-      `landed`        the landing commit's message carries the Decision Record
-      `lost`          it does not — SPEC §4.3 binding B1 was defeated at merge
-
-    Never raises and never exits: `_run_soft` swallows the non-zero `git log`
-    that an unknown oid produces, which is why this must not use `git()`.
+    `--ignore-missing` preserves the old per-PR behavior: an oid absent from a
+    shallow clone is omitted while resolvable siblings are still classified.
+    NUL framing keeps multiline commit messages from becoming record boundaries.
     """
+    wanted = list(dict.fromkeys(oid for oid in oids if oid))
+    if not wanted:
+        return ["no_sha" for _ in oids]
+    output = _run_soft(
+        [
+            "git",
+            "log",
+            "--no-walk=unsorted",
+            "--ignore-missing",
+            "-z",
+            "--format=%H%x00%B",
+            "--stdin",
+        ],
+        "\n".join(wanted) + "\n",
+    )
+    by_oid: dict[str, str] = {}
+    if output is not None:
+        fields = output.split("\0")
+        if fields and fields[-1] == "":
+            fields.pop()
+        if len(fields) % 2 == 0:
+            for oid, body in zip(fields[0::2], fields[1::2]):
+                by_oid[oid] = "landed" if DR_HEADING in body else "lost"
+    return [
+        "no_sha" if not oid else by_oid.get(oid.lower(), "not_in_clone")
+        for oid in oids
+    ]
+
+
+def classify_merge_commit(oid: str | None) -> str:
+    """Classify one commit, preserving support for refs and abbreviated oids."""
     if not oid:
         return "no_sha"
     body = _run_soft(["git", "log", "-1", "--format=%B", oid])
@@ -792,11 +820,12 @@ def collect_dr_binding(merged: list, limit: int, window: SinceWindow | None) -> 
     """
     with_dr = [p for p in merged if DR_HEADING in ((p or {}).get("body") or "")]
     counts = {"no_sha": 0, "not_in_clone": 0, "landed": 0, "lost": 0}
-    verdict_by_pr: dict = {}
+    merge_oids = []
     for pr in with_dr:
         mc = pr.get("mergeCommit")
-        oid = mc.get("oid") if isinstance(mc, dict) else None
-        verdict = classify_merge_commit(oid)
+        merge_oids.append(mc.get("oid") if isinstance(mc, dict) else None)
+    verdict_by_pr: dict = {}
+    for pr, verdict in zip(with_dr, classify_merge_commits(merge_oids)):
         counts[verdict] += 1
         # Keyed on the PR number, not `id(pr)`: identity is only stable while
         # this exact list of dicts is alive, and a future refactor that copies
