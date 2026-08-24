@@ -23,11 +23,99 @@ import runpy
 import sys
 import unicodedata
 from pathlib import Path
-from typing import Any
+from typing import TypedDict, cast
 
 _RUN_GH = runpy.run_path(str(Path(__file__).with_name("gi-gh.py")))["run_gh"]
 
-DEFAULTS: dict[str, Any] = {
+ScoreConfig = TypedDict(
+    "ScoreConfig",
+    {
+        "weights.phrase": int,
+        "weights.title_overlap": int,
+        "weights.keyword": int,
+        "weights.same_type": int,
+        "high_threshold": int,
+        "medium_threshold": int,
+        "min_token_length": int,
+        "phrase_min_tokens": int,
+        "backlog_limit": int,
+        "max_items": int,
+        "extra_stop_words": list[str],
+    },
+)
+
+
+class Item(TypedDict):
+    """Normalized proposed issue accepted by the scoring core."""
+
+    index: int
+    title: str
+    keywords: list[str]
+    type: str | None
+
+
+class ScoreTarget(TypedDict, total=False):
+    """Existing issue or proposed item used as the comparison target."""
+
+    index: int
+    number: int
+    title: str
+    body: str
+    keywords: list[str]
+    type: str | None
+    labels: list[object]
+
+
+class Payment(TypedDict):
+    """One score contribution and its token-level provenance."""
+
+    signal: str
+    tokens: list[str]
+    amount: int
+
+
+class ScoredPair(TypedDict):
+    """Directional score plus the evidence consumed to produce it."""
+
+    score: int
+    shared_keywords: list[str]
+    consumed_tokens: list[str]
+    payments: list[Payment]
+
+
+class _OptionalMatchRecord(TypedDict, total=False):
+    match_title: str
+    match_number: int
+    match_labels: list[object]
+    match_index: int
+    confidence: str
+    pair: list[int]
+    direction: str
+    directional_scores: dict[str, int]
+
+
+class MatchRecord(_OptionalMatchRecord):
+    """Serialized match; optional keys distinguish backlog and batch matches."""
+
+    item_index: int
+    match_type: str
+    score: int
+    shared_keywords: list[str]
+    payments: list[Payment]
+    reason: str
+
+
+class MediumIssueContext(TypedDict):
+    """Deduplicated issue context passed to medium-band judgement."""
+
+    number: int
+    title: str
+    body: str
+    body_truncated: bool
+    labels: list[object]
+
+
+DEFAULTS: dict[str, object] = {
     "weights.phrase": 2,
     "weights.title_overlap": 2,
     "weights.keyword": 1,
@@ -107,7 +195,7 @@ def _flatten_config(raw: object) -> dict[str, object]:
     }
 
 
-def resolve_config(raw: object, args: argparse.Namespace) -> dict[str, Any]:
+def resolve_config(raw: object, args: argparse.Namespace) -> ScoreConfig:
     values = dict(DEFAULTS)
     overrides = _flatten_config(raw)
     unknown = sorted(set(overrides) - set(DEFAULTS))
@@ -143,7 +231,19 @@ def resolve_config(raw: object, args: argparse.Namespace) -> dict[str, Any]:
     if not isinstance(extra, list) or not all(isinstance(word, str) for word in extra):
         raise InvalidInput("duplicate_detection.extra_stop_words must be a list of strings")
     values["extra_stop_words"] = extra
-    return values
+    return {
+        "weights.phrase": cast(int, values["weights.phrase"]),
+        "weights.title_overlap": cast(int, values["weights.title_overlap"]),
+        "weights.keyword": cast(int, values["weights.keyword"]),
+        "weights.same_type": cast(int, values["weights.same_type"]),
+        "high_threshold": cast(int, values["high_threshold"]),
+        "medium_threshold": cast(int, values["medium_threshold"]),
+        "min_token_length": cast(int, values["min_token_length"]),
+        "phrase_min_tokens": cast(int, values["phrase_min_tokens"]),
+        "backlog_limit": cast(int, values["backlog_limit"]),
+        "max_items": cast(int, values["max_items"]),
+        "extra_stop_words": cast(list[str], extra),
+    }
 
 
 def active_tokens(text: str, stop_words: frozenset[str], minimum: int) -> list[str]:
@@ -202,7 +302,7 @@ def issue_type(labels: object) -> str | None:
     return None
 
 
-def score_pair(item: dict[str, Any], target: dict[str, Any], config: dict[str, Any]) -> dict[str, Any]:
+def score_pair(item: Item, target: ScoreTarget, config: ScoreConfig) -> ScoredPair:
     """Score one direction and return token-level payment provenance."""
     minimum = config["min_token_length"]
     extra_tokens = {
@@ -226,7 +326,7 @@ def score_pair(item: dict[str, Any], target: dict[str, Any], config: dict[str, A
     }
 
     consumed: set[str] = set()
-    payments: list[dict[str, Any]] = []
+    payments: list[Payment] = []
     score = 0
 
     phrase = phrase_hit(
@@ -275,7 +375,7 @@ def score_pair(item: dict[str, Any], target: dict[str, Any], config: dict[str, A
     }
 
 
-def read_request() -> dict[str, Any]:
+def read_request() -> dict[str, object]:
     buffer = getattr(sys.stdin, "buffer", None)
     raw = buffer.read().decode("utf-8", errors="replace") if buffer else sys.stdin.read()
     if not raw.strip():
@@ -289,13 +389,13 @@ def read_request() -> dict[str, Any]:
     return value
 
 
-def normalize_items(request: dict[str, Any], maximum: int) -> list[dict[str, Any]]:
+def normalize_items(request: dict[str, object], maximum: int) -> list[Item]:
     items = request.get("items")
     if not isinstance(items, list) or not items:
         raise InvalidInput("request must carry a non-empty 'items' array")
     if len(items) > maximum:
         raise InvalidInput(f"request carries {len(items)} items; maximum is {maximum}")
-    normalized: list[dict[str, Any]] = []
+    normalized: list[Item] = []
     seen: set[int] = set()
     for position, raw in enumerate(items, start=1):
         if not isinstance(raw, dict):
@@ -319,7 +419,7 @@ def normalize_items(request: dict[str, Any], maximum: int) -> list[dict[str, Any
     return normalized
 
 
-def load_issue_file(path: str, limit: int) -> tuple[list[dict[str, Any]], bool]:
+def load_issue_file(path: str, limit: int) -> tuple[list[ScoreTarget], bool]:
     try:
         value = json.loads(Path(path).read_text(encoding="utf-8"))
     except OSError as exc:
@@ -328,11 +428,11 @@ def load_issue_file(path: str, limit: int) -> tuple[list[dict[str, Any]], bool]:
         raise InvalidInput(f"{path} is not valid JSON — {exc.msg}") from exc
     if not isinstance(value, list):
         raise InvalidInput(f"{path} must hold a JSON array")
-    issues = [entry for entry in value if isinstance(entry, dict)]
+    issues: list[ScoreTarget] = [entry for entry in value if isinstance(entry, dict)]
     return issues[:limit], len(issues) > limit
 
 
-def _gh_issue_list(limit: int, repo: str | None, fields: str) -> list[dict[str, Any]]:
+def _gh_issue_list(limit: int, repo: str | None, fields: str) -> list[ScoreTarget]:
     command = ["issue", "list", "--state", "open", "--json", fields, "--limit", str(limit)]
     if repo:
         command.extend(["--repo", repo])
@@ -349,7 +449,7 @@ def _gh_issue_list(limit: int, repo: str | None, fields: str) -> list[dict[str, 
     return [entry for entry in value if isinstance(entry, dict)]
 
 
-def fetch_issues(limit: int, repo: str | None) -> tuple[list[dict[str, Any]], bool]:
+def fetch_issues(limit: int, repo: str | None) -> tuple[list[ScoreTarget], bool]:
     issues = _gh_issue_list(limit, repo, "number,title,body,labels")
     truncated = False
     if len(issues) == limit:
@@ -357,7 +457,7 @@ def fetch_issues(limit: int, repo: str | None) -> tuple[list[dict[str, Any]], bo
     return issues, truncated
 
 
-def band(score: int, config: dict[str, Any]) -> str:
+def band(score: int, config: ScoreConfig) -> str:
     if score >= config["high_threshold"]:
         return "high"
     if score >= config["medium_threshold"]:
@@ -366,9 +466,9 @@ def band(score: int, config: dict[str, Any]) -> str:
 
 
 def record_for(
-    item: dict[str, Any], target: dict[str, Any], scored: dict[str, Any], match_type: str
-) -> dict[str, Any]:
-    record: dict[str, Any] = {
+    item: Item, target: ScoreTarget, scored: ScoredPair, match_type: str
+) -> MatchRecord:
+    record: MatchRecord = {
         "item_index": item["index"],
         "match_type": match_type,
         "match_title": str(target.get("title") or ""),
@@ -422,9 +522,9 @@ def main(argv: list[str] | None = None) -> int:
         sys.stderr.write(f"⚠ gi-dup-score: {exc}\n")
         return 4
 
-    high_matches: list[dict[str, Any]] = []
-    medium_matches: list[dict[str, Any]] = []
-    internal_high: list[dict[str, Any]] = []
+    high_matches: list[MatchRecord] = []
+    medium_matches: list[MatchRecord] = []
+    internal_high: list[MatchRecord] = []
 
     for item in items:
         for issue in issues:
@@ -474,7 +574,7 @@ def main(argv: list[str] | None = None) -> int:
                 })
                 (internal_high if level == "high" else medium_matches).append(record)
 
-    def order(record: dict[str, Any]) -> tuple[Any, ...]:
+    def order(record: MatchRecord) -> tuple[tuple[int, ...], int, int]:
         return (
             tuple(record.get("pair", [record["item_index"]])),
             -record["score"],
@@ -487,7 +587,7 @@ def main(argv: list[str] | None = None) -> int:
         for record in ordered_medium
         if record["match_type"] == "existing_issue"
     }
-    medium_issue_context = []
+    medium_issue_context: list[MediumIssueContext] = []
     for issue in issues:
         if issue.get("number") not in medium_issue_numbers:
             continue
