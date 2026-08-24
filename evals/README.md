@@ -18,6 +18,7 @@ bash tests/test-eval-harness.sh
 bash tests/test-eval-creator.sh
 bash tests/test-eval-resolver.sh
 bash tests/test-eval-pr-review.sh
+bash tests/test-eval-triage-autopilot-357.sh
 ```
 
 Requirements: `python3`, `bash`, `git`. **No** `gh` auth, **no** network, **no**
@@ -116,8 +117,21 @@ evals/
 
 Aim toward **≥5 prompts per skill**, including **negative-trigger** cases (empty
 body, missing `Closes #N`, non-conventional branch, invalid run-log record).
-Today's floor ships creator (2), resolver (1), pr-review (2) plus harness unit
-tests.
+Today's floor ships creator (2), resolver (1), pr-review (2), triage (1) and
+auto-pilot (1), plus harness unit tests.
+
+### Cases on a host without a sandbox
+
+`run_eval.sh` fails closed when the host has no OS-level network sandbox, so a
+developer machine without Linux user+network namespaces cannot execute a
+subject. `tests/test-eval-triage-autopilot-357.sh` shows the pattern that keeps
+such cases covered anyway: assert the case manifest, replay the cassettes
+through `gh_shim.py` directly, cross-check the case's expected answers against
+the repo's own deterministic tools (`gi-triage-graph.py`, `gi-deps.py`), and run
+`subject.sh` + `grade.py` in a disposable directory. Those checks are
+host-independent; the sandboxed `run_eval.sh` run stays the authoritative one
+and is required in CI via `IDD_EVAL_REQUIRE_SANDBOX=1`. **Never** relax the
+sandbox gate in `run_eval.sh` to make a case runnable.
 
 ## Hermeticity rules
 

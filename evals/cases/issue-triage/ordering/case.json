@@ -1,0 +1,67 @@
+{
+  "name": "issue-triage/ordering",
+  "skill": "issue-triage",
+  "prompt": "Triage the open backlog and report the execution order to work next",
+  "grade": [
+    {
+      "tool": "file-exists",
+      "file": "OUT/rank-1-issue-12.txt",
+      "expect_exit": 0,
+      "label": "rank 1 is #12 — unblocked bug, oldest of the bugs still open"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/rank-2-issue-21.txt",
+      "expect_exit": 0,
+      "label": "rank 2 is #21 — bugs precede features in the same level"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/rank-3-issue-8.txt",
+      "expect_exit": 0,
+      "label": "rank 3 is #8 — feature precedes improvement in the same level"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/rank-4-issue-3.txt",
+      "expect_exit": 0,
+      "label": "rank 4 is #3 — the older improvement #15 is held back by its dependency edge, not by age"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/rank-5-issue-15.txt",
+      "expect_exit": 0,
+      "label": "rank 5 is #15 — the `Depends on #12` edge lands it after its blocker, below the newer #3"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/rank-6-issue-30.txt",
+      "expect_exit": 0,
+      "label": "rank 6 is #30 — maybe-fixed sorts to the bottom despite being the oldest bug"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/pick-12-P1.txt",
+      "expect_exit": 0,
+      "label": "the next pick is #12 at P1 — first entry that is neither blocked nor maybe-fixed"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/triage.json",
+      "expect_exit": 0,
+      "label": "triage payload persisted"
+    },
+    {
+      "tool": "idd-lint",
+      "args": ["issue", "OUT/issue-top.md"],
+      "expect_exit": 0,
+      "label": "the picked issue's body is spec-conformant"
+    },
+    {
+      "tool": "idd-lint",
+      "args": ["issue", "OUT/issue-unstructured.md"],
+      "expect_exit": 1,
+      "label": "an un-normalized body still fails idd-lint (negative)"
+    }
+  ]
+}

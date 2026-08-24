@@ -98,6 +98,15 @@ jobs:
       - name: test-eval-pr-review
         run: bash tests/test-eval-pr-review.sh
 
+      # IDD_EVAL_REQUIRE_SANDBOX turns "no OS network sandbox" from a skip into
+      # a failure, so the sandboxed run_eval.sh pass can never silently vanish
+      # from CI. A host without user+network namespaces keeps structural
+      # coverage only.
+      - name: test-eval-triage-autopilot-357
+        run: bash tests/test-eval-triage-autopilot-357.sh
+        env:
+          IDD_EVAL_REQUIRE_SANDBOX: "1"
+
       - name: test-autopilot-modes
         run: bash tests/test-autopilot-modes.sh
 
