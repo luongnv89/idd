@@ -334,3 +334,6 @@ jobs:
 
       - name: test-runs-jsonl-rotation-354
         run: bash tests/test-runs-jsonl-rotation-354.sh
+
+      - name: test-run-stats-373
+        run: bash tests/test-run-stats-373.sh
