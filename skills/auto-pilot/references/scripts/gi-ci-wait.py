@@ -71,9 +71,12 @@ from __future__ import annotations
 
 import argparse
 import json
-import subprocess
+import runpy
 import sys
 import time
+from pathlib import Path
+
+_RUN_GH = runpy.run_path(str(Path(__file__).with_name("gi-gh.py")))["run_gh"]
 
 DEFAULT_INTERVAL_S = 30
 DEFAULT_TIMEOUT_S = 600
@@ -116,18 +119,6 @@ class Unavailable(Exception):
     """The wait could not run; the caller falls back to prose — exit 4."""
 
 
-def _run_gh(args: list[str]) -> tuple[int, str, str]:
-    try:
-        proc = subprocess.run(
-            ["gh", *args], capture_output=True, text=True, check=False
-        )
-    except FileNotFoundError as exc:
-        raise Unavailable("gh is not installed or not on PATH") from exc
-    except OSError as exc:
-        raise Unavailable(f"cannot run gh — {exc}") from exc
-    return proc.returncode, proc.stdout, proc.stderr
-
-
 def poll_once(pr: str | None, repo: str | None) -> list[dict[str, object]] | None:
     """Return the current check list, or None when the PR reports no checks."""
     args = ["pr", "checks"]
@@ -137,7 +128,8 @@ def poll_once(pr: str | None, repo: str | None) -> list[dict[str, object]] | Non
         args += ["--repo", repo]
     args += ["--json", "name,state,bucket,link"]
 
-    code, out, err = _run_gh(args)
+    proc = _RUN_GH(args, Unavailable)
+    code, out, err = proc.returncode, proc.stdout, proc.stderr
     stripped = out.strip()
     if stripped:
         try:

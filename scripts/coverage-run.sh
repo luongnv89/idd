@@ -36,7 +36,9 @@ for s in "$SCRIPTS"/*.py; do
 done
 
 # Network-bound entry points get --help only (they shell out to gh): gi-issue,
-# gi-ci-wait, gi-secscan. Named here so the wiring check can see them.
+# gi-ci-wait, gi-secscan. The import-only gi-gh helper is also named here so
+# the wiring check can verify every tracked shared script remains measured.
+run "$SCRIPTS/gi-gh.py" --help
 run "$SCRIPTS/gi-issue.py" --help
 run "$SCRIPTS/gi-ci-wait.py" --help
 run "$SCRIPTS/gi-secscan.py" --help

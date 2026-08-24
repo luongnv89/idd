@@ -19,11 +19,13 @@ from __future__ import annotations
 
 import argparse
 import json
-import subprocess
+import runpy
 import sys
 import unicodedata
 from pathlib import Path
 from typing import Any
+
+_RUN_GH = runpy.run_path(str(Path(__file__).with_name("gi-gh.py")))["run_gh"]
 
 DEFAULTS: dict[str, Any] = {
     "weights.phrase": 2,
@@ -331,15 +333,10 @@ def load_issue_file(path: str, limit: int) -> tuple[list[dict[str, Any]], bool]:
 
 
 def _gh_issue_list(limit: int, repo: str | None, fields: str) -> list[dict[str, Any]]:
-    command = ["gh", "issue", "list", "--state", "open", "--json", fields, "--limit", str(limit)]
+    command = ["issue", "list", "--state", "open", "--json", fields, "--limit", str(limit)]
     if repo:
         command.extend(["--repo", repo])
-    try:
-        result = subprocess.run(command, capture_output=True, text=True, check=False)
-    except FileNotFoundError as exc:
-        raise Unavailable("gh is not installed or not on PATH") from exc
-    except OSError as exc:
-        raise Unavailable(f"cannot run gh — {exc}") from exc
+    result = _RUN_GH(command, Unavailable)
     if result.returncode:
         detail = result.stderr.strip().splitlines()
         raise Unavailable("gh issue list failed: " + (detail[-1] if detail else f"exit {result.returncode}"))

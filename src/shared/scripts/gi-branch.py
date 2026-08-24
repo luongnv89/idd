@@ -56,8 +56,12 @@ import argparse
 import json
 import os
 import re
+import runpy
 import subprocess
 import sys
+from pathlib import Path
+
+_RUN_GH = runpy.run_path(str(Path(__file__).with_name("gi-gh.py")))["run_gh"]
 
 # The inclusive maximum total length. The naming conventions say the branch
 # name must stay *under* 50 characters, so the default is 49, not 50 — a name
@@ -207,14 +211,7 @@ def fetch_issue(number: int, repo: str | None) -> tuple[str, list[str]]:
     args = ["issue", "view", str(number), "--json", "title,labels"]
     if repo:
         args += ["--repo", repo]
-    try:
-        proc = subprocess.run(
-            ["gh", *args], capture_output=True, text=True, check=False
-        )
-    except FileNotFoundError as exc:
-        raise Unavailable("gh is not installed or not on PATH") from exc
-    except OSError as exc:
-        raise Unavailable(f"cannot run gh — {exc}") from exc
+    proc = _RUN_GH(args, Unavailable)
     if proc.returncode != 0:
         detail = proc.stderr.strip().splitlines()
         raise Unavailable(

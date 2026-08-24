@@ -663,7 +663,9 @@ fi
 # classified scorer failure use the real scorer. HUP/INT/TERM are delivered to
 # the shell after the traps are armed; each must terminate with 128+signal,
 # remove the request through EXIT, and never reach the continuation marker.
-FLOW="$TMP/dup-flow"; mkdir -p "$FLOW/references/scripts"; cp "$SKILLS/issue-creator/references/scripts/gi-dup-score.py" "$FLOW/references/scripts/"
+FLOW="$TMP/dup-flow"; mkdir -p "$FLOW/references/scripts"
+cp "$SKILLS/issue-creator/references/scripts/gi-dup-score.py" \
+  "$SKILLS/issue-creator/references/scripts/gi-gh.py" "$FLOW/references/scripts/"
 printf '[]\n' > "$FLOW/issues.json"
 cat > "$FLOW/run-cleanup.sh" <<'EOF'
 #!/usr/bin/env bash
