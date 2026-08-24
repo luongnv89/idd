@@ -388,18 +388,26 @@ EVAL_STATE_DIR="$CORRUPT_STATE" python3 "$SHIM" issue create \
   --title "after-oversize" --body "body" > "$TMP/oversize-counter.out" \
   2> "$TMP/oversize-counter.err"
 OVERSIZE_EXIT=$?
+printf '%s\n' '9223372036854775807' > "$CORRUPT_STATE/issue_counter"
+EVAL_STATE_DIR="$CORRUPT_STATE" python3 "$SHIM" issue create \
+  --title "after-exhaustion" --body "body" > "$TMP/exhausted-counter.out" \
+  2> "$TMP/exhausted-counter.err"
+EXHAUSTED_EXIT=$?
 set -e
 if [ "$CORRUPT_EXIT" -eq 0 ] && [ "$OVERSIZE_EXIT" -eq 0 ] \
+  && [ "$EXHAUSTED_EXIT" -eq 1 ] \
   && grep -q 'invalid issue counter' "$TMP/corrupt.err" \
   && grep -q 'counter exceeds 64 bytes' "$TMP/oversize-counter.err" \
   && ! grep -q 'Traceback' "$TMP/corrupt.err" \
   && ! grep -q 'Traceback' "$TMP/oversize-counter.err" \
+  && grep -q 'issue counter exhausted' "$TMP/exhausted-counter.err" \
+  && ! grep -q 'Traceback' "$TMP/exhausted-counter.err" \
   && grep -q '/issues/1$' "$TMP/corrupt.out" \
   && grep -q '/issues/1$' "$TMP/oversize-counter.out" \
-  && [ "$(cat "$CORRUPT_STATE/issue_counter")" = "1" ]; then
-  pass "T20: corrupt and oversized counters warn and reset to issue 1"
+  && [ "$(cat "$CORRUPT_STATE/issue_counter")" = "9223372036854775807" ]; then
+  pass "T20: invalid counters reset and exhaustion fails without reuse"
 else
-  fail "T20: corrupt counters recover without traceback (exits $CORRUPT_EXIT/$OVERSIZE_EXIT)"
+  fail "T20: counter errors avoid traceback/reuse (exits $CORRUPT_EXIT/$OVERSIZE_EXIT/$EXHAUSTED_EXIT)"
 fi
 
 # ─── T21: non-allowlisted shell assertion is never executed ─
