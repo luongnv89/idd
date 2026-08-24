@@ -227,6 +227,9 @@ jobs:
       - name: test-scripts-278
         run: bash tests/test-scripts-278.sh
 
+      - name: test-dup-score-perf-353
+        run: bash tests/test-dup-score-perf-353.sh
+
       - name: test-bug-sweep-343
         run: bash tests/test-bug-sweep-343.sh
 

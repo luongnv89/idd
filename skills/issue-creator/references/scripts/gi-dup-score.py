@@ -22,6 +22,7 @@ import json
 import runpy
 import sys
 import unicodedata
+from functools import lru_cache
 from pathlib import Path
 from typing import TypedDict, cast
 
@@ -152,8 +153,8 @@ class Unavailable(Exception):
     """Backlog cannot be read (exit 4)."""
 
 
-def canonical_tokens(text: str) -> list[str]:
-    """Return NFKC/case-folded alphanumeric tokens, preserving order."""
+@lru_cache(maxsize=8192)
+def _canonical_cached(text: str) -> tuple[str, ...]:
     normalized = unicodedata.normalize("NFKC", text).casefold()
     tokens: list[str] = []
     current: list[str] = []
@@ -165,7 +166,121 @@ def canonical_tokens(text: str) -> list[str]:
             current = []
     if current:
         tokens.append("".join(current))
-    return tokens
+    return tuple(tokens)
+
+
+def canonical_tokens(text: str) -> list[str]:
+    """Return NFKC/case-folded alphanumeric tokens, preserving order."""
+    return list(_canonical_cached(text))
+
+
+@lru_cache(maxsize=4096)
+def _stop_words(extra_words: tuple[str, ...]) -> frozenset[str]:
+    extra: set[str] = set()
+    for word in extra_words:
+        extra.update(_canonical_cached(word))
+    return frozenset(STOP_WORDS | extra)
+
+
+def _config_stop_words(config: ScoreConfig) -> frozenset[str]:
+    return _stop_words(tuple(config["extra_stop_words"]))
+
+
+@lru_cache(maxsize=8192)
+def _active_cached(
+    text: str, stop_words: frozenset[str], minimum: int
+) -> tuple[str, ...]:
+    return tuple(
+        token for token in _canonical_cached(text)
+        if len(token) >= minimum and token not in stop_words
+    )
+
+
+@lru_cache(maxsize=8192)
+def _evidence_cached(
+    text: str, stop_words: frozenset[str], minimum: int
+) -> tuple[str | None, ...]:
+    return tuple(
+        token if len(token) >= minimum and token not in stop_words else None
+        for token in _canonical_cached(text)
+    )
+
+
+def active_tokens(text: str, stop_words: frozenset[str], minimum: int) -> list[str]:
+    return list(_active_cached(text, stop_words, minimum))
+
+
+def evidence_sequence(
+    text: str, stop_words: frozenset[str], minimum: int
+) -> list[str | None]:
+    """Canonical sequence with ignored tokens retained as phrase barriers.
+
+    Dropping ignored tokens before phrase matching would join their neighbours.
+    Adding a stop word could then create a new phrase and *raise* a score, the
+    inverse of the option's contract. ``None`` prevents that silent adjacency.
+    """
+    return list(_evidence_cached(text, stop_words, minimum))
+
+
+@lru_cache(maxsize=4096)
+def _keyword_set(
+    keywords: tuple[str, ...], stop_words: frozenset[str], minimum: int
+) -> frozenset[str]:
+    tokens: set[str] = set()
+    for keyword in keywords:
+        tokens.update(_active_cached(str(keyword), stop_words, minimum))
+    return frozenset(tokens)
+
+
+@lru_cache(maxsize=8192)
+def _token_union(
+    title: str,
+    body: str,
+    stop_words: frozenset[str],
+    minimum: int,
+) -> frozenset[str]:
+    return (
+        frozenset(_active_cached(title, stop_words, minimum))
+        | frozenset(_active_cached(body, stop_words, minimum))
+    )
+
+
+@lru_cache(maxsize=2048)
+def _target_runs(
+    sequence: tuple[str | None, ...]
+) -> dict[int, frozenset[tuple[str, ...]]]:
+    """Active n-gram windows by size; ``None`` barriers never enter a window.
+
+    Built once per distinct evidence sequence instead of once per pair call.
+    """
+    runs: dict[int, frozenset[tuple[str, ...]]] = {}
+    limit = len(sequence)
+    for size in range(1, limit + 1):
+        windows = {
+            sequence[start:start + size]
+            for start in range(limit - size + 1)
+            if None not in sequence[start:start + size]
+        }
+        runs[size] = frozenset(windows)
+    return runs
+
+
+def phrase_hit(
+    item_tokens: list[str | None], target_tokens: list[str | None], minimum: int
+) -> list[str]:
+    """Longest contiguous active phrase; ignored tokens are hard barriers."""
+    if len(item_tokens) < minimum or len(target_tokens) < minimum:
+        return []
+    target_runs = _target_runs(tuple(target_tokens))
+    for size in range(min(len(item_tokens), len(target_tokens)), minimum - 1, -1):
+        if size not in target_runs:
+            continue
+        runs = target_runs[size]
+        for start in range(len(item_tokens) - size + 1):
+            run = item_tokens[start:start + size]
+            if None not in run and tuple(run) in runs:
+                return [str(token) for token in run]
+    return []
 
 
 def _flatten_config(raw: object) -> dict[str, object]:
@@ -246,47 +361,6 @@ def resolve_config(raw: object, args: argparse.Namespace) -> ScoreConfig:
     }
 
 
-def active_tokens(text: str, stop_words: frozenset[str], minimum: int) -> list[str]:
-    return [
-        token for token in canonical_tokens(text)
-        if len(token) >= minimum and token not in stop_words
-    ]
-
-
-def evidence_sequence(
-    text: str, stop_words: frozenset[str], minimum: int
-) -> list[str | None]:
-    """Canonical sequence with ignored tokens retained as phrase barriers.
-
-    Dropping ignored tokens before phrase matching would join their neighbours.
-    Adding a stop word could then create a new phrase and *raise* a score, the
-    inverse of the option's contract. ``None`` prevents that silent adjacency.
-    """
-    return [
-        token if len(token) >= minimum and token not in stop_words else None
-        for token in canonical_tokens(text)
-    ]
-
-
-def phrase_hit(
-    item_tokens: list[str | None], target_tokens: list[str | None], minimum: int
-) -> list[str]:
-    """Longest contiguous active phrase; ignored tokens are hard barriers."""
-    if len(item_tokens) < minimum or len(target_tokens) < minimum:
-        return []
-    for size in range(min(len(item_tokens), len(target_tokens)), minimum - 1, -1):
-        target_runs = {
-            tuple(target_tokens[start:start + size])
-            for start in range(len(target_tokens) - size + 1)
-            if None not in target_tokens[start:start + size]
-        }
-        for start in range(len(item_tokens) - size + 1):
-            run = item_tokens[start:start + size]
-            if None not in run and tuple(run) in target_runs:
-                return [str(token) for token in run]
-    return []
-
-
 def normalize_type(value: object) -> str | None:
     return TYPE_ALIASES.get(str(value or "").strip().casefold())
 
@@ -303,27 +377,29 @@ def issue_type(labels: object) -> str | None:
 
 
 def score_pair(item: Item, target: ScoreTarget, config: ScoreConfig) -> ScoredPair:
-    """Score one direction and return token-level payment provenance."""
+    """Score one direction and return token-level payment provenance.
+
+    Tokenization, stop-word construction, and n-gram extraction are cached per
+    distinct text (F-PERF-003), so repeated pair scoring pays for each string
+    once per run instead of once per call.
+    """
     minimum = config["min_token_length"]
-    extra_tokens = {
-        token
-        for word in config["extra_stop_words"]
-        for token in canonical_tokens(word)
-    }
-    stop_words = frozenset(STOP_WORDS | extra_tokens)
-    item_title = active_tokens(item["title"], stop_words, minimum)
-    target_title = active_tokens(str(target.get("title") or ""), stop_words, minimum)
-    item_title_sequence = evidence_sequence(item["title"], stop_words, minimum)
-    target_title_sequence = evidence_sequence(
-        str(target.get("title") or ""), stop_words, minimum
+    stop_words = _config_stop_words(config)
+    item_title_text = item["title"]
+    target_title_text = str(target.get("title") or "")
+    item_title = list(_active_cached(item_title_text, stop_words, minimum))
+    target_title = list(_active_cached(target_title_text, stop_words, minimum))
+    item_title_sequence = list(
+        _evidence_cached(item_title_text, stop_words, minimum)
     )
-    target_body = active_tokens(str(target.get("body") or ""), stop_words, minimum)
-    target_all = set(target_title) | set(target_body)
-    keyword_tokens = {
-        token
-        for keyword in item.get("keywords", [])
-        for token in active_tokens(str(keyword), stop_words, minimum)
-    }
+    target_title_sequence = list(
+        _evidence_cached(target_title_text, stop_words, minimum)
+    )
+    target_body_text = str(target.get("body") or "")
+    target_all = _token_union(target_title_text, target_body_text, stop_words, minimum)
+    keyword_tokens = _keyword_set(
+        tuple(item.get("keywords") or []), stop_words, minimum
+    )
 
     consumed: set[str] = set()
     payments: list[Payment] = []
