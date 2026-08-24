@@ -80,6 +80,9 @@ jobs:
       - name: test-idd-lint-stats-project
         run: bash tests/test-idd-lint-stats-project.sh
 
+      - name: test-idd-lint-structure-350
+        run: bash tests/test-idd-lint-structure-350.sh
+
       - name: test-eval-harness
         run: bash tests/test-eval-harness.sh
 
