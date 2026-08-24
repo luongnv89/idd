@@ -73,6 +73,21 @@ else
   fail "T2.1: build.sh failed against default out"
 fi
 
+quiet_log="$TMP_OUT/quiet.log"
+if "$BUILD_SH" --out "$TMP_OUT/quiet-build" --quiet >"$quiet_log" 2>&1 \
+   && [ ! -s "$quiet_log" ]; then
+  pass "T2.2: quiet build succeeds without output"
+else
+  fail "T2.2: quiet build failed or emitted output"
+fi
+
+capture_sites="$(grep -c 'capture_logged' "$BUILD_SH" || true)"
+if grep -q '^capture_logged() {' "$BUILD_SH" && [ "$capture_sites" -eq 3 ]; then
+  pass "T2.3: quiet compile and verify share capture_logged"
+else
+  fail "T2.3: capture_logged is not the single quiet capture path"
+fi
+
 # ───────────────────────────────────────────────────────────
 # T3: every public src skill is present in root skills/
 # ───────────────────────────────────────────────────────────
