@@ -18,7 +18,7 @@ import shlex
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 
 def _repo_root() -> Path:
@@ -134,6 +134,98 @@ def _allowlisted_shell_command(
     return None, "command is not in the shell assertion allowlist"
 
 
+class GradeInputError(ValueError):
+    """A malformed assertion that must fail before invoking a grading tool."""
+
+
+def _handle_idd_lint(
+    assertion: dict[str, Any], out_dir: Path, repo_root: Path
+) -> int | None:
+    args = assertion.get("args") or []
+    if not isinstance(args, list):
+        raise GradeInputError("args must be a list")
+    resolved = [_sub_out(str(arg), out_dir) for arg in args]
+    cmd = [sys.executable, str(repo_root / "scripts" / "idd-lint.py"), *resolved]
+    return _run(cmd, cwd=repo_root)
+
+
+def _handle_gi_runlog_echo(
+    assertion: dict[str, Any], out_dir: Path, repo_root: Path
+) -> int | None:
+    file_rel = assertion.get("file")
+    if not file_rel:
+        raise GradeInputError("gi-runlog-echo requires 'file'")
+    path = Path(_sub_out(str(file_rel), out_dir))
+    if not path.is_file():
+        raise GradeInputError(f"missing file {path}")
+    payload = path.read_text(encoding="utf-8")
+    cmd = [
+        sys.executable,
+        str(repo_root / "src" / "shared" / "scripts" / "gi-runlog.py"),
+        "--echo",
+    ]
+    return _run(cmd, stdin_data=payload, cwd=repo_root)
+
+
+def _handle_file_exists(
+    assertion: dict[str, Any], out_dir: Path, repo_root: Path
+) -> int:
+    del repo_root
+    file_rel = assertion.get("file") or (assertion.get("args") or [None])[0]
+    if not file_rel:
+        raise GradeInputError("file-exists requires 'file'")
+    path = Path(_sub_out(str(file_rel), out_dir))
+    return 0 if path.is_file() else 1
+
+
+def _handle_red_green(
+    assertion: dict[str, Any], out_dir: Path, repo_root: Path
+) -> int:
+    del repo_root
+    file_rel = assertion.get("file")
+    if not file_rel:
+        raise GradeInputError("red-green requires 'file'")
+    path = Path(_sub_out(str(file_rel), out_dir))
+    try:
+        evidence = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise GradeInputError(f"invalid red-green JSON: {exc}") from exc
+    if not isinstance(evidence, dict):
+        raise GradeInputError("red-green evidence must be a JSON object")
+    expected = {"red_exit": 1, "green_exit": 0}
+    got_evidence = {
+        "red_exit": evidence.get("red_exit"),
+        "green_exit": evidence.get("green_exit"),
+    }
+    valid_types = all(type(evidence.get(key)) is int for key in expected)
+    return (
+        0
+        if valid_types and got_evidence == expected and set(evidence) == set(expected)
+        else 1
+    )
+
+
+def _handle_shell(
+    assertion: dict[str, Any], out_dir: Path, repo_root: Path
+) -> int | None:
+    cmd, error = _allowlisted_shell_command(
+        assertion.get("args"), out_dir=out_dir, repo_root=repo_root
+    )
+    if cmd is None:
+        raise GradeInputError(f"rejected before execution: {error}")
+    return _run(cmd, cwd=repo_root)
+
+
+GradeHandler = Callable[[dict[str, Any], Path, Path], int | None]
+GRADE_HANDLERS: dict[str, GradeHandler] = {
+    "idd-lint": _handle_idd_lint,
+    "gi-runlog-echo": _handle_gi_runlog_echo,
+    "file-exists": _handle_file_exists,
+    "red-green": _handle_red_green,
+    "shell": _handle_shell,
+}
+
+
 def _grade_one(
     assertion: dict[str, Any],
     *,
@@ -143,75 +235,14 @@ def _grade_one(
     tool = assertion.get("tool")
     expect = int(assertion.get("expect_exit", 0))
     label = assertion.get("label") or f"{tool} expect_exit={expect}"
-
-    if tool == "idd-lint":
-        args = assertion.get("args") or []
-        if not isinstance(args, list):
-            print(f"  ✗ {label} — args must be a list")
-            return False
-        resolved = [_sub_out(str(a), out_dir) for a in args]
-        cmd = [sys.executable, str(repo_root / "scripts" / "idd-lint.py"), *resolved]
-        got = _run(cmd, cwd=repo_root)
-    elif tool == "gi-runlog-echo":
-        file_rel = assertion.get("file")
-        if not file_rel:
-            print(f"  ✗ {label} — gi-runlog-echo requires 'file'")
-            return False
-        path = Path(_sub_out(str(file_rel), out_dir))
-        if not path.is_file():
-            print(f"  ✗ {label} — missing file {path}")
-            return False
-        payload = path.read_text(encoding="utf-8")
-        cmd = [
-            sys.executable,
-            str(repo_root / "src" / "shared" / "scripts" / "gi-runlog.py"),
-            "--echo",
-        ]
-        got = _run(cmd, stdin_data=payload, cwd=repo_root)
-    elif tool == "file-exists":
-        file_rel = assertion.get("file") or (assertion.get("args") or [None])[0]
-        if not file_rel:
-            print(f"  ✗ {label} — file-exists requires 'file'")
-            return False
-        path = Path(_sub_out(str(file_rel), out_dir))
-        got = 0 if path.is_file() else 1
-    elif tool == "red-green":
-        file_rel = assertion.get("file")
-        if not file_rel:
-            print(f"  ✗ {label} — red-green requires 'file'")
-            return False
-        path = Path(_sub_out(str(file_rel), out_dir))
-        try:
-            evidence = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, ValueError) as exc:
-            print(f"  ✗ {label} — invalid red-green JSON: {exc}")
-            return False
-        if not isinstance(evidence, dict):
-            print(f"  ✗ {label} — red-green evidence must be a JSON object")
-            return False
-        expected = {"red_exit": 1, "green_exit": 0}
-        got_evidence = {
-            "red_exit": evidence.get("red_exit"),
-            "green_exit": evidence.get("green_exit"),
-        }
-        valid_types = all(type(evidence.get(key)) is int for key in expected)
-        got = (
-            0
-            if valid_types
-            and got_evidence == expected
-            and set(evidence) == set(expected)
-            else 1
-        )
-    elif tool == "shell":
-        cmd, error = _allowlisted_shell_command(
-            assertion.get("args"), out_dir=out_dir, repo_root=repo_root
-        )
-        if cmd is None:
-            print(f"  ✗ {label} — rejected before execution: {error}")
-            return False
-        got = _run(cmd, cwd=repo_root)
-    else:
+    handler = GRADE_HANDLERS.get(tool) if isinstance(tool, str) else None
+    if handler is None:
         print(f"  ✗ {label} — unknown tool {tool!r}")
+        return False
+    try:
+        got = handler(assertion, out_dir, repo_root)
+    except GradeInputError as exc:
+        print(f"  ✗ {label} — {exc}")
         return False
 
     if got == expect:

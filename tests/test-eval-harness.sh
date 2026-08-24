@@ -494,6 +494,69 @@ else
   fail "T22: malformed argv artifacts fail cleanly (exit $MALFORMED_EXIT)"
 fi
 
+# ─── T23: shim flags share one table-driven parser and URL builder ─
+set +e
+python3 - "$SHIM" <<'PY'
+import importlib.util
+import sys
+
+spec = importlib.util.spec_from_file_location("gh_shim", sys.argv[1])
+shim = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = shim
+spec.loader.exec_module(shim)
+parsed = shim._parse_value_flags(
+    ["issue", "create", "--title=first", "--body", "hello", "--title", "last"]
+)
+assert [(item.destination, item.value) for item in parsed] == [
+    ("title", "first"),
+    ("body", "hello"),
+    ("title", "last"),
+]
+assert shim.issue_url(7) == "https://github.com/eval/harness/issues/7"
+source = open(sys.argv[1], encoding="utf-8").read()
+assert source.count("https://github.com/eval/harness/issues") == 1
+PY
+T23=$?
+set -e
+if [ "$T23" -eq 0 ]; then
+  pass "T23: shim uses table-driven value flags and one issue URL builder"
+else
+  fail "T23: shim flag parser or issue URL builder contract failed"
+fi
+
+# ─── T24: grade dispatch is a complete handler table ───────
+set +e
+python3 - "$GRADE" <<'PY'
+import importlib.util
+import inspect
+import sys
+
+spec = importlib.util.spec_from_file_location("grade", sys.argv[1])
+grade = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(grade)
+assert set(grade.GRADE_HANDLERS) == {
+    "idd-lint", "gi-runlog-echo", "file-exists", "red-green", "shell"
+}
+assert all(callable(handler) for handler in grade.GRADE_HANDLERS.values())
+assert "elif tool ==" not in inspect.getsource(grade._grade_one)
+PY
+T24=$?
+set -e
+if [ "$T24" -eq 0 ]; then
+  pass "T24: grade tools dispatch through the complete handler table"
+else
+  fail "T24: grade handler table is incomplete or bypassed"
+fi
+
+# ─── T25: sandbox selection is factored without shell syntax drift ─
+helper_count="$(grep -c '^sandbox_exec_[a-z_]*() {' "$RUN" || true)"
+if bash -n "$RUN" && [ "$helper_count" -ge 4 ] \
+  && ! grep -q 'elif \[ "$OS_NAME"' "$RUN"; then
+  pass "T25: run_eval sandbox selection uses sandbox_exec helpers"
+else
+  fail "T25: run_eval sandbox helper structure or syntax failed"
+fi
+
 echo "Results: $PASS passed, $FAIL failed"
 if [ "$FAIL" -gt 0 ]; then
   exit 1

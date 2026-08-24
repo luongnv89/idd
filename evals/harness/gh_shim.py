@@ -52,6 +52,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -66,6 +67,25 @@ JSON_REQUIRED_PREFIXES: tuple[tuple[str, ...], ...] = (
 )
 
 MAX_ISSUE_NUMBER = 2**63 - 1
+ISSUE_URL_BASE = "https://github.com/eval/harness/issues"
+
+VALUE_FLAG_DESTINATIONS = {
+    "--json": "json",
+    "--title": "title",
+    "--body": "body",
+    "--body-file": "body_file",
+}
+
+
+@dataclass(frozen=True)
+class ParsedValueFlag:
+    index: int
+    option: str
+    destination: str
+    value: str
+    joined: bool
+    width: int
+
 
 HELP_TEXT = """\
 gh — eval harness shim (record/replay)
@@ -84,37 +104,60 @@ def _eprint(msg: str) -> None:
     print(msg, file=sys.stderr)
 
 
-def _normalize_argv(argv: list[str]) -> list[str]:
-    """Normalize argv for comparison: sort --json field lists."""
-    out: list[str] = []
+def issue_url(number: int | str) -> str:
+    """Return the deterministic URL emitted for a synthetic issue."""
+    return f"{ISSUE_URL_BASE}/{number}"
+
+
+def _parse_value_flags(argv: list[str]) -> list[ParsedValueFlag]:
+    """Parse supported ``--flag value`` and ``--flag=value`` forms once."""
+    parsed: list[ParsedValueFlag] = []
     i = 0
     while i < len(argv):
         arg = argv[i]
-        if arg == "--json" and i + 1 < len(argv):
-            fields = argv[i + 1]
-            sorted_fields = ",".join(sorted(f.strip() for f in fields.split(",") if f.strip()))
-            out.append("--json")
-            out.append(sorted_fields)
+        destination = VALUE_FLAG_DESTINATIONS.get(arg)
+        if destination is not None and i + 1 < len(argv):
+            parsed.append(ParsedValueFlag(i, arg, destination, argv[i + 1], False, 2))
             i += 2
             continue
-        if arg.startswith("--json="):
-            fields = arg.split("=", 1)[1]
-            sorted_fields = ",".join(sorted(f.strip() for f in fields.split(",") if f.strip()))
-            out.append(f"--json={sorted_fields}")
+        option, separator, value = arg.partition("=")
+        destination = VALUE_FLAG_DESTINATIONS.get(option)
+        if separator and destination is not None:
+            parsed.append(ParsedValueFlag(i, option, destination, value, True, 1))
+        i += 1
+    return parsed
+
+
+def _normalize_json_fields(fields: str) -> str:
+    return ",".join(sorted(field.strip() for field in fields.split(",") if field.strip()))
+
+
+def _normalize_argv(argv: list[str]) -> list[str]:
+    """Normalize argv for comparison: sort --json field lists."""
+    json_flags = {
+        flag.index: flag
+        for flag in _parse_value_flags(argv)
+        if flag.destination == "json"
+    }
+    out: list[str] = []
+    i = 0
+    while i < len(argv):
+        flag = json_flags.get(i)
+        if flag is None:
+            out.append(argv[i])
             i += 1
             continue
-        out.append(arg)
-        i += 1
+        fields = _normalize_json_fields(flag.value)
+        if flag.joined:
+            out.append(f"{flag.option}={fields}")
+        else:
+            out.extend((flag.option, fields))
+        i += flag.width
     return out
 
 
 def _has_json_flag(argv: list[str]) -> bool:
-    for i, arg in enumerate(argv):
-        if arg == "--json" and i + 1 < len(argv):
-            return True
-        if arg.startswith("--json="):
-            return True
-    return False
+    return any(flag.destination == "json" for flag in _parse_value_flags(argv))
 
 
 def _requires_json(argv: list[str]) -> bool:
@@ -239,35 +282,16 @@ def _next_issue_number(state: Path) -> int:
 def _handle_issue_create(argv: list[str]) -> int:
     """Synthetic issue create using EVAL_STATE_DIR or cassette fallback."""
     state = _state_dir()
-    title = "untitled"
-    body = ""
-    i = 0
-    while i < len(argv):
-        if argv[i] == "--title" and i + 1 < len(argv):
-            title = argv[i + 1]
-            i += 2
-            continue
-        if argv[i].startswith("--title="):
-            title = argv[i].split("=", 1)[1]
-            i += 1
-            continue
-        if argv[i] == "--body" and i + 1 < len(argv):
-            body = argv[i + 1]
-            i += 2
-            continue
-        if argv[i].startswith("--body="):
-            body = argv[i].split("=", 1)[1]
-            i += 1
-            continue
-        if argv[i] == "--body-file" and i + 1 < len(argv):
-            body = Path(argv[i + 1]).read_text(encoding="utf-8")
-            i += 2
-            continue
-        if argv[i].startswith("--body-file="):
-            body = Path(argv[i].split("=", 1)[1]).read_text(encoding="utf-8")
-            i += 1
-            continue
-        i += 1
+    values = {"title": "untitled", "body": ""}
+    for flag in _parse_value_flags(argv):
+        if flag.destination == "title":
+            values["title"] = flag.value
+        elif flag.destination == "body":
+            values["body"] = flag.value
+        elif flag.destination == "body_file":
+            values["body"] = Path(flag.value).read_text(encoding="utf-8")
+    title = values["title"]
+    body = values["body"]
 
     if state is not None:
         n = _next_issue_number(state)
@@ -279,7 +303,7 @@ def _handle_issue_create(argv: list[str]) -> int:
                     "title": title,
                     "body": body,
                     "state": "OPEN",
-                    "url": f"https://github.com/eval/harness/issues/{n}",
+                    "url": issue_url(n),
                 },
                 indent=2,
             )
@@ -288,12 +312,11 @@ def _handle_issue_create(argv: list[str]) -> int:
         )
         # Also dump body for graders that look for issue.md
         (state / f"issue_{n}.md").write_text(body, encoding="utf-8")
-        url = f"https://github.com/eval/harness/issues/{n}"
-        print(url)
+        print(issue_url(n))
         return 0
 
     # No state dir: still emit a deterministic URL so subjects don't hang.
-    print("https://github.com/eval/harness/issues/1")
+    print(issue_url(1))
     return 0
 
 
@@ -320,13 +343,12 @@ def _try_state_issue_view(argv: list[str]) -> int | None:
     data = json.loads(issue_path.read_text(encoding="utf-8"))
     # Respect --json field selection when present.
     fields: list[str] | None = None
-    for i, a in enumerate(argv):
-        if a == "--json" and i + 1 < len(argv):
-            fields = [f.strip() for f in argv[i + 1].split(",") if f.strip()]
-            break
-        if a.startswith("--json="):
-            fields = [f.strip() for f in a.split("=", 1)[1].split(",") if f.strip()]
-            break
+    json_flag = next(
+        (flag for flag in _parse_value_flags(argv) if flag.destination == "json"),
+        None,
+    )
+    if json_flag is not None:
+        fields = [field.strip() for field in json_flag.value.split(",") if field.strip()]
     if fields:
         payload = {k: data.get(k) for k in fields}
     else:

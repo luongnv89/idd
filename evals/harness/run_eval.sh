@@ -133,25 +133,47 @@ chmod 755 "$SUBJECT_CMD"
 # PATH isolation and proxy/DNS tricks are not network isolation. Use the
 # native macOS sandbox or a Linux user+network namespace, and fail closed when
 # neither is available. map-current-user ensures the subject is never root.
-OS_NAME="$(uname -s)"
-if [ "$(id -u)" -eq 0 ]; then
-  echo "✗ refusing to run eval subject as root" >&2
-  exit 2
-fi
-set +e
-if [ "$OS_NAME" = "Darwin" ]; then
-  SANDBOX_EXEC="$(command -v sandbox-exec || true)"
-  if [ -z "$SANDBOX_EXEC" ]; then
+sandbox_exec_darwin() {
+  local subject_cmd="$1" sandbox_exec sandbox_profile
+  sandbox_exec="$(command -v sandbox-exec || true)"
+  if [ -z "$sandbox_exec" ]; then
     echo "✗ no supported macOS network sandbox (sandbox-exec)" >&2
     exit 2
   fi
-  SANDBOX_PROFILE="$WORK/network.sb"
-  printf '%s\n' '(version 1)' '(allow default)' '(deny network*)' > "$SANDBOX_PROFILE"
-  "$SANDBOX_EXEC" -f "$SANDBOX_PROFILE" "$SUBJECT_CMD"
-  SUBJECT_EXIT=$?
-elif [ "$OS_NAME" = "Linux" ]; then
-  UNSHARE="$(command -v unshare || true)"
-  if [ -z "$UNSHARE" ]; then
+  sandbox_profile="$WORK/network.sb"
+  printf '%s\n' '(version 1)' '(allow default)' '(deny network*)' > "$sandbox_profile"
+  "$sandbox_exec" -f "$sandbox_profile" "$subject_cmd"
+}
+
+sandbox_exec_linux_sudo() {
+  local subject_cmd="$1" unshare="$2" host_uid="$3" host_gid="$4"
+  local sudo setpriv uid_probe
+  sudo="$(command -v sudo || true)"
+  setpriv="$(command -v setpriv || true)"
+  uid_probe="$WORK/uid-probe.sh"
+  if [ -z "$sudo" ] || [ -z "$setpriv" ]; then
+    echo "✗ Linux user+network namespace unavailable; refusing unsandboxed eval" >&2
+    exit 2
+  fi
+  cat > "$uid_probe" <<EOF
+#!/bin/sh
+test "\$(/usr/bin/id -u)" = "$host_uid" && test "\$(/usr/bin/id -g)" = "$host_gid"
+EOF
+  chmod 755 "$uid_probe"
+  if ! "$sudo" -n "$unshare" --net --fork "$setpriv" \
+    --reuid="$host_uid" --regid="$host_gid" --clear-groups "$uid_probe" \
+    >/dev/null 2>&1; then
+    echo "✗ Linux user+network namespace unavailable; refusing unsandboxed eval" >&2
+    exit 2
+  fi
+  "$sudo" -n "$unshare" --net --fork "$setpriv" \
+    --reuid="$host_uid" --regid="$host_gid" --clear-groups "$subject_cmd"
+}
+
+sandbox_exec_linux() {
+  local subject_cmd="$1" unshare host_uid host_gid
+  unshare="$(command -v unshare || true)"
+  if [ -z "$unshare" ]; then
     echo "✗ no supported Linux network sandbox (unshare)" >&2
     exit 2
   fi
@@ -160,38 +182,35 @@ elif [ "$OS_NAME" = "Linux" ]; then
   # they permit a passwordless sudo. Prefer the unprivileged path, then fall
   # back to a root-created network namespace while dropping back to the caller
   # UID/GID before the subject starts. Never run the subject as root.
-  HOST_UID="$(id -u)"
-  HOST_GID="$(id -g)"
-  if "$UNSHARE" --user --map-current-user --net true >/dev/null 2>&1; then
-    "$UNSHARE" --user --map-current-user --net "$SUBJECT_CMD"
-    SUBJECT_EXIT=$?
-  else
-    SUDO="$(command -v sudo || true)"
-    SETPRIV="$(command -v setpriv || true)"
-    UID_PROBE="$WORK/uid-probe.sh"
-    if [ -z "$SUDO" ] || [ -z "$SETPRIV" ]; then
-      echo "✗ Linux user+network namespace unavailable; refusing unsandboxed eval" >&2
-      exit 2
-    fi
-    cat > "$UID_PROBE" <<EOF
-#!/bin/sh
-test "\$(/usr/bin/id -u)" = "$HOST_UID" && test "\$(/usr/bin/id -g)" = "$HOST_GID"
-EOF
-    chmod 755 "$UID_PROBE"
-    if ! "$SUDO" -n "$UNSHARE" --net --fork "$SETPRIV" \
-      --reuid="$HOST_UID" --regid="$HOST_GID" --clear-groups "$UID_PROBE" \
-      >/dev/null 2>&1; then
-      echo "✗ Linux user+network namespace unavailable; refusing unsandboxed eval" >&2
-      exit 2
-    fi
-    "$SUDO" -n "$UNSHARE" --net --fork "$SETPRIV" \
-      --reuid="$HOST_UID" --regid="$HOST_GID" --clear-groups "$SUBJECT_CMD"
-    SUBJECT_EXIT=$?
+  host_uid="$(id -u)"
+  host_gid="$(id -g)"
+  if "$unshare" --user --map-current-user --net true >/dev/null 2>&1; then
+    "$unshare" --user --map-current-user --net "$subject_cmd"
+    return $?
   fi
-else
-  echo "✗ unsupported OS $OS_NAME; refusing unsandboxed eval" >&2
+  sandbox_exec_linux_sudo "$subject_cmd" "$unshare" "$host_uid" "$host_gid"
+}
+
+sandbox_exec_subject() {
+  local os_name="$1" subject_cmd="$2"
+  case "$os_name" in
+    Darwin) sandbox_exec_darwin "$subject_cmd" ;;
+    Linux) sandbox_exec_linux "$subject_cmd" ;;
+    *)
+      echo "✗ unsupported OS $os_name; refusing unsandboxed eval" >&2
+      exit 2
+      ;;
+  esac
+}
+
+OS_NAME="$(uname -s)"
+if [ "$(id -u)" -eq 0 ]; then
+  echo "✗ refusing to run eval subject as root" >&2
   exit 2
 fi
+set +e
+sandbox_exec_subject "$OS_NAME" "$SUBJECT_CMD"
+SUBJECT_EXIT=$?
 set -e
 
 if [ "$SUBJECT_EXIT" -ne 0 ]; then

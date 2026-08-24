@@ -38,6 +38,30 @@ warn() { _log "⚠ $*"; }
 err()  { _log "✗ $*" >&2; }
 die()  { err "$1"; exit "${2:-1}"; }
 
+capture_logged() {
+  local prefix="$1" failure_message="$2" show_status="$3" footer="$4"
+  shift 4
+  local log_file status
+  log_file="$(mktemp "${TMPDIR:-/tmp}/${prefix}.XXXXXX")"
+  if "$@" >"$log_file" 2>&1; then
+    rm -f "$log_file"
+    return 0
+  else
+    status=$?
+    if [[ "$show_status" -eq 1 ]]; then
+      err "$failure_message (exit $status)"
+    else
+      err "$failure_message"
+    fi
+    sed 's/^/  /' "$log_file" >&2
+    rm -f "$log_file"
+    if [[ -n "$footer" ]]; then
+      err "$footer"
+    fi
+    return "$status"
+  fi
+}
+
 BUILD_QUIET=0
 PROMOTE_SKILLS=1
 PY_ARGS=()
@@ -189,21 +213,13 @@ run_compile() {
     info "step 1/3: compile skills → $skills_out"
   fi
 
-  local log_file="" status=0
+  local status=0
   if [[ "$BUILD_QUIET" -eq 1 ]]; then
-    log_file="$(mktemp "${TMPDIR:-/tmp}/idd-build.XXXXXX")"
-    # Capture status in the else branch: an if with a false condition and no
-    # else returns 0, so `status=$?` after a bare if/then/fi would read the
-    # if's success, not py_invoke's failure (silently swallowing build aborts).
-    if py_invoke ${verbose_args[@]+"${verbose_args[@]}"} "${compile_args[@]}" >"$log_file" 2>&1; then
-      rm -f "$log_file"
+    if capture_logged idd-build "compile failed" 1 "" \
+      py_invoke ${verbose_args[@]+"${verbose_args[@]}"} "${compile_args[@]}"; then
       return 0
     else
-      status=$?
-      err "compile failed (exit $status)"
-      sed 's/^/  /' "$log_file" >&2
-      rm -f "$log_file"
-      return "$status"
+      return $?
     fi
   fi
 
@@ -230,22 +246,14 @@ run_verify() {
     return 1
   fi
 
-  local log_file="" status=0
+  local status=0
   if [[ "$BUILD_QUIET" -eq 1 ]]; then
-    log_file="$(mktemp "${TMPDIR:-/tmp}/idd-verify.XXXXXX")"
-    # Capture status in the else branch (see run_compile): a false if with no
-    # else returns 0, which would mask verify failures otherwise.
-    if bash "$VERIFY_SH" "$skills_out" >"$log_file" 2>&1; then
-      rm -f "$log_file"
-      if [[ "$BUILD_QUIET" -eq 0 ]]; then ok "skills verification passed"; fi
+    if capture_logged idd-verify "skills verification failed" 0 \
+      "  skills/ was not updated (previous tree unchanged)" \
+      bash "$VERIFY_SH" "$skills_out"; then
       return 0
     else
-      status=$?
-      err "skills verification failed"
-      sed 's/^/  /' "$log_file" >&2
-      rm -f "$log_file"
-      err "  skills/ was not updated (previous tree unchanged)"
-      return "$status"
+      return $?
     fi
   fi
 
