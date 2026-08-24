@@ -282,8 +282,54 @@ def _is_text_file(path: Path) -> bool:
     return path.suffix in TEXT_EXTS
 
 
+_READ_CACHE: dict[str, tuple[tuple[int, int], str]] = {}
+_LISTING_CACHE: dict[str, tuple[int, list[Path]]] = {}
+
+
+def _forget(path: Path) -> None:
+    """Drop what a write to `path` just invalidated."""
+    key = str(path)
+    _READ_CACHE.pop(key, None)
+    # A new entry also changes what the parent directory lists.
+    _LISTING_CACHE.pop(str(path.parent), None)
+
+
+def _reset_io_caches() -> None:
+    """Empty both memos — one build per process, one cache lifetime."""
+    _READ_CACHE.clear()
+    _LISTING_CACHE.clear()
+
+
 def _read_text(path: Path) -> str:
-    return path.read_text(encoding="utf-8")
+    """Read a UTF-8 file, memoized on the path's (mtime, size) stamp.
+
+    The build makes many independent passes over the same trees: a full run
+    calls this 1081 times for 237 distinct paths, so 78% of the reads — and
+    ~13 MB of the ~15 MB decoded — are repeats of bytes already in hand.
+
+    The stamp, rather than the path alone, is what makes the memo safe. The
+    build both writes and reads the emitted tree in one run (validation scans
+    what emission just wrote), and a path-only cache would silently encode
+    today's "written once, then read once" ordering as a requirement. Keyed on
+    the stamp, a rewritten file simply misses; `_write_text` and `_copy_binary`
+    additionally forget the path outright, so a rewrite landing inside one
+    filesystem timestamp tick cannot serve stale text either.
+    """
+    key = str(path)
+    try:
+        stat = path.stat()
+    except OSError:
+        # Unreadable now: drop any stale entry and let the real read raise the
+        # error the caller expects at the call site it expects it from.
+        _READ_CACHE.pop(key, None)
+        return path.read_text(encoding="utf-8")
+    stamp = (stat.st_mtime_ns, stat.st_size)
+    cached = _READ_CACHE.get(key)
+    if cached is not None and cached[0] == stamp:
+        return cached[1]
+    text = path.read_text(encoding="utf-8")
+    _READ_CACHE[key] = (stamp, text)
+    return text
 
 
 def _write_text(path: Path, content: str) -> None:
@@ -291,6 +337,7 @@ def _write_text(path: Path, content: str) -> None:
     # newline='\n' forces LF; no platform-default translation.
     with open(path, "w", encoding="utf-8", newline="\n") as fh:
         fh.write(content)
+    _forget(path)
 
 
 def _copy_binary(src: Path, dst: Path) -> None:
@@ -298,10 +345,31 @@ def _copy_binary(src: Path, dst: Path) -> None:
     # copy2, not copyfile: shared scripts ship 0755 and copyfile drops the mode
     # to a umask-dependent 0644/0664.
     shutil.copy2(src, dst)
+    _forget(dst)
 
 
 def _sorted_iterdir(path: Path) -> list[Path]:
-    return sorted(path.iterdir(), key=lambda p: p.name)
+    """Directory entries by name, memoized on the directory's mtime.
+
+    A directory's mtime changes exactly when its entry set does, which is
+    exactly what this listing reports — so the stamp is a precise key rather
+    than an approximation of one. `_walk_files` re-walks the same trees once
+    per skill (384 calls over 77 distinct roots in a full build); the memo
+    turns the repeats into a dict lookup. The returned list is a copy so a
+    caller cannot mutate the cached one.
+    """
+    key = str(path)
+    try:
+        stamp = path.stat().st_mtime_ns
+    except OSError:
+        _LISTING_CACHE.pop(key, None)
+        return sorted(path.iterdir(), key=lambda p: p.name)
+    cached = _LISTING_CACHE.get(key)
+    if cached is not None and cached[0] == stamp:
+        return list(cached[1])
+    entries = sorted(path.iterdir(), key=lambda p: p.name)
+    _LISTING_CACHE[key] = (stamp, entries)
+    return list(entries)
 
 
 def _walk_files(root: Path) -> Iterable[Path]:
