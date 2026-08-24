@@ -1,0 +1,157 @@
+{
+  "name": "auto-pilot/merge-gating",
+  "skill": "auto-pilot",
+  "prompt": "Decide whether to merge PR #101 under each autopilot mode and dependency state",
+  "grade": [
+    {
+      "tool": "file-exists",
+      "file": "OUT/gate-default-unset-clean-merged.txt",
+      "expect_exit": 0,
+      "label": "no autopilot config at all resolves to balanced and merges a clean PR"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/gate-balanced-clean-merged.txt",
+      "expect_exit": 0,
+      "label": "balanced merges a clean PR"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/gate-conservative-clean-left_open.txt",
+      "expect_exit": 0,
+      "label": "conservative never merges, even a clean PR"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/gate-aggressive-clean-merged.txt",
+      "expect_exit": 0,
+      "label": "aggressive merges a clean PR"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/gate-balanced-partial-left_open.txt",
+      "expect_exit": 0,
+      "label": "the default install never merges a PR with unresolved review issues"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/gate-conservative-partial-left_open.txt",
+      "expect_exit": 0,
+      "label": "conservative leaves a partial PR open"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/gate-aggressive-partial-optout-left_open.txt",
+      "expect_exit": 0,
+      "label": "aggressive without merge_partial behaves exactly like balanced"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/gate-aggressive-partial-optin-partial_followup.txt",
+      "expect_exit": 0,
+      "label": "partial merge needs both aggressive and merge_partial: true"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/gate-legacy-automerge-true-partial-partial_followup.txt",
+      "expect_exit": 0,
+      "label": "legacy auto_merge: true maps to aggressive + merge_partial"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/gate-legacy-automerge-false-clean-left_open.txt",
+      "expect_exit": 0,
+      "label": "legacy auto_merge: false maps to conservative"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/gate-mode-wins-over-legacy-left_open.txt",
+      "expect_exit": 0,
+      "label": "an explicit autopilot.mode wins over a legacy auto_merge beside it"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/gate-unmergeable-pr-stays-open-left_open.txt",
+      "expect_exit": 0,
+      "label": "conflicts or red CI leave a clean-reviewed PR open rather than merging it"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/gate-critical-partial-conservative-stops-stop.txt",
+      "expect_exit": 0,
+      "label": "critical handling is unchanged under conservative"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/gate-critical-partial-aggressive-stops-stop.txt",
+      "expect_exit": 0,
+      "label": "critical handling is unchanged under aggressive + merge_partial"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/gate-dependency-open-blocks-blocked_by_dependency.txt",
+      "expect_exit": 0,
+      "label": "an open `Depends on` blocker outranks a clean review in balanced mode"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/gate-dependency-merged-clears-merged.txt",
+      "expect_exit": 0,
+      "label": "a CLOSED blocker whose PR is MERGED clears the gate (cross-repo ref ignored)"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/gate-critical-partial-stops-stop.txt",
+      "expect_exit": 0,
+      "label": "a critical issue with unresolved review issues stops rather than merging"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/gate-critical-partial-blocked-stops-stop.txt",
+      "expect_exit": 0,
+      "label": "the critical stop happens while reviewing, before the merge-time dependency gate"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/dependency-gate.json",
+      "expect_exit": 0,
+      "label": "dependency gate evidence persisted"
+    },
+    {
+      "tool": "gi-runlog-echo",
+      "file": "OUT/run-merged.json",
+      "expect_exit": 0,
+      "label": "the merged run-log record validates"
+    },
+    {
+      "tool": "gi-runlog-echo",
+      "file": "OUT/run-left_open.json",
+      "expect_exit": 0,
+      "label": "the left_open run-log record validates"
+    },
+    {
+      "tool": "gi-runlog-echo",
+      "file": "OUT/run-partial_followup.json",
+      "expect_exit": 0,
+      "label": "the partial_followup run-log record validates"
+    },
+    {
+      "tool": "gi-runlog-echo",
+      "file": "OUT/run-blocked_by_dependency.json",
+      "expect_exit": 0,
+      "label": "the blocked_by_dependency run-log record validates"
+    },
+    {
+      "tool": "gi-runlog-echo",
+      "file": "OUT/run-wrong-vocabulary.json",
+      "expect_exit": 3,
+      "label": "a resolver outcome on an auto-pilot row is rejected (negative)"
+    },
+    {
+      "tool": "gi-runlog-echo",
+      "file": "OUT/run-uncapped-cycles.json",
+      "expect_exit": 3,
+      "label": "qa_cycles past the class ceiling needs a breach_reason (negative)"
+    }
+  ]
+}
