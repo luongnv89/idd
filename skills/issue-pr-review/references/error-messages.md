@@ -83,7 +83,7 @@ All errors follow the rich format: symbol + description + fix action.
 
 ## Linked Issue Errors
 
-### Linked issue unreadable at the review boundary
+### Linked issue unreadable at the review boundary <!-- a:rve-linked-issue-unreadable -->
 
 **Trigger:** the PR body links an issue (`Closes #{N}`), but neither the Step 1
 *Depth gate* refresh nor its direct-`gh` degrade returns a usable record — on the

@@ -91,6 +91,9 @@ check_block_lacks() {
   fi
 }
 
+# shellcheck source=lib/anchors.bash
+. "$REPO_ROOT/tests/lib/anchors.bash"
+
 echo "◆ Subagent Context Passing Contract Tests (issue #256)"
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 
@@ -139,27 +142,27 @@ done
 # merged sibling, with the whole suite green.
 check_has "$SRC_AP_PHASES" 'gh issue list --state open --json [a-zA-Z,]*state,updatedAt' \
   "T1.1: Phase 1's list call requests state and updatedAt"
-check_has "$SRC_AP_PHASES" '^### Step 1\.2b — Capture the caller payload' \
+anchor_present "$SRC_AP_PHASES" ap-step12b-capture \
   "T1.2: auto-pilot has a named step that captures the payload"
-check_has "$SRC_AP_PROMPTS" '\{issue_payload\}' \
+anchor_check "$SRC_AP_PROMPTS" ap-resolver-spawn '\{issue_payload\}' \
   "T1.3: the spawn prompts substitute an {issue_payload} variable"
-check_has "$SRC_AP_PROMPTS" '\| .\{issue_payload\}. \|' \
+anchor_check "$SRC_AP_PROMPTS" ap-template-vars '\| .\{issue_payload\}. \|' \
   "T1.4: {issue_payload} is declared in the Template Variables table"
-check_has "$SRC_RES_STEPS" '^## Step 0i — Caller payload gate' \
+anchor_present "$SRC_RES_STEPS" rs-step0i-gate \
   "T1.5: the resolver owns a named gate for the caller payload"
-check_has "$SRC_RES_STEPS" 'issue_payload = supplied \| partial \| absent' \
+anchor_check "$SRC_RES_STEPS" rs-step0i-ordering 'issue_payload = supplied \| partial \| absent' \
   "T1.6: the gate sets exactly one three-state variable"
-check_has "$SRC_RES_STEPS" '^### Scope — 0a.s read only' \
+anchor_present "$SRC_RES_STEPS" rs-step0i-scope \
   "T1.7: the gate scopes the substitution to 0a's read"
 
-PAYLOAD_BLOCK="$(awk '/^## Step 0i — Caller payload gate/,/^## Step 1 — Research/' "$SRC_RES_STEPS")"
+PAYLOAD_BLOCK="$(anchor_span "$SRC_RES_STEPS" rs-step0i-gate rs-step1-research || true)"
 check_block_has "$PAYLOAD_BLOCK" '0d still rewrites the body' \
   "T1.8: 0d still rewrites the body and still invalidates the cache"
 check_block_has "$PAYLOAD_BLOCK" 'updatedAt. is \*\*required and load-bearing\*\*' \
   "T1.9: updatedAt is required, and the concurrency/0h reason is stated"
 check_block_has "$PAYLOAD_BLOCK" 'Step 0h' \
   "T1.10: the gate names the sibling gate that consumes updatedAt"
-check_has "$SRC_RES_SKILL" 'issue_payload = supplied \| partial \| absent' \
+anchor_check "$SRC_RES_SKILL" rs-0a-payload-concurrency 'issue_payload = supplied \| partial \| absent' \
   "T1.11: the SKILL pointer carries the three states, first read wins"
 # 0a ends "if not found: stop; if closed: stop". Both are freshness judgements,
 # and a payload's `state` is only as fresh as the caller's list — an issue closed
@@ -185,7 +188,7 @@ check_block_has "$PAYLOAD_BLOCK" '0h condition 5.s live pre-normalization value'
   "T1.16: Step 0h's condition 5 receives the live updatedAt after the match gate"
 check_block_has "$PAYLOAD_BLOCK" 'except .comments.' \
   "T1.17: the supplied row states the payload carries 0a's fields except comments"
-check_has "$SRC_RES_SKILL" 'gh issue view N --json state,comments,updatedAt' \
+anchor_check "$SRC_RES_SKILL" rs-0a-payload-concurrency 'gh issue view N --json state,comments,updatedAt' \
   "T1.18: the SKILL clause names the same widened live read, first read wins"
 # The batch spawn hands over one record per batched issue, which can never parse
 # as the single object the `supplied` row describes. Without a per-issue reading
@@ -200,9 +203,9 @@ check_block_has "$PAYLOAD_BLOCK" 'Batched spawns carry one record per issue' \
 # stated in ONE extended contract block — never a second block
 # repeating #254's words, which would drift from them.
 # ───────────────────────────────────────────────────────────
-check_has "$SRC_RES_STEPS" '"triage_context": null' \
+anchor_check "$SRC_RES_STEPS" rs-step1-delegation-payload '"triage_context": null' \
   "T2.1: the Step 1 delegation payload carries a triage_context key"
-check_has "$SRC_RES_STEPS" '^### .triage_context. \(when supplied\)' \
+anchor_present "$SRC_RES_STEPS" rs-triage-context \
   "T2.2: pipeline-steps documents when triage_context is populated"
 check_has "$SRC_RESEARCHER" '^### .prior_analysis. and .triage_context. \(when supplied\)' \
   "T2.3: the researcher contract block covers BOTH artifacts under one heading"
@@ -216,7 +219,7 @@ check_has "$SRC_RESEARCHER" 'no commit pin at all' \
   "T2.5: the researcher states triage_context carries no commit pin"
 check_has "$SRC_RESEARCHER" '\*\*reorder\*\* a scan and never authorises' \
   "T2.6: triage_context may reorder a scan, never authorise skipping a phase"
-check_has "$SRC_RES_STEPS" 'only \*\*reorder\*\* a scan' \
+anchor_check "$SRC_RES_STEPS" rs-triage-context 'only \*\*reorder\*\* a scan' \
   "T2.7: the caller side states the same reorder-never-skip limit"
 check_has "$SRC_RESEARCHER" 'If .triage_context. was supplied, use it and \*\*do not read the file\*\*' \
   "T2.8: Phase 5's own triage read is moved to the caller, not duplicated"
@@ -234,16 +237,16 @@ check_has "$SRC_RESEARCHER" 'Phase 0 .*runs \*\*in full\*\*' \
 # read this as permission to skip a CI wait on author-written
 # evidence — which is exactly what #255 forbids.
 # ───────────────────────────────────────────────────────────
-check_has "$SRC_AP_PROMPTS" 'ci_status: "passed@<sha40>", "failed@<sha40>", or "no_ci"' \
+anchor_check "$SRC_AP_PROMPTS" ap-reviewer-spawn 'ci_status: "passed@<sha40>", "failed@<sha40>", or "no_ci"' \
   "T3.1: the reviewer's ci_status return value is commit-bound"
-check_has "$SRC_AP_PHASES" '^### Step 5\.1a — CI verdict gate' \
+anchor_present "$SRC_AP_PHASES" ap-ci-verdict-gate \
   "T3.2: auto-pilot owns a named gate for the returned verdict"
-check_has "$SRC_AP_PHASES" 'ci_verdict = trusted \| stale \| absent' \
+anchor_check "$SRC_AP_PHASES" ap-ci-verdict-gate 'ci_verdict = trusted \| stale \| absent' \
   "T3.3: the gate sets exactly one three-state variable"
 # One widened --json read serves both the pre-merge checks and the gate. A
 # separate `gh pr view --json headRefOid` three lines after Step 5.1's own read
 # is two calls where the gate's selling point is one.
-check_has "$SRC_AP_PHASES" 'gh pr view \{pr_number\} --json mergeable,reviewDecision,statusCheckRollup,headRefOid' \
+anchor_check "$SRC_AP_PHASES" ap-premerge-checks 'gh pr view \{pr_number\} --json mergeable,reviewDecision,statusCheckRollup,headRefOid' \
   "T3.4: one widened --json read serves the pre-merge checks and the gate"
 GATE_EXTRA_READS="$(grep -cE '^gh pr view \{pr_number\} --json headRefOid$' "$SRC_AP_PHASES" || true)"
 if [ "$GATE_EXTRA_READS" = "0" ]; then
@@ -252,7 +255,7 @@ else
   fail "T3.4b: the gate still issues a standalone headRefOid read ($GATE_EXTRA_READS)"
 fi
 
-CI_GATE_BLOCK="$(awk '/^### Step 5\.1a — CI verdict gate/,/^### Step 5\.1b — Dependency Gate/' "$SRC_AP_PHASES")"
+CI_GATE_BLOCK="$(anchor_span "$SRC_AP_PHASES" ap-ci-verdict-gate ap-dependency-gate || true)"
 check_block_has "$CI_GATE_BLOCK" 'subagent return value, not a PR-body marker' \
   "T3.5: the gate distinguishes an in-process return value from a PR-body marker"
 check_block_has "$CI_GATE_BLOCK" '.failed@<sha40>. is never .trusted.' \
@@ -286,7 +289,7 @@ check_block_has "$CI_GATE_BLOCK" 'harder to forge than a PR-body marker' \
 check_block_has "$CI_GATE_BLOCK" 'review\.adaptive_depth: false. disables this gate' \
   "T3.7: the existing adaptive switch is the off-switch — no new config key"
 # #255's literal must survive: CI is never skipped by the QA handoff marker.
-check_has "$SRC_AP_PHASES" 'never skipped by the marker' \
+anchor_check "$SRC_AP_PHASES" ap-ci-verdict-gate 'never skipped by the marker' \
   "T3.8: auto-pilot still states CI is never skipped by the QA handoff marker"
 check_has "$SRC_PR_CI" '^### Binding the verdict to a commit' \
   "T3.9: pr-review documents how the verdict is bound to a commit"
@@ -294,7 +297,7 @@ check_has "$SRC_PR_SKILL" 'ci_sha' \
   "T3.10: pr-review's Step 5 records the head SHA it waited on"
 # phases.md and examples.md narrate the same wait; updated apart, they drift and
 # the narration claims a poll the pipeline no longer performs.
-check_has "$SRC_AP_EXAMPLES" 'Step 5\.1a — CI verdict gate' \
+anchor_check "$SRC_AP_EXAMPLES" ap-ex-merge-requires-ci 'Step 5\.1a — CI verdict gate' \
   "T3.11: the examples narration is updated in lockstep with phases.md"
 
 # A gate whose only input is never captured is inert. Step 2.3 enumerates the
@@ -302,7 +305,7 @@ check_has "$SRC_AP_EXAMPLES" 'Step 5\.1a — CI verdict gate' \
 # `ci_status` is the one returned field nothing in that step prints — an
 # un-enumerated field is a plausible drop, and dropping it forces `absent` on
 # every iteration while the gate appears to be in force.
-STEP32_BLOCK="$(awk '/^### Step 3\.2 — Process Review Result/,/^## Phase 5 — Merge/' "$SRC_AP_PHASES")"
+STEP32_BLOCK="$(anchor_span "$SRC_AP_PHASES" ap-step32-review-result ap-phase5-merge || true)"
 check_block_has "$STEP32_BLOCK" 'Extract: .result., .review_cycles.' \
   "T3.12: Step 3.2 enumerates the reviewer fields it keeps, like Step 2.3"
 check_block_has "$STEP32_BLOCK" '\*\*Retain .ci_status. verbatim\*\*' \
@@ -323,28 +326,32 @@ check_block_has "$CI_GATE_BLOCK" 'this gate neither widens nor closes it' \
 # A correction that lands in the home and not in its siblings leaves the OLD,
 # looser condition standing where an agent reads it — and here the looser form
 # ("SHA equality alone") fails OPEN on a merge decision. Pin both siblings.
-EXAMPLES_CI_BLOCK="$(awk '/^### Merge requires CI checks/{f=1;print;next} f&&/^#/{exit} f{print}' "$SRC_AP_EXAMPLES")"
+EXAMPLES_CI_BLOCK="$(anchor_span "$SRC_AP_EXAMPLES" ap-ex-merge-requires-ci ap-ex-interrupted-run || true)"
 check_block_has "$EXAMPLES_CI_BLOCK" 'non-empty with every check in it green' \
   "T3.17: the examples narration carries the rollup conjunct, not SHA equality alone"
 check_block_has "$EXAMPLES_CI_BLOCK" 'unreadable — is .absent., not .trusted.' \
   "T3.18: the examples narration says an empty rollup is absent, not trusted"
 check_block_has "$EXAMPLES_CI_BLOCK" 'does not cover a clean base advance' \
   "T3.19: the examples narration no longer claims mergeable catches a moved base"
-check_lacks "$SRC_AP_SKILL" 'ci_status. when the head has not moved' \
+anchor_lacks "$SRC_AP_SKILL" ap-snapshot-budget 'ci_status. when the head has not moved' \
   "T3.20: the SKILL phase table states no half-condition for the CI verdict gate"
-check_has "$SRC_AP_SKILL" 'gh issue view N --json state,comments,updatedAt' \
+check_lacks "$SRC_AP_SKILL" 'ci_status. when the head has not moved' \
+  "T3.20b: no half-condition for the CI verdict gate anywhere in the SKILL (file-wide)"
+anchor_check "$SRC_AP_SKILL" ap-snapshot-budget 'gh issue view N --json state,comments,updatedAt' \
   "T3.21: the SKILL names the widened live re-verify, not the old single-field read"
-check_lacks "$SRC_AP_SKILL" 'single-field .gh issue view' \
+anchor_lacks "$SRC_AP_SKILL" ap-snapshot-budget 'single-field .gh issue view' \
   "T3.22: no site still calls the Step 0i re-verify single-field"
+check_lacks "$SRC_AP_SKILL" 'single-field .gh issue view' \
+  "T3.22b: no site anywhere in the SKILL calls the re-verify single-field (file-wide)"
 
 # ───────────────────────────────────────────────────────────
 # T4 (AC4): last-green test state has ONE home and TWO consumers,
 # and it layers UNDER resolve.auto_test. Over it, a `false` config
 # would be silently overridden by a recorded run.
 # ───────────────────────────────────────────────────────────
-check_has "$SRC_RES_STEPS" '^### Last-green test state' \
+anchor_present "$SRC_RES_STEPS" rs-last-green-state \
   "T4.1: pipeline-steps.md owns the last-green test state section"
-check_has "$SRC_RES_STEPS" 'Single home of .tests_state. and of its two run-state consumers' \
+anchor_check "$SRC_RES_STEPS" rs-clean-tree 'Single home of .tests_state.' \
   "T4.2: that section declares itself the single home"
 STATE_HITS="$(grep -rlE 'tests_state = ' "$REPO_ROOT/src" 2>/dev/null || true)"
 STATE_COUNT="$(printf '%s\n' "$STATE_HITS" | grep -c . || true)"
@@ -355,9 +362,9 @@ else
   printf '      %s\n' $STATE_HITS
 fi
 
-QA_BLOCK="$(awk '/^## Step 4 — QA/,/^### Step 4 — UI\/UX review/' "$SRC_RES_STEPS")"
-QA_BLOCK_CAPTURE="$(printf '%s\n' "$QA_BLOCK" | awk '/^2\. \*\*Run tests\*\*/,/^3\. \*\*Evaluate results/')"
-STATE_BLOCK="$(awk '/^### Last-green test state/,/^### Loop controls/' "$SRC_RES_STEPS")"
+QA_BLOCK="$(anchor_span "$SRC_RES_STEPS" rs-step4-qa rs-step4-ui-review || true)"
+QA_BLOCK_CAPTURE="$(anchor_span "$SRC_RES_STEPS" rs-qa-run-tests rs-qa-evaluate || true)"
+STATE_BLOCK="$(anchor_span "$SRC_RES_STEPS" rs-last-green-state rs-qa-loop-controls || true)"
 check_block_has "$STATE_BLOCK" 'Step 4, cycle N\+1' \
   "T4.4: consumer 1 is Step 4's next cycle after a no-commit fixer"
 # Consumer 1 sits exactly where the previous run is USUALLY red — cycle N+1 only
@@ -390,14 +397,14 @@ check_block_has "$STATE_BLOCK" 'Fail-safe is .run.' \
   "T4.7: nothing recorded, or any doubt, runs the suite"
 check_block_has "$STATE_BLOCK" 'new config key is introduced' \
   "T4.8: the existing adaptive switch is the off-switch — no new config key"
-check_has "$SRC_RES_SKILL" 'Under .auto_test., not over it' \
+anchor_check "$SRC_RES_SKILL" rs-deliver-clean-tree 'Under .auto_test., not over it' \
   "T4.9: the SKILL's Step 5 clause states the layering, first read wins"
 # The single home above declares itself the only place either definition is
 # stated, then SKILL.md restates the comparison inline — and SKILL.md is the
 # always-loaded file while pipeline-steps.md is progressive disclosure, so the
 # restatement is the copy an agent acts on. A restatement that gives only SHA
 # equality IS the looser second definition the home exists to prevent.
-check_has "$SRC_RES_SKILL" 'equals .git rev-parse HEAD. \*\*and .git status --porcelain=v1 --untracked-files=all. is empty\*\*' \
+anchor_check "$SRC_RES_SKILL" rs-deliver-clean-tree 'equals .git rev-parse HEAD. \*\*and .git status --porcelain=v1 --untracked-files=all. is empty\*\*' \
   "T4.9b: the SKILL's restatement carries the canonical clean-tree rule"
 # #255 captures tests_sha where the suite runs; promoting it to run state must
 # not move or soften that capture.
@@ -430,11 +437,11 @@ fi
 
 UNTRUSTED='untrusted local data with exactly the status of issue text'
 SAFETY='may gate duplicated work, never a safety gate'
-RESOLVER_PROMPT="$(awk '/^## Resolver Subagent/,/^## PR Reviewer Subagent/' "$SRC_AP_PROMPTS")"
-REVIEWER_PROMPT="$(awk '/^## PR Reviewer Subagent/,/^## Analyzer Subagent/' "$SRC_AP_PROMPTS")"
-BATCH_PROMPT="$(awk '/^## Batch Resolver Subagent/,/^## Template Variables/' "$SRC_AP_PROMPTS")"
-CAPTURE_BLOCK="$(awk '/^### Step 1\.2b — Capture the caller payload/,/^### Step 1\.3/' "$SRC_AP_PHASES")"
-TRIAGE_BLOCK="$(awk '/^### .triage_context. \(when supplied\)/,/^### What the researcher does/' "$SRC_RES_STEPS")"
+RESOLVER_PROMPT="$(anchor_span "$SRC_AP_PROMPTS" ap-resolver-spawn ap-reviewer-spawn || true)"
+REVIEWER_PROMPT="$(anchor_span "$SRC_AP_PROMPTS" ap-reviewer-spawn ap-analyzer-spawn || true)"
+BATCH_PROMPT="$(anchor_span "$SRC_AP_PROMPTS" ap-batch-spawn ap-template-vars || true)"
+CAPTURE_BLOCK="$(anchor_span "$SRC_AP_PHASES" ap-step12b-capture ap-step13-plan || true)"
+TRIAGE_BLOCK="$(anchor_span "$SRC_RES_STEPS" rs-triage-context rs-researcher-scope || true)"
 
 check_block_has "$RESOLVER_PROMPT" "$UNTRUSTED" "T5.5: the resolver prompt marks its payloads untrusted"
 check_block_has "$REVIEWER_PROMPT" "$UNTRUSTED" "T5.6: the reviewer prompt marks its payload untrusted"
@@ -449,7 +456,7 @@ check_block_has "$BATCH_PROMPT"    "$SAFETY" "T5.13: the batch prompt carries th
 check_block_has "$CAPTURE_BLOCK"   "$SAFETY" "T5.14: the capture step carries the never-a-safety-gate rule"
 check_block_has "$PAYLOAD_BLOCK"   "$SAFETY" "T5.15: the resolver's Step 0i carries the never-a-safety-gate rule"
 check_block_has "$TRIAGE_BLOCK"    "$SAFETY" "T5.16: the triage_context section carries the never-a-safety-gate rule"
-check_has "$SRC_AP_SKILL"          "$SAFETY" \
+anchor_check "$SRC_AP_SKILL" ap-snapshot-budget "$SAFETY" \
   "T5.17: auto-pilot's SKILL states the rule where an agent reads it first"
 
 # The reviewer is spawned in Phase 3-4, STRICTLY AFTER Phase 2's resolver ran
@@ -552,19 +559,19 @@ check_block_has "$CAPTURE_BLOCK" 'omit that block entirely and spawn without it'
 # ───────────────────────────────────────────────────────────
 check_has "$BUILT_AP_PHASES" 'gh issue list --state open --json [a-zA-Z,]*state,updatedAt' \
   "T7.1: built phases.md ships the widened list call"
-check_has "$BUILT_AP_PHASES" '^### Step 5\.1a — CI verdict gate' \
+anchor_present "$BUILT_AP_PHASES" ap-ci-verdict-gate \
   "T7.2: built phases.md ships the CI verdict gate"
-check_has "$BUILT_AP_PHASES" 'never skipped by the marker' \
+anchor_check "$BUILT_AP_PHASES" ap-ci-verdict-gate 'never skipped by the marker' \
   "T7.3: built phases.md still ships #255's marker rule"
-check_has "$BUILT_AP_PROMPTS" '\{issue_payload\}' \
+anchor_check "$BUILT_AP_PROMPTS" ap-resolver-spawn '\{issue_payload\}' \
   "T7.4: built subagent-prompts.md ships the payload variable"
-check_has "$BUILT_AP_PROMPTS" 'ci_status: "passed@<sha40>"' \
+anchor_check "$BUILT_AP_PROMPTS" ap-reviewer-spawn 'ci_status: "passed@<sha40>"' \
   "T7.5: built subagent-prompts.md ships the commit-bound ci_status"
-check_has "$BUILT_RES_STEPS" '^## Step 0i — Caller payload gate' \
+anchor_present "$BUILT_RES_STEPS" rs-step0i-gate \
   "T7.6: built pipeline-steps.md ships the payload gate"
-check_has "$BUILT_RES_STEPS" '^### Last-green test state' \
+anchor_present "$BUILT_RES_STEPS" rs-last-green-state \
   "T7.7: built pipeline-steps.md ships the last-green test state home"
-check_has "$BUILT_RES_STEPS" '"triage_context": null' \
+anchor_check "$BUILT_RES_STEPS" rs-step1-delegation-payload '"triage_context": null' \
   "T7.8: built pipeline-steps.md ships the triage_context payload key"
 check_has "$BUILT_RESEARCHER" '^### .prior_analysis. and .triage_context. \(when supplied\)' \
   "T7.9: the bundled researcher prompt ships the single extended contract block"
@@ -574,26 +581,26 @@ check_has "$BUILT_CONV" '^## Caller-supplied context payloads' \
   "T7.11: the bundled conventions doc ships the caller-payload rules"
 check_has "$BUILT_CONV" "$SAFETY" \
   "T7.12: the bundled conventions doc ships the never-a-safety-gate rule"
-check_has "$BUILT_RES_SKILL" 'issue_payload = supplied \| partial \| absent' \
+anchor_check "$BUILT_RES_SKILL" rs-0a-payload-concurrency 'issue_payload = supplied \| partial \| absent' \
   "T7.13: built resolver SKILL.md ships the payload states"
 check_has "$BUILT_PR_CI" '^### Binding the verdict to a commit' \
   "T7.14: built pr-review mechanics ship the verdict binding"
-check_has "$BUILT_AP_EXAMPLES" 'Step 5\.1a — CI verdict gate' \
+anchor_check "$BUILT_AP_EXAMPLES" ap-ex-merge-requires-ci 'Step 5\.1a — CI verdict gate' \
   "T7.15: built examples.md ships the updated narration"
 
 # The twins below are the groups that shipped only in src/ before: the
 # untrusted-data boundary (T5.5-T5.7, the security-critical group), every
 # fail-safe clause (T6.1-T6.5), the tests_state layering (T4.6-T4.8), and the
 # reviewer payload scope. A boundary that ships only in src/ protects nobody.
-B_RESOLVER_PROMPT="$(awk '/^## Resolver Subagent/,/^## PR Reviewer Subagent/' "$BUILT_AP_PROMPTS")"
-B_REVIEWER_PROMPT="$(awk '/^## PR Reviewer Subagent/,/^## Analyzer Subagent/' "$BUILT_AP_PROMPTS")"
-B_BATCH_PROMPT="$(awk '/^## Batch Resolver Subagent/,/^## Template Variables/' "$BUILT_AP_PROMPTS")"
-B_CAPTURE_BLOCK="$(awk '/^### Step 1\.2b — Capture the caller payload/,/^### Step 1\.3/' "$BUILT_AP_PHASES")"
-B_PAYLOAD_BLOCK="$(awk '/^## Step 0i — Caller payload gate/,/^## Step 1 — Research/' "$BUILT_RES_STEPS")"
-B_TRIAGE_BLOCK="$(awk '/^### .triage_context. \(when supplied\)/,/^### What the researcher does/' "$BUILT_RES_STEPS")"
-B_STATE_BLOCK="$(awk '/^### Last-green test state/,/^### Loop controls/' "$BUILT_RES_STEPS")"
-B_QA_CAPTURE="$(awk '/^## Step 4 — QA/,/^### Step 4 — UI\/UX review/' "$BUILT_RES_STEPS" | awk '/^2\. \*\*Run tests\*\*/,/^3\. \*\*Evaluate results/')"
-B_CI_GATE_BLOCK="$(awk '/^### Step 5\.1a — CI verdict gate/,/^### Step 5\.1b — Dependency Gate/' "$BUILT_AP_PHASES")"
+B_RESOLVER_PROMPT="$(anchor_span "$BUILT_AP_PROMPTS" ap-resolver-spawn ap-reviewer-spawn || true)"
+B_REVIEWER_PROMPT="$(anchor_span "$BUILT_AP_PROMPTS" ap-reviewer-spawn ap-analyzer-spawn || true)"
+B_BATCH_PROMPT="$(anchor_span "$BUILT_AP_PROMPTS" ap-batch-spawn ap-template-vars || true)"
+B_CAPTURE_BLOCK="$(anchor_span "$BUILT_AP_PHASES" ap-step12b-capture ap-step13-plan || true)"
+B_PAYLOAD_BLOCK="$(anchor_span "$BUILT_RES_STEPS" rs-step0i-gate rs-step1-research || true)"
+B_TRIAGE_BLOCK="$(anchor_span "$BUILT_RES_STEPS" rs-triage-context rs-researcher-scope || true)"
+B_STATE_BLOCK="$(anchor_span "$BUILT_RES_STEPS" rs-last-green-state rs-qa-loop-controls || true)"
+B_QA_CAPTURE="$(anchor_span "$BUILT_RES_STEPS" rs-qa-run-tests rs-qa-evaluate || true)"
+B_CI_GATE_BLOCK="$(anchor_span "$BUILT_AP_PHASES" ap-ci-verdict-gate ap-dependency-gate || true)"
 
 check_block_has "$B_RESOLVER_PROMPT" "$UNTRUSTED" "T7.16: built resolver prompt marks its payloads untrusted"
 check_block_has "$B_REVIEWER_PROMPT" "$UNTRUSTED" "T7.17: built reviewer prompt marks its payload untrusted"
@@ -640,7 +647,7 @@ check_block_has  "$B_REVIEWER_PROMPT" '\{issue_payload_ids\}' \
   "T7.36b: built reviewer prompt substitutes the trimmed identifying-fields block"
 check_block_lacks "$B_REVIEWER_PROMPT" '\{issue_payload\}' \
   "T7.36c: built reviewer prompt never substitutes the full verbatim payload"
-check_has "$BUILT_AP_PHASES" 'gh pr view \{pr_number\} --json mergeable,reviewDecision,statusCheckRollup,headRefOid' \
+anchor_check "$BUILT_AP_PHASES" ap-premerge-checks 'gh pr view \{pr_number\} --json mergeable,reviewDecision,statusCheckRollup,headRefOid' \
   "T7.39: built phases.md ships the single widened --json read"
 check_has "$BUILT_CONV" 'may carry the subset that applies to their consumer, never a different rule' \
   "T7.40: the bundled conventions doc ships the subset-restatement rule"
@@ -654,9 +661,9 @@ check_block_has "$B_PAYLOAD_BLOCK" '0h condition 5.s live pre-normalization valu
   "T7.42: built payload gate feeds Step 0h's condition 5 the live updatedAt"
 check_block_has "$B_PAYLOAD_BLOCK" 'Batched spawns carry one record per issue' \
   "T7.43: built payload gate ships the per-issue rule for batch blocks"
-check_has "$BUILT_RES_SKILL" 'equals .git rev-parse HEAD. \*\*and .git status --porcelain=v1 --untracked-files=all. is empty\*\*' \
+anchor_check "$BUILT_RES_SKILL" rs-deliver-clean-tree 'equals .git rev-parse HEAD. \*\*and .git status --porcelain=v1 --untracked-files=all. is empty\*\*' \
   "T7.44: built resolver SKILL.md ships the canonical clean-tree rule"
-check_has "$BUILT_RES_SKILL" 'gh issue view N --json state,comments,updatedAt' \
+anchor_check "$BUILT_RES_SKILL" rs-0a-payload-concurrency 'gh issue view N --json state,comments,updatedAt' \
   "T7.45: built resolver SKILL.md ships the widened live re-verify"
 check_block_has "$B_CI_GATE_BLOCK" 'statusCheckRollup. is non-empty with every check in it green' \
   "T7.46: built CI verdict gate requires a non-empty, all-green rollup"
@@ -669,7 +676,7 @@ check_block_has "$B_BATCH_PROMPT" 'gh issue view <number> --json state,comments,
 check_block_lacks "$B_BATCH_PROMPT" 'use it and fetch nothing' \
   "T7.50: built batch prompt no longer licenses fetching nothing at all"
 
-B_STEP32_BLOCK="$(awk '/^### Step 3\.2 — Process Review Result/,/^## Phase 5 — Merge/' "$BUILT_AP_PHASES")"
+B_STEP32_BLOCK="$(anchor_span "$BUILT_AP_PHASES" ap-step32-review-result ap-phase5-merge || true)"
 check_block_has "$B_STEP32_BLOCK" '\*\*Retain .ci_status. verbatim\*\*' \
   "T7.51: built Step 3.2 retains ci_status verbatim — the gate's only input"
 check_block_has "$B_STEP32_BLOCK" 'Step 5\.1a — CI verdict gate' \
@@ -679,15 +686,17 @@ check_block_has "$B_CI_GATE_BLOCK" 'that moved \*\*into conflict\*\*, and nothin
 check_block_has "$B_CI_GATE_BLOCK" 'this gate neither widens nor closes it' \
   "T7.54: built CI verdict gate states the residual is open, not mitigated"
 
-B_EXAMPLES_CI_BLOCK="$(awk '/^### Merge requires CI checks/{f=1;print;next} f&&/^#/{exit} f{print}' "$BUILT_AP_EXAMPLES")"
+B_EXAMPLES_CI_BLOCK="$(anchor_span "$BUILT_AP_EXAMPLES" ap-ex-merge-requires-ci ap-ex-interrupted-run || true)"
 check_block_has "$B_EXAMPLES_CI_BLOCK" 'non-empty with every check in it green' \
   "T7.55: built examples narration carries the rollup conjunct"
 check_block_has "$B_EXAMPLES_CI_BLOCK" 'does not cover a clean base advance' \
   "T7.56: built examples narration no longer claims mergeable catches a moved base"
-check_has "$BUILT_AP_SKILL" 'gh issue view N --json state,comments,updatedAt' \
+anchor_check "$BUILT_AP_SKILL" ap-snapshot-budget 'gh issue view N --json state,comments,updatedAt' \
   "T7.57: built auto-pilot SKILL.md names the widened live re-verify"
-check_lacks "$BUILT_AP_SKILL" 'ci_status. when the head has not moved' \
+anchor_lacks "$BUILT_AP_SKILL" ap-snapshot-budget 'ci_status. when the head has not moved' \
   "T7.58: built auto-pilot SKILL.md states no half-condition for the CI verdict gate"
+check_lacks "$BUILT_AP_SKILL" 'ci_status. when the head has not moved' \
+  "T7.58b: built auto-pilot SKILL.md has no half-condition anywhere (file-wide)"
 
 # ───────────────────────────────────────────────────────────
 # Summary

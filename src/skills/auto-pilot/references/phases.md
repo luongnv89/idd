@@ -684,9 +684,9 @@ already ran a full triage there is nothing to re-run, so go straight to that
 block. The retry never repeats — at most one re-triage per iteration, ever — so
 a backlog that genuinely has nothing eligible cannot spin.
 
-### Step 1.2b — Capture the caller payload
+### Step 1.2b — Capture the caller payload <!-- a:ap-step12b-capture -->
 
-This is the **mode-neutral pre-spawn capture**. In triage mode run it after
+This is the **mode-neutral pre-spawn capture**. In triage mode run it after <!-- a:ap-capture-canonical -->
 selection. In explicit-list mode run it against the complete retained map after
 validation and **before analyzer spawn**, because the analyzer consumes the same
 validated records; after optimization, project selected entries into each
@@ -887,7 +887,7 @@ behavior, so an omission costs a read and breaks nothing.
 ○ Triage context: captured ({affected_count} affected files) — passed to subagents
 ```
 
-### Step 1.3 — Display Plan and Auto-Start
+### Step 1.3 — Display Plan and Auto-Start <!-- a:ap-step13-plan -->
 
 On the first iteration, display the execution plan and immediately begin — no confirmation prompt. The user's invocation of `/auto-pilot` is the confirmation.
 
@@ -1314,7 +1314,7 @@ See the `{{skill:issue-pr-review}}` skill for the full pipeline.
 
 Use the **PR Reviewer Subagent** prompt from `references/subagent-prompts.md`, substituting `{pr_number}` and, when Step 1.2b captured it, `{issue_payload_ids}` for the issue this PR closes. **The reviewer reads identifying fields from that payload only** — and gets only those, because Step 1.2b trimmed the block to `number`, `title` and `labels`, so the scope is structural rather than instruction-only. This spawn happens strictly *after* Phase 2's resolver ran its Step 0d normalization (`gh issue edit` + re-read), so a Phase-1 body would be superseded by construction — on an unnormalized backlog issue, 0d is what *creates* the structured Acceptance Criteria section. That is why the body is dropped from this block rather than fenced off in prose. The reviewer's acceptance-criteria verification therefore always re-fetches the live body, and the #36 `acceptance_criteria` hard-block is never evaluated against the payload. The subagent runs the full `/issue-pr-review --auto --no-merge` pipeline: review, test, CI check, fix, repeat. It does NOT merge — merging is the main agent's job in Phase 5. The `--no-merge` flag suppresses auto-merge in `--auto` mode so the reviewer never steals the merge step from Phase 5's mode gate and dependency gate.
 
-### Step 3.2 — Process Review Result
+### Step 3.2 — Process Review Result <!-- a:ap-step32-review-result -->
 
 Parse the subagent's response. Extract: `result`, `review_cycles`, `issues_found`,
 `issues_fixed`, `issues_noted`, `remaining_issues`, `pre_pass_fixes`,
@@ -1506,9 +1506,9 @@ Options 2 and 3 merged nothing, so they run nothing.
 
 ---
 
-## Phase 5 — Merge
+## Phase 5 — Merge <!-- a:ap-phase5-merge -->
 
-### Step 5.1 — Pre-merge Checks
+### Step 5.1 — Pre-merge Checks <!-- a:ap-premerge-checks -->
 
 Before merging, verify:
 
@@ -1535,7 +1535,7 @@ If not mergeable:
 
 **Autonomous behavior:** Leave the PR open and move on. The PR is already created with all changes — it can be merged manually later or picked up on the next auto-pilot run. Only pause if `autopilot.pause_on_failure` is explicitly `true`.
 
-### Step 5.1a — CI verdict gate
+### Step 5.1a — CI verdict gate <!-- a:ap-ci-verdict-gate -->
 
 **Single home of the CI-trust rule.** Phase 3-4's reviewer subagent already ran
 `/issue-pr-review` Step 5 on this PR and returned `ci_status` **bound to the
@@ -1625,13 +1625,13 @@ One `○` line, per `docs/terminal-style.md`:
 ○ CI verdict: absent — waiting on CI
 ```
 
-### Step 5.1b — Dependency Gate
+### Step 5.1b — Dependency Gate <!-- a:ap-dependency-gate -->
 
 If `autopilot.respect_dependencies` is `true` (default), check whether the originating issue declares any dependencies that are not yet merged. The convention is documented in `docs/idd-methodology.md` (Issue Dependencies). If the config is `false`, skip this step and proceed to Step 5.2.
 
 #### Parse dependency markers
 
-Read the issue body from Step 1.2b's held `{issue_payload}` resolution snapshot. Only when that issue has no complete held snapshot, fetch with `python3 shared/scripts/gi-issue.py N --fields body` — reading `.issue.body`; exit 3 is a stop, while no `python3`, exit 2, or exit 4 degrades to `gh issue view N --json body`. Extract every `Depends on #N` and `Blocked by #N` reference. The match is case-insensitive and tolerates list/sentence/colon shapes:
+Read the issue body from Step 1.2b's held `{issue_payload}` resolution snapshot. Only when that issue has no complete held snapshot, fetch with `python3 shared/scripts/gi-issue.py N --fields body` — reading `.issue.body`; exit 3 is a stop, while no `python3`, exit 2, or exit 4 degrades to `gh issue view N --json body`. Extract every `Depends on #N` and `Blocked by #N` reference. The match is case-insensitive and tolerates list/sentence/colon shapes: <!-- a:ap-deps-reuse-snapshot -->
 
 ```
 - Depends on #12

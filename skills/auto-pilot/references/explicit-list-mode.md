@@ -27,7 +27,7 @@ Stop.
 
 ### Validate issues upfront
 
-Before starting the loop, validate every issue and retain the complete resolution
+Before starting the loop, validate every issue and retain the complete resolution <!-- a:ap-explicit-retained-records -->
 snapshot that the canonical post-selection capture step consumes:
 
 ```bash

@@ -423,9 +423,9 @@ needs no change from a caller: `/auto-pilot`'s explicit-list mode, which runs
 `/issue-analysis` and then `/issue-resolver` back to back on the same tree, gets
 the reuse purely by having written the file.
 
-## Step 0i — Caller payload gate
+## Step 0i — Caller payload gate <!-- a:rs-step0i-gate -->
 
-**Ordering:** classify the framed payload **before Step 0a**, tentatively consume
+**Ordering:** classify the framed payload **before Step 0a**, tentatively consume <!-- a:rs-step0i-ordering -->
 a supplied snapshot in 0a, then run the mandatory live
 `state,comments,updatedAt` probe there. Before any 0d body rewrite, parse both
 timestamps and require the live `updatedAt` to exactly match the retained
@@ -484,7 +484,7 @@ batched issue.
 
 ### Scope — 0a's read only
 
-The payload substitutes for **Step 0a's fetch and nothing else**:
+The payload substitutes for **Step 0a's fetch and nothing else**: <!-- a:rs-step0i-scope -->
 
 - **0d still rewrites the body** with `gh issue edit`, and still ends with the
   mandatory cache invalidation named in *0a*. The payload is the
@@ -558,9 +558,9 @@ One `○` line, per docs/terminal-style.md:
 ○ Issue payload: absent — fetching
 ```
 
-## Step 1 — Research (codebase-researcher subagent)
+## Step 1 — Research (codebase-researcher subagent) <!-- a:rs-step1-research -->
 
-### Delegation payload
+### Delegation payload <!-- a:rs-step1-delegation-payload -->
 
 ```json
 {
@@ -590,7 +590,7 @@ lets an ambient parent checkout become that lane's implicit workspace.
 `history` and `cross_references` blocks are the useful part). On every other
 path pass `null` or omit the key, so the payload is byte-for-byte today's.
 
-### `triage_context` (when supplied)
+### `triage_context` (when supplied) <!-- a:rs-triage-context -->
 
 `triage_context` is the optional **sibling** of `prior_analysis`: this issue's
 own row from the triage graph — `type`, `priority`, `blocks`, `blocked_by`,
@@ -629,7 +629,7 @@ today. `resolve.adaptive_effort: false` also treats it as absent. One `○` line
 ○ Triage context: absent — researcher reads the triage graph itself
 ```
 
-### What the researcher does
+### What the researcher does <!-- a:rs-researcher-scope -->
 
 1. **Verify not already resolved** — check git history for closing commits and scan the codebase for evidence the bug is fixed.
 2. **Scan codebase** — extract targets, grep/glob, read files, trace dependencies.
@@ -1253,12 +1253,12 @@ If commits exceed `resolve.max_commits`:
 
 If no Agent tool, implement inline following `shared/agents/implementer.md`.
 
-## Step 4 — QA (code-reviewer + fixer subagents)
+## Step 4 — QA (code-reviewer + fixer subagents) <!-- a:rs-step4-qa -->
 
 Each cycle:
 
 1. **Code review** — spawn a *fresh* code-reviewer subagent per cycle (see `shared/agents/code-reviewer.md`) so each pass is unbiased. Pass the same `workspace_contract` and independent `expected_lane_identity` sibling used by Steps 1–3 (both `null` on ordinary runs); the reviewer validates their binding before reading the diff or files.
-2. **Run tests** — unit, integration, e2e (if present), build/compile. Record
+2. **Run tests** — unit, integration, e2e (if present), build/compile. Record <!-- a:rs-qa-run-tests -->
    `tests_state` — the passing count paired with `tests_sha` = `git rev-parse HEAD`,
    see *Last-green test state* below — **at the moment the suite runs**.
    **Record it only for a green run on a clean tree:** a suite that reported any
@@ -1273,14 +1273,14 @@ Each cycle:
    the suite actually ran on, and *Update documentation* commits after this point,
    so the value is unrecoverable later (`references/report-templates.md`, *QA
    handoff marker*). Nothing recorded ⇒ omit the whole `tests=` field; never substitute the head SHA.
-3. **Evaluate results:**
+3. **Evaluate results:** <!-- a:rs-qa-evaluate -->
    - Reviewer returns `PASS` AND all tests pass AND build succeeds → exit loop, QA passed.
    - Issues found → delegate fixes, then start next cycle.
 4. **Fix issues** — spawn or re-message the fixer subagent (see `shared/agents/fixer.md`) with reviewer findings, failing test/build output, and the same `workspace_contract` plus independent `expected_lane_identity` sibling used by the reviewer (both `null` on ordinary runs), passing `security_convention`: `references/docs/pre-commit-security.md`, `secscan_script`: the **absolute** path to `references/scripts/gi-secscan.py`, **and** `secscan_policy_ref`: `origin/${base}` (paths and a ref name only — the script reads `security.*` from the ref itself, so the branch under fix never supplies the policy that scans it). Absolutize both before binding: a subagent runs with the target repo as its working directory, so a skill-relative path resolves to nothing. Both are spawn variables rather than references inside the agent file, because an emitted agent prompt renders its own references as absolute repo URLs and so cannot name a path inside this skill's bundle. The fixer reads affected files, applies targeted fixes, verifies them, runs the mandatory pre-commit security scan before committing — the script first, the document's Primary Pattern only when the script cannot run, and a script exit of 1 is a block that stops the commit — and commits as `fix(scope): address review feedback (#N)`. The main agent does not apply code fixes inline when the Agent tool is available.
 
-### Last-green test state
+### Last-green test state <!-- a:rs-last-green-state -->
 
-**Single home of `tests_state` and of its two run-state consumers.** Those are
+**Single home of `tests_state` and of its two run-state consumers.** Those are <!-- a:rs-clean-tree -->
 Step 4 cycle N+1 and Step 5 Deliver below. The QA marker is the durable rendering
 of the same state; `references/report-templates.md` is only that marker's
 rendering location, not a third consumer. Two definitions of "the suite already
@@ -1346,7 +1346,7 @@ One `○` line per skip, per docs/terminal-style.md:
 ○ Test suite: skipped (last green 128@9f2c1ab == HEAD)
 ```
 
-### Loop controls
+### Loop controls <!-- a:rs-qa-loop-controls -->
 
 - **Max cycles (hard bound):** `resolve.qa_max_cycles` (default: 5). Never
   exceed this configured cap.
@@ -1375,7 +1375,7 @@ If max cycles with remaining issues:
 - Interactive: show remaining issues, ask to continue.
 - Auto: continue to Deliver — PR can be created with known issues noted.
 
-### Step 4 — UI/UX review (auto-detected)
+### Step 4 — UI/UX review (auto-detected) <!-- a:rs-step4-ui-review -->
 
 The full mechanics — contract, keyword list, classification, code-review spawn,
 display-environment label, browser gate + capability checks, and the skip/success

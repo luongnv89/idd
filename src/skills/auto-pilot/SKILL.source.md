@@ -292,7 +292,7 @@ Phase 0 runs **once**, before the loop; each iteration then runs 5 phases. For b
 
 See `references/phases.md` for full prompts, error handling, and decision tables.
 
-**Caller-supplied context (issues #256 and #285).** The stale literal "one body
+**Caller-supplied context (issues #256 and #285).** The stale literal "one body <!-- a:ap-snapshot-budget -->
 fetch per lifecycle" is superseded by a measurable body-snapshot budget with
 three freshness boundaries: (1) **resolution** — at most one body-bearing snapshot
 per issue, reused by resolver/batch resolver, researcher, analysis and dependency
