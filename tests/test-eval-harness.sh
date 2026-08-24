@@ -383,15 +383,23 @@ set +e
 EVAL_STATE_DIR="$CORRUPT_STATE" python3 "$SHIM" issue create \
   --title "after-corruption" --body "body" > "$TMP/corrupt.out" 2> "$TMP/corrupt.err"
 CORRUPT_EXIT=$?
+printf '%0300d\n' 0 > "$CORRUPT_STATE/issue_counter"
+EVAL_STATE_DIR="$CORRUPT_STATE" python3 "$SHIM" issue create \
+  --title "after-oversize" --body "body" > "$TMP/oversize-counter.out" \
+  2> "$TMP/oversize-counter.err"
+OVERSIZE_EXIT=$?
 set -e
-if [ "$CORRUPT_EXIT" -eq 0 ] \
+if [ "$CORRUPT_EXIT" -eq 0 ] && [ "$OVERSIZE_EXIT" -eq 0 ] \
   && grep -q 'invalid issue counter' "$TMP/corrupt.err" \
+  && grep -q 'counter exceeds 64 bytes' "$TMP/oversize-counter.err" \
   && ! grep -q 'Traceback' "$TMP/corrupt.err" \
+  && ! grep -q 'Traceback' "$TMP/oversize-counter.err" \
   && grep -q '/issues/1$' "$TMP/corrupt.out" \
+  && grep -q '/issues/1$' "$TMP/oversize-counter.out" \
   && [ "$(cat "$CORRUPT_STATE/issue_counter")" = "1" ]; then
-  pass "T20: corrupt issue counter warns and resets to issue 1"
+  pass "T20: corrupt and oversized counters warn and reset to issue 1"
 else
-  fail "T20: corrupt issue counter recovers without traceback (exit $CORRUPT_EXIT)"
+  fail "T20: corrupt counters recover without traceback (exits $CORRUPT_EXIT/$OVERSIZE_EXIT)"
 fi
 
 # ─── T21: non-allowlisted shell assertion is never executed ─
@@ -429,6 +437,7 @@ MALFORMED_OUT="$TMP/malformed-artifact-out"
 mkdir -p "$MALFORMED_OUT"
 printf 'fix/342-safe\0suffix\n' > "$MALFORMED_OUT/nul.txt"
 printf '\377\n' > "$MALFORMED_OUT/non-utf8.txt"
+dd if=/dev/zero of="$MALFORMED_OUT/oversized.txt" bs=65537 count=1 2>/dev/null
 printf 'fix/342-safe\n' > "$MALFORMED_OUT/valid.txt"
 cat > "$CASE/case.json" <<'EOF'
 {
@@ -448,6 +457,12 @@ cat > "$CASE/case.json" <<'EOF'
     },
     {
       "tool": "shell",
+      "args": ["python3 scripts/idd-lint.py branch \"$(tr -d '\\n' < OUT/oversized.txt)\""],
+      "expect_exit": 0,
+      "label": "oversized artifact"
+    },
+    {
+      "tool": "shell",
       "args": ["python3 scripts/idd-lint.py branch \"$(tr -d '\\n' < OUT/valid.txt)\""],
       "expect_exit": 0,
       "label": "valid artifact still runs"
@@ -463,6 +478,7 @@ set -e
 if [ "$MALFORMED_EXIT" -eq 1 ] \
   && grep -q 'NUL byte' "$TMP/malformed-grade.out" \
   && grep -q 'not valid UTF-8' "$TMP/malformed-grade.out" \
+  && grep -q 'exceeds the 64 KiB argv limit' "$TMP/malformed-grade.out" \
   && grep -q '✓ valid artifact still runs' "$TMP/malformed-grade.out" \
   && ! grep -q 'Traceback' "$TMP/malformed-grade.out"; then
   pass "T22: malformed argv artifacts fail cleanly and grading continues"

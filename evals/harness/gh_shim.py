@@ -188,11 +188,15 @@ def _read_issue_counter(counter: Path) -> int:
     if not counter.exists():
         return 0
     try:
-        value = int(counter.read_text(encoding="utf-8").strip())
-        if value < 0:
-            raise ValueError("counter must be non-negative")
+        with counter.open("rb") as fh:
+            data = fh.read(65)
+        if len(data) > 64:
+            raise ValueError("counter exceeds 64 bytes")
+        value = int(data.decode("utf-8").strip())
+        if not 0 <= value < 2**63 - 1:
+            raise ValueError("counter is outside the supported range")
         return value
-    except (UnicodeError, ValueError) as exc:
+    except (OSError, UnicodeError, ValueError) as exc:
         _eprint(f"⚠ gh shim: invalid issue counter {counter}: {exc}; resetting to 0")
         return 0
 

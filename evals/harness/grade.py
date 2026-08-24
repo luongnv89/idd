@@ -77,7 +77,8 @@ def _out_artifact(token: str, out_dir: Path) -> Path | None:
 def _read_shell_artifact_value(artifact: Path) -> tuple[str | None, str | None]:
     """Read a small UTF-8 artifact safely before placing it in an argv entry."""
     try:
-        data = artifact.read_bytes()
+        with artifact.open("rb") as fh:
+            data = fh.read(64 * 1024 + 1)
     except OSError as exc:
         return None, f"cannot read OUT artifact: {exc}"
     if len(data) > 64 * 1024:
