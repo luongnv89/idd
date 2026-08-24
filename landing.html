@@ -115,7 +115,10 @@
       --line-soft: #181c1f;
       --fg: #FAFAFA;
       --fg-muted: #a7b0b4;
-      --fg-dim: #6b7479;
+      /* F-UX-006: #6b7479 measured 4.15:1 on --bg and 3.90:1 on --panel —
+         under the 4.5:1 AA floor for the body copy that uses it. #8a949a
+         is 6.40:1 on --bg and 6.02:1 on --panel. */
+      --fg-dim: #8a949a;
       /* Semantic colors from the CLI style guide */
       --cyan: #4fd0e3;
       --yellow: #ffcb47;
@@ -131,7 +134,10 @@
     }
 
     * { box-sizing: border-box; }
-    html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+    /* F-UX-007: the sticky header is 64px tall, so an anchor jump has to
+       stop 64px + breathing room short of the target or the heading lands
+       underneath it. */
+    html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; scroll-padding-top: 80px; }
 
     body {
       margin: 0;
@@ -170,12 +176,17 @@
       display: flex; align-items: center; justify-content: space-between;
       height: 64px;
     }
-    .brand { display: flex; align-items: center; gap: 11px; font-weight: 800; font-size: 21px; letter-spacing: -0.04em; }
+    .brand { display: flex; align-items: center; gap: 11px; min-height: 44px; font-weight: 800; font-size: 21px; letter-spacing: -0.04em; }
     .brand svg { display: block; }
     .brand .b-issue { color: var(--fg); }
     .brand .b-dev { color: var(--green); }
     .nav-links { display: flex; align-items: center; gap: 28px; }
-    .nav-links a { color: var(--fg-muted); font-size: 15px; font-weight: 500; transition: color .15s; }
+    /* F-UX-009: a 15px link is ~24px tall on its own; inline-flex + a 44px
+       floor gives every nav target (the CTA included) a real hit area. */
+    .nav-links a {
+      display: inline-flex; align-items: center; min-width: 44px; min-height: 44px;
+      color: var(--fg-muted); font-size: 15px; font-weight: 500; transition: color .15s;
+    }
     .nav-links a:hover { color: var(--fg); }
     .nav-links a.active { color: var(--green); }
     .nav-cta {
@@ -184,7 +195,41 @@
       padding: 8px 16px; border-radius: 8px; transition: all .15s;
     }
     .nav-cta:hover { background: rgba(0,255,65,0.1); border-color: var(--green); }
-    @media (max-width: 760px) { .nav-links a:not(.nav-cta) { display: none; } }
+
+    /* F-UX-002: below the nav breakpoint the inline links collapse and only
+       the GitHub CTA survives, stranding Docs and Changelog above the fold.
+       This disclosure menu carries them plus the section anchors. It is a
+       plain <details>, so it opens, closes, and takes keyboard focus with no
+       script at all — same no-JS contract as F-UX-001. */
+    .nav-menu { display: none; position: relative; }
+    .nav-menu > summary {
+      list-style: none; cursor: pointer;
+      display: inline-flex; align-items: center; justify-content: center;
+      min-width: 44px; min-height: 44px; padding: 0 14px;
+      font-family: var(--mono); font-size: 14px; font-weight: 600;
+      color: var(--fg-muted); background: transparent;
+      border: 1px solid var(--line); border-radius: 8px; transition: all .15s;
+    }
+    .nav-menu > summary::-webkit-details-marker { display: none; }
+    .nav-menu > summary::marker { content: ""; }
+    .nav-menu[open] > summary { color: var(--green); border-color: rgba(0,255,65,0.35); }
+    .nav-menu-panel {
+      position: absolute; right: 0; top: calc(100% + 10px); z-index: 60;
+      display: flex; flex-direction: column; min-width: 210px; padding: 6px;
+      background: var(--panel); border: 1px solid var(--line);
+      border-radius: 10px; box-shadow: 0 24px 60px -24px rgba(0,0,0,0.92);
+    }
+    .nav-menu-panel a {
+      display: flex; align-items: center; min-height: 44px;
+      padding: 0 14px; border-radius: 8px;
+      color: var(--fg-muted); font-size: 15px; font-weight: 500;
+    }
+    .nav-menu-panel a:hover, .nav-menu-panel a:focus { color: var(--green); background: rgba(0,255,65,0.07); }
+    @media (max-width: 760px) {
+      .nav-links a:not(.nav-cta) { display: none; }
+      .nav-links { gap: 12px; }
+      .nav-menu { display: block; }
+    }
 
     /* ───────────────────────── BUTTONS ───────────────────────── */
     .btn {
@@ -370,6 +415,10 @@
     .model-table td:first-child { color: var(--yellow); font-weight: 700; }
     .model-table td:nth-child(2) { color: var(--fg-muted); }
     .model-table td:last-child { color: var(--green); }
+    /* F-UX-012: a wide table scrolls inside its own box rather than pushing
+       the page sideways. tabindex on the wrapper keeps it keyboard-reachable
+       (WCAG 2.1.1) now that it is a scroll container. */
+    .table-scroll { max-width: 100%; overflow-x: auto; }
     .model-note { margin-top: 16px; font-family: var(--mono); font-size: 12px; color: var(--fg-dim); line-height: 1.55; }
     .terminal.compact .term-body { padding: 16px 18px; font-size: 12.5px; line-height: 1.75; }
 
@@ -432,8 +481,10 @@
     .shots-nav.next { right: 12px; }
     /* Dots */
     .shots-dots { display: flex; justify-content: center; gap: 2px; margin-top: 22px; }
+    /* F-UX-009: the visible dot stays 9px (::before); the button around it
+       carries the 44px hit area. */
     .shots-dots button {
-      width: 28px; height: 28px; padding: 0;
+      width: 44px; height: 44px; padding: 0;
       border: 0; background: transparent;
       display: grid; place-items: center;
       cursor: pointer;
@@ -445,7 +496,8 @@
     }
     .shots-dots button.active::before { background: var(--green); border-color: var(--green); box-shadow: 0 0 10px var(--green-glow); }
     @media (max-width: 560px) {
-      .shots-nav { width: 38px; height: 38px; font-size: 16px; }
+      /* F-UX-009: only the glyph shrinks — 44x44 is the floor, not a target. */
+      .shots-nav { font-size: 16px; }
       .shot .shot-frame, .shot img { max-height: 320px; }
     }
 
@@ -550,16 +602,29 @@
     .install-body .cmt { color: var(--fg-dim); }
     .install-body .cmd { color: var(--fg); }
     .install-body .cmd .green { color: var(--green); }
-    .copy-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    /* F-UX-012: the install command holds an unbreakable 32-character URL, so
+       the text column's min-content width plus a non-shrinking button pushed
+       the row ~57px past a 375px viewport. `anywhere` lets the URL break, so
+       min-content stops driving the layout; wrap drops the button to its own
+       line when even that is not enough. */
+    .install-body .cmt, .install-body .cmd { overflow-wrap: anywhere; }
+    .copy-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+    .copy-row > div { flex: 1 1 240px; min-width: 0; }
     .copy-btn {
       font-family: var(--mono); font-size: 12px; color: var(--fg-dim);
       border: 1px solid var(--line); border-radius: 6px; padding: 5px 11px;
       background: transparent; cursor: pointer; transition: all .15s; flex-shrink: 0;
+      /* F-UX-009 hit area; max-width keeps the long 'copy blocked' label,
+         which never shrinks, inside the box instead of past it. */
+      display: inline-flex; align-items: center; justify-content: center;
+      min-width: 44px; min-height: 44px; max-width: 100%;
     }
     .copy-btn:hover { color: var(--green); border-color: rgba(0,255,65,0.35); }
     /* F-UX-011: the copy button reports both outcomes, never fails silently. */
     .copy-btn.copy-ok { color: var(--green); border-color: rgba(0,255,65,0.45); }
-    .copy-btn.copy-error { color: #ff8a80; border-color: rgba(255,138,128,0.5); }
+    /* F-UX-006: use the --red token (6.39:1 on the install box) instead of a
+       one-off #ff8a80 that bypassed the palette. */
+    .copy-btn.copy-error { color: var(--red); border-color: rgba(255,93,82,0.5); }
 
     /* ── FAQ ── */
     .faq { max-width: 800px; margin: 50px auto 0; }
@@ -600,7 +665,7 @@
     }
     .foot-inner { display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
     .foot-links { display: flex; gap: 26px; font-size: 14px; }
-    .foot-links a { color: var(--fg-dim); transition: color .15s; }
+    .foot-links a { display: inline-flex; align-items: center; min-width: 44px; min-height: 44px; color: var(--fg-dim); transition: color .15s; }
     .foot-links a:hover { color: var(--green); }
     .foot-note { font-family: var(--mono); font-size: 12.5px; color: var(--fg-dim); }
 
@@ -656,6 +721,20 @@
         <a href="changelog.html">Changelog</a>
         <a href="./#install">Install</a>
         <a class="nav-cta" href="https://github.com/luongnv89/idd">GitHub ↗</a>
+        <!-- F-UX-002: shown only below 760px, where the inline links above
+             are hidden. Pure <details> — works with JavaScript off. -->
+        <details class="nav-menu" id="nav-menu">
+          <summary>Menu</summary>
+          <div class="nav-menu-panel">
+            <a href="./">Home</a>
+            <a href="./#how">How it works</a>
+            <a href="./#commands">Commands</a>
+            <a href="./#team">Team</a>
+            <a href="docs.html">Docs</a>
+            <a href="changelog.html">Changelog</a>
+            <a href="./#install">Install</a>
+          </div>
+        </details>
       </nav>
     </div>
   </header>
@@ -781,6 +860,7 @@
           <h3>Right model, right thinking level — stamped on every issue</h3>
           <p>When you create or normalize an issue, <code>/issue-creator</code> maps estimated effort to a <strong>model + thinking tier</strong> from CursorBench data. The preview shows <span class="mono green">⚡ Model:</span>; the issue body stores an advisory <strong>Suggested model:</strong> line with the benchmark date.</p>
           <p>Use it to route XS typo fixes to low-cost modes and reserve extra-high thinking for large features — without blocking creation if the cache is offline (bundled seed + graceful fallback).</p>
+          <div class="table-scroll" tabindex="0">
           <table class="model-table" aria-label="Effort to suggested model mapping">
             <thead><tr><th>Effort</th><th>OpenAI</th><th>Anthropic</th></tr></thead>
             <tbody>
@@ -791,6 +871,7 @@
               <tr><td>XL</td><td>GPT-5.5 Extra High</td><td>Fable 5 Max</td></tr>
             </tbody>
           </table>
+          </div>
           <p class="model-note">Toggle with <code>model_suggestion.enabled</code> in <code>.gitissue.yml</code> · refresh CursorBench into <code>.gitissue/model-data.json</code></p>
         </div>
         <div class="terminal compact">
@@ -1283,11 +1364,33 @@
         .catch(function () {});
     }());
 
-    // Scroll reveal
-    var io = new IntersectionObserver(function (entries) {
-      entries.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
-    }, { threshold: 0.12 });
-    document.querySelectorAll('.reveal').forEach(function (el) { io.observe(el); });
+    // Mobile disclosure nav — close the panel once a link is chosen so it
+    // does not sit over the section it just scrolled to. Enhancement only:
+    // with script off the menu still opens and closes from <summary>.
+    (function () {
+      var menu = document.getElementById('nav-menu');
+      if (!menu) { return; }
+      menu.addEventListener('click', function (e) {
+        if (e.target && e.target.tagName === 'A') { menu.removeAttribute('open'); }
+      });
+    }());
+
+    // Scroll reveal. The observer is an enhancement: where
+    // IntersectionObserver is missing, `new IntersectionObserver` would throw
+    // and leave every .reveal block at opacity: 0 — the F-UX-001 failure mode
+    // with scripting ON. Check the capability first and reveal everything.
+    (function () {
+      var revealables = document.querySelectorAll('.reveal');
+      var i;
+      if (typeof IntersectionObserver !== 'function') {
+        for (i = 0; i < revealables.length; i++) { revealables[i].classList.add('in'); }
+        return;
+      }
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+      }, { threshold: 0.12 });
+      for (i = 0; i < revealables.length; i++) { io.observe(revealables[i]); }
+    }());
   </script>
 </body>
 </html>
