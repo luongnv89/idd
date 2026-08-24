@@ -141,6 +141,7 @@ edit the source and run ./scripts/build.sh.
 from __future__ import annotations
 
 import argparse
+from contextlib import nullcontext
 import hashlib
 import io
 import json
@@ -149,7 +150,7 @@ import re
 import stat as statmod
 import subprocess
 import sys
-from typing import NamedTuple
+from typing import BinaryIO, NamedTuple
 
 # --- Rule patterns -----------------------------------------------------------
 #
@@ -267,6 +268,25 @@ def _git(args: list[str]) -> str:
             check=False,
         )
     except (OSError, ValueError) as exc:  # git missing, or a bad argv
+        raise Unavailable(f"cannot run git — {exc}") from exc
+    if proc.returncode != 0:
+        detail = proc.stderr.decode("utf-8", errors="replace").strip().splitlines()
+        raise Unavailable(
+            "git " + " ".join(args) + " failed: " + (detail[-1] if detail else "unknown")
+        )
+    return os.fsdecode(proc.stdout)
+
+
+def _git_stdin(args: list[str], payload: bytes) -> str:
+    """Run one read-only git command with binary stdin, or raise Unavailable."""
+    try:
+        proc = subprocess.run(
+            ["git", "--no-replace-objects", *args],
+            input=payload,
+            capture_output=True,
+            check=False,
+        )
+    except (OSError, ValueError) as exc:
         raise Unavailable(f"cannot run git — {exc}") from exc
     if proc.returncode != 0:
         detail = proc.stderr.decode("utf-8", errors="replace").strip().splitlines()
@@ -516,27 +536,29 @@ def _range_targets(base: str) -> list[Target]:
         # revision. No shell is involved, but argv injection is still injection.
         raise UsageError(f"--range value must be a revision, not an option: {base!r}")
     commits = _split_lines(_git(["rev-list", f"{base}..HEAD", "--"]))
-    targets: list[Target] = []
     for commit in commits:
         if not _OID_RE.match(commit):
             raise Unavailable(f"--range: git rev-list printed {commit!r}, not a commit id")
-        targets += _raw_targets(
-            _git(
-                [
-                    "diff-tree",
-                    "-r",
-                    "-m",
-                    "--root",
-                    "--raw",
-                    "-z",
-                    "--no-abbrev",
-                    "--no-commit-id",
-                    commit,
-                ]
-            ),
-            f"--range (commit {commit[:8]})",
-        )
-    return _dedupe_targets(targets)
+    if not commits:
+        return []
+    # `diff-tree --stdin` emits the same concatenated `--raw -z` records as one
+    # invocation per commit when `--no-commit-id` is set. Keep rev-list order,
+    # root handling, and merge-parent expansion unchanged while paying one fork.
+    raw = _git_stdin(
+        [
+            "diff-tree",
+            "-r",
+            "-m",
+            "--root",
+            "--raw",
+            "-z",
+            "--no-abbrev",
+            "--no-commit-id",
+            "--stdin",
+        ],
+        ("\n".join(commits) + "\n").encode("ascii"),
+    )
+    return _dedupe_targets(_raw_targets(raw, "--range"))
 
 
 def collect_targets(args: argparse.Namespace) -> tuple[list[Target], str, bool]:
@@ -1105,58 +1127,111 @@ class Reading(NamedTuple):
 NO_BYTES = Reading("no-bytes", None, None, 0, None, False)
 
 
+class _LimitedReader:
+    """Expose exactly one batch response body without consuming its trailer."""
+
+    def __init__(self, handle: BinaryIO, remaining: int) -> None:
+        self._handle = handle
+        self.remaining = remaining
+
+    def read(self, size: int = -1) -> bytes:
+        if self.remaining == 0:
+            return b""
+        wanted = self.remaining if size < 0 else min(size, self.remaining)
+        chunks: list[bytes] = []
+        while wanted:
+            chunk = self._handle.read(wanted)
+            if not chunk:
+                raise OSError("unexpected EOF in git cat-file --batch content")
+            chunks.append(chunk)
+            got = len(chunk)
+            wanted -= got
+            self.remaining -= got
+        return b"".join(chunks)
+
+
+class _BlobBatch:
+    """Read every scanned blob through one persistent `git cat-file --batch`."""
+
+    def __init__(self) -> None:
+        self.proc: subprocess.Popen[bytes] | None = None
+
+    def __enter__(self) -> _BlobBatch:
+        try:
+            self.proc = subprocess.Popen(
+                ["git", "--no-replace-objects", "cat-file", "--batch"],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+            )
+        except OSError as exc:
+            raise Unavailable(f"cannot start git cat-file --batch — {exc}") from exc
+        return self
+
+    def __exit__(self, exc_type, exc, traceback) -> None:
+        assert self.proc is not None
+        if exc_type is not None:
+            self.proc.kill()
+            self.proc.wait()
+            return
+        assert self.proc.stdin is not None
+        try:
+            self.proc.stdin.close()
+        except OSError as close_error:
+            self.proc.wait()
+            raise Unavailable(
+                f"git cat-file --batch closed unexpectedly — {close_error}"
+            ) from close_error
+        status = self.proc.wait()
+        if status != 0:
+            raise Unavailable("git cat-file --batch failed — not every blob was read")
+
+    def read(
+        self, oid: str, pattern: re.Pattern[str], tap: bool, sizes: dict[str, int]
+    ) -> Reading:
+        """Scan one response, then drain it to preserve the next frame boundary."""
+        assert self.proc is not None
+        assert self.proc.stdin is not None and self.proc.stdout is not None
+        try:
+            self.proc.stdin.write(oid.encode("ascii") + b"\n")
+            self.proc.stdin.flush()
+            header = self.proc.stdout.readline()
+            parts = header.rstrip(b"\n").split()
+            if len(parts) != 3 or parts[0] != oid.encode("ascii") or parts[1] != b"blob":
+                raise OSError(f"unexpected batch header {header!r}")
+            size = int(parts[2])
+            if size < 0 or sizes.get(oid) != size:
+                raise OSError(f"blob {oid} changed size between batch reads")
+            limited = _LimitedReader(self.proc.stdout, size)
+            meter = _Tap(limited) if tap else None
+            decided, detail = _scan_stream(meter or limited, pattern)
+            # A match or binary sniff may stop early. Drain only to restore the
+            # protocol boundary; the tap still records exactly what was scanned.
+            while limited.read(_CHUNK):
+                pass
+            if self.proc.stdout.read(1) != b"\n":
+                raise OSError("missing git cat-file --batch response trailer")
+        except (OSError, ValueError, UnicodeEncodeError, MemoryError) as exc:
+            raise Unavailable(f"cannot read blob {oid} — {exc}") from exc
+        return Reading(
+            "read",
+            detail,
+            size,
+            meter.count if meter else 0,
+            meter.hexdigest() if meter else None,
+            decided,
+        )
+
+
 def _read_blob(
-    oid: str, pattern: re.Pattern[str], tap: bool, sizes: dict[str, int]
+    batch: _BlobBatch,
+    oid: str,
+    pattern: re.Pattern[str],
+    tap: bool,
+    sizes: dict[str, int],
 ) -> Reading:
-    """Scan a git object by id. The path is not involved and cannot redirect it.
-
-    A failure here is exit 4, never a fallback: `git show`ing a blob and quietly
-    scanning the working-tree file instead when it fails is how a tidied copy
-    came to be scanned in place of the bytes a commit was about to write.
-    Stopping early *by decision* — a match, or a binary sniff — still counts as
-    a successful read even though closing the pipe leaves git a non-zero status.
-
-    `--no-replace-objects` goes before `cat-file`, never after it: it is a git
-    top-level option, and as a `cat-file` option git rejects it outright. Without
-    it a `refs/replace` entry pointing the secret-bearing blob at a clean one
-    makes this read return the clean bytes, and the scan reports on a blob the
-    commit does not ship.
-    """
-    try:
-        proc = subprocess.Popen(
-            ["git", "--no-replace-objects", "cat-file", "blob", oid],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-        )
-    except OSError as exc:
-        raise Unavailable(f"cannot read blob {oid} — {exc}") from exc
-    assert proc.stdout is not None
-    meter = _Tap(proc.stdout) if tap else None
-    try:
-        decided, detail = _scan_stream(meter or proc.stdout, pattern)
-    except (OSError, MemoryError) as exc:
-        proc.kill()
-        proc.wait()
-        raise Unavailable(f"cannot read blob {oid} — {exc}") from exc
-    finally:
-        # Close rather than drain: draining a multi-gigabyte blob to be polite
-        # to the pipe would spend the memory the chunked read was written to
-        # avoid. git takes EPIPE and exits non-zero.
-        proc.stdout.close()
-    status = proc.wait()
-    if not decided and status != 0:
-        raise Unavailable(
-            f"git cat-file blob {oid} failed — the bytes this entry ships were "
-            "never read"
-        )
-    return Reading(
-        "read",
-        detail,
-        sizes.get(oid),
-        meter.count if meter else 0,
-        meter.hexdigest() if meter else None,
-        decided,
-    )
+    """Scan a git object by id without letting its path steer the read."""
+    return batch.read(oid, pattern, tap, sizes)
 
 
 def _blob_sizes(oids: list[str]) -> dict[str, int]:
@@ -1304,94 +1379,116 @@ def scan(
     secret_value: re.Pattern[str] = rules["secret_value"]  # type: ignore[assignment]
     junk_file: re.Pattern[str] = rules["junk_file"]  # type: ignore[assignment]
 
-    for target in targets:
-        path = target.path
-        if allow is not None and allow.search(path):
-            skipped += 1
-            continue
-        scanned += 1
+    blob_context = (
+        _BlobBatch()
+        if any(
+            target.kind == "blob"
+            and (allow is None or allow.search(target.path) is None)
+            for target in targets
+        )
+        else nullcontext(None)
+    )
+    with blob_context as blob_batch:
+        for target in targets:
+            path = target.path
+            if allow is not None and allow.search(path):
+                skipped += 1
+                continue
+            scanned += 1
 
-        if secret_file.search(path):
-            blocking.append(
-                {
-                    "rule": "secret-file",
-                    "path": path,
-                    "detail": "filename matches a secret-bearing pattern",
-                }
-            )
-
-        if junk_file.search(path):
-            warnings.append(
-                {
-                    "rule": "build-artifact",
-                    "path": path,
-                    "detail": "build artifact or temp file — add it to .gitignore",
-                }
-            )
-
-        resolved = os.path.join(base, path) if base else path
-        reading: Reading | None = None
-        if target.kind == "blob":
-            reading = _read_blob(target.oid, secret_value, emit_sources, sizes)
-        elif target.kind == "worktree":
-            reading = _read_worktree(resolved, secret_value, emit_sources, strict)
-            if reading is None and strict:
-                raise Unavailable(
-                    f"{path!r} is listed by git but no bytes could be read for "
-                    "it — the scan cannot report on a file it never opened"
-                )
-            if reading is None or (not strict and reading.state == "no-bytes"):
-                # A caller-supplied list has no git guarantee behind it: a typo,
-                # a stray space, or a directory where a file was meant resolves
-                # to no bytes at all, and reporting that as clean is a scan of
-                # zero bytes dressed as a pass. (Under `strict` a "no-bytes"
-                # entry is a submodule gitlink git itself listed, which really
-                # does ship no file content.)
-                warnings.append(
+            if secret_file.search(path):
+                blocking.append(
                     {
-                        "rule": "unreadable-path",
+                        "rule": "secret-file",
                         "path": path,
-                        "detail": "listed for scanning but not readable — "
-                        "its contents were never checked",
+                        "detail": "filename matches a secret-bearing pattern",
                     }
                 )
 
-        if emit_sources:
-            sources.append(
-                {
-                    "path": path,
-                    "kind": (
-                        target.kind
-                        if target.kind == "absent"
-                        else "unread"
-                        if reading is None
-                        else (target.kind if reading.state == "read" else "no-bytes")
-                    ),
-                    "id": target.oid
-                    if target.kind == "blob"
-                    else (os.path.abspath(resolved) if target.kind == "worktree" else ""),
-                    "reason": target.reason,
-                    "bytes_read": reading.bytes_read if reading else 0,
-                    "sha256": reading.digest if reading else None,
-                    "decided_early": bool(reading and reading.decided_early),
-                }
-            )
+            if junk_file.search(path):
+                warnings.append(
+                    {
+                        "rule": "build-artifact",
+                        "path": path,
+                        "detail": "build artifact or temp file — add it to .gitignore",
+                    }
+                )
 
-        if reading is None:
-            continue
-        if reading.detail is not None:
-            blocking.append(
-                {"rule": "secret-value", "path": path, "detail": reading.detail}
-            )
-        if reading.size is not None and reading.size > rules["max_bytes"]:  # type: ignore[operator]
-            warnings.append(
-                {
-                    "rule": "large-file",
-                    "path": path,
-                    "detail": f"{reading.size // (1024 * 1024)} MB exceeds "
-                    f"{rules['max_mb']} MB without Git LFS",
-                }
-            )
+            resolved = os.path.join(base, path) if base else path
+            reading: Reading | None = None
+            if target.kind == "blob":
+                assert isinstance(blob_batch, _BlobBatch)
+                reading = _read_blob(
+                    blob_batch, target.oid, secret_value, emit_sources, sizes
+                )
+            elif target.kind == "worktree":
+                reading = _read_worktree(resolved, secret_value, emit_sources, strict)
+                if reading is None and strict:
+                    raise Unavailable(
+                        f"{path!r} is listed by git but no bytes could be read for "
+                        "it — the scan cannot report on a file it never opened"
+                    )
+                if reading is None or (not strict and reading.state == "no-bytes"):
+                    # A caller-supplied list has no git guarantee behind it: a typo,
+                    # a stray space, or a directory where a file was meant resolves
+                    # to no bytes at all, and reporting that as clean is a scan of
+                    # zero bytes dressed as a pass. (Under `strict` a "no-bytes"
+                    # entry is a submodule gitlink git itself listed, which really
+                    # does ship no file content.)
+                    warnings.append(
+                        {
+                            "rule": "unreadable-path",
+                            "path": path,
+                            "detail": "listed for scanning but not readable — "
+                            "its contents were never checked",
+                        }
+                    )
+
+            if emit_sources:
+                sources.append(
+                    {
+                        "path": path,
+                        "kind": (
+                            target.kind
+                            if target.kind == "absent"
+                            else "unread"
+                            if reading is None
+                            else (
+                                target.kind if reading.state == "read" else "no-bytes"
+                            )
+                        ),
+                        "id": target.oid
+                        if target.kind == "blob"
+                        else (
+                            os.path.abspath(resolved)
+                            if target.kind == "worktree"
+                            else ""
+                        ),
+                        "reason": target.reason,
+                        "bytes_read": reading.bytes_read if reading else 0,
+                        "sha256": reading.digest if reading else None,
+                        "decided_early": bool(reading and reading.decided_early),
+                    }
+                )
+
+            if reading is None:
+                continue
+            if reading.detail is not None:
+                blocking.append(
+                    {"rule": "secret-value", "path": path, "detail": reading.detail}
+                )
+            if (
+                reading.size is not None
+                and reading.size > rules["max_bytes"]  # type: ignore[operator]
+            ):
+                warnings.append(
+                    {
+                        "rule": "large-file",
+                        "path": path,
+                        "detail": f"{reading.size // (1024 * 1024)} MB exceeds "
+                        f"{rules['max_mb']} MB without Git LFS",
+                    }
+                )
 
     branch = current_branch()
     if branch in PROTECTED_BRANCHES:
