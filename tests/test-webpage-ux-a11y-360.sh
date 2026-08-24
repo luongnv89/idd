@@ -728,6 +728,10 @@ def computed(rules, path, prop, width):
                 if not selector_matches(sel, path):
                     continue
             except ValueError:
+                # A selector the parser cannot model is a blind spot, not a
+                # non-match: tally it so the guard below fails loud instead of
+                # silently dropping a rule that might win `display`.
+                unmodelled.add(sel)
                 continue
             cands.append((specificity(sel), order, val))
     if not cands:
