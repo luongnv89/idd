@@ -105,8 +105,12 @@ def gate(mode, merge_partial, auto_merge, review, deps_ok, critical, mergeable=T
     resolved, partial_ok = effective_mode(mode, merge_partial, auto_merge)
     if review != "clean" and critical:
         return "stop"
+    # `partial_ok` is the single place the "aggressive + merge_partial" rule
+    # lives — re-testing the mode here would make that rule unobservable, so a
+    # scenario that opts a non-aggressive mode into merge_partial could never
+    # detect the rule being dropped.
     would_merge = (review == "clean" and resolved in ("balanced", "aggressive")) or (
-        review != "clean" and resolved == "aggressive" and partial_ok
+        review != "clean" and partial_ok
     )
     if not would_merge:
         # The mode forbids this merge, so the merge step never runs.
@@ -161,6 +165,11 @@ SCENARIOS = [
     ("conservative-partial", "conservative", False, None, "partial", True, False, pr_mergeable),
     ("aggressive-partial-optout", "aggressive", False, None, "partial", True, False, pr_mergeable),
     ("aggressive-partial-optin", "aggressive", True, None, "partial", True, False, pr_mergeable),
+    # `merge_partial` is honored solely under `aggressive`: opting a lesser mode
+    # into it changes nothing, which is what keeps a default or conservative
+    # install from ever merging a PR with unresolved fixable review issues.
+    ("balanced-partial-optin", "balanced", True, None, "partial", True, False, pr_mergeable),
+    ("conservative-partial-optin", "conservative", True, None, "partial", True, False, pr_mergeable),
     ("legacy-automerge-true-partial", None, None, True, "partial", True, False, pr_mergeable),
     ("legacy-automerge-false-clean", None, None, False, "clean", True, False, pr_mergeable),
     # `autopilot.mode` is the source of truth; a legacy auto_merge beside it is ignored.

@@ -25,13 +25,13 @@
       "tool": "file-exists",
       "file": "OUT/rank-4-issue-3.txt",
       "expect_exit": 0,
-      "label": "rank 4 is #3 — stale improvement still ordered above blocked work"
+      "label": "rank 4 is #3 — the older improvement #15 is held back by its dependency edge, not by age"
     },
     {
       "tool": "file-exists",
       "file": "OUT/rank-5-issue-15.txt",
       "expect_exit": 0,
-      "label": "rank 5 is #15 — blocked by #12, so it lands after its blocker"
+      "label": "rank 5 is #15 — the `Depends on #12` edge lands it after its blocker, below the newer #3"
     },
     {
       "tool": "file-exists",

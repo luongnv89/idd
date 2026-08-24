@@ -53,6 +53,18 @@
     },
     {
       "tool": "file-exists",
+      "file": "OUT/gate-balanced-partial-optin-left_open.txt",
+      "expect_exit": 0,
+      "label": "merge_partial: true is ignored under balanced"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/gate-conservative-partial-optin-left_open.txt",
+      "expect_exit": 0,
+      "label": "merge_partial: true is ignored under conservative"
+    },
+    {
+      "tool": "file-exists",
       "file": "OUT/gate-legacy-automerge-true-partial-partial_followup.txt",
       "expect_exit": 0,
       "label": "legacy auto_merge: true maps to aggressive + merge_partial"
