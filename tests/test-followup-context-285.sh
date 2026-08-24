@@ -72,7 +72,7 @@ anchor_check "$PH" ap-capture-canonical 'analyzer, resolver, and batch-resolver'
 anchor_lacks "$PH" ap-capture-canonical 'resolver and[[:space:]]+batch-resolver spawns only|only spawns that receive it' "canonical contract rejects resolver-only recipients"
 lacks "$PH" 'resolver and[[:space:]]+batch-resolver spawns only|only spawns that receive it' "canonical contract rejects resolver-only recipients (file-wide)"
 anchor_check "$PH" ap-capture-canonical 'coherence gate' "canonical contract names analyzer coherence gate"
-anchor_check "$PH" ap-capture-canonical '`updatedAt` match' "canonical contract requires exact analyzer timestamp match"
+anchor_check "$PH" ap-capture-canonical '`updatedAt` match before reusing retained' "canonical contract requires exact analyzer timestamp match"
 anchor_check "$PH" ap-capture-canonical '`--refresh` fallback' "canonical contract refreshes incoherent analyzer snapshots"
 anchor_check "$PR" ap-analyzer-spawn 'BEGIN_UNTRUSTED_issue_payload_\{payload_nonce\}' "analyzer receives nonce-framed retained records"
 anchor_check "$PR" ap-analyzer-spawn 'replaces only' "analyzer limits payload reuse to analysis Step 1"
@@ -83,7 +83,7 @@ anchor_check "$IA" ia-caller-payload-gate 'match exactly' "analysis requires par
 anchor_check "$IA" ia-caller-payload-gate 'full-field fetch below with `--refresh`' "analysis concurrent edit forces a refreshed full record"
 anchor_check "$IA" ia-caller-payload-gate '[Nn]ever combine retained' "analysis forbids mixed-generation snapshots"
 anchor_check "$IA" ia-caller-payload-gate 'already-resolved and cross-reference' "analysis safety phases still run in full"
-anchor_check "$PR" ap-analyzer-spawn 'persisted analysis timestamp' "analyzer prompt carries the coherent snapshot rule"
+anchor_check "$PR" ap-analyzer-spawn 'persisted analysis timestamp must come from' "analyzer prompt carries the coherent snapshot rule"
 anchor_check "$BIA" ia-caller-payload-gate 'coherent|match exactly' "generated copy carries coherent analysis snapshot rule: skills/issue-analysis/SKILL.md"
 anchor_check "$BPR" ap-analyzer-spawn 'coherent|persisted analysis timestamp' "generated copy carries coherent analysis snapshot rule: skills/auto-pilot/references/subagent-prompts.md"
 python3 - <<'PY' && pass "explicit-list analyzer rejects stale body and persists one refreshed snapshot" || fail "analysis combined stale body with fresh metadata"
@@ -159,8 +159,8 @@ PY
 # The empty-record fail-safe stops only when a linked issue could not be read (#296).
 for f in "$RV" "$BRV"; do
   anchor_check "$f" rv-depth-gate-refresh 'empty-record fail-safe' "SKILL points at the fail-safe: ${f#"$ROOT/"}"
-  anchor_check "$f" rv-depth-gate-refresh 'empty snapshot' "fail-safe pointer is scoped to a linked issue: ${f#"$ROOT/"}"
-  anchor_check "$f" rv-step3-ac-snapshot 'linked issue is a different state' "Step 3 exempts no-linked-issue PRs from the fail-safe: ${f#"$ROOT/"}"
+  anchor_check "$f" rv-depth-gate-refresh 'never review a linked issue on an empty' "fail-safe pointer is scoped to a linked issue: ${f#"$ROOT/"}"
+  anchor_check "$f" rv-step3-ac-snapshot '\*\*no\*\* linked issue is a different state' "Step 3 exempts no-linked-issue PRs from the fail-safe: ${f#"$ROOT/"}"
 done
 for f in "$RVM" "$BRVM"; do
   n="${f#"$ROOT/"}"
