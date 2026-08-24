@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SCRIPT="$ROOT/src/shared/scripts/gi-dup-score.py"
 FIXTURE="$ROOT/tests/fixtures/gi-dup-score-backlog.json"
+EXPECTED="$ROOT/tests/fixtures/gi-dup-score-expected.json"
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 PASS=0; FAIL=0
 pass(){ echo "  ✓ $1"; PASS=$((PASS+1)); }
@@ -12,8 +13,20 @@ fail(){ echo "  ✗ $1"; FAIL=$((FAIL+1)); }
 echo "◆ Canonical duplicate scorer (issue #253)"
 
 python3 - "$SCRIPT" "$FIXTURE" <<'PY' && pass "calibrated fixture and metamorphic invariants" || fail "calibrated fixture or metamorphic invariants"
-import importlib.util, itertools, json, sys
+import ast, importlib.util, itertools, json, pathlib, sys, typing
 spec=importlib.util.spec_from_file_location("dup",sys.argv[1]); m=importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+# Fixed-key boundaries have named schemas, while callers still exchange plain
+# dictionaries at runtime. Keep the weak Any escape hatch out of this module.
+for name in ("ScoreConfig", "Item", "Payment", "ScoredPair", "MatchRecord"):
+    assert typing.is_typeddict(getattr(m, name)), name
+assert m.ScoreConfig.__required_keys__ == frozenset(m.DEFAULTS)
+assert m.Item.__required_keys__ == frozenset({"index", "title", "keywords", "type"})
+assert m.Payment.__required_keys__ == frozenset({"signal", "tokens", "amount"})
+assert {"match_number", "match_index", "pair"} <= m.MatchRecord.__optional_keys__
+hints=typing.get_type_hints(m.score_pair)
+assert hints == {"item":m.Item, "target":m.ScoreTarget, "config":m.ScoreConfig, "return":m.ScoredPair}
+tree=ast.parse(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+assert not any(isinstance(node, ast.Name) and node.id == "Any" for node in ast.walk(tree))
 cfg=m.resolve_config({}, type("A",(),{"limit":None,"high":None,"medium":None})())
 data=json.load(open(sys.argv[2]))
 # Labels are fixture data independent of output; defaults must realize them.
@@ -136,6 +149,9 @@ request='{"mode":"create","items":[{"index":1,"title":"Ship duplicate scorer","k
 out1="$(printf '%s' "$request" | python3 "$SCRIPT" --issues-from "$TMP/issues.json")"
 out2="$(printf '%s' "$request" | python3 "$SCRIPT" --issues-from "$TMP/issues.json")"
 [ "$out1" = "$out2" ] && pass "identical input produces identical JSON bytes" || fail "output is nondeterministic"
+printf '%s\n' "$out1" > "$TMP/fixed-output.json"
+cmp -s "$EXPECTED" "$TMP/fixed-output.json" \
+  && pass "typed refactor preserves fixed-fixture JSON bytes" || fail "fixed-fixture output changed"
 printf '%s' "$out1" | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d["duplicates"] and d["medium_band"]==[]' \
   && pass "high band is deterministic and medium band is empty" || fail "high/medium routing"
 
