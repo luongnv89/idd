@@ -137,6 +137,11 @@ jobs:
       - name: test-webpage-hardening-338
         run: bash tests/test-webpage-hardening-338.sh
 
+      # F-UX-001/003/008/011 (issue #359): reveal gating, changelog <noscript>
+      # fallback, clipboard failure state, and no fabricated commit stat.
+      - name: test-webpage-ux-correctness-359
+        run: bash tests/test-webpage-ux-correctness-359.sh
+
       - name: test-model-suggestion-124
         run: bash tests/test-model-suggestion-124.sh
 
