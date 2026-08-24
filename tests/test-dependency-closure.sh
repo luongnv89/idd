@@ -245,9 +245,11 @@ print("gi-agentonly")
 EOF
 chmod 0755 "$SYN_TMP/src/shared/scripts/gi-syn.py" \
            "$SYN_TMP/src/shared/scripts/gi-agentonly.py"
-# Copy build scripts so the synthetic build runs the same code path.
+# Copy the compatibility entry point and its build package so the synthetic
+# build runs the same split implementation as the repository build.
 mkdir -p "$SYN_TMP/scripts"
 cp "$REPO_ROOT/scripts/build.py" "$SYN_TMP/scripts/build.py"
+cp -R "$REPO_ROOT/scripts/build" "$SYN_TMP/scripts/build"
 cp "$REPO_ROOT/scripts/build.sh" "$SYN_TMP/scripts/build.sh"
 cp "$REPO_ROOT/scripts/verify_flattened_skills.sh" "$SYN_TMP/scripts/verify_flattened_skills.sh"
 chmod +x "$SYN_TMP/scripts/build.sh" "$SYN_TMP/scripts/verify_flattened_skills.sh"
