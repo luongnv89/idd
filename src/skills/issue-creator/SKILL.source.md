@@ -109,7 +109,7 @@ Exit 0 prints `state` (`fresh` | `stale` | `seeded` | `installed`), `stale`, `ag
 
 ## Subagent Architecture
 
-The deterministic half of duplicate detection runs in `shared/scripts/gi-dup-score.py`; it reads the proposed items and the once-loaded resolved `duplicate_detection.*` mapping on stdin, then self-fetches the backlog. The skill delegates **only the medium-band judgement (Step 3)** to the duplicate-detector subagent, so the model never recomputes scores or reads up to 100 issue bodies. Every other step stays in the main agent.
+The deterministic half of duplicate detection runs in `shared/scripts/gi-dup-score.py`, with its GitHub call delegated to the bundled `shared/scripts/gi-gh.py` subprocess boundary; it reads the proposed items and the once-loaded resolved `duplicate_detection.*` mapping on stdin, then self-fetches the backlog. The skill delegates **only the medium-band judgement (Step 3)** to the duplicate-detector subagent, so the model never recomputes scores or reads up to 100 issue bodies. Every other step stays in the main agent.
 
 In **batch mode**, one script run scores all existing and internal pairs bidirectionally. At most one subagent spawn judges the pooled `medium_band`, and an empty band skips the spawn entirely.
 
@@ -156,6 +156,7 @@ Check these files:
 - `references/docs/auto-mode.md` — auto-mode detection and the non-interactive gate rule
 - `references/docs/terminal-style.md` — terminal output style contract (symbols, output structure, table/error formats)
 - `references/scripts/gi-config.py` — config resolver: merges the documented defaults with `.gitissue.yml` and prints one JSON line
+- `references/scripts/gi-gh.py` — shared GitHub CLI subprocess boundary used by the GitHub-backed helpers
 - `references/scripts/gi-issue.py` — TTL-cached issue fetcher for Normalize mode's repeat reads
 - `references/scripts/gi-dup-score.py` — deterministic duplicate scorer (Step 3)
 - `references/scripts/gi-model-cache.py` — model-data cache lifecycle

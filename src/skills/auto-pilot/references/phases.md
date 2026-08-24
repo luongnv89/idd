@@ -697,6 +697,8 @@ issue, without affecting siblings.
 - **Triage mode:** the selected row has no body, so fetch the resolution snapshot
   once for the picked issue:
 
+  The GitHub-backed helpers share the bundled subprocess boundary in `shared/scripts/gi-gh.py`.
+
   ```bash
   python3 shared/scripts/gi-issue.py {issue_number} --fields number,title,body,labels,assignees,state,updatedAt
   ```

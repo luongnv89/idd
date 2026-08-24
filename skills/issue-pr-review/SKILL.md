@@ -58,7 +58,7 @@ references/docs/terminal-style.md
 references/docs/ui-review.md
 references/scripts/gi-config.py
 references/scripts/gi-secscan.py
-references/scripts/gi-ci-wait.py
+references/scripts/gi-ci-wait.py references/scripts/gi-gh.py
 references/scripts/gi-issue.py
 ```
 
@@ -185,7 +185,7 @@ cannot hand to a script.
 Decide **how deep** this review goes, so a one-line copy fix is not put through
 the same full-weight review as a multi-subsystem PR: `profile = light | full`.
 The signal and `light` changes are defined in `references/docs/agent-model-effort.md` (*Complexity → pipeline profile*) and `references/review-loop-mechanics.md` (*Depth gate*); **read and apply both**.
-First, when the PR body links an issue, refresh it at the review boundary:
+First, with `references/scripts/gi-gh.py` bundled beside its consumer, when the PR body links an issue, refresh it at the review boundary:
 `python3 references/scripts/gi-issue.py {linked_issue} --fields number,title,body,labels --refresh`,
 reading `.issue`. Exit 3 stops; no `python3`, exit 2, or exit 4 degrades to
 `gh issue view {linked_issue} --json number,title,body,labels`. Retain either successful

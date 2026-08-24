@@ -127,6 +127,7 @@ Check these files relative to the skill's directory (the dirname of this SKILL.m
 - `references/scripts/gi-runlog.py` — run-log writer: validates, normalizes, and appends one `.gitissue/runs.jsonl` record
 - `references/scripts/gi-deps.py` — dependency-marker parser for the Phase 5 dependency gate
 - `references/scripts/gi-ci-wait.py` — CI waiter: polls a PR's checks to a verdict in one invocation, for the Phase 5 pre-merge gate
+- `references/scripts/gi-gh.py` — shared GitHub CLI subprocess boundary used by the GitHub-backed helpers
 - `references/scripts/gi-issue.py` — TTL-cached issue fetcher for the repeat reads across Phases 1, 4, and 5
 - `references/scripts/gi-branch.py` — safe branch derivation for caller-managed parallel worktrees
 - `references/scripts/gi-triage-graph.py` — Phase 1 execution order, status, staleness, and priority

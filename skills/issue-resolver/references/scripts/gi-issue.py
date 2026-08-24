@@ -45,11 +45,13 @@ import hashlib
 import json
 import os
 import re
-import subprocess
+import runpy
 import sys
 import tempfile
 import time
 from pathlib import Path
+
+_RUN_GH = runpy.run_path(str(Path(__file__).with_name("gi-gh.py")))["run_gh"]
 
 DEFAULT_TTL_S = 300
 CACHE_DIRNAME = Path(".gitissue") / "cache"
@@ -151,14 +153,7 @@ def fetch(number: int, fields: list[str], repo: str | None) -> dict:
     args = ["issue", "view", str(number), "--json", ",".join(fields)]
     if repo:
         args += ["--repo", repo]
-    try:
-        proc = subprocess.run(
-            ["gh", *args], capture_output=True, text=True, check=False
-        )
-    except FileNotFoundError as exc:
-        raise Unavailable("gh is not installed or not on PATH") from exc
-    except OSError as exc:
-        raise Unavailable(f"cannot run gh — {exc}") from exc
+    proc = _RUN_GH(args, Unavailable)
     if proc.returncode != 0:
         detail = proc.stderr.strip().splitlines()
         raise Unavailable(
