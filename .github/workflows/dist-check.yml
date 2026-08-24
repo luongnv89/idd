@@ -186,6 +186,9 @@ jobs:
       - name: test-build-determinism
         run: bash tests/test-build-determinism.sh
 
+      - name: test-build-package-split
+        run: bash tests/test-build-package-split.sh
+
       # F-TEST-002 (issue #334): negative mutations must fail build.py, not
       # just positive paths pass.
       - name: test-build-negative-mutations
