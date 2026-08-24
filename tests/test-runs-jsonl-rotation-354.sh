@@ -258,6 +258,23 @@ else
 fi
 
 # ───────────────────────────────────────────────────────────
+# T10: rotated segments are gitignored (regression — a segment is
+# machine-local telemetry and must never become committable)
+# ───────────────────────────────────────────────────────────
+if git -C "$REPO_ROOT" check-ignore -q .gitissue/runs.jsonl; then
+  pass "T10: active run log is gitignored"
+else
+  fail "T10: .gitissue/runs.jsonl is NOT gitignored"
+fi
+SEG_IGNORED=1
+for seg in .gitissue/runs-20260101T000000Z.jsonl .gitissue/runs-20260824T120000Z.jsonl; do
+  git -C "$REPO_ROOT" check-ignore -q "$seg" || { SEG_IGNORED=0; fail "T10: $seg is NOT gitignored"; }
+done
+if [ "$SEG_IGNORED" = "1" ]; then
+  pass "T10: rotated runs-<stamp>.jsonl segments are gitignored"
+fi
+
+# ───────────────────────────────────────────────────────────
 # Summary
 # ───────────────────────────────────────────────────────────
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
