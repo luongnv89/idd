@@ -73,7 +73,7 @@ If the issue has no acceptance criteria:
 
 Each `fail` criterion becomes a fixable issue in Step 6 with `category: acceptance_criteria`, `action: fix`, evidence as the description, and the criterion text as the suggested fix target.
 
-## Traceability checks
+## Traceability checks <!-- a:rvc-traceability-checks -->
 
 > Run only when `review.require_traceability_check` is `true`. When `false`, skip this entire subsection and emit `○ traceability: pass — verification disabled (review.require_traceability_check: false)`.
 

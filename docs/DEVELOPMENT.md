@@ -118,6 +118,40 @@ git ls-files 'tests/*.sh' | xargs -n1 bash   # run all
 
 `tests/README.md`, `README-sprint2.md`, and `README-sprint3.md` are something else: manual, human-driven test cases that do need a scratch GitHub repo.
 
+### Anchor markers (assert on contracts, not on sentences)
+
+Most of this repo is prose, so a test that asserts a skill's behavior has to
+read that prose. Grepping for a whole English sentence couples the suite to
+wording: rewording a requirement without changing it turns CI red, and gutting
+the requirement while keeping the sentence stays green (issue #358).
+
+An **anchor** is the inline HTML comment `<!-- a:<id> -->`, appended to the line
+that opens a contract-critical block in an authored `src/` file. It is inert —
+invisible in rendered Markdown, never read by a skill at run time — and
+`scripts/build.py` copies it byte-identically into `skills/`, so one anchor in
+`src/` serves both the source-side and built-side assertions.
+
+- An **anchor region** runs from the anchor line to the line before the next
+  anchor or the next Markdown heading, whichever comes first.
+- An **anchor span** (`<start-id>` … `<end-id>`) covers a block that legitimately
+  contains sub-headings. Both ids name real sections, so a span replaces the two
+  exact heading strings an `awk '/^## A/,/^## B/'` extraction would pin.
+
+Tests source `tests/lib/anchors.bash` and use `anchor_check`, `anchor_lacks`,
+`anchor_present`, and `anchor_span`. Every helper fails when the anchor is
+missing or not unique — so a migrated assertion keeps its teeth even before its
+pattern is considered. Inside a region, assert a **machine token** (identifier,
+config key, command string, placeholder, literal output line) wherever the
+contract has one, and a short keyword stem only where it does not. Never assert
+a whole English sentence.
+
+The library's header is the full convention reference, including the rule that
+its `.bash` extension keeps it out of `git ls-files 'tests/*.sh'`.
+
+`tests/test-followup-context-285.sh` and `tests/test-subagent-context-256.sh`
+are the migrated examples. Migration is deliberately partial — the remaining
+prose-grepping suites are tracked on issue #358.
+
 ### Behavioral eval harness
 
 `evals/` is a hermetic, network-free behavioral suite for skill *outcomes* (issue bodies, PR bodies, branch/commit names, `runs.jsonl` records). Cases run a deterministic subject under a PATH-fronted `gh` record/replay shim (`evals/harness/gh_shim.py`), then grade artifacts with `scripts/idd-lint.py` and `src/shared/scripts/gi-runlog.py` — not prose greps of skill source.

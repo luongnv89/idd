@@ -271,7 +271,7 @@ Note: the `/issue-pr-review --auto --no-merge` subagent handled the full review-
   To unblock: resolve dependency issues first
 ```
 
-### Merge requires CI checks
+### Merge requires CI checks <!-- a:ap-ex-merge-requires-ci -->
 
 First consult *Step 5.1a — CI verdict gate*. The reviewer subagent already
 waited on this PR's CI and returned `ci_status` bound to the commit it waited
@@ -346,7 +346,7 @@ head changes, leave the PR open:
 ```
 Leave PR open, continue to next issue. Non-fatal.
 
-### Interrupted run, resumed
+### Interrupted run, resumed <!-- a:ap-ex-interrupted-run -->
 
 A run is killed (terminal closed, machine rebooted) during Phase 3 of its second
 issue. Re-invoking `/auto-pilot` alone would re-triage, re-pick #42, and the

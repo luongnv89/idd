@@ -62,7 +62,7 @@ The PR title follows `{type}({scope}): {description} (#{issue_number})` — see 
 
 ### QA handoff marker
 
-The last line of the body is a machine-readable **QA handoff** — the resolver's
+The last line of the body is a machine-readable **QA handoff** — the resolver's <!-- a:rt-qa-handoff -->
 statement that this PR already went through a clean QA loop, so
 `/issue-pr-review` can collapse its duplicate of that work into one confirmation
 pass instead of re-running the identical review on an unchanged diff. The

@@ -222,7 +222,7 @@ Each step prints a new line when it starts (with `●`) and updates to `✓` on 
 
 ### Caller payload gate (auto-pilot only)
 
-Before the ordinary fetch, classify an optional nonce-framed `issue_payload`
+Before the ordinary fetch, classify an optional nonce-framed `issue_payload` <!-- a:ia-caller-payload-gate -->
 record as `supplied | partial | absent`. `supplied` requires complete-line
 `BEGIN_UNTRUSTED_issue_payload_<nonce>` / matching `END_…` boundaries, a
 trusted-runtime-generated 32-lowercase-hex nonce, and exactly one compact-JSON

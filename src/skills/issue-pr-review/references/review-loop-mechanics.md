@@ -4,7 +4,7 @@ Exact spawn calls and the token-trade rationale for the reviewer/fixer agents us
 
 ## Depth gate (adaptive review depth)
 
-The Step 1 *Depth gate* selects a review `profile` — `light` or `full` — from a
+The Step 1 *Depth gate* selects a review `profile` — `light` or `full` — from a <!-- a:rvm-depth-gate -->
 pre-work complexity signal, so a trivial PR is not reviewed as deeply as a
 multi-subsystem one. The mechanism and the shared `XS … XL` scale live in
 `docs/agent-model-effort.md` (*Complexity → pipeline profile*); this section is
@@ -33,7 +33,7 @@ how deep this review goes.
 
 ### The empty-record fail-safe
 
-SKILL.md's review-boundary refresh has two paths — the script, then a direct
+SKILL.md's review-boundary refresh has two paths — the script, then a direct <!-- a:rvm-empty-record-failsafe -->
 `gh` degrade. This is what happens when **neither** returns a usable record.
 
 **Scope — one state, and only one: a linked issue exists *and* its record could
@@ -90,7 +90,7 @@ criteria it claims to have checked. This is a **stop**, not a degrade — the sa
 class as an exit-3 invalid input, and unlike the missing-`python3` case, which
 has a working second path and therefore degrades.
 
-**When `review.require_acceptance_criteria_check` is `false`, the stop still applies.**
+**When `review.require_acceptance_criteria_check` is `false`, the stop still applies.** <!-- a:rvm-verification-flag-false -->
 The paragraphs above are written for the default configuration, and on the
 opt-out path their reasoning does not hold on its own terms — so this branch is
 decided here rather than left as an unstated consequence. With that flag
@@ -124,7 +124,7 @@ three reasons:
   (stop). A configuration flag does not move a PR between those two states, so
   it is not the thing that decides this branch.
 
-**Placeholder binding at the Depth gate.** SKILL.md's two review-boundary
+**Placeholder binding at the Depth gate.** SKILL.md's two review-boundary <!-- a:rvm-placeholder-binding -->
 command lines take `{linked_issue}` — the linked issue's number — because `{N}`
 is the PR number at every other command site in SKILL.md. Step 6's `Closes`
 body edit and the Step 3 gate bullet that states it take `{linked_issue}` for
