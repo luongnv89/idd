@@ -44,12 +44,14 @@ Never opens network sockets in replay mode. Stdlib only.
 
 from __future__ import annotations
 
+import fcntl
 import json
 import os
 import re
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -62,6 +64,8 @@ JSON_REQUIRED_PREFIXES: tuple[tuple[str, ...], ...] = (
     ("pr", "checks"),
     ("api",),
 )
+
+MAX_ISSUE_NUMBER = 2**63 - 1
 
 HELP_TEXT = """\
 gh — eval harness shim (record/replay)
@@ -182,14 +186,54 @@ def _state_dir() -> Path | None:
     return p
 
 
+def _read_issue_counter(counter: Path) -> int:
+    if not counter.exists():
+        return 0
+    try:
+        with counter.open("rb") as fh:
+            data = fh.read(65)
+        if len(data) > 64:
+            raise ValueError("counter exceeds 64 bytes")
+        value = int(data.decode("utf-8").strip())
+        if not 0 <= value <= MAX_ISSUE_NUMBER:
+            raise ValueError("counter is outside the supported range")
+        return value
+    except (OSError, UnicodeError, ValueError) as exc:
+        _eprint(f"⚠ gh shim: invalid issue counter {counter}: {exc}; resetting to 0")
+        return 0
+
+
+def _write_issue_counter(counter: Path, value: int) -> None:
+    """Publish the counter atomically while the caller holds its sidecar lock."""
+    tmp_name: str | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=counter.parent,
+            prefix=".issue_counter.",
+            delete=False,
+        ) as tmp:
+            tmp.write(str(value))
+            tmp_name = tmp.name
+        os.replace(tmp_name, counter)
+    finally:
+        if tmp_name is not None:
+            Path(tmp_name).unlink(missing_ok=True)
+
+
 def _next_issue_number(state: Path) -> int:
     counter = state / "issue_counter"
-    if counter.exists():
-        n = int(counter.read_text(encoding="utf-8").strip() or "0") + 1
-    else:
-        n = 1
-    counter.write_text(str(n), encoding="utf-8")
-    return n
+    lock_path = state / "issue_counter.lock"
+    with lock_path.open("a+b") as lock_fh:
+        fcntl.flock(lock_fh.fileno(), fcntl.LOCK_EX)
+        current = _read_issue_counter(counter)
+        if current >= MAX_ISSUE_NUMBER:
+            _eprint(f"✗ gh shim: issue counter exhausted at {MAX_ISSUE_NUMBER}")
+            raise SystemExit(1)
+        n = current + 1
+        _write_issue_counter(counter, n)
+        return n
 
 
 def _handle_issue_create(argv: list[str]) -> int:

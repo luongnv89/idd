@@ -14,6 +14,7 @@ import argparse
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -40,19 +41,97 @@ def _sub_out(value: str, out_dir: Path) -> str:
     return re.sub(r"(?<![A-Za-z0-9_])OUT(?=/|$|[^A-Za-z0-9_])", out, value)
 
 
-def _run(cmd: list[str], *, stdin_data: str | None = None, cwd: Path) -> int:
-    proc = subprocess.run(  # noqa: S603
-        cmd,
-        input=stdin_data,
-        text=True,
-        capture_output=True,
-        cwd=str(cwd),
-    )
+def _run(cmd: list[str], *, stdin_data: str | None = None, cwd: Path) -> int | None:
+    try:
+        proc = subprocess.run(  # noqa: S603
+            cmd,
+            input=stdin_data,
+            text=True,
+            capture_output=True,
+            cwd=str(cwd),
+        )
+    except (OSError, UnicodeError, ValueError) as exc:
+        print(f"    │ unable to run grading tool: {exc}")
+        return None
     # Surface tool output lightly for debugging failed grades.
     if proc.returncode != 0 and (proc.stdout or proc.stderr):
         for line in (proc.stdout + proc.stderr).splitlines()[:20]:
             print(f"    │ {line}")
     return proc.returncode
+
+
+def _out_artifact(token: str, out_dir: Path) -> Path | None:
+    """Resolve a constrained OUT-relative artifact without allowing traversal."""
+    if not re.fullmatch(r"OUT/[A-Za-z0-9._/-]+", token):
+        return None
+    path = Path(_sub_out(token, out_dir)).resolve()
+    try:
+        path.relative_to(out_dir)
+    except ValueError:
+        return None
+    if ".." in Path(token).parts:
+        return None
+    return path
+
+
+def _read_shell_artifact_value(artifact: Path) -> tuple[str | None, str | None]:
+    """Read a small UTF-8 artifact safely before placing it in an argv entry."""
+    try:
+        with artifact.open("rb") as fh:
+            data = fh.read(64 * 1024 + 1)
+    except OSError as exc:
+        return None, f"cannot read OUT artifact: {exc}"
+    if len(data) > 64 * 1024:
+        return None, "OUT artifact exceeds the 64 KiB argv limit"
+    try:
+        value = data.decode("utf-8")
+    except UnicodeDecodeError:
+        return None, "OUT artifact is not valid UTF-8"
+    if "\0" in value:
+        return None, "OUT artifact contains a NUL byte"
+    return value.replace("\n", ""), None
+
+
+def _allowlisted_shell_command(
+    args: Any,
+    *,
+    out_dir: Path,
+    repo_root: Path,
+) -> tuple[list[str] | None, str | None]:
+    """Translate legacy shell assertions into fixed argv without running a shell."""
+    if not isinstance(args, list) or len(args) != 1 or not isinstance(args[0], str):
+        return None, "shell requires exactly one command string"
+    try:
+        tokens = shlex.split(args[0])
+    except ValueError as exc:
+        return None, f"invalid shell assertion: {exc}"
+
+    prefix = ["python3", "scripts/idd-lint.py"]
+    substitution = re.compile(r"\$\(tr -d '\\n' < (OUT/[A-Za-z0-9._/-]+)\)")
+    lint = [sys.executable, str(repo_root / "scripts" / "idd-lint.py")]
+
+    if len(tokens) == 4 and tokens[:2] == prefix and tokens[2] in {"branch", "commit"}:
+        match = substitution.fullmatch(tokens[3])
+        artifact = _out_artifact(match.group(1), out_dir) if match else None
+        if artifact is None or not artifact.is_file():
+            return None, "branch/commit assertion requires a readable OUT artifact"
+        value, error = _read_shell_artifact_value(artifact)
+        if value is None:
+            return None, error
+        return [*lint, tokens[2], value], None
+
+    if len(tokens) == 6 and tokens[:3] == [*prefix, "pr"] and tokens[4] == "--title":
+        body = _out_artifact(tokens[3], out_dir)
+        match = substitution.fullmatch(tokens[5])
+        title = _out_artifact(match.group(1), out_dir) if match else None
+        if body is None or title is None or not body.is_file() or not title.is_file():
+            return None, "PR assertion requires readable body and title OUT artifacts"
+        title_value, error = _read_shell_artifact_value(title)
+        if title_value is None:
+            return None, error
+        return [*lint, "pr", str(body), "--title", title_value], None
+
+    return None, "command is not in the shell assertion allowlist"
 
 
 def _grade_one(
@@ -124,14 +203,13 @@ def _grade_one(
             else 1
         )
     elif tool == "shell":
-        # Escape hatch for rare hermetic checks (e.g. red→green evidence).
-        # Args is a single shell command string run under bash -c.
-        args = assertion.get("args") or []
-        if not args:
-            print(f"  ✗ {label} — shell requires args")
+        cmd, error = _allowlisted_shell_command(
+            assertion.get("args"), out_dir=out_dir, repo_root=repo_root
+        )
+        if cmd is None:
+            print(f"  ✗ {label} — rejected before execution: {error}")
             return False
-        cmd_str = _sub_out(str(args[0] if len(args) == 1 else " ".join(str(a) for a in args)), out_dir)
-        got = _run(["bash", "-c", cmd_str], cwd=repo_root)
+        got = _run(cmd, cwd=repo_root)
     else:
         print(f"  ✗ {label} — unknown tool {tool!r}")
         return False

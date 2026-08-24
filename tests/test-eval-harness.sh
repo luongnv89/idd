@@ -2,7 +2,8 @@
 # test-eval-harness.sh — unit tests for gh_shim + grade hermeticity (#261)
 #
 # Covers: exact cassette match, --json enforcement, no network (shim only),
-# grade fails when expect_exit mismatches, EVAL_RECORD fail-closed.
+# concurrent issue IDs, corrupt counter recovery, shell assertion allowlisting,
+# grade exit matching, and EVAL_RECORD fail-closed.
 #
 # Usage: bash tests/test-eval-harness.sh
 
@@ -347,6 +348,150 @@ if [ "$RG_MALFORMED" -eq 1 ]; then
   pass "T18: malformed structured red→green evidence fails"
 else
   fail "T18: malformed structured red→green evidence fails (got $RG_MALFORMED)"
+fi
+
+# ─── T19: parallel issue creates allocate unique numbers ───
+PARALLEL_STATE="$TMP/parallel-state"
+mkdir -p "$PARALLEL_STATE"
+export EVAL_CASSETTES="$TMP/cassettes.json"
+pids=""
+for i in $(seq 1 200); do
+  EVAL_STATE_DIR="$PARALLEL_STATE" python3 "$SHIM" issue create \
+    --title "parallel-$i" --body "body-$i" > "$TMP/parallel-$i.out" \
+    2> "$TMP/parallel-$i.err" &
+  pids="$pids $!"
+done
+parallel_ok=1
+for pid in $pids; do
+  wait "$pid" || parallel_ok=0
+done
+unique_count="$(cat "$TMP"/parallel-*.out | sort -u | wc -l | tr -d ' ')"
+final_counter="$(cat "$PARALLEL_STATE/issue_counter" 2>/dev/null || true)"
+issue_files="$(find "$PARALLEL_STATE" -name 'issue_*.json' -type f | wc -l | tr -d ' ')"
+if [ "$parallel_ok" -eq 1 ] && [ "$unique_count" -eq 200 ] \
+  && [ "$final_counter" = "200" ] && [ "$issue_files" -eq 200 ]; then
+  pass "T19: parallel issue creates allocate 200 unique numbers"
+else
+  fail "T19: parallel issue creates are unique (urls=$unique_count counter=$final_counter files=$issue_files)"
+fi
+
+# ─── T20: corrupt counter warns and resets without traceback ─
+CORRUPT_STATE="$TMP/corrupt-state"
+mkdir -p "$CORRUPT_STATE"
+printf '%s\n' 'not-a-number' > "$CORRUPT_STATE/issue_counter"
+set +e
+EVAL_STATE_DIR="$CORRUPT_STATE" python3 "$SHIM" issue create \
+  --title "after-corruption" --body "body" > "$TMP/corrupt.out" 2> "$TMP/corrupt.err"
+CORRUPT_EXIT=$?
+printf '%0300d\n' 0 > "$CORRUPT_STATE/issue_counter"
+EVAL_STATE_DIR="$CORRUPT_STATE" python3 "$SHIM" issue create \
+  --title "after-oversize" --body "body" > "$TMP/oversize-counter.out" \
+  2> "$TMP/oversize-counter.err"
+OVERSIZE_EXIT=$?
+printf '%s\n' '9223372036854775807' > "$CORRUPT_STATE/issue_counter"
+EVAL_STATE_DIR="$CORRUPT_STATE" python3 "$SHIM" issue create \
+  --title "after-exhaustion" --body "body" > "$TMP/exhausted-counter.out" \
+  2> "$TMP/exhausted-counter.err"
+EXHAUSTED_EXIT=$?
+set -e
+if [ "$CORRUPT_EXIT" -eq 0 ] && [ "$OVERSIZE_EXIT" -eq 0 ] \
+  && [ "$EXHAUSTED_EXIT" -eq 1 ] \
+  && grep -q 'invalid issue counter' "$TMP/corrupt.err" \
+  && grep -q 'counter exceeds 64 bytes' "$TMP/oversize-counter.err" \
+  && ! grep -q 'Traceback' "$TMP/corrupt.err" \
+  && ! grep -q 'Traceback' "$TMP/oversize-counter.err" \
+  && grep -q 'issue counter exhausted' "$TMP/exhausted-counter.err" \
+  && ! grep -q 'Traceback' "$TMP/exhausted-counter.err" \
+  && grep -q '/issues/1$' "$TMP/corrupt.out" \
+  && grep -q '/issues/1$' "$TMP/oversize-counter.out" \
+  && [ "$(cat "$CORRUPT_STATE/issue_counter")" = "9223372036854775807" ]; then
+  pass "T20: invalid counters reset and exhaustion fails without reuse"
+else
+  fail "T20: counter errors avoid traceback/reuse (exits $CORRUPT_EXIT/$OVERSIZE_EXIT/$EXHAUSTED_EXIT)"
+fi
+
+# ─── T21: non-allowlisted shell assertion is never executed ─
+MALICIOUS_CASE="$TMP/malicious-shell-case"
+MALICIOUS_OUT="$TMP/malicious-shell-out"
+mkdir -p "$MALICIOUS_CASE" "$MALICIOUS_OUT"
+cat > "$MALICIOUS_CASE/case.json" <<'EOF'
+{
+  "name": "harness/reject-shell-command",
+  "grade": [
+    {
+      "tool": "shell",
+      "args": ["touch OUT/executed"],
+      "expect_exit": 0,
+      "label": "non-allowlisted command"
+    }
+  ]
+}
+EOF
+set +e
+REPO_ROOT="$REPO_ROOT" python3 "$GRADE" --case "$MALICIOUS_CASE" \
+  --out "$MALICIOUS_OUT" > "$TMP/malicious-grade.out" 2>&1
+MALICIOUS_EXIT=$?
+set -e
+if [ "$MALICIOUS_EXIT" -eq 1 ] \
+  && grep -q 'rejected before execution' "$TMP/malicious-grade.out" \
+  && [ ! -e "$MALICIOUS_OUT/executed" ]; then
+  pass "T21: non-allowlisted shell assertion is rejected before execution"
+else
+  fail "T21: non-allowlisted shell assertion is rejected (exit $MALICIOUS_EXIT)"
+fi
+
+# ─── T22: malformed argv artifacts fail without traceback ──
+MALFORMED_OUT="$TMP/malformed-artifact-out"
+mkdir -p "$MALFORMED_OUT"
+printf 'fix/342-safe\0suffix\n' > "$MALFORMED_OUT/nul.txt"
+printf '\377\n' > "$MALFORMED_OUT/non-utf8.txt"
+dd if=/dev/zero of="$MALFORMED_OUT/oversized.txt" bs=65537 count=1 2>/dev/null
+printf 'fix/342-safe\n' > "$MALFORMED_OUT/valid.txt"
+cat > "$CASE/case.json" <<'EOF'
+{
+  "name": "harness/reject-malformed-artifacts",
+  "grade": [
+    {
+      "tool": "shell",
+      "args": ["python3 scripts/idd-lint.py branch \"$(tr -d '\\n' < OUT/nul.txt)\""],
+      "expect_exit": 0,
+      "label": "NUL artifact"
+    },
+    {
+      "tool": "shell",
+      "args": ["python3 scripts/idd-lint.py commit \"$(tr -d '\\n' < OUT/non-utf8.txt)\""],
+      "expect_exit": 0,
+      "label": "non-UTF-8 artifact"
+    },
+    {
+      "tool": "shell",
+      "args": ["python3 scripts/idd-lint.py branch \"$(tr -d '\\n' < OUT/oversized.txt)\""],
+      "expect_exit": 0,
+      "label": "oversized artifact"
+    },
+    {
+      "tool": "shell",
+      "args": ["python3 scripts/idd-lint.py branch \"$(tr -d '\\n' < OUT/valid.txt)\""],
+      "expect_exit": 0,
+      "label": "valid artifact still runs"
+    }
+  ]
+}
+EOF
+set +e
+REPO_ROOT="$REPO_ROOT" python3 "$GRADE" --case "$CASE" \
+  --out "$MALFORMED_OUT" > "$TMP/malformed-grade.out" 2>&1
+MALFORMED_EXIT=$?
+set -e
+if [ "$MALFORMED_EXIT" -eq 1 ] \
+  && grep -q 'NUL byte' "$TMP/malformed-grade.out" \
+  && grep -q 'not valid UTF-8' "$TMP/malformed-grade.out" \
+  && grep -q 'exceeds the 64 KiB argv limit' "$TMP/malformed-grade.out" \
+  && grep -q '✓ valid artifact still runs' "$TMP/malformed-grade.out" \
+  && ! grep -q 'Traceback' "$TMP/malformed-grade.out"; then
+  pass "T22: malformed argv artifacts fail cleanly and grading continues"
+else
+  fail "T22: malformed argv artifacts fail cleanly (exit $MALFORMED_EXIT)"
 fi
 
 echo "Results: $PASS passed, $FAIL failed"
