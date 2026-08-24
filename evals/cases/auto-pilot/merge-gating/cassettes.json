@@ -21,6 +21,12 @@
       "exit": 0
     },
     {
+      "argv": ["issue", "view", "52", "--json", "number,title,body,labels,state"],
+      "stdout": "{\"number\":52,\"title\":\"Retire the legacy export path\",\"body\":\"Drop the v1 exporter once its replacement ships.\\n\\nDepends on #41\\n\",\"labels\":[{\"name\":\"improvement\"}],\"state\":\"OPEN\"}\n",
+      "stderr": "",
+      "exit": 0
+    },
+    {
       "argv": ["issue", "view", "12", "--json", "number,state,closedByPullRequestsReferences"],
       "stdout": "{\"number\":12,\"state\":\"OPEN\",\"closedByPullRequestsReferences\":[]}\n",
       "stderr": "",
@@ -29,6 +35,12 @@
     {
       "argv": ["issue", "view", "40", "--json", "number,state,closedByPullRequestsReferences"],
       "stdout": "{\"number\":40,\"state\":\"CLOSED\",\"closedByPullRequestsReferences\":[{\"number\":88,\"state\":\"MERGED\"}]}\n",
+      "stderr": "",
+      "exit": 0
+    },
+    {
+      "argv": ["issue", "view", "41", "--json", "number,state,closedByPullRequestsReferences"],
+      "stdout": "{\"number\":41,\"state\":\"CLOSED\",\"closedByPullRequestsReferences\":[{\"number\":89,\"state\":\"CLOSED\"}]}\n",
       "stderr": "",
       "exit": 0
     },

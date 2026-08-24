@@ -23,12 +23,16 @@ set -euo pipefail
 
 gh auth status >/dev/null
 
-# The blocked issue (#50 depends on the still-open #12) and the cleared one
-# (#51 depends on the merged #40, plus a cross-repo ref that must be ignored).
+# The blocked issue (#50 depends on the still-open #12), the cleared one (#51
+# depends on the merged #40, plus a cross-repo ref that must be ignored), and
+# the half-cleared one (#52 depends on #41, which is CLOSED but whose only
+# closing PR was CLOSED unmerged — closing an issue by hand does not ship it).
 gh issue view 50 --json number,title,body,labels,state > "$EVAL_OUT/issue-50.json"
 gh issue view 51 --json number,title,body,labels,state > "$EVAL_OUT/issue-51.json"
+gh issue view 52 --json number,title,body,labels,state > "$EVAL_OUT/issue-52.json"
 gh issue view 12 --json number,state,closedByPullRequestsReferences > "$EVAL_OUT/issue-12.json"
 gh issue view 40 --json number,state,closedByPullRequestsReferences > "$EVAL_OUT/issue-40.json"
+gh issue view 41 --json number,state,closedByPullRequestsReferences > "$EVAL_OUT/issue-41.json"
 gh pr view 101 --json number,title,body,state,mergeable > "$EVAL_OUT/pr-101.json"
 
 EVAL_OUT="$EVAL_OUT" python3 - <<'PY'
@@ -124,25 +128,42 @@ def gate(mode, merge_partial, auto_merge, review, deps_ok, critical, mergeable=T
     return "merged" if review == "clean" else "partial_followup"
 
 
-blockers_index = {12: load("issue-12.json"), 40: load("issue-40.json")}
+blockers_index = {
+    12: load("issue-12.json"),
+    40: load("issue-40.json"),
+    41: load("issue-41.json"),
+}
 
 issue_50 = load("issue-50.json")
 issue_51 = load("issue-51.json")
+issue_52 = load("issue-52.json")
 deps_50 = dep_numbers(issue_50["body"], 50)
 deps_51 = dep_numbers(issue_51["body"], 51)
+deps_52 = dep_numbers(issue_52["body"], 52)
 blocked_ok = dependency_satisfied(blockers_index, deps_50)
 cleared_ok = dependency_satisfied(blockers_index, deps_51)
+unmerged_ok = dependency_satisfied(blockers_index, deps_52)
 
 assert deps_50 == [12], f"expected #50 to gate on #12, got {deps_50}"
 assert deps_51 == [40], f"expected #51 to gate on #40 only, got {deps_51}"
+assert deps_52 == [41], f"expected #52 to gate on #41, got {deps_52}"
 assert blocked_ok is False, "#12 is still OPEN — the gate must not clear"
 assert cleared_ok is True, "#40 is CLOSED with a MERGED PR — the gate must clear"
+# Assert the fixture shape, not the verdict: #41 is CLOSED, so only the
+# every-closing-PR-is-MERGED half of the rule can still hold this gate shut.
+# The verdict itself is left to the graded artifact, so dropping that half of
+# the rule fails the case rather than tripping an assertion here.
+_blocker_41 = blockers_index[41]
+assert _blocker_41["state"] == "CLOSED" and all(
+    pr["state"] != "MERGED" for pr in _blocker_41["closedByPullRequestsReferences"]
+), "fixture #41 must be CLOSED with no MERGED closing PR"
 
 with open(os.path.join(out, "dependency-gate.json"), "w", encoding="utf-8") as fh:
     json.dump(
         {
             "issue_50": {"blockers": deps_50, "satisfied": blocked_ok},
             "issue_51": {"blockers": deps_51, "satisfied": cleared_ok},
+            "issue_52": {"blockers": deps_52, "satisfied": unmerged_ok},
         },
         fh,
         indent=2,
@@ -176,8 +197,14 @@ SCENARIOS = [
     ("mode-wins-over-legacy", "conservative", False, True, "clean", True, False, pr_mergeable),
     ("dependency-open-blocks", "balanced", False, None, "clean", blocked_ok, False, pr_mergeable),
     ("dependency-merged-clears", "balanced", False, None, "clean", cleared_ok, False, pr_mergeable),
+    # A blocker closed by hand — CLOSED, but its only closing PR was CLOSED
+    # unmerged — has not shipped, so the gate stays shut.
+    ("dependency-closed-unmerged-pr", "balanced", False, None, "clean", unmerged_ok, False, pr_mergeable),
     # Conflicts or red CI outrank a clean review and a cleared dependency gate.
     ("unmergeable-pr-stays-open", "balanced", False, None, "clean", True, False, False),
+    # The critical stop is scoped to an exhausted review: a critical issue whose
+    # PR reviews clean merges like any other.
+    ("critical-clean-merges", "balanced", False, None, "clean", True, True, pr_mergeable),
     # Critical handling is unchanged across all three modes.
     ("critical-partial-stops", "balanced", False, None, "partial", True, True, pr_mergeable),
     ("critical-partial-conservative-stops", "conservative", False, None, "partial", True, True, pr_mergeable),

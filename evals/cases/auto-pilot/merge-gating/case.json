@@ -113,9 +113,21 @@
     },
     {
       "tool": "file-exists",
+      "file": "OUT/gate-dependency-closed-unmerged-pr-blocked_by_dependency.txt",
+      "expect_exit": 0,
+      "label": "a CLOSED blocker whose closing PR never merged keeps the gate shut"
+    },
+    {
+      "tool": "file-exists",
       "file": "OUT/gate-critical-partial-stops-stop.txt",
       "expect_exit": 0,
       "label": "a critical issue with unresolved review issues stops rather than merging"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/gate-critical-clean-merges-merged.txt",
+      "expect_exit": 0,
+      "label": "a critical issue whose review comes back clean still merges — the stop needs both"
     },
     {
       "tool": "file-exists",

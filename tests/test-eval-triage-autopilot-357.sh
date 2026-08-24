@@ -217,11 +217,13 @@ for assertion in case["grade"]:
     if name.startswith("rank-"):
         rank, number = name[len("rank-"):-len(".txt")].split("-issue-")
         expected.append((int(rank), int(number)))
-expected = [number for _, number in sorted(expected)]
-assert expected, "case asserts no ranks"
-assert [r for r, _ in sorted(zip(range(1, len(expected) + 1), expected))] == list(
-    range(1, len(expected) + 1)
-), "ranks must be contiguous from 1"
+pairs = sorted(expected)
+assert pairs, "case asserts no ranks"
+# Assert on the ranks the case actually declares, before they are dropped: a
+# manifest that repeats rank 1 or skips a rank must not read as an order.
+ranks = [rank for rank, _ in pairs]
+assert ranks == list(range(1, len(ranks) + 1)), "ranks must be contiguous from 1"
+expected = [number for _, number in pairs]
 
 # Rebuild the scanned graph the subject derives from the same cassette.
 issues, prs = None, None
@@ -299,9 +301,10 @@ for call in cassettes["calls"]:
     if "body" in payload:
         bodies[payload["number"]] = payload["body"]
 
-# The subject gates #50 on #12 and #51 on #40 only (the cross-repo ref in #51
-# must be ignored). gi-deps.py is the repo's own parser for that grammar.
-expected = {50: ["12"], 51: ["40"]}
+# The subject gates #50 on #12, #51 on #40 only (the cross-repo ref in #51 must
+# be ignored), and #52 on #41. gi-deps.py is the repo's own parser for that
+# grammar.
+expected = {50: ["12"], 51: ["40"], 52: ["41"]}
 for number, want in expected.items():
     proc = subprocess.run(
         [sys.executable, str(deps_script)],
