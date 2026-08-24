@@ -44,6 +44,8 @@ make_copy() {
   cp -R "$REPO_ROOT/docs" "$copy/docs"
   cp "$REPO_ROOT/scripts/build.py" "$copy/scripts/build.py"
   cp -R "$REPO_ROOT/scripts/build" "$copy/scripts/build"
+  # Never let workspace-local bytecode mask a same-size source mutation.
+  rm -rf "$copy/scripts/build/__pycache__"
   printf '%s' "$copy"
 }
 
