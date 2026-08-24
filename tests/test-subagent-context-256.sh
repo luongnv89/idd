@@ -335,10 +335,14 @@ check_block_has "$EXAMPLES_CI_BLOCK" 'does not cover a clean base advance' \
   "T3.19: the examples narration no longer claims mergeable catches a moved base"
 anchor_lacks "$SRC_AP_SKILL" ap-snapshot-budget 'ci_status. when the head has not moved' \
   "T3.20: the SKILL phase table states no half-condition for the CI verdict gate"
+check_lacks "$SRC_AP_SKILL" 'ci_status. when the head has not moved' \
+  "T3.20b: no half-condition for the CI verdict gate anywhere in the SKILL (file-wide)"
 anchor_check "$SRC_AP_SKILL" ap-snapshot-budget 'gh issue view N --json state,comments,updatedAt' \
   "T3.21: the SKILL names the widened live re-verify, not the old single-field read"
 anchor_lacks "$SRC_AP_SKILL" ap-snapshot-budget 'single-field .gh issue view' \
   "T3.22: no site still calls the Step 0i re-verify single-field"
+check_lacks "$SRC_AP_SKILL" 'single-field .gh issue view' \
+  "T3.22b: no site anywhere in the SKILL calls the re-verify single-field (file-wide)"
 
 # ───────────────────────────────────────────────────────────
 # T4 (AC4): last-green test state has ONE home and TWO consumers,
@@ -691,6 +695,8 @@ anchor_check "$BUILT_AP_SKILL" ap-snapshot-budget 'gh issue view N --json state,
   "T7.57: built auto-pilot SKILL.md names the widened live re-verify"
 anchor_lacks "$BUILT_AP_SKILL" ap-snapshot-budget 'ci_status. when the head has not moved' \
   "T7.58: built auto-pilot SKILL.md states no half-condition for the CI verdict gate"
+check_lacks "$BUILT_AP_SKILL" 'ci_status. when the head has not moved' \
+  "T7.58b: built auto-pilot SKILL.md has no half-condition anywhere (file-wide)"
 
 # ───────────────────────────────────────────────────────────
 # Summary

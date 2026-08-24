@@ -41,9 +41,9 @@ printf '◆ Follow-up Context Contract Tests (issue #285)\n'
 anchor_check "$PR" ap-resolver-spawn '^BEGIN_UNTRUSTED_issue_payload_\{payload_nonce\}$' "payload opening boundary is a complete line"
 anchor_check "$PR" ap-resolver-spawn '^END_UNTRUSTED_issue_payload_\{payload_nonce\}$' "payload closing boundary is a complete line"
 anchor_check "$PR" ap-payload-framing 'secrets\.token_hex\(16\)' "nonce is trusted-runtime generated"
-anchor_check "$PR" ap-payload-framing 'authenticat' "framing does not claim authentication"
-anchor_check "$PR" ap-payload-framing 'mismatch' "mismatched framing is unusable"
-anchor_check "$PR" ap-payload-framing '(closing|final|last) (delimiter|boundary)' "instructions follow the closing boundary"
+anchor_check "$PR" ap-payload-framing '\*\*not\*\* authenticat' "framing does not claim authentication"
+anchor_check "$PR" ap-payload-framing 'missing or mismatched' "mismatched framing is unusable"
+anchor_check "$PR" ap-payload-framing 'Instructions:.*after the.*(closing|final|last) (delimiter|boundary)|`Instructions:` section starts only after' "instructions follow the closing boundary"
 
 # A malicious static marker in content cannot equal a fresh nonce boundary.
 python3 - <<'PY' && pass "malicious body cannot synthesize the actual nonce boundary" || fail "malicious body forged nonce boundary"
@@ -67,9 +67,10 @@ anchor_check "$EX" ap-explicit-retained-records 'complete retained map' "analyze
 anchor_check "$EX" ap-explicit-retained-records 'without another body read|record-validation' "post-optimization projection does not refetch or revalidate"
 anchor_check "$EX" ap-explicit-retained-records 'keyed by issue number' "batch payload path is reachable"
 anchor_check "$PH" ap-capture-canonical 'before analyzer spawn' "canonical capture orders explicit-list framing before analyzer"
-anchor_check "$PH" ap-deps-reuse-snapshot 'extra GitHub read' "dependency parsing reuses held body"
+anchor_check "$PH" ap-deps-reuse-snapshot '\*\*no\*\* extra GitHub read' "dependency parsing reuses held body"
 anchor_check "$PH" ap-capture-canonical 'analyzer, resolver, and batch-resolver' "canonical payload recipients include analyzer"
 anchor_lacks "$PH" ap-capture-canonical 'resolver and[[:space:]]+batch-resolver spawns only|only spawns that receive it' "canonical contract rejects resolver-only recipients"
+lacks "$PH" 'resolver and[[:space:]]+batch-resolver spawns only|only spawns that receive it' "canonical contract rejects resolver-only recipients (file-wide)"
 anchor_check "$PH" ap-capture-canonical 'coherence gate' "canonical contract names analyzer coherence gate"
 anchor_check "$PH" ap-capture-canonical '`updatedAt` match' "canonical contract requires exact analyzer timestamp match"
 anchor_check "$PH" ap-capture-canonical '`--refresh` fallback' "canonical contract refreshes incoherent analyzer snapshots"
@@ -128,6 +129,7 @@ PY
 anchor_check "$RV" rv-depth-gate-refresh 'links an issue, refresh|refresh it at the review boundary' "review refresh is conditional on a linked issue (#296)"
 anchor_check "$RV" rv-depth-gate-refresh 'even when `review\.adaptive_depth` is `false`' "review refresh is independent of adaptive depth"
 anchor_lacks "$RV" rv-depth-gate-refresh 'unconditionally' "the stale unconditional claim is gone (#296)"
+lacks "$RV" 'unconditionally' "the stale unconditional claim is gone (#296) (file-wide)"
 anchor_check "$RV" rv-depth-gate-refresh 'review\.adaptive_depth` is `false`' "adaptive-depth-off path still retains the review snapshot"
 anchor_check "$RV" rv-depth-gate-refresh '`profile = full` after the refresh' "adaptive-depth-off ordering refreshes before profile pin"
 anchor_check "$RV" rv-depth-gate-refresh 'gh issue view \{linked_issue\} --json number,title,body,labels' "review refresh fallback preserves the exact field set"
@@ -165,7 +167,7 @@ for f in "$RVM" "$BRVM"; do
   anchor_check "$f" rvm-empty-record-failsafe 'Re-run the refresh once' "fail-safe retries exactly once: $n"
   anchor_check "$f" rvm-empty-record-failsafe 'original order' "the retry names both paths and their order: $n"
   anchor_check "$f" rvm-empty-record-failsafe 'Never proceed with an empty' "never-proceed is scoped to a linked issue: $n"
-  anchor_check "$f" rvm-empty-record-failsafe 'fall back to a cached' "never-cache prohibition survives: $n"
+  anchor_check "$f" rvm-empty-record-failsafe '[Nn]ever fall back to a cached' "never-cache prohibition survives: $n"
   anchor_check "$f" rvm-empty-record-failsafe 'never\*\* stops it' "no-linked-issue PRs are never stopped: $n"
   anchor_check "$f" rvm-empty-record-failsafe 'n/a — no linked issue' "carve-out matches verification-checks handling: $n"
   anchor_check "$f" rvm-empty-record-failsafe '✗ Cannot read linked issue' "the stop prints a rich error: $n"
@@ -223,6 +225,7 @@ for f in "$RVM" "$BRVM"; do
   anchor_present "$f" rvm-placeholder-binding "the depth gate placeholder binding is written down: $n"
   # The binding is per file; no claim that every issue-bound {N} announces itself.
   anchor_lacks "$f" rvm-placeholder-binding 'each says so where it is used' "the binding note claims no per-use announcement it cannot keep: $n"
+  lacks "$f" 'each says so where it is used' "the binding note claims no per-use announcement it cannot keep (file-wide): $n"
   # The flag-false path must not claim the Depth gate signals are the only
   # remaining readers: issue_context reaches the fixer and ui-reviewer ungated.
   anchor_check "$f" rvm-verification-flag-false 'issue_context' "the flag-false path names the ungated snapshot consumers: $n"
@@ -239,6 +242,7 @@ anchor_check "$AP" ap-snapshot-budget 'not count as a body snapshot' "live non-b
 anchor_check "$AP" ap-snapshot-budget '#284 is merged' "merged partial PR is recorded satisfied"
 anchor_check "$AP" ap-snapshot-budget '#293 already fixed' "CI polling follow-up is recorded satisfied"
 anchor_lacks "$PH" ap-deps-reuse-snapshot 'extra read of one issue' "dependency path no longer requires the duplicate read"
+lacks "$PH" 'extra read of one issue' "dependency path no longer requires the duplicate read (file-wide)"
 
 # Step 0i ordering and triage continuation.
 anchor_check "$RS" rs-step0i-ordering 'before Step 0a' "Step 0i ordering starts before 0a"
