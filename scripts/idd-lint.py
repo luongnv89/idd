@@ -1160,7 +1160,12 @@ def render(findings: list[Finding], label: str, level: str, quiet: bool) -> int:
 def read_input(path: str | None) -> str:
     try:
         if path is None or path == "-":
-            return sys.stdin.read()
+            # POSIX Python may configure stdin with surrogateescape, which
+            # silently accepts invalid UTF-8. Decode the byte stream strictly
+            # so file and stdin inputs honor the same error contract.
+            stream = getattr(sys.stdin, "buffer", sys.stdin)
+            raw = stream.read()
+            return raw.decode("utf-8") if isinstance(raw, bytes) else raw
         with open(path, encoding="utf-8") as fh:
             return fh.read()
     except (OSError, UnicodeDecodeError) as exc:
