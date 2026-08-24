@@ -36,6 +36,7 @@ import ast
 import importlib
 import importlib.util
 import sys
+import tempfile
 import types
 from pathlib import Path
 
@@ -70,15 +71,33 @@ assert [arg.arg for arg in visit.args.args] == [
     "self", "kind", "name", "path_chain", "bundle"
 ], "closure walker inputs are not explicit"
 
-# A third-party top-level `build` module must not hijack the compatibility shim.
+# Third-party `build` and `scripts` packages must not hijack the compatibility
+# shim. In particular, scripts/ is a namespace package, so a regular foreign
+# package later on sys.path would otherwise win resolution and execute first.
 sys.modules["build"] = types.ModuleType("build")
 sys.modules["build"].foreign = True
-spec = importlib.util.spec_from_file_location(
-    "idd_build_package_contract", root / "scripts/build.py"
-)
-module = importlib.util.module_from_spec(spec)
-assert spec.loader is not None
-spec.loader.exec_module(module)
+with tempfile.TemporaryDirectory() as tmp:
+    foreign = Path(tmp)
+    foreign_scripts = foreign / "scripts"
+    foreign_scripts.mkdir()
+    (foreign_scripts / "__init__.py").write_text("", encoding="utf-8")
+    sentinel = foreign / "foreign-build-executed"
+    (foreign_scripts / "build.py").write_text(
+        f"from pathlib import Path\nPath({str(sentinel)!r}).touch()\n",
+        encoding="utf-8",
+    )
+    sys.path.append(str(foreign))
+    try:
+        spec = importlib.util.spec_from_file_location(
+            "idd_build_package_contract", root / "scripts/build.py"
+        )
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+    finally:
+        sys.path.remove(str(foreign))
+    assert not sentinel.exists(), "foreign scripts.build executed"
+
 assert callable(module.build)
 assert callable(module._parse_config_mapping)
 assert module._FULL_SCHEMA_FENCE_RE.pattern

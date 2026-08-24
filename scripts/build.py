@@ -3,22 +3,34 @@
 
 from __future__ import annotations
 
-import importlib
+import hashlib
+import importlib.util
 import sys
 from pathlib import Path
 
-# Direct execution adds scripts/ rather than the repository root to sys.path,
-# while importlib-based parity tests add neither. Import the qualified local
-# package so a preloaded third-party top-level `build` module cannot hijack this
-# compatibility entry point.
-_REPO_ROOT = str(Path(__file__).resolve().parent.parent)
-if _REPO_ROOT not in sys.path:
-    sys.path.insert(0, _REPO_ROOT)
-
-_package = importlib.import_module("scripts.build")
-_expected = Path(__file__).resolve().parent / "build" / "__init__.py"
-if Path(_package.__file__).resolve() != _expected:
-    raise ImportError(f"scripts.build resolved outside this checkout: {_package.__file__}")
+# Load the adjacent package by exact path under a private name. Importing
+# `scripts.build` by name is unsafe because scripts/ is a namespace package: a
+# regular third-party `scripts` package later on sys.path wins resolution, and
+# its code runs before an origin check can reject it.
+_package_dir = Path(__file__).resolve().parent / "build"
+_package_init = _package_dir / "__init__.py"
+_package_name = "_idd_build_" + hashlib.sha256(
+    str(_package_dir).encode("utf-8")
+).hexdigest()[:16]
+_spec = importlib.util.spec_from_file_location(
+    _package_name,
+    _package_init,
+    submodule_search_locations=[str(_package_dir)],
+)
+if _spec is None or _spec.loader is None:
+    raise ImportError(f"cannot load local build package: {_package_init}")
+_package = importlib.util.module_from_spec(_spec)
+sys.modules[_package_name] = _package
+try:
+    _spec.loader.exec_module(_package)
+except BaseException:
+    sys.modules.pop(_package_name, None)
+    raise
 for _name in _package.__all__:
     globals()[_name] = getattr(_package, _name)
 
