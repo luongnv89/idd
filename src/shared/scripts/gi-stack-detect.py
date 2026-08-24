@@ -242,10 +242,91 @@ def match_paths(files: list[str], pattern: str) -> list[str]:
     return sorted(hits, key=lambda f: (depth(f), f))
 
 
-def detect_language(root: str, files: list[str], markers: list) -> tuple[str | None, str | None]:
+# `fnmatch` treats only these three as special; a pattern without them matches
+# by equality, which an index can answer without touching the file list.
+GLOB_METACHARACTERS = ("*", "?", "[")
+
+
+class RepoIndex:
+    """One repository scan, with each glob resolved once and each file read once.
+
+    Detection asks 39 questions of the same file list — 13 language markers, 10
+    dependency files, 16 test-runner markers — and `match_paths` answers each by
+    walking every tracked path twice through `fnmatch` and then sorting. That is
+    O(files x patterns): 174k pattern evaluations on a 3000-file repository, a
+    third of them re-asking a question already answered (`package.json` alone is
+    globbed five times, and read five times after that).
+
+    Two memos remove the repetition. Repeated globs are answered from a dict,
+    and repeated reads return the text already decoded. Most markers are literal
+    filenames, so those are resolved through a name index built once instead of
+    a scan per pattern; genuine globs still fall through to `match_paths`.
+
+    Nothing here is derived from the marker tables: the index answers whatever
+    pattern it is handed, so a `--rules` override that replaces a table outright
+    is resolved exactly like a built-in one.
+
+    Both memos trade memory for the repeats they remove, and hold it for the
+    process. The reads are bounded by what the markers can open — the two
+    `content-any` budgets plus the dependency files — times `MAX_READ_BYTES`;
+    the name index holds about two entries per tracked path. A detection pass
+    is one short-lived process, so the peak is transient, but it is a peak the
+    transient reads it replaces did not have.
+    """
+
+    def __init__(self, root: str, files: list[str]) -> None:
+        self.root = root
+        self.files = files
+        self._names: dict[str, list[str]] | None = None
+        self._hits: dict[str, list[str]] = {}
+        self._texts: dict[str, str] = {}
+
+    def _name_index(self) -> dict[str, list[str]]:
+        """Every tracked path under its own name and its basename, in file order."""
+        if self._names is None:
+            names: dict[str, list[str]] = {}
+            for path in self.files:
+                # A set: a root-level file, whose path *is* its basename, must
+                # be listed once — `match_paths` ors the two tests, not sums.
+                for key in {
+                    os.path.normcase(path),
+                    os.path.normcase(os.path.basename(path)),
+                }:
+                    names.setdefault(key, []).append(path)
+            self._names = names
+        return self._names
+
+    def match(self, pattern: str) -> list[str]:
+        """`match_paths(self.files, pattern)`, computed at most once per pattern."""
+        hits = self._hits.get(pattern)
+        if hits is None:
+            if any(char in pattern for char in GLOB_METACHARACTERS):
+                hits = match_paths(self.files, pattern)
+            else:
+                found = self._name_index().get(os.path.normcase(pattern), [])
+                hits = sorted(found, key=lambda f: (depth(f), f))
+            self._hits[pattern] = hits
+        # A copy: `match_paths` handed back a fresh list every call, and a
+        # caller that sorted or trimmed one in place must not edit the memo.
+        return list(hits)
+
+    def read(self, rel: str) -> str:
+        """`read_file(self.root, rel)`, decoded at most once per path.
+
+        The unreadable-file empty string is cached too, so an error path stays
+        an error path rather than becoming a retry.
+        """
+        text = self._texts.get(rel)
+        if text is None:
+            text = read_file(self.root, rel)
+            self._texts[rel] = text
+        return text
+
+
+def detect_language(index: RepoIndex, markers: list) -> tuple[str | None, str | None]:
     best: tuple[int, str, str] | None = None
     for pattern, language in markers:
-        for hit in match_paths(files, pattern):
+        for hit in index.match(pattern):
             candidate = (depth(hit), hit, language)
             if best is None or candidate[0] < best[0]:
                 best = candidate
@@ -253,16 +334,16 @@ def detect_language(root: str, files: list[str], markers: list) -> tuple[str | N
     if best is None:
         return None, None
     _, source, language = best
-    if language == "JavaScript" and "typescript" in read_file(root, source).lower():
+    if language == "JavaScript" and "typescript" in index.read(source).lower():
         language = "TypeScript"
     return language, source
 
 
-def detect_framework(root: str, files: list[str], markers: list) -> tuple[str | None, str | None]:
+def detect_framework(index: RepoIndex, markers: list) -> tuple[str | None, str | None]:
     texts: list[tuple[str, str]] = []
     for name in DEPENDENCY_FILES:
-        for hit in match_paths(files, name)[:3]:
-            texts.append((hit, read_file(root, hit)))
+        for hit in index.match(name)[:3]:
+            texts.append((hit, index.read(hit)))
     for token, framework in markers:
         pattern = re.compile(r"(?<![\w./@-])" + re.escape(token) + r"(?![\w-])", re.IGNORECASE)
         for source, text in texts:
@@ -271,17 +352,17 @@ def detect_framework(root: str, files: list[str], markers: list) -> tuple[str | 
     return None, None
 
 
-def detect_test_runner(root: str, files: list[str], markers: list) -> tuple[str | None, str | None]:
+def detect_test_runner(index: RepoIndex, markers: list) -> tuple[str | None, str | None]:
     for kind, pattern, runner in markers:
         if kind == "file":
-            hits = match_paths(files, pattern)
+            hits = index.match(pattern)
             if hits:
                 return runner, hits[0]
         elif kind in ("content", "content-any"):
             name, _, needle = pattern.partition("::")
             budget = 3 if kind == "content" else MAX_CONTENT_ANY_FILES
-            for hit in match_paths(files, name)[:budget]:
-                if needle and needle.lower() in read_file(root, hit).lower():
+            for hit in index.match(name)[:budget]:
+                if needle and needle.lower() in index.read(hit).lower():
                     return runner, hit
         else:
             raise InvalidInput(f"unknown test-runner marker kind: {kind!r}")
@@ -353,9 +434,10 @@ def main(argv: list[str] | None = None) -> int:
         framework_rules = [tuple(row) for row in rules.get("framework", FRAMEWORK_MARKERS)]
         runner_rules = [tuple(row) for row in rules.get("test_runner", TEST_RUNNER_MARKERS)]
         files, count_source = list_files(root)
-        language, language_source = detect_language(root, files, language_rules)
-        framework, framework_source = detect_framework(root, files, framework_rules)
-        runner, runner_source = detect_test_runner(root, files, runner_rules)
+        index = RepoIndex(root, files)
+        language, language_source = detect_language(index, language_rules)
+        framework, framework_source = detect_framework(index, framework_rules)
+        runner, runner_source = detect_test_runner(index, runner_rules)
     except InvalidInput as exc:
         sys.stderr.write(f"✗ gi-stack-detect: {exc}\n")
         return 3

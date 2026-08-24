@@ -44,6 +44,7 @@ Never opens network sockets in replay mode. Stdlib only.
 
 from __future__ import annotations
 
+import atexit
 import fcntl
 import json
 import os
@@ -180,44 +181,83 @@ def _load_cassettes(path: Path) -> dict[str, Any]:
     return data
 
 
-def _match_call(argv: list[str], calls: list[dict[str, Any]]) -> dict[str, Any] | None:
-    """Match argv against cassettes — exact entries always beat prefix entries.
+@dataclass(frozen=True)
+class PreparedCalls:
+    """Cassette entries with every argv normalized once, at load time.
 
-    Two-pass on purpose: a leading ``match: "prefix"`` cassette must not steal a
-    later exact match for a longer command (e.g. prefix ``["pr"]`` vs exact
-    ``["pr", "view", "1", ...]``).
+    Matching used to normalize the whole cassette twice per lookup — pass 1
+    normalized every entry before discarding the prefix ones, then pass 2
+    normalized every entry again before discarding the exact ones — so a miss
+    over n entries cost 2n normalizations of work that never changes. Doing it
+    at load makes it n, once, and turns the exact pass into a dict lookup.
+
+    `frozen` here means the two fields are never rebound after construction —
+    not that `exact` is immutable, since it is an ordinary dict. Nothing
+    mutates or hashes an instance; `_prepare_calls` builds one and hands it
+    straight to `match`.
     """
-    norm = _normalize_argv(argv)
-    # Pass 1: exact matches only.
+
+    exact: dict[tuple[str, ...], dict[str, Any]]
+    prefixes: tuple[tuple[tuple[str, ...], dict[str, Any]], ...]
+
+    def match(self, argv: list[str]) -> dict[str, Any] | None:
+        """Exact entries always beat prefix entries.
+
+        Two ranks on purpose: a leading ``match: "prefix"`` cassette must not
+        steal a later exact match for a longer command (e.g. prefix ``["pr"]``
+        vs exact ``["pr", "view", "1", ...]``).
+        """
+        norm = tuple(_normalize_argv(argv))
+        exact_hit = self.exact.get(norm)
+        if exact_hit is not None:
+            return exact_hit
+        # `prefixes` is ordered longest-first, so the first hit is the longest
+        # prefix; a stable sort left equal lengths in cassette order.
+        for c_norm, call in self.prefixes:
+            if len(norm) >= len(c_norm) and norm[: len(c_norm)] == c_norm:
+                return call
+        return None
+
+
+def _prepare_calls(calls: list[Any]) -> PreparedCalls:
+    """Index one cassette's calls by their normalized argv."""
+    exact: dict[tuple[str, ...], dict[str, Any]] = {}
+    prefixes: list[tuple[tuple[str, ...], dict[str, Any]]] = []
     for call in calls:
+        # Malformed entries are skipped, not rejected: a cassette is a fixture
+        # and one unusable row must not take the whole replay down.
         if not isinstance(call, dict):
             continue
         c_argv = call.get("argv")
         if not isinstance(c_argv, list):
             continue
-        c_norm = _normalize_argv([str(x) for x in c_argv])
-        match_mode = call.get("match", "exact")
-        if match_mode == "prefix":
-            continue
-        if norm == c_norm:
-            return call
-    # Pass 2: prefix matches (longest-prefix wins among prefix entries).
-    best: dict[str, Any] | None = None
-    best_len = -1
-    for call in calls:
-        if not isinstance(call, dict):
-            continue
-        c_argv = call.get("argv")
-        if not isinstance(c_argv, list):
-            continue
-        c_norm = _normalize_argv([str(x) for x in c_argv])
-        if call.get("match", "exact") != "prefix":
-            continue
-        if len(norm) >= len(c_norm) and norm[: len(c_norm)] == c_norm:
-            if len(c_norm) > best_len:
-                best = call
-                best_len = len(c_norm)
-    return best
+        c_norm = tuple(_normalize_argv([str(x) for x in c_argv]))
+        if call.get("match", "exact") == "prefix":
+            prefixes.append((c_norm, call))
+        else:
+            # First entry wins, exactly as the in-order scan did.
+            exact.setdefault(c_norm, call)
+    prefixes.sort(key=lambda entry: len(entry[0]), reverse=True)
+    return PreparedCalls(exact, tuple(prefixes))
+
+
+def _match_call(argv: list[str], calls: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """Match argv against an unprepared list of cassette entries."""
+    return _prepare_calls(calls).match(argv)
+
+
+def _load_prepared(path: Path) -> PreparedCalls:
+    """Load a cassette and normalize its argv once, at load.
+
+    Buffered-but-unflushed records join the index so a call recorded earlier in
+    this process still replays, exactly as it did when every record was written
+    to disk the instant it was captured. `_load_cassettes` still validates the
+    file, so an unusable cassette exits here as it always did.
+    """
+    data = _load_cassettes(path)
+    calls = list(data.get("calls", []))
+    calls.extend(_PENDING_RECORDS.get(str(path), ()))
+    return _prepare_calls(calls)
 
 
 def _state_dir() -> Path | None:
@@ -393,6 +433,94 @@ def _find_real_gh() -> str | None:
     return None
 
 
+# Captured-but-unwritten calls, per cassette path. Flushed once, at exit.
+_PENDING_RECORDS: dict[str, list[dict[str, Any]]] = {}
+_FLUSH_REGISTERED = False
+
+
+def _default_file_mode() -> int:
+    """What `open(path, "w")` would have created a new file as.
+
+    The flush publishes through a temp file, and `NamedTemporaryFile` is 0600.
+    A cassette recorded into a new path used to be created by `write_text`, so
+    it landed at 0666 filtered by the umask; reading the umask back keeps that
+    unchanged rather than silently tightening every freshly captured cassette.
+    """
+    umask = os.umask(0)
+    os.umask(umask)
+    return 0o666 & ~umask
+
+
+def _buffer_record(cassette_path: Path, record: dict[str, Any]) -> None:
+    """Queue one captured call; the cassette is rewritten once, at exit.
+
+    Recording used to reload, append to, and rewrite the entire cassette for
+    every captured call — O(n^2) bytes for n calls in one process, 74 MB of
+    writes to produce a 294 KB cassette at n=500. Buffering makes that one
+    rewrite however many calls the process captures.
+
+    Read that bound literally. ``run_eval.sh`` fronts this script on PATH as
+    ``gh``, so a normal capture run is one process per call, each buffering
+    exactly one record: the amplification *across* processes is unchanged and
+    cannot be fixed from inside one of them. What this does fix is the
+    in-process case — ``main()`` is importable and callable in a loop — and it
+    is what lets the flush publish atomically, below, instead of truncating a
+    committed fixture mid-write.
+
+    A process that dies on a signal now loses its buffer where it used to have
+    written each call already. Normal return, ``sys.exit``, an uncaught
+    exception and SIGINT all still flush; SIGTERM, SIGKILL and ``os._exit`` do
+    not. That is an accepted trade: ``EVAL_RECORD=1`` is local capture only —
+    ``run_eval.sh`` and CI fail closed on it — and the session is re-runnable.
+    """
+    global _FLUSH_REGISTERED
+    _PENDING_RECORDS.setdefault(str(cassette_path), []).append(record)
+    if not _FLUSH_REGISTERED:
+        atexit.register(_flush_records)
+        _FLUSH_REGISTERED = True
+
+
+def _flush_records() -> None:
+    """Write every buffered call back to its cassette, one rewrite each.
+
+    Published via ``os.replace`` over a sibling temp file — the same idiom the
+    issue counter uses — because buffering concentrates the whole session into
+    a single write, and a truncated cassette is worse than a short one.
+    """
+    for raw, records in _PENDING_RECORDS.items():
+        if not records:
+            continue
+        path = Path(raw)
+        data = _load_cassettes(path) if path.exists() else {"version": 1, "calls": []}
+        data.setdefault("version", 1)
+        data.setdefault("calls", [])
+        data["calls"].extend(records)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        mode = path.stat().st_mode & 0o777 if path.exists() else _default_file_mode()
+        tmp_name: str | None = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                encoding="utf-8",
+                dir=path.parent,
+                prefix=f".{path.name}.",
+                delete=False,
+            ) as tmp:
+                # Name first: the write is what can fail, and the `finally`
+                # below can only clean up a temp file it has been told about.
+                tmp_name = tmp.name
+                tmp.write(json.dumps(data, indent=2) + "\n")
+            # NamedTemporaryFile is 0600; a cassette is a committed fixture, so
+            # replacing one must not quietly narrow who can read it.
+            os.chmod(tmp_name, mode)
+            os.replace(tmp_name, path)
+            tmp_name = None
+        finally:
+            if tmp_name is not None:
+                Path(tmp_name).unlink(missing_ok=True)
+        records.clear()
+
+
 def _record_and_replay(argv: list[str], cassette_path: Path) -> int:
     real = _find_real_gh()
     if real is None:
@@ -405,19 +533,15 @@ def _record_and_replay(argv: list[str], cassette_path: Path) -> int:
     )
     sys.stdout.write(proc.stdout)
     sys.stderr.write(proc.stderr)
-    data = _load_cassettes(cassette_path) if cassette_path.exists() else {"version": 1, "calls": []}
-    data.setdefault("version", 1)
-    data.setdefault("calls", [])
-    data["calls"].append(
+    _buffer_record(
+        cassette_path,
         {
             "argv": argv,
             "stdout": proc.stdout,
             "stderr": proc.stderr,
             "exit": proc.returncode,
-        }
+        },
     )
-    cassette_path.parent.mkdir(parents=True, exist_ok=True)
-    cassette_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
     return proc.returncode
 
 
@@ -456,8 +580,8 @@ def main(argv: list[str] | None = None) -> int:
     if len(argv) >= 2 and argv[0] == "issue" and argv[1] == "create":
         # Prefer cassette if it has an exact/prefix match for create.
         if cassette_path.exists():
-            data = _load_cassettes(cassette_path)
-            hit = _match_call(argv, data.get("calls", []))
+            prepared = _load_prepared(cassette_path)
+            hit = prepared.match(argv)
             if hit is not None:
                 sys.stdout.write(hit.get("stdout", ""))
                 sys.stderr.write(hit.get("stderr", ""))
@@ -474,8 +598,8 @@ def main(argv: list[str] | None = None) -> int:
         _eprint(f"✗ cassette not found: {cassette_path}")
         return 1
 
-    data = _load_cassettes(cassette_path)
-    hit = _match_call(argv, data.get("calls", []))
+    prepared = _load_prepared(cassette_path)
+    hit = prepared.match(argv)
     if hit is not None:
         sys.stdout.write(hit.get("stdout", ""))
         sys.stderr.write(hit.get("stderr", ""))

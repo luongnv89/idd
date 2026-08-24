@@ -13,7 +13,7 @@ from .agents import (
     _load_conventions_sections,
 )
 from .closure import _compute_closure
-from .common import CONFIG_SCHEMA_DOC, SOURCE_SKILL_MD
+from .common import CONFIG_SCHEMA_DOC, SOURCE_SKILL_MD, _reset_io_caches
 from .doc_slimming import (
     _check_digest_coverage,
     _zero_mention_bundled_docs,
@@ -170,6 +170,8 @@ def build(
     verbose: bool = False,
     no_root_skills: bool = False,
 ) -> None:
+    # One build, one cache lifetime: the read/listing memos never outlive a run.
+    _reset_io_caches()
     if verbose:
         print(f"● Building from {src} to {out}")
     public_skills, deprecated = _inventory_phase(src, verbose)

@@ -710,8 +710,24 @@ def merge_patch(
         if patch["skip_list"] is None:
             raise InputError("skip_list must be a list of integers")
         merged_skips = list(out.get("skip_list") or [])
+        # A parallel set answers membership; the list stays the record of order.
+        # `number not in merged_skips` rescanned the whole skip list per patched
+        # number, so one --update was O(existing x incoming). The set is local
+        # and never reaches `out` — a stray key there would be persisted and
+        # then rejected as unknown by the next patch.
+        seen_skips: set[object] = set()
+        for number in merged_skips:
+            try:
+                seen_skips.add(number)
+            except TypeError:
+                # A state file is not element-checked on load. An unhashable
+                # leftover can never equal an integer, and `_check_int_list`
+                # has already established every incoming number is one, so
+                # leaving it out of the set changes no answer.
+                pass
         for number in patch["skip_list"]:
-            if number not in merged_skips:
+            if number not in seen_skips:
+                seen_skips.add(number)
                 merged_skips.append(number)
         out["skip_list"] = merged_skips
 

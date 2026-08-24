@@ -284,6 +284,56 @@ def normalize_issues(request: dict) -> list[dict]:
 # --- graph -------------------------------------------------------------------
 
 
+def blocking_degrees(edges: list[dict]) -> dict[object, int]:
+    """Every issue's blocking degree, counted in one pass over `edges`.
+
+    Answering one issue at a time meant a full scan per question, and
+    `precedence` asks twice per undirected pair, so ordering a backlog cost
+    O(E^2): a 120-issue graph made 14,280 calls over 102 million edge
+    inspections. One pass builds every answer at once.
+
+    Two properties of the scan it replaces are load-bearing. An edge counts
+    **once** for an issue however many of its ends name it — `{a: 5, b: 5}` is
+    one edge, not two — so each edge's ends are deduplicated before counting.
+    And membership was `==`, which a dict reproduces exactly: `True`, `1`, and
+    `1.0` are one key, as they were one match.
+
+    Unhashable ends are skipped rather than raising. They can never equal the
+    integer issue number every caller looks up, and `_edge_key` already exists
+    because such a value must reach `known()` and be reported as this script's
+    exit 3 — not escape as a `TypeError` and an exit code no call site reads.
+    """
+    degrees: dict[object, int] = {}
+    for edge in edges:
+        ends: list[object] = []
+        for value in (edge.get("a"), edge.get("b"), edge.get("from")):
+            try:
+                hash(value)
+            except TypeError:
+                continue
+            if value not in ends:
+                ends.append(value)
+        for value in ends:
+            degrees[value] = degrees.get(value, 0) + 1
+    return degrees
+
+
+def _degree_of(degrees: dict[object, int], number: object) -> int:
+    """One issue's entry in a `blocking_degrees` map, absent or not.
+
+    Unhashable on the *lookup* side needs the same tolerance as on the counting
+    side. Hashing to look up would raise a `TypeError` and exit 1 — a code no
+    call site classifies — for a value `known()` is about to reject as this
+    script's exit 3 anyway. Every caller here looks up an issue number that is
+    already a key of the issue index and so is always hashable; the guard is for
+    the map, not for them.
+    """
+    try:
+        return degrees.get(number, 0)
+    except TypeError:
+        return 0
+
+
 def blocking_degree(edges: list[dict], number: int) -> int:
     """How many edges could make `number` a **blocker** of something else.
 
@@ -294,11 +344,19 @@ def blocking_degree(edges: list[dict], number: int) -> int:
     ordered ahead of it. An undirected end counts, because which way it will be
     directed is exactly what this number is being used to decide.
     """
-    total = 0
-    for edge in edges:
-        if number in (edge.get("a"), edge.get("b"), edge.get("from")):
-            total += 1
-    return total
+    try:
+        hash(number)
+    except TypeError:
+        # An unhashable number is not a map key and never will be, so answer it
+        # the way the map was built — by `==` against the same three ends. The
+        # scan is the exact original, kept so this function's answer is
+        # unchanged for *every* input, not only the ones callers can produce.
+        return sum(
+            1
+            for edge in edges
+            if number in (edge.get("a"), edge.get("b"), edge.get("from"))
+        )
+    return _degree_of(blocking_degrees(edges), number)
 
 
 def _edge_key(edge: dict) -> tuple:
@@ -343,6 +401,9 @@ def direct_edges(
             raise InvalidInput(f"edges[{position}] names unknown issue {value!r}")
         return value
 
+    # Counted once, over the canonical list, before any pair is compared:
+    # `normalized` is complete and never mutated below.
+    degrees = blocking_degrees(normalized)
     directed: list[tuple[int, int]] = []
     co_dependent: list[list[int]] = []
     for position, edge in enumerate(normalized):
@@ -356,7 +417,7 @@ def direct_edges(
         right = known(edge.get("b"), position)
         if left == right:
             continue
-        winner = precedence(index[left], index[right], normalized)
+        winner = precedence(index[left], index[right], normalized, degrees)
         if winner is None:
             pair = sorted([left, right])
             if pair not in co_dependent:
@@ -374,7 +435,9 @@ def direct_edges(
     return unique, sorted(co_dependent)
 
 
-def precedence(left: dict, right: dict, edges: list[dict]) -> int | None:
+def precedence(
+    left: dict, right: dict, edges: list[dict], degrees: dict[object, int] | None = None
+) -> int | None:
     """Which of two issues should be resolved first, or None when neither does.
 
     The order of the tests is the order the detection reference states them:
@@ -382,11 +445,17 @@ def precedence(left: dict, right: dict, edges: list[dict]) -> int | None:
     the issue number — a pair that ties on all three is reported as
     `co_dependent`, which is a real answer, where an order derived from an
     issue number would read as a dependency that nobody observed.
+
+    `degrees` is the one-pass map from `blocking_degrees`, which a caller
+    ordering many pairs builds once. Omitting it computes the same map here, so
+    a lone comparison still answers from `edges` alone.
     """
     if left["created"] and right["created"] and left["created"] != right["created"]:
         return left["number"] if left["created"] < right["created"] else right["number"]
-    left_degree = blocking_degree(edges, left["number"])
-    right_degree = blocking_degree(edges, right["number"])
+    if degrees is None:
+        degrees = blocking_degrees(edges)
+    left_degree = _degree_of(degrees, left["number"])
+    right_degree = _degree_of(degrees, right["number"])
     if left_degree != right_degree:
         return left["number"] if left_degree > right_degree else right["number"]
     left_rank = TYPE_RANK.get(left["type"] or "", 99)
