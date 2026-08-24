@@ -115,6 +115,10 @@ check_flow "$SPEC" 'No skill adds, drops, or renames one' \
   "AC6: per-skill field drift is forbidden"
 check_flow "$SPEC" 'byte-identical in every skill' \
   "AC6: the contract states its own byte-identity rule"
+check_flow "$SPEC" 'the leading unit is unpadded and every unit after it is zero-padded' \
+  "AC6: the elapsed rendering is pinned, so two skills cannot format one duration differently"
+check_flow "$SPEC" 'Drop zero-valued \*leading\* units, never interior or trailing ones' \
+  "AC6: which units may be dropped is stated, not left to judgement"
 echo ""
 
 # ── AC5: explicit unavailable marker, and 0 is not that marker ──────────────
@@ -190,6 +194,15 @@ for d in "${SKILL_DIRS[@]}"; do
   # precheck does not name is a file whose absence nobody notices at run time.
   check_has  "$f" '(^|`)references/run-stats\.md' \
     "AC1: $name's bundled dependency precheck names the contract"
+  # AC2's real exposure: the error catalog holds the exact output blocks for the
+  # stops, and an agent that prints one and exits would otherwise skip the footer.
+  cat="$REPO_ROOT/$d/references/error-messages.md"
+  check_flow "$cat" 'block here that stops the run is followed by the run-stats footer' \
+    "AC2: $name's error catalog binds every stopping block to the footer"
+  check_flow "$cat" 'prints .elapsed n/a., which is the contract working' \
+    "AC2/AC5: $name's error catalog covers a stop before the clock was captured"
+  check_flow "$cat" 'warns and continues is not a terminal outcome' \
+    "AC2: $name's error catalog excludes non-terminal warnings"
 done
 echo ""
 

@@ -32,7 +32,7 @@ Fixed, in this order. No skill adds, drops, or renames one.
 
 | Field | Value | Source |
 |-------|-------|--------|
-| `elapsed` | wall-clock duration, `{H}h {M}m {S}s` with zero-valued leading units dropped (`4m 12s`, `48s`, `1h 03m 20s`) | `now - run_started_epoch` |
+| `elapsed` | wall-clock duration, `{H}h {M}m {S}s`. Drop zero-valued *leading* units, never interior or trailing ones; the leading unit is unpadded and every unit after it is zero-padded to two digits — `4m 12s`, `48s`, `1h 03m 20s`, `2h 00m 07s` | `now - run_started_epoch` |
 | `tokens` | tokens the run consumed, a plain integer with thousands separators (`128,400`) | the host runtime, when it reports a usage figure to the skill |
 | `agents` | subagents the run spawned, an integer | the orchestrator's own count of spawns |
 
