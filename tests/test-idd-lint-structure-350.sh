@@ -127,7 +127,7 @@ with tempfile.TemporaryDirectory() as tmp:
         {"number": 1, "body": "<!-- gitissue:normalized v1 -->"},
         {"number": 2, "body": "plain"},
     ]
-    tier_stats = module.collect_run_tier_stats(20, runs)
+    tier_stats = module.collect_run_tier_stats(20, module.load_run_rows(runs))
 check(tier_stats["tiers"]["normalized"] == {
     "runs": 1, "success_pct": 100, "median_qa": 1,
 } and tier_stats["tiers"]["unnormalized"] == {
@@ -144,7 +144,7 @@ original_collectors = (
 )
 module.collect_issue_normalization_stats = lambda limit: collector_calls.append("issues") or {"open_issues": 0}
 module.collect_merged_pr_stats = lambda limit, window: collector_calls.append("prs") or {"merged_prs": 0}
-module.collect_run_tier_stats = lambda limit, path: collector_calls.append("tiers") or {"tiers": {}}
+module.collect_run_tier_stats = lambda limit, rows: collector_calls.append("tiers") or {"tiers": {}}
 combined = module.collect_github_stats(20, Path("unused"))
 (module.collect_issue_normalization_stats,
  module.collect_merged_pr_stats,

@@ -25,6 +25,15 @@ and never reset the count. It prints one JSON line and writes nothing:
 `quarantine` is `streak >= threshold` and `threshold > 0`; `--threshold 0`
 disables quarantine outright, so it is always false.
 
+Rotation keeps the active log small (F-PERF-006). Before an append-mode write
+(`--append` or `--append-once`) the active log is renamed to a timestamped
+segment beside itself — `runs-<YYYYMMDDTHHMMSSZ>.jsonl` — when it has reached
+`--rotate-max-bytes` or sat idle past `--rotate-max-days`; the new record then
+starts a fresh active log. Rotation is best-effort like every other write: a
+failed rename warns on stderr and the record still appends. Readers scan a
+bounded tail — the newest `--tail-segments` segments plus the active log,
+oldest first — so streaks and idempotency checks survive rotation.
+
 The count is deliberately **soft**. The run log is gitignored, best-effort and
 deletable, so it can only ever carry *progress toward* quarantine — the durable
 state is the label `/auto-pilot` applies at the threshold. That asymmetry sets
@@ -67,6 +76,23 @@ except ImportError:  # pragma: no cover - non-POSIX hosts fail closed at runtime
     fcntl = None
 
 DEFAULT_LOG_PATH = ".gitissue/runs.jsonl"
+
+# Rotation (F-PERF-006): the active log never grows without bound. Before an
+# append-mode write, a log at or above the byte ceiling — or idle past the day
+# ceiling, measured from the file's mtime so backdated `ts` fields never
+# trigger it — renames to a timestamped segment beside itself and the append
+# lands in a fresh active log.
+DEFAULT_ROTATE_MAX_BYTES = 1024 * 1024
+DEFAULT_ROTATE_MAX_DAYS = 30
+
+# How deep readers scan: the newest N rotated segments plus the active log,
+# oldest first. A bound keeps every read O(window) after years of appends; a
+# streak or event_id rotated out of the window has left its scope.
+DEFAULT_TAIL_SEGMENTS = 10
+
+# Rotated-segment stamp: compact UTC, sorts lexicographically in chronological
+# order because every field is zero-padded and fixed-width.
+SEGMENT_STAMP_FORMAT = "%Y%m%dT%H%M%SZ"
 
 # Consecutive failed runs before `/auto-pilot` quarantines an issue. Mirrors the
 # documented `autopilot.quarantine_after` default so an omitted --threshold
@@ -338,22 +364,44 @@ def _append_once_lock(path: Path):
             lock_fh.close()
 
 
-def append_once(path: Path, record: dict[str, object], *, ts_was_supplied: bool) -> bool:
+def append_once(
+    path: Path,
+    record: dict[str, object],
+    *,
+    ts_was_supplied: bool,
+    rotate_max_bytes: int = DEFAULT_ROTATE_MAX_BYTES,
+    rotate_max_days: int = DEFAULT_ROTATE_MAX_DAYS,
+    tail: int = DEFAULT_TAIL_SEGMENTS,
+) -> bool:
     """Atomically append by event_id; return False for an identical retry.
 
-    The advisory lock covers the whole cross-process transaction: read,
-    identical/conflict decision, append, flush, and fsync. A lock failure is an
-    OSError so the caller exits 4 and leaves the lane log_pending for resume.
+    The advisory lock covers the whole cross-process transaction: rotation
+    check, read, identical/conflict decision, append, flush, and fsync. A lock
+    failure is an OSError so the caller exits 4 and leaves the lane log_pending
+    for resume. The dedup scan sees the same tail window as --failure-streak:
+    an event_id rotated out of it is outside the idempotency scope.
     """
     event_id = record.get("event_id")
     if not isinstance(event_id, str):
         raise RecordError("--append-once requires event_id")
 
     with _append_once_lock(path):
+        maybe_rotate(path, max_bytes=rotate_max_bytes, max_days=rotate_max_days)
+
+        # An unreadable active log is fatal here — unlike the streak read,
+        # appending without seeing it could double-write a parallel lane's
+        # event, so exit 4 leaves the lane log_pending for resume instead.
+        # A segment that cannot be read only narrows the dedup window.
+        lines: list[str] = []
+        for segment in segment_paths(path, tail):
+            try:
+                lines.extend(segment.read_text(encoding="utf-8").splitlines())
+            except (OSError, UnicodeDecodeError):
+                continue
         try:
-            lines = path.read_text(encoding="utf-8").splitlines()
+            lines.extend(path.read_text(encoding="utf-8").splitlines())
         except FileNotFoundError:
-            lines = []
+            pass
         except (OSError, UnicodeDecodeError) as exc:
             raise OSError(f"cannot read existing log for append-once — {exc}") from exc
 
@@ -375,6 +423,99 @@ def append_once(path: Path, record: dict[str, object], *, ts_was_supplied: bool)
 
         append_line(path, render(record))
         return True
+
+
+def segment_paths(path: Path, limit: int = DEFAULT_TAIL_SEGMENTS) -> list[Path]:
+    """This log's rotated segments, oldest first, at most `limit` of them.
+
+    Segments are `<stem>-<stamp>.jsonl` siblings of the active file — a shape
+    that cannot collide with the active log itself or with `runs.jsonl.lock`,
+    and whose fixed-width stamps sort in chronological order without parsing.
+    """
+    try:
+        segments = sorted(
+            candidate
+            for candidate in path.parent.glob(f"{path.stem}-*.jsonl")
+            if candidate.is_file()
+        )
+    except OSError:
+        return []
+    # `[-0:]` would be `[:]` — every segment — so 0 needs its own branch.
+    return segments[-limit:] if limit > 0 else []
+
+
+def read_log_lines(path: Path, limit: int = DEFAULT_TAIL_SEGMENTS) -> tuple[list[str], bool]:
+    """(lines, readable) across the tail window: segments then active, in order.
+
+    The order matters — oldest to newest is append order, so both consumers can
+    treat the concatenation exactly like the single file they used to read. A
+    component that cannot be opened or decoded is skipped; `readable` is true
+    when any component was read, which keeps the fail-open streak contract
+    (`exit 4` only when there was nothing at all to read).
+    """
+    lines: list[str] = []
+    readable = False
+    for candidate in (*segment_paths(path, limit), path):
+        try:
+            lines.extend(candidate.read_text(encoding="utf-8").splitlines())
+            readable = True
+        except (OSError, UnicodeDecodeError):
+            continue
+    return lines, readable
+
+
+def rotation_due(path: Path, *, max_bytes: int, max_days: int) -> bool:
+    """Whether an append-mode write should rotate first.
+
+    Size reads the byte count; age reads the mtime — how long since the last
+    append, not the age of any record inside. Content-based aging would let a
+    backdated `ts` field rotate a brand-new log on its second line, and it
+    would cost a read on every append to check.
+    """
+    try:
+        stat = path.stat()
+    except OSError:
+        return False  # missing or unreadable: nothing to rotate yet
+    if max_bytes > 0 and stat.st_size >= max_bytes:
+        return True
+    if max_days > 0:
+        idle_s = datetime.now(timezone.utc).timestamp() - stat.st_mtime
+        if idle_s >= max_days * 86400:
+            return True
+    return False
+
+
+def rotate_log(path: Path, *, now: datetime | None = None) -> Path:
+    """Rename the active log to a timestamped segment; return the segment path.
+
+    Same-second collisions get a numeric `-N` suffix rather than clobbering.
+    OSError propagates — rotation is best-effort, so callers warn and append
+    to the un-rotated file instead of failing the record.
+    """
+    stamp = (now or datetime.now(timezone.utc)).strftime(SEGMENT_STAMP_FORMAT)
+    target = path.with_name(f"{path.stem}-{stamp}.jsonl")
+    suffix = 0
+    while target.exists():
+        suffix += 1
+        target = path.with_name(f"{path.stem}-{stamp}-{suffix}.jsonl")
+    path.rename(target)
+    return target
+
+
+def maybe_rotate(path: Path, *, max_bytes: int, max_days: int) -> Path | None:
+    """Rotate if due; return the segment written, or None. Never raises."""
+    if max_bytes <= 0 and max_days <= 0:
+        return None
+    if not rotation_due(path, max_bytes=max_bytes, max_days=max_days):
+        return None
+    try:
+        return rotate_log(path)
+    except OSError as exc:
+        print(
+            f"⚠ gi-runlog: could not rotate {path} — appending anyway ({exc})",
+            file=sys.stderr,
+        )
+        return None
 
 
 def count_failure_streak(lines: list[str], issue: int) -> int:
@@ -404,19 +545,18 @@ def count_failure_streak(lines: list[str], issue: int) -> int:
     return streak
 
 
-def failure_streak(path: Path, issue: int, threshold: int) -> tuple[dict[str, object], bool]:
+def failure_streak(
+    path: Path, issue: int, threshold: int, *, tail: int = DEFAULT_TAIL_SEGMENTS
+) -> tuple[dict[str, object], bool]:
     """Return the streak verdict for `issue` and whether the log was readable.
 
     The boolean is the exit code's business, not the verdict's: an unreadable
     log still produces a printable line, and that line says `streak: 0` so the
-    caller cannot quarantine on evidence nobody read.
+    caller cannot quarantine on evidence nobody read. The read spans the tail
+    window (rotated segments plus the active log), so a streak survives the
+    rotation that keeps the active file small.
     """
-    readable = True
-    lines: list[str] = []
-    try:
-        lines = path.read_text(encoding="utf-8").splitlines()
-    except (OSError, UnicodeDecodeError):
-        readable = False
+    lines, readable = read_log_lines(path, tail)
 
     streak = count_failure_streak(lines, issue) if readable else 0
     return (
@@ -475,6 +615,14 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     parser.add_argument(
+        "--no-rotate",
+        action="store_true",
+        help=(
+            "disable rotation: append to the active log however large or "
+            "old it is"
+        ),
+    )
+    parser.add_argument(
         "--path",
         "--log",
         default=DEFAULT_LOG_PATH,
@@ -493,14 +641,52 @@ def main(argv: list[str] | None = None) -> int:
             f"(default {DEFAULT_QUARANTINE_AFTER}; 0 disables quarantine)"
         ),
     )
+    parser.add_argument(
+        "--rotate-max-bytes",
+        type=int,
+        default=DEFAULT_ROTATE_MAX_BYTES,
+        metavar="N",
+        help=(
+            "append modes: rotate the active log before writing once it is at "
+            f"least this size in bytes (default {DEFAULT_ROTATE_MAX_BYTES}); "
+            "0 disables the size trigger"
+        ),
+    )
+    parser.add_argument(
+        "--rotate-max-days",
+        type=int,
+        default=DEFAULT_ROTATE_MAX_DAYS,
+        metavar="D",
+        help=(
+            "append modes: rotate before writing when the log has sat idle "
+            f"this many days (mtime-based, default {DEFAULT_ROTATE_MAX_DAYS}); "
+            "0 disables the age trigger"
+        ),
+    )
+    parser.add_argument(
+        "--tail-segments",
+        type=int,
+        default=DEFAULT_TAIL_SEGMENTS,
+        metavar="K",
+        help=(
+            "how many of the newest rotated segments reads and dedup scans "
+            f"cover, oldest first (default {DEFAULT_TAIL_SEGMENTS})"
+        ),
+    )
     args = parser.parse_args(argv)
+
+    for name in ("rotate_max_bytes", "rotate_max_days", "tail_segments"):
+        if getattr(args, name) < 0:
+            print(f"✗ gi-runlog: --{name.replace('_', '-')} must be >= 0", file=sys.stderr)
+            return 2
 
     if args.failure_streak is not None:
         if args.threshold < 0:
             print("✗ gi-runlog: --threshold must be >= 0", file=sys.stderr)
             return 3
         result, readable = failure_streak(
-            Path(args.path), args.failure_streak, args.threshold
+            Path(args.path), args.failure_streak, args.threshold,
+            tail=args.tail_segments,
         )
         # The line is printed either way. An exit-4 caller that reads stdout
         # anyway must land on "no streak", never on a stale or invented one.
@@ -548,7 +734,12 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.append_once:
             written = append_once(
-                Path(args.path), record, ts_was_supplied=ts_was_supplied
+                Path(args.path),
+                record,
+                ts_was_supplied=ts_was_supplied,
+                rotate_max_bytes=0 if args.no_rotate else args.rotate_max_bytes,
+                rotate_max_days=0 if args.no_rotate else args.rotate_max_days,
+                tail=args.tail_segments,
             )
             print(
                 json.dumps(
@@ -560,7 +751,18 @@ def main(argv: list[str] | None = None) -> int:
                 )
             )
         else:
-            append_line(Path(args.path), line)
+            path = Path(args.path)
+            # Plain --append has no lock of its own, so rotation races are
+            # tolerated rather than serialized where fcntl is missing: the
+            # rename is best-effort and a lost race just appends to the
+            # segment instead of the fresh log.
+            if not args.no_rotate:
+                maybe_rotate(
+                    path,
+                    max_bytes=args.rotate_max_bytes,
+                    max_days=args.rotate_max_days,
+                )
+            append_line(path, line)
     except RecordError as exc:
         print(f"✗ gi-runlog: {exc}", file=sys.stderr)
         return 3

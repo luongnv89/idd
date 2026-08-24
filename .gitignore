@@ -55,8 +55,9 @@ dist/agents/
 # Local review/analysis artifacts (session outputs, not project docs)
 /local/
 
-# Autopilot/resolver run log (local activity, not committed)
+# Autopilot/resolver run log and its rotated segments (local activity, not committed)
 .gitissue/runs.jsonl
+.gitissue/runs-*.jsonl
 
 # Analysis, triage, and issue-cache artifacts are local and regenerable; they
 # can carry issue bodies and repository findings that should not be committed.

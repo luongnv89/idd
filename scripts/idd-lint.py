@@ -94,6 +94,10 @@ PASS_PERCENT_THRESHOLD = 80
 WARN_PERCENT_THRESHOLD = 40
 DEFAULT_GITHUB_FETCH_LIMIT = 200
 
+# Bounded tail over rotated run-log segments (F-PERF-006): the same newest-N
+# window gi-runlog's readers scan, so every consumer sees one logical log.
+MAX_RUN_SEGMENTS = 10
+
 
 class Finding:
     def __init__(self, severity: str, code: str, message: str) -> None:
@@ -706,21 +710,45 @@ def _unexplained_ceiling_breach(row: dict) -> bool:
     return not (isinstance(reason, str) and reason.strip())
 
 
-def collect_run_stats(path: Path) -> dict | None:
-    """Outcome/QA/duration aggregates from the append-only run log."""
-    if not path.is_file():
-        return None
-    rows = []
-    for line in path.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if not line:
+def load_run_rows(path: Path) -> list[dict] | None:
+    """Parse the run log exactly once — active file plus rotated segments.
+
+    Rotation (F-PERF-006) splits one append-only file into timestamped
+    `runs-*.jsonl` segments plus the fresh active log, so a reader that opens
+    only the active path silently loses every record before the last rotation.
+    This reads the same bounded tail gi-runlog scans — newest segments first,
+    oldest to newest, then the active file — and skips malformed lines with the
+    no-schema-migration tolerance every runs.jsonl reader shares. Returns None
+    when nothing anywhere parsed to a row.
+    """
+    segments = sorted(
+        candidate
+        for candidate in path.parent.glob(f"{path.stem}-*.jsonl")
+        if candidate.is_file()
+    )
+    rows: list[dict] = []
+    for candidate in (*segments[-MAX_RUN_SEGMENTS:], path):
+        if not candidate.is_file():
             continue
         try:
-            row = json.loads(line)
-        except json.JSONDecodeError:
+            text = candidate.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
             continue
-        if isinstance(row, dict):
-            rows.append(row)
+        for line in text.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(row, dict):
+                rows.append(row)
+    return rows or None
+
+
+def collect_run_stats(rows: list[dict] | None) -> dict | None:
+    """Outcome/QA/duration aggregates over run-log rows parsed by load_run_rows."""
     if not rows:
         return None
     outcomes: dict[str, int] = {}
@@ -928,10 +956,14 @@ def collect_merged_pr_stats(
     }
 
 
-def collect_run_tier_stats(limit: int, run_rows_path: Path) -> dict | None:
+def collect_run_tier_stats(limit: int, run_rows: list[dict] | None) -> dict | None:
     """Join resolver outcomes to normalized and unnormalized issue bodies."""
-    runs = collect_run_stats(run_rows_path)
-    if not runs or not runs["issues"]:
+    if not run_rows:
+        return None
+    issues = sorted(
+        {row["issue"] for row in run_rows if isinstance(row.get("issue"), int)}
+    )
+    if not issues:
         return None
     all_issues = _gh_json(
         "issue", "list", "--state", "all",
@@ -945,14 +977,10 @@ def collect_run_tier_stats(limit: int, run_rows_path: Path) -> dict | None:
         issue["number"]: bool(MARKER_RE.search(issue.get("body") or ""))
         for issue in all_issues
     }
-    rows = []
-    for line in run_rows_path.read_text(encoding="utf-8").splitlines():
-        try:
-            row = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        if isinstance(row, dict) and row.get("outcome") not in SKIP_OUTCOMES:
-            rows.append(row)
+    rows = [
+        row for row in run_rows
+        if row.get("outcome") not in SKIP_OUTCOMES
+    ]
 
     tiers: dict[str, dict] = {}
     for name, wanted in (("normalized", True), ("unnormalized", False)):
@@ -994,16 +1022,27 @@ def collect_run_tier_stats(limit: int, run_rows_path: Path) -> dict | None:
 
 
 def collect_github_stats(
-    limit: int, run_rows_path: Path, window: SinceWindow | None = None
+    limit: int,
+    run_rows_path: Path,
+    window: SinceWindow | None = None,
+    *,
+    run_rows: list[dict] | None = None,
 ) -> dict | None:
-    """Orchestrate the three independent gh-backed stats collectors."""
+    """Orchestrate the three independent gh-backed stats collectors.
+
+    runs.jsonl is parsed exactly once per call (F-PERF-007): load_run_rows runs
+    here and the rows feed every downstream consumer. A caller that already
+    parsed the log passes `run_rows` to share its read instead of re-parsing.
+    """
+    if run_rows is None:
+        run_rows = load_run_rows(run_rows_path)
     result = collect_issue_normalization_stats(limit)
     if result is None:
         return None  # gh missing, unauthenticated, or offline — skip the section
     merged = collect_merged_pr_stats(limit, window)
     if merged is not None:
         result.update(merged)
-    tiers = collect_run_tier_stats(limit, run_rows_path)
+    tiers = collect_run_tier_stats(limit, run_rows)
     if tiers is not None:
         result.update(tiers)
     return result
@@ -1320,12 +1359,17 @@ def cmd_stats(args: argparse.Namespace) -> int:
     # distinguish from a typo, and a false positive must not cost the report.
     git_since = window.since if window and window.cutoff is not None else None
     commit_s = collect_commit_stats(branch, git_since)
-    run_s = collect_run_stats(runs_path)
+    # One parse per command (F-PERF-007): the same rows feed the run-log
+    # section and, via collect_github_stats, the normalization-tier join.
+    run_rows = load_run_rows(runs_path)
+    run_s = collect_run_stats(run_rows)
     gh_s, gh_skipped = None, None
     if args.no_github:
         gh_skipped = "--no-github"
     else:
-        gh_s = collect_github_stats(args.limit, runs_path, window)
+        gh_s = collect_github_stats(
+            args.limit, runs_path, window, run_rows=run_rows
+        )
         if gh_s is None:
             gh_skipped = "gh unavailable, unauthenticated, or offline"
 
