@@ -73,6 +73,7 @@ edit the source and run ./scripts/build.sh.
 from __future__ import annotations
 
 import argparse
+import glob
 import json
 import os
 import re
@@ -841,6 +842,27 @@ def _retire_lock(path: Path, observed: tuple | None) -> str:
     return "retired"
 
 
+def _sweep_retired_strays(lock_path: Path) -> None:
+    """Remove orphaned `<lock>.retired-<pid>` strays under the dir guard.
+
+    A crash between `_retire_lock`'s rename and its unlink strands the retired
+    copy on disk forever — nothing reads it again. Sweeping runs only inside
+    `_lock_guard`, whose stable-directory flock guarantees no concurrent retire
+    is mid-rename on these names.
+    """
+    try:
+        strays = sorted(
+            lock_path.parent.glob(f"{glob.escape(lock_path.name)}.retired-*")
+        )
+    except OSError:
+        return
+    for stray in strays:
+        try:
+            stray.unlink()
+        except OSError:
+            pass
+
+
 def _create_lock_exclusive(path: Path, payload: dict) -> bool:
     """True when the lock was created, False when it already existed.
 
@@ -1043,6 +1065,7 @@ def run_lock(args, paths) -> int:
     if args.dry_run:
         return _run_lock_locked(args, paths)
     with _lock_guard(paths["lock"]):
+        _sweep_retired_strays(paths["lock"])
         return _run_lock_locked(args, paths)
 
 
@@ -1169,6 +1192,7 @@ def run_unlock(args, paths) -> int:
     if args.dry_run:
         return _run_unlock_locked(args, paths)
     with _lock_guard(paths["lock"]):
+        _sweep_retired_strays(paths["lock"])
         return _run_unlock_locked(args, paths)
 
 

@@ -212,6 +212,9 @@ jobs:
       - name: test-scripts-278
         run: bash tests/test-scripts-278.sh
 
+      - name: test-bug-sweep-343
+        run: bash tests/test-bug-sweep-343.sh
+
       - name: test-secscan-contract-272
         run: bash tests/test-secscan-contract-272.sh
 

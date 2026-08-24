@@ -325,7 +325,18 @@ def lint_pr(body: str, title: str | None, issue_type: str | None, level: str) ->
             for line in acv.splitlines()
             if line.strip().startswith("|") and "---" not in line
         ]
-        data_rows = [r for r in rows[1:] if len(r) >= 3] if rows else []
+
+        def _is_acv_header(r: list[str]) -> bool:
+            # The canonical header (§5.2). Detected by content, not position,
+            # so a headerless table keeps its first data row.
+            return (
+                len(r) >= 3
+                and r[0].lower() == "criterion"
+                and r[1].lower() == "status"
+                and r[2].lower() == "evidence"
+            )
+
+        data_rows = [r for r in rows if len(r) >= 3 and not _is_acv_header(r)]
         if not data_rows:
             if NO_AC_NOTE_RE.search(acv):
                 findings.append(ok("P03", "explicit no-acceptance-criteria note present (§5.2)"))
@@ -333,7 +344,7 @@ def lint_pr(body: str, title: str | None, issue_type: str | None, level: str) ->
                 findings.append(err("P03", "'## Acceptance Criteria Verification' has no data rows (§5.2)"))
         else:
             bad = [r for r in data_rows if r[1].lower() not in AC_STATUSES]
-            no_evidence = [r for r in data_rows if len(r) < 3 or not r[2]]
+            no_evidence = [r for r in data_rows if not r[2]]
             if bad:
                 findings.append(err("P03", f"AC verification rows with status outside pass/fail/unverified: {len(bad)} (§5.2)"))
             elif no_evidence:
@@ -1147,10 +1158,21 @@ def render(findings: list[Finding], label: str, level: str, quiet: bool) -> int:
 
 
 def read_input(path: str | None) -> str:
-    if path is None or path == "-":
-        return sys.stdin.read()
-    with open(path, encoding="utf-8") as fh:
-        return fh.read()
+    try:
+        if path is None or path == "-":
+            # POSIX Python may configure stdin with surrogateescape, which
+            # silently accepts invalid UTF-8. Decode the byte stream strictly
+            # so file and stdin inputs honor the same error contract.
+            stream = getattr(sys.stdin, "buffer", sys.stdin)
+            raw = stream.read()
+            return raw.decode("utf-8") if isinstance(raw, bytes) else raw
+        with open(path, encoding="utf-8") as fh:
+            return fh.read()
+    except (OSError, UnicodeDecodeError) as exc:
+        # Unreadable input is a usage error, not a lint finding: keep the
+        # documented 0/1/2 exit contract instead of a traceback.
+        print(f"✗ idd-lint: cannot read input {path!r} — {exc}", file=sys.stderr)
+        sys.exit(2)
 
 
 # --- CLI -----------------------------------------------------------------------
