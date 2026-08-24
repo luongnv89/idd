@@ -37,16 +37,29 @@
 #      token must appear in the right block, not merely somewhere in the file.
 #   2. Where a contract is purely normative prose with no machine token, a short
 #      keyword stem any faithful restatement must still contain (`authenticat`,
-#      `mismatch`). Far more reword-tolerant than a full sentence, still red
+#      `interpolat`). Far more reword-tolerant than a full sentence, still red
 #      when the claim is dropped.
 # Never assert a whole English sentence — that is the coupling being removed.
+#
+# POLARITY. Where the contract is a prohibition, a negation, or a condition, the
+# stem MUST come from the polarity-bearing word (`**not**`, `never`, `**no**`,
+# `without`, `only after`, `when … links`) — never from the subject noun. A stem
+# taken from the subject (`mismatch`, `refresh`) survives the claim's own
+# inversion and asserts nothing. For the same reason, never `|`-alternate a
+# polarity-bearing token with a polarity-free one: the weakest branch defines
+# the assertion.
+#
+# HARD WRAP. Prose in this repo is hard-wrapped and the helpers below grep the
+# region line by line, so no single pattern can span a wrapped claim. A claim
+# whose subject and predicate straddle a line break needs `anchor_check_flat`,
+# which joins the region into one line before matching.
 #
 # TEETH. Every helper below fails when the anchor is missing (the contract was
 # deleted) or appears more than once (the region is ambiguous), independently of
 # the pattern. A migrated assertion therefore keeps three failure modes, not one.
 #
-# CALLER CONTRACT. Define pass() and fail() before calling anchor_check or
-# anchor_lacks; they are resolved at call time.
+# CALLER CONTRACT. Define pass() and fail() before calling anchor_check,
+# anchor_check_flat, or anchor_lacks; they are resolved at call time.
 
 # anchor_region FILE ID — print the anchor's region on stdout.
 # Exit 1 when the file is unreadable, or the anchor is absent or not unique.
@@ -113,6 +126,26 @@ anchor_check() {
   else
     fail "$msg"
     printf '      anchor a:%s region lacks: %s\n' "$id" "$pattern"
+  fi
+}
+
+# anchor_check_flat FILE ID REGEX MSG — as anchor_check, but the region's lines
+# are joined into one line separated by single spaces before matching, so a
+# pattern may span hard-wrapped prose.
+anchor_check_flat() {
+  local file="$1" id="$2" pattern="$3" msg="$4" region flat rc=0
+  region="$(anchor_region "$file" "$id")" || rc=$?
+  if [ "$rc" -ne 0 ]; then
+    fail "$msg"
+    printf '      anchor a:%s is missing or not unique in %s\n' "$id" "$file"
+    return 0
+  fi
+  flat="$(printf '%s\n' "$region" | tr '\n' ' ')"
+  if printf '%s\n' "$flat" | grep -qE -- "$pattern"; then
+    pass "$msg"
+  else
+    fail "$msg"
+    printf '      anchor a:%s flattened region lacks: %s\n' "$id" "$pattern"
   fi
 }
 

@@ -132,18 +132,30 @@ invisible in rendered Markdown, never read by a skill at run time — and
 `src/` serves both the source-side and built-side assertions.
 
 - An **anchor region** runs from the anchor line to the line before the next
-  anchor or the next Markdown heading, whichever comes first.
+  anchor or the next Markdown heading, whichever comes first. "Heading" means an
+  ATX heading of *any* level (`^#+ `), so a `####` closes a region just as a
+  `##` does. Headings and anchors inside fenced code blocks do **not** close a
+  region.
 - An **anchor span** (`<start-id>` … `<end-id>`) covers a block that legitimately
   contains sub-headings. Both ids name real sections, so a span replaces the two
   exact heading strings an `awk '/^## A/,/^## B/'` extraction would pin.
 
-Tests source `tests/lib/anchors.bash` and use `anchor_check`, `anchor_lacks`,
-`anchor_present`, and `anchor_span`. Every helper fails when the anchor is
-missing or not unique — so a migrated assertion keeps its teeth even before its
-pattern is considered. Inside a region, assert a **machine token** (identifier,
-config key, command string, placeholder, literal output line) wherever the
-contract has one, and a short keyword stem only where it does not. Never assert
-a whole English sentence.
+Tests source `tests/lib/anchors.bash` and use `anchor_check`,
+`anchor_check_flat`, `anchor_lacks`, `anchor_present`, and `anchor_span`. Every
+helper fails when the anchor is missing or not unique — so a migrated assertion
+keeps its teeth even before its pattern is considered. Inside a region, assert a
+**machine token** (identifier, config key, command string, placeholder, literal
+output line) wherever the contract has one, and a short keyword stem only where
+it does not. Never assert a whole English sentence.
+
+Where the contract is a prohibition, a negation, or a condition, take the stem
+from the polarity-bearing word (`**not**`, `never`, `**no**`, `without`, `only
+after`, `when … links`), never from the subject noun — a subject stem survives
+the claim's own inversion. Never `|`-alternate a polarity-bearing token with a
+polarity-free one; the weakest branch defines the assertion. Prose here is
+hard-wrapped and `anchor_check` greps line by line, so a claim that straddles a
+line break needs `anchor_check_flat`, which joins the region into one line
+before matching.
 
 The library's header is the full convention reference, including the rule that
 its `.bash` extension keeps it out of `git ls-files 'tests/*.sh'`.

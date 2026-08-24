@@ -42,8 +42,8 @@ anchor_check "$PR" ap-resolver-spawn '^BEGIN_UNTRUSTED_issue_payload_\{payload_n
 anchor_check "$PR" ap-resolver-spawn '^END_UNTRUSTED_issue_payload_\{payload_nonce\}$' "payload closing boundary is a complete line"
 anchor_check "$PR" ap-payload-framing 'secrets\.token_hex\(16\)' "nonce is trusted-runtime generated"
 anchor_check "$PR" ap-payload-framing '\*\*not\*\* authenticat' "framing does not claim authentication"
-anchor_check "$PR" ap-payload-framing 'missing or mismatched' "mismatched framing is unusable"
-anchor_check "$PR" ap-payload-framing 'Instructions:.*after the.*(closing|final|last) (delimiter|boundary)|`Instructions:` section starts only after' "instructions follow the closing boundary"
+anchor_check_flat "$PR" ap-payload-framing 'missing or mismatched.*unusable' "mismatched framing is unusable"
+anchor_check_flat "$PR" ap-payload-framing '`Instructions:`.*only after the (last|final) closing (delimiter|boundary)' "instructions follow the closing boundary"
 
 # A malicious static marker in content cannot equal a fresh nonce boundary.
 python3 - <<'PY' && pass "malicious body cannot synthesize the actual nonce boundary" || fail "malicious body forged nonce boundary"
@@ -64,7 +64,7 @@ anchor_check "$PH" ap-capture-canonical 'mode-neutral' "capture is mode-neutral"
 anchor_check "$EX" ap-explicit-retained-records 'explicit_issue_records\[N\]' "explicit-list retains complete issue records"
 anchor_check "$EX" ap-explicit-retained-records '[Bb]efore spawning' "explicit-list captures retained map before analyzer spawn"
 anchor_check "$EX" ap-explicit-retained-records 'complete retained map' "analyzer receives the complete retained map"
-anchor_check "$EX" ap-explicit-retained-records 'without another body read|record-validation' "post-optimization projection does not refetch or revalidate"
+anchor_check "$EX" ap-explicit-retained-records 'without another body read' "post-optimization projection does not refetch or revalidate"
 anchor_check "$EX" ap-explicit-retained-records 'keyed by issue number' "batch payload path is reachable"
 anchor_check "$PH" ap-capture-canonical 'before analyzer spawn' "canonical capture orders explicit-list framing before analyzer"
 anchor_check "$PH" ap-deps-reuse-snapshot '\*\*no\*\* extra GitHub read' "dependency parsing reuses held body"
@@ -126,7 +126,7 @@ assert not (payload.get("284") and payload["284"].get("number") == 285)
 PY
 
 # Review boundary bypasses TTL once, then Step 3 reuses the same refreshed entry.
-anchor_check "$RV" rv-depth-gate-refresh 'links an issue, refresh|refresh it at the review boundary' "review refresh is conditional on a linked issue (#296)"
+anchor_check "$RV" rv-depth-gate-refresh 'links an issue, refresh' "review refresh is conditional on a linked issue (#296)"
 anchor_check "$RV" rv-depth-gate-refresh 'even when `review\.adaptive_depth` is `false`' "review refresh is independent of adaptive depth"
 anchor_lacks "$RV" rv-depth-gate-refresh 'unconditionally' "the stale unconditional claim is gone (#296)"
 lacks "$RV" 'unconditionally' "the stale unconditional claim is gone (#296) (file-wide)"
