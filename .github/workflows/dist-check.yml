@@ -273,6 +273,9 @@ jobs:
       - name: test-autopilot-state-257
         run: bash tests/test-autopilot-state-257.sh
 
+      - name: test-gi-state-cleanup-349
+        run: bash tests/test-gi-state-cleanup-349.sh
+
       - name: test-resolver-borrow-skills-309
         run: bash tests/test-resolver-borrow-skills-309.sh
 

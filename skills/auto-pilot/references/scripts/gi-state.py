@@ -82,6 +82,7 @@ import sys
 import tempfile
 from contextlib import contextmanager
 from datetime import datetime, timezone
+from enum import Enum
 from pathlib import Path
 
 try:
@@ -187,6 +188,20 @@ class InputError(ValueError):
 
 class WriteError(OSError):
     """The write itself failed — the input was fine."""
+
+
+class LaneNormalizationMode(Enum):
+    """Whether lane records are complete persisted values or partial patches."""
+
+    COMPLETE = "complete"
+    PATCH = "patch"
+
+
+class HeartbeatLockMode(Enum):
+    """Whether a heartbeat call must acquire or already owns the lock guard."""
+
+    ACQUIRE_GUARD = "acquire_guard"
+    GUARD_HELD = "guard_held"
 
 
 def _now() -> str:
@@ -372,6 +387,34 @@ def _check_int_list(record: dict, key: str) -> None:
         raise InputError(f"{key} must be a list of integers")
 
 
+def _normalize_record_fields(
+    value: dict,
+    out: dict[str, object],
+    *,
+    context: str,
+) -> None:
+    """Copy and validate the phase, branch, and title shared by run records."""
+    for key in ("title", "branch", "phase"):
+        if key not in value:
+            continue
+        if value[key] is not None and not isinstance(value[key], str):
+            raise InputError(f"{context}.{key} must be a string or null")
+        out[key] = value[key]
+
+    phase = out.get("phase")
+    if isinstance(phase, str) and not PHASE_RE.match(phase):
+        raise InputError(f"{context}.phase '{phase}' is not a phase name")
+    branch = out.get("branch")
+    if isinstance(branch, str) and not BRANCH_RE.match(branch):
+        raise InputError(
+            f"{context}.branch '{branch}' is not a conventional branch "
+            "name (see the naming-conventions reference)"
+        )
+    title = out.get("title")
+    if isinstance(title, str) and len(title) > TITLE_MAX:
+        out["title"] = title[:TITLE_MAX]
+
+
 def _normalize_current(value: object) -> dict[str, object] | None:
     if value is None:
         return None
@@ -386,29 +429,26 @@ def _normalize_current(value: object) -> dict[str, object] | None:
             if not _is_int(value[key]):
                 raise InputError(f"current.{key} must be an integer or null")
         out[key] = value.get(key)
-    for key in ("title", "branch", "phase", "outcome", "started_at"):
+    _normalize_record_fields(value, out, context="current")
+    for key in ("title", "branch", "phase"):
+        out.setdefault(key, None)
+    for key in ("outcome", "started_at"):
         if key in value and value[key] is not None:
             if not isinstance(value[key], str):
                 raise InputError(f"current.{key} must be a string or null")
         out[key] = value.get(key)
-    if isinstance(out.get("phase"), str) and not PHASE_RE.match(out["phase"]):
-        raise InputError(f"current.phase '{out['phase']}' is not a phase name")
-    if isinstance(out.get("branch"), str) and not BRANCH_RE.match(out["branch"]):
-        # The one recorded field a later step puts in a shell word. Refusing the
-        # write is what keeps `gh pr list --head "…"` from running `$(…)`.
-        raise InputError(
-            f"current.branch '{out['branch']}' is not a conventional branch "
-            "name (see the naming-conventions reference)"
-        )
     # `title` and `outcome` are display-only — they are truncated and escaped
     # into JSON, never interpolated into a command — so they stay unconstrained.
-    title = out.get("title")
-    if isinstance(title, str) and len(title) > TITLE_MAX:
-        out["title"] = title[:TITLE_MAX]
     return {key: out[key] for key in sorted(out)}
 
 
-def _normalize_lane(value: object, *, partial: bool = False) -> dict[str, object]:
+def _normalize_lane(
+    value: object,
+    *,
+    mode: LaneNormalizationMode = LaneNormalizationMode.COMPLETE,
+) -> dict[str, object]:
+    if not isinstance(mode, LaneNormalizationMode):
+        raise InputError("lane normalization mode is invalid")
     if not isinstance(value, dict):
         raise InputError("each lanes entry must be an object")
     unknown = sorted(set(value) - LANE_KEYS)
@@ -422,14 +462,12 @@ def _normalize_lane(value: object, *, partial: bool = False) -> dict[str, object
         if value["pr"] is not None and not _is_int(value["pr"]):
             raise InputError("lanes.pr must be an integer or null")
         out["pr"] = value["pr"]
+    _normalize_record_fields(value, out, context="lanes")
     for key in (
-        "title",
         "lane_id",
-        "branch",
         "worktree_path",
         "base_sha",
         "event_id",
-        "phase",
         "outcome",
         "started_at",
     ):
@@ -438,13 +476,6 @@ def _normalize_lane(value: object, *, partial: bool = False) -> dict[str, object
         if value[key] is not None and not isinstance(value[key], str):
             raise InputError(f"lanes.{key} must be a string or null")
         out[key] = value[key]
-    if isinstance(out.get("phase"), str) and not PHASE_RE.match(out["phase"]):
-        raise InputError(f"lanes.phase '{out['phase']}' is not a phase name")
-    if isinstance(out.get("branch"), str) and not BRANCH_RE.match(out["branch"]):
-        raise InputError(
-            f"lanes.branch '{out['branch']}' is not a conventional branch "
-            "name (see the naming-conventions reference)"
-        )
     for key in ("lane_id", "event_id"):
         if isinstance(out.get(key), str) and not LANE_ID_RE.match(out[key]):
             raise InputError(f"lanes.{key} '{out[key]}' is not a safe identifier")
@@ -456,27 +487,28 @@ def _normalize_lane(value: object, *, partial: bool = False) -> dict[str, object
             raise InputError("lanes.worktree_path must be a canonical absolute path")
         if str(Path(path)) != path:
             raise InputError("lanes.worktree_path must be normalized")
-    title = out.get("title")
-    if isinstance(title, str) and len(title) > TITLE_MAX:
-        out["title"] = title[:TITLE_MAX]
     if "telemetry" in value:
         if value["telemetry"] is not None and not isinstance(value["telemetry"], dict):
             raise InputError("lanes.telemetry must be an object or null")
         out["telemetry"] = value["telemetry"]
-    if not partial:
+    if mode is LaneNormalizationMode.COMPLETE:
         # Full records may omit every optional field. Keeping absent fields
         # absent makes a v1 singleton state and a v1+lanes state coexist.
         return {key: out[key] for key in sorted(out)}
     return out
 
 
-def _normalize_lanes(value: object, *, partial: bool = False) -> list[dict[str, object]]:
+def _normalize_lanes(
+    value: object,
+    *,
+    mode: LaneNormalizationMode = LaneNormalizationMode.COMPLETE,
+) -> list[dict[str, object]]:
     if not isinstance(value, list):
         raise InputError("lanes must be a list of objects")
     out = []
     seen = set()
     for entry in value:
-        lane = _normalize_lane(entry, partial=partial)
+        lane = _normalize_lane(entry, mode=mode)
         if lane["issue"] in seen:
             raise InputError(f"lanes contains duplicate issue {lane['issue']}")
         seen.add(lane["issue"])
@@ -634,7 +666,9 @@ def merge_patch(
             out[key] = patch[key]
 
     if "lanes" in patch:
-        incoming_lanes = _normalize_lanes(patch["lanes"], partial=True)
+        incoming_lanes = _normalize_lanes(
+            patch["lanes"], mode=LaneNormalizationMode.PATCH
+        )
         if not incoming_lanes:
             out["lanes"] = []
         else:
@@ -955,7 +989,7 @@ def _touch_lock_heartbeat(
     run_id: object,
     pid: int | None = None,
     *,
-    _lock_held: bool = False,
+    lock_mode: HeartbeatLockMode = HeartbeatLockMode.ACQUIRE_GUARD,
 ) -> None:
     """Refresh this run's lock timestamp so a long run never ages itself out.
 
@@ -968,6 +1002,8 @@ def _touch_lock_heartbeat(
     directory guard is held, so a replacement cannot be overwritten by this
     stale heartbeat.
     """
+    if not isinstance(lock_mode, HeartbeatLockMode):
+        raise InputError("heartbeat lock mode is invalid")
     if not _pid_known(pid):
         return
 
@@ -985,7 +1021,7 @@ def _touch_lock_heartbeat(
         _atomic_write(lock_path, _render_json(parsed))
 
     try:
-        if _lock_held:
+        if lock_mode is HeartbeatLockMode.GUARD_HELD:
             refresh()
         else:
             with _lock_guard(lock_path):
@@ -1069,123 +1105,107 @@ def run_lock(args, paths) -> int:
         return _run_lock_locked(args, paths)
 
 
-def _run_lock_locked(args, paths) -> int:
-    # A plain `--lock` starts a *new* run, so it mints a new id even when a
-    # previous run left its state file behind: adopting that id would give two
-    # unrelated runs one id in both the report marker and `runs.jsonl`. Only
-    # `--lock --resume` — the caller saying "I am continuing the recorded run" —
-    # takes the id off disk. `--init` then adopts whichever id this lock holds,
-    # so the documented lock → init → unlock sequence stays one run either way.
+def _prepare_lock_attempt(args, paths) -> tuple[object, str | None, str, dict]:
+    """Read the lock and derive the screened identity for one lock attempt."""
     existing, error = _read_json_file(paths["lock"])
-    own_lock = args.resume and error is None and _pid_owns(existing, args.pid)
+    owned_by_pid = args.resume and error is None and _pid_owns(existing, args.pid)
     run_id = args.run_id or (
         (_resolve_run_id(args, paths) if args.resume else None)
-        # A resume that finds no recorded id but does find a lock this very
-        # process owns adopts the lock's id: the interrupted run died before
-        # `--init` ever wrote a state, and minting a second id here would orphan
-        # the lock this run is holding — the id would then disagree with the
-        # `--unlock` that ends the run. Screened like every other disk-sourced
-        # id: a lock carrying a non-string id falls through to a fresh one
-        # (and so to the ordinary held/reclaim paths), never to a crash.
-        or (_screen_run_id(existing.get("run_id")) if own_lock else None)
+        or (
+            _screen_run_id(existing.get("run_id"))
+            if owned_by_pid and isinstance(existing, dict)
+            else None
+        )
         or _new_run_id()
     )
     if not RUN_ID_RE.match(run_id):
         raise InputError(f"run_id '{run_id}' is not a valid run id")
-    payload = _lock_payload(run_id, args.pid)
+    return existing, error, run_id, _lock_payload(run_id, args.pid)
 
-    if own_lock and _owns_lock(existing, run_id, args.pid):
-        # A genuine `--resume` usually finds its OWN lock still there and still
-        # live: what was interrupted is the loop, inside an agent process that
-        # is itself alive, so the owner pid recorded in that lock is the very
-        # pid this call passes. Refusing it would deny a run its own lock and
-        # make `--resume` unusable in the common case. Re-acquiring is a
-        # heartbeat refresh, not a reclaim: the file is never taken out of the
-        # way, so no window opens for a third run.
-        if args.dry_run:
-            _emit({"dry_run": True, "status": "would_reacquire", "lock": existing})
-            return 0
-        _touch_lock_heartbeat(
-            paths["lock"], run_id, pid=args.pid, _lock_held=True
-        )
-        refreshed, _ = _read_json_file(paths["lock"])
-        # The heartbeat is a best-effort write. A concurrent TTL reclaim or
-        # `--lock --force` in that window can replace the file; reporting
-        # `reacquired` from the re-read without re-checking ownership would
-        # publish someone else's lock as this run's success.
-        if not _owns_lock(refreshed, run_id, args.pid):
-            holder, status, _ = _classify_lock(args, paths)
-            if not holder and isinstance(refreshed, dict):
-                holder = refreshed
-            return _emit_held(holder, status)
-        _emit({"status": "reacquired", "lock": refreshed})
+
+def _try_reacquire(args, paths, existing: object, run_id: str) -> int:
+    """Refresh and verify a resume request that still owns its live lock."""
+    if args.dry_run:
+        _emit({"dry_run": True, "status": "would_reacquire", "lock": existing})
         return 0
-
-    if existing is not None or error is not None:
-        holder, status, observed = _classify_lock(args, paths)
-        if not status["stale"] and not args.force:
-            return _emit_held(holder, status)
-        if args.dry_run:
-            _emit(
-                {
-                    "dry_run": True,
-                    "status": "would_reclaim",
-                    "holder": holder,
-                    "lock": payload,
-                    **status,
-                }
-            )
-            return 0
-        # Reclaiming is not a plain write. `_atomic_write` here would let two
-        # runs that both classified the same stale lock both "win", because
-        # os.replace never refuses an existing file: retire the exact lock this
-        # run classified, then create the replacement with O_CREAT|O_EXCL, and
-        # re-classify whenever either step loses the race.
-        for _ in range(RECLAIM_ATTEMPTS):
-            if not status["stale"] and not args.force:
-                break
-            if _retire_lock(paths["lock"], observed) != "changed":
-                if _create_lock_exclusive(paths["lock"], payload):
-                    print(
-                        f"⚠ gi-state: reclaimed a "
-                        f"{status['stale_reason'] or 'forced'} lock from run "
-                        f"{holder.get('run_id')}",
-                        file=sys.stderr,
-                    )
-                    _emit(
-                        {
-                            "status": "reclaimed",
-                            "previous": holder,
-                            "lock": payload,
-                            **status,
-                        }
-                    )
-                    return 0
-            holder, status, current = _classify_lock(args, paths)
-            if current != observed:
-                # A *different* lock is at the path now. This invocation
-                # classified the one it was asked to reclaim, and a stale
-                # verdict about that file says nothing about this one, so it
-                # stops instead of reclaiming on somebody else's evidence. At
-                # the default TTL that leaves exactly one winner: the run that
-                # published the replacement. At `--ttl 0`, where every lock is
-                # stale the instant it is written, contended reclaimers can all
-                # stop and the round has *no* winner — the fail-safe direction,
-                # and no shipped prose passes `--ttl`.
-                break
+    _touch_lock_heartbeat(
+        paths["lock"],
+        run_id,
+        pid=args.pid,
+        lock_mode=HeartbeatLockMode.GUARD_HELD,
+    )
+    refreshed, _ = _read_json_file(paths["lock"])
+    if not _owns_lock(refreshed, run_id, args.pid):
+        holder, status, _ = _classify_lock(args, paths)
+        if not holder and isinstance(refreshed, dict):
+            holder = refreshed
         return _emit_held(holder, status)
+    _emit({"status": "reacquired", "lock": refreshed})
+    return 0
 
+
+def _emit_reclaimed(holder: dict, status: dict, payload: dict) -> int:
+    reason = status["stale_reason"] or "forced"
+    print(
+        f"⚠ gi-state: reclaimed a {reason} lock from run {holder.get('run_id')}",
+        file=sys.stderr,
+    )
+    _emit({"status": "reclaimed", "previous": holder, "lock": payload, **status})
+    return 0
+
+
+def _try_reclaim(args, paths, payload: dict) -> int:
+    """Reclaim only the stale lock identity this invocation classified."""
+    holder, status, observed = _classify_lock(args, paths)
+    if not status["stale"] and not args.force:
+        return _emit_held(holder, status)
+    if args.dry_run:
+        _emit(
+            {
+                "dry_run": True,
+                "status": "would_reclaim",
+                "holder": holder,
+                "lock": payload,
+                **status,
+            }
+        )
+        return 0
+    for _ in range(RECLAIM_ATTEMPTS):
+        if not status["stale"] and not args.force:
+            break
+        retired = _retire_lock(paths["lock"], observed)
+        if retired != "changed" and _create_lock_exclusive(paths["lock"], payload):
+            return _emit_reclaimed(holder, status, payload)
+        holder, status, current = _classify_lock(args, paths)
+        if current != observed:
+            # A stale verdict about the old lock says nothing about this one.
+            break
+    return _emit_held(holder, status)
+
+
+def _acquire_fresh(args, paths, payload: dict) -> int:
+    """Publish a fresh lock, refusing a concurrent winner."""
     if args.dry_run:
         _emit({"dry_run": True, "status": "would_acquire", "lock": payload})
         return 0
     if not _create_lock_exclusive(paths["lock"], payload):
-        # Another process won the race between the read above and this create.
         existing, _ = _read_json_file(paths["lock"])
         print("✗ gi-state: the run lock was taken concurrently", file=sys.stderr)
-        _emit({"status": "held", "holder": existing if isinstance(existing, dict) else {}})
+        holder = existing if isinstance(existing, dict) else {}
+        _emit({"status": "held", "holder": holder})
         return 3
     _emit({"status": "acquired", "lock": payload})
     return 0
+
+
+def _run_lock_locked(args, paths) -> int:
+    """Dispatch a lock request to reacquire, reclaim, or fresh-acquire."""
+    existing, error, run_id, payload = _prepare_lock_attempt(args, paths)
+    if args.resume and _owns_lock(existing, run_id, args.pid):
+        return _try_reacquire(args, paths, existing, run_id)
+    if existing is not None or error is not None:
+        return _try_reclaim(args, paths, payload)
+    return _acquire_fresh(args, paths, payload)
 
 
 def run_unlock(args, paths) -> int:

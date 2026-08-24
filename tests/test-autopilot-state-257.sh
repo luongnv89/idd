@@ -567,8 +567,8 @@ stolen = {
 }
 orig = mod._touch_lock_heartbeat
 
-def steal(lock_path, run_id, pid=None, _lock_held=False):
-    orig(lock_path, run_id, pid=pid, _lock_held=_lock_held)
+def steal(lock_path, run_id, pid=None, lock_mode=mod.HeartbeatLockMode.ACQUIRE_GUARD):
+    orig(lock_path, run_id, pid=pid, lock_mode=lock_mode)
     Path(lock_path).write_text(json.dumps(stolen) + "\n", encoding="utf-8")
 
 mod._touch_lock_heartbeat = steal
