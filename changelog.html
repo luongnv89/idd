@@ -12,6 +12,7 @@
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
   <style>
@@ -199,6 +200,15 @@
       background: linear-gradient(90deg, var(--line-soft) 25%, var(--line) 50%, var(--line-soft) 75%);
       background-size: 200% 100%; animation: shimmer 1.5s infinite;
     }
+    /* F-UX-003: revealed only by the no-script stylesheet at the end of head. */
+    .cl-noscript {
+      display: none;
+      border: 1px solid var(--line-soft); border-radius: var(--radius);
+      padding: 24px 28px; background: var(--panel); max-width: 800px; margin: 0 auto;
+    }
+    .cl-noscript h2 { font-size: 1.1rem; margin: 0 0 8px; }
+    .cl-noscript p { color: var(--fg-muted); margin: 0 0 14px; }
+    .cl-noscript a { color: var(--green); text-decoration: underline; }
     .tl-skeleton .shimmer-sm { width: 60%; }
     .tl-skeleton .shimmer-lg { width: 90%; }
     @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
@@ -223,6 +233,19 @@
     .foot-links a:hover { color: var(--green); }
     .foot-note { font-family: var(--mono); font-size: 12.5px; color: var(--fg-dim); }
   </style>
+  <!-- F-UX-003: the timeline and the three API-derived stats only ever fill in
+       from script. Without scripting the skeletons would shimmer forever and
+       the stats would sit at "—", so hide both and reveal the in-body fallback
+       instead. This must sit AFTER the main stylesheet above: the selectors have
+       the same specificity, so source order is what decides. An inline
+       stylesheet is already permitted by the CSP at the top of this file. -->
+  <noscript>
+    <style>
+      .tl-skeleton { display: none; }
+      .changelog-stats { display: none; }
+      .cl-noscript { display: block; }
+    </style>
+  </noscript>
 </head>
 <body>
 
@@ -280,6 +303,22 @@
         <div class="tl-skeleton"><div class="shimmer shimmer-lg"></div><div class="shimmer"></div></div>
         <div class="tl-skeleton"><div class="shimmer shimmer-sm"></div><div class="shimmer"></div></div>
       </div>
+
+      <noscript>
+        <div class="cl-noscript">
+          <h2>The release timeline needs JavaScript</h2>
+          <p>
+            This page builds its timeline from the GitHub Releases API at load
+            time. With JavaScript off, the full history is still available as
+            plain text — every release, with the same entries.
+          </p>
+          <p>
+            <a href="https://github.com/luongnv89/idd/blob/main/CHANGELOG.md">Read CHANGELOG.md on GitHub</a>
+            &nbsp;·&nbsp;
+            <a href="https://github.com/luongnv89/idd/releases">Browse the releases</a>
+          </p>
+        </div>
+      </noscript>
     </div>
   </main>
 
@@ -426,17 +465,36 @@
         return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
       }
 
-      // Fetch releases from GitHub API
-      Promise.all([
-        fetch(repoApi + '/releases?per_page=100').then(function (r) { return r.json(); }),
-        fetch(repoApi).then(function (r) { return r.json(); })
-      ]).then(function (data) {
-        var releases = data[0];
-        var repo = data[1];
+      // F-UX-008: the commit count is read from the Commits API, never
+      // estimated. `per_page=1` makes GitHub paginate one commit per page, so
+      // the `rel="last"` page number IS the commit total — one cheap request.
+      // If the count cannot be established the stat keeps its "—" placeholder;
+      // it is never filled with a guess.
+      (function () {
+        fetch(repoApi + '/commits?per_page=1')
+          .then(function (res) {
+            if (!res || !res.ok) { throw new Error('commits request failed'); }
+            var link = (res.headers && typeof res.headers.get === 'function') ? res.headers.get('Link') : null;
+            var last = link ? /[?&]page=(\d+)>;\s*rel="last"/.exec(link) : null;
+            if (last) { return parseInt(last[1], 10); }
+            // No pagination header means the whole history fits on one page.
+            return res.json().then(function (rows) {
+              return Array.isArray(rows) ? rows.length : NaN;
+            });
+          })
+          .then(function (total) {
+            if (typeof total !== 'number' || !isFinite(total) || total <= 0) { return; }
+            commitsEl.textContent = new Intl.NumberFormat('en').format(total);
+          })
+          .catch(function () { /* leave the "—" placeholder — no fabricated number */ });
+      }());
 
+      // Fetch releases from GitHub API
+      fetch(repoApi + '/releases?per_page=100').then(function (r) {
+        return r.json();
+      }).then(function (releases) {
         // Stats
         releasesEl.textContent = releases.length;
-        commitsEl.textContent = new Intl.NumberFormat('en').format(repo.forks_count * 10 + releases.length * 12);
         var firstDate = new Date('2026-03-21T00:00:00Z');
         var now = new Date();
         daysEl.textContent = Math.round((now - firstDate) / 86400000);
@@ -460,7 +518,6 @@
         // Fallback: use known data (already newest-first)
         releasesEl.textContent = knownReleases.length;
         daysEl.textContent = Math.round((new Date() - new Date('2026-03-21T00:00:00Z')) / 86400000);
-        commitsEl.textContent = '~160';
         renderTimeline(knownReleases);
       });
     }());

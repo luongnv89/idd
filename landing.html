@@ -4,6 +4,11 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self'; connect-src https://api.github.com" />
+  <!-- F-UX-001: scroll-reveal hiding is gated on this class, so a JS-less
+       browser never runs it and every .reveal block stays visible. Runs in
+       <head> (parser-blocking) so the class is set before the body paints.
+       Inline script is already permitted by the CSP above. -->
+  <script>document.documentElement.classList.add('js');</script>
   <title>issuedev — GitHub Issue Workflow for AI Coding Agents</title>
   <meta name="description" content="Issue-Driven Development for GitHub: turn issues into agent-ready work orders. Eight terminal commands structure, triage, resolve, and review — shipping tested PRs." />
   <link rel="canonical" href="https://luongnv.com/idd/" />
@@ -552,6 +557,9 @@
       background: transparent; cursor: pointer; transition: all .15s; flex-shrink: 0;
     }
     .copy-btn:hover { color: var(--green); border-color: rgba(0,255,65,0.35); }
+    /* F-UX-011: the copy button reports both outcomes, never fails silently. */
+    .copy-btn.copy-ok { color: var(--green); border-color: rgba(0,255,65,0.45); }
+    .copy-btn.copy-error { color: #ff8a80; border-color: rgba(255,138,128,0.5); }
 
     /* ── FAQ ── */
     .faq { max-width: 800px; margin: 50px auto 0; }
@@ -597,13 +605,15 @@
     .foot-note { font-family: var(--mono); font-size: 12.5px; color: var(--fg-dim); }
 
     /* reveal — marketing scroll-in; >300ms is fine here (not a UI interaction).
-       Stagger sibling cards via --i (30–80ms steps, Emil Kowalski). */
-    .reveal {
+       Stagger sibling cards via --i (30–80ms steps, Emil Kowalski).
+       Gated on .js (set by the head script): the observer that adds .in only
+       runs with scripting on, so without it nothing may be hidden. */
+    .js .reveal {
       opacity: 0; transform: translateY(22px);
       transition: opacity .6s var(--ease-out), transform .6s var(--ease-out);
       transition-delay: calc(var(--i, 0) * 55ms);
     }
-    .reveal.in { opacity: 1; transform: none; }
+    .js .reveal.in { opacity: 1; transform: none; }
 
     .copy-btn:active, .nav-cta:active { transform: scale(0.97); }
 
@@ -617,7 +627,7 @@
         transition-duration: 0.01ms !important;
         scroll-behavior: auto !important;
       }
-      .reveal { opacity: 1; transform: none; transition-delay: 0ms; }
+      .js .reveal { opacity: 1; transform: none; transition-delay: 0ms; }
       .btn:active, .btn-primary:active, .copy-btn:active, .nav-cta:active,
       .feat-card:hover, .agent-card:hover, .agent-card:hover .agent-icon { transform: none; }
       .eyebrow .dot, .cursor { animation: none; }
@@ -1212,13 +1222,37 @@
       go(0);
     }());
 
-    // Copy buttons
+    // Copy buttons — F-UX-011: clipboard writes can be blocked (insecure
+    // origin, permission denied, no Clipboard API at all). Every one of those
+    // paths surfaces a visible error state instead of doing nothing.
     document.querySelectorAll('.copy-btn').forEach(function (btn) {
+      var label = btn.textContent;
+      var timer = null;
+
+      function flash(text, cls, ms) {
+        if (timer) { clearTimeout(timer); }
+        btn.textContent = text;
+        btn.classList.remove('copy-ok');
+        btn.classList.remove('copy-error');
+        btn.classList.add(cls);
+        timer = setTimeout(function () {
+          btn.textContent = label;
+          btn.classList.remove(cls);
+          timer = null;
+        }, ms);
+      }
+
+      function copied() { flash('✓ copied', 'copy-ok', 1400); }
+      function failed() { flash('✗ copy blocked — select and press ⌘/Ctrl+C', 'copy-error', 3200); }
+
       btn.addEventListener('click', function () {
-        navigator.clipboard.writeText(btn.dataset.copy).then(function () {
-          var t = btn.textContent; btn.textContent = '✓ copied';
-          setTimeout(function () { btn.textContent = t; }, 1400);
-        });
+        var write;
+        try {
+          if (!navigator.clipboard || !navigator.clipboard.writeText) { failed(); return; }
+          write = navigator.clipboard.writeText(btn.dataset.copy);
+        } catch (err) { failed(); return; }
+        if (!write || typeof write.then !== 'function') { failed(); return; }
+        write.then(copied).catch(failed);
       });
     });
 
