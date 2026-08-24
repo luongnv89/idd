@@ -10,6 +10,7 @@ from .closure import _scan_logical_refs
 from .common import (
     CONFIG_SCHEMA_DOC,
     CONFIG_SECTIONS_ALWAYS,
+    DOC_DIGEST_EXPECTED_BYTES,
     DOC_DIGEST_OPTIONAL_SECTIONS,
     DOC_SECTION_DIGESTS,
     FULL_CONFIG_SCHEMA_SKILLS,
@@ -54,6 +55,21 @@ def _section_names(heading: str, block: str) -> set[str]:
     return {heading} | set(re.findall(r"^### (.+?)\s*$", block, re.MULTILINE))
 
 
+def _check_doc_digest_size(name: str, source: str, digest: str) -> None:
+    """Fail when a measured digest footprint drifts from its reviewed budget."""
+    expected = DOC_DIGEST_EXPECTED_BYTES.get(name)
+    if expected is None:
+        return
+    measured = (len(source.encode("utf-8")), len(digest.encode("utf-8")))
+    if measured != expected:
+        _abort(
+            f"docs/{name} digest byte-size drift: expected source={expected[0]} "
+            f"bytes and digest={expected[1]} bytes; measured source={measured[0]} "
+            f"bytes and digest={measured[1]} bytes. Review the digest and update "
+            "DOC_DIGEST_EXPECTED_BYTES."
+        )
+
+
 def _doc_digest(name: str, text: str, skill_root: Path) -> str:
     """Emit the per-skill digest of a document listed in DOC_SECTION_DIGESTS."""
     keep = DOC_SECTION_DIGESTS[name]
@@ -82,13 +98,15 @@ def _doc_digest(name: str, text: str, skill_root: Path) -> str:
     body = "\n".join(
         block.rstrip("\n") + "\n" for heading, block in sections if heading in kept
     )
-    return (
+    digest = (
         preamble.rstrip("\n")
         + "\n\n"
         + _DIGEST_NOTICE.format(name=name)
         + "\n"
         + body
     )
+    _check_doc_digest_size(name, text, digest)
+    return digest
 
 
 def _shared_doc_headings(repo_root: Path, name: str) -> frozenset[str]:
