@@ -508,6 +508,22 @@ def load_issue_file(path: str, limit: int) -> tuple[list[ScoreTarget], bool]:
     return issues[:limit], len(issues) > limit
 
 
+def _parse_gh_json(raw: str) -> object:
+    """Parse JSON from gh stdout, skipping leading non-JSON banner lines.
+
+    Shells that decorate captured output (for example mise) prepend a line
+    that is not JSON. ``json.loads`` skips whitespace but not those lines, so
+    a valid issue list after a banner would otherwise be rejected as
+    unparsable. Exit 4 stays reserved for output that still has no JSON.
+    """
+    lines = raw.splitlines(keepends=True)
+    for index, line in enumerate(lines):
+        stripped = line.lstrip()
+        if stripped[:1] in "{[":
+            return json.loads("".join(lines[index:]))
+    raise json.JSONDecodeError("Expecting value", raw, 0)
+
+
 def _gh_issue_list(limit: int, repo: str | None, fields: str) -> list[ScoreTarget]:
     command = ["issue", "list", "--state", "open", "--json", fields, "--limit", str(limit)]
     if repo:
@@ -517,7 +533,7 @@ def _gh_issue_list(limit: int, repo: str | None, fields: str) -> list[ScoreTarge
         detail = result.stderr.strip().splitlines()
         raise Unavailable("gh issue list failed: " + (detail[-1] if detail else f"exit {result.returncode}"))
     try:
-        value = json.loads(result.stdout)
+        value = _parse_gh_json(result.stdout)
     except json.JSONDecodeError as exc:
         raise Unavailable(f"gh printed unparsable JSON — {exc.msg}") from exc
     if not isinstance(value, list):
