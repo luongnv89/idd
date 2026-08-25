@@ -11,6 +11,13 @@
 #        than being omitted, guessed, or reported as zero.
 #   AC6: shape and labels are consistent across skills.
 #
+# SUPERSEDED IN PART by issue #410: AC3 and AC5 bind `elapsed` and `agents`
+# only. `tokens` is conditional — printed where the host reports a figure, left
+# out of the line where it does not, because a host-agnostic skill cannot
+# obtain a real count without the subprocess/summarization pass the contract's
+# own Overhead section forbids. A permanent `tokens n/a` is the bug #410 fixed,
+# so this suite now forbids that string in the contract.
+#
 # AC6 is enforced structurally: references/run-stats.md is byte-identical in
 # every skill, so "consistent across skills" is a checksum, not a promise. The
 # contract lives per skill rather than in docs/terminal-style.md because that
@@ -111,8 +118,8 @@ check_has  "$SPEC" '^\| .elapsed. \|' "AC3: elapsed is a defined field"
 check_has  "$SPEC" '^\| .tokens. \|'  "AC3: tokens is a defined field"
 check_has  "$SPEC" '^\| .agents. \|'  "AC6: agents is a defined field"
 check_flow "$SPEC" 'Fixed, in this order' "AC6: field order is pinned"
-check_flow "$SPEC" 'No skill adds, drops, or renames one' \
-  "AC6: per-skill field drift is forbidden"
+check_flow "$SPEC" 'No skill adds, reorders, or renames one' \
+  "AC6: adding, reordering, or renaming a field is forbidden"
 check_flow "$SPEC" 'byte-identical in every skill' \
   "AC6: the contract states its own byte-identity rule"
 check_flow "$SPEC" 'the leading unit is unpadded and every unit after it is zero-padded' \
@@ -127,15 +134,29 @@ check_has  "$SPEC" '^## Unavailable values' "AC5: the contract has an Unavailabl
 check_flow "$SPEC" 'prints the literal .n/a. — never a guess' \
   "AC5: undeterminable metrics print the literal n/a"
 check_flow "$SPEC" 'never an omitted field, never .0.' \
-  "AC5: n/a is required instead of omitting or zeroing"
-check_flow "$SPEC" 'tokens n/a. is the expected reading' \
-  "AC5: tokens default to n/a — a skill has no token counter of its own"
+  "AC5: elapsed and agents require n/a instead of omitting or zeroing"
+check_flow "$SPEC" '.elapsed. and .agents. are unconditional' \
+  "AC5: the n/a rule is scoped to the unconditional fields"
 check_flow "$SPEC" 'Never estimate from output length' \
   "AC5: guessing a token count is forbidden"
 check_flow "$SPEC" 'is a \*\*determined\*\* value' \
   "AC5: a true zero is still reported as 0, not n/a"
 check_flow "$SPEC" 'between .nothing happened. and .we do not know.' \
   "AC5: the 0-vs-n/a distinction is stated, not implied"
+echo ""
+
+# ── #410: tokens is conditional, never a permanent n/a ──────────────────────
+echo "  #410 — tokens is a conditional field"
+check_lacks "$SPEC" 'tokens n/a' \
+  "#410/AC1: the contract never shows tokens as a permanent n/a"
+check_has  "$SPEC" 'Run stats   elapsed [^·]* · agents ' \
+  "#410/AC3: the omitted rendering is shown as canonical"
+check_flow "$SPEC" 'the field is left out, not marked' \
+  "#410/AC3: an unreported token count omits the field rather than marking it"
+check_flow "$SPEC" 'If you would have to go and find it' \
+  "#410/AC2: what counts as a reported figure is a stated decision procedure"
+check_flow "$SPEC" 'never read the host.s transcript, session files, or logs' \
+  "#410: reconstructing a count from host internals is forbidden"
 echo ""
 
 # ── AC2: bound to every terminal outcome, not just the happy path ───────────
