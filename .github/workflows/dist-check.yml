@@ -142,6 +142,11 @@ jobs:
       - name: test-webpage-ux-correctness-359
         run: bash tests/test-webpage-ux-correctness-359.sh
 
+      # F-UX-002/006/007/009/012 (issue #360): mobile disclosure nav, WCAG AA
+      # contrast, scroll-padding-top, 44px touch targets, table overflow.
+      - name: test-webpage-ux-a11y-360
+        run: bash tests/test-webpage-ux-a11y-360.sh
+
       # F-UX-004/005/010 (issue #361): docs install/asm, docs CTA target,
       # first-use glossary, single on-page brand.
       - name: test-webpage-ux-clarity-361
