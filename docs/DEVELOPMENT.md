@@ -6,6 +6,17 @@
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) or any SKILL.md-compatible agent
 - Git 2.30+
 
+## Dependencies
+
+No third-party package manifest (no `package.json`, `requirements.txt`,
+`pyproject.toml`, or lockfile). Python under `src/shared/scripts/` and
+`scripts/` is stdlib-only. `gi-config.py` may import PyYAML if the interpreter
+already has it; that is optional and undeclared — the vendored restricted YAML
+parser is the always-available path.
+
+Reconfirmed at epic #363 close (P2 Modernize). `MODERNIZATION_PLAN.md` and
+`MODERNIZATION_REPORT.md` were never committed; the tracker is issue #363.
+
 ## Local Setup
 
 1. Clone the repository:
