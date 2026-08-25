@@ -142,6 +142,11 @@ jobs:
       - name: test-webpage-ux-correctness-359
         run: bash tests/test-webpage-ux-correctness-359.sh
 
+      # F-UX-004/005/010 (issue #361): docs install/asm, docs CTA target,
+      # first-use glossary, single on-page brand.
+      - name: test-webpage-ux-clarity-361
+        run: bash tests/test-webpage-ux-clarity-361.sh
+
       - name: test-model-suggestion-124
         run: bash tests/test-model-suggestion-124.sh
 

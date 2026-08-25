@@ -9,29 +9,29 @@
        <head> (parser-blocking) so the class is set before the body paints.
        Inline script is already permitted by the CSP above. -->
   <script>document.documentElement.classList.add('js');</script>
-  <title>issuedev — GitHub Issue Workflow for AI Coding Agents</title>
-  <meta name="description" content="Issue-Driven Development for GitHub: turn issues into agent-ready work orders. Eight terminal commands structure, triage, resolve, and review — shipping tested PRs." />
+  <title>gitissue — GitHub Issue Workflow for AI Coding Agents</title>
+  <meta name="description" content="Issue-Driven Development (IDD) for GitHub: turn issues into agent-ready work orders. Eight terminal commands structure, triage, resolve, and review — shipping tested PRs." />
   <link rel="canonical" href="https://luongnv.com/idd/" />
   <link rel="icon" type="image/svg+xml" href="assets/logo/favicon.svg" />
   <meta name="theme-color" content="#0A0A0A" />
 
   <!-- Open Graph -->
-  <meta property="og:title" content="issuedev — GitHub Issue Workflow for AI Coding Agents" />
+  <meta property="og:title" content="gitissue — GitHub Issue Workflow for AI Coding Agents" />
   <meta property="og:description" content="Turn issues into agent-ready work orders — eight terminal commands that structure, triage, resolve, and review." />
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://luongnv.com/idd/" />
-  <meta property="og:site_name" content="issuedev" />
+  <meta property="og:site_name" content="gitissue" />
   <meta property="og:image" content="https://luongnv.com/idd/assets/og/og-card.png" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
-  <meta property="og:image:alt" content="issuedev — issues → agent-ready work orders" />
+  <meta property="og:image:alt" content="gitissue — issues → agent-ready work orders" />
 
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="issuedev — GitHub Issue Workflow for AI Coding Agents" />
+  <meta name="twitter:title" content="gitissue — GitHub Issue Workflow for AI Coding Agents" />
   <meta name="twitter:description" content="Turn issues into agent-ready work orders — eight agent-ready commands that structure, triage, resolve, and review, shipping tested PRs." />
   <meta name="twitter:image" content="https://luongnv.com/idd/assets/og/og-card.png" />
-  <meta name="twitter:image:alt" content="issuedev — issues → agent-ready work orders" />
+  <meta name="twitter:image:alt" content="gitissue — issues → agent-ready work orders" />
 
   <!-- Structured data -->
   <script type="application/ld+json">
@@ -49,16 +49,15 @@
         "@type": "WebSite",
         "@id": "https://luongnv.com/idd/#website",
         "url": "https://luongnv.com/idd/",
-        "name": "issuedev",
-        "description": "Issue-Driven Development — eight terminal commands that turn issues into agent-ready work orders.",
+        "name": "gitissue",
+        "description": "Issue-Driven Development (IDD) — eight terminal commands that turn issues into agent-ready work orders.",
         "inLanguage": "en",
         "publisher": { "@id": "https://luongnv.com/#organization" }
       },
       {
         "@type": "SoftwareApplication",
         "@id": "https://luongnv.com/idd/#software",
-        "name": "issuedev",
-        "alternateName": "gitissue",
+        "name": "gitissue",
         "applicationCategory": "DeveloperApplication",
         "softwareApplicationCategory": "DeveloperApplication",
         "operatingSystem": "macOS, Linux, Windows",
@@ -88,7 +87,7 @@
           {
             "@type": "ListItem",
             "position": 2,
-            "name": "issuedev",
+            "name": "gitissue",
             "item": "https://luongnv.com/idd/"
           }
         ]
@@ -641,11 +640,11 @@
   <!-- ───────────────────────── NAV ───────────────────────── -->
   <header class="nav">
     <div class="wrap nav-inner">
-      <a class="brand" href="./" aria-label="issuedev home">
+      <a class="brand" href="./" aria-label="gitissue home">
         <svg width="26" height="26" viewBox="0 0 120 120" aria-hidden="true">
           <path fill-rule="evenodd" fill="#00FF41" d="M60 12 L108 60 L60 108 L12 60 Z M48 46 L80 60 L48 74 Z"/>
         </svg>
-        <span><span class="b-issue">issue</span><span class="b-dev">dev</span></span>
+        <span><span class="b-issue">git</span><span class="b-dev">issue</span></span>
       </a>
       <nav class="nav-links">
         <a href="./" class="active">Home</a>
@@ -664,7 +663,7 @@
   <section class="hero" id="top">
     <div class="wrap hero-grid">
       <div>
-        <span class="eyebrow">Issue-Driven Development · Spec v1.1 · 8 commands · MIT</span>
+        <span class="eyebrow">Issue-Driven Development (IDD) · Spec v1.1 · 8 commands · MIT</span>
         <h1 class="hero-title">Issues → <span class="accent">agent-ready work orders.</span></h1>
         <p class="hero-sub">
           Eight terminal commands that <strong>structure, analyze, triage, resolve, and review</strong> your GitHub issues —
@@ -691,7 +690,7 @@
       <div class="terminal compact reveal">
         <div class="term-bar">
           <div class="dots"><i></i><i></i><i></i></div>
-          <span class="title">~/your-repo — issuedev</span>
+          <span class="title">~/your-repo — gitissue</span>
         </div>
         <div class="term-body">
 <div class="ln"><span class="c-prompt">❯</span> /issue-resolver 42</div>
@@ -747,14 +746,14 @@
     <div class="wrap">
       <div class="section-tag">The fix</div>
       <h2 class="sec-title">Every issue becomes a self-contained work order.</h2>
-      <p class="sec-lead">issuedev turns each GitHub issue into something typed, structured, and enriched with acceptance criteria — then resolves it, with commit messages and PR titles that link every line of code back to the intention that created it.</p>
+      <p class="sec-lead">gitissue turns each GitHub issue into something typed, structured, and enriched with acceptance criteria — then resolves it, with commit messages and PR titles that link every line of code back to the intention that created it.</p>
 
       <div class="feat-grid">
         <div class="feat-card reveal" style="grid-column: 1 / -1;">
           <span class="feat-cmd">/issue-creator</span>
           <h3>Structure, don't guess — plus the right model mode for the job</h3>
-          <p>Describe a bug or feature in plain text. issuedev classifies the type, estimates effort (XS–XL), generates acceptance criteria, and files a clean issue — preserving your original words in a Reporter Context block without guessing implementation details.</p>
-          <p style="margin-top: 12px;"><span class="mono green">⚡ Model:</span> Each issue gets an advisory <strong>Suggested model</strong> with <strong>thinking level</strong> (e.g. GPT-5.5 High · Opus 4.8 Medium) keyed off effort, using CursorBench benchmarks — so you pick a capable tier for hard work and a cheaper tier for trivial fixes instead of running everything on max.</p>
+          <p>Describe a bug or feature in plain text. gitissue classifies the type, estimates effort (XS–XL), generates acceptance criteria, and files a clean issue — preserving your original words in a Reporter Context block without guessing implementation details.</p>
+          <p style="margin-top: 12px;"><span class="mono green">⚡ Model:</span> Each issue gets an advisory <strong>Suggested model</strong> with <strong>thinking level</strong> (e.g. GPT-5.5 High · Opus 4.8 Medium) keyed off effort, using CursorBench (a public coding-agent benchmark) — so you pick a capable tier for hard work and a cheaper tier for trivial fixes instead of running everything on max.</p>
         </div>
         <div class="feat-card reveal">
           <span class="feat-cmd">/issue-resolver N</span>
@@ -893,7 +892,7 @@
     <div class="wrap">
       <div class="section-tag">The toolkit</div>
       <h2 class="sec-title">Eight commands. One source of truth.</h2>
-      <p class="sec-lead">Each is a self-contained skill — drop it into Claude Code, Codex CLI, or any SKILL.md-compatible harness. Mix and match; nothing depends on the rest. Need exact inputs? See the <a class="green" href="docs.html">full docs</a>.</p>
+      <p class="sec-lead">Each is a self-contained skill — drop it into Claude Code, Codex CLI, or any agent that loads SKILL.md files (the markdown file that teaches an agent a skill). Mix and match; nothing depends on the rest. Need exact inputs? See the <a class="green" href="docs.html">full docs</a>.</p>
 
       <div class="feat-grid" style="grid-template-columns: repeat(2,1fr);">
         <div class="feat-card reveal"><span class="feat-cmd">/issue-creator</span><p style="margin-top:2px">Classify type, estimate effort, suggest model + thinking level (CursorBench), preserve reporter context, and file structured acceptance criteria.</p></div>
@@ -1047,7 +1046,7 @@
     <div class="wrap">
       <div class="section-tag">What is IDD?</div>
       <h2 class="sec-title">A tool-neutral spec — issues as the atomic unit of work.</h2>
-      <p class="sec-lead">Issue-Driven Development is a written contract: an issue tracker and git history become executable project memory. <a class="green" href="https://github.com/luongnv89/idd/blob/main/SPEC.md">SPEC.md</a> (v1.1) defines the issue format, dependency and <code class="mono green">Part of #N</code> hierarchy markers, naming grammar, and L1–L3 conformance levels — with RFC-2119 MUST/SHOULD language. It needs no specific AI agent, editor, or host. <strong>issuedev is the reference implementation</strong> for Claude Code + GitHub; a human with a text editor can conform too.</p>
+      <p class="sec-lead">Issue-Driven Development is a written contract: an issue tracker and git history become executable project memory. <a class="green" href="https://github.com/luongnv89/idd/blob/main/SPEC.md">SPEC.md</a> (v1.1) defines the issue format, dependency and <code class="mono green">Part of #N</code> hierarchy markers, naming grammar, and L1–L3 conformance levels — with RFC-2119 MUST/SHOULD language. It needs no specific AI agent, editor, or host. <strong>gitissue is the reference implementation</strong> for Claude Code + GitHub; a human with a text editor can conform too.</p>
 
       <div class="split">
         <div class="idd-card reveal">
@@ -1069,7 +1068,7 @@
     <div class="wrap">
       <div class="section-tag">No lock-in</div>
       <h2 class="sec-title">Works with the tools you already use.</h2>
-      <p class="sec-lead">IDD is a methodology, not a platform. The structured issue format is plain GitHub markdown — anything that reads issues can consume it. issuedev adds structure; everything else keeps working exactly as before.</p>
+      <p class="sec-lead">IDD is a methodology, not a platform. The structured issue format is plain GitHub markdown — anything that reads issues can consume it. gitissue adds structure; everything else keeps working exactly as before.</p>
       <div class="tools">
         <div class="tool"><b>Claude Code</b> — load skills directly</div>
         <div class="tool"><b>Codex CLI</b> — pipe issue body as context</div>
@@ -1101,7 +1100,7 @@
       </div>
 
       <div class="hero-cta" style="justify-content:center; margin-top:36px;">
-        <a class="btn btn-primary" href="https://github.com/luongnv89/idd">▶ Read the full docs</a>
+        <a class="btn btn-primary" href="docs.html">▶ Read the full docs</a>
         <a class="btn btn-ghost" href="https://github.com/luongnv89/idd/releases/latest">Latest release</a>
       </div>
     </div>
@@ -1116,7 +1115,7 @@
       <div class="faq">
         <details>
           <summary>Does this lock me into a specific AI tool? <span class="q-ico">+</span></summary>
-          <div class="a">No. The structured issue format is plain GitHub markdown — any tool that reads GitHub issues can consume it. issuedev ships as self-contained SKILL.md skills that run on Claude Code, Codex CLI, Gemini CLI, or any SKILL.md-compatible harness. Your existing workflow keeps working exactly as before.</div>
+          <div class="a">No. The structured issue format is plain GitHub markdown — any tool that reads GitHub issues can consume it. gitissue ships as self-contained SKILL.md skills that run on Claude Code, Codex CLI, Gemini CLI, or any SKILL.md-compatible harness. Your existing workflow keeps working exactly as before.</div>
         </details>
         <details>
           <summary>Will it rewrite or overwrite my existing issues? <span class="q-ico">+</span></summary>
@@ -1136,7 +1135,7 @@
         </details>
         <details>
           <summary>How much does it cost? <span class="q-ico">+</span></summary>
-          <div class="a">issuedev is open source under the MIT license. Clone it, fork it, ship it. You only pay for whatever AI agent you choose to run the skills with.</div>
+          <div class="a">gitissue is open source under the MIT license. Clone it, fork it, ship it. You only pay for whatever AI agent you choose to run the skills with.</div>
         </details>
         <details>
           <summary>Can I enforce the spec without running an AI agent? <span class="q-ico">+</span></summary>
@@ -1168,7 +1167,7 @@
         <svg width="22" height="22" viewBox="0 0 120 120" aria-hidden="true">
           <path fill-rule="evenodd" fill="#00FF41" d="M60 12 L108 60 L60 108 L12 60 Z M48 46 L80 60 L48 74 Z"/>
         </svg>
-        <span><span class="b-issue">issue</span><span class="b-dev">dev</span></span>
+        <span><span class="b-issue">git</span><span class="b-dev">issue</span></span>
       </a>
       <div class="foot-links">
         <a href="https://github.com/luongnv89/idd">GitHub</a>
