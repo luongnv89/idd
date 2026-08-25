@@ -412,7 +412,7 @@ Full rendering spec (column widths, sort order, color rules) and JSON schema liv
 
 After the triage table (Step 8) and persist (Step 9) are both complete, print a structured step-by-step summary at the end:
 
-**Then the run-stats footer.** Close with the *Run Stats Footer* — `references/run-stats.md` — `elapsed`, `tokens`, `agents`, run cost only, `n/a` for anything undetermined. It is the last thing printed at **every** terminal outcome, including a run that ended early — no open issues, a failed fetch, an invalid config, or a scan that timed out.
+**Then the run-stats footer.** Close with the *Run Stats Footer* — `references/run-stats.md` — `elapsed`, `tokens` only where the host reported a count (otherwise left out), `agents`, run cost only, `n/a` for anything else undetermined. It is the last thing printed at **every** terminal outcome, including a run that ended early — no open issues, a failed fetch, an invalid config, or a scan that timed out.
 
 ```
 ◆ Issue Triage — {N} issues analyzed

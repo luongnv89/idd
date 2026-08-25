@@ -10,12 +10,21 @@ editing every copy.
 
 ```
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  Run stats   elapsed 4m 12s · tokens n/a · agents 4
+  Run stats   elapsed 4m 12s · agents 4
+```
+
+Where the host reports a token count, that count takes its place between
+`elapsed` and `agents`:
+
+```
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  Run stats   elapsed 4m 12s · tokens 128,400 · agents 4
 ```
 
 Two lines, printed last — after the skill's own final report, closing summary,
-or error block, whichever ended the run. Two-space indent, ` · ` between
-fields, `┄` separator, per the skill's terminal-style contract.
+or error block, whichever ended the run — in both renderings. Two-space
+indent, ` · ` between fields, `┄` separator, per the skill's terminal-style
+contract.
 
 ## Every terminal outcome
 
@@ -26,14 +35,18 @@ invalid-config stop. Where a skill appends a run-log line it also prints this
 footer, and it prints it on the paths that never reach a run-log write too. A
 run that produced no output at all is the only run without a footer.
 
-## The three fields
+## The fields
 
-Fixed, in this order. No skill adds, drops, or renames one.
+Fixed, in this order. No skill adds, reorders, or renames one. `elapsed` and
+`agents` are always present; `tokens` is the one conditional field — it prints
+only where the host runtime reported a usage figure, and is left out entirely
+otherwise. That is not a per-skill choice: on a host that reports nothing every
+skill drops it, and on a host that reports every skill prints it.
 
 | Field | Value | Source |
 |-------|-------|--------|
 | `elapsed` | wall-clock duration, `{H}h {M}m {S}s`. Drop zero-valued *leading* units, never interior or trailing ones; the leading unit is unpadded and every unit after it is zero-padded to two digits — `4m 12s`, `48s`, `1h 03m 20s`, `2h 00m 07s` | `now - run_started_epoch` |
-| `tokens` | tokens the run consumed, a plain integer with thousands separators (`128,400`) | the host runtime, when it reports a usage figure to the skill |
+| `tokens` | tokens the run consumed, a plain integer with thousands separators (`128,400`). **Conditional** — printed only where the host reported a figure; otherwise the field and its ` · ` separator are both left out | the host runtime, when it reports a usage figure to the skill |
 | `agents` | subagents the run spawned, an integer | the orchestrator's own count of spawns |
 
 `run_started_epoch` is captured once, at skill start, in the same shell as
@@ -45,13 +58,10 @@ new.
 
 ## Unavailable values
 
-A field whose value cannot be determined prints the literal `n/a` — never a
-guess, never an omitted field, never `0`.
+`elapsed` and `agents` are unconditional. A field whose value cannot be
+determined prints the literal `n/a` — never a guess, never an omitted field,
+never `0`.
 
-- **`tokens n/a` is the expected reading on most hosts.** A skill is prose
-  executed by an agent; it has no token counter of its own. Print a number only
-  when the runtime actually reports one. Never estimate from output length,
-  file sizes, or step counts.
 - `elapsed n/a` when no start time was captured — a stop *before* the config
   load has no anchor to measure from.
 - `agents n/a` when the count was lost, for example across a resume that did
@@ -60,6 +70,27 @@ guess, never an omitted field, never `0`.
 `0` is a **determined** value and is correct where it is true: a skill that
 spawns no subagents prints `agents 0`, not `agents n/a`. The distinction is
 between *nothing happened* and *we do not know*.
+
+## The conditional token count
+
+`tokens` is the exception: where there is no figure the field is left out, not
+marked. A skill is prose executed by an agent; it has no token counter of its
+own, and on most hosts nothing reports one to it. A marker that can never
+resolve is not information — it is a field announcing, every run, that it will
+never have a value.
+
+- **The host reported a figure → print it.** `tokens 128,400`, thousands
+  separators, in the field's fixed position between `elapsed` and `agents`.
+- **Nothing reported one → leave the field out.** Print
+  `Run stats   elapsed 4m 12s · agents 4`: no dangling ` · `, no placeholder in
+  its place.
+- **What counts as reported.** A usage figure the host surfaced to you, in this
+  run's own context, as part of running it. Not derived, not looked up, not
+  computed. If you would have to go and find it, that is the leave-it-out case.
+- **Never manufacture one.** Never estimate from output length, file sizes, or
+  step counts, and never read the host's transcript, session files, or logs to
+  reconstruct one — that is a subprocess and a summarization pass, which
+  *Overhead* forbids.
 
 ## What the footer must not carry
 
