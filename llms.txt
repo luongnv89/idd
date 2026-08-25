@@ -1,6 +1,6 @@
-# issuedev
+# gitissue
 
-> Issue-Driven Development for GitHub: eight terminal commands that structure, analyze, triage, resolve, review, and self-check GitHub issue workflows so humans and AI coding agents can ship tested PRs.
+> Issue-Driven Development for GitHub: seven public skills that structure, analyze, triage, resolve, and review GitHub issue workflows so humans and AI coding agents can ship tested PRs (`src/skills/` — seven packages; `/idd-doctor` is internal).
 
 ## Start here
 
