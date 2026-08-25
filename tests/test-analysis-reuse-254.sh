@@ -63,7 +63,10 @@ check_block_has() {
   local block="$1"
   local pattern="$2"
   local label="$3"
-  if printf '%s' "$block" | grep -qE "$pattern"; then
+  if [ -z "$block" ]; then
+    fail "$label"
+    echo "      block is empty — the extraction anchor no longer matches"
+  elif printf '%s' "$block" | grep -qE "$pattern"; then
     pass "$label"
   else
     fail "$label"
@@ -75,13 +78,19 @@ check_block_lacks() {
   local block="$1"
   local pattern="$2"
   local label="$3"
-  if printf '%s' "$block" | grep -qE "$pattern"; then
+  if [ -z "$block" ]; then
+    fail "$label"
+    echo "      block is empty — the extraction anchor no longer matches"
+  elif printf '%s' "$block" | grep -qE "$pattern"; then
     fail "$label"
     echo "      forbidden pattern still present: $pattern"
   else
     pass "$label"
   fi
 }
+
+# shellcheck source=lib/anchors.bash
+. "$REPO_ROOT/tests/lib/anchors.bash"
 
 echo "◆ Analysis Reuse Gate Contract Tests (issue #254)"
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
@@ -120,11 +129,11 @@ else
   printf '      %s\n' $ANCESTOR_HITS
 fi
 
-check_has "$SRC_STEPS" '^## Step 0h — Analysis reuse gate' \
+anchor_present "$SRC_STEPS" rs-step0h-gate \
   "T1.2: pipeline-steps.md defines the Step 0h section"
 check_has "$SRC_STEPS" '[Ss]ingle home of the freshness predicate|single home' \
   "T1.3: Step 0h declares itself the single home of the definition"
-check_has "$SRC_SKILL" '### 0h — Analysis reuse gate' \
+anchor_present "$SRC_SKILL" rs-0h-skill \
   "T1.4: SKILL source adds the 0h sub-step"
 check_has "$SRC_SKILL" 'Step 0h — Analysis reuse gate' \
   "T1.5: SKILL source points 0h at the pipeline-steps home"
@@ -211,11 +220,11 @@ check_has "$SRC_STEPS" '0d.*bumps `updatedAt`|bumps `updatedAt`' \
 # T5 (AC1/safety): the seeded research pass never skips the
 # already-resolved verification, and never trusts stale hints.
 # ───────────────────────────────────────────────────────────
-check_has "$SRC_STEPS" '^### .reuse. — seeded, verify-first research' \
+anchor_present "$SRC_STEPS" rs-reuse-research \
   "T5.1: Step 1 has a reuse sub-section"
 check_has "$SRC_STEPS" 'prior_analysis' \
   "T5.2: the Step 1 delegation payload carries prior_analysis"
-REUSE_BLOCK="$(awk '/^### .reuse. — seeded, verify-first research/,/^### Inline fallback/' "$SRC_STEPS")"
+REUSE_BLOCK="$(anchor_span "$SRC_STEPS" rs-reuse-research rs-research-fallback || true)"
 if printf '%s' "$REUSE_BLOCK" | grep -qE '\*\*Keep\*\* the \*Verify not already resolved\* phase \*\*in full\*\*'; then
   pass "T5.3: the reuse pass keeps the already-resolved check in full"
 else
@@ -247,9 +256,9 @@ check_has "$SRC_RESEARCHER" 'Phase 0 .*runs \*\*in full\*\*|Phase 0.*in full' \
 # T6 (AC1): Step 2 skips the synthesizer and still produces a
 # complete Decision Record.
 # ───────────────────────────────────────────────────────────
-check_has "$SRC_STEPS" '^### .reuse. — lift the options, skip the synthesis' \
+anchor_present "$SRC_STEPS" rs-reuse-plan \
   "T6.1: Step 2 has a reuse sub-section"
-PLAN_BLOCK="$(awk '/^### .reuse. — lift the options, skip the synthesis/,/^### Plan selection/' "$SRC_STEPS")"
+PLAN_BLOCK="$(anchor_span "$SRC_STEPS" rs-reuse-plan rs-plan-selection || true)"
 if printf '%s' "$PLAN_BLOCK" | grep -qE 'do \*\*not\*\* spawn the synthesizer'; then
   pass "T6.2: the reuse path does not spawn the synthesizer"
 else
@@ -290,7 +299,7 @@ check_has "$SRC_TEMPLATES" 'selected_option. and .options_rejected. MUST always 
 # ───────────────────────────────────────────────────────────
 # T8 (install surface): the built tree carries the same contract.
 # ───────────────────────────────────────────────────────────
-check_has "$BUILT_STEPS" '^## Step 0h — Analysis reuse gate' \
+anchor_present "$BUILT_STEPS" rs-step0h-gate \
   "T8.1: built pipeline-steps.md ships the Step 0h home"
 check_has "$BUILT_STEPS" 'git merge-base --is-ancestor' \
   "T8.2: built pipeline-steps.md ships the ancestry test"
@@ -300,7 +309,7 @@ check_has "$BUILT_STEPS" 'verify-first hints to confirm or refute, never asserti
   "T8.4: built pipeline-steps.md ships the verify-first semantics"
 check_has "$BUILT_STEPS" 'decision_record\.options_rejected' \
   "T8.5: built pipeline-steps.md ships the rejection_reason derivation"
-check_has "$BUILT_SKILL" '### 0h — Analysis reuse gate' \
+anchor_present "$BUILT_SKILL" rs-0h-skill \
   "T8.6: built SKILL.md ships the 0h sub-step"
 check_has "$BUILT_SKILL" 'gi-issue\.py \{N\} --fields [a-zA-Z,]*updatedAt' \
   "T8.7: built SKILL.md ships the widened 0a field list"
@@ -326,8 +335,8 @@ fi
 # so a Step 0e worktree never has it — a bare relative path there
 # answers `absent` forever and the gate silently never fires.
 # ───────────────────────────────────────────────────────────
-PREDICATE_BLOCK="$(awk '/^### The predicate/,/^### Fail-safe/' "$SRC_STEPS")"
-BUILT_PREDICATE_BLOCK="$(awk '/^### The predicate/,/^### Fail-safe/' "$BUILT_STEPS")"
+PREDICATE_BLOCK="$(anchor_span "$SRC_STEPS" rs-step0h-predicate rs-step0h-failsafe || true)"
+BUILT_PREDICATE_BLOCK="$(anchor_span "$BUILT_STEPS" rs-step0h-predicate rs-step0h-failsafe || true)"
 
 check_block_has "$PREDICATE_BLOCK" 'git rev-parse --git-common-dir' \
   "T9.1: the predicate resolves the original checkout via --git-common-dir"
@@ -362,8 +371,8 @@ check_block_has "$PREDICATE_BLOCK" 'substituted by the caller' \
 # `Options rejected` content, so the composition must not be left
 # to whichever sub-section is read first.
 # ───────────────────────────────────────────────────────────
-UNLOCKS_BLOCK="$(awk '/^### What .fresh. unlocks/,/^## Step 1 — Research/' "$SRC_STEPS")"
-PLAN_LIGHT_BLOCK="$(awk '/^### .light. profile — skip the synthesis/,/^### .reuse. — lift the options/' "$SRC_STEPS")"
+UNLOCKS_BLOCK="$(anchor_span "$SRC_STEPS" rs-step0h-unlocks rs-step1-research || true)"
+PLAN_LIGHT_BLOCK="$(anchor_span "$SRC_STEPS" rs-light-plan rs-reuse-plan || true)"
 
 check_block_has "$UNLOCKS_BLOCK" '.reuse. wins Step 2' \
   "T11.1: Step 0h states the light+fresh precedence — reuse wins Step 2"
@@ -441,7 +450,7 @@ for pair in "src:$SRC_PERSIST" "built:$BUILT_PERSIST"; do
     continue
   fi
   # Only the Persist step — the schema example below it is illustrative.
-  persist_block="$(awk '/^## Persist/,/^### JSON Schema/' "$persist_file")"
+  persist_block="$(anchor_span "$persist_file" ia-persist ia-json-schema || true)"
 
   check_block_has "$persist_block" 'git rev-parse HEAD.*git_state\.commit_sha' \
     "T13.1 ($tag): the capture binds \`git rev-parse HEAD\` to git_state.commit_sha"

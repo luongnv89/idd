@@ -286,7 +286,7 @@ worktree is intentionally left in place after the PR is created so the user can 
 
 Do not auto-remove it — the user may still want the local artifacts.
 
-## Step 0h — Analysis reuse gate
+## Step 0h — Analysis reuse gate <!-- a:rs-step0h-gate -->
 
 **The single home of the freshness predicate.** `/issue-analysis` writes
 `.gitissue/analysis-<N>.json` carrying everything Steps 1–2 would otherwise
@@ -319,7 +319,7 @@ When `resolve.adaptive_effort` is `false`, **skip this gate**: set
 `full`, and reuse is the same class of saving, so the one key disables both.
 **No new config key is introduced.**
 
-### The predicate — five conditions, all must hold
+### The predicate — five conditions, all must hold <!-- a:rs-step0h-predicate -->
 
 `{base}` is **this run's synced base** — the branch the mandatory Repo Sync
 rebased onto, or the `origin/${base}` that `git worktree add` forked from. Never
@@ -384,7 +384,7 @@ never fire. *0a* runs **before** 0d and already fetches the issue, so it capture
 `updatedAt` in its field list and condition 5 is evaluated against that
 **pre-normalization** value — never a re-fetch taken after 0d.
 
-### Fail-safe: any doubt is `stale`
+### Fail-safe: any doubt is `stale` <!-- a:rs-step0h-failsafe -->
 
 A missing key, a short or unknown SHA, an unparsable timestamp, a `git` command
 that errors for any reason, or any condition that cannot be evaluated ⇒ `stale`
@@ -400,7 +400,7 @@ Surface the decision as one line so the saving is auditable:
 ○ Analysis reuse: absent — full pipeline
 ```
 
-### What `fresh` unlocks
+### What `fresh` unlocks <!-- a:rs-step0h-unlocks -->
 
 | Step | `fresh` behavior |
 |------|------------------|
@@ -709,7 +709,7 @@ surfaced profile and the run-log `profile` reflect the final value.
 The delegation payload is otherwise unchanged; pass the researcher a note that a
 lighter, targeted scan is expected (mirroring the model/effort tier intent).
 
-### `reuse` — seeded, verify-first research
+### `reuse` — seeded, verify-first research <!-- a:rs-reuse-research -->
 
 When *Step 0h* set `analysis_reuse = fresh`, populate `prior_analysis` in the
 payload above and run a **reduced, verify-first** pass:
@@ -742,7 +742,7 @@ of re-running it.
 The saving is real but bounded, and worth stating plainly: the codebase is
 researched once and *verified* once, rather than researched twice.
 
-### Inline fallback
+### Inline fallback <!-- a:rs-research-fallback -->
 
 If no Agent tool, execute research inline following the same phases described in `references/agents/codebase-researcher.md`.
 
@@ -770,7 +770,7 @@ The synthesizer returns 3 options differing in scope:
 2. **Balanced approach** — proper fix, reasonable scope (usually recommended)
 3. **Comprehensive refactor** — addresses root cause and technical debt
 
-### `light` profile — skip the synthesis
+### `light` profile — skip the synthesis <!-- a:rs-light-plan -->
 
 When *Step 0g* selected `profile = light` **and *Step 0h* did not set
 `analysis_reuse = fresh`** (when both apply, `reuse` wins Step 2 — see *Step 0h →
@@ -803,7 +803,7 @@ stayed `light` through research.
 The tracker line is unchanged (`[2/5] Plan  ✓ approach: {selected option name}`);
 `{selected option name}` is the direct minimal plan's name.
 
-### `reuse` — lift the options, skip the synthesis
+### `reuse` — lift the options, skip the synthesis <!-- a:rs-reuse-plan -->
 
 When *Step 0h* set `analysis_reuse = fresh` and Step 1 did not revise it to
 `stale`, do **not** spawn the synthesizer: the analysis already ran it, against a
@@ -856,7 +856,7 @@ Provenance is already durable: the Decision Record's
 `Analyzed at: {branch} @ {commit_sha_short}` line carries the analysis's own
 `git_state` — precisely the commit these options were produced against.
 
-### Plan selection
+### Plan selection <!-- a:rs-plan-selection -->
 
 **Interactive, `resolve.approval_gate: auto`:** display the recommended option and proceed.
 
@@ -1404,7 +1404,7 @@ this sub-step. Only the resolver's deltas are listed here.
   *QA handoff marker*). Nothing recorded ⇒ omit the `@<sha40>` suffix; never
   substitute the head SHA.
 
-## Edge Cases
+## Edge Cases <!-- a:rs-edge-cases -->
 
 Full behavior for the edge cases named in SKILL.md.
 

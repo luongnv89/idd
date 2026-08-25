@@ -114,6 +114,9 @@ check_block_lacks() {
   fi
 }
 
+# shellcheck source=lib/anchors.bash
+. "$REPO_ROOT/tests/lib/anchors.bash"
+
 echo "◆ Auto-Pilot Triage Cache Tests (issue #258)"
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 
@@ -180,7 +183,7 @@ check_has "$SRC_PHASES" '--limit 100' \
 # Bounded at Step 1.1b, not at Step 1.2: Step 1.1b sits between them and also
 # talks about bodies and about Step 1.2b, so a block that swallowed it would let
 # its prose satisfy assertions that are about Step 1.1 alone.
-STEP11_BLOCK="$(awk '/^### Step 1\.1 — Triage/,/^### Step 1\.1b — Live eligibility read/' "$SRC_PHASES")"
+STEP11_BLOCK="$(anchor_span "$SRC_PHASES" ap-step11-triage ap-step11b-live-read || true)"
 check_block_has "$STEP11_BLOCK" 'No .body' \
   "T1.4: Step 1.1 states that the list carries no body, and why"
 check_block_has "$STEP11_BLOCK" 'Step 1\.2b' \
@@ -195,16 +198,16 @@ check_has "$SRC_TRIAGE_SKILL" 'gh issue list [^`]*body' \
 # ───────────────────────────────────────────────────────────
 # T2 (AC1): a triage-cache gate sits above the loop
 # ───────────────────────────────────────────────────────────
-check_has "$SRC_PHASES" '^### Step 1\.1a — Triage cache gate' \
+anchor_present "$SRC_PHASES" ap-step11a-cache-gate \
   "T2.1: auto-pilot has a named triage-cache gate"
 # Renamed from `Step 1.0` when #257's run-state work landed a *different*
 # `Step 1.0 — Resume entry gate` in the new Phase 0. `1.1a` is the gate that
 # decides whether `Step 1.1` runs, so it letters onto 1.1 beside `Step 1.1b`.
 check_lacks "$SRC_PHASES" '^### Step 1\.0 — Triage cache gate' \
   "T2.1b: the old colliding heading is gone"
-check_has "$SRC_PHASES" '^### Step 1\.0 — Resume entry gate' \
+anchor_present "$SRC_PHASES" ap-step10-resume \
   "T2.1c: #257's Step 1.0 keeps its name"
-GATE_BLOCK="$(awk '/^### Step 1\.1a — Triage cache gate/,/^### Step 1\.1 — Triage/' "$SRC_PHASES")"
+GATE_BLOCK="$(anchor_span "$SRC_PHASES" ap-step11a-cache-gate ap-step11-triage || true)"
 check_block_has "$GATE_BLOCK" 'triage_cache = fresh \| stale \| absent' \
   "T2.2: the gate sets exactly one three-state variable"
 for state in fresh stale absent; do
@@ -243,9 +246,9 @@ check_has "$SRC_PHASES" '.summary\.suggested_order. in a cache Step 1\.1a reused
 # ───────────────────────────────────────────────────────────
 # T3 (AC1/AC3): the post-merge update is removal-only
 # ───────────────────────────────────────────────────────────
-check_has "$SRC_PHASES" '^### Step 1\.6 — Update the triage cache after a merge' \
+anchor_present "$SRC_PHASES" ap-step16-cache-update \
   "T3.1: auto-pilot has a named incremental-update step"
-UPDATE_BLOCK="$(awk '/^### Step 1\.6 — Update the triage cache after a merge/,0' "$SRC_PHASES")"
+UPDATE_BLOCK="$(anchor_region "$SRC_PHASES" ap-step16-cache-update || true)"
 for field in 'issues\[\]' 'summary\.suggested_order' 'summary\.parallel_groups' \
              'blocked_by' 'blocks' 'history\[\]'; do
   check_block_has "$UPDATE_BLOCK" "$field" \
@@ -308,7 +311,7 @@ check_block_has "$UPDATE_BLOCK" 'potentially_fixed_by.target_issue' \
 # The widened trigger is only real if the OTHER merge site points back at it.
 # Step 1.6 sits at the far end of the file, so a reader working through Phase 3-4
 # would otherwise never learn that its merge owes the cache an update.
-STEP2B_BLOCK="$(awk '/^\*\*Step 2b — Merge/,/^#### Critical issues/' "$SRC_PHASES")"
+STEP2B_BLOCK="$(anchor_span "$SRC_PHASES" ap-step2b-merge ap-critical-issues || true)"
 check_block_has "$STEP2B_BLOCK" 'run \*Step 1\.6 — Update the triage cache after a merge\*' \
   "T3.16: the Phase 3-4 partial merge points at the cache update"
 check_block_has "$STEP2B_BLOCK" 'for \*Step 1\.2\* to pick again next iteration' \
@@ -321,7 +324,7 @@ check_block_has "$STEP2B_BLOCK" 'failed-merge path below closed nothing' \
 # ───────────────────────────────────────────────────────────
 # Extracted with the same anchors tests/test-subagent-context-256.sh uses, so a
 # rename that breaks that suite breaks this one in the same place.
-CAPTURE_BLOCK="$(awk '/^### Step 1\.2b — Capture the caller payload/,/^### Step 1\.3/' "$SRC_PHASES")"
+CAPTURE_BLOCK="$(anchor_span "$SRC_PHASES" ap-step12b-capture ap-step13-plan || true)"
 check_block_has "$CAPTURE_BLOCK" 'gi-issue\.py' \
   "T4.1: Step 1.2b fetches the picked issue's record on demand"
 check_block_has "$CAPTURE_BLOCK" 'python3 shared/scripts/gi-issue\.py \{issue_number\}' \
@@ -380,7 +383,7 @@ check_has "$SCHEMA" '\.gitissue/triage\.json. \| ./issue-triage., ./auto-pilot' 
 # Capture the section before matching it — an `awk … | grep -q` pipeline lets
 # grep exit on the first match and leaves awk writing into a closed pipe, which
 # under `set -o pipefail` fails the assertion on a match that succeeded.
-pick_block="$(awk '/^### Step 1\.2 — Pick Next Issue/{f=1; next} f && /^### /{exit} f' "$SRC_PHASES")"
+pick_block="$(anchor_span "$SRC_PHASES" ap-step12-pick ap-step12b-capture || true)"
 if grep -E '^- \*\*Not skipped\*\*' <<< "$pick_block" | grep -q 'session skip list'; then
   pass "T5.8: Step 1.2 eligibility criteria still names the session skip list"
 else
@@ -547,9 +550,9 @@ done < "$TMP/removal-report"
 # pick-miss predicate, and the `✓ All issues resolved` stop. Step 1.1b restores
 # a body-less two-field read that answers all three.
 
-check_has "$SRC_PHASES" '^### Step 1\.1b — Live eligibility read' \
+anchor_present "$SRC_PHASES" ap-step11b-live-read \
   "T10.1: a named step supplies the live open-issue set the pick needs"
-LIVEREAD_BLOCK="$(awk '/^### Step 1\.1b — Live eligibility read/,/^### Step 1\.2 — Pick Next Issue/' "$SRC_PHASES")"
+LIVEREAD_BLOCK="$(anchor_span "$SRC_PHASES" ap-step11b-live-read ap-step12-pick || true)"
 check_block_has "$LIVEREAD_BLOCK" 'gh issue list --state open --json number,assignees --limit 100' \
   "T10.2: the live read asks for exactly the two fields the cache cannot answer"
 check_block_has "$LIVEREAD_BLOCK" 'neither a GitHub .state. nor an .assignees. field' \
@@ -577,7 +580,7 @@ check_bullet() {
   local file="$1" bullet="$2" pattern="$3" label="$4"
   local block
   # Same reason as T5.8: capture, then match — never pipe awk into `grep -q`.
-  block="$(awk '/^### Step 1\.2 — Pick Next Issue/{f=1; next} f && /^### /{exit} f' "$file")"
+  block="$(anchor_span "$file" ap-step12-pick ap-step12b-capture || true)"
   if grep -E -- "$bullet" <<< "$block" | grep -qE -- "$pattern"; then
     pass "$label"
   else
@@ -591,7 +594,7 @@ check_bullet "$SRC_PHASES" '^- \*\*Open\*\*' 'Step 1\.1b' \
 check_bullet "$SRC_PHASES" '^- \*\*Not assigned\*\*' 'Step 1\.1b' \
   "T10.11: the Not assigned criterion reads the live set, not the cache"
 
-PICK_BLOCK="$(awk '/^### Step 1\.2 — Pick Next Issue/{f=1; next} f && /^### /{exit} f' "$SRC_PHASES")"
+PICK_BLOCK="$(anchor_span "$SRC_PHASES" ap-step12-pick ap-step12b-capture || true)"
 check_block_has "$PICK_BLOCK" 'skip the last two' \
   "T10.12: an unavailable live read defers the two criteria rather than guessing"
 
@@ -620,7 +623,7 @@ check_has "$SRC_CONFIG" 'Step 1\.1b' \
 
 # F3: the third merge-and-close site. Step 1.6 sits at the far end of the file,
 # so each site that closes an issue carries its own pointer back to it.
-CRITICAL_BLOCK="$(awk '/^#### Critical issues: stop and ask the user/,/^## Phase 5 — Merge/' "$SRC_PHASES")"
+CRITICAL_BLOCK="$(anchor_span "$SRC_PHASES" ap-critical-issues ap-phase5-merge || true)"
 check_block_has "$CRITICAL_BLOCK" 'run \*Step 1\.6 — Update the triage cache after a merge\*' \
   "T10.21: the critical-issue Option 1 merge points at the cache update"
 check_block_has "$CRITICAL_BLOCK" 'for \*Step 1\.2\* to pick again next iteration' \
@@ -634,7 +637,7 @@ check_block_has "$UPDATE_BLOCK" 'Three sites, one rule' \
 
 # F4: the clean-finish message needs BOTH a second documented trigger and a home
 # that a reuse iteration actually executes — Step 1.1 is the step it skips.
-NOISSUES_ENTRY="$(awk '/^### No open issues/,/^### No eligible issues/' "$SRC_ERRORS")"
+NOISSUES_ENTRY="$(anchor_span "$SRC_ERRORS" ape-no-open-issues ape-no-eligible-issues || true)"
 check_block_has "$NOISSUES_ENTRY" 'Step 1\.1b' \
   "T10.26: the error catalog documents the reuse-iteration trigger"
 check_block_has "$NOISSUES_ENTRY" 'reuse' \
@@ -653,11 +656,11 @@ check_block_has "$LIVEREAD_BLOCK" '\*\*non\*\*-empty live backlog is a' \
 # ───────────────────────────────────────────────────────────
 # T9 (install surface): the built tree carries the same contract
 # ───────────────────────────────────────────────────────────
-check_has "$BUILT_PHASES" '^### Step 1\.1a — Triage cache gate' \
+anchor_present "$BUILT_PHASES" ap-step11a-cache-gate \
   "T9.1: built phases.md ships the triage cache gate"
 check_lacks "$BUILT_PHASES" '^### Step 1\.0 — Triage cache gate' \
   "T9.1b: built phases.md ships no colliding Step 1.0 heading"
-check_has "$BUILT_PHASES" '^### Step 1\.6 — Update the triage cache after a merge' \
+anchor_present "$BUILT_PHASES" ap-step16-cache-update \
   "T9.2: built phases.md ships the incremental update"
 check_has "$BUILT_PHASES" 'gh issue list --state open --json [a-zA-Z,]*state,updatedAt' \
   "T9.3: built phases.md ships the list call"
@@ -694,7 +697,7 @@ check_has "$BUILT_CONFIG" 'refuse any pre-existing cache' \
   "T9.16: built configuration.md ships the corrected off-switch wording"
 # T10's rules, on the installed surface. A live-eligibility read that ships only
 # in src/ leaves every install picking closed and foreign-assigned issues.
-check_has "$BUILT_PHASES" '^### Step 1\.1b — Live eligibility read' \
+anchor_present "$BUILT_PHASES" ap-step11b-live-read \
   "T9.17: built phases.md ships the live eligibility read"
 check_has "$BUILT_PHASES" 'gh issue list --state open --json number,assignees --limit 100' \
   "T9.18: built phases.md ships the body-less two-field live read"
@@ -710,10 +713,10 @@ check_has "$BUILT_PHASES" 'Post-pick eligibility re-check' \
   "T9.23: built phases.md ships the post-pick eligibility re-check"
 check_has "$BUILT_PHASES" '\*Phase 3-4 Option 1\*' \
   "T9.24: built phases.md ships the third merge-and-close site"
-B_CRITICAL_BLOCK="$(awk '/^#### Critical issues: stop and ask the user/,/^## Phase 5 — Merge/' "$BUILT_PHASES")"
+B_CRITICAL_BLOCK="$(anchor_span "$BUILT_PHASES" ap-critical-issues ap-phase5-merge || true)"
 check_block_has "$B_CRITICAL_BLOCK" 'run \*Step 1\.6 — Update the triage cache after a merge\*' \
   "T9.25: built phases.md ships Option 1's pointer at the cache update"
-B_NOISSUES_ENTRY="$(awk '/^### No open issues/,/^### No eligible issues/' "$BUILT_ERRORS")"
+B_NOISSUES_ENTRY="$(anchor_span "$BUILT_ERRORS" ape-no-open-issues ape-no-eligible-issues || true)"
 check_block_has "$B_NOISSUES_ENTRY" 'Step 1\.1b' \
   "T9.26: built error-messages.md ships the reuse-iteration trigger"
 
@@ -728,7 +731,7 @@ check_block_has "$B_NOISSUES_ENTRY" 'Step 1\.1b' \
 # per-iteration triage promised there outranks the corrected *Mode Detection*
 # text further down the same file. It must state the same rule, not a summary of
 # the behavior this issue removed.
-OVERVIEW="$(awk '/^# \/auto-pilot/,/^## Autonomy Philosophy/' "$SRC_SKILL")"
+OVERVIEW="$(anchor_span "$SRC_SKILL" ap-skill-title ap-autonomy || true)"
 check_block_lacks "$OVERVIEW" 'Each iteration: triage the backlog' \
   "T11.1: the Overview no longer promises a triage per iteration"
 check_block_has "$OVERVIEW" 'triages \*\*once\*\* at loop start' \
@@ -749,7 +752,7 @@ check_has "$SRC_SKILL" '^  Phase 1 — Triage/Pick  \(triage once at start;' \
 # G2 — the resolver's Step 0i is the second home of THIS loop's payload
 # provenance. It described a bulk Phase 1 list that no longer exists, including
 # the comments rationale auto-pilot's own Step 1.2b deliberately dropped.
-PAYLOAD_GATE="$(awk '/^## Step 0i — Caller payload gate/,/^## Step 1 — Research/' "$SRC_RES_STEPS")"
+PAYLOAD_GATE="$(anchor_span "$SRC_RES_STEPS" rs-step0i-gate rs-step1-research || true)"
 check_block_lacks "$PAYLOAD_GATE" 'Phase 1 lists every open issue' \
   "T11.8: Step 0i no longer sources the payload from a bulk open-issue list"
 check_block_lacks "$PAYLOAD_GATE" 'lists up to 100 open issues' \
@@ -817,7 +820,7 @@ check_has "$SRC_PHASES" 'skip labels, --skip, failed, or ineligible' \
   "T11.33: the rendered Skipped bucket admits the post-pick rejection"
 # The catalog entry enumerates the same writers. Both copies of the rendered
 # block stay byte-identical (pinned by tests/test-autopilot-dependency-gate.sh).
-NOELIGIBLE_ENTRY="$(awk '/^### No eligible issues/,/^### API rate limit during triage/' "$SRC_ERRORS")"
+NOELIGIBLE_ENTRY="$(anchor_span "$SRC_ERRORS" ape-no-eligible-issues ape-api-rate-limit || true)"
 for reason in 'blocked_by_dependency' 'failed' 'closed' 'assigned'; do
   check_block_has "$NOELIGIBLE_ENTRY" "\`$reason\`" \
     "T11.34: the catalog trigger names the $reason writer"
@@ -829,12 +832,12 @@ check_block_has "$NOELIGIBLE_ENTRY" 'skip labels, --skip, failed, or ineligible'
 
 # T11 on the installed surface — a drift fix that ships only in src/ is not
 # installed for anyone, which is the whole reason T9 exists.
-B_OVERVIEW="$(awk '/^# \/auto-pilot/,/^## Autonomy Philosophy/' "$BUILT_SKILL")"
+B_OVERVIEW="$(anchor_span "$BUILT_SKILL" ap-skill-title ap-autonomy || true)"
 check_block_has "$B_OVERVIEW" 'triages \*\*once\*\* at loop start' \
   "T11.37: built SKILL.md's Overview ships the triage-once rule"
 check_lacks "$BUILT_SKILL" 'a full triage on the first iteration' \
   "T11.38: built SKILL.md's Phase 1 table row ships the corrected wording"
-B_PAYLOAD_GATE="$(awk '/^## Step 0i — Caller payload gate/,/^## Step 1 — Research/' "$BUILT_RES_STEPS")"
+B_PAYLOAD_GATE="$(anchor_span "$BUILT_RES_STEPS" rs-step0i-gate rs-step1-research || true)"
 check_block_lacks "$B_PAYLOAD_GATE" 'Phase 1 lists every open issue' \
   "T11.39: built pipeline-steps.md ships the corrected payload provenance"
 check_block_lacks "$B_PAYLOAD_GATE" 'than the fetch it saves' \
@@ -971,7 +974,7 @@ check_block_has "$CAPTURE_BLOCK" 'gh issue view N --json state,comments,updatedA
   "T12.29: 1.2b names the resolver's live re-verify as the backstop"
 check_block_has "$CAPTURE_BLOCK" 'last word on .state.' \
   "T12.30: 1.2b says which read is the last word on state, and it is not this one"
-B_CAPTURE_BLOCK="$(awk '/^### Step 1\.2b — Capture the caller payload/,/^### Step 1\.3/' "$BUILT_PHASES")"
+B_CAPTURE_BLOCK="$(anchor_span "$BUILT_PHASES" ap-step12b-capture ap-step13-plan || true)"
 check_block_lacks "$B_CAPTURE_BLOCK" 'This record is live' \
   "T12.31: built phases.md ships the corrected freshness claim"
 check_block_has "$B_CAPTURE_BLOCK" 'gh issue view N --json state,comments,updatedAt' \
@@ -1051,7 +1054,7 @@ check_block_has "$UPDATE_BLOCK" 'never from .queue., so re-deriving' \
   "T13.21: Step 1.6 names what a resume actually reads instead"
 # The cross-reference has to exist at the OTHER home too, or a reader of
 # Step 1.0's payload table never learns the rule.
-RESUME_BLOCK="$(awk '/^### Step 1\.0 — Resume entry gate/,/^### Step 1\.0b/' "$SRC_PHASES")"
+RESUME_BLOCK="$(anchor_span "$SRC_PHASES" ap-step10-resume ap-step10b-checkpoint || true)"
 check_block_has "$RESUME_BLOCK" '\| .queue. \|' \
   "T13.22: Step 1.0 still documents the queue key"
 check_block_has "$RESUME_BLOCK" 'Two lists, two facts' \
@@ -1070,7 +1073,7 @@ check_block_has "$GATE_BLOCK" 'every path into Phase 1, including .--resume.' \
   "T13.25: the gate runs on the resume path too"
 check_block_has "$GATE_BLOCK" 'never the order itself' \
   "T13.26: the gate says the run state does not record the pick order"
-STEP12_BLOCK="$(awk '/^### Step 1\.2 — Pick Next Issue/,/^### Step 1\.2b/' "$SRC_PHASES")"
+STEP12_BLOCK="$(anchor_span "$SRC_PHASES" ap-step12-pick ap-step12b-capture || true)"
 check_block_has "$STEP12_BLOCK" 'resume-seeded' \
   "T13.27: Step 1.2 names the resume-seeded lists"
 check_block_has "$STEP12_BLOCK" '.skip_list\[\]. is seeded straight into the session skip list' \
@@ -1117,16 +1120,16 @@ check_block_has "$UPDATE_BLOCK" 'End-of-iteration checkpoint' \
   "T13.39: Step 1.6 names the checkpoint it runs alongside"
 check_block_has "$UPDATE_BLOCK" 'different files' \
   "T13.40: Step 1.6 says the two own different files"
-CLEANUP_BLOCK="$(awk '/^### Step 5\.3 — Cleanup/,/^### Step 1\.6/' "$SRC_PHASES")"
+CLEANUP_BLOCK="$(anchor_span "$SRC_PHASES" ap-step53-cleanup ap-step16-cache-update || true)"
 check_block_has "$CLEANUP_BLOCK" 'append this issue to .processed\[\]. with its final' \
   "T13.41: Step 5.3 still carries #257's end-of-iteration checkpoint"
 check_block_lacks "$CLEANUP_BLOCK" 'summary\.suggested_order' \
   "T13.42: that checkpoint does not duplicate Step 1.6's job"
 
 # --- The built tree ships all of it. ---
-B_GATE_BLOCK="$(awk '/^### Step 1\.1a — Triage cache gate/,/^### Step 1\.1 — Triage/' "$BUILT_PHASES")"
-B_UPDATE_BLOCK="$(awk '/^### Step 1\.6 — Update the triage cache after a merge/,0' "$BUILT_PHASES")"
-B_STEP12_BLOCK="$(awk '/^### Step 1\.2 — Pick Next Issue/,/^### Step 1\.2b/' "$BUILT_PHASES")"
+B_GATE_BLOCK="$(anchor_span "$BUILT_PHASES" ap-step11a-cache-gate ap-step11-triage || true)"
+B_UPDATE_BLOCK="$(anchor_region "$BUILT_PHASES" ap-step16-cache-update || true)"
+B_STEP12_BLOCK="$(anchor_span "$BUILT_PHASES" ap-step12-pick ap-step12b-capture || true)"
 check_block_has "$B_GATE_BLOCK" 'every path into Phase 1, including .--resume.' \
   "T13.43: built phases.md ships the resume clause"
 check_block_has "$B_GATE_BLOCK" 'read-only, so .--dry-run. does not change it' \

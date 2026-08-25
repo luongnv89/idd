@@ -160,16 +160,28 @@ before matching.
 The library's header is the full convention reference, including the rule that
 its `.bash` extension keeps it out of `git ls-files 'tests/*.sh'`.
 
-`tests/test-followup-context-285.sh` and `tests/test-subagent-context-256.sh`
-are the migrated examples. Migration is deliberately partial — the remaining
-prose-grepping suites are tracked on issue #401. Named in #358's Decision
-Record as the next-highest-churn remainder:
+Migrated onto `tests/lib/anchors.bash` (heading extracts are `anchor_span` /
+`anchor_region`; remaining assertions are machine tokens, polarity-bearing
+stems, or behavioral checks):
 
+- `tests/test-followup-context-285.sh` and `tests/test-subagent-context-256.sh` (#358 / PR #395)
 - `tests/test-autopilot-triage-cache-258.sh`
 - `tests/test-qa-handoff-255.sh`
 - `tests/test-analysis-reuse-254.sh`
 
-The tracking issue enumerates the rest of the unmigrated suite.
+Those three named remainder suites were the #358 Decision Record's
+next-highest-churn slice; they close issue #401 together. Remaining
+`tests/*.sh` files that still grep skill markdown without `anchors.bash` are
+**deferred** (issue #401 AC4), not forgotten:
+
+| Class | Suites (representative) | Why deferred |
+|-------|-------------------------|--------------|
+| Structural / build | `test-build-script.sh`, `test-build-negative-mutations.sh`, `test-bundled-doc-slimming-249.sh`, `test-dependency-closure.sh`, `test-disclosure-gates-250.sh`, `test-consolidated-blocks-248.sh`, `test-skill-frontmatter-keys-307.sh`, `test-skill-line-cap-247.sh`, `test-root-skills-install-surface.sh`, `test-init-template-doc-urls-source.sh` | Assert install/build shape, not skill wording. A heading rename should not be this slice. |
+| Script / schema contracts | `test-scripts-252.sh`, `test-scripts-253.sh`, `test-scripts-pipeline-251.sh`, `test-config-schema-38.sh`, `test-runs-jsonl.sh`, `test-pre-commit-security.sh` | Pin commands, keys, and exit codes; already token-shaped. |
+| Sibling feature suites | remaining `test-autopilot-*.sh`, `test-issue-*.sh`, `test-idd-doctor.sh`, `test-model-*.sh`, `test-projects-sync.sh`, `test-sync-safety.sh`, `test-squash-binding-295.sh`, `test-phase1-contract-truthfulness.sh`, `test-pr-body-closing-keywords-312.sh`, `test-resolver-borrow-skills-309.sh` | True remaining prose-coupling. Migrate in later slices the same way #358 then #401 did — one named cluster per PR, not the whole inventory. |
+
+Open a new tracker when the next cluster is picked; do not retarget this
+paragraph at a closed issue.
 
 ### Behavioral eval harness
 

@@ -9,13 +9,13 @@ metadata:
   effort: max
 ---
 
-# /auto-pilot
+# /auto-pilot <!-- a:ap-skill-title -->
 
 Fully autonomous development loop: triage, pick, resolve, review, fix, merge, repeat — zero user prompts. (Version history lives in `CHANGELOG.md`; `docs/release-notes/` covers only early smoke-test reports and is not kept current per release.)
 
 The auto-pilot orchestrates existing gitissue skills into a continuous loop that processes the issue backlog with absolute autonomy. It triages **once** at loop start — reusing a fresh `.gitissue/triage.json` when there is one (*Mode Detection*) — then picks from that order. By default (`autopilot.max_parallel: 1`) it follows the original sequence exactly. When `max_parallel > 1`, it may resolve independent members of one persisted `parallel_groups` entry concurrently in isolated worktrees, then reviews and merges their PRs strictly one at a time. Every lane's run-log append stays in that serialized drain; after each merge, update the cached order in place. Clean PRs merge in `balanced` or `aggressive` mode. PRs with unresolved review issues create a follow-up issue and stay open unless `mode: aggressive` and `merge_partial: true` are both explicitly set. For critical issues, the loop stops and asks the user for a decision instead of auto-continuing.
 
-## Autonomy Philosophy
+## Autonomy Philosophy <!-- a:ap-autonomy -->
 
 Inspired by the auto-adapt-mode pattern: **always proceed, never block on recoverable situations**. The auto-pilot classifies every decision into two categories:
 
