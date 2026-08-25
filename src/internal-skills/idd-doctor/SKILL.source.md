@@ -75,6 +75,7 @@ If any are missing, stop immediately and print:
 Check these files relative to the skill's directory (the dirname of this SKILL.md):
 
 - `references/error-messages.md` — Error catalog
+- `references/run-stats.md` — run-stats footer contract (shape, fields, unavailable marker)
 
 ## Configuration
 
@@ -87,6 +88,8 @@ If `.gitissue.yml` does **not** exist, Check 3 is skipped with an `○ no .gitis
 ## Pipeline
 
 The doctor executes the four checks in order, prints one line per check, then a summary footer, then an informational run-log summary (see *Run-log summary*). Checks never short-circuit — every check runs even after a `FAIL`, so the operator sees the full picture in one pass.
+
+**Capture the run clock before Check 1** — run `date +%s` once and keep the epoch as `run_started_epoch`; the *Run Stats Footer* (`references/run-stats.md`) measures `elapsed` from it. Reading a clock is not a repo mutation, so it stays inside the *Read-only guarantee*.
 
 Expected output for a clean repo (verify against this when testing the skill):
 
@@ -393,6 +396,12 @@ A read heuristic for steps 1–3 (no new dependency — `tail` + a JSON-aware pa
 ```bash
 [ -s .gitissue/runs.jsonl ] && tail -n 50 .gitissue/runs.jsonl
 ```
+
+---
+
+## Run stats footer
+
+After the run-log summary, close with the *Run Stats Footer* — `references/run-stats.md` — `elapsed`, `tokens`, `agents`, run cost only, `n/a` for anything undetermined. It is the last thing printed at **every** terminal outcome, including a run that never reached Check 1: not a git repository, no `src/skills/` tree, or an unreadable `.gitissue.yml`. The doctor spawns no subagents, so `agents 0` is the determined value here, not `n/a`. It reports the run's own cost and never a metric a check already printed.
 
 ---
 

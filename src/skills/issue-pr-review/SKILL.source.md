@@ -46,6 +46,7 @@ references/prepass-tests-ci-mechanics.md
 references/verification-checks.md
 references/review-loop-mechanics.md
 references/report-templates.md
+references/run-stats.md
 references/error-messages.md
 references/docs/pre-commit-security.md
 references/docs/sync-conventions.md
@@ -79,7 +80,7 @@ If `origin` is missing or rebase conflicts occur, stop and ask (interactive) or 
 
 ## Configuration
 
-Load config once at skill start: run `python3 shared/scripts/gi-config.py` — two independent requirements, both mandatory. **Working directory:** the repo root, because the script resolves `.gitissue.yml` against the working directory; run it from anywhere else and it exits 0 reporting `config_file: null`/`first_run: true`, silently discarding the repo's real config. **Script path:** relative to this SKILL.md's own directory, *not* to the working directory — resolve it to an absolute path exactly as the *Bundled dependency precheck* resolves its list, and pass that absolute path to `python3`. It prints `{"config": {…dotted keys…}, "config_file": …, "first_run": …}` as JSON on stdout, merging the defaults below with `.gitissue.yml`. Exit 0: use `config`; `first_run: true` means no `.gitissue.yml` was found and every value came from the defaults below. Exit 3: `.gitissue.yml` is invalid — print `✗ Invalid config: .gitissue.yml` followed by the offending key and reason the script reported on stderr, and stop. Script file absent: a bundled dependency is missing, which is a broken install and not a degrade — stop and print the `✗ Missing bundled dependency` block the *Bundled dependency precheck* names. Any other outcome (no `python3`, non-zero exit, unparsable stdout): print `⚠ gi-config unavailable — using the inline defaults below` and instead follow the manual fallback procedure that makes up the rest of this section. That procedure is the *alternative* to this script, never an extra step to run alongside it: on exit 0 the script's `config` is the whole answer and the rest of this section is reference material only. Never re-read the config after this step.
+Load config once at skill start: run `python3 shared/scripts/gi-config.py` — two independent requirements, both mandatory. **Working directory:** the repo root, because the script resolves `.gitissue.yml` against the working directory; run it from anywhere else and it exits 0 reporting `config_file: null`/`first_run: true`, silently discarding the repo's real config. **Script path:** relative to this SKILL.md's own directory, *not* to the working directory — resolve it to an absolute path exactly as the *Bundled dependency precheck* resolves its list, and pass that absolute path to `python3`. It prints `{"config": {…dotted keys…}, "config_file": …, "first_run": …}` as JSON on stdout, merging the defaults below with `.gitissue.yml`. Exit 0: use `config`; `first_run: true` means no `.gitissue.yml` was found and every value came from the defaults below. Exit 3: `.gitissue.yml` is invalid — print `✗ Invalid config: .gitissue.yml` followed by the offending key and reason the script reported on stderr, and stop. Script file absent: a bundled dependency is missing, which is a broken install and not a degrade — stop and print the `✗ Missing bundled dependency` block the *Bundled dependency precheck* names. Any other outcome (no `python3`, non-zero exit, unparsable stdout): print `⚠ gi-config unavailable — using the inline defaults below` and instead follow the manual fallback procedure that makes up the rest of this section. That procedure is the *alternative* to this script, never an extra step to run alongside it: on exit 0 the script's `config` is the whole answer and the rest of this section is reference material only. Never re-read the config after this step. **Capture the run clock here:** chain that same `python3` invocation as `python3 …; ec=$?; date +%s >&2; exit "$ec"` and keep the stderr epoch as `run_started_epoch` — JSON stdout and the script's exit stay intact, it costs no extra round trip, and it is what the *Run Stats Footer* (`references/run-stats.md`) measures `elapsed` from.
 
 Otherwise, load `.gitissue.yml` once. Defaults (full semantics in `docs/config-schema.md`):
 - `review.max_cycles: 3` — 3 LLM cycles suffice once the script pre-pass handles mechanical issues
@@ -455,7 +456,7 @@ Print a structured step-by-step summary of the pipeline results, using the templ
 - *Summary — PR With Remaining Issues* — review couldn't clear everything within `review.max_cycles`
 - *Auto-Merge (auto mode only)* — post-report squash merge and block-on-failure handling
 
-In interactive mode: never auto-merge — just report status.
+In interactive mode: never auto-merge — just report status. **Then the run-stats footer.** Close with the *Run Stats Footer* — `references/run-stats.md` — `elapsed`, `tokens`, `agents`, run cost only, `n/a` for anything undetermined. It is the last thing printed at **every** terminal outcome, including a run that stopped before Step 7: a failed prerequisite, an invalid config, a PR that could not be checked out, a CI wait that gave up, or a review loop that exhausted `review.max_cycles`.
 
 When `--no-merge` is set (even in auto mode): skip the merge step and report status only — equivalent to interactive mode's merge behavior. This flag exists so auto-pilot's reviewer subagent can run the full review-fix cycle without stealing the merge step from Phase 5.
 
@@ -472,7 +473,6 @@ When `--no-merge` is set (even in auto mode): skip the merge step and report sta
 - **Platform driver:** all tracker access follows the GitHub driver — `--json` with explicit field selection, never parsed text output; full catalog in docs/platform-github.md.
 - **Terminal output:** follow the `docs/terminal-style.md` vocabulary — `[N/7]` step counter; symbols `●` progress, `✓` success, `✗` failure, `◆` header, `⚠` warning, `○` info; two-space indent, `┄` separators, URLs on their own line, max 80 chars.
 - **Errors:** rich format from `references/error-messages.md` — `✗ Short description` then `  To fix:  <command>`.
-- **Expected output:** a clean review prints the 7-step tracker and a summary — see *Expected Inline Output* in `references/report-templates.md`.
 
 ## Edge Cases
 
