@@ -1,6 +1,6 @@
-# Contributing to issue-dev
+# Contributing to gitissue
 
-Thanks for your interest in contributing! issue-dev is a skills-only project — there's no runtime code, just Claude Code skills written in Markdown. This makes contributing accessible to anyone comfortable with Markdown and GitHub.
+Thanks for your interest in contributing! gitissue is a **prompt-first** project: each public skill is a self-contained SKILL.md package (`src/skills/<name>/SKILL.source.md`) that instructs an agent how to perform a task. The exception is `src/shared/scripts/` — small, stdlib-only Python helpers the skills shell out to when determinism beats prose (`src/shared/scripts/gi-config.py:3`).
 
 ## How to Contribute
 
@@ -34,9 +34,9 @@ graph TD
 ```
 
 1. Fork the repository
-2. Create a feature branch from `main`:
+2. Create a type-based feature branch from `main` (`docs/naming-conventions.md:16`):
    ```bash
-   git checkout -b feat/your-change
+   git checkout -b feat/15-your-change
    ```
 3. Make your changes
 4. Test your skill changes against a real GitHub repo (see [Development Setup](#development-setup))
@@ -105,11 +105,17 @@ src/                        # SOURCE OF TRUTH — hand-edit here
 │       └── references/
 ├── internal-skills/        # /idd-doctor and other internal-only skills
 └── shared/
-    └── agents/             # Shared agent definitions used by multiple skills
+    ├── agents/             # Shared agent definitions used by multiple skills
+    └── scripts/            # stdlib-only Python helpers (14 × gi-*.py)
 
-scripts/
+scripts/                    # Repo tooling (not the shared-script closure)
 ├── build.sh                # Thin entrypoint → calls build.py
-└── build.py                # Deterministic builder (src/ + docs/ → skills/ + dist/)
+├── build.py                # Deterministic builder (src/ + docs/ → skills/ + dist/)
+├── coverage-run.sh         # Coverage over shared Python script entry points
+├── install-hooks.sh        # Local pre-commit security hook installer
+├── idd-lint.py             # IDD Spec linter (no LLM, stdlib-only)
+├── gi-model-refresh.py     # CI-only CursorBench model-data freshness gate
+└── verify_flattened_skills.sh  # URL-aware self-containment check
 
 docs/                       # Single top-level docs tree (issue #81) — runtime
                              # docs bundled into skills at build time plus
@@ -164,21 +170,31 @@ docs: add triage workflow example to README
 
 ```mermaid
 graph LR
-    M[main<br/>stable, releasable] --> F["feat/*<br/>new features"]
-    M --> X["fix/*<br/>bug fixes"]
-    M --> I["issue-N/*<br/>issue-linked branches"]
+    M[main<br/>stable, releasable] --> F["feat/N-…<br/>new features"]
+    M --> X["fix/N-…<br/>bug fixes"]
+    M --> D["docs/N-…<br/>documentation"]
+    M --> R["refactor/N-…<br/>improvements"]
 
     F --> M
     X --> M
-    I --> M
+    D --> M
+    R --> M
 
     style M fill:#4CAF50,color:#fff
 ```
 
-- `main` — stable, always releasable
-- `feat/*` — new features
-- `fix/*` — bug fixes
-- `issue-N/*` — issue-linked branches (created by `/issue-resolver`)
+Default branch names are **type-based** (`docs/naming-conventions.md:16-38`): `<type>/<issue-number>-<short-description>`, lowercase, hyphens, under 50 characters. `/issue-resolver` derives this when `resolve.branch_prefix` is `"auto"` (`docs/naming-conventions.md:72-75`).
+
+| Prefix | When | Example |
+|--------|------|---------|
+| `fix/` | bug | `fix/42-mobile-auth-redirect` |
+| `feat/` | feature | `feat/15-dark-mode-toggle` |
+| `refactor/` | improvement | `refactor/8-cleanup-auth-module` |
+| `docs/` | documentation | `docs/23-update-api-reference` |
+| `test/` | tests | `test/31-add-auth-unit-tests` |
+| `chore/` | maintenance | `chore/50-update-dependencies` |
+
+A configured `resolve.branch_prefix` other than `"auto"` (for example `"issue-"`) is an opt-out, not the default (`docs/naming-conventions.md:72-77`).
 
 ## Pull Request Process
 
@@ -208,7 +224,7 @@ graph TD
 
 ## Coding Standards
 
-Since this is a skills-only project, "code" means SKILL.md files and references:
+Authored work is SKILL.md, references, templates, and the stdlib helpers under `src/shared/scripts/` (`src/shared/scripts/gi-config.py:3`):
 
 - **`gh` CLI calls** — always use `--json` with explicit field selection, never parse text output
 - **Terminal output** — follow the symbol vocabulary and formatting rules in `DESIGN.md`
