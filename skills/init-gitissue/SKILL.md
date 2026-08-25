@@ -71,7 +71,7 @@ Check these files relative to the skill's directory (the dirname of this SKILL.m
 
 ## Configuration Check
 
-This skill GENERATES the config — it does not read one. Check if `.gitissue.yml` already exists in the repo root before proceeding. **Capture the run clock in that same check:** append `; date +%s` to the first shell invocation and keep the epoch as `run_started_epoch` — it costs no extra round trip and it is what the *Run Stats Footer* (`references/run-stats.md`) measures `elapsed` from.
+This skill GENERATES the config — it does not read one. Check if `.gitissue.yml` already exists in the repo root before proceeding. **Capture the run clock in that same check:** chain the first shell as `…; ec=$?; date +%s >&2; exit $ec` and keep the stderr epoch as `run_started_epoch` — the check's exit stays intact, it costs no extra round trip, and it is what the *Run Stats Footer* (`references/run-stats.md`) measures `elapsed` from.
 
 ### File does NOT exist — always create
 

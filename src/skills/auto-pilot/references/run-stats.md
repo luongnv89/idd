@@ -36,10 +36,12 @@ Fixed, in this order. No skill adds, drops, or renames one.
 | `tokens` | tokens the run consumed, a plain integer with thousands separators (`128,400`) | the host runtime, when it reports a usage figure to the skill |
 | `agents` | subagents the run spawned, an integer | the orchestrator's own count of spawns |
 
-`run_started_epoch` is captured once, at skill start, by appending `; date +%s`
-to the skill's first shell invocation — the config load. It costs no extra
-round trip. A skill that already records a start time reuses that value and
-captures nothing new.
+`run_started_epoch` is captured once, at skill start, in the same shell as
+the skill's first command — the config load — via
+`cmd; ec=$?; date +%s >&2; exit $ec`. Read the epoch from stderr so stdout
+and the command's exit stay intact. It costs no extra round trip. A skill
+that already records a start time reuses that value and captures nothing
+new.
 
 ## Unavailable values
 

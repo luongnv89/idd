@@ -210,8 +210,8 @@ echo ""
 echo "  AC3 — the run clock anchor"
 for name in issue-analysis issue-creator issue-pr-review issue-resolver issue-triage; do
   f="$REPO_ROOT/src/skills/$name/SKILL.source.md"
-  check_flow "$f" 'date \+%s. to that same .python3. invocation' \
-    "AC4: $name captures the clock in the config load — no extra round trip"
+  check_flow "$f" 'that same .python3. invocation.*ec=\$\?; date \+%s >&2; exit \$ec' \
+    "AC4: $name captures the clock in the config load — no extra round trip, exit and stdout preserved"
   check_has  "$f" 'run_started_epoch' "AC3: $name names the run_started_epoch anchor"
 done
 check_flow "$REPO_ROOT/src/skills/auto-pilot/SKILL.source.md" \
