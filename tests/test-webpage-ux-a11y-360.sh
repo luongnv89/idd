@@ -432,8 +432,16 @@ for name, spec in PAGES.items():
         wrapped = 0
         for pos in tables:
             before = stripped[:pos].rstrip()
-            if before.endswith('<div class="table-scroll" tabindex="0">'):
-                wrapped += 1
+            # Accept extra attributes (role, aria-label) as long as the
+            # wrapper is a .table-scroll with tabindex="0".
+            open_tag = re.search(r'<div\b[^>]*>\s*$', before)
+            if open_tag:
+                tag = open_tag.group(0)
+                classes = re.search(r'\bclass="([^"]*)"', tag)
+                tabindex = re.search(r'\btabindex="([^"]*)"', tag)
+                if (classes and 'table-scroll' in classes.group(1).split()
+                        and tabindex and tabindex.group(1) == '0'):
+                    wrapped += 1
         ov = resolve(rules, '.table-scroll').get('overflow-x')
         if wrapped != len(tables):
             emit(False, '%s F-UX-012: %d of %d tables lack a .table-scroll wrapper'

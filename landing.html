@@ -169,9 +169,19 @@
     /* ───────────────────────── NAV ───────────────────────── */
     header.nav {
       position: sticky; top: 0; z-index: 50;
-      backdrop-filter: blur(14px);
       background: rgba(10,10,10,0.72);
       border-bottom: 1px solid var(--line-soft);
+    }
+    /* backdrop-filter on the header itself clips overflow in Chrome/Safari,
+       so the absolutely positioned .nav-menu-panel never paints. Filter a
+       full-bleed ::before instead. */
+    header.nav::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: -1;
+      pointer-events: none;
+      backdrop-filter: blur(14px);
     }
     .nav-inner {
       display: flex; align-items: center; justify-content: space-between;
@@ -438,6 +448,7 @@
        keyboard (WCAG 2.1.1) — measured in Firefox at 320px, 7 of the 9 docs
        tables and the landing model table really do overflow their box. */
     .table-scroll { max-width: 100%; overflow-x: auto; }
+    .table-scroll:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
     .model-note { margin-top: 16px; font-family: var(--mono); font-size: 12px; color: var(--fg-dim); line-height: 1.55; }
     .terminal.compact .term-body { padding: 16px 18px; font-size: 12.5px; line-height: 1.75; }
 
@@ -881,7 +892,7 @@
           <h3>Right model, right thinking level — stamped on every issue</h3>
           <p>When you create or normalize an issue, <code>/issue-creator</code> maps estimated effort to a <strong>model + thinking tier</strong> from CursorBench data. The preview shows <span class="mono green">⚡ Model:</span>; the issue body stores an advisory <strong>Suggested model:</strong> line with the benchmark date.</p>
           <p>Use it to route XS typo fixes to low-cost modes and reserve extra-high thinking for large features — without blocking creation if the cache is offline (bundled seed + graceful fallback).</p>
-          <div class="table-scroll" tabindex="0">
+          <div class="table-scroll" role="region" tabindex="0" aria-label="Right model, right thinking level">
           <table class="model-table" aria-label="Effort to suggested model mapping">
             <thead><tr><th>Effort</th><th>OpenAI</th><th>Anthropic</th></tr></thead>
             <tbody>

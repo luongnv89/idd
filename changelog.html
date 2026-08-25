@@ -71,9 +71,19 @@
     /* ── NAV ── */
     header.nav {
       position: sticky; top: 0; z-index: 50;
-      backdrop-filter: blur(14px);
       background: rgba(10,10,10,0.72);
       border-bottom: 1px solid var(--line-soft);
+    }
+    /* backdrop-filter on the header itself clips overflow in Chrome/Safari,
+       so the absolutely positioned .nav-menu-panel never paints. Filter a
+       full-bleed ::before instead. */
+    header.nav::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: -1;
+      pointer-events: none;
+      backdrop-filter: blur(14px);
     }
     .nav-inner {
       display: flex; align-items: center; justify-content: space-between;
