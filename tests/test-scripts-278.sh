@@ -210,6 +210,35 @@ set -e
 [ "$a" = 0 ] && [ "$b" = 0 ] && [ "$s2" = 2 ] \
   && pass "invalid/unavailable/usage map to exits 3/4/2" || fail "exit vocabulary (got $s2/$s/$s4)"
 
+# Leading non-JSON banner (mise) must not hide a readable backlog (#374).
+mkdir -p "$TMP/banner/bin"
+cat > "$TMP/banner/bin/gh" << 'EOF'
+#!/bin/sh
+echo "mise ~/.config/mise/config.toml tools: gh@2.97.0"
+echo '[{"number":1,"title":"Ship duplicate scorer","body":"duplicate scorer runtime","labels":[{"name":"feature"}]}]'
+EOF
+chmod +x "$TMP/banner/bin/gh"
+set +e
+banner_out="$(printf '%s' "$request" | PATH="$TMP/banner/bin:$PATH" python3 "$SCRIPT" 2>"$TMP/banner-ok-err")"
+banner_ok=$?
+set -e
+printf '%s' "$banner_out" | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d["duplicates"] and d["issue_source"]=="gh"' \
+  && [ "$banner_ok" = 0 ] \
+  && pass "leading mise banner still yields duplicate scores" || fail "banner-prefixed gh JSON was rejected"
+
+cat > "$TMP/banner/bin/gh" << 'EOF'
+#!/bin/sh
+echo "mise ~/.config/mise/config.toml tools: gh@2.97.0"
+echo "not a backlog"
+EOF
+chmod +x "$TMP/banner/bin/gh"
+set +e
+printf '%s' "$request" | PATH="$TMP/banner/bin:$PATH" python3 "$SCRIPT" >/dev/null 2>"$TMP/banner-err"
+banner_s=$?
+set -e
+[ "$banner_s" = 4 ] && grep -q 'gh printed unparsable JSON' "$TMP/banner-err" \
+  && pass "banner with no JSON still exits 4" || fail "exit 4 missing for unusable gh stdout"
+
 # Untrusted issue text stays data; no shell is used and no text-carrying flag exists.
 mkdir "$TMP/inject"
 python3 - "$TMP/inject/issues.json" "$TMP/inject/request.json" <<'PY'

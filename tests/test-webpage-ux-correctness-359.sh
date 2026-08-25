@@ -13,7 +13,8 @@
 #       derived from unrelated numbers; when it cannot be established the
 #       stat keeps its "—" placeholder rather than showing a guess.
 #   F-UX-011. The copy button surfaces a visible error state on every
-#       clipboard failure path (rejection, thrown call, missing API).
+#       clipboard failure path (rejection, thrown call, missing API,
+#       non-thenable writeText return).
 #
 # Also guards the invariant that none of this loosened the Content-Security-
 # Policy metas added by issue #338.
@@ -21,10 +22,14 @@
 # Sections:
 #   Static   — string/structure assertions (always run).
 #   CSS      — python3 scan of landing.html's <style>: no rule may hide
-#              .reveal without also requiring .js.
+#              .reveal without a genuine `.js` class requirement (not a
+#              substring match; `:not(.js)` does not count).
 #   Behavior — node DOM-shim driving landing.html's real inline script through
-#              three clipboard scenarios. Requires node; without it the section
-#              fails loudly rather than passing silently.
+#              five clipboard scenarios (ok / reject / throws / missing /
+#              non-thenable). Requires node; without it the section fails
+#              loudly rather than passing silently.
+#   Mutation — each new/changed assertion is broken in a temp copy, confirmed
+#              red, then discarded. The working tree is never mutated.
 #
 # Usage: bash tests/test-webpage-ux-correctness-359.sh
 # Returns: exit 0 if all tests pass, exit 1 on any failure.
@@ -41,6 +46,127 @@ FAIL=0
 
 pass() { echo "  ✓ $1"; PASS=$((PASS + 1)); }
 fail() { echo "  ✗ $1"; FAIL=$((FAIL + 1)); }
+
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+
+# C1: a hide rule on .reveal is allowed only when that selector actually
+# requires the `js` class. `:not(.js)` and identifiers that merely contain
+# the characters `.js` (`.json`) do not qualify.
+scan_reveal_gating() {
+  python3 - "$1" <<'PY'
+import io, re, sys
+
+html = io.open(sys.argv[1], encoding='utf-8').read()
+styles = re.findall(r'<style>(.*?)</style>', html, re.S)
+if not styles:
+    print('  no <style> block found', file=sys.stderr)
+    sys.exit(1)
+
+css = '\n'.join(styles)
+css = re.sub(r'/\*.*?\*/', '', css, flags=re.S)
+css = re.sub(r'@media[^{]*\{', '', css)
+
+
+def requires_js_class(selector):
+    """True iff the selector requires the `js` class, not a `.js` substring."""
+    stripped = re.sub(r':not\([^)]*\)', '', selector)
+    return re.search(r'\.js(?![A-Za-z0-9_-])', stripped) is not None
+
+
+bad = []
+for selector, body in re.findall(r'([^{}]+)\{([^{}]*)\}', css):
+    selector = ' '.join(selector.split())
+    hides = (re.search(r'opacity:\s*0(\D|$)', body)
+             or re.search(r'visibility:\s*hidden', body)
+             or re.search(r'display:\s*none', body))
+    if not hides:
+        continue
+    for part in selector.split(','):
+        part = ' '.join(part.split())
+        if '.reveal' not in part:
+            continue
+        if not requires_js_class(part):
+            bad.append(part)
+
+if bad:
+    for s in bad:
+        print('  ungated hiding rule: ' + s, file=sys.stderr)
+    sys.exit(1)
+sys.exit(0)
+PY
+}
+
+# T8: the only JS write to the commits stat is Intl.NumberFormat(...).format(total).
+scan_commits_writes() {
+  python3 - "$1" <<'PY'
+import io, re, sys
+
+html = io.open(sys.argv[1], encoding='utf-8').read()
+scripts = re.findall(r'<script>(.*?)</script>', html, re.S)
+code = '\n'.join(scripts)
+code = re.sub(r'/\*.*?\*/', '', code, flags=re.S)
+code = re.sub(r'//[^\n]*', '', code)
+
+target = (
+    r'(?:commitsEl|document\.getElementById\(\s*[\'"]cl-commits[\'"]\s*\))'
+    r'\s*\.\s*(textContent|innerHTML|innerText)\s*=\s*([^;]+)'
+)
+writes = re.findall(target, code)
+if len(writes) != 1:
+    print('  expected exactly 1 write to commitsEl value, found %d' % len(writes),
+          file=sys.stderr)
+    for _, rhs in writes:
+        print('    rhs: ' + ' '.join(rhs.split()), file=sys.stderr)
+    sys.exit(1)
+prop, rhs = writes[0]
+rhs = ' '.join(rhs.split())
+if prop != 'textContent':
+    print('  commitsEl written via ' + prop + ', not textContent', file=sys.stderr)
+    sys.exit(1)
+if not re.search(r'Intl\.NumberFormat\([^)]*\)\.format\(\s*total\s*\)', rhs):
+    print('  commitsEl write is not API-derived format(total): ' + rhs, file=sys.stderr)
+    sys.exit(1)
+if re.search(r'releases|forks|~|\*', rhs):
+    print('  commitsEl write looks fabricated: ' + rhs, file=sys.stderr)
+    sys.exit(1)
+sys.exit(0)
+PY
+}
+
+scan_commits_placeholder() {
+  python3 - "$1" <<'PY'
+import io, re, sys
+
+html = io.open(sys.argv[1], encoding='utf-8').read()
+m = re.search(r'<[^>]*\bid=["\']cl-commits["\'][^>]*>([^<]*)</', html)
+if not m:
+    print('  no #cl-commits element in markup', file=sys.stderr)
+    sys.exit(1)
+placeholder = m.group(1).strip()
+if placeholder != '\u2014':
+    print('  #cl-commits placeholder is %r, expected em-dash' % placeholder,
+          file=sys.stderr)
+    sys.exit(1)
+sys.exit(0)
+PY
+}
+
+# Apply a unique-needle replacement into dst. Exit 2 if the needle is not unique.
+apply_mut() {
+  python3 - "$1" "$2" "$3" "$4" <<'PY'
+import sys
+from pathlib import Path
+
+src, dst, old, new = sys.argv[1:5]
+text = Path(src).read_text(encoding='utf-8')
+count = text.count(old)
+if count != 1:
+    sys.stderr.write('mutation needle count %d != 1\n' % count)
+    sys.exit(2)
+Path(dst).write_text(text.replace(old, new, 1), encoding='utf-8')
+PY
+}
 
 echo "◆ Web page UX correctness (#359)"
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
@@ -163,16 +289,19 @@ else
 fi
 
 # ── F-UX-008: honest stats ─────────────────────────────────────────────────
-if grep -qE 'forks_count[[:space:]]*\*' "$CHANGELOG"; then
-  fail "T8 (F-UX-008): commit count is still derived from forks_count"
+# The invariant is the value, not two known-bad literals: commitsEl is written
+# once, from Intl.NumberFormat(...).format(total), or it stays the "—" markup
+# placeholder. A novel formula such as `releases.length * 12` must fail here.
+if scan_commits_writes "$CHANGELOG"; then
+  pass "T8 (F-UX-008): the only commitsEl write is API-derived format(total)"
 else
-  pass "T8 (F-UX-008): no forks_count-derived commit estimate remains"
+  fail "T8 (F-UX-008): commitsEl is written from something other than the API total"
 fi
 
-if grep -qE "'~[0-9]+'" "$CHANGELOG"; then
-  fail "T9 (F-UX-008): a hardcoded ~N estimate remains in changelog.html"
+if scan_commits_placeholder "$CHANGELOG"; then
+  pass "T9 (F-UX-008): #cl-commits markup is the em-dash placeholder"
 else
-  pass "T9 (F-UX-008): no hardcoded ~N estimate remains"
+  fail "T9 (F-UX-008): #cl-commits markup is not the em-dash placeholder"
 fi
 
 if grep -q "/commits?per_page=1" "$CHANGELOG" && grep -q 'rel="last"' "$CHANGELOG"; then
@@ -216,42 +345,10 @@ echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄�
 echo "CSS rule scan (no ungated rule may hide .reveal)"
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 
-if python3 - "$LANDING" <<'PY'
-import io, re, sys
-
-html = io.open(sys.argv[1], encoding='utf-8').read()
-styles = re.findall(r'<style>(.*?)</style>', html, re.S)
-if not styles:
-    print('  no <style> block found', file=sys.stderr)
-    sys.exit(1)
-
-css = '\n'.join(styles)
-css = re.sub(r'/\*.*?\*/', '', css, flags=re.S)
-
-# Flatten @media wrappers so their inner rules are scanned too.
-css = re.sub(r'@media[^{]*\{', '', css)
-
-bad = []
-for selector, body in re.findall(r'([^{}]+)\{([^{}]*)\}', css):
-    selector = ' '.join(selector.split())
-    if '.reveal' not in selector:
-        continue
-    # A rule that only restores visibility is harmless whatever its scope.
-    hides = re.search(r'opacity:\s*0(\D|$)', body) or re.search(r'visibility:\s*hidden', body) \
-        or re.search(r'display:\s*none', body)
-    if hides and '.js' not in selector:
-        bad.append(selector)
-
-if bad:
-    for s in bad:
-        print('  ungated hiding rule: ' + s, file=sys.stderr)
-    sys.exit(1)
-sys.exit(0)
-PY
-then
-  pass "C1 (F-UX-001): every rule that hides .reveal requires .js"
+if scan_reveal_gating "$LANDING"; then
+  pass "C1 (F-UX-001): every rule that hides .reveal requires the js class"
 else
-  fail "C1 (F-UX-001): a .reveal rule hides content without requiring .js"
+  fail "C1 (F-UX-001): a .reveal rule hides content without requiring the js class"
 fi
 
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
@@ -264,9 +361,6 @@ if ! command -v node >/dev/null 2>&1; then
   echo "Result: $PASS passed, $FAIL failed"
   exit 1
 fi
-
-TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
 
 cat > "$TMP/copy-harness.cjs" <<'HARNESS_EOF'
 'use strict';
@@ -322,6 +416,8 @@ if (scenario === 'reject') {
   clipboard = undefined;
 } else if (scenario === 'ok') {
   clipboard = { writeText() { return Promise.resolve(); } };
+} else if (scenario === 'nonthenable') {
+  clipboard = { writeText() { return 1; } };
 } else {
   console.error('harness: unknown scenario ' + scenario);
   process.exit(2);
@@ -378,12 +474,13 @@ new Promise(function (r) { setTimeout(r, 20); }).then(function () {
 });
 HARNESS_EOF
 
-for scenario_name in ok reject throws missing; do
+for scenario_name in ok reject throws missing nonthenable; do
   case "$scenario_name" in
-    ok)      label="clipboard resolves → success state, no error state" ;;
-    reject)  label="clipboard rejects (permission denied) → visible error state" ;;
-    throws)  label="writeText throws synchronously → visible error state" ;;
-    missing) label="no Clipboard API at all → visible error state" ;;
+    ok)           label="clipboard resolves → success state, no error state" ;;
+    reject)       label="clipboard rejects (permission denied) → visible error state" ;;
+    throws)       label="writeText throws synchronously → visible error state" ;;
+    missing)      label="no Clipboard API at all → visible error state" ;;
+    nonthenable)  label="writeText returns a non-thenable → visible error state" ;;
   esac
   if node "$TMP/copy-harness.cjs" "$LANDING" "$scenario_name" >"$TMP/out-$scenario_name.txt" 2>&1; then
     pass "B (F-UX-011): $label"
@@ -392,6 +489,99 @@ for scenario_name in ok reject throws missing; do
     sed 's/^/      /' "$TMP/out-$scenario_name.txt"
   fi
 done
+
+echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
+echo "Mutation proofs (temp copies; working tree untouched)"
+echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
+
+# M-C1a: the F-UX-001 shape that the old substring check accepted.
+if python3 - "$LANDING" "$TMP/mut-c1-notjs.html" <<'PY'
+from pathlib import Path
+import sys
+src, dst = sys.argv[1], sys.argv[2]
+text = Path(src).read_text(encoding='utf-8')
+needle = '</style>'
+if text.count(needle) != 1:
+    sys.stderr.write('</style> count %d != 1\n' % text.count(needle))
+    sys.exit(2)
+Path(dst).write_text(
+    text.replace(needle, 'html:not(.js) .reveal{opacity:0}\n  </style>', 1),
+    encoding='utf-8')
+PY
+then
+  if scan_reveal_gating "$TMP/mut-c1-notjs.html" 2>/dev/null; then
+    fail "M-C1a: html:not(.js) .reveal{opacity:0} stayed green — C1 has no teeth"
+  else
+    pass "M-C1a: html:not(.js) .reveal{opacity:0} turns C1 red"
+  fi
+else
+  fail "M-C1a: could not inject html:not(.js) mutant (</style> not unique)"
+fi
+
+# M-C1b: a class whose name merely contains the characters `.js`.
+if python3 - "$LANDING" "$TMP/mut-c1-json.html" <<'PY'
+from pathlib import Path
+import sys
+src, dst = sys.argv[1], sys.argv[2]
+text = Path(src).read_text(encoding='utf-8')
+needle = '</style>'
+if text.count(needle) != 1:
+    sys.stderr.write('</style> count %d != 1\n' % text.count(needle))
+    sys.exit(2)
+Path(dst).write_text(
+    text.replace(needle, '.json .reveal{opacity:0}\n  </style>', 1),
+    encoding='utf-8')
+PY
+then
+  if scan_reveal_gating "$TMP/mut-c1-json.html" 2>/dev/null; then
+    fail "M-C1b: .json .reveal{opacity:0} stayed green — C1 is still a substring test"
+  else
+    pass "M-C1b: .json .reveal{opacity:0} turns C1 red"
+  fi
+else
+  fail "M-C1b: could not inject .json mutant (</style> not unique)"
+fi
+
+# M-T8: a novel fabricated formula the old literal greps would miss.
+T8_OLD="commitsEl.textContent = new Intl.NumberFormat('en').format(total);"
+T8_NEW="commitsEl.textContent = releases.length * 12;"
+if apply_mut "$CHANGELOG" "$TMP/mut-t8.html" "$T8_OLD" "$T8_NEW"; then
+  if scan_commits_writes "$TMP/mut-t8.html" 2>/dev/null; then
+    fail "M-T8: releases.length * 12 stayed green — T8 is still a literal grep"
+  else
+    pass "M-T8: releases.length * 12 turns the commitsEl invariant red"
+  fi
+else
+  fail "M-T8: format(total) assignment was not a unique needle"
+fi
+
+# M-T9: replacing the em-dash placeholder with a hardcoded estimate.
+T9_OLD='<div class="val" id="cl-commits">—</div>'
+T9_NEW='<div class="val" id="cl-commits">~160</div>'
+if apply_mut "$CHANGELOG" "$TMP/mut-t9.html" "$T9_OLD" "$T9_NEW"; then
+  if scan_commits_placeholder "$TMP/mut-t9.html" 2>/dev/null; then
+    fail "M-T9: ~160 placeholder stayed green — T9 has no teeth"
+  else
+    pass "M-T9: a ~160 placeholder turns T9 red"
+  fi
+else
+  fail "M-T9: cl-commits placeholder markup was not a unique needle"
+fi
+
+# M-B: drop the non-thenable guard; the new scenario must go red.
+B_OLD="if (!write || typeof write.then !== 'function') { failed(); return; }"
+B_NEW="/* non-thenable guard removed */"
+if apply_mut "$LANDING" "$TMP/mut-nonthenable.html" "$B_OLD" "$B_NEW"; then
+  if node "$TMP/copy-harness.cjs" "$TMP/mut-nonthenable.html" nonthenable \
+       >"$TMP/out-mut-nonthenable.txt" 2>&1; then
+    fail "M-B: non-thenable scenario stayed green after removing the guard"
+    sed 's/^/      /' "$TMP/out-mut-nonthenable.txt"
+  else
+    pass "M-B: removing the non-thenable guard turns the scenario red"
+  fi
+else
+  fail "M-B: non-thenable guard was not a unique needle"
+fi
 
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 echo "Result: $PASS passed, $FAIL failed"

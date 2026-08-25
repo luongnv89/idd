@@ -85,7 +85,7 @@ recovery) applies unchanged when it does run.
 
 ## Configuration
 
-Load config once at skill start: run `python3 shared/scripts/gi-config.py` — two independent requirements, both mandatory. **Working directory:** the repo root, because the script resolves `.gitissue.yml` against the working directory; run it from anywhere else and it exits 0 reporting `config_file: null`/`first_run: true`, silently discarding the repo's real config. **Script path:** relative to this SKILL.md's own directory, *not* to the working directory — resolve it to an absolute path exactly as the *Bundled dependency precheck* resolves its list, and pass that absolute path to `python3`. It prints `{"config": {…dotted keys…}, "config_file": …, "first_run": …}` as JSON on stdout, merging the defaults below with `.gitissue.yml`. Exit 0: use `config`, and print the `○ First run` line below when `first_run` is `true`. Exit 3: `.gitissue.yml` is invalid — print the validation error from `references/error-messages.md` (*Invalid config*) and stop. Script file absent: a bundled dependency is missing, which is a broken install and not a degrade — stop and print the `✗ Missing bundled dependency` block the *Bundled dependency precheck* names. Any other outcome (no `python3`, non-zero exit, unparsable stdout): print `⚠ gi-config unavailable — using the inline defaults below` and instead follow the manual fallback procedure that makes up the rest of this section. That procedure is the *alternative* to this script, never an extra step to run alongside it: on exit 0 the script's `config` is the whole answer and the rest of this section is reference material only. Never re-read the config after this step.
+Load config once at skill start: run `python3 shared/scripts/gi-config.py` — two independent requirements, both mandatory. **Working directory:** the repo root, because the script resolves `.gitissue.yml` against the working directory; run it from anywhere else and it exits 0 reporting `config_file: null`/`first_run: true`, silently discarding the repo's real config. **Script path:** relative to this SKILL.md's own directory, *not* to the working directory — resolve it to an absolute path exactly as the *Bundled dependency precheck* resolves its list, and pass that absolute path to `python3`. It prints `{"config": {…dotted keys…}, "config_file": …, "first_run": …}` as JSON on stdout, merging the defaults below with `.gitissue.yml`. Exit 0: use `config`, and print the `○ First run` line below when `first_run` is `true`. Exit 3: `.gitissue.yml` is invalid — print the validation error from `references/error-messages.md` (*Invalid config*) and stop. Script file absent: a bundled dependency is missing, which is a broken install and not a degrade — stop and print the `✗ Missing bundled dependency` block the *Bundled dependency precheck* names. Any other outcome (no `python3`, non-zero exit, unparsable stdout): print `⚠ gi-config unavailable — using the inline defaults below` and instead follow the manual fallback procedure that makes up the rest of this section. That procedure is the *alternative* to this script, never an extra step to run alongside it: on exit 0 the script's `config` is the whole answer and the rest of this section is reference material only. Never re-read the config after this step. **Capture the run clock here:** chain that same `python3` invocation as `python3 …; ec=$?; date +%s >&2; exit "$ec"` and keep the stderr epoch as `run_started_epoch` — JSON stdout and the script's exit stay intact, it costs no extra round trip, and it is what the *Run Stats Footer* (`references/run-stats.md`) measures `elapsed` from.
 
 Otherwise, load `.gitissue.yml` from the repo root once at skill start. If the file does not exist, use defaults and print:
 
@@ -147,6 +147,7 @@ Check these files:
 - `references/clarify-intent.md` — Step 3.5 clarify-ambiguous-intent full procedure
 - `references/error-messages.md` — complete error catalog with triggers and exact output
 - `references/examples.md` — worked example runs (create, normalize, batch)
+- `references/run-stats.md` — run-stats footer contract (shape, fields, unavailable marker)
 - `references/docs/naming-conventions.md` — issue title and labeling conventions
 - `references/docs/github-projects-sync.md` — GitHub Projects status sync reference
 - `references/docs/config-schema.md` — configuration schema reference
@@ -424,6 +425,8 @@ A successful create prints the issue URL and a compact summary:
 ```
 
 In batch mode, one line per issue is printed followed by a totals footer (`✓ 5 created, 1 skipped (duplicate)`).
+
+**Then the run-stats footer.** Close with the *Run Stats Footer* — `references/run-stats.md` — `elapsed`, `tokens`, `agents`, run cost only, `n/a` for anything undetermined. It is the last thing printed at **every** terminal outcome, including a run that created nothing — a cancelled confirmation, a duplicate the user chose not to file, an invalid config, or a failed `gh issue create`. In batch mode one footer covers the whole batch, never one per issue.
 
 ## Edge Cases
 

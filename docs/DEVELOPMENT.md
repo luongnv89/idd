@@ -162,7 +162,14 @@ its `.bash` extension keeps it out of `git ls-files 'tests/*.sh'`.
 
 `tests/test-followup-context-285.sh` and `tests/test-subagent-context-256.sh`
 are the migrated examples. Migration is deliberately partial — the remaining
-prose-grepping suites are tracked on issue #358.
+prose-grepping suites are tracked on issue #401. Named in #358's Decision
+Record as the next-highest-churn remainder:
+
+- `tests/test-autopilot-triage-cache-258.sh`
+- `tests/test-qa-handoff-255.sh`
+- `tests/test-analysis-reuse-254.sh`
+
+The tracking issue enumerates the rest of the unmigrated suite.
 
 ### Behavioral eval harness
 

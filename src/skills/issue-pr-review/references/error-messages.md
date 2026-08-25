@@ -2,6 +2,8 @@
 
 All errors follow the rich format: symbol + description + fix action.
 
+**A block here that stops the run is followed by the run-stats footer** — see `references/run-stats.md`. A stop is a terminal outcome like any other, and printing the error block and exiting without the footer is the gap that contract exists to close. A stop that happens before the run clock was captured prints `elapsed n/a`, which is the contract working, not a hole in it. A `⚠` block that warns and continues is not a terminal outcome and prints no footer of its own.
+
 ---
 
 ## Prerequisite Errors

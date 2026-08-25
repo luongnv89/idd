@@ -60,6 +60,7 @@ Check these files relative to the skill's directory (the dirname of this SKILL.m
 - `templates/gitissue-template.yml` — canonical config template with all schema fields
 - `references/error-messages.md` — complete error catalog with triggers and exact output
 - `references/examples.md` — worked example runs
+- `references/run-stats.md` — run-stats footer contract (shape, fields, unavailable marker)
 - `references/docs/config-schema.md` — full configuration schema
 - `references/docs/naming-conventions.md` — naming conventions (referenced by generated config)
 - `references/docs/idd-methodology.md` — IDD methodology reference
@@ -70,7 +71,7 @@ Check these files relative to the skill's directory (the dirname of this SKILL.m
 
 ## Configuration Check
 
-This skill GENERATES the config — it does not read one. Check if `.gitissue.yml` already exists in the repo root before proceeding.
+This skill GENERATES the config — it does not read one. Check if `.gitissue.yml` already exists in the repo root before proceeding. **Capture the run clock in that same check:** chain the first shell as `…; ec=$?; date +%s >&2; exit "$ec"` and keep the stderr epoch as `run_started_epoch` — the check's exit stays intact, it costs no extra round trip, and it is what the *Run Stats Footer* (`references/run-stats.md`) measures `elapsed` from.
 
 ### File does NOT exist — always create
 
@@ -344,6 +345,8 @@ If existing issue templates were detected in `.github/ISSUE_TEMPLATE/`, add a co
 ## Step 4 — Report
 
 Print a structured step-by-step summary showing what was detected and configured:
+
+**Then the run-stats footer.** Close with the *Run Stats Footer* — `references/run-stats.md` — `elapsed`, `tokens`, `agents`, run cost only, `n/a` for anything undetermined. It is the last thing printed at **every** terminal outcome, including a run that wrote no config — a failed prerequisite, a declined overwrite, or a scan that could not complete. This skill spawns no subagents, so `agents 0` is the determined value here, not `n/a`.
 
 ```
 ◆ Init Gitissue — setup complete
