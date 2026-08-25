@@ -251,7 +251,7 @@ LIMITED`'s `Next action:` line on the same value for the same reason.
 
 ## Triage
 
-### No open issues
+### No open issues <!-- a:ape-no-open-issues -->
 ```
 ✓ All issues resolved — nothing left to triage!
 ```
@@ -266,7 +266,7 @@ second trigger is not optional: a reuse iteration never runs Step 1.1, so withou
 it a backlog that empties mid-run falls through to `⚠ No eligible issues to pick`
 with all-zero counts. This is a success message, not an error.
 
-### No eligible issues
+### No eligible issues <!-- a:ape-no-eligible-issues -->
 ```
 ⚠ No eligible issues to pick
 
@@ -290,7 +290,7 @@ byte-identical to the one in `references/phases.md` (*Step 1.2*), and take which
 bucket each reason counts under from that step's reason-to-bucket table — it is
 the single home of that mapping, never restated here.
 
-### API rate limit during a loop read
+### API rate limit during a loop read <!-- a:ape-api-rate-limit -->
 ```
 ⚠ GitHub API rate limit reached while fetching issues
 

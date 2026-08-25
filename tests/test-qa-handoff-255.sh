@@ -62,7 +62,10 @@ check_block_has() {
   local block="$1"
   local pattern="$2"
   local label="$3"
-  if printf '%s' "$block" | grep -qE "$pattern"; then
+  if [ -z "$block" ]; then
+    fail "$label"
+    echo "      block is empty — the extraction anchor no longer matches"
+  elif printf '%s' "$block" | grep -qE "$pattern"; then
     pass "$label"
   else
     fail "$label"
@@ -74,13 +77,19 @@ check_block_lacks() {
   local block="$1"
   local pattern="$2"
   local label="$3"
-  if printf '%s' "$block" | grep -qE "$pattern"; then
+  if [ -z "$block" ]; then
+    fail "$label"
+    echo "      block is empty — the extraction anchor no longer matches"
+  elif printf '%s' "$block" | grep -qE "$pattern"; then
     fail "$label"
     echo "      forbidden pattern still present: $pattern"
   else
     pass "$label"
   fi
 }
+
+# shellcheck source=lib/anchors.bash
+. "$REPO_ROOT/tests/lib/anchors.bash"
 
 echo "◆ QA Handoff Marker Contract Tests (issue #255)"
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
@@ -128,7 +137,7 @@ done
 for pair in "src:$SRC_PR" "built:$BUILT_PR"; do
   tag="${pair%%:*}"
   f="${pair#*:}"
-  check_has "$f" '^### QA handoff gate' \
+  anchor_present "$f" rv-qa-handoff-gate \
     "T1.1 ($tag): SKILL.md declares the QA handoff gate"
   check_has "$f" 'qa_handoff = trusted \| stale \| absent' \
     "T1.2 ($tag): the gate sets one three-state variable"
@@ -151,7 +160,7 @@ check_has "$SRC_PR" 'min\(1, configured_cap\)' \
 check_has "$BUILT_PR" 'collapsed into' \
   "T2.4: the built SKILL.md ships the collapse, not a skip"
 
-SKIPS_BLOCK="$(awk '/^### What .trusted. skips/,/^### Never gated/' "$SRC_LOOP")"
+SKIPS_BLOCK="$(anchor_span "$SRC_LOOP" rvm-trusted-skips rvm-never-gated || true)"
 check_block_has "$SKIPS_BLOCK" 'collapsed into.*fresh confirmation pass' \
   "T2.5: the skips table describes the reviewer as collapsed, never removed"
 check_block_has "$SKIPS_BLOCK" 'min\(1, configured_cap\)' \
@@ -164,8 +173,8 @@ check_has "$SRC_LOOP" 'merge, not a deletion' \
 # Step 2 and Step 4 — and only when the marker's tests= SHA
 # equals head. No tests= field ⇒ nothing is skipped.
 # ───────────────────────────────────────────────────────────
-STEP2_BLOCK="$(awk '/^## Step 2 — Script Pre-pass/,/^## Step 3 — Analyze/' "$SRC_PR")"
-STEP4_BLOCK="$(awk '/^## Step 4 — Run Tests/,/^## Step 5 — Check CI/' "$SRC_PR")"
+STEP2_BLOCK="$(anchor_span "$SRC_PR" rv-step2-prepass rv-step3-analyze || true)"
+STEP4_BLOCK="$(anchor_span "$SRC_PR" rv-step4-tests rv-step5-ci || true)"
 
 check_block_has "$STEP2_BLOCK" 'qa_handoff = trusted' \
   "T3.1: Step 2's test leg names the trusted verdict"
@@ -289,9 +298,9 @@ check_has "$SRC_PR" 'never authentication' \
   "T5.9: SKILL.md carries the not-authentication rule where it is read first"
 
 # 5b. The Never-gated list exists and names every protected check.
-check_has "$SRC_LOOP" '^### Never gated' \
+anchor_present "$SRC_LOOP" rvm-never-gated \
   "T5.10: the mechanics carry an explicit Never gated section"
-NEVER_BLOCK="$(awk '/^### Never gated/,0' "$SRC_LOOP")"
+NEVER_BLOCK="$(anchor_region "$SRC_LOOP" rvm-never-gated || true)"
 for entry in 'gi-secscan' 'lint/format auto-fix' 'CI wait' 'acceptance-criteria verification' 'four traceability checks'; do
   check_block_has "$NEVER_BLOCK" "$entry" \
     "T5.11: Never gated names: $entry"
@@ -305,9 +314,9 @@ check_block_has "$NEVER_BLOCK" 'hard-blocks' \
 
 # 5c. The protected call sites carry NO marker conditional. Read each block and
 #     assert the gate variable never appears inside it.
-SECSCAN_BLOCK="$(awk '/^### Commit auto-fixes/,/^## Step 3 — Analyze/' "$SRC_PR")"
-CI_BLOCK="$(awk '/^## Step 5 — Check CI Status/,/^## Step 6 — Fix Issues/' "$SRC_PR")"
-VERIFY_BLOCK="$(awk '/^### Verification gates and the AC \+ traceability checks/,/^## Step 4 — Run Tests/' "$SRC_PR")"
+SECSCAN_BLOCK="$(anchor_span "$SRC_PR" rv-commit-autofix rv-step3-analyze || true)"
+CI_BLOCK="$(anchor_span "$SRC_PR" rv-step5-ci rv-step6-fix || true)"
+VERIFY_BLOCK="$(anchor_span "$SRC_PR" rv-verify-gates rv-step4-tests || true)"
 
 check_block_lacks "$SECSCAN_BLOCK" 'qa_handoff' \
   "T5.15: the gi-secscan invocation carries no qa_handoff conditional"
@@ -323,16 +332,16 @@ check_block_has "$VERIFY_BLOCK" 'require_acceptance_criteria_check' \
   "T5.20: (guard) the verification block was actually located"
 
 # The same must hold on the installed copy — a src-only guarantee ships nothing.
-BUILT_SECSCAN_BLOCK="$(awk '/^### Commit auto-fixes/,/^## Step 3 — Analyze/' "$BUILT_PR")"
-BUILT_CI_BLOCK="$(awk '/^## Step 5 — Check CI Status/,/^## Step 6 — Fix Issues/' "$BUILT_PR")"
-BUILT_VERIFY_BLOCK="$(awk '/^### Verification gates and the AC \+ traceability checks/,/^## Step 4 — Run Tests/' "$BUILT_PR")"
+BUILT_SECSCAN_BLOCK="$(anchor_span "$BUILT_PR" rv-commit-autofix rv-step3-analyze || true)"
+BUILT_CI_BLOCK="$(anchor_span "$BUILT_PR" rv-step5-ci rv-step6-fix || true)"
+BUILT_VERIFY_BLOCK="$(anchor_span "$BUILT_PR" rv-verify-gates rv-step4-tests || true)"
 check_block_lacks "$BUILT_SECSCAN_BLOCK" 'qa_handoff' \
   "T5.21: built SKILL.md keeps gi-secscan unconditional"
 check_block_lacks "$BUILT_CI_BLOCK" 'qa_handoff' \
   "T5.22: built SKILL.md keeps the CI wait unconditional"
 check_block_lacks "$BUILT_VERIFY_BLOCK" 'qa_handoff' \
   "T5.23: built SKILL.md keeps AC + traceability unconditional"
-check_has "$BUILT_LOOP" '^### Never gated' \
+anchor_present "$BUILT_LOOP" rvm-never-gated \
   "T5.24: the built mechanics ship the Never gated list"
 
 # 5d. The blocks above only cover SKILL.md. The procedures they gate are written
@@ -435,7 +444,7 @@ check_has "$REPO_ROOT/skills/issue-pr-review/references/docs/platform-github.md"
 for pair in "src:$SRC_TEMPLATES" "built:$BUILT_TEMPLATES"; do
   tag="${pair%%:*}"
   f="${pair#*:}"
-  check_has "$f" '^### QA handoff marker' \
+  anchor_present "$f" rt-qa-handoff \
     "T9.1 ($tag): report-templates.md owns the producer contract"
   check_has "$f" '<!-- gitissue:qa v1 head=<sha40> profile=<light\|full> cycles=<n> review=clean' \
     "T9.2 ($tag): the grammar is written out in full"
@@ -452,7 +461,7 @@ for pair in "src:$SRC_TEMPLATES" "built:$BUILT_TEMPLATES"; do
 done
 
 # The marker must be the LAST line inside the PR body template fence.
-TEMPLATE_FENCE="$(awk '/^## PR Body Template/,/^The PR title follows/' "$SRC_TEMPLATES")"
+TEMPLATE_FENCE="$(anchor_region "$SRC_TEMPLATES" rt-pr-body-template || true)"
 LAST_IN_FENCE="$(printf '%s\n' "$TEMPLATE_FENCE" | grep -vE '^\s*$' | awk '/^```$/{last=prev} {prev=$0} END {print last}')"
 if printf '%s' "$LAST_IN_FENCE" | grep -q 'gitissue:qa v1'; then
   pass "T9.8: the marker is the last content line of the PR body template"
@@ -520,9 +529,9 @@ check_has "$AP_PHASES" 'never skipped by the marker' \
 # and both test legs would then be skipped on a commit no local
 # suite has ever run.
 # ───────────────────────────────────────────────────────────
-check_has "$SRC_LOOP" '^### Re-evaluation after a push' \
+anchor_present "$SRC_LOOP" rvm-reeval-push \
   "T13.1: the mechanics own a re-evaluation section, scoped to any push"
-check_has "$BUILT_LOOP" '^### Re-evaluation after a push' \
+anchor_present "$BUILT_LOOP" rvm-reeval-push \
   "T13.2: the built mechanics ship it"
 check_has "$SRC_LOOP" 'per-cycle\*\* verdict, not a once-per-run constant' \
   "T13.3: qa_handoff is documented as a per-cycle verdict"
@@ -544,7 +553,7 @@ done
 # Step 2 is where the missed trigger bit: it commits and pushes its lint/format
 # auto-fix (the resolver runs no formatter, so this is the likely path), moving
 # head off the marker before Step 3 or Step 4 ever consult the verdict.
-REEVAL_BLOCK="$(awk '/^### Re-evaluation after a push/,/^### Never gated/' "$SRC_LOOP")"
+REEVAL_BLOCK="$(anchor_span "$SRC_LOOP" rvm-reeval-push rvm-never-gated || true)"
 check_block_has "$REEVAL_BLOCK" "Step 2's lint/format auto-fix commit" \
   "T13.5d: the mechanics enumerate Step 2's auto-fix commit as a trigger"
 check_block_has "$REEVAL_BLOCK" '[Ee]very fixer push in the Review Loop' \
@@ -554,7 +563,7 @@ check_block_has "$REEVAL_BLOCK" 'any push this skill makes' \
 for pair in "src:$SRC_PR" "built:$BUILT_PR"; do
   tag="${pair%%:*}"
   f="${pair#*:}"
-  step2="$(awk '/^## Step 2 — Script Pre-pass/,/^## Step 3 — Analyze/' "$f")"
+  step2="$(anchor_span "$f" rv-step2-prepass rv-step3-analyze || true)"
   check_block_has "$step2" 'recompute the verdict then, before Step 3' \
     "T13.5g ($tag): Step 2 instructs a recompute after its own auto-fix push"
 done
@@ -578,7 +587,7 @@ check_has "$BUILT_RESOLVER" 'never append a second copy' \
 
 # A skipped Step 4 evaluated neither check, so it renders PARTIAL — never a
 # silent pass — and {head7} was never a defined template variable.
-BUILT_STEP4_BLOCK="$(awk '/^## Step 4 — Run Tests/,/^## Step 5 — Check CI/' "$BUILT_PR")"
+BUILT_STEP4_BLOCK="$(anchor_span "$BUILT_PR" rv-step4-tests rv-step5-ci || true)"
 check_block_has "$STEP4_BLOCK" 'Result: PARTIAL' \
   "T13.12: Step 4's trusted skip states its completion rendering"
 check_block_has "$STEP4_BLOCK" '× Suite passed. / .× Build clean' \
@@ -677,7 +686,7 @@ check_block_has "$UI_SKIP_ROW" 'never on an unsuffixed .ui=' \
 check_has "$SRC_LOOP" '\*before\* its QA cycles' \
   "T15.6: the rationale names the drift the SHA closes"
 # The built consumer ships the same binding — a src-only contract installs nothing.
-BUILT_UI_SKIP_ROW="$(awk '/^### What .trusted. skips/,/^### Never gated/' "$BUILT_LOOP" | grep -E '^\|[^|]*code UI review' || true)"
+BUILT_UI_SKIP_ROW="$(anchor_span "$BUILT_LOOP" rvm-trusted-skips rvm-never-gated || true | grep -E '^\|[^|]*code UI review' || true)"
 check_block_has "$BUILT_UI_SKIP_ROW" '@<sha40>. present and equal to .head' \
   "T15.7: the built mechanics ship the commit-bound code-UI condition"
 # SKILL.md is read first and must carry the same condition, in src and built.
@@ -771,7 +780,7 @@ for pair in "src:$SRC_PIPELINE" "built:$BUILT_PIPELINE"; do
   f="${pair#*:}"
   # tests_sha — captured in the QA loop's Run tests item, before the
   # documentation commit that would otherwise make it unrecoverable.
-  qa_block="$(awk '/^## Step 4 — QA/,/^### Step 4 — UI\/UX review/' "$f")"
+  qa_block="$(anchor_span "$f" rs-step4-qa rs-step4-ui-review || true)"
   check_block_has "$qa_block" 'tests_sha. = .git rev-parse HEAD' \
     "T18.1 ($tag): the QA loop captures tests_sha with an explicit command"
   check_block_has "$qa_block" 'at the moment the suite runs' \
@@ -780,7 +789,7 @@ for pair in "src:$SRC_PIPELINE" "built:$BUILT_PIPELINE"; do
     "T18.3 ($tag): an uncaptured tests_sha omits the field instead of defaulting"
   # ui_sha — captured where the ui-reviewer is spawned, which precedes the QA
   # cycles, so every fix commit those cycles produce lands after it.
-  ui_block="$(awk '/^### Step 4 — UI\/UX review/,/^## Edge Cases/' "$f")"
+  ui_block="$(anchor_span "$f" rs-step4-ui-review rs-edge-cases || true)"
   check_block_has "$ui_block" 'ui_sha. = .git rev-parse HEAD' \
     "T18.4 ($tag): the UI review sub-step captures ui_sha with an explicit command"
   check_block_has "$ui_block" 'ui-reviewer is spawned\*\*' \
@@ -833,8 +842,8 @@ check_block_has "$CL_ENTRY" 'unsuffixed .ui=. stays parsable but is never skippa
 for pair in "src:$SRC_PR" "built:$BUILT_PR"; do
   tag="${pair%%:*}"
   f="${pair#*:}"
-  step2="$(awk '/^## Step 2 — Script Pre-pass/,/^## Step 3 — Analyze/' "$f")"
-  step4="$(awk '/^## Step 4 — Run Tests/,/^## Step 5 — Check CI/' "$f")"
+  step2="$(anchor_span "$f" rv-step2-prepass rv-step3-analyze || true)"
+  step4="$(anchor_span "$f" rv-step4-tests rv-step5-ci || true)"
   check_block_has "$step2" 'qa_handoff = trusted' \
     "T20.1 ($tag): Step 2 still names the trusted verdict"
   check_block_has "$step2" 'tests=. field whose SHA equals .head|tests=.*SHA equals' \
@@ -859,8 +868,8 @@ done
 for pair in "src:$SRC_PR" "built:$BUILT_PR"; do
   tag="${pair%%:*}"
   f="${pair#*:}"
-  step2="$(awk '/^## Step 2 — Script Pre-pass/,/^## Step 3 — Analyze/' "$f")"
-  step4="$(awk '/^## Step 4 — Run Tests/,/^## Step 5 — Check CI/' "$f")"
+  step2="$(anchor_span "$f" rv-step2-prepass rv-step3-analyze || true)"
+  step4="$(anchor_span "$f" rv-step4-tests rv-step5-ci || true)"
   check_block_has "$step2" 'ignore .tests=. and run the local suite as unmarked' \
     "T20.9 ($tag): Step 2 ignores tests= and runs the suite when ci_leg_runnable is false"
   check_block_has "$step2" 'no CI' \
@@ -895,10 +904,10 @@ for pair in "src:$SRC_LOOP" "built:$BUILT_LOOP"; do
     "T20.21 ($tag): the contract site states the three-part AND"
   check_has "$f" 'never.*from Step 5' \
     "T20.22 ($tag): ci_leg_runnable is never decided from Step 5's wait"
-  skips="$(awk '/^### What .trusted. skips/,/^### Re-evaluation after a push/' "$f")"
+  skips="$(anchor_span "$f" rvm-trusted-skips rvm-reeval-push || true)"
   check_block_has "$skips" 'and .ci_leg_runnable' \
     "T20.23 ($tag): the skips table's test rows add and ci_leg_runnable"
-  reeval="$(awk '/^### Re-evaluation after a push/,/^### Never gated/' "$f")"
+  reeval="$(anchor_span "$f" rvm-reeval-push rvm-never-gated || true)"
   check_block_has "$reeval" 'tests=. skip is refused when .ci_leg_runnable. is false' \
     "T20.24 ($tag): re-evaluation notes the independent tests= refusal"
 done

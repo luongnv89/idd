@@ -203,7 +203,7 @@ After output:
 
 ---
 
-## Persist
+## Persist <!-- a:ia-persist -->
 
 After Step 8, save the analysis to `.gitissue/analysis-<N>.json`.
 
@@ -237,7 +237,7 @@ If writing fails:
 ```
 This is a warning, not a fatal error — the terminal output from Step 6 was already displayed.
 
-### JSON Schema (`.gitissue/analysis-<N>.json`)
+### JSON Schema (`.gitissue/analysis-<N>.json`) <!-- a:ia-json-schema -->
 
 ```json
 {

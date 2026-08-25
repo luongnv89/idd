@@ -282,7 +282,7 @@ review runs in full.
 **There is no security-scan field, in any spelling, and none may be added.** Its
 only possible consumer would be a safety gate — see *The trust model* above.
 
-### What `trusted` skips
+### What `trusted` skips <!-- a:rvm-trusted-skips -->
 
 | Step | Under `trusted` | Condition |
 |------|-----------------|-----------|
@@ -312,7 +312,7 @@ test legs. If the pass returns fixable findings they go to the fixer exactly as
 today; the fixer's commit then moves the head, so the next re-evaluation turns
 the verdict `stale` and the remaining cycles are the full pipeline again.
 
-### Re-evaluation after a push
+### Re-evaluation after a push <!-- a:rvm-reeval-push -->
 
 `qa_handoff` is a **per-cycle** verdict, not a once-per-run constant. Step 1
 computes it, but the Review Loop re-enters at **Step 3, not Step 1** — so nothing
@@ -356,7 +356,7 @@ Restoring the full pipeline is **not** a widening of what `qa_handoff` may
 do: its power is bounded against the ungated pipeline, and the ungated pipeline
 is exactly what `stale` runs (*Precedence* in SKILL.md owns that rule).
 
-### Never gated
+### Never gated <!-- a:rvm-never-gated -->
 
 `qa_handoff` may **never** skip, shorten, or soften any of the following — on any
 profile, for any marker, at any cycle:

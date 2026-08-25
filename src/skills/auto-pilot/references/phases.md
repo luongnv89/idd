@@ -8,7 +8,7 @@ This phase runs **before Phase 1 in triage mode and before the first list entry
 in explicit list mode** — a resume that ran after the triage would already have
 re-picked the issue it was supposed to continue.
 
-### Step 1.0 — Resume entry gate
+### Step 1.0 — Resume entry gate <!-- a:ap-step10-resume -->
 
 Read the recorded state — `python3 shared/scripts/gi-state.py --read` — and set
 exactly one value:
@@ -137,7 +137,7 @@ print `⚠ gi-state unavailable` and continue — the loop's own work is unaffec
 only resume is lost. Under `--dry-run` add `--dry-run` to the call. Delete the
 payload file afterwards.
 
-### Step 1.0b — Checkpoint procedure
+### Step 1.0b — Checkpoint procedure <!-- a:ap-step10b-checkpoint -->
 
 Every checkpoint below is the same two steps: write the patch object with the
 **Write** tool to `.gitissue/cache/state-patch.json` (it carries an issue title —
@@ -243,7 +243,7 @@ triage every iteration, which is what `references/configuration.md` claims.
 This check does **not** live in *Step 1.6* — that step runs only after a merge,
 so a trigger there cannot fire on a non-merging iteration.
 
-### Step 1.1a — Triage cache gate
+### Step 1.1a — Triage cache gate <!-- a:ap-step11a-cache-gate -->
 
 **Evaluated once, before the first iteration** — never per iteration. Re-running
 a full triage every time round the loop is the duplicated work this gate
@@ -318,7 +318,7 @@ One `○` line, per `docs/terminal-style.md`:
 ○ Triage cache absent — running a full triage
 ```
 
-### Step 1.1 — Triage
+### Step 1.1 — Triage <!-- a:ap-step11-triage -->
 
 Run a full triage. Step 1.1a already skipped this on a `fresh` cache, and Step
 1.6 keeps it skipped until a re-triage is required:
@@ -423,7 +423,7 @@ Without that second entry point a backlog that empties mid-run would fall
 through to *Step 1.2*'s `⚠ No eligible issues to pick` with all-zero counts,
 which reads as a failure and is not one.
 
-### Step 1.1b — Live eligibility read
+### Step 1.1b — Live eligibility read <!-- a:ap-step11b-live-read -->
 
 **Evaluated every iteration, immediately before the pick.** *Step 1.1a* removed
 the per-iteration triage; it must not also remove the orchestrator's live view of
@@ -496,7 +496,7 @@ iteration *Step 1.1*'s own `✓ Triage updated` line already reported the count:
 ⚠ Live backlog unavailable — deferring the open/assigned checks to Step 1.2b
 ```
 
-### Step 1.2 — Pick Next Issue
+### Step 1.2 — Pick Next Issue <!-- a:ap-step12-pick -->
 
 From `summary.suggested_order` in `.gitissue/triage.json` (the triage execution order), select the first issue that is:
 - **Not blocked** — no unresolved dependencies in the triage graph
@@ -1404,7 +1404,7 @@ Compute the **effective mode** per the *Resolution rules* under *Merge Modes* in
 
 Whenever Step 2 would merge a PR (aggressive + `merge_partial: true`), run **Step 5.1b — Dependency Gate** first using the originating issue `#{issue_number}`, then run the shared **Step 5.1a — CI verdict gate** against the current PR head. SPEC §2 requires these checks before **any** automated merge, including partial merges. The CI gate may accept `ci_verdict = trusted` only when the live head still equals the `passed@<sha40>` `ci_status` SHA and the same live rollup is non-empty and entirely green. Otherwise run the documented waiter/fallback for this head; accept only a settled `pass`, `none` with `none_confirmed: true`, or a successfully verified equivalent manual fallback. A stale or absent status, failed or pending checks, an unsettled terminal snapshot, an unconfirmed empty result, an unavailable or failed fallback, or any head change leaves the PR open. If either gate finds an unsatisfied dependency or non-mergeable CI, do **not** merge: print the structured alert from `references/error-messages.md`, record the iteration outcome as `blocked_by_dependency` or `left_open`, leave the PR open, add the issue to the session skip list, and **continue to the next eligible issue** (same record-and-continue semantics as Phase 5). Only when both gates pass may the flow proceed to Step 2b.
 
-**Step 2b — Merge (only when aggressive + merge_partial: true and both gates passed):**
+**Step 2b — Merge (only when aggressive + merge_partial: true and both gates passed):** <!-- a:ap-step2b-merge -->
 
 ```bash
 gh pr merge {pr_number} --squash --delete-branch
@@ -1466,7 +1466,7 @@ so a run interrupted between "the cycles are spent" and "the next issue starts"
 resumes knowing the review is finished. Without it a resume re-enters review and
 burns another `review_cycles` on a PR that already exhausted them.
 
-#### Critical issues: stop and ask the user
+#### Critical issues: stop and ask the user <!-- a:ap-critical-issues -->
 
 If the original issue has any label in `autopilot.critical_labels` (default: `["critical", "priority:critical"]`), the auto-pilot does **not** create a follow-up or auto-merge. Instead, it stops the loop and presents the situation to the user for a decision. Critical issues deserve human judgment — an incomplete fix could make things worse.
 
@@ -1812,7 +1812,7 @@ to Step 5.3. **AC2 holds here too** — nothing in this phase closes an issue wh
 PR is still open and unreviewed; the issue is closed by GitHub, as the
 consequence of merging the `Closes #N` PR, and by nothing else.
 
-### Step 5.3 — Cleanup
+### Step 5.3 — Cleanup <!-- a:ap-step53-cleanup -->
 
 **Parallel lane — exactly-once log transition.** Before cleanup, construct the
 normalized run-log object with the lane's persisted `event_id` and checkpoint
@@ -1893,7 +1893,7 @@ finished or already gave up on. These are the same two lists the run holds in
 memory — the state file is where they survive a crash, not a second source of
 truth.
 
-### Step 1.6 — Update the triage cache after a merge
+### Step 1.6 — Update the triage cache after a merge <!-- a:ap-step16-cache-update -->
 
 Numbered in Phase 1 because it maintains Phase 1's payload; executed here
 because a merge is what makes it necessary.

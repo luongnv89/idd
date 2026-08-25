@@ -294,7 +294,7 @@ still print `effort: full` (the pinned profile) so the line is uniform:
 [0/5] Preflight    ✓ issue #N open, branch: {branch_name}{workspace_note}, effort: {profile}
 ```
 
-### 0h — Analysis reuse gate
+### 0h — Analysis reuse gate <!-- a:rs-0h-skill -->
 
 Set `analysis_reuse` to `fresh`, `stale`, or `absent` by the five-condition predicate in `references/pipeline-steps.md` (*Step 0h — Analysis reuse gate*) — its **single home**; never define "fresh" anywhere else. `fresh` seeds Step 1's research and skips Step 2's synthesizer; `stale`/`absent` run today's full pipeline unchanged. Any doubt — missing key, short SHA, unparsable timestamp, failed `git` call — is `stale` (fail-safe). Skipped, like *0g*, when `resolve.adaptive_effort` is `false`; no new config key.
 

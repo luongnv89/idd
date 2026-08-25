@@ -200,7 +200,7 @@ files changed (Step 1's `files`), the retained body's `## Metadata` `Effort` ban
 and labels (any `security`/`CVE`/`vulnerability` forces `full`). Resolve to `light`
 only when **every** signal agrees; any `full`/missing/ambiguous → `full`.
 
-### QA handoff gate (trust an already-QA'd PR)
+### QA handoff gate (trust an already-QA'd PR) <!-- a:rv-qa-handoff-gate -->
 
 `/issue-resolver` ends a clean QA loop — review clean, tests green — by writing
 `<!-- gitissue:qa v1 head=… -->` as the PR body's last line. This gate decides
@@ -244,7 +244,7 @@ Surface both on the `[1/7]` tracker line; with `review.adaptive_depth: false` pr
 
 ---
 
-## Step 2 — Script Pre-pass [2/7]
+## Step 2 — Script Pre-pass [2/7] <!-- a:rv-step2-prepass -->
 
 Before spawning any LLM reviewer, run deterministic tools to catch mechanical issues — zero LLM tokens, all scripts and CLI tools.
 
@@ -252,7 +252,7 @@ Before spawning any LLM reviewer, run deterministic tools to catch mechanical is
 
 **Default (fix loop):** detect the project's lint/format tools, run each auto-fix command (don't block on warnings — only on errors that prevent the fix from running), then run the test suite to catch failures early. The per-tool detection table and example commands are in `references/prepass-tests-ci-mechanics.md` (*Step 2*). **Under `qa_handoff = trusted`, skip only the test run**, and only when the marker carries a `tests=` field whose SHA equals `head` **and `ci_leg_runnable` is true** — that suite already ran on this exact commit. When `ci_leg_runnable` is false (no CI / empty `statusCheckRollup` / `no_ci` / `review.check_ci: false`), ignore `tests=` and run the local suite as unmarked. The lint/format auto-fix still runs (it mutates the tree, so skipping it changes the PR, not just the review's cost), and the `gi-secscan` gate below is **never** gated on `qa_handoff`. When that auto-fix commits and pushes, the head moves off the marker: recompute the verdict then, before Step 3 — this skill re-evaluates after **any** push it makes, not only the fixer's (*Review Loop*) — so Step 4 runs the suite in full on the commit the auto-fix produced.
 
-### Commit auto-fixes
+### Commit auto-fixes <!-- a:rv-commit-autofix -->
 
 **Skip entirely when `--review-only`.** Otherwise, if any files were modified by
 the auto-fix tools, you MUST scan before staging — blocking on real secrets and
@@ -303,7 +303,7 @@ If tests fail here, continue to the review loop — failures are picked up in St
 
 ---
 
-## Step 3 — Analyze & Review [3/7]
+## Step 3 — Analyze & Review [3/7] <!-- a:rv-step3-analyze -->
 
 ### Reviewer agents and cycle reuse
 
@@ -338,7 +338,7 @@ Step 3 produces a single verdict in **five dimensions** — `correctness`, `acce
 
 A PR can pass tests and still fail `traceability` or `acceptance_criteria` — those are not gated by test results.
 
-### Verification gates and the AC + traceability checks
+### Verification gates and the AC + traceability checks <!-- a:rv-verify-gates -->
 
 Two dimensions — `acceptance_criteria` and `traceability` — are produced by this skill, not the reviewer. Their full procedure (per-criterion AC verification, the four traceability checks, and the refactor/chore exemption) lives in `references/verification-checks.md`. **Read that file and apply it now**, before aggregating the cycle report. The gating rules the rest of this skill depends on — enforce them here and in the Review Loop: <!-- a:rv-traceability-outcomes -->
 
@@ -351,7 +351,7 @@ These two hard-blocks are the issue #36 contract: a PR can pass tests and still 
 
 ---
 
-## Step 4 — Run Tests & Build [4/7]
+## Step 4 — Run Tests & Build [4/7] <!-- a:rv-step4-tests -->
 
 When `review.run_tests` is false, skip this step and report `○ tests skipped (review.run_tests: false)`; the soft-pass conjunction treats the test leg as satisfied.
 
@@ -369,7 +369,7 @@ Or if failures:
 
 ---
 
-## Step 5 — Check CI Status [5/7]
+## Step 5 — Check CI Status [5/7] <!-- a:rv-step5-ci -->
 
 When `review.check_ci` is false, skip polling and report `○ CI skipped (review.check_ci: false)`; the soft-pass conjunction treats the CI leg as satisfied (same pattern as disabled AC/traceability checks).
 
@@ -399,7 +399,7 @@ Pending CI is **not clean** — it never satisfies soft-pass and auto mode must 
 
 ---
 
-## Step 6 — Fix Issues [6/7]
+## Step 6 — Fix Issues [6/7] <!-- a:rv-step6-fix -->
 
 Collect issues from Steps 3-5, but **only fix those with `action: "fix"`** — `action: "note"` issues (medium code_quality/test_coverage suggestions) are reported in the summary but never trigger a fix cycle. This is the key token optimization. Fixable sources are the same five dimensions from Step 3's *Dimensional review output* (each `fail`/UI `action:"fix"` becomes one fixable issue) plus Step 4 test failures and Step 5 CI failures.
 
