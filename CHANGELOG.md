@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- gitissue:normalized v1 -->
 
-## [Unreleased]
+## v0.20.0 — 2026-08-20
 
 ### Features
 - **security:** ship an installable local pre-commit secret gate (#340) — `.githooks/pre-commit` delegates staged index blobs to `gi-secscan.py --staged` and preserves its output and exit status; `bash scripts/install-hooks.sh` enables it per checkout without overwriting another hooks path. CONTRIBUTING documents install, verification, removal, and the `--no-verify` limitation, while a hermetic integration test proves benign commits pass and a staged canary is blocked.
