@@ -70,11 +70,12 @@ by all eight skills; `tests/test-run-stats-373.sh` now forbids the string
 
 ## Consequences
 
-- #373's AC3 ("reports at minimum elapsed and tokens") and AC5 ("an
-  undeterminable metric shows an explicit unavailable marker") remain binding on
-  `elapsed` and `agents`. For `tokens` they are superseded by this record; the
-  test suite's header says so, so a later reader does not mistake the change for
-  drift.
+- #373's AC3 ("reports at minimum elapsed and tokens") never named `agents`, so
+  stripping its `tokens` clause leaves it binding on `elapsed` only. AC5 ("an
+  undeterminable metric shows an explicit unavailable marker") is generic, so it
+  stays binding on both unconditional fields — `elapsed` and `agents`. For
+  `tokens` both are superseded by this record; the test suite's header says so,
+  so a later reader does not mistake the change for drift.
 - The footer's field count is no longer fixed at three. Anything parsing it must
   read fields by label, not by position — which the ` · `-delimited
   `label value` shape already supports.

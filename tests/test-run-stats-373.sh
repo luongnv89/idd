@@ -11,9 +11,10 @@
 #        than being omitted, guessed, or reported as zero.
 #   AC6: shape and labels are consistent across skills.
 #
-# SUPERSEDED IN PART by issue #410: AC3 and AC5 bind `elapsed` and `agents`
-# only. `tokens` is conditional — printed where the host reports a figure, left
-# out of the line where it does not, because a host-agnostic skill cannot
+# SUPERSEDED IN PART by issue #410: AC3's `tokens` clause is superseded, leaving
+# AC3 binding on `elapsed` only; AC5 is generic, so it binds `elapsed` and
+# `agents`. `tokens` is conditional — printed where the host reports a figure,
+# left out of the line where it does not, because a host-agnostic skill cannot
 # obtain a real count without the subprocess/summarization pass the contract's
 # own Overhead section forbids. A permanent `tokens n/a` is the bug #410 fixed,
 # so this suite now forbids that string in the contract.
@@ -63,6 +64,17 @@ check_lacks() {
   local file="$1" pattern="$2" label="$3"
   if grep -qE "$pattern" "$file" 2>/dev/null; then
     fail "$label (forbidden pattern present in ${file#$REPO_ROOT/}: $pattern)"
+  else
+    pass "$label"
+  fi
+}
+
+# The negative twin of check_flow: a forbidden sentence must stay forbidden even
+# if a reviving edit hard-wraps it across a line break, so collapse first.
+check_flow_lacks() {
+  local file="$1" pattern="$2" label="$3"
+  if tr '\n' ' ' < "$file" 2>/dev/null | tr -s ' ' | grep -qE "$pattern"; then
+    fail "$label (forbidden prose present in ${file#$REPO_ROOT/}: $pattern)"
   else
     pass "$label"
   fi
@@ -211,6 +223,13 @@ for d in "${SKILL_DIRS[@]}"; do
     "AC6: $name points at the contract rather than restating it"
   check_flow "$f" 'every\*\* terminal outcome' \
     "AC2: $name binds the footer to every terminal outcome"
+  # #410: the call-site clause is what the agent reads *before* it opens the
+  # contract, so a silent revert here reinstates the bug in the operative
+  # instruction while references/run-stats.md still says otherwise.
+  check_flow "$f" 'only where the host reported a count' \
+    "#410: $name's call site states the conditional rule"
+  check_flow_lacks "$f" '`elapsed`, `tokens`, `agents`' \
+    "#410: $name's call site does not list tokens as an unconditional field"
   # The precheck list is this repo's authoritative bundle guard — a contract the
   # precheck does not name is a file whose absence nobody notices at run time.
   check_has  "$f" '(^|`)references/run-stats\.md' \
