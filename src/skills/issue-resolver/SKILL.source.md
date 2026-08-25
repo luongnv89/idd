@@ -464,7 +464,7 @@ variant in `references/report-templates.md` (*Closing Summary*): *Successful
 Resolution* (every step passed), *Resolution With Warnings* (QA left residual
 issues or another step warned), or *Already Resolved* (Step 0/1 found the issue
 already closed — no PR reference). The *Expected Inline Pipeline Output* example
-in the same file shows the tracker and closing block together. **Then the run-stats footer.** Close with the *Run Stats Footer* — `references/run-stats.md` — `elapsed`, `tokens`, `agents`, run cost only, `n/a` for anything undetermined. It is the last thing printed at **every** terminal outcome, including the ones that never reach this block: a preflight stop (`not found`, `closed`, `pr_in_progress`), an invalid-config stop, `already_resolved`, a blocked secret scan, a failed final test run, or any failed step.
+in the same file shows the tracker and closing block together. **Then the run-stats footer.** Close with the *Run Stats Footer* — `references/run-stats.md` — `elapsed`, `tokens` only where the host reported a count (otherwise left out), `agents`, run cost only, `n/a` for anything else undetermined. It is the last thing printed at **every** terminal outcome, including the ones that never reach this block: a preflight stop (`not found`, `closed`, `pr_in_progress`), an invalid-config stop, `already_resolved`, a blocked secret scan, a failed final test run, or any failed step.
 
 ---
 

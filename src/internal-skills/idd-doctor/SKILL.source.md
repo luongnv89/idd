@@ -401,7 +401,7 @@ A read heuristic for steps 1–3 (no new dependency — `tail` + a JSON-aware pa
 
 ## Run stats footer
 
-After the run-log summary, close with the *Run Stats Footer* — `references/run-stats.md` — `elapsed`, `tokens`, `agents`, run cost only, `n/a` for anything undetermined. It is the last thing printed at **every** terminal outcome, including a run that never reached Check 1: not a git repository, no `src/skills/` tree, or an unreadable `.gitissue.yml`. The doctor spawns no subagents, so `agents 0` is the determined value here, not `n/a`. It reports the run's own cost and never a metric a check already printed.
+After the run-log summary, close with the *Run Stats Footer* — `references/run-stats.md` — `elapsed`, `tokens` only where the host reported a count (otherwise left out), `agents`, run cost only, `n/a` for anything else undetermined. It is the last thing printed at **every** terminal outcome, including a run that never reached Check 1: not a git repository, no `src/skills/` tree, or an unreadable `.gitissue.yml`. The doctor spawns no subagents, so `agents 0` is the determined value here, not `n/a`. It reports the run's own cost and never a metric a check already printed.
 
 ---
 

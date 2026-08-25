@@ -426,7 +426,7 @@ A successful create prints the issue URL and a compact summary:
 
 In batch mode, one line per issue is printed followed by a totals footer (`✓ 5 created, 1 skipped (duplicate)`).
 
-**Then the run-stats footer.** Close with the *Run Stats Footer* — `references/run-stats.md` — `elapsed`, `tokens`, `agents`, run cost only, `n/a` for anything undetermined. It is the last thing printed at **every** terminal outcome, including a run that created nothing — a cancelled confirmation, a duplicate the user chose not to file, an invalid config, or a failed `gh issue create`. In batch mode one footer covers the whole batch, never one per issue.
+**Then the run-stats footer.** Close with the *Run Stats Footer* — `references/run-stats.md` — `elapsed`, `tokens` only where the host reported a count (otherwise left out), `agents`, run cost only, `n/a` for anything else undetermined. It is the last thing printed at **every** terminal outcome, including a run that created nothing — a cancelled confirmation, a duplicate the user chose not to file, an invalid config, or a failed `gh issue create`. In batch mode one footer covers the whole batch, never one per issue.
 
 ## Edge Cases
 

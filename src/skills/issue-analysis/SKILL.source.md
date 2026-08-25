@@ -333,7 +333,7 @@ Persisting these fields does **not** change the analysis pipeline — it only ad
 
 After all 8 steps and persistence complete, print a structured step-by-step summary so the user can see what happened at each stage:
 
-**Then the run-stats footer.** Close with the *Run Stats Footer* — `references/run-stats.md` — `elapsed`, `tokens`, `agents`, run cost only, `n/a` for anything undetermined. It is the last thing printed at **every** terminal outcome, including a run that ended early — an issue that was not found or is closed, an invalid config, or a scan that could not complete.
+**Then the run-stats footer.** Close with the *Run Stats Footer* — `references/run-stats.md` — `elapsed`, `tokens` only where the host reported a count (otherwise left out), `agents`, run cost only, `n/a` for anything else undetermined. It is the last thing printed at **every** terminal outcome, including a run that ended early — an issue that was not found or is closed, an invalid config, or a scan that could not complete.
 
 ```
 ◆ Issue Analysis: #{N} — {title}

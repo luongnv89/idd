@@ -346,7 +346,7 @@ If existing issue templates were detected in `.github/ISSUE_TEMPLATE/`, add a co
 
 Print a structured step-by-step summary showing what was detected and configured:
 
-**Then the run-stats footer.** Close with the *Run Stats Footer* — `references/run-stats.md` — `elapsed`, `tokens`, `agents`, run cost only, `n/a` for anything undetermined. It is the last thing printed at **every** terminal outcome, including a run that wrote no config — a failed prerequisite, a declined overwrite, or a scan that could not complete. This skill spawns no subagents, so `agents 0` is the determined value here, not `n/a`.
+**Then the run-stats footer.** Close with the *Run Stats Footer* — `references/run-stats.md` — `elapsed`, `tokens` only where the host reported a count (otherwise left out), `agents`, run cost only, `n/a` for anything else undetermined. It is the last thing printed at **every** terminal outcome, including a run that wrote no config — a failed prerequisite, a declined overwrite, or a scan that could not complete. This skill spawns no subagents, so `agents 0` is the determined value here, not `n/a`.
 
 ```
 ◆ Init Gitissue — setup complete

@@ -456,7 +456,7 @@ Print a structured step-by-step summary of the pipeline results, using the templ
 - *Summary — PR With Remaining Issues* — review couldn't clear everything within `review.max_cycles`
 - *Auto-Merge (auto mode only)* — post-report squash merge and block-on-failure handling
 
-In interactive mode: never auto-merge — just report status. **Then the run-stats footer.** Close with the *Run Stats Footer* — `references/run-stats.md` — `elapsed`, `tokens`, `agents`, run cost only, `n/a` for anything undetermined. It is the last thing printed at **every** terminal outcome, including a run that stopped before Step 7: a failed prerequisite, an invalid config, a PR that could not be checked out, a CI wait that gave up, or a review loop that exhausted `review.max_cycles`.
+In interactive mode: never auto-merge — just report status. **Then the run-stats footer.** Close with the *Run Stats Footer* — `references/run-stats.md` — `elapsed`, `tokens` only where the host reported a count (otherwise left out), `agents`, run cost only, `n/a` for anything else undetermined. It is the last thing printed at **every** terminal outcome, including a run that stopped before Step 7: a failed prerequisite, an invalid config, a PR that could not be checked out, a CI wait that gave up, or a review loop that exhausted `review.max_cycles`.
 
 When `--no-merge` is set (even in auto mode): skip the merge step and report status only — equivalent to interactive mode's merge behavior. This flag exists so auto-pilot's reviewer subagent can run the full review-fix cycle without stealing the merge step from Phase 5.
 
