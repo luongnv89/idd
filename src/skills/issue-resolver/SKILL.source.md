@@ -44,14 +44,14 @@ tree. If `origin` is missing or rebase conflicts occur, stop and ask the user
 
 ## Configuration
 
-Load config once at skill start; never re-read it. Run `python3 shared/scripts/gi-config.py` **from the repo root**, with the **script path resolved to an absolute path** exactly as the *Bundled dependency precheck* resolves its list. It prints `{"config": {…dotted keys…}, "config_file": …, "first_run": …}` on stdout, merging the defaults below with `.gitissue.yml`. Both requirements and the chained clock below are load-bearing — rationale in `references/pipeline-steps.md` (*Configuration load*).
+Load config once at skill start; never re-read it. Run `python3 shared/scripts/gi-config.py` with two mandatory requirements. **Working directory:** the repo root. **Script path:** resolved to an absolute path exactly as the *Bundled dependency precheck* resolves its list. It prints `{"config": {…dotted keys…}, "config_file": …, "first_run": …}` on stdout, merging the defaults below with `.gitissue.yml`. Both requirements and the chained clock below are load-bearing — rationale in `references/pipeline-steps.md` (*Configuration load*).
 
 - **Exit 0** — use `config`; print the `○ First run` line below when `first_run` is `true`.
 - **Exit 3** — invalid `.gitissue.yml`: print the validation error from `references/error-messages.md` (*Invalid config*) and stop.
-- **Script file absent** — a broken install, not a degrade: stop and print the `✗ Missing bundled dependency` block the *Bundled dependency precheck* names.
+- **Script file absent** — a missing bundled dependency is a broken install and not a degrade: stop and print the `✗ Missing bundled dependency` block the *Bundled dependency precheck* names.
 - **Anything else** (no `python3`, another non-zero exit, unparsable stdout) — print `⚠ gi-config unavailable — using the inline defaults below`, then read `.gitissue.yml` by hand against those defaults *instead of* the script, never beside it.
 
-**Capture the run clock here:** chain that same invocation as `python3 …; ec=$?; date +%s >&2; exit "$ec"` and keep the stderr epoch as `run_started_epoch` — what the *Run Stats Footer* (`references/run-stats.md`) measures `elapsed` from.
+**Capture the run clock here:** chain that same `python3` invocation as `python3 …; ec=$?; date +%s >&2; exit "$ec"` and keep the stderr epoch as `run_started_epoch` — what the *Run Stats Footer* (`references/run-stats.md`) measures `elapsed` from.
 
 Otherwise, load `.gitissue.yml` from the repo root once at skill start. If the file does not exist, use defaults and print:
 
@@ -179,7 +179,7 @@ Check whether this issue should be worked on. Open with `● Preflight check for
 
 ### 0a — Fetch issue
 
-The GitHub-backed helpers share the bundled subprocess boundary in `shared/scripts/gi-gh.py`. Classify any framed caller payload first (`/auto-pilot` captured it in mode-neutral *Step 1.2b*) — *Step 0i — Caller payload gate* in `references/pipeline-steps.md` is its single home: the framing, the `supplied | partial | absent` states, the mandatory live `state,comments,updatedAt` probe under `supplied`, the exact match between retained and live `updatedAt` required before 0d, the discard-and-refresh fallback on any mismatch (applied identically to individual, array, and keyed-map payloads), and the rule that no safety check — 0a's two stops included — is ever decided from a payload. Then run `python3 shared/scripts/gi-issue.py {N} --fields number,title,body,labels,assignees,state,comments,updatedAt` and read `.issue`, except where that gate lets the payload stand in for this read. **Capture `updatedAt` here** — 0d's `gh issue edit` bumps it, so *0h* must compare against this pre-normalization value or it reports stale on every first-normalized issue. Resolve the script path as the *Bundled dependency precheck* resolves its list. Exit 3 is a stop. No `python3`, exit 2 (an unresolved script path), or exit 4 degrades: run `gh issue view {N} --json number,title,body,labels,assignees,state,comments,updatedAt` directly — the cache is an optimization, never a dependency. **0d rewrites the body, so it MUST end with `python3 shared/scripts/gi-issue.py {N} --invalidate`**; the cache is repo-wide and outlives this skill, so without it Step 1 and Step 5 read the pre-normalization body. <!-- a:rs-0a-payload-concurrency -->
+The GitHub-backed helpers share the bundled subprocess boundary in `shared/scripts/gi-gh.py`. Classify any framed caller payload first (`/auto-pilot` captured it in mode-neutral *Step 1.2b*) — *Step 0i — Caller payload gate* in `references/pipeline-steps.md` is its single home: the framing, `issue_payload = supplied | partial | absent`, the mandatory live read `gh issue view N --json state,comments,updatedAt` under `supplied`, the exact match between retained and live `updatedAt` required before 0d, the discard-and-refresh fallback on any mismatch (applied identically to individual, array, and keyed-map payloads), and the rule that no safety check — 0a's two stops included — is ever decided from a payload. Then run `python3 shared/scripts/gi-issue.py {N} --fields number,title,body,labels,assignees,state,comments,updatedAt` and read `.issue`, except where that gate lets the payload stand in for this read. **Capture `updatedAt` here** — 0d's `gh issue edit` bumps it, so *0h* must compare against this pre-normalization value or it reports stale on every first-normalized issue. Resolve the script path as the *Bundled dependency precheck* resolves its list. Exit 3 is a stop. No `python3`, exit 2 (an unresolved script path), or exit 4 degrades: run `gh issue view {N} --json number,title,body,labels,assignees,state,comments,updatedAt` directly — the cache is an optimization, never a dependency. **0d rewrites the body, so it MUST end with `python3 shared/scripts/gi-issue.py {N} --invalidate`**; the cache is repo-wide and outlives this skill, so without it Step 1 and Step 5 read the pre-normalization body. <!-- a:rs-0a-payload-concurrency -->
 
 **If not found:** output error and stop. **If closed:** output warning and stop.
 
@@ -307,8 +307,8 @@ mode). Spawn the researcher (`shared/agents/codebase-researcher.md`) with the ca
 pattern. Delegation payload, phases, early exit and inline fallback:
 `references/pipeline-steps.md` (*Step 1 — Research*).
 
-**`light`** — a lighter pass (*0g* table; mechanics in *Step 1 — Research → `light`
-profile*). A `high`/`complex` signal revises the profile **upward** to `full`, never
+**`light`** — a lighter pass: see the profile table in *Step 0g*, mechanics in
+*Step 1 — Research → `light` profile*. A `high`/`complex` signal revises the profile **upward** to `full`, never
 downward. **`analysis_reuse = fresh`** (*0h*) — pass `prior_analysis` and run the seeded
 **verify-first** pass: hints to confirm or refute, never to trust; the already-resolved
 check still runs in full (*Step 1 — Research → `reuse`*). Also pass the optional sibling
@@ -439,7 +439,7 @@ gh pr create --title "{pr_title}" --body "{pr_body}"
 
 **PR title:** `{type}({scope}): {description} (#{issue_number})` (`docs/naming-conventions.md`)
 
-**PR body:** fill *PR Body Template* in `references/report-templates.md` — Summary, Approach, **Decision Record** (from `.gitissue/analysis-<N>.json` if present, else synthesized), Changes, Test Results, **Acceptance Criteria Verification**. The last two are the durable analysis signal surviving squash-merge; never omit them (`docs/idd-methodology.md`). The template's **last line** is the `<!-- gitissue:qa v1 … -->` handoff marker: fill it in **only when QA exited clean**, otherwise drop the line — a second copy makes the consumer fall back to the full pipeline. Field derivation and the omit rules are in the same file (*QA handoff marker*); `head=` is `git rev-parse HEAD` taken after the last commit and immediately before `git push`.
+**PR body:** fill *PR Body Template* in `references/report-templates.md` — Summary, Approach, **Decision Record** (from `.gitissue/analysis-<N>.json` if present, else synthesized), Changes, Test Results, **Acceptance Criteria Verification**. The last two are the durable analysis signal surviving squash-merge; never omit them (`docs/idd-methodology.md`). The template's **last line** is the `<!-- gitissue:qa v1 … -->` handoff marker: fill it in **only when QA exited clean**, otherwise drop the line — never append a second copy, because two markers make the consumer fall back to the full pipeline. Field derivation and the omit rules are in the same file (*QA handoff marker*); `head=` is `git rev-parse HEAD` taken after the last commit and immediately before `git push`.
 
 ### Project board sync
 
