@@ -21,9 +21,7 @@ Resolve a GitHub issue end-to-end — from issue to atomic PR in 6 steps.
 | `/issue-resolver <N> --auto` | auto-pilot | Resolve fully autonomously, no user prompts |
 | `/issue-resolver <N> --no-run-log` | (modifier) | Suppress the `.gitissue/runs.jsonl` append; return telemetry to the caller instead |
 
-The argument must be a GitHub issue number. `--auto` is set automatically when invoked by `/auto-pilot`.
-
-The `--no-run-log` flag is **orthogonal to `--auto`** and is passed **only by `/auto-pilot`** — see *Step 5 — Deliver* → *Run-log entry* for the rationale.
+The argument must be a GitHub issue number. `--auto` is set automatically by `/auto-pilot`. `--no-run-log` is **orthogonal to `--auto`** and passed **only by `/auto-pilot`** — rationale in *Step 5 — Deliver* → *Run-log entry*.
 
 ## Prerequisites
 
