@@ -1,5 +1,9 @@
 ---
-name: issue-resolver description: "Create an atomic PR closing a GitHub issue end-to-end via a 6-step pipeline. Use to resolve, fix, or implement issue #N. Don't use for analysis without fixing (/issue-analysis), reviewing a PR (/issue-pr-review), or bulk backlog work (/auto-pilot)." license: MIT compatibility: "Requires git and GitHub CLI (gh) with authentication and push access. Self-contained — uses shared agents from shared/agents/." metadata:
+name: issue-resolver
+description: "Create an atomic PR closing a GitHub issue end-to-end via a 6-step pipeline. Use to resolve, fix, or implement issue #N. Don't use for analysis without fixing (/issue-analysis), reviewing a PR (/issue-pr-review), or bulk backlog work (/auto-pilot)."
+license: MIT
+compatibility: "Requires git and GitHub CLI (gh) with authentication and push access. Self-contained — uses shared agents from shared/agents/."
+metadata:
   version: 0.17.0
   author: Luong NGUYEN <luongnv89@gmail.com>
   effort: max
@@ -82,12 +86,9 @@ Agent(
 
 As the orchestrator, for each spawned step:
 
-1. **Name the role** in the spawn `description` (e.g. `"researcher — research issue #N"`). 2. **Size the model/effort** per `docs/agent-model-effort.md` from the most-recent
-   complexity signal, falling back to the agent's default tier — advisory, never blocks.
-3. **Monitor before advancing** — verify the agent returned its contract's required
-   shape (researcher: `status`+`complexity`; synthesizer: one `recommended` option;
-   implementer: commits+tests+repro for bugs; reviewer/fixer: `result`+counts). A
-   missing/blocking return is the signal to stop (interactive) or follow auto behavior.
+1. **Name the role** in the spawn `description` (e.g. `"researcher — research issue #N"`).
+2. **Size the model/effort** per `docs/agent-model-effort.md` from the most-recent complexity signal, falling back to the agent's default tier — advisory, never blocks.
+3. **Monitor before advancing** — verify the agent returned its contract's required shape (researcher: `status`+`complexity`; synthesizer: one `recommended` option; implementer: commits+tests+repro for bugs; reviewer/fixer: `result`+counts). A missing/blocking return is the signal to stop (interactive) or follow auto behavior.
 4. **Audit** — record the per-step signal the run log folds in (`complexity`, `qa_cycles`, `outcome`, `duration_s`) plus the `[N/5]` tracker line.
 
 ### Environment check
