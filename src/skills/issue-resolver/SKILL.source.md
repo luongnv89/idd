@@ -213,9 +213,9 @@ Set `analysis_reuse` to `fresh`, `stale` or `absent` by the five-condition predi
 
 ## Step 1 — Research
 
-Understand the issue, the affected code and the candidate solutions; the same pass verifies the issue is not already fixed (auto mode closes it and exits). Spawn the researcher (`shared/agents/codebase-researcher.md`). Payload, phases, early exit, inline fallback: `references/pipeline-steps.md` (*Step 1 — Research*).
+Understand the issue, the affected code and candidate solutions; the same pass verifies the issue is not already fixed (auto mode closes it and exits). Spawn the researcher (`shared/agents/codebase-researcher.md`). Payload, phases, early exit, fallback: `references/pipeline-steps.md` (*Step 1 — Research*).
 
-**Profiles.** `light` — see the profile table in *Step 0g* (*→ `light` profile*); a `high`/`complex` signal revises **upward** to `full`, never downward. `analysis_reuse = fresh` (*0h*) — pass `prior_analysis` for the seeded **verify-first** pass: hints to confirm or refute, never to trust, with the already-resolved check still run in full (*→ `reuse`*). `triage_context` carries no commit pin, so it may only **reorder** a scan (*→ `triage_context`*).
+**Profiles.** `light` — see the profile table in *Step 0g* (*→ `light` profile*); a `high`/`complex` signal revises **upward** to `full`, never downward. `analysis_reuse = fresh` (*0h*) — pass `prior_analysis` for the seeded **verify-first** pass: confirm or refute, never trust, with the already-resolved check still run in full (*→ `reuse`*). `triage_context` has no commit pin, so it may only **reorder** a scan (*→ `triage_context`*).
 
 ```
 [1/5] Research     ✓ read {N} files, complexity: {level}
@@ -225,7 +225,7 @@ Understand the issue, the affected code and the candidate solutions; the same pa
 
 ## Step 2 — Plan
 
-Generate implementation options and select one. Spawn the synthesizer (`shared/agents/synthesizer.md`); it returns minimal / balanced / comprehensive, balanced usually recommended. Selection behavior and inline fallback: `references/pipeline-steps.md` (*Step 2 — Plan*).
+Generate options and select one. Spawn the synthesizer (`shared/agents/synthesizer.md`); it returns minimal / balanced / comprehensive, balanced usually recommended. Selection and fallback: `references/pipeline-steps.md` (*Step 2 — Plan*).
 
 **Profiles.** `light` — skip the synthesis; see the profile table in *Step 0g* (*→ `light` profile*). `analysis_reuse = fresh` (*0h*) skips the same spawn but **wins Step 2 when both apply** — a replacement, not an addition: lift `options[]`, `recommended_option`, `overall_complexity` and `overall_risk` from the analysis, each `rejection_reason` from `decision_record.options_rejected[]` (*→ `reuse`*).
 
@@ -235,7 +235,7 @@ Generate implementation options and select one. Spawn the synthesizer (`shared/a
 
 ### Design-confirm checkpoint (high-complexity, interactive only)
 
-**Exactly one** extra agreement point before code is written. Fires only when **both** hold: the synthesizer reports `overall_complexity: L`/`XL` or `overall_risk: High`, **and** interactive mode (`--auto`/`IDD_AUTO_MODE=1` never pauses). Accept (default) → Step 3; decline → stop before implementing. Record it in the PR Decision Record. Procedure: `references/pipeline-steps.md` (*Step 2 — Plan → Design-confirm checkpoint*).
+**Exactly one** extra agreement point before code is written. Fires only when **both** hold: the synthesizer reports `overall_complexity: L`/`XL` or `overall_risk: High`, **and** interactive mode (`--auto`/`IDD_AUTO_MODE=1` never pauses). Accept (default) → Step 3; decline → stop before implementing. Record it in the PR Decision Record. Procedure: *Step 2 — Plan → Design-confirm checkpoint*.
 
 ---
 
@@ -247,7 +247,7 @@ Optionally augment the implementer with external skills from `references/skill-i
 
 **`light` profile:** skip the propose/install — see the profile table in *Step 0g* — but **still run the leftover teardown** there.
 
-Then spawn the implementer (`shared/agents/implementer.md`), passing the plan, branch name, naming conventions and `selected_skills`. **Bug** issues first run the red-capable reproduction checkpoint — reproduce, confirm red, fix, convert to a regression test — surfaced in the PR Decision Record and acceptance table; non-bug issues skip it and auto mode never blocks (`references/bug-verification.md`). Payload, commit guardrails, inline fallback: *Step 3 — Implement*.
+Then spawn the implementer (`shared/agents/implementer.md`) with the plan, branch name, naming conventions and `selected_skills`. **Bug** issues first run the red-capable reproduction checkpoint — reproduce, confirm red, fix, convert to a regression test — surfaced in the PR Decision Record and acceptance table; non-bug issues skip it and auto mode never blocks (`references/bug-verification.md`). Payload, commit guardrails, fallback: *Step 3 — Implement*.
 
 ```
 [3/5] Implement    ✓ {N} files changed, {U} unit tests, {E} e2e tests
@@ -257,15 +257,15 @@ Then spawn the implementer (`shared/agents/implementer.md`), passing the plan, b
 
 ## Step 4 — QA
 
-Automated review-fix loop: review → test → fix → repeat until clean or the cap is hit.
+Automated loop: review → test → fix → repeat until clean or the cap is hit.
 
 ### Spawning the code reviewer
 
-Spawn a **fresh** reviewer (`shared/agents/code-reviewer.md`) each cycle for unbiased review. On blocking issues from the reviewer or a test/build run, spawn or re-message the fixer (`shared/agents/fixer.md`) with issue context, branch/base branch, findings, failing output, the commit message `fix({scope}): address review feedback (#N)`, and the pre-commit security gate it MUST run before committing — `security_convention` (`references/docs/pre-commit-security.md`), `secscan_script` (`references/scripts/gi-secscan.py`) and `secscan_policy_ref` (`origin/${base}`) as spawn variables. Paths and a ref name only. Collect the fixer's JSON result and decide on another cycle — never fix inline when the Agent tool is available.
+Spawn a **fresh** reviewer (`shared/agents/code-reviewer.md`) each cycle. On blocking issues from the reviewer or a test/build run, spawn or re-message the fixer (`shared/agents/fixer.md`) with issue context, branch/base branch, findings, failing output, the commit message `fix({scope}): address review feedback (#N)`, and the pre-commit security gate it MUST run before committing — `security_convention` (`references/docs/pre-commit-security.md`), `secscan_script` (`references/scripts/gi-secscan.py`) and `secscan_policy_ref` (`origin/${base}`) as spawn variables; paths and a ref name only. Collect the fixer's JSON result and decide on another cycle — never fix inline when the Agent tool is available.
 
 ### UI/UX review (auto-detected)
 
-UI review is **auto-detected per issue** — no config flag enables it. Scan the issue body and diff for UI work before the QA cycles. The **code UI review** is environment-independent and always runs; the **browser UI review** runs only when a running app is reachable *and* opted in, else **skips with a warning while the code UI review still runs** — fail-soft. Detection, the `ui-reviewer` spawn and the `ui_review.browser_review` gate: `docs/ui-review.md`. Resolver deltas and cycle mechanics (`resolve.qa_max_cycles`, exit-on-clean, exit-on-stagnation): `references/pipeline-steps.md` (*Step 4 — UI/UX review*, *Step 4 — QA*).
+UI review is **auto-detected per issue** — no config flag enables it. Scan the issue body and diff for UI work before the QA cycles. The **code UI review** is environment-independent and always runs; the **browser UI review** runs only when a running app is reachable *and* opted in, else **skips with a warning while the code UI review still runs**. Detection, the `ui-reviewer` spawn and the `ui_review.browser_review` gate: `docs/ui-review.md`. Resolver deltas and cycle mechanics (`resolve.qa_max_cycles`, exit-on-clean, exit-on-stagnation): `references/pipeline-steps.md` (*Step 4 — UI/UX review*, *Step 4 — QA*).
 
 **`light` profile:** cap the loop at **1** cycle instead of `resolve.qa_max_cycles` — see the profile table in *Step 0g*. Class policy: light=1; full+low/medium=2; full+high=`qa_max_cycles`. Record `ceiling`/`breach_reason`.
 
@@ -277,9 +277,9 @@ Push, create the PR, report.
 
 ### Verify all tests pass
 
-With `resolve.auto_test` true (default), run the full suite once more after the QA fixes; false skips it. **Under `auto_test`, not over it:** when `tests_state`'s SHA equals `git rev-parse HEAD` **and `git status --porcelain=v1 --untracked-files=all` is empty**, a clean QA cycle already ran this suite on this tree — skip it and print `○ Test suite: skipped (last green {count}@{sha_short} == HEAD)`. Nothing recorded, or any doubt, runs it (`references/pipeline-steps.md`, *Step 4 — QA → Last-green test state*, the single home of the variable and both consumers). <!-- a:rs-deliver-clean-tree -->
+With `resolve.auto_test` true (default), run the full suite once more after the QA fixes; false skips it. **Under `auto_test`, not over it:** when `tests_state`'s SHA equals `git rev-parse HEAD` **and `git status --porcelain=v1 --untracked-files=all` is empty**, a clean QA cycle already ran this suite on this tree — skip it, print `○ Test suite: skipped (last green {count}@{sha_short} == HEAD)`. Nothing recorded, or any doubt, runs it (`references/pipeline-steps.md`, *Step 4 — QA → Last-green test state*, the single home of the variable and both consumers). <!-- a:rs-deliver-clean-tree -->
 
-A failure here prints `✗ Final test run failed — PR not created` with the details and stops, even in auto mode.
+A failure prints `✗ Final test run failed — PR not created` with details and stops, even in auto mode.
 
 ### Update documentation
 
@@ -287,7 +287,7 @@ If the change affects documented behavior, update README, inline docs and CHANGE
 
 ### Push branch and create PR
 
-Scan the whole branch diff first — QA fixes can introduce secrets. Export `IDD_AUTO_MODE=1` in auto mode, then from the repo root run `python3 shared/scripts/gi-secscan.py --range "origin/${base}" --policy-ref "origin/${base}"`. It reads `security.*` from `.gitissue.yml` **at the base ref**: never pass a config *value* on the command line, and never let the branch under scan supply the policy that scans it (`references/pipeline-steps.md` → *Step 5 — Deliver → Pre-push secret scan*).
+Scan the whole branch diff first — QA fixes can introduce secrets. Export `IDD_AUTO_MODE=1` in auto mode, then from the repo root run `python3 shared/scripts/gi-secscan.py --range "origin/${base}" --policy-ref "origin/${base}"`. It reads `security.*` from `.gitissue.yml` **at the base ref**: never pass a config *value* on the command line, and never let the branch under scan supply the policy that scans it (*Step 5 — Deliver → Pre-push secret scan*).
 
 - **Pass** needs all four: exit 0, `policy_source` equal to the `ref:origin/…` requested, `verdict` not `block`, `scanned` not 0 while `skipped` is above 0.
 - **Exit 1 is the block verdict** — stop, do not push, report the path from `blocking[]`; never fall through to the prose scan. **Exit 3** (uncompilable `security.*` regex) also stops.
@@ -303,7 +303,7 @@ gh pr create --title "{pr_title}" --body "{pr_body}"
 
 **PR title:** `{type}({scope}): {description} (#{issue_number})` (`docs/naming-conventions.md`)
 
-**PR body:** fill *PR Body Template* in `references/report-templates.md` — Summary, Approach, **Decision Record**, Changes, Test Results, **Acceptance Criteria Verification**; never omit the last two (`docs/idd-methodology.md`). Its **last line** is the `<!-- gitissue:qa v1 … -->` handoff marker: fill it in **only when QA exited clean**, otherwise drop the line — never append a second copy. Field derivation and omit rules: same file, *QA handoff marker*. `head=` is `git rev-parse HEAD` taken after the last commit, immediately before `git push`.
+**PR body:** fill *PR Body Template* in `references/report-templates.md` — Summary, Approach, **Decision Record**, Changes, Test Results, **Acceptance Criteria Verification**; never omit the last two (`docs/idd-methodology.md`). Its **last line** is the `<!-- gitissue:qa v1 … -->` handoff marker: fill it in **only when QA exited clean**, otherwise drop the line — never append a second copy. Derivation and omit rules: same file, *QA handoff marker*. `head=` is `git rev-parse HEAD` after the last commit, immediately before `git push`.
 
 ### Project board sync
 
@@ -314,7 +314,7 @@ With `projects.sync_enabled` true, set status to `status_map.done` (`docs/github
 
 ### Run-log entry (monitoring)
 
-At **every terminal outcome** — delivered PR (`success`), early exit because already fixed (`already_resolved`), or a failed step (`failed`) — append exactly **one JSON line** to `.gitissue/runs.jsonl`, **unless invoked with `--no-run-log`**, which appends **nothing** and returns the telemetry to the caller. `--no-run-log` enforces the **single writer** rule under `/auto-pilot` and is independent of `--auto`: a standalone `/issue-resolver <N> --auto` still writes. Field derivation and suppression rationale: `references/report-templates.md` (*Run-log entry — field derivation and suppression*), following `docs/run-log-schema.md`.
+At **every terminal outcome** — delivered PR (`success`), early exit because already fixed (`already_resolved`), or a failed step (`failed`) — append exactly **one JSON line** to `.gitissue/runs.jsonl`, **unless invoked with `--no-run-log`**, which appends **nothing** and returns the telemetry to the caller. That enforces the **single writer** rule under `/auto-pilot` and is independent of `--auto`: a standalone `/issue-resolver <N> --auto` still writes. Field derivation and suppression rationale: `references/report-templates.md` (*Run-log entry — field derivation and suppression*), following `docs/run-log-schema.md`.
 
 ```bash
 # Exactly one of these runs. --echo validates the telemetry you return and writes nothing.
@@ -322,15 +322,15 @@ if [ -n "$no_run_log" ]; then printf '%s' "$run_json" | python3 shared/scripts/g
 # Fallback when `python3` is unavailable or the script exits 4: mkdir -p .gitissue && printf '%s\n' "$run_json" >> .gitissue/runs.jsonl
 ```
 
-**Exit 3:** the record is invalid — the script printed the reason and wrote nothing. A stop, not a degrade: never append `$run_json` raw. Correct the record and re-run, or drop the line.
+**Exit 3:** the record is invalid; the script wrote nothing. A stop, not a degrade: never append `$run_json` raw. Correct the record and re-run, or drop the line.
 
-Every other write failure (no `python3`, exit 2, exit 4) is **non-fatal** — use the fallback append and never block the reported run result. Only append; never rewrite or reorder lines.
+Every other write failure (no `python3`, exit 2, exit 4) is **non-fatal** — use the fallback append, never block the reported result. Only append; never rewrite or reorder lines.
 
 ---
 
 ## Closing Summary
 
-Print **one** closing block carrying only what the `[N/5]` tracker never printed: the outcome line, the `risk_rating`, and the single PR reference (number, title, URL, `Closes #N`). Never repeat a tracker metric. Use the matching variant in `references/report-templates.md` (*Closing Summary*): *Successful Resolution*, *Resolution With Warnings*, or *Already Resolved* (no PR reference). **Then the run-stats footer** — `references/run-stats.md`: elapsed, tokens only where the host reported a count (otherwise left out), agents, run cost only, `n/a` for anything else undetermined. It is the last thing printed at **every** terminal outcome, including those that never reach this block: a preflight stop (`not found`, `closed`, `pr_in_progress`), an invalid-config stop, `already_resolved`, a blocked secret scan, a failed final test run, or any failed step.
+Print **one** closing block carrying only what the `[N/5]` tracker never printed: the outcome line, the `risk_rating`, and the single PR reference (number, title, URL, `Closes #N`). Never repeat a tracker metric. Use the matching variant in `references/report-templates.md` (*Closing Summary*): *Successful Resolution*, *Resolution With Warnings*, or *Already Resolved*. **Then the run-stats footer** — `references/run-stats.md`: elapsed, tokens only where the host reported a count (otherwise left out), agents, run cost only, `n/a` for anything else undetermined. It is the last thing printed at **every** terminal outcome, including those that never reach this block: a preflight stop (`not found`, `closed`, `pr_in_progress`), an invalid-config stop, `already_resolved`, a blocked secret scan, a failed final test run, or any failed step.
 
 ---
 
@@ -339,9 +339,9 @@ Print **one** closing block carrying only what the `[N/5]` tracker never printed
 With `--auto` (or under `/auto-pilot`) the pipeline runs without user interaction. Each step states its own auto behavior; these are the cross-cutting invariants:
 
 - **Environment:** export `IDD_AUTO_MODE=1` before any shell snippet that consults it (`docs/pre-commit-security.md`).
-- **Workspace:** in-place is the default resolution path. Skip Step 0e and allow no `git worktree add` on the default resolution path; standalone auto mode and auto-pilot's single-lane path run mandatory Repo Sync, then *0f*. With `max_parallel > 1` a resolver may receive `IDD_CALLER_WORKTREE=1` and, after the validation in `references/pipeline-steps.md`, use that already-current workspace without creating, falling back from, or cleaning it up.
+- **Workspace:** in-place is the default resolution path. Skip Step 0e and allow no `git worktree add` on the default resolution path; standalone auto mode and auto-pilot's single-lane path run mandatory Repo Sync, then *0f*. With `max_parallel > 1` a resolver may receive `IDD_CALLER_WORKTREE=1` and use that already-current workspace, without creating, falling back from, or cleaning it up.
 - **Never blocks:** every decision point has a defined auto behavior — per-step list in `references/pipeline-steps.md` (*Auto-mode behavior by step*). Every terminal outcome still runs borrow teardown.
-- **Deliver:** create the PR; never merge — that is `/auto-pilot`'s or `/issue-pr-review`'s job. Under `/auto-pilot` the selected `profile` is **returned** in the telemetry (with `--no-run-log`); a standalone `--auto` run writes `profile` itself.
+- **Deliver:** create the PR; never merge — that is `/auto-pilot`'s or `/issue-pr-review`'s job. Under `/auto-pilot` the selected `profile` is **returned** in the telemetry; a standalone `--auto` run writes `profile` itself.
 
 No `[y/N]`, `Choose:` or `Continue?` prompts.
 
@@ -351,4 +351,4 @@ Missing acceptance criteria, an empty issue body, large issues (20+ files), test
 
 ## Platform Driver and Output Conventions
 
-Tracker access follows the GitHub driver — `--json` with explicit field selection, never parsed text; catalog in docs/platform-github.md. Terminal output follows `docs/terminal-style.md` — symbols `● ✓ ✗ ◆ ⚡ ⚠ ○`, two-space indent, `┄` separators, URLs on their own line, ≤80 chars, plus the `[N/5]` counter. Errors use the rich format from `references/error-messages.md`: `✗ what failed`, then `To fix:  <command>`, then a docs link when applicable.
+Tracker access follows the GitHub driver — `--json` with explicit field selection, never parsed text; catalog in docs/platform-github.md. Terminal output follows `docs/terminal-style.md` — symbols `● ✓ ✗ ◆ ⚡ ⚠ ○`, two-space indent, `┄` separators, URLs on their own line, ≤80 chars, plus the `[N/5]` counter. Errors use the rich format from `references/error-messages.md`: `✗ what failed`, `To fix:  <command>`, then a docs link.
