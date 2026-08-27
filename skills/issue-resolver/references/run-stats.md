@@ -120,10 +120,14 @@ rather than editing this list.
   looked up, or computed, which *The conditional token count* rules out by
   name. A field resting on all three would resolve on no run of any skill,
   which is exactly the defect issue #410 removed.
-- **A count of skills invoked.** Only two of the eight skills can invoke
-  another skill at run time; in the other six the field would be a constant.
-  Dropping it in those six is not available either, because omission is not a
-  per-skill choice, by the rule stated in *The fields*.
+- **A count of skills invoked.** It measures what the run did rather than what
+  it cost, which is the line issue #165 drew; that is the ground. Two further
+  reasons hold it there: only two of the eight skills can invoke another skill
+  at run time, and dropping it in the other six is not available, because
+  omission is not a per-skill choice, by the rule stated in *The fields*. That
+  the field would be a constant in those six is not itself a reason — `agents`
+  is a constant `0` in a skill that spawns no subagents and is kept, because a
+  determined constant resolves.
 - **A count of tool calls.** Producing one means a running tally maintained
   across every step of the run, which *Overhead* forbids by name. `agents`
   survives the same test only because subagent spawns are few, discrete, and
