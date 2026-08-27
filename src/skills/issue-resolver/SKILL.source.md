@@ -442,17 +442,14 @@ If `projects.sync_enabled` is true, update status to `status_map.done` (see `doc
 
 ### Run-log entry (monitoring)
 
-At **every terminal outcome** — delivered PR (`success`), early exit because
-already fixed (`already_resolved`), or a failed step (`failed`) — append exactly
-**one JSON line** to `.gitissue/runs.jsonl`, **unless invoked with `--no-run-log`**,
-in which case append **nothing** and return the telemetry to the caller instead.
-`--no-run-log` enforces the **single writer** rule under `/auto-pilot` and is
-independent of `--auto` — a standalone `/issue-resolver <N> --auto` is *not*
-suppressed and still writes. Field derivation (the object's keys, the researcher
-`complexity` collapse, when to omit `profile`) and the full suppression rationale
-are in `references/report-templates.md` (*Run-log entry — field derivation and
-suppression*), which follows the schema in `docs/config-schema.md`
-(*`.gitissue/runs.jsonl` — run log*).
+At **every terminal outcome** — delivered PR (`success`), early exit because already
+fixed (`already_resolved`), or a failed step (`failed`) — append exactly **one JSON line** to
+`.gitissue/runs.jsonl`, **unless invoked with `--no-run-log`**, in which case
+append **nothing** and return the telemetry to the caller instead. `--no-run-log`
+enforces the **single writer** rule under `/auto-pilot` and is independent of `--auto`:
+a standalone `/issue-resolver <N> --auto` still writes. Field derivation and the full
+suppression rationale are in `references/report-templates.md` (*Run-log entry — field
+derivation and suppression*), which follows the schema in `docs/run-log-schema.md`.
 
 ```bash
 # Exactly one of these runs. --echo validates the telemetry you return and writes nothing.
@@ -460,9 +457,13 @@ if [ -n "$no_run_log" ]; then printf '%s' "$run_json" | python3 shared/scripts/g
 # Fallback when `python3` is unavailable or the script exits 4: mkdir -p .gitissue && printf '%s\n' "$run_json" >> .gitissue/runs.jsonl
 ```
 
-**Exit 3:** the record itself is invalid — the script printed the reason on stderr and wrote nothing. This is a stop, not a degrade: never append `$run_json` raw, because that writes the malformed line the script exists to reject. Correct the record and re-run, or drop the line.
+**Exit 3:** the record itself is invalid — the script printed the reason on stderr and
+wrote nothing. A stop, not a degrade: never append `$run_json` raw, because that writes
+the malformed line the script exists to reject. Correct the record and re-run, or drop it.
 
-Only the *write* is best-effort and non-fatal — a write that cannot happen (no `python3`, exit 2 for an unresolved script path or a malformed invocation, exit 4) never blocks the reported run result; use the fallback append above for any of them, never for exit 3. A rejected record is never written by any path. Only append; never rewrite or reorder existing lines.
+Every other write failure (no `python3`, exit 2 for an unresolved script path or a
+malformed invocation, exit 4) is **non-fatal** — use the fallback append above and never
+block the reported run result. Only append; never rewrite or reorder existing lines.
 
 ---
 
