@@ -17,15 +17,15 @@ Resolve a GitHub issue end-to-end — from issue to atomic PR in 6 steps.
 
 | Invocation | Mode | What happens |
 |------------|------|--------------|
-| `/issue-resolver <N>` | interactive | Resolve issue #N, ask the user to pick a plan |
+| `/issue-resolver <N>` | interactive | Resolve issue #N; the user picks the plan |
 | `/issue-resolver <N> --auto` | auto-pilot | Resolve autonomously, no prompts |
-| `/issue-resolver <N> --no-run-log` | (modifier) | Suppress the `.gitissue/runs.jsonl` append; return telemetry to the caller |
+| `/issue-resolver <N> --no-run-log` | (modifier) | Append nothing to `.gitissue/runs.jsonl`; return telemetry to the caller |
 
-`N` must be a GitHub issue number. `--auto` is set automatically by `/auto-pilot`. `--no-run-log` is **orthogonal to `--auto`** and passed **only by `/auto-pilot`** — rationale in *Step 5 — Deliver* → *Run-log entry*.
+`N` must be a GitHub issue number. `--auto` is set by `/auto-pilot`. `--no-run-log` is **orthogonal to `--auto`** and passed **only by `/auto-pilot`** — see *Step 5 — Deliver* → *Run-log entry*.
 
 ## Prerequisites
 
-Verify before any operation — git repository (`git rev-parse --git-dir`), `gh` installed (`which gh`), authenticated (`gh auth status`), remote present (`git remote -v`). On failure print the exact error from `references/error-messages.md` and stop.
+Verify before any operation — git repository (`git rev-parse --git-dir`), `gh` installed (`which gh`) and authenticated (`gh auth status`), remote present (`git remote -v`). On failure print the exact error from `references/error-messages.md` and stop.
 
 ## Repo Sync Before Edits (mandatory)
 
@@ -33,26 +33,26 @@ In-place path only (ordinary auto mode, or interactive after declining Step 0e);
 
 ## Configuration
 
-Load config once at skill start; never re-read it. Run `python3 shared/scripts/gi-config.py` — two mandatory requirements. **Working directory:** the repo root. **Script path:** absolute, resolved exactly as the *Bundled dependency precheck* resolves its list. It prints `{"config": {…dotted keys…}, "config_file": …, "first_run": …}`, merging the defaults below with `.gitissue.yml`. Why both requirements and the clock below are load-bearing: `references/pipeline-steps.md` (*Configuration load*).
+Load config once at skill start; never re-read it. Run `python3 shared/scripts/gi-config.py` — two mandatory requirements. **Working directory:** the repo root. **Script path:** absolute, resolved as the *Bundled dependency precheck* resolves its list. It prints `{"config": {…dotted keys…}, "config_file": …, "first_run": …}`, merging the defaults below with `.gitissue.yml`. Why both requirements and the clock matter: `references/pipeline-steps.md` (*Configuration load*).
 
 - **Exit 0** — use `config`; when `first_run` is `true` print `○ First run — using default config. Run /init-gitissue to customize.`
-- **Exit 3** — invalid `.gitissue.yml`: print the validation error from `references/error-messages.md` (*Invalid config*) and stop.
-- **Script file absent** — a missing bundled dependency is a broken install and not a degrade: stop and print the `✗ Missing bundled dependency` block.
-- **Anything else** (no `python3`, another non-zero exit, unparsable stdout) — print `⚠ gi-config unavailable — using the inline defaults below`, then read `.gitissue.yml` by hand *instead of* the script, never beside it.
+- **Exit 3** — invalid `.gitissue.yml`: print the error from `references/error-messages.md` (*Invalid config*) and stop.
+- **Script file absent** — a missing bundled dependency is a broken install and not a degrade: stop, print `✗ Missing bundled dependency`.
+- **Anything else** (no `python3`, another non-zero exit, unparsable stdout) — print `⚠ gi-config unavailable — using the inline defaults below`, then read `.gitissue.yml` by hand *instead of* the script.
 
 **Capture the run clock here:** chain that same `python3` invocation as `python3 …; ec=$?; date +%s >&2; exit "$ec"` and keep the stderr epoch as `run_started_epoch` — what the *Run Stats Footer* (`references/run-stats.md`) measures `elapsed` from.
 
-Defaults, and per-key behavior, in `docs/config-schema.md`: `issue.auto_normalize: true` · `resolve.approval_gate: auto` · `resolve.branch_prefix: "auto"` · `resolve.auto_test: true` · `resolve.test_timeout: 300` · `resolve.max_commits: 10` · `resolve.qa_max_cycles: 5` · `resolve.adaptive_effort: true` (*0g*) · `resolve.ui_review.browser_review: "ask"` · `resolve.borrow_skills: false`.
+Defaults and per-key behavior in `docs/config-schema.md`: `issue.auto_normalize: true` · `resolve.approval_gate: auto` · `resolve.branch_prefix: "auto"` · `resolve.auto_test: true` · `resolve.test_timeout: 300` · `resolve.max_commits: 10` · `resolve.qa_max_cycles: 5` · `resolve.adaptive_effort: true` (*0g*) · `resolve.ui_review.browser_review: "ask"` · `resolve.borrow_skills: false`.
 
 ---
 
 ## Subagent Architecture
 
-Heavy work goes to subagents (`shared/agents/`), keeping the main agent's **context window** clean and its **token budget** predictable: the main agent owns Step 0, Step 4's loop and Step 5; Steps 1-3 each spawn one. Diagram: `references/pipeline-steps.md` (*Subagent Architecture Diagram*). Prompts are bundled at `references/agents/<name>.md`; their shared conventions live in `docs/shared-agent-conventions.md`.
+Heavy work goes to subagents (`shared/agents/`), keeping the main agent's **context window** clean and its **token budget** predictable: the main agent owns Step 0, Step 4's loop and Step 5; Steps 1-3 each spawn one. Diagram: `references/pipeline-steps.md` (*Subagent Architecture Diagram*). Prompts are bundled at `references/agents/<name>.md`; shared conventions live in `docs/shared-agent-conventions.md`.
 
 ### Spawning a subagent (canonical pattern)
 
-Every step spawns with the same shape — only role, description and prompt file change. **Do NOT set `subagent_type`**; always use the default general-purpose agent:
+Only role, description and prompt file change per step. **Do NOT set `subagent_type`**; use the default general-purpose agent:
 
 ```python
 Agent(
@@ -64,15 +64,15 @@ Agent(
 
 ### Orchestrating the agents (model/effort, monitoring, audit)
 
-For each spawned step: **name the role** in the spawn `description`; **size the model/effort** per `docs/agent-model-effort.md`; **monitor before advancing** — a missing or blocking return stops the run (interactive) or follows the auto behavior; **audit** the per-step signal. Per-agent required shapes and the audited fields: `references/pipeline-steps.md` (*Orchestrating the agents*).
+Per spawned step: **name the role** in the spawn `description`; **size the model/effort** per `docs/agent-model-effort.md`; **monitor before advancing** — a missing or blocking return stops the run (interactive) or follows the auto behavior; **audit** the per-step signal. Required return shapes and audited fields: `references/pipeline-steps.md` (*Orchestrating the agents*).
 
 ### Environment check
 
-If the Agent tool is available, use subagents as above; if not (e.g. Claude.ai), run each step inline via the fallback instructions.
+With the Agent tool available, use subagents as above; without it (e.g. Claude.ai), run each step inline via the fallback instructions.
 
 ### Bundled dependency precheck
 
-Before execution, verify **every** path below exists relative to this SKILL.md's own directory. This list is the authoritative guard — keep it complete. If any path is missing, stop and print the `✗ Missing bundled dependency` block from `references/error-messages.md` (*Bundled dependencies*); never continue with an inline or guessed subagent prompt:
+Verify **every** path below exists relative to this SKILL.md's own directory — the authoritative guard. Any missing path stops the run: print the `✗ Missing bundled dependency` block from `references/error-messages.md` (*Bundled dependencies*), never an inline or guessed subagent prompt.
 
 ```text
 references/agents/codebase-researcher.md
@@ -112,13 +112,13 @@ references/scripts/gi-state.py
 
 ## Pipeline Overview
 
-6 steps (0-5) — Preflight, Research, Plan, Implement, QA, Deliver. Show progress with the `[N/5]` counter: each step prints a new line on start (`●`), updating to `✓`/`✗`. Static sequential output, no animation. Worked example in `references/report-templates.md` (*Expected Inline Pipeline Output*).
+6 steps (0-5) — Preflight, Research, Plan, Implement, QA, Deliver. Each prints a new `[N/5]` line on start (`●`), updating to `✓`/`✗`; static sequential output, no animation. Worked example in `references/report-templates.md` (*Expected Inline Pipeline Output*).
 
 ---
 
 ### Step completion reports
 
-Each step closes with a completion report — `√`/`×` per check plus a `Result: PASS | PARTIAL | FAIL` line — so "step done" is checkable, not asserted. Check names, `Result` semantics and block format: `references/report-templates.md` (*Step Completion Reports*) — **read it now**, before Step 0. A step is not complete until its `Result:` line is printed.
+Each step closes with `√`/`×` per check plus a `Result: PASS | PARTIAL | FAIL` line. Check names, semantics and format: `references/report-templates.md` (*Step Completion Reports*) — **read it now**, before Step 0. A step is not complete until its `Result:` line is printed.
 
 ---
 
