@@ -21,26 +21,26 @@ Resolve a GitHub issue end-to-end — from issue to atomic PR in 6 steps.
 | `/issue-resolver <N> --auto` | auto-pilot | Resolve autonomously, no prompts |
 | `/issue-resolver <N> --no-run-log` | (modifier) | Append nothing to `.gitissue/runs.jsonl`; return telemetry to the caller |
 
-`N` must be a GitHub issue number. `--auto` is set by `/auto-pilot`. `--no-run-log` is **orthogonal to `--auto`** — see *Step 5 — Deliver* → *Run-log entry*.
+`N` must be a GitHub issue number. `--auto` is set by `/auto-pilot`; `--no-run-log` is **orthogonal to `--auto`** (*Step 5 — Deliver* → *Run-log entry*).
 
 ## Prerequisites
 
-Verify before any operation — git repository (`git rev-parse --git-dir`), `gh` installed (`which gh`) and authenticated (`gh auth status`), remote present (`git remote -v`). On failure print the exact error from `references/error-messages.md` and stop.
+Required before any operation — git repository (`git rev-parse --git-dir`), `gh` installed (`which gh`) and authenticated (`gh auth status`), remote present (`git remote -v`). On failure print the exact error from `references/error-messages.md` and stop.
 
 ## Repo Sync Before Edits (mandatory)
 
-In-place path only (ordinary auto mode, or interactive after declining Step 0e); accepted and validated caller-managed worktrees already start from the fetched base, and an invalid `IDD_CALLER_WORKTREE=1` is a stop, never a sync bypass. Sync with the **stash-first pattern** — stash (including untracked) → fetch → rebase-pull → pop, aborting with the recovery hint if the pop conflicts. Copy the snippet and recovery procedure from `docs/sync-conventions.md` (*Quick Reference (Copy-Paste Snippet)*); never improvise a bare rebase on a dirty tree. A missing `origin` or a rebase conflict stops and asks (interactive), or aborts (auto).
+In-place path only (ordinary auto mode, or interactive after declining Step 0e); worktree paths already start from the fetched base, and an invalid `IDD_CALLER_WORKTREE=1` is a stop, never a sync bypass. Sync with the **stash-first pattern**: copy the snippet and recovery procedure from `docs/sync-conventions.md` (*Quick Reference (Copy-Paste Snippet)*), and never improvise a bare rebase on a dirty tree. A missing `origin` or a rebase conflict stops and asks (interactive), or aborts (auto).
 
 ## Configuration
 
-Load config once at skill start; never re-read it. Run `python3 shared/scripts/gi-config.py` — two mandatory requirements. **Working directory:** the repo root. **Script path:** absolute, resolved as the *Bundled dependency precheck* resolves its list. It prints `{"config": {…dotted keys…}, "config_file": …, "first_run": …}`, merging the defaults below with `.gitissue.yml`. Why both requirements and the clock matter: `references/pipeline-steps.md` (*Configuration load*).
+Load config once; never re-read it. Run `python3 shared/scripts/gi-config.py` — two mandatory requirements. **Working directory:** the repo root. **Script path:** absolute, resolved as the *Bundled dependency precheck* resolves its list. It prints `{"config": {…dotted keys…}, "config_file": …, "first_run": …}`, merging the defaults below with `.gitissue.yml`. Why each matters: `references/pipeline-steps.md` (*Configuration load*).
 
 - **Exit 0** — use `config`; on `first_run` print `○ First run — using default config. Run /init-gitissue to customize.`
 - **Exit 3** — invalid `.gitissue.yml`: print the error from `references/error-messages.md` (*Invalid config*) and stop.
 - **Script file absent** — a missing bundled dependency is a broken install and not a degrade: stop, print `✗ Missing bundled dependency`.
-- **Anything else** (no `python3`, another non-zero exit, unparsable stdout) — print `⚠ gi-config unavailable — using the inline defaults below`, then read `.gitissue.yml` by hand *instead of* the script.
+- **Anything else** (no `python3`, other non-zero exit, unparsable stdout) — print `⚠ gi-config unavailable — using the inline defaults below`, then read `.gitissue.yml` by hand *instead of* the script.
 
-**Capture the run clock here:** chain that same `python3` invocation as `python3 …; ec=$?; date +%s >&2; exit "$ec"` and keep the stderr epoch as `run_started_epoch` — what the *Run Stats Footer* (`references/run-stats.md`) measures `elapsed` from.
+**Capture the run clock here:** chain that same `python3` invocation as `python3 …; ec=$?; date +%s >&2; exit "$ec"`, keeping the stderr epoch as `run_started_epoch` — what the *Run Stats Footer* (`references/run-stats.md`) measures `elapsed` from.
 
 Defaults and per-key behavior in `docs/config-schema.md`: `issue.auto_normalize: true` · `resolve.approval_gate: auto` · `resolve.branch_prefix: "auto"` · `resolve.auto_test: true` · `resolve.test_timeout: 300` · `resolve.max_commits: 10` · `resolve.qa_max_cycles: 5` · `resolve.adaptive_effort: true` (*0g*) · `resolve.ui_review.browser_review: "ask"` · `resolve.borrow_skills: false`.
 
@@ -48,7 +48,7 @@ Defaults and per-key behavior in `docs/config-schema.md`: `issue.auto_normalize:
 
 ## Subagent Architecture
 
-Heavy work goes to subagents (`shared/agents/`), keeping the main agent's **context window** clean and its **token budget** predictable: the main agent owns Step 0, Step 4's loop and Step 5; Steps 1-3 each spawn one. Diagram: `references/pipeline-steps.md` (*Subagent Architecture Diagram*). Prompts are bundled at `references/agents/<name>.md`; shared conventions live in `docs/shared-agent-conventions.md`.
+Heavy work goes to subagents (`shared/agents/`), keeping the main agent's **context window** clean and its **token budget** predictable: it owns Step 0, Step 4's loop and Step 5, and Steps 1-3 each spawn one. Diagram: `references/pipeline-steps.md` (*Subagent Architecture Diagram*). Prompts are bundled at `references/agents/<name>.md`; shared conventions in `docs/shared-agent-conventions.md`.
 
 ### Spawning a subagent (canonical pattern)
 
@@ -72,7 +72,7 @@ With the Agent tool, use subagents as above; without it (e.g. Claude.ai), run ea
 
 ### Bundled dependency precheck
 
-Verify **every** path below exists relative to this SKILL.md's own directory — the authoritative guard. Any missing path stops the run: print the `✗ Missing bundled dependency` block from `references/error-messages.md` (*Bundled dependencies*), never an inline or guessed subagent prompt.
+Verify **every** path below exists relative to this SKILL.md's own directory. Any missing path stops the run: print the `✗ Missing bundled dependency` block from `references/error-messages.md` (*Bundled dependencies*), never an inline or guessed prompt.
 
 ```text
 references/agents/codebase-researcher.md
@@ -112,11 +112,11 @@ references/scripts/gi-state.py
 
 ## Pipeline Overview
 
-6 steps (0-5) — Preflight, Research, Plan, Implement, QA, Deliver. Each prints a new `[N/5]` line on start (`●`), updating to `✓`/`✗`; static sequential output. Worked example: `references/report-templates.md` (*Expected Inline Pipeline Output*).
+6 steps (0-5) — Preflight, Research, Plan, Implement, QA, Deliver. Each prints a `[N/5]` line on start (`●`), updating to `✓`/`✗`. Worked example: `references/report-templates.md` (*Expected Inline Pipeline Output*).
 
 ### Step completion reports
 
-Each step closes with `√`/`×` per check plus a `Result: PASS | PARTIAL | FAIL` line. Check names, semantics and format: `references/report-templates.md` (*Step Completion Reports*) — **read it now**, before Step 0. A step is not complete until its `Result:` line is printed.
+Each step closes with `√`/`×` per check plus a `Result: PASS | PARTIAL | FAIL` line — format in `references/report-templates.md` (*Step Completion Reports*), **read it now**, before Step 0. A step is not complete until its `Result:` line prints.
 
 ---
 
@@ -126,7 +126,7 @@ Decide whether this issue should be worked on. Open with `● Preflight check fo
 
 ### 0a — Fetch issue
 
-GitHub reads share the subprocess boundary in `shared/scripts/gi-gh.py`. Classify any framed caller payload first (`/auto-pilot` captured it in mode-neutral *Step 1.2b*) — *Step 0i — Caller payload gate* in `references/pipeline-steps.md` is its single home: the framing, `issue_payload = supplied | partial | absent`, the mandatory live read `gh issue view N --json state,comments,updatedAt` under `supplied`, the exact match between retained and live `updatedAt` required before 0d, the discard-and-refresh fallback on any mismatch (identical for individual, array, and keyed-map payloads), and the rule that no safety check is ever decided from a payload. Then run `python3 shared/scripts/gi-issue.py {N} --fields number,title,body,labels,assignees,state,comments,updatedAt` and read `.issue`, except where that gate lets the payload stand in. **Capture `updatedAt` here** — 0d's `gh issue edit` bumps it, so *0h* must compare against this pre-normalization value. Resolve the script path as the *Bundled dependency precheck* does. Exit 3 stops; no `python3`, exit 2 or exit 4 degrades to `gh issue view {N} --json number,title,body,labels,assignees,state,comments,updatedAt`. **0d rewrites the body, so it MUST end with `python3 shared/scripts/gi-issue.py {N} --invalidate`.** <!-- a:rs-0a-payload-concurrency -->
+GitHub reads share the subprocess boundary in `shared/scripts/gi-gh.py`. Classify any framed caller payload first (`/auto-pilot` captured it in mode-neutral *Step 1.2b*); *Step 0i — Caller payload gate* in `references/pipeline-steps.md` is its single home — framing, `issue_payload = supplied | partial | absent`, the mandatory live `gh issue view N --json state,comments,updatedAt` under `supplied`, the exact match between retained and live `updatedAt` before 0d, discard-and-refresh on mismatch (identical for individual, array, and keyed-map payloads), and no safety check ever decided from a payload. Then run `python3 shared/scripts/gi-issue.py {N} --fields number,title,body,labels,assignees,state,comments,updatedAt` and read `.issue`, except where that gate lets the payload stand in. **Capture `updatedAt` here** — 0d's `gh issue edit` bumps it, so *0h* must compare against this pre-normalization value. Resolve the script path as the *Bundled dependency precheck* does. Exit 3 stops; no `python3`, exit 2 or exit 4 degrades to `gh issue view {N} --json number,title,body,labels,assignees,state,comments,updatedAt`. **0d rewrites the body, so it MUST end with `python3 shared/scripts/gi-issue.py {N} --invalidate`.** <!-- a:rs-0a-payload-concurrency -->
 
 **Not found:** error, stop. **Closed:** warning, stop.
 
@@ -137,7 +137,7 @@ git branch -a | grep -i "{N}"                                # existing branches
 gh pr list --state open --json number,title,body,headRefName --limit 20
 ```
 
-Scan PR bodies for `Closes #N`, `Fixes #N`, `Resolves #N`. An **open** PR already targeting the issue prints the `⚠ PR already targets issue` block from `references/error-messages.md` (*Guards*) and stops — return `status: pr_in_progress` with its `pr_number` and `branch_name`, and **never close the issue** (`references/pipeline-steps.md` → *Early exit*). Only a **merged** PR, or a closing commit on the default branch, is `already_resolved`.
+Scan PR bodies for `Closes #N`, `Fixes #N`, `Resolves #N`. An **open** PR targeting the issue prints the `⚠ PR already targets issue` block from `references/error-messages.md` (*Guards*) and stops — return `status: pr_in_progress` with its `pr_number` and `branch_name`, and **never close the issue** (*Early exit*). Only a **merged** PR, or a closing commit on the default branch, is `already_resolved`.
 
 ### 0c — Guards
 
@@ -155,7 +155,7 @@ If `issue.auto_normalize` is true and the body carries no `<!-- gitissue:normali
 
 ### 0e — Workspace (interactive only)
 
-Derive one `{branch_name}` before 0e or 0f picks a workspace: `python3 shared/scripts/gi-branch.py {N} --from-issue --type {type}`, reading `.branch`. **`--from-issue` is mandatory** — never put the issue title or the configured prefix on the command line (`references/pipeline-steps.md` → *Step 0e — Workspace*). `{type}` is one of six classified literals, never free text. Exit 3 stops; no `python3`, exit 2 or exit 4 degrades to `docs/naming-conventions.md` by hand. Both paths use this one name.
+Derive one `{branch_name}` before 0e or 0f picks a workspace: `python3 shared/scripts/gi-branch.py {N} --from-issue --type {type}`, reading `.branch`. **`--from-issue` is mandatory** — never put the issue title or configured prefix on the command line (`references/pipeline-steps.md` → *Step 0e — Workspace*). `{type}` is one of six classified literals. Exit 3 stops; no `python3`, exit 2 or exit 4 degrades to `docs/naming-conventions.md` by hand. Both paths use this name.
 
 **Auto mode (`--auto` / `IDD_AUTO_MODE=1`): skip this offer entirely.** A set `IDD_CALLER_WORKTREE=1` uses the validated caller-managed path in `references/pipeline-steps.md`; otherwise go to *0f*.
 
@@ -180,7 +180,7 @@ Accept replaces *0f — Create branch* and the mandatory Repo Sync; decline runs
 
 ### 0f — Create branch
 
-The **in-place path** — ordinary auto mode, or interactive after declining. Accepted and validated caller-managed paths already checked out the branch. Use the `{branch_name}` already derived (*0e — Workspace*, `docs/naming-conventions.md`); never re-derive it. **If it exists:** interactive asks `continue` or `fresh`; auto takes `continue`.
+The **in-place path** — ordinary auto mode, or interactive after declining; worktree paths already checked out the branch. Use the `{branch_name}` already derived (*0e — Workspace*, `docs/naming-conventions.md`); never re-derive it. **If it exists:** interactive asks `continue` or `fresh`; auto takes `continue`.
 
 ### 0g — Complexity gate (select the pipeline profile)
 
@@ -207,7 +207,7 @@ Revise **upward** only (Step 1 reports `high`/`complex` on an `S` band → `full
 
 ### 0h — Analysis reuse gate <!-- a:rs-0h-skill -->
 
-Set `analysis_reuse` to `fresh`, `stale` or `absent` by the five-condition predicate in `references/pipeline-steps.md` (*Step 0h — Analysis reuse gate*) — its **single home**. `fresh` seeds Step 1 and skips Step 2's synthesizer; `stale`/`absent` run the full pipeline. Any doubt — missing key, short SHA, unparsable timestamp, failed `git` call — is `stale` (fail-safe). Skipped, like *0g*, when `resolve.adaptive_effort` is `false`.
+Set `analysis_reuse` to `fresh`, `stale` or `absent` by the five-condition predicate in `references/pipeline-steps.md` (*Step 0h — Analysis reuse gate*) — its **single home**. `fresh` seeds Step 1 and skips Step 2's synthesizer; `stale`/`absent` run the full pipeline. Any doubt is `stale` (fail-safe). Skipped, like *0g*, when `resolve.adaptive_effort` is `false`.
 
 ---
 
