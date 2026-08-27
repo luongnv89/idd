@@ -287,26 +287,24 @@ UI review is **auto-detected per issue** — no config flag enables it. Scan the
 
 ## Step 5 — Deliver
 
-Push, create PR, and report.
+Push, create the PR, report.
 
 ### Verify all tests pass
 
-When `resolve.auto_test` is true (default), run the full test suite one final time to confirm everything is clean after QA fixes. When false, skip this suite (QA Step 4 may still have run tests during the loop). **Under `auto_test`, not over it:** when `tests_state`'s SHA equals `git rev-parse HEAD` **and `git status --porcelain=v1 --untracked-files=all` is empty** at this moment, a clean QA cycle already ran this exact suite on this exact tree — skip it and print `○ Test suite: skipped (last green {count}@{sha_short} == HEAD)`. Nothing recorded, or any doubt, runs it (`references/pipeline-steps.md`, *Step 4 — QA → Last-green test state*, the single home of the variable and both consumers). <!-- a:rs-deliver-clean-tree -->
+When `resolve.auto_test` is true (default), run the full suite one final time after the QA fixes; when false, skip it. **Under `auto_test`, not over it:** when `tests_state`'s SHA equals `git rev-parse HEAD` **and `git status --porcelain=v1 --untracked-files=all` is empty**, a clean QA cycle already ran this suite on this tree — skip it and print `○ Test suite: skipped (last green {count}@{sha_short} == HEAD)`. Nothing recorded, or any doubt, runs it (`references/pipeline-steps.md`, *Step 4 — QA → Last-green test state*, the single home of the variable and both consumers). <!-- a:rs-deliver-clean-tree -->
 
-If tests fail at this point, print `✗ Final test run failed — PR not created` with the failure details and stop — even in auto mode, a failing PR is worse than no PR.
+A failure here prints `✗ Final test run failed — PR not created` with the details and stops, even in auto mode.
 
 ### Update documentation
 
-If the changes affect documented behavior, update README, inline docs, and CHANGELOG as applicable.
+If the change affects documented behavior, update README, inline docs and CHANGELOG.
 
 ### Push branch and create PR
 
-Before pushing, scan the whole branch diff — it catches secrets that slipped in during QA fixes. Export `IDD_AUTO_MODE=1` first in auto mode, then from the repo root run `python3 shared/scripts/gi-secscan.py --range "origin/${base}" --policy-ref "origin/${base}"`. It reads `security.*` from `.gitissue.yml` **at the base ref**: never pass a config
-*value* on the command line, and never let the branch under scan supply the policy that
-scans it. Why each rule below exists — `references/pipeline-steps.md` (*Step 5 — Deliver → Pre-push secret scan*).
+Scan the whole branch diff first — it catches secrets that slipped in during QA fixes. Export `IDD_AUTO_MODE=1` in auto mode, then from the repo root run `python3 shared/scripts/gi-secscan.py --range "origin/${base}" --policy-ref "origin/${base}"`. It reads `security.*` from `.gitissue.yml` **at the base ref**: never pass a config *value* on the command line, and never let the branch under scan supply the policy that scans it. Why each rule below holds: `references/pipeline-steps.md` (*Step 5 — Deliver → Pre-push secret scan*).
 
 - **Pass** needs all four: exit 0, `policy_source` equal to the `ref:origin/…` requested, `verdict` not `block`, and `scanned` not 0 while `skipped` is above 0.
-- **Exit 1 is the block verdict** — stop, do not push, report the path from `blocking[]`. Never fall through to the prose scan hoping for a pass.
+- **Exit 1 is the block verdict** — stop, do not push, report the path from `blocking[]`. Never fall through to the prose scan.
 - **Exit 3** (uncompilable `security.*` regex) — also a stop.
 - **No `python3`, exit 2, or exit 4** — degrade: print `⚠ gi-secscan unavailable — running the documented scan`, then run the **Primary Pattern** in `docs/pre-commit-security.md` over `git diff --name-only "origin/${base}"...HEAD`. Exit 1 with no parsable JSON on stdout is a crash, not a verdict — treat it as exit 2.
 
@@ -320,18 +318,18 @@ gh pr create --title "{pr_title}" --body "{pr_body}"
 
 **PR title:** `{type}({scope}): {description} (#{issue_number})` (`docs/naming-conventions.md`)
 
-**PR body:** fill *PR Body Template* in `references/report-templates.md` — Summary, Approach, **Decision Record** (from `.gitissue/analysis-<N>.json` if present, else synthesized), Changes, Test Results, **Acceptance Criteria Verification**. The last two are the durable analysis signal surviving squash-merge; never omit them (`docs/idd-methodology.md`). The template's **last line** is the `<!-- gitissue:qa v1 … -->` handoff marker: fill it in **only when QA exited clean**, otherwise drop the line — never append a second copy, because two markers make the consumer fall back to the full pipeline. Field derivation and the omit rules are in the same file (*QA handoff marker*); `head=` is `git rev-parse HEAD` taken after the last commit and immediately before `git push`.
+**PR body:** fill *PR Body Template* in `references/report-templates.md` — Summary, Approach, **Decision Record** (from `.gitissue/analysis-<N>.json` if present, else synthesized), Changes, Test Results, **Acceptance Criteria Verification**. Never omit the last two (`docs/idd-methodology.md`). The template's **last line** is the `<!-- gitissue:qa v1 … -->` handoff marker: fill it in **only when QA exited clean**, otherwise drop the line — never append a second copy. Field derivation and the omit rules: same file, *QA handoff marker*. `head=` is `git rev-parse HEAD` taken after the last commit and immediately before `git push`.
 
 ### Project board sync
 
-If `projects.sync_enabled` is true, update status to `status_map.done` (see `docs/github-projects-sync.md`). After delivery:
+If `projects.sync_enabled` is true, set status to `status_map.done` (`docs/github-projects-sync.md`). After delivery:
 ```
 [5/5] Deliver      ✓ PR #{pr_number} created
 ```
 
 ### Run-log entry (monitoring)
 
-At **every terminal outcome** — delivered PR (`success`), early exit because already fixed (`already_resolved`), or a failed step (`failed`) — append exactly **one JSON line** to `.gitissue/runs.jsonl`, **unless invoked with `--no-run-log`**, in which case append **nothing** and return the telemetry to the caller instead. `--no-run-log` enforces the **single writer** rule under `/auto-pilot` and is independent of `--auto`: a standalone `/issue-resolver <N> --auto` still writes. Field derivation and the full suppression rationale are in `references/report-templates.md` (*Run-log entry — field derivation and suppression*), which follows the schema in `docs/run-log-schema.md`.
+At **every terminal outcome** — delivered PR (`success`), early exit because already fixed (`already_resolved`), or a failed step (`failed`) — append exactly **one JSON line** to `.gitissue/runs.jsonl`, **unless invoked with `--no-run-log`**, in which case append **nothing** and return the telemetry to the caller. `--no-run-log` enforces the **single writer** rule under `/auto-pilot` and is independent of `--auto`: a standalone `/issue-resolver <N> --auto` still writes. Field derivation and the suppression rationale: `references/report-templates.md` (*Run-log entry — field derivation and suppression*), following `docs/run-log-schema.md`.
 
 ```bash
 # Exactly one of these runs. --echo validates the telemetry you return and writes nothing.
@@ -339,36 +337,33 @@ if [ -n "$no_run_log" ]; then printf '%s' "$run_json" | python3 shared/scripts/g
 # Fallback when `python3` is unavailable or the script exits 4: mkdir -p .gitissue && printf '%s\n' "$run_json" >> .gitissue/runs.jsonl
 ```
 
-**Exit 3:** the record itself is invalid — the script printed the reason on stderr and
-wrote nothing. A stop, not a degrade: never append `$run_json` raw, because that writes the malformed line the script exists to reject. Correct the record and re-run, or drop the line.
+**Exit 3:** the record is invalid — the script printed the reason on stderr and wrote nothing. A stop, not a degrade: never append `$run_json` raw. Correct the record and re-run, or drop the line.
 
-Every other write failure (no `python3`, exit 2 for an unresolved script path or a malformed invocation, exit 4) is **non-fatal** — use the fallback append above and never block the reported run result. Only append; never rewrite or reorder existing lines.
+Every other write failure (no `python3`, exit 2, exit 4) is **non-fatal** — use the fallback append above and never block the reported run result. Only append; never rewrite or reorder existing lines.
 
 ---
 
 ## Closing Summary
 
-After the pipeline completes, print **one** closing block carrying only what the live `[N/5]` tracker never printed: the outcome line, the `risk_rating`, and the single PR reference (number, title, URL, `Closes #N`). Repeating any tracker metric — per-step pass/fail, files read, complexity, option, files changed, test counts, QA cycles — is the duplication issue #165 removed. Use the matching variant in `references/report-templates.md` (*Closing Summary*): *Successful Resolution* (every step passed), *Resolution With Warnings* (QA left residual issues or another step warned), or *Already Resolved* (Step 0/1 found the issue already closed — no PR reference). The *Expected Inline Pipeline Output* example in the same file shows the tracker and closing block together. **Then the run-stats footer.** Close with the *Run Stats Footer* — `references/run-stats.md` — `elapsed`, `tokens` only where the host reported a count (otherwise left out), `agents`, run cost only, `n/a` for anything else undetermined. It is the last thing printed at **every** terminal outcome, including the ones that never reach this block: a preflight stop (`not found`, `closed`, `pr_in_progress`), an invalid-config stop, `already_resolved`, a blocked secret scan, a failed final test run, or any failed step.
+Print **one** closing block carrying only what the live `[N/5]` tracker never printed: the outcome line, the `risk_rating`, and the single PR reference (number, title, URL, `Closes #N`). Never repeat a tracker metric. Use the matching variant in `references/report-templates.md` (*Closing Summary*): *Successful Resolution*, *Resolution With Warnings*, or *Already Resolved* (no PR reference). **Then the run-stats footer.** Close with the *Run Stats Footer* — `references/run-stats.md` — elapsed, tokens only where the host reported a count (otherwise left out), agents, run cost only, `n/a` for anything else undetermined. It is the last thing printed at **every** terminal outcome, including those that never reach this block: a preflight stop (`not found`, `closed`, `pr_in_progress`), an invalid-config stop, `already_resolved`, a blocked secret scan, a failed final test run, or any failed step.
 
 ---
 
 ## Auto-Pilot Mode
 
-With `--auto` (or under `/auto-pilot`) the whole pipeline runs without user interaction. Each step above states its own auto behavior; these are the cross-cutting invariants:
+With `--auto` (or under `/auto-pilot`) the pipeline runs without user interaction. Each step states its own auto behavior; these are the cross-cutting invariants:
 
 - **Environment:** Export `IDD_AUTO_MODE=1` before any shell snippet that consults it (`docs/pre-commit-security.md`).
-- **Workspace:** The default resolution path is in-place. Skip Step 0e and allow no `git worktree add` on the default resolution path; ordinary standalone auto mode and auto-pilot's default single-lane path run mandatory Repo Sync, then *0f*, exactly as before. A resolver launched by auto-pilot with `max_parallel > 1` may receive `IDD_CALLER_WORKTREE=1`; after the linked-worktree/branch validation in `references/pipeline-steps.md`, it uses that already-current workspace without creating, falling back from, or cleaning it up. The prompt never appears on either path.
-- **Never blocks:** every decision point has a defined auto behavior — the per-step list is in `references/pipeline-steps.md` (*Auto-mode behavior by step*). Every terminal outcome still runs borrow teardown.
-- **Deliver:** Create PR. Do NOT merge — merging is `/auto-pilot`'s or `/issue-pr-review`'s job. Under `/auto-pilot` the selected `profile` is **returned** in the telemetry (with `--no-run-log`) and folded into auto-pilot's single run-log line; a standalone `--auto` run writes `profile` itself.
+- **Workspace:** in-place is the default resolution path. Skip Step 0e and allow no `git worktree add` on the default resolution path; standalone auto mode and auto-pilot's single-lane path run mandatory Repo Sync, then *0f*. With `max_parallel > 1` a resolver may receive `IDD_CALLER_WORKTREE=1` and, after the validation in `references/pipeline-steps.md`, use that already-current workspace without creating, falling back from, or cleaning it up. The prompt never appears.
+- **Never blocks:** every decision point has a defined auto behavior — per-step list in `references/pipeline-steps.md` (*Auto-mode behavior by step*). Every terminal outcome still runs borrow teardown.
+- **Deliver:** create the PR; never merge — that is `/auto-pilot`'s or `/issue-pr-review`'s job. Under `/auto-pilot` the selected `profile` is **returned** in the telemetry (with `--no-run-log`); a standalone `--auto` run writes `profile` itself.
 
-No `[y/N]` prompts, no `Choose:` prompts, no `Continue?` prompts.
+No `[y/N]`, `Choose:` or `Continue?` prompts.
 
 ## Edge Cases
 
-No acceptance criteria, empty issue body, large issues (20+ files), test failure/timeout, and branch-already-exists are all handled — full behavior for each is in `references/pipeline-steps.md` (*Edge Cases*).
+Missing acceptance criteria, an empty issue body, large issues (20+ files), test failure or timeout, and branch-already-exists are all handled — behavior for each edge case is in `references/pipeline-steps.md` (*Edge Cases*).
 
 ## Platform Driver and Output Conventions
 
-All tracker access follows the GitHub driver — `--json` with explicit field selection, never parsed text output. The full operation catalog and driver rules live in docs/platform-github.md.
-
-Terminal output follows the `docs/terminal-style.md` contract — symbols `● ✓ ✗ ◆ ⚡ ⚠ ○`, two-space indent, `┄` separators, URLs on their own line, ≤80 chars, one blank line between sections, static sequential output (no animation), plus the `[N/5]` pipeline step counter. Errors use the rich format from `references/error-messages.md`: `✗ what failed`, then `To fix:  <command>`, then a docs link when applicable.
+Tracker access follows the GitHub driver — `--json` with explicit field selection, never parsed text; catalog in docs/platform-github.md. Terminal output follows `docs/terminal-style.md` — symbols `● ✓ ✗ ◆ ⚡ ⚠ ○`, two-space indent, `┄` separators, URLs on their own line, ≤80 chars, static sequential output, plus the `[N/5]` counter. Errors use the rich format from `references/error-messages.md`: `✗ what failed`, then `To fix:  <command>`, then a docs link when applicable.
