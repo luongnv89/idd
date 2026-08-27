@@ -17,38 +17,38 @@ Resolve a GitHub issue end-to-end — from issue to atomic PR in 6 steps.
 
 | Invocation | Mode | What happens |
 |------------|------|--------------|
-| `/issue-resolver <N>` | interactive | Resolve issue #N, ask user to pick plan |
-| `/issue-resolver <N> --auto` | auto-pilot | Resolve fully autonomously, no user prompts |
-| `/issue-resolver <N> --no-run-log` | (modifier) | Suppress the `.gitissue/runs.jsonl` append; return telemetry to the caller instead |
+| `/issue-resolver <N>` | interactive | Resolve issue #N, ask the user to pick a plan |
+| `/issue-resolver <N> --auto` | auto-pilot | Resolve autonomously, no prompts |
+| `/issue-resolver <N> --no-run-log` | (modifier) | Suppress the `.gitissue/runs.jsonl` append; return telemetry to the caller |
 
-The argument must be a GitHub issue number. `--auto` is set automatically by `/auto-pilot`. `--no-run-log` is **orthogonal to `--auto`** and passed **only by `/auto-pilot`** — rationale in *Step 5 — Deliver* → *Run-log entry*.
+`N` must be a GitHub issue number. `--auto` is set automatically by `/auto-pilot`. `--no-run-log` is **orthogonal to `--auto`** and passed **only by `/auto-pilot`** — rationale in *Step 5 — Deliver* → *Run-log entry*.
 
 ## Prerequisites
 
-Verify before any operation — git repository (`git rev-parse --git-dir`), `gh` installed (`which gh`), authenticated (`gh auth status`), GitHub remote exists (`git remote -v`). On failure, print the exact error from `references/error-messages.md` and stop.
+Verify before any operation — git repository (`git rev-parse --git-dir`), `gh` installed (`which gh`), authenticated (`gh auth status`), GitHub remote present (`git remote -v`). On failure print the exact error from `references/error-messages.md` and stop.
 
 ## Repo Sync Before Edits (mandatory)
 
-Applies to the **in-place path** only (ordinary auto mode, or interactive after declining Step 0e). Accepted interactive and validated caller-managed worktrees start from the fetched base; an invalid `IDD_CALLER_WORKTREE=1` is a stop, never a sync bypass or in-place fallback. Sync with the **stash-first pattern** — stash (including untracked) → fetch → rebase-pull → pop, aborting with the recovery hint if the pop conflicts. Copy the snippet and the recovery procedure from `docs/sync-conventions.md` (*Quick Reference (Copy-Paste Snippet)*); never improvise a bare rebase on a dirty tree. A missing `origin` or a rebase conflict stops and asks (interactive), or aborts with a clear error (auto).
+Applies to the **in-place path** only (ordinary auto mode, or interactive after declining Step 0e). Accepted interactive and validated caller-managed worktrees start from the fetched base; an invalid `IDD_CALLER_WORKTREE=1` is a stop, never a sync bypass or in-place fallback. Sync with the **stash-first pattern** — stash (including untracked) → fetch → rebase-pull → pop, aborting with the recovery hint if the pop conflicts. Copy the snippet and recovery procedure from `docs/sync-conventions.md` (*Quick Reference (Copy-Paste Snippet)*); never improvise a bare rebase on a dirty tree. A missing `origin` or a rebase conflict stops and asks (interactive), or aborts with a clear error (auto).
 
 ## Configuration
 
-Load config once at skill start; never re-read it. Run `python3 shared/scripts/gi-config.py` — two mandatory requirements. **Working directory:** the repo root. **Script path:** absolute, resolved exactly as the *Bundled dependency precheck* resolves its list. It prints `{"config": {…dotted keys…}, "config_file": …, "first_run": …}` on stdout, merging the defaults below with `.gitissue.yml`. Why each requirement and the chained clock are load-bearing: `references/pipeline-steps.md` (*Configuration load*).
+Load config once at skill start; never re-read it. Run `python3 shared/scripts/gi-config.py` — two mandatory requirements. **Working directory:** the repo root. **Script path:** absolute, resolved exactly as the *Bundled dependency precheck* resolves its list. It prints `{"config": {…dotted keys…}, "config_file": …, "first_run": …}`, merging the defaults below with `.gitissue.yml`. Why both requirements and the clock below are load-bearing: `references/pipeline-steps.md` (*Configuration load*).
 
 - **Exit 0** — use `config`; when `first_run` is `true` print `○ First run — using default config. Run /init-gitissue to customize.`
 - **Exit 3** — invalid `.gitissue.yml`: print the validation error from `references/error-messages.md` (*Invalid config*) and stop.
 - **Script file absent** — a missing bundled dependency is a broken install and not a degrade: stop and print the `✗ Missing bundled dependency` block.
-- **Anything else** (no `python3`, another non-zero exit, unparsable stdout) — print `⚠ gi-config unavailable — using the inline defaults below`, then read `.gitissue.yml` by hand against those defaults *instead of* the script, never beside it.
+- **Anything else** (no `python3`, another non-zero exit, unparsable stdout) — print `⚠ gi-config unavailable — using the inline defaults below`, then read `.gitissue.yml` by hand *instead of* the script, never beside it.
 
 **Capture the run clock here:** chain that same `python3` invocation as `python3 …; ec=$?; date +%s >&2; exit "$ec"` and keep the stderr epoch as `run_started_epoch` — what the *Run Stats Footer* (`references/run-stats.md`) measures `elapsed` from.
 
-Defaults (full field reference in `docs/config-schema.md`): `issue.auto_normalize: true` · `resolve.approval_gate: auto` (ignored in auto mode) · `resolve.branch_prefix: "auto"` · `resolve.auto_test: true` · `resolve.test_timeout: 300` · `resolve.max_commits: 10` · `resolve.qa_max_cycles: 5` · `resolve.adaptive_effort: true` — scale the pipeline to complexity (*0g*); `false` pins `profile = full` · `resolve.ui_review.browser_review: "ask"` — gates only the optional browser review; the code UI review is auto-detected and always runs · `resolve.borrow_skills: false` — installed-only propose; `true` may borrow catalogued skills.
+Defaults (field reference `docs/config-schema.md`): `issue.auto_normalize: true` · `resolve.approval_gate: auto` · `resolve.branch_prefix: "auto"` · `resolve.auto_test: true` · `resolve.test_timeout: 300` · `resolve.max_commits: 10` · `resolve.qa_max_cycles: 5` · `resolve.adaptive_effort: true` (*0g*; `false` pins `profile = full`) · `resolve.ui_review.browser_review: "ask"` (gates only the browser review) · `resolve.borrow_skills: false` (`true` may borrow catalogued skills).
 
 ---
 
 ## Subagent Architecture
 
-Heavy work is delegated to subagents (`shared/agents/`) to keep the main agent's **context window** clean and its **token budget** predictable: the main agent owns Step 0, Step 4's review-fix loop and Step 5; Steps 1-3 each spawn one. Diagram in `references/pipeline-steps.md` (*Subagent Architecture Diagram*). Every agent prompt is bundled at `references/agents/<name>.md` and opens with a role header and a compact I/O contract; the conventions they share live once in `docs/shared-agent-conventions.md`.
+Heavy work goes to subagents (`shared/agents/`) to keep the main agent's **context window** clean and its **token budget** predictable: the main agent owns Step 0, Step 4's review-fix loop and Step 5; Steps 1-3 each spawn one. Diagram in `references/pipeline-steps.md` (*Subagent Architecture Diagram*). Each agent prompt is bundled at `references/agents/<name>.md`; the conventions they share live once in `docs/shared-agent-conventions.md`.
 
 ### Spawning a subagent (canonical pattern)
 
@@ -64,12 +64,7 @@ Agent(
 
 ### Orchestrating the agents (model/effort, monitoring, audit)
 
-For each spawned step:
-
-1. **Name the role** in the spawn `description` (e.g. `"researcher — research issue #N"`).
-2. **Size the model/effort** per `docs/agent-model-effort.md` from the most-recent complexity signal, falling back to the agent's default tier — advisory, never blocking.
-3. **Monitor before advancing** — check the agent returned its contract's required shape (researcher: `status`+`complexity`; synthesizer: one `recommended` option; implementer: commits+tests+repro for bugs; reviewer/fixer: `result`+counts). A missing or blocking return stops the run (interactive) or follows the auto behavior.
-4. **Audit** — record the per-step signal the run log folds in (`complexity`, `qa_cycles`, `outcome`, `duration_s`) plus the `[N/5]` tracker line.
+For each spawned step: **name the role** in the spawn `description`; **size the model/effort** per `docs/agent-model-effort.md` from the most-recent complexity signal, falling back to the agent's default tier (advisory, never blocking); **monitor before advancing** — check the agent returned its contract's shape (researcher `status`+`complexity`; synthesizer one `recommended` option; implementer commits+tests+repro for bugs; reviewer/fixer `result`+counts), a missing or blocking return stopping the run (interactive) or following the auto behavior; and **audit** — record `complexity`, `qa_cycles`, `outcome`, `duration_s` plus the `[N/5]` tracker line.
 
 ### Environment check
 
