@@ -33,32 +33,16 @@ Applies to the **in-place path** only (ordinary auto mode, or interactive after 
 
 ## Configuration
 
-Load config once at skill start; never re-read it. Run `python3 shared/scripts/gi-config.py` with two mandatory requirements. **Working directory:** the repo root. **Script path:** resolved to an absolute path exactly as the *Bundled dependency precheck* resolves its list. It prints `{"config": {…dotted keys…}, "config_file": …, "first_run": …}` on stdout, merging the defaults below with `.gitissue.yml`. Both requirements and the chained clock below are load-bearing — rationale in `references/pipeline-steps.md` (*Configuration load*).
+Load config once at skill start; never re-read it. Run `python3 shared/scripts/gi-config.py` — two mandatory requirements. **Working directory:** the repo root. **Script path:** absolute, resolved exactly as the *Bundled dependency precheck* resolves its list. It prints `{"config": {…dotted keys…}, "config_file": …, "first_run": …}` on stdout, merging the defaults below with `.gitissue.yml`. Why each requirement and the chained clock are load-bearing: `references/pipeline-steps.md` (*Configuration load*).
 
-- **Exit 0** — use `config`; print the `○ First run` line below when `first_run` is `true`.
+- **Exit 0** — use `config`; when `first_run` is `true` print `○ First run — using default config. Run /init-gitissue to customize.`
 - **Exit 3** — invalid `.gitissue.yml`: print the validation error from `references/error-messages.md` (*Invalid config*) and stop.
-- **Script file absent** — a missing bundled dependency is a broken install and not a degrade: stop and print the `✗ Missing bundled dependency` block the *Bundled dependency precheck* names.
+- **Script file absent** — a missing bundled dependency is a broken install and not a degrade: stop and print the `✗ Missing bundled dependency` block.
 - **Anything else** (no `python3`, another non-zero exit, unparsable stdout) — print `⚠ gi-config unavailable — using the inline defaults below`, then read `.gitissue.yml` by hand against those defaults *instead of* the script, never beside it.
 
 **Capture the run clock here:** chain that same `python3` invocation as `python3 …; ec=$?; date +%s >&2; exit "$ec"` and keep the stderr epoch as `run_started_epoch` — what the *Run Stats Footer* (`references/run-stats.md`) measures `elapsed` from.
 
-Otherwise, load `.gitissue.yml` from the repo root once at skill start. If the file does not exist, use defaults and print:
-
-```
-○ First run — using default config. Run /init-gitissue to customize.
-```
-
-Defaults (full field reference in `docs/config-schema.md`):
-- `issue.auto_normalize: true`
-- `resolve.approval_gate: auto` (ignored in auto mode — always auto)
-- `resolve.branch_prefix: "auto"`
-- `resolve.auto_test: true`
-- `resolve.test_timeout: 300`
-- `resolve.max_commits: 10`
-- `resolve.qa_max_cycles: 5`
-- `resolve.adaptive_effort: true` — scale the pipeline to the issue's complexity (see *Step 0g — Complexity gate*). When `false`, every issue runs the full pipeline (profile pinned to `full`).
-- `resolve.ui_review.browser_review: "ask"` — gates only the optional browser/screenshot review; the code-level UI review (*Step 4 — UI/UX review*) is auto-detected and always runs.
-- `resolve.borrow_skills: false` — installed-only propose; `true` may borrow catalogued skills (`references/pipeline-steps.md`).
+Defaults (full field reference in `docs/config-schema.md`): `issue.auto_normalize: true` · `resolve.approval_gate: auto` (ignored in auto mode) · `resolve.branch_prefix: "auto"` · `resolve.auto_test: true` · `resolve.test_timeout: 300` · `resolve.max_commits: 10` · `resolve.qa_max_cycles: 5` · `resolve.adaptive_effort: true` — scale the pipeline to complexity (*0g*); `false` pins `profile = full` · `resolve.ui_review.browser_review: "ask"` — gates only the optional browser review; the code UI review is auto-detected and always runs · `resolve.borrow_skills: false` — installed-only propose; `true` may borrow catalogued skills.
 
 ---
 
