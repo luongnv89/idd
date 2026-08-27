@@ -144,7 +144,7 @@ git branch -a | grep -i "{N}"                                # existing branches
 gh pr list --state open --json number,title,body,headRefName --limit 20
 ```
 
-Scan PR bodies for `Closes #N`, `Fixes #N`, `Resolves #N`. If an **open** PR already exists, print the `⚠ PR already targets issue` block from `references/error-messages.md` (*Guards*) and stop — return `status: pr_in_progress` with that `pr_number` and `branch_name`, and **never close the issue**: an unreviewed, unmerged PR is not a resolution (`references/pipeline-steps.md` → *Early exit*). Only a **merged** PR or a closing commit on the default branch is `already_resolved`.
+Scan PR bodies for `Closes #N`, `Fixes #N`, `Resolves #N`. An **open** PR already targeting the issue prints the `⚠ PR already targets issue` block from `references/error-messages.md` (*Guards*) and stops — return `status: pr_in_progress` with its `pr_number` and `branch_name`, and **never close the issue**: an unreviewed, unmerged PR is not a resolution (`references/pipeline-steps.md` → *Early exit*). Only a **merged** PR or a closing commit on the default branch is `already_resolved`.
 
 ### 0c — Guards
 
