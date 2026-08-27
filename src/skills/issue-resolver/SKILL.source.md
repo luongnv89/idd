@@ -33,7 +33,7 @@ In-place path only (auto mode, or interactive after declining Step 0e); worktree
 
 ## Configuration
 
-Load config once; never re-read it. Run `python3 shared/scripts/gi-config.py`, with two mandatory requirements — **Working directory:** the repo root; **Script path:** absolute, resolved as the *Bundled dependency precheck* resolves its list. It prints `{"config": {…dotted keys…}, "config_file": …, "first_run": …}`, merging the defaults below with `.gitissue.yml`. Why each matters: `references/pipeline-steps.md` (*Configuration load*).
+Load config once; never re-read it. Run `python3 shared/scripts/gi-config.py`, with two mandatory requirements — **Working directory:** the repo root; **Script path:** absolute, as the *Bundled dependency precheck* resolves its list. It prints `{"config": {…dotted keys…}, "config_file": …, "first_run": …}`, merging the defaults below with `.gitissue.yml`. Why each matters: `references/pipeline-steps.md` (*Configuration load*).
 
 - **Exit 0** — use `config`; on `first_run` print `○ First run — using default config. Run /init-gitissue to customize.`
 - **Exit 3** — invalid `.gitissue.yml`: print the error from `references/error-messages.md` (*Invalid config*), stop.
@@ -145,17 +145,17 @@ Scan PR bodies for `Closes #N`, `Fixes #N`, `Resolves #N`. An **open** PR target
 
 ### 0d — Auto-normalize
 
-If `issue.auto_normalize` is true and the body carries no `<!-- gitissue:normalized v1 -->` marker:
+If `issue.auto_normalize` is true and the body has no `<!-- gitissue:normalized v1 -->` marker:
 
-1. **Security label check (SPEC §1.4)** — before any rewrite, scan labels for `security`, `CVE`, or `vulnerability` (case-insensitive). On a match:
+1. **Security label check (SPEC §1.4)** — before any rewrite, scan labels for `security`, `CVE`, `vulnerability` (case-insensitive). On a match:
    - **Auto mode (`--auto` / `IDD_AUTO_MODE=1`):** print the `⚠ … Skipping auto-normalization` warning (`references/error-messages.md` → *Security-labeled issue (skip)*) with the first matching label as `{label}`, and continue **without** rewriting.
    - **Interactive mode:** same warning, then ask for explicit operator confirmation; default **no**, and a decline continues without normalization.
 
-2. **Normalize inline** — when nothing blocks: classify the type, generate the body, add the marker, back up the original in a comment, `gh issue edit`, invalidate the cache (`python3 shared/scripts/gi-issue.py {N} --invalidate`), re-fetch. Same structure-only flow as `/issue-creator` Normalize mode, but the resolver does **not** invoke `/issue-creator` as a subprocess. On failure, warn and continue with the original body.
+2. **Normalize inline** — when nothing blocks: classify the type, generate the body, add the marker, back up the original in a comment, `gh issue edit`, invalidate the cache (`python3 shared/scripts/gi-issue.py {N} --invalidate`), re-fetch. Structure-only, as `/issue-creator` Normalize mode, but the resolver does **not** invoke `/issue-creator` as a subprocess. On failure, warn and keep the original body.
 
 ### 0e — Workspace (interactive only)
 
-Derive one `{branch_name}` first: `python3 shared/scripts/gi-branch.py {N} --from-issue --type {type}`, reading `.branch`. **`--from-issue` is mandatory** — never put the issue title or configured prefix on the command line (`references/pipeline-steps.md` → *Step 0e — Workspace*). `{type}` is one of six classified literals. Exit 3 stops; no `python3`, exit 2 or exit 4 degrades to `docs/naming-conventions.md` by hand. Both paths use this name.
+Derive one `{branch_name}` first: `python3 shared/scripts/gi-branch.py {N} --from-issue --type {type}`, reading `.branch`. **`--from-issue` is mandatory** — never put the issue title or configured prefix on the command line (`references/pipeline-steps.md` → *Step 0e — Workspace*). `{type}` is one of six classified literals. Exit 3 stops; no `python3`, exit 2 or exit 4 degrades to `docs/naming-conventions.md`. Both paths use this name.
 
 **Auto mode (`--auto` / `IDD_AUTO_MODE=1`): skip this offer entirely.** A set `IDD_CALLER_WORKTREE=1` uses the validated caller-managed path in `references/pipeline-steps.md`; otherwise go to *0f*.
 
@@ -175,7 +175,7 @@ Derive one `{branch_name}` first: `python3 shared/scripts/gi-branch.py {N} --fro
   Resolve in a new worktree? [Y/n]
 ```
 
-Accept replaces *0f — Create branch* and the mandatory Repo Sync; decline runs the mandatory Repo Sync then *0f — Create branch*. Creation, setup, cleanup, fallback: *Step 0e — Workspace*.
+Accept replaces *0f — Create branch* and the mandatory Repo Sync; decline runs the mandatory Repo Sync then *0f — Create branch*. Creation, setup, cleanup: *Step 0e — Workspace*.
 
 ### 0f — Create branch
 
@@ -183,23 +183,23 @@ The **in-place path** — ordinary auto mode, or interactive after declining; wo
 
 ### 0g — Complexity gate (select the pipeline profile)
 
-Decide **before Step 1** how much pipeline this issue earns; the `XS … XL` scale and safety rules live in `docs/agent-model-effort.md` (*Complexity → pipeline profile*). `resolve.adaptive_effort: false` skips the gate (`profile = full`); otherwise read the **pre-work `Effort` band** in `## Metadata`, never a later agent output:
+Decide **before Step 1** how much pipeline this issue earns; the `XS … XL` scale and safety rules live in `docs/agent-model-effort.md` (*Complexity → pipeline profile*). `resolve.adaptive_effort: false` pins `profile = full`; otherwise read the **pre-work `Effort` band** in `## Metadata`, never a later agent output:
 
-- `XS`/`S`, asserted (not `(needs review)`/low-confidence) → `light`
+- `XS`/`S`, asserted (not `(needs review)`) → `light`
 - `M`/`L`/`XL` → `full`
-- `XS`/`S` but low-confidence, **or** absent/unparseable → `full` (ambiguous → fuller)
+- `XS`/`S` low-confidence, **or** absent/unparseable → `full` (ambiguous → fuller)
 
 **What `light` collapses — the single home for this rule.** `full` changes nothing. Mechanics: `references/pipeline-steps.md` (*Step N → `light` profile*).
 
 | Step | `light` behavior |
 |------|------------------|
 | 1 — Research | Lighter pass; the already-resolved check still runs. |
-| 2 — Plan | Do **not** spawn the synthesizer; derive a minimal plan inline, and the design-confirm checkpoint does not apply. **Unless *0h* set `analysis_reuse = fresh`**: *Step 2 — Plan → `reuse`* then governs, options are **lifted** from the analysis, and the design-confirm checkpoint **does** apply. |
+| 2 — Plan | Do **not** spawn the synthesizer; derive a minimal plan inline, and the design-confirm checkpoint does not apply. **Unless *0h* set `analysis_reuse = fresh`**: *Step 2 — Plan → `reuse`* governs, options are **lifted**, and the design-confirm checkpoint **does** apply. |
 | 3 — Propose relevant skills | Skip propose/install; `selected_skills = []`. **Leftover teardown still runs** (*Step 3 — Propose relevant skills*), except in a parallel lane (`IDD_CALLER_WORKTREE=1`). |
 | 4 — QA | Cap the loop at **1** cycle; one reviewer spawn still runs. |
 | 5 — Deliver | **Unchanged**. |
 
-Revise **upward** only, never downgrade. `{workspace_note}` is ` (worktree)` in a worktree, empty otherwise; `effort: full` prints even when `resolve.adaptive_effort` is `false`:
+Revise **upward** only. `{workspace_note}` is ` (worktree)` in a worktree, empty otherwise; `effort: full` prints even when `resolve.adaptive_effort` is `false`:
 ```
 [0/5] Preflight    ✓ issue #N open, branch: {branch_name}{workspace_note}, effort: {profile}
 ```
@@ -286,11 +286,11 @@ If the change affects documented behavior, update README, inline docs and CHANGE
 
 ### Push branch and create PR
 
-Scan the branch diff first — QA fixes can introduce secrets. Export `IDD_AUTO_MODE=1` in auto mode, then from the repo root run `python3 shared/scripts/gi-secscan.py --range "origin/${base}" --policy-ref "origin/${base}"`. It reads `security.*` from `.gitissue.yml` **at the base ref**: never pass a config *value* on the command line, never let the scanned branch supply its own policy (*Pre-push secret scan*).
+Scan the branch diff first. Export `IDD_AUTO_MODE=1` in auto mode, then from the repo root run `python3 shared/scripts/gi-secscan.py --range "origin/${base}" --policy-ref "origin/${base}"`. It reads `security.*` from `.gitissue.yml` **at the base ref**: never pass a config *value* on the command line, never let the scanned branch supply its own policy (*Pre-push secret scan*).
 
 - **Pass** needs all four: exit 0, `policy_source` equal to the `ref:origin/…` requested, `verdict` not `block`, `scanned` not 0 while `skipped` is above 0.
-- **Exit 1 is the block verdict** — stop, do not push, report the path from `blocking[]`. **Exit 3** (uncompilable `security.*` regex) also stops.
-- **No `python3`, exit 2, exit 4** — degrade: print `⚠ gi-secscan unavailable — running the documented scan`, then run the **Primary Pattern** in `docs/pre-commit-security.md` over `git diff --name-only "origin/${base}"...HEAD`. Exit 1 with no parsable JSON is a crash, not a verdict — treat it as exit 2.
+- **Exit 1 is the block verdict** — stop, do not push, report `blocking[]`. **Exit 3** (uncompilable `security.*` regex) also stops.
+- **No `python3`, exit 2, exit 4** — degrade: print `⚠ gi-secscan unavailable — running the documented scan` and run the **Primary Pattern** in `docs/pre-commit-security.md` over `git diff --name-only "origin/${base}"...HEAD`. Exit 1 without parsable JSON is a crash — treat it as exit 2.
 
 Never read a non-zero exit as a pass. Only after the scan passes:
 
@@ -302,7 +302,7 @@ gh pr create --title "{pr_title}" --body "{pr_body}"
 
 **PR title:** `{type}({scope}): {description} (#{issue_number})` (`docs/naming-conventions.md`)
 
-**PR body:** fill *PR Body Template* in `references/report-templates.md` — Summary, Approach, **Decision Record**, Changes, Test Results, **Acceptance Criteria Verification**; never omit the last two (`docs/idd-methodology.md`). Its **last line** is the `<!-- gitissue:qa v1 … -->` handoff marker: fill it **only when QA exited clean**, else drop the line — never append a second copy (*QA handoff marker*). `head=` is `git rev-parse HEAD` after the last commit, before `git push`.
+**PR body:** fill *PR Body Template* in `references/report-templates.md` — Summary, Approach, **Decision Record**, Changes, Test Results, **Acceptance Criteria Verification**; never omit the last two (`docs/idd-methodology.md`). Its **last line** is the `<!-- gitissue:qa v1 … -->` marker: fill it **only when QA exited clean**, else drop the line — never append a second copy (*QA handoff marker*). `head=` is `git rev-parse HEAD` after the last commit.
 
 ### Project board sync
 
@@ -313,7 +313,7 @@ With `projects.sync_enabled` true, set status to `status_map.done` (`docs/github
 
 ### Run-log entry (monitoring)
 
-At **every terminal outcome** — delivered PR (`success`), early exit because already fixed (`already_resolved`), or a failed step (`failed`) — append exactly **one JSON line** to `.gitissue/runs.jsonl`, **unless invoked with `--no-run-log`**, which appends **nothing** and returns the telemetry instead. That enforces the **single writer** rule under `/auto-pilot` and is independent of `--auto`: a standalone `/issue-resolver <N> --auto` still writes. Derivation and suppression: `references/report-templates.md` (*Run-log entry — field derivation and suppression*), following `docs/run-log-schema.md`.
+At **every terminal outcome** — `success`, `already_resolved`, or `failed` — append exactly **one JSON line** to `.gitissue/runs.jsonl`, **unless invoked with `--no-run-log`**, which appends **nothing** and returns the telemetry instead. That enforces the **single writer** rule under `/auto-pilot`, independently of `--auto`: a standalone `/issue-resolver <N> --auto` still writes. Derivation and suppression: `references/report-templates.md` (*Run-log entry — field derivation and suppression*), following `docs/run-log-schema.md`.
 
 ```bash
 # Exactly one of these runs. --echo validates the telemetry you return and writes nothing.
@@ -327,17 +327,17 @@ if [ -n "$no_run_log" ]; then printf '%s' "$run_json" | python3 shared/scripts/g
 
 ## Closing Summary
 
-Print **one** closing block carrying only what the `[N/5]` tracker never printed: the outcome line, the `risk_rating`, and the PR reference (number, title, URL, `Closes #N`). Never repeat a tracker metric. Use the matching variant in `references/report-templates.md` (*Closing Summary*): *Successful Resolution*, *Resolution With Warnings*, or *Already Resolved*. **Then the run-stats footer** — `references/run-stats.md`: elapsed, tokens only where the host reported a count (otherwise left out), agents, run cost only, `n/a` for anything undetermined. It is the last thing printed at **every** terminal outcome, including those that never reach this block — a preflight stop (`not found`, `closed`, `pr_in_progress`), an invalid-config stop, `already_resolved`, a blocked secret scan, a failed final test run, or any failed step.
+Print **one** closing block carrying only what the `[N/5]` tracker never printed: the outcome line, `risk_rating`, and the PR reference (number, title, URL, `Closes #N`). Never repeat a tracker metric. Use the matching variant in `references/report-templates.md` (*Closing Summary*). **Then the run-stats footer** — `references/run-stats.md`: elapsed, tokens only where the host reported a count (otherwise left out), agents, run cost only, `n/a` for anything undetermined. It is the last thing printed at **every** terminal outcome, including those that never reach this block — a preflight stop (`not found`, `closed`, `pr_in_progress`), an invalid-config stop, `already_resolved`, a blocked secret scan, a failed final test run, or any failed step.
 
 ---
 
 ## Auto-Pilot Mode
 
-With `--auto` (or under `/auto-pilot`) the pipeline runs without user interaction. Each step states its own auto behavior; these are the cross-cutting invariants:
+With `--auto` (or under `/auto-pilot`) the pipeline runs without user interaction. Each step states its own auto behavior; the cross-cutting invariants:
 
 - **Environment:** export `IDD_AUTO_MODE=1` before any shell snippet that consults it (`docs/pre-commit-security.md`).
 - **Workspace:** in-place is the default resolution path. Skip Step 0e and allow no `git worktree add` on the default resolution path; run mandatory Repo Sync, then *0f*. With `max_parallel > 1` a resolver may receive `IDD_CALLER_WORKTREE=1` and use that already-current workspace, without creating or cleaning it up.
-- **Never blocks:** every decision point has a defined auto behavior — per-step list in `references/pipeline-steps.md` (*Auto-mode behavior by step*). Every terminal outcome still runs borrow teardown.
+- **Never blocks:** every decision point has a defined auto behavior (*Auto-mode behavior by step*). Every terminal outcome still runs borrow teardown.
 - **Deliver:** create the PR; never merge — `/auto-pilot`'s or `/issue-pr-review`'s job. Under `/auto-pilot` the `profile` is **returned** in the telemetry; a standalone `--auto` run writes it.
 
 No `[y/N]`, `Choose:` or `Continue?` prompts.
