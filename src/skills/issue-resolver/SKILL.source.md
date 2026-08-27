@@ -38,7 +38,7 @@ Load config once; never re-read it. Run `python3 shared/scripts/gi-config.py`, w
 - **Exit 0** — use `config`; on `first_run` print `○ First run — using default config. Run /init-gitissue to customize.`
 - **Exit 3** — invalid `.gitissue.yml`: print the error from `references/error-messages.md` (*Invalid config*), stop.
 - **Script file absent** — a missing bundled dependency is a broken install and not a degrade: stop, print `✗ Missing bundled dependency`.
-- **Anything else** (no `python3`, other non-zero exit, unparsable stdout) — print `⚠ gi-config unavailable — using the inline defaults below`, then read `.gitissue.yml` by hand *instead of* the script.
+- **Anything else** (no `python3`, other non-zero exit, unparsable stdout) — print `⚠ gi-config unavailable — using the inline defaults below`, then read `.gitissue.yml` by hand, *instead of* the script.
 
 **Capture the run clock here:** chain that same `python3` invocation as `python3 …; ec=$?; date +%s >&2; exit "$ec"`, keeping the stderr epoch as `run_started_epoch` — what the *Run Stats Footer* (`references/run-stats.md`) measures `elapsed` from.
 
@@ -126,7 +126,7 @@ Open with `● Preflight check for issue #N...`.
 
 ### 0a — Fetch issue
 
-GitHub reads share the boundary in `shared/scripts/gi-gh.py`. Classify any framed caller payload first (`/auto-pilot` captured it in mode-neutral *Step 1.2b*); *Step 0i — Caller payload gate* in `references/pipeline-steps.md` is its single home — framing, `issue_payload = supplied | partial | absent`, the mandatory live `gh issue view N --json state,comments,updatedAt` under `supplied`, the exact match between retained and live `updatedAt` before 0d, discard-and-refresh on mismatch (identical for individual, array, and keyed-map payloads), and no safety check decided from a payload. Then run `python3 shared/scripts/gi-issue.py {N} --fields number,title,body,labels,assignees,state,comments,updatedAt`, reading `.issue` unless that gate substitutes the payload. **Capture `updatedAt` here** — 0d's `gh issue edit` bumps it, so *0h* compares against this pre-normalization value. Exit 3 stops; no `python3`, exit 2 or exit 4 degrades to `gh issue view {N} --json number,title,body,labels,assignees,state,comments,updatedAt`. **0d rewrites the body, so it MUST end with `python3 shared/scripts/gi-issue.py {N} --invalidate`.** <!-- a:rs-0a-payload-concurrency -->
+GitHub reads share the boundary in `shared/scripts/gi-gh.py`. Classify any framed caller payload first (`/auto-pilot` captured it in mode-neutral *Step 1.2b*); *Step 0i — Caller payload gate* in `references/pipeline-steps.md` is its single home — framing, `issue_payload = supplied | partial | absent`, the mandatory live `gh issue view N --json state,comments,updatedAt` under `supplied`, the exact match between retained and live `updatedAt` before 0d, discard-and-refresh on mismatch (identical for individual, array, and keyed-map payloads), no safety check decided from a payload. Then run `python3 shared/scripts/gi-issue.py {N} --fields number,title,body,labels,assignees,state,comments,updatedAt`, reading `.issue` unless that gate substitutes the payload. **Capture `updatedAt` here** — 0d's `gh issue edit` bumps it, so *0h* compares against this pre-normalization value. Exit 3 stops; no `python3`, exit 2 or exit 4 degrades to `gh issue view {N} --json number,title,body,labels,assignees,state,comments,updatedAt`. **0d rewrites the body, so it MUST end with `python3 shared/scripts/gi-issue.py {N} --invalidate`.** <!-- a:rs-0a-payload-concurrency -->
 
 **Not found:** error, stop. **Closed:** warning, stop.
 
@@ -183,23 +183,23 @@ The **in-place path** — ordinary auto mode, or interactive after declining; wo
 
 ### 0g — Complexity gate (select the pipeline profile)
 
-Decide **before Step 1** how much pipeline this issue earns; the `XS … XL` scale and safety rules live in `docs/agent-model-effort.md` (*Complexity → pipeline profile*). `resolve.adaptive_effort: false` skips the gate (`profile = full`). Otherwise read the **pre-work `Effort` band** in `## Metadata`, never a later agent output:
+Decide **before Step 1** how much pipeline this issue earns; the `XS … XL` scale and safety rules live in `docs/agent-model-effort.md` (*Complexity → pipeline profile*). `resolve.adaptive_effort: false` skips the gate (`profile = full`); otherwise read the **pre-work `Effort` band** in `## Metadata`, never a later agent output:
 
 - `XS`/`S`, asserted (not `(needs review)`/low-confidence) → `light`
 - `M`/`L`/`XL` → `full`
 - `XS`/`S` but low-confidence, **or** absent/unparseable → `full` (ambiguous → fuller)
 
-**What `light` collapses — the single home for this rule.** `full` changes nothing. Per-step mechanics: `references/pipeline-steps.md` (*Step N → `light` profile*).
+**What `light` collapses — the single home for this rule.** `full` changes nothing. Mechanics: `references/pipeline-steps.md` (*Step N → `light` profile*).
 
 | Step | `light` behavior |
 |------|------------------|
-| 1 — Research | Lighter pass; the already-resolved check still runs. Skip the dependency trace and solution research. |
+| 1 — Research | Lighter pass; the already-resolved check still runs. |
 | 2 — Plan | Do **not** spawn the synthesizer; derive a minimal plan inline, and the design-confirm checkpoint does not apply. **Unless *0h* set `analysis_reuse = fresh`**: *Step 2 — Plan → `reuse`* then governs, options are **lifted** from the analysis, and the design-confirm checkpoint **does** apply. |
 | 3 — Propose relevant skills | Skip propose/install; `selected_skills = []`. **Leftover teardown still runs** (*Step 3 — Propose relevant skills*), except in a parallel lane (`IDD_CALLER_WORKTREE=1`). |
-| 4 — QA | Cap the loop at **1** cycle instead of `resolve.qa_max_cycles`; one reviewer spawn still runs. |
-| 5 — Deliver | **Unchanged** — Decision Record and Acceptance Criteria Verification always ship. |
+| 4 — QA | Cap the loop at **1** cycle; one reviewer spawn still runs. |
+| 5 — Deliver | **Unchanged**. |
 
-Revise **upward** only; never downgrade. `{workspace_note}` is ` (worktree)` in a worktree, empty otherwise; `effort: full` prints even when `resolve.adaptive_effort` is `false`:
+Revise **upward** only, never downgrade. `{workspace_note}` is ` (worktree)` in a worktree, empty otherwise; `effort: full` prints even when `resolve.adaptive_effort` is `false`:
 ```
 [0/5] Preflight    ✓ issue #N open, branch: {branch_name}{workspace_note}, effort: {profile}
 ```
@@ -242,7 +242,7 @@ Generate options and select one. Spawn the synthesizer (`shared/agents/synthesiz
 
 ### Propose relevant skills
 
-Optionally augment the implementer with external skills from `references/skill-index.md`: detect, propose, accept into `selected_skills`; internal agents stay the fallback. Borrow/install, `{name, origin}` records via `shared/scripts/gi-state.py`, teardown of `origin: borrowed` only, the `◆`/`○` block, cleanup and auto-mode: `references/pipeline-steps.md` (*Step 3 — Propose relevant skills*).
+Optionally augment the implementer with external skills from `references/skill-index.md`: detect, propose, accept into `selected_skills`; internal agents stay the fallback. Borrow/install, `{name, origin}` records via `shared/scripts/gi-state.py`, teardown of `origin: borrowed` only, the `◆`/`○` block and auto-mode: `references/pipeline-steps.md` (*Step 3 — Propose relevant skills*).
 
 **`light` profile:** skip the propose/install — see the profile table in *Step 0g* — but **still run the leftover teardown** there.
 
@@ -286,11 +286,11 @@ If the change affects documented behavior, update README, inline docs and CHANGE
 
 ### Push branch and create PR
 
-Scan the whole branch diff first — QA fixes can introduce secrets. Export `IDD_AUTO_MODE=1` in auto mode, then from the repo root run `python3 shared/scripts/gi-secscan.py --range "origin/${base}" --policy-ref "origin/${base}"`. It reads `security.*` from `.gitissue.yml` **at the base ref**: never pass a config *value* on the command line, and never let the scanned branch supply its own policy (*Step 5 — Deliver → Pre-push secret scan*).
+Scan the branch diff first — QA fixes can introduce secrets. Export `IDD_AUTO_MODE=1` in auto mode, then from the repo root run `python3 shared/scripts/gi-secscan.py --range "origin/${base}" --policy-ref "origin/${base}"`. It reads `security.*` from `.gitissue.yml` **at the base ref**: never pass a config *value* on the command line, never let the scanned branch supply its own policy (*Pre-push secret scan*).
 
-- **Pass** needs all four: exit 0, `policy_source` equal to the `ref:origin/…` requested, `verdict` not `block`, and `scanned` not 0 while `skipped` is above 0.
-- **Exit 1 is the block verdict** — stop, do not push, report the path from `blocking[]`; never fall through to the prose scan. **Exit 3** (uncompilable `security.*` regex) also stops.
-- **No `python3`, exit 2, or exit 4** — degrade: print `⚠ gi-secscan unavailable — running the documented scan`, then run the **Primary Pattern** in `docs/pre-commit-security.md` over `git diff --name-only "origin/${base}"...HEAD`. Exit 1 with no parsable JSON is a crash, not a verdict — treat it as exit 2.
+- **Pass** needs all four: exit 0, `policy_source` equal to the `ref:origin/…` requested, `verdict` not `block`, `scanned` not 0 while `skipped` is above 0.
+- **Exit 1 is the block verdict** — stop, do not push, report the path from `blocking[]`. **Exit 3** (uncompilable `security.*` regex) also stops.
+- **No `python3`, exit 2, exit 4** — degrade: print `⚠ gi-secscan unavailable — running the documented scan`, then run the **Primary Pattern** in `docs/pre-commit-security.md` over `git diff --name-only "origin/${base}"...HEAD`. Exit 1 with no parsable JSON is a crash, not a verdict — treat it as exit 2.
 
 Never read a non-zero exit as a pass. Only after the scan passes:
 
@@ -302,7 +302,7 @@ gh pr create --title "{pr_title}" --body "{pr_body}"
 
 **PR title:** `{type}({scope}): {description} (#{issue_number})` (`docs/naming-conventions.md`)
 
-**PR body:** fill *PR Body Template* in `references/report-templates.md` — Summary, Approach, **Decision Record**, Changes, Test Results, **Acceptance Criteria Verification**; never omit the last two (`docs/idd-methodology.md`). Its **last line** is the `<!-- gitissue:qa v1 … -->` handoff marker: fill it in **only when QA exited clean**, else drop the line — never append a second copy. Derivation and omit rules: *QA handoff marker*. `head=` is `git rev-parse HEAD` after the last commit, immediately before `git push`.
+**PR body:** fill *PR Body Template* in `references/report-templates.md` — Summary, Approach, **Decision Record**, Changes, Test Results, **Acceptance Criteria Verification**; never omit the last two (`docs/idd-methodology.md`). Its **last line** is the `<!-- gitissue:qa v1 … -->` handoff marker: fill it **only when QA exited clean**, else drop the line — never append a second copy (*QA handoff marker*). `head=` is `git rev-parse HEAD` after the last commit, before `git push`.
 
 ### Project board sync
 
@@ -321,9 +321,7 @@ if [ -n "$no_run_log" ]; then printf '%s' "$run_json" | python3 shared/scripts/g
 # Fallback when `python3` is unavailable or the script exits 4: mkdir -p .gitissue && printf '%s\n' "$run_json" >> .gitissue/runs.jsonl
 ```
 
-**Exit 3:** the record is invalid; the script wrote nothing. A stop, not a degrade: never append `$run_json` raw. Correct the record and re-run, or drop the line.
-
-Every other write failure (no `python3`, exit 2, exit 4) is **non-fatal** — use the fallback append, never block the reported result. Only append; never rewrite or reorder lines.
+**Exit 3:** the record is invalid and nothing was written. A stop, not a degrade: never append `$run_json` raw. Correct the record and re-run, or drop the line. Every other write failure (no `python3`, exit 2, exit 4) is **non-fatal** — use the fallback append, never block the reported result. Only append; never rewrite or reorder lines.
 
 ---
 
