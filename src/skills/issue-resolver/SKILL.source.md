@@ -21,7 +21,7 @@ Resolve a GitHub issue end-to-end — from issue to atomic PR in 6 steps.
 | `/issue-resolver <N> --auto` | auto-pilot | Resolve autonomously, no prompts |
 | `/issue-resolver <N> --no-run-log` | (modifier) | Append nothing to `.gitissue/runs.jsonl`; return telemetry to the caller |
 
-`N` must be a GitHub issue number. `--auto` is set by `/auto-pilot`. `--no-run-log` is **orthogonal to `--auto`** and passed **only by `/auto-pilot`** — see *Step 5 — Deliver* → *Run-log entry*.
+`N` must be a GitHub issue number. `--auto` is set by `/auto-pilot`. `--no-run-log` is **orthogonal to `--auto`** — see *Step 5 — Deliver* → *Run-log entry*.
 
 ## Prerequisites
 
@@ -35,7 +35,7 @@ In-place path only (ordinary auto mode, or interactive after declining Step 0e);
 
 Load config once at skill start; never re-read it. Run `python3 shared/scripts/gi-config.py` — two mandatory requirements. **Working directory:** the repo root. **Script path:** absolute, resolved as the *Bundled dependency precheck* resolves its list. It prints `{"config": {…dotted keys…}, "config_file": …, "first_run": …}`, merging the defaults below with `.gitissue.yml`. Why both requirements and the clock matter: `references/pipeline-steps.md` (*Configuration load*).
 
-- **Exit 0** — use `config`; when `first_run` is `true` print `○ First run — using default config. Run /init-gitissue to customize.`
+- **Exit 0** — use `config`; on `first_run` print `○ First run — using default config. Run /init-gitissue to customize.`
 - **Exit 3** — invalid `.gitissue.yml`: print the error from `references/error-messages.md` (*Invalid config*) and stop.
 - **Script file absent** — a missing bundled dependency is a broken install and not a degrade: stop, print `✗ Missing bundled dependency`.
 - **Anything else** (no `python3`, another non-zero exit, unparsable stdout) — print `⚠ gi-config unavailable — using the inline defaults below`, then read `.gitissue.yml` by hand *instead of* the script.
@@ -52,7 +52,7 @@ Heavy work goes to subagents (`shared/agents/`), keeping the main agent's **cont
 
 ### Spawning a subagent (canonical pattern)
 
-Only role, description and prompt file change per step. **Do NOT set `subagent_type`**; use the default general-purpose agent:
+Only role, description and prompt file change per step. **Do NOT set `subagent_type`**:
 
 ```python
 Agent(
@@ -64,11 +64,11 @@ Agent(
 
 ### Orchestrating the agents (model/effort, monitoring, audit)
 
-Per spawned step: **name the role** in the spawn `description`; **size the model/effort** per `docs/agent-model-effort.md`; **monitor before advancing** — a missing or blocking return stops the run (interactive) or follows the auto behavior; **audit** the per-step signal. Required return shapes and audited fields: `references/pipeline-steps.md` (*Orchestrating the agents*).
+Per spawned step: **name the role** in the spawn `description`; **size the model/effort** per `docs/agent-model-effort.md`; **monitor before advancing** — a missing or blocking return stops the run (interactive) or follows the auto behavior; **audit** the per-step signal. Return shapes and audited fields: `references/pipeline-steps.md` (*Orchestrating the agents*).
 
 ### Environment check
 
-With the Agent tool available, use subagents as above; without it (e.g. Claude.ai), run each step inline via the fallback instructions.
+With the Agent tool, use subagents as above; without it (e.g. Claude.ai), run each step inline via the fallback instructions.
 
 ### Bundled dependency precheck
 
@@ -112,9 +112,7 @@ references/scripts/gi-state.py
 
 ## Pipeline Overview
 
-6 steps (0-5) — Preflight, Research, Plan, Implement, QA, Deliver. Each prints a new `[N/5]` line on start (`●`), updating to `✓`/`✗`; static sequential output, no animation. Worked example in `references/report-templates.md` (*Expected Inline Pipeline Output*).
-
----
+6 steps (0-5) — Preflight, Research, Plan, Implement, QA, Deliver. Each prints a new `[N/5]` line on start (`●`), updating to `✓`/`✗`; static sequential output. Worked example: `references/report-templates.md` (*Expected Inline Pipeline Output*).
 
 ### Step completion reports
 
