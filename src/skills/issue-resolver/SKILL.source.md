@@ -4,7 +4,7 @@ description: "Create an atomic PR closing a GitHub issue end-to-end via a 6-step
 license: MIT
 compatibility: "Requires git and GitHub CLI (gh) with authentication and push access. Self-contained — uses shared agents from shared/agents/."
 metadata:
-  version: 0.17.0
+  version: 0.18.0
   author: Luong NGUYEN <luongnv89@gmail.com>
   effort: max
 ---
