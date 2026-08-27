@@ -217,11 +217,10 @@ Set `analysis_reuse` to `fresh`, `stale` or `absent` by the five-condition predi
 
 ## Step 1 — Research
 
-Understand the issue, the affected code and the candidate solutions; the same pass verifies the issue is not already fixed (the early-exit path closes it in auto mode). Spawn the researcher (`shared/agents/codebase-researcher.md`) with the canonical pattern. Payload, phases, early exit and inline fallback: `references/pipeline-steps.md` (*Step 1 — Research*).
+Understand the issue, the affected code and the candidate solutions; the same pass verifies the issue is not already fixed (auto mode closes it and exits). Spawn the researcher (`shared/agents/codebase-researcher.md`) with the canonical pattern. Payload, phases, early exit and inline fallback: `references/pipeline-steps.md` (*Step 1 — Research*).
 
-**Profiles.** `light` — a lighter pass; see the profile table in *Step 0g*, mechanics in *Step 1 — Research → `light` profile*. A `high`/`complex` signal revises the profile **upward** to `full`, never downward. `analysis_reuse = fresh` (*0h*) — pass `prior_analysis` and run the seeded **verify-first** pass: hints to confirm or refute, never to trust; the already-resolved check still runs in full (*→ `reuse`*). Pass the optional sibling key `triage_context` too: it carries **no commit pin**, so it may only **reorder** a scan, never skip a phase (*→ `triage_context`*).
+**Profiles.** `light` — see the profile table in *Step 0g*, mechanics in *→ `light` profile*; a `high`/`complex` signal revises the profile **upward** to `full`, never downward. `analysis_reuse = fresh` (*0h*) — pass `prior_analysis` for the seeded **verify-first** pass: hints to confirm or refute, never to trust, with the already-resolved check still run in full (*→ `reuse`*). Pass the optional sibling key `triage_context` too: no commit pin, so it may only **reorder** a scan, never skip a phase (*→ `triage_context`*).
 
-After research:
 ```
 [1/5] Research     ✓ read {N} files, complexity: {level}
 ```
@@ -230,18 +229,17 @@ After research:
 
 ## Step 2 — Plan
 
-Generate implementation options and select one. Spawn the synthesizer (`shared/agents/synthesizer.md`) with the canonical pattern; it returns 3 options — minimal / balanced / comprehensive — with balanced usually recommended. Selection behavior and inline fallback: `references/pipeline-steps.md` (*Step 2 — Plan*).
+Generate implementation options and select one. Spawn the synthesizer (`shared/agents/synthesizer.md`) with the canonical pattern; it returns minimal / balanced / comprehensive, balanced usually recommended. Selection behavior and inline fallback: `references/pipeline-steps.md` (*Step 2 — Plan*).
 
-**Profiles.** `light` — skip the 3-option synthesis; see the profile table in *Step 0g*, procedure in *Step 2 — Plan → `light` profile*. `analysis_reuse = fresh` (*0h*) skips the same spawn but **wins Step 2 when both apply** — a replacement, not an addition: lift `options[]`, `recommended_option`, `overall_complexity` and `overall_risk` from the analysis instead of deriving a minimal plan, and each `rejection_reason` from `decision_record.options_rejected[]` (*→ `reuse`*).
+**Profiles.** `light` — skip the synthesis; see the profile table in *Step 0g*, procedure in *→ `light` profile*. `analysis_reuse = fresh` (*0h*) skips the same spawn but **wins Step 2 when both apply** — a replacement, not an addition: lift `options[]`, `recommended_option`, `overall_complexity` and `overall_risk` from the analysis, and each `rejection_reason` from `decision_record.options_rejected[]` (*→ `reuse`*).
 
-After plan selection:
 ```
 [2/5] Plan         ✓ approach: {selected option name}
 ```
 
 ### Design-confirm checkpoint (high-complexity, interactive only)
 
-High-risk work earns **exactly one** extra agreement point before code is written. Fires only when **both** hold: the synthesizer reports `overall_complexity: L`/`XL` or `overall_risk: High`, **and** interactive mode (`--auto`/`IDD_AUTO_MODE=1` never pauses). Accept (default) → Step 3 unchanged; decline → stop before implementing and suggest re-running or a different option. Record it in the PR Decision Record. Procedure: `references/pipeline-steps.md` (*Step 2 — Plan → Design-confirm checkpoint*).
+High-risk work earns **exactly one** extra agreement point before code is written. Fires only when **both** hold: the synthesizer reports `overall_complexity: L`/`XL` or `overall_risk: High`, **and** interactive mode (`--auto`/`IDD_AUTO_MODE=1` never pauses). Accept (default) → Step 3 unchanged; decline → stop before implementing. Record it in the PR Decision Record. Procedure: `references/pipeline-steps.md` (*Step 2 — Plan → Design-confirm checkpoint*).
 
 ---
 
@@ -253,9 +251,8 @@ Optionally augment the implementer with external skills from `references/skill-i
 
 **`light` profile:** skip the propose/install — see the profile table in *Step 0g* — but **still run the leftover teardown** there.
 
-Then spawn the implementer (`shared/agents/implementer.md`) with the canonical pattern, passing the plan, branch name, naming conventions and `selected_skills`. **Bug** issues first run the red-capable reproduction checkpoint — reproduce, confirm red, fix, convert to a regression test — surfaced in the PR Decision Record and acceptance table; non-bug issues skip it and auto mode never blocks (`references/bug-verification.md`). Payload, commit guardrails and inline fallback: *Step 3 — Implement* in the same file.
+Then spawn the implementer (`shared/agents/implementer.md`) with the canonical pattern, passing the plan, branch name, naming conventions and `selected_skills`. **Bug** issues first run the red-capable reproduction checkpoint — reproduce, confirm red, fix, convert to a regression test — surfaced in the PR Decision Record and acceptance table; non-bug issues skip it and auto mode never blocks (`references/bug-verification.md`). Payload, commit guardrails and inline fallback: *Step 3 — Implement*.
 
-After implementation:
 ```
 [3/5] Implement    ✓ {N} files changed, {U} unit tests, {E} e2e tests
 ```
@@ -268,11 +265,11 @@ Automated review-fix loop: review → test → fix → repeat until clean or the
 
 ### Spawning the code reviewer
 
-Spawn a **fresh** reviewer (`shared/agents/code-reviewer.md`) each cycle, canonical pattern, for unbiased review. On blocking issues from the reviewer or a test/build run, spawn or re-message the fixer (`shared/agents/fixer.md`) the same way with issue context, branch/base branch, findings, failing output, the commit message `fix({scope}): address review feedback (#N)`, and the pre-commit security gate it MUST run before committing — `security_convention` (`references/docs/pre-commit-security.md`), `secscan_script` (`references/scripts/gi-secscan.py`) and `secscan_policy_ref` (`origin/${base}`) as spawn variables. Paths and a ref name only. Collect the fixer's JSON result and decide whether to run another cycle — never fix inline when the Agent tool is available.
+Spawn a **fresh** reviewer (`shared/agents/code-reviewer.md`) each cycle for unbiased review. On blocking issues from the reviewer or a test/build run, spawn or re-message the fixer (`shared/agents/fixer.md`) with issue context, branch/base branch, findings, failing output, the commit message `fix({scope}): address review feedback (#N)`, and the pre-commit security gate it MUST run before committing — `security_convention` (`references/docs/pre-commit-security.md`), `secscan_script` (`references/scripts/gi-secscan.py`) and `secscan_policy_ref` (`origin/${base}`) as spawn variables. Paths and a ref name only. Collect the fixer's JSON result and decide whether to run another cycle — never fix inline when the Agent tool is available.
 
 ### UI/UX review (auto-detected)
 
-UI review is **auto-detected per issue** — no config flag enables it. Scan the issue body and diff for UI work before the QA cycles. The **code UI review** is environment-independent and always runs; the **browser UI review** runs only when a running app is reachable *and* opted in, else **skips with a warning while the code UI review still runs** — fail-soft. Detection rules, the `ui-reviewer` spawn, the `ui_review.browser_review` gate and its messages: `docs/ui-review.md`. Resolver deltas and cycle mechanics (`resolve.qa_max_cycles`, exit-on-clean, exit-on-stagnation): `references/pipeline-steps.md` (*Step 4 — UI/UX review*, *Step 4 — QA*).
+UI review is **auto-detected per issue** — no config flag enables it. Scan the issue body and diff for UI work before the QA cycles. The **code UI review** is environment-independent and always runs; the **browser UI review** runs only when a running app is reachable *and* opted in, else **skips with a warning while the code UI review still runs** — fail-soft. Detection rules, the `ui-reviewer` spawn and the `ui_review.browser_review` gate: `docs/ui-review.md`. Resolver deltas and cycle mechanics (`resolve.qa_max_cycles`, exit-on-clean, exit-on-stagnation): `references/pipeline-steps.md` (*Step 4 — UI/UX review*, *Step 4 — QA*).
 
 **`light` profile:** cap the loop at **1** cycle instead of `resolve.qa_max_cycles` — see the profile table in *Step 0g*. Class policy: light=1; full+low/medium=2; full+high=`qa_max_cycles`. Record `ceiling`/`breach_reason`.
 
