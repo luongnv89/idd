@@ -229,13 +229,9 @@ Set `analysis_reuse` to `fresh`, `stale` or `absent` by the five-condition predi
 
 ## Step 1 — Research
 
-Understand the issue, the affected code and the candidate solutions; the same pass verifies the issue has not already been fixed (the early-exit path closes it in auto mode). Spawn the researcher (`shared/agents/codebase-researcher.md`) with the canonical pattern. Delegation payload, phases, early exit and inline fallback: `references/pipeline-steps.md` (*Step 1 — Research*).
+Understand the issue, the affected code and the candidate solutions; the same pass verifies the issue is not already fixed (the early-exit path closes it in auto mode). Spawn the researcher (`shared/agents/codebase-researcher.md`) with the canonical pattern. Payload, phases, early exit and inline fallback: `references/pipeline-steps.md` (*Step 1 — Research*).
 
-**`light`** — a lighter pass: see the profile table in *Step 0g*, mechanics in
-*Step 1 — Research → `light` profile*. A `high`/`complex` signal revises the profile **upward** to `full`, never
-downward. **`analysis_reuse = fresh`** (*0h*) — pass `prior_analysis` and run the seeded
-**verify-first** pass: hints to confirm or refute, never to trust; the already-resolved
-check still runs in full (*Step 1 — Research → `reuse`*). Also pass the optional sibling key **`triage_context`**, which carries **no commit pin** and so may only **reorder** a scan, never authorise skipping a phase (*Step 1 — Research → `triage_context`*).
+**Profiles.** `light` — a lighter pass; see the profile table in *Step 0g*, mechanics in *Step 1 — Research → `light` profile*. A `high`/`complex` signal revises the profile **upward** to `full`, never downward. `analysis_reuse = fresh` (*0h*) — pass `prior_analysis` and run the seeded **verify-first** pass: hints to confirm or refute, never to trust; the already-resolved check still runs in full (*→ `reuse`*). Pass the optional sibling key `triage_context` too: it carries **no commit pin**, so it may only **reorder** a scan, never skip a phase (*→ `triage_context`*).
 
 After research:
 ```
@@ -246,13 +242,9 @@ After research:
 
 ## Step 2 — Plan
 
-Generate implementation options and select one. Spawn the synthesizer (`shared/agents/synthesizer.md`) with the canonical pattern. It returns 3 options — minimal / balanced / comprehensive — with the balanced option usually recommended.
+Generate implementation options and select one. Spawn the synthesizer (`shared/agents/synthesizer.md`) with the canonical pattern; it returns 3 options — minimal / balanced / comprehensive — with balanced usually recommended. Selection behavior and inline fallback: `references/pipeline-steps.md` (*Step 2 — Plan*).
 
-Selection behavior (interactive auto, interactive comment-and-wait, auto-pilot) and inline fallback are in `references/pipeline-steps.md` (*Step 2 — Plan*).
-
-**`light` profile:** skip the 3-option synthesis — see the profile table in
-*Step 0g*; full procedure in `references/pipeline-steps.md` (*Step 2 — Plan →
-`light` profile*). **`analysis_reuse = fresh`** (*0h*) skips the same spawn but **wins Step 2 when both apply** — not an addition to the `light` skip, a replacement for it: lift `options[]`, `recommended_option`, `overall_complexity` and `overall_risk` from the analysis instead of deriving a minimal plan, deriving each `rejection_reason` from `decision_record.options_rejected[]` (*Step 2 — Plan → `reuse`*).
+**Profiles.** `light` — skip the 3-option synthesis; see the profile table in *Step 0g*, procedure in *Step 2 — Plan → `light` profile*. `analysis_reuse = fresh` (*0h*) skips the same spawn but **wins Step 2 when both apply** — a replacement, not an addition: lift `options[]`, `recommended_option`, `overall_complexity` and `overall_risk` from the analysis instead of deriving a minimal plan, and each `rejection_reason` from `decision_record.options_rejected[]` (*→ `reuse`*).
 
 After plan selection:
 ```
@@ -261,7 +253,7 @@ After plan selection:
 
 ### Design-confirm checkpoint (high-complexity, interactive only)
 
-High-risk work earns **exactly one** extra agreement point before code is written — no new phase, artifact, or config key. Fires only when **both** hold: synthesizer reports `overall_complexity: L`/`XL` or `overall_risk: High` (trivial/low/medium skip it), **and** interactive mode (`--auto`/`IDD_AUTO_MODE=1` never pauses). Accept (default) → Step 3 unchanged; decline → stop before implementing and suggest re-running or picking a different option. Record the decision in the PR Decision Record. Full procedure in `references/pipeline-steps.md` (*Step 2 — Plan → Design-confirm checkpoint*).
+High-risk work earns **exactly one** extra agreement point before code is written. Fires only when **both** hold: the synthesizer reports `overall_complexity: L`/`XL` or `overall_risk: High`, **and** interactive mode (`--auto`/`IDD_AUTO_MODE=1` never pauses). Accept (default) → Step 3 unchanged; decline → stop before implementing and suggest re-running or a different option. Record it in the PR Decision Record. Procedure: `references/pipeline-steps.md` (*Step 2 — Plan → Design-confirm checkpoint*).
 
 ---
 
