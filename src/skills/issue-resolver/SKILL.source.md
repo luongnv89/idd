@@ -256,15 +256,11 @@ High-risk work earns **exactly one** extra agreement point before code is writte
 
 ### Propose relevant skills
 
-Before spawning the implementer, optionally augment it with external skills from `references/skill-index.md`. Detect (installed vs available-to-borrow when `resolve.borrow_skills` is true), propose, accept into `selected_skills`; internal agents remain the fallback. Borrow/install, `{name, origin}` records via `shared/scripts/gi-state.py`, teardown of `origin: borrowed` only, the `◆`/`○` block, leftover cleanup, and auto-mode are in `references/pipeline-steps.md` (*Step 3 — Propose relevant skills*).
+Optionally augment the implementer with external skills from `references/skill-index.md`: detect, propose, accept into `selected_skills`; internal agents stay the fallback. Borrow/install, `{name, origin}` records via `shared/scripts/gi-state.py`, teardown of `origin: borrowed` only, the `◆`/`○` block, leftover cleanup and auto-mode: `references/pipeline-steps.md` (*Step 3 — Propose relevant skills*).
 
-**`light` profile:** skip the propose/install — see the profile table in *Step 0g* — but **still run the leftover teardown** in `references/pipeline-steps.md`.
+**`light` profile:** skip the propose/install — see the profile table in *Step 0g* — but **still run the leftover teardown** there.
 
-Write code and tests based on the selected plan. Spawn the implementer (`shared/agents/implementer.md`) with the canonical pattern, passing the plan, branch name, naming conventions, and `selected_skills`.
-
-For **bug** issues, the implementer first runs the red-capable reproduction checkpoint — reproduce the symptom, confirm it fails red, fix, then convert to a regression test. Surfaced as evidence in the PR Decision Record and acceptance table. Non-bug issues skip it; auto mode never blocks. See `references/bug-verification.md`.
-
-Full payload, commit guardrails, and inline fallback are in `references/pipeline-steps.md` (*Step 3 — Implement*).
+Then spawn the implementer (`shared/agents/implementer.md`) with the canonical pattern, passing the plan, branch name, naming conventions and `selected_skills`. **Bug** issues first run the red-capable reproduction checkpoint — reproduce, confirm red, fix, convert to a regression test — surfaced in the PR Decision Record and acceptance table; non-bug issues skip it and auto mode never blocks (`references/bug-verification.md`). Payload, commit guardrails and inline fallback: *Step 3 — Implement* in the same file.
 
 After implementation:
 ```
@@ -275,22 +271,17 @@ After implementation:
 
 ## Step 4 — QA
 
-Automated review-fix loop: review → test → fix → repeat until clean or max cycles reached.
+Automated review-fix loop: review → test → fix → repeat until clean or the cap is hit.
 
 ### Spawning the code reviewer
 
-For each QA cycle, spawn a **fresh** reviewer (`shared/agents/code-reviewer.md`) with the canonical pattern — fresh each cycle for unbiased review.
-
-When the reviewer or test/build run returns blocking issues, spawn or re-message the fixer (`shared/agents/fixer.md`) the same way. Pass issue context, branch/base branch, reviewer findings, failing test/build output, commit message `fix({scope}): address review feedback (#N)`, and the pre-commit security gate it MUST run before committing — `security_convention` (`references/docs/pre-commit-security.md`), `secscan_script` (`references/scripts/gi-secscan.py`) and `secscan_policy_ref` (`origin/${base}`) as spawn variables, because an emitted agent prompt cannot resolve a skill-relative path on its own. Paths and a ref name only — the script reads `security.*` from that ref itself, so the branch being fixed never supplies the policy that scans it. Collect the fixer's JSON result and decide whether to start another cycle — never apply fixes inline when the Agent tool is available.
+Spawn a **fresh** reviewer (`shared/agents/code-reviewer.md`) each cycle, canonical pattern, for unbiased review. On blocking issues from the reviewer or a test/build run, spawn or re-message the fixer (`shared/agents/fixer.md`) the same way with issue context, branch/base branch, findings, failing output, the commit message `fix({scope}): address review feedback (#N)`, and the pre-commit security gate it MUST run before committing — `security_convention` (`references/docs/pre-commit-security.md`), `secscan_script` (`references/scripts/gi-secscan.py`) and `secscan_policy_ref` (`origin/${base}`) as spawn variables. Paths and a ref name only. Collect the fixer's JSON result and decide whether to run another cycle — never fix inline when the Agent tool is available.
 
 ### UI/UX review (auto-detected)
 
-UI review is **auto-detected per issue** — no config flag enables it. Scan the issue body/diff for UI work before the QA cycles, then run only what *can* and *should* run: the **code UI review** reads the diff, is environment-independent, and runs anywhere including headless (never gated on a GUI/browser); the **browser UI review** takes optional screenshots from a running app and runs only when reachable *and* opted in, else **skips with a warning while the code UI review still runs** — fail-soft.
+UI review is **auto-detected per issue** — no config flag enables it. Scan the issue body and diff for UI work before the QA cycles. The **code UI review** is environment-independent and always runs; the **browser UI review** runs only when a running app is reachable *and* opted in, else **skips with a warning while the code UI review still runs** — fail-soft. Detection rules, the `ui-reviewer` spawn, the `ui_review.browser_review` gate and its messages: `docs/ui-review.md`. Resolver deltas and cycle mechanics (`resolve.qa_max_cycles`, exit-on-clean, exit-on-stagnation): `references/pipeline-steps.md` (*Step 4 — UI/UX review*, *Step 4 — QA*).
 
-Detection rules, the `ui-reviewer` spawn, the `ui_review.browser_review` gate, and skip/success messages are in `docs/ui-review.md`; the resolver's own deltas (diff command, variables, `resolve.ui_review.browser_review` as the gate key, findings flow) are in `references/pipeline-steps.md` (*Step 4 — UI/UX review*). Cycle mechanics and loop controls (`resolve.qa_max_cycles`, exit-on-clean, exit-on-stagnation) are in the same file (*Step 4 — QA*).
-
-**`light` profile:** cap the review-fix loop at **1** cycle instead of
-`resolve.qa_max_cycles` — see the profile table in *Step 0g*. Class policy: light=1; full+low/medium=2; full+high=`qa_max_cycles`. Record `ceiling`/`breach_reason`.
+**`light` profile:** cap the loop at **1** cycle instead of `resolve.qa_max_cycles` — see the profile table in *Step 0g*. Class policy: light=1; full+low/medium=2; full+high=`qa_max_cycles`. Record `ceiling`/`breach_reason`.
 
 ---
 
