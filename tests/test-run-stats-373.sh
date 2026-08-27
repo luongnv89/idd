@@ -19,6 +19,15 @@
 # own Overhead section forbids. A permanent `tokens n/a` is the bug #410 fixed,
 # so this suite now forbids that string in the contract.
 #
+# EXTENDED by issue #414: the field set was settled repo-wide as `elapsed`,
+# `tokens` (conditional), and `agents`. A `cost` figure, a count of skills
+# invoked, and a count of tool calls were each assessed and rejected — the
+# first as unresolvable on every current host, the second as a run-activity
+# metric on the #165 line, the third as the per-step tally Overhead forbids.
+# docs/decisions/run-stats-field-set.md is the record. This suite now pins both
+# the contract's own statement of that decision and the record itself, so a
+# silent widening of the footer fails here rather than shipping.
+#
 # AC6 is enforced structurally: references/run-stats.md is byte-identical in
 # every skill, so "consistent across skills" is a checksum, not a promise. The
 # contract lives per skill rather than in docs/terminal-style.md because that
@@ -207,6 +216,61 @@ check_has  "$SPEC" '^## What the footer must not carry' \
   "#165: the contract forbids repeating already-printed metrics"
 check_flow "$SPEC" 'the duplication issue #165 removed' \
   "#165: the contract cites the issue the rule comes from"
+echo ""
+
+# ── #414 — the settled field set: three fields, and why not six ─────────────
+echo "  #414 — the settled field set"
+ADR="$REPO_ROOT/docs/decisions/run-stats-field-set.md"
+if [ ! -f "$ADR" ]; then
+  fail "#414/AC1: docs/decisions/run-stats-field-set.md missing — the field-set decision has no record"
+fi
+check_has  "$SPEC" '^## Fields considered and not carried' \
+  "#414/AC1: the contract carries the recorded field-set decision"
+check_lacks "$SPEC" '^\| .(cost|skills|tool calls). \|' \
+  "#414/AC3: no rejected field was added to the field table"
+check_flow "$SPEC" 'assessed once, repo-wide, in issue #414' \
+  "#414/AC1: the field set was settled once, not per skill"
+check_flow "$SPEC" 'exactly the defect issue #410 removed' \
+  "#414/AC1: a cost field is rejected on the #410 unresolvable-field ground"
+check_flow "$SPEC" 'omission is not a per-skill choice' \
+  "#414/AC3: a skills-invoked count is rejected because a per-skill drop is unavailable"
+check_flow "$SPEC" 'a running tally maintained across every step' \
+  "#414/AC1: a tool-call count is rejected on the Overhead ground"
+check_flow "$SPEC" 'Issue #165 narrowed this footer to run cost alone, and that narrowing stands' \
+  "#414/AC2: the #165 narrowing is addressed and left un-reversed"
+check_flow "$SPEC" 'a reversal has to be recorded as one' \
+  "#414/AC2: widening the footer is defined as a stated reversal"
+# The rendered example lines are the operative instruction — a rejected field
+# smuggled into one of them would ship even with the field table left alone.
+check_flow_lacks "$SPEC" '· (cost|skills|tool calls) ' \
+  "#414/AC3: no rejected field appears in a rendered Run stats line"
+# The two assertions above key on the three literal labels, so a widening under
+# a near-miss name (`costs`, `skill`, `tool-calls`) walks past them. These three
+# are label-agnostic: two end-anchor the rendered lines, so no field can follow
+# `agents` whatever it is called, and the third ratchets the field-table row
+# count. The inline, backtick-quoted rendering in *The conditional token count*
+# cannot take a `$`, so the anchored pair scopes to the two fenced examples.
+check_has "$SPEC" '^  Run stats   elapsed [^·]+ · agents [0-9]+$' \
+  "#414/AC3: the omitted-token rendering carries no field beyond agents"
+check_has "$SPEC" '^  Run stats   elapsed [^·]+ · tokens [^·]+ · agents [0-9]+$' \
+  "#414/AC3: the full rendering carries no field beyond agents"
+# The label-agnostic half of the widening guard: the two `check_lacks`/
+# `check_flow_lacks` assertions above catch the three rejected fields by name,
+# this one catches a field added under any name at all. Baseline is 3 rows —
+# `elapsed`, `tokens`, `agents`. `|| true` because `grep -c` exits 1 on a zero
+# count, which `set -e` would turn into a silent abort instead of a failure.
+rows=$(grep -cE '^\| `[a-z]' "$SPEC" || true)
+if [ "$rows" -eq 3 ]; then
+  pass "#414/AC3: the field table still carries exactly 3 fields — no field was appended"
+else
+  fail "#414/AC3: the field table carries $rows fields, expected 3 — a field was added or removed"
+fi
+if [ -f "$ADR" ]; then
+  check_has  "$ADR" '^\*\*Issue:\*\* \[#414\]' \
+    "#414/AC1: one decision record exists and names the issue"
+  check_flow "$ADR" '\*\*The #165 narrowing stands\.\*\*' \
+    "#414/AC2: the record states the #165 relationship rather than implying it"
+fi
 echo ""
 
 # ── AC1 + AC2: every skill points at the contract at its report site ───────

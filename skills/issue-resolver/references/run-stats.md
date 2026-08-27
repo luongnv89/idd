@@ -106,3 +106,34 @@ Measuring must never become a measurable share of what it measures. The whole
 footer costs one epoch read at start, one at the end, and two lines of output.
 Never add a timing call per step, a running tally file, a subprocess, or a
 summarization pass to produce it.
+
+## Fields considered and not carried
+
+Three fields that other tools' run footers carry are deliberately absent here.
+Each was assessed once, repo-wide, in issue #414; their absence is a recorded
+decision, not an oversight, and re-proposing one means reopening that record
+rather than editing this list.
+
+- **A cost figure.** A skill cannot compute one from what it has. It needs a
+  token count — the one conditional field, absent on most hosts — plus a price
+  table and the identity of every model the run used. Each of those is derived,
+  looked up, or computed, which *The conditional token count* rules out by
+  name. A field resting on all three would resolve on no run of any skill,
+  which is exactly the defect issue #410 removed.
+- **A count of skills invoked.** It measures what the run did rather than what
+  it cost, which is the line issue #165 drew; that is the ground. Two further
+  reasons hold it there: only two of the eight skills can invoke another skill
+  at run time, and dropping it in the other six is not available, because
+  omission is not a per-skill choice, by the rule stated in *The fields*. That
+  the field would be a constant in those six is not itself a reason — `agents`
+  is a constant `0` in a skill that spawns no subagents and is kept, because a
+  determined constant resolves.
+- **A count of tool calls.** Producing one means a running tally maintained
+  across every step of the run, which *Overhead* forbids by name. `agents`
+  survives the same test only because subagent spawns are few, discrete, and
+  already scripted by the orchestrator, so counting them adds no per-step work.
+
+Issue #165 narrowed this footer to run cost alone, and that narrowing stands.
+Each of the three counts run activity rather than run cost, so adopting one
+would be a reversal of #165, and a reversal has to be recorded as one, not
+arrived at by adding a field.
