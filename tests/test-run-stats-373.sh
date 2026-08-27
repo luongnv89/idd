@@ -244,6 +244,27 @@ check_flow "$SPEC" 'a reversal has to be recorded as one' \
 # smuggled into one of them would ship even with the field table left alone.
 check_flow_lacks "$SPEC" '· (cost|skills|tool calls) ' \
   "#414/AC3: no rejected field appears in a rendered Run stats line"
+# The two assertions above key on the three literal labels, so a widening under
+# a near-miss name (`costs`, `skill`, `tool-calls`) walks past them. These three
+# are label-agnostic: two end-anchor the rendered lines, so no field can follow
+# `agents` whatever it is called, and the third ratchets the field-table row
+# count. The inline, backtick-quoted rendering in *The conditional token count*
+# cannot take a `$`, so the anchored pair scopes to the two fenced examples.
+check_has "$SPEC" '^  Run stats   elapsed [^·]+ · agents [0-9]+$' \
+  "#414/AC3: the omitted-token rendering carries no field beyond agents"
+check_has "$SPEC" '^  Run stats   elapsed [^·]+ · tokens [^·]+ · agents [0-9]+$' \
+  "#414/AC3: the full rendering carries no field beyond agents"
+# The label-agnostic half of the widening guard: the two `check_lacks`/
+# `check_flow_lacks` assertions above catch the three rejected fields by name,
+# this one catches a field added under any name at all. Baseline is 3 rows —
+# `elapsed`, `tokens`, `agents`. `|| true` because `grep -c` exits 1 on a zero
+# count, which `set -e` would turn into a silent abort instead of a failure.
+rows=$(grep -cE '^\| `[a-z]' "$SPEC" || true)
+if [ "$rows" -eq 3 ]; then
+  pass "#414/AC3: the field table still carries exactly 3 fields — no field was appended"
+else
+  fail "#414/AC3: the field table carries $rows fields, expected 3 — a field was added or removed"
+fi
 if [ -f "$ADR" ]; then
   check_has  "$ADR" '^\*\*Issue:\*\* \[#414\]' \
     "#414/AC1: one decision record exists and names the issue"

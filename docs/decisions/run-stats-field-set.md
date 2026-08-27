@@ -58,15 +58,29 @@ on a figure no current host reports would print on no run of any skill, which
 is precisely the defect issue #410 removed when it stopped `tokens` printing a
 permanent `n/a`.
 
-**`skills` is dropped.** Only two of the eight skills can invoke another skill
-at run time: `/issue-resolver`, through its borrowed-skills path, and
-`/auto-pilot`. In the other six the field would be a constant forever. Dropping
-it in those six alone is not available, because the contract's rule that
-omission is not a per-skill choice makes the field all-eight-or-none. To be
-clear about the grounds: issue #165 does **not** bar this field. No skill
-prints a skills-used metric in its own report today, so a footer entry would
-not be the duplication #165 removed. It is rejected on the #410 ground instead
-— a field that can never resolve in three quarters of the places it prints.
+**`skills` is dropped, on the #165 activity-versus-cost line.** A count of
+skills invoked measures what the run *did*, not what it cost — the same
+distinction on which the activity metrics #165 removed were removed, and the
+one the *The #165 narrowing stands* paragraph below restates for all three
+rejected fields. That is the primary ground and it holds in every skill,
+including the two where the number would vary.
+
+Two secondary grounds support it. First, all-eight-or-none: only
+`/issue-resolver`, through its borrowed-skills path, and `/auto-pilot` can
+invoke another skill at run time, and the contract's rule that omission is not
+a per-skill choice makes the field all-eight-or-none, so it cannot be carried
+only where it is interesting. Second, the line and word budgets in
+*Consequences* below, which price every added field across eight call sites.
+
+To keep the record honest about what does **not** ground this: "the field would
+be a constant in six skills" is not a disqualifying reason, and an earlier
+draft of this record was wrong to lean on it. `agents` is likewise a constant
+`0` in `/init-gitissue`, which spawns no subagents, and `agents` is kept — the
+contract's own *Unavailable values* section says `0` is a **determined** value.
+A determined constant resolves; what #410 removed was a field that can *never*
+have a value, a permanent `n/a`. That is true of `cost` and it is not true of
+`skills`. The #410 ground is therefore not available here, which is why the
+#165 ground carries the decision.
 
 **`tool calls` is dropped.** Producing the number means a running tally
 maintained across every step of the run, and the contract's *Overhead* section
@@ -125,8 +139,10 @@ divergence from `skill-auto-improver` is now intentional and recorded, so the
   footer prints.
 - **`tool calls`** — revisit only if a host reports a tally the skill does not
   have to maintain itself.
-- **`skills`** — revisit only if every skill can invoke another skill at run
-  time, so the field is not a constant in most of the places it prints.
+- **`skills`** — revisit only if a count of skills invoked stops being a
+  run-activity metric: that is, only if #165's activity-versus-cost line is
+  itself reopened and the reopening recorded as such. How many skills can
+  invoke another one does not bear on it; `agents` was never held to that bar.
 
 Partial satisfaction reopens none of them. A field that resolves on some hosts
-or in some skills is the defect this record and #410 both refuse.
+is the defect this record and #410 both refuse.
