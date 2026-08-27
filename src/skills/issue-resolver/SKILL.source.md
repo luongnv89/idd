@@ -162,15 +162,12 @@ If `issue.auto_normalize` is true and not already normalized (no `<!-- gitissue:
 
 ### 0e — Workspace (interactive only)
 
-Before Step 0e or 0f selects a workspace, derive one `{branch_name}` with `python3 shared/scripts/gi-branch.py {N} --from-issue --type {type}` and read `.branch`. **`--from-issue` is mandatory — never put the issue title or the configured prefix on the command line.** A title is written by whoever filed the issue, so interpolating it into a shell word is a command injection that `/auto-pilot` would run unattended; `--from-issue` makes the script read both values itself. `{type}` is one of the six literals this skill classified, never free text. Exit 3 is a stop; no `python3`, exit 2 (an unresolved script path), or exit 4 degrades to deriving the name by hand per `docs/naming-conventions.md`. Both workspace paths use this one name — full contract in `references/pipeline-steps.md` (*Step 0e*).
-
-Then decide *where* the resolution work happens.
+Derive one `{branch_name}` before 0e or 0f picks a workspace: `python3 shared/scripts/gi-branch.py {N} --from-issue --type {type}`, reading `.branch`. **`--from-issue` is mandatory** — never put the issue title or the configured prefix on the command line; a title is attacker-controlled, and the flag makes the script read both values itself (`references/pipeline-steps.md` → *Step 0e — Workspace*). `{type}` is one of the six literals this skill classified, never free text. Exit 3 stops; no `python3`, exit 2 or exit 4 degrades to deriving the name by hand per `docs/naming-conventions.md`. Both workspace paths use this one name. Then decide *where* the work happens.
 
 **Auto mode (`--auto` / `IDD_AUTO_MODE=1`): skip this offer entirely.** A set
 `IDD_CALLER_WORKTREE=1` uses the validated caller-managed path in `references/pipeline-steps.md`; otherwise go to *0f* (legacy in-place). Neither auto path shows the prompt.
 
-**Interactive mode:** offer to run the resolution in a dedicated git *worktree*
-— an isolated checkout in a separate directory — so branch creation, implementation, and testing never touch the user's current working tree. State plainly what will be set up and the workspace/branch naming the user can expect:
+**Interactive mode:** offer a dedicated git *worktree* — an isolated checkout in a separate directory — so branch creation, implementation and testing never touch the user's current working tree. State what will be set up and the naming to expect:
 
 ```
 ◆ Workspace for issue #N
@@ -190,17 +187,13 @@ Then decide *where* the resolution work happens.
   Resolve in a new worktree? [Y/n]
 ```
 
-Accept replaces *0f — Create branch* and the mandatory Repo Sync; decline runs the mandatory Repo Sync then *0f — Create branch* as today. Creation commands, setup-artifact propagation, cleanup guidance, and fallback-on-failure behavior are in `references/pipeline-steps.md` (*Step 0e — Workspace*) — never leave the user without a working resolution.
+Accept replaces *0f — Create branch* and the mandatory Repo Sync; decline runs the mandatory Repo Sync then *0f — Create branch*. Creation commands, setup-artifact propagation, cleanup and fallback-on-failure are in `references/pipeline-steps.md` (*Step 0e — Workspace*) — never leave the user without a working resolution.
 
 ### 0f — Create branch
 
-The **in-place path** — ordinary auto mode, or interactive after declining the offer. Accepted interactive and validated caller-managed paths already checked out the branch and skip this sub-step.
+The **in-place path** — ordinary auto mode, or interactive after declining the offer. Accepted interactive and validated caller-managed paths already checked out the branch and skip this sub-step. Use the `{branch_name}` already derived (*0e — Workspace*, `docs/naming-conventions.md`); never re-derive it here.
 
-Use the `{branch_name}` already derived before Step 0e/0f (see *0e — Workspace*, `docs/config-schema.md`, `docs/naming-conventions.md`) — never re-derive it here.
-
-**If branch already exists:**
-- Interactive mode: ask `continue` or `fresh`
-- Auto mode: `continue` (checkout existing branch)
+**If the branch already exists:** interactive asks `continue` or `fresh`; auto takes `continue` (checkout the existing branch).
 
 ### 0g — Complexity gate (select the pipeline profile)
 
