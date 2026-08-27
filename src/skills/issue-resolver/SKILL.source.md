@@ -29,7 +29,7 @@ Verify before any operation — git repository (`git rev-parse --git-dir`), `gh`
 
 ## Repo Sync Before Edits (mandatory)
 
-Applies to the **in-place path** only (ordinary auto mode, or interactive after declining Step 0e). Accepted interactive and validated caller-managed worktrees start from the fetched base; an invalid `IDD_CALLER_WORKTREE=1` is a stop, never a sync bypass or in-place fallback. Sync in-place with the **stash-first pattern**: (including untracked) → fetch → rebase-pull the current branch → pop the stash, aborting with the recovery hint if the pop conflicts. Copy the exact snippet and the full recovery procedure from `docs/sync-conventions.md` (*Quick Reference (Copy-Paste Snippet)*) — canonical; never improvise a bare rebase on a dirty tree. If `origin` is missing or rebase conflicts occur, stop and ask the user (interactive) or abort with a clear error (auto).
+Applies to the **in-place path** only (ordinary auto mode, or interactive after declining Step 0e). Accepted interactive and validated caller-managed worktrees start from the fetched base; an invalid `IDD_CALLER_WORKTREE=1` is a stop, never a sync bypass or in-place fallback. Sync with the **stash-first pattern** — stash (including untracked) → fetch → rebase-pull → pop, aborting with the recovery hint if the pop conflicts. Copy the snippet and the recovery procedure from `docs/sync-conventions.md` (*Quick Reference (Copy-Paste Snippet)*); never improvise a bare rebase on a dirty tree. A missing `origin` or a rebase conflict stops and asks (interactive), or aborts with a clear error (auto).
 
 ## Configuration
 
