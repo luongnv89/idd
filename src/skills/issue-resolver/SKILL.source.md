@@ -260,43 +260,34 @@ Use the `{branch_name}` already derived before Step 0e/0f (see *0e — Workspace
 
 ### 0g — Complexity gate (select the pipeline profile)
 
-Decide **before Step 1** how much pipeline this issue earns, so a trivial edit
-does not pay the full orchestration cost. The mechanism, the shared `XS … XL`
-scale it reuses, and the safety rules are defined once in
-`docs/agent-model-effort.md` (*Complexity → pipeline profile*) — apply that
-document here; this sub-step is only the resolver's entry point into it.
+Decide **before Step 1** how much pipeline this issue earns. Mechanism, the shared
+`XS … XL` scale and the safety rules are defined once in `docs/agent-model-effort.md`
+(*Complexity → pipeline profile*) — this sub-step is only the entry point into it.
 
-When `resolve.adaptive_effort` is `false`, skip the gate entirely: set
-`profile = full` and continue exactly as before. Otherwise select the profile
-from the issue's **pre-work `Effort` band** (the `XS … XL` value in the issue's
-`## Metadata`, written by `/issue-creator`) — never from a later agent output, so
-the saving is real:
+`resolve.adaptive_effort: false` skips the gate: `profile = full`. Otherwise select
+from the issue's **pre-work `Effort` band** (the `XS … XL` value in `## Metadata`,
+written by `/issue-creator`) — never from a later agent output, so the saving is real:
 
 - `Effort` `XS`/`S`, asserted (not `(needs review)`/low-confidence) → `profile = light`
 - `Effort` `M`/`L`/`XL` → `profile = full`
 - `Effort` `XS`/`S` but low-confidence, **or** absent/unparseable → `profile = full` (ambiguous → fuller)
 
-**What `light` collapses — the single home for this rule.** `full` leaves every
-step exactly as it is today. Each step below points back to this table; the full
-per-step mechanics live in `references/pipeline-steps.md` (*Step N → `light`
-profile*).
+**What `light` collapses — the single home for this rule.** `full` changes nothing.
+Per-step mechanics: `references/pipeline-steps.md` (*Step N → `light` profile*).
 
 | Step | `light` behavior |
 |------|------------------|
-| 1 — Research | Lighter pass: the already-resolved safety check and a focused scan of the obviously-affected file(s) still run; skip the broad dependency trace and external solution research. |
+| 1 — Research | Lighter pass: already-resolved safety check and a focused scan of the obviously-affected file(s) still run; skip the broad dependency trace and external solution research. |
 | 2 — Plan | Skip the 3-option synthesis entirely — do **not** spawn the synthesizer. Derive a **direct minimal plan** inline and record it as the selected option, so the Decision Record still has a real `Selected option`; the design-confirm checkpoint does not apply — **unless *0h* set `analysis_reuse = fresh`**, in which case *Step 2 — Plan → `reuse`* governs instead: options are **lifted** from the analysis, not derived, and the design-confirm checkpoint **does** apply. |
 | 3 — Propose relevant skills | Skip the **propose/install** — set `selected_skills = []` and go straight to the implementer, mirroring auto-mode behavior. **Leftover teardown still runs** (`references/pipeline-steps.md` → *Step 3 — Propose relevant skills*): a `light` run must still release skills a crashed earlier run borrowed — the one path where even teardown is off is a parallel lane (`IDD_CALLER_WORKTREE=1`), which disables borrowing outright (*Parallel lanes* there). |
-| 4 — QA | Cap the review-fix loop at **1** cycle (a single review pass; fix once if blocking issues are found, then deliver) instead of `resolve.qa_max_cycles`. One reviewer spawn still runs — the fast path reduces depth, it does not skip review. UI review remains auto-detected as usual. |
+| 4 — QA | Cap the review-fix loop at **1** cycle instead of `resolve.qa_max_cycles`: one review pass, fix once if blocking, then deliver. One reviewer spawn still runs — less depth, never no review. UI review stays auto-detected. |
 | 5 — Deliver | **Unchanged** — always emits the Decision Record and Acceptance Criteria Verification table. The profile never removes durable memory. |
 
-The profile may only be **revised upward** later (e.g. Step 1 research reports
-`high`/`complex` on what the band called `S` → switch to `full` for the remaining
-steps); never downgrade a `full` run to `light` mid-pipeline.
-
-After preflight, surface the chosen profile so the effort decision is
-transparent. `{workspace_note}` is ` (worktree)` in a worktree, empty otherwise;
-`{profile}` is `light` or `full` — when `resolve.adaptive_effort` is `false`,
-still print `effort: full` (the pinned profile) so the line is uniform:
+The profile may only be **revised upward** later (Step 1 reports `high`/`complex` on
+what the band called `S` → `full` for the remaining steps); never downgrade
+mid-pipeline. Then surface it — `{workspace_note}` is ` (worktree)` in a worktree,
+empty otherwise; print `effort: full` even when `resolve.adaptive_effort` is `false`,
+so the line is uniform:
 ```
 [0/5] Preflight    ✓ issue #N open, branch: {branch_name}{workspace_note}, effort: {profile}
 ```
