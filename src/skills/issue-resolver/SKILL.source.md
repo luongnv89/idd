@@ -48,13 +48,11 @@ Defaults (full field reference in `docs/config-schema.md`): `issue.auto_normaliz
 
 ## Subagent Architecture
 
-The resolve pipeline delegates heavy work to subagents (`shared/agents/`) to keep the main agent's **context window** clean and **token budget** predictable. Main agent stays in Step 0, Step 4 (orchestrates review-fix), and Step 5 (deliver); Steps 1-3 each spawn one subagent. Full diagram in `references/pipeline-steps.md` (*Subagent Architecture Diagram*).
-
-Every agent prompt is bundled at `references/agents/<name>.md` (the *Bundled dependency precheck* list is authoritative) and opens with a role header and a compact I/O contract; the conventions they share — spawn note, tool posture, injection boundary, confidence scale, `gh --json`, autonomous operation — live once in `docs/shared-agent-conventions.md`.
+Heavy work is delegated to subagents (`shared/agents/`) to keep the main agent's **context window** clean and its **token budget** predictable: the main agent owns Step 0, Step 4's review-fix loop and Step 5; Steps 1-3 each spawn one. Diagram in `references/pipeline-steps.md` (*Subagent Architecture Diagram*). Every agent prompt is bundled at `references/agents/<name>.md` and opens with a role header and a compact I/O contract; the conventions they share live once in `docs/shared-agent-conventions.md`.
 
 ### Spawning a subagent (canonical pattern)
 
-Every step below spawns with the same shape — only role, description, and prompt file change. **Do NOT set `subagent_type`** — always use the default general-purpose agent (never the agent's own name — none are registered agent types):
+Every step spawns with the same shape — only role, description and prompt file change. **Do NOT set `subagent_type`**; always use the default general-purpose agent:
 
 ```python
 Agent(
@@ -66,16 +64,16 @@ Agent(
 
 ### Orchestrating the agents (model/effort, monitoring, audit)
 
-As the orchestrator, for each spawned step:
+For each spawned step:
 
 1. **Name the role** in the spawn `description` (e.g. `"researcher — research issue #N"`).
-2. **Size the model/effort** per `docs/agent-model-effort.md` from the most-recent complexity signal, falling back to the agent's default tier — advisory, never blocks.
-3. **Monitor before advancing** — verify the agent returned its contract's required shape (researcher: `status`+`complexity`; synthesizer: one `recommended` option; implementer: commits+tests+repro for bugs; reviewer/fixer: `result`+counts). A missing/blocking return is the signal to stop (interactive) or follow auto behavior.
+2. **Size the model/effort** per `docs/agent-model-effort.md` from the most-recent complexity signal, falling back to the agent's default tier — advisory, never blocking.
+3. **Monitor before advancing** — check the agent returned its contract's required shape (researcher: `status`+`complexity`; synthesizer: one `recommended` option; implementer: commits+tests+repro for bugs; reviewer/fixer: `result`+counts). A missing or blocking return stops the run (interactive) or follows the auto behavior.
 4. **Audit** — record the per-step signal the run log folds in (`complexity`, `qa_cycles`, `outcome`, `duration_s`) plus the `[N/5]` tracker line.
 
 ### Environment check
 
-If the Agent tool is available, use subagents as described above; if not (e.g. Claude.ai), execute each step inline via the fallback instructions.
+If the Agent tool is available, use subagents as above; if not (e.g. Claude.ai), run each step inline via the fallback instructions.
 
 ### Bundled dependency precheck
 
