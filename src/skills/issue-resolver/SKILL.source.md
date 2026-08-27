@@ -25,7 +25,7 @@ Resolve a GitHub issue end-to-end — from issue to atomic PR in 6 steps.
 
 ## Prerequisites
 
-Required before any operation — git repository (`git rev-parse --git-dir`), `gh` installed (`which gh`) and authenticated (`gh auth status`), remote present (`git remote -v`). On failure print the error from `references/error-messages.md` and stop.
+Check before any operation — git repository (`git rev-parse --git-dir`), `gh` installed (`which gh`) and authenticated (`gh auth status`), remote present (`git remote -v`). On failure print the error from `references/error-messages.md` and stop.
 
 ## Repo Sync Before Edits (mandatory)
 
@@ -68,11 +68,11 @@ Per step: **name the role** in the spawn `description`; **size the model/effort*
 
 ### Environment check
 
-With the Agent tool, use subagents; without it (e.g. Claude.ai), run each step inline via its fallback.
+Use subagents when the Agent tool is available; without it (e.g. Claude.ai), run each step inline via its fallback instructions.
 
 ### Bundled dependency precheck
 
-Every path below must exist relative to this SKILL.md's own directory. A missing path stops the run: print the `✗ Missing bundled dependency` block from `references/error-messages.md` (*Bundled dependencies*), never a guessed prompt.
+Check that every path below exists relative to this SKILL.md's own directory. A missing path stops the run: print the `✗ Missing bundled dependency` block from `references/error-messages.md` (*Bundled dependencies*), never a guessed prompt.
 
 ```text
 references/agents/codebase-researcher.md
@@ -112,7 +112,7 @@ references/scripts/gi-state.py
 
 ## Pipeline Overview
 
-6 steps (0-5) — Preflight, Research, Plan, Implement, QA, Deliver — each printing a `[N/5]` line on start (`●`) that updates to `✓`/`✗`. Example: `references/report-templates.md` (*Expected Inline Pipeline Output*).
+6 steps (0-5) — Preflight, Research, Plan, Implement, QA, Deliver — each printing a `[N/5]` line on start (`●`) that updates to `✓`/`✗`. Read the expected output for every tracker line and closing block in `references/report-templates.md` (*Expected Inline Pipeline Output*) — that example is the format contract.
 
 ### Step completion reports
 
@@ -216,10 +216,6 @@ Understand the issue, the affected code and candidate solutions; the same pass v
 
 **Profiles.** `light` — see the profile table in *Step 0g*; a `high`/`complex` signal revises **upward** to `full`, never downward. `analysis_reuse = fresh` (*0h*) — pass `prior_analysis` for the seeded **verify-first** pass: confirm or refute, never trust, with the already-resolved check still run in full. `triage_context` has no commit pin, so it may only **reorder** a scan (*→ `reuse`*, *→ `triage_context`*).
 
-```
-[1/5] Research     ✓ read {N} files, complexity: {level}
-```
-
 ---
 
 ## Step 2 — Plan
@@ -227,10 +223,6 @@ Understand the issue, the affected code and candidate solutions; the same pass v
 Generate options and select one. Spawn the synthesizer (`shared/agents/synthesizer.md`); it returns minimal / balanced / comprehensive, balanced usually recommended. Selection and fallback: *Step 2 — Plan*.
 
 **Profiles.** `light` — skip the synthesis; see the profile table in *Step 0g*. `analysis_reuse = fresh` (*0h*) skips the same spawn but **wins Step 2 when both apply** — a replacement, not an addition: lift `options[]`, `recommended_option`, `overall_complexity` and `overall_risk` from the analysis, each `rejection_reason` from `decision_record.options_rejected[]` (*→ `reuse`*).
-
-```
-[2/5] Plan         ✓ approach: {selected option name}
-```
 
 ### Design-confirm checkpoint (high-complexity, interactive only)
 
@@ -247,10 +239,6 @@ Optionally augment the implementer with external skills from `references/skill-i
 **`light` profile:** skip the propose/install — see the profile table in *Step 0g* — but **still run the leftover teardown** there.
 
 Then spawn the implementer (`shared/agents/implementer.md`) with the plan, branch name, naming conventions and `selected_skills`. **Bug** issues first run the red-capable reproduction checkpoint — reproduce, confirm red, fix, convert to a regression test — surfaced in the Decision Record and acceptance table; other issues skip it, and auto mode never blocks (`references/bug-verification.md`). Payload, commit guardrails, fallback: *Step 3 — Implement*.
-
-```
-[3/5] Implement    ✓ {N} files changed, {U} unit tests, {E} e2e tests
-```
 
 ---
 
@@ -286,7 +274,7 @@ If the change affects documented behavior, update README, inline docs and CHANGE
 
 ### Push branch and create PR
 
-Scan the branch diff first. Export `IDD_AUTO_MODE=1` in auto mode, then from the repo root run `python3 shared/scripts/gi-secscan.py --range "origin/${base}" --policy-ref "origin/${base}"`. It reads `security.*` from `.gitissue.yml` **at the base ref**: never pass a config *value* on the command line, never let the scanned branch supply its own policy (*Pre-push secret scan*).
+Run the branch-diff scan first. Export `IDD_AUTO_MODE=1` in auto mode, then from the repo root run `python3 shared/scripts/gi-secscan.py --range "origin/${base}" --policy-ref "origin/${base}"`. It reads `security.*` from `.gitissue.yml` **at the base ref**: never pass a config *value* on the command line, never let the scanned branch supply its own policy (*Pre-push secret scan*).
 
 - **Pass** needs all four: exit 0, `policy_source` equal to the `ref:origin/…` requested, `verdict` not `block`, `scanned` not 0 while `skipped` is above 0.
 - **Exit 1 is the block verdict** — stop, do not push, report `blocking[]`. **Exit 3** (uncompilable `security.*` regex) also stops.
@@ -306,10 +294,7 @@ gh pr create --title "{pr_title}" --body "{pr_body}"
 
 ### Project board sync
 
-With `projects.sync_enabled` true, set status to `status_map.done` (`docs/github-projects-sync.md`).
-```
-[5/5] Deliver      ✓ PR #{pr_number} created
-```
+With `projects.sync_enabled` true, set status to `status_map.done` (`docs/github-projects-sync.md`), then print the `[5/5] Deliver` tracker line.
 
 ### Run-log entry (monitoring)
 
@@ -327,7 +312,7 @@ if [ -n "$no_run_log" ]; then printf '%s' "$run_json" | python3 shared/scripts/g
 
 ## Closing Summary
 
-Print **one** closing block carrying only what the `[N/5]` tracker never printed: the outcome line, `risk_rating`, and the PR reference (number, title, URL, `Closes #N`). Never repeat a tracker metric. Use the matching variant in `references/report-templates.md` (*Closing Summary*). **Then the run-stats footer** — `references/run-stats.md`: elapsed, tokens only where the host reported a count (otherwise left out), agents, run cost only, `n/a` for anything undetermined. It is the last thing printed at **every** terminal outcome, including those that never reach this block — a preflight stop (`not found`, `closed`, `pr_in_progress`), an invalid-config stop, `already_resolved`, a blocked secret scan, a failed final test run, or any failed step.
+Emit **one** closing block carrying only what the `[N/5]` tracker never printed: the outcome line, `risk_rating`, and the PR reference (number, title, URL, `Closes #N`). Never repeat a tracker metric. Use the matching variant in `references/report-templates.md` (*Closing Summary*). **Then the run-stats footer** — `references/run-stats.md`: elapsed, tokens only where the host reported a count (otherwise left out), agents, run cost only, `n/a` for anything undetermined. It is the last thing printed at **every** terminal outcome, including those that never reach this block — a preflight stop (`not found`, `closed`, `pr_in_progress`), an invalid-config stop, `already_resolved`, a blocked secret scan, a failed final test run, or any failed step.
 
 ---
 
