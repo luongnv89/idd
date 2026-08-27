@@ -32,6 +32,38 @@ Main Agent (orchestrator)
 └── Step 5: Deliver (main agent — push + create PR + report)
 ```
 
+## Configuration load
+
+Full rationale for SKILL.md *Configuration*, which owns the command, the exit-code
+handling and the default field list. Three details there are load-bearing and easy
+to get wrong.
+
+**Run it from the repo root.** `gi-config.py` resolves `.gitissue.yml` against the
+*working directory*. Run it anywhere else and it still exits 0 — reporting
+`config_file: null` and `first_run: true` — so the repo's real configuration is
+discarded silently, with no error to notice. A wrong working directory therefore
+looks exactly like a zero-config repo.
+
+**Resolve the script path against this SKILL.md's own directory, not the working
+directory.** The two are different by construction here: the skill is installed
+somewhere under the agent's skills tree while the run happens in the user's repo.
+Resolve it to an absolute path the same way the *Bundled dependency precheck*
+resolves its list, and pass that absolute path to `python3`.
+
+**The script and the manual read are alternatives, never a pair.** On exit 0 the
+returned `config` is the whole answer; the defaults printed in SKILL.md are then
+reference material only, and re-reading `.gitissue.yml` on top of a successful run
+can only introduce a disagreement. The manual read runs *instead*, on the degrade
+path, and only there.
+
+**Why the clock is chained onto this call.** `run_started_epoch` has to be taken
+before any pipeline work, and this is the first command the skill runs. Chaining
+`; ec=$?; date +%s >&2; exit "$ec"` keeps stdout clean for the JSON parse and
+preserves the script's own exit code for the branches above, so the measurement
+costs no extra round trip. `elapsed` in the *Run Stats Footer*
+(`references/run-stats.md`) is measured from it, at every terminal outcome — so a
+run that never captures it reports `elapsed: n/a` rather than a wrong number.
+
 ## Step 0e — Workspace
 
 Full procedure for the worktree offer described in SKILL.md *Step 0e — Workspace*.
