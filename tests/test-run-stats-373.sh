@@ -22,8 +22,8 @@
 # EXTENDED by issue #414: the field set was settled repo-wide as `elapsed`,
 # `tokens` (conditional), and `agents`. A `cost` figure, a count of skills
 # invoked, and a count of tool calls were each assessed and rejected — the
-# first as unresolvable on every current host, the second as a constant in six
-# of the eight skills, the third as the per-step tally Overhead forbids.
+# first as unresolvable on every current host, the second as a run-activity
+# metric on the #165 line, the third as the per-step tally Overhead forbids.
 # docs/decisions/run-stats-field-set.md is the record. This suite now pins both
 # the contract's own statement of that decision and the record itself, so a
 # silent widening of the footer fails here rather than shipping.
