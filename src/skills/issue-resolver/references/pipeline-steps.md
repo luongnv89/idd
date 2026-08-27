@@ -32,6 +32,33 @@ Main Agent (orchestrator)
 └── Step 5: Deliver (main agent — push + create PR + report)
 ```
 
+## Orchestrating the agents
+
+Full detail for SKILL.md *Subagent Architecture → Orchestrating the agents*, which owns
+the four duties. This section carries the per-agent shapes and the audited fields.
+
+**Required return shape, checked before the next step starts.** A step that advances on
+a malformed return carries the damage forward silently, so treat the shape as the
+step's completion criterion:
+
+| Agent | Must return |
+|-------|-------------|
+| `codebase-researcher` | `status` and `complexity` |
+| `synthesizer` | exactly one `recommended` option |
+| `implementer` | commits, tests, and a reproduction for bug issues |
+| `code-reviewer` / `fixer` | `result` plus the finding counts |
+
+A missing or blocking return is the signal to stop (interactive) or to follow the step's
+documented auto behavior — never to guess the missing field.
+
+**Model/effort sizing** comes from `docs/agent-model-effort.md`, read from the
+most-recent complexity signal and falling back to the agent's default tier. It is
+advisory: a tier that cannot be honoured never blocks the step.
+
+**Audited per step:** `complexity`, `qa_cycles`, `outcome` and `duration_s` — the four
+signals the run log folds into its single line — plus the `[N/5]` tracker line the user
+sees.
+
 ## Configuration load
 
 Full rationale for SKILL.md *Configuration*, which owns the command, the exit-code
