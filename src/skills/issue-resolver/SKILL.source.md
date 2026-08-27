@@ -77,7 +77,7 @@ If the Agent tool is available, use subagents as above; if not (e.g. Claude.ai),
 
 ### Bundled dependency precheck
 
-Verify this skill's bundled subagent prompts and reference files are present. Before execution, verify **every** path in the list below exists relative to the skill's directory (the dirname of this SKILL.md). This list is the authoritative guard — keep it complete and independent of the *Additional Resources* navigation index, which exists for human navigation and may list files with source-relative group prefixes. If any path is missing, stop immediately and print the `✗ Missing bundled dependency` block from `references/error-messages.md` (*Bundled dependencies*); do not continue with an inline or guessed subagent prompt:
+Before execution, verify **every** path below exists relative to this SKILL.md's own directory. This list is the authoritative guard — keep it complete. If any path is missing, stop and print the `✗ Missing bundled dependency` block from `references/error-messages.md` (*Bundled dependencies*); never continue with an inline or guessed subagent prompt:
 
 ```text
 references/agents/codebase-researcher.md
@@ -117,15 +117,13 @@ references/scripts/gi-state.py
 
 ## Pipeline Overview
 
-The resolve pipeline has 6 steps (0-5) — Preflight, Research, Plan, Implement, QA, Deliver. Display progress with the `[N/5]` step counter: each step prints a new line on start (`●`), updating to `✓`/`✗` on success/failure. Static sequential output — no animation. Worked example of the full tracker in `references/report-templates.md` (*Expected Inline Pipeline Output*).
+6 steps (0-5) — Preflight, Research, Plan, Implement, QA, Deliver. Show progress with the `[N/5]` counter: each step prints a new line on start (`●`), updating to `✓`/`✗`. Static sequential output, no animation. Worked example in `references/report-templates.md` (*Expected Inline Pipeline Output*).
 
 ---
 
 ### Step completion reports
 
-Each step closes with a completion report — `√`/`×` per check plus a `Result: PASS | PARTIAL | FAIL` line — so "step done" is checkable rather than asserted. The per-step check names, the `Result` semantics, and the block format are in `references/report-templates.md` (*Step Completion Reports*) —
-**read it now**, before Step 0. A step is not complete until its `Result:`
-line is printed.
+Each step closes with a completion report — `√`/`×` per check plus a `Result: PASS | PARTIAL | FAIL` line — so "step done" is checkable, not asserted. Check names, `Result` semantics and block format: `references/report-templates.md` (*Step Completion Reports*) — **read it now**, before Step 0. A step is not complete until its `Result:` line is printed.
 
 ---
 
