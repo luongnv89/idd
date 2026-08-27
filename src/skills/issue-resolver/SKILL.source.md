@@ -21,7 +21,7 @@ Resolve a GitHub issue end-to-end — from issue to atomic PR in 6 steps.
 | `/issue-resolver <N> --auto` | auto-pilot | Resolve autonomously, no prompts |
 | `/issue-resolver <N> --no-run-log` | (modifier) | Append nothing to `.gitissue/runs.jsonl`; return telemetry to the caller |
 
-`N` must be a GitHub issue number. `--auto` is set by `/auto-pilot`; `--no-run-log` is **orthogonal to `--auto`** (*Step 5 — Deliver* → *Run-log entry*).
+`N` must be a GitHub issue number; `--auto` is set by `/auto-pilot`; `--no-run-log` is **orthogonal to `--auto`** (*Step 5 — Deliver* → *Run-log entry*).
 
 ## Prerequisites
 
@@ -29,14 +29,14 @@ Required before any operation — git repository (`git rev-parse --git-dir`), `g
 
 ## Repo Sync Before Edits (mandatory)
 
-In-place path only (ordinary auto mode, or interactive after declining Step 0e); worktree paths already start from the fetched base, and an invalid `IDD_CALLER_WORKTREE=1` is a stop, never a sync bypass. Sync with the **stash-first pattern**: copy the snippet and recovery procedure from `docs/sync-conventions.md` (*Quick Reference (Copy-Paste Snippet)*), and never improvise a bare rebase on a dirty tree. A missing `origin` or a rebase conflict stops and asks (interactive), or aborts (auto).
+In-place path only (ordinary auto mode, or interactive after declining Step 0e); worktree paths already start from the fetched base, and an invalid `IDD_CALLER_WORKTREE=1` is a stop, never a sync bypass. Sync with the **stash-first pattern**: copy the snippet and recovery procedure from `docs/sync-conventions.md` (*Quick Reference (Copy-Paste Snippet)*), never a bare rebase on a dirty tree. A missing `origin` or a rebase conflict stops and asks (interactive), or aborts (auto).
 
 ## Configuration
 
 Load config once; never re-read it. Run `python3 shared/scripts/gi-config.py` — two mandatory requirements. **Working directory:** the repo root. **Script path:** absolute, resolved as the *Bundled dependency precheck* resolves its list. It prints `{"config": {…dotted keys…}, "config_file": …, "first_run": …}`, merging the defaults below with `.gitissue.yml`. Why each matters: `references/pipeline-steps.md` (*Configuration load*).
 
 - **Exit 0** — use `config`; on `first_run` print `○ First run — using default config. Run /init-gitissue to customize.`
-- **Exit 3** — invalid `.gitissue.yml`: print the error from `references/error-messages.md` (*Invalid config*) and stop.
+- **Exit 3** — invalid `.gitissue.yml`: print the error from `references/error-messages.md` (*Invalid config*), stop.
 - **Script file absent** — a missing bundled dependency is a broken install and not a degrade: stop, print `✗ Missing bundled dependency`.
 - **Anything else** (no `python3`, other non-zero exit, unparsable stdout) — print `⚠ gi-config unavailable — using the inline defaults below`, then read `.gitissue.yml` by hand *instead of* the script.
 
@@ -48,7 +48,7 @@ Defaults and per-key behavior in `docs/config-schema.md`: `issue.auto_normalize:
 
 ## Subagent Architecture
 
-Heavy work goes to subagents (`shared/agents/`), keeping the main agent's **context window** clean and its **token budget** predictable: it owns Step 0, Step 4's loop and Step 5, and Steps 1-3 each spawn one. Diagram: `references/pipeline-steps.md` (*Subagent Architecture Diagram*). Prompts are bundled at `references/agents/<name>.md`; shared conventions in `docs/shared-agent-conventions.md`.
+Heavy work goes to subagents (`shared/agents/`), keeping the main agent's **context window** clean and its **token budget** predictable: it owns Step 0, Step 4's loop and Step 5; Steps 1-3 each spawn one. Diagram: `references/pipeline-steps.md` (*Subagent Architecture Diagram*). Prompts are bundled at `references/agents/<name>.md`; shared conventions in `docs/shared-agent-conventions.md`.
 
 ### Spawning a subagent (canonical pattern)
 
@@ -64,15 +64,15 @@ Agent(
 
 ### Orchestrating the agents (model/effort, monitoring, audit)
 
-Per spawned step: **name the role** in the spawn `description`; **size the model/effort** per `docs/agent-model-effort.md`; **monitor before advancing** — a missing or blocking return stops the run (interactive) or follows the auto behavior; **audit** the per-step signal. Return shapes and audited fields: `references/pipeline-steps.md` (*Orchestrating the agents*).
+Per spawned step: **name the role** in the spawn `description`; **size the model/effort** per `docs/agent-model-effort.md`; **monitor before advancing** — a missing or blocking return stops the run (interactive) or follows the auto behavior; **audit** the per-step signal. Return shapes and audited fields: *Orchestrating the agents*.
 
 ### Environment check
 
-With the Agent tool, use subagents as above; without it (e.g. Claude.ai), run each step inline via the fallback instructions.
+With the Agent tool, use subagents; without it (e.g. Claude.ai), run each step inline via the fallback instructions.
 
 ### Bundled dependency precheck
 
-Verify **every** path below exists relative to this SKILL.md's own directory. Any missing path stops the run: print the `✗ Missing bundled dependency` block from `references/error-messages.md` (*Bundled dependencies*), never an inline or guessed prompt.
+Verify **every** path below exists relative to this SKILL.md's own directory. Any missing path stops the run: print the `✗ Missing bundled dependency` block from `references/error-messages.md` (*Bundled dependencies*), never a guessed prompt.
 
 ```text
 references/agents/codebase-researcher.md
@@ -112,7 +112,7 @@ references/scripts/gi-state.py
 
 ## Pipeline Overview
 
-6 steps (0-5) — Preflight, Research, Plan, Implement, QA, Deliver. Each prints a `[N/5]` line on start (`●`), updating to `✓`/`✗`. Worked example: `references/report-templates.md` (*Expected Inline Pipeline Output*).
+6 steps (0-5) — Preflight, Research, Plan, Implement, QA, Deliver. Each prints a `[N/5]` line on start (`●`), updating to `✓`/`✗`. Example: `references/report-templates.md` (*Expected Inline Pipeline Output*).
 
 ### Step completion reports
 
