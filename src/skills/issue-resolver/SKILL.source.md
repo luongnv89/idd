@@ -407,16 +407,31 @@ If the changes affect documented behavior, update README, inline docs, and CHANG
 
 ### Push branch and create PR
 
-Before pushing, run a final pre-push pass over the whole branch diff — it catches secrets that slipped in during QA fixes. Export `IDD_AUTO_MODE=1` first in auto mode, then run `python3 shared/scripts/gi-secscan.py --range "origin/${base}" --policy-ref "origin/${base}"` from the repo root. It reads this repo's `security.allow_pattern`, `security.extra_secret_file_pattern`, `security.extra_secret_value_pattern`, and `security.max_file_size_mb` from `.gitissue.yml` itself — never pass a config *value* on the command line, because `.gitissue.yml` is repo-controlled and a crafted value would escape its quoting. `--policy-ref` takes that policy from the **base ref** rather than this branch: the issue body that drove the implementation is untrusted, so a branch that grew a permissive `security.allow_pattern` must not be the branch that decides how it is scanned. **Treat exit 0 as a pass only when `policy_source` is the `ref:origin/…` you asked for, `verdict` is not `block`, and `scanned` is not 0 while `skipped` is above 0** — a scan that examined nothing is not a clean scan, and an allow pattern suppresses scanning rather than findings. **Exit 1 is the block verdict: stop, do not push, and report the path from `blocking[]` — never fall through to the prose scan hoping for a pass.** Exit 3 (an uncompilable `security.*` regex) is also a stop. A missing `python3`, **exit 2** (the script path did not resolve, or the invocation was malformed — a scan that never ran is never a scan that passed), or exit 4 degrades: print `⚠ gi-secscan unavailable — running the documented scan` and run the **Primary Pattern** in `docs/pre-commit-security.md` over `git diff --name-only "origin/${base}"...HEAD` instead. Exit 1 with no parsable JSON on stdout is a crash rather than a verdict — treat it as exit 2 and degrade. Do not improvise a weaker check, and never read any non-zero exit as a pass. Only after the scan passes (or warnings are accepted):
+Before pushing, scan the whole branch diff — it catches secrets that slipped in during
+QA fixes. Export `IDD_AUTO_MODE=1` first in auto mode, then from the repo root run
+`python3 shared/scripts/gi-secscan.py --range "origin/${base}" --policy-ref "origin/${base}"`.
+It reads `security.*` from `.gitissue.yml` **at the base ref**: never pass a config
+*value* on the command line, and never let the branch under scan supply the policy that
+scans it. Why each rule below exists — `references/pipeline-steps.md` (*Step 5 — Deliver
+→ Pre-push secret scan*).
+
+- **Pass** needs all four: exit 0, `policy_source` equal to the `ref:origin/…` requested, `verdict` not `block`, and `scanned` not 0 while `skipped` is above 0.
+- **Exit 1 is the block verdict** — stop, do not push, report the path from `blocking[]`. Never fall through to the prose scan hoping for a pass.
+- **Exit 3** (uncompilable `security.*` regex) — also a stop.
+- **No `python3`, exit 2, or exit 4** — degrade: print `⚠ gi-secscan unavailable — running the documented scan`, then run the **Primary Pattern** in `docs/pre-commit-security.md` over `git diff --name-only "origin/${base}"...HEAD`. Exit 1 with no parsable JSON on stdout is a crash, not a verdict — treat it as exit 2.
+
+Never improvise a weaker check; never read a non-zero exit as a pass. Only after the
+scan passes (or warnings are accepted):
 
 ```bash
+# gated by the gi-secscan.py pass above — see docs/pre-commit-security.md
 git push -u origin {branch_name}
 gh pr create --title "{pr_title}" --body "{pr_body}"
 ```
 
-**PR title:** `{type}({scope}): {description} (#{issue_number})` (see `docs/naming-conventions.md`)
+**PR title:** `{type}({scope}): {description} (#{issue_number})` (`docs/naming-conventions.md`)
 
-**PR body:** Fill the template in `references/report-templates.md` (*PR Body Template*) — Summary, Approach, **Decision Record** (from `.gitissue/analysis-<N>.json` if present, else synthesized), Changes table, Test Results, **Acceptance Criteria Verification** table. The last two are the durable analysis signal surviving squash-merge; never omit them (see `docs/idd-methodology.md`). That template's **last line** is the `<!-- gitissue:qa v1 … -->` handoff marker: fill it in **only when QA exited clean**, and otherwise drop the line — never append a second copy, because two markers make the consumer fall back to the full pipeline. Field derivation, the omit-on-a-non-clean-exit rule, and the no-secret-scan-field rule are in `references/report-templates.md` (*QA handoff marker*); `head=` is `git rev-parse HEAD` taken after the last commit and immediately before `git push`.
+**PR body:** fill *PR Body Template* in `references/report-templates.md` — Summary, Approach, **Decision Record** (from `.gitissue/analysis-<N>.json` if present, else synthesized), Changes, Test Results, **Acceptance Criteria Verification**. The last two are the durable analysis signal surviving squash-merge; never omit them (`docs/idd-methodology.md`). The template's **last line** is the `<!-- gitissue:qa v1 … -->` handoff marker: fill it in **only when QA exited clean**, otherwise drop the line — a second copy makes the consumer fall back to the full pipeline. Field derivation and the omit rules are in the same file (*QA handoff marker*); `head=` is `git rev-parse HEAD` taken after the last commit and immediately before `git push`.
 
 ### Project board sync
 
