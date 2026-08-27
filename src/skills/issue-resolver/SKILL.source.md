@@ -301,12 +301,19 @@ Set `analysis_reuse` to `fresh`, `stale`, or `absent` by the five-condition pred
 
 ## Step 1 — Research
 
-Deeply understand the issue, affected codebase, and possible solutions; also verifies the issue hasn't already been fixed (early-exit path closes it in auto mode). Spawn the researcher (`shared/agents/codebase-researcher.md`) with the canonical pattern — full delegation payload, phases, early-exit behavior, and inline fallback are in `references/pipeline-steps.md` (*Step 1 — Research*).
+Understand the issue, the affected code and the candidate solutions; the same pass
+verifies the issue has not already been fixed (the early-exit path closes it in auto
+mode). Spawn the researcher (`shared/agents/codebase-researcher.md`) with the canonical
+pattern. Delegation payload, phases, early exit and inline fallback:
+`references/pipeline-steps.md` (*Step 1 — Research*).
 
-**`light` profile:** run a **lighter** research pass — see the profile table in
-*Step 0g* for what it collapses, and `references/pipeline-steps.md` (*Step 1 —
-Research → `light` profile*) for the mechanics. On a `high`/`complex` signal,
-revise the profile **upward** to `full` (never downward). **`analysis_reuse = fresh`** (*0h*): pass `prior_analysis` and run the seeded **verify-first** pass — hints to confirm or refute, never to trust; the already-resolved check still runs in full (*Step 1 — Research → `reuse`*). Also pass the optional sibling key **`triage_context`** (this issue's triage row, from the caller or from the triage graph): unlike `prior_analysis` it carries **no commit pin**, so it may only **reorder** a scan, never authorise skipping a phase (*Step 1 — Research → `triage_context`*).
+**`light`** — a lighter pass (*0g* table; mechanics in *Step 1 — Research → `light`
+profile*). A `high`/`complex` signal revises the profile **upward** to `full`, never
+downward. **`analysis_reuse = fresh`** (*0h*) — pass `prior_analysis` and run the seeded
+**verify-first** pass: hints to confirm or refute, never to trust; the already-resolved
+check still runs in full (*Step 1 — Research → `reuse`*). Also pass the optional sibling
+key **`triage_context`**, which carries **no commit pin** and so may only **reorder** a
+scan, never authorise skipping a phase (*Step 1 — Research → `triage_context`*).
 
 After research:
 ```
