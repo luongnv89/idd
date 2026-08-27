@@ -128,7 +128,7 @@ Check whether this issue should be worked on. Open with `● Preflight check for
 
 ### 0a — Fetch issue
 
-The GitHub-backed helpers share the bundled subprocess boundary in `shared/scripts/gi-gh.py`. Classify any framed caller payload first (`/auto-pilot` captured it in mode-neutral *Step 1.2b*) — *Step 0i — Caller payload gate* in `references/pipeline-steps.md` is its single home: the framing, `issue_payload = supplied | partial | absent`, the mandatory live read `gh issue view N --json state,comments,updatedAt` under `supplied`, the exact match between retained and live `updatedAt` required before 0d, the discard-and-refresh fallback on any mismatch (applied identically to individual, array, and keyed-map payloads), and the rule that no safety check — 0a's two stops included — is ever decided from a payload. Then run `python3 shared/scripts/gi-issue.py {N} --fields number,title,body,labels,assignees,state,comments,updatedAt` and read `.issue`, except where that gate lets the payload stand in. **Capture `updatedAt` here** — 0d's `gh issue edit` bumps it, so *0h* must compare against this pre-normalization value. Resolve the script path as the *Bundled dependency precheck* resolves its list. Exit 3 stops; no `python3`, exit 2 or exit 4 degrades to `gh issue view {N} --json number,title,body,labels,assignees,state,comments,updatedAt` — the cache is an optimization, never a dependency. **0d rewrites the body, so it MUST end with `python3 shared/scripts/gi-issue.py {N} --invalidate`**, or Step 1 and Step 5 read the pre-normalization body. <!-- a:rs-0a-payload-concurrency -->
+GitHub reads share the subprocess boundary in `shared/scripts/gi-gh.py`. Classify any framed caller payload first (`/auto-pilot` captured it in mode-neutral *Step 1.2b*) — *Step 0i — Caller payload gate* in `references/pipeline-steps.md` is its single home: the framing, `issue_payload = supplied | partial | absent`, the mandatory live read `gh issue view N --json state,comments,updatedAt` under `supplied`, the exact match between retained and live `updatedAt` required before 0d, the discard-and-refresh fallback on any mismatch (applied identically to individual, array, and keyed-map payloads), and the rule that no safety check — 0a's two stops included — is ever decided from a payload. Then run `python3 shared/scripts/gi-issue.py {N} --fields number,title,body,labels,assignees,state,comments,updatedAt` and read `.issue`, except where that gate lets the payload stand in. **Capture `updatedAt` here** — 0d's `gh issue edit` bumps it, so *0h* must compare against this pre-normalization value. Resolve the script path as the *Bundled dependency precheck* resolves its list. Exit 3 stops; no `python3`, exit 2 or exit 4 degrades to `gh issue view {N} --json number,title,body,labels,assignees,state,comments,updatedAt`. **0d rewrites the body, so it MUST end with `python3 shared/scripts/gi-issue.py {N} --invalidate`.** <!-- a:rs-0a-payload-concurrency -->
 
 **If not found:** output error and stop. **If closed:** output warning and stop.
 
@@ -139,7 +139,7 @@ git branch -a | grep -i "{N}"                                # existing branches
 gh pr list --state open --json number,title,body,headRefName --limit 20
 ```
 
-Scan PR bodies for `Closes #N`, `Fixes #N`, `Resolves #N`. An **open** PR already targeting the issue prints the `⚠ PR already targets issue` block from `references/error-messages.md` (*Guards*) and stops — return `status: pr_in_progress` with its `pr_number` and `branch_name`, and **never close the issue**: an unreviewed, unmerged PR is not a resolution (`references/pipeline-steps.md` → *Early exit*). Only a **merged** PR or a closing commit on the default branch is `already_resolved`.
+Scan PR bodies for `Closes #N`, `Fixes #N`, `Resolves #N`. An **open** PR already targeting the issue prints the `⚠ PR already targets issue` block from `references/error-messages.md` (*Guards*) and stops — return `status: pr_in_progress` with its `pr_number` and `branch_name`, and **never close the issue** (`references/pipeline-steps.md` → *Early exit*). Only a **merged** PR or a closing commit on the default branch is `already_resolved`.
 
 ### 0c — Guards
 
@@ -151,18 +151,18 @@ If `issue.auto_normalize` is true and not already normalized (no `<!-- gitissue:
 
 1. **Security label check (SPEC §1.4)** — before any rewrite, scan issue labels for `security`, `CVE`, or `vulnerability` (case-insensitive). If any match:
    - **Auto mode (`--auto` / `IDD_AUTO_MODE=1`):** print the `⚠ … Skipping auto-normalization` warning from `references/error-messages.md` (*Security-labeled issue (skip)*) — using the first matching label name for `{label}` — and continue preflight **without** rewriting the issue body.
-   - **Interactive mode:** print the same warning and ask for explicit operator confirmation. Default is **no** — do not rewrite unless the operator clearly confirms (e.g. `y` / `yes`). If declined, continue without normalization.
+   - **Interactive mode:** print the same warning and ask for explicit operator confirmation. Default **no**: do not rewrite unless the operator confirms; if declined, continue without normalization.
 
 2. **Normalize inline** — when no security label blocks (or the operator confirmed): classify the issue type, generate the normalized body, add the marker, post a backup comment carrying the original, `gh issue edit` the issue, invalidate the cache (`python3 shared/scripts/gi-issue.py {N} --invalidate`), then re-fetch. Same structure-only flow as `/issue-creator` Normalize mode, but the resolver does **not** invoke `/issue-creator` as a subprocess — Step 0d runs inline. On failure, warn and continue with the original body (`references/error-messages.md`).
 
 ### 0e — Workspace (interactive only)
 
-Derive one `{branch_name}` before 0e or 0f picks a workspace: `python3 shared/scripts/gi-branch.py {N} --from-issue --type {type}`, reading `.branch`. **`--from-issue` is mandatory** — never put the issue title or the configured prefix on the command line; a title is attacker-controlled, and the flag makes the script read both values itself (`references/pipeline-steps.md` → *Step 0e — Workspace*). `{type}` is one of the six literals this skill classified, never free text. Exit 3 stops; no `python3`, exit 2 or exit 4 degrades to deriving the name by hand per `docs/naming-conventions.md`. Both workspace paths use this one name. Then decide *where* the work happens.
+Derive one `{branch_name}` before 0e or 0f picks a workspace: `python3 shared/scripts/gi-branch.py {N} --from-issue --type {type}`, reading `.branch`. **`--from-issue` is mandatory** — never put the issue title or the configured prefix on the command line (`references/pipeline-steps.md` → *Step 0e — Workspace*). `{type}` is one of the six literals this skill classified, never free text. Exit 3 stops; no `python3`, exit 2 or exit 4 degrades to deriving the name by hand per `docs/naming-conventions.md`. Both workspace paths use this one name. Then decide *where* the work happens.
 
 **Auto mode (`--auto` / `IDD_AUTO_MODE=1`): skip this offer entirely.** A set
 `IDD_CALLER_WORKTREE=1` uses the validated caller-managed path in `references/pipeline-steps.md`; otherwise go to *0f* (legacy in-place). Neither auto path shows the prompt.
 
-**Interactive mode:** offer a dedicated git *worktree* — an isolated checkout in a separate directory — so branch creation, implementation and testing never touch the user's current working tree. State what will be set up and the naming to expect:
+**Interactive mode:** offer a dedicated git *worktree* so branch creation, implementation and testing never touch the user's current working tree. State what will be set up and the naming to expect:
 
 ```
 ◆ Workspace for issue #N
@@ -182,7 +182,7 @@ Derive one `{branch_name}` before 0e or 0f picks a workspace: `python3 shared/sc
   Resolve in a new worktree? [Y/n]
 ```
 
-Accept replaces *0f — Create branch* and the mandatory Repo Sync; decline runs the mandatory Repo Sync then *0f — Create branch*. Creation commands, setup-artifact propagation, cleanup and fallback-on-failure are in `references/pipeline-steps.md` (*Step 0e — Workspace*) — never leave the user without a working resolution.
+Accept replaces *0f — Create branch* and the mandatory Repo Sync; decline runs the mandatory Repo Sync then *0f — Create branch*. Creation commands, setup-artifact propagation, cleanup and fallback-on-failure: `references/pipeline-steps.md` (*Step 0e — Workspace*).
 
 ### 0f — Create branch
 
@@ -194,7 +194,7 @@ The **in-place path** — ordinary auto mode, or interactive after declining the
 
 Decide **before Step 1** how much pipeline this issue earns. Mechanism, the shared `XS … XL` scale and the safety rules live once in `docs/agent-model-effort.md` (*Complexity → pipeline profile*); this sub-step is only the entry point.
 
-`resolve.adaptive_effort: false` skips the gate: `profile = full`. Otherwise select from the issue's **pre-work `Effort` band** (the `XS … XL` value in `## Metadata`, written by `/issue-creator`) — never from a later agent output, so the saving is real:
+`resolve.adaptive_effort: false` skips the gate: `profile = full`. Otherwise select from the issue's **pre-work `Effort` band** (the `XS … XL` value in `## Metadata`, written by `/issue-creator`) — never from a later agent output:
 
 - `Effort` `XS`/`S`, asserted (not `(needs review)`/low-confidence) → `profile = light`
 - `Effort` `M`/`L`/`XL` → `profile = full`
@@ -205,11 +205,11 @@ Per-step mechanics: `references/pipeline-steps.md` (*Step N → `light` profile*
 
 | Step | `light` behavior |
 |------|------------------|
-| 1 — Research | Lighter pass: the already-resolved check and a focused scan of the obviously-affected file(s) still run; skip the broad dependency trace and external solution research. |
-| 2 — Plan | Skip the 3-option synthesis — do **not** spawn the synthesizer; derive a **direct minimal plan** inline and record it as the selected option so the Decision Record keeps a real `Selected option`, and the design-confirm checkpoint does not apply. **Unless *0h* set `analysis_reuse = fresh`**: then *Step 2 — Plan → `reuse`* governs, options are **lifted** from the analysis rather than derived, and the design-confirm checkpoint **does** apply. |
-| 3 — Propose relevant skills | Skip the **propose/install** — set `selected_skills = []` and go straight to the implementer, as auto mode does. **Leftover teardown still runs** (`references/pipeline-steps.md` → *Step 3 — Propose relevant skills*): a `light` run still releases skills a crashed run borrowed. The one path without teardown is a parallel lane (`IDD_CALLER_WORKTREE=1`), which disables borrowing outright. |
-| 4 — QA | Cap the review-fix loop at **1** cycle instead of `resolve.qa_max_cycles`: one review pass, fix once if blocking, deliver. One reviewer spawn still runs — less depth, never no review. UI review stays auto-detected. |
-| 5 — Deliver | **Unchanged** — always emits the Decision Record and Acceptance Criteria Verification table. The profile never removes durable memory. |
+| 1 — Research | Lighter pass: the already-resolved check and a focused scan of the affected file(s) still run; skip the broad dependency trace and external solution research. |
+| 2 — Plan | Skip the 3-option synthesis — do **not** spawn the synthesizer; derive a **direct minimal plan** inline as the selected option, and the design-confirm checkpoint does not apply. **Unless *0h* set `analysis_reuse = fresh`**: then *Step 2 — Plan → `reuse`* governs, options are **lifted** from the analysis, and the design-confirm checkpoint **does** apply. |
+| 3 — Propose relevant skills | Skip the **propose/install** — set `selected_skills = []` and go straight to the implementer. **Leftover teardown still runs** (`references/pipeline-steps.md` → *Step 3 — Propose relevant skills*). The one path without teardown is a parallel lane (`IDD_CALLER_WORKTREE=1`), which disables borrowing outright. |
+| 4 — QA | Cap the review-fix loop at **1** cycle instead of `resolve.qa_max_cycles`: one review pass, fix once if blocking, deliver. One reviewer spawn still runs. UI review stays auto-detected. |
+| 5 — Deliver | **Unchanged** — always emits the Decision Record and Acceptance Criteria Verification table. |
 
 The profile may only be **revised upward** later (Step 1 reports `high`/`complex` on an `S` band → `full` for the rest); never downgrade mid-pipeline. Then surface it — `{workspace_note}` is ` (worktree)` in a worktree, empty otherwise; print `effort: full` even when `resolve.adaptive_effort` is `false`:
 ```
