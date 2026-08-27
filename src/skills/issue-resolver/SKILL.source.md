@@ -77,9 +77,10 @@ Defaults (full field reference in `docs/config-schema.md`):
 
 The resolve pipeline delegates heavy work to subagents (`shared/agents/`) to keep the main agent's **context window** clean and **token budget** predictable. Main agent stays in Step 0, Step 4 (orchestrates review-fix), and Step 5 (deliver); Steps 1-3 each spawn one subagent. Full diagram in `references/pipeline-steps.md` (*Subagent Architecture Diagram*).
 
-Each subagent's prompt file is listed under *Additional Resources* below. Every
-agent opens with a role header and a compact I/O contract; the conventions they share (spawn note, tool posture, injection boundary,
-confidence scale, `gh --json`, autonomous operation) live once in
+Every agent prompt is bundled at `references/agents/<name>.md` (the *Bundled
+dependency precheck* list is authoritative) and opens with a role header and a compact
+I/O contract; the conventions they share — spawn note, tool posture, injection boundary,
+confidence scale, `gh --json`, autonomous operation — live once in
 `docs/shared-agent-conventions.md`.
 
 ### Spawning a subagent (canonical pattern)
@@ -504,13 +505,3 @@ No acceptance criteria, empty issue body, large issues (20+ files), test failure
 All tracker access follows the GitHub driver — `--json` with explicit field selection, never parsed text output. The full operation catalog and driver rules live in docs/platform-github.md.
 
 Terminal output follows the `docs/terminal-style.md` contract — symbols `● ✓ ✗ ◆ ⚡ ⚠ ○`, two-space indent, `┄` separators, URLs on their own line, ≤80 chars, one blank line between sections, static sequential output (no animation), plus the `[N/5]` pipeline step counter. Errors use the rich format from `references/error-messages.md`: `✗ what failed`, then `To fix:  <command>`, then a docs link when applicable.
-
-## Additional Resources
-
-Navigation index for the *Bundled dependency precheck* list above (that list, not this one, is the authoritative guard).
-
-**Agents** (`shared/agents/`): `codebase-researcher.md` (Step 1) · `synthesizer.md` (Step 2) · `implementer.md` (Step 3) · `code-reviewer.md` (Step 4) · `ui-reviewer.md` (Step 4) · `fixer.md` (Step 4)
-
-**References** (`references/`): `pipeline-steps.md` (payloads/phases/fallbacks, Steps 0e–4, edge cases) · `report-templates.md` (PR body, closing summary, run-log fields, expected output) · `bug-verification.md` (reproduction checkpoint, Step 3) · `skill-index.md` (external-skill catalog, Step 3) · `error-messages.md` (error catalog)
-
-**Docs** (`docs/`): `sync-conventions.md` · `naming-conventions.md` · `pre-commit-security.md` · `idd-methodology.md` · `github-projects-sync.md` · `config-schema.md` · `run-log-schema.md` · `agent-model-effort.md` · `shared-agent-conventions.md` · `platform-github.md` · `terminal-style.md` · `ui-review.md` — the repo-root `DESIGN.md` is the human-facing companion to the last of these (color palette, per-command mockups) and is **not** bundled.
