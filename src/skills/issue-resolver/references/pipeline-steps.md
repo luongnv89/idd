@@ -1474,6 +1474,27 @@ Reading it as a degrade inverts the verdict and pushes the secret. The one excep
 exit 1 with no parsable JSON on stdout — that is a crash, not a verdict, and is handled
 as exit 2.
 
+## Auto-mode behavior by step
+
+The per-step half of SKILL.md *Auto-Pilot Mode*, which owns the cross-cutting
+invariants (environment, workspace, deliver, no prompts). Under `--auto` /
+`IDD_AUTO_MODE=1` no step ever waits for a person:
+
+| Step | Auto behavior |
+|------|---------------|
+| *0c* — Guards | Skip the assignment guard; log blocking labels as warnings and continue. |
+| *0d* — Auto-normalize | A security-labelled issue prints the skip warning and continues **without** rewriting the body — no operator confirmation is sought. |
+| *0e* — Workspace | The offer never appears. |
+| *0g* — Complexity gate | Still runs: it reads the pre-work `Effort` band, which needs no prompt. |
+| *Step 1* — Research | An already-resolved issue is closed with a comment and the run exits cleanly. |
+| *Step 2* — Plan | Auto-select the recommended option; the design-confirm checkpoint never fires. |
+| *Step 3* — Implement | Continue past the max-commits guard with a warning. Never prompt for skills: internal agents only, unless `resolve.borrow_skills` is `true`, in which case the auto-selected set is borrowed without asking. |
+| *Step 4* — QA | Run the cycles autonomously; on stagnation, deliver with the known issues recorded rather than stopping. |
+| *Step 5* — Deliver | Create the PR; never merge. |
+
+Every terminal outcome — success, `already_resolved`, or `failed` — still runs the
+borrow teardown in *Step 3 — Propose relevant skills*.
+
 ## Edge Cases <!-- a:rs-edge-cases -->
 
 Full behavior for the edge cases named in SKILL.md.

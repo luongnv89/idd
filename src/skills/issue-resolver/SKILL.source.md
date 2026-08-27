@@ -483,14 +483,16 @@ in the same file shows the tracker and closing block together. **Then the run-st
 
 ## Auto-Pilot Mode
 
-When invoked with `--auto` (or by `/auto-pilot`), the entire pipeline runs without user interaction. Each step above already states its own auto behavior; these are the cross-cutting invariants:
+With `--auto` (or under `/auto-pilot`) the whole pipeline runs without user
+interaction. Each step above states its own auto behavior; these are the
+cross-cutting invariants:
 
 - **Environment:** Export `IDD_AUTO_MODE=1` before any shell snippet that consults it (`docs/pre-commit-security.md`).
 - **Workspace:** The default resolution path is in-place. Skip Step 0e and allow no `git worktree add` on the default resolution path; ordinary standalone auto mode and auto-pilot's default single-lane path run mandatory Repo Sync, then *0f*, exactly as before. A resolver launched by auto-pilot with `max_parallel > 1` may receive `IDD_CALLER_WORKTREE=1`; after the linked-worktree/branch validation in `references/pipeline-steps.md`, it uses that already-current workspace without creating, falling back from, or cleaning it up. The prompt never appears on either path.
-- **Never blocks:** *0c* skips the assignment guard and logs blocking labels as warnings; *0g* still runs (reads the pre-work `Effort` band, no prompt); *Step 1* closes an already-resolved issue with a comment and exits cleanly; *Step 2* auto-selects the recommended option and design-confirm never appears; *Step 3* continues past the max-commits guard with a warning and never prompts for skills (internal agents only unless `resolve.borrow_skills` is true — then auto-selects/borrows); *Step 4* runs its cycles autonomously and delivers with known issues on stagnation. Every terminal outcome still runs borrow teardown.
-- **Deliver:** Create PR. Do NOT merge — merging is `/auto-pilot` or `/issue-pr-review`'s job. Under `/auto-pilot` the selected `profile` is **returned** in the telemetry (with `--no-run-log`) and folded into auto-pilot's single run-log line; a standalone `--auto` run writes `profile` itself.
+- **Never blocks:** every decision point has a defined auto behavior — the per-step list is in `references/pipeline-steps.md` (*Auto-mode behavior by step*). Every terminal outcome still runs borrow teardown.
+- **Deliver:** Create PR. Do NOT merge — merging is `/auto-pilot`'s or `/issue-pr-review`'s job. Under `/auto-pilot` the selected `profile` is **returned** in the telemetry (with `--no-run-log`) and folded into auto-pilot's single run-log line; a standalone `--auto` run writes `profile` itself.
 
-No `[y/N]` prompts, no `Choose:` prompts, no `Continue?` prompts. Every decision point has a defined auto behavior.
+No `[y/N]` prompts, no `Choose:` prompts, no `Continue?` prompts.
 
 ## Edge Cases
 
