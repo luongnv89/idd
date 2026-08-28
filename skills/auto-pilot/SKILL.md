@@ -210,7 +210,7 @@ Auto-pilot delegates to the resolver/reviewer **skills**, which spawn the shared
 
 ### Subagent Architecture
 
-At `autopilot.max_parallel: 1`, each iteration spawns up to 2 subagents (resolver, then PR reviewer); explicit list mode adds a one-time analyzer upfront. Above 1, one iteration may spawn up to `max_parallel` **resolver-only** lanes concurrently from one persisted independent `parallel_groups` entry, then drains them in deterministic triage order — PR review, merge gate, merge, run-log append, checkpoint, triage-cache update and worktree cleanup are all strictly serialized, one lane at a time. The lane diagram, the `run-state.json` lane fields and the ownership rules are in `references/orchestration.md` → *Subagent architecture*.
+At `autopilot.max_parallel: 1`, each iteration spawns up to 2 subagents (resolver, then PR reviewer); explicit list mode adds a one-time analyzer upfront. Above 1, one iteration may spawn up to `max_parallel` **resolver-only** lanes concurrently from one persisted independent `parallel_groups` entry, then drains them in deterministic triage order — PR review, merge gate, merge, run-log append, checkpoint, triage-cache update and worktree cleanup are all strictly serialized, one lane at a time. The main agent tracks each lane's issue, title, branch, PR, phase and result in `run-state.json`. The lane diagram, its lane fields and the ownership rules are in `references/orchestration.md` → *Subagent architecture*. Every subagent's prompt — resolver, reviewer, analyzer, batch resolver — is in `references/subagent-prompts.md`; read it once at skill start.
 
 The PR review subagent runs `/issue-pr-review --auto --no-merge`, handling the full review-fix cycle internally — same reviewer and fixer agents across cycles, fresh confirmation pass at the end. `--no-merge` suppresses auto-merge so the reviewer never steals the merge step: merging is always the main agent's job (Phase 5).
 
@@ -394,7 +394,7 @@ The outcome-meaning table, the summary template and the batch-mode delta live in
 
 ## Examples & Edge Cases
 
-Full example runs (happy path, explicit list, invalid issues) and edge-case scenarios (review-fix cycles, blocked backlog, CI wait) live in `references/examples.md`. Read that file when debugging a specific scenario. Four edge cases are decided here rather than there:
+Full example runs (happy path, explicit list, invalid issues) and edge-case scenarios (review-fix cycles, blocked backlog, CI wait) live in `references/examples.md`. Read that file when debugging a specific scenario. These edge cases are decided here rather than there:
 
 - **Empty backlog** — the loop exits with a green "no work remaining" notice, not an error.
 - **Critical issue unresolvable** — the loop halts and hands control back to the user with the exact error output.

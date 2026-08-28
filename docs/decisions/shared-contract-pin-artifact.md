@@ -165,6 +165,7 @@ granted on a post-pass measurement, never on an estimate.
 | Skill | Floor | Basis |
 |---|---:|---|
 | **`/issue-pr-review`** | **3239** (lower bound) — 3474 upper | The compression pass ran in #417 / PR #425: 6213 → 4377 `wc -w`, 500 → 379 lines, seven reference files, every conditional section already relocated. Even on the heuristic-free lower bound, deleting every free-prose word leaves 3239. Its pinned material is the per-step gates themselves; D3 forbids moving them. |
+| **`/auto-pilot`** | **3375** (lower bound) — 3688 upper; **3089** on the lower bound with every single-word category grep discounted | The compression pass ran in #415 / PR #433: 6026 → 5232 `wc -w`, 481 → 429 lines, 5941 → 5147 `asm` words. Measured **after** the pass by the method above (30 tracked suites traced under `bash -x`, 110 live patterns replayed and unioned). Deleting every free-prose word still leaves 3375. Its pinned material is the per-phase gates, the merge-mode table, the stop-condition table and the run-log write contract; all are raw `grep`s naming `SKILL.source.md`, which the class table forbids re-targeting, and all are every-run gate logic that D3 forbids relocating in any case. |
 
 #### The 330-word objection, answered
 
@@ -186,7 +187,14 @@ that file in full on every run. Moving 330 words from the body into it lowers
 context, smaller number. If that counted, the cap would be measuring nothing.
 It does not count, so `/issue-pr-review` is an exception.
 
-### The one deferred verdict — `/auto-pilot`
+### The deferred verdict, resolved — `/auto-pilot`
+
+**Resolved 2026-08-28 in [#415](https://github.com/luongnv89/idd/issues/415):
+`/auto-pilot` is a recorded exception.** The pass ran, the floor was re-measured
+post-pass, and it did not clear. The accounting is
+`docs/experiments/skill-auto-improver-auto-pilot.md` §6. The original framing of
+the deferral follows.
+
 
 `/auto-pilot` measures a floor of 3106–3207, over the cap by 106 words on the
 lower bound, and is **neither a clear nor an exception**. It is the only skill
@@ -251,7 +259,7 @@ file.
 
 | Child | Skill | Consequence under this ADR |
 |---|---|---|
-| **#415** | `/auto-pilot` | **Deferred verdict — the only one.** Run the pass: 2734–2835 words of free prose, plus removable prose around the pinned literals. Today's 3106–3207 floor is an over-estimate for an un-compressed body. Not exempt in advance — re-measure under D4 afterwards, and add it to the exceptions table only if the post-pass floor still exceeds 3000. |
+| **#415** | `/auto-pilot` | **Deferred verdict, now resolved as an exception** (see the exceptions table). Run the pass: 2734–2835 words of free prose, plus removable prose around the pinned literals. Today's 3106–3207 floor is an over-estimate for an un-compressed body. Not exempt in advance — re-measure under D4 afterwards, and add it to the exceptions table only if the post-pass floor still exceeds 3000. |
 | **#416** | `/issue-resolver` | Closed. Clears both gates (97 overall, `context-efficiency` 8, 2958 words). No action. |
 | **#417** | `/issue-pr-review` | **Unblocked as a recorded exception.** Its floor exceeds the cap on the lower-bound measurement, and D3 forbids the only remaining route to the cap. Close #417 on the gates it did clear — Gate 1 less the word cap, Gate 2 less `context-efficiency`, overall 93/A, every other category 10 — citing this ADR's exceptions table. Nothing is owed. |
 | **#418** | `/issue-triage` | Clears. Floor 2767–2804 against a 3799-word body: cut 799 words from 995–1032 of free prose. Tight but not blocked. Do **not** re-litigate the artifact question. |
