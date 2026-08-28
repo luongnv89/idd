@@ -33,7 +33,7 @@ Review a PR end-to-end — analyze, test, fix, check CI, repeat until clean.
 
 ### Bundled dependency precheck
 
-Verify **every** path below exists relative to the skill's directory (the dirname of this SKILL.md); this list is the authoritative guard. If any is missing, stop, print the error, and never continue with an inline or guessed reviewer/fixer prompt:
+Verify **every** path below exists relative to the skill's directory (the dirname of this SKILL.md); this list is the authoritative guard. If any is missing, stop immediately, print the error, and never continue with an inline or guessed reviewer/fixer prompt:
 
 ```text
 references/agents/code-reviewer.md
@@ -220,8 +220,8 @@ procedure, table and rationale in `references/prepass-tests-ci-mechanics.md`
 (*Commit auto-fixes*), **read it now**. **Exit 1 is the block verdict: stop, do
 not stage, do not push, report the path from `blocking[]`** — never the degrade
 path. Exit 3 is also a stop. A missing `python3`, **exit 2** (a scan that never
-ran), or exit 4 degrades: print `⚠ gi-secscan unavailable — running the
-documented scan` and run the **Primary Pattern** in `docs/pre-commit-security.md`.
+ran), or exit 4 degrades: print `⚠ gi-secscan unavailable — running the documented scan`
+and run the **Primary Pattern** in `docs/pre-commit-security.md`.
 Exit 1 without parsable JSON is a crash: treat it as exit 2, and never read a
 non-zero exit as a pass.
 
@@ -334,7 +334,7 @@ When true, run the whole wait in one call — `python3 shared/scripts/gi-ci-wait
 ```
 [5/7] CI Status    ⚠ checks still running after {timeout}s
 ```
-Pending CI is **not clean** — it never satisfies soft-pass and auto mode must not merge while CI is pending, including when Step 6 finds zero fixables and would otherwise exit the fix loop. Interactive: ask to wait more or proceed without merging. Auto: do not merge; extend polling or stop with remaining issues.
+Pending CI is **not clean** — it never satisfies soft-pass and auto mode must not merge while CI is pending, including when Step 6 finds zero fixables and would otherwise exit the fix loop. Interactive: ask to wait more or proceed without merging. Auto: do not merge; extend polling or stop with remaining issues — do not assume a later cycle will re-check once the fix loop has ended.
 
 **No CI configured:**
 ```
