@@ -20,6 +20,11 @@
 #      the local test suite.
 #  I4. The manual (no-script) fallback honors the flag on the same contract.
 #  I5. /auto-pilot is out of scope and must not consume the key.
+#  I6. The ignored-CI path is excluded from the auto-merge gate. The leg is
+#      satisfied for *loop exit* only; "clean" at the merge gate must exclude
+#      it the way it already excludes pending CI. Without this, standalone
+#      /issue-pr-review --auto with review.auto_merge: true would squash-merge
+#      a red PR — I2's PARTIAL means "continue", so it never blocked anything.
 #
 # The built skills/ tree is asserted alongside src/ so drift is caught here and
 # not only by the CI drift check.
@@ -365,6 +370,72 @@ for r in "$SRC_REF" "$DIST_REF"; do
     pass "T9: $label documents the ignored-CI path"
   else
     fail "T9: $label does not document the ignored-CI path"
+  fi
+done
+
+# ───────────────────────────────────────────────────────────
+# T10: I6 — the ignored-CI path is excluded from the auto-merge gate
+# ───────────────────────────────────────────────────────────
+# I2 ("the outcome is PARTIAL") is *not* protective: a step-level PARTIAL means
+# "continue" (report-templates.md → Step Completion Reports), and the ignored
+# path deliberately satisfies the soft-pass CI leg. So the only thing standing
+# between `--auto` + `review.auto_merge: true` and a squash-merged red PR is an
+# explicit carve-out at each gate site, worded the way `pending CI is never
+# clean` already is. Assert all three sites, in src and dist.
+
+for f in "$SRC_SKILL" "$DIST_SKILL"; do
+  label="${f#"$REPO_ROOT"/}"
+
+  # Site 1 — Step 7's merge parenthetical. The sentence that already excludes
+  # pending CI must exclude the ignored CI failure on the same line: two
+  # distinct "never clean" carve-outs, one of them naming the key.
+  merge_gate="$(grep -F 'pending CI is never clean' "$f" || true)"
+  never_clean_count="$(printf '%s\n' "$merge_gate" | grep -o 'never clean' | wc -l | tr -d ' ')"
+  if printf '%s' "$merge_gate" | grep -qF "review.${KEY}" \
+     && [ "${never_clean_count:-0}" -ge 2 ]; then
+    pass "T10.I6: $label Step 7 merge gate excludes an ignored CI failure (never clean)"
+  else
+    fail "T10.I6: $label Step 7 merge gate does not exclude an ignored CI failure"
+  fi
+
+  # Site 2 — the soft-pass Review Loop bullet. Its CI-leg enumeration is what
+  # "clean" resolves to; it must name the new alternative AND scope it to loop
+  # exit, or the enumeration silently hands the merge gate a red PR.
+  soft_bullet="$(grep -F 'Soft pass (`review.soft_pass: true`, default)' "$f" || true)"
+  if printf '%s' "$soft_bullet" | grep -qF "review.${KEY}" \
+     && printf '%s' "$soft_bullet" | grep -qF 'never clean at the auto-merge gate'; then
+    pass "T10.I6: $label soft-pass bullet enumerates the ignored CI leg as loop-exit-only"
+  else
+    fail "T10.I6: $label soft-pass bullet does not scope the ignored CI leg to loop exit"
+  fi
+
+  # Site 3 — the strict-pass bullet inherits the same tests/CI gates, so it
+  # inherits the same hole unless it states the carve-out too.
+  strict_bullet="$(grep -F 'Strict pass (`review.soft_pass: false`)' "$f" || true)"
+  if printf '%s' "$strict_bullet" | grep -qF "review.${KEY}" \
+     && printf '%s' "$strict_bullet" | grep -qF 'never clean at the auto-merge gate'; then
+    pass "T10.I6: $label strict-pass bullet enumerates the ignored CI leg as loop-exit-only"
+  else
+    fail "T10.I6: $label strict-pass bullet does not scope the ignored CI leg to loop exit"
+  fi
+done
+
+# Site 4 — report-templates.md's auto-merge paragraph. "The same configured
+# pass condition as the loop exit" is exactly the sentence the carve-out
+# falsifies, so it must state the exclusion itself, not defer to it.
+for r in "$SRC_REF" "$DIST_REF"; do
+  rt="$r/report-templates.md"
+  label="${rt#"$REPO_ROOT"/}"
+  if [ ! -f "$rt" ]; then
+    fail "T10.I6: $label not found"
+    continue
+  fi
+  gate_para="$(grep -F 'Auto-merge is gated on' "$rt" || true)"
+  if printf '%s' "$gate_para" | grep -qF "review.${KEY}" \
+     && printf '%s' "$gate_para" | grep -qF 'never clean'; then
+    pass "T10.I6: $label auto-merge paragraph carves the ignored CI failure out of the merge gate"
+  else
+    fail "T10.I6: $label auto-merge paragraph does not exclude the ignored CI failure"
   fi
 done
 
