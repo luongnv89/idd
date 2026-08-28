@@ -238,10 +238,6 @@ origin "$branch_name"`, the variable bound in Step 1).
 ```
 [2/7] Pre-pass     ✓ lint clean, format clean, {N} tests passed
                      Auto-fixed: {files_fixed} files (lint/format)
-```
-
-If no tools detected:
-```
 [2/7] Pre-pass     ○ no lint/format tools detected, tests: {N} passed
 ```
 
@@ -255,14 +251,11 @@ If tests fail here, continue to the review loop — Step 4 picks them up.
 
 Read `references/agents/code-reviewer.md` and `references/agents/fixer.md` for the two prompts; both spawn with the default general-purpose agent (do NOT set `subagent_type`). Pass `branch_name`, `base_branch`, `pr_context` (title + body), `diff_command` (`gh pr diff {N}`), and `review.confidence_threshold` (default 80) as the minimum finding confidence; ui-reviewer keeps its 75 floor.
 
-To minimize tokens the loop **reuses the same reviewer across cycles**: cycle 1 cold-starts, cycles 2+ re-message it via `SendMessage`, and after the fixer reports zero fixable issues one **fresh** confirmation reviewer does an unbiased final check. Under `qa_handoff = trusted` the cycle-1 reviewer is **collapsed into** that fresh confirmation pass rather than skipped — the PR still receives exactly one independent, full-strength review, from an agent with no memory of the resolver's own — and the loop cap drops to `min(1, configured_cap)`. The collapse **saves no reviewer spawn**: the confirmation pass is itself fix-conditional, so an unmarked clean PR already gets one cold-start pass and no confirmation; what `trusted` changes is *which* pass runs, and the saving is the duplicated test legs at Steps 2 and 4. Both are refused by *Precedence* when the marker says `profile=light` against `profile=full`. Spawn calls: `references/review-loop-mechanics.md`.
+To minimize tokens the loop **reuses the same reviewer across cycles**: cycle 1 cold-starts, cycles 2+ re-message it via `SendMessage`, and after the fixer reports zero fixable issues one **fresh** confirmation reviewer does an unbiased final check. Under `qa_handoff = trusted` the cycle-1 reviewer is **collapsed into** that fresh confirmation pass rather than skipped, so the PR still receives exactly one independent, full-strength review, and the loop cap drops to `min(1, configured_cap)`. The collapse **saves no reviewer spawn** — the confirmation pass is itself fix-conditional — and *Precedence* refuses both collapse and cap when the marker says `profile=light` against `profile=full`. Spawn calls and what the collapse buys: `references/review-loop-mechanics.md` (*Why reuse the reviewer*).
 
 ### UI/UX Review (Step 3 — auto-detected)
 
-UI review is **auto-detected per PR** — no config flag enables it. Two legs:
-
-- **Code UI review** reads the diff/changed files, so it is environment-independent: it runs whenever UI work is detected, on any machine **including a no-GUI/server host** — never gated on a GUI, running app, or browser.
-- **Browser UI review** is an optional bonus needing a reachable app *and* user opt-in. When it can't run it **skips with a warning and the code UI review still runs** — fail-soft to code-only, never block.
+UI review is **auto-detected per PR** — no config flag enables it. Two legs: the **code** UI review reads the diff, so it runs on any host, **including a no-GUI/server host**, never gated on a GUI or browser; the **browser** UI review is an optional bonus that **skips with a warning while the code UI review still runs** (*The two legs* in `references/ui-review-mechanics.md`).
 
 Detection commands, the code-review spawn, the report-only `ui_env` label, the browser gate and its three-part capability check, and headless capture are in `references/docs/ui-review.md`; this skill's deltas in `references/ui-review-mechanics.md`. **Read both and apply them** when `ui: detected`; they preserve the contract above and route `action: "fix"` UI findings into Step 6 under `category: ui_ux`. Under `qa_handoff = trusted` the **code** UI review is skipped only when the marker's `ui=` leg says it already ran (`ui=code…` or `ui=code+browser…`) **and** carries an `@<sha40>` equal to `head` — never on `ui=none`, never on an unsuffixed `ui=`, and never for the browser leg.
 
@@ -307,12 +300,7 @@ A skipped step evaluated neither check, so its report is `× Suite passed` / `×
 
 ```
 [4/7] Test         ✓ build ok, {N} tests passed
-```
-
-Or if failures:
-```
-[4/7] Test         ✗ {N} tests failed
-                     {brief failure summary}
+[4/7] Test         ✗ {N} tests failed — {brief failure summary}
 ```
 
 ---
@@ -325,27 +313,14 @@ When true, run the whole wait in one call — `python3 references/scripts/gi-ci-
 
 **Bind the verdict to the commit it was reached on** — record `ci_sha` = the `headRefOid` this wait ran against, and report `ci_status` as `passed@` or `failed@` plus that full 40-character SHA; `no_ci`, a skipped wait, and any degraded wait that never read a head stay bare. Settle window, manual polling loop and its head re-read, and the bare-vs-bound cases: `references/prepass-tests-ci-mechanics.md` (*Step 5*, *Binding the verdict to a commit*). **Read that file and apply it now.**
 
-**All checks passed:**
 ```
 [5/7] CI Status    ✓ all checks passed
-```
-
-**Checks failed:**
-```
-[5/7] CI Status    ✗ {N} checks failed
-                     {check_name}: {bucket}
-```
-
-**Checks still running after timeout:**
-```
+[5/7] CI Status    ✗ {N} checks failed — {check_name}: {bucket}
 [5/7] CI Status    ⚠ checks still running after {timeout}s
-```
-Pending CI is **not clean** — it never satisfies soft-pass and auto mode must not merge while CI is pending, including when Step 6 finds zero fixables and would otherwise exit the fix loop. Interactive: ask to wait more or proceed without merging. Auto: do not merge; extend polling or stop with remaining issues — do not assume a later cycle will re-check once the fix loop has ended.
-
-**No CI configured:**
-```
 [5/7] CI Status    ○ no CI checks configured
 ```
+
+Pending CI is **not clean** — it never satisfies soft-pass and auto mode must not merge while CI is pending, including when Step 6 finds zero fixables and would otherwise exit the fix loop. Interactive: ask to wait more or proceed without merging. Auto: do not merge; extend polling or stop with remaining issues — do not assume a later cycle will re-check once the fix loop has ended.
 
 ---
 
@@ -368,9 +343,7 @@ Delegate to the fixer subagent (`references/agents/fixer.md`) — never apply co
 
 ```
 [6/7] Fix          ✓ fixed {N} issues (noted: {note_count} — not fixed)
-```
 
-```
 Cycle {N}:
   ✗ {fixable_count} fixable issues found
   ✓ Fixed: [category] description (file:line)
@@ -423,7 +396,4 @@ Print a structured summary, using the templates in `references/report-templates.
 
 ## Edge Cases
 
-- **No PR for current branch** — asks for an explicit `<N>` or stops cleanly.
-- **CI still running** — waits up to `review.ci_timeout`, then prints state and stops without merging.
-- **Critical issue unresolvable after 3 cycles** — stops, prints remaining issues, does not merge.
-- **Merge conflict with base** — prints the exact rebase command and stops.
+No PR for the current branch (ask for an explicit `<N>` or stop cleanly), CI still running (wait up to `review.ci_timeout`, print state, stop without merging), a critical issue still unresolved at the cycle cap (stop, print remaining, do not merge), and a merge conflict with base (print the exact rebase command and stop) each have a rich error block in `references/error-messages.md`.

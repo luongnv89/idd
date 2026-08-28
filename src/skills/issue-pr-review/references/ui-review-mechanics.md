@@ -9,6 +9,20 @@ classification rule, the code-review spawn, the display-environment label, the
 browser gate + capability checks, and the skip/success output. Read that file
 before running this step. This file carries only `/issue-pr-review`'s deltas.
 
+## The two legs, and why only one of them can be blocked
+
+- **Code UI review** reads the diff and the changed files, so it is
+  environment-independent. It runs whenever UI work is detected, on any machine
+  **including a no-GUI/server host**, and is never gated on a GUI, a running
+  app, or a browser. Nothing about the host may switch it off.
+- **Browser UI review** is an optional bonus that needs a reachable app *and*
+  user opt-in. When it cannot run it **skips with a warning and the code UI
+  review still runs** — fail-soft to code-only, never a blocked step.
+
+That asymmetry is the contract SKILL.md's *Step 3 — UI/UX Review* states in one
+line; it is why `light` may skip the browser leg while `qa_handoff = trusted`
+reaches only the code leg.
+
 ## Deltas for `/issue-pr-review`
 
 - **When:** detection runs once, after Step 2, before the review cycles.

@@ -448,6 +448,18 @@ To minimize token usage, the review loop **reuses the same reviewer agent** acro
 
 This trades perfect independence between cycles (which rarely matters in practice — the reviewer was already correct about what the issues were) for significant token savings. The fresh confirmation pass at the end catches anything the reused reviewer might have missed.
 
+**What the `trusted` collapse actually buys.** Under `qa_handoff = trusted` the
+cycle-1 cold start is collapsed into the fresh confirmation pass rather than
+skipped. The PR therefore still receives one independent, full-strength review,
+and it comes from an agent with **no memory of the resolver's own** review — which
+is the whole point of not simply trusting the marker. The collapse saves no
+reviewer spawn: the confirmation pass is itself fix-conditional, so an unmarked
+clean PR already gets exactly one cold-start pass and no confirmation. What
+`trusted` changes is *which* pass runs, not how many; the real saving is the
+duplicated test legs at Steps 2 and 4. Both the collapse and the cycle cap are
+refused by SKILL.md's *Precedence* rule when the marker says `profile=light`
+against a pr-review `profile=full`.
+
 ## Cycle 1 — Initial review
 
 Read `shared/agents/code-reviewer.md` for the full prompt template. Read `shared/agents/fixer.md` for the fix-cycle prompt template.
