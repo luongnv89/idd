@@ -15,16 +15,16 @@ Creates structured, intent-focused GitHub issues from text, screenshots, or list
 
 ## Output Contract
 
-This skill is an **intent-capture tool only**: issues capture **durable human intent**, and it never inspects code to enrich one. The skill MUST NOT include in the issue body:
+This skill is an **intent-capture tool only**: it never inspects code to enrich an issue. The skill MUST NOT include in the issue body:
 
-- **No predicted affected files** — paths, modules, or directories guessed from the codebase
+- **No predicted affected files**
 - **No generated technical notes** — implementation approach, architecture constraints, design notes derived from code
-- **No root cause** — diagnostic reasoning about *why* a bug occurs in the current code
+- **No root cause** — diagnostic reasoning about *why* a bug occurs
 - **No implementation hints** — code snippets, function signatures, "how to fix" instructions
 
-Those four belong to `/issue-analysis`, `/issue-triage`, and `/issue-resolver`, which produce them fresh against the current codebase when work begins; encoding them here would freeze stale understanding into durable memory.
+Those four belong to `/issue-analysis`, `/issue-triage`, and `/issue-resolver`, which produce them fresh against the current codebase when work begins.
 
-The body **does** carry: type classification, problem description, reporter context (verbatim, in a blockquote — reporter-supplied technical detail is preserved, only skill-generated technical content is barred), screenshots, acceptance criteria, and metadata (priority, effort, labels, and — when `model_suggestion.enabled` — an advisory **Suggested model:** line per the two-model rendering rule in `references/model-suggestion.md`). That suggestion is the one externally-derived value admitted — advisory cost guidance like effort, not an implementation hint — stamped with its CursorBench data date so staleness is self-documenting.
+The body **does** carry: type classification, problem description, reporter context (verbatim, in a blockquote — reporter-supplied technical detail is preserved; only skill-generated technical content is barred), screenshots, acceptance criteria, and metadata (priority, effort, labels, and — when `model_suggestion.enabled` — an advisory **Suggested model:** line per the two-model rendering rule in `references/model-suggestion.md`). That suggestion is the one externally-derived value admitted, stamped with its CursorBench data date so staleness is self-documenting.
 
 ## Prompt Injection Boundary
 
@@ -62,18 +62,14 @@ Before any operation, verify the environment. On failure, print the exact error 
 
 ## Repo Sync (scoped to actual source-tree writes)
 
-Every durable write here is **remote** — issue bodies through `gh issue edit`,
-screenshots committed server-side by the GitHub contents API
-(`references/image-upload.md`) — and duplicate scoring's ignored request under
-`.gitissue/cache/` is transient runtime state, not source work. A local
-`git pull --rebase` protects none of it and on a dirty tree can stop a pure
-create with a rebase conflict, so create, normalize, and image upload run
-**without** a repo sync.
+Every durable write here is **remote** — `gh issue edit`, and screenshots
+committed server-side by the GitHub contents API — so create, normalize, and
+image upload run **without** a repo sync. A local `git pull --rebase` protects
+none of it and on a dirty tree can stop a pure create with a rebase conflict.
 
 Only a run that writes durable files to the working tree syncs first, with the
 stash-first pattern in `docs/sync-conventions.md` — immediately before that
-write, not at skill start. The rest of that document (auto-mode contract,
-stash-pop recovery) then applies unchanged.
+write, not at skill start.
 
 ## Configuration
 
@@ -99,9 +95,7 @@ Exit 0 prints `state` (`fresh` | `stale` | `seeded` | `installed`), `stale`, `ag
 
 ## Subagent Architecture
 
-The deterministic half of duplicate detection runs in `shared/scripts/gi-dup-score.py`, its GitHub call delegated to the bundled `shared/scripts/gi-gh.py` subprocess boundary; it reads the proposed items and the once-loaded resolved `duplicate_detection.*` mapping on stdin, then self-fetches the backlog. Only the **medium-band judgement (Step 3)** is delegated, to the duplicate-detector subagent, so the model never recomputes scores or reads up to 100 issue bodies. Every other step stays in the main agent. In **batch mode** one script run scores all existing and internal pairs bidirectionally; at most one spawn judges the pooled `medium_band`, and an empty band skips the spawn entirely.
-
-Read `shared/agents/duplicate-detector.md` for the medium-band prompt.
+Scoring is deterministic and runs in `shared/scripts/gi-dup-score.py`, its GitHub call delegated to the bundled `shared/scripts/gi-gh.py` subprocess boundary. Only the **medium-band judgement (Step 3)** is delegated to a subagent — read `shared/agents/duplicate-detector.md` for its prompt. Every other step stays in the main agent.
 
 ### Environment check
 
@@ -144,13 +138,13 @@ Check these files — each is named again at the step that reads it:
 
 Upload each supplied image to GitHub and embed it, on top of reading it for visual context. Formats: PNG, JPG/JPEG, GIF, WEBP, SVG (max 10 MB each). Embeds go in a **Screenshots** section between Description and Acceptance Criteria; omit that section when no images are provided. Upload failures never block creation — the issue is created text-only with a `⚠` warning. Durable embeds require a **public** repo.
 
-When images are present, **read `references/image-upload.md` now** for the procedure: validation, the base64-via-stdin `gh api` upload (with the `ARG_MAX` rationale), markdown placement, multi-image handling, failure messages, and normalization-mode preservation.
+When images are present, **read `references/image-upload.md` now** for the procedure.
 
 ---
 
 ## Confidence Scoring System
 
-Auto-enriched fields (type classification, acceptance criteria, and tool-suggested Metadata — priority, effort, labels) carry a confidence level, shown in previews and written into the body: **high** → `(high)` / `(high confidence)`, **medium** → `(medium)` / `(medium confidence)`, **low** → `(needs review)` in both. `high` is explicit keywords or stated requirements; `medium` is inferred from tone/context; `low` is ambiguous and defaulted. Fill every `{…_confidence}` placeholder from the level criteria and per-field determination tables in `references/confidence-scoring.md` — **read it now**; never ship an inferred field unmarked.
+Auto-enriched fields — type classification, acceptance criteria, and tool-suggested Metadata (priority, effort, labels) — carry a confidence level in the preview and in the body. Fill every `{…_confidence}` placeholder from the level criteria and per-field determination tables in `references/confidence-scoring.md` — **read it now**; never ship an inferred field unmarked.
 
 ---
 
@@ -254,13 +248,11 @@ The duplicate is still reported in the Step 6 summary as `⚠ warn`, exactly as 
 
 ### Step 3.5 — Clarify Ambiguous Intent
 
-Active intent capture: when **type classification** or **acceptance-criteria** confidence is `low` — and only in **interactive Create mode** — resolve the ambiguity before drafting. When both are `high`/`medium`, this step is a silent no-op and the one-shot Step 3 → Step 4 path is unchanged.
+Fires only in **interactive Create mode**, and only when **type classification** or **acceptance-criteria** confidence is `low`; otherwise it is a silent no-op and the one-shot Step 3 → Step 4 path is unchanged. **Non-interactive contexts never block:** in Batch mode and any auto/non-interactive context, **skip this step entirely** — draft with the defaulted assumptions and mark those fields `(needs review)`.
 
-**Non-interactive contexts never block:** in Batch mode and any auto/non-interactive context, **skip this step entirely** — draft with the defaulted assumptions and mark those fields `(needs review)` exactly as today.
+Resolve from the repo before asking, and hold the **Output Contract boundary**: inspection here sets *classification* and confidence only — no affected file, technical note, root cause, or implementation hint may reach the body.
 
-**Resolve from the repo first.** A question is only worth asking if the repo cannot answer it; if inspection settles the field (a `ThemeToggle` already exists → bug, not feature), raise confidence to `high` (conclusive) or `medium` (suggestive) and do not ask. **Output Contract boundary (critical):** that inspection sets *classification* and confidence only — no affected file, technical note, root cause, or implementation hint may reach the issue body.
-
-When the step does fire, **read `references/clarify-intent.md` now**: it carries the gating rules, the repo-resolution rationale, the one-question-at-a-time idiom with its example prompt and plain `[Y/n]` recommended default, the confidence each answer earns, and the non-interactive specification.
+When the step fires, **read `references/clarify-intent.md` now** for the gating rules, the example prompt and its `[Y/n]` default, and the confidence each answer earns.
 
 ### Step 4 — Generate Issue Content
 
@@ -358,7 +350,7 @@ All tracker access follows the GitHub driver — `--json` with explicit field se
 
 ## GitHub Projects Sync
 
-After each issue is created (single or batch), when `projects.sync_enabled` is `true`, sync it to the repo's board per `docs/github-projects-sync.md`: discover the linked project (or reuse the cached project ID), add the issue, set its Status to `projects.status_map.todo` (default: "Todo"), and print `✓ Added to project "{project_title}" — Status: Todo`. When `false` (the default), skip silently. Any sync failure prints a `⚠` warning and continues — project sync never blocks issue creation; that document carries the error messages and degradation details.
+After each issue is created (single or batch), when `projects.sync_enabled` is `true`, sync it per `docs/github-projects-sync.md`, setting Status to `projects.status_map.todo` (default: "Todo") and printing `✓ Added to project "{project_title}" — Status: Todo`. When `false` — the default — skip silently. Any sync failure prints a `⚠` warning and continues; project sync never blocks issue creation.
 
 ## Expected Output
 
@@ -368,8 +360,8 @@ A successful create prints Step 6's `◆ Issue Created` block: its `Result: DONE
 
 ## Edge Cases
 
-- **Duplicate detection** — a closely matching open issue is raised before filing; the user dedupes or creates anyway (auto mode: the Step 3 carve-out).
-- **Screenshot-only input** — the image is inspected, described in text, drafted into a structured issue, and attached to the body.
-- **Ambiguous batch input** — unclear item boundaries get a parsed preview and a confirmation before creating (auto mode: the Batch Step 4 carve-out).
-- **GitHub API rate limit** — creation stops at the last successful issue; the partial result is reported with a resume hint.
-- **Empty body** — the issue is created with only a title, `(needs review)` noted in Metadata.
+- **Duplicate detection** — a close match is raised before filing (Step 3).
+- **Screenshot-only input** — the image is described in text, drafted, and attached.
+- **Ambiguous batch input** — unclear item boundaries get a parsed preview first.
+- **GitHub API rate limit** — creation stops at the last successful issue and reports the partial result with a resume hint.
+- **Empty body** — the issue is created with only a title, `(needs review)` in Metadata.
