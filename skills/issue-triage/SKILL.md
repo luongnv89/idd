@@ -270,6 +270,8 @@ With `--limit N`, use N instead of 100. **Empty state**: with no open issues, ou
   Create issues with /issue-creator to get started.
 ```
 
+Progress output:
+
 ```
 ● Fetching {N} open issues...
 ```
@@ -390,8 +392,9 @@ Tracker access follows the GitHub driver — `--json` with explicit field select
 
 ## Expected Output
 
-The expected output of a cached view is defined once under *Default Mode → 3*,
-closing on one of the three endings in *4*; an update ends on that same view.
+The expected output of a cached view is defined once under *Default Mode → 3.
+Render the cached report*, closing on one of the three endings in *4. Detect
+changes and suggest update*; an update ends on that same view.
 
 ## Edge Cases
 

@@ -17,7 +17,7 @@ tree regenerated with bare `./scripts/build.sh` (compile → verify → promote)
 Body size was measured two ways. `wc -w`/`wc -l` on the file is the working number;
 `asm eval` strips the YAML frontmatter first, and that is the number Gate 2 scores. This
 skill's frontmatter is **74 words**, so its two numbers sit 74 apart at both ends of the
-pass. Source and built `SKILL.md` measure identically (3037 words / 402 lines) — the build
+pass. Source and built `SKILL.md` measure identically (3048 words / 405 lines) — the build
 rewrites reference tokens (`docs/X.md` → `references/docs/X.md`) without changing word or
 line counts.
 
@@ -26,7 +26,7 @@ of one topology, and a duplicated defaults table, plus in-place compression ever
 else. **No material was moved into this skill's `references/`** — `git diff --stat` for the
 whole branch touches exactly two files, `SKILL.source.md` and its built counterpart — so
 decision **D3** of `docs/decisions/shared-contract-pin-artifact.md` (*relocation is not a
-word-cap strategy*) is not engaged. The 836 `asm` words this pass removed are words the
+word-cap strategy*) is not engaged. The 825 `asm` words this pass removed are words the
 agent no longer loads, not words that moved somewhere it still loads them from. One
 qualification to that claim is recorded in §1.
 
@@ -38,8 +38,8 @@ qualification to that claim is recorded in §1.
 |------|-------|----------|-------|
 | **Gate 1** | `quick_validate.py` exit | 0 (pass) | **0 (pass)** |
 | Gate 1 | Frontmatter audit (`asm eval` → `checks`) | all pass | **all pass** |
-| Gate 1 | Body under 500 lines | 498 (pass — 2 from the cap) | **402 (pass)** |
-| Gate 1 | Body under 3000 words | **3799 (FAIL)** | **2963 (pass)** |
+| Gate 1 | Body under 500 lines | 498 (pass — 2 from the cap) | **405 (pass)** |
+| Gate 1 | Body under 3000 words | **3799 (FAIL)** | **2974 (pass)** |
 | Gate 1 | Negative-trigger clause in description | pass | pass (description untouched) |
 | Gate 1 | `metadata.version` semver + `metadata.author` | pass (0.5.5) | **pass (0.6.0)** |
 | Gate 1 | `docs/README.md` opens with the AI-skip comment | pass | pass (untouched) |
@@ -64,13 +64,13 @@ Per-category (`asm eval --json`, built tree):
 Baseline blocker, verbatim from the evaluator: *"Body is over 3000 words — split long
 content into referenced files or templates."* It docked `context-efficiency` 4 points and
 `prompt-engineering` 1 (*"Body is very long (3799 words)"*), so one measurement moved two
-categories. Final findings: *"Body length within healthy range (2963 words)."*
+categories. Final findings: *"Body length within healthy range (2974 words)."*
 
 Body size, command of record:
 
 ```
-wc -w < src/skills/issue-triage/SKILL.source.md   # 3873 → 3037
-wc -l < src/skills/issue-triage/SKILL.source.md   #  498 →  402
+wc -w < src/skills/issue-triage/SKILL.source.md   # 3873 → 3048
+wc -l < src/skills/issue-triage/SKILL.source.md   #  498 →  405
 ```
 
 `metadata.version`: **0.5.5 → 0.6.0** (minor — no restructure, but view mode gained two
@@ -82,7 +82,7 @@ a bundled dependency precheck before its first bundled-file read).
 `docs/decisions/shared-contract-pin-artifact.md` measured `/issue-triage` at 3799 `asm`
 words with an assertion-pinned floor of **2767–2804** and only **995–1032 words of free
 prose** against a required cut of **799**. That arithmetic assumes cuts are whole-line
-deletions of unpinned prose. The actual pass cut **836** `asm` words, more than the free
+deletions of unpinned prose. The actual pass cut **825** `asm` words, more than the free
 prose alone allows, because most of it came from *compressing assertion-carrying lines
 around their pinned literals* — the same mechanism the ADR names when it declines to treat
 `/auto-pilot`'s pre-compression floor as a floor. **No assertion was deleted or loosened,
@@ -108,6 +108,7 @@ after every edit.
 | *"Future versions may reorder project board items based on triage priority."* | Nowhere — deliberately. A forward-looking note that changes nothing an agent does is the rubric item-6 no-op. | ~13 |
 | In-place compression: every remaining section | Same instruction, fewer words. | ~440 |
 | **Added** — view-mode run-stats footer + view-mode precheck (§5) | — | **+60** |
+| **Added back** — `Progress output:` label and the two full section names in *Expected Output* | — | **+10** |
 
 **Two changes are called out rather than folded into "no behavior change".**
 
@@ -232,7 +233,7 @@ Rubric resolved at `~/.claude/skills/skill-auto-improver/references/predictabili
 | 1 | Invocation chosen intentionally | **pass** | User-invoked, and the shape matches: the body opens on an *Invocation* table of four forms (`/issue-triage`, `update`, `--limit N`, `… --auto`) and reads as "the user asked for this, proceed". The description keeps its negative-trigger clause because `/auto-pilot` reaches this skill model-invoked, and `compatibility` states the view-mode carve-out (*"Default mode (cached view) needs only local file access — no gh required"*) so the cheap branch is discoverable before the body is read. |
 | 2 | Branches mapped before the body | **pass** | Three orthogonal branches are selected before any step runs, each named in one place: **mode** (view vs. update — decided in *Invocation* and *Default Mode*, both above *Prerequisites*; view mode never enters Steps 1-9); **auto vs. interactive** (`--auto`, deferred to `docs/auto-mode.md`; the skill has exactly one blocking prompt, `Sync now? [Y/n]`, and its auto carve-out is stated at that gate); **Agent tool available vs. not** (*Environment check*, the sole gate on the inline procedure). |
 | 3 | Demanding, checkable completion criteria | **pass** | Stronger than its sibling's. Each step closes with `√`/`×` per check plus a `Result: PASS \| PARTIAL \| FAIL` line, and the body states the gate outright — *"No step is complete until its `Result:` line prints."* `/issue-analysis` has no equivalent sentence, which #419 recorded as an open advisory; `/issue-triage` does. The Final Report ends on a literal `Result: DONE` or `Result: CACHED`; Step 9's success bar is a named top-level key set plus six `summary` sub-keys; the empty state and the rate-budget threshold are both hard stops with stated numbers (0 open issues; `remaining` below 100). |
-| 4 | Progressive disclosure + delegability | **pass** (this pass fixed the disclosure half) | Was 3799 `asm` words at 498 lines — two lines from `tests/test-skill-line-cap-247.sh`'s `CAP=500` — with a redundant resource index and three renderings of one topology. Now 2963 words / 402 lines. The two every-run specs are one-line read-now pointers (`references/detection.md` at Steps 1b & 2, `references/output-and-persist.md` at *Step completion reports*), which is what `tests/test-disclosure-gates-250.sh` AC1.6 and AC3.2 assert. Delegability sub-check below. |
+| 4 | Progressive disclosure + delegability | **pass** (this pass fixed the disclosure half) | Was 3799 `asm` words at 498 lines — two lines from `tests/test-skill-line-cap-247.sh`'s `CAP=500` — with a redundant resource index and three renderings of one topology. Now 2974 words / 405 lines. The two every-run specs are one-line read-now pointers (`references/detection.md` at Steps 1b & 2, `references/output-and-persist.md` at *Step completion reports*), which is what `tests/test-disclosure-gates-250.sh` AC1.6 and AC3.2 assert. Delegability sub-check below. |
 | 5 | Leading words | **pass** | Recurring concepts are named once and referred to by name: *view mode*, *stash-first sync*, *Bundled dependency precheck*, *Run Stats Footer*, *full-scope scanner*, *auto mode*, *degrade vs. stop*, *prose procedure*. This pass extended the pattern rather than breaking it — *Environment check* now cites the orchestrator diagram's batch rule instead of restating it, and the Configuration section's two separate "never re-read the config" sentences became one clause. |
 | 6 | No duplication / stale sediment / sprawl / no-ops | **pass** (this pass fixed it), one item left open | **Removed:** the *Additional Resources* index; the *Parallel execution* and *Batch splitting* diagrams (both restating the orchestrator diagram above them); *Environment check*'s third statement of the batch rule; the config defaults table (duplicating the bundled `docs/config-schema.md` *triage* section); the duplicate `gh issue list --state closed` fence; the second "never re-read the config" sentence; the "invalid values" sentence duplicating the exit-3 branch; three single-pointer sections folded into *Output Conventions*. **No-op removed:** *"Future versions may reorder project board items based on triage priority"* — a forward-looking note that changes nothing an agent does. **Stale sediment fixed:** the precheck list described `references/docs/idd-methodology.md` as *"IDD methodology (durable analysis fields)"*; durable analysis fields are `/issue-analysis`'s use of that doc, and `/issue-triage` cites it for the `Depends on #N` / `Blocked by #N` marker grammar. Corrected to *"dependency markers"*. **Left open, advisory:** the *Final Report* tracker labels (`Fetch issues`, `Already-fixed`, `Dependencies`, `Circular deps`, `Execution order`, `Parallelizable`, `Stale detection`, `Priority`, `Persist`) and the step headings (*Step 1*, *Steps 1b & 2*, *Steps 3-7*, *Step 8-9*) name the same nine units of work in two vocabularies. Both label sets are printed strings — changing either changes output — so neither was touched. |
 | 7 | Publish-ready — no auto-improver dependency | **pass** | `quick_validate.py` exit 0 (*"Skill is valid!"*), `asm eval` 97/A with no category below 8, 402 lines, description carries the negative-trigger clause, `metadata.version`/`author`/`license` present, `docs/README.md` opens with the AI-skip comment. The skill clears the standard without a follow-up auto-improver run. |
@@ -380,7 +381,7 @@ were paid for out of the same pass's cuts; together they are why the bump is 0.6
 
 | File | Change |
 |---|---|
-| `src/skills/issue-triage/SKILL.source.md` | 3873 → 3037 `wc` words, 498 → 402 lines; `metadata.version` 0.5.5 → 0.6.0; view-mode run-stats footer added and routed through the *Bundled dependency precheck*; `idd-methodology.md` precheck description corrected |
+| `src/skills/issue-triage/SKILL.source.md` | 3873 → 3048 `wc` words, 498 → 405 lines; `metadata.version` 0.5.5 → 0.6.0; view-mode run-stats footer added and routed through the *Bundled dependency precheck*; `idd-methodology.md` precheck description corrected |
 | `skills/issue-triage/SKILL.md` | regenerated (`./scripts/build.sh`) |
 | `docs/experiments/skill-auto-improver-issue-triage.md` | this report |
 
@@ -405,7 +406,7 @@ pre-change baseline on this machine.
 
 **None.** Both gates pass on the built tree:
 
-- **Gate 1** — `quick_validate.py` exit 0; 402 lines (< 500); 2963 `asm` words (< 3000);
+- **Gate 1** — `quick_validate.py` exit 0; 405 lines (< 500); 2974 `asm` words (< 3000);
   frontmatter audit clean with the negative-trigger clause, `metadata.version` `0.6.0` and
   `metadata.author` present; `docs/README.md` opens with the AI-skip comment; both bundled
   scripts print descriptive stderr and exit 3 on invalid input; the dependency preflight is
@@ -421,8 +422,8 @@ away:
 1. `context-efficiency` scores **8**, not 10, because the evaluator's top band is 120–1500
    words. Reaching it is not available to this skill: the ADR's measurement puts its
    assertion-pinned floor at **2767–2804** words, above the band's ceiling before a single
-   word of free prose. 8 clears the gate. The body is held at 2963 rather than pressed against
-   3000 so the next edit has a little room, though less than `/issue-analysis` left itself.
+   word of free prose. 8 clears the gate. The body is held at 2974 rather than pressed against
+   3000, though that leaves less room for the next edit than `/issue-analysis` kept.
 2. Predictability item **#6** leaves one advisory open: the *Final Report* tracker labels and
    the step headings name the same nine units of work in two vocabularies. Both are printed
    strings, so reconciling them changes output. See §3.
