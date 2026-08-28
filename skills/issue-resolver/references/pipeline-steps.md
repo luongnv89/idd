@@ -32,6 +32,65 @@ Main Agent (orchestrator)
 └── Step 5: Deliver (main agent — push + create PR + report)
 ```
 
+## Orchestrating the agents
+
+Full detail for SKILL.md *Subagent Architecture → Orchestrating the agents*, which owns
+the four duties. This section carries the per-agent shapes and the audited fields.
+
+**Required return shape, checked before the next step starts.** A step that advances on
+a malformed return carries the damage forward silently, so treat the shape as the
+step's completion criterion:
+
+| Agent | Must return |
+|-------|-------------|
+| `codebase-researcher` | `status` and `complexity` |
+| `synthesizer` | exactly one `recommended` option |
+| `implementer` | commits, tests, and a reproduction for bug issues |
+| `code-reviewer` / `fixer` | `result` plus the finding counts |
+
+A missing or blocking return is the signal to stop (interactive) or to follow the step's
+documented auto behavior — never to guess the missing field.
+
+**Model/effort sizing** comes from `references/docs/agent-model-effort.md`, read from the
+most-recent complexity signal and falling back to the agent's default tier. It is
+advisory: a tier that cannot be honoured never blocks the step.
+
+**Audited per step:** `complexity`, `qa_cycles`, `outcome` and `duration_s` — the four
+signals the run log folds into its single line — plus the `[N/5]` tracker line the user
+sees.
+
+## Configuration load
+
+Full rationale for SKILL.md *Configuration*, which owns the command, the exit-code
+handling and the default field list. Three details there are load-bearing and easy
+to get wrong.
+
+**Run it from the repo root.** `gi-config.py` resolves `.gitissue.yml` against the
+*working directory*. Run it anywhere else and it still exits 0 — reporting
+`config_file: null` and `first_run: true` — so the repo's real configuration is
+discarded silently, with no error to notice. A wrong working directory therefore
+looks exactly like a zero-config repo.
+
+**Resolve the script path against this SKILL.md's own directory, not the working
+directory.** The two are different by construction here: the skill is installed
+somewhere under the agent's skills tree while the run happens in the user's repo.
+Resolve it to an absolute path the same way the *Bundled dependency precheck*
+resolves its list, and pass that absolute path to `python3`.
+
+**The script and the manual read are alternatives, never a pair.** On exit 0 the
+returned `config` is the whole answer; the defaults printed in SKILL.md are then
+reference material only, and re-reading `.gitissue.yml` on top of a successful run
+can only introduce a disagreement. The manual read runs *instead*, on the degrade
+path, and only there.
+
+**Why the clock is chained onto this call.** `run_started_epoch` has to be taken
+before any pipeline work, and this is the first command the skill runs. Chaining
+`; ec=$?; date +%s >&2; exit "$ec"` keeps stdout clean for the JSON parse and
+preserves the script's own exit code for the branches above, so the measurement
+costs no extra round trip. `elapsed` in the *Run Stats Footer*
+(`references/run-stats.md`) is measured from it, at every terminal outcome — so a
+run that never captures it reports `elapsed: n/a` rather than a wrong number.
+
 ## Step 0e — Workspace
 
 Full procedure for the worktree offer described in SKILL.md *Step 0e — Workspace*.
@@ -1103,11 +1162,26 @@ complexity, affected files, UI detection, lifecycle grouping). Illustrative:
   Installing first would leave an untracked copy that leftover teardown can
   never find and that the next run's detect misclassifies as `preinstalled` —
   making it permanent.
+- **Installer bootstrap — check before the first install.** Both installers are
+  external dependencies of this step, not of the skill: `npx skills add …` needs
+  `npx` (bundled with Node.js) and `asm install …` needs the `asm` binary
+  (`npm install -g agent-skill-manager`). Probe with `command -v npx` and
+  `command -v asm`; if **neither** resolves, borrowing is unavailable in this
+  environment — print `⚠ No skill installer on PATH (npx or asm) — borrowing
+  disabled`, keep the propose set installed-only, and continue. Never install
+  the installer unattended, and never fail the resolution over it: a missing
+  installer is a degrade, exactly like a missing `python3`.
 - Install each recorded-borrowed name into `~/.claude/skills/<name>/` with the
   same tools the skill README already names (`npx skills add
   https://github.com/luongnv89/skills --skill <name>` or `asm install …
   --skill <name>`). Never install a name absent from the index. Never
   interpolate the issue body into the command.
+- **Verify the install before using it.** A tool that exits 0 has not proved the
+  skill is discoverable by the agent. Confirm with `asm list -p claude --json`
+  (or, where `asm` is absent, that `~/.claude/skills/<name>/SKILL.md` exists)
+  that `<name>` is present; a name that does not come back is an install
+  failure, handled by the failure bullet below, and never reaches
+  `selected_skills`.
 - **Drop the borrow marker — same breath as the install.** Immediately after a
   successful install, create the **empty** file
   `~/.claude/skills/<name>/.gitissue-borrowed`. Empty is deliberate and is part
@@ -1403,6 +1477,65 @@ this sub-step. Only the resolver's deltas are listed here.
   *Update documentation* after them, lands later (`references/report-templates.md`,
   *QA handoff marker*). Nothing recorded ⇒ omit the `@<sha40>` suffix; never
   substitute the head SHA.
+
+## Step 5 — Deliver
+
+### Pre-push secret scan
+
+Full rationale for SKILL.md *Step 5 — Deliver → Push branch and create PR*, which owns
+the invocation, the pass condition and every exit code. Two of its rules look like style
+and are not.
+
+**Why no config value ever reaches the command line.** `gi-secscan.py` reads
+`security.allow_pattern`, `security.extra_secret_file_pattern`,
+`security.extra_secret_value_pattern` and `security.max_file_size_mb` out of
+`.gitissue.yml` itself. `.gitissue.yml` is repo-controlled, so its values are attacker
+-influenced on a public repository; interpolating one into a shell word lets a crafted
+value close its quote and append a command to a step that `/auto-pilot` runs unattended.
+Passing only flags and a ref name keeps every untrusted string inside the script's own
+parser.
+
+**Why `--policy-ref` names the base, not the branch.** The branch being scanned was
+implemented from an untrusted issue body. If the scan read `security.*` from that same
+branch, a change that grew a permissive `security.allow_pattern` would be deciding how
+it is scanned — the gate would approve exactly the commit that disarmed it. Reading the
+policy from `origin/<base>` means the rules come from a ref the resolution cannot write.
+That is also why the pass condition checks `policy_source`: an exit 0 whose
+`policy_source` is not the `ref:origin/…` that was asked for means the script fell back
+to some other policy, and the scan that ran is not the scan that was requested.
+
+**Why `scanned: 0` with `skipped > 0` is not a pass.** An allow pattern suppresses
+*scanning*, not findings. A `.gitissue.yml` whose allow pattern matches everything
+produces a clean verdict over nothing at all, which is indistinguishable from a clean
+verdict over the diff unless the counts are read. Treat "examined nothing" as a failure
+to scan and degrade to the documented prose pass instead.
+
+**Why exit 1 never degrades.** Every other non-zero exit from a bundled script means the
+script could not answer. Exit 1 here means it *did* answer, and the answer was `block`.
+Reading it as a degrade inverts the verdict and pushes the secret. The one exception is
+exit 1 with no parsable JSON on stdout — that is a crash, not a verdict, and is handled
+as exit 2.
+
+## Auto-mode behavior by step
+
+The per-step half of SKILL.md *Auto-Pilot Mode*, which owns the cross-cutting
+invariants (environment, workspace, deliver, no prompts). Under `--auto` /
+`IDD_AUTO_MODE=1` no step ever waits for a person:
+
+| Step | Auto behavior |
+|------|---------------|
+| *0c* — Guards | Skip the assignment guard; log blocking labels as warnings and continue. |
+| *0d* — Auto-normalize | A security-labelled issue prints the skip warning and continues **without** rewriting the body — no operator confirmation is sought. |
+| *0e* — Workspace | The offer never appears. |
+| *0g* — Complexity gate | Still runs: it reads the pre-work `Effort` band, which needs no prompt. |
+| *Step 1* — Research | An already-resolved issue is closed with a comment and the run exits cleanly. |
+| *Step 2* — Plan | Auto-select the recommended option; the design-confirm checkpoint never fires. |
+| *Step 3* — Implement | Continue past the max-commits guard with a warning. Never prompt for skills: internal agents only, unless `resolve.borrow_skills` is `true`, in which case the auto-selected set is borrowed without asking. |
+| *Step 4* — QA | Run the cycles autonomously; on stagnation, deliver with the known issues recorded rather than stopping. |
+| *Step 5* — Deliver | Create the PR; never merge. |
+
+Every terminal outcome — success, `already_resolved`, or `failed` — still runs the
+borrow teardown in *Step 3 — Propose relevant skills*.
 
 ## Edge Cases <!-- a:rs-edge-cases -->
 

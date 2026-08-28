@@ -4,109 +4,77 @@ description: "Create an atomic PR closing a GitHub issue end-to-end via a 6-step
 license: MIT
 compatibility: "Requires git and GitHub CLI (gh) with authentication and push access. Self-contained — uses shared agents from shared/agents/."
 metadata:
-  version: 0.17.0
+  version: 0.18.0
   author: Luong NGUYEN <luongnv89@gmail.com>
   effort: max
 ---
 
 # /issue-resolver N
 
-Resolve a GitHub issue end-to-end — from issue to atomic PR in 6 steps.
+Issue → atomic PR in 6 steps.
 
 ## Invocation
 
 | Invocation | Mode | What happens |
 |------------|------|--------------|
-| `/issue-resolver <N>` | interactive | Resolve issue #N, ask user to pick plan |
-| `/issue-resolver <N> --auto` | auto-pilot | Resolve fully autonomously, no user prompts |
-| `/issue-resolver <N> --no-run-log` | (modifier) | Suppress the `.gitissue/runs.jsonl` append; return telemetry to the caller instead |
+| `/issue-resolver <N>` | interactive | Resolve #N; user picks the plan |
+| `/issue-resolver <N> --auto` | auto-pilot | Resolve autonomously; no prompts |
+| `/issue-resolver <N> --no-run-log` | (modifier) | Append nothing to `.gitissue/runs.jsonl`; return telemetry |
 
-The argument must be a GitHub issue number. `--auto` is set automatically when invoked by `/auto-pilot`.
-
-The `--no-run-log` flag is **orthogonal to `--auto`** and is passed **only by `/auto-pilot`** — see *Step 5 — Deliver* → *Run-log entry* for the rationale.
+`N` is a GitHub issue number. `--auto` is set by `/auto-pilot`; `--no-run-log` is **orthogonal to `--auto`** (*Step 5 — Deliver* → *Run-log entry*).
 
 ## Prerequisites
 
-Verify before any operation — git repository (`git rev-parse --git-dir`), `gh` installed (`which gh`), authenticated (`gh auth status`), GitHub remote exists (`git remote -v`). On failure, print the exact error from `references/error-messages.md` and stop.
+Check before any operation: git repository (`git rev-parse --git-dir`), `gh` installed (`which gh`) and authenticated (`gh auth status`), remote present (`git remote -v`). On failure print the `references/error-messages.md` error, stop.
 
 ## Repo Sync Before Edits (mandatory)
 
-Applies to the **in-place path** only (ordinary auto mode, or interactive after
-declining Step 0e). Accepted interactive and validated caller-managed worktrees
-start from the fetched base; an invalid `IDD_CALLER_WORKTREE=1` is a stop, never
-a sync bypass or in-place fallback. Sync in-place with the **stash-first pattern**:
-(including untracked) → fetch → rebase-pull the current branch → pop the stash,
-aborting with the recovery hint if the pop conflicts. Copy the exact snippet and
-the full recovery procedure from `references/docs/sync-conventions.md` (*Quick Reference
-(Copy-Paste Snippet)*) — canonical; never improvise a bare rebase on a dirty
-tree. If `origin` is missing or rebase conflicts occur, stop and ask the user
-(interactive) or abort with a clear error (auto).
+In-place path only; worktree paths start from the fetched base, and an invalid `IDD_CALLER_WORKTREE=1` is a stop, never a sync bypass. Use the **stash-first pattern**: copy the snippet and recovery from `references/docs/sync-conventions.md` (*Quick Reference (Copy-Paste Snippet)*), never a bare rebase on a dirty tree. A missing `origin` or a conflict stops and asks (interactive), or aborts (auto).
 
 ## Configuration
 
-Load config once at skill start: run `python3 references/scripts/gi-config.py` — two independent requirements, both mandatory. **Working directory:** the repo root, because the script resolves `.gitissue.yml` against the working directory; run it from anywhere else and it exits 0 reporting `config_file: null`/`first_run: true`, silently discarding the repo's real config. **Script path:** relative to this SKILL.md's own directory, *not* to the working directory — resolve it to an absolute path exactly as the *Bundled dependency precheck* resolves its list, and pass that absolute path to `python3`. It prints `{"config": {…dotted keys…}, "config_file": …, "first_run": …}` as JSON on stdout, merging the defaults below with `.gitissue.yml`. Exit 0: use `config`, and print the `○ First run` line below when `first_run` is `true`. Exit 3: `.gitissue.yml` is invalid — print the validation error from `references/error-messages.md` (*Invalid config*) and stop. Script file absent: a bundled dependency is missing, which is a broken install and not a degrade — stop and print the `✗ Missing bundled dependency` block the *Bundled dependency precheck* names. Any other outcome (no `python3`, non-zero exit, unparsable stdout): print `⚠ gi-config unavailable — using the inline defaults below` and instead follow the manual fallback procedure that makes up the rest of this section. That procedure is the *alternative* to this script, never an extra step to run alongside it: on exit 0 the script's `config` is the whole answer and the rest of this section is reference material only. Never re-read the config after this step. **Capture the run clock here:** chain that same `python3` invocation as `python3 …; ec=$?; date +%s >&2; exit "$ec"` and keep the stderr epoch as `run_started_epoch` — JSON stdout and the script's exit stay intact, it costs no extra round trip, and it is what the *Run Stats Footer* (`references/run-stats.md`) measures `elapsed` from.
+Load config once; never re-read it. Run `python3 references/scripts/gi-config.py` — **Working directory:** the repo root; **Script path:** absolute, as the *Bundled dependency precheck* resolves its list. It prints `{"config": …, "config_file": …, "first_run": …}` merged over the defaults below. Why each matters: `references/pipeline-steps.md` (*Configuration load*).
 
-Otherwise, load `.gitissue.yml` from the repo root once at skill start. If the file does not exist, use defaults and print:
+- **Exit 0** — use `config`.
+- **Exit 3** — invalid `.gitissue.yml`: print the `references/error-messages.md` error (*Invalid config*), stop.
+- **Script file absent** — a broken install and not a degrade: stop, print `✗ Missing bundled dependency`.
+- **Anything else** (no `python3`, non-zero exit, unparsable stdout) — print `⚠ gi-config unavailable — reading .gitissue.yml by hand` and read it yourself *instead of* the script, over the keys and defaults below.
 
-```
-○ First run — using default config. Run /init-gitissue to customize.
-```
+Either path: no `.gitissue.yml` (`first_run`) prints `○ First run — using default config. Run /init-gitissue to customize.`
 
-Defaults (full field reference in `references/docs/config-schema.md`):
-- `issue.auto_normalize: true`
-- `resolve.approval_gate: auto` (ignored in auto mode — always auto)
-- `resolve.branch_prefix: "auto"`
-- `resolve.auto_test: true`
-- `resolve.test_timeout: 300`
-- `resolve.max_commits: 10`
-- `resolve.qa_max_cycles: 5`
-- `resolve.adaptive_effort: true` — scale the pipeline to the issue's complexity (see *Step 0g — Complexity gate*). When `false`, every issue runs the full pipeline (profile pinned to `full`).
-- `resolve.ui_review.browser_review: "ask"` — gates only the optional browser/screenshot review; the code-level UI review (*Step 4 — UI/UX review*) is auto-detected and always runs.
-- `resolve.borrow_skills: false` — installed-only propose; `true` may borrow catalogued skills (`references/pipeline-steps.md`).
+**Capture the run clock here:** chain that same `python3` invocation as `python3 …; ec=$?; date +%s >&2; exit "$ec"`; the stderr epoch is `run_started_epoch`, from which the *Run Stats Footer* (`references/run-stats.md`) measures `elapsed`.
+
+Defaults and behavior per key: `references/docs/config-schema.md` — `issue.auto_normalize` · `resolve.approval_gate` · `resolve.branch_prefix` · `resolve.auto_test` · `resolve.test_timeout` · `resolve.max_commits` · `resolve.qa_max_cycles` · `resolve.adaptive_effort` · `resolve.ui_review.browser_review` · `resolve.borrow_skills: false`.
 
 ---
 
 ## Subagent Architecture
 
-The resolve pipeline delegates heavy work to subagents (`shared/agents/`) to keep the main agent's **context window** clean and **token budget** predictable. Main agent stays in Step 0, Step 4 (orchestrates review-fix), and Step 5 (deliver); Steps 1-3 each spawn one subagent. Full diagram in `references/pipeline-steps.md` (*Subagent Architecture Diagram*).
-
-Each subagent's prompt file is listed under *Additional Resources* below. Every
-agent opens with a role header and a compact I/O contract; the conventions they share (spawn note, tool posture, injection boundary,
-confidence scale, `gh --json`, autonomous operation) live once in
-`references/docs/shared-agent-conventions.md`.
+Heavy work goes to subagents (`shared/agents/`), keeping the main agent's **context window** lean: it owns Step 0, Step 4's loop and Step 5; Steps 1-3 each spawn one (*Subagent Architecture Diagram*). Prompts: `references/agents/<name>.md`; conventions: `references/docs/shared-agent-conventions.md`.
 
 ### Spawning a subagent (canonical pattern)
 
-Every step below spawns with the same shape — only role, description, and prompt file change. **Do NOT set `subagent_type`** — always use the default general-purpose agent (never the agent's own name — none are registered agent types):
+Role, description and prompt file change per step. **Do NOT set `subagent_type`**:
 
 ```python
 Agent(
   description="{role} — {action} issue #N",
   prompt=<{agent-file}.md prompt with {variables} replaced>,
-  # do NOT set subagent_type — default general-purpose agent, never a custom type (e.g. NOT "code-reviewer")
+  # never subagent_type — the default general-purpose agent, not "code-reviewer"
 )
 ```
 
 ### Orchestrating the agents (model/effort, monitoring, audit)
 
-As the orchestrator, for each spawned step:
-
-1. **Name the role** in the spawn `description` (e.g. `"researcher — research issue #N"`).
-2. **Size the model/effort** per `references/docs/agent-model-effort.md` from the most-recent
-   complexity signal, falling back to the agent's default tier — advisory, never blocks.
-3. **Monitor before advancing** — verify the agent returned its contract's required
-   shape (researcher: `status`+`complexity`; synthesizer: one `recommended` option;
-   implementer: commits+tests+repro for bugs; reviewer/fixer: `result`+counts). A
-   missing/blocking return is the signal to stop (interactive) or follow auto behavior.
-4. **Audit** — record the per-step signal the run log folds in (`complexity`, `qa_cycles`, `outcome`, `duration_s`) plus the `[N/5]` tracker line.
+Per step: **name the role** in the spawn `description`; **size the model/effort** per `references/docs/agent-model-effort.md`; **monitor before advancing** — a missing or blocking return stops the run (interactive) or takes the auto behavior; **audit** the signal. Shapes and fields: *Orchestrating the agents*.
 
 ### Environment check
 
-If the Agent tool is available, use subagents as described above; if not (e.g. Claude.ai), execute each step inline via the fallback instructions.
+Use subagents when the Agent tool is available; otherwise (e.g. Claude.ai) run steps inline via their fallback instructions.
 
 ### Bundled dependency precheck
 
-Verify this skill's bundled subagent prompts and reference files are present. Before execution, verify **every** path in the list below exists relative to the skill's directory (the dirname of this SKILL.md). This list is the authoritative guard — keep it complete and independent of the *Additional Resources* navigation index, which exists for human navigation and may list files with source-relative group prefixes. If any path is missing, stop immediately and print the `✗ Missing bundled dependency` block from `references/error-messages.md` (*Bundled dependencies*); do not continue with an inline or guessed subagent prompt:
+Check every path below exists relative to this SKILL.md's directory. A missing path stops the run: print the `✗ Missing bundled dependency` block from `references/error-messages.md` (*Bundled dependencies*); never guess a prompt.
 
 ```text
 references/agents/codebase-researcher.md
@@ -146,201 +114,115 @@ references/scripts/gi-state.py
 
 ## Pipeline Overview
 
-The resolve pipeline has 6 steps (0-5) — Preflight, Research, Plan, Implement,
-QA, Deliver. Display progress with the `[N/5]` step counter: each step prints a
-new line on start (`●`), updating to `✓`/`✗` on success/failure. Static
-sequential output — no animation. Worked example of the full tracker in
-`references/report-templates.md` (*Expected Inline Pipeline Output*).
-
----
+6 steps (0-5) — Preflight, Research, Plan, Implement, QA, Deliver — each printing a `[N/5]` line on start (`●`) that updates to `✓`/`✗`. Read the expected output example in `references/report-templates.md` (*Expected Inline Pipeline Output*).
 
 ### Step completion reports
 
-Each step closes with a completion report — `√`/`×` per check plus a
-`Result: PASS | PARTIAL | FAIL` line — so "step done" is checkable rather than
-asserted. The per-step check names, the `Result` semantics, and the block
-format are in `references/report-templates.md` (*Step Completion Reports*) —
-**read it now**, before Step 0. A step is not complete until its `Result:`
-line is printed.
+Each step closes with `√`/`×` per check plus a `Result: PASS | PARTIAL | FAIL` line — format in `references/report-templates.md` (*Step Completion Reports*), **read it now**. A step is incomplete until `Result:` prints.
 
 ---
 
 ## Step 0 — Preflight
 
-Check whether this issue should be worked on. Open with `● Preflight check for issue #N...`.
+Open with `● Preflight check for issue #N...`.
 
 ### 0a — Fetch issue
 
-The GitHub-backed helpers share the bundled subprocess boundary in `references/scripts/gi-gh.py`. First classify any framed caller payload per *Step 0i*; then run `python3 references/scripts/gi-issue.py {N} --fields number,title,body,labels,assignees,state,comments,updatedAt` and read `.issue` only when the payload is absent/partial. **Capture `updatedAt` here** — 0d's `gh issue edit` bumps it, so *0h* must compare against this pre-normalization value or it reports stale on every first-normalized issue. The same issue is read again in 0d, Step 1, and Step 5; the script serves those repeats from `.gitissue/cache/` rather than the network, and the field list is this skill's choice. Resolve the script path as the *Bundled dependency precheck* resolves its list. Exit 3 is a stop. No `python3`, exit 2 (an unresolved script path), or exit 4 degrades: run `gh issue view {N} --json number,title,body,labels,assignees,state,comments,updatedAt` directly — the cache is an optimization, never a dependency. **0d rewrites the body, so it MUST end with `python3 references/scripts/gi-issue.py {N} --invalidate`**; the cache is repo-wide and outlives this skill, so without it Step 1 and Step 5 read the pre-normalization body. **Caller payload:** when the spawn prompt carries a correctly nonce-framed, complete `issue_payload` for this issue (`/auto-pilot` captured it in mode-neutral *Step 1.2b*), use it **in place of this read only** — `issue_payload = supplied | partial | absent`, `updatedAt` required, missing/mismatched framing or any doubt is `absent` and this fetch runs; 0d still rewrites and still invalidates, and no safety check is ever gated on it (*Step 0i — Caller payload gate* in `references/pipeline-steps.md`). A payload carries every field above **except `comments`**, and its `state` and `updatedAt` are only as fresh as the caller's fetch, so under `supplied` **run one live read before 0b: `gh issue view N --json state,comments,updatedAt`** — not through the cache — and decide the two stops below from that `state`, never the payload. Before 0d, parse and require an exact match between retained and live `updatedAt`; mismatch, missing, or unparsable discards the payload and runs the complete 0a fetch with `--refresh` (or direct full-field `gh` fallback), whose record then feeds normalization and *0h* condition 5. This per-issue fallback applies identically to individual, array, and keyed-map payloads. <!-- a:rs-0a-payload-concurrency -->
+GitHub reads share the boundary in `references/scripts/gi-gh.py`. Classify any framed caller payload first (`/auto-pilot` captured it in mode-neutral *Step 1.2b*); *Step 0i — Caller payload gate* in `references/pipeline-steps.md` is its single home — `issue_payload = supplied | partial | absent`, the mandatory live `gh issue view N --json state,comments,updatedAt` under `supplied`, the exact match between retained and live `updatedAt` before 0d, discard-and-refresh on mismatch (identical for individual, array, and keyed-map payloads), never a gate. Then run `python3 references/scripts/gi-issue.py {N} --fields number,title,body,labels,assignees,state,comments,updatedAt`, reading `.issue` unless the gate substitutes a payload. **Capture `updatedAt` here** — 0d's `gh issue edit` bumps it, so *0h* uses this pre-normalization value. Exit 3 stops; anything else degrades to `gh issue view {N} --json number,title,body,labels,assignees,state,comments,updatedAt`. **0d rewrites the body, so it MUST end with `python3 references/scripts/gi-issue.py {N} --invalidate`.** <!-- a:rs-0a-payload-concurrency -->
 
-**If not found:** output error and stop. **If closed:** output warning and stop.
+**Not found:** error, stop. **Closed:** warning, stop.
 
 ### 0b — Check for existing work
 
-```bash
-git branch -a | grep -i "{N}"                                # existing branches
-gh pr list --state open --json number,title,body,headRefName --limit 20
-```
-
-Scan PR bodies for `Closes #N`, `Fixes #N`, `Resolves #N`. If an **open** PR already exists, print the `⚠ PR already targets issue` block from `references/error-messages.md` (*Guards*) and stop — return `status: pr_in_progress` with that `pr_number` and `branch_name`, and **never close the issue**: an unreviewed, unmerged PR is not a resolution (`references/pipeline-steps.md` → *Early exit*). Only a **merged** PR or a closing commit on the default branch is `already_resolved`.
+Check existing branches (`git branch -a | grep -i "{N}"`) and open PRs (`gh pr list --state open --json number,title,body,headRefName --limit 20`), scanning bodies for `Closes #N`, `Fixes #N`, `Resolves #N`. An **open** PR targeting the issue prints the `⚠ PR already targets issue` block from `references/error-messages.md` (*Guards*), stops, returns `status: pr_in_progress` with its `pr_number` and `branch_name`, and must **never close the issue** (*Early exit*). Only a **merged** PR or a closing commit on the default branch is `already_resolved`.
 
 ### 0c — Guards
 
-**Interactive:** warn and ask if assigned to someone else or `wontfix`/`blocked`/`do-not-merge` labels exist. **Auto:** skip the assignment guard; log blocking labels, don't stop.
+**Interactive:** warn and ask if assigned elsewhere, or on `wontfix`/`blocked`/`do-not-merge` labels. **Auto:** skip the assignment guard, log blocking labels, never stop.
 
 ### 0d — Auto-normalize
 
-If `issue.auto_normalize` is true and not already normalized (no `<!-- gitissue:normalized v1 -->` marker):
+If `issue.auto_normalize` is true and the body lacks a `<!-- gitissue:normalized v1 -->` marker:
 
-1. **Security label check (SPEC §1.4)** — before any rewrite, scan issue labels for `security`, `CVE`, or `vulnerability` (case-insensitive). If any match:
-   - **Auto mode (`--auto` / `IDD_AUTO_MODE=1`):** print the `⚠ … Skipping auto-normalization` warning from `references/error-messages.md` (*Security-labeled issue (skip)*) — using the first matching label name for `{label}` — and continue preflight **without** rewriting the issue body.
-   - **Interactive mode:** print the same warning and ask for explicit operator confirmation. Default is **no** — do not rewrite unless the operator clearly confirms (e.g. `y` / `yes`). If declined, continue without normalization.
+1. **Security label check (SPEC §1.4)** — before any rewrite scan labels for `security`, `CVE`, `vulnerability` (case-insensitive). On a match:
+   - **Auto mode (`--auto` / `IDD_AUTO_MODE=1`):** print the `⚠ … Skipping auto-normalization` warning (`references/error-messages.md` → *Security-labeled issue (skip)*), first matching label as `{label}`, continue **without** rewriting.
+   - **Interactive mode:** same warning, then ask for explicit operator confirmation; default **no**, a decline continuing without normalization.
 
-2. **Normalize inline** — when no security label blocks (or interactive operator confirmed): classify issue type, generate normalized body, add marker, post a backup comment with the original body, update the issue via `gh issue edit`, invalidate the cached entry (`python3 references/scripts/gi-issue.py {N} --invalidate`), then re-fetch. This is the same structure-only flow as `/issue-creator` Normalize mode (`references/modes.md` in the issue-creator skill); the resolver does **not** invoke `/issue-creator` as a subprocess — it performs Step 0d inline. If normalization fails, warn and continue with the original body (see `references/error-messages.md`).
+2. **Normalize inline** — otherwise: classify the type, generate the body, add the marker, back up the original in a comment, `gh issue edit`, invalidate the cache (`python3 references/scripts/gi-issue.py {N} --invalidate`), re-fetch. Structure-only, as `/issue-creator` Normalize mode; the resolver does **not** invoke `/issue-creator` as a subprocess. On failure **warn** and continue with the original body (`references/error-messages.md` → *Auto-normalization failed*).
 
 ### 0e — Workspace (interactive only)
 
-Before Step 0e or 0f selects a workspace, derive one `{branch_name}` with `python3 references/scripts/gi-branch.py {N} --from-issue --type {type}` and read `.branch`. **`--from-issue` is mandatory — never put the issue title or the configured prefix on the command line.** A title is written by whoever filed the issue, so interpolating it into a shell word is a command injection that `/auto-pilot` would run unattended; `--from-issue` makes the script read both values itself. `{type}` is one of the six literals this skill classified, never free text. Exit 3 is a stop; no `python3`, exit 2 (an unresolved script path), or exit 4 degrades to deriving the name by hand per `references/docs/naming-conventions.md`. Both workspace paths use this one name — full contract in `references/pipeline-steps.md` (*Step 0e*).
+Derive one `{branch_name}` first: `python3 references/scripts/gi-branch.py {N} --from-issue --type {type}`, reading `.branch`. **`--from-issue` is mandatory** — never put the issue title or configured prefix on the command line (`references/pipeline-steps.md` → *Step 0e — Workspace*). `{type}` is one of six classified literals. Exit 3 stops; anything else degrades to `references/docs/naming-conventions.md`. Both paths use it.
 
-Then decide *where* the resolution work happens.
+**Auto mode (`--auto` / `IDD_AUTO_MODE=1`): skip this offer entirely.** A set `IDD_CALLER_WORKTREE=1` uses the validated caller-managed path; otherwise go to *0f*.
 
-**Auto mode (`--auto` / `IDD_AUTO_MODE=1`): skip this offer entirely.** A set
-`IDD_CALLER_WORKTREE=1` uses the validated caller-managed path in
-`references/pipeline-steps.md`; otherwise go to *0f* (legacy in-place). Neither
-auto path shows the prompt.
-
-**Interactive mode:** offer to run the resolution in a dedicated git *worktree*
-— an isolated checkout in a separate directory — so branch creation,
-implementation, and testing never touch the user's current working tree. State
-plainly what will be set up and the workspace/branch naming the user can expect:
+**Interactive mode:** offer a git *worktree*, so work never touches the user's tree:
 
 ```
 ◆ Workspace for issue #N
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
 
-  This resolution can run in an isolated git worktree instead of your
-  current working tree.
-
     Branch:    {branch_name}
     Worktree:  ../{repo}-worktrees/{branch_name with / → -}
     Setup:     copies your gitignored local config (.env*, and similar),
-               then runs this project's detected install/bootstrap so the
-               workspace is ready to run without manual reconfiguration.
+               then runs this project's detected install/bootstrap.
 
   Accepting keeps your current working tree untouched. Declining uses the current working tree with the existing sync and branch behavior.
 
   Resolve in a new worktree? [Y/n]
 ```
 
-Accept replaces *0f — Create branch* and the mandatory Repo Sync; decline runs the
-mandatory Repo Sync then *0f — Create branch* as today. Creation commands,
-setup-artifact propagation, cleanup guidance, and fallback-on-failure behavior are
-in `references/pipeline-steps.md` (*Step 0e — Workspace*) — never leave the user
-without a working resolution.
+Accept replaces *0f — Create branch* and the mandatory Repo Sync; decline runs mandatory Repo Sync then *0f*. Creation, setup, cleanup: *Step 0e — Workspace*.
 
 ### 0f — Create branch
 
-The **in-place path** — ordinary auto mode, or interactive after declining the
-offer. Accepted interactive and validated caller-managed paths already checked
-out the branch and skip this sub-step.
-
-Use the `{branch_name}` already derived before Step 0e/0f (see *0e — Workspace*,
-`references/docs/config-schema.md`, `references/docs/naming-conventions.md`) — never re-derive it here.
-
-**If branch already exists:**
-- Interactive mode: ask `continue` or `fresh`
-- Auto mode: `continue` (checkout existing branch)
+The **in-place path**; worktree paths already checked out the branch. Reuse the derived `{branch_name}` (*0e — Workspace*, `references/docs/naming-conventions.md`). **If it exists:** interactive asks `continue` or `fresh`, auto takes `continue`.
 
 ### 0g — Complexity gate (select the pipeline profile)
 
-Decide **before Step 1** how much pipeline this issue earns, so a trivial edit
-does not pay the full orchestration cost. The mechanism, the shared `XS … XL`
-scale it reuses, and the safety rules are defined once in
-`references/docs/agent-model-effort.md` (*Complexity → pipeline profile*) — apply that
-document here; this sub-step is only the resolver's entry point into it.
+Decide **before Step 1** how much pipeline this issue earns; the `XS … XL` scale and safety rules: `references/docs/agent-model-effort.md` (*Complexity → pipeline profile*). `resolve.adaptive_effort: false` pins `full`; else read the **pre-work `Effort` band** in `## Metadata`, never later agent output:
 
-When `resolve.adaptive_effort` is `false`, skip the gate entirely: set
-`profile = full` and continue exactly as before. Otherwise select the profile
-from the issue's **pre-work `Effort` band** (the `XS … XL` value in the issue's
-`## Metadata`, written by `/issue-creator`) — never from a later agent output, so
-the saving is real:
+- `XS`/`S` asserted (not `(needs review)`) → `light`; `M`/`L`/`XL` → `full`
+- `XS`/`S` low-confidence, **or** absent/unparseable → `full` (ambiguous → fuller)
 
-- `Effort` `XS`/`S`, asserted (not `(needs review)`/low-confidence) → `profile = light`
-- `Effort` `M`/`L`/`XL` → `profile = full`
-- `Effort` `XS`/`S` but low-confidence, **or** absent/unparseable → `profile = full` (ambiguous → fuller)
-
-**What `light` collapses — the single home for this rule.** `full` leaves every
-step exactly as it is today. Each step below points back to this table; the full
-per-step mechanics live in `references/pipeline-steps.md` (*Step N → `light`
-profile*).
+**What `light` collapses — the single home for this rule.** Mechanics: `references/pipeline-steps.md` (*Step N → `light` profile*).
 
 | Step | `light` behavior |
 |------|------------------|
-| 1 — Research | Lighter pass: the already-resolved safety check and a focused scan of the obviously-affected file(s) still run; skip the broad dependency trace and external solution research. |
-| 2 — Plan | Skip the 3-option synthesis entirely — do **not** spawn the synthesizer. Derive a **direct minimal plan** inline and record it as the selected option, so the Decision Record still has a real `Selected option`; the design-confirm checkpoint does not apply — **unless *0h* set `analysis_reuse = fresh`**, in which case *Step 2 — Plan → `reuse`* governs instead: options are **lifted** from the analysis, not derived, and the design-confirm checkpoint **does** apply. |
-| 3 — Propose relevant skills | Skip the **propose/install** — set `selected_skills = []` and go straight to the implementer, mirroring auto-mode behavior. **Leftover teardown still runs** (`references/pipeline-steps.md` → *Step 3 — Propose relevant skills*): a `light` run must still release skills a crashed earlier run borrowed — the one path where even teardown is off is a parallel lane (`IDD_CALLER_WORKTREE=1`), which disables borrowing outright (*Parallel lanes* there). |
-| 4 — QA | Cap the review-fix loop at **1** cycle (a single review pass; fix once if blocking issues are found, then deliver) instead of `resolve.qa_max_cycles`. One reviewer spawn still runs — the fast path reduces depth, it does not skip review. UI review remains auto-detected as usual. |
-| 5 — Deliver | **Unchanged** — always emits the Decision Record and Acceptance Criteria Verification table. The profile never removes durable memory. |
+| 1 — Research | Lighter pass; the already-resolved check still runs. |
+| 2 — Plan | Do **not** spawn the synthesizer; derive a minimal plan inline, no design-confirm checkpoint. **Unless *0h* set `analysis_reuse = fresh`**: *Step 2 — Plan → `reuse`* governs, options are **lifted**, and the design-confirm checkpoint **does** apply. |
+| 3 — Propose relevant skills | Skip propose/install; `selected_skills = []`. **Leftover teardown still runs** (*Step 3*), except in a parallel lane (`IDD_CALLER_WORKTREE=1`). |
+| 4 — QA | Cap the loop at **1** cycle; one reviewer spawn still runs. |
+| 5 — Deliver | **Unchanged**. |
 
-The profile may only be **revised upward** later (e.g. Step 1 research reports
-`high`/`complex` on what the band called `S` → switch to `full` for the remaining
-steps); never downgrade a `full` run to `light` mid-pipeline.
-
-After preflight, surface the chosen profile so the effort decision is
-transparent. `{workspace_note}` is ` (worktree)` in a worktree, empty otherwise;
-`{profile}` is `light` or `full` — when `resolve.adaptive_effort` is `false`,
-still print `effort: full` (the pinned profile) so the line is uniform:
+Revise **upward** only. `{workspace_note}` is ` (worktree)` in a worktree, else empty; `effort: full` prints even under `resolve.adaptive_effort: false`:
 ```
 [0/5] Preflight    ✓ issue #N open, branch: {branch_name}{workspace_note}, effort: {profile}
 ```
 
 ### 0h — Analysis reuse gate <!-- a:rs-0h-skill -->
 
-Set `analysis_reuse` to `fresh`, `stale`, or `absent` by the five-condition predicate in `references/pipeline-steps.md` (*Step 0h — Analysis reuse gate*) — its **single home**; never define "fresh" anywhere else. `fresh` seeds Step 1's research and skips Step 2's synthesizer; `stale`/`absent` run today's full pipeline unchanged. Any doubt — missing key, short SHA, unparsable timestamp, failed `git` call — is `stale` (fail-safe). Skipped, like *0g*, when `resolve.adaptive_effort` is `false`; no new config key.
+Set `analysis_reuse` to `fresh`, `stale` or `absent` by the five-condition predicate in `references/pipeline-steps.md` (*Step 0h — Analysis reuse gate*) — its **single home**. `fresh` seeds Step 1 and skips Step 2's synthesizer; `stale`/`absent` run the full pipeline. Any doubt is `stale` (fail-safe). Skipped when `resolve.adaptive_effort: false`.
 
 ---
 
 ## Step 1 — Research
 
-Deeply understand the issue, affected codebase, and possible solutions; also verifies the issue hasn't already been fixed (early-exit path closes it in auto mode). Spawn the researcher (`references/agents/codebase-researcher.md`) with the canonical pattern — full delegation payload, phases, early-exit behavior, and inline fallback are in `references/pipeline-steps.md` (*Step 1 — Research*).
+Understand the issue, the affected code and candidate solutions; the same pass verifies it is not already fixed (auto then closes it). Spawn the researcher (`references/agents/codebase-researcher.md`). Payload, phases, early exit, fallback: *Step 1 — Research*.
 
-**`light` profile:** run a **lighter** research pass — see the profile table in
-*Step 0g* for what it collapses, and `references/pipeline-steps.md` (*Step 1 —
-Research → `light` profile*) for the mechanics. On a `high`/`complex` signal,
-revise the profile **upward** to `full` (never downward). **`analysis_reuse = fresh`** (*0h*): pass `prior_analysis` and run the seeded **verify-first** pass — hints to confirm or refute, never to trust; the already-resolved check still runs in full (*Step 1 — Research → `reuse`*). Also pass the optional sibling key **`triage_context`** (this issue's triage row, from the caller or from the triage graph): unlike `prior_analysis` it carries **no commit pin**, so it may only **reorder** a scan, never authorise skipping a phase (*Step 1 — Research → `triage_context`*).
-
-After research:
-```
-[1/5] Research     ✓ read {N} files, complexity: {level}
-```
+**Profiles.** `light` — see the profile table in *Step 0g*; a `high`/`complex` signal revises **upward** to `full`. `analysis_reuse = fresh` (*0h*) — pass `prior_analysis` for the seeded **verify-first** pass: confirm or refute, never trust; the already-resolved check still runs. `triage_context` has no commit pin, so it may only **reorder** a scan (*→ `reuse`*, *→ `triage_context`*).
 
 ---
 
 ## Step 2 — Plan
 
-Generate implementation options and select one. Spawn the synthesizer (`references/agents/synthesizer.md`) with the canonical pattern. It returns 3 options — minimal / balanced / comprehensive — with the balanced option usually recommended.
+Generate options and select one. Spawn the synthesizer (`references/agents/synthesizer.md`); it returns minimal / balanced / comprehensive, balanced usually recommended (*Step 2 — Plan*).
 
-Selection behavior (interactive auto, interactive comment-and-wait, auto-pilot) and inline fallback are in `references/pipeline-steps.md` (*Step 2 — Plan*).
-
-**`light` profile:** skip the 3-option synthesis — see the profile table in
-*Step 0g*; full procedure in `references/pipeline-steps.md` (*Step 2 — Plan →
-`light` profile*). **`analysis_reuse = fresh`** (*0h*) skips the same spawn but **wins Step 2 when both apply** — not an addition to the `light` skip, a replacement for it: lift `options[]`, `recommended_option`, `overall_complexity` and `overall_risk` from the analysis instead of deriving a minimal plan, deriving each `rejection_reason` from `decision_record.options_rejected[]` (*Step 2 — Plan → `reuse`*).
-
-After plan selection:
-```
-[2/5] Plan         ✓ approach: {selected option name}
-```
+**Profiles.** `light` — see the profile table in *Step 0g*. `analysis_reuse = fresh` (*0h*) skips the same spawn but **wins Step 2 when both apply** — a replacement, not an addition: lift `options[]`, `recommended_option`, `overall_complexity`, `overall_risk` from the analysis, each `rejection_reason` from `decision_record.options_rejected[]` (*→ `reuse`*).
 
 ### Design-confirm checkpoint (high-complexity, interactive only)
 
-High-risk work earns **exactly one** extra agreement point before code is written —
-no new phase, artifact, or config key. Fires only when **both** hold: synthesizer
-reports `overall_complexity: L`/`XL` or `overall_risk: High` (trivial/low/medium
-skip it), **and** interactive mode (`--auto`/`IDD_AUTO_MODE=1` never pauses).
-Accept (default) → Step 3 unchanged; decline → stop before implementing and
-suggest re-running or picking a different option. Record the decision in the PR
-Decision Record. Full procedure in `references/pipeline-steps.md` (*Step 2 —
-Plan → Design-confirm checkpoint*).
+**Exactly one** extra agreement point before code is written, when **both** hold: `overall_complexity: L`/`XL` or `overall_risk: High`, **and** interactive mode (`--auto`/`IDD_AUTO_MODE=1` never pauses). Accept (default) → Step 3; decline → stop, recorded in the PR Decision Record (*Step 2 — Plan → Design-confirm checkpoint*).
 
 ---
 
@@ -348,153 +230,101 @@ Plan → Design-confirm checkpoint*).
 
 ### Propose relevant skills
 
-Before spawning the implementer, optionally augment it with external skills from
-`references/skill-index.md`. Detect (installed vs available-to-borrow when
-`resolve.borrow_skills` is true), propose, accept into `selected_skills`;
-internal agents remain the fallback. Borrow/install, `{name, origin}` records
-via `references/scripts/gi-state.py`, teardown of `origin: borrowed` only, the
-`◆`/`○` block, leftover cleanup, and auto-mode are in
-`references/pipeline-steps.md` (*Step 3 — Propose relevant skills*).
+Optionally augment the implementer with external skills from `references/skill-index.md`: detect, propose, accept into `selected_skills`; internal agents remain the fallback. Borrow/install, `{name, origin}` records via `references/scripts/gi-state.py`, teardown of `origin: borrowed` only, auto-mode: `references/pipeline-steps.md` (*Step 3 — Propose relevant skills*).
 
-**`light` profile:** skip the propose/install — see the profile table in *Step 0g* — but **still run the leftover teardown** in `references/pipeline-steps.md`.
+**`light` profile:** see the profile table in *Step 0g* — the **leftover teardown still runs** there.
 
-Write code and tests based on the selected plan. Spawn the implementer (`references/agents/implementer.md`) with the canonical pattern, passing the plan, branch name, naming conventions, and `selected_skills`.
-
-For **bug** issues, the implementer first runs the red-capable reproduction checkpoint — reproduce the symptom, confirm it fails red, fix, then convert to a regression test. Surfaced as evidence in the PR Decision Record and acceptance table. Non-bug issues skip it; auto mode never blocks. See `references/bug-verification.md`.
-
-Full payload, commit guardrails, and inline fallback are in `references/pipeline-steps.md` (*Step 3 — Implement*).
-
-After implementation:
-```
-[3/5] Implement    ✓ {N} files changed, {U} unit tests, {E} e2e tests
-```
+Then spawn the implementer (`references/agents/implementer.md`) with the plan, branch name, naming conventions and `selected_skills`. **Bug** issues first run the red-capable reproduction checkpoint — reproduce, confirm red, fix, convert to a regression test — surfaced in the Decision Record and acceptance table; others skip it, auto never blocks (`references/bug-verification.md`). Payload, guardrails, fallback: *Step 3*.
 
 ---
 
 ## Step 4 — QA
 
-Automated review-fix loop: review → test → fix → repeat until clean or max cycles reached.
+Loop: review → test → fix, until clean or the cap is hit.
 
 ### Spawning the code reviewer
 
-For each QA cycle, spawn a **fresh** reviewer (`references/agents/code-reviewer.md`) with the canonical pattern — fresh each cycle for unbiased review.
-
-When the reviewer or test/build run returns blocking issues, spawn or re-message the fixer (`references/agents/fixer.md`) the same way. Pass issue context, branch/base branch, reviewer findings, failing test/build output, commit message `fix({scope}): address review feedback (#N)`, and the pre-commit security gate it MUST run before committing — `security_convention` (`references/docs/pre-commit-security.md`), `secscan_script` (`references/scripts/gi-secscan.py`) and `secscan_policy_ref` (`origin/${base}`) as spawn variables, because an emitted agent prompt cannot resolve a skill-relative path on its own. Paths and a ref name only — the script reads `security.*` from that ref itself, so the branch being fixed never supplies the policy that scans it. Collect the fixer's JSON result and decide whether to start another cycle — never apply fixes inline when the Agent tool is available.
+Spawn a **fresh** reviewer (`references/agents/code-reviewer.md`) each cycle. On blocking issues, spawn or re-message the fixer (`references/agents/fixer.md`) with issue context, branch/base branch, findings, failing output, the commit message `fix({scope}): address review feedback (#N)`, and the pre-commit security gate it MUST run before committing — `security_convention` (`references/docs/pre-commit-security.md`), `secscan_script` (`references/scripts/gi-secscan.py`), `secscan_policy_ref` (`origin/${base}`) as spawn variables; paths and a ref only. Read the fixer's JSON result and decide on another cycle — never fix inline when the Agent tool exists.
 
 ### UI/UX review (auto-detected)
 
-UI review is **auto-detected per issue** — no config flag enables it. Scan the issue body/diff for UI work before the QA cycles, then run only what *can* and *should* run: the **code UI review** reads the diff, is environment-independent, and runs anywhere including headless (never gated on a GUI/browser); the **browser UI review** takes optional screenshots from a running app and runs only when reachable *and* opted in, else **skips with a warning while the code UI review still runs** — fail-soft.
+UI review is **auto-detected per issue** — no config flag enables it. Scan the issue body and diff for UI work before cycling. The **code UI review** always runs; the **browser UI review** runs only when a running app is reachable *and* opted in, else **skips with a warning**. Detection, the `ui-reviewer` spawn and the `ui_review.browser_review` gate: `references/docs/ui-review.md`. Deltas and cycle mechanics: *Step 4 — UI/UX review*, *Step 4 — QA*.
 
-Detection rules, the `ui-reviewer` spawn, the `ui_review.browser_review` gate, and skip/success messages are in `references/docs/ui-review.md`; the resolver's own deltas (diff command, variables, `resolve.ui_review.browser_review` as the gate key, findings flow) are in `references/pipeline-steps.md` (*Step 4 — UI/UX review*). Cycle mechanics and loop controls (`resolve.qa_max_cycles`, exit-on-clean, exit-on-stagnation) are in the same file (*Step 4 — QA*).
-
-**`light` profile:** cap the review-fix loop at **1** cycle instead of
-`resolve.qa_max_cycles` — see the profile table in *Step 0g*. Class policy:
-light=1; full+low/medium=2; full+high=`qa_max_cycles`. Record `ceiling`/`breach_reason`.
+**`light` profile:** see the profile table in *Step 0g*. Class policy: light=1; full+low/medium=2; full+high=`resolve.qa_max_cycles`. Record `ceiling`/`breach_reason`.
 
 ---
 
 ## Step 5 — Deliver
 
-Push, create PR, and report.
-
 ### Verify all tests pass
 
-When `resolve.auto_test` is true (default), run the full test suite one final time to confirm everything is clean after QA fixes. When false, skip this suite (QA Step 4 may still have run tests during the loop). **Under `auto_test`, not over it:** when `tests_state`'s SHA equals `git rev-parse HEAD` **and `git status --porcelain=v1 --untracked-files=all` is empty** at this moment, a clean QA cycle already ran this exact suite on this exact tree — skip it and print `○ Test suite: skipped (last green {count}@{sha_short} == HEAD)`. Nothing recorded, or any doubt, runs it (`references/pipeline-steps.md`, *Step 4 — QA → Last-green test state*, the single home of the variable and both consumers). <!-- a:rs-deliver-clean-tree -->
+With `resolve.auto_test` true (default), run the full suite once more after QA; false skips. **Under `auto_test`, not over it:** when `tests_state`'s SHA equals `git rev-parse HEAD` **and `git status --porcelain=v1 --untracked-files=all` is empty**, a clean QA cycle already ran this suite on this tree — skip it, print `○ Test suite: skipped (last green {count}@{sha_short} == HEAD)`. Nothing recorded, or any doubt, runs it (*Step 4 — QA → Last-green test state*, the variable's single home). <!-- a:rs-deliver-clean-tree -->
 
-If tests fail at this point, print `✗ Final test run failed — PR not created` with the failure details and stop — even in auto mode, a failing PR is worse than no PR.
+A failure prints `✗ Final test run failed — PR not created` and stops, even in auto.
 
 ### Update documentation
 
-If the changes affect documented behavior, update README, inline docs, and CHANGELOG as applicable.
+If the change affects documented behavior, update README, inline docs, CHANGELOG.
 
 ### Push branch and create PR
 
-Before pushing, run a final pre-push pass over the whole branch diff — it catches secrets that slipped in during QA fixes. Export `IDD_AUTO_MODE=1` first in auto mode, then run `python3 references/scripts/gi-secscan.py --range "origin/${base}" --policy-ref "origin/${base}"` from the repo root. It reads this repo's `security.allow_pattern`, `security.extra_secret_file_pattern`, `security.extra_secret_value_pattern`, and `security.max_file_size_mb` from `.gitissue.yml` itself — never pass a config *value* on the command line, because `.gitissue.yml` is repo-controlled and a crafted value would escape its quoting. `--policy-ref` takes that policy from the **base ref** rather than this branch: the issue body that drove the implementation is untrusted, so a branch that grew a permissive `security.allow_pattern` must not be the branch that decides how it is scanned. **Treat exit 0 as a pass only when `policy_source` is the `ref:origin/…` you asked for, `verdict` is not `block`, and `scanned` is not 0 while `skipped` is above 0** — a scan that examined nothing is not a clean scan, and an allow pattern suppresses scanning rather than findings. **Exit 1 is the block verdict: stop, do not push, and report the path from `blocking[]` — never fall through to the prose scan hoping for a pass.** Exit 3 (an uncompilable `security.*` regex) is also a stop. A missing `python3`, **exit 2** (the script path did not resolve, or the invocation was malformed — a scan that never ran is never a scan that passed), or exit 4 degrades: print `⚠ gi-secscan unavailable — running the documented scan` and run the **Primary Pattern** in `references/docs/pre-commit-security.md` over `git diff --name-only "origin/${base}"...HEAD` instead. Exit 1 with no parsable JSON on stdout is a crash rather than a verdict — treat it as exit 2 and degrade. Do not improvise a weaker check, and never read any non-zero exit as a pass. Only after the scan passes (or warnings are accepted):
+Run the branch-diff scan first: export `IDD_AUTO_MODE=1` in auto mode, then from the repo root run `python3 references/scripts/gi-secscan.py --range "origin/${base}" --policy-ref "origin/${base}"`. It reads `security.*` from `.gitissue.yml` **at the base ref**: never pass a config *value* on the command line, never let the scanned branch supply its policy (*Pre-push secret scan*).
+
+- **Pass** needs all four: exit 0, `policy_source` equal to the requested `ref:origin/…`, `verdict` not `block`, `scanned` not 0 while `skipped` is above 0.
+- **Exit 1 is the block verdict** — stop, do not push, report `blocking[]`. **Exit 3** (uncompilable `security.*`) also stops.
+- **No `python3`, exit 2, exit 4** — degrade: print `⚠ gi-secscan unavailable — running the documented scan` and run the **Primary Pattern** in `references/docs/pre-commit-security.md` over `git diff --name-only "origin/${base}"...HEAD`. Exit 1 without JSON is a crash — treat as exit 2.
+
+Never read a non-zero exit as a pass. Only after it passes:
 
 ```bash
+# gated by the gi-secscan.py pass above — see references/docs/pre-commit-security.md
 git push -u origin {branch_name}
 gh pr create --title "{pr_title}" --body "{pr_body}"
 ```
 
-**PR title:** `{type}({scope}): {description} (#{issue_number})` (see `references/docs/naming-conventions.md`)
+**PR title:** `{type}({scope}): {description} (#{issue_number})` (`references/docs/naming-conventions.md`)
 
-**PR body:** Fill the template in `references/report-templates.md` (*PR Body Template*) — Summary, Approach, **Decision Record** (from `.gitissue/analysis-<N>.json` if present, else synthesized), Changes table, Test Results, **Acceptance Criteria Verification** table. The last two are the durable analysis signal surviving squash-merge; never omit them (see `references/docs/idd-methodology.md`). That template's **last line** is the `<!-- gitissue:qa v1 … -->` handoff marker: fill it in **only when QA exited clean**, and otherwise drop the line — never append a second copy, because two markers make the consumer fall back to the full pipeline. Field derivation, the omit-on-a-non-clean-exit rule, and the no-secret-scan-field rule are in `references/report-templates.md` (*QA handoff marker*); `head=` is `git rev-parse HEAD` taken after the last commit and immediately before `git push`.
+**PR body:** fill *PR Body Template* in `references/report-templates.md`; never omit its **Decision Record**, Test Results or **Acceptance Criteria Verification** (`references/docs/idd-methodology.md`). Its **last line** is the `<!-- gitissue:qa v1 … -->` marker: fill it **only when QA exited clean**, else drop it — never append a second copy (*QA handoff marker*). `head=` is `git rev-parse HEAD` after the last commit.
 
 ### Project board sync
 
-If `projects.sync_enabled` is true, update status to `status_map.done` (see `references/docs/github-projects-sync.md`). After delivery:
-```
-[5/5] Deliver      ✓ PR #{pr_number} created
-```
+With `projects.sync_enabled` true, set `status_map.done` (`references/docs/github-projects-sync.md`), then print `[5/5] Deliver`.
 
 ### Run-log entry (monitoring)
 
-At **every terminal outcome** — delivered PR (`success`), early exit because
-already fixed (`already_resolved`), or a failed step (`failed`) — append exactly
-**one JSON line** to `.gitissue/runs.jsonl`, **unless invoked with `--no-run-log`**,
-in which case append **nothing** and return the telemetry to the caller instead.
-`--no-run-log` enforces the **single writer** rule under `/auto-pilot` and is
-independent of `--auto` — a standalone `/issue-resolver <N> --auto` is *not*
-suppressed and still writes. Field derivation (the object's keys, the researcher
-`complexity` collapse, when to omit `profile`) and the full suppression rationale
-are in `references/report-templates.md` (*Run-log entry — field derivation and
-suppression*), which follows the schema in `references/docs/config-schema.md`
-(*`.gitissue/runs.jsonl` — run log*).
+At **every terminal outcome** — `success`, `already_resolved`, `failed` — append exactly **one JSON line** to `.gitissue/runs.jsonl`, **unless invoked with `--no-run-log`**, which appends **nothing** and returns telemetry. That is the **single writer** rule under `/auto-pilot`, independent of `--auto`: a standalone `/issue-resolver <N> --auto` still writes. Derivation: `references/report-templates.md` (*Run-log entry — field derivation and suppression*), per `references/docs/run-log-schema.md`.
 
 ```bash
-# Exactly one of these runs. --echo validates the telemetry you return and writes nothing.
+# Exactly one runs. --echo validates the telemetry you return and writes nothing.
 if [ -n "$no_run_log" ]; then printf '%s' "$run_json" | python3 references/scripts/gi-runlog.py --echo; else printf '%s' "$run_json" | python3 references/scripts/gi-runlog.py --append; fi
 # Fallback when `python3` is unavailable or the script exits 4: mkdir -p .gitissue && printf '%s\n' "$run_json" >> .gitissue/runs.jsonl
 ```
 
-**Exit 3:** the record itself is invalid — the script printed the reason on stderr and wrote nothing. This is a stop, not a degrade: never append `$run_json` raw, because that writes the malformed line the script exists to reject. Correct the record and re-run, or drop the line.
-
-Only the *write* is best-effort and non-fatal — a write that cannot happen (no `python3`, exit 2 for an unresolved script path or a malformed invocation, exit 4) never blocks the reported run result; use the fallback append above for any of them, never for exit 3. A rejected record is never written by any path. Only append; never rewrite or reorder existing lines.
+**Exit 3:** the record is invalid and nothing was written — a stop, not a degrade: never append `$run_json` raw. Correct the record and re-run, or drop the line. Every other write failure is **non-fatal** — use the fallback append, never block the result. Only append; never rewrite or reorder lines.
 
 ---
 
 ## Closing Summary
 
-After the pipeline completes, print **one** closing block carrying only what the
-live `[N/5]` tracker never printed: the outcome line, the `risk_rating`, and the
-single PR reference (number, title, URL, `Closes #N`). Repeating any tracker
-metric — per-step pass/fail, files read, complexity, option, files changed, test
-counts, QA cycles — is the duplication issue #165 removed. Use the matching
-variant in `references/report-templates.md` (*Closing Summary*): *Successful
-Resolution* (every step passed), *Resolution With Warnings* (QA left residual
-issues or another step warned), or *Already Resolved* (Step 0/1 found the issue
-already closed — no PR reference). The *Expected Inline Pipeline Output* example
-in the same file shows the tracker and closing block together. **Then the run-stats footer.** Close with the *Run Stats Footer* — `references/run-stats.md` — `elapsed`, `tokens` only where the host reported a count (otherwise left out), `agents`, run cost only, `n/a` for anything else undetermined. It is the last thing printed at **every** terminal outcome, including the ones that never reach this block: a preflight stop (`not found`, `closed`, `pr_in_progress`), an invalid-config stop, `already_resolved`, a blocked secret scan, a failed final test run, or any failed step.
+Emit **one** closing block with only what the `[N/5]` tracker never printed: the outcome line, `risk_rating`, the PR reference (number, title, URL, `Closes #N`). Use the matching variant in `references/report-templates.md` (*Closing Summary*). **Then the run-stats footer** — `references/run-stats.md`: elapsed, tokens only where the host reported a count (else left out), agents, run cost only, `n/a` otherwise. It prints last at **every** terminal outcome, including those never reaching this block — a preflight stop (`not found`, `closed`, `pr_in_progress`), an invalid-config stop, `already_resolved`, a blocked scan, a failed final test run, any failed step.
 
 ---
 
 ## Auto-Pilot Mode
 
-When invoked with `--auto` (or by `/auto-pilot`), the entire pipeline runs without user interaction. Each step above already states its own auto behavior; these are the cross-cutting invariants:
+With `--auto` (or under `/auto-pilot`) the pipeline runs without user interaction. Each step states its auto behavior; the invariants:
 
-- **Environment:** Export `IDD_AUTO_MODE=1` before any shell snippet that consults it (`references/docs/pre-commit-security.md`).
-- **Workspace:** The default resolution path is in-place. Skip Step 0e and allow no `git worktree add` on the default resolution path; ordinary standalone auto mode and auto-pilot's default single-lane path run mandatory Repo Sync, then *0f*, exactly as before. A resolver launched by auto-pilot with `max_parallel > 1` may receive `IDD_CALLER_WORKTREE=1`; after the linked-worktree/branch validation in `references/pipeline-steps.md`, it uses that already-current workspace without creating, falling back from, or cleaning it up. The prompt never appears on either path.
-- **Never blocks:** *0c* skips the assignment guard and logs blocking labels as warnings; *0g* still runs (reads the pre-work `Effort` band, no prompt); *Step 1* closes an already-resolved issue with a comment and exits cleanly; *Step 2* auto-selects the recommended option and design-confirm never appears; *Step 3* continues past the max-commits guard with a warning and never prompts for skills (internal agents only unless `resolve.borrow_skills` is true — then auto-selects/borrows); *Step 4* runs its cycles autonomously and delivers with known issues on stagnation. Every terminal outcome still runs borrow teardown.
-- **Deliver:** Create PR. Do NOT merge — merging is `/auto-pilot` or `/issue-pr-review`'s job. Under `/auto-pilot` the selected `profile` is **returned** in the telemetry (with `--no-run-log`) and folded into auto-pilot's single run-log line; a standalone `--auto` run writes `profile` itself.
+- **Environment:** export `IDD_AUTO_MODE=1` before any shell snippet consulting it (`references/docs/pre-commit-security.md`).
+- **Workspace:** in-place is the default resolution path. Skip Step 0e and allow no `git worktree add` on the default resolution path; run mandatory Repo Sync, then *0f*. With `max_parallel > 1` a resolver may receive `IDD_CALLER_WORKTREE=1` and use that workspace, never creating or cleaning it up.
+- **Never blocks:** every decision point has a defined auto behavior (*Auto-mode behavior by step*); every terminal outcome still runs borrow teardown.
+- **Deliver:** create the PR; never merge — `/auto-pilot`'s or `/issue-pr-review`'s job. Under `/auto-pilot` the `profile` is **returned** in telemetry; a standalone `--auto` run writes it.
 
-No `[y/N]` prompts, no `Choose:` prompts, no `Continue?` prompts. Every decision point has a defined auto behavior.
+No `[y/N]`, `Choose:` or `Continue?` prompts.
 
 ## Edge Cases
 
-No acceptance criteria, empty issue body, large issues (20+ files), test failure/timeout, and branch-already-exists are all handled — full behavior for each is in `references/pipeline-steps.md` (*Edge Cases*).
+Missing acceptance criteria, empty issue body, large issues (20+ files), test failure or timeout, branch-already-exists: *Edge Cases*.
 
 ## Platform Driver and Output Conventions
 
-All tracker access follows the GitHub driver — `--json` with explicit field selection, never parsed text output. The full operation catalog and driver rules live in references/docs/platform-github.md.
-
-Terminal output follows the `references/docs/terminal-style.md` contract — symbols `● ✓ ✗ ◆ ⚡ ⚠ ○`, two-space indent, `┄` separators, URLs on their own line, ≤80 chars, one blank line between sections, static sequential output (no animation), plus the `[N/5]` pipeline step counter. Errors use the rich format from `references/error-messages.md`: `✗ what failed`, then `To fix:  <command>`, then a docs link when applicable.
-
-## Additional Resources
-
-Navigation index for the *Bundled dependency precheck* list above (that list, not this one, is the authoritative guard).
-
-**Agents** (`shared/agents/`): `codebase-researcher.md` (Step 1) · `synthesizer.md` (Step 2) · `implementer.md` (Step 3) · `code-reviewer.md` (Step 4) · `ui-reviewer.md` (Step 4) · `fixer.md` (Step 4)
-
-**References** (`references/`): `pipeline-steps.md` (payloads/phases/fallbacks, Steps 0e–4, edge cases) · `report-templates.md` (PR body, closing summary, run-log fields, expected output) · `bug-verification.md` (reproduction checkpoint, Step 3) · `skill-index.md` (external-skill catalog, Step 3) · `error-messages.md` (error catalog)
-
-**Docs** (`docs/`): `sync-conventions.md` · `naming-conventions.md` · `pre-commit-security.md` · `idd-methodology.md` · `github-projects-sync.md` · `config-schema.md` · `run-log-schema.md` · `agent-model-effort.md` · `shared-agent-conventions.md` · `platform-github.md` · `terminal-style.md` · `ui-review.md` — the repo-root `DESIGN.md` is the human-facing companion to the last of these (color palette, per-command mockups) and is **not** bundled.
+Tracker access uses the GitHub driver — `--json` with explicit fields, never parsed text (references/docs/platform-github.md). Output follows `references/docs/terminal-style.md` — `● ✓ ✗ ◆ ⚡ ⚠ ○`, two-space indent, `┄` separators, URLs on their own line, ≤80 chars, static sequential output (no animation), the `[N/5]` counter. Errors use `references/error-messages.md`'s format: `✗ what failed`, `To fix:  <command>`, a docs link.
