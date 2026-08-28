@@ -19,7 +19,9 @@ an issue-derived value on that command line.
 ## The canonical rules
 
 Apply the same rules `gi-dup-score.py` implements, so a degraded run and a
-scripted run reach the same verdict:
+scripted run reach the same verdict. The weights, thresholds and limits come
+from the once-loaded `duplicate_detection.*` config; their names and defaults
+are in `docs/config-schema.md`.
 
 - NFKC/case-fold tokens.
 - One minimum-length policy and one additive stop-word policy.
