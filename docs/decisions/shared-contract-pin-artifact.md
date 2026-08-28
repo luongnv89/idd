@@ -233,11 +233,16 @@ same gate as Step 2" creates a real failure mode in which a stale marker skips
 the suite. The duplication is a gate stated at each site that applies it, which
 is exactly what the contract requires.
 
-T20 is therefore **not relaxed and not re-targeted**. It is the canonical
-example of an assertion whose subject genuinely is placement: what it pins is
-that *each decision site states its own gate*. Package resolution does not
-change that — both spans still resolve, and both must still carry all eight
-patterns.
+T20 is therefore **not relaxed**, and its two decision-site spans
+(`rv-step2-prepass`…`rv-step3-analyze` and `rv-step4-tests`…`rv-step5-ci`,
+T20.1–T20.16) stay **file-scoped on purpose**. They are the canonical example of
+an assertion whose subject genuinely is placement: what they pin is that *each
+decision site states its own gate*. Both spans still carry all eight patterns.
+
+T20's remaining checks (T20.17–T20.27) are ordinary relocatable contracts in
+`references/review-loop-mechanics.md` and `references/report-templates.md`, and
+they do move to the package root — the distinction is per assertion, not per
+test file.
 
 ## Consequence for every child of #413
 
