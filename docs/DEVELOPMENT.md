@@ -171,6 +171,37 @@ before matching.
 The library's header is the full convention reference, including the rule that
 its `.bash` extension keeps it out of `git ls-files 'tests/*.sh'`.
 
+### The governed artifact is the skill package (issue #426)
+
+A shared-contract assertion pins a *behaviour*, and a behaviour belongs to the
+skill **package** — the SKILL body plus that skill's own `references/*.md` —
+not to whichever file currently carries the prose. Every anchor helper therefore
+accepts a **package directory** wherever it accepts a file:
+
+```bash
+anchor_check "$REPO_ROOT/src/skills/issue-pr-review" rvm-never-gated 'gi-secscan' "…"
+```
+
+The anchor must be unique across the whole package, so a contract that moves
+between files keeps its assertion and a contract duplicated into two files still
+fails. Bundled `references/agents/`, `references/docs/` and `references/scripts/`
+are **outside** the package: they are copies of sources under `src/shared/` and
+`docs/`, and a copy is not a second contract site. `/idd-doctor` has no built
+tree, so its governed artifact is `src/internal-skills/idd-doctor/` alone.
+
+Keep the **file** form where the contract's subject genuinely is placement —
+ordering, adjacency, or a gate that must be restated at each site that applies
+it. `tests/test-qa-handoff-255.sh` T20 is the worked example: the `tests=` skip
+is decided independently at Step 2 and at Step 4, so each site must carry the
+whole three-part AND, and the assertion stays file-scoped on purpose.
+
+Relocation is bounded. Prose may leave a SKILL body — taking its anchor and its
+assertions with it — only when the material is **conditional at run time**.
+Material the body gates with *read it now* is loaded on every run, so moving it
+shrinks `wc -w` and shrinks nothing else. See
+[`docs/decisions/shared-contract-pin-artifact.md`](decisions/shared-contract-pin-artifact.md)
+for the rule, the per-skill measurement behind it, and the recorded exception.
+
 Migrated onto `tests/lib/anchors.bash` (heading extracts are `anchor_span` /
 `anchor_region`; remaining assertions are machine tokens, polarity-bearing
 stems, or behavioral checks):
