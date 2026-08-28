@@ -4,7 +4,7 @@ description: "Generate a .gitissue.yml by auto-detecting a repo's stack, test ru
 license: MIT
 compatibility: "Requires git. No GitHub CLI or authentication needed — generates a local config file only."
 metadata:
-  version: 0.3.6
+  version: 0.3.7
   author: Luong NGUYEN <luongnv89@gmail.com>
   effort: low
 ---
