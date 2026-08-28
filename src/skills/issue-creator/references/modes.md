@@ -200,6 +200,8 @@ Print a structured step-by-step summary:
   https://github.com/owner/repo/issues/{N}
 ```
 
+Then the *Run Stats Footer* (`references/run-stats.md`) — the last thing a Normalize run prints, at **every** terminal outcome, the stops of Steps 1-4 and a failed update included.
+
 ---
 
 ## Mode: Batch Create
@@ -424,6 +426,8 @@ The retry hint shows the single-create invocation for each failed item, so the u
   Epic binding:      ✓ pass (bound to #40, checklist updated)
 ```
 
-If the parent checklist update failed (Step 5.5 warning), show `⚠ warn (children created, parent #40 checklist not updated)` instead. When no parent is bound, the footer is exactly as shown above with no Epic binding line.
+If the parent checklist update failed (Step 5.5 warning), show `⚠ warn (children created, parent #40 checklist not updated)` instead. When no parent is bound, the summary is exactly as shown above with no Epic binding line.
+
+Then the *Run Stats Footer* (`references/run-stats.md`) — the last thing a Batch run prints, at **every** terminal outcome, a cancelled approval and a fully failed batch included. **One footer covers the whole batch**, never one per issue.
 
 ---

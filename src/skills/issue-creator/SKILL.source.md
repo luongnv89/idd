@@ -299,27 +299,27 @@ Resolve the template directory from `issue.template`: `"default"` → this skill
 Create issue? [Y/n]
 ```
 
-The `Images:` line appears only when images were provided. Show count and upload status. If some failed: `Images: 1/2 uploaded (1 failed)`. The `⚡ Model:` line appears only when `model_suggestion.enabled`; render it per the two-model rendering rule in `references/model-suggestion.md`.
+`Images:` appears only when images were provided, showing count and upload status (`Images: 1/2 uploaded (1 failed)` when some failed). `⚡ Model:` appears only when `model_suggestion.enabled`; render it per the two-model rendering rule in `references/model-suggestion.md`.
 
 Wait for confirmation. If declined, stop without creating.
 
-**Auto mode (`docs/auto-mode.md`) — never blocks.** Print the preview block (it is the record of what was created), then **auto-approve** it instead of showing `Create issue? [Y/n]`, and log:
+**Auto mode (`docs/auto-mode.md`) — never blocks.** Print the preview block — it is the record of what was created — then **auto-approve** it instead of showing `Create issue? [Y/n]`, and log:
 
 ```
   ⚠ Auto mode: create confirmation skipped — issue auto-approved from the preview above.
 ```
 
-Proceed to Step 6. There is no auto-mode path that declines — a run that should not create an issue is one that should not have been started.
+Proceed to Step 6. No auto-mode path declines: a run that should not create an issue is one that should not have started.
 
 ### Step 6 — Create Issue
 
-When `issue.labels_auto_suggest` is true, pass suggested labels on create; when false, omit `--label` entirely (preview must not show a Labels line except when auto-suggest is on).
+When `issue.labels_auto_suggest` is true, pass the suggested labels on create; when false, omit `--label` entirely, and the preview shows no Labels line.
 
 ```bash
 gh issue create --title "{title}" --body "{populated_template}" [--label "{labels}"]
 ```
 
-The body is the fully populated template including `<!-- gitissue:normalized v1 -->` at the top.
+The body is the fully populated template, `<!-- gitissue:normalized v1 -->` at the top.
 
 Print a structured step-by-step summary:
 
@@ -340,64 +340,43 @@ Print a structured step-by-step summary:
   https://github.com/owner/repo/issues/42
 ```
 
-In auto mode the `Preview:` line reads `✓ auto-approved` instead of `✓ approved` — the summary must not report an approval no human gave (`docs/auto-mode.md`).
+In auto mode the `Preview:` line reads `✓ auto-approved`, not `✓ approved` — the summary must not report an approval no human gave (`docs/auto-mode.md`).
 
-If duplicates were found but the run proceeded anyway:
+If duplicates were found and the run proceeded anyway:
 ```
   Duplicates:        ⚠ warn ({N} potential duplicates, {override_source})
 ```
 
-`{override_source}` is `user overrode` in interactive mode and `auto-approved` in auto mode — never report a human decision that no human made (`docs/auto-mode.md`).
+`{override_source}` is `user overrode` interactively and `auto-approved` in auto mode — never report a human decision no human made (`docs/auto-mode.md`).
 
-On failure, output the matching error from `references/error-messages.md`.
+On failure, print the matching error from `references/error-messages.md`.
 
 ---
 
 ## Modes: Normalize & Batch Create
 
-In addition to **Create**, the skill supports two more modes, each with its own step-by-step flow:
-
-- **Normalize** — fetch an existing issue, classify it, fill in missing sections, and update the issue body.
-- **Batch Create** — parse a multi-item input, preview parsed items, and create one issue per item with per-item success/failure tracking.
-
-Full per-mode step specs and error paths live in `references/modes.md`. Example runs (batch from a planning document, create from a vague description) live in `references/examples.md`.
+**Normalize** fetches an existing issue, classifies it, fills in missing sections, and updates the body. **Batch Create** parses a multi-item input, previews the parsed items, and creates one issue per item with per-item success/failure tracking. Both step specs, their error paths and their terminal reports live in `references/modes.md` — **read it now** when the run is in either mode. Worked example runs are in `references/examples.md`.
 
 ---
-## Platform Driver
-
-All tracker access follows the GitHub driver — `--json` with explicit field selection, never parsed text output. The full operation catalog and driver rules live in docs/platform-github.md.
 
 ## Output Conventions
 
-Terminal output follows the `docs/terminal-style.md` contract — symbols `● ✓ ✗ ◆ ⚡ ⚠ ○`, two-space indent, `┄` separators, URLs on their own line, ≤80 chars, one blank line between sections, static sequential output (no animation); issue-creator additionally uses `+` (added field) and `=` (preserved field). Errors use the rich format from `references/error-messages.md`: `✗ what failed`, then `To fix:  <command>`, then a docs link when applicable.
+All tracker access follows the GitHub driver — `--json` with explicit field selection, never parsed text output; the operation catalog and driver rules are in docs/platform-github.md. Terminal output follows the `docs/terminal-style.md` contract — symbols `● ✓ ✗ ◆ ⚡ ⚠ ○`, two-space indent, `┄` separators, URLs on their own line, ≤80 chars, one blank line between sections, static sequential output (no animation); issue-creator adds `+` (added field) and `=` (preserved field). Errors use the rich format from `references/error-messages.md`: `✗ what failed`, then `To fix:  <command>`, then a docs link when applicable.
 
 ## GitHub Projects Sync
 
-After each issue is created (single or batch), if `projects.sync_enabled` is `true` in `.gitissue.yml`, sync it to the repo's GitHub Project board per `docs/github-projects-sync.md`: discover the linked project (or use the cached project ID), add the issue, and set its Status to `projects.status_map.todo` (default: "Todo"), printing `✓ Added to project "{project_title}" — Status: Todo`.
-
-If `projects.sync_enabled` is `false` (default), skip silently. If any sync step fails, print a `⚠` warning and continue — never block issue creation on project sync failure. See `docs/github-projects-sync.md` for error messages and graceful degradation details.
+After each issue is created (single or batch), when `projects.sync_enabled` is `true`, sync it to the repo's board per `docs/github-projects-sync.md`: discover the linked project (or reuse the cached project ID), add the issue, set its Status to `projects.status_map.todo` (default: "Todo"), and print `✓ Added to project "{project_title}" — Status: Todo`. When `false` (the default), skip silently. Any sync failure prints a `⚠` warning and continues — project sync never blocks issue creation; that document carries the error messages and degradation details.
 
 ## Expected Output
 
-A successful create prints the issue URL and a compact summary:
+A successful create prints Step 6's `◆ Issue Created` block: its `Result: DONE` line, then the issue number, title, and URL. Normalize and Batch print their own reports (`references/modes.md`, Steps 12 and 6) — in batch mode one line per issue plus a totals footer (`✓ 5 created, 1 skipped (duplicate)`).
 
-```
-  ✓ Issue #42 created
-    https://github.com/owner/repo/issues/42
-
-  Title:  Fix mobile auth redirect loop
-  Type:   bug (high confidence)
-  Labels: bug, auth, mobile
-```
-
-In batch mode, one line per issue is printed followed by a totals footer (`✓ 5 created, 1 skipped (duplicate)`).
-
-**Then the run-stats footer.** Close with the *Run Stats Footer* — `references/run-stats.md` — `elapsed`, `tokens` only where the host reported a count (otherwise left out), `agents`, run cost only, `n/a` for anything else undetermined. It is the last thing printed at **every** terminal outcome, including a run that created nothing — a cancelled confirmation, a duplicate the user chose not to file, an invalid config, or a failed `gh issue create`. In batch mode one footer covers the whole batch, never one per issue.
+**Then the run-stats footer.** Close with the *Run Stats Footer* — `references/run-stats.md` — `elapsed`, `tokens` only where the host reported a count (otherwise left out), `agents`, run cost only, `n/a` for anything else undetermined. It is the last thing printed at **every** terminal outcome, in every mode, including a run that created nothing — a cancelled confirmation, a duplicate the user chose not to file, an invalid config, or a failed `gh issue create`. In batch mode one footer covers the whole batch, never one per issue.
 
 ## Edge Cases
 
-- **Duplicate detection** — if an existing open issue closely matches, the skill asks before filing; the user can dedupe or create anyway (interactive; in auto mode see the Step 3 auto-mode carve-out).
-- **Screenshot-only input** — the image is inspected, described in text, and a structured issue is drafted; the image is also attached to the issue body.
-- **Ambiguous batch input** — if item boundaries are unclear, the skill shows a parsed preview and asks for confirmation before creating (interactive; in auto mode see the Batch Step 4 auto-mode carve-out).
+- **Duplicate detection** — a closely matching open issue is raised before filing; the user dedupes or creates anyway (auto mode: the Step 3 carve-out).
+- **Screenshot-only input** — the image is inspected, described in text, drafted into a structured issue, and attached to the body.
+- **Ambiguous batch input** — unclear item boundaries get a parsed preview and a confirmation before creating (auto mode: the Batch Step 4 carve-out).
 - **GitHub API rate limit** — creation stops at the last successful issue; the partial result is reported with a resume hint.
-- **Empty body** — the issue is created with only a title; `(needs review)` is noted in the metadata section.
+- **Empty body** — the issue is created with only a title, `(needs review)` noted in Metadata.
