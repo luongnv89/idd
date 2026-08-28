@@ -65,7 +65,14 @@ Source and built `SKILL.md` measure identically (3031 words / 330 lines), as the
 baseline.
 
 `metadata.version`: **0.17.0 → 0.18.0** (minor — sections relocated to `references/`, one
-new dependency-preflight rule; no behavior or output-format change).
+new dependency-preflight rule). One printed string did change, and it is called out rather
+than folded into "no output-format change": the config degrade warning is now
+`⚠ gi-config unavailable — reading .gitissue.yml by hand` instead of
+`… — using the inline defaults below`, because this skill's inline defaults became a key list
+plus a `docs/config-schema.md` pointer, leaving the old wording pointing at something no
+longer there. That literal is not in `references/error-messages.md` — it has never been
+catalogued for any skill — so nothing was orphaned, but the resolver's warning now differs
+from the identical line the other six skills still print, where it remains accurate.
 
 ### What moved, and where
 
@@ -102,9 +109,10 @@ every commit by a scripted guard over the phrases the suite pins to `SKILL.sourc
 suite on the rebuilt tree. **Neither is evidence that meaning survived.** Both answer one
 question — *is every pinned literal still present?* — and a sentence can lose its verb, its
 pointer, or a fallback branch without disturbing a single pinned literal. This pass ran green
-on all 83 test files while dropping three pieces of instruction semantics: the `warn` verb in
+on 82 of the 83 test files — the 83rd being the pre-existing macOS `wc` artifact in §6, which
+predates it — while dropping three pieces of instruction semantics: the `warn` verb in
 0d and the `references/error-messages.md` pointer behind it, the `○ First run` print on the
-config degrade path, and the *static sequential output — no animation* rule. All three were
+config degrade path, and the *static sequential output (no animation)* rule. All three were
 found by human review afterwards and restored in the follow-up commit. Suite-green is
 consistent with semantic loss. The instrument that actually catches it is a word-level diff
 (`git diff --word-diff`) read one removed word at a time, asking of each whether it is a verb,

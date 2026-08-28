@@ -327,4 +327,4 @@ Missing acceptance criteria, empty issue body, large issues (20+ files), test fa
 
 ## Platform Driver and Output Conventions
 
-Tracker access uses the GitHub driver — `--json` with explicit fields, never parsed text (docs/platform-github.md). Output follows `docs/terminal-style.md` — `● ✓ ✗ ◆ ⚡ ⚠ ○`, two-space indent, `┄` separators, URLs on their own line, ≤80 chars, static sequential output — no animation, the `[N/5]` counter. Errors use `references/error-messages.md`'s format: `✗ what failed`, `To fix:  <command>`, a docs link.
+Tracker access uses the GitHub driver — `--json` with explicit fields, never parsed text (docs/platform-github.md). Output follows `docs/terminal-style.md` — `● ✓ ✗ ◆ ⚡ ⚠ ○`, two-space indent, `┄` separators, URLs on their own line, ≤80 chars, static sequential output (no animation), the `[N/5]` counter. Errors use `references/error-messages.md`'s format: `✗ what failed`, `To fix:  <command>`, a docs link.
