@@ -4,7 +4,7 @@ description: "Review a PR end-to-end with CI checks, fix cycles, and optional au
 license: MIT
 compatibility: "Requires git and GitHub CLI (gh) with authentication. Self-contained — uses shared agents from shared/agents/."
 metadata:
-  version: 2.6.0
+  version: 2.7.0
   author: Luong NGUYEN <luongnv89@gmail.com>
   effort: high
 ---

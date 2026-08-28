@@ -8,8 +8,18 @@
 
 > **Two gates are left unresolved, both on body length:** Gate 1's *under 3000
 > words* threshold, and Gate 2's *every category >= 8* floor, which for this skill
-> is decided by `context-efficiency` and `context-efficiency` alone. §6 states
-> the measured reason rather than an estimate. Everything else passes.
+> is decided by `context-efficiency` and `context-efficiency` alone. Everything
+> else passes: overall 93/A, every other category 10, `quick_validate.py` exit 0,
+> 380 lines against the 500 cap.
+>
+> §6 is not an estimate and not a judgement call. The body is 4376 `wc -w`; the
+> gate needs ≤ 3065. Of those words, **2835 sit on the 70 lines that carry a
+> verified test assertion** and **672 are structural** (fences, tables, headings,
+> the precheck list). Deleting *all* 869 remaining words of free prose still
+> lands at 3507 — 442 words short. The target is unreachable without either
+> deleting operative instruction or changing what the suite asserts, and #417
+> puts test changes out of scope. §6.1 gives the method and the two constraint
+> classes that do not show up as word counts.
 
 Measurement convention: `src/skills/<name>/` holds `SKILL.source.md`, not
 `SKILL.md`, so `quick_validate.py` and `asm eval` cannot read the authored source.
@@ -33,10 +43,10 @@ apart — a property of this frontmatter, not a constant.
 |------|-------|----------|-------|
 | **Gate 1** | `quick_validate.py` exit | not measured at baseline | **0 — "Skill is valid!"** |
 | Gate 1 | Frontmatter audit (`asm eval` → `structure`) | 10/10 | **10/10** |
-| Gate 1 | Body under 500 lines | 500 / 500 (**at cap**) | **422 (pass)** |
-| Gate 1 | Body under 3000 words | **6148 (FAIL)** | **4539 (still FAIL)** — §6 |
+| Gate 1 | Body under 500 lines | 500 / 500 (**at cap**) | **380 (pass)** |
+| Gate 1 | Body under 3000 words | **6148 (FAIL)** | **4311 (still FAIL)** — §6 |
 | Gate 1 | Negative-trigger clause in description | pass | pass (description untouched) |
-| Gate 1 | `metadata.version` semver + `metadata.author` | pass (2.5.0) | **pass (2.6.0)** |
+| Gate 1 | `metadata.version` semver + `metadata.author` | pass (2.5.0) | **pass (2.7.0)** |
 | Gate 1 | `docs/README.md` opens with the AI-skip comment | pass | pass |
 | Gate 1 | Bundled scripts print descriptive stderr | pass | pass |
 | Gate 1 | Dependency preflight (conditional) | **not applicable** | **not applicable** — §3 |
@@ -59,8 +69,8 @@ Per-category (`asm eval --json skills/issue-pr-review`, built tree):
 Body size, command of record:
 
 ```
-wc -w < src/skills/issue-pr-review/SKILL.source.md   # 6213 → 4604
-wc -l < src/skills/issue-pr-review/SKILL.source.md   #  500 →  422
+wc -w < src/skills/issue-pr-review/SKILL.source.md   # 6213 → 4376
+wc -l < src/skills/issue-pr-review/SKILL.source.md   #  500 →  380
 ```
 
 Source and built `SKILL.md` measure identically, as they did at baseline.
@@ -251,7 +261,7 @@ hold. Any miss and the answer is Mode 1, or nothing"*):
 
 - **Precondition 1, verbatim:** *"The target **clears Gate 1** already. A
   conversion on top of an unpublishable skill compounds two problems; retrofit
-  first."* This target does **not** clear Gate 1 — its body is 4539 words against
+  first."* This target does **not** clear Gate 1 — its body is 4311 words against
   the 3000 threshold (§6). On its own this settles the mode.
 - **Precondition 4, verbatim:** *"**The user has confirmed the restructure in this
   run.** Name the steps you would convert and the version bump it forces, and
@@ -279,28 +289,65 @@ code block, `+1` a tokens/budget mention) are already earned, so the category is
 6 and cannot reach the floor of 8 until the body is under 3000. Overall 93 is
 comfortably above the >85 bar and is not the blocker.
 
-The pass took the body from **6148 → 4539** asm words (−26%) and **500 → 422**
-lines. It stopped there because the remainder is contract that the repo's own
-test suite pins to `SKILL.source.md` **by file**. Composition of the final 4539:
+The pass took the body from **6148 → 4311** asm words (−30%) and **500 → 380**
+lines. It stopped there because what remains is contract that the repo's own
+test suite pins to `SKILL.source.md` **by file, by phrase, and in some cases by
+line and by region**. The composition below is measured, not estimated — the
+method is in §6.1.
 
 | Component | Words | Movable? |
 |---|---:|---|
-| Fenced output blocks, tables, headings | 680 | Partly — but no test pins them, and they are the skill's display contract |
-| Prose lines carrying an assertion that greps `SKILL.source.md` | ~2250 in 41 lines | **No** — the assertion names this file |
-| Remaining prose (gate conditions, exit codes, degrade paths, pointers) | ~1600 | Already cut roughly in half this pass |
+| Words on the **70 lines** that carry at least one verified assertion greping `SKILL.source.md` | **2835** | Only *around* the literal. The line must keep the asserted phrase, and several assertions are line-oriented conjunctions that forbid re-wrapping. |
+| Structural words — fenced blocks, tables, headings | **672** | Mostly no. The *Expected output* fence is what the evaluator's `testability` check matches, and the *Bundled dependency precheck* list is asserted by `test-scripts-pipeline-251.sh` T1. |
+| Free prose — not on an assertion line, not structural | **869** | Yes, in principle. |
 
-The 41 protected lines are not incidental phrasing. They are the *QA handoff
-gate* verdict table and its *Precedence* rule
-(`tests/test-qa-handoff-255.sh`, ~30 assertions against `$SRC_PR`/`$BUILT_PR`),
-the `gi-config` load contract (`test-scripts-pipeline-251.sh` T5), the run-stats
-call site (`test-run-stats-373.sh` AC1/AC2/AC3 and #410's conditional-token
-clause), the soft/strict-pass conjunction
-(`test-phase1-contract-truthfulness.sh` F5), the `--review-only` authoritative
-definition (`test-consolidated-blocks-248.sh` T4.1), the reviewer-collapse
-claims, the `rv-*` anchor spans (`test-followup-context-285.sh`), and the two
-#36 hard-blocks. Reaching 3000 would mean cutting those lines to roughly
-18-word carriers, which drops the surrounding exit codes, skip conditions and
-stop-vs-degrade distinctions they exist to state.
+**This is the arithmetic that closes the question.** Reaching Gate 1 needs
+`wc -w` ≤ 3065 (asm ≤ 3000), i.e. **1311 more words**. Deleting *every one of the
+869 free-prose words* — every pointer, every degrade path, every stop condition
+not currently under a grep — still lands at 3507 `wc -w` / **3442 asm**, which
+fails Gate 1. The remaining 442 words would have to come out of the 70
+assertion-carrying lines or the structural block. So the target is not reachable
+by relocation; it is reachable only by deleting operative instruction or by
+changing what the tests assert, and #417 rules the latter out of scope.
+
+For scale: the pure pinned-literal text — the characters a test matches
+verbatim — is **18.6%** of the body (~815 words). The gap between that 815 and
+the 2835 words on those lines is the instruction the literals sit inside, which
+is why "only 18% is pinned" does **not** mean 82% is removable.
+
+### 6.1 How the composition was measured
+
+The 20 test files that assert against this skill were enumerated (the 9 that name
+it obviously, plus 11 found by sweeping every tracked `tests/*.sh` for loops,
+arrays and glob sweeps that reach it: `test-secscan-policy-274.sh`,
+`test-scripts-252.sh`, `test-scripts-pipeline-251.sh`, `test-run-stats-373.sh`,
+`test-disclosure-gates-250.sh`, `test-skill-line-cap-247.sh`,
+`test-skill-frontmatter-keys-307.sh`, `test-agent-conventions-inline-245.sh`,
+`test-flattened-self-contained.sh`, `test-root-skills-install-surface.sh`,
+`test-bundled-doc-slimming-249.sh`). That yields **281 distinct assertions**, of
+which 113 are positive line-oriented patterns against the body; those 113 were
+replayed with `grep -noE` to mark the exact matched character spans, and the
+spans were aggregated per line and per section.
+
+Two classes of constraint do not show up as words but bound the rewrite anyway:
+
+- **Region and span assertions.** `tests/lib/anchors.bash` bounds an
+  `anchor_check` region at the next heading or the next `<!-- a:… -->`, so the
+  eight assertions on `rv-depth-gate-refresh` must all live inside that one
+  region. `anchor_span` additionally pins anchor *ordering*, and three spans
+  (`rv-commit-autofix`→`rv-step3-analyze`, `rv-verify-gates`→`rv-step4-tests`,
+  `rv-step5-ci`→`rv-step6-fix`) must **not** contain the string `qa_handoff`.
+- **Test-mandated duplication.** `test-qa-handoff-255.sh` T20 requires the same
+  eight patterns — including `ci_leg_runnable`, `empty statusCheckRollup|no_ci`
+  and "ignore `tests=` and run the local suite as unmarked" — in **both** the
+  Step 2 span and the Step 4 span. The obvious "state it once, point from the
+  other" dedup is therefore forbidden, not merely unhelpful.
+
+Two further lines are fixed by the evaluator rather than the suite: the labelled
+*Expected output* fence (which earned `testability` 10 in this same PR) and the
+destructive-auto-merge paragraph with its three gates (which earned `safety` 10).
+Removing either to save words would re-break a gate this PR already closed.
+
 
 **The honest position:** this skill's practical floor is around 4000–4200 words
 while those contracts stay where the tests require them. Closing the gate
@@ -337,8 +384,10 @@ The field set was not widened, reordered or renamed.
 
 | File | Change |
 |---|---|
-| `src/skills/issue-pr-review/SKILL.source.md` | 6213 → 4604 `wc -w`, 500 → 422 lines; `metadata.version` 2.5.0 → 2.6.0; *Expected output* label and the destructive auto-merge rule added; *Additional Resources* deleted |
-| `src/skills/issue-pr-review/references/review-loop-mechanics.md` | two new sections — *Config keys and what they gate* (now also carrying every default value) and *Binding the head-ref name* |
+| `src/skills/issue-pr-review/SKILL.source.md` | 6213 → 4376 `wc -w`, 500 → 380 lines; `metadata.version` 2.5.0 → 2.7.0; *Expected output* label and the destructive auto-merge rule added; *Additional Resources* deleted |
+| `src/skills/issue-pr-review/references/review-loop-mechanics.md` | two new sections — *Config keys and what they gate* (now also carrying every default value, plus *Why the working directory and the script path both matter*) and *Binding the head-ref name*; *Why reuse the reviewer* gains *What the `trusted` collapse actually buys* |
+| `src/skills/issue-pr-review/references/ui-review-mechanics.md` | new *The two legs, and why only one of them can be blocked* |
+| `src/skills/issue-pr-review/references/error-messages.md` | new *Merge conflict with base* — the rebase-command block the Edge Cases pointer now depends on |
 | `skills/issue-pr-review/SKILL.md` | regenerated (`./scripts/build.sh`) |
 | `skills/issue-pr-review/references/review-loop-mechanics.md` | regenerated |
 | `docs/experiments/skill-auto-improver-issue-pr-review.md` | this report |
