@@ -4,24 +4,25 @@ Exact spawn calls and the token-trade rationale for the reviewer/fixer agents us
 
 ## Config keys and what they gate
 
-SKILL.md's *Configuration* section lists the keys and their default values; this is
-what each one does to the pipeline. Value syntax and validation live in
-`references/docs/config-schema.md`.
+SKILL.md's *Configuration* section names the loader and its degrade path; this is
+the full key list — every default value, and what each key does to the pipeline.
+It is also the list to read `.gitissue.yml` against by hand when `gi-config` is
+unavailable. Value syntax and validation live in `references/docs/config-schema.md`.
 
-| Key | What it gates |
+| Key (default) | What it gates |
 |-----|---------------|
-| `review.max_cycles` | Cycle cap for Steps 3–6. Three LLM cycles suffice once the script pre-pass has handled the mechanical issues. Step 1's `light` profile and `qa_handoff = trusted` each cap it at `min(1, configured_cap)`. |
-| `review.adaptive_depth` | Scales review depth to the PR's complexity (*Depth gate*). When `false`, every PR gets full-depth review — `profile` is pinned to `full` — and the *QA handoff gate* is skipped with `qa_handoff = absent`. |
-| `review.auto_merge` | Honored only in `--auto` mode. Interactive `/issue-pr-review` never merges regardless of this flag, and `--no-merge` suppresses the merge even in auto mode. |
-| `review.confidence_threshold` | Minimum confidence for code-reviewer findings. The ui-reviewer keeps its own 75 floor and does not read this key. |
-| `review.run_tests` / `review.check_ci` | Enable Step 4 and Step 5. When either is `false` the step reports `○ … skipped` and the soft-pass conjunction treats that leg as satisfied. |
-| `review.ci_poll_interval` / `review.ci_timeout` / `review.test_timeout` | Seconds. The first two are passed to `gi-ci-wait.py` as `--interval` / `--timeout`; the third bounds the Step 4 suite. |
-| `review.soft_pass` | `true` (default): when zero `action: fix` issues remain and the tests/CI/traceability legs pass, remaining `note` findings and `partial` dimensions are report-only. **`false` (strict):** the same tests/CI gates apply, and in addition every enabled dimension must be `pass` and no `action: "note"` finding may remain — a `partial` dimension or any note blocks a clean result **and blocks merge**. Notes never become fixer inputs (Step 6 fixes only `action: "fix"`), so strict mode surfaces them for manual remediation rather than looping without a fixable action. |
-| `review.require_acceptance_criteria_check` | `true` (default) gates per-criterion AC verification. When `false`, `acceptance_criteria` reports `pass — verification disabled` and never blocks soft-pass. |
-| `review.require_traceability_check` | `true` (default) gates the four traceability checks. When `false`, `traceability` reports `pass — verification disabled` and never blocks soft-pass. |
-| `review.traceability_exempt_labels` | Labels that exempt a PR from the `Closes #N` hard-fail; the exemption reports `traceability: pass — exempt`. It cannot relax check 4 — a non-`pass` check 4 still stands. Full scope in `verification-checks.md` (*Refactor/chore exemption*). |
-| `review.traceability_exempt_pattern` | Body-line regex granting the same exemption, for PRs that carry the type in the body rather than as a label. |
-| `review.ui_review.browser_review` | `"false"` \| `"ask"` \| `"true"` — the optional browser (screenshot) review only. `"ask"` prompts interactive users and skips in auto mode. It does **not** gate the auto-detected code-level UI review, which has no config flag at all. |
+| `review.max_cycles: 3` | Cycle cap for Steps 3–6. Three LLM cycles suffice once the script pre-pass has handled the mechanical issues. Step 1's `light` profile and `qa_handoff = trusted` each cap it at `min(1, configured_cap)`. |
+| `review.adaptive_depth: true` | Scales review depth to the PR's complexity (*Depth gate*). When `false`, every PR gets full-depth review — `profile` is pinned to `full` — and the *QA handoff gate* is skipped with `qa_handoff = absent`. |
+| `review.auto_merge: false` | Honored only in `--auto` mode. Interactive `/issue-pr-review` never merges regardless of this flag, and `--no-merge` suppresses the merge even in auto mode. |
+| `review.confidence_threshold: 80` | Minimum confidence for code-reviewer findings. The ui-reviewer keeps its own 75 floor and does not read this key. |
+| `review.run_tests: true` / `review.check_ci: true` | Enable Step 4 and Step 5. When either is `false` the step reports `○ … skipped` and the soft-pass conjunction treats that leg as satisfied. |
+| `review.ci_poll_interval: 30` / `review.ci_timeout: 600` / `review.test_timeout: 300` | Seconds. The first two are passed to `gi-ci-wait.py` as `--interval` / `--timeout`; the third bounds the Step 4 suite. |
+| `review.soft_pass: true` | `true` (default): when zero `action: fix` issues remain and the tests/CI/traceability legs pass, remaining `note` findings and `partial` dimensions are report-only. **`false` (strict):** the same tests/CI gates apply, and in addition every enabled dimension must be `pass` and no `action: "note"` finding may remain — a `partial` dimension or any note blocks a clean result **and blocks merge**. Notes never become fixer inputs (Step 6 fixes only `action: "fix"`), so strict mode surfaces them for manual remediation rather than looping without a fixable action. |
+| `review.require_acceptance_criteria_check: true` | `true` (default) gates per-criterion AC verification. When `false`, `acceptance_criteria` reports `pass — verification disabled` and never blocks soft-pass. |
+| `review.require_traceability_check: true` | `true` (default) gates the four traceability checks. When `false`, `traceability` reports `pass — verification disabled` and never blocks soft-pass. |
+| `review.traceability_exempt_labels: ["refactor", "chore"]` | Labels that exempt a PR from the `Closes #N` hard-fail; the exemption reports `traceability: pass — exempt`. It cannot relax check 4 — a non-`pass` check 4 still stands. Full scope in `verification-checks.md` (*Refactor/chore exemption*). |
+| `review.traceability_exempt_pattern: "^\\s*Type:\\s*(refactor|chore)\\s*$"` | Body-line regex granting the same exemption, for PRs that carry the type in the body rather than as a label. |
+| `review.ui_review.browser_review: "ask"` | `"false"` \| `"ask"` \| `"true"` — the optional browser (screenshot) review only. `"ask"` prompts interactive users and skips in auto mode. It does **not** gate the auto-detected code-level UI review, which has no config flag at all. |
 
 The traceability flags default to the values shown, preserving the issue #36 contract.
 

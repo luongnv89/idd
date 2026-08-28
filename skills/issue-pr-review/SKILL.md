@@ -17,23 +17,23 @@ Review a PR end-to-end — analyze, test, fix, check CI, repeat until clean.
 
 | Invocation | Mode | What happens |
 |------------|------|--------------|
-| `/issue-pr-review <N>` | interactive | Review, fix, and repeat until clean; report findings (no auto-merge) |
+| `/issue-pr-review <N>` | interactive | Review, fix, repeat until clean; report (no auto-merge) |
 | `/issue-pr-review <N> --auto` | auto-pilot | Review, fix, and auto-merge when clean |
-| `/issue-pr-review <N> --auto --no-merge` | auto-pilot | Review, fix, and report — skip auto-merge (use when another agent owns the merge step) |
+| `/issue-pr-review <N> --auto --no-merge` | auto-pilot | Review and fix, but skip auto-merge |
 | `/issue-pr-review` | detect | Auto-detect PR for current branch |
-| `/issue-pr-review --review-only` | read-only | Review and report, never fix or merge (see *Review-only mode*) |
+| `/issue-pr-review --review-only` | read-only | Review and report, never fix or merge |
 
-`--auto` is set automatically when invoked by `/auto-pilot`. In auto mode, export `IDD_AUTO_MODE=1` before any shell snippet that consults it — the pre-commit security scan reads this to switch from prompt-on-warning to log-and-continue (`references/docs/pre-commit-security.md`). `--no-merge` suppresses auto-merge even when `--auto` is set: use it when another agent (e.g. auto-pilot's Phase 5) owns the merge step — the full review-fix cycle runs but stops at the summary report without calling `gh pr merge`.
+`--auto` is set automatically by `/auto-pilot`. In auto mode export `IDD_AUTO_MODE=1` before any shell snippet that consults it — the pre-commit security scan reads it to switch from prompt-on-warning to log-and-continue (`references/docs/pre-commit-security.md`). `--no-merge` suppresses auto-merge even under `--auto`, for when another agent owns the merge step.
 
 ## Prerequisites
 
 1. Confirm git repository: `git rev-parse --git-dir`
 2. Confirm `gh` is installed and authenticated: `gh auth status`
-3. Confirm the bundled agent prompts and reference files exist (see *Bundled dependency precheck* below)
+3. Confirm the bundled prompts and reference files exist — *Bundled dependency precheck*
 
 ### Bundled dependency precheck
 
-`/issue-pr-review` is distributed as a self-contained skill — it does not require another gitissue skill to review a PR, but it does require its bundled agent prompts and reference files. Before execution, verify **every** path in the list below exists relative to the skill's directory (the dirname of this SKILL.md). This list is the authoritative guard. If any path is missing, stop immediately, print the error, and do not continue with an inline or guessed reviewer/fixer prompt:
+Verify **every** path below exists relative to the skill's directory (the dirname of this SKILL.md); this list is the authoritative guard. If any is missing, stop, print the error, and never continue with an inline or guessed reviewer/fixer prompt:
 
 ```text
 references/agents/code-reviewer.md
@@ -72,21 +72,19 @@ references/scripts/gi-issue.py
 
 ## Repo Sync Before Edits (mandatory)
 
-Before making any fixes, sync with remote using the **stash-first pattern**: if the working tree is dirty, `git stash push -u` first; then `git fetch origin` and `git pull --rebase origin "$branch"`; then `git stash pop` (on pop failure, stop and surface `git stash list` / `git stash show -p stash@{0}` for recovery). The exact script and recovery procedure are in `references/docs/sync-conventions.md`. If `origin` is missing or rebase conflicts occur, stop and ask (interactive) or abort with a clear error (auto).
+Before any fix, sync with the **stash-first pattern** — full script and recovery in `references/docs/sync-conventions.md`: `git stash push -u` if the tree is dirty, `git fetch origin`, `git pull --rebase origin "$branch"`, `git stash pop`. On pop failure, stop and surface `git stash list` / `git stash show -p stash@{0}`. If `origin` is missing or the rebase conflicts, stop and ask (interactive) or abort with a clear error (auto).
 
 ## Configuration
 
-Load config once at skill start: run `python3 references/scripts/gi-config.py` — two independent requirements, both mandatory. **Working directory:** the repo root, because the script resolves `.gitissue.yml` against the working directory; run it from anywhere else and it exits 0 reporting `config_file: null`/`first_run: true`, silently discarding the repo's real config. **Script path:** relative to this SKILL.md's own directory, *not* to the working directory — resolve it to an absolute path exactly as the *Bundled dependency precheck* resolves its list, and pass that absolute path to `python3`. It prints `{"config": {…dotted keys…}, "config_file": …, "first_run": …}` as JSON on stdout. Exit 0: use `config`; `first_run: true` means no `.gitissue.yml` was found and every value came from the defaults below. Exit 3: `.gitissue.yml` is invalid — print `✗ Invalid config: .gitissue.yml` followed by the offending key and reason the script reported on stderr, and stop. Script file absent: a bundled dependency is missing, which is a broken install and not a degrade — stop and print the `✗ Missing bundled dependency` block. Any other outcome (no `python3`, non-zero exit, unparsable stdout): print `⚠ gi-config unavailable — using the inline defaults below` and read `.gitissue.yml` by hand over those keys instead — the *alternative* to this script, never an extra step alongside it. Never re-read the config after this step. **Capture the run clock here:** chain that same `python3` invocation as `python3 …; ec=$?; date +%s >&2; exit "$ec"` and keep the stderr epoch as `run_started_epoch` — JSON stdout and the script's exit stay intact, and it is what the *Run Stats Footer* (`references/run-stats.md`) measures `elapsed` from.
+Load config once at skill start: run `python3 references/scripts/gi-config.py`. **Working directory:** the repo root — the script resolves `.gitissue.yml` against it, and run anywhere else it exits 0 reporting `config_file: null`/`first_run: true`, silently discarding the repo's real config. **Script path:** resolve it against this SKILL.md's own directory, as the *Bundled dependency precheck* resolves its list. Exit 0: use `config`. Exit 3: print `✗ Invalid config: .gitissue.yml` with the offending key and reason from stderr, and stop. Script file absent: a bundled dependency is missing, which is a broken install and not a degrade — stop and print the `✗ Missing bundled dependency` block. Anything else (no `python3`, non-zero exit, unparsable stdout): print `⚠ gi-config unavailable — reading .gitissue.yml by hand` and read it yourself over the keys below, *instead of* the script. Never re-read the config after this step. **Capture the run clock here:** chain that invocation as `python3 …; ec=$?; date +%s >&2; exit "$ec"` and keep the stderr epoch as `run_started_epoch` — what the *Run Stats Footer* (`references/run-stats.md`) measures `elapsed` from.
 
-Defaults: `review.max_cycles: 3`, `review.adaptive_depth: true`, `review.auto_merge: false` (overridden to `true` in auto mode), `review.confidence_threshold: 80`, `review.run_tests: true`, `review.check_ci: true`, `review.ci_poll_interval: 30`, `review.ci_timeout: 600`, `review.test_timeout: 300` (seconds), `review.soft_pass: true`, `review.require_acceptance_criteria_check: true`, `review.require_traceability_check: true`, `review.traceability_exempt_labels: ["refactor", "chore"]`, `review.traceability_exempt_pattern: "^\\s*Type:\\s*(refactor|chore)\\s*$"`, `review.ui_review.browser_review: "ask"`.
-
-Value semantics are in `references/docs/config-schema.md`; what each key gates here — strict `soft_pass`, the two verification flags when `false`, the exemption scope, the browser-review gate — is in `references/review-loop-mechanics.md` (*Config keys and what they gate*). UI/UX **code** review needs no config flag: it is auto-detected per PR (*Step 3*).
+Every `review.*` key, its default (`review.max_cycles: 3`, `review.soft_pass: true`, `review.auto_merge: false` — auto mode overrides to `true`) and what it gates are tabulated in `references/review-loop-mechanics.md` (*Config keys and what they gate*); value syntax in `references/docs/config-schema.md`. UI/UX **code** review needs no config flag — it is auto-detected per PR (*Step 3*).
 
 ---
 
 ## Pipeline Overview
 
-**Expected output** — a clean run prints one line per step, in this shape:
+**Expected output** — example of a clean run, one line per step:
 
 ```
   ◆ PR Review Pipeline
@@ -100,11 +98,11 @@ Value semantics are in `references/docs/config-schema.md`; what each key gates h
   [7/7] Report       ✓ PR is clean — ready to merge
 ```
 
-Step 2 runs once before the loop; Steps 3-6 repeat up to `review.max_cycles` times (default: 3); Step 7 runs once at the end. The pipeline minimizes LLM tokens via the zero-token script pre-pass, reviewer/fixer reuse across cycles, `fix`/`note` severity filtering (Step 6), and the soft-pass condition.
+Step 2 runs once; Steps 3-6 repeat up to `review.max_cycles` (default 3); Step 7 runs once. The pipeline minimizes LLM tokens via the zero-token pre-pass, reviewer/fixer reuse, `fix`/`note` filtering, and soft-pass.
 
 ### Step completion reports
 
-Each step closes with a completion report — `√`/`×` per check plus a `Result: PASS | PARTIAL | FAIL` line — so "step done" is checkable rather than asserted, and a step is not complete until its `Result:` line is printed. The per-step check names, `Result` semantics, and block format are in `references/report-templates.md` (*Step Completion Reports*) — **read it now**.
+Each step closes with `√`/`×` per check plus a `Result: PASS | PARTIAL | FAIL` line; a step is not complete until its `Result:` line prints. Check names, semantics and format: `references/report-templates.md` (*Step Completion Reports*) — **read it now**.
 
 ---
 
@@ -132,7 +130,7 @@ If no PR exists for the current branch:
 gh pr view {N} --json number,title,body,baseRefName,headRefName,headRefOid,state,url,labels,reviews,statusCheckRollup,files
 ```
 
-Extract the PR number/title/URL, base and head branches, the head commit SHA (`headRefOid` — the *QA handoff gate* below binds against it), linked issue numbers (from `Closes #N` in the body), current CI status, and changed files.
+Extract the number/title/URL, base and head branches, the head SHA (`headRefOid` — the *QA handoff gate* binds against it), linked issue numbers (from `Closes #N`), CI status, and changed files.
 
 **If PR is closed/merged:**
 ```
@@ -142,38 +140,34 @@ Stop.
 
 ### Checkout PR head branch
 
-Check out the PR head branch before Step 2 or any other step that runs git against the working tree, so pre-pass commits and the fixer operate on `{headRefName}` and not on whatever branch was active when the skill was invoked (e.g. `main`):
+Check out the PR head branch before Step 2 or anything else that runs git against the working tree, so pre-pass commits and the fixer operate on `{headRefName}`:
 
 ```bash
 gh pr checkout {N}
 ```
 
-Use `{headRefName}` from Step 1 as `{branch_name}` for sync, commit, and push. Canonical command: `references/docs/platform-github.md` (*Pull requests* → Checkout PR head branch).
-
-**Bind it to a shell variable — never paste the literal name into a command.** A head-ref name is attacker-chosen, and git permits shell metacharacters in a ref, so pasting one into a shell word runs it on the reviewer's machine. Assign once — `branch_name="$(gh pr view {N} --json headRefName --jq .headRefName)"` — and use `"$branch_name"` wherever this skill puts `{branch_name}` in a **shell command** (display templates and spawn-variable lists still show the plain name). Why substitution output is inert, and the same rule at the `gi-secscan`/`gi-branch` call sites, is in `references/review-loop-mechanics.md` (*Binding the head-ref name*).
+`{headRefName}` is `{branch_name}` for sync, commit and push (canonical command: `references/docs/platform-github.md`). **Bind it to a shell variable — never paste the literal name into a command:** a head-ref name is attacker-chosen and git permits shell metacharacters in a ref. Assign once — `branch_name="$(gh pr view {N} --json headRefName --jq .headRefName)"` — then use `"$branch_name"` in every **shell command**; display templates and spawn-variable lists keep the plain name. Why: `references/review-loop-mechanics.md` (*Binding the head-ref name*).
 
 ### Depth gate (select the review profile)
 
-Decide **how deep** this review goes, so a one-line copy fix is not put through <!-- a:rv-depth-gate-refresh -->
-the same full-weight review as a multi-subsystem PR: `profile = light | full`.
-The signal and `light` changes are defined in `references/docs/agent-model-effort.md` (*Complexity → pipeline profile*) and `references/review-loop-mechanics.md` (*Depth gate*); **read and apply both**.
+Decide **how deep** this review goes: `profile = light | full`. Signals and what <!-- a:rv-depth-gate-refresh -->
+`light` changes: `references/docs/agent-model-effort.md` (*Complexity → pipeline profile*) and `references/review-loop-mechanics.md` (*Depth gate*) — **read and apply both**.
 First, with `references/scripts/gi-gh.py` bundled beside its consumer, when the PR body links an issue, refresh it at the review boundary:
 `python3 references/scripts/gi-issue.py {linked_issue} --fields number,title,body,labels --refresh`,
 reading `.issue`. Exit 3 stops; no `python3`, exit 2, or exit 4 degrades to
 `gh issue view {linked_issue} --json number,title,body,labels`. Retain either successful
-record as `linked_issue_snapshot`; Step 3 consumes it directly, so a direct-`gh`
-fallback cannot expose an older cache entry. **If neither path yields a usable
-record, apply the empty-record fail-safe in `references/review-loop-mechanics.md`
-(*Depth gate*) — never review a linked issue on an empty snapshot.** The refresh runs
-even when `review.adaptive_depth` is `false`; do not interpret those effort signals,
-and set `profile = full` after the refresh. Otherwise feed three signals: diff size /
-files changed (Step 1's `files`), the retained body's `## Metadata` `Effort` band,
-and labels (any `security`/`CVE`/`vulnerability` forces `full`). Resolve to `light`
-only when **every** signal agrees; any `full`/missing/ambiguous → `full`.
+record as `linked_issue_snapshot`. **If neither path yields a usable record, apply the
+empty-record fail-safe in `references/review-loop-mechanics.md` (*Depth gate*) — never
+review a linked issue on an empty snapshot.** The refresh runs even when
+`review.adaptive_depth` is `false`; then ignore the effort signals and set
+`profile = full` after the refresh. Otherwise weigh three: diff size / files
+changed, the retained body's `## Metadata` `Effort` band, and labels (any
+`security`/`CVE`/`vulnerability` forces `full`). Resolve to `light` only when
+**every** signal agrees; any `full`/missing/ambiguous → `full`.
 
 ### QA handoff gate (trust an already-QA'd PR) <!-- a:rv-qa-handoff-gate -->
 
-`/issue-resolver` ends a clean QA loop by writing `<!-- gitissue:qa v1 head=… -->` as the PR body's last line. This gate decides whether to believe it, so an already-QA'd PR is reviewed **once, by a fresh agent**, and skips the local suite that already passed on this exact commit. It runs **after** the Depth gate and sets `qa_handoff = trusted | stale | absent`, plus `ci_leg_runnable` from loaded `review.check_ci` and Step 1's `statusCheckRollup`:
+`/issue-resolver` ends a clean QA loop by writing `<!-- gitissue:qa v1 head=… -->` as the PR body's last line. This gate decides whether to believe it, so an already-QA'd PR is reviewed **once, by a fresh agent**. It runs **after** the Depth gate and sets `qa_handoff = trusted | stale | absent`, plus `ci_leg_runnable` from loaded `review.check_ci` and Step 1's `statusCheckRollup`:
 
 | Value | When | Effect |
 |-------|------|--------|
@@ -182,12 +176,11 @@ only when **every** signal agrees; any `full`/missing/ambiguous → `full`.
 | `absent` | the body carries no marker | today's full pipeline, unchanged |
 
 `stale` and `absent` are distinguished for the operator only; both take the identical path.
-**Fail-safe: any doubt is `stale`** — an unparsable or duplicated marker included; an unknown extra field is *not* doubt (mechanics, *Parsing the marker*).
-**A marker is never authentication:** a PR body is attacker-controlled (`gh pr edit --body`) and `head=` binds without authenticating it, so this verdict may gate **only duplicated work**, never a safety gate. The reasoning, the parse, *What `trusted` skips*, and the binding *Never gated* list live in `references/review-loop-mechanics.md` (*QA handoff gate*) — **read it now**.
+**Fail-safe: any doubt is `stale`** — an unparsable or duplicated marker included; an unknown extra field is *not* doubt.
+**A marker is never authentication:** a PR body is attacker-controlled (`gh pr edit --body`), so this verdict may gate **only duplicated work**, never a safety gate. The parse, *What `trusted` skips*, and the binding *Never gated* list: `references/review-loop-mechanics.md` (*QA handoff gate*) — **read it now**.
+When `review.adaptive_depth` is `false`, skip this gate: set `qa_handoff = absent`. **No new config key is introduced.**
 
-When `review.adaptive_depth` is `false`, skip this gate: set `qa_handoff = absent` — that key already pins the review to full depth and this is the same class of saving. **No new config key is introduced.**
-
-**Precedence, stated once:** `qa_handoff` is computed *after* `profile`, and its power is bounded **relative to the ungated pipeline** — it may only **narrow** what a `stale`/`absent` PR already gets, never make this review do more. The bound is per verdict, not monotonic across the run: a flip to `stale` that restores the full cap is a return to the ungated pipeline, not a widening. The one asymmetric case is a marker `profile=light` against a pr-review `profile=full`, where the fuller wins — the review collapse **and** the cycle cap are **refused**, while the duplicate-test skip still applies, because a test run is a test run at any depth.
+**Precedence, stated once:** `qa_handoff` is computed *after* `profile`, and its power is bounded **relative to the ungated pipeline** — it may only **narrow** what a `stale`/`absent` PR already gets. The bound is per verdict, not monotonic across the run: a flip back to `stale` restores the full cap and is a return to the ungated pipeline, not a widening. One asymmetric case: a marker `profile=light` against a pr-review `profile=full`, where the fuller wins — the review collapse **and** the cycle cap are **refused**, while the duplicate-test skip still applies, because a test run is a test run at any depth.
 
 Surface both on the `[1/7]` tracker line; with `review.adaptive_depth: false` print `depth: full, qa: absent` so it stays uniform:
 
@@ -200,46 +193,42 @@ Surface both on the `[1/7]` tracker line; with `review.adaptive_depth: false` pr
 
 ## Step 2 — Script Pre-pass [2/7] <!-- a:rv-step2-prepass -->
 
-Before spawning any LLM reviewer, run deterministic tools to catch mechanical issues — zero LLM tokens, all scripts and CLI tools.
+Before spawning any LLM reviewer, run deterministic tools — zero LLM tokens. **When `--review-only` is set** this pre-pass is detection-only (*Review-only mode*, Step 7).
 
-**When `--review-only` is set:** this pre-pass is detection-only — see *Review-only mode* under Step 7.
-
-**Default (fix loop):** detect the project's lint/format tools, run each auto-fix command (don't block on warnings — only on errors that prevent the fix from running), then run the test suite to catch failures early. The per-tool detection table and example commands are in `references/prepass-tests-ci-mechanics.md` (*Step 2*). **Under `qa_handoff = trusted`, skip only the test run**, and only when the marker carries a `tests=` field whose SHA equals `head` **and `ci_leg_runnable` is true**. When `ci_leg_runnable` is false (no CI / empty `statusCheckRollup` / `no_ci` / `review.check_ci: false`), ignore `tests=` and run the local suite as unmarked. The lint/format auto-fix still runs (it mutates the tree, so skipping it changes the PR, not just the review's cost), and the `gi-secscan` gate below is **never** gated on `qa_handoff`. When that auto-fix commits and pushes, the head moves off the marker: recompute the verdict then, before Step 3 (*Review Loop*).
+**Default (fix loop):** detect the project's lint/format tools, run each auto-fix command (block only on errors that prevent the fix from running), then run the test suite. Detection table: `references/prepass-tests-ci-mechanics.md` (*Step 2*). **Under `qa_handoff = trusted`, skip only the test run**, and only when the marker carries a `tests=` field whose SHA equals `head` **and `ci_leg_runnable` is true**. When `ci_leg_runnable` is false (no CI / empty `statusCheckRollup` / `no_ci` / `review.check_ci: false`), ignore `tests=` and run the local suite as unmarked. The lint/format auto-fix still runs — it mutates the tree, so skipping it changes the PR, not just the review's cost — and the `gi-secscan` gate below is **never** gated on `qa_handoff`. That auto-fix moves the head off the marker: recompute the verdict before Step 3 (*Review Loop*).
 
 ### Commit auto-fixes <!-- a:rv-commit-autofix -->
 
-**Skip entirely when `--review-only`.** Otherwise, if any files were modified by
-the auto-fix tools, you MUST scan before staging — blocking on real secrets and
-warning on large files / build artifacts / protected branches. In auto mode,
-export `IDD_AUTO_MODE=1` first so warnings are logged rather than needing
-confirmation. Run it from the repo root:
+**Skip entirely when `--review-only`.** Otherwise, if the auto-fix tools modified
+any file, you MUST scan before staging — blocking on real secrets, warning on
+large files / build artifacts / protected branches. In auto mode export
+`IDD_AUTO_MODE=1` first, so warnings are logged rather than needing confirmation.
+Run from the repo root:
 
 ```bash
 base="$(gh repo view --json defaultBranchRef --jq .defaultBranchRef.name)"
 python3 references/scripts/gi-secscan.py --working-tree --policy-ref "origin/${base}"
 ```
 
-The script reads `security.allow_pattern` and its siblings itself, so **never
-interpolate a config value into this command**. `--policy-ref` is the trust
-boundary: this skill has the PR's branch checked out, so without it that branch's
-own `.gitissue.yml` governs its review. Bind `base` **first** from the
-repository's default branch, never the PR's `baseRefName` — unset makes the ref
-`origin/`, and exit 4 then degrades this gate on every run.
+Bind `base` **first**, from the repository's default branch, never the PR's
+`baseRefName`; `--policy-ref` is the trust boundary, because this skill has the
+PR's branch checked out. Never interpolate a config value into this command — the
+script reads `security.*` itself.
 
 **A pass is all four: exit 0, `policy_source` exactly the `ref:origin/…` asked
-for, `verdict` not `block`, and not (`scanned` 0 with `skipped` above 0)** — full
-procedure in `references/prepass-tests-ci-mechanics.md`. **Exit 1 is the block
-verdict: stop, do not stage, do not push, report the path from `blocking[]`** —
-never the degrade path. Exit 3 (an uncompilable `security.*` regex) is also a
-stop. A missing `python3`, **exit 2** (the path did not resolve, or the
-invocation was malformed — a scan that never ran), or exit 4 degrades: print
-`⚠ gi-secscan unavailable — running the documented scan` and run the **Primary
-Pattern** in `references/docs/pre-commit-security.md` instead. Exit 1 without parsable JSON
-is a crash: treat it as exit 2, and never read a non-zero exit as a pass.
+for, `verdict` not `block`, and not (`scanned` 0 with `skipped` above 0)** —
+procedure, table and rationale in `references/prepass-tests-ci-mechanics.md`
+(*Commit auto-fixes*), **read it now**. **Exit 1 is the block verdict: stop, do
+not stage, do not push, report the path from `blocking[]`** — never the degrade
+path. Exit 3 is also a stop. A missing `python3`, **exit 2** (a scan that never
+ran), or exit 4 degrades: print `⚠ gi-secscan unavailable — running the
+documented scan` and run the **Primary Pattern** in `references/docs/pre-commit-security.md`.
+Exit 1 without parsable JSON is a crash: treat it as exit 2, and never read a
+non-zero exit as a pass.
 
 Only after the scan passes (or warnings are accepted), commit and push (`git add
 -A` → `git commit -m "style: auto-fix lint and format issues"` → `git push
-origin "$branch_name"`, using the variable bound in Step 1).
+origin "$branch_name"`, the variable bound in Step 1).
 
 ```
 [2/7] Pre-pass     ✓ lint clean, format clean, {N} tests passed
@@ -251,7 +240,7 @@ If no tools detected:
 [2/7] Pre-pass     ○ no lint/format tools detected, tests: {N} passed
 ```
 
-If tests fail here, continue to the review loop — failures are picked up in Step 4 and addressed in the fix cycle.
+If tests fail here, continue to the review loop — Step 4 picks them up.
 
 ---
 
@@ -259,20 +248,20 @@ If tests fail here, continue to the review loop — failures are picked up in St
 
 ### Reviewer agents and cycle reuse
 
-Read `references/agents/code-reviewer.md` for the reviewer prompt and `references/agents/fixer.md` for the fix-cycle prompt. Both spawn with the default general-purpose agent (do NOT set `subagent_type`). Pass the reviewer `branch_name`, `base_branch`, `pr_context` (PR title + body), `diff_command` (`gh pr diff {N}`), and `review.confidence_threshold` (default 80) as the minimum finding confidence; ui-reviewer keeps its 75 floor.
+Read `references/agents/code-reviewer.md` and `references/agents/fixer.md` for the two prompts; both spawn with the default general-purpose agent (do NOT set `subagent_type`). Pass `branch_name`, `base_branch`, `pr_context` (title + body), `diff_command` (`gh pr diff {N}`), and `review.confidence_threshold` (default 80) as the minimum finding confidence; ui-reviewer keeps its 75 floor.
 
-To minimize tokens, the loop **reuses the same reviewer across cycles**: cycle 1 cold-starts; cycles 2+ re-message it via `SendMessage` to re-review the updated diff; after the fixer reports zero fixable issues, one **fresh** confirmation reviewer does an unbiased final check. Under `qa_handoff = trusted`, the cycle-1 cold-start reviewer is **collapsed into** that fresh confirmation pass rather than skipped — the PR still receives exactly one independent, full-strength review, from an agent with no memory of the resolver's own — and the loop cap drops to `min(1, configured_cap)`. The collapse **saves no reviewer spawn**: the confirmation pass is itself fix-conditional, so an unmarked clean PR already gets exactly one cold-start pass and no confirmation. What `trusted` changes is *which* single pass runs — the unbiased one; the measured saving is the duplicated local test legs at Steps 2 and 4. Both are refused by Step 1's *Precedence* carve-out when the marker says `profile=light` and this review resolved `profile=full`. Spawn calls and the `SendMessage` prompt are in `references/review-loop-mechanics.md`.
+To minimize tokens the loop **reuses the same reviewer across cycles**: cycle 1 cold-starts, cycles 2+ re-message it via `SendMessage`, and after the fixer reports zero fixable issues one **fresh** confirmation reviewer does an unbiased final check. Under `qa_handoff = trusted` the cycle-1 reviewer is **collapsed into** that fresh confirmation pass rather than skipped — the PR still receives exactly one independent, full-strength review, from an agent with no memory of the resolver's own — and the loop cap drops to `min(1, configured_cap)`. The collapse **saves no reviewer spawn**: the confirmation pass is itself fix-conditional, so an unmarked clean PR already gets one cold-start pass and no confirmation; what `trusted` changes is *which* pass runs, and the saving is the duplicated test legs at Steps 2 and 4. Both are refused by *Precedence* when the marker says `profile=light` against `profile=full`. Spawn calls: `references/review-loop-mechanics.md`.
 
 ### UI/UX Review (Step 3 — auto-detected)
 
-UI review is **auto-detected per PR** — no config flag enables it. Two legs, with different guarantees:
+UI review is **auto-detected per PR** — no config flag enables it. Two legs:
 
-- **Code UI review** is environment-independent (reads the diff/changed files). It runs whenever UI work is detected, on any machine **including a no-GUI/server host** — never gated on a GUI, running app, or browser.
-- **Browser UI review** is an optional, additive bonus: it captures screenshots from a running app, so it needs a reachable app *and* user opt-in. When it can't run (no app, capture unsafe, or auto mode without opt-in), it **skips with a warning and the code UI review still runs** — fail-soft to code-only, never block.
+- **Code UI review** reads the diff/changed files, so it is environment-independent: it runs whenever UI work is detected, on any machine **including a no-GUI/server host** — never gated on a GUI, running app, or browser.
+- **Browser UI review** is an optional bonus needing a reachable app *and* user opt-in. When it can't run it **skips with a warning and the code UI review still runs** — fail-soft to code-only, never block.
 
-The shared mechanics — detection commands, the code-review spawn, the report-only display-environment label (`ui_env`), the browser-review gate + three-part capability check, and the headless capture call — live in `references/docs/ui-review.md`; this skill's deltas (PR diff command, variables, interactive proposal prompt, cycle-reuse `SendMessage`) are in `references/ui-review-mechanics.md`. **Read both and apply them** when `ui: detected`; together they preserve the contract above and route `action: "fix"` UI findings into Step 6 under `category: ui_ux`. Under `qa_handoff = trusted` the **code** UI review is skipped only when the marker's `ui=` leg says it already ran (`ui=code…` or `ui=code+browser…`) **and** carries an `@<sha40>` equal to `head` — never on `ui=none`, never on an unsuffixed `ui=` (well-formed, but not commit-bound), and never for the browser leg.
+Detection commands, the code-review spawn, the report-only `ui_env` label, the browser gate and its three-part capability check, and headless capture are in `references/docs/ui-review.md`; this skill's deltas in `references/ui-review-mechanics.md`. **Read both and apply them** when `ui: detected`; they preserve the contract above and route `action: "fix"` UI findings into Step 6 under `category: ui_ux`. Under `qa_handoff = trusted` the **code** UI review is skipped only when the marker's `ui=` leg says it already ran (`ui=code…` or `ui=code+browser…`) **and** carries an `@<sha40>` equal to `head` — never on `ui=none`, never on an unsuffixed `ui=`, and never for the browser leg.
 
-For acceptance-criteria verification, consume `linked_issue_snapshot` from the review-boundary read directly; do not call `gi-issue.py` or `gh` again — this preserves the fresh record even where a stale cache entry could not be updated. When a linked issue exists but its snapshot holds no usable record, the *Depth gate*'s empty-record fail-safe applies. A PR with **no** linked issue is a different state, not a fail-safe case: it proceeds normally — `acceptance_criteria` reports `○ pass — none defined; manual review recommended` and traceability check 1 handles the missing `Closes #N` (`references/verification-checks.md`). <!-- a:rv-step3-ac-snapshot -->
+For acceptance-criteria verification, consume `linked_issue_snapshot` directly; do not call `gi-issue.py` or `gh` again. If a linked issue exists but its snapshot holds no usable record, the *Depth gate*'s empty-record fail-safe applies. A PR with **no** linked issue is a different state, not a fail-safe case: it proceeds normally — `acceptance_criteria` reports `○ pass — none defined; manual review recommended`, and traceability check 1 handles the missing `Closes #N`. <!-- a:rv-step3-ac-snapshot -->
 
 ```
 [3/7] Review       ✓ spec[ac:pass correctness:pass safety:pass]
@@ -282,22 +271,20 @@ For acceptance-criteria verification, consume `linked_issue_snapshot` from the r
 
 ### Order within Step 3
 
-Within a cycle, in order: reviewer subagent → UI reviewer in **code** mode (skip when `ui: not detected`) → per-criterion AC verification → the four traceability checks → aggregate all four into the five dimensions below for the cycle report.
+Reviewer subagent → UI reviewer in **code** mode (skip when `ui: not detected`) → per-criterion AC verification → the four traceability checks → aggregate into the five dimensions.
 
 ### Dimensional review output
 
-Step 3 produces a single verdict in **five dimensions** — `correctness`, `acceptance_criteria`, `traceability`, `maintainability`, `safety` — each reporting `pass`, `partial`, or `fail`. UI `ui_ux` findings fold into `maintainability`, and a UI `action: "fix"` finding makes it at least `partial` and adds a fixable issue to Step 6 (`category: ui_ux`) — the verdict never shows all-pass while UI fixables remain. The report groups the five under a **Spec axis** (`acceptance_criteria`, `correctness`, `safety`) and a **Standards axis** (`traceability`, `maintainability`) — presentation-only, no per-axis verdict. The reviewer-category mapping and the two-axis rationale are in `references/verification-checks.md`. **Read that file and apply it now.**
-
-A PR can pass tests and still fail `traceability` or `acceptance_criteria` — those are not gated by test results.
+Five dimensions — `correctness`, `acceptance_criteria`, `traceability`, `maintainability`, `safety` — each `pass`, `partial`, or `fail`. UI `ui_ux` findings fold into `maintainability`, and a UI `action: "fix"` finding makes it at least `partial` and adds a fixable issue (`category: ui_ux`) — the verdict never shows all-pass while UI fixables remain. The report groups them under a **Spec axis** (`acceptance_criteria`, `correctness`, `safety`) and a **Standards axis** (`traceability`, `maintainability`) — presentation-only, no per-axis verdict. Mapping and rationale: `references/verification-checks.md`. **Read that file and apply it now.** A PR can pass tests and still fail `traceability` or `acceptance_criteria`.
 
 ### Verification gates and the AC + traceability checks <!-- a:rv-verify-gates -->
 
-Two dimensions — `acceptance_criteria` and `traceability` — are produced by this skill, not the reviewer. Their full procedure (per-criterion AC verification, the four traceability checks, and the refactor/chore exemption) lives in `references/verification-checks.md`. **Read that file and apply it now**, before aggregating the cycle report. The gating rules the rest of this skill depends on — enforce them here and in the Review Loop: <!-- a:rv-traceability-outcomes -->
+`acceptance_criteria` and `traceability` are produced by this skill, not the reviewer; their procedure — per-criterion AC verification, the four traceability checks, the refactor/chore exemption — is in `references/verification-checks.md`. **Read that file and apply it now**, before aggregating the cycle report. Enforce these gating rules here and in the Review Loop: <!-- a:rv-traceability-outcomes -->
 
 - `review.require_acceptance_criteria_check` (default `true`) gates the AC check; `review.require_traceability_check` (default `true`) gates traceability. When either is `false`, that dimension reports `pass — verification disabled` and never blocks soft-pass.
 - **Any `acceptance_criteria: fail`** → fixable issue in Step 6, `category: acceptance_criteria`. **Hard-blocks** soft-pass.
-- **`Closes #{linked_issue}` absent** (traceability check 1, unless the PR is refactor/chore-exempt) → fixable issue in Step 6, `category: traceability`, suggested fix "Add `Closes #{linked_issue}` to the PR body." **Hard-blocks** soft-pass.
-- All other traceability outcomes (missing commit ref, missing Decision Record on a human-authored PR, etc.) report `partial` and do **not** block.
+- **`Closes #{linked_issue}` absent** (traceability check 1, unless refactor/chore-exempt) → fixable issue in Step 6, `category: traceability`, suggested fix "Add `Closes #{linked_issue}` to the PR body." **Hard-blocks** soft-pass.
+- All other traceability outcomes report `partial` and do **not** block.
 
 These two hard-blocks are the issue #36 contract: a PR can pass tests and still be blocked on `acceptance_criteria: fail` or a missing `Closes #N`.
 
@@ -305,13 +292,13 @@ These two hard-blocks are the issue #36 contract: a PR can pass tests and still 
 
 ## Step 4 — Run Tests & Build [4/7] <!-- a:rv-step4-tests -->
 
-When `review.run_tests` is false, skip this step and report `○ tests skipped (review.run_tests: false)`; the soft-pass conjunction treats the test leg as satisfied.
+When `review.run_tests` is false, skip this step, report `○ tests skipped (review.run_tests: false)`; the soft-pass conjunction treats the test leg as satisfied.
 
-When true, detect and run the project's build system, then run all test types (unit, integration, e2e where present), with a `review.test_timeout`-second timeout (default: 300). The detection table and test-type breakdown are in `references/prepass-tests-ci-mechanics.md` (*Step 4*).
+When true, detect and run the build system, then all test types (unit, integration, e2e where present) with a `review.test_timeout`-second timeout (default 300). Detection table: `references/prepass-tests-ci-mechanics.md` (*Step 4*).
 
-**Under `qa_handoff = trusted`, skip this step** and report `○ tests skipped (qa handoff @ {commit_sha_short})` — the first 7 characters of Step 1's `headRefOid` — but only when the marker carries a `tests=` field whose SHA equals `head` **and `ci_leg_runnable` is true**; with no `tests=` field, or a SHA that differs, run the step in full. When `ci_leg_runnable` is false (no CI / empty `statusCheckRollup` / `no_ci` / `review.check_ci: false`), ignore `tests=` and run the local suite as unmarked. The verdict is `trusted` only against the **live** head — recomputed after any push this skill makes (*Review Loop*) — so the suite it stands in for did run on this exact commit; the soft-pass conjunction therefore treats the test leg as satisfied.
+**Under `qa_handoff = trusted`, skip this step** and report `○ tests skipped (qa handoff @ {commit_sha_short})` — the first 7 characters of Step 1's `headRefOid` — but only when the marker carries a `tests=` field whose SHA equals `head` **and `ci_leg_runnable` is true**; with no `tests=` field, or a SHA that differs, run the step in full. When `ci_leg_runnable` is false (no CI / empty `statusCheckRollup` / `no_ci` / `review.check_ci: false`), ignore `tests=` and run the local suite as unmarked. The verdict is `trusted` only against the **live** head — recomputed after any push this skill makes — so the suite it stands in for did run on this exact commit; the soft-pass conjunction therefore treats the test leg as satisfied.
 
-A skipped step evaluated neither of its checks, so its completion report is `× Suite passed` / `× Build clean` with `Result: PARTIAL`, and the closing summary carries the gap — never a silent `√`/`✓ pass`. Step 5's CI is a separate leg and is never skipped: it runs on the remote against the merge result, and nothing in a PR body is evidence about it.
+A skipped step evaluated neither check, so its report is `× Suite passed` / `× Build clean` with `Result: PARTIAL` and the closing summary carries the gap — never a silent `√`/`✓ pass`. Step 5's CI is a separate leg, never skipped: it runs on the remote against the merge result, and nothing in a PR body is evidence about it.
 
 ```
 [4/7] Test         ✓ build ok, {N} tests passed
@@ -327,11 +314,11 @@ Or if failures:
 
 ## Step 5 — Check CI Status [5/7] <!-- a:rv-step5-ci -->
 
-When `review.check_ci` is false, skip polling and report `○ CI skipped (review.check_ci: false)`; the soft-pass conjunction treats the CI leg as satisfied.
+When `review.check_ci` is false, skip polling, report `○ CI skipped (review.check_ci: false)`; the soft-pass conjunction treats the CI leg as satisfied.
 
-When true, run the whole wait in one call — `python3 references/scripts/gi-ci-wait.py {N} --interval {review.ci_poll_interval} --timeout {review.ci_timeout}` — and read `verdict` from its JSON (`pass` / `fail` / `pending` / `none`), so a ten-minute wait costs one tool call instead of one per poll. A terminal snapshot is trusted only after its check-name set settles, and `none` counts as clean only when `none_confirmed` is `true`; otherwise both are `pending`. Exit 3 (a malformed argument) is a stop. Exit 4, or no `python3`, degrades to the **merge-safe manual fallback** — never to a filtered `gh pr checks` list, which makes an empty result look successful. On `fail`, extract details with `gh run view {run_id} --log-failed`.
+When true, run the whole wait in one call — `python3 references/scripts/gi-ci-wait.py {N} --interval {review.ci_poll_interval} --timeout {review.ci_timeout}` — and read `verdict` (`pass` / `fail` / `pending` / `none`). A terminal snapshot is trusted only after its check-name set settles, and `none` is clean only when `none_confirmed` is `true`; otherwise both are `pending`. Exit 3 is a stop. Exit 4, or no `python3`, degrades to the **merge-safe manual fallback** — never to a filtered `gh pr checks` list, which makes an empty result look successful. On `fail`, extract details with `gh run view {run_id} --log-failed`.
 
-**Bind the verdict to the commit it was reached on** — record `ci_sha` = the `headRefOid` this wait ran against, and report `ci_status` as `passed@` or `failed@` followed by that full 40-character SHA (`no_ci` stays bare, and so does a skipped or degraded wait that never read a head): an unbound verdict is not evidence about any particular commit (issue #256). The settle-window rule, the manual polling loop and its head re-read, and the bare-vs-bound cases are in `references/prepass-tests-ci-mechanics.md` (*Step 5*, *Binding the verdict to a commit*). **Read that file and apply it now.**
+**Bind the verdict to the commit it was reached on** — record `ci_sha` = the `headRefOid` this wait ran against, and report `ci_status` as `passed@` or `failed@` plus that full 40-character SHA; `no_ci`, a skipped wait, and any degraded wait that never read a head stay bare. Settle window, manual polling loop and its head re-read, and the bare-vs-bound cases: `references/prepass-tests-ci-mechanics.md` (*Step 5*, *Binding the verdict to a commit*). **Read that file and apply it now.**
 
 **All checks passed:**
 ```
@@ -348,7 +335,7 @@ When true, run the whole wait in one call — `python3 references/scripts/gi-ci-
 ```
 [5/7] CI Status    ⚠ checks still running after {timeout}s
 ```
-Pending CI is **not clean** — it never satisfies soft-pass and auto mode must not merge while CI is pending (including when Step 6 finds zero fixables and would otherwise exit the fix loop). Interactive: ask to wait more or proceed without merging. Auto: do not merge; extend polling or stop with remaining issues — do not assume a later cycle will re-check once the fix loop has ended.
+Pending CI is **not clean** — it never satisfies soft-pass and auto mode must not merge while CI is pending, including when Step 6 finds zero fixables and would otherwise exit the fix loop. Interactive: ask to wait more or proceed without merging. Auto: do not merge; extend polling or stop with remaining issues.
 
 **No CI configured:**
 ```
@@ -359,9 +346,9 @@ Pending CI is **not clean** — it never satisfies soft-pass and auto mode must 
 
 ## Step 6 — Fix Issues [6/7] <!-- a:rv-step6-fix -->
 
-Collect issues from Steps 3-5, but **only fix those with `action: "fix"`** — `action: "note"` issues are reported in the summary but never trigger a fix cycle. This is the key token optimization. Fixable sources are the five dimensions from *Dimensional review output* (each `fail`/UI `action:"fix"` becomes one fixable issue) plus Step 4 test failures and Step 5 CI failures.
+Collect issues from Steps 3-5, but **only fix those with `action: "fix"`** — `action: "note"` issues are reported, never fixed. This is the key token optimization. Fixable sources: the five dimensions (each `fail`/UI `action:"fix"` is one fixable issue) plus Step 4 test failures and Step 5 CI failures.
 
-Acceptance-criteria fixes typically need code changes. The traceability `Closes #{linked_issue}` fix is a **read-modify-write** PR-body edit (driver rule 2 in `references/docs/platform-github.md`): (1) `gh pr view {N} --json body`; (2) prepend `Closes #{linked_issue}` as the **first line** when absent (SPEC §3.3 / `references/docs/naming-conventions.md`), preserving the rest of the body unchanged — never replace the body from scratch; (3) `gh pr edit {N} --body "{merged_body}"`; (4) re-read with `gh pr view {N} --json body` and confirm `## Decision Record`, the Acceptance Criteria Verification table, and any trailing `<!-- gitissue:qa v1 … -->` marker are still present — prepending to line 1 leaves a trailing marker untouched by construction, and this re-read is what proves it. Apply code fixes, then commit and push as usual. <!-- a:rv-closes-body-edit -->
+The traceability `Closes #{linked_issue}` fix is a **read-modify-write** PR-body edit (driver rule 2 in `references/docs/platform-github.md`): (1) `gh pr view {N} --json body`; (2) prepend `Closes #{linked_issue}` as the **first line** when absent (SPEC §3.3 / `references/docs/naming-conventions.md`), preserving the rest unchanged — never replace the body from scratch; (3) `gh pr edit {N} --body "{merged_body}"`; (4) re-read with `gh pr view {N} --json body` and confirm `## Decision Record`, the Acceptance Criteria Verification table, and any trailing `<!-- gitissue:qa v1 … -->` marker are still present. Apply code fixes, then commit and push as usual. <!-- a:rv-closes-body-edit -->
 
 ### If no fixable issues
 
@@ -372,13 +359,12 @@ Exit the **fix loop** only. Soft-pass is **not** implied — evaluate it next pe
 
 ### If fixable issues found
 
-Delegate fixes to the fixer subagent (`references/agents/fixer.md`) — never apply code changes in the main skill context — reusing the same fixer across cycles when possible. The fixer reads affected files, applies targeted changes, runs the mandatory pre-commit security scan against the staged set — `references/scripts/gi-secscan.py` under the same `--policy-ref` base ref Step 2 used, with the Primary Pattern in `references/docs/pre-commit-security.md` as its fallback, real secrets blocking the commit either way — then commits. The main agent collects the fixer's JSON result and pushes (`git push origin "$branch_name"`, the variable bound in Step 1 — never the literal ref name); unresolved blocking findings carry to the next cycle. The spawn variables and `Agent(...)` call are in `references/review-loop-mechanics.md`.
+Delegate to the fixer subagent (`references/agents/fixer.md`) — never apply code changes in the main skill context — reusing the same fixer across cycles. It applies targeted changes, runs the mandatory pre-commit security scan against the staged set (`references/scripts/gi-secscan.py`, same `--policy-ref` base ref as Step 2, Primary Pattern in `references/docs/pre-commit-security.md` as fallback, real secrets blocking either way), then commits. The main agent collects its JSON result and pushes (`git push origin "$branch_name"` — never the literal ref name); unresolved blocking findings carry to the next cycle. Spawn variables and the `Agent(...)` call: `references/review-loop-mechanics.md`.
 
 ```
 [6/7] Fix          ✓ fixed {N} issues (noted: {note_count} — not fixed)
 ```
 
-Track what was fixed and what was noted:
 ```
 Cycle {N}:
   ✗ {fixable_count} fixable issues found
@@ -390,52 +376,48 @@ Cycle {N}:
 
 ## Review Loop
 
-After Step 6, go back to Step 3 — reuse the same reviewer agent via `SendMessage` (not a fresh spawn). Only spawn fresh for the confirmation pass.
+After Step 6, go back to Step 3 — reuse the same reviewer via `SendMessage`, spawning fresh only for the confirmation pass. Mechanics for every control below: `references/review-loop-mechanics.md` (*Depth gate*, *What `light` changes in the loop*, *QA handoff gate*, *Re-evaluation after a push*, *Config keys and what they gate*) — **read that file and apply it now.**
 
-**Loop controls.** The mechanics behind every control below live in `references/review-loop-mechanics.md` (*Depth gate*, *What `light` changes in the loop*, *QA handoff gate*, *Re-evaluation after a push*, *Config keys and what they gate*). **Read that file and apply it now.**
-
-- **Max cycles:** `review.max_cycles` (default: 3). Step 1's `light` profile and `qa_handoff = trusted` each cap it at `min(1, configured_cap)` — the `trusted` cap subject to the depth carve-out in Step 1's *Precedence*. The `light` profile also skips the optional browser UI review; `trusted` never does — it reaches only the **code** leg (Step 3), because the browser leg is opt-in and fail-soft on both sides. Neither skips the reviewer, and neither relaxes the two #36 hard-blocks.
-- **Re-evaluate `qa_handoff` after any push this skill makes** — Step 2's auto-fix commit as much as every fixer push — re-read `headRefOid` and recompute the verdict before the next step that reads it. The loop re-enters at Step 3, never Step 1.
-- **Agent reuse:** Cycles 2+ reuse the existing reviewer and fixer agents. **Confirmation pass:** when the fixer reports all fixed, spawn one fresh reviewer for unbiased verification — if clean → PASS; if new issues → back to the existing fixer (counts as a cycle).
-- **Soft pass (when `review.soft_pass: true`, default):** Stop when ALL hold: zero `action: "fix"` issues remain AND (tests pass or `review.run_tests: false`) AND (CI passes, no CI configured, or `review.check_ci: false`) AND traceability is not `fail`. Medium `note` issues and `partial` dimensions are report-only. **Strict pass (when `review.soft_pass: false`)** — strict mode applies the same tests/CI gates, then requires zero `action: "fix"` findings, zero remaining `action: "note"` findings, and `pass` for every enabled dimension; a `partial` or any note is a strict blocker — exit the fix loop, report it under Remaining, and do not report clean or merge.
-- **Hard-block conditions:** enforce the two #36 hard-blocks from Step 3's *Verification gates* — `traceability: fail` (e.g. missing `Closes #{N}`) and any `acceptance_criteria: fail` block even when every other dimension is clean and tests pass.
+- **Max cycles:** `review.max_cycles` (default 3). The `light` profile and `qa_handoff = trusted` each cap it at `min(1, configured_cap)` — the `trusted` cap subject to the *Precedence* carve-out. The `light` profile also skips the optional browser UI review; `trusted` never does — it reaches only the **code** leg (Step 3), because the browser leg is opt-in and fail-soft on both sides. Neither skips the reviewer, and neither relaxes the two #36 hard-blocks.
+- **Re-evaluate `qa_handoff` after any push this skill makes** — Step 2's auto-fix commit as much as every fixer push — re-read `headRefOid` and recompute before the next step that reads it. The loop re-enters at Step 3, never Step 1.
+- **Agent reuse:** cycles 2+ reuse the existing reviewer and fixer. **Confirmation pass:** when the fixer reports all fixed, spawn one fresh reviewer — clean → PASS; new issues → back to the existing fixer (counts as a cycle).
+- **Soft pass (`review.soft_pass: true`, default):** stop when ALL hold: zero `action: "fix"` issues remain AND (tests pass or `review.run_tests: false`) AND (CI passes, no CI configured, or `review.check_ci: false`) AND traceability is not `fail`. Notes and `partial` dimensions are report-only. **Strict pass (when `review.soft_pass: false`)** — strict mode applies the same tests/CI gates, then requires zero `action: "fix"` findings, zero remaining `action: "note"` findings, and `pass` for every enabled dimension; a `partial` dimension or any note is a strict blocker — exit the fix loop, report it under Remaining, and do not report clean or merge.
+- **Hard-block conditions:** `traceability: fail` (e.g. missing `Closes #{N}`) and any `acceptance_criteria: fail` block even when every other dimension is clean and tests pass.
 - **`review.auto_merge`:** honored only in `--auto` mode. Interactive `/issue-pr-review` never merges regardless of this flag.
-- **Exit on stagnation:** If the same issues appear in 2 consecutive cycles, stop and report
-- **Review-only mode:** After Step 1 (including PR head checkout), run Step 2 detection-only (no auto-fix commits), then Steps 3-5 once — skip Step 6, never fix, loop, or merge
+- **Exit on stagnation:** if the same issues appear in 2 consecutive cycles, stop and report
+- **Review-only mode:** after Step 1 (including PR head checkout), Step 2 detection-only, then Steps 3-5 once — skip Step 6, never fix, loop, or merge
 
 ---
 
 ## Step 7 — Summary Report [7/7]
 
-Print a structured step-by-step summary of the pipeline results, using the templates in `references/report-templates.md`:
+Print a structured summary, using the templates in `references/report-templates.md`:
 
 - *Summary — Clean PR* — all checks pass, may include soft-pass notes
-- *Summary — PR With Remaining Issues* — review couldn't clear everything within `review.max_cycles`
+- *Summary — PR With Remaining Issues* — not cleared within `review.max_cycles`
 - *Auto-Merge (auto mode only)* — post-report squash merge and block-on-failure handling
 
-**Auto-merge is the one destructive action this skill takes:** it squash merges the PR and deletes the head branch, and neither is reversible from here. It is confirmed by gate, not by prompt, and every gate must hold: interactive `/issue-pr-review` never merges whatever `review.auto_merge` says; `--auto` merges only when `review.auto_merge` is true **and** the PR is clean (pending CI is never clean); `--no-merge` suppresses the merge outright. There is no dry-run — if any gate is unmet, report and stop, and never remove a branch by hand to "finish" a merge the gates refused.
-
-When `--no-merge` is set (even in auto mode): skip the merge step and report status only. This flag exists so auto-pilot's reviewer subagent can run the full review-fix cycle without stealing the merge step from Phase 5.
+**Auto-merge is the one destructive action this skill takes:** it squash merges the PR and deletes the head branch, and neither is reversible from here. It is confirmed by gate, not by prompt, and every gate must hold: interactive `/issue-pr-review` never merges whatever `review.auto_merge` says; `--auto` merges only when `review.auto_merge` is true **and** the PR is clean (pending CI is never clean); `--no-merge` suppresses the merge outright, so auto-pilot's reviewer subagent can run the full cycle without stealing Phase 5's merge step. There is no dry-run — if a gate is unmet, report and stop, and never remove a branch by hand to "finish" a merge the gates refused.
 
 **Then the run-stats footer.** Close with the *Run Stats Footer* — `references/run-stats.md` — `elapsed`, `tokens` only where the host reported a count (otherwise left out), `agents`, run cost only, `n/a` for anything else undetermined. It is the last thing printed at **every** terminal outcome, including a run that stopped before Step 7: a failed prerequisite, an invalid config, a PR that could not be checked out, a CI wait that gave up, or a review loop that exhausted `review.max_cycles`.
 
 **Review-only mode (`--review-only`) — authoritative definition.** This is the single home for the flag's behavior; every other mention is a pointer here.
 
 - **Step flow:** Step 1 (PR info + `gh pr checkout`), Step 2 detection-only, Steps 3-5 **once**, skip Step 6, report in Step 7 — never loop, fix, or merge.
-- **Step 2 is detection-only:** run lint/format in check mode (e.g. `npx eslint .` without `--fix`, `npx prettier --check .`, `ruff check .` without `--fix`) — no `--fix`, `--write`, or other mutating flags.
+- **Step 2 is detection-only:** lint/format in check mode (`npx eslint .`, `npx prettier --check .`, `ruff check .`) — no `--fix`, `--write`, or other mutating flags.
 - **No writes at all:** skip *Commit auto-fixes* entirely. No file edits, commits, or pushes in this mode.
 
 ---
 
 ## Conventions
 
-- **Platform driver:** all tracker access follows the GitHub driver — `--json` with explicit field selection, never parsed text output; full catalog in references/docs/platform-github.md.
-- **Terminal output:** follow the `references/docs/terminal-style.md` vocabulary — `[N/7]` step counter; symbols `●` progress, `✓` success, `✗` failure, `◆` header, `⚠` warning, `○` info; two-space indent, `┄` separators, URLs on their own line, max 80 chars.
+- **Platform driver:** all tracker access follows the GitHub driver — `--json` with explicit field selection, never parsed text output; catalog in references/docs/platform-github.md.
+- **Terminal output:** the `references/docs/terminal-style.md` vocabulary — `[N/7]` counter; `●` `✓` `✗` `◆` `⚠` `○`; two-space indent, `┄` separators, URLs on their own line, max 80 chars.
 - **Errors:** rich format from `references/error-messages.md` — `✗ Short description` then `  To fix:  <command>`.
 
 ## Edge Cases
 
 - **No PR for current branch** — asks for an explicit `<N>` or stops cleanly.
 - **CI still running** — waits up to `review.ci_timeout`, then prints state and stops without merging.
-- **Critical issue unresolvable after 3 cycles** — stops, prints remaining issues, does not merge, hands back to the user.
+- **Critical issue unresolvable after 3 cycles** — stops, prints remaining issues, does not merge.
 - **Merge conflict with base** — prints the exact rebase command and stops.
