@@ -4,7 +4,7 @@ description: "Analyze one GitHub issue for root cause, complexity, and risk into
 license: MIT
 compatibility: "Requires git and GitHub CLI (gh) with authentication. View mode (`/issue-analysis N view`) needs only local file access — no gh required."
 metadata:
-  version: 0.5.2
+  version: 0.6.0
   author: Luong NGUYEN <luongnv89@gmail.com>
   effort: high
 ---
@@ -24,7 +24,7 @@ The argument must be a GitHub issue number.
 
 ## View Mode
 
-When invoked as `/issue-analysis <N> view`, skip the entire analysis pipeline (Steps 1-8) and the persist step. Instead:
+When invoked as `/issue-analysis <N> view`, run the *Bundled dependency precheck* below, then skip the entire analysis pipeline (Steps 1-8) and the persist step. Instead:
 
 1. Check for `.gitissue/analysis-<N>.json` at the repo root
 2. If the file does not exist, output the empty-state message from `references/error-messages.md` and stop:
@@ -40,7 +40,7 @@ When invoked as `/issue-analysis <N> view`, skip the entire analysis pipeline (S
      Check:   was the file edited manually?
    ```
 5. Compute report age from the `timestamp` field relative to now
-6. Render the full analysis report to terminal using the same `docs/terminal-style.md` format as Step 6, with a cache header:
+6. Render the full analysis report to terminal using the same `docs/terminal-style.md` format as Step 8, with a cache header:
 
 ```
 ◆ Issue Analysis (cached)
@@ -54,7 +54,7 @@ When invoked as `/issue-analysis <N> view`, skip the entire analysis pipeline (S
 ○ Cached report. Run /issue-analysis N for fresh analysis.
 ```
 
-After rendering, stop. View mode never writes to the file or makes API calls.
+Every view-mode exit — empty state, corrupted JSON, rendered report — closes with the *Run Stats Footer* (`references/run-stats.md`), then stops. View mode never writes to the file or makes API calls.
 
 ---
 
@@ -62,7 +62,7 @@ After rendering, stop. View mode never writes to the file or makes API calls.
 
 **View mode** (`/issue-analysis <N> view`) needs only a local `.gitissue/analysis-<N>.json` — skip the `gh` checks below.
 
-For the full analysis pipeline, verify the environment before any operation. On failure, output the exact error from `references/error-messages.md` and stop.
+For the full pipeline, verify the environment before any operation; on failure, output the exact error from `references/error-messages.md` and stop.
 
 1. Confirm git repository: `git rev-parse --git-dir`
 2. Confirm `gh` is installed: `which gh`
@@ -71,7 +71,7 @@ For the full analysis pipeline, verify the environment before any operation. On 
 
 ## Repo Sync (recommended)
 
-Before analyzing, recommend syncing with the remote so codebase analysis uses current code:
+Before analyzing, recommend syncing with the remote so analysis uses current code:
 
 ```
 ⚡ Your branch may be behind the remote. Sync before analyzing?
@@ -105,7 +105,7 @@ If `origin` is missing or rebase conflicts occur, inform the user and continue w
 
 ## Configuration
 
-Load config once at skill start: run `python3 shared/scripts/gi-config.py` — two independent requirements, both mandatory. **Working directory:** the repo root, because the script resolves `.gitissue.yml` against the working directory; run it from anywhere else and it exits 0 reporting `config_file: null`/`first_run: true`, silently discarding the repo's real config. **Script path:** relative to this SKILL.md's own directory, *not* to the working directory — resolve it to an absolute path exactly as the *Bundled dependency precheck* resolves its list, and pass that absolute path to `python3`. It prints `{"config": {…dotted keys…}, "config_file": …, "first_run": …}` as JSON on stdout, merging the defaults below with `.gitissue.yml`. Exit 0: use `config`, and print the `○ First run` line below when `first_run` is `true`. Exit 3: `.gitissue.yml` is invalid — print the validation error from `references/error-messages.md` (*Invalid config*) and stop. Script file absent: a bundled dependency is missing, which is a broken install and not a degrade — stop and print the `✗ Missing bundled dependency` block the *Bundled dependency precheck* names. Any other outcome (no `python3`, non-zero exit, unparsable stdout): print `⚠ gi-config unavailable — using the inline defaults below` and instead follow the manual fallback procedure that makes up the rest of this section. That procedure is the *alternative* to this script, never an extra step to run alongside it: on exit 0 the script's `config` is the whole answer and the rest of this section is reference material only. Never re-read the config after this step. **Capture the run clock here:** chain that same `python3` invocation as `python3 …; ec=$?; date +%s >&2; exit "$ec"` and keep the stderr epoch as `run_started_epoch` — JSON stdout and the script's exit stay intact, it costs no extra round trip, and it is what the *Run Stats Footer* (`references/run-stats.md`) measures `elapsed` from.
+Load config once at skill start: run `python3 shared/scripts/gi-config.py`. Two independent requirements, both mandatory. **Working directory:** the repo root — the script resolves `.gitissue.yml` against it, so from anywhere else it exits 0 reporting `config_file: null`/`first_run: true`, silently discarding the repo's real config. **Script path:** relative to this SKILL.md's own directory, *not* the working directory — resolve it to an absolute path exactly as the *Bundled dependency precheck* resolves its list, and pass that absolute path to `python3`. It prints `{"config": {…dotted keys…}, "config_file": …, "first_run": …}` as JSON on stdout, merging the defaults below with `.gitissue.yml`. Exit 0: use `config`, and print the `○ First run` line below when `first_run` is `true`. Exit 3: `.gitissue.yml` is invalid — print the validation error from `references/error-messages.md` (*Invalid config*) and stop. Script file absent: a bundled dependency is missing, which is a broken install and not a degrade — stop and print the `✗ Missing bundled dependency` block the *Bundled dependency precheck* names. Any other outcome (no `python3`, non-zero exit, unparsable stdout): print `⚠ gi-config unavailable — using the inline defaults below` and follow the manual fallback making up the rest of this section — the *alternative* to the script, never an extra step alongside it; on exit 0 the script's `config` is the whole answer and the rest of this section is reference material only. Never re-read the config after this step. **Capture the run clock here:** chain that same `python3` invocation as `python3 …; ec=$?; date +%s >&2; exit "$ec"` and keep the stderr epoch as `run_started_epoch` — JSON stdout and the script's exit stay intact, it costs no extra round trip, and the *Run Stats Footer* (`references/run-stats.md`) measures `elapsed` from it.
 
 Otherwise, load `.gitissue.yml` from the repo root once at skill start. If the file does not exist, use defaults and print:
 
@@ -129,7 +129,7 @@ Do not re-read the config at each step.
 
 ## Subagent Architecture
 
-The analysis pipeline delegates heavy work to subagents to keep the main agent's **context window** clean and minimize **token** usage. The main agent orchestrates and communicates with the user, while subagents handle codebase exploration and analytical synthesis within their own token budgets.
+The pipeline delegates heavy work to subagents, keeping the main agent's **context window** clean and minimizing **token** usage: the main agent orchestrates and talks to the user, while subagents explore the codebase and synthesize within their own token budgets.
 
 ```
 Main Agent (orchestrator)
@@ -149,20 +149,18 @@ Main Agent (orchestrator)
 └── Main agent: Step 8 (Output) and Persist
 ```
 
-Read `shared/agents/codebase-researcher.md` for the full explorer prompt.
-Read `shared/agents/synthesizer.md` for the full synthesizer prompt.
+Read `shared/agents/codebase-researcher.md` and `shared/agents/synthesizer.md` for the full explorer and synthesizer prompts.
 
 ### Environment check
 
 If the Agent tool is available, use subagents as described above. If not (e.g.
-Claude.ai), read `references/inline-fallback.md` — it holds the full Steps 2-7
-procedure for that path, and no delegated run ever needs it. Step 8 is unchanged
+Claude.ai), read `references/inline-fallback.md`, which holds the full Steps 2-7
+procedure for that path; no delegated run needs it. Step 8 is unchanged
 either way.
 
 ### Bundled dependency precheck
 
-Verify that this skill's bundled subagent prompts and reference files are present, resolving each path below relative to the skill's directory (the dirname of this SKILL.md).
-If any are missing, stop immediately and print:
+Verify these bundled files are present, resolving each path below relative to the skill's directory (the dirname of this SKILL.md). If any are missing, stop immediately and print:
 
 ```
 ✗ Missing bundled dependency: {missing_file}
@@ -177,41 +175,27 @@ Check these files:
 
 - `references/agents/codebase-researcher.md` — Codebase Researcher subagent prompt (Steps 2-5)
 - `references/agents/synthesizer.md` — Synthesizer subagent prompt (Steps 6-7)
-- `references/subagent-steps.md` — per-step prompts and tool budgets for subagents
-- `references/inline-fallback.md` — Steps 2-7 procedure for runs without the Agent tool
-- `references/output-and-persist.md` — terminal report rendering spec and JSON schema
-- `references/run-stats.md` — run-stats footer contract (shape, fields, unavailable marker)
-- `references/error-messages.md` — complete error catalog with triggers and exact output
+- `references/subagent-steps.md` — per-step prompts and tool budgets
+- `references/inline-fallback.md` — Steps 2-7 without the Agent tool
+- `references/output-and-persist.md` — report rendering spec and JSON schema
+- `references/run-stats.md` — run-stats footer contract
+- `references/error-messages.md` — error catalog with triggers and exact output
 - `references/examples.md` — worked example runs
-- `references/docs/sync-conventions.md` — stash-first sync convention and recovery
-- `references/docs/idd-methodology.md` — IDD methodology (durable analysis fields)
-- `references/docs/config-schema.md` — configuration schema reference
-- `references/docs/platform-github.md` — GitHub platform driver reference
-- `references/docs/agent-model-effort.md` — per-agent model and reasoning-effort mapping
-- `references/docs/terminal-style.md` — terminal output style contract (symbols, output structure, table/error formats)
-- `references/scripts/gi-config.py` — config resolver: merges the documented defaults with `.gitissue.yml` and prints one JSON line
-- `references/scripts/gi-gh.py` — shared GitHub CLI subprocess boundary used by the issue fetcher
-- `references/scripts/gi-issue.py` — TTL-cached issue fetcher used by Step 1
-
-The steps below describe the subagent delegation path; the inline fallback lives in `references/inline-fallback.md`.
+- `references/docs/sync-conventions.md` — stash-first sync and recovery
+- `references/docs/idd-methodology.md` — IDD methodology
+- `references/docs/config-schema.md` — configuration schema
+- `references/docs/platform-github.md` — GitHub platform driver
+- `references/docs/agent-model-effort.md` — per-agent model and effort mapping
+- `references/docs/terminal-style.md` — terminal output style contract
+- `references/scripts/gi-config.py` — config resolver: defaults merged with `.gitissue.yml`, one JSON line
+- `references/scripts/gi-gh.py` — GitHub CLI subprocess boundary
+- `references/scripts/gi-issue.py` — TTL-cached issue fetcher (Step 1)
 
 ---
 
 ## Pipeline Overview
 
-The analysis pipeline has 8 steps plus a persist step. Display progress using the `[N/8]` step counter:
-
-```
-  ◆ Analysis Pipeline
-  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  [1/8] Fetch          ✓ issue #42 loaded (bug)
-  [2/8] Extract        ✓ 8 keywords, 2 file refs
-  [3/8] Research       ● reading 18 files...
-  [4/8] History        ✓ 5 related commits, 1 prior fix attempt
-  [5/8] Cross-refs     ✓ 2 related issues, 1 may resolve this
-```
-
-Each step prints a new line when it starts (with `●`) and updates to `✓` on success or `✗` on failure. Static sequential output — no animation.
+The analysis pipeline has 8 steps plus a persist step. Display progress using the `[N/8]` step counter, one line per step, in the format shown under *Expected Output*. Each step prints a new line when it starts (with `●`) and updates to `✓` on success or `✗` on failure.
 
 ---
 
@@ -261,7 +245,7 @@ python3 shared/scripts/gi-issue.py {N} \
 After discarding a formerly supplied record, run this same command with
 `--refresh` so no pre-probe cache entry can recreate the stale snapshot.
 
-Read `.issue` from the JSON envelope. The field list is this skill's choice — the widest of any skill, because analysis reads the whole issue. Exit 3 (a malformed argument) is a stop. Exit 4, or no `python3`, degrades to `gh issue view {N} --json number,title,body,labels,assignees,state,comments,createdAt,updatedAt,author`; the cache is an optimization, never a dependency.
+Read `.issue` from the JSON envelope. The field list is the widest of any skill: analysis reads the whole issue. Exit 3 (a malformed argument) is a stop. Exit 4, or no `python3`, degrades to `gh issue view {N} --json number,title,body,labels,assignees,state,comments,createdAt,updatedAt,author`; the cache is an optimization, never a dependency.
 
 **If not found:**
 ```
@@ -276,13 +260,13 @@ Stop.
 ```
 ⚠ Issue #N is closed. Analyzing anyway for reference.
 ```
-Unlike issue-resolver, analysis does NOT stop on closed issues — analyzing a closed issue is a valid use case (understanding what was done, reviewing approach). Print the warning and continue.
+Unlike issue-resolver, analysis does NOT stop on closed issues — reviewing what was done is a valid use case. Print the warning and continue.
 
-**No guards:** Analysis is read-only and non-destructive. No assignment guard or blocking label guard is needed — there is no risk of duplicating work or violating blocks.
+**No guards:** analysis is read-only and non-destructive, so no assignment guard or blocking-label guard is needed — no work can be duplicated and no block violated.
 
 ### Classify type
 
-From the issue title, body, and labels, determine the issue type: `bug`, `feature`, or `improvement`. Use these heuristics:
+From the title, body, and labels, determine the issue type (`bug`, `feature`, `improvement`) using these heuristics:
 
 - Labels containing `bug`, `defect`, `error` → bug
 - Labels containing `feature`, `enhancement`, `request` → feature
@@ -299,15 +283,9 @@ After fetch:
 
 ## Steps 2-7 — Explorer & Synthesizer
 
-Steps 2-5 run inside the Codebase Researcher subagent (Explorer phase); Steps 6-7 run inside the Synthesizer subagent. **Read `references/subagent-steps.md` now** — it carries the delegation payload, the return handling, and the tool budgets every run needs before spawning either subagent. Its inline counterpart, `references/inline-fallback.md`, is gated: read it **only** when the Agent tool is unavailable.
+Steps 2-5 run inside the Codebase Researcher subagent (Explorer phase); Steps 6-7 run inside the Synthesizer subagent. **Read `references/subagent-steps.md` now** — it carries the delegation payload, the return handling, and the tool budgets every run needs before spawning either subagent. Its inline counterpart, `references/inline-fallback.md`, is read **only** when the Agent tool is unavailable.
 
-Quick summary:
-- **Step 2** — extract keywords & file refs from the issue.
-- **Step 3** — codebase scan (grep/glob, read up to 20 files).
-- **Step 4** — git history scan (related commits, prior fix attempts).
-- **Step 5** — cross-reference related issues & PRs.
-- **Step 6** — root cause synthesis.
-- **Step 7** — implementation options & complexity/risk scoring.
+Quick summary — **2** extract keywords & file refs from the issue · **3** codebase scan (grep/glob, read up to 20 files) · **4** git history scan (related commits, prior fix attempts) · **5** cross-reference related issues & PRs · **6** root cause synthesis · **7** implementation options & complexity/risk scoring.
 
 ---
 ## Step 8-9 — Output & Persist
@@ -320,18 +298,18 @@ Summary:
 
 ### Durable analysis fields
 
-`/issue-analysis` JSON is local cache — see *Analysis Artifacts and Durable Memory* in `docs/idd-methodology.md`. To make the analysis durable, two structured fields are persisted alongside the existing analysis content so `/issue-resolver` can lift them into the PR body:
+`/issue-analysis` JSON is local cache — see *Analysis Artifacts and Durable Memory* in `docs/idd-methodology.md`. Two structured fields are persisted alongside the analysis content to make it durable, so `/issue-resolver` can lift them into the PR body:
 
-1. **`git_state`** — the branch and commit SHA the analysis ran against, under the exact keys `git_state.commit_sha` (never `sha`) and `git_state.captured_at`. This pins the analysis to a specific point in time so reviewers can verify the current-code reality the recommendation was made against, and so `/issue-resolver`'s *Step 0h — Analysis reuse gate* can check whether the pin still holds — capture every value by running the commands in `references/output-and-persist.md`, never by inventing one.
-2. **`decision_record`** — five core fields lifted from Steps 6 and 7: `root_cause`, `options_considered`, `options_rejected`, `selected_option`, `residual_risk`. The labels are stable across `/issue-analysis`, `/issue-resolver`, and `/issue-pr-review` because the downstream presence checks are string-matched. Bug issues additionally carry an optional sixth `reproduction` field, but `/issue-analysis` does not populate it (it is produced post-fix by `/issue-resolver`'s bug-verification checkpoint) — see `references/output-and-persist.md`.
+1. **`git_state`** — the branch and commit SHA the analysis ran against, under the exact keys `git_state.commit_sha` (never `sha`) and `git_state.captured_at`. It pins the analysis to a point in time, so reviewers can check the recommendation against the code it was made on and `/issue-resolver`'s *Step 0h — Analysis reuse gate* can test whether the pin still holds — capture every value by running the commands in `references/output-and-persist.md`, never by inventing one.
+2. **`decision_record`** — five core fields lifted from Steps 6 and 7: `root_cause`, `options_considered`, `options_rejected`, `selected_option`, `residual_risk`. The labels are stable across `/issue-analysis`, `/issue-resolver`, and `/issue-pr-review` because the downstream presence checks are string-matched. Bug issues carry an optional sixth `reproduction` field that `/issue-analysis` never populates — `/issue-resolver`'s post-fix bug-verification checkpoint produces it; see `references/output-and-persist.md`.
 
-Persisting these fields does **not** change the analysis pipeline — it only adds two new keys to the JSON and a *Decision Record* section to the terminal report. See `references/output-and-persist.md` for the exact schema and rendering.
+These add two JSON keys and a *Decision Record* section to the terminal report; nothing else changes. Exact schema and rendering: `references/output-and-persist.md`.
 
 ---
 
 ## Final Report
 
-After all 8 steps and persistence complete, print a structured step-by-step summary so the user can see what happened at each stage:
+After all 8 steps and persistence complete, print a step-by-step summary of what happened at each stage:
 
 **Then the run-stats footer.** Close with the *Run Stats Footer* — `references/run-stats.md` — `elapsed`, `tokens` only where the host reported a count (otherwise left out), `agents`, run cost only, `n/a` for anything else undetermined. It is the last thing printed at **every** terminal outcome, including a run that ended early — an issue that was not found or is closed, an invalid config, or a scan that could not complete.
 
@@ -355,23 +333,17 @@ After all 8 steps and persistence complete, print a structured step-by-step summ
   Saved: .gitissue/analysis-N.json
 ```
 
-If a step produced no results (e.g., no git history found), mark it with a note:
+If a step produced no results (e.g. no git history), mark it with a note:
 
 ```
   Git history:       ○ skip (no related commits found)
 ```
 
-If the issue may already be resolved:
+If the issue may already be resolved, the same block marks the research row and result:
 
 ```
-◆ Issue Analysis: #{N} — {title}
-┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-
-  Fetch:             ✓ pass
-  Extract targets:   ✓ pass
   Research:          ⚡ may already be fixed by {sha7}
   ...
-  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Result:            DONE (verify if already resolved)
 ```
 
@@ -400,7 +372,7 @@ A successful analysis prints the 8-step tracker and a condensed report, then per
   Recommendation:  {one-sentence next step}
 ```
 
-View mode (`/issue-analysis N view`) reads the JSON and renders the same report without re-running the pipeline.
+View mode renders the same report from the JSON without re-running the pipeline.
 
 ## Edge Cases
 
@@ -435,15 +407,13 @@ Stop. Analysis requires at least one relevant file.
 
 ### Re-analysis (existing JSON)
 
-If `.gitissue/analysis-<N>.json` already exists when running a full analysis (not view mode), overwrite it silently. The new analysis replaces the old one entirely.
+If `.gitissue/analysis-<N>.json` already exists when running a full analysis (not view mode), overwrite it silently — the new analysis replaces the old entirely.
 
 ---
 
 ## Example Runs
 
-Full example outputs (happy path, view mode, already-closed issue) are kept in `references/examples.md` so SKILL.md stays focused on pipeline mechanics.
-
----
+Full example outputs (happy path, view mode, already-closed issue) are in `references/examples.md`.
 
 ---
 
@@ -453,13 +423,4 @@ All tracker access follows the GitHub driver — `--json` with explicit field se
 
 ## Output Conventions
 
-Terminal output follows the `docs/terminal-style.md` contract — symbols `● ✓ ✗ ◆ ⚡ ⚠ ○`, two-space indent, `┄` separators, URLs on their own line, ≤80 chars, one blank line between sections, static sequential output (no animation), plus a `[N/8]` pipeline step counter and `│ ─ ┼` tables (right-align numbers, `—` for empty cells). Errors use the rich format from `references/error-messages.md`: `✗ what failed`, then `To fix:  <command>`, then a docs link when applicable.
-
-## Additional Resources
-
-- **`shared/agents/codebase-researcher.md`** — Codebase Researcher subagent prompt (Steps 2-5 delegation)
-- **`shared/agents/synthesizer.md`** — Synthesizer subagent prompt (Steps 6-7 delegation)
-- **`references/inline-fallback.md`** — Steps 2-7 procedure for runs without the Agent tool (gated)
-- **`references/error-messages.md`** — Complete error catalog with triggers and exact output
-- **`docs/terminal-style.md`** — Terminal output style contract (bundled at build time; the repo-root `DESIGN.md` is the human-facing companion and is not bundled)
-- **`docs/config-schema.md`** — Full configuration schema
+Terminal output follows the `docs/terminal-style.md` contract — symbols `● ✓ ✗ ◆ ⚡ ⚠ ○`, two-space indent, `┄` separators, URLs on their own line, ≤80 chars, one blank line between sections, static sequential output (no animation), a `[N/8]` pipeline step counter, and `│ ─ ┼` tables (right-align numbers, `—` for empty cells). Errors use the rich format from `references/error-messages.md`: `✗ what failed`, then `To fix:  <command>`, then a docs link when applicable.
