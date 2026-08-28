@@ -131,15 +131,10 @@ review:
   # Scale review depth to each PR's complexity (adaptive depth).
   # Type: boolean
   # Default: true
-  # When true, /issue-pr-review derives a pre-work complexity signal from the PR
-  # (diff size, files-changed, labels, and the linked issue's Effort band — the
-  # fuller of any that disagree) and, for a trivial PR, caps the review-fix loop
-  # at 1 cycle and skips optional passes. The acceptance-criteria and
-  # traceability hard-blocks always run at full strength. Complex or ambiguous
-  # PRs keep the full max_cycles depth. When false, every PR gets full review
-  # depth as before — the profile is pinned to "full", and the QA handoff gate
-  # is disabled too, so a resolver-marked PR also gets the full pipeline. The
-  # chosen depth is surfaced on the [1/7] tracker line. See
+  # True: a trivial PR caps the review-fix loop at 1 cycle and skips optional
+  # passes; the AC and traceability hard-blocks still run at full strength.
+  # False: profile pinned to "full", and the QA handoff gate is disabled too.
+  # Signal selection and the XS…XL scale:
   # https://github.com/luongnv89/idd/blob/main/docs/agent-model-effort.md
   # (Complexity → pipeline profile).
   adaptive_depth: true
@@ -165,6 +160,15 @@ review:
   # Type: boolean
   # Default: true
   check_ci: true
+
+  # Treat a terminal CI failure as non-blocking during PR review (opt-in).
+  # Type: boolean
+  # Default: false
+  # No GitHub API field identifies a billing-related CI failure, so when true
+  # this ignores ANY terminal CI failure, not only billing ones. CI is still
+  # polled and still reported (unlike check_ci: false); only the review gate
+  # stops blocking. It does not relax /auto-pilot's merge gate.
+  ignore_ci_billing_failures: false
 
   # Seconds between CI status polls
   # Type: integer
@@ -197,22 +201,18 @@ review:
   # Run per-criterion acceptance-criteria verification against the linked issue.
   # Type: boolean
   # Default: true
-  # When true, /issue-pr-review parses the linked issue's `## Acceptance Criteria`
-  # and reports each criterion as pass/fail/unverified; any `fail` blocks soft-pass.
-  # When false, the acceptance_criteria dimension is reported as `pass` with a
-  # "verification disabled" note and never blocks. Default true preserves the
-  # contract from issue #36.
+  # True: each criterion of the linked issue's `## Acceptance Criteria` is
+  # reported pass/fail/unverified, and any `fail` blocks soft-pass. False: the
+  # dimension reports `pass — verification disabled` and never blocks.
   require_acceptance_criteria_check: true
 
   # Run the four traceability checks against the PR body and commit history.
   # Type: boolean
   # Default: true
-  # When true, /issue-pr-review verifies `Closes #N`, commit references,
-  # Decision Record presence, and Acceptance Criteria Verification block; the
-  # missing-`Closes #N` case blocks soft-pass even on green tests/CI.
-  # When false, the traceability dimension is reported as `pass` with a
-  # "verification disabled" note and never blocks. Default true preserves the
-  # contract from issue #36.
+  # True: verifies `Closes #N`, commit references, Decision Record, and the
+  # Acceptance Criteria Verification block; a missing `Closes #N` blocks
+  # soft-pass even on green tests/CI. False: the dimension reports
+  # `pass — verification disabled` and never blocks.
   require_traceability_check: true
 
   # PR labels that exempt a PR from the `Closes #N` hard-fail (check 1 only).
@@ -428,6 +428,7 @@ Config is validated at every skill start; errors include line numbers:
 | `review.confidence_threshold` | `80` | Min confidence level for issues |
 | `review.run_tests` | `true` | Run tests during review |
 | `review.check_ci` | `true` | Check CI status during review |
+| `review.ignore_ci_billing_failures` | `false` | Opt-in: a terminal CI failure is reported but not blocking at the review gate. Ignores **any** terminal failure — see the schema comment |
 | `review.ci_poll_interval` | `30` | Seconds between CI polls |
 | `review.ci_timeout` | `600` | CI polling timeout |
 | `review.test_timeout` | `300` | Review test timeout |
