@@ -15,7 +15,8 @@ frontmatter in a tree the build owns.
 
 Body size was measured two ways, deliberately. `wc -w`/`wc -l` on the file is the working
 number; `asm eval`'s own count strips the YAML frontmatter first, and that is the number
-Gate 2 scores. The gap is a constant 72 words.
+Gate 2 scores. This file's frontmatter is 72 words, so its two numbers sit 72 apart — a
+property of this frontmatter, not a constant to carry to another skill.
 
 ---
 
@@ -25,8 +26,8 @@ Gate 2 scores. The gap is a constant 72 words.
 |------|-------|----------|-------|
 | **Gate 1** | `quick_validate.py` exit | 0 (pass) | **0 (pass)** |
 | Gate 1 | Frontmatter completeness (`asm eval` → `structure`) | 10/10 | **10/10** |
-| Gate 1 | Body under 500 lines | 500 / 500 (**at cap**) | **328 (pass)** |
-| Gate 1 | Body under 3000 words | **5609 (FAIL)** | **2991 (pass)** |
+| Gate 1 | Body under 500 lines | 500 / 500 (**at cap**) | **330 (pass)** |
+| Gate 1 | Body under 3000 words | **5609 (FAIL)** | **2959 (pass)** |
 | Gate 1 | Negative-trigger clause in description | pass | pass (description untouched) |
 | Gate 1 | `metadata.version` semver + `metadata.author` | pass (0.17.0) | **pass (0.18.0)** |
 | Gate 1 | `docs/README.md` opens with AI-skip comment | pass | pass |
@@ -51,16 +52,16 @@ Baseline blocker, verbatim from the evaluator: *"Body is over 3000 words — spl
 content into referenced files or templates."* Both `context-efficiency` (0 of its 4 length
 points) and `prompt-engineering` (1 point) were docked on that one measurement, so the
 relocation pass moved two categories at once. Final findings: *"Body length within healthy
-range (2991 words)."*
+range (2959 words)."*
 
 Body size, command of record:
 
 ```
-wc -w < src/skills/issue-resolver/SKILL.source.md   # 5681 → 3063
-wc -l < src/skills/issue-resolver/SKILL.source.md   #  500 →  328
+wc -w < src/skills/issue-resolver/SKILL.source.md   # 5681 → 3031
+wc -l < src/skills/issue-resolver/SKILL.source.md   #  500 →  330
 ```
 
-Source and built `SKILL.md` measure identically (3063 words / 328 lines), as they did at
+Source and built `SKILL.md` measure identically (3031 words / 330 lines), as they did at
 baseline.
 
 `metadata.version`: **0.17.0 → 0.18.0** (minor — sections relocated to `references/`, one
@@ -69,10 +70,18 @@ new dependency-preflight rule; no behavior or output-format change).
 ### What moved, and where
 
 Nothing was deleted outright except the *Additional Resources* index, which self-declared as
-redundant (*"the precheck list above, not this one, is the authoritative guard"*) and which
-`scripts/build/doc_slimming.py` already strips before its bundled-doc reachability scan.
-Everything else was **relocated**, and each destination section was written in the same
-commit as the cut that pointed at it:
+redundant: *"the precheck list above, not this one, is the authoritative guard."* An earlier
+draft of this report justified that deletion by saying `scripts/build/doc_slimming.py` already
+strips the section. **That was a category error.** `_slim_doc_for_skill`'s only call site
+(`scripts/build/emit.py`) processes bundled `references/docs/*` and never `SKILL.md`, and
+`_strip_bibliography_blocks` runs only inside the two zero-mention *validation* scans, which
+return a list and write nothing. The section duly shipped in `origin/main`'s built `SKILL.md`.
+
+The deletion stands on its own terms instead: all 23 entries the index named appear in the
+*Bundled dependency precheck* list, and 22 of them are also cited by name from the body's own
+prose. The exception, `ui-reviewer.md`, is carried by the precheck list — the guard the index
+itself deferred to. Everything else was **relocated**, and each destination section was
+written in the same commit as the cut that pointed at it:
 
 | Moved out of the body | New home (`references/`) |
 |---|---|
@@ -85,11 +94,22 @@ commit as the cut that pointed at it:
 
 No exit code, fallback procedure, stop condition, script path, or `<!-- a: -->` anchor was
 dropped. The three body anchors (`rs-0a-payload-concurrency`, `rs-0h-skill`,
-`rs-deliver-clean-tree`) are present exactly once each. Preservation was checked two ways:
-after every commit by a scripted guard over the phrases the suite pins to
-`SKILL.source.md` (extracted up front from the 34 resolver-touching test files), and
-end-to-end by the full suite on the rebuilt tree, which is what covers the built-side
-assertions the guard does not read.
+`rs-deliver-clean-tree`) are present exactly once each.
+
+**How that was checked, and what the check could not see.** Preservation was verified after
+every commit by a scripted guard over the phrases the suite pins to `SKILL.source.md`
+(extracted up front from the 34 resolver-touching test files), and end-to-end by the full
+suite on the rebuilt tree. **Neither is evidence that meaning survived.** Both answer one
+question — *is every pinned literal still present?* — and a sentence can lose its verb, its
+pointer, or a fallback branch without disturbing a single pinned literal. This pass ran green
+on all 83 test files while dropping three pieces of instruction semantics: the `warn` verb in
+0d and the `references/error-messages.md` pointer behind it, the `○ First run` print on the
+config degrade path, and the *static sequential output — no animation* rule. All three were
+found by human review afterwards and restored in the follow-up commit. Suite-green is
+consistent with semantic loss. The instrument that actually catches it is a word-level diff
+(`git diff --word-diff`) read one removed word at a time, asking of each whether it is a verb,
+an exit code, a path, a stop-vs-degrade distinction, a literal print string, or a section
+pointer — which is what the restoration commit used.
 
 ---
 
@@ -138,10 +158,10 @@ Rubric resolved at `~/.claude/skills/skill-creator/references/predictability-rub
 | 1 | Invocation chosen intentionally | **pass** | User-invoked (`/issue-resolver N`), and the shape matches: the body opens with an *Invocation* table of three forms and reads as "the user asked for this, proceed", not "apply this now". The description still carries the negative-trigger clause because `/auto-pilot` reaches the skill model-invoked. |
 | 2 | Branches mapped before the body | **pass** | Four orthogonal branches are selected before any step runs and each is named in one place: mode (interactive / `--auto`), workspace (in-place / accepted worktree / caller-managed `IDD_CALLER_WORKTREE=1`), profile (*0g*, `light` / `full`), and reuse (*0h*, `fresh` / `stale` / `absent`). Branch-specific mechanics are disclosed per branch in `pipeline-steps.md`, not inlined. |
 | 3 | Demanding, checkable completion criteria | **pass** | Every step ends in a *Step completion report* — `√`/`×` per check plus `Result: PASS \| PARTIAL \| FAIL` — and the body states *"A step is incomplete until `Result:` prints."* Criteria are tied to commands and counts (`git status --porcelain=v1 --untracked-files=all` empty, `scanned` not 0, the `[N/5]` tracker), not impressions. |
-| 4 | Progressive disclosure + delegability | **pass** (this pass fixed it) | Was the failing item: 5609 words in an always-loaded body, at the 500-line cap. Now 2991 words / 328 lines, with every relocated block reached by a one-line pointer naming its target section. Delegability sub-check below. |
+| 4 | Progressive disclosure + delegability | **pass** (this pass fixed it) | Was the failing item: 5609 words in an always-loaded body, at the 500-line cap. Now 2959 words / 330 lines, with every relocated block reached by a one-line pointer naming its target section. Delegability sub-check below. |
 | 5 | Leading words | **pass** | Recurring concepts are named once and referred to by name: *stash-first pattern*, *fail-safe*, *red-capable reproduction checkpoint*, *single writer*, *single home*, *degrade vs. stop*, *block verdict*, *last-green test state*, *profile*. The compression pass consistently replaced re-explanation with the leading word plus a pointer. |
-| 6 | No duplication / stale sediment / sprawl / no-ops | **pass** (this pass fixed it) | Removed: the *Additional Resources* index (self-declared redundant with the precheck list); three `[N/5]` tracker fences duplicating *Expected Inline Pipeline Output*; the per-step auto-mode enumeration that restated each step's own auto clause; ~40 justification clauses whose rationale now has one home in `references/`. No dead reference remains — every italic section name a body pointer cites resolves to a real `##`/`###` heading in the named file, and the build's closure and precheck-drift guards pass. |
-| 7 | Publish-ready — no auto-improver dependency | **pass** | `quick_validate.py` exit 0, `asm eval` 97/A with no category below 8, 328 lines, description carries the negative-trigger clause, `metadata.version`/`author`/`license` present. The skill now clears the standard without a follow-up auto-improver run. |
+| 6 | No duplication / stale sediment / sprawl / no-ops | **pass** (this pass fixed it) | Removed: the *Additional Resources* index (self-declared redundant with the precheck list); three `[N/5]` tracker fences duplicating *Expected Inline Pipeline Output*; the per-step auto-mode enumeration that restated each step's own auto clause; ~40 justification clauses whose rationale now has one home in `references/`. The build's closure and precheck-drift guards pass. Body pointers were re-checked one by one, and **the claim that every italic section name resolves to a real `##`/`###` heading does not hold**: `references/error-messages.md` (*Bundled dependencies*) names no such heading — that block lives under `### Missing bundled dependency` — and *Step N → `light` profile* is a pattern over two headings rather than a literal one. Both predate this pass, on `origin/main`, and neither was introduced or worsened here, so both are left alone. |
+| 7 | Publish-ready — no auto-improver dependency | **pass** | `quick_validate.py` exit 0, `asm eval` 97/A with no category below 8, 330 lines, description carries the negative-trigger clause, `metadata.version`/`author`/`license` present. The skill now clears the standard without a follow-up auto-improver run. |
 
 ### Delegability sub-check (item #4)
 
@@ -169,8 +189,14 @@ not gate the PASS.
 
 ## 4. Delegation-conversion decision (Mode 2)
 
-**Declined.** Named precondition it failed: *Mode 2 requires an undelegated heavy phase to
-convert, and `/issue-resolver` has none.*
+**Declined.** Named precondition it failed, verbatim from `skill-auto-improver`'s
+`references/delegation-conversion.md` → *When Mode 2 applies*, item 4: *"The user has
+confirmed the restructure in this run."* No confirmation was given — the restructure was never
+put to the user — and the same reference is explicit that a conversion *"is never something
+this skill decides on the user's behalf."* That alone settles the mode.
+
+It would also have had nothing to convert, which is why the decline is not merely
+procedural:
 
 - Steps 1, 2 and 3 each already spawn a `shared/agents/*` subagent through the canonical
   `Agent(...)` pattern; Step 4 spawns the reviewer, the fixer and (auto-detected) the
@@ -188,14 +214,17 @@ forbids for the same reason it forbids a subagent owning a safety gate.
 
 ## 5. Run-stats footer (issue #414 shape)
 
-Unchanged by this pass, and deliberately so. The contract settled by #414 is
+The *contract* is unchanged by this pass, deliberately so. The *prose carrying it* was
+**reworded** during compression — substance-preserving, with all 156 pinned checks passing —
+which an earlier draft of this report overstated as "unchanged". The contract settled by #414
+is
 `elapsed` · `tokens` (conditional) · `agents`, two lines, printed **last at every terminal
 outcome**. It lives in `references/run-stats.md`; the SKILL body carries only the pointer,
 the `run_started_epoch` capture in *Configuration*, and the enumeration of the terminal
 outcomes that never reach the *Closing Summary* block (preflight stop, invalid-config stop,
 `already_resolved`, blocked secret scan, failed final test run, any failed step). The field
-set was not widened, reordered or renamed. `tests/test-run-stats-373.sh` (156 checks) passes
-on both the source and the built tree.
+set was not widened, reordered or renamed — that claim stands unqualified.
+`tests/test-run-stats-373.sh` (156 checks) passes on both the source and the built tree.
 
 ---
 
@@ -203,7 +232,7 @@ on both the source and the built tree.
 
 | File | Change |
 |---|---|
-| `src/skills/issue-resolver/SKILL.source.md` | compressed 5681 → 3063 words, 500 → 328 lines; `metadata.version` 0.17.0 → 0.18.0 |
+| `src/skills/issue-resolver/SKILL.source.md` | compressed 5681 → 3031 words, 500 → 330 lines; `metadata.version` 0.17.0 → 0.18.0. Includes the follow-up commit restoring three dropped instruction semantics, paid for by trimming restatement already carried by the *Step 0g* profile table |
 | `src/skills/issue-resolver/references/pipeline-steps.md` | four new sections (*Configuration load*, *Orchestrating the agents*, *Auto-mode behavior by step*, *Step 5 — Deliver → Pre-push secret scan*) plus the installer bootstrap and install verification on the borrow path |
 | `skills/issue-resolver/SKILL.md` | regenerated (`./scripts/build.sh`) |
 | `skills/issue-resolver/references/pipeline-steps.md` | regenerated |
@@ -222,7 +251,7 @@ and reproduces on pristine `origin/main`.
 
 **None.** Both gates pass on the built tree:
 
-- Gate 1 — `quick_validate.py` exit 0; 328 lines (< 500); 2991 words (< 3000); frontmatter
+- Gate 1 — `quick_validate.py` exit 0; 330 lines (< 500); 2959 words (< 3000); frontmatter
   complete; dependency preflight now carries all four elements.
 - Gate 2 — `asm eval` overall **97** (> 85), minimum category **8** (>= 8).
 
@@ -231,4 +260,6 @@ One item is deliberately deferred rather than unresolved: `context-efficiency` s
 test-pinned contract prose out of the SKILL body — the suite asserts ~40 literal phrases
 against `SKILL.source.md` itself (the 0g `light`-profile table rows, the 0e worktree offer
 block, the 0d security-label branch, the run-log literals, the secscan pass condition) — so
-the practical floor for this skill is a little under 3000 words. 8 clears the gate.
+the practical floor for this skill is a little under 3000 words. 8 clears the gate, and the
+body is held at 2959 rather than pressed against 3000 so the next edit has room to add a
+sentence without re-breaking `context-efficiency`.
