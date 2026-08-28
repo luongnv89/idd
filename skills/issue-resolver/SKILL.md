@@ -33,12 +33,14 @@ In-place path only; worktree paths start from the fetched base, and an invalid `
 
 ## Configuration
 
-Load config once; never re-read it. Run `python3 references/scripts/gi-config.py` — **Working directory:** the repo root; **Script path:** absolute, as the *Bundled dependency precheck* resolves its own list. It prints `{"config": …, "config_file": …, "first_run": …}` merged over the defaults below. Why each matters: `references/pipeline-steps.md` (*Configuration load*).
+Load config once; never re-read it. Run `python3 references/scripts/gi-config.py` — **Working directory:** the repo root; **Script path:** absolute, as the *Bundled dependency precheck* resolves its list. It prints `{"config": …, "config_file": …, "first_run": …}` merged over the defaults below. Why each matters: `references/pipeline-steps.md` (*Configuration load*).
 
-- **Exit 0** — use `config`; on `first_run` print `○ First run — using default config. Run /init-gitissue to customize.`
+- **Exit 0** — use `config`.
 - **Exit 3** — invalid `.gitissue.yml`: print the `references/error-messages.md` error (*Invalid config*), stop.
 - **Script file absent** — a broken install and not a degrade: stop, print `✗ Missing bundled dependency`.
-- **Anything else** (no `python3`, non-zero exit, unparsable stdout) — print `⚠ gi-config unavailable — using the inline defaults below` and read `.gitissue.yml` by hand *instead of* the script.
+- **Anything else** (no `python3`, non-zero exit, unparsable stdout) — print `⚠ gi-config unavailable — reading .gitissue.yml by hand` and read it yourself *instead of* the script, over the keys and defaults below.
+
+Either path: no `.gitissue.yml` (`first_run`) prints `○ First run — using default config. Run /init-gitissue to customize.`
 
 **Capture the run clock here:** chain that same `python3` invocation as `python3 …; ec=$?; date +%s >&2; exit "$ec"`; the stderr epoch is `run_started_epoch`, from which the *Run Stats Footer* (`references/run-stats.md`) measures `elapsed`.
 
@@ -48,7 +50,7 @@ Defaults and behavior per key: `references/docs/config-schema.md` — `issue.aut
 
 ## Subagent Architecture
 
-Heavy work goes to subagents (`shared/agents/`), keeping the main agent's **context window** clean and its **token budget** predictable: it owns Step 0, Step 4's loop and Step 5; Steps 1-3 each spawn one (*Subagent Architecture Diagram*). Prompts live at `references/agents/<name>.md`, conventions in `references/docs/shared-agent-conventions.md`.
+Heavy work goes to subagents (`shared/agents/`), keeping the main agent's **context window** lean: it owns Step 0, Step 4's loop and Step 5; Steps 1-3 each spawn one (*Subagent Architecture Diagram*). Prompts: `references/agents/<name>.md`; conventions: `references/docs/shared-agent-conventions.md`.
 
 ### Spawning a subagent (canonical pattern)
 
@@ -112,7 +114,7 @@ references/scripts/gi-state.py
 
 ## Pipeline Overview
 
-6 steps (0-5) — Preflight, Research, Plan, Implement, QA, Deliver — each printing a `[N/5]` line on start (`●`) that updates to `✓`/`✗`. Read the worked example of the expected output in `references/report-templates.md` (*Expected Inline Pipeline Output*).
+6 steps (0-5) — Preflight, Research, Plan, Implement, QA, Deliver — each printing a `[N/5]` line on start (`●`) that updates to `✓`/`✗`. Read the expected output example in `references/report-templates.md` (*Expected Inline Pipeline Output*).
 
 ### Step completion reports
 
@@ -146,7 +148,7 @@ If `issue.auto_normalize` is true and the body lacks a `<!-- gitissue:normalized
    - **Auto mode (`--auto` / `IDD_AUTO_MODE=1`):** print the `⚠ … Skipping auto-normalization` warning (`references/error-messages.md` → *Security-labeled issue (skip)*), first matching label as `{label}`, continue **without** rewriting.
    - **Interactive mode:** same warning, then ask for explicit operator confirmation; default **no**, a decline continuing without normalization.
 
-2. **Normalize inline** — otherwise: classify the type, generate the body, add the marker, back up the original in a comment, `gh issue edit`, invalidate the cache (`python3 references/scripts/gi-issue.py {N} --invalidate`), re-fetch. Structure-only, as `/issue-creator` Normalize mode; the resolver does **not** invoke `/issue-creator` as a subprocess. On failure keep the original body.
+2. **Normalize inline** — otherwise: classify the type, generate the body, add the marker, back up the original in a comment, `gh issue edit`, invalidate the cache (`python3 references/scripts/gi-issue.py {N} --invalidate`), re-fetch. Structure-only, as `/issue-creator` Normalize mode; the resolver does **not** invoke `/issue-creator` as a subprocess. On failure **warn** and continue with the original body (`references/error-messages.md` → *Auto-normalization failed*).
 
 ### 0e — Workspace (interactive only)
 
@@ -178,7 +180,7 @@ The **in-place path**; worktree paths already checked out the branch. Reuse the 
 
 ### 0g — Complexity gate (select the pipeline profile)
 
-Decide **before Step 1** how much pipeline this issue earns; the `XS … XL` scale and safety rules live in `references/docs/agent-model-effort.md` (*Complexity → pipeline profile*). `resolve.adaptive_effort: false` pins `full`; else read the **pre-work `Effort` band** in `## Metadata`, never later agent output:
+Decide **before Step 1** how much pipeline this issue earns; the `XS … XL` scale and safety rules: `references/docs/agent-model-effort.md` (*Complexity → pipeline profile*). `resolve.adaptive_effort: false` pins `full`; else read the **pre-work `Effort` band** in `## Metadata`, never later agent output:
 
 - `XS`/`S` asserted (not `(needs review)`) → `light`; `M`/`L`/`XL` → `full`
 - `XS`/`S` low-confidence, **or** absent/unparseable → `full` (ambiguous → fuller)
@@ -208,7 +210,7 @@ Set `analysis_reuse` to `fresh`, `stale` or `absent` by the five-condition predi
 
 Understand the issue, the affected code and candidate solutions; the same pass verifies it is not already fixed (auto then closes it). Spawn the researcher (`references/agents/codebase-researcher.md`). Payload, phases, early exit, fallback: *Step 1 — Research*.
 
-**Profiles.** `light` — see the profile table in *Step 0g*; a `high`/`complex` signal revises **upward** to `full`, never downward. `analysis_reuse = fresh` (*0h*) — pass `prior_analysis` for the seeded **verify-first** pass: confirm or refute, never trust; the already-resolved check still runs. `triage_context` has no commit pin, so it may only **reorder** a scan (*→ `reuse`*, *→ `triage_context`*).
+**Profiles.** `light` — see the profile table in *Step 0g*; a `high`/`complex` signal revises **upward** to `full`. `analysis_reuse = fresh` (*0h*) — pass `prior_analysis` for the seeded **verify-first** pass: confirm or refute, never trust; the already-resolved check still runs. `triage_context` has no commit pin, so it may only **reorder** a scan (*→ `reuse`*, *→ `triage_context`*).
 
 ---
 
@@ -216,7 +218,7 @@ Understand the issue, the affected code and candidate solutions; the same pass v
 
 Generate options and select one. Spawn the synthesizer (`references/agents/synthesizer.md`); it returns minimal / balanced / comprehensive, balanced usually recommended (*Step 2 — Plan*).
 
-**Profiles.** `light` — skip the synthesis; see the profile table in *Step 0g*. `analysis_reuse = fresh` (*0h*) skips the same spawn but **wins Step 2 when both apply** — a replacement, not an addition: lift `options[]`, `recommended_option`, `overall_complexity`, `overall_risk` from the analysis, each `rejection_reason` from `decision_record.options_rejected[]` (*→ `reuse`*).
+**Profiles.** `light` — see the profile table in *Step 0g*. `analysis_reuse = fresh` (*0h*) skips the same spawn but **wins Step 2 when both apply** — a replacement, not an addition: lift `options[]`, `recommended_option`, `overall_complexity`, `overall_risk` from the analysis, each `rejection_reason` from `decision_record.options_rejected[]` (*→ `reuse`*).
 
 ### Design-confirm checkpoint (high-complexity, interactive only)
 
@@ -230,7 +232,7 @@ Generate options and select one. Spawn the synthesizer (`references/agents/synth
 
 Optionally augment the implementer with external skills from `references/skill-index.md`: detect, propose, accept into `selected_skills`; internal agents remain the fallback. Borrow/install, `{name, origin}` records via `references/scripts/gi-state.py`, teardown of `origin: borrowed` only, auto-mode: `references/pipeline-steps.md` (*Step 3 — Propose relevant skills*).
 
-**`light` profile:** skip propose/install — see the profile table in *Step 0g* — but **still run the leftover teardown** there.
+**`light` profile:** see the profile table in *Step 0g* — the **leftover teardown still runs** there.
 
 Then spawn the implementer (`references/agents/implementer.md`) with the plan, branch name, naming conventions and `selected_skills`. **Bug** issues first run the red-capable reproduction checkpoint — reproduce, confirm red, fix, convert to a regression test — surfaced in the Decision Record and acceptance table; others skip it, auto never blocks (`references/bug-verification.md`). Payload, guardrails, fallback: *Step 3*.
 
@@ -246,9 +248,9 @@ Spawn a **fresh** reviewer (`references/agents/code-reviewer.md`) each cycle. On
 
 ### UI/UX review (auto-detected)
 
-UI review is **auto-detected per issue** — no config flag enables it. Scan the issue body and diff for UI work before cycling. The **code UI review** is environment-independent and always runs; the **browser UI review** runs only when a running app is reachable *and* opted in, else **skips with a warning while the code UI review still runs**. Detection, the `ui-reviewer` spawn and the `ui_review.browser_review` gate: `references/docs/ui-review.md`. Deltas and cycle mechanics: *Step 4 — UI/UX review*, *Step 4 — QA*.
+UI review is **auto-detected per issue** — no config flag enables it. Scan the issue body and diff for UI work before cycling. The **code UI review** always runs; the **browser UI review** runs only when a running app is reachable *and* opted in, else **skips with a warning**. Detection, the `ui-reviewer` spawn and the `ui_review.browser_review` gate: `references/docs/ui-review.md`. Deltas and cycle mechanics: *Step 4 — UI/UX review*, *Step 4 — QA*.
 
-**`light` profile:** cap the loop at **1** cycle — see the profile table in *Step 0g*. Class policy: light=1; full+low/medium=2; full+high=`resolve.qa_max_cycles`. Record `ceiling`/`breach_reason`.
+**`light` profile:** see the profile table in *Step 0g*. Class policy: light=1; full+low/medium=2; full+high=`resolve.qa_max_cycles`. Record `ceiling`/`breach_reason`.
 
 ---
 
@@ -304,7 +306,7 @@ if [ -n "$no_run_log" ]; then printf '%s' "$run_json" | python3 references/scrip
 
 ## Closing Summary
 
-Emit **one** closing block with only what the `[N/5]` tracker never printed: the outcome line, `risk_rating`, the PR reference (number, title, URL, `Closes #N`). Never repeat a tracker metric; use the matching variant in `references/report-templates.md` (*Closing Summary*). **Then the run-stats footer** — `references/run-stats.md`: elapsed, tokens only where the host reported a count (else left out), agents, run cost only, `n/a` otherwise. It prints last at **every** terminal outcome, including those never reaching this block — a preflight stop (`not found`, `closed`, `pr_in_progress`), an invalid-config stop, `already_resolved`, a blocked scan, a failed final test run, any failed step.
+Emit **one** closing block with only what the `[N/5]` tracker never printed: the outcome line, `risk_rating`, the PR reference (number, title, URL, `Closes #N`). Use the matching variant in `references/report-templates.md` (*Closing Summary*). **Then the run-stats footer** — `references/run-stats.md`: elapsed, tokens only where the host reported a count (else left out), agents, run cost only, `n/a` otherwise. It prints last at **every** terminal outcome, including those never reaching this block — a preflight stop (`not found`, `closed`, `pr_in_progress`), an invalid-config stop, `already_resolved`, a blocked scan, a failed final test run, any failed step.
 
 ---
 
@@ -321,8 +323,8 @@ No `[y/N]`, `Choose:` or `Continue?` prompts.
 
 ## Edge Cases
 
-Edge cases — missing acceptance criteria, empty issue body, large issues (20+ files), test failure or timeout, branch-already-exists — are handled in *Edge Cases*.
+Missing acceptance criteria, empty issue body, large issues (20+ files), test failure or timeout, branch-already-exists: *Edge Cases*.
 
 ## Platform Driver and Output Conventions
 
-Tracker access uses the GitHub driver — `--json` with explicit fields, never parsed text (references/docs/platform-github.md). Output follows `references/docs/terminal-style.md` — `● ✓ ✗ ◆ ⚡ ⚠ ○`, two-space indent, `┄` separators, URLs on their own line, ≤80 chars, the `[N/5]` counter. Errors use `references/error-messages.md`'s format: `✗ what failed`, `To fix:  <command>`, a docs link.
+Tracker access uses the GitHub driver — `--json` with explicit fields, never parsed text (references/docs/platform-github.md). Output follows `references/docs/terminal-style.md` — `● ✓ ✗ ◆ ⚡ ⚠ ○`, two-space indent, `┄` separators, URLs on their own line, ≤80 chars, static sequential output — no animation, the `[N/5]` counter. Errors use `references/error-messages.md`'s format: `✗ what failed`, `To fix:  <command>`, a docs link.
