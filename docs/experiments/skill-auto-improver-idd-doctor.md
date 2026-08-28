@@ -16,8 +16,10 @@ indicatively at **96 / grade A** on a synthesized copy. See §0 and §7.
 `/idd-doctor` is the repo's only **internal** skill. It is authored at
 `src/internal-skills/idd-doctor/` and, unlike the seven public skills, it is **never built**:
 
-- `skills/idd-doctor/` does not exist. `tests/test-root-skills-install-surface.sh` T5 asserts
-  it must not.
+- `skills/idd-doctor/` does not exist. `tests/test-root-skills-install-surface.sh` T5 asserts it
+  stays out of the distributed root `skills/` tree — that is a rule about the *install surface*,
+  not a prohibition on a built tree existing somewhere else, which is why #434's middle option
+  stays open.
 - `scripts/build.py` contains **zero** references to `src/internal-skills`. It does not handle
   that source root at all. A bare `./scripts/build.sh` on this branch reports
   `✓ public skills: 7` and leaves `git diff -- skills/` empty.
@@ -132,7 +134,7 @@ longer loads, not words that moved somewhere it still loads them from.
 | *Testing*'s 10-item enumeration of what `tests/test-idd-doctor.sh` covers | One sentence naming the same coverage. The test file is the authority on its own assertions; the enumeration restated them without changing what the agent does. | ~87 |
 | *Read-only guarantee*'s 4-bullet list | Folded into the section's own opening sentence, which previously omitted *tags* and *comments* and now carries both. The list was introduced by *"In detail, the skill is forbidden to:"* and then restated the sentence above it. | ~38 |
 | *Scope (v1)* table rows 1 and 2 | Check 1 and Check 2 each enumerate their own files and forbidden phrases in full, two screens below. The rows now say what the check verifies and point at the section that lists them. | ~55 |
-| Check 2's *Match algorithm* (3 numbered steps) | *"Check 1's Pattern match algorithm without its negation steps: every matching line records a finding `{file, line_number, pattern, snippet}`."* Check 1's four steps are untouched. | ~20 |
+| Check 2's *Match algorithm* (3 numbered steps) | *"Check 1's Pattern match algorithm without its negation steps: every matching line records a finding `{file, line_number, pattern, snippet}`."* Check 1's own four steps are intact (step 4's *"on the matching line"* → *"on that line"* is the only wording change). | ~20 |
 | Per-file glosses on the *Bundled dependency precheck* list | The `references/run-stats.md` gloss (*"run-stats footer contract (shape, fields, unavailable marker)"*) restated the contract file's own subject; the `references/error-messages.md` gloss is carried by the three use sites that name it. Follows the precedent #415 set for `/auto-pilot`. | ~12 |
 | `docs/naming-conventions.md` pointer, described in the index as *"(referenced for context)"* | **Nowhere — deliberately.** This is a read-only skill that creates no branch, commit, PR or issue. A pointer to the naming conventions changes nothing an agent does here, which is the rubric item-6 no-op. It has no build-closure consequence either: nothing about this package is bundled, because nothing about it is built. | ~14 |
 | Duplicate rendering of Check 3's skip line in *Configuration* | See *Three changes called out* below. | ~8 |
@@ -169,16 +171,16 @@ longer loads, not words that moved somewhere it still loads them from.
 ### How preservation was checked, and what the check caught
 
 Every tracked suite naming this skill or its source root was traced under `bash -x` at the
-baseline commit and **every assertion applied to `SKILL.source.md` was extracted from the trace
-line, not guessed**. Nine suites reach it: `test-idd-doctor.sh`, `test-run-stats-373.sh`,
+baseline commit and **every assertion applied to `SKILL.source.md` was extracted from the traced
+command line, not guessed**. Nine suites reach it: `test-idd-doctor.sh`, `test-run-stats-373.sh`,
 `test-runs-jsonl.sh`, `test-skill-frontmatter-keys-307.sh`, `test-disclosure-gates-250.sh`,
 `test-skill-line-cap-247.sh`, `test-root-skills-install-surface.sh`, `test-build-script.sh`,
-`test-pre-commit-security.sh`. That yielded **52 pinned patterns** — 24 `grep -q[iEF]` literals
-or regexes, 3 `check_flow` collapsed-newline sentences, 1 `check_flow_lacks` prohibition, the
-four `## Check N —` headings plus their line-order comparison, and the frontmatter key-set and
-`metadata.effort` audits.
+`test-pre-commit-security.sh`. The extracted set spans `grep -q[iEF]` literals and regexes, the
+four `## Check N —` headings plus their line-order comparison, 3 `check_flow` collapsed-newline
+sentences, 1 `check_flow_lacks` prohibition, and the frontmatter key-set and `metadata.effort`
+audits.
 
-A guard script re-asserted the full set, plus 33 further literals not covered by any test
+A guard script replayed that set as **34 assertions**, plus **37 further literals** not covered by any test
 (every exit code, `PR_TITLE`, `HTTP 422`, `gh auth status`, `date +%s`, `N = 50`, `tail -n 50`,
 `qa_cycles`, `skipped_reason`, `already_resolved`, every forbidden-pattern variant, both
 `src/skills/issue-creator/` paths, all three `docs/*.md` citations, `agents 0`, `n/a`, and the
@@ -418,15 +420,33 @@ skills/` is clean, which is the strongest statement available here, since the bu
 know this skill exists.
 
 **Test suite of record** (`git ls-files 'tests/*.sh' | xargs -n1 bash`, serial, `IDD_AUTO_MODE`
-unset): **82 passed, 1 failed** across 83 tracked scripts — identical to the pre-change baseline
-on this machine.
+unset, 83 tracked scripts). The suite was run twice end-to-end, and the two runs did not agree —
+so the in-loop numbers are reported as observed rather than smoothed into one figure:
 
-- The single failure is `tests/test-runs-jsonl-rotation-354.sh` T4, the known macOS-only
-  artifact (BSD `wc` pads its output, so `"       3" != "3"`). Unrelated to this change;
-  reproduces on pristine `main`; ubuntu CI is green.
-- `tests/test-scripts-252.sh` AC1, the other known non-defect, **passed** — it fails only with
-  `IDD_AUTO_MODE=1` exported, and the variable was unset for every run.
-- `tests/test-build-script.sh` is known-flaky in-loop; it was re-run standalone and passes.
+| Run | Result | Failing |
+|---|---|---|
+| 1 | 80 passed, 3 failed | `test-runs-jsonl-rotation-354.sh`, `test-scripts-253.sh`, `test-autopilot-hardening-259.sh` |
+| 2 | 81 passed, 2 failed | `test-runs-jsonl-rotation-354.sh`, `test-scripts-253.sh` |
+
+**Every script that failed in a loop was re-run standalone.** Only one fails that way:
+
+- `tests/test-runs-jsonl-rotation-354.sh` T4 — the known macOS-only artifact (BSD `wc` pads its
+  output, so `"       3" != "3"`). Unrelated to this change; reproduces on pristine `main`;
+  ubuntu CI is green. **Standalone: fails.**
+- `tests/test-scripts-253.sh` — **standalone: exit 0**, run twice, the second time *after* this
+  report was committed. That second run is the discriminating one: 253 AC5 counts per-script
+  call-sites across every tracked `.md` including `docs/`, and this report names
+  `shared/scripts/` twice, so a real interaction would have shown there.
+- `tests/test-autopilot-hardening-259.sh` — **standalone: exit 0**.
+- `tests/test-build-script.sh` — known-flaky in-loop, passed in both loop runs here; re-run
+  standalone anyway, exit 0.
+- `tests/test-scripts-252.sh` AC1, the other known non-defect, **passed in both runs** — it
+  fails only with `IDD_AUTO_MODE=1` exported, and the variable was unset throughout.
+
+So the defensible statement is: **82 pass and 1 fails when each script is judged on its own**,
+and the in-loop variance is the known flaky class this repo already tracks — a different subset
+each run, always green standalone. No baseline run at `e6b9136` was taken, so this report makes
+no "identical to baseline" claim.
 
 ---
 
