@@ -4,7 +4,7 @@ description: "Create structured GitHub issues from text, screenshots, or lists, 
 license: MIT
 compatibility: "Requires git and GitHub CLI (gh) with authentication. Run `gh auth status` to verify."
 metadata:
-  version: 0.8.0
+  version: 0.9.0
   author: Luong NGUYEN <luongnv89@gmail.com>
   effort: medium
 ---
@@ -68,7 +68,7 @@ durable files to the working tree syncs first, with the stash-first pattern in
 
 ## Configuration
 
-Load config once at skill start with `python3 shared/scripts/gi-config.py`. Two mandatory requirements. **Working directory:** the repo root — the script resolves `.gitissue.yml` against the working directory, so running it elsewhere exits 0 with `config_file: null`/`first_run: true`, silently discarding the repo's real config. **Script path:** relative to this SKILL.md's own directory, *not* the working directory — resolve it as the *Bundled dependency precheck* does. It prints `{"config": {…dotted keys…}, "config_file": …, "first_run": …}` on stdout, merging the defaults below with `.gitissue.yml`. Exit 0: use `config`, printing `○ First run` below when `first_run` is `true`. Exit 3: `.gitissue.yml` is invalid — print the validation error from `references/error-messages.md` (*Invalid config*) and stop. Script file absent: a bundled dependency is missing, which is a broken install and not a degrade — stop and print the `✗ Missing bundled dependency` block. Any other outcome (no `python3`, non-zero exit, unparsable stdout): print `⚠ gi-config unavailable — using the inline defaults below` and follow the fallback below *instead*, never alongside. Never re-read the config. **Capture the run clock here:** chain that same `python3` invocation as `python3 …; ec=$?; date +%s >&2; exit "$ec"` and keep the stderr epoch as `run_started_epoch`, leaving stdout and exit intact. It is what the *Run Stats Footer* (`references/run-stats.md`) measures `elapsed` from.
+Load config once at skill start with `python3 shared/scripts/gi-config.py`. Two mandatory requirements. **Working directory:** the repo root — the script resolves `.gitissue.yml` against the working directory, so running it elsewhere exits 0 with `config_file: null`/`first_run: true`, silently discarding the repo's real config. **Script path:** relative to this SKILL.md's own directory, *not* the working directory — resolve it as the *Bundled dependency precheck* does. It prints `{"config": {…dotted keys…}, "config_file": …, "first_run": …}` on stdout, merging the defaults below with `.gitissue.yml`. Exit 0: use `config`, printing `○ First run` below when `first_run` is `true`. Exit 3: `.gitissue.yml` is invalid — print the validation error from `references/error-messages.md` (*Invalid config*) and stop. Script file absent: a bundled dependency is missing, which is a broken install and not a degrade — stop and print the `✗ Missing bundled dependency` block. Any other outcome (no `python3`, non-zero exit, unparsable stdout): print `⚠ gi-config unavailable — using the inline defaults below` and follow the fallback below *instead*, never alongside. Never re-read it. **Capture the run clock here:** chain that same `python3` invocation as `python3 …; ec=$?; date +%s >&2; exit "$ec"` and keep the stderr epoch as `run_started_epoch`, leaving stdout and exit intact. It is what the *Run Stats Footer* (`references/run-stats.md`) measures `elapsed` from.
 
 Fallback: read `.gitissue.yml` from the repo root once. Absent, use the defaults and print:
 
@@ -84,7 +84,7 @@ When `model_suggestion.enabled` is `true` (the default), run the model-data cach
 python3 shared/scripts/gi-model-cache.py --skill-dir "$skill_dir"
 ```
 
-Exit 0 prints `state` (`fresh` | `stale` | `seeded` | `installed`), `stale`, `age_days`, `data_version`, `data_date`, and `bands` — the effort → two-model mapping with each pick's per-task cost. Exit 3: stop and print the validation error. **Script file — or `templates/model-data.json` — absent:** stop with the `✗ Missing bundled dependency` block; a missing seed is a broken install, not a degrade. **Exit 4, no `python3`, exit 2, or unparsable stdout:** print `⚠ gi-model-cache unavailable — model suggestions disabled for this run` and continue without it, or run the lifecycle by hand from `references/model-suggestion.md`, the authoritative prose procedure. `state: "stale"` warns, never fails — in auto mode log it and use the data as-is. `--refresh-model-data` forces a refresh first (WebFetch, then `--install`); when `model_suggestion.enabled` is `false`, skip all model-suggestion steps silently.
+Exit 0 prints `state` (`fresh` | `stale` | `seeded` | `installed`), `stale`, `age_days`, `data_version`, `data_date`, and `bands` — the effort → two-model mapping with each pick's per-task cost. Exit 3: stop and print the validation error. **Script file — or `templates/model-data.json` — absent:** stop with the `✗ Missing bundled dependency` block; a missing seed is a broken install, not a degrade. **Exit 4, no `python3`, exit 2, or unparsable stdout:** print `⚠ gi-model-cache unavailable — model suggestions disabled for this run` and continue without it, or run the lifecycle by hand from `references/model-suggestion.md`, the authoritative prose procedure. `state: "stale"` warns, never fails — in auto mode log it and use the data. `--refresh-model-data` forces a refresh first (WebFetch, then `--install`); when `model_suggestion.enabled` is `false`, skip all model-suggestion steps silently.
 
 ## Subagent Architecture
 
@@ -159,9 +159,9 @@ Extract from the description:
 
 Refuse a planted `.gitissue/cache` symlink, create that ignored directory only
 when it is a real directory, then create a unique exclusive request file
-(`mktemp`, mode 0600) holding the classified `items` and the once-loaded
-`config`. Feed `"$dup_request"` on stdin; never put a title, keyword, body, or
-config value on the command line, and never reuse a shared
+(`mktemp`, mode 0600) holding the classified `items` and once-loaded `config`.
+Feed `"$dup_request"` on stdin; never put a title, keyword, body, or config
+value on the command line, and never reuse a shared
 `.gitissue/cache/dup-request.json`.
 
 ```bash
@@ -196,7 +196,7 @@ cleanup_dup_request
 trap - EXIT HUP INT TERM
 ```
 
-Resolve the script as the dependency precheck does, and read `dup_output` only after `dup_status` is classified. Exit 0 returns `duplicates` (deterministic high band), `medium_band`, deduplicated `medium_issue_context`, `medium_judgement`, and `batch_internal_duplicates`. An empty `medium_band` skips the agent. When non-empty, take the first `medium_judgement.selected_count` candidates in script order and spawn the duplicate-detector in chunks of `medium_judgement.batch_size` with `{mode, items, candidates: chunk, issue_context: only the medium_issue_context rows referenced by that chunk}`. It returns one tri-state `decision` (`confirmed` | `rejected` | `ambiguous`) per candidate, without fetching or rescoring. Match verdicts by complete identity (`item_index`, `match_type`, and `match_number` or `match_index`), never by array position. A candidate leaves the warnings **only** on exactly one well-formed `rejected` verdict carrying that identity and a non-empty evidence-based reason. Keep `confirmed` and `ambiguous` as warnings, marking `ambiguous` `(needs review)`. A missing, duplicate, malformed, incomplete, unknown-decision, wrong-identity, or failed-agent verdict is fail-safe ambiguity: retain the candidate with its `score`, `payments`, and `reason` as a `(needs review)` warning, and never treat a failed chunk's partial output as authority. Leftover `medium_judgement.deferred_count` candidates are **retained as possible-duplicate warnings without an LLM verdict**. High matches are warnings too, title and labels on each record.
+Resolve the script as the dependency precheck does, and read `dup_output` only after `dup_status` is classified. Exit 0 returns `duplicates` (deterministic high band), `medium_band`, deduplicated `medium_issue_context`, `medium_judgement`, and `batch_internal_duplicates`. An empty `medium_band` skips the agent. When non-empty, take the first `medium_judgement.selected_count` candidates in script order and spawn the duplicate-detector in chunks of `medium_judgement.batch_size` with `{mode, items, candidates: chunk, issue_context: only the medium_issue_context rows referenced by that chunk}`. It returns one tri-state `decision` (`confirmed` | `rejected` | `ambiguous`) per candidate, without fetching or rescoring. Match verdicts by complete identity (`item_index`, `match_type`, and `match_number` or `match_index`), never by array position. A candidate leaves the warnings **only** on exactly one well-formed `rejected` verdict carrying that identity and a non-empty evidence-based reason. Keep `confirmed` and `ambiguous` as warnings, marking `ambiguous` `(needs review)`. A missing, duplicate, malformed, incomplete, unknown-decision, wrong-identity, or failed-agent verdict is fail-safe ambiguity: retain the candidate with its `score`, `payments`, and `reason` as a `(needs review)` warning, and never treat a failed chunk's output as authority. Leftover `medium_judgement.deferred_count` candidates are **retained as possible-duplicate warnings without an LLM verdict**. High matches are warnings too.
 
 Exit 3 is an invalid request/config: stop with the validation error. A missing script is a broken install: stop with the dependency error. For no `python3`, exit 2/4, or unparsable stdout, print `⚠ gi-dup-score unavailable — scoring duplicates inline`; exit 4 means the backlog was unreadable, never empty. For that fallback take `backlog_limit` from the once-loaded `duplicate_detection.backlog_limit`, validate it, and run this block as written — the extra record is a truncation probe, not a record to score:
 
@@ -233,7 +233,7 @@ The Step 6 summary still reports it as `⚠ warn`, exactly as an interactive ove
 
 ### Step 3.5 — Clarify Ambiguous Intent
 
-Fires only in **interactive Create mode**, and only when **type classification** or **acceptance-criteria** confidence is `low`; otherwise it is a silent no-op and the Step 3 → Step 4 path is unchanged. **Non-interactive contexts never block:** in Batch mode and any auto context, **skip this step** — draft with the defaulted assumptions and mark those fields `(needs review)`.
+Fires only in **interactive Create mode**, and only when **type classification** or **acceptance-criteria** confidence is `low`; otherwise it is a silent no-op and the Step 3 → Step 4 path is unchanged. **Non-interactive contexts never block:** in Batch mode and any auto context, **skip this step** — draft with the defaults and mark those fields `(needs review)`.
 
 Resolve from the repo before asking, and hold the **Output Contract boundary**: inspection here sets *classification* and confidence only — no affected file, technical note, root cause, or implementation hint reaches the body. When the step fires, **read `references/clarify-intent.md` now** for the gating rules, the example prompt with its `[Y/n]` default, and the confidence each answer earns.
 
@@ -319,11 +319,13 @@ If duplicates were found and the run proceeded anyway:
 
 **Normalize** fetches an issue, classifies it, fills in missing sections, and updates the body. **Batch Create** parses a multi-item input, previews the items, and creates one issue per item with per-item success/failure tracking. Both step specs, error paths, and terminal reports are in `references/modes.md` — **read it now** in either mode. Worked example runs: `references/examples.md`.
 
+
+
 ---
 
 ## Output Conventions
 
-Tracker access follows the GitHub driver — `--json` with explicit field selection, never parsed text; the operation catalog is docs/platform-github.md. Terminal output follows `docs/terminal-style.md` — symbols `● ✓ ✗ ◆ ⚡ ⚠ ○`, two-space indent, `┄` separators, URLs on their own line, ≤80 chars, static sequential output; issue-creator adds `+` (added) and `=` (preserved). Errors use the rich format from `references/error-messages.md`: `✗ what failed`, `To fix:  <command>`, then a docs link.
+Tracker access follows the GitHub driver — `--json` with explicit field selection, never parsed text; the operation catalog is docs/platform-github.md. Terminal output follows `docs/terminal-style.md` — symbols `● ✓ ✗ ◆ ⚡ ⚠ ○`, two-space indent, `┄` separators, URLs on their own line, ≤80 chars, static sequential output; issue-creator adds `+` (added) and `=` (preserved). Errors use the rich format from `references/error-messages.md`: `✗ what failed`, `To fix:  <command>`, a docs link.
 
 ## GitHub Projects Sync
 
@@ -333,7 +335,7 @@ After each issue is created, when `projects.sync_enabled` is `true`, sync it per
 
 A successful create prints Step 6's `◆ Issue Created` block; Normalize and Batch print their own (`references/modes.md`, Steps 12 and 6), batch adding a line per issue and a totals footer (`✓ 5 created, 1 skipped (duplicate)`).
 
-**Then the run-stats footer.** Close with the *Run Stats Footer* — `references/run-stats.md` — `elapsed`, `tokens` only where the host reported a count (otherwise left out), `agents`, run cost only, `n/a` for anything undetermined. It is the last thing printed at **every** terminal outcome in every mode, a run that created nothing included: a cancelled confirmation, an invalid config, a failed `gh issue create`. One footer covers a whole batch, never one per issue.
+**Then the run-stats footer.** Close with the *Run Stats Footer* — `references/run-stats.md` — `elapsed`, `tokens` only where the host reported a count (otherwise left out), `agents`, run cost only, `n/a` for anything undetermined. It is the last thing printed at **every** terminal outcome in every mode, a run that created nothing included: a cancelled confirmation, an invalid config, a failed `gh issue create`. One footer per batch, never one per issue.
 
 ## Edge Cases
 
