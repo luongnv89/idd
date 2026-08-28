@@ -27,7 +27,7 @@ property of this frontmatter, not a constant to carry to another skill.
 | **Gate 1** | `quick_validate.py` exit | 0 (pass) | **0 (pass)** |
 | Gate 1 | Frontmatter completeness (`asm eval` → `structure`) | 10/10 | **10/10** |
 | Gate 1 | Body under 500 lines | 500 / 500 (**at cap**) | **330 (pass)** |
-| Gate 1 | Body under 3000 words | **5609 (FAIL)** | **2959 (pass)** |
+| Gate 1 | Body under 3000 words | **5609 (FAIL)** | **2958 (pass)** |
 | Gate 1 | Negative-trigger clause in description | pass | pass (description untouched) |
 | Gate 1 | `metadata.version` semver + `metadata.author` | pass (0.17.0) | **pass (0.18.0)** |
 | Gate 1 | `docs/README.md` opens with AI-skip comment | pass | pass |
@@ -52,16 +52,16 @@ Baseline blocker, verbatim from the evaluator: *"Body is over 3000 words — spl
 content into referenced files or templates."* Both `context-efficiency` (0 of its 4 length
 points) and `prompt-engineering` (1 point) were docked on that one measurement, so the
 relocation pass moved two categories at once. Final findings: *"Body length within healthy
-range (2959 words)."*
+range (2958 words)."*
 
 Body size, command of record:
 
 ```
-wc -w < src/skills/issue-resolver/SKILL.source.md   # 5681 → 3031
+wc -w < src/skills/issue-resolver/SKILL.source.md   # 5681 → 3030
 wc -l < src/skills/issue-resolver/SKILL.source.md   #  500 →  330
 ```
 
-Source and built `SKILL.md` measure identically (3031 words / 330 lines), as they did at
+Source and built `SKILL.md` measure identically (3030 words / 330 lines), as they did at
 baseline.
 
 `metadata.version`: **0.17.0 → 0.18.0** (minor — sections relocated to `references/`, one
@@ -166,7 +166,7 @@ Rubric resolved at `~/.claude/skills/skill-creator/references/predictability-rub
 | 1 | Invocation chosen intentionally | **pass** | User-invoked (`/issue-resolver N`), and the shape matches: the body opens with an *Invocation* table of three forms and reads as "the user asked for this, proceed", not "apply this now". The description still carries the negative-trigger clause because `/auto-pilot` reaches the skill model-invoked. |
 | 2 | Branches mapped before the body | **pass** | Four orthogonal branches are selected before any step runs and each is named in one place: mode (interactive / `--auto`), workspace (in-place / accepted worktree / caller-managed `IDD_CALLER_WORKTREE=1`), profile (*0g*, `light` / `full`), and reuse (*0h*, `fresh` / `stale` / `absent`). Branch-specific mechanics are disclosed per branch in `pipeline-steps.md`, not inlined. |
 | 3 | Demanding, checkable completion criteria | **pass** | Every step ends in a *Step completion report* — `√`/`×` per check plus `Result: PASS \| PARTIAL \| FAIL` — and the body states *"A step is incomplete until `Result:` prints."* Criteria are tied to commands and counts (`git status --porcelain=v1 --untracked-files=all` empty, `scanned` not 0, the `[N/5]` tracker), not impressions. |
-| 4 | Progressive disclosure + delegability | **pass** (this pass fixed it) | Was the failing item: 5609 words in an always-loaded body, at the 500-line cap. Now 2959 words / 330 lines, with every relocated block reached by a one-line pointer naming its target section. Delegability sub-check below. |
+| 4 | Progressive disclosure + delegability | **pass** (this pass fixed it) | Was the failing item: 5609 words in an always-loaded body, at the 500-line cap. Now 2958 words / 330 lines, with every relocated block reached by a one-line pointer naming its target section. Delegability sub-check below. |
 | 5 | Leading words | **pass** | Recurring concepts are named once and referred to by name: *stash-first pattern*, *fail-safe*, *red-capable reproduction checkpoint*, *single writer*, *single home*, *degrade vs. stop*, *block verdict*, *last-green test state*, *profile*. The compression pass consistently replaced re-explanation with the leading word plus a pointer. |
 | 6 | No duplication / stale sediment / sprawl / no-ops | **pass** (this pass fixed it) | Removed: the *Additional Resources* index (self-declared redundant with the precheck list); three `[N/5]` tracker fences duplicating *Expected Inline Pipeline Output*; the per-step auto-mode enumeration that restated each step's own auto clause; ~40 justification clauses whose rationale now has one home in `references/`. The build's closure and precheck-drift guards pass. Body pointers were re-checked one by one, and **the claim that every italic section name resolves to a real `##`/`###` heading does not hold**: `references/error-messages.md` (*Bundled dependencies*) names no such heading — that block lives under `### Missing bundled dependency` — and *Step N → `light` profile* is a pattern over two headings rather than a literal one. Both predate this pass, on `origin/main`, and neither was introduced or worsened here, so both are left alone. |
 | 7 | Publish-ready — no auto-improver dependency | **pass** | `quick_validate.py` exit 0, `asm eval` 97/A with no category below 8, 330 lines, description carries the negative-trigger clause, `metadata.version`/`author`/`license` present. The skill now clears the standard without a follow-up auto-improver run. |
@@ -240,7 +240,7 @@ set was not widened, reordered or renamed — that claim stands unqualified.
 
 | File | Change |
 |---|---|
-| `src/skills/issue-resolver/SKILL.source.md` | compressed 5681 → 3031 words, 500 → 330 lines; `metadata.version` 0.17.0 → 0.18.0. Includes the follow-up commit restoring three dropped instruction semantics, paid for by trimming restatement already carried by the *Step 0g* profile table |
+| `src/skills/issue-resolver/SKILL.source.md` | compressed 5681 → 3030 words, 500 → 330 lines; `metadata.version` 0.17.0 → 0.18.0. Includes the follow-up commit restoring three dropped instruction semantics, paid for by trimming restatement already carried by the *Step 0g* profile table |
 | `src/skills/issue-resolver/references/pipeline-steps.md` | four new sections (*Configuration load*, *Orchestrating the agents*, *Auto-mode behavior by step*, *Step 5 — Deliver → Pre-push secret scan*) plus the installer bootstrap and install verification on the borrow path |
 | `skills/issue-resolver/SKILL.md` | regenerated (`./scripts/build.sh`) |
 | `skills/issue-resolver/references/pipeline-steps.md` | regenerated |
@@ -259,7 +259,7 @@ and reproduces on pristine `origin/main`.
 
 **None.** Both gates pass on the built tree:
 
-- Gate 1 — `quick_validate.py` exit 0; 330 lines (< 500); 2959 words (< 3000); frontmatter
+- Gate 1 — `quick_validate.py` exit 0; 330 lines (< 500); 2958 words (< 3000); frontmatter
   complete; dependency preflight now carries all four elements.
 - Gate 2 — `asm eval` overall **97** (> 85), minimum category **8** (>= 8).
 
@@ -269,5 +269,5 @@ test-pinned contract prose out of the SKILL body — the suite asserts ~40 liter
 against `SKILL.source.md` itself (the 0g `light`-profile table rows, the 0e worktree offer
 block, the 0d security-label branch, the run-log literals, the secscan pass condition) — so
 the practical floor for this skill is a little under 3000 words. 8 clears the gate, and the
-body is held at 2959 rather than pressed against 3000 so the next edit has room to add a
+body is held at 2958 rather than pressed against 3000 so the next edit has room to add a
 sentence without re-breaking `context-efficiency`.
