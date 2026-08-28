@@ -146,13 +146,13 @@ Stop.
 
 ### Checkout PR head branch
 
-Check out the PR head branch before Step 2 or anything else that runs git against the working tree, so pre-pass commits and the fixer operate on `{headRefName}`:
+Check out the PR head before Step 2, so pre-pass commits and the fixer operate on `{headRefName}`:
 
 ```bash
 gh pr checkout {N}
 ```
 
-`{headRefName}` is `{branch_name}` for sync, commit and push (canonical command: `references/docs/platform-github.md`). **Bind it to a shell variable — never paste the literal name into a command:** a head-ref name is attacker-chosen and git permits shell metacharacters in a ref. Assign once — `branch_name="$(gh pr view {N} --json headRefName --jq .headRefName)"` — then use `"$branch_name"` in every **shell command**; display templates and spawn-variable lists keep the plain name. Why: `references/review-loop-mechanics.md` (*Binding the head-ref name*).
+`{headRefName}` is `{branch_name}` for sync, commit and push (canonical command: `references/docs/platform-github.md`). **Bind it to a shell variable — never paste the literal name into a command:** assign once, `branch_name="$(gh pr view {N} --json headRefName --jq .headRefName)"`, then use `"$branch_name"` in every **shell command**; display templates and spawn-variable lists keep the plain name. Why it is a safety rule: `references/review-loop-mechanics.md` (*Binding the head-ref name*).
 
 ### Depth gate (select the review profile)
 
@@ -215,25 +215,11 @@ base="$(gh repo view --json defaultBranchRef --jq .defaultBranchRef.name)"
 python3 references/scripts/gi-secscan.py --working-tree --policy-ref "origin/${base}"
 ```
 
-Bind `base` **first**, from the repository's default branch, never the PR's
-`baseRefName`; `--policy-ref` is the trust boundary, because this skill has the
-PR's branch checked out. Never interpolate a config value into this command — the
-script reads `security.*` itself.
+Bind `base` **first**, from the repository's default branch, never the PR's `baseRefName`; never interpolate a config value into this command — the script reads `security.*` itself.
 
-**A pass is all four: exit 0, `policy_source` exactly the `ref:origin/…` asked
-for, `verdict` not `block`, and not (`scanned` 0 with `skipped` above 0)** —
-procedure, table and rationale in `references/prepass-tests-ci-mechanics.md`
-(*Commit auto-fixes*), **read it now**. **Exit 1 is the block verdict: stop, do
-not stage, do not push, report the path from `blocking[]`** — never the degrade
-path. Exit 3 is also a stop. A missing `python3`, **exit 2** (a scan that never
-ran), or exit 4 degrades: print `⚠ gi-secscan unavailable — running the documented scan`
-and run the **Primary Pattern** in `references/docs/pre-commit-security.md`.
-Exit 1 without parsable JSON is a crash: treat it as exit 2, and never read a
-non-zero exit as a pass.
+**A pass is all four: exit 0, `policy_source` exactly the `ref:origin/…` asked for, `verdict` not `block`, and not (`scanned` 0 with `skipped` above 0).** **Exit 1 is the block verdict: stop, do not stage, do not push, report the path from `blocking[]`** — never the degrade path, and exit 1 without parsable JSON is a crash, so treat it as exit 2. Exit 3 is also a stop. A missing `python3`, **exit 2** (a scan that never ran), or exit 4 degrades: print `⚠ gi-secscan unavailable — running the documented scan` and run the **Primary Pattern** in `references/docs/pre-commit-security.md`. Never read a non-zero exit as a pass. Why each part holds, the `--policy-ref` trust boundary, and the commit/push commands gated behind the scan: `references/prepass-tests-ci-mechanics.md` (*Commit auto-fixes*) — **read it now**.
 
-Only after the scan passes (or warnings are accepted), commit and push (`git add
--A` → `git commit -m "style: auto-fix lint and format issues"` → `git push
-origin "$branch_name"`, the variable bound in Step 1).
+Only after the scan passes (or warnings are accepted), commit and push: `git add -A`, then `git commit -m "style: auto-fix lint and format issues"`, then `git push origin "$branch_name"` (the variable bound in Step 1).
 
 ```
 [2/7] Pre-pass     ✓ lint clean, format clean, {N} tests passed
@@ -328,7 +314,7 @@ Pending CI is **not clean** — it never satisfies soft-pass and auto mode must 
 
 Collect issues from Steps 3-5, but **only fix those with `action: "fix"`** — `action: "note"` issues are reported, never fixed. This is the key token optimization. Fixable sources: the five dimensions (each `fail`/UI `action:"fix"` is one fixable issue) plus Step 4 test failures and Step 5 CI failures.
 
-The traceability `Closes #{linked_issue}` fix is a **read-modify-write** PR-body edit (driver rule 2 in `references/docs/platform-github.md`): (1) `gh pr view {N} --json body`; (2) prepend `Closes #{linked_issue}` as the **first line** when absent (SPEC §3.3 / `references/docs/naming-conventions.md`), preserving the rest unchanged — never replace the body from scratch; (3) `gh pr edit {N} --body "{merged_body}"`; (4) re-read with `gh pr view {N} --json body` and confirm `## Decision Record`, the Acceptance Criteria Verification table, and any trailing `<!-- gitissue:qa v1 … -->` marker are still present. Apply code fixes, then commit and push as usual. <!-- a:rv-closes-body-edit -->
+The traceability `Closes #{linked_issue}` fix is a **read-modify-write** PR-body edit (driver rule 2 in `references/docs/platform-github.md`): `gh pr view {N} --json body`, prepend `Closes #{linked_issue}` as the **first line** when absent (SPEC §3.3 / `references/docs/naming-conventions.md`) preserving the rest unchanged, `gh pr edit {N} --body "{merged_body}"`, then re-read and confirm `## Decision Record`, the Acceptance Criteria Verification table, and any trailing `<!-- gitissue:qa v1 … -->` marker are still present. Never replace the body from scratch. Apply code fixes, then commit and push as usual. <!-- a:rv-closes-body-edit -->
 
 ### If no fixable issues
 
@@ -390,9 +376,7 @@ Print a structured summary, using the templates in `references/report-templates.
 
 ## Conventions
 
-- **Platform driver:** all tracker access follows the GitHub driver — `--json` with explicit field selection, never parsed text output; catalog in references/docs/platform-github.md.
-- **Terminal output:** the `references/docs/terminal-style.md` vocabulary — `[N/7]` counter; `●` `✓` `✗` `◆` `⚠` `○`; two-space indent, `┄` separators, URLs on their own line, max 80 chars.
-- **Errors:** rich format from `references/error-messages.md` — `✗ Short description` then `  To fix:  <command>`.
+Terminal output uses the `references/docs/terminal-style.md` vocabulary — `[N/7]` counter; `●` `✓` `✗` `◆` `⚠` `○`; two-space indent, `┄` separators, URLs on their own line, max 80 chars. Tracker access follows the GitHub driver (`--json`, explicit fields, never parsed text). Errors use the rich format in `references/error-messages.md`.
 
 ## Edge Cases
 
