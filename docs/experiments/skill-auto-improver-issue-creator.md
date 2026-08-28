@@ -25,8 +25,9 @@ line counts.
 **What this pass is, in one line.** Deletion of a duplicated resource index, of prose that
 restated a bundled reference the same sentence points at, and of rationale that changes
 nothing an agent does — plus in-place compression everywhere else, and **one** relocation
-of genuinely run-time-conditional material. 1859 `asm` words came out of the body; 1665 of
-them are words the agent no longer loads at all.
+of genuinely run-time-conditional material. 1859 `asm` words came out of the body; all but
+the 165 that moved into `references/dup-score-fallback.md` are words the agent no longer
+loads at all, and even those 165 are now loaded only on the degrade branch.
 
 ---
 
@@ -91,7 +92,7 @@ clears, with 19 `asm` words of headroom under the cap.
 | Cut | Where it survives | `asm` words |
 |---|---|---:|
 | *Additional Resources* index (10 entries) | Every path is cited at its use site or on the *Bundled dependency precheck* list. | ~110 |
-| Per-entry glosses on the 28-item precheck list | The 28 paths all remain, grouped; each file's purpose is stated at the step that reads it. | ~150 |
+| Per-entry glosses on the precheck list | All 27 paths remain, grouped into four bullets; each file's purpose is stated at the step that reads it. Parity was verified in both directions after the regrouping: 27 named, 27 present under `skills/issue-creator/`, and no bundled `references/` or `templates/` file left unnamed. Nothing in the suite checks that for non-script entries — `tests/test-scripts-pipeline-251.sh` T1 covers `references/scripts/*.py` only — and a precheck-named file absent from the bundle is fatal at run time, so it was checked by hand. | ~150 |
 | Configuration's second *"do not re-read the config"* sentence and its *"invalid values"* sentence | The paragraph above them already carries *Never re-read it* and the exit-3 stop. | ~30 |
 | Ten `duplicate_detection.*` default values (`weights.*`, thresholds, `min_token_length`, `phrase_min_tokens`, `max_items`, `extra_stop_words`) | `docs/config-schema.md`, bundled as `references/docs/config-schema.md` and named on the same line. `duplicate_detection.backlog_limit: 100` stays inline because the body's own fallback fence uses it. | ~40 |
 | Step 2's type-confidence bullets | `references/confidence-scoring.md` → *Fields with Confidence* → **Type classification**, which the body gates **read it now**. | ~55 |
@@ -109,6 +110,18 @@ clears, with 19 `asm` words of headroom under the cap.
 | In-place compression: every remaining section | Same instruction, fewer words. | ~700 |
 | **Relocated** — the `gi-dup-score` inline-fallback algorithm | `references/dup-score-fallback.md` (new, written in the same commit). | **−165 body / +260 reference** |
 | **Added** — Run Stats Footer at modes.md Steps 12 and 6 | — | 0 body (§5) |
+| **Assessed, not cut** — `templates/` duplication | See below. | 0 |
+
+**`templates/` was assessed and left alone.** #420's brief flagged the templates as possible
+compression territory. They are not. `templates/bug.md`, `feature.md` and `improvement.md`
+are 64–67 words each, and Step 4's numbered list is not a restatement of them but the
+**operative fill instruction** — what to synthesize into each section, which fields carry a
+confidence marker, and which placeholder receives it. Item 6 in particular must keep
+`{priority_confidence}`, `{effort_confidence}` and `{labels_confidence}` verbatim:
+`tests/test-issue-creator-confidence-191.sh` asserts `_confidence` and `priority_confidence`
+on `SKILL.source.md`. The list was compressed in place (each item's gloss shortened) but
+nothing moved and nothing was deleted; the yield would have been low and the cost a broken
+contract.
 
 **Four changes are called out rather than folded into "no behavior change".**
 
