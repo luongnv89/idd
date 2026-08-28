@@ -19,7 +19,7 @@ Analyze open GitHub issues to surface dependencies, suggest priorities, group pa
 |------------|--------------|
 | `/issue-triage` | Show cached triage from `.gitissue/triage.json`; with no cache, run a full analysis and persist, then suggest an update if the repo changed. |
 | `/issue-triage update` | Force a full re-analysis: **Prerequisites** (rate-budget preflight included), then Steps 1-9, overwriting `.gitissue/triage.json` |
-| `/issue-triage --limit N` | Force a full re-analysis of up to N issues (Prerequisites, then Steps 1-9) |
+| `/issue-triage --limit N` | The same, capped at N issues |
 | `/issue-triage … --auto` | (modifier) Run non-interactively — every gate logs a `⚠` and takes its safe default rather than prompting |
 
 The design principle: **viewing is cheap and instant, updating is deliberate.** The report renders with no GitHub API call; an update runs only on request or approval.
@@ -172,12 +172,10 @@ Manual fallback: load `.gitissue.yml` from the repo root; if absent, use the def
 ○ First run — using default config. Run /init-gitissue to customize.
 ```
 
-Triage settings, with their defaults — full semantics in `docs/config-schema.md`
-(*triage*): `triage.stale_threshold_days` `14` (days of inactivity before an
-issue is flagged stale), `triage.auto_priority` `true` (suggest P1/P2/P3 from
-type, age and dependency position), `triage.include_closed` `false`,
-`triage.scan_timeout_per_issue` `30` (max seconds of file-dependency scanning
-per issue).
+Triage settings and their defaults — `triage.stale_threshold_days` `14`,
+`triage.auto_priority` `true`, `triage.include_closed` `false`,
+`triage.scan_timeout_per_issue` `30` — with full semantics for each in
+`docs/config-schema.md` (*triage*).
 
 Invalid values in an existing file are the exit-3 case above: print the validation error from `references/error-messages.md` and stop.
 
@@ -222,20 +220,20 @@ Verify these bundled files are present, each path resolved against the skill's d
   Then restart the agent session and re-run /issue-triage.
 ```
 
-- `references/agents/issue-relationship-scanner.md` — dependency + history scanner prompt
-- `references/detection.md` — confidence scoring, merge logic, Steps 3-7 prose procedure
-- `references/output-and-persist.md` — rendering spec, JSON schema, step completion reports
-- `references/run-stats.md` — run-stats footer contract (shape, fields, unavailable marker)
-- `references/error-messages.md` — error catalog: triggers and exact output
+- `references/agents/issue-relationship-scanner.md` — scanner prompt
+- `references/detection.md` — scoring, merge logic, Steps 3-7 prose procedure
+- `references/output-and-persist.md` — rendering, JSON schema, step reports
+- `references/run-stats.md` — run-stats footer contract
+- `references/error-messages.md` — error catalog
 - `references/examples.md` — worked example runs
-- `references/docs/sync-conventions.md` — stash-first sync and recovery
-- `references/docs/idd-methodology.md` — IDD methodology (dependency markers)
+- `references/docs/sync-conventions.md` — stash-first sync
+- `references/docs/idd-methodology.md` — dependency markers
 - `references/docs/github-projects-sync.md` — Projects status sync
 - `references/docs/config-schema.md` — configuration schema
-- `references/docs/platform-github.md` — GitHub platform driver
-- `references/docs/auto-mode.md` — auto-mode detection and the gate rule
-- `references/docs/terminal-style.md` — symbols, structure, tables, errors
-- `references/scripts/gi-config.py` — config resolver, one JSON line
+- `references/docs/platform-github.md` — GitHub driver
+- `references/docs/auto-mode.md` — auto-mode gate rule
+- `references/docs/terminal-style.md` — symbols, tables, errors
+- `references/scripts/gi-config.py` — config resolver
 - `references/scripts/gi-triage-graph.py` — cycles, order, parallel sets, staleness, priority
 
 ---
@@ -244,7 +242,7 @@ Verify these bundled files are present, each path resolved against the skill's d
 
 Each step closes with a completion report — `√`/`×` per check plus a
 `Result: PASS | PARTIAL | FAIL` line — so "step done" is checkable, not
-asserted. Check names, `Result` semantics and block format are in
+asserted. Check names, `Result` semantics and block format:
 `references/output-and-persist.md` (*Step Completion Reports*) — **read it
 now**, before Step 1. No step is complete until its `Result:` line prints.
 
@@ -344,7 +342,7 @@ Step 8 renders the triage table — rank, issue, priority, blockers, status, par
 
 With the triage table (Step 8) and persist (Step 9) complete, print a step-by-step summary:
 
-**Then the run-stats footer.** Close with the *Run Stats Footer* — `references/run-stats.md` — `elapsed`, `tokens` only where the host reported a count (otherwise left out), `agents`, run cost only, `n/a` for anything else undetermined. It is the last thing printed at **every** terminal outcome, including a run that ended early — no open issues, a failed fetch, an invalid config, or a scan that timed out.
+**Then the run-stats footer.** Close with the *Run Stats Footer* — `references/run-stats.md` — `elapsed`, `tokens` only where the host reported a count (otherwise left out), `agents`, run cost only, `n/a` for anything else undetermined. It is the last thing printed at **every** terminal outcome, including a run that ended early — no open issues, a failed fetch, an invalid config, a timed-out scan.
 
 ```
 ◆ Issue Triage — {N} issues analyzed
@@ -391,15 +389,13 @@ Tracker access follows the GitHub driver — `--json` with explicit field select
 
 ## Expected Output
 
-A cached view renders instantly from `.gitissue/triage.json`, in the format
-defined once under *Default Mode → 3*, closing on one of the three endings in
-*4*. An update (`/issue-triage update`) runs Steps 1–9 and overwrites the cache,
-ending on that same view.
+The expected output of a cached view is defined once under *Default Mode → 3*,
+closing on one of the three endings in *4*; an update ends on that same view.
 
 ## Edge Cases
 
 - **No cache and no issues** — prints `○ No open issues`, writes no cache file.
 - **Circular dependency** — the cycle is reported; order comes from topological pruning.
-- **Stale issues (>90 days)** — grouped at the report's foot under a `⚠ stale` marker.
-- **Rate-limited** — partial results kept, the report notes the gap, the retry command is shown.
-- **Already-fixed false positive** — the report lists supporting commits/PRs to verify before closing.
+- **Stale issues (>90 days)** — grouped at the report's foot under `⚠ stale`.
+- **Rate-limited** — partial results kept, the report notes the gap and the retry command.
+- **Already-fixed false positive** — the report lists the supporting commits/PRs to verify.
