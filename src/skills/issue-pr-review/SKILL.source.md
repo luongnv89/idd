@@ -104,7 +104,7 @@ Every `review.*` key, its default (`review.max_cycles: 3`, `review.soft_pass: tr
   [7/7] Report       ✓ PR is clean — ready to merge
 ```
 
-Step 2 runs once; Steps 3-6 repeat up to `review.max_cycles` (default 3); Step 7 runs once. The pipeline minimizes LLM tokens via the zero-token pre-pass, reviewer/fixer reuse, `fix`/`note` filtering, and soft-pass.
+Step 2 runs once; Steps 3-6 repeat up to `review.max_cycles` (default 3); Step 7 runs once. Tokens are minimized by the zero-token pre-pass, reviewer/fixer reuse, `fix`/`note` filtering, and soft-pass.
 
 ### Step completion reports
 
@@ -295,7 +295,7 @@ A skipped step evaluated neither check, so its report is `× Suite passed` / `×
 
 When `review.check_ci` is false, skip polling, report `○ CI skipped (review.check_ci: false)`; the soft-pass conjunction treats the CI leg as satisfied.
 
-When true, run the whole wait in one call — `python3 shared/scripts/gi-ci-wait.py {N} --interval {review.ci_poll_interval} --timeout {review.ci_timeout}` — and read `verdict` (`pass` / `fail` / `pending` / `none`). A terminal snapshot is trusted only after its check-name set settles, and `none` is clean only when `none_confirmed` is `true`; otherwise both are `pending`. Exit 3 is a stop. Exit 4, or no `python3`, degrades to the **merge-safe manual fallback** — never to a filtered `gh pr checks` list, which makes an empty result look successful. On `fail`, extract details with `gh run view {run_id} --log-failed`.
+When true, run the whole wait in one call — `python3 shared/scripts/gi-ci-wait.py {N} --interval {review.ci_poll_interval} --timeout {review.ci_timeout}` — and read `verdict` (`pass` / `fail` / `pending` / `none`). A terminal snapshot is trusted only after its check-name set settles; `none` is clean only when `none_confirmed` is `true`; otherwise both are `pending`. Exit 3 is a stop. Exit 4, or no `python3`, degrades to the **merge-safe manual fallback** — never to a filtered `gh pr checks` list, which makes an empty result look successful. On `fail`, extract details with `gh run view {run_id} --log-failed`.
 
 **Bind the verdict to the commit it was reached on** — record `ci_sha` = the `headRefOid` this wait ran against, and report `ci_status` as `passed@` or `failed@` plus that full 40-character SHA; `no_ci`, a skipped wait, and any degraded wait that never read a head stay bare. Settle window, manual polling loop and its head re-read, and the bare-vs-bound cases: `references/prepass-tests-ci-mechanics.md` (*Step 5*, *Binding the verdict to a commit*). **Read that file and apply it now.**
 
@@ -306,7 +306,7 @@ When true, run the whole wait in one call — `python3 shared/scripts/gi-ci-wait
 [5/7] CI Status    ○ no CI checks configured
 ```
 
-Pending CI is **not clean** — it never satisfies soft-pass and auto mode must not merge while CI is pending, including when Step 6 finds zero fixables and would otherwise exit the fix loop. Interactive: ask to wait more or proceed without merging. Auto: do not merge; extend polling or stop with remaining issues — do not assume a later cycle will re-check once the fix loop has ended.
+Pending CI is **not clean**: it never satisfies soft-pass, and auto mode must not merge while CI is pending — including when Step 6 finds zero fixables and would otherwise exit the fix loop. Interactive: ask to wait more or proceed without merging. Auto: do not merge; extend polling or stop with remaining issues — do not assume a later cycle will re-check once the fix loop has ended.
 
 ---
 
@@ -356,21 +356,17 @@ After Step 6, go back to Step 3 — reuse the same reviewer via `SendMessage`, s
 
 ## Step 7 — Summary Report [7/7]
 
-Print a structured summary, using the templates in `references/report-templates.md`:
+Print a structured summary from `references/report-templates.md` — *Summary — Clean PR* (all checks pass, may include soft-pass notes), *Summary — PR With Remaining Issues* (not cleared within `review.max_cycles`), *Auto-Merge (auto mode only)* (post-report squash merge, block-on-failure handling).
 
-- *Summary — Clean PR* — all checks pass, may include soft-pass notes
-- *Summary — PR With Remaining Issues* — not cleared within `review.max_cycles`
-- *Auto-Merge (auto mode only)* — post-report squash merge and block-on-failure handling
+**Auto-merge is the one destructive action this skill takes:** it squash merges the PR and deletes the head branch, neither reversible from here. It is confirmed by gate, not by prompt, and every gate must hold: interactive `/issue-pr-review` never merges whatever `review.auto_merge` says; `--auto` merges only when `review.auto_merge` is true **and** the PR is clean (pending CI is never clean); `--no-merge` suppresses the merge outright, so auto-pilot's reviewer can run the full cycle without stealing Phase 5's merge step. No dry-run — if a gate is unmet, report and stop, and never remove a branch by hand to "finish" a merge the gates refused.
 
-**Auto-merge is the one destructive action this skill takes:** it squash merges the PR and deletes the head branch, and neither is reversible from here. It is confirmed by gate, not by prompt, and every gate must hold: interactive `/issue-pr-review` never merges whatever `review.auto_merge` says; `--auto` merges only when `review.auto_merge` is true **and** the PR is clean (pending CI is never clean); `--no-merge` suppresses the merge outright, so auto-pilot's reviewer subagent can run the full cycle without stealing Phase 5's merge step. There is no dry-run — if a gate is unmet, report and stop, and never remove a branch by hand to "finish" a merge the gates refused.
+**Then the run-stats footer.** Close with the *Run Stats Footer* — `references/run-stats.md` — `elapsed`, `tokens` only where the host reported a count (otherwise left out), `agents`, run cost only, `n/a` for anything else undetermined. It is the last thing printed at **every** terminal outcome, including a run that stopped before Step 7: a failed prerequisite, an invalid config, an un-checkoutable PR, a CI wait that gave up, or a loop that exhausted `review.max_cycles`.
 
-**Then the run-stats footer.** Close with the *Run Stats Footer* — `references/run-stats.md` — `elapsed`, `tokens` only where the host reported a count (otherwise left out), `agents`, run cost only, `n/a` for anything else undetermined. It is the last thing printed at **every** terminal outcome, including a run that stopped before Step 7: a failed prerequisite, an invalid config, a PR that could not be checked out, a CI wait that gave up, or a review loop that exhausted `review.max_cycles`.
-
-**Review-only mode (`--review-only`) — authoritative definition.** This is the single home for the flag's behavior; every other mention is a pointer here.
+**Review-only mode (`--review-only`) — authoritative definition.** The single home for the flag's behavior; every other mention points here.
 
 - **Step flow:** Step 1 (PR info + `gh pr checkout`), Step 2 detection-only, Steps 3-5 **once**, skip Step 6, report in Step 7 — never loop, fix, or merge.
 - **Step 2 is detection-only:** lint/format in check mode (`npx eslint .`, `npx prettier --check .`, `ruff check .`) — no `--fix`, `--write`, or other mutating flags.
-- **No writes at all:** skip *Commit auto-fixes* entirely. No file edits, commits, or pushes in this mode.
+- **No writes at all:** skip *Commit auto-fixes* entirely — no file edits, commits, or pushes.
 
 ---
 
