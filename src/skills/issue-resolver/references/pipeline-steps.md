@@ -1162,11 +1162,26 @@ complexity, affected files, UI detection, lifecycle grouping). Illustrative:
   Installing first would leave an untracked copy that leftover teardown can
   never find and that the next run's detect misclassifies as `preinstalled` —
   making it permanent.
+- **Installer bootstrap — check before the first install.** Both installers are
+  external dependencies of this step, not of the skill: `npx skills add …` needs
+  `npx` (bundled with Node.js) and `asm install …` needs the `asm` binary
+  (`npm install -g agent-skill-manager`). Probe with `command -v npx` and
+  `command -v asm`; if **neither** resolves, borrowing is unavailable in this
+  environment — print `⚠ No skill installer on PATH (npx or asm) — borrowing
+  disabled`, keep the propose set installed-only, and continue. Never install
+  the installer unattended, and never fail the resolution over it: a missing
+  installer is a degrade, exactly like a missing `python3`.
 - Install each recorded-borrowed name into `~/.claude/skills/<name>/` with the
   same tools the skill README already names (`npx skills add
   https://github.com/luongnv89/skills --skill <name>` or `asm install …
   --skill <name>`). Never install a name absent from the index. Never
   interpolate the issue body into the command.
+- **Verify the install before using it.** A tool that exits 0 has not proved the
+  skill is discoverable by the agent. Confirm with `asm list -p claude --json`
+  (or, where `asm` is absent, that `~/.claude/skills/<name>/SKILL.md` exists)
+  that `<name>` is present; a name that does not come back is an install
+  failure, handled by the failure bullet below, and never reaches
+  `selected_skills`.
 - **Drop the borrow marker — same breath as the install.** Immediately after a
   successful install, create the **empty** file
   `~/.claude/skills/<name>/.gitissue-borrowed`. Empty is deliberate and is part
