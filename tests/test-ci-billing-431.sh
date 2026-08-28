@@ -440,6 +440,64 @@ for r in "$SRC_REF" "$DIST_REF"; do
 done
 
 # ───────────────────────────────────────────────────────────
+# T11: a failing check renders {bucket}/{state}, never a bare {bucket}
+# ───────────────────────────────────────────────────────────
+# gh's `bucket` is raw: a terminal STARTUP_FAILURE or STALE still carries
+# `bucket: pending`, so printing it alone under a "checks failed" heading
+# contradicts the heading. Nothing else in the suite pins this —
+# test-scripts-252.sh exercises gi-ci-wait.py's classifier, not the skill's
+# render string — so a revert to a bare {bucket} would otherwise pass silently.
+
+# True when the text carries a {bucket} token not immediately followed by `/`.
+has_bare_bucket() {
+  printf '%s\n' "$1" | grep -qE '\{bucket\}([^/]|$)'
+}
+
+for f in "$SRC_SKILL" "$DIST_SKILL"; do
+  label="${f#"$REPO_ROOT"/}"
+  tracker="$(step5_of "$f" | grep -F '[5/7] CI Status' | grep -F '✗' || true)"
+
+  if printf '%s' "$tracker" | grep -qF '{bucket}/{state}'; then
+    pass "T11: $label Step 5 failing-check tracker renders {bucket}/{state}"
+  else
+    fail "T11: $label Step 5 failing-check tracker does not render {bucket}/{state}"
+  fi
+
+  if [ -n "$tracker" ] && ! has_bare_bucket "$tracker"; then
+    pass "T11: $label Step 5 failing-check tracker never renders a bare {bucket}"
+  else
+    fail "T11: $label Step 5 failing-check tracker renders a bare {bucket}"
+  fi
+done
+
+for r in "$SRC_REF" "$DIST_REF"; do
+  em="$r/error-messages.md"
+  label="${em#"$REPO_ROOT"/}"
+  if [ ! -f "$em" ]; then
+    fail "T11: $label not found"
+    continue
+  fi
+  # The fenced sample output inside the ignored-CI entry only: the prose that
+  # follows it legitimately names `{bucket}` alone while explaining the rule.
+  em_fence="$(awk '/^### CI failed but was not blocking/{s=1;next}
+                   /^### /{s=0}
+                   s && /^```/{f=!f;next}
+                   s && f' "$em")"
+
+  if printf '%s\n' "$em_fence" | grep -qF 'Failing: {check_name} ({bucket}/{state})'; then
+    pass "T11: $label ignored-CI block prints ({bucket}/{state})"
+  else
+    fail "T11: $label ignored-CI block does not print ({bucket}/{state})"
+  fi
+
+  if [ -n "$em_fence" ] && ! has_bare_bucket "$em_fence"; then
+    pass "T11: $label ignored-CI block never prints a bare {bucket}"
+  else
+    fail "T11: $label ignored-CI block prints a bare {bucket}"
+  fi
+done
+
+# ───────────────────────────────────────────────────────────
 # Summary
 # ───────────────────────────────────────────────────────────
 echo ""
