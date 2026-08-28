@@ -41,7 +41,7 @@ Gate 1 requirement this skill was missing.
 | **Gate 1** | `quick_validate.py` exit | 0 (pass) | **0 (pass)** |
 | Gate 1 | Frontmatter audit (`asm eval` → `checks`) | all pass | **all pass** |
 | Gate 1 | Body under 500 lines | 481 (pass) | **428 (pass)** |
-| Gate 1 | Body under 3000 words | **5941 (FAIL)** | **5182 (FAIL — D4 exception, §6)** |
+| Gate 1 | Body under 3000 words | **5941 (FAIL)** | **5129 (FAIL — D4 exception, §6)** |
 | Gate 1 | Negative-trigger clause in the description | pass | pass (description untouched) |
 | Gate 1 | `metadata.version` semver + `metadata.author` | pass (2.5.0) | **pass (2.6.0)** |
 | Gate 1 | `docs/README.md` opens with the AI-skip comment | pass | pass (untouched) |
@@ -66,11 +66,11 @@ Per-category (`asm eval --json`, built tree):
 Body size, command of record:
 
 ```
-wc -w < src/skills/auto-pilot/SKILL.source.md   # 6026 → 5267
+wc -w < src/skills/auto-pilot/SKILL.source.md   # 6026 → 5216
 wc -l < src/skills/auto-pilot/SKILL.source.md   #  481 →  428
 ```
 
-`asm eval` body words: **5941 → 5182** (−759). `metadata.version`: **2.5.0 → 2.6.0**
+`asm eval` body words: **5941 → 5129** (−812). `metadata.version`: **2.5.0 → 2.6.0**
 (minor — no restructure, but the skill gained two instructions it did not have: a
 complete *Dependency Preflight* gate, and a run-stats footer bound to the pre-loop
 stops that never reach *Final Summary*).
@@ -163,7 +163,7 @@ section T1 requires to name every bundled script.
 | Four *Edge Cases* bullets | Prerequisite 9 (merge permission), Prerequisite 8 (rate budget), and the `autopilot.quarantine_after` / `quarantine_label` defaults. Replaced by one sentence covering the two mid-run variants those bullets alone carried. | ~110 |
 | `## Platform Driver`, `## Edge Cases`, `## Explicit List Mode`, `### Why Subagents & What the Main Agent Does` headings | Folded into *Output Conventions*, *Examples & Edge Cases*, *Mode Detection* and *Context Window Management*, each carrying every citation it had. | ~40 |
 | Config-defaults glosses duplicating `references/configuration.md` | That file expands every key; the body keeps the key names, the values, and the two glosses that are operative rather than explanatory (`max_parallel` validation, `quarantine_label` append). | ~35 |
-| In-place compression: every remaining section | Same instruction, fewer words. | ~410 |
+| In-place compression: every remaining section | Same instruction, fewer words. | ~460 |
 | **Added** — `## Dependency Preflight (mandatory)` (§2) | — | **+150** |
 | **Added** — run-stats footer bound to the pre-loop stops (§5) | — | **+40** |
 | **Added back** — subagent-prompts pointer and the per-lane field list | — | **+30** |
@@ -221,11 +221,14 @@ line and column), `gi-runlog.py` (`✗ gi-runlog: missing required key(s): …`)
 `gi-ratelimit.py` (`✗ gi-ratelimit: --threshold must be >= 0`), `gi-state.py`
 (`✗ gi-state: --ttl must be zero or greater`) and `gi-triage-graph.py`
 (`✗ gi-triage-graph: no request object on stdin`); `gi-ci-wait.py` and `gi-issue.py`
-exit 3 on an out-of-range interval and TTL respectively. `gi-branch.py`, `gi-deps.py`
-and `gi-gh.py` reject a malformed command line with argparse's own usage text and
-exit **2** — the shared vocabulary's *usage error*, not a swallowed failure.
-`gi-deps.py` has no invalid input by construction: it is a parser over arbitrary
-issue text and reports no dependencies rather than failing.
+exit 3 on an out-of-range interval and TTL respectively. The remaining three reject an
+unrecognised flag with argparse's own usage text on stderr and exit **2** — the shared
+vocabulary's *usage error*, not a swallowed failure — and none of the three has an
+invalid *input* to reject: `gi-deps.py` is a parser over arbitrary issue text and
+reports no dependencies rather than failing (bare, on non-JSON stdin, it exits 0);
+`gi-branch.py` constrains `--type` with argparse `choices`, so a bad type is a usage
+error by construction; and `gi-gh.py` is a library boundary the build bundles beside
+its consumers rather than a command — invoked bare it does nothing and exits 0.
 
 Every exit-3 path the body routes is routed to a **stop**, not a degrade, and that
 routing was preserved verbatim — including the `## Configuration` fatal branch
@@ -244,7 +247,7 @@ Rubric resolved at `~/.claude/skills/skill-auto-improver/references/predictabili
 | 1 | Invocation chosen intentionally | **pass** | User-invoked, and the shape matches: the body opens on an *Invocation* table of eight forms and a *Combining flags* paragraph stating the three illegal pairs. The description keeps its negative-trigger clause naming the three skills a caller might reach for instead, and `compatibility` states the hard requirements (git, `gh` with auth and push access, merge permission for auto-merge, four sibling skills from the same distribution, `issue-creator` optional) before the body is read. |
 | 2 | Branches mapped before the body | **pass** | Four orthogonal branches, each decided in one place above the phases: **mode** (triage vs. explicit list — *Mode Detection*); **merge mode** (`conservative`/`balanced`/`aggressive` × `merge_partial` — the *Merge Modes* table plus four resolution rules covering the legacy `auto_merge` fallback); **parallelism** (`max_parallel = 1` legacy path vs. bounded fan-out — *Subagent Architecture*); **run state** (`--resume` / `--fresh` / `--force-unlock` — *Invocation*, resolved at Phase 0 to `resumable`/`stale`/`absent`). The no-merge downgrade on insufficient permission is a fifth, decided at Prerequisite 9. |
 | 3 | Demanding, checkable completion criteria | **pass** | Each phase closes with `√`/`×` per check plus a `Result: PASS \| PARTIAL \| FAIL` line, and the body states the gate outright — *"A phase is not complete until its `Result:` line is printed."* The loop's own terminal criteria are a 13-row *Stop Conditions* table, each row naming its exact printed string and its categorical outcome, and the six outcome labels are fixed and enumerated in three places that must agree (*Iteration Report*, *Stop Conditions*, *Final Summary*). |
-| 4 | Progressive disclosure + delegability | **partial — the disclosure half is the open item** | 5182 `asm` words at 428 lines. The line cap is met with 72 lines to spare; the word cap is not, and §6 records why it is not reachable. The every-run specs are one-line read-now pointers (`references/summary-format.md` at *Step completion reports*, `references/run-log.md` before the write), which is what `tests/test-disclosure-gates-250.sh` AC3.2 asserts. Delegability sub-check below. |
+| 4 | Progressive disclosure + delegability | **partial — the disclosure half is the open item** | 5129 `asm` words at 428 lines. The line cap is met with 72 lines to spare; the word cap is not, and §6 records why it is not reachable. The every-run specs are one-line read-now pointers (`references/summary-format.md` at *Step completion reports*, `references/run-log.md` before the write), which is what `tests/test-disclosure-gates-250.sh` AC3.2 asserts. Delegability sub-check below. |
 | 5 | Leading words | **pass** | Recurring concepts are named once and referred to by name: *auto-decide* vs. *confirm with user*, *serialized drain*, *lane*, *Bundled dependency precheck*, *Dependency Preflight*, *Run Stats Footer*, *stop-and-ask exception*, *degrade vs. stop*, *body snapshot*. This pass extended the pattern — *Edge Cases* now defers to *Prerequisite 8* and *Prerequisite 9* by name instead of restating them, and *Subagent Architecture* defers to `references/orchestration.md` for the lane diagram instead of drawing a second one. |
 | 6 | No duplication / stale sediment / sprawl / no-ops | **pass** (this pass fixed it), two items left open | **Removed:** the *Additional Resources* index; 31 precheck glosses; the run-log-vs-run-state paragraph and the parallel-lane mechanics, both owned in full by `references/run-log.md`; four *Edge Cases* bullets restating Prerequisites 8 and 9 and two config keys; the config-defaults glosses duplicating `references/configuration.md`; four single-pointer headings. **No-op removed:** the `CHANGELOG.md` / `docs/release-notes/` version-history note. **Left open, advisory:** (a) the *Caller-supplied context* paragraph is written as a change record — it names issues #256 and #285, a superseded literal, and two merged PRs — rather than as the contract it states; four of its clauses are pinned by `tests/test-subagent-context-256.sh`, so rewriting it as a plain contract would have to move those assertions first. (b) the six outcome labels are enumerated three times, in *Iteration Report*, *Stop Conditions* and *Final Summary*; all three are printed strings and two of the three are pinned line-by-line, so none was touched. |
 | 7 | Publish-ready — no auto-improver dependency | **partial** | `quick_validate.py` exits 0 (*"Skill is valid!"*), `asm eval` 93/A, 428 lines, the description carries its negative-trigger clause, `metadata.version`/`author`/`effort` present, `docs/README.md` opens with the AI-skip comment, and the dependency preflight is now complete. The one item that would need a follow-up run is the word cap, and §6 records it as a D4 exception rather than as work outstanding. |
@@ -365,9 +368,20 @@ is captured:
 
 That also covers the fifth pre-loop stop, the run lock held by a live run — which is
 additionally a *Stop Conditions* row, so it was already covered twice. No footer
-instruction was added at any individual stop site; adding one per stop is the bloat
-the predictability audit forbids by name, and on a body already over the word cap it
-would be worse than that.
+instruction was added at any individual stop site; adding one per stop is the bloat the
+predictability audit forbids by name, and on a body already over the word cap it would
+be worse than that.
+
+**One ordering consequence, recorded rather than restructured for.** A Prerequisite 1
+failure now points at `references/run-stats.md`, which the *Bundled dependency
+precheck* — which runs later — is what verifies. So the earliest stops route to a file
+whose presence has not been checked. That is the same ordering asymmetry #418 recorded
+and closed for `/issue-triage`'s view mode, and it is benign here for the same reason
+it was benign there: a missing bundled file is fatal by CLAUDE.md's *fatal vs. degrade*
+rule, so the agent stops either way and the run's exit is not silently swallowed.
+Hoisting the whole precheck above Prerequisite 1 would put a file-presence loop ahead
+of `git rev-parse --git-dir`, which is a worse first instruction; the alternative,
+repeating the precheck, is the per-stop bloat this section already declines.
 
 ---
 
@@ -376,15 +390,68 @@ would be worse than that.
 **Gate 1's under-3000-words item and Gate 2's `context-efficiency >= 8` are one
 finding** (the ADR's Context section: `context-efficiency` scores 6 or 8 and nothing
 else, and the `+2` is the body word cap). Both are recorded here as a **D4 exception**
-under `docs/decisions/shared-contract-pin-artifact.md`, which requires the exception
-to be granted on a **post-pass** measurement and never on an estimate.
+under `docs/decisions/shared-contract-pin-artifact.md`, which requires the exception to
+be granted on a **post-pass** measurement and never on an estimate.
 
-### The measurement
+### The claim, stated in the right order
+
+The exception rests on **D3**, not on the floor arithmetic. D3: *"Material the body
+gates with read it now — or that an agent must apply on every run to execute a step —
+stays in the body … When the two conflict, the gate loses."* `/auto-pilot` runs
+unattended. What is left in this body after the pass is the gate logic that decides,
+with no human at the terminal, whether to merge, whether to pause, whether to stop and
+which of six outcomes to record — and, section by section (§6.2), it is either
+every-run mandatory or pinned to this file by raw `grep`s the ADR's class table forbids
+re-targeting. That is the argument. The floor measurement (§6.3) corroborates it and is
+reported honestly, including the two ways it can be attacked.
+
+### 6.1 Why the floor cannot be the headline claim
+
+Two limitations, both recorded here rather than left to be found:
+
+1. **The floor is a counterfactual, and this pass did not reach it.** The floor is what
+   would remain after deleting *every* non-pinned, non-structural word. The body is at
+   5129 `asm` words with 1799 free-prose words (lower bound) still in it. §6.2 walks
+   where those words are and why each block survives — without that walk the floor
+   number proves nothing about the body that actually ships.
+2. **The ADR's method is sensitive to line wrapping, not only to content.** A pinned
+   *word* is any word on a line an assertion matches. This body mixes long single-line
+   paragraphs with hard-wrapped ones: the `## Configuration` paragraph is one 200-word
+   line and Prerequisite 8's threshold is one 160-word line, so a single literal pins
+   each in full, while the hard-wrapped run-lock, *Step completion reports* and run-log
+   sections are counted line by line. Re-wrapping this file at 80 columns would lower
+   the reported floor materially at **zero** change in content. The numbers below are
+   therefore an upper reading of the floor on the method the ADR specifies, and the
+   exception does not depend on them alone.
+
+### 6.2 Where the remaining free prose is, and why each block stays
+
+1799 free-prose words (lower bound), by section, with the D3 verdict on each:
+
+| Section | Free words | What it is, and why it stays |
+|---|---:|---|
+| *Dependency Preflight (mandatory)* | 330 | **Gate 1 requires it** (§2). A skill that invokes other skills must carry this section above its first mutating step, with four elements per dependency. Deleting it to satisfy the word cap would fail the same gate the cap belongs to. |
+| *Context Window Management* | 286 | The **delegation contract itself** — what the main agent may never do (read source, read diffs, run tests, write code), what each subagent is spawned as, and the one-snapshot-per-issue budget. It is applied on every iteration, and it is what makes the `references/` tree loadable at all. Moving it would be the purest form of the trade D3 prohibits: the orchestrator must have read it before it can dispatch anything. |
+| *Iteration Report* | 277 | The per-iteration write path: the outcome vocabulary, the single-writer rule, the two append sites and the degrade/stop split. Executed every iteration. Its reference (`references/run-log.md`) is gated **read it now**, so relocating further buys a metric and no context. |
+| *Phase Details* | 211 | The phase table's own prose plus the *Caller-supplied context* budget. Every run executes all five phases. |
+| *Prerequisites* | 135 | Nine environment gates plus the footer-ordering sentence (§5). Every run evaluates all of them before anything mutates. |
+| *Configuration* | 134 | The defaults the loop reads and the degrade-vs-stop routing around them. Loaded once, read for the whole run. |
+| *Autonomy Philosophy* | 110 | The auto-decide / confirm-with-user split — the rule that makes an unattended loop safe, and the one place the single stop-and-ask exception is stated. |
+| *Examples & Edge Cases* | 101 | Five branch outcomes decided here rather than in `references/examples.md`; four more were deleted this pass as duplicates. The remainder are one line each. |
+| *Stop Conditions*, *Loop Overview*, *Mode Detection*, *Prompt Injection Boundary*, *Expected Output* | 200 combined | Table preamble, the phase diagram's framing, the branch selector, the untrusted-input rule, and the printed-block framing. None exceeds 60 words. |
+
+Not one of these blocks is *conditional at run time* in the sense D3 makes relocation
+available for. Every one is either evaluated on every run or required by Gate 1 itself.
+The conditional material — the lane mechanics, the run-log parallel contract, the
+explicit-list parsing rules, the worked examples — is already in `references/`, and
+§6.4 tabulates it.
+
+### 6.3 The measurement
 
 Method as the ADR specifies: 30 tracked suites naming `auto-pilot` traced under
 `bash -x`; every `grep` pattern extracted from the traced command line, never guessed;
-each replayed against the body and the matched line numbers unioned; a *pinned word*
-is any word on a line at least one real assertion matches; *structural* is frontmatter,
+each replayed against the body and the matched line numbers unioned; a *pinned word* is
+any word on a line at least one real assertion matches; *structural* is frontmatter,
 headings, table rows and fenced lines that no assertion matches; **floor** is what
 remains after deleting every non-pinned, non-structural word.
 
@@ -392,55 +459,48 @@ remains after deleting every non-pinned, non-structural word.
 |---|---:|---:|---:|---:|---:|
 | Baseline, lower bound | 5941 | 3046 | 540 | 2438 | **3501** |
 | Baseline, upper bound | 5941 | 3384 | 535 | 2105 | **3834** |
-| **Post-pass, lower bound** | **5182** | 2891 | 569 | 1805 | **3375** |
-| **Post-pass, upper bound** | **5182** | 3242 | 564 | 1459 | **3721** |
+| **Post-pass, lower bound** | **5129** | 2846 | 569 | 1799 | **3330** |
+| **Post-pass, upper bound** | **5129** | 3191 | 564 | 1459 | **3670** |
 
 The ADR's own pre-pass figure for this skill was 3106–3207. This measurement is higher
 on the same method because it is taken from a fuller pattern set — the `-e`-guarded
 greps that the ADR's extractor and this one's first version both mis-normalised (§1).
 The direction the ADR predicted still holds and is visible in the table: the floor
-**fell** 126 words as the pass compressed assertion-carrying lines around their pinned
+**fell 171 words** as the pass compressed assertion-carrying lines around their pinned
 literals. It did not fall anywhere near far enough. **Deleting every remaining word of
-free prose leaves 3375 `asm` words — 375 over the cap on the heuristic-free lower
-bound, 721 over on the upper.**
+free prose leaves 3330 `asm` words — 330 over the cap on the heuristic-free lower
+bound, 670 over on the upper.**
 
-### The objection this exception has to survive
-
-The ADR granted `/issue-pr-review` its exception only after answering the strongest
-available objection to it. The strongest one here is different, and it is this: many
-of the live patterns are **single-word** category greps — `\bmerged\b`, `\bfailed\b`,
-`\bskipped\b`, `\bleft_open\b`, `\bpartial_followup\b`, `\bblocked_by_dependency\b`,
-`\bbalanced\b`, `\bconservative\b`, `\baggressive\b` — emitted by a loop in
+**Objection A — the single-word category greps.** Many live patterns are single-word
+greps — `\bmerged\b`, `\bfailed\b`, `\bskipped\b`, `\bleft_open\b`,
+`\bpartial_followup\b`, `\bblocked_by_dependency\b`, `\bbalanced\b`,
+`\bconservative\b`, `\baggressive\b` — emitted by loops in
 `tests/test-autopilot-modes.sh` and `tests/test-autopilot-dependency-gate.sh` that
-asserts each label appears *somewhere* in the body. Counting every line containing
-"merged" as pinned overstates what those assertions require.
-
-**Discount them entirely and the exception still stands.** Re-running the measurement
-with all nine single-word patterns removed:
+assert each label appears *somewhere*. Counting every line containing "merged" as
+pinned overstates what they require. Discount all nine and re-measure:
 
 | Post-pass body | Pinned | Structural | Free prose | **Floor** |
 |---|---:|---:|---:|---:|
-| Lower bound, single-word greps discounted | 2506 | 668 | 2091 | **3089** |
-| Upper bound, single-word greps discounted | 2949 | 621 | 1695 | **3485** |
+| Lower bound, single-word greps discounted | 2463 | 668 | 2083 | **3046** |
+| Upper bound, single-word greps discounted | 2900 | 621 | 1693 | **3436** |
 
-3089 is still over 3000, on the most generous reading available — lower bound, nine
-assertions written off, every free-prose word deleted.
+3046 is still over 3000 — but by 46 words, on the most generous reading available
+(lower bound, nine assertions written off, every free-prose word deleted). That margin
+is too thin to carry an exception on its own, which is why §6.1 and §6.2 do the work
+and this table corroborates rather than decides.
 
-### The other objection, and why it is not a route to the cap
+**Objection B — the minimal set cover.** Keep, for each assertion, only the single
+cheapest line that satisfies it, delete every other line, and the result is **2459
+`asm` words** — under the cap. That number is real and is recorded here rather than
+omitted, but it is not a body. What it deletes is not free prose: it is the ~600 words
+of normative instruction sitting on assertion-carrying lines *beside* the literal — the
+threshold arithmetic around `✗ Insufficient GitHub API rate budget for auto-pilot`, the
+degrade-vs-stop routing around `gi-config unavailable`, the ordering rule around
+`--append-once`. The set-cover number measures how few words could still satisfy
+`grep`; it does not measure how few words could still run the loop unattended. D3
+decides that, and it decides it the other way.
 
-A minimal set-cover over the live patterns — keep, for each assertion, only the single
-cheapest line that satisfies it, and delete every other line — reaches **2487 `asm`
-words**, under the cap. That number is real and is recorded here rather than omitted,
-but it is not a body. What it deletes is not free prose: it is the ~600 words of
-normative instruction that sit on assertion-carrying lines *beside* the literal — the
-threshold arithmetic around `✗ Insufficient GitHub API rate budget for auto-pilot`,
-the degrade-vs-stop routing around `gi-config unavailable`, the ordering rule around
-`--append-once`. Under **D3** that material is every-run gate logic an agent must
-apply to execute a step, and *"when the two conflict, the gate loses."* The set-cover
-number measures how few words could still satisfy `grep`; it does not measure how few
-words could still run the loop unattended.
-
-### Relocation, taken seriously and rejected on the ADR's own rule
+### 6.4 Relocation, taken seriously and rejected on the ADR's own rules
 
 D4 requires that everything conditional be relocated before the exception is granted.
 Each candidate, named:
@@ -453,16 +513,17 @@ Each candidate, named:
 | `## Configuration` block | ~330 | **Cannot move.** `tests/test-scripts-pipeline-251.sh` T5 slices the section out of the file in embedded Python and requires four literals and at least one inline dotted default inside it. |
 | Run-log fences + exit-3 clause | ~180 | **Cannot move.** Same suite, same file-scoped Python. |
 | *Bundled dependency precheck* list | ~90 | **Cannot move.** T1 requires the section to name every script bundled under `references/scripts/`. |
-| `max_parallel > 1` lane mechanics | ~120 | **Already done.** The lane diagram and ownership rules moved to `references/orchestration.md` in an earlier issue; this pass deleted the body's remaining restatement of them. What is left is the two-sentence branch summary and the per-lane field list. |
-| Run-log parallel-lane contract | ~130 | **Already done, and D3-blocked for the remainder.** `references/run-log.md` owns it; this pass deleted the body's duplicate. The pointer to it is gated **read it now** before the write, so moving anything further there lowers `wc -w` and lowers loaded context by zero — the exact trade D3 prohibits. |
-| Explicit list mode | ~90 | **Already done.** `references/explicit-list-mode.md` owns it; the body carries a pointer gated on the `--issues` branch. |
+| *Dependency Preflight* | ~150 | **Cannot move.** Gate 1 §8 requires the section in the target above its first mutating step. |
+| `max_parallel > 1` lane mechanics | ~120 | **Already out.** The lane diagram and ownership rules live in `references/orchestration.md`; this pass deleted the body's remaining restatement. What is left is the two-sentence branch summary and the per-lane field list. |
+| Run-log parallel-lane contract | ~130 | **Already out, and D3-blocked for the remainder.** `references/run-log.md` owns it; this pass deleted the body's duplicate. The pointer to it is gated **read it now** before the write, so moving anything further there lowers `wc -w` and lowers loaded context by zero — the exact trade D3 prohibits. |
+| Explicit list mode | ~90 | **Already out.** `references/explicit-list-mode.md` owns it; the body carries a pointer gated on the `--issues` branch. |
 | *Edge Cases* | ~110 | **Deleted, not moved** — four of seven bullets restated Prerequisites 8 and 9 and two config defaults; the rest sit beside the `references/examples.md` pointer, which is conditional (*read that file when debugging a specific scenario*). |
 
-Everything conditional is already out. What remains is per-run gate logic pinned to
-the file by raw `grep`s that #401 has not yet migrated to anchors, and that D3 would
-forbid moving even after it does.
+Everything conditional is already out. What remains is per-run gate logic pinned to the
+file by raw `grep`s that #401 has not yet migrated to anchors, and that D3 would forbid
+moving even after it does.
 
-### What this means for #415
+### 6.5 What this means for #415
 
 Under D4, `/auto-pilot` closes on **Gate 1 less the word cap** plus **Gate 2 less
 `context-efficiency`**: `quick_validate.py` 0, frontmatter audit clean, 428 lines
@@ -477,7 +538,7 @@ table with this measurement.
 
 | File | Change |
 |---|---|
-| `src/skills/auto-pilot/SKILL.source.md` | 6026 → 5267 `wc` words, 481 → 428 lines; `metadata.version` 2.5.0 → 2.6.0; `## Dependency Preflight (mandatory)` added with all four §8 elements; run-stats footer bound to the four pre-loop stops; four sections folded; the resource index, 31 precheck glosses and two duplicated run-log paragraphs deleted |
+| `src/skills/auto-pilot/SKILL.source.md` | 6026 → 5216 `wc` words, 481 → 428 lines; `metadata.version` 2.5.0 → 2.6.0; `## Dependency Preflight (mandatory)` added with all four §8 elements; run-stats footer bound to the four pre-loop stops; four sections folded; the resource index, 31 precheck glosses and two duplicated run-log paragraphs deleted |
 | `skills/auto-pilot/SKILL.md` | regenerated (`./scripts/build.sh`) |
 | `docs/decisions/shared-contract-pin-artifact.md` | `/auto-pilot` added to *Recorded exceptions* with the post-pass measurement; the deferred-verdict section marked resolved; the #413 consequence row updated |
 | `docs/experiments/skill-auto-improver-auto-pilot.md` | this report |
@@ -504,12 +565,15 @@ to the pre-change baseline on this machine.
 
 **One, and it is recorded rather than open.**
 
-- **Gate 1 — body under 3000 words: not met (5182).**
+- **Gate 1 — body under 3000 words: not met (5129).**
 - **Gate 2 — `context-efficiency >= 8`: not met (6).** Same finding.
 
-Both are a **D4 recorded exception** on the post-pass floor of **3375** `asm` words
-(lower bound), which survives discounting the nine single-word category greps (3089)
-and which D3 forbids reaching by relocation. §6 carries the accounting; the ADR
+Both are a **D4 recorded exception**, resting on **D3** — the words that remain are
+per-run gate logic for a loop with no human at the terminal, and every block of them is
+walked in §6.2 — and corroborated by a post-pass floor of **3330** `asm` words (lower
+bound), which survives discounting the nine single-word category greps (3046) and which
+D3 forbids reaching by relocation. §6 carries the accounting, including the two
+objections to the floor metric and the two limitations of the metric itself; the ADR
 carries the entry.
 
 Everything else passes: `quick_validate.py` 0, frontmatter audit clean, 428 lines,
