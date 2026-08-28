@@ -75,19 +75,13 @@ Compute report age from the `updated` timestamp. Render the triage table in Step
 
 ### 4. Detect changes and suggest update
 
-Then test whether the data is outdated, with local checks only (no GitHub API calls):
-
-**a) Git history check** — commits since the last triage:
+Then test whether the data is outdated, with local checks only (no GitHub API calls) — **a)** commits since the last triage:
 
 ```bash
 git log --oneline --since="{updated timestamp from cache}" | wc -l
 ```
 
-**b) Report age check** — how old the cached report is.
-
-**c) Issue activity check** — the cached issues' `updated_at` timestamps against the cache's own `updated` timestamp, catching issues already moving at triage time.
-
-Print one of these endings:
+**b)** the cached report's age; **c)** the cached issues' `updated_at` timestamps against the cache's own `updated` timestamp, catching issues already moving at triage time. Print one of these endings:
 
 **No changes detected:**
 ```
@@ -106,7 +100,7 @@ Print one of these endings:
   Run /issue-triage update for fresh analysis.
 ```
 
-These suggestions are informational — the skill never auto-updates; the user decides whether to act.
+These suggestions are informational — the skill never auto-updates.
 
 Every view-mode exit — a corrupted cache, or a rendered report with or without a suggestion — closes with the *Run Stats Footer* (`references/run-stats.md`), then **stops**. View mode never writes the file and makes no API call beyond that git log. It skips *Configuration*, so no `run_started_epoch` exists and `elapsed` prints `n/a`.
 
@@ -116,10 +110,10 @@ Every view-mode exit — a corrupted cache, or a rendered report with or without
 
 Verify the environment first. On failure, output the exact error from `references/error-messages.md` and stop.
 
-1. Confirm git repository: `git rev-parse --git-dir`
-2. Confirm `gh` is installed: `which gh`
-3. Confirm authentication: `gh auth status`
-4. Confirm GitHub remote exists: `git remote -v`
+1. Git repository: `git rev-parse --git-dir`
+2. `gh` installed: `which gh`
+3. Authenticated: `gh auth status`
+4. GitHub remote present: `git remote -v`
 5. **Check the rate budget** (driver rule 4, `docs/platform-github.md`). Update mode fetches every open issue and fans a scanner subagent out per batch, each with its own `gh` calls, so check before that loop:
 
    ```bash
@@ -130,7 +124,7 @@ Verify the environment first. On failure, output the exact error from `reference
 
 ## Repo Sync (recommended)
 
-Recommend a sync first, so the dependency scan sees the latest code:
+Recommend a sync first, so the dependency scan sees current code:
 
 ```
 ⚡ Your branch may be behind the remote. Sync before triaging?
@@ -158,7 +152,7 @@ if [ "$dirty" -eq 1 ]; then
 fi
 ```
 
-If `origin` is missing or the rebase conflicts, say so and continue without syncing. If the user declines the prompt, proceed without syncing.
+If `origin` is missing or the rebase conflicts, say so and continue unsynced. If the user declines the prompt, proceed without syncing.
 
 **Auto mode (`docs/auto-mode.md`) — never blocks.** Skip the `Sync now? [Y/n]` prompt, **run the stash-first sync immediately** (the interactive default is `Y`), and log:
 
@@ -166,7 +160,7 @@ If `origin` is missing or the rebase conflicts, say so and continue without sync
   ⚠ Auto mode: sync confirmation skipped — syncing with origin before triage.
 ```
 
-This is the carve-out `/issue-analysis` applies, and failure stays non-fatal exactly as above — a sync problem must never abort an unattended run.
+Same carve-out `/issue-analysis` applies; failure stays non-fatal exactly as above — a sync problem must never abort an unattended run.
 
 ## Configuration
 
@@ -178,14 +172,12 @@ Manual fallback: load `.gitissue.yml` from the repo root; if absent, use the def
 ○ First run — using default config. Run /init-gitissue to customize.
 ```
 
-Triage settings and defaults (full semantics in `docs/config-schema.md`):
-
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `triage.stale_threshold_days` | `14` | Days of inactivity before an issue is flagged stale |
-| `triage.auto_priority` | `true` | Suggest P1/P2/P3 from type, age and dependency position |
-| `triage.include_closed` | `false` | Include recently closed issues |
-| `triage.scan_timeout_per_issue` | `30` | Max seconds of file-dependency scanning per issue |
+Triage settings, with their defaults — full semantics in `docs/config-schema.md`
+(*triage*): `triage.stale_threshold_days` `14` (days of inactivity before an
+issue is flagged stale), `triage.auto_priority` `true` (suggest P1/P2/P3 from
+type, age and dependency position), `triage.include_closed` `false`,
+`triage.scan_timeout_per_issue` `30` (max seconds of file-dependency scanning
+per issue).
 
 Invalid values in an existing file are the exit-3 case above: print the validation error from `references/error-messages.md` and stop.
 
@@ -198,17 +190,15 @@ A full update delegates its heaviest phase to subagents, keeping the main agent'
 ```
 Main Agent (orchestrator)
 ├── Step 1: Fetch Issues (lightweight — stays in main agent)
-│
 ├── Spawn: one issue-relationship-scanner subagent per batch
 │   Runs history (Step 1b) and dependency (Step 2) in one full scan
 │   Pass `{ issues: [{number, title, body}], repo_root, scan_timeout, scope: "both" }`
-│   For 10+ issues, split into parallel batches (~5 issues each)
-│   Main agent merges batches, adds cross-batch edges + file-overlap signals
-│   Returns: potentially-fixed issues, affected files, directed dependency edges
-│
+│   10+ issues → parallel batches of ~5; main agent merges them,
+│   adding cross-batch edges + file-overlap signals
+│   Returns: potentially-fixed issues, affected files, directed edges
 ├── Steps 3-7: Main agent — arithmetic over the returned data
-├── Step 8: Output (main agent — render terminal report)
-└── Step 9: Persist (main agent — write triage.json)
+├── Step 8: Output (render terminal report)
+└── Step 9: Persist (write triage.json)
 ```
 
 The combined scanner prompt — one agent covering dependency and history scanning
@@ -221,7 +211,7 @@ With the Agent tool, use subagents as above; without it (e.g., Claude.ai), run h
 
 ### Bundled dependency precheck
 
-Verify this skill's bundled prompts, references and scripts are present, resolving each path below against the skill's directory (the dirname of this SKILL.md). On any miss, stop immediately and print:
+Verify these bundled files are present, resolving each path against the skill's directory (the dirname of this SKILL.md). On any miss, stop and print:
 
 ```
 ✗ Missing bundled dependency: {missing_file}
@@ -231,8 +221,6 @@ Verify this skill's bundled prompts, references and scripts are present, resolvi
 
   Then restart the agent session and re-run /issue-triage.
 ```
-
-Check these files:
 
 - `references/agents/issue-relationship-scanner.md` — dependency + history scanner prompt
 - `references/detection.md` — confidence scoring, merge logic, Steps 3-7 prose procedure
@@ -289,10 +277,10 @@ With `--limit N`, use N instead of 100. **Empty state**: with no open issues, ou
 
 ## Steps 1b & 2 — Already-Fixed & Dependency Detection
 
-One full-scope scanner per batch finds issues already fixed by commits/PRs **and** builds the file-overlap dependency map. **Read `references/detection.md` now** — its subagent prompts, confidence-scoring rules and merge logic are what these steps execute, not optional tuning detail. When a scanned body carries a `Depends on #N` / `Blocked by #N` marker, read its grammar in `docs/idd-methodology.md` (*Issue Dependencies*) so the directed edges here match the semantics `/auto-pilot`'s merge gate enforces.
+One full-scope scanner per batch finds issues already fixed by commits/PRs **and** builds the file-overlap dependency map. **Read `references/detection.md` now** — its subagent prompts, confidence-scoring rules and merge logic are what these steps execute, not optional tuning detail. Where a scanned body carries a `Depends on #N` / `Blocked by #N` marker, take its grammar from `docs/idd-methodology.md` (*Issue Dependencies*), so the directed edges here match the semantics `/auto-pilot`'s merge gate enforces.
 
 - **Step 1b** — flags open issues whose titles/bodies match recent commit messages or merged PR descriptions, marking them `potentially_fixed` with evidence links.
-- **Step 2** — extracts keywords per title and body, scans the codebase for affected files, and computes pairwise overlap into a `dependencies[]` graph. Affected files come from that scan, never from the issue body.
+- **Step 2** — extracts keywords per title and body, scans the codebase for affected files, and computes pairwise overlap into a `dependencies[]` graph. Affected files come from that scan, never the issue body.
 - **Step 3** — circular-dependency detection, folded into the scripted block below, which breaks and reports each cycle.
 
 ---
@@ -307,7 +295,7 @@ between identical runs is not actionable.
 
 Write the merged scan to `.gitissue/cache/triage-scan.json` with the Write tool
 — **never** put an issue title on a command line; titles are reporter-written
-text and this skill runs unattended under `/auto-pilot`:
+text and this skill runs unattended under `/auto-pilot`.
 
 ```json
 {"issues": [{"number": 12, "title": "…", "type": "bug", "labels": ["bug"],
@@ -318,8 +306,7 @@ text and this skill runs unattended under `/auto-pilot`:
 
 `edges` are the scanner's undirected pairs (`a`/`b`), which the script directs by
 its documented heuristics; pass an already-directed pair as `from`/`to`. Then,
-from the repo root (script path resolved as the *Bundled dependency precheck*
-resolves its list):
+from the repo root (script path resolved as the precheck resolves its list):
 
 ```bash
 python3 shared/scripts/gi-triage-graph.py --source /issue-triage --out .gitissue/triage.json < .gitissue/cache/triage-scan.json
@@ -340,7 +327,7 @@ afterwards. Classify **every** outcome:
 | exit 3 | invalid input — an issue without a number, an edge naming an unknown issue, an unparsable timestamp, an out-of-range `triage.*` value | **stop**; print the validation error from `references/error-messages.md`. Never degrade past exit 3 |
 | script file absent | broken install, not a runtime problem | stop with the `✗ Missing bundled dependency` block above |
 | exit 4 | payload computed, `--out` unwritable | it is still on stdout — warn per `references/error-messages.md` (*triage.json write failure*) and continue to Step 8 |
-| no `python3`, exit 2, unparsable stdout | environment problem | print `⚠ gi-triage-graph unavailable — computing the order inline` and run the prose procedure in `references/detection.md` (*Steps 3-7 — the prose procedure*), then persist per `references/output-and-persist.md` |
+| no `python3`, exit 2, unparsable stdout | environment problem | print `⚠ gi-triage-graph unavailable — computing the order inline`, run the prose procedure in `references/detection.md` (*Steps 3-7 — the prose procedure*), then persist per `references/output-and-persist.md` |
 
 That prose procedure is the authoritative statement of the rules the script
 implements, and stays runnable by hand.
@@ -398,19 +385,16 @@ Omit rows for steps that found nothing — `Already-fixed` at count 0, `Circular
 
 ## Output Conventions
 
-Terminal output follows the `docs/terminal-style.md` contract — symbols `● ✓ ✗ ◆ ⚡ ⚠ ○`, two-space indent, `┄` separators, URLs on their own line, ≤80 chars, one blank line between sections, static sequential output (no animation), plus `│ ─ ┼` tables (right-align numbers, `—` for empty cells). Errors use the rich format from `references/error-messages.md`: `✗ what failed`, then `To fix:  <command>`, then a docs link when applicable. That catalog covers authentication failures, CLI not found, no remote, no issues, too many issues, circular dependencies and API rate limits.
+Terminal output follows the `docs/terminal-style.md` contract — symbols `● ✓ ✗ ◆ ⚡ ⚠ ○`, two-space indent, `┄` separators, URLs on their own line, ≤80 chars, one blank line between sections, static sequential output (no animation), plus `│ ─ ┼` tables (right-align numbers, `—` for empty cells). Errors use the rich format from `references/error-messages.md`: `✗ what failed`, then `To fix:  <command>`, then a docs link when applicable — a catalog covering auth failures, CLI not found, no remote, no issues, too many issues, circular dependencies and rate limits.
 
-All tracker access follows the GitHub driver — `--json` with explicit field selection, never parsed text. Operation catalog and driver rules: docs/platform-github.md. This skill is **read-only** against the GitHub Project board and never changes issue status; how other skills (issue-creator, issue-resolver) update it is in `docs/github-projects-sync.md`.
-
-Worked runs — first run, cached view with and without changes, explicit update, empty repo, circular dependency — are in `references/examples.md`.
+Tracker access follows the GitHub driver — `--json` with explicit field selection, never parsed text; operation catalog and driver rules in docs/platform-github.md. This skill is **read-only** against the GitHub Project board and never changes issue status; how other skills update it is in `docs/github-projects-sync.md`. Worked runs are in `references/examples.md`.
 
 ## Expected Output
 
 A cached view renders instantly from `.gitissue/triage.json`, in the format
-defined once under *Default Mode → 3. Render the cached report*, closing on one
-of the three endings in *4. Detect changes and suggest update*. An update
-(`/issue-triage update`) runs Steps 1–9, overwrites the cache and ends on that
-same snapshot view.
+defined once under *Default Mode → 3*, closing on one of the three endings in
+*4*. An update (`/issue-triage update`) runs Steps 1–9, overwrites the cache and
+ends on that same snapshot view.
 
 ## Edge Cases
 
