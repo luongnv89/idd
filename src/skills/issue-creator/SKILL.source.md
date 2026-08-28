@@ -119,8 +119,9 @@ Each is named again at the step that reads it:
   `templates/improvement.md`
 - Step specs and catalogs: `references/modes.md`, `references/model-suggestion.md`,
   `references/image-upload.md`, `references/confidence-scoring.md`,
-  `references/clarify-intent.md`, `references/error-messages.md`,
-  `references/examples.md`, `references/run-stats.md`
+  `references/clarify-intent.md`, `references/dup-score-fallback.md`,
+  `references/error-messages.md`, `references/examples.md`,
+  `references/run-stats.md`
 - Shared docs: `references/docs/naming-conventions.md`,
   `references/docs/github-projects-sync.md`, `references/docs/config-schema.md`,
   `references/docs/idd-methodology.md`, `references/docs/sync-conventions.md`,
@@ -220,7 +221,7 @@ probe_limit=$((backlog_limit + 1))
 fallback_issues="$(gh issue list --state open --json number,title,body,labels --limit "$probe_limit")" || exit 4
 ```
 
-Parse `fallback_issues` as JSON, score only its first `backlog_limit` records, and report the scan as truncated when the extra record exists. Quoting the validated digits-only value is mandatory; never use `eval`, shell re-parsing, or an issue-derived value on this command line. Apply the documented canonical rules: NFKC/case-fold tokens; one minimum-length and additive stop-word policy; fixed phrase → title-overlap → keyword precedence; each payment derived only from newly consumed item tokens; one same-type payment; configured weights and thresholds, phrase per-token weight greater than or equal to title-overlap weight. Apply internal batch pairs both directions, keeping the stronger. The fallback uses the same bounded medium-judgement protocol above; a candidate outside the bounded LLM slice remains a warning.
+Then **read `references/dup-score-fallback.md` now** — it carries the parse-and-truncation rule and the canonical scoring rules the script implements, so a degraded run reaches the same verdict. Read it only on this branch; the medium-judgement protocol above is unchanged.
 
 #### Present results
 
