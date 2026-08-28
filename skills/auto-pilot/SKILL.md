@@ -11,33 +11,33 @@ metadata:
 
 # /auto-pilot <!-- a:ap-skill-title -->
 
-Fully autonomous development loop: triage, pick, resolve, review, fix, merge, repeat — zero user prompts. (Version history lives in `CHANGELOG.md`; `docs/release-notes/` covers only early smoke-test reports and is not kept current per release.)
+Fully autonomous development loop: triage, pick, resolve, review, fix, merge, repeat — zero user prompts.
 
-The auto-pilot orchestrates existing gitissue skills into a continuous loop that processes the issue backlog with absolute autonomy. It triages **once** at loop start — reusing a fresh `.gitissue/triage.json` when there is one (*Mode Detection*) — then picks from that order. By default (`autopilot.max_parallel: 1`) it follows the original sequence exactly. When `max_parallel > 1`, it may resolve independent members of one persisted `parallel_groups` entry concurrently in isolated worktrees, then reviews and merges their PRs strictly one at a time. Every lane's run-log append stays in that serialized drain; after each merge, update the cached order in place. Clean PRs merge in `balanced` or `aggressive` mode. PRs with unresolved review issues create a follow-up issue and stay open unless `mode: aggressive` and `merge_partial: true` are both explicitly set. For critical issues, the loop stops and asks the user for a decision instead of auto-continuing.
+The auto-pilot orchestrates existing gitissue skills into a continuous loop over the issue backlog. It triages **once** at loop start — reusing a fresh `.gitissue/triage.json` when there is one (*Mode Detection*) — then picks from that order. At the default `autopilot.max_parallel: 1` it follows that sequence exactly; above 1 it may resolve independent members of one persisted `parallel_groups` entry concurrently in isolated worktrees, then reviews and merges their PRs strictly one at a time. Every lane's run-log append stays in that serialized drain; after each merge, update the cached order in place. Clean PRs merge in `balanced` or `aggressive` mode. PRs with unresolved review issues create a follow-up issue and stay open unless `mode: aggressive` and `merge_partial: true` are both explicitly set. For critical issues the loop stops and asks the user instead of auto-continuing.
 
 ## Autonomy Philosophy <!-- a:ap-autonomy -->
 
-Inspired by the auto-adapt-mode pattern: **always proceed, never block on recoverable situations**. The auto-pilot classifies every decision into two categories:
+Inspired by the auto-adapt-mode pattern: **always proceed, never block on recoverable situations**. Every decision falls into one of two categories:
 
-1. **Auto-decide** (99% of cases) — The agent picks the best option and continues:
+1. **Auto-decide** (99% of cases) — the agent picks the best option and continues:
    - Switching branches, stashing changes, syncing with remote
-   - Choosing resolution strategies, picking implementation approaches
+   - Choosing resolution strategies and implementation approaches
    - Skipping failed issues and moving to the next one
    - Retrying after transient failures — which failures are recoverable is driver rule 5 in `references/docs/platform-github.md`; the bounded retry loop that acts on it is in `references/preflight.md` (*Transient-failure retry*)
    - Merging PRs that pass review (only when `autopilot.mode` permits — see Configuration)
    - Falling back to simpler strategies when optimizations fail
    - **PR blocked by an unmerged dependency** — if the originating issue has a `Depends on #N` / `Blocked by #N` marker and any referenced issue is still open (or its PR is unmerged), never merge out of order — but never stop the run for it either. Record the outcome as `blocked_by_dependency`, leave the PR open and unchanged, add the issue to the session skip list, and continue to the next eligible issue. Disabled by `autopilot.respect_dependencies: false`.
 
-2. **Confirm with user** (rare, critical) — Only for genuinely irreversible or dangerous actions:
+2. **Confirm with user** (rare, critical) — only for genuinely irreversible or dangerous actions:
    - Force-pushing to a shared branch (never done automatically)
-   - Deleting remote branches that others might depend on
+   - Deleting remote branches others might depend on
    - Modifying repository settings or branch protection rules
-   - Any action that matches the dangerous patterns list (destructive ops, production deployment, package publishing)
+   - Any action matching the dangerous patterns list (destructive ops, production deployment, package publishing)
    - **Critical issues with unresolved review problems** — if the issue has a `critical` or `priority:critical` label and the review-fix loop exhausts its cycles without resolving all issues, stop and ask. This is the **only** documented stop-and-ask exception; every other condition — including a dependency-blocked merge — resolves to an automatic decision.
 
-When in doubt, the auto-pilot proceeds with the safer option rather than stopping to ask. A skipped issue can always be retried; a blocked loop wastes time.
+When in doubt, proceed with the safer option rather than stopping to ask. A skipped issue can always be retried; a blocked loop wastes time.
 
-**Delegated skills inherit the autonomy.** Every gitissue skill `/auto-pilot` invokes — `/issue-triage`, `/issue-analysis`, `/issue-resolver`, `/issue-pr-review`, and the optional mid-loop `/issue-creator` normalization — is invoked with `--auto` **and** with `IDD_AUTO_MODE=1` exported before the invocation. Both signals, every time. This is the caller obligation in `references/docs/auto-mode.md`: a delegated skill's interactive gate has a defined non-interactive behavior, but that behavior only fires when the caller sets the signal, so a caller that sets neither still deadlocks a run with no human at the terminal. **Never rely on the callee detecting auto-pilot provenance** — provenance is not checkable, the flag and the environment variable are.
+**Delegated skills inherit the autonomy.** Every gitissue skill `/auto-pilot` invokes — `/issue-triage`, `/issue-analysis`, `/issue-resolver`, `/issue-pr-review`, and the optional mid-loop `/issue-creator` normalization — is invoked with `--auto` **and** with `IDD_AUTO_MODE=1` exported before the invocation. Both signals, every time. This is the caller obligation in `references/docs/auto-mode.md`: a delegated skill's interactive gate has a defined non-interactive behavior, but that behavior fires only when the caller sets the signal, so a caller that sets neither deadlocks a run with no human at the terminal. **Never rely on the callee detecting auto-pilot provenance** — provenance is not checkable, the flag and the environment variable are.
 
 ## Invocation
 
@@ -56,95 +56,87 @@ When in doubt, the auto-pilot proceeds with the safer option rather than stoppin
 
 ## Prerequisites
 
-Before starting the loop, verify the environment. On failure, output the exact error from `references/error-messages.md` and stop.
+Before starting the loop, verify the environment. On failure, output the exact error from `references/error-messages.md`, close with the *Run Stats Footer* (`references/run-stats.md`), and stop — that ordering governs every stop in this section, in *Dependency Preflight*, in the *Bundled dependency precheck*, and at the run-lock and config stops below, and a stop before the config load prints `elapsed n/a`.
 
 1. Confirm git repository: `git rev-parse --git-dir`
 2. Confirm `gh` is installed: `which gh`
 3. Confirm authentication: `gh auth status`
 4. Confirm GitHub remote exists: `git remote -v`
-5. Confirm required skills are installed from the same IDD distribution:
-   - `issue-triage`
-   - `issue-analysis`
-   - `issue-resolver`
-   - `issue-pr-review`
+5. Confirm the required skills are installed from the same IDD distribution — `issue-triage`, `issue-analysis`, `issue-resolver`, `issue-pr-review` (*Dependency Preflight* below)
 6. Confirm clean working tree: `git status --porcelain`
 7. Confirm on default branch: `git rev-parse --abbrev-ref HEAD`
-8. **Check the rate budget** (driver rule 4, `references/docs/platform-github.md` ~12): auto-pilot processes many issues in a loop, each fanning out resolver and review subagents that make their own `gh`/API calls. Before starting the loop, confirm enough budget remains:
+8. **Check the rate budget** (driver rule 4, `references/docs/platform-github.md` ~12): the loop fans out resolver and review subagents that make their own `gh`/API calls, so confirm enough budget remains:
 
    ```bash
    gh api rate_limit --jq '{remaining: .rate.remaining, reset: .rate.reset}'
    ```
 
-   **Threshold:** at or above 500, proceed silently; between 200 and 500, warn with the `⚠` variant and continue. Below **200** the run does **not** stop dead — it **pauses until `reset` and then re-probes**, provided that instant fits inside `autopilot.max_runtime_minutes`; when it does not fit, or `reset` is unknown, stop cleanly with the persisted report rather than stranding issues half-resolved. The fit is measured from the clock here — no run has started, so no `started_at` exists to measure from — and that clock is read **once**, at the first probe, so every re-probe and every consecutive pause shares one deadline instead of pushing it forward. This site also holds **no run lock yet**, so the pause neither refreshes a heartbeat nor releases anything on the stop path. The verdict, that preflight variant, the chunked pause that keeps the run lock alive across a *mid-run* pause, and the prose fallback are in `references/preflight.md` (*Rate-limit pause*) — read it before acting on a low budget.
-9. **Confirm push/merge permission** (driver `references/docs/platform-github.md` ~22-23): check the caller's repository permission:
+   **Threshold:** at or above 500, proceed silently; between 200 and 500, warn with the `⚠` variant and continue. Below **200** the run does **not** stop dead — it **pauses until `reset` and then re-probes**, provided that instant fits inside `autopilot.max_runtime_minutes`; when it does not fit, or `reset` is unknown, stop cleanly with the persisted report rather than stranding issues half-resolved. The fit is measured from the clock here — no run has started, so there is no `started_at` to measure from — and that clock is read **once**, at the first probe, so every re-probe and every consecutive pause shares one deadline instead of pushing it forward. This site also holds **no run lock yet**, so the pause neither refreshes a heartbeat nor releases anything on the stop path. The verdict, that preflight variant, the chunked pause that keeps the run lock alive across a *mid-run* pause, and the prose fallback are in `references/preflight.md` (*Rate-limit pause*) — read it before acting on a low budget.
+9. **Confirm push/merge permission** (driver `references/docs/platform-github.md` ~22-23) with `gh repo view --json viewerPermission`. `ADMIN`, `MAINTAIN` or `WRITE` can push and merge — proceed. `READ`, `TRIAGE` or `NONE` cannot merge: rather than fail, **downgrade to no-merge mode** — print `⚠ Insufficient merge permission — running in no-merge mode` from `references/error-messages.md`, run the full triage/resolve/review loop, and skip Phase 5, leaving every PR open for a maintainer. Leaving PRs open beats failing.
 
-   ```bash
-   gh repo view --json viewerPermission
-   ```
+## Dependency Preflight (mandatory)
 
-   If `viewerPermission` is `ADMIN`, `MAINTAIN`, or `WRITE`, the caller can push and merge — proceed normally. If it is `READ`, `TRIAGE`, or `NONE`, the caller cannot merge PRs. Rather than fail, **downgrade to no-merge mode**: print the `⚠ Insufficient merge permission — running in no-merge mode` line from `references/error-messages.md`, then run the full triage/resolve/review loop but skip Phase 5 (merge), leaving every PR open for a maintainer to merge. This is consistent with auto-pilot's always-proceed philosophy: leave PRs open rather than failing.
+`/auto-pilot` invokes other gitissue skills. Verify each one is installed **before** the run lock, the auto-stash, or any triage, resolution, review, or merge:
 
-### Skill dependency precheck
+```bash
+for s in issue-triage issue-analysis issue-resolver issue-pr-review; do
+  asm list -p claude --json | grep -q "\"$s\"" || {
+    echo "Missing required skill: $s" >&2
+    echo "Install it:      asm install $s -p claude --yes" >&2
+    echo "No asm yet:      npm install -g agent-skill-manager" >&2
+    echo "Verify:          asm list -p claude --json | grep '$s'" >&2
+    exit 1
+  }
+done
+```
 
-`/auto-pilot` delegates to other gitissue skills. Before any triage, resolution,
-review, merge, or mutation, verify they are available in the agent environment.
-If one or more **required** skills (step 5 above) are missing, stop immediately
-and print the exact `✗ Missing required gitissue skill(s)` block from
-`references/preflight.md` — do not continue with partial execution.
-`issue-creator` is optional; if missing, skip mid-loop normalization and warn
-instead of stopping. When it is present, invoke it with `--auto` and with
-`IDD_AUTO_MODE=1` exported, per *Autonomy Philosophy* above — its Normalize
-apply gate is the one delegated gate that sits directly in the loop's path, so
-a caller that omits the signals stalls the whole run.
+If a required skill is missing, stop and print the `✗ Missing required gitissue skill(s)` block from `references/preflight.md`, which carries those same four elements — do not continue with partial execution. `issue-creator` is optional: run the same check for it, and on a miss warn, skip mid-loop normalization, and continue. Invoke it with `--auto` and with `IDD_AUTO_MODE=1` exported, per *Autonomy Philosophy* — its Normalize apply gate is the one delegated gate sitting directly in the loop's path, so a caller that omits the signals stalls the whole run.
 
 ### Bundled dependency precheck
 
-Verify this skill's bundled reference files are present. If any are missing, stop
-and print the `✗ Missing bundled dependency` block from `references/preflight.md`.
-Check these files relative to the skill's directory (the dirname of this SKILL.md):
+Verify this skill's bundled files are present, relative to the skill's directory (the dirname of this SKILL.md). If any is missing, stop and print the `✗ Missing bundled dependency` block from `references/preflight.md`.
 
-- `references/phases.md` — phase-by-phase execution spec
-- `references/subagent-prompts.md` — resolver, reviewer, analyzer, batch-resolver subagent prompts
-- `references/preflight.md` — precheck error outputs and branch-sync procedure
-- `references/orchestration.md` — subagent rationale and main-agent task list
-- `references/explicit-list-mode.md` — explicit list mode parsing rules and dependency scan
-- `references/run-log.md` — run-log single-writer and batch fan-out contracts
-- `references/summary-format.md` — final-summary outcome table and template
-- `references/run-stats.md` — run-stats footer contract (shape, fields, unavailable marker)
-- `references/configuration.md` — per-key config rationale and edge-case behavior
-- `references/error-messages.md` — complete error catalog with triggers and exact output
-- `references/examples.md` — worked example runs
-- `references/docs/idd-methodology.md` — IDD methodology (issue dependencies, etc.)
-- `references/docs/sync-conventions.md` — stash-first sync convention and recovery
-- `references/docs/config-schema.md` — configuration schema reference
-- `references/docs/run-log-schema.md` — `.gitissue/runs.jsonl` run-log schema
-- `references/docs/naming-conventions.md` — naming conventions
-- `references/docs/platform-github.md` — GitHub platform driver reference
-- `references/docs/shared-agent-conventions.md` — shared subagent conventions
-- `references/docs/agent-model-effort.md` — per-agent model and reasoning-effort mapping
-- `references/docs/terminal-style.md` — terminal output style contract (symbols, output structure, table/error formats)
-- `references/docs/auto-mode.md` — auto-mode detection and the caller obligation for delegated skills
-- `references/scripts/gi-config.py` — config resolver: merges the documented defaults with `.gitissue.yml` and prints one JSON line
-- `references/scripts/gi-runlog.py` — run-log writer: validates, normalizes, and appends one `.gitissue/runs.jsonl` record
-- `references/scripts/gi-deps.py` — dependency-marker parser for the Phase 5 dependency gate
-- `references/scripts/gi-ci-wait.py` — CI waiter: polls a PR's checks to a verdict in one invocation, for the Phase 5 pre-merge gate
-- `references/scripts/gi-gh.py` — shared GitHub CLI subprocess boundary used by the GitHub-backed helpers
-- `references/scripts/gi-issue.py` — TTL-cached issue fetcher for the repeat reads across Phases 1, 4, and 5
-- `references/scripts/gi-branch.py` — safe branch derivation for caller-managed parallel worktrees
-- `references/scripts/gi-triage-graph.py` — Phase 1 execution order, status, staleness, and priority
-- `references/scripts/gi-state.py` — run-state, run-lock, and final-report writer (resume, `--force-unlock`, and the `--dry-run` no-mutation guarantee)
+- `references/phases.md`
+- `references/subagent-prompts.md`
+- `references/preflight.md`
+- `references/orchestration.md`
+- `references/explicit-list-mode.md`
+- `references/run-log.md`
+- `references/summary-format.md`
+- `references/run-stats.md`
+- `references/configuration.md`
+- `references/error-messages.md`
+- `references/examples.md`
+- `references/docs/idd-methodology.md`
+- `references/docs/sync-conventions.md`
+- `references/docs/config-schema.md`
+- `references/docs/run-log-schema.md`
+- `references/docs/naming-conventions.md`
+- `references/docs/platform-github.md`
+- `references/docs/shared-agent-conventions.md`
+- `references/docs/agent-model-effort.md`
+- `references/docs/terminal-style.md`
+- `references/docs/auto-mode.md`
+- `references/scripts/gi-config.py`
+- `references/scripts/gi-runlog.py`
+- `references/scripts/gi-deps.py`
+- `references/scripts/gi-ci-wait.py`
+- `references/scripts/gi-gh.py`
+- `references/scripts/gi-issue.py`
+- `references/scripts/gi-branch.py`
+- `references/scripts/gi-triage-graph.py`
+- `references/scripts/gi-state.py`
 - `references/scripts/gi-ratelimit.py` — rate-limit verdict, chunked pause, transient-failure backoff, and the run's wall-clock budget
 
 **Acquire the run lock before the first mutation.** The auto-stash below writes
 to the repository, so the lock precedes it — run
-`python3 references/scripts/gi-state.py --lock --pid "$PPID"` from the repo root
-(`$PPID` is the durable agent process, not this one-shot shell — a lock owned by
-a shell that has already exited reads as dead and reclaims itself; add
-`--resume` to that call when `/auto-pilot --resume` was invoked, so the
-continued run keeps its recorded run id instead of minting a second one),
-exactly as the
-*Configuration* step resolves this skill's own script path. Exit 0 means this
-run holds the lock — `acquired`, `reclaimed` (which prints the script's own
+`python3 references/scripts/gi-state.py --lock --pid "$PPID"` from the repo root,
+resolving the script path exactly as *Configuration* resolves this skill's own.
+`$PPID` is the durable agent process, not this one-shot shell: a lock owned by a
+shell that has already exited reads as dead and reclaims itself. Add `--resume`
+to that call when `/auto-pilot --resume` was invoked, so the continued run keeps
+its recorded run id instead of minting a second one. Exit 0 means this run holds
+the lock — `acquired`, `reclaimed` (which prints the script's own
 `⚠ gi-state: reclaimed a … lock` line), or, on a `--resume` that finds its own
 lock still live, `reacquired`. All three are evidence about the *lock*, never
 about the recorded run state
@@ -158,10 +150,10 @@ unlocked and un-resumable, per the fallback beside every call site in
 holds the lock and acquires nothing.
 
 If the working tree is dirty, auto-stash before starting; if not on the default
-branch, auto-switch and rebase on a clean tree. Both procedures (the stash-first
-sync, the rebase-abort recovery, and the `⚠` status lines) live in
+branch, auto-switch and rebase on a clean tree. Both procedures — the stash-first
+sync, the rebase-abort recovery, and the `⚠` status lines — live in
 `references/preflight.md` → *Auto-stash and branch sync*. These are safe, local,
-reversible operations — no user confirmation needed; the stash is restored with
+reversible operations needing no confirmation; the stash is restored with
 `git stash pop` after the run.
 
 ## Configuration
