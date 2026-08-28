@@ -133,34 +133,23 @@ If any are missing, stop immediately and print:
   Then restart the agent session and re-run /issue-creator.
 ```
 
-Check these files:
+Check these files — each is named again at the step that reads it:
 
-- `references/agents/duplicate-detector.md` — duplicate detection subagent prompt
-- `templates/model-data.json` — bundled model-data seed `gi-model-cache.py` copies on first run
-- `templates/bug.md` — bug issue template
-- `templates/feature.md` — feature request template
-- `templates/improvement.md` — improvement request template
-- `references/modes.md` — Normalize and Batch mode step specs and error paths
-- `references/model-suggestion.md` — model-suggestion cache lifecycle and mapping
-- `references/image-upload.md` — image upload procedure and failure handling
-- `references/confidence-scoring.md` — confidence levels and per-field determination
-- `references/clarify-intent.md` — Step 3.5 clarify-ambiguous-intent full procedure
-- `references/error-messages.md` — complete error catalog with triggers and exact output
-- `references/examples.md` — worked example runs (create, normalize, batch)
-- `references/run-stats.md` — run-stats footer contract (shape, fields, unavailable marker)
-- `references/docs/naming-conventions.md` — issue title and labeling conventions
-- `references/docs/github-projects-sync.md` — GitHub Projects status sync reference
-- `references/docs/config-schema.md` — configuration schema reference
-- `references/docs/idd-methodology.md` — IDD methodology reference
-- `references/docs/sync-conventions.md` — stash-first sync convention and recovery
-- `references/docs/platform-github.md` — GitHub platform driver reference
-- `references/docs/auto-mode.md` — auto-mode detection and the non-interactive gate rule
-- `references/docs/terminal-style.md` — terminal output style contract (symbols, output structure, table/error formats)
-- `references/scripts/gi-config.py` — config resolver: merges the documented defaults with `.gitissue.yml` and prints one JSON line
-- `references/scripts/gi-gh.py` — shared GitHub CLI subprocess boundary used by the GitHub-backed helpers
-- `references/scripts/gi-issue.py` — TTL-cached issue fetcher for Normalize mode's repeat reads
-- `references/scripts/gi-dup-score.py` — deterministic duplicate scorer (Step 3)
-- `references/scripts/gi-model-cache.py` — model-data cache lifecycle
+- Subagent prompt and templates: `references/agents/duplicate-detector.md`,
+  `templates/model-data.json`, `templates/bug.md`, `templates/feature.md`,
+  `templates/improvement.md`
+- Step specs and catalogs: `references/modes.md`, `references/model-suggestion.md`,
+  `references/image-upload.md`, `references/confidence-scoring.md`,
+  `references/clarify-intent.md`, `references/error-messages.md`,
+  `references/examples.md`, `references/run-stats.md`
+- Shared docs: `references/docs/naming-conventions.md`,
+  `references/docs/github-projects-sync.md`, `references/docs/config-schema.md`,
+  `references/docs/idd-methodology.md`, `references/docs/sync-conventions.md`,
+  `references/docs/platform-github.md`, `references/docs/auto-mode.md`,
+  `references/docs/terminal-style.md`
+- Scripts: `references/scripts/gi-config.py`, `references/scripts/gi-gh.py`,
+  `references/scripts/gi-issue.py`, `references/scripts/gi-dup-score.py`,
+  `references/scripts/gi-model-cache.py`
 
 ---
 
@@ -435,16 +424,3 @@ In batch mode, one line per issue is printed followed by a totals footer (`✓ 5
 - **Ambiguous batch input** — if item boundaries are unclear, the skill shows a parsed preview and asks for confirmation before creating (interactive; in auto mode see the Batch Step 4 auto-mode carve-out).
 - **GitHub API rate limit** — creation stops at the last successful issue; the partial result is reported with a resume hint.
 - **Empty body** — the issue is created with only a title; `(needs review)` is noted in the metadata section.
-
-## Additional Resources
-
-- **`references/error-messages.md`** — Complete error catalog with triggers and exact output
-- **`docs/naming-conventions.md`** — Issue title and labeling conventions
-- **`docs/github-projects-sync.md`** — Shared GitHub Projects status sync reference
-- **`templates/bug.md`** — Bug report template
-- **`templates/feature.md`** — Feature request template
-- **`templates/improvement.md`** — Improvement template
-- **`references/model-suggestion.md`** — Model-suggestion cache + complexity→model mapping
-- **`references/image-upload.md`** — Image upload procedure, placement, and failure handling
-- **`references/confidence-scoring.md`** — Confidence levels and per-field determination tables
-- **`references/clarify-intent.md`** — Step 3.5 clarify-ambiguous-intent full procedure and example
