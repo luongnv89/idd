@@ -199,9 +199,10 @@ Main Agent (orchestrator)
 └── Step 9: Persist (write triage.json)
 ```
 
-The combined scanner prompt — one agent covering dependency and history scanning
-both — is `shared/agents/issue-relationship-scanner.md`. Batches run in parallel
-and are collected before Step 3, where the main agent adds cross-batch edges.
+Read the combined scanner prompt — one agent covering dependency and history
+scanning both — in `shared/agents/issue-relationship-scanner.md`. Batches run in
+parallel and are collected before Step 3, where the main agent adds cross-batch
+edges.
 
 ### Environment check
 
@@ -311,7 +312,7 @@ python3 shared/scripts/gi-triage-graph.py --source /issue-triage --out .gitissue
 ```
 
 Exit 0 prints — and `--out` persists — the whole `.gitissue/triage.json` payload,
-which is Step 9 done: `version`, `updated`, `source`, `analyzed_count`,
+which is Step 9 done — top-level `version`, `updated`, `source`, `analyzed_count`,
 `issues[]`, `summary` (`parallel_groups`, `stale_count`, `stale_threshold_days`,
 `potentially_fixed_count`, `suggested_order`, `circular_deps`, `co_dependent`)
 and `history[]`. Each `issues[]` entry has a `status` of `ready`, `blocked`,
@@ -335,7 +336,7 @@ Pri column and skip priority suggestions.
 
 ## Step 8-9 — Output & Persist
 
-Step 8 renders the triage table — rank, issue, priority, blockers, status, parallelizable and stale flags — and the suggested execution order, from the payload above. Step 9 is the `--out` write; where the script degraded, write the same schema by hand. Column widths, sort order, colour rules and JSON schema: `references/output-and-persist.md`.
+Step 8 renders the triage table — rank, issue, priority, blockers, status, parallelizable and stale flags — and the suggested execution order, from the payload above. Step 9 is the `--out` write; where the script degraded, write the same schema by hand. Column widths, sort order, color rules and JSON schema: `references/output-and-persist.md`.
 
 ---
 ## Final Report
