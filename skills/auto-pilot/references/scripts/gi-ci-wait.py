@@ -44,6 +44,23 @@ grace window did not fit inside the timeout, or `--once` was passed — means
 label. **Callers must treat `none` as mergeable only when `none_confirmed` is
 true.**
 
+Correcting gh's bucket for terminal states
+------------------------------------------
+
+`gh pr checks` maps each check to a bucket, and its mapping has no case for
+`STARTUP_FAILURE` or `STALE` — both fall to its default, `pending`. Those two
+are terminal: nothing about the check will change again. Left as `pending` they
+reset the settle window on every poll, so the wait burns the whole `--timeout`
+and then answers `pending` — a ten-minute stall followed by a not-clean verdict,
+on a check that finished before the first poll. `effective_bucket()` reclassifies
+them as `fail`, which is what they are.
+
+The correction is one-way by construction: it only ever promotes `pending` to
+`fail`, never anything toward `pass`, and it never touches a bucket gh already
+models. An *unmodelled* bucket with no recognized terminal state stays `pending`,
+because guessing "done" about something we do not model is the direction that
+merges a broken PR.
+
 Non-empty terminal results use a separate settle window. Once a terminal
 snapshot appears, its normalized check-name set must remain unchanged for
 `--settle-window` seconds before `pass` or `fail` is returned. Additions and
@@ -98,16 +115,27 @@ DEFAULT_SETTLE_WINDOW_S = 30
 TERMINAL_OK = frozenset({"pass", "skipping"})
 TERMINAL_BAD = frozenset({"fail", "cancel"})
 
+# Conclusions GitHub reports as terminal but that `gh pr checks` buckets as
+# `pending`: cli/cli's aggregate.go has no case for them, so they fall to its
+# default. Left as `pending` they reset the settle window on every poll, so the
+# wait burns the whole timeout and then reports `pending` — a stall on a check
+# that will never change. Reclassify them as the terminal failures they are.
+TERMINAL_BAD_STATES = frozenset({"STARTUP_FAILURE", "STALE"})
+
 # Verdicts that end the wait the moment they are seen. `pending` and `none` are
 # both "ask again": the first because a run is still going, the second because
 # nothing has registered yet — and until the grace window closes those are the
 # same situation.
 TERMINAL_VERDICTS = frozenset({"pass", "fail"})
 
-# gh exits non-zero to *report* check status: 8 = still pending, 1 = failing or
-# "no checks". Those are verdicts, so the exit status alone cannot distinguish
-# them from a real error — the payload on stdout is what decides, and an empty
-# payload from a non-zero exit is treated as an error rather than as "none".
+# Without `--json`, gh exits non-zero to *report* check status: 8 = still
+# pending, 1 = failing. With `--json` the exporter short-circuits that: whenever
+# any check exists gh prints the array and exits 0, so in this script's mode the
+# exit status carries no verdict. A non-zero exit here is either a real error or
+# the one remaining status answer — "this PR has no checks", which gh reports on
+# stderr with one of the markers below. So the payload on stdout is what decides,
+# and an empty payload from a non-zero exit with no marker is treated as an error
+# rather than as "none".
 _NO_CHECKS_MARKERS = ("no checks reported", "no check runs")
 
 
@@ -147,7 +175,7 @@ def poll_once(pr: str | None, repo: str | None) -> list[dict[str, object]] | Non
         # gh succeeded and printed nothing: there are genuinely no checks.
         return None
     # Everything else is an error, including exits 1 and 8. Those two carry
-    # check *status* when there is a payload, but with empty stdout and no
+    # check *status* in gh's non-JSON mode, but with empty stdout and no
     # "no checks" marker they are how gh reports an API 502, a rate limit, or
     # an unresolvable PR. Reading that as "no CI configured" would let a caller
     # merge a PR whose checks it never saw — so it degrades instead.
@@ -157,13 +185,29 @@ def poll_once(pr: str | None, repo: str | None) -> list[dict[str, object]] | Non
     )
 
 
+def effective_bucket(check: dict[str, object]) -> str:
+    """The bucket to classify by, correcting gh's mapping for terminal states.
+
+    One-way only: it promotes `pending` to `fail` for a state gh does not bucket,
+    and never moves anything toward `pass`. A bucket gh already models is
+    returned untouched, and an unmodelled bucket with no recognized terminal
+    state stays exactly as gh reported it — still pending.
+    """
+    bucket = str(check.get("bucket") or "pending").lower()
+    if bucket in TERMINAL_OK or bucket in TERMINAL_BAD:
+        return bucket          # never override a bucket gh already models
+    if str(check.get("state") or "").upper() in TERMINAL_BAD_STATES:
+        return "fail"
+    return bucket
+
+
 def classify(checks: list[dict[str, object]]) -> tuple[str, dict[str, int]]:
     """Reduce a check list to (verdict, per-bucket counts)."""
     counts = {"pass": 0, "fail": 0, "pending": 0, "skipping": 0, "cancel": 0}
     pending = 0
     failing = 0
     for check in checks:
-        bucket = str(check.get("bucket") or "pending").lower()
+        bucket = effective_bucket(check)
         counts[bucket] = counts.get(bucket, 0) + 1
         if bucket in TERMINAL_BAD:
             failing += 1
@@ -268,10 +312,10 @@ def wait(
     return {
         "verdict": verdict,
         "checks": checks,
+        # Same classifier as `counts` and `verdict`, so the three cannot
+        # disagree: a check counted as failing is always listed here.
         "failing": [
-            check
-            for check in checks
-            if str(check.get("bucket") or "").lower() in TERMINAL_BAD
+            check for check in checks if effective_bucket(check) in TERMINAL_BAD
         ],
         "counts": counts,
         "elapsed_s": int(elapsed_s),
@@ -304,7 +348,10 @@ def report(result: dict[str, object]) -> None:
     elif verdict == "fail":
         sys.stderr.write(f"✗ CI failed — {counts['fail'] + counts['cancel']} of {total} checks\n")
         for check in result["failing"]:  # type: ignore[union-attr]
-            sys.stderr.write(f"  ✗ {check.get('name')} ({check.get('bucket')})\n")
+            # The effective bucket, not the raw one: a STARTUP_FAILURE entry
+            # still carries gh's `bucket: pending`, and printing that under a
+            # "CI failed" heading reads as a contradiction.
+            sys.stderr.write(f"  ✗ {check.get('name')} ({effective_bucket(check)})\n")
             link = check.get("link")
             if link:
                 sys.stderr.write(f"    {link}\n")

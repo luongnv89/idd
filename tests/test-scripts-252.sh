@@ -392,6 +392,57 @@ else
   fail "AC2: an unmodeled bucket is treated as pending, not as done"
 fi
 
+# Issue #431. `gh pr checks` has no bucket case for STARTUP_FAILURE or STALE, so
+# both fall to its default `pending` — but they are terminal, and a pending
+# snapshot resets the settle window on every poll. Left uncorrected the wait
+# burns the entire --timeout and then answers `pending`, which is not clean:
+# a ten-minute stall followed by a hard stop, on a check that finished before
+# the first poll. They must classify as `fail`, appear in `failing[]`, and
+# return promptly.
+failing_names() {
+  python3 -c 'import json,sys;print(",".join(str(c.get("name")) for c in json.loads(sys.stdin.read())["failing"]))'
+}
+
+for terminal_state in STARTUP_FAILURE STALE; do
+  GH_FIXTURE="[{\"name\":\"build\",\"state\":\"$terminal_state\",\"bucket\":\"pending\",\"link\":\"u\"}]"
+
+  run_status out st env GH_FIXTURE="$GH_FIXTURE" PATH="$STUB:$PATH" \
+    python3 "$CIWAIT" 42 --once
+  if [ "$st" = "0" ] \
+     && [ "$(printf '%s' "$out" | jkey verdict)" = "fail" ] \
+     && [ "$(printf '%s' "$out" | failing_names)" = "build" ]; then
+    pass "AC2/#431: $terminal_state is a terminal failure — verdict fail, listed in failing[]"
+  else
+    fail "AC2/#431: $terminal_state did not classify as fail (exit $st, verdict $(printf '%s' "$out" | jkey verdict))"
+  fi
+
+  # The assertion that actually encodes the defect: --once bypasses the settle
+  # loop, so only a timed run proves the wait ends instead of burning --timeout.
+  run_status out st env GH_FIXTURE="$GH_FIXTURE" PATH="$STUB:$PATH" \
+    python3 "$CIWAIT" 42 --interval 1 --timeout 30 --settle-window 1
+  if [ "$(printf '%s' "$out" | jkey verdict)" = "fail" ] \
+     && [ "$(printf '%s' "$out" | jkey settled)" = "True" ] \
+     && [ "$(printf '%s' "$out" | jkey elapsed_s)" -le 5 ]; then
+    pass "AC2/#431: $terminal_state settles and returns fail without burning the timeout"
+  else
+    fail "AC2/#431: $terminal_state burned the timeout (elapsed $(printf '%s' "$out" | jkey elapsed_s)s, verdict $(printf '%s' "$out" | jkey verdict))"
+  fi
+done
+
+# The correction is one-way: it only ever promotes pending → fail, and never
+# overrides a bucket gh already models. A terminal-bad *state* under a bucket gh
+# does model leaves that bucket alone — moving anything toward `pass` would be
+# the dangerous direction, and moving a modeled `pass` to `fail` would make the
+# script disagree with gh about a check gh understands.
+GH_FIXTURE='[{"name":"build","state":"STARTUP_FAILURE","bucket":"pass","link":"u"}]'
+run_status out st env GH_FIXTURE="$GH_FIXTURE" PATH="$STUB:$PATH" \
+  python3 "$CIWAIT" 42 --once
+if [ "$(printf '%s' "$out" | jkey verdict)" = "pass" ]; then
+  pass "AC2/#431: a modeled bucket is never overridden — the correction is pending → fail only"
+else
+  fail "AC2/#431: the state override reached a bucket gh already models"
+fi
+
 # `none` is two different answers wearing one label, and telling them apart is a
 # merge-safety property: a repository with no CI reports none forever, while a
 # repository that *does* have CI also reports none for the seconds between a
