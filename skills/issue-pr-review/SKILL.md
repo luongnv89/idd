@@ -23,13 +23,11 @@ Review a PR end-to-end — analyze, test, fix, check CI, repeat until clean.
 | `/issue-pr-review` | detect | Auto-detect PR for current branch |
 | `/issue-pr-review --review-only` | read-only | Review and report, never fix or merge |
 
-`--auto` is set automatically by `/auto-pilot`. In auto mode export `IDD_AUTO_MODE=1` before any shell snippet that consults it — the pre-commit security scan reads it to switch from prompt-on-warning to log-and-continue (`references/docs/pre-commit-security.md`). `--no-merge` suppresses auto-merge even under `--auto`, for when another agent owns the merge step.
+`--auto` is set by `/auto-pilot`. In auto mode export `IDD_AUTO_MODE=1` before any shell snippet that consults it — the pre-commit security scan reads it to switch from prompt-on-warning to log-and-continue (`references/docs/pre-commit-security.md`). `--no-merge` suppresses auto-merge even under `--auto`.
 
 ## Prerequisites
 
-1. Confirm git repository: `git rev-parse --git-dir`
-2. Confirm `gh` is installed and authenticated: `gh auth status`
-3. Confirm the bundled prompts and reference files exist — *Bundled dependency precheck*
+Confirm before any operation: git repository (`git rev-parse --git-dir`), `gh` installed and authenticated (`gh auth status`), and the bundled prompts and reference files present — *Bundled dependency precheck*.
 
 ### Bundled dependency precheck
 
@@ -57,7 +55,8 @@ references/docs/terminal-style.md
 references/docs/ui-review.md
 references/scripts/gi-config.py
 references/scripts/gi-secscan.py
-references/scripts/gi-ci-wait.py references/scripts/gi-gh.py
+references/scripts/gi-ci-wait.py
+references/scripts/gi-gh.py
 references/scripts/gi-issue.py
 ```
 
@@ -72,13 +71,20 @@ references/scripts/gi-issue.py
 
 ## Repo Sync Before Edits (mandatory)
 
-Before any fix, sync with the **stash-first pattern** — full script and recovery in `references/docs/sync-conventions.md`: `git stash push -u` if the tree is dirty, `git fetch origin`, `git pull --rebase origin "$branch"`, `git stash pop`. On pop failure, stop and surface `git stash list` / `git stash show -p stash@{0}`. If `origin` is missing or the rebase conflicts, stop and ask (interactive) or abort with a clear error (auto).
+Before any fix, sync with the **stash-first pattern** — snippet and recovery in `references/docs/sync-conventions.md`: `git stash push -u` if the tree is dirty, `git fetch origin`, `git pull --rebase origin "$branch"`, `git stash pop`. On pop failure, stop and surface `git stash list` / `git stash show -p stash@{0}`. A missing `origin` or a conflicting rebase stops and asks (interactive), or aborts with a clear error (auto).
 
 ## Configuration
 
-Load config once at skill start: run `python3 references/scripts/gi-config.py`. **Working directory:** the repo root — the script resolves `.gitissue.yml` against it, and run anywhere else it exits 0 reporting `config_file: null`/`first_run: true`, silently discarding the repo's real config. **Script path:** resolve it against this SKILL.md's own directory, as the *Bundled dependency precheck* resolves its list. Exit 0: use `config`. Exit 3: print `✗ Invalid config: .gitissue.yml` with the offending key and reason from stderr, and stop. Script file absent: a bundled dependency is missing, which is a broken install and not a degrade — stop and print the `✗ Missing bundled dependency` block. Anything else (no `python3`, non-zero exit, unparsable stdout): print `⚠ gi-config unavailable — reading .gitissue.yml by hand` and read it yourself over the keys below, *instead of* the script. Never re-read the config after this step. **Capture the run clock here:** chain that same `python3` invocation as `python3 …; ec=$?; date +%s >&2; exit "$ec"` and keep the stderr epoch as `run_started_epoch` — what the *Run Stats Footer* (`references/run-stats.md`) measures `elapsed` from.
+Load config once at skill start; never re-read it. Run `python3 references/scripts/gi-config.py` — **Working directory:** the repo root; **Script path:** resolved against this SKILL.md's own directory, as the *Bundled dependency precheck* resolves its list. Why both matter: `references/review-loop-mechanics.md` (*Config keys and what they gate*).
 
-Every `review.*` key, its default (`review.max_cycles: 3`, `review.soft_pass: true`, `review.auto_merge: false` — auto mode overrides to `true`) and what it gates are tabulated in `references/review-loop-mechanics.md` (*Config keys and what they gate*); value syntax in `references/docs/config-schema.md`. UI/UX **code** review needs no config flag — it is auto-detected per PR (*Step 3*).
+- **Exit 0** — use `config`.
+- **Exit 3** — print `✗ Invalid config: .gitissue.yml` with the offending key and reason from stderr, and stop.
+- **Script file absent** — a broken install and not a degrade: stop and print the `✗ Missing bundled dependency` block.
+- **Anything else** (no `python3`, non-zero exit, unparsable stdout) — print `⚠ gi-config unavailable — reading .gitissue.yml by hand` and read it yourself, over the keys below, *instead of* the script.
+
+**Capture the run clock here:** chain that same `python3` invocation as `python3 …; ec=$?; date +%s >&2; exit "$ec"`; the stderr epoch is `run_started_epoch`, from which the *Run Stats Footer* (`references/run-stats.md`) measures `elapsed`.
+
+Every `review.*` key, its default (`review.max_cycles: 3`, `review.soft_pass: true`, `review.auto_merge: false` — auto mode overrides to `true`) and what it gates: `references/review-loop-mechanics.md` (*Config keys and what they gate*); value syntax in `references/docs/config-schema.md`. UI/UX **code** review needs no config flag — auto-detected per PR (*Step 3*).
 
 ---
 
@@ -377,14 +383,15 @@ Cycle {N}:
 
 After Step 6, go back to Step 3 — reuse the same reviewer via `SendMessage`, spawning fresh only for the confirmation pass. Mechanics for every control below: `references/review-loop-mechanics.md` (*Depth gate*, *What `light` changes in the loop*, *QA handoff gate*, *Re-evaluation after a push*, *Config keys and what they gate*) — **read that file and apply it now.**
 
-- **Max cycles:** `review.max_cycles` (default 3). The `light` profile and `qa_handoff = trusted` each cap it at `min(1, configured_cap)` — the `trusted` cap subject to the *Precedence* carve-out. The `light` profile also skips the optional browser UI review; `trusted` never does — it reaches only the **code** leg (Step 3), because the browser leg is opt-in and fail-soft on both sides. Neither skips the reviewer, and neither relaxes the two #36 hard-blocks.
+- **Max cycles:** `review.max_cycles` (default 3). `light` and `qa_handoff = trusted` each cap it at `min(1, configured_cap)`, the `trusted` cap subject to the *Precedence* carve-out. The `light` profile also skips the optional browser UI review; `trusted` never does — it reaches only the **code** leg (Step 3). Neither skips the reviewer; neither relaxes the two #36 hard-blocks.
 - **Re-evaluate `qa_handoff` after any push this skill makes** — Step 2's auto-fix commit as much as every fixer push — re-read `headRefOid` and recompute before the next step that reads it. The loop re-enters at Step 3, never Step 1.
 - **Agent reuse:** cycles 2+ reuse the existing reviewer and fixer. **Confirmation pass:** when the fixer reports all fixed, spawn one fresh reviewer — clean → PASS; new issues → back to the existing fixer (counts as a cycle).
-- **Soft pass (`review.soft_pass: true`, default):** stop when ALL hold: zero `action: "fix"` issues remain AND (tests pass or `review.run_tests: false`) AND (CI passes, no CI configured, or `review.check_ci: false`) AND traceability is not `fail`. Notes and `partial` dimensions are report-only. **Strict pass (when `review.soft_pass: false`)** — strict mode applies the same tests/CI gates, then requires zero `action: "fix"` findings, zero remaining `action: "note"` findings, and `pass` for every enabled dimension; a `partial` dimension or any note is a strict blocker — exit the fix loop, report it under Remaining, and do not report clean or merge.
+- **Soft pass (`review.soft_pass: true`, default):** stop when ALL hold — zero `action: "fix"` issues remain, tests pass or `review.run_tests: false`, CI passes or no CI configured or `review.check_ci: false`, and traceability is not `fail`. Notes and `partial` dimensions are report-only.
+- **Strict pass (`review.soft_pass: false`):** strict mode keeps those tests/CI gates and adds zero `action: "fix"` findings, zero remaining `action: "note"` findings, and `pass` for every enabled dimension; any note or `partial` dimension is a strict blocker — exit the fix loop, report it under Remaining, and do not report clean or merge.
 - **Hard-block conditions:** `traceability: fail` (e.g. missing `Closes #{N}`) and any `acceptance_criteria: fail` block even when every other dimension is clean and tests pass.
-- **`review.auto_merge`:** honored only in `--auto` mode. Interactive `/issue-pr-review` never merges regardless of this flag.
-- **Exit on stagnation:** if the same issues appear in 2 consecutive cycles, stop and report
-- **Review-only mode:** after Step 1 (including PR head checkout), Step 2 detection-only, then Steps 3-5 once — skip Step 6, never fix, loop, or merge
+- **`review.auto_merge`:** honored only in `--auto` mode; interactive `/issue-pr-review` never merges.
+- **Exit on stagnation:** same issues in 2 consecutive cycles → stop and report.
+- **Review-only mode:** Step 1 (including PR head checkout), Step 2 detection-only, Steps 3-5 once — skip Step 6, never fix, loop, or merge (*Step 7*).
 
 ---
 

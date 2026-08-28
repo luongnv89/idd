@@ -9,6 +9,16 @@ the full key list — every default value, and what each key does to the pipelin
 It is also the list to read `.gitissue.yml` against by hand when `gi-config` is
 unavailable. Value syntax and validation live in `references/docs/config-schema.md`.
 
+**Why the working directory and the script path both matter.** `gi-config.py`
+resolves `.gitissue.yml` against the *current working directory*, so it must be
+run from the repo root. Run anywhere else it does not fail loudly: it exits 0
+reporting `config_file: null` / `first_run: true`, silently discarding the repo's
+real config and handing the run a full set of defaults. The script *path*, by
+contrast, is resolved against the skill's own directory — the same way the
+*Bundled dependency precheck* resolves its list — because the bundled copy lives
+beside SKILL.md, not beside the repo being reviewed. Getting either one wrong
+produces a run that looks configured and is not.
+
 | Key (default) | What it gates |
 |-----|---------------|
 | `review.max_cycles: 3` | Cycle cap for Steps 3–6. Three LLM cycles suffice once the script pre-pass has handled the mechanical issues. Step 1's `light` profile and `qa_handoff = trusted` each cap it at `min(1, configured_cap)`. |
