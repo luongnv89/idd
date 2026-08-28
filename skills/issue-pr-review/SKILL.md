@@ -76,7 +76,7 @@ Before any fix, sync with the **stash-first pattern** — full script and recove
 
 ## Configuration
 
-Load config once at skill start: run `python3 references/scripts/gi-config.py`. **Working directory:** the repo root — the script resolves `.gitissue.yml` against it, and run anywhere else it exits 0 reporting `config_file: null`/`first_run: true`, silently discarding the repo's real config. **Script path:** resolve it against this SKILL.md's own directory, as the *Bundled dependency precheck* resolves its list. Exit 0: use `config`. Exit 3: print `✗ Invalid config: .gitissue.yml` with the offending key and reason from stderr, and stop. Script file absent: a bundled dependency is missing, which is a broken install and not a degrade — stop and print the `✗ Missing bundled dependency` block. Anything else (no `python3`, non-zero exit, unparsable stdout): print `⚠ gi-config unavailable — reading .gitissue.yml by hand` and read it yourself over the keys below, *instead of* the script. Never re-read the config after this step. **Capture the run clock here:** chain that invocation as `python3 …; ec=$?; date +%s >&2; exit "$ec"` and keep the stderr epoch as `run_started_epoch` — what the *Run Stats Footer* (`references/run-stats.md`) measures `elapsed` from.
+Load config once at skill start: run `python3 references/scripts/gi-config.py`. **Working directory:** the repo root — the script resolves `.gitissue.yml` against it, and run anywhere else it exits 0 reporting `config_file: null`/`first_run: true`, silently discarding the repo's real config. **Script path:** resolve it against this SKILL.md's own directory, as the *Bundled dependency precheck* resolves its list. Exit 0: use `config`. Exit 3: print `✗ Invalid config: .gitissue.yml` with the offending key and reason from stderr, and stop. Script file absent: a bundled dependency is missing, which is a broken install and not a degrade — stop and print the `✗ Missing bundled dependency` block. Anything else (no `python3`, non-zero exit, unparsable stdout): print `⚠ gi-config unavailable — reading .gitissue.yml by hand` and read it yourself over the keys below, *instead of* the script. Never re-read the config after this step. **Capture the run clock here:** chain that same `python3` invocation as `python3 …; ec=$?; date +%s >&2; exit "$ec"` and keep the stderr epoch as `run_started_epoch` — what the *Run Stats Footer* (`references/run-stats.md`) measures `elapsed` from.
 
 Every `review.*` key, its default (`review.max_cycles: 3`, `review.soft_pass: true`, `review.auto_merge: false` — auto mode overrides to `true`) and what it gates are tabulated in `references/review-loop-mechanics.md` (*Config keys and what they gate*); value syntax in `references/docs/config-schema.md`. UI/UX **code** review needs no config flag — it is auto-detected per PR (*Step 3*).
 
@@ -155,15 +155,14 @@ Decide **how deep** this review goes: `profile = light | full`. Signals and what
 First, with `references/scripts/gi-gh.py` bundled beside its consumer, when the PR body links an issue, refresh it at the review boundary:
 `python3 references/scripts/gi-issue.py {linked_issue} --fields number,title,body,labels --refresh`,
 reading `.issue`. Exit 3 stops; no `python3`, exit 2, or exit 4 degrades to
-`gh issue view {linked_issue} --json number,title,body,labels`. Retain either successful
-record as `linked_issue_snapshot`. **If neither path yields a usable record, apply the
-empty-record fail-safe in `references/review-loop-mechanics.md` (*Depth gate*) — never
-review a linked issue on an empty snapshot.** The refresh runs even when
-`review.adaptive_depth` is `false`; then ignore the effort signals and set
-`profile = full` after the refresh. Otherwise weigh three: diff size / files
-changed, the retained body's `## Metadata` `Effort` band, and labels (any
-`security`/`CVE`/`vulnerability` forces `full`). Resolve to `light` only when
-**every** signal agrees; any `full`/missing/ambiguous → `full`.
+`gh issue view {linked_issue} --json number,title,body,labels`. Retain either
+successful record as `linked_issue_snapshot`.
+**If neither path yields a usable record, apply the empty-record fail-safe in `references/review-loop-mechanics.md` (*Depth gate*) — never review a linked issue on an empty snapshot.**
+The refresh runs even when `review.adaptive_depth` is `false`; then ignore the effort signals and set `profile = full` after the refresh.
+Otherwise weigh three signals: diff size / files changed, the retained body's
+`## Metadata` `Effort` band, and labels (any `security`/`CVE`/`vulnerability`
+forces `full`). Resolve to `light` only when **every** signal agrees; any
+`full`/missing/ambiguous → `full`.
 
 ### QA handoff gate (trust an already-QA'd PR) <!-- a:rv-qa-handoff-gate -->
 
@@ -195,7 +194,7 @@ Surface both on the `[1/7]` tracker line; with `review.adaptive_depth: false` pr
 
 Before spawning any LLM reviewer, run deterministic tools — zero LLM tokens. **When `--review-only` is set** this pre-pass is detection-only (*Review-only mode*, Step 7).
 
-**Default (fix loop):** detect the project's lint/format tools, run each auto-fix command (block only on errors that prevent the fix from running), then run the test suite. Detection table: `references/prepass-tests-ci-mechanics.md` (*Step 2*). **Under `qa_handoff = trusted`, skip only the test run**, and only when the marker carries a `tests=` field whose SHA equals `head` **and `ci_leg_runnable` is true**. When `ci_leg_runnable` is false (no CI / empty `statusCheckRollup` / `no_ci` / `review.check_ci: false`), ignore `tests=` and run the local suite as unmarked. The lint/format auto-fix still runs — it mutates the tree, so skipping it changes the PR, not just the review's cost — and the `gi-secscan` gate below is **never** gated on `qa_handoff`. That auto-fix moves the head off the marker: recompute the verdict before Step 3 (*Review Loop*).
+**Default (fix loop):** detect the project's lint/format tools, run each auto-fix command (block only on errors that prevent the fix from running), then run the test suite. Detection table: `references/prepass-tests-ci-mechanics.md` (*Step 2*). **Under `qa_handoff = trusted`, skip only the test run**, and only when the marker carries a `tests=` field whose SHA equals `head` **and `ci_leg_runnable` is true**. When `ci_leg_runnable` is false (no CI / empty `statusCheckRollup` / `no_ci` / `review.check_ci: false`), ignore `tests=` and run the local suite as unmarked. The lint/format auto-fix still runs — it mutates the tree, so skipping it changes the PR, not just the review's cost — and the `gi-secscan` gate below is **never** gated on `qa_handoff`. That auto-fix moves the head off the marker: recompute the verdict then, before Step 3 (*Review Loop*).
 
 ### Commit auto-fixes <!-- a:rv-commit-autofix -->
 
@@ -284,7 +283,7 @@ Five dimensions — `correctness`, `acceptance_criteria`, `traceability`, `maint
 - `review.require_acceptance_criteria_check` (default `true`) gates the AC check; `review.require_traceability_check` (default `true`) gates traceability. When either is `false`, that dimension reports `pass — verification disabled` and never blocks soft-pass.
 - **Any `acceptance_criteria: fail`** → fixable issue in Step 6, `category: acceptance_criteria`. **Hard-blocks** soft-pass.
 - **`Closes #{linked_issue}` absent** (traceability check 1, unless refactor/chore-exempt) → fixable issue in Step 6, `category: traceability`, suggested fix "Add `Closes #{linked_issue}` to the PR body." **Hard-blocks** soft-pass.
-- All other traceability outcomes report `partial` and do **not** block.
+- All other traceability outcomes (missing commit ref, missing Decision Record on a human-authored PR) report `partial` and do **not** block.
 
 These two hard-blocks are the issue #36 contract: a PR can pass tests and still be blocked on `acceptance_criteria: fail` or a missing `Closes #N`.
 
