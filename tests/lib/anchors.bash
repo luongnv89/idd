@@ -132,9 +132,9 @@ anchor_region() {
 # the line before the END anchor's line.
 # Exit 1 when the file is unreadable, either anchor is absent or not unique, or
 # END does not follow START. Exit 2 when an id is not a well-formed anchor id.
-# A span is a contiguous stretch of ONE document, so when FILE is a package
-# directory the package resolves START and END must then be unique in that same
-# file — a span never straddles two files.
+# A span is a contiguous stretch of ONE document. When FILE is a package
+# directory, the package resolves START to a file and END must then be unique in
+# that same file — a span never straddles two files.
 anchor_span() {
   local file="$1" start="$2" end="$3" id
 
