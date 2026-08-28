@@ -34,22 +34,22 @@ The body **does** carry: type classification, problem description, reporter cont
 
 | Invocation | Mode | What happens |
 |------------|------|--------------|
-| `/issue-creator <text>` | Create | New structured issue from a text description |
-| `/issue-creator <N>` | Normalize | Restructure existing issue #N into standard template |
-| `/issue-creator <N> --dry-run` | Preview | Show normalization preview without applying |
+| `/issue-creator <text>` | Create | New structured issue from a description |
+| `/issue-creator <N>` | Normalize | Restructure existing issue #N into the standard template |
+| `/issue-creator <N> --dry-run` | Preview | Normalization preview, not applied |
 | `/issue-creator <N> --force` | Force | Normalize even if security-labeled |
-| `/issue-creator <multi-item text>` | Batch | Extract multiple issues from one input and create sequentially |
-| `/issue-creator <multi-item text> --parent <N>` | Batch (epic-bound) | Same as Batch, but bind every child to parent epic #N — see `references/modes.md` |
-| `/issue-creator … --refresh-model-data` | Refresh | Force-refresh the skill-level model-data cache, then proceed |
-| `/issue-creator … --auto` | (modifier) | Run non-interactively — every gate logs a `⚠` and takes its safe default instead of prompting |
+| `/issue-creator <multi-item text>` | Batch | Extract multiple issues and create them sequentially |
+| `/issue-creator <multi-item text> --parent <N>` | Batch (epic-bound) | Batch, binding every child to parent epic #N |
+| `/issue-creator … --refresh-model-data` | Refresh | Force-refresh the model-data cache, then proceed |
+| `/issue-creator … --auto` | (modifier) | Non-interactive: every gate logs a `⚠` and takes its safe default |
 
-Detect mode: if the argument is a number → Normalize. If the input holds multiple distinct items (a numbered list, bullets, several paragraphs on different problems, a planning document with several work items) → Batch. Otherwise → Create.
+Detect mode: if the argument is a number → Normalize. If the input holds multiple distinct items (a numbered list, bullets, a planning document with several work items) → Batch. Otherwise → Create.
 
-**Auto mode.** `--auto` composes with Create, Normalize, and Batch alike. Detection, the log-and-proceed gate rule, the `⚠` line format, and the safety stops that still abort are defined once in `references/docs/auto-mode.md`; the gates below cite it and each documents its own safe default. In auto mode this skill has **no** blocking prompt: Step 3 duplicates, Step 3.5 clarify, Step 5 preview, Normalize apply, Batch approval, Batch epic offer, the model-cache refresh, and the Repo Sync failure path all have a defined non-interactive behavior. Safety stops still abort (a failed backup, a missing `origin`) — auto mode removes confirmations, never safeguards.
+**Auto mode.** `--auto` composes with all three modes. Detection, the log-and-proceed gate rule, the `⚠` line format, and the safety stops that still abort are defined once in `references/docs/auto-mode.md`; each gate below cites it and states its own safe default. In auto mode this skill has **no** blocking prompt. Safety stops still abort (a failed backup, a missing `origin`) — auto mode removes confirmations, never safeguards.
 
-**Epic binding (Batch only):** `--parent <N>` binds every child to parent epic #N with the hierarchy marker `Part of #N` (SPEC §2.1 — see `references/docs/idd-methodology.md`). A parent comes **only** from this flag; a bare number is always Normalize, never a parent. Full flow in `references/modes.md` (Batch Create → Epic binding).
+**Epic binding (Batch only):** `--parent <N>` binds every child to parent epic #N with the marker `Part of #N` (SPEC §2.1 — `references/docs/idd-methodology.md`). A parent comes **only** from this flag; a bare number is always Normalize. Full flow in `references/modes.md` (Batch Create → Epic binding).
 
-**Image/screenshot input**: read the image with the Read tool for visual context, treat what it shows as the input description, and combine it with any accompanying text. Also upload and embed it — see **Image Upload** below.
+**Image/screenshot input**: read the image with the Read tool for visual context and treat what it shows, plus any accompanying text, as the input description. Also upload and embed it — see **Image Upload** below.
 
 ## Prerequisites
 
@@ -73,25 +73,23 @@ write, not at skill start.
 
 ## Configuration
 
-Load config once at skill start: run `python3 references/scripts/gi-config.py` — two independent requirements, both mandatory. **Working directory:** the repo root, because the script resolves `.gitissue.yml` against the working directory; run it from anywhere else and it exits 0 reporting `config_file: null`/`first_run: true`, silently discarding the repo's real config. **Script path:** relative to this SKILL.md's own directory, *not* the working directory — resolve it to an absolute path exactly as the *Bundled dependency precheck* resolves its list. It prints `{"config": {…dotted keys…}, "config_file": …, "first_run": …}` as JSON on stdout, merging the defaults below with `.gitissue.yml`. Exit 0: use `config`, printing the `○ First run` line below when `first_run` is `true`. Exit 3: `.gitissue.yml` is invalid — print the validation error from `references/error-messages.md` (*Invalid config*) and stop. Script file absent: a bundled dependency is missing, which is a broken install and not a degrade — stop and print the `✗ Missing bundled dependency` block the *Bundled dependency precheck* names. Any other outcome (no `python3`, non-zero exit, unparsable stdout): print `⚠ gi-config unavailable — using the inline defaults below` and follow the manual fallback that makes up the rest of this section — the *alternative* to the script, never an extra step beside it, since on exit 0 its `config` is the whole answer. Never re-read the config after this step. **Capture the run clock here:** chain that same `python3` invocation as `python3 …; ec=$?; date +%s >&2; exit "$ec"` and keep the stderr epoch as `run_started_epoch` — stdout and exit stay intact, it costs no extra round trip, and it is what the *Run Stats Footer* (`references/run-stats.md`) measures `elapsed` from.
+Load config once at skill start: run `python3 references/scripts/gi-config.py`. Two requirements, both mandatory. **Working directory:** the repo root, because the script resolves `.gitissue.yml` against the working directory; run it elsewhere and it exits 0 reporting `config_file: null`/`first_run: true`, silently discarding the repo's real config. **Script path:** relative to this SKILL.md's own directory, *not* the working directory — resolve it to an absolute path as the *Bundled dependency precheck* does. It prints `{"config": {…dotted keys…}, "config_file": …, "first_run": …}` on stdout, merging the defaults below with `.gitissue.yml`. Exit 0: use `config`, printing the `○ First run` line below when `first_run` is `true`. Exit 3: `.gitissue.yml` is invalid — print the validation error from `references/error-messages.md` (*Invalid config*) and stop. Script file absent: a bundled dependency is missing, which is a broken install and not a degrade — stop and print the `✗ Missing bundled dependency` block. Any other outcome (no `python3`, non-zero exit, unparsable stdout): print `⚠ gi-config unavailable — using the inline defaults below` and follow the manual fallback below *instead*, never alongside. Never re-read the config after this step. **Capture the run clock here:** chain that same `python3` invocation as `python3 …; ec=$?; date +%s >&2; exit "$ec"` and keep the stderr epoch as `run_started_epoch` — stdout and exit stay intact, and it is what the *Run Stats Footer* (`references/run-stats.md`) measures `elapsed` from.
 
-Fallback: read `.gitissue.yml` from the repo root once. If it does not exist, use the defaults and print:
+Fallback: read `.gitissue.yml` from the repo root once. Absent, use the defaults and print:
 
 ```
 ○ First run — using default config. Run /init-gitissue to customize.
 ```
 
-Defaults: `issue.template: "default"`, `issue.labels_auto_suggest: true`, `issue.normalize_comment: true`, `model_suggestion.enabled: true`; duplicate scoring reads the once-loaded `duplicate_detection.*` keys (`weights.phrase: 2`, `weights.title_overlap: 2`, `weights.keyword: 1`, `weights.same_type: 1`, `high_threshold: 5`, `medium_threshold: 3`, `min_token_length: 1`, `phrase_min_tokens: 3`, `backlog_limit: 100`, `max_items: 100`, `extra_stop_words: ""`). Their one-line glosses live in `references/docs/config-schema.md`.
+Defaults: `issue.template: "default"`, `issue.labels_auto_suggest: true`, `issue.normalize_comment: true`, `model_suggestion.enabled: true`; duplicate scoring reads the once-loaded `duplicate_detection.*` keys (`weights.phrase: 2`, `weights.title_overlap: 2`, `weights.keyword: 1`, `weights.same_type: 1`, `high_threshold: 5`, `medium_threshold: 3`, `min_token_length: 1`, `phrase_min_tokens: 3`, `backlog_limit: 100`, `max_items: 100`, `extra_stop_words: ""`), glossed in `references/docs/config-schema.md`.
 
-If `model_suggestion.enabled` is `true` (the default), run the model-data cache lifecycle (locate / seed / age) once now, before Step 1. Set `skill_dir` to the absolute dirname of this SKILL.md — the cache is **skill-level** (a dated `model-data-<date>.json` in the installed skill folder, shared across all repos), never per-repo:
+When `model_suggestion.enabled` is `true` (the default), run the model-data cache lifecycle once now, before Step 1, with `skill_dir` the absolute dirname of this SKILL.md — the cache is **skill-level** (a dated `model-data-<date>.json` in the installed skill folder), never per-repo:
 
 ```bash
 python3 references/scripts/gi-model-cache.py --skill-dir "$skill_dir"
 ```
 
-Exit 0 prints `state` (`fresh` | `stale` | `seeded` | `installed`), `stale`, `age_days`, `data_version`, `data_date`, and `bands` — the effort → two-model mapping with each pick's per-task cost, everything Steps 4 and 5 need. Exit 3 (a bad `--skill-dir`, a `model_suggestion.cache_ttl_days` out of range, an `--install` payload that fails validation): stop and print the validation error. **Script file — or `templates/model-data.json` — absent:** stop with the `✗ Missing bundled dependency` block; both are on the precheck list, so a missing seed is a broken install, not the runtime degrade its exit 4 would look like. **Exit 4, no `python3`, exit 2, or unparsable stdout:** print `⚠ gi-model-cache unavailable — model suggestions disabled for this run` and continue without the suggestion, or run the lifecycle by hand from `references/model-suggestion.md`, the authoritative prose procedure. `state: "stale"` is a warning, not a failure — in auto mode log it and use the data as-is.
-
-`--refresh-model-data` forces a refresh first (WebFetch, then `--install`). When `model_suggestion.enabled` is `false`, skip all model-suggestion steps silently and do not run the script.
+Exit 0 prints `state` (`fresh` | `stale` | `seeded` | `installed`), `stale`, `age_days`, `data_version`, `data_date`, and `bands` — the effort → two-model mapping with each pick's per-task cost. Exit 3: stop and print the validation error. **Script file — or `templates/model-data.json` — absent:** stop with the `✗ Missing bundled dependency` block; both are on the precheck list, so a missing seed is a broken install, not a degrade. **Exit 4, no `python3`, exit 2, or unparsable stdout:** print `⚠ gi-model-cache unavailable — model suggestions disabled for this run` and continue without the suggestion, or run the lifecycle by hand from `references/model-suggestion.md`, the authoritative prose procedure. `state: "stale"` warns, never fails — in auto mode log it and use the data as-is. `--refresh-model-data` forces a refresh first (WebFetch, then `--install`). When `model_suggestion.enabled` is `false`, skip all model-suggestion steps silently and do not run the script.
 
 ## Subagent Architecture
 
@@ -103,7 +101,7 @@ With the Agent tool available, spawn only when Step 3 has medium candidates. Wit
 
 ### Bundled dependency precheck
 
-Verify every bundled file below is present, resolving each path relative to the skill's directory (the dirname of this SKILL.md). If any is missing, stop immediately and print:
+Verify every file below is present, resolving each path relative to the skill's directory (the dirname of this SKILL.md). If any is missing, stop and print:
 
 ```text
 ✗ Missing bundled dependency: {missing_file}
@@ -114,7 +112,7 @@ Verify every bundled file below is present, resolving each path relative to the 
   Then restart the agent session and re-run /issue-creator.
 ```
 
-Check these files — each is named again at the step that reads it:
+Each is named again at the step that reads it:
 
 - Subagent prompt and templates: `references/agents/duplicate-detector.md`,
   `templates/model-data.json`, `templates/bug.md`, `templates/feature.md`,
@@ -165,7 +163,6 @@ Extract from the description:
 | Good | Bad |
 |------|-----|
 | Fix mobile auth redirect loop | Login is broken |
-| Add dark mode toggle to settings | Dark mode |
 | Bug: App crashes on iOS when tapping login | It doesn't work on my phone |
 
 ### Step 3 — Check for Duplicates
@@ -197,7 +194,7 @@ chmod 600 "$dup_request"
 {"mode":"create","items":[{"index":1,"title":"…","keywords":["…"],"type":"bug"}],"config":{"duplicate_detection.weights.phrase":2}}
 ```
 
-Arm cleanup before the invocation, so success, a classified exit, an interrupt, and an unexpected stop all remove **this run's** request. Signal handlers must exit with the conventional `128 + signal` status; handling a signal by cleanup alone suppresses cancellation and can let issue creation continue. Each signal exits through the single `EXIT` cleanup; the normal path cleans once, then disarms every trap:
+Arm cleanup before the invocation, so success, a classified exit, an interrupt, and an unexpected stop all remove **this run's** request. Signal handlers must exit `128 + signal` — cleanup alone suppresses cancellation and can let issue creation continue. Each signal exits through the single `EXIT` cleanup; the normal path cleans once, then disarms every trap:
 
 ```bash
 cleanup_dup_request() { rm -f "$dup_request"; }
@@ -211,9 +208,9 @@ cleanup_dup_request
 trap - EXIT HUP INT TERM
 ```
 
-Resolve the script relative to this SKILL.md as the dependency precheck does, and read `dup_output` only after `dup_status` is classified. Exit 0 returns `duplicates` (deterministic high band), `medium_band`, deduplicated `medium_issue_context`, `medium_judgement`, and `batch_internal_duplicates`. An empty `medium_band` skips the agent. When non-empty, take the first `medium_judgement.selected_count` candidates in script order and spawn the duplicate-detector in chunks of `medium_judgement.batch_size` with `{mode, items, candidates: chunk, issue_context: only the medium_issue_context rows referenced by that chunk}`. It returns one tri-state `decision` (`confirmed` | `rejected` | `ambiguous`) per candidate, without fetching or rescoring. Match verdicts by the complete identity (`item_index`, `match_type`, and `match_number` or `match_index`), never by array position. A candidate leaves the possible-duplicate warnings **only** on exactly one well-formed `rejected` verdict carrying that identity and a non-empty evidence-based reason. Keep `confirmed` and `ambiguous` as warnings, marking `ambiguous` `(needs review)`. A missing, duplicate, malformed, incomplete, unknown-decision, wrong-identity, or failed-agent verdict is fail-safe ambiguity: retain the candidate with its deterministic `score`, `payments`, and `reason` as a `(needs review)` warning, and never treat partial output from a failed chunk as authority. Any remaining `medium_judgement.deferred_count` candidates are **retained as possible-duplicate warnings without an LLM verdict** — bounded judgement may defer ambiguity, never turn it into "no duplicate." High matches are warnings too; their title and labels stay on each record, and the scorer never silently drops requested work.
+Resolve the script as the dependency precheck does, and read `dup_output` only after `dup_status` is classified. Exit 0 returns `duplicates` (deterministic high band), `medium_band`, deduplicated `medium_issue_context`, `medium_judgement`, and `batch_internal_duplicates`. An empty `medium_band` skips the agent. When non-empty, take the first `medium_judgement.selected_count` candidates in script order and spawn the duplicate-detector in chunks of `medium_judgement.batch_size` with `{mode, items, candidates: chunk, issue_context: only the medium_issue_context rows referenced by that chunk}`. It returns one tri-state `decision` (`confirmed` | `rejected` | `ambiguous`) per candidate, without fetching or rescoring. Match verdicts by the complete identity (`item_index`, `match_type`, and `match_number` or `match_index`), never by array position. A candidate leaves the possible-duplicate warnings **only** on exactly one well-formed `rejected` verdict carrying that identity and a non-empty evidence-based reason. Keep `confirmed` and `ambiguous` as warnings, marking `ambiguous` `(needs review)`. A missing, duplicate, malformed, incomplete, unknown-decision, wrong-identity, or failed-agent verdict is fail-safe ambiguity: retain the candidate with its `score`, `payments`, and `reason` as a `(needs review)` warning, and never treat a failed chunk's partial output as authority. Any remaining `medium_judgement.deferred_count` candidates are **retained as possible-duplicate warnings without an LLM verdict**. High matches are warnings too, with their title and labels on each record.
 
-Exit 3 is an invalid request/config: stop with the validation error. A missing script is a broken install: stop with the dependency error. For no `python3`, exit 2/4, or unparsable stdout, print `⚠ gi-dup-score unavailable — scoring duplicates inline`; exit 4 means the backlog was unreadable, never empty. For that fallback take `backlog_limit` from the once-loaded `duplicate_detection.backlog_limit` and validate it first. Run this block as written — the extra record is a truncation probe, not a record to score:
+Exit 3 is an invalid request/config: stop with the validation error. A missing script is a broken install: stop with the dependency error. For no `python3`, exit 2/4, or unparsable stdout, print `⚠ gi-dup-score unavailable — scoring duplicates inline`; exit 4 means the backlog was unreadable, never empty. For that fallback take `backlog_limit` from the once-loaded `duplicate_detection.backlog_limit` and validate it first. Run this block as written — the extra record is a truncation probe:
 
 ```bash
 case "$backlog_limit" in
@@ -223,7 +220,7 @@ probe_limit=$((backlog_limit + 1))
 fallback_issues="$(gh issue list --state open --json number,title,body,labels --limit "$probe_limit")" || exit 4
 ```
 
-Parse `fallback_issues` as JSON, score only its first `backlog_limit` records, and report the scan as truncated when the extra record exists. Quoting the validated digits-only value is mandatory; never use `eval`, shell re-parsing, or an issue-derived value on this command line. Apply the documented canonical rules: NFKC/case-fold tokens; one minimum-length and additive stop-word policy; fixed phrase → title-overlap → keyword precedence; each payment derived only from newly consumed item tokens; one same-type payment; configured weights and thresholds. The phrase per-token weight must be greater than or equal to title-overlap weight, so removing evidence with an extra stop word cannot move a token into a higher-paying lower-precedence signal. Apply internal batch pairs in both directions, keeping the stronger direction. The fallback uses the same bounded medium-judgement protocol above; a candidate outside the bounded LLM slice remains a warning.
+Parse `fallback_issues` as JSON, score only its first `backlog_limit` records, and report the scan as truncated when the extra record exists. Quoting the validated digits-only value is mandatory; never use `eval`, shell re-parsing, or an issue-derived value on this command line. Apply the documented canonical rules: NFKC/case-fold tokens; one minimum-length and additive stop-word policy; fixed phrase → title-overlap → keyword precedence; each payment derived only from newly consumed item tokens; one same-type payment; configured weights and thresholds, phrase per-token weight greater than or equal to title-overlap weight. Apply internal batch pairs both directions, keeping the stronger. The fallback uses the same bounded medium-judgement protocol above; a candidate outside the bounded LLM slice remains a warning.
 
 #### Present results
 
@@ -260,14 +257,14 @@ If image paths were provided, upload them now with the **Image Upload** procedur
 
 Resolve the template directory from `issue.template`: `"default"` → this skill's bundled `templates/`; a path → read `bug.md`, `feature.md`, or `improvement.md` from there (error if missing). Fill every placeholder it declares:
 
-1. **Type** — the classified type with its confidence
+1. **Type** — classified type with its confidence
 2. **Description** — synthesized from the input: current/expected behavior for bugs, related components, related issues
 3. **Reporter Context** — the user's original text, verbatim, in a blockquote
-4. **Screenshots** — the embeds, only where images were provided and uploaded successfully
-5. **Acceptance Criteria** — 3-5 testable criteria derived from the problem description, each with its confidence
-6. **Metadata** — suggested priority, estimated effort (XS/S/M/L/XL), and suggested labels, **each with a trailing confidence marker** via `{priority_confidence}`, `{effort_confidence}`, and `{labels_confidence}`, plus the advisory **Suggested model:** line keyed off the effort band. Render it — and the `{data_version}` / `{data_date}` placeholders — per the two-model rendering rule in `references/model-suggestion.md`, which also defines the disabled behaviour (the line is removed from Metadata entirely).
+4. **Screenshots** — the embeds, only where images uploaded successfully
+5. **Acceptance Criteria** — 3-5 testable criteria from the problem description, each with its confidence
+6. **Metadata** — priority, effort (XS/S/M/L/XL), and labels, **each with a trailing confidence marker** via `{priority_confidence}`, `{effort_confidence}`, and `{labels_confidence}`, plus the advisory **Suggested model:** line keyed off the effort band. Render it — and the `{data_version}` / `{data_date}` placeholders — per the two-model rendering rule in `references/model-suggestion.md`, which also defines the disabled behaviour (the line is removed from Metadata entirely).
 
-**Note:** per the Output Contract above, the body MUST NOT include predicted affected files, generated technical notes, root cause, or implementation hints. Acceptance criteria express *what done looks like*, not *how to implement it*.
+**Note:** per the Output Contract, acceptance criteria express *what done looks like*, never *how to implement it*.
 
 ### Step 5 — Preview and Confirm
 
@@ -294,7 +291,7 @@ Wait for confirmation. If declined, stop without creating.
   ⚠ Auto mode: create confirmation skipped — issue auto-approved from the preview above.
 ```
 
-Proceed to Step 6. No auto-mode path declines: a run that should not create an issue is one that should not have started.
+Proceed to Step 6. No auto-mode path declines.
 
 ### Step 6 — Create Issue
 
@@ -304,9 +301,7 @@ When `issue.labels_auto_suggest` is true, pass the suggested labels on create; w
 gh issue create --title "{title}" --body "{populated_template}" [--label "{labels}"]
 ```
 
-The body is the fully populated template, `<!-- gitissue:normalized v1 -->` at the top.
-
-Print a structured step-by-step summary:
+The body is the fully populated template, `<!-- gitissue:normalized v1 -->` at the top. Print a structured step-by-step summary:
 
 ```
 ◆ Issue Created
@@ -325,7 +320,7 @@ Print a structured step-by-step summary:
   https://github.com/owner/repo/issues/42
 ```
 
-In auto mode the `Preview:` line reads `✓ auto-approved`, not `✓ approved` — the summary must not report an approval no human gave (`references/docs/auto-mode.md`).
+In auto mode `Preview:` reads `✓ auto-approved`, not `✓ approved` — the summary must not report an approval no human gave (`references/docs/auto-mode.md`).
 
 If duplicates were found and the run proceeded anyway:
 ```
@@ -340,13 +335,13 @@ On failure, print the matching error from `references/error-messages.md`.
 
 ## Modes: Normalize & Batch Create
 
-**Normalize** fetches an existing issue, classifies it, fills in missing sections, and updates the body. **Batch Create** parses a multi-item input, previews the parsed items, and creates one issue per item with per-item success/failure tracking. Both step specs, their error paths and their terminal reports live in `references/modes.md` — **read it now** when the run is in either mode. Worked example runs are in `references/examples.md`.
+**Normalize** fetches an issue, classifies it, fills in missing sections, and updates the body. **Batch Create** parses a multi-item input, previews the items, and creates one issue per item with per-item success/failure tracking. Both step specs, error paths, and terminal reports live in `references/modes.md` — **read it now** when the run is in either mode. Worked example runs are in `references/examples.md`.
 
 ---
 
 ## Output Conventions
 
-All tracker access follows the GitHub driver — `--json` with explicit field selection, never parsed text output; the operation catalog and driver rules are in references/docs/platform-github.md. Terminal output follows the `references/docs/terminal-style.md` contract — symbols `● ✓ ✗ ◆ ⚡ ⚠ ○`, two-space indent, `┄` separators, URLs on their own line, ≤80 chars, one blank line between sections, static sequential output (no animation); issue-creator adds `+` (added field) and `=` (preserved field). Errors use the rich format from `references/error-messages.md`: `✗ what failed`, then `To fix:  <command>`, then a docs link when applicable.
+Tracker access follows the GitHub driver — `--json` with explicit field selection, never parsed text; the operation catalog is references/docs/platform-github.md. Terminal output follows `references/docs/terminal-style.md` — symbols `● ✓ ✗ ◆ ⚡ ⚠ ○`, two-space indent, `┄` separators, URLs on their own line, ≤80 chars, one blank line between sections, static sequential output; issue-creator adds `+` (added field) and `=` (preserved field). Errors use the rich format from `references/error-messages.md`: `✗ what failed`, then `To fix:  <command>`, then a docs link when applicable.
 
 ## GitHub Projects Sync
 
@@ -354,9 +349,9 @@ After each issue is created (single or batch), when `projects.sync_enabled` is `
 
 ## Expected Output
 
-A successful create prints Step 6's `◆ Issue Created` block: its `Result: DONE` line, then the issue number, title, and URL. Normalize and Batch print their own reports (`references/modes.md`, Steps 12 and 6) — in batch mode one line per issue plus a totals footer (`✓ 5 created, 1 skipped (duplicate)`).
+A successful create prints Step 6's `◆ Issue Created` block. Normalize and Batch print their own reports (`references/modes.md`, Steps 12 and 6); batch adds one line per issue and a totals footer (`✓ 5 created, 1 skipped (duplicate)`).
 
-**Then the run-stats footer.** Close with the *Run Stats Footer* — `references/run-stats.md` — `elapsed`, `tokens` only where the host reported a count (otherwise left out), `agents`, run cost only, `n/a` for anything else undetermined. It is the last thing printed at **every** terminal outcome, in every mode, including a run that created nothing — a cancelled confirmation, a duplicate the user chose not to file, an invalid config, or a failed `gh issue create`. In batch mode one footer covers the whole batch, never one per issue.
+**Then the run-stats footer.** Close with the *Run Stats Footer* — `references/run-stats.md` — `elapsed`, `tokens` only where the host reported a count (otherwise left out), `agents`, run cost only, `n/a` for anything undetermined. It is the last thing printed at **every** terminal outcome in every mode, a run that created nothing included — a cancelled confirmation, an invalid config, a failed `gh issue create`. In batch mode one footer covers the whole batch, never one per issue.
 
 ## Edge Cases
 
