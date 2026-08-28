@@ -259,16 +259,21 @@ rather than by list:
 > rate-limit or runtime-budget stop, and an invalid-config stop. … A run that produced no
 > output at all is the only run without a footer.
 
-Since that file is a bundled dependency named in the precheck list and cited from the body at
-the point the footer is printed, **AC4 holds** for the pipeline path: the body's blanket
-*"every terminal outcome"* plus the reference's construction covers the prerequisite failures,
-the missing-bundled-dependency stop, the empty-body decline and the no-relevant-files stop,
-none of which the body enumerates.
+**AC4 holds for every exit from the pipeline** on the blanket sentence plus that construction.
+The prerequisite failures (`git rev-parse`, `which gh`, `gh auth status`, `git remote -v`), the
+missing-bundled-dependency stop, the empty-body decline and the no-relevant-files stop are all
+early exits *from* the run the *Final Report* section closes, and *"every terminal outcome"*
+scopes over them by construction even though none is enumerated. No footer instruction was
+added at any of those sites, and none should be — adding one per stop is the bloat the
+predictability audit forbids by name.
 
-**One gap was real and was closed in this pass.** View mode *"skip[s] the entire analysis
-pipeline (Steps 1-8) and the persist step"*, so a reader reaching its three exits never passes
-the *Final Report* section where the footer instruction lives. The section previously ended
-*"After rendering, stop."* It now reads:
+**View mode is the one case that does not follow from that, and it was closed in this pass.**
+The asymmetry is not arbitrary. The *Final Report* section opens *"After all 8 steps and
+persistence complete"*, and view mode *"skip[s] the entire analysis pipeline (Steps 1-8) and
+the persist step"* — it is not an early exit *from* the pipeline, it is a branch that never
+enters it, so the sentence's own scope excludes it and a reader following the view-mode branch
+never passes the instruction at all. The section previously ended *"After rendering, stop."* It
+now reads:
 
 > Every view-mode exit — empty state, corrupted JSON, rendered report — closes with the *Run
 > Stats Footer* (`references/run-stats.md`), then stops. View mode never writes to the file or
@@ -280,13 +285,31 @@ already governs: view mode skips *Configuration*, so no `run_started_epoch` is c
 `elapsed` prints the literal `n/a` — *"a stop before the config load has no anchor to measure
 from"* — not a guess and not `0`.
 
+**That addition exposed a second defect, pre-existing, and it was closed too.** `## View Mode`
+sits at line 25 and the *Bundled dependency precheck* at line 161, so a view-mode run following
+the body top-to-bottom reached three instructions to read a bundled file —
+`references/error-messages.md` twice (the empty-state and corrupted-JSON messages) and now
+`references/run-stats.md` — with nothing on that path having verified any of them is present.
+`## Prerequisites` compounds it by telling view mode to *"skip the `gh` checks below"*. Under
+CLAUDE.md's *fatal vs. degrade* rule a missing bundled file is fatal, not a degrade, and the
+precheck is the guard that detects it. The View Mode preamble now runs the precheck first:
+
+> When invoked as `/issue-analysis <N> view`, run the *Bundled dependency precheck* below, then
+> skip the entire analysis pipeline (Steps 1-8) and the persist step.
+
+The forward reference by section name follows the pattern *Configuration* already uses
+(*"resolve it to an absolute path exactly as the *Bundled dependency precheck* resolves its
+list"*), which likewise sits above the section it names. No test covers this: the suite only
+pins that `references/run-stats.md` appears somewhere in the body. The +8 words were paid for
+by two restatement trims in the same commit, so the body is unchanged at 2965 `wc` words.
+
 ---
 
 ## 6. Files changed
 
 | File | Change |
 |---|---|
-| `src/skills/issue-analysis/SKILL.source.md` | 3213 → 2965 `wc` words, 465 → 426 lines; `metadata.version` 0.5.2 → 0.6.0; View Mode run-stats instruction added; `Step 6` → `Step 8` cross-reference fix |
+| `src/skills/issue-analysis/SKILL.source.md` | 3213 → 2965 `wc` words, 465 → 426 lines; `metadata.version` 0.5.2 → 0.6.0; View Mode run-stats instruction added and routed through the *Bundled dependency precheck*; `Step 6` → `Step 8` cross-reference fix |
 | `skills/issue-analysis/SKILL.md` | regenerated (`./scripts/build.sh`) |
 | `docs/experiments/skill-auto-improver-issue-analysis.md` | this report |
 

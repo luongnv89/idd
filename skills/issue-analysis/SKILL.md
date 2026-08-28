@@ -24,7 +24,7 @@ The argument must be a GitHub issue number.
 
 ## View Mode
 
-When invoked as `/issue-analysis <N> view`, skip the entire analysis pipeline (Steps 1-8) and the persist step. Instead:
+When invoked as `/issue-analysis <N> view`, run the *Bundled dependency precheck* below, then skip the entire analysis pipeline (Steps 1-8) and the persist step. Instead:
 
 1. Check for `.gitissue/analysis-<N>.json` at the repo root
 2. If the file does not exist, output the empty-state message from `references/error-messages.md` and stop:
@@ -154,8 +154,8 @@ Read `references/agents/codebase-researcher.md` and `references/agents/synthesiz
 ### Environment check
 
 If the Agent tool is available, use subagents as described above. If not (e.g.
-Claude.ai), read `references/inline-fallback.md` — it holds the full Steps 2-7
-procedure for that path, and no delegated run ever needs it. Step 8 is unchanged
+Claude.ai), read `references/inline-fallback.md`, which holds the full Steps 2-7
+procedure for that path; no delegated run needs it. Step 8 is unchanged
 either way.
 
 ### Bundled dependency precheck
@@ -303,7 +303,7 @@ Summary:
 1. **`git_state`** — the branch and commit SHA the analysis ran against, under the exact keys `git_state.commit_sha` (never `sha`) and `git_state.captured_at`. It pins the analysis to a point in time, so reviewers can check the recommendation against the code it was made on and `/issue-resolver`'s *Step 0h — Analysis reuse gate* can test whether the pin still holds — capture every value by running the commands in `references/output-and-persist.md`, never by inventing one.
 2. **`decision_record`** — five core fields lifted from Steps 6 and 7: `root_cause`, `options_considered`, `options_rejected`, `selected_option`, `residual_risk`. The labels are stable across `/issue-analysis`, `/issue-resolver`, and `/issue-pr-review` because the downstream presence checks are string-matched. Bug issues carry an optional sixth `reproduction` field that `/issue-analysis` never populates — `/issue-resolver`'s post-fix bug-verification checkpoint produces it; see `references/output-and-persist.md`.
 
-These add two JSON keys and a *Decision Record* section to the terminal report; nothing else in the analysis pipeline changes. Exact schema and rendering: `references/output-and-persist.md`.
+These add two JSON keys and a *Decision Record* section to the terminal report; nothing else changes. Exact schema and rendering: `references/output-and-persist.md`.
 
 ---
 
