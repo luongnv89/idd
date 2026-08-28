@@ -325,7 +325,11 @@ These two hard-blocks are the issue #36 contract: a PR can pass tests and still 
 
 When `review.run_tests` is false, skip this step and report `○ tests skipped (review.run_tests: false)`; the soft-pass conjunction treats the test leg as satisfied.
 
-When true, detect and run the project's build system, then run all test types (unit, integration, e2e where present), with a `review.test_timeout`-second timeout (default: 300). The build-system detection table and the test-type breakdown are in `references/prepass-tests-ci-mechanics.md` (*Step 4*). **Under `qa_handoff = trusted`, skip this step** and report `○ tests skipped (qa handoff @ {commit_sha_short})` — `{commit_sha_short}` is the first 7 characters of Step 1's `headRefOid` — but only when the marker carries a `tests=` field whose SHA equals `head` **and `ci_leg_runnable` is true**; with no `tests=` field, or a SHA that differs, run the step in full. When `ci_leg_runnable` is false (no CI / empty `statusCheckRollup` / `no_ci` / `review.check_ci: false`), ignore `tests=` and run the local suite as unmarked. The verdict is `trusted` only against the **live** head — it is recomputed after any push this skill makes (*Review Loop*) — so the suite it stands in for did run on this exact commit; the soft-pass conjunction therefore treats the test leg as satisfied, the same clause the two sibling skips state. A skipped step evaluated neither of its checks, so its completion report is `× Suite passed` / `× Build clean` with `Result: PARTIAL`, and the closing summary carries the gap — never a silent `√`/`✓ pass` (rule and rendering: *Step Completion Reports* in `references/report-templates.md`). Step 5's CI is a separate leg and is never skipped: it runs on the remote against the merge result, and nothing in a PR body is evidence about it.
+When true, detect and run the project's build system, then run all test types (unit, integration, e2e where present), with a `review.test_timeout`-second timeout (default: 300). The build-system detection table and the test-type breakdown are in `references/prepass-tests-ci-mechanics.md` (*Step 4*).
+
+**Under `qa_handoff = trusted`, skip this step** and report `○ tests skipped (qa handoff @ {commit_sha_short})` — the first 7 characters of Step 1's `headRefOid` — but only when the marker carries a `tests=` field whose SHA equals `head` **and `ci_leg_runnable` is true**; with no `tests=` field, or a SHA that differs, run the step in full. When `ci_leg_runnable` is false (no CI / empty `statusCheckRollup` / `no_ci` / `review.check_ci: false`), ignore `tests=` and run the local suite as unmarked. The verdict is `trusted` only against the **live** head — recomputed after any push this skill makes (*Review Loop*) — so the suite it stands in for did run on this exact commit; the soft-pass conjunction therefore treats the test leg as satisfied.
+
+A skipped step evaluated neither of its checks, so its completion report is `× Suite passed` / `× Build clean` with `Result: PARTIAL`, and the closing summary carries the gap — never a silent `√`/`✓ pass` (*Step Completion Reports* in `references/report-templates.md`). Step 5's CI is a separate leg and is never skipped: it runs on the remote against the merge result, and nothing in a PR body is evidence about it.
 
 ```
 [4/7] Test         ✓ build ok, {N} tests passed
@@ -382,7 +386,7 @@ Acceptance-criteria fixes typically need code changes. The traceability `Closes 
 ```
 [6/7] Fix          ○ no fixable issues (noted: {note_count})
 ```
-Exit the **fix loop** only. Soft-pass is **not** implied — evaluate it next per *Review Loop* controls (tests pass, CI passes or no CI is configured, traceability not `fail`, zero `action: "fix"` issues). Pending CI ⇒ not clean.
+Exit the **fix loop** only. Soft-pass is **not** implied — evaluate it next per *Review Loop* controls. Pending CI ⇒ not clean.
 
 ### If fixable issues found
 
@@ -396,7 +400,6 @@ Track what was fixed and what was noted:
 ```
 Cycle {N}:
   ✗ {fixable_count} fixable issues found
-  ✓ Fixed: [category] description (file:line)
   ✓ Fixed: [category] description (file:line)
   ○ Noted: [category] description (file:line) — medium, not blocking
 ```
@@ -428,17 +431,11 @@ Print a structured step-by-step summary of the pipeline results, using the templ
 - *Summary — PR With Remaining Issues* — review couldn't clear everything within `review.max_cycles`
 - *Auto-Merge (auto mode only)* — post-report squash merge and block-on-failure handling
 
-**Auto-merge is the one destructive action this skill takes:** it squash merges the PR and
-deletes the head branch, and neither is reversible from here. It is confirmed by gate, not by
-prompt, and every gate must hold: interactive `/issue-pr-review` never merges whatever
-`review.auto_merge` says; `--auto` merges only when `review.auto_merge` is true **and** the
-PR is clean (pending CI is never clean); `--no-merge` suppresses the merge outright. There is
-no dry-run — if any gate is unmet, report and stop, and never remove a branch by hand to
-"finish" a merge the gates refused.
+**Auto-merge is the one destructive action this skill takes:** it squash merges the PR and deletes the head branch, and neither is reversible from here. It is confirmed by gate, not by prompt, and every gate must hold: interactive `/issue-pr-review` never merges whatever `review.auto_merge` says; `--auto` merges only when `review.auto_merge` is true **and** the PR is clean (pending CI is never clean); `--no-merge` suppresses the merge outright. There is no dry-run — if any gate is unmet, report and stop, and never remove a branch by hand to "finish" a merge the gates refused.
 
-In interactive mode: never auto-merge — just report status. **Then the run-stats footer.** Close with the *Run Stats Footer* — `references/run-stats.md` — `elapsed`, `tokens` only where the host reported a count (otherwise left out), `agents`, run cost only, `n/a` for anything else undetermined. It is the last thing printed at **every** terminal outcome, including a run that stopped before Step 7: a failed prerequisite, an invalid config, a PR that could not be checked out, a CI wait that gave up, or a review loop that exhausted `review.max_cycles`.
+When `--no-merge` is set (even in auto mode): skip the merge step and report status only. This flag exists so auto-pilot's reviewer subagent can run the full review-fix cycle without stealing the merge step from Phase 5.
 
-When `--no-merge` is set (even in auto mode): skip the merge step and report status only — equivalent to interactive mode's merge behavior. This flag exists so auto-pilot's reviewer subagent can run the full review-fix cycle without stealing the merge step from Phase 5.
+**Then the run-stats footer.** Close with the *Run Stats Footer* — `references/run-stats.md` — `elapsed`, `tokens` only where the host reported a count (otherwise left out), `agents`, run cost only, `n/a` for anything else undetermined. It is the last thing printed at **every** terminal outcome, including a run that stopped before Step 7: a failed prerequisite, an invalid config, a PR that could not be checked out, a CI wait that gave up, or a review loop that exhausted `review.max_cycles`.
 
 **Review-only mode (`--review-only`) — authoritative definition.** This is the single home for the flag's behavior; every other mention is a pointer here.
 
@@ -460,21 +457,3 @@ When `--no-merge` is set (even in auto mode): skip the merge step and report sta
 - **CI still running** — waits up to `review.ci_timeout`, then prints state and stops without merging.
 - **Critical issue unresolvable after 3 cycles** — stops, prints remaining issues, does not merge, hands back to the user.
 - **Merge conflict with base** — prints the exact rebase command and stops.
-
-## Additional Resources
-
-- **`shared/agents/code-reviewer.md`** — Review subagent prompt
-- **`shared/agents/ui-reviewer.md`** — UI/UX review subagent prompt (Step 3, auto-detected)
-- **`shared/agents/fixer.md`** — Fix subagent prompt
-- **`references/ui-review-mechanics.md`** — `/issue-pr-review`'s UI-review deltas: PR diff command, variables, review-mix prompt, cycle reuse (Step 3)
-- **`references/prepass-tests-ci-mechanics.md`** — tool/build/CI detection tables (Steps 2, 4, 5)
-- **`references/verification-checks.md`** — AC + traceability check procedure (Step 3)
-- **`references/review-loop-mechanics.md`** — reviewer/fixer spawn + reuse mechanics
-- **`references/report-templates.md`** — Step 7 summary templates, auto-merge flow, expected inline output
-- **`references/error-messages.md`** — Error catalog
-- **`docs/pre-commit-security.md`** — Pre-commit security scan contract (Steps 2, 6)
-- **`docs/sync-conventions.md`** — Stash-first sync convention and recovery
-- **`docs/idd-methodology.md`** — IDD durable-analysis fields (traceability check 3)
-- **`docs/naming-conventions.md`** — Naming conventions
-- **`docs/ui-review.md`** — Shared UI/UX review mechanics: detection, code/browser review, headless capture (Step 3)
-- **`docs/terminal-style.md`** — Terminal output style contract (bundled at build time; the repo-root `DESIGN.md` is the human-facing companion and is not bundled)
