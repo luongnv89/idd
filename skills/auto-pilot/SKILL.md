@@ -346,7 +346,7 @@ stderr and wrote nothing. This is a stop, not a degrade: never append
 `$run_json` raw, because that writes the malformed line the script exists to
 reject. Correct the record and re-run, or drop the line.
 
-On the legacy sequential/batch path only, the write is best-effort: no `python3`,
+On the legacy sequential/batch path only, the write is best-effort and non-fatal: no `python3`,
 exit 2, or exit 4 uses the raw fallback; exit 3 never does. On a parallel lane an
 unavailable or failed `--append-once` leaves `log_pending`, continues with ready
 siblings, and neither marks that lane processed nor removes its worktree; resume
