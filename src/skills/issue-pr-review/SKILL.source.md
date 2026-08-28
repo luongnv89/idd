@@ -4,7 +4,7 @@ description: "Review a PR end-to-end with CI checks, fix cycles, and optional au
 license: MIT
 compatibility: "Requires git and GitHub CLI (gh) with authentication. Self-contained — uses shared agents from shared/agents/."
 metadata:
-  version: 2.5.0
+  version: 2.6.0
   author: Luong NGUYEN <luongnv89@gmail.com>
   effort: high
 ---
@@ -101,6 +101,8 @@ UI/UX **code** review needs no config flag — it is auto-detected per PR (*Step
 ---
 
 ## Pipeline Overview
+
+**Expected output** — a clean run prints one line per step, in this shape:
 
 ```
   ◆ PR Review Pipeline
@@ -455,6 +457,14 @@ Print a structured step-by-step summary of the pipeline results, using the templ
 - *Summary — Clean PR* — all checks pass, may include soft-pass notes
 - *Summary — PR With Remaining Issues* — review couldn't clear everything within `review.max_cycles`
 - *Auto-Merge (auto mode only)* — post-report squash merge and block-on-failure handling
+
+**Auto-merge is the one destructive action this skill takes:** it squash merges the PR and
+deletes the head branch, and neither is reversible from here. It is confirmed by gate, not by
+prompt, and every gate must hold: interactive `/issue-pr-review` never merges whatever
+`review.auto_merge` says; `--auto` merges only when `review.auto_merge` is true **and** the
+PR is clean (pending CI is never clean); `--no-merge` suppresses the merge outright. There is
+no dry-run — if any gate is unmet, report and stop, and never remove a branch by hand to
+"finish" a merge the gates refused.
 
 In interactive mode: never auto-merge — just report status. **Then the run-stats footer.** Close with the *Run Stats Footer* — `references/run-stats.md` — `elapsed`, `tokens` only where the host reported a count (otherwise left out), `agents`, run cost only, `n/a` for anything else undetermined. It is the last thing printed at **every** terminal outcome, including a run that stopped before Step 7: a failed prerequisite, an invalid config, a PR that could not be checked out, a CI wait that gave up, or a review loop that exhausted `review.max_cycles`.
 
