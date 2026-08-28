@@ -358,6 +358,20 @@ relaxing which file those ~30 assertions target so the contract can live in
 follow-up work, not something to smuggle in under a compression pass, and
 neither is served by editing the tests to fit the lint.
 
+**Resolved by [#426](https://github.com/luongnv89/idd/issues/426).** The
+repo-wide decision is recorded at
+[`docs/decisions/shared-contract-pin-artifact.md`](../decisions/shared-contract-pin-artifact.md).
+It re-measured all eight skills and found the assertion load binding on only two
+bodies, this one and `/auto-pilot`; six clear the cap on ordinary compression.
+It also settles the relocation question against relocation: `context-efficiency`
+already earns its external-references points, and material the body gates with
+*read it now* is loaded every run, so moving it out of the body trades real
+context for a green metric. `/issue-pr-review` is therefore the ADR's one
+**recorded exception** to the 3000-word cap — floor 3239 words on a
+heuristic-free lower-bound measurement, against a 3000-word ceiling. #417 closes
+on Gate 1 less the word cap and Gate 2 less `context-efficiency`: overall 93/A,
+every other category 10, 379 lines against the 500 cap.
+
 Not attempted, and why: moving the per-step output fences into
 `references/report-templates.md` would recover roughly 330 words, and no test
 pins them. It was left alone because it does not change either gate's verdict

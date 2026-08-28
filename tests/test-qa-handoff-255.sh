@@ -94,6 +94,14 @@ check_block_lacks() {
 echo "◆ QA Handoff Marker Contract Tests (issue #255)"
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 
+# The governed artifact is the skill package, not any one file in it
+# (issue #426, docs/decisions/shared-contract-pin-artifact.md). The `_PKG`
+# roots below are what the anchor helpers take where a contract may legitimately
+# be relocated inside the package; the file paths stay for the raw greps and for
+# the assertions whose subject genuinely is placement (T20).
+SRC_PR_PKG="$REPO_ROOT/src/skills/issue-pr-review"
+BUILT_PR_PKG="$REPO_ROOT/skills/issue-pr-review"
+
 SRC_PR="$REPO_ROOT/src/skills/issue-pr-review/SKILL.source.md"
 SRC_LOOP="$REPO_ROOT/src/skills/issue-pr-review/references/review-loop-mechanics.md"
 SRC_PR_TEMPLATES="$REPO_ROOT/src/skills/issue-pr-review/references/report-templates.md"
@@ -160,7 +168,7 @@ check_has "$SRC_PR" 'min\(1, configured_cap\)' \
 check_has "$BUILT_PR" 'collapsed into' \
   "T2.4: the built SKILL.md ships the collapse, not a skip"
 
-SKIPS_BLOCK="$(anchor_span "$SRC_LOOP" rvm-trusted-skips rvm-never-gated || true)"
+SKIPS_BLOCK="$(anchor_span "$SRC_PR_PKG" rvm-trusted-skips rvm-never-gated || true)"
 check_block_has "$SKIPS_BLOCK" 'collapsed into.*fresh confirmation pass' \
   "T2.5: the skips table describes the reviewer as collapsed, never removed"
 check_block_has "$SKIPS_BLOCK" 'min\(1, configured_cap\)' \
@@ -298,9 +306,9 @@ check_has "$SRC_PR" 'never authentication' \
   "T5.9: SKILL.md carries the not-authentication rule where it is read first"
 
 # 5b. The Never-gated list exists and names every protected check.
-anchor_present "$SRC_LOOP" rvm-never-gated \
+anchor_present "$SRC_PR_PKG" rvm-never-gated \
   "T5.10: the mechanics carry an explicit Never gated section"
-NEVER_BLOCK="$(anchor_region "$SRC_LOOP" rvm-never-gated || true)"
+NEVER_BLOCK="$(anchor_region "$SRC_PR_PKG" rvm-never-gated || true)"
 for entry in 'gi-secscan' 'lint/format auto-fix' 'CI wait' 'acceptance-criteria verification' 'four traceability checks'; do
   check_block_has "$NEVER_BLOCK" "$entry" \
     "T5.11: Never gated names: $entry"
@@ -341,7 +349,7 @@ check_block_lacks "$BUILT_CI_BLOCK" 'qa_handoff' \
   "T5.22: built SKILL.md keeps the CI wait unconditional"
 check_block_lacks "$BUILT_VERIFY_BLOCK" 'qa_handoff' \
   "T5.23: built SKILL.md keeps AC + traceability unconditional"
-anchor_present "$BUILT_LOOP" rvm-never-gated \
+anchor_present "$BUILT_PR_PKG" rvm-never-gated \
   "T5.24: the built mechanics ship the Never gated list"
 
 # 5d. The blocks above only cover SKILL.md. The procedures they gate are written
@@ -529,9 +537,9 @@ check_has "$AP_PHASES" 'never skipped by the marker' \
 # and both test legs would then be skipped on a commit no local
 # suite has ever run.
 # ───────────────────────────────────────────────────────────
-anchor_present "$SRC_LOOP" rvm-reeval-push \
+anchor_present "$SRC_PR_PKG" rvm-reeval-push \
   "T13.1: the mechanics own a re-evaluation section, scoped to any push"
-anchor_present "$BUILT_LOOP" rvm-reeval-push \
+anchor_present "$BUILT_PR_PKG" rvm-reeval-push \
   "T13.2: the built mechanics ship it"
 check_has "$SRC_LOOP" 'per-cycle\*\* verdict, not a once-per-run constant' \
   "T13.3: qa_handoff is documented as a per-cycle verdict"
@@ -553,7 +561,7 @@ done
 # Step 2 is where the missed trigger bit: it commits and pushes its lint/format
 # auto-fix (the resolver runs no formatter, so this is the likely path), moving
 # head off the marker before Step 3 or Step 4 ever consult the verdict.
-REEVAL_BLOCK="$(anchor_span "$SRC_LOOP" rvm-reeval-push rvm-never-gated || true)"
+REEVAL_BLOCK="$(anchor_span "$SRC_PR_PKG" rvm-reeval-push rvm-never-gated || true)"
 check_block_has "$REEVAL_BLOCK" "Step 2's lint/format auto-fix commit" \
   "T13.5d: the mechanics enumerate Step 2's auto-fix commit as a trigger"
 check_block_has "$REEVAL_BLOCK" '[Ee]very fixer push in the Review Loop' \
@@ -686,7 +694,7 @@ check_block_has "$UI_SKIP_ROW" 'never on an unsuffixed .ui=' \
 check_has "$SRC_LOOP" '\*before\* its QA cycles' \
   "T15.6: the rationale names the drift the SHA closes"
 # The built consumer ships the same binding — a src-only contract installs nothing.
-BUILT_UI_SKIP_ROW="$(anchor_span "$BUILT_LOOP" rvm-trusted-skips rvm-never-gated || true | grep -E '^\|[^|]*code UI review' || true)"
+BUILT_UI_SKIP_ROW="$(anchor_span "$BUILT_PR_PKG" rvm-trusted-skips rvm-never-gated || true | grep -E '^\|[^|]*code UI review' || true)"
 check_block_has "$BUILT_UI_SKIP_ROW" '@<sha40>. present and equal to .head' \
   "T15.7: the built mechanics ship the commit-bound code-UI condition"
 # SKILL.md is read first and must carry the same condition, in src and built.
@@ -888,9 +896,10 @@ for pair in "src:$SRC_PR" "built:$BUILT_PR"; do
     "T20.16 ($tag): Step 4 names review.check_ci: false"
 done
 
-for pair in "src:$SRC_LOOP" "built:$BUILT_LOOP"; do
+for pair in "src:$SRC_LOOP:$SRC_PR_PKG" "built:$BUILT_LOOP:$BUILT_PR_PKG"; do
   tag="${pair%%:*}"
-  f="${pair#*:}"
+  f="${pair#*:}"; f="${f%%:*}"
+  pkg="${pair##*:}"
   vocab_row="$(grep -E '^\| .tests=<count>' "$f" | head -1 || true)"
   check_block_has "$vocab_row" 'ci_leg_runnable' \
     "T20.17 ($tag): the tests= field-vocab row names ci_leg_runnable"
@@ -904,10 +913,10 @@ for pair in "src:$SRC_LOOP" "built:$BUILT_LOOP"; do
     "T20.21 ($tag): the contract site states the three-part AND"
   check_has "$f" 'never.*from Step 5' \
     "T20.22 ($tag): ci_leg_runnable is never decided from Step 5's wait"
-  skips="$(anchor_span "$f" rvm-trusted-skips rvm-reeval-push || true)"
+  skips="$(anchor_span "$pkg" rvm-trusted-skips rvm-reeval-push || true)"
   check_block_has "$skips" 'and .ci_leg_runnable' \
     "T20.23 ($tag): the skips table's test rows add and ci_leg_runnable"
-  reeval="$(anchor_span "$f" rvm-reeval-push rvm-never-gated || true)"
+  reeval="$(anchor_span "$pkg" rvm-reeval-push rvm-never-gated || true)"
   check_block_has "$reeval" 'tests=. skip is refused when .ci_leg_runnable. is false' \
     "T20.24 ($tag): re-evaluation notes the independent tests= refusal"
 done

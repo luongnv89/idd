@@ -58,8 +58,47 @@
 # deleted) or appears more than once (the region is ambiguous), independently of
 # the pattern. A migrated assertion therefore keeps three failure modes, not one.
 #
+# THE GOVERNED ARTIFACT IS THE SKILL PACKAGE (issue #426, ADR
+# docs/decisions/shared-contract-pin-artifact.md). Which file inside a skill
+# carries a contract is an authoring choice; the contract belongs to the package.
+# So every helper below accepts a PACKAGE DIRECTORY wherever it accepts a file:
+# pass `src/skills/<name>` (or `skills/<name>`, or
+# `src/internal-skills/idd-doctor`) and the anchor is located across that
+# skill's own files — its `SKILL.source.md` / `SKILL.md` plus `references/*.md`.
+# Bundled `references/agents/`, `references/docs/` and `references/scripts/` are
+# NOT part of the package for this purpose: they are copies of sources under
+# `src/shared/`, and a copy is not a second contract site.
+#
+# Package scoping strengthens the teeth rather than relaxing them — the anchor
+# must occur exactly once across the WHOLE package, so a contract duplicated
+# into a reference file still fails. Passing a file keeps file-scoped behaviour,
+# which stays correct: a file is a member of its package. Use the file form when
+# the contract's subject genuinely is placement (ordering, adjacency, or a gate
+# that must be restated at each site that applies it — see the T20 discussion in
+# the ADR). Relocation is bounded by the ADR's D3: prose may leave a SKILL body
+# only when it is conditional at run time, never to satisfy a word cap.
+#
 # CALLER CONTRACT. Define pass() and fail() before calling anchor_check,
 # anchor_check_flat, or anchor_lacks; they are resolved at call time.
+
+# anchor_package_file ROOT ID — print the one file in the skill package ROOT
+# that carries the anchor. Exit 1 when no file carries it, when one file carries
+# it more than once, or when two files carry it.
+anchor_package_file() {
+  local root="$1" id="$2" f hits found=""
+
+  for f in "$root/SKILL.source.md" "$root/SKILL.md" "$root"/references/*.md; do
+    [ -f "$f" ] || continue
+    hits="$(grep -cF -- "<!-- a:${id} -->" "$f" 2>/dev/null || true)"
+    [ "${hits:-0}" -ge 1 ] || continue
+    [ "${hits}" = "1" ] || return 1
+    [ -z "$found" ] || return 1
+    found="$f"
+  done
+
+  [ -n "$found" ] || return 1
+  printf '%s\n' "$found"
+}
 
 # anchor_region FILE ID — print the anchor's region on stdout.
 # Exit 1 when the file is unreadable, or the anchor is absent or not unique.
@@ -70,6 +109,10 @@ anchor_region() {
   case "$id" in
     *[!a-z0-9-]* | '' | -* | *-) return 2 ;;
   esac
+
+  if [ -d "$file" ]; then
+    file="$(anchor_package_file "$file" "$id")" || return 1
+  fi
 
   [ -r "$file" ] || return 1
 
@@ -89,6 +132,9 @@ anchor_region() {
 # the line before the END anchor's line.
 # Exit 1 when the file is unreadable, either anchor is absent or not unique, or
 # END does not follow START. Exit 2 when an id is not a well-formed anchor id.
+# A span is a contiguous stretch of ONE document. When FILE is a package
+# directory, the package resolves START to a file and END must then be unique in
+# that same file — a span never straddles two files.
 anchor_span() {
   local file="$1" start="$2" end="$3" id
 
@@ -97,6 +143,10 @@ anchor_span() {
       *[!a-z0-9-]* | '' | -* | *-) return 2 ;;
     esac
   done
+
+  if [ -d "$file" ]; then
+    file="$(anchor_package_file "$file" "$start")" || return 1
+  fi
 
   [ -r "$file" ] || return 1
 
@@ -113,6 +163,7 @@ anchor_span() {
 }
 
 # anchor_check FILE ID REGEX MSG — region must exist, be unique, and match REGEX.
+# FILE may be a skill package directory; see anchor_package_file.
 anchor_check() {
   local file="$1" id="$2" pattern="$3" msg="$4" region rc=0
   region="$(anchor_region "$file" "$id")" || rc=$?

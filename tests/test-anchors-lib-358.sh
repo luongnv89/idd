@@ -151,6 +151,135 @@ else
 fi
 
 # ───────────────────────────────────────────────────────────
+# Package resolution (issue #426) — the governed artifact is the
+# skill package, so a package directory resolves the anchor across
+# the skill's own files. ADR: docs/decisions/shared-contract-pin-artifact.md
+# ───────────────────────────────────────────────────────────
+PKG="$TMP/pkg"
+mkdir -p "$PKG/references" "$PKG/references/agents" "$PKG/references/docs"
+
+cat >"$PKG/SKILL.source.md" <<'EOF'
+# Fixture skill
+
+<!-- a:pkg-body -->
+body contract
+TOKEN_PKG_BODY
+<!-- a:pkg-body-end -->
+after the body span
+
+<!-- a:pkg-shared -->
+body copy of a duplicated contract
+EOF
+
+cat >"$PKG/references/mechanics.md" <<'EOF'
+# Mechanics
+
+<!-- a:pkg-ref -->
+relocated contract
+TOKEN_PKG_REF
+
+<!-- a:pkg-shared -->
+reference copy of a duplicated contract
+EOF
+
+cat >"$PKG/references/agents/some-agent.md" <<'EOF'
+# Bundled shared agent
+
+<!-- a:pkg-agent-only -->
+bundled agent copy — governed by src/shared/agents/, not by this package
+EOF
+
+cat >"$PKG/references/docs/some-doc.md" <<'EOF'
+# Bundled runtime doc
+
+<!-- a:pkg-doc-only -->
+bundled doc copy — governed by docs/, not by this package
+EOF
+
+# P1: a body anchor resolves through the package root.
+capture anchor_region "$PKG" pkg-body
+if [ "$RC" -eq 0 ] && printf '%s\n' "$OUT" | grep -q TOKEN_PKG_BODY; then
+  pass "P1: package root resolves an anchor in the SKILL body"
+else
+  fail "P1: package root should resolve a body anchor (rc=$RC)"
+fi
+
+# P2: the same call finds a contract that has been relocated into references/.
+capture anchor_region "$PKG" pkg-ref
+if [ "$RC" -eq 0 ] && printf '%s\n' "$OUT" | grep -q TOKEN_PKG_REF; then
+  pass "P2: package root resolves an anchor relocated into references/"
+else
+  fail "P2: package root should resolve a relocated anchor (rc=$RC)"
+fi
+
+# P3: teeth — a contract duplicated across two package files is ambiguous.
+capture anchor_region "$PKG" pkg-shared
+if [ "$RC" -ne 0 ]; then
+  pass "P3: anchor duplicated across two package files fails loudly (rc=$RC)"
+else
+  fail "P3: expected non-zero for an anchor in two package files, got 0"
+fi
+
+# P4: teeth — a deleted contract still fails.
+capture anchor_region "$PKG" pkg-no-such
+if [ "$RC" -ne 0 ]; then
+  pass "P4: anchor absent from the package fails loudly (rc=$RC)"
+else
+  fail "P4: expected non-zero for an anchor absent from the package, got 0"
+fi
+
+# P5: bundled shared agents and docs are NOT package contract sites — they are
+# copies of sources under src/shared/ and docs/ (ADR D1).
+capture anchor_region "$PKG" pkg-agent-only
+if [ "$RC" -ne 0 ]; then
+  pass "P5.1: references/agents/ is outside the package (rc=$RC)"
+else
+  fail "P5.1: references/agents/ must not resolve as a package contract site"
+fi
+capture anchor_region "$PKG" pkg-doc-only
+if [ "$RC" -ne 0 ]; then
+  pass "P5.2: references/docs/ is outside the package (rc=$RC)"
+else
+  fail "P5.2: references/docs/ must not resolve as a package contract site"
+fi
+
+# P6: a span stays inside one document — an end anchor in another file fails.
+capture anchor_span "$PKG" pkg-body pkg-body-end
+if [ "$RC" -eq 0 ] && printf '%s\n' "$OUT" | grep -q TOKEN_PKG_BODY; then
+  pass "P6.1: package span resolves within one file"
+else
+  fail "P6.1: package span should resolve within one file (rc=$RC)"
+fi
+capture anchor_span "$PKG" pkg-body pkg-ref
+if [ "$RC" -ne 0 ]; then
+  pass "P6.2: a span whose end anchor is in another package file fails (rc=$RC)"
+else
+  fail "P6.2: expected non-zero for a cross-file span, got 0"
+fi
+
+# P7: bad ids are still rejected before any package lookup.
+capture anchor_region "$PKG" foo_bar
+if [ "$RC" -eq 2 ]; then
+  pass "P7: bad id is rejected with exit 2 even for a package root"
+else
+  fail "P7: expected exit 2 for foo_bar against a package root, got $RC"
+fi
+
+# P8: against the real repo — a package root resolves both trees.
+capture anchor_package_file "$REPO_ROOT/src/skills/issue-pr-review" rv-step5-ci
+if [ "$RC" -eq 0 ] && [ "$OUT" = "$REPO_ROOT/src/skills/issue-pr-review/SKILL.source.md" ]; then
+  pass "P8.1: real src package resolves rv-step5-ci to SKILL.source.md"
+else
+  fail "P8.1: real src package should resolve rv-step5-ci to the body (rc=$RC, out=$OUT)"
+fi
+capture anchor_package_file "$REPO_ROOT/skills/issue-pr-review" rvm-trusted-skips
+if [ "$RC" -eq 0 ] && [ "$OUT" = "$REPO_ROOT/skills/issue-pr-review/references/review-loop-mechanics.md" ]; then
+  pass "P8.2: real built package resolves rvm-trusted-skips to its reference file"
+else
+  fail "P8.2: real built package should resolve rvm-trusted-skips (rc=$RC, out=$OUT)"
+fi
+
+# ───────────────────────────────────────────────────────────
 # Mutation harness — each needle must occur exactly once
 # ───────────────────────────────────────────────────────────
 apply_mut() {
@@ -184,8 +313,9 @@ prove_defanged() {
     . "$1"
     FIX="$2"
     UNREAD="$3"
-    eval "$4"
-  ' _ "$TMP/$name.bash" "$FIX" "$UNREAD" "$check"; then
+    PKG="$4"
+    eval "$5"
+  ' _ "$TMP/$name.bash" "$FIX" "$UNREAD" "$PKG" "$check"; then
     pass "$label: breaking the branch defangs the assertion"
   else
     fail "$label: mutant still fails — assertion would stay green (vacuous)"
@@ -260,6 +390,15 @@ prove_defanged pastnext \
   'capture(){ RC=0; OUT="$("$@" 2>/dev/null)" || RC=$?; }
    capture anchor_region "$FIX" alpha
    [ "$RC" -eq 0 ] && printf "%s\n" "$OUT" | grep -q TOKEN_BETA'
+
+# package resolution: accept an anchor found in two package files
+prove_defanged pkgdup \
+    '[ -z "$found" ] || return 1' \
+    '[ -z "$found" ] || found="$found"' \
+  "mutation/package-cross-file-duplicate" \
+  'capture(){ RC=0; OUT="$("$@" 2>/dev/null)" || RC=$?; }
+   capture anchor_region "$PKG" pkg-shared
+   [ "$RC" -eq 0 ]'
 
 echo
 echo "  Result: $PASS passed, $FAIL failed"

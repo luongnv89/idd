@@ -194,6 +194,37 @@ next-highest-churn slice; they close issue #401 together. Remaining
 Open a new tracker when the next cluster is picked; do not retarget this
 paragraph at a closed issue.
 
+### The governed artifact is the skill package (issue #426)
+
+A shared-contract assertion pins a *behaviour*, and a behaviour belongs to the
+skill **package** — the SKILL body plus that skill's own `references/*.md` —
+not to whichever file currently carries the prose. Every anchor helper therefore
+accepts a **package directory** wherever it accepts a file:
+
+```bash
+anchor_check "$REPO_ROOT/src/skills/issue-pr-review" rvm-never-gated 'gi-secscan' "…"
+```
+
+The anchor must be unique across the whole package, so a contract that moves
+between files keeps its assertion and a contract duplicated into two files still
+fails. Bundled `references/agents/`, `references/docs/` and `references/scripts/`
+are **outside** the package: they are copies of sources under `src/shared/` and
+`docs/`, and a copy is not a second contract site. `/idd-doctor` has no built
+tree, so its governed artifact is `src/internal-skills/idd-doctor/` alone.
+
+Keep the **file** form where the contract's subject genuinely is placement —
+ordering, adjacency, or a gate that must be restated at each site that applies
+it. `tests/test-qa-handoff-255.sh` T20 is the worked example: the `tests=` skip
+is decided independently at Step 2 and at Step 4, so each site must carry the
+whole three-part AND, and the assertion stays file-scoped on purpose.
+
+Relocation is bounded. Prose may leave a SKILL body — taking its anchor and its
+assertions with it — only when the material is **conditional at run time**.
+Material the body gates with *read it now* is loaded on every run, so moving it
+shrinks `wc -w` and shrinks nothing else. See
+[`docs/decisions/shared-contract-pin-artifact.md`](decisions/shared-contract-pin-artifact.md)
+for the rule, the per-skill measurement behind it, and the recorded exception.
+
 ### Behavioral eval harness
 
 `evals/` is a hermetic, network-free behavioral suite for skill *outcomes* (issue bodies, PR bodies, branch/commit names, `runs.jsonl` records). Cases run a deterministic subject under a PATH-fronted `gh` record/replay shim (`evals/harness/gh_shim.py`), then grade artifacts with `scripts/idd-lint.py` and `src/shared/scripts/gi-runlog.py` — not prose greps of skill source.
