@@ -4,7 +4,7 @@ description: "Scan an IDD repo for doc drift, missing autopilot mode, and unsafe
 license: MIT
 compatibility: Requires git. GitHub CLI (gh) is optional — used only for the merge-strategy check; skipped when gh is absent.
 metadata:
-  version: 0.2.0
+  version: 0.3.0
   author: Luong NGUYEN <luongnv89@gmail.com>
   effort: low
 ---
@@ -26,15 +26,15 @@ Run a report-only health check on an IDD repository, surfacing doc drift on the 
 ## Scope (v1)
 
 The doctor performs exactly four **gating checks** (each PASS / WARN / FAIL), then
-one **informational, non-gating** section — the *run-log summary* — that reports
-`.gitissue/runs.jsonl` telemetry but never affects the PASS/WARN/FAIL result.
-Anything beyond those is **out of scope**:
+one **informational, non-gating** section — the *run-log summary* — reporting
+`.gitissue/runs.jsonl` telemetry that never affects the result. Anything beyond
+those is **out of scope**:
 
 | # | Check | What it verifies | Failure mode |
 |---|-------|-----------------|--------------|
 | 1 | Stale skill claims | The `/issue-creator` README and SKILL text make no claim that the skill inspects code (Check 1 lists the files and the forbidden phrases). | `FAIL` |
 | 2 | Issue-template fields | No issue template asks the reporter for resolver-owned content (Check 2 lists the directories and the forbidden labels). | `FAIL` |
-| 3 | Autopilot mode set | If `.gitissue.yml` exists in the repo root, it contains an `autopilot.mode` key. | `FAIL` (only when `.gitissue.yml` exists) |
+| 3 | Autopilot mode set | `.gitissue.yml`, if present in the repo root, carries an `autopilot.mode` key. | `FAIL` (only when `.gitissue.yml` exists) |
 | 4 | Squash-merge default | Squash is the only merge strategy allowed **and** the squash message source is the PR body (SPEC §4.3 B1). | `WARN` |
 
 ### Explicitly out of scope for v1
@@ -47,7 +47,7 @@ Before any check, verify the environment. On failure, print the exact error from
 
 1. Confirm git repository: `git rev-parse --git-dir`
 
-`gh` is **optional**. The merge-strategy check (Check 4) needs `gh` and authentication; if either is missing, that check is skipped with an `○` note rather than failing the run.
+`gh` is **optional**: Check 4 needs it plus authentication, and skips with an `○` note rather than failing the run when either is absent.
 
 ### Bundled dependency precheck
 
@@ -66,14 +66,14 @@ Verify this skill's bundled reference files are present. If any is missing, stop
 
 That stop is a terminal outcome: print the block, then the *Run Stats Footer* (`references/run-stats.md`), then stop. It runs before the clock capture in *Pipeline*, so there is no `run_started_epoch` and `elapsed` prints the literal `n/a`, with `agents 0`. If `references/run-stats.md` is itself the missing file, print those two lines from the shape in *Run stats footer*.
 
-Check these files relative to the skill's directory (the dirname of this SKILL.md):
+Check these, relative to this SKILL.md's directory:
 
-- `references/error-messages.md` — Error catalog
-- `references/run-stats.md` — run-stats footer contract (shape, fields, unavailable marker)
+- `references/error-messages.md`
+- `references/run-stats.md`
 
 ## Configuration
 
-This skill **reads** `.gitissue.yml` (only to determine whether `autopilot.mode` is set in Check 3 — the field is documented in `docs/config-schema.md`) and is otherwise config-free. There is no `doctor:` section in `.gitissue.yml` and no per-check toggles in v1.
+This skill **reads** `.gitissue.yml` only to determine whether Check 3's `autopilot.mode` is set (that field is documented in `docs/config-schema.md`); it is otherwise config-free, with no `doctor:` section and no per-check toggles in v1.
 
 If `.gitissue.yml` does **not** exist, Check 3 skips rather than fails (see *Check 3*) — a repo that has not yet run `/init-gitissue` is not punished for it.
 
@@ -85,7 +85,7 @@ The doctor executes the four checks in order — one line each, then a summary f
 
 **Capture the run clock before Check 1** — one `date +%s`, kept as `run_started_epoch`; the *Run Stats Footer* (`references/run-stats.md`) measures `elapsed` from it. Reading a clock is not a repo mutation, so it stays inside the *Read-only guarantee*.
 
-Expected output for a clean repo (verify against this when testing the skill):
+Expected output for a clean repo (verify against this when testing):
 
 ```
   ◆ /idd-doctor — health check
@@ -130,11 +130,11 @@ src/skills/issue-creator/docs/README.md
 src/skills/issue-creator/SKILL.source.md
 ```
 
-These two are the only files in scope. Other skills (`/issue-analysis`, `/init-gitissue`, `/auto-pilot`, etc.) legitimately scan code, so flagging them would be a false positive. Do **not** scan `references/`, `templates/`, `docs/`, the top-level `README.md`, or any other skill's files. Add a future intent-only skill's files here explicitly; mechanical "scan all skills" matching is deliberately avoided in v1.
+These two are the only files in scope. Other skills (`/issue-analysis`, `/init-gitissue`, `/auto-pilot`, etc.) legitimately scan code, so flagging them would be a false positive. Do **not** scan `references/`, `templates/`, `docs/`, the top-level `README.md`, or another skill's files. Add a future intent-only skill's files here explicitly; mechanical "scan all skills" matching is deliberately avoided in v1.
 
 ### Forbidden patterns (case-insensitive substring match, with surrounding negation)
 
-A line **fails** if it contains any of the patterns below **and** does not also contain a negation marker (`no`, `not`, `never`, `does not`, `doesn't`, `without`, `cannot`, `won't`).
+A line **fails** if it contains any pattern below **and** no negation marker (`no`, `not`, `never`, `does not`, `doesn't`, `without`, `cannot`, `won't`).
 
 | Pattern | Why it's forbidden |
 |---------|-------------------|
@@ -162,7 +162,7 @@ The negation check is **per-line**: a negation in a separate paragraph does not 
 | Pass | `✓ [1/4] Stale skill claims    no stale language in /issue-creator` |
 | Fail | `✗ [1/4] Stale skill claims    {K} drifted line(s) in {J} file(s)` followed by a per-finding block |
 
-Per-finding block format (indented under the check line):
+Per-finding block (indented under the check line):
 
 ```
         {path}:{line_number}
@@ -174,7 +174,7 @@ Per-finding block format (indented under the check line):
 
 ## Check 2 — Issue-template fields
 
-Scan issue-template files for field labels that ask the reporter (or normalizer) to provide content the IDD methodology forbids: predicted affected files, generated technical notes, root cause, or implementation hints.
+Scan issue-template files for field labels asking the reporter (or normalizer) for content the IDD methodology forbids: predicted affected files, generated technical notes, root cause, or implementation hints.
 
 ### What to scan
 
@@ -219,7 +219,7 @@ If no template file exists at all (neither `src/skills/issue-creator/templates/`
 
 ## Check 3 — Autopilot mode
 
-Verify that `.gitissue.yml`, when present, sets `autopilot.mode`. The `mode` key is what makes the conservative-merge default reachable; without it, legacy `auto_merge` falls back to the old aggressive behavior in some code paths.
+Verify that `.gitissue.yml`, when present, sets `autopilot.mode`. That key makes the conservative-merge default reachable; without it, legacy `auto_merge` falls back to the old aggressive behavior in some code paths.
 
 ### Procedure
 
@@ -252,9 +252,7 @@ The fail line is followed by a fix hint indented one extra level:
 
 ## Check 4 — Squash-merge default
 
-Verify the repository's merge configuration carries the SPEC §4.3 **B1** binding: squash is the only strategy, **and** the squash commit message is the PR body. IDD uses one-commit-per-PR semantics, so any non-squash strategy is a footgun — and a squash-only repo still defeats B1 if `squash_merge_commit_message` is GitHub's default `COMMIT_MESSAGES`, which writes the list of commit subjects and drops the Decision Record at the merge boundary.
-
-SPEC §4.3 requires warning at **both** levels, and forbids reporting the binding satisfied on the strategy alone or when the configuration cannot be read.
+Verify the repository's merge configuration carries the SPEC §4.3 **B1** binding: squash is the only strategy, **and** the squash commit message is the PR body. IDD uses one-commit-per-PR semantics, so any non-squash strategy is a footgun — and a squash-only repo still defeats B1 if `squash_merge_commit_message` is GitHub's default `COMMIT_MESSAGES`, which writes the commit subjects and drops the Decision Record at the merge boundary. SPEC §4.3 requires warning at **both** levels, and forbids reporting the binding satisfied on the strategy alone or when the configuration cannot be read.
 
 ### Procedure
 
@@ -267,7 +265,7 @@ SPEC §4.3 requires warning at **both** levels, and forbids reporting the bindin
    gh repo view --json mergeCommitAllowed,squashMergeAllowed,rebaseMergeAllowed
    ```
 
-3. Read the **message source** — a second, separate call. It is not a `gh repo view` field (`gh repo view --json squashMergeCommitMessage` fails with `Unknown JSON field`), so read it from the REST API:
+3. Read the **message source** — a second, separate call. It is not a `gh repo view` field (`gh repo view --json squashMergeCommitMessage` fails with `Unknown JSON field`), so read the REST API:
 
    ```bash
    gh api repos/{owner}/{repo} --jq '{squash_merge_commit_title,squash_merge_commit_message}'
@@ -282,7 +280,7 @@ SPEC §4.3 requires warning at **both** levels, and forbids reporting the bindin
      AND squash_merge_commit_message == "PR_BODY"
    ```
 
-5. If step 2 succeeded but step 3 did not — the call 404s, the token lacks permission, or the field is absent — the message source is **unknown**. Warn with `binding unverified`. Never pass: an unread configuration is not a satisfied binding (SPEC §4.3). A missing or unauthenticated `gh` still **skips** (step 1): a skip claims nothing about the binding, which is not the same as claiming it holds.
+5. If step 2 succeeded but step 3 did not — a 404, a token lacking permission, an absent field — the message source is **unknown**. Warn with `binding unverified`. Never pass: an unread configuration is not a satisfied binding (SPEC §4.3). A missing or unauthenticated `gh` still **skips** (step 1): a skip claims nothing about the binding, which is not the same as claiming it holds.
 6. Otherwise, **warn** (not fail) — repo settings are owner-controlled and the doctor only nudges.
 
 ### Output
@@ -398,7 +396,7 @@ It reads files (via `Read` / `cat`) and runs read-only `gh` queries (`gh repo vi
 
 ## Testing
 
-Integration tests live in `tests/test-idd-doctor.sh` — pure bash, exit 0 on pass, same pattern as `tests/test-projects-sync.sh` and `tests/test-autopilot-modes.sh`. They assert this spec against itself: package structure; both forbidden-pattern catalogs; the four checks documented in order; the read-only guarantee; the `gh` field selections; every skip and both fix-hint formats; the exit-code mapping; and the run-log summary's non-gating contract, graceful degradation, and three reported metrics. Run with:
+Integration tests live in `tests/test-idd-doctor.sh` — pure bash, exit 0 on pass. They assert this spec against itself: package structure; both forbidden-pattern catalogs; the four checks in order; the read-only guarantee; the `gh` field selections; every skip and both fix-hint formats; the exit-code mapping; and the run-log summary's non-gating contract, graceful degradation, and metrics. Run with:
 
 ```bash
 bash tests/test-idd-doctor.sh
@@ -408,7 +406,7 @@ bash tests/test-idd-doctor.sh
 
 ## Output Conventions
 
-Terminal output follows the `DESIGN.md` contract (repo root) — symbols `● ✓ ✗ ◆ ⚡ ⚠ ○`, two-space indent, `┄` separators, URLs on their own line, ≤80 chars, one blank line between sections, static sequential output (no animation). Per-check line: `{symbol} [N/4] {Check name (16 chars)} {detail}`; per-finding indent 8 spaces (4 + 4). Errors use the rich format from `references/error-messages.md`: `✗ what failed`, then `To fix:  <command>`, then a docs link when applicable.
+Terminal output follows the `DESIGN.md` contract (repo root) — symbols `● ✓ ✗ ◆ ⚡ ⚠ ○`, two-space indent, `┄` separators, URLs on their own line, ≤80 chars, one blank line between sections, static sequential output (no animation). Per-check line: `{symbol} [N/4] {Check name (16 chars)} {detail}`; per-finding indent 8 spaces (4 + 4). Errors use the rich format from `references/error-messages.md`: `✗ what failed`, `To fix:  <command>`, then a docs link when applicable.
 
 ## Edge Cases
 
@@ -416,4 +414,4 @@ Terminal output follows the `DESIGN.md` contract (repo root) — symbols `● �
 - **`autopilot.mode` set to a non-canonical value** (e.g. `mode: yolo`) — Check 3 still passes; any non-empty value satisfies "key set", and a future v2 may validate values.
 - **A skill README carries a forbidden pattern inside a code block or fenced quote** — Check 1 still flags it; v1 is mechanically strict, not contextually nuanced.
 - **GitHub Enterprise repos without `gh` auth** — Check 4 is skipped, never failed.
-- **`/issue-creator` is missing** — Check 1 fails with a `src/skills/issue-creator/docs/README.md not found` finding; that skill is required for an IDD repo.
+- **`/issue-creator` is missing** — Check 1 fails with a `src/skills/issue-creator/docs/README.md not found` finding; that skill is required in an IDD repo.
