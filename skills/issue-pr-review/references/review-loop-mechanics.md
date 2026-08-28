@@ -2,6 +2,65 @@
 
 Exact spawn calls and the token-trade rationale for the reviewer/fixer agents used in Step 3 and the Review Loop of `/issue-pr-review`. SKILL.md keeps the summary (cold start → SendMessage re-review → fresh confirmation); this file holds the detail.
 
+## Config keys and what they gate
+
+SKILL.md's *Configuration* section names the loader and its degrade path; this is
+the full key list — every default value, and what each key does to the pipeline.
+It is also the list to read `.gitissue.yml` against by hand when `gi-config` is
+unavailable. Value syntax and validation live in `references/docs/config-schema.md`.
+
+**Why the working directory and the script path both matter.** `gi-config.py`
+resolves `.gitissue.yml` against the *current working directory*, so it must be
+run from the repo root. Run anywhere else it does not fail loudly: it exits 0
+reporting `config_file: null` / `first_run: true`, silently discarding the repo's
+real config and handing the run a full set of defaults. The script *path*, by
+contrast, is resolved against the skill's own directory — the same way the
+*Bundled dependency precheck* resolves its list — because the bundled copy lives
+beside SKILL.md, not beside the repo being reviewed. Getting either one wrong
+produces a run that looks configured and is not.
+
+| Key (default) | What it gates |
+|-----|---------------|
+| `review.max_cycles: 3` | Cycle cap for Steps 3–6. Three LLM cycles suffice once the script pre-pass has handled the mechanical issues. Step 1's `light` profile and `qa_handoff = trusted` each cap it at `min(1, configured_cap)`. |
+| `review.adaptive_depth: true` | Scales review depth to the PR's complexity (*Depth gate*). When `false`, every PR gets full-depth review — `profile` is pinned to `full` — and the *QA handoff gate* is skipped with `qa_handoff = absent`. |
+| `review.auto_merge: false` | Honored only in `--auto` mode. Interactive `/issue-pr-review` never merges regardless of this flag, and `--no-merge` suppresses the merge even in auto mode. |
+| `review.confidence_threshold: 80` | Minimum confidence for code-reviewer findings. The ui-reviewer keeps its own 75 floor and does not read this key. |
+| `review.run_tests: true` / `review.check_ci: true` | Enable Step 4 and Step 5. When either is `false` the step reports `○ … skipped` and the soft-pass conjunction treats that leg as satisfied. |
+| `review.ci_poll_interval: 30` / `review.ci_timeout: 600` / `review.test_timeout: 300` | Seconds. The first two are passed to `gi-ci-wait.py` as `--interval` / `--timeout`; the third bounds the Step 4 suite. |
+| `review.soft_pass: true` | `true` (default): when zero `action: fix` issues remain and the tests/CI/traceability legs pass, remaining `note` findings and `partial` dimensions are report-only. **`false` (strict):** the same tests/CI gates apply, and in addition every enabled dimension must be `pass` and no `action: "note"` finding may remain — a `partial` dimension or any note blocks a clean result **and blocks merge**. Notes never become fixer inputs (Step 6 fixes only `action: "fix"`), so strict mode surfaces them for manual remediation rather than looping without a fixable action. |
+| `review.require_acceptance_criteria_check: true` | `true` (default) gates per-criterion AC verification. When `false`, `acceptance_criteria` reports `pass — verification disabled` and never blocks soft-pass. |
+| `review.require_traceability_check: true` | `true` (default) gates the four traceability checks. When `false`, `traceability` reports `pass — verification disabled` and never blocks soft-pass. |
+| `review.traceability_exempt_labels: ["refactor", "chore"]` | Labels that exempt a PR from the `Closes #N` hard-fail; the exemption reports `traceability: pass — exempt`. It cannot relax check 4 — a non-`pass` check 4 still stands. Full scope in `verification-checks.md` (*Refactor/chore exemption*). |
+| `review.traceability_exempt_pattern: "^\\s*Type:\\s*(refactor|chore)\\s*$"` | Body-line regex granting the same exemption, for PRs that carry the type in the body rather than as a label. |
+| `review.ui_review.browser_review: "ask"` | `"false"` \| `"ask"` \| `"true"` — the optional browser (screenshot) review only. `"ask"` prompts interactive users and skips in auto mode. It does **not** gate the auto-detected code-level UI review, which has no config flag at all. |
+
+The traceability flags default to the values shown, preserving the issue #36 contract.
+
+## Binding the head-ref name
+
+SKILL.md's *Checkout PR head branch* requires `branch_name` to be bound once with
+command substitution and used as `"$branch_name"` in every shell command. This is
+why, and why the obvious weaker forms do not work.
+
+A head-ref name is chosen by whoever opened the PR, and git permits `` ` ``, `$`,
+`(`, `;` and `&` in a ref. So a branch literally named ``fix/1-`id` `` becomes a
+command when it is pasted into a shell word, on the reviewing machine, with the
+reviewer's credentials. Double quotes do **not** save it: `"$(…)"` and a backtick
+still evaluate inside double quotes — quoting stops word-splitting and globbing,
+not substitution.
+
+Command-substitution *output*, by contrast, is never re-evaluated. `branch_name`
+holds the bytes `gh` printed, whatever they are, and `"$branch_name"` expands to
+exactly one argument containing those bytes. That is the whole mechanism.
+
+The plain `{branch_name}` placeholder still appears in this skill's **display
+templates** and in **spawn-variable lists** — neither is a shell word, and
+substituting there would only make the output wrong.
+
+This is the same rule already applied at the `gi-secscan` and `gi-branch` call
+sites; the head-ref name is the one untrusted value this skill cannot hand
+straight to a script.
+
 ## Depth gate (adaptive review depth)
 
 The Step 1 *Depth gate* selects a review `profile` — `light` or `full` — from a <!-- a:rvm-depth-gate -->
@@ -388,6 +447,18 @@ To minimize token usage, the review loop **reuses the same reviewer agent** acro
 - **Confirmation pass:** After the fixer reports all issues resolved, spawn a **fresh confirmation reviewer** (separate agent, no memory of prior cycles) for an unbiased final check. This is the only fresh spawn after cycle 1.
 
 This trades perfect independence between cycles (which rarely matters in practice — the reviewer was already correct about what the issues were) for significant token savings. The fresh confirmation pass at the end catches anything the reused reviewer might have missed.
+
+**What the `trusted` collapse actually buys.** Under `qa_handoff = trusted` the
+cycle-1 cold start is collapsed into the fresh confirmation pass rather than
+skipped. The PR therefore still receives one independent, full-strength review,
+and it comes from an agent with **no memory of the resolver's own** review — which
+is the whole point of not simply trusting the marker. The collapse saves no
+reviewer spawn: the confirmation pass is itself fix-conditional, so an unmarked
+clean PR already gets exactly one cold-start pass and no confirmation. What
+`trusted` changes is *which* pass runs, not how many; the real saving is the
+duplicated test legs at Steps 2 and 4. Both the collapse and the cycle cap are
+refused by SKILL.md's *Precedence* rule when the marker says `profile=light`
+against a pr-review `profile=full`.
 
 ## Cycle 1 — Initial review
 

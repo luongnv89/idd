@@ -172,6 +172,21 @@ none.
   PR:  {pr_url}
 ```
 
+### Merge conflict with base
+
+**Trigger:** the PR head cannot be rebased onto its base — during the mandatory
+repo sync, or when `gh pr merge` reports the branch is not mergeable. Print the
+exact rebase command and stop; never resolve a conflict unattended, and never
+force-push to "clear" it.
+
+```
+✗ PR #{N} conflicts with {base_branch}
+
+  To fix:  git fetch origin && git rebase origin/{base_branch}
+  Then:    resolve the conflicts, git rebase --continue, git push --force-with-lease
+  PR:      {pr_url}
+```
+
 ---
 
 ## Stagnation
