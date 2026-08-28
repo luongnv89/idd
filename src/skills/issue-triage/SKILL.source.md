@@ -4,7 +4,7 @@ description: "Scan open GitHub issues for dependencies, priority, parallel work,
 license: MIT
 compatibility: "Requires git and GitHub CLI (gh) with authentication. Default mode (cached view) needs only local file access — no gh required."
 metadata:
-  version: 0.5.5
+  version: 0.6.0
   author: Luong NGUYEN <luongnv89@gmail.com>
   effort: medium
 ---
@@ -455,44 +455,33 @@ Omit lines where a step found nothing (e.g., omit `Already-fixed` if count is 0,
 
 ## Example Runs
 
-Full example runs (first run, cached view with/without changes, explicit update, empty repo, circular dependency scenario) live in `references/examples.md` to keep SKILL.md focused on mechanics.
+Worked runs — first run, cached view with and without changes, explicit update, empty repo, circular dependency — are in `references/examples.md`.
 
 ---
 ## Platform Driver
 
-All tracker access follows the GitHub driver — `--json` with explicit field selection, never parsed text output. The full operation catalog and driver rules live in docs/platform-github.md.
+All tracker access follows the GitHub driver — `--json` with explicit field selection, never parsed text. Operation catalog and driver rules: docs/platform-github.md.
 
 ## Output Conventions
 
-Terminal output follows the `docs/terminal-style.md` contract — symbols `● ✓ ✗ ◆ ⚡ ⚠ ○`, two-space indent, `┄` separators, URLs on their own line, ≤80 chars, one blank line between sections, static sequential output (no animation), plus `│ ─ ┼` tables (right-align numbers, `—` for empty cells). Errors use the rich format from `references/error-messages.md`: `✗ what failed`, then `To fix:  <command>`, then a docs link when applicable. The complete catalog in `references/error-messages.md` covers authentication failures, CLI not found, no remote, no issues, too many issues, circular dependencies, and API rate limits.
+Terminal output follows the `docs/terminal-style.md` contract — symbols `● ✓ ✗ ◆ ⚡ ⚠ ○`, two-space indent, `┄` separators, URLs on their own line, ≤80 chars, one blank line between sections, static sequential output (no animation), plus `│ ─ ┼` tables (right-align numbers, `—` for empty cells). Errors use the rich format from `references/error-messages.md`: `✗ what failed`, then `To fix:  <command>`, then a docs link when applicable. That catalog covers authentication failures, CLI not found, no remote, no issues, too many issues, circular dependencies, and API rate limits.
 
 ## GitHub Projects Sync
 
-The triage skill is **read-only** with respect to the GitHub Project board. It does not change issue status. Future versions may reorder project board items based on triage priority.
-
-See `docs/github-projects-sync.md` for the shared reference on how other skills (issue-creator, issue-resolver) update project board status.
+This skill is **read-only** with respect to the GitHub Project board — it never changes issue status. How other skills (issue-creator, issue-resolver) update board status is in `docs/github-projects-sync.md`. A future version may reorder board items by triage priority.
 
 ## Expected Output
 
-A cached view renders instantly from `.gitissue/triage.json` — the rendering
-itself is defined once in *Default Mode → 3. Render the cached report* above
-(header, table, flag lines), followed by one of the three endings in *Default
-Mode → 4. Detect changes and suggest update* (up-to-date, commits since last
-triage, or issue activity). Full worked runs are in `references/examples.md`.
-
-An update (`/issue-triage update`) runs Steps 1–9 and overwrites the cache, ending with the same snapshot view.
+A cached view renders instantly from `.gitissue/triage.json`, in the format
+defined once above under *Default Mode → 3. Render the cached report*, closing
+with one of the three endings in *4. Detect changes and suggest update*. An
+update (`/issue-triage update`) runs Steps 1–9, overwrites the cache, and ends
+with that same snapshot view.
 
 ## Edge Cases
 
-- **No cache and no issues** — prints a friendly `○ No open issues` and exits without creating a cache file.
-- **Circular dependency detected** — flagged in the report with the offending cycle; execution order still computed via topological pruning.
-- **Stale issues (>90 days)** — grouped at the bottom of the report with a `⚠ stale` marker.
-- **Rate-limited by GitHub API** — partial results are kept, the report notes incompleteness, and the user is shown the exact retry command.
-- **Already-fixed detection false positive** — the report lists supporting commits/PRs so the user can verify before closing.
-
-## Additional Resources
-
-- **`references/error-messages.md`** — Complete error catalog with triggers and exact output
-- **`docs/github-projects-sync.md`** — Shared GitHub Projects status sync reference
-- **`docs/terminal-style.md`** — Terminal output style contract (bundled at build time; the repo-root `DESIGN.md` is the human-facing companion and is not bundled)
-- **`docs/config-schema.md`** — Full configuration schema
+- **No cache and no issues** — prints `○ No open issues` and writes no cache file.
+- **Circular dependency** — the cycle is reported; order is still computed by topological pruning.
+- **Stale issues (>90 days)** — grouped at the report's foot under a `⚠ stale` marker.
+- **Rate-limited** — partial results are kept, the report notes incompleteness, and the exact retry command is shown.
+- **Already-fixed false positive** — the report lists the supporting commits/PRs so the user can verify before closing.
