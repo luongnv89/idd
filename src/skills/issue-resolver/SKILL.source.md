@@ -112,7 +112,7 @@ references/scripts/gi-state.py
 
 ## Pipeline Overview
 
-6 steps (0-5) — Preflight, Research, Plan, Implement, QA, Deliver — each printing a `[N/5]` line on start (`●`) that updates to `✓`/`✗`. Read the expected output in `references/report-templates.md` (*Expected Inline Pipeline Output*).
+6 steps (0-5) — Preflight, Research, Plan, Implement, QA, Deliver — each printing a `[N/5]` line on start (`●`) that updates to `✓`/`✗`. Read the worked example of the expected output in `references/report-templates.md` (*Expected Inline Pipeline Output*).
 
 ### Step completion reports
 
