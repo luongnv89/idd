@@ -239,10 +239,13 @@ T20.1–T20.16) stay **file-scoped on purpose**. They are the canonical example 
 an assertion whose subject genuinely is placement: what they pin is that *each
 decision site states its own gate*. Both spans still carry all eight patterns.
 
-T20's remaining checks (T20.17–T20.27) are ordinary relocatable contracts in
-`references/review-loop-mechanics.md` and `references/report-templates.md`, and
-they do move to the package root — the distinction is per assertion, not per
-test file.
+Of T20's remaining checks, only T20.23 and T20.24 move to the package root —
+they are `anchor_span` calls, and a span follows its anchors. T20.17–T20.22 and
+T20.25–T20.27 stay file-scoped: they are raw `grep`s naming
+`references/review-loop-mechanics.md` and `references/report-templates.md` by
+path, and the class table above forbids silently re-targeting those. Migrating
+them is issue #401's paced work. The distinction is per assertion, not per test
+file.
 
 ## Consequence for every child of #413
 
