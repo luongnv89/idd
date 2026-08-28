@@ -84,6 +84,11 @@ floor 3239–3474 against its 3410).
 | `auto-pilot` | 93 | 6 | fail (word cap) |
 | `idd-doctor` | — | — | not scoreable — no built tree |
 
+`quick_validate.py` (skill-creator) exits 0 — *"Skill is valid!"* — on
+`skills/init-gitissue`, `skills/issue-resolver` and `skills/issue-pr-review`, so
+for those three the word cap is the only Gate 1 item still open, and for the
+first two it is not open either.
+
 **What the measurement shows.** For six of the eight skills the assertion load is
 nowhere near binding: their floors sit 1000–2000 words below the cap, and the
 gap between today's body and 3000 words is ordinary free prose. The suite is not
@@ -161,12 +166,46 @@ granted on a post-pass measurement, never on an estimate.
 |---|---:|---|
 | **`/issue-pr-review`** | **3239** (lower bound) — 3474 upper | The compression pass ran in #417 / PR #425: 6213 → 4377 `wc -w`, 500 → 379 lines, seven reference files, every conditional section already relocated. Even on the heuristic-free lower bound, deleting every free-prose word leaves 3239. Its pinned material is the per-step gates themselves; D3 forbids moving them. |
 
-`/auto-pilot` measures a floor of 3106–3207 and is **not** an exception yet: no
-compression pass has run against it, its body still carries 2734–2835 words of
-free prose, and its assertion-carrying lines are visibly fatter than
-`/issue-pr-review`'s post-pass lines (2553 pinned words over 91 lines, against
-3058 over 86). Much of that is removable prose *around* the pinned literals.
-#415 runs the pass first; D4 decides afterwards.
+#### The 330-word objection, answered
+
+#417 §6 names one relocation candidate it left alone: *"moving the per-step
+output fences into `references/report-templates.md` would recover roughly 330
+words, and no test pins them."* Those fences sit in the structural bucket above,
+so on the **lower** bound the arithmetic is 3239 − 330 = **2909 — under the
+cap**. The exception has to survive that subtraction, and it does, on two counts.
+
+**On the upper bound it survives outright:** 3474 − 330 = 3144, still over.
+
+**On the lower bound it survives under D3, and this is the purest case of the
+trade D3 prohibits.** `references/report-templates.md` is *already* gated
+read-now in the body — *"Check names, semantics and format:
+`references/report-templates.md` (Step Completion Reports) — **read it now**"* —
+and the Step 7 summary templates are read from the same file. The agent loads
+that file in full on every run. Moving 330 words from the body into it lowers
+`wc -w` by 330 and lowers the agent's loaded context by **exactly zero**. Same
+context, smaller number. If that counted, the cap would be measuring nothing.
+It does not count, so `/issue-pr-review` is an exception.
+
+### The one deferred verdict — `/auto-pilot`
+
+`/auto-pilot` measures a floor of 3106–3207, over the cap by 106 words on the
+lower bound, and is **neither a clear nor an exception**. It is the only skill
+of the eight whose verdict this ADR defers, and it defers it for a reason that
+does not apply to any other:
+
+`/issue-pr-review`'s floor was measured **after** its compression pass ran — the
+body went 6213 → 4377 `wc -w`, seven reference files were carved out, and the
+conditional material was exhausted — so 3239 is a floor. `/auto-pilot`'s 3106
+was measured on an **untouched** 6024-word body still carrying 2734–2835 words
+of free prose. Compression does not only delete free prose; it also shortens the
+assertion-carrying lines *around* their pinned literals, which is where 2405–2553
+of the floor's words sit. So 3106 is an upper estimate of `/auto-pilot`'s floor,
+not its floor.
+
+#415 runs the pass, then re-measures under D4. If the post-pass floor still
+exceeds 3000, `/auto-pilot` joins the exceptions table on that measurement. It
+does not get an exception in advance, and it does not get re-litigated as an
+artifact question.
 
 ## Which assertions may follow a relocation, and which may not
 
@@ -204,7 +243,7 @@ patterns.
 
 | Child | Skill | Consequence under this ADR |
 |---|---|---|
-| **#415** | `/auto-pilot` | Run the pass. 2734–2835 words of free prose plus removable prose around the pinned literals; floor measures 3106–3207 today, which is an over-estimate for an un-compressed body. Not exempt in advance — if the post-pass floor still exceeds 3000, apply D4 and add it to the exceptions table. |
+| **#415** | `/auto-pilot` | **Deferred verdict — the only one.** Run the pass: 2734–2835 words of free prose, plus removable prose around the pinned literals. Today's 3106–3207 floor is an over-estimate for an un-compressed body. Not exempt in advance — re-measure under D4 afterwards, and add it to the exceptions table only if the post-pass floor still exceeds 3000. |
 | **#416** | `/issue-resolver` | Closed. Clears both gates (97 overall, `context-efficiency` 8, 2958 words). No action. |
 | **#417** | `/issue-pr-review` | **Unblocked as a recorded exception.** Its floor exceeds the cap on the lower-bound measurement, and D3 forbids the only remaining route to the cap. Close #417 on the gates it did clear — Gate 1 less the word cap, Gate 2 less `context-efficiency`, overall 93/A, every other category 10 — citing this ADR's exceptions table. Nothing is owed. |
 | **#418** | `/issue-triage` | Clears. Floor 2767–2804 against a 3799-word body: cut 799 words from 995–1032 of free prose. Tight but not blocked. Do **not** re-litigate the artifact question. |
