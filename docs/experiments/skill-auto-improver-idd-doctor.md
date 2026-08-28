@@ -451,6 +451,12 @@ and the in-loop variance is the known flaky class this repo already tracks — a
 each run, always green standalone. No baseline run at `e6b9136` was taken, so this report makes
 no "identical to baseline" claim.
 
+**CI settles it.** `.github/workflows/dist-check.yml` runs all 83 scripts serially on ubuntu, one
+named step each, and on this branch's head every one is **green — including
+`test-runs-jsonl-rotation-354.sh`, `test-scripts-253.sh` and `test-autopilot-hardening-259.sh`**.
+That confirms 354 T4 as a macOS `wc`-padding artifact rather than a defect, and the other two as
+local in-loop flakiness with no counterpart in CI.
+
 ---
 
 ## 7. Unresolved gates
