@@ -11,7 +11,7 @@ metadata:
 
 # /issue-triage
 
-Analyze open GitHub issues to surface dependencies, suggest priorities, identify parallelizable work, flag stale issues, and detect issues that may have already been fixed by commits or PRs targeting other issues. Defaults to **view mode** — instantly renders cached results from `.gitissue/triage.json`. On first run (no cache), automatically performs a full analysis. After showing cached data, checks local git history and suggests an update if changes are detected. Full re-analysis only happens when the user explicitly requests `/issue-triage update`.
+Analyze open GitHub issues to surface dependencies, suggest priorities, group parallelizable work, flag stale issues, and detect issues already fixed by commits or PRs aimed at other issues. Defaults to **view mode** — renders cached results from `.gitissue/triage.json` instantly, then checks local git history and suggests an update when it finds changes. With no cache, the first run analyzes automatically; otherwise a full re-analysis happens only on an explicit `/issue-triage update`.
 
 ## Invocation
 
@@ -22,31 +22,31 @@ Analyze open GitHub issues to surface dependencies, suggest priorities, identify
 | `/issue-triage --limit N` | Force a full re-analysis with up to N issues (runs Prerequisites, then Steps 1-9) |
 | `/issue-triage … --auto` | (modifier) Run non-interactively — every gate logs a `⚠` and takes its safe default instead of prompting |
 
-The design principle: **viewing is cheap and instant, updating is deliberate.** Users see their triage report immediately without waiting for GitHub API calls. Updates only happen when the user explicitly requests one or approves a suggestion.
+The design principle: **viewing is cheap and instant, updating is deliberate.** The report renders with no GitHub API call; an update runs only when the user asks for one or approves a suggestion.
 
-**Auto mode.** `--auto` composes with every invocation above. Detection, the log-and-proceed gate rule, the `⚠` line format, and the safety stops that still abort are defined once in `docs/auto-mode.md`; this skill's gates cite it rather than restating it. In auto mode `/issue-triage` runs unattended end to end — it has no blocking prompt, so it is safe to drive from an orchestrator or a subagent.
+**Auto mode.** `--auto` composes with every invocation above. Detection, the log-and-proceed gate rule, the `⚠` line format, and the safety stops that still abort live once in `docs/auto-mode.md`; the gates below cite it rather than restate it. Under `--auto` this skill has no blocking prompt, so an orchestrator or subagent can drive it end to end.
 
 ## Default Mode (View with Smart Suggestions)
 
-When invoked as `/issue-triage` (without `update` or `--limit`):
+When invoked as `/issue-triage` (without `update` or `--limit`), run the *Bundled dependency precheck* below — view mode reads bundled files too, and a missing one is a broken install, not a degrade — then:
 
 ### 1. Check for cached data
 
 Look for `.gitissue/triage.json` at the repo root.
 
-**If the file does not exist**, print a brief notice and automatically fall through to a full analysis (Steps 1-9):
+**If it does not exist**, print this notice and fall through to a full analysis (Steps 1-9):
 
 ```
 ○ No cached triage found — running first analysis...
 ```
 
-Then execute the full pipeline (starting from Prerequisites) and stop after Step 9.
+Then run the full pipeline from Prerequisites and stop after Step 9.
 
 **If the file exists**, continue to step 2.
 
 ### 2. Parse the cached data
 
-Read and parse the JSON file. If the JSON is malformed or unparseable, output the error from `references/error-messages.md` and stop:
+Parse the JSON. If it is malformed, output the error from `references/error-messages.md` and stop:
 
 ```
 ✗ .gitissue/triage.json is corrupted
@@ -57,7 +57,7 @@ Read and parse the JSON file. If the JSON is malformed or unparseable, output th
 
 ### 3. Render the cached report
 
-Compute report age from the `updated` timestamp relative to now. Render the triage table to terminal using the same `docs/terminal-style.md` format as Step 8, with a cache header:
+Compute report age from the `updated` timestamp. Render the triage table in the same `docs/terminal-style.md` format as Step 8, under a cache header:
 
 ```
 ◆ Issue Triage (cached)
@@ -79,7 +79,7 @@ Compute report age from the `updated` timestamp relative to now. Render the tria
 
 ### 4. Detect changes and suggest update
 
-After rendering the cached report, check whether the triage data might be outdated. Run these lightweight checks (no GitHub API calls):
+Then test whether the data may be outdated, with local checks only (no GitHub API calls):
 
 **a) Git history check** — count commits since the last triage:
 
@@ -89,7 +89,7 @@ git log --oneline --since="{updated timestamp from cache}" | wc -l
 
 **b) Report age check** — compute how old the cached report is.
 
-**c) Issue activity check** — compare the cached issue `updated_at` timestamps against the cache's `updated` timestamp to see if any issues were already showing signs of change at triage time.
+**c) Issue activity check** — compare the cached issues' `updated_at` timestamps against the cache's own `updated` timestamp, to catch issues already moving at triage time.
 
 Based on these signals, print one of these endings:
 
@@ -110,9 +110,9 @@ Based on these signals, print one of these endings:
   Run /issue-triage update for fresh analysis.
 ```
 
-These suggestions are informational only — the skill never auto-updates. The user decides whether to act on them.
+These suggestions are informational — the skill never auto-updates; the user decides whether to act.
 
-After the suggestion (or the "up to date" message), **stop**. View mode never writes to the file or makes API calls beyond the local git log check.
+Every view-mode exit — a corrupted cache, or a rendered report with or without a suggestion — closes with the *Run Stats Footer* (`references/run-stats.md`), then **stops**. View mode never writes to the file and makes no API call beyond the local git log check. It also skips *Configuration*, so no `run_started_epoch` was captured and `elapsed` prints `n/a`.
 
 ---
 
@@ -124,17 +124,17 @@ Before any operation, verify the environment. On failure, output the exact error
 2. Confirm `gh` is installed: `which gh`
 3. Confirm authentication: `gh auth status`
 4. Confirm GitHub remote exists: `git remote -v`
-5. **Check the rate budget** (driver rule 4, `docs/platform-github.md`): update mode runs a batch loop that fetches every open issue and fans out one relationship-scanner subagent per batch, each making its own `gh`/API calls. Before that loop, confirm enough budget remains:
+5. **Check the rate budget** (driver rule 4, `docs/platform-github.md`). Update mode fetches every open issue and fans a scanner subagent out per batch, each making its own `gh` calls, so confirm the budget before that loop:
 
    ```bash
    gh api rate_limit --jq '{remaining: .rate.remaining, reset: .rate.reset}'
    ```
 
-   **Threshold:** if `remaining` is below **100**, stop and print the `✗ Insufficient API rate budget` error from `references/error-messages.md` — the batch loop would exhaust the budget mid-scan and leave a partial triage. Between 100 and 200, warn with the same message's `⚠` variant but continue. At or above 200, proceed silently. (View mode makes no API calls and skips this check entirely.)
+   **Threshold:** below **100** `remaining`, stop and print the `✗ Insufficient API rate budget` error from `references/error-messages.md` — the loop would exhaust the budget mid-scan and leave a partial triage. Between 100 and 200, warn with that message's `⚠` variant and continue. At 200 or above, proceed silently. View mode makes no API calls and skips this check.
 
 ## Repo Sync (recommended)
 
-Before analyzing issues, recommend syncing with the remote so dependency analysis based on local files is accurate:
+Recommend a sync first, so the file-based dependency scan sees the latest code:
 
 ```
 ⚡ Your branch may be behind the remote. Sync before triaging?
@@ -170,7 +170,7 @@ If `origin` is missing or rebase conflicts occur, inform the user and continue w
   ⚠ Auto mode: sync confirmation skipped — syncing with origin before triage.
 ```
 
-This matches the same non-interactive sync carve-out `/issue-analysis` already applies. Failure stays non-fatal exactly as above: if `origin` is missing or the rebase conflicts, warn and continue the triage without syncing — a sync problem must never abort an unattended run.
+This is the same non-interactive carve-out `/issue-analysis` applies, and failure stays non-fatal exactly as above — a sync problem must never abort an unattended run.
 
 ## Configuration
 
@@ -244,32 +244,31 @@ If any are missing, stop immediately and print:
 
 Check these files:
 
-- `references/agents/issue-relationship-scanner.md` — Combined dependency + history scanner prompt
-- `references/detection.md` — Confidence-scoring rules and merge logic for detection
-- `references/output-and-persist.md` — Terminal report rendering spec and JSON schema
+- `references/agents/issue-relationship-scanner.md` — combined dependency + history scanner prompt
+- `references/detection.md` — confidence scoring, merge logic, and the Steps 3-7 prose procedure
+- `references/output-and-persist.md` — report rendering spec, JSON schema, step completion reports
 - `references/run-stats.md` — run-stats footer contract (shape, fields, unavailable marker)
-- `references/error-messages.md` — complete error catalog with triggers and exact output
+- `references/error-messages.md` — error catalog with triggers and exact output
 - `references/examples.md` — worked example runs
-- `references/docs/sync-conventions.md` — stash-first sync convention and recovery
-- `references/docs/idd-methodology.md` — IDD methodology (durable analysis fields)
-- `references/docs/github-projects-sync.md` — GitHub Projects status sync reference
-- `references/docs/config-schema.md` — configuration schema reference
-- `references/docs/platform-github.md` — GitHub platform driver reference
+- `references/docs/sync-conventions.md` — stash-first sync and recovery
+- `references/docs/idd-methodology.md` — IDD methodology (dependency markers)
+- `references/docs/github-projects-sync.md` — Projects status sync reference
+- `references/docs/config-schema.md` — configuration schema
+- `references/docs/platform-github.md` — GitHub platform driver
 - `references/docs/auto-mode.md` — auto-mode detection and the non-interactive gate rule
-- `references/docs/terminal-style.md` — terminal output style contract (symbols, output structure, table/error formats)
-- `references/scripts/gi-config.py` — config resolver: merges the documented defaults with `.gitissue.yml` and prints one JSON line
-- `references/scripts/gi-triage-graph.py` — cycle detection, execution order, parallel sets, staleness, and priority
+- `references/docs/terminal-style.md` — terminal style contract (symbols, structure, tables, errors)
+- `references/scripts/gi-config.py` — config resolver: defaults merged with `.gitissue.yml`, one JSON line
+- `references/scripts/gi-triage-graph.py` — cycles, order, parallel sets, staleness, priority
 
 ---
 
 ### Step completion reports
 
 Each step closes with a completion report — `√`/`×` per check plus a
-`Result: PASS | PARTIAL | FAIL` line — so "step done" is checkable rather than
-asserted. The per-step check names, the `Result` semantics, and the block
-format are in `references/output-and-persist.md` (*Step Completion Reports*) —
-**read it now**, before Step 1. A step is not complete until its `Result:`
-line is printed.
+`Result: PASS | PARTIAL | FAIL` line — so "step done" is checkable, not
+asserted. Check names, `Result` semantics and block format are in
+`references/output-and-persist.md` (*Step Completion Reports*) — **read it
+now**, before Step 1. A step is not complete until its `Result:` line prints.
 
 ---
 
@@ -279,13 +278,9 @@ line is printed.
 gh issue list --state open --json number,title,body,labels,assignees,state,createdAt,updatedAt --limit 100
 ```
 
-If `triage.include_closed` is true, also fetch closed issues and merge the results:
+If `triage.include_closed` is true, run the same command with `--state closed` and merge the results.
 
-```bash
-gh issue list --state closed --json number,title,body,labels,assignees,state,createdAt,updatedAt --limit 100
-```
-
-If the repository has more than 100 open issues and no `--limit` was specified, warn using the message from `references/error-messages.md`:
+Past 100 open issues with no `--limit`, warn using the message from `references/error-messages.md`:
 
 ```
 ⚠ {count} open issues found. Analyzing first 100.
@@ -293,9 +288,9 @@ If the repository has more than 100 open issues and no `--limit` was specified, 
   To analyze all: /issue-triage --limit {count}
 ```
 
-If `--limit N` was provided, use that value instead of the default 100.
+With `--limit N`, use N instead of the default 100.
 
-**Empty state**: If no open issues are found, output the message from `references/error-messages.md` and stop:
+**Empty state**: with no open issues, output the message from `references/error-messages.md` and stop:
 
 ```
 ○ No open issues found. Nothing to triage!
