@@ -85,9 +85,11 @@ commit as the cut that pointed at it:
 
 No exit code, fallback procedure, stop condition, script path, or `<!-- a: -->` anchor was
 dropped. The three body anchors (`rs-0a-payload-concurrency`, `rs-0h-skill`,
-`rs-deliver-clean-tree`) are present exactly once each, and every phrase the suite pins to
-the SKILL body survived — verified after every commit by a scripted guard covering all 34
-resolver-touching test files.
+`rs-deliver-clean-tree`) are present exactly once each. Preservation was checked two ways:
+after every commit by a scripted guard over the phrases the suite pins to
+`SKILL.source.md` (extracted up front from the 34 resolver-touching test files), and
+end-to-end by the full suite on the rebuilt tree, which is what covers the built-side
+assertions the guard does not read.
 
 ---
 
@@ -159,8 +161,9 @@ Every step heavy enough to hand off, walked:
 | **Step 0 — Preflight** | borderline (0a–0h) | **step 0 is not delegable because it needs the user mid-step** — 0c's assignment/label guard and 0e's worktree offer are interactive decision points, and 0a/0d mutate the issue the rest of the run reads. |
 | **Step 5 — Deliver** | borderline | **step 5 is not delegable because it depends on the previous step's exact text** — the PR body's Decision Record and Acceptance Criteria Verification table are built from Step 2's selected option and Step 4's findings verbatim, and the run-stats footer measures from a clock captured in *Configuration*. |
 
-No finding: every heavy step names its slice, and the two orchestrator-resident steps are
-recorded with their reason. Advisory only — this did not gate the PASS.
+**Pass:** every heavy step names its slice, and the two orchestrator-resident steps are
+recorded with their reason, which is the sub-check's stated bar. Advisory only — this did
+not gate the PASS.
 
 ---
 
