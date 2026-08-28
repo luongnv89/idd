@@ -220,7 +220,7 @@ Before spawning any LLM reviewer, run deterministic tools to catch mechanical is
 
 **When `--review-only` is set:** this pre-pass is detection-only — see *Review-only mode* under Step 7.
 
-**Default (fix loop):** detect the project's lint/format tools, run each auto-fix command (don't block on warnings — only on errors that prevent the fix from running), then run the test suite to catch failures early. The per-tool detection table and example commands are in `references/prepass-tests-ci-mechanics.md` (*Step 2*). **Under `qa_handoff = trusted`, skip only the test run**, and only when the marker carries a `tests=` field whose SHA equals `head` **and `ci_leg_runnable` is true** — that suite already ran on this exact commit. When `ci_leg_runnable` is false (no CI / empty `statusCheckRollup` / `no_ci` / `review.check_ci: false`), ignore `tests=` and run the local suite as unmarked. The lint/format auto-fix still runs (it mutates the tree, so skipping it changes the PR, not just the review's cost), and the `gi-secscan` gate below is **never** gated on `qa_handoff`. When that auto-fix commits and pushes, the head moves off the marker: recompute the verdict then, before Step 3 — this skill re-evaluates after **any** push it makes, not only the fixer's (*Review Loop*) — so Step 4 runs the suite in full on the commit the auto-fix produced.
+**Default (fix loop):** detect the project's lint/format tools, run each auto-fix command (don't block on warnings — only on errors that prevent the fix from running), then run the test suite to catch failures early. The per-tool detection table and example commands are in `references/prepass-tests-ci-mechanics.md` (*Step 2*). **Under `qa_handoff = trusted`, skip only the test run**, and only when the marker carries a `tests=` field whose SHA equals `head` **and `ci_leg_runnable` is true** — that suite already ran on this exact commit. When `ci_leg_runnable` is false (no CI / empty `statusCheckRollup` / `no_ci` / `review.check_ci: false`), ignore `tests=` and run the local suite as unmarked. The lint/format auto-fix still runs (it mutates the tree, so skipping it changes the PR, not just the review's cost), and the `gi-secscan` gate below is **never** gated on `qa_handoff`. When that auto-fix commits and pushes, the head moves off the marker: recompute the verdict then, before Step 3 (*Review Loop*), so Step 4 runs the suite in full on the commit the auto-fix produced.
 
 ### Commit auto-fixes <!-- a:rv-commit-autofix -->
 
@@ -228,20 +228,20 @@ Before spawning any LLM reviewer, run deterministic tools to catch mechanical is
 the auto-fix tools, you MUST scan before staging — blocking on real secrets and
 warning on large files / build artifacts / protected branches. In auto mode,
 export `IDD_AUTO_MODE=1` first so warnings are logged rather than needing
-confirmation. Run:
+confirmation. Run it from the repo root:
 
 ```bash
 base="$(gh repo view --json defaultBranchRef --jq .defaultBranchRef.name)"
 python3 shared/scripts/gi-secscan.py --working-tree --policy-ref "origin/${base}"
 ```
 
-Run it from the repo root; the script reads `security.allow_pattern` and its
-siblings itself, so **never interpolate a config value into this command**.
-`--policy-ref` is the trust boundary — this skill has the PR's branch checked
-out, so without it that branch's own `.gitissue.yml` governs its review, and
-`allow_pattern: "."` reports clean having scanned nothing. Bind `base` **first**
-from the repository's default branch, never the PR's `baseRefName`: unset makes
-the ref `origin/`, and exit 4 then degrades this gate on every run.
+The script reads `security.allow_pattern` and its siblings itself, so **never
+interpolate a config value into this command**. `--policy-ref` is the trust
+boundary — this skill has the PR's branch checked out, so without it that
+branch's own `.gitissue.yml` governs its review, and `allow_pattern: "."` reports
+clean having scanned nothing. Bind `base` **first** from the repository's default
+branch, never the PR's `baseRefName`: unset makes the ref `origin/`, and exit 4
+then degrades this gate on every run.
 
 **A pass is all four: exit 0, `policy_source` exactly the `ref:origin/…` asked
 for, `verdict` not `block`, and not (`scanned` 0 with `skipped` above 0)** — full
@@ -277,20 +277,20 @@ If tests fail here, continue to the review loop — failures are picked up in St
 
 ### Reviewer agents and cycle reuse
 
-Read `shared/agents/code-reviewer.md` for the reviewer prompt and `shared/agents/fixer.md` for the fix-cycle prompt. Both spawn with the default general-purpose agent (do NOT set `subagent_type`; not a custom `code-reviewer`/`fixer` type). Pass the reviewer `branch_name`, `base_branch`, `pr_context` (PR title + body), and `diff_command` (`gh pr diff {N}`). Pass `review.confidence_threshold` (default 80) as the minimum confidence for code-reviewer findings; ui-reviewer keeps its 75 floor.
+Read `shared/agents/code-reviewer.md` for the reviewer prompt and `shared/agents/fixer.md` for the fix-cycle prompt. Both spawn with the default general-purpose agent (do NOT set `subagent_type`; not a custom `code-reviewer`/`fixer` type). Pass the reviewer `branch_name`, `base_branch`, `pr_context` (PR title + body), `diff_command` (`gh pr diff {N}`), and `review.confidence_threshold` (default 80) as the minimum confidence for its findings; ui-reviewer keeps its 75 floor.
 
-To minimize tokens, the loop **reuses the same reviewer across cycles**: cycle 1 cold-starts; cycles 2+ re-message it via `SendMessage` to re-review the updated diff; after the fixer reports zero fixable issues, one **fresh** confirmation reviewer does an unbiased final check. Under `qa_handoff = trusted`, the cycle-1 cold-start reviewer is **collapsed into** that fresh confirmation pass rather than skipped — the PR still receives exactly one independent, full-strength review, from an agent with no memory of the resolver's own — and the loop cap drops to `min(1, configured_cap)`. The collapse **saves no reviewer spawn**: the confirmation pass is itself fix-conditional, so an unmarked clean PR already gets exactly one cold-start pass and no confirmation. What `trusted` changes is *which* single pass runs — the unbiased one; the measured saving is the duplicated local test legs at Steps 2 and 4. Both are refused by Step 1's *Precedence* carve-out when the marker says `profile=light` and this review resolved `profile=full`. The exact spawn calls, the `SendMessage` re-review prompt, and the token-trade rationale live in `references/review-loop-mechanics.md`.
+To minimize tokens, the loop **reuses the same reviewer across cycles**: cycle 1 cold-starts; cycles 2+ re-message it via `SendMessage` to re-review the updated diff; after the fixer reports zero fixable issues, one **fresh** confirmation reviewer does an unbiased final check. Under `qa_handoff = trusted`, the cycle-1 cold-start reviewer is **collapsed into** that fresh confirmation pass rather than skipped — the PR still receives exactly one independent, full-strength review, from an agent with no memory of the resolver's own — and the loop cap drops to `min(1, configured_cap)`. The collapse **saves no reviewer spawn**: the confirmation pass is itself fix-conditional, so an unmarked clean PR already gets exactly one cold-start pass and no confirmation. What `trusted` changes is *which* single pass runs — the unbiased one; the measured saving is the duplicated local test legs at Steps 2 and 4. Both are refused by Step 1's *Precedence* carve-out when the marker says `profile=light` and this review resolved `profile=full`. Spawn calls, the `SendMessage` prompt, and the token-trade rationale are in `references/review-loop-mechanics.md`.
 
 ### UI/UX Review (Step 3 — auto-detected)
 
-UI review is **auto-detected per PR** — no config flag enables it. The skill scans the PR title/body and changed files for UI work, then runs only what *can* and *should* run. The contract:
+UI review is **auto-detected per PR** — no config flag enables it. Two legs, with different guarantees:
 
 - **Code UI review** is environment-independent (reads the diff/changed files). It runs whenever UI work is detected, on any machine **including a no-GUI/server host** — never gated on a GUI, running app, or browser.
-- **Browser UI review** is an optional, additive bonus: it captures screenshots from a running app, so it runs only with a reachable app *and* user opt-in. When it can't run (no app, capture unsafe, or auto mode without opt-in), it **skips with a warning and the code UI review still runs** — fail-soft to code-only, never block.
+- **Browser UI review** is an optional, additive bonus: it captures screenshots from a running app, so it needs a reachable app *and* user opt-in. When it can't run (no app, capture unsafe, or auto mode without opt-in), it **skips with a warning and the code UI review still runs** — fail-soft to code-only, never block.
 
 The shared mechanics — detection commands, the code-review spawn, the report-only display-environment label (`ui_env`), the browser-review gate + three-part capability check, and the headless capture call — live in `docs/ui-review.md`. This skill's own deltas — the PR diff command, the variables it passes, the interactive proposal prompt, and cycle-reuse `SendMessage` — are in `references/ui-review-mechanics.md`. **Read both and apply them** when `ui: detected`; together they preserve the contract above and route `action: "fix"` UI findings into Step 6 under `category: ui_ux`. Under `qa_handoff = trusted` the **code** UI review is skipped only when the marker's `ui=` leg says it already ran (`ui=code…` or `ui=code+browser…`) **and** carries an `@<sha40>` equal to `head` — never on `ui=none`, never on an unsuffixed `ui=` (well-formed, but not commit-bound), and never for the browser leg, which is opt-in and fail-soft on both sides.
 
-For acceptance-criteria verification, consume `linked_issue_snapshot` from the review-boundary read directly; do not call `gi-issue.py` or `gh` again. This preserves the fresh record even when `gi-issue.py --refresh` failed and the successful direct-`gh` fallback could not update a stale cache entry. When a linked issue exists but its snapshot holds no usable record, the *Depth gate*'s empty-record fail-safe applies — an empty or stale record never stands in for current acceptance criteria. A PR with **no** linked issue is a different state, not a fail-safe case: nothing was refreshed, nothing is missing, and it proceeds normally — `acceptance_criteria` reports `○ pass — none defined; manual review recommended` and traceability check 1 handles the missing `Closes #N` (`references/verification-checks.md`). <!-- a:rv-step3-ac-snapshot -->
+For acceptance-criteria verification, consume `linked_issue_snapshot` from the review-boundary read directly; do not call `gi-issue.py` or `gh` again — this preserves the fresh record even when the direct-`gh` fallback could not update a stale cache entry. When a linked issue exists but its snapshot holds no usable record, the *Depth gate*'s empty-record fail-safe applies. A PR with **no** linked issue is a different state, not a fail-safe case: nothing was refreshed, nothing is missing, and it proceeds normally — `acceptance_criteria` reports `○ pass — none defined; manual review recommended` and traceability check 1 handles the missing `Closes #N` (`references/verification-checks.md`). <!-- a:rv-step3-ac-snapshot -->
 
 ```
 [3/7] Review       ✓ spec[ac:pass correctness:pass safety:pass]
@@ -304,7 +304,7 @@ Within a cycle, in order: reviewer subagent → UI reviewer in **code** mode (sk
 
 ### Dimensional review output
 
-Step 3 produces a single verdict in **five dimensions** — `correctness`, `acceptance_criteria`, `traceability`, `maintainability`, `safety` — each reporting `pass`, `partial`, or `fail`. The reviewer's internal categories map onto them; when UI work is detected, the UI reviewer's `ui_ux` findings fold into `maintainability`, and a UI `action: "fix"` finding makes `maintainability` at least `partial` and adds a fixable issue to Step 6 (`category: ui_ux`) — the verdict never shows all-pass while UI fixables remain. The report groups the five under a **Spec axis** (`acceptance_criteria`, `correctness`, `safety`) and a **Standards axis** (`traceability`, `maintainability`) — presentation-only, no per-axis verdict. Full reviewer-category mapping and the two-axis rationale live in `references/verification-checks.md`. **Read that file and apply it now.**
+Step 3 produces a single verdict in **five dimensions** — `correctness`, `acceptance_criteria`, `traceability`, `maintainability`, `safety` — each reporting `pass`, `partial`, or `fail`. When UI work is detected the UI reviewer's `ui_ux` findings fold into `maintainability`, and a UI `action: "fix"` finding makes `maintainability` at least `partial` and adds a fixable issue to Step 6 (`category: ui_ux`) — the verdict never shows all-pass while UI fixables remain. The report groups the five under a **Spec axis** (`acceptance_criteria`, `correctness`, `safety`) and a **Standards axis** (`traceability`, `maintainability`) — presentation-only, no per-axis verdict. The reviewer-category mapping and the two-axis rationale are in `references/verification-checks.md`. **Read that file and apply it now.**
 
 A PR can pass tests and still fail `traceability` or `acceptance_criteria` — those are not gated by test results.
 
