@@ -152,8 +152,11 @@ longer loads, not words that moved somewhere it still loads them from.
    line as `` `○ [3/4] Autopilot mode        skipped — no .gitissue.yml` ``. Those are two
    different strings for one printed line, and an agent reading *Configuration* first would print
    the wrong one. *Configuration* now says Check 3 *"skips rather than fails (see Check 3)"* and
-   renders nothing. This is the only place in the pass where a printed string left the body
-   without a surviving copy, and it left because it was wrong.
+   renders nothing. `references/error-messages.md` was checked too, since ADR D1 makes the
+   governed artifact the whole package: its `### Skip (no config)` block already carried the
+   canonical form, so the deleted line was the sole outlier and the package is now internally
+   consistent. This is the only place in the pass where a printed string left the body without a
+   surviving copy, and it left because it was wrong.
 2. **A scope row was corrected while being shortened.** *Scope (v1)* row 4 read *"The
    repository's default merge strategy is squash (squash allowed AND merge-commit and
    rebase-merge disallowed)"* — the strategy level only. Check 4 has required **both** levels
@@ -349,8 +352,8 @@ not touched by this pass.
 The body's call-site sentence kept its pinned shape and gained exactly one item in its
 illustrative tail:
 
-> Close with the *Run Stats Footer* — `references/run-stats.md` — `elapsed`, `tokens` only where
-> the host reported a count (otherwise left out), `agents`, run cost only, `n/a` for anything
+> After the run-log summary, close with the *Run Stats Footer* — `references/run-stats.md` —
+> `elapsed`, `tokens` only where the host reported a count (otherwise left out), `agents`, run cost only, `n/a` for anything
 > else undetermined. It is the last thing printed at **every** terminal outcome, including a run
 > that never reached Check 1: not a git repository, **a missing bundled dependency**, no
 > `src/skills/` tree, or an unreadable `.gitissue.yml`. The doctor spawns no subagents, so
