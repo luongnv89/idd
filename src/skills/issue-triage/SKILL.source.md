@@ -17,9 +17,9 @@ Analyze open GitHub issues to surface dependencies, suggest priorities, group pa
 
 | Invocation | What happens |
 |------------|--------------|
-| `/issue-triage` | Show cached triage from `.gitissue/triage.json`. If no cache exists, automatically run a full analysis and persist. After rendering, suggest an update if repo changes are detected. |
-| `/issue-triage update` | Force a full re-analysis: run **Prerequisites** (including the rate-budget preflight), then Steps 1-9, and overwrite `.gitissue/triage.json` |
-| `/issue-triage --limit N` | Force a full re-analysis with up to N issues (runs Prerequisites, then Steps 1-9) |
+| `/issue-triage` | Show cached triage from `.gitissue/triage.json`; with no cache, run a full analysis and persist. After rendering, suggest an update if repo changes are detected. |
+| `/issue-triage update` | Force a full re-analysis: **Prerequisites** (including the rate-budget preflight), then Steps 1-9, overwriting `.gitissue/triage.json` |
+| `/issue-triage --limit N` | Force a full re-analysis of up to N issues (Prerequisites, then Steps 1-9) |
 | `/issue-triage … --auto` | (modifier) Run non-interactively — every gate logs a `⚠` and takes its safe default instead of prompting |
 
 The design principle: **viewing is cheap and instant, updating is deliberate.** The report renders with no GitHub API call; an update runs only when the user asks for one or approves a suggestion.
@@ -87,11 +87,11 @@ Then test whether the data may be outdated, with local checks only (no GitHub AP
 git log --oneline --since="{updated timestamp from cache}" | wc -l
 ```
 
-**b) Report age check** — compute how old the cached report is.
+**b) Report age check** — how old the cached report is.
 
-**c) Issue activity check** — compare the cached issues' `updated_at` timestamps against the cache's own `updated` timestamp, to catch issues already moving at triage time.
+**c) Issue activity check** — the cached issues' `updated_at` timestamps against the cache's own `updated` timestamp, catching issues already moving at triage time.
 
-Based on these signals, print one of these endings:
+Print one of these endings:
 
 **No changes detected:**
 ```
@@ -134,7 +134,7 @@ Before any operation, verify the environment. On failure, output the exact error
 
 ## Repo Sync (recommended)
 
-Recommend a sync first, so the file-based dependency scan sees the latest code:
+Recommend a sync first, so the dependency scan sees the latest code:
 
 ```
 ⚡ Your branch may be behind the remote. Sync before triaging?
@@ -143,7 +143,7 @@ Recommend a sync first, so the file-based dependency scan sees the latest code:
   Sync now? [Y/n]
 ```
 
-If the user agrees, run the stash-first sync (see `docs/sync-conventions.md`):
+On agreement, run the stash-first sync (`docs/sync-conventions.md`):
 
 ```bash
 branch="$(git rev-parse --abbrev-ref HEAD)"
@@ -162,7 +162,7 @@ if [ "$dirty" -eq 1 ]; then
 fi
 ```
 
-If `origin` is missing or rebase conflicts occur, inform the user and continue without syncing. If the user declines the prompt, proceed without syncing.
+If `origin` is missing or the rebase conflicts, say so and continue without syncing. If the user declines the prompt, proceed without syncing.
 
 **Auto mode (`docs/auto-mode.md`) — never blocks.** Do not show the `Sync now? [Y/n]` prompt. **Run the stash-first sync immediately** (the interactive default is `Y`), and log:
 
@@ -186,10 +186,10 @@ Triage settings and defaults (full semantics in `docs/config-schema.md`):
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `triage.stale_threshold_days` | `14` | Flag issues with no activity beyond this many days |
-| `triage.auto_priority` | `true` | Suggest P1/P2/P3 based on type, age, and dependency position |
-| `triage.include_closed` | `false` | Include recently closed issues in triage analysis |
-| `triage.scan_timeout_per_issue` | `30` | Max seconds to scan per issue for file dependencies |
+| `triage.stale_threshold_days` | `14` | Days of inactivity before an issue is flagged stale |
+| `triage.auto_priority` | `true` | Suggest P1/P2/P3 from type, age and dependency position |
+| `triage.include_closed` | `false` | Include recently closed issues |
+| `triage.scan_timeout_per_issue` | `30` | Max seconds of file-dependency scanning per issue |
 
 An existing file carrying invalid values is the exit-3 case above: print the validation error from `references/error-messages.md` and stop.
 
@@ -210,11 +210,7 @@ Main Agent (orchestrator)
 │   Main agent merges batches, adds cross-batch edges + file-overlap signals
 │   Returns: potentially-fixed issues, affected files, directed dependency edges
 │
-├── Steps 3-7: Main agent (lightweight computation)
-│   Circular dep detection, topological sort, parallelization,
-│   stale detection, priority assignment — all operate on the
-│   structured data returned by subagents
-│
+├── Steps 3-7: Main agent — arithmetic over the returned data
 ├── Step 8: Output (main agent — render terminal report)
 └── Step 9: Persist (main agent — write triage.json)
 ```
@@ -305,22 +301,22 @@ Progress output:
 
 ## Steps 1b & 2 — Already-Fixed & Dependency Detection
 
-One full-scope scanner per batch finds issues already fixed by commits/PRs **and** builds the file-overlap dependency map. **Read `references/detection.md` now** — the subagent prompts, confidence-scoring rules, and merge logic there are what these steps execute, not optional tuning detail. The `Depends on #N` / `Blocked by #N` body markers this scan may also encounter — their grammar and how each skill treats them — are defined in `docs/idd-methodology.md` (*Issue Dependencies*); consult it when a scanned body carries one, so the directed edges reported here stay consistent with the marker semantics `/auto-pilot`'s merge gate enforces.
+One full-scope scanner per batch finds issues already fixed by commits/PRs **and** builds the file-overlap dependency map. **Read `references/detection.md` now** — its subagent prompts, confidence-scoring rules and merge logic are what these steps execute, not optional tuning detail. When a scanned body carries a `Depends on #N` / `Blocked by #N` marker, read its grammar in `docs/idd-methodology.md` (*Issue Dependencies*) so the directed edges here match the semantics `/auto-pilot`'s merge gate enforces.
 
 Summary:
-- **Step 1b** — flags open issues whose titles/bodies match recent commit messages or merged PR descriptions. Marks them `potentially_fixed` with evidence links.
-- **Step 2** — for each issue, extracts keywords from the title and body and scans the current codebase to discover affected files, then computes pairwise overlap to produce a `dependencies[]` graph. Affected files are derived from the codebase scan, never read from the issue body.
-- **Step 3** — circular-dependency detection; folded into the scripted block below, which breaks each cycle and reports it.
+- **Step 1b** — flags open issues whose titles/bodies match recent commit messages or merged PR descriptions, marking them `potentially_fixed` with evidence links.
+- **Step 2** — extracts keywords from each title and body, scans the codebase for affected files, and computes pairwise overlap into a `dependencies[]` graph. Affected files come from the codebase scan, never from the issue body.
+- **Step 3** — circular-dependency detection, folded into the scripted block below, which breaks and reports each cycle.
 
 ---
 ## Steps 3-7 — Order, Parallel Sets, Staleness, Priority
 
-Cycle detection, the topological sort and its tie-breaks, the independent-set
-grouping, the date subtraction behind staleness, and the P1/P2/P3 buckets are
-all arithmetic over the scanner's structured result. There is one correct answer
-for each, so run `shared/scripts/gi-triage-graph.py` rather than recomputing
-them from prose — a recomputed order is a *plausible* one, and a triage that
-reorders itself between identical runs is not actionable.
+Cycle detection, the topological sort and its tie-breaks, independent-set
+grouping, the date subtraction behind staleness and the P1/P2/P3 buckets are
+arithmetic over the scanner's result — one correct answer each. Run
+`shared/scripts/gi-triage-graph.py` rather than recompute them from prose: a
+recomputed order is merely *plausible*, and a triage that reorders itself
+between identical runs is not actionable.
 
 Write the merged scan to `.gitissue/cache/triage-scan.json` with the Write tool
 — **never** put an issue title on a command line; titles are reporter-written
@@ -333,45 +329,41 @@ text and this skill runs unattended under `/auto-pilot`:
  "edges": [{"a": 12, "b": 15}]}
 ```
 
-`edges` entries are the scanner's undirected pairs (`a`/`b`); the script directs
-them by the documented heuristics. Pass an already-directed pair as `from`/`to`.
-Then, from the repo root (resolve the script path relative to this SKILL.md
-exactly as the *Bundled dependency precheck* resolves its list):
+`edges` are the scanner's undirected pairs (`a`/`b`), which the script directs by
+its documented heuristics; pass an already-directed pair as `from`/`to`. Then,
+from the repo root (resolving the script path as the *Bundled dependency
+precheck* resolves its list):
 
 ```bash
 python3 shared/scripts/gi-triage-graph.py --source /issue-triage --out .gitissue/triage.json < .gitissue/cache/triage-scan.json
 ```
 
-Exit 0 prints — and `--out` persists — the full `.gitissue/triage.json` payload,
-which is Step 9 done: top-level `version`, `updated`, `source`,
-`analyzed_count`, `issues[]`, `summary` (`parallel_groups`, `stale_count`,
-`stale_threshold_days`, `potentially_fixed_count`, `suggested_order`,
-`circular_deps`, `co_dependent`), and `history[]`. Each `issues[]` entry carries
-a `status` of `ready`, `blocked`, `stale`, or `maybe-fixed` — in that precedence
-order, `maybe-fixed` first — which the table renders as `ready`, `blocked #N`,
-`stale (Nd)`, and `maybe-fixed`. Delete the scan file afterwards. Classify
-**every** outcome:
+Exit 0 prints — and `--out` persists — the whole `.gitissue/triage.json` payload,
+which is Step 9 done: `version`, `updated`, `source`, `analyzed_count`,
+`issues[]`, `summary` (`parallel_groups`, `stale_count`, `stale_threshold_days`,
+`potentially_fixed_count`, `suggested_order`, `circular_deps`, `co_dependent`)
+and `history[]`. Each `issues[]` entry carries a `status` of `ready`, `blocked`,
+`stale` or `maybe-fixed`, in that precedence order with `maybe-fixed` first,
+rendered in the table as `ready`, `blocked #N`, `stale (Nd)` and `maybe-fixed`.
+Delete the scan file afterwards. Classify **every** outcome:
 
 | Outcome | Meaning | Do |
 |---------|---------|----|
 | exit 0 | computed and persisted | render Step 8 from the payload |
-| exit 3 | invalid input — an issue without a number, an edge naming an unknown issue, an unparsable timestamp, or an out-of-range `triage.*` value | **stop**; print the validation error from `references/error-messages.md`. Never degrade past exit 3 |
+| exit 3 | invalid input — an issue without a number, an edge naming an unknown issue, an unparsable timestamp, an out-of-range `triage.*` value | **stop**; print the validation error from `references/error-messages.md`. Never degrade past exit 3 |
 | script file absent | broken install, not a runtime problem | stop with the `✗ Missing bundled dependency` block above |
-| exit 4 | the payload was computed but `--out` could not be written | it is still on stdout — warn per `references/error-messages.md` (*triage.json write failure*) and continue to Step 8 |
+| exit 4 | payload computed, `--out` unwritable | it is still on stdout — warn per `references/error-messages.md` (*triage.json write failure*) and continue to Step 8 |
 | no `python3`, exit 2, unparsable stdout | environment problem | print `⚠ gi-triage-graph unavailable — computing the order inline` and run the prose procedure in `references/detection.md` (*Steps 3-7 — the prose procedure*), then persist per `references/output-and-persist.md` |
 
-The prose procedure in `references/detection.md` is the authoritative statement
-of the rules the script implements — cycle breaking, tie-breaks, the stale
-threshold, and the priority buckets — and stays runnable by hand.
+That prose procedure is the authoritative statement of the rules the script
+implements, and stays runnable by hand.
 
-If `triage.auto_priority` is false, every `priority` comes back `null`; omit the
-Pri column from the table and skip priority suggestions.
+If `triage.auto_priority` is false every `priority` comes back `null`: omit the
+Pri column and skip priority suggestions.
 
 ## Step 8-9 — Output & Persist
 
-Step 8 renders the full triage table (rank, issue, priority, blockers, status, parallelizable flag, stale flag) and a suggested execution order from the payload above. Step 9 is the `--out` write; when the script degraded, write the same schema by hand — see `references/output-and-persist.md`.
-
-Full rendering spec (column widths, sort order, color rules) and JSON schema live in `references/output-and-persist.md`.
+Step 8 renders the full triage table — rank, issue, priority, blockers, status, parallelizable and stale flags — plus the suggested execution order, from the payload above. Step 9 is the `--out` write; where the script degraded, write the same schema by hand. Column widths, sort order, colour rules and the JSON schema are all in `references/output-and-persist.md`.
 
 ---
 ## Final Report
@@ -400,12 +392,10 @@ After the triage table (Step 8) and persist (Step 9) are both complete, print a 
   Next action:       /issue-resolver {first}
 ```
 
-For cached view mode (no update run):
+Cached view mode (no update run) prints the same block with only these rows —
+header `◆ Issue Triage — cached`, then:
 
 ```
-◆ Issue Triage — cached
-┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-
   Cache load:        ✓ pass (age: {Nd Nh})
   Issues:            {N} analyzed
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
@@ -439,10 +429,10 @@ This skill is **read-only** with respect to the GitHub Project board — it neve
 ## Expected Output
 
 A cached view renders instantly from `.gitissue/triage.json`, in the format
-defined once above under *Default Mode → 3. Render the cached report*, closing
-with one of the three endings in *4. Detect changes and suggest update*. An
-update (`/issue-triage update`) runs Steps 1–9, overwrites the cache, and ends
-with that same snapshot view.
+defined once under *Default Mode → 3. Render the cached report*, closing with
+one of the three endings in *4. Detect changes and suggest update*. An update
+(`/issue-triage update`) runs Steps 1–9, overwrites the cache, and ends with
+that same snapshot view.
 
 ## Edge Cases
 
