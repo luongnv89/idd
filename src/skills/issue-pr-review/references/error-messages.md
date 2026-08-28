@@ -133,6 +133,25 @@ none.
   Docs:    https://github.com/luongnv89/idd/blob/main/docs/platform-github.md
 ```
 
+### CI failed but was not blocking
+
+**Trigger:** Step 5 reached verdict `fail` while `review.ignore_ci_billing_failures` is `true`.
+
+```
+⚠ {N} CI checks failed — not blocking (review.ignore_ci_billing_failures: true)
+
+  Failing: {check_name} ({bucket})
+           {check_link}
+  Result:  PARTIAL — ci_status recorded as failed@{sha40}, PR not merged
+  To fix:  gh run view {run_id} --log-failed
+  Undo:    set review.ignore_ci_billing_failures: false in .gitissue.yml
+  Docs:    https://github.com/luongnv89/idd/blob/main/docs/config-schema.md
+```
+
+This is a `⚠`, never a `✓`: the checks did fail, and the flag ignores **any**
+terminal CI failure because GitHub exposes no API field naming a billing one.
+`/auto-pilot` re-runs its own wait and still refuses to merge.
+
 ### CI log fetch failed
 
 **Trigger:** `gh run view {run_id} --log-failed` fails.

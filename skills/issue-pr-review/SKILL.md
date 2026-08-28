@@ -299,9 +299,19 @@ When true, run the whole wait in one call — `python3 references/scripts/gi-ci-
 
 **Bind the verdict to the commit it was reached on** — record `ci_sha` = the `headRefOid` this wait ran against, and report `ci_status` as `passed@` or `failed@` plus that full 40-character SHA; `no_ci`, a skipped wait, and any degraded wait that never read a head stay bare. Settle window, manual polling loop and its head re-read, and the bare-vs-bound cases: `references/prepass-tests-ci-mechanics.md` (*Step 5*, *Binding the verdict to a commit*). **Read that file and apply it now.**
 
+**`review.ignore_ci_billing_failures: true`** (default `false`) makes a terminal `fail` verdict **non-blocking at this gate only**. CI is still polled and `failing[]` is still reported; Step 6 raises **no** CI fixable, and the soft-pass conjunction treats the CI leg as satisfied — under `review.soft_pass: false` too, since the key gates the CI leg itself, with strict mode's extra dimension and note requirements still standing. Four invariants hold regardless:
+
+- **`ci_status` stays `failed@{sha40}`, never `passed@`.** The checks did fail; `passed@` would bind a false claim to a commit, and it cannot satisfy `/auto-pilot`'s Step 5.1a `trusted` path anyway — that additionally requires a live all-green `statusCheckRollup`, which will not exist.
+- **The outcome is `PARTIAL`, never a clean pass** — `√ CI queried` / `× Required checks green`, with the gap carried into the closing summary (`references/report-templates.md`).
+- **`ci_leg_runnable` is unaffected.** It reads `review.check_ci` and Step 1's `statusCheckRollup` and never this key, so an ignored CI failure never also skips the local test suite.
+- **The merge is still refused.** `--auto` does not merge a `PARTIAL`, and `/auto-pilot` re-runs its own wait and refuses on the same red checks. That is the deliberate, documented boundary: this key relaxes **this skill's review gate only**.
+
+It ignores only a *terminal* `fail`; `pending` stays not clean, and `none` / `none_confirmed` are untouched. GitHub exposes no API field naming a billing-related failure, so the key cannot single billing out — it ignores **any** terminal CI failure. The manual fallback honors it identically.
+
 ```
 [5/7] CI Status    ✓ all checks passed
 [5/7] CI Status    ✗ {N} checks failed — {check_name}: {bucket}
+[5/7] CI Status    ⚠ {N} checks failed — not blocking (review.ignore_ci_billing_failures: true)
 [5/7] CI Status    ⚠ checks still running after {timeout}s
 [5/7] CI Status    ○ no CI checks configured
 ```
