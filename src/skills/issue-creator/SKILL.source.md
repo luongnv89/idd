@@ -146,17 +146,15 @@ Check these files — each is named again at the step that reads it:
 
 ## Image Upload
 
-When the user provides image paths, upload each to GitHub and embed it in the issue body — in addition to reading the image for visual context. Supported formats: PNG, JPG/JPEG, GIF, WEBP, SVG (max 10 MB each). Embeds go in a **Screenshots** section between Description and Acceptance Criteria; omit the section when no images are provided. Upload failures never block creation — the issue is created text-only with a `⚠` warning. Durable embeds require a **public** repo.
+Upload each supplied image to GitHub and embed it in the issue body, on top of reading it for visual context. Formats: PNG, JPG/JPEG, GIF, WEBP, SVG (max 10 MB each). Embeds go in a **Screenshots** section between Description and Acceptance Criteria; omit the section when no images are provided. Upload failures never block creation — the issue is created text-only with a `⚠` warning. Durable embeds require a **public** repo.
 
-See `references/image-upload.md` for the full procedure: validation, the base64-via-stdin `gh api` upload (with the `ARG_MAX` rationale), markdown placement, multi-image handling, failure messages, and normalization-mode preservation.
+The full procedure is `references/image-upload.md`: validation, the base64-via-stdin `gh api` upload (with the `ARG_MAX` rationale), markdown placement, multi-image handling, failure messages, and normalization-mode preservation.
 
 ---
 
 ## Confidence Scoring System
 
-Auto-enriched fields (type classification, acceptance criteria, and tool-suggested Metadata values — priority, effort, labels) carry a confidence level shown in previews and written into the issue body: **high** → `(high)` / `(high confidence)`, **medium** → `(medium)` / `(medium confidence)`, **low** → `(needs review)` in both. `high` means explicit keywords or stated requirements; `medium` is inferred from tone/context; `low` is ambiguous and defaulted. When populating templates, fill every `{…_confidence}` placeholder from the tables in `references/confidence-scoring.md`; never ship an inferred field unmarked.
-
-See `references/confidence-scoring.md` for the full level criteria and the per-field determination tables.
+Auto-enriched fields (type classification, acceptance criteria, and tool-suggested Metadata values — priority, effort, labels) carry a confidence level shown in previews and written into the issue body: **high** → `(high)` / `(high confidence)`, **medium** → `(medium)` / `(medium confidence)`, **low** → `(needs review)` in both. `high` means explicit keywords or stated requirements; `medium` is inferred from tone/context; `low` is ambiguous and defaulted. When populating templates, fill every `{…_confidence}` placeholder from the level criteria and per-field determination tables in `references/confidence-scoring.md` — **read it now**; never ship an inferred field unmarked.
 
 ---
 
@@ -170,17 +168,9 @@ Extract from the description:
 
 ### Step 2 — Classify Type and Title
 
-**Type classification:**
-- **bug** — broken behavior, errors, crashes, regressions
-- **feature** — new capability, endpoint, UI element, workflow
-- **improvement** — enhancement, refactoring, performance, UX polish
+**Type classification:** **bug** — broken behavior, errors, crashes, regressions. **feature** — new capability, endpoint, UI element, workflow. **improvement** — enhancement, refactoring, performance, UX polish.
 
-**Issue title conventions** (see `docs/naming-conventions.md` for the full reference):
-- Use **imperative mood** (like a command): "Fix login crash on mobile" not "Login is crashing"
-- Keep titles **concise, descriptive, and actionable** — under 70 characters
-- Include **context** when helpful: "Fix checkout page redirect on Safari"
-- The title should read as what needs to happen, not what is broken
-- Optional **type prefix** for extra clarity: "Bug: App crashes on iOS login"
+**Issue title conventions** — the full reference is `docs/naming-conventions.md`: **imperative mood**, what needs to happen rather than what is broken; **concise, descriptive, actionable**, under 70 characters; **context** where it helps; an optional **type prefix** for clarity.
 
 | Good | Bad |
 |------|-----|
@@ -189,10 +179,7 @@ Extract from the description:
 | Refactor auth middleware for OAuth2 | Auth stuff needs updating |
 | Bug: App crashes on iOS when tapping login | It doesn't work on my phone |
 
-Assign confidence to the type classification:
-- **high** — explicit crash/error/500 keywords (bug), "add new"/"create" (feature), "refactor"/"improve"/"optimize" (improvement)
-- **medium** — inferred from description context (e.g., "doesn't work" → bug, "would be nice" → feature)
-- **low** — ambiguous description, type defaulted based on most common pattern
+Assign the type classification its confidence from the **Type classification** row of `references/confidence-scoring.md`.
 
 ### Step 3 — Check for Duplicates
 
@@ -200,10 +187,10 @@ Assign confidence to the type classification:
 
 Refuse a planted `.gitissue/cache` symlink, create that ignored directory only
 when it is a real directory, then create a unique exclusive request file
-(`mktemp`, mode 0600). Write the classified `items` plus the once-loaded
-`config` into that file. Feed `"$dup_request"` on stdin; never put an issue
-title, keyword, body, or config value on the command line, and never reuse a
-shared `.gitissue/cache/dup-request.json` path.
+(`mktemp`, mode 0600) holding the classified `items` and the once-loaded
+`config`. Feed `"$dup_request"` on stdin; never put an issue title, keyword,
+body, or config value on the command line, and never reuse a shared
+`.gitissue/cache/dup-request.json` path.
 
 ```bash
 if [ -L .gitissue/cache ]; then
@@ -223,7 +210,7 @@ chmod 600 "$dup_request"
 {"mode":"create","items":[{"index":1,"title":"…","keywords":["…"],"type":"bug"}],"config":{"duplicate_detection.weights.phrase":2}}
 ```
 
-Run the scorer with cleanup armed before the invocation, so success, a classified exit, an interrupt, and an unexpected stop all remove **this run's** request. The signal handlers must exit with the conventional `128 + signal` status; handling a signal by cleanup alone suppresses cancellation and can let issue creation continue. Each signal exits through the single `EXIT` cleanup, while the normal path cleans once before disarming every trap:
+Arm cleanup before the invocation, so success, a classified exit, an interrupt, and an unexpected stop all remove **this run's** request. Signal handlers must exit with the conventional `128 + signal` status; handling a signal by cleanup alone suppresses cancellation and can let issue creation continue. Each signal exits through the single `EXIT` cleanup; the normal path cleans once, then disarms every trap:
 
 ```bash
 cleanup_dup_request() { rm -f "$dup_request"; }
@@ -237,9 +224,9 @@ cleanup_dup_request
 trap - EXIT HUP INT TERM
 ```
 
-Resolve the script relative to this SKILL.md as the dependency precheck does, and interpret `dup_output` only after `dup_status` is classified. Exit 0 returns `duplicates` (deterministic high band), `medium_band`, deduplicated `medium_issue_context`, `medium_judgement`, and `batch_internal_duplicates`. An empty `medium_band` skips the agent. When non-empty, take the first `medium_judgement.selected_count` candidates in their script-defined order and spawn the duplicate-detector in chunks of `medium_judgement.batch_size` with `{mode, items, candidates: chunk, issue_context: only the medium_issue_context rows referenced by that chunk}`. It returns one tri-state `decision` (`confirmed` | `rejected` | `ambiguous`) per candidate without fetching or rescoring. Match verdicts to candidates by the complete identity (`item_index`, `match_type`, and `match_number` or `match_index`), never by array position. A candidate is removed from the possible-duplicate warnings **only** by exactly one well-formed `rejected` verdict carrying the same identity and a non-empty evidence-based reason. Keep `confirmed` and `ambiguous` candidates as warnings, distinguishing `ambiguous` as `(needs review)`. A missing, duplicate, malformed, incomplete, unknown-decision, wrong-identity, or failed-agent verdict is fail-safe ambiguity: retain the original candidate and its deterministic `score`, `payments`, and `reason` as a `(needs review)` warning. Do not use partial output from a failed chunk as authority. Any remaining `medium_judgement.deferred_count` candidates are **retained as possible-duplicate warnings without an LLM verdict** — bounded judgement may defer ambiguity, never turn it into "no duplicate." High matches are warnings too; their title and labels remain directly on each record, and the scorer never silently drops requested work.
+Resolve the script relative to this SKILL.md as the dependency precheck does, and read `dup_output` only after `dup_status` is classified. Exit 0 returns `duplicates` (deterministic high band), `medium_band`, deduplicated `medium_issue_context`, `medium_judgement`, and `batch_internal_duplicates`. An empty `medium_band` skips the agent. When non-empty, take the first `medium_judgement.selected_count` candidates in script order and spawn the duplicate-detector in chunks of `medium_judgement.batch_size` with `{mode, items, candidates: chunk, issue_context: only the medium_issue_context rows referenced by that chunk}`. It returns one tri-state `decision` (`confirmed` | `rejected` | `ambiguous`) per candidate, without fetching or rescoring. Match verdicts by the complete identity (`item_index`, `match_type`, and `match_number` or `match_index`), never by array position. A candidate leaves the possible-duplicate warnings **only** on exactly one well-formed `rejected` verdict carrying that identity and a non-empty evidence-based reason. Keep `confirmed` and `ambiguous` as warnings, marking `ambiguous` `(needs review)`. A missing, duplicate, malformed, incomplete, unknown-decision, wrong-identity, or failed-agent verdict is fail-safe ambiguity: retain the candidate with its deterministic `score`, `payments`, and `reason` as a `(needs review)` warning, and never treat partial output from a failed chunk as authority. Any remaining `medium_judgement.deferred_count` candidates are **retained as possible-duplicate warnings without an LLM verdict** — bounded judgement may defer ambiguity, never turn it into "no duplicate." High matches are warnings too; their title and labels stay on each record, and the scorer never silently drops requested work.
 
-Exit 3 is invalid request/config: stop with the validation error. A missing script is a broken install: stop with the dependency error. For no `python3`, exit 2/4, or unparsable stdout, print `⚠ gi-dup-score unavailable — scoring duplicates inline`; exit 4 means the backlog was unreadable, never empty. For that fallback, take `backlog_limit` from the once-loaded `duplicate_detection.backlog_limit` and validate it before use. Run this block as written; the extra record is a truncation probe, not a record to score:
+Exit 3 is an invalid request/config: stop with the validation error. A missing script is a broken install: stop with the dependency error. For no `python3`, exit 2/4, or unparsable stdout, print `⚠ gi-dup-score unavailable — scoring duplicates inline`; exit 4 means the backlog was unreadable, never empty. For that fallback take `backlog_limit` from the once-loaded `duplicate_detection.backlog_limit` and validate it first. Run this block as written — the extra record is a truncation probe, not a record to score:
 
 ```bash
 case "$backlog_limit" in
@@ -249,11 +236,11 @@ probe_limit=$((backlog_limit + 1))
 fallback_issues="$(gh issue list --state open --json number,title,body,labels --limit "$probe_limit")" || exit 4
 ```
 
-Parse `fallback_issues` as JSON, score only its first `backlog_limit` records, and report the scan as truncated when the extra record exists. Quoting the validated digits-only value is mandatory; never use `eval`, shell re-parsing, or an issue-derived value on this command line. Apply the documented canonical rules: NFKC/case-fold tokens; one minimum-length and additive stop-word policy; fixed phrase → title-overlap → keyword precedence; each payment derived only from newly consumed item tokens; one same-type payment; configured weights and thresholds. The phrase per-token weight must be greater than or equal to title-overlap weight, so removing evidence with an extra stop word cannot move a token into a higher-paying lower-precedence signal. Apply internal batch pairs in both directions and keep the stronger direction. Inline fallback uses the same bounded medium-judgement protocol above; a candidate outside the bounded LLM slice remains a warning.
+Parse `fallback_issues` as JSON, score only its first `backlog_limit` records, and report the scan as truncated when the extra record exists. Quoting the validated digits-only value is mandatory; never use `eval`, shell re-parsing, or an issue-derived value on this command line. Apply the documented canonical rules: NFKC/case-fold tokens; one minimum-length and additive stop-word policy; fixed phrase → title-overlap → keyword precedence; each payment derived only from newly consumed item tokens; one same-type payment; configured weights and thresholds. The phrase per-token weight must be greater than or equal to title-overlap weight, so removing evidence with an extra stop word cannot move a token into a higher-paying lower-precedence signal. Apply internal batch pairs in both directions, keeping the stronger direction. The fallback uses the same bounded medium-judgement protocol above; a candidate outside the bounded LLM slice remains a warning.
 
 #### Present results
 
-If the subagent (or fallback) found potential duplicates (confidence `medium` or `high`):
+If the subagent or fallback found potential duplicates (`medium` or `high`):
 
 ```
 ⚠ Possible duplicate: #42 "Fix auth redirect loop"
@@ -264,39 +251,38 @@ If the subagent (or fallback) found potential duplicates (confidence `medium` or
 
 If no duplicates found, proceed silently.
 
-**Auto mode (`docs/auto-mode.md`) — never blocks.** Do not show the `Continue creating? [Y/n]` prompt. **Proceed with creation** (the interactive default) and log one `⚠` naming the suspected duplicate, so the override is auditable:
+**Auto mode (`docs/auto-mode.md`) — never blocks.** Do not show the `Continue creating? [Y/n]` prompt. **Proceed with creation** (the interactive default) and log one `⚠` per flagged duplicate, naming it, so the override is auditable:
 
 ```
   ⚠ Auto mode: duplicate confirmation skipped — proceeding despite possible duplicate #42 "Fix auth redirect loop".
 ```
 
-Log one line per flagged duplicate. The duplicate is still reported in the Step 6 summary as `⚠ warn` exactly as an interactive override is.
+The duplicate is still reported in the Step 6 summary as `⚠ warn`, exactly as an interactive override is.
 
 ### Step 3.5 — Clarify Ambiguous Intent
 
 Active intent capture: when **type classification** or **acceptance-criteria** confidence is `low` — and only in **interactive Create mode** — resolve the ambiguity before drafting. When both are `high`/`medium`, this step is a silent no-op and the one-shot Step 3 → Step 4 path is unchanged.
 
-- **Resolve from the repo first.** A question is only worth asking if the repo cannot answer it. If inspection settles the field (e.g. a `ThemeToggle` already exists → bug, not feature), do not ask — raise confidence to `high` (conclusive) or `medium` (suggestive).
-- **Output Contract boundary (critical):** repo inspection here only disambiguates intent and sets confidence; its findings MUST NOT leak into the issue body (no affected files, technical notes, root cause, or implementation hints). This step changes *classification*, never *body content*.
-- **How to ask:** at most one or two questions, one at a time, each capturing intent (never implementation), with a recommended default equal to today's `(needs review)` guess, using the plain `[Y/n]` idiom (no special UI widget — the skill also runs on Claude.ai). Accepted default → record at `medium`; override → `high`. Then proceed to Step 4 regardless.
-- **Non-interactive contexts (never block):** in Batch mode and any auto/non-interactive context, **skip this step entirely** — draft with the defaulted assumptions and mark those fields `(needs review)` exactly as today.
+**Non-interactive contexts never block:** in Batch mode and any auto/non-interactive context, **skip this step entirely** — draft with the defaulted assumptions and mark those fields `(needs review)` exactly as today.
 
-See `references/clarify-intent.md` for the full gating rules, the repo-resolution rationale, the example prompt, and the non-interactive specification.
+**Resolve from the repo first.** A question is only worth asking if the repo cannot answer it; if inspection settles the field (a `ThemeToggle` already exists → bug, not feature), raise confidence to `high` (conclusive) or `medium` (suggestive) and do not ask. **Output Contract boundary (critical):** that inspection sets *classification* and confidence only — no affected file, technical note, root cause, or implementation hint may reach the issue body.
+
+When the step does fire, **read `references/clarify-intent.md` now**: it carries the gating rules, the repo-resolution rationale, the one-question-at-a-time idiom with its example prompt and plain `[Y/n]` recommended default, the confidence each answer earns, and the non-interactive specification.
 
 ### Step 4 — Generate Issue Content
 
-If the user provided image paths, upload them now using the **Image Upload** procedure. Collect the resulting markdown embeds for inclusion in the issue body.
+If image paths were provided, upload them now with the **Image Upload** procedure and collect the markdown embeds.
 
-Resolve the template directory from `issue.template`: when `"default"`, use this skill's bundled `templates/`; when a path, read `bug.md`, `feature.md`, or `improvement.md` from that directory (error if missing). Populate every section:
+Resolve the template directory from `issue.template`: `"default"` → this skill's bundled `templates/`; a path → read `bug.md`, `feature.md`, or `improvement.md` from there (error if missing). Fill every placeholder it declares:
 
-1. **Type** — classified type with confidence
-2. **Description** — synthesized from user input, including current/expected behavior (bugs), related components, related issues
-3. **Reporter Context** — user's original text, verbatim, in a blockquote
-4. **Screenshots** — embedded images (only if images were provided and uploaded successfully)
-5. **Acceptance Criteria** — 3-5 testable criteria derived from the problem description, with confidence levels
-6. **Metadata** — suggested priority, estimated effort (XS/S/M/L/XL), and suggested labels, **each with a trailing confidence marker** via `{priority_confidence}`, `{effort_confidence}`, and `{labels_confidence}` in the template, plus an advisory **Suggested model:** line keyed off the effort band. Render it — and the `{data_version}` / `{data_date}` placeholders — per the two-model rendering rule in `references/model-suggestion.md`, which also defines the disabled behaviour (the line is removed from Metadata entirely).
+1. **Type** — the classified type with its confidence
+2. **Description** — synthesized from the input: current/expected behavior for bugs, related components, related issues
+3. **Reporter Context** — the user's original text, verbatim, in a blockquote
+4. **Screenshots** — the embeds, only where images were provided and uploaded successfully
+5. **Acceptance Criteria** — 3-5 testable criteria derived from the problem description, each with its confidence
+6. **Metadata** — suggested priority, estimated effort (XS/S/M/L/XL), and suggested labels, **each with a trailing confidence marker** via `{priority_confidence}`, `{effort_confidence}`, and `{labels_confidence}`, plus the advisory **Suggested model:** line keyed off the effort band. Render it — and the `{data_version}` / `{data_date}` placeholders — per the two-model rendering rule in `references/model-suggestion.md`, which also defines the disabled behaviour (the line is removed from Metadata entirely).
 
-**Note:** Per the Output Contract above, the issue body MUST NOT include predicted affected files, generated technical notes, root cause, or implementation hints. Acceptance criteria express *what done looks like*, not *how to implement it*.
+**Note:** per the Output Contract above, the body MUST NOT include predicted affected files, generated technical notes, root cause, or implementation hints. Acceptance criteria express *what done looks like*, not *how to implement it*.
 
 ### Step 5 — Preview and Confirm
 
