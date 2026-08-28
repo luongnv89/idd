@@ -16,7 +16,8 @@ Full example outputs for the three typical scenarios.
    - `git ls-files` returns 342 files → medium
 4. Defaults: `test_timeout: 300`, `auto_test: true`, `stale_threshold_days: 14`, `scan_timeout_per_issue: 30`
 5. Write `.gitissue.yml` with Next.js-specific comments
-6. Report:
+6. Validate the written file — parses as YAML, no placeholder tokens left
+7. Report:
 
 ```
 ◆ Init Gitissue — setup complete
@@ -29,6 +30,7 @@ Full example outputs for the three typical scenarios.
   Templates:         ✓ .github/ISSUE_TEMPLATE/ (3 templates)
   Repo size:         ✓ medium (342 files)
   Config:            ✓ generated .gitissue.yml
+  Validation:        ✓ parses as YAML, no placeholders left
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Result:            DONE
 
@@ -51,7 +53,8 @@ Full example outputs for the three typical scenarios.
 4. Print: `○ Could not detect test runner. Setting resolve.auto_test: false.`
 5. Defaults: `test_timeout: 60`, `auto_test: false`, `stale_threshold_days: 7`, `scan_timeout_per_issue: 30`
 6. Write `.gitissue.yml`
-7. Report:
+7. Validate the written file — parses as YAML, no placeholder tokens left
+8. Report:
 
 ```
   ○ Could not detect test runner. Setting resolve.auto_test: false.
@@ -63,10 +66,11 @@ Full example outputs for the three typical scenarios.
   Git repo:          ✓ pass
   Language:          ✓ Python (from requirements.txt)
   Framework:         ○ skip (not detected)
-  Test runner:       ○ skip (not detected)
+  Test runner:       ⚠ warn (none — auto_test disabled)
   Templates:         ○ skip (none found)
   Repo size:         ✓ small (47 files)
   Config:            ✓ generated .gitissue.yml
+  Validation:        ✓ parses as YAML, no placeholders left
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Result:            DONE
 
@@ -82,7 +86,8 @@ Full example outputs for the three typical scenarios.
 2. `.gitissue.yml` already exists — show overwrite/merge/cancel prompt
 3. User chooses **merge**
 4. Read existing file, scan repo, add missing fields
-5. Report:
+5. Validate the merged file — parses as YAML, no placeholder tokens left
+6. Report:
 
 ```
 ◆ Init Gitissue — setup complete
@@ -94,7 +99,8 @@ Full example outputs for the three typical scenarios.
   Test runner:       ✓ Go test
   Templates:         ○ skip (none found)
   Repo size:         ✓ large (1847 files)
-  Config:            ✓ merged .gitissue.yml (3 new fields, 8 preserved)
+  Config:            ✓ merged into existing .gitissue.yml (3 new, 8 preserved)
+  Validation:        ✓ parses as YAML, no placeholders left
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Result:            DONE
 
