@@ -72,6 +72,8 @@ If any are missing, stop immediately and print:
   Then restart the agent session and re-run /idd-doctor.
 ```
 
+That stop is a terminal outcome: print the block, then the *Run Stats Footer* (`references/run-stats.md`), then stop. The precheck runs before the clock capture in *Pipeline*, so there is no `run_started_epoch` yet and `elapsed` prints the literal `n/a`, alongside `agents 0`. If `references/run-stats.md` is itself the missing file, print those two lines from the shape given in *Run stats footer*.
+
 Check these files relative to the skill's directory (the dirname of this SKILL.md):
 
 - `references/error-messages.md` — Error catalog
@@ -79,7 +81,7 @@ Check these files relative to the skill's directory (the dirname of this SKILL.m
 
 ## Configuration
 
-This skill **reads** `.gitissue.yml` (only to determine whether `autopilot.mode` is set in Check 3) and is otherwise config-free. There is no `doctor:` section in `.gitissue.yml` and no per-check toggles in v1.
+This skill **reads** `.gitissue.yml` (only to determine whether `autopilot.mode` is set in Check 3 — the field is documented in `docs/config-schema.md`) and is otherwise config-free. There is no `doctor:` section in `.gitissue.yml` and no per-check toggles in v1.
 
 If `.gitissue.yml` does **not** exist, Check 3 is skipped with an `○ no .gitissue.yml — skipped` note rather than failing. Repos that have not yet run `/init-gitissue` should not be punished by the doctor.
 
@@ -401,18 +403,13 @@ A read heuristic for steps 1–3 (no new dependency — `tail` + a JSON-aware pa
 
 ## Run stats footer
 
-After the run-log summary, close with the *Run Stats Footer* — `references/run-stats.md` — `elapsed`, `tokens` only where the host reported a count (otherwise left out), `agents`, run cost only, `n/a` for anything else undetermined. It is the last thing printed at **every** terminal outcome, including a run that never reached Check 1: not a git repository, no `src/skills/` tree, or an unreadable `.gitissue.yml`. The doctor spawns no subagents, so `agents 0` is the determined value here, not `n/a`. It reports the run's own cost and never a metric a check already printed.
+After the run-log summary, close with the *Run Stats Footer* — `references/run-stats.md` — `elapsed`, `tokens` only where the host reported a count (otherwise left out), `agents`, run cost only, `n/a` for anything else undetermined. It is the last thing printed at **every** terminal outcome, including a run that never reached Check 1: not a git repository, a missing bundled dependency, no `src/skills/` tree, or an unreadable `.gitissue.yml`. The doctor spawns no subagents, so `agents 0` is the determined value here, not `n/a`. It reports the run's own cost and never a metric a check already printed.
 
 ---
 
 ## Read-only guarantee
 
-The skill MUST NOT modify any file in the repo, create branches or commits, open issues or PRs, or mutate `.gitissue.yml` or any config file. In detail, the skill is forbidden to:
-
-- Modify any file in the repo
-- Create branches, commits, tags, or PRs
-- Edit issue bodies or post comments
-- Mutate `.gitissue.yml` or any config file
+The skill MUST NOT modify any file in the repo, create branches, commits, tags, or PRs, edit issue bodies or post comments, or mutate `.gitissue.yml` or any config file.
 
 The implementation reads files (via `Read` / `cat`) and runs read-only `gh` queries (`gh repo view --json …`, `gh api repos/{owner}/{repo}`, `gh auth status`). Test fixtures (see *Testing*) assert that the working tree is unchanged after a doctor run.
 
@@ -420,22 +417,7 @@ The implementation reads files (via `Read` / `cat`) and runs read-only `gh` quer
 
 ## Testing
 
-Integration tests live in `tests/test-idd-doctor.sh` and follow the same pattern as `tests/test-projects-sync.sh` and `tests/test-autopilot-modes.sh` — pure bash, exit 0 on pass.
-
-The test suite covers:
-
-1. SKILL.md, README.md, and references files exist with the expected structure
-2. Each forbidden Check 1 pattern is enumerated in the SKILL doc
-3. Each forbidden Check 2 pattern is enumerated in the SKILL doc
-4. The four-check pipeline is documented in order
-5. Read-only guarantee is documented
-6. The `gh repo view` field selection matches the documented contract
-7. The skip behavior for missing `gh`, missing `.gitissue.yml`, and missing template directories is documented
-8. The exit-code mapping (PASS=0, WARN=0, FAIL=1) is documented
-9. The fix hint format is documented for both Check 3 and Check 4
-10. The run-log summary is documented as informational/non-gating, reads `.gitissue/runs.jsonl`, degrades gracefully when the file is absent, and reports resolve rate, median QA cycles, and common skip reasons
-
-Run with:
+Integration tests live in `tests/test-idd-doctor.sh` — pure bash, exit 0 on pass, same pattern as `tests/test-projects-sync.sh` and `tests/test-autopilot-modes.sh`. They assert this spec against itself: package structure; both forbidden-pattern catalogs; the four checks documented in order; the read-only guarantee; the `gh` field selections; every skip and both fix-hint formats; the exit-code mapping; and the run-log summary's non-gating contract, graceful degradation, and three reported metrics. Run with:
 
 ```bash
 bash tests/test-idd-doctor.sh
@@ -445,7 +427,7 @@ bash tests/test-idd-doctor.sh
 
 ## Output Conventions
 
-Terminal output follows the DESIGN.md contract — symbols `● ✓ ✗ ◆ ⚡ ⚠ ○`, two-space indent, `┄` separators, URLs on their own line, ≤80 chars, one blank line between sections, static sequential output (no animation). Per-check line format: `{symbol} [N/4] {Check name (16 chars)} {detail}`; per-finding indent 8 spaces (4 + 4). Errors use the rich format from `references/error-messages.md`: `✗ what failed`, then `To fix:  <command>`, then a docs link when applicable.
+Terminal output follows the `DESIGN.md` contract (repo root) — symbols `● ✓ ✗ ◆ ⚡ ⚠ ○`, two-space indent, `┄` separators, URLs on their own line, ≤80 chars, one blank line between sections, static sequential output (no animation). Per-check line format: `{symbol} [N/4] {Check name (16 chars)} {detail}`; per-finding indent 8 spaces (4 + 4). Errors use the rich format from `references/error-messages.md`: `✗ what failed`, then `To fix:  <command>`, then a docs link when applicable.
 
 ## Edge Cases
 
@@ -454,11 +436,3 @@ Terminal output follows the DESIGN.md contract — symbols `● ✓ ✗ ◆ ⚡ 
 - **A skill README contains the forbidden pattern inside a code block or fenced quote** — Check 1 still flags it. The intent of v1 is mechanical strictness, not contextual nuance.
 - **GitHub Enterprise repos without `gh` auth** — Check 4 is skipped, never failed.
 - **`/issue-creator` skill is missing** — Check 1 fails with a clear `src/skills/issue-creator/docs/README.md not found` finding (the `/issue-creator` skill is required for an IDD repo).
-
-## Additional Resources
-
-- **`references/error-messages.md`** — Complete error catalog with triggers and exact output
-- **`docs/naming-conventions.md`** — Branch, commit, PR, and issue naming conventions (referenced for context)
-- **`docs/config-schema.md`** — Full configuration schema (Check 3 references the `autopilot.mode` field)
-- **`docs/run-log-schema.md`** — `.gitissue/runs.jsonl` run-log schema
-- **`DESIGN.md`** — Terminal output style guide (repo root)
