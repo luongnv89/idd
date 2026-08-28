@@ -193,25 +193,11 @@ Check these files:
 - `references/scripts/gi-gh.py` — shared GitHub CLI subprocess boundary used by the issue fetcher
 - `references/scripts/gi-issue.py` — TTL-cached issue fetcher used by Step 1
 
-The steps below describe the subagent delegation path; the inline fallback lives in `references/inline-fallback.md`.
-
 ---
 
 ## Pipeline Overview
 
-The analysis pipeline has 8 steps plus a persist step. Display progress using the `[N/8]` step counter:
-
-```
-  ◆ Analysis Pipeline
-  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  [1/8] Fetch          ✓ issue #42 loaded (bug)
-  [2/8] Extract        ✓ 8 keywords, 2 file refs
-  [3/8] Research       ● reading 18 files...
-  [4/8] History        ✓ 5 related commits, 1 prior fix attempt
-  [5/8] Cross-refs     ✓ 2 related issues, 1 may resolve this
-```
-
-Each step prints a new line when it starts (with `●`) and updates to `✓` on success or `✗` on failure. Static sequential output — no animation.
+The analysis pipeline has 8 steps plus a persist step. Display progress using the `[N/8]` step counter, one line per step, in the format shown under *Expected Output*. Each step prints a new line when it starts (with `●`) and updates to `✓` on success or `✗` on failure.
 
 ---
 
@@ -331,7 +317,7 @@ Persisting these fields does **not** change the analysis pipeline — it only ad
 
 ## Final Report
 
-After all 8 steps and persistence complete, print a structured step-by-step summary so the user can see what happened at each stage:
+After all 8 steps and persistence complete, print a step-by-step summary of what happened at each stage:
 
 **Then the run-stats footer.** Close with the *Run Stats Footer* — `references/run-stats.md` — `elapsed`, `tokens` only where the host reported a count (otherwise left out), `agents`, run cost only, `n/a` for anything else undetermined. It is the last thing printed at **every** terminal outcome, including a run that ended early — an issue that was not found or is closed, an invalid config, or a scan that could not complete.
 
@@ -361,17 +347,11 @@ If a step produced no results (e.g., no git history found), mark it with a note:
   Git history:       ○ skip (no related commits found)
 ```
 
-If the issue may already be resolved:
+If the issue may already be resolved, the same block marks the research row and the result:
 
 ```
-◆ Issue Analysis: #{N} — {title}
-┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-
-  Fetch:             ✓ pass
-  Extract targets:   ✓ pass
   Research:          ⚡ may already be fixed by {sha7}
   ...
-  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Result:            DONE (verify if already resolved)
 ```
 
@@ -400,7 +380,7 @@ A successful analysis prints the 8-step tracker and a condensed report, then per
   Recommendation:  {one-sentence next step}
 ```
 
-View mode (`/issue-analysis N view`) reads the JSON and renders the same report without re-running the pipeline.
+View mode renders the same report from the JSON without re-running the pipeline.
 
 ## Edge Cases
 
@@ -441,9 +421,7 @@ If `.gitissue/analysis-<N>.json` already exists when running a full analysis (no
 
 ## Example Runs
 
-Full example outputs (happy path, view mode, already-closed issue) are kept in `references/examples.md` so SKILL.md stays focused on pipeline mechanics.
-
----
+Full example outputs — happy path, view mode, already-closed issue — are in `references/examples.md`.
 
 ---
 
@@ -454,12 +432,3 @@ All tracker access follows the GitHub driver — `--json` with explicit field se
 ## Output Conventions
 
 Terminal output follows the `docs/terminal-style.md` contract — symbols `● ✓ ✗ ◆ ⚡ ⚠ ○`, two-space indent, `┄` separators, URLs on their own line, ≤80 chars, one blank line between sections, static sequential output (no animation), plus a `[N/8]` pipeline step counter and `│ ─ ┼` tables (right-align numbers, `—` for empty cells). Errors use the rich format from `references/error-messages.md`: `✗ what failed`, then `To fix:  <command>`, then a docs link when applicable.
-
-## Additional Resources
-
-- **`shared/agents/codebase-researcher.md`** — Codebase Researcher subagent prompt (Steps 2-5 delegation)
-- **`shared/agents/synthesizer.md`** — Synthesizer subagent prompt (Steps 6-7 delegation)
-- **`references/inline-fallback.md`** — Steps 2-7 procedure for runs without the Agent tool (gated)
-- **`references/error-messages.md`** — Complete error catalog with triggers and exact output
-- **`docs/terminal-style.md`** — Terminal output style contract (bundled at build time; the repo-root `DESIGN.md` is the human-facing companion and is not bundled)
-- **`docs/config-schema.md`** — Full configuration schema
