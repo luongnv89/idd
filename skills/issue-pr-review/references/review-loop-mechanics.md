@@ -25,6 +25,31 @@ what each one does to the pipeline. Value syntax and validation live in
 
 The traceability flags default to the values shown, preserving the issue #36 contract.
 
+## Binding the head-ref name
+
+SKILL.md's *Checkout PR head branch* requires `branch_name` to be bound once with
+command substitution and used as `"$branch_name"` in every shell command. This is
+why, and why the obvious weaker forms do not work.
+
+A head-ref name is chosen by whoever opened the PR, and git permits `` ` ``, `$`,
+`(`, `;` and `&` in a ref. So a branch literally named ``fix/1-`id` `` becomes a
+command when it is pasted into a shell word, on the reviewing machine, with the
+reviewer's credentials. Double quotes do **not** save it: `"$(…)"` and a backtick
+still evaluate inside double quotes — quoting stops word-splitting and globbing,
+not substitution.
+
+Command-substitution *output*, by contrast, is never re-evaluated. `branch_name`
+holds the bytes `gh` printed, whatever they are, and `"$branch_name"` expands to
+exactly one argument containing those bytes. That is the whole mechanism.
+
+The plain `{branch_name}` placeholder still appears in this skill's **display
+templates** and in **spawn-variable lists** — neither is a shell word, and
+substituting there would only make the output wrong.
+
+This is the same rule already applied at the `gi-secscan` and `gi-branch` call
+sites; the head-ref name is the one untrusted value this skill cannot hand
+straight to a script.
+
 ## Depth gate (adaptive review depth)
 
 The Step 1 *Depth gate* selects a review `profile` — `light` or `full` — from a <!-- a:rvm-depth-gate -->

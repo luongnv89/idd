@@ -160,16 +160,7 @@ gh pr checkout {N}
 
 Use `{headRefName}` from Step 1 as `{branch_name}` for sync, commit, and push. Canonical command: `references/docs/platform-github.md` (*Pull requests* → Checkout PR head branch).
 
-**Bind it to a shell variable — never paste the literal name into a command.** A
-head-ref name is chosen by whoever opened the PR, and git permits `` ` ``, `$`,
-`(`, `;` and `&` in a ref, so ``fix/1-`id` `` in a shell word runs on the
-reviewer's machine; double quotes do not stop `$(…)` or a backtick. Assign once —
-`branch_name="$(gh pr view {N} --json headRefName --jq .headRefName)"` — and use
-`"$branch_name"` wherever this skill puts `{branch_name}` in a **shell command**
-(display templates and spawn-variable lists still show the plain name). Command-substitution
-output is never re-evaluated, so it is inert whatever the name holds. Same rule as
-the `gi-secscan` and `gi-branch` call sites, for the one untrusted value this skill
-cannot hand to a script.
+**Bind it to a shell variable — never paste the literal name into a command.** A head-ref name is attacker-chosen and git permits `` ` ``, `$`, `(`, `;` and `&` in a ref, so a name in a shell word runs on the reviewer's machine; double quotes do not stop `$(…)` or a backtick. Assign once — `branch_name="$(gh pr view {N} --json headRefName --jq .headRefName)"` — and use `"$branch_name"` wherever this skill puts `{branch_name}` in a **shell command** (display templates and spawn-variable lists still show the plain name). Why command substitution is inert here, and the same rule at the `gi-secscan`/`gi-branch` call sites, is in `references/review-loop-mechanics.md` (*Binding the head-ref name*).
 
 ### Depth gate (select the review profile)
 
@@ -204,26 +195,15 @@ It runs **after** the Depth gate and sets `qa_handoff = trusted | stale | absent
 | `stale` | a marker is present but any condition fails | today's full pipeline, unchanged |
 | `absent` | the body carries no marker | today's full pipeline, unchanged |
 
-`stale` and `absent` are distinguished for the operator only; both take the identical path, the one that already exists.
+`stale` and `absent` are distinguished for the operator only; both take the identical path.
 **Fail-safe: any doubt is `stale`** — an unparsable or duplicated marker included; an unknown extra field is *not* doubt (mechanics, *Parsing the marker*).
 **A marker is never authentication:** a PR body is attacker-controlled (`gh pr edit --body`) and `head=` binds without
 authenticating it, so this verdict may gate **only duplicated work**, never a safety gate. The reasoning, the parse,
 *What `trusted` skips*, and the binding *Never gated* list live in `references/review-loop-mechanics.md`
 (*QA handoff gate*) — **read it now**.
 
-When `review.adaptive_depth` is `false`, skip this gate: set `qa_handoff = absent`.
-That key already pins the review to full depth and this is the same class of
-saving, so one key disables both. **No new config key is introduced.**
-**Precedence, stated once:** `qa_handoff` is computed *after* `profile`, and its
-power is bounded **relative to the ungated pipeline** — it may only **narrow**
-what a `stale`/`absent` PR already gets, and never make this review do more than
-that. The bound is per verdict, not monotonic across the run: this skill
-recomputes `qa_handoff` after every push it makes (*Review Loop*), and a flip to
-`stale` that restores the full cap is a return to the ungated pipeline, not a
-widening. The one asymmetric case is a marker `profile=light` against a pr-review
-`profile=full`, where the fuller wins — the review collapse **and** the cycle cap
-are **refused**, while the duplicate-test skip still applies, because a test run
-is a test run at any depth.
+When `review.adaptive_depth` is `false`, skip this gate: set `qa_handoff = absent` — that key already pins the review to full depth and this is the same class of saving. **No new config key is introduced.**
+**Precedence, stated once:** `qa_handoff` is computed *after* `profile`, and its power is bounded **relative to the ungated pipeline** — it may only **narrow** what a `stale`/`absent` PR already gets, never make this review do more. The bound is per verdict, not monotonic across the run: this skill recomputes `qa_handoff` after every push it makes (*Review Loop*), and a flip to `stale` that restores the full cap is a return to the ungated pipeline, not a widening. The one asymmetric case is a marker `profile=light` against a pr-review `profile=full`, where the fuller wins — the review collapse **and** the cycle cap are **refused**, while the duplicate-test skip still applies, because a test run is a test run at any depth.
 
 Surface both on the `[1/7]` tracker line; with `review.adaptive_depth: false` print `depth: full, qa: absent` so it stays uniform:
 
@@ -363,7 +343,9 @@ Or if failures:
 
 When `review.check_ci` is false, skip polling and report `○ CI skipped (review.check_ci: false)`; the soft-pass conjunction treats the CI leg as satisfied (same pattern as disabled AC/traceability checks).
 
-When true, run the whole wait in one call — `python3 references/scripts/gi-ci-wait.py {N} --interval {review.ci_poll_interval} --timeout {review.ci_timeout}` — and read `verdict` from its JSON (`pass` / `fail` / `pending` / `none`). A non-empty terminal snapshot is trusted only after its normalized check-name set remains unchanged for the elapsed `--settle-window` (default 30 seconds); additions or removals reset settlement, and an unsettled terminal result is `pending`. `none` counts as clean only when `none_confirmed` is `true`; without it the checks have merely not registered yet, and it is treated as `pending`. One invocation replaces the poll loop, so a ten-minute wait costs one tool call instead of one per poll. Exit 3 (a malformed argument) is a stop. Exit 4, or no `python3`, degrades to the **merge-safe manual fallback** in `references/prepass-tests-ci-mechanics.md`: accept trusted `ci_status` only when it matches the live `headRefOid` and non-empty green `statusCheckRollup`, otherwise poll `gh pr view {N} --json headRefOid,statusCheckRollup` at `review.ci_poll_interval` intervals while enforcing complete current-head rollups, none-grace, settle-window stability, and a final head re-read. Any missing/unreadable head or rollup, failed/pending/unsettled check, head change, or unconfirmed empty result leaves the PR open and is not clean. Either way, on `fail` extract details with `gh run view {run_id} --log-failed`. **Bind the verdict to the commit it was reached on** — record `ci_sha` = the `headRefOid` this wait ran against, and report `ci_status` as `passed@` or `failed@` followed by that full 40-character SHA (`no_ci` stays bare, and so does a skipped or degraded wait that never read a head): an unbound verdict is not evidence about any particular commit, and a caller that re-verifies the head can then trust it instead of re-polling (issue #256). The manual polling, failure-extraction and SHA-binding detail is in `references/prepass-tests-ci-mechanics.md` (*Step 5*).
+When true, run the whole wait in one call — `python3 references/scripts/gi-ci-wait.py {N} --interval {review.ci_poll_interval} --timeout {review.ci_timeout}` — and read `verdict` from its JSON (`pass` / `fail` / `pending` / `none`). One invocation replaces the poll loop, so a ten-minute wait costs one tool call instead of one per poll. A terminal snapshot is trusted only after its check-name set settles, and `none` counts as clean only when `none_confirmed` is `true`; otherwise both are `pending`. Exit 3 (a malformed argument) is a stop. Exit 4, or no `python3`, degrades to the **merge-safe manual fallback** — never to a filtered `gh pr checks` list, which makes an empty result look successful. On `fail`, extract details with `gh run view {run_id} --log-failed`.
+
+**Bind the verdict to the commit it was reached on** — record `ci_sha` = the `headRefOid` this wait ran against, and report `ci_status` as `passed@` or `failed@` followed by that full 40-character SHA (`no_ci` stays bare, and so does a skipped or degraded wait that never read a head): an unbound verdict is not evidence about any particular commit (issue #256). The settle-window rule, the manual polling loop and its head re-read, the failure extraction, and the bare-vs-bound cases are in `references/prepass-tests-ci-mechanics.md` (*Step 5*, *Binding the verdict to a commit*). **Read that file and apply it now.**
 
 **All checks passed:**
 ```
@@ -423,16 +405,16 @@ Cycle {N}:
 
 ## Review Loop
 
-After Step 6, go back to Step 3 — but reuse the same reviewer agent via `SendMessage` (not a fresh spawn). Only spawn fresh for the confirmation pass.
+After Step 6, go back to Step 3 — reuse the same reviewer agent via `SendMessage` (not a fresh spawn). Only spawn fresh for the confirmation pass.
 
-**Loop controls:**
-- **Max cycles:** `review.max_cycles` (default: 3). Step 1's `light` profile and `qa_handoff = trusted` each cap it at `min(1, configured_cap)` — the `trusted` cap subject to the depth carve-out in Step 1's *Precedence*. The `light` profile also skips the optional browser UI review; `trusted` never does — it reaches only the **code** leg (Step 3), because the browser leg is opt-in and fail-soft on both sides. Neither skips the reviewer, and neither relaxes the two #36 hard-blocks (`acceptance_criteria: fail`, missing `Closes #N`), which run at full strength on every path. **Re-evaluate `qa_handoff` after any push this skill makes** — Step 2's auto-fix commit as much as every fixer push — re-read `headRefOid` and recompute the verdict before the next step that reads it, because the push moved the head the marker binds to; nothing else re-reads it, and the loop re-enters at Step 3, never Step 1. Full mechanics in `references/review-loop-mechanics.md` (*Depth gate*, *QA handoff gate*, *Re-evaluation after a push*).
-- **Agent reuse:** Cycles 2+ reuse the existing reviewer and fixer agents. Fresh spawn only for the confirmation pass after fixer reports zero issues.
-- **Soft pass (when `review.soft_pass: true`, default):** Stop when ALL hold: zero `action: "fix"` issues remain AND (tests pass or `review.run_tests: false`) AND (CI passes, no CI configured, or `review.check_ci: false`) AND traceability is not `fail`. Medium `note` issues and `partial` dimensions are report-only — they do not block.
-- **Strict pass (when `review.soft_pass: false`):** Apply the same tests/CI gates, then require zero `action: "fix"` findings, zero remaining `action: "note"` findings, and `pass` for every enabled dimension. A `partial` dimension or any note is a strict blocker: exit the fix loop, report it under Remaining, and do not report clean or merge. Notes never become fixer inputs — Step 6 still fixes only `action: "fix"` — so strict mode surfaces these for manual remediation rather than looping without a fixable action.
+**Loop controls.** The mechanics behind every control below live in `references/review-loop-mechanics.md` (*Depth gate*, *What `light` changes in the loop*, *QA handoff gate*, *Re-evaluation after a push*, *Config keys and what they gate*). **Read that file and apply it now.**
+
+- **Max cycles:** `review.max_cycles` (default: 3). Step 1's `light` profile and `qa_handoff = trusted` each cap it at `min(1, configured_cap)` — the `trusted` cap subject to the depth carve-out in Step 1's *Precedence*. The `light` profile also skips the optional browser UI review; `trusted` never does — it reaches only the **code** leg (Step 3), because the browser leg is opt-in and fail-soft on both sides. Neither skips the reviewer, and neither relaxes the two #36 hard-blocks.
+- **Re-evaluate `qa_handoff` after any push this skill makes** — Step 2's auto-fix commit as much as every fixer push — re-read `headRefOid` and recompute the verdict before the next step that reads it. The loop re-enters at Step 3, never Step 1.
+- **Agent reuse:** Cycles 2+ reuse the existing reviewer and fixer agents. **Confirmation pass:** when the fixer reports all fixed, spawn one fresh reviewer for unbiased verification — if clean → PASS; if new issues → back to the existing fixer (counts as a cycle).
+- **Soft pass (when `review.soft_pass: true`, default):** Stop when ALL hold: zero `action: "fix"` issues remain AND (tests pass or `review.run_tests: false`) AND (CI passes, no CI configured, or `review.check_ci: false`) AND traceability is not `fail`. Medium `note` issues and `partial` dimensions are report-only. **Strict pass (when `review.soft_pass: false`)** — strict mode applies the same tests/CI gates, then requires zero `action: "fix"` findings, zero remaining `action: "note"` findings, and `pass` for every enabled dimension; a `partial` or any note is a strict blocker — exit the fix loop, report it under Remaining, and do not report clean or merge.
+- **Hard-block conditions:** enforce the two #36 hard-blocks from Step 3's *Verification gates* — `traceability: fail` (e.g. missing `Closes #{N}`) and any `acceptance_criteria: fail` block even when every other dimension is clean and tests pass.
 - **`review.auto_merge`:** honored only in `--auto` mode (auto-pilot forces merge when mode permits). Interactive `/issue-pr-review` never merges regardless of this flag.
-- **Hard-block conditions:** enforce the two #36 hard-blocks from Step 3's *Verification gates* — `traceability: fail` (e.g. missing `Closes #{N}`) and any `acceptance_criteria: fail` block even when every other dimension is clean and tests pass. They are gated on `review.require_traceability_check` / `review.require_acceptance_criteria_check` (both default `true`; `false` → `pass — verification disabled`), with the refactor/chore exemption reporting `traceability: pass — exempt` (unless check 4 is non-`pass`, which the exemption cannot relax).
-- **Confirmation pass:** When the fixer reports all fixed, spawn one fresh reviewer for unbiased verification. If clean → PASS. If new issues → back to existing fixer (counts as a cycle).
 - **Exit on stagnation:** If the same issues appear in 2 consecutive cycles, stop and report
 - **Review-only mode:** After Step 1 (including PR head checkout), run Step 2 detection-only (no auto-fix commits), then Steps 3-5 once — skip Step 6, never fix, loop, or merge
 
