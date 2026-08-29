@@ -103,6 +103,11 @@ review:
   confidence_threshold: 80
   run_tests: true
   check_ci: true
+  # Opt-in: report a terminal CI failure without blocking the review gate.
+  # GitHub exposes no API field naming a billing-related failure, so this
+  # ignores ANY terminal CI failure, not only billing ones. CI is still polled
+  # and still reported, and /auto-pilot's merge gate is unaffected.
+  ignore_ci_billing_failures: false
   ci_poll_interval: 30
   ci_timeout: 600
   test_timeout: 300

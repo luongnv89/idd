@@ -136,7 +136,7 @@ It prints one JSON object. Read `verdict`:
 | `verdict` | Meaning | Step 5 outcome |
 |-----------|---------|----------------|
 | `pass` | every check reached a terminal non-failing bucket and the normalized check-name set settled | `✓ all checks passed` |
-| `fail` | at least one check failed or was cancelled after the set settled — see `failing[]` | `✗ {N} checks failed` |
+| `fail` | at least one check failed or was cancelled after the set settled — see `failing[]` | `✗ {N} checks failed` — or, under `review.ignore_ci_billing_failures: true`, `⚠ {N} checks failed — not blocking` |
 | `pending` | checks still run, or the terminal set never settled before timeout | `⚠ checks still running` — **not clean** (see below) |
 | `none` | the repository reports no checks for this PR | `○ no CI checks configured` |
 
@@ -183,6 +183,15 @@ report clean or merge.
    unsettled, unconfirmed-empty, head change, or fallback error leaves the PR
    open and is not a clean result.
 
+A **settled, head-bound failure** is the single item on that list that
+`review.ignore_ci_billing_failures: true` reclassifies as non-blocking, and the
+fallback must honor the flag exactly as the script path does — same `PARTIAL`,
+same `failed@<sha40>`, same refusal to merge. The other six are untouched:
+timeout, pending, unsettled, unconfirmed-empty, head change, and fallback error
+are all "we do not know", not "we know it failed", and the flag ignores only a
+failure it actually observed. An unavailable fallback still reports
+nothing clean: a wait that never ran observed no failure to ignore.
+
 On failure, extract failure details from the CI log:
 
 ```bash
@@ -213,11 +222,23 @@ asked), and any degraded path where `headRefOid` could not be read. A bare value
 is not malformed — it is simply not evidence about a particular commit, and a
 caller must treat it as no evidence at all.
 
-This changes nothing inside this skill: Step 5 still waits, still blocks on
-`fail`, still refuses to treat `pending` as clean, and is **never** skipped by
-anything a PR body claims. The binding exists so that a caller which has already
-seen this verdict can re-verify the head cheaply rather than re-running the whole
-wait — the difference between an in-process return value from a subagent this
+**`review.ignore_ci_billing_failures: true` is not a fourth case, and it is not
+a `passed@`.** The wait ran, the checks are red, and the head is known, so the
+value is `failed@<sha40>` — exactly what it would be with the flag off. The flag
+changes what *this skill's review gate* does with that fact; it does not change
+the fact. Writing `passed@` here would bind a false claim to a commit, and it
+would buy nothing: `/auto-pilot`'s Step 5.1a `trusted` path additionally requires
+a live all-green `statusCheckRollup`, which a red PR does not have. So
+`/auto-pilot` re-runs its own wait and still refuses the merge. That is the
+**intended and documented boundary** of this key — it is scoped to
+`/issue-pr-review`, and nothing about it makes a red PR mergeable.
+
+The **binding** changes nothing inside this skill: Step 5 still waits, still
+blocks on `fail` unless `review.ignore_ci_billing_failures` holds that failure
+non-blocking, still refuses to treat `pending` as clean, and is **never**
+skipped by anything a PR body claims. It exists so that a caller which has
+already seen this verdict can re-verify the head cheaply rather than re-running
+the whole wait — the difference between an in-process return value from a subagent this
 run spawned, and a marker written into a PR body by whoever authored it. Only
 the first can be re-verified against the commit it names without trusting its
 author. See `/auto-pilot`'s *Step 5.1a — CI verdict gate* for the consuming side.

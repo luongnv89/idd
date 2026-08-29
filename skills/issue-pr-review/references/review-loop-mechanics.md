@@ -26,6 +26,7 @@ produces a run that looks configured and is not.
 | `review.auto_merge: false` | Honored only in `--auto` mode. Interactive `/issue-pr-review` never merges regardless of this flag, and `--no-merge` suppresses the merge even in auto mode. |
 | `review.confidence_threshold: 80` | Minimum confidence for code-reviewer findings. The ui-reviewer keeps its own 75 floor and does not read this key. |
 | `review.run_tests: true` / `review.check_ci: true` | Enable Step 4 and Step 5. When either is `false` the step reports `○ … skipped` and the soft-pass conjunction treats that leg as satisfied. |
+| `review.ignore_ci_billing_failures: false` | `true` makes a terminal Step 5 `fail` non-blocking **at this skill's review gate only**: CI is still polled and reported, Step 6 raises no CI fixable, and the soft-pass conjunction treats the CI leg as satisfied (in strict `soft_pass: false` mode too). `ci_status` still binds as `failed@<sha40>` and the step reports `PARTIAL`. The satisfied leg is **loop exit only**: Step 7's auto-merge gate excludes this path by name — an ignored CI failure is never clean, exactly as pending CI is never clean — so `--auto` does not merge it, and `/auto-pilot`'s merge gate re-runs its own wait and still refuses. **It does not touch `ci_leg_runnable`** — see below. GitHub exposes no API field naming a billing failure, so it ignores *any* terminal CI failure. |
 | `review.ci_poll_interval: 30` / `review.ci_timeout: 600` / `review.test_timeout: 300` | Seconds. The first two are passed to `gi-ci-wait.py` as `--interval` / `--timeout`; the third bounds the Step 4 suite. |
 | `review.soft_pass: true` | `true` (default): when zero `action: fix` issues remain and the tests/CI/traceability legs pass, remaining `note` findings and `partial` dimensions are report-only. **`false` (strict):** the same tests/CI gates apply, and in addition every enabled dimension must be `pass` and no `action: "note"` finding may remain — a `partial` dimension or any note blocks a clean result **and blocks merge**. Notes never become fixer inputs (Step 6 fixes only `action: "fix"`), so strict mode surfaces them for manual remediation rather than looping without a fixable action. |
 | `review.require_acceptance_criteria_check: true` | `true` (default) gates per-criterion AC verification. When `false`, `acceptance_criteria` reports `pass — verification disabled` and never blocks soft-pass. |
@@ -327,6 +328,27 @@ false`, or an empty/absent/unreadable rollup — the early `no_ci`). An empty
 rollup is ambiguous (just-pushed vs no CI) and fail-safes to RUN the suite.
 When `ci_leg_runnable` is false, ignore `tests=` and run both local test legs
 as if the PR were unmarked. No new config key; Step 5's CI wait stays ungated.
+
+**`review.ignore_ci_billing_failures` does not enter this predicate — it is
+unchanged by that key, in either direction.** `ci_leg_runnable` asks whether CI
+*ran*; the ignore flag asks whether a CI *failure blocks*. Those questions are
+orthogonal — the flag never observes whether CI ran, only what to do once it
+has — and folding it into the predicate would not merely be untidy, it would
+answer the wrong question: a flag set to ignore failures would drive
+`ci_leg_runnable` **false**, which forces both local test legs to *run* on a PR
+whose marker says they already did. So a `trusted` marker's `tests=` skip is
+decided exactly as above whatever the ignore flag says. The safe direction is
+the same one: a wrong answer here makes the local suite *run*, never skip.
+
+The composition a maintainer has to see is the other one. With a `trusted`
+marker, `review.check_ci: true`, and a non-empty rollup, `ci_leg_runnable` stays
+true, so **both local test legs are skipped** — and if CI then goes red, the
+ignore flag drops that verdict too. Nothing this review ran independently
+verified that head. That is by design and not a hole, but only because the
+local suite's skip is justified by the resolver's own QA marker — the `tests=`
+SHA equalling the live head — and never by the ignore flag, which supplies no
+evidence about anything. If that marker is not trusted and head-bound, the suite
+runs.
 
 `ui=` is split into legs because the code UI review is environment-independent
 while the browser leg is fail-soft and skips on a headless host. A flat verdict

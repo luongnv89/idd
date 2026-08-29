@@ -220,7 +220,7 @@ On merge failure:
   Result:            BLOCKED (manual merge required)
 ```
 
-Auto-merge is gated on the same configured pass condition as the loop exit, including `traceability != fail` and zero `acceptance_criteria: fail`. With `review.soft_pass: false`, it additionally requires zero notes and no partial dimensions. A PR that passes tests and CI but fails traceability or acceptance criteria — or has a strict-pass blocker — is **not** auto-merged.
+Auto-merge is gated on the configured loop-exit pass condition **plus exclusions the loop exit does not apply**: pending CI is never clean, and a terminal CI failure held non-blocking by `review.ignore_ci_billing_failures: true` is never clean either — that key satisfies the loop's CI leg so the fix loop can stop and report `PARTIAL`, and it never satisfies this gate. The shared part includes `traceability != fail` and zero `acceptance_criteria: fail`. With `review.soft_pass: false`, it additionally requires zero notes and no partial dimensions. A PR that passes tests and CI but fails traceability or acceptance criteria — or has a strict-pass blocker — is **not** auto-merged.
 
 When `--no-merge` is set (even in auto mode): skip the merge step entirely and report status only. The PR stays open for the owning agent (e.g. auto-pilot Phase 5) to merge through its own mode gate and dependency gate.
 
@@ -287,16 +287,29 @@ Rules that make the report worth reading:
 | 6 — Fix Issues | `Fixes applied` · `Re-review clean` |
 | 7 — Summary Report | `AC verified` · `Verdict recorded` · `Merge decision stated` |
 
-`PARTIAL` covers the documented soft paths: no CI configured (Step 5); the fix
-loop exhausting `review_cycles` with only non-blocking findings left (Step 6); or
-Step 4's test + build run skipped under `qa_handoff = trusted`, which evaluates
-neither of that step's checks and so renders
+`PARTIAL` covers the documented soft paths: no CI configured (Step 5); a Step 5
+CI failure held non-blocking by `review.ignore_ci_billing_failures: true`; the
+fix loop exhausting `review_cycles` with only non-blocking findings left (Step
+6); or Step 4's test + build run skipped under `qa_handoff = trusted`, which
+evaluates neither of that step's checks and so renders
 
 ```
   [4/7] Tests        ○ tests skipped (qa handoff @ {commit_sha_short})
     × Suite passed   × Build clean
     Result: PARTIAL
 ```
+
+The ignored-CI path renders the same way, and its `×` is load-bearing: the wait
+ran and the checks are red, so `Required checks green` is genuinely false. The
+flag makes that non-blocking, not true.
+
+```
+  [5/7] CI Status    ⚠ {N} checks failed — not blocking (review.ignore_ci_billing_failures: true)
+    √ CI queried   × Required checks green
+    Result: PARTIAL
+```
+
+The closing summary carries the same gap — `CI status: ○ {N} checks failed (not blocking — review.ignore_ci_billing_failures)` and a `Result: PARTIAL` verdict, never `PASS`. The caller still receives `ci_status` as `failed@<sha40>`.
 
 A failing test, a red required check, or an unaddressed blocking finding is
 always `FAIL`.

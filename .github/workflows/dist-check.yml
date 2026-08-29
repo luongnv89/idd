@@ -245,6 +245,9 @@ jobs:
       - name: test-disclosure-gates
         run: bash tests/test-disclosure-gates-250.sh
 
+      - name: test-ci-billing-431
+        run: bash tests/test-ci-billing-431.sh
+
       - name: test-scripts-pipeline-251
         run: bash tests/test-scripts-pipeline-251.sh
 
