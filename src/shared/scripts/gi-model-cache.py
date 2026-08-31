@@ -13,12 +13,12 @@ the reference document becomes refresh- and debug-only reading.
 
 Output on stdout, one JSON object:
 
-    {"state": "fresh", "cache_file": "…/model-data-2026-06-12.json",
-     "last_fetched": "2026-06-12T00:00:00Z", "data_date": "2026-06-12",
-     "data_version": "3.1", "source": "CursorBench 3.1",
+    {"state": "fresh", "cache_file": "…/model-data-2026-08-31.json",
+     "last_fetched": "2026-08-31T00:00:00Z", "data_date": "2026-08-31",
+     "data_version": "3.2", "source": "CursorBench 3.2",
      "age_days": 3, "stale": false, "ttl_days": 7, "pruned": [],
-     "bands": {"M": {"openai": "GPT-5.5 High", "openai_cost": 3.59,
-                     "anthropic": "Opus 4.8 Medium", "anthropic_cost": 3.83}}}
+     "bands": {"M": {"openai": "GPT-5.6 Sol High", "openai_cost": 2.79,
+                     "anthropic": "Opus 5 Medium", "anthropic_cost": 3.29}}}
 
 `state` is one of `fresh`, `stale`, `seeded`, or `installed`. `stale` is also
 returned as its own boolean, because a freshly *seeded* cache can be stale too —
@@ -438,7 +438,7 @@ def render_bands(payload: dict) -> dict[str, dict]:
 
 
 def data_version(payload: dict) -> str | None:
-    """The version portion of `source` — `3.1` from `CursorBench 3.1`.
+    """The version portion of `source` — `3.2` from `CursorBench 3.2`.
 
     Scanned backwards in one pass instead of matched with
     `([0-9]+(?:\\.[0-9]+)*)\\s*$`. That pattern is nested quantification against
