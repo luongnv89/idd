@@ -14,7 +14,7 @@ and the skill continues (mirroring the image-upload degradation pattern).
 
 | Item | Value |
 |------|-------|
-| Source | CursorBench 3.1 — `https://cursor.com/cursorbench` |
+| Source | CursorBench 3.2 — `https://cursor.com/cursorbench` |
 | Cache file | `{skill_dir}/model-data-{YYYY-MM-DD}.json` — **skill-level, dated, one per machine** |
 | Bundled seed | `{skill_dir}/templates/model-data.json` — undated, ships inside the skill |
 | Staleness threshold | 7 days (compared against the cache's `last_fetched`) |
@@ -26,7 +26,7 @@ machine, so users never re-seed or maintain duplicate caches across projects.
 dirname of its `SKILL.md`).
 
 **The cache filename carries the date it was last updated**
-(`model-data-{YYYY-MM-DD}.json`, e.g. `model-data-2026-06-12.json`). That date is
+(`model-data-{YYYY-MM-DD}.json`, e.g. `model-data-2026-08-31.json`). That date is
 the date portion of the cache's own `last_fetched`, so the two can never
 disagree, and a glance at the filename tells you whether a refresh is likely
 needed without opening the file.
@@ -52,15 +52,15 @@ diffs, and a full overwrite on refresh (never append).
 ```json
 {
   "schema_version": 1,
-  "source": "CursorBench 3.1",
+  "source": "CursorBench 3.2",
   "source_url": "https://cursor.com/cursorbench",
-  "last_fetched": "2026-06-12T00:00:00Z",
+  "last_fetched": "2026-08-31T00:00:00Z",
   "providers": {
-    "openai":    { "family": "GPT-5.5", "models": [ { "name": "...", "thinking": "...", "score": 0.0, "cost_per_task_usd": 0.0, "tokens_per_task": 0 } ] },
-    "anthropic": { "families": ["Fable 5", "Opus 4.7", "Opus 4.8"], "models": [ { "name": "...", "family": "...", "thinking": "...", "score": 0.0, "cost_per_task_usd": 0.0, "tokens_per_task": 0 } ] }
+    "openai":    { "families": ["GPT-5.6 Sol", "GPT-5.6 Terra", "GPT-5.6 Luna", "GPT-5.5"], "models": [ { "name": "...", "family": "...", "thinking": "...", "score": 0.0, "cost_per_task_usd": 0.0, "tokens_per_task": 0 } ] },
+    "anthropic": { "families": ["Fable 5", "Opus 5", "Opus 4.8", "Sonnet 5"], "models": [ { "name": "...", "family": "...", "thinking": "...", "score": 0.0, "cost_per_task_usd": 0.0, "tokens_per_task": 0 } ] }
   },
   "complexity_mapping": {
-    "XS": { "label": "trivial", "openai": "GPT-5.5 Low", "anthropic": "Opus 4.7 Low" }
+    "XS": { "label": "trivial", "openai": "GPT-5.6 Sol Low", "anthropic": "Opus 5 Low" }
   }
 }
 ```
@@ -70,8 +70,8 @@ picks (one OpenAI, one Anthropic) — you pick one, not both. It therefore carri
 **no** cost field of its own: a single summed figure would misrepresent the cost
 of either pick (roughly doubling it). Per-task cost is instead rendered
 **per-model**, sourced from each named model's own `cost_per_task_usd` in the
-`providers` block. So the M band's cost is `GPT-5.5 High` → `$3.59` and
-`Opus 4.8 Medium` → `$3.83`, shown as two independent figures — never their sum.
+`providers` block. So the M band's cost is `GPT-5.6 Sol High` → `$2.79` and
+`Opus 5 Medium` → `$3.29`, shown as two independent figures — never their sum.
 
 ## Cache lifecycle (runs once at skill start, after config load)
 
@@ -118,14 +118,14 @@ creates the issue without them — the same outcome as state 4 below.
 1. **Cache present and fresh** (`last_fetched` ≤ `cache_ttl_days`, default 7) →
    use it silently:
    ```
-   ○ Using cached model data (CursorBench 3.1, fetched {age}).
+   ○ Using cached model data (CursorBench 3.2, fetched {age}).
    ```
 
 2. **Cache present but stale** (`last_fetched` older than the threshold) → warn
    and offer a refresh. Use the stale data if the user declines or the refresh
    fails:
    ```
-   ⚠ Model data is {age} old (CursorBench 3.1).
+   ⚠ Model data is {age} old (CursorBench 3.2).
      Refresh now? [y/N]
    ```
 
@@ -141,7 +141,7 @@ creates the issue without them — the same outcome as state 4 below.
       "$skill_dir/model-data-${seed_date}.json"
    ```
    ```
-   ○ Seeded model data from bundled CursorBench 3.1 snapshot.
+   ○ Seeded model data from bundled CursorBench 3.2 snapshot.
      Fetch the latest now? [y/N]
    ```
 
@@ -230,11 +230,11 @@ costs are independent, never summed:
 
 | Effort | OpenAI (cost/task) | Anthropic (cost/task) |
 |--------|--------------------|-----------------------|
-| XS | GPT-5.5 Low ($1.19) | Opus 4.7 Low ($1.87) |
-| S  | GPT-5.5 Medium ($2.22) | Opus 4.8 Low ($2.93) |
-| M  | GPT-5.5 High ($3.59) | Opus 4.8 Medium ($3.83) |
-| L  | GPT-5.5 Extra High ($4.37) | Opus 4.7 Extra High ($7.11) |
-| XL | GPT-5.5 Extra High ($4.37) | Fable 5 Max ($18.02) |
+| XS | GPT-5.6 Sol Low ($1.01) | Opus 5 Low ($2.55) |
+| S  | GPT-5.6 Sol Medium ($1.95) | Opus 5 Low ($2.55) |
+| M  | GPT-5.6 Sol High ($2.79) | Opus 5 Medium ($3.29) |
+| L  | GPT-5.6 Sol Extra High ($3.88) | Opus 5 Extra High ($7.35) |
+| XL | GPT-5.6 Sol Max ($5.69) | Fable 5 Max ($17.32) |
 
 Always read the mapping from the cache file, not from this table — the table is
 the seed snapshot and may be refreshed. If the cache omits a band, fall back to
@@ -245,16 +245,16 @@ the nearest lower band and note `(needs review)`.
 **The two-model rendering rule (single home).** The suggestion appears in **two**
 places — the Step 5 ephemeral preview and the durable issue-body `## Metadata`
 line. In both, it **always names exactly two models — one OpenAI model and one
-Anthropic model — joined by ` · ` (OpenAI first)** — e.g. `GPT-5.5 High · Opus
-4.8 Medium`. The two names are read from the effort band's `openai` and
+Anthropic model — joined by ` · ` (OpenAI first)** — e.g. `GPT-5.6 Sol High · Opus
+5 Medium`. The two names are read from the effort band's `openai` and
 `anthropic` entries in the cache. Both providers are always present; **never**
 collapse it to a single model or a single provider. Every mention of this rule
 elsewhere points here.
 
 In the **ephemeral preview** (Step 5), append each model's own per-task cost in
 parentheses immediately after it, read from that model's `cost_per_task_usd` in
-the `providers` block — e.g. `GPT-5.5 High (~$3.59/task) · Opus 4.8 Medium
-(~$3.83/task)`. The two costs are independent (the picks are alternatives) and
+the `providers` block — e.g. `GPT-5.6 Sol High (~$2.79/task) · Opus 5 Medium
+(~$3.29/task)`. The two costs are independent (the picks are alternatives) and
 are **never** added together. The durable `**Suggested model:**` body line omits
 costs (it stays a lean, dated advisory of the two names).
 
@@ -268,7 +268,7 @@ Add a `⚡ Model:` line to the `◆ Issue Preview` block:
   Type:     feature (high)
   Title:    Add dark mode toggle to settings
   Effort:   M
-  ⚡ Model:  GPT-5.5 High (~$3.59/task) · Opus 4.8 Medium (~$3.83/task)
+  ⚡ Model:  GPT-5.6 Sol High (~$2.79/task) · Opus 5 Medium (~$3.29/task)
   Labels:   feature, settings
   Criteria: 4 acceptance criteria generated (medium)
 ```
@@ -279,13 +279,13 @@ Add a `**Suggested model:**` line after `**Effort:**` in the body. It is
 **dated and labelled advisory** so its staleness is self-documenting:
 
 ```markdown
-**Suggested model:** GPT-5.5 High · Opus 4.8 Medium _(CursorBench 3.1, 2026-06-12 — advisory)_
+**Suggested model:** GPT-5.6 Sol High · Opus 5 Medium _(CursorBench 3.2, 2026-08-31 — advisory)_
 ```
 
 The template placeholders fill from the cache: `{openai_model}` and
 `{anthropic_model}` are the effort band's `openai` / `anthropic` entries,
-`{data_version}` is the version portion of `source` (e.g. `3.1` from
-`CursorBench 3.1` — do not repeat the `CursorBench` prefix), and `{data_date}` is
+`{data_version}` is the version portion of `source` (e.g. `3.2` from
+`CursorBench 3.2` — do not repeat the `CursorBench` prefix), and `{data_date}` is
 the date portion of `last_fetched`.
 This is the one piece of externally-derived data the Output Contract admits
 into the body — see the

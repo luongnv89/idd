@@ -1,45 +1,407 @@
 {
   "schema_version": 1,
-  "source": "CursorBench 3.1",
+  "source": "CursorBench 3.2",
   "source_url": "https://cursor.com/cursorbench",
-  "last_fetched": "2026-06-12T00:00:00Z",
+  "last_fetched": "2026-08-31T00:00:00Z",
   "note": "Bundled seed shipped with the issue-creator skill. Copied to a skill-level model-data-<date>.json cache (shared across all repos) on first run when none exists. Cost/task figures are computed by applying each model's published per-million-token pricing to tokens used per task. Refresh with /issue-creator (older than 7 days) or force with --refresh-model-data.",
   "providers": {
     "openai": {
-      "family": "GPT-5.5",
+      "families": [
+        "GPT-5.6 Sol",
+        "GPT-5.6 Terra",
+        "GPT-5.6 Luna",
+        "GPT-5.5"
+      ],
       "models": [
-        { "rank": 1, "name": "GPT-5.5 Extra High", "thinking": "extra-high", "score": 64.3, "cost_per_task_usd": 4.37, "tokens_per_task": 17905 },
-        { "rank": 2, "name": "GPT-5.5 High", "thinking": "high", "score": 62.6, "cost_per_task_usd": 3.59, "tokens_per_task": 13329 },
-        { "rank": 3, "name": "GPT-5.5 Medium", "thinking": "medium", "score": 59.2, "cost_per_task_usd": 2.22, "tokens_per_task": 9065 },
-        { "rank": 4, "name": "GPT-5.5 Low", "thinking": "low", "score": 48.8, "cost_per_task_usd": 1.19, "tokens_per_task": 4923 }
+        {
+          "rank": 1,
+          "name": "GPT-5.6 Sol Max",
+          "family": "GPT-5.6 Sol",
+          "thinking": "max",
+          "score": 67.2,
+          "cost_per_task_usd": 5.69,
+          "tokens_per_task": 28320
+        },
+        {
+          "rank": 2,
+          "name": "GPT-5.6 Terra Max",
+          "family": "GPT-5.6 Terra",
+          "thinking": "max",
+          "score": 64.9,
+          "cost_per_task_usd": 2.31,
+          "tokens_per_task": 32969
+        },
+        {
+          "rank": 3,
+          "name": "GPT-5.6 Sol Extra High",
+          "family": "GPT-5.6 Sol",
+          "thinking": "extra-high",
+          "score": 64.5,
+          "cost_per_task_usd": 3.88,
+          "tokens_per_task": 19699
+        },
+        {
+          "rank": 4,
+          "name": "GPT-5.6 Sol High",
+          "family": "GPT-5.6 Sol",
+          "thinking": "high",
+          "score": 63.5,
+          "cost_per_task_usd": 2.79,
+          "tokens_per_task": 13867
+        },
+        {
+          "rank": 5,
+          "name": "GPT-5.6 Luna Max",
+          "family": "GPT-5.6 Luna",
+          "thinking": "max",
+          "score": 61.1,
+          "cost_per_task_usd": 0.39,
+          "tokens_per_task": 87973
+        },
+        {
+          "rank": 6,
+          "name": "GPT-5.6 Sol Medium",
+          "family": "GPT-5.6 Sol",
+          "thinking": "medium",
+          "score": 60.0,
+          "cost_per_task_usd": 1.95,
+          "tokens_per_task": 9747
+        },
+        {
+          "rank": 7,
+          "name": "GPT-5.6 Terra Extra High",
+          "family": "GPT-5.6 Terra",
+          "thinking": "extra-high",
+          "score": 59.2,
+          "cost_per_task_usd": 1.15,
+          "tokens_per_task": 16089
+        },
+        {
+          "rank": 8,
+          "name": "GPT-5.5 High",
+          "family": "GPT-5.5",
+          "thinking": "high",
+          "score": 58.4,
+          "cost_per_task_usd": 2.05,
+          "tokens_per_task": 12183
+        },
+        {
+          "rank": 9,
+          "name": "GPT-5.5 Extra High",
+          "family": "GPT-5.5",
+          "thinking": "extra-high",
+          "score": 58.4,
+          "cost_per_task_usd": 2.85,
+          "tokens_per_task": 17534
+        },
+        {
+          "rank": 10,
+          "name": "GPT-5.6 Luna Extra High",
+          "family": "GPT-5.6 Luna",
+          "thinking": "extra-high",
+          "score": 57.7,
+          "cost_per_task_usd": 0.23,
+          "tokens_per_task": 22480
+        },
+        {
+          "rank": 11,
+          "name": "GPT-5.6 Luna High",
+          "family": "GPT-5.6 Luna",
+          "thinking": "high",
+          "score": 56.8,
+          "cost_per_task_usd": 0.16,
+          "tokens_per_task": 15141
+        },
+        {
+          "rank": 12,
+          "name": "GPT-5.6 Terra High",
+          "family": "GPT-5.6 Terra",
+          "thinking": "high",
+          "score": 54.2,
+          "cost_per_task_usd": 0.71,
+          "tokens_per_task": 9468
+        },
+        {
+          "rank": 13,
+          "name": "GPT-5.5 Medium",
+          "family": "GPT-5.5",
+          "thinking": "medium",
+          "score": 53.8,
+          "cost_per_task_usd": 1.51,
+          "tokens_per_task": 8522
+        },
+        {
+          "rank": 14,
+          "name": "GPT-5.6 Sol Low",
+          "family": "GPT-5.6 Sol",
+          "thinking": "low",
+          "score": 52.6,
+          "cost_per_task_usd": 1.01,
+          "tokens_per_task": 5104
+        },
+        {
+          "rank": 15,
+          "name": "GPT-5.6 Terra Medium",
+          "family": "GPT-5.6 Terra",
+          "thinking": "medium",
+          "score": 50.3,
+          "cost_per_task_usd": 0.49,
+          "tokens_per_task": 6222
+        },
+        {
+          "rank": 16,
+          "name": "GPT-5.6 Luna Medium",
+          "family": "GPT-5.6 Luna",
+          "thinking": "medium",
+          "score": 47.7,
+          "cost_per_task_usd": 0.08,
+          "tokens_per_task": 7095
+        },
+        {
+          "rank": 17,
+          "name": "GPT-5.6 Terra Low",
+          "family": "GPT-5.6 Terra",
+          "thinking": "low",
+          "score": 46.9,
+          "cost_per_task_usd": 0.42,
+          "tokens_per_task": 5312
+        },
+        {
+          "rank": 18,
+          "name": "GPT-5.5 Low",
+          "family": "GPT-5.5",
+          "thinking": "low",
+          "score": 46.6,
+          "cost_per_task_usd": 0.98,
+          "tokens_per_task": 5168
+        },
+        {
+          "rank": 19,
+          "name": "GPT-5.6 Luna Low",
+          "family": "GPT-5.6 Luna",
+          "thinking": "low",
+          "score": 37.6,
+          "cost_per_task_usd": 0.03,
+          "tokens_per_task": 3209
+        }
       ]
     },
     "anthropic": {
-      "families": ["Fable 5", "Opus 4.7", "Opus 4.8"],
+      "families": [
+        "Fable 5",
+        "Opus 5",
+        "Opus 4.8",
+        "Sonnet 5"
+      ],
       "models": [
-        { "rank": 1, "name": "Fable 5 Max", "family": "Fable 5", "thinking": "max", "score": 72.9, "cost_per_task_usd": 18.02, "tokens_per_task": 63842 },
-        { "rank": 2, "name": "Fable 5 Extra High", "family": "Fable 5", "thinking": "extra-high", "score": 72.0, "cost_per_task_usd": 13.74, "tokens_per_task": 48754 },
-        { "rank": 3, "name": "Fable 5 High", "family": "Fable 5", "thinking": "high", "score": 70.6, "cost_per_task_usd": 10.81, "tokens_per_task": 37173 },
-        { "rank": 4, "name": "Fable 5 Medium", "family": "Fable 5", "thinking": "medium", "score": 69.8, "cost_per_task_usd": 8.27, "tokens_per_task": 28507 },
-        { "rank": 5, "name": "Fable 5 Low", "family": "Fable 5", "thinking": "low", "score": 64.2, "cost_per_task_usd": 5.70, "tokens_per_task": 18882 },
-        { "rank": 6, "name": "Opus 4.7 Max", "family": "Opus 4.7", "thinking": "max", "score": 64.8, "cost_per_task_usd": 11.02, "tokens_per_task": 62989 },
-        { "rank": 7, "name": "Opus 4.8 Max", "family": "Opus 4.8", "thinking": "max", "score": 63.8, "cost_per_task_usd": 7.59, "tokens_per_task": 77370 },
-        { "rank": 8, "name": "Opus 4.8 Extra High", "family": "Opus 4.8", "thinking": "extra-high", "score": 62.1, "cost_per_task_usd": 6.14, "tokens_per_task": 55622 },
-        { "rank": 9, "name": "Opus 4.7 Extra High", "family": "Opus 4.7", "thinking": "extra-high", "score": 61.6, "cost_per_task_usd": 7.11, "tokens_per_task": 43942 },
-        { "rank": 10, "name": "Opus 4.7 High", "family": "Opus 4.7", "thinking": "high", "score": 59.4, "cost_per_task_usd": 5.01, "tokens_per_task": 32227 },
-        { "rank": 11, "name": "Opus 4.8 High", "family": "Opus 4.8", "thinking": "high", "score": 58.4, "cost_per_task_usd": 4.41, "tokens_per_task": 36788 },
-        { "rank": 12, "name": "Opus 4.8 Medium", "family": "Opus 4.8", "thinking": "medium", "score": 56.6, "cost_per_task_usd": 3.83, "tokens_per_task": 31684 },
-        { "rank": 13, "name": "Opus 4.8 Low", "family": "Opus 4.8", "thinking": "low", "score": 54.3, "cost_per_task_usd": 2.93, "tokens_per_task": 22726 },
-        { "rank": 14, "name": "Opus 4.7 Medium", "family": "Opus 4.7", "thinking": "medium", "score": 52.7, "cost_per_task_usd": 2.93, "tokens_per_task": 19193 },
-        { "rank": 15, "name": "Opus 4.7 Low", "family": "Opus 4.7", "thinking": "low", "score": 48.3, "cost_per_task_usd": 1.87, "tokens_per_task": 13164 }
+        {
+          "rank": 1,
+          "name": "Fable 5 Max",
+          "family": "Fable 5",
+          "thinking": "max",
+          "score": 70.5,
+          "cost_per_task_usd": 17.32,
+          "tokens_per_task": 103525
+        },
+        {
+          "rank": 2,
+          "name": "Opus 5 Max",
+          "family": "Opus 5",
+          "thinking": "max",
+          "score": 70.0,
+          "cost_per_task_usd": 8.23,
+          "tokens_per_task": 61838
+        },
+        {
+          "rank": 3,
+          "name": "Opus 5 Extra High",
+          "family": "Opus 5",
+          "thinking": "extra-high",
+          "score": 69.3,
+          "cost_per_task_usd": 7.35,
+          "tokens_per_task": 54239
+        },
+        {
+          "rank": 4,
+          "name": "Fable 5 Extra High",
+          "family": "Fable 5",
+          "thinking": "extra-high",
+          "score": 68.4,
+          "cost_per_task_usd": 11.73,
+          "tokens_per_task": 64971
+        },
+        {
+          "rank": 5,
+          "name": "Opus 5 High",
+          "family": "Opus 5",
+          "thinking": "high",
+          "score": 66.7,
+          "cost_per_task_usd": 3.91,
+          "tokens_per_task": 27932
+        },
+        {
+          "rank": 6,
+          "name": "Fable 5 High",
+          "family": "Fable 5",
+          "thinking": "high",
+          "score": 66.5,
+          "cost_per_task_usd": 8.77,
+          "tokens_per_task": 43747
+        },
+        {
+          "rank": 7,
+          "name": "Fable 5 Medium",
+          "family": "Fable 5",
+          "thinking": "medium",
+          "score": 65.2,
+          "cost_per_task_usd": 6.8,
+          "tokens_per_task": 30366
+        },
+        {
+          "rank": 8,
+          "name": "Opus 5 Medium",
+          "family": "Opus 5",
+          "thinking": "medium",
+          "score": 64.3,
+          "cost_per_task_usd": 3.29,
+          "tokens_per_task": 23612
+        },
+        {
+          "rank": 9,
+          "name": "Opus 5 Low",
+          "family": "Opus 5",
+          "thinking": "low",
+          "score": 62.8,
+          "cost_per_task_usd": 2.55,
+          "tokens_per_task": 18529
+        },
+        {
+          "rank": 10,
+          "name": "Opus 4.8 Max",
+          "family": "Opus 4.8",
+          "thinking": "max",
+          "score": 62.3,
+          "cost_per_task_usd": 5.77,
+          "tokens_per_task": 71411
+        },
+        {
+          "rank": 11,
+          "name": "Fable 5 Low",
+          "family": "Fable 5",
+          "thinking": "low",
+          "score": 62.1,
+          "cost_per_task_usd": 4.46,
+          "tokens_per_task": 18182
+        },
+        {
+          "rank": 12,
+          "name": "Sonnet 5 Max",
+          "family": "Sonnet 5",
+          "thinking": "max",
+          "score": 61.5,
+          "cost_per_task_usd": 4.3,
+          "tokens_per_task": 92882
+        },
+        {
+          "rank": 13,
+          "name": "Opus 4.8 Extra High",
+          "family": "Opus 4.8",
+          "thinking": "extra-high",
+          "score": 59.4,
+          "cost_per_task_usd": 4.5,
+          "tokens_per_task": 51121
+        },
+        {
+          "rank": 14,
+          "name": "Sonnet 5 Extra High",
+          "family": "Sonnet 5",
+          "thinking": "extra-high",
+          "score": 58.7,
+          "cost_per_task_usd": 2.77,
+          "tokens_per_task": 52871
+        },
+        {
+          "rank": 15,
+          "name": "Opus 4.8 High",
+          "family": "Opus 4.8",
+          "thinking": "high",
+          "score": 58.0,
+          "cost_per_task_usd": 3.15,
+          "tokens_per_task": 33548
+        },
+        {
+          "rank": 16,
+          "name": "Sonnet 5 High",
+          "family": "Sonnet 5",
+          "thinking": "high",
+          "score": 56.9,
+          "cost_per_task_usd": 2.13,
+          "tokens_per_task": 39483
+        },
+        {
+          "rank": 17,
+          "name": "Opus 4.8 Medium",
+          "family": "Opus 4.8",
+          "thinking": "medium",
+          "score": 56.1,
+          "cost_per_task_usd": 2.81,
+          "tokens_per_task": 28384
+        },
+        {
+          "rank": 18,
+          "name": "Opus 4.8 Low",
+          "family": "Opus 4.8",
+          "thinking": "low",
+          "score": 53.1,
+          "cost_per_task_usd": 2.02,
+          "tokens_per_task": 19624
+        },
+        {
+          "rank": 19,
+          "name": "Sonnet 5 Medium",
+          "family": "Sonnet 5",
+          "thinking": "medium",
+          "score": 52.4,
+          "cost_per_task_usd": 1.44,
+          "tokens_per_task": 26200
+        },
+        {
+          "rank": 20,
+          "name": "Sonnet 5 Low",
+          "family": "Sonnet 5",
+          "thinking": "low",
+          "score": 47.7,
+          "cost_per_task_usd": 0.87,
+          "tokens_per_task": 16269
+        }
       ]
     }
   },
   "complexity_mapping": {
-    "XS": { "label": "trivial",          "openai": "GPT-5.5 Low",        "anthropic": "Opus 4.7 Low" },
-    "S":  { "label": "simple",           "openai": "GPT-5.5 Medium",     "anthropic": "Opus 4.8 Low" },
-    "M":  { "label": "moderate",         "openai": "GPT-5.5 High",       "anthropic": "Opus 4.8 Medium" },
-    "L":  { "label": "complex",          "openai": "GPT-5.5 Extra High", "anthropic": "Opus 4.7 Extra High" },
-    "XL": { "label": "super complex",    "openai": "GPT-5.5 Extra High", "anthropic": "Fable 5 Max" }
+    "XS": {
+      "label": "trivial",
+      "openai": "GPT-5.6 Sol Low",
+      "anthropic": "Opus 5 Low"
+    },
+    "S": {
+      "label": "simple",
+      "openai": "GPT-5.6 Sol Medium",
+      "anthropic": "Opus 5 Low"
+    },
+    "M": {
+      "label": "moderate",
+      "openai": "GPT-5.6 Sol High",
+      "anthropic": "Opus 5 Medium"
+    },
+    "L": {
+      "label": "complex",
+      "openai": "GPT-5.6 Sol Extra High",
+      "anthropic": "Opus 5 Extra High"
+    },
+    "XL": {
+      "label": "super complex",
+      "openai": "GPT-5.6 Sol Max",
+      "anthropic": "Fable 5 Max"
+    }
   }
 }

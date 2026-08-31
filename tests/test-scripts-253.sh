@@ -416,6 +416,16 @@ new_skill_dir() {
   local d="$1"
   mkdir -p "$d/templates"
   cp "$SEED_SRC" "$d/templates/model-data.json"
+  # Pin the fixture date so lifecycle assertions remain independent of the
+  # weekly CursorBench seed refresh.
+  python3 - "$d/templates/model-data.json" <<'PY'
+import json, sys
+path = sys.argv[1]
+data = json.load(open(path))
+data["last_fetched"] = "2026-06-12T00:00:00Z"
+with open(path, "w") as handle:
+    json.dump(data, handle, indent=2)
+PY
 }
 
 SK1="$TMP/skill1"
@@ -447,11 +457,11 @@ fi
 
 # The bands are what the rendering rule needs, with per-model costs that are
 # never summed — the two picks are alternatives.
-if [ "$(printf '%s' "$out" | jkey 'bands.M.openai')" = "GPT-5.5 High" ] \
-   && [ "$(printf '%s' "$out" | jkey 'bands.M.anthropic')" = "Opus 4.8 Medium" ] \
-   && [ "$(printf '%s' "$out" | jkey 'bands.M.openai_cost')" = "3.59" ] \
-   && [ "$(printf '%s' "$out" | jkey 'bands.M.anthropic_cost')" = "3.83" ] \
-   && [ "$(printf '%s' "$out" | jkey data_version)" = "3.1" ]; then
+if [ "$(printf '%s' "$out" | jkey 'bands.M.openai')" = "GPT-5.6 Sol High" ] \
+   && [ "$(printf '%s' "$out" | jkey 'bands.M.anthropic')" = "Opus 5 Medium" ] \
+   && [ "$(printf '%s' "$out" | jkey 'bands.M.openai_cost')" = "2.79" ] \
+   && [ "$(printf '%s' "$out" | jkey 'bands.M.anthropic_cost')" = "3.29" ] \
+   && [ "$(printf '%s' "$out" | jkey data_version)" = "3.2" ]; then
   pass "AC4: the effort bands carry both picks and each pick's own cost"
 else
   fail "AC4: the band mapping is wrong (got: $out)"
