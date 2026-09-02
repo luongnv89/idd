@@ -26,7 +26,7 @@ machine, so users never re-seed or maintain duplicate caches across projects.
 dirname of its `SKILL.md`).
 
 **The cache filename carries the date it was last updated**
-(`model-data-{YYYY-MM-DD}.json`, e.g. `model-data-2026-08-31.json`). That date is
+(`model-data-{YYYY-MM-DD}.json`, e.g. `model-data-2026-09-02.json`). That date is
 the date portion of the cache's own `last_fetched`, so the two can never
 disagree, and a glance at the filename tells you whether a refresh is likely
 needed without opening the file.
@@ -54,10 +54,10 @@ diffs, and a full overwrite on refresh (never append).
   "schema_version": 1,
   "source": "CursorBench 3.2",
   "source_url": "https://cursor.com/cursorbench",
-  "last_fetched": "2026-08-31T00:00:00Z",
+  "last_fetched": "2026-09-02T00:00:00Z",
   "providers": {
     "openai":    { "families": ["GPT-5.6 Sol", "GPT-5.6 Terra", "GPT-5.6 Luna", "GPT-5.5"], "models": [ { "name": "...", "family": "...", "thinking": "...", "score": 0.0, "cost_per_task_usd": 0.0, "tokens_per_task": 0 } ] },
-    "anthropic": { "families": ["Fable 5", "Opus 5", "Opus 4.8", "Sonnet 5"], "models": [ { "name": "...", "family": "...", "thinking": "...", "score": 0.0, "cost_per_task_usd": 0.0, "tokens_per_task": 0 } ] }
+    "anthropic": { "families": ["Fable 5.1", "Fable 5", "Opus 5", "Opus 4.8", "Sonnet 5"], "models": [ { "name": "...", "family": "...", "thinking": "...", "score": 0.0, "cost_per_task_usd": 0.0, "tokens_per_task": 0 } ] }
   },
   "complexity_mapping": {
     "XS": { "label": "trivial", "openai": "GPT-5.6 Sol Low", "anthropic": "Opus 5 Low" }
@@ -234,7 +234,7 @@ costs are independent, never summed:
 | S  | GPT-5.6 Sol Medium ($1.95) | Opus 5 Low ($2.55) |
 | M  | GPT-5.6 Sol High ($2.79) | Opus 5 Medium ($3.29) |
 | L  | GPT-5.6 Sol Extra High ($3.88) | Opus 5 Extra High ($7.35) |
-| XL | GPT-5.6 Sol Max ($5.69) | Fable 5 Max ($17.32) |
+| XL | GPT-5.6 Sol Max ($5.69) | Fable 5.1 Max ($9.64) |
 
 Always read the mapping from the cache file, not from this table — the table is
 the seed snapshot and may be refreshed. If the cache omits a band, fall back to
@@ -279,7 +279,7 @@ Add a `**Suggested model:**` line after `**Effort:**` in the body. It is
 **dated and labelled advisory** so its staleness is self-documenting:
 
 ```markdown
-**Suggested model:** GPT-5.6 Sol High · Opus 5 Medium _(CursorBench 3.2, 2026-08-31 — advisory)_
+**Suggested model:** GPT-5.6 Sol High · Opus 5 Medium _(CursorBench 3.2, 2026-09-02 — advisory)_
 ```
 
 The template placeholders fill from the cache: `{openai_model}` and

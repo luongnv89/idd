@@ -25,7 +25,7 @@ invent a parallel scale.
 | S | S | low–medium | GPT-5.6 Sol Medium | Opus 5 Low |
 | M | M | medium | GPT-5.6 Sol High | Opus 5 Medium |
 | L | L | high (extra-high) | GPT-5.6 Sol Extra High | Opus 5 Extra High |
-| XL | XL | max | GPT-5.6 Sol Max | Fable 5 Max |
+| XL | XL | max | GPT-5.6 Sol Max | Fable 5.1 Max |
 
 The research pipeline's 5-value complexity (`trivial / low / medium / high / complex`)
 maps to effort bands `XS / S / M / L / XL` (see `complexity_mapping` in issue-creator

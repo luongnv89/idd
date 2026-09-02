@@ -2,7 +2,7 @@
   "schema_version": 1,
   "source": "CursorBench 3.2",
   "source_url": "https://cursor.com/cursorbench",
-  "last_fetched": "2026-08-31T00:00:00Z",
+  "last_fetched": "2026-09-02T00:00:00Z",
   "note": "Bundled seed shipped with the issue-creator skill. Copied to a skill-level model-data-<date>.json cache (shared across all repos) on first run when none exists. Cost/task figures are computed by applying each model's published per-million-token pricing to tokens used per task. Refresh with /issue-creator (older than 7 days) or force with --refresh-model-data.",
   "providers": {
     "openai": {
@@ -188,6 +188,7 @@
     },
     "anthropic": {
       "families": [
+        "Fable 5.1",
         "Fable 5",
         "Opus 5",
         "Opus 4.8",
@@ -196,6 +197,24 @@
       "models": [
         {
           "rank": 1,
+          "name": "Fable 5.1 Max",
+          "family": "Fable 5.1",
+          "thinking": "max",
+          "score": 73.4,
+          "cost_per_task_usd": 9.64,
+          "tokens_per_task": 72060
+        },
+        {
+          "rank": 2,
+          "name": "Fable 5.1 Extra High",
+          "family": "Fable 5.1",
+          "thinking": "extra-high",
+          "score": 72.8,
+          "cost_per_task_usd": 6.96,
+          "tokens_per_task": 51349
+        },
+        {
+          "rank": 3,
           "name": "Fable 5 Max",
           "family": "Fable 5",
           "thinking": "max",
@@ -204,7 +223,7 @@
           "tokens_per_task": 103525
         },
         {
-          "rank": 2,
+          "rank": 4,
           "name": "Opus 5 Max",
           "family": "Opus 5",
           "thinking": "max",
@@ -213,7 +232,16 @@
           "tokens_per_task": 61838
         },
         {
-          "rank": 3,
+          "rank": 5,
+          "name": "Fable 5.1 High",
+          "family": "Fable 5.1",
+          "thinking": "high",
+          "score": 69.4,
+          "cost_per_task_usd": 4.8,
+          "tokens_per_task": 33153
+        },
+        {
+          "rank": 6,
           "name": "Opus 5 Extra High",
           "family": "Opus 5",
           "thinking": "extra-high",
@@ -222,7 +250,7 @@
           "tokens_per_task": 54239
         },
         {
-          "rank": 4,
+          "rank": 7,
           "name": "Fable 5 Extra High",
           "family": "Fable 5",
           "thinking": "extra-high",
@@ -231,7 +259,16 @@
           "tokens_per_task": 64971
         },
         {
-          "rank": 5,
+          "rank": 8,
+          "name": "Fable 5.1 Medium",
+          "family": "Fable 5.1",
+          "thinking": "medium",
+          "score": 68.0,
+          "cost_per_task_usd": 3.53,
+          "tokens_per_task": 23801
+        },
+        {
+          "rank": 9,
           "name": "Opus 5 High",
           "family": "Opus 5",
           "thinking": "high",
@@ -240,7 +277,7 @@
           "tokens_per_task": 27932
         },
         {
-          "rank": 6,
+          "rank": 10,
           "name": "Fable 5 High",
           "family": "Fable 5",
           "thinking": "high",
@@ -249,7 +286,16 @@
           "tokens_per_task": 43747
         },
         {
-          "rank": 7,
+          "rank": 11,
+          "name": "Fable 5.1 Low",
+          "family": "Fable 5.1",
+          "thinking": "low",
+          "score": 66.2,
+          "cost_per_task_usd": 2.9,
+          "tokens_per_task": 19522
+        },
+        {
+          "rank": 12,
           "name": "Fable 5 Medium",
           "family": "Fable 5",
           "thinking": "medium",
@@ -258,7 +304,7 @@
           "tokens_per_task": 30366
         },
         {
-          "rank": 8,
+          "rank": 13,
           "name": "Opus 5 Medium",
           "family": "Opus 5",
           "thinking": "medium",
@@ -267,7 +313,7 @@
           "tokens_per_task": 23612
         },
         {
-          "rank": 9,
+          "rank": 14,
           "name": "Opus 5 Low",
           "family": "Opus 5",
           "thinking": "low",
@@ -276,7 +322,7 @@
           "tokens_per_task": 18529
         },
         {
-          "rank": 10,
+          "rank": 15,
           "name": "Opus 4.8 Max",
           "family": "Opus 4.8",
           "thinking": "max",
@@ -285,7 +331,7 @@
           "tokens_per_task": 71411
         },
         {
-          "rank": 11,
+          "rank": 16,
           "name": "Fable 5 Low",
           "family": "Fable 5",
           "thinking": "low",
@@ -294,7 +340,7 @@
           "tokens_per_task": 18182
         },
         {
-          "rank": 12,
+          "rank": 17,
           "name": "Sonnet 5 Max",
           "family": "Sonnet 5",
           "thinking": "max",
@@ -303,7 +349,7 @@
           "tokens_per_task": 92882
         },
         {
-          "rank": 13,
+          "rank": 18,
           "name": "Opus 4.8 Extra High",
           "family": "Opus 4.8",
           "thinking": "extra-high",
@@ -312,7 +358,7 @@
           "tokens_per_task": 51121
         },
         {
-          "rank": 14,
+          "rank": 19,
           "name": "Sonnet 5 Extra High",
           "family": "Sonnet 5",
           "thinking": "extra-high",
@@ -321,7 +367,7 @@
           "tokens_per_task": 52871
         },
         {
-          "rank": 15,
+          "rank": 20,
           "name": "Opus 4.8 High",
           "family": "Opus 4.8",
           "thinking": "high",
@@ -330,7 +376,7 @@
           "tokens_per_task": 33548
         },
         {
-          "rank": 16,
+          "rank": 21,
           "name": "Sonnet 5 High",
           "family": "Sonnet 5",
           "thinking": "high",
@@ -339,7 +385,7 @@
           "tokens_per_task": 39483
         },
         {
-          "rank": 17,
+          "rank": 22,
           "name": "Opus 4.8 Medium",
           "family": "Opus 4.8",
           "thinking": "medium",
@@ -348,7 +394,7 @@
           "tokens_per_task": 28384
         },
         {
-          "rank": 18,
+          "rank": 23,
           "name": "Opus 4.8 Low",
           "family": "Opus 4.8",
           "thinking": "low",
@@ -357,7 +403,7 @@
           "tokens_per_task": 19624
         },
         {
-          "rank": 19,
+          "rank": 24,
           "name": "Sonnet 5 Medium",
           "family": "Sonnet 5",
           "thinking": "medium",
@@ -366,7 +412,7 @@
           "tokens_per_task": 26200
         },
         {
-          "rank": 20,
+          "rank": 25,
           "name": "Sonnet 5 Low",
           "family": "Sonnet 5",
           "thinking": "low",
@@ -401,7 +447,7 @@
     "XL": {
       "label": "super complex",
       "openai": "GPT-5.6 Sol Max",
-      "anthropic": "Fable 5 Max"
+      "anthropic": "Fable 5.1 Max"
     }
   }
 }

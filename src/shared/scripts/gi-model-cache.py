@@ -13,8 +13,8 @@ the reference document becomes refresh- and debug-only reading.
 
 Output on stdout, one JSON object:
 
-    {"state": "fresh", "cache_file": "…/model-data-2026-08-31.json",
-     "last_fetched": "2026-08-31T00:00:00Z", "data_date": "2026-08-31",
+    {"state": "fresh", "cache_file": "…/model-data-2026-09-02.json",
+     "last_fetched": "2026-09-02T00:00:00Z", "data_date": "2026-09-02",
      "data_version": "3.2", "source": "CursorBench 3.2",
      "age_days": 3, "stale": false, "ttl_days": 7, "pruned": [],
      "bands": {"M": {"openai": "GPT-5.6 Sol High", "openai_cost": 2.79,
