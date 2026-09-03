@@ -31,7 +31,8 @@ check_not_contains() {
   fi
 }
 
-RESOLVER="$REPO_ROOT/src/skills/issue-resolver/references/pipeline-steps.md"
+. "$(cd "$(dirname "$0")" && pwd)/lib/spec.bash"  # spec_concat — split reference specs read as one file (#323)
+RESOLVER="$(spec_concat "$REPO_ROOT/src/skills/issue-resolver/references/pipeline-steps.md")"
 ANALYSIS="$REPO_ROOT/src/skills/issue-analysis/SKILL.source.md"
 ANALYSIS_STEPS="$REPO_ROOT/src/skills/issue-analysis/references/subagent-steps.md"
 ANALYSIS_OUTPUT="$REPO_ROOT/src/skills/issue-analysis/references/output-and-persist.md"
@@ -42,7 +43,7 @@ TRIAGE_SKILL="$REPO_ROOT/src/skills/issue-triage/SKILL.source.md"
 TRIAGE="$REPO_ROOT/src/skills/issue-triage/references/detection.md"
 SCANNER="$REPO_ROOT/src/shared/agents/issue-relationship-scanner.md"
 TEMPLATE="$REPO_ROOT/src/skills/init-gitissue/templates/gitissue-template.yml"
-DIST_RESOLVER="$REPO_ROOT/skills/issue-resolver/references/pipeline-steps.md"
+DIST_RESOLVER="$(spec_concat "$REPO_ROOT/skills/issue-resolver/references/pipeline-steps.md")"
 DIST_ANALYSIS="$REPO_ROOT/skills/issue-analysis/SKILL.md"
 DIST_ANALYSIS_STEPS="$REPO_ROOT/skills/issue-analysis/references/subagent-steps.md"
 DIST_REVIEW="$REPO_ROOT/skills/issue-pr-review/SKILL.md"

@@ -122,7 +122,7 @@ creates nothing.
 the run's last action, on success, on every stop condition, and after the
 critical-issue pause. It releases only a lock whose id matches the run state's,
 so in the one case where `--init` never wrote a state for this run (its exit-3
-path in `references/phases.md` *Step 1.0*) the recorded id belongs to some other
+path in `references/phases/phase-0-lock-resume.md` *Step 1.0*) the recorded id belongs to some other
 run and the release needs `--unlock --force`.
 
 **Fallback when the script cannot run.** A missing bundled file is a broken
@@ -153,7 +153,7 @@ run was given. **It has two derivations, one per call site.** Mid-run it is
 `run_state.started_at + autopilot.max_runtime_minutes × 60`, the same instant the
 *Runtime budget check* measures against, so the pause and the budget cannot
 disagree. At **Prerequisite 8** there is no run state to read it from — `--init`
-writes `started_at` in `references/phases.md` (*Step 1.0*), which runs after the
+writes `started_at` in `references/phases/phase-0-lock-resume.md` (*Step 1.0*), which runs after the
 prerequisites — so derive it from the clock: `now + autopilot.max_runtime_minutes
 × 60`, with the minutes taken from the one config load. At the first probe that
 is the *same* instant, because a run that has not started has spent none of its
@@ -199,12 +199,12 @@ python3 references/scripts/gi-ratelimit.py --wait \
 ```
 
 After **every** chunk, refresh the heartbeat with the ordinary checkpoint of
-`references/phases.md` (*Step 1.0b*) — `gi-state.py` stays the single writer of
+`references/phases/phase-0-lock-resume.md` (*Step 1.0b*) — `gi-state.py` stays the single writer of
 `.gitissue/run.lock`, and nothing here may touch that file directly. Repeat until
 the line reports `done: true`, then re-probe. A line with `done: false` and
 `waited_s: 0` means a further chunk would run past the deadline: stop cleanly,
 exactly as `action: stop` does. Check the runtime budget before and after the
-pause (`references/phases.md` → *Runtime budget check*). The heartbeat refresh
+pause (`references/phases/phase-0-lock-resume.md` → *Runtime budget check*). The heartbeat refresh
 and that bracketing budget check describe the **mid-run** site; the paragraph
 below says how each of them reads at Prerequisite 8.
 
@@ -269,7 +269,7 @@ exit **0**, because exhaustion is an answer and not a failure to answer),
 **fall through to the degrade the call site already documents** — never to a new
 stop. The contract adds attempts *before* an existing fallback and never replaces
 it: for *Step 1.1b*'s live eligibility read that fallback is
-`live_backlog = unavailable` (`references/phases.md`), and for a `gh issue edit`
+`live_backlog = unavailable` (`references/phases/phase-1-triage-pick.md` → *Step 1.1b*), and for a `gh issue edit`
 it is that call's own no-write path. Honour a `Retry-After` header when it asks
 for longer than the computed delay.
 

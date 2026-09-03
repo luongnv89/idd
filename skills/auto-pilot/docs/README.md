@@ -74,7 +74,8 @@ When something fails, the auto-pilot skips and continues rather than stopping. A
 | Path | Description |
 |---|---|
 | `../references/orchestration.md` | Loop orchestration and the top-level control flow |
-| `../references/phases.md` | Full per-phase specification for each iteration |
+| `../references/phases.md` | Index of the five loop phases, one file each |
+| `../references/phases/phase-*.md` | Full per-phase specification (0, 1, 2, 3 & 4, 5) — read per phase, never all at once |
 | `../references/preflight.md` | Environment and rate-budget preflight checks |
 | `../references/configuration.md` | Auto-pilot config options and merge-mode matrix |
 | `../references/explicit-list-mode.md` | Explicit `--issues` list mode: validation, analysis, batching |

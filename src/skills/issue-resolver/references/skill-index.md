@@ -2,7 +2,7 @@
 
 A reference catalog of the skills published at
 `https://github.com/luongnv89/skills`, grouped by the lifecycle phase each one
-serves. The Step 3 propose-and-select sub-step (see `references/pipeline-steps.md`,
+serves. The Step 3 propose-and-select sub-step (see `references/steps/step-3-implement.md`,
 *Step 3 — Propose relevant skills*) reads this index to decide which skills to
 offer for the analyzed task. SKILL.md references this file at Step 3 — do not
 inline the catalog back into SKILL.md.
@@ -15,7 +15,7 @@ the filesystem is the *availability* signal.
 Default (`resolve.borrow_skills: false`): the propose set is **installed-only**.
 When `resolve.borrow_skills: true`, a catalogued-but-missing name is
 **available to borrow** for one task (install, record origin, uninstall only
-`origin: borrowed` — `references/pipeline-steps.md`).
+`origin: borrowed` — `references/steps/step-3-implement.md`).
 
 ## Source-agnostic by design
 

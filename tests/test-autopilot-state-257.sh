@@ -1049,7 +1049,8 @@ expect_grep "AC3: the invocation table documents --force-unlock" \
 expect_grep "AC4: --resume is documented as incompatible with --dry-run" \
   "cannot combine with \`--dry-run\`" "$AP_SKILL"
 
-AP_PHASES="$SKILLS/auto-pilot/references/phases.md"
+. "$(cd "$(dirname "$0")" && pwd)/lib/spec.bash"  # spec_concat — split reference specs read as one file (#323)
+AP_PHASES="$(spec_concat "$SKILLS/auto-pilot/references/phases.md")"
 AP_PREFLIGHT="$SKILLS/auto-pilot/references/preflight.md"
 AP_ERRORS="$SKILLS/auto-pilot/references/error-messages.md"
 AP_SUMMARY="$SKILLS/auto-pilot/references/summary-format.md"
@@ -1238,7 +1239,7 @@ fi
 # ───────────────────────────────────────────────────────────
 # T6 (AC2): no issue is closed behind an unreviewed, unmerged PR
 # ───────────────────────────────────────────────────────────
-RES_STEPS="$SKILLS/issue-resolver/references/pipeline-steps.md"
+RES_STEPS="$(spec_concat "$SKILLS/issue-resolver/references/pipeline-steps.md")"
 RES_SKILL="$SKILLS/issue-resolver/SKILL.md"
 RESEARCHER="$SKILLS/issue-resolver/references/agents/codebase-researcher.md"
 AP_PROMPTS="$SKILLS/auto-pilot/references/subagent-prompts.md"

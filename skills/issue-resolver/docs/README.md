@@ -68,7 +68,8 @@ asm install https://github.com/luongnv89/idd --skill issue-resolver
 
 | Path | Description |
 |---|---|
-| `../references/pipeline-steps.md` | Full step-by-step specification of the 6-step resolve pipeline |
+| `../references/pipeline-steps.md` | Index of the 6-step resolve pipeline: orchestration shapes, step-file table, auto-mode table, edge cases |
+| `../references/steps/step-*.md` | One file per step (0, 0h, 0i, 1-5) with its full input/output spec and inline fallback — read per step, never all at once |
 | `../references/bug-verification.md` | Post-fix bug-verification checkpoint and reproduction capture |
 | `../references/report-templates.md` | PR body and terminal report templates |
 | `../references/skill-index.md` | Progressive-disclosure index of the skill's reference files |

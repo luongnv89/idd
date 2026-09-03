@@ -19,6 +19,7 @@
 # Returns: exit 0 on pass, exit 1 on failure.
 
 set -euo pipefail
+. "$(cd "$(dirname "$0")" && pwd)/lib/spec.bash"  # spec_concat — split reference specs read as one file (#323)
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SRC_SCRIPTS="$REPO_ROOT/src/shared/scripts"
@@ -852,7 +853,7 @@ expect_grep "AC1: resolver's pre-push scan calls gi-secscan" \
 expect_grep "AC1: pr-review's auto-fix commit calls gi-secscan" \
   "references/scripts/gi-secscan.py" "$SKILLS/issue-pr-review/SKILL.md"
 expect_grep "AC1: the implementer receives the scan path as a spawn variable" \
-  "secscan_script" "$SKILLS/issue-resolver/references/pipeline-steps.md"
+  "secscan_script" "$(spec_concat "$SKILLS/issue-resolver/references/pipeline-steps.md")"
 expect_grep "AC1: the fixer receives the scan path as a spawn variable" \
   "secscan_script" "$SKILLS/issue-pr-review/references/review-loop-mechanics.md"
 expect_grep "AC2: pr-review Step 5 calls gi-ci-wait" \
@@ -1618,7 +1619,7 @@ else
 fi
 
 # The subagent spawn bindings must be absolute, or the gate silently never runs.
-for f in "$SKILLS/issue-resolver/references/pipeline-steps.md" \
+for f in "$(spec_concat "$SKILLS/issue-resolver/references/pipeline-steps.md")" \
          "$SKILLS/issue-pr-review/references/review-loop-mechanics.md"; do
   if grep -q "absolute" "$f"; then
     pass "AC1: $(basename "$f") requires an absolute secscan_script path"
@@ -1646,7 +1647,7 @@ else
 fi
 
 # gi-ci-wait can return `none`; the merge gate must say what that does.
-if grep -q "none" "$SKILLS/auto-pilot/references/phases.md"; then
+if grep -q "none" "$(spec_concat "$SKILLS/auto-pilot/references/phases.md")"; then
   pass "AC2: auto-pilot's merge gate handles the none verdict"
 else
   fail "AC2: auto-pilot's merge gate leaves the none verdict unhandled"

@@ -219,7 +219,8 @@ if [ -f "$SHIPPED_DEPS" ]; then
   fi
 fi
 
-PHASES="$SKILLS/auto-pilot/references/phases.md"
+. "$(cd "$(dirname "$0")" && pwd)/lib/spec.bash"  # spec_concat — split reference specs read as one file (#323)
+PHASES="$(spec_concat "$SKILLS/auto-pilot/references/phases.md")"
 if grep -qF 'references/scripts/gi-deps.py' "$PHASES"; then
   pass "T2.4: shipped phases.md cites references/scripts/gi-deps.py"
 else
@@ -745,7 +746,9 @@ for label, path in (
     ("source", root / "src" / "skills" / "auto-pilot" / "references" / "phases.md"),
     ("built", root / "skills" / "auto-pilot" / "references" / "phases.md"),
 ):
-    text = path.read_text(encoding="utf-8") if path.is_file() else ""
+    # phases.md is an index since #323; the spec is the index plus its phases/ parts.
+    parts = [path, *sorted((path.parent / "phases").glob("*.md"))] if path.is_file() else []
+    text = "".join(p.read_text(encoding="utf-8") for p in parts)
     emit(
         "**Strip cross-repo tokens**" in text and "**Capture bare refs**" in text,
         f"T5: phases.md ({label}) keeps manual steps 1-2 of the dependency parse",

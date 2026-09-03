@@ -4,7 +4,7 @@ description: "Create an atomic PR closing a GitHub issue end-to-end via a 6-step
 license: MIT
 compatibility: "Requires git and GitHub CLI (gh) with authentication and push access. Self-contained — uses shared agents from shared/agents/."
 metadata:
-  version: 0.18.0
+  version: 0.19.0
   author: Luong NGUYEN <luongnv89@gmail.com>
   effort: max
 ---
@@ -33,7 +33,7 @@ In-place path only; worktree paths start from the fetched base, and an invalid `
 
 ## Configuration
 
-Load config once; never re-read it. Run `python3 shared/scripts/gi-config.py` — **Working directory:** the repo root; **Script path:** absolute, as the *Bundled dependency precheck* resolves its list. It prints `{"config": …, "config_file": …, "first_run": …}` merged over the defaults below. Why each matters: `references/pipeline-steps.md` (*Configuration load*).
+Load config once; never re-read it. Run `python3 shared/scripts/gi-config.py` — **Working directory:** the repo root; **Script path:** absolute, as the *Bundled dependency precheck* resolves its list. It prints `{"config": …, "config_file": …, "first_run": …}` merged over the defaults below. Why each matters: `references/steps/step-0-preflight.md` (*Configuration load*).
 
 - **Exit 0** — use `config`.
 - **Exit 3** — invalid `.gitissue.yml`: print the `references/error-messages.md` error (*Invalid config*), stop.
@@ -84,6 +84,14 @@ references/agents/code-reviewer.md
 references/agents/ui-reviewer.md
 references/agents/fixer.md
 references/pipeline-steps.md
+references/steps/step-0-preflight.md
+references/steps/step-0h-analysis-reuse.md
+references/steps/step-0i-caller-payload.md
+references/steps/step-1-research.md
+references/steps/step-2-plan.md
+references/steps/step-3-implement.md
+references/steps/step-4-qa.md
+references/steps/step-5-deliver.md
 references/report-templates.md
 references/run-stats.md
 references/bug-verification.md
@@ -128,7 +136,7 @@ Open with `● Preflight check for issue #N...`.
 
 ### 0a — Fetch issue
 
-GitHub reads share the boundary in `shared/scripts/gi-gh.py`. Classify any framed caller payload first (`/auto-pilot` captured it in mode-neutral *Step 1.2b*); *Step 0i — Caller payload gate* in `references/pipeline-steps.md` is its single home — `issue_payload = supplied | partial | absent`, the mandatory live `gh issue view N --json state,comments,updatedAt` under `supplied`, the exact match between retained and live `updatedAt` before 0d, discard-and-refresh on mismatch (identical for individual, array, and keyed-map payloads), never a gate. Then run `python3 shared/scripts/gi-issue.py {N} --fields number,title,body,labels,assignees,state,comments,updatedAt`, reading `.issue` unless the gate substitutes a payload. **Capture `updatedAt` here** — 0d's `gh issue edit` bumps it, so *0h* uses this pre-normalization value. Exit 3 stops; anything else degrades to `gh issue view {N} --json number,title,body,labels,assignees,state,comments,updatedAt`. **0d rewrites the body, so it MUST end with `python3 shared/scripts/gi-issue.py {N} --invalidate`.** <!-- a:rs-0a-payload-concurrency -->
+GitHub reads share the boundary in `shared/scripts/gi-gh.py`. Classify any framed caller payload first (`/auto-pilot` captured it in mode-neutral *Step 1.2b*); *Step 0i — Caller payload gate* in `references/steps/step-0i-caller-payload.md` is its single home — `issue_payload = supplied | partial | absent`, the mandatory live `gh issue view N --json state,comments,updatedAt` under `supplied`, the exact match between retained and live `updatedAt` before 0d, discard-and-refresh on mismatch (identical for individual, array, and keyed-map payloads), never a gate. Then run `python3 shared/scripts/gi-issue.py {N} --fields number,title,body,labels,assignees,state,comments,updatedAt`, reading `.issue` unless the gate substitutes a payload. **Capture `updatedAt` here** — 0d's `gh issue edit` bumps it, so *0h* uses this pre-normalization value. Exit 3 stops; anything else degrades to `gh issue view {N} --json number,title,body,labels,assignees,state,comments,updatedAt`. **0d rewrites the body, so it MUST end with `python3 shared/scripts/gi-issue.py {N} --invalidate`.** <!-- a:rs-0a-payload-concurrency -->
 
 **Not found:** error, stop. **Closed:** warning, stop.
 
@@ -152,7 +160,7 @@ If `issue.auto_normalize` is true and the body lacks a `<!-- gitissue:normalized
 
 ### 0e — Workspace (interactive only)
 
-Derive one `{branch_name}` first: `python3 shared/scripts/gi-branch.py {N} --from-issue --type {type}`, reading `.branch`. **`--from-issue` is mandatory** — never put the issue title or configured prefix on the command line (`references/pipeline-steps.md` → *Step 0e — Workspace*). `{type}` is one of six classified literals. Exit 3 stops; anything else degrades to `docs/naming-conventions.md`. Both paths use it.
+Derive one `{branch_name}` first: `python3 shared/scripts/gi-branch.py {N} --from-issue --type {type}`, reading `.branch`. **`--from-issue` is mandatory** — never put the issue title or configured prefix on the command line (`references/steps/step-0-preflight.md` → *Step 0e — Workspace*). `{type}` is one of six classified literals. Exit 3 stops; anything else degrades to `docs/naming-conventions.md`. Both paths use it.
 
 **Auto mode (`--auto` / `IDD_AUTO_MODE=1`): skip this offer entirely.** A set `IDD_CALLER_WORKTREE=1` uses the validated caller-managed path; otherwise go to *0f*.
 
@@ -185,7 +193,7 @@ Decide **before Step 1** how much pipeline this issue earns; the `XS … XL` sca
 - `XS`/`S` asserted (not `(needs review)`) → `light`; `M`/`L`/`XL` → `full`
 - `XS`/`S` low-confidence, **or** absent/unparseable → `full` (ambiguous → fuller)
 
-**What `light` collapses — the single home for this rule.** Mechanics: `references/pipeline-steps.md` (*Step N → `light` profile*).
+**What `light` collapses — the single home for this rule.** Mechanics: the *`light` profile* subsection of `references/steps/step-1-research.md` and `references/steps/step-2-plan.md`.
 
 | Step | `light` behavior |
 |------|------------------|
@@ -202,7 +210,7 @@ Revise **upward** only. `{workspace_note}` is ` (worktree)` in a worktree, else 
 
 ### 0h — Analysis reuse gate <!-- a:rs-0h-skill -->
 
-Set `analysis_reuse` to `fresh`, `stale` or `absent` by the five-condition predicate in `references/pipeline-steps.md` (*Step 0h — Analysis reuse gate*) — its **single home**. `fresh` seeds Step 1 and skips Step 2's synthesizer; `stale`/`absent` run the full pipeline. Any doubt is `stale` (fail-safe). Skipped when `resolve.adaptive_effort: false`.
+Set `analysis_reuse` to `fresh`, `stale` or `absent` by the five-condition predicate in `references/steps/step-0h-analysis-reuse.md` (*Step 0h — Analysis reuse gate*) — its **single home**. `fresh` seeds Step 1 and skips Step 2's synthesizer; `stale`/`absent` run the full pipeline. Any doubt is `stale` (fail-safe). Skipped when `resolve.adaptive_effort: false`.
 
 ---
 
@@ -230,7 +238,7 @@ Generate options and select one. Spawn the synthesizer (`shared/agents/synthesiz
 
 ### Propose relevant skills
 
-Optionally augment the implementer with external skills from `references/skill-index.md`: detect, propose, accept into `selected_skills`; internal agents remain the fallback. Borrow/install, `{name, origin}` records via `shared/scripts/gi-state.py`, teardown of `origin: borrowed` only, auto-mode: `references/pipeline-steps.md` (*Step 3 — Propose relevant skills*).
+Optionally augment the implementer with external skills from `references/skill-index.md`: detect, propose, accept into `selected_skills`; internal agents remain the fallback. Borrow/install, `{name, origin}` records via `shared/scripts/gi-state.py`, teardown of `origin: borrowed` only, auto-mode: `references/steps/step-3-implement.md` (*Step 3 — Propose relevant skills*).
 
 **`light` profile:** see the profile table in *Step 0g* — the **leftover teardown still runs** there.
 

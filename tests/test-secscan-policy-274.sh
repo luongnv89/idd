@@ -563,15 +563,19 @@ for rel, needles in CALLERS.items():
 # check while the variable is never actually bound, and the agent would take
 # the unprotected path with the prose in `fixer.md`/`implementer.md`
 # unreachable. Requiring the two within one window ties the mention to the
-# binding site. `pipeline-steps.md` binds at two spawn sites (fixer and
-# implementer), so `expected` records how many windows must contain both.
+# binding site. The resolver binds at two spawn sites — the implementer in
+# steps/step-3-implement.md and the fixer in steps/step-4-qa.md (one file each
+# since #323) — so `expected` records how many windows must contain both.
 BINDERS = {
     os.path.join(
         "src", "skills", "issue-pr-review", "references", "review-loop-mechanics.md"
     ): 1,
     os.path.join(
-        "src", "skills", "issue-resolver", "references", "pipeline-steps.md"
-    ): 2,
+        "src", "skills", "issue-resolver", "references", "steps", "step-3-implement.md"
+    ): 1,
+    os.path.join(
+        "src", "skills", "issue-resolver", "references", "steps", "step-4-qa.md"
+    ): 1,
     os.path.join("src", "skills", "issue-resolver", "SKILL.source.md"): 1,
 }
 WINDOW = 1200

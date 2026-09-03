@@ -521,7 +521,8 @@ check_has "$BUILT_PR" 'gitissue:qa v1' \
   "T11.2: the built SKILL.md ships the preserved-content confirmation"
 
 AP_PROMPTS="$REPO_ROOT/src/skills/auto-pilot/references/subagent-prompts.md"
-AP_PHASES="$REPO_ROOT/src/skills/auto-pilot/references/phases.md"
+. "$(cd "$(dirname "$0")" && pwd)/lib/spec.bash"  # spec_concat — split reference specs read as one file (#323)
+AP_PHASES="$(spec_concat "$REPO_ROOT/src/skills/auto-pilot/references/phases.md")"
 check_has "$AP_PROMPTS" 'QA handoff marker' \
   "T11.3: the auto-pilot reviewer prompt qualifies its run-tests narration"
 check_has "$AP_PHASES" 'QA handoff marker' \
@@ -773,8 +774,8 @@ check_has "$SRC_CONFIG_SCHEMA" 'QA handoff gate' \
 # the contract forbids. Every capture therefore states the
 # omit-rather-than-default fail-safe too.
 # ───────────────────────────────────────────────────────────
-SRC_PIPELINE="$REPO_ROOT/src/skills/issue-resolver/references/pipeline-steps.md"
-BUILT_PIPELINE="$REPO_ROOT/skills/issue-resolver/references/pipeline-steps.md"
+SRC_PIPELINE="$(spec_concat "$REPO_ROOT/src/skills/issue-resolver/references/pipeline-steps.md")"
+BUILT_PIPELINE="$(spec_concat "$REPO_ROOT/skills/issue-resolver/references/pipeline-steps.md")"
 for f in "$SRC_PIPELINE" "$BUILT_PIPELINE"; do
   if [ -f "$f" ]; then
     pass "T18.0: exists: ${f#$REPO_ROOT/}"
@@ -797,7 +798,7 @@ for pair in "src:$SRC_PIPELINE" "built:$BUILT_PIPELINE"; do
     "T18.3 ($tag): an uncaptured tests_sha omits the field instead of defaulting"
   # ui_sha — captured where the ui-reviewer is spawned, which precedes the QA
   # cycles, so every fix commit those cycles produce lands after it.
-  ui_block="$(anchor_span "$f" rs-step4-ui-review rs-edge-cases || true)"
+  ui_block="$(anchor_span "$f" rs-step4-ui-review rs-step5-deliver || true)"
   check_block_has "$ui_block" 'ui_sha. = .git rev-parse HEAD' \
     "T18.4 ($tag): the UI review sub-step captures ui_sha with an explicit command"
   check_block_has "$ui_block" 'ui-reviewer is spawned\*\*' \
@@ -815,11 +816,11 @@ for pair in "src:$SRC_TEMPLATES" "built:$BUILT_TEMPLATES"; do
   f="${pair#*:}"
   tests_row="$(grep -E '^\| .tests. \|' "$f" | head -1 || true)"
   ui_row="$(grep -E '^\| .ui. \|' "$f" | head -1 || true)"
-  check_block_has "$tests_row" 'references/pipeline-steps\.md' \
+  check_block_has "$tests_row" 'references/steps/step-4-qa\.md' \
     "T18.8 ($tag): the tests= row points at its capture site"
   check_block_has "$tests_row" 'when no capture was recorded' \
     "T18.9 ($tag): and omits the field when nothing was captured"
-  check_block_has "$ui_row" 'references/pipeline-steps\.md' \
+  check_block_has "$ui_row" 'references/steps/step-4-qa\.md' \
     "T18.10 ($tag): the ui= row points at its capture site"
   check_block_has "$ui_row" 'whenever no capture was recorded' \
     "T18.11 ($tag): and omits the suffix when nothing was captured"

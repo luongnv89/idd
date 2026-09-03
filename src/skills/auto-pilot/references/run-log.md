@@ -63,7 +63,7 @@ ready siblings continue. **When the append runs depends on the outcome:**
   when the streak is counted (counting first is off by one). The same
   `log_pending` → `--append-once` → `logged` contract applies; quarantine then
   proceeds only after `logged`. Worktree cleanup for that failed lane follows
-  the ordinary failed-lane rules in `references/phases.md`.
+  the ordinary failed-lane rules in `references/phases/phase-2-resolve.md`.
 
 No two appends overlap, and a worker never appends on failure or success.
 

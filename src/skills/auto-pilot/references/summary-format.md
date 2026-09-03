@@ -60,7 +60,7 @@ explicit list is done. `PAUSED` — the loop stopped for a decision it may not m
 alone (a critical issue with unresolved review problems, `pause_on_failure`).
 `LIMIT REACHED` — `autopilot.max_iterations` was hit. **`BUDGET REACHED`** — the
 wall-clock budget `autopilot.max_runtime_minutes` expired
-(`references/phases.md` → *Runtime budget check*); the run stopped cleanly at an
+(`references/phases/phase-0-lock-resume.md` → *Runtime budget check*); the run stopped cleanly at an
 iteration boundary with nothing in flight, so `Next action:` is the ordinary
 `/auto-pilot to continue`. **`RATE LIMITED`** — the `✗ Insufficient API rate
 budget` stop fired: the API budget ran out and waiting for `reset` would not fit

@@ -33,7 +33,8 @@ echo "◆ Auto-Pilot Dependency Gate Tests (issue #93)"
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 
 SKILL="$REPO_ROOT/src/skills/auto-pilot/SKILL.source.md"
-PHASES="$REPO_ROOT/src/skills/auto-pilot/references/phases.md"
+. "$(cd "$(dirname "$0")" && pwd)/lib/spec.bash"  # spec_concat — split reference specs read as one file (#323)
+PHASES="$(spec_concat "$REPO_ROOT/src/skills/auto-pilot/references/phases.md")"
 ERRORS="$REPO_ROOT/src/skills/auto-pilot/references/error-messages.md"
 EXAMPLES="$REPO_ROOT/src/skills/auto-pilot/references/examples.md"
 SCHEMA="$REPO_ROOT/docs/config-schema.md"
@@ -254,7 +255,7 @@ fi
 # ───────────────────────────────────────────────────────────
 # T12: dist/ tree mirrors src/ for the new content (drift guard)
 # ───────────────────────────────────────────────────────────
-DIST_PHASES="$REPO_ROOT/dist/skills/auto-pilot/references/phases.md"
+DIST_PHASES="$(spec_concat "$REPO_ROOT/dist/skills/auto-pilot/references/phases.md" || true)"
 DIST_SKILL="$REPO_ROOT/dist/skills/auto-pilot/SKILL.md"
 
 if [ -f "$DIST_PHASES" ] && grep -qE '^### Step 5\.1b — Dependency Gate' "$DIST_PHASES"; then
