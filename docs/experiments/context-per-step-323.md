@@ -37,7 +37,7 @@ Taken 2026-09-03 on the built tree (`skills/`) with `wc -c`. "Directed" means
 what the skill prose tells the agent to read at that step; a live agent may read
 more or less (§4 measures that). These cells are a dated record of what the
 split produced and are deliberately left unrefreshed; §4.2 reconciles the five
-that no longer match today's tree.
+per-file cells that no longer match today's tree.
 
 ### `/issue-resolver`
 
@@ -212,14 +212,15 @@ not belong in this comparison: it reaches the implementer and the fixer as a
 spawn-variable *path*, and the orchestrator reads it only on the degrade branch
 where `gi-secscan.py` cannot run. The measured transcript never read it.
 
-**Reconciling these with §2.** Five of §2's After cells differ from today's
-tree — four in the `/issue-resolver` table and one in `/auto-pilot` — and they
-differ for two different reasons. Three were measured mid-PR, before the final
-build: no commit since the split has touched them — the table below shows their
-`a6e29d6` and today columns identical — so the sizes §2 records for them were
-never on any committed tree. One is ordinary post-merge drift. One is both.
-Every other cell in §2's After column, in both tables, still matches to the
-byte.
+**Reconciling these with §2.** Five of §2's After per-file cells differ from
+today's tree — four in the `/issue-resolver` table and one in `/auto-pilot` —
+and they differ for two different reasons. Three were measured mid-PR, before
+the final build: no commit since the split has touched them — the table below
+shows their `a6e29d6` and today columns identical — so the sizes §2 records for
+them were never on any committed tree. One is ordinary post-merge drift. One is
+both. Every other per-file cell in §2's After column, in both tables, still
+matches to the byte. The bold totals are derived from those cells and move with
+them.
 
 | File | §2 says | at `a6e29d6` | today | Why it differs |
 |---|---|---|---|---|
@@ -289,8 +290,9 @@ is a splitting question, not a delegation one.
 
 ### 4.4 Stated limitations
 
-- **One transcript, not a matched pair.** The procedure asked for the same issue
-  run before and after the split. The installed skill under `~/.claude/skills/`
+- **One transcript, not a matched pair.** As originally written, the procedure
+  asked for the same issue run before and after the split, the *before* being
+  the parent of the split commit. The installed skill under `~/.claude/skills/`
   is still the pre-split build, so no post-split live run exists to pair with.
   The verdict rests on the before-run establishing *which* files the main agent
   actually reads, plus static post-split sizes for how big they are.
