@@ -197,9 +197,11 @@ paragraph at a closed issue.
 ### The governed artifact is the skill package (issue #426)
 
 A shared-contract assertion pins a *behaviour*, and a behaviour belongs to the
-skill **package** — the SKILL body plus that skill's own `references/*.md` —
-not to whichever file currently carries the prose. Every anchor helper therefore
-accepts a **package directory** wherever it accepts a file:
+skill **package** — the SKILL body, that skill's own `references/*.md`, and the
+`references/steps/*.md` / `references/phases/*.md` part files the issue #323
+split carved out of them — not to whichever file currently carries the prose.
+Every anchor helper therefore accepts a **package directory** wherever it
+accepts a file:
 
 ```bash
 anchor_check "$REPO_ROOT/src/skills/issue-pr-review" rvm-never-gated 'gi-secscan' "…"

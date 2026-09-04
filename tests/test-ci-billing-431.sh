@@ -342,7 +342,9 @@ for f in "$REPO_ROOT/src/skills/auto-pilot/SKILL.source.md" \
   [ -f "$f" ] && grep -q "$KEY" "$f" && ap_hits="$ap_hits ${f#"$REPO_ROOT"/}"
 done
 for f in "$REPO_ROOT"/src/skills/auto-pilot/references/*.md \
-         "$REPO_ROOT"/skills/auto-pilot/references/*.md; do
+         "$REPO_ROOT"/skills/auto-pilot/references/*.md \
+         "$REPO_ROOT"/src/skills/auto-pilot/references/phases/*.md \
+         "$REPO_ROOT"/skills/auto-pilot/references/phases/*.md; do
   [ -f "$f" ] || continue
   grep -q "$KEY" "$f" && ap_hits="$ap_hits ${f#"$REPO_ROOT"/}"
 done
