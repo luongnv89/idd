@@ -25,7 +25,7 @@ fail() { echo "  ✗ $1"; FAIL=$((FAIL + 1)); }
 has() { grep -qE "$2" "$1" && pass "$3" || fail "$3"; }
 
 TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
+trap 'spec_cleanup; rm -rf "$TMP"' EXIT  # replaces spec.bash's own EXIT trap (#443)
 
 echo "◆ Auto-Pilot Parallel Worktrees (issue #260)"
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
