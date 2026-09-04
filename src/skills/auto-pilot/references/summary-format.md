@@ -174,7 +174,7 @@ Rules that make the report worth reading:
 
 `Triage current` is `√` when the order the pick used is current — a full triage
 this iteration ran, a cache *Step 1.1a* read as `fresh`, or a cache *Step 1.6*
-updated after the last merge. It is not "a triage ran this iteration": under
+(`references/phases/phase-5-merge.md`) updated after the last merge. It is not "a triage ran this iteration": under
 issue #258 a run triages once and updates incrementally, so a name that asserted
 a refresh would mark every reuse iteration `×` and turn a working loop into a
 wall of `PARTIAL`. It is `×` only when the gate degraded and the pick ran against

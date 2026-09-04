@@ -293,7 +293,7 @@ The implementer **returns** a `reproduction` block (command, red status, stated-
 match, regression-test path or "manual — no seam"). The main agent folds it into the PR
 body's Decision Record and Acceptance Criteria Verification table (durable home — see
 `references/report-templates.md`); when `.gitissue/analysis-<N>.json` is **fresh** by the
-predicate in *Step 0h — Analysis reuse gate* above (its single home — "fresh" is never
+predicate in *Step 0h — Analysis reuse gate* in `references/steps/step-0h-analysis-reuse.md` (its single home — "fresh" is never
 used undefined), the same data also lives in its `decision_record.reproduction` field
 (optional cache mirror, written by `/issue-analysis`, never created by the resolver).
 

@@ -30,7 +30,7 @@ Each cycle:
 ### Last-green test state <!-- a:rs-last-green-state -->
 
 **Single home of `tests_state` and of its two run-state consumers.** Those are <!-- a:rs-clean-tree -->
-Step 4 cycle N+1 and Step 5 Deliver below. The QA marker is the durable rendering
+Step 4 cycle N+1 below and Step 5 Deliver (`references/steps/step-5-deliver.md`). The QA marker is the durable rendering
 of the same state; `references/report-templates.md` is only that marker's
 rendering location, not a third consumer. Two definitions of "the suite already
 ran on this commit" drift apart, so this is the only place either is stated.

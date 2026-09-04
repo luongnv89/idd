@@ -14,9 +14,13 @@ implementing or debugging that phase.
 | 1 — Triage and Pick | `references/phases/phase-1-triage-pick.md` | 1.1a, 1.1, 1.1b, 1.2, 1.2b, 1.3 | Top of each iteration |
 | 2 — Resolve (subagent) | `references/phases/phase-2-resolve.md` | 2.x | Before spawning a resolver lane |
 | 3 & 4 — PR Review (via /issue-pr-review) | `references/phases/phase-3-4-review.md` | 3.x, 4.x | Before spawning the reviewer |
-| 5 — Merge | `references/phases/phase-5-merge.md` | 5.x incl. 5.1b, *End-of-iteration checkpoint* | Before the merge gate |
+| 5 — Merge | `references/phases/phase-5-merge.md` | 5.x incl. 5.1b, 1.6, *End-of-iteration checkpoint* | Before the merge gate |
 
 A pointer of the form `references/phases.md` (*Step N.n*) or (*Phase N*) resolves
-through this table: the step number's leading digit names the phase file.
+through this table's *Steps inside* column, not through the step number's
+leading digit: *Step 1.0* and *Step 1.0b* live in Phase 0
+(`references/phases/phase-0-lock-resume.md`), and *Step 1.6* — numbered in
+Phase 1 but executed after a merge — lives in Phase 5
+(`references/phases/phase-5-merge.md`).
 
 ---

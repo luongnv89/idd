@@ -260,7 +260,8 @@ LIMITED`'s `Next action:` line on the same value for the same reason.
 that skipped Step 1.1 because *Step 1.1a* read the cache as `fresh` — *Step 1.1b*'s
 live `gh issue list --state open --json number,assignees` returns an empty array,
 which is the same condition reached without a scan (equivalently, an empty
-`summary.suggested_order` in a cache Step 1.1a reused or Step 1.6 updated). Both
+`summary.suggested_order` in a cache Step 1.1a reused or Step 1.6 —
+`references/phases/phase-5-merge.md` — updated). Both
 entry points print the one block in `references/phases/phase-1-triage-pick.md` (*Step 1.1*). The
 second trigger is not optional: a reuse iteration never runs Step 1.1, so without
 it a backlog that empties mid-run falls through to `⚠ No eligible issues to pick`

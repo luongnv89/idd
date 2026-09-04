@@ -11,7 +11,7 @@ risk — pinned to the commit it ran against. This gate decides whether that
 artifact is still true, so an analyze-then-resolve sequence on an unchanged tree
 researches the codebase **once** instead of twice. Every other mention of a
 *fresh* analysis in this skill — `references/report-templates.md` (*Lifting the
-Decision Record*) and the bug-repro mirror in *Step 3* below — defers to this
+Decision Record*) and the bug-repro mirror in *Step 3* (`references/steps/step-3-implement.md`) — defers to this
 section. Do not restate or re-derive a freshness rule anywhere else.
 
 Runs after *0g — Complexity gate*, before *Step 1 — Research*. It sets exactly

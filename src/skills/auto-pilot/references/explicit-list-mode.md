@@ -367,8 +367,9 @@ The `[Issue {i}/{total}]` counter reflects total issues (not batches), so the us
 
 All other phases (Resolve, Review, Fix, Merge) run identically to triage mode,
 with one exception, and it is Phase 1 work rather than a fourth phase changing:
-*Step 1.6 — Update the triage cache after a merge* is numbered in Phase 1 and
-merely *executed* after a merge, so it is skipped here with the rest of Phase 1
+*Step 1.6 — Update the triage cache after a merge* (`references/phases/phase-5-merge.md`)
+is numbered in Phase 1 and merely *executed* after a merge, so it is skipped
+here with the rest of Phase 1
 (see *Re-triage between iterations* below).
 
 ### Re-triage between iterations
