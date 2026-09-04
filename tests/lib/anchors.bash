@@ -64,7 +64,10 @@
 # So every helper below accepts a PACKAGE DIRECTORY wherever it accepts a file:
 # pass `src/skills/<name>` (or `skills/<name>`, or
 # `src/internal-skills/idd-doctor`) and the anchor is located across that
-# skill's own files — its `SKILL.source.md` / `SKILL.md` plus `references/*.md`.
+# skill's own files — its `SKILL.source.md` / `SKILL.md`, its `references/*.md`,
+# and its `references/steps/*.md` / `references/phases/*.md` part files, which
+# the issue #323 split carved out of a single reference and which are authored
+# package prose exactly like the file they came from.
 # Bundled `references/agents/`, `references/docs/` and `references/scripts/` are
 # NOT part of the package for this purpose: they are copies of sources under
 # `src/shared/`, and a copy is not a second contract site.
@@ -87,7 +90,8 @@
 anchor_package_file() {
   local root="$1" id="$2" f hits found=""
 
-  for f in "$root/SKILL.source.md" "$root/SKILL.md" "$root"/references/*.md; do
+  for f in "$root/SKILL.source.md" "$root/SKILL.md" "$root"/references/*.md \
+           "$root"/references/steps/*.md "$root"/references/phases/*.md; do
     [ -f "$f" ] || continue
     hits="$(grep -cF -- "<!-- a:${id} -->" "$f" 2>/dev/null || true)"
     [ "${hits:-0}" -ge 1 ] || continue
