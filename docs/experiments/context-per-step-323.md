@@ -180,14 +180,20 @@ and it means "under 2,000 lines" is not evidence that a file arrives whole.
 
 **After — post-split, static is a sound proxy for live.** The observed cut
 above happened at roughly 59 KB of output. The largest file the split produced
-is `step-3-implement.md` at 19,515 bytes and 313 lines, about a third of that,
-so no split file comes near the bound and each arrives whole. Its rendered size
-is slightly *larger* than `wc -c`, because `Read` prefixes every line with its
-number; §4.4 carries that arithmetic. The prose files bearing on the
-comparison, on the built `skills/issue-resolver` tree, re-measured 2026-09-04 —
-this is not a full ranking, but nothing it omits exceeds 17,658, and the largest
-bundled `references/scripts/*.py` exceed every row here without belonging in the
-table at all, being executed rather than read:
+anywhere is `/auto-pilot`'s `phase-1-triage-pick.md` (§2), 41,280 bytes over
+696 lines, which `Read` renders as 43,566 characters — 73.7% of the 59,078 the
+truncated call returned, counted on the same character basis. That file is
+still under the observed bound, but with far less room than the ones this
+comparison turns on. Within `/issue-resolver` the largest is
+`step-3-implement.md` at 19,515 bytes and 313 lines, about a third of the cut,
+so none of the `/issue-resolver` files below comes near the bound and each
+arrives whole. Their rendered size is slightly *larger* than `wc -c`, because
+`Read` prefixes every line with its number; §4.4 carries that arithmetic. The
+prose files bearing on the comparison, on the built `skills/issue-resolver`
+tree, re-measured 2026-09-04 — this is not a full ranking, but nothing it omits
+exceeds 17,658, and the largest bundled `references/scripts/*.py` exceed every
+row here without belonging in the table at all, being executed rather than
+read:
 
 | Bytes | File | When the main agent reads it |
 |---|---|---|
@@ -207,10 +213,11 @@ where `gi-secscan.py` cannot run. The measured transcript never read it.
 **Reconciling these with §2.** Five of §2's After cells differ from today's
 tree — four in the `/issue-resolver` table and one in `/auto-pilot` — and they
 differ for two different reasons. Three were measured mid-PR, before the final
-build: `git log --follow` shows a single commit for each of those files, the
-split itself, so the sizes §2 records for them were never on any committed
-tree. One is ordinary post-merge drift. One is both. Every other cell in §2's
-After column, in both tables, still matches to the byte.
+build: no commit since the split has touched them — the table below shows their
+`a6e29d6` and today columns identical — so the sizes §2 records for them were
+never on any committed tree. One is ordinary post-merge drift. One is both.
+Every other cell in §2's After column, in both tables, still matches to the
+byte.
 
 | File | §2 says | at `a6e29d6` | today | Why it differs |
 |---|---|---|---|---|
@@ -267,9 +274,6 @@ cannot deliver its own premise here.
   the worktree-accept, worktree-failure-fallback and cleanup paths, and again in
   the in-place summary and the caller-managed-worktree skip. An orchestrator
   that must re-verify it reads that prose anyway.
-- The arithmetic then closes: a spawn prompt of roughly 15 KB — the
-  `codebase-researcher.md` comparator is 15,032 bytes — against at most 17,658
-  bytes moved, before the required-return-shape spec #440 itself mandates.
 
 **Outcome:** #440 closes as not needed. The remaining candidate for the same
 treatment is `issue-pr-review/references/review-loop-mechanics.md` (§3), which
@@ -286,8 +290,8 @@ is a splitting question, not a delegation one.
   That substitution is safe here, and the arithmetic says why rather than
   asserting it. Static and live diverge two ways: truncation, which cost the
   pre-split spec 34% of its bytes, and `Read`'s per-line number prefix, which
-  adds a little. No split file comes near the truncation bound, so only the
-  prefix applies, and it is calculable — `{n}\t` per line:
+  adds a little. None of the three files below comes near the truncation bound,
+  so only the prefix applies, and it is calculable — `{n}\t` per line:
 
   | `wc -c` | as `Read` renders it | Lines | File |
   |---|---|---|---|
@@ -303,13 +307,14 @@ is a splitting question, not a delegation one.
   the three would be 21,428 / 20,659 / 18,706 and both margins would widen
   instead. The ranking holds on either basis, which is the only thing the rule
   turns on. A matched live pair would sharpen the totals; it cannot move that.
-- **Per-step attribution was not recoverable.** Step 3 asks for a split
-  delimited by the `[N/5]` tracker lines. The measured agent printed all the
-  tracker tokens in one planning block before doing its reads, so the reads
-  cannot be assigned to steps after the fact. The per-file ranking the rule
-  needs is unaffected.
+- **Per-step attribution was not recoverable.** As originally written, the
+  procedure asked for a per-step split delimited by the `[N/5]` tracker lines.
+  The measured agent printed all the tracker tokens in one planning block
+  before doing its reads, so the reads cannot be assigned to steps after the
+  fact, and §4.1 now asks only for per-file totals. The per-file ranking the
+  rule needs is unaffected.
 - **No token line.** The host reported no usage figure for the measured run, so
-  step 4's tokens column is empty.
+  the tokens line step 4 asks for is absent.
 
 ## 5. Test-suite note
 
