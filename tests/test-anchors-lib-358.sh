@@ -156,7 +156,8 @@ fi
 # the skill's own files. ADR: docs/decisions/shared-contract-pin-artifact.md
 # ───────────────────────────────────────────────────────────
 PKG="$TMP/pkg"
-mkdir -p "$PKG/references" "$PKG/references/agents" "$PKG/references/docs"
+mkdir -p "$PKG/references" "$PKG/references/agents" "$PKG/references/docs" \
+         "$PKG/references/steps" "$PKG/references/phases"
 
 cat >"$PKG/SKILL.source.md" <<'EOF'
 # Fixture skill
@@ -180,6 +181,9 @@ TOKEN_PKG_REF
 
 <!-- a:pkg-shared -->
 reference copy of a duplicated contract
+
+<!-- a:pkg-part-dup -->
+sibling copy of a contract that also lives in references/steps/
 EOF
 
 cat >"$PKG/references/agents/some-agent.md" <<'EOF'
@@ -194,6 +198,27 @@ cat >"$PKG/references/docs/some-doc.md" <<'EOF'
 
 <!-- a:pkg-doc-only -->
 bundled doc copy — governed by docs/, not by this package
+EOF
+
+# Per-step / per-phase part files (the issue #323 split). Unlike the bundled
+# copies above these are authored package prose, so they ARE contract sites.
+cat >"$PKG/references/steps/step-one.md" <<'EOF'
+# Step one
+
+<!-- a:pkg-step -->
+part-file contract
+TOKEN_PKG_STEP
+
+<!-- a:pkg-part-dup -->
+part-file copy of a contract that also lives in a sibling references/*.md
+EOF
+
+cat >"$PKG/references/phases/phase-one.md" <<'EOF'
+# Phase one
+
+<!-- a:pkg-phase -->
+part-file contract
+TOKEN_PKG_PHASE
 EOF
 
 # P1: a body anchor resolves through the package root.
@@ -278,6 +303,72 @@ if [ "$RC" -eq 0 ] && [ "$OUT" = "$REPO_ROOT/skills/issue-pr-review/references/r
 else
   fail "P8.2: real built package should resolve rvm-trusted-skips (rc=$RC, out=$OUT)"
 fi
+
+# P9: a part file under references/steps/ resolves through the package root —
+# the #323 split moved authored prose one directory deeper (issue #442).
+capture anchor_region "$PKG" pkg-step
+if [ "$RC" -eq 0 ] && printf '%s\n' "$OUT" | grep -q TOKEN_PKG_STEP; then
+  pass "P9: package root resolves an anchor in references/steps/"
+else
+  fail "P9: package root should resolve a references/steps/ anchor (rc=$RC)"
+fi
+
+# P10: the same for references/phases/.
+capture anchor_region "$PKG" pkg-phase
+if [ "$RC" -eq 0 ] && printf '%s\n' "$OUT" | grep -q TOKEN_PKG_PHASE; then
+  pass "P10: package root resolves an anchor in references/phases/"
+else
+  fail "P10: package root should resolve a references/phases/ anchor (rc=$RC)"
+fi
+
+# P11: teeth — a duplicate spanning a part file and a sibling references/*.md
+# is ambiguous across the package and must be rejected.
+capture anchor_package_file "$PKG" pkg-part-dup
+if [ "$RC" -ne 0 ]; then
+  pass "P11.1: duplicate spanning a part file and a sibling fails loudly (rc=$RC)"
+else
+  fail "P11.1: expected non-zero for a part-file/sibling duplicate, got 0 ($OUT)"
+fi
+capture anchor_region "$PKG" pkg-part-dup
+if [ "$RC" -ne 0 ]; then
+  pass "P11.2: anchor_region rejects the cross-directory duplicate too (rc=$RC)"
+else
+  fail "P11.2: expected non-zero for a part-file/sibling duplicate, got 0"
+fi
+
+# P12/P13: against the real repo — a contract that lives in a part file
+# resolves through the package root in both the src/ and built trees.
+n=0
+for pkg_root in "$REPO_ROOT/src/skills/issue-resolver" \
+                "$REPO_ROOT/skills/issue-resolver"; do
+  n=$((n + 1))
+  capture anchor_package_file "$pkg_root" rs-step4-qa
+  case "$OUT" in
+    */references/steps/*) in_part=1 ;;
+    *) in_part=0 ;;
+  esac
+  if [ "$RC" -eq 0 ] && [ "$in_part" -eq 1 ]; then
+    pass "P12.$n: ${pkg_root#"$REPO_ROOT"/} resolves rs-step4-qa under references/steps/"
+  else
+    fail "P12.$n: ${pkg_root#"$REPO_ROOT"/} should resolve rs-step4-qa under references/steps/ (rc=$RC, out=$OUT)"
+  fi
+done
+
+n=0
+for pkg_root in "$REPO_ROOT/src/skills/auto-pilot" \
+                "$REPO_ROOT/skills/auto-pilot"; do
+  n=$((n + 1))
+  capture anchor_package_file "$pkg_root" ap-phase5-merge
+  case "$OUT" in
+    */references/phases/*) in_part=1 ;;
+    *) in_part=0 ;;
+  esac
+  if [ "$RC" -eq 0 ] && [ "$in_part" -eq 1 ]; then
+    pass "P13.$n: ${pkg_root#"$REPO_ROOT"/} resolves ap-phase5-merge under references/phases/"
+  else
+    fail "P13.$n: ${pkg_root#"$REPO_ROOT"/} should resolve ap-phase5-merge under references/phases/ (rc=$RC, out=$OUT)"
+  fi
+done
 
 # ───────────────────────────────────────────────────────────
 # Mutation harness — each needle must occur exactly once
