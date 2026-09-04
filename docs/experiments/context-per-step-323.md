@@ -176,7 +176,9 @@ returned 1,030 of the file's 1,560 lines and stopped mid-sentence. **The bound
 is on returned output size, not line count.** The file is comfortably under
 `Read`'s 2,000-line ceiling and was cut anyway, at roughly 59 KB of rendered
 output. That correction matters twice over: it refutes §1's original reasoning,
-and it means "under 2,000 lines" is not evidence that a file arrives whole.
+which as first written held that the `Read` tool's 2,000-line cap meant a
+1,560-line file lands whole, and it means "under 2,000 lines" is not evidence
+that a file arrives whole.
 
 **After — post-split, static is a sound proxy for live.** The observed cut
 above happened at roughly 59 KB of output. The largest file the split produced
@@ -246,12 +248,18 @@ pre-split spec led its nearest rival by 3.1×; the post-split Step 0 file is no
 longer even first. The lever the pre-split number pointed at is gone, spent by
 the split itself.
 
-**The rule's own wording is ambiguous, and it is worth naming.** Step 5's first
-clause anchors on "the static 34 KB ceiling" — the three Step 0 files summed.
+**The rule's own wording is ambiguous, and it is worth naming.** As originally
+written — before this note replaced it with a pointer back here — step 5 of
+§4.1 read: "delegate Step 0 only if the main agent's measured reference bytes
+at the end of Step 0 exceed the static 34 KB ceiling above by less than the
+cost of a spawn (the researcher spawn's own prompt is ~15 KB) — that is, only
+if Step 0 is still the largest single read the main agent makes. Otherwise the
+split alone is the answer and the follow-up closes as not needed." Its first
+clause anchors on that "static 34 KB ceiling" — the three Step 0 files summed.
 That was 34,118 bytes against §2's cells and is 34,153 against today's, and
-either *would* exceed 20,292. Its "that is" clause says "largest
-single read." The single-read reading governs, because #440's body states it
-independently as the normative gate, and because §2 marks `0h` conditional on
+either *would* exceed 20,292. Its "that is" clause says "largest single read."
+The single-read reading governs, because #440's body states it independently
+as the normative gate, and because §2 marks `0h` conditional on
 `resolve.adaptive_effort` and `0i` conditional on a caller payload. A standalone
 `/issue-resolver N` reads 23,686 bytes of Step 0 across two files, or 31,495
 with `0h`; 34,153 is a worst case, not the common path. (The ceiling figure
@@ -303,10 +311,11 @@ is a splitting question, not a delegation one.
   narrows from 2,634 to 2,170, and the step-file backstop margin from 1,857 to
   1,815. One caveat on units: the rendered column counts *characters*, which is
   what the live measurement counts, while `wc -c` counts bytes, and these files
-  carry several hundred bytes of multibyte punctuation each. Rendered as bytes
-  the three would be 21,428 / 20,659 / 18,706 and both margins would widen
-  instead. The ranking holds on either basis, which is the only thing the rule
-  turns on. A matched live pair would sharpen the totals; it cannot move that.
+  carry 652, 238 and 100 bytes of multibyte punctuation respectively. Rendered
+  as bytes the three would be 21,428 / 20,659 / 18,706 and both margins would
+  widen instead. The ranking holds on either basis, which is the only thing the
+  rule turns on. A matched live pair would sharpen the totals; it cannot move
+  that.
 - **Per-step attribution was not recoverable.** As originally written, the
   procedure asked for a per-step split delimited by the `[N/5]` tracker lines.
   The measured agent printed all the tracker tokens in one planning block
