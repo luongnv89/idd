@@ -18,10 +18,11 @@ STATE="$REPO_ROOT/src/shared/scripts/gi-state.py"
 SCHEMA="$REPO_ROOT/docs/config-schema.md"
 TEMPLATE="$REPO_ROOT/src/skills/init-gitissue/templates/gitissue-template.yml"
 RESOLVER="$REPO_ROOT/src/skills/issue-resolver/SKILL.source.md"
-STEPS="$REPO_ROOT/src/skills/issue-resolver/references/pipeline-steps.md"
+. "$(cd "$(dirname "$0")" && pwd)/lib/spec.bash"  # spec_concat — split reference specs read as one file (#323)
+STEPS="$(spec_concat "$REPO_ROOT/src/skills/issue-resolver/references/pipeline-steps.md")"
 ERR="$REPO_ROOT/src/skills/issue-resolver/references/error-messages.md"
 INDEX="$REPO_ROOT/src/skills/issue-resolver/references/skill-index.md"
-AP_PHASES="$REPO_ROOT/src/skills/auto-pilot/references/phases.md"
+AP_PHASES="$(spec_concat "$REPO_ROOT/src/skills/auto-pilot/references/phases.md")"
 DIST="$REPO_ROOT/.github/workflows/dist-check.yml"
 
 PASS=0

@@ -4,7 +4,7 @@ description: "Run an autonomous triage-resolve-review-merge loop to auto-pilot t
 license: MIT
 compatibility: "Requires git and GitHub CLI (gh) with auth and push access. Requires merge permission for auto-merge. Requires issue-triage, issue-resolver, issue-analysis, and issue-pr-review to be installed from the same distribution. Optional: issue-creator for normalizing unstructured issues mid-loop."
 metadata:
-  version: 2.6.0
+  version: 2.7.0
   author: Luong NGUYEN <luongnv89@gmail.com>
   effort: max
 ---
@@ -52,7 +52,7 @@ When in doubt, take the safer option rather than stopping. A skipped issue can b
 | `/auto-pilot --fresh` | Ignore any recorded run state and start a new run (the default when no state exists) |
 | `/auto-pilot --force-unlock` | Reclaim a run lock held by a run that is no longer alive, then start |
 
-**Combining flags:** `--issues` combines with `--dry-run` and `--skip` — example: `/auto-pilot --issues 5,10,12 --skip 10 --dry-run` — but not with `--limit` (the list is the limit). `--resume` cannot combine with `--dry-run` (a resume advances a real run; a dry run mutates nothing) or with `--fresh` (opposite answers to one question). The resume entry gate, the run lock, and the checkpoints live in `references/phases.md` (*Step 1.0*) and `references/preflight.md` (*Run lock*).
+**Combining flags:** `--issues` combines with `--dry-run` and `--skip` — example: `/auto-pilot --issues 5,10,12 --skip 10 --dry-run` — but not with `--limit` (the list is the limit). `--resume` cannot combine with `--dry-run` (a resume advances a real run; a dry run mutates nothing) or with `--fresh` (opposite answers to one question). The resume entry gate, the run lock, and the checkpoints live in `references/phases/phase-0-lock-resume.md` (*Step 1.0*) and `references/preflight.md` (*Run lock*).
 
 ## Prerequisites
 
@@ -97,6 +97,11 @@ If a required skill is missing, stop and print the `✗ Missing required gitissu
 Verify these bundled files are present, relative to the skill's directory (the dirname of this SKILL.md). A missing one is a broken install: stop and print the `✗ Missing bundled dependency` block from `references/preflight.md`.
 
 - `references/phases.md`
+- `references/phases/phase-0-lock-resume.md`
+- `references/phases/phase-1-triage-pick.md`
+- `references/phases/phase-2-resolve.md`
+- `references/phases/phase-3-4-review.md`
+- `references/phases/phase-5-merge.md`
 - `references/subagent-prompts.md`
 - `references/preflight.md`
 - `references/orchestration.md`
@@ -198,7 +203,7 @@ Defaults (per-key rationale and edge-case behavior: `references/configuration.md
 - With `autopilot.mode` unset but `autopilot.auto_merge` **explicitly present**, read it as legacy: `auto_merge: true` ≈ `aggressive` + `merge_partial: true` (the prior 2.1.x behavior); `auto_merge: false` ≈ `conservative`.
 - Critical-issue handling is unchanged across all modes — the loop always stops and asks when a critical issue still has unresolved review problems after all cycles.
 
-Per-phase decision logic: `references/phases.md` (Phase 3-4 partial gate, Phase 5 merge gate) — read it when implementing or debugging a merge path.
+Per-phase decision logic: `references/phases/phase-3-4-review.md` (Phase 3-4 partial gate) and `references/phases/phase-5-merge.md` (Phase 5 merge gate) — read the one you need when implementing or debugging a merge path.
 
 ---
 
@@ -254,7 +259,7 @@ is printed.
 
 ## Phase Details
 
-Phase 0 runs **once**, before the loop; each iteration then runs 5 phases. The full spec — subagent prompts, followup-issue template, merge gates, force-resolution fallbacks, error handling, decision tables — is in `references/phases.md`. Read it when implementing or debugging a phase.
+Phase 0 runs **once**, before the loop; each iteration then runs 5 phases. The full spec — subagent prompts, followup-issue template, merge gates, force-resolution fallbacks, error handling, decision tables — is in `references/phases.md` — an index of one file per phase under `references/phases/`. Read that phase's file when implementing or debugging it, never the whole set.
 
 | Phase | Name | Purpose | Subagent? |
 |-------|------|---------|-----------|
@@ -370,7 +375,7 @@ The loop stops on any of these — except the rows marked *loop continues*, whic
 | Mode forbids merge (clean PR in `conservative`) | `○ PR #{pr_number} ready for manual merge (mode: conservative)` (`left_open`, *loop continues*) |
 | PR blocked by an unmerged dependency | `⚠ BLOCKED — PR #{pr_number} cannot merge until dependency #{N} is merged` (PR left open, `blocked_by_dependency`, issue added to the session skip list, *loop continues*) |
 | Run lock held by a live run | `✗ Another /auto-pilot run is in progress` (the loop never starts; nothing is mutated) |
-| Runtime budget reached (`autopilot.max_runtime_minutes`) | `○ Runtime budget reached ({max} min) — stopping cleanly` — checked at the top of each iteration and around every rate-limit pause (`references/phases.md` → *Runtime budget check*); nothing new is started, the final summary is persisted with `--report`, and the lock is released |
+| Runtime budget reached (`autopilot.max_runtime_minutes`) | `○ Runtime budget reached ({max} min) — stopping cleanly` — checked at the top of each iteration and around every rate-limit pause (`references/phases/phase-0-lock-resume.md` → *Runtime budget check*); nothing new is started, the final summary is persisted with `--report`, and the lock is released |
 | API rate budget too low to wait out | `✗ Insufficient GitHub API rate budget for auto-pilot` — waiting for `reset` would run past `autopilot.max_runtime_minutes`, or `reset` is unknown (`references/preflight.md` → *Rate-limit pause*, the `stop` row); the summary is persisted with `--report` and reports `Result: RATE LIMITED`. At Prerequisite 8 the loop never starts and no lock is held yet; mid-run the stop falls between iterations and the lock is released |
 | User cancellation | `○ Auto-pilot stopped by user` |
 

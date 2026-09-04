@@ -118,7 +118,7 @@ LIMITED`'s `Next action:` line on the same value for the same reason.
 ⚠ gi-ratelimit unavailable — computing the pause by hand
 ```
 **Trigger:** No `python3`, exit 2 (the script path did not resolve), or exit 4 from any `gi-ratelimit.py` call. A **missing bundled file** is different — that is a broken install, and the `✗ Missing bundled dependency` block above is the answer. Exit 3 is invalid input: a stop for that one probe, never a degrade.
-**Action:** Follow the prose fallback beside the call site in `references/preflight.md` (*Rate-limit pause*, *Transient-failure retry*) or `references/phases.md` (*Runtime budget check*). For the budget check the wording is `⚠ gi-ratelimit unavailable — the runtime budget is not enforced` and the run continues unbounded. Never read a degrade as an expiry or as a `stop` verdict.
+**Action:** Follow the prose fallback beside the call site in `references/preflight.md` (*Rate-limit pause*, *Transient-failure retry*) or `references/phases/phase-0-lock-resume.md` (*Runtime budget check*). For the budget check the wording is `⚠ gi-ratelimit unavailable — the runtime budget is not enforced` and the run continues unbounded. Never read a degrade as an expiry or as a `stop` verdict.
 
 ### Runtime budget reached (clean stop)
 ```
@@ -128,7 +128,7 @@ LIMITED`'s `Next action:` line on the same value for the same reason.
   Processed: {n} issue(s) this run
   Remaining work is untouched — re-run /auto-pilot to continue.
 ```
-**Trigger:** `gi-ratelimit.py --budget` returns `expired: true` at the top of an iteration or around a rate-limit pause (`references/phases.md` → *Runtime budget check*). Not an error — the run did what it was told.
+**Trigger:** `gi-ratelimit.py --budget` returns `expired: true` at the top of an iteration or around a rate-limit pause (`references/phases/phase-0-lock-resume.md` → *Runtime budget check*). Not an error — the run did what it was told.
 **Action:** Start nothing new, print the Final Summary, persist it with `gi-state.py --report`, release the run lock, and stop. An iteration already in flight is never abandoned: the budget gates when work may start, not how long it may run.
 
 ### Insufficient merge permission (auto-downgrade)
@@ -260,8 +260,9 @@ LIMITED`'s `Next action:` line on the same value for the same reason.
 that skipped Step 1.1 because *Step 1.1a* read the cache as `fresh` — *Step 1.1b*'s
 live `gh issue list --state open --json number,assignees` returns an empty array,
 which is the same condition reached without a scan (equivalently, an empty
-`summary.suggested_order` in a cache Step 1.1a reused or Step 1.6 updated). Both
-entry points print the one block in `references/phases.md` (*Step 1.1*). The
+`summary.suggested_order` in a cache Step 1.1a reused or Step 1.6 —
+`references/phases/phase-5-merge.md` — updated). Both
+entry points print the one block in `references/phases/phase-1-triage-pick.md` (*Step 1.1*). The
 second trigger is not optional: a reuse iteration never runs Step 1.1, so without
 it a backlog that empties mid-run falls through to `⚠ No eligible issues to pick`
 with all-zero counts. This is a success message, not an error.
@@ -286,7 +287,7 @@ Step 1.2b's post-pick re-check (`closed` when the issue is not open;
 the effective `skip_labels` set). This is the
 **only** place a run ends for dependency reasons — the gate itself never stops
 the loop. Omit the `Dep-blocked` line when that count is zero. Keep this block
-byte-identical to the one in `references/phases.md` (*Step 1.2*), and take which
+byte-identical to the one in `references/phases/phase-1-triage-pick.md` (*Step 1.2*), and take which
 bucket each reason counts under from that step's reason-to-bucket table — it is
 the single home of that mapping, never restated here.
 
@@ -298,7 +299,7 @@ the single home of that mapping, never restated here.
   Check:   gh api rate_limit --jq '{remaining: .rate.remaining, reset: .rate.reset}'
 ```
 **Trigger:** HTTP 403 with rate-limit headers during an issue fetch, mid-run.
-**Action:** Classify it by driver rule 5 in `docs/platform-github.md`. A *secondary* limit carrying `Retry-After` is recoverable: retry on the bounded backoff in `references/preflight.md` (*Transient-failure retry*). *Primary* exhaustion is not retryable — take the *Rate-limit pause* in that same file, which either pauses until `reset` and resumes or stops cleanly. Only when both are exhausted does the read fall through to its documented degrade (`live_backlog = unavailable`, `references/phases.md` → *Step 1.1b*). There is no remedy addressed to a reader here: an unattended run has none.
+**Action:** Classify it by driver rule 5 in `docs/platform-github.md`. A *secondary* limit carrying `Retry-After` is recoverable: retry on the bounded backoff in `references/preflight.md` (*Transient-failure retry*). *Primary* exhaustion is not retryable — take the *Rate-limit pause* in that same file, which either pauses until `reset` and resumes or stops cleanly. Only when both are exhausted does the read fall through to its documented degrade (`live_backlog = unavailable`, `references/phases/phase-1-triage-pick.md` → *Step 1.1b*). There is no remedy addressed to a reader here: an unattended run has none.
 
 ## Resolve
 
@@ -319,7 +320,7 @@ the single home of that mapping, never restated here.
   Continuing to next issue...
 ```
 **Trigger:** After a Phase 2.3 failure, `gi-runlog.py --failure-streak` reports `quarantine: true` — `autopilot.quarantine_after` consecutive `failed` records for this issue (`0` disables the check entirely).
-**Action:** `gh issue edit {issue_number} --add-label "{quarantine_label}"` — only after the label passes the `^[A-Za-z0-9._:-]+$` check in `references/phases.md`, since a config string reaching a command line is not metacharacter-checked by `gi-config.py` — then record the skip-list reason `quarantined` and **continue to the next issue**: record-and-continue, never a stop. The label is in the effective `skip_labels` set, so later runs skip the issue with no extra gate. Missing or unreadable log (exit 4, `streak: 0`): print `⚠ gi-runlog unavailable — skipping the quarantine check` and never quarantine on evidence nobody read.
+**Action:** `gh issue edit {issue_number} --add-label "{quarantine_label}"` — only after the label passes the `^[A-Za-z0-9._:-]+$` check in `references/phases/phase-2-resolve.md` (*Step 2.3*), since a config string reaching a command line is not metacharacter-checked by `gi-config.py` — then record the skip-list reason `quarantined` and **continue to the next issue**: record-and-continue, never a stop. The label is in the effective `skip_labels` set, so later runs skip the issue with no extra gate. Missing or unreadable log (exit 4, `streak: 0`): print `⚠ gi-runlog unavailable — skipping the quarantine check` and never quarantine on evidence nobody read.
 
 ### Quarantine label could not be applied (degrade)
 ```

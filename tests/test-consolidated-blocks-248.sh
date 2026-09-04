@@ -47,12 +47,13 @@ has_flat() {
 
 SHARED_UI="docs/ui-review.md"
 RESOLVER_SKILL="src/skills/issue-resolver/SKILL.source.md"
-RESOLVER_PIPELINE="src/skills/issue-resolver/references/pipeline-steps.md"
+. "$(cd "$(dirname "$0")" && pwd)/lib/spec.bash"  # spec_concat — split reference specs read as one file (#323)
+RESOLVER_PIPELINE="$(spec_concat "src/skills/issue-resolver/references/pipeline-steps.md")"
 PR_SKILL="src/skills/issue-pr-review/SKILL.source.md"
 PR_UI="src/skills/issue-pr-review/references/ui-review-mechanics.md"
 PR_PREPASS="src/skills/issue-pr-review/references/prepass-tests-ci-mechanics.md"
 AP_SKILL="src/skills/auto-pilot/SKILL.source.md"
-AP_PHASES="src/skills/auto-pilot/references/phases.md"
+AP_PHASES="$(spec_concat "src/skills/auto-pilot/references/phases.md")"
 AP_CONFIG="src/skills/auto-pilot/references/configuration.md"
 AP_LIST="src/skills/auto-pilot/references/explicit-list-mode.md"
 CREATOR_SKILL="src/skills/issue-creator/SKILL.source.md"

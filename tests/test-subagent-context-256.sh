@@ -100,22 +100,23 @@ echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄�
 SRC_CONV="$REPO_ROOT/docs/shared-agent-conventions.md"
 SRC_RESEARCHER="$REPO_ROOT/src/shared/agents/codebase-researcher.md"
 SRC_AP_SKILL="$REPO_ROOT/src/skills/auto-pilot/SKILL.source.md"
-SRC_AP_PHASES="$REPO_ROOT/src/skills/auto-pilot/references/phases.md"
+. "$(cd "$(dirname "$0")" && pwd)/lib/spec.bash"  # spec_concat — split reference specs read as one file (#323)
+SRC_AP_PHASES="$(spec_concat "$REPO_ROOT/src/skills/auto-pilot/references/phases.md")"
 SRC_AP_PROMPTS="$REPO_ROOT/src/skills/auto-pilot/references/subagent-prompts.md"
 SRC_AP_EXAMPLES="$REPO_ROOT/src/skills/auto-pilot/references/examples.md"
 SRC_RES_SKILL="$REPO_ROOT/src/skills/issue-resolver/SKILL.source.md"
-SRC_RES_STEPS="$REPO_ROOT/src/skills/issue-resolver/references/pipeline-steps.md"
+SRC_RES_STEPS="$(spec_concat "$REPO_ROOT/src/skills/issue-resolver/references/pipeline-steps.md")"
 SRC_PR_SKILL="$REPO_ROOT/src/skills/issue-pr-review/SKILL.source.md"
 SRC_PR_CI="$REPO_ROOT/src/skills/issue-pr-review/references/prepass-tests-ci-mechanics.md"
 
 BUILT_CONV="$REPO_ROOT/skills/auto-pilot/references/docs/shared-agent-conventions.md"
 BUILT_RESEARCHER="$REPO_ROOT/skills/issue-resolver/references/agents/codebase-researcher.md"
 BUILT_AP_SKILL="$REPO_ROOT/skills/auto-pilot/SKILL.md"
-BUILT_AP_PHASES="$REPO_ROOT/skills/auto-pilot/references/phases.md"
+BUILT_AP_PHASES="$(spec_concat "$REPO_ROOT/skills/auto-pilot/references/phases.md")"
 BUILT_AP_PROMPTS="$REPO_ROOT/skills/auto-pilot/references/subagent-prompts.md"
 BUILT_AP_EXAMPLES="$REPO_ROOT/skills/auto-pilot/references/examples.md"
 BUILT_RES_SKILL="$REPO_ROOT/skills/issue-resolver/SKILL.md"
-BUILT_RES_STEPS="$REPO_ROOT/skills/issue-resolver/references/pipeline-steps.md"
+BUILT_RES_STEPS="$(spec_concat "$REPO_ROOT/skills/issue-resolver/references/pipeline-steps.md")"
 BUILT_PR_SKILL="$REPO_ROOT/skills/issue-pr-review/SKILL.md"
 BUILT_PR_CI="$REPO_ROOT/skills/issue-pr-review/references/prepass-tests-ci-mechanics.md"
 
@@ -350,12 +351,12 @@ check_lacks "$SRC_AP_SKILL" 'single-field .gh issue view' \
 # would be silently overridden by a recorded run.
 # ───────────────────────────────────────────────────────────
 anchor_present "$SRC_RES_STEPS" rs-last-green-state \
-  "T4.1: pipeline-steps.md owns the last-green test state section"
+  "T4.1: steps/step-4-qa.md owns the last-green test state section"
 anchor_check "$SRC_RES_STEPS" rs-clean-tree 'Single home of .tests_state.' \
   "T4.2: that section declares itself the single home"
 STATE_HITS="$(grep -rlE 'tests_state = ' "$REPO_ROOT/src" 2>/dev/null || true)"
 STATE_COUNT="$(printf '%s\n' "$STATE_HITS" | grep -c . || true)"
-if [ "$STATE_COUNT" = "1" ] && [ "$STATE_HITS" = "$SRC_RES_STEPS" ]; then
+if [ "$STATE_COUNT" = "1" ] && [ "$STATE_HITS" = "$REPO_ROOT/src/skills/issue-resolver/references/steps/step-4-qa.md" ]; then
   pass "T4.3: tests_state is defined in exactly one src/ file"
 else
   fail "T4.3: tests_state must be defined in exactly one src/ file — found $STATE_COUNT"

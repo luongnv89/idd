@@ -60,7 +60,7 @@ explicit list is done. `PAUSED` — the loop stopped for a decision it may not m
 alone (a critical issue with unresolved review problems, `pause_on_failure`).
 `LIMIT REACHED` — `autopilot.max_iterations` was hit. **`BUDGET REACHED`** — the
 wall-clock budget `autopilot.max_runtime_minutes` expired
-(`references/phases.md` → *Runtime budget check*); the run stopped cleanly at an
+(`references/phases/phase-0-lock-resume.md` → *Runtime budget check*); the run stopped cleanly at an
 iteration boundary with nothing in flight, so `Next action:` is the ordinary
 `/auto-pilot to continue`. **`RATE LIMITED`** — the `✗ Insufficient API rate
 budget` stop fired: the API budget ran out and waiting for `reset` would not fit
@@ -174,7 +174,7 @@ Rules that make the report worth reading:
 
 `Triage current` is `√` when the order the pick used is current — a full triage
 this iteration ran, a cache *Step 1.1a* read as `fresh`, or a cache *Step 1.6*
-updated after the last merge. It is not "a triage ran this iteration": under
+(`references/phases/phase-5-merge.md`) updated after the last merge. It is not "a triage ran this iteration": under
 issue #258 a run triages once and updates incrementally, so a name that asserted
 a refresh would mark every reuse iteration `×` and turn a working loop into a
 wall of `PARTIAL`. It is `×` only when the gate degraded and the pick ran against

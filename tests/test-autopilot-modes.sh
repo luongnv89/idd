@@ -150,7 +150,8 @@ done
 # ───────────────────────────────────────────────────────────
 # T4: phases.md gates merge behavior on mode
 # ───────────────────────────────────────────────────────────
-PHASES="$REPO_ROOT/src/skills/auto-pilot/references/phases.md"
+. "$(cd "$(dirname "$0")" && pwd)/lib/spec.bash"  # spec_concat — split reference specs read as one file (#323)
+PHASES="$(spec_concat "$REPO_ROOT/src/skills/auto-pilot/references/phases.md")"
 
 if grep -qE 'autopilot\.mode|effective mode' "$PHASES"; then
   pass "T4.1: phases.md describes mode gating"

@@ -1,7 +1,7 @@
 # Bug Verification — Red-Capable Reproduction Before the Fix
 
 The reproduction checkpoint for `type: bug` issues, invoked from Step 3 — Implement
-(see `references/pipeline-steps.md`). It makes the IDD `verifiable` principle real:
+(see `references/steps/step-3-implement.md`). It makes the IDD `verifiable` principle real:
 a bug fix must be backed by a **demonstrated red → green transition**, not just a
 checked box in the acceptance table.
 

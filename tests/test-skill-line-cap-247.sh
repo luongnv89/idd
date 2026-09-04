@@ -110,8 +110,8 @@ check_pointer "expected inline pipeline output" \
   '^## Expected Inline Pipeline Output'
 
 check_pointer "propose-relevant-skills procedure" \
-  'references/pipeline-steps\.md.*Step 3 — Propose relevant skills' \
-  "pipeline-steps.md" \
+  'references/steps/step-3-implement\.md.*Step 3 — Propose relevant skills' \
+  "steps/step-3-implement.md" \
   'Propose relevant skills'
 
 # The stash-first sync snippet moved to the bundled runtime doc, not a reference.

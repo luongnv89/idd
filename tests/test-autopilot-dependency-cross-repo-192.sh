@@ -20,7 +20,8 @@ fail() { echo "  ✗ $1"; FAIL=$((FAIL + 1)); }
 echo "◆ Auto-Pilot dependency gate cross-repo exclusion (issue #192)"
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 
-PHASES="$REPO_ROOT/src/skills/auto-pilot/references/phases.md"
+. "$(cd "$(dirname "$0")" && pwd)/lib/spec.bash"  # spec_concat — split reference specs read as one file (#323)
+PHASES="$(spec_concat "$REPO_ROOT/src/skills/auto-pilot/references/phases.md")"
 PARSE="$REPO_ROOT/src/shared/scripts/gi-deps.py"
 SHIPPED_PARSE="$REPO_ROOT/skills/auto-pilot/references/scripts/gi-deps.py"
 

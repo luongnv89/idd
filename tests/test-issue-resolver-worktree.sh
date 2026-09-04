@@ -45,11 +45,12 @@ echo "◆ Issue Resolver Worktree Contract Tests (issue #123)"
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 
 SRC_SKILL="$REPO_ROOT/src/skills/issue-resolver/SKILL.source.md"
-SRC_STEPS="$REPO_ROOT/src/skills/issue-resolver/references/pipeline-steps.md"
+. "$(cd "$(dirname "$0")" && pwd)/lib/spec.bash"  # spec_concat — split reference specs read as one file (#323)
+SRC_STEPS="$(spec_concat "$REPO_ROOT/src/skills/issue-resolver/references/pipeline-steps.md")"
 SRC_ERRORS="$REPO_ROOT/src/skills/issue-resolver/references/error-messages.md"
 SRC_AUTOPILOT_PROMPTS="$REPO_ROOT/src/skills/auto-pilot/references/subagent-prompts.md"
 ROOT_SKILL="$REPO_ROOT/skills/issue-resolver/SKILL.md"
-ROOT_STEPS="$REPO_ROOT/skills/issue-resolver/references/pipeline-steps.md"
+ROOT_STEPS="$(spec_concat "$REPO_ROOT/skills/issue-resolver/references/pipeline-steps.md")"
 ROOT_ERRORS="$REPO_ROOT/skills/issue-resolver/references/error-messages.md"
 
 for file in "$SRC_SKILL" "$SRC_STEPS" "$SRC_ERRORS" "$SRC_AUTOPILOT_PROMPTS" "$ROOT_SKILL" "$ROOT_STEPS" "$ROOT_ERRORS"; do

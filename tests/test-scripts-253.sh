@@ -24,6 +24,7 @@
 # Returns: exit 0 on pass, exit 1 on failure.
 
 set -euo pipefail
+. "$(cd "$(dirname "$0")" && pwd)/lib/spec.bash"  # spec_concat — split reference specs read as one file (#323)
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SRC_SCRIPTS="$REPO_ROOT/src/shared/scripts"
@@ -888,7 +889,7 @@ expect_grep "AC1: dedicated non-vacuous scorer suite is CI-wired" \
 expect_grep "AC2: issue-triage's ordering step calls gi-triage-graph" \
   "references/scripts/gi-triage-graph.py" "$SKILLS/issue-triage/SKILL.md"
 expect_grep "AC2: auto-pilot Phase 1 calls the SAME script, not a reimplementation" \
-  "references/scripts/gi-triage-graph.py" "$SKILLS/auto-pilot/references/phases.md"
+  "references/scripts/gi-triage-graph.py" "$(spec_concat "$SKILLS/auto-pilot/references/phases.md")"
 expect_grep "AC3: init-gitissue Step 1 calls gi-stack-detect" \
   "references/scripts/gi-stack-detect.py" "$SKILLS/init-gitissue/SKILL.md"
 expect_grep "AC4: issue-creator's config step calls gi-model-cache" \
@@ -926,7 +927,7 @@ for entry in \
   fi
 done
 expect_grep "AC5: auto-pilot classifies exit 3 and exit 4 at its call site" \
-  "Exit 4 means only the write failed" "$SKILLS/auto-pilot/references/phases.md"
+  "Exit 4 means only the write failed" "$(spec_concat "$SKILLS/auto-pilot/references/phases.md")"
 # issue-creator's only wave-3 call site is gi-model-cache, whose exit-3 stop is
 # stated in the call-site prose rather than in the shared exit-code table.
 expect_grep "AC4: issue-creator's gi-model-cache call site stops on exit 3" \

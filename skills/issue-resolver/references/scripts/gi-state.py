@@ -644,7 +644,7 @@ def merge_patch(
     if not isinstance(patch, dict):
         raise InputError("stdin must be a single JSON object")
     if "queue" in patch:
-        # Recorded intent at `--init` (*Two lists, two facts* in phases.md).
+        # Recorded intent at `--init` (*Two lists, two facts* in phases/phase-5-merge.md).
         # Accepting a patch here would let a caller silently rewrite the run's
         # original scope, which is the one fact `queue` exists to keep.
         raise InputError("queue is recorded at --init and cannot be patched")

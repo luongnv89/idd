@@ -719,7 +719,8 @@ fi
 # ───────────────────────────────────────────────────────────
 AP="$SKILLS/auto-pilot"
 AP_SKILL="$AP/SKILL.md"
-AP_PHASES="$AP/references/phases.md"
+. "$(cd "$(dirname "$0")" && pwd)/lib/spec.bash"  # spec_concat — split reference specs read as one file (#323)
+AP_PHASES="$(spec_concat "$AP/references/phases.md")"
 AP_PREFLIGHT="$AP/references/preflight.md"
 AP_ERRORS="$AP/references/error-messages.md"
 AP_CONFIG="$AP/references/configuration.md"
@@ -1261,7 +1262,7 @@ expect_block "AC2: mid-run it is still measured from the recorded started_at" \
 expect_block "AC2: at Prerequisite 8 it comes from the clock instead" \
   "$PAUSE_BLOCK" 'derive it from the clock: `now + autopilot.max_runtime_minutes'
 expect_block "AC2: the preflight derivation says why no run state exists yet" \
-  "$PAUSE_BLOCK" 'writes `started_at` in `references/phases.md` (*Step 1.0*), which runs after the'
+  "$PAUSE_BLOCK" 'writes `started_at` in `references/phases/phase-0-lock-resume.md` (*Step 1.0*), which runs after the'
 expect_block "AC2: 0 still means unbounded at both sites" \
   "$PAUSE_BLOCK" '`0` means unbounded'
 expect_block "AC2: fabricating a started_at is ruled out, with the consequence named" \

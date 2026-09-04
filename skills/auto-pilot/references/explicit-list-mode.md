@@ -37,7 +37,7 @@ gh issue view {N} --json number,title,body,state,labels,assignees,updatedAt
 Store successful replies in `explicit_issue_records[N]`. This is explicit-list
 mode's one **resolution-boundary body snapshot**. **Before spawning the
 analyzer**, invoke the canonical mode-neutral *Step 1.2b — Capture
-the caller payload* in `references/phases.md` once for the complete retained map:
+the caller payload* in `references/phases/phase-1-triage-pick.md` once for the complete retained map:
 validate every record, compact-serialize the map, and nonce-frame it for that
 spawn. The analyzer and dependency ordering project from this captured map rather
 than fetching bodies again. After optimization selects an individual or batch,
@@ -174,7 +174,7 @@ If `--dry-run`:
 ○ Dry run complete. No issues resolved.
 ```
 Stop. **The stop belongs ahead of the first persisted write, not after it** — the
-same reordering Phase 1 applies (`references/phases.md` → *Step 1.1*): under
+same reordering Phase 1 applies (`references/phases/phase-1-triage-pick.md` → *Step 1.1*): under
 `--dry-run` the analysis is computed and printed but nothing is persisted, the
 run lock is taken with `--dry-run` (reporting a holder, creating nothing), and
 every run-state write carries `--dry-run` too. A dry run leaves the repository
@@ -201,7 +201,7 @@ Also maintain a `processed` set (initially empty) that tracks which issues have 
 **`processed` and the session skip list are run-state fields, not pure memory.**
 Both live in `.gitissue/run-state.json` (`processed[]`, `skip_list[]`) and are
 appended de-duplicated at each end-of-iteration checkpoint
-(`references/phases.md` → *Step 1.0b*, *End-of-iteration checkpoint*). The
+(`references/phases/phase-0-lock-resume.md` → *Step 1.0b*; `references/phases/phase-5-merge.md` → *End-of-iteration checkpoint*). The
 in-memory copies stay the working set — every lookup above reads them — but a
 resumed run seeds them from the state file, which is the only reason a crash
 mid-batch does not re-resolve issues that already landed. When `gi-state.py` is
@@ -259,7 +259,7 @@ resolved inside someone else's batch) and never two (skipped at the spawn *and*
 at its own turn).
 
 The write side is unchanged: a failure inside this mode runs the same *Quarantine
-after repeated failures* procedure in `references/phases.md`.
+after repeated failures* procedure in `references/phases/phase-2-resolve.md`.
 
 When advancing to the next item in `optimized_order`:
 1. **If already processed** (in the `processed` set): emit a skip line and advance.
@@ -367,8 +367,9 @@ The `[Issue {i}/{total}]` counter reflects total issues (not batches), so the us
 
 All other phases (Resolve, Review, Fix, Merge) run identically to triage mode,
 with one exception, and it is Phase 1 work rather than a fourth phase changing:
-*Step 1.6 — Update the triage cache after a merge* is numbered in Phase 1 and
-merely *executed* after a merge, so it is skipped here with the rest of Phase 1
+*Step 1.6 — Update the triage cache after a merge* (`references/phases/phase-5-merge.md`)
+is numbered in Phase 1 and merely *executed* after a merge, so it is skipped
+here with the rest of Phase 1
 (see *Re-triage between iterations* below).
 
 ### Re-triage between iterations

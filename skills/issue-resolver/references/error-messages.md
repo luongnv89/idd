@@ -81,7 +81,7 @@ All errors follow the rich error format: what went wrong + fix command + docs li
   Use /issue-pr-review {pr_number} to review it instead.
 ```
 **Trigger:** Step 0b finds an open PR whose body contains `Closes #N`, `Fixes #N`, or `Resolves #N`.
-**Action:** Stop — the resolve pipeline does not create a second PR for the same issue. Return `status: pr_in_progress` with that PR's `pr_number` and `branch_name`, and **never close the issue**: an unreviewed, unmerged PR is not a resolution, and the caller routes those identifiers into a review of the existing PR (SKILL.md → *0b*, `references/pipeline-steps.md` → *Early exit*).
+**Action:** Stop — the resolve pipeline does not create a second PR for the same issue. Return `status: pr_in_progress` with that PR's `pr_number` and `branch_name`, and **never close the issue**: an unreviewed, unmerged PR is not a resolution, and the caller routes those identifiers into a review of the existing PR (SKILL.md → *0b*, `references/steps/step-1-research.md` → *Early exit*).
 
 ### Assigned to another user
 ```
@@ -303,7 +303,7 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 ```
 ⚠ gi-state unavailable — skipping leftover borrow teardown
 ```
-**Trigger:** Any failure of `gi-state.py --read` / `--update` / `--init` on the borrow-record path — no `python3`, exit 2, exit 4, or **exit 3** (invalid patch or corrupt state). All of them degrade the same way, because borrowing is an opt-in sub-step over a machine-local, gitignored file: borrow nothing, tear nothing down, continue the resolve (`references/pipeline-steps.md` → *Step 3 — Propose relevant skills*, the exit-code rule at the head of the sub-step — the one scoped exception to `3` = stop). Do not invent a second writer for `.gitissue/run-state.json` and never repair it by hand. A missing bundled file is still fatal (`✗ Missing bundled dependency`).
+**Trigger:** Any failure of `gi-state.py --read` / `--update` / `--init` on the borrow-record path — no `python3`, exit 2, exit 4, or **exit 3** (invalid patch or corrupt state). All of them degrade the same way, because borrowing is an opt-in sub-step over a machine-local, gitignored file: borrow nothing, tear nothing down, continue the resolve (`references/steps/step-3-implement.md` → *Step 3 — Propose relevant skills*, the exit-code rule at the head of the sub-step — the one scoped exception to `3` = stop). Do not invent a second writer for `.gitissue/run-state.json` and never repair it by hand. A missing bundled file is still fatal (`✗ Missing bundled dependency`).
 
 ## Configuration
 

@@ -96,13 +96,14 @@ echo "◆ Analysis Reuse Gate Contract Tests (issue #254)"
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 
 SRC_SKILL="$REPO_ROOT/src/skills/issue-resolver/SKILL.source.md"
-SRC_STEPS="$REPO_ROOT/src/skills/issue-resolver/references/pipeline-steps.md"
+. "$(cd "$(dirname "$0")" && pwd)/lib/spec.bash"  # spec_concat — split reference specs read as one file (#323)
+SRC_STEPS="$(spec_concat "$REPO_ROOT/src/skills/issue-resolver/references/pipeline-steps.md")"
 SRC_TEMPLATES="$REPO_ROOT/src/skills/issue-resolver/references/report-templates.md"
 SRC_RESEARCHER="$REPO_ROOT/src/shared/agents/codebase-researcher.md"
 SRC_METHODOLOGY="$REPO_ROOT/docs/idd-methodology.md"
 
 BUILT_SKILL="$REPO_ROOT/skills/issue-resolver/SKILL.md"
-BUILT_STEPS="$REPO_ROOT/skills/issue-resolver/references/pipeline-steps.md"
+BUILT_STEPS="$(spec_concat "$REPO_ROOT/skills/issue-resolver/references/pipeline-steps.md")"
 BUILT_TEMPLATES="$REPO_ROOT/skills/issue-resolver/references/report-templates.md"
 BUILT_RESEARCHER="$REPO_ROOT/skills/issue-resolver/references/agents/codebase-researcher.md"
 
@@ -120,10 +121,14 @@ done
 # T1 (AC2): the predicate has exactly one home in src/.
 # Two definitions drift apart; the stricter one silently wins.
 # ───────────────────────────────────────────────────────────
-ANCESTOR_HITS="$(grep -rlE 'merge-base --is-ancestor' "$REPO_ROOT/src" 2>/dev/null || true)"
+# The predicate's own form — `"$sha" "$base_ref"` — not the worktree lane's
+# `IDD_BASE_SHA` ancestry check in Step 0e, which is a different question and
+# lives in its own step file since #323.
+STEP0H="$REPO_ROOT/src/skills/issue-resolver/references/steps/step-0h-analysis-reuse.md"
+ANCESTOR_HITS="$(grep -rlE 'merge-base --is-ancestor "\$sha" "\$base_ref"' "$REPO_ROOT/src" 2>/dev/null || true)"
 ANCESTOR_COUNT="$(printf '%s\n' "$ANCESTOR_HITS" | grep -c . || true)"
-if [ "$ANCESTOR_COUNT" = "1" ] && [ "$ANCESTOR_HITS" = "$SRC_STEPS" ]; then
-  pass "T1.1: the ancestry test lives in exactly one src/ file (resolver pipeline-steps.md)"
+if [ "$ANCESTOR_COUNT" = "1" ] && [ "$ANCESTOR_HITS" = "$STEP0H" ]; then
+  pass "T1.1: the ancestry test lives in exactly one src/ file (resolver steps/step-0h-analysis-reuse.md)"
 else
   fail "T1.1: the ancestry test must live in exactly one src/ file — found $ANCESTOR_COUNT"
   printf '      %s\n' $ANCESTOR_HITS

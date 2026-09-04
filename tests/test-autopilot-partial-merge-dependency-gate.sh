@@ -15,7 +15,8 @@ fail() { echo "  ✗ $1"; FAIL=$((FAIL + 1)); }
 echo "◆ Auto-Pilot Partial-Merge Dependency Gate (issue #184)"
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 
-PHASES="$REPO_ROOT/src/skills/auto-pilot/references/phases.md"
+. "$(cd "$(dirname "$0")" && pwd)/lib/spec.bash"  # spec_concat — split reference specs read as one file (#323)
+PHASES="$(spec_concat "$REPO_ROOT/src/skills/auto-pilot/references/phases.md")"
 ERRORS="$REPO_ROOT/src/skills/auto-pilot/references/error-messages.md"
 
 # AC1: Phase 3-4 partial path runs dependency and CI gates before merge

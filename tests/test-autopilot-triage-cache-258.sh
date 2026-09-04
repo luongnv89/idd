@@ -120,7 +120,8 @@ check_block_lacks() {
 echo "◆ Auto-Pilot Triage Cache Tests (issue #258)"
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 
-SRC_PHASES="$REPO_ROOT/src/skills/auto-pilot/references/phases.md"
+. "$(cd "$(dirname "$0")" && pwd)/lib/spec.bash"  # spec_concat — split reference specs read as one file (#323)
+SRC_PHASES="$(spec_concat "$REPO_ROOT/src/skills/auto-pilot/references/phases.md")"
 SRC_CONFIG="$REPO_ROOT/src/skills/auto-pilot/references/configuration.md"
 SRC_ERRORS="$REPO_ROOT/src/skills/auto-pilot/references/error-messages.md"
 SRC_SKILL="$REPO_ROOT/src/skills/auto-pilot/SKILL.source.md"
@@ -134,11 +135,11 @@ SCHEMA="$REPO_ROOT/docs/config-schema.md"
 # T11's second homes: the resolver states this loop's payload provenance in two
 # of its own files, and the shared conventions state the staleness rule once for
 # every skill.
-SRC_RES_STEPS="$REPO_ROOT/src/skills/issue-resolver/references/pipeline-steps.md"
+SRC_RES_STEPS="$(spec_concat "$REPO_ROOT/src/skills/issue-resolver/references/pipeline-steps.md")"
 SRC_RES_SKILL="$REPO_ROOT/src/skills/issue-resolver/SKILL.source.md"
 SRC_CONV="$REPO_ROOT/docs/shared-agent-conventions.md"
 
-BUILT_PHASES="$REPO_ROOT/skills/auto-pilot/references/phases.md"
+BUILT_PHASES="$(spec_concat "$REPO_ROOT/skills/auto-pilot/references/phases.md")"
 BUILT_CONFIG="$REPO_ROOT/skills/auto-pilot/references/configuration.md"
 BUILT_ERRORS="$REPO_ROOT/skills/auto-pilot/references/error-messages.md"
 BUILT_SKILL="$REPO_ROOT/skills/auto-pilot/SKILL.md"
@@ -147,7 +148,7 @@ BUILT_EXPLICIT="$REPO_ROOT/skills/auto-pilot/references/explicit-list-mode.md"
 BUILT_EXAMPLES="$REPO_ROOT/skills/auto-pilot/references/examples.md"
 BUILT_SUMMARY="$REPO_ROOT/skills/auto-pilot/references/summary-format.md"
 BUILT_PERSIST="$REPO_ROOT/skills/issue-triage/references/output-and-persist.md"
-BUILT_RES_STEPS="$REPO_ROOT/skills/issue-resolver/references/pipeline-steps.md"
+BUILT_RES_STEPS="$(spec_concat "$REPO_ROOT/skills/issue-resolver/references/pipeline-steps.md")"
 BUILT_RES_SKILL="$REPO_ROOT/skills/issue-resolver/SKILL.md"
 
 for file in "$SRC_PHASES" "$SRC_CONFIG" "$SRC_ERRORS" "$SRC_SKILL" "$SRC_PROMPTS" \

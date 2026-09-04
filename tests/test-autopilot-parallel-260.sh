@@ -4,11 +4,12 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 STATE="$REPO_ROOT/src/shared/scripts/gi-state.py"
-PHASES="$REPO_ROOT/src/skills/auto-pilot/references/phases.md"
+. "$(cd "$(dirname "$0")" && pwd)/lib/spec.bash"  # spec_concat — split reference specs read as one file (#323)
+PHASES="$(spec_concat "$REPO_ROOT/src/skills/auto-pilot/references/phases.md")"
 PROMPTS="$REPO_ROOT/src/skills/auto-pilot/references/subagent-prompts.md"
 RUNLOG="$REPO_ROOT/src/skills/auto-pilot/references/run-log.md"
 RESOLVER="$REPO_ROOT/src/skills/issue-resolver/SKILL.source.md"
-RESOLVER_STEPS="$REPO_ROOT/src/skills/issue-resolver/references/pipeline-steps.md"
+RESOLVER_STEPS="$(spec_concat "$REPO_ROOT/src/skills/issue-resolver/references/pipeline-steps.md")"
 RESEARCHER="$REPO_ROOT/src/shared/agents/codebase-researcher.md"
 SYNTHESIZER="$REPO_ROOT/src/shared/agents/synthesizer.md"
 IMPLEMENTER="$REPO_ROOT/src/shared/agents/implementer.md"

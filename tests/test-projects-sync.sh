@@ -88,7 +88,8 @@ fi
 # T7: issue-resolver references the projects sync utility (in SKILL.md or
 # pipeline-steps.md — the in-progress transition lives in the latter since #35).
 RESOLVER="$REPO_ROOT/src/skills/issue-resolver/SKILL.source.md"
-RESOLVER_PIPELINE="$REPO_ROOT/src/skills/issue-resolver/references/pipeline-steps.md"
+. "$(cd "$(dirname "$0")" && pwd)/lib/spec.bash"  # spec_concat — split reference specs read as one file (#323)
+RESOLVER_PIPELINE="$(spec_concat "$REPO_ROOT/src/skills/issue-resolver/references/pipeline-steps.md")"
 if grep -q "github-projects-sync.md" "$RESOLVER" 2>/dev/null; then
   pass "T7: issue-resolver references github-projects-sync.md"
 else
