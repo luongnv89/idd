@@ -59,7 +59,7 @@
 # ORDERING is the one thing chaining cannot fix. `trap ... EXIT` *replaces* the
 # handler, so a script arming its own trap AFTER sourcing this file drops the
 # cleanup. Five scripts do that and spell it out themselves:
-#   trap 'rm -rf "$TMP"; spec_cleanup' EXIT
+#   trap 'spec_cleanup; rm -rf "$TMP"' EXIT
 # A new script should arm its EXIT trap before sourcing, or do the same.
 # tests/test-spec-tmp-cleanup-443.sh fails when one does neither.
 #
