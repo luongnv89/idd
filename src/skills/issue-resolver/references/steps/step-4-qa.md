@@ -27,6 +27,13 @@ Each cycle:
    - Issues found → delegate fixes, then start next cycle.
 4. **Fix issues** — spawn or re-message the fixer subagent (see `shared/agents/fixer.md`) with reviewer findings, failing test/build output, and the same `workspace_contract` plus independent `expected_lane_identity` sibling used by the reviewer (both `null` on ordinary runs), passing `security_convention`: `references/docs/pre-commit-security.md`, `secscan_script`: the **absolute** path to `references/scripts/gi-secscan.py`, **and** `secscan_policy_ref`: `origin/${base}` (paths and a ref name only — the script reads `security.*` from the ref itself, so the branch under fix never supplies the policy that scans it). Absolutize both before binding: a subagent runs with the target repo as its working directory, so a skill-relative path resolves to nothing. Both are spawn variables rather than references inside the agent file, because an emitted agent prompt renders its own references as absolute repo URLs and so cannot name a path inside this skill's bundle. The fixer reads affected files, applies targeted fixes, verifies them, runs the mandatory pre-commit security scan before committing — the script first, the document's Primary Pattern only when the script cannot run, and a script exit of 1 is a block that stops the commit — and commits as `fix(scope): address review feedback (#N)`. The main agent does not apply code fixes inline when the Agent tool is available.
 
+**Profile carry.** The pipeline profile *Step 0g* selected — `light` or `full` —
+is carried to Deliver and written as the QA handoff marker's `profile=` field
+(`references/report-templates.md`, *QA handoff marker*). Unlike `tests=` and
+`ui=`'s `@<sha40>`, it has no omit rule, so it is never dropped and never guessed:
+it is already in hand from Step 0g, and carrying it costs nothing, exactly as
+`tests_state` and `ui_sha` are carried from where they are captured.
+
 ### Last-green test state <!-- a:rs-last-green-state -->
 
 **Single home of `tests_state` and of its two run-state consumers.** Those are <!-- a:rs-clean-tree -->

@@ -935,6 +935,293 @@ for pair in "src:$SRC_TEMPLATES" "built:$BUILT_TEMPLATES"; do
 done
 
 # ───────────────────────────────────────────────────────────
+# T21 (issue #446, AC1/AC2/AC3): the producer names the marker's
+# fields literally, and a real predicate — not a substring grep —
+# pins the consumer's parse rules.
+#
+# PR #445 shipped `verdict=clean` where the contract requires
+# `review=clean`. That marker MATCHES the documented PARSE_RE, so
+# an assertion built on PARSE_RE alone stays green while the
+# marker is silently untrusted and every skip is forfeited. The
+# predicate below therefore implements *Parsing the marker* from
+# review-loop-mechanics.md end to end — whole `key=value` pairs,
+# never substrings — and is driven with that exact literal.
+# ───────────────────────────────────────────────────────────
+
+# qa_handoff_verdict BODY HEADREFOID — echo trusted | stale | absent.
+# The consumer's rules, in the consumer's order.
+qa_handoff_verdict() {
+  local body="$1" head_ref="$2"
+  local matches count marker inner tok key val
+  local head_val="" review_val="" have_head=0 have_review=0
+
+  # PARSE_RE is the grep the suite already pins at T16 — reuse it, never a copy.
+  matches="$(printf '%s\n' "$body" | grep -oE "$PARSE_RE" || true)"
+  # Zero matches ⇒ absent. The version is matched loosely so a v2 marker
+  # reaches the version rule below instead of disappearing into `absent`.
+  [ -n "$matches" ] || { printf 'absent\n'; return 0; }
+  count="$(printf '%s\n' "$matches" | grep -c . || true)"
+  # More than one match ⇒ stale. Ambiguity is never resolved in the marker's favour.
+  [ "$count" = "1" ] || { printf 'stale\n'; return 0; }
+
+  marker="$matches"
+  inner="${marker#<!-- }"
+  inner="${inner%-->}"
+  # Exactly one match ⇒ read it as space-separated key=value pairs.
+  # shellcheck disable=SC2086
+  set -- $inner
+  [ "${1:-}" = "gitissue:qa" ] || { printf 'stale\n'; return 0; }
+  # A version other than v1 ⇒ stale.
+  [ "${2:-}" = "v1" ] || { printf 'stale\n'; return 0; }
+  shift 2
+
+  for tok in ${1+"$@"}; do
+    case "$tok" in
+      *=*) key="${tok%%=*}"; val="${tok#*=}" ;;
+      *)   printf 'stale\n'; return 0 ;;   # a malformed pair ⇒ stale
+    esac
+    case "$key" in
+      head)   have_head=1;   head_val="$val" ;;
+      review) have_review=1; review_val="$val" ;;
+      *)      : ;;                          # unknown/extra keys: ignored, never fatal
+    esac
+  done
+
+  # A missing head=, or a head= that is not 40 lowercase hex characters ⇒ stale.
+  [ "$have_head" = "1" ] || { printf 'stale\n'; return 0; }
+  printf '%s' "$head_val" | grep -qE '^[0-9a-f]{40}$' || { printf 'stale\n'; return 0; }
+  # A review= that is not `clean` ⇒ stale. Whole pair, never a substring.
+  [ "$have_review" = "1" ] || { printf 'stale\n'; return 0; }
+  [ "$review_val" = "clean" ] || { printf 'stale\n'; return 0; }
+  # trusted iff all of the above AND head= equals the PR's headRefOid.
+  [ "$head_val" = "$head_ref" ] || { printf 'stale\n'; return 0; }
+  printf 'trusted\n'
+}
+
+check_verdict() {
+  local body="$1" head_ref="$2" want="$3" label="$4" got
+  got="$(qa_handoff_verdict "$body" "$head_ref")"
+  if [ "$got" = "$want" ]; then
+    pass "$label"
+  else
+    fail "$label"
+    echo "      expected verdict: $want"
+    echo "      actual verdict:   $got"
+  fi
+}
+
+# The trusted fixture is DERIVED from the producer template, so a future edit to
+# that line that breaks the consumer contract turns this block red rather than
+# leaving a frozen copy green.
+T21_HEAD="5d73a6ee7c732ec69d8dc5ea17dabe33b0284570"
+T21_TESTS_SHA="8f70f8213c0a4b6e5d9c1f2a3b4c5d6e7f809a1b"
+T21_UI_SHA="a084c8544e1b2c3d4e5f60718293a4b5c6d7e8f9"
+T21_OTHER_HEAD="0123456789abcdef0123456789abcdef01234567"
+
+T21_TEMPLATE_LINE="$(grep -oE '<!-- gitissue:qa v1 [^>]*-->' "$SRC_TEMPLATES" \
+  | grep -F '{head_sha}' | head -1 || true)"
+if [ -n "$T21_TEMPLATE_LINE" ]; then
+  pass "T21.1: the PR body template renders the marker with {braced} fill-in slots"
+else
+  fail "T21.1: no {head_sha} marker line found in the producer template"
+fi
+
+T21_TRUSTED="$(printf '%s' "$T21_TEMPLATE_LINE" | sed \
+  -e "s/{head_sha}/$T21_HEAD/g" \
+  -e "s/{profile}/full/g" \
+  -e "s/{qa_cycles}/2/g" \
+  -e "s/{test_count}/128/g" \
+  -e "s/{tests_sha}/$T21_TESTS_SHA/g" \
+  -e "s/{ui_legs}/code+browser/g" \
+  -e "s/{ui_result}/clean/g" \
+  -e "s/{ui_sha}/$T21_UI_SHA/g")"
+
+# Guard: every braced token the template carries is one this block substitutes.
+# A new token would otherwise survive into the fixture and quietly weaken it.
+if [ -n "$T21_TRUSTED" ] && ! printf '%s' "$T21_TRUSTED" | grep -q '{'; then
+  pass "T21.2: the template's braced tokens are exactly the documented field set"
+else
+  fail "T21.2: an unsubstituted {token} survives in the rendered marker"
+  echo "      rendered: $T21_TRUSTED"
+fi
+
+T21_BODY_HEAD="Closes #446
+
+## Summary
+
+One-paragraph summary.
+"
+T21_BODY_OK="${T21_BODY_HEAD}
+${T21_TRUSTED}"
+
+# AC1 — a marker rendered from the producer template, against a matching head.
+check_verdict "$T21_BODY_OK" "$T21_HEAD" trusted \
+  "T21.3 (AC1): the template-rendered marker on its own head is trusted"
+
+# AC2 — the literal marker observed on PR #445. Well-formed to PARSE_RE, and
+# still never trusted, because `verdict=` is not `review=`.
+T21_BAD_445='<!-- gitissue:qa v1 head=5d73a6ee7c732ec69d8dc5ea17dabe33b0284570 cycles=1 verdict=clean -->'
+check_verdict "${T21_BODY_HEAD}
+${T21_BAD_445}" "$T21_HEAD" stale \
+  "T21.4 (AC2): the verdict=clean marker shipped on PR #445 is stale, not trusted"
+if printf '%s\n' "$T21_BAD_445" | grep -qE "$PARSE_RE"; then
+  pass "T21.5 (AC2): (vacuity guard) PARSE_RE alone matches that marker, so only the field check catches it"
+else
+  fail "T21.5 (AC2): PARSE_RE no longer matches the PR #445 marker — the regression fixture is inert"
+fi
+
+# AC2 — every other doubt fails safe.
+check_verdict "${T21_BODY_HEAD}
+${T21_TRUSTED}" "$T21_OTHER_HEAD" stale \
+  "T21.6 (AC2): a head= that differs from headRefOid is stale"
+
+T21_EXTRA="${T21_TRUSTED% -->} scope=repo -->"
+check_verdict "${T21_BODY_HEAD}
+${T21_EXTRA}" "$T21_HEAD" trusted \
+  "T21.7: an unknown extra key is ignored, never fatal"
+
+T21_V2="${T21_TRUSTED/gitissue:qa v1/gitissue:qa v2}"
+check_verdict "${T21_BODY_HEAD}
+${T21_V2}" "$T21_HEAD" stale \
+  "T21.8 (AC2): a v2 marker resolves stale, not absent"
+
+check_verdict "$T21_BODY_HEAD" "$T21_HEAD" absent \
+  "T21.9 (AC4): a body with no marker is absent"
+
+check_verdict "${T21_BODY_HEAD}
+${T21_TRUSTED}
+${T21_TRUSTED}" "$T21_HEAD" stale \
+  "T21.10 (AC2): two markers in one body are stale"
+
+check_verdict "${T21_BODY_HEAD}
+${T21_TRUSTED/$T21_HEAD/5d73a6e}" "$T21_HEAD" stale \
+  "T21.11 (AC2): a head= that is not 40 lowercase hex is stale"
+
+check_verdict "${T21_BODY_HEAD}
+${T21_TRUSTED/head=$T21_HEAD /}" "$T21_HEAD" stale \
+  "T21.12 (AC2): a marker with no head= pair is stale"
+
+check_verdict "${T21_BODY_HEAD}
+${T21_TRUSTED/review=clean/review=noted}" "$T21_HEAD" stale \
+  "T21.13 (AC2): a review= that is not clean is stale"
+
+# Whole-pair lookup, never a substring: a key that merely *contains* the
+# required name is not that key. A `grep -q 'review=clean'` predicate accepts
+# both of the following, which is the sloppiness this block exists to rule out —
+# and the reason every other fixture here is decided by a different branch.
+check_verdict "${T21_BODY_HEAD}
+${T21_TRUSTED/review=clean/xreview=clean}" "$T21_HEAD" stale \
+  "T21.13a (AC2): xreview=clean is not a review= pair"
+check_verdict "${T21_BODY_HEAD}
+${T21_TRUSTED/head=$T21_HEAD/xhead=$T21_HEAD}" "$T21_HEAD" stale \
+  "T21.13b (AC2): xhead=<sha40> is not a head= pair"
+
+# The rules the predicate implements are still stated at the consumer's
+# contract site, on the authored source and on the installed copy.
+for pair in "src:$SRC_PR_PKG" "built:$BUILT_PR_PKG"; do
+  tag="${pair%%:*}"
+  pkg="${pair#*:}"
+  anchor_check_flat "$pkg" rvm-parse-marker '.review=. that is not .clean.' \
+    "T21.14 ($tag): the parse rules require review= to be clean"
+  anchor_check_flat "$pkg" rvm-parse-marker '[Aa]ny doubt .*stale' \
+    "T21.15 ($tag): the fail-safe is any doubt ⇒ stale"
+  anchor_check_flat "$pkg" rvm-parse-marker 'not 40 lowercase hex' \
+    "T21.16 ($tag): head= must be 40 lowercase hex characters"
+  anchor_check_flat "$pkg" rvm-parse-marker '\*\*ignored, never fatal\*\*' \
+    "T21.17 ($tag): unknown keys are ignored, never fatal"
+  anchor_check_flat "$pkg" rvm-parse-marker 'More than one match\*\*.*stale' \
+    "T21.18 ($tag): more than one match is stale"
+  anchor_check_flat "$pkg" rvm-parse-marker 'headRefOid' \
+    "T21.19 ($tag): trusted binds head= to the PR's headRefOid"
+done
+
+# Root cause (#446): the operative Step 5 instruction elided the marker, so its
+# field names had to be recalled rather than copied. It now writes them out.
+for pair in "src:$SRC_RESOLVER" "built:$BUILT_RESOLVER"; do
+  tag="${pair%%:*}"
+  f="${pair#*:}"
+  check_has "$f" 'review=clean' \
+    "T21.20 ($tag): Step 5 names the review=clean literal"
+  check_has "$f" 'head=\{head_sha\}' \
+    "T21.21 ($tag): Step 5 names head= literally"
+  check_has "$f" 'profile=\{profile\}' \
+    "T21.22 ($tag): Step 5 names profile= literally"
+  check_has "$f" 'tests=\{test_count\}@\{tests_sha\}' \
+    "T21.23 ($tag): Step 5 names tests= literally"
+  check_has "$f" 'ui=\{ui_legs\}:\{ui_result\}@\{ui_sha\}' \
+    "T21.24 ($tag): Step 5 names ui= literally"
+  check_has "$f" 'character-for-character' \
+    "T21.25 ($tag): Step 5 says the line is copied character-for-character"
+  check_has "$f" '\{braced\}' \
+    "T21.26 ($tag): and that only the {braced} tokens are substituted"
+  check_has "$f" 'verdict=' \
+    "T21.27 ($tag): Step 5 names verdict= as a spelling that is not accepted"
+  check_has "$f" 'no synonym' \
+    "T21.28 ($tag): Step 5 states review=clean has no synonym"
+  # Strongest form: the operative instruction renders the marker exactly as the
+  # producer template does, so the two can never drift apart again.
+  resolver_marker="$(grep -oE '<!-- gitissue:qa v1 [^>]*-->' "$f" \
+    | grep -F '{head_sha}' | head -1 || true)"
+  if [ -n "$resolver_marker" ] && [ "$resolver_marker" = "$T21_TEMPLATE_LINE" ]; then
+    pass "T21.29 ($tag): Step 5's marker line is byte-identical to the producer template's"
+  else
+    fail "T21.29 ($tag): Step 5's marker line does not match the producer template"
+    echo "      template: $T21_TEMPLATE_LINE"
+    echo "      resolver: $resolver_marker"
+  fi
+done
+
+# AC3 — the producer contract itself says the vocabulary is closed and copied.
+for pair in "src:$SRC_TEMPLATES" "built:$BUILT_TEMPLATES"; do
+  tag="${pair%%:*}"
+  f="${pair#*:}"
+  anchor_check_flat "$f" rt-pr-body-template '\{braced\}' \
+    "T21.30 ($tag): the PR body template legend names the {braced} fill-in slots"
+  anchor_check_flat "$f" rt-pr-body-template '\*\*literal\*\*' \
+    "T21.31 ($tag): every other character is literal"
+  anchor_check_flat "$f" rt-pr-body-template 'never regenerated' \
+    "T21.32 ($tag): copied, never regenerated"
+  anchor_check_flat "$f" rt-qa-handoff 'character-for-character' \
+    "T21.33 ($tag): the marker contract states the verbatim-copy rule"
+  anchor_check_flat "$f" rt-qa-handoff 'no synonym' \
+    "T21.34 ($tag): review=clean has no synonym"
+  anchor_check_flat "$f" rt-qa-handoff 'verdict=' \
+    "T21.35 ($tag): verdict= is named as a spelling the consumer refuses"
+  anchor_check_flat "$f" rt-qa-handoff '.profile=. has no omit rule' \
+    "T21.36 ($tag): profile= has no omit rule and is always written"
+done
+
+# The missing capture-and-carry obligation that dropped profile= (#446, gap 3).
+SRC_STEP4="$REPO_ROOT/src/skills/issue-resolver/references/steps/step-4-qa.md"
+BUILT_STEP4="$REPO_ROOT/skills/issue-resolver/references/steps/step-4-qa.md"
+for pair in "src:$SRC_STEP4" "built:$BUILT_STEP4"; do
+  tag="${pair%%:*}"
+  f="${pair#*:}"
+  if [ -f "$f" ]; then
+    pass "T21.37 ($tag): exists: ${f#$REPO_ROOT/}"
+  else
+    fail "T21.37 ($tag): missing: ${f#$REPO_ROOT/}"
+    continue
+  fi
+  check_has "$f" 'carried to Deliver' \
+    "T21.38 ($tag): the profile is carried to Deliver like tests_state and ui_sha"
+  check_has "$f" 'profile=. field' \
+    "T21.39 ($tag): and is named as the marker's profile= field"
+  check_has "$f" 'no omit rule' \
+    "T21.40 ($tag): profile= has no omit rule"
+  check_has "$f" 'never dropped and never guessed' \
+    "T21.41 ($tag): so it is never dropped and never guessed"
+done
+# Placement: the obligation sits inside Step 4, beside the other marker captures.
+for pair in "src:$SRC_PIPELINE" "built:$BUILT_PIPELINE"; do
+  tag="${pair%%:*}"
+  f="${pair#*:}"
+  qa_block="$(anchor_span "$f" rs-step4-qa rs-step4-ui-review || true)"
+  check_block_has "$qa_block" 'profile=. field' \
+    "T21.42 ($tag): the profile carry lives in Step 4 with the other marker captures"
+done
+
+# ───────────────────────────────────────────────────────────
 # T12 (install surface): both capped SKILL.md files stay inside
 # the skill-creator 500-line cap after this change.
 # ───────────────────────────────────────────────────────────
