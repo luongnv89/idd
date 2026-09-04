@@ -5,11 +5,14 @@
 # index plus its parts. Nothing removed those files, so a full suite run left
 # ~150 of them (~20 MB) in $TMPDIR and the count grew with every run.
 #
-# The fix chains spec_cleanup onto the EXIT trap from inside spec_concat rather
-# than replacing the trap, so a script that armed its own handler keeps it. That
-# chaining is invisible in normal output — it only shows up as files that are or
-# are not there afterwards — so this test drives real scripts under a scratch
-# $TMPDIR and counts what survives.
+# The fix chains spec_cleanup onto the EXIT trap once, at source time, from the
+# guard at the foot of tests/lib/spec.bash — in the caller's own shell, and by
+# extending the installed handler rather than replacing it, so a script that
+# armed its own trap keeps it. spec_concat itself installs nothing; it only
+# appends the path it just created to a registry file. That chaining is
+# invisible in normal output — it only shows up as files that are or are not
+# there afterwards — so this test drives real scripts under a scratch $TMPDIR
+# and counts what survives.
 #
 # Usage: bash tests/test-spec-tmp-cleanup-443.sh
 # Returns: exit 0 on pass, exit 1 on failure.
@@ -37,10 +40,16 @@ echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄�
 leaked() { find "$1" -maxdepth 1 -name 'spec-*' | wc -l | tr -d ' '; }
 
 # Run a fixture script with its own scratch TMPDIR. Prints the exit status.
+#
+# "${BASH:-bash}", not bare `bash`: every assertion below runs inside a fixture,
+# so a bare `bash` would send them all to whatever is first on PATH and this
+# script's own interpreter would test nothing but its own scan loops. On a mac
+# with a newer bash installed, `/bin/bash tests/…` would then silently exercise
+# bash 5 fixtures — the one thing the bash 3.2 leg exists to rule out.
 run_fixture() {
   local script="$1" dir="$2" st=0
   mkdir -p "$dir"
-  TMPDIR="$dir" bash "$script" >"$dir/.stdout" 2>"$dir/.stderr" || st=$?
+  TMPDIR="$dir" "${BASH:-bash}" "$script" >"$dir/.stdout" 2>"$dir/.stderr" || st=$?
   echo "$st"
 }
 
@@ -159,14 +168,39 @@ else
 fi
 
 # ───────────────────────────────────────────────────────────
-# Chaining is idempotent — many calls, one spec_cleanup
+# Chaining happens once, and the counter can tell one chain from two
+#
+# The loop below cannot itself produce a second chain — spec_chain_cleanup runs
+# once, from spec.bash's source-time guard, and spec_concat installs nothing —
+# so it asserts that many calls do not disturb what the single chain installed.
+# What keeps the `-eq 1` assertion honest is the counter, checked separately
+# against a handler that really does name spec_cleanup twice.
 # ───────────────────────────────────────────────────────────
 cat >"$TMP/idem.sh" <<EOF
 set -euo pipefail
 . "$LIB"
+
+# Count occurrences, not matching lines. "trap -p EXIT" prints a one-line
+# handler however many times spec_cleanup appears inside it, so "grep -c" reads
+# a doubled chain as 1 and the assertion below could never fail. awk's gsub
+# counts hits and always exits 0, so a zero count cannot trip "pipefail".
+count_chained() {
+  trap -p EXIT | awk '{ n += gsub(/spec_cleanup/, "&") } END { print n + 0 }'
+}
+
 for _ in 1 2 3 4; do s="\$(spec_concat "$INDEX")"; done
-n="\$(trap -p EXIT | grep -c spec_cleanup)"
+n="\$(count_chained)"
 [ "\$n" -eq 1 ] || { echo "spec_cleanup appears \$n time(s)" >&2; exit 1; }
+
+# Prove the counter can see a double chain, or the assertion above is vacuous.
+# Install one deliberately, check it reads as 2, then restore what was there.
+orig="\$(trap -p EXIT)"
+trap 'spec_cleanup; spec_cleanup' EXIT
+n2="\$(count_chained)"
+eval "\$orig"
+[ "\$n2" -eq 2 ] || { echo "a doubled handler counted as \$n2, not 2" >&2; exit 1; }
+[ "\$(count_chained)" -eq 1 ] || { echo "restoring the handler failed" >&2; exit 1; }
+
 spec_cleanup
 spec_cleanup
 EOF
@@ -201,10 +235,16 @@ cat >"$SCAN" <<'AWK'
 }
 AWK
 
+# A process substitution's failure cannot fail the enclosing script, not even
+# under `set -o pipefail`, so a moved tests/ directory or a broken glob would
+# feed this loop nothing and the scan would pass having examined zero files.
+# Count what was actually scanned and require it to be non-zero (20 today).
 offenders=""
+scanned=0
 while IFS= read -r f; do
   src="$(awk '/^[ \t]*[.]|^[ \t]*source/ && /lib\/spec\.bash/ {print FNR; exit}' "$f")"
   [ -n "$src" ] || continue
+  scanned=$((scanned + 1))
   while IFS= read -r hit; do
     n="${hit%%:*}"
     [ "$n" -gt "$src" ] || continue
@@ -213,17 +253,26 @@ while IFS= read -r f; do
   done < <(awk -f "$SCAN" "$f")
 done < <(cd "$REPO_ROOT" && grep -rl 'lib/spec\.bash' tests/*.sh | sed "s|^|$REPO_ROOT/|")
 
-[ -n "$offenders" ] \
-  && fail "T6 (AC3): EXIT trap armed after sourcing spec.bash, cleanup dropped:$offenders" \
-  || pass "T6 (AC3): every EXIT trap armed after sourcing spec.bash chains spec_cleanup"
+if [ "$scanned" -eq 0 ]; then
+  fail "T6 (AC3): the scan examined 0 files — the file list is broken"
+elif [ -n "$offenders" ]; then
+  fail "T6 (AC3): EXIT trap armed after sourcing spec.bash, cleanup dropped:$offenders"
+else
+  pass "T6 (AC3): $scanned scanned; every EXIT trap armed after sourcing chains spec_cleanup"
+fi
 
 # ───────────────────────────────────────────────────────────
-# AC1, end to end — two real suite members leave $TMPDIR clean
+# AC1, end to end — three real suite members leave $TMPDIR clean
 #
 # One caller arms no trap of its own (254); one arms a trap after its first
-# spec_concat call and so must spell the cleanup out (260). Both paths matter.
+# spec_concat call and so must spell the cleanup out (260); one arms its own
+# EXIT trap BEFORE sourcing — 258, the fastest of the four suite members that
+# arm one before sourcing. Only that third shape drives spec_chain_cleanup's
+# `trap -p` and `eval` round trip against a real handler in a script the suite
+# actually maintains; elsewhere it is covered by the synthetic heredoc fixtures
+# of T2, T3 and T4 alone. All three paths matter.
 # ───────────────────────────────────────────────────────────
-for real in test-analysis-reuse-254 test-autopilot-parallel-260; do
+for real in test-analysis-reuse-254 test-autopilot-parallel-260 test-autopilot-triage-cache-258; do
   D="$TMP/real-$real"
   st="$(run_fixture "$REPO_ROOT/tests/$real.sh" "$D")"
   if [ "$st" -ne 0 ]; then
