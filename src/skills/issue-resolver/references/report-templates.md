@@ -6,6 +6,8 @@ Templates for the PR body, the single closing summary, and the expected pipeline
 
 This template is the load-bearing artifact for durable project memory. Under squash-merge, GitHub copies the PR body verbatim into the commit message that lands on the default branch **only when the repo's `squash_merge_commit_message` is `PR_BODY`** — that is a per-repo setting, not platform behavior, and GitHub's default (`COMMIT_MESSAGES`) writes the list of commit subjects instead, dropping everything below at the merge boundary (issue #295). Read it with `gh api repos/{owner}/{repo} --jq .squash_merge_commit_message`; `gh repo view --json` cannot report it. Repos using merge-commit or rebase-merge — or squash-merge with any other message source — keep this content only on GitHub. Write the template in full regardless: the PR body is the half of the dual write this skill controls, and `/issue-pr-review` reports the binding's real status separately. See *Analysis Artifacts and Durable Memory* in `docs/idd-methodology.md`.
 
+**Placeholder legend.** Inside the fence below, the `{braced}` tokens are the only fill-in slots. Every other character — field names, punctuation, `=` signs, section headings — is **literal** and is copied as-is, never regenerated and never re-worded.
+
 ```markdown
 Closes #{issue_number}
 
@@ -82,6 +84,17 @@ consumer is `/issue-pr-review`'s *QA handoff gate*
 | `review` | always `clean` | emitted **only** on the clean QA exit — there is no dirty spelling of this field |
 | `tests` | `<count>@<sha40>` | durable rendering of `tests_state`: the final suite's passing count and the SHA it actually ran against. This template is the marker rendering location, not a third run-state consumer. That suite runs **before** *Update documentation*, which may commit, so the two SHAs can differ — write the real one, never `head` by assumption. Both values are captured where the suite runs (`references/steps/step-4-qa.md`, *Step 4 — QA*, item 2), because they cannot be recovered afterwards. **Omit the whole field** when `resolve.auto_test` is `false`, or when no capture was recorded: no suite ran, or none was asserted, so there is nothing to assert. The consumer honors this field only when a CI leg can actually run (`ci_leg_runnable`); produce the field the same way regardless |
 | `ui` | `<legs>:<result>@<sha40>` | legs are `none` (no UI review ran), `code` (code UI review only), or `code+browser` (both). Result is `clean` or `noted`. The legs are named separately because the code review is environment-independent while the browser leg is fail-soft and skips on a headless host — a flat verdict would let the consumer trust a leg that never ran. The SHA is the commit the UI review **actually ran against** — `git rev-parse HEAD` at the moment it ran, never `head` by assumption: *Step 4*'s UI review precedes that step's QA cycles, so every QA fix commit, and *Update documentation* after them, lands later. It is captured where that review is spawned (`references/steps/step-4-qa.md`, *Step 4 — UI/UX review*, *SHA capture*). Omit the `@<sha40>` on `ui=none`, where there is no review to bind, and whenever no capture was recorded; the consumer reads an unbound `ui=` as parsable but never skippable |
+
+**Copy the field names, never recall them.** The grammar above is a **closed
+literal vocabulary**. Render the marker by copying the *PR Body Template*'s last
+line character-for-character and substituting only its `{braced}` tokens; a
+field name reconstructed from memory is how issue #446 shipped a marker no
+consumer would ever trust. `review=clean` is that exact spelling and has **no
+synonym** — `verdict=`, `status=` and `result=` are not accepted, and a marker
+spelling it any of those ways still matches the consumer's parse grep, so it
+resolves to `stale` and silently forfeits every skip. `profile=` has no omit
+rule and is **always written**. Only `tests=` and `ui=`'s `@<sha40>` carry the
+omissions the field table above documents; nothing else may be dropped.
 
 **Two absolute rules.**
 

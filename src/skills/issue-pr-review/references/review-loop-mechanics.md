@@ -274,7 +274,7 @@ The binding is on code, not on prose.
 
 ### Parsing the marker
 
-Read it out of the `body` already fetched in Step 1 — no extra API call:
+Read it out of the `body` already fetched in Step 1 — no extra API call: <!-- a:rvm-parse-marker -->
 
 ```bash
 grep -oE '<!-- gitissue:qa v[0-9]+ [^>]*-->' <<<"$body"

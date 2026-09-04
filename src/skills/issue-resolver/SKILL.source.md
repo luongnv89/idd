@@ -292,7 +292,15 @@ gh pr create --title "{pr_title}" --body "{pr_body}"
 
 **PR title:** `{type}({scope}): {description} (#{issue_number})` (`docs/naming-conventions.md`)
 
-**PR body:** fill *PR Body Template* in `references/report-templates.md`; never omit its **Decision Record**, Test Results or **Acceptance Criteria Verification** (`docs/idd-methodology.md`). Its **last line** is the `<!-- gitissue:qa v1 … -->` marker: fill it **only when QA exited clean**, else drop it — never append a second copy (*QA handoff marker*). `head=` is `git rev-parse HEAD` after the last commit.
+**PR body:** fill *PR Body Template* in `references/report-templates.md`; never omit its **Decision Record**, Test Results or **Acceptance Criteria Verification** (`docs/idd-methodology.md`). Its **last line** is the QA handoff marker: fill it **only when QA exited clean**, else drop it — never append a second copy (*QA handoff marker* owns the per-field omit rules). `head=` is `git rev-parse HEAD` after the last commit.
+
+Copy that line out of the template **character-for-character** and substitute **only** the `{braced}` tokens. Every field name is a literal — never re-worded, renamed, abbreviated, or reconstructed from memory:
+
+```
+<!-- gitissue:qa v1 head={head_sha} profile={profile} cycles={qa_cycles} review=clean tests={test_count}@{tests_sha} ui={ui_legs}:{ui_result}@{ui_sha} -->
+```
+
+`review=clean` is that exact spelling and has **no synonym**: a marker writing `verdict=`, `status=` or `result=` instead still matches the consumer's parse grep, so it resolves to `stale` and silently forfeits every skip the marker exists to buy.
 
 ### Project board sync
 
