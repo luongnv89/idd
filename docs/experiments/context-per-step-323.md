@@ -286,7 +286,12 @@ cannot deliver its own premise here.
 
 **Outcome:** #440 closes as not needed. The remaining candidate for the same
 treatment is `issue-pr-review/references/review-loop-mechanics.md` (§3), which
-is a splitting question, not a delegation one.
+is a splitting question, not a delegation one. One other file is worth
+watching, for a different reason: `phase-1-triage-pick.md` is the one §4.2
+flags as having the least headroom against the observed truncation bound,
+though it is still under it. §3 leaves it whole because a further split would
+skip no reads, a rationale about read counts rather than about truncation, so
+it deserves a second look if that file grows.
 
 ### 4.4 Stated limitations
 
