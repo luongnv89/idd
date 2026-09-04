@@ -91,8 +91,9 @@ line character-for-character and substituting only its `{braced}` tokens; a
 field name reconstructed from memory is how issue #446 shipped a marker no
 consumer would ever trust. `review=clean` is that exact spelling and has **no
 synonym** — `verdict=`, `status=` and `result=` are not accepted, and a marker
-spelling it any of those ways still matches the consumer's parse grep, so it
-resolves to `stale` and silently forfeits every skip. `profile=` has no omit
+spelling it any of those ways still matches the consumer's parse grep, so it is
+never `absent`: the wrong key is ignored as an unknown one, `review=` is then
+missing, and the marker resolves to `stale`, silently forfeiting every skip. `profile=` has no omit
 rule and is **always written**. Only `tests=` and `ui=`'s `@<sha40>` carry the
 omissions the field table above documents; nothing else may be dropped.
 

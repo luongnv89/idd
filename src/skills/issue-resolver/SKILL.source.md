@@ -300,7 +300,7 @@ Copy that line out of the template **character-for-character** and substitute **
 <!-- gitissue:qa v1 head={head_sha} profile={profile} cycles={qa_cycles} review=clean tests={test_count}@{tests_sha} ui={ui_legs}:{ui_result}@{ui_sha} -->
 ```
 
-`review=clean` is that exact spelling and has **no synonym**: a marker writing `verdict=`, `status=` or `result=` instead still matches the consumer's parse grep, so it resolves to `stale` and silently forfeits every skip the marker exists to buy.
+`review=clean` is that exact spelling and has **no synonym**: a marker writing `verdict=`, `status=` or `result=` instead still matches the consumer's parse grep, so it is never `absent` — the wrong key is then ignored as an unknown one, `review=` is missing, and the marker resolves to `stale`, silently forfeiting every skip it exists to buy.
 
 ### Project board sync
 
