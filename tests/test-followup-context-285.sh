@@ -309,7 +309,7 @@ anchor_check "$RS" rs-clean-tree 'commit-relevant tree, not the entire' "claim i
 anchor_check "$RT" rt-qa-handoff 'rendering location, not a third' "report template is rendering, not a third consumer"
 
 # Exercise the canonical command in temporary repositories.
-tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
+tmp="$(mktemp -d)"; trap 'spec_cleanup; rm -rf "$tmp"' EXIT  # replaces spec.bash's own EXIT trap (#443)
 git -C "$tmp" init -q
 git -C "$tmp" config user.email test@example.com
 git -C "$tmp" config user.name Test

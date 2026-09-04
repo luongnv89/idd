@@ -44,7 +44,7 @@ pass() { echo "  ✓ $1"; PASS=$((PASS + 1)); }
 fail() { echo "  ✗ $1"; FAIL=$((FAIL + 1)); }
 
 TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
+trap 'spec_cleanup; rm -rf "$TMP"' EXIT  # replaces spec.bash's own EXIT trap (#443)
 
 # Run a command, capturing stdout and the exit status without tripping `set -e`.
 run_status() {

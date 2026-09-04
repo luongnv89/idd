@@ -312,6 +312,9 @@ jobs:
       - name: test-anchors-lib-358
         run: bash tests/test-anchors-lib-358.sh
 
+      - name: test-spec-tmp-cleanup-443
+        run: bash tests/test-spec-tmp-cleanup-443.sh
+
       - name: test-squash-binding-295
         run: bash tests/test-squash-binding-295.sh
 

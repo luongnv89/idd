@@ -85,7 +85,7 @@ run_status() {
 }
 
 TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
+trap 'spec_cleanup; rm -rf "$TMP"' EXIT  # replaces spec.bash's own EXIT trap (#443)
 
 echo "◆ Resolver borrow/teardown catalogued skills (issue #309)"
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"

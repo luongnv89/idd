@@ -36,7 +36,7 @@ pass() { echo "  ✓ $1"; PASS=$((PASS + 1)); }
 fail() { echo "  ✗ $1"; FAIL=$((FAIL + 1)); }
 
 TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
+trap 'spec_cleanup; rm -rf "$TMP"' EXIT  # replaces spec.bash's own EXIT trap (#443)
 
 # AWS's own documentation example key, assembled from two halves so the literal
 # never appears in this file. gi-secscan scans file *contents*, so a checked-in
