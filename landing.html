@@ -10,7 +10,7 @@
        Inline script is already permitted by the CSP above. -->
   <script>document.documentElement.classList.add('js');</script>
   <title>gitissue — GitHub Issue Workflow for AI Coding Agents</title>
-  <meta name="description" content="Issue-Driven Development (IDD) for GitHub: turn issues into agent-ready work orders. Eight terminal commands structure, triage, resolve, and review — shipping tested PRs." />
+  <meta name="description" content="Issue-Driven Development for GitHub: turn issues into agent-ready work orders. Eight commands structure, triage, resolve, and review — shipping tested PRs." />
   <link rel="canonical" href="https://luongnv.com/idd/" />
   <link rel="icon" type="image/svg+xml" href="assets/logo/favicon.svg" />
   <meta name="theme-color" content="#0A0A0A" />
@@ -91,6 +91,56 @@
             "item": "https://luongnv.com/idd/"
           }
         ]
+      }
+    ]
+  }
+  </script>
+
+  <!-- FAQ structured data — mirrors the visible #faq questions verbatim -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "Does this lock me into a specific AI tool?",
+        "acceptedAnswer": { "@type": "Answer", "text": "No. The structured issue format is plain GitHub markdown — any tool that reads GitHub issues can consume it. gitissue ships as self-contained SKILL.md skills that run on Claude Code, Codex CLI, Gemini CLI, or any SKILL.md-compatible harness." }
+      },
+      {
+        "@type": "Question",
+        "name": "Will it rewrite or overwrite my existing issues?",
+        "acceptedAnswer": { "@type": "Answer", "text": "Normalization preserves your original text inside a Reporter Context blockquote and posts a backup comment before changing anything. Inferred fields are tagged with confidence markers — (high confidence), (needs review)." }
+      },
+      {
+        "@type": "Question",
+        "name": "Is auto-pilot safe to run on a real repo?",
+        "acceptedAnswer": { "@type": "Answer", "text": "It is balanced by default: clean PRs are merged, but a PR with unresolved review issues gets a follow-up issue and stays open. Conservative mode holds every merge; aggressive mode opts into partial merges." }
+      },
+      {
+        "@type": "Question",
+        "name": "Do I need to configure anything to start?",
+        "acceptedAnswer": { "@type": "Answer", "text": "No. Every command runs zero-config with sensible defaults. Run /init-gitissue to generate a project-specific .gitissue.yml when ready to tune settings." }
+      },
+      {
+        "@type": "Question",
+        "name": "What does it actually require?",
+        "acceptedAnswer": { "@type": "Answer", "text": "The GitHub CLI (gh) 2.0+, Git 2.30+, and Claude Code or any SKILL.md-compatible agent." }
+      },
+      {
+        "@type": "Question",
+        "name": "How much does it cost?",
+        "acceptedAnswer": { "@type": "Answer", "text": "gitissue is open source under the MIT license. You only pay for whatever AI agent you choose to run the skills with." }
+      },
+      {
+        "@type": "Question",
+        "name": "Can I enforce the spec without running an AI agent?",
+        "acceptedAnswer": { "@type": "Answer", "text": "Yes. scripts/idd-lint.py checks IDD Spec conformance from plain data — no LLM, no network, no dependencies beyond the Python standard library. Exit code 0/1 drops straight into CI." }
+      },
+      {
+        "@type": "Question",
+        "name": "What is the suggested model on new issues?",
+        "acceptedAnswer": { "@type": "Answer", "text": "/issue-creator estimates issue effort (XS–XL) and adds an advisory Suggested model with thinking level grounded in CursorBench benchmarks, so humans and agents can match spend to scope." }
       }
     ]
   }

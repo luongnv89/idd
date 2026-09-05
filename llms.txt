@@ -1,6 +1,6 @@
 # gitissue
 
-> Issue-Driven Development for GitHub: seven public skills that structure, analyze, triage, resolve, and review GitHub issue workflows so humans and AI coding agents can ship tested PRs (`src/skills/` — seven packages; `/idd-doctor` is internal).
+> Issue-Driven Development for GitHub: eight skills that structure, analyze, triage, resolve, and review GitHub issue workflows so humans and AI coding agents can ship tested PRs (seven public packages in `src/skills/` plus internal `/idd-doctor`).
 
 ## Start here
 
