@@ -165,9 +165,9 @@ review:
   # Type: boolean
   # Default: false
   # No GitHub API field identifies a billing-related CI failure, so when true
-  # this ignores ANY terminal CI failure, not only billing ones. CI is still
-  # polled and reported (unlike check_ci: false); only the review gate stops
-  # blocking. /auto-pilot's merge gate still refuses failing CI: merge by hand.
+  # this ignores ANY terminal CI failure. CI is still polled and reported
+  # (unlike check_ci: false); only the review gate stops blocking. Merge by
+  # hand: no merge gate is relaxed (/issue-pr-review --auto, /auto-pilot).
   ignore_ci_billing_failures: false
 
   # Seconds between CI status polls
@@ -428,7 +428,7 @@ Config is validated at every skill start; errors include line numbers:
 | `review.confidence_threshold` | `80` | Min confidence level for issues |
 | `review.run_tests` | `true` | Run tests during review |
 | `review.check_ci` | `true` | Check CI status during review |
-| `review.ignore_ci_billing_failures` | `false` | Opt-in: review gate ignores **any** terminal CI failure (see schema comment); /auto-pilot's merge gate still refuses — merge by hand |
+| `review.ignore_ci_billing_failures` | `false` | Opt-in: review gate ignores **any** terminal CI failure; no merge gate is relaxed (/issue-pr-review --auto, /auto-pilot) — merge by hand |
 | `review.ci_poll_interval` | `30` | Seconds between CI polls |
 | `review.ci_timeout` | `600` | CI polling timeout |
 | `review.test_timeout` | `300` | Review test timeout |

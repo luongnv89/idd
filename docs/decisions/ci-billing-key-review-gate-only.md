@@ -39,14 +39,18 @@ the key where it is and make the docs and the AC say what it actually does.
 field carries the failure reason as data, so the key ignores **any** terminal
 CI failure, not only billing ones. If the key reached the merge gate, `--auto`
 would squash-merge a genuinely red build whenever the key was on. That inverts
-the safety posture PR #436 kept at its design-confirm checkpoint, where the
-ignored path was deliberately carved out of every merge gate.
+the safety posture PR #436 kept. Its design-confirm checkpoint chose the narrow
+scope and left `/auto-pilot`'s merge gate untouched. A later review cycle on
+the same PR carved the ignored path out of `/issue-pr-review`'s Step 7
+auto-merge gate, on both the soft-pass and strict-pass paths, after finding that
+`--auto` with `review.auto_merge: true` would otherwise merge a red PR.
 
 **#431 AC3 is amended to match.** The amended wording is:
 
 > When the setting is enabled, /issue-pr-review's review gate continues instead
-> of stopping on a terminal CI failure; /auto-pilot's merge gate still refuses
-> to merge, so the PR is merged by hand.
+> of stopping on a terminal CI failure; no merge gate is relaxed
+> (/issue-pr-review --auto and /auto-pilot both still refuse to merge), so the
+> PR is merged by hand.
 
 ## Consequences
 
@@ -54,11 +58,12 @@ ignored path was deliberately carved out of every merge gate.
   key. The key saves the review, not the merge.
 - The scope is stated where a user configuring the key reads it: the schema
   comment and defaults-table row in `docs/config-schema.md`, and the comment in
-  `/init-gitissue`'s `.gitissue.yml` template.
+  `/init-gitissue`'s `.gitissue.yml` template. Each says no merge gate is
+  relaxed, naming both `/issue-pr-review --auto` and `/auto-pilot`.
 - `tests/test-ci-billing-431.sh` pins the scope at `/auto-pilot`'s merge gate:
   Phase 5.1a must keep reading `failed@<sha40>` as `absent`, and the user-facing
-  comments must keep the merge-by-hand wording. `/auto-pilot`'s own files still
-  do not name the key.
+  comments must keep the merge-by-hand wording that names both merge gates.
+  `/auto-pilot`'s own files still do not name the key.
 
 ## Billing detection: annotations and structural signal — closed out
 

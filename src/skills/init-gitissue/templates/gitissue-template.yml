@@ -106,8 +106,8 @@ review:
   # Opt-in: report a terminal CI failure without blocking the review gate.
   # GitHub exposes no API field naming a billing-related failure, so this
   # ignores ANY terminal CI failure, not only billing ones. CI is still polled
-  # and still reported. Review gate only: /auto-pilot's merge gate still
-  # refuses a PR with failing CI, so merge that PR by hand.
+  # and still reported. Review gate only: no merge gate is relaxed
+  # (/issue-pr-review --auto, /auto-pilot), so merge that PR by hand.
   ignore_ci_billing_failures: false
   ci_poll_interval: 30
   ci_timeout: 600
