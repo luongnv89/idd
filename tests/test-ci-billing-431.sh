@@ -26,6 +26,15 @@
 #      /issue-pr-review --auto with review.auto_merge: true would squash-merge
 #      a red PR — I2's PARTIAL means "continue", so it never blocked anything.
 #
+# Issue #451 — the key's scope was decided as review gate only
+# (docs/decisions/ci-billing-key-review-gate-only.md), amending #431's AC3:
+#  I7. The chosen scope is asserted at /auto-pilot's merge gate. Phase 5.1a
+#      still never trusts `failed@<sha40>` and reads it as `absent`, so a CI
+#      failure the key ignored upstream still leaves the PR unmerged; and the
+#      schema comment and init template tell the user to merge that PR by hand.
+#      T8 proves /auto-pilot does not *consume* the key; T12 proves its merge
+#      gate still *refuses* what the key let through.
+#
 # The built skills/ tree is asserted alongside src/ so drift is caught here and
 # not only by the CI drift check.
 #
@@ -498,6 +507,82 @@ for r in "$SRC_REF" "$DIST_REF"; do
     fail "T11: $label ignored-CI block prints a bare {bucket}"
   fi
 done
+
+# ───────────────────────────────────────────────────────────
+# T12: I7 (#451) — review gate only: /auto-pilot's merge gate still refuses
+# ───────────────────────────────────────────────────────────
+# The key is scoped to /issue-pr-review's review gate on purpose: it cannot
+# tell a billing failure from a real one, so reaching the merge gate would let
+# `--auto` squash-merge a red build. The refusal lives in Phase 5.1a, which
+# must keep routing a `failed@<sha40>` verdict to `absent` (re-run the wait,
+# leave the PR open) rather than trusting it.
+for f in "$REPO_ROOT/src/skills/auto-pilot/references/phases/phase-5-merge.md" \
+         "$REPO_ROOT/skills/auto-pilot/references/phases/phase-5-merge.md"; do
+  label="${f#"$REPO_ROOT"/}"
+  if [ ! -f "$f" ]; then
+    fail "T12.I7: $label not found"
+    continue
+  fi
+  if grep -qF '**`failed@<sha40>` is never `trusted`.**' "$f"; then
+    pass "T12.I7: $label states failed@<sha40> is never trusted"
+  else
+    fail "T12.I7: $label no longer states failed@<sha40> is never trusted"
+  fi
+  # The rule's own paragraph must route the verdict to `absent`, so the wait
+  # runs and reaches "not mergeable". Scoped to that paragraph: `absent`
+  # appears elsewhere in the gate for unrelated fail-safe cases.
+  rule_para="$(awk '/^\*\*`failed@<sha40>` is never `trusted`\.\*\*/{s=1} s && /^$/{exit} s' "$f")"
+  if printf '%s' "$rule_para" | tr '\n' ' ' | grep -qF 'Read it as `absent`'; then
+    pass "T12.I7: $label reads failed@<sha40> as absent (merge gate still refuses)"
+  else
+    fail "T12.I7: $label does not read failed@<sha40> as absent"
+  fi
+done
+
+# The user configuring the key must read the same boundary: an /auto-pilot run
+# still stops before merging, and the PR is merged by hand.
+for s in "$SCHEMA" "$DIST_INIT_SCHEMA"; do
+  label="${s#"$REPO_ROOT"/}"
+  comment="$(awk '/# Treat a terminal CI failure as non-blocking during PR review/{c=1}
+                  c && /^[[:space:]]*ignore_ci_billing_failures:/{exit} c' "$s" | tr '\n' ' ')"
+  if printf '%s' "$comment" | grep -qF 'only the review gate stops' \
+     && printf '%s' "$comment" | grep -qF "/auto-pilot's merge gate still refuses failing CI: merge by hand"; then
+    pass "T12.I7: $label schema comment says /auto-pilot still stops at merge (merge by hand)"
+  else
+    fail "T12.I7: $label schema comment does not state the merge-by-hand boundary"
+  fi
+  if grep -E "\| \`review\.${KEY}\` \|" "$s" | grep -qF "review gate ignores" \
+     && grep -E "\| \`review\.${KEY}\` \|" "$s" | grep -qF "/auto-pilot's merge gate still refuses — merge by hand"; then
+    pass "T12.I7: $label defaults-table row says review gate only"
+  else
+    fail "T12.I7: $label defaults-table row does not say review gate only"
+  fi
+done
+
+for t in "$TEMPLATE" "$DIST_TEMPLATE"; do
+  label="${t#"$REPO_ROOT"/}"
+  comment="$(awk '/# Opt-in: report a terminal CI failure without blocking the review gate/{c=1}
+                  c && /^[[:space:]]*ignore_ci_billing_failures:/{exit} c' "$t" | sed 's/^[[:space:]]*#[[:space:]]*//' | tr '\n' ' ')"
+  if printf '%s' "$comment" | grep -qF "Review gate only: /auto-pilot's merge gate still refuses a PR with failing CI" \
+     && printf '%s' "$comment" | grep -qF 'merge that PR by hand'; then
+    pass "T12.I7: $label comment says review gate only (merge by hand)"
+  else
+    fail "T12.I7: $label comment does not state the merge-by-hand boundary"
+  fi
+  if grep -qF 'merge gate is unaffected' "$t"; then
+    fail "T12.I7: $label still carries the old 'merge gate is unaffected' wording"
+  else
+    pass "T12.I7: $label dropped the ambiguous 'merge gate is unaffected' wording"
+  fi
+done
+
+DECISION="$REPO_ROOT/docs/decisions/ci-billing-key-review-gate-only.md"
+if [ -f "$DECISION" ] && grep -qF 'issues/451' "$DECISION" \
+   && grep -qiE 'review-gate only|review gate only' "$DECISION"; then
+  pass "T12.I7: decision record exists, names #451, and records review gate only"
+else
+  fail "T12.I7: decision record missing or does not name #451"
+fi
 
 # ───────────────────────────────────────────────────────────
 # Summary
