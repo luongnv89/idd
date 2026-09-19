@@ -117,7 +117,19 @@ FAIL=0
 # carve-out bullet dropped the repeated `src/shared/scripts/` path and the row
 # dropped the `Machine-local` the bullet already states: 512,100 -> 512,023.
 # The line does not move; six bytes of headroom remain.
-BUDGET=512029
+#
+# Issue #454 is the second raise, and again a measured one. It adds a whole new
+# top-level `agents` section: 24 keys (2 knobs x 11 roles + `default`) that the
+# Full Schema fence must list one per line, because gi-config derives its
+# defaults — and its unknown-role rejection — from that fence. The section is
+# named by no skill yet, so only /init-gitissue (which keeps the schema whole)
+# carries it: the cost is paid once, not 7 times. The first draft measured
+# +1,921; compressing its own comment block, map labels and Defaults Table rows
+# brought it to +1,396, of which the bare key lines alone are ~700. Nothing
+# else in the bundle grew. The line moves by exactly that — 512,023 + 1,402 =
+# 513,425 measured — and keeps the same six bytes of headroom, so the ratchet
+# is not widened.
+BUDGET=513431
 
 pass() { echo "  ✓ $1"; PASS=$((PASS + 1)); }
 fail() { echo "  ✗ $1"; FAIL=$((FAIL + 1)); }

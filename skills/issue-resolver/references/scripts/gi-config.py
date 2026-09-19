@@ -30,6 +30,11 @@ document or a per-skill excerpt carrying only the sections that skill reads, so
     documentation deprecated it, so an untouched old `.gitissue.yml` must not
     become a hard stop.
 
+The `agents` section gets two extra steps. Every non-null `agents.*` value must
+be a short opaque token (letters, digits and `._:/[]-`), else exit 3. After the
+merge a null `agents.<knob>.<role>` is filled from `agents.<knob>.default`, so a
+caller reads one key per role; all-null means "inherit the main agent".
+
 Exit codes
   0  merged config printed
   2  usage error
@@ -85,6 +90,14 @@ _REMOVED_ROW_RE = re.compile(
 # when it emits a per-skill excerpt. Its presence is therefore the document's
 # own signal that the section list in front of us is complete.
 _SECTION_MAP_RE = re.compile(r"^#{2,4}\s+Config Section Map\s*$", re.MULTILINE)
+
+# `.gitissue.yml` is repo-controlled, and an `agents.*` value travels into a
+# spawn-tool parameter and a subagent prompt. The guard is a shape check only —
+# the strings stay opaque to IDD — and is applied with `fullmatch`, because `$`
+# would let a trailing newline through.
+_AGENTS_PREFIX = "agents."
+_AGENT_VALUE_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/\[\]-]{0,63}")
+_AGENT_KNOBS = ("model", "effort")
 
 
 class ConfigError(Exception):
@@ -388,7 +401,29 @@ def merge(
             "section(s) outside this schema view, passed through unvalidated: " + listed
         )
 
+    # Guarded on every accepted `agents.*` key, in view or not: a per-skill
+    # excerpt that hides the section must not also hide the value guard.
+    for key in sorted(accepted):
+        value = accepted[key]
+        if not key.startswith(_AGENTS_PREFIX) or value is None:
+            continue
+        if not isinstance(value, str) or _AGENT_VALUE_RE.fullmatch(value) is None:
+            errors.append(
+                f"{key} — must be null or a string of 1-64 letters, digits and "
+                "._:/[]- that starts with a letter or digit"
+            )
+
     merged = {**defaults, **accepted}
+    # Default fill: a null `agents.<knob>.<role>` takes `agents.<knob>.default`,
+    # so an orchestrator reads exactly one key per role.
+    for knob in _AGENT_KNOBS:
+        prefix = f"{_AGENTS_PREFIX}{knob}."
+        fallback = merged.get(prefix + "default")
+        if fallback is None:
+            continue
+        for key in merged:
+            if key.startswith(prefix) and merged[key] is None:
+                merged[key] = fallback
     phrase_weight = merged.get("duplicate_detection.weights.phrase")
     overlap_weight = merged.get("duplicate_detection.weights.title_overlap")
     if (

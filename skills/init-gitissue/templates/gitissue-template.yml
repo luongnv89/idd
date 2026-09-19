@@ -239,3 +239,38 @@ security:
 
   # Warn (never block) when a scanned file exceeds this size, in megabytes
   max_file_size_mb: 10
+
+# Per-role subagent model / thinking-effort overrides (optional)
+# null = pass nothing; the subagent inherits the main agent's configuration.
+# Values are opaque strings your harness accepts (letters, digits and
+# . _ : / [ ] - only, max 64 chars). A role left null takes its `default`.
+agents:
+  # Model name per subagent role
+  model:
+    default: null
+    codebase-researcher: null
+    synthesizer: null
+    implementer: null
+    code-reviewer: null
+    ui-reviewer: null
+    fixer: null
+    duplicate-detector: null
+    issue-relationship-scanner: null
+    autopilot-resolver: null
+    autopilot-reviewer: null
+    autopilot-analyzer: null
+
+  # Thinking effort per subagent role
+  effort:
+    default: null
+    codebase-researcher: null
+    synthesizer: null
+    implementer: null
+    code-reviewer: null
+    ui-reviewer: null
+    fixer: null
+    duplicate-detector: null
+    issue-relationship-scanner: null
+    autopilot-resolver: null
+    autopilot-reviewer: null
+    autopilot-analyzer: null
