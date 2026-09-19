@@ -63,7 +63,11 @@ so terminal output and audit logs name the responsible role.
 Agent tool parameters:
   description: "<role> — <task> (#N)"
   prompt:      <the agent's prompt with {variables} replaced>
+  model:       <optional — only when agents.model.<role> is set>
 ```
+
+`model` is **optional**: pass it only when `agents` config sets one for the role
+([agent-overrides.md](https://github.com/luongnv89/idd/blob/main/docs/agent-overrides.md)).
 
 **Do NOT set `subagent_type`** — always use the default general-purpose agent.
 The shared agent files are prompt templates, not registered agent types.

@@ -486,6 +486,13 @@ against a pr-review `profile=full`.
 
 Read `shared/agents/code-reviewer.md` for the full prompt template. Read `shared/agents/fixer.md` for the fix-cycle prompt template.
 
+**Per-role overrides.** Every spawn in this file — the cycle-1 reviewer, the
+confirmation reviewer and the fixer — applies `docs/agent-overrides.md` for its role:
+`agents.model.code-reviewer` / `agents.effort.code-reviewer` for both reviewer spawns,
+`agents.model.fixer` / `agents.effort.fixer` for the fixer. A `null` value (the
+default) passes nothing, so the calls below are unchanged; a re-messaged agent keeps
+the configuration it was spawned with.
+
 Spawn a new reviewer agent (cold start):
 
 ```python

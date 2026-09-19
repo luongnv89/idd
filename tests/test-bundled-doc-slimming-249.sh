@@ -129,7 +129,19 @@ FAIL=0
 # else in the bundle grew. The line moves by exactly that — 512,023 + 1,402 =
 # 513,425 measured — and keeps the same six bytes of headroom, so the ratchet
 # is not widened.
-BUDGET=513431
+#
+# Issue #455 is the third raise, and its acceptance criteria are the cost. It
+# requires (a) a new runtime doc, agent-overrides.md, bundled into each of the
+# six spawning skills, and (b) each of those skills to name the `agents`
+# section, so the excerpt #454 paid for once is now carried six more times.
+# Neither can be excerpted away: (a) is one rule with one home, read whole at
+# every spawn; (b) is the key list gi-config derives its defaults from.
+# Measured: 6 x 2,273 (the doc, compressed from a 3,020-byte first draft)
+# + 6 x 1,377 (the `agents` excerpt) + 1,152 (the two URL pointers in
+# shared-agent-conventions.md and agent-model-effort.md, across 6 bundled
+# copies) = +23,052. 513,431 + 23,052 = 536,483 measured; the line keeps the
+# same six bytes of headroom, so the ratchet is not widened.
+BUDGET=536489
 
 pass() { echo "  ✓ $1"; PASS=$((PASS + 1)); }
 fail() { echo "  ✗ $1"; FAIL=$((FAIL + 1)); }

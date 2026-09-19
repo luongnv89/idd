@@ -187,6 +187,11 @@ jobs:
       - name: test-agents-config-454
         run: bash tests/test-agents-config-454.sh
 
+      # Issue #455: docs/agent-overrides.md bundled into every spawning skill,
+      # the `agents` config excerpt, and the unchanged subagent_type prohibition.
+      - name: test-agent-overrides-455
+        run: bash tests/test-agent-overrides-455.sh
+
       - name: test-gh-invocation-helper-344
         run: bash tests/test-gh-invocation-helper-344.sh
 
