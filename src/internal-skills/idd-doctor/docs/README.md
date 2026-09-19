@@ -91,6 +91,12 @@ No arguments. The skill reads from the current repo and prints a four-line repor
     Result: WARN  (4 checks, 0 failed, 1 warned)
 ```
 
+After the result, a non-gating, read-only **run-log summary** over the last 50
+lines of `.gitissue/runs.jsonl` prints the resolve rate, median QA cycles, top
+skip reasons, and an `Agent overrides:` line — how many runs recorded their
+configured per-role `agents.*` overrides as `applied`, `partial` or `fallback`
+(`none configured` when no run carries the field).
+
 ## Resources
 
 | Path | Description |

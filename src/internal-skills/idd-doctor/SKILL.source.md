@@ -339,7 +339,7 @@ code, and (like every part of this skill) is strictly **read-only** — it reads
 
 The schema is `docs/run-log-schema.md` (*`.gitissue/runs.jsonl` — run log*): one
 JSON object per line carrying at least `ts`, `issue`, `mode`, `outcome`, and
-`pr`, plus optional `qa_cycles` and `skipped_reason`.
+`pr`, plus optional `qa_cycles`, `skipped_reason` and `agent_overrides`.
 
 ### Procedure
 
@@ -358,6 +358,10 @@ JSON object per line carrying at least `ts`, `issue`, `mode`, `outcome`, and
      runs without the field); `n/a` if none carry it.
    - **Common skip reasons** — the top few `skipped_reason` values by frequency
      among `skipped` / `already_resolved` runs, each with its count.
+   - **Agent overrides** — among the runs carrying `agent_overrides`, the count
+     of each value: `applied`, `partial`, `fallback`. A run without the field
+     had no override configured and is not counted; an unknown value is ignored.
+     When no run carries it, print `none configured` instead of three zeros.
 4. Print the section using DESIGN.md symbols.
 
 ### Output
@@ -368,6 +372,7 @@ JSON object per line carrying at least `ts`, `issue`, `mode`, `outcome`, and
         Resolve rate:    {resolved}/{n} ({pct}%)
         Median QA cycles: {median}
         Top skip reasons: {reason1} ({c1}), {reason2} ({c2})
+        Agent overrides:  {applied} applied · {partial} partial · {fallback} fallback
 ```
 
 When no runs are recorded, *Procedure* step 1's single graceful-degradation line replaces the whole block.

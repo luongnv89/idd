@@ -364,6 +364,73 @@ else
   fail "T10e: recorded ceiling override should be valid"
 fi
 
+# --- T11: agent_overrides outcome field (issue #456) ------------------------
+ao_rec() { # $1 = raw JSON value for agent_overrides
+  printf '{"ts":"2026-01-01T00:00:00Z","issue":456,"mode":"auto","skill":"issue-resolver","profile":"full","agent_overrides":%s,"qa_cycles":1,"outcome":"success","pr":9}' "$1"
+}
+for v in applied partial fallback; do
+  rc=0; out="$(ao_rec "\"$v\"" | python3 "$HELPER" --echo 2>/dev/null)" || rc=$?
+  if [ "$rc" = 0 ] && printf '%s' "$out" | grep -qF "\"agent_overrides\":\"$v\""; then
+    pass "T11a: gi-runlog accepts agent_overrides=$v"
+  else
+    fail "T11a: gi-runlog should accept agent_overrides=$v (exit $rc)"
+  fi
+done
+for bad in '"inherited"' '"APPLIED"' '""' 'true' '["applied"]'; do
+  rc=0; ao_rec "$bad" | python3 "$HELPER" --echo >/dev/null 2>&1 || rc=$?
+  if [ "$rc" = 3 ]; then
+    pass "T11b: gi-runlog rejects agent_overrides=$bad with exit 3"
+  else
+    fail "T11b: agent_overrides=$bad returned exit $rc, expected 3"
+  fi
+done
+rc=0; out="$(ao_rec null | python3 "$HELPER" --echo 2>/dev/null)" || rc=$?
+if [ "$rc" = 0 ] && ! printf '%s' "$out" | grep -qF "agent_overrides"; then
+  pass "T11c: a null agent_overrides is omitted, never written"
+else
+  fail "T11c: null agent_overrides should be dropped (exit $rc): $out"
+fi
+out="$(printf '{"ts":"2026-01-01T00:00:00Z","issue":456,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":9}' | python3 "$HELPER" --echo 2>/dev/null)" || true
+if ! printf '%s' "$out" | grep -qF "agent_overrides"; then
+  pass "T11c: an absent agent_overrides stays absent"
+else
+  fail "T11c: gi-runlog invented an agent_overrides key"
+fi
+# Canonical order: right after profile, whatever order the writer used.
+out="$(printf '{"agent_overrides":"partial","pr":9,"outcome":"merged","skill":"auto-pilot","mode":"balanced","issue":456,"profile":"full","qa_cycles":1,"ts":"2026-01-01T00:00:00Z"}' | python3 "$HELPER" --echo 2>/dev/null)" || true
+if printf '%s' "$out" | grep -qF '"profile":"full","agent_overrides":"partial","qa_cycles":1'; then
+  pass "T11d: agent_overrides is emitted in canonical order (after profile)"
+else
+  fail "T11d: agent_overrides out of canonical order: $out"
+fi
+# A rejected value must not reach the log.
+ao_rec '"nope"' | python3 "$HELPER" --append --path "$TMP_RUNLOG/ao.jsonl" >/dev/null 2>&1 || true
+if [ ! -s "$TMP_RUNLOG/ao.jsonl" ]; then
+  pass "T11e: a rejected agent_overrides writes nothing"
+else
+  fail "T11e: an invalid agent_overrides record was appended"
+fi
+
+has "$RUNLOG" '| `agent_overrides` |' "T11f: run-log schema documents agent_overrides"
+for v in applied partial fallback; do
+  has "$RUNLOG" "\`$v\`" "T11f: run-log schema documents the '$v' value"
+done
+has "$RUNLOG" "Omitted when no spawned role had an override configured" \
+  "T11f: run-log schema documents the omit rule"
+has_skill "$REPO_ROOT/src/skills/issue-resolver" "**\`agent_overrides\`**" \
+  "T11g: resolver run-log step derives agent_overrides"
+has_skill "$REPO_ROOT/src/skills/issue-resolver" "Omit the field when no spawned role had an" \
+  "T11g: resolver omits agent_overrides when nothing is configured"
+has "$AUTOPILOT" "agent_overrides" "T11g: auto-pilot run-log entry lists agent_overrides"
+has "$REPO_ROOT/src/skills/auto-pilot/references/run-log.md" "Omit the field" \
+  "T11g: auto-pilot omits agent_overrides when nothing is configured"
+has "$REPO_ROOT/src/skills/auto-pilot/references/subagent-prompts.md" "- agent_overrides:" \
+  "T11g: resolver subagent returns agent_overrides to the single writer"
+has "$DOCTOR" "Agent overrides:" "T11h: idd-doctor prints the agent-overrides line"
+has "$DOCTOR" "{applied} applied · {partial} partial · {fallback} fallback" \
+  "T11h: idd-doctor reports applied versus fallback counts"
+has "$DOCTOR" "none configured" "T11h: idd-doctor degrades when no run carries the field"
+
 echo ""
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 echo "  Results: $PASS passed, $FAIL failed"

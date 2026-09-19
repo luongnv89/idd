@@ -113,6 +113,7 @@ KEY_ORDER = (
     "skill",
     "complexity",
     "profile",
+    "agent_overrides",
     "qa_cycles",
     "ceiling",
     "breach_reason",
@@ -127,6 +128,7 @@ OPTIONAL_KEYS = (
     "event_id",
     "complexity",
     "profile",
+    "agent_overrides",
     "qa_cycles",
     "ceiling",
     "breach_reason",
@@ -163,6 +165,10 @@ OUTCOMES_BY_SKILL = {
 
 PROFILES = frozenset({"light", "full"})
 
+# Whether the configured `agents.*` overrides reached the run's spawns (issue
+# #456). Absent means no override was configured — never written as a value.
+AGENT_OVERRIDES = frozenset({"applied", "partial", "fallback"})
+
 # The researcher estimates on five values; the run log stores three.
 COMPLEXITY_COLLAPSE = {
     "trivial": "low",
@@ -180,6 +186,7 @@ STR_KEYS = (
     "skill",
     "outcome",
     "profile",
+    "agent_overrides",
     "complexity",
     "skipped_reason",
     "breach_reason",
@@ -290,6 +297,13 @@ def normalize_record(record: object, *, now: str | None = None) -> dict[str, obj
     if profile is not None and profile not in PROFILES:
         raise RecordError(
             f"profile '{profile}' is not one of " + ", ".join(sorted(PROFILES))
+        )
+
+    agent_overrides = out.get("agent_overrides")
+    if agent_overrides is not None and agent_overrides not in AGENT_OVERRIDES:
+        raise RecordError(
+            f"agent_overrides '{agent_overrides}' is not one of "
+            + ", ".join(sorted(AGENT_OVERRIDES))
         )
 
     # Absent optional fields are omitted, never written as null. `pr` is the

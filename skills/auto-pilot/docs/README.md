@@ -81,7 +81,7 @@ When something fails, the auto-pilot skips and continues rather than stopping. A
 | `../references/explicit-list-mode.md` | Explicit `--issues` list mode: validation, analysis, batching |
 | `../references/subagent-prompts.md` | Exact prompts for resolver, reviewer, analyzer, and batch-resolver subagents |
 | `../references/summary-format.md` | Final summary template and the six iteration outcomes |
-| `../references/run-log.md` | `.gitissue/runs.jsonl` run-log schema and single-writer rules |
+| `../references/run-log.md` | `.gitissue/runs.jsonl` run-log schema, single-writer rules, and the `agent_overrides` outcome field |
 | `../references/examples.md` | Full example sessions and edge-case scenarios |
 | `../references/error-messages.md` | Complete error catalog with triggers and autonomous recovery actions |
 

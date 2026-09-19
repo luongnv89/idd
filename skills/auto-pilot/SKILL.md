@@ -327,7 +327,7 @@ appends. The single-writer, parallel-lane and batch fan-out contracts live in
 
 Populate it from the iteration's known values plus the resolver's telemetry
 (`ts`, `issue`, `mode`, `skill`, `outcome`, `pr`, and `qa_cycles` / `ceiling` /
-`breach_reason` / `complexity` / `profile` / `duration_s` when present). **When
+`breach_reason` / `complexity` / `profile` / `agent_overrides` / `duration_s` when present). **When
 the outcome is `skipped`, always include `skipped_reason`** — a skip never ran
 the resolver, so it carries no telemetry. Full field list:
 `references/run-log.md` → *Fields to populate*.
