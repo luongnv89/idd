@@ -12,8 +12,8 @@
 #      repo-controlled and the string reaches a spawn parameter and a prompt);
 #   5. the schema document and the init template both carry the section.
 #
-# Every fixture is block-style YAML inside the restricted grammar, so the result
-# is the same whether or not the interpreter has PyYAML.
+# Every fixture but T4q's unquoted one is block-style YAML inside the restricted
+# grammar, so the result is the same whether or not the interpreter has PyYAML.
 #
 # Usage: bash tests/test-agents-config-454.sh
 # Returns: exit 0 if all checks pass, exit 1 on failure
@@ -221,6 +221,45 @@ printf 'agents:\n  model:\n    fixer: opus\n' > "$TMP/ok.yml"
 RC=0; python3 "$GI_CONFIG" --schema "$TMP/excerpt.md" --config "$TMP/ok.yml" >"$TMP/out" 2>"$TMP/err" || RC=$?
 [ "$RC" -eq 0 ] && pass "T4 a valid out-of-view agents value still passes through" \
   || fail "T4 out-of-view valid: rc=$RC err=$(cat "$TMP/err")"
+
+# ─── T4q: bracketed values must be quoted (#462) ────────────────────────────
+# `default: sonnet[1m]` is a plain scalar to PyYAML, but the restricted fallback
+# parser refuses `[`/`]` outside quotes — so without PyYAML the whole config
+# degrades (exit 4). Pin both behaviours: a parser change must be deliberate.
+# A shim `yaml` module that raises ImportError forces the fallback path.
+mkdir -p "$TMP/noyaml"
+echo 'raise ImportError("PyYAML hidden by test-agents-config-454.sh")' > "$TMP/noyaml/yaml.py"
+# run_fallback <fixture-file>: as run(), with PyYAML made unimportable.
+run_fallback() {
+  RC=0
+  PYTHONPATH="$TMP/noyaml" python3 "$GI_CONFIG" --schema "$SCHEMA" --config "$1" \
+    >"$TMP/out" 2>"$TMP/err" || RC=$?
+}
+printf 'agents:\n  model:\n    default: sonnet[1m]\n' > "$TMP/unquoted.yml"
+printf 'agents:\n  model:\n    default: "sonnet[1m]"\n' > "$TMP/quoted.yml"
+
+run_fallback "$TMP/unquoted.yml"
+if [ "$RC" -eq 4 ] && grep -q 'without PyYAML' "$TMP/err" && [ ! -s "$TMP/out" ]; then
+  pass "T4q unquoted sonnet[1m], fallback parser: exit 4 (degrade), no stdout"
+else
+  fail "T4q unquoted/fallback: rc=$RC err=$(cat "$TMP/err")"
+fi
+run_fallback "$TMP/quoted.yml"
+[ "$RC" -eq 0 ] && [ "$(get agents.model.fixer)" = '"sonnet[1m]"' ] \
+  && pass "T4q quoted \"sonnet[1m]\", fallback parser: exit 0, value kept" \
+  || fail "T4q quoted/fallback: rc=$RC err=$(cat "$TMP/err")"
+if python3 -c 'import yaml' 2>/dev/null; then
+  run "$TMP/unquoted.yml"
+  [ "$RC" -eq 0 ] && [ "$(get agents.model.fixer)" = '"sonnet[1m]"' ] \
+    && pass "T4q unquoted sonnet[1m], PyYAML: exit 0, value kept" \
+    || fail "T4q unquoted/PyYAML: rc=$RC err=$(cat "$TMP/err")"
+else
+  pass "T4q unquoted/PyYAML: skipped (PyYAML not installed)"
+fi
+grep -q 'Quote a value containing \[ or \]' "$TEMPLATE" \
+  && pass "T4q init template tells users to quote bracketed values" || fail "T4q template lacks the quoting hint"
+grep -q 'quote one with \[ or \]' "$SCHEMA" \
+  && pass "T4q config-schema.md tells users to quote bracketed values" || fail "T4q schema lacks the quoting hint"
 
 # ─── T5: documentation and template ─────────────────────────────────────────
 grep -q '^agents:$' "$SCHEMA"                       && pass "T5a Full Schema block has the agents section" || fail "T5a"

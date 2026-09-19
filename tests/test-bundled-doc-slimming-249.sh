@@ -139,8 +139,11 @@ FAIL=0
 # Measured: 6 x 2,273 (the doc, compressed from a 3,020-byte first draft)
 # + 6 x 1,377 (the `agents` excerpt) + 1,152 (the two URL pointers in
 # shared-agent-conventions.md and agent-model-effort.md, across 6 bundled
-# copies) = +23,052. 513,431 + 23,052 = 536,483 measured; the line keeps the
-# same six bytes of headroom, so the ratchet is not widened.
+# copies) = 23,052 itemised, +23,058 in total (six bytes were not itemised).
+# The delta is taken on the measured total, not on the old BUDGET line:
+# 513,425 + 23,058 = 536,483 measured; the line keeps the same six bytes of
+# headroom, so the ratchet is not widened. (Issue #462 corrected this
+# arithmetic; BUDGET itself was right and did not move.)
 BUDGET=536489
 
 pass() { echo "  ✓ $1"; PASS=$((PASS + 1)); }

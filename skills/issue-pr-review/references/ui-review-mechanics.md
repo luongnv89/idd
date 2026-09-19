@@ -79,3 +79,7 @@ Return the same JSON format as before.
 
 For the confirmation pass, spawn one **fresh** UI reviewer for an unbiased final
 check.
+
+Every UI reviewer spawn is role `ui-reviewer`: apply `references/docs/agent-overrides.md`
+with the resolved `agents.model.ui-reviewer` / `agents.effort.ui-reviewer`;
+`null` (the default) passes nothing, leaving the call unchanged.

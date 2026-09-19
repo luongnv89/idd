@@ -244,6 +244,8 @@ security:
 # null = pass nothing; the subagent inherits the main agent's configuration.
 # Values are opaque strings your harness accepts (letters, digits and
 # . _ : / [ ] - only, max 64 chars). A role left null takes its `default`.
+# Quote a value containing [ or ], e.g. default: "sonnet[1m]" — unquoted it
+# only parses with PyYAML; without it the whole config degrades to defaults.
 agents:
   # Model name per subagent role
   model:

@@ -58,11 +58,13 @@ Agent(
 )
 ```
 
-The consuming skill supplies the variable set (`{branch_name}`, `{base_branch}`,
-`{issue_context}`, `{pr_context}`, `{diff_command}`, and any skill-specific
-extras). Merge UI reviewer findings into that skill's own review findings — both
-use the same `action: "fix" | "note"` semantics, so they flow into the existing
-fix loop unchanged.
+Role `ui-reviewer`: the consuming skill applies its agent-override rule with
+`agents.model.ui-reviewer` / `agents.effort.ui-reviewer`; `null` passes nothing.
+
+The consuming skill supplies the variables (`{branch_name}`, `{base_branch}`,
+`{issue_context}`, `{pr_context}`, `{diff_command}`, plus its own extras). Merge
+UI reviewer findings into its review findings — same `action: "fix" | "note"`
+semantics, so they flow into the fix loop unchanged.
 
 ## Browser-based review (optional, gated)
 
@@ -70,17 +72,16 @@ Browser review runs only when it both *can* and *should*.
 
 **First, detect the display environment (for the report only — capture is always
 headless).** Classify the runtime as *no-GUI/server* or *graphical* up front,
-before the gate and capability checks, so `ui_env` is always defined for every
-code path below — including the early skip paths. This label never selects the
-launch mode and never gates the review — Playwright always runs **headless** (the
-only capture mode this review has ever used), so behavior on a graphical display
-is unchanged:
+before the gate and capability checks, so `ui_env` is defined on every code
+path below — including the early skip paths. This label never selects the
+launch mode and never gates the review — Playwright always runs **headless**, so
+behavior on a graphical display is unchanged:
 
 ```bash
-# Label the environment for reporting. Capture stays headless either way —
-# headless Chromium needs no display, so a no-GUI/server host is fully supported.
+# Report-only label. Capture stays headless — headless Chromium needs no
+# display, so a no-GUI/server host is fully supported.
 if [ "$(uname)" = "Darwin" ] || [ -n "${DISPLAY:-}" ] || [ -n "${WAYLAND_DISPLAY:-}" ]; then
-  ui_env="graphical"        # a display is present (macOS, or Linux with X11/Wayland)
+  ui_env="graphical"        # macOS, or Linux with X11/Wayland
 else
   ui_env="no-GUI server"    # no display ($DISPLAY/$WAYLAND_DISPLAY unset on a non-macOS host)
 fi

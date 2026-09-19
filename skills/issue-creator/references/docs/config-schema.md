@@ -133,11 +133,11 @@ model_suggestion:
   # .github/workflows/model-data-refresh.yml): skips while the bundled
   # seed is younger than cache_ttl_days.
 
-# Per-role subagent overrides. null = inherit the main agent. Values are opaque
-# harness strings matching ^[A-Za-z0-9][A-Za-z0-9._:/\[\]-]{0,63}$ (else exit
-# 3: they reach a spawn parameter and a prompt). gi-config fills a null role
-# from its knob's `default`; without gi-config the section is ignored.
-# autopilot-resolver also covers the batch resolver.
+# Per-role subagent overrides. null = inherit main agent. Values: opaque
+# harness strings, ^[A-Za-z0-9][A-Za-z0-9._:/\[\]-]{0,63}$ (else exit 3: they
+# reach a spawn call and a prompt); quote one with [ or ]: "opus[1m]".
+# gi-config fills a null role from its `default`; without it the section is
+# ignored. autopilot-resolver covers the batch resolver too.
 agents:
   # Type: string or null. Default: null.
   model:

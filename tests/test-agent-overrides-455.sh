@@ -10,8 +10,10 @@
 #      over the advisory tier;
 #   2. each spawning skill bundles the doc, lists it in its precheck, and its
 #      bundled config excerpt carries the `agents` section;
-#   3. every listed spawn site cites the rule for its role, and auto-pilot's
-#      four spawn blocks are keyed to the three autopilot-* roles;
+#   3. every listed spawn site cites the rule and names its real role(s) —
+#      including the parallel-lane and ui-reviewer sites (#462) — auto-pilot's
+#      four spawn blocks are keyed to the three autopilot-* roles, and every
+#      role cited anywhere in src/ or docs/ is one of the schema's 11 roles;
 #   4. with no `agents` section the bundled resolver yields null for every
 #      role and no documented spawn call carries a `model` argument;
 #   5. the "never set subagent_type" prohibition text is unchanged.
@@ -97,16 +99,39 @@ site() {
     has "$label names agents.model.$role" "$file" "agents.model.$role"
   done
 }
-site "T3a resolver SKILL.md"        "$OUT/issue-resolver/SKILL.md" '<role>'
-site "T3b resolver pipeline-steps"  "$OUT/issue-resolver/references/pipeline-steps.md" '<role>'
-site "T3c pr-review SKILL.md"       "$OUT/issue-pr-review/SKILL.md" '<role>'
+# named <label> <built file> <role>...: a site that cites the rule through the
+# `<role>` placeholder must still spell out, in backticks, each real role it
+# spawns — the placeholder alone would pass with the role list deleted (#462).
+named() {
+  local label="$1" file="$2"; shift 2
+  site "$label" "$file" '<role>'
+  for role in "$@"; do
+    has "$label names role $role" "$file" "\`$role\`"
+  done
+}
+RESOLVER_ROLES="codebase-researcher synthesizer implementer code-reviewer ui-reviewer fixer"
+# shellcheck disable=SC2086
+named "T3a resolver SKILL.md"        "$OUT/issue-resolver/SKILL.md" $RESOLVER_ROLES
+# shellcheck disable=SC2086
+named "T3b resolver pipeline-steps"  "$OUT/issue-resolver/references/pipeline-steps.md" $RESOLVER_ROLES
+named "T3c pr-review SKILL.md"       "$OUT/issue-pr-review/SKILL.md" code-reviewer fixer ui-reviewer
 site "T3d pr-review loop mechanics" "$OUT/issue-pr-review/references/review-loop-mechanics.md" code-reviewer fixer
 site "T3e analysis subagent-steps"  "$OUT/issue-analysis/references/subagent-steps.md" codebase-researcher synthesizer
 site "T3f triage detection"         "$OUT/issue-triage/references/detection.md" issue-relationship-scanner
 site "T3g creator SKILL.md"         "$OUT/issue-creator/SKILL.md" duplicate-detector
-for role in codebase-researcher synthesizer implementer code-reviewer ui-reviewer fixer; do
-  has "T3h resolver names role $role" "$OUT/issue-resolver/SKILL.md" "\`$role\`"
-done
+# #462: the spawn sites that had no local pointer to the rule.
+site "T3h auto-pilot parallel lanes" "$OUT/auto-pilot/references/phases/phase-2-resolve.md" autopilot-resolver
+site "T3n pr-review ui mechanics"    "$OUT/issue-pr-review/references/ui-review-mechanics.md" ui-reviewer
+# ui-review.md is a runtime doc: it names the role's keys but must not cite the
+# rule's doc by bare token (that would add a doc→doc bundling edge).
+UIDOC="$ROOT/docs/ui-review.md"
+has "T3o ui-review.md names agents.model.ui-reviewer"  "$UIDOC" 'agents.model.ui-reviewer'
+has "T3o ui-review.md names agents.effort.ui-reviewer" "$UIDOC" 'agents.effort.ui-reviewer'
+if grep -qF 'agent-overrides.md' "$UIDOC"; then
+  fail "T3o ui-review.md cites agent-overrides.md (a doc→doc bundling edge)"
+else
+  pass "T3o ui-review.md adds no doc→doc bundling edge"
+fi
 
 AP="$OUT/auto-pilot/references/subagent-prompts.md"
 has "T3i auto-pilot prompts cite the rule" "$AP" 'references/docs/agent-overrides.md'
@@ -136,12 +161,38 @@ PY
   fi
 done
 # No documented spawn call passes a model: the override is prose beside it.
-if grep -rnE '^\s*(model|effort)\s*=' "$ROOT/src/skills" --include='*.md' >"$TMP/modelargs" 2>/dev/null; then
+# docs/ and the shared agents document spawn calls too (e.g. docs/ui-review.md).
+if grep -rnE '^\s*(model|effort)\s*=' "$ROOT/src/skills" "$ROOT/src/internal-skills" \
+     "$ROOT/src/shared/agents" "$ROOT/docs" --include='*.md' >"$TMP/modelargs" 2>/dev/null; then
   fail "T4b a documented Agent() call carries a model/effort argument: $(head -2 "$TMP/modelargs")"
 else
   pass "T4b no documented Agent() call carries a model/effort argument"
 fi
 has "T4c doc: null is byte-for-byte today's call" "$DOC" 'byte-for-byte'
+
+# ─── T4d: every cited role is a schema role (#462) ──────────────────────────
+# The schema's roles are whatever the resolver emits; a role cited at a spawn
+# site but absent from the schema would resolve to nothing, silently.
+python3 - "$TMP/cfg.json" > "$TMP/schema-roles" <<'PY'
+import json, sys
+cfg = json.load(open(sys.argv[1]))["config"]
+print("\n".join(sorted({k.split(".", 2)[2] for k in cfg if k.startswith("agents.")} - {"default"})))
+PY
+[ "$(wc -l < "$TMP/schema-roles" | tr -d ' ')" -eq 11 ] \
+  && pass "T4d schema declares 11 roles" || fail "T4d schema role count: $(wc -l < "$TMP/schema-roles")"
+{
+  grep -rhoE 'agents\.(model|effort)\.[a-z][a-z0-9-]*' "$ROOT/src" "$ROOT/docs"/*.md \
+    --include='*.md' --include='*.yml' | sed -E 's/^agents\.(model|effort)\.//'
+  grep -rhoE 'effort: role `[a-z][a-z0-9-]*`' "$ROOT/src/skills" --include='*.md' \
+    | sed -E 's/.*`([^`]*)`/\1/'
+} | sort -u | grep -vx 'default' > "$TMP/cited-roles" || true
+[ -s "$TMP/cited-roles" ] && pass "T4d spawn sites cite at least one role" || fail "T4d no cited roles found"
+STRAY="$(grep -vxFf "$TMP/schema-roles" "$TMP/cited-roles" || true)"
+if [ -z "$STRAY" ]; then
+  pass "T4d every cited role is a schema role ($(wc -l < "$TMP/cited-roles" | tr -d ' ') cited)"
+else
+  fail "T4d cited role(s) not in the schema: $(echo "$STRAY" | tr '\n' ' ')"
+fi
 
 # ─── T5: the subagent_type prohibition text is unchanged ────────────────────
 has "T5a resolver prohibition"       "$OUT/issue-resolver/SKILL.md" 'Role, description and prompt file change per step. **Do NOT set `subagent_type`**:'
