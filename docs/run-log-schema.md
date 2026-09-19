@@ -2,15 +2,12 @@
 
 The cross-run telemetry file written by `/issue-resolver` and `/auto-pilot`.
 Canonical schema for a `runs.jsonl` line: field set, append rules, rotation, and
-the single-writer convention. It stands alone so appending one line never needs
-the full configuration schema
-([config-schema.md](https://github.com/luongnv89/idd/blob/main/docs/config-schema.md)).
+the single-writer convention.
 
 ## Schema
 
-`runs.jsonl` is the first home for the `monitoring` value: an **append-only,
-schema-light, newline-delimited JSON** file, one self-contained object per run,
-deletable like the rest of `.gitissue/`. Its readers — `/idd-doctor`'s run-log
+`runs.jsonl` is an **append-only, schema-light, newline-delimited JSON** file,
+one self-contained object per run, deletable like the rest of `.gitissue/`. Its readers — `/idd-doctor`'s run-log
 summary, `scripts/idd-lint.py stats` and `gi-runlog.py --failure-streak` — are
 **best-effort by design**: truncation costs only *progress toward* a quarantine,
 never an existing one, whose durable record is the label `/auto-pilot` applies.
@@ -20,19 +17,20 @@ Full field set; *Always present* is the required minimum:
 
 | Field | Type | Always present | Description |
 |-------|------|----------------|-------------|
-| `ts` | string (ISO 8601 UTC) | yes | When the run finished, e.g. `2026-06-26T14:31:07Z` |
+| `ts` | string (ISO 8601 UTC) | yes | When the run finished |
 | `event_id` | string | no | Idempotency key for a parallel lane, minted at scheduling. Used only with `--append-once`; legacy writers omit it. |
 | `issue` | integer | yes | Issue number the run processed |
 | `mode` | string | yes | Resolver rows: `interactive`/`auto`. Auto-pilot rows: its merge mode (`conservative`/`balanced`/`aggressive`) |
-| `skill` | string | yes | `issue-resolver` or `auto-pilot` — which skill wrote the line |
+| `skill` | string | yes | `issue-resolver` or `auto-pilot` — the writer |
 | `outcome` | string | yes | Terminal outcome. Resolver: `success`, `already_resolved`, `failed`. Auto-pilot: `merged`, `left_open`, `partial_followup`, `blocked_by_dependency`, `failed`, `skipped`. |
 | `pr` | integer or null | yes | PR number when a PR was created, else `null` |
 | `complexity` | string | no | Research complexity on the **3-value** run-log scale, when known. Collapse the researcher's 5-value estimate: `trivial`/`low` → `low`, `medium` → `medium`, `high`/`complex` → `high`. Never emit `trivial` or `complex`. |
 | `profile` | string | no | Adaptive-effort pipeline profile: `light` (trivial fast path) or `full`. Omitted when `resolve.adaptive_effort` is `false` or the signal was unavailable. See [agent-model-effort.md](https://github.com/luongnv89/idd/blob/main/docs/agent-model-effort.md) (Complexity → profile). |
+| `agent_overrides` | string | no | Whether the configured `agents.*` overrides reached the run's spawns: `applied` (all — a prompt-hint effort counts), `partial` (some), `fallback` (none: unsupported, a rejected spawn, or no Agent tool). **Omitted when no spawned role had an override configured.** |
 | `qa_cycles` | integer | no | QA review-fix cycles run |
 | `ceiling` | integer | no | Class QA-cycle policy ceiling: 1 for `light`, `resolve.qa_max_cycles` (default 5) for `full`+`high`, else 2. Omit unless recorded; a recorded value must be a positive integer and overrides the computed one. |
 | `breach_reason` | string | no | Why `qa_cycles` exceeded `ceiling`. Required when `qa_cycles` > `ceiling`; omit otherwise; `gi-runlog` rejects an over-ceiling row without it (exit 3) and `idd-lint stats` exits 1 on such rows. |
-| `duration_s` | integer | no | Wall-clock run duration in seconds, when measurable |
+| `duration_s` | integer | no | Wall-clock run duration in seconds |
 | `skipped_reason` | string | no | Why the issue was skipped (auto-pilot skips, any `skipped`/`already_resolved` outcome): e.g. `already_resolved`, `blocked_label`, `blocked_by_dependency`, `in_skip_list`, `assigned_to_other`, `quarantined` |
 
 Example lines:
@@ -91,23 +89,23 @@ and `scripts/idd-lint.py stats` all read the newest `--tail-segments` (default
 that window is out of every reader's scope, so its `event_id` may be reused.
 
 **Single writer under `/auto-pilot`:** `/auto-pilot` runs `/issue-resolver` as a
-subagent, so uncoordinated both would append, double-counting every processed
-issue in `/idd-doctor`'s metrics. So `/auto-pilot` passes the resolver
-`--no-run-log`: it **returns** its telemetry — run `status` (the `outcome`),
-`qa_cycles`, `ceiling`, `breach_reason`, `complexity`, `duration_s` — and the
-orchestrator folds it into one enriched line. The flag is **orthogonal to
+subagent; both appending would double-count every issue in `/idd-doctor`'s
+metrics. So it passes the resolver `--no-run-log`, which **returns** its
+telemetry — run `status` (the `outcome`),
+`qa_cycles`, `ceiling`, `breach_reason`, `complexity`, `agent_overrides`,
+`duration_s` — and the orchestrator folds it into one enriched line. The flag is **orthogonal to
 `--auto`/`IDD_AUTO_MODE`**: a standalone `/issue-resolver <N> --auto` still logs.
 The rule: the outermost skill is the single writer; an inner resolver stays silent.
 
 **Batch fan-out (one line per attempted issue).** The *Batch Resolver* path
-(`/auto-pilot --issues`) follows the same rule, so `/auto-pilot` **fans the one
-batch result out into one line per attempted issue**, never per PR — the shared
-`pr` and `complexity` on every line, the batch-scalar `qa_cycles` and
-`duration_s` on **one line only** so `/idd-doctor`'s medians are not weighted
+(`/auto-pilot --issues`) **fans the one batch result out into one line per
+attempted issue**, never per PR — the shared
+`pr` and `complexity` on every line, the batch-scalar `qa_cycles`,
+`duration_s` and `agent_overrides` on **one line only** so `/idd-doctor`'s medians and counts are not weighted
 N-fold. At batch time only the issues in `issues_resolved` get a line. No `failed` line is written at batch time; every
 unresolved attempted issue — including the batch's primary (spawn-position)
 issue, whose `optimized_order` slot is already consumed — is re-queued for
-individual resolution, which writes its one line: no re-resolve double-count and
+individual resolution, which writes its one line: no double-count and
 no inverse under-count. One carve-out: the later `already resolved in batch` skip
 is display only and writes no run-log line. Authored contract:
 `src/skills/auto-pilot/references/explicit-list-mode.md` (*Run-log fan-out for

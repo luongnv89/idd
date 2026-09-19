@@ -35,7 +35,7 @@ is invoked with `--no-run-log` (see *Resolver Subagent* in
 auto-pilot writes here. Writing in both places would double-write one line per
 issue and skew `/idd-doctor`'s resolve-rate and median-QA metrics. The resolver
 **returns** its telemetry (`qa_cycles`, `ceiling`, `breach_reason`, `complexity`,
-`profile`, `duration_s`) in its result; fold those into the **single line**
+`profile`, `agent_overrides`, `duration_s`) in its result; fold those into the **single line**
 auto-pilot writes (enriched with that telemetry) so the per-issue QA signal
 survives even though the resolver stayed silent. The resolver's run `status` informs auto-pilot's decision but is **not**
 copied into the row's `outcome` — that field stays auto-pilot's own six
@@ -101,10 +101,19 @@ stable run/lane identifier persisted at scheduling), `issue` (the number), `mode
 auto-pilot merge mode — `conservative` / `balanced` / `aggressive`), `skill`
 (`auto-pilot`), `outcome` (one of the six categorical labels), `pr` (the PR
 number when one was created, else `null`), and — from the resolver's report-back
-— `qa_cycles`, `ceiling`, `breach_reason`, `complexity`, `profile`, and
-`duration_s` when present (`profile` is the adaptive-effort profile the resolve
+— `qa_cycles`, `ceiling`, `breach_reason`, `complexity`, `profile`,
+`agent_overrides`, and `duration_s` when present (`profile` is the adaptive-effort profile the resolve
 chose, `light` or `full`; omit it when the resolver returned none). Fold
-`ceiling` / `breach_reason` through unchanged when the resolver returned them. **When the outcome is `skipped`, always include
+`ceiling` / `breach_reason` through unchanged when the resolver returned them.
+
+**`agent_overrides`** records whether the configured `agents.*` overrides
+reached this issue's spawns (`references/docs/run-log-schema.md`). Merge the resolver's
+returned value with the tally of auto-pilot's **own** per-issue spawns that had
+an override configured (the PR reviewer and any fixer): all `applied` →
+`applied`; all `fallback` → `fallback`; any mix → `partial`. **Omit the field
+when neither side had an override configured** — so a `skipped` line, which
+spawned nothing, never carries it. Never write `null` or a fourth value:
+`gi-runlog.py` rejects it (exit 3). **When the outcome is `skipped`, always include
 `skipped_reason`** (e.g. `already_resolved`,
 `blocked_label`, `blocked_by_dependency`, `in_skip_list`, `assigned_to_other`,
 `quarantined`); a skip never ran the resolver, so it carries no resolver

@@ -89,6 +89,7 @@ When done, report back ONLY these fields:
 - breach_reason: why qa_cycles exceeded the ceiling; required only when it did
 - complexity: Research complexity collapsed to the runs.jsonl 3-value scale (see references/docs/run-log-schema.md — trivial/low→low, medium→medium, high/complex→high)
 - profile: the adaptive-effort pipeline profile the resolve selected ("light" or "full"), for the run-log `profile` field; omit/null when resolve.adaptive_effort is false or no profile was selected
+- agent_overrides: "applied", "partial" or "fallback" — whether the configured agents.* overrides reached this resolve's spawns (see references/docs/run-log-schema.md); omit when no spawned role had an override configured
 - duration_s: wall-clock seconds for the resolve, when measurable, for the run-log line
 - failure_step: which step failed (if status is failure)
 - failure_reason: short error description (if status is failure)
@@ -327,6 +328,9 @@ When done, report back ONLY these fields:
   or "full"), shared on every fanned-out run-log line like complexity; omit/null
   when resolve.adaptive_effort is false. (A batch of several issues is rarely
   trivial, so this is usually "full".)
+- agent_overrides: "applied", "partial" or "fallback" — whether the configured
+  agents.* overrides reached the batch's spawns; like qa_cycles it is attributed
+  to the primary issue's line only. Omit when no spawned role had one configured
 - duration_s: wall-clock seconds for the batch resolve, when measurable; like
   qa_cycles it is attributed to the primary issue's line only
 - failure_step: which step failed (if status is failure)

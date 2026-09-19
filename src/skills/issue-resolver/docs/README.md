@@ -83,3 +83,8 @@ A pull request on GitHub linked to the resolved issue, containing:
 - Test results
 - Acceptance criteria checklist
 - `Closes #N` for automatic issue closure on merge
+
+Each run also appends one line to `.gitissue/runs.jsonl` (or returns it as
+telemetry under `--no-run-log`). When a per-role `agents.*` override is
+configured for a role the run spawned, the line carries `agent_overrides`:
+`applied`, `partial` or `fallback`. It is omitted when nothing is configured.

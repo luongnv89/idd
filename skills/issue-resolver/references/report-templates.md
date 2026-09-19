@@ -224,11 +224,11 @@ actually writing the line.
 
 Build the object from values already known during the run — `ts`, `issue`,
 `mode`, `skill`, `outcome`, `pr`, plus the optional `complexity`, `profile`,
-`qa_cycles`, `ceiling`, `breach_reason`, `duration_s`, and `skipped_reason` —
+`agent_overrides`, `qa_cycles`, `ceiling`, `breach_reason`, `duration_s`, and `skipped_reason` —
 following the schema in `references/docs/run-log-schema.md` rather than re-deriving fields
 here.
 
-Two derivations are the resolver's own:
+These derivations are the resolver's own:
 
 - **`complexity`** — collapse the researcher's 5-value scale to the 3-value
   run-log scale before writing: `trivial`/`low` → `low`, `medium` → `medium`,
@@ -236,6 +236,12 @@ Two derivations are the resolver's own:
 - **`profile`** — the pipeline profile chosen in *Step 0g* (`light` or `full`).
   Omit the field only when `resolve.adaptive_effort` is `false`, or when no
   profile was selected at all (for example an early failure before Step 0g ran).
+- **`agent_overrides`** — tally every configured (non-`null`) `agents.model` /
+  `agents.effort` knob of each role this run spawned: `applied` when all of them
+  reached their spawn (verbatim, or effort as the prompt hint), `fallback` when
+  none did (unsupported-parameter skip, a role degraded by a rejected spawn, no
+  Agent tool), `partial` for a mix. **Omit the field when no spawned role had an
+  override configured** — never write `null` or a fourth value (exit 3).
 - **`ceiling`** — class policy: `1` if `profile` is `light`; `resolve.qa_max_cycles`
   (default 5) if complexity is `high`; otherwise `2`. Fail-safe omitted
   profile/complexity as full + medium (`2`).
@@ -250,7 +256,7 @@ found the issue already fixed and exited early), or `failed` (a step failed).
 `--no-run-log` is passed only by `/auto-pilot`, which runs this resolver as a
 subagent and writes the **single** run-log line per issue itself — appending here
 too would double-write and skew `/idd-doctor`'s metrics. Instead **return** the
-telemetry (`outcome`, `qa_cycles`, `ceiling`, `breach_reason`, `complexity`, `profile`, `duration_s`) in the
+telemetry (`outcome`, `qa_cycles`, `ceiling`, `breach_reason`, `complexity`, `profile`, `agent_overrides`, `duration_s`) in the
 subagent result so the orchestrator folds it into its own line.
 
 The flag is independent of `--auto`: a standalone `/issue-resolver <N> --auto`
