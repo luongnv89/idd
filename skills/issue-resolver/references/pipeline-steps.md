@@ -56,7 +56,8 @@ most-recent complexity signal and falling back to the agent's default tier. It i
 advisory: a tier that cannot be honoured never blocks the step.
 
 **Per-role overrides** come from `references/docs/agent-overrides.md`, applied at each of the
-spawns in the diagram above (Steps 1–3, the Step 4 reviewer, UI reviewer and fixer).
+spawns in the diagram above (`codebase-researcher`, `synthesizer`, `implementer`,
+then Step 4's `code-reviewer`, `ui-reviewer` and `fixer`).
 A configured `agents.model.<role>` wins over the advisory tier for that role, which
 stays as the prompt hint; `agents.effort.<role>` follows the same rule. Both `null` —
 the default — leaves every spawn exactly as the step file writes it. A rejected spawn

@@ -117,8 +117,12 @@ Then launch **all** prepared resolver calls before waiting for any one of them:
 
 Launch each lane with the canonical supported shape only:
 `Agent(description="resolver — resolve issue #N", prompt=<lane prompt>)`. Do not
-invent `cwd`, environment, or `subagent_type` fields. The validated lane record
-is structured prompt data and is the worker's complete workspace authority.
+invent `cwd`, environment, or `subagent_type` fields. Each lane is role
+`autopilot-resolver`: apply `docs/agent-overrides.md` with the resolved
+`agents.model.autopilot-resolver` / `agents.effort.autopilot-resolver`; `null`
+(the default) passes nothing, so the call stays exactly that shape. The
+validated lane record is structured prompt data and is the worker's complete
+workspace authority.
 
 Before fan-out, capability-gate the host: parallel mode requires workers whose
 Read/Edit/Write tools accept absolute paths and whose Bash tool can execute one
