@@ -4,6 +4,8 @@ This file contains the exact prompts to pass to each subagent via the Agent tool
 
 **CRITICAL — never set `subagent_type`:** Every subagent below is spawned with the **default general-purpose agent**. Do NOT pass a `subagent_type` parameter to the Agent tool. The skills referenced in these prompts (`issue-resolver`, `issue-pr-review`, `issue-analysis`) are **skills**, not agent types — passing `subagent_type: "issue-resolver"` fails with `Agent type 'issue-resolver' not found`. The skill is invoked from *inside* the subagent's prompt (via the skill prompts below), never as the agent type. Pass only `description` and `prompt`.
 
+**Per-role overrides:** each spawn block below names its `agents` role. Apply `docs/agent-overrides.md` with the resolved `agents.model.<role>` / `agents.effort.<role>` for that role; `null` (the default) passes nothing, so the call stays `description` + `prompt` only. The roles are `autopilot-resolver` (single and batch resolver), `autopilot-reviewer` and `autopilot-analyzer`.
+
 **Autonomy principle:** All subagents operate in fully autonomous mode. They make all decisions independently, always choosing the best available option. They never prompt the user for confirmation. If something fails, they report the failure back to the main agent — they don't stop and ask.
 
 ## Resolver Subagent <!-- a:ap-resolver-spawn -->
@@ -12,6 +14,7 @@ This file contains the exact prompts to pass to each subagent via the Agent tool
 - `description`: "Resolve issue #{N}"
 - `prompt`: (below)
 - `subagent_type`: omit (use the default general-purpose agent — `issue-resolver` is a skill, not an agent type)
+- `model` / effort: role `autopilot-resolver` — per `docs/agent-overrides.md`; omit when `null`
 
 ```
 Resolve GitHub issue #{issue_number} in this repository using the {{skill:issue-resolver}} skill in auto mode.
@@ -98,6 +101,7 @@ When done, report back ONLY these fields:
 - `description`: "Review PR #{N}"
 - `prompt`: (below)
 - `subagent_type`: omit (use the default general-purpose agent — `issue-pr-review` is a skill, not an agent type)
+- `model` / effort: role `autopilot-reviewer` — per `docs/agent-overrides.md`; omit when `null`
 
 ```
 Review pull request #{pr_number} in this repository using the {{skill:issue-pr-review}} skill.
@@ -170,6 +174,7 @@ Used in explicit list mode (`--issues`) to analyze all issues before resolution 
 - `description`: "Analyze issues for optimal resolution"
 - `prompt`: (below)
 - `subagent_type`: omit (use the default general-purpose agent — `issue-analysis` is a skill, not an agent type)
+- `model` / effort: role `autopilot-analyzer` — per `docs/agent-overrides.md`; omit when `null`
 
 ```
 Analyze the following GitHub issues to determine the optimal resolution order
@@ -242,6 +247,7 @@ Used when the analyzer identifies issues that can be resolved together in a sing
 - `description`: "Batch-resolve issues #{N1}, #{N2}"
 - `prompt`: (below)
 - `subagent_type`: omit (use the default general-purpose agent — `issue-resolver` is a skill, not an agent type)
+- `model` / effort: role `autopilot-resolver` — per `docs/agent-overrides.md`; omit when `null`
 
 ```
 Resolve the following GitHub issues TOGETHER in a single branch and PR.

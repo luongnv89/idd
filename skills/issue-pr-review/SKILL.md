@@ -51,6 +51,7 @@ references/docs/config-schema.md
 references/docs/naming-conventions.md
 references/docs/platform-github.md
 references/docs/agent-model-effort.md
+references/docs/agent-overrides.md
 references/docs/terminal-style.md
 references/docs/ui-review.md
 references/scripts/gi-config.py
@@ -235,7 +236,7 @@ If tests fail here, continue to the review loop — Step 4 picks them up.
 
 ### Reviewer agents and cycle reuse
 
-Read `references/agents/code-reviewer.md` and `references/agents/fixer.md` for the two prompts; both spawn with the default general-purpose agent (do NOT set `subagent_type`). Pass `branch_name`, `base_branch`, `pr_context` (title + body), `diff_command` (`gh pr diff {N}`), and `review.confidence_threshold` (default 80) as the minimum finding confidence; ui-reviewer keeps its 75 floor.
+Read `references/agents/code-reviewer.md` and `references/agents/fixer.md` for the two prompts; both spawn with the default general-purpose agent (do NOT set `subagent_type`), applying `references/docs/agent-overrides.md` for the `code-reviewer`, `fixer` and `ui-reviewer` roles — `agents.model.<role>` / `agents.effort.<role>`, `null` passing nothing. Pass `branch_name`, `base_branch`, `pr_context` (title + body), `diff_command` (`gh pr diff {N}`), and `review.confidence_threshold` (default 80) as the minimum finding confidence; ui-reviewer keeps its 75 floor.
 
 To minimize tokens the loop **reuses the same reviewer across cycles**: cycle 1 cold-starts, cycles 2+ re-message it via `SendMessage`, and after the fixer reports zero fixable issues one **fresh** confirmation reviewer does an unbiased final check. Under `qa_handoff = trusted` the cycle-1 reviewer is **collapsed into** that fresh confirmation pass rather than skipped, so the PR still receives exactly one independent, full-strength review, and the loop cap drops to `min(1, configured_cap)`. The collapse **saves no reviewer spawn** — the confirmation pass is itself fix-conditional — and *Precedence* refuses both collapse and cap when the marker says `profile=light` against `profile=full`. Spawn calls and what the collapse buys: `references/review-loop-mechanics.md` (*Why reuse the reviewer*).
 

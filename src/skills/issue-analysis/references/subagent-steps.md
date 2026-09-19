@@ -15,6 +15,8 @@ When the Agent tool is available, spawn the explorer subagent to handle Steps 2-
 - Config: max_files, trace_depth, scan_timeout
 - Repo root path (absolute)
 
+Both spawns in this file apply `docs/agent-overrides.md` for their role: `agents.model.codebase-researcher` / `agents.effort.codebase-researcher` for the explorer, `agents.model.synthesizer` / `agents.effort.synthesizer` for the synthesizer. A `null` value (the default) passes nothing, leaving the spawn unchanged.
+
 The explorer prompt is defined in `shared/agents/codebase-researcher.md`. When spawning for `/issue-analysis`, instruct the researcher to **skip Phase 0 stop-on-resolve** (closed/fixed issues are valid analysis targets) while still returning `status` fields when detected.
 
 ### Explorer return handling

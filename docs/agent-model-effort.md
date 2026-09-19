@@ -11,6 +11,9 @@ This is **advisory guidance**, not an enforced control: IDD spawns
 general-purpose agents, so the orchestrator selects the tier when it decides how
 to run a step. It never blocks a step.
 
+A model or effort pinned per role in the `agents` config wins over this tier:
+[agent-overrides.md](https://github.com/luongnv89/idd/blob/main/docs/agent-overrides.md).
+
 ## Complexity → model / effort
 
 Reuse the single `XS … XL` scale already defined for issue effort and model

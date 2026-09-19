@@ -233,6 +233,7 @@ Verify these bundled files are present, each path resolved against the skill's d
 - `references/docs/config-schema.md` — configuration schema
 - `references/docs/platform-github.md` — GitHub driver
 - `references/docs/auto-mode.md` — auto-mode gate rule
+- `references/docs/agent-overrides.md` — per-role `agents.model` / `agents.effort` spawn rule
 - `references/docs/terminal-style.md` — symbols, tables, errors
 - `references/scripts/gi-config.py` — config resolver
 - `references/scripts/gi-triage-graph.py` — cycles, order, parallel sets, staleness, priority

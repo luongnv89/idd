@@ -186,6 +186,7 @@ Check these files:
 - `references/docs/config-schema.md` — configuration schema
 - `references/docs/platform-github.md` — GitHub platform driver
 - `references/docs/agent-model-effort.md` — per-agent model and effort mapping
+- `references/docs/agent-overrides.md` — per-role `agents.model` / `agents.effort` spawn rule
 - `references/docs/terminal-style.md` — terminal output style contract
 - `references/scripts/gi-config.py` — config resolver: defaults merged with `.gitissue.yml`, one JSON line
 - `references/scripts/gi-gh.py` — GitHub CLI subprocess boundary

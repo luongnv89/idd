@@ -120,6 +120,7 @@ Verify these bundled files are present, relative to the skill's directory (the d
 - `references/docs/platform-github.md`
 - `references/docs/shared-agent-conventions.md`
 - `references/docs/agent-model-effort.md`
+- `references/docs/agent-overrides.md`
 - `references/docs/terminal-style.md`
 - `references/docs/auto-mode.md`
 - `references/scripts/gi-config.py`

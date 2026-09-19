@@ -1,7 +1,7 @@
 <!-- Generated from /docs/config-schema.md. Do not edit. Edit source and run ./scripts/build.sh. -->
 # `.gitissue.yml` Configuration Schema
 
-> **Per-skill excerpt (generated).** Only the configuration sections this skill reads are reproduced here: `issue`, `platform`, `projects`, `resolve`, `security`. The complete schema — every section and the full defaults table — is at [config-schema.md](https://github.com/luongnv89/idd/blob/main/docs/config-schema.md).
+> **Per-skill excerpt (generated).** Only the configuration sections this skill reads are reproduced here: `agents`, `issue`, `platform`, `projects`, `resolve`, `security`. The complete schema — every section and the full defaults table — is at [config-schema.md](https://github.com/luongnv89/idd/blob/main/docs/config-schema.md).
 
 gitissue works with zero configuration — every setting has a default. With no `.gitissue.yml`, the first-run hint is shown:
 
@@ -180,6 +180,40 @@ security:
   allow_pattern: ""
   # Type: integer. Default: 10. Minimum: 1. Warn (never block) above this MB.
   max_file_size_mb: 10
+
+# Per-role subagent overrides. null = inherit the main agent. Values are opaque
+# harness strings matching ^[A-Za-z0-9][A-Za-z0-9._:/\[\]-]{0,63}$ (else exit
+# 3: they reach a spawn parameter and a prompt). gi-config fills a null role
+# from its knob's `default`; without gi-config the section is ignored.
+# autopilot-resolver also covers the batch resolver.
+agents:
+  # Type: string or null. Default: null.
+  model:
+    default: null
+    codebase-researcher: null
+    synthesizer: null
+    implementer: null
+    code-reviewer: null
+    ui-reviewer: null
+    fixer: null
+    duplicate-detector: null
+    issue-relationship-scanner: null
+    autopilot-resolver: null
+    autopilot-reviewer: null
+    autopilot-analyzer: null
+  effort:
+    default: null
+    codebase-researcher: null
+    synthesizer: null
+    implementer: null
+    code-reviewer: null
+    ui-reviewer: null
+    fixer: null
+    duplicate-detector: null
+    issue-relationship-scanner: null
+    autopilot-resolver: null
+    autopilot-reviewer: null
+    autopilot-analyzer: null
 ```
 
 ## `.gitissue/` Directory
@@ -248,3 +282,7 @@ Config is validated at every skill start; errors include line numbers:
 | `security.extra_secret_value_pattern` | `""` | Extra regex ORed onto the built-in real-API-key value pattern |
 | `security.allow_pattern` | `""` | Matching paths skip every rule — an exclusion is a path no rule can block. Repo-controlled, so reviews of branches you don't control read it from a trusted ref (`--policy-ref`) instead |
 | `security.max_file_size_mb` | `10` | Warn (never block) above this file size without Git LFS |
+| `agents.model.default` | `null` | Model for every subagent role; `null` = inherit the main agent |
+| `agents.model` per-role keys | `null` | Overrides `default`; a `null` role resolves to it |
+| `agents.effort.default` | `null` | Thinking effort, same rules |
+| `agents.effort` per-role keys | `null` | As `agents.model` |

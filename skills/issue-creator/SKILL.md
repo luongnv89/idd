@@ -92,7 +92,7 @@ Scoring is deterministic and runs in `references/scripts/gi-dup-score.py`, its G
 
 ### Environment check
 
-With the Agent tool available, spawn only when Step 3 has medium candidates. Without it, report those candidates as possible duplicates rather than pretending an LLM verdict occurred.
+With the Agent tool available, spawn only when Step 3 has medium candidates, applying `references/docs/agent-overrides.md` for the `duplicate-detector` role (`agents.model.duplicate-detector` / `agents.effort.duplicate-detector`; `null`, the default, passes nothing). Without it, report those candidates as possible duplicates rather than pretending an LLM verdict occurred.
 
 ### Bundled dependency precheck
 
@@ -120,7 +120,7 @@ Each is named again at the step that reads it:
   `references/docs/github-projects-sync.md`, `references/docs/config-schema.md`,
   `references/docs/idd-methodology.md`, `references/docs/sync-conventions.md`,
   `references/docs/platform-github.md`, `references/docs/auto-mode.md`,
-  `references/docs/terminal-style.md`
+  `references/docs/terminal-style.md`, `references/docs/agent-overrides.md`
 - `references/scripts/gi-config.py`, `references/scripts/gi-gh.py`,
   `references/scripts/gi-issue.py`, `references/scripts/gi-dup-score.py`,
   `references/scripts/gi-model-cache.py`

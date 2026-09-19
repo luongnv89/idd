@@ -64,6 +64,8 @@ Agent(
 )
 ```
 
+**Per-role overrides:** apply `docs/agent-overrides.md` at every spawn — resolved `agents.model.<role>` / `agents.effort.<role>` for the role being spawned (`codebase-researcher`, `synthesizer`, `implementer`, `code-reviewer`, `ui-reviewer`, `fixer`). `null` (the default) passes nothing, leaving the call above as written.
+
 ### Orchestrating the agents (model/effort, monitoring, audit)
 
 Per step: **name the role** in the spawn `description`; **size the model/effort** per `docs/agent-model-effort.md`; **monitor before advancing** — a missing or blocking return stops the run (interactive) or takes the auto behavior; **audit** the signal. Shapes and fields: *Orchestrating the agents*.
@@ -105,6 +107,7 @@ references/docs/github-projects-sync.md
 references/docs/run-log-schema.md
 references/docs/config-schema.md
 references/docs/agent-model-effort.md
+references/docs/agent-overrides.md
 references/docs/shared-agent-conventions.md
 references/docs/platform-github.md
 references/docs/terminal-style.md
