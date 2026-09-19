@@ -182,6 +182,11 @@ jobs:
       - name: test-config-errors-clock-pin-356
         run: bash tests/test-config-errors-clock-pin-356.sh
 
+      # Issue #454: agents.model / agents.effort — default fill, unknown-role
+      # rejection and the value guard in gi-config.py.
+      - name: test-agents-config-454
+        run: bash tests/test-agents-config-454.sh
+
       - name: test-gh-invocation-helper-344
         run: bash tests/test-gh-invocation-helper-344.sh
 
