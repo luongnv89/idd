@@ -252,6 +252,11 @@ jobs:
       - name: test-bundled-doc-slimming
         run: bash tests/test-bundled-doc-slimming-249.sh
 
+      # Issue #466: every skills/<name>/ bundle stays within its ratcheted
+      # budget in scripts/skill-budgets.json — growth and unratcheted shrinks fail.
+      - name: test-skill-bundle-budget-466
+        run: bash tests/test-skill-bundle-budget-466.sh
+
       - name: test-disclosure-gates
         run: bash tests/test-disclosure-gates-250.sh
 
