@@ -349,6 +349,54 @@ else
 fi
 
 # ───────────────────────────────────────────────────────────
+# T28: per-phase durations — the slowest phase across runs (#467)
+# ───────────────────────────────────────────────────────────
+# Median per phase name across rows carrying `phases`; auto-pilot rows carry the
+# resolver's phases, so they pool with resolver rows. Malformed phases (a
+# raw-appended row bypasses gi-runlog) are skipped, never fatal.
+cp "$SYN/.gitissue/runs.jsonl" "$SYN/.gitissue/runs.jsonl.t28" 2>/dev/null || true
+printf '%s\n' \
+  '{"ts":"2026-07-09T00:00:00Z","issue":11,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":1,"phases":{"preflight":10,"research":60,"qa":200}}' \
+  '{"ts":"2026-07-09T00:01:00Z","issue":12,"mode":"balanced","skill":"auto-pilot","outcome":"merged","pr":2,"phases":{"preflight":12,"research":300,"qa":100}}' \
+  '{"ts":"2026-07-09T00:02:00Z","issue":13,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":3,"phases":"garbage"}' \
+  '{"ts":"2026-07-09T00:03:00Z","issue":14,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":4,"phases":{"qa":-5,"plan":true,"implement":"9","deliver":null}}' \
+  '{"ts":"2026-07-09T00:04:00Z","issue":15,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":5}' \
+  > "$SYN/.gitissue/runs.jsonl"
+T28_OUT="$(cd "$SYN" && python3 "$LINT" stats --no-github 2>&1)" && T28_EXIT=0 || T28_EXIT=$?
+if [ "$T28_EXIT" -eq 0 ] && printf '%s' "$T28_OUT" | grep -qE "slowest phase +research \(median 180s · 2 runs\)"; then
+  pass "T28a: stats names the slowest phase (highest median) and tolerates malformed phases"
+else
+  fail "T28a: stats slowest-phase line missing or wrong (exit $T28_EXIT)"
+fi
+if (cd "$SYN" && python3 "$LINT" stats --no-github --json) | python3 -c "
+import json, sys
+r = json.load(sys.stdin)['runs']
+assert r['slowest_phase'] == 'research', r
+p = r['phases']
+assert set(p) == {'preflight', 'research', 'qa'}, p
+assert p['research'] == {'runs': 2, 'median_s': 180, 'total_s': 360}, p
+assert p['qa']['median_s'] == 150 and p['preflight']['runs'] == 2, p
+" 2>/dev/null; then
+  pass "T28b: stats --json carries per-phase medians and slowest_phase"
+else
+  fail "T28b: stats --json per-phase aggregate is wrong"
+fi
+# Rows without phases: no slowest-phase line, slowest_phase null, still exit 0.
+printf '%s\n' \
+  '{"ts":"2026-07-09T00:00:00Z","issue":11,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":1}' \
+  > "$SYN/.gitissue/runs.jsonl"
+T28_OUT="$(cd "$SYN" && python3 "$LINT" stats --no-github 2>&1)" && T28_EXIT=0 || T28_EXIT=$?
+T28_JSON="$(cd "$SYN" && python3 "$LINT" stats --no-github --json 2>/dev/null \
+  | python3 -c "import json,sys; r=json.load(sys.stdin)['runs']; print(r['slowest_phase'], r['phases'])" 2>/dev/null)"
+if [ "$T28_EXIT" -eq 0 ] && ! printf '%s' "$T28_OUT" | grep -q "slowest phase" \
+   && [ "$T28_JSON" = "None {}" ]; then
+  pass "T28c: a log without phases prints no slowest-phase line (pre-#467 rows unaffected)"
+else
+  fail "T28c: pre-#467 rows changed the report (exit $T28_EXIT, json '$T28_JSON')"
+fi
+mv "$SYN/.gitissue/runs.jsonl.t28" "$SYN/.gitissue/runs.jsonl" 2>/dev/null || true
+
+# ───────────────────────────────────────────────────────────
 # T25b: bucket identity — the union is a real union (#180)
 # ───────────────────────────────────────────────────────────
 # subject_ref + closes_body - both == pr_derived. If this drifts, the

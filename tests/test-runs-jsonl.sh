@@ -431,6 +431,84 @@ has "$DOCTOR" "{applied} applied · {partial} partial · {fallback} fallback" \
   "T11h: idd-doctor reports applied versus fallback counts"
 has "$DOCTOR" "none configured" "T11h: idd-doctor degrades when no run carries the field"
 
+# --- T12: per-phase durations (issue #467) ----------------------------------
+ph_rec() { # $1 = raw JSON value for phases
+  printf '{"ts":"2026-01-01T00:00:00Z","issue":467,"mode":"auto","skill":"issue-resolver","qa_cycles":1,"outcome":"success","pr":9,"duration_s":94,"phases":%s,"skipped_reason":"x"}' "$1"
+}
+good='{"preflight":9,"research":21,"plan":6,"implement":38,"qa":14,"deliver":0}'
+rc=0; out="$(ph_rec "$good" | python3 "$HELPER" --echo 2>/dev/null)" || rc=$?
+if [ "$rc" -eq 0 ] && printf '%s' "$out" | grep -qF "\"phases\":$good"; then
+  pass "T12a: gi-runlog accepts a phases object and keeps its run order"
+else
+  fail "T12a: phases object rejected or reordered (exit $rc): $out"
+fi
+if printf '%s' "$out" | grep -qF '"duration_s":94,"phases":{' \
+   && printf '%s' "$out" | grep -qF '},"skipped_reason":"x"}'; then
+  pass "T12b: phases is emitted in canonical order (after duration_s)"
+else
+  fail "T12b: phases out of canonical order: $out"
+fi
+for bad in '[1,2]' '"slow"' '7' '{"Research":1}' '{"1qa":1}' '{"qa":-1}' '{"qa":1.5}' '{"qa":true}' '{"qa":"12"}' '{"qa":null}' \
+  '{"a":1,"b":1,"c":1,"d":1,"e":1,"f":1,"g":1,"h":1,"i":1,"j":1,"k":1,"l":1,"m":1,"n":1,"o":1,"p":1,"q":1}'; do
+  rc=0; ph_rec "$bad" | python3 "$HELPER" --echo >/dev/null 2>&1 || rc=$?
+  if [ "$rc" -eq 3 ]; then
+    pass "T12c: gi-runlog rejects phases=$bad with exit 3"
+  else
+    fail "T12c: phases=$bad returned exit $rc, expected 3"
+  fi
+done
+for empty in 'null' '{}'; do
+  rc=0; out="$(ph_rec "$empty" | python3 "$HELPER" --echo 2>/dev/null)" || rc=$?
+  if [ "$rc" -eq 0 ] && ! printf '%s' "$out" | grep -q '"phases"'; then
+    pass "T12d: phases=$empty is omitted, never written"
+  else
+    fail "T12d: phases=$empty should be dropped (exit $rc): $out"
+  fi
+done
+T12_LOG="$TMP_RUNLOG/t12-runs.jsonl"
+rm -f "$T12_LOG"
+ph_rec '{"qa":-1}' | python3 "$HELPER" --append --path "$T12_LOG" >/dev/null 2>&1 || true
+if [ ! -s "$T12_LOG" ]; then
+  pass "T12e: a rejected phases record writes nothing"
+else
+  fail "T12e: an invalid phases record was appended"
+fi
+# AC1: an existing reader keeps working on rows that carry phases — including a
+# raw-appended malformed one that bypassed the validator.
+T12_STREAK="$TMP_RUNLOG/t12-streak.jsonl"
+printf '%s\n' \
+  '{"ts":"2026-01-01T00:00:00Z","issue":467,"mode":"auto","skill":"issue-resolver","outcome":"failed","pr":null,"phases":{"preflight":3,"research":40}}' \
+  '{"ts":"2026-01-02T00:00:00Z","issue":467,"mode":"auto","skill":"issue-resolver","outcome":"failed","pr":null,"phases":"garbage"}' \
+  > "$T12_STREAK"
+streak="$(python3 "$HELPER" --failure-streak 467 --log "$T12_STREAK" 2>/dev/null \
+  | python3 -c 'import json,sys; print(json.load(sys.stdin)["streak"])' 2>/dev/null)"
+if [ "$streak" = "2" ]; then
+  pass "T12j: --failure-streak reads rows carrying phases (streak 2)"
+else
+  fail "T12j: --failure-streak on phases rows returned '${streak:-?}', expected 2"
+fi
+has "$RUNLOG" '| `phases` |' "T12f: run-log schema documents phases"
+has "$RUNLOG" 'need not sum to `duration_s`' "T12f: run-log schema states phases need not sum to duration_s"
+has "$RUNLOG" '`duration_s`, `phases` and `agent_overrides` on **one line only**' \
+  "T12f: batch fan-out attributes phases to one line only"
+has_skill "$REPO_ROOT/src/skills/issue-resolver" '**`phases`**' \
+  "T12g: resolver run-log step derives phases"
+has_skill "$REPO_ROOT/src/skills/issue-resolver" 'step that never started' \
+  "T12g: resolver omits phases that never started"
+has "$RESOLVER" 'as each `[N/5]` step starts' "T12g: resolver captures a clock at each step boundary"
+has "$REPO_ROOT/src/skills/issue-resolver/references/report-templates.md" '`duration_s`, `phases`) in the' \
+  "T12g: resolver returns phases under --no-run-log"
+has "$AUTOPILOT" '`duration_s` / `phases` when present' "T12h: auto-pilot folds phases into its line"
+has "$REPO_ROOT/src/skills/auto-pilot/references/run-log.md" '`breach_reason` / `phases` through unchanged' \
+  "T12h: auto-pilot folds resolver phases through unchanged"
+has "$REPO_ROOT/src/skills/auto-pilot/references/subagent-prompts.md" "- phases:" \
+  "T12h: resolver subagent returns phases to the single writer"
+has "$REPO_ROOT/src/skills/auto-pilot/references/explicit-list-mode.md" '`qa_cycles`, `duration_s`, `phases` and' \
+  "T12h: batch fan-out attributes phases once"
+has "$DOCTOR" "Slowest phase:" "T12i: idd-doctor prints the slowest-phase line"
+has "$DOCTOR" 'skip a non-object `phases`' "T12i: idd-doctor skips malformed phase entries"
+has "$DOCTOR" '`n/a` when no run carries the field' "T12i: idd-doctor degrades when no run carries phases"
+
 echo ""
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 echo "  Results: $PASS passed, $FAIL failed"

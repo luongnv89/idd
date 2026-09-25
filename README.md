@@ -183,7 +183,7 @@ python3 scripts/idd-lint.py stats            # add --no-github for offline, --js
 
 Checks are tagged with the spec section they enforce and mapped to the L1–L3 conformance levels (`--level L2` skips Decision-Record checks for repos not claiming L3). Exit code 0/1 makes it CI-native; `/idd-doctor` remains the deep, agent-powered health check.
 
-`stats` closes the evidence loop: it measures whether the methodology is paying for itself — what fraction of commits trace to issues, how many merged PRs carry Decision Records into git history, and (when `gh` is available) whether normalized issues actually resolve with fewer QA cycles than unnormalized ones.
+`stats` closes the evidence loop: it measures whether the methodology is paying for itself — what fraction of commits trace to issues, how many merged PRs carry Decision Records into git history, which pipeline phase is slowest across runs that recorded per-phase timing, and (when `gh` is available) whether normalized issues actually resolve with fewer QA cycles than unnormalized ones.
 
 #### Run `idd-lint` from anywhere — shell shortcut
 

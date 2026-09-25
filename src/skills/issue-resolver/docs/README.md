@@ -88,3 +88,6 @@ Each run also appends one line to `.gitissue/runs.jsonl` (or returns it as
 telemetry under `--no-run-log`). When a per-role `agents.*` override is
 configured for a role the run spawned, the line carries `agent_overrides`:
 `applied`, `partial` or `fallback`. It is omitted when nothing is configured.
+The line also carries `phases` — seconds spent in each step (`preflight`,
+`research`, `plan`, `implement`, `qa`, `deliver`) — so `idd-lint stats` and
+`/idd-doctor` can name the slowest phase across runs.

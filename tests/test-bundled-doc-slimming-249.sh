@@ -144,7 +144,15 @@ FAIL=0
 # 513,425 + 23,058 = 536,483 measured; the line keeps the same six bytes of
 # headroom, so the ratchet is not widened. (Issue #462 corrected this
 # arithmetic; BUDGET itself was right and did not move.)
-BUDGET=536489
+#
+# Issue #467 is the fourth raise. Its first AC needs a new optional run-log
+# field, `phases`, documented in run-log-schema.md, which ships to 2 skills
+# (auto-pilot, issue-resolver). The field row, a `phases` example on one
+# example line and the two telemetry lists cost +293 per copy; compressing the
+# doc's intro and rotation prose paid back 101, leaving +192 per copy. Measured
+# 536,471 before (536,489 was 18 over the measured total, not six) + 2 x 192
+# = 536,855; the line keeps six bytes of headroom, so the ratchet is not widened.
+BUDGET=536861
 
 pass() { echo "  ✓ $1"; PASS=$((PASS + 1)); }
 fail() { echo "  ✗ $1"; FAIL=$((FAIL + 1)); }

@@ -93,9 +93,11 @@ No arguments. The skill reads from the current repo and prints a four-line repor
 
 After the result, a non-gating, read-only **run-log summary** over the last 50
 lines of `.gitissue/runs.jsonl` prints the resolve rate, median QA cycles, top
-skip reasons, and an `Agent overrides:` line — how many runs recorded their
+skip reasons, an `Agent overrides:` line — how many runs recorded their
 configured per-role `agents.*` overrides as `applied`, `partial` or `fallback`
-(`none configured` when no run carries the field).
+(`none configured` when no run carries the field) — and a `Slowest phase:` line
+naming the pipeline phase with the highest median duration across runs that
+recorded per-phase timing (`n/a` when none did).
 
 ## Resources
 

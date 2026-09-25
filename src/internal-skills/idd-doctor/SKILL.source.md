@@ -339,7 +339,7 @@ code, and (like every part of this skill) is strictly **read-only** — it reads
 
 The schema is `docs/run-log-schema.md` (*`.gitissue/runs.jsonl` — run log*): one
 JSON object per line carrying at least `ts`, `issue`, `mode`, `outcome`, and
-`pr`, plus optional `qa_cycles`, `skipped_reason` and `agent_overrides`.
+`pr`, plus optional `qa_cycles`, `skipped_reason`, `agent_overrides` and `phases`.
 
 ### Procedure
 
@@ -362,6 +362,10 @@ JSON object per line carrying at least `ts`, `issue`, `mode`, `outcome`, and
      of each value: `applied`, `partial`, `fallback`. A run without the field
      had no override configured and is not counted; an unknown value is ignored.
      When no run carries it, print `none configured` instead of three zeros.
+   - **Slowest phase** — among the runs carrying a `phases` object, the median
+     seconds of each phase name (skip a non-object `phases` and any entry that is
+     not a non-negative integer); print the phase with the highest median, its
+     median and how many runs recorded it. `n/a` when no run carries the field.
 4. Print the section using DESIGN.md symbols.
 
 ### Output
@@ -373,6 +377,7 @@ JSON object per line carrying at least `ts`, `issue`, `mode`, `outcome`, and
         Median QA cycles: {median}
         Top skip reasons: {reason1} ({c1}), {reason2} ({c2})
         Agent overrides:  {applied} applied · {partial} partial · {fallback} fallback
+        Slowest phase:    {phase} (median {median}s · {runs} runs)
 ```
 
 When no runs are recorded, *Procedure* step 1's single graceful-degradation line replaces the whole block.

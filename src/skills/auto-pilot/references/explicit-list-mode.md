@@ -347,15 +347,15 @@ of a batch line, not a fresh processed issue. Ordinary skips —
 Build each written line from `docs/run-log-schema.md`, with these batch attributions:
 
 - **Shared fields on every line:** the batch `pr` (the one PR number) and `complexity`.
-- **Scalar telemetry attributed once:** `qa_cycles`, `duration_s` and
+- **Scalar telemetry attributed once:** `qa_cycles`, `duration_s`, `phases` and
   `agent_overrides` (when the batch returned one) describe the
   *whole batch*, so put them on **one line only — the primary (first) issue's
   line** — and omit them from the others. Writing them on all N lines would weight
   one batch N-fold in `/idd-doctor`'s median-QA-cycles, duration and
   agent-override aggregates.
 
-The Batch Resolver **returns** `qa_cycles`, `complexity`, `agent_overrides` and
-`duration_s` so
+The Batch Resolver **returns** `qa_cycles`, `complexity`, `agent_overrides`,
+`duration_s` and `phases` so
 auto-pilot can populate them. Each append uses the same best-effort, non-fatal
 `mkdir -p .gitissue` + single-`\n` rule as everywhere else — a failed append never
 stops the loop. Append only; never rewrite prior lines.
