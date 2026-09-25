@@ -1,0 +1,35 @@
+{
+  "name": "issue-resolver/gh-call-counter",
+  "skill": "issue-resolver",
+  "prompt": "Read issue #7 the way the resolver does — cached, invalidated, refreshed — and count every gh call (issue #465)",
+  "repo_scripts": [
+    "src/shared/scripts/gi-issue.py",
+    "src/shared/scripts/gi-gh.py"
+  ],
+  "grade": [
+    {
+      "tool": "gh-calls",
+      "expect_count": 3,
+      "expect_by_command": {"issue view": 3},
+      "expect_argv": [
+        ["issue", "view", "7", "--json", "body,labels,number,state,title"],
+        ["issue", "view", "7", "--json", "body,labels,number,state,title"],
+        ["issue", "view", "7", "--json", "body,labels,number,state,title"]
+      ],
+      "expect_exit": 0,
+      "label": "four reads and one invalidate cost exactly three gh calls (miss, hit, drop, miss, refresh)"
+    },
+    {
+      "tool": "gh-calls",
+      "expect_count": 4,
+      "expect_exit": 1,
+      "label": "the counter is exact — an off-by-one expectation fails"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/reads.txt",
+      "expect_exit": 0,
+      "label": "per-read cache outcomes recorded"
+    }
+  ]
+}

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# test-eval-resolver.sh — behavioral evals for issue-resolver (#261)
+# test-eval-resolver.sh — behavioral evals for issue-resolver (#261, #465)
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -34,6 +34,7 @@ run_case() {
 }
 
 run_case "trivial-bug"
+run_case "gh-call-counter"
 
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 echo "Results: $PASS passed, $FAIL failed"

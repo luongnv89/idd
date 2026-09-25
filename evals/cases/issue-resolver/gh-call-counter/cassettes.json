@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "calls": [
+    {
+      "argv": ["issue", "view", "7", "--json", "number,title,body,labels,state"],
+      "stdout": "{\"number\":7,\"title\":\"Fix token refresh race\",\"body\":\"<!-- gitissue:normalized v1 -->\\n\\n## Type\\n\\nBug\\n\",\"labels\":[{\"name\":\"bug\"}],\"state\":\"OPEN\"}\n",
+      "stderr": "",
+      "exit": 0
+    }
+  ]
+}
