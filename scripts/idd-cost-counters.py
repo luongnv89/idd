@@ -10,7 +10,9 @@ Two jobs, one per subcommand:
       argv tokens (`issue view`, `pr checks`, …). The shim records the
       normalized argv and nothing else, so the same scripted flow always yields
       the same log and this summary is byte-stable. This is the adopted
-      counter: gh calls per scripted flow.
+      counter: gh calls per scripted flow. It counts script-issued calls; the
+      evidence below counts agent-issued ones, so its link to cost is
+      inferred, not measured (see the doc's §6).
 
   evidence DIR
       Mine local Claude Code session transcripts for the evidence that decides
@@ -58,7 +60,10 @@ Exit codes
   2  usage error
   3  invalid input — a log, transcripts dir or runs log that does not exist or
      cannot be parsed, or an --exclude regex that does not compile
-  4  cannot complete — an unreadable file while mining
+  4  cannot complete — a file that exists but cannot be read or is not UTF-8
+     (the call log, a transcript or the runs log). The message gives the
+     reason only (the OS error text, or the offending byte offset), never the
+     path the OS error carries, so the transcripts DIR stays unechoed.
 
 Authored at scripts/idd-cost-counters.py — repo tooling; not bundled into
 skills.
@@ -105,7 +110,20 @@ class InputError(Exception):
 
 
 class Unavailable(Exception):
-    """Mining could not complete — exit 4."""
+    """A file could not be read or decoded — exit 4."""
+
+
+def _why(exc: Exception) -> str:
+    """The reason an existing file could not be read, without its path.
+
+    str(OSError) embeds the filename, which may sit under the transcripts DIR
+    this tool promises never to echo, so only strerror is used.
+    """
+    if isinstance(exc, UnicodeDecodeError):
+        return f"not UTF-8 at byte {exc.start}"
+    if isinstance(exc, OSError):
+        return exc.strerror or type(exc).__name__
+    return type(exc).__name__
 
 
 # ─── calls ────────────────────────────────────────────────
@@ -117,19 +135,22 @@ def summarize_calls(path: str) -> dict[str, Any]:
         raise InputError(f"no gh call log at {path}")
     by_command: Counter[str] = Counter()
     total = 0
-    with open(path, encoding="utf-8") as fh:
-        for lineno, line in enumerate(fh, 1):
-            if not line.strip():
-                continue
-            try:
-                record = json.loads(line)
-            except ValueError as exc:
-                raise InputError(f"log line {lineno} is not JSON — {exc}") from exc
-            argv = record.get("argv") if isinstance(record, dict) else None
-            if not isinstance(argv, list) or not all(isinstance(a, str) for a in argv):
-                raise InputError(f"log line {lineno} has no argv string list")
-            total += 1
-            by_command[" ".join(argv[:2])] += 1
+    try:
+        with open(path, encoding="utf-8") as fh:
+            for lineno, line in enumerate(fh, 1):
+                if not line.strip():
+                    continue
+                try:
+                    record = json.loads(line)
+                except ValueError as exc:
+                    raise InputError(f"log line {lineno} is not JSON — {exc}") from exc
+                argv = record.get("argv") if isinstance(record, dict) else None
+                if not isinstance(argv, list) or not all(isinstance(a, str) for a in argv):
+                    raise InputError(f"log line {lineno} has no argv string list")
+                total += 1
+                by_command[" ".join(argv[:2])] += 1
+    except (OSError, UnicodeError) as exc:
+        raise Unavailable(f"cannot read the gh call log — {_why(exc)}") from exc
     return {"total": total, "by_command": dict(sorted(by_command.items()))}
 
 
@@ -156,7 +177,7 @@ def _load_rows(path: str) -> list[dict[str, Any]]:
                 if isinstance(row, dict):
                     rows.append(row)
     except (OSError, UnicodeError) as exc:
-        raise Unavailable(f"cannot read a transcript — {exc}") from exc
+        raise Unavailable(f"cannot read a transcript — {_why(exc)}") from exc
     return rows
 
 
@@ -425,7 +446,7 @@ def load_durations(path: str) -> dict[int, list[Any]]:
                     if type(issue) is int:
                         durations.setdefault(issue, []).append(record["duration_s"])
     except (OSError, UnicodeError) as exc:
-        raise Unavailable(f"cannot read the runs log — {exc}") from exc
+        raise Unavailable(f"cannot read the runs log — {_why(exc)}") from exc
     return durations
 
 

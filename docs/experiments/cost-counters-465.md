@@ -5,8 +5,9 @@
 **Change:** the eval shim logs every `gh` call; `grade.py` grades the count;
 `scripts/idd-cost-counters.py` summarizes a call log and mines the evidence.
 **Date:** 2026-09-26
-**Status:** complete. One counter adopted (gh calls per scripted flow); four
-proposed and not adopted. Every number below is output of the tool in §3.4.
+**Status:** complete. One counter adopted (gh calls per scripted flow), with
+the qualification in §6: its evidence was measured on agent-issued calls, so
+its link to cost is inferred, not measured. Four proposed and not adopted. Every number below is output of the tool in §3.4.
 
 ## 1. Question
 
@@ -73,7 +74,7 @@ The counters therefore live in two places, and neither runs as part of a skill:
 
 | Metric | Definition |
 |--------|------------|
-| `gh` | matches of `` (?:^\|[\s;&\|(`$])gh\s+(?:issue\|pr\|api\|repo\|run\|label\|project\|search\|release\|workflow\|auth)\b `` in Bash tool_use commands |
+| `gh` | matches of `` (?:^\|[\s;&\|(`$])gh\s+(?:issue\|pr\|api\|repo\|run\|label\|project\|search\|release\|workflow\|auth)\b `` in Bash tool_use commands. This counts the `gh` invocations the **agent** writes into a command. It does **not** count `gh` calls made inside a shared script the agent runs (`gi-issue.py`, `gi-ci-wait.py` and the like): the transcript shows only the command that runs the script, never the `gh` processes the script spawns |
 | `gh_bytes` | tool_result size of the Bash calls with at least one `gh` match |
 | `result_bytes` | every tool_result: a string counts its UTF-8 bytes, anything else the length of its JSON serialization |
 | `spawns` | `Agent`/`Task` tool_uses |
@@ -201,7 +202,7 @@ it should be read that way.
 
 | Counter | Verdict | Why |
 |---------|---------|-----|
-| **gh calls per flow** | **adopted** | Passes in both flows: 0.81 / 0.66, p <5e-05 / 0.0018. The duration cross-check agrees (0.64, p 0.0114). The lab produces it deterministically: the `gh-call-counter` case counts exactly 3, byte-identical across runs (`tests/test-cost-counters-465.sh`). |
+| **gh calls per flow** | **adopted, with a qualification** | The quantity "gh invocations per run" passes in both flows: 0.81 / 0.66, p <5e-05 / 0.0018. The duration cross-check agrees (0.64, p 0.0114). The lab produces it deterministically: the `gh-call-counter` case counts exactly 3, byte-identical across runs (`tests/test-cost-counters-465.sh`). The qualification: the evidence was measured on agent-issued calls, and the lab counts script-issued calls, a disjoint set (see the second caveat below). The lab counter's link to cost is inferred, not measured. |
 | gh output bytes | proposed — not adopted | Below the bar in both flows: 0.49 in resolver, and 0.35 in review, where p 0.112 is not significant. Its partial ρ is near zero or negative. |
 | subagent spawns | proposed — not adopted | The sign flips between flows (−0.30 resolver, 0.76 review). This is a flow-mix artifact. The older resolver runs (session `adbacce0`, issues 415–426) ran inline with 0 spawns but were among the most expensive runs. The review sample mixes orchestrators, which spawn reviewers, with single reviewers, which spawn nothing. |
 | runtime tool-result bytes | proposed — not adopted | Clears the correlation bar (0.66 / 0.93), but nothing in the lab can produce it deterministically. It is the size of what an agent chose to read and run, and the eval lab runs no agent. The resolver's partial ρ of 0.09 also says it mostly tracks the number of tool calls. |
@@ -213,8 +214,18 @@ it should be read that way.
   partial ρ drops to 0.44 (resolver) and 0.25 (review). A good share of the
   correlation is "longer runs make more calls of every kind". A drop in gh
   calls is evidence of a cheaper run, not proof of one.
-- **The lab sees only script-issued calls.** The eval case counts `gh` calls
-  made by shared scripts such as `gi-issue.py`. In real runs most `gh` calls
+- **The evidence and the lab count measure disjoint sets of calls.** The
+  transcript metric (§3.2) counts only the `gh` invocations the agent writes
+  into a Bash command. A command that runs `gi-issue.py` has no `gh` in its
+  text, so every `gh` call made inside a shared script is left out. The eval
+  case counts the opposite set: only the `gh` calls made by shared scripts
+  such as `gi-issue.py`, and none the agent composes. No call is in both. So
+  the ρ values above validate the **quantity** "gh invocations per run" as a
+  cost proxy, measured on agent-issued calls. They were not measured on the
+  lab counter. The lab counter's link to cost is inferred by analogy: the
+  unit is the same (one `gh` process, one GitHub round trip), and only the
+  issuer differs. That inference is plausible. It is not evidence.
+- **The lab sees only script-issued calls.** In real runs most `gh` calls
   come from the prose, which the agent composes itself. Resolve 422 issued 128.
   So a lower lab count shows a script got cheaper. It does not show the prose
   around that script did too. That gap is residual risk for anyone who uses

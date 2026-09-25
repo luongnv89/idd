@@ -18,7 +18,8 @@
 #   T7  `evidence` on a synthetic transcript fixture: exact per-run numbers
 #       (max-per-message-id token dedupe, nested child aggregation, the gh
 #       regex, exclusion, selection) and byte-identical output per seed (AC2)
-#   T8  `evidence` usage and input errors map onto the exit vocabulary
+#   T8  `evidence` usage and input errors map onto the exit vocabulary; an
+#       unreadable or non-UTF-8 file exits 4 without a traceback or its path
 #   T9  run_eval.sh rejects an unsafe repo_scripts entry before any subject
 #   T10 run_eval.sh on the gh-call-counter case, sandboxed — authoritative
 #
@@ -211,6 +212,14 @@ if [ "$ec" -eq 3 ] && [ "$ec_bad" -eq 3 ]; then
 else
   fail "T5: missing/malformed log exited $ec/$ec_bad, want 3/3"
 fi
+printf '{"argv":["issue","view"]}\n\377\376\n' > "$TMP/nonutf8.jsonl"
+"$PYTHON_BIN" "$TOOL" calls "$TMP/nonutf8.jsonl" >/dev/null 2>"$TMP/nonutf8.err"
+ec_nonutf8=$?
+if [ "$ec_nonutf8" -eq 4 ] && ! grep -q "Traceback" "$TMP/nonutf8.err" && ! grep -q "$TMP" "$TMP/nonutf8.err"; then
+  pass "T5: a non-UTF-8 log exits 4 (cannot complete) — no traceback, no path"
+else
+  fail "T5: non-UTF-8 log exited $ec_nonutf8, want 4 with no traceback or path"; sed 's/^/      /' "$TMP/nonutf8.err"
+fi
 
 # ─── T6: grade.py gh-calls handler ─────────────────────────
 # grade_case <name> <out-has-log 0|1> <assertion-json> — prints grade exit.
@@ -392,6 +401,17 @@ if [ "$ec_usage" -eq 2 ] && [ "$ec_missing" -eq 3 ] && [ "$ec_regex" -eq 3 ]; th
   pass "T8: no dir → 2 (usage); missing dir or bad --exclude → 3 (invalid input)"
 else
   fail "T8: exits were $ec_usage/$ec_missing/$ec_regex, want 2/3/3"
+fi
+BAD="$TMP/bad-transcripts"
+mkdir -p "$BAD/s/subagents"
+printf '{"description":"Resolve issue #1","spawnDepth":1}\n' > "$BAD/s/subagents/a.meta.json"
+printf '\377\n' > "$BAD/s/subagents/a.jsonl"
+"$PYTHON_BIN" "$TOOL" evidence "$BAD" >/dev/null 2>"$TMP/bad-ev.err"
+ec_undecodable=$?
+if [ "$ec_undecodable" -eq 4 ] && ! grep -q "Traceback" "$TMP/bad-ev.err" && ! grep -q "$BAD" "$TMP/bad-ev.err"; then
+  pass "T8: a non-UTF-8 transcript exits 4 — no traceback, DIR not echoed"
+else
+  fail "T8: non-UTF-8 transcript exited $ec_undecodable, want 4 with no traceback or DIR"; sed 's/^/      /' "$TMP/bad-ev.err"
 fi
 
 # ─── T9: run_eval.sh validates repo_scripts before any subject ─
