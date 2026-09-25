@@ -535,7 +535,7 @@ spec = importlib.util.spec_from_file_location("grade", sys.argv[1])
 grade = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(grade)
 assert set(grade.GRADE_HANDLERS) == {
-    "idd-lint", "gi-runlog-echo", "file-exists", "red-green", "shell"
+    "idd-lint", "gi-runlog-echo", "file-exists", "red-green", "shell", "gh-calls"
 }
 assert all(callable(handler) for handler in grade.GRADE_HANDLERS.values())
 assert "elif tool ==" not in inspect.getsource(grade._grade_one)

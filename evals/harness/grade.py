@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Grade an eval case with deterministic tools (idd-lint, gi-runlog).
+"""Grade an eval case with deterministic tools (idd-lint, gi-runlog, gh-calls).
 
 Usage:
   python3 evals/harness/grade.py --case <case-dir> --out <artifact-dir>
@@ -216,6 +216,87 @@ def _handle_shell(
     return _run(cmd, cwd=repo_root)
 
 
+def _gh_command(argv: list[str]) -> str:
+    """The command a logged call is counted under: its first two argv tokens."""
+    return " ".join(argv[:2])
+
+
+def _read_gh_call_log(path: Path) -> list[list[str]]:
+    """Parse the shim's EVAL_GH_CALL_LOG: one ``{"argv": [...]}`` per line."""
+    if not path.is_file():
+        raise GradeInputError(f"missing gh call log {path.name} — was the shim wired?")
+    calls: list[list[str]] = []
+    for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        if not line.strip():
+            continue
+        try:
+            record = json.loads(line)
+        except ValueError as exc:
+            raise GradeInputError(f"gh call log line {lineno}: {exc}") from exc
+        argv = record.get("argv") if isinstance(record, dict) else None
+        if not isinstance(argv, list) or not all(isinstance(a, str) for a in argv):
+            raise GradeInputError(f"gh call log line {lineno}: no argv string list")
+        calls.append(argv)
+    return calls
+
+
+def _handle_gh_calls(
+    assertion: dict[str, Any], out_dir: Path, repo_root: Path
+) -> int:
+    """Deterministic gh-call counter (issue #465).
+
+    Every expectation given must hold: ``expect_count`` (exact total),
+    ``expect_by_command`` (exact count per first-two-token command, for the
+    commands named) and ``expect_argv`` (the exact normalized argv sequence).
+    """
+    del repo_root
+    token = str(assertion.get("file") or "OUT/gh-calls.jsonl")
+    path = _out_artifact(token, out_dir)
+    if path is None:
+        raise GradeInputError(f"gh-calls file must be an OUT/ artifact, got {token!r}")
+    count = assertion.get("expect_count")
+    by_command = assertion.get("expect_by_command")
+    sequence = assertion.get("expect_argv")
+    if count is None and by_command is None and sequence is None:
+        raise GradeInputError(
+            "gh-calls requires expect_count, expect_by_command or expect_argv"
+        )
+    if count is not None and (type(count) is not int or count < 0):
+        raise GradeInputError("expect_count must be a non-negative integer")
+    if by_command is not None and not (
+        isinstance(by_command, dict)
+        and all(type(v) is int and v >= 0 for v in by_command.values())
+    ):
+        raise GradeInputError("expect_by_command must map commands to integers")
+    if sequence is not None and not (
+        isinstance(sequence, list)
+        and all(
+            isinstance(argv, list) and all(isinstance(a, str) for a in argv)
+            for argv in sequence
+        )
+    ):
+        raise GradeInputError("expect_argv must be a list of argv string lists")
+
+    calls = _read_gh_call_log(path)
+    tally: dict[str, int] = {}
+    for argv in calls:
+        tally[_gh_command(argv)] = tally.get(_gh_command(argv), 0) + 1
+    print(f"    │ gh calls: {len(calls)} {json.dumps(tally, sort_keys=True)}")
+
+    ok = True
+    if count is not None and len(calls) != count:
+        print(f"    │ want {count} call(s), got {len(calls)}")
+        ok = False
+    for command, want in sorted((by_command or {}).items()):
+        if tally.get(command, 0) != want:
+            print(f"    │ want {want} × {command!r}, got {tally.get(command, 0)}")
+            ok = False
+    if sequence is not None and calls != sequence:
+        print("    │ logged argv sequence differs from expect_argv")
+        ok = False
+    return 0 if ok else 1
+
+
 GradeHandler = Callable[[dict[str, Any], Path, Path], int | None]
 GRADE_HANDLERS: dict[str, GradeHandler] = {
     "idd-lint": _handle_idd_lint,
@@ -223,6 +304,7 @@ GRADE_HANDLERS: dict[str, GradeHandler] = {
     "file-exists": _handle_file_exists,
     "red-green": _handle_red_green,
     "shell": _handle_shell,
+    "gh-calls": _handle_gh_calls,
 }
 
 
