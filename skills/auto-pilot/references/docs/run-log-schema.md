@@ -1,9 +1,8 @@
 <!-- Generated from /docs/run-log-schema.md. Do not edit. Edit source and run ./scripts/build.sh. -->
 # `.gitissue/runs.jsonl` — Run Log Schema
 
-The cross-run telemetry file written by `/issue-resolver` and `/auto-pilot`.
-Canonical schema for a `runs.jsonl` line: field set, append rules, rotation, and
-the single-writer convention.
+The cross-run telemetry file written by `/issue-resolver` and `/auto-pilot`: field
+set, append rules, rotation, and the single-writer convention.
 
 ## Schema
 
@@ -32,13 +31,14 @@ Full field set; *Always present* is the required minimum:
 | `ceiling` | integer | no | Class QA-cycle policy ceiling: 1 for `light`, `resolve.qa_max_cycles` (default 5) for `full`+`high`, else 2. Omit unless recorded; a recorded value must be a positive integer and overrides the computed one. |
 | `breach_reason` | string | no | Why `qa_cycles` exceeded `ceiling`. Required when `qa_cycles` > `ceiling`; omit otherwise; `gi-runlog` rejects an over-ceiling row without it (exit 3) and `idd-lint stats` exits 1 on such rows. |
 | `duration_s` | integer | no | Wall-clock run duration in seconds |
+| `phases` | object | no | Seconds per pipeline phase, `{name: int ≥ 0}` in run order; only phases that ran; need not sum to `duration_s`. ≤16 names of `[a-z][a-z0-9_-]`, ≤32 chars. |
 | `skipped_reason` | string | no | Why the issue was skipped (auto-pilot skips, any `skipped`/`already_resolved` outcome): e.g. `already_resolved`, `blocked_label`, `blocked_by_dependency`, `in_skip_list`, `assigned_to_other`, `quarantined` |
 
 Example lines:
 
 ```jsonl
 {"ts":"2026-06-26T14:31:07Z","issue":141,"mode":"auto","skill":"issue-resolver","complexity":"medium","profile":"full","qa_cycles":2,"outcome":"success","pr":150,"duration_s":372}
-{"ts":"2026-06-26T15:02:41Z","issue":152,"mode":"auto","skill":"issue-resolver","complexity":"low","profile":"light","qa_cycles":1,"outcome":"success","pr":161,"duration_s":94}
+{"ts":"2026-06-26T15:02:41Z","issue":152,"mode":"auto","skill":"issue-resolver","complexity":"low","profile":"light","qa_cycles":1,"outcome":"success","pr":161,"duration_s":94,"phases":{"preflight":9,"research":21,"plan":6,"implement":38,"qa":14,"deliver":6}}
 {"ts":"2026-06-26T14:48:12Z","issue":118,"mode":"balanced","skill":"auto-pilot","outcome":"skipped","pr":null,"skipped_reason":"blocked_by_dependency"}
 ```
 
@@ -79,8 +79,7 @@ append-mode write, `gi-runlog.py` renames it to a sibling segment
 `runs-<YYYYMMDDTHHMMSSZ>.jsonl` (UTC stamp, `-N` on a same-second collision) once
 it has reached `--rotate-max-bytes` (default 1048576) **or** sat idle past
 `--rotate-max-days` (default 30); the record then starts a fresh log. Age is the
-file's mtime, not any `ts` inside it, so a backdated record cannot rotate a fresh
-log. Rotation is best-effort: a failed rename warns on stderr and the record
+file's mtime, never a `ts`. Rotation is best-effort: a failed rename warns on stderr and the record
 still appends. `--no-rotate` disables it, `--echo` never rotates, and the raw
 fallback bypasses it entirely.
 
@@ -94,7 +93,7 @@ subagent; both appending would double-count every issue in `/idd-doctor`'s
 metrics. So it passes the resolver `--no-run-log`, which **returns** its
 telemetry — run `status` (the `outcome`),
 `qa_cycles`, `ceiling`, `breach_reason`, `complexity`, `agent_overrides`,
-`duration_s` — and the orchestrator folds it into one enriched line. The flag is **orthogonal to
+`duration_s`, `phases` — and the orchestrator folds it into one enriched line. The flag is **orthogonal to
 `--auto`/`IDD_AUTO_MODE`**: a standalone `/issue-resolver <N> --auto` still logs.
 The rule: the outermost skill is the single writer; an inner resolver stays silent.
 
@@ -102,7 +101,7 @@ The rule: the outermost skill is the single writer; an inner resolver stays sile
 (`/auto-pilot --issues`) **fans the one batch result out into one line per
 attempted issue**, never per PR — the shared
 `pr` and `complexity` on every line, the batch-scalar `qa_cycles`,
-`duration_s` and `agent_overrides` on **one line only** so `/idd-doctor`'s medians and counts are not weighted
+`duration_s`, `phases` and `agent_overrides` on **one line only** so `/idd-doctor`'s medians and counts are not weighted
 N-fold. At batch time only the issues in `issues_resolved` get a line. No `failed` line is written at batch time; every
 unresolved attempted issue — including the batch's primary (spawn-position)
 issue, whose `optimized_order` slot is already consumed — is re-queued for

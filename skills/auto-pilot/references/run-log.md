@@ -35,7 +35,7 @@ is invoked with `--no-run-log` (see *Resolver Subagent* in
 auto-pilot writes here. Writing in both places would double-write one line per
 issue and skew `/idd-doctor`'s resolve-rate and median-QA metrics. The resolver
 **returns** its telemetry (`qa_cycles`, `ceiling`, `breach_reason`, `complexity`,
-`profile`, `agent_overrides`, `duration_s`) in its result; fold those into the **single line**
+`profile`, `agent_overrides`, `duration_s`, `phases`) in its result; fold those into the **single line**
 auto-pilot writes (enriched with that telemetry) so the per-issue QA signal
 survives even though the resolver stayed silent. The resolver's run `status` informs auto-pilot's decision but is **not**
 copied into the row's `outcome` — that field stays auto-pilot's own six
@@ -102,9 +102,9 @@ auto-pilot merge mode — `conservative` / `balanced` / `aggressive`), `skill`
 (`auto-pilot`), `outcome` (one of the six categorical labels), `pr` (the PR
 number when one was created, else `null`), and — from the resolver's report-back
 — `qa_cycles`, `ceiling`, `breach_reason`, `complexity`, `profile`,
-`agent_overrides`, and `duration_s` when present (`profile` is the adaptive-effort profile the resolve
+`agent_overrides`, `duration_s`, and `phases` when present (`profile` is the adaptive-effort profile the resolve
 chose, `light` or `full`; omit it when the resolver returned none). Fold
-`ceiling` / `breach_reason` through unchanged when the resolver returned them.
+`ceiling` / `breach_reason` / `phases` through unchanged when the resolver returned them.
 
 **`agent_overrides`** records whether the configured `agents.*` overrides
 reached this issue's spawns (`references/docs/run-log-schema.md`). Merge the resolver's

@@ -13,7 +13,8 @@ Validates Issue-Driven Development artifacts against the IDD Spec
   idd-lint repo   [--base REF]          lint current branch + commits vs base
   idd-lint stats  [--branch REF] [--since DATE] [--no-github] [--json]
                                         evidence report: trace-completeness,
-                                        Decision-Record coverage, run outcomes
+                                        Decision-Record coverage, run outcomes,
+                                        slowest recorded run phase
 
 FILE of `-` (or omitted) reads stdin. `--level L1|L2|L3` (default L3) selects
 the conformance level to enforce; checks above the selected level are skipped.
@@ -747,6 +748,42 @@ def load_run_rows(path: Path) -> list[dict] | None:
     return rows or None
 
 
+def collect_phase_stats(rows: list[dict]) -> dict[str, dict]:
+    """Per-phase seconds across rows carrying the optional `phases` map (#467).
+
+    Tolerant like every runs.jsonl reader: the raw-append fallback bypasses
+    gi-runlog's validation, so a non-object `phases` or an entry that is not a
+    non-negative integer is skipped, never raised on.
+    """
+    seconds: dict[str, list[int]] = {}
+    for r in rows:
+        phases = r.get("phases")
+        if not isinstance(phases, dict):
+            continue
+        for name, value in phases.items():
+            if (
+                isinstance(name, str)
+                and isinstance(value, int)
+                and not isinstance(value, bool)
+                and value >= 0
+            ):
+                seconds.setdefault(name, []).append(value)
+    return {
+        name: {"runs": len(values), "median_s": _median(values), "total_s": sum(values)}
+        for name, values in seconds.items()
+    }
+
+
+def slowest_phase(phases: dict[str, dict]) -> str | None:
+    """The phase with the highest median; ties go to the larger total, then name."""
+    if not phases:
+        return None
+    return min(
+        phases,
+        key=lambda name: (-phases[name]["median_s"], -phases[name]["total_s"], name),
+    )
+
+
 def collect_run_stats(rows: list[dict] | None) -> dict | None:
     """Outcome/QA/duration aggregates over run-log rows parsed by load_run_rows."""
     if not rows:
@@ -766,6 +803,7 @@ def collect_run_stats(rows: list[dict] | None) -> dict | None:
             sub_qa = [r["qa_cycles"] for r in sub if isinstance(r.get("qa_cycles"), int)]
             by_complexity[level] = {"runs": len(sub), "median_qa": _median(sub_qa)}
     unexplained = [r for r in rows if _unexplained_ceiling_breach(r)]
+    phases = collect_phase_stats(rows)
     return {
         "runs": len(rows),
         "outcomes": dict(sorted(outcomes.items())),
@@ -775,6 +813,8 @@ def collect_run_stats(rows: list[dict] | None) -> dict | None:
         "median_qa_cycles": _median(qa),
         "median_duration_s": _median(dur),
         "by_complexity": by_complexity,
+        "phases": phases,
+        "slowest_phase": slowest_phase(phases),
         "issues": sorted({r["issue"] for r in rows if isinstance(r.get("issue"), int)}),
         "unexplained_ceiling_breaches": len(unexplained),
         "ceiling_breach_issues": sorted(
@@ -1256,6 +1296,15 @@ def _render_run_log_stats(run_s: dict | None) -> list[str]:
         )
     if run_s["median_duration_s"] is not None:
         lines.append(_info_row("median duration", f"{round(run_s['median_duration_s'])}s"))
+    slowest = run_s.get("slowest_phase")
+    if slowest:
+        phase = run_s["phases"][slowest]
+        runs = phase["runs"]
+        lines.append(_info_row(
+            "slowest phase",
+            f"{slowest} (median {round(phase['median_s'])}s"
+            f" · {runs} run{'s' if runs != 1 else ''})",
+        ))
     if run_s["by_complexity"]:
         parts = [
             f"{level} {values['runs']}"

@@ -91,6 +91,7 @@ When done, report back ONLY these fields:
 - profile: the adaptive-effort pipeline profile the resolve selected ("light" or "full"), for the run-log `profile` field; omit/null when resolve.adaptive_effort is false or no profile was selected
 - agent_overrides: "applied", "partial" or "fallback" — whether the configured agents.* overrides reached this resolve's spawns (see references/docs/run-log-schema.md); omit when no spawned role had an override configured
 - duration_s: wall-clock seconds for the resolve, when measurable, for the run-log line
+- phases: per-step seconds as a JSON object in run order, e.g. {"preflight":9,"research":21,"plan":6,"implement":38,"qa":14,"deliver":6} (see references/docs/run-log-schema.md); only steps that started; omit when none was measured
 - failure_step: which step failed (if status is failure)
 - failure_reason: short error description (if status is failure)
 - resolution_details: explanation (if status is already_resolved)
@@ -333,6 +334,8 @@ When done, report back ONLY these fields:
   to the primary issue's line only. Omit when no spawned role had one configured
 - duration_s: wall-clock seconds for the batch resolve, when measurable; like
   qa_cycles it is attributed to the primary issue's line only
+- phases: per-step seconds of the batch resolve as a JSON object (see
+  references/docs/run-log-schema.md); primary issue's line only, like duration_s
 - failure_step: which step failed (if status is failure)
 - failure_reason: short error description (if status is failure)
 ```

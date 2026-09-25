@@ -120,6 +120,7 @@ KEY_ORDER = (
     "outcome",
     "pr",
     "duration_s",
+    "phases",
     "skipped_reason",
 )
 
@@ -133,6 +134,7 @@ OPTIONAL_KEYS = (
     "ceiling",
     "breach_reason",
     "duration_s",
+    "phases",
     "skipped_reason",
 )
 
@@ -168,6 +170,13 @@ PROFILES = frozenset({"light", "full"})
 # Whether the configured `agents.*` overrides reached the run's spawns (issue
 # #456). Absent means no override was configured — never written as a value.
 AGENT_OVERRIDES = frozenset({"applied", "partial", "fallback"})
+
+# Per-phase wall-clock seconds (issue #467): the one object-valued field, a flat
+# {phase name: non-negative int} map in the writer's pipeline order. Names are
+# open (any skill may record its own phases) but bounded, so a reader can print
+# them without escaping; the entry cap keeps one line from growing unbounded.
+PHASE_NAME_RE = re.compile(r"^[a-z][a-z0-9_-]{0,31}$")
+MAX_PHASES = 16
 
 # The researcher estimates on five values; the run log stores three.
 COMPLEXITY_COLLAPSE = {
@@ -305,6 +314,23 @@ def normalize_record(record: object, *, now: str | None = None) -> dict[str, obj
             f"agent_overrides '{agent_overrides}' is not one of "
             + ", ".join(sorted(AGENT_OVERRIDES))
         )
+
+    phases = out.get("phases")
+    if phases is not None:
+        if not isinstance(phases, dict):
+            raise RecordError("phases must be an object of {phase name: seconds}")
+        if len(phases) > MAX_PHASES:
+            raise RecordError(f"phases carries {len(phases)} entries (max {MAX_PHASES})")
+        for name, seconds in phases.items():
+            if not PHASE_NAME_RE.match(name):
+                raise RecordError(
+                    f"phase name '{name}' must be 1-32 chars of [a-z0-9_-], "
+                    "starting with a letter"
+                )
+            if not _is_int(seconds) or seconds < 0:
+                raise RecordError(f"phases.{name} must be a non-negative integer")
+        if not phases:
+            out["phases"] = None  # an empty map is absent, dropped below
 
     # Absent optional fields are omitted, never written as null. `pr` is the
     # single documented exception and is required, so it is never dropped.
