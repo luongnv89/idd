@@ -72,6 +72,22 @@ After editing anything under `src/`, rebuild before committing:
 
 CI's drift check fails any PR where the committed `skills/` output does not match a transient build.
 
+### Skill bundle size budgets (issue #466)
+
+Every emitted bundle under `skills/<name>/` has a byte budget, and CI enforces it. Budgets and the current measurement of each bundle live in one committed file, `scripts/skill-budgets.json`, and `scripts/skill-budget.py` checks and ratchets them.
+
+- **What is measured** — the bundle's prompt surface: every regular file under `skills/<name>/`, summed in bytes, except `docs/README.md` (never auto-loaded), `references/scripts/**` (executed, not read), `*.json` data files (script-read; issue-creator's `model-data.json` is rewritten weekly by the model-data refresh bot), and dotfile or `__pycache__` paths. Symlinks are not counted. `idd-doctor` has no built tree, so it has no budget.
+- **The headroom rule** — a budget is at most `measured + headroom_bytes` (1024 today). CI fails when a bundle grows past its budget, when a recorded `measured` is not the current size, and when a bundle shrank by more than the headroom without its budget being lowered.
+- **After any change that touches `skills/`**, rebuild and ratchet, then commit both `skills/` and `scripts/skill-budgets.json`:
+
+  ```bash
+  ./scripts/build.sh && python3 scripts/skill-budget.py --ratchet
+  ```
+
+  `--ratchet` refreshes every `measured`, lowers each budget to `min(budget, measured + headroom)`, adds new skills, and drops removed ones. It **never raises** a budget: a bundle over its ceiling stays over, and `--ratchet` exits 1.
+- **Raising a budget is a deliberate hand edit.** Set that skill's `budget` to a value at or above its measured size, run the ratchet command above (it clamps the budget back to `measured + headroom`), commit both files, and justify the growth in the PR.
+- **Check locally** with `python3 scripts/skill-budget.py` (`--check` is the default; `--json` prints the table as JSON). The CI step is `tests/test-skill-bundle-budget-466.sh`.
+
 ## Making Changes
 
 ```mermaid
