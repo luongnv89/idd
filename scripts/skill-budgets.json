@@ -1,0 +1,33 @@
+{
+  "headroom_bytes": 1024,
+  "skills": {
+    "auto-pilot": {
+      "budget": 412047,
+      "measured": 411023
+    },
+    "init-gitissue": {
+      "budget": 120734,
+      "measured": 119710
+    },
+    "issue-analysis": {
+      "budget": 154162,
+      "measured": 153138
+    },
+    "issue-creator": {
+      "budget": 172906,
+      "measured": 171882
+    },
+    "issue-pr-review": {
+      "budget": 261394,
+      "measured": 260370
+    },
+    "issue-resolver": {
+      "budget": 354045,
+      "measured": 353021
+    },
+    "issue-triage": {
+      "budget": 127207,
+      "measured": 126183
+    }
+  }
+}
