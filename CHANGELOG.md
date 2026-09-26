@@ -26,7 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **build:** enforce per-skill prompt-surface byte budgets in CI, with a ratchet that lowers budgets after reductions and never raises them automatically. ([#470](https://github.com/luongnv89/idd/pull/470))
 
 ### Maintenance
-- **tests:** disable automatic Git maintenance in batching-test fixtures so background repacking cannot race temporary-directory cleanup (#352).
+- **tests:** disable automatic Git maintenance in batching-test fixtures so background repacking cannot race temporary-directory cleanup (#352). Compare run-log fixture line counts numerically to tolerate macOS `wc` padding (#354).
 - **tests:** scope package enumeration to step and phase directories, clean up temporary spec files, and strengthen regression assertions. ([#444](https://github.com/luongnv89/idd/pull/444), [#445](https://github.com/luongnv89/idd/pull/445), [#449](https://github.com/luongnv89/idd/pull/449))
 - **model-data:** refresh CursorBench model suggestions, including the Fable 5.1 family. ([#437](https://github.com/luongnv89/idd/pull/437))
 - **landing:** shorten the search description, add FAQ structured data, and correct the skill count.

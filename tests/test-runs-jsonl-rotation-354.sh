@@ -111,7 +111,7 @@ for i in 1 2 3; do
   failed_record 9 failed | python3 "$RUNLOG" --append --path "$LOG" \
     --rotate-max-bytes 10 --rotate-max-days 0 --no-rotate >/dev/null 2>&1
 done
-if [ "$(ls "$D" | grep -c 'jsonl')" = "1" ] && [ "$(wc -l < "$LOG")" = "3" ]; then
+if [ "$(ls "$D" | grep -c 'jsonl')" = "1" ] && [ "$(wc -l < "$LOG")" -eq 3 ]; then
   pass "T4: --no-rotate appends in place"
 else
   fail "T4: --no-rotate still rotated or lost lines"
