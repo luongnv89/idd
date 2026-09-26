@@ -69,6 +69,9 @@ The counters therefore live in two places, and neither runs as part of a skill:
   - review: `^(Review PR|reviewer|Code review)`
 - **Exclusion:** `--exclude '#465'` drops this issue's own resolve run. That
   run was still in progress, and still growing, when the snapshot was taken.
+  `--exclude '#472'` drops this PR's own review runs. They are keyed by the PR
+  number, which `#465` does not match, and they were recorded after the
+  snapshot.
 - **Nesting:** a run's totals include every descendant transcript. A child is
   linked to its parent when the child meta's `toolUseId` equals the id of an
   `Agent`/`Task` tool_use in the parent, applied recursively.
@@ -108,8 +111,14 @@ included. It is **not** a billed amount (see §6).
 
 ```bash
 python3 scripts/idd-cost-counters.py evidence ~/.claude/projects/<repo-slug> \
-  --exclude '#465' --runs-log .gitissue/runs.jsonl          # add --json for JSON
+  --exclude '#465' --exclude '#472' \
+  --runs-log .gitissue/runs.jsonl                           # add --json for JSON
 ```
+
+The recorded figures are for the 2026-09-26 snapshot. Runs recorded after it,
+including this PR's own review runs (keyed by PR #472, which `#465` does not
+match), change n and the statistics, so they have to be excluded to reproduce
+§4 and §5.
 
 The port was checked against the analysis scripts that first produced these
 figures. Fed the runs in the same order, it reproduces every ρ, partial ρ and
