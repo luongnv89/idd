@@ -51,6 +51,8 @@ def init_repo(path):
     git(path, "init", "-q", "-b", "feature", ".")
     git(path, "config", "user.email", "test@example.invalid")
     git(path, "config", "user.name", "test")
+    # Disposable fixtures must not spawn maintenance during cleanup.
+    git(path, "config", "maintenance.auto", "false")
     (path / "base.txt").write_text("base\n", encoding="utf-8")
     git(path, "add", "base.txt")
     git(path, "commit", "-qm", "base")
