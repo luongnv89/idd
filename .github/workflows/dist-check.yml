@@ -200,6 +200,9 @@ jobs:
       - name: test-gh-invocation-helper-344
         run: bash tests/test-gh-invocation-helper-344.sh
 
+      - name: test-backlog-snapshot-468
+        run: bash tests/test-backlog-snapshot-468.sh
+
       - name: test-orphaned-doc-cleanup-345
         run: bash tests/test-orphaned-doc-cleanup-345.sh
 

@@ -40,6 +40,8 @@ modules = {
     "gi-branch": load("gi_branch_344", scripts / "gi-branch.py"),
     "gi-dup-score": load("gi_dup_score_344", scripts / "gi-dup-score.py"),
     "gi-ci-wait": load("gi_ci_wait_344", scripts / "gi-ci-wait.py"),
+    # #468: the shared open-issue snapshot is a fifth consumer.
+    "gi-backlog": load("gi_backlog_344", scripts / "gi-backlog.py"),
 }
 
 
@@ -51,6 +53,8 @@ def invoke(name: str):
         return module.fetch_issue(344, None)
     if name == "gi-dup-score":
         return module._gh_issue_list(1, None, "number")
+    if name == "gi-backlog":
+        return module.fetch(1, None)
     return module.poll_once("344", None)
 
 
@@ -71,7 +75,7 @@ emit(
     all('_RUN_GH(' in text for text in consumer_text.values())
     and all('subprocess.run(\n            ["gh"' not in text for text in consumer_text.values())
     and helper_text.count("subprocess.run(") == 1,
-    "T1: all four consumers use the one gi-gh subprocess implementation",
+    "T1: all five consumers use the one gi-gh subprocess implementation",
 )
 
 # The helper owns identical process-start failure translation for every caller.
@@ -90,7 +94,7 @@ for label, effect, expected in (
                 seen.append("NO ERROR")
     emit(
         seen == [expected] * len(modules),
-        f"T2: {label} maps to the same unavailable contract in all four scripts",
+        f"T2: {label} maps to the same unavailable contract in all five scripts",
     )
 
 # Successful calls remain shell-free, capture text, and preserve each parser's
@@ -115,11 +119,12 @@ emit(
     values["gi-issue"]["number"] == 344
     and values["gi-branch"] == ("Title", [])
     and values["gi-dup-score"] == [{"number": 1}]
-    and values["gi-ci-wait"][0]["bucket"] == "pass",
-    "T3: all four command-specific parsers receive successful helper output",
+    and values["gi-ci-wait"][0]["bucket"] == "pass"
+    and values["gi-backlog"] == [{"number": 1}],
+    "T3: all five command-specific parsers receive successful helper output",
 )
 emit(
-    len(calls) == 4
+    len(calls) == len(modules)
     and all(call[0][0] == "gh" for call in calls)
     and all(
         kwargs == {"capture_output": True, "text": True, "check": False}
@@ -143,7 +148,7 @@ for label, fake in (
                 caught.append(name)
     emit(
         caught == list(modules),
-        f"T4: {label} remains an unavailable result in all four scripts",
+        f"T4: {label} remains an unavailable result in all five scripts",
     )
 
 # Every installed consumer must carry its sibling helper. This proves the
