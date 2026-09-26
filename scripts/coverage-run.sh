@@ -43,6 +43,11 @@ run "$SCRIPTS/gi-issue.py" --help
 run "$SCRIPTS/gi-ci-wait.py" --help
 run "$SCRIPTS/gi-secscan.py" --help
 
+# gi-backlog — offline surface only: snapshot status, invalidation, bad input.
+run "$SCRIPTS/gi-backlog.py" --status --cache-dir "$TMP/backlog"
+run "$SCRIPTS/gi-backlog.py" --invalidate --cache-dir "$TMP/backlog"
+run "$SCRIPTS/gi-backlog.py" --fields bogus --cache-dir "$TMP/backlog"
+
 # gi-config — merge defaults with this repo's real config, then a dotted key.
 run "$SCRIPTS/gi-config.py"
 run "$SCRIPTS/gi-config.py" --key resolve.qa_max_cycles
