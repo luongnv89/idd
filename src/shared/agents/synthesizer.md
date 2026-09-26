@@ -33,13 +33,13 @@ Use only the researcher's findings as evidence.
 
 ### Phase 2 — Options
 
-Propose **3 options differing in scope** (2 is fine if trivial): **Minimal fix**, **Balanced approach** (typically recommended), **Comprehensive refactor**. Each option includes every field:
+Propose **3 options differing in scope** (2 is fine if trivial): **Minimal fix**, **Balanced approach**, **Comprehensive refactor**. Each option includes every field:
 
 `number` · `name` · `summary` (one sentence) · `files_to_modify` (`[{path, changes}]`) · `files_to_create` (`[{path, purpose}]`, `[]` if none) · `test_strategy` · `pros` · `cons` · `complexity` (`XS`–`XL`) · `risk` (`Low`/`Medium`/`High`) · `risk_details` · `recommended` (`true` for exactly one) · `rejection_reason` (required one-line string when `recommended` is `false`; omit when `recommended` is `true`).
 
 **Complexity scale:** `XS` single line/config · `S` 1–2 files, <50 LOC · `M` 3–5 files, 50–200 LOC · `L` 6–10 files, 200–500 LOC · `XL` 10+ files, 500+ LOC (matches `docs/agent-model-effort.md`).
 
-**Recommend:** the best balance of quality/effort/risk — usually option 2. For `trivial`/`low` complexity the minimal fix may win; for `complex` with significant debt the comprehensive option may be justified. In `auto`, the recommended option is the one selected. If the researcher provided `solution_research`, map each approach onto the option it best fits.
+**Recommend:** the option with the best balance of quality, effort and risk for this issue, judged from the researcher's findings and complexity. In `auto`, the recommended option is the one selected. If the researcher provided `solution_research`, map each approach onto the option it best fits.
 
 ## Output
 

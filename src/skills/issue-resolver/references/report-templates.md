@@ -140,8 +140,8 @@ the single PR reference (number, title, URL, `Closes #N`). Print it **once**,
 immediately after the tracker's `[5/5]` line — do not also print a separate
 step-by-step report. Pick the variant that matches the run's outcome.
 
-> Why so spare: the tracker is the recap. Restating its metrics here is the
-> duplication #165 removed — keep this block to the outcome, the one un-shown
+> Why so spare: the tracker is the recap. Restating its metrics here would
+> report the same number twice — keep this block to the outcome, the one un-shown
 > metric (risk), and the PR reference.
 
 ### Successful Resolution
@@ -285,7 +285,7 @@ Rules that make the report worth reading:
 - `√` — the check passed. `×` — it did not. One entry per check the step actually
   validates. Checks are **gates that could have failed**, never restatements of a
   metric the tracker line already carries (files read, counts, option number) —
-  restating those is the duplication issue #165 removed.
+  restating those would report the same fact twice.
 - `Result: PASS` — every check is `√`; continue.
 - `Result: PARTIAL` — only non-blocking checks are `×`; continue, and carry the
   gap into the closing summary so it is never silently dropped.

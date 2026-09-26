@@ -6,7 +6,7 @@
 
 Map the ecosystem of issues — how they connect through shared files, how commits relate through history, how PRs incidentally fix what they never targeted.
 
-The shared conventions are inlined into the prompt below; `https://github.com/luongnv89/idd/blob/main/docs/shared-agent-conventions.md` is their single source of truth (and carries the orchestrator-side spawn parameters). Merges the former `dependency-scanner` and `history-scanner`.
+The shared conventions are inlined into the prompt below; `https://github.com/luongnv89/idd/blob/main/docs/shared-agent-conventions.md` is their single source of truth (and carries the orchestrator-side spawn parameters).
 
 ## Shared agent conventions (inlined — no file lookup required)
 

@@ -148,7 +148,7 @@ Both conditions must hold:
    the synthesizer reports `overall_complexity: L` or `XL`, **or** `overall_risk: High`
    (equivalently the researcher's `complexity` is `high` or `complex`). For
    `trivial`/`low`/`medium` (`overall_complexity` `XS`/`S`/`M` with non-`High` risk) the
-   checkpoint is skipped and the pipeline runs the fast path exactly as before.
+   checkpoint is skipped and the pipeline runs the fast path.
 2. **Interactive mode.** In auto mode (`--auto` / `IDD_AUTO_MODE=1`) the checkpoint is
    never presented — see *Auto mode* below.
 

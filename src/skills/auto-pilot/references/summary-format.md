@@ -161,7 +161,7 @@ Rules that make the report worth reading:
 - `√` — the check passed. `×` — it did not. One entry per check the step actually
   validates. Checks are **gates that could have failed**, never restatements of a
   metric the tracker line already carries (files read, counts, option number) —
-  restating those is the duplication issue #165 removed.
+  restating those would report the same fact twice.
 - `Result: PASS` — every check is `√`; continue.
 - `Result: PARTIAL` — only non-blocking checks are `×`; continue, and carry the
   gap into the closing summary so it is never silently dropped.
@@ -174,11 +174,10 @@ Rules that make the report worth reading:
 
 `Triage current` is `√` when the order the pick used is current — a full triage
 this iteration ran, a cache *Step 1.1a* read as `fresh`, or a cache *Step 1.6*
-(`references/phases/phase-5-merge.md`) updated after the last merge. It is not "a triage ran this iteration": under
-issue #258 a run triages once and updates incrementally, so a name that asserted
-a refresh would mark every reuse iteration `×` and turn a working loop into a
-wall of `PARTIAL`. It is `×` only when the gate degraded and the pick ran against
-an order nothing could vouch for.
+(`references/phases/phase-5-merge.md`) updated after the last merge. A run triages
+once, reuses a `fresh` cache, and updates it incrementally after each merge;
+cache reuse satisfies this check. It is `×` only when the gate degraded and the
+pick ran against an order nothing could vouch for.
 
 `Runtime budget` is `√` when the check ran and the budget had time left, and
 `×` when it could not be evaluated (`gi-ratelimit` degraded) — an expired budget

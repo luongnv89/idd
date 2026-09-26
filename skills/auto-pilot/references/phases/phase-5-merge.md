@@ -413,7 +413,7 @@ A resumed run learns what is already done from `processed[]` and `skip_list[]`,
 never from `queue`, so re-deriving `queue` per merge would buy nothing and would
 destroy the only record of the run's original scope. **Do not "fix" the
 divergence by writing one into the other** — that would collapse two facts into
-one and is exactly the duplicated-home failure issue #248 forbids.
+one with two homes that can drift.
 
 > **Note:** Skipped in explicit list mode (`--issues`), with the rest of Phase 1
 > (the note at the top of `references/phases/phase-1-triage-pick.md`). That mode never triages, so there is no
@@ -457,8 +457,8 @@ Write tool:
 1. Drop the resolved number from `issues[]`.
 2. Drop it from `summary.suggested_order`.
 3. Drop it from every `summary.parallel_groups` entry, and drop any group that
-   empties as a result — a group of zero is not a parallel set, and issue #260's
-   consumer reads these directly.
+   empties as a result — a group of zero is not a parallel set, and the
+   `max_parallel > 1` scheduler reads these groups directly.
 4. Drop it from every remaining issue's `blocked_by` and from every remaining
    issue's `blocks`.
 5. Discard the entire `summary.circular_deps` chain when it contains the

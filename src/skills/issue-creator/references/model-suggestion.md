@@ -4,7 +4,7 @@ How `/issue-creator` suggests a cost-effective model + thinking level for each
 issue, and how it manages the local CursorBench data cache. This procedure
 runs when `model_suggestion.enabled` is `true` in `.gitissue.yml`
 (default: `true`). When disabled, every step here is skipped
-silently — issue creation behaves exactly as before.
+silently — create the issue without a model suggestion.
 
 The suggestion is **advisory metadata**, like priority and effort. It never
 blocks issue creation: any fetch, cache, or parse failure degrades to a warning

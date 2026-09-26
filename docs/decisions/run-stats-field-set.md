@@ -106,6 +106,8 @@ divergence from `skill-auto-improver` is now intentional and recorded, so the
 
 ## Consequences
 
+- **2026-09-26 amendment (#475):** The runtime contract now omits the field-set rationale section; this ADR retains the rationale, and the footer fields and overhead rules are unchanged.
+
 - The contract gains a section and no field. The printed block is unchanged, so
   AC6's byte-identity guarantee across the eight copies and every #410
   assertion in `tests/test-run-stats-373.sh` are untouched — the copies still

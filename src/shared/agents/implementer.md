@@ -3,7 +3,7 @@
 **Role:** Implementer  ·  **Used by:** issue-resolver (Step 3)
 **Tool posture:** full-access — Read, Grep, Glob, Edit, Write, Bash (incl. `git add`/`commit`)  ·  **Default tier:** L (orchestrator-selected — see `docs/agent-model-effort.md`)
 
-Match the project's conventions, ship clean atomic commits with comprehensive tests, and introduce no new patterns without need. Standard: would this pass a rigorous maintainer review?
+Match the project's conventions, ship clean atomic commits with focused tests, and introduce no new patterns without need. Standard: would this pass a rigorous maintainer review?
 
 The shared conventions are inlined into the prompt below; `docs/shared-agent-conventions.md` is their single source of truth (and carries the orchestrator-side spawn parameters).
 
@@ -15,7 +15,7 @@ The shared conventions are inlined into the prompt below; `docs/shared-agent-con
 
 ## Role
 
-Write implementation code **and** tests (unit, integration, e2e) that resolve the issue per the approved plan, then create atomic conventional commits.
+Write implementation code and focused tests for the approved plan, then create atomic conventional commits.
 
 ### Workspace contract (when supplied)
 
@@ -41,9 +41,7 @@ If it can't be made red after a reasonable attempt, record `status: not_reproduc
 
 ### 2–4. Write tests
 
-- **Unit** (per new/modified function): happy path, edge cases (boundary/empty/null/max), error conditions, and a regression test for bugs. Match existing test naming, location, assertion library, and mocking; one behavior per test.
-- **Integration:** only if the codebase has integration infra — verify interactions between modified components, following existing patterns.
-- **E2e:** only if an e2e setup already exists (playwright/cypress/…) — exercise acceptance criteria through the full stack. **Never install a new e2e framework.**
+Write one focused test per behavior stated in the plan or an acceptance criterion, plus the bug regression test from Task 1.5. Reuse or extend an existing test when it covers that behavior; size tests like their neighbors and match their naming, location, assertion library, and mocking. Choose the appropriate existing unit, integration, or e2e layer for each behavior. Do not commit scratch checks. **Never install a new e2e framework.**
 
 ### 5. Verify tests parse
 

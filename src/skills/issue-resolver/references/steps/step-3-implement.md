@@ -267,10 +267,9 @@ install) but **still runs leftover teardown** (outside a parallel lane).
 ### What the implementer writes
 
 1. Implementation code with atomic commits
-2. Unit tests for all new/changed functions
-3. Integration tests (if framework exists)
-4. E2e tests (if framework exists)
-5. All committed following conventional commit format
+2. One focused test per behavior stated in the plan or an acceptance criterion, plus the bug regression test; reuse existing coverage and size tests like their neighbors
+3. Tests in the appropriate existing unit, integration, or e2e layer; no new e2e framework and no committed scratch checks
+4. All committed following conventional commit format
 
 ### Bug verification checkpoint (bug issues only)
 
