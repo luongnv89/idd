@@ -61,6 +61,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import os
 import runpy
 import sys
@@ -141,8 +142,16 @@ def fetch(limit: int, repo: str | None) -> list[dict]:
     return [row for row in loaded if isinstance(row, dict)]
 
 
+def _is_int(value: object) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool)
+
+
 def read_snapshot(path: Path) -> dict | None:
-    """The snapshot, or None when it is absent or not the documented shape."""
+    """The snapshot, or None when it is absent or not the documented shape.
+
+    Every meta key is type-checked, so a snapshot that passes can be compared
+    by servable() and reported by status() without raising.
+    """
     try:
         loaded = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
@@ -152,14 +161,16 @@ def read_snapshot(path: Path) -> dict | None:
     meta, issues = loaded.get("meta"), loaded.get("issues")
     if not isinstance(meta, dict) or not isinstance(issues, list):
         return None
-    fetched_at, fetch_limit = meta.get("fetched_at"), meta.get("fetch_limit")
-    fields, row_count = meta.get("fields"), meta.get("row_count")
+    fetched_at, fields = meta.get("fetched_at"), meta.get("fields")
     if (
         not isinstance(fetched_at, (int, float)) or isinstance(fetched_at, bool)
-        or not isinstance(fetch_limit, int) or isinstance(fetch_limit, bool)
-        or not isinstance(row_count, int) or isinstance(row_count, bool)
-        or row_count != len(issues)
+        or not math.isfinite(fetched_at)
+        or not _is_int(meta.get("fetch_limit"))
+        or not _is_int(meta.get("row_count"))
+        or meta["row_count"] != len(issues)
         or not isinstance(fields, list)
+        or not all(isinstance(field, str) for field in fields)
+        or not isinstance(meta.get("repo"), (str, type(None)))
         or not all(isinstance(row, dict) for row in issues)
     ):
         return None
@@ -230,12 +241,19 @@ def load(
     path = snapshot_path(root, repo)
     now = time.time()
 
-    snap = None if refresh or ttl <= 0 else read_snapshot(path)
-    cached = snap is not None and servable(snap, limit, fields, repo, ttl, now)
-    if cached:
-        issues = snap["issues"]
-        age = int(now - snap["meta"]["fetched_at"])
-    else:
+    cached = False
+    if not refresh and ttl > 0:
+        # A snapshot is an optimization: anything unexpected on the cached
+        # path is a miss, never an exit — the live fetch below answers.
+        try:
+            snap = read_snapshot(path)
+            if snap is not None and servable(snap, limit, fields, repo, ttl, now):
+                issues = snap["issues"]
+                age = int(now - snap["meta"]["fetched_at"])
+                cached = True
+        except Exception:
+            cached = False
+    if not cached:
         issues = fetch(limit + 1, repo)
         age = 0
         write_snapshot(path, {

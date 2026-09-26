@@ -247,16 +247,28 @@ o="$(python3 "$BACKLOG" --limit 3 --cache-dir "$C")"
 C="$TMP/c6"
 python3 "$BACKLOG" --limit 3 --cache-dir "$C" >/dev/null
 SNAP="$(ls "$C"/backlog-open-*.json)"
+# Fresh-stamped snapshots with one wrong-typed meta key: each must still miss,
+# not crash (a list-of-lists `fields` used to raise TypeError -> exit 1).
+NOW="$(date +%s)"
+fresh() { # fresh <fields> <fetch_limit> <repo> <row_count> <issues> [fetched_at]
+  printf '{"meta":{"fetched_at":%s,"fetch_limit":%s,"fields":%s,"repo":%s,"row_count":%s},"issues":%s}' \
+    "${6:-$NOW}" "$2" "$1" "$3" "$4" "$5"
+}
 i=0
 for garbage in 'not json at all' '{"meta":{}}' '[1,2,3]' '{"meta":{"fetched_at":"x","fetch_limit":4,"fields":[],"repo":null,"row_count":0},"issues":[]}' \
-               '{"meta":{"fetched_at":9e18,"fetch_limit":4,"fields":["number"],"repo":null,"row_count":9},"issues":[]}' ''; do
+               '{"meta":{"fetched_at":9e18,"fetch_limit":4,"fields":["number"],"repo":null,"row_count":9},"issues":[]}' '' \
+               "$(fresh '[["number"]]' 4 null 0 '[]')" "$(fresh '["number",1]' 4 null 0 '[]')" \
+               "$(fresh '["number"]' true null 0 '[]')" "$(fresh '["number"]' 4 5 0 '[]')" \
+               "$(fresh '["number"]' 4 null 1 '[1]')" "$(fresh '["number"]' 4 null 0 '[]' Infinity)"; do
   i=$((i + 1))
   printf '%s' "$garbage" > "$SNAP"; reset_log
+  python3 "$BACKLOG" --status --cache-dir "$C" >/dev/null 2>&1; st=$?
   o="$(python3 "$BACKLOG" --limit 3 --cache-dir "$C" 2>/dev/null)"; s=$?
-  if [ "$s" = 0 ] && [ "$(printf '%s' "$o" | jkey cached)" = false ] && [ "$(calls)" = 1 ]; then
-    pass "AC4: corrupt snapshot #$i degrades to a live fetch (exit 0)"
+  if [ "$st" = 0 ] && [ "$s" = 0 ] && [ "$(printf '%s' "$o" | jkey cached)" = false ] && [ "$(calls)" = 1 ] \
+     && [ "$(jkey meta.fields < "$SNAP")" = '["number", "title", "body", "labels", "assignees", "state", "createdAt", "updatedAt"]' ]; then
+    pass "AC4: corrupt snapshot #$i: --status exits 0; a read degrades to a live fetch and rewrites it"
   else
-    fail "AC4: corrupt snapshot #$i (exit $s, calls=$(calls))"
+    fail "AC4: corrupt snapshot #$i (status exit $st, exit $s, calls=$(calls))"
   fi
 done
 head -c 40 "$SNAP" > "$SNAP.cut" && mv "$SNAP.cut" "$SNAP"; reset_log

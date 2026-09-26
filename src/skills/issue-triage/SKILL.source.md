@@ -260,7 +260,7 @@ Read the open list through the shared snapshot in `shared/scripts/gi-backlog.py`
 python3 shared/scripts/gi-backlog.py --limit 100 --fields number,title,body,labels,assignees,state,createdAt,updatedAt
 ```
 
-Use the envelope's `.issues`. A snapshot younger than 5 minutes is served (`cached: true` — print `○ Backlog snapshot ({age_s}s old)`); `update` appends `--refresh` and auto mode appends `--ttl 0`, so both fetch live. Exit 3: stop. No `python3`, exit 2/4, or unparsable stdout: print `⚠ gi-backlog unavailable — fetching directly` and run:
+Use the envelope's `.issues`. A snapshot younger than 5 minutes is served (`cached: true` — print `○ Backlog snapshot ({age_s}s old)`); `update` appends `--refresh` and auto mode appends `--ttl 0`, so both fetch live. Exit 3: stop. No `python3`, other non-zero exit, bad JSON: print `⚠ gi-backlog unavailable — fetching directly` and run:
 
 ```bash
 gh issue list --state open --json number,title,body,labels,assignees,state,createdAt,updatedAt --limit 100
