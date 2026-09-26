@@ -8,7 +8,7 @@
 
 <p align="center">
   <a href="https://luongnv.com/idd/"><img src="https://img.shields.io/badge/website-luongnv.com%2Fidd-00FF41.svg?labelColor=0A0A0A" alt="Website"></a>
-  <a href="https://github.com/luongnv89/idd/releases/latest"><img src="https://img.shields.io/badge/version-0.21.0-blue.svg" alt="Version 0.21.0"></a>
+  <a href="https://github.com/luongnv89/idd/releases/latest"><img src="https://img.shields.io/badge/version-0.22.0-blue.svg" alt="Version 0.22.0"></a>
   <a href="https://github.com/luongnv89/idd/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="MIT License"></a>
   <a href="https://github.com/luongnv89/idd"><img src="https://img.shields.io/badge/commands-7-blue.svg" alt="7 commands"></a>
   <a href="https://github.com/luongnv89/idd/blob/main/CONTRIBUTING.md"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs Welcome"></a>
@@ -530,7 +530,7 @@ review:
   require_acceptance_criteria_check: true  # block soft-pass if AC verification fails
 ```
 
-Everything you don't set falls back to a sensible default. The advanced surface — custom templates, approval gates, GitHub Projects sync, analysis and monitoring knobs — lives in the full schema: [`docs/config-schema.md`](docs/config-schema.md)
+Everything you don't set falls back to a sensible default. Set `agents.model.<role>` and `agents.effort.<role>` to choose a model and thinking effort for individual subagent roles; each role falls back to its `agents.model.default` or `agents.effort.default` setting, then to the main agent configuration. See [agent overrides](docs/agent-overrides.md) for harness support and fallback behavior. Custom templates, approval gates, GitHub Projects sync, and all other settings are documented in the [full configuration schema](docs/config-schema.md).
 
 </details>
 

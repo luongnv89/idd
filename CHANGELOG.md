@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- gitissue:normalized v1 -->
 
+## v0.22.0 — 2026-09-26
+
+### Features
+- **agents:** configure a default or per-role model and thinking effort with `agents.model` and `agents.effort`. Skills apply the resolved values at subagent spawn sites, report unsupported options, and retry a rejected spawn once with inherited settings. Follow-up messages retain the agent's original spawn configuration. ([#457](https://github.com/luongnv89/idd/pull/457), [#460](https://github.com/luongnv89/idd/pull/460), [#463](https://github.com/luongnv89/idd/pull/463))
+- **run-log:** record whether agent overrides were `applied`, `partial`, or `fallback`; `/idd-doctor` summarizes those outcomes. The field is omitted when no spawned role had an override configured. ([#461](https://github.com/luongnv89/idd/pull/461))
+- **run-log:** record optional per-phase resolver durations, carry them through `/auto-pilot`'s single-writer log, and report the slowest recorded phase in `idd-lint stats` and `/idd-doctor`. ([#471](https://github.com/luongnv89/idd/pull/471))
+- **backlog:** share a five-minute open-issue snapshot between interactive triage and issue-creator duplicate checks. Cache misses and corruption fall back to live reads; issue creation invalidates the snapshot. Triage `update`, auto-mode triage, and safety gates use live reads. ([#473](https://github.com/luongnv89/idd/pull/473))
+- **evals:** add deterministic GitHub CLI invocation counts, a real-script cache evaluation, and reproducible offline evidence analysis. Counts serve as a regression measure; their relationship to runtime cost remains provisional. ([#472](https://github.com/luongnv89/idd/pull/472))
+
+### Fixes
+- **resolver:** copy QA handoff marker field names literally so a renamed `review=` field cannot silently invalidate reuse of completed QA. ([#448](https://github.com/luongnv89/idd/pull/448))
+- **config:** clarify that `review.ignore_ci_billing_failures` affects the review gate only and does not permit merging a PR with failed CI. ([#452](https://github.com/luongnv89/idd/pull/452))
+- **landing:** define SKILL.md and CursorBench at first use in FAQ structured data. ([#459](https://github.com/luongnv89/idd/pull/459))
+
+### Refactoring
+- **prompts:** split resolver procedures and auto-pilot phases into files loaded for the current step; record the accompanying live measurement. Remove obsolete runtime history and repeated rationale, focus tests on stated behaviors, and base implementation recommendations on findings. ([#441](https://github.com/luongnv89/idd/pull/441), [#450](https://github.com/luongnv89/idd/pull/450), [#487](https://github.com/luongnv89/idd/pull/487))
+- **build:** enforce per-skill prompt-surface byte budgets in CI, with a ratchet that lowers budgets after reductions and never raises them automatically. ([#470](https://github.com/luongnv89/idd/pull/470))
+
+### Maintenance
+- **tests:** disable automatic Git maintenance in batching-test fixtures so background repacking cannot race temporary-directory cleanup (#352).
+- **tests:** scope package enumeration to step and phase directories, clean up temporary spec files, and strengthen regression assertions. ([#444](https://github.com/luongnv89/idd/pull/444), [#445](https://github.com/luongnv89/idd/pull/445), [#449](https://github.com/luongnv89/idd/pull/449))
+- **model-data:** refresh CursorBench model suggestions, including the Fable 5.1 family. ([#437](https://github.com/luongnv89/idd/pull/437))
+- **landing:** shorten the search description, add FAQ structured data, and correct the skill count.
+
+Contributions by @luongnv89.
+
+**Full Changelog**: https://github.com/luongnv89/idd/compare/v0.21.0...v0.22.0
+
 ## v0.21.0 — 2026-08-29
 
 ### Features
