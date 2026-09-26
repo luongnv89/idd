@@ -7,9 +7,11 @@ one JSON object on stdin. Existing issues are either fetched by this script via
 ``gh --json`` or read from ``--issues-from`` for tests/debugging. Issue text is
 never accepted as a command-line argument. With ``--snapshot`` the fetch goes
 through the sibling ``gi-backlog.py`` shared open-issue snapshot (TTL 300 s,
-``--cache-dir`` defaulting to ``.gitissue/cache``); any snapshot failure —
+``--cache-dir`` defaulting to ``.gitissue/cache``). Any snapshot *failure* —
 missing or broken script, gh error, bad cache — falls through to this script's
-own live fetch, so the flag can change the number of gh calls, never the scores.
+own live fetch, so a failure never changes the scores; but a snapshot served
+inside its TTL may be up to 300 s stale (only ``/issue-creator``'s own creates
+invalidate it).
 It is opt-in so a stray snapshot in the working directory cannot answer for a
 caller that did not ask for one.
 

@@ -33,8 +33,11 @@ automated caller that must see a live list still leaves one behind for the next
 reader. (`gi-issue.py`'s `--ttl 0` skips the write as well — the difference is
 deliberate.) `--refresh` does the same for one call; `--status` reports a
 snapshot's age and freshness without fetching; `--invalidate` deletes every
-snapshot in the cache directory — anything that creates or edits an issue runs
-it so the next dedup scan sees the change.
+snapshot in the cache directory. Only `/issue-creator` runs it, after each issue
+it creates; edits, closes, merges, and other skills' creates do not, so a reader
+may see a list up to the TTL stale. Hence only advisory consumers (duplicate
+scoring, interactive triage ordering) may read the snapshot — no safety gate
+(eligibility or state checks, merge gates) may ever be served from it.
 
 Output on success is one JSON line on stdout:
 
@@ -146,6 +149,15 @@ def _is_int(value: object) -> bool:
     return isinstance(value, int) and not isinstance(value, bool)
 
 
+def _is_finite_number(value: object) -> bool:
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
+        return False
+    try:
+        return math.isfinite(value)
+    except OverflowError:  # an int too large for a float, e.g. 10**400
+        return False
+
+
 def read_snapshot(path: Path) -> dict | None:
     """The snapshot, or None when it is absent or not the documented shape.
 
@@ -163,8 +175,7 @@ def read_snapshot(path: Path) -> dict | None:
         return None
     fetched_at, fields = meta.get("fetched_at"), meta.get("fields")
     if (
-        not isinstance(fetched_at, (int, float)) or isinstance(fetched_at, bool)
-        or not math.isfinite(fetched_at)
+        not _is_finite_number(fetched_at)
         or not _is_int(meta.get("fetch_limit"))
         or not _is_int(meta.get("row_count"))
         or meta["row_count"] != len(issues)

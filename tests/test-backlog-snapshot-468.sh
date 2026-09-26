@@ -259,7 +259,8 @@ for garbage in 'not json at all' '{"meta":{}}' '[1,2,3]' '{"meta":{"fetched_at":
                '{"meta":{"fetched_at":9e18,"fetch_limit":4,"fields":["number"],"repo":null,"row_count":9},"issues":[]}' '' \
                "$(fresh '[["number"]]' 4 null 0 '[]')" "$(fresh '["number",1]' 4 null 0 '[]')" \
                "$(fresh '["number"]' true null 0 '[]')" "$(fresh '["number"]' 4 5 0 '[]')" \
-               "$(fresh '["number"]' 4 null 1 '[1]')" "$(fresh '["number"]' 4 null 0 '[]' Infinity)"; do
+               "$(fresh '["number"]' 4 null 1 '[1]')" "$(fresh '["number"]' 4 null 0 '[]' Infinity)" \
+               "$(fresh '["number"]' 4 null 0 '[]' "1$(printf '0%.0s' $(seq 400))")"; do
   i=$((i + 1))
   printf '%s' "$garbage" > "$SNAP"; reset_log
   python3 "$BACKLOG" --status --cache-dir "$C" >/dev/null 2>&1; st=$?
