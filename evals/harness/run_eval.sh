@@ -50,7 +50,9 @@ SUBJECT_WORK="$WORK/repo"
 HOME_DIR="$WORK/home"
 GH_CONFIG="$WORK/gh-config"
 GH_SHIM_COPY="$WORK/gh_shim.py"
-mkdir -p "$STATE" "$OUT" "$BIN" "$CASE_COPY" "$SUBJECT_WORK" "$HOME_DIR" "$GH_CONFIG"
+SCRIPTS_COPY="$WORK/scripts"
+GH_CALL_LOG="$WORK/gh-calls.jsonl"
+mkdir -p "$STATE" "$OUT" "$BIN" "$CASE_COPY" "$SUBJECT_WORK" "$HOME_DIR" "$GH_CONFIG" "$SCRIPTS_COPY"
 
 # Copy the complete case, including subject.sh, before execution. This keeps
 # $0, case-relative paths, and the working directory outside the checkout.
@@ -67,6 +69,40 @@ PYTHON_BIN="$(command -v python3 || true)"
 if [ -z "$PYTHON_BIN" ] || [ ! -x "$PYTHON_BIN" ]; then
   echo "✗ python3 is required for eval execution" >&2
   exit 2
+fi
+
+# Optional case.json "repo_scripts": real shared scripts a case runs instead of
+# a stand-in (issue #465). Validated and COPIED into $SCRIPTS_COPY — never
+# referenced in place — so the subject still cannot reach the checkout. Only a
+# regular file named src/shared/scripts/<lowercase-hyphen>.py is accepted, and
+# a bad entry stops here, before any subject runs, on every host.
+REPO_SCRIPTS_CHECK='
+import json, re, sys
+from pathlib import Path
+
+case = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+root = Path(sys.argv[2])
+entries = case.get("repo_scripts", []) if isinstance(case, dict) else []
+if not isinstance(entries, list):
+    sys.exit("  repo_scripts must be a list")
+for entry in entries:
+    if not isinstance(entry, str) or not re.fullmatch(
+        r"src/shared/scripts/[a-z0-9]+(?:-[a-z0-9]+)*[.]py", entry
+    ):
+        sys.exit(f"  repo_scripts entry not allowed: {entry!r}")
+    path = root / entry
+    if path.is_symlink() or not path.is_file():
+        sys.exit(f"  repo_scripts entry is not a regular file: {entry}")
+    print(entry)
+'
+if ! REPO_SCRIPTS="$("$PYTHON_BIN" -c "$REPO_SCRIPTS_CHECK" "$CASE_DIR/case.json" "$REPO_ROOT")"; then
+  echo "✗ invalid repo_scripts in $CASE_DIR/case.json" >&2
+  exit 2
+fi
+if [ -n "$REPO_SCRIPTS" ]; then
+  while IFS= read -r rel; do
+    cp "$REPO_ROOT/$rel" "$SCRIPTS_COPY/"
+  done <<< "$REPO_SCRIPTS"
 fi
 cat > "$BIN/gh" <<EOF
 #!/usr/bin/env bash
@@ -110,6 +146,11 @@ echo "  case: $CASE_DIR"
 echo "  out:  $OUT"
 echo "  gh:   $BIN/gh"
 
+# Every shim invocation appends one normalized-argv line here (issue #465).
+# Created up front so a case that makes no gh call still grades an empty log:
+# a missing log therefore always means broken wiring, never "zero calls".
+: > "$GH_CALL_LOG"
+
 # The subject gets only variables needed to run an eval. In particular, do
 # not pass credentials, proxies, or Git worktree variables from the host.
 SUBJECT_CMD="$WORK/run-subject.sh"
@@ -126,6 +167,8 @@ exec env -i \\
   EVAL_OUT="$OUT" \\
   EVAL_CASE_DIR="$CASE_COPY" \\
   EVAL_WORK="$WORK" \\
+  EVAL_SCRIPTS_DIR="$SCRIPTS_COPY" \\
+  EVAL_GH_CALL_LOG="$GH_CALL_LOG" \\
   bash "$CASE_COPY/subject.sh"
 EOF
 chmod 755 "$SUBJECT_CMD"
@@ -218,6 +261,11 @@ if [ "$SUBJECT_EXIT" -ne 0 ]; then
   exit "$SUBJECT_EXIT"
 fi
 echo "  ✓ subject completed"
+
+# The call log lives outside OUT while the subject runs and is published into
+# OUT only now, replacing (never following) anything the subject left there.
+rm -f "$OUT/gh-calls.jsonl"
+cp "$GH_CALL_LOG" "$OUT/gh-calls.jsonl"
 
 set +e
 REPO_ROOT="$REPO_ROOT" "$PYTHON_BIN" "$HARNESS_DIR/grade.py" --case "$CASE_DIR" --out "$OUT"

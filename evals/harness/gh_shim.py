@@ -7,6 +7,13 @@ satisfies skill-shaped `gh` invocations without opening a network socket.
 Environment
   EVAL_CASSETTES   path to cassettes.json (required in replay mode)
   EVAL_STATE_DIR   optional mutable state for issue create / sequential IDs
+  EVAL_GH_CALL_LOG optional path; when set, every invocation appends exactly
+                   one JSON line ``{"argv": [...]}`` holding the normalized
+                   argv (``--json`` field lists sorted) before anything else
+                   runs, so help, version and refused calls are counted too.
+                   No timestamp, pid, cwd or temp path is recorded: the same
+                   flow yields a byte-identical log on every run (issue #465).
+                   Unset, the shim writes nothing.
   EVAL_RECORD=1    local capture only: unmatched calls run real `gh` and
                    append to the cassette. NEVER enable in CI — tests fail
                    closed when this is set.
@@ -545,9 +552,36 @@ def _record_and_replay(argv: list[str], cassette_path: Path) -> int:
     return proc.returncode
 
 
+def _log_call(argv: list[str]) -> None:
+    """Append one deterministic record per invocation to EVAL_GH_CALL_LOG.
+
+    The record is the normalized argv and nothing else, so two runs of the same
+    flow produce byte-identical logs — the property the #465 cost counter rests
+    on. One ``write()`` of one full line, under an exclusive flock on the log
+    itself, keeps concurrent shim processes from interleaving records. A log
+    that cannot be written is reported, never fatal: the graded count then
+    comes up short and the case fails there, where the cause is visible.
+    """
+    raw = os.environ.get("EVAL_GH_CALL_LOG")
+    if not raw:
+        return
+    line = json.dumps({"argv": _normalize_argv(argv)}, ensure_ascii=False) + "\n"
+    try:
+        with open(raw, "a", encoding="utf-8") as fh:
+            fcntl.flock(fh.fileno(), fcntl.LOCK_EX)
+            fh.write(line)
+            fh.flush()
+    except OSError as exc:
+        _eprint(f"⚠ gh shim: cannot append to EVAL_GH_CALL_LOG {raw}: {exc}")
+
+
 def main(argv: list[str] | None = None) -> int:
     if argv is None:
         argv = sys.argv[1:]
+
+    # First, before any dispatch: every invocation is one call, whatever it
+    # turns out to be (help, version, a refused call, a cassette miss).
+    _log_call(argv)
 
     # Help / bare invocation — no cassette required.
     if not argv or argv[0] in ("--help", "-h", "help"):

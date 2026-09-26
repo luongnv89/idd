@@ -107,6 +107,11 @@ jobs:
         env:
           IDD_EVAL_REQUIRE_SANDBOX: "1"
 
+      - name: test-cost-counters-465
+        run: bash tests/test-cost-counters-465.sh
+        env:
+          IDD_EVAL_REQUIRE_SANDBOX: "1"
+
       - name: test-autopilot-modes
         run: bash tests/test-autopilot-modes.sh
 
