@@ -202,7 +202,7 @@ A handful of jobs are worse as prose than as code: restating the same config def
 | `gi-issue.py` | Serve repeat `gh issue view` reads from a TTL cache keyed by issue *and* field set (`src/shared/scripts/gi-issue.py:2`) | auto-pilot, issue-analysis, issue-creator, issue-pr-review, issue-resolver |
 | `gi-backlog.py` | Serve the open-issue list from one TTL snapshot shared by triage and the duplicate scorer; stale or corrupt snapshots refetch (`src/shared/scripts/gi-backlog.py:3`) | issue-creator, issue-triage |
 | `gi-branch.py` | Derive a branch name from an issue number, title, and type, and self-check it against the branch grammar (`src/shared/scripts/gi-branch.py:2`) | issue-resolver, auto-pilot |
-| `gi-dup-score.py` | Score proposed issues against the open backlog (`src/shared/scripts/gi-dup-score.py:2`) | issue-creator |
+| `gi-dup-score.py` | Score proposed issues against the open backlog (`src/shared/scripts/gi-dup-score.py:3`) | issue-creator |
 | `gi-gh.py` | Shared subprocess boundary for GitHub CLI calls (`src/shared/scripts/gi-gh.py:2`) | issue-analysis, issue-creator, issue-pr-review, issue-resolver, issue-triage, auto-pilot |
 | `gi-model-cache.py` | Locate, seed, and age the skill-level model-suggestion cache (`src/shared/scripts/gi-model-cache.py:2`) | issue-creator |
 | `gi-ratelimit.py` | Rate-limit verdict, chunked pause, backoff, and runtime budget (`src/shared/scripts/gi-ratelimit.py:2`) | auto-pilot |
