@@ -236,6 +236,8 @@ Verify these bundled files are present, each path resolved against the skill's d
 - `references/docs/agent-overrides.md` — per-role `agents.model` / `agents.effort` spawn rule
 - `references/docs/terminal-style.md` — symbols, tables, errors
 - `references/scripts/gi-config.py` — config resolver
+- `references/scripts/gi-backlog.py` — shared open-issue snapshot (Step 1)
+- `references/scripts/gi-gh.py` — GitHub CLI subprocess boundary
 - `references/scripts/gi-triage-graph.py` — cycles, order, parallel sets, staleness, priority
 
 ---
@@ -252,16 +254,24 @@ now**, before Step 1. No step is complete until its `Result:` line prints.
 
 ## Step 1 — Fetch Issues
 
+Read the open list through the shared snapshot in `references/scripts/gi-backlog.py` (its GitHub call goes through `references/scripts/gi-gh.py`); `/issue-creator`'s dedup reads the same file:
+
+```bash
+python3 references/scripts/gi-backlog.py --limit 100 --fields number,title,body,labels,assignees,state,createdAt,updatedAt
+```
+
+Use the envelope's `.issues`. A snapshot younger than 5 minutes is served (`cached: true` — print `○ Backlog snapshot ({age_s}s old)`); `update` appends `--refresh` and auto mode appends `--ttl 0`, so both fetch live. Exit 3: stop. No `python3`, exit 2/4, or unparsable stdout: print `⚠ gi-backlog unavailable — fetching directly` and run:
+
 ```bash
 gh issue list --state open --json number,title,body,labels,assignees,state,createdAt,updatedAt --limit 100
 ```
 
-With `triage.include_closed` true, run the same command with `--state closed` and merge. Past 100 open issues and no `--limit`, warn using `references/error-messages.md`:
+With `triage.include_closed` true, run that `gh` command with `--state closed` and merge. When `truncated` is true (fallback: exactly 100 rows) and no `--limit`, warn using `references/error-messages.md`:
 
 ```
-⚠ {count} open issues found. Analyzing first 100.
+⚠ More than 100 open issues found. Analyzing first 100.
 
-  To analyze all: /issue-triage --limit {count}
+  To analyze more: /issue-triage --limit {N}
 ```
 
 With `--limit N`, use N instead of 100. **Empty state**: with no open issues, output the message from `references/error-messages.md` and stop:

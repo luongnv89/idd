@@ -88,7 +88,7 @@ Exit 0 prints `state` (`fresh` | `stale` | `seeded` | `installed`), `stale`, `ag
 
 ## Subagent Architecture
 
-Scoring is deterministic and runs in `references/scripts/gi-dup-score.py`, its GitHub call delegated to the bundled `references/scripts/gi-gh.py` boundary. Only the **medium-band judgement (Step 3)** is delegated to a subagent — read `references/agents/duplicate-detector.md` for its prompt. That keeps up to 100 issue bodies out of the main agent's token budget. Every other step stays in the main agent.
+Scoring is deterministic and runs in `references/scripts/gi-dup-score.py`, its GitHub call delegated to the bundled `references/scripts/gi-gh.py` boundary and read through the shared open-issue snapshot in `references/scripts/gi-backlog.py` (5-minute TTL; any snapshot failure falls back to a live fetch). Only the **medium-band judgement (Step 3)** is delegated to a subagent — read `references/agents/duplicate-detector.md` for its prompt. That keeps up to 100 issue bodies out of the main agent's token budget. Every other step stays in the main agent.
 
 ### Environment check
 
@@ -123,7 +123,7 @@ Each is named again at the step that reads it:
   `references/docs/terminal-style.md`, `references/docs/agent-overrides.md`
 - `references/scripts/gi-config.py`, `references/scripts/gi-gh.py`,
   `references/scripts/gi-issue.py`, `references/scripts/gi-dup-score.py`,
-  `references/scripts/gi-model-cache.py`
+  `references/scripts/gi-backlog.py`, `references/scripts/gi-model-cache.py`
 
 ---
 
@@ -190,7 +190,7 @@ trap cleanup_dup_request EXIT
 trap 'exit 129' HUP
 trap 'exit 130' INT
 trap 'exit 143' TERM
-dup_output=$(python3 references/scripts/gi-dup-score.py < "$dup_request")
+dup_output=$(python3 references/scripts/gi-dup-score.py --snapshot < "$dup_request")
 dup_status=$?
 cleanup_dup_request
 trap - EXIT HUP INT TERM
@@ -285,7 +285,7 @@ When `issue.labels_auto_suggest` is true, pass the suggested labels; when false,
 gh issue create --title "{title}" --body "{populated_template}" [--label "{labels}"]
 ```
 
-The body is the populated template, `<!-- gitissue:normalized v1 -->` at the top. Print a step-by-step summary:
+The body is the populated template, `<!-- gitissue:normalized v1 -->` at the top. After each successful create, **mandatory**: `python3 references/scripts/gi-backlog.py --invalidate` (on failure, `rm -f .gitissue/cache/backlog-open-*.json`), so the next dedup scan sees the new issue. Print a step-by-step summary:
 
 ```
 ◆ Issue Created

@@ -314,7 +314,7 @@ When `parent` is bound, it flows into Step 5 (child marker) and Step 5.5 (parent
 
 ### Step 5 — Create Issues
 
-Create each approved issue sequentially using the same pipeline as single Create mode (generate content from template, `gh issue create`). Each issue gets the full template treatment — `<!-- gitissue:normalized v1 -->` marker, all sections populated.
+Create each approved issue sequentially using the same pipeline as single Create mode (generate content from template, `gh issue create`, snapshot `--invalidate`). Each issue gets the full template treatment — `<!-- gitissue:normalized v1 -->` marker, all sections populated.
 
 **Child hierarchy marker (only when a parent is bound in Step 4.5).** When — and only when — a `parent` is bound, append the hierarchy marker to **each child body** before `gh issue create`, on its own line at the very end of the body (after the Metadata section), mirroring how the children of an existing epic place it:
 

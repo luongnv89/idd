@@ -68,11 +68,11 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 
 ### Too many issues
 ```
-⚠ {count} open issues found. Analyzing first {limit}.
+⚠ More than {limit} open issues found. Analyzing first {limit}.
 
-  To analyze all: /issue-triage --limit {count}
+  To analyze more: /issue-triage --limit {N}
 ```
-**Trigger:** `gh issue list` returns more than the limit (default 100) and no `--limit` override was specified.
+**Trigger:** `gi-backlog.py` reports `truncated: true` (fallback: `gh issue list` returns exactly the limit, default 100) and no `--limit` override was specified.
 
 ### Circular dependencies
 ```
