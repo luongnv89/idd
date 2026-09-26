@@ -15,7 +15,7 @@
     },
     "issue-creator": {
       "budget": 172906,
-      "measured": 171882
+      "measured": 172307
     },
     "issue-pr-review": {
       "budget": 261394,
@@ -27,7 +27,7 @@
     },
     "issue-triage": {
       "budget": 127207,
-      "measured": 126183
+      "measured": 127100
     }
   }
 }

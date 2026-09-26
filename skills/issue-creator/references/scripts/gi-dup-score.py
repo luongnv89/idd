@@ -1,10 +1,19 @@
 #!/usr/bin/env python3
+# gi-requires: references/scripts/gi-backlog.py
 """Deterministically score proposed issues against the open backlog.
 
 Proposed items and resolved ``duplicate_detection.*`` configuration arrive as
 one JSON object on stdin. Existing issues are either fetched by this script via
 ``gh --json`` or read from ``--issues-from`` for tests/debugging. Issue text is
-never accepted as a command-line argument.
+never accepted as a command-line argument. With ``--snapshot`` the fetch goes
+through the sibling ``gi-backlog.py`` shared open-issue snapshot (TTL 300 s,
+``--cache-dir`` defaulting to ``.gitissue/cache``). Any snapshot *failure* —
+missing or broken script, gh error, bad cache — falls through to this script's
+own live fetch, so a failure never changes the scores; but a snapshot served
+inside its TTL may be up to 300 s stale (only ``/issue-creator``'s own creates
+invalidate it).
+It is opt-in so a stray snapshot in the working directory cannot answer for a
+caller that did not ask for one.
 
 The scorer's invariant is structural: every payment is computed from canonical
 item tokens that no earlier signal consumed. Title phrases, title overlap, and
@@ -541,7 +550,29 @@ def _gh_issue_list(limit: int, repo: str | None, fields: str) -> list[ScoreTarge
     return [entry for entry in value if isinstance(entry, dict)]
 
 
-def fetch_issues(limit: int, repo: str | None) -> tuple[list[ScoreTarget], bool]:
+def _snapshot_issues(
+    limit: int, repo: str | None, cache_dir: str | None
+) -> tuple[list[ScoreTarget], bool] | None:
+    """Read through gi-backlog.py's shared snapshot; None on any failure."""
+    try:
+        backlog = runpy.run_path(str(Path(__file__).with_name("gi-backlog.py")))
+        rows, truncated, _info = backlog["load"](
+            limit, ["number", "title", "body", "labels"], repo, 300, False, cache_dir
+        )
+        return cast(list[ScoreTarget], rows), bool(truncated)
+    except KeyboardInterrupt:
+        raise
+    except BaseException:  # SystemExit included: the snapshot is an optimization
+        return None
+
+
+def fetch_issues(
+    limit: int, repo: str | None, snapshot: bool = False, cache_dir: str | None = None
+) -> tuple[list[ScoreTarget], bool]:
+    if snapshot:
+        served = _snapshot_issues(limit, repo, cache_dir)
+        if served is not None:
+            return served
     issues = _gh_issue_list(limit, repo, "number,title,body,labels")
     truncated = False
     if len(issues) == limit:
@@ -589,6 +620,12 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--repo", metavar="OWNER/NAME")
     parser.add_argument("--issues-from", metavar="FILE")
+    parser.add_argument(
+        "--snapshot", action="store_true",
+        help="read the backlog through the shared gi-backlog.py snapshot",
+    )
+    parser.add_argument("--cache-dir", metavar="DIR",
+                        help="snapshot location for --snapshot (default .gitissue/cache)")
     parser.add_argument("--limit", type=int, metavar="N")
     parser.add_argument("--high", type=int, metavar="N")
     parser.add_argument("--medium", type=int, metavar="N")
@@ -605,7 +642,9 @@ def main(argv: list[str] | None = None) -> int:
             issues, truncated = load_issue_file(args.issues_from, config["backlog_limit"])
             source = "file"
         else:
-            issues, truncated = fetch_issues(config["backlog_limit"], args.repo)
+            issues, truncated = fetch_issues(
+                config["backlog_limit"], args.repo, args.snapshot, args.cache_dir
+            )
             source = "gh"
     except InvalidInput as exc:
         sys.stderr.write(f"✗ gi-dup-score: {exc}\n")

@@ -1279,6 +1279,9 @@ EXPECTED_SITES = {
     # 5 since issue #261: the behavioral eval grader invokes gi-runlog.py.
     "gi-model-cache.py": 2, "gi-runlog.py": 5, "gi-secscan.py": 4,
     "gi-stack-detect.py": 1, "gi-triage-graph.py": 2,
+    # 2 since issue #468: /issue-triage Step 1 reads the shared open-issue
+    # snapshot, and /issue-creator Step 6 invalidates it after each create.
+    "gi-backlog.py": 2,
 }
 # A call is any mention of a shared script by filename, however it is launched
 # (python3, python3.11, uv run, a bare ./path relying on the exec bit), plus the
