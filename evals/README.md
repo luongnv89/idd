@@ -130,7 +130,10 @@ the resolver's read pattern — miss, TTL hit, invalidate, miss, `--refresh` —
 grades the call log at exactly 3 `gh` calls, the same on every run.
 `python3 scripts/idd-cost-counters.py calls <log>` summarizes any call log; its
 `evidence` subcommand is the offline transcript miner behind the decision to
-adopt this counter. Method, raw numbers and verdicts are in
+adopt this counter provisionally: the exact count is a deterministic regression
+check, not a validated cost counter, because the evidence was measured on
+agent-issued `gh` calls and this case counts script-issued ones. Method, raw
+numbers and verdicts are in
 [docs/experiments/cost-counters-465.md](https://github.com/luongnv89/idd/blob/main/docs/experiments/cost-counters-465.md).
 
 ## Adding a case

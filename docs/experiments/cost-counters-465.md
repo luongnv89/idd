@@ -5,9 +5,12 @@
 **Change:** the eval shim logs every `gh` call; `grade.py` grades the count;
 `scripts/idd-cost-counters.py` summarizes a call log and mines the evidence.
 **Date:** 2026-09-26
-**Status:** complete. One counter adopted (gh calls per scripted flow), with
-the qualification in §6: its evidence was measured on agent-issued calls, so
-its link to cost is inferred, not measured. Four proposed and not adopted. Every number below is output of the tool in §3.4.
+**Status:** complete. One counter adopted provisionally (gh calls per scripted
+flow). Its exact count is kept as a deterministic regression check, but it is
+not a validated cost counter: the evidence in §6 was measured on agent-issued
+calls, and the lab counts script-issued ones, so its link to cost is inferred,
+not measured. Four proposed and not adopted. Every number below is output of
+the tool in §3.4.
 
 ## 1. Question
 
@@ -200,15 +203,19 @@ in the eval lab. To be plain about it: **the threshold was chosen after the
 data above had been seen.** It is a post-hoc bar, not a pre-registered one, and
 it should be read that way.
 
+A counter that meets the bar only through a related quantity, measured on a
+different set of calls, is adopted **provisionally**, not validated. That is the
+case for gh calls per flow below.
+
 | Counter | Verdict | Why |
 |---------|---------|-----|
-| **gh calls per flow** | **adopted, with a qualification** | The quantity "gh invocations per run" passes in both flows: 0.81 / 0.66, p <5e-05 / 0.0018. The duration cross-check agrees (0.64, p 0.0114). The lab produces it deterministically: the `gh-call-counter` case counts exactly 3, byte-identical across runs (`tests/test-cost-counters-465.sh`). The qualification: the evidence was measured on agent-issued calls, and the lab counts script-issued calls, a disjoint set (see the second caveat below). The lab counter's link to cost is inferred, not measured. |
+| **gh calls per flow** | **adopted provisionally** | The quantity "gh invocations per run" passes in both flows: 0.81 / 0.66, p <5e-05 / 0.0018. The duration cross-check agrees (0.64, p 0.0114). The lab produces it deterministically: the `gh-call-counter` case counts exactly 3, byte-identical across runs (`tests/test-cost-counters-465.sh`). The qualification: the evidence was measured on agent-issued calls, and the lab counts script-issued calls, a disjoint set (see the second caveat below). The lab counter's link to cost is inferred, not measured. What "provisionally" means: (a) the exact-count assertion (the `gh-call-counter` case graded at exactly 3; `tests/test-cost-counters-465.sh` T2/T10, run in CI) is kept as a deterministic regression count, so CI fails if the count moves; (b) it is not a validated cost counter, and not a cost budget, target or ratchet, so nothing should be optimized against it as a cost proxy yet; (c) promoting it to a validated cost counter needs evidence measured on script-issued gh calls, for example per-run counts of gh processes spawned inside shared scripts, correlated against run cost. |
 | gh output bytes | proposed — not adopted | Below the bar in both flows: 0.49 in resolver, and 0.35 in review, where p 0.112 is not significant. Its partial ρ is near zero or negative. |
 | subagent spawns | proposed — not adopted | The sign flips between flows (−0.30 resolver, 0.76 review). This is a flow-mix artifact. The older resolver runs (session `adbacce0`, issues 415–426) ran inline with 0 spawns but were among the most expensive runs. The review sample mixes orchestrators, which spawn reviewers, with single reviewers, which spawn nothing. |
 | runtime tool-result bytes | proposed — not adopted | Clears the correlation bar (0.66 / 0.93), but nothing in the lab can produce it deterministically. It is the size of what an agent chose to read and run, and the eval lab runs no agent. The resolver's partial ρ of 0.09 also says it mostly tracks the number of tool calls. |
 | static bundle / directed-read bytes | proposed — not adopted | Constant for a given build, so it has no per-run variance and cannot correlate with per-run cost. `scripts/skill-budget.py` (#466) stays what it is: a size budget, not a validated cost counter. |
 
-### Caveats on the adopted counter
+### Caveats on the provisionally adopted counter
 
 - **It is partly a proxy for run length.** With `tools` held fixed, the
   partial ρ drops to 0.44 (resolver) and 0.25 (review). A good share of the

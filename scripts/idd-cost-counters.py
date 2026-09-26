@@ -9,10 +9,11 @@ Two jobs, one per subcommand:
       gh invocations and a per-command tally, where a command is the first two
       argv tokens (`issue view`, `pr checks`, …). The shim records the
       normalized argv and nothing else, so the same scripted flow always yields
-      the same log and this summary is byte-stable. This is the adopted
-      counter: gh calls per scripted flow. It counts script-issued calls; the
-      evidence below counts agent-issued ones, so its link to cost is
-      inferred, not measured (see the doc's §6).
+      the same log and this summary is byte-stable. This is the provisionally
+      adopted counter: gh calls per scripted flow. It is kept as a
+      deterministic regression count, not a validated cost counter. It counts
+      script-issued calls; the evidence below counts agent-issued ones, so its
+      link to cost is inferred, not measured (see the doc's §6).
 
   evidence DIR
       Mine local Claude Code session transcripts for the evidence that decides
