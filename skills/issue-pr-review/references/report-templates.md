@@ -261,7 +261,7 @@ Rules that make the report worth reading:
 - `√` — the check passed. `×` — it did not. One entry per check the step actually
   validates. Checks are **gates that could have failed**, never restatements of a
   metric the tracker line already carries (files read, counts, option number) —
-  restating those is the duplication issue #165 removed.
+  restating those would report the same fact twice.
 - `Result: PASS` — every check is `√`; continue.
 - `Result: PARTIAL` — only non-blocking checks are `×`; continue, and carry the
   gap into the closing summary so it is never silently dropped.

@@ -25,8 +25,8 @@
 # first as unresolvable on every current host, the second as a run-activity
 # metric on the #165 line, the third as the per-step tally Overhead forbids.
 # docs/decisions/run-stats-field-set.md is the record. This suite now pins both
-# the contract's own statement of that decision and the record itself, so a
-# silent widening of the footer fails here rather than shipping.
+# the contract's field limits and the ADR's rationale, so a silent widening fails
+# here without loading decision history into every skill run (#475).
 #
 # AC6 is enforced structurally: references/run-stats.md is byte-identical in
 # every skill, so "consistent across skills" is a checksum, not a promise. The
@@ -214,8 +214,8 @@ echo ""
 echo "  #165 — no duplicated metrics"
 check_has  "$SPEC" '^## What the footer must not carry' \
   "#165: the contract forbids repeating already-printed metrics"
-check_flow "$SPEC" 'the duplication issue #165 removed' \
-  "#165: the contract cites the issue the rule comes from"
+check_flow "$SPEC" 'would report the same number twice' \
+  "#165: the contract explains why metrics must not be repeated"
 echo ""
 
 # ── #414 — the settled field set: three fields, and why not six ─────────────
@@ -224,22 +224,26 @@ ADR="$REPO_ROOT/docs/decisions/run-stats-field-set.md"
 if [ ! -f "$ADR" ]; then
   fail "#414/AC1: docs/decisions/run-stats-field-set.md missing — the field-set decision has no record"
 fi
-check_has  "$SPEC" '^## Fields considered and not carried' \
-  "#414/AC1: the contract carries the recorded field-set decision"
+check_lacks "$SPEC" '^## Fields considered and not carried' \
+  "#475/AC1: field-set history stays outside the runtime contract"
 check_lacks "$SPEC" '^\| .(cost|skills|tool calls). \|' \
   "#414/AC3: no rejected field was added to the field table"
-check_flow "$SPEC" 'assessed once, repo-wide, in issue #414' \
-  "#414/AC1: the field set was settled once, not per skill"
-check_flow "$SPEC" 'exactly the defect issue #410 removed' \
-  "#414/AC1: a cost field is rejected on the #410 unresolvable-field ground"
-check_flow "$SPEC" 'omission is not a per-skill choice' \
-  "#414/AC3: a skills-invoked count is rejected because a per-skill drop is unavailable"
-check_flow "$SPEC" 'a running tally maintained across every step' \
-  "#414/AC1: a tool-call count is rejected on the Overhead ground"
-check_flow "$SPEC" 'Issue #165 narrowed this footer to run cost alone, and that narrowing stands' \
-  "#414/AC2: the #165 narrowing is addressed and left un-reversed"
-check_flow "$SPEC" 'a reversal has to be recorded as one' \
-  "#414/AC2: widening the footer is defined as a stated reversal"
+if [ -f "$ADR" ]; then
+  check_flow "$ADR" 'one repo-wide decision, not eight local ones' \
+    "#414/AC1: the field set was settled once, not per skill"
+  check_flow "$ADR" 'precisely the defect issue #410 removed' \
+    "#414/AC1: a cost field is rejected on the unresolvable-field ground"
+  check_flow "$ADR" 'omission is not a per-skill choice' \
+    "#414/AC3: a skills-invoked count cannot be dropped per skill"
+  check_flow "$ADR" 'running tally maintained across every step' \
+    "#414/AC1: a tool-call count is rejected on the Overhead ground"
+  check_flow "$ADR" 'upholds and reaffirms' \
+    "#414/AC2: the cost-only narrowing is addressed and left un-reversed"
+  check_flow "$ADR" 'A reversal must be recorded as one' \
+    "#414/AC2: widening the footer requires a stated reversal"
+  check_flow "$ADR" '[0-9]{4}-[0-9]{2}-[0-9]{2} amendment.*runtime contract now omits' \
+    "#475/AC3: a dated amendment records the rationale relocation"
+fi
 # The rendered example lines are the operative instruction — a rejected field
 # smuggled into one of them would ship even with the field table left alone.
 check_flow_lacks "$SPEC" '· (cost|skills|tool calls) ' \

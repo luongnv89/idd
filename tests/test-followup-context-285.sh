@@ -236,12 +236,14 @@ for f in "$RVE" "$BRVE"; do
   anchor_check "$f" rve-linked-issue-unreadable 'still raised' "the stop entry is not conditional on the flag: ${f#"$ROOT/"}"
 done
 
-# Snapshot budget supersedes the stale literal without weakening freshness reads.
-anchor_check "$AP" ap-snapshot-budget 'stale literal' "stale one-fetch wording is superseded"
-for term in '\*\*resolution\*\*' '\*\*mutation\*\*' '\*\*review\*\*'; do anchor_check "$AP" ap-snapshot-budget "$term" "snapshot budget names $term boundary"; done
-anchor_check "$AP" ap-snapshot-budget 'not count as a body snapshot' "live non-body freshness probe remains required"
-anchor_check "$AP" ap-snapshot-budget '#284 is merged' "merged partial PR is recorded satisfied"
-anchor_check "$AP" ap-snapshot-budget '#293 already fixed' "CI polling follow-up is recorded satisfied"
+# Snapshot budget states the current rule without weakening freshness reads.
+for f in "$AP" "$ROOT/skills/auto-pilot/SKILL.md"; do
+  anchor_lacks "$f" ap-snapshot-budget 'stale literal|#284|#293' "snapshot contract omits migration history: $f"
+  anchor_lacks "$f" ap-snapshot-budget 'one body fetch|fetch per lifecycle' "snapshot contract omits one-fetch wording: $f"
+  for term in '\*\*resolution\*\*' '\*\*mutation\*\*' '\*\*review\*\*'; do anchor_check "$f" ap-snapshot-budget "$term" "snapshot budget names $term boundary: $f"; done
+  anchor_check "$f" ap-snapshot-budget 'not count as a body snapshot' "live non-body freshness probe remains required: $f"
+  anchor_check "$f" ap-snapshot-budget 'does not alter CI polling' "CI polling is unchanged: $f"
+done
 anchor_lacks "$PH" ap-deps-reuse-snapshot 'extra read of one issue' "dependency path no longer requires the duplicate read"
 lacks "$PH" 'extra read of one issue' "dependency path no longer requires the duplicate read (file-wide)"
 
