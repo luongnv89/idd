@@ -256,6 +256,22 @@ Don't have `asm`? `npm install -g agent-skill-manager`.
 
 `asm` is idempotent — re-running the same command updates installed skills in place with no duplicate files. Each installed skill is complete, so there is no separate shared-agent install step. After install, restart your agent tool so it picks up the new skill(s). The full install surface lives under [`skills/`](skills/): `issue-creator`, `issue-analysis`, `issue-resolver`, `issue-triage`, `issue-pr-review`, `auto-pilot`, and `init-gitissue`.
 
+#### Alternative — Claude Code plugin
+
+Claude Code users can install the same seven skills as one plugin. This repo is its own plugin marketplace, and the marketplace pins the plugin to the latest tagged release, so a plugin install ships exactly that release's `skills/`:
+
+```bash
+claude plugin marketplace add luongnv89/idd   # register the marketplace (once)
+claude plugin install idd@idd                 # install the plugin
+```
+
+Inside a session, `/plugin marketplace add luongnv89/idd` and `/plugin install idd@idd` do the same. Start a new session afterwards. Plugin skills are namespaced: `/idd:issue-creator`, `/idd:issue-resolver 42`, `/idd:auto-pilot`, and so on.
+
+- **Update** — auto-update is off by default for third-party marketplaces, so pull a new release yourself: `claude plugin marketplace update idd`, then `claude plugin update idd@idd`, then restart the session.
+- **Uninstall** — `claude plugin uninstall idd@idd`. To forget the marketplace too: `claude plugin marketplace remove idd`.
+- **Pick one install path.** Don't keep the plugin and an `asm` or manual copy side by side: both copies load, so every skill appears twice (`/issue-resolver` and `/idd:issue-resolver`), possibly at different versions.
+- **`/idd:auto-pilot` in a plugin-only install** needs the first release after v0.22.0. The v0.22.0 dependency preflight looks the other skills up only through `asm`, so without an `asm` install it stops with *Missing required skill*. The other six skills work from v0.22.0.
+
 #### Fallback — manual copy
 
 Skills are plain directories. If you prefer to see every file move, clone and copy:
