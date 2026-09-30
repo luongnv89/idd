@@ -76,13 +76,14 @@ Before starting the loop, verify the environment. On failure, output the exact e
 
 ## Dependency Preflight (mandatory)
 
-`/auto-pilot` invokes other gitissue skills. Verify each one is installed **before** the run lock, the auto-stash, or any triage, resolution, review, or merge:
+`/auto-pilot` invokes other gitissue skills. Verify each one is installed **before** the run lock, the auto-stash, or any triage, resolution, review, or merge. Bind `SKILL_DIR` to the dirname of this SKILL.md: a sibling `$SKILL_DIR/../<name>/SKILL.md` counts as installed (plugin, asm and copied installs all keep skills side by side); `asm list` is the fallback:
 
 ```bash
 for s in issue-triage issue-analysis issue-resolver issue-pr-review; do
-  asm list -p claude --json | grep -q "\"$s\"" || {
+  [ -f "$SKILL_DIR/../$s/SKILL.md" ] || asm list -p claude --json 2>/dev/null | grep -q "\"$s\"" || {
     echo "Missing required skill: $s" >&2
     echo "Install it:      asm install $s -p claude --yes" >&2
+    echo "Or as a plugin:  claude plugin install idd@idd" >&2
     echo "No asm yet:      npm install -g agent-skill-manager" >&2
     echo "Verify:          asm list -p claude --json | grep '$s'" >&2
     exit 1
