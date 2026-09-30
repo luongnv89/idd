@@ -83,7 +83,7 @@ for s in issue-triage issue-analysis issue-resolver issue-pr-review; do
   [ -f "$SKILL_DIR/../$s/SKILL.md" ] || asm list -p claude --json 2>/dev/null | grep -q "\"$s\"" || {
     echo "Missing required skill: $s" >&2
     echo "Install it:      asm install $s -p claude --yes" >&2
-    echo "Or as a plugin:  claude plugin install idd@idd" >&2
+    echo "Or as a plugin:  claude plugin marketplace add luongnv89/idd && claude plugin install idd@idd" >&2
     echo "No asm yet:      npm install -g agent-skill-manager" >&2
     echo "Verify:          asm list -p claude --json | grep '$s'" >&2
     exit 1
