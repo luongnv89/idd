@@ -87,6 +87,10 @@ docs/                              # All documentation — single tree (issue #8
 ├── decisions/                     #   repo's main branch only)
 ├── experiments/                   #
 └── release-notes/                 # ↑
+
+.claude-plugin/                    # Claude Code plugin + marketplace (issue #469)
+├── plugin.json                    #   repo root is the plugin; root skills/ auto-scanned
+└── marketplace.json               #   lists `idd`, pinned to the release tag (ref vX.Y.Z)
 ```
 
 ### Docs placement rule
