@@ -155,32 +155,45 @@ else
   if run_claude plugin validate --json "$PLUGIN_JSON" >"$TMP/c1.json" 2>"$TMP/c1.err"; then c1_rc=0; else c1_rc=$?; fi
   c1="$(python3 - "$TMP/c1.json" "$c1_rc" <<'PY'
 import json, sys
+# Type-safe on purpose: a changed validate --json shape must print a FAIL line,
+# never raise and leave stdout empty.
+def items(v):
+    return v if isinstance(v, list) else []
+def text(x):
+    return str(x.get("message", "?")) if isinstance(x, dict) else str(x)
 try:
     with open(sys.argv[1], encoding="utf-8") as f:
         d = json.load(f)
 except (OSError, ValueError):
     print("FAIL|C1: validate --json output is not JSON (exit %s)" % sys.argv[2]); sys.exit(0)
+if not isinstance(d, dict):
+    print("FAIL|C1: validate --json output is a %s, not an object (exit %s)" % (type(d).__name__, sys.argv[2])); sys.exit(0)
 problems = []
 if sys.argv[2] != "0":
     problems.append("exit " + sys.argv[2])
 if d.get("success") is not True:
     problems.append("success is not true")
-m = d.get("manifest") or {}
+m = d.get("manifest")
+m = m if isinstance(m, dict) else {}
 if m.get("type") != "plugin":
     problems.append("manifest type %r" % m.get("type"))
-problems += ["manifest error: " + e.get("message", "?") for e in m.get("errors") or []]
-problems += ["manifest warning: " + w.get("message", "?") for w in m.get("warnings") or []]
-for c in d.get("contents") or []:
-    name = c.get("file", "?")
-    problems += ["%s error: %s" % (name, e.get("message", "?")) for e in c.get("errors") or []]
-    problems += ["%s warning: %s" % (name, w.get("message", "?")) for w in c.get("warnings") or []
-                 if "CLAUDE.md at the plugin root" not in w.get("message", "")]
+problems += ["manifest error: " + text(e) for e in items(m.get("errors"))]
+problems += ["manifest warning: " + text(w) for w in items(m.get("warnings"))]
+for c in items(d.get("contents")):
+    if not isinstance(c, dict):
+        problems.append("contents item is a %s, not an object" % type(c).__name__)
+        continue
+    name = str(c.get("file", "?"))
+    problems += ["%s error: %s" % (name, text(e)) for e in items(c.get("errors"))]
+    problems += ["%s warning: %s" % (name, text(w)) for w in items(c.get("warnings"))
+                 if "CLAUDE.md at the plugin root" not in text(w)]
 if problems:
     print("FAIL|C1: plugin validate reported: " + "; ".join(problems))
 else:
     print("PASS|C1: claude plugin validate passes plugin.json and its skills")
 PY
 )"
+  [ -n "$c1" ] || fail "C1: validate output could not be parsed (exit $c1_rc)"
   while IFS='|' read -r verdict msg; do
     [ -n "$verdict" ] || continue
     if [ "$verdict" = "PASS" ]; then pass "$msg"; else fail "$msg"; fi
@@ -200,7 +213,11 @@ PY
     c3="$(python3 - "$TMP/c3.log" "$PLUGIN_JSON" "$EXPECTED_SKILLS" <<'PY'
 import json, re, sys
 text = open(sys.argv[1], encoding="utf-8").read()
-version = json.load(open(sys.argv[2], encoding="utf-8")).get("version")
+try:
+    plugin = json.load(open(sys.argv[2], encoding="utf-8"))
+except (OSError, ValueError):
+    plugin = None
+version = plugin.get("version") if isinstance(plugin, dict) else None
 expected = sorted(s for s in sys.argv[3].split("\n") if s)
 out = []
 first = text.strip().splitlines()[0] if text.strip() else ""
@@ -219,6 +236,7 @@ for label in ("Agents", "Hooks", "MCP servers", "LSP servers"):
 print("\n".join(out))
 PY
 )"
+    [ -n "$c3" ] || fail "C3: plugin details output could not be parsed"
     while IFS='|' read -r verdict msg; do
       [ -n "$verdict" ] || continue
       if [ "$verdict" = "PASS" ]; then pass "$msg"; else fail "$msg"; fi
