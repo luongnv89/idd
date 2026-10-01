@@ -551,8 +551,9 @@ fi
 #   2. the good cache survives, which is what the --install call site in
 #      references/model-suggestion.md promises ("the old cache is untouched").
 #   3. the *next* ordinary run still works. Writing the poison first bricked
-#      the cache permanently: every later run re-read it and re-crashed, and
-#      the script deliberately never reseeds over a cache it cannot read.
+#      the cache permanently: every later run re-read it and re-crashed. A
+#      poisoned cache would now be ignored (⚠) and reseeded (#491), but the
+#      guard keeps the refreshed cache from being clobbered in the first place.
 SK5="$TMP/skill5"
 new_skill_dir "$SK5"
 python3 "$MODEL" --skill-dir "$SK5" --cache-dir "${SK5}-cache" --no-config --now 2026-06-14 >/dev/null
@@ -761,6 +762,39 @@ if [ "$st" = "0" ] && [ "$(printf '%s' "$out" | jkey state)" = "installed" ] \
 else
   fail "#491: --install into an unusable root (exit $st: $out)"
 fi
+# A valid cache keeps working when the seed is missing: exit 0 with the cache's
+# data and a ⚠ line naming the unreadable seed — never exit 4 while a cache exists.
+MS="$TMP/missing-seed-skill"
+seed_dated "$MS" 2026-06-12
+python3 "$MODEL" --skill-dir "$MS" --cache-dir "$TMP/missing-seed-cache" --no-config --now 2026-06-14 >/dev/null
+rm -f "$MS/templates/model-data.json"
+err="$(python3 "$MODEL" --skill-dir "$MS" --cache-dir "$TMP/missing-seed-cache" --no-config --now 2026-06-14 2>&1 >"$TMP/ms.out")" && st=0 || st=$?
+out="$(cat "$TMP/ms.out")"
+ms_state="$(printf '%s' "$out" | jkey state 2>/dev/null || true)"
+if [ "$st" = "0" ] && { [ "$ms_state" = "fresh" ] || [ "$ms_state" = "stale" ]; } \
+   && printf '%s' "$err" | grep -q '⚠ gi-model-cache:'; then
+  pass "#491: a valid cache with a missing seed is used (exit 0, fresh/stale, ⚠)"
+else
+  fail "#491: a valid cache with a missing seed (exit $st, state $ms_state: $err)"
+fi
+
+# A symlinked dated entry in the cache root is never followed: a newer-dated
+# link to a valid model-data file outside the root is not used, and neither the
+# write nor the prune touches its target.
+SL="$TMP/symlink-entry-skill"
+seed_dated "$SL" 2026-06-12
+seed_dated "$TMP/symlink-outside" 2026-07-01
+mkdir -p "$TMP/symlink-entry-cache"
+ln -s "$TMP/symlink-outside/templates/model-data.json" "$TMP/symlink-entry-cache/model-data-2026-07-01.json"
+run_status out st python3 "$MODEL" --skill-dir "$SL" --cache-dir "$TMP/symlink-entry-cache" --no-config --now 2026-07-02
+sl_date="$(printf '%s' "$out" | jkey data_date 2>/dev/null || true)"
+if [ "$st" = "0" ] && [ -n "$sl_date" ] && [ "$sl_date" != "2026-07-01" ] \
+   && [ -f "$TMP/symlink-outside/templates/model-data.json" ]; then
+  pass "#491: a symlinked dated cache entry is skipped and its target left intact"
+else
+  fail "#491: a symlinked dated cache entry was followed (exit $st, data_date $sl_date)"
+fi
+
 if [ ! -e "$TMP/xdg-default/gitissue" ]; then
   pass "#491: every invocation in this file pinned its cache root"
 else

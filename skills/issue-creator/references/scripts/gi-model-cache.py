@@ -425,10 +425,11 @@ def parse_model_data(text: str, label: str) -> dict:
 def load_payload(path: str, label: str) -> dict:
     """Read a model-data document, or raise Unavailable.
 
-    A file that exists but cannot be parsed *or does not validate* is not
-    treated as absent. Falling through to the seed there would report `seeded`
-    while the user's refreshed data sits unreadable on disk — a silent
-    substitution of one data source for another, which this contract forbids.
+    A file that exists but cannot be parsed *or does not validate* raises
+    Unavailable rather than reading as absent; each caller decides what that
+    means. load_cache() turns it into a `⚠`-warned miss, so the seed replaces
+    the bad cache and the substitution is never silent (#491). The seed caller
+    degrades to exit 4 only when no valid cache exists either.
     """
     try:
         text = read_capped(path, f"{label} at {path}")

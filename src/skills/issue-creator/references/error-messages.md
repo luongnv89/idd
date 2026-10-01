@@ -244,4 +244,4 @@ All model-suggestion failures are **non-fatal** — they warn and continue creat
   Ignoring the cached copy and reseeding from the bundled snapshot.
   Tip: refresh with --refresh-model-data to fetch current data.
 ```
-**Trigger:** The user-level `model-data-<date>.json` cache exists but fails JSON parsing or validation (e.g. missing `complexity_mapping`). It is treated as a cache miss: the seed replaces it and suggestions continue.
+**Trigger:** The user-level `model-data-<date>.json` cache exists but fails JSON parsing or validation (e.g. missing `complexity_mapping`). It is treated as a cache miss: the seed replaces it and suggestions continue. From the script this is exit 0 plus a `⚠ gi-model-cache:` stderr line, echoed as-is.
