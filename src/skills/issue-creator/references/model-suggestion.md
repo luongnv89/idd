@@ -15,15 +15,18 @@ and the skill continues (mirroring the image-upload degradation pattern).
 | Item | Value |
 |------|-------|
 | Source | CursorBench 3.2 — `https://cursor.com/cursorbench` |
-| Cache file | `{skill_dir}/model-data-{YYYY-MM-DD}.json` — **skill-level, dated, one per machine** |
-| Bundled seed | `{skill_dir}/templates/model-data.json` — undated, ships inside the skill |
+| Cache file | `{cache_dir}/model-data-{YYYY-MM-DD}.json` — **user-level, dated, one per machine** |
+| Cache dir | `{cache_dir}` = `$IDD_CACHE_DIR`, else `${XDG_CACHE_HOME:-$HOME/.cache}/gitissue` |
+| Bundled seed | `{skill_dir}/templates/model-data.json` — undated, ships inside the skill, read-only |
 | Staleness threshold | 7 days (compared against the cache's `last_fetched`) |
 
-The model-suggestion cache is **skill-level data — it does not vary by
-repository.** One cache under the installed skill folder serves every repo on the
+The model-suggestion cache is **user-level data — it does not vary by
+repository.** One cache in the user's cache directory serves every repo on the
 machine, so users never re-seed or maintain duplicate caches across projects.
 `{skill_dir}` is the directory of the installed `issue-creator` skill (the
-dirname of its `SKILL.md`).
+dirname of its `SKILL.md`); it is only ever **read**, for the bundled seed.
+`{cache_dir}` is where the cache is written (`gi-model-cache.py --cache-dir`
+overrides it; a `{cache_dir}` that is itself a symlink is refused).
 
 **The cache filename carries the date it was last updated**
 (`model-data-{YYYY-MM-DD}.json`, e.g. `model-data-2026-09-02.json`). That date is
@@ -31,17 +34,20 @@ the date portion of the cache's own `last_fetched`, so the two can never
 disagree, and a glance at the filename tells you whether a refresh is likely
 needed without opening the file.
 
-The cache is **not** stored per-repo under `.gitissue/` and is **never
-committed**: it is regenerable runtime state, not project state. It lives at the
-**skill root**, never inside `templates/` — `templates/` ships only the undated
-seed, and the build copies that directory wholesale, so runtime state must stay
-out of it.
+The cache is **never per-repo** — not under `.gitissue/` — and is **never
+committed**: it is regenerable runtime state, not project state. It is also
+**never inside the skill folder**: a plugin update replaces the versioned plugin
+directory, an `asm install` replaces the copy, and `claude --plugin-dir .` points
+the skill folder at a git checkout, where a written cache would be an untracked
+file. `{cache_dir}` sits outside all of them.
 
-> **Upgrade note.** Reinstalling the skill (`asm install`, or a manual copy)
-> replaces the skill folder, so the dated cache is cleared on upgrade. This is
-> self-healing, not data loss: the freshly-installed seed reseeds the lifecycle
-> below (and is usually newer than the cache it replaced), and a refresh is
-> offered on the next run.
+> **Upgrade note.** Because the cache lives outside the skill folder, it
+> survives plugin updates and reinstalls. An upgrade can ship a newer bundled
+> seed, so the lifecycle compares the two by `last_fetched`: when the seed's
+> date is **newer** than the cache's, the seed wins and is written to
+> `{cache_dir}` (pruning the older copy); otherwise — including a tie — the
+> cache is kept. A refreshed cache is therefore never overwritten by an older
+> seed, and a weekly seed refresh still reaches every install.
 
 The cache file mirrors the `triage.json` / `analysis-<N>.json` JSON conventions:
 a top-level ISO-8601 (`Z`) `last_fetched` timestamp, JSON formatted for readable
@@ -80,21 +86,22 @@ Only when `model_suggestion.enabled` is `true`.
 > **This section is refresh- and debug-only reading.** The default run does not
 > execute it: SKILL.md's *Configuration* step runs
 > `shared/scripts/gi-model-cache.py`, which performs the whole lifecycle —
-> locate, seed, prune, age against the TTL — and returns `state`, `stale`,
+> locate, seed, prune, age against the TTL — and returns `persisted`, `state`, `stale`,
 > `age_days`, `data_version`, `data_date`, and the resolved `bands` mapping.
 > What follows is the authoritative description of what that script does, the
 > procedure to run by hand when it degrades, and the refresh path (which still
 > needs WebFetch and therefore still needs an agent).
 
-### Locating the cache (skill-level, dated)
+### Locating the cache (user-level, dated)
 
-The cache lives in the installed skill folder, not per-repo. The script lists
-the skill root for `model-data-*.json` and selects the newest by its filename
-date; by hand, that is:
+The cache lives in `{cache_dir}`, not in the skill folder and not per-repo. The
+script lists `{cache_dir}` for `model-data-*.json` and selects the newest by its
+filename date; by hand, that is:
 
 ```bash
-# Newest skill-level cache, or empty if none exists yet.
-cache="$(ls -1 "$skill_dir"/model-data-*.json 2>/dev/null | sort | tail -n1)"
+cache_dir="${IDD_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/gitissue}"
+# Newest user-level cache, or empty if none exists yet.
+cache="$(ls -1 "$cache_dir"/model-data-*.json 2>/dev/null | sort | tail -n1)"
 ```
 
 The filename date (`model-data-{YYYY-MM-DD}.json`) is the human-glance signal;
@@ -102,11 +109,16 @@ the authoritative staleness check is always the cache's internal `last_fetched`.
 If several dated files are somehow present, the newest wins and the lifecycle
 prunes the rest on the next write (see *Refresh procedure*).
 
-A cache file that exists but does not parse is **not** treated as missing: the
-script exits 4 and says so rather than seeding over it, because reseeding there
-would silently replace the user's refreshed data with the bundled snapshot and
-report success. On exit 4 the skill disables model suggestions for the run and
-creates the issue without them — the same outcome as state 4 below.
+A cache file that does not parse or fails validation is treated as a **miss**,
+never used — it is stored fetched content. The script prints a `⚠` line naming
+it, so the substitution is never silent, and reseeds from the bundled seed,
+which prunes the bad copy. Exit 4 is reserved for state 4 below: no valid cache
+**and** no readable seed.
+
+When `{cache_dir}` is unusable (unwritable, a symlink, not a directory, or no
+absolute `$HOME`), nothing is written: the seed is served from memory for this
+run, the script exits 0 with `persisted: false` and `cache_file: null`, and
+prints a `⚠` line. Suggestions keep working; only the cache is skipped.
 
 > **Per-repo legacy cache (AC7).** A pre-existing `.gitissue/model-data.json`
 > from an older skill version is **ignored** — the skill neither reads nor
@@ -129,23 +141,24 @@ creates the issue without them — the same outcome as state 4 below.
      Refresh now? [y/N]
    ```
 
-3. **Cache missing** (script `state: "seeded"`) → seed it from the bundled
-   `templates/model-data.json` into the skill folder under a dated name, then
-   offer a fresh fetch. By hand:
+3. **Cache missing, invalid, or older than the seed** (script
+   `state: "seeded"`) → seed it from the bundled `templates/model-data.json`
+   into `{cache_dir}` under a dated name, then offer a fresh fetch. By hand:
    ```bash
    # Date portion of the seed's own last_fetched — NOT today's date — so the
    # filename date and the cache's last_fetched can never disagree (AC5).
    seed_date="$(grep -o '"last_fetched": *"[0-9-]\{10\}' \
      "$skill_dir/templates/model-data.json" | grep -o '[0-9-]\{10\}$')"
+   mkdir -p "$cache_dir"
    cp "$skill_dir/templates/model-data.json" \
-      "$skill_dir/model-data-${seed_date}.json"
+      "$cache_dir/model-data-${seed_date}.json"
    ```
    ```
    ○ Seeded model data from bundled CursorBench 3.2 snapshot.
      Fetch the latest now? [y/N]
    ```
 
-4. **Bundled seed also missing** (script exit 4) → emit the rich error
+4. **No valid cache and bundled seed also missing** (script exit 4) → emit the rich error
    `Model data unavailable` from `references/error-messages.md`, disable
    suggestions for this run, and continue creating the issue without them.
 
@@ -183,15 +196,16 @@ scoring tables. On success:
    ```
 
    The script names the file from the date portion of the payload's own
-   `last_fetched` and **deletes every other `model-data-*.json` in the skill
-   folder**, so exactly one dated cache remains and the filename can never
+   `last_fetched` and **deletes every other `model-data-*.json` in
+   `{cache_dir}`**, so exactly one dated cache remains and the filename can never
    disagree with the timestamp inside it. Exit 3 means the payload is not a
-   model-data document — stop and warn; the old cache is untouched. Delete the
-   scratch file afterwards.
+   model-data document — stop and warn; the old cache is untouched.
+   `persisted: false` means `{cache_dir}` was unusable: the refreshed data is
+   used for this run only. Delete the scratch file afterwards.
 
 By hand, when the script is unavailable: write the parsed data to
-`$skill_dir/model-data-{YYYY-MM-DD}.json` using the date portion of the new
-`last_fetched`, then delete every other `model-data-*.json` in the skill folder.
+`$cache_dir/model-data-{YYYY-MM-DD}.json` using the date portion of the new
+`last_fetched`, then delete every other `model-data-*.json` in `$cache_dir`.
 
 On any failure (network, parse, empty result), warn with
 `Model data refresh failed` from `references/error-messages.md` and keep the
@@ -303,7 +317,7 @@ changes from the pre-feature behaviour.
 model_suggestion:
   # Master switch. When false, all model-suggestion behaviour is skipped.
   enabled: true
-  # Source URL refreshed into the skill-level model-data-<date>.json cache
+  # Source URL refreshed into the user-level model-data-<date>.json cache
   data_url: "https://cursor.com/cursorbench"
   # Days before the cache is considered stale
   cache_ttl_days: 7

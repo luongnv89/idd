@@ -2,18 +2,35 @@
 """Run the model-suggestion data cache lifecycle for /issue-creator.
 
 The lifecycle is `ls`, `cp`, a date subtraction, and a few `jq` lookups — locate
-the newest `model-data-<date>.json` in the installed skill folder, seed it from
-the bundled snapshot when there is none, compare `last_fetched` against the TTL,
-and read the effort band's two model names and their per-task costs. Shipped as
-prose it is a 12.3 KB reference document read on every default run, to compute
-an answer that has exactly one correct value.
+the newest `model-data-<date>.json` in the user-level cache root, seed it from
+the bundled snapshot when there is none (or when the snapshot is newer), compare
+`last_fetched` against the TTL, and read the effort band's two model names and
+their per-task costs. Shipped as prose it is a 12.3 KB reference document read on
+every default run, to compute an answer that has exactly one correct value.
 
 This script computes it and hands back everything the rendering rule needs, so
 the reference document becomes refresh- and debug-only reading.
 
+Two locations, two jobs (issue #491). `--skill-dir` is the installed skill and
+is only ever **read**: it holds the bundled seed, `templates/model-data.json`.
+Every install mode replaces or tracks that folder — a plugin update swaps the
+versioned plugin directory, an `asm` reinstall replaces the copy, and
+`claude --plugin-dir .` points it at a git checkout — so nothing is written
+there. The dated cache lives in a **user-level cache root**, resolved as
+`--cache-dir`, else `$IDD_CACHE_DIR`, else `${XDG_CACHE_HOME:-$HOME/.cache}/gitissue`
+(a relative `XDG_CACHE_HOME` is ignored, as the XDG spec requires). It is outside
+every skill folder and every repository, so it survives upgrades and is never
+committed. A root that is itself a symlink is refused.
+
+Freshness: when both a valid cache and the seed exist, the one with the newer
+`last_fetched` date wins (a tie keeps the cache), so a reinstall that ships a
+newer seed still reaches users who already have a cache. A seed that wins is
+written to the cache root and the older dated copies are pruned.
+
 Output on stdout, one JSON object:
 
-    {"state": "fresh", "cache_file": "…/model-data-2026-09-02.json",
+    {"state": "fresh", "cache_file": "…/gitissue/model-data-2026-09-02.json",
+     "cache_dir": "…/gitissue", "persisted": true,
      "last_fetched": "2026-09-02T00:00:00Z", "data_date": "2026-09-02",
      "data_version": "3.2", "source": "CursorBench 3.2",
      "age_days": 3, "stale": false, "ttl_days": 7, "pruned": [],
@@ -23,7 +40,10 @@ Output on stdout, one JSON object:
 `state` is one of `fresh`, `stale`, `seeded`, or `installed`. `stale` is also
 returned as its own boolean, because a freshly *seeded* cache can be stale too —
 the bundled snapshot carries the date it was built, never today's date, so the
-filename date and `last_fetched` can never disagree.
+filename date and `last_fetched` can never disagree. `persisted` is `false` (and
+`cache_file` is `null`) when the cache root cannot be used — unwritable, a
+symlink, not a directory, or no absolute home — and the data was served from
+memory for this run only.
 
 Refreshed data comes from the network (a WebFetch the agent performs), so it is
 untrusted: pass it as a **file path or on stdin** via `--install`, never
@@ -33,21 +53,23 @@ used or written: over the size cap, or any control/escape byte, over-long
 string, non-finite number, or negative number anywhere in the tree, and the
 document is refused rather than repaired. The cache stores fetched bytes across
 runs, so anything let in once re-enters on every later run without a refetch.
+A cached document that fails that boundary is therefore treated as a **miss**,
+never used: a `⚠` line on stderr names it, and the seed replaces it.
 
 Exit codes
-  0  the cache is in a usable state (`fresh`, `stale`, `seeded`, `installed`)
+  0  usable model data (`fresh`, `stale`, `seeded`, `installed`). Also when the
+     cache root is unusable: the seed (or the `--install` payload) is served
+     from memory with `persisted: false` and a `⚠ gi-model-cache: …` line on
+     stderr — a cache problem never disables suggestions while data exists.
   2  usage error
   3  invalid input — `--skill-dir` is not a directory, a negative `--ttl-days`,
      or an `--install` payload that is not a model-data object or fails
      validation (stderr: `✗ gi-model-cache: …`). Stop; the old cache is
      untouched.
-  4  cannot complete — no readable cache *and* no readable bundled seed, or the
-     newest cache is corrupt or fails validation (stderr:
-     `⚠ gi-model-cache: …`). Degrade: disable
-     model suggestions for this run and continue creating the issue, exactly as
-     the prose lifecycle's *Bundled seed also missing* state already says. A
-     corrupt cache is never silently replaced by the seed — that would report a
-     refresh the user never got.
+  4  cannot complete — no valid cache *and* no readable bundled seed (stderr:
+     `⚠ gi-model-cache: …`). Degrade: disable model suggestions for this run
+     and continue creating the issue, exactly as the prose lifecycle's
+     *Bundled seed also missing* state already says.
 
 Authored at src/shared/scripts/gi-model-cache.py — do not edit installed copies;
 edit the source and run ./scripts/build.sh.
@@ -68,6 +90,8 @@ import tempfile
 DEFAULT_TTL_DAYS = 7
 CACHE_GLOB_RE = re.compile(r"^model-data-(\d{4}-\d{2}-\d{2})\.json$")
 SEED_REL = os.path.join("templates", "model-data.json")
+CACHE_DIR_ENV = "IDD_CACHE_DIR"
+CACHE_SUBDIR = "gitissue"
 
 # --- the validation boundary --------------------------------------------------
 #
@@ -123,6 +147,10 @@ class InvalidInput(Exception):
 
 class Unavailable(Exception):
     """No usable model data — exit 4, caller disables suggestions."""
+
+
+class CacheUnwritable(Exception):
+    """The cache root cannot be used — serve from memory, `persisted: false`."""
 
 
 # --- configuration -----------------------------------------------------------
@@ -224,17 +252,64 @@ def resolve_ttl(args: argparse.Namespace) -> int:
 # --- cache -------------------------------------------------------------------
 
 
-def dated_caches(skill_dir: str) -> list[tuple[str, str]]:
-    """(date, path) for every `model-data-<date>.json`, newest first."""
+def resolve_cache_root(explicit: str | None) -> str | None:
+    """`--cache-dir`, else `$IDD_CACHE_DIR`, else the XDG user cache + `gitissue`.
+
+    Never the skill folder and never a repository: both are replaced or tracked
+    by every install mode (issue #491). Returns None when no absolute location
+    can be derived — a relative `~` would resolve against the working directory,
+    which is usually a repository, so it is refused rather than guessed.
+    """
+    if explicit:
+        return os.path.abspath(explicit)
+    env = os.environ.get(CACHE_DIR_ENV)
+    if env:
+        return os.path.abspath(env)
+    xdg = os.environ.get("XDG_CACHE_HOME")
+    if xdg and os.path.isabs(xdg):
+        return os.path.join(xdg, CACHE_SUBDIR)
+    home = os.path.expanduser("~")
+    if not os.path.isabs(home):
+        return None
+    return os.path.join(home, ".cache", CACHE_SUBDIR)
+
+
+def check_root(root: str | None) -> str:
+    """Return `root`, or raise CacheUnwritable when it cannot hold the cache.
+
+    Only the root itself is checked for a symlink: a symlinked *ancestor* such
+    as `~/.cache` on another volume is an ordinary setup, while a symlinked root
+    is a redirect planted where the cache was expected.
+    """
+    if root is None:
+        raise CacheUnwritable("no absolute cache directory (HOME is not set)")
+    if os.path.islink(root):
+        raise CacheUnwritable(f"the cache directory {root} is a symlink — refused")
+    if os.path.lexists(root) and not os.path.isdir(root):
+        raise CacheUnwritable(f"the cache directory {root} is not a directory")
+    return root
+
+
+def dated_caches(root: str | None) -> list[tuple[str, str]]:
+    """(date, path) for every `model-data-<date>.json`, newest first.
+
+    A root that does not exist yet is an empty cache (first run); nothing is
+    created here, so a read-only run never makes a directory. A symlinked entry
+    is skipped rather than followed.
+    """
+    root = check_root(root)
     try:
-        names = os.listdir(skill_dir)
+        names = os.listdir(root)
+    except FileNotFoundError:
+        return []
     except OSError as exc:
-        raise Unavailable(f"cannot list {skill_dir} — {exc}") from exc
+        raise CacheUnwritable(f"cannot list {root} — {exc}") from exc
     found = []
     for name in names:
         match = CACHE_GLOB_RE.match(name)
-        if match:
-            found.append((match.group(1), os.path.join(skill_dir, name)))
+        path = os.path.join(root, name)
+        if match and not os.path.islink(path):
+            found.append((match.group(1), path))
     return sorted(found, reverse=True)
 
 
@@ -350,10 +425,11 @@ def parse_model_data(text: str, label: str) -> dict:
 def load_payload(path: str, label: str) -> dict:
     """Read a model-data document, or raise Unavailable.
 
-    A file that exists but cannot be parsed *or does not validate* is not
-    treated as absent. Falling through to the seed there would report `seeded`
-    while the user's refreshed data sits unreadable on disk — a silent
-    substitution of one data source for another, which this contract forbids.
+    A file that exists but cannot be parsed *or does not validate* raises
+    Unavailable rather than reading as absent; each caller decides what that
+    means. load_cache() turns it into a `⚠`-warned miss, so the seed replaces
+    the bad cache and the substitution is never silent (#491). The seed caller
+    degrades to exit 4 only when no valid cache exists either.
     """
     try:
         text = read_capped(path, f"{label} at {path}")
@@ -472,9 +548,19 @@ def data_version(payload: dict) -> str | None:
     return text[start:end]
 
 
-def write_cache(skill_dir: str, payload: dict, date: str) -> tuple[str, list[str]]:
-    """Write the dated cache and prune every other dated copy."""
-    target = os.path.join(skill_dir, f"model-data-{date}.json")
+def write_cache(root: str | None, payload: dict, date: str) -> tuple[str, list[str]]:
+    """Write the dated cache into the cache root and prune every other dated copy.
+
+    Any failure — the root unusable, cannot be created, or the write itself —
+    raises CacheUnwritable; the caller then serves `payload` from memory.
+    """
+    root = check_root(root)
+    try:
+        os.makedirs(root, mode=0o700, exist_ok=True)
+    except OSError as exc:
+        raise CacheUnwritable(f"cannot create {root} — {exc}") from exc
+    root = check_root(root)  # re-checked: makedirs follows a symlink planted meanwhile
+    target = os.path.join(root, f"model-data-{date}.json")
     # `target + ".tmp"` opened with plain `open()` is a predictable path that
     # follows a symlink planted there, and inherits whatever the umask allows.
     # `mkstemp` is O_CREAT|O_EXCL|O_RDWR on an unpredictable name at mode 0600
@@ -483,7 +569,7 @@ def write_cache(skill_dir: str, payload: dict, date: str) -> tuple[str, list[str
     temp = None
     try:
         handle_fd, temp = tempfile.mkstemp(
-            dir=skill_dir, prefix=f".model-data-{date}.", suffix=".tmp"
+            dir=root, prefix=f".model-data-{date}.", suffix=".tmp"
         )
         with os.fdopen(handle_fd, "w", encoding="utf-8") as handle:
             # `allow_nan=False` keeps the cache RFC 8259 even if a future path
@@ -497,7 +583,7 @@ def write_cache(skill_dir: str, payload: dict, date: str) -> tuple[str, list[str
         os.replace(temp, target)
         temp = None
     except (OSError, ValueError, RecursionError) as exc:
-        raise Unavailable(f"cannot write {target} — {exc}") from exc
+        raise CacheUnwritable(f"cannot write {target} — {exc}") from exc
     finally:
         if temp is not None:
             try:
@@ -505,7 +591,11 @@ def write_cache(skill_dir: str, payload: dict, date: str) -> tuple[str, list[str
             except OSError:
                 pass
     pruned = []
-    for _, path in dated_caches(skill_dir):
+    try:
+        others = dated_caches(root)
+    except CacheUnwritable:
+        others = []
+    for _, path in others:
         if os.path.abspath(path) == os.path.abspath(target):
             continue
         try:
@@ -514,6 +604,42 @@ def write_cache(skill_dir: str, payload: dict, date: str) -> tuple[str, list[str
         except OSError:
             continue
     return target, sorted(pruned)
+
+
+def warn(message: str) -> None:
+    sys.stderr.write(f"⚠ gi-model-cache: {message}\n")
+
+
+def persist(root: str | None, payload: dict, date: str) -> tuple[str | None, list[str]]:
+    """Write the cache, or degrade to serving `payload` from memory this run."""
+    try:
+        return write_cache(root, payload, date)
+    except CacheUnwritable as exc:
+        warn(f"{exc}; using the model data from memory for this run (not cached)")
+        return None, []
+
+
+def load_cache(root: str | None) -> tuple[tuple[dict, str, str] | None, bool]:
+    """(newest valid cache as (payload, date, path) or None, root usable).
+
+    An unusable root, an empty root, and an invalid newest cache are all a
+    miss. An invalid cache gets a `⚠` line naming it and is left for the next
+    write to prune — it is never used, because it is stored fetched content.
+    """
+    try:
+        caches = dated_caches(root)
+    except CacheUnwritable as exc:
+        warn(f"{exc}; nothing is cached this run")
+        return None, False
+    if not caches:
+        return None, True
+    _, path = caches[0]
+    try:
+        payload = load_payload(path, "model-data cache")
+        return (payload, last_fetched_date(payload, "model-data cache"), path), True
+    except Unavailable as exc:
+        warn(f"ignoring the model-data cache — {exc}")
+        return None, True
 
 
 def read_install_payload(source: str) -> dict:
@@ -551,13 +677,21 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="gi-model-cache.py",
         description=(
-            "Locate, seed, age, and read the skill-level model-data cache. "
+            "Locate, seed, age, and read the user-level model-data cache. "
             "Prints one JSON object on stdout."
         ),
         epilog="Example: python3 gi-model-cache.py --skill-dir \"$skill_dir\"",
     )
     parser.add_argument(
-        "--skill-dir", required=True, metavar="DIR", help="installed issue-creator skill folder"
+        "--skill-dir", required=True, metavar="DIR",
+        help="installed issue-creator skill folder (read-only: holds the bundled seed)",
+    )
+    parser.add_argument(
+        "--cache-dir", metavar="DIR",
+        help=(
+            f"where the dated cache lives (default ${CACHE_DIR_ENV}, else "
+            f"${{XDG_CACHE_HOME:-$HOME/.cache}}/{CACHE_SUBDIR})"
+        ),
     )
     parser.add_argument(
         "--ttl-days", type=int, metavar="N",
@@ -595,32 +729,45 @@ def main(argv: list[str] | None = None) -> int:
                 ) from exc
         else:
             today = dt.datetime.now(dt.timezone.utc).date()
+        root = resolve_cache_root(args.cache_dir)
 
         if args.install:
             payload = read_install_payload(args.install)
             date = last_fetched_date(payload, "installed payload")
-            cache_file, pruned = write_cache(skill_dir, payload, date)
+            cache_file, pruned = persist(root, payload, date)
             state = "installed"
         else:
-            caches = dated_caches(skill_dir)
-            if caches:
-                date, cache_file = caches[0]
-                payload = load_payload(cache_file, "model-data cache")
-                date = last_fetched_date(payload, "model-data cache")
+            cached, root_usable = load_cache(root)
+            seed: tuple[dict, str] | None = None
+            if not args.no_seed:
+                seed_path = os.path.join(skill_dir, SEED_REL)
+                try:
+                    seed_payload = load_payload(seed_path, "bundled model-data seed")
+                    seed = (
+                        seed_payload,
+                        last_fetched_date(seed_payload, "bundled model-data seed"),
+                    )
+                except Unavailable as exc:
+                    if cached is None:
+                        raise
+                    warn(str(exc))
+            # The newer `last_fetched` date wins; a tie keeps the cache.
+            if cached is not None and (seed is None or cached[1] >= seed[1]):
+                payload, date, cache_file = cached
                 state = "fresh"
-            elif args.no_seed:
-                raise Unavailable("no model-data cache present and --no-seed was given")
-            else:
-                seed = os.path.join(skill_dir, SEED_REL)
-                payload = load_payload(seed, "bundled model-data seed")
-                date = last_fetched_date(payload, "bundled model-data seed")
-                cache_file, pruned = write_cache(skill_dir, payload, date)
+            elif seed is not None:
+                payload, date = seed
+                cache_file = None
+                if root_usable:
+                    cache_file, pruned = persist(root, payload, date)
                 state = "seeded"
+            else:
+                raise Unavailable("no model-data cache present and --no-seed was given")
     except InvalidInput as exc:
         sys.stderr.write(f"✗ gi-model-cache: {exc}\n")
         return 3
     except Unavailable as exc:
-        sys.stderr.write(f"⚠ gi-model-cache: {exc}\n")
+        warn(str(exc))
         return 4
 
     age_days = (today - parse_day(date)).days
@@ -633,6 +780,8 @@ def main(argv: list[str] | None = None) -> int:
             {
                 "state": state,
                 "cache_file": cache_file,
+                "cache_dir": root,
+                "persisted": cache_file is not None,
                 "last_fetched": payload.get("last_fetched"),
                 "data_date": date,
                 "data_version": data_version(payload),

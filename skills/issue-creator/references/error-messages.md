@@ -227,12 +227,21 @@ All model-suggestion failures are **non-fatal** — they warn and continue creat
   To fix:  reinstall the skill, or set model_suggestion.enabled: false
   Docs:    https://github.com/luongnv89/idd/blob/main/docs/config-schema.md
 ```
-**Trigger:** `model_suggestion.enabled` is true but neither a skill-level `model-data-<date>.json` cache nor the bundled `templates/model-data.json` seed can be read. Suggestions are skipped; issue creation proceeds.
+**Trigger:** `model_suggestion.enabled` is true but neither a valid user-level `model-data-<date>.json` cache nor the bundled `templates/model-data.json` seed can be read — `gi-model-cache.py` exit 4. Suggestions are skipped; issue creation proceeds.
+
+### Model data cache not writable
+```
+⚠ gi-model-cache: {reason}; nothing is cached this run
+  Using the bundled model data from memory for this run.
+  To fix:  make ~/.cache/gitissue a writable directory, or set IDD_CACHE_DIR
+  Docs:    https://github.com/luongnv89/idd/blob/main/docs/config-schema.md
+```
+**Trigger:** The cache directory (`$IDD_CACHE_DIR`, else `${XDG_CACHE_HOME:-$HOME/.cache}/gitissue`) is unwritable, a symlink, or not a directory — `gi-model-cache.py` exit 0 with `persisted: false`. Suggestions still render from the seed.
 
 ### Model data malformed
 ```
 ⚠ Model data is malformed — {detail}
-  Skipping model suggestion for this issue.
-  Tip: refresh with --refresh-model-data, or reinstall the skill to restore the bundled seed.
+  Ignoring the cached copy and reseeding from the bundled snapshot.
+  Tip: refresh with --refresh-model-data to fetch current data.
 ```
-**Trigger:** The skill-level `model-data-<date>.json` cache exists but fails JSON parsing or is missing the `complexity_mapping` / `providers` keys.
+**Trigger:** The user-level `model-data-<date>.json` cache exists but fails JSON parsing or validation (e.g. missing `complexity_mapping`). It is treated as a cache miss: the seed replaces it and suggestions continue. From the script this is exit 0 plus a `⚠ gi-model-cache:` stderr line, echoed as-is.

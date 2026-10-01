@@ -415,7 +415,7 @@ Repo-root state beside `.gitissue.yml`, created on first use.
 | `.gitissue/runs.jsonl` | `/issue-resolver`, `/auto-pilot` | Append-only run log (one line per issue) |
 | `.gitissue/run-state.json`, `run.lock`, `last-run-report.md` | `/auto-pilot`; `/issue-resolver` (`borrowed_skills` only) | Resume state, lock, report |
 
-> **Not in `.gitissue/`:** the model-suggestion cache is **skill-level** (`model-data-<date>.json`, all repos).
+> **Not in `.gitissue/`:** the model-suggestion cache is **user-level** (`~/.cache/gitissue/`, all repos).
 
 **Conventions:**
 - Create via `mkdir -p`

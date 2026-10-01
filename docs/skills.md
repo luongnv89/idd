@@ -63,7 +63,7 @@ Creates structured, intent-focused GitHub issues. It preserves reporter context 
 | `/issue-creator <N>` | Normalize | Rewrites existing issue #N into the standard template. |
 | `/issue-creator <N> --dry-run` | Preview | Shows the normalization preview without applying it. |
 | `/issue-creator <N> --force` | Force normalize | Normalizes even when the issue has security-sensitive labels. |
-| `/issue-creator … --refresh-model-data` | Refresh cache | Force-refreshes the skill-level model-data cache before proceeding (combines with any mode when model suggestion is enabled). |
+| `/issue-creator … --refresh-model-data` | Refresh cache | Force-refreshes the user-level model-data cache before proceeding (combines with any mode when model suggestion is enabled). |
 | `/issue-creator <multi-item text>` | Batch | Extracts multiple issues from one input and creates them sequentially. |
 | `/issue-creator <image path> [text]` | Screenshot/image issue | Reads visual context, uploads the image to GitHub, embeds it in the issue body, and creates a structured issue. |
 | `/issue-creator … --auto` | Autonomous | Runs non-interactively (combines with any mode): every gate logs a `⚠` and takes its safe default instead of prompting — see `docs/auto-mode.md`. |

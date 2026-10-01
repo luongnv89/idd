@@ -204,7 +204,7 @@ A handful of jobs are worse as prose than as code: restating the same config def
 | `gi-branch.py` | Derive a branch name from an issue number, title, and type, and self-check it against the branch grammar (`src/shared/scripts/gi-branch.py:2`) | issue-resolver, auto-pilot |
 | `gi-dup-score.py` | Score proposed issues against the open backlog (`src/shared/scripts/gi-dup-score.py:3`) | issue-creator |
 | `gi-gh.py` | Shared subprocess boundary for GitHub CLI calls (`src/shared/scripts/gi-gh.py:2`) | issue-analysis, issue-creator, issue-pr-review, issue-resolver, issue-triage, auto-pilot |
-| `gi-model-cache.py` | Locate, seed, and age the skill-level model-suggestion cache (`src/shared/scripts/gi-model-cache.py:2`) | issue-creator |
+| `gi-model-cache.py` | Locate, seed, and age the user-level model-suggestion cache (`src/shared/scripts/gi-model-cache.py:2`) | issue-creator |
 | `gi-ratelimit.py` | Rate-limit verdict, chunked pause, backoff, and runtime budget (`src/shared/scripts/gi-ratelimit.py:2`) | auto-pilot |
 | `gi-stack-detect.py` | Detect repo language, framework, test runner, and size (`src/shared/scripts/gi-stack-detect.py:2`) | init-gitissue |
 | `gi-state.py` | `/auto-pilot` resumable run state, run lock, and final report (`src/shared/scripts/gi-state.py:2`) | auto-pilot, issue-resolver |

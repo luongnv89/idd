@@ -176,7 +176,8 @@ with tempfile.TemporaryDirectory() as raw_tmp:
     fixture_now = (seed_day + timedelta(days=30)).isoformat()
     model = payload(
         run(
-            [sys.executable, str(MODEL), "--skill-dir", str(skill_dir), "--now", fixture_now],
+            [sys.executable, str(MODEL), "--skill-dir", str(skill_dir),
+             "--cache-dir", str(tmp / "model-cache"), "--now", fixture_now],
             nested,
         ),
         "gi-model-cache hostile-ancestor fixture",
@@ -212,7 +213,8 @@ with tempfile.TemporaryDirectory() as raw_tmp:
     )
     model = payload(
         run(
-            [sys.executable, str(MODEL), "--skill-dir", str(skill_dir), "--now", fixture_now],
+            [sys.executable, str(MODEL), "--skill-dir", str(skill_dir),
+             "--cache-dir", str(tmp / "model-cache"), "--now", fixture_now],
             nested,
         ),
         "gi-model-cache repo-root fixture",
