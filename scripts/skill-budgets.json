@@ -2,12 +2,12 @@
   "headroom_bytes": 1024,
   "skills": {
     "auto-pilot": {
-      "budget": 410641,
-      "measured": 409617
+      "budget": 410548,
+      "measured": 409524
     },
     "init-gitissue": {
-      "budget": 118837,
-      "measured": 117813
+      "budget": 118744,
+      "measured": 117720
     },
     "issue-analysis": {
       "budget": 152136,
@@ -19,11 +19,11 @@
     },
     "issue-pr-review": {
       "budget": 259487,
-      "measured": 258463
+      "measured": 259156
     },
     "issue-resolver": {
       "budget": 352879,
-      "measured": 351855
+      "measured": 352010
     },
     "issue-triage": {
       "budget": 126155,
