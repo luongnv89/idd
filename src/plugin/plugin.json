@@ -1,0 +1,21 @@
+{
+  "name": "idd",
+  "version": "0.22.0",
+  "description": "Issue-Driven Development: Claude Code skills that create, triage, analyze, resolve, review, and auto-pilot GitHub issues.",
+  "author": {
+    "name": "Luong NGUYEN",
+    "email": "luongnv89@gmail.com"
+  },
+  "homepage": "https://github.com/luongnv89/idd",
+  "repository": "https://github.com/luongnv89/idd",
+  "license": "MIT",
+  "keywords": [
+    "issue-driven-development",
+    "github-issues",
+    "triage",
+    "pull-requests",
+    "code-review",
+    "automation"
+  ],
+  "skills": "./"
+}

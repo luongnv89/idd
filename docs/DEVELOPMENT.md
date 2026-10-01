@@ -32,7 +32,7 @@ Reconfirmed at epic #363 close (P2 Modernize). `MODERNIZATION_PLAN.md` and
    asm install https://github.com/luongnv89/idd --skill issue-resolver
 
    # Claude Code plugin — load this checkout's skills/ for one session, no install:
-   claude --plugin-dir .
+   claude --plugin-dir skills
 
    # Manual copy — single skill from this checkout:
    mkdir -p ~/.claude/skills
@@ -91,14 +91,17 @@ Every emitted bundle under `skills/<name>/` has a byte budget, and CI enforces i
 - **Raising a budget is a deliberate hand edit.** Set that skill's `budget` to a value at or above its measured size, run the ratchet command above (it clamps the budget back to `measured + headroom`), commit both files, and justify the growth in the PR.
 - **Check locally** with `python3 scripts/skill-budget.py` (`--check` is the default; `--json` prints the table as JSON). The CI step is `tests/test-skill-bundle-budget-466.sh`.
 
-### Claude Code plugin (issue #469)
+### Claude Code plugin (issues #469, #492)
 
-The repo root is both a Claude Code plugin and the marketplace that lists it. `.claude-plugin/plugin.json` is the plugin manifest; it has no `skills` key, because Claude Code scans the root `skills/` automatically. `.claude-plugin/marketplace.json` lists one plugin, `idd`, whose source is this repo at the release tag (`"ref": "vX.Y.Z"`). An install therefore ships the tagged tree, never whatever `main` holds. Users install with `claude plugin marketplace add luongnv89/idd` and `claude plugin install idd@idd` (see [README → Install](../README.md#install)).
+The repo root is the marketplace; the plugin is the committed `skills/` tree. `.claude-plugin/marketplace.json` lists one plugin, `idd`, with a `git-subdir` source: this repo, `"path": "skills"`, at the release tag (`"ref": "vX.Y.Z"`). An install therefore fetches only the tagged release's `skills/` folder (about 2.7 MB), never `src/`, `tests/`, `docs/`, the website or whatever `main` holds. Users install with `claude plugin marketplace add luongnv89/idd` and `claude plugin install idd@idd` (see [README → Install](../README.md#install)).
 
-- **Try it locally** with `claude --plugin-dir .`, which loads this checkout's `skills/` as the `idd` plugin for one session, and `claude --plugin-dir . plugin details idd`, which lists the components the plugin ships.
-- **Keep the root free of plugin components.** A root `agents/`, `commands/`, `hooks/`, `.mcp.json`, `.lsp.json` or `settings.json` would change what every plugin install gets. `tests/test-plugin-manifest-469.sh` fails if one appears.
-- **Release checklist.** The release commit bumps five version strings together: the first `## vX.Y.Z` heading in `CHANGELOG.md`, the README version badge, `version` in `plugin.json`, the marketplace entry's `version`, and the entry's `ref` (`vX.Y.Z`). `tests/test-plugin-manifest-469.sh` fails when any of them disagree. Push the tag and the commit together, `git push --atomic origin main vX.Y.Z`, so the marketplace on `main` never names a tag that does not exist yet.
-- **CI** runs the same test with a pinned `claude` CLI (`IDD_PLUGIN_REQUIRE_CLI=1`). It checks `claude plugin validate` on both manifests and `plugin details` against `src/skills/`. Without `claude` on `PATH`, the test skips the CLI checks locally and prints a `○` line.
+- **One manifest, authored once.** The plugin manifest lives at `src/plugin/plugin.json`. The build copies it byte-identical to `skills/.claude-plugin/plugin.json`, the plugin root's manifest, with `"skills": "./"` so the skill folders at that root are the plugin's skills. Edit the source and rebuild; never hand-edit the emitted copy. The skill tree itself is still the one `skills/` build output — there is no second copy for the plugin.
+- **The marketplace entry also says `"skills": "./"`.** It lets a tag whose `skills/` has no manifest (v0.22.0 and earlier) load every skill, and it is harmless once the tag carries one. Never set `"strict": false`: with a manifest present, the plugin then fails to load.
+- **No root-`CLAUDE.md` warning.** The repo root carries no `plugin.json`, so it is not a plugin root, and `claude plugin validate skills/.claude-plugin/plugin.json` passes with no warnings. `tests/test-plugin-manifest-469.sh` fails if a root `plugin.json` comes back or the validator reports any warning.
+- **Try it locally** with `claude --plugin-dir skills`, which loads this checkout's `skills/` as the `idd` plugin for one session, and `claude --plugin-dir skills plugin details idd`, which lists the components the plugin ships.
+- **Keep the plugin root free of other components.** An `agents/`, `commands/`, `hooks/`, `.mcp.json`, `.lsp.json` or `settings.json` under `skills/` would change what every plugin install gets. `tests/test-plugin-manifest-469.sh` fails if one appears, and fails if `skills/` holds anything besides the skill folders and `.claude-plugin/`.
+- **Release checklist.** The release commit bumps five version strings together: the first `## vX.Y.Z` heading in `CHANGELOG.md`, the README version badge, `version` in `src/plugin/plugin.json` (then rebuild, so `skills/.claude-plugin/plugin.json` follows), the marketplace entry's `version`, and the entry's `ref` (`vX.Y.Z`). `tests/test-plugin-manifest-469.sh` fails when any of them disagree. Push the tag and the commit together, `git push --atomic origin main vX.Y.Z`, so the marketplace on `main` never names a tag that does not exist yet. Existing installs move to the slimmer layout on the first `claude plugin update idd@idd` after that release.
+- **CI** runs the same test with a pinned `claude` CLI (`IDD_PLUGIN_REQUIRE_CLI=1`). It checks `claude plugin validate` on both manifests, `plugin details` against `src/skills/`, and an end-to-end install: a throwaway repo holding this `skills/` tree plus decoy root files, installed through the real marketplace entry, must leave only the skills and the manifest in the plugin cache. Without `claude` on `PATH`, the test skips the CLI checks locally and prints a `○` line.
 
 ## Making Changes
 
@@ -310,5 +313,5 @@ graph TD
 | `docs/sample-normalized-issue.md` | Example normalized issue (intent-only) |
 | `docs/ARCHITECTURE.md` | System design, data flow, durable-memory model |
 | `CHANGELOG.md` | Per-release notes |
-| `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json` | Claude Code plugin manifest and self-hosted marketplace, pinned to the release tag (issue #469) |
+| `.claude-plugin/marketplace.json`, `src/plugin/plugin.json` | Self-hosted Claude Code marketplace (git-subdir source `skills/`, pinned to the release tag) and the plugin manifest source the build emits to `skills/.claude-plugin/plugin.json` (issues #469, #492) |
 | `src/internal-skills/idd-doctor/SKILL.source.md` | Read-only health check — run before submitting a PR |

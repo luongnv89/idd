@@ -47,11 +47,13 @@ graph LR
 Authored skill sources live under `src/skills/`. The build publishes each
 public skill as a complete, flat, installable package under top-level `skills/`
 for repo-root installers such as `asm install https://github.com/luongnv89/idd`.
-The same `skills/` tree is what the Claude Code plugin ships: the repo root is
-the plugin (`.claude-plugin/plugin.json`) and its own marketplace
-(`.claude-plugin/marketplace.json`, pinned to the release tag), so
-`claude plugin install idd@idd` installs the tagged release's `skills/` with no
-second copy (issue #469).
+The same `skills/` tree is what the Claude Code plugin ships: `skills/` is the
+plugin root (the build emits `skills/.claude-plugin/plugin.json` from
+`src/plugin/plugin.json`), and the repo root is the marketplace
+(`.claude-plugin/marketplace.json`), whose `git-subdir` source fetches only
+`skills/` at the release tag. `claude plugin install idd@idd` therefore installs
+the tagged release's `skills/` and nothing else from the repo, with no second
+copy (issues #469, #492).
 The same packages are also buildable into `dist/skills/` for CI testing and
 release packaging, but `dist/` is no longer committed.
 

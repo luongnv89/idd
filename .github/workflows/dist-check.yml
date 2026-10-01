@@ -216,7 +216,12 @@ jobs:
 
       - name: Drift check — committed skills/ must match verified build
         run: |
-          if ! git diff --exit-code -- skills/; then
+          # `git diff` misses a newly emitted file nobody committed (e.g.
+          # skills/.claude-plugin/plugin.json, issue #492), so untracked
+          # paths under skills/ fail the check too.
+          untracked="$(git status --porcelain=v1 --untracked-files=all -- skills/)"
+          if ! git diff --exit-code -- skills/ || [ -n "$untracked" ]; then
+            [ -z "$untracked" ] || printf '%s\n' "$untracked"
             echo "::error::skills/ is out of date. Run ./scripts/build.sh and commit the result."
             exit 1
           fi
@@ -375,8 +380,8 @@ jobs:
       - name: test-root-skills-install-surface
         run: bash tests/test-root-skills-install-surface.sh
 
-      # Issue #469: the repo root is a Claude Code plugin and its own
-      # marketplace. Install a pinned CLI so the host validator runs on every
+      # Issue #469/#492: the repo root is the marketplace and skills/ is the
+      # plugin it installs. Install a pinned CLI so the host validator runs on every
       # change; IDD_PLUGIN_REQUIRE_CLI turns a missing CLI from a skip into a
       # failure. Bump the pin deliberately, like an action SHA.
       - name: Install pinned Claude Code CLI (plugin validation)

@@ -81,6 +81,22 @@ def _emit_flattened_skill(
         )
 
 
+def _emit_plugin_manifest(src: Path, out_skills: Path) -> None:
+    """Emit the Claude Code plugin manifest into the skills tree (issue #492).
+
+    `skills/` is the plugin root: the marketplace entry installs it through a
+    `git-subdir` source, so a plugin install copies only the built skills and
+    never the rest of the repository. The manifest is authored once at
+    `src/plugin/plugin.json` and copied byte-identical to
+    `<out>/skills/.claude-plugin/plugin.json` — the one hand-kept copy is the
+    source, never the emitted file. A source tree without it (a fixture build)
+    emits nothing.
+    """
+    manifest = src / "plugin" / "plugin.json"
+    if manifest.is_file():
+        _copy_binary(manifest, out_skills / ".claude-plugin" / "plugin.json")
+
+
 def _emit_repo_root_skills(repo_root: Path, out_skills: Path) -> None:
     """Mirror flattened skills to repo-root skills/ for ASM repo URL installs.
 
