@@ -103,6 +103,9 @@ Verify every file below is present, each path resolved relative to the skill's d
 
   To fix:  asm install https://github.com/luongnv89/idd --skill issue-creator
            (or reinstall the full distribution)
+  Plugin:  claude plugin marketplace add luongnv89/idd
+           claude plugin install idd@idd
+           (or: claude plugin update idd@idd)
 
   Then restart the agent session and re-run /issue-creator.
 ```

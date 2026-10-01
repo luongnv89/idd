@@ -46,6 +46,9 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 
   To fix:  asm install https://github.com/luongnv89/idd --skill issue-resolver
            (or reinstall the full distribution)
+  Plugin:  claude plugin marketplace add luongnv89/idd
+           claude plugin install idd@idd
+           (or: claude plugin update idd@idd)
 
   Then restart the agent session and re-run /issue-resolver.
 ```

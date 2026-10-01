@@ -167,6 +167,9 @@ Verify these bundled files are present, resolving each path below relative to th
 
   To fix:  asm install https://github.com/luongnv89/idd --skill issue-analysis
            (or reinstall the full distribution)
+  Plugin:  claude plugin marketplace add luongnv89/idd
+           claude plugin install idd@idd
+           (or: claude plugin update idd@idd)
 
   Then restart the agent session and re-run /issue-analysis.
 ```

@@ -394,6 +394,9 @@ jobs:
           DISABLE_AUTOUPDATER: "1"
           CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1"
 
+      - name: test-missing-dep-plugin-hint-490
+        run: bash tests/test-missing-dep-plugin-hint-490.sh
+
       - name: test-runs-jsonl
         run: bash tests/test-runs-jsonl.sh
 
