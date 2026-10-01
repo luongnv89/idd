@@ -123,7 +123,9 @@ review:
   # Default: true
   # True: verifies `Closes #N`, commit references, Decision Record, and the
   # Acceptance Criteria Verification block; a missing `Closes #N` blocks
-  # soft-pass even on green tests/CI. False: the dimension reports
+  # soft-pass even on green tests/CI — unless line 1 is `Refs #N` on a partial
+  # PR whose AC table defers the open criteria (status `unverified`, evidence
+  # `deferred`). Not an exemption, always on. False: the dimension reports
   # `pass — verification disabled` and never blocks.
   require_traceability_check: true
 
@@ -132,9 +134,7 @@ review:
   # Default: ["refactor", "chore"]
   # When the PR carries any label in this list, /issue-pr-review skips the
   # `Closes #N` check and reports `traceability: pass — exempt`. The other
-  # three traceability checks (commit reference, Decision Record, Acceptance
-  # Criteria Verification block) still run and report `partial` if absent.
-  # Set to [] to disable label-based exemption (see also traceability_exempt_pattern).
+  # three checks still run. Set to [] to disable label-based exemption.
   traceability_exempt_labels:
     - refactor
     - chore
@@ -142,11 +142,9 @@ review:
   # PR-body pattern that exempts a PR from the `Closes #N` hard-fail (check 1 only).
   # Type: string (regex, multiline-anchored, case-insensitive)
   # Default: "^\\s*Type:\\s*(refactor|chore)\\s*$"
-  # When the PR body contains a line matching this pattern, /issue-pr-review
-  # skips the `Closes #N` check and reports `traceability: pass — exempt`. The
-  # other three traceability checks still run.
+  # A matching PR-body line grants the same exemption as the labels above.
   # Set to "" to disable pattern-based exemption. Setting both this and
-  # traceability_exempt_labels to empty restores strict issue #36 behavior.
+  # traceability_exempt_labels to empty disables both exemptions.
   traceability_exempt_pattern: "^\\s*Type:\\s*(refactor|chore)\\s*$"
 
   # UI/UX review settings (Step 3 — Review)
@@ -273,7 +271,7 @@ Config is validated at every skill start; errors include line numbers:
 | `review.test_timeout` | `300` | Review test timeout |
 | `review.soft_pass` | `true` | Allow note findings and partial dimensions after fixables resolve; `false` requires no notes and all enabled dimensions pass |
 | `review.require_acceptance_criteria_check` | `true` | Run per-criterion acceptance-criteria verification; `fail` blocks soft-pass |
-| `review.require_traceability_check` | `true` | Run the four traceability checks; missing `Closes #N` blocks soft-pass |
+| `review.require_traceability_check` | `true` | Run the four traceability checks; missing `Closes #N` blocks soft-pass unless line 1 is a valid intentional `Refs #N` |
 | `review.traceability_exempt_labels` | `["refactor", "chore"]` | PR labels that exempt a PR from the `Closes #N` hard-fail (check 1 only; other three checks still run) |
 | `review.traceability_exempt_pattern` | `"^\\s*Type:\\s*(refactor\|chore)\\s*$"` | Regex (multiline, case-insensitive) matched against PR body for exemption from check 1 |
 | `review.ui_review.browser_review` | `"ask"` | Browser (screenshot) UI review mode; code UI review is auto-detected and always runs |

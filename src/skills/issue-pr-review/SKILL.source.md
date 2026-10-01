@@ -137,7 +137,7 @@ If no PR exists for the current branch:
 gh pr view {N} --json number,title,body,baseRefName,headRefName,headRefOid,state,url,labels,reviews,statusCheckRollup,files
 ```
 
-Extract the number/title/URL, base and head branches, the head SHA (`headRefOid` — the *QA handoff gate* binds against it), linked issue numbers (from `Closes #N`), CI status, and changed files.
+Extract the number/title/URL, base and head branches, the head SHA (`headRefOid` — the *QA handoff gate* binds against it), linked issue numbers (from `Closes #N`, or a first-line `Refs #N` — *Intentional reference* in `references/verification-checks.md`), CI status, and changed files.
 
 **If PR is closed/merged:**
 ```
@@ -268,7 +268,7 @@ Five dimensions — `correctness`, `acceptance_criteria`, `traceability`, `maint
 
 - `review.require_acceptance_criteria_check` (default `true`) gates the AC check; `review.require_traceability_check` (default `true`) gates traceability. When either is `false`, that dimension reports `pass — verification disabled` and never blocks soft-pass.
 - **Any `acceptance_criteria: fail`** → fixable issue in Step 6, `category: acceptance_criteria`. **Hard-blocks** soft-pass.
-- **`Closes #{linked_issue}` absent** (traceability check 1, unless refactor/chore-exempt) → fixable issue in Step 6, `category: traceability`, suggested fix "Add `Closes #{linked_issue}` to the PR body." **Hard-blocks** soft-pass.
+- **`Closes #{linked_issue}` absent** (traceability check 1, unless refactor/chore-exempt or a valid intentional `Refs`) → fixable issue in Step 6, `category: traceability`, suggested fix "Add `Closes #{linked_issue}` to the PR body." **Hard-blocks** soft-pass. A failing `Refs #{linked_issue}` line 1 hard-blocks as `action: note`, **never** auto-fixed.
 - All other traceability outcomes (missing commit ref, missing Decision Record on a human-authored PR) report `partial` and do **not** block.
 
 These two hard-blocks are the issue #36 contract: a PR can pass tests and still be blocked on `acceptance_criteria: fail` or a missing `Closes #N`.
@@ -327,7 +327,7 @@ Pending CI is **not clean**: it never satisfies soft-pass, and auto mode must no
 
 Collect issues from Steps 3-5, but **only fix those with `action: "fix"`** — `action: "note"` issues are reported, never fixed. This is the key token optimization. Fixable sources: the five dimensions (each `fail`/UI `action:"fix"` is one fixable issue) plus Step 4 test failures and Step 5 CI failures.
 
-The traceability `Closes #{linked_issue}` fix is a **read-modify-write** PR-body edit (driver rule 2 in `docs/platform-github.md`): `gh pr view {N} --json body`, prepend `Closes #{linked_issue}` as the **first line** when absent (SPEC §3.3 / `docs/naming-conventions.md`) preserving the rest unchanged, `gh pr edit {N} --body "{merged_body}"`, then re-read and confirm `## Decision Record`, the Acceptance Criteria Verification table, and any trailing `<!-- gitissue:qa v1 … -->` marker are still present. Never replace the body from scratch. Apply code fixes, then commit and push as usual. <!-- a:rv-closes-body-edit -->
+The traceability `Closes #{linked_issue}` fix is a **read-modify-write** PR-body edit (driver rule 2 in `docs/platform-github.md`): `gh pr view {N} --json body`, prepend `Closes #{linked_issue}` as the **first line** when absent (SPEC §3.3 / `docs/naming-conventions.md`) preserving the rest unchanged, `gh pr edit {N} --body "{merged_body}"`, then re-read and confirm `## Decision Record`, the Acceptance Criteria Verification table, and any trailing `<!-- gitissue:qa v1 … -->` marker are still present. Never replace the body from scratch, and **never** prepend when line 1 is `Refs #{linked_issue}`. Apply code fixes, then commit and push as usual. <!-- a:rv-closes-body-edit -->
 
 ### If no fixable issues
 

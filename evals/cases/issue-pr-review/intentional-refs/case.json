@@ -1,0 +1,29 @@
+{
+  "name": "issue-pr-review/intentional-refs",
+  "skill": "issue-pr-review",
+  "prompt": "Intentional partial delivery (#493): Refs #N with declared deferred ACs passes; deferring every AC fails",
+  "grade": [
+    {
+      "tool": "idd-lint",
+      "args": [
+        "pr",
+        "OUT/pr-body.md",
+        "--title",
+        "feat(plugin): ship the claude code plugin (#42)"
+      ],
+      "expect_exit": 0,
+      "label": "Refs #N PR declaring deferred ACs passes idd-lint"
+    },
+    {
+      "tool": "idd-lint",
+      "args": [
+        "pr",
+        "OUT/pr-body-all-deferred.md",
+        "--title",
+        "feat(plugin): ship the claude code plugin (#42)"
+      ],
+      "expect_exit": 1,
+      "label": "Refs #N PR deferring every AC fails idd-lint (negative)"
+    }
+  ]
+}

@@ -168,7 +168,7 @@ Under `COMMIT_MESSAGES` (or any non-`PR_BODY` value) do not treat code-span or b
 
 ## Summary — Refactor/Chore Exempt PR
 
-Refactor or chore PRs (skill quality passes, dependency bumps, doc-only updates) are exempt from the `Closes #N` hard-fail when they match `review.traceability_exempt_labels` or `review.traceability_exempt_pattern`. Check 1 is skipped; checks 2-4 still run — a missing commit reference or Decision Record (checks 2-3) reports `partial`, never `fail`. Check 4 has no "absent" mode, and is the exception to the rendering below: a qualified-only, defeated, or unverified binding is a repository finding, not a PR one, so it holds the dimension at `partial` rather than being appended to an exempt `pass`.
+A PR matching `review.traceability_exempt_labels` or `review.traceability_exempt_pattern` skips check 1 only (`references/verification-checks.md` → *Refactor/chore exemption*); checks 2-4 still run. Check 4 is the exception to the rendering below: a qualified-only, defeated, or unverified binding is a repository finding, not a PR one, so it holds the dimension at `partial` rather than being appended to an exempt `pass`.
 
 ```
   Review dimensions:
@@ -181,18 +181,14 @@ Refactor or chore PRs (skill quality passes, dependency bumps, doc-only updates)
       maintainability:     ✓ pass
 ```
 
-The `acceptance_criteria` line above shows the common case for refactor/chore PRs (no linked issue, so no AC defined). When a refactor PR does have a linked issue with acceptance criteria, those criteria still verify normally — the refactor exemption relaxes only check 1 of traceability, never AC. The "verification disabled" wording appears only when `review.require_acceptance_criteria_check: false` is explicitly set.
-
-When checks 2-3 produce partial findings on an exempt PR, append them inline (check 4 is not appended — a non-`pass` check 4 holds the dimension at `partial`, as above):
+The `acceptance_criteria` line shows the common no-linked-issue case; a linked issue's criteria still verify normally — the exemption never relaxes AC. Check 2-3 partials are appended inline:
 
 ```
     traceability:        ○ pass — exempt (refactor/chore PR; no Closes #N required);
                            no commit references #{N}
 ```
 
-Note: check 2 (`git log --grep="#{N}"`) is well-defined only when the exempt PR has a linked issue number to grep for. If the PR is opened without any tracked issue, check 2 is reported as `n/a — no linked issue` rather than `partial`.
-
-The match mechanism (label name or pattern) is logged so reviewers can audit which exemption rule fired. To restore strict issue #36 behavior (no exemption), set `review.traceability_exempt_labels: []` and `review.traceability_exempt_pattern: ""`.
+Log the matching mechanism (label name or pattern). Emptying both keys disables the exemption; an intentional `Refs #N` PR (*Intentional reference*) is not an exemption and still renders `○ pass — intentional reference (Refs #{N}; {k} AC deferred)`, its deferred criteria as `○ deferred`.
 
 ## Auto-Merge (auto mode only)
 

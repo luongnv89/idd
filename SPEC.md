@@ -116,7 +116,7 @@ Types: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `style`, `perf`. Scop
 
 ### 3.3 Pull request titles
 
-Same grammar as commits: `<type>(<scope>): <description> (#<issue-number>)`. Use the dominant type when a PR spans several. `Closes #N` goes on the **first line of the PR body**, never in the title.
+Same grammar as commits: `<type>(<scope>): <description> (#<issue-number>)`. Use the dominant type when a PR spans several. `Closes #N` goes on the **first line of the PR body**, never in the title — or `Refs #N` for an intentional partial delivery (§5.1).
 
 ### 3.4 Issue titles
 
@@ -173,6 +173,8 @@ Issue #N → branch <type>/N-… → commits …(#N) → PR title …(#N) + body
 ```
 
 Concretely: the branch name carries the issue number (§3.1); every commit references it (§3.2); the PR title references it and the PR body's first line is `Closes #N` (§3.3), so the tracker links and auto-closes the issue on merge. From any point — a `git blame` line, a commit, a PR, an issue — the rest of the chain is reachable.
+
+**Intentional partial delivery.** A PR that delivers part of an issue that MUST stay open after merge MAY open with `Refs #N` instead of `Closes #N`. The chain is then intact but does not close the issue, so the form is valid only when: the first body line is exactly `Refs #N` for the issue the PR title names; no closing keyword (`close[sd]`, `fix(e[sd])`, `resolve[sd]`) names `#N` anywhere in the body; and the §5.2 table marks each criterion left open as a *deferred row* — Status `unverified`, Evidence containing `deferred` — while at least one row is not deferred. Tooling MUST treat a `Refs #N` PR that misses any condition as missing `Closes #N`, and MUST NOT rewrite it to `Closes #N` automatically.
 
 ### 5.2 Acceptance criteria verification
 
