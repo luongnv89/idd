@@ -1,30 +1,50 @@
 #!/usr/bin/env bash
-# test-plugin-manifest-469.sh — the repo root as a Claude Code plugin and its
-# own marketplace (issue #469).
+# test-plugin-manifest-469.sh — the Claude Code plugin and its self-hosted
+# marketplace (issues #469, #492).
 #
-# The plugin ships the committed skills/ tree at the tagged release, so what
-# can drift is the manifests, not the skills. These checks guard that drift.
+# Layout (issue #492): the repo root is the marketplace only
+# (.claude-plugin/marketplace.json). The plugin root is the committed skills/
+# tree: its manifest is authored once at src/plugin/plugin.json and the build
+# emits it byte-identical to skills/.claude-plugin/plugin.json. The marketplace
+# entry installs skills/ through a `git-subdir` source pinned to the release
+# tag, so a plugin install copies the built skills and never the rest of the
+# repo (src/, tests/, docs/, the website, the root CLAUDE.md).
 #
-# Structural checks (always run — python3 stdlib only, no network, no git):
-#   S1  .claude-plugin/plugin.json and marketplace.json parse as JSON objects
+# Structural checks (always run — python3 stdlib only, no network):
+#   S1  src/plugin/plugin.json, skills/.claude-plugin/plugin.json and
+#       .claude-plugin/marketplace.json parse as JSON objects
 #   S2  plugin name == marketplace name == the single entry's name == `idd`
-#   S3  the entry's source is `github` + repo `luongnv89/idd`
+#   S3  the entry's source is `git-subdir`, url `luongnv89/idd`, path `skills`,
+#       and the entry declares `"skills": "./"` (so a tag whose skills/ has no
+#       manifest still loads every skill)
 #   S4  entry ref == "v" + entry version, and entry version == plugin version
 #   S5  plugin version == the first `## vX.Y.Z` heading in CHANGELOG.md
 #   S6  plugin version == the README version badge
-#   S7  no root plugin component (agents/, commands/, hooks/, .mcp.json,
-#       .lsp.json, settings.json) and no component-path key in plugin.json,
-#       so the plugin ships skills and nothing else
+#   S7  the manifest's only component key is `"skills": "./"`, the entry
+#       description matches the manifest's, no plugin component (agents/,
+#       commands/, hooks/, .mcp.json, .lsp.json, settings.json) sits in the
+#       plugin root, and the repo root carries no plugin.json — the root is
+#       not a plugin, so its CLAUDE.md never reaches `plugin validate`
 #   S8  skills/ holds exactly the skill directories under src/skills/ (so the
 #       internal idd-doctor never ships)
+#   S9  skills/ holds nothing else: the skill directories plus .claude-plugin/
+#       with plugin.json alone — the whole install payload
+#   S10 the emitted manifest is byte-identical to src/plugin/plugin.json and
+#       committed (one hand-kept copy, never a second)
 #
-# Host checks (need the `claude` CLI; each call runs with a throwaway HOME):
-#   C1  `claude plugin validate --json` on plugin.json: success, no errors;
-#       the only warning allowed is the root-CLAUDE.md one
+# Host checks (need the `claude` CLI; each call runs with a throwaway HOME
+# and CLAUDE_CONFIG_DIR, so the user's real plugin config is never touched):
+#   C1  `claude plugin validate --json` on skills/.claude-plugin/plugin.json:
+#       success, no errors and no warnings
 #   C2  `claude plugin validate --strict` on marketplace.json exits 0
-#   C3  `claude --plugin-dir <root> plugin details idd` reports the plugin
+#   C3  `claude --plugin-dir skills plugin details idd` reports the plugin
 #       version and exactly the src/skills/ names as skills, and zero agents,
 #       hooks, MCP servers and LSP servers
+#   C4  end-to-end install: a throwaway git repo holding this skills/ tree
+#       plus decoy root files is tagged and installed through the real
+#       marketplace entry (only its url swapped to file://); the plugin cache
+#       holds the skills and the manifest, none of the decoys, and the
+#       installed plugin lists every skill
 #
 # Usage: bash tests/test-plugin-manifest-469.sh
 # Without `claude` on PATH the host checks are skipped with a ○ line. Set
@@ -34,7 +54,9 @@
 set -uo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-PLUGIN_JSON="$REPO_ROOT/.claude-plugin/plugin.json"
+PLUGIN_ROOT="$REPO_ROOT/skills"
+SOURCE_JSON="$REPO_ROOT/src/plugin/plugin.json"
+PLUGIN_JSON="$PLUGIN_ROOT/.claude-plugin/plugin.json"
 MARKET_JSON="$REPO_ROOT/.claude-plugin/marketplace.json"
 
 PASS=0
@@ -47,19 +69,21 @@ skip() { echo "  ○ skipped — $1"; SKIP=$((SKIP + 1)); }
 
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/plugin-469.XXXXXX")"
 trap 'rm -rf "$TMP"' EXIT
-mkdir -p "$TMP/home"
+mkdir -p "$TMP/home/.claude"
 
 # Expected skill names, one per line, sorted: the public skill sources.
 EXPECTED_SKILLS="$(cd "$REPO_ROOT/src/skills" && for d in */; do printf '%s\n' "${d%/}"; done | LC_ALL=C sort)"
 
-echo "◆ Claude Code Plugin Manifest Tests (issue #469)"
+echo "◆ Claude Code Plugin Manifest Tests (issues #469, #492)"
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 
-# ── S1–S7: one python3 pass prints `PASS|<msg>` / `FAIL|<msg>` lines ─────────
-structural="$(python3 - "$REPO_ROOT" <<'PY'
+# ── S1–S7, S9: one python3 pass prints `PASS|<msg>` / `FAIL|<msg>` lines ─────
+structural="$(python3 - "$REPO_ROOT" "$EXPECTED_SKILLS" <<'PY'
 import json, os, re, sys
 
 root = sys.argv[1]
+expected = sorted(s for s in sys.argv[2].split("\n") if s)
+plugin_root = os.path.join(root, "skills")
 out = []
 def check(ok, msg):
     out.append(("PASS|" if ok else "FAIL|") + msg)
@@ -75,9 +99,10 @@ def load(rel):
     check(ok, f"S1: {rel} parses as a JSON object")
     return data if ok else None
 
-plugin = load(".claude-plugin/plugin.json")
+source = load("src/plugin/plugin.json")
+plugin = load("skills/.claude-plugin/plugin.json")
 market = load(".claude-plugin/marketplace.json")
-if plugin is None or market is None:
+if source is None or plugin is None or market is None:
     print("\n".join(out)); sys.exit(0)
 
 entries = market.get("plugins")
@@ -90,8 +115,11 @@ check(names == ("idd", "idd", "idd"),
 
 src = entry.get("source")
 src = src if isinstance(src, dict) else {}
-check(src.get("source") == "github" and src.get("repo") == "luongnv89/idd",
-      f"S3: entry source is github luongnv89/idd (got {src.get('source')!r} {src.get('repo')!r})")
+got_src = (src.get("source"), src.get("url"), src.get("path"))
+check(got_src == ("git-subdir", "luongnv89/idd", "skills"),
+      f"S3: entry source is git-subdir luongnv89/idd path skills (got {got_src})")
+check(entry.get("skills") == "./",
+      f"S3: entry declares skills \"./\" (got {entry.get('skills')!r})")
 
 pv, ev, ref = plugin.get("version"), entry.get("version"), src.get("ref")
 semver = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
@@ -113,18 +141,30 @@ with open(os.path.join(root, "README.md"), encoding="utf-8") as f:
 badge = badge.group(1) if badge else None
 check(badge == pv, f"S6: plugin version matches README version badge (badge {badge!r}, plugin {pv!r})")
 
-components = ["agents", "commands", "hooks", ".mcp.json", ".lsp.json", "settings.json"]
-present = [c for c in components if os.path.lexists(os.path.join(root, c))]
-check(not present, f"S7: no plugin component at repo root (found {present})")
 keys = ["skills", "agents", "commands", "hooks", "mcpServers", "lspServers", "outputStyles"]
-bad = [k for k in keys if k in plugin]
-check(not bad, f"S7: plugin.json declares no component paths (found {bad})")
+declared = {k: plugin[k] for k in keys if k in plugin}
+check(declared == {"skills": "./"},
+      f"S7: plugin.json declares only skills \"./\" as a component path (got {declared})")
+check(entry.get("description") == plugin.get("description"),
+      "S7: marketplace entry description matches plugin.json")
+components = ["agents", "commands", "hooks", ".mcp.json", ".lsp.json", "settings.json"]
+present = [c for c in components if os.path.lexists(os.path.join(plugin_root, c))]
+check(not present, f"S7: no plugin component in the plugin root skills/ (found {present})")
+check(not os.path.lexists(os.path.join(root, ".claude-plugin", "plugin.json")),
+      "S7: the repo root carries no .claude-plugin/plugin.json (the root is a marketplace, not a plugin)")
+
+top = sorted(os.listdir(plugin_root)) if os.path.isdir(plugin_root) else []
+want = sorted(expected + [".claude-plugin"])
+check(top == want, f"S9: skills/ holds only the skills and .claude-plugin/ (extra {sorted(set(top) - set(want))}, missing {sorted(set(want) - set(top))})")
+manifest_dir = os.path.join(plugin_root, ".claude-plugin")
+inside = sorted(os.listdir(manifest_dir)) if os.path.isdir(manifest_dir) else []
+check(inside == ["plugin.json"], f"S9: skills/.claude-plugin/ holds plugin.json alone (got {inside})")
 
 print("\n".join(out))
 PY
 )"
 if [ -z "$structural" ]; then
-  fail "S1–S7: structural checker produced no output"
+  fail "S1–S9: structural checker produced no output"
 fi
 while IFS='|' read -r verdict msg; do
   [ -n "$verdict" ] || continue
@@ -139,16 +179,33 @@ else
   fail "S8: skills/ ($(echo $actual_skills)) differs from src/skills/ ($(echo $EXPECTED_SKILLS))"
 fi
 
-# ── C1–C3: host validation through the claude CLI ────────────────────────────
+# ── S10: one hand-kept manifest — the emitted copy matches it and is committed ─
+if [ -f "$SOURCE_JSON" ] && [ -f "$PLUGIN_JSON" ] && cmp -s "$SOURCE_JSON" "$PLUGIN_JSON"; then
+  pass "S10: skills/.claude-plugin/plugin.json is byte-identical to src/plugin/plugin.json"
+else
+  fail "S10: skills/.claude-plugin/plugin.json differs from src/plugin/plugin.json — run ./scripts/build.sh"
+fi
+if git -C "$REPO_ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  if git -C "$REPO_ROOT" ls-files --error-unmatch skills/.claude-plugin/plugin.json >/dev/null 2>&1; then
+    pass "S10: skills/.claude-plugin/plugin.json is committed with the skills/ tree"
+  else
+    fail "S10: skills/.claude-plugin/plugin.json is not tracked — commit the rebuilt skills/"
+  fi
+else
+  skip "S10: not a git work tree — tracked-manifest check needs git"
+fi
+
+# ── C1–C4: host validation through the claude CLI ────────────────────────────
 run_claude() {
-  HOME="$TMP/home" DISABLE_AUTOUPDATER=1 CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 claude "$@"
+  HOME="$TMP/home" CLAUDE_CONFIG_DIR="$TMP/home/.claude" DISABLE_AUTOUPDATER=1 \
+    CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 claude "$@"
 }
 
 if ! command -v claude >/dev/null 2>&1; then
   if [ "${IDD_PLUGIN_REQUIRE_CLI:-}" = "1" ]; then
-    fail "C1–C3: claude CLI not on PATH and IDD_PLUGIN_REQUIRE_CLI=1"
+    fail "C1–C4: claude CLI not on PATH and IDD_PLUGIN_REQUIRE_CLI=1"
   else
-    skip "C1–C3: claude CLI not on PATH (set IDD_PLUGIN_REQUIRE_CLI=1 to require it)"
+    skip "C1–C4: claude CLI not on PATH (set IDD_PLUGIN_REQUIRE_CLI=1 to require it)"
   fi
 else
   # C1 — plugin manifest plus the skills it discovers.
@@ -185,12 +242,11 @@ for c in items(d.get("contents")):
         continue
     name = str(c.get("file", "?"))
     problems += ["%s error: %s" % (name, text(e)) for e in items(c.get("errors"))]
-    problems += ["%s warning: %s" % (name, text(w)) for w in items(c.get("warnings"))
-                 if "CLAUDE.md at the plugin root" not in text(w)]
+    problems += ["%s warning: %s" % (name, text(w)) for w in items(c.get("warnings"))]
 if problems:
     print("FAIL|C1: plugin validate reported: " + "; ".join(problems))
 else:
-    print("PASS|C1: claude plugin validate passes plugin.json and its skills")
+    print("PASS|C1: claude plugin validate passes plugin.json and its skills with no warnings")
 PY
 )"
   [ -n "$c1" ] || fail "C1: validate output could not be parsed (exit $c1_rc)"
@@ -209,7 +265,7 @@ PY
   fi
 
   # C3 — the component inventory the plugin actually ships.
-  if run_claude --plugin-dir "$REPO_ROOT" plugin details idd >"$TMP/c3.log" 2>&1; then
+  if run_claude --plugin-dir "$PLUGIN_ROOT" plugin details idd >"$TMP/c3.log" 2>&1; then
     c3="$(python3 - "$TMP/c3.log" "$PLUGIN_JSON" "$EXPECTED_SKILLS" <<'PY'
 import json, re, sys
 text = open(sys.argv[1], encoding="utf-8").read()
@@ -242,8 +298,90 @@ PY
       if [ "$verdict" = "PASS" ]; then pass "$msg"; else fail "$msg"; fi
     done <<< "$c3"
   else
-    fail "C3: claude --plugin-dir plugin details idd failed"
+    fail "C3: claude --plugin-dir skills plugin details idd failed"
     sed -n '1,20p' "$TMP/c3.log" | sed 's/^/      /'
+  fi
+
+  # C4 — end-to-end install through the real marketplace entry (issue #492).
+  # A throwaway repo stands in for the tagged release: this skills/ tree plus
+  # decoy root files a whole-repo install would carry. Only the entry's url is
+  # swapped (to file://); its source type, path, ref and skills key are real.
+  C4="$TMP/c4"
+  mkdir -p "$C4/repo" "$C4/market/.claude-plugin" "$C4/home/.claude"
+  c4_version="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["version"])' "$PLUGIN_JSON" 2>/dev/null || true)"
+  if [ -z "$c4_version" ]; then
+    fail "C4: no plugin version to tag (skills/.claude-plugin/plugin.json unreadable)"
+  elif ! (
+      cp -R "$PLUGIN_ROOT" "$C4/repo/skills" &&
+      cd "$C4/repo" &&
+      mkdir -p src tests docs &&
+      printf 'decoy\n' > CLAUDE.md && printf 'decoy\n' > README.md &&
+      printf 'decoy\n' > landing.html && printf 'decoy\n' > src/decoy.md &&
+      printf 'decoy\n' > tests/decoy.sh && printf 'decoy\n' > docs/decoy.md &&
+      git init -q &&
+      git -c user.name=t -c user.email=t@t -c commit.gpgsign=false -c maintenance.auto=false \
+        add -A &&
+      git -c user.name=t -c user.email=t@t -c commit.gpgsign=false -c maintenance.auto=false \
+        commit -qm "release fixture" &&
+      git -c tag.gpgsign=false tag "v$c4_version"
+    ) >"$TMP/c4-git.log" 2>&1; then
+    fail "C4: could not build the throwaway release repo"
+    sed -n '1,10p' "$TMP/c4-git.log" | sed 's/^/      /'
+  elif ! python3 - "$MARKET_JSON" "$C4/market/.claude-plugin/marketplace.json" "file://$C4/repo" <<'PY'
+import json, sys
+market = json.load(open(sys.argv[1], encoding="utf-8"))
+market["plugins"][0]["source"]["url"] = sys.argv[3]
+with open(sys.argv[2], "w", encoding="utf-8") as f:
+    json.dump(market, f, indent=2)
+PY
+  then
+    fail "C4: could not write the throwaway marketplace"
+  else
+    run_c4() {
+      HOME="$C4/home" CLAUDE_CONFIG_DIR="$C4/home/.claude" DISABLE_AUTOUPDATER=1 \
+        CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 claude "$@"
+    }
+    if run_c4 plugin marketplace add "$C4/market" >"$TMP/c4.log" 2>&1 &&
+       run_c4 plugin install idd@idd >>"$TMP/c4.log" 2>&1; then
+      run_c4 plugin details idd@idd >"$TMP/c4-details.log" 2>&1 || true
+      c4="$(python3 - "$C4/home/.claude/plugins/cache/idd/idd/$c4_version" "$PLUGIN_JSON" "$EXPECTED_SKILLS" "$TMP/c4-details.log" <<'PY'
+import filecmp, os, re, sys
+cache, manifest, expected, details = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+expected = sorted(s for s in expected.split("\n") if s)
+out = []
+if not os.path.isdir(cache):
+    print("FAIL|C4: no plugin cache at %s" % cache); sys.exit(0)
+# The CLI adds its own bookkeeping dot-entries (e.g. .in_use); the payload is
+# every other entry, plus the shipped .claude-plugin/.
+names = sorted(os.listdir(cache))
+payload = sorted(n for n in names if not n.startswith(".") or n == ".claude-plugin")
+want = sorted(expected + [".claude-plugin"])
+out.append(("PASS|" if payload == want else "FAIL|")
+           + "C4: the plugin cache holds only the skills and .claude-plugin/ (got %s)" % payload)
+leaked = [n for n in ("CLAUDE.md", "README.md", "landing.html", "src", "tests", "docs") if n in names]
+out.append(("PASS|" if not leaked else "FAIL|")
+           + "C4: no repo-root file reaches the plugin cache (leaked %s)" % leaked)
+shipped = os.path.join(cache, ".claude-plugin", "plugin.json")
+same = os.path.isfile(shipped) and filecmp.cmp(shipped, manifest, shallow=False)
+out.append(("PASS|" if same else "FAIL|")
+           + "C4: the cached manifest is the emitted skills/.claude-plugin/plugin.json")
+text = open(details, encoding="utf-8").read()
+m = re.search(r"^\s*Skills \((\d+)\)\s+(.*)$", text, re.M)
+got = sorted(s.strip() for s in m.group(2).split(",")) if m else None
+out.append(("PASS|" if got == expected else "FAIL|")
+           + "C4: the installed plugin loads exactly the %d src/skills/ skills (got %s)" % (len(expected), got))
+print("\n".join(out))
+PY
+)"
+      [ -n "$c4" ] || fail "C4: install result could not be parsed"
+      while IFS='|' read -r verdict msg; do
+        [ -n "$verdict" ] || continue
+        if [ "$verdict" = "PASS" ]; then pass "$msg"; else fail "$msg"; fi
+      done <<< "$c4"
+    else
+      fail "C4: claude plugin marketplace add / install from the throwaway release failed"
+      sed -n '1,20p' "$TMP/c4.log" | sed 's/^/      /'
+    fi
   fi
 fi
 
@@ -257,5 +395,5 @@ fi
 if [ "$SKIP" -gt 0 ]; then
   echo "  ⚠ host checks skipped — structural coverage only"
 fi
-echo "  ✓ Claude Code plugin package is valid and matches the release (#469)"
+echo "  ✓ Claude Code plugin package is valid and matches the release (#469, #492)"
 exit 0

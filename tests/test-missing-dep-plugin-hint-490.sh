@@ -47,7 +47,9 @@ def check(ok, label):
 market = json.loads((root / ".claude-plugin/marketplace.json").read_text())
 plugin = market["plugins"][0]
 plugin_id = f'{plugin["name"]}@{market["name"]}'
-repo = plugin["source"]["repo"]
+# The `marketplace add` target is this repo in owner/repo form: a `github`
+# source names it as `repo`, a `git-subdir` source (issue #492) as `url`.
+repo = plugin["source"].get("repo") or plugin["source"]["url"]
 want_add = f"Plugin:  claude plugin marketplace add {repo}"
 want_install = f"claude plugin install {plugin_id}"
 want_update = f"claude plugin update {plugin_id}"

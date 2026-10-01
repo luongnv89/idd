@@ -94,7 +94,11 @@ from .doc_slimming import (
     _zero_mention_bundled_docs,
     _zero_mention_bundled_scripts,
 )
-from .emit import _emit_flattened_skill, _emit_repo_root_skills
+from .emit import (
+    _emit_flattened_skill,
+    _emit_plugin_manifest,
+    _emit_repo_root_skills,
+)
 from .inventory import (
     _check_non_markdown_in,
     _discover_distributed_deprecated,

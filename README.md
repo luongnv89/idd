@@ -258,7 +258,7 @@ Don't have `asm`? `npm install -g agent-skill-manager`.
 
 #### Alternative — Claude Code plugin
 
-Claude Code users can install the same seven skills as one plugin. This repo is its own plugin marketplace, and the marketplace pins the plugin to the latest tagged release, so a plugin install ships exactly that release's `skills/`:
+Claude Code users can install the same seven skills as one plugin. This repo is its own plugin marketplace, and the marketplace pins the plugin to the latest tagged release. A plugin install fetches only that release's `skills/` folder (about 2.7 MB), not the rest of the repository:
 
 ```bash
 claude plugin marketplace add luongnv89/idd   # register the marketplace (once)

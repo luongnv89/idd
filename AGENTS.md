@@ -64,6 +64,10 @@ src/
 │       ├── SKILL.source.md
 │       └── references/
 │
+├── plugin/
+│   └── plugin.json         # Claude Code plugin manifest source (issue #492);
+│                           #   build emits skills/.claude-plugin/plugin.json
+│
 docs/                              # All documentation — single tree (issue #81)
 ├── config-schema.md               # ↓ Runtime docs (skills reference these via
 ├── run-log-schema.md              #   bare `docs/X.md` tokens; build.py
@@ -84,9 +88,9 @@ docs/                              # All documentation — single tree (issue #8
 ├── experiments/                   #
 └── release-notes/                 # ↑
 
-.claude-plugin/                    # Claude Code plugin + marketplace (issue #469)
-├── plugin.json                    #   repo root is the plugin; root skills/ auto-scanned
-└── marketplace.json               #   lists `idd`, pinned to the release tag (ref vX.Y.Z)
+.claude-plugin/                    # Claude Code marketplace (issues #469, #492)
+└── marketplace.json               #   lists `idd`: git-subdir source, plugin root skills/,
+                                   #   pinned to the release tag (ref vX.Y.Z)
 ```
 
 ### Docs placement rule
