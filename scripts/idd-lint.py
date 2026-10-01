@@ -332,6 +332,45 @@ def lint_commit(subject: str) -> list[Finding]:
 # --- PR checks (L2 §3.3+§5, L3 §4) ------------------------------------------------
 
 
+CLOSING_KEYWORD_RE = r"(?i)\b(close[sd]?|fix(e[sd])?|resolve[sd]?)\s+#{n}\b"
+
+
+def ac_verification_rows(body: str) -> list[list[str]]:
+    """Data rows of the `## Acceptance Criteria Verification` table (§5.2)."""
+    acv = split_sections(body).get("Acceptance Criteria Verification") or ""
+    rows = [
+        [c.strip() for c in line.strip().strip("|").split("|")]
+        for line in acv.splitlines()
+        if line.strip().startswith("|") and "---" not in line
+    ]
+    return [
+        r for r in rows
+        if len(r) >= 3 and not (r[0].lower() == "criterion" and r[1].lower() == "status")
+    ]
+
+
+def is_deferred_row(row: list[str]) -> bool:
+    """A criterion the PR declares open: Status `unverified`, Evidence says `deferred` (§5.1)."""
+    return row[1].lower() == "unverified" and "deferred" in row[2].lower()
+
+
+def intentional_reference_problem(body: str, n: str, title: str | None) -> str | None:
+    """Why a `Refs #N` first line is not a valid intentional reference, or None (§5.1)."""
+    if title is not None:
+        m = COMMIT_RE.match(title.strip())
+        if m and m.group(4) != n:
+            return f"the title names #{m.group(4)}, not #{n}"
+    if re.search(CLOSING_KEYWORD_RE.format(n=n), body):
+        return f"the body also carries a closing keyword for #{n}"
+    rows = ac_verification_rows(body)
+    deferred = [r for r in rows if is_deferred_row(r)]
+    if not deferred:
+        return "no deferred acceptance-criteria row (Status 'unverified', Evidence 'deferred') declares what stays open"
+    if len(deferred) == len(rows):
+        return "every acceptance-criteria row is deferred — nothing is delivered"
+    return None
+
+
 def lint_pr(body: str, title: str | None, issue_type: str | None, level: str) -> list[Finding]:
     findings: list[Finding] = []
     sections = split_sections(body)
@@ -348,12 +387,20 @@ def lint_pr(body: str, title: str | None, issue_type: str | None, level: str) ->
         else:
             findings.append(err("P01", f"title '{title}' does not match <type>(<scope>): <description> (#N) (§3.3)"))
 
-    # P02 (L2) — first body line is `Closes #N` (§3.3, §5.1)
+    # P02 (L2) — first body line is `Closes #N`, or a valid intentional
+    # `Refs #N` partial delivery (§3.3, §5.1)
     first = first_content_line(body)
+    refs = re.match(r"^Refs #(\d+)$", first)
     if re.match(r"^Closes #\d+$", first):
         findings.append(ok("P02", f"body first line is '{first}' (§5.1)"))
+    elif refs:
+        problem = intentional_reference_problem(body, refs.group(1), title)
+        if problem is None:
+            findings.append(ok("P02", f"body first line is '{first}' — intentional partial delivery (§5.1)"))
+        else:
+            findings.append(err("P02", f"'{first}' is not a valid intentional reference: {problem} (§5.1)"))
     else:
-        findings.append(err("P02", "body must start with 'Closes #N' on its first line (§3.3, §5.1)"))
+        findings.append(err("P02", "body must start with 'Closes #N' (or a valid intentional 'Refs #N') on its first line (§3.3, §5.1)"))
 
     # P03 (L2) — Acceptance Criteria Verification table (§5.2)
     acv = sections.get("Acceptance Criteria Verification")

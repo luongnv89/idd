@@ -76,9 +76,9 @@ already fetched in Step 1 and takes the **fuller** of any inputs that disagree:
 
 - **Diff size / files-changed** (`gh pr view {N} --json files`) — small change
   (≈ ≤ 15 changed lines in 1 file) leans `light`.
-- **Linked-issue `Effort` band** — when the PR body has `Closes #N`, read the
-  `## Metadata` `Effort` band out of `linked_issue_snapshot`, the record SKILL.md
-  already retained at the review boundary. **Do not re-read the issue here**: the
+- **Linked-issue `Effort` band** — when the PR links an issue (`Closes #N` or a
+  first-line `Refs #N`), read the `## Metadata` `Effort` band out of
+  `linked_issue_snapshot`, the record SKILL.md already retained at the review boundary. **Do not re-read the issue here**: the
   snapshot is the fresher record, and a second read would reintroduce exactly the
   duplicate the review boundary exists to remove. `XS`/`S` asserted leans
   `light`, `M`/`L`/`XL` or low-confidence leans `full`.
@@ -98,8 +98,8 @@ SKILL.md's review-boundary refresh has two paths — the script, then a direct <
 
 **Scope — one state, and only one: a linked issue exists *and* its record could
 not be read.** The refresh is conditional in exactly the way the `Effort` bullet
-above is — **when the PR body has `Closes #N`**. A PR with no linked issue has
-nothing to refresh, so its empty `linked_issue_snapshot` is the correct state
+above is — **when the PR links an issue** (`Closes #N` or a first-line
+`Refs #N`). A PR with no linked issue has nothing to refresh, so its empty `linked_issue_snapshot` is the correct state
 rather than a failed read, and this fail-safe **never** stops it. It proceeds to
 Step 3 like any other PR, where `references/verification-checks.md` already
 answers for it: `acceptance_criteria` reports `○ pass — none defined; manual

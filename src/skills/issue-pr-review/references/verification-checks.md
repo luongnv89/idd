@@ -70,6 +70,7 @@ If the issue has no acceptance criteria:
 - Any criterion `fail` → ✗ acceptance_criteria: fail (blocks soft-pass; treat as fixable)
 - No fails, but at least one `unverified` → ⚠ acceptance_criteria: partial (report-only when `review.soft_pass: true`; strict blocker when `false`)
 - No criteria defined → ○ acceptance_criteria: pass (with the "manual review recommended" note)
+- On a PR whose line 1 is `Refs #{N}`, a criterion whose row is deferred (Status `unverified`, Evidence `deferred`) → `○ deferred`, excluded from the rules above: it neither blocks nor counts as delivered, and is never `fail` — check 1 alone judges the form
 
 Each `fail` criterion becomes a fixable issue in Step 6 with `category: acceptance_criteria`, `action: fix`, evidence as the description, and the criterion text as the suggested fix target.
 
@@ -79,7 +80,7 @@ Each `fail` criterion becomes a fixable issue in Step 6 with `category: acceptan
 
 Per the dual-write rule (see *Analysis Artifacts and Durable Memory* in `docs/idd-methodology.md`), the durable analysis signal must survive the squash-merge into git history. Run the following four checks against the PR body, the commits in the PR, and the repo's merge configuration:
 
-1. **Issue link** — the PR-link surface still requires `Closes #{N}`, `Fixes #{N}`, or `Resolves #{N}` for the linked issue (issue #36 hard-fail when absent, unless the *Refactor/chore exemption* below applies). Detect with the same regex GitHub uses: `(?i)(close[sd]?|fix(e[sd])?|resolve[sd]?)\s+#\d+`. Reuse check 4's already-read `squash_merge_commit_message` — do not issue a second API call — to choose which body surface is merge-effective:
+1. **Issue link** — the PR-link surface still requires `Closes #{N}`, `Fixes #{N}`, or `Resolves #{N}` for the linked issue (issue #36 hard-fail when absent, unless the *Refactor/chore exemption* or a valid *Intentional reference* below applies). Detect with the same regex GitHub uses: `(?i)(close[sd]?|fix(e[sd])?|resolve[sd]?)\s+#\d+`. Reuse check 4's already-read `squash_merge_commit_message` — do not issue a second API call — to choose which body surface is merge-effective:
    - `PR_BODY` (B1): evaluate the regex against the **raw** PR body. Do **not** strip markdown. Keywords that appear only inside fenced code, inline code spans, or blockquotes **are** merge-effective — GitHub copies the body bytes into the squash commit message, and commit-message closing keywords do not honour markdown.
    - Any other value, including `COMMIT_MESSAGES`, or an unread check-4 field: evaluate the regex with **markdown-aware** PR-body rules (ignore matches that live only in fenced code, inline code spans, or blockquotes). Those matches are not GitHub PR-timeline closers.
    Collect every issue number the merge-effective surface would close. If that set differs from the markdown-aware PR-link set, report a `note` (never `action: fix`) naming the extra and/or missing numbers as issues that will close — or will not close — at squash-merge under B1. The #36 hard-fail still keys off the PR-link requirement for `{N}`, not off extra merge-only numbers.
@@ -97,7 +98,7 @@ Per the dual-write rule (see *Analysis Artifacts and Durable Memory* in `docs/id
    The second read goes through `gh api` rather than `--json` field selection because `gh repo view --json squashMergeCommitMessage` returns `Unknown JSON field` (`docs/platform-github.md` → *Operation catalog* → *Preflight*). Outcomes:
    - The strategy read answers with squash-only (`squashMergeAllowed == true`, `mergeCommitAllowed == false`, `rebaseMergeAllowed == false`) **and** `squash_merge_commit_message == PR_BODY` → the **B1/squash** binding holds; check 4 passes and check 3's fields are the durable record.
    - `squash_merge_commit_message == PR_BODY`, but the strategy read is not squash-only (`squashMergeAllowed == false`, `mergeCommitAllowed == true`, and/or `rebaseMergeAllowed == true`) → report `partial — B1/squash qualified only`, naming the observed strategy summary. The PR body will reach git history only for squash merges; merge-commit and/or rebase can bypass the durable record.
-   - Any other `squash_merge_commit_message` value → the **B1** binding is defeated: report `partial`, name the observed value, and say the record will not reach git history *via B1*. Scope the wording to B1 rather than asserting it reaches git history by no route at all: this check can only test B1, and a repo that keeps durable memory through B2 (merge-commit body) or B3 (git notes) instead is not defeated by a non-`PR_BODY` value. There is no declared-binding key to read — `.gitissue.yml` has none — so the check does not branch on one; such a repo reads the finding as informational, or turns the dimension off with `review.require_traceability_check: false`.
+   - Any other `squash_merge_commit_message` value → the **B1** binding is defeated: report `partial`, name the observed value, and say the record will not reach git history *via B1*. Scope the wording to B1: this check tests only B1, and a repo keeping durable memory via B2 (merge-commit body) or B3 (git notes) is not defeated by it. `.gitissue.yml` declares no binding, so such a repo reads the finding as informational, or sets `review.require_traceability_check: false`.
    - **A read that does not answer is not a pass.** If either call fails (no `gh`, unauthenticated, 404, insufficient permission) or the response carries no such field, report `partial — squash-merge binding unverified` with the reason. Never degrade to `pass`: asserting an unread configuration is exactly the failure this check exists to catch.
 
    All three non-`pass` repository-setting outcomes are properties of the **repository**, not of the PR. They are `note` findings only — never emit them as `action: fix` findings, because no change to this PR can satisfy them and the remedy is a repo-settings mutation an unattended fixer must not make. Name the fix in the report for a human instead: `gh api -X PATCH repos/{owner}/{repo} -f allow_squash_merge=true -f allow_merge_commit=false -f allow_rebase_merge=false -f squash_merge_commit_title=PR_TITLE -f squash_merge_commit_message=PR_BODY`. The strategy flags and both `squash_merge_commit_*` flags belong in the same repo-settings change: GitHub pairs `PR_BODY` only with `PR_TITLE`, so sending the message alone against the default `COMMIT_OR_PR_TITLE` fails with HTTP 422 `invalid_squash_commit_setting_combo`, and leaving merge-commit or rebase enabled still leaves B1 bypassable.
@@ -110,23 +111,36 @@ Per the dual-write rule (see *Analysis Artifacts and Durable Memory* in `docs/id
 | Squash-merge binding defeated | checks 1-3 pass; the strategy read may be squash-only, but check 4 read a `squash_merge_commit_message` other than `PR_BODY` | ⚠ traceability: partial — "squash-merge binding defeated (`squash_merge_commit_message: {value}`) — the durable record will not reach git history via B1" |
 | Squash-merge binding unverified | either the strategy read or the message-source read did not answer: no `gh`, unauthenticated, 404, insufficient permission, or the field is absent | ⚠ traceability: partial — "squash-merge binding unverified ({reason})" |
 | `Closes #{N}` absent on a refactor/chore-exempt PR | check 1 skipped via the *Refactor/chore exemption* below; checks 2-4 still run | ○ traceability: pass — exempt (refactor/chore PR; no Closes #N required), with any check 2-3 partial findings appended. A non-`pass` **check 4** is not exempt-able and holds the dimension at ⚠ partial |
-| `Closes #{N}` absent | check 1 fails (regardless of other checks) | ✗ traceability: fail (blocking — see below) |
+| `Refs #{N}` intentional reference | check 1 satisfied by the *Intentional reference* form below; checks 2-4 run as for the exemption | ○ traceability: pass — intentional reference (Refs #{N}; {k} AC deferred), check 2-3 partials appended; a non-`pass` check 4 holds ⚠ partial |
+| `Closes #{N}` absent | check 1 fails (regardless of other checks; includes a `Refs #{N}` first line that fails the *Intentional reference* form) | ✗ traceability: fail (blocking — see below) |
 | Decision Record absent on a human-authored PR | check 3 partially fails: PR was not produced by `/issue-resolver` and has no Decision Record | ⚠ traceability: partial — "PR not produced by `/issue-resolver`; Decision Record absent" |
 | Commit reference absent | check 2 fails but check 1 passes (PR body has Closes #N but no commit references the issue) | ⚠ traceability: partial — "no commit references #{N}" |
 | Acceptance Criteria Verification block absent on a `/issue-resolver` PR | check 3 fails on a PR that does include a Decision Record | ⚠ traceability: partial — "Acceptance Criteria Verification block missing" |
 
 When `review.soft_pass: true`, the `Closes #{N}` failure is the only traceability outcome that **blocks** the soft-pass; other partial outcomes are reported but do not block. When `review.soft_pass: false`, those partial outcomes are strict blockers too (but remain non-fixer `note` findings). The three repository-setting check-4 outcomes get **no exception** from that rule, and none from the refactor/chore exemption either: under strict mode a qualified-only, defeated, or unverified binding blocks, and it is meant to — a repo that has opted into strict review has said an unsatisfied convention is not shippable, and this one is unsatisfied at the repo level. The remedy is the repo-settings `gh api -X PATCH` in check 4, run by someone with admin rights; a repo that would rather not gate on it sets `review.soft_pass: true` (the default) or `review.require_traceability_check: false`. This matches issue #36's contract: a PR missing `Closes #N` reports a traceability failure even if tests pass; a human-authored PR without a Decision Record reports `partial`, not `fail`.
 
-When traceability fails on `Closes #{N}`, emit a fixable issue in Step 6 with `category: traceability`, `action: fix`, suggested fix: "Add `Closes #{linked_issue}` to the PR body." The fix string names `{linked_issue}` and not `{N}` on purpose. It is the one `{N}` in this file that is emitted into `findings_json` and handed to the fixer (`shared/agents/fixer.md`), which carries no copy of this procedure and reads the string as written; there `{N}` is the PR number, and check 1's `#\d+` accepts any number, so a rendered `Closes #<PR>` would silently false-pass the gate that emitted the finding.
+When traceability fails on `Closes #{N}`, emit a fixable issue in Step 6 with `category: traceability`, `action: fix`, suggested fix: "Add `Closes #{linked_issue}` to the PR body." — unless line 1 is `Refs #{linked_issue}`, which gets `action: note` instead (*Intentional reference*). The fix string names `{linked_issue}` and not `{N}` on purpose. It is the one `{N}` in this file that is emitted into `findings_json` and handed to the fixer (`shared/agents/fixer.md`), which carries no copy of this procedure and reads the string as written; there `{N}` is the PR number, and check 1's `#\d+` accepts any number, so a rendered `Closes #<PR>` would silently false-pass the gate that emitted the finding.
+
+## Intentional reference (`Refs #N`) <!-- a:rvc-intentional-reference -->
+
+A PR delivering part of an issue that must stay open says `Refs #{N}`, not `Closes #{N}`. **Not** an exemption — no `review.*` key turns it off — it satisfies check 1 only when **all** hold:
+
+1. The body's first content line is exactly `Refs #{N}`, and `{N}` equals the PR title's `(#N)` when the title carries one.
+2. No closing keyword names `#{N}` (word-bounded, so `#{N}0` does not count) anywhere in the **raw** body, code spans and blockquotes included.
+3. The `## Acceptance Criteria Verification` table declares what stays open: at least one **deferred row** (Status exactly `unverified`, Evidence containing `deferred`, case-insensitive) and at least one row that is not deferred. Deferring every criterion delivers nothing and fails.
+
+`{N}` from that line is the linked issue, so its criteria load; deferred rows report `○ deferred` even when a condition fails.
+
+A `Refs #{N}` first line that misses a condition is check 1's `fail` and still hard-blocks, but its finding is `action: note`, never `fix`: prepending `Closes` would close an issue the author meant to keep open. Name the failed condition; a human declares the deferred rows or swaps `Refs` for `Closes`.
 
 ## Refactor/chore exemption
 
-Some PRs aren't tied to a single tracked issue — skill quality passes, dependency bumps, doc-only updates. Forcing each one to open a tracking issue purely to satisfy the `Closes #N` gate is workflow ceremony with no information gain. To accommodate this, check 1 (`Closes #N`) is **skipped** when either of the following holds:
+Some PRs track no single issue — skill quality passes, dependency bumps, doc-only updates — and opening one just to satisfy `Closes #N` is ceremony. Check 1 is **skipped** when either holds:
 
-1. The PR has any label whose name appears in `review.traceability_exempt_labels` (default: `["refactor", "chore"]`). Match is exact and case-sensitive against GitHub label names.
-2. The PR body contains a line matching `review.traceability_exempt_pattern` (default: `"^\\s*Type:\\s*(refactor|chore)\\s*$"`, case-insensitive, evaluated multiline-anchored against the body). The line may appear anywhere in the body. The default is shown in YAML double-quoted form, so `\\s` is the correct value to copy into `.gitissue.yml`.
+1. The PR has a label named in `review.traceability_exempt_labels` (default `["refactor", "chore"]`; exact, case-sensitive).
+2. A body line matches `review.traceability_exempt_pattern` (default `"^\\s*Type:\\s*(refactor|chore)\\s*$"`, case-insensitive, multiline-anchored, anywhere in the body). The default is in YAML double-quoted form, so `\\s` is the value to copy into `.gitissue.yml`.
 
-The exemption applies **only to check 1**. Checks 2-4 still run; a missing commit reference or Decision Record is reported as `partial`, never `fail`. Check 4 has no "absent" mode — its non-`pass` outcomes are *qualified-only*, *defeated*, and *unverified*, and none is exempt-able, because the exemption is about this PR's link to an issue while check 4 is about the repository. **A non-`pass` check 4 keeps the dimension at `partial` even on an exempt PR**: rendering `pass — exempt` over a qualified-only, defeated, or unread binding would be the same "report pass on an unread binding" this check exists to end. Note that check 2 (`git log --grep="#{N}"`) is well-defined only when there is a tracked issue number; an exempt refactor/chore PR with no linked issue has no `#{N}` to grep for, so check 2 is reported as `n/a — no linked issue`, not `partial`. When an exempt PR _does_ have a linked issue (e.g., a refactor scoped under a tracking ticket) but no commit references it, the report is `○ pass — exempt; no commit references #{N} (note)`, not `fail`.
+The exemption applies **only to check 1**; checks 2-4 still run, and a missing commit reference or Decision Record is `partial`, never `fail`. Check 4's non-`pass` outcomes — *qualified-only*, *defeated*, *unverified* — are not exempt-able: the exemption concerns this PR's issue link, check 4 the repository, so **a non-`pass` check 4 keeps the dimension at `partial` even on an exempt PR**. Check 2 needs an issue number: with no linked issue it reports `n/a — no linked issue`; with one but no referencing commit, `○ pass — exempt; no commit references #{N} (note)`.
 
 Report wording:
 
@@ -134,13 +148,13 @@ Report wording:
 traceability:        ○ pass — exempt (refactor/chore PR; no Closes #N required)
 ```
 
-If checks 2-3 produce partial findings on an exempt PR, append them as in the human-authored case (check 4 is not appended — a non-`pass` check 4 holds the dimension at `partial`):
+Check 2-3 partials on an exempt PR are appended as in the human-authored case (check 4 is not — it holds the dimension at `partial`):
 
 ```
 traceability:        ○ pass — exempt (refactor/chore PR; no Closes #N required);
                        no commit references #{N}
 ```
 
-To **disable** the exemption entirely (restore the strict issue #36 behavior), set `traceability_exempt_labels: []` and `traceability_exempt_pattern: ""` in `.gitissue.yml`.
+To **disable** the exemption, set `traceability_exempt_labels: []` and `traceability_exempt_pattern: ""` in `.gitissue.yml`. The *Intentional reference* form is not an exemption and stays in force.
 
-The exemption check runs before the four traceability checks; if a PR matches, log which mechanism matched (label name or pattern) so reviewers can audit the decision in the report.
+The exemption check runs before the four traceability checks; log which mechanism matched (label name or pattern) so reviewers can audit the decision.

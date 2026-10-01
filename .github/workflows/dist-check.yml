@@ -133,6 +133,10 @@ jobs:
       - name: test-issue-pr-review-traceability
         run: bash tests/test-issue-pr-review-traceability.sh
 
+      # Issue #493: intentional partial `Refs #N` PRs pass the traceability gate.
+      - name: test-intentional-refs-493
+        run: bash tests/test-intentional-refs-493.sh
+
       - name: test-issue-resolver-0d-security
         run: bash tests/test-issue-resolver-0d-security.sh
 
