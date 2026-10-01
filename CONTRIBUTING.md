@@ -125,7 +125,7 @@ tests/                      # Integration test scripts
 
 ### Build Workflow
 
-`src/` is the single source of truth. `skills/` is the committed install surface; `dist/` is a gitignored staging area the build verifies before promoting to `skills/`.
+`src/` is the single source of truth. `skills/` is the committed install surface — for `asm`, manual copies, and the Claude Code plugin (`.claude-plugin/`, pinned to the release tag) alike; `dist/` is a gitignored staging area the build verifies before promoting to `skills/`.
 
 ```bash
 ./scripts/build.sh          # Rebuild from src/, verify, then update skills/
@@ -139,7 +139,7 @@ The build is byte-deterministic: rerunning it on an unchanged `src/` produces an
 
 Each skill should be tested against a real (or test) GitHub repository:
 
-1. Install the skill locally in Claude Code
+1. Install the skill locally in Claude Code (or load the whole checkout as a plugin for one session: `claude --plugin-dir .`)
 2. Run the skill against a test repo with known issues
 3. Verify the terminal output matches expected patterns from `DESIGN.md`
 4. Check that `gh` CLI calls use `--json` with explicit field selection

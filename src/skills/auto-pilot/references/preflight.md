@@ -18,6 +18,8 @@ If one or more required skills are missing, stop immediately and print:
   To fix:  asm install https://github.com/luongnv89/idd
            Select: {missing_skill_list}
   Or:      asm install https://github.com/luongnv89/idd --skill {first_missing_skill}
+  Plugin:  claude plugin marketplace add luongnv89/idd
+           claude plugin install idd@idd
 
   Then restart the agent session and re-run /auto-pilot.
 ```

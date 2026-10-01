@@ -375,6 +375,25 @@ jobs:
       - name: test-root-skills-install-surface
         run: bash tests/test-root-skills-install-surface.sh
 
+      # Issue #469: the repo root is a Claude Code plugin and its own
+      # marketplace. Install a pinned CLI so the host validator runs on every
+      # change; IDD_PLUGIN_REQUIRE_CLI turns a missing CLI from a skip into a
+      # failure. Bump the pin deliberately, like an action SHA.
+      - name: Install pinned Claude Code CLI (plugin validation)
+        run: |
+          npm install -g --no-fund --no-audit @anthropic-ai/claude-code@2.1.286
+          claude --version
+        env:
+          DISABLE_AUTOUPDATER: "1"
+          CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1"
+
+      - name: test-plugin-manifest-469
+        run: bash tests/test-plugin-manifest-469.sh
+        env:
+          IDD_PLUGIN_REQUIRE_CLI: "1"
+          DISABLE_AUTOUPDATER: "1"
+          CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1"
+
       - name: test-runs-jsonl
         run: bash tests/test-runs-jsonl.sh
 
