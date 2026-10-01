@@ -51,6 +51,9 @@ stop immediately and print:
 
   To fix:  asm install https://github.com/luongnv89/idd --skill init-gitissue
            (or reinstall the full distribution)
+  Plugin:  claude plugin marketplace add luongnv89/idd
+           claude plugin install idd@idd
+           (or: claude plugin update idd@idd)
 
   Then restart the agent session and re-run /init-gitissue.
 ```

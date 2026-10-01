@@ -217,6 +217,9 @@ Verify these bundled files are present, each path resolved against the skill's d
 
   To fix:  asm install https://github.com/luongnv89/idd --skill issue-triage
            (or reinstall the full distribution)
+  Plugin:  claude plugin marketplace add luongnv89/idd
+           claude plugin install idd@idd
+           (or: claude plugin update idd@idd)
 
   Then restart the agent session and re-run /issue-triage.
 ```
