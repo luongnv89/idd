@@ -209,8 +209,8 @@ projects:
 # Model suggestion settings (used by /issue-creator)
 model_suggestion:
   # Suggest a cost-effective model + thinking level per issue, from CursorBench
-  # data cached at the skill level in model-data-<date>.json (shared across all
-  # repos, not per-project). When false, silently skipped.
+  # data cached per user in ~/.cache/gitissue/model-data-<date>.json (shared
+  # across all repos, not per-project). When false, silently skipped.
   enabled: true
 
   # Source URL refreshed into the cache on opt-in or via --refresh-model-data

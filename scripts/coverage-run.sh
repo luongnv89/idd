@@ -93,7 +93,7 @@ run "$SCRIPTS/gi-triage-graph.py" --no-config --now 2026-03-20T14:30:00Z < "$TMP
 
 # gi-model-cache — lifecycle against an empty installed-skill folder.
 mkdir -p "$TMP/skill"
-run "$SCRIPTS/gi-model-cache.py" --skill-dir "$TMP/skill" --no-seed
+run "$SCRIPTS/gi-model-cache.py" --skill-dir "$TMP/skill" --cache-dir "$TMP/model-cache" --no-seed
 
 # gi-ratelimit — pure arithmetic over fixed instants, no network.
 run "$SCRIPTS/gi-ratelimit.py" --backoff --attempt 2 --now 2026-08-23T00:00:00Z

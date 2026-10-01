@@ -1,19 +1,20 @@
 #!/usr/bin/env bash
-# test-model-suggestion-124.sh — Validate the skill-level model cache
-# shipped for issue #124.
+# test-model-suggestion-124.sh — Validate the shared (one-per-machine) model
+# cache shipped for issue #124, relocated to a user-level root by issue #491.
 #
 # Verifies issue #124 acceptance criteria against the authored sources and the
 # build output. This is a documentation/skill repo: if the spec language and
 # seed data are present and the build ships them, the agent following the skill
 # produces the documented behavior.
 #
-#  AC1. Model-suggestion cache is stored at the skill installation level, not
-#       per-repo under .gitissue/.
+#  AC1. Model-suggestion cache is stored once per machine, not per-repo under
+#       .gitissue/. Since #491 that is a user-level cache root, not the skill
+#       folder (which plugin updates and reinstalls replace).
 #  AC2. A new repo reuses the existing shared cache without creating a
 #       project-local model-data.json copy.
 #  AC3. Refreshing stale data updates the shared cache once for all repos.
 #  AC4. Staleness detection and bundled-seed fallback operate against the
-#       shared skill-level cache location.
+#       shared user-level cache location.
 #  AC5. The cache filename includes the update date (model-data-<date>.json).
 #  AC6. Users can force a refresh at any time (--refresh-model-data),
 #       independent of the staleness threshold.
@@ -62,20 +63,22 @@ for f in "$SKILL" "$REF" "$SEED" "$ERRORS" "$SCHEMA" "$INIT_TEMPLATE"; do
 done
 
 # ───────────────────────────────────────────────────────────
-# T1: AC1/AC4 — cache lives at the skill level, not per-repo
+# T1: AC1/AC4 — one shared user-level cache, never per-repo (#124, #491)
 # ───────────────────────────────────────────────────────────
-if grep -qiE 'skill[ -]level' "$REF"; then
-  pass "T1.AC1.1: reference describes a skill-level cache"
+if grep -qiE 'user[ -]level' "$REF" && grep -qiE 'never per-repo' "$REF"; then
+  pass "T1.AC1.1: reference describes a user-level cache that is never per-repo"
 else
-  fail "T1.AC1.1: reference does not describe a skill-level cache"
+  fail "T1.AC1.1: reference does not describe a user-level, never-per-repo cache"
 fi
 
-# The reference must use the skill-dir placeholder for the cache, and must NOT
-# instruct writing the live cache under .gitissue/ anymore.
-if grep -qE '\{skill_dir\}/model-data' "$REF"; then
-  pass "T1.AC1.2: cache path uses {skill_dir}/model-data-<date>.json"
+# The reference must root the cache at the {cache_dir} placeholder, never at
+# {skill_dir} (replaced by every plugin update and reinstall, #491), and must
+# NOT instruct writing the live cache under .gitissue/ anymore.
+if grep -qE '\{cache_dir\}/model-data' "$REF" \
+   && ! grep -qE '\{skill_dir\}/model-data-' "$REF"; then
+  pass "T1.AC1.2: cache path uses {cache_dir}/model-data-<date>.json, never {skill_dir}"
 else
-  fail "T1.AC1.2: cache path not rooted at {skill_dir}"
+  fail "T1.AC1.2: cache path not rooted at {cache_dir} (or still at {skill_dir})"
 fi
 
 if grep -qE 'cp[^\n]*\.gitissue/model-data\.json' "$REF"; then
@@ -152,7 +155,7 @@ fi
 
 # The durable docs (config-schema) must record that the cache is no longer in
 # .gitissue/ and that a legacy file is ignored.
-if grep -qiE 'skill-level' "$SCHEMA" && grep -qiE 'ignored|legacy' "$SCHEMA"; then
+if grep -qiE 'user-level' "$SCHEMA" && grep -qiE 'ignored|legacy' "$SCHEMA"; then
   pass "T4.AC7.2: config-schema documents the move + legacy handling"
 else
   fail "T4.AC7.2: config-schema does not document the move + legacy handling"
@@ -168,11 +171,11 @@ else
   pass "T5.AC2.1: init template no longer points cache at .gitissue/"
 fi
 
-# Error catalog must reference the skill-level cache, not the per-repo path.
-if grep -qiE 'skill-level `?model-data' "$ERRORS"; then
-  pass "T5.AC2.2: error catalog references the skill-level cache"
+# Error catalog must reference the user-level cache, not the per-repo path.
+if grep -qiE 'user-level `?model-data' "$ERRORS"; then
+  pass "T5.AC2.2: error catalog references the user-level cache"
 else
-  fail "T5.AC2.2: error catalog does not reference the skill-level cache"
+  fail "T5.AC2.2: error catalog does not reference the user-level cache"
 fi
 
 # ───────────────────────────────────────────────────────────
@@ -192,10 +195,10 @@ fi
 
 BUILT_REF="$BUILD_OUT/skills/issue-creator/references/model-suggestion.md"
 if grep -q -- '--refresh-model-data' "$BUILT_REF" 2>/dev/null && \
-   grep -qiE 'skill[ -]level' "$BUILT_REF" 2>/dev/null; then
-  pass "T6.2: skill-level cache + force refresh present in built reference"
+   grep -qiE 'user[ -]level' "$BUILT_REF" 2>/dev/null; then
+  pass "T6.2: user-level cache + force refresh present in built reference"
 else
-  fail "T6.2: built reference missing skill-level cache / force refresh"
+  fail "T6.2: built reference missing user-level cache / force refresh"
 fi
 
 # Seed still ships undated (the dated file is runtime-only, never shipped).

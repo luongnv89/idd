@@ -457,7 +457,7 @@ duplicate_detection:
 # Model suggestion (/issue-creator). Procedure: references/model-suggestion.md
 model_suggestion:
   # Type: boolean. Default: true. false skips suggestion; body/preview unchanged.
-  # Cache is skill-level model-data-<date>.json (all repos); --refresh-model-data.
+  # Cache: user-level model-data-<date>.json (all repos); --refresh-model-data.
   enabled: true
   # Type: string. Default: "https://cursor.com/cursorbench"
   data_url: "https://cursor.com/cursorbench"
@@ -626,7 +626,7 @@ Repo-root state beside `.gitissue.yml`, created on first use.
 | `.gitissue/runs.jsonl` | `/issue-resolver`, `/auto-pilot` | Append-only run log (one line per issue) |
 | `.gitissue/run-state.json`, `run.lock`, `last-run-report.md` | `/auto-pilot`; `/issue-resolver` (`borrowed_skills` only) | Resume state, lock, report |
 
-> **Not in `.gitissue/`:** the model-suggestion cache is **skill-level** (`model-data-<date>.json`, all repos).
+> **Not in `.gitissue/`:** the model-suggestion cache is **user-level** (`~/.cache/gitissue/`, all repos).
 
 **Conventions:**
 - Create via `mkdir -p`

@@ -413,6 +413,10 @@ printf '{"dependencies": {"react": "1.0"}, "x": "\\"; touch PWNED; echo \\""}\n'
 # T4 (AC4): gi-model-cache — the lifecycle, and the no-substitution rule
 # ───────────────────────────────────────────────────────────
 SEED_SRC="$SRC/skills/issue-creator/templates/model-data.json"
+# Every invocation below pins --cache-dir; the environment is pinned as well, so
+# an invocation that forgets cannot write to the developer's or CI's real $HOME.
+unset IDD_CACHE_DIR
+export XDG_CACHE_HOME="$TMP/xdg-default"
 new_skill_dir() {
   local d="$1"
   mkdir -p "$d/templates"
@@ -431,16 +435,16 @@ PY
 
 SK1="$TMP/skill1"
 new_skill_dir "$SK1"
-out="$(python3 "$MODEL" --skill-dir "$SK1" --no-config --now 2026-06-14)"
+out="$(python3 "$MODEL" --skill-dir "$SK1" --cache-dir "${SK1}-cache" --no-config --now 2026-06-14)"
 if [ "$(printf '%s' "$out" | jkey state)" = "seeded" ] \
    && [ "$(printf '%s' "$out" | jkey data_date)" = "2026-06-12" ] \
-   && [ -f "$SK1/model-data-2026-06-12.json" ]; then
+   && [ -f "${SK1}-cache/model-data-2026-06-12.json" ]; then
   pass "AC4: a missing cache is seeded under the SEED's own date, not today's"
 else
   fail "AC4: seeding is wrong (got: $out)"
 fi
 
-out="$(python3 "$MODEL" --skill-dir "$SK1" --no-config --now 2026-06-14)"
+out="$(python3 "$MODEL" --skill-dir "$SK1" --cache-dir "${SK1}-cache" --no-config --now 2026-06-14)"
 if [ "$(printf '%s' "$out" | jkey state)" = "fresh" ] \
    && [ "$(printf '%s' "$out" | jkey stale)" = "False" ] \
    && [ "$(printf '%s' "$out" | jkey age_days)" = "2" ]; then
@@ -448,7 +452,7 @@ if [ "$(printf '%s' "$out" | jkey state)" = "fresh" ] \
 else
   fail "AC4: a fresh cache is misreported (got: $out)"
 fi
-out="$(python3 "$MODEL" --skill-dir "$SK1" --no-config --now 2026-07-30)"
+out="$(python3 "$MODEL" --skill-dir "$SK1" --cache-dir "${SK1}-cache" --no-config --now 2026-07-30)"
 if [ "$(printf '%s' "$out" | jkey state)" = "stale" ] \
    && [ "$(printf '%s' "$out" | jkey stale)" = "True" ]; then
   pass "AC4: a cache past the TTL is stale (a warning, not a failure)"
@@ -472,13 +476,13 @@ fi
 MCFG="$TMP/mcfg"
 mkdir -p "$MCFG"
 printf 'model_suggestion:\n  cache_ttl_days: 60\n' > "$MCFG/.gitissue.yml"
-out="$(python3 "$MODEL" --skill-dir "$SK1" --config "$MCFG/.gitissue.yml" --now 2026-07-30)"
+out="$(python3 "$MODEL" --skill-dir "$SK1" --cache-dir "${SK1}-cache" --config "$MCFG/.gitissue.yml" --now 2026-07-30)"
 [ "$(printf '%s' "$out" | jkey stale)" = "False" ] \
   && pass "AC4: model_suggestion.cache_ttl_days from .gitissue.yml is honoured" \
   || fail "AC4: model_suggestion.cache_ttl_days is ignored"
 
 # --install writes the new dated file AND prunes every other one.
-printf 'x\n' > "$SK1/model-data-2020-01-01.json"
+printf 'x\n' > "${SK1}-cache/model-data-2020-01-01.json"
 NEWDATA="$TMP/newdata.json"
 python3 -c '
 import json, sys
@@ -486,44 +490,53 @@ d = json.load(open(sys.argv[1]))
 d["last_fetched"] = "2026-08-01T00:00:00Z"
 json.dump(d, open(sys.argv[2], "w"))
 ' "$SEED_SRC" "$NEWDATA"
-out="$(python3 "$MODEL" --skill-dir "$SK1" --no-config --install "$NEWDATA" --now 2026-08-02)"
-remaining="$(ls "$SK1" | grep -c '^model-data-' || true)"
+out="$(python3 "$MODEL" --skill-dir "$SK1" --cache-dir "${SK1}-cache" --no-config --install "$NEWDATA" --now 2026-08-02)"
+remaining="$(ls "${SK1}-cache" | grep -c '^model-data-' || true)"
 if [ "$(printf '%s' "$out" | jkey state)" = "installed" ] \
-   && [ -f "$SK1/model-data-2026-08-01.json" ] && [ "$remaining" = "1" ]; then
+   && [ -f "${SK1}-cache/model-data-2026-08-01.json" ] && [ "$remaining" = "1" ]; then
   pass "AC4: --install writes the dated cache and prunes every older copy"
 else
   fail "AC4: --install left $remaining dated file(s) (got: $out)"
 fi
 
-# ── Fail closed: a corrupt cache is NOT silently replaced by the seed ────────
-# Reseeding there would report a refresh the user never got, and would throw
-# away their refreshed data. Exit 4 and leave the file alone.
+# ── A corrupt cache is a MISS, never used — and never silently (#491) ──────
+# The cache is stored fetched content, so a document that fails the validation
+# boundary is ignored with a ⚠ line naming it, and the seed replaces it. Exit 4
+# is reserved for "no valid cache AND no readable seed".
 SK2="$TMP/skill2"
 new_skill_dir "$SK2"
-printf 'not json at all\n' > "$SK2/model-data-2026-06-12.json"
-run_status out st python3 "$MODEL" --skill-dir "$SK2" --no-config --now 2026-06-14
-seeded_over="$(ls "$SK2" | grep -c '^model-data-' || true)"
-if [ "$st" = "4" ] && [ "$seeded_over" = "1" ] \
-   && grep -q 'not json at all' "$SK2/model-data-2026-06-12.json"; then
-  pass "AC4: a corrupt cache exits 4 and is never overwritten by the bundled seed"
+mkdir -p "${SK2}-cache"
+printf 'not json at all\n' > "${SK2}-cache/model-data-2026-06-12.json"
+err="$(python3 "$MODEL" --skill-dir "$SK2" --cache-dir "${SK2}-cache" --no-config --now 2026-06-14 2>&1 >"$TMP/sk2.out")" && st=0 || st=$?
+out="$(cat "$TMP/sk2.out")"
+if [ "$st" = "0" ] && [ "$(printf '%s' "$out" | jkey state)" = "seeded" ] \
+   && printf '%s' "$err" | grep -q '⚠ gi-model-cache: ignoring the model-data cache' \
+   && python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "${SK2}-cache/model-data-2026-06-12.json"; then
+  pass "AC4: a corrupt cache is a warned miss — the seed replaces it, exit 0"
 else
-  fail "AC4: a corrupt cache was silently replaced (exit $st, files=$seeded_over)"
+  fail "AC4: a corrupt cache is not handled as a warned miss (exit $st, err: $err)"
 fi
+SK2B="$TMP/skill2b"
+mkdir -p "$SK2B" "${SK2B}-cache"
+printf 'not json at all\n' > "${SK2B}-cache/model-data-2026-06-12.json"
+run_status out st python3 "$MODEL" --skill-dir "$SK2B" --cache-dir "${SK2B}-cache" --no-config
+[ "$st" = "4" ] && pass "AC4: a corrupt cache with no bundled seed exits 4" \
+                || fail "AC4: a corrupt cache with no seed exits 4 (got $st)"
 
 # No cache and no seed is the documented "disable suggestions" degrade.
 SK3="$TMP/skill3"
 mkdir -p "$SK3"
-run_status out st python3 "$MODEL" --skill-dir "$SK3" --no-config
+run_status out st python3 "$MODEL" --skill-dir "$SK3" --cache-dir "${SK3}-cache" --no-config
 [ "$st" = "4" ] && pass "AC4: no cache and no bundled seed exits 4 (degrade, keep creating)" \
                 || fail "AC4: no cache and no seed exits 4 (got $st)"
 
 # An --install payload that is not model data must not clobber a good cache.
 SK4="$TMP/skill4"
 new_skill_dir "$SK4"
-python3 "$MODEL" --skill-dir "$SK4" --no-config --now 2026-06-14 >/dev/null
+python3 "$MODEL" --skill-dir "$SK4" --cache-dir "${SK4}-cache" --no-config --now 2026-06-14 >/dev/null
 printf '{"hello": 1}\n' > "$TMP/junk.json"
-run_status out st python3 "$MODEL" --skill-dir "$SK4" --no-config --install "$TMP/junk.json"
-if [ "$st" = "3" ] && [ -f "$SK4/model-data-2026-06-12.json" ]; then
+run_status out st python3 "$MODEL" --skill-dir "$SK4" --cache-dir "${SK4}-cache" --no-config --install "$TMP/junk.json"
+if [ "$st" = "3" ] && [ -f "${SK4}-cache/model-data-2026-06-12.json" ]; then
   pass "AC4: a non-model-data --install payload exits 3 and leaves the cache intact"
 else
   fail "AC4: a junk --install payload exits 3 without clobbering (got $st)"
@@ -542,49 +555,67 @@ fi
 #      the script deliberately never reseeds over a cache it cannot read.
 SK5="$TMP/skill5"
 new_skill_dir "$SK5"
-python3 "$MODEL" --skill-dir "$SK5" --no-config --now 2026-06-14 >/dev/null
+python3 "$MODEL" --skill-dir "$SK5" --cache-dir "${SK5}-cache" --no-config --now 2026-06-14 >/dev/null
 python3 -c '
 import json, sys
 d = json.load(open(sys.argv[1]))
 d["last_fetched"] = "2026-02-30T00:00:00Z"
 json.dump(d, open(sys.argv[2], "w"))
 ' "$SEED_SRC" "$TMP/impossible-date.json"
-run_status out st python3 "$MODEL" --skill-dir "$SK5" --no-config \
+run_status out st python3 "$MODEL" --skill-dir "$SK5" --cache-dir "${SK5}-cache" --no-config \
   --install "$TMP/impossible-date.json"
 [ "$st" = "3" ] && pass "AC4: an impossible last_fetched date in --install exits 3, not 1" \
                 || fail "AC4: an impossible --install date exits 3 (got $st)"
-if [ -f "$SK5/model-data-2026-06-12.json" ] \
-   && [ ! -f "$SK5/model-data-2026-02-30.json" ]; then
+if [ -f "${SK5}-cache/model-data-2026-06-12.json" ] \
+   && [ ! -f "${SK5}-cache/model-data-2026-02-30.json" ]; then
   pass "AC4: an impossible --install date leaves the existing cache untouched"
 else
-  fail "AC4: an impossible --install date clobbered the cache ($(ls "$SK5"))"
+  fail "AC4: an impossible --install date clobbered the cache ($(ls "${SK5}-cache"))"
 fi
-run_status out st python3 "$MODEL" --skill-dir "$SK5" --no-config --now 2026-06-14
+run_status out st python3 "$MODEL" --skill-dir "$SK5" --cache-dir "${SK5}-cache" --no-config --now 2026-06-14
 [ "$st" = "0" ] && pass "AC4: the run after a rejected --install date still succeeds" \
                 || fail "AC4: a rejected --install date bricked the cache (got $st)"
 
 # The same impossible date already sitting in a cache degrades (4), never 1.
 SK6="$TMP/skill6"
 new_skill_dir "$SK6"
+mkdir -p "${SK6}-cache"
 python3 -c '
 import json, sys
 d = json.load(open(sys.argv[1]))
 d["last_fetched"] = "2026-02-30T00:00:00Z"
 json.dump(d, open(sys.argv[2], "w"))
-' "$SEED_SRC" "$SK6/model-data-2026-02-30.json"
-run_status out st python3 "$MODEL" --skill-dir "$SK6" --no-config --now 2026-06-14
-[ "$st" = "4" ] && pass "AC4: an impossible date in an existing cache exits 4, not 1" \
-                || fail "AC4: an impossible cached date exits 4 (got $st)"
+' "$SEED_SRC" "${SK6}-cache/model-data-2026-02-30.json"
+run_status out st python3 "$MODEL" --skill-dir "$SK6" --cache-dir "${SK6}-cache" --no-config --now 2026-06-14
+if [ "$st" = "0" ] && [ "$(printf '%s' "$out" | jkey state)" = "seeded" ] \
+   && [ ! -e "${SK6}-cache/model-data-2026-02-30.json" ]; then
+  pass "AC4: an impossible date in an existing cache is a miss (reseeded, pruned), not exit 1"
+else
+  fail "AC4: an impossible cached date is not a reseeded miss (got $st: $out)"
+fi
+SK6B="$TMP/skill6b"
+mkdir -p "$SK6B"
+cp -R "${SK6}-cache" "${SK6B}-cache"
+cp "${SK6B}-cache/model-data-2026-06-12.json" "$TMP/sk6-valid.json"
+python3 -c '
+import json, sys
+d = json.load(open(sys.argv[1]))
+d["last_fetched"] = "2026-02-30T00:00:00Z"
+json.dump(d, open(sys.argv[2], "w"))
+' "$TMP/sk6-valid.json" "${SK6B}-cache/model-data-2026-07-01.json"
+run_status out st python3 "$MODEL" --skill-dir "$SK6B" --cache-dir "${SK6B}-cache" --no-config --now 2026-06-14
+[ "$st" = "4" ] && pass "AC4: an impossible cached date with no seed exits 4, not 1" \
+                || fail "AC4: an impossible cached date with no seed exits 4 (got $st)"
 
 # And the same shape on the flag that supplies "today".
-run_status out st python3 "$MODEL" --skill-dir "$SK1" --no-config --now 2026-02-30
+run_status out st python3 "$MODEL" --skill-dir "$SK1" --cache-dir "${SK1}-cache" --no-config --now 2026-02-30
 [ "$st" = "3" ] && pass "AC4: an impossible --now date exits 3, not 1" \
                 || fail "AC4: an impossible --now date exits 3 (got $st)"
 
-run_status out st python3 "$MODEL" --skill-dir "$TMP/no-such-skill-dir" --no-config
+run_status out st python3 "$MODEL" --skill-dir "$TMP/no-such-skill-dir" --cache-dir "$TMP/nsd-cache" --no-config
 [ "$st" = "3" ] && pass "AC4: a non-directory --skill-dir exits 3" \
                 || fail "AC4: a non-directory --skill-dir exits 3 (got $st)"
-run_status out st python3 "$MODEL" --skill-dir "$SK1" --no-config --ttl-days -1
+run_status out st python3 "$MODEL" --skill-dir "$SK1" --cache-dir "${SK1}-cache" --no-config --ttl-days -1
 [ "$st" = "3" ] && pass "AC4: a negative --ttl-days exits 3" \
                 || fail "AC4: a negative --ttl-days exits 3 (got $st)"
 run_status out st python3 "$MODEL"
@@ -603,9 +634,138 @@ d["last_fetched"] = "2026-08-03T00:00:00Z"
 d["source"] = "CursorBench 3.1\"; touch " + sys.argv[3] + "/PWNED; echo \""
 json.dump(d, open(sys.argv[2], "w"))
 ' "$SEED_SRC" "$TMP/evil.json" "$INJ4"
-( cd "$INJ4" && python3 "$MODEL" --skill-dir "$SK5" --no-config --install - < "$TMP/evil.json" >/dev/null 2>&1 ) || true
+( cd "$INJ4" && python3 "$MODEL" --skill-dir "$SK5" --cache-dir "${SK5}-cache" --no-config --install - < "$TMP/evil.json" >/dev/null 2>&1 ) || true
 [ ! -e "$INJ4/PWNED" ] && pass "AC4: crafted fetched content cannot execute (stdin/file, never a command line)" \
                        || fail "AC4: crafted model data executed a command — injection"
+
+# ── #491: the cache lives in a user-level root, never in the skill folder ──
+# Every install mode replaces or tracks the skill folder (plugin update, asm
+# reinstall, `claude --plugin-dir .`), so the seed is only read from there and
+# the dated cache is written to --cache-dir / $IDD_CACHE_DIR / XDG.
+seed_dated() {  # seed_dated <skill-dir> <YYYY-MM-DD>
+  new_skill_dir "$1"
+  python3 - "$1/templates/model-data.json" "$2" <<'PY'
+import json, sys
+path = sys.argv[1]
+data = json.load(open(path))
+data["last_fetched"] = sys.argv[2] + "T00:00:00Z"
+with open(path, "w") as handle:
+    json.dump(data, handle, indent=2)
+PY
+}
+UC="$TMP/user-cache"
+
+# AC1/AC3: a refresh installed under v1 survives v1's folder being replaced.
+V1="$TMP/plugin-v1"
+seed_dated "$V1" 2026-06-12
+python3 "$MODEL" --skill-dir "$V1" --cache-dir "$UC" --no-config --install "$NEWDATA" --now 2026-08-02 >/dev/null
+rm -rf "$V1"
+V2="$TMP/plugin-v2"
+seed_dated "$V2" 2026-06-12
+out="$(python3 "$MODEL" --skill-dir "$V2" --cache-dir "$UC" --no-config --now 2026-08-02)"
+if [ "$(printf '%s' "$out" | jkey state)" = "fresh" ] \
+   && [ "$(printf '%s' "$out" | jkey data_date)" = "2026-08-01" ] \
+   && [ "$(printf '%s' "$out" | jkey persisted)" = "True" ] \
+   && [ -f "$UC/model-data-2026-08-01.json" ]; then
+  pass "#491 AC1: a refreshed cache survives the skill folder being replaced (plugin update / reinstall)"
+else
+  fail "#491 AC1: the cache did not survive a skill-folder replacement (got: $out)"
+fi
+if ls "$V2" | grep -q '^model-data-'; then
+  fail "#491: a dated cache was written into the skill folder"
+else
+  pass "#491: nothing is ever written into the skill folder"
+fi
+
+# Freshness: an upgrade that ships a NEWER seed wins over the cache and prunes it.
+V3="$TMP/plugin-v3"
+seed_dated "$V3" 2026-09-01
+out="$(python3 "$MODEL" --skill-dir "$V3" --cache-dir "$UC" --no-config --now 2026-09-02)"
+if [ "$(printf '%s' "$out" | jkey state)" = "seeded" ] \
+   && [ "$(printf '%s' "$out" | jkey data_date)" = "2026-09-01" ] \
+   && [ -f "$UC/model-data-2026-09-01.json" ] && [ ! -e "$UC/model-data-2026-08-01.json" ]; then
+  pass "#491: a seed newer than the cache wins, is written, and prunes the older cache"
+else
+  fail "#491: a newer seed did not replace the older cache (got: $out)"
+fi
+# ...and an OLDER seed never overwrites a newer cache (a tie keeps the cache).
+out="$(python3 "$MODEL" --skill-dir "$V2" --cache-dir "$UC" --no-config --now 2026-09-02)"
+if [ "$(printf '%s' "$out" | jkey data_date)" = "2026-09-01" ] \
+   && [ "$(printf '%s' "$out" | jkey state)" = "fresh" ]; then
+  pass "#491: an older seed never overwrites a newer cache"
+else
+  fail "#491: an older seed replaced a newer cache (got: $out)"
+fi
+
+# AC2: under `claude --plugin-dir .` the skill folder is a git checkout. Running
+# from inside it leaves the working tree clean — asserted by absence, not by an
+# ignore rule (a user repo has none).
+AC2="$TMP/plugin-dir-repo"
+mkdir -p "$AC2/skills"
+seed_dated "$AC2/skills/issue-creator" 2026-06-12
+git -C "$AC2" init -q
+git -C "$AC2" -c user.email=t@example.com -c user.name=t add -A
+git -C "$AC2" -c user.email=t@example.com -c user.name=t -c commit.gpgsign=false commit -q -m seed
+( cd "$AC2" && env -u IDD_CACHE_DIR XDG_CACHE_HOME="$TMP/xdg-ac2" \
+    python3 "$MODEL" --skill-dir "$AC2/skills/issue-creator" --no-config --now 2026-06-14 >/dev/null )
+porcelain="$(git -C "$AC2" status --porcelain --untracked-files=all)"
+if [ -z "$porcelain" ] && [ -f "$TMP/xdg-ac2/gitissue/model-data-2026-06-12.json" ]; then
+  pass "#491 AC2: a run from a --plugin-dir checkout leaves no untracked file; the cache goes to XDG"
+else
+  fail "#491 AC2: the run dirtied the checkout or missed XDG (status: $porcelain)"
+fi
+
+# Root resolution: --cache-dir > $IDD_CACHE_DIR > $XDG_CACHE_HOME/gitissue >
+# $HOME/.cache/gitissue; a relative XDG_CACHE_HOME is ignored (XDG spec).
+RS="$TMP/root-skill"
+seed_dated "$RS" 2026-06-12
+cd_of() { printf '%s' "$1" | jkey cache_dir; }
+out="$(IDD_CACHE_DIR="$TMP/env-root" XDG_CACHE_HOME="$TMP/xdg-r" python3 "$MODEL" --skill-dir "$RS" --no-config)"
+[ "$(cd_of "$out")" = "$TMP/env-root" ] && pass "#491: \$IDD_CACHE_DIR overrides XDG_CACHE_HOME" \
+  || fail "#491: \$IDD_CACHE_DIR not honoured (got: $(cd_of "$out"))"
+out="$(IDD_CACHE_DIR="$TMP/env-root" python3 "$MODEL" --skill-dir "$RS" --cache-dir "$TMP/flag-root" --no-config)"
+[ "$(cd_of "$out")" = "$TMP/flag-root" ] && pass "#491: --cache-dir overrides \$IDD_CACHE_DIR" \
+  || fail "#491: --cache-dir not honoured (got: $(cd_of "$out"))"
+out="$(env -u IDD_CACHE_DIR XDG_CACHE_HOME=relative/xdg HOME="$TMP/home" python3 "$MODEL" --skill-dir "$RS" --no-config)"
+[ "$(cd_of "$out")" = "$TMP/home/.cache/gitissue" ] && [ ! -e relative ] \
+  && pass "#491: a relative XDG_CACHE_HOME is ignored; \$HOME/.cache/gitissue is used" \
+  || fail "#491: relative XDG_CACHE_HOME handling (got: $(cd_of "$out"))"
+
+# Unusable root (a regular file, or a symlink): serve the seed from memory —
+# exit 0, persisted:false, a ⚠ line — never exit 4 while a seed exists. A file
+# and a symlink, not chmod: root ignores mode bits, so chmod is uid-dependent.
+printf 'x\n' > "$TMP/root-is-file"
+err="$(python3 "$MODEL" --skill-dir "$RS" --cache-dir "$TMP/root-is-file" --no-config 2>&1 >"$TMP/rf.out")" && st=0 || st=$?
+out="$(cat "$TMP/rf.out")"
+if [ "$st" = "0" ] && [ "$(printf '%s' "$out" | jkey persisted)" = "False" ] \
+   && [ "$(printf '%s' "$out" | jkey cache_file)" = "None" ] \
+   && [ "$(printf '%s' "$out" | jkey state)" = "seeded" ] \
+   && printf '%s' "$err" | grep -q '⚠ gi-model-cache:'; then
+  pass "#491: an unusable cache root serves the seed from memory (exit 0, persisted:false, ⚠)"
+else
+  fail "#491: an unusable cache root is not degraded to memory (exit $st: $out)"
+fi
+mkdir -p "$TMP/link-target"
+ln -s "$TMP/link-target" "$TMP/root-is-link"
+run_status out st python3 "$MODEL" --skill-dir "$RS" --cache-dir "$TMP/root-is-link" --no-config
+if [ "$st" = "0" ] && [ "$(printf '%s' "$out" | jkey persisted)" = "False" ] \
+   && [ -z "$(ls -A "$TMP/link-target")" ]; then
+  pass "#491: a symlinked cache root is refused — nothing written through it"
+else
+  fail "#491: a symlinked cache root was followed (exit $st: $out)"
+fi
+run_status out st python3 "$MODEL" --skill-dir "$RS" --cache-dir "$TMP/root-is-file" --no-config --install "$NEWDATA"
+if [ "$st" = "0" ] && [ "$(printf '%s' "$out" | jkey state)" = "installed" ] \
+   && [ "$(printf '%s' "$out" | jkey persisted)" = "False" ]; then
+  pass "#491: --install into an unusable root uses the payload for this run (persisted:false)"
+else
+  fail "#491: --install into an unusable root (exit $st: $out)"
+fi
+if [ ! -e "$TMP/xdg-default/gitissue" ]; then
+  pass "#491: every invocation in this file pinned its cache root"
+else
+  fail "#491: an unpinned invocation wrote to the default cache root"
+fi
 
 # ───────────────────────────────────────────────────────────
 # T5 (AC5): wiring — the built skills call the scripts and keep a fallback
