@@ -87,7 +87,7 @@ All errors follow the rich format: symbol + description + fix action.
 
 ### Linked issue unreadable at the review boundary <!-- a:rve-linked-issue-unreadable -->
 
-**Trigger:** the PR body links an issue (`Closes #{N}`), but neither the Step 1
+**Trigger:** the PR body links an issue (`Closes #{N}` or a first-line `Refs #{N}`), but neither the Step 1
 *Depth gate* refresh nor its direct-`gh` degrade returns a usable record — on the
 first attempt or on the single re-run. This is a **stop**, not a degrade: Step 3
 would otherwise verify acceptance criteria against an empty snapshot and report
@@ -105,7 +105,7 @@ section.
 
 **Placeholders:** this is the one entry in this file where `{N}` is **not** the
 PR number. Here `{N}` is the **linked issue** being read — the number `Closes #N`
-names — and `{PR}` is the pull request under review. The resume command takes
+(or `Refs #N`) names — and `{PR}` is the pull request under review. The resume command takes
 `{PR}`; re-running the review against the issue number reviews the wrong PR, or
 none.
 

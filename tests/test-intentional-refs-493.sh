@@ -47,7 +47,7 @@ for pkg in "$ROOT/src/skills/issue-pr-review" "$ROOT/skills/issue-pr-review"; do
   anchor_check "$pkg" rvc-intentional-reference 'Status exactly `unverified`, Evidence containing `deferred`' "T1 deferred rows are status-gated: $n"
   anchor_check "$pkg" rvc-intentional-reference 'at least one row that is not deferred' "T1 deferring every AC fails: $n"
   anchor_check "$pkg" rvc-intentional-reference 'No closing keyword names `#\{N\}`' "T1 a closing keyword for N voids the form: $n"
-  anchor_check "$pkg" rvc-intentional-reference 'merge-effective surface' "T1 the keyword scan reuses check 1's surface: $n"
+  anchor_check "$pkg" rvc-intentional-reference 'anywhere in the \*\*raw\*\* body, code spans and blockquotes included' "T1 the keyword scan reads the raw body, as SPEC §5.1 does: $n"
   anchor_check "$pkg" rvc-intentional-reference "PR title's \`\(#N\)\`" "T1 the Refs number is cross-checked against the title: $n"
   # AC2 polarity: a failing Refs line still blocks but is never auto-fixed.
   anchor_check "$pkg" rvc-intentional-reference 'still hard-blocks' "T2 a failing Refs line still blocks: $n"

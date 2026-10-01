@@ -70,7 +70,7 @@ If the issue has no acceptance criteria:
 - Any criterion `fail` → ✗ acceptance_criteria: fail (blocks soft-pass; treat as fixable)
 - No fails, but at least one `unverified` → ⚠ acceptance_criteria: partial (report-only when `review.soft_pass: true`; strict blocker when `false`)
 - No criteria defined → ○ acceptance_criteria: pass (with the "manual review recommended" note)
-- A criterion deferred by a valid *Intentional reference* → `○ deferred`, excluded from the rules above: it neither blocks nor counts as delivered
+- On a PR whose line 1 is `Refs #{N}`, a criterion whose row is deferred (Status `unverified`, Evidence `deferred`) → `○ deferred`, excluded from the rules above: it neither blocks nor counts as delivered, and is never `fail` — check 1 alone judges the form
 
 Each `fail` criterion becomes a fixable issue in Step 6 with `category: acceptance_criteria`, `action: fix`, evidence as the description, and the criterion text as the suggested fix target.
 
@@ -126,10 +126,10 @@ When traceability fails on `Closes #{N}`, emit a fixable issue in Step 6 with `c
 A PR delivering part of an issue that must stay open says `Refs #{N}`, not `Closes #{N}`. **Not** an exemption — no `review.*` key turns it off — it satisfies check 1 only when **all** hold:
 
 1. The body's first content line is exactly `Refs #{N}`, and `{N}` equals the PR title's `(#N)` when the title carries one.
-2. No closing keyword names `#{N}` (word-bounded, so `#{N}0` does not count) on check 1's merge-effective surface — under B1 that includes code spans and blockquotes.
+2. No closing keyword names `#{N}` (word-bounded, so `#{N}0` does not count) anywhere in the **raw** body, code spans and blockquotes included.
 3. The `## Acceptance Criteria Verification` table declares what stays open: at least one **deferred row** (Status exactly `unverified`, Evidence containing `deferred`, case-insensitive) and at least one row that is not deferred. Deferring every criterion delivers nothing and fails.
 
-`{N}` from that line is the linked issue, so its criteria load; deferred ones report `○ deferred`.
+`{N}` from that line is the linked issue, so its criteria load; deferred rows report `○ deferred` even when a condition fails.
 
 A `Refs #{N}` first line that misses a condition is check 1's `fail` and still hard-blocks, but its finding is `action: note`, never `fix`: prepending `Closes` would close an issue the author meant to keep open. Name the failed condition; a human declares the deferred rows or swaps `Refs` for `Closes`.
 
