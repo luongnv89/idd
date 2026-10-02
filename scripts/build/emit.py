@@ -91,8 +91,9 @@ def _emit_plugin_manifest(src: Path, out_skills: Path) -> None:
     `<out>/skills/.claude-plugin/plugin.json` — the one hand-kept copy is the
     source, never the emitted file. `src/plugin/README.md` is copied the same
     way to `<out>/skills/README.md`: the Claude plugin directory requires a
-    README in the plugin folder and shows it as the listing description. A
-    source tree without them (a fixture build) emits nothing.
+    README in the plugin folder and shows it as the listing description.
+    `src/plugin/icon.png` goes to `<out>/skills/.claude-plugin/icon.png`, the
+    directory's default listing-icon path. A source tree without them (a fixture build) emits nothing.
     """
     manifest = src / "plugin" / "plugin.json"
     if manifest.is_file():
@@ -100,6 +101,9 @@ def _emit_plugin_manifest(src: Path, out_skills: Path) -> None:
     readme = src / "plugin" / "README.md"
     if readme.is_file():
         _copy_binary(readme, out_skills / "README.md")
+    icon = src / "plugin" / "icon.png"
+    if icon.is_file():
+        _copy_binary(icon, out_skills / ".claude-plugin" / "icon.png")
 
 
 def _emit_repo_root_skills(repo_root: Path, out_skills: Path) -> None:

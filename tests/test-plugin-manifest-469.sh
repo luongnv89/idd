@@ -28,9 +28,11 @@
 #   S8  skills/ holds exactly the skill directories under src/skills/ (so the
 #       internal idd-doctor never ships)
 #   S9  skills/ holds nothing else: the skill directories, .claude-plugin/
-#       with plugin.json alone, and README.md — the whole install payload
+#       with plugin.json and icon.png only, and README.md — the whole install payload
 #   S10 the emitted manifest is byte-identical to src/plugin/plugin.json and
 #       committed (one hand-kept copy, never a second)
+#   S12 skills/.claude-plugin/icon.png (the directory listing icon) is a
+#       square PNG, 512-2048 px per side, under 2 MB
 #   S11 skills/README.md is byte-identical to src/plugin/README.md and has the
 #       40 words outside code blocks the Claude plugin directory requires
 #
@@ -161,7 +163,18 @@ want = sorted(expected + [".claude-plugin", "README.md"])
 check(top == want, f"S9: skills/ holds only the skills, .claude-plugin/ and README.md (extra {sorted(set(top) - set(want))}, missing {sorted(set(want) - set(top))})")
 manifest_dir = os.path.join(plugin_root, ".claude-plugin")
 inside = sorted(os.listdir(manifest_dir)) if os.path.isdir(manifest_dir) else []
-check(inside == ["plugin.json"], f"S9: skills/.claude-plugin/ holds plugin.json alone (got {inside})")
+check(inside == ["icon.png", "plugin.json"], f"S9: skills/.claude-plugin/ holds plugin.json and icon.png only (got {inside})")
+# The Claude plugin directory takes the listing icon from .claude-plugin/icon.png:
+# a square PNG, 512-2048 px per side, under 2 MB.
+icon = os.path.join(manifest_dir, "icon.png")
+dims = None
+if os.path.isfile(icon):
+    with open(icon, "rb") as f:
+        head = f.read(24)
+    if head[:8] == b"\x89PNG\r\n\x1a\n" and head[12:16] == b"IHDR":
+        dims = (int.from_bytes(head[16:20], "big"), int.from_bytes(head[20:24], "big"))
+ok_icon = bool(dims) and dims[0] == dims[1] and 512 <= dims[0] <= 2048 and os.path.getsize(icon) < 2 * 1024 * 1024
+check(ok_icon, f"S12: skills/.claude-plugin/icon.png is a square 512-2048 px PNG under 2 MB (got {dims})")
 
 print("\n".join(out))
 PY
@@ -296,7 +309,10 @@ version = plugin.get("version") if isinstance(plugin, dict) else None
 expected = sorted(s for s in sys.argv[3].split("\n") if s)
 out = []
 first = text.strip().splitlines()[0] if text.strip() else ""
-out.append(("PASS|" if first == "idd %s" % version else "FAIL|")
+# With a displayName the CLI prints "<displayName> (idd) <version>".
+display = plugin.get("displayName") if isinstance(plugin, dict) else None
+want_first = ("%s (idd) %s" % (display, version)) if display else ("idd %s" % version)
+out.append(("PASS|" if first == want_first else "FAIL|")
            + "C3: plugin details names idd %s (got %r)" % (version, first))
 m = re.search(r"^\s*Skills \((\d+)\)\s+(.*)$", text, re.M)
 got = sorted(s.strip() for s in m.group(2).split(",")) if m else None

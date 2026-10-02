@@ -72,7 +72,8 @@ src/
 ├── plugin/
 │   ├── plugin.json         # Claude Code plugin manifest source (issue #492);
 │                           #   build emits skills/.claude-plugin/plugin.json
-│   └── README.md           # Plugin README (directory listing); build emits skills/README.md
+│   ├── README.md           # Plugin README (directory listing); build emits skills/README.md
+│   └── icon.png            # Listing icon; build emits skills/.claude-plugin/icon.png
 │
 docs/                              # All documentation — single tree (issue #81)
 ├── config-schema.md               # ↓ Runtime docs (skills reference these via

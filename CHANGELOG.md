@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- gitissue:normalized v1 -->
 
+## v0.23.1 — 2026-10-02
+
+### Maintenance
+- **plugin:** ship a listing icon at `skills/.claude-plugin/icon.png` (built from `src/plugin/icon.png`) and set `displayName` to "IDD: Issue-Driven Development" for the Claude plugin directory listing.
+
+**Full Changelog**: https://github.com/luongnv89/idd/compare/v0.23.0...v0.23.1
+
 ## v0.23.0 — 2026-10-02
 
 ### Features
