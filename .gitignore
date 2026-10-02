@@ -47,11 +47,12 @@ tests/output/
 .claude/
 
 # Build outputs not committed (per refactor-plan-v10 §1)
-# - dist/skills/ and dist/agents/ are built by ./scripts/build.sh, not committed
+# - dist skills, agents and catalog are built by ./scripts/build.sh
 dist/skills/
 dist/agents/
 # Local-only flattened internal skills; never an install/release surface
 /internal-skills/
+dist/.agents/plugins/marketplace.json
 
 # gstack browser/session artifacts
 .gstack/

@@ -202,7 +202,7 @@ print("  ✓ T6.1: actual internal package complete, scripts byte/mode identical
 with tempfile.TemporaryDirectory() as tmp:
     root = Path(tmp) / "checkout"
     root.mkdir()
-    for directory in ("src", "docs", "scripts"):
+    for directory in ("src", "docs", "scripts", ".claude-plugin"):
         shutil.copytree(repo / directory, root / directory,
                         ignore=shutil.ignore_patterns("__pycache__"))
     # An internal-only fixture exercises all three existing closure kinds.

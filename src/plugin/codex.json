@@ -1,0 +1,18 @@
+{
+  "description": "Issue-Driven Development: skills that create, triage, analyze, resolve, review, and auto-pilot GitHub issues.",
+  "interface": {
+    "displayName": "IDD: Issue-Driven Development",
+    "shortDescription": "GitHub issues to reviewed PRs",
+    "longDescription": "Turn GitHub issues into development work: create and prioritize issues, investigate solutions, implement changes, open and review pull requests, or run the backlog loop. Uses your authenticated GitHub CLI and local repository. Auto-pilot can push and merge changes.",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Read",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "Use IDD to triage the open issues in this repository."
+    ],
+    "composerIcon": "./.claude-plugin/icon.png",
+    "logo": "./.claude-plugin/icon.png"
+  }
+}

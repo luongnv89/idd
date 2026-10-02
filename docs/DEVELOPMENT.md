@@ -108,6 +108,30 @@ Every emitted bundle under `skills/<name>/` has a byte budget, and CI enforces i
 - **Raising a budget is a deliberate hand edit.** Set that skill's `budget` to a value at or above its measured size, run the ratchet command above (it clamps the budget back to `measured + headroom`), commit both files, and justify the growth in the PR.
 - **Check locally** with `python3 scripts/skill-budget.py` (`--check` is the default; `--json` prints the table as JSON). The CI step is `tests/test-skill-bundle-budget-466.sh`.
 
+### Codex plugin (issue #489)
+
+The build derives `skills/.codex-plugin/plugin.json` from the canonical release
+identity in `src/plugin/plugin.json` and presentation-only `src/plugin/codex.json`.
+The overlay has no independent version. Both providers share the eight built skill
+folders and `.claude-plugin/icon.png`. The Codex compatibility manifest uses
+an explicit `skills` array listing each built skill directory. Codex 0.160.0
+loads these as `idd:<skill>`; a root `"./"` entry installs but discovers no skills.
+
+The generated `.agents/plugins/marketplace.json` uses the Claude marketplace’s
+release pin and an HTTPS `git-subdir` source for `./skills`. Update the existing
+release metadata together, then run `bash scripts/build.sh` and commit both the
+skills and generated catalog. Never edit a second pin manually. Custom `--out`
+builds emit their catalog under that output and do not promote it; the standard
+build promotes both outputs after verification. Direct `build.py` promotion also
+copies the catalog. CI checks tracked changes and untracked generated files.
+
+Run `bash tests/test-codex-plugin-489.sh` for manifest, release parity, fresh build,
+contained assets and deterministic ZIP checks. Build a submission artifact with
+`python3 scripts/package-codex-plugin.py --output /tmp/idd-codex-plugin.zip`.
+See [Codex plugin submission](codex-plugin-submission.md) for local preview,
+release timing and the owner’s remaining portal steps. No tag is created by the
+packaging command; the existing tag does not yet contain Codex support.
+
 ### Claude Code plugin (issues #469, #492)
 
 The repo root is the marketplace; the plugin is the committed `skills/` tree. `.claude-plugin/marketplace.json` lists one plugin, `idd`, with a `git-subdir` source: this repo, `"path": "skills"`, at the release tag (`"ref": "vX.Y.Z"`). An install therefore fetches only the tagged release's `skills/` folder (about 2.7 MB), never `src/`, `tests/`, `docs/`, the website or whatever `main` holds. Users install with `claude plugin marketplace add luongnv89/idd` and `claude plugin install idd@idd` (see [README → Install](../README.md#install)).
@@ -116,7 +140,7 @@ The repo root is the marketplace; the plugin is the committed `skills/` tree. `.
 - **The marketplace entry also says `"skills": "./"`.** It lets a tag whose `skills/` has no manifest (v0.22.0 and earlier) load every skill, and it is harmless once the tag carries one. Never set `"strict": false`: with a manifest present, the plugin then fails to load.
 - **No root-`CLAUDE.md` warning.** The repo root carries no `plugin.json`, so it is not a plugin root, and `claude plugin validate skills/.claude-plugin/plugin.json` passes with no warnings. `tests/test-plugin-manifest-469.sh` fails if a root `plugin.json` comes back or the validator reports any warning.
 - **Try it locally** with `claude --plugin-dir skills`, which loads this checkout's `skills/` as the `idd` plugin for one session, and `claude --plugin-dir skills plugin details idd`, which lists the components the plugin ships.
-- **Keep the plugin root free of other components.** An `agents/`, `commands/`, `hooks/`, `.mcp.json`, `.lsp.json` or `settings.json` under `skills/` would change what every plugin install gets. `tests/test-plugin-manifest-469.sh` fails if one appears, and fails if `skills/` holds anything besides the skill folders and `.claude-plugin/`.
+- **Keep the plugin root free of other components.** An `agents/`, `commands/`, `hooks/`, `.mcp.json`, `.lsp.json` or `settings.json` under `skills/` would change what every plugin install gets. `tests/test-plugin-manifest-469.sh` fails if one appears, and fails if `skills/` holds anything besides the skill folders, `.claude-plugin/`, `.codex-plugin/`, and `README.md`.
 - **Plugin README.** `src/plugin/README.md` is emitted byte-identical to `skills/README.md`, the plugin folder's README. The [Claude plugin directory](https://claude.com/docs/plugins/pre-submission-checklist) blocks a plugin without a README of at least 40 words in the plugin folder and shows it as the listing description, so it must disclose everything the plugin runs, sends, or stores. Update it whenever a skill gains a new network call, write location, or destructive action. `tests/test-plugin-manifest-469.sh` (S11) checks the copy and the word count. `src/plugin/icon.png` is emitted to `skills/.claude-plugin/icon.png`, the listing icon (S12: square PNG, 512–2048 px, under 2 MB). The directory reads the icon only on the first save or submission, so replacing the file later does not change the listing.
 - **Release checklist.** The release commit bumps five version strings together: the first `## vX.Y.Z` heading in `CHANGELOG.md`, the README version badge, `version` in `src/plugin/plugin.json` (then rebuild, so `skills/.claude-plugin/plugin.json` follows), the marketplace entry's `version`, and the entry's `ref` (`vX.Y.Z`). `tests/test-plugin-manifest-469.sh` fails when any of them disagree. Push the tag and the commit together, `git push --atomic origin main vX.Y.Z`, so the marketplace on `main` never names a tag that does not exist yet. Existing installs move to the slimmer layout on the first `claude plugin update idd@idd` after that release. The Claude plugin directory listing tracks a pinned tag, so after pushing the tag, change the tracked tag to `vX.Y.Z` on the plugin's page at https://claude.ai/directory/manage.
 - **CI** runs the same test with a pinned `claude` CLI (`IDD_PLUGIN_REQUIRE_CLI=1`). It checks `claude plugin validate` on both manifests, `plugin details` against `src/skills/`, and an end-to-end install: a throwaway repo holding this `skills/` tree plus decoy root files, installed through the real marketplace entry, must leave only the skills and the manifest in the plugin cache. Without `claude` on `PATH`, the test skips the CLI checks locally and prints a `○` line.
