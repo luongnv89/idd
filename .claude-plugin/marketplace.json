@@ -11,13 +11,13 @@
     {
       "name": "idd",
       "description": "Issue-Driven Development: Claude Code skills that create, triage, analyze, resolve, review, and auto-pilot GitHub issues.",
-      "version": "0.22.0",
+      "version": "0.23.0",
       "skills": "./",
       "source": {
         "source": "git-subdir",
         "url": "luongnv89/idd",
         "path": "skills",
-        "ref": "v0.22.0"
+        "ref": "v0.23.0"
       }
     }
   ]

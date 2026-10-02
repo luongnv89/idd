@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- gitissue:normalized v1 -->
 
+## v0.23.0 — 2026-10-02
+
+### Features
+- **plugin:** install all seven IDD skills as one Claude Code plugin: `claude plugin marketplace add luongnv89/idd`, then `claude plugin install idd@idd`. Skills are namespaced as `/idd:<skill>`. The marketplace pins the plugin to the release tag, and an install fetches only the tagged `skills/` folder (about 2.7 MB). `/idd:auto-pilot` now works in a plugin-only install. The standalone `asm install` path is unchanged. ([#488](https://github.com/luongnv89/idd/pull/488), [#497](https://github.com/luongnv89/idd/pull/497))
+- **review:** `/issue-pr-review` accepts an intentional partial `Refs #N` PR in the traceability gate when the body uses no closing keyword for `#N` and every undelivered criterion is marked deferred. ([#494](https://github.com/luongnv89/idd/pull/494))
+
+- **plugin:** ship a plugin README (`skills/README.md`, built from `src/plugin/README.md`) that lists the skills and discloses what the plugin runs, sends, and stores, as the Claude plugin directory requires.
+
+### Fixes
+- **issue-creator:** write the model-suggestion cache to a user-level root (`--cache-dir`, `$IDD_CACHE_DIR`, or `${XDG_CACHE_HOME:-$HOME/.cache}/gitissue`) so a plugin update or `asm` reinstall no longer discards it. ([#495](https://github.com/luongnv89/idd/pull/495))
+- **skills:** every `Missing bundled dependency` fix hint now names the plugin reinstall and update commands next to the `asm` command. ([#496](https://github.com/luongnv89/idd/pull/496))
+
+Contributions by @luongnv89.
+
+**Full Changelog**: https://github.com/luongnv89/idd/compare/v0.22.0...v0.23.0
+
 ## v0.22.0 — 2026-09-26
 
 ### Features

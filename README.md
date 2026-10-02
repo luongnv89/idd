@@ -8,7 +8,7 @@
 
 <p align="center">
   <a href="https://luongnv.com/idd/"><img src="https://img.shields.io/badge/website-luongnv.com%2Fidd-00FF41.svg?labelColor=0A0A0A" alt="Website"></a>
-  <a href="https://github.com/luongnv89/idd/releases/latest"><img src="https://img.shields.io/badge/version-0.22.0-blue.svg" alt="Version 0.22.0"></a>
+  <a href="https://github.com/luongnv89/idd/releases/latest"><img src="https://img.shields.io/badge/version-0.23.0-blue.svg" alt="Version 0.23.0"></a>
   <a href="https://github.com/luongnv89/idd/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="MIT License"></a>
   <a href="https://github.com/luongnv89/idd"><img src="https://img.shields.io/badge/commands-7-blue.svg" alt="7 commands"></a>
   <a href="https://github.com/luongnv89/idd/blob/main/CONTRIBUTING.md"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs Welcome"></a>
@@ -270,7 +270,6 @@ Inside a session, `/plugin marketplace add luongnv89/idd` and `/plugin install i
 - **Update** — auto-update is off by default for third-party marketplaces, so pull a new release yourself: `claude plugin marketplace update idd`, then `claude plugin update idd@idd`, then restart the session.
 - **Uninstall** — `claude plugin uninstall idd@idd`. To forget the marketplace too: `claude plugin marketplace remove idd`.
 - **Pick one install path.** Don't keep the plugin and an `asm` or manual copy side by side: both copies load, so every skill appears twice (`/issue-resolver` and `/idd:issue-resolver`), possibly at different versions.
-- **`/idd:auto-pilot` in a plugin-only install** needs the first release after v0.22.0. The v0.22.0 dependency preflight looks the other skills up only through `asm`, so without an `asm` install it stops with *Missing required skill*. The other six skills work from v0.22.0.
 
 #### Fallback — manual copy
 

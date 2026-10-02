@@ -27,10 +27,12 @@
 #       not a plugin, so its CLAUDE.md never reaches `plugin validate`
 #   S8  skills/ holds exactly the skill directories under src/skills/ (so the
 #       internal idd-doctor never ships)
-#   S9  skills/ holds nothing else: the skill directories plus .claude-plugin/
-#       with plugin.json alone — the whole install payload
+#   S9  skills/ holds nothing else: the skill directories, .claude-plugin/
+#       with plugin.json alone, and README.md — the whole install payload
 #   S10 the emitted manifest is byte-identical to src/plugin/plugin.json and
 #       committed (one hand-kept copy, never a second)
+#   S11 skills/README.md is byte-identical to src/plugin/README.md and has the
+#       40 words outside code blocks the Claude plugin directory requires
 #
 # Host checks (need the `claude` CLI; each call runs with a throwaway HOME
 # and CLAUDE_CONFIG_DIR, so the user's real plugin config is never touched):
@@ -43,7 +45,8 @@
 #   C4  end-to-end install: a throwaway git repo holding this skills/ tree
 #       plus decoy root files is tagged and installed through the real
 #       marketplace entry (only its url swapped to file://); the plugin cache
-#       holds the skills and the manifest, none of the decoys, and the
+#       holds the skills, the manifest and the plugin README, none of the
+#       decoys, and the
 #       installed plugin lists every skill
 #
 # Usage: bash tests/test-plugin-manifest-469.sh
@@ -154,8 +157,8 @@ check(not os.path.lexists(os.path.join(root, ".claude-plugin", "plugin.json")),
       "S7: the repo root carries no .claude-plugin/plugin.json (the root is a marketplace, not a plugin)")
 
 top = sorted(os.listdir(plugin_root)) if os.path.isdir(plugin_root) else []
-want = sorted(expected + [".claude-plugin"])
-check(top == want, f"S9: skills/ holds only the skills and .claude-plugin/ (extra {sorted(set(top) - set(want))}, missing {sorted(set(want) - set(top))})")
+want = sorted(expected + [".claude-plugin", "README.md"])
+check(top == want, f"S9: skills/ holds only the skills, .claude-plugin/ and README.md (extra {sorted(set(top) - set(want))}, missing {sorted(set(want) - set(top))})")
 manifest_dir = os.path.join(plugin_root, ".claude-plugin")
 inside = sorted(os.listdir(manifest_dir)) if os.path.isdir(manifest_dir) else []
 check(inside == ["plugin.json"], f"S9: skills/.claude-plugin/ holds plugin.json alone (got {inside})")
@@ -193,6 +196,22 @@ if git -C "$REPO_ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   fi
 else
   skip "S10: not a git work tree — tracked-manifest check needs git"
+fi
+
+# ── S11: the plugin README (directory listing) is emitted from its source ────
+SOURCE_README="$REPO_ROOT/src/plugin/README.md"
+PLUGIN_README="$REPO_ROOT/skills/README.md"
+if [ -f "$SOURCE_README" ] && [ -f "$PLUGIN_README" ] && cmp -s "$SOURCE_README" "$PLUGIN_README"; then
+  pass "S11: skills/README.md is byte-identical to src/plugin/README.md"
+else
+  fail "S11: skills/README.md differs from src/plugin/README.md — run ./scripts/build.sh"
+fi
+# The Claude plugin directory blocks a README under 40 words outside code blocks.
+readme_words="$(awk '/^```/{f=!f; next} !f' "$SOURCE_README" 2>/dev/null | wc -w | tr -d ' ')"
+if [ "${readme_words:-0}" -ge 40 ]; then
+  pass "S11: the plugin README has $readme_words words outside code blocks (directory minimum 40)"
+else
+  fail "S11: the plugin README has ${readme_words:-0} words outside code blocks; the plugin directory requires 40"
 fi
 
 # ── C1–C4: host validation through the claude CLI ────────────────────────────
@@ -355,12 +374,17 @@ if not os.path.isdir(cache):
 # every other entry, plus the shipped .claude-plugin/.
 names = sorted(os.listdir(cache))
 payload = sorted(n for n in names if not n.startswith(".") or n == ".claude-plugin")
-want = sorted(expected + [".claude-plugin"])
+want = sorted(expected + [".claude-plugin", "README.md"])
 out.append(("PASS|" if payload == want else "FAIL|")
-           + "C4: the plugin cache holds only the skills and .claude-plugin/ (got %s)" % payload)
-leaked = [n for n in ("CLAUDE.md", "README.md", "landing.html", "src", "tests", "docs") if n in names]
+           + "C4: the plugin cache holds only the skills, .claude-plugin/ and README.md (got %s)" % payload)
+leaked = [n for n in ("CLAUDE.md", "landing.html", "src", "tests", "docs") if n in names]
 out.append(("PASS|" if not leaked else "FAIL|")
            + "C4: no repo-root file reaches the plugin cache (leaked %s)" % leaked)
+plugin_readme = os.path.join(os.path.dirname(os.path.dirname(manifest)), "README.md")
+cached_readme = os.path.join(cache, "README.md")
+same_readme = os.path.isfile(cached_readme) and filecmp.cmp(cached_readme, plugin_readme, shallow=False)
+out.append(("PASS|" if same_readme else "FAIL|")
+           + "C4: the cached README.md is the plugin README, not the repo-root README")
 shipped = os.path.join(cache, ".claude-plugin", "plugin.json")
 same = os.path.isfile(shipped) and filecmp.cmp(shipped, manifest, shallow=False)
 out.append(("PASS|" if same else "FAIL|")
