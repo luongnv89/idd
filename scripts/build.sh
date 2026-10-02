@@ -291,6 +291,10 @@ run_promote() {
 
   rm -rf "$ROOT_SKILLS"
   cp -R "$skills_out" "$ROOT_SKILLS"
+  if [[ -f "$out_dir/.agents/plugins/marketplace.json" ]]; then
+    mkdir -p "$ROOT/.agents/plugins"
+    cp "$out_dir/.agents/plugins/marketplace.json" "$ROOT/.agents/plugins/marketplace.json"
+  fi
 
   if [[ "$BUILD_QUIET" -eq 0 ]]; then
     ok "skills/ updated → $ROOT_SKILLS"

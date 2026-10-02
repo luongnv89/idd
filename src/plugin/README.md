@@ -1,6 +1,6 @@
 # IDD — Issue-Driven Development
 
-IDD makes GitHub issues the single source of truth for development work. This plugin bundles seven Claude Code skills that turn rough notes into structured issues, prioritize the backlog, investigate one issue, open a pull request that resolves it, review and merge that pull request, and run the whole loop unattended.
+IDD makes GitHub issues the single source of truth for development work. This plugin bundles seven skills for Codex and Claude Code that turn rough notes into structured issues, prioritize the backlog, investigate one issue, open a pull request that resolves it, review and merge that pull request, and run the whole loop unattended.
 
 ## Skills
 
@@ -14,6 +14,10 @@ IDD makes GitHub issues the single source of truth for development work. This pl
 | `/idd:auto-pilot` | Repeats triage, resolve, review, and merge across the backlog without prompts |
 | `/idd:init-gitissue` | Writes a `.gitissue.yml` tuned to the repository's stack |
 
+In Codex, invoke the same skills as `$idd:issue-creator`, `$idd:issue-resolver N`,
+and `$idd:auto-pilot` (or select them in the skill picker). The table above uses
+Claude Code’s `/idd:<skill>` command syntax.
+
 ## Requirements
 
 - The GitHub CLI (`gh`), authenticated with `gh auth login`, for the repository you work in
@@ -22,13 +26,19 @@ IDD makes GitHub issues the single source of truth for development work. This pl
 
 ## What the plugin runs, sends, and stores
 
-The plugin has no hooks, MCP servers, or background processes. Everything happens when you invoke a skill, through tools Claude already uses in your session:
+The plugin has no hooks, MCP servers, or background processes. Everything happens when you invoke a skill, through the agent host’s tools in your session:
 
 - **GitHub, through your own `gh` login.** The skills read and write issues, labels, comments, pull requests, and CI status in the repository you point them at. `/idd:issue-resolver` and `/idd:auto-pilot` create branches, commit, and push with `git`. `/idd:issue-pr-review` and `/idd:auto-pilot` can merge pull requests: auto-pilot does so without asking, which is its purpose, and both respect the repository's own branch rules. The plugin never reads or forwards your token itself.
 - **One optional public page.** `/idd:issue-creator` can refresh its model-suggestion table by fetching the public page `https://cursor.com/cursorbench`, only after you accept a refresh prompt or pass `--refresh-model-data`. Nothing about your repository is sent, and the bundled data works offline.
-- **Local files only.** Run logs, triage and analysis results, and caches go to `.gitissue/` in your repository. The model-suggestion cache goes to `${XDG_CACHE_HOME:-~/.cache}/gitissue`. Before any commit, a scan checks staged changes for secrets and build artifacts.
+- **Local state.** Run logs, triage and analysis results, and caches go to `.gitissue/` in your repository. The model-suggestion cache goes to `${XDG_CACHE_HOME:-~/.cache}/gitissue`. Before any commit, a scan checks staged changes for secrets and build artifacts.
 
-No telemetry is collected, and no data leaves your machine except the GitHub calls above and that optional page fetch.
+IDD adds no telemetry service. Your agent host processes repository content and
+prompts under its own data settings. Skills can also use the host’s search or
+browser tools for solution research, invoke project tests and CI workflows, and
+install explicitly selected optional skills; those actions can contact their
+respective services. Git and GitHub operations use your existing authentication.
+Do not include secrets in prompts or issue content. The repository’s configuration
+and the selected workflow determine which actions require confirmation.
 
 ## Configuration
 

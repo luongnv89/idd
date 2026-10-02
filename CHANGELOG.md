@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- gitissue:normalized v1 -->
 
+## Unreleased
+
+### Features
+- **plugin:** prepare the same seven IDD skills for Codex with a generated manifest and release-pinned marketplace, deterministic submission ZIP tooling, and a local preview/submission guide. Publication and a new release remain pending. (#489)
+
 ## v0.23.1 — 2026-10-02
 
 ### Maintenance
