@@ -219,8 +219,8 @@ jobs:
           # `git diff` misses a newly emitted file nobody committed (e.g.
           # skills/.claude-plugin/plugin.json, issue #492), so untracked
           # paths under skills/ fail the check too.
-          untracked="$(git status --porcelain=v1 --untracked-files=all -- skills/)"
-          if ! git diff --exit-code -- skills/ || [ -n "$untracked" ]; then
+          untracked="$(git status --porcelain=v1 --untracked-files=all -- skills/ .agents/plugins/marketplace.json)"
+          if ! git diff --exit-code -- skills/ .agents/plugins/marketplace.json || [ -n "$untracked" ]; then
             [ -z "$untracked" ] || printf '%s\n' "$untracked"
             echo "::error::skills/ is out of date. Run ./scripts/build.sh and commit the result."
             exit 1
@@ -391,6 +391,9 @@ jobs:
         env:
           DISABLE_AUTOUPDATER: "1"
           CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1"
+
+      - name: test-codex-plugin-489
+        run: bash tests/test-codex-plugin-489.sh
 
       - name: test-plugin-manifest-469
         run: bash tests/test-plugin-manifest-469.sh

@@ -28,7 +28,7 @@
 #   S8  skills/ holds exactly the skill directories under src/skills/ (so the
 #       internal idd-doctor never ships)
 #   S9  skills/ holds nothing else: the skill directories, .claude-plugin/
-#       with plugin.json and icon.png only, and README.md — the whole install payload
+#       with plugin.json and icon.png only, .codex-plugin/ and README.md — the whole install payload
 #   S10 the emitted manifest is byte-identical to src/plugin/plugin.json and
 #       committed (one hand-kept copy, never a second)
 #   S12 skills/.claude-plugin/icon.png (the directory listing icon) is a
@@ -159,8 +159,8 @@ check(not os.path.lexists(os.path.join(root, ".claude-plugin", "plugin.json")),
       "S7: the repo root carries no .claude-plugin/plugin.json (the root is a marketplace, not a plugin)")
 
 top = sorted(os.listdir(plugin_root)) if os.path.isdir(plugin_root) else []
-want = sorted(expected + [".claude-plugin", "README.md"])
-check(top == want, f"S9: skills/ holds only the skills, .claude-plugin/ and README.md (extra {sorted(set(top) - set(want))}, missing {sorted(set(want) - set(top))})")
+want = sorted(expected + [".claude-plugin", ".codex-plugin", "README.md"])
+check(top == want, f"S9: skills/ holds only the skills, provider metadata and README.md (extra {sorted(set(top) - set(want))}, missing {sorted(set(want) - set(top))})")
 manifest_dir = os.path.join(plugin_root, ".claude-plugin")
 inside = sorted(os.listdir(manifest_dir)) if os.path.isdir(manifest_dir) else []
 check(inside == ["icon.png", "plugin.json"], f"S9: skills/.claude-plugin/ holds plugin.json and icon.png only (got {inside})")
@@ -389,10 +389,10 @@ if not os.path.isdir(cache):
 # The CLI adds its own bookkeeping dot-entries (e.g. .in_use); the payload is
 # every other entry, plus the shipped .claude-plugin/.
 names = sorted(os.listdir(cache))
-payload = sorted(n for n in names if not n.startswith(".") or n == ".claude-plugin")
-want = sorted(expected + [".claude-plugin", "README.md"])
+payload = sorted(n for n in names if not n.startswith(".") or n in (".claude-plugin", ".codex-plugin"))
+want = sorted(expected + [".claude-plugin", ".codex-plugin", "README.md"])
 out.append(("PASS|" if payload == want else "FAIL|")
-           + "C4: the plugin cache holds only the skills, .claude-plugin/ and README.md (got %s)" % payload)
+           + "C4: the plugin cache holds only the skills, provider metadata and README.md (got %s)" % payload)
 leaked = [n for n in ("CLAUDE.md", "landing.html", "src", "tests", "docs") if n in names]
 out.append(("PASS|" if not leaked else "FAIL|")
            + "C4: no repo-root file reaches the plugin cache (leaked %s)" % leaked)

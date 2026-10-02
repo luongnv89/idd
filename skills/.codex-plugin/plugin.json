@@ -1,0 +1,46 @@
+{
+  "name": "idd",
+  "version": "0.23.1",
+  "author": {
+    "name": "Luong NGUYEN",
+    "email": "luongnv89@gmail.com"
+  },
+  "homepage": "https://github.com/luongnv89/idd",
+  "repository": "https://github.com/luongnv89/idd",
+  "license": "MIT",
+  "keywords": [
+    "issue-driven-development",
+    "github-issues",
+    "triage",
+    "pull-requests",
+    "code-review",
+    "automation"
+  ],
+  "description": "Issue-Driven Development: skills that create, triage, analyze, resolve, review, and auto-pilot GitHub issues.",
+  "skills": [
+    "./auto-pilot",
+    "./init-gitissue",
+    "./issue-analysis",
+    "./issue-creator",
+    "./issue-pr-review",
+    "./issue-resolver",
+    "./issue-triage"
+  ],
+  "interface": {
+    "displayName": "IDD: Issue-Driven Development",
+    "shortDescription": "GitHub issues to reviewed PRs",
+    "longDescription": "Turn GitHub issues into development work: create and prioritize issues, investigate solutions, implement changes, open and review pull requests, or run the backlog loop. Uses your authenticated GitHub CLI and local repository. Auto-pilot can push and merge changes.",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Read",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "Use IDD to triage the open issues in this repository."
+    ],
+    "composerIcon": "./.claude-plugin/icon.png",
+    "logo": "./.claude-plugin/icon.png",
+    "developerName": "Luong NGUYEN",
+    "websiteURL": "https://github.com/luongnv89/idd"
+  }
+}

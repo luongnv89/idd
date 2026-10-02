@@ -152,7 +152,7 @@ IDD is a methodology, not a vendor lock-in. The structured issue format is plain
 | Tool | How it works with gitissue |
 |------|---------------------------|
 | **Claude Code** | Load skills directly — `/issue-creator`, `/issue-resolver` |
-| **Codex CLI** | `gh issue view 42 --json body` and pass to codex as context |
+| **Codex CLI** | Load skills directly or as the IDD plugin — `$idd:issue-resolver 42` |
 | **Gemini CLI** | Pipe issue body to gemini for resolution |
 | **GitHub Copilot** | Structured issues give Copilot better context for suggestions |
 | **Any SKILL.md agent** | Install the self-contained [`skills/`](skills/) packages via `asm` or manual copy |
@@ -270,6 +270,27 @@ Inside a session, `/plugin marketplace add luongnv89/idd` and `/plugin install i
 - **Update** — auto-update is off by default for third-party marketplaces, so pull a new release yourself: `claude plugin marketplace update idd`, then `claude plugin update idd@idd`, then restart the session.
 - **Uninstall** — `claude plugin uninstall idd@idd`. To forget the marketplace too: `claude plugin marketplace remove idd`.
 - **Pick one install path.** Don't keep the plugin and an `asm` or manual copy side by side: both copies load, so every skill appears twice (`/issue-resolver` and `/idd:issue-resolver`), possibly at different versions.
+
+#### Alternative — Codex plugin
+
+The same seven skills ship with a Codex plugin manifest. **Release pending:**
+the current release tag predates this package. The commands below become usable
+once a new release includes it; for this checkout, use the
+[local preview and submission guide](docs/codex-plugin-submission.md).
+
+```bash
+codex plugin marketplace add luongnv89/idd
+codex plugin add idd@idd
+codex plugin list --json
+```
+
+Start a new session, then invoke `$idd:issue-creator`, `$idd:issue-resolver 42`, or
+`$idd:auto-pilot`. Use one installation method per host to avoid duplicate skills.
+To update, run `codex plugin marketplace upgrade idd`, then
+`codex plugin add idd@idd` and start a new session. To uninstall, run
+`codex plugin remove idd@idd`; optionally run
+`codex plugin marketplace remove idd` too. The generated marketplace pins the
+same release and `skills/` payload as the Claude Code plugin.
 
 #### Fallback — manual copy
 
