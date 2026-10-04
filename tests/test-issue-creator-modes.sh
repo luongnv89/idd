@@ -178,7 +178,7 @@ has_near "$SKILL" "Create issue? [Y/n]" \
 # and nothing past it.
 has_near "$MODES" "[A]ll / [e]dit / [c]ancel" "Auto mode" 15 \
   "T9.4: batch approval gate has an auto-mode carve-out"
-has "$MODES" "issues auto-approved and created" \
+has "$MODES" "issues auto-approved for creation" \
   "T9.4: batch carve-out logs how many issues were auto-approved"
 has "$MODES" "Never take \`[e]dit\` or \`[c]ancel\` in auto mode" \
   "T9.4: batch auto path rules out [e]dit / [c]ancel"

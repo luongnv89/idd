@@ -5,13 +5,18 @@
   "grade": [
     {
       "tool": "idd-lint",
-      "args": ["issue", "OUT/issue.md"],
+      "args": [
+        "issue",
+        "OUT/issue.md"
+      ],
       "expect_exit": 0,
       "label": "normalized issue body passes idd-lint"
     },
     {
       "tool": "shell",
-      "args": ["python3 scripts/idd-lint.py branch \"$(tr -d '\\n' < OUT/branch.txt)\""],
+      "args": [
+        "python3 scripts/idd-lint.py branch \"$(tr -d '\\n' < OUT/branch.txt)\""
+      ],
       "expect_exit": 0,
       "label": "branch name from subject artifact passes idd-lint"
     },
@@ -20,6 +25,31 @@
       "file": "OUT/issue-url.txt",
       "expect_exit": 0,
       "label": "gh issue create returned a URL"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/report.txt",
+      "expect_exit": 0,
+      "label": "review report artifact exists"
+    },
+    {
+      "tool": "gh-calls",
+      "expect_by_command": {
+        "issue create": 1,
+        "issue view": 1
+      },
+      "expect_exit": 0,
+      "label": "created issue is read back before reporting completion"
     }
-  ]
+  ],
+  "human_review": {
+    "criteria": [
+      "Opening text states completion status and the created issue number.",
+      "Observed write verification is separate from inferred classification and untested bug reproduction.",
+      "Issue URL and saved verification.json support the reported title/body checks.",
+      "The report says No approval needed and names remaining user actions."
+    ],
+    "feedback": "Record each reviewer answer; absent, blank, or nonresponsive feedback leaves understanding unconfirmed.",
+    "scope": "This deterministic stand-in tests a report fixture, not live agent behavior. Apply these criteria to actual agent outputs in behavioral evaluations."
+  }
 }

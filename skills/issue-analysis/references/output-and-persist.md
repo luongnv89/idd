@@ -1,6 +1,76 @@
 # /issue-analysis — Output & Persistence Format
 
-Full Step 8 terminal rendering spec and Step 9 JSON persistence schema. SKILL.md shows a condensed summary; read this when debugging output or JSON format.
+Full Step 8 terminal rendering spec and Step 9 JSON persistence schema. Read this before rendering or persisting, including cached view mode.
+
+## Review contract
+
+Apply these rules to fresh analysis, cached views, and early exits. Preserve
+existing authorization; a recommendation does not authorize implementation.
+
+1. Lead with `DONE`, `PARTIAL`, `BLOCKED`, or `CACHED` and the main finding or
+   reason for stopping. `DONE` requires complete research and verified persistence.
+   A timed-out scan or failed save is `PARTIAL`, even when a report was rendered.
+2. Attach evidence to material claims: repository `path:line` locations for code
+   observations, commit IDs for history, and issue/PR links for tracker findings.
+   Distinguish a likely root cause inferred from code from an observed reproduction.
+   Report only checks actually performed; analysis does not establish a fix.
+3. Keep uncertainty beside the main finding: incomplete scans, unverified
+   assumptions, untested reproduction, and residual risk. In view mode, state
+   cache age and the recorded commit; current code and issue freshness are
+   unverified because view mode performs no API calls or new analysis.
+4. State the next decision or `No approval needed.` Name remaining work separately,
+   such as reviewing the recommended option or rerunning an incomplete scan.
+   Do not request implementation approval merely to finish this analysis.
+
+Default to a concise summary and a static table comparing the 2–3 options; keep
+the detailed sections below when useful or requested. A small diagram may explain
+architecture relationships when the output supports it; otherwise use text.
+These bounded comparisons do not need an interactive report. Honor a requested
+format while retaining result, evidence, uncertainty, and decision. Print `Saved:`
+only after the new file was verified; a retained old cache is not a successful save.
+
+### Evaluate report understanding
+
+Apply these criteria to actual outputs as well as schema correctness:
+
+| Criterion | Observable check |
+|---|---|
+| Result is findable | Opening text states status and the main finding; limitations are visible without searching logs. |
+| Facts and assumptions are separate | Code observations, hypotheses, cached data, and untested reproduction are labeled distinctly. |
+| Claims are traceable | Each material claim names supporting code, commit, tracker evidence, or an observed validation check. |
+| Next decision is clear | Output identifies the next decision or says no approval is needed, and lists remaining work. |
+
+When running behavioral evaluations, include fresh analysis, cached view, scan
+timeout, and failed persistence. Grade the agent's report against all four rows.
+Ask human reviewers the corresponding four questions and record their responses
+with the evaluation. Missing, blank, or nonresponsive feedback leaves human
+understanding **unconfirmed**. Contract tests inspect instructions and examples;
+they do not establish live agent behavior or human understanding.
+
+## Validate analysis data
+
+Before rendering cached data or replacing a cache, check the schema below:
+
+- Require an object with `version: 1`, `source: "/issue-analysis"`, the requested
+  positive integer `issue.number`, and the documented field types. Require valid
+  ISO-8601 timestamps; report a future timestamp as clock uncertainty, not a
+  negative report age. Reject unsupported versions or a different issue number.
+- Require nonempty `options`, sequential option numbers starting at 1, and an
+  integer `recommended_option` that names an existing option. A single justified
+  option is valid; do not invent alternatives merely to fill the usual 2–3 slots.
+- Require `decision_record.options_considered` to match the option numbers/names;
+  `options_rejected` must contain exactly the unselected options with reasons.
+  Require `selected_option` to match the recommended number, name, and summary.
+  Overall complexity/risk must match that option's values.
+- Require `git_state.commit_sha` to be a full 40-character hexadecimal SHA and
+  `commit_sha_short` its first seven characters. The top-level `timestamp` must
+  equal `git_state.captured_at`; preserve the fetched `issue.updatedAt` verbatim.
+
+Check synthesizer-owned fields before Step 8; validate the full object after
+adding persistence metadata. On failure, name the invalid field and stop that
+render/save operation. In view mode, leave the cache untouched and suggest a
+fresh `/issue-analysis N` run. During a fresh run, retain the previous cache and
+report incomplete analysis; never silently repair or invent missing evidence.
 
 ## Step 8 — Output (Terminal Report)
 
@@ -224,8 +294,9 @@ After Step 8, save the analysis to `.gitissue/analysis-<N>.json`.
    - `selected_option` ← `options[recommended_option - 1]` reduced to number + name + summary
    - `residual_risk` ← the highest-severity con of the selected option, or `"none identified"` if none
 4. Build the full JSON object from Steps 1-8 analysis results plus `git_state` and `decision_record` using the schema below. `issue.updatedAt` is **required**: copy it verbatim from the Step 1 issue fetch (whose field list already requests `updatedAt`) — never omit it, never re-derive it, and never substitute the capture time.
-5. Write `.gitissue/analysis-<N>.json` with formatted JSON (readable diffs in git)
-6. Print: `✓ Analysis saved to .gitissue/analysis-<N>.json`
+5. Apply *Validate analysis data* to the complete object. Write formatted JSON to a unique temporary file in `.gitissue/`, then parse it back and compare it with that object. If validation or writing fails, remove only this run's temporary file and retain the previous cache.
+6. Atomically replace `.gitissue/analysis-<N>.json` with the verified temporary file. Re-read the destination and compare the complete object before reporting success.
+7. Only after verification, print: `✓ Analysis saved to .gitissue/analysis-<N>.json`
 
 **These key names are a consumer contract.** `/issue-resolver`'s *Step 0h — Analysis reuse gate* reads `git_state.commit_sha` and `issue.updatedAt` to decide whether this analysis is still true — the commit-SHA pin exists precisely so that check is possible, and `issue.updatedAt` is the GitHub-clock value the resolver compares its own fresh fetch against. The top-level `timestamp` and `git_state.captured_at` record when the analysis was taken; they are the *local* clock and the gate never compares them against GitHub's. Renaming a key (writing `git_state.sha` instead of `commit_sha`), omitting one, or inventing the clock does not fail loudly: it silently answers `stale` forever, so the resolver re-runs the very research this file was written to save.
 
@@ -235,7 +306,7 @@ If writing fails:
 
   To fix:  check file permissions in the .gitissue/ directory
 ```
-This is a warning, not a fatal error — the terminal output from Step 6 was already displayed.
+Keep the Step 8 report available, but mark the final result `PARTIAL` and persistence as failed or unverified. Do not print `Saved:` for this run. If replacement failed, state that the previous cache remains; if readback failed after replacement, state that the new cache is unverified.
 
 ### JSON Schema (`.gitissue/analysis-<N>.json`) <!-- a:ia-json-schema -->
 
@@ -318,7 +389,7 @@ This is a warning, not a fatal error — the terminal output from Step 6 was alr
       }
     ],
     "regression_candidate": {
-      "sha": "e4f5g6h",
+      "sha": "e4f506a",
       "message": "refactor: simplify session check",
       "author": "asmith",
       "date": "2026-03-10T14:00:00Z",
@@ -370,28 +441,20 @@ This is a warning, not a fatal error — the terminal output from Step 6 was alr
     "captured_at": "2026-03-21T14:30:00Z"
   },
   "decision_record": {
-    "root_cause": "One-paragraph diagnosis lifted from analysis.summary or analysis.details.",
+    "root_cause": "One-paragraph analysis summary.",
     "options_considered": [
-      {"number": 1, "name": "Minimal fix"},
-      {"number": 2, "name": "Balanced refactor"},
-      {"number": 3, "name": "Comprehensive overhaul"}
+      {
+        "number": 1,
+        "name": "Minimal fix"
+      }
     ],
-    "options_rejected": [
-      {"number": 1, "reason": "Hardcoded list grows over time."},
-      {"number": 3, "reason": "Out of scope for this issue."}
-    ],
+    "options_rejected": [],
     "selected_option": {
-      "number": 2,
-      "name": "Balanced refactor",
-      "summary": "One-sentence description of the chosen approach."
+      "number": 1,
+      "name": "Minimal fix",
+      "summary": "Add login route to redirect exclusion list"
     },
-    "residual_risk": "What remains uncertain after the fix lands, or 'none identified'.",
-    "reproduction": {
-      "command": "Exact command/test that reproduces the symptom (bug issues only).",
-      "status": "red",
-      "stated_reason_match": "The failing line/message that matches the issue symptom.",
-      "regression_test": "Path of the regression test, or 'manual — no seam'."
-    }
+    "residual_risk": "Hardcoded exclusion list grows over time"
   }
 }
 ```
@@ -504,4 +567,3 @@ The `reproduction` object is **optional** and present only for `type: bug` issue
 | `decision_record.reproduction.status` | string | `"red"` (reproduced, failing for the stated reason) or `"not_reproduced"` |
 | `decision_record.reproduction.stated_reason_match` | string | The failing line/message matching the issue symptom |
 | `decision_record.reproduction.regression_test` | string | Path of the regression test, or `"manual — no seam"` |
-

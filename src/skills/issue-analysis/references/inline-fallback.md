@@ -57,7 +57,7 @@ This is the most thorough codebase scan in the gitissue system — more comprehe
    - `medium` — keyword match only
    - `low` — transitive dependency (no direct keyword match)
 2. Read the top `analysis.max_files` files (default 30)
-3. Use the Agent tool for parallel file reads when there are 3+ files to examine
+3. Read files with the available local tools; do not request the unavailable Agent tool. Count all reads against `analysis.max_files`.
 
 ### Phase 3c — Trace dependencies
 
@@ -79,7 +79,7 @@ The entire research phase is bounded by `analysis.scan_timeout` (default 120s). 
 
   To fix:  increase analysis.scan_timeout in .gitissue.yml
 ```
-Continue with whatever was collected. This is a warning, not a fatal error.
+Set `scan_stats.scan_timed_out` to true. If at least one relevant file was read, continue with the collected evidence and mark the final result `PARTIAL`. Otherwise follow the no-relevant-files stop in SKILL.md.
 
 After research:
 ```
