@@ -105,13 +105,13 @@ If `origin` is missing or fetch, rebase, or stash restoration fails, stop and re
 
 ## Configuration
 
-Load config once at skill start with `python3 references/scripts/gi-config.py`. Run from the repo root so `.gitissue.yml` resolves correctly. Resolve the script to an absolute path relative to this SKILL.md, as in the *Bundled dependency precheck*, never relative to the working directory.
+Load config once at skill start with `python3 references/scripts/gi-config.py`. **Working directory:** the repo root — the script resolves `.gitissue.yml` against the working directory, so running it elsewhere exits 0 with `config_file: null`/`first_run: true`, silently discarding the repo's real config. Resolve the script to an absolute path relative to this SKILL.md, as in the *Bundled dependency precheck*, never relative to the working directory.
 
 Capture `run_started_epoch` from stderr by chaining that same `python3` invocation as `python3 …; ec=$?; date +%s >&2; exit "$ec"`. Preserve JSON stdout and exit status for the *Run Stats Footer* (`references/run-stats.md`).
 
 - Exit 0: use `config` from `{"config": {…dotted keys…}, "config_file": …, "first_run": …}`. Print the hint below when `first_run` is true.
 - Exit 3: stop with *Invalid config* from `references/error-messages.md`.
-- Missing script: stop with `✗ Missing bundled dependency`; this is a broken install.
+- Script file absent: a bundled dependency is missing, which is a broken install and not a degrade — stop and print the `✗ Missing bundled dependency` block.
 - No `python3`, another non-zero exit, or unparsable stdout: print `⚠ gi-config unavailable — using the inline defaults below`. Read `.gitissue.yml` once from the repo root, or use defaults if absent. Use this manual fallback instead of the script result.
 
 When config is absent, print:

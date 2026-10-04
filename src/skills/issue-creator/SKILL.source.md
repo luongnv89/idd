@@ -66,13 +66,13 @@ durable files to the working tree syncs first, with the stash-first pattern in
 
 ## Configuration
 
-Load config once at skill start with `python3 shared/scripts/gi-config.py`. Run from the repo root so `.gitissue.yml` resolves correctly. Resolve the script relative to this SKILL.md, as in the *Bundled dependency precheck*; never relative to the working directory. Never re-read the config.
+Load config once at skill start with `python3 shared/scripts/gi-config.py`. **Working directory:** the repo root — the script resolves `.gitissue.yml` against the working directory, so running it elsewhere exits 0 with `config_file: null`/`first_run: true`, silently discarding the repo's real config. Resolve the script relative to this SKILL.md, as in the *Bundled dependency precheck*; never relative to the working directory. Never re-read the config.
 
 Capture `run_started_epoch` from stderr by chaining that same `python3` invocation as `python3 …; ec=$?; date +%s >&2; exit "$ec"`, preserving stdout and exit status for `references/run-stats.md`.
 
 - Exit 0: use `config` from `{"config": {…dotted keys…}, "config_file": …, "first_run": …}`. If `first_run` is true, print the hint below.
 - Exit 3: stop with *Invalid config* from `references/error-messages.md`.
-- Missing script: stop with `✗ Missing bundled dependency`; never degrade a broken install.
+- Script file absent: a bundled dependency is missing, which is a broken install and not a degrade — stop and print the `✗ Missing bundled dependency` block.
 - No `python3`, other non-zero exit, or unparsable stdout: print `⚠ gi-config unavailable — using the inline defaults below`. Read `.gitissue.yml` from the repo root once, or use defaults if absent. Use this fallback instead of the script result.
 
 ```
@@ -90,7 +90,7 @@ python3 shared/scripts/gi-model-cache.py --skill-dir "$skill_dir"
 The user-level cache lives in `${XDG_CACHE_HOME:-$HOME/.cache}/gitissue/` (`IDD_CACHE_DIR` overrides), never per-repo or inside the skill folder. The bundled seed is read-only.
 
 - Exit 0: use `state` (`fresh` | `stale` | `seeded` | `installed`), `stale`, `age_days`, `data_version`, `data_date`, `persisted`, and `bands` (effort → two models with per-task costs). Echo every `⚠ gi-model-cache:` stderr line, including `persisted: false`. Stale data warns, never fails; auto mode uses it.
-- Exit 3: stop with the validation error.
+- Exit 3: stop and print the validation error.
 - Missing script or `templates/model-data.json`: stop with `✗ Missing bundled dependency`.
 - Exit 4 (no valid cache and no readable seed), no `python3`, exit 2, or unparsable stdout: print `⚠ gi-model-cache unavailable — model suggestions disabled for this run`. Continue without suggestions, or follow the manual lifecycle in `references/model-suggestion.md`.
 - `--refresh-model-data`: read `references/model-suggestion.md` and force-refresh first (WebFetch, then `--install`).
