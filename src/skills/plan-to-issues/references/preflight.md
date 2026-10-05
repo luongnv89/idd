@@ -167,8 +167,7 @@ SKILL.md's dirname:
   || echo "MISSING: issue-creator"
 ```
 
-Present in this session's available-skills listing but missing on both probes is still
-**installed** — a root the probes do not know is in use. Only all three failing counts as missing.
+Both probes failing means `issue-creator` is missing — stop with the missing-skill block.
 
 ## Skill dependency table
 

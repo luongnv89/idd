@@ -73,4 +73,4 @@ Phase 0's per-probe failure blocks — `gh` too old, token scope, permission, am
 ```
 ⚠ gi-plan-map unavailable — rendering the plan map by hand
 ```
-**Trigger:** no `python3`, exit 2, or empty stdout. Render by hand per `references/epic-dashboard.md` (*Layout*, *Rules the layout must hold*) and record the degrade under *Uncertainty*.
+**Trigger:** no `python3`, any non-zero exit other than 3, or empty/unparsable stdout. Render by hand per `references/epic-dashboard.md` (*Layout*, *Rules the layout must hold*) and record the degrade under *Uncertainty*.

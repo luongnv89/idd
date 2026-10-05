@@ -120,7 +120,7 @@ and parses `` ` ``/`$(…)` just as an argument would (SKILL.md -> *Prompt Injec
 
 ```bash
 title="$(jq -r --arg id "$task_id" 'first(.phases[].tasks[] | select(.task_id == $id and .title != null)) | "\($id): \(.title)"' worklist.json)"
-[ -n "$title" ] || { echo "✗ no task $task_id in worklist — refusing to blank the title"; exit 1; }
+if [ -z "$title" ]; then echo "✗ no task $task_id in worklist — refusing to blank the title"; exit 1; fi
 gh issue edit <n> --title "$title"
 ```
 

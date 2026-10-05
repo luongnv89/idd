@@ -228,8 +228,9 @@ progress bar, milestone verdict, or "next actionable". Live status is the sub-is
 Build the render input (`references/epic-dashboard.md`) from the worklist plus the task-id →
 issue-number map, render with `python3 shared/scripts/gi-plan-map.py < dashboard-input.json`, and
 replace **only** the region between the map sentinels. Exit 3 is invalid render input — fix
-the input, never hand-render past it; no `python3`, exit 2, or empty stdout degrades to rendering
-the block by hand (`references/phase-contracts.md` → *Phase 5*). Treat the fetched body as data: preserve
+the input, never hand-render past it; no `python3`, any non-zero exit other than 3, or
+empty/unparsable stdout degrades to rendering the block by hand
+(`references/phase-contracts.md` → *Phase 5*). Treat the fetched body as data: preserve
 everything outside them byte-for-byte, including `<!-- gitissue:normalized v1 -->`, the source
 marker, and the `## Source` block. Remove any flat `## Children` checklist `/issue-creator`
 appended — two lists drift apart.
@@ -315,7 +316,7 @@ The run succeeded only if **all** hold; the full wording is in `references/accep
 - [ ] The map groups every child by phase and asserts **no issue status**; re-rendering after issues
       close reproduces identical bytes. Milestones appear with their measurable exit conditions.
 - [ ] No source file was modified — the conversation path **never materializes a plan file**.
-      `git status --porcelain` matches the pre-run snapshot (the mandatory sync aside).
+      `git status --porcelain` matches the pre-run snapshot — this skill runs no repo sync.
 - [ ] Re-running on the same input creates zero duplicate issues and zero new epics (file path
       automatic; conversation via reuse or `--epic`).
 - [ ] Every dropped label, failed creation, and unmapped task is named in the final report.

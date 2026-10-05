@@ -77,9 +77,9 @@ gh label list --limit 200 --json name --jq '.[].name'      # existing set, one c
 label_grammar='^(epic|bug|improvement|feature|priority:(critical|high|medium|low)|dim:[a-z0-9]+|phase:[a-z0-9._-]+)$'
 # per missing label — $name, $color, $desc are read from the computed label set, never retyped
 if [[ $name =~ $label_grammar ]]; then
-  args=(--description "$desc")
+  args=("$name" --description "$desc")
   if [ -n "$color" ]; then args+=(--color "$color"); fi   # no hex in the table → gh picks one
-  gh label create "$name" "${args[@]}"
+  gh label create "${args[@]}"
 else
   printf '⚠ dropped malformed label: %s\n' "$name"
 fi

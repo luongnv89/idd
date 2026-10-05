@@ -146,7 +146,8 @@ python3 shared/scripts/gi-plan-map.py < dashboard-input.json > dashboard.md
 ```
 
 Exit 3 is invalid render input: stop and fix the input (*Invalid render input* in
-`references/error-messages.md`). No `python3`, exit 2, or empty stdout is a degrade: print
+`references/error-messages.md`). No `python3`, any non-zero exit other than 3, or empty/unparsable
+stdout is a degrade: print
 `⚠ gi-plan-map unavailable — rendering the plan map by hand`, write the block yourself from the same
 input by `references/epic-dashboard.md` (*Sentinels*, *Layout*, *Rules the layout must hold*) —
 flatten every plan-derived string to one line and escape `|` in table cells, as the script does —

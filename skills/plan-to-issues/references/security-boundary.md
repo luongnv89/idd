@@ -24,7 +24,7 @@ command as an already-bound variable *sourced from parsed data*, never retyped:
 ```bash
 # read the value out of the worklist — the shell never sees the source text as syntax
 title="$(jq -r --arg id "$task_id" 'first(.phases[].tasks[] | select(.task_id == $id and .title != null)) | "\($id): \(.title)"' worklist.json)"
-[ -n "$title" ] || { echo "✗ no task $task_id in worklist — refusing to blank the title"; exit 1; }
+if [ -z "$title" ]; then echo "✗ no task $task_id in worklist — refusing to blank the title"; exit 1; fi
 gh issue edit <n> --title "$title"          # "$title" is not re-expanded
 ```
 

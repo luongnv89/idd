@@ -23,7 +23,7 @@ adopts it after a confirm. Design for the interruption; do not claim it is impos
    # A plan is exactly one file — Phase 0's discovery resolves a `tasks/` directory to one before
    # this runs. `git ls-files -- <path>` is a PATHSPEC, so without this guard a directory would
    # expand to one line per file and write a multi-line, broken marker.
-   [ -f "$plan" ] || { echo "✗ not a plan file: $plan"; exit 1; }   # discovery resolves tasks/ to one file
+   if [ ! -f "$plan" ]; then echo "✗ not a plan file: $plan"; exit 1; fi   # discovery resolves tasks/
    # -c core.quotePath=false: ls-files octal-escapes a non-ASCII name (`"PL\303\204N.md"`) and the
    # shell fallback below does not, so without it the same plan binds two different markers
    # depending on whether it is tracked yet — committing the plan between runs would then miss the
@@ -181,7 +181,7 @@ an empty `plan_path` is — it would make one marker match every conversation.
 ```bash
 slug="$(printf '%s' "$epic_title" | tr '[:upper:]' '[:lower:]' \
   | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//' | cut -c1-60)"
-[ -n "$slug" ] || { echo "✗ empty conversation slug — refusing to bind"; exit 1; }
+if [ -z "$slug" ]; then echo "✗ empty conversation slug — refusing to bind"; exit 1; fi
 ```
 
 *`--epic <n>` resume:* do **not** re-slug from a Phase 1 title (there is none), from `<n>`, or
@@ -193,7 +193,7 @@ from current turns. Fetch `#<n>` and set `source.value` / `$slug` from the exist
 ```bash
 body="$(gh issue view "$n" --json body --jq '.body')"
 slug="$(printf '%s\n' "$body" | sed -n 's/^<!-- plan-to-issues:conversation=\(.*\) -->$/\1/p' | head -1)"
-[ -n "$slug" ] || { echo "✗ epic #$n has no conversation= marker — cannot resume"; exit 1; }
+if [ -z "$slug" ]; then echo "✗ epic #$n has no conversation= marker — cannot resume"; exit 1; fi
 printf '%s\n' "$body" | grep -q '^<!-- plan-to-issues:plan=' \
   && { echo "✗ epic #$n is bound to a plan — not a conversation resume"; exit 1; }
 ```

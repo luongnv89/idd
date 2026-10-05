@@ -64,6 +64,8 @@ for f in "$SKILL" "$SRC"/references/*.md "$SRC/docs/README.md"; do
   lacks "$f" 'skills/issue-creator|skills:skills/plan-to-issues' "AC2: ${f#$SRC/} uses bare --skill names"
 done
 lacks "$SKILL" 'git pull --rebase origin' "AC2: no mandatory repo sync"
+lacks "$SKILL" 'mandatory sync' "AC2: no stale mandatory-sync wording"
+lacks "$SRC/references/acceptance-criteria.md" 'mandatory sync' "AC2: no stale mandatory-sync wording in acceptance-criteria.md"
 flows "$SKILL" 'python3 shared/scripts/gi-config\.py' "AC2: config loads through gi-config"
 flows "$SKILL" 'ec=\$\?; date \+%s >&2; exit "\$ec"' "AC2: run clock chained onto the config load"
 has   "$SKILL" '^## Closing Summary$' "AC2: Closing Summary section"
@@ -78,22 +80,26 @@ python3 "$SCRIPT" --help >/dev/null 2>&1; [ $? -eq 0 ] && pass "AC3: --help exit
 python3 "$SCRIPT" --bogus </dev/null >/dev/null 2>&1; [ $? -eq 2 ] && pass "AC3: bad argument exits 2" || fail "AC3: bad argument did not exit 2"
 
 expect3() {
-  local label="$1" input="$2" rc
+  # $3 is a regex the stderr must match, naming the field or condition that
+  # failed — so each case is proven to reach its intended check.
+  local label="$1" input="$2" want="$3" rc
   printf '%b' "$input" | python3 "$SCRIPT" >"$TMP/out" 2>"$TMP/err"; rc=$?
-  if [ "$rc" -eq 3 ] && grep -q '^✗ gi-plan-map:' "$TMP/err" && ! grep -q 'Traceback' "$TMP/err" && [ ! -s "$TMP/out" ]; then
-    pass "AC3: $label exits 3 with a ✗ line"
+  if [ "$rc" -eq 3 ] && grep -q '^✗ gi-plan-map:' "$TMP/err" && grep -qE -- "$want" "$TMP/err" \
+     && ! grep -q 'Traceback' "$TMP/err" && [ ! -s "$TMP/out" ]; then
+    pass "AC3: $label exits 3 naming the failure"
   else
-    fail "AC3: $label → exit $rc ($(head -1 "$TMP/err"))"
+    fail "AC3: $label → exit $rc ($(head -1 "$TMP/err")), want /$want/"
   fi
 }
-expect3 "empty stdin" ''
-expect3 "non-UTF-8 input" '\xff\xfe'
-expect3 "malformed JSON" '{not json'
-expect3 "non-object JSON" '[1, 2]'
-expect3 "missing key" '{"plan_path":"p.md","synced":"d","epic":1}'
-expect3 "empty phases" '{"plan_path":"p.md","synced":"d","epic":1,"phases":[]}'
-expect3 "string epic number" '{"plan_path":"p.md","synced":"d","epic":"1 --> x","phases":[{"id":"P0","title":"t","tasks":[]}]}'
-expect3 "boolean title" '{"plan_path":true,"synced":"d","epic":1,"phases":[{"id":"P0","title":"t","tasks":[]}]}'
+P0='"phases":[{"id":"P0","title":"t","tasks":[]}]'
+expect3 "empty stdin" '' 'no input on stdin'
+expect3 "non-UTF-8 input" '\xff\xfe' 'not valid UTF-8'
+expect3 "malformed JSON" '{not json' 'not valid JSON'
+expect3 "non-object JSON" '[1, 2]' 'must be a JSON object'
+expect3 "missing key" '{"plan_path":"p.md","synced":"2026-01-01","epic":1}' 'missing required key: phases'
+expect3 "empty phases" '{"plan_path":"p.md","synced":"2026-01-01","epic":1,"phases":[]}' 'phases. must be a non-empty list'
+expect3 "string epic number" '{"plan_path":"p.md","synced":"2026-01-01","epic":"1 --> x",'"$P0"'}' 'epic must be'
+expect3 "boolean title" '{"plan_path":true,"synced":"2026-01-01","epic":1,'"$P0"'}' 'plan_path must be'
 
 # ── AC4: render properties ───────────────────────────────────────────────────
 python3 "$SCRIPT" < "$FIXTURE" > "$TMP/a.md"; rc=$?
