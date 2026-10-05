@@ -152,7 +152,15 @@ FAIL=0
 # doc's intro and rotation prose paid back 101, leaving +192 per copy. Measured
 # 536,471 before (536,489 was 18 over the measured total, not six) + 2 x 192
 # = 536,855; the line keeps six bytes of headroom, so the ratchet is not widened.
-BUDGET=536861
+#
+# Issue #502 is the fifth raise: a new public skill, /plan-to-issues, moved in
+# from luongnv89/skills. Its closure is the floor every skill pays —
+# config-schema.md (required by gi-config.py's `gi-requires`; excerpted to
+# `platform`), platform-github.md (pulled in by that excerpt) and
+# terminal-style.md. idd-methodology.md was deliberately left unbundled (an
+# absolute URL instead), saving ~11 KB. Measured 536,855 + 14,657 = 551,512;
+# the line keeps six bytes of headroom, so the ratchet is not widened.
+BUDGET=551518
 
 pass() { echo "  ✓ $1"; PASS=$((PASS + 1)); }
 fail() { echo "  ✗ $1"; FAIL=$((FAIL + 1)); }

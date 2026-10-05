@@ -10,14 +10,14 @@
        Inline script is already permitted by the CSP above. -->
   <script>document.documentElement.classList.add('js');</script>
   <title>gitissue — GitHub Issue Workflow for AI Coding Agents</title>
-  <meta name="description" content="Issue-Driven Development for GitHub: turn issues into agent-ready work orders. Eight commands structure, triage, resolve, and review — shipping tested PRs." />
+  <meta name="description" content="Issue-Driven Development for GitHub: turn issues into agent-ready work orders. Nine commands plan, structure, triage, resolve, and review — shipping tested PRs." />
   <link rel="canonical" href="https://luongnv.com/idd/" />
   <link rel="icon" type="image/svg+xml" href="assets/logo/favicon.svg" />
   <meta name="theme-color" content="#0A0A0A" />
 
   <!-- Open Graph -->
   <meta property="og:title" content="gitissue — GitHub Issue Workflow for AI Coding Agents" />
-  <meta property="og:description" content="Turn issues into agent-ready work orders — eight terminal commands that structure, triage, resolve, and review." />
+  <meta property="og:description" content="Turn issues into agent-ready work orders — nine terminal commands that plan, structure, triage, resolve, and review." />
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://luongnv.com/idd/" />
   <meta property="og:site_name" content="gitissue" />
@@ -29,7 +29,7 @@
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="gitissue — GitHub Issue Workflow for AI Coding Agents" />
-  <meta name="twitter:description" content="Turn issues into agent-ready work orders — eight agent-ready commands that structure, triage, resolve, and review, shipping tested PRs." />
+  <meta name="twitter:description" content="Turn issues into agent-ready work orders — nine agent-ready commands that plan, structure, triage, resolve, and review, shipping tested PRs." />
   <meta name="twitter:image" content="https://luongnv.com/idd/assets/og/og-card.png" />
   <meta name="twitter:image:alt" content="gitissue — issues → agent-ready work orders" />
 
@@ -50,7 +50,7 @@
         "@id": "https://luongnv.com/idd/#website",
         "url": "https://luongnv.com/idd/",
         "name": "gitissue",
-        "description": "Issue-Driven Development (IDD) — eight terminal commands that turn issues into agent-ready work orders.",
+        "description": "Issue-Driven Development (IDD) — nine terminal commands that turn plans and issues into agent-ready work orders.",
         "inLanguage": "en",
         "publisher": { "@id": "https://luongnv.com/#organization" }
       },
@@ -824,10 +824,10 @@
   <section class="hero" id="top">
     <div class="wrap hero-grid">
       <div>
-        <span class="eyebrow">Issue-Driven Development (IDD) · Spec v1.1 · 8 commands · MIT</span>
+        <span class="eyebrow">Issue-Driven Development (IDD) · Spec v1.1 · 9 commands · MIT</span>
         <h1 class="hero-title">Issues → <span class="accent">agent-ready work orders.</span></h1>
         <p class="hero-sub">
-          Eight terminal commands that <strong>structure, analyze, triage, resolve, and review</strong> your GitHub issues —
+          Nine terminal commands that <strong>plan, structure, analyze, triage, resolve, and review</strong> your GitHub issues —
           so any developer or AI agent can pick up an issue and ship a tested PR. Zero config.
         </p>
 
@@ -990,7 +990,7 @@
         <div class="step reveal" style="--i:0">
           <div class="num">1</div>
           <h3>Describe</h3>
-          <p>Type the problem in plain English. <code>/issue-creator</code> classifies it, estimates effort, suggests model + thinking level, and structures a typed issue with acceptance criteria.</p>
+          <p>Type the problem in plain English. <code>/issue-creator</code> classifies it, estimates effort, suggests model + thinking level, and structures a typed issue with acceptance criteria. Got a whole plan? <code>/plan-to-issues</code> files it as an epic plus one issue per task.</p>
         </div>
         <div class="step reveal" style="--i:1">
           <div class="num">2</div>
@@ -1054,10 +1054,11 @@
   <section id="commands">
     <div class="wrap">
       <div class="section-tag">The toolkit</div>
-      <h2 class="sec-title">Eight commands. One source of truth.</h2>
-      <p class="sec-lead">Each is a self-contained skill — drop it into Claude Code, Codex CLI, or any agent that loads SKILL.md files (the markdown file that teaches an agent a skill). Mix and match; nothing depends on the rest. Need exact inputs? See the <a class="green" href="docs.html">full docs</a>.</p>
+      <h2 class="sec-title">Nine commands. One source of truth.</h2>
+      <p class="sec-lead">Each is a self-contained skill — drop it into Claude Code, Codex CLI, or any agent that loads SKILL.md files (the markdown file that teaches an agent a skill). Mix and match — only /auto-pilot and /plan-to-issues need sibling skills, and they check for them first. Need exact inputs? See the <a class="green" href="docs.html">full docs</a>.</p>
 
       <div class="feat-grid" style="grid-template-columns: repeat(2,1fr);">
+        <div class="feat-card reveal" style="grid-column: 1 / -1;"><span class="feat-cmd">/plan-to-issues</span><p style="margin-top:2px">The entry point: turn a phased plan file — or the conversation you just had — into labelled issues under one tracking epic, each mapped to its source task. Bodies are written by <code>/issue-creator</code>, with <code>Depends on #N</code> markers <code>/auto-pilot</code> respects. No plan file required.</p></div>
         <div class="feat-card reveal"><span class="feat-cmd">/issue-creator</span><p style="margin-top:2px">Classify type, estimate effort, suggest model + thinking level (CursorBench), preserve reporter context, and file structured acceptance criteria.</p></div>
         <div class="feat-card reveal"><span class="feat-cmd">/issue-analysis N</span><p style="margin-top:2px">Root cause, git history, implementation options, complexity and risk — saved to <code>.gitissue/</code>.</p></div>
         <div class="feat-card reveal"><span class="feat-cmd">/issue-resolver N</span><p style="margin-top:2px">6-step pipeline: preflight → research → plan → implement → QA → deliver a PR with <code>Closes #N</code>.</p></div>

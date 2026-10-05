@@ -90,7 +90,8 @@ check_flow_lacks() {
 }
 
 # Every skill that carries a final report — the six the issue names, plus
-# init-gitissue and the repo-internal idd-doctor, which also print one.
+# init-gitissue and the repo-internal idd-doctor, which also print one, and
+# plan-to-issues (issue #502).
 SKILL_DIRS=(
   "src/skills/auto-pilot"
   "src/skills/init-gitissue"
@@ -99,6 +100,7 @@ SKILL_DIRS=(
   "src/skills/issue-pr-review"
   "src/skills/issue-resolver"
   "src/skills/issue-triage"
+  "src/skills/plan-to-issues"
   "src/internal-skills/idd-doctor"
 )
 
@@ -316,7 +318,7 @@ echo ""
 
 # ── AC3/AC4: each skill has a named clock anchor to measure elapsed from ───
 echo "  AC3 — the run clock anchor"
-for name in issue-analysis issue-creator issue-pr-review issue-resolver issue-triage; do
+for name in issue-analysis issue-creator issue-pr-review issue-resolver issue-triage plan-to-issues; do
   f="$REPO_ROOT/src/skills/$name/SKILL.source.md"
   check_flow "$f" 'that same .python3. invocation.*ec=\$\?; date \+%s >&2; exit "\$ec"' \
     "AC4: $name captures the clock in the config load — no extra round trip, exit and stdout preserved"
@@ -358,10 +360,10 @@ for s in "$REPO_ROOT"/skills/*/SKILL.md; do
     fail "AC1: built $skill does not bundle references/run-stats.md — run ./scripts/build.sh"
   fi
 done
-if [ "$built" -eq 7 ]; then
-  pass "AC1: all 7 distributed skills were checked"
+if [ "$built" -eq 8 ]; then
+  pass "AC1: all 8 distributed skills were checked"
 else
-  fail "AC1: found $built built skills, expected 7"
+  fail "AC1: found $built built skills, expected 8"
 fi
 echo ""
 

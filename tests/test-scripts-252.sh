@@ -1261,7 +1261,9 @@ SCRIPT_NAME = re.compile(r"gi-[a-z0-9-]+\.py")
 EXPECTED_SITES = {
     # 3 since issue #260: /auto-pilot parallel worktree prep also derives the
     # lane branch via gi-branch.py (beside the two issue-resolver sites).
-    "gi-branch.py": 3, "gi-ci-wait.py": 4, "gi-config.py": 6,
+    "gi-branch.py": 3, "gi-ci-wait.py": 4,
+    # 7 since issue #502: /plan-to-issues loads config through gi-config.
+    "gi-config.py": 7,
     # 15 since issue #258: /auto-pilot Step 1.2b fetches the picked issue's
     # record on demand, because Phase 1's bulk list no longer carries `body`.
     # 14 since issue #285: the dependency-parsing step in
@@ -1282,6 +1284,8 @@ EXPECTED_SITES = {
     # 2 since issue #468: /issue-triage Step 1 reads the shared open-issue
     # snapshot, and /issue-creator Step 6 invalidates it after each create.
     "gi-backlog.py": 2,
+    # 3 since issue #502: /plan-to-issues Phase 5 renders the epic plan map.
+    "gi-plan-map.py": 3,
 }
 # A call is any mention of a shared script by filename, however it is launched
 # (python3, python3.11, uv run, a bare ./path relying on the exec bit), plus the

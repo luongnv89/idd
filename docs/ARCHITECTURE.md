@@ -10,7 +10,8 @@ The only external dependency for GitHub interaction is the GitHub CLI (`gh`).
 
 ```mermaid
 graph LR
-    U[User - terminal] --> IC["/issue-creator"]
+    U[User - terminal] --> PI["/plan-to-issues"]
+    U --> IC["/issue-creator"]
     U --> IA["/issue-analysis N"]
     U --> IT["/issue-triage"]
     U --> IR["/issue-resolver N"]
@@ -19,6 +20,8 @@ graph LR
     U --> ID["/idd-doctor"]
     U --> IG["/init-gitissue"]
 
+    PI --> G8["plan or conversation → epic + plan map"]
+    PI --> |"one batch per phase"| IC
     IC --> G1["gh issue create/edit (intent only)"]
     IA --> G5["gh issue view → codebase scan → .gitissue/analysis-N.json"]
     IT --> G3["gh issue list → keyword scan → .gitissue/triage.json"]
@@ -40,6 +43,7 @@ graph LR
     style G5 fill:#2196F3,color:#fff
     style G6 fill:#2196F3,color:#fff
     style G7 fill:#9E9E9E,color:#fff
+    style G8 fill:#2196F3,color:#fff
 ```
 
 ## Skill Anatomy
@@ -201,7 +205,7 @@ A handful of jobs are worse as prose than as code: restating the same config def
 
 | Script | Job | Bundled into |
 |--------|-----|--------------|
-| `gi-config.py` | Merge documented defaults with `.gitissue.yml` into one JSON line (`src/shared/scripts/gi-config.py:3`) | auto-pilot, issue-analysis, issue-creator, issue-pr-review, issue-resolver, issue-triage |
+| `gi-config.py` | Merge documented defaults with `.gitissue.yml` into one JSON line (`src/shared/scripts/gi-config.py:3`) | auto-pilot, issue-analysis, issue-creator, issue-pr-review, issue-resolver, issue-triage, plan-to-issues |
 | `gi-runlog.py` | Validate, normalize, and append (or `--echo`) one `.gitissue/runs.jsonl` record (`src/shared/scripts/gi-runlog.py:2`) | issue-resolver, auto-pilot |
 | `gi-deps.py` | Extract local dependency issue numbers from an issue body, ignoring cross-repo refs (`src/shared/scripts/gi-deps.py:2`) | auto-pilot |
 | `gi-secscan.py` | Apply the five pre-commit security rules to a path set and print one JSON verdict (`clean`/`warn`/`block`) (`src/shared/scripts/gi-secscan.py:2`) | issue-pr-review, issue-resolver |
@@ -216,6 +220,7 @@ A handful of jobs are worse as prose than as code: restating the same config def
 | `gi-stack-detect.py` | Detect repo language, framework, test runner, and size (`src/shared/scripts/gi-stack-detect.py:2`) | init-gitissue |
 | `gi-state.py` | `/auto-pilot` resumable run state, run lock, and final report (`src/shared/scripts/gi-state.py:2`) | auto-pilot, issue-resolver |
 | `gi-triage-graph.py` | Triage execution order, status, staleness, and priority (`src/shared/scripts/gi-triage-graph.py:2`) | auto-pilot, issue-triage |
+| `gi-plan-map.py` | Render `/plan-to-issues`' static epic plan map: reads the render JSON on stdin, writes the sentinel-bounded plan-map markdown on stdout; exits `0` ok, `2` usage, `3` invalid input (`src/shared/scripts/gi-plan-map.py:2`) | plan-to-issues |
 
 **Closure kind.** `SHARED_SCRIPT_RE` matches the bare token `shared/scripts/<name>.py` in a skill's own files (and in any runtime doc reachable from them). The matched name resolves against `src/shared/scripts/`; the file is copied with `shutil.copy2` so the committed `0755` mode survives into the install package. Scripts are **leaves** — the build never scans a `.py` body for further references, so a comment can't drag a document into a bundle. Discovery is regex plus filesystem, which means adding a script needs no `build.py` change. The token is directory-scoped (`shared/scripts/`, not a bare `scripts/`) because a bare form collides with the prose mentions of this repo's own `scripts/` directory that already sit inside the closure read set.
 

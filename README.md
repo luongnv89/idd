@@ -10,7 +10,7 @@
   <a href="https://luongnv.com/idd/"><img src="https://img.shields.io/badge/website-luongnv.com%2Fidd-00FF41.svg?labelColor=0A0A0A" alt="Website"></a>
   <a href="https://github.com/luongnv89/idd/releases/latest"><img src="https://img.shields.io/badge/version-0.23.1-blue.svg" alt="Version 0.23.1"></a>
   <a href="https://github.com/luongnv89/idd/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="MIT License"></a>
-  <a href="https://github.com/luongnv89/idd"><img src="https://img.shields.io/badge/commands-7-blue.svg" alt="7 commands"></a>
+  <a href="https://github.com/luongnv89/idd"><img src="https://img.shields.io/badge/commands-8-blue.svg" alt="8 commands"></a>
   <a href="https://github.com/luongnv89/idd/blob/main/CONTRIBUTING.md"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs Welcome"></a>
 </p>
 
@@ -20,7 +20,7 @@
 
 # Turn GitHub Issues Into Structured, Agent-Ready Work Orders
 
-Seven public skills that structure, analyze, triage, resolve, review, and self-check GitHub issue workflows — so any developer or AI agent can pick up an issue and ship a tested PR (`src/skills/` — `/issue-creator`, `/issue-analysis`, `/issue-resolver`, `/issue-triage`, `/init-gitissue`, `/auto-pilot`, `/issue-pr-review`).
+Eight public skills that plan, structure, analyze, triage, resolve, review, and self-check GitHub issue workflows — so any developer or AI agent can pick up an issue and ship a tested PR (`src/skills/` — `/plan-to-issues`, `/issue-creator`, `/issue-analysis`, `/issue-resolver`, `/issue-triage`, `/init-gitissue`, `/auto-pilot`, `/issue-pr-review`).
 
 [**Website**](https://luongnv.com/idd/) · [**Get Started**](#get-started) · [**What is IDD?**](#what-is-idd) · [**Capturing Intention**](#capturing-intention) · [**Why Good Issues & Commits Matter**](#why-good-issues-and-commit-messages-matter) · [**Works With Any Tool**](#works-with-any-tool)
 
@@ -42,6 +42,8 @@ gitissue turns every GitHub issue into a self-contained work order: typed, struc
 
 ```mermaid
 graph TD
+    P["Phased plan or conversation"] --> Q["/plan-to-issues"]
+    Q --> |"tracking epic + one issue per task"| B
     A["Describe a problem"] --> B["/issue-creator"]
     B --> C["Structured issue"]
     C --> D["/issue-triage"]
@@ -52,6 +54,7 @@ graph TD
     H -.-> G
 
     style A fill:#4CAF50,color:#fff
+    style P fill:#4CAF50,color:#fff
     style G fill:#2196F3,color:#fff
     style H fill:#FF9800,color:#fff
 ```
@@ -59,6 +62,7 @@ graph TD
 | Command | What it does | Effort |
 |---------|-------------|--------|
 | `/issue-creator` | Classify type, generate acceptance criteria, create a structured issue | medium |
+| `/plan-to-issues` | Turn a phased plan file — or a conversation about what to build — into labelled issues under one tracking epic, each mapped to its source task; bodies written by `/issue-creator` | high |
 | `/issue-analysis N` | Root cause, git history, implementation options, complexity and risk | high |
 | `/issue-resolver N` | 6-step pipeline: preflight, research, plan, implement, QA, deliver PR with `Closes #N` | max |
 | `/issue-triage` | Dependency graph, stale detection, already-fixed detection via commit/PR scanning, priority and execution order | medium |
@@ -158,7 +162,7 @@ IDD is a methodology, not a vendor lock-in. The structured issue format is plain
 | **Any SKILL.md agent** | Install the self-contained [`skills/`](skills/) packages via `asm` or manual copy |
 | **Human developers** | Read the issue — acceptance criteria and structure are right there |
 
-All tracker access is concentrated behind one **platform driver** document — [`docs/platform-github.md`](docs/platform-github.md), the operation catalog every skill's `gh` commands must match. GitHub is the only implemented driver; porting to another tracker means writing one equivalent document (e.g. `glab` mappings), not hunting through seven skills.
+All tracker access is concentrated behind one **platform driver** document — [`docs/platform-github.md`](docs/platform-github.md), the operation catalog every skill's `gh` commands must match. GitHub is the only implemented driver; porting to another tracker means writing one equivalent document (e.g. `glab` mappings), not hunting through eight skills.
 
 gitissue is **complementary** to your existing workflow. Use it alongside TDD, BDD, CI/CD pipelines, project management tools, or any AI coding agent. It fills one gap — structuring and triaging issues — and stays out of the way for everything else.
 
@@ -254,11 +258,11 @@ asm install https://github.com/luongnv89/idd --skill issue-resolver
 
 Don't have `asm`? `npm install -g agent-skill-manager`.
 
-`asm` is idempotent — re-running the same command updates installed skills in place with no duplicate files. Each installed skill is complete, so there is no separate shared-agent install step. After install, restart your agent tool so it picks up the new skill(s). The full install surface lives under [`skills/`](skills/): `issue-creator`, `issue-analysis`, `issue-resolver`, `issue-triage`, `issue-pr-review`, `auto-pilot`, and `init-gitissue`.
+`asm` is idempotent — re-running the same command updates installed skills in place with no duplicate files. Each installed skill is complete, so there is no separate shared-agent install step. After install, restart your agent tool so it picks up the new skill(s). The full install surface lives under [`skills/`](skills/): `issue-creator`, `plan-to-issues`, `issue-analysis`, `issue-resolver`, `issue-triage`, `issue-pr-review`, `auto-pilot`, and `init-gitissue`.
 
 #### Alternative — Claude Code plugin
 
-Claude Code users can install the same seven skills as one plugin. This repo is its own plugin marketplace, and the marketplace pins the plugin to the latest tagged release. A plugin install fetches only that release's `skills/` folder (about 2.7 MB), not the rest of the repository:
+Claude Code users can install the same eight skills as one plugin. This repo is its own plugin marketplace, and the marketplace pins the plugin to the latest tagged release. A plugin install fetches only that release's `skills/` folder (about 2.7 MB), not the rest of the repository:
 
 ```bash
 claude plugin marketplace add luongnv89/idd   # register the marketplace (once)
@@ -291,6 +295,12 @@ Create a structured issue:
 /issue-creator "Login fails on mobile when session cookie expires"
 ```
 
+Or file a whole plan — or the conversation you just had — as an epic plus one issue per task:
+
+```bash
+/plan-to-issues docs/ROADMAP.md
+```
+
 Resolve it:
 
 ```bash
@@ -316,6 +326,7 @@ Browse the authored source for each skill — these links point to `src/` for re
 | Skill | Source |
 |-------|--------|
 | `/issue-creator` | [`src/skills/issue-creator/`](src/skills/issue-creator/) |
+| `/plan-to-issues` | [`src/skills/plan-to-issues/`](src/skills/plan-to-issues/) |
 | `/issue-analysis` | [`src/skills/issue-analysis/`](src/skills/issue-analysis/) |
 | `/issue-resolver` | [`src/skills/issue-resolver/`](src/skills/issue-resolver/) |
 | `/issue-triage` | [`src/skills/issue-triage/`](src/skills/issue-triage/) |
@@ -336,6 +347,8 @@ The key idea: the gap between "someone describes a problem" and "someone ships a
 
 ```mermaid
 graph TD
+    P["Phased plan or conversation"] --> Q["/plan-to-issues"]
+    Q --> |"tracking epic + one issue per task"| B
     A["Problem described"] --> B["/issue-creator"]
     B --> C["Structured issue with acceptance criteria"]
     C --> D["/issue-triage"]
@@ -347,6 +360,7 @@ graph TD
     I -.-> |"triage → resolve → review → merge loop"| H
 
     style A fill:#4CAF50,color:#fff
+    style P fill:#4CAF50,color:#fff
     style H fill:#2196F3,color:#fff
     style I fill:#FF9800,color:#fff
 ```
@@ -417,6 +431,20 @@ MIT Licensed · [View on GitHub](https://github.com/luongnv89/idd)
 **Normalize mode** restructures an existing issue: preserves original text in a Reporter Context blockquote, generates acceptance criteria, and posts a backup before editing.
 
 **Batch mode** auto-detects multiple items (numbered lists, bullet points, planning documents) and creates them sequentially with a preview table and approval step.
+
+### /plan-to-issues -- Plan or Conversation to Epic + Issues
+
+| Invocation | Mode | Description |
+|------------|------|-------------|
+| `/plan-to-issues` | Create | Resolve the input — discover a plan file, else fall back to the conversation — then create the epic and one issue per task |
+| `/plan-to-issues <path.md>` | Create | Use that plan file (any path, any producer) |
+| `/plan-to-issues --from-conversation` | Create | Draft the task list from the conversation, confirm once, then file it — no plan file needed |
+| `/plan-to-issues --from-conversation --epic <n>` | Resume | Restore the confirmed task list from epic #n and file only the remaining tasks |
+| `/plan-to-issues --dry-run` | Preview | Print the task table, labels, and plan-map preview. Creates nothing |
+| `/plan-to-issues --phase P0,P1` | Create (filtered) | File only those phases; the map still lists every phase |
+| `/plan-to-issues sync <epic#>` | Sync | Re-render the epic's static plan map. Creates no issues |
+
+The bulk counterpart of `/issue-creator`, and the entry point upstream of the loop: plan → `/plan-to-issues` → `/issue-triage` → `/issue-resolver` (or `/auto-pilot`) → `/issue-pr-review`. It creates one **epic** issue (whole-effort acceptance criteria plus a static plan map grouped by phase; live status comes from GitHub native sub-issues) and one issue per task. Every body is written by `/issue-creator` in batch mode with `--parent <epic>` (`Part of #<epic>`), labelled `phase:pN`, type, `dim:`, and `priority:`, with `Depends on #N` markers that `/auto-pilot`'s merge gate reads. Re-runs are idempotent, and no source file is modified. Requires git, authenticated `gh`, and the sibling `issue-creator` skill.
 
 ### /issue-analysis N -- Deep Issue Analysis
 
@@ -590,6 +618,7 @@ src/
 │   ├── issue-resolver/     # /issue-resolver N
 │   ├── issue-triage/       # /issue-triage
 │   ├── issue-pr-review/    # /issue-pr-review — review, test, CI, fix, merge
+│   ├── plan-to-issues/     # /plan-to-issues — plan or conversation → epic + issues
 │   └── init-gitissue/      # /init-gitissue
 │       (each skill has SKILL.source.md, README.md, references/)
 │

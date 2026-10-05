@@ -1,0 +1,44 @@
+{
+  "plan_path": "MODERNIZATION_PLAN.md",
+  "baseline": "AMBER — builds; 41/58 tests pass",
+  "synced": "2026-10-05",
+  "epic": 100,
+  "critical_path": ["Pre.1", "0.1", "9.9"],
+  "phases": [
+    {
+      "id": "Pre",
+      "title": "Agent environment",
+      "goal": "project env an AI agent can use autonomously",
+      "filed": true,
+      "milestone": { "id": "ME", "exit": "CLAUDE.md and AGENTS.md exist" },
+      "tasks": [
+        { "task_id": "Pre.1", "title": "Make the project environment agent-runnable",
+          "issue": 101, "state": "closed", "depends_on": [], "unknown_deps": [] }
+      ]
+    },
+    {
+      "id": "P0",
+      "title": "Stabilize",
+      "goal": "baseline green | reproducible\nin CI",
+      "filed": true,
+      "milestone": { "id": "M0", "exit": "baseline-green reproducible in CI" },
+      "tasks": [
+        { "task_id": "0.1", "title": "Commit the lockfile\nand restore the build",
+          "issue": 102, "state": "open", "depends_on": ["Pre.1"], "unknown_deps": ["Z.9"] },
+        { "task_id": "0.2", "title": "Add CI", "issue": null, "state": null,
+          "depends_on": ["0.1"], "unknown_deps": [] }
+      ]
+    },
+    {
+      "id": "P1",
+      "title": "Secure",
+      "goal": "zero High advisories",
+      "filed": false,
+      "milestone": { "id": "M1", "exit": "zero known High/Critical advisories" },
+      "tasks": []
+    }
+  ],
+  "deferred": [
+    { "id": "F-DEP-009", "severity": "Medium", "why": "upstream v4 | unreleased", "revisit": "when v4 ships" }
+  ]
+}

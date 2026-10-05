@@ -33,7 +33,8 @@ src/
 │       ├── gi-model-cache.py      # Locate/seed/read the user-level model-data cache
 │       ├── gi-stack-detect.py     # Detect repo stack, test runner, size, issue templates
 │       ├── gi-state.py            # /auto-pilot resumable run state + run lock
-│       └── gi-triage-graph.py     # Triage execution order, status, staleness, priority
+│       ├── gi-triage-graph.py     # Triage execution order, status, staleness, priority
+│       └── gi-plan-map.py         # Render plan-to-issues' static epic plan map
 │
 ├── skills/
 │   ├── auto-pilot/         # /auto-pilot — triage, resolve, review, merge loop
@@ -53,6 +54,9 @@ src/
 │   │   ├── SKILL.source.md
 │   │   └── references/
 │   ├── issue-pr-review/    # /issue-pr-review — review, test, CI check, fix, merge
+│   │   ├── SKILL.source.md
+│   │   └── references/
+│   ├── plan-to-issues/     # /plan-to-issues — plan or conversation → epic + issues
 │   │   ├── SKILL.source.md
 │   │   └── references/
 │   └── init-gitissue/      # /init-gitissue — generate .gitissue.yml

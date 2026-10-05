@@ -98,12 +98,12 @@ def check_tree(tree, label):
 
 
 src = check_tree(root / "src/skills", "src")
-check(len(src) == 7, f"src: exactly 7 missing-dependency blocks (found {len(src)})")
+check(len(src) == 8, f"src: exactly 8 missing-dependency blocks (found {len(src)})")
 
 built = root / "skills"
 if built.is_dir():
     out = check_tree(built, "skills")
-    check(len(out) == 7, f"skills: exactly 7 built blocks (found {len(out)})")
+    check(len(out) == 8, f"skills: exactly 8 built blocks (found {len(out)})")
 
 print()
 if failed:

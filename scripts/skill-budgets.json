@@ -28,6 +28,10 @@
     "issue-triage": {
       "budget": 130813,
       "measured": 130281
+    },
+    "plan-to-issues": {
+      "budget": 162847,
+      "measured": 162748
     }
   }
 }

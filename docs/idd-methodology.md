@@ -57,7 +57,7 @@ IDD standardizes the path from intention to implementation as five phases. Each 
 
 | Phase | Question it answers | gitissue reference implementation |
 |-------|--------------------|-----------------------------------|
-| **Capture** | What does the reporter actually want? | `/issue-creator` |
+| **Capture** | What does the reporter actually want? | `/issue-creator`; `/plan-to-issues` for a whole plan |
 | **Normalize** | Does an existing issue state that intent clearly? | `/issue-creator N` |
 | **Triage** | What should be worked on, in what order? | `/issue-triage` |
 | **Analyze** | Where in the *current* code does this land, and how risky is it? | `/issue-analysis N` |
@@ -73,6 +73,8 @@ In the gitissue reference implementation, the phases map onto commands like this
 
 ```mermaid
 graph TD
+    P["Phased plan or conversation"] --> Q["/plan-to-issues"]
+    Q --> |"epic + one issue per task"| B
     A["Problem described<br/>(text, screenshot, planning doc)"] --> B["/issue-creator"]
     B --> C["Structured issue:<br/>Type, Reporter context,<br/>Acceptance criteria,<br/>Metadata"]
     C --> D["/issue-analysis N (optional)"]

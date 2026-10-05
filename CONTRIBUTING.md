@@ -100,13 +100,16 @@ src/                        # SOURCE OF TRUTH — hand-edit here
 │   ├── auto-pilot/         # /auto-pilot — triage, resolve, review, merge loop
 │   │   ├── SKILL.source.md
 │   │   └── references/
+│   ├── plan-to-issues/     # /plan-to-issues — plan or conversation → epic + issues
+│   │   ├── SKILL.source.md
+│   │   └── references/
 │   └── init-gitissue/      # /init-gitissue — config generator
 │       ├── SKILL.source.md
 │       └── references/
 ├── internal-skills/        # /idd-doctor and other internal-only skills
 └── shared/
     ├── agents/             # Shared agent definitions used by multiple skills
-    └── scripts/            # stdlib-only Python helpers (14 × gi-*.py)
+    └── scripts/            # stdlib-only Python helpers (16 × gi-*.py)
 
 scripts/                    # Repo tooling (not the shared-script closure)
 ├── build.sh                # Thin entrypoint → calls build.py
