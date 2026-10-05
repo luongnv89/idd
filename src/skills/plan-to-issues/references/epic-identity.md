@@ -74,10 +74,14 @@ adopts it after a confirm. Design for the interruption; do not claim it is impos
 
 1. **Check for an existing epic first** — fetch and filter locally, since GitHub's search tokenizer
    is unreliable on markers. Request every field the filters below need — they cost nothing on the
-   same call, and `labels`/`state`/`createdAt` are what the fallback reads:
+   same call, and `labels`/`state`/`created_at` are what the fallback reads. Page through **every**
+   issue: a `gh issue list --limit N` window misses an epic once N newer issues exist, and the run
+   then duplicates it:
 
    ```bash
-   gh issue list --state all --limit 200 --json number,title,body,labels,state,createdAt
+   repo="$(gh repo view --json nameWithOwner --jq .nameWithOwner)"
+   gh api --paginate "repos/$repo/issues?state=all&per_page=100" \
+     --jq '.[] | select(.pull_request == null) | {number,title,body,state,created_at,labels:[.labels[].name]}'
    ```
 
    Filter on the **plan-binding marker** for this exact plan path —

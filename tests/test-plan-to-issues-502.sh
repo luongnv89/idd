@@ -139,6 +139,22 @@ else
   fail "R1: per-page jq aggregate on a sub_issues read: ${aggr//$ROOT\//}"
 fi
 
+# ── R2: epic and child lookups read every issue ──────────────────────────────
+# `gh issue list` lists newest first, so a --limit window misses an epic (or its
+# children) once that many newer issues exist, and a re-run duplicates them.
+# The lookups must page through every issue with `gh api --paginate`.
+windowed="$(grep -rnE 'gh issue list[^`]*--limit' "$ROOT/src/skills/plan-to-issues" \
+  | grep -vE 'gh issue list --limit N' || true)"
+if [ -z "$windowed" ]; then
+  pass "R2: no windowed gh issue list lookup"
+else
+  fail "R2: windowed gh issue list lookup: ${windowed//$ROOT\//}"
+fi
+for f in references/epic-identity.md references/issue-creator-bridge.md references/phase-contracts.md SKILL.source.md; do
+  has "$ROOT/src/skills/plan-to-issues/$f" 'gh api --paginate "?repos/[^"]*/issues\?state=all' \
+    "R2: $f pages through every issue"
+done
+
 # ── AC5: shipped and listed ──────────────────────────────────────────────────
 BUILT="$ROOT/skills/plan-to-issues"
 if cmp -s "$BUILT/references/scripts/gi-plan-map.py" "$SCRIPT"; then

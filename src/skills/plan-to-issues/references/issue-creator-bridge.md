@@ -106,9 +106,12 @@ each title to build `task_id → issue_number`. Then confirm against the tracker
 transcript:
 
 ```bash
-gh issue list --state all --limit 500 --json number,title,labels,body \
-  --jq '[.[] | select(.body | test("Part of #<epic>\\b"))] | map({number,title,labels:[.labels[].name]})'
+repo="$(gh repo view --json nameWithOwner --jq .nameWithOwner)"
+gh api --paginate "repos/$repo/issues?state=all&per_page=100" \
+  --jq '.[] | select(.pull_request == null and ((.body // "") | test("Part of #<epic>\\b"))) | {number,title,labels:[.labels[].name]}'
 ```
+
+One child per line. Page every issue: a `gh issue list --limit N` window misses older children.
 
 Filter locally rather than with `--search "Part of #100 in:body"`: GitHub's search tokenizer drops
 the `#`, so that query silently matches issues mentioning `100` and misses others. A local `select`

@@ -244,8 +244,9 @@ must be reverted.
 ### Phase 6 — Verify and report
 
 **verify-by-re-read** every claim before making it: `gh issue view <epic> --json body` for the source
-marker, the sentinels, and one line per filed issue; then `gh issue list --state all --limit 500
---json number,title,labels,body` filtered **locally** on `Part of #<epic>` — never
+marker, the sentinels, and one line per filed issue; then
+`gh api --paginate "repos/{owner}/{repo}/issues?state=all&per_page=100"` (every issue, never a
+`--limit` window; skip entries with `pull_request`) filtered **locally** on `Part of #<epic>` — never
 `--search "… in:body"`, whose tokenizer drops the `#` and both over- and under-matches.
 
 Repair what is repairable — missing label → `--add-label`; missing sub-issue link → re-register;

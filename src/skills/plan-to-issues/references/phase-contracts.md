@@ -169,7 +169,8 @@ must be reverted.
 **verify-by-re-read** every claim before making it:
 
 - `gh issue view <epic> --json body` — source marker and sentinels present, one line per filed issue.
-- `gh issue list --state all --limit 500 --json number,title,labels,body`, filtered **locally** on
+- `gh api --paginate "repos/{owner}/{repo}/issues?state=all&per_page=100"` (every issue, never a
+  `--limit` window; skip entries with `pull_request`), filtered **locally** on
   `Part of #<epic>` — the child set matches the map and each child's labels contain its computed
   set. Never `--search "… in:body"`: GitHub's tokenizer drops the `#` and both over- and
   under-matches.
