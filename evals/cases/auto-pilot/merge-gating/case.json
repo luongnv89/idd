@@ -176,6 +176,22 @@
       "file": "OUT/run-uncapped-cycles.json",
       "expect_exit": 3,
       "label": "qa_cycles past the class ceiling needs a breach_reason (negative)"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/summary.txt",
+      "expect_exit": 0,
+      "label": "final summary states result, evidence, uncertainty, and decision"
     }
-  ]
+  ],
+  "human_review": {
+    "criteria": [
+      "The first summary line states the run status, complete or partial, and the main finding.",
+      "Observed checks (merged PRs, validated run-log records) are separate from simulated or unverified items listed under Uncertainty.",
+      "Each merged row names its PR, and each left_open or blocked_by_dependency row names what blocks it.",
+      "The summary says No approval needed and names the remaining user actions on Next action."
+    ],
+    "feedback": "Record each reviewer answer; absent, blank, or nonresponsive feedback leaves understanding unconfirmed.",
+    "scope": "This deterministic stand-in tests a summary fixture, not live agent behavior. Apply these criteria to actual agent outputs in behavioral evaluations."
+  }
 }

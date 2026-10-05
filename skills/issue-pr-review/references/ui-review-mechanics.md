@@ -1,6 +1,6 @@
 # UI/UX Review Mechanics
 
-Operational detail for the auto-detected UI/UX review in *Step 3 — UI/UX Review*.
+Operational detail for the auto-detected UI/UX review in SKILL.md Step 3 (*UI review*).
 
 The mechanics themselves are **shared with `/issue-resolver` and live in exactly
 one home: `references/docs/ui-review.md`** — the contract (auto-detect → always run code
@@ -19,7 +19,7 @@ before running this step. This file carries only `/issue-pr-review`'s deltas.
   user opt-in. When it cannot run it **skips with a warning and the code UI
   review still runs** — fail-soft to code-only, never a blocked step.
 
-That asymmetry is the contract SKILL.md's *Step 3 — UI/UX Review* states in one
+That asymmetry is the contract SKILL.md's Step 3 *UI review* paragraph states in one
 line; it is why `light` may skip the browser leg while `qa_handoff = trusted`
 reaches only the code leg.
 

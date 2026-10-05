@@ -84,8 +84,8 @@ and treat its `security:` block as a reviewable change on its own. It is a
 warning, not a hard stop — `--policy-ref` already denies it any effect on this
 scan, and legitimate config PRs must stay mergeable.
 
-The full exit contract is in SKILL.md (*Step 2 — Commit auto-fixes*) and is not
-optional here: **exit 1 is a block** — stop, do not commit, report the path from
+The exit contract (summarized in SKILL.md *Step 2 — Commit auto-fixes*) is not
+optional: **exit 1 is a block** — stop, do not commit, report the path from
 `blocking[]`, never fall through to another scan. **Exit 3 is also a stop**, not
 a degrade: an uncompilable `security.*` regex means the repo's own rules were
 never applied, and a misconfigured scan has not run, so its silence is not a
@@ -198,7 +198,20 @@ On failure, extract failure details from the CI log:
 gh run view {run_id} --log-failed
 ```
 
-When checks are still running after `review.ci_timeout`: pending CI is **not clean** — it never satisfies soft-pass and auto mode must not merge or proceed while CI is pending (including when the fix loop finds zero fixables and would otherwise exit). In interactive mode: ask to wait more or proceed without merging. In auto mode: **do not proceed past an unresolved CI timeout** — extend polling or stop with remaining issues; do not assume a later cycle will re-check once the fix loop has already ended.
+When checks are still running after `review.ci_timeout`: pending CI is **not clean** — it never satisfies soft-pass and auto mode must not merge or proceed while CI is pending (including when the fix loop finds zero fixables and would otherwise exit). In interactive mode: ask whether to wait another `review.ci_timeout`; on yes, re-run the wait; on no, report without merging. In auto mode: **do not proceed past an unresolved CI timeout** — re-run the wait once with the same timeout, and if CI is still pending, stop with the pending checks under Remaining; do not assume a later cycle will re-check once the fix loop has already ended.
+
+Render a failing check as `{bucket}/{state}`, both fields straight from its `failing[]` entry. `bucket` is gh's **raw** bucket, which reads `pending` for a terminal `STARTUP_FAILURE` or `STALE`; printing it alone under a "checks failed" heading contradicts the heading. `state` is what makes the terminal failure legible.
+
+### Ignoring terminal CI failures
+
+`review.ignore_ci_billing_failures: true` (default `false`) makes a terminal `fail` verdict **non-blocking at the Step 5 gate only**. CI is still polled and `failing[]` is still reported; Step 6 raises no CI fixable, and the soft-pass conjunction treats the CI leg as satisfied — under `review.soft_pass: false` too, since the key gates the CI leg itself, with strict mode's extra dimension and note requirements still standing. Four invariants hold regardless:
+
+- **`ci_status` stays `failed@{sha40}`, never `passed@`.** The checks did fail; `passed@` would bind a false claim to a commit, and it cannot satisfy `/auto-pilot`'s Step 5.1a `trusted` path anyway — that additionally requires a live all-green `statusCheckRollup`, which will not exist.
+- **The outcome is `PARTIAL`, never a clean pass** — `√ CI queried` / `× Required checks green`, with the gap carried into the closing summary (`report-templates.md`). A step-level `PARTIAL` means *continue*, so this invariant is the report's honesty, not the merge gate; the fourth invariant is what refuses the merge.
+- **`ci_leg_runnable` is unaffected.** It reads `review.check_ci` and Step 1's `statusCheckRollup` and never this key, so an ignored CI failure never also skips the local test suite.
+- **The merge is still refused.** The auto-merge gate excludes this path by name — an ignored CI failure is never clean, exactly as pending CI is never clean (SKILL.md *Review Loop* and *Step 7*, `report-templates.md`) — so the CI leg this key satisfies carries the fix loop to a `PARTIAL` stop and never to a merge. `/auto-pilot` additionally re-runs its own wait and refuses on the same red checks. That is the deliberate, documented boundary: this key relaxes **this skill's review gate only**.
+
+It ignores only a *terminal* `fail`; `pending` stays not clean, and `none` / `none_confirmed` are untouched. GitHub exposes no API field naming a billing-related failure, so the key cannot single billing out — it ignores **any** terminal CI failure. The manual fallback honors it identically.
 
 ### Binding the verdict to a commit
 

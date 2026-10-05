@@ -146,3 +146,34 @@ cat > "$EVAL_OUT/run.json" <<'EOF'
   "duration_s": 12
 }
 EOF
+
+# Closing block per the Review contract (references/report-templates.md →
+# *Closing Summary*): result first, then evidence, uncertainty, and the
+# decision. Every claim is computed from the artifacts just written, so the
+# report cannot claim more than they show (a created PR is not a merged one).
+python3 - "$EVAL_OUT" <<'PY'
+import json, os, re, sys
+out = sys.argv[1]
+rg = json.load(open(os.path.join(out, "red-green.json"), encoding="utf-8"))
+run = json.load(open(os.path.join(out, "run.json"), encoding="utf-8"))
+url = open(os.path.join(out, "pr-url.txt"), encoding="utf-8").read().strip()
+body = open(os.path.join(out, "pr-body.md"), encoding="utf-8").read()
+m = re.search(r"/pull/(\d+)$", url)
+assert m, f"gh pr create returned no PR URL: {url!r}"
+pr = m.group(1)
+assert rg["red_exit"] != 0 and rg["green_exit"] == 0, rg
+assert run["outcome"] == "success" and str(run["pr"]) == pr, (run, pr)
+assert body.splitlines()[0] == "Closes #1", "PR body must open with Closes #1"
+ac_rows = [r for r in body.splitlines() if r.startswith("| login")]
+assert ac_rows and all("| pass |" in r for r in ac_rows), f"AC rows not all pass: {ac_rows}"
+report = (
+    "Result: DONE — issue #1 resolved (low risk)\n"
+    f"Evidence: tests/test_login.py exit {rg['red_exit']} before the fix, exit 0 after; "
+    f"PR #{pr} created ({url}); run log record outcome=success\n"
+    "Uncertainty: risk rating is a judgment; secret scan and QA review not run by this stand-in\n"
+    "Decision: No approval needed.\n"
+    f"Next action: /issue-pr-review {pr}\n"
+)
+with open(os.path.join(out, "report.txt"), "w", encoding="utf-8") as fh:
+    fh.write(report)
+PY

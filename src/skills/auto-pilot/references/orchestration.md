@@ -93,3 +93,11 @@ fan-in and one at a time; `--no-merge` preserves Phase 5 as the sole merge site.
   validate its conventional branch, locate an open PR for it, and resume at the
   earliest safe phase. Any doubt re-runs or re-checks work; it never assumes a
   merge, a run-log append, or a completed cleanup.
+
+## Measuring the body-snapshot budget
+
+SKILL.md → *Caller-supplied context* names the three freshness boundaries
+(resolution, mutation, review). Measure body-returning reads by issue and by
+boundary/reason, never by total `gh` calls: the resolver's non-body
+`state,comments,updatedAt` probe preserves its 0a stops and 0h freshness check
+and is not a body read.

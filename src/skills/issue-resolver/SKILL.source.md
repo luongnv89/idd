@@ -4,8 +4,8 @@ description: "Create an atomic PR closing a GitHub issue end-to-end via a 6-step
 license: MIT
 compatibility: "Requires git and GitHub CLI (gh) with authentication and push access. Self-contained — uses shared agents from shared/agents/."
 metadata:
-  version: 0.19.0
-  author: Luong NGUYEN <luongnv89@gmail.com>
+  version: 0.20.0
+  author: "Luong NGUYEN <luongnv89@gmail.com>"
   effort: max
 ---
 
@@ -15,17 +15,20 @@ Issue → atomic PR in 6 steps.
 
 ## Invocation
 
-| Invocation | Mode | What happens |
-|------------|------|--------------|
-| `/issue-resolver <N>` | interactive | Resolve #N; user picks the plan |
-| `/issue-resolver <N> --auto` | auto-pilot | Resolve autonomously; no prompts |
-| `/issue-resolver <N> --no-run-log` | (modifier) | Append nothing to `.gitissue/runs.jsonl`; return telemetry |
-
-`N` is a GitHub issue number. `--auto` is set by `/auto-pilot`; `--no-run-log` is **orthogonal to `--auto`** (*Step 5 — Deliver* → *Run-log entry*).
+| Invocation (`N` = issue number) | What happens |
+|------------|--------------|
+| `/issue-resolver <N>` | Interactive; user picks the plan |
+| `/issue-resolver <N> --auto` | No prompts; set by `/auto-pilot` |
+| `/issue-resolver <N> --no-run-log` | Modifier, **orthogonal to `--auto`**: append nothing to `.gitissue/runs.jsonl`, return telemetry (*Run-log entry*) |
 
 ## Prerequisites
 
-Check before any operation: git repository (`git rev-parse --git-dir`), `gh` installed (`which gh`) and authenticated (`gh auth status`), remote present (`git remote -v`). On failure print the `references/error-messages.md` error, stop.
+Run these checks in order before any operation. A non-zero exit or empty output stops the run: print that check's `references/error-messages.md` error and the *Closing Summary* `BLOCKED` block.
+
+1. Git repository: `git rev-parse --git-dir`.
+2. `gh` installed: `which gh`.
+3. `gh` authenticated: `gh auth status`.
+4. Remote present: `git remote -v` prints at least one line.
 
 ## Repo Sync Before Edits (mandatory)
 
@@ -33,7 +36,7 @@ In-place path only; worktree paths start from the fetched base, and an invalid `
 
 ## Configuration
 
-Load config once; never re-read it. Run `python3 shared/scripts/gi-config.py` — **Working directory:** the repo root; **Script path:** absolute, as the *Bundled dependency precheck* resolves its list. It prints `{"config": …, "config_file": …, "first_run": …}` merged over the defaults below. Why each matters: `references/steps/step-0-preflight.md` (*Configuration load*).
+Load config once; never re-read it. Run `python3 shared/scripts/gi-config.py` — **Working directory:** the repo root; **Script path:** absolute, as the *Bundled dependency precheck* resolves its list. It prints `{"config": …, "config_file": …, "first_run": …}` merged over the defaults below (rationale: `references/steps/step-0-preflight.md`, *Configuration load*).
 
 - **Exit 0** — use `config`.
 - **Exit 3** — invalid `.gitissue.yml`: print the `references/error-messages.md` error (*Invalid config*), stop.
@@ -42,7 +45,7 @@ Load config once; never re-read it. Run `python3 shared/scripts/gi-config.py` �
 
 Either path: no `.gitissue.yml` (`first_run`) prints `○ First run — using default config. Run /init-gitissue to customize.`
 
-**Capture the run clock here:** chain that same `python3` invocation as `python3 …; ec=$?; date +%s >&2; exit "$ec"`; the stderr epoch is `run_started_epoch`, from which the *Run Stats Footer* (`references/run-stats.md`) measures `elapsed`. Take `date +%s` again as each `[N/5]` step starts and at the terminal outcome: those boundaries are the run log's `phases` (`references/report-templates.md`).
+**Capture the run clock here:** chain that same `python3` invocation as `python3 …; ec=$?; date +%s >&2; exit "$ec"`; the stderr epoch is `run_started_epoch`, the *Run Stats Footer*'s `elapsed` anchor. Take `date +%s` again as each `[N/5]` step starts and at the terminal outcome: those boundaries are the run log's `phases` (`references/report-templates.md`).
 
 Defaults and behavior per key: `docs/config-schema.md` — `issue.auto_normalize` · `resolve.approval_gate` · `resolve.branch_prefix` · `resolve.auto_test` · `resolve.test_timeout` · `resolve.max_commits` · `resolve.qa_max_cycles` · `resolve.adaptive_effort` · `resolve.ui_review.browser_review` · `resolve.borrow_skills: false`.
 
@@ -50,7 +53,7 @@ Defaults and behavior per key: `docs/config-schema.md` — `issue.auto_normalize
 
 ## Subagent Architecture
 
-Heavy work goes to subagents (`shared/agents/`), keeping the main agent's **context window** lean: it owns Step 0, Step 4's loop and Step 5; Steps 1-3 each spawn one (*Subagent Architecture Diagram*). Prompts: `references/agents/<name>.md`; conventions: `docs/shared-agent-conventions.md`.
+Heavy work goes to subagents (`shared/agents/`), keeping the main agent's **context window** lean: it owns Step 0, Step 4's loop and Step 5; Steps 1-3 each spawn one (*Subagent Architecture Diagram*). Prompts: `references/agents/<name>.md`; conventions: `docs/shared-agent-conventions.md`. Without the Agent tool (e.g. Claude.ai), run each step inline via its fallback instructions.
 
 ### Spawning a subagent (canonical pattern)
 
@@ -64,15 +67,11 @@ Agent(
 )
 ```
 
-**Per-role overrides:** apply `docs/agent-overrides.md` at every spawn — resolved `agents.model.<role>` / `agents.effort.<role>` for the role being spawned (`codebase-researcher`, `synthesizer`, `implementer`, `code-reviewer`, `ui-reviewer`, `fixer`). `null` (the default) passes nothing, leaving the call above as written.
+**Per-role overrides:** at every spawn apply `docs/agent-overrides.md` — the resolved `agents.model.<role>` / `agents.effort.<role>` for the spawned role (`codebase-researcher`, `synthesizer`, `implementer`, `code-reviewer`, `ui-reviewer`, `fixer`); `null` (the default) passes nothing.
 
-### Orchestrating the agents (model/effort, monitoring, audit)
+### Orchestrating the agents
 
-Per step: **name the role** in the spawn `description`; **size the model/effort** per `docs/agent-model-effort.md`; **monitor before advancing** — a missing or blocking return stops the run (interactive) or takes the auto behavior; **audit** the signal. Shapes and fields: *Orchestrating the agents*.
-
-### Environment check
-
-Use subagents when the Agent tool is available; otherwise (e.g. Claude.ai) run steps inline via their fallback instructions.
+Name the role in `description`, size model/effort per `docs/agent-model-effort.md`, and read each return before advancing: a missing or blocking return stops (interactive) or takes the auto behavior (*Orchestrating the agents*).
 
 ### Bundled dependency precheck
 
@@ -125,11 +124,11 @@ references/scripts/gi-state.py
 
 ## Pipeline Overview
 
-6 steps (0-5) — Preflight, Research, Plan, Implement, QA, Deliver — each printing a `[N/5]` line on start (`●`) that updates to `✓`/`✗`. Read the expected output example in `references/report-templates.md` (*Expected Inline Pipeline Output*).
+6 steps (0-5) — Preflight, Research, Plan, Implement, QA, Deliver — each printing a `[N/5]` line (`●` → `✓`/`✗`); expected output example: `references/report-templates.md` (*Expected Inline Pipeline Output*).
 
 ### Step completion reports
 
-Each step closes with `√`/`×` per check plus a `Result: PASS | PARTIAL | FAIL` line — format in `references/report-templates.md` (*Step Completion Reports*), **read it now**. A step is incomplete until `Result:` prints.
+Each step closes with `√`/`×` per check and a `Result: PASS | PARTIAL | FAIL` line (*Step Completion Reports* in `references/report-templates.md`, **read it now**). A step is incomplete until `Result:` prints.
 
 ---
 
@@ -145,7 +144,11 @@ GitHub reads share the boundary in `shared/scripts/gi-gh.py`. Classify any frame
 
 ### 0b — Check for existing work
 
-Check existing branches (`git branch -a | grep -i "{N}"`) and open PRs (`gh pr list --state open --json number,title,body,headRefName --limit 20`), scanning bodies for `Closes #N`, `Fixes #N`, `Resolves #N`. An **open** PR targeting the issue prints the `⚠ PR already targets issue` block from `references/error-messages.md` (*Guards*), stops, returns `status: pr_in_progress` with its `pr_number` and `branch_name`, and must **never close the issue** (*Early exit*). Only a **merged** PR or a closing commit on the default branch is `already_resolved`.
+1. List branches: `git branch -a | grep -i "{N}"`.
+2. List open PRs: `gh pr list --state open --json number,title,body,headRefName --limit 20`. A PR targets the issue when its body has `Closes #N`, `Fixes #N` or `Resolves #N`.
+3. If an **open** PR targets it: print the `⚠ PR already targets issue` block from `references/error-messages.md` (*Guards*), stop, return `status: pr_in_progress` with its `pr_number` and `branch_name`, and **never close the issue** (*Early exit*).
+
+Only a **merged** PR or a closing commit on the default branch is `already_resolved`.
 
 ### 0c — Guards
 
@@ -159,11 +162,15 @@ If `issue.auto_normalize` is true and the body lacks a `<!-- gitissue:normalized
    - **Auto mode (`--auto` / `IDD_AUTO_MODE=1`):** print the `⚠ … Skipping auto-normalization` warning (`references/error-messages.md` → *Security-labeled issue (skip)*), first matching label as `{label}`, continue **without** rewriting.
    - **Interactive mode:** same warning, then ask for explicit operator confirmation; default **no**, a decline continuing without normalization.
 
-2. **Normalize inline** — otherwise: classify the type, generate the body, add the marker, back up the original in a comment, `gh issue edit`, invalidate the cache (`python3 shared/scripts/gi-issue.py {N} --invalidate`), re-fetch. Structure-only, as `/issue-creator` Normalize mode; the resolver does **not** invoke `/issue-creator` as a subprocess. On failure **warn** and continue with the original body (`references/error-messages.md` → *Auto-normalization failed*).
+2. **Normalize inline** — otherwise, structure-only as `/issue-creator` Normalize mode (the resolver does **not** invoke `/issue-creator` as a subprocess):
+   1. Classify the type and generate the body with the marker.
+   2. Back up the original body in a comment.
+   3. Run `gh issue edit`, then `python3 shared/scripts/gi-issue.py {N} --invalidate`, then re-fetch.
+   4. On any failure, **warn** and continue with the original body (`references/error-messages.md` → *Auto-normalization failed*).
 
 ### 0e — Workspace (interactive only)
 
-Derive one `{branch_name}` first: `python3 shared/scripts/gi-branch.py {N} --from-issue --type {type}`, reading `.branch`. **`--from-issue` is mandatory** — never put the issue title or configured prefix on the command line (`references/steps/step-0-preflight.md` → *Step 0e — Workspace*). `{type}` is one of six classified literals. Exit 3 stops; anything else degrades to `docs/naming-conventions.md`. Both paths use it.
+Derive one `{branch_name}` first: `python3 shared/scripts/gi-branch.py {N} --from-issue --type {type}`, reading `.branch`. **`--from-issue` is mandatory** — never put the issue title or configured prefix on the command line (`references/steps/step-0-preflight.md` → *Step 0e — Workspace*). `{type}` is one of six classified literals. Exit 3 stops; anything else degrades to `docs/naming-conventions.md`.
 
 **Auto mode (`--auto` / `IDD_AUTO_MODE=1`): skip this offer entirely.** A set `IDD_CALLER_WORKTREE=1` uses the validated caller-managed path; otherwise go to *0f*.
 
@@ -243,15 +250,13 @@ Generate options and select one. Spawn the synthesizer (`shared/agents/synthesiz
 
 Optionally augment the implementer with external skills from `references/skill-index.md`: detect, propose, accept into `selected_skills`; internal agents remain the fallback. Borrow/install, `{name, origin}` records via `shared/scripts/gi-state.py`, teardown of `origin: borrowed` only, auto-mode: `references/steps/step-3-implement.md` (*Step 3 — Propose relevant skills*).
 
-**`light` profile:** see the profile table in *Step 0g* — the **leftover teardown still runs** there.
-
-Then spawn the implementer (`shared/agents/implementer.md`) with the plan, branch name, naming conventions and `selected_skills`. **Bug** issues first run the red-capable reproduction checkpoint — reproduce, confirm red, fix, convert to a regression test — surfaced in the Decision Record and acceptance table; others skip it, auto never blocks (`references/bug-verification.md`). Payload, guardrails, fallback: *Step 3*.
+Then spawn the implementer (`shared/agents/implementer.md`) with the plan, branch name, naming conventions and `selected_skills`. **Bug** issues first run the red-capable reproduction checkpoint — reproduce, confirm red, fix, convert to a regression test — surfaced in the Decision Record and acceptance table; others skip it, auto never blocks (`references/bug-verification.md`). Payload, guardrails, fallback: *Step 3*; `light`: profile table in *Step 0g*.
 
 ---
 
 ## Step 4 — QA
 
-Loop: review → test → fix, until clean or the cap is hit.
+Loop: review → test → fix until clean or the cycle cap — light=1 (profile table in *Step 0g*); full+low/medium=2; full+high=`resolve.qa_max_cycles`. Record `ceiling`/`breach_reason`.
 
 ### Spawning the code reviewer
 
@@ -259,9 +264,7 @@ Spawn a **fresh** reviewer (`shared/agents/code-reviewer.md`) each cycle. On blo
 
 ### UI/UX review (auto-detected)
 
-UI review is **auto-detected per issue** — no config flag enables it. Scan the issue body and diff for UI work before cycling. The **code UI review** always runs; the **browser UI review** runs only when a running app is reachable *and* opted in, else **skips with a warning**. Detection, the `ui-reviewer` spawn and the `ui_review.browser_review` gate: `docs/ui-review.md`. Deltas and cycle mechanics: *Step 4 — UI/UX review*, *Step 4 — QA*.
-
-**`light` profile:** see the profile table in *Step 0g*. Class policy: light=1; full+low/medium=2; full+high=`resolve.qa_max_cycles`. Record `ceiling`/`breach_reason`.
+UI review is **auto-detected per issue** (no config flag): scan the issue body and diff for UI work before cycling. The **code UI review** always runs; the **browser UI review** runs only when a running app is reachable *and* opted in, else **skips with a warning**. Detection, the `ui-reviewer` spawn and the `ui_review.browser_review` gate: `docs/ui-review.md`; mechanics: *Step 4 — UI/UX review*.
 
 ---
 
@@ -275,7 +278,10 @@ A failure prints `✗ Final test run failed — PR not created` and stops, even 
 
 ### Update documentation
 
-If the change affects documented behavior, update README, inline docs, CHANGELOG.
+1. List the user-visible names the diff changes (commands, flags, config keys, public functions, output strings).
+2. Search `README*`, `docs/`, `CHANGELOG*` and the changed files' docstrings for each name.
+3. Update each match describing the old behavior; add a `CHANGELOG` entry if that file exists.
+4. No match: record `docs: none found` in the Evidence row.
 
 ### Push branch and create PR
 
@@ -297,13 +303,13 @@ gh pr create --title "{pr_title}" --body "{pr_body}"
 
 **PR body:** fill *PR Body Template* in `references/report-templates.md`; never omit its **Decision Record**, Test Results or **Acceptance Criteria Verification** (`docs/idd-methodology.md`). Its **last line** is the QA handoff marker: fill it **only when QA exited clean**, else drop it — never append a second copy (*QA handoff marker* owns the per-field omit rules). `head=` is `git rev-parse HEAD` after the last commit.
 
-Copy that line out of the template **character-for-character** and substitute **only** the `{braced}` tokens. Every field name is a literal — never re-worded, renamed, abbreviated, or reconstructed from memory:
+Copy that line out of the template **character-for-character** and substitute **only** the `{braced}` tokens; never re-word or recall a field name:
 
 ```
 <!-- gitissue:qa v1 head={head_sha} profile={profile} cycles={qa_cycles} review=clean tests={test_count}@{tests_sha} ui={ui_legs}:{ui_result}@{ui_sha} -->
 ```
 
-`review=clean` is that exact spelling and has **no synonym**: a marker writing `verdict=`, `status=` or `result=` instead still matches the consumer's parse grep, so it is never `absent` — the wrong key is then ignored as an unknown one, `review=` is missing, and the marker resolves to `stale`, silently forfeiting every skip it exists to buy.
+`review=clean` has **no synonym**: `verdict=`, `status=` or `result=` make the marker `stale` (*QA handoff marker* explains why).
 
 ### Project board sync
 
@@ -325,25 +331,23 @@ if [ -n "$no_run_log" ]; then printf '%s' "$run_json" | python3 shared/scripts/g
 
 ## Closing Summary
 
-Emit **one** closing block with only what the `[N/5]` tracker never printed: the outcome line, `risk_rating`, the PR reference (number, title, URL, `Closes #N`). Use the matching variant in `references/report-templates.md` (*Closing Summary*). **Then the run-stats footer** — `references/run-stats.md`: elapsed, tokens only where the host reported a count (else left out), agents, run cost only, `n/a` otherwise. It prints last at **every** terminal outcome, including those never reaching this block — a preflight stop (`not found`, `closed`, `pr_in_progress`), an invalid-config stop, `already_resolved`, a blocked scan, a failed final test run, any failed step.
+Emit **one** closing block at **every** terminal outcome, stops included. Read the *Review contract* in `references/report-templates.md` (*Closing Summary*), then print its matching variant: `Result:` first (`DONE`, `PARTIAL` or `BLOCKED`), then `Evidence:`, `Uncertainty:`, `Decision:` and `Next action:`. **Then the run-stats footer** (`references/run-stats.md`) prints last, with tokens only where the host reported a count.
 
 ---
 
 ## Auto-Pilot Mode
 
-With `--auto` (or under `/auto-pilot`) the pipeline runs without user interaction. Each step states its auto behavior; the invariants:
+With `--auto` (or under `/auto-pilot`) no step prompts. Invariants:
 
 - **Environment:** export `IDD_AUTO_MODE=1` before any shell snippet consulting it (`docs/pre-commit-security.md`).
 - **Workspace:** in-place is the default resolution path. Skip Step 0e and allow no `git worktree add` on the default resolution path; run mandatory Repo Sync, then *0f*. With `max_parallel > 1` a resolver may receive `IDD_CALLER_WORKTREE=1` and use that workspace, never creating or cleaning it up.
-- **Never blocks:** every decision point has a defined auto behavior (*Auto-mode behavior by step*); every terminal outcome still runs borrow teardown.
-- **Deliver:** create the PR; never merge — `/auto-pilot`'s or `/issue-pr-review`'s job. Under `/auto-pilot` the `profile` is **returned** in telemetry; a standalone `--auto` run writes it.
-
-No `[y/N]`, `Choose:` or `Continue?` prompts.
+- **Never blocks:** every decision point has an auto behavior (*Auto-mode behavior by step*); every terminal outcome runs borrow teardown. No `[y/N]`, `Choose:` or `Continue?` prompts.
+- **Deliver:** create the PR; never merge (`/auto-pilot`'s or `/issue-pr-review`'s job). Under `/auto-pilot` the `profile` is **returned** in telemetry; a standalone `--auto` run writes it.
 
 ## Edge Cases
 
-Missing acceptance criteria, empty issue body, large issues (20+ files), test failure or timeout, branch-already-exists: *Edge Cases*.
+No ACs, empty body, 20+ files, test failure or timeout, existing branch: *Edge Cases*.
 
 ## Platform Driver and Output Conventions
 
-Tracker access uses the GitHub driver — `--json` with explicit fields, never parsed text (docs/platform-github.md). Output follows `docs/terminal-style.md` — `● ✓ ✗ ◆ ⚡ ⚠ ○`, two-space indent, `┄` separators, URLs on their own line, ≤80 chars, static sequential output (no animation), the `[N/5]` counter. Errors use `references/error-messages.md`'s format: `✗ what failed`, `To fix:  <command>`, a docs link.
+Tracker access uses the GitHub driver: `--json` with explicit fields, never parsed text (docs/platform-github.md). Output follows `docs/terminal-style.md` (symbols, indent, URLs on their own line, ≤80 chars, no animation). Errors use `references/error-messages.md`'s format.

@@ -62,6 +62,7 @@ RESOLVER="$REPO_ROOT/src/skills/issue-resolver/SKILL.source.md"
 AUTOPILOT="$REPO_ROOT/src/skills/auto-pilot/SKILL.source.md"
 AUTOPILOT_DIR="$REPO_ROOT/src/skills/auto-pilot"
 DOCTOR="$REPO_ROOT/src/internal-skills/idd-doctor/SKILL.source.md"
+DOCTOR_RUNLOG="$REPO_ROOT/src/internal-skills/idd-doctor/references/run-log-summary.md"
 
 # --- T1: canonical schema in run-log-schema.md -------------------------------
 has "$RUNLOG" ".gitissue/runs.jsonl" "T1: run-log-schema documents .gitissue/runs.jsonl"
@@ -102,9 +103,9 @@ has "$AUTOPILOT" "non-fatal" "T3: auto-pilot documents non-fatal write"
 has "$DOCTOR" "Run-log summary" "T4: idd-doctor has a Run-log summary section"
 has "$DOCTOR" "non-gating" "T4: idd-doctor summary is informational/non-gating"
 has "$DOCTOR" "runs.jsonl" "T4: idd-doctor reads runs.jsonl"
-has "$DOCTOR" "Resolve rate" "T4: idd-doctor reports resolve rate"
-has "$DOCTOR" "Median QA cycles" "T4: idd-doctor reports median QA cycles"
-has "$DOCTOR" "skip reason" "T4: idd-doctor reports common skip reasons"
+has "$DOCTOR_RUNLOG" "Resolve rate" "T4: idd-doctor reports resolve rate"
+has "$DOCTOR_RUNLOG" "Median QA cycles" "T4: idd-doctor reports median QA cycles"
+has "$DOCTOR_RUNLOG" "skip reason" "T4: idd-doctor reports common skip reasons"
 has "$DOCTOR" "no runs recorded yet" "T4: idd-doctor degrades gracefully when file absent"
 # read-only guarantee still asserted near the summary
 has "$DOCTOR" "read-only" "T4: idd-doctor summary preserves read-only guarantee"
@@ -426,10 +427,10 @@ has "$REPO_ROOT/src/skills/auto-pilot/references/run-log.md" "Omit the field" \
   "T11g: auto-pilot omits agent_overrides when nothing is configured"
 has "$REPO_ROOT/src/skills/auto-pilot/references/subagent-prompts.md" "- agent_overrides:" \
   "T11g: resolver subagent returns agent_overrides to the single writer"
-has "$DOCTOR" "Agent overrides:" "T11h: idd-doctor prints the agent-overrides line"
-has "$DOCTOR" "{applied} applied · {partial} partial · {fallback} fallback" \
+has "$DOCTOR_RUNLOG" "Agent overrides:" "T11h: idd-doctor prints the agent-overrides line"
+has "$DOCTOR_RUNLOG" "{applied} applied · {partial} partial · {fallback} fallback" \
   "T11h: idd-doctor reports applied versus fallback counts"
-has "$DOCTOR" "none configured" "T11h: idd-doctor degrades when no run carries the field"
+has "$DOCTOR_RUNLOG" "none configured" "T11h: idd-doctor degrades when no run carries the field"
 
 # --- T12: per-phase durations (issue #467) ----------------------------------
 ph_rec() { # $1 = raw JSON value for phases
@@ -505,9 +506,9 @@ has "$REPO_ROOT/src/skills/auto-pilot/references/subagent-prompts.md" "- phases:
   "T12h: resolver subagent returns phases to the single writer"
 has "$REPO_ROOT/src/skills/auto-pilot/references/explicit-list-mode.md" '`qa_cycles`, `duration_s`, `phases` and' \
   "T12h: batch fan-out attributes phases once"
-has "$DOCTOR" "Slowest phase:" "T12i: idd-doctor prints the slowest-phase line"
-has "$DOCTOR" 'skip a non-object `phases`' "T12i: idd-doctor skips malformed phase entries"
-has "$DOCTOR" '`n/a` when no run carries the field' "T12i: idd-doctor degrades when no run carries phases"
+has "$DOCTOR_RUNLOG" "Slowest phase:" "T12i: idd-doctor prints the slowest-phase line"
+has "$DOCTOR_RUNLOG" 'skip a non-object `phases`' "T12i: idd-doctor skips malformed phase entries"
+has "$DOCTOR_RUNLOG" '`n/a` when no run carries the field' "T12i: idd-doctor degrades when no run carries phases"
 
 echo ""
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"

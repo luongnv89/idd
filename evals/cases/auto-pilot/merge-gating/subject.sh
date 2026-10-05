@@ -297,6 +297,35 @@ with open(os.path.join(out, "run-uncapped-cycles.json"), "w", encoding="utf-8") 
     json.dump({**RECORDS["merged"], "qa_cycles": 9}, fh, indent=2)
     fh.write("\n")
 
+# Review contract (references/summary-format.md): Result first, then evidence,
+# uncertainty, and the decision. Every claim is computed from the run-log
+# records just written, so the summary cannot drift from runs.jsonl.
+rows = [RECORDS[k] for k in ("merged", "left_open", "partial_followup", "blocked_by_dependency")]
+merged = [r for r in rows if r["outcome"] == "merged"]
+not_merged = [r for r in rows if r["outcome"] != "merged"]
+status = "partial" if not_merged else "complete"
+summary = (
+    f"Result: LIMIT REACHED — {status}: {len(merged)} merged, {len(not_merged)} not cleanly merged\n"
+    + "".join(f"Iteration {i}: {r['outcome']} — #{r['issue']}"
+              + (f" → PR #{r['pr']}" if r["pr"] else "") + "\n"
+              for i, r in enumerate(rows, 1))
+    + "Evidence: " + "; ".join(f"PR #{r['pr']} merged" for r in merged)
+    + f"; {len(rows)} run-log records validated by gi-runlog\n"
+    "Uncertainty: CI verdicts and follow-up filing are simulated by this stand-in, not observed\n"
+    "Decision: No approval needed.\n"
+    "Next action: merge dependency for #50, review open PR #101 follow-ups\n"
+)
+lines = summary.splitlines()
+assert lines[0].startswith("Result: ") and status in lines[0]
+order = []
+for key in ("Evidence:", "Uncertainty:", "Decision:", "Next action:"):
+    hits = [i for i, l in enumerate(lines) if l.startswith(key)]
+    assert len(hits) == 1, key
+    order.append(hits[0])
+assert order == sorted(order), "contract rows out of order"
+with open(os.path.join(out, "summary.txt"), "w", encoding="utf-8") as fh:
+    fh.write(summary)
+
 print("  ○ gate decisions: " + ", ".join(f"{k}={v}" for k, v in sorted(decisions.items())))
 PY
 

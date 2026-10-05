@@ -28,6 +28,7 @@ outcome. Later runs skip the issue as an ordinary label skip.
 ```
 ◆ Auto-Pilot Summary — {completed}/{max} iterations
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  Result:                  {COMPLETED / PAUSED / LIMIT REACHED / BUDGET REACHED / RATE LIMITED} — {complete | partial}: {main finding}
 
   Iteration 1:       ✓ merged                — #{n1} {title1} → PR #{pr1}
   Iteration 2:       ⚠ left_open             — #{n2} {title2} → PR #{pr2}
@@ -43,13 +44,19 @@ outcome. Later runs skip the issue as an ordinary label skip.
   failed:                  {failed_count}
   skipped:                 {skipped_count}
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  Result:                  {COMPLETED / PAUSED / LIMIT REACHED / BUDGET REACHED / RATE LIMITED}
   Mode:                    {conservative / balanced / aggressive}
+  Evidence:                {observed checks — see Review contract}
+  Uncertainty:             {unverified or degraded items, or "none observed"}
+  Decision:                {No approval needed. | the pending critical decision}
 
   Remaining:               {remaining_count} open issues
   Next action:             /auto-pilot to continue
   Report:                  .gitissue/last-run-report.md
 ```
+
+The `Result:` row is the first row under the header so the outcome is findable
+without scrolling past the iteration rows. Its value set is unchanged — the five
+values below; `complete | partial` and the main finding follow it after `—`.
 
 The `Report:` line is the path the summary was **persisted** to, printed after
 the write succeeds and omitted when it did not (or under `--dry-run`, which
@@ -89,6 +96,75 @@ at zero and no iteration rows — and `COMPLETED` (nothing was done), `PAUSED` (
 decision is waiting), `LIMIT REACHED` (no iteration ran) and `BUDGET REACHED`
 (the wall clock had time left; it was the API budget that did not) are each false
 of it.
+
+## Review contract
+
+Apply these rules to the final summary at every terminal outcome that prints
+one. A stop in *Prerequisites*, *Dependency Preflight*, the bundled precheck, the
+run lock or config load prints no summary (the rate-budget stop excepted): its
+rich error block carries the result (`✗` line), the evidence (the failed check)
+and the next action (`To fix:` line), and nothing ran, so there is nothing else
+to qualify.
+
+1. **Result first.** The first row is `Result:` with one of the five values, then
+   `complete` or `partial`, then the main finding:
+   - `complete` — every processed iteration ended `merged`, or `skipped` for a
+     reason the user chose (`--skip`, a skip label, already resolved), and no
+     completion-report check was `×`.
+   - `partial` — at least one iteration ended `left_open`, `partial_followup`,
+     `blocked_by_dependency` or `failed`, or a check was `×` (a degraded script,
+     an unread quarantine streak, a run-log line left `log_pending`).
+   - The main finding is one clause: for example `3 merged, 1 left open (CI red)`
+     or `paused on critical #42`.
+2. **Evidence.** Name only checks the loop observed: the merged PR numbers, the
+   CI verdict each merge relied on (`ci_status` or the CI wait), the follow-up
+   issue numbers filed, the run-log append result, and the persisted report path.
+   A PR the reviewer reported clean is evidence of a review verdict, not of a
+   merge; only `gh pr merge` success plus the closed issue establishes `merged`.
+3. **Uncertainty.** List what the loop did not verify: any `⚠` degrade (gi-config,
+   gi-state, gi-runlog, gi-ratelimit), a CI verdict reused from the reviewer
+   rather than re-polled, a follow-up issue that could not be filed, an iteration
+   that never reached review, a lane left `log_pending`, and an unsynced tree. If
+   nothing applies, print `none observed`. Label inferences (triage priority,
+   dependency edges) as inferences, never as verified facts.
+4. **Decision.** An autonomous run makes its own decisions, so print
+   `Decision: No approval needed.` The one exception is `PAUSED` on a critical
+   issue with unresolved review problems: name that decision (merge, fix by hand,
+   or close the PR) and the PR it concerns. Name remaining user actions
+   separately on `Next action:` — open PRs a maintainer must merge (`left_open`,
+   no-merge mode, `conservative`), quarantined issues to inspect, and the
+   dependency to merge for a `blocked_by_dependency` PR. Never add an approval
+   gate the loop does not already have.
+
+### Format rule
+
+The default format is the static terminal summary above: one row per iteration,
+at most `autopilot.max_iterations` rows, inspectable at once. Project convention
+forbids terminal animation, so auto-pilot produces no interactive report;
+`.gitissue/runs.jsonl` is the machine-readable form for later filtering and
+`.gitissue/last-run-report.md` the persisted copy. If the user asks for another
+format (for example a Markdown table or a Mermaid timeline), render it from the
+same summary and keep the `Result`, `Evidence`, `Uncertainty` and `Decision`
+rows. If the host cannot render that format, say so and print the terminal
+summary.
+
+### Evaluate report understanding
+
+Grade actual summaries against these criteria as well as merge-gate correctness:
+
+| Criterion | Observable check |
+|---|---|
+| Result is findable | The first row states the status, `complete`/`partial`, and the main finding without reading the iteration rows or logs. |
+| Facts and assumptions are separate | Observed checks (merge, CI verdict, follow-up filed, persisted report) are distinct from degraded or reused verdicts listed under `Uncertainty`. |
+| Claims are traceable | Each `merged` row names its PR; each `left_open`/`blocked_by_dependency` row names its blocker; `partial` names what made it partial. |
+| Next decision is clear | The summary says `No approval needed.` or names the one pending critical decision, and lists remaining user actions on `Next action:`. |
+
+When running behavioral evaluations, include a clean run, a run with a
+`left_open` PR, a critical-issue pause and a rate-limited stop, and grade each
+summary against all four rows. Ask human reviewers the matching four questions
+and record their answers in the eval case's `human_review` block. Missing, blank,
+or nonresponsive feedback leaves human understanding unconfirmed; agent
+inspection cannot confirm it.
 
 ## Persisted run report
 

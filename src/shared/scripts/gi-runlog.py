@@ -417,8 +417,8 @@ def append_once(
 
     The advisory lock covers the whole cross-process transaction: rotation
     check, read, identical/conflict decision, append, flush, and fsync. A lock
-    failure is an OSError so the caller exits 4 and leaves the lane log_pending
-    for resume. The dedup scan sees the same tail window as --failure-streak:
+    failure is an OSError: the caller keeps the lane log_pending for resume
+    and exits 4. The dedup scan sees the same tail window as --failure-streak:
     an event_id rotated out of it is outside the idempotency scope.
     """
     event_id = record.get("event_id")
@@ -430,7 +430,7 @@ def append_once(
 
         # An unreadable active log is fatal here — unlike the streak read,
         # appending without seeing it could double-write a parallel lane's
-        # event, so exit 4 leaves the lane log_pending for resume instead.
+        # event, so the lane stays log_pending for resume (exit 4) instead.
         # A segment that cannot be read only narrows the dedup window.
         lines: list[str] = []
         for segment in segment_paths(path, tail):

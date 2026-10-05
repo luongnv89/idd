@@ -39,7 +39,7 @@ The traceability flags default to the values shown, preserving the issue #36 con
 
 ## Binding the head-ref name
 
-SKILL.md's *Checkout PR head branch* requires `branch_name` to be bound once with
+SKILL.md's Step 1 (*Bind the head-ref name*) requires `branch_name` to be bound once with
 command substitution and used as `"$branch_name"` in every shell command. This is
 why, and why the obvious weaker forms do not work.
 
@@ -213,7 +213,7 @@ counting uses that share the braces — `{N} tests passed`, `{N} checks failed`,
   lines plus the merge command, each read beside the row that names its number
   — so the ambiguity costs a reader a moment, not a false-passing gate.
 - SKILL.md — the PR, with one prose exception: the *Review Loop*'s restatement
-  of the hard-block, "missing `Closes #{N}`". It names the condition, not a
+  of the hard-block, "a missing `Closes #N`". It names the condition, not a
   command or a fix string, so nothing downstream substitutes it.
 
 **What `light` changes in the loop:**
@@ -242,10 +242,21 @@ blocks soft-pass and does not merge.
 Step 1's *QA handoff gate* sets `qa_handoff = trusted | stale | absent` from a
 marker `/issue-resolver` writes as the last line of a PR body it opened after a
 **clean** QA loop (producer contract: *QA handoff marker* in that skill's
-`references/report-templates.md`). SKILL.md owns the verdict table, the
-fail-safe, and the precedence rule; this section is the mechanics — the parse,
+`references/report-templates.md`). SKILL.md owns the verdict table and the
+fail-safe; this section owns the precedence rule and the mechanics — the parse,
 what `trusted` narrows, when the verdict is recomputed, and the list of checks it
 may never touch.
+
+### Precedence
+
+**Precedence, stated once:** `qa_handoff` is computed *after* `profile`, and its
+power is bounded **relative to the ungated pipeline** — it may only **narrow**
+what a `stale`/`absent` PR already gets. The bound is per verdict, not monotonic across the run:
+a flip back to `stale` restores the full cap and is a return to the ungated
+pipeline, not a widening. One asymmetric case: a marker `profile=light` against a
+pr-review `profile=full`, where the fuller wins — the review collapse **and** the cycle cap are **refused**,
+while the duplicate-test skip still applies, because a test run is a test run at
+any depth.
 
 ### The trust model — forgery is worthless, not impossible
 
@@ -306,7 +317,7 @@ every particular.
 | Field | Meaning | How the loop uses it |
 |-------|---------|----------------------|
 | `head=<sha40>` | the commit the resolver QA'd | the whole predicate — must equal `headRefOid` |
-| `profile=<light\|full>` | the resolver's own Step 0g profile | `light` is a strictly shallower claim; see *Precedence* in SKILL.md |
+| `profile=<light\|full>` | the resolver's own Step 0g profile | `light` is a strictly shallower claim; see *Precedence* above |
 | `cycles=<n>` | QA cycles the resolver ran | reported only |
 | `review=clean` | the resolver's QA exited clean | required — there is no dirty spelling, because a non-clean resolver run emits no marker at all |
 | `tests=<count>@<sha40>` | the final suite's passing count and the SHA it ran against | the two test skips below apply **only** when this field is present, its SHA equals `head`, **and `ci_leg_runnable`** (`review.check_ci` is `true` and Step 1's `statusCheckRollup` is non-empty). Refuse the skip when no CI (`no_ci`) or `review.check_ci` is `false` |
@@ -368,7 +379,7 @@ only possible consumer would be a safety gate — see *The trust model* above.
 | Step | Under `trusted` | Condition |
 |------|-----------------|-----------|
 | 2 — pre-pass test run | skipped | `tests=` present **and** its SHA equals `head` **and `ci_leg_runnable`** |
-| 3 — cycle-1 cold-start reviewer | **collapsed into** the fresh confirmation pass | every `trusted` marker **except** the depth carve-out — a marker `profile=light` against this review's `profile=full` refuses the collapse (*Precedence* in SKILL.md owns that rule — not restated here) |
+| 3 — cycle-1 cold-start reviewer | **collapsed into** the fresh confirmation pass | every `trusted` marker **except** the depth carve-out — a marker `profile=light` against this review's `profile=full` refuses the collapse (*Precedence* above owns that rule — not restated here) |
 | 3 — code UI review | skipped | `ui=code…` or `ui=code+browser…` **and** its `@<sha40>` present and equal to `head`; never on `ui=none`, and never on an unsuffixed `ui=` |
 | 4 — local test + build run | skipped | `tests=` present **and** its SHA equals `head` **and `ci_leg_runnable`** |
 | Loop cycle cap | `min(1, configured_cap)` — the same ceiling idiom the `light` profile uses, and it wins over an `/auto-pilot` `review_cycles` override for the same reason | **the same carve-out as the reviewer-collapse row**: a `profile=light` marker against a `profile=full` review refuses the cap too, leaving it at `review.max_cycles`. Both levers are review depth, so they answer to the carve-out together |
@@ -435,7 +446,7 @@ keeps comparing `tests=` against the marker's own now-stale `head=` and the loca
 suite never runs on the pushed commit — precisely the commit that most needs it.
 Restoring the full pipeline is **not** a widening of what `qa_handoff` may
 do: its power is bounded against the ungated pipeline, and the ungated pipeline
-is exactly what `stale` runs (*Precedence* in SKILL.md owns that rule).
+is exactly what `stale` runs (*Precedence* above owns that rule).
 
 ### Never gated <!-- a:rvm-never-gated -->
 
@@ -479,7 +490,7 @@ reviewer spawn: the confirmation pass is itself fix-conditional, so an unmarked
 clean PR already gets exactly one cold-start pass and no confirmation. What
 `trusted` changes is *which* pass runs, not how many; the real saving is the
 duplicated test legs at Steps 2 and 4. Both the collapse and the cycle cap are
-refused by SKILL.md's *Precedence* rule when the marker says `profile=light`
+refused by the *Precedence* rule above when the marker says `profile=light`
 against a pr-review `profile=full`.
 
 ## Cycle 1 — Initial review
