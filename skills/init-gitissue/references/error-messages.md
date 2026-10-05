@@ -26,7 +26,7 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 
   Choose: [overwrite/merge/cancel]
 ```
-**Trigger:** `.gitissue.yml` already exists in the repo root and the run is interactive. In auto mode (`--auto` or `IDD_AUTO_MODE=1`) this prompt is not shown: print `⚠ .gitissue.yml exists — auto mode keeps it (cancel)` and take **cancel**.
+**Trigger:** `.gitissue.yml` already exists in the repo root and the run is interactive. In auto mode (`--auto` or `IDD_AUTO_MODE=1`) this prompt is not shown: print `⚠ Auto mode: overwrite/merge/cancel prompt skipped — kept the existing .gitissue.yml (cancel).` and take **cancel**.
 
 ### Existing config does not parse
 ```

@@ -7,7 +7,7 @@
     },
     "init-gitissue": {
       "budget": 130846,
-      "measured": 129822
+      "measured": 130157
     },
     "issue-analysis": {
       "budget": 158629,
@@ -19,11 +19,11 @@
     },
     "issue-pr-review": {
       "budget": 257934,
-      "measured": 256910
+      "measured": 257330
     },
     "issue-resolver": {
       "budget": 358913,
-      "measured": 357889
+      "measured": 357893
     },
     "issue-triage": {
       "budget": 130813,

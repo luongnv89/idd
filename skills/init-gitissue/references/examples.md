@@ -134,7 +134,7 @@ Full example outputs for four scenarios. Every report follows `references/review
 4. Report:
 
 ```
-⚠ .gitissue.yml exists — auto mode keeps it (cancel)
+⚠ Auto mode: overwrite/merge/cancel prompt skipped — kept the existing .gitissue.yml (cancel).
 
 ◆ Init Gitissue — cancelled
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄

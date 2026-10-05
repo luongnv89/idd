@@ -13,7 +13,7 @@ metadata:
 
 Initialize gitissue for the current repository. Scans the codebase to detect language, framework, test runner, and repo size, then generates a `.gitissue.yml` config file with project-specific defaults.
 
-**Invocation**: `/init-gitissue` — no arguments.
+**Invocation**: `/init-gitissue` — interactive. `/init-gitissue --auto` (or `IDD_AUTO_MODE=1`) — no prompts; an existing `.gitissue.yml` is kept.
 
 ## When to Use
 
@@ -106,7 +106,7 @@ If the file already exists, show the prompt from `references/error-messages.md`:
 - **overwrite** — run full generation. Keep the existing file until Step 3 replaces it in one write.
 - **merge** — read the existing file. If it does not parse as YAML, print *Existing config does not parse* (`references/error-messages.md`), leave it untouched, and stop with `Result: BLOCKED`. Otherwise preserve every user-set value and add only the schema fields it lacks.
 - **cancel** — make no change. Report `Result: CANCELLED`.
-- **Auto mode** (`--auto` or `IDD_AUTO_MODE=1`) — do not prompt. Print `⚠ .gitissue.yml exists — auto mode keeps it (cancel)` and take **cancel**, the safe default.
+- **Auto mode** (`--auto` or `IDD_AUTO_MODE=1`) — do not prompt. Print `⚠ Auto mode: overwrite/merge/cancel prompt skipped — kept the existing .gitissue.yml (cancel).` and take **cancel**, the safe default.
 
 ---
 
@@ -431,7 +431,7 @@ decision — with the criteria in `references/review-contract.md`.
 
 ## Edge Cases
 
-- **Config already exists** — the skill shows an overwrite / merge / cancel prompt; it does not print a diff of detected vs current values.
+- **Config already exists** — interactive runs show an overwrite / merge / cancel prompt; auto mode skips it, takes cancel, and prints the `⚠ Auto mode:` line. Neither prints a diff of detected vs current values.
 - **Unrecognized language** — falls back to a minimal generic config with inline comments guiding manual edits.
 - **Not a git repository** — prints the exact error from `references/error-messages.md` and stops; no file is written.
 - **Empty repo (no source files)** — writes a minimal default config; the Language and Test runner rows print their `⚠ warn` variants.

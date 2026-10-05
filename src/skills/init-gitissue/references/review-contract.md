@@ -57,7 +57,7 @@ Print `Uncertainty: none beyond marker-file detection` when nothing else applies
 
 Print `Decision: No approval needed.` This skill writes one local file and
 commits nothing. The overwrite/merge/cancel prompt is the only gate, and it is
-answered before the report. Name the remaining user actions separately on the
+answered before the report (auto mode answers it with cancel). Name the remaining user actions separately on the
 `Next action:` row:
 
 - `DONE` / `PARTIAL`: review and commit `.gitissue.yml`, then `/issue-creator`.

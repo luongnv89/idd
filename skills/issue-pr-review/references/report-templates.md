@@ -21,14 +21,20 @@ human-facing summary: the report-back fields `/auto-pilot` reads (`result`,
 1. **Result first.** The first row after the header is `Result:` with one status
    and the main finding or stop reason:
    - `PASS` — the loop-exit condition held (soft or strict, per
-     `review.soft_pass`) with every CI and test leg satisfied by a real pass or a
-     config skip; no merge was attempted (interactive, `--no-merge`, or
-     `review.auto_merge: false`).
+     `review.soft_pass`) with every CI and test leg satisfied by a real pass, a
+     config skip, or a `qa_handoff = trusted` test skip (listed under
+     *Uncertainty*, never as `✓ pass`). The PR is clean. When an auto-merge
+     follows, its `MERGED` or `BLOCKED (manual merge required)` block supersedes
+     this row; otherwise (interactive, `--no-merge`, or
+     `review.auto_merge: false`) it is the final status.
    - `MERGED` — `PASS`, and the auto-merge succeeded.
    - `PARTIAL` — the loop exited with no finding left, but a leg was not
      verified: a CI failure held non-blocking by
      `review.ignore_ci_billing_failures`, CI still pending at the stop, or a
-     degraded tool that left a check unevaluated. Never merged.
+     degraded tool that left a check unevaluated. Never merged. A `trusted` test
+     skip is not on this list: Step 4's own completion report reads
+     `Result: PARTIAL`, but the summary carries that gap as *Uncertainty* and
+     stays `PASS`.
    - `WARN (manual review recommended)` / `WARN (strict pass not reached)` —
      findings remain after the cycle cap, a stagnation stop, a #36 hard-block, or a
      strict-pass blocker. Never merged.
