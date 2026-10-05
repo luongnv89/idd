@@ -132,6 +132,10 @@ On agreement, run the stash-first sync (`docs/sync-conventions.md`):
 
 ```bash
 branch="$(git rev-parse --abbrev-ref HEAD)"
+if [ -d "$(git rev-parse --git-path rebase-merge)" ] || [ -d "$(git rev-parse --git-path rebase-apply)" ]; then
+  echo "⚠ Rebase already in progress — skipping sync"
+  exit 0
+fi
 dirty=0
 if [ -n "$(git status --porcelain)" ]; then
   if ! git stash push -u -m "pre-sync: ${branch}"; then
@@ -140,7 +144,9 @@ if [ -n "$(git status --porcelain)" ]; then
   fi
   dirty=1
 fi
-if ! { git fetch origin && git pull --rebase origin "$branch"; }; then
+if ! git fetch origin; then
+  echo "⚠ Sync failed — continuing on the unsynced tree"
+elif ! git pull --rebase origin "$branch"; then
   git rebase --abort 2>/dev/null || true
   echo "⚠ Sync failed — continuing on the unsynced tree"
 fi
@@ -152,7 +158,7 @@ if [ "$dirty" -eq 1 ]; then
 fi
 ```
 
-If the stash, the fetch, or the rebase fails (including a missing `origin`), the block leaves the tree as it was and triage continues unsynced; never scan a conflicted tree. Report the unsynced tree under *Uncertainty*. If the stash pop fails, stop with `Result: BLOCKED` and its recovery line — the user's changes are still in the stash. If the user declines the prompt, proceed without syncing.
+If a rebase is already in progress on entry, the block skips the sync entirely — it never aborts a rebase it did not start. Otherwise, if the stash, the fetch, or the pull fails (including a missing `origin`), the block leaves the tree as it was and triage continues unsynced; `git rebase --abort` only unwinds a rebase this pull started. Never scan a conflicted tree. Report the unsynced tree under *Uncertainty*. If the stash pop fails, stop with `Result: BLOCKED` and its recovery line — the user's changes are still in the stash. If the user declines the prompt, proceed without syncing.
 
 **Auto mode (`docs/auto-mode.md`) — never blocks.** Skip the `Sync now? [Y/n]` prompt, **run the stash-first sync immediately** (the interactive default is `Y`), and log:
 
