@@ -269,6 +269,7 @@ bash tests/test-eval-harness.sh
 bash tests/test-eval-creator.sh
 bash tests/test-eval-resolver.sh
 bash tests/test-eval-pr-review.sh
+bash tests/test-eval-plan-to-issues.sh
 ```
 
 No `gh` auth and no network. `EVAL_RECORD=1` is for local cassette capture only and is fail-closed in `run_eval.sh` / CI. How to add cases, cassette format, and grading: [evals/README.md](../evals/README.md).
