@@ -402,6 +402,9 @@ jobs:
       - name: test-missing-dep-plugin-hint-490
         run: bash tests/test-missing-dep-plugin-hint-490.sh
 
+      - name: test-plan-to-issues-502
+        run: bash tests/test-plan-to-issues-502.sh
+
       - name: test-runs-jsonl
         run: bash tests/test-runs-jsonl.sh
 

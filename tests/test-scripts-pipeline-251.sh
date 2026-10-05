@@ -93,6 +93,8 @@ WIRED = [
     "issue-pr-review",
     "issue-resolver",
     "issue-triage",
+    # plan-to-issues joined in issue #502 (gi-config.py, gi-plan-map.py).
+    "plan-to-issues",
 ]
 HEADING_RE = re.compile(r"^\s{0,3}#{2,4}\s+Bundled dependency precheck\s*$")
 SCRIPT_REF_RE = re.compile(r"(?<![\w/])references/scripts/([a-z][a-z0-9-]+\.py)")

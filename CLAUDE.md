@@ -38,7 +38,8 @@ src/
 │       ├── gi-issue.py            # TTL-cached `gh issue view` by field set
 │       ├── gi-backlog.py          # TTL-cached open-issue snapshot shared by triage + dedup
 │       ├── gi-branch.py           # Derive a convention-conformant branch name
-│       └── gi-ratelimit.py        # Rate-limit verdict, chunked pause, backoff, runtime budget
+│       ├── gi-ratelimit.py        # Rate-limit verdict, chunked pause, backoff, runtime budget
+│       └── gi-plan-map.py         # Render plan-to-issues' static epic plan map
 │
 ├── skills/
 │   ├── auto-pilot/         # /auto-pilot — triage, resolve, review, merge loop
@@ -58,6 +59,9 @@ src/
 │   │   ├── SKILL.source.md
 │   │   └── references/
 │   ├── issue-pr-review/    # /issue-pr-review — review, test, CI check, fix, merge
+│   │   ├── SKILL.source.md
+│   │   └── references/
+│   ├── plan-to-issues/     # /plan-to-issues — plan or conversation → epic + issues
 │   │   ├── SKILL.source.md
 │   │   └── references/
 │   └── init-gitissue/      # /init-gitissue — generate .gitissue.yml

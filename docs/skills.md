@@ -8,6 +8,7 @@ This page documents every public skill shipped by gitissue / IDD, what each skil
 |---|---|---|
 | `/init-gitissue` | Generate `.gitissue.yml` for a repo | No arguments |
 | `/issue-creator` | Create, normalize, or batch-create structured GitHub issues | Text, issue number, multi-item text, screenshots |
+| `/plan-to-issues` | Turn a phased plan or a conversation into an epic plus one labelled issue per task | Plan file path, `--from-conversation`, `--dry-run`, `--phase`, `sync <epic#>` |
 | `/issue-analysis` | Deep-analysis report for one issue | Issue number, optional `view` |
 | `/issue-triage` | Prioritize and order the issue backlog | No args, `update`, `--limit N` |
 | `/issue-resolver` | Resolve one issue and open an atomic PR | Issue number, optional `--auto` |
@@ -82,6 +83,36 @@ PNG, JPG/JPEG, GIF, WEBP, and SVG, up to 10 MB per image.
 
 - Requires `git` and authenticated `gh`.
 - Requires a GitHub remote.
+
+---
+
+## `/plan-to-issues`
+
+Converts a phased plan file — any path, any producer — or a conversation about what to build into labelled GitHub issues under one tracking epic. It is the bulk counterpart of `/issue-creator` and the entry point upstream of the loop: plan → `/plan-to-issues` → `/issue-triage` → `/issue-resolver` (or `/auto-pilot`) → `/issue-pr-review`. No plan file is required.
+
+### Input options
+
+| Input | Mode | Behavior |
+|---|---|---|
+| `/plan-to-issues` | Create | Resolves the input — plan discovery first, then the conversation — and creates the epic plus one issue per task. |
+| `/plan-to-issues <path.md>` | Create | Uses that plan file. |
+| `/plan-to-issues --from-conversation` | Create | Drafts the task list from the conversation, shows it, and files it only after you confirm. |
+| `/plan-to-issues --from-conversation --epic <n>` | Resume | Restores the confirmed task list from epic #n and files only the remaining tasks. |
+| `/plan-to-issues --dry-run` | Preview | Prints the task table, labels, and plan-map preview. Creates nothing. |
+| `/plan-to-issues --phase P0,P1` | Create (filtered) | Files only those phases; the map still lists every phase. |
+| `/plan-to-issues sync <epic#>` | Sync | Re-renders the epic's static plan map. Creates no issues. |
+
+### Output
+
+- One **epic** issue: whole-effort acceptance criteria plus a static plan map grouped by phase. Live open/closed status comes from GitHub native sub-issues, not the body.
+- One issue per **task**, written by `/issue-creator` in batch mode with `--parent <epic>` (`Part of #<epic>`), labelled `phase:pN`, type, `dim:`, and `priority:`, with `Depends on #N` markers that `/auto-pilot`'s merge gate reads.
+- Re-runs are idempotent: an existing epic is reused and only missing tasks are filed. No source file is modified.
+
+### Requirements
+
+- Requires `git`, authenticated `gh`, and a GitHub remote.
+- Requires the sibling `issue-creator` skill from the same distribution — it writes every issue body.
+- `python3` renders the plan map; without it the skill follows the documented manual procedure.
 
 ---
 
@@ -271,6 +302,7 @@ After the four gating checks, the doctor prints one **informational, non-gating*
 | First-time setup | `/init-gitissue` |
 | Turn a bug report or feature request into a structured issue | `/issue-creator <text>` |
 | Normalize an existing issue | `/issue-creator <N>` |
+| File a phased plan or a conversation as an epic plus issues | `/plan-to-issues` or `/plan-to-issues <path.md>` |
 | Understand one issue before implementing | `/issue-analysis <N>` |
 | Decide what to work on next | `/issue-triage` or `/issue-triage update` |
 | Implement one issue | `/issue-resolver <N>` |

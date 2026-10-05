@@ -10,7 +10,7 @@
   "plugins": [
     {
       "name": "idd",
-      "description": "Issue-Driven Development: Claude Code skills that create, triage, analyze, resolve, review, and auto-pilot GitHub issues.",
+      "description": "Issue-Driven Development: Claude Code skills that plan, create, triage, analyze, resolve, review, and auto-pilot GitHub issues.",
       "version": "0.23.1",
       "skills": "./",
       "source": {

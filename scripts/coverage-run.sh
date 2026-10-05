@@ -101,6 +101,12 @@ run "$SCRIPTS/gi-ratelimit.py" --budget --max-minutes 30 --started-at 2026-08-23
 printf '%s' '{"rate":{"remaining":4000,"limit":5000,"reset":1755902400}}' | \
   run "$SCRIPTS/gi-ratelimit.py" --verdict --now 2026-08-23T00:00:00Z
 
+# gi-plan-map — render the fixture map, then the invalid-input exits.
+run "$SCRIPTS/gi-plan-map.py" < tests/fixtures/plan-map/input.json
+printf '%s' 'not json' | run "$SCRIPTS/gi-plan-map.py"
+printf '%s' '{"plan_path":"p.md","synced":"d","epic":"1","phases":[]}' | run "$SCRIPTS/gi-plan-map.py"
+printf '\xff' | run "$SCRIPTS/gi-plan-map.py"
+
 # gi-branch — derive a name locally (never --from-issue here: that needs gh).
 run "$SCRIPTS/gi-branch.py" 42 --title "Fix login crash on mobile" --type bug --no-config
 

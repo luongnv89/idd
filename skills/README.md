@@ -1,12 +1,13 @@
 # IDD — Issue-Driven Development
 
-IDD makes GitHub issues the single source of truth for development work. This plugin bundles seven Claude Code skills that turn rough notes into structured issues, prioritize the backlog, investigate one issue, open a pull request that resolves it, review and merge that pull request, and run the whole loop unattended.
+IDD makes GitHub issues the single source of truth for development work. This plugin bundles eight Claude Code skills that turn rough notes or a whole plan into structured issues, prioritize the backlog, investigate one issue, open a pull request that resolves it, review and merge that pull request, and run the whole loop unattended.
 
 ## Skills
 
 | Command | What it does |
 |---|---|
 | `/idd:issue-creator` | Creates structured issues from text, screenshots, or lists, with acceptance criteria and a duplicate check; normalizes existing issues to the IDD template |
+| `/idd:plan-to-issues` | Turns a phased plan file, or a conversation about what to build, into labelled issues under one tracking epic that maps each issue to its source task |
 | `/idd:issue-triage` | Scans open issues for dependencies, priority, parallel work, and staleness, and proposes an order |
 | `/idd:issue-analysis N` | Investigates issue N for root cause, complexity, and risk |
 | `/idd:issue-resolver N` | Branches, implements, tests, commits, and opens one pull request that closes issue N |
