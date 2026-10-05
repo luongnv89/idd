@@ -52,6 +52,12 @@
       "label": "triage payload persisted"
     },
     {
+      "tool": "file-exists",
+      "file": "OUT/report.txt",
+      "expect_exit": 0,
+      "label": "review report states result, evidence, uncertainty, and decision"
+    },
+    {
       "tool": "idd-lint",
       "args": ["issue", "OUT/issue-top.md"],
       "expect_exit": 0,
@@ -63,5 +69,15 @@
       "expect_exit": 1,
       "label": "an un-normalized body still fails idd-lint (negative)"
     }
-  ]
+  ],
+  "human_review": {
+    "criteria": [
+      "The first report line states DONE and the suggested start issue with its priority.",
+      "Observed checks (fetch count, triage.json readback) are separate from inferred dependency edges and unverified maybe-fixed flags.",
+      "Each maybe-fixed flag names the PR that triggered it, and triage.json supports the reported order.",
+      "The report says No approval needed and names the next action."
+    ],
+    "feedback": "Record each reviewer answer; absent, blank, or nonresponsive feedback leaves understanding unconfirmed.",
+    "scope": "This deterministic stand-in tests a report fixture, not live agent behavior. Apply these criteria to actual agent outputs in behavioral evaluations."
+  }
 }

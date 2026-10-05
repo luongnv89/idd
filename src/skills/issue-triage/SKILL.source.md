@@ -4,14 +4,14 @@ description: "Scan open GitHub issues for dependencies, priority, parallel work,
 license: MIT
 compatibility: "Requires git and GitHub CLI (gh) with authentication. Default mode (cached view) needs only local file access — no gh required."
 metadata:
-  version: 0.6.0
-  author: Luong NGUYEN <luongnv89@gmail.com>
+  version: 0.7.0
+  author: "Luong NGUYEN <luongnv89@gmail.com>"
   effort: medium
 ---
 
 # /issue-triage
 
-Analyze open GitHub issues to surface dependencies, suggest priorities, group parallelizable work, flag stale issues, and detect issues already fixed by commits or PRs aimed elsewhere. Defaults to **view mode**: render cached results from `.gitissue/triage.json` instantly, then check local git history and suggest an update on any change. With no cache the first run analyzes automatically; otherwise a full re-analysis needs `/issue-triage update`.
+Analyze open GitHub issues to surface dependencies, suggest priorities, group parallelizable work, flag stale issues, and detect issues already fixed by commits or PRs aimed elsewhere. Defaults to **view mode** (cached results); a full re-analysis needs `/issue-triage update`.
 
 ## Invocation
 
@@ -24,7 +24,7 @@ Analyze open GitHub issues to surface dependencies, suggest priorities, group pa
 
 The design principle: **viewing is cheap and instant, updating is deliberate.** The report renders with no GitHub API call; an update runs only on request or approval.
 
-**Auto mode.** `--auto` composes with every invocation above. Detection, the log-and-proceed gate rule, the `⚠` line format and the safety stops that still abort live once in `docs/auto-mode.md`; the gates below cite it rather than restate it. Under `--auto` there is no blocking prompt, so an orchestrator or subagent can drive this skill end to end.
+**Auto mode.** `--auto` composes with every invocation above. Detection, the log-and-proceed gate rule, the `⚠` line format and the safety stops that still abort live once in `docs/auto-mode.md`; the gates below cite it rather than restate it.
 
 ## Default Mode (View with Smart Suggestions)
 
@@ -75,34 +75,29 @@ Compute report age from the `updated` timestamp. Render the triage table in Step
 
 ### 4. Detect changes and suggest update
 
-Then test whether the data is outdated, using local checks only — **a)** commits since the last triage:
+Run three local checks against the cache's `updated` timestamp:
 
-```bash
-git log --oneline --since="{updated timestamp from cache}" | wc -l
-```
+1. Count commits since the last triage:
 
-**b)** the cached report's age; **c)** the cached issues' `updated_at` timestamps against the cache's `updated` timestamp, catching issues already moving at triage time. Print one ending:
+   ```bash
+   git log --oneline --since="{updated timestamp from cache}" | wc -l
+   ```
 
-**No changes detected:**
+2. Compute the report age.
+3. Count cached issues whose `updated_at` falls within the 24 hours before `updated` — issues already active at triage time.
+
+Print one line per check that fired, in this order; if none fired, print only the first ending:
+
 ```
 ○ Cached report is up to date. No changes detected since last triage.
-```
-
-**Changes detected (commits since last triage):**
-```
 ○ {N} commit(s) since last triage ({report age} ago).
-  Issues may have changed. Run /issue-triage update for fresh analysis.
+○ Report is {Nd Nh} old (>24 hours).
+○ {N} issue(s) were active at triage time and may have changed.
 ```
 
-**Report is old (>24 hours):**
-```
-○ Report is {Nd Nh} old.
-  Run /issue-triage update for fresh analysis.
-```
+After any fired line, print `  Run /issue-triage update for fresh analysis.` These suggestions are informational — the skill never auto-updates.
 
-These suggestions are informational — the skill never auto-updates.
-
-Every view-mode exit — corrupted cache, or a rendered report with or without a suggestion — closes with the *Run Stats Footer* (`references/run-stats.md`), then **stops**. View mode never writes the file and makes no API call beyond that git log; it skips *Configuration*, so there is no `run_started_epoch` and `elapsed` prints `n/a`.
+Every view-mode exit — corrupted cache, or a rendered report with or without a suggestion — prints the cached *Final Report* block, then closes with the *Run Stats Footer* (`references/run-stats.md`), then **stops**. View mode never writes the file and makes no API call beyond that git log; it skips *Configuration*, so there is no `run_started_epoch` and `elapsed` prints `n/a`.
 
 ---
 
@@ -114,13 +109,13 @@ Verify the environment first. On failure, output the exact error from `reference
 2. Confirm `gh` is installed: `which gh`
 3. Confirm authentication: `gh auth status`
 4. Confirm the GitHub remote: `git remote -v`
-5. **Check the rate budget** (driver rule 4, `docs/platform-github.md`). Update mode fetches every open issue and fans out a scanner subagent per batch, each with its own `gh` calls, so check before that loop:
+5. **Check the rate budget** (driver rule 4, `docs/platform-github.md`). Every scanner batch makes its own `gh` calls, so check before that loop:
 
    ```bash
    gh api rate_limit --jq '{remaining: .rate.remaining, reset: .rate.reset}'
    ```
 
-   **Threshold:** below **100** `remaining`, stop and print the `✗ Insufficient API rate budget` error from `references/error-messages.md` — the loop would exhaust the budget mid-scan, leaving a partial triage. Between 100 and 200, warn with that message's `⚠` variant and continue; at 200 or above proceed silently. View mode makes no API calls and skips this check.
+   **Threshold:** below **100** `remaining`, stop and print the `✗ Insufficient API rate budget` error from `references/error-messages.md` (`Result: BLOCKED`). Between 100 and 200, warn with that message's `⚠` variant and continue; at 200 or above proceed silently. View mode makes no API calls and skips this check.
 
 ## Repo Sync (recommended)
 
@@ -137,13 +132,24 @@ On agreement, run the stash-first sync (`docs/sync-conventions.md`):
 
 ```bash
 branch="$(git rev-parse --abbrev-ref HEAD)"
+if [ -d "$(git rev-parse --git-path rebase-merge)" ] || [ -d "$(git rev-parse --git-path rebase-apply)" ]; then
+  echo "⚠ Rebase already in progress — skipping sync"
+  exit 0
+fi
 dirty=0
 if [ -n "$(git status --porcelain)" ]; then
-  git stash push -u -m "pre-sync: ${branch}"
+  if ! git stash push -u -m "pre-sync: ${branch}"; then
+    echo "⚠ Stash failed — skipping sync"
+    exit 0
+  fi
   dirty=1
 fi
-git fetch origin
-git pull --rebase origin "$branch"
+if ! git fetch origin; then
+  echo "⚠ Sync failed — continuing on the unsynced tree"
+elif ! git pull --rebase origin "$branch"; then
+  git rebase --abort 2>/dev/null || true
+  echo "⚠ Sync failed — continuing on the unsynced tree"
+fi
 if [ "$dirty" -eq 1 ]; then
   git stash pop || {
     echo "✗ Stash pop failed — recover with: git stash list && git stash show -p stash@{0}"
@@ -152,7 +158,7 @@ if [ "$dirty" -eq 1 ]; then
 fi
 ```
 
-If `origin` is missing or the rebase conflicts, say so and continue unsynced. If the user declines the prompt, proceed without syncing.
+If a rebase is already in progress on entry, the block skips the sync entirely — it never aborts a rebase it did not start. Otherwise, if the stash, the fetch, or the pull fails (including a missing `origin`), the block leaves the tree as it was and triage continues unsynced; `git rebase --abort` only unwinds a rebase this pull started. Never scan a conflicted tree. Report the unsynced tree under *Uncertainty*. If the stash pop fails, stop with `Result: BLOCKED` and its recovery line — the user's changes are still in the stash. If the user declines the prompt, proceed without syncing.
 
 **Auto mode (`docs/auto-mode.md`) — never blocks.** Skip the `Sync now? [Y/n]` prompt, **run the stash-first sync immediately** (the interactive default is `Y`), and log:
 
@@ -160,11 +166,22 @@ If `origin` is missing or the rebase conflicts, say so and continue unsynced. If
   ⚠ Auto mode: sync confirmation skipped — syncing with origin before triage.
 ```
 
-Same carve-out `/issue-analysis` applies; failure stays non-fatal exactly as above — a sync problem must never abort an unattended run.
+The prompt skip matches `/issue-analysis`; failure handling is exactly as above — only a failed stash pop stops an unattended run.
 
 ## Configuration
 
-Load config once at skill start, never re-read it: run `python3 shared/scripts/gi-config.py` — two mandatory requirements. **Working directory:** the repo root, since the script resolves `.gitissue.yml` against it; elsewhere it exits 0 with `config_file: null`/`first_run: true`, silently discarding the repo's real config. **Script path:** this SKILL.md's own directory, *not* the working directory — resolve it to an absolute path exactly as the *Bundled dependency precheck* resolves its list, and pass that. Stdout is `{"config": {…dotted keys…}, "config_file": …, "first_run": …}`, the defaults below merged with `.gitissue.yml`. Exit 0: use `config` and print the `○ First run` line below when `first_run` is `true`; the rest of this section is then reference material. Exit 3: `.gitissue.yml` is invalid — print the validation error from `references/error-messages.md` (*Invalid config*) and stop. Script file absent: a bundled dependency is missing, which is a broken install and not a degrade — stop and print the `✗ Missing bundled dependency` block the *Bundled dependency precheck* names. Anything else (no `python3`, non-zero exit, unparsable stdout): print `⚠ gi-config unavailable — using the inline defaults below` and follow the manual fallback below — the *alternative* to the script, never an extra step alongside it. **Capture the run clock here:** chain that same `python3` invocation as `python3 …; ec=$?; date +%s >&2; exit "$ec"`, keeping the stderr epoch as `run_started_epoch` — stdout and exit status stay intact, it costs no extra round trip, and the *Run Stats Footer* (`references/run-stats.md`) measures `elapsed` from it.
+Load config once at skill start with `python3 shared/scripts/gi-config.py`; never re-read it.
+
+- **Working directory:** the repo root. The script resolves `.gitissue.yml` against the working directory; elsewhere it exits 0 with `config_file: null`/`first_run: true`, silently discarding the repo's real config.
+- **Script path:** resolve it to an absolute path relative to this SKILL.md, as the *Bundled dependency precheck* resolves its list — never relative to the working directory.
+- **Run clock:** chain that same `python3` invocation as `python3 …; ec=$?; date +%s >&2; exit "$ec"` and keep the stderr epoch as `run_started_epoch`. Stdout and exit status stay intact; the *Run Stats Footer* (`references/run-stats.md`) measures `elapsed` from it.
+
+Classify the result:
+
+- Exit 0: use `config` from `{"config": {…dotted keys…}, "config_file": …, "first_run": …}`. If `first_run` is `true`, print the `○ First run` line below.
+- Exit 3: `.gitissue.yml` is invalid. Print *Invalid config* from `references/error-messages.md` and stop.
+- Script file absent: a broken install and not a degrade. Stop with the `✗ Missing bundled dependency` block.
+- No `python3`, another non-zero exit, or unparsable stdout: print `⚠ gi-config unavailable — using the inline defaults below` and use the manual fallback *instead of* the script.
 
 Manual fallback: load `.gitissue.yml` from the repo root; if absent, use the defaults below and print:
 
@@ -175,9 +192,7 @@ Manual fallback: load `.gitissue.yml` from the repo root; if absent, use the def
 Triage settings and their defaults — `triage.stale_threshold_days` `14`,
 `triage.auto_priority` `true`, `triage.include_closed` `false`,
 `triage.scan_timeout_per_issue` `30` — with full semantics for each in
-`docs/config-schema.md` (*triage*).
-
-Invalid values in an existing file are the exit-3 case above: print the validation error from `references/error-messages.md` and stop.
+`docs/config-schema.md` (*triage*). Invalid values in an existing file are the exit-3 case above.
 
 ---
 
@@ -199,10 +214,8 @@ Main Agent (orchestrator)
 └── Step 9: Persist (write triage.json)
 ```
 
-Read the combined scanner prompt — one agent covering dependency and history
-scanning both — in `shared/agents/issue-relationship-scanner.md`. Batches run in
-parallel and are collected before Step 3, where the main agent adds cross-batch
-edges.
+The scanner prompt is `shared/agents/issue-relationship-scanner.md`. Collect
+every batch before Step 3.
 
 ### Environment check
 
@@ -296,17 +309,15 @@ One full-scope scanner per batch finds issues already fixed by commits/PRs **and
 
 - **Step 1b** — flags open issues whose titles/bodies match recent commit messages or merged PR descriptions, marking them `potentially_fixed` with evidence links.
 - **Step 2** — extracts keywords per title and body, scans the codebase for affected files, and computes pairwise overlap into a `dependencies[]` graph. Affected files come from that scan, never the body.
-- **Step 3** — circular-dependency detection, folded into the scripted block below, which breaks and reports each cycle.
+- **Step 3** — cycle detection, folded into the scripted block below.
 
 ---
 ## Steps 3-7 — Order, Parallel Sets, Staleness, Priority
 
-Cycle detection, the topological sort and its tie-breaks, independent-set
-grouping, the staleness date subtraction and the P1/P2/P3 buckets are arithmetic
-over the scanner's result — one correct answer each. Run
-`shared/scripts/gi-triage-graph.py` rather than recompute them from prose: a
-recomputed order is merely *plausible*, and a triage that reorders itself
-between identical runs is not actionable.
+Cycles, the topological order, parallel sets, staleness and P1/P2/P3 buckets
+are arithmetic with one correct answer each. Run
+`shared/scripts/gi-triage-graph.py` rather than recompute them from prose, so
+identical runs produce an identical order.
 
 Write the merged scan to `.gitissue/cache/triage-scan.json` with the Write tool
 — **never** put an issue title on a command line; titles are reporter-written
@@ -344,26 +355,26 @@ afterwards. Classify **every** outcome:
 | exit 4 | payload computed, `--out` unwritable | it is still on stdout — warn per `references/error-messages.md` (*triage.json write failure*) and continue to Step 8 |
 | no `python3`, exit 2, unparsable stdout | environment problem | print `⚠ gi-triage-graph unavailable — computing the order inline`, run the prose procedure in `references/detection.md` (*Steps 3-7 — the prose procedure*), then persist per `references/output-and-persist.md` |
 
-That prose procedure is the authoritative statement of the rules the script
-implements, and stays runnable by hand.
+That prose procedure is the authoritative statement of the script's rules.
 
 If `triage.auto_priority` is false every `priority` comes back `null`: omit the
 Pri column and skip priority suggestions.
 
 ## Step 8-9 — Output & Persist
 
-Step 8 renders the triage table — rank, issue, priority, blockers, status, parallelizable and stale flags — and the suggested execution order, from the payload above. Step 9 is the `--out` write; where the script degraded, write the same schema by hand. Column widths, sort order, color rules and JSON schema: `references/output-and-persist.md`.
+Step 8 renders the triage table and the suggested execution order from the payload above. Step 9 is the `--out` write; where the script degraded, write the same schema by hand. Column widths, sort order, color rules and JSON schema: `references/output-and-persist.md`.
 
 ---
 ## Final Report
 
-With the triage table (Step 8) and persist (Step 9) complete, print a step-by-step summary:
+After Step 9, print the summary block below. **Read `references/output-and-persist.md` (*Review contract*) first** — it sets when `Result` is `DONE`, `PARTIAL`, `BLOCKED` or `CACHED`, what goes in the `Evidence`, `Uncertainty` and `Decision` rows, the cached-view rows, and the format rule. Print a `✓ pass` row only for a check that ran and passed.
 
-**Then the run-stats footer.** Close with the *Run Stats Footer* — `references/run-stats.md` — `elapsed`, `tokens` only where the host reported a count (otherwise left out), `agents`, run cost only, `n/a` for anything else undetermined. It is the last thing printed at **every** terminal outcome, including a run that ended early — no open issues, a failed fetch, an invalid config, a timed-out scan.
+**Then the run-stats footer.** Close with the *Run Stats Footer* (`references/run-stats.md`) — `tokens` only where the host reported a count. It is the last thing printed at **every** terminal outcome, including a run that ended early — no open issues, a failed fetch, an invalid config, a timed-out scan.
 
 ```
 ◆ Issue Triage — {N} issues analyzed
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  Result:            DONE — {main finding, e.g. "start with #12 (P1)"}
 
   Fetch issues:      ✓ pass ({N} open issues)
   Already-fixed:     ✓ pass ({fixed_count} potentially fixed)
@@ -375,45 +386,29 @@ With the triage table (Step 8) and persist (Step 9) complete, print a step-by-st
   Priority:          ✓ pass ({p1} P1, {p2} P2, {p3} P3)
   Persist:           ✓ pass (saved to .gitissue/triage.json)
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  Result:            DONE
-
+  Evidence:          {checks run; commit/PR links behind each maybe-fixed flag}
+  Uncertainty:       {inferred edges and flags; unsynced tree; skipped checks}
+  Decision:          No approval needed.
   Suggested start:   #{first} — {title}
   Next action:       /issue-resolver {first}
 ```
-
-Cached view mode prints that same block under the header
-`◆ Issue Triage — cached`, with only these rows:
-
-```
-  Cache load:        ✓ pass (age: {Nd Nh})
-  Issues:            {N} analyzed
-  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  Result:            CACHED
-
-  Suggested start:   #{first} — {title}
-  Next action:       /issue-resolver {first}
-```
-
-Omit rows for steps that found nothing — `Already-fixed` at count 0, `Circular deps` when none were checked.
 
 ---
 
 ## Output Conventions
 
-Terminal output follows the `docs/terminal-style.md` contract — symbols `● ✓ ✗ ◆ ⚡ ⚠ ○`, two-space indent, `┄` separators, URLs on their own line, ≤80 chars, one blank line between sections, static sequential output (no animation), `│ ─ ┼` tables (right-align numbers, `—` for empty cells). Errors use the rich format from `references/error-messages.md` — `✗ what failed`, `To fix:  <command>`, then a docs link where one applies — a catalog covering auth failures, no CLI, no remote, no issues, too many issues, circular dependencies and rate limits.
+Terminal output follows the `docs/terminal-style.md` contract — symbols `● ✓ ✗ ◆ ⚡ ⚠ ○`, two-space indent, `┄` separators, URLs on their own line, ≤80 chars, static sequential output, `│ ─ ┼` tables. Errors use the rich format from `references/error-messages.md` — `✗ what failed`, `To fix:  <command>`, then a docs link where one applies.
 
 Tracker access follows the GitHub driver — `--json` with explicit field selection, never parsed text; catalog and rules in docs/platform-github.md. This skill is **read-only** against the GitHub Project board and never changes issue status; how other skills update it is in `docs/github-projects-sync.md`. Worked runs: `references/examples.md`.
 
 ## Expected Output
 
-The expected output of a cached view is defined once under *Default Mode → 3.
-Render the cached report*, closing on one of the three endings in *4. Detect
-changes and suggest update*; an update ends on that same view.
+A cached view renders *Default Mode → 3* and the lines from *4. Detect changes and suggest update*; an update ends on that same view. Both close with the *Final Report* block under the *Review contract*.
 
 ## Edge Cases
 
 - **No cache and no issues** — prints `○ No open issues`, writes no cache file.
 - **Circular dependency** — the cycle is reported; order comes from topological pruning.
-- **Stale issues (>90 days)** — grouped at the report's foot under `⚠ stale`.
-- **Rate-limited** — partial results kept, the report notes the gap and the retry command.
-- **Already-fixed false positive** — the report lists the supporting commits/PRs to verify.
+- **Stale issues** — inactive longer than `triage.stale_threshold_days` (default 14); counted on the `⚠ Stale` line.
+- **Rate-limited** — partial results kept, `Result: PARTIAL`, the gap and the retry command listed under *Uncertainty*.
+- **Already-fixed false positive** — each maybe-fixed flag cites its commits/PRs under *Evidence*; it is an inference until a person verifies it.

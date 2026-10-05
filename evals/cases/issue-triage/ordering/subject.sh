@@ -213,6 +213,27 @@ pick = next(r for r in records if r["status"] not in ("blocked", "maybe-fixed"))
 with open(os.path.join(out, f"pick-{pick['number']}-{pick['priority']}.txt"), "w", encoding="utf-8") as fh:
     fh.write(f"{pick['number']} {pick['priority']} {pick['title']}\n")
 
+# Review contract (references/output-and-persist.md): result first, then
+# evidence, uncertainty, and the decision. Every claim below is computed from
+# the payload just written, so the report cannot drift from triage.json.
+with open(os.path.join(out, "triage.json"), encoding="utf-8") as fh:
+    persisted = json.load(fh)
+assert persisted["summary"]["suggested_order"] == order
+flagged = [r for r in records if r["status"] == "maybe-fixed"]
+evidence = "; ".join(
+    f"#{r['number']} maybe-fixed by {r['potentially_fixed_by']}" for r in flagged
+) or "no maybe-fixed flags"
+report = (
+    f"Result: DONE — start with #{pick['number']} ({pick['priority']})\n"
+    f"Evidence: {len(records)} open issues fetched; triage.json written and read back; {evidence}\n"
+    "Uncertainty: dependency edges come from body markers; maybe-fixed flags match "
+    "PR text and are unverified; codebase file-overlap scan not run by this stand-in\n"
+    "Decision: No approval needed.\n"
+    f"Next action: /issue-resolver {pick['number']}\n"
+)
+with open(os.path.join(out, "report.txt"), "w", encoding="utf-8") as fh:
+    fh.write(report)
+
 print("  ○ suggested order: " + " → ".join(f"#{n}" for n in order))
 print(f"  ○ pick: #{pick['number']} ({pick['priority']})")
 PY

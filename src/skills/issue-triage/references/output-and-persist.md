@@ -2,6 +2,86 @@
 
 Full Step 8 rendering spec and Step 9 JSON schema. SKILL.md shows a summary; read this for exact format details.
 
+## Review contract
+
+Apply these rules to the *Final Report* block of every terminal outcome: a full
+update, a cached view, and an early stop. Triage only recommends an order; it
+authorizes no change to any issue.
+
+1. **Result first.** The first row after the header is `Result:` with one status
+   and the main finding or stop reason:
+   - `DONE` — every step ran, every check passed, and `.gitissue/triage.json`
+     was written.
+   - `PARTIAL` — a report rendered, but at least one check is `×` or `⚠`: a
+     rate-limited or timed-out scan, a degraded script, an unsynced tree after a
+     failed sync, or a failed write.
+   - `BLOCKED` — the run stopped before a report rendered: failed
+     prerequisite, insufficient rate budget, invalid config, missing bundled
+     dependency, or a corrupted cache.
+   - `CACHED` — a view-mode render from `.gitissue/triage.json`.
+2. **Evidence.** Name the checks that actually ran (fetch count, scanner
+   batches returned, script exit code, persisted path). For each `maybe-fixed`
+   issue, link the commit or PR that triggered the flag. A `✓ pass` row is
+   allowed only for a check that ran and passed. Print `⚠ skipped` for a check
+   that did not run, and omit the `Already-fixed` row only when its count is 0.
+3. **Uncertainty.** Label inferences as inferences: dependency edges come from
+   keyword and file-overlap heuristics; `maybe-fixed` flags come from matching
+   commit and PR text, not from a test; priorities are rule buckets, not a
+   judgment of business value. Also list any unsynced tree, skipped or
+   degraded check, and truncated fetch (`--limit` reached). In a cached view,
+   state the cache age; the current backlog and code are unverified because view
+   mode makes no API call.
+4. **Decision.** Print `Decision: No approval needed.` Triage changes no issue,
+   so it never asks for approval. Name the remaining user actions separately on
+   the `Next action:` row — for example `/issue-resolver {first}`, verifying a
+   `maybe-fixed` issue before closing it, or `/issue-triage update` for a stale
+   cache. On `BLOCKED`, the next action is the `To fix:` command of the error.
+
+### Cached-view block
+
+Cached view mode prints the *Final Report* block under the header
+`◆ Issue Triage — cached`, with only these rows:
+
+```
+  Result:            CACHED — {main finding, e.g. "start with #12 (P1)"}
+  Cache load:        ✓ pass (age: {Nd Nh})
+  Issues:            {N} analyzed
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  Evidence:          .gitissue/triage.json, updated {timestamp}
+  Uncertainty:       backlog and code not re-checked since {timestamp}
+  Decision:          No approval needed.
+  Suggested start:   #{first} — {title}
+  Next action:       /issue-resolver {first}
+```
+
+### Format rule
+
+The default format is the static terminal table plus the summary lines below:
+one row per issue, at most `--limit` rows, inspectable at once. Project
+convention forbids terminal animation, so triage produces no interactive report;
+`.gitissue/triage.json` is the machine-readable form for later filtering. If the
+user asks for another format (for example a Mermaid dependency graph or a
+Markdown table), produce it from the same payload and keep the `Result`,
+`Evidence`, `Uncertainty` and `Decision` rows. If the host cannot render the
+requested format, say so and print the terminal table.
+
+### Evaluate report understanding
+
+Grade actual outputs against these criteria as well as ordering correctness:
+
+| Criterion | Observable check |
+|---|---|
+| Result is findable | The first row states the status and the suggested start without reading the table or logs. |
+| Facts and assumptions are separate | Observed checks (fetch, script exit, persisted file) are distinct from inferred edges, `maybe-fixed` flags and cached data. |
+| Claims are traceable | Each `maybe-fixed` flag links its commit or PR; each blocked status names its blocker; `PARTIAL` names the failed check. |
+| Next decision is clear | The output says `No approval needed.` and names the remaining user actions. |
+
+When running behavioral evaluations, include a full update, a cached view, a
+degraded scan and a failed write, and grade each report against all four rows.
+Ask human reviewers the matching four questions and record their answers in the
+eval case's `human_review` block. Missing, blank, or nonresponsive feedback leaves
+human understanding unconfirmed; agent inspection cannot confirm it.
+
 ## Step 8 — Output
 
 
