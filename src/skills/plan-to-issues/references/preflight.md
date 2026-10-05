@@ -25,7 +25,13 @@ gh repo view --json nameWithOwner,hasIssuesEnabled,isArchived,viewerPermission,i
 git remote | wc -l                                        # G5 — >1 means the target is ambiguous
 gh repo set-default --view                                # G5 — only when the above is >1
 gh api rate_limit --jq '.resources.core.remaining'        # G6 — budget headroom
+gh api graphql -F owner='{owner}' -F name='{repo}' \
+  -f query='query($owner:String!,$name:String!){repository(owner:$owner,name:$name){issues{totalCount} pullRequests{totalCount}}}' \
+  --jq '.data.repository | .issues.totalCount + .pullRequests.totalCount'   # G6 — items
 ```
+
+G6's second probe (one GraphQL call) sizes the lookups; gh fills `{owner}`/`{repo}` from the
+G4/G5 target. `items` counts PRs: the REST `issues?state=all` lookups page over both.
 
 G1 is a **capability probe, not a version floor**: rather than asserting a minimum `gh` version,
 run the `--json` form this skill depends on and read the error. `unknown flag: --json` means the
@@ -54,8 +60,9 @@ a single-remote repo looks like two.
 | G5 | one remote | pass |
 | G5 | >1 remote, default set | pass — record which repo is the target |
 | G5 | >1 remote, no default | **stop** — *Ambiguous target repo* block |
-| G6 | `remaining` ≥ `4 × tasks + 20` | pass |
+| G6 | `remaining` ≥ `4 × tasks + 20 + (phases + 2) × ceil(items / 100)` | pass |
 | G6 | `remaining` < that | **stop** — *API budget* block, with the reset time |
+| G6 | items probe fails | **warn** — drop the lookup term, check `4 × tasks + 20`; a re-run resumes |
 | G6 | more than 80 tasks | **warn** — secondary content-creation limits; recommend `--phase` runs |
 
 A **degrade** verdict continues the run and is repeated in the final report — a silently reduced run
@@ -66,6 +73,9 @@ The `4 × tasks + 20` estimate: per task, one create, one label edit, one verifi
 share of the dependency pass; plus the epic, the label diff, and the dashboard write. The primary
 limit is 5,000/hour, so this rarely binds. What does bind on large plans is GitHub's **secondary**
 content-creation limit, which no endpoint reports — hence the warn at 80.
+
+The lookup term: a run makes `phases + 2` full-list lookups (the epic lookup, one child check per
+phase batch, the Phase 6 verify) at `ceil(items / 100)` pages each.
 
 ### gh failure blocks
 
@@ -147,7 +157,7 @@ content-creation limit, which no endpoint reports — hence the warn at 80.
 ```text
 ✗ Not enough GitHub API budget for this run
 
-  Needed:    ~{estimate} requests ({n_tasks} tasks)
+  Needed:    ~{estimate} requests ({n_tasks} tasks + {lookups} lookups × {pages} pages)
   Remaining: {remaining} of {limit}, resets at {reset_time}
 
   To fix:  wait for the reset, or file one phase at a time:
@@ -381,7 +391,7 @@ On success, one line per check, then continue:
   Tools present:      √ pass (git, gh 2.87.3, python3)
   gh ready:           √ pass (luongnv89 · scopes include repo · --json ok)
   Repo writable:      √ pass (luongnv89/skills · issues on · ADMIN)
-  API budget:         √ pass (4905 remaining, ~220 needed)
+  API budget:         √ pass (4905 remaining, ~324 needed · 1240 items)
   Skills installed:   √ pass (issue-creator 0.8.0)
   Bundled files:      √ pass (22/22)
   Input resolved:     √ pass (file MODERNIZATION_PLAN.md — 50 tasks, 6 phases)

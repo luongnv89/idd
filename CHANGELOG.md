@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Features
 - **plan-to-issues:** add `/plan-to-issues`, moved from luongnv89/skills, as the eighth public skill. It turns a phased plan file, or a conversation about what to build, into labelled issues under one tracking epic that maps each issue to its source task. Every body is written by `/issue-creator`, and each task's dependencies become `Depends on #N` markers that `/auto-pilot`'s merge gate reads. Re-runs are idempotent, and `sync <epic#>` re-renders the epic's static plan map with the new shared `gi-plan-map.py`. Install with `asm install https://github.com/luongnv89/idd --skill plan-to-issues` or the plugin (`/idd:plan-to-issues`). ([#502](https://github.com/luongnv89/idd/issues/502))
 
+### Fixes
+- **plan-to-issues:** the Phase 0 API-budget gate now counts the paginated epic and child lookups, `(phases + 2) × ceil(items / 100)`, where `items` (issues plus pull requests) comes from one GraphQL count probe. Before, the gate counted only the per-task requests, so on a large repo it passed and the run then ran out of budget midway. ([#505](https://github.com/luongnv89/idd/issues/505))
+
 ## v0.23.1 — 2026-10-02
 
 ### Maintenance
