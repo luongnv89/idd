@@ -1,13 +1,13 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 330 64" width="330" height="64">
-  <!-- issuedev full logo: mark + wordmark horizontal -->
-
-  <!-- Mark (scaled to fit 56px, centered vertically in 64px) -->
-  <g transform="translate(4, 4) scale(0.467)">
-    <path fill-rule="evenodd" fill="#00FF41"
-          d="M60 12 L108 60 L60 108 L12 60 Z
-             M48 46 L80 60 L48 74 Z"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 156 72" role="img" aria-labelledby="t">
+  <title id="t">IDD</title>
+  <!-- Primary lockup for dark surfaces: neon mark + #FAFAFA wordmark -->
+  <g id="mark" fill="#00FF41" transform="translate(6.1 4)">
+    <!-- hash: one union outline (2 rails + 2 slanted verticals), centre cell as a hole -->
+    <path d="M21.56 8 L28.64 8 L27.14 18 L41.06 18 L42.56 8 L49.64 8 L48.14 18 L58.14 18 L57.09 25 L47.09 25 L44.99 39 L54.99 39 L53.94 46 L43.94 46 L42.44 56 L35.36 56 L36.86 46 L22.94 46 L21.44 56 L14.36 56 L15.86 46 L5.86 46 L6.91 39 L16.91 39 L19.01 25 L9.01 25 L10.06 18 L20.06 18 Z M26.09 25 L23.99 39 L37.91 39 L40.01 25 Z"/>
+    <!-- issue dot -->
+    <path d="M32 27.5 A4.5 4.5 0 1 1 32 36.5 A4.5 4.5 0 1 1 32 27.5 Z"/>
   </g>
-
-  <!-- Wordmark — single text element, no gap -->
-  <text x="76" y="44" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif" font-size="40" font-weight="700" letter-spacing="-1.5"><tspan fill="#FAFAFA">issue</tspan><tspan fill="#00FF41">dev</tspan></text>
+  <g id="wordmark" fill="#FAFAFA" transform="translate(79 22)">
+    <path d="M0 0 L7 0 L7 28 L0 28 Z M13 0 H22.5 A14 14 0 0 1 22.5 28 H13 Z M20 6.5 V21.5 H22.5 A6.5 7.5 0 0 0 22.5 6.5 Z M41.5 0 H51 A14 14 0 0 1 51 28 H41.5 Z M48.5 6.5 V21.5 H51 A6.5 7.5 0 0 0 51 6.5 Z"/>
+  </g>
 </svg>
