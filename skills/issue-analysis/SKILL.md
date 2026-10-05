@@ -1,11 +1,11 @@
 ---
-name: issue-analysis
+name: "issue-analysis"
 description: "Analyze one GitHub issue for root cause, complexity, and risk into .gitissue/analysis-N.json. Use when you need to analyze or scope issue #N. Don't use for creating issues (/issue-creator), triaging (/issue-triage), or resolving (/issue-resolver)."
 license: MIT
 compatibility: "Requires git and GitHub CLI (gh) with authentication. View mode (`/issue-analysis N view`) needs only local file access — no gh required."
 metadata:
-  version: 0.6.0
-  author: Luong NGUYEN <luongnv89@gmail.com>
+  version: 0.7.0
+  author: "Luong NGUYEN <luongnv89@gmail.com>"
   effort: high
 ---
 
@@ -20,7 +20,7 @@ Deep analysis of a single GitHub issue — root cause, architecture impact, impl
 | `/issue-analysis <N>` | Full deep analysis of issue #N, persist to `.gitissue/analysis-<N>.json` |
 | `/issue-analysis <N> view` | Render cached analysis from `.gitissue/analysis-<N>.json` without re-scanning |
 
-The argument must be a GitHub issue number.
+Require a positive integer issue number; reject invalid input before resolving paths or running commands.
 
 ## View Mode
 
@@ -31,8 +31,8 @@ When invoked as `/issue-analysis <N> view`, run the *Bundled dependency precheck
    ```
    ○ No analysis found for issue #N. Run /issue-analysis N to generate one.
    ```
-3. Read and parse the JSON file
-4. If the JSON is malformed or unparseable, output the error from `references/error-messages.md` and stop:
+3. Read and parse the JSON file. Read `references/output-and-persist.md` and apply its *Validate analysis data* checks, including the requested issue number, before rendering.
+4. If the JSON is malformed, unparseable, or fails validation, output the error from `references/error-messages.md` and stop:
    ```
    ✗ .gitissue/analysis-N.json is corrupted
 
@@ -88,11 +88,11 @@ If the user agrees (interactive), run the stash-first sync (see `references/docs
 branch="$(git rev-parse --abbrev-ref HEAD)"
 dirty=0
 if [ -n "$(git status --porcelain)" ]; then
-  git stash push -u -m "pre-sync: ${branch}"
+  git stash push -u -m "pre-sync: ${branch}" || exit 1
   dirty=1
 fi
-git fetch origin
-git pull --rebase origin "$branch"
+git fetch origin || exit 1
+git pull --rebase origin "$branch" || exit 1
 if [ "$dirty" -eq 1 ]; then
   git stash pop || {
     echo "✗ Stash pop failed — recover with: git stash list && git stash show -p stash@{0}"
@@ -101,13 +101,20 @@ if [ "$dirty" -eq 1 ]; then
 fi
 ```
 
-If `origin` is missing or rebase conflicts occur, inform the user and continue without syncing. If the user declines the prompt, proceed without syncing.
+If `origin` is missing or fetch, rebase, or stash restoration fails, stop and report recovery instructions from `references/docs/sync-conventions.md`. Never analyze a conflicted tree or claim sync succeeded. If the user declines the prompt, proceed without syncing and disclose that limitation.
 
 ## Configuration
 
-Load config once at skill start: run `python3 references/scripts/gi-config.py`. Two independent requirements, both mandatory. **Working directory:** the repo root — the script resolves `.gitissue.yml` against it, so from anywhere else it exits 0 reporting `config_file: null`/`first_run: true`, silently discarding the repo's real config. **Script path:** relative to this SKILL.md's own directory, *not* the working directory — resolve it to an absolute path exactly as the *Bundled dependency precheck* resolves its list, and pass that absolute path to `python3`. It prints `{"config": {…dotted keys…}, "config_file": …, "first_run": …}` as JSON on stdout, merging the defaults below with `.gitissue.yml`. Exit 0: use `config`, and print the `○ First run` line below when `first_run` is `true`. Exit 3: `.gitissue.yml` is invalid — print the validation error from `references/error-messages.md` (*Invalid config*) and stop. Script file absent: a bundled dependency is missing, which is a broken install and not a degrade — stop and print the `✗ Missing bundled dependency` block the *Bundled dependency precheck* names. Any other outcome (no `python3`, non-zero exit, unparsable stdout): print `⚠ gi-config unavailable — using the inline defaults below` and follow the manual fallback making up the rest of this section — the *alternative* to the script, never an extra step alongside it; on exit 0 the script's `config` is the whole answer and the rest of this section is reference material only. Never re-read the config after this step. **Capture the run clock here:** chain that same `python3` invocation as `python3 …; ec=$?; date +%s >&2; exit "$ec"` and keep the stderr epoch as `run_started_epoch` — JSON stdout and the script's exit stay intact, it costs no extra round trip, and the *Run Stats Footer* (`references/run-stats.md`) measures `elapsed` from it.
+Load config once at skill start with `python3 references/scripts/gi-config.py`. **Working directory:** the repo root — the script resolves `.gitissue.yml` against the working directory, so running it elsewhere exits 0 with `config_file: null`/`first_run: true`, silently discarding the repo's real config. Resolve the script to an absolute path relative to this SKILL.md, as in the *Bundled dependency precheck*, never relative to the working directory.
 
-Otherwise, load `.gitissue.yml` from the repo root once at skill start. If the file does not exist, use defaults and print:
+Capture `run_started_epoch` from stderr by chaining that same `python3` invocation as `python3 …; ec=$?; date +%s >&2; exit "$ec"`. Preserve JSON stdout and exit status for the *Run Stats Footer* (`references/run-stats.md`).
+
+- Exit 0: use `config` from `{"config": {…dotted keys…}, "config_file": …, "first_run": …}`. Print the hint below when `first_run` is true.
+- Exit 3: stop with *Invalid config* from `references/error-messages.md`.
+- Script file absent: a bundled dependency is missing, which is a broken install and not a degrade — stop and print the `✗ Missing bundled dependency` block.
+- No `python3`, another non-zero exit, or unparsable stdout: print `⚠ gi-config unavailable — using the inline defaults below`. Read `.gitissue.yml` once from the repo root, or use defaults if absent. Use this manual fallback instead of the script result.
+
+When config is absent, print:
 
 ```
 ○ First run — using default config. Run /init-gitissue to customize.
@@ -289,7 +296,7 @@ After fetch:
 
 Steps 2-5 run inside the Codebase Researcher subagent (Explorer phase); Steps 6-7 run inside the Synthesizer subagent. **Read `references/subagent-steps.md` now** — it carries the delegation payload, the return handling, and the tool budgets every run needs before spawning either subagent. Its inline counterpart, `references/inline-fallback.md`, is read **only** when the Agent tool is unavailable.
 
-Quick summary — **2** extract keywords & file refs from the issue · **3** codebase scan (grep/glob, read up to 20 files) · **4** git history scan (related commits, prior fix attempts) · **5** cross-reference related issues & PRs · **6** root cause synthesis · **7** implementation options & complexity/risk scoring.
+Quick summary — **2** extract keywords & file refs from the issue · **3** codebase scan (grep/glob, read up to `analysis.max_files` files, default 30) · **4** git history scan (related commits, prior fix attempts) · **5** cross-reference related issues & PRs · **6** root cause synthesis · **7** implementation options & complexity/risk scoring.
 
 ---
 ## Step 8-9 — Output & Persist
@@ -313,9 +320,9 @@ These add two JSON keys and a *Decision Record* section to the terminal report; 
 
 ## Final Report
 
-After all 8 steps and persistence complete, print a step-by-step summary of what happened at each stage:
+Apply the *Review contract* in `references/output-and-persist.md` to every terminal outcome, including view mode and early stops. After all 8 steps and persistence, summarize only observed results; use `PARTIAL` for incomplete research or failed persistence.
 
-**Then the run-stats footer.** Close with the *Run Stats Footer* — `references/run-stats.md` — `elapsed`, `tokens` only where the host reported a count (otherwise left out), `agents`, run cost only, `n/a` for anything else undetermined. It is the last thing printed at **every** terminal outcome, including a run that ended early — an issue that was not found or is closed, an invalid config, or a scan that could not complete.
+**Then the run-stats footer.** Close with the *Run Stats Footer* — `references/run-stats.md` — `elapsed`, `tokens` only where the host reported a count (otherwise left out), `agents`, run cost only, `n/a` for anything else undetermined. It is the last thing printed at **every** terminal outcome, including a run that ended early — an issue that was not found, an invalid config, or a scan that could not complete.
 
 ```
 ◆ Issue Analysis: #{N} — {title}
@@ -411,7 +418,7 @@ Stop. Analysis requires at least one relevant file.
 
 ### Re-analysis (existing JSON)
 
-If `.gitissue/analysis-<N>.json` already exists when running a full analysis (not view mode), overwrite it silently — the new analysis replaces the old entirely.
+If `.gitissue/analysis-<N>.json` already exists when running a full analysis (not view mode), overwrite it silently only after the new analysis passes validation; replace it atomically per `references/output-and-persist.md`. If validation or replacement fails, retain the old cache; report failed readback as unverified.
 
 ---
 

@@ -114,6 +114,64 @@ has "$SKILL" "cached analysis"       "T7: view mode renders the cached analysis"
 # --- T8: full analysis overwrites the cache silently ------------------------
 has "$SKILL" "overwrite it silently" "T8: a fresh full analysis overwrites the cache silently"
 
+# --- T9: the documented JSON example satisfies its consumer relationships ---
+if python3 - "$PERSIST" <<'PY'
+import copy
+import json
+import re
+import sys
+from pathlib import Path
+
+text = Path(sys.argv[1]).read_text()
+schema = text.split("### JSON Schema", 1)[1]
+data = json.loads(schema.split("```json\n", 1)[1].split("\n```", 1)[0])
+
+def coherent(value):
+    options = value["options"]
+    numbers = [option["number"] for option in options]
+    selected = value["recommended_option"]
+    record = value["decision_record"]
+    if numbers != list(range(1, len(options) + 1)) or selected not in numbers:
+        return False
+    option = options[selected - 1]
+    return (
+        record["options_considered"] == [
+            {"number": item["number"], "name": item["name"]} for item in options
+        ]
+        and record["selected_option"] == {
+            key: option[key] for key in ("number", "name", "summary")
+        }
+        and sorted(item["number"] for item in record["options_rejected"])
+        == [number for number in numbers if number != selected]
+        and value["overall_complexity"] == option["complexity"]
+        and value["overall_risk"] == option["risk"]
+        and value["timestamp"] == value["git_state"]["captured_at"]
+    )
+
+assert coherent(data), "schema example contradicts its options or timestamps"
+assert re.fullmatch(r"[0-9a-f]{40}", data["git_state"]["commit_sha"])
+assert data["git_state"]["commit_sha_short"] == data["git_state"]["commit_sha"][:7]
+assert "reproduction" not in data["decision_record"], "analysis must not invent resolver evidence"
+invalid = copy.deepcopy(data)
+invalid["decision_record"]["selected_option"]["number"] = 99
+assert not coherent(invalid), "check must reject selection of a missing option"
+PY
+then
+  pass "T9: schema example has coherent option selection and provenance"
+else
+  fail "T9: schema example contradicts its consumer contract"
+fi
+
+# --- T10: report and cache validation rules remain part of the skill --------
+for criterion in "Result is findable" "Facts and assumptions are separate" \
+                 "Claims are traceable" "Next decision is clear"; do
+  has "$PERSIST" "$criterion" "T10: review guidance covers $criterion"
+done
+has "$PERSIST" "unconfirmed" "T10: absent human feedback does not imply understanding"
+has "$PERSIST" "Atomically replace" "T10: new analysis replaces cache only after validation"
+has "$PERSIST" 'Do not print `Saved:`' "T10: failed persistence cannot claim a saved result"
+has "$SKILL" "Validate analysis data" "T10: view mode validates cached data before rendering"
+
 echo ""
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 echo "  Results: $PASS passed, $FAIL failed"

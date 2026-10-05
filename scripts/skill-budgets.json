@@ -10,12 +10,12 @@
       "measured": 117862
     },
     "issue-analysis": {
-      "budget": 152136,
-      "measured": 151254
+      "budget": 158629,
+      "measured": 157605
     },
     "issue-creator": {
-      "budget": 173540,
-      "measured": 172758
+      "budget": 178706,
+      "measured": 177682
     },
     "issue-pr-review": {
       "budget": 259487,

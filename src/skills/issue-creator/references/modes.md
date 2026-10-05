@@ -151,10 +151,10 @@ python3 references/scripts/gi-issue.py {N} --invalidate
 Re-read the body and confirm `<!-- gitissue:normalized v1 -->` is the first line. Read it straight from `gh`, never from the cache — verifying a write against a cached pre-write body proves nothing:
 
 ```bash
-gh issue view {N} --json body --jq '.body' | head -1
+gh issue view {N} --json body --jq '.body'
 ```
 
-If the marker is missing, stop and report — do not claim normalization succeeded.
+If the marker is missing, stop and report — do not claim normalization succeeded. Also compare the complete fetched body with the approved normalized body; a marker alone does not prove the content was saved. On mismatch, report the update as unverified and retain the backup link.
 
 ### Step 10 — Post Normalization Comment
 
@@ -178,7 +178,7 @@ python3 references/scripts/gi-issue.py {N} --invalidate   # mandatory: labels ju
 
 ### Step 12 — Report
 
-Print a structured step-by-step summary:
+Apply references/examples.md (Review contract) before printing the summary. Populate statuses from observed results; the examples below show successful checks, not assumed defaults.
 
 ```
 ◆ Issue Normalized: #{N}
@@ -288,7 +288,7 @@ Create {N} issues? [A]ll / [e]dit / [c]ancel
 **Auto mode (`docs/auto-mode.md`) — never blocks.** Print the preview table (it is the record of what was created), then **auto-approve the full set** — the `[A]ll` path, which is the interactive default — instead of prompting, and log one line stating how many issues were auto-approved:
 
 ```
-  ⚠ Auto mode: batch approval skipped — 3 issues auto-approved and created.
+  ⚠ Auto mode: batch approval skipped — 3 issues auto-approved for creation.
 ```
 
 Never take `[e]dit` or `[c]ancel` in auto mode: `edit` needs a human to say what to change, and `cancel` discards work the caller explicitly requested. Items flagged as possible duplicates in Step 3 are included in the approved set — they are already logged as `⚠` there and are not silently dropped.
@@ -375,7 +375,7 @@ The parent SHOULD close only when all its children close (SPEC §2.1) — this c
 
 ### Step 6 — Report
 
-Print a structured step-by-step summary:
+Apply references/examples.md (Review contract) before printing the summary. Populate statuses from observed results; the examples below show successful checks, not assumed defaults.
 
 **All succeeded:**
 ```
