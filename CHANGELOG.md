@@ -7,13 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- gitissue:normalized v1 -->
 
-## [Unreleased]
+## v0.24.0 — 2026-10-05
 
 ### Features
-- **plan-to-issues:** add `/plan-to-issues`, moved from luongnv89/skills, as the eighth public skill. It turns a phased plan file, or a conversation about what to build, into labelled issues under one tracking epic that maps each issue to its source task. Every body is written by `/issue-creator`, and each task's dependencies become `Depends on #N` markers that `/auto-pilot`'s merge gate reads. Re-runs are idempotent, and `sync <epic#>` re-renders the epic's static plan map with the new shared `gi-plan-map.py`. Install with `asm install https://github.com/luongnv89/idd --skill plan-to-issues` or the plugin (`/idd:plan-to-issues`). ([#502](https://github.com/luongnv89/idd/issues/502))
+- **plan-to-issues:** add `/plan-to-issues`, moved from luongnv89/skills, as the eighth public skill. It turns a phased plan file, or a conversation about what to build, into labelled issues under one tracking epic that maps each issue to its source task. Every body is written by `/issue-creator`, and each task's dependencies become `Depends on #N` markers that `/auto-pilot`'s merge gate reads. Re-runs are idempotent, and `sync <epic#>` re-renders the epic's static plan map with the new shared `gi-plan-map.py`. Install with `asm install https://github.com/luongnv89/idd --skill plan-to-issues` or the plugin (`/idd:plan-to-issues`). ([#502](https://github.com/luongnv89/idd/issues/502), [#504](https://github.com/luongnv89/idd/pull/504))
 
 ### Fixes
-- **plan-to-issues:** the Phase 0 API-budget gate now counts the paginated epic and child lookups, `(phases + 2) × ceil(items / 100)`, where `items` (issues plus pull requests) comes from one GraphQL count probe. Before, the gate counted only the per-task requests, so on a large repo it passed and the run then ran out of budget midway. ([#505](https://github.com/luongnv89/idd/issues/505))
+- **issue-creator, issue-analysis:** both skills verify the saved content before claiming success — `/issue-analysis` validates cached identity and option consistency and reports a failed save as partial, while `/issue-creator` performs an uncached readback before generating its report, so neither can report completion before the write is confirmed. ([#499](https://github.com/luongnv89/idd/pull/499))
+- **triage:** `/issue-triage` now states result, evidence, uncertainty and decision in its final report, with `DONE`/`PARTIAL`/`BLOCKED`/`CACHED` outcomes, instead of always closing with `Result: DONE` and hardcoded `✓ pass` rows even when a scan was rate-limited, a script degraded or the write failed. A failed stash, fetch or rebase now leaves the tree unchanged and triage continues unsynced rather than scanning a conflicted tree. ([#500](https://github.com/luongnv89/idd/pull/500))
+- **skills:** retrofit five more skills to the shared review contract — `/issue-resolver`, `/issue-pr-review`, `/auto-pilot`, `/init-gitissue` and `/idd-doctor` now close every run with a `Result` (done, partial or blocked) plus `Evidence`, `Uncertainty` and `Decision` rows, and instructions that bundled several actions or left a case undefined are split into one action per line with a named outcome. This touches human-facing output only: report-back fields, `.gitissue/` JSON, run-log records, verdict tokens and exit codes are unchanged. ([#413](https://github.com/luongnv89/idd/issues/413), [#501](https://github.com/luongnv89/idd/pull/501))
+- **init-gitissue:** in auto mode, an existing `.gitissue.yml` is kept instead of overwritten, and merging into an unparsable file reports `BLOCKED`. ([#501](https://github.com/luongnv89/idd/pull/501))
+- **skills:** ship an MIT `LICENSE` in each standalone skill package, so a skill installed on its own carries its own license. ([#499](https://github.com/luongnv89/idd/pull/499), [#500](https://github.com/luongnv89/idd/pull/500), [#501](https://github.com/luongnv89/idd/pull/501))
+- **plan-to-issues:** the Phase 0 API-budget gate now counts the paginated epic and child lookups, `(phases + 2) × ceil(items / 100)`, where `items` (issues plus pull requests) comes from one GraphQL count probe. Before, the gate counted only the per-task requests, so on a large repo it passed and the run then ran out of budget midway. ([#505](https://github.com/luongnv89/idd/issues/505), [#506](https://github.com/luongnv89/idd/pull/506))
+
+### Maintenance
+- **evals:** port the `/plan-to-issues` behavioral evals — the file-path happy path and `sync` — into the hermetic eval harness as `tests/test-eval-plan-to-issues.sh`. The harness's `gh` shim now replays `gh api … --jq` calls instead of refusing them for lacking `--json`, a flag `gh api` does not have. ([#503](https://github.com/luongnv89/idd/issues/503), [#507](https://github.com/luongnv89/idd/pull/507))
+
+Contributions by @luongnv89.
+
+**Full Changelog**: https://github.com/luongnv89/idd/compare/v0.23.1...v0.24.0
 
 ## v0.23.1 — 2026-10-02
 

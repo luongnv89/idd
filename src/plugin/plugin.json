@@ -1,7 +1,7 @@
 {
   "name": "idd",
   "displayName": "IDD: Issue-Driven Development",
-  "version": "0.23.1",
+  "version": "0.24.0",
   "description": "Issue-Driven Development: Claude Code skills that plan, create, triage, analyze, resolve, review, and auto-pilot GitHub issues.",
   "author": {
     "name": "Luong NGUYEN",
