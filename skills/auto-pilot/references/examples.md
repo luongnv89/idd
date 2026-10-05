@@ -69,6 +69,7 @@ Detailed example runs and edge-case behaviors referenced from SKILL.md.
 
 ◆ Auto-Pilot Summary — 3/3 iterations
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  Result:                  LIMIT REACHED — complete: 3 merged, 5 issues remain
 
   Iteration 1:       ✓ merged                — #12 Fix auth redirect loop → PR #45
   Iteration 2:       ✓ merged                — #8 Add pagination to API → PR #46
@@ -81,8 +82,10 @@ Detailed example runs and edge-case behaviors referenced from SKILL.md.
   failed:                  0
   skipped:                 0
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  Result:                  LIMIT REACHED
   Mode:                    balanced
+  Evidence:                PRs #45, #46, #47 merged after green CI; 3 run-log lines appended
+  Uncertainty:             none observed
+  Decision:                No approval needed.
 
   Remaining:               5 open issues
   Next action:             /auto-pilot to continue
@@ -188,6 +191,7 @@ Detailed example runs and edge-case behaviors referenced from SKILL.md.
 
 ◆ Auto-Pilot Summary — 2/3 iterations (batch mode)
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  Result:                  COMPLETED — complete: 2 merged, #8 resolved in batch
   Analysis: ✓ pass (3 issues, 1 batch groups)
 
   Iteration 1:       ✓ merged                — #12 Refactor auth middleware → PR #50
@@ -201,8 +205,10 @@ Detailed example runs and edge-case behaviors referenced from SKILL.md.
   failed:                  0
   skipped:                 1
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  Result:                  COMPLETED
   Mode:                    balanced
+  Evidence:                PRs #50, #51 merged after green CI; #8 closed by PR #51
+  Uncertainty:             none observed
+  Decision:                No approval needed.
 
   Remaining:               0 open issues
   Next action:             /auto-pilot to continue
@@ -497,9 +503,12 @@ persisted and the lock released on the way out:
 
 ◆ Auto-Pilot Summary — 7/10 iterations
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  Result:                  BUDGET REACHED — partial: 7 processed, #61 quarantined
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  Result:                  BUDGET REACHED
   Mode:                    balanced
+  Evidence:                runtime budget check at iteration 8; report persisted
+  Uncertainty:             none observed
+  Decision:                No approval needed.
 
   Remaining:               12 open issues
   Next action:             /auto-pilot to continue

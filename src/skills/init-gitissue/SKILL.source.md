@@ -4,8 +4,8 @@ description: "Generate a .gitissue.yml by auto-detecting a repo's stack, test ru
 license: MIT
 compatibility: "Requires git. No GitHub CLI or authentication needed — generates a local config file only."
 metadata:
-  version: 0.3.7
-  author: Luong NGUYEN <luongnv89@gmail.com>
+  version: 0.4.0
+  author: "Luong NGUYEN <luongnv89@gmail.com>"
   effort: low
 ---
 
@@ -13,7 +13,7 @@ metadata:
 
 Initialize gitissue for the current repository. Scans the codebase to detect language, framework, test runner, and repo size, then generates a `.gitissue.yml` config file with project-specific defaults.
 
-**Invocation**: `/init-gitissue` — no arguments.
+**Invocation**: `/init-gitissue` — interactive. `/init-gitissue --auto` (or `IDD_AUTO_MODE=1`) — no prompts; an existing `.gitissue.yml` is kept.
 
 ## When to Use
 
@@ -64,6 +64,8 @@ Check these files relative to the skill's directory (the dirname of this SKILL.m
 - `references/error-messages.md` — complete error catalog with triggers and exact output
 - `references/examples.md` — worked example runs
 - `references/run-stats.md` — run-stats footer contract (shape, fields, unavailable marker)
+- `references/review-contract.md` — report statuses, evidence, uncertainty, decision, format rule
+- `references/merge-strategy-check.md` — optional post-write merge-settings check
 - `references/docs/config-schema.md` — full configuration schema
 - `references/docs/naming-conventions.md` — naming conventions (referenced by generated config)
 - `references/docs/idd-methodology.md` — IDD methodology reference
@@ -101,9 +103,10 @@ If the file already exists, show the prompt from `references/error-messages.md`:
   Choose: [overwrite/merge/cancel]
 ```
 
-- **overwrite** — delete existing file, proceed with full generation
-- **merge** — read the existing file, preserve all user-set values, only add fields that are missing from the schema
-- **cancel** — stop immediately, no changes
+- **overwrite** — run full generation. Keep the existing file until Step 3 replaces it in one write.
+- **merge** — read the existing file. If it does not parse as YAML, print *Existing config does not parse* (`references/error-messages.md`), leave it untouched, and stop with `Result: BLOCKED`. Otherwise preserve every user-set value and add only the schema fields it lacks.
+- **cancel** — make no change. Report `Result: CANCELLED`.
+- **Auto mode** (`--auto` or `IDD_AUTO_MODE=1`) — do not prompt. Print `⚠ Auto mode: overwrite/merge/cancel prompt skipped — kept the existing .gitissue.yml (cancel).` and take **cancel**, the safe default.
 
 ---
 
@@ -160,7 +163,7 @@ Check for these files in the repo root (or nearby):
 | `Gemfile` | Ruby |
 | `*.csproj`, `*.sln` | C# |
 
-If multiple language markers exist, pick the primary one (the one with the most source files or the one at the repo root). If none detected, use empty state.
+If several language markers exist, use the one at the repo root. If several are at the root, use the language with the most source files. If none is detected, use empty state.
 
 ### Framework Detection
 
@@ -186,7 +189,7 @@ Parse dependency files to identify frameworks:
 
 Check `package.json` dependencies/devDependencies, `requirements.txt` lines, `pyproject.toml` dependencies, `Gemfile` gems, `go.mod` require blocks, `Cargo.toml` dependencies, `pom.xml`/`build.gradle` dependencies.
 
-If no framework detected, omit the framework line from the report (not an error).
+If no framework is detected, print the `○ skip` Framework row (not an error).
 
 ### Test Runner Detection
 
@@ -275,12 +278,19 @@ Write `.gitissue.yml` to the repo root. The file must include:
 3. Inline `#` comments explaining each setting
 4. Framework-specific comments where applicable
 5. Values customized per Step 2 logic
+6. When Step 1 found `.github/ISSUE_TEMPLATE/`, this comment above `template:`:
+
+```yaml
+  # Note: .github/ISSUE_TEMPLATE/ found ({N} templates)
+  # Set template to ".github/ISSUE_TEMPLATE" to use your existing templates
+  template: default
+```
 
 ### Template
 
 Use the canonical template at `templates/gitissue-template.yml` — it contains every field from `docs/config-schema.md` with inline comments. At write time, substitute the placeholder tokens (`{language}`, `{framework}`, `{test_runner}`, `{repo_size}`, `{file_count}`, `{true_or_false}`, `{timeout_value}`, `{stale_value}`) with the values computed in Step 2. Read `templates/gitissue-template.yml` to see the exact field layout.
 
-If **merge** mode was chosen, read the existing file first, preserve all user-set values, and only add fields that are missing.
+In **merge** mode, write the existing file's values plus the missing fields, per the *File exists* rules.
 
 If the file write fails, output the error from `references/error-messages.md` and stop:
 ```
@@ -299,55 +309,25 @@ re-read the file just written and verify three things:
 2. **No placeholder token survived substitution.** `grep -nE '\{(language|framework|test_runner|repo_size|file_count|true_or_false|timeout_value|stale_value)\}' .gitissue.yml` must return nothing. Any hit means Step 3 substitution missed a token.
 3. **The `platform` key is present** — it is the driver selector every skill resolves on load, so a config without it is unusable.
 
-On a parse error or a surviving placeholder, do **not** report success. Print the
-matching error from `references/error-messages.md` (*Generated config failed
-validation*), leave the file in place for inspection, and stop.
+On a parse error, a surviving placeholder, or a missing `platform` key, do **not**
+report success. Print the matching error from `references/error-messages.md` (*Generated config failed
+validation*), leave the file in place for inspection, and stop with `Result: BLOCKED`.
 
-### Merge strategy warning (optional, when `gh` is available)
+### Merge strategy check (optional)
 
-After a successful write, when `which gh` succeeds and `gh auth status` passes, run **both** squash-merge preflight reads from `docs/platform-github.md` — the strategy allow-flags and the squash-commit message source. They answer different questions and neither substitutes for the other:
-
-```bash
-gh repo view --json mergeCommitAllowed,squashMergeAllowed,rebaseMergeAllowed
-gh api repos/{owner}/{repo} --jq '{squash_merge_commit_title, squash_merge_commit_message}'
-```
-
-The second uses the REST endpoint on purpose: `gh repo view --json squashMergeCommitMessage` returns `Unknown JSON field` — the sub-setting is not reachable through that selector.
-
-When squash is not the only allowed strategy (`squashMergeAllowed` false, or merge-commit/rebase allowed), print:
-
-```
-⚠ Merge strategy is not squash-only — squash-merge is required for IDD durable-memory (B1 binding). See docs/idd-methodology.md.
-```
-
-When `squash_merge_commit_message` is anything other than `PR_BODY`, warn separately — the strategy can be squash-only and the B1 binding still be defeated, because the squash commit then carries the list of commit subjects instead of the PR body, and the Decision Record never reaches git history (issue #295). GitHub's default is `COMMIT_MESSAGES`, so this warning fires on most fresh repos:
-
-```
-⚠ Squash commit message is {value}, not PR_BODY — the PR body will not reach git
-  history, defeating the B1 durable-memory binding. See docs/idd-methodology.md.
-
-To fix:  gh api -X PATCH repos/{owner}/{repo} -f squash_merge_commit_title=PR_TITLE -f squash_merge_commit_message=PR_BODY
-```
-
-Both flags are required. GitHub accepts only four title/message combinations, and `PR_BODY` pairs solely with `PR_TITLE` — sending the message alone against the common default `COMMIT_OR_PR_TITLE` fails with HTTP 422 `invalid_squash_commit_setting_combo`, so a remedy naming one flag cannot work.
-
-Warn on each condition independently: a repo can fail both, and reporting only the strategy is the blind spot that hid this for the whole life of the project.
-
-When `gh` is missing or unauthenticated, print `○ Merge strategy check skipped — gh not installed` (or not authenticated) and continue. When the strategy read succeeds but the settings read does not answer (404, insufficient permission, or the field absent from the response), print `○ Squash commit message check skipped — {reason}` and continue — never report it satisfied, since an unread setting is the assumption this check exists to remove.
-
-If existing issue templates were detected in `.github/ISSUE_TEMPLATE/`, add a comment:
-
-```yaml
-  # Note: .github/ISSUE_TEMPLATE/ found ({N} templates)
-  # Set template to ".github/ISSUE_TEMPLATE" to use your existing templates
-  template: default
-```
+After a validated write, run the two read-only repository-settings reads in
+`references/merge-strategy-check.md`. That file defines when the check is
+skipped, the two independent warnings, and the `Merge settings:` report row. The
+check never changes a setting and never changes `Result`.
 
 ---
 
 ## Step 4 — Report
 
-Print a structured step-by-step summary showing what was detected and configured:
+Print the report below. `references/review-contract.md` defines each `Result`
+status (`DONE`, `PARTIAL`, `BLOCKED`, `CANCELLED`) and what the `Evidence`,
+`Uncertainty`, `Decision`, and `Next action` rows must carry. Print `✓` only for
+a check that ran and passed.
 
 **Then the run-stats footer.** Close with the *Run Stats Footer* — `references/run-stats.md` — `elapsed`, `tokens` only where the host reported a count (otherwise left out), `agents`, run cost only, `n/a` for anything else undetermined. It is the last thing printed at **every** terminal outcome, including a run that wrote no config — a failed prerequisite, a declined overwrite, or a scan that could not complete. This skill spawns no subagents, so `agents 0` is the determined value here, not `n/a`.
 
@@ -355,19 +335,23 @@ Print a structured step-by-step summary showing what was detected and configured
 ◆ Init Gitissue — setup complete
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
 
+  Result:            DONE — .gitissue.yml generated and validated
   Git repo:          ✓ pass
   Language:          ✓ {language} (from {file})
-  Framework:         ✓ {framework}
-  Test runner:       ✓ {test_runner}
+  Framework:         ✓ {framework} (from {file})
+  Test runner:       ✓ {test_runner} (from {file})
   Templates:         ✓ {template_status}
-  Repo size:         ✓ {size} ({count} files)
+  Repo size:         ✓ {size} ({count} files, via {file_count_source})
   Config:            ✓ generated .gitissue.yml
-  Validation:        ✓ parses as YAML, no placeholders left
+  Validation:        ✓ parses as YAML, no placeholders left, platform set
+  Merge settings:    ✓ squash-only, PR_BODY
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  Result:            DONE
+  Evidence:          gi-stack-detect exit 0; re-read with {parser}
+  Uncertainty:       values from marker files; no test command run
+  Decision:          No approval needed.
 
   Config: .gitissue.yml
-  Next action: /issue-creator to create your first issue
+  Next action: review and commit .gitissue.yml, then /issue-creator
 ```
 
 ### Variations
@@ -401,7 +385,7 @@ And earlier in the flow, print:
 ```
   Validation:        ⚠ warn (skipped — no YAML parser available)
 ```
-and set `Result: PARTIAL`.
+and set `Result: PARTIAL — config written; parse check skipped`.
 
 **No issue templates** — show:
 ```
@@ -413,7 +397,7 @@ and set `Result: PARTIAL`.
   Templates:         ✓ .github/ISSUE_TEMPLATE/ ({N} templates)
 ```
 
-**Merge mode** — change Config line and result:
+**Merge mode** — change Config line:
 ```
   Config:            ✓ merged into existing .gitissue.yml ({N} new, {M} preserved)
 ```
@@ -430,7 +414,6 @@ and set `Result: PARTIAL`.
 Full example outputs for three scenarios (TypeScript + Next.js project, minimal Python project, config-already-exists merge) live in `references/examples.md` — read that file when debugging detection or merge behavior.
 
 ---
----
 
 ## Output Conventions
 
@@ -441,15 +424,17 @@ Terminal output follows the `docs/terminal-style.md` contract — symbols `● �
 After a successful run the repo root contains a validated `.gitissue.yml` and the
 terminal prints the *Step 4 — Report* block above — the `Validation:` row is the
 checkable bar: the run only reports `DONE` after the written file parsed as YAML
-with no placeholder tokens left. Variations (merge mode, missing framework,
-missing test runner) are listed under that step.
+with no placeholder tokens left and a `platform` key. Variations (merge mode,
+missing framework, missing test runner) are listed under that step. Grade report
+understanding — findable result, separated facts, traceable claims, clear next
+decision — with the criteria in `references/review-contract.md`.
 
 ## Edge Cases
 
-- **Config already exists** — the skill shows an overwrite / merge / cancel prompt; it does not print a diff of detected vs current values.
+- **Config already exists** — interactive runs show an overwrite / merge / cancel prompt; auto mode skips it, takes cancel, and prints the `⚠ Auto mode:` line. Neither prints a diff of detected vs current values.
 - **Unrecognized language** — falls back to a minimal generic config with inline comments guiding manual edits.
 - **Not a git repository** — prints the exact error from `references/error-messages.md` and stops; no file is written.
-- **Empty repo (no source files)** — writes a minimal default config and notes that detection was skipped.
+- **Empty repo (no source files)** — writes a minimal default config; the Language and Test runner rows print their `⚠ warn` variants.
 
 ## Additional Resources
 

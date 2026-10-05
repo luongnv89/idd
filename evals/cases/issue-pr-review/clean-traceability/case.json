@@ -19,6 +19,22 @@
       "args": ["python3 scripts/idd-lint.py branch \"$(tr -d '\\n' < OUT/branch.txt)\""],
       "expect_exit": 0,
       "label": "branch name from subject artifact passes idd-lint"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/report.txt",
+      "expect_exit": 0,
+      "label": "review summary states result, evidence, uncertainty, and decision"
     }
-  ]
+  ],
+  "human_review": {
+    "criteria": [
+      "The first summary row states PASS and that the PR is ready to merge.",
+      "Observed checks (PR read, body line 1, Decision Record present) are separate from the unverified acceptance criterion and the checks this stand-in did not run.",
+      "Each claim names its source: the PR number and state, the exact first body line, the AC Verification table.",
+      "The summary says No approval needed and names the remaining user action (merge the PR)."
+    ],
+    "feedback": "Record each reviewer answer; absent, blank, or nonresponsive feedback leaves understanding unconfirmed.",
+    "scope": "This deterministic stand-in tests a report fixture, not live agent behavior. Apply these criteria to actual agent outputs in behavioral evaluations."
+  }
 }

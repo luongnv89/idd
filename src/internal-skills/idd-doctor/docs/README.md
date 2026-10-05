@@ -80,16 +80,26 @@ No arguments. The skill reads from the current repo and prints a four-line repor
     ✓ [1/4] Stale skill claims    no stale language in /issue-creator
     ✓ [2/4] Issue-template fields no forbidden fields in 5 templates
     ○ [3/4] Autopilot mode        skipped — no .gitissue.yml
-    ⚠ [4/4] Squash-merge default  squash + merge-commit + rebase enabled — recommend squash-only
-        Fix: in repo Settings → General → Pull Requests, allow only "Squash merging"
+    ⚠ [4/4] Squash-merge default  squash + merge-commit + rebase enabled; squash message source PR_BODY — recommend squash-only
+        Fix: in repo Settings → General → Pull Requests, allow only "Squash merging",
+             and set the squash commit message to "Pull request title and description"
         Or:  gh api -X PATCH repos/:owner/:repo \
                -f allow_squash_merge=true \
                -f allow_merge_commit=false \
-               -f allow_rebase_merge=false
+               -f allow_rebase_merge=false \
+               -f squash_merge_commit_title=PR_TITLE \
+               -f squash_merge_commit_message=PR_BODY
 
     ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
     Result: WARN  (4 checks, 0 failed, 1 warned)
+    Evidence:    ran 1 2 4 · skipped 3 (no .gitissue.yml) · scanned 2 skill files, 5 templates
+    Uncertainty: check 3 not verified (skipped); checks 1-3 are text heuristics
+    Decision:    No approval needed — report-only, nothing changed. Next: apply the check 4 Fix hint, then re-run /idd-doctor
 ```
+
+The `Result:` line leads the summary; `Evidence`, `Uncertainty`, and `Decision`
+say what was actually checked, what was not, and what to do next. A skipped
+check is never counted as a pass.
 
 After the result, a non-gating, read-only **run-log summary** over the last 50
 lines of `.gitissue/runs.jsonl` prints the resolve rate, median QA cycles, top
@@ -105,6 +115,9 @@ recorded per-phase timing (`n/a` when none did).
 |---|---|
 | `SKILL.md` | Full check definitions, pattern catalogs, and exit-code semantics |
 | `../references/error-messages.md` | Error catalog for prerequisite failures and per-check output formats |
+| `../references/review-contract.md` | Summary rows (evidence, uncertainty, decision), format rule, and understanding criteria |
+| `../references/run-log-summary.md` | Run-log summary metrics and output layout |
+| `../references/run-stats.md` | Shared run-stats footer contract |
 
 ## Related Skills
 

@@ -11,12 +11,93 @@ The five dimensions are grouped under **two named axes** so *does it do the righ
 
 The axes are a presentation grouping only. The status symbol on each dimension line, the `fix`/`note` semantics, and the soft-pass gate are all unchanged and stay per-dimension — there is no separate per-axis verdict line. Keep every dimension on its own line under the right axis header; the same five dimension names always appear.
 
+## Review contract
+
+Apply these rules to the Step 7 summary of **every** terminal outcome — a clean
+PR, remaining issues, a merge, and a stop before Step 7. They change only the
+human-facing summary: the report-back fields `/auto-pilot` reads (`result`,
+`ci_status`, …), PR-body markers, and exit behavior are untouched.
+
+1. **Result first.** The first row after the header is `Result:` with one status
+   and the main finding or stop reason:
+   - `PASS` — the loop-exit condition held (soft or strict, per
+     `review.soft_pass`) with every CI and test leg satisfied by a real pass, a
+     config skip, or a `qa_handoff = trusted` test skip (listed under
+     *Uncertainty*, never as `✓ pass`). The PR is clean. When an auto-merge
+     follows, its `MERGED` or `BLOCKED (manual merge required)` block supersedes
+     this row; otherwise (interactive, `--no-merge`, or
+     `review.auto_merge: false`) it is the final status.
+   - `MERGED` — `PASS`, and the auto-merge succeeded.
+   - `PARTIAL` — the loop exited with no finding left, but a leg was not
+     verified: a CI failure held non-blocking by
+     `review.ignore_ci_billing_failures`, CI still pending at the stop, or a
+     degraded tool that left a check unevaluated. Never merged. A `trusted` test
+     skip is not on this list: Step 4's own completion report reads
+     `Result: PARTIAL`, but the summary carries that gap as *Uncertainty* and
+     stays `PASS`.
+   - `WARN (manual review recommended)` / `WARN (strict pass not reached)` —
+     findings remain after the cycle cap, a stagnation stop, a #36 hard-block, or a
+     strict-pass blocker. Never merged.
+   - `BLOCKED ({reason})` — the run stopped before a verdict, or the merge
+     failed: a failed prerequisite or missing bundled dependency, invalid
+     config, no PR or a closed PR, a `gi-secscan` block or stop, a merge
+     conflict, or `BLOCKED (manual merge required)`.
+2. **Evidence.** Name the checks that actually ran, with their observed result
+   and the commit they ran on: test count and `headRefOid` short SHA, the
+   `gi-ci-wait` verdict and `ci_status`, the `gi-secscan` exit and
+   `policy_source`, the PR-body re-read after a `Closes` edit. Print `✓ pass` only
+   for a check that ran and passed; print `○ skipped ({reason})` for one that did
+   not run. Each remaining finding keeps its `[dimension]` tag and `file:line`.
+   End with the PR URL on its own line.
+3. **Uncertainty.** Label what was inferred or not executed here: tests
+   inherited from a `trusted` QA marker (run by `/issue-resolver`, not by this
+   review); a skipped browser UI leg; a manual CI fallback; a `light` depth
+   profile; acceptance criteria marked `unverified`; reviewer findings, which are
+   model judgments above `review.confidence_threshold`, not executed checks.
+   Print `Uncertainty: none` only when every check ran here.
+4. **Decision.** Print `Decision: No approval needed.` — the merge gates are
+   configuration, not a prompt, and `--auto` runs never ask. Name the remaining
+   user action separately on a `Next action:` row: merge the PR yourself
+   (interactive `PASS` never merges), fix the listed findings and re-run, or the
+   `To fix:` command of a `BLOCKED` error.
+
+Rows that a stop before Step 7 cannot fill are omitted, never invented: a
+`BLOCKED` summary carries `Result`, `Evidence` (what ran before the stop),
+`Uncertainty`, `Decision`, and `Next action` only.
+
+### Format rule
+
+The default is the static terminal summary below: the five dimension lines plus
+at most `review.max_cycles` cycles of findings fit on one screen, and project
+convention forbids terminal animation. Interactive filtering is therefore not
+applicable; each finding already carries its dimension, `file:line`, and
+severity beside its claim. When the user asks for another format (for example a
+Markdown table to paste into a PR comment), render it from the same results and
+keep the `Result`, `Evidence`, `Uncertainty`, and `Decision` rows. When the host
+cannot render the requested format, say so and print the terminal summary.
+
+### Report-understanding criteria
+
+Grade a Step 7 summary on these, alongside correctness:
+
+| Criterion | Observable check |
+|-----------|------------------|
+| Main result is findable | The first row states `Result:` with its status and main finding; no scrolling or log reading is needed. |
+| Facts and assumptions are separated | `Evidence` names checks that ran here; inherited, skipped, or model-judged items appear under `Uncertainty`. |
+| Claims are traceable | Each finding names its dimension and `file:line`; each pass names the check and commit; a step `PASS` never stands in for a merge. |
+| Next decision is clear | `Decision:` and `Next action:` state whether approval is needed and what the user does next. |
+
+Behavioral evals apply these to actual summaries. Ask human reviewers the same
+four questions and record their answers in the eval's feedback; absent, blank,
+or nonresponsive feedback leaves human understanding unconfirmed.
+
 ## Summary — Clean PR
 
 ```
 ◆ PR Review: #{pr_number} (pass {N} — clean)
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
 
+  Result:            PASS — {main finding, e.g. "clean; ready to merge"}
   Script pre-pass:   ✓ lint/format auto-fixed ({auto_fixed} files)
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Review dimensions:
@@ -33,7 +114,10 @@ The axes are a presentation grouping only. The status symbol on each dimension l
   Issues fixed:      ✓ {total_fixed} total across {cycles} cycles
   Issues noted:      ○ {note_count} (medium, not blocking)
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  Result:            PASS
+  Evidence:          tests {count} passed @ {sha7}; CI {ci_status}
+  Uncertainty:       {inherited/skipped/model-judged items, or "none"}
+  Decision:          No approval needed.
+  Next action:       merge PR #{pr_number} (this run does not merge)
 
   {pr_url}
 ```
@@ -56,6 +140,7 @@ commit it is inherited from, never `✓ pass`:
 ◆ PR Review: #{pr_number} (pass {max} — issues remain)
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
 
+  Result:            WARN (manual review recommended) — {n} blocking findings remain
   Review dimensions:
     Spec axis (satisfies acceptance criteria?):
       acceptance_criteria: ✗ fail ({n_fail}/{n_total} criteria fail, {n_unverified} unverified)
@@ -68,8 +153,6 @@ commit it is inherited from, never `✓ pass`:
   Tests:             ✓ pass
   CI status:         ✓ pass
   Issues fixed:      ✓ {total_fixed} total across {max} cycles
-  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  Result:            WARN (manual review recommended)
 
   Remaining (grouped by axis):
     Spec axis:
@@ -77,6 +160,11 @@ commit it is inherited from, never `✓ pass`:
       ● [correctness] {description} ({file}:{line})
     Standards axis:
       ● [traceability] PR body missing Closes #{N}
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  Evidence:          tests {count} passed @ {sha7}; CI {ci_status}; {max} cycles run
+  Uncertainty:       {unverified criteria, model-judged findings, skipped legs}
+  Decision:          No approval needed.
+  Next action:       fix the Remaining findings, then re-run /issue-pr-review {pr_number}
 
   {pr_url}
 ```
@@ -86,7 +174,8 @@ Each remaining finding keeps its `[dimension]` tag; the axis sub-headers only gr
 ### Summary — Strict-pass blockers
 
 When `review.soft_pass: false`, any remaining `action: "note"` finding or
-`partial` dimension is a strict blocker even though it is not a fixer input:
+`partial` dimension is a strict blocker even though it is not a fixer input. The
+`Result:` row replaces the remaining-issues summary's first row:
 
 ```
   Result:            WARN (strict pass not reached)
@@ -198,22 +287,22 @@ If the PR is clean AND `--auto` is set (and `--no-merge` is **not** set):
 gh pr merge {N} --squash --delete-branch
 ```
 
-Append to the report on success:
+The merge runs after the summary prints, so close with a merge block whose first
+row supersedes the summary's `Result:`. On success:
 
 ```
-  Merge:             ✓ pass (squash merged)
-  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  Result:            MERGED
-
-  ✓ PR #{N} merged — branch {branch_name} deleted
+  Result:            MERGED — PR #{N} squash merged, branch {branch_name} deleted
+  Merge:             ✓ pass (gh pr merge exit 0)
+  Decision:          No approval needed.
 ```
 
 On merge failure:
 
 ```
+  Result:            BLOCKED (manual merge required) — {reason}
   Merge:             ✗ fail ({reason})
-  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  Result:            BLOCKED (manual merge required)
+  Decision:          No approval needed.
+  Next action:       resolve {reason}, then gh pr merge {N} --squash --delete-branch
 ```
 
 Auto-merge is gated on the configured loop-exit pass condition **plus exclusions the loop exit does not apply**: pending CI is never clean, and a terminal CI failure held non-blocking by `review.ignore_ci_billing_failures: true` is never clean either — that key satisfies the loop's CI leg so the fix loop can stop and report `PARTIAL`, and it never satisfies this gate. The shared part includes `traceability != fail` and zero `acceptance_criteria: fail`. With `review.soft_pass: false`, it additionally requires zero notes and no partial dimensions. A PR that passes tests and CI but fails traceability or acceptance criteria — or has a strict-pass blocker — is **not** auto-merged.

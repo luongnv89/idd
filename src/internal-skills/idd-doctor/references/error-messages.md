@@ -49,8 +49,8 @@ All errors follow the rich error format: what went wrong + fix command (+ docs l
 ```
         Fix: rewrite the offending lines to remove claims that /issue-creator
              scans the codebase, predicts affected files, or generates
-             implementation notes. See docs §1a or
-             /Users/.../src/skills/issue-creator/docs/README.md for the intent-only contract.
+             implementation notes. See SPEC.md §1.2 (intent–code boundary)
+             for the intent-only contract.
 ```
 
 ---
@@ -110,6 +110,13 @@ All errors follow the rich error format: what went wrong + fix command (+ docs l
 ```
 **Trigger:** `.gitissue.yml` exists but does not contain a recognizable `autopilot.mode` line.
 
+### Fail (unreadable)
+```
+  ✗ [3/4] Autopilot mode        .gitissue.yml unreadable
+        Fix: check the file's permissions:  ls -l .gitissue.yml
+```
+**Trigger:** `.gitissue.yml` exists but cannot be read. The check fails rather than stopping the run; Check 4 still runs.
+
 ---
 
 ## Check 4 — Squash-merge default
@@ -125,6 +132,12 @@ All errors follow the rich error format: what went wrong + fix command (+ docs l
   ○ [4/4] Squash-merge default  skipped — gh not authenticated
 ```
 **Trigger:** `gh auth status` exits non-zero.
+
+### Skip (repo settings unreadable)
+```
+  ○ [4/4] Squash-merge default  skipped — repo settings unreadable
+```
+**Trigger:** `gh` is authenticated but `gh repo view --json mergeCommitAllowed,squashMergeAllowed,rebaseMergeAllowed` fails — for example, the repo has no GitHub remote. Nothing was read, so the binding is neither passed nor warned.
 
 ### Pass
 ```
@@ -187,13 +200,16 @@ This repo today reads `squash-only · squash message source PR_BODY` — the mes
 
 ## Summary footer
 
-After all four checks, print one of:
+After all four checks, print the separator, one `Result:` line, then the three contract rows defined in `references/review-contract.md`:
 
 ```
+    ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
     Result: PASS  ({total} checks, 0 failed, 0 warned)
     Result: WARN  ({total} checks, 0 failed, {W} warned)
     Result: FAIL  ({total} checks, {F} failed, {W} warned)
-        Run /idd-doctor after applying fixes to verify.
+    Evidence:    ran {checks} · skipped {N} ({reason}) · scanned {a} skill files, {b} templates
+    Uncertainty: {items, separated by "; "}
+    Decision:    No approval needed — report-only, nothing changed. Next: {fix hints to apply, then re-run /idd-doctor | none}
 ```
 
-Where `{total}` is always 4. The "Run /idd-doctor after applying fixes…" hint is appended only when `{F} > 0`.
+Print exactly one of the three `Result:` lines. `{total}` is always 4. Omit the `skipped …` clause when no check skipped.

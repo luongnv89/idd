@@ -2,7 +2,7 @@
 # UI/UX Review Mechanics (shared)
 
 Single authoritative home for the auto-detected UI/UX review shared by
-`/issue-resolver` (Step 4 — QA) and `/issue-pr-review` (Step 3 — UI/UX Review).
+`/issue-resolver` (Step 4 — QA) and `/issue-pr-review` (Step 3 — Analyze & Review).
 Each consuming skill keeps only its own *deltas* (where the diff comes from,
 which config scope gates the browser pass, which variables it passes, and where
 findings flow) and points here for everything below.

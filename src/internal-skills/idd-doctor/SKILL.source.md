@@ -4,8 +4,8 @@ description: "Scan an IDD repo for doc drift, missing autopilot mode, and unsafe
 license: MIT
 compatibility: Requires git. GitHub CLI (gh) is optional — used only for the merge-strategy check; skipped when gh is absent.
 metadata:
-  version: 0.3.0
-  author: Luong NGUYEN <luongnv89@gmail.com>
+  version: 0.4.0
+  author: "Luong NGUYEN <luongnv89@gmail.com>"
   effort: low
 ---
 
@@ -45,7 +45,8 @@ those is **out of scope**:
 
 Before any check, verify the environment. On failure, print the exact error from `references/error-messages.md` and stop.
 
-1. Confirm git repository: `git rev-parse --git-dir`
+1. Confirm git repository: `git rev-parse --git-dir`. On a non-zero exit, print *Not a git repository*.
+2. Confirm the repo root is readable: `ls -a .`. On a non-zero exit, print *Could not read repo root*.
 
 `gh` is **optional**: Check 4 needs it plus authentication, and skips with an `○` note rather than failing the run when either is absent.
 
@@ -69,6 +70,8 @@ That stop is a terminal outcome: print the block, then the *Run Stats Footer* (`
 Check these, relative to this SKILL.md's directory:
 
 - `references/error-messages.md`
+- `references/review-contract.md`
+- `references/run-log-summary.md`
 - `references/run-stats.md`
 
 ## Configuration
@@ -81,7 +84,7 @@ If `.gitissue.yml` does **not** exist, Check 3 skips rather than fails (see *Che
 
 ## Pipeline
 
-The doctor executes the four checks in order — one line each, then a summary footer, then the informational *Run-log summary*. Checks never short-circuit: every one runs even after a `FAIL`, so the operator sees the full picture in one pass.
+The doctor executes the four checks in order — one line each, then a summary footer, then the informational *Run-log summary*. Checks never short-circuit: every one runs even after a `FAIL`, so the operator sees the full picture in one pass. Each check prints its outcome line, findings, and fix hint exactly as `references/error-messages.md` gives them under that check's heading; the sections below define only *when* each outcome applies.
 
 **Capture the run clock before Check 1** — one `date +%s`, kept as `run_started_epoch`; the *Run Stats Footer* (`references/run-stats.md`) measures `elapsed` from it. Reading a clock is not a repo mutation, so it stays inside the *Read-only guarantee*.
 
@@ -105,17 +108,22 @@ Expected output for a clean repo (verify against this when testing):
 
     ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
     Result: PASS  (4 checks, 0 failed, 0 warned)
+    Evidence:    ran 1 2 3 4 · scanned 2 skill files, M templates
+    Uncertainty: checks 1-3 are text heuristics
+    Decision:    No approval needed — report-only, nothing changed. Next: none
 ```
+
+The run-log summary and the run-stats footer follow that block.
 
 **Exit codes** (when invoked from a script wrapper):
 
 | Result | Exit | When |
 |--------|------|------|
-| `PASS` | 0 | All four pass; a warning is not a failure, though it changes the label |
+| `PASS` | 0 | No `FAIL` and no `WARN`; a skipped check counts as neither |
 | `WARN` | 0 | At least one `WARN`, no `FAIL` |
 | `FAIL` | 1 | At least one `FAIL` |
 
-The skill runs inside an agent, so there is no real exit code — but the final line MUST end with `PASS`, `WARN`, or `FAIL` so a wrapper script can grep for it.
+The skill runs inside an agent, so there is no real exit code. A wrapper script greps the `Result:` line instead, so that line MUST carry `PASS`, `WARN`, or `FAIL` as the first word after `Result:`. Lines printed after it never carry a status word in that position.
 
 ---
 
@@ -155,20 +163,10 @@ The negation guard exists so a line like *"the issue-creator skill **does not** 
 
 The negation check is **per-line**: a negation in a separate paragraph does not absolve a later positive claim.
 
-### Output
+### Outcome
 
-| Outcome | Line |
-|---------|------|
-| Pass | `✓ [1/4] Stale skill claims    no stale language in /issue-creator` |
-| Fail | `✗ [1/4] Stale skill claims    {K} drifted line(s) in {J} file(s)` followed by a per-finding block |
-
-Per-finding block (indented under the check line):
-
-```
-        {path}:{line_number}
-        pattern: {matched_pattern}
-        line:    {trimmed_line_text}
-```
+- **Pass** — no finding in either file.
+- **Fail** — at least one finding. Print the fail line, one per-finding block (`{path}:{line_number}`, `pattern:`, `line:`) per finding, then the fix hint once. A file in scope that does not exist is one finding: `{path} not found`.
 
 ---
 
@@ -191,8 +189,7 @@ src/skills/issue-creator/templates/*.md
 |---------|-------------------|
 | `affected files` | predicting them is the resolver's job |
 | `predicted affected files` | same |
-| `technical notes` (with `generated` or as a header label like `## Technical Notes`) | generated technical notes belong in the resolver, not the issue |
-| `## technical notes` | section header for forbidden content |
+| `technical notes` (also matches a `## Technical Notes` header) | generated technical notes belong in the resolver, not the issue |
 | `root cause` | root-cause analysis is the resolver's job |
 | `implementation hints` | they belong in the resolver |
 | `implementation notes` | same |
@@ -204,16 +201,11 @@ The match is **substring**, case-insensitive; a literal `Affected Files:` in a t
 
 Check 1's *Pattern match algorithm* without its negation steps: every matching line records a finding `{file, line_number, pattern, snippet}`.
 
-### Output
+### Outcome
 
-| Outcome | Line |
-|---------|------|
-| Pass | `✓ [2/4] Issue-template fields no forbidden fields in N template(s)` |
-| Fail | `✗ [2/4] Issue-template fields {K} forbidden field(s) in {J} template(s)` followed by a per-finding block |
-
-Per-finding format (same as Check 1).
-
-If no template file exists at all (neither `src/skills/issue-creator/templates/` nor `.github/ISSUE_TEMPLATE/`), the check passes with `✓ [2/4] Issue-template fields no template files found — nothing to check`.
+- **Pass (no templates)** — no file matches any glob above. Nothing was scanned, so `Evidence` reports `0 templates`.
+- **Pass** — every scanned template is clean.
+- **Fail** — at least one finding. Print the fail line, one per-finding block per finding (Check 1's format), then the fix hint once.
 
 ---
 
@@ -223,30 +215,16 @@ Verify that `.gitissue.yml`, when present, sets `autopilot.mode`. That key makes
 
 ### Procedure
 
-1. Check whether `.gitissue.yml` exists in the repo root. If not, **skip** — see *Output*.
-2. If present, read it as text — no YAML parser required; a regex check suffices and adds no dependency.
-3. Look for a line matching `^[[:space:]]*mode:[[:space:]]*[^#[:space:]]+` inside an `autopilot:` block. Equivalent shell heuristic:
+1. Check whether `.gitissue.yml` exists in the repo root. If not, skip with `○ [3/4] Autopilot mode        skipped — no .gitissue.yml`.
+2. Read the file as text — no YAML parser required; a regex check suffices and adds no dependency. If the file exists but cannot be read, print the *Fail (unreadable)* line and go to Check 4.
+3. Look for a line matching `^[[:space:]]+mode:[[:space:]]*[^#[:space:]]+` inside an `autopilot:` block. Any non-empty value matches; the value is not validated in v1. Equivalent shell heuristic:
 
    ```bash
-   awk '/^autopilot:/{f=1;next} /^[^[:space:]#]/{f=0} f' .gitissue.yml | grep -E '^[[:space:]]+mode:[[:space:]]*(conservative|balanced|aggressive)\b'
+   awk '/^autopilot:/{f=1;next} /^[^[:space:]#]/{f=0} f' .gitissue.yml | grep -E '^[[:space:]]+mode:[[:space:]]*[^#[:space:]]+'
    ```
 
-4. If a match is found, capture the mode value for the report.
-
-### Output
-
-| Outcome | Line |
-|---------|------|
-| Skip | `○ [3/4] Autopilot mode        skipped — no .gitissue.yml` |
-| Pass | `✓ [3/4] Autopilot mode        autopilot.mode = {value}` |
-| Fail | `✗ [3/4] Autopilot mode        .gitissue.yml has no autopilot.mode` |
-
-The fail line is followed by a fix hint indented one extra level:
-
-```
-        Fix: add to .gitissue.yml under `autopilot:`
-          mode: conservative
-```
+4. If a line matches, the check passes; capture the value for the pass line.
+5. If no line matches, the check fails; print the fail line and its fix hint.
 
 ---
 
@@ -265,6 +243,7 @@ Verify the repository's merge configuration carries the SPEC §4.3 **B1** bindin
    gh repo view --json mergeCommitAllowed,squashMergeAllowed,rebaseMergeAllowed
    ```
 
+   If this call fails (for example, no GitHub remote), skip with `○ [4/4] Squash-merge default  skipped — repo settings unreadable` and stop the check; nothing was read, so nothing is claimed.
 3. Read the **message source** — a second, separate call. It is not a `gh repo view` field (`gh repo view --json squashMergeCommitMessage` fails with `Unknown JSON field`), so read the REST API:
 
    ```bash
@@ -280,51 +259,14 @@ Verify the repository's merge configuration carries the SPEC §4.3 **B1** bindin
      AND squash_merge_commit_message == "PR_BODY"
    ```
 
-5. If step 2 succeeded but step 3 did not — a 404, a token lacking permission, an absent field — the message source is **unknown**. Warn with `binding unverified`. Never pass: an unread configuration is not a satisfied binding (SPEC §4.3). A missing or unauthenticated `gh` still **skips** (step 1): a skip claims nothing about the binding, which is not the same as claiming it holds.
-6. Otherwise, **warn** (not fail) — repo settings are owner-controlled and the doctor only nudges.
-
-### Output
-
-| Outcome | Line |
-|---------|------|
-| Skip | `○ [4/4] Squash-merge default  skipped — gh not installed` (or *not authenticated*) |
-| Pass | `✓ [4/4] Squash-merge default  squash-only · squash message source PR_BODY` |
-| Warn | `⚠ [4/4] Squash-merge default  {summary} — recommend squash-only` |
-| Warn (unread) | `⚠ [4/4] Squash-merge default  {summary}; squash message source unreadable — binding unverified` |
-
-`{summary}` lists the allowed strategies, then — when step 3 succeeded — the message-source clause. For example `squash + merge-commit + rebase enabled; squash message source PR_BODY`, or `squash-only; squash message source COMMIT_MESSAGES`. The full enumeration is in `references/error-messages.md`.
-
-The warn line is followed by a fix hint indented one extra level:
-
-```
-        Fix: in repo Settings → General → Pull Requests, allow only "Squash merging",
-             and set the squash commit message to "Pull request title and description"
-        Or:  gh api -X PATCH repos/:owner/:repo \
-               -f allow_squash_merge=true \
-               -f allow_merge_commit=false \
-               -f allow_rebase_merge=false \
-               -f squash_merge_commit_title=PR_TITLE \
-               -f squash_merge_commit_message=PR_BODY
-```
-
-Both `squash_merge_commit_*` fields go in one call: GitHub pairs `PR_BODY` only with `PR_TITLE`, rejecting the message alone with HTTP 422.
+5. If step 2 succeeded but step 3 did not — a 404, a token lacking permission, an absent field — the message source is **unknown**. Print the *Warn — message source unreadable* line, which ends `binding unverified`. Never pass: an unread configuration is not a satisfied binding (SPEC §4.3). A missing or unauthenticated `gh` still **skips** (step 1): a skip claims nothing about the binding, which is not the same as claiming it holds.
+6. Otherwise, **warn** (not fail) with `⚠ [4/4]` and the fix hint — repo settings are owner-controlled and the doctor only nudges. Build `{summary}` from the strategy and message-source tables in `references/error-messages.md`.
 
 ---
 
 ## Summary footer
 
-After all four checks, print:
-
-```
-    ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-    Result: {RESULT}  ({total} checks, {failed} failed, {warned} warned)
-```
-
-`{RESULT}` is `PASS`, `WARN`, or `FAIL` per the exit-code table. If any check failed, append a one-line hint:
-
-```
-    Run /idd-doctor after applying fixes to verify.
-```
+After all four checks, print the separator, then `Result: {RESULT}  ({total} checks, {failed} failed, {warned} warned)` — `{RESULT}` per the exit-code table, `{total}` always 4. Then print the `Evidence`, `Uncertainty`, and `Decision` rows from `references/review-contract.md`, which also holds the format rule for a requested Markdown or JSON report. The exact layouts are under *Summary footer* in `references/error-messages.md`.
 
 ---
 
@@ -348,51 +290,17 @@ JSON object per line carrying at least `ts`, `issue`, `mode`, `outcome`, and
    and stop the section. Absence is never a failure.
 2. Otherwise take the **last N** lines (default `N = 50`). That cap bounds the
    agent's context budget — never load a long-lived repo's whole log into the
-   context window. Tolerate malformed lines: silently skip any that is not valid
-   JSON rather than aborting the summary.
-3. Compute, over the parsed runs:
-   - **Resolve rate** — share of runs whose `outcome` is a delivered resolution;
-     count `success` (resolver) and `merged` (auto-pilot) as resolved, and report
-     `resolved / total` with a percentage.
-   - **Median QA cycles** — median `qa_cycles` across the runs carrying it (omit
-     runs without the field); `n/a` if none carry it.
-   - **Common skip reasons** — the top few `skipped_reason` values by frequency
-     among `skipped` / `already_resolved` runs, each with its count.
-   - **Agent overrides** — among the runs carrying `agent_overrides`, the count
-     of each value: `applied`, `partial`, `fallback`. A run without the field
-     had no override configured and is not counted; an unknown value is ignored.
-     When no run carries it, print `none configured` instead of three zeros.
-   - **Slowest phase** — among the runs carrying a `phases` object, the median
-     seconds of each phase name (skip a non-object `phases` and any entry that is
-     not a non-negative integer); print the phase with the highest median, its
-     median and how many runs recorded it. `n/a` when no run carries the field.
-4. Print the section using DESIGN.md symbols.
-
-### Output
-
-```
-    ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-    ○ Run-log summary           last {n} of {total} runs
-        Resolve rate:    {resolved}/{n} ({pct}%)
-        Median QA cycles: {median}
-        Top skip reasons: {reason1} ({c1}), {reason2} ({c2})
-        Agent overrides:  {applied} applied · {partial} partial · {fallback} fallback
-        Slowest phase:    {phase} (median {median}s · {runs} runs)
-```
-
-When no runs are recorded, *Procedure* step 1's single graceful-degradation line replaces the whole block.
-
-A read heuristic for steps 1–3 (no new dependency — `tail` + a JSON-aware pass):
-
-```bash
-[ -s .gitissue/runs.jsonl ] && tail -n 50 .gitissue/runs.jsonl
-```
+   context window. Tolerate malformed lines: skip any that is not valid JSON
+   rather than aborting the summary, and count them as `{m}`.
+3. Compute the five metrics — resolve rate, median QA cycles, common skip
+   reasons, agent overrides, slowest phase — and print the section, both
+   exactly as `references/run-log-summary.md` defines them.
 
 ---
 
 ## Run stats footer
 
-After the run-log summary, close with the *Run Stats Footer* — `references/run-stats.md` — `elapsed`, `tokens` only where the host reported a count (otherwise left out), `agents`, run cost only, `n/a` for anything else undetermined. It is the last thing printed at **every** terminal outcome, including a run that never reached Check 1: not a git repository, a missing bundled dependency, no `src/skills/` tree, or an unreadable `.gitissue.yml`. The doctor spawns no subagents, so `agents 0` is the determined value here, not `n/a`. It reports the run's own cost and never a metric a check already printed.
+After the run-log summary, close with the *Run Stats Footer* — `references/run-stats.md` — `elapsed`, `tokens` only where the host reported a count (otherwise left out), `agents`, run cost only, `n/a` for anything else undetermined. It is the last thing printed at **every** terminal outcome, including a run that never reached Check 1: not a git repository, an unreadable repo root, or a missing bundled dependency. A missing `/issue-creator` or an unreadable `.gitissue.yml` is a check finding, not a stop. The doctor spawns no subagents, so `agents 0` is the determined value here, not `n/a`. It reports the run's own cost and never a metric a check already printed.
 
 ---
 
@@ -406,17 +314,13 @@ It reads files (via `Read` / `cat`) and runs read-only `gh` queries (`gh repo vi
 
 ## Testing
 
-Integration tests live in `tests/test-idd-doctor.sh` — pure bash, exit 0 on pass. They assert this spec against itself: package structure; both forbidden-pattern catalogs; the four checks in order; the read-only guarantee; the `gh` field selections; every skip and both fix-hint formats; the exit-code mapping; and the run-log summary's non-gating contract, graceful degradation, and metrics. Run with:
-
-```bash
-bash tests/test-idd-doctor.sh
-```
+`tests/test-idd-doctor.sh` (pure bash, exit 0 on pass) asserts this spec against itself — structure, both pattern catalogs, check order, read-only guarantee, `gh` field selections, skips, exit codes, and the run-log summary. Run `bash tests/test-idd-doctor.sh`. Those assertions check correctness only; grade a real report's readability against the *Understanding criteria* in `references/review-contract.md`.
 
 ---
 
 ## Output Conventions
 
-Terminal output follows the `DESIGN.md` contract (repo root) — symbols `● ✓ ✗ ◆ ⚡ ⚠ ○`, two-space indent, `┄` separators, URLs on their own line, ≤80 chars, one blank line between sections, static sequential output (no animation). Per-check line: `{symbol} [N/4] {Check name (16 chars)} {detail}`; per-finding indent 8 spaces (4 + 4). Errors use the rich format from `references/error-messages.md`: `✗ what failed`, `To fix:  <command>`, then a docs link when applicable.
+Terminal output follows the `DESIGN.md` contract (repo root) — symbols `● ✓ ✗ ◆ ⚡ ⚠ ○`, two-space indent, `┄` separators, URLs on their own line, ≤80 chars, one blank line between sections, static sequential output (no animation). Per-check line: `{symbol} [N/4] {Check name (16 chars)} {detail}`; per-finding indent 8 spaces (4 + 4). Errors use the rich format from `references/error-messages.md`: `✗ what failed`, `To fix:  <command>`, then a docs link when applicable. This terminal layout is the default; a requested Markdown or JSON report follows the *Format rule* in `references/review-contract.md`.
 
 ## Edge Cases
 

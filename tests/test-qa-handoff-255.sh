@@ -408,26 +408,26 @@ check_has "$BUILT_PR" '[Nn]o new config key is introduced' \
 # Precedence with the pre-existing light|full depth gate, stated once.
 PRECEDENCE_HITS="$(grep -rlE 'Precedence, stated once' "$REPO_ROOT/src" 2>/dev/null || true)"
 PRECEDENCE_COUNT="$(printf '%s\n' "$PRECEDENCE_HITS" | grep -c . || true)"
-if [ "$PRECEDENCE_COUNT" = "1" ] && [ "$PRECEDENCE_HITS" = "$SRC_PR" ]; then
+if [ "$PRECEDENCE_COUNT" = "1" ] && [ "$PRECEDENCE_HITS" = "$SRC_LOOP" ]; then
   pass "T7.6: the depth ↔ handoff precedence is stated in exactly one src/ file"
 else
   fail "T7.6: the precedence rule must live in exactly one src/ file — found $PRECEDENCE_COUNT"
   printf '      %s\n' $PRECEDENCE_HITS
 fi
-check_has "$SRC_PR" 'bounded \*\*relative to the ungated pipeline\*\*' \
+check_has "$SRC_LOOP" 'bounded \*\*relative to the ungated pipeline\*\*' \
   "T7.7: qa_handoff's power is bounded against the ungated pipeline"
-check_has "$SRC_PR" 'may only \*\*narrow\*\*' \
+check_has "$SRC_LOOP" 'may only \*\*narrow\*\*' \
   "T7.7b: it may only narrow what a stale/absent PR already gets"
-check_has "$SRC_PR" 'per verdict, not monotonic across the run' \
+check_has "$SRC_LOOP" 'per verdict, not monotonic across the run' \
   "T7.7c: the bound is per verdict, so re-evaluation is not a widening"
-check_has "$SRC_PR" 'review collapse \*\*and\*\* the cycle cap' \
+check_has "$SRC_LOOP" 'review collapse \*\*and\*\* the cycle cap' \
   "T7.8: profile=light against pr-review full refuses the collapse AND the cap"
-check_has "$SRC_PR" 'duplicate-test skip still applies' \
+check_has "$SRC_LOOP" 'duplicate-test skip still applies' \
   "T7.9: that same asymmetric case still allows the duplicate-test skip"
 check_block_has "$SKIPS_BLOCK" 'the same carve-out as the reviewer-collapse row' \
   "T7.10: the skips table's cycle-cap row names the same carve-out, not 'always'"
-check_block_has "$SKIPS_BLOCK" 'refuses the collapse \(\*Precedence\* in SKILL.md owns that rule' \
-  "T7.11: the skips table points at SKILL.md instead of restating the rule"
+check_block_has "$SKIPS_BLOCK" 'refuses the collapse \(\*Precedence\* above owns that rule' \
+  "T7.11: the skips table points at the Precedence section instead of restating the rule"
 
 # ───────────────────────────────────────────────────────────
 # T8 (AC1/AC2): headRefOid is actually fetched — the predicate is

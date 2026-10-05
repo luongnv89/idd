@@ -130,27 +130,67 @@ If no analysis JSON exists (e.g., resolver was invoked without prior analysis), 
 
 ## Closing Summary
 
-The closing summary is the **single** end-of-run block. It does **not** repeat
-anything the live `[N/5]` tracker already showed — neither per-step pass/fail nor
-the per-step metrics (files read, complexity, option, files changed, test counts,
-QA cycles all appear on the tracker lines, see *Expected Inline Pipeline Output*).
-The closing block carries **only facts the tracker never printed**: the overall
-outcome line, the `risk_rating` (Plan never surfaces it on its tracker line), and
-the single PR reference (number, title, URL, `Closes #N`). Print it **once**,
-immediately after the tracker's `[5/5]` line — do not also print a separate
-step-by-step report. Pick the variant that matches the run's outcome.
+The closing summary is the **single** end-of-run block. It never repeats a
+per-step pass/fail or a metric the `[N/5]` tracker already printed (files read,
+complexity, option, files changed, test counts, QA cycles — see *Expected Inline
+Pipeline Output*). Print it **once**: after the tracker's last line, or after the
+error block of a stop. Pick the variant that matches the run's outcome.
 
-> Why so spare: the tracker is the recap. Restating its metrics here would
-> report the same number twice — keep this block to the outcome, the one un-shown
-> metric (risk), and the PR reference.
+### Review contract
+
+Apply these rules to every variant. The resolver opens a PR and never merges it,
+so no row asks for approval. The rows are human-facing only: the report-back
+fields a caller reads and the run-log record keep their shape.
+
+1. **Result first.** The first row is `Result:` with one status and the main
+   finding or stop reason:
+   - `DONE` — a PR was created and every step's completion report printed
+     `Result: PASS`; or the issue was `already_resolved`.
+   - `PARTIAL` — a PR was created, but at least one step printed
+     `Result: PARTIAL` (residual QA findings, a failed board sync or run-log
+     append, a check that could not be evaluated).
+   - `BLOCKED` — the run stopped before a PR was created: a failed
+     prerequisite, an invalid config, a missing bundled dependency, `not found`,
+     `closed`, `pr_in_progress`, a declined design confirm, a step that printed
+     `Result: FAIL`, a blocked secret scan, or a failed final test run.
+
+   These run statuses are separate from the per-step `PASS | PARTIAL | FAIL`
+   vocabulary (*Step Completion Reports*).
+2. **Evidence.** Name only checks that ran, each with its observed result: the
+   final suite (`{count} passed@{sha7}`, or its skip reason), the secret-scan
+   verdict and `policy_source`, the QA verdict, the PR URL that `gh pr create`
+   returned, the docs search (*Update documentation*), and the run-log write
+   (`appended`, `echoed`, or `fallback`). For `already_resolved`, cite the fixing
+   commit or PR. For `BLOCKED`, cite the failed check and its observed output.
+3. **Uncertainty.** List what this run did not verify: PR-body AC rows not marked
+   `pass`, a skipped browser UI review, `resolve.auto_test: false`, a script that
+   degraded to its prose procedure, the inline fallback without the Agent tool,
+   a reused analysis (`analysis_reuse = fresh` — verified first, not re-derived),
+   and the `light` profile's single QA cycle. Label `risk_rating` as a judgment,
+   not a measurement. Write `none identified` only when no item applies.
+4. **Decision.** Print `Decision: No approval needed.` in interactive and auto
+   mode alike. Name the remaining user action on `Next action:`:
+   - a created PR: `/issue-pr-review {pr_number}` (review, then merge);
+   - under `/auto-pilot`: `none — auto-pilot reviews and merges`;
+   - `pr_in_progress`: `/issue-pr-review {pr_number}` for the existing PR;
+   - any other `BLOCKED`: the `To fix:` command of the error block.
+
+A wrapped row continues on the next line, aligned under its value, so every line
+stays within 80 characters.
 
 ### Successful Resolution
 
-Every step passed:
+Every step printed `Result: PASS`:
 
 ```
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  ✓ Issue #{issue_number} resolved ({risk_rating} risk)
+  Result:       DONE — issue #{issue_number} resolved ({risk_rating} risk)
+  Evidence:     final tests {count} passed@{sha7}
+                secret scan pass ({policy_source}) · QA review clean
+                run log {run_log_state}
+  Uncertainty:  {items, or "none identified"}
+  Decision:     No approval needed.
+  Next action:  /issue-pr-review {pr_number}
 
   PR #{pr_number}: {pr_title}
   https://github.com/owner/repo/pull/{pr_number}
@@ -159,15 +199,19 @@ Every step passed:
 
 ### Resolution With Warnings
 
-When any step had problems (e.g., QA could not fully clean up, tests still flaky).
-The outcome line names the residual issue — the remaining-count and cycle total
-are genuinely new (the tracker's `[4/5] QA` line would have shown the in-progress
-state, not the final unresolved count):
+A PR was created, but a step printed `Result: PARTIAL`. The `Result:` row names
+the residual gap — the remaining count and cycle total are new facts (the
+tracker's `[4/5] QA` line showed the in-progress state, not the final count):
 
 ```
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  ⚠ Issue #{issue_number} resolved — manual review recommended ({risk_rating} risk)
-    ⚠ QA: {remaining} issues remain after {cycles} cycles
+  Result:       PARTIAL — issue #{issue_number} PR created ({risk_rating} risk)
+                QA: {remaining} issues remain after {cycles} cycles
+  Evidence:     final tests {count} passed@{sha7}
+                secret scan pass ({policy_source}) · run log {run_log_state}
+  Uncertainty:  {remaining} unresolved QA findings listed in the PR body
+  Decision:     No approval needed.
+  Next action:  /issue-pr-review {pr_number}
 
   PR #{pr_number}: {pr_title}
   https://github.com/owner/repo/pull/{pr_number}
@@ -176,14 +220,62 @@ state, not the final unresolved count):
 
 ### Already Resolved
 
-Step 0 or Step 1 detected the issue was already closed — no PR is created, so the
-PR reference is omitted entirely. The fixing SHA is the one new fact:
+Step 0 or Step 1 found the fix already on the default branch. No PR is created,
+so the PR reference is omitted:
 
 ```
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  ○ Issue #{issue_number} already resolved — closed, no PR needed
-    already fixed by {sha7}
+  Result:       DONE — issue #{issue_number} already resolved, no PR needed
+  Evidence:     fixed by {sha7} ({merged PR #M | closing commit})
+  Uncertainty:  matched by commit and PR text; the suite was not re-run
+  Decision:     No approval needed.
+  Next action:  {"none — issue closed", or "close #{issue_number}"}
 ```
+
+### Blocked
+
+The run stopped before a PR was created. The error block from
+`references/error-messages.md` prints first; this block follows it:
+
+```
+  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+  Result:       BLOCKED — {stop reason}
+  Evidence:     {failed check}: {observed output}
+  Uncertainty:  {steps not run, e.g. "Steps 1-5 not run; no code changed"}
+  Decision:     No approval needed.
+  Next action:  {To fix command, or /issue-pr-review {pr_number}}
+```
+
+### Format rule
+
+The default format is the terminal block above, after the `[N/5]` tracker. The
+PR body is the durable Markdown record. If the user asks for another format (for
+example a Markdown summary or JSON), render it from the same facts and keep the
+`Result`, `Evidence`, `Uncertainty`, `Decision` and `Next action` rows. If the
+host cannot render the requested format, say so and print the terminal block.
+
+The resolver produces no interactive report: one run covers one issue and one
+PR, the closing block has at most a dozen rows, and the PR body's *Acceptance
+Criteria Verification* table already ties each criterion to its evidence. No
+review of this output needs repeated filtering.
+
+### Evaluate report understanding
+
+Grade actual outputs against these criteria as well as correctness:
+
+| Criterion | Observable check |
+|---|---|
+| Result is findable | The first row states `DONE`, `PARTIAL` or `BLOCKED` and the PR or stop reason, without reading the tracker or logs. |
+| Facts and assumptions are separate | Observed checks (suite run, secret scan, `gh pr create` URL) are distinct from unverified ACs, skipped legs and `risk_rating`. |
+| Claims are traceable | Each test claim names its count and SHA; `already_resolved` names the fixing commit; `BLOCKED` names the failed check; `PARTIAL` names the residual gap. A created PR is not reported as merged. |
+| Next decision is clear | The output says `No approval needed.` and names the next action. |
+
+When running behavioral evaluations, include a delivered PR, a PR with residual
+QA findings, a blocked secret scan, and an `already_resolved` issue, and grade
+each closing block against all four rows. Ask human reviewers the matching four
+questions and record their answers in the eval case's `human_review` block.
+Missing, blank, or nonresponsive feedback leaves human understanding
+unconfirmed; agent inspection cannot confirm it.
 
 ## Expected Inline Pipeline Output
 
@@ -201,17 +293,22 @@ in the closing block:
   [4/5] QA           ✓ clean after 2 cycles
   [5/5] Deliver      ✓ PR #87 created
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  ✓ Issue #42 resolved (low risk)
+  Result:       DONE — issue #42 resolved (low risk)
+  Evidence:     final tests 14 passed@3f9c2a1
+                secret scan pass (ref:origin/main) · QA review clean
+                run log appended
+  Uncertainty:  browser UI review skipped (no running app)
+  Decision:     No approval needed.
+  Next action:  /issue-pr-review 87
 
   PR #87: fix(auth): resolve mobile auth redirect (#42)
   https://github.com/user/repo/pull/87
   Closes #42
 ```
 
-Every metric the old closing block restated — files read, complexity, option,
-files changed, test counts, QA cycles — is already on a `[N/5]` tracker line
-above. Only the outcome, the `risk_rating`, and the PR reference are new, so only
-those appear below the separator.
+The tracker metrics — files read, complexity, option, files changed, test counts,
+QA cycles — stay on the `[N/5]` lines above. Below the separator are only the
+*Review contract* rows, the `risk_rating`, and the PR reference.
 
 ## Run-log entry — field derivation and suppression
 

@@ -26,7 +26,18 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 
   Choose: [overwrite/merge/cancel]
 ```
-**Trigger:** `.gitissue.yml` already exists in the repo root.
+**Trigger:** `.gitissue.yml` already exists in the repo root and the run is interactive. In auto mode (`--auto` or `IDD_AUTO_MODE=1`) this prompt is not shown: print `⚠ Auto mode: overwrite/merge/cancel prompt skipped — kept the existing .gitissue.yml (cancel).` and take **cancel**.
+
+### Existing config does not parse
+```
+✗ Existing .gitissue.yml does not parse as YAML — cannot merge
+
+  {yaml_parse_error}
+
+  To fix:  fix the file by hand, or re-run /init-gitissue and choose overwrite
+  Docs:    https://github.com/luongnv89/idd/blob/main/docs/config-schema.md
+```
+**Trigger:** The user chose **merge** and the existing file fails the YAML parse. The file is left untouched and the run reports `Result: BLOCKED`.
 
 ## Detection
 

@@ -19,7 +19,7 @@ A separate, narrower opt-out exists for refactor/chore PRs (see *Refactor/chore 
 
 ## Reviewer-category → dimension mapping
 
-The five user-facing dimensions and the fixed mapping from reviewer categories live in SKILL.md (*Dimensional review output*). The reviewer's JSON output partitions findings by its own categories; this skill aggregates them: `correctness` → `correctness`; `code_quality` + `test_coverage` → `maintainability`; `security` + `edge_cases` → `safety`. The remaining two dimensions (`acceptance_criteria`, `traceability`) are produced by the checks below. Each dimension's status: any `action: fix` finding → ✗ `fail`; only `action: note` findings → ⚠ `partial`; no findings → ✓ `pass`.
+SKILL.md (Step 3, *Dimensions*) names the five user-facing dimensions; this section owns the fixed mapping from reviewer categories. The reviewer's JSON output partitions findings by its own categories; this skill aggregates them: `correctness` → `correctness`; `code_quality` + `test_coverage` → `maintainability`; `security` + `edge_cases` → `safety`. The remaining two dimensions (`acceptance_criteria`, `traceability`) are produced by the checks below. Each dimension's status: any `action: fix` finding → ✗ `fail`; only `action: note` findings → ⚠ `partial`; no findings → ✓ `pass`.
 
 ## Two-axis grouping — Spec vs Standards
 
