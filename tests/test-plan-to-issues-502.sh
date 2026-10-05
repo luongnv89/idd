@@ -119,6 +119,26 @@ has "$TMP/a.md" '^### P1 — Secure · not filed$' "AC4: an unfiled phase is kep
 has "$TMP/a.md" '⚠ unknown dep Z\.9' "AC4: unknown dependency flagged, never guessed"
 has "$TMP/a.md" '/plan-to-issues sync 100' "AC4: sync hint names the epic"
 
+# ── R1: sub-issue reads paginate ─────────────────────────────────────────────
+# The sub_issues list endpoint returns 30 per page; an unpaginated read silently
+# drops children 31+ (sync would then unlink them). Every GET read must carry
+# --paginate. Exempt: the POST registration and the preflight existence probe.
+unpaged="$(grep -rnE 'gh api[^`]*sub_issues' "$ROOT/src/skills/plan-to-issues" \
+  | grep -vE -- '--method POST|issues/1/sub_issues' | grep -v -- 'gh api --paginate' || true)"
+if [ -z "$unpaged" ]; then
+  pass "R1: every sub_issues GET read uses --paginate"
+else
+  fail "R1: sub_issues read without --paginate: ${unpaged//$ROOT\//}"
+fi
+# --paginate applies --jq per page, so an aggregate (length, [...]) prints one
+# value per page; counts must use one-number-per-line output instead.
+aggr="$(grep -rnE 'sub_issues.*--jq .(length|\[)' "$ROOT/src/skills/plan-to-issues" || true)"
+if [ -z "$aggr" ]; then
+  pass "R1: no per-page jq aggregate on a sub_issues read"
+else
+  fail "R1: per-page jq aggregate on a sub_issues read: ${aggr//$ROOT\//}"
+fi
+
 # ── AC5: shipped and listed ──────────────────────────────────────────────────
 BUILT="$ROOT/skills/plan-to-issues"
 if cmp -s "$BUILT/references/scripts/gi-plan-map.py" "$SCRIPT"; then

@@ -217,7 +217,7 @@ progress, and resumption at phase granularity. Format and invocation:
   `Depends on #N` marker. Phases file in order, so cross-phase deps resolve.
 
 **Completion criteria:** created + skipped equals the filtered worklist count; every issue carries
-`Part of #<epic>` and its full label set; `gh api …/issues/<epic>/sub_issues --jq 'length'` matches;
+`Part of #<epic>` and its full label set; `gh api --paginate …/issues/<epic>/sub_issues --jq '.[].number' | wc -l` matches;
 every task with dependencies carries `Depends on #N`; every id maps to exactly one issue. A task
 that failed to file is listed by id with its error — never silently dropped.
 

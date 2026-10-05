@@ -25,7 +25,8 @@ gh groups only).
    issue number would otherwise inject a phantom child — see `references/epic-dashboard.md` ->
    *Sync algorithm*.
 3. Fetch the epic's registered children in one call:
-   `gh api repos/{owner}/{repo}/issues/<epic>/sub_issues --jq '.[].number'`. Compare against the
+   `gh api --paginate repos/{owner}/{repo}/issues/<epic>/sub_issues --jq '.[].number'` (`--paginate`
+   is required: the endpoint returns 30 per page, and a missed page would drop real children). Compare against the
    numbers parsed in step 2 — a child registered on the epic but absent from the map is one the map
    must gain; a number in the map that is no longer a child is one it must lose. Issue *state* is
    deliberately not fetched: the map does not render it.

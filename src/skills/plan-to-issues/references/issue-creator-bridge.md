@@ -161,7 +161,7 @@ already linked still linked. The call is idempotent enough to re-run — re-addi
 sub-issue returns an error that is safe to ignore — but check first when you want a clean log:
 
 ```bash
-gh api "repos/$repo/issues/<epic>/sub_issues" --jq '[.[].number]'   # already registered
+gh api --paginate "repos/$repo/issues/<epic>/sub_issues" --jq '.[].number'   # already registered, one per line
 ```
 
 **If the endpoint is unavailable** (older GitHub Enterprise, or the feature disabled), do not fall
@@ -169,8 +169,9 @@ back to writing checkboxes into the map — that reintroduces the stale-status p
 continue: `⚠ sub-issues unavailable — the epic lists its children but GitHub will not show their
 status; open a child to see it`. The map is still correct; only the live panel is missing.
 
-**Completion criteria:** `gh api repos/$repo/issues/<epic>/sub_issues --jq 'length'` equals the
-number of issues filed under this epic, and every number it returns appears in the plan map.
+**Completion criteria:** `gh api --paginate repos/$repo/issues/<epic>/sub_issues --jq '.[].number' | wc -l`
+equals the number of issues filed under this epic, and every number the same call lists (without
+`| wc -l`) appears in the plan map.
 
 ## Step 5 — Dependency pass
 

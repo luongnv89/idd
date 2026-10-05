@@ -14,7 +14,7 @@ The run is successful only if **all** hold:
 - [ ] Every child issue carries `Part of #<epic>` and a label set with at least `phase:` and a type
       label; every child with dependencies also carries `Depends on #N`.
 - [ ] Every child issue is registered as a **native sub-issue** of the epic — verified against
-      `gh api repos/{owner}/{repo}/issues/<epic>/sub_issues`, not assumed from `--parent`.
+      `gh api --paginate repos/{owner}/{repo}/issues/<epic>/sub_issues`, not assumed from `--parent`.
 - [ ] The epic exists, carries the `epic` label, and its body holds exactly one source marker for
       this input and one plan map between the sentinels — verified by re-reading, not by exit code.
 - [ ] The map groups every child by phase, in order, and asserts **no issue status**: no checkbox,

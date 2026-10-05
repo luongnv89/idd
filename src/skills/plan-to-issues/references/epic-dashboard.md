@@ -157,7 +157,7 @@ gh issue view <epic> --json body --jq '.body' > epic-body.md          # 1. fetch
 grep -cFx '<!-- plan-dashboard:start -->' epic-body.md                # 2. gate: must be 1
 grep -oE '^- #[0-9]+ — [A-Za-z0-9.]+' epic-body.md                   # 3. children + task ids
 repo="$(gh repo view --json nameWithOwner --jq .nameWithOwner)"
-gh api "repos/$repo/issues/<epic>/sub_issues" --jq '.[].number'     # 4. registered children; no state fetch
+gh api --paginate "repos/$repo/issues/<epic>/sub_issues" --jq '.[].number'  # 4. registered children; no state fetch
 python3 shared/scripts/gi-plan-map.py < dashboard-input.json            # 5. re-render
 gh issue edit <epic> --body-file epic-body-updated.md                 # 6. write back
 gh issue view <epic> --json body --jq '.body' \
