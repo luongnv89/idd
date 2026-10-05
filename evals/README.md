@@ -18,6 +18,7 @@ bash tests/test-eval-harness.sh
 bash tests/test-eval-creator.sh
 bash tests/test-eval-resolver.sh
 bash tests/test-eval-pr-review.sh
+bash tests/test-eval-plan-to-issues.sh
 bash tests/test-eval-triage-autopilot-357.sh
 bash tests/test-cost-counters-465.sh
 ```
@@ -66,9 +67,12 @@ evals/
 
 - **Exact** argv match is preferred; `"match": "prefix"` matches a leading prefix.
 - Comma-separated `--json` field lists are compared after sorting field names.
-- Data-producing commands (`issue view/list`, `pr view/list`, `pr checks`, `api`)
+- Data-producing commands (`issue view/list`, `pr view/list`, `pr checks`)
   **require `--json`** — the shim exits 2 without it (enforces
   [docs/platform-github.md](../docs/platform-github.md)).
+- `gh api` is exempt: the real `gh api` has no `--json` and selects fields with
+  `--jq`. `--jq` and `--paginate` are plain argv tokens for matching, and an
+  `api` cassette's `stdout` is the post-`--jq` text.
 - `issue create` may be cassettes or allocated via `EVAL_STATE_DIR`.
 
 ### Environment
@@ -151,8 +155,8 @@ numbers and verdicts are in
 
 Aim toward **≥5 prompts per skill**, including **negative-trigger** cases (empty
 body, missing `Closes #N`, non-conventional branch, invalid run-log record).
-Today's floor ships creator (2), resolver (2), pr-review (2), triage (1) and
-auto-pilot (1), plus harness unit tests.
+Today's floor ships creator (2), resolver (2), pr-review (3), triage (1),
+auto-pilot (1) and plan-to-issues (2), plus harness unit tests.
 
 ### Cases on a host without a sandbox
 
