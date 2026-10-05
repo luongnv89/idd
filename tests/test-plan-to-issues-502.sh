@@ -155,6 +155,19 @@ for f in references/epic-identity.md references/issue-creator-bridge.md referenc
     "R2: $f pages through every issue"
 done
 
+# ── R3: the API-budget gate counts the paginated lookups (issue #505) ────────
+# Each lookup pages over issues + PRs at 100 per page, and a run makes
+# `phases + 2` of them; a per-task-only estimate passes on large repos and the
+# run then runs out of budget midway.
+PRE="$ROOT/src/skills/plan-to-issues/references/preflight.md"
+has   "$PRE" '^\| G6 \| `remaining` ≥ `4 × tasks \+ 20 \+ \(phases \+ 2\) × ceil\(items / 100\)`' \
+  "R3: G6 formula carries the paginated lookup term"
+has   "$PRE" 'issues\{totalCount\} pullRequests\{totalCount\}' "R3: one GraphQL probe counts issues + PRs"
+has   "$PRE" "\\.issues\\.totalCount \\+ \\.pullRequests\\.totalCount" "R3: probe sums both counts"
+has   "$PRE" '^\| G6 \| items probe fails \| \*\*warn\*\*' "R3: a failed count probe warns, never stops"
+has   "$PRE" '\{lookups\} lookups × \{pages\} pages' "R3: API budget block shows the lookup breakdown"
+has   "$PRE" '~324 needed · 1240 items' "R3: report example matches 50 tasks, 6 phases, 1240 items"
+
 # ── AC5: shipped and listed ──────────────────────────────────────────────────
 BUILT="$ROOT/skills/plan-to-issues"
 if cmp -s "$BUILT/references/scripts/gi-plan-map.py" "$SCRIPT"; then
