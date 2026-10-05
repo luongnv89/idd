@@ -1,0 +1,37 @@
+{
+  "name": "plan-to-issues/sync",
+  "skill": "plan-to-issues",
+  "prompt": "/plan-to-issues sync 100",
+  "repo_scripts": [
+    "src/shared/scripts/gi-plan-map.py"
+  ],
+  "grade": [
+    {
+      "tool": "idd-lint",
+      "args": [
+        "issue",
+        "OUT/epic-body-updated.md"
+      ],
+      "expect_exit": 0,
+      "label": "epic body written back by sync still passes idd-lint"
+    },
+    {
+      "tool": "gh-calls",
+      "expect_by_command": {
+        "api --paginate": 1,
+        "issue create": 0,
+        "issue edit": 1
+      },
+      "expect_argv": [
+        ["issue", "view", "100", "--json", "body", "--jq", ".body"],
+        ["repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner"],
+        ["api", "--paginate", "repos/eval/harness/issues/100/sub_issues", "--jq", ".[].number"],
+        ["issue", "view", "103", "--json", "title", "--jq", ".title"],
+        ["issue", "edit", "100", "--body-file", "epic-body-updated.md"],
+        ["issue", "view", "100", "--json", "body", "--jq", ".body"]
+      ],
+      "expect_exit": 0,
+      "label": "one sub_issues call, one title read for the gained child, one body edit, nothing filed"
+    }
+  ]
+}

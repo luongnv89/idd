@@ -1,0 +1,73 @@
+{
+  "version": 1,
+  "calls": [
+    {
+      "argv": ["label", "list", "--limit", "200", "--json", "name", "--jq", ".[].name"],
+      "stdout": "bug\nimprovement\nfeature\n",
+      "stderr": "",
+      "exit": 0
+    },
+    {
+      "match": "prefix",
+      "argv": ["label", "create"],
+      "stdout": "",
+      "stderr": "",
+      "exit": 0
+    },
+    {
+      "argv": ["repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner"],
+      "stdout": "eval/harness\n",
+      "stderr": "",
+      "exit": 0
+    },
+    {
+      "argv": ["api", "--paginate", "repos/eval/harness/issues?state=all&per_page=100", "--jq", ".[] | select(.pull_request == null) | {number,title,body,state,created_at,labels:[.labels[].name]}"],
+      "stdout": "",
+      "stderr": "",
+      "exit": 0
+    },
+    {
+      "match": "prefix",
+      "argv": ["issue", "edit"],
+      "stdout": "https://github.com/eval/harness/issues/1\n",
+      "stderr": "",
+      "exit": 0
+    },
+    {
+      "argv": ["api", "repos/eval/harness/issues/2", "--jq", ".id"],
+      "stdout": "5000000002\n",
+      "stderr": "",
+      "exit": 0
+    },
+    {
+      "argv": ["api", "repos/eval/harness/issues/3", "--jq", ".id"],
+      "stdout": "5000000003\n",
+      "stderr": "",
+      "exit": 0
+    },
+    {
+      "argv": ["api", "repos/eval/harness/issues/4", "--jq", ".id"],
+      "stdout": "5000000004\n",
+      "stderr": "",
+      "exit": 0
+    },
+    {
+      "argv": ["api", "--method", "POST", "repos/eval/harness/issues/1/sub_issues", "-F", "sub_issue_id=5000000002"],
+      "stdout": "{\"number\":1}\n",
+      "stderr": "",
+      "exit": 0
+    },
+    {
+      "argv": ["api", "--method", "POST", "repos/eval/harness/issues/1/sub_issues", "-F", "sub_issue_id=5000000003"],
+      "stdout": "{\"number\":1}\n",
+      "stderr": "",
+      "exit": 0
+    },
+    {
+      "argv": ["api", "--method", "POST", "repos/eval/harness/issues/1/sub_issues", "-F", "sub_issue_id=5000000004"],
+      "stdout": "{\"number\":1}\n",
+      "stderr": "",
+      "exit": 0
+    }
+  ]
+}
