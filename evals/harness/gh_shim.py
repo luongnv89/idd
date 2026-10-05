@@ -43,8 +43,12 @@ prefix. Comma-separated field lists after ``--json`` are compared after
 sorting field names so order does not matter.
 
 Data-producing commands that skills use (``issue view/list``, ``pr view/list``,
-``pr checks``, ``api``) require ``--json``; missing ``--json`` exits 2, matching
-platform-github.md.
+``pr checks``) require ``--json``; missing ``--json`` exits 2, matching
+platform-github.md. ``gh api`` is exempt: the real ``gh api`` has no ``--json``
+flag — it returns the endpoint's JSON and selects fields with ``--jq``, which is
+how docs/platform-github.md writes its ``gh api`` reads. A cassette for an
+``api`` call stores the post-``--jq`` stdout, and ``--jq``/``--paginate`` are
+ordinary argv tokens for matching.
 
 Never opens network sockets in replay mode. Stdlib only.
 """
@@ -64,14 +68,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-# Commands that must carry --json when used for data retrieval.
+# Commands that must carry --json when used for data retrieval. `api` is not
+# here: the real `gh api` has no --json and selects fields with --jq instead.
 JSON_REQUIRED_PREFIXES: tuple[tuple[str, ...], ...] = (
     ("issue", "view"),
     ("issue", "list"),
     ("pr", "view"),
     ("pr", "list"),
     ("pr", "checks"),
-    ("api",),
 )
 
 MAX_ISSUE_NUMBER = 2**63 - 1

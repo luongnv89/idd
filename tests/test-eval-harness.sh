@@ -557,6 +557,46 @@ else
   fail "T25: run_eval sandbox helper structure or syntax failed"
 fi
 
+# ─── T26: gh api replays with --jq; no --json required (#503) ─
+# The real `gh api` has no --json and selects fields with --jq
+# (docs/platform-github.md), so the shim must replay api calls as cassettes
+# while still refusing a data-producing issue view without --json.
+cat > "$TMP/api-cassettes.json" <<'EOF'
+{
+  "version": 1,
+  "calls": [
+    {
+      "argv": ["api", "--paginate", "repos/eval/harness/issues/100/sub_issues", "--jq", ".[].number"],
+      "stdout": "101\n102\n",
+      "exit": 0
+    },
+    {
+      "argv": ["api", "--method", "POST", "repos/eval/harness/issues/100/sub_issues", "-F", "sub_issue_id=9001"],
+      "stdout": "{\"number\":100}\n",
+      "exit": 0
+    }
+  ]
+}
+EOF
+set +e
+API_JQ="$(EVAL_CASSETTES="$TMP/api-cassettes.json" python3 "$SHIM" api --paginate \
+  repos/eval/harness/issues/100/sub_issues --jq '.[].number' 2>"$TMP/api-jq.err")"
+API_JQ_EXIT=$?
+API_POST="$(EVAL_CASSETTES="$TMP/api-cassettes.json" python3 "$SHIM" api --method POST \
+  repos/eval/harness/issues/100/sub_issues -F sub_issue_id=9001 2>"$TMP/api-post.err")"
+API_POST_EXIT=$?
+EVAL_CASSETTES="$TMP/api-cassettes.json" python3 "$SHIM" issue view 100 \
+  >/dev/null 2>"$TMP/api-view.err"
+API_VIEW_EXIT=$?
+set -e
+if [ "$API_JQ_EXIT" -eq 0 ] && [ "$API_JQ" = "$(printf '101\n102')" ] \
+  && [ "$API_POST_EXIT" -eq 0 ] && [ "$API_POST" = '{"number":100}' ] \
+  && [ "$API_VIEW_EXIT" -eq 2 ] && grep -q -- '--json' "$TMP/api-view.err"; then
+  pass "T26: gh api --jq / --method POST replay; issue view without --json still exits 2"
+else
+  fail "T26: gh api replay (exits $API_JQ_EXIT/$API_POST_EXIT, view $API_VIEW_EXIT)"
+fi
+
 echo "Results: $PASS passed, $FAIL failed"
 if [ "$FAIL" -gt 0 ]; then
   exit 1
