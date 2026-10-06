@@ -184,7 +184,9 @@ check "V4: launch.log, drive.log and verdict.json are kept" "$?"
 case "$EV" in "$(cd "$R" && cd "$(git rev-parse --git-common-dir)" && pwd -P)"/idd/evidence/*) true ;; *) false ;; esac
 check "V4: evidence lives under <git common dir>/idd/evidence/" "$?"
 [ -z "$(cd "$R" && git status --porcelain=v1 --untracked-files=all)" ]; check "V4: the work tree stays clean" "$?"
-[ "$(stat -f %Lp "$EV" 2>/dev/null || stat -c %a "$EV")" = 700 ]; check "V4: the evidence directory is mode 0700" "$?"
+# Python, not stat(1): GNU `stat -f` means --file-system and prints to stdout
+# before failing, so a BSD-first `stat -f %Lp || stat -c %a` breaks on Linux.
+[ "$(python3 -c 'import os,sys; print(format(os.stat(sys.argv[1]).st_mode & 0o777, "o"))' "$EV")" = 700 ]; check "V4: the evidence directory is mode 0700" "$?"
 
 # ── V5: owned-only teardown ──────────────────────────────────
 sleep 300 & DECOY=$!
