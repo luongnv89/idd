@@ -164,6 +164,11 @@ jobs:
       - name: test-webpage-ux-clarity-361
         run: bash tests/test-webpage-ux-clarity-361.sh
 
+      # Light theme on landing/docs/changelog: attributed head init script,
+      # one light token rule, AA contrast, toggle control, init behavior.
+      - name: test-webpage-theme
+        run: bash tests/test-webpage-theme.sh
+
       - name: test-model-suggestion-124
         run: bash tests/test-model-suggestion-124.sh
 

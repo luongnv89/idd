@@ -4,34 +4,81 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self'; connect-src https://api.github.com" />
+  <!-- Theme: resolve the palette before first paint. An explicit localStorage
+       choice wins; otherwise follow the OS, live. The attribute carries the
+       whole state — no data-theme means the dark :root tokens. -->
+  <script id="theme-init">
+  (function () {
+    var KEY = 'idd-theme';
+    var root = document.documentElement;
+    var stored = null;
+    try { stored = localStorage.getItem(KEY); } catch (e) { stored = null; }
+    var explicit = (stored === 'light' || stored === 'dark') ? stored : null;
+    var mq = (typeof matchMedia === 'function') ? matchMedia('(prefers-color-scheme: light)') : null;
+
+    function osTheme() { return (mq && mq.matches) ? 'light' : 'dark'; }
+    function paint(theme) {
+      var meta = document.querySelector('meta[name="theme-color"]');
+      if (meta) { meta.setAttribute('content', theme === 'light' ? '#FAFAFA' : '#0A0A0A'); }
+      var btn = document.getElementById('theme-toggle');
+      if (btn) {
+        var label = theme === 'light' ? 'Switch to dark theme' : 'Switch to light theme';
+        btn.setAttribute('aria-label', label);
+        btn.setAttribute('title', label);
+      }
+    }
+    function apply(theme) {
+      if (theme === 'light') { root.setAttribute('data-theme', 'light'); }
+      else { root.removeAttribute('data-theme'); }
+      paint(theme);
+    }
+
+    apply(explicit || osTheme());
+
+    document.addEventListener('DOMContentLoaded', function () { paint(explicit || osTheme()); });
+    document.addEventListener('click', function (e) {
+      var btn = e.target && e.target.closest ? e.target.closest('#theme-toggle') : null;
+      if (!btn) { return; }
+      var next = ((explicit || osTheme()) === 'light') ? 'dark' : 'light';
+      explicit = next;
+      try { localStorage.setItem(KEY, next); } catch (err) {}
+      apply(next);
+    });
+    if (mq) {
+      var follow = function (e) { if (!explicit) { apply(e.matches ? 'light' : 'dark'); } };
+      if (mq.addEventListener) { mq.addEventListener('change', follow); }
+      else if (mq.addListener) { mq.addListener(follow); }
+    }
+  }());
+  </script>
   <!-- F-UX-001: scroll-reveal hiding is gated on this class, so a JS-less
        browser never runs it and every .reveal block stays visible. Runs in
        <head> (parser-blocking) so the class is set before the body paints.
        Inline script is already permitted by the CSP above. -->
   <script>document.documentElement.classList.add('js');</script>
-  <title>gitissue — GitHub Issue Workflow for AI Coding Agents</title>
-  <meta name="description" content="Issue-Driven Development for GitHub: turn issues into agent-ready work orders. Nine commands plan, structure, triage, resolve, and review — shipping tested PRs." />
+  <title>IDD — Issue-Driven Development for AI Coding Agents</title>
+  <meta name="description" content="IDD turns GitHub issues into agent-ready work orders, then tested PRs. Eight open-source skills that work with any coding agent." />
   <link rel="canonical" href="https://luongnv.com/idd/" />
   <link rel="icon" type="image/svg+xml" href="assets/logo/favicon.svg" />
   <meta name="theme-color" content="#0A0A0A" />
 
   <!-- Open Graph -->
-  <meta property="og:title" content="gitissue — GitHub Issue Workflow for AI Coding Agents" />
-  <meta property="og:description" content="Turn issues into agent-ready work orders — nine terminal commands that plan, structure, triage, resolve, and review." />
+  <meta property="og:title" content="IDD — Issue-Driven Development for AI Coding Agents" />
+  <meta property="og:description" content="GitHub issues in, tested PRs out. Eight open-source skills that structure, triage, resolve, and review your issues." />
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://luongnv.com/idd/" />
-  <meta property="og:site_name" content="gitissue" />
+  <meta property="og:site_name" content="IDD" />
   <meta property="og:image" content="https://luongnv.com/idd/assets/og/og-card.png" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
-  <meta property="og:image:alt" content="gitissue — issues → agent-ready work orders" />
+  <meta property="og:image:alt" content="IDD: Turn GitHub issues into agent-ready work orders. Issue-Driven Development, 8 commands, MIT." />
 
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="gitissue — GitHub Issue Workflow for AI Coding Agents" />
-  <meta name="twitter:description" content="Turn issues into agent-ready work orders — nine agent-ready commands that plan, structure, triage, resolve, and review, shipping tested PRs." />
+  <meta name="twitter:title" content="IDD — Issue-Driven Development for AI Coding Agents" />
+  <meta name="twitter:description" content="GitHub issues in, tested PRs out. Eight open-source skills that structure, triage, resolve, and review your issues." />
   <meta name="twitter:image" content="https://luongnv.com/idd/assets/og/og-card.png" />
-  <meta name="twitter:image:alt" content="gitissue — issues → agent-ready work orders" />
+  <meta name="twitter:image:alt" content="IDD: Turn GitHub issues into agent-ready work orders. Issue-Driven Development, 8 commands, MIT." />
 
   <!-- Structured data -->
   <script type="application/ld+json">
@@ -49,19 +96,19 @@
         "@type": "WebSite",
         "@id": "https://luongnv.com/idd/#website",
         "url": "https://luongnv.com/idd/",
-        "name": "gitissue",
-        "description": "Issue-Driven Development (IDD) — nine terminal commands that turn plans and issues into agent-ready work orders.",
+        "name": "IDD",
+        "description": "Issue-Driven Development (IDD): eight skills that turn plans and GitHub issues into agent-ready work orders and tested PRs.",
         "inLanguage": "en",
         "publisher": { "@id": "https://luongnv.com/#organization" }
       },
       {
         "@type": "SoftwareApplication",
         "@id": "https://luongnv.com/idd/#software",
-        "name": "gitissue",
+        "name": "IDD",
         "applicationCategory": "DeveloperApplication",
         "softwareApplicationCategory": "DeveloperApplication",
         "operatingSystem": "macOS, Linux, Windows",
-        "description": "Issue-Driven Development for GitHub: structure, analyze, triage, resolve, and review issues so humans and AI coding agents can ship tested PRs.",
+        "description": "Issue-Driven Development for GitHub: structure, triage, resolve, and review issues so people and AI coding agents can ship tested PRs.",
         "url": "https://luongnv.com/idd/",
         "downloadUrl": "https://github.com/luongnv89/idd/releases/latest",
         "codeRepository": "https://github.com/luongnv89/idd",
@@ -87,7 +134,7 @@
           {
             "@type": "ListItem",
             "position": 2,
-            "name": "gitissue",
+            "name": "IDD",
             "item": "https://luongnv.com/idd/"
           }
         ]
@@ -104,43 +151,38 @@
     "mainEntity": [
       {
         "@type": "Question",
-        "name": "Does this lock me into a specific AI tool?",
-        "acceptedAnswer": { "@type": "Answer", "text": "No. The structured issue format is plain GitHub markdown — any tool that reads GitHub issues can consume it. gitissue ships as self-contained SKILL.md skills (SKILL.md is the markdown file that teaches an agent a skill) that run on Claude Code, Codex CLI, Gemini CLI, or any SKILL.md-compatible harness." }
+        "name": "Why not just ask my agent to fix issue #42?",
+        "acceptedAnswer": { "@type": "Answer", "text": "You can, and it will guess. A one-line issue doesn’t say which files matter, what done looks like, or how to check it. /issue-resolver first rewrites a vague issue into a work order with acceptance criteria, then runs the same pipeline every time: research, plan, implement with tests, and QA against each criterion. The branch, commits, and PR all reference the issue, so the reason behind every change stays in your history." }
       },
       {
         "@type": "Question",
-        "name": "Will it rewrite or overwrite my existing issues?",
-        "acceptedAnswer": { "@type": "Answer", "text": "Normalization preserves your original text inside a Reporter Context blockquote and posts a backup comment before changing anything. Inferred fields are tagged with confidence markers — (high confidence), (needs review)." }
+        "name": "Does this lock me into a specific AI tool?",
+        "acceptedAnswer": { "@type": "Answer", "text": "No. Issues stay plain GitHub markdown that any tool or person can read. The skills ship as self-contained SKILL.md files (SKILL.md is the markdown file that teaches an agent a skill), so they run on Claude Code, Codex, Cursor, GitHub Copilot, Gemini CLI, OpenCode, or any other coding agent that loads skills." }
+      },
+      {
+        "@type": "Question",
+        "name": "Will it overwrite my existing issues?",
+        "acceptedAnswer": { "@type": "Answer", "text": "No. Normalizing an issue keeps your original text in a Reporter Context blockquote and posts a backup comment before anything changes. Inferred fields carry confidence markers, (high confidence) or (needs review), so you can see what was guessed." }
       },
       {
         "@type": "Question",
         "name": "Is auto-pilot safe to run on a real repo?",
-        "acceptedAnswer": { "@type": "Answer", "text": "It is balanced by default: clean PRs are merged, but a PR with unresolved review issues gets a follow-up issue and stays open. Conservative mode holds every merge; aggressive mode opts into partial merges." }
+        "acceptedAnswer": { "@type": "Answer", "text": "It defaults to balanced mode: clean PRs merge, and a PR with unresolved review findings stays open with a follow-up issue. conservative mode holds every merge for you. Partial merges happen only if you opt into aggressive mode with merge_partial: true. A dependency-aware merge gate respects Depends on #N and Blocked by #N, and you can pass an explicit issue list for targeted runs." }
       },
       {
         "@type": "Question",
-        "name": "Do I need to configure anything to start?",
-        "acceptedAnswer": { "@type": "Answer", "text": "No. Every command runs zero-config with sensible defaults. Run /init-gitissue to generate a project-specific .gitissue.yml when ready to tune settings." }
-      },
-      {
-        "@type": "Question",
-        "name": "What does it actually require?",
-        "acceptedAnswer": { "@type": "Answer", "text": "The GitHub CLI (gh) 2.0+, Git 2.30+, and Claude Code or any SKILL.md-compatible agent." }
+        "name": "What do I need to get started?",
+        "acceptedAnswer": { "@type": "Answer", "text": "The GitHub CLI (gh) 2.0+ signed in with gh auth login, Git 2.30+, and any coding agent that loads SKILL.md skills. No config file is needed. When you want to tune settings, /init-gitissue detects your stack and writes a .gitissue.yml." }
       },
       {
         "@type": "Question",
         "name": "How much does it cost?",
-        "acceptedAnswer": { "@type": "Answer", "text": "gitissue is open source under the MIT license. You only pay for whatever AI agent you choose to run the skills with." }
+        "acceptedAnswer": { "@type": "Answer", "text": "Nothing. IDD is open source under the MIT license. You pay only for the AI agent you run it with." }
       },
       {
         "@type": "Question",
-        "name": "Can I enforce the spec without running an AI agent?",
-        "acceptedAnswer": { "@type": "Answer", "text": "Yes. scripts/idd-lint.py checks IDD Spec conformance from plain data — no LLM, no network, no dependencies beyond the Python standard library. Exit code 0/1 drops straight into CI." }
-      },
-      {
-        "@type": "Question",
-        "name": "What is the suggested model on new issues?",
-        "acceptedAnswer": { "@type": "Answer", "text": "/issue-creator estimates issue effort (XS–XL) and adds an advisory Suggested model with thinking level grounded in CursorBench (a public coding-agent benchmark), so humans and agents can match spend to scope." }
+        "name": "Can I enforce the spec without an AI agent?",
+        "acceptedAnswer": { "@type": "Answer", "text": "Yes. idd-lint is a single Python file that checks IDD Spec conformance for issues, PRs, commit messages, branches, or a whole repo. Its lint checks need no LLM, no network, and nothing beyond the standard library, and they exit 0 or 1, so they drop straight into CI. It ships in the repo, not the skill pack: download scripts/idd-lint.py and run it on any repo." }
       }
     ]
   }
@@ -181,6 +223,7 @@
       /* strong custom easings (Emil Kowalski) — built-in CSS curves lack punch */
       --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
       --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+      color-scheme: dark;
     }
 
     * { box-sizing: border-box; }
@@ -214,6 +257,11 @@
     .mono { font-family: var(--mono); }
     .green { color: var(--green); }
     .muted { color: var(--fg-muted); }
+    .sr-only {
+      position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+      overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%);
+      white-space: nowrap; border: 0;
+    }
 
     /* ───────────────────────── NAV ───────────────────────── */
     header.nav {
@@ -254,6 +302,16 @@
       white-space: nowrap;
     }
     .nav-cta:hover { background: rgba(0,255,65,0.1); border-color: var(--green); }
+    /* Theme toggle sits beside the CTA and survives the mobile collapse —
+       it is a <button>, so the a:not() collapse rule never touches it. */
+    .theme-toggle {
+      display: inline-flex; align-items: center; justify-content: center;
+      min-width: 44px; min-height: 44px; padding: 0;
+      background: transparent; border: 1px solid var(--line); border-radius: 8px;
+      color: var(--fg-muted); cursor: pointer; transition: all .15s;
+    }
+    .theme-toggle:hover { color: var(--green); border-color: rgba(0,255,65,0.35); }
+    .theme-toggle .icon-moon { display: none; }
 
     /* F-UX-002: below the nav breakpoint the inline links collapse and only
        the GitHub CTA survives, stranding Docs and Changelog above the fold.
@@ -302,6 +360,7 @@
       .wrap.nav-inner { padding: 0 16px; }
       .brand { font-size: 18px; }
       .nav-cta { padding: 8px 10px; }
+      .nav-links { gap: 8px; }
       .nav-menu > summary { padding: 0 10px; }
     }
 
@@ -341,9 +400,9 @@
     @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
 
     h1.hero-title {
-      font-size: clamp(2.6rem, 6vw, 4.5rem);
+      font-size: clamp(2.6rem, 6vw, 4rem);
       line-height: 1.04; font-weight: 800; letter-spacing: -0.035em;
-      margin: 0 0 22px; max-width: 16ch;
+      margin: 0 0 22px; max-width: 16ch; text-wrap: balance;
     }
     h1.hero-title .accent {
       color: var(--green);
@@ -360,10 +419,34 @@
       font-family: var(--mono); font-size: 13.5px; color: var(--fg-dim);
     }
     .hero-trust span { display: inline-flex; align-items: center; gap: 7px; }
+    .hero-trust [hidden] { display: none; }
     .hero-trust .ok { color: var(--green); }
 
     .hero-grid { display: grid; grid-template-columns: 1.05fr 1fr; gap: 56px; align-items: center; }
     @media (max-width: 940px) { .hero-grid { grid-template-columns: 1fr; gap: 44px; } }
+
+    /* ── Autonomous band (deck §2c) ── */
+    .auto-band {
+      margin-top: 64px; border: 1px solid var(--line-soft); border-radius: var(--radius);
+      padding: 30px 32px;
+      background: linear-gradient(180deg, var(--panel), var(--bg-soft));
+    }
+    .auto-kicker {
+      font-family: var(--mono); font-size: 13px; font-weight: 600;
+      color: var(--green); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 12px;
+    }
+    .auto-band h3 { font-size: 1.5rem; font-weight: 800; letter-spacing: -0.03em; margin: 0 0 18px; }
+    .auto-flow {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px;
+      font-family: var(--mono); font-size: 13.5px; margin-bottom: 18px;
+    }
+    .auto-chip {
+      border: 1px solid var(--line); border-radius: 7px; padding: 6px 12px;
+      background: var(--panel-2); color: var(--fg-muted); white-space: nowrap;
+    }
+    .auto-arr { color: var(--green); }
+    .auto-band p { margin: 0 0 14px; color: var(--fg-muted); max-width: 78ch; line-height: 1.62; }
+    .auto-band p code { font-family: var(--mono); color: var(--green); font-size: 0.9em; }
 
     /* ───────────────────────── TERMINAL ───────────────────────── */
     .terminal {
@@ -384,10 +467,30 @@
     .term-bar .dots i:nth-child(2){ background:#ffbd2e; }
     .term-bar .dots i:nth-child(3){ background:#27c93f; }
     .term-bar .title { margin-left: 10px; font-size: 12.5px; color: var(--fg-dim); }
-    .term-body { padding: 20px 22px; font-size: 13.5px; line-height: 1.85; }
+    .term-body { padding: 20px 22px; font-size: 13.5px; line-height: 1.85; overflow-y: auto; transition: opacity .45s ease; }
+    .term-body.fading { opacity: 0; }
     .term-body .ln { white-space: pre-wrap; }
+    /* Stage rail + pause control for the animated hero loop (deck §2b). */
+    .term-rail {
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+      padding: 7px 16px; background: #101315; border-bottom: 1px solid var(--line);
+      font-size: 11.5px; color: var(--fg-dim); letter-spacing: 0.04em;
+    }
+    .term-rail .stage { transition: color .2s; }
+    .term-rail .stage.active { color: var(--green); font-weight: 600; }
+    .term-rail .rail-sep { opacity: .45; }
+    .term-pause {
+      display: inline-flex; align-items: center; justify-content: center;
+      min-width: 44px; min-height: 44px; padding: 0;
+      margin: -8px -8px -8px auto;
+      background: transparent; border: 0; border-radius: 8px;
+      color: var(--fg-dim); font-family: var(--mono); font-size: 12px; cursor: pointer;
+    }
+    .term-pause:hover { color: var(--green); }
+    .term-pause[hidden] { display: none; }
     .c-prompt { color: var(--green); }
     .c-dim { color: var(--fg-dim); }
+    .c-rail { color: var(--fg-dim); }
     .c-ok { color: var(--green); }
     .c-fail { color: var(--red); }
     .c-cyan { color: var(--cyan); }
@@ -458,8 +561,6 @@
     }
     .feat-card h3 { font-size: 1.22rem; font-weight: 700; margin: 0 0 9px; letter-spacing: -0.02em; }
     .feat-card p { margin: 0; color: var(--fg-muted); font-size: 0.99rem; line-height: 1.62; }
-    .feat-card .effort { margin-top: 16px; font-family: var(--mono); font-size: 12px; color: var(--fg-dim); }
-    .feat-card .effort b { color: var(--green); font-weight: 600; }
 
     /* ── Model suggestion highlight ── */
     .model-highlight {
@@ -479,25 +580,13 @@
     }
     .model-panel h3 { font-size: 1.35rem; font-weight: 800; margin: 0 0 12px; letter-spacing: -0.03em; }
     .model-panel p { margin: 0 0 14px; color: var(--fg-muted); line-height: 1.62; font-size: 0.99rem; }
-    .model-table {
-      width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 12.5px;
-      margin-top: 18px;
-    }
-    .model-table th, .model-table td {
-      text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line-soft);
-    }
-    .model-table th { color: var(--fg-dim); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; }
-    .model-table td:first-child { color: var(--yellow); font-weight: 700; }
-    .model-table td:nth-child(2) { color: var(--fg-muted); }
-    .model-table td:last-child { color: var(--green); }
-    /* F-UX-012: a wide table scrolls inside its own box instead of pushing the
-       page sideways. tabindex="0" keeps that scroll container reachable by
-       keyboard (WCAG 2.1.1) — measured in Firefox at 320px, 7 of the 9 docs
-       tables and the landing model table really do overflow their box. */
-    .table-scroll { max-width: 100%; overflow-x: auto; }
-    .table-scroll:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
     .model-note { margin-top: 16px; font-family: var(--mono); font-size: 12px; color: var(--fg-dim); line-height: 1.55; }
-    .terminal.compact .term-body { padding: 16px 18px; font-size: 12.5px; line-height: 1.75; }
+    /* Keep flags like --no-github on one line so they never break mid-token. */
+    .model-note code { white-space: nowrap; }
+    /* The lint get-block reuses the install-box component, panel-width and
+       left-aligned instead of the centered 820px box. */
+    .install-box.lint-box { margin: 18px 0 0; max-width: none; }
+    .terminal.compact .term-body { padding: 16px 18px 8px; font-size: 12.5px; line-height: 1.75; }
 
     /* ── How it works ── */
     .steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; margin-top: 52px; }
@@ -578,8 +667,27 @@
       .shot .shot-frame, .shot img { max-height: 320px; }
     }
 
+    /* ── Proof stats ── */
+    .proof-stats {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;
+      margin: 44px auto 0; max-width: 900px;
+    }
+    @media (max-width: 640px) { .proof-stats { grid-template-columns: 1fr; } }
+    .stat {
+      background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+      padding: 26px 24px; text-align: center;
+    }
+    .stat b {
+      display: block; font-family: var(--mono); font-size: 1.9rem; font-weight: 700;
+      color: var(--green); line-height: 1.1;
+    }
+    .stat span { display: block; margin-top: 8px; color: var(--fg-muted); font-size: 0.95rem; }
+    .proof-link { text-align: center; margin-top: 20px; font-family: var(--mono); font-size: 13.5px; }
+
     /* ── Works with ── */
     .tools { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 44px; justify-content: center; }
+    .tools.tools-left { justify-content: flex-start; margin-top: 18px; }
+    .tools-title { font-size: 1.05rem; font-weight: 700; letter-spacing: -0.02em; margin: 48px 0 0; }
     .tool {
       border: 1px solid var(--line); border-radius: 100px; padding: 11px 22px;
       font-family: var(--mono); font-size: 14px; color: var(--fg-muted);
@@ -588,77 +696,11 @@
     .tool:hover { border-color: rgba(0,255,65,0.3); color: var(--fg); }
     .tool b { color: var(--green); font-weight: 600; }
 
-    /* ── Agent team ── */
-    .agent-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 20px;
-      margin-top: 50px;
-    }
-    @media (max-width: 1020px) { .agent-grid { grid-template-columns: repeat(2, 1fr); } }
-    @media (max-width: 540px) { .agent-grid { grid-template-columns: 1fr; } }
-    .agent-card {
-      background: linear-gradient(180deg, var(--panel), var(--bg-soft));
-      border: 1px solid var(--line-soft);
-      border-radius: var(--radius);
-      padding: 22px 20px 24px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      transition: border-color .2s var(--ease-out), transform .2s var(--ease-out);
-    }
-    @media (hover: hover) and (pointer: fine) {
-      .agent-card:hover {
-        border-color: rgba(0,255,65,0.28);
-        transform: translateY(-2px);
-      }
-    }
-    .agent-head { display: flex; align-items: center; gap: 14px; }
-    .agent-icon {
-      width: 46px;
-      height: 46px;
-      border-radius: 12px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-family: var(--mono);
-      font-size: 20px;
-      color: var(--green);
-      flex-shrink: 0;
-      background: rgba(0,255,65,0.06);
-      border: 1px solid rgba(0,255,65,0.22);
-      transition: transform .2s var(--ease-out), background .2s ease;
-    }
-    .agent-card:hover .agent-icon { transform: scale(1.06); background: rgba(0,255,65,0.12); }
-    .agent-meta h3 {
-      margin: 0;
-      font-size: 1.02rem;
-      font-weight: 800;
-      letter-spacing: -0.02em;
-      line-height: 1.2;
-    }
-    .agent-meta .role {
-      margin: 4px 0 0;
-      font-family: var(--mono);
-      font-size: 11.5px;
-      color: var(--fg-dim);
-      font-weight: 600;
-    }
-    .agent-desc {
-      margin: 0;
-      font-size: 0.9rem;
-      color: var(--fg-muted);
-      line-height: 1.55;
-    }
-    .agent-skills {
-      margin: 0;
-      font-size: 0.82rem;
-      color: var(--fg-dim);
-      line-height: 1.45;
-    }
-    .agent-skills span { color: var(--fg-muted); }
+    /* ── Commands footnote ── */
+    .hood-note { margin: 40px 0 0; color: var(--fg-muted); font-size: 0.99rem; line-height: 1.62; max-width: 72ch; }
 
     /* ── Methodology split ── */
+    .trace-line { font-family: var(--mono); color: var(--fg-dim); font-size: 14px; letter-spacing: 0.04em; margin: 22px 0 0; }
     .split { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; margin-top: 50px; }
     @media (max-width: 860px) { .split { grid-template-columns: 1fr; } }
     .idd-card {
@@ -750,6 +792,98 @@
     .foot-links a:hover { color: var(--green); }
     .foot-note { font-family: var(--mono); font-size: 12.5px; color: var(--fg-dim); }
 
+    /* ── Light theme ──
+       One token swap plus descendant overrides for every hardcoded dark
+       colour. Brand rules: mark and wordmark render #0A0A0A, primary buttons
+       go near-black with a neutral shadow, and neon #00FF41 never sits on a
+       light surface. */
+    html[data-theme="light"] {
+      color-scheme: light;
+      --green: #00751E;
+      --green-dim: #005E18;
+      --green-glow: rgba(0, 117, 30, 0.18);
+      --bg: #FAFAFA;
+      --bg-soft: #F4F4F5;
+      --panel: #FFFFFF;
+      --panel-2: #F4F4F5;
+      --line: #E4E4E7;
+      --line-soft: #EDEDF0;
+      --fg: #0A0A0A;
+      --fg-muted: #3F454B;
+      --fg-dim: #686E74;
+      --cyan: #00707D;
+      --yellow: #8A5A00;
+      --red: #C0261C;
+      --blue: #0B5CBF;
+    }
+    html[data-theme="light"] .brand-logo g { fill: #0A0A0A; }
+    html[data-theme="light"] .brand-logo > path { fill: #0A0A0A; }
+    html[data-theme="light"] body {
+      background-image:
+        radial-gradient(900px 500px at 50% -8%, rgba(0,117,30,0.07), transparent 60%),
+        radial-gradient(700px 600px at 100% 10%, rgba(0,117,30,0.03), transparent 55%);
+    }
+    html[data-theme="light"] ::selection { background: var(--green); color: #FAFAFA; }
+    html[data-theme="light"] header.nav { background: rgba(250,250,250,0.72); }
+    html[data-theme="light"] .nav-cta { border-color: rgba(0,117,30,0.35); }
+    html[data-theme="light"] .nav-cta:hover { background: rgba(0,117,30,0.08); }
+    html[data-theme="light"] .nav-menu[open] > summary { border-color: rgba(0,117,30,0.35); }
+    html[data-theme="light"] .nav-menu-panel { box-shadow: 0 24px 60px -24px rgba(0,0,0,0.18); }
+    html[data-theme="light"] .nav-menu-panel a:hover,
+    html[data-theme="light"] .nav-menu-panel a:focus-visible { background: rgba(0,117,30,0.07); }
+    html[data-theme="light"] .theme-toggle:hover { border-color: rgba(0,117,30,0.35); }
+    html[data-theme="light"] .theme-toggle .icon-sun { display: none; }
+    html[data-theme="light"] .theme-toggle .icon-moon { display: inline; }
+    html[data-theme="light"] .btn-primary {
+      background: #0A0A0A; color: #FAFAFA;
+      box-shadow: 0 0 0 1px rgba(10,10,10,0.15), 0 12px 40px -14px rgba(10,10,10,0.35);
+    }
+    @media (hover: hover) and (pointer: fine) {
+      html[data-theme="light"] .btn-primary:hover { box-shadow: 0 0 0 1px #0A0A0A, 0 18px 50px -14px rgba(10,10,10,0.4); }
+    }
+    html[data-theme="light"] .btn-ghost:hover { background: rgba(10,10,10,0.05); }
+    html[data-theme="light"] .eyebrow { background: rgba(0,117,30,0.06); border-color: rgba(0,117,30,0.22); }
+    html[data-theme="light"] h1.hero-title .accent { text-shadow: none; }
+    html[data-theme="light"] .problem { background: linear-gradient(180deg, transparent, rgba(192,38,28,0.03), transparent); }
+    @media (hover: hover) and (pointer: fine) {
+      html[data-theme="light"] .feat-card:hover { border-color: rgba(0,117,30,0.3); }
+    }
+    html[data-theme="light"] .feat-cmd { background: rgba(0,117,30,0.07); border-color: rgba(0,117,30,0.18); }
+    html[data-theme="light"] .model-panel { border-color: rgba(0,117,30,0.22); background: linear-gradient(165deg, rgba(0,117,30,0.05), var(--panel)); }
+    html[data-theme="light"] .step .num { color: #FAFAFA; }
+    html[data-theme="light"] .tool:hover { border-color: rgba(0,117,30,0.3); }
+    html[data-theme="light"] .final { background: radial-gradient(700px 360px at 50% 0%, rgba(0,117,30,0.08), transparent 65%); }
+    html[data-theme="light"] .copy-btn:hover { border-color: rgba(0,117,30,0.35); }
+    html[data-theme="light"] .copy-btn.copy-ok { border-color: rgba(0,117,30,0.45); }
+    /* Terminal-like surfaces stay dark in the light theme: the dark tokens
+       are re-declared on the container so neon-on-dark contents never invert. */
+    html[data-theme="light"] .terminal,
+    html[data-theme="light"] .install-box,
+    html[data-theme="light"] .shot,
+    html[data-theme="light"] .shots-nav {
+      /* Re-resolve the inherited text colour too: bare text nodes inherit the
+         light --fg from <body> unless the container sets color explicitly. */
+      color: var(--fg);
+      --green: #00FF41;
+      --green-dim: #00cc34;
+      --green-glow: rgba(0, 255, 65, 0.35);
+      --bg: #0A0A0A;
+      --bg-soft: #0e0f10;
+      --panel: #111315;
+      --panel-2: #16191c;
+      --line: #1f2428;
+      --line-soft: #181c1f;
+      --fg: #FAFAFA;
+      --fg-muted: #a7b0b4;
+      --fg-dim: #808a90;
+      --cyan: #4fd0e3;
+      --yellow: #ffcb47;
+      --red: #ff5d52;
+      --blue: #4aa3ff;
+    }
+    html[data-theme="light"] .terminal { box-shadow: 0 30px 80px -40px rgba(0,0,0,0.45), 0 0 0 1px var(--line); }
+    html[data-theme="light"] .shot { box-shadow: 0 24px 70px -36px rgba(0,0,0,0.35); }
+
     /* reveal — marketing scroll-in; >300ms is fine here (not a UI interaction).
        Stagger sibling cards via --i (30–80ms steps, Emil Kowalski).
        Gated on .js (set by the head script): the observer that adds .in only
@@ -775,7 +909,7 @@
       }
       .js .reveal { opacity: 1; transform: none; transition-delay: 0ms; }
       .btn:active, .btn-primary:active, .copy-btn:active, .nav-cta:active,
-      .feat-card:hover, .agent-card:hover, .agent-card:hover .agent-icon { transform: none; }
+      .feat-card:hover { transform: none; }
       .eyebrow .dot, .cursor { animation: none; }
     }
   </style>
@@ -794,10 +928,13 @@
         <a href="./" class="active" aria-current="page">Home</a>
         <a href="./#how">How it works</a>
         <a href="./#commands">Commands</a>
-        <a href="./#team">Team</a>
         <a href="docs.html">Docs</a>
         <a href="changelog.html">Changelog</a>
         <a href="./#install">Install</a>
+        <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Switch to light theme" title="Switch to light theme">
+          <svg class="icon-sun" width="17" height="17" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="3.2" fill="none" stroke="currentColor" stroke-width="1.6"/><g stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.4 1.4M11.55 11.55l1.4 1.4M12.95 3.05l-1.4 1.4M4.45 11.55l-1.4 1.4"/></g></svg>
+          <svg class="icon-moon" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M13.6 9.6A6 6 0 1 1 6.4 2.4a4.8 4.8 0 0 0 7.2 7.2Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+        </button>
         <a class="nav-cta" href="https://github.com/luongnv89/idd">GitHub ↗</a>
         <!-- F-UX-002: shown only below 760px, where the inline links above
              are hidden. Pure <details> — works with JavaScript off. -->
@@ -807,7 +944,6 @@
             <a href="./" class="active" aria-current="page">Home</a>
             <a href="./#how">How it works</a>
             <a href="./#commands">Commands</a>
-            <a href="./#team">Team</a>
             <a href="docs.html">Docs</a>
             <a href="changelog.html">Changelog</a>
             <a href="./#install">Install</a>
@@ -821,48 +957,63 @@
   <section class="hero" id="top">
     <div class="wrap hero-grid">
       <div>
-        <span class="eyebrow">Issue-Driven Development (IDD) · Spec v1.1 · 9 commands · MIT</span>
-        <h1 class="hero-title">Issues → <span class="accent">agent-ready work orders.</span></h1>
+        <span class="eyebrow">Issue-Driven Development (IDD) · Spec v1.1 · MIT</span>
+        <h1 class="hero-title">GitHub issues in. <br/><span class="accent">Tested PRs out.</span></h1>
         <p class="hero-sub">
-          Nine terminal commands that <strong>plan, structure, analyze, triage, resolve, and review</strong> your GitHub issues —
-          so any developer or AI agent can pick up an issue and ship a tested PR. Zero config.
+          IDD turns vague issues into work orders with acceptance criteria, then has your AI agent research, build, test, and review each one. Every commit links back to the issue that asked for it.
         </p>
 
         <div class="hero-cta">
-          <a class="btn btn-primary" href="./#install">▶ Get Started</a>
-          <a class="btn btn-ghost" href="docs.html">Read the Docs</a>
-          <a class="btn btn-ghost" href="https://github.com/luongnv89/idd">View on GitHub</a>
+          <a class="btn btn-primary" href="./#install">▶ Install IDD</a>
+          <a class="btn btn-ghost" href="https://github.com/luongnv89/idd">View the source on GitHub</a>
         </div>
         <div class="hero-trust">
           <span><span class="ok">✓</span> Latest release <a href="https://github.com/luongnv89/idd/releases/latest" id="latest-release">v0.24.0</a></span>
           <span id="github-stars" hidden><span class="ok">★</span> <span id="github-stars-count"></span> GitHub stars</span>
-          <span><span class="ok">✓</span> Plain GitHub markdown</span>
-          <span><span class="ok">✓</span> No vendor lock-in</span>
-          <span><span class="ok">✓</span> Runs in your terminal</span>
-          <span><span class="ok">⚡</span> Model + thinking hints on create</span>
-          <span><span class="ok">✓</span> <code class="mono">idd-lint</code> — spec conformance in CI, no LLM</span>
+          <span><span class="ok">✓</span> Zero config</span>
+          <span><span class="ok">✓</span> Plain GitHub markdown, no lock-in</span>
+          <span><span class="ok">✓</span> Works with any coding agent</span>
         </div>
       </div>
 
       <!-- Live terminal mock -->
-      <div class="terminal compact reveal">
+      <div class="terminal compact reveal" id="hero-term">
         <div class="term-bar">
           <div class="dots"><i></i><i></i><i></i></div>
-          <span class="title">~/your-repo — gitissue</span>
+          <span class="title">~/your-repo — idd</span>
+          <button type="button" id="hero-term-pause" class="term-pause" aria-label="Pause animation" hidden>❚❚</button>
         </div>
-        <div class="term-body">
+        <div class="term-rail" aria-hidden="true">
+          <span class="stage" data-stage="create">create</span><span class="rail-sep">·</span><span class="stage" data-stage="triage">triage</span><span class="rail-sep">·</span><span class="stage" data-stage="resolve">resolve</span><span class="rail-sep">·</span><span class="stage" data-stage="review">review</span>
+        </div>
+        <p class="sr-only">Animated terminal: /issue-creator previews and files issue #42, /issue-triage scans open issues and puts #42 next, /issue-resolver 42 runs its pipeline and opens PR #87, and /issue-pr-review 87 --auto verifies, merges PR #87, and closes #42.</p>
+        <div class="term-body" aria-hidden="true">
+<div class="ln"><span class="c-prompt">❯</span> /issue-creator "login redirect loops on mobile Safari"</div>
+<div class="ln"><span class="c-ok">✓</span> Created issue #42</div>
+<div class="ln c-dim">┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄</div>
+<div class="ln"><span class="c-prompt">❯</span> /issue-triage</div>
+<div class="ln"><span class="c-ok">✓</span> Next up: #42 · P1 · no blockers</div>
+<div class="ln c-dim">┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄</div>
 <div class="ln"><span class="c-prompt">❯</span> /issue-resolver 42</div>
-<div class="ln"><span class="c-head">◆ Resolve Pipeline</span></div>
-<div class="ln"><span class="c-step">[0/5] Preflight</span>    <span class="c-ok">✓</span> issue #42 open</div>
-<div class="ln"><span class="c-step">[1/5] Research </span>    <span class="c-ok">✓</span> read 5 files</div>
-<div class="ln"><span class="c-step">[2/5] Plan     </span>    <span class="c-ok">✓</span> fix redirect logic</div>
-<div class="ln"><span class="c-step">[3/5] Implement</span>    <span class="c-ok">✓</span> 2 files, 45 lines</div>
-<div class="ln"><span class="c-step">[4/5] QA       </span>    <span class="c-ok">✓</span> clean after 2 cycles</div>
-<div class="ln"><span class="c-step">[5/5] Deliver  </span>    <span class="c-ok">✓</span> PR #87 created</div>
-<div class="ln">&nbsp;</div>
-<div class="ln"><span class="c-ok">✓</span> Done — <span class="c-cyan">PR #87</span>: fix(auth): resolve redirect (#42)</div>
-<div class="ln"><span class="c-prompt">❯</span> <span class="cursor"></span></div>
+<div class="ln"><span class="c-ok">✓</span> PR #87 opened · 2 files, 41 lines, 3 tests</div>
+<div class="ln c-dim">┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄</div>
+<div class="ln"><span class="c-prompt">❯</span> /issue-pr-review 87 --auto</div>
+<div class="ln"><span class="c-ok">✓</span> Merged PR #87 · issue #42 closed</div>
+<div class="ln c-dim">┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄</div>
         </div>
+      </div>
+    </div>
+
+    <!-- Autonomous band -->
+    <div class="wrap">
+      <div class="auto-band reveal">
+        <div class="auto-kicker">Autonomous mode</div>
+        <h3>Hand it a plan. Come back to merged PRs.</h3>
+        <div class="auto-flow">
+          <span class="auto-chip">plan.md</span><span class="auto-arr">→</span><span class="auto-chip">/plan-to-issues</span><span class="auto-arr">→</span><span class="auto-chip">epic + issues</span><span class="auto-arr">→</span><span class="auto-chip">/auto-pilot</span><span class="auto-arr">→</span><span class="auto-chip">merged PRs</span>
+        </div>
+        <p><code>/plan-to-issues</code> turns a plan, or the conversation you just had, into an epic with one issue per task. <code>/auto-pilot</code> then triages, resolves, reviews, and merges them on its own, and can keep going for days: it waits out GitHub rate limits, picks up where it stopped with <code>--resume</code>, and sets aside issues that keep failing.</p>
+        <a class="green" href="docs.html#auto-pilot">See how auto-pilot works →</a>
       </div>
     </div>
   </section>
@@ -871,30 +1022,29 @@
   <section class="problem" id="problem">
     <div class="wrap">
       <div class="section-tag">The problem</div>
-      <h2 class="sec-title">Unstructured issues kill velocity — and destroy your history.</h2>
-      <p class="sec-lead">GitHub issues were designed for humans to read, not for agents to execute. The gap between "someone describes a problem" and "someone ships a fix" is where projects bleed time.</p>
+      <h2 class="sec-title">A one-line issue is not a work order.</h2>
+      <p class="sec-lead">GitHub issues are written for people to read, not for agents to execute. Everything between the bug report and the fix is left for someone to work out.</p>
 
       <div class="prob-grid">
         <div class="prob-card reveal" style="--i:0">
           <div class="glyph">✗</div>
           <h3>30 minutes before line one</h3>
-          <p>Someone files "the login is broken on mobile." A developer — human or AI — burns half an hour figuring out which files to even open before writing a single line of code.</p>
+          <p>Someone files “the login is broken on mobile.” A developer, human or AI, can burn half an hour finding which files to open before writing any code.</p>
         </div>
         <div class="prob-card reveal" style="--i:1">
           <div class="glyph">✗</div>
           <h3>Agents edit the wrong files</h3>
-          <p>Without typed context and acceptance criteria, an AI agent confidently produces changes to the wrong files — because the issue never told it where to look or when it's done.</p>
+          <p>Without acceptance criteria or pointers into the code, an agent picks files with confidence and gets them wrong. The issue never said where to look or what done means.</p>
         </div>
         <div class="prob-card reveal" style="--i:2">
           <div class="glyph">✗</div>
           <h3>A backlog with no order</h3>
-          <p>47 open issues sit untriaged: no dependency awareness, no execution order, no idea which ones are already fixed or which two could ship in parallel.</p>
+          <p>Dozens of open issues and no map: which ones block others, which are already fixed, and which two could ship in parallel.</p>
         </div>
       </div>
 
       <p class="prob-quote reveal">
-        Six months later your <span class="strike">git log reads "fix stuff", "update", "WIP"</span><br/>
-        — and nobody can trace <span class="pop">why</span> a change was ever made.
+        Six months later, your <span class="strike">git log reads “fix stuff”, “update”, “WIP”</span>,<br/>and nobody can say <span class="pop">why</span> a change was made.
       </p>
     </div>
   </section>
@@ -904,73 +1054,28 @@
     <div class="wrap">
       <div class="section-tag">The fix</div>
       <h2 class="sec-title">Every issue becomes a self-contained work order.</h2>
-      <p class="sec-lead">gitissue turns each GitHub issue into something typed, structured, and enriched with acceptance criteria — then resolves it, with commit messages and PR titles that link every line of code back to the intention that created it.</p>
+      <p class="sec-lead">IDD rewrites each issue into a typed spec with acceptance criteria, resolves it into a tested PR, and names every branch, commit, and PR after the issue it closes. Unlike a one-off prompt, the same pipeline runs every time.</p>
 
       <div class="feat-grid">
-        <div class="feat-card reveal" style="grid-column: 1 / -1;">
+        <div class="feat-card reveal" style="--i:0">
           <span class="feat-cmd">/issue-creator</span>
-          <h3>Structure, don't guess — plus the right model mode for the job</h3>
-          <p>Describe a bug or feature in plain text. gitissue classifies the type, estimates effort (XS–XL), generates acceptance criteria, and files a clean issue — preserving your original words in a Reporter Context block without guessing implementation details.</p>
-          <p style="margin-top: 12px;"><span class="mono green">⚡ Model:</span> Each issue gets an advisory <strong>Suggested model</strong> with <strong>thinking level</strong> (e.g. GPT-5.5 High · Opus 4.8 Medium) keyed off effort, using CursorBench (a public coding-agent benchmark) — so you pick a capable tier for hard work and a cheaper tier for trivial fixes instead of running everything on max.</p>
+          <h3>Issues an agent can act on</h3>
+          <p>Describe a bug or feature in plain words. You get a typed issue with an effort size and acceptance criteria, and your original text stays intact in a Reporter Context block.</p>
         </div>
-        <div class="feat-card reveal">
+        <div class="feat-card reveal" style="--i:1">
           <span class="feat-cmd">/issue-resolver N</span>
-          <h3>Issue → tested PR, one command</h3>
-          <p>A 6-step pipeline runs end to end: preflight, research, plan, implement, QA, deliver. Out comes an atomic PR with <code>Closes #N</code> — branch named, commits conventional, tests written.</p>
-          <div class="effort">effort <b>max</b></div>
+          <h3>Issue to tested PR in one command</h3>
+          <p>Research, plan, implement, and QA run end to end. Out comes an atomic PR with <code>Closes #N</code>, a conventional branch name and commits, and tests for the change.</p>
         </div>
-        <div class="feat-card reveal">
+        <div class="feat-card reveal" style="--i:2">
           <span class="feat-cmd">/issue-triage</span>
-          <h3>See the whole backlog at once</h3>
-          <p>Dependency graph, priority suggestions, parallelizable work, stale-issue warnings, and already-fixed detection by scanning commits and PRs. One command produces a suggested execution order.</p>
+          <h3>A backlog with an order</h3>
+          <p>Maps dependencies, flags stale issues and ones already fixed by a commit or PR, and proposes an execution order, including work that can run in parallel.</p>
         </div>
-        <div class="feat-card reveal">
+        <div class="feat-card reveal" style="--i:3">
           <span class="feat-cmd">/auto-pilot</span>
-          <h3>Hands-free, balanced by default</h3>
-          <p>Triage → resolve → review → merge, looped across the backlog. In the default <code>balanced</code> mode clean PRs merge and partial ones stay open with a follow-up issue; <code>conservative</code> holds every merge, <code>aggressive</code> opts into partial merges. A dependency-aware merge gate keeps order sane.</p>
-          <div class="effort">effort <b>max</b></div>
-        </div>
-      </div>
-
-      <div class="model-highlight reveal">
-        <div class="model-panel">
-          <div class="section-tag" style="margin-bottom: 10px;">Cost-aware by default</div>
-          <h3>Right model, right thinking level — stamped on every issue</h3>
-          <p>When you create or normalize an issue, <code>/issue-creator</code> maps estimated effort to a <strong>model + thinking tier</strong> from CursorBench data. The preview shows <span class="mono green">⚡ Model:</span>; the issue body stores an advisory <strong>Suggested model:</strong> line with the benchmark date.</p>
-          <p>Use it to route XS typo fixes to low-cost modes and reserve extra-high thinking for large features — without blocking creation if the cache is offline (bundled seed + graceful fallback).</p>
-          <div class="table-scroll" role="region" tabindex="0" aria-label="Right model, right thinking level">
-          <table class="model-table" aria-label="Effort to suggested model mapping">
-            <thead><tr><th>Effort</th><th>OpenAI</th><th>Anthropic</th></tr></thead>
-            <tbody>
-              <tr><td>XS</td><td>GPT-5.5 Low</td><td>Opus 4.7 Low</td></tr>
-              <tr><td>S</td><td>GPT-5.5 Medium</td><td>Opus 4.8 Low</td></tr>
-              <tr><td>M</td><td>GPT-5.5 High</td><td>Opus 4.8 Medium</td></tr>
-              <tr><td>L</td><td>GPT-5.5 Extra High</td><td>Opus 4.7 Extra High</td></tr>
-              <tr><td>XL</td><td>GPT-5.5 Extra High</td><td>Fable 5 Max</td></tr>
-            </tbody>
-          </table>
-          </div>
-          <p class="model-note">Toggle with <code>model_suggestion.enabled</code> in <code>.gitissue.yml</code> · refresh CursorBench into <code>.gitissue/model-data.json</code></p>
-        </div>
-        <div class="terminal compact">
-          <div class="term-bar">
-            <div class="dots"><i></i><i></i><i></i></div>
-            <span class="title">/issue-creator — preview</span>
-          </div>
-          <div class="term-body">
-<div class="ln"><span class="c-head">◆ Issue Preview</span></div>
-<div class="ln c-dim">┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄</div>
-<div class="ln"><span class="c-step">  Type:</span>     bug (high)</div>
-<div class="ln"><span class="c-step">  Title:</span>    Fix session cookie expiry on mobile</div>
-<div class="ln"><span class="c-step">  Effort:</span>   M</div>
-<div class="ln"><span class="c-yellow">  ⚡ Model:</span>  <span class="c-ok">GPT-5.5 High · Opus 4.8 Medium</span>  <span class="c-dim">(~$7.42/task)</span></div>
-<div class="ln"><span class="c-step">  Labels:</span>   bug, auth, mobile</div>
-<div class="ln"><span class="c-step">  Criteria:</span> 4 acceptance criteria (medium)</div>
-<div class="ln">&nbsp;</div>
-<div class="ln c-dim">Metadata in issue body:</div>
-<div class="ln"><span class="c-cyan">**Suggested model:**</span> GPT-5.5 High · Opus 4.8 Medium</div>
-<div class="ln c-dim">  _(CursorBench 3.1, 2026-06-12 — advisory)_</div>
-          </div>
+          <h3>Hands-free, on merge rules you set</h3>
+          <p>Loops triage, resolve, review, and merge across the backlog. Balanced mode, the default, merges clean PRs and opens a follow-up issue for the rest. Conservative mode holds every merge.</p>
         </div>
       </div>
     </div>
@@ -980,40 +1085,51 @@
   <section id="how">
     <div class="wrap">
       <div class="section-tag">How it works</div>
-      <h2 class="sec-title">From a sentence to a merged PR — in four moves.</h2>
-      <p class="sec-lead">No new platform to learn. The structured issue format is plain GitHub markdown, and every step is a command you run in the terminal you already live in.</p>
+      <h2 class="sec-title">From one sentence to a merged PR in four steps.</h2>
+      <p class="sec-lead">No new platform. Issues stay plain GitHub markdown, and every step is a command in the terminal you already use.</p>
 
       <div class="steps">
         <div class="step reveal" style="--i:0">
           <div class="num">1</div>
           <h3>Describe</h3>
-          <p>Type the problem in plain English. <code>/issue-creator</code> classifies it, estimates effort, suggests model + thinking level, and structures a typed issue with acceptance criteria. Got a whole plan? <code>/plan-to-issues</code> files it as an epic plus one issue per task.</p>
+          <p>Type the problem in plain English and <code>/issue-creator</code> files a structured issue. For a whole plan, <code>/plan-to-issues</code> files an epic with one issue per task.</p>
         </div>
         <div class="step reveal" style="--i:1">
           <div class="num">2</div>
           <h3>Triage</h3>
-          <p><code>/issue-triage</code> maps dependencies across the backlog, flags stale and already-fixed issues, and proposes an order.</p>
+          <p><code>/issue-triage</code> maps dependencies, flags stale and already-fixed issues, and proposes an order.</p>
         </div>
         <div class="step reveal" style="--i:2">
           <div class="num">3</div>
           <h3>Resolve</h3>
-          <p><code>/issue-resolver N</code> researches, plans, implements, and QAs — then opens an atomic PR that closes the issue.</p>
+          <p><code>/issue-resolver N</code> researches, plans, implements, and tests, then opens a PR that closes the issue.</p>
         </div>
         <div class="step reveal" style="--i:3">
           <div class="num">4</div>
           <h3>Review &amp; ship</h3>
-          <p><code>/issue-pr-review</code> verifies each acceptance criterion, scores five dimensions, fixes, and merges when green.</p>
+          <p><code>/issue-pr-review</code> checks each acceptance criterion, scores five dimensions, and fixes what fails. Add <code>--auto</code> to merge once it’s green.</p>
         </div>
+      </div>
+
+      <div class="hero-cta reveal" style="justify-content:center; margin-top:36px;">
+        <a class="btn btn-primary" href="./#install">▶ Copy the install command</a>
       </div>
     </div>
   </section>
 
-  <!-- ───────────────────────── SCREENSHOTS ───────────────────────── -->
-  <section id="screens">
+  <!-- ───────────────────────── PROOF ───────────────────────── -->
+  <section id="proof">
     <div class="wrap">
-      <div class="section-tag">See it run</div>
-      <h2 class="sec-title">Transparency, not a black box.</h2>
-      <p class="sec-lead">Confidence scores, step progress, and exactly what's happening at each phase — straight from your terminal. Every symbol carries meaning.</p>
+      <div class="section-tag">Proof</div>
+      <h2 class="sec-title">IDD is built with IDD.</h2>
+      <p class="sec-lead">This repository files, resolves, and reviews its own issues with these skills, in public. More than 200 of its merged PRs close a linked issue.</p>
+
+      <div class="proof-stats reveal">
+        <div class="stat"><b>250+</b><span>issues closed</span></div>
+        <div class="stat"><b>230+</b><span>pull requests merged</span></div>
+        <div class="stat"><b>25+</b><span>releases shipped</span></div>
+      </div>
+      <p class="proof-link reveal"><a class="green" href="https://github.com/luongnv89/idd/pulls?q=is%3Apr+is%3Amerged">See every merged PR on GitHub ↗</a></p>
 
       <div class="shots reveal" id="shots" role="region" tabindex="0" aria-roledescription="carousel" aria-label="Product screenshots (use arrow keys to navigate)">
         <div class="shots-viewport">
@@ -1047,32 +1163,81 @@
     </div>
   </section>
 
+  <!-- ───────────────────────── INSTALL ───────────────────────── -->
+  <section id="install" class="center">
+    <div class="wrap">
+      <div class="section-tag">Get started</div>
+      <h2 class="sec-title">Install once. Zero config to start.</h2>
+      <p class="sec-lead">You need <code class="mono green">gh</code> 2.0+, Git 2.30+, and a coding agent that loads SKILL.md files (the markdown file that teaches an agent a skill).</p>
+
+      <div class="install-box reveal">
+        <div class="install-body">
+          <div class="copy-row">
+            <div>
+              <div class="cmt"># install all eight skills with asm (agent-skill-manager)</div>
+              <div class="cmd"><span class="green">npm</span> install -g agent-skill-manager</div>
+              <div class="cmd"><span class="green">asm</span> install https://github.com/luongnv89/idd</div>
+            </div>
+            <button class="copy-btn" data-copy="npm install -g agent-skill-manager &amp;&amp; asm install https://github.com/luongnv89/idd">copy</button>
+          </div>
+          <div class="copy-row">
+            <div>
+              <div class="cmt"># or install as a Claude Code plugin, pinned to the latest release</div>
+              <div class="cmd"><span class="green">claude</span> plugin marketplace add luongnv89/idd</div>
+              <div class="cmd"><span class="green">claude</span> plugin install idd@idd</div>
+            </div>
+            <button class="copy-btn" data-copy="claude plugin marketplace add luongnv89/idd &amp;&amp; claude plugin install idd@idd">copy</button>
+          </div>
+        </div>
+      </div>
+      <p class="install-note">asm installs the skills for 20+ coding agents, including Claude Code, Codex, Cursor, GitHub Copilot, Gemini CLI, OpenCode, and Windsurf. Restart your agent, then try <code class="mono">/issue-creator</code> with a one-line bug report. The Claude Code plugin namespaces commands, like <code class="mono green">/idd:issue-resolver 42</code>. Pick one install path: with both, every skill shows up twice. <a class="green" href="docs.html#install">Updates and manual install</a> are in the docs.</p>
+
+      <div class="hero-cta" style="justify-content:center; margin-top:36px;">
+        <a class="btn btn-primary" href="docs.html">▶ Read the full docs</a>
+        <a class="btn btn-ghost" href="https://github.com/luongnv89/idd/releases/latest">See the latest release</a>
+      </div>
+    </div>
+  </section>
+
   <!-- ───────────────────────── COMMANDS ───────────────────────── -->
   <section id="commands">
     <div class="wrap">
       <div class="section-tag">The toolkit</div>
-      <h2 class="sec-title">Nine commands. One source of truth.</h2>
-      <p class="sec-lead">Each is a self-contained skill — drop it into Claude Code, Codex CLI, or any agent that loads SKILL.md files (the markdown file that teaches an agent a skill). Mix and match — only /auto-pilot and /plan-to-issues need sibling skills, and they check for them first. Need exact inputs? See the <a class="green" href="docs.html">full docs</a>.</p>
+      <h2 class="sec-title">Eight commands. One source of truth.</h2>
+      <p class="sec-lead">Each command is a self-contained skill, so you can install all eight or copy only what you need. <code>/auto-pilot</code> and <code>/plan-to-issues</code> call sibling skills and check for them first. Every input and option is in the <a class="green" href="docs.html">docs</a>.</p>
 
-      <div class="feat-grid" style="grid-template-columns: repeat(2,1fr);">
-        <div class="feat-card reveal" style="grid-column: 1 / -1;"><span class="feat-cmd">/plan-to-issues</span><p style="margin-top:2px">The entry point: turn a phased plan file — or the conversation you just had — into labelled issues under one tracking epic, each mapped to its source task. Bodies are written by <code>/issue-creator</code>, with <code>Depends on #N</code> markers <code>/auto-pilot</code> respects. No plan file required.</p></div>
-        <div class="feat-card reveal"><span class="feat-cmd">/issue-creator</span><p style="margin-top:2px">Classify type, estimate effort, suggest model + thinking level (CursorBench), preserve reporter context, and file structured acceptance criteria.</p></div>
-        <div class="feat-card reveal"><span class="feat-cmd">/issue-analysis N</span><p style="margin-top:2px">Root cause, git history, implementation options, complexity and risk — saved to <code>.gitissue/</code>.</p></div>
-        <div class="feat-card reveal"><span class="feat-cmd">/issue-resolver N</span><p style="margin-top:2px">6-step pipeline: preflight → research → plan → implement → QA → deliver a PR with <code>Closes #N</code>.</p></div>
-        <div class="feat-card reveal"><span class="feat-cmd">/issue-triage</span><p style="margin-top:2px">Dependency graph, stale detection, already-fixed scanning, priority and execution order.</p></div>
-        <div class="feat-card reveal"><span class="feat-cmd">/issue-pr-review</span><p style="margin-top:2px">Lint/format/test pre-pass, per-criterion AC verification, five-dimension scoring, and fix cycles. Opt-in: treat a terminal CI fail as non-blocking at the review gate — never auto-merged. Auto-merge only with <code>--auto</code>.</p></div>
-        <div class="feat-card reveal"><span class="feat-cmd">/auto-pilot</span><p style="margin-top:2px">Triage → resolve → review → merge loop with balanced-by-default merge modes (<code>conservative</code>/<code>balanced</code>/<code>aggressive</code>).</p></div>
-        <div class="feat-card reveal"><span class="feat-cmd">/init-gitissue</span><p style="margin-top:2px">Auto-detect language, framework, and test runner; generate a tuned <code>.gitissue.yml</code>.</p></div>
-        <div class="feat-card reveal"><span class="feat-cmd">/idd-doctor</span><p style="margin-top:2px">Read-only health check for your IDD repository invariants. <span class="muted">(maintainer tooling)</span></p></div>
+      <div class="feat-grid">
+        <div class="feat-card reveal"><span class="feat-cmd">/plan-to-issues</span><p style="margin-top:2px">Turn a plan file, or the conversation you just had, into a tracking epic with one labelled issue per task and <code>Depends on #N</code> markers <code>/auto-pilot</code> respects.</p></div>
+        <div class="feat-card reveal"><span class="feat-cmd">/issue-creator</span><p style="margin-top:2px">Classify, size (XS–XL), and write acceptance criteria. Also suggests a model and thinking level for the job, from CursorBench (a public coding-agent benchmark).</p></div>
+        <div class="feat-card reveal"><span class="feat-cmd">/issue-analysis N</span><p style="margin-top:2px">Root cause, git history, implementation options, complexity, and risk, saved to <code>.gitissue/</code>.</p></div>
+        <div class="feat-card reveal"><span class="feat-cmd">/issue-resolver N</span><p style="margin-top:2px">Preflight, research, plan, implement, and QA, then a PR with <code>Closes #N</code>.</p></div>
+        <div class="feat-card reveal"><span class="feat-cmd">/issue-triage</span><p style="margin-top:2px">Dependency graph, stale and already-fixed detection, priority, and an execution order.</p></div>
+        <div class="feat-card reveal"><span class="feat-cmd">/issue-pr-review</span><p style="margin-top:2px">Lint and test pre-pass, a check per acceptance criterion, five-dimension scoring, and fix cycles. Merges only with <code>--auto</code>.</p></div>
+        <div class="feat-card reveal"><span class="feat-cmd">/auto-pilot</span><p style="margin-top:2px">Triage, resolve, review, and merge across the backlog in <code>conservative</code>, <code>balanced</code> (default), or <code>aggressive</code> mode.</p></div>
+        <div class="feat-card reveal"><span class="feat-cmd">/init-gitissue</span><p style="margin-top:2px">Detect your language, framework, and test runner, and write a tuned <code>.gitissue.yml</code>.</p></div>
       </div>
+
+      <p class="hood-note reveal">Under the hood, eight shared agents do the work: duplicate detector, codebase researcher, synthesizer, implementer, code reviewer, fixer, relationship scanner, and UI/UX reviewer. Set each one’s model and thinking effort in <code class="mono green">.gitissue.yml</code>, or keep the defaults.</p>
 
       <div class="model-highlight reveal">
         <div class="model-panel">
           <div class="section-tag" style="margin-bottom: 10px;">No agent required</div>
-          <h3><code>idd-lint</code> — enforce the spec in CI</h3>
-          <p><code>scripts/idd-lint.py</code> validates <a class="green" href="https://github.com/luongnv89/idd/blob/main/SPEC.md">IDD Spec</a> conformance from plain data — <strong>no LLM, no network, no dependencies</strong> beyond the Python standard library. Lint issues, PRs, commit messages, branches, or a whole repo; every check is tagged with the spec section it enforces and mapped to <code>L1–L3</code> levels.</p>
-          <p>The <code>stats</code> mode goes further: an evidence report with trace completeness, Decision-Record coverage, and resolution outcomes by issue quality — rendered with verdict meters. Exit code 0/1 makes it CI-native; <code>/idd-doctor</code> stays the deep, agent-powered check.</p>
-          <p class="model-note">Runs on any repo, gitissue skills or not · <code>--level L2</code> skips L3 Decision-Record checks · <code>--json</code> for machines, <code>--no-github</code> for offline</p>
+          <h3><code>idd-lint</code>: enforce the spec in CI</h3>
+          <p><code>scripts/idd-lint.py</code> checks <a class="green" href="https://github.com/luongnv89/idd/blob/main/SPEC.md">IDD Spec</a> conformance from plain data: issues, PRs, commit messages, branches, or a whole repo. Every check cites the spec section it enforces and maps to an <code>L1–L3</code> level. Lint checks need <strong>no LLM, no network, and nothing beyond the Python standard library</strong>.</p>
+          <p>The <code>stats</code> mode adds an evidence report: trace completeness, Decision-Record coverage, and resolution outcomes by issue quality. Exit codes 0 and 1 drop straight into CI.</p>
+          <div class="install-box lint-box">
+            <div class="install-body">
+              <div class="copy-row">
+                <div>
+                  <div class="cmt"># one file, Python standard library only</div>
+                  <div class="cmd">curl -O https://raw.githubusercontent.com/luongnv89/idd/main/scripts/idd-lint.py</div>
+                  <div class="cmd">python3 idd-lint.py repo --base origin/main</div>
+                </div>
+                <button class="copy-btn" data-copy="curl -O https://raw.githubusercontent.com/luongnv89/idd/main/scripts/idd-lint.py &amp;&amp; python3 idd-lint.py repo --base origin/main">copy</button>
+              </div>
+            </div>
+          </div>
+          <p class="model-note">Not in the skill pack · runs on any repo · <code>--level L2</code> skips Decision-Record checks · <code>--json</code> for machines · <code>--no-github</code> keeps stats offline</p>
         </div>
         <div class="terminal compact">
           <div class="term-bar">
@@ -1080,7 +1245,7 @@
             <span class="title">idd-lint — spec conformance</span>
           </div>
           <div class="term-body">
-<div class="ln"><span class="c-prompt">❯</span> idd-lint repo --base origin/main</div>
+<div class="ln"><span class="c-prompt">❯</span> python3 idd-lint.py repo --base origin/main</div>
 <div class="ln"><span class="c-head">◆ idd-lint — repo @ main</span> <span class="c-dim">(IDD Spec v1.1, level L2)</span></div>
 <div class="ln c-dim">┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄</div>
 <div class="ln"><span class="c-ok">✓</span> <span class="c-dim">[B02]</span> branch <span class="c-cyan">fix/42-mobile-auth</span> matches grammar <span class="c-dim">(§3.1)</span></div>
@@ -1095,183 +1260,40 @@
     </div>
   </section>
 
-  <!-- ───────────────────────── AGENT TEAM ───────────────────────── -->
-  <section id="team">
-    <div class="wrap">
-      <div class="section-tag">Specialists under the hood</div>
-      <h2 class="sec-title">Eight shared agents, one per job.</h2>
-      <p class="sec-lead">Skills orchestrate the pipeline; sub-agents handle research, synthesis, implementation, review, and fixes. Set each role's model and thinking effort in <code class="mono green">.gitissue.yml</code>, or keep the default inherited settings. Unsupported overrides fall back gracefully, and run logs record whether configured overrides were applied.</p>
-
-      <div class="agent-grid">
-        <article class="agent-card reveal" style="--i:0">
-          <div class="agent-head">
-            <div class="agent-icon" aria-hidden="true">⧉</div>
-            <div class="agent-meta">
-              <h3>Duplicate Detector</h3>
-              <p class="role">issue dedup · scoring</p>
-            </div>
-          </div>
-          <p class="agent-desc">Scores a new issue against the open backlog and flags likely duplicates before one more copy lands.</p>
-          <p class="agent-skills"><span>Used by:</span> /issue-creator</p>
-        </article>
-
-        <article class="agent-card reveal" style="--i:1">
-          <div class="agent-head">
-            <div class="agent-icon" aria-hidden="true">⌕</div>
-            <div class="agent-meta">
-              <h3>Codebase Researcher</h3>
-              <p class="role">deep scan · solution research</p>
-            </div>
-          </div>
-          <p class="agent-desc">Maps the files, dependencies, and git history an issue touches — and researches how similar problems were solved.</p>
-          <p class="agent-skills"><span>Used by:</span> /issue-resolver · /issue-analysis · /auto-pilot</p>
-        </article>
-
-        <article class="agent-card reveal" style="--i:2">
-          <div class="agent-head">
-            <div class="agent-icon" aria-hidden="true">◇</div>
-            <div class="agent-meta">
-              <h3>Synthesizer</h3>
-              <p class="role">analysis · implementation options</p>
-            </div>
-          </div>
-          <p class="agent-desc">Turns research into weighed options with trade-offs and a recommended approach — plus an overall complexity read.</p>
-          <p class="agent-skills"><span>Used by:</span> /issue-analysis · /issue-resolver</p>
-        </article>
-
-        <article class="agent-card reveal" style="--i:3">
-          <div class="agent-head">
-            <div class="agent-icon" aria-hidden="true">⚡</div>
-            <div class="agent-meta">
-              <h3>Implementer</h3>
-              <p class="role">code · tests</p>
-            </div>
-          </div>
-          <p class="agent-desc">Ships the change and its tests to match project conventions — data structures first, red-capable verification before bug fixes.</p>
-          <p class="agent-skills"><span>Used by:</span> /issue-resolver</p>
-        </article>
-
-        <article class="agent-card reveal" style="--i:4">
-          <div class="agent-head">
-            <div class="agent-icon" aria-hidden="true">◎</div>
-            <div class="agent-meta">
-              <h3>Code Reviewer</h3>
-              <p class="role">confidence-based review</p>
-            </div>
-          </div>
-          <p class="agent-desc">Evidence-based review that reports only high-confidence findings, grouped under Spec and Standards axes — no nitpick noise.</p>
-          <p class="agent-skills"><span>Used by:</span> /issue-pr-review · /issue-resolver · /auto-pilot</p>
-        </article>
-
-        <article class="agent-card reveal" style="--i:5">
-          <div class="agent-head">
-            <div class="agent-icon" aria-hidden="true">⟳</div>
-            <div class="agent-meta">
-              <h3>Fixer</h3>
-              <p class="role">targeted fixes</p>
-            </div>
-          </div>
-          <p class="agent-desc">Applies scoped fixes for review, test, CI, and acceptance-criteria failures — cycling until the PR turns green.</p>
-          <p class="agent-skills"><span>Used by:</span> /issue-pr-review · /issue-resolver</p>
-        </article>
-
-        <article class="agent-card reveal" style="--i:6">
-          <div class="agent-head">
-            <div class="agent-icon" aria-hidden="true">⋔</div>
-            <div class="agent-meta">
-              <h3>Relationship Scanner</h3>
-              <p class="role">deps · already-fixed detection</p>
-            </div>
-          </div>
-          <p class="agent-desc">Finds file-level dependencies between issues, work that can run in parallel, and issues already fixed by a commit or PR.</p>
-          <p class="agent-skills"><span>Used by:</span> /issue-triage</p>
-        </article>
-
-        <article class="agent-card reveal" style="--i:7">
-          <div class="agent-head">
-            <div class="agent-icon" aria-hidden="true">◈</div>
-            <div class="agent-meta">
-              <h3>UI/UX Reviewer</h3>
-              <p class="role">a11y · screenshot review</p>
-            </div>
-          </div>
-          <p class="agent-desc">Auto-detects UI changes and reviews accessibility, responsive layout, and honest UI against the screenshots in the PR.</p>
-          <p class="agent-skills"><span>Used by:</span> /issue-pr-review · /issue-resolver</p>
-        </article>
-      </div>
-    </div>
-  </section>
-
   <!-- ───────────────────────── METHODOLOGY ───────────────────────── -->
   <section id="methodology">
     <div class="wrap">
       <div class="section-tag">What is IDD?</div>
-      <h2 class="sec-title">A tool-neutral spec — issues as the atomic unit of work.</h2>
-      <p class="sec-lead">Issue-Driven Development is a written contract: an issue tracker and git history become executable project memory. <a class="green" href="https://github.com/luongnv89/idd/blob/main/SPEC.md">SPEC.md</a> (v1.1) defines the issue format, dependency and <code class="mono green">Part of #N</code> hierarchy markers, naming grammar, and L1–L3 conformance levels — with RFC-2119 MUST/SHOULD language. It needs no specific AI agent, editor, or host. <strong>gitissue is the reference implementation</strong> for Claude Code + GitHub; a human with a text editor can conform too.</p>
+      <h2 class="sec-title">Issue-Driven. Intention-Driven. Same IDD.</h2>
+      <p class="sec-lead">IDD began as Issue-Driven Development: every change starts as an issue and ends as a PR that closes it. It is just as much Intention-Driven Development: the issue records what someone wants and why, and that intention travels with the work into the code, the review, and your git history.</p>
+      <p class="trace-line">intention → analysis → implementation → review → memory</p>
 
       <div class="split">
         <div class="idd-card reveal">
-          <div class="kicker">// The translation gap</div>
-          <h3>From vague report to work order</h3>
-          <p>Turning a vague report — "login is broken on mobile" — into a structured work order with acceptance criteria, current-code analysis at execution time, and a clear definition of done. That's the gap between describing a problem and shipping a fix, and IDD closes it.</p>
+          <div class="kicker">// Issue-Driven</div>
+          <h3>The issue is the unit of work</h3>
+          <p>Each change starts as a structured issue with acceptance criteria and ends as one atomic PR. <a class="green" href="https://github.com/luongnv89/idd/blob/main/SPEC.md">SPEC.md</a> (v1.1) defines the issue format, dependency and <code class="mono green">Part of #N</code> markers, naming grammar, and L1–L3 conformance levels in RFC 2119 language. Any agent, editor, or person can conform; these eight skills are the reference implementation on GitHub.</p>
         </div>
         <div class="idd-card reveal">
-          <div class="kicker">// The intention gap</div>
-          <h3>Commits that carry the <em>why</em></h3>
-          <p>Every change ends as a PR linked to its issue, so the commit that resolves it carries the <em>why</em> forward. Decision Records bind durable memory to the work. Your git history becomes a knowledge base you can retrieve from — not noise.</p>
+          <div class="kicker">// Intention-Driven</div>
+          <h3>The <em>why</em> travels with the code</h3>
+          <p>The issue says what should change and why. The PR proves how it changed, a Decision Record keeps the reasoning, and the commit that resolves the issue carries it into git history, where the next person or agent can find it.</p>
         </div>
       </div>
-    </div>
-  </section>
 
-  <!-- ───────────────────────── WORKS WITH ───────────────────────── -->
-  <section id="works" class="center">
-    <div class="wrap">
-      <div class="section-tag">No lock-in</div>
-      <h2 class="sec-title">Works with the tools you already use.</h2>
-      <p class="sec-lead">IDD is a methodology, not a platform. The structured issue format is plain GitHub markdown — anything that reads issues can consume it. gitissue adds structure; everything else keeps working exactly as before.</p>
-      <div class="tools">
-        <div class="tool"><b>Claude Code</b> — load skills directly</div>
-        <div class="tool"><b>Codex CLI</b> — pipe issue body as context</div>
-        <div class="tool"><b>Gemini CLI</b> — resolve from the issue</div>
-        <div class="tool"><b>GitHub Copilot</b> — richer context</div>
-        <div class="tool"><b>Any SKILL.md agent</b></div>
-        <div class="tool"><b>Human developers</b> — just read it</div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ───────────────────────── INSTALL ───────────────────────── -->
-  <section id="install" class="center">
-    <div class="wrap">
-      <div class="section-tag">Get started</div>
-      <h2 class="sec-title">Your first issue in 30 seconds.</h2>
-      <p class="sec-lead">Needs <code class="mono green">gh</code> 2.0+, Git 2.30+, and Claude Code (or any SKILL.md agent). Zero config to start.</p>
-
-      <div class="install-box reveal">
-        <div class="install-body">
-          <div class="copy-row">
-            <div>
-              <div class="cmt"># one command installs the whole pack — all eight skills</div>
-              <div class="cmd"><span class="green">asm</span> install https://github.com/luongnv89/idd</div>
-            </div>
-            <button class="copy-btn" data-copy="asm install https://github.com/luongnv89/idd">copy</button>
-          </div>
-          <div class="copy-row">
-            <div>
-              <div class="cmt"># or install as a Claude Code plugin, pinned to the latest release</div>
-              <div class="cmd"><span class="green">claude</span> plugin marketplace add luongnv89/idd</div>
-              <div class="cmd"><span class="green">claude</span> plugin install idd@idd</div>
-            </div>
-            <button class="copy-btn" data-copy="claude plugin marketplace add luongnv89/idd &amp;&amp; claude plugin install idd@idd">copy</button>
-          </div>
-        </div>
-      </div>
-      <p class="install-note">Plugin skills are namespaced, like <code class="mono green">/idd:issue-resolver 42</code>. Inside a session, <code class="mono">/plugin marketplace add luongnv89/idd</code> and <code class="mono">/plugin install idd@idd</code> do the same. To update, run <code class="mono">claude plugin marketplace update idd</code>, then <code class="mono">claude plugin update idd@idd</code>. Pick one install path: with both the plugin and <code class="mono">asm</code>, every skill shows up twice.</p>
-
-      <div class="hero-cta" style="justify-content:center; margin-top:36px;">
-        <a class="btn btn-primary" href="docs.html">▶ Read the full docs</a>
-        <a class="btn btn-ghost" href="https://github.com/luongnv89/idd/releases/latest">Latest release</a>
+      <h3 class="tools-title">Works with the coding agent you already use</h3>
+      <div class="tools tools-left">
+        <div class="tool"><b>Claude Code</b></div>
+        <div class="tool"><b>Codex</b></div>
+        <div class="tool"><b>Cursor</b></div>
+        <div class="tool"><b>GitHub Copilot</b></div>
+        <div class="tool"><b>Gemini CLI</b></div>
+        <div class="tool"><b>OpenCode</b></div>
+        <div class="tool"><b>Windsurf</b></div>
+        <div class="tool"><b>Cline</b></div>
+        <div class="tool"><b>Amp</b></div>
+        <div class="tool"><b>Any agent</b> that loads SKILL.md</div>
+        <div class="tool"><b>People</b> just read the issues</div>
       </div>
     </div>
   </section>
@@ -1284,36 +1306,32 @@
 
       <div class="faq">
         <details>
-          <summary>Does this lock me into a specific AI tool? <span class="q-ico">+</span></summary>
-          <div class="a">No. The structured issue format is plain GitHub markdown — any tool that reads GitHub issues can consume it. gitissue ships as self-contained SKILL.md skills that run on Claude Code, Codex CLI, Gemini CLI, or any SKILL.md-compatible harness. Your existing workflow keeps working exactly as before.</div>
+          <summary>Why not just ask my agent to fix issue #42? <span class="q-ico">+</span></summary>
+          <div class="a">You can, and it will guess. A one-line issue doesn’t say which files matter, what done looks like, or how to check it. <code>/issue-resolver</code> first rewrites a vague issue into a work order with acceptance criteria, then runs the same pipeline every time: research, plan, implement with tests, and QA against each criterion. The branch, commits, and PR all reference the issue, so the reason behind every change stays in your history.</div>
         </details>
         <details>
-          <summary>Will it rewrite or overwrite my existing issues? <span class="q-ico">+</span></summary>
-          <div class="a">Normalization preserves your original text inside a <code>&gt; Reporter Context</code> blockquote and posts a backup comment before changing anything. Inferred fields are tagged with confidence markers — <code>(high confidence)</code>, <code>(needs review)</code> — so you can see exactly what was guessed versus what was certain.</div>
+          <summary>Does this lock me into a specific AI tool? <span class="q-ico">+</span></summary>
+          <div class="a">No. Issues stay plain GitHub markdown that any tool or person can read. The skills ship as self-contained SKILL.md files (SKILL.md is the markdown file that teaches an agent a skill), so they run on Claude Code, Codex, Cursor, GitHub Copilot, Gemini CLI, OpenCode, or any other coding agent that loads skills.</div>
+        </details>
+        <details>
+          <summary>Will it overwrite my existing issues? <span class="q-ico">+</span></summary>
+          <div class="a">No. Normalizing an issue keeps your original text in a <code>Reporter Context</code> blockquote and posts a backup comment before anything changes. Inferred fields carry confidence markers, <code>(high confidence)</code> or <code>(needs review)</code>, so you can see what was guessed.</div>
         </details>
         <details>
           <summary>Is auto-pilot safe to run on a real repo? <span class="q-ico">+</span></summary>
-          <div class="a">It's <code>balanced</code> by default: clean PRs are merged, but a PR with unresolved review issues gets a follow-up issue and stays open — partial merges never happen unless you explicitly opt into <code>aggressive</code> mode with <code>merge_partial: true</code>. Prefer to review everything yourself? <code>conservative</code> mode holds every merge. A dependency-aware merge gate respects <code>Depends on #N</code> / <code>Blocked by #N</code>, and you can pass an explicit issue list for targeted runs.</div>
+          <div class="a">It defaults to <code>balanced</code> mode: clean PRs merge, and a PR with unresolved review findings stays open with a follow-up issue. <code>conservative</code> mode holds every merge for you. Partial merges happen only if you opt into <code>aggressive</code> mode with <code>merge_partial: true</code>. A dependency-aware merge gate respects <code>Depends on #N</code> and <code>Blocked by #N</code>, and you can pass an explicit issue list for targeted runs.</div>
         </details>
         <details>
-          <summary>Do I need to configure anything to start? <span class="q-ico">+</span></summary>
-          <div class="a">No. Every command runs zero-config with sensible defaults. When you're ready to tune language, framework, and test-runner settings, run <code>/init-gitissue</code> to generate a project-specific <code>.gitissue.yml</code> — but it's entirely optional.</div>
-        </details>
-        <details>
-          <summary>What does it actually require? <span class="q-ico">+</span></summary>
-          <div class="a">The GitHub CLI (<code>gh</code>) 2.0+ authenticated via <code>gh auth login</code>, Git 2.30+, and Claude Code or any SKILL.md-compatible agent. Every <code>gh</code> call uses explicit JSON field selection — no fragile text parsing.</div>
+          <summary>What do I need to get started? <span class="q-ico">+</span></summary>
+          <div class="a">The GitHub CLI (<code>gh</code>) 2.0+ signed in with <code>gh auth login</code>, Git 2.30+, and any coding agent that loads SKILL.md skills. No config file is needed. When you want to tune settings, <code>/init-gitissue</code> detects your stack and writes a <code>.gitissue.yml</code>.</div>
         </details>
         <details>
           <summary>How much does it cost? <span class="q-ico">+</span></summary>
-          <div class="a">gitissue is open source under the MIT license. Clone it, fork it, ship it. You only pay for whatever AI agent you choose to run the skills with.</div>
+          <div class="a">Nothing. IDD is open source under the MIT license. You pay only for the AI agent you run it with.</div>
         </details>
         <details>
-          <summary>Can I enforce the spec without running an AI agent? <span class="q-ico">+</span></summary>
-          <div class="a">Yes. <code>scripts/idd-lint.py</code> checks <a class="green" href="https://github.com/luongnv89/idd/blob/main/SPEC.md">IDD Spec</a> conformance from plain data — no LLM, no network, no dependencies beyond the Python standard library. Lint issues, PRs, commits, branches, or a whole repo (<code>--level L2</code> to skip L3 Decision-Record checks), and get an exit code 0/1 that drops straight into CI. Its <code>stats</code> mode prints an evidence report — trace completeness, Decision-Record coverage, and outcomes by issue quality. Any repo can run it, gitissue skills or not; <code>/idd-doctor</code> remains the deeper, agent-powered health check.</div>
-        </details>
-        <details>
-          <summary>What is the suggested model on new issues? <span class="q-ico">+</span></summary>
-          <div class="a"><code>/issue-creator</code> estimates issue effort (XS–XL) and adds an advisory <strong>Suggested model</strong> with a <strong>thinking level</strong> (e.g. GPT-5.5 High · Opus 4.8 Medium), grounded in CursorBench benchmarks. It appears in the create preview as <code>⚡ Model:</code> and in the issue metadata so humans and agents can match spend to scope — use a low tier for trivial fixes and higher thinking only when the issue warrants it. Disable via <code>model_suggestion.enabled: false</code> in <code>.gitissue.yml</code>.</div>
+          <summary>Can I enforce the spec without an AI agent? <span class="q-ico">+</span></summary>
+          <div class="a">Yes. <code>idd-lint</code> is a single Python file that checks <a class="green" href="https://github.com/luongnv89/idd/blob/main/SPEC.md">IDD Spec</a> conformance for issues, PRs, commit messages, branches, or a whole repo. Its lint checks need no LLM, no network, and nothing beyond the standard library, and they exit 0 or 1, so they drop straight into CI. It ships in the repo, not the skill pack: download <code>scripts/idd-lint.py</code> and run it on any repo.</div>
         </details>
       </div>
     </div>
@@ -1321,13 +1339,13 @@
 
   <!-- ───────────────────────── FINAL CTA ───────────────────────── -->
   <div class="final">
-    <h2>Stop translating issues by hand.<br/>Let your agents <span class="green">execute them.</span></h2>
-    <p>Turn vague reports into agent-ready work orders — and turn your git history back into the knowledge base it was meant to be.</p>
+    <h2>Every line of code,<br/><span class="green">traced back to its issue.</span></h2>
+    <p>Eight skills, one install. No config file, no lock-in, nothing to pay.</p>
     <div class="hero-cta">
-      <a class="btn btn-primary" href="./#install">▶ Get Started Free</a>
-      <a class="btn btn-ghost" href="https://github.com/luongnv89/idd">Star on GitHub ★</a>
+      <a class="btn btn-primary" href="./#install">▶ Install IDD</a>
+      <a class="btn btn-ghost" href="https://github.com/luongnv89/idd">Star IDD on GitHub ★</a>
     </div>
-    <div class="risk"><span class="ok">✓</span> MIT licensed &nbsp;·&nbsp; <span class="ok">✓</span> Zero config &nbsp;·&nbsp; <span class="ok">✓</span> No vendor lock-in</div>
+    <div class="risk"><span class="ok">✓</span> MIT licensed &nbsp;·&nbsp; <span class="ok">✓</span> Zero config &nbsp;·&nbsp; <span class="ok">✓</span> Plain GitHub markdown</div>
   </div>
 
   <!-- ───────────────────────── FOOTER ───────────────────────── -->
@@ -1459,6 +1477,242 @@
       menu.addEventListener('click', function (e) {
         if (e.target && e.target.tagName === 'A') { menu.removeAttribute('open'); }
       });
+    }());
+
+    // Hero terminal loop (deck §2b). The markup's static transcript is the
+    // default for no-JS and prefers-reduced-motion — the animation only
+    // starts when full motion is allowed. A user pause sticks: visibility
+    // and off-screen auto-pauses never resume over it.
+    (function () {
+      var term = document.getElementById('hero-term');
+      if (!term) { return; }
+      var body = term.querySelector('.term-body');
+      var pauseBtn = document.getElementById('hero-term-pause');
+      if (!body || !pauseBtn) { return; }
+      if (typeof matchMedia === 'function' &&
+          matchMedia('(prefers-reduced-motion: reduce)').matches) { return; }
+
+      var TYPE_MS = 28;    // per typed character on command lines
+      var LINE_MS = 260;   // between output lines
+      var PIPE_MS = 420;   // between [n/5] pipeline lines
+      var STAGE_MS = 900;  // between stages
+      var HOLD_MS = 3500;  // hold on the final line
+      var FADE_MS = 450;   // fade out before the loop restarts
+      var MAX_LINES = 15;  // the animated body never grows past this
+      var SEP = '┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄';  // closes each stage block
+
+      var seq = [
+        { stage: 'create', lines: [
+          { t: '❯ /issue-creator "login redirect loops on mobile Safari"', typed: true },
+          { t: '◆ Issue Preview' },
+          { t: '│   Type:      bug (high confidence)' },
+          { t: '│   Effort:    S' },
+          { t: '│   Criteria:  3 acceptance criteria' },
+          { t: '✓ Created issue #42: Fix login redirect loop on mobile Safari' },
+          { t: SEP }
+        ] },
+        { stage: 'triage', lines: [
+          { t: '❯ /issue-triage', typed: true },
+          { t: '  ● Scanning 12 open issues...' },
+          { t: '✓ Next up: #42 · P1 · no blockers' },
+          { t: SEP }
+        ] },
+        { stage: 'resolve', lines: [
+          { t: '❯ /issue-resolver 42', typed: true },
+          { t: '◆ Resolve Pipeline' },
+          { t: '│   [0/5] Preflight    ✓ issue #42 open', pipe: true },
+          { t: '│   [1/5] Research     ✓ read 6 files', pipe: true },
+          { t: '│   [2/5] Plan         ✓ guard the redirect callback', pipe: true },
+          { t: '│   [3/5] Implement    ✓ 2 files, 41 lines, 3 tests', pipe: true },
+          { t: '│   [4/5] QA           ✓ clean after 1 cycle', pipe: true },
+          { t: '│   [5/5] Deliver      ✓ PR #87 opened', pipe: true },
+          { t: SEP }
+        ] },
+        { stage: 'review', lines: [
+          { t: '❯ /issue-pr-review 87 --auto', typed: true },
+          { t: '◆ PR Review: #87 (pass 1 — clean)' },
+          { t: '│   ✓ 3/3 acceptance criteria verified' },
+          { t: '│   ✓ 128 tests passed · CI green' },
+          { t: '│   ✓ traceability: Closes #42' },
+          { t: '✓ Merged PR #87 · issue #42 closed' },
+          { t: SEP }
+        ] }
+      ];
+
+      function scroll() { body.scrollTop = body.scrollHeight; }
+
+      // Colour the symbols and labels, not whole lines (DESIGN.md). A leading
+      // '│ ' is a block rail — colour the glyph, then parse the rest by the
+      // same rules.
+      function partsOf(t) {
+        var m;
+        if ((m = /^(│ )(.*)$/.exec(t))) {
+          return [{ t: m[1], cls: 'c-rail' }].concat(partsOf(m[2]));
+        }
+        if (/^┄+$/.test(t)) { return [{ t: t, cls: 'c-dim' }]; }
+        if ((m = /^❯ /.exec(t))) {
+          return [{ t: '❯ ', cls: 'c-prompt' }, { t: t.slice(m[0].length) }];
+        }
+        if ((m = /^(\s*\[\d\/5\] .*?)(\s+)(✓)(.*)$/.exec(t))) {
+          return [{ t: m[1] + m[2], cls: 'c-step' }, { t: m[3], cls: 'c-ok' }, { t: m[4] }];
+        }
+        if (/^◆/.test(t)) { return [{ t: t, cls: 'c-head' }]; }
+        if ((m = /^(\s*)(●)(.*)$/.exec(t))) {
+          return [{ t: m[1] }, { t: m[2], cls: 'c-yellow' }, { t: m[3], cls: 'c-step' }];
+        }
+        if ((m = /^(\s*)(✓)(.*)$/.exec(t))) {
+          return [{ t: m[1] }, { t: m[2], cls: 'c-ok' }, { t: m[3] }];
+        }
+        if ((m = /^(\s*\S+:\s+)(.*)$/.exec(t))) {
+          return [{ t: m[1], cls: 'c-step' }, { t: m[2] }];
+        }
+        return [{ t: t }];
+      }
+
+      // Flatten the sequence into timed events so pause/resume is a single
+      // timer: each event runs, then the next event's delay is scheduled.
+      var evs = [];
+      seq.forEach(function (stage, si) {
+        evs.push({ d: si === 0 ? 0 : STAGE_MS, run: function () {
+          var stages = term.querySelectorAll('.stage');
+          for (var i = 0; i < stages.length; i++) {
+            stages[i].classList.toggle('active', stages[i].getAttribute('data-stage') === stage.stage);
+          }
+        } });
+        stage.lines.forEach(function (spec) {
+          // draw(n) reveals the first n characters across the line's spans;
+          // the line element is built lazily so a pause between events
+          // leaves a clean resume point.
+          var div = null, parts = null;
+          function draw(n) {
+            if (!div) {
+              parts = partsOf(spec.t);
+              div = document.createElement('div');
+              div.className = 'ln';
+              for (var i = 0; i < parts.length; i++) {
+                var s = document.createElement('span');
+                if (parts[i].cls) { s.className = parts[i].cls; }
+                div.appendChild(s);
+              }
+              body.appendChild(div);
+            }
+            var rest = n;
+            for (var i = 0; i < parts.length; i++) {
+              var take = Math.min(parts[i].t.length, Math.max(rest, 0));
+              div.children[i].textContent = parts[i].t.slice(0, take);
+              rest -= take;
+            }
+            scroll();
+          }
+          if (spec.typed) {
+            evs.push({ d: 0, run: function () { draw(0); } });
+            spec.t.split('').forEach(function (ch, i) {
+              evs.push({ d: TYPE_MS, run: function () { draw(i + 1); } });
+            });
+            evs.push({ d: LINE_MS, run: function () {} });
+          } else {
+            evs.push({ d: spec.pipe ? PIPE_MS : LINE_MS, run: function () { draw(spec.t.length); } });
+          }
+        });
+      });
+      evs.push({ d: HOLD_MS, run: function () { body.classList.add('fading'); } });
+      evs.push({ d: FADE_MS, run: function () {
+        body.textContent = '';
+        body.classList.remove('fading');
+        body.scrollTop = 0;
+        idx = -1;
+      } });
+
+      var idx = 0, timer = null, paused = false, userPaused = false;
+      function tick() {
+        if (paused || idx >= evs.length) { return; }
+        evs[idx].run();
+        idx += 1;
+        if (idx < evs.length && !paused) { timer = setTimeout(tick, evs[idx].d); }
+      }
+      function setLabel() {
+        pauseBtn.setAttribute('aria-label', paused ? 'Play animation' : 'Pause animation');
+        pauseBtn.textContent = paused ? '▶' : '❚❚';
+      }
+      function halt() { if (timer) { clearTimeout(timer); timer = null; } }
+      function pause(auto) {
+        if (paused) {
+          if (!auto) { userPaused = true; setLabel(); }
+          return;
+        }
+        paused = true;
+        if (!auto) { userPaused = true; }
+        halt();
+        setLabel();
+      }
+      function play(auto) {
+        if (!paused) { return; }
+        if (auto && userPaused) { return; }
+        if (!auto) { userPaused = false; }
+        paused = false;
+        setLabel();
+        if (idx < evs.length) { timer = setTimeout(tick, evs[idx].d); }
+      }
+      pauseBtn.addEventListener('click', function () {
+        if (paused) { play(false); } else { pause(false); }
+      });
+      if (typeof IntersectionObserver === 'function') {
+        new IntersectionObserver(function (entries) {
+          entries.forEach(function (e) {
+            if (e.isIntersecting) { play(true); } else { pause(true); }
+          });
+        }).observe(term);
+      }
+      document.addEventListener('visibilitychange', function () {
+        if (document.hidden) { pause(true); } else { play(true); }
+      });
+
+      // Fix the body height so appearing lines never move the layout, capped
+      // at MAX_LINES rows: render the full sequence in an off-DOM clone at
+      // the real width (narrow viewports wrap), measure, then play inside a
+      // fixed-height overflow-hidden box whose auto-scroll keeps the newest
+      // line in view. Debounced re-measure on resize.
+      function measure() {
+        var probe = document.createElement('div');
+        probe.className = body.className;
+        probe.style.cssText = 'position:absolute; visibility:hidden; left:-9999px; top:0; width:' + body.clientWidth + 'px;';
+        seq.forEach(function (stage) {
+          stage.lines.forEach(function (spec) {
+            var div = document.createElement('div');
+            div.className = 'ln';
+            div.textContent = spec.t;
+            probe.appendChild(div);
+          });
+        });
+        term.appendChild(probe);
+        var full = probe.offsetHeight;
+        term.removeChild(probe);
+        var cs = getComputedStyle(body);
+        var lh = parseFloat(cs.lineHeight) || 20;
+        var pad = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+        return Math.min(full, Math.round(MAX_LINES * lh + pad));
+      }
+      function fit() {
+        var h = measure() + 'px';
+        body.style.minHeight = h;
+        body.style.maxHeight = h;
+        scroll();
+      }
+      if (typeof addEventListener === 'function') {
+        var rsz = null;
+        addEventListener('resize', function () {
+          if (rsz) { clearTimeout(rsz); }
+          rsz = setTimeout(fit, 150);
+        });
+      }
+
+      body.textContent = '';
+      body.style.overflow = 'hidden';
+      fit();
+
+      pauseBtn.hidden = false;
+      setLabel();
+      timer = setTimeout(tick, evs[0].d);
     }());
 
     // Scroll reveal. The observer is an enhancement: where

@@ -1,6 +1,6 @@
-# gitissue
+# IDD
 
-> Issue-Driven Development for GitHub: nine skills that plan, structure, analyze, triage, resolve, and review GitHub issue workflows so humans and AI coding agents can ship tested PRs (eight public packages in `src/skills/` plus internal `/idd-doctor`).
+> IDD (Issue-Driven Development) for GitHub: eight public skills that plan, structure, analyze, triage, resolve, and review GitHub issue workflows so people and AI coding agents can ship tested PRs, plus the maintainer-only `/idd-doctor` health check.
 
 ## Start here
 
