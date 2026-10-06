@@ -6,7 +6,7 @@ One part of `references/pipeline-steps.md` — the index that maps every step to
 
 Each cycle:
 
-1. **Code review** — spawn a *fresh* code-reviewer subagent per cycle (see `shared/agents/code-reviewer.md`) so each pass is unbiased, with `{review_mode}` = `review` and `{challenge_context}` empty. Pass the same `workspace_contract` and independent `expected_lane_identity` sibling used by Steps 1–3 (both `null` on ordinary runs); the reviewer validates their binding before reading the diff or files.
+1. **Code review** — spawn a *fresh* code-reviewer subagent per cycle (see `shared/agents/code-reviewer.md`) so each pass is unbiased, with `{review_mode}` = `review` and `{challenge_context}` empty. No PR exists yet, so bind `{pr_context}` to the issue's acceptance criteria, the selected plan and the implementer's *Test Integrity* record — the reviewer checks each removed or weakened test against them. Pass the same `workspace_contract` and independent `expected_lane_identity` sibling used by Steps 1–3 (both `null` on ordinary runs); the reviewer validates their binding before reading the diff or files.
 2. **Run tests** — unit, integration, e2e (if present), build/compile. Record <!-- a:rs-qa-run-tests -->
    `tests_state` — the passing count paired with `tests_sha` = `git rev-parse HEAD`,
    see *Last-green test state* below — **at the moment the suite runs**.
