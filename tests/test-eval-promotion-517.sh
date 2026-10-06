@@ -102,6 +102,7 @@ cat > "$TMP/stub-agent.sh" <<'SH'
 #!/usr/bin/env bash
 set -u
 echo "stub agent: starting in $(pwd)"
+if [ -n "${STUB_FIFO:-}" ]; then mkfifo agent.fifo; fi
 echo "skills at $EVAL_SKILLS_DIR, out at $EVAL_OUT"
 echo "comparing baseline and Candidate wording"
 echo "prompt: $(cat "$EVAL_PROMPT_FILE")"
@@ -115,6 +116,7 @@ echo "isolation-parent: $(ls -A "$PARENT" | wc -l | tr -d ' ')"
 echo "isolation-transcripts: $(find "$PARENT" -name transcript.txt | wc -l | tr -d ' ')"
 echo "isolation-skillmd: $(find "$PARENT" -name SKILL.md | wc -l | tr -d ' ')"
 echo "isolation-behaviors: $(find "$PARENT" -name SKILL.md -exec cat {} + | tr '\n' ' ')"
+echo "isolation-tmpdirs: ${TMPDIR#"$RUN_ROOT"/} ${XDG_CACHE_HOME#"$RUN_ROOT"/} ${XDG_CONFIG_HOME#"$RUN_ROOT"/}"
 python3 -c 'import os, sys; print("mtimes:", *[int(os.lstat(p).st_mtime) for p in sys.argv[1:]])' \
   "$EVAL_SKILLS_DIR/demo/SKILL.md" "$EVAL_SKILLS_DIR/demo" "$EVAL_SKILLS_DIR" notes.txt .
 gh pr create --title "fix" --body "done"
@@ -122,6 +124,7 @@ echo "result" > "$EVAL_OUT/result.txt"
 if [ -n "${STUB_LEAK:-}" ]; then echo "$STUB_LEAK"; fi
 if [ -n "${STUB_LEAK_HOME:-}" ]; then echo "$STUB_LEAK_HOME" > "$HOME/agent-cache.txt"; fi
 if [ -n "${STUB_CRIT_OUT:-}" ]; then echo "$STUB_CRIT_OUT" > "$EVAL_OUT/summary.md"; fi
+if [ -n "${STUB_SLEEP:-}" ]; then sleep "$STUB_SLEEP"; fi
 echo "stub agent: done" >&2
 SH
 
@@ -130,7 +133,7 @@ agent_config() {  # agent_config <file> <python-dict-edits>
 import json, sys
 cfg = {"command": ["bash", sys.argv[2], "{prompt_file}", "{skills_dir}"],
        "model": "stub-model-1", "cli": "stub-cli", "cli_version": "0.0.1",
-       "tools": ["bash", "gh"], "pass_env": ["STUB_LEAK", "STUB_LEAK_HOME", "STUB_CRIT_OUT"]}
+       "tools": ["bash", "gh"], "pass_env": ["STUB_LEAK", "STUB_LEAK_HOME", "STUB_CRIT_OUT", "STUB_FIFO", "STUB_SLEEP"]}
 exec(sys.argv[3])
 open(sys.argv[1], "w").write(json.dumps(cfg))
 PY
@@ -227,13 +230,14 @@ expect_exit() {  # expect_exit <code> <drive args...>
 agent_config "$TMP/agent-token.json" "cfg['pass_env'] = ['GH_TOKEN']"
 agent_config "$TMP/agent-nomodel.json" "del cfg['model']"
 agent_config "$TMP/agent-notools.json" "cfg['tools'] = []"
+agent_config "$TMP/agent-tmpdir.json" "cfg['pass_env'] = ['TMPDIR']"
 T3_OK=1
-for cfg in agent-token agent-nomodel agent-notools; do
+for cfg in agent-token agent-nomodel agent-notools agent-tmpdir; do
   expect_exit 3 run --task-id demo-task --baseline "$BASE" --candidate "$CAND" \
     --agent-config "$TMP/$cfg.json" || T3_OK=0
 done
 if [ "$T3_OK" -eq 1 ] && [ "$(run_count)" = "0" ]; then
-  pass "T3: agent config with GH_TOKEN pass_env / no model / empty tools exits 3"
+  pass "T3: agent config with GH_TOKEN or TMPDIR pass_env / no model / empty tools exits 3"
 else
   fail "T3: agent config validation"
 fi
@@ -340,6 +344,7 @@ for bid, rec in key.items():
     assert iso["isolation-transcripts"] == "1", (bid, iso)
     assert iso["isolation-skillmd"] == "1", (bid, iso)
     assert iso["isolation-behaviors"].strip() == f"behavior: {want}", (bid, iso)
+    assert iso["isolation-tmpdirs"] == "run/tmp run/home/.cache run/home/.config", (bid, iso)
     mt = [l for l in text.splitlines() if l.startswith("mtimes:")]
     assert len(mt) == 1, text
     mtimes.update(int(v) for v in mt[0].split()[1:])
@@ -455,9 +460,15 @@ if [ -n "$RUN_DIR" ]; then
   # paths are run-dir-relative and the rubric comes from the store).
   cp -R "$RUN_DIR" "$TMP/run-reject"
   cp -R "$RUN_DIR" "$TMP/run-bad"
+  cp -R "$RUN_DIR" "$TMP/run-hold"
   scores "$TMP/scores-reject.json" 0 1
   drive verdict --run-dir "$TMP/run-reject" --scores "$TMP/scores-reject.json" >"$TMP/v.json" 2>/dev/null || T9_OK=0
   [ "$(verdict_of "$TMP/v.json")" = "reject" ] || T9_OK=0
+  # Candidate == baseline but below min_pass_rate → hold. The scores file is
+  # the run dir's own scores.json: the driver must not try to copy it onto itself.
+  scores "$TMP/run-hold/scores.json" 0 0
+  drive verdict --run-dir "$TMP/run-hold" --scores "$TMP/run-hold/scores.json" >"$TMP/v.json" 2>/dev/null || T9_OK=0
+  [ "$(verdict_of "$TMP/v.json")" = "hold" ] || T9_OK=0
   scores "$TMP/scores-short.json" 1 0 drop
   expect_exit 3 verdict --run-dir "$RUN_DIR" --scores "$TMP/scores-short.json" \
     && grep -q "exactly every blind id" "$TMP/last.err" || T9_OK=0
@@ -499,7 +510,7 @@ else
   T9_OK=0
 fi
 if [ "$T9_OK" -eq 1 ]; then
-  pass "T9: verdict reject/promote by the rule, final once recorded; verify true, then false after tampering; short scores / malformed provenance → 3"
+  pass "T9: verdict reject/hold/promote by the rule (hold scored from the run dir's own scores.json), final once recorded; verify true, then false after tampering; short scores / malformed provenance → 3"
 else
   fail "T9: verdict + verify"
 fi
@@ -572,6 +583,41 @@ if [ "$T11_OK" -eq 1 ]; then
   pass "T11: lock.json shape, .gitignore store, dist-check step, README section, 6 grade handlers"
 else
   fail "T11: repo wiring"
+fi
+
+# ─── T12: below min_runs, timeout, unusual files ───────────
+# One run per arm against min_runs 2: the stub leaves a FIFO in its workspace
+# and outlives --timeout 1. The run still completes; the FIFO is skipped and
+# recorded, the exit is "timeout", and the verdict is insufficient.
+T12_OK=1
+set +e
+STUB_FIFO=1 STUB_SLEEP=5 drive run --task-id demo-task --baseline "$BASE" --candidate "$CAND" \
+  --agent-config "$TMP/agent.json" --runs 1 --timeout 1 >"$TMP/run4.json" 2>/dev/null
+EC12=$?
+set -e
+RUN4="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1])).get("run_dir",""))' "$TMP/run4.json" 2>/dev/null || true)"
+if [ "$EC12" -eq 0 ] && [ -n "$RUN4" ]; then
+  python3 - "$RUN4" <<'PY' || T12_OK=0
+import json, sys
+from pathlib import Path
+run = Path(sys.argv[1])
+key = json.loads((run / "sealed/key.json").read_text())
+assert len(key) == 2, key
+for rec in key.values():
+    assert rec["exit"] == "timeout" and rec["leak"] is False, rec
+    assert rec["skipped"] == ["workspace/agent.fifo"], rec
+    assert not (run / rec["raw"] / "workspace/agent.fifo").exists(), rec
+PY
+  RUN_DIR="$RUN4" scores "$TMP/scores-insufficient.json" 1 1
+  drive verdict --run-dir "$RUN4" --scores "$TMP/scores-insufficient.json" >"$TMP/v4.json" 2>/dev/null || T12_OK=0
+  [ "$(verdict_of "$TMP/v4.json")" = "insufficient" ] || T12_OK=0
+else
+  T12_OK=0
+fi
+if [ "$T12_OK" -eq 1 ]; then
+  pass "T12: runs below min_runs → insufficient; a timed-out agent records exit \"timeout\"; a FIFO left behind is skipped and recorded, not fatal"
+else
+  fail "T12: insufficient / timeout / unusual files (exit $EC12)"
 fi
 
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"

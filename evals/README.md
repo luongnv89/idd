@@ -284,10 +284,14 @@ python3 $A verdict --run-dir <run_dir> --scores scores.json
 python3 $A verify --run-dir <run_dir>
 ```
 
-The agent runs with an isolated `HOME` and `gh` config. A PATH-fronted
-`gh_shim.py` replays the task's cassettes. Only the variables named in
-`pass_env` come from your environment, and GitHub tokens, `EVAL_*` and `IDD_*`
-are refused there. Pass the model credentials your CLI needs this way. The
+The agent runs with an isolated `HOME`, `gh` config, `TMPDIR`,
+`XDG_CACHE_HOME` and `XDG_CONFIG_HOME`, all inside its run root, so nothing is
+shared through the system `/tmp` and the post-run scan sees what it writes
+there. A PATH-fronted `gh_shim.py` replays the task's cassettes. Only the
+variables named in `pass_env` come from your environment, and GitHub tokens,
+`EVAL_*`, `IDD_*` and the variables the driver sets itself are refused there.
+A socket, FIFO or device the agent leaves behind is not copied into `raw/`;
+the run's sealed record lists it under `skipped`. Pass the model credentials your CLI needs this way. The
 command must print the full session, tool calls included, on stdout or stderr,
 for example through a streaming or verbose JSON output mode. Leak detection and
 grading see nothing else.

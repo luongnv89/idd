@@ -8,7 +8,8 @@ by private rubrics, and decides whether the candidate may be promoted.
 
 It is opt-in and local only. It needs the model provider's network, so it is
 not sandboxed, and it is NEVER run in CI: `run` refuses when CI or
-GITHUB_ACTIONS is set, unless IDD_EVAL_AGENT=1 is set, and when EVAL_RECORD=1.
+GITHUB_ACTIONS is set, when IDD_EVAL_AGENT=1 is missing, and when
+EVAL_RECORD=1.
 
 Subcommands
   lock    --task-id ID
@@ -85,6 +86,7 @@ import shlex
 import shutil
 import signal
 import socket
+import stat
 import subprocess
 import sys
 import tempfile
@@ -109,8 +111,17 @@ FORBIDDEN_ENV = {
 }
 FORBIDDEN_ENV_PREFIXES = ("EVAL_", "IDD_")
 # Variables the driver sets itself; passing them through would bypass the
-# isolated HOME, gh config or the PATH-fronted shim.
-MANAGED_ENV = {"HOME", "PATH", "LANG", "GH_CONFIG_DIR", "GH_PROMPT_DISABLED"}
+# isolated HOME, temp and XDG dirs, gh config or the PATH-fronted shim.
+MANAGED_ENV = {
+    "HOME",
+    "PATH",
+    "LANG",
+    "GH_CONFIG_DIR",
+    "GH_PROMPT_DISABLED",
+    "TMPDIR",
+    "XDG_CACHE_HOME",
+    "XDG_CONFIG_HOME",
+}
 HARNESS_FILES = (
     "evals/harness/agent_eval.py",
     "evals/harness/gh_shim.py",
@@ -617,13 +628,16 @@ def _hermetic_git(cwd: Path, home: Path, *args: str) -> None:
 def _stage_run(raw: Path, task_dir: Path, prompt: str, harness_shim: Path) -> dict:
     workspace, out, home = raw / "workspace", raw / "out", raw / "home"
     gh_config, state, bindir = raw / "gh-config", raw / "state", raw / "bin"
+    # The agent's temp and XDG dirs live inside the run root, so the post-run
+    # scan sees what it writes there and nothing is shared through /tmp.
+    tmp, xdg_cache, xdg_config = raw / "tmp", home / ".cache", home / ".config"
     fixture = task_dir / "fixture_repo"
     raw.mkdir(parents=True)
     if fixture.is_dir():
         shutil.copytree(fixture, workspace, symlinks=True)
     else:
         workspace.mkdir()
-    for d in (out, home, gh_config, state, bindir):
+    for d in (out, home, gh_config, state, bindir, tmp, xdg_cache, xdg_config):
         d.mkdir()
     _hermetic_git(workspace, home, "init", "-q")
     _hermetic_git(workspace, home, "config", "user.name", "idd-eval")
@@ -653,6 +667,9 @@ def _stage_run(raw: Path, task_dir: Path, prompt: str, harness_shim: Path) -> di
         "gh_config": gh_config,
         "state": state,
         "bin": bindir,
+        "tmp": tmp,
+        "xdg_cache": xdg_cache,
+        "xdg_config": xdg_config,
         "prompt_file": prompt_file,
         "cassettes": cassettes,
         "call_log": call_log,
@@ -666,6 +683,9 @@ def _agent_env(paths: dict, skills: Path, pass_env: list[str]) -> dict[str, str]
         "LANG": "C.UTF-8",
         "GH_CONFIG_DIR": str(paths["gh_config"]),
         "GH_PROMPT_DISABLED": "1",
+        "TMPDIR": str(paths["tmp"]),
+        "XDG_CACHE_HOME": str(paths["xdg_cache"]),
+        "XDG_CONFIG_HOME": str(paths["xdg_config"]),
         "EVAL_CASSETTES": str(paths["cassettes"]),
         "EVAL_STATE_DIR": str(paths["state"]),
         "EVAL_GH_CALL_LOG": str(paths["call_log"]),
@@ -739,6 +759,28 @@ def _post_leaks(run_root: Path, stage: Path, canary: bytes, criteria_shingles: s
         except OSError:
             reasons.append(f"unscannable {rel}")
     return reasons
+
+
+def _copy_stage(stage: Path, raw: Path) -> list[str]:
+    """Copy a finished stage to raw/, skipping what cannot be copied.
+
+    A socket, FIFO or device the agent left behind would make copytree raise
+    after a paid session; such entries are skipped and returned (relative to
+    the stage) so the run records them.
+    """
+    skipped: list[str] = []
+
+    def ignore(dirpath: str, names: list[str]) -> set[str]:
+        drop: set[str] = set()
+        for name in names:
+            mode = os.lstat(os.path.join(dirpath, name)).st_mode
+            if not (stat.S_ISREG(mode) or stat.S_ISDIR(mode) or stat.S_ISLNK(mode)):
+                drop.add(name)
+                skipped.append(Path(dirpath, name).relative_to(stage).as_posix())
+        return drop
+
+    shutil.copytree(stage, raw, symlinks=True, ignore=ignore)
+    return sorted(skipped)
 
 
 def _run_checks(
@@ -1009,7 +1051,7 @@ def _run_staged(
         shutil.copyfile(stage / "transcript.txt", paths["out"] / "transcript.txt")
         leak_reasons = _post_leaks(run_root, stage, canary, criteria_shingles)
         raw = run_dir / "raw" / bid
-        shutil.copytree(stage, raw, symlinks=True)
+        skipped = _copy_stage(stage, raw)
         _drop_scratch(run_root, scratch)
         checks_passed = _run_checks(repo, run_dir, bid, task["id"], rubric["checks"], raw)
         records[bid] = {
@@ -1021,7 +1063,10 @@ def _run_staged(
             "checks_passed": checks_passed,
             "leak": bool(leak_reasons),
             "leak_reasons": leak_reasons,
+            "skipped": skipped,
         }
+        if skipped:
+            _say("⚠", f"run {n}: not copied (not a regular file, dir or symlink): {', '.join(skipped)}")
         mark = "⚠" if leak_reasons else "✓"
         _say(mark, f"run {n}/{len(plan)} {bid}: exit {code}, {duration}s")
 
@@ -1194,7 +1239,8 @@ def cmd_verdict(args: argparse.Namespace) -> dict:
         result = "hold"
 
     scores_path = run_dir / "scores.json"
-    shutil.copyfile(args.scores, scores_path)
+    if not (scores_path.exists() and os.path.samefile(args.scores, scores_path)):
+        shutil.copyfile(args.scores, scores_path)
     verdict = {
         "result": result,
         "baseline": tally["baseline"],
