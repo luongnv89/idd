@@ -39,7 +39,8 @@ src/
 │       ├── gi-backlog.py          # TTL-cached open-issue snapshot shared by triage + dedup
 │       ├── gi-branch.py           # Derive a convention-conformant branch name
 │       ├── gi-ratelimit.py        # Rate-limit verdict, chunked pause, backoff, runtime budget
-│       └── gi-plan-map.py         # Render plan-to-issues' static epic plan map
+│       ├── gi-plan-map.py         # Render plan-to-issues' static epic plan map
+│       └── gi-receipt.py          # Write/verify the revision receipt behind a QA handoff
 │
 ├── skills/
 │   ├── auto-pilot/         # /auto-pilot — triage, resolve, review, merge loop

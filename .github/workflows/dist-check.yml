@@ -346,6 +346,12 @@ jobs:
       - name: test-subagent-context-256
         run: bash tests/test-subagent-context-256.sh
 
+      - name: test-merge-identity-516
+        run: bash tests/test-merge-identity-516.sh
+
+      - name: test-qa-receipt-515
+        run: bash tests/test-qa-receipt-515.sh
+
       - name: test-followup-context-285
         run: bash tests/test-followup-context-285.sh
 

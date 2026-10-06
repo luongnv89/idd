@@ -22,6 +22,8 @@ Each cycle:
    the suite actually ran on, and *Update documentation* commits after this point,
    so the value is unrecoverable later (`references/report-templates.md`, *QA
    handoff marker*). Nothing recorded ⇒ omit the whole `tests=` field; never substitute the head SHA.
+   Keep the exact suite command beside it, as `tests_command`. Deliver's
+   revision receipt records it with the count and SHA (*Revision receipt*).
 3. **Evaluate results:** <!-- a:rs-qa-evaluate -->
    - Reviewer returns `PASS` AND all tests pass AND build succeeds → exit loop, QA passed.
    - Issues found → delegate fixes, then start next cycle.

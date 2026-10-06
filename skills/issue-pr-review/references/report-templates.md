@@ -281,11 +281,36 @@ Log the matching mechanism (label name or pattern). Emptying both keys disables 
 
 ## Auto-Merge (auto mode only)
 
-If the PR is clean AND `--auto` is set (and `--no-merge` is **not** set):
+If the PR is clean AND `--auto` is set (and `--no-merge` is **not** set), run the
+merge identity check, then merge with the expected-head guard (issue #516):
 
 ```bash
-gh pr merge {N} --squash --delete-branch
+verified_head="{ci_sha}"   # Step 5's ci_sha; with none, the headRefOid the final review cycle read
+read -r head_now base_ref <<<"$(gh pr view {N} --json headRefOid,baseRefName --jq '"\(.headRefOid) \(.baseRefName)"')"
+behind_by="$(gh api "repos/{owner}/{repo}/compare/${base_ref}...${verified_head}" --jq .behind_by)"
+if [ -n "$verified_head" ] && [ "$head_now" = "$verified_head" ] && [ "$behind_by" = "0" ]; then
+  gh pr merge {N} --squash --delete-branch --match-head-commit "$verified_head"
+else
+  echo "BLOCKED (stale merge authorization)"   # never merged; report it and stop
+fi
 ```
+
+The check is the subset of `/auto-pilot`'s *Step 5.1c — Merge identity gate*
+that a standalone review needs. A CI verdict covers one commit on one base, so
+the merge needs both unchanged. `head_now` must equal `verified_head`, and
+`behind_by` must be exactly `0`, meaning the live tip of the base branch is an
+ancestor of the checked head and the squash lands exactly the tree CI ran on.
+Compare against the branch name, never `baseRefOid`: that field is the base as
+of the PR's last sync and can trail the live branch by many commits.
+`--match-head-commit` makes GitHub refuse the merge when the head moved after
+the check. Anything else (a moved head, a base that moved ahead, a failed read
+or compare, an empty or non-integer answer) is **not** a merge. Report
+`BLOCKED (stale merge authorization)` and stop. Never re-wait and never update
+the branch here. **Patch-id equality never replaces fresh integration checks.**
+A rebased or cherry-picked twin of a checked commit needs its own CI on its
+own SHA. One residual stays open: a base that advances in the seconds between
+the compare and the merge. Branch protection's *Require branches to be up to
+date before merging* closes it on the server.
 
 The merge runs after the summary prints, so close with a merge block whose first
 row supersedes the summary's `Result:`. On success:
@@ -302,7 +327,16 @@ On merge failure:
   Result:            BLOCKED (manual merge required) — {reason}
   Merge:             ✗ fail ({reason})
   Decision:          No approval needed.
-  Next action:       resolve {reason}, then gh pr merge {N} --squash --delete-branch
+  Next action:       resolve {reason}, then re-run /issue-pr-review {N} --auto
+```
+
+On a stale merge identity (nothing was merged):
+
+```
+  Result:            BLOCKED (stale merge authorization) — {reason}
+  Merge:             ✗ not attempted (head {verified_head_short} vs base {base_ref}: {reason})
+  Decision:          No approval needed.
+  Next action:       gh pr update-branch {N}, then re-run /issue-pr-review {N} --auto
 ```
 
 Auto-merge is gated on the configured loop-exit pass condition **plus exclusions the loop exit does not apply**: pending CI is never clean, and a terminal CI failure held non-blocking by `review.ignore_ci_billing_failures: true` is never clean either — that key satisfies the loop's CI leg so the fix loop can stop and report `PARTIAL`, and it never satisfies this gate. The shared part includes `traceability != fail` and zero `acceptance_criteria: fail`. With `review.soft_pass: false`, it additionally requires zero notes and no partial dimensions. A PR that passes tests and CI but fails traceability or acceptance criteria — or has a strict-pass blocker — is **not** auto-merged.

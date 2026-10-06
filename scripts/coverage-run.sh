@@ -107,6 +107,22 @@ printf '%s' 'not json' | run "$SCRIPTS/gi-plan-map.py"
 printf '%s' '{"plan_path":"p.md","synced":"d","epic":"1","phases":[]}' | run "$SCRIPTS/gi-plan-map.py"
 printf '\xff' | run "$SCRIPTS/gi-plan-map.py"
 
+# gi-receipt — write, verify, absent and invalid paths against a throwaway repo.
+# GIT_DIR / GIT_WORK_TREE point the script's git calls there while coverage
+# keeps running from the repo root, so .coveragerc and .coverage resolve here.
+RCPT="$TMP/receipt-repo"
+git init -q -b main "$RCPT" && git -C "$RCPT" -c user.email=c@example.invalid -c user.name=cov \
+  commit -q --allow-empty -m one
+RCPT_SHA="$(git -C "$RCPT" rev-parse HEAD)"
+rcpt() { GIT_DIR="$RCPT/.git" GIT_WORK_TREE="$RCPT" "$PY" -m coverage run -a --rcfile="$RC" "$@" >/dev/null 2>&1 || true; }
+printf '{"tool":"issue-resolver","profile":"full","cycles":1,"review":"clean","tests":{"count":3,"sha":"%s","command":"bash t.sh"}}' "$RCPT_SHA" | \
+  rcpt "$SCRIPTS/gi-receipt.py" --write
+rcpt "$SCRIPTS/gi-receipt.py" --verify "$RCPT_SHA"
+rcpt "$SCRIPTS/gi-receipt.py" --verify 0123456789abcdef0123456789abcdef01234567
+rcpt "$SCRIPTS/gi-receipt.py" --verify not-a-sha
+printf '%s' '{"tool":"issue-resolver","profile":"full","cycles":1,"review":"noted"}' | \
+  rcpt "$SCRIPTS/gi-receipt.py" --write
+
 # gi-branch — derive a name locally (never --from-issue here: that needs gh).
 run "$SCRIPTS/gi-branch.py" 42 --title "Fix login crash on mobile" --type bug --no-config
 

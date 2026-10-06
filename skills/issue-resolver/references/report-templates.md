@@ -122,6 +122,34 @@ silently costing exactly the work the marker exists to save.
 read-modify-write, so a marker on the final line is untouched by that edit by
 construction.
 
+### Revision receipt <!-- a:rt-revision-receipt -->
+
+The marker is a claim in a body the PR author can edit, and its `head=` is a
+public SHA, so the marker on its own proves nothing (issue #515). The consumer
+therefore trusts it only beside a **revision receipt** for the same commit,
+which `references/scripts/gi-receipt.py --write` stores under the git common dir
+(`idd/receipts/<sha40>.json`). That store is outside every branch and every PR
+body, and every worktree of the clone shares it. Write the receipt whenever the
+marker is filled, never otherwise. The record on stdin mirrors the marker:
+
+| Key | Value |
+|-----|-------|
+| `tool` | `issue-resolver` |
+| `profile` | the marker's `profile=` |
+| `cycles` | the marker's `cycles=` |
+| `review` | `clean` (the script refuses anything else) |
+| `tests` | `{"count": <test_count>, "sha": "<tests_sha>", "command": "<the suite command that ran>"}`: exactly the marker's `tests=` plus its command. `null` whenever the marker omits `tests=`. |
+| `ui` | the marker's `ui=` value, character for character, e.g. `code:clean@<sha40>` or `none:clean` |
+| `artifacts` | optional paths to saved evidence, such as the final suite's log. Each is digested. |
+
+The script records what it measures itself, never what the record claims: the
+full `HEAD` SHA, a clean tree (it refuses a dirty one), the executor's
+user/uid/host, artifact digests and a timestamp. `tests.sha` must be `HEAD` or
+an ancestor of it. The receipt is bookkeeping against the PR author's write
+surface, not cryptographic authentication: code already running on this host
+can write the store, and a review on another machine finds no receipt and runs
+in full.
+
 ### Lifting the Decision Record
 
 Analysis JSON is **fresh** exactly when the predicate in `references/steps/step-0h-analysis-reuse.md` (*Step 0h — Analysis reuse gate*) says so — five checkable conditions, any doubt ⇒ stale. That section is the single home of the definition: do not restate, tighten, or re-derive a freshness rule here. When fresh, you may lift `root_cause`, `options_considered`, and `git_state` from the cache; **`selected_option` and `options_rejected` MUST always reflect this run's Step 2 outcome** — the synthesizer's options, or the options Step 2 lifted under `analysis_reuse = fresh` (*Step 2 — Plan → `reuse`*) — never a pick from an analysis this run did not prove fresh. Field labels are stable across skills — do not rename them.

@@ -289,9 +289,9 @@ single
 so no second read is issued. A rollup that shows nothing — empty, absent or
 unreadable — is `absent`, not `trusted`, and the full wait below runs.
 `mergeable` from the same call catches a base that moved **into conflict** and
-nothing else; it does not cover a clean base advance, so the moved-base residual
-*Step 5.1a* names is unchanged here. With both conditions met there is nothing
-left to wait for *on this head*, and the merge proceeds:
+nothing else; it does not cover a clean base advance — *Step 5.1c — Merge
+identity gate* does, after this verdict and before the merge. With both
+conditions met there is nothing left to wait for *on this head*:
 
 ```
 ○ CI verdict: trusted (passed @ 9f2c1ab) — head unchanged, checks green, no re-poll
@@ -343,6 +343,18 @@ first observation: keep polling through the none-grace only when no check has
 ever appeared, and leave the PR open for an unconfirmed none or any fallback
 failure. Do not claim a manual result is commit-bound when `headRefOid` cannot
 be read.
+
+A settled green result, from the waiter or from this fallback, still reaches the
+merge only through *Step 5.1c*: re-read the head and base name, require the head
+to equal the one this wait checked and `behind_by` to be exactly `0` against the
+live base branch (never `baseRefOid`), then merge with
+`gh pr merge {pr_number} --squash --delete-branch --match-head-commit "$verified_head"`.
+A base that moved on while CI ran leaves the PR open:
+
+```
+⚠ Merge identity: stale (base main is 3 commits ahead of 9f2c1ab) — PR left open
+  Continuing to next issue...
+```
 
 If the timeout expires before a non-empty, all-green membership settles, or the
 head changes, leave the PR open:

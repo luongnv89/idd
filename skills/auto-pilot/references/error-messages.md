@@ -456,8 +456,22 @@ the single home of that mapping, never restated here.
 ⚠ Merge failed for PR #{pr_number} — PR left open
   Continuing to next issue...
 ```
-**Trigger:** `gh pr merge` returns non-zero exit code.
+**Trigger:** `gh pr merge` returns non-zero exit code — including a head that moved after the merge identity gate, which `--match-head-commit` refuses.
 **Action:** Leave PR open, continue to next issue. Non-fatal.
+
+### Stale merge authorization
+```
+⚠ Merge identity: stale ({reason}) — PR left open
+
+  PR:      #{pr_number} ({pr_url})
+  Checked: head {verified_head_short} against base {base_ref}
+  To fix:  gh pr update-branch {pr_number}
+           (pushes a new head; its fresh CI is merged by a later run)
+  Docs:    https://github.com/luongnv89/idd/blob/main/docs/platform-github.md
+  Continuing to next issue...
+```
+**Trigger:** Step 5.1c — Merge identity gate answers `stale`: the head moved since the CI verdict, the live base branch is ahead of the verified head (`behind_by` above 0), or the head/base read or compare call failed. `{reason}` names which. Patch-id or diff equality with a checked commit never turns this into `fresh`.
+**Action:** Do not merge. Record `left_open`, leave the PR open, continue to next issue. Non-fatal; never re-waited and never repaired by this run.
 
 ### CI checks timeout
 ```

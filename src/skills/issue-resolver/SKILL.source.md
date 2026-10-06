@@ -118,6 +118,7 @@ references/scripts/gi-branch.py
 references/scripts/gi-gh.py
 references/scripts/gi-issue.py
 references/scripts/gi-state.py
+references/scripts/gi-receipt.py
 ```
 
 ---
@@ -310,6 +311,18 @@ Copy that line out of the template **character-for-character** and substitute **
 ```
 
 `review=clean` has **no synonym**: `verdict=`, `status=` or `result=` make the marker `stale` (*QA handoff marker* explains why).
+
+### Revision receipt <!-- a:rs-revision-receipt -->
+
+The marker alone is not evidence, because whoever opened the PR can write it. **Whenever the marker is filled**, record its receipt while `HEAD` is still the marker's `head=` and `git status --porcelain=v1 --untracked-files=all` is empty. Without a receipt, `/issue-pr-review` reads the marker as `stale`. The JSON record carries `profile`, `cycles`, `review: "clean"`, `ui` (the marker's `ui=` value), and `tests`: the `tests=` count and SHA plus the command that ran, or `null` when the marker omits `tests=` (*Revision receipt* in `references/report-templates.md`). The script prints the `sha` it recorded, which must equal the marker's `head=`.
+
+```bash
+printf '%s' "$receipt_json" | python3 shared/scripts/gi-receipt.py --write
+```
+
+- **Exit 0**: written.
+- **Exit 3**: invalid record, nothing written. Fix it and retry once, or ship without a receipt.
+- **Exit 4, or no `python3`**: print `⚠ No revision receipt — the reviewer will run its full pipeline`. Ship without a receipt and **never hand-write one**, because the script's clean-tree and `HEAD` checks are what a receipt attests.
 
 ### Project board sync
 
