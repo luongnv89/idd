@@ -23,6 +23,8 @@ work is involved, then run only the review that *can* and *should* run:
   so it only runs when there is a reachable running app *and* the user opted in.
   When it can't run, it **skips with a warning and the code UI review still
   runs** — fail-soft to code-only, never block.
+- **Verification recipe** is opt-in: a base-ref `.gitissue-recipe.json`
+  launches, drives and tears down an owned instance (*Verification recipe*).
 
 ## Detection
 
@@ -69,27 +71,18 @@ semantics, so they flow into the fix loop unchanged.
 
 Browser review runs only when it both *can* and *should*.
 
-**First, detect the display environment (for the report only — capture is always
-headless).** Classify the runtime as *no-GUI/server* or *graphical* up front,
-before the gate and capability checks, so `ui_env` is defined on every code
-path below — including the early skip paths. This label never selects the
-launch mode and never gates the review — Playwright always runs **headless**, so
-behavior on a graphical display is unchanged:
+**First, label the display environment — for the report only.** Set `ui_env`
+before the gate, so every path below (skips included) can name it. The label
+never gates the review and never switches Playwright to a headed launch:
+capture is always **headless**, which needs no display:
 
 ```bash
-# Report-only label. Capture stays headless — headless Chromium needs no
-# display, so a no-GUI/server host is fully supported.
 if [ "$(uname)" = "Darwin" ] || [ -n "${DISPLAY:-}" ] || [ -n "${WAYLAND_DISPLAY:-}" ]; then
   ui_env="graphical"        # macOS, or Linux with X11/Wayland
 else
   ui_env="no-GUI server"    # no display ($DISPLAY/$WAYLAND_DISPLAY unset on a non-macOS host)
 fi
 ```
-
-This detection is **report-only**: it is never a fourth gate, and it never
-switches Playwright to a headed launch. A no-GUI result does **not** skip the
-browser review — headless Chromium needs no display, so capture proceeds headless
-exactly as it does on a graphical host.
 
 Then check `{ui_config_scope}.ui_review.browser_review`:
 
@@ -100,9 +93,8 @@ Then check `{ui_config_scope}.ui_review.browser_review`:
 Then verify the runtime can actually capture screenshots — **all** must hold:
 
 1. A target app is running and reachable (e.g. `curl -sf {app_url}` succeeds).
-2. A headless browser is available (Playwright/Chromium installed). A headless
-   server with no physical display is fine — headless Chromium needs no display;
-   what it needs is the browser binary and a reachable app.
+2. A headless browser is available (Playwright/Chromium installed); no display
+   is needed.
 3. Capture is safe (not a production URL, no auth wall that would log real
    traffic).
 
@@ -124,6 +116,36 @@ success so the review output always states that the headless path ran and where:
 ```
 ✓ Browser review — captured 3 viewports (Playwright: headless; environment: {ui_env})
 ```
+
+## Verification recipe (optional, opt-in) <!-- a:ui-verification-recipe -->
+
+Project-wide, independent of UI detection: `.gitissue-recipe.json` maps
+**capabilities** to changed paths. The consuming skill runs it through its
+bundled recipe helper (schema in the helper's docstring), which prints one JSON
+verdict.
+
+- **Source:** read **only from the base ref**, never the working tree — a branch
+  must not supply the recipe it is verified by. Its commands run in the working
+  tree, against the code under test.
+- **Opt-in:** no file (`status: absent`) changes nothing. Interactive: run with
+  `--plan`, list the mapped capabilities, ask `Run verification recipe? [Y/n]`.
+  Auto: runs only when the base-ref recipe's `auto` list names `{ui_config_scope}`;
+  `.gitissue.yml` cannot enable it, as a branch can edit it.
+- **Lifecycle:** launch in a new process group — the only group the helper
+  signals — wait for the ready URL, drive each mapped capability, then SIGTERM
+  and SIGKILL that group, run `cleanup`, remove `{instance_dir}`. Teardown runs
+  on every path, readiness failure and interruption included.
+- **Evidence:** `<git common dir>/idd/evidence/<head sha40>/<run>/` holds
+  `launch.log`, each `drive.log` and drive output, and `verdict.json`. Inside
+  `.git` and outside the instance, it survives teardown, never dirties the
+  tree, and is never overwritten.
+- **Verdict:** `result: fail` (a drive exited non-zero or timed out) is an
+  `action: "fix"` finding citing that capability's `drive.log`. Exit 3 (invalid
+  base-ref recipe, nothing launched) stops with `✗ Invalid verification recipe:
+  .gitissue-recipe.json at {ref}`, the helper's reason, and `To fix: correct or
+  remove it on the base branch`. Exit 4, exit 2 or no `python3`: print
+  `⚠ Verification recipe skipped — {reason}` and continue. Never hand-run
+  recipe commands: owned-only teardown is what the helper guarantees.
 
 ## Integration with the fixer
 

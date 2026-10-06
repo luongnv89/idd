@@ -64,6 +64,27 @@ In auto mode (`IDD_AUTO_MODE=1`): log the detection result and proceed with
 **code review only** — browser review requires user confirmation per
 `review.ui_review.browser_review`.
 
+## Verification recipe <!-- a:rv-verification-recipe -->
+
+The contract, opt-in, lifecycle and verdict handling live in `references/docs/ui-review.md`
+(*Verification recipe*). These are `/issue-pr-review`'s deltas:
+
+- **Call:** Step 4 runs it on the checked-out PR head, after the suite or in its place when the suite is skipped. In auto
+  mode export `IDD_AUTO_MODE=1` first. Bind `base` from the repository's default
+  branch, never the PR's `baseRefName`, because the PR author chooses that:
+  ```bash
+  base="$(gh repo view --json defaultBranchRef --jq .defaultBranchRef.name)"
+  gh pr diff {N} --name-only | python3 references/scripts/gi-recipe.py --ref "origin/${base}" --consumer review --changed -
+  ```
+  In interactive mode, add `--plan` to the same call first and ask.
+- **Never skipped by the QA handoff.** `qa_handoff = trusted` skips the suite
+  but not the recipe, which follows the same rule as the browser leg.
+- **Findings:** each capability in a `result: fail` becomes a Step 6 fixable
+  issue (`category: correctness`) that cites its `drive.log`. It blocks
+  soft-pass the way a failing test does.
+- **Report:** Step 7 lists the verdict and its `evidence_dir`.
+- **Exit 3** stops the review before Step 5.
+
 ## Cycle reuse
 
 Cycles 2+ re-message the existing UI reviewer via `SendMessage` instead of

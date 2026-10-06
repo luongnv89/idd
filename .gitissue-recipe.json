@@ -1,0 +1,26 @@
+{
+  "_comment": "Verification recipe for this repo's static site. The skills read it from the base branch only; format in docs/ui-review.md (Verification recipe). auto is empty, so only interactive runs offer it.",
+  "version": 1,
+  "auto": [],
+  "launch": {
+    "command": ["python3", "-m", "http.server", "{port}", "--bind", "127.0.0.1"],
+    "ready": {"url": "/landing.html", "timeout_s": 20}
+  },
+  "capabilities": [
+    {
+      "name": "landing",
+      "paths": ["landing.html", "assets/*"],
+      "drive": ["curl", "-sf", "-o", "{evidence_dir}/landing.html", "{app_url}/landing.html"]
+    },
+    {
+      "name": "docs-page",
+      "paths": ["docs.html"],
+      "drive": ["curl", "-sf", "-o", "{evidence_dir}/docs.html", "{app_url}/docs.html"]
+    },
+    {
+      "name": "changelog-page",
+      "paths": ["changelog.html"],
+      "drive": ["curl", "-sf", "-o", "{evidence_dir}/changelog.html", "{app_url}/changelog.html"]
+    }
+  ]
+}

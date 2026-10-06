@@ -30,6 +30,7 @@ Closes #{issue_number}
 - **Design-confirm:** {high-complexity issues only — "confirmed Option {N} at design-confirm checkpoint (complexity: {level})" in interactive mode, or "auto-selected Option {N} (complexity: {level})" in auto mode; omit this line for trivial/low/medium complexity}
 - **Sensitive-change gate:** {only when it triggered — "triggered by {reasons}; probes {id held | id → test obligation}; blockers {id amended+cleared | id rebutted ({citation})}; verdict {proceed | stop | operator override}"; omit this line when it did not trigger}
 - **Design sketches:** {only when they ran — "compared {k} designs; Option {n} rejects {transitions} ({checker}); verdict {proceed | switch from Option {r}: {reason} | unproven (needs review): {problems}}"; when skipped on the full profile — "skipped ({reason})"; omit on the light profile}
+- **Verification recipe:** {only when `.gitissue-recipe.json` exists at the base ref — "drove {k}/{n} capabilities ({names}), {pass | fail}; evidence `{evidence_dir}`" when it ran, else "skipped ({reason})"; omit when the base ref has no recipe}
 - **Premise reset:** {only when it blocked — "premise {premise_id} failed in cycles {cycles}; {lifted by revision {new_id} ({diagnostic commands}) | not lifted — no further fix}"; omit otherwise}
 - **Reproduction:** {bug issues only — success: `<command>` confirmed red for the stated reason → regression test `<path>` (or "manual — no seam"); degraded: `not reproduced — <one-line reason> (fix applied without confirmed red; criterion marked unverified)`; omit for non-bug issues}
 
@@ -146,7 +147,7 @@ marker is filled, never otherwise. The record on stdin mirrors the marker:
 | `review` | `clean` (the script refuses anything else) |
 | `tests` | `{"count": <test_count>, "sha": "<tests_sha>", "command": "<the suite command that ran>"}`: exactly the marker's `tests=` plus its command. `null` whenever the marker omits `tests=`. |
 | `ui` | the marker's `ui=` value, character for character, e.g. `code:clean@<sha40>` or `none:clean` |
-| `artifacts` | optional paths to saved evidence, such as the final suite's log. Each is digested. |
+| `artifacts` | optional paths to saved evidence, such as the final suite's log, and always the `evidence` paths of `recipe_state` when the verification recipe ran (`references/steps/step-4-qa.md`, *Verification recipe*). Each is digested. |
 
 The script records what it measures itself, never what the record claims: the
 full `HEAD` SHA, a clean tree (it refuses a dirty one), the executor's

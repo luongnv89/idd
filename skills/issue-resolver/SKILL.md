@@ -122,6 +122,7 @@ references/scripts/gi-receipt.py
 references/scripts/gi-sensitive.py
 references/scripts/gi-premise.py
 references/scripts/gi-sketch.py
+references/scripts/gi-recipe.py
 ```
 
 ---
@@ -274,6 +275,8 @@ Spawn a **fresh** reviewer (`references/agents/code-reviewer.md`) each cycle. On
 
 UI review is **auto-detected per issue** (no config flag): scan the issue body and diff for UI work before cycling. The **code UI review** always runs; the **browser UI review** runs only when a running app is reachable *and* opted in, else **skips with a warning**. Detection, the `ui-reviewer` spawn and the `ui_review.browser_review` gate: `references/docs/ui-review.md`; mechanics: *Step 4 — UI/UX review*.
 
+**Verification recipe:** when the base branch commits `.gitissue-recipe.json`, each cycle also runs it through `references/scripts/gi-recipe.py`: launch, drive the capabilities the diff maps, keep evidence, tear down the owned instance. Auto mode runs it only when the recipe opts in `resolve` (*Step 4 — QA → Verification recipe*).
+
 ---
 
 ## Step 5 — Deliver
@@ -321,7 +324,7 @@ Copy that line out of the template **character-for-character** and substitute **
 
 ### Revision receipt <!-- a:rs-revision-receipt -->
 
-The marker alone is not evidence, because whoever opened the PR can write it. **Whenever the marker is filled**, record its receipt while `HEAD` is still the marker's `head=` and `git status --porcelain=v1 --untracked-files=all` is empty. Without a receipt, `/issue-pr-review` reads the marker as `stale`. The JSON record carries `profile`, `cycles`, `review: "clean"`, `ui` (the marker's `ui=` value), and `tests`: the `tests=` count and SHA plus the command that ran, or `null` when the marker omits `tests=` (*Revision receipt* in `references/report-templates.md`). The script prints the `sha` it recorded, which must equal the marker's `head=`.
+The marker alone is not evidence, because whoever opened the PR can write it. **Whenever the marker is filled**, record its receipt while `HEAD` is still the marker's `head=` and `git status --porcelain=v1 --untracked-files=all` is empty. Without a receipt, `/issue-pr-review` reads the marker as `stale`. The JSON record carries `profile`, `cycles`, `review: "clean"`, `ui` (the marker's `ui=` value), and `tests`: the `tests=` count and SHA plus the command that ran, or `null` when the marker omits `tests=`, plus `artifacts`: the `recipe_state` evidence paths when a recipe ran (*Revision receipt* in `references/report-templates.md`). The script prints the `sha` it recorded, which must equal the marker's `head=`.
 
 ```bash
 printf '%s' "$receipt_json" | python3 references/scripts/gi-receipt.py --write

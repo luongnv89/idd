@@ -1297,6 +1297,9 @@ EXPECTED_SITES = {
     "gi-premise.py": 1,
     # 1 since issue #520: the resolver's design-sketch check (Step 2).
     "gi-sketch.py": 1,
+    # 2 since issue #523: the resolver's Step 4 and pr-review's Step 4 run the
+    # base-ref verification recipe.
+    "gi-recipe.py": 2,
 }
 # A call is any mention of a shared script by filename, however it is launched
 # (python3, python3.11, uv run, a bare ./path relying on the exec bit), plus the
