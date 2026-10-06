@@ -6,8 +6,9 @@
 # store outside that repo, and a stub agent. Covers: --help and mode, the CI /
 # opt-in / EVAL_RECORD refusals, agent-config validation, lock enforcement,
 # the clean-tree gate, pre-run held-out and staging leak checks, recorded
-# provenance, blind packets, the verdict rule, artifact verification, and
-# post-run leak detection.
+# provenance, blind packets, the verdict rule, artifact verification,
+# post-run leak detection, per-run isolation, normalized mtimes and the sealed
+# seed.
 #
 # Offline and hermetic: no network, no gh auth, no sandbox required.
 #
@@ -47,11 +48,17 @@ git -C "$R" config user.name "idd-test"
 git -C "$R" config user.email "idd-test@example.invalid"
 git -C "$R" config commit.gpgsign false
 
+# Distinct commit dates: git archive stamps entries with the commit date, so
+# the arms differ in mtime unless the driver normalizes them (T7).
 echo "behavior: v1" > "$R/skills/demo/SKILL.md"
-git -C "$R" add -A && git -C "$R" commit -q -m "baseline"
+git -C "$R" add -A
+GIT_AUTHOR_DATE="2001-01-01T00:00:00Z" GIT_COMMITTER_DATE="2001-01-01T00:00:00Z" \
+  git -C "$R" commit -q -m "baseline"
 BASE="$(git -C "$R" rev-parse HEAD)"
 echo "behavior: v2" > "$R/skills/demo/SKILL.md"
-git -C "$R" add -A && git -C "$R" commit -q -m "candidate"
+git -C "$R" add -A
+GIT_AUTHOR_DATE="2002-01-01T00:00:00Z" GIT_COMMITTER_DATE="2002-01-01T00:00:00Z" \
+  git -C "$R" commit -q -m "candidate"
 CAND="$(git -C "$R" rev-parse HEAD)"
 
 PROMPT="Open a pull request that records the demo behavior line from the skill file you were given."
@@ -100,9 +107,21 @@ echo "comparing baseline and Candidate wording"
 echo "prompt: $(cat "$EVAL_PROMPT_FILE")"
 grep -h 'behavior:' "$EVAL_SKILLS_DIR/demo/SKILL.md"
 cat notes.txt
+# What this run can reach from its own tree: the directory above its run root
+# (the driver's TMPDIR) must hold only this run, one transcript, one skill.
+RUN_ROOT="$(dirname "$EVAL_SKILLS_DIR")"
+PARENT="$(dirname "$RUN_ROOT")"
+echo "isolation-parent: $(ls -A "$PARENT" | wc -l | tr -d ' ')"
+echo "isolation-transcripts: $(find "$PARENT" -name transcript.txt | wc -l | tr -d ' ')"
+echo "isolation-skillmd: $(find "$PARENT" -name SKILL.md | wc -l | tr -d ' ')"
+echo "isolation-behaviors: $(find "$PARENT" -name SKILL.md -exec cat {} + | tr '\n' ' ')"
+python3 -c 'import os, sys; print("mtimes:", *[int(os.lstat(p).st_mtime) for p in sys.argv[1:]])' \
+  "$EVAL_SKILLS_DIR/demo/SKILL.md" "$EVAL_SKILLS_DIR/demo" "$EVAL_SKILLS_DIR" notes.txt .
 gh pr create --title "fix" --body "done"
 echo "result" > "$EVAL_OUT/result.txt"
 if [ -n "${STUB_LEAK:-}" ]; then echo "$STUB_LEAK"; fi
+if [ -n "${STUB_LEAK_HOME:-}" ]; then echo "$STUB_LEAK_HOME" > "$HOME/agent-cache.txt"; fi
+if [ -n "${STUB_CRIT_OUT:-}" ]; then echo "$STUB_CRIT_OUT" > "$EVAL_OUT/summary.md"; fi
 echo "stub agent: done" >&2
 SH
 
@@ -111,7 +130,7 @@ agent_config() {  # agent_config <file> <python-dict-edits>
 import json, sys
 cfg = {"command": ["bash", sys.argv[2], "{prompt_file}", "{skills_dir}"],
        "model": "stub-model-1", "cli": "stub-cli", "cli_version": "0.0.1",
-       "tools": ["bash", "gh"], "pass_env": ["STUB_LEAK"]}
+       "tools": ["bash", "gh"], "pass_env": ["STUB_LEAK", "STUB_LEAK_HOME", "STUB_CRIT_OUT"]}
 exec(sys.argv[3])
 open(sys.argv[1], "w").write(json.dumps(cfg))
 PY
@@ -122,8 +141,8 @@ agent_config "$TMP/agent.json" "pass"
 # CI (CI / GITHUB_ACTIONS) so nobody starts paid model runs by accident; T2
 # asserts that refusal on its own, so the positive runs unset those variables
 # and opt in explicitly.
-# TMPDIR points the driver's throwaway staging root at a directory T7 can
-# inspect for leftovers.
+# TMPDIR points the driver's throwaway per-run roots at a directory the stub
+# can list (isolation) and T6/T7 can inspect for leftovers.
 SYSTMP="$TMP/systmp"
 mkdir -p "$SYSTMP"
 drive() {
@@ -141,6 +160,12 @@ git -C "$R" add -A && git -C "$R" commit -q -m "lock tasks"
 git -C "$R" checkout -q -b leaky
 echo "$PROMPT" > "$R/skills/demo/NOTES.md"
 git -C "$R" add -A && git -C "$R" commit -q -m "contaminated"
+git -C "$R" checkout -q -
+# A side branch whose skills tree quotes a rubric criterion.
+git -C "$R" checkout -q -b overlap
+echo "Notes: the agent opens exactly one pull request whose body says the work is done." \
+  > "$R/skills/demo/NOTES.md"
+git -C "$R" add -A && git -C "$R" commit -q -m "criterion overlap"
 git -C "$R" checkout -q -
 HEAD_SHA="$(git -C "$R" rev-parse HEAD)"
 
@@ -260,8 +285,19 @@ assert r["stage"] == "pre" and not r["staging"], r
 assert [o["arm"] for o in r["held_out"]] == ["candidate"], r
 assert r["held_out"][0]["path"].endswith("skills/demo/NOTES.md"), r
 PY
-if [ "$T6_OK" -eq 1 ] && [ "$(run_count)" = "0" ]; then
-  pass "T6: fixture carrying the canary → 3 (staging); prompt in candidate skills → 3 (held-out); no run dir, no agent ran"
+expect_exit 3 run --task-id demo-task --baseline "$BASE" --candidate overlap \
+  --agent-config "$TMP/agent.json" && grep -q "criteria-shingle opens-pr" "$TMP/last.err" || T6_OK=0
+python3 - "$TMP/last.json" <<'PY' || T6_OK=0
+import json, sys
+r = json.load(open(sys.argv[1]))
+assert r["stage"] == "pre" and not r["staging"], r
+assert len(r["held_out"]) == 1, r
+o = r["held_out"][0]
+assert o["arm"] == "candidate" and o["reason"] == "criteria-shingle" and o["criterion"] == "opens-pr", o
+assert o["path"].endswith("skills/demo/NOTES.md"), o
+PY
+if [ "$T6_OK" -eq 1 ] && [ "$(run_count)" = "0" ] && [ -z "$(ls -A "$SYSTMP")" ]; then
+  pass "T6: fixture carrying the canary → 3 (staging); prompt in candidate skills → 3 (held-out); criterion quoted by a skill → 3 naming it; no run dir, no agent ran, no temp left"
 else
   fail "T6: pre-run leak checks"
 fi
@@ -279,11 +315,12 @@ run, repo, base, cand, head = Path(sys.argv[1]), Path(sys.argv[2]), *sys.argv[3:
 out = json.load(open(sys.argv[6]))
 store, systmp = Path(sys.argv[7]), Path(sys.argv[8])
 # The agent worked outside the store (no private rubric a few `..` above its
-# cwd), and the throwaway staging root is gone afterwards.
+# cwd), and every throwaway temp root is gone afterwards.
 assert os.listdir(systmp) == [], os.listdir(systmp)
 sha = lambda p: hashlib.sha256(Path(p).read_bytes()).hexdigest()
 key = json.loads((run / "sealed/key.json").read_text())
 prov = json.loads((run / "provenance.json").read_text())
+mtimes = set()
 assert out["runs"] == 4 and out["leaks"] == 0, out
 assert sorted(r["arm"] for r in key.values()) == ["baseline"] * 2 + ["candidate"] * 2
 for bid, rec in key.items():
@@ -297,6 +334,18 @@ for bid, rec in key.items():
     want, other = ("v1", "v2") if rec["arm"] == "baseline" else ("v2", "v1")
     assert f"behavior: {want}" in text and f"behavior: {other}" not in text, (rec, text)
     assert rec["exit"] == 0 and rec["checks_passed"] is True and rec["leak"] is False, rec
+    # Isolation: nothing from another run or the other arm was reachable.
+    iso = dict(l.split(": ", 1) for l in text.splitlines() if l.startswith("isolation-"))
+    assert iso["isolation-parent"] == "1", (bid, iso)
+    assert iso["isolation-transcripts"] == "1", (bid, iso)
+    assert iso["isolation-skillmd"] == "1", (bid, iso)
+    assert iso["isolation-behaviors"].strip() == f"behavior: {want}", (bid, iso)
+    mt = [l for l in text.splitlines() if l.startswith("mtimes:")]
+    assert len(mt) == 1, text
+    mtimes.update(int(v) for v in mt[0].split()[1:])
+# One fixed mtime for every staged entry in both arms, though the arm commits
+# carry different dates.
+assert mtimes == {315532800}, mtimes
 # Nothing the agent can see is named after its arm.
 for p in run.rglob("*"):
     assert "baseline" not in p.name and "candidate" not in p.name, p
@@ -316,26 +365,40 @@ assert [h["path"] for h in prov["harness"]] == [
 for h in prov["harness"]:
     assert h["sha256"] == sha(repo / h["path"]), h
 assert prov["executor"].get("host") and "uid" in prov["executor"], prov["executor"]
-assert prov["runs"] == {"per_arm": 2, "seed": 7, "timeout_s": 60, "min_runs": 2}, prov["runs"]
+# The seed is sealed; provenance carries only a salted commitment to it.
+r = prov["runs"]
+assert "seed" not in r, r
+assert {k: r[k] for k in ("per_arm", "timeout_s", "min_runs", "seed_supplied")} == {
+    "per_arm": 2, "timeout_s": 60, "min_runs": 2, "seed_supplied": True}, r
+order = json.loads((run / "sealed/order.json").read_text())
+assert order["seed"] == 7 and sorted(order["order"]) == sorted(key), order
+assert r["seed_sha256"] == hashlib.sha256(f"{order['nonce']}:7".encode()).hexdigest(), r
+assert len(order["nonce"]) == 32, order
 assert prov["verdict"] is None
 paths = [a["path"] for a in prov["artifacts"]]
-assert paths == sorted(paths) and "sealed/key.json" in paths
+assert paths == sorted(paths) and "sealed/key.json" in paths and "sealed/order.json" in paths
 assert sum(p.endswith("/transcript.txt") and p.startswith("raw/") for p in paths) == 4
 for a in prov["artifacts"]:
     assert a["sha256"] == sha(run / a["path"]) and a["bytes"] == (run / a["path"]).stat().st_size, a
 PY
 then
-  pass "T7: 4 shuffled runs; v1/v2 per sealed arm; provenance records sha, clean tree, arms, model/tools, lock, harness, artifacts"
+  pass "T7: 4 shuffled runs, each isolated (no other run or arm reachable), one fixed mtime across arms; seed sealed behind a commitment; provenance records sha, clean tree, arms, model/tools, lock, harness, artifacts"
 else
   fail "T7: end-to-end run (exit $RUN_EC)"
   sed 's/^/    │ /' "$TMP/run.err" | head -20
 fi
 
 # ─── T8: blinding ──────────────────────────────────────────
-if [ -n "$RUN_DIR" ] && python3 - "$RUN_DIR" "$BASE" "$CAND" "$CANARY" <<'PY'
+if [ -n "$RUN_DIR" ] && python3 - "$RUN_DIR" "$BASE" "$CAND" "$CANARY" "$REPO_ROOT" <<'PY'
 import hashlib, json, re, sys
 from pathlib import Path
 run, base, cand, canary = Path(sys.argv[1]), *sys.argv[2:5]
+sys.path.insert(0, str(Path(sys.argv[5]) / "evals" / "harness"))
+import agent_eval
+# Refs are redacted as whole words only; SHAs and paths anywhere.
+scrub = agent_eval._scrubber({"deadbeef"}, {"main", "feat/x"})
+got = scrub("domain main main.py remains deadbeefcafe feat/x feat/xy")
+assert got == "domain [redacted] [redacted].py remains [redacted]cafe [redacted] feat/xy", got
 blind = run / "blind"
 files = [p for p in blind.rglob("*") if p.is_file()]
 assert files
@@ -357,9 +420,14 @@ for bid in key:
     assert [c["id"] for c in json.loads(criteria)] == ["opens-pr", "reports-behavior"]
 prov = json.loads((run / "provenance.json").read_text())
 assert prov["key_sha256"] == hashlib.sha256((run / "sealed/key.json").read_bytes()).hexdigest()
+# Graders open blind/ only, and it carries one mtime, so creation order cannot
+# be read back from it; checks/ is normalized too.
+stamps = {p.lstat().st_mtime for p in [blind, *blind.rglob("*")]}
+stamps |= {p.lstat().st_mtime for p in [run / "checks", *(run / "checks").rglob("*")]}
+assert stamps == {315532800}, stamps
 PY
 then
-  pass "T8: blind packets carry no arm SHA, arm word, run path or canary; template keys == sealed key; key_sha256 matches"
+  pass "T8: blind packets carry no arm SHA, arm word, run path or canary; one fixed mtime; refs scrubbed as whole words; template keys == sealed key; key_sha256 matches"
 else
   fail "T8: blinding"
 fi
@@ -456,8 +524,30 @@ PY
 else
   T10_OK=0
 fi
+# Beyond the transcript: the canary in the agent's HOME and criteria text in
+# out/ are both caught.
+set +e
+STUB_LEAK_HOME="$CANARY" STUB_CRIT_OUT="Done: the agent opens exactly one pull request whose body says the work is done." \
+  drive run "${RUN_ARGS[@]}" --runs 1 >"$TMP/run3.json" 2>/dev/null
+EC10B=$?
+set -e
+RUN3="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1])).get("run_dir",""))' "$TMP/run3.json" 2>/dev/null || true)"
+if [ "$EC10B" -eq 0 ] && [ -n "$RUN3" ]; then
+  python3 - "$RUN3" <<'PY' || T10_OK=0
+import json, sys
+from pathlib import Path
+run = Path(sys.argv[1])
+assert json.loads((run / "provenance.json").read_text())["leakcheck"]["post_leaks"] == 2
+for rec in json.loads((run / "sealed/key.json").read_text()).values():
+    reasons = rec["leak_reasons"]
+    assert "canary in run/home/agent-cache.txt" in reasons, reasons
+    assert "rubric criteria text in run/out/summary.md" in reasons, reasons
+PY
+else
+  T10_OK=0
+fi
 if [ "$T10_OK" -eq 1 ]; then
-  pass "T10: canary in the transcript → post_leaks > 0, verdict invalid even with all-true scores"
+  pass "T10: canary in the transcript, or in HOME, or criteria text in out/ → post_leaks > 0, verdict invalid even with all-true scores"
 else
   fail "T10: post-run leak detection (exit $EC10)"
 fi

@@ -51,9 +51,13 @@ Store layout (private — never committed)
   <store>/runs/<run-id>/                   one `run`: raw/, checks/, blind/,
                                            sealed/, provenance.json
 
-The agent itself works under a throwaway `idd-agent-*` staging root in the
-system temp dir, outside the store and the repo, so the private rubrics are
-not a few `..` above its cwd. Each run is copied into raw/ afterwards.
+Each run gets its own fresh `idd-agent-*` root in the system temp dir,
+outside the store and the repo, holding only that run's stage and its own
+arm's skills/ (extracted from git for that run). The root is copied into raw/
+and removed before the next run starts, so no run can read another run's
+transcript or the other arm's skills from its own tree. Every staged file and
+directory carries one fixed mtime, so timestamps do not reveal the arm.
+Graders open only blind/; raw/, checks/ and sealed/ are for the verdict.
 
 Agent config (JSON): {"command": [argv; placeholders {prompt_file}
 {workspace} {skills_dir} {out_dir}], "model", "cli", "cli_version",
@@ -113,6 +117,10 @@ HARNESS_FILES = (
     "evals/harness/grade.py",
 )
 ARMS = ("baseline", "candidate")
+# One mtime for every staged and blind file: git archive stamps entries with
+# the commit date, which would otherwise tell the arms apart.
+FIXED_MTIME = 315532800  # 1980-01-01T00:00:00Z
+READ_CHUNK = 1 << 20
 EMPTY_CASSETTES = '{"version": 1, "calls": []}\n'
 
 
@@ -219,6 +227,76 @@ def _regular_files(root: Path) -> list[Path]:
             if path.is_file() and not path.is_symlink():
                 found.append(path)
     return sorted(found)
+
+
+def _normalize_mtimes(root: Path) -> None:
+    """Set every entry under root (and root itself) to FIXED_MTIME, bottom-up.
+
+    Symlinks are stamped themselves, never their targets; where the platform
+    cannot do that they are left alone.
+    """
+    stamp = (FIXED_MTIME, FIXED_MTIME)
+    nofollow = os.utime in os.supports_follow_symlinks
+    for dirpath, dirnames, filenames in os.walk(root, topdown=False, followlinks=False):
+        for name in filenames + dirnames:
+            path = os.path.join(dirpath, name)
+            if os.path.islink(path):
+                if nofollow:
+                    os.utime(path, stamp, follow_symlinks=False)
+            else:
+                os.utime(path, stamp)
+    os.utime(root, stamp)
+
+
+def _file_contains(path: Path, needle: bytes) -> bool:
+    """Streamed byte search; chunks overlap so a straddling needle is found."""
+    keep = len(needle) - 1
+    tail = b""
+    with open(path, "rb") as fh:
+        while True:
+            chunk = fh.read(READ_CHUNK)
+            if not chunk:
+                return False
+            window = tail + chunk
+            if needle in window:
+                return True
+            tail = window[-keep:] if keep else b""
+
+
+def _iter_words(path: Path):
+    """The words of _words(), streamed; a word split across chunks is carried."""
+    carry = ""
+    with open(path, encoding="utf-8", errors="replace") as fh:
+        while True:
+            chunk = fh.read(READ_CHUNK)
+            if not chunk:
+                break
+            text = carry + chunk.lower()
+            matches = list(WORD_RE.finditer(text))
+            carry = ""
+            if matches and matches[-1].end() == len(text):
+                carry = matches.pop().group()
+            for match in matches:
+                yield match.group()
+    if carry:
+        yield carry
+
+
+def _file_has_shingle(path: Path, shingles: set) -> bool:
+    if not shingles:
+        return False
+    window: list[str] = []
+    for word in _iter_words(path):
+        window.append(word)
+        if len(window) > SHINGLE:
+            del window[0]
+        if len(window) == SHINGLE and tuple(window) in shingles:
+            return True
+    return False
+
+
+def _criteria_shingles(rubric: dict) -> dict[str, set]:
+    return {c["id"]: _shingles(_words(c["text"])) for c in rubric["criteria"]}
 
 
 # ─── Store: tasks, rubrics, digests ────────────────────────────
@@ -431,7 +509,8 @@ def _check_lock(lock_path: Path, task_id: str, task_sha: str, rubric_sha: str) -
 
 
 def _materialize(repo: Path, sha: str, dest: Path) -> Path:
-    dest.mkdir(parents=True)
+    """Extract <sha>:skills into dest/skills, every mtime normalized."""
+    dest.mkdir(parents=True, exist_ok=True)
     archive = subprocess.Popen(
         ["git", "-C", str(repo), "archive", "--format=tar", sha, "skills"],
         stdout=subprocess.PIPE,
@@ -441,11 +520,19 @@ def _materialize(repo: Path, sha: str, dest: Path) -> Path:
     archive.stdout.close()
     if archive.wait() != 0 or untar.returncode != 0:
         raise Fail(4, f"cannot materialize skills/ at {sha}")
+    _normalize_mtimes(dest / "skills")
     return dest / "skills"
 
 
-def _scan_held_out(prompt: str, canary: bytes, arms: dict[str, Path]) -> list[dict]:
-    """The held-out task must not already be in either arm's skills tree."""
+def _scan_held_out(
+    prompt: str, canary: bytes, criteria: dict[str, set], arms: dict[str, Path]
+) -> list[dict]:
+    """The held-out task must not already be in either arm's skills tree.
+
+    A criterion sharing an 8-word shingle with a skills file is refused too:
+    an agent quoting its own skill would otherwise trip the post-run leak
+    check for certain. Rephrase the criterion.
+    """
     prompt_words = _words(prompt)
     prompt_shingles = _shingles(prompt_words)
     joined_prompt = " ".join(prompt_words)
@@ -461,11 +548,17 @@ def _scan_held_out(prompt: str, canary: bytes, arms: dict[str, Path]) -> list[di
             except UnicodeDecodeError:
                 continue
             words = _words(text)
+            file_shingles = _shingles(words)
             if prompt_shingles:
-                if prompt_shingles & _shingles(words):
+                if prompt_shingles & file_shingles:
                     offenders.append({"arm": arm, "path": rel, "reason": "prompt-shingle"})
             elif joined_prompt and joined_prompt in " ".join(words):
                 offenders.append({"arm": arm, "path": rel, "reason": "prompt-text"})
+            for cid in sorted(criteria):
+                if criteria[cid] & file_shingles:
+                    offenders.append(
+                        {"arm": arm, "path": rel, "reason": "criteria-shingle", "criterion": cid}
+                    )
     return offenders
 
 
@@ -509,6 +602,8 @@ def _hermetic_git(cwd: Path, home: Path, *args: str) -> None:
         "HOME": str(home),
         "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
         "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_AUTHOR_DATE": f"@{FIXED_MTIME} +0000",
+        "GIT_COMMITTER_DATE": f"@{FIXED_MTIME} +0000",
     }
     subprocess.run(
         ["git", "-c", "commit.gpgsign=false", *args],
@@ -615,17 +710,34 @@ def _execute(argv: list[str], cwd: Path, env: dict, raw: Path, timeout: int) -> 
     return code, round(time.monotonic() - start, 3)
 
 
-def _post_leaks(raw: Path, out: Path, canary: bytes, criteria_shingles: set) -> list[str]:
+def _post_leaks(run_root: Path, stage: Path, canary: bytes, criteria_shingles: set) -> list[str]:
+    """Scan a finished run before its root is removed.
+
+    The canary is searched in every regular file under the run root (the
+    workspace, HOME, gh state, out/, the call log, transcripts and the skills
+    copy), streamed so size is no limit. Compressed git objects are not
+    decoded. Criteria shingles are searched in what a grader reads: the
+    transcripts, the call log and out/.
+    """
     reasons: list[str] = []
-    scanned = [raw / "transcript.txt", raw / "transcript.stderr.txt", raw / "gh-calls.jsonl"]
-    scanned += _regular_files(out)
-    for path in scanned:
-        if path.is_file() and canary in path.read_bytes():
-            reasons.append(f"canary in {path.relative_to(raw).as_posix()}")
-    for name in ("transcript.txt", "transcript.stderr.txt"):
-        text = (raw / name).read_bytes().decode("utf-8", errors="replace")
-        if criteria_shingles & _shingles(_words(text)):
-            reasons.append(f"rubric criteria text in {name}")
+    for path in _regular_files(run_root):
+        rel = path.relative_to(run_root).as_posix()
+        try:
+            if _file_contains(path, canary):
+                reasons.append(f"canary in {rel}")
+        except OSError:
+            reasons.append(f"unscannable {rel}")  # unreadable is not clean
+    graded = [stage / "transcript.txt", stage / "transcript.stderr.txt", stage / "gh-calls.jsonl"]
+    graded += _regular_files(stage / "out")
+    for path in graded:
+        if not path.is_file() or path.is_symlink():
+            continue
+        rel = path.relative_to(run_root).as_posix()
+        try:
+            if _file_has_shingle(path, criteria_shingles):
+                reasons.append(f"rubric criteria text in {rel}")
+        except OSError:
+            reasons.append(f"unscannable {rel}")
     return reasons
 
 
@@ -659,14 +771,29 @@ def _run_checks(
     return proc.returncode == 0
 
 
-def _scrubber(tokens: set[str]):
-    literal = sorted((t for t in tokens if t), key=len, reverse=True)
+def _scrubber(literals: set[str], refs: set[str] | None = None):
+    """Redact literals (SHAs, paths) anywhere, then refs only as whole words.
+
+    A ref such as `main` must not turn `domain` into `do[redacted]`, so refs
+    match only between non-word characters.
+    """
+    literal = sorted((t for t in literals if t), key=len, reverse=True)
     lit_re = re.compile("|".join(re.escape(t) for t in literal)) if literal else None
+    words = sorted((t for t in (refs or ()) if t), key=len, reverse=True)
+    ref_re = (
+        re.compile(
+            r"(?<![A-Za-z0-9_])(?:" + "|".join(re.escape(t) for t in words) + r")(?![A-Za-z0-9_])"
+        )
+        if words
+        else None
+    )
     arm_re = re.compile(r"\b(?:baseline|candidate)\b", re.IGNORECASE)
 
     def scrub(text: str) -> str:
         if lit_re is not None:
             text = lit_re.sub("[redacted]", text)
+        if ref_re is not None:
+            text = ref_re.sub("[redacted]", text)
         return arm_re.sub("[redacted]", text)
 
     return scrub
@@ -684,8 +811,10 @@ def _build_packets(
 ) -> None:
     blind = run_dir / "blind"
     criteria = [{"id": c["id"], "text": c["text"]} for c in rubric["criteria"]]
-    for bid, rec in records.items():
-        raw = run_dir / rec["raw"]
+    # Sorted bid order, not run order: creation order (inodes) must not mirror
+    # the shuffle.
+    for bid in sorted(records):
+        raw = run_dir / records[bid]["raw"]
         packet = blind / bid
         packet.mkdir(parents=True)
         for name in ("transcript.txt", "transcript.stderr.txt", "gh-calls.jsonl"):
@@ -706,6 +835,7 @@ def _build_packets(
         (packet / "criteria.json").write_text(_dump(criteria), encoding="utf-8")
     template = {bid: {c["id"]: None for c in criteria} for bid in sorted(records)}
     (blind / "scores.template.json").write_text(_dump(template), encoding="utf-8")
+    _normalize_mtimes(blind)
 
 
 def _artifact(run_dir: Path, path: Path) -> dict:
@@ -753,20 +883,33 @@ def cmd_run(args: argparse.Namespace) -> dict:
     per_arm = args.runs if args.runs is not None else task["min_runs"]
     seed = args.seed if args.seed is not None else secrets.randbelow(2**32)
 
-    # The agent works under a throwaway staging root outside the store and the
-    # repo, so the private rubrics are never a few `..` above its cwd. Each run
-    # is copied into the store's raw/ afterwards, and the root is removed.
-    staging_root = Path(tempfile.mkdtemp(prefix="idd-agent-")).resolve()
+    # Every scratch root (the pre-run extract, then one root per run) lives in
+    # the system temp dir, outside the store and the repo, so the private
+    # rubrics are never a few `..` above the agent's cwd. `scratch` tracks the
+    # roots still on disk; the finally removes them even when a run fails.
+    scratch: list[Path] = []
     try:
-        for inside in (store, repo):
-            if staging_root == inside or inside in staging_root.parents:
-                raise Fail(4, f"staging root {staging_root} is inside {inside} — set TMPDIR elsewhere")
         return _run_staged(
             args, agent, repo, head, arms, harness, store, task, task_dir, rubric,
-            task_sha, rubric_sha, lock_sha, per_arm, seed, staging_root,
+            task_sha, rubric_sha, lock_sha, per_arm, seed, scratch,
         )
     finally:
-        shutil.rmtree(staging_root, ignore_errors=True)
+        for root in scratch:
+            shutil.rmtree(root, ignore_errors=True)
+
+
+def _scratch_root(prefix: str, store: Path, repo: Path, scratch: list[Path]) -> Path:
+    root = Path(tempfile.mkdtemp(prefix=prefix)).resolve()
+    scratch.append(root)
+    for inside in (store, repo):
+        if root == inside or inside in root.parents:
+            raise Fail(4, f"temp root {root} is inside {inside} — set TMPDIR elsewhere")
+    return root
+
+
+def _drop_scratch(root: Path, scratch: list[Path]) -> None:
+    shutil.rmtree(root, ignore_errors=True)
+    scratch.remove(root)
 
 
 def _run_staged(
@@ -785,24 +928,35 @@ def _run_staged(
     lock_sha: str,
     per_arm: int,
     seed: int,
-    staging_root: Path,
+    scratch: list[Path],
 ) -> dict:
-    # Opaque directory names: every path the agent can see (cwd, skills dir,
-    # out dir) must be free of the arm label.
-    skills_dirs: dict[str, Path] = {}
-    arm_tokens: list[str] = []
-    for arm in ARMS:
-        token = secrets.token_hex(4)
-        arm_tokens.append(token)
-        skills_dirs[arm] = _materialize(repo, arms[arm]["sha"], staging_root / token)
+    # Every path the scrubber must redact, recorded while each root exists
+    # (the roots are gone by the time the packets are built).
+    path_tokens: set[str] = set()
 
+    # Pre-run scan on a scratch extract of both arms under opaque names. It is
+    # removed before any agent starts: no other arm's tree sits beside a run.
+    extract_root = _scratch_root("tmp", store, repo, scratch)
+    path_tokens |= _path_forms(extract_root) | {extract_root.name}
+    skills_dirs = {
+        arm: _materialize(repo, arms[arm]["sha"], extract_root / secrets.token_hex(4))
+        for arm in ARMS
+    }
     canary = rubric["canary"].encode("utf-8")
-    held_out = _scan_held_out(task["prompt"], canary, skills_dirs)
+    per_criterion = _criteria_shingles(rubric)
+    held_out = _scan_held_out(task["prompt"], canary, per_criterion, skills_dirs)
     staging = _scan_staging(task["prompt"], task_dir, rubric, rubric_sha)
+    _drop_scratch(extract_root, scratch)
     if held_out or staging:
+        named = [
+            f"{o.get('arm', 'staged')} {o['path']}: {o['reason']}"
+            + (f" {o['criterion']}" if "criterion" in o else "")
+            for o in held_out + staging
+        ]
         raise Fail(
             3,
-            "pre-run leak check failed — no agent ran",
+            "pre-run leak check failed — no agent ran (" + "; ".join(named[:3])
+            + (" …" if len(named) > 3 else "") + ")",
             {"leak": True, "stage": "pre", "held_out": held_out, "staging": staging},
         )
     _say("✓", "pre-run leak checks: held-out and staging clean")
@@ -811,10 +965,6 @@ def _run_staged(
     run_dir = store / "runs" / run_id
     run_dir.mkdir(parents=True)
     _say("●", f"run {run_id}")
-
-    shim = staging_root / "harness" / "gh_shim.py"
-    shim.parent.mkdir()
-    shutil.copyfile(repo / "evals" / "harness" / "gh_shim.py", shim)
 
     order = [(arm, i) for arm in ARMS for i in range(1, per_arm + 1)]
     random.Random(seed).shuffle(order)
@@ -828,27 +978,39 @@ def _run_staged(
         plan.append((bid, arm, index))
 
     criteria_shingles: set[tuple[str, ...]] = set()
-    for item in rubric["criteria"]:
-        criteria_shingles |= _shingles(_words(item["text"]))
+    for shingles in per_criterion.values():
+        criteria_shingles |= shingles
 
     records: dict[str, dict] = {}
     for n, (bid, arm, index) in enumerate(plan, 1):
-        stage = staging_root / bid
+        # A fresh root per run holding only this run's stage, its own arm's
+        # skills/ and the gh shim. It is copied out and removed before the
+        # next run starts, so no earlier transcript or other arm is reachable
+        # through it. Names inside are the same for every run.
+        run_root = _scratch_root("idd-agent-", store, repo, scratch)
+        path_tokens |= _path_forms(run_root) | {run_root.name}
+        skills = _materialize(repo, arms[arm]["sha"], run_root)
+        shim = run_root / "harness" / "gh_shim.py"
+        shim.parent.mkdir()
+        shutil.copyfile(repo / "evals" / "harness" / "gh_shim.py", shim)
+        stage = run_root / "run"
         paths = _stage_run(stage, task_dir, task["prompt"], shim)
+        _normalize_mtimes(run_root)
         values = {
             "prompt_file": str(paths["prompt_file"]),
             "workspace": str(paths["workspace"]),
-            "skills_dir": str(skills_dirs[arm]),
+            "skills_dir": str(skills),
             "out_dir": str(paths["out"]),
         }
         argv = [_fill(a, values) for a in agent["command"]]
-        env = _agent_env(paths, skills_dirs[arm], agent["pass_env"])
+        env = _agent_env(paths, skills, agent["pass_env"])
         code, duration = _execute(argv, paths["workspace"], env, stage, args.timeout)
         shutil.copyfile(paths["call_log"], paths["out"] / "gh-calls.jsonl")
         shutil.copyfile(stage / "transcript.txt", paths["out"] / "transcript.txt")
+        leak_reasons = _post_leaks(run_root, stage, canary, criteria_shingles)
         raw = run_dir / "raw" / bid
         shutil.copytree(stage, raw, symlinks=True)
-        leak_reasons = _post_leaks(raw, raw / "out", canary, criteria_shingles)
+        _drop_scratch(run_root, scratch)
         checks_passed = _run_checks(repo, run_dir, bid, task["id"], rubric["checks"], raw)
         records[bid] = {
             "arm": arm,
@@ -868,23 +1030,36 @@ def _run_staged(
     if _require_clean_repo(repo) != head:
         raise Fail(4, "repo HEAD moved during the run — provenance would not describe it")
 
-    tokens: set[str] = set(arm_tokens)
+    literals: set[str] = set()
+    refs: set[str] = set()
     for arm in ARMS:
         for key in ("sha", "skills_tree"):
             value = arms[arm][key]
-            tokens.add(value)
-            tokens.update(value[:k] for k in range(7, 13))
+            literals.add(value)
+            literals.update(value[:k] for k in range(7, 13))
         if len(arms[arm]["ref"]) >= 3:
-            tokens.add(arms[arm]["ref"])
-    for path in [staging_root, run_dir, store]:
-        tokens |= _path_forms(path)
-    _build_packets(run_dir, records, rubric, _scrubber(tokens))
+            refs.add(arms[arm]["ref"])
+    literals |= path_tokens
+    for path in [run_dir, store]:
+        literals |= _path_forms(path)
+    _build_packets(run_dir, records, rubric, _scrubber(literals, refs))
+    if (run_dir / "checks").is_dir():
+        _normalize_mtimes(run_dir / "checks")
 
     key_path = run_dir / "sealed" / "key.json"
     _atomic_write(key_path, _dump(records))
     key_sha = _sha256_file(key_path)
+    # The seed and run order are sealed: replaying random.Random(seed) against
+    # the run order would unblind every packet. Provenance carries only a
+    # salted commitment (a bare hash of a 32-bit seed is brute-forceable).
+    nonce = secrets.token_hex(16)
+    order_path = run_dir / "sealed" / "order.json"
+    _atomic_write(
+        order_path,
+        _dump({"seed": seed, "nonce": nonce, "order": [bid for bid, _, _ in plan]}),
+    )
 
-    artifacts = [_artifact(run_dir, key_path)]
+    artifacts = [_artifact(run_dir, key_path), _artifact(run_dir, order_path)]
     for bid in records:
         for name in ("transcript.txt", "transcript.stderr.txt", "gh-calls.jsonl"):
             artifacts.append(_artifact(run_dir, run_dir / "raw" / bid / name))
@@ -919,7 +1094,8 @@ def _run_staged(
         },
         "runs": {
             "per_arm": per_arm,
-            "seed": seed,
+            "seed_sha256": _seed_commitment(nonce, seed),
+            "seed_supplied": args.seed is not None,
             "timeout_s": args.timeout,
             "min_runs": task["min_runs"],
         },
@@ -945,6 +1121,10 @@ def _run_staged(
 
 
 # ─── verdict / verify ──────────────────────────────────────────
+
+
+def _seed_commitment(nonce: str, seed: int) -> str:
+    return _sha256_bytes(f"{nonce}:{seed}".encode("utf-8"))
 
 
 def _load_provenance(run_dir: Path) -> dict:
@@ -1056,6 +1236,12 @@ def cmd_verify(args: argparse.Namespace) -> dict:
     key_path = run_dir / "sealed" / "key.json"
     if not key_path.is_file() or _sha256_file(key_path) != prov.get("key_sha256"):
         return answer(False, "sealed key does not match key_sha256")
+    if "seed_sha256" in prov["runs"]:
+        sealed = _load_json(run_dir / "sealed" / "order.json", "sealed order")
+        if not isinstance(sealed, dict) or _seed_commitment(
+            str(sealed.get("nonce")), sealed.get("seed")
+        ) != prov["runs"]["seed_sha256"]:
+            return answer(False, "sealed seed does not match runs.seed_sha256")
     verdict = prov.get("verdict")
     if verdict is not None:
         scores = run_dir / "scores.json"
@@ -1095,7 +1281,8 @@ def _parser() -> argparse.ArgumentParser:
     p.add_argument("--candidate", required=True, help="git ref for the candidate skills/")
     p.add_argument("--agent-config", required=True, type=Path)
     p.add_argument("--runs", type=int, default=None, help="runs per arm (default: task min_runs)")
-    p.add_argument("--seed", type=int, default=None, help="run-order seed (default: random)")
+    p.add_argument("--seed", type=int, default=None, help="run-order seed, sealed with the arm key (default: random; "
+                   "omit it when the operator also grades)")
     p.add_argument("--timeout", type=int, default=1800, help="seconds per run (default 1800)")
     p.set_defaults(func=cmd_run)
 

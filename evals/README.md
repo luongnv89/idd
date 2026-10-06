@@ -210,24 +210,47 @@ dirty tree (exit 4), so the lock it reads is the committed one.
 
 **Leakage checks.** Before any agent starts, `run` exits 3 when either arm's
 `skills/` contains the rubric canary or any 8-word shingle of the task prompt
-(the held-out check). It also exits 3 when the staged prompt, fixture or
+(the held-out check). It also exits 3, naming the criterion and the file, when
+a criterion shares an 8-word shingle with either arm's `skills/`. An agent
+quoting its own skill would otherwise trip the post-run check for certain, so
+rephrase the criterion. It also exits 3 when the staged prompt, fixture or
 cassettes carry the canary, an 8-word shingle of any criterion, or a
-byte-for-byte rubric copy (the staging check). After each run it scans the
-transcripts, the `gh` call log and every `out/` file for the canary, and the
-transcripts for criteria shingles. A hit marks the run `leak`.
+byte-for-byte rubric copy (the staging check). After each run, before its root
+is removed, it scans every regular file under that root (workspace, `HOME`,
+`gh` state, `out/`, the call log, the transcripts and the skills copy) for the
+canary, and the transcripts, the call log and every `out/` file for criteria
+shingles. Files are streamed, so size is no limit, and an unreadable file
+counts as a leak. Compressed git objects are not decoded. A hit marks the run
+`leak`.
 
-**Blinding.** Runs are shuffled by a recorded seed under random blind ids. The
-agent works in a throwaway `idd-agent-*` staging root in the system temp dir,
-outside the store and the repo, so no private rubric sits a few `..` above its
-cwd. Every path it sees is opaque, so no directory is named after its arm. Each
-run is copied into `runs/<id>/raw/<bid>/` and the staging root is removed. Each
-`blind/<bid>/` packet holds scrubbed transcripts, the call log, text `out/`
-files and `criteria.json` (ids and text only, with no canary and no checks).
-Scrubbing redacts both arms' SHAs, skills trees and refs (with 7–12 character
-prefixes), the words *baseline* and *candidate*, and the run's absolute paths.
+**Blinding.** Runs are shuffled by a sealed seed under random blind ids. Each
+run gets its own fresh `idd-agent-*` root in the system temp dir, outside the
+store and the repo, so no private rubric sits a few `..` above its cwd. The
+root holds only that run's stage, its own arm's `skills/` (extracted from git
+for that run) and the `gh` shim, under names that are the same for every run.
+It is copied into `runs/<id>/raw/<bid>/` and removed before the next run
+starts, so no run can reach an earlier run's transcript or the other arm's
+skills through it. The pre-run scan's extract of both arms is removed before
+the first agent starts. The agent is not sandboxed, though: it can still read
+the repository's git history, so the lane assumes an agent that follows its
+skills rather than a hostile one. Every staged file and directory, and the
+fixture's commit, carries one fixed timestamp, so mtimes do not reveal the arm.
+Each `blind/<bid>/` packet holds scrubbed transcripts, the call log, text
+`out/` files and `criteria.json` (ids and text only, with no canary and no
+checks). Packets are written in sorted blind-id order and `blind/` is stamped
+with one fixed mtime, so creation order says nothing about run order.
+Scrubbing redacts both arms' SHAs and skills trees (with 7–12 character
+prefixes) and every temp and run path anywhere, refs only as whole words (a
+ref `main` leaves `domain` alone), and the words *baseline* and *candidate*.
 The arm mapping is sealed in `sealed/key.json`, and provenance records its
-digest. A run gets one verdict: re-scoring after the key is unsealed would show
-which arm each blind id belongs to, so a second `verdict` exits 3.
+digest. The seed and the run order are sealed in `sealed/order.json`, and
+provenance records only `runs.seed_sha256`, a salted commitment to the seed.
+Replaying the seed against the run order would unblind every packet. Omit
+`--seed` (provenance's `runs.seed_supplied` says whether you passed one) when
+the operator also grades. **Graders open `blind/` only**: `raw/`, `checks/`,
+`sealed/` and the `run` command's stderr are for the operator and the verdict.
+A run gets one verdict: re-scoring after the key is unsealed would show which
+arm each blind id belongs to, so a second `verdict` exits 3.
 
 **Grading and verdict.** The rubric's `checks` run per run through `grade.py`,
 which grades the objective part. Graders fill `blind/scores.template.json` with
@@ -242,9 +265,10 @@ verdict is `invalid` if any run leaked, `insufficient` below the task's
 `clean_tree`, `executor`, `artifacts` as `{path, sha256, bytes}`,
 `written_at`). The driver measures the repository HEAD, each arm's `sha` and
 `skills_tree`, the harness file digests, the task, rubric and lock digests, the
-seed and the run counts. Under `agent.declared` it records what the operator
-*declares*: model, CLI, CLI version and tools. The driver cannot verify these.
-`verify --run-dir D` re-hashes every listed artifact and the sealed key.
+seed commitment and the run counts. Under `agent.declared` it records what the
+operator *declares*: model, CLI, CLI version and tools. The driver cannot verify these.
+`verify --run-dir D` re-hashes every listed artifact and the sealed key, and
+checks the sealed seed against its commitment.
 
 **Operator procedure.**
 
@@ -255,7 +279,7 @@ python3 $A lock --task-id <id>                # author task + rubric privately f
 git add evals/promotion/lock.json && git commit -m "chore(evals): lock <id>"
 python3 $A run --task-id <id> --baseline main --candidate <branch> \
   --agent-config ~/agent.json                 # prints run_dir + scores template
-# graders fill blind/scores.template.json without opening sealed/ or raw/
+# graders fill blind/scores.template.json and open nothing but blind/
 python3 $A verdict --run-dir <run_dir> --scores scores.json
 python3 $A verify --run-dir <run_dir>
 ```
