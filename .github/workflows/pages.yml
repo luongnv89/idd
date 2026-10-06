@@ -56,6 +56,7 @@ jobs:
           cp llms.txt _site/llms.txt
           # Only the assets the page actually references.
           cp assets/logo/*.svg _site/assets/logo/
+          cp assets/logo/brand-showcase.html _site/assets/logo/
           cp assets/og/og-card.png                       _site/assets/og/
           cp assets/screenshots/issue-creator.png        _site/assets/screenshots/
           cp assets/screenshots/issue-resolver-11.png    _site/assets/screenshots/

@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self'">
+<title>IDD — Brand Identity</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --base: #0A0A0A;
+    --surface: #111111;
+    --border: #262626;
+    --muted: #A1A1A1;
+    --text: #FAFAFA;
+    --neon: #00FF41;
+    --sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { -webkit-font-smoothing: antialiased; }
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+  }
+  body {
+    background: var(--base);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.6;
+  }
+  .page { max-width: 1100px; margin: 0 auto; padding: 0 32px 96px; }
+
+  /* ── labels ─────────────────────────────────────────── */
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--neon);
+  }
+  section { margin-top: 96px; }
+  .sec-head { display: flex; align-items: baseline; gap: 16px; margin-bottom: 32px; }
+  .sec-head h2 { font-size: 26px; font-weight: 800; letter-spacing: -0.02em; }
+  .sec-head .eyebrow { flex: none; }
+
+  /* ── cards ──────────────────────────────────────────── */
+  .card {
+    border-radius: 14px;
+    padding: 28px;
+  }
+  .card.dark {
+    background: var(--surface);
+    border: 1px solid var(--border);
+  }
+  .card.light {
+    background: var(--text);
+    color: var(--base);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35), 0 2px 8px rgba(0, 0, 0, 0.25);
+  }
+  .card .file {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .card.light .file { color: #555; }
+
+  /* ── hero ───────────────────────────────────────────── */
+  .hero { text-align: center; padding: 96px 0 8px; }
+  .hero .mark {
+    width: 160px;
+    height: 160px;
+    filter: drop-shadow(0 0 28px rgba(0, 255, 65, 0.30));
+  }
+  .hero .eyebrow { display: block; margin-top: 36px; }
+  .hero h1 { margin-top: 14px; line-height: 0; }
+  .hero h1 .wordmark { display: inline-block; }
+  .hero .tagline {
+    margin-top: 16px;
+    color: var(--muted);
+    font-size: 17px;
+  }
+
+  /* ── grids: let items shrink below their content's natural width ── */
+  .concept > *, .variants > *, .type-samples > *, .palette > *, .devref > * { min-width: 0; }
+
+  /* ── concept ────────────────────────────────────────── */
+  .concept { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: stretch; }
+  .concept .diagram {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 28px; padding: 36px 28px;
+  }
+  .legend {
+    list-style: none;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px 20px;
+    width: 100%;
+    max-width: 400px;
+  }
+  .legend li { display: flex; align-items: center; gap: 10px; }
+  .legend .n {
+    flex: none;
+    width: 20px; height: 20px;
+    border: 1.5px solid var(--text);
+    border-radius: 50%;
+    color: var(--text);
+    font-size: 11px; font-weight: 600;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .legend .l { color: var(--muted); font-size: 13.5px; }
+  .concept .notes { display: flex; flex-direction: column; gap: 22px; }
+  .concept .notes p { color: var(--muted); font-size: 14.5px; }
+  .concept .notes strong { display: block; color: var(--text); font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 4px; }
+  .concept .notes .sw { color: var(--neon); font-family: var(--mono); font-weight: 600; }
+
+  /* ── variants ───────────────────────────────────────── */
+  .variants { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  .variants .full { grid-column: 1 / -1; }
+  .variant-card {
+    display: flex; flex-direction: column; gap: 20px;
+    transition: transform 0.18s ease;
+  }
+  .variant-card:hover { transform: translateY(-2px); }
+  .variant-card .v-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    align-self: flex-start;
+  }
+  .card.light .v-label { color: #666; }
+  .variant-card .v-img { display: flex; align-items: center; justify-content: center; min-height: 120px; padding: 8px 0; }
+  .variant-card .v-img img { max-width: 100%; height: auto; display: block; }
+  .variant-card .file { align-self: flex-end; }
+
+  .fav-row { display: flex; align-items: flex-end; gap: 36px; }
+  .fav-item { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .fav-item img { display: block; }
+  .fav-item .cap { font-family: var(--mono); font-size: 11px; color: #666; }
+
+  /* ── palette ────────────────────────────────────────── */
+  .palette { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+  .chip { overflow: hidden; padding: 0; }
+  .chip .swatch {
+    height: 84px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+  }
+  .chip .meta { padding: 16px 20px 20px; }
+  .chip .meta .name { font-weight: 600; font-size: 14px; }
+  .chip .meta .role { color: var(--muted); font-size: 12.5px; margin-top: 3px; }
+  .sw-neon    { background: #00FF41; color: #0A0A0A; }
+  .sw-base    { background: #0A0A0A; color: #FAFAFA; }
+  .sw-surface { background: #111111; color: #FAFAFA; }
+  .sw-border  { background: #262626; color: #FAFAFA; }
+  .sw-muted   { background: #A1A1A1; color: #0A0A0A; }
+  .sw-text    { background: #FAFAFA; color: #0A0A0A; }
+
+  /* ── typography ─────────────────────────────────────── */
+  .type-spec { text-align: center; padding: 44px 28px; }
+  .type-spec img { width: 220px; max-width: 70%; height: auto; }
+  .type-spec .cap { margin-top: 18px; color: var(--muted); font-size: 13px; }
+  .type-samples { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 24px; }
+  .type-samples .wide { grid-column: 1 / -1; }
+  .sample .s-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 14px;
+  }
+  .sample .h-sample { font-size: 34px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.15; }
+  .sample .b-sample { color: var(--muted); }
+  .sample .m-sample { font-family: var(--mono); font-weight: 600; font-size: 17px; }
+  .sample .m-sample .p { color: var(--neon); }
+
+  /* ── dev reference ──────────────────────────────────── */
+  .devref { display: flex; flex-direction: column; gap: 24px; }
+  .devref .d-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 14px;
+  }
+  pre {
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.65;
+    overflow-x: auto;
+    max-width: 100%;
+    color: var(--text);
+  }
+  pre .k { color: #FAFAFA; }
+  pre .s { color: #00FF41; }
+  pre .p { color: #A1A1A1; }
+  .tree { font-family: var(--mono); font-size: 13px; line-height: 1.9; color: var(--text); }
+  .tree .d { color: var(--muted); }
+  .tree .note { margin-top: 12px; color: var(--muted); font-size: 12.5px; }
+
+  /* ── footer ─────────────────────────────────────────── */
+  .foot {
+    margin-top: 96px;
+    padding-top: 32px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .foot a { color: var(--neon); text-decoration: none; }
+  .foot a:hover { text-decoration: underline; }
+
+  @media (max-width: 760px) {
+    .page { padding: 0 20px 72px; }
+    .hero h1 .wordmark { width: 102px; height: 44px; }
+    section { margin-top: 72px; }
+    .concept, .variants, .type-samples { grid-template-columns: 1fr; }
+    .palette { grid-template-columns: 1fr 1fr; }
+    .legend { grid-template-columns: 1fr; }
+    .foot { flex-direction: column; align-items: flex-start; gap: 8px; }
+  }
+  @media (max-width: 480px) {
+    .palette { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ── 1 · HERO ──────────────────────────────────────── -->
+  <header class="hero">
+    <svg class="mark" viewBox="0 0 64 64" role="img" aria-label="IDD mark">
+      <g fill="#00FF41">
+        <path d="M21.56 8 L28.64 8 L27.14 18 L41.06 18 L42.56 8 L49.64 8 L48.14 18 L58.14 18 L57.09 25 L47.09 25 L44.99 39 L54.99 39 L53.94 46 L43.94 46 L42.44 56 L35.36 56 L36.86 46 L22.94 46 L21.44 56 L14.36 56 L15.86 46 L5.86 46 L6.91 39 L16.91 39 L19.01 25 L9.01 25 L10.06 18 L20.06 18 Z M26.09 25 L23.99 39 L37.91 39 L40.01 25 Z"/>
+        <path d="M32 27.5 A4.5 4.5 0 1 1 32 36.5 A4.5 4.5 0 1 1 32 27.5 Z"/>
+      </g>
+    </svg>
+    <span class="eyebrow">Brand Identity</span>
+    <h1><span class="sr-only">IDD</span><svg class="wordmark" width="130" height="56" viewBox="0 0 65 28" aria-hidden="true" focusable="false"><path fill="#FAFAFA" d="M0 0 L7 0 L7 28 L0 28 Z M13 0 H22.5 A14 14 0 0 1 22.5 28 H13 Z M20 6.5 V21.5 H22.5 A6.5 7.5 0 0 0 22.5 6.5 Z M41.5 0 H51 A14 14 0 0 1 51 28 H41.5 Z M48.5 6.5 V21.5 H51 A6.5 7.5 0 0 0 51 6.5 Z"/></svg></h1>
+    <p class="tagline">Every line of code, traced back to its issue.</p>
+  </header>
+
+  <!-- ── 2 · DESIGN CONCEPT ────────────────────────────── -->
+  <section id="concept">
+    <div class="sec-head"><span class="eyebrow">01</span><h2>Design concept</h2></div>
+    <div class="concept">
+      <div class="card dark diagram">
+        <svg viewBox="0 0 400 400" role="img" aria-label="Annotated IDD mark" style="width:100%;max-width:400px;height:auto">
+          <g fill="#00FF41" transform="translate(40 40) scale(5)">
+            <path d="M21.56 8 L28.64 8 L27.14 18 L41.06 18 L42.56 8 L49.64 8 L48.14 18 L58.14 18 L57.09 25 L47.09 25 L44.99 39 L54.99 39 L53.94 46 L43.94 46 L42.44 56 L35.36 56 L36.86 46 L22.94 46 L21.44 56 L14.36 56 L15.86 46 L5.86 46 L6.91 39 L16.91 39 L19.01 25 L9.01 25 L10.06 18 L20.06 18 Z M26.09 25 L23.99 39 L37.91 39 L40.01 25 Z"/>
+            <path d="M32 27.5 A4.5 4.5 0 1 1 32 36.5 A4.5 4.5 0 1 1 32 27.5 Z"/>
+          </g>
+          <g stroke="#A1A1A1" stroke-width="1" fill="none">
+            <path d="M270.5 80 L318 52"/>
+            <path d="M222.5 200 L376 200"/>
+            <path d="M58 130 H50 V270 H58"/>
+            <path d="M26 200 H50"/>
+            <path d="M129.5 320 L82 372"/>
+          </g>
+          <g fill="#FAFAFA">
+            <circle cx="270.5" cy="80" r="2.5"/>
+            <circle cx="129.5" cy="320" r="2.5"/>
+          </g>
+          <g>
+            <circle cx="318" cy="52" r="12" fill="#0A0A0A" stroke="#FAFAFA" stroke-width="1.5"/>
+            <text x="318" y="52" text-anchor="middle" dominant-baseline="central" font-family="Inter, system-ui, sans-serif" font-weight="600" font-size="12" fill="#FAFAFA">1</text>
+            <circle cx="376" cy="200" r="12" fill="#0A0A0A" stroke="#FAFAFA" stroke-width="1.5"/>
+            <text x="376" y="200" text-anchor="middle" dominant-baseline="central" font-family="Inter, system-ui, sans-serif" font-weight="600" font-size="12" fill="#FAFAFA">2</text>
+            <circle cx="26" cy="200" r="12" fill="#0A0A0A" stroke="#FAFAFA" stroke-width="1.5"/>
+            <text x="26" y="200" text-anchor="middle" dominant-baseline="central" font-family="Inter, system-ui, sans-serif" font-weight="600" font-size="12" fill="#FAFAFA">3</text>
+            <circle cx="82" cy="372" r="12" fill="#0A0A0A" stroke="#FAFAFA" stroke-width="1.5"/>
+            <text x="82" y="372" text-anchor="middle" dominant-baseline="central" font-family="Inter, system-ui, sans-serif" font-weight="600" font-size="12" fill="#FAFAFA">4</text>
+          </g>
+        </svg>
+        <ol class="legend">
+          <li><span class="n">1</span><span class="l">#N, the issue reference</span></li>
+          <li><span class="n">2</span><span class="l">Issue dot, the source of truth</span></li>
+          <li><span class="n">3</span><span class="l">Rails = wordmark cap height</span></li>
+          <li><span class="n">4</span><span class="l">Two directions: 0° and a 0.15 slant</span></li>
+        </ol>
+      </div>
+      <div class="card dark notes">
+        <p><strong>Symbol</strong>The hash is how IDD ties work together. A branch is fix/42-…, a commit ends in (#42), a PR says Closes #42. The mark makes that #N reference the brand, and puts the issue itself, as a dot, in the center cell: the single source of truth everything else is built around.</p>
+        <p><strong>Construction</strong>Every edge follows one of two directions, horizontal or a 0.15 slant, so the mark reads as engineered rather than drawn. The bars are 7 units on a 64-unit grid, and the center cell is a 14-unit square holding a 9-unit dot. At 16px, a pixel-snapped favicon redraw takes over.</p>
+        <p><strong>Color</strong>Dark-first, like the terminal it lives in. Neon <span class="sw">#00FF41</span> is reserved for the mark and for highlights (14.5:1 on #0A0A0A); it never fills a background and never sits on light surfaces (1.3:1). On light backgrounds, the mark goes monochrome #0A0A0A.</p>
+        <p><strong>Typography</strong>The IDD wordmark is drawn, not typeset: 7-unit stems match the hash bars, the D bowls are true semicircles echoing the dot, and the cap height sits exactly between the two rails, so mark and name share one grid. Inter and JetBrains Mono carry everything else, matching the site.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── 3 · LOGO VARIANTS ─────────────────────────────── -->
+  <section id="variants">
+    <div class="sec-head"><span class="eyebrow">02</span><h2>Logo variants</h2></div>
+    <div class="variants">
+      <div class="card dark variant-card full">
+        <span class="v-label">Primary · dark surfaces</span>
+        <div class="v-img"><img src="logo-full.svg" alt="IDD primary lockup" style="width:312px"></div>
+        <span class="file">logo-full.svg</span>
+      </div>
+      <div class="card light variant-card full">
+        <span class="v-label">Monochrome · light surfaces</span>
+        <div class="v-img"><img src="logo-black.svg" alt="IDD monochrome black lockup" style="width:312px"></div>
+        <span class="file">logo-black.svg</span>
+      </div>
+      <div class="card dark variant-card full">
+        <span class="v-label">Monochrome white · dark or photo backgrounds</span>
+        <div class="v-img"><img src="logo-white.svg" alt="IDD monochrome white lockup" style="width:312px"></div>
+        <span class="file">logo-white.svg</span>
+      </div>
+      <div class="card dark variant-card">
+        <span class="v-label">Mark</span>
+        <div class="v-img"><img src="logo-mark.svg" alt="IDD mark" style="width:128px"></div>
+        <span class="file">logo-mark.svg</span>
+      </div>
+      <div class="card light variant-card">
+        <span class="v-label">App icon</span>
+        <div class="v-img"><img src="logo-icon.svg" alt="IDD app icon" style="width:128px"></div>
+        <span class="file">logo-icon.svg</span>
+      </div>
+      <div class="card dark variant-card">
+        <span class="v-label">Wordmark</span>
+        <div class="v-img"><img src="logo-wordmark.svg" alt="IDD wordmark" style="width:180px"></div>
+        <span class="file">logo-wordmark.svg</span>
+      </div>
+      <div class="card light variant-card">
+        <span class="v-label">Favicon</span>
+        <div class="v-img">
+          <div class="fav-row">
+            <div class="fav-item"><img src="favicon.svg" alt="IDD favicon at 64px" width="64" height="64"><span class="cap">64px</span></div>
+            <div class="fav-item"><img src="favicon.svg" alt="IDD favicon at 32px" width="32" height="32"><span class="cap">32px</span></div>
+            <div class="fav-item"><img src="favicon.svg" alt="IDD favicon at 16px" width="16" height="16"><span class="cap">16×16px</span></div>
+          </div>
+        </div>
+        <span class="file">favicon.svg</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── 4 · COLOR PALETTE ─────────────────────────────── -->
+  <section id="color">
+    <div class="sec-head"><span class="eyebrow">03</span><h2>Color palette</h2></div>
+    <div class="palette">
+      <div class="card dark chip">
+        <div class="swatch sw-neon">#00FF41</div>
+        <div class="meta"><div class="name">Neon</div><div class="role">The mark, highlights, CTAs. Never a background fill.</div></div>
+      </div>
+      <div class="card dark chip">
+        <div class="swatch sw-base" style="border-bottom:1px solid #262626">#0A0A0A</div>
+        <div class="meta"><div class="name">Base</div><div class="role">Page background, icon tile.</div></div>
+      </div>
+      <div class="card dark chip">
+        <div class="swatch sw-surface">#111111</div>
+        <div class="meta"><div class="name">Surface</div><div class="role">Cards, elevated panels.</div></div>
+      </div>
+      <div class="card dark chip">
+        <div class="swatch sw-border">#262626</div>
+        <div class="meta"><div class="name">Border</div><div class="role">Hairlines, tile edge.</div></div>
+      </div>
+      <div class="card dark chip">
+        <div class="swatch sw-muted">#A1A1A1</div>
+        <div class="meta"><div class="name">Muted</div><div class="role">Secondary text (7.7:1 on base).</div></div>
+      </div>
+      <div class="card dark chip">
+        <div class="swatch sw-text">#FAFAFA</div>
+        <div class="meta"><div class="name">Text</div><div class="role">Primary text, wordmark on dark (19:1).</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── 5 · TYPOGRAPHY ────────────────────────────────── -->
+  <section id="type">
+    <div class="sec-head"><span class="eyebrow">04</span><h2>Typography</h2></div>
+    <div class="card dark type-spec">
+      <img src="logo-wordmark.svg" alt="IDD wordmark specimen">
+      <p class="cap">Custom-drawn wordmark: 7-unit stems, cap height = hash rails</p>
+    </div>
+    <div class="type-samples">
+      <div class="card dark sample">
+        <div class="s-label">Inter · 800 · headings</div>
+        <div class="h-sample">Every line of code, traced back to its issue.</div>
+      </div>
+      <div class="card dark sample">
+        <div class="s-label">Inter · 400 · body</div>
+        <div class="b-sample">GitHub issues are the single source of truth for all development work — structure, triage, resolve, and review them so any developer or AI agent can ship a tested PR.</div>
+      </div>
+      <div class="card dark sample wide">
+        <div class="s-label">JetBrains Mono · 600 · terminal</div>
+        <div class="m-sample"><span class="p">❯</span> /issue-resolver 42</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── 6 · DEVELOPER REFERENCE ───────────────────────── -->
+  <section id="devref">
+    <div class="sec-head"><span class="eyebrow">05</span><h2>Developer reference</h2></div>
+    <div class="devref">
+      <div class="card dark">
+        <div class="d-label">Tailwind theme</div>
+<pre><span class="k">colors</span><span class="p">:</span> <span class="p">{</span> <span class="k">brand</span><span class="p">:</span> <span class="p">{</span>
+  <span class="k">primary</span><span class="p">:</span> <span class="s">'#0A0A0A'</span><span class="p">,</span>  <span class="k">surface</span><span class="p">:</span> <span class="s">'#111111'</span><span class="p">,</span>  <span class="k">border</span><span class="p">:</span> <span class="s">'#262626'</span><span class="p">,</span>
+  <span class="k">muted</span><span class="p">:</span>   <span class="s">'#A1A1A1'</span><span class="p">,</span>  <span class="k">text</span><span class="p">:</span>    <span class="s">'#FAFAFA'</span><span class="p">,</span>  <span class="k">accent</span><span class="p">:</span> <span class="s">'#00FF41'</span>
+<span class="p">}</span> <span class="p">},</span>
+<span class="k">fontFamily</span><span class="p">:</span> <span class="p">{</span>
+  <span class="k">sans</span><span class="p">:</span> <span class="p">[</span><span class="s">'Inter'</span><span class="p">,</span> <span class="s">'system-ui'</span><span class="p">,</span> <span class="s">'sans-serif'</span><span class="p">],</span>
+  <span class="k">mono</span><span class="p">:</span> <span class="p">[</span><span class="s">'"JetBrains Mono"'</span><span class="p">,</span> <span class="s">'ui-monospace'</span><span class="p">,</span> <span class="s">'monospace'</span><span class="p">]</span>
+<span class="p">}</span></pre>
+      </div>
+      <div class="card dark">
+        <div class="d-label">Files</div>
+        <div class="tree">
+          logo-mark.svg      <span class="d"># canonical 64×64 mark — source of truth</span><br>
+          logo-full.svg      <span class="d"># 156×72 lockup for dark surfaces</span><br>
+          logo-wordmark.svg  <span class="d"># 77×40 drawn wordmark</span><br>
+          logo-icon.svg      <span class="d"># 512×512 dark app-icon tile</span><br>
+          favicon.svg        <span class="d"># 16×16 pixel-snapped redraw</span><br>
+          logo-white.svg     <span class="d"># monochrome lockup — dark / photo backgrounds</span><br>
+          logo-black.svg     <span class="d"># monochrome lockup — light backgrounds</span><br>
+          brand-showcase.html <span class="d"># this page</span>
+          <p class="note">@8× PNG exports sit alongside each SVG (logo-*.png, favicon.png).</p>
+        </div>
+      </div>
+      <div class="card dark">
+        <div class="d-label">Usage — README</div>
+<pre><span class="p">&lt;</span><span class="k">picture</span><span class="p">&gt;</span>
+  <span class="p">&lt;</span><span class="k">source</span> <span class="k">media</span><span class="p">=</span><span class="s">"(prefers-color-scheme: dark)"</span>  <span class="k">srcset</span><span class="p">=</span><span class="s">"assets/logo/logo-white.svg"</span><span class="p">&gt;</span>
+  <span class="p">&lt;</span><span class="k">source</span> <span class="k">media</span><span class="p">=</span><span class="s">"(prefers-color-scheme: light)"</span> <span class="k">srcset</span><span class="p">=</span><span class="s">"assets/logo/logo-black.svg"</span><span class="p">&gt;</span>
+  <span class="p">&lt;</span><span class="k">img</span> <span class="k">src</span><span class="p">=</span><span class="s">"assets/logo/logo-black.svg"</span> <span class="k">alt</span><span class="p">=</span><span class="s">"IDD logo"</span> <span class="k">height</span><span class="p">=</span><span class="s">"80"</span><span class="p">&gt;</span>
+<span class="p">&lt;/</span><span class="k">picture</span><span class="p">&gt;</span></pre>
+      </div>
+      <div class="card dark">
+        <div class="d-label">Usage — favicon</div>
+<pre><span class="p">&lt;</span><span class="k">link</span> <span class="k">rel</span><span class="p">=</span><span class="s">"icon"</span> <span class="k">type</span><span class="p">=</span><span class="s">"image/svg+xml"</span> <span class="k">href</span><span class="p">=</span><span class="s">"assets/logo/favicon.svg"</span><span class="p">&gt;</span></pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── 7 · FOOTER ────────────────────────────────────── -->
+  <footer class="foot">
+    <span>IDD · Brand Identity · Issue-Driven Development · Luong NGUYEN</span>
+    <a href="https://github.com/luongnv89/idd">github.com/luongnv89/idd</a>
+  </footer>
+
+</div>
+</body>
+</html>
