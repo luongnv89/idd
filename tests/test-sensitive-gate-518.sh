@@ -168,6 +168,10 @@ check "G4: a probe with no refuting observation is not accepted" "$?"
 check "G4: a challenge that was not independent does not pass" "$?"
 [ "$(field "$(adj falsified-first)" verdict)" = '"replan"' ] && [ "$(field "$(adj falsified-after-replan)" verdict)" = '"stop"' ]
 check "G4: a falsified probe replans once, then stops" "$?"
+[ "$(field "$(adj post-probe-held-at-plan)" verdict)" = '"stop"' ] && [ "$(field "$(adj post-probe-held-at-plan)" open_blockers)" = '["B1"]' ]
+check "G4: a post probe 'held' at plan time is no evidence — citing it leaves the blocker open" "$?"
+[ "$(field "$(adj post-probe-falsified-at-plan)" verdict)" = '"stop"' ] && [ "$(field "$(adj post-probe-falsified-at-plan)" falsified)" = '[]' ]
+check "G4: a post probe 'falsified' at plan time is a malformed record — stop, never replan" "$?"
 [ "$(field "$(adj probe-citation-held)" test_obligations)" = '["P2"]' ]
 check "G4: an unrun post-change probe becomes a test obligation" "$?"
 [ "$(field "$(adj post-probes-only)" verdict)" = '"stop"' ]

@@ -69,7 +69,10 @@ plan, writing rebuttals — stays with the agent.
       and falsified_if — a probe that names no observation able to refute it
       is not falsifiable. A `pre` probe must have run (`result` set), and at
       least one must exist: a ledger of only unrun `post` probes has tested
-      nothing. A `post` probe with no result is a Step 3 test obligation.
+      nothing. Every `post` probe is a Step 3 test obligation; one that
+      already carries a result is a problem (it cannot have run before the
+      change) — never held, never falsified, never citable. Only a `pre`
+      probe can be held or falsified.
     * A falsified probe sends the plan back to option selection once
       (`replan`) whatever the challenge, blockers or problems say — the plan
       is dead, so nothing else about it needs closing. After a replan
@@ -283,14 +286,20 @@ def adjudicate(ledger: object, root: Path) -> dict:
             problems.append(f"probe {pid}: phase must be pre or post")
         if result not in ("held", "falsified", None):
             problems.append(f"probe {pid}: result must be held, falsified or null")
-        if result == "falsified":
-            falsified.append(pid)
-        elif result == "held" and not missing:
-            held.add(pid)
-        elif result is None and phase == "pre":
-            problems.append(f"pre-change probe {pid} has not run")
-        elif result is None and phase == "post":
+        if phase == "post":
+            # Adjudication runs at Step 2, before any change exists: a post
+            # probe cannot have run, so a result on one is a malformed record —
+            # never evidence (kept out of held and falsified), still an obligation.
             obligations.append(pid)
+            if result is not None:
+                problems.append(f"post-change probe {pid} cannot have run before the change")
+        elif phase == "pre":
+            if result == "falsified":
+                falsified.append(pid)
+            elif result == "held" and not missing:
+                held.add(pid)
+            elif result is None:
+                problems.append(f"pre-change probe {pid} has not run")
 
     if probes and not any(p.get("phase") == "pre" and p.get("result") in ("held", "falsified") for p in probes):
         problems.append("no pre-change probe has run")
