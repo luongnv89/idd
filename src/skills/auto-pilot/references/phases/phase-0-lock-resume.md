@@ -155,6 +155,18 @@ same safe branch/phase screens as `current` and may carry a `telemetry` object
 until the serialized run-log write consumes it. The write is atomic, so an
 interrupted checkpoint leaves the previous state readable. Exit 0 is a written
 checkpoint.
+**Phases are validated transitions, not free labels.** `gi-state.py` holds one
+transition table each for the top-level `phase`, `current.phase` and
+`lanes[].phase`, built from the checkpoints in these phase files and the
+reconciliation table above. Staying in a phase and moving back toward more
+verification (`resolve`, `returned`, `review`) are legal; skipping verification
+is not. That means `fix`/`merge` without a prior `review`, a lane at `completed`
+before `logged`, a new lane that starts past `resolve`, or any phase outside the
+vocabulary. A phase must also carry its evidence: an integer `pr` for
+`returned`/`review`/`fix`/`merge` and for a `merged` cleanup, a `branch` for a
+`planned`/`resolve` lane, and `telemetry.run_log` for
+`log_pending`/`logged`/`completed`. A refused patch exits 3 and writes nothing.
+The state on disk keeps the last legal checkpoint.
 **Exit 3** is a stop for the state machinery — the patch or the file on disk is
 invalid: print the reason, never apply the patch by hand, and continue the loop
 un-resumable. No `python3`, exit 2, or exit 4: print `⚠ gi-state unavailable`

@@ -35,7 +35,15 @@ Modes
             a command, so it is only length-bounded. `lanes` is the durable
             parallel-resolver queue: entries merge by issue, while `[]` clears
             the completed batch. `queue` is `--init` only: it is the run's
-            recorded intent, and a patch that names it is refused
+            recorded intent, and a patch that names it is refused.
+            Phases are a closed vocabulary with a transition table per record
+            (top level, `current`, each lane), and a phase that claims progress
+            must carry its evidence: an integer `pr` for returned/review/fix/
+            merge and for a `merged` cleanup, a `branch` for a planned or
+            resolving lane, `telemetry.run_log` for log_pending/logged/
+            completed. An unknown phase, an illegal edge, or a missing piece of
+            evidence is refused at exit 3 before anything is written — the
+            state on disk is unchanged, under `--dry-run` too
   --lock    create `.gitissue/run.lock` with O_CREAT|O_EXCL; refuse a lock held
             by a live run, reclaim one that is stale. Mints a fresh run id, so
             a leftover state file from a finished run cannot lend its id to an
@@ -180,6 +188,62 @@ BRANCH_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/-]{0,200}\Z")
 LANE_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\Z")
 SHA_RE = re.compile(r"^[0-9a-f]{40}\Z")
 TS_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z\Z")
+
+# Phase transition tables: `from → allowed to`. Derived from /auto-pilot's
+# documented checkpoints (phase-0 resume reconciliation, phase-1 lane plan,
+# phase-2 resolve/return, phase-3-4 review, phase-5 merge and end-of-iteration),
+# never from what the script happens to accept today. Staying in a phase is
+# always legal (an idempotent re-checkpoint). Every back-edge listed here is a
+# move toward *more* verification (resolve, returned, review), which is what a
+# resume does with an uncertain record; the forward edges that would skip
+# verification — reaching fix/merge without review, `completed` without
+# `logged` — are the ones the tables leave out.
+RUN_TRANSITIONS: dict[str, frozenset[str]] = {
+    "init": frozenset({"triage", "resolve", "review"}),
+    "triage": frozenset({"resolve", "review"}),
+    "resolve": frozenset({"triage", "review", "cleanup"}),
+    "review": frozenset({"fix", "merge", "cleanup", "triage", "resolve"}),
+    "fix": frozenset({"review", "merge", "cleanup", "triage", "resolve"}),
+    "merge": frozenset({"review", "fix", "cleanup", "triage", "resolve"}),
+    "cleanup": frozenset({"triage", "resolve", "review"}),
+}
+CURRENT_TRANSITIONS: dict[str, frozenset[str]] = {
+    "resolve": frozenset({"review", "cleanup"}),
+    "review": frozenset({"fix", "merge", "cleanup", "resolve"}),
+    "fix": frozenset({"review", "merge", "cleanup", "resolve"}),
+    "merge": frozenset({"review", "fix", "cleanup", "resolve"}),
+    "cleanup": frozenset({"review", "resolve"}),
+}
+# A new `current` (none recorded, or a different issue) may start anywhere but
+# fix/merge; those two are reachable fresh only by the resume copy of a lane
+# that is already recorded in that same phase.
+CURRENT_START = frozenset({"resolve", "review", "cleanup"})
+_DRAIN = frozenset({"review", "fix", "merge"})
+_LANE_EXITS = frozenset({"failed", "blocked_dirty"})
+LANE_TRANSITIONS: dict[str, frozenset[str]] = {
+    "planned": frozenset({"resolve", "returned"} | _LANE_EXITS),
+    "resolve": frozenset({"returned"} | _LANE_EXITS),
+    "returned": frozenset({"resolve", "review"} | _LANE_EXITS),
+    "review": frozenset(
+        {"fix", "merge", "cleanup", "resolve", "returned", "log_pending"}
+        | _LANE_EXITS
+    ),
+    "fix": frozenset(
+        {"review", "merge", "cleanup", "resolve", "returned", "log_pending"}
+        | _LANE_EXITS
+    ),
+    "merge": frozenset(
+        {"review", "fix", "cleanup", "resolve", "returned", "log_pending"}
+        | _LANE_EXITS
+    ),
+    "cleanup": frozenset({"log_pending"} | _LANE_EXITS),
+    "log_pending": frozenset({"logged"} | _LANE_EXITS),
+    "logged": frozenset({"cleanup", "completed"} | _LANE_EXITS),
+    "completed": frozenset(),
+    "failed": frozenset({"cleanup", "log_pending"}),
+    "blocked_dirty": frozenset({"log_pending"}),
+}
+LANE_START = frozenset({"planned", "resolve"})
 
 
 class InputError(ValueError):
@@ -631,6 +695,127 @@ def load_state(path: Path) -> dict[str, object]:
     return parsed
 
 
+def _check_transition(
+    table: dict[str, frozenset[str]],
+    prior: object,
+    new: object,
+    *,
+    context: str,
+    start: frozenset[str] | None = None,
+) -> None:
+    """Refuse a phase write that the transition table does not allow."""
+    if new is None:
+        raise InputError(f"{context}: a phase cannot be cleared to null")
+    if new not in table:
+        raise InputError(
+            f"{context}: '{new}' is not a known phase "
+            f"(known: {', '.join(sorted(table))})"
+        )
+    if prior == new:
+        return
+    if prior is None:
+        if start is not None and new not in start:
+            raise InputError(
+                f"{context}: a new record cannot start at '{new}' "
+                f"(allowed starts: {', '.join(sorted(start))})"
+            )
+        return
+    if not isinstance(prior, str) or prior not in table:
+        raise InputError(
+            f"{context}: the recorded phase {prior!r} is not a known phase, so "
+            "no transition from it is legal — re-run --init"
+        )
+    if new not in table[prior]:
+        allowed = ", ".join(sorted(table[prior])) or "none — it is terminal"
+        raise InputError(
+            f"{context}: illegal transition {prior} → {new} (allowed: {allowed})"
+        )
+
+
+def _has_run_log(record: dict) -> bool:
+    telemetry = record.get("telemetry")
+    return isinstance(telemetry, dict) and isinstance(telemetry.get("run_log"), dict)
+
+
+def _require_evidence(record: dict, *, context: str, lane: bool) -> None:
+    """Refuse a record whose phase claims progress it carries no evidence for.
+
+    A phase is a claim about work already done. The evidence each one needs is
+    the field the next step will act on — the PR a review reads, the run-log
+    object an exactly-once append replays — so a checkpoint without it would
+    hand a resume a phase it cannot honor.
+    """
+    phase = record.get("phase")
+    if lane and phase in ("planned", "resolve") and not isinstance(
+        record.get("branch"), str
+    ):
+        raise InputError(f"{context}: phase '{phase}' requires a branch")
+    needs_pr = phase in ("returned", "review", "fix", "merge") or (
+        phase == "cleanup" and record.get("outcome") == "merged"
+    )
+    if needs_pr and not _is_int(record.get("pr")):
+        raise InputError(f"{context}: phase '{phase}' requires an integer pr")
+    if lane and phase in ("log_pending", "logged", "completed") and not _has_run_log(
+        record
+    ):
+        raise InputError(
+            f"{context}: phase '{phase}' requires telemetry.run_log "
+            "(the persisted run-log object)"
+        )
+
+
+def _validate_lane_phases(
+    before: list[dict[str, object]],
+    incoming: list[dict[str, object]],
+    after: list[dict[str, object]],
+) -> None:
+    prior_by_issue = {lane["issue"]: lane for lane in before}
+    after_by_issue = {lane["issue"]: lane for lane in after}
+    for lane in incoming:
+        issue = lane["issue"]
+        context = f"lanes[{issue}].phase"
+        merged = after_by_issue[issue]
+        if "phase" in lane:
+            prior = prior_by_issue.get(issue)
+            _check_transition(
+                LANE_TRANSITIONS,
+                None if prior is None else prior.get("phase"),
+                lane["phase"],
+                context=context,
+                start=LANE_START,
+            )
+        if isinstance(merged.get("phase"), str) and merged["phase"] in LANE_TRANSITIONS:
+            _require_evidence(merged, context=context, lane=True)
+
+
+def _validate_current_phase(
+    base: object,
+    named: dict,
+    merged: dict[str, object],
+    lanes: list[object],
+) -> None:
+    same_record = isinstance(base, dict) and base.get("issue") == merged.get("issue")
+    prior = base.get("phase") if same_record else None
+    if "phase" in named:
+        new = named["phase"]
+        start = CURRENT_START
+        if prior is None and new in _DRAIN:
+            # The resume copy of a draining lane re-enters its own phase.
+            if any(
+                isinstance(lane, dict)
+                and lane.get("issue") == merged.get("issue")
+                and lane.get("phase") == new
+                for lane in lanes
+            ):
+                start = start | {new}
+        _check_transition(
+            CURRENT_TRANSITIONS, prior, new, context="current.phase", start=start
+        )
+    # `current` is not re-normalized on load, so its phase may be any JSON value.
+    if isinstance(merged.get("phase"), str) and merged["phase"] in CURRENT_TRANSITIONS:
+        _require_evidence(merged, context="current.phase", lane=False)
+
+
 def merge_patch(
     state: dict[str, object], patch: object, *, now: str | None = None
 ) -> dict[str, object]:
@@ -661,6 +846,10 @@ def merge_patch(
     _check_str(patch, "report_path")
     if "limit" in patch and patch["limit"] is not None and not _is_int(patch["limit"]):
         raise InputError("limit must be an integer or null")
+    if "phase" in patch:
+        _check_transition(
+            RUN_TRANSITIONS, state.get("phase"), patch["phase"], context="phase"
+        )
     for key in PATCH_SCALARS:
         if key in patch:
             out[key] = patch[key]
@@ -684,6 +873,7 @@ def merge_patch(
                 merged_lane.update(lane)
                 by_issue[issue] = _normalize_lane(merged_lane)
             out["lanes"] = [by_issue[number] for number in order]
+            _validate_lane_phases(existing_lanes, incoming_lanes, out["lanes"])
 
     if "current" in patch:
         incoming = _normalize_current(patch["current"])
@@ -693,7 +883,19 @@ def merge_patch(
             base = out.get("current")
             merged = dict(base) if isinstance(base, dict) else {}
             merged.update({k: v for k, v in incoming.items() if k in patch["current"]})
+            _validate_current_phase(
+                base, patch["current"], merged, out.get("lanes") or []
+            )
             out["current"] = {key: merged[key] for key in sorted(merged)}
+
+    # Checked after `current` merges: the PR a review/fix/merge phase acts on
+    # may arrive in the very patch that names the phase.
+    if "phase" in patch and patch["phase"] in _DRAIN:
+        current = out.get("current")
+        if not (isinstance(current, dict) and _is_int(current.get("pr"))):
+            raise InputError(
+                f"phase: '{patch['phase']}' requires current.pr (the PR under review)"
+            )
 
     if "processed" in patch:
         existing = _normalize_processed(out.get("processed") or [])
