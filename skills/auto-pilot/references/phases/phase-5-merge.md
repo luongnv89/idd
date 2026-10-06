@@ -271,8 +271,10 @@ own placeholders, filled from the current repository. The base name is bound
 through `--jq`, never pasted, because the PR author picks it:
 
 ```bash
+verified_head="{verified_head}"
 read -r head_now base_ref <<<"$(gh pr view {pr_number} --json headRefOid,baseRefName --jq '"\(.headRefOid) \(.baseRefName)"')"
 behind_by="$(gh api "repos/{owner}/{repo}/compare/${base_ref}...${verified_head}" --jq .behind_by)"
+echo "head_now=$head_now base_ref=$base_ref behind_by=$behind_by"
 ```
 
 | `merge_identity` | When | Effect |
@@ -346,13 +348,19 @@ If the mode forbids merge (`conservative`):
 ```
 
 If the mode allows merge (`balanced` or `aggressive`), and only on a `fresh`
-*Step 5.1c* answer, merge with the expected-head guard. `verified_head` is the
-SHA that step bound. GitHub refuses the merge if the head no longer matches it:
+*Step 5.1c* answer, merge with the expected-head guard. Run it as **one** shell
+call (variables do not survive between calls), `{verified_head}` being the
+40-hex SHA that step bound. A non-zero exit is outcome `left_open`, never `merged`:
 
 ```bash
+verified_head="{verified_head}"
+read -r head_now base_ref <<<"$(gh pr view {pr_number} --json headRefOid,baseRefName --jq '"\(.headRefOid) \(.baseRefName)"')"
+behind_by="$(gh api "repos/{owner}/{repo}/compare/${base_ref}...${verified_head}" --jq .behind_by)"
 if [ -n "$verified_head" ] && [ "$head_now" = "$verified_head" ] && [ "$behind_by" = "0" ]; then
   gh pr merge {pr_number} --squash --delete-branch --match-head-commit "$verified_head"
-fi   # otherwise merge_identity is stale: no merge, outcome left_open
+else
+  echo "merge_identity=stale (head_now=$head_now behind_by=$behind_by)"; exit 1
+fi
 ```
 
 ```
@@ -371,7 +379,7 @@ If the merge command fails (branch protection, required approvals, conflicts, a 
 Record the iteration outcome (`merged` or `left_open`) for the final summary.
 
 **Checkpoint (post-merge).** The merge is the one irreversible step in the
-iteration, so record it immediately after `gh pr merge` returns — or after the
+iteration, so record it immediately after the merge block exits 0 — or after the
 mode gate declines to merge — with the *Step 1.0b* procedure:
 
 ```json

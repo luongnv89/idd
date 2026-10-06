@@ -2,8 +2,8 @@
   "headroom_bytes": 1024,
   "skills": {
     "auto-pilot": {
-      "budget": 411133,
-      "measured": 410708
+      "budget": 411636,
+      "measured": 411636
     },
     "init-gitissue": {
       "budget": 130846,

@@ -119,10 +119,19 @@ Whenever Step 2 would merge a PR (aggressive + `merge_partial: true`), run **Ste
 
 **Step 2b — Merge (only when aggressive + merge_partial: true and all three gates passed):** <!-- a:ap-step2b-merge -->
 
+Run it as **one** shell call (variables do not survive between calls),
+`{verified_head}` being the 40-hex SHA Step 5.1c bound. A non-zero exit is the
+merge-failed path below, `left_open`:
+
 ```bash
+verified_head="{verified_head}"
+read -r head_now base_ref <<<"$(gh pr view {pr_number} --json headRefOid,baseRefName --jq '"\(.headRefOid) \(.baseRefName)"')"
+behind_by="$(gh api "repos/{owner}/{repo}/compare/${base_ref}...${verified_head}" --jq .behind_by)"
 if [ -n "$verified_head" ] && [ "$head_now" = "$verified_head" ] && [ "$behind_by" = "0" ]; then
   gh pr merge {pr_number} --squash --delete-branch --match-head-commit "$verified_head"
-fi   # otherwise Step 5.1c is stale: no merge, outcome left_open
+else
+  echo "merge_identity=stale (head_now=$head_now behind_by=$behind_by)"; exit 1
+fi
 ```
 
 ```

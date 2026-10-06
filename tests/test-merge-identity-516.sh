@@ -135,6 +135,47 @@ for base in "$REPO_ROOT/src/skills" "$REPO_ROOT/skills"; do
   done
 done
 
+# M6c: each shipped merge block is self-contained. An agent's shell drops
+# variables between tool calls, so a guard that reads $verified_head/$head_now/
+# $behind_by bound in another block sees "" and silently skips the merge. The
+# fenced block holding the guard must bind all three itself and have an `else`
+# branch that exits non-zero, so a skipped merge is visible and never `merged`.
+# guarded_block FILE — print the fenced block that contains the guard line.
+guarded_block() {
+  GUARD_RE="$GUARD_RE" awk '
+    BEGIN { re = ENVIRON["GUARD_RE"] }
+    /^```/ { if (inb) { if (hit) { printf "%s", buf; exit } inb=0; buf="" } else { inb=1; hit=0; buf="" } next }
+    inb { buf = buf $0 "\n"; if ($0 ~ re) hit=1 }
+  ' "$1" 2>/dev/null || true
+}
+for base in "$REPO_ROOT/src/skills" "$REPO_ROOT/skills"; do
+  for rel in auto-pilot/references/phases/phase-5-merge.md \
+             auto-pilot/references/phases/phase-3-4-review.md \
+             issue-pr-review/references/report-templates.md; do
+    f="$base/$rel"
+    blk="$(guarded_block "$f")"
+    label="M6c (${f#$REPO_ROOT/}): the guarded merge block binds its own identity"
+    if [ -n "$blk" ] \
+       && printf '%s' "$blk" | grep -qE '^verified_head="' \
+       && printf '%s' "$blk" | grep -qE '^read -r head_now base_ref <<<' \
+       && printf '%s' "$blk" | grep -qE '^behind_by="\$\(gh api ' \
+       && printf '%s' "$blk" | grep -qE '^else$'; then
+      pass "$label"
+    else
+      fail "$label"
+    fi
+  done
+done
+for base in "$REPO_ROOT/src/skills" "$REPO_ROOT/skills"; do
+  for rel in auto-pilot/references/phases/phase-5-merge.md \
+             auto-pilot/references/phases/phase-3-4-review.md; do
+    f="$base/$rel"
+    blk="$(guarded_block "$f")"
+    check_block_has "$blk" 'echo "merge_identity=stale .*exit 1' \
+      "M6c (${f#$REPO_ROOT/}): a stale identity prints and exits non-zero"
+  done
+done
+
 # ───────────────────────────────────────────────────────────
 # M7: the partial-merge path and the critical-issue merge use the same gate.
 # ───────────────────────────────────────────────────────────
