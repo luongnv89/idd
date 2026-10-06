@@ -367,6 +367,9 @@ jobs:
       - name: test-behavior-test-contracts-521
         run: bash tests/test-behavior-test-contracts-521.sh
 
+      - name: test-state-scope-522
+        run: bash tests/test-state-scope-522.sh
+
       - name: test-followup-context-285
         run: bash tests/test-followup-context-285.sh
 

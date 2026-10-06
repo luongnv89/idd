@@ -124,7 +124,7 @@ print(json.dumps({
         "issue": 349,
         "title": "x" * 600,
         "branch": "refactor/349-decompose-gi-state-lock-paths",
-        "phase": "research",
+        "phase": "resolve",
     },
     "lanes": [{
         "issue": 349,
@@ -139,7 +139,7 @@ state="$(printf '%s' "$patch" | python3 "$STATE" --update --dir "$TMP" --pid $$)
 printf '%s' "$state" | python3 -c '
 import json, sys
 state = json.load(sys.stdin)
-assert state["current"]["phase"] == "research"
+assert state["current"]["phase"] == "resolve"
 assert state["lanes"][0]["phase"] == "planned"
 assert len(state["current"]["title"]) == 500
 assert len(state["lanes"][0]["title"]) == 500

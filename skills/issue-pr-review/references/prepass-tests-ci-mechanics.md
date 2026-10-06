@@ -8,24 +8,56 @@ Detect available lint/format/test tools from the project.
 
 **When `--review-only` is set:** run the detection-only variant of this step — see *Review-only mode* in SKILL.md for the exact contract.
 
-**Default (fix loop):** run each auto-fix command below. Capture output but don't block on warnings — only block on errors that prevent the fix from running.
+**Default (fix loop):** scope the auto-fix to the approved paths first (below), then run each auto-fix command in the table over that list only. Capture output but don't block on warnings — only block on errors that prevent the fix from running.
 
-| Tool type | Detection | Auto-fix command |
+### Approved paths — scope before any formatter runs <!-- a:rv-prepass-scope -->
+
+The checkout can hold work that is not the PR's: an operator's uncommitted edits, untracked scratch files, a previous step's leftovers. A tree-wide formatter rewrites them and `git add -A` would commit them into the PR. So the pre-pass formats and stages **approved paths** only: the files Step 1's `gh pr view … --json files` lists that exist on disk **and** were clean before the auto-fix ran. A PR file that was already dirty is skipped and reported, because its edits are not the PR's to commit.
+
+From the repo root, after `gh pr checkout` and **before** any formatter runs, record the baseline and the approved list. Paths stay NUL-delimited in files under `$scope` and never become shell words:
+
+```bash
+scope="$(mktemp -d)"
+gh pr view {N} --json files > "$scope/pr.json"
+{ git diff --name-only -z --no-renames HEAD; git diff --cached --name-only -z --no-renames; git ls-files -z --others --exclude-standard; } > "$scope/dirty-before"
+python3 - "$scope" <<'PY'
+import json, os, sys
+d = sys.argv[1]
+def nul(name):
+    with open(os.path.join(d, name), "rb") as fh:
+        return {p for p in fh.read().split(b"\0") if p}
+pr = {os.fsencode(f["path"]) for f in json.load(open(os.path.join(d, "pr.json")))["files"]}
+dirty = nul("dirty-before")
+approved = sorted(p for p in pr - dirty if os.path.isfile(p) and not os.path.islink(p))
+for p in sorted(pr & dirty):
+    print("⚠ pre-pass: skipping already-dirty PR file " + os.fsdecode(p), file=sys.stderr)
+with open(os.path.join(d, "approved"), "wb") as fh:
+    fh.write(b"".join(p + b"\0" for p in approved))
+with open(os.path.join(d, "approved-args"), "wb") as fh:
+    fh.write(b"".join(b"./" + p + b"\0" for p in approved))
+PY
+```
+
+`--cached` catches a staged change whose working copy matches `HEAD`, which `git add` would overwrite. `approved` holds repo-relative paths for git; `approved-args` holds the same paths prefixed `./`, so a file named `-x.js` reaches a formatter as a path, never as an option. A symlink is never approved: a formatter would rewrite its target, which can sit outside the PR. An empty `approved` means there is nothing to format: skip the formatters and the commit. If this block cannot run (no `python3`, a failed `gh` read), **skip the auto-fix and its commit** with `⚠ pre-pass: auto-fix skipped — approved paths unavailable`. Never fall back to a tree-wide formatter or `git add -A`.
+
+| Tool type | Detection | Auto-fix command (approved paths only) |
 |-----------|-----------|-----------------|
-| ESLint | `.eslintrc*` or `eslint` in package.json | `npx eslint --fix .` |
-| Prettier | `.prettierrc*` or `prettier` in package.json | `npx prettier --write .` |
-| Black | `pyproject.toml` with `[tool.black]` | `python -m black .` |
-| Ruff | `pyproject.toml` with `[tool.ruff]` or `ruff.toml` | `ruff check --fix . && ruff format .` |
-| isort | `pyproject.toml` with `[tool.isort]` | `python -m isort .` |
-| gofmt | `go.mod` | `gofmt -w .` |
-| rustfmt | `Cargo.toml` | `cargo fmt` |
-| clang-format | `.clang-format` | `find . -name '*.c' -o -name '*.h' \| xargs clang-format -i` |
+| ESLint | `.eslintrc*` or `eslint` in package.json | `grep -z -E '\.[cm]?[jt]sx?$' "$scope/approved-args" \| xargs -0 -r npx eslint --fix` |
+| Prettier | `.prettierrc*` or `prettier` in package.json | `xargs -0 -r npx prettier --write --ignore-unknown < "$scope/approved-args"` |
+| Black | `pyproject.toml` with `[tool.black]` | `grep -z -E '\.pyi?$' "$scope/approved-args" \| xargs -0 -r python -m black` |
+| Ruff | `pyproject.toml` with `[tool.ruff]` or `ruff.toml` | `grep -z -E '\.pyi?$' "$scope/approved-args" \| xargs -0 -r ruff check --fix`, then the same pipe into `xargs -0 -r ruff format` |
+| isort | `pyproject.toml` with `[tool.isort]` | `grep -z -E '\.pyi?$' "$scope/approved-args" \| xargs -0 -r python -m isort` |
+| gofmt | `go.mod` | `grep -z -E '\.go$' "$scope/approved-args" \| xargs -0 -r gofmt -w` |
+| rustfmt | `Cargo.toml` | `grep -z -E '\.rs$' "$scope/approved-args" \| xargs -0 -r rustfmt` |
+| clang-format | `.clang-format` | `grep -z -E '\.[ch]$' "$scope/approved-args" \| xargs -0 -r clang-format -i` |
 
 ```bash
 # Example for a Node.js project:
-npx eslint --fix . 2>&1
-npx prettier --write . 2>&1
+grep -z -E '\.[cm]?[jt]sx?$' "$scope/approved-args" | xargs -0 -r npx eslint --fix 2>&1
+xargs -0 -r npx prettier --write --ignore-unknown < "$scope/approved-args" 2>&1
 ```
+
+`rustfmt` follows out-of-line `mod` declarations into other files. Such a spill-over lands outside `approved`, so the staging step below reports it and never stages it.
 
 Then run the project's test suite to catch failures early (before the LLM review):
 
@@ -36,13 +68,41 @@ npm test          # or pytest, go test ./..., cargo test, etc.
 
 ### Commit auto-fixes
 
-**Not used in `--review-only`.** Run the pre-commit security scan first, binding
-`base` **first** and in the same shell as the scan:
+**Not used in `--review-only`.** Stage the auto-fix's own changes first: the
+approved paths that are dirty now. Each was clean at the baseline, so a change on
+one is the formatter's. Any other path that changed since the baseline is
+spill-over: report it and leave it unstaged and untouched. Paths dirty at the
+baseline are not reported here either; they were never this step's.
+
+```bash
+{ git diff --name-only -z --no-renames HEAD; git diff --cached --name-only -z --no-renames; git ls-files -z --others --exclude-standard; } > "$scope/dirty-after"
+python3 - "$scope" <<'PY'
+import os, sys
+d = sys.argv[1]
+def nul(name):
+    with open(os.path.join(d, name), "rb") as fh:
+        return {p for p in fh.read().split(b"\0") if p}
+approved, before, after = nul("approved"), nul("dirty-before"), nul("dirty-after")
+for p in sorted(after - before - approved):
+    print("⚠ pre-pass: out-of-scope change left unstaged: " + os.fsdecode(p), file=sys.stderr)
+with open(os.path.join(d, "stage"), "wb") as fh:
+    fh.write(b"".join(p + b"\0" for p in sorted(approved & after)))
+PY
+[ -s "$scope/stage" ] && git --literal-pathspecs add --pathspec-from-file="$scope/stage" --pathspec-file-nul
+```
+
+An empty `stage` means the auto-fix changed nothing in scope: skip the scan and
+the commit. Otherwise run the pre-commit security scan over the staged set,
+binding `base` **first** and in the same shell as the scan:
 
 ```bash
 base="$(gh repo view --json defaultBranchRef --jq .defaultBranchRef.name)"
-python3 references/scripts/gi-secscan.py --working-tree --policy-ref "origin/${base}"
+python3 references/scripts/gi-secscan.py --staged --policy-ref "origin/${base}"
 ```
+
+`--staged` reads the index blobs, which are the bytes the commit writes. If the
+index already held unrelated staged entries, the scan covers them too: a
+superset, so it can over-block but never under-scan.
 
 The order is the gate: with `base` unset the ref expands to `origin/`, which does
 not resolve, so the script exits 4 and this gate degrades to the prose Primary
@@ -85,7 +145,9 @@ warning, not a hard stop — `--policy-ref` already denies it any effect on this
 scan, and legitimate config PRs must stay mergeable.
 
 The exit contract (summarized in SKILL.md *Step 2 — Commit auto-fixes*) is not
-optional: **exit 1 is a block** — stop, do not commit, report the path from
+optional: **exit 1 is a block** — stop, do not commit, unstage the auto-fix with
+`git --literal-pathspecs restore --staged --pathspec-from-file="$scope/stage" --pathspec-file-nul`
+(the index only; the files on disk keep the fix), report the path from
 `blocking[]`, never fall through to another scan. **Exit 3 is also a stop**, not
 a degrade: an uncompilable `security.*` regex means the repo's own rules were
 never applied, and a misconfigured scan has not run, so its silence is not a
@@ -96,10 +158,15 @@ accepted — see the scan contract in SKILL.md), commit and push:
 
 ```bash
 # Gated above by references/scripts/gi-secscan.py (see pre-commit-security.md).
-git add -A
-git commit -m "style: auto-fix lint and format issues"
+# --only + the stage list: a pre-existing unrelated staged entry stays staged, uncommitted.
+git --literal-pathspecs commit --only --pathspec-from-file="$scope/stage" --pathspec-file-nul \
+  -m "style: auto-fix lint and format issues"
 git push origin "$branch_name"   # bound in SKILL.md Step 1; never a literal ref name
+rm -rf "$scope"
 ```
+
+Never stage with `git add -A`, `git add .` or `git commit -a`: each would sweep
+the unrelated dirty and untracked files this step exists to preserve.
 
 ## Step 4 — Build-system detection
 

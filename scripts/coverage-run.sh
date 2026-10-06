@@ -75,6 +75,12 @@ mkdir -p "$TMP/state"
 printf '%s' '{"run_id":"cov-run-0001","mode":"balanced","invocation":"/auto-pilot","queue":[333],"limit":1}' | \
   run "$SCRIPTS/gi-state.py" --init --dir "$TMP/state"
 run "$SCRIPTS/gi-state.py" --read --dir "$TMP/state"
+# A legal review checkpoint, then an illegal edge and an evidence-free lane (#522).
+printf '%s' '{"phase":"review","current":{"issue":333,"branch":"fix/333-a","pr":9,"phase":"review"}}' | \
+  run "$SCRIPTS/gi-state.py" --update --dir "$TMP/state"
+printf '%s' '{"phase":"init"}' | run "$SCRIPTS/gi-state.py" --update --dir "$TMP/state"
+printf '%s' '{"lanes":[{"issue":334,"phase":"planned"}]}' | \
+  run "$SCRIPTS/gi-state.py" --update --dir "$TMP/state"
 printf '%s' '{"run_id":"cov-run-0001","markdown":"## done"}' | \
   run "$SCRIPTS/gi-state.py" --report --dir "$TMP/state"
 
