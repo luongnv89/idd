@@ -23,18 +23,21 @@ plan, writing rebuttals — stays with the agent.
                      case-insensitive — the labels Step 0d already honours
     ci-workflow      .github/workflows/**, .github/actions/**,
                      .gitlab-ci.yml / .yaml, .circleci/**, Jenkinsfile,
-                     azure-pipelines.yml / .yaml
+                     azure-pipelines.yml, .travis.yml,
+                     bitbucket-pipelines.yml, .drone.yml (each also .yaml)
     secrets          .env / .env.*, *.pem, *.key, *.p12, *.pfx, id_rsa*,
                      id_ed25519*, or a path word starting secret / credential
     auth             a path word starting: auth, login, logout, signin,
                      signon, passw, passwd, oauth, session, token, perm, acl,
-                     rbac, sso, saml, jwt, crypt, csrf, otp, mfa
+                     rbac, sso, saml, jwt, crypt, csrf, otp, mfa, secur,
+                     polic, guard, role
 
   Path words split on every non-alphanumeric character and on letter/digit
   boundaries, taken both with and without a camelCase split (AuthService →
   auth service authservice, LogIn → log in login, oauth2 → oauth 2), then
   match by prefix. That over-matches on purpose — `author`,
-  `tokenizer`, `permalink` trigger too: the gate fails closed.
+  `tokenizer`, `permalink`, `guardrail`, `policyholder` trigger
+  too: the gate fails closed.
     access-policy    CODEOWNERS, SECURITY.md, .github/dependabot.yml / .yaml
     security-config  .gitissue.yml, .pre-commit-config.yaml, .gitleaks.toml,
                      or a file whose name contains `secscan`
@@ -105,12 +108,14 @@ LABEL_WORDS = ("security", "cve", "vulnerability")
 AUTH_STEMS = (
     "auth", "login", "logout", "signin", "signon", "passw", "passwd", "oauth",
     "session", "token", "perm", "acl", "rbac", "sso", "saml", "jwt", "crypt",
-    "csrf", "otp", "mfa",
+    "csrf", "otp", "mfa", "secur", "polic", "guard", "role",
 )
 SECRET_STEMS = ("secret", "credential")
 SECRET_SUFFIXES = (".pem", ".key", ".p12", ".pfx")
 CI_FILES = frozenset({
     ".gitlab-ci.yml", ".gitlab-ci.yaml", "Jenkinsfile", "azure-pipelines.yml", "azure-pipelines.yaml",
+    ".travis.yml", ".travis.yaml", "bitbucket-pipelines.yml", "bitbucket-pipelines.yaml",
+    ".drone.yml", ".drone.yaml",
 })
 CI_DIRS = (".github/workflows/", ".github/actions/")
 POLICY_FILES = frozenset({"CODEOWNERS", "SECURITY.md"})

@@ -91,6 +91,15 @@ for pair in \
   "src/OAuth2Client.java:auth" \
   "azure-pipelines.yaml:ci-workflow" \
   ".github/dependabot.yaml:access-policy" \
+  "SecurityConfig.java:auth" \
+  "LogIn.tsx:auth" \
+  "AuthService.ts:auth" \
+  "config/packages/security.yaml:auth" \
+  "app/security/filters.py:auth" \
+  "app/Policies/PostPolicy.php:auth" \
+  "src/roles.guard.ts:auth" \
+  ".travis.yml:ci-workflow" \
+  "bitbucket-pipelines.yml:ci-workflow" \
   ".env.production:secrets" \
   "deploy/server.pem:secrets" \
   "config/credentials.yml:secrets" \

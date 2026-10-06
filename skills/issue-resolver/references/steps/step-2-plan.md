@@ -152,7 +152,8 @@ Exit 3 means you built a malformed record — fix it and re-run. No `python3`, e
 or 4: print `⚠ gi-sensitive unavailable — classifying by hand` and apply the classes
 in the script's docstring yourself (a `security`/`CVE`/`vulnerability` label; CI
 workflows and actions; secrets and `.env*` files; auth/login/password/session/
-permission/token paths, camelCase and prefixes included;
+permission/token/security/policy/guard/role paths, camelCase and prefixes
+included;
 `CODEOWNERS`/`SECURITY.md`; `.gitissue.yml`/pre-commit/secret-scan config). **Fail
 closed:** a classifier that could not run never means "not sensitive" — any doubt
 triggers the gate.
