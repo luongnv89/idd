@@ -139,6 +139,7 @@ marker is filled, never otherwise. The record on stdin mirrors the marker:
 | `cycles` | the marker's `cycles=` |
 | `review` | `clean` (the script refuses anything else) |
 | `tests` | `{"count": <test_count>, "sha": "<tests_sha>", "command": "<the suite command that ran>"}`: exactly the marker's `tests=` plus its command. `null` whenever the marker omits `tests=`. |
+| `ui` | the marker's `ui=` value, character for character, e.g. `code:clean@<sha40>` or `none:clean` |
 | `artifacts` | optional paths to saved evidence, such as the final suite's log. Each is digested. |
 
 The script records what it measures itself, never what the record claims: the

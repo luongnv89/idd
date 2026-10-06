@@ -120,8 +120,9 @@ mkrepo() {  # mkrepo DIR — a repo with one commit; prints nothing
 R="$TMP/repo"
 mkrepo "$R"
 HEAD_SHA="$(git -C "$R" rev-parse HEAD)"
-record() {  # record TESTS_SHA [COUNT] — a valid stdin record
-  printf '{"tool":"issue-resolver","profile":"full","cycles":2,"review":"clean","tests":{"count":%s,"sha":"%s","command":"bash tests/run.sh"}}' "${2:-17}" "$1"
+record() {  # record TESTS_SHA [COUNT] [UI-JSON] [PROFILE] — a valid stdin record
+  printf '{"tool":"issue-resolver","profile":"%s","cycles":2,"review":"clean","ui":%s,"tests":{"count":%s,"sha":"%s","command":"bash tests/run.sh"}}' \
+    "${4:-full}" "${3:-null}" "${2:-17}" "$1"
 }
 write() { (cd "$1" && python3 "$SCRIPT" --write); }
 verify() { (cd "$1" && python3 "$SCRIPT" --verify "$2"); }
@@ -251,7 +252,7 @@ marker_field() {  # marker_field MARKER KEY — the value of one whole key=value
   return 1
 }
 qa_verdict() {
-  local body="$1" head_ref="$2" repo="$3" m head review tests v
+  local body="$1" head_ref="$2" repo="$3" m head review tests profile ui v
   m="$(printf '%s\n' "$body" | grep -oE "$PARSE_RE" || true)"
   [ -n "$m" ] || { echo absent; return; }
   [ "$(printf '%s\n' "$m" | grep -c .)" = "1" ] || { echo stale; return; }
@@ -259,11 +260,15 @@ qa_verdict() {
   head="$(marker_field "$m" head || true)"
   review="$(marker_field "$m" review || true)"
   tests="$(marker_field "$m" tests || echo null)"
+  profile="$(marker_field "$m" profile || echo null)"
+  ui="$(marker_field "$m" ui || echo null)"
   printf '%s' "$head" | grep -qE '^[0-9a-f]{40}$' || { echo stale; return; }
   [ "$review" = "clean" ] && [ "$head" = "$head_ref" ] || { echo stale; return; }
   v="$(cd "$repo" && python3 "$SCRIPT" --verify "$head" 2>/dev/null)" || { echo stale; return; }
   [ "$(json_get "$v" verified)" = "true" ] || { echo stale; return; }
   [ "$(json_get "$v" tests)" = "$tests" ] || { echo stale; return; }
+  [ "$(json_get "$v" profile)" = "$profile" ] || { echo stale; return; }
+  [ "$(json_get "$v" ui)" = "$ui" ] || { echo stale; return; }
   echo trusted
 }
 tests_skip() {  # tests_skip VERDICT MARKER HEAD CI_LEG_RUNNABLE — yes | no
@@ -305,7 +310,7 @@ verdict="$(qa_verdict "$BODY" "$FHEAD" "$F")"
 check "R11.3 (AC1): forged marker + unrelated green CI skips no test run" "$?"
 
 # Non-vacuity: the same predicate DOES trust a marker its receipt backs.
-record "$FHEAD" 128 | write "$F" >/dev/null
+record "$FHEAD" 128 "\"code:clean@$FHEAD\"" | write "$F" >/dev/null
 verdict="$(qa_verdict "$BODY" "$FHEAD" "$F")"
 [ "$verdict" = "trusted" ]; check "R11.4: (vacuity guard) with a matching receipt the same marker is trusted" "$?"
 [ "$(tests_skip "$verdict" "$FORGED" "$FHEAD" "$CI_LEG_RUNNABLE")" = "yes" ]
@@ -314,6 +319,13 @@ check "R11.5: (vacuity guard) and only then is the duplicate test run skipped" "
 INFLATED="$(render "$FHEAD" 999)"
 [ "$(qa_verdict "${BODY/$FORGED/$INFLATED}" "$FHEAD" "$F")" = "stale" ]
 check "R11.6: a marker whose tests= the receipt does not back is stale" "$?"
+# Nor to a forged depth claim or UI leg — both drive skips of their own.
+LIGHT="${FORGED/profile=full/profile=light}"
+[ "$(qa_verdict "${BODY/$FORGED/$LIGHT}" "$FHEAD" "$F")" = "stale" ]
+check "R11.6b: a marker whose profile= the receipt does not back is stale" "$?"
+UIB="${FORGED/ui=code:clean/ui=code+browser:clean}"
+[ "$(qa_verdict "${BODY/$FORGED/$UIB}" "$FHEAD" "$F")" = "stale" ]
+check "R11.6c: a marker whose ui= the receipt does not back is stale" "$?"
 # A receipt for an older commit does not cover a newer head.
 echo more >> "$F/a.txt"
 git -C "$F" commit -q -am "after the receipt"
@@ -343,8 +355,8 @@ for pair in "src:$SRC_PR_PKG" "built:$BUILT_PR_PKG"; do
     "R12.4 ($tag): no degrade path can produce trusted"
   anchor_check "$pkg" rv-receipt-gate 'without a receipt, skips nothing' \
     "R12.5 ($tag): a marker plus green CI without a receipt skips nothing"
-  anchor_check "$pkg" rv-receipt-gate "receipt's .tests. equals the marker's .tests=." \
-    "R12.6 ($tag): the receipt must agree with the marker's tests="
+  anchor_check "$pkg" rv-receipt-gate "receipt's .profile., .tests. and .ui. equal the marker's .profile=., .tests=. and .ui=." \
+    "R12.6 ($tag): the receipt must agree with the marker's profile=, tests= and ui="
   anchor_check_flat "$pkg" rvm-verify-receipt 'Re-evaluation never re-reads the store' \
     "R12.7 ($tag): re-evaluation after a push never re-reads the store"
   anchor_check_flat "$pkg" rvm-verify-receipt 'not cryptographic authentication' \

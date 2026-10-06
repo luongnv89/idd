@@ -120,7 +120,9 @@ Whenever Step 2 would merge a PR (aggressive + `merge_partial: true`), run **Ste
 **Step 2b — Merge (only when aggressive + merge_partial: true and all three gates passed):** <!-- a:ap-step2b-merge -->
 
 ```bash
-gh pr merge {pr_number} --squash --delete-branch --match-head-commit "$verified_head"
+if [ -n "$verified_head" ] && [ "$head_now" = "$verified_head" ] && [ "$behind_by" = "0" ]; then
+  gh pr merge {pr_number} --squash --delete-branch --match-head-commit "$verified_head"
+fi   # otherwise Step 5.1c is stale: no merge, outcome left_open
 ```
 
 ```

@@ -288,8 +288,11 @@ merge identity check, then merge with the expected-head guard (issue #516):
 verified_head="{ci_sha}"   # Step 5's ci_sha; with none, the headRefOid the final review cycle read
 read -r head_now base_ref <<<"$(gh pr view {N} --json headRefOid,baseRefName --jq '"\(.headRefOid) \(.baseRefName)"')"
 behind_by="$(gh api "repos/{owner}/{repo}/compare/${base_ref}...${verified_head}" --jq .behind_by)"
-# merge only when "$head_now" = "$verified_head" and "$behind_by" = 0
-gh pr merge {N} --squash --delete-branch --match-head-commit "$verified_head"
+if [ -n "$verified_head" ] && [ "$head_now" = "$verified_head" ] && [ "$behind_by" = "0" ]; then
+  gh pr merge {N} --squash --delete-branch --match-head-commit "$verified_head"
+else
+  echo "BLOCKED (stale merge authorization)"   # never merged; report it and stop
+fi
 ```
 
 The check is the subset of `/auto-pilot`'s *Step 5.1c — Merge identity gate*

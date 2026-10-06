@@ -344,10 +344,12 @@ suite's count, SHA and command, and artifact digests.
    any non-zero exit, and no `python3` all mean **no receipt** ⇒ `stale`. No
    prose procedure may stand in for the script and produce `trusted`. The
    degrade costs a full pipeline, never a skip.
-3. **The receipt must agree with the marker.** Its `tests` (`<count>@<sha40>`,
-   or `null`) must equal the marker's `tests=` value, both absent counting as
-   equal. A marker whose `tests=` the receipt does not back is `stale`, so a
-   real receipt cannot lend trust to a forged count.
+3. **The receipt must agree with the marker.** Every marker field that
+   drives a skip must equal what the receipt recorded: `profile=` (the
+   collapse and cap carve-out), `tests=` (`<count>@<sha40>`, or `null`) and
+   `ui=` (the code UI review skip). Absent on both sides counts as equal. A
+   marker field the receipt does not back makes the marker `stale`, so a real
+   receipt never lends trust to a forged `profile=`, count or UI leg.
 4. **Re-evaluation never re-reads the store.** After a push the marker's
    `head=` no longer matches the new head, so the verdict can only become
    `stale` (*Re-evaluation after a push*). A receipt that PR code wrote during

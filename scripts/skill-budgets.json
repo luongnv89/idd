@@ -3,7 +3,7 @@
   "skills": {
     "auto-pilot": {
       "budget": 411133,
-      "measured": 410375
+      "measured": 410708
     },
     "init-gitissue": {
       "budget": 130846,
@@ -19,11 +19,11 @@
     },
     "issue-pr-review": {
       "budget": 266226,
-      "measured": 265202
+      "measured": 265527
     },
     "issue-resolver": {
       "budget": 362358,
-      "measured": 361334
+      "measured": 361471
     },
     "issue-triage": {
       "budget": 131873,

@@ -314,7 +314,7 @@ Copy that line out of the template **character-for-character** and substitute **
 
 ### Revision receipt <!-- a:rs-revision-receipt -->
 
-The marker alone is not evidence, because whoever opened the PR can write it. **Whenever the marker is filled**, record its receipt while `HEAD` is still the marker's `head=` and `git status --porcelain=v1 --untracked-files=all` is empty. Without a receipt, `/issue-pr-review` reads the marker as `stale`. The JSON record carries `profile`, `cycles`, `review: "clean"`, and `tests`: the `tests=` count and SHA plus the command that ran, or `null` when the marker omits `tests=` (*Revision receipt* in `references/report-templates.md`). The script prints the `sha` it recorded, which must equal the marker's `head=`.
+The marker alone is not evidence, because whoever opened the PR can write it. **Whenever the marker is filled**, record its receipt while `HEAD` is still the marker's `head=` and `git status --porcelain=v1 --untracked-files=all` is empty. Without a receipt, `/issue-pr-review` reads the marker as `stale`. The JSON record carries `profile`, `cycles`, `review: "clean"`, `ui` (the marker's `ui=` value), and `tests`: the `tests=` count and SHA plus the command that ran, or `null` when the marker omits `tests=` (*Revision receipt* in `references/report-templates.md`). The script prints the `sha` it recorded, which must equal the marker's `head=`.
 
 ```bash
 printf '%s' "$receipt_json" | python3 shared/scripts/gi-receipt.py --write

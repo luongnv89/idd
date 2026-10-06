@@ -30,6 +30,7 @@ The store
        "cycles": <int >= 0>, "review": "clean",
        "tests": {"count": <int >= 0>, "sha": "<sha40>", "command": "<str>"}
                 | null,                                  (optional)
+       "ui": "<the marker's ui= value>" | null,          (optional)
        "artifacts": ["<path>", ...]}                     (optional)
 
   and adds what it measures itself, never what the caller claims:
@@ -43,10 +44,11 @@ The store
   is not evidence about this commit. Prints {"written": true, "sha", "path"}.
 
 --verify SHA40 (reviewer)
-  Prints {"verified": true | false, "reason", "sha", "path", "tests",
-  "receipt"}. `tests` is the receipt's "<count>@<sha40>" (null when the
-  resolver recorded no suite), so a caller compares it with the marker's
-  `tests=` as a string. `verified` is true only when the file is a regular
+  Prints {"verified": true | false, "reason", "sha", "path", "profile",
+  "tests", "ui", "receipt"}. `tests` is the receipt's "<count>@<sha40>" (null
+  when the resolver recorded no suite); `profile` and `ui` are the recorded
+  values. A caller compares each with the marker's `profile=`, `tests=` and
+  `ui=` as strings, so a real receipt never backs a field it did not record. `verified` is true only when the file is a regular
   file (not a symlink) that parses, carries schema 1, names this SHA, records
   a clean tree and `review: clean`, was written by this user on this host, and
   every artifact that still exists still has its recorded digest. Anything
@@ -165,6 +167,9 @@ def validate_record(record) -> dict:
         if not isinstance(command, str) or not command.strip():
             raise InvalidInput("tests.command must be a non-empty string")
         tests = {"count": tests["count"], "sha": tests["sha"], "command": command}
+    ui = record.get("ui")
+    if ui is not None and (not isinstance(ui, str) or not ui.strip() or any(c.isspace() for c in ui)):
+        raise InvalidInput("ui must be the marker's ui= value (no spaces) or null")
     artifacts = record.get("artifacts", [])
     if not isinstance(artifacts, list) or not all(
         isinstance(a, str) and a for a in artifacts
@@ -179,6 +184,7 @@ def validate_record(record) -> dict:
         "cycles": record["cycles"],
         "review": "clean",
         "tests": tests,
+        "ui": ui,
         "artifacts": artifacts,
     }
 
@@ -204,6 +210,11 @@ def write(stdin_text: str) -> dict:
                 f"tests.sha {tests['sha']} is not HEAD or an ancestor of it"
             ) from exc
 
+    try:
+        digests = [_digest(p) for p in fields["artifacts"]]
+    except OSError as exc:
+        raise CannotComplete(f"could not read an artifact: {exc}") from exc
+
     receipt = {
         "schema": SCHEMA,
         "sha": sha,
@@ -213,8 +224,9 @@ def write(stdin_text: str) -> dict:
         "cycles": fields["cycles"],
         "review": "clean",
         "tests": tests,
+        "ui": fields["ui"],
         "executor": executor(),
-        "artifacts": [_digest(p) for p in fields["artifacts"]],
+        "artifacts": digests,
         "written_at": _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
 
@@ -241,7 +253,7 @@ def write(stdin_text: str) -> dict:
 
 def _refuse(sha: str, path: str | None, reason: str) -> dict:
     return {"verified": False, "reason": reason, "sha": sha, "path": path,
-            "tests": None, "receipt": None}
+            "profile": None, "tests": None, "ui": None, "receipt": None}
 
 
 def verify(sha: str) -> dict:
@@ -297,6 +309,10 @@ def verify(sha: str) -> dict:
             return _refuse(sha, path, "malformed tests record")
         tests_text = f"{tests['count']}@{tests['sha']}"
 
+    ui = receipt.get("ui")
+    if ui is not None and not isinstance(ui, str):
+        return _refuse(sha, path, "malformed ui record")
+
     artifacts = receipt.get("artifacts")
     if not isinstance(artifacts, list):
         return _refuse(sha, path, "malformed artifacts")
@@ -313,7 +329,8 @@ def verify(sha: str) -> dict:
                 return _refuse(sha, path, f"artifact changed since the receipt: {art['path']}")
 
     return {"verified": True, "reason": "ok", "sha": sha, "path": path,
-            "tests": tests_text, "receipt": receipt}
+            "profile": receipt["profile"], "tests": tests_text, "ui": ui,
+            "receipt": receipt}
 
 
 def main(argv: list[str] | None = None) -> int:

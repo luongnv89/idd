@@ -119,6 +119,22 @@ for root in "$REPO_ROOT/src/skills" "$REPO_ROOT/skills" "$REPO_ROOT/docs/platfor
   fi
 done
 
+# M6b: the shipped merge snippets execute the predicate — a comment in front of
+# an unconditional merge would merge onto a moved base when run verbatim.
+GUARD_RE='^ *if \[ -n "\$verified_head" \] && \[ "\$head_now" = "\$verified_head" \] && \[ "\$behind_by" = "0" \]; then$'
+for base in "$REPO_ROOT/src/skills" "$REPO_ROOT/skills"; do
+  for rel in auto-pilot/references/phases/phase-5-merge.md \
+             auto-pilot/references/phases/phase-3-4-review.md \
+             issue-pr-review/references/report-templates.md; do
+    f="$base/$rel"
+    if grep -A1 -E "$GUARD_RE" "$f" 2>/dev/null | grep -qE 'gh pr merge \{[^}]*\} --squash'; then
+      pass "M6b (${f#$REPO_ROOT/}): the merge runs inside the identity predicate"
+    else
+      fail "M6b (${f#$REPO_ROOT/}): the merge is not guarded by an executable predicate"
+    fi
+  done
+done
+
 # ───────────────────────────────────────────────────────────
 # M7: the partial-merge path and the critical-issue merge use the same gate.
 # ───────────────────────────────────────────────────────────

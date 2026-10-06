@@ -350,7 +350,9 @@ If the mode allows merge (`balanced` or `aggressive`), and only on a `fresh`
 SHA that step bound. GitHub refuses the merge if the head no longer matches it:
 
 ```bash
-gh pr merge {pr_number} --squash --delete-branch --match-head-commit "$verified_head"
+if [ -n "$verified_head" ] && [ "$head_now" = "$verified_head" ] && [ "$behind_by" = "0" ]; then
+  gh pr merge {pr_number} --squash --delete-branch --match-head-commit "$verified_head"
+fi   # otherwise merge_identity is stale: no merge, outcome left_open
 ```
 
 ```
