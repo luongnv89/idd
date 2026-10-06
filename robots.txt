@@ -1,4 +1,4 @@
-# issuedev / gitissue
+# IDD Stack
 # https://luongnv.com/idd/
 
 User-agent: *

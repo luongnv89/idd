@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="t">
-  <title id="t">IDD</title>
+  <title id="t">IDD Stack</title>
   <!-- Canonical mark (source of truth): precision hash + issue dot -->
   <g id="mark" fill="#00FF41">
     <!-- hash: one union outline (2 rails + 2 slanted verticals), centre cell as a hole -->
