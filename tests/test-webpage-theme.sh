@@ -114,7 +114,7 @@ for path in sys.argv[1:]:
     spec = PAGES[name]
     src = io.open(path, encoding='utf-8').read()
     css = css_of(src)
-    out = {'t1': [], 't2': [], 't3': [], 't4': [], 't6': []}
+    out = {'t1': [], 't2': [], 't3': [], 't4': [], 't6': [], 't7': []}
 
     # T1 — one attributed init script, in <head>, before any styling
     if src.count('id="theme-init"') != 1:
@@ -207,11 +207,34 @@ for path in sys.argv[1:]:
         elif not re.search(r'(^|[;\s])color\s*:', surf.group(1)):
             out['t6'].append('dark-surface rule lacks color: — inherited text goes light-on-dark')
 
+        selection = rule_body(css, 'html[data-theme="light"] ::selection') or ''
+        selection_props = dict(re.findall(r'([\w-]+)\s*:\s*([^;]+);', selection))
+        for surface in ('.terminal', '.install-box', '.shot', '.shots-nav'):
+            surface_rule = re.search(r'html\[data-theme="light"\]\s*' + re.escape(surface)
+                                     + r'\s*(?:,[^{}]*)?\{([^}]*)\}', css)
+            if not surface_rule:
+                out['t7'].append('missing dark-surface palette for %s' % surface)
+                continue
+            palette = dict(light_tok, **tokens_of(surface_rule.group(1)))
+            colours = []
+            for prop in ('color', 'background'):
+                value = selection_props.get(prop, '')
+                value = re.sub(r'var\((--[\w-]+)\)', lambda m: palette.get(m.group(1), ''), value)
+                if not re.fullmatch(r'#[0-9a-fA-F]{3}(?:[0-9a-fA-F]{3})?', value):
+                    out['t7'].append('%s selection %s is not a resolved hex colour: %r'
+                                     % (surface, prop, value))
+                else:
+                    colours.append(value)
+            if len(colours) == 2:
+                ratio = contrast(*colours)
+                if ratio < 4.5:
+                    out['t7'].append('%s selection contrast = %.2f:1 < 4.5' % (surface, ratio))
+
     results[name] = out
 
 had_fail = False
 for name in PAGES:
-    checks = ('t1', 't2', 't3', 't4') + (('t6',) if name == 'landing.html' else ())
+    checks = ('t1', 't2', 't3', 't4') + (('t6', 't7') if name == 'landing.html' else ())
     for t in checks:
         probs = results[name][t]
         if probs:
@@ -224,9 +247,9 @@ for name in PAGES:
 sys.exit(1 if had_fail else 0)
 PY
 then
-  pass "T1–T4+T6: init script placement, single light rule, contrast, toggle control, dark-surface colour"
+  pass "T1–T4+T6–T7: init, light palette, toggle, dark-surface text and selection contrast"
 else
-  fail "T1–T4+T6: theme structure/palette violations (see above)"
+  fail "T1–T4+T6–T7: theme structure/palette violations (see above)"
 fi
 
 # ── T5: theme-init behaviour in a node DOM shim ──

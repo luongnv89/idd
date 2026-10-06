@@ -243,6 +243,146 @@ else
   fail "T14: hero terminal animation requirements unmet"
 fi
 
+if ! command -v node >/dev/null 2>&1; then
+  fail "T14 behavior: node is required to exercise the hero loop"
+elif node - "$LANDING" <<'JS'
+const assert = require('assert');
+const fs = require('fs');
+const vm = require('vm');
+const src = fs.readFileSync(process.argv[2], 'utf8');
+const hero = src.match(/\(function \(\) \{\s*var term = document\.getElementById\('hero-term'\);[\s\S]*?\}\(\)\);/);
+assert(hero, 'hero animation script missing');
+
+class Element {
+  constructor() {
+    this.children = [];
+    this.parentNode = null;
+    this.style = {};
+    this.attrs = {};
+    this.listeners = {};
+    this.classes = new Set();
+    this.classList = {
+      add: c => this.classes.add(c),
+      remove: c => this.classes.delete(c),
+      toggle: (c, on) => on ? this.classes.add(c) : this.classes.delete(c)
+    };
+    this.clears = 0;
+    this.text = '';
+    this.clientWidth = 600;
+    this.offsetHeight = 600;
+  }
+  appendChild(el) { el.parentNode = this; this.children.push(el); }
+  removeChild(el) {
+    this.children.splice(this.children.indexOf(el), 1);
+    el.parentNode = null;
+  }
+  set textContent(text) {
+    this.children.forEach(el => { el.parentNode = null; });
+    this.children = [];
+    this.text = text;
+    if (text === '') { this.clears++; }
+  }
+  get textContent() { return this.text + this.children.map(el => el.textContent).join(''); }
+  setAttribute(k, v) { this.attrs[k] = v; }
+  getAttribute(k) { return this.attrs[k]; }
+  addEventListener(k, fn) { this.listeners[k] = fn; }
+}
+
+const body = new Element();
+const term = new Element();
+const button = new Element();
+term.appendChild(body);
+term.querySelector = () => body;
+term.querySelectorAll = () => [];
+const document = {
+  hidden: false,
+  listeners: {},
+  getElementById: id => id === 'hero-term' ? term : button,
+  createElement: () => new Element(),
+  addEventListener(k, fn) { this.listeners[k] = fn; }
+};
+let now = 0;
+let nextId = 0;
+const timers = new Map();
+let intersection;
+const sandbox = {
+  document,
+  IntersectionObserver: function (callback) { intersection = callback; this.observe = () => {}; },
+  matchMedia: () => ({ matches: false }),
+  getComputedStyle: () => ({ lineHeight: '20px', paddingTop: '0px', paddingBottom: '0px' }),
+  setTimeout(fn, delay) { const id = ++nextId; timers.set(id, { fn, at: now + delay }); return id; },
+  clearTimeout(id) { timers.delete(id); }
+};
+vm.runInNewContext(hero[0], sandbox);
+
+function advance(ms) {
+  const end = now + ms;
+  for (let n = 0; n < 10000; n++) {
+    const next = [...timers].sort((a, b) => a[1].at - b[1].at)[0];
+    if (!next || next[1].at > end) { now = end; return; }
+    now = next[1].at;
+    timers.delete(next[0]);
+    next[1].fn();
+  }
+  assert.fail('hero timers did not settle');
+}
+function until(check, label) {
+  for (let n = 0; n < 1000 && !check(); n++) { advance(100); }
+  assert(check(), label);
+}
+function visible() {
+  assert(body.children.some(el => el.className === 'ln' && el.parentNode === body && el.textContent.trim()),
+    'hero has no attached non-empty line');
+  assert(!body.classes.has('fading'), 'hero text is still fading out');
+}
+
+for (let loop = 1; loop <= 3; loop++) {
+  until(() => body.textContent.includes('/issue-creator'), `loop ${loop} never renders its command`);
+  visible();
+  intersection([{ isIntersecting: false }]);
+  const offscreenText = body.textContent;
+  document.hidden = true;
+  document.listeners.visibilitychange();
+  document.hidden = false;
+  document.listeners.visibilitychange();
+  advance(10000);
+  assert.equal(body.textContent, offscreenText, 'visible tab resumed an offscreen hero');
+  assert.equal(timers.size, 0, 'offscreen hero kept a pending timer');
+  document.hidden = true;
+  document.listeners.visibilitychange();
+  intersection([{ isIntersecting: true }]);
+  assert.equal(timers.size, 0, 'intersection resumed a hidden-tab hero');
+  document.hidden = false;
+  document.listeners.visibilitychange();
+  assert.equal(timers.size, 1, 'visible intersecting hero did not resume');
+  button.listeners.click();
+  assert.equal(button.attrs['aria-label'], 'Play animation');
+  const pausedText = body.textContent;
+  intersection([{ isIntersecting: false }]);
+  document.hidden = true;
+  document.listeners.visibilitychange();
+  intersection([{ isIntersecting: true }]);
+  document.hidden = false;
+  document.listeners.visibilitychange();
+  advance(10000);
+  assert.equal(body.textContent, pausedText, 'paused hero text changed');
+  assert.equal(timers.size, 0, 'paused hero kept a pending timer');
+  button.listeners.click();
+  assert.equal(button.attrs['aria-label'], 'Pause animation');
+  until(() => body.textContent.includes('issue #42 closed'), `loop ${loop} never completes after resume`);
+  visible();
+  if (loop < 3) {
+    const clears = body.clears;
+    until(() => body.clears > clears, `loop ${loop} never restarts`);
+  }
+}
+JS
+then
+  pass "T14 behavior: three attached hero loops, user pause, combined visibility/intersection gating"
+else
+  fail "T14 behavior: hero loop or pause/resume regression (see above)"
+fi
+
 # ── v2: the autonomous band lives inside the hero section ──
 hero_seg=$(sed -n '/<section class="hero"/,/id="problem"/p' "$LANDING")
 if printf '%s' "$hero_seg" | grep -q '/plan-to-issues' \
