@@ -181,6 +181,10 @@ def validate(obj: object) -> dict:
     ready_url = ready.get("url")
     if not isinstance(ready_url, str) or not (ready_url.startswith("/") or ready_url.startswith("{app_url}")):
         raise InvalidRecipe("recipe.launch.ready.url must start with / or {app_url}")
+    ready_probe = ready_url.replace("{app_url}", app_url.replace("{port}", "1"))
+    ready_probe = app_url.replace("{port}", "1") + ready_probe if ready_probe.startswith("/") else ready_probe
+    if urllib.parse.urlsplit(ready_probe).hostname not in LOOPBACK_HOSTS:
+        raise InvalidRecipe("recipe.launch.ready.url must stay on the app_url host")
     ready_timeout = _timeout(ready, "timeout_s", 30, "recipe.launch.ready")
     caps_in = top.get("capabilities")
     if not isinstance(caps_in, list) or not caps_in:
@@ -333,6 +337,14 @@ def _on_signal(signum, _frame):
     raise Interrupted(f"interrupted by signal {signum}")
 
 
+def _defer_signal(_signum, _frame):
+    """During teardown a second signal must not abort the kill of the owned group.
+
+    A Python-level handler (unlike SIG_IGN) resets on exec, so cleanup commands
+    still receive SIGTERM normally.
+    """
+
+
 def _evidence_root(common_dir: str, head: str, consumer: str) -> str:
     stamp = _dt.datetime.now(_dt.timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     path = os.path.join(common_dir, "idd", "evidence", head, f"{consumer}-{stamp}-{os.getpid()}")
@@ -353,7 +365,7 @@ def _list_evidence(root: str) -> list[str]:
     return found
 
 
-def execute(recipe: dict, verdict: dict, changed_caps: list[dict], repo_root: str, common_dir: str) -> int:
+def execute(recipe: dict, verdict: dict, repo_root: str, common_dir: str) -> int:
     """Launch, drive, tear down. Fills `verdict` in place; returns the exit code."""
     if not hasattr(os, "killpg"):
         raise CannotComplete("process groups are unsupported on this platform")
@@ -370,8 +382,9 @@ def execute(recipe: dict, verdict: dict, changed_caps: list[dict], repo_root: st
     if ready_url.startswith("/"):
         ready_url = app_url + ready_url
     code, proc = 0, None
-    previous = {s: signal.signal(s, _on_signal) for s in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP)}
     launch_log = open(os.path.join(evidence_dir, "launch.log"), "wb")
+    signals = (signal.SIGTERM, signal.SIGINT, signal.SIGHUP)
+    previous = {s: signal.signal(s, _on_signal) for s in signals}
     try:
         try:
             proc = subprocess.Popen(
@@ -386,7 +399,7 @@ def execute(recipe: dict, verdict: dict, changed_caps: list[dict], repo_root: st
         for entry in verdict["capabilities"]:
             if not entry["mapped"]:
                 continue
-            cap = next(c for c in changed_caps if c["name"] == entry["name"])
+            cap = next(c for c in recipe["capabilities"] if c["name"] == entry["name"])
             cap_dir = os.path.join(evidence_dir, cap["name"])
             os.makedirs(cap_dir, mode=0o700)
             cap_env = dict(env, IDD_EVIDENCE_DIR=cap_dir)
@@ -400,6 +413,8 @@ def execute(recipe: dict, verdict: dict, changed_caps: list[dict], repo_root: st
         verdict.update(status="unavailable", reason=str(exc))
         code = 4
     finally:
+        for sig in signals:
+            signal.signal(sig, _defer_signal)
         if proc is not None:
             verdict["torn_down"] = _stop_group(proc)
         launch_log.close()
@@ -474,7 +489,7 @@ def main(argv: list[str] | None = None) -> int:
                 repo_root = _git_out("rev-parse", "--show-toplevel")
                 verdict["head"] = _git_out("rev-parse", "HEAD")
                 common_dir = os.path.abspath(_git_out("rev-parse", "--git-common-dir"))
-                code = execute(recipe, verdict, recipe["capabilities"], repo_root, common_dir)
+                code = execute(recipe, verdict, repo_root, common_dir)
     except InvalidRecipe as exc:
         print(f"✗ gi-recipe: {exc}", file=sys.stderr)
         return 3

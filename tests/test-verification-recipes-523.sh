@@ -261,6 +261,7 @@ bad "an unknown key" "{\"version\":1,$GOOD_LAUNCH,\"capabilities\":[{\"name\":\"
 bad "a non-loopback app_url" "{\"version\":1,\"app_url\":\"https://example.com\",$GOOD_LAUNCH,\"capabilities\":[{\"name\":\"x\",\"drive\":[\"true\"]}]}"
 bad "a shell-string command" '{"version":1,"launch":{"command":"python3 -m http.server","ready":{"url":"/"}},"capabilities":[{"name":"x","drive":["true"]}]}'
 bad "a duplicate capability name" "{\"version\":1,$GOOD_LAUNCH,\"capabilities\":[{\"name\":\"x\",\"drive\":[\"true\"]},{\"name\":\"x\",\"drive\":[\"true\"]}]}"
+bad "a ready URL that leaves the loopback host" '{"version":1,"launch":{"command":["true"],"ready":{"url":"{app_url}@example.com/"}},"capabilities":[{"name":"x","drive":["true"]}]}'
 bad "an unknown auto consumer" "{\"version\":1,\"auto\":[\"deploy\"],$GOOD_LAUNCH,\"capabilities\":[{\"name\":\"x\",\"drive\":[\"true\"]}]}"
 R="$TMP/badref"; new_repo "$R"
 (cd "$R" && printf 'x' | python3 "$SCRIPT" --ref origin/nope --consumer resolve --changed - >/dev/null 2>&1); [ "$?" = 4 ]
