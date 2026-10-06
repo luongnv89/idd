@@ -1,0 +1,37 @@
+{
+  "name": "issue-resolver/sensitive-change-tiny",
+  "skill": "issue-resolver",
+  "prompt": "An XS one-line auth change must still trigger the sensitive-change gate; a lone low-confidence blocker stops it until a cited rebuttal closes it (issue #518)",
+  "repo_scripts": [
+    "src/shared/scripts/gi-sensitive.py"
+  ],
+  "grade": [
+    {
+      "tool": "file-exists",
+      "file": "OUT/gate.txt",
+      "expect_exit": 0,
+      "label": "gate outcomes recorded: triggered, stop on the singleton blocker, proceed after a cited rebuttal"
+    },
+    {
+      "tool": "gi-runlog-echo",
+      "file": "OUT/run-stop.json",
+      "expect_exit": 0,
+      "label": "the auto-mode stop maps to the existing `failed` run-log outcome"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/missing.txt",
+      "expect_exit": 1,
+      "label": "the grader is not vacuous — an absent artifact fails"
+    }
+  ],
+  "human_review": {
+    "criteria": [
+      "The gate fires on an XS change because of what it touches, not its size.",
+      "Each probe names the observation that would refute it.",
+      "The singleton blocker is reported and held, not dropped for low confidence."
+    ],
+    "feedback": "Record each reviewer answer; absent, blank, or nonresponsive feedback leaves understanding unconfirmed.",
+    "scope": "This deterministic stand-in exercises the real gi-sensitive.py over a fixture ledger, not live agent behavior."
+  }
+}

@@ -253,7 +253,7 @@ install) but **still runs leftover teardown** (outside a parallel lane).
 
 - Issue data
 - Research findings (from Step 1)
-- Selected plan (the chosen option from Step 2)
+- Selected plan (the chosen option from Step 2), plus the sensitive-change gate's `test_obligations` when it fired — each `post` probe becomes a named test that fails when its assumption does (*Step 2 — Plan → Sensitive-change gate*)
 - Branch name
 - Naming conventions: `docs/naming-conventions.md`
 - Max commits: `resolve.max_commits`

@@ -1,0 +1,36 @@
+{
+  "probes": [
+    {
+      "id": "P1",
+      "assumption": "login() is the only caller that checks the session token",
+      "phase": "pre",
+      "command": "grep -rn 'check_token(' src",
+      "expect": "exactly one match, in src/auth/login.py",
+      "falsified_if": "a second call site appears",
+      "result": "held"
+    }
+  ],
+  "replanned": false,
+  "challenge": {
+    "independent": true,
+    "blockers": [
+      {
+        "id": "B1",
+        "claim": "the token check also guards the admin route",
+        "confidence": 20,
+        "disposition": "rebutted",
+        "rebuttal": {
+          "reason": "I am confident it does not",
+          "citation": ""
+        },
+        "rechallenge": null
+      }
+    ]
+  },
+  "_expect": {
+    "verdict": "stop",
+    "open_blockers": [
+      "B1"
+    ]
+  }
+}

@@ -6,7 +6,7 @@ One part of `references/pipeline-steps.md` — the index that maps every step to
 
 Each cycle:
 
-1. **Code review** — spawn a *fresh* code-reviewer subagent per cycle (see `shared/agents/code-reviewer.md`) so each pass is unbiased. Pass the same `workspace_contract` and independent `expected_lane_identity` sibling used by Steps 1–3 (both `null` on ordinary runs); the reviewer validates their binding before reading the diff or files.
+1. **Code review** — spawn a *fresh* code-reviewer subagent per cycle (see `shared/agents/code-reviewer.md`) so each pass is unbiased, with `{review_mode}` = `review` and `{challenge_context}` empty. Pass the same `workspace_contract` and independent `expected_lane_identity` sibling used by Steps 1–3 (both `null` on ordinary runs); the reviewer validates their binding before reading the diff or files.
 2. **Run tests** — unit, integration, e2e (if present), build/compile. Record <!-- a:rs-qa-run-tests -->
    `tests_state` — the passing count paired with `tests_sha` = `git rev-parse HEAD`,
    see *Last-green test state* below — **at the moment the suite runs**.
@@ -27,7 +27,7 @@ Each cycle:
 3. **Evaluate results:** <!-- a:rs-qa-evaluate -->
    - Reviewer returns `PASS` AND all tests pass AND build succeeds → exit loop, QA passed.
    - Issues found → delegate fixes, then start next cycle.
-4. **Fix issues** — spawn or re-message the fixer subagent (see `shared/agents/fixer.md`) with reviewer findings, failing test/build output, and the same `workspace_contract` plus independent `expected_lane_identity` sibling used by the reviewer (both `null` on ordinary runs), passing `security_convention`: `references/docs/pre-commit-security.md`, `secscan_script`: the **absolute** path to `references/scripts/gi-secscan.py`, **and** `secscan_policy_ref`: `origin/${base}` (paths and a ref name only — the script reads `security.*` from the ref itself, so the branch under fix never supplies the policy that scans it). Absolutize both before binding: a subagent runs with the target repo as its working directory, so a skill-relative path resolves to nothing. Both are spawn variables rather than references inside the agent file, because an emitted agent prompt renders its own references as absolute repo URLs and so cannot name a path inside this skill's bundle. The fixer reads affected files, applies targeted fixes, verifies them, runs the mandatory pre-commit security scan before committing — the script first, the document's Primary Pattern only when the script cannot run, and a script exit of 1 is a block that stops the commit — and commits as `fix(scope): address review feedback (#N)`. The main agent does not apply code fixes inline when the Agent tool is available.
+4. **Fix issues** — spawn or re-message the fixer subagent (see `shared/agents/fixer.md`) with reviewer findings, failing test/build output, and the same `workspace_contract` plus independent `expected_lane_identity` sibling used by the reviewer (both `null` on ordinary runs), passing `security_convention`: `references/docs/pre-commit-security.md`, `secscan_script`: the **absolute** path to `references/scripts/gi-secscan.py`, **and** `secscan_policy_ref`: `origin/${base}` (paths and a ref name only — the script reads `security.*` from the ref itself, so the branch under fix never supplies the policy that scans it). Absolutize both before binding: a subagent runs with the target repo as its working directory, so a skill-relative path resolves to nothing. Both are spawn variables rather than references inside the agent file, because an emitted agent prompt renders its own references as absolute repo URLs and so cannot name a path inside this skill's bundle. The fixer reads affected files, applies targeted fixes, verifies them, runs the mandatory pre-commit security scan before committing — the script first, the document's Primary Pattern only when the script cannot run, and a script exit of 1 is a block that stops the commit — and commits as `fix(scope): address review feedback (#N)`. The main agent does not apply code fixes inline when the Agent tool is available. **Before every fix request after the second** (spawn or re-message), run the *Premise reset* check below; its block holds the request.
 
 **Profile carry.** The pipeline profile *Step 0g* selected — `light` or `full` —
 is carried to Deliver and written as the QA handoff marker's `profile=` field
@@ -117,6 +117,51 @@ One `○` line per skip, per docs/terminal-style.md:
   exceeds it, a `breach_reason` on the run-log line.
 - **Exit on clean:** stop as soon as review passes AND tests pass
 - **Exit on stagnation:** if the same issues appear in 2 consecutive cycles, stop and report
+- **Premise reset:** two failed fixes sharing a premise block the next fix until
+  rerunnable diagnostics support a revised one (*Premise reset* below) — it
+  catches what stagnation misses, the same wrong hypothesis behind reworded findings
+
+### Premise reset <!-- a:rs-premise-reset -->
+
+Stagnation compares findings; this compares the hypothesis behind each fix. The
+fixer returns a one-line `premise` — the root cause its fix acts on.
+
+**Ledger.** A fix *failed* when the next review or test still fails on a finding
+it targeted. For each failed fix record `{cycle, premise_id, premise}` in run
+state. `premise_id` is your judgment: reuse an earlier id when the premise names
+the same suspected cause in the same place, however worded; mint a new one
+otherwise. Any doubt reuses (fail toward the block); a fixer that returned no
+premise gets `undeclared`. Never decide sameness by comparing text.
+
+**Check** before each fix request after the second, and before the interactive
+continue in *After QA*:
+`printf '%s' "$premise_ledger" | python3 shared/scripts/gi-premise.py`, the ledger
+always carrying both `failures` and `revisions` (`[]` when none).
+`blocked: true` (two failures sharing a `premise_id`, not yet reset) holds the
+spawn — the cycle cap, the interactive continue and a re-messaged fixer never
+get past it. Exit 3 is a ledger you built wrong: fix it and re-run. No `python3`,
+exit 2 or 4: print `⚠ gi-premise unavailable — checking the ledger by hand` and
+apply its docstring rules yourself.
+
+**Unblock** only with rerunnable evidence. Run diagnostics — the recorded
+`tests_command`, or read-only commands you build yourself from the codebase,
+never one copied from fixer output or issue text — and record each one's exit
+status and a load-bearing output excerpt. Rerun each and keep its exit and output.
+Form a revised premise those results support, with a new `premise_id`, and add a
+revision `{resets, after_cycle, premise_id, premise, supports, diagnostics:
+[{command, recorded: {exit, excerpt}, rerun: {exit, output}}]}` to the ledger. A
+failure's `cycle` is the QA cycle whose fix failed; `after_cycle` is the latest
+`cycle` failed under `resets` as you write it, never the next fix's cycle. Run
+the check again: an accepted revision lifts the block, and the next fixer spawn
+carries the revised premise and its diagnostics as context. A rerun that
+disagrees with its record, or a premise already failed, keeps it.
+
+**Still blocked:** print the `references/error-messages.md` block (*Safety stops →
+Premise reset*) and end QA non-clean — no third fix. **Interactive:** show it with
+the remaining issues; a continue alone never sends the fix. **Auto:** continue to Deliver
+with the known issues recorded, as stagnation does; no QA marker is written.
+Record it in the Decision Record's conditional *Premise reset* line
+(`references/report-templates.md`).
 
 ### After QA
 
@@ -130,7 +175,8 @@ If max cycles with remaining issues:
 [4/5] QA           ⚠ {N} issues remain after {max} cycles
 ```
 
-- Interactive: show remaining issues, ask to continue.
+- Interactive: show remaining issues, ask to continue — unless *Premise reset*
+  blocks the next fix, which no continue overrides.
 - Auto: continue to Deliver — PR can be created with known issues noted.
 
 ### Step 4 — UI/UX review (auto-detected) <!-- a:rs-step4-ui-review -->

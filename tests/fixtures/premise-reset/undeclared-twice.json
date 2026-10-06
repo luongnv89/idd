@@ -1,0 +1,21 @@
+{
+  "failures": [
+    {
+      "cycle": 1,
+      "premise_id": "undeclared",
+      "premise": ""
+    },
+    {
+      "cycle": 2,
+      "premise_id": "undeclared",
+      "premise": ""
+    }
+  ],
+  "revisions": [],
+  "_expect": {
+    "blocked": true,
+    "blocking_premises": [
+      "undeclared"
+    ]
+  }
+}

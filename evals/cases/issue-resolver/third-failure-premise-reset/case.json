@@ -1,0 +1,37 @@
+{
+  "name": "issue-resolver/third-failure-premise-reset",
+  "skill": "issue-resolver",
+  "prompt": "Two QA fixes fail under one premise; the third fix is blocked until a rerun diagnostic supports a revised premise (issue #519)",
+  "repo_scripts": [
+    "src/shared/scripts/gi-premise.py"
+  ],
+  "grade": [
+    {
+      "tool": "file-exists",
+      "file": "OUT/premise.txt",
+      "expect_exit": 0,
+      "label": "premise outcomes recorded: blocked after two shared failures, unblocked by a matching rerun, blocked on a mismatch"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/diagnostic-rerun.txt",
+      "expect_exit": 0,
+      "label": "the diagnostic was actually rerun and its output kept"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/missing.txt",
+      "expect_exit": 1,
+      "label": "the grader is not vacuous — an absent artifact fails"
+    }
+  ],
+  "human_review": {
+    "criteria": [
+      "The two failed fixes are recognised as one premise even though the fixer worded it differently.",
+      "The third fix is not sent while the premise stands.",
+      "The revised premise is supported by a diagnostic that reran to its recorded result."
+    ],
+    "feedback": "Record each reviewer answer; absent, blank, or nonresponsive feedback leaves understanding unconfirmed.",
+    "scope": "This deterministic stand-in exercises the real gi-premise.py with a real rerun diagnostic, not live agent behavior."
+  }
+}

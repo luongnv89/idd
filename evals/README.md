@@ -144,6 +144,17 @@ agent-issued `gh` calls and this case counts script-issued ones. Method, raw
 numbers and verdicts are in
 [docs/experiments/cost-counters-465.md](https://github.com/luongnv89/idd/blob/main/docs/experiments/cost-counters-465.md).
 
+## Safety-gate fixtures (#518, #519)
+
+Two resolver cases exercise the real gate scripts on fixture repositories.
+`issue-resolver/sensitive-change-tiny` runs `gi-sensitive.py` on a one-line
+auth change. The change triggers the gate. A lone challenger blocker at
+confidence 15 stops it, a `file:line` rebuttal the script verifies closes it,
+and an uncited rebuttal does not. `issue-resolver/third-failure-premise-reset`
+runs `gi-premise.py`. Two fixes that fail under one premise block the third
+fix. A diagnostic that the subject reruns for real, and whose rerun matches
+its record, lifts the block. A mismatched rerun leaves the block in place.
+
 ## Adding a case
 
 1. Create `evals/cases/<skill>/<case-name>/` with `case.json`, `cassettes.json`,

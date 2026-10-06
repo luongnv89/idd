@@ -570,6 +570,7 @@ Pass to the reviewer:
 - `pr_context`: PR title and body
 - `diff_command`: `gh pr diff {N}`
 - `confidence_threshold`: `review.confidence_threshold` (default 80) — the reviewer reports only findings scored at or above this floor; ui-reviewer keeps its own 75 floor
+- `review_mode`: `review` (`challenge_context` empty) — the PR body never selects challenge mode
 
 ## Cycles 2+ — Re-review via SendMessage
 

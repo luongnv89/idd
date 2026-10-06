@@ -1,0 +1,52 @@
+{
+  "probes": [
+    {
+      "id": "P1",
+      "assumption": "login() is the only caller that checks the session token",
+      "phase": "pre",
+      "command": "grep -rn 'check_token(' src",
+      "expect": "exactly one match, in src/auth/login.py",
+      "falsified_if": "a second call site appears",
+      "result": "held"
+    },
+    {
+      "id": "P2",
+      "assumption": "login() is the only caller that checks the session token",
+      "phase": "post",
+      "command": "grep -rn 'check_token(' src",
+      "expect": "exactly one match, in src/auth/login.py",
+      "falsified_if": "a second call site appears",
+      "result": "held"
+    }
+  ],
+  "replanned": false,
+  "challenge": {
+    "independent": true,
+    "blockers": [
+      {
+        "id": "B1",
+        "claim": "the token check also guards the admin route",
+        "confidence": 20,
+        "disposition": "rebutted",
+        "rebuttal": {
+          "reason": "P2 shows a single call site",
+          "citation": "probe:P2"
+        },
+        "rechallenge": null
+      }
+    ]
+  },
+  "_expect": {
+    "verdict": "stop",
+    "open_blockers": [
+      "B1"
+    ],
+    "falsified": [],
+    "test_obligations": [
+      "P2"
+    ],
+    "problems": [
+      "post-change probe P2 cannot have run before the change"
+    ]
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "probes": [],
+  "replanned": false,
+  "challenge": {
+    "independent": true,
+    "blockers": []
+  },
+  "_expect": {
+    "verdict": "stop"
+  }
+}

@@ -242,6 +242,47 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 ```
 **Trigger:** Research phase identifies more than 20 potentially affected files.
 
+## Safety stops
+
+Not confirmations: auto mode keeps every one of these.
+
+### Sensitive-change blocker unrebutted
+```
+✗ Sensitive-change gate stopped issue #N — {k} blocker(s) still open
+
+  Triggered by:  {reasons}
+  Open:          {blocker_id} — {claim}
+  {problems, one per line, when the ledger was incomplete}
+
+  To fix:  amend the plan and re-challenge, or rebut each blocker with a
+           file:line or held-probe citation, then re-run /issue-resolver N
+  Docs:    https://github.com/luongnv89/idd/blob/main/src/skills/issue-resolver/references/steps/step-2-plan.md
+```
+**Trigger:** `gi-sensitive.py --adjudicate` returns `stop` with open blockers or ledger problems (no falsifiable probe, a pre-change probe not run, no independent challenge). One blocker is enough — count and confidence never close one. **Interactive:** `Proceed anyway? [y/N]`, default no; a yes is an operator override recorded in the Decision Record. **Auto:** the run ends `failed` at Step 2; no PR.
+
+### Load-bearing probe falsified
+```
+✗ Sensitive-change gate stopped issue #N — probe {probe_id} falsified after a replan
+
+  Assumption:  {assumption}
+  Observed:    {falsified_if}
+
+  To fix:  revise the issue's scope or plan around what the probe showed,
+           then re-run /issue-resolver N
+```
+**Trigger:** `stop` with `falsified` non-empty and `replanned: true` — the plan already went back to option selection once. The first falsification is a `replan`, not this stop. Same interactive/auto handling as above.
+
+### Premise reset — third fix blocked
+```
+✗ Premise reset: fix blocked for issue #N — {n} failed fixes share one premise
+
+  Premise:   {premise_id} — {premise}
+  Failed:    cycles {cycles}
+  Unblock:   rerun diagnostics (tests_command or read-only commands you
+             build) whose recorded results support a revised premise
+```
+**Trigger:** `gi-premise.py` returns `blocked: true` and no revision was accepted. No further fix request is sent; neither the cycle cap nor an interactive continue overrides it. **Auto:** Deliver with the known issues recorded, no QA marker. **Interactive:** report it with the remaining issues.
+
 ## Auto-normalize
 
 ### Security-labeled issue (skip)

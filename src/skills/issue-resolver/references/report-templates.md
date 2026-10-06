@@ -28,6 +28,8 @@ Closes #{issue_number}
 - **Residual risk:** {what remains uncertain or accepted as known limitation, or "none identified"}
 - **Effort profile:** {"light — fast path (pre-work Effort {band}); synthesis skipped, QA capped at 1 cycle" when the run used the light profile; omit this line entirely on the full profile — the default — so it appears only when the fast path actually fired}
 - **Design-confirm:** {high-complexity issues only — "confirmed Option {N} at design-confirm checkpoint (complexity: {level})" in interactive mode, or "auto-selected Option {N} (complexity: {level})" in auto mode; omit this line for trivial/low/medium complexity}
+- **Sensitive-change gate:** {only when it triggered — "triggered by {reasons}; probes {id held | id → test obligation}; blockers {id amended+cleared | id rebutted ({citation})}; verdict {proceed | stop | operator override}"; omit this line when it did not trigger}
+- **Premise reset:** {only when it blocked — "premise {premise_id} failed in cycles {cycles}; {lifted by revision {new_id} ({diagnostic commands}) | not lifted — no further fix}"; omit otherwise}
 - **Reproduction:** {bug issues only — success: `<command>` confirmed red for the stated reason → regression test `<path>` (or "manual — no seam"); degraded: `not reproduced — <one-line reason> (fix applied without confirmed red; criterion marked unverified)`; omit for non-bug issues}
 
 Analyzed at: `{branch} @ {commit_sha_short}` ({YYYY-MM-DD})

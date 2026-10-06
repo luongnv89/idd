@@ -1290,6 +1290,11 @@ EXPECTED_SITES = {
     # /issue-pr-review verifies it in its QA handoff gate (SKILL.md) and its
     # mechanics (*Verifying the receipt*).
     "gi-receipt.py": 3,
+    # 2 since issue #518: the resolver's sensitive-change gate classifies the
+    # planned change and adjudicates its probe/challenge ledger (Step 2).
+    "gi-sensitive.py": 2,
+    # 1 since issue #519: the resolver's premise-reset check (Step 4 QA).
+    "gi-premise.py": 1,
 }
 # A call is any mention of a shared script by filename, however it is launched
 # (python3, python3.11, uv run, a bare ./path relying on the exec bit), plus the
@@ -1387,6 +1392,11 @@ ALLOWED_VARS = {
     # Issue #515. The PR head SHA GitHub computed, checked against
     # ^[0-9a-f]{40}$ at the call site and again by gi-receipt (exit 3 otherwise).
     "$head_oid": "40-hex headRefOid GitHub reported, format-checked twice",
+    # Issues #518/#519. Ledgers the resolver composed; each reaches its script
+    # on stdin through printf, like $run_json — never as an argument.
+    "$sensitive_json": "labels + planned paths the resolver composed; reaches gi-sensitive on stdin",
+    "$gate_ledger": "probe/challenge ledger the resolver composed; reaches gi-sensitive on stdin",
+    "$premise_ledger": "QA premise ledger the resolver composed; reaches gi-premise on stdin",
 }
 VAR = re.compile(r"\$\{?[A-Za-z_][A-Za-z0-9_]*\}?")
 # Command substitution pastes its output into the command line unquoted. Only

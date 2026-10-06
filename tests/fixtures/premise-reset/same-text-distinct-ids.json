@@ -1,0 +1,19 @@
+{
+  "failures": [
+    {
+      "cycle": 1,
+      "premise_id": "A",
+      "premise": "the cache key omits the locale"
+    },
+    {
+      "cycle": 2,
+      "premise_id": "B",
+      "premise": "the cache key omits the locale"
+    }
+  ],
+  "revisions": [],
+  "_expect": {
+    "blocked": false,
+    "blocking_premises": []
+  }
+}

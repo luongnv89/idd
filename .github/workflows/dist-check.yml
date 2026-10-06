@@ -355,6 +355,12 @@ jobs:
       - name: test-qa-receipt-515
         run: bash tests/test-qa-receipt-515.sh
 
+      - name: test-sensitive-gate-518
+        run: bash tests/test-sensitive-gate-518.sh
+
+      - name: test-premise-reset-519
+        run: bash tests/test-premise-reset-519.sh
+
       - name: test-followup-context-285
         run: bash tests/test-followup-context-285.sh
 

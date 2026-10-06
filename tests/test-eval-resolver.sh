@@ -35,6 +35,8 @@ run_case() {
 
 run_case "trivial-bug"
 run_case "gh-call-counter"
+run_case "sensitive-change-tiny"
+run_case "third-failure-premise-reset"
 
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 echo "Results: $PASS passed, $FAIL failed"
