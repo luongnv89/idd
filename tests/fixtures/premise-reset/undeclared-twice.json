@@ -11,6 +11,7 @@
       "premise": ""
     }
   ],
+  "revisions": [],
   "_expect": {
     "blocked": true,
     "blocking_premises": [

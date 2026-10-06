@@ -47,7 +47,7 @@ blocked() { python3 "$PREMISE" | python3 -c 'import json,sys; print(json.load(sy
 
 failures='[{"cycle": 1, "premise_id": "A", "premise": "the cache key omits the locale"},
            {"cycle": 2, "premise_id": "A", "premise": "locale missing from the key builder"}]'
-after_two="$(printf '{"failures": %s}' "$failures" | blocked)"
+after_two="$(printf '{"failures": %s, "revisions": []}' "$failures" | blocked)"
 
 # The orchestrator's own diagnostic: the recorded suite command, run twice.
 set +e

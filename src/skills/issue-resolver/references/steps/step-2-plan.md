@@ -164,18 +164,24 @@ probe with no refuting observation is not falsifiable. `phase: pre` probes test
 the code as it is: run them now and record `result` (`held`/`falsified`). `phase:
 post` probes can only run after the change: they become **named test obligations**
 handed to the Step 3 implementer, each satisfied by a test that fails when the
-assumption does.
+assumption does. **A falsified `pre` probe kills the plan:** skip steps 3–4 (the
+challenge need not run on a dead plan) and go to step 5 with `challenge: null` —
+its `replan` sends you back to option selection.
 
 **3. Independent challenge.** Spawn a **fresh** code-reviewer
-(`shared/agents/code-reviewer.md`) in challenge mode: `{challenge_context}` = a
-`## Challenge brief` heading, then the selected option, the probe ledger and its
-results; `{diff_command}` = `git diff --stat "origin/${base}"...HEAD` (no diff
-exists yet); `{confidence_threshold}` = `80`. Its `"action": "blocker"` issues are
-the blockers — every one it holds, at any confidence: no threshold applies to them.
+(`shared/agents/code-reviewer.md`) in challenge mode: `{review_mode}` = `challenge`;
+`{challenge_context}` = a `## Challenge brief` heading, then the selected option,
+the probe ledger and its results; `{pr_context}` empty; `{diff_command}` =
+`git diff --stat "origin/${base}"...HEAD` (no diff exists yet);
+`{confidence_threshold}` = `80`; and the same `workspace_contract` plus independent
+`expected_lane_identity` sibling Steps 1–2 received (both `null` on ordinary runs).
+Every issue a challenge-mode reviewer returns counts as a blocker whatever its
+action label — every one it holds, at any confidence: no threshold applies to them.
 
 **4. Reasoned adjudication.** Close each blocker one of two ways, or it stays open:
 
-- **Amend** the plan and re-challenge once (a fresh reviewer, same mode, focused on
+- **Amend** the plan and re-challenge once (a fresh reviewer with the same
+  bindings — `{review_mode}` = `challenge`, the lane pair — its brief focused on
   that blocker): `rechallenge: cleared` closes it, `standing` leaves it open. One
   re-challenge round per blocker, never more.
 - **Rebut** it with a reason and a citation the script verifies: `path:line` in this
@@ -184,17 +190,22 @@ the blockers — every one it holds, at any confidence: no threshold applies to 
 Never vote, count, average or threshold blockers away: **one challenger's single
 blocker at any confidence holds the gate until it is closed.**
 
-**5. Verdict.** Record the ledger — `probes`, `replanned`, `challenge: {independent,
-blockers: [{id, claim, disposition, rebuttal, rechallenge}]}` — and run
+**5. Verdict.** Record the ledger — `probes`, `replanned` (a boolean, always
+present), `challenge: {independent, blockers: [{id, claim, disposition, rebuttal,
+rechallenge}]}` (`null` only when no challenge ran) — and run
 `printf '%s' "$gate_ledger" | python3 shared/scripts/gi-sensitive.py --adjudicate`
-from the repo root — citations resolve against it — with the script path absolute,
-as the precheck resolves it (both invocations). Without the script, apply its
+from the canonical worktree root when one is bound (`workspace_contract.repo_root`,
+as `cd -- "$root" && printf … | python3 … --adjudicate`), otherwise from the repo
+root — citations resolve against the working directory — with the script path
+absolute, as the precheck resolves it (both invocations). A missing or unknown key
+is exit 3: fix the ledger, never read it as `proceed`. Without the script, apply its
 docstring rules by hand.
 
 - `proceed` — continue; carry `test_obligations` to Step 3. Print
   `✓ Sensitive-change gate: proceed ({n} probes, {m} blockers closed)`.
 - `replan` — a probe was falsified: return to option selection once with
-  `replanned: true`, then re-run this gate on the new option.
+  `replanned: true`, then re-run this gate on the new option. Open blockers on the
+  dead plan do not carry over; the new option gets its own challenge.
 - `stop` — print the matching `references/error-messages.md` block (*Safety stops*).
   **Interactive:** ask `Proceed anyway? [y/N]` (default no); a yes is recorded as an
   operator override. **Auto:** a safety stop, never auto-resolved — the run ends

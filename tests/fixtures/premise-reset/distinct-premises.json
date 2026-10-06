@@ -11,6 +11,7 @@
       "premise": "wrong TTL"
     }
   ],
+  "revisions": [],
   "_expect": {
     "blocked": false,
     "blocking_premises": []

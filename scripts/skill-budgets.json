@@ -19,11 +19,11 @@
     },
     "issue-pr-review": {
       "budget": 267464,
-      "measured": 266440
+      "measured": 266843
     },
     "issue-resolver": {
-      "budget": 375236,
-      "measured": 374212
+      "budget": 375540,
+      "measured": 375540
     },
     "issue-triage": {
       "budget": 131873,

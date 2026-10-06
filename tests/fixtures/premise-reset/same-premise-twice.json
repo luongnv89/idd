@@ -11,6 +11,7 @@
       "premise": "locale missing from the cache key (reworded)"
     }
   ],
+  "revisions": [],
   "_expect": {
     "blocked": true,
     "blocking_premises": [

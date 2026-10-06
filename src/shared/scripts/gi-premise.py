@@ -28,6 +28,10 @@ Reads one JSON ledger on stdin:
 A failure is a cycle whose fix was applied and whose next review or test still
 failed on a finding that fix targeted. Failures need not be consecutive.
 
+Both `failures` and `revisions` are required lists — `[]` when there are none.
+A missing key, or any other top-level key not starting with `_`, is exit 3: a
+misspelled `failures` must never read as "nothing failed".
+
 Prints {"blocked": true | false, "blocking_premises": [...],
 "accepted_revisions": [...], "problems": [...]}:
 
@@ -46,8 +50,9 @@ Exit codes
   0  answered — `blocked` true or false. Read `blocked`, never the exit
      status. This script never exits 1.
   2  usage error.
-  3  invalid input — stdin is not a ledger of the documented shape. Fix the
-     ledger and re-run; never read this as "not blocked".
+  3  invalid input — stdin is not a ledger of the documented shape
+     (including a missing or unknown top-level key). Fix the ledger and
+     re-run; never read this as "not blocked".
   4  cannot complete — stdin unreadable.
 
 Authored at src/shared/scripts/gi-premise.py — do not edit installed copies;
@@ -65,8 +70,11 @@ class InvalidInput(ValueError):
     """stdin is not a ledger of the documented shape (exit 3)."""
 
 
+REQUIRED_KEYS = ("failures", "revisions")
+
+
 def _objects(ledger: dict, key: str) -> list[dict]:
-    value = ledger.get(key, [])
+    value = ledger[key]
     if not isinstance(value, list) or not all(isinstance(v, dict) for v in value):
         raise InvalidInput(f"`{key}` must be a list of objects")
     return value
@@ -103,6 +111,12 @@ def rerun_matches(diagnostic: dict) -> bool:
 def decide(ledger: object) -> dict:
     if not isinstance(ledger, dict):
         raise InvalidInput("stdin must be a JSON object")
+    missing = [k for k in REQUIRED_KEYS if k not in ledger]
+    if missing:
+        raise InvalidInput(f"missing required key(s): {', '.join(missing)}")
+    unknown = sorted(k for k in ledger if k not in REQUIRED_KEYS and not str(k).startswith("_"))
+    if unknown:
+        raise InvalidInput(f"unknown key(s): {', '.join(unknown)}")
     failures = _objects(ledger, "failures")
     revisions = _objects(ledger, "revisions")
 

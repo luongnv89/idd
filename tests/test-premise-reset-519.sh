@@ -106,8 +106,22 @@ check "R3: a 'revised' premise that already failed keeps the block" "$?"
 check "R3: a later failure under the reset premise blocks again" "$?"
 [ "$(field "$(verdict revised-premise-fails-twice)" blocking_premises)" = '["R1"]' ]
 check "R3: the revised premise is held to the same rule" "$?"
-printf '%s' '{"failures":[{"cycle":"1","premise_id":"A"}]}' | python3 "$SCRIPT" >/dev/null 2>&1; [ "$?" = "3" ]
+printf '%s' '{"failures":[{"cycle":"1","premise_id":"A"}],"revisions":[]}' | python3 "$SCRIPT" >/dev/null 2>&1; [ "$?" = "3" ]
 check "R3: a malformed ledger is exit 3, never 'not blocked'" "$?"
+F2='[{"cycle":1,"premise_id":"A"},{"cycle":2,"premise_id":"A"}]'
+for pair in \
+  '{}:an empty ledger' \
+  "{\"failures\":$F2}:a ledger without revisions" \
+  "{\"revisions\":[]}:a ledger without failures" \
+  "{\"failure\":$F2,\"revisions\":[]}:a misspelled failures key" \
+  "{\"failures\":$F2,\"revisions\":[],\"revision\":[]}:an unknown top-level key"; do
+  json="${pair%:*}"; what="${pair##*:}"
+  printf '%s' "$json" | python3 "$SCRIPT" >/dev/null 2>&1; [ "$?" = "3" ]
+  check "R3: $what is exit 3, never 'not blocked'" "$?"
+done
+out="$(printf '%s' "{\"failures\":$F2,\"revisions\":[],\"_note\":\"x\"}" | python3 "$SCRIPT")"
+[ "$(field "$out" blocked)" = "true" ]
+check "R3: a top-level key starting with _ is ignored" "$?"
 
 # ── R4: the prose contract ───────────────────────────────────
 anchor_check "$STEP4" rs-premise-reset 'gi-premise\.py' \

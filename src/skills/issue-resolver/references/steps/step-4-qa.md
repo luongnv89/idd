@@ -6,7 +6,7 @@ One part of `references/pipeline-steps.md` — the index that maps every step to
 
 Each cycle:
 
-1. **Code review** — spawn a *fresh* code-reviewer subagent per cycle (see `shared/agents/code-reviewer.md`) so each pass is unbiased, with `{challenge_context}` empty. Pass the same `workspace_contract` and independent `expected_lane_identity` sibling used by Steps 1–3 (both `null` on ordinary runs); the reviewer validates their binding before reading the diff or files.
+1. **Code review** — spawn a *fresh* code-reviewer subagent per cycle (see `shared/agents/code-reviewer.md`) so each pass is unbiased, with `{review_mode}` = `review` and `{challenge_context}` empty. Pass the same `workspace_contract` and independent `expected_lane_identity` sibling used by Steps 1–3 (both `null` on ordinary runs); the reviewer validates their binding before reading the diff or files.
 2. **Run tests** — unit, integration, e2e (if present), build/compile. Record <!-- a:rs-qa-run-tests -->
    `tests_state` — the passing count paired with `tests_sha` = `git rev-parse HEAD`,
    see *Last-green test state* below — **at the moment the suite runs**.
@@ -135,7 +135,8 @@ premise gets `undeclared`. Never decide sameness by comparing text.
 
 **Check** before each fix request after the second, and before the interactive
 continue in *After QA*:
-`printf '%s' "$premise_ledger" | python3 shared/scripts/gi-premise.py`.
+`printf '%s' "$premise_ledger" | python3 shared/scripts/gi-premise.py`, the ledger
+always carrying both `failures` and `revisions` (`[]` when none).
 `blocked: true` (two failures sharing a `premise_id`, not yet reset) holds the
 spawn — the cycle cap, the interactive continue and a re-messaged fixer never
 get past it. Exit 3 is a ledger you built wrong: fix it and re-run. No `python3`,

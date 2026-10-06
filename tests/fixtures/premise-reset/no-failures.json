@@ -1,5 +1,6 @@
 {
   "failures": [],
+  "revisions": [],
   "_expect": {
     "blocked": false,
     "blocking_premises": []

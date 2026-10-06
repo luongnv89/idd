@@ -16,6 +16,7 @@
       "premise": "the cache key omits the locale"
     }
   ],
+  "revisions": [],
   "_expect": {
     "blocked": true,
     "blocking_premises": [

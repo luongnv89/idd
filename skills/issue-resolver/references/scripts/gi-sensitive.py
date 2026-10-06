@@ -14,7 +14,10 @@ plan, writing rebuttals — stays with the agent.
       {"labels": ["<issue label>", ...], "paths": ["<planned file>", ...]}
 
   and prints {"sensitive": true | false, "reasons": [{"source", "value",
-  "class"}]}. Size never enters: one sensitive path or label is enough.
+  "class"}]}. Size never enters: one sensitive path or label is enough. Both
+  keys are required (an empty list is fine); a missing key, or any other
+  top-level key not starting with `_`, is exit 3 — a misspelled `paths` must
+  never read as "no sensitive path".
 
     label            a label containing `security`, `cve` or `vulnerability`,
                      case-insensitive — the labels Step 0d already honours
@@ -46,14 +49,21 @@ plan, writing rebuttals — stays with the agent.
                                   ...]}}
 
   and prints {"verdict": "proceed" | "replan" | "stop", "open_blockers",
-  "falsified", "test_obligations", "problems"}. The rules:
+  "falsified", "test_obligations", "problems"}. `probes` (a list) and
+  `replanned` (a boolean) are required; `challenge` may be absent or null
+  (recorded as a problem → stop), but when present it must carry a boolean
+  `independent` and a `blockers` list, and every blocker a `disposition`. A
+  missing key, or any other top-level key not starting with `_`, is exit 3.
+  The rules:
 
     * At least one probe; each needs a non-empty assumption, command, expect
       and falsified_if — a probe that names no observation able to refute it
       is not falsifiable. A `pre` probe must have run (`result` set); a `post`
       probe with no result is a Step 3 test obligation.
     * A falsified probe sends the plan back to option selection once
-      (`replan`); after a replan (`replanned: true`) it is a `stop`.
+      (`replan`) whatever the challenge, blockers or problems say — the plan
+      is dead, so nothing else about it needs closing. After a replan
+      (`replanned: true`) a falsified probe is a `stop`.
     * The challenge must be recorded and `independent: true`.
     * A blocker closes only two ways: `amended` with `rechallenge: cleared`, or
       `rebutted` with a reason and a citation that checks out — `path:line`
@@ -62,14 +72,15 @@ plan, writing rebuttals — stays with the agent.
       Anything else leaves it open.
     * Count, votes and confidence are never read: a single blocker raised by
       one challenger at any confidence stops the gate until it is closed.
-    * Any open blocker or problem is a `stop`.
+    * Otherwise any open blocker or problem is a `stop`.
 
 Exit codes
   0  answered — `proceed`, `replan` and `stop` are all answers. Read
      `verdict`, never the exit status. This script never exits 1.
   2  usage error.
-  3  invalid input — stdin is not a JSON object of the documented shape. Fix
-     the record and re-run; never read this as "not sensitive" or "proceed".
+  3  invalid input — stdin is not a JSON object of the documented shape
+     (including a missing or unknown top-level key). Fix the record and
+     re-run; never read this as "not sensitive" or "proceed".
   4  cannot complete — stdin unreadable.
 
 Authored at src/shared/scripts/gi-sensitive.py — do not edit installed copies;
@@ -137,8 +148,19 @@ def path_class(raw: str) -> str | None:
     return None
 
 
+def _require_keys(record: dict, required: tuple[str, ...], optional: tuple[str, ...] = ()) -> None:
+    """Fail closed on a missing or unknown top-level key (`_`-prefixed keys pass)."""
+    missing = [k for k in required if k not in record]
+    if missing:
+        raise InvalidInput(f"missing required key(s): {', '.join(missing)}")
+    allowed = set(required) | set(optional)
+    unknown = sorted(k for k in record if k not in allowed and not str(k).startswith("_"))
+    if unknown:
+        raise InvalidInput(f"unknown key(s): {', '.join(unknown)}")
+
+
 def _string_list(record: dict, key: str) -> list[str]:
-    value = record.get(key, [])
+    value = record[key]
     if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
         raise InvalidInput(f"`{key}` must be a list of strings")
     return value
@@ -147,6 +169,7 @@ def _string_list(record: dict, key: str) -> list[str]:
 def classify(record: object) -> dict:
     if not isinstance(record, dict):
         raise InvalidInput("stdin must be a JSON object")
+    _require_keys(record, ("labels", "paths"))
     reasons = []
     for label in _string_list(record, "labels"):
         if any(word in label.lower() for word in LABEL_WORDS):
@@ -188,15 +211,27 @@ def citation_holds(citation: str, held_probes: set[str], root: Path) -> bool:
 def adjudicate(ledger: object, root: Path) -> dict:
     if not isinstance(ledger, dict):
         raise InvalidInput("stdin must be a JSON object")
-    probes = ledger.get("probes")
+    _require_keys(ledger, ("probes", "replanned"), ("challenge",))
+    probes = ledger["probes"]
     if not isinstance(probes, list) or not all(isinstance(p, dict) for p in probes):
         raise InvalidInput("`probes` must be a list of objects")
+    if not isinstance(ledger["replanned"], bool):
+        raise InvalidInput("`replanned` must be a boolean")
     challenge = ledger.get("challenge")
-    if challenge is not None and not isinstance(challenge, dict):
-        raise InvalidInput("`challenge` must be an object")
-    blockers = (challenge or {}).get("blockers", [])
-    if not isinstance(blockers, list) or not all(isinstance(b, dict) for b in blockers):
-        raise InvalidInput("`challenge.blockers` must be a list of objects")
+    blockers: list = []
+    if challenge is not None:
+        if not isinstance(challenge, dict):
+            raise InvalidInput("`challenge` must be an object or null")
+        missing = [k for k in ("independent", "blockers") if k not in challenge]
+        if missing:
+            raise InvalidInput(f"`challenge` is missing {', '.join(missing)}")
+        if not isinstance(challenge["independent"], bool):
+            raise InvalidInput("`challenge.independent` must be a boolean")
+        blockers = challenge["blockers"]
+        if not isinstance(blockers, list) or not all(isinstance(b, dict) for b in blockers):
+            raise InvalidInput("`challenge.blockers` must be a list of objects")
+        if not all("disposition" in b for b in blockers):
+            raise InvalidInput("every blocker needs a `disposition`")
 
     problems: list[str] = []
     falsified: list[str] = []
@@ -243,10 +278,11 @@ def adjudicate(ledger: object, root: Path) -> dict:
         if not closed:
             open_blockers.append(bid)
 
-    if problems or open_blockers:
+    if falsified:
+        # A falsified probe kills the plan: replan once, whatever else is open.
+        verdict = "stop" if ledger["replanned"] else "replan"
+    elif problems or open_blockers:
         verdict = "stop"
-    elif falsified:
-        verdict = "stop" if ledger.get("replanned") is True else "replan"
     else:
         verdict = "proceed"
     return {

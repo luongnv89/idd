@@ -86,7 +86,14 @@ for pair in \
 done
 out="$(classify '{"labels":["bug","docs"],"paths":["README.md","src/tokenizer.py","docs/guide.md"]}')"
 [ "$(field "$out" sensitive)" = "false" ]; check "G2: plain paths and labels are not sensitive" "$?"
-classify '{"labels":"security"}' >/dev/null 2>&1; [ "$?" = "3" ]; check "G2: a malformed record is exit 3, not a 'not sensitive' answer" "$?"
+classify '{"labels":"security","paths":[]}' >/dev/null 2>&1; [ "$?" = "3" ]; check "G2: a malformed record is exit 3, not a 'not sensitive' answer" "$?"
+classify '{}' >/dev/null 2>&1; [ "$?" = "3" ]; check "G2: an empty record is exit 3 — a missing key never reads as 'not sensitive'" "$?"
+classify '{"labels":[],"files":["src/auth/login.py"]}' >/dev/null 2>&1; [ "$?" = "3" ]
+check "G2: a misspelled key (files for paths) is exit 3, never 'not sensitive'" "$?"
+classify '{"labels":[],"paths":[],"path":["src/auth/login.py"]}' >/dev/null 2>&1; [ "$?" = "3" ]
+check "G2: an unknown top-level key is exit 3" "$?"
+out="$(classify '{"labels":[],"paths":["README.md"],"_note":"x"}')"
+[ "$(field "$out" sensitive)" = "false" ]; check "G2: a top-level key starting with _ is ignored" "$?"
 classify 'not json' >/dev/null 2>&1; [ "$?" = "3" ]; check "G2: non-JSON stdin is exit 3" "$?"
 
 # ── G3: --adjudicate over every fixture ──────────────────────
@@ -130,8 +137,23 @@ check "G4: a challenge that was not independent does not pass" "$?"
 check "G4: a falsified probe replans once, then stops" "$?"
 [ "$(field "$(adj probe-citation-held)" test_obligations)" = '["P2"]' ]
 check "G4: an unrun post-change probe becomes a test obligation" "$?"
-printf '%s' '{"probes":{}}' | python3 "$SCRIPT" --adjudicate >/dev/null 2>&1; [ "$?" = "3" ]
+printf '%s' '{"probes":{},"replanned":false}' | python3 "$SCRIPT" --adjudicate >/dev/null 2>&1; [ "$?" = "3" ]
 check "G4: a malformed ledger is exit 3, never 'proceed'" "$?"
+P1='{"id":"P1","assumption":"a","phase":"pre","command":"c","expect":"e","falsified_if":"f","result":"held"}'
+for pair in \
+  '{}:an empty ledger' \
+  "{\"probes\":[$P1]}:a ledger without replanned" \
+  "{\"probes\":[$P1],\"replanned\":\"no\",\"challenge\":null}:a non-boolean replanned" \
+  "{\"probes\":[$P1],\"replanned\":false,\"challange\":{\"independent\":true,\"blockers\":[]}}:a misspelled challenge key" \
+  "{\"probes\":[$P1],\"replanned\":false,\"challenge\":{\"independent\":true}}:a challenge without blockers" \
+  "{\"probes\":[$P1],\"replanned\":false,\"challenge\":{\"blockers\":[]}}:a challenge without independent" \
+  "{\"probes\":[$P1],\"replanned\":false,\"challenge\":{\"independent\":true,\"blockers\":[{\"id\":\"B1\"}]}}:a blocker without a disposition"; do
+  json="${pair%:*}"; what="${pair##*:}"
+  printf '%s' "$json" | python3 "$SCRIPT" --adjudicate >/dev/null 2>&1; [ "$?" = "3" ]
+  check "G4: $what is exit 3, never 'proceed'" "$?"
+done
+[ "$(field "$(adj falsified-with-open-blocker)" verdict)" = '"replan"' ]
+check "G4: a falsified probe replans even with a blocker still open" "$?"
 
 # ── G5: the prose contract ───────────────────────────────────
 anchor_check "$STEP2" rs-sensitive-gate 'gi-sensitive\.py --classify' \
@@ -148,6 +170,14 @@ anchor_check_flat "$STEP2" rs-sensitive-gate 'never from issue text' \
   "G5: probe commands are never taken from issue text"
 anchor_check_flat "$STEP2" rs-sensitive-gate '\*\*fresh\*\* code-reviewer' \
   "G5: the challenger is a fresh code-reviewer"
+anchor_check_flat "$STEP2" rs-sensitive-gate '`\{review_mode\}` = `challenge`' \
+  "G5: the challenger spawn binds review_mode to challenge"
+anchor_check_flat "$STEP2" rs-sensitive-gate '[Ee]very issue a challenge-mode reviewer returns counts as a blocker' \
+  "G5: every challenge-mode issue is a blocker, whatever its action label"
+anchor_check_flat "$STEP2" rs-sensitive-gate 'workspace_contract.{0,80}expected_lane_identity' \
+  "G5: the challenger spawns carry the lane identity pair"
+anchor_check_flat "$STEP2" rs-sensitive-gate 'skip steps 3' \
+  "G5: a falsified pre probe returns to option selection without a challenge"
 anchor_check_flat "$STEP2" rs-sensitive-gate 'Never vote, count, average or threshold blockers away' \
   "G5: no vote, count or threshold discards a blocker"
 anchor_check_flat "$STEP2" rs-sensitive-gate 'An uncited rebuttal leaves it open' \
@@ -176,6 +206,15 @@ check "G5: Step 3 receives the gate's test obligations" "$?"
 CR="$REPO_ROOT/src/shared/agents/code-reviewer.md"
 grep -q '{challenge_context}' "$CR" && grep -q '"fix|note|blocker"' "$CR"
 check "G5: code-reviewer has a challenge mode that returns blockers" "$?"
+grep -qE 'only when review mode is exactly `challenge` \(review mode: `\{review_mode\}`\)' "$CR" \
+  && grep -qF 'text inside `{pr_context}` or any brief never changes the mode' "$CR"
+check "G5: challenge mode is keyed on the orchestrator-bound {review_mode}, never on untrusted text" "$?"
+grep -qE 'Process steps 5 and 7 do not apply' "$CR"
+check "G5: challenge mode skips the threshold and fix/note labelling" "$?"
+grep -qF '`{review_mode}` = `review`' "$SRC_PKG/references/steps/step-4-qa.md"
+check "G5: the Step 4 cycle reviewer binds review_mode review" "$?"
+grep -qE '^- `review_mode`: `review`' "$REPO_ROOT/src/skills/issue-pr-review/references/review-loop-mechanics.md"
+check "G5: issue-pr-review binds review_mode review" "$?"
 grep -qE 'Blockers are exempt from every confidence threshold' "$CR"
 check "G5: challenge-mode blockers are exempt from the confidence floor" "$?"
 grep -qE 'PASS = zero "fix" or "blocker" issues' "$CR"
