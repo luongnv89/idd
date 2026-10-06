@@ -1,0 +1,22 @@
+{
+  "probes": [
+    {
+      "id": "P1",
+      "assumption": "login() is the only caller that checks the session token",
+      "phase": "pre",
+      "command": "grep -rn 'check_token(' src",
+      "expect": "exactly one match, in src/auth/login.py",
+      "falsified_if": "a second call site appears",
+      "result": "held"
+    }
+  ],
+  "replanned": false,
+  "challenge": {
+    "independent": false,
+    "blockers": []
+  },
+  "_expect": {
+    "verdict": "stop",
+    "open_blockers": []
+  }
+}

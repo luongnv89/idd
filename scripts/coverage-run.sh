@@ -123,6 +123,24 @@ rcpt "$SCRIPTS/gi-receipt.py" --verify not-a-sha
 printf '%s' '{"tool":"issue-resolver","profile":"full","cycles":1,"review":"noted"}' | \
   rcpt "$SCRIPTS/gi-receipt.py" --write
 
+# gi-sensitive — classify (hit, miss, malformed) and adjudicate the gate ledger.
+printf '%s' '{"labels":["Security"],"paths":[".github/workflows/ci.yml","src/auth/login.py",".env.local","CODEOWNERS",".gitissue.yml","README.md"]}' | \
+  run "$SCRIPTS/gi-sensitive.py" --classify
+printf '%s' '[]' | run "$SCRIPTS/gi-sensitive.py" --classify
+printf '%s' '{"labels":"x"}' | run "$SCRIPTS/gi-sensitive.py" --classify
+for f in tests/fixtures/sensitive-gate/*.json; do
+  run "$SCRIPTS/gi-sensitive.py" --adjudicate < "$f"
+done
+printf '%s' '{"probes":{}}' | run "$SCRIPTS/gi-sensitive.py" --adjudicate
+printf '\xff' | run "$SCRIPTS/gi-sensitive.py" --adjudicate
+
+# gi-premise — blocked, unblocked, rejected revisions and malformed ledgers.
+for f in tests/fixtures/premise-reset/*.json; do
+  run "$SCRIPTS/gi-premise.py" < "$f"
+done
+printf '%s' '{"failures":[{"cycle":"1"}]}' | run "$SCRIPTS/gi-premise.py"
+printf '%s' 'not json' | run "$SCRIPTS/gi-premise.py"
+
 # gi-branch — derive a name locally (never --from-issue here: that needs gh).
 run "$SCRIPTS/gi-branch.py" 42 --title "Fix login crash on mobile" --type bug --no-config
 

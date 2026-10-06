@@ -107,6 +107,7 @@ Require `{workspace_contract}` and independently supplied `{expected_lane_identi
   "commits": ["<sha> <subject>"],
   "fixed": [ {"finding_id": "...", "description": "...", "evidence": "file:line or test name"} ],
   "remaining": [ {"finding_id": "...", "description": "...", "reason": "why not fixed"} ],
+  "premise": "One line: the root cause your fix acts on (what you believe is wrong, and where)",
   "summary": "One concise paragraph"
 }
 

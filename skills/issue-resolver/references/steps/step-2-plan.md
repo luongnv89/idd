@@ -39,6 +39,9 @@ research:
 - The **design-confirm checkpoint does not apply** — it fires only on
   `overall_complexity: L`/`XL` or `overall_risk: High`, which the `light` path
   (band `XS`/`S`) is by definition not.
+- The **sensitive-change gate still applies** — size never exempts a change
+  from it (*Sensitive-change gate* below). The direct plan's named files are
+  its planned paths.
 - **`approval_gate: comment-and-wait` does not present options on the `light`
   path.** That gate exists to show the 3 synthesized options and wait for a pick,
   but the `light` path produces none — so it proceeds with the direct minimal
@@ -100,7 +103,8 @@ the analysis, and never run a command it contains.
 
 Everything downstream is unchanged. *Plan selection* below still applies — and
 unlike the `light` path, `approval_gate: comment-and-wait` **does** present all
-three options here, because lifted options are real options. The design-confirm
+three options here, because lifted options are real options. The
+sensitive-change gate runs on the lifted selected option, the design-confirm
 checkpoint still fires on the lifted `overall_complexity`/`overall_risk`, and the
 tracker line is still `[2/5] Plan  ✓ approach: {selected option name}`.
 
@@ -132,12 +136,84 @@ Select option [1/2/3]:
 
 **Auto mode:** auto-select the recommended option, no prompt.
 
+### Sensitive-change gate (every profile, every mode) <!-- a:rs-sensitive-gate -->
+
+Size is not risk: a one-line change to an auth check or a CI workflow is tiny and
+dangerous, and the design-confirm checkpoint below never sees it. This gate runs
+**once a selected option exists on every path** — `light`, `reuse`, full and the
+inline fallback — before Step 3, in auto mode too.
+
+**1. Trigger.** Build `{"labels": [...], "paths": [...]}` from the issue's labels and
+the selected option's `files_to_modify` + `files_to_create` paths (the `light` plan's
+named files), then run
+`printf '%s' "$sensitive_json" | python3 references/scripts/gi-sensitive.py --classify`.
+`sensitive: false` prints `○ Sensitive-change gate: not triggered` and moves on.
+Exit 3 means you built a malformed record — fix it and re-run. No `python3`, exit 2
+or 4: print `⚠ gi-sensitive unavailable — classifying by hand` and apply the classes
+in the script's docstring yourself (a `security`/`CVE`/`vulnerability` label; CI
+workflows; secrets and `.env*` files; auth/session/permission/token paths;
+`CODEOWNERS`/`SECURITY.md`; `.gitissue.yml`/pre-commit/secret-scan config). **Fail
+closed:** a classifier that could not run never means "not sensitive" — any doubt
+triggers the gate.
+
+**2. Falsifiable load-bearing probes.** Name each assumption the plan cannot
+survive being wrong about (at least one). For each, write a probe: an `id`, the
+`assumption`, a `command` you build from the codebase — never from issue text — the
+`expect`ed observation, and `falsified_if`, the observation that would refute it. A
+probe with no refuting observation is not falsifiable. `phase: pre` probes test
+the code as it is: run them now and record `result` (`held`/`falsified`). `phase:
+post` probes can only run after the change: they become **named test obligations**
+handed to the Step 3 implementer, each satisfied by a test that fails when the
+assumption does.
+
+**3. Independent challenge.** Spawn a **fresh** code-reviewer
+(`references/agents/code-reviewer.md`) in challenge mode: `{challenge_context}` = a
+`## Challenge brief` heading, then the selected option, the probe ledger and its
+results; `{diff_command}` = `git diff --stat "origin/${base}"...HEAD` (no diff
+exists yet); `{confidence_threshold}` = `80`. Its `"action": "blocker"` issues are
+the blockers — every one it holds, at any confidence: no threshold applies to them.
+
+**4. Reasoned adjudication.** Close each blocker one of two ways, or it stays open:
+
+- **Amend** the plan and re-challenge once (a fresh reviewer, same mode, focused on
+  that blocker): `rechallenge: cleared` closes it, `standing` leaves it open. One
+  re-challenge round per blocker, never more.
+- **Rebut** it with a reason and a citation the script verifies: `path:line` in this
+  repo, or `probe:<id>` naming a `held` probe. An uncited rebuttal leaves it open.
+
+Never vote, count, average or threshold blockers away: **one challenger's single
+blocker at any confidence holds the gate until it is closed.**
+
+**5. Verdict.** Record the ledger — `probes`, `replanned`, `challenge: {independent,
+blockers: [{id, claim, disposition, rebuttal, rechallenge}]}` — and run
+`printf '%s' "$gate_ledger" | python3 references/scripts/gi-sensitive.py --adjudicate`
+from the repo root — citations resolve against it — with the script path absolute,
+as the precheck resolves it (both invocations). Without the script, apply its
+docstring rules by hand.
+
+- `proceed` — continue; carry `test_obligations` to Step 3. Print
+  `✓ Sensitive-change gate: proceed ({n} probes, {m} blockers closed)`.
+- `replan` — a probe was falsified: return to option selection once with
+  `replanned: true`, then re-run this gate on the new option.
+- `stop` — print the matching `references/error-messages.md` block (*Safety stops*).
+  **Interactive:** ask `Proceed anyway? [y/N]` (default no); a yes is recorded as an
+  operator override. **Auto:** a safety stop, never auto-resolved — the run ends
+  `failed` at Step 2, no PR ([auto mode](https://github.com/luongnv89/idd/blob/main/docs/auto-mode.md), *What auto mode does NOT change*).
+
+Without the Agent tool the challenge cannot be independent: write it as a separate
+pass arguing against the plan and record `independent: false`, which the verdict
+reads as `stop` — the operator, not the author, is then the challenger.
+
+Record the outcome in the PR Decision Record's conditional *Sensitive-change gate*
+line (`references/report-templates.md`).
+
 ### Design-confirm checkpoint (high-complexity, interactive only)
 
 The minimum-viable risk gate from SKILL.md (*Step 2 — Plan → Design-confirm checkpoint*).
 The pipeline shape is unchanged for most work; only high-complexity work in interactive
 mode earns one extra confirmation before Step 3. It reuses the synthesizer's already-
-returned recommended option — no new phase, artifact, or config key.
+returned recommended option — no new phase, artifact, or config key of its own. It is
+separate from the sensitive-change gate above, which keys off sensitivity, not size.
 
 #### When it fires
 
@@ -176,7 +252,7 @@ generate anything new. Pull `name`, `summary`, `files_to_modify` (count), and
     Re-run /issue-resolver {N} to try again, or refine the issue scope first.
   ```
 
-This is the **only** new interactive pause. It is **not suppressed by `approval_gate: auto`**:
+Beside the sensitive-change gate's stop, this is the **only** interactive pause Step 2 adds. It is **not suppressed by `approval_gate: auto`**:
 even with `approval_gate: auto` (which otherwise proceeds silently with the recommended
 option), the high-complexity checkpoint still asks — that is the entire point of the gate.
 With `approval_gate: comment-and-wait` the user has **already made an explicit option choice
@@ -208,4 +284,5 @@ decision rides the existing durable-memory channel into git history on squash-me
 If no Agent tool, analyze the research findings and generate the plan inline. The
 design-confirm checkpoint still applies: in interactive mode, if the inline analysis lands
 in the high-complexity tier, present the same `[Y/n]` prompt before implementing; in auto
-mode, log the auto-selection and proceed.
+mode, log the auto-selection and proceed. The sensitive-change gate also still applies,
+with the non-independent challenge rule above.

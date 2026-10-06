@@ -119,6 +119,8 @@ references/scripts/gi-gh.py
 references/scripts/gi-issue.py
 references/scripts/gi-state.py
 references/scripts/gi-receipt.py
+references/scripts/gi-sensitive.py
+references/scripts/gi-premise.py
 ```
 
 ---
@@ -209,7 +211,7 @@ Decide **before Step 1** how much pipeline this issue earns; the `XS … XL` sca
 | Step | `light` behavior |
 |------|------------------|
 | 1 — Research | Lighter pass; the already-resolved check still runs. |
-| 2 — Plan | Do **not** spawn the synthesizer; derive a minimal plan inline, no design-confirm checkpoint. **Unless *0h* set `analysis_reuse = fresh`**: *Step 2 — Plan → `reuse`* governs, options are **lifted**, and the design-confirm checkpoint **does** apply. |
+| 2 — Plan | Do **not** spawn the synthesizer; derive a minimal plan inline, no design-confirm checkpoint; the sensitive-change gate **still runs**. **Unless *0h* set `analysis_reuse = fresh`**: *Step 2 — Plan → `reuse`* governs, options are **lifted**, and the design-confirm checkpoint **does** apply. |
 | 3 — Propose relevant skills | Skip propose/install; `selected_skills = []`. **Leftover teardown still runs** (*Step 3*), except in a parallel lane (`IDD_CALLER_WORKTREE=1`). |
 | 4 — QA | Cap the loop at **1** cycle; one reviewer spawn still runs. |
 | 5 — Deliver | **Unchanged**. |
@@ -239,6 +241,10 @@ Generate options and select one. Spawn the synthesizer (`shared/agents/synthesiz
 
 **Profiles.** `light` — see the profile table in *Step 0g*. `analysis_reuse = fresh` (*0h*) skips the same spawn but **wins Step 2 when both apply** — a replacement, not an addition: lift `options[]`, `recommended_option`, `overall_complexity`, `overall_risk` from the analysis, each `rejection_reason` from `decision_record.options_rejected[]` (*→ `reuse`*).
 
+### Sensitive-change gate (every profile, every mode)
+
+Size never exempts a change. Once an option is selected, `shared/scripts/gi-sensitive.py --classify` checks the labels and planned paths; when sensitive, run falsifiable load-bearing probes, a **fresh** code-reviewer challenge, and adjudication where one unrebutted blocker at any confidence holds the plan. `--adjudicate` decides; `stop` is a safety stop in auto mode (*Step 2 — Plan → Sensitive-change gate*).
+
 ### Design-confirm checkpoint (high-complexity, interactive only)
 
 **Exactly one** extra agreement point before code is written, when **both** hold: `overall_complexity: L`/`XL` or `overall_risk: High`, **and** interactive mode (`--auto`/`IDD_AUTO_MODE=1` never pauses). Accept (default) → Step 3; decline → stop, recorded in the PR Decision Record (*Step 2 — Plan → Design-confirm checkpoint*).
@@ -257,7 +263,7 @@ Then spawn the implementer (`shared/agents/implementer.md`) with the plan, branc
 
 ## Step 4 — QA
 
-Loop: review → test → fix until clean or the cycle cap — light=1 (profile table in *Step 0g*); full+low/medium=2; full+high=`resolve.qa_max_cycles`. Record `ceiling`/`breach_reason`.
+Loop: review → test → fix until clean or the cycle cap — light=1 (profile table in *Step 0g*); full+low/medium=2; full+high=`resolve.qa_max_cycles`. Record `ceiling`/`breach_reason`. **Premise reset:** two failed fixes sharing a premise block the next fix — cap and interactive continue included — until rerunnable diagnostics support a revised premise; `shared/scripts/gi-premise.py` decides (*Step 4 — QA → Premise reset*).
 
 ### Spawning the code reviewer
 

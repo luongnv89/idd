@@ -1,0 +1,25 @@
+{
+  "failures": [
+    {
+      "cycle": 1,
+      "premise_id": "A",
+      "premise": "the cache key omits the locale"
+    },
+    {
+      "cycle": 2,
+      "premise_id": "B",
+      "premise": "wrong TTL"
+    },
+    {
+      "cycle": 3,
+      "premise_id": "A",
+      "premise": "the cache key omits the locale"
+    }
+  ],
+  "_expect": {
+    "blocked": true,
+    "blocking_premises": [
+      "A"
+    ]
+  }
+}
