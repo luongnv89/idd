@@ -24,6 +24,8 @@ Each cycle:
    handoff marker*). Nothing recorded ⇒ omit the whole `tests=` field; never substitute the head SHA.
    Keep the exact suite command beside it, as `tests_command`. Deliver's
    revision receipt records it with the count and SHA (*Revision receipt*).
+   Then run the *Verification recipe* below on the same tree. A `result: fail`
+   counts as a failing test.
 3. **Evaluate results:** <!-- a:rs-qa-evaluate -->
    - Reviewer returns `PASS` AND all tests pass AND build succeeds → exit loop, QA passed.
    - Issues found → delegate fixes, then start next cycle.
@@ -103,6 +105,29 @@ One `○` line per skip, per docs/terminal-style.md:
 ```
 ○ Test suite: skipped (last green 128@9f2c1ab == HEAD)
 ```
+
+### Verification recipe <!-- a:rs-verification-recipe -->
+
+The contract, opt-in, lifecycle and verdict handling live in `docs/ui-review.md`
+(*Verification recipe*). These are the resolver's deltas:
+
+- **Call:** in auto mode export `IDD_AUTO_MODE=1` first, then from the repo root
+  run:
+  ```bash
+  git diff --name-only "origin/${base}"...HEAD | python3 shared/scripts/gi-recipe.py --ref "origin/${base}" --consumer resolve --changed -
+  ```
+  In interactive mode, add `--plan` to the same call first and ask. A decline
+  skips the recipe for the rest of this run.
+- **When:** in every cycle, right after the suite, so the cycle that exits clean
+  ran the recipe on the commit it hands off. The suite's *Last-green test state*
+  skip also skips the recipe, and the previous verdict carries over.
+- **Findings:** for `result: fail`, give the fixer each failed capability's name
+  and its `drive.log` path. The cycle is not clean.
+- **Record** `recipe_state`, the `ran` verdict of the cycle that exits clean. Its
+  `evidence` paths become the revision receipt's `artifacts`, and the Decision
+  Record's *Verification recipe* line reports it. `absent`, `skipped`, a decline
+  and a degrade record nothing.
+- **Exit 3** stops the run. In auto mode the run ends `failed` with no PR.
 
 ### Loop controls <!-- a:rs-qa-loop-controls -->
 

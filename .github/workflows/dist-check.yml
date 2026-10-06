@@ -370,6 +370,9 @@ jobs:
       - name: test-state-scope-522
         run: bash tests/test-state-scope-522.sh
 
+      - name: test-verification-recipes-523
+        run: bash tests/test-verification-recipes-523.sh
+
       - name: test-followup-context-285
         run: bash tests/test-followup-context-285.sh
 

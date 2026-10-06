@@ -170,7 +170,16 @@ FAIL=0
 # trusted only beside a revision receipt): +700 across its bundled copies, so
 # 555,262 + 700 = 555,962; the line keeps six bytes of headroom, so the
 # ratchet is not widened.
-BUDGET=555968
+#
+# Issue #523 is the seventh raise. Its AC needs the verification-recipe
+# contract (base-ref source, per-consumer auto opt-in, owned-only lifecycle,
+# evidence store, verdict handling) in its one shared home, ui-review.md, which
+# ships to 2 skills (issue-resolver, issue-pr-review). The schema itself lives
+# in gi-recipe.py's docstring, not here. A 3,560-byte first draft was cut to
+# 2,066, and the browser leg's duplicated report-only paragraphs paid back 694
+# more, leaving +1,372 per copy: measured 555,962 + 2,744 = 558,706; the line
+# keeps six bytes of headroom, so the ratchet is not widened.
+BUDGET=558712
 
 pass() { echo "  ✓ $1"; PASS=$((PASS + 1)); }
 fail() { echo "  ✗ $1"; FAIL=$((FAIL + 1)); }

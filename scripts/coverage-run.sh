@@ -172,6 +172,39 @@ printf '%s' '{"recommended":2,"options":[{"number":1}]}' | run "$SCRIPTS/gi-sket
 printf '%s' '[]' | run "$SCRIPTS/gi-sketch.py"
 printf '\xff' | run "$SCRIPTS/gi-sketch.py"
 
+# gi-recipe — absent, plan, auto skip, a passing and a failing run, a launch
+# that never becomes ready, and an invalid recipe, against a throwaway repo.
+RCP="$TMP/recipe-repo"
+git init -q -b main "$RCP"
+rcp_commit() { git -C "$RCP" add -A && git -C "$RCP" -c user.email=c@example.invalid -c user.name=cov commit -q -m "$1"; }
+rcp() { printf 'index.html\n' | GIT_DIR="$RCP/.git" GIT_WORK_TREE="$RCP" "$PY" -m coverage run -a --rcfile="$RC" \
+  "$SCRIPTS/gi-recipe.py" --ref main --consumer resolve --changed - "$@" >/dev/null 2>&1 || true; }
+printf '<h1>cov</h1>\n' > "$RCP/index.html" && rcp_commit init
+rcp
+cat > "$RCP/.gitissue-recipe.json" <<'EOF'
+{"version": 1, "auto": ["review"],
+ "launch": {"command": ["python3", "-m", "http.server", "{port}", "--bind", "127.0.0.1"],
+            "ready": {"url": "/index.html", "timeout_s": 20}},
+ "capabilities": [{"name": "page", "paths": ["*.html"], "drive": ["true"]},
+                  {"name": "broken", "drive": ["sh", "-c", "exit 3"]},
+                  {"name": "other", "paths": ["src/*"], "drive": ["true"]}],
+ "cleanup": [["true"]]}
+EOF
+rcp_commit recipe
+rcp --plan
+rcp --auto
+rcp
+printf '%s' '{"version":1,"launch":{"command":["sleep","5"],"ready":{"url":"/","timeout_s":1}},"capabilities":[{"name":"x","drive":["true"]}]}' > "$RCP/.gitissue-recipe.json"
+rcp_commit unready
+rcp
+printf '%s' '{"version":1,"app_url":"http://example.com","launch":{"command":["true"],"ready":{"url":"/"}},"capabilities":[]}' > "$RCP/.gitissue-recipe.json"
+rcp_commit invalid
+rcp
+printf '{' > "$RCP/.gitissue-recipe.json" && rcp_commit malformed
+rcp
+GIT_DIR="$RCP/.git" GIT_WORK_TREE="$RCP" "$PY" -m coverage run -a --rcfile="$RC" \
+  "$SCRIPTS/gi-recipe.py" --ref nope --consumer review --changed /dev/null >/dev/null 2>&1 || true
+
 # gi-branch — derive a name locally (never --from-issue here: that needs gh).
 run "$SCRIPTS/gi-branch.py" 42 --title "Fix login crash on mobile" --type bug --no-config
 

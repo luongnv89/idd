@@ -60,6 +60,7 @@ references/scripts/gi-ci-wait.py
 references/scripts/gi-gh.py
 references/scripts/gi-issue.py
 references/scripts/gi-receipt.py
+references/scripts/gi-recipe.py
 ```
 
 ```text
@@ -228,6 +229,8 @@ This skill produces `acceptance_criteria` and `traceability` itself, per `refere
 - **`review.run_tests` is false:** skip; report `○ tests skipped (review.run_tests: false)`.
 - **Under `qa_handoff = trusted`, skip this step** and report `○ tests skipped (qa handoff @ {commit_sha_short})` — `trusted` holds only against the **live** head, so the soft-pass conjunction therefore treats the test leg as satisfied — only when the marker carries a `tests=` field whose SHA equals `head` **and `ci_leg_runnable` is true**; with no `tests=` field, or a SHA that differs, run the step in full. When `ci_leg_runnable` is false (no CI / empty `statusCheckRollup` / `no_ci` / `review.check_ci: false`), ignore `tests=` and run the local suite as unmarked.
 - **Otherwise:** run the build, then every test type present, with a `review.test_timeout`-second timeout (default 300) — `references/prepass-tests-ci-mechanics.md` (*Step 4*).
+
+**Verification recipe:** when the base branch commits `.gitissue-recipe.json`, run it in this step with `references/scripts/gi-recipe.py`, even when the suite is skipped (`qa_handoff = trusted` included). Auto mode runs it only when the recipe opts in `review`. A `result: fail` is fixable and blocks soft-pass (`references/ui-review-mechanics.md`, *Verification recipe*).
 
 A skip satisfies the soft-pass test leg but evaluated neither check: it reports `× Suite passed` / `× Build clean` with `Result: PARTIAL`, never a silent `√`.
 
