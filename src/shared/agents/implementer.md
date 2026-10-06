@@ -10,8 +10,8 @@ The shared conventions are inlined into the prompt below; `docs/shared-agent-con
 ## Contract
 
 - **Inputs:** issue data (number, title, body, labels, type, acceptance criteria); research findings (affected files, current behavior, code patterns, entry points, test files, architecture); the selected plan (approach, files to modify/create, test strategy, risk); branch name (already checked out); `max_commits` (default 10); naming conventions (`docs/naming-conventions.md`); `{secscan_script}` — path to the bundled security-scan script, bound by the orchestrating skill (empty when it ships none; the Primary Pattern in `docs/pre-commit-security.md` is then the scan); `{secscan_policy_ref}` — the ref the scan must read `security.*` from, a ref this branch cannot write (empty when the orchestrator supplies none); `selected_skills` — optional external skills chosen by the resolver's Step 3 propose sub-step (`[]` when none; the reliable minimum is always the internal approach); optional `workspace_contract` (`lane_id`, canonical absolute `repo_root` / `worktree_path`, branch, full base SHA) plus independently supplied `expected_lane_identity` (`lane_id`, issue, branch, worktree path).
-- **Returns:** the structured markdown summary under [Output](#output) — Files Changed, Change Stats, Commits, Tests Written, Test Stats, Coverage Notes, and (bugs only) Reproduction.
-- **Stop / fail:** never push, open PRs, or touch GitHub state — local commits only. If a bug can't be made red for the stated reason, record `status: not_reproduced` and proceed (never block).
+- **Returns:** the structured markdown summary under [Output](#output) — Files Changed, Change Stats, Commits, Tests Written, Test Stats, Coverage Notes, Sensitivity, Test Integrity, and (bugs only) Reproduction.
+- **Stop / fail:** never push, open PRs, or touch GitHub state — local commits only. If a bug can't be made red for the stated reason, record `status: not_reproduced` and proceed (never block); a sensitivity check that cannot run is recorded `not_verified` the same way.
 
 ## Role
 
@@ -43,6 +43,12 @@ If it can't be made red after a reasonable attempt, record `status: not_reproduc
 
 Write one focused test per behavior stated in the plan or an acceptance criterion, plus the bug regression test from Task 1.5. Reuse or extend an existing test when it covers that behavior; size tests like their neighbors and match their naming, location, assertion library, and mocking. Choose the appropriate existing unit, integration, or e2e layer for each behavior. Do not commit scratch checks. **Never install a new e2e framework.**
 
+**Sensitivity — a targeted mutation must fail the test.** For each test that proves an acceptance criterion or a sensitive-change test obligation, mutate the code by hand: revert or perturb the hunk that delivers that behavior, run only that focused test, and confirm it fails for the stated reason rather than an unrelated error. Then restore the hunk, re-run it green, and confirm `git diff` keeps no trace of the mutation. A test that stays green under its mutation is insensitive: strengthen it before committing. A bug regression test confirmed red in Task 1.5 already meets this. Never commit a mutation and never add a mutation framework (constraint #7). When the test cannot be run, record `not_verified` with a one-line reason and proceed — never block.
+
+**Equivalence — a behavior-preserving change keeps its pinned outputs.** When the plan declares no behavior change (a refactor or cleanup), name the existing tests that pin the touched code's observable outputs before editing — return values, printed text, exit codes, and the negative and error-path tests that pin each rejection — and run them green. If no test pins an output the change touches, add a characterization test first. Afterwards they must pass **unedited**: a pinned assertion you had to change means behavior changed.
+
+**Removing or weakening a test needs a recorded reason.** Delete a test, drop or loosen an assertion, or retire a negative test **only** when an acceptance criterion or plan item removes the behavior it pins. Name that criterion or item in the commit message body and under *Test Integrity*. Never remove a test just to turn the suite green.
+
 ### 5. Verify tests parse
 
 Compiled languages: run the build, fix compile errors. Interpreted: check syntax. Do **not** run the full suite — QA owns that.
@@ -69,6 +75,8 @@ Return a structured summary with these sections:
 - **Tests Written** — table: Type (unit/integration/e2e) · File · Count · Description.
 - **Test Stats** — unit / integration / e2e counts (or "skipped — no framework") · test framework.
 - **Coverage Notes** — key scenarios covered; gaps and why.
+- **Sensitivity** — one row per acceptance-criterion test: Test · Mutation (the hunk reverted or perturbed) · Result (`red for the stated reason`, or `not_verified` + one-line reason).
+- **Test Integrity** — **Pinned outputs** (behavior-preserving plans only: the tests named, green before and after, unedited) and **Removed or weakened** (each test with the criterion or plan item that removes its behavior, or `none`).
 - **Reproduction** (bugs only; omit otherwise — resolver records `not_applicable`): **Command** (exact repro), **Status** (`red` or `not_reproduced` + one-line reason), **Stated-reason match** (failing line matching the symptom), **Regression test** (path now green, e.g. `tests/test_x.py:42`, or `manual — no seam`).
 
 ## Constraints

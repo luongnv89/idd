@@ -47,6 +47,7 @@ Analyzed at: `{branch} @ {commit_sha_short}` ({YYYY-MM-DD})
 - E2e tests: {count} passed (or skipped)
 - Build: passed
 - QA cycles: {count}
+- Test integrity: {pinned: `<tests>` green before and after, unedited — behavior-preserving plans only}; {removed or weakened: `<test>` — <criterion or plan item>, or "none"}
 
 ## Acceptance Criteria Verification
 
@@ -58,6 +59,8 @@ Analyzed at: `{branch} @ {commit_sha_short}` ({YYYY-MM-DD})
 Use `pass`, `fail`, or `unverified` per criterion. Always cite evidence (a file path, a test name, or a one-line explanation). If the issue has no acceptance criteria, replace the table with `> **Note:** No acceptance criteria defined — manual review recommended.`
 
 **Bug issues — reproduction evidence.** When the issue `type` is `bug`, the Evidence column must cite the reproduction command from the Step 3 bug-verification checkpoint (`references/bug-verification.md`), not just a checkmark. Format the cell as `Verified red: <command> → fixed → <regression test path>` (or `… → manual repro, no seam` when no test seam exists). If the symptom could not be reproduced, mark that criterion `unverified` and note `not reproduced: <reason>`.
+
+**Every issue — sensitivity evidence.** A criterion proved by a test cites the implementer's *Sensitivity* row (*Step 3 — Sensitivity and test integrity*): `Sensitive: <test> fails with <mutation> → restored green`. A `not_verified` row marks that criterion `unverified` and notes `sensitivity not verified: <reason>`.
 
 <!-- gitissue:qa v1 head={head_sha} profile={profile} cycles={qa_cycles} review=clean tests={test_count}@{tests_sha} ui={ui_legs}:{ui_result}@{ui_sha} --> {omit this entire line unless QA exited clean, and omit the ` tests=…` field when no final suite ran — see *QA handoff marker* below}
 ```

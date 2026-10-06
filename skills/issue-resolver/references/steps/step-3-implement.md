@@ -270,6 +270,19 @@ install) but **still runs leftover teardown** (outside a parallel lane).
 2. One focused test per behavior stated in the plan or an acceptance criterion, plus the bug regression test; reuse existing coverage and size tests like their neighbors
 3. Tests in the appropriate existing unit, integration, or e2e layer; no new e2e framework and no committed scratch checks
 4. All committed following conventional commit format
+5. The *Sensitivity* and *Test Integrity* records below
+
+### Sensitivity and test integrity (every issue type) <!-- a:rs-test-sensitivity -->
+
+Rules: `references/agents/implementer.md`, Tasks 2–4. A hand-made mutation of the
+hunk behind each acceptance-criterion test must turn it red, then is restored —
+never a mutation framework, never the full suite, never a committed mutation.
+A **no behavior change** plan keeps its pinned tests, negative ones included,
+passing **unedited**. A test goes only when a criterion or plan item removes its
+behavior — no blanket ban. *Sensitivity* rows feed the AC Evidence column and
+*Test Integrity* the Test Results (`references/report-templates.md`) and the
+Step 4 reviewer. **Auto mode never blocks:** a check that cannot run is
+`not_verified`, its criterion `unverified`.
 
 ### Bug verification checkpoint (bug issues only)
 

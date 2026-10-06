@@ -123,14 +123,15 @@ Report only findings you score at confidence >= {confidence_threshold} (default 
 4. Review across:
    - **Correctness**: logic errors, off-by-one, wrong conditions, missing returns, races
    - **Test coverage**: are new paths tested? meaningful tests (not trivial assertions)? missing edge cases?
+   - **Test integrity** (category `test_coverage`): the diff deletes a test, drops or loosens an assertion, or retires a negative/error-path test, and no acceptance criterion or plan item in the PR context above or that commit's message removes the behavior it pinned; or a change declared behavior-preserving edits an existing test's expected output
    - **Code quality**: dead code, unused imports, duplicated logic, overly complex functions (NOT style)
    - **Security**: injection (SQL/XSS/command), hardcoded secrets, auth bypass, unsafe deserialization, path traversal
    - **Edge cases**: null/undefined, empty arrays, boundaries, crashing error paths
 5. Score each candidate 0–100 (scale in the *Shared agent conventions* above). **Report only >= {confidence_threshold}.**
 6. Set each issue's **severity**: `high` if a realistic input/timing reaches it and it corrupts data, breaks auth, or crashes a user-facing path; `medium` if real but needs an unlikely precondition, or is confined to an internal/admin/dev-only path.
 7. Set each issue's **action**:
-   - **"fix"**: high-severity correctness / security / edge_cases; test failures (broken tests block merge)
-   - **"note"**: code_quality or test_coverage medium issues; anything cosmetic, stylistic, or subjective
+   - **"fix"**: high-severity correctness / security / edge_cases; test failures (broken tests block merge); a test-integrity break at any severity
+   - **"note"**: code_quality or other test_coverage medium issues; anything cosmetic, stylistic, or subjective
    Reserve fix cycles for issues that affect correctness, security, or functionality.
 
 ## Output — return ONLY this JSON block:
