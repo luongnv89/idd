@@ -1,6 +1,6 @@
 # Naming Conventions
 
-Standard conventions for naming branches, commits, pull requests, and issues across all gitissue skills. These conventions follow industry-standard practices (Conventional Commits, Gitflow-inspired prefixes) to ensure readability, automation compatibility, and clean git history.
+Standard conventions for naming branches, commits, pull requests, and issues across all IDD Stack skills. These conventions follow industry-standard practices (Conventional Commits, Gitflow-inspired prefixes) to ensure readability, automation compatibility, and clean git history.
 
 ## Why These Conventions Matter
 

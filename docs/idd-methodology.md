@@ -55,7 +55,7 @@ This context-gathering phase often takes longer than the fix itself. For AI agen
 
 IDD standardizes the path from intention to implementation as five phases. Each phase answers one question, and each is independently useful:
 
-| Phase | Question it answers | gitissue reference implementation |
+| Phase | Question it answers | IDD Stack reference implementation |
 |-------|--------------------|-----------------------------------|
 | **Capture** | What does the reporter actually want? | `/issue-creator`; `/plan-to-issues` for a whole plan |
 | **Normalize** | Does an existing issue state that intent clearly? | `/issue-creator N` |
@@ -69,7 +69,7 @@ The phases are the methodology; the commands are one implementation of it. A tea
 
 ## The IDD Workflow
 
-In the gitissue reference implementation, the phases map onto commands like this:
+In the IDD Stack reference implementation, the phases map onto commands like this:
 
 ```mermaid
 graph TD
@@ -104,7 +104,7 @@ IDD makes intention capture an explicit, iterative dialogue rather than a form t
 4. **Read back what was captured** — and realize what you actually meant, what's missing, what's imprecise
 5. **Refine through conversation** — correct, add detail, sharpen the intent until the issue says exactly what you want
 
-This loop does something no template or form can do: it helps you **discover your own intention**. The interviewer — in gitissue, the `/issue-creator` agent — acts as both a mirror and a structured elicitor: reflecting your input back in a standardized format, and asking a precise question exactly when ambiguity would otherwise be guessed at. The questioning is targeted, not an interrogation: it engages only on fields that are genuinely unclear, and adds no friction when intent is already plain.
+This loop does something no template or form can do: it helps you **discover your own intention**. The interviewer — in IDD Stack, the `/issue-creator` agent — acts as both a mirror and a structured elicitor: reflecting your input back in a standardized format, and asking a precise question exactly when ambiguity would otherwise be guessed at. The questioning is targeted, not an interrogation: it engages only on fields that are genuinely unclear, and adds no friction when intent is already plain.
 
 By the time the issue is finalized, it represents what the creator wants in a format that both humans and AI agents can inspect, question, and execute against. The structured issue becomes the **source of truth for intended behavior** — every downstream phase starts from it.
 
@@ -153,7 +153,7 @@ Low-confidence fields are marked `(needs review)` so reviewers know to verify. A
 IDD issues are plain tracker markdown. Any tool that can read an issue can consume the structured format:
 
 - **Claude Code** — reads the issue, follows the resolve pipeline
-- **Codex CLI / Gemini CLI** — same structured issue, no gitissue-specific dependencies
+- **Codex CLI / Gemini CLI** — same structured issue, no IDD Stack-specific dependencies
 - **Human developers** — readable sections, clear acceptance criteria
 - **Future agents** — anything that can read markdown and follow a documented issue contract
 
@@ -220,7 +220,7 @@ IDD's unit of work is the issue, but larger efforts need one level above it: whe
 - **Each child** carries `Part of #N` in its body — the hierarchy marker defined in [SPEC.md §2.1](https://github.com/luongnv89/idd/blob/main/SPEC.md). Same grammar as `Depends on #N`: plain prose, case-insensitive, grep-friendly.
 - **Scope is not order.** `Part of #N` says a child contributes to the parent's outcome; it never gates merging. When child B needs child A merged first, B additionally says `Depends on #A` — the two markers answer different questions.
 
-**Decomposing a design document.** A PRD or design doc decomposes top-down: one epic per feature area, then independently resolvable children — each with its own acceptance criteria small enough for a single atomic PR. In gitissue, `/issue-creator`'s **batch mode** is the hook: feed it a PRD section or planning list and it creates the children in one pass; add the `Part of #N` markers and the parent checklist to bind them. The intent–code boundary applies at every level: the epic captures the *why* of the effort, the children capture the *what* of each slice, and no level predicts affected files.
+**Decomposing a design document.** A PRD or design doc decomposes top-down: one epic per feature area, then independently resolvable children — each with its own acceptance criteria small enough for a single atomic PR. In IDD Stack, `/issue-creator`'s **batch mode** is the hook: feed it a PRD section or planning list and it creates the children in one pass; add the `Part of #N` markers and the parent checklist to bind them. The intent–code boundary applies at every level: the epic captures the *why* of the effort, the children capture the *what* of each slice, and no level predicts affected files.
 
 Skills treat the marker conservatively today: `/issue-triage` may group children under their epic as a display signal, and `/auto-pilot`'s merge gate remains driven by `Depends on #N` alone.
 

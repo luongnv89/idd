@@ -114,7 +114,7 @@ Stop.
 Post a backup comment with the original body before making any edits. This is a data safety requirement — if the backup fails, abort entirely. Never edit the issue body without a verified backup.
 
 ```bash
-gh issue comment {N} --body "<details><summary>Original issue body (backup by gitissue)</summary>
+gh issue comment {N} --body "<details><summary>Original issue body (backup by IDD Stack)</summary>
 
 {original_body}
 
@@ -161,7 +161,7 @@ If the marker is missing, stop and report — do not claim normalization succeed
 If `issue.normalize_comment` is true:
 
 ```bash
-gh issue comment {N} --body "🔧 **Normalized by gitissue**
+gh issue comment {N} --body "🔧 **Normalized by IDD Stack**
 
 Added: type classification, acceptance criteria, structured description.
 Original body preserved in Reporter Context block and backup comment above."

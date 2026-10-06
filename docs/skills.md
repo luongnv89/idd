@@ -1,6 +1,6 @@
-# gitissue Skills Reference
+# IDD Stack Skills Reference
 
-This page documents every public skill shipped by gitissue / IDD, what each skill does, and the supported input forms. Skills are invoked as slash commands in an agent session. One skill — `/idd-doctor` — is **repo-internal**: it lives in `src/internal-skills/`, is excluded from the built `skills/` and `dist/` surface (see `docs/ARCHITECTURE.md`), and is not distributed for external install.
+This page documents every public skill shipped by IDD Stack, what each skill does, and the supported input forms. Skills are invoked as slash commands in an agent session. One skill — `/idd-doctor` — is **repo-internal**: it lives in `src/internal-skills/`, is excluded from the built `skills/` and `dist/` surface (see `docs/ARCHITECTURE.md`), and is not distributed for external install.
 
 ## Quick map
 
@@ -29,7 +29,7 @@ This page documents every public skill shipped by gitissue / IDD, what each skil
 
 ## `/init-gitissue`
 
-Initializes IDD configuration for the current repository by detecting language, framework, test runner, and repo size, then writing `.gitissue.yml`.
+Initializes IDD Stack configuration for the current repository by detecting language, framework, test runner, and repo size, then writing `.gitissue.yml`.
 
 ### Input options
 
@@ -261,7 +261,7 @@ The loop pauses only for critical unresolved review failures, because that decis
 ### Requirements
 
 - Requires `git`, authenticated `gh`, GitHub remote, push access, and merge permission.
-- Requires the core IDD skills from the same distribution: `issue-triage`, `issue-analysis`, `issue-resolver`, and `issue-pr-review`.
+- Requires the core IDD Stack skills from the same distribution: `issue-triage`, `issue-analysis`, `issue-resolver`, and `issue-pr-review`.
 
 ---
 

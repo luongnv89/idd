@@ -1,6 +1,6 @@
 # Behavioral eval harness
 
-Hermetic, network-free behavioral evaluations for gitissue skills. Cases run a
+Hermetic, network-free behavioral evaluations for IDD Stack skills. Cases run a
 **deterministic subject** (a skill stand-in that produces the same artifacts the
 real skill should) under a PATH-fronted `gh` record/replay shim, then grade
 outputs with **idd-lint** and **gi-runlog** — not prose greps of skill source.

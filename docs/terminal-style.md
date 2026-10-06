@@ -1,6 +1,6 @@
 # Terminal Output Style Contract
 
-The single source of truth for what gitissue skills emit: symbol vocabulary,
+The single source of truth for what IDD Stack skills emit: symbol vocabulary,
 output structure, progress patterns, table and error formats, and the rules for
 confirmations, confidence, first-run, and empty states. `DESIGN.md` (repo root)
 is the human-facing guide layered on top — colors and per-command mockups; where
@@ -12,7 +12,7 @@ the two overlap, this document wins.
 2. **Transparency builds trust.** Show confidence scores, step progress, and what's happening at each phase. No black boxes.
 3. **Errors are help.** When something fails, show what went wrong + how to fix + where to learn more.
 4. **Warmth in empty states.** "No items found" is not a design. Every empty state has context and a next action.
-5. **Distinctive, not decorative.** Step counters, confidence markers, and semantic symbols give gitissue its own feel — not generic AI slop.
+5. **Distinctive, not decorative.** Step counters, confidence markers, and semantic symbols give IDD Stack its own feel — not generic AI slop.
 
 ## Symbol Vocabulary
 
@@ -109,11 +109,11 @@ Always include: what went wrong, how to fix it, where to learn more.
   Apply normalization? [Y/n]
 ```
 
-Default option in uppercase. Alternatives in lowercase.
+Default option uppercase; alternatives lowercase.
 
 ## Confidence Markers
 
-Unique to gitissue. Show honesty about what's inferred:
+Unique to IDD Stack. Show honesty about what's inferred:
 
 ```
   + Files:    auth.py (high), config.py (medium)

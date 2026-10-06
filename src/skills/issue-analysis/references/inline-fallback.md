@@ -41,7 +41,7 @@ After extraction:
 
 ### Step 3 — Research (Deep Codebase Scan)
 
-This is the most thorough codebase scan in the gitissue system — more comprehensive than issue-resolver's Research step.
+This is the most thorough codebase scan in IDD Stack — more comprehensive than issue-resolver's Research step.
 
 ### Phase 3a — Broad search
 

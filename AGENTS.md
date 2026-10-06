@@ -1,8 +1,8 @@
-# AGENTS.md — gitissue / IDD
+# AGENTS.md — IDD Stack
 
 ## Project Overview
 
-gitissue implements Issue-Driven Development (IDD) — a methodology where GitHub issues are the single source of truth for all development work. The product is a set of Codex skills that create, normalize, resolve, and triage GitHub issues.
+IDD Stack implements Issue-Driven Development (IDD) — a methodology where GitHub issues are the single source of truth for all development work. The product is a set of Codex skills that create, normalize, resolve, and triage GitHub issues.
 
 ## Architecture
 

@@ -6,14 +6,14 @@ exact error outputs and the stash-first sync procedure.
 
 ## Skill dependency precheck
 
-`/auto-pilot` delegates work to other gitissue skills. Before any triage,
+`/auto-pilot` delegates work to other IDD Stack skills. Before any triage,
 resolution, review, merge, or repository mutation, verify those skills are
 available in the current agent environment.
 
 If one or more required skills are missing, stop immediately and print:
 
 ```text
-✗ Missing required gitissue skill(s): {missing_skill_list}
+✗ Missing required IDD Stack skill(s): {missing_skill_list}
 
   To fix:  asm install https://github.com/luongnv89/idd
            Select: {missing_skill_list}

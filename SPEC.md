@@ -8,7 +8,7 @@
 
 The key words MUST, MUST NOT, SHOULD, SHOULD NOT, and MAY are to be interpreted as described in [RFC 2119](https://www.rfc-editor.org/rfc/rfc2119).
 
-This document defines the *contract* only. It requires no specific AI agent, editor, CLI, or hosting platform. Any tool — or a human with a text editor — can implement it. [gitissue](README.md) is a reference implementation of this spec for Claude Code + GitHub.
+This document defines the *contract* only. It requires no specific AI agent, editor, CLI, or hosting platform. Any tool — or a human with a text editor — can implement it. [IDD Stack](README.md) is a reference implementation of this spec for Claude Code + GitHub.
 
 ## Terminology
 
