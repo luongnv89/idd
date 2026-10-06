@@ -258,7 +258,7 @@ PY
 }
 write_heartbeat_lock "$D1HB/run.lock"
 heartbeat_before="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["heartbeat"])' "$D1HB/run.lock")"
-run_status out st bash -c "printf '%s' '{\"phase\":\"checkpoint\"}' | python3 '$STATE' --update --dir '$D1HB'"
+run_status out st bash -c "printf '%s' '{\"phase\":\"triage\"}' | python3 '$STATE' --update --dir '$D1HB'"
 heartbeat_after="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["heartbeat"])' "$D1HB/run.lock")"
 if [ "$st" = "0" ] && [ "$heartbeat_after" = "$heartbeat_before" ]; then
   pass "AC3: update without --pid does not refresh a same-run-id foreign lock"
@@ -267,7 +267,7 @@ else
 fi
 write_heartbeat_lock "$D1HB/run.lock"
 heartbeat_before="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["heartbeat"])' "$D1HB/run.lock")"
-run_status out st bash -c "printf '%s' '{\"phase\":\"checkpoint\"}' | python3 '$STATE' --update --dir '$D1HB' --pid 4243"
+run_status out st bash -c "printf '%s' '{\"phase\":\"triage\"}' | python3 '$STATE' --update --dir '$D1HB' --pid 4243"
 heartbeat_after="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["heartbeat"])' "$D1HB/run.lock")"
 if [ "$st" = "0" ] && [ "$heartbeat_after" = "$heartbeat_before" ]; then
   pass "AC3: update with a different pid does not refresh a same-run-id foreign lock"
@@ -276,7 +276,7 @@ else
 fi
 write_heartbeat_lock "$D1HB/run.lock"
 heartbeat_before="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["heartbeat"])' "$D1HB/run.lock")"
-run_status out st bash -c "printf '%s' '{\"phase\":\"checkpoint\"}' | python3 '$STATE' --update --dir '$D1HB' --pid 4242"
+run_status out st bash -c "printf '%s' '{\"phase\":\"triage\"}' | python3 '$STATE' --update --dir '$D1HB' --pid 4242"
 heartbeat_after="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["heartbeat"])' "$D1HB/run.lock")"
 if [ "$st" = "0" ] && [ "$heartbeat_after" != "$heartbeat_before" ]; then
   pass "AC3: update with the correct owner pid refreshes the lock heartbeat"
@@ -838,7 +838,7 @@ fi
 # --update --dry-run must leave the previous state byte-identical.
 printf '{"run_id":"r257"}' | python3 "$STATE" --init --dir "$D7" >/dev/null
 before="$(python3 -c 'import hashlib,sys;print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "$D7/run-state.json")"
-run_status out st bash -c "printf '%s' '{\"phase\":\"merge\"}' | python3 '$STATE' --update --dir '$D7' --dry-run"
+run_status out st bash -c "printf '%s' '{\"phase\":\"triage\"}' | python3 '$STATE' --update --dir '$D7' --dry-run"
 after="$(python3 -c 'import hashlib,sys;print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "$D7/run-state.json")"
 if [ "$st" = "0" ] && [ "$before" = "$after" ]; then
   pass "AC4: --update --dry-run leaves the state byte-identical"
@@ -946,7 +946,7 @@ else
   fail "B4: $inj_fail injection payload(s) reached the run state"
 fi
 # …and a conventional branch still round-trips, or the gate would be useless.
-run_status out st bash -c "printf '%s' '{\"current\":{\"issue\":7,\"branch\":\"fix/7-mobile-auth-redirect\",\"phase\":\"review\"}}' | python3 '$STATE' --update --dir '$D13'"
+run_status out st bash -c "printf '%s' '{\"current\":{\"issue\":7,\"branch\":\"fix/7-mobile-auth-redirect\",\"pr\":87,\"phase\":\"review\"}}' | python3 '$STATE' --update --dir '$D13'"
 if [ "$st" = "0" ] && [ "$(printf '%s' "$out" | jkey current.branch)" = "fix/7-mobile-auth-redirect" ]; then
   pass "B4: a docs/naming-conventions.md branch name still round-trips"
 else

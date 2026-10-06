@@ -328,7 +328,7 @@ VERIFY_BLOCK="$(anchor_span "$SRC_PR" rv-verify-gates rv-step4-tests || true)"
 
 check_block_lacks "$SECSCAN_BLOCK" 'qa_handoff' \
   "T5.15: the gi-secscan invocation carries no qa_handoff conditional"
-check_block_has "$SECSCAN_BLOCK" 'gi-secscan\.py --working-tree' \
+check_block_has "$SECSCAN_BLOCK" 'gi-secscan\.py --staged' \
   "T5.16: (guard) the gi-secscan block was actually located"
 check_block_lacks "$CI_BLOCK" 'qa_handoff' \
   "T5.17: Step 5's CI wait carries no qa_handoff conditional"

@@ -253,6 +253,10 @@ else
 fi
 rm -f "$git_dir42/MERGE_HEAD"
 # A blocked dirty lane must not keep its ready sibling from a serialized drain.
+# The batch was cleared above, so re-plan it first: gi-state refuses a lane
+# that starts anywhere but planned/resolve (issue #522).
+printf '%s' '{"lanes":[{"issue":42,"branch":"feat/42-a","phase":"planned"},{"issue":45,"branch":"fix/45-b","phase":"planned"}]}' \
+  | python3 "$STATE" --update --dir "$TMP/state" >/dev/null
 printf '%s' '{"lanes":[{"issue":42,"phase":"blocked_dirty"},{"issue":45,"phase":"returned","pr":87}]}' \
   | python3 "$STATE" --update --dir "$TMP/state" >/dev/null
 state="$(python3 "$STATE" --read --dir "$TMP/state")"
