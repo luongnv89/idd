@@ -13,7 +13,7 @@ metadata:
 
 Fully autonomous development loop: triage, pick, resolve, review, fix, merge, repeat — zero user prompts.
 
-It orchestrates the other gitissue skills over the backlog. It triages **once** at loop start (reusing a fresh `.gitissue/triage.json`, *Mode Detection*) and picks from that order; with `autopilot.max_parallel` above 1, independent issues resolve concurrently in isolated worktrees, but PRs are reviewed and merged one at a time. After each merge, update the cached order in place. *Merge Modes* decide which PRs merge; a critical issue with unresolved review problems stops the loop for the user.
+It orchestrates the other IDD Stack skills over the backlog. It triages **once** at loop start (reusing a fresh `.gitissue/triage.json`, *Mode Detection*) and picks from that order; with `autopilot.max_parallel` above 1, independent issues resolve concurrently in isolated worktrees, but PRs are reviewed and merged one at a time. After each merge, update the cached order in place. *Merge Modes* decide which PRs merge; a critical issue with unresolved review problems stops the loop for the user.
 
 ## Autonomy Philosophy <!-- a:ap-autonomy -->
 

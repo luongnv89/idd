@@ -10,9 +10,11 @@
 #              a single product brand (IDD Stack) is used on these pages
 #   T8       — the single product brand is IDD Stack (issue #512, superseding
 #              IDD and gitissue): after literal identifiers (.gitissue.yml,
-#              .gitissue/, init-gitissue, gitissue:normalized, the
+#              .gitissue/, init-gitissue, the gitissue:normalized,
+#              gitissue:qa, and gitissue:run-report markers, the
 #              ~/.cache/gitissue path) are removed, no "gitissue" remains on
-#              the website, llms.txt, or the README-level docs
+#              the website, llms.txt, the README-level docs, or
+#              docs/config-schema.md
 #   T9       — "IDD Stack" fills every product-name slot: page titles,
 #              og:site_name, JSON-LD names, llms.txt H1, the plugin
 #              displayName, and the plugin README H1. "IDD" alone stays the
@@ -149,7 +151,7 @@ fi
 brand_out="$(python3 -c '
 import re, sys
 
-allow = re.compile(r"\.gitissue\.yml|\.gitissue/|init-gitissue|gitissue:normalized|cache\}?/gitissue", re.I)
+allow = re.compile(r"\.gitissue\.yml|\.gitissue/|init-gitissue|gitissue:(normalized|qa|run-report)|cache\}?/gitissue", re.I)
 bad = []
 for path in sys.argv[1:]:
     text = open(path, encoding="utf-8").read()
@@ -162,7 +164,7 @@ for line in bad:
 sys.exit(1 if bad else 0)
 ' "$LANDING" "$DOCS" "$CHANGELOG_PAGE" "$LLMS" "$PLUGIN_README" \
   "$REPO_ROOT/README.md" "$REPO_ROOT/CONTRIBUTING.md" "$REPO_ROOT/SPEC.md" \
-  "$REPO_ROOT/docs/skills.md")" && brand_status=0 || brand_status=$?
+  "$REPO_ROOT/docs/skills.md" "$REPO_ROOT/docs/config-schema.md")" && brand_status=0 || brand_status=$?
 if [ "$brand_status" -eq 0 ]; then
   pass "T8: no \"gitissue\" outside literal identifiers on the site, llms.txt, or README-level docs"
 else

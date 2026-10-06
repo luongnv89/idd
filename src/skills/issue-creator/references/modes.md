@@ -351,7 +351,7 @@ Conform to SPEC §2.1: the marker records that the child contributes to parent #
    ```bash
    gh issue view {parent} --json number,body --jq '.body'
    ```
-2. **Modify** in memory: append (or, if a gitissue checklist block already exists, extend) a checklist block listing only the children that were actually created (skip any that failed in Step 5). Use the exact em-dash format from SPEC §2.1 — `- [ ] #N — <title>` (that is a Unicode em-dash `—`, not a hyphen):
+2. **Modify** in memory: append (or, if an IDD Stack checklist block already exists, extend) a checklist block listing only the children that were actually created (skip any that failed in Step 5). Use the exact em-dash format from SPEC §2.1 — `- [ ] #N — <title>` (that is a Unicode em-dash `—`, not a hyphen):
    ```
    ## Children
 
