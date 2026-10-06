@@ -2,8 +2,8 @@
   "headroom_bytes": 1024,
   "skills": {
     "auto-pilot": {
-      "budget": 411636,
-      "measured": 411636
+      "budget": 412508,
+      "measured": 412508
     },
     "init-gitissue": {
       "budget": 130846,
@@ -18,8 +18,8 @@
       "measured": 178257
     },
     "issue-pr-review": {
-      "budget": 267496,
-      "measured": 267496
+      "budget": 273021,
+      "measured": 273021
     },
     "issue-resolver": {
       "budget": 386505,

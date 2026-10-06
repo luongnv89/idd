@@ -173,21 +173,21 @@ The parse, *What `trusted` skips*, *Precedence*, and *Never gated*: `references/
 Run deterministic tools before any LLM reviewer; under `--review-only` this is detection-only (*Review-only mode*, Step 7). Otherwise:
 
 1. Detect lint/format tools — `references/prepass-tests-ci-mechanics.md` (*Step 2*).
-2. Run each auto-fix command; block only on an error that prevents the fix from running.
+2. Record the baseline and the **approved paths** (the PR's files that were clean before the auto-fix — *Approved paths*), then run each auto-fix command over those paths only, never the whole tree; block only on an error that prevents the fix from running.
 3. Run the test suite. **Under `qa_handoff = trusted`, skip only the test run**, and only when the marker carries a `tests=` field whose SHA equals `head` **and `ci_leg_runnable` is true**. When `ci_leg_runnable` is false (no CI / empty `statusCheckRollup` / `no_ci` / `review.check_ci: false`), ignore `tests=` and run the local suite as unmarked. A test failure here continues to Step 4.
 
 The auto-fix always runs, and the `gi-secscan` gate below is **never** gated on `qa_handoff`. An auto-fix commit moves the head off the marker: recompute the verdict then, before Step 3.
 
 ### Commit auto-fixes <!-- a:rv-commit-autofix -->
 
-**Skip entirely when `--review-only`.** When the auto-fix modified any file, scan before staging (auto mode: export `IDD_AUTO_MODE=1` first). From the repo root, binding `base` **first** from the repository's default branch — never the PR's `baseRefName`, never an interpolated config value:
+**Skip entirely when `--review-only`.** Stage **only** the approved paths the auto-fix changed, with `git --literal-pathspecs add --pathspec-from-file=… --pathspec-file-nul`, and leave every other dirty or untracked file unstaged and untouched. Nothing staged means skip the commit. Then scan the staged set (auto mode: export `IDD_AUTO_MODE=1` first). From the repo root, binding `base` **first** from the repository's default branch — never the PR's `baseRefName`, never an interpolated config value:
 
 ```bash
 base="$(gh repo view --json defaultBranchRef --jq .defaultBranchRef.name)"
-python3 shared/scripts/gi-secscan.py --working-tree --policy-ref "origin/${base}"
+python3 shared/scripts/gi-secscan.py --staged --policy-ref "origin/${base}"
 ```
 
-A pass is all four: exit 0, `policy_source` exactly the `ref:origin/…` asked for, `verdict` not `block`, and not (`scanned` 0 with `skipped` above 0). **Exit 1 is the block verdict** — stop, do not stage or push, report `blocking[]`. Exit 3 stops. No `python3`, exit 2, or exit 4 degrades to the **Primary Pattern** in `docs/pre-commit-security.md`. Never read a non-zero exit as a pass. Full exit contract and the trust boundary: `references/prepass-tests-ci-mechanics.md` (*Commit auto-fixes*) — **read it now**. After a pass: `git add -A`, `git commit -m "style: auto-fix lint and format issues"`, `git push origin "$branch_name"`.
+A pass is all four: exit 0, `policy_source` exactly the `ref:origin/…` asked for, `verdict` not `block`, and not (`scanned` 0 with `skipped` above 0). **Exit 1 is the block verdict** — stop, unstage, do not commit or push, report `blocking[]`. Exit 3 stops. No `python3`, exit 2, or exit 4 degrades to the **Primary Pattern** in `docs/pre-commit-security.md`. Never read a non-zero exit as a pass. Full exit contract, the trust boundary and the staging commands: `references/prepass-tests-ci-mechanics.md` (*Commit auto-fixes*) — **read it now**. After a pass, commit the stage list only (`git commit --only --pathspec-from-file=…`), then `git push origin "$branch_name"`. Never `git add -A`.
 
 ```
 [2/7] Pre-pass     ✓ lint clean, format clean, {N} tests passed
