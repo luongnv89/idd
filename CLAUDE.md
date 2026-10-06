@@ -42,7 +42,8 @@ src/
 │       ├── gi-plan-map.py         # Render plan-to-issues' static epic plan map
 │       ├── gi-receipt.py          # Write/verify the revision receipt behind a QA handoff
 │       ├── gi-sensitive.py        # Classify a sensitive change; adjudicate its probe/challenge ledger
-│       └── gi-premise.py          # Premise-reset verdict: block a fix after two shared-premise failures
+│       ├── gi-premise.py          # Premise-reset verdict: block a fix after two shared-premise failures
+│       └── gi-sketch.py           # Design-sketch verdict: distinct designs, invalid transitions rejected
 │
 ├── skills/
 │   ├── auto-pilot/         # /auto-pilot — triage, resolve, review, merge loop

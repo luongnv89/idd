@@ -1,0 +1,66 @@
+{
+  "recommended": 1,
+  "options": [
+    {
+      "number": 1,
+      "shape": "status enum + transition table",
+      "types": "type Status = 'draft' | 'submitted' | 'paid';\nconst next: { [S in Status]: Status[] } = { draft: ['submitted'], submitted: ['paid'], paid: [] };\nfunction advance<F extends Status>(from: F, to: (typeof next)[F][number]): Status { return to; }",
+      "callers": [
+        {
+          "id": "V1",
+          "kind": "valid",
+          "transition": "draft -> submitted",
+          "check": {
+            "exit": 0,
+            "excerpt": ""
+          }
+        },
+        {
+          "id": "X1",
+          "kind": "invalid",
+          "transition": "draft -> paid",
+          "check": {
+            "exit": 2,
+            "excerpt": "error TS2345: Argument of type '\"paid\"' is not assignable to parameter of type '\"submitted\"'."
+          }
+        }
+      ]
+    },
+    {
+      "number": 2,
+      "shape": "a different label",
+      "types": "type Status = 'draft' | 'submitted' | 'paid';\n   const next: { [S in Status]: Status[] } = { draft: ['submitted'], submitted: ['paid'], paid: [] };\n   function advance<F extends Status>(from: F, to: (typeof next)[F][number]): Status { return to; }",
+      "callers": [
+        {
+          "id": "V1",
+          "kind": "valid",
+          "transition": "draft -> submitted",
+          "check": {
+            "exit": 0,
+            "excerpt": ""
+          }
+        },
+        {
+          "id": "X1",
+          "kind": "invalid",
+          "transition": "draft -> paid",
+          "check": {
+            "exit": 2,
+            "excerpt": "error TS2345: Argument of type '\"paid\"' is not assignable to parameter of type '\"submitted\"'."
+          }
+        }
+      ]
+    }
+  ],
+  "_expect": {
+    "verdict": "unproven",
+    "selected": 1,
+    "distinct": false,
+    "indistinct": [
+      [
+        1,
+        2
+      ]
+    ]
+  }
+}

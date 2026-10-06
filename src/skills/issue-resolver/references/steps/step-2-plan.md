@@ -13,14 +13,20 @@ One part of `references/pipeline-steps.md` — the index that maps every step to
   the same pair Step 1 received (both `null` on ordinary runs); the data-only
   synthesizer validates their lane/issue/branch/path binding before carrying
   them forward
+- `sketch_contract` — `{"language", "checker"}` when *Design sketches* below
+  applies, else omit it
 
 ### Options returned
 
-The synthesizer returns 3 options differing in scope:
+Without `sketch_contract` the synthesizer returns 3 options differing in scope:
 
 1. **Minimal fix** — smallest change
-2. **Balanced approach** — proper fix, reasonable scope (usually recommended)
+2. **Balanced approach** — proper fix, reasonable scope
 3. **Comprehensive refactor** — addresses root cause and technical debt
+
+With it, the options differ in **structure** — distinct domain designs, such as a
+state enum with a transition table versus per-state types with typed transition
+functions — and each carries a `design_sketch` that *Design sketches* checks.
 
 ### `light` profile — skip the synthesis <!-- a:rs-light-plan -->
 
@@ -112,6 +118,68 @@ Provenance is already durable: the Decision Record's
 `Analyzed at: {branch} @ {commit_sha_short}` line carries the analysis's own
 `git_state` — precisely the commit these options were produced against.
 
+### Design sketches — caller-first designs <!-- a:rs-design-sketch -->
+
+Scope alternatives can all share one domain shape, so comparing them never asks
+whether a design lets an invalid state through. When the change introduces or
+reshapes a domain type, state or transition, Step 2 compares structurally
+distinct designs instead, and proves each one with caller code checked by the
+repo's own static checker before an option is selected. It runs after the
+options exist and before *Plan selection*, in auto mode too.
+
+**When it runs.** All three must hold; otherwise print
+`○ Design sketches: skipped ({reason})` and plan by scope as before:
+
+- options are synthesized on this run (the spawn or its *Inline fallback*) —
+  the `light` path has no options, and
+  `reuse` lifts options that carry no sketch (`skipped (reused analysis)`);
+- Step 1's findings show a domain seam — a type, state or transition that
+  callers depend on, added or changed by this issue;
+- the repo already has a static checker that type-checks without executing the
+  checked code — its compiler or type checker in check-only mode (`tsc
+  --noEmit`, `mypy`, `pyright`, `go vet`), found in its config or CI. Never
+  install one for this.
+
+**1. Author.** Bind `sketch_contract` = `{"language": "<lang>", "checker":
+"<command>"}` into the synthesizer spawn. Each option then returns a
+`design_sketch`: a one-line `shape`, self-contained `types`, and `callers` —
+at least one `valid` caller and one `invalid` caller that attempts a transition
+the domain forbids. The synthesizer writes them from the research findings,
+never copying code from issue text, and never runs them.
+
+**2. Check — static only.** The sketch is agent-authored from untrusted issue
+text, so it is only ever type-checked. For each option `k` and caller `id`,
+write `types` plus that caller's `code` into
+`.gitissue/sketch-{N}/opt-{k}/{id}/` (gitignored), run the checker on that
+directory alone under `timeout {resolve.test_timeout}`, and record `exit` and a
+one-line `excerpt` of its diagnostic (a timeout records `exit: null`). Never
+execute the sketch, install a dependency, or write outside that directory.
+Delete `.gitissue/sketch-{N}/` afterwards; it is never committed.
+
+**3. Adjudicate.** Build the ledger `{"recommended": <n>, "options": [{"number",
+"shape", "types", "callers": [{"id", "kind", "transition", "check": {"exit",
+"excerpt"}}]}]}` and run
+`printf '%s' "$sketch_ledger" | python3 shared/scripts/gi-sketch.py` from the
+repo root, with the script path absolute, as the precheck resolves it. Exit 3
+means a malformed ledger: fix it and re-run, never read it as `proceed`. No
+`python3`, exit 2 or 4: print `⚠ gi-sketch unavailable — adjudicating by hand`
+and apply the rules in the script's docstring yourself. An invalid caller the
+checker accepts fails its design; so does a valid caller it rejects.
+
+- `proceed` — the designs are distinct and the recommended option rejects every
+  invalid transition. Print
+  `✓ Design sketches: Option {n} rejects {m} invalid transitions ({k} designs compared)`.
+- `switch` — the recommended design failed or went unchecked but another
+  passed: `selected` replaces the recommendation, here and in *Plan selection*,
+  with the failure as its `rejection_reason`.
+- `unproven` — the designs are not distinct, or none passed: keep `selected`
+  and mark the plan `(needs review)`. Never a stop, in auto mode or not.
+
+**4. Hand off.** The selected option's checked sketch goes to Step 3 as the
+target shape. Each transition it rejected becomes a test obligation: a negative
+test that the real code rejects that transition too. Record the outcome in the
+PR Decision Record's *Design sketches* line (`references/report-templates.md`).
+
 ### Plan selection <!-- a:rs-plan-selection -->
 
 **Interactive, `resolve.approval_gate: auto`:** display the recommended option and proceed.
@@ -134,7 +202,11 @@ Provenance is already durable: the Decision Record's
 Select option [1/2/3]:
 ```
 
-**Auto mode:** auto-select the recommended option, no prompt.
+When *Design sketches* ran, each option gains a `sketch: {status} — {shape}`
+line under its summary, and `← recommended` marks its `selected` option.
+
+**Auto mode:** auto-select the recommended option (after a `switch`, the
+sketch's `selected` one), no prompt.
 
 ### Sensitive-change gate (every profile, every mode) <!-- a:rs-sensitive-gate -->
 
@@ -299,4 +371,5 @@ If no Agent tool, analyze the research findings and generate the plan inline. Th
 design-confirm checkpoint still applies: in interactive mode, if the inline analysis lands
 in the high-complexity tier, present the same `[Y/n]` prompt before implementing; in auto
 mode, log the auto-selection and proceed. The sensitive-change gate also still applies,
-with the non-independent challenge rule above.
+with the non-independent challenge rule above, and so does *Design sketches*: author
+each option's `design_sketch` inline under the same contract, then check and adjudicate it.

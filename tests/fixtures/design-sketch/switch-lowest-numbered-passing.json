@@ -1,0 +1,85 @@
+{
+  "recommended": 3,
+  "options": [
+    {
+      "number": 1,
+      "shape": "status enum + transition table",
+      "types": "type Status = 'draft' | 'submitted' | 'paid';\nconst next: { [S in Status]: Status[] } = { draft: ['submitted'], submitted: ['paid'], paid: [] };\nfunction advance<F extends Status>(from: F, to: (typeof next)[F][number]): Status { return to; }",
+      "callers": [
+        {
+          "id": "V1",
+          "kind": "valid",
+          "transition": "draft -> submitted",
+          "check": {
+            "exit": 0,
+            "excerpt": ""
+          }
+        },
+        {
+          "id": "X1",
+          "kind": "invalid",
+          "transition": "draft -> paid",
+          "check": {
+            "exit": 2,
+            "excerpt": "error TS2345: Argument of type '\"paid\"' is not assignable to parameter of type '\"submitted\"'."
+          }
+        }
+      ]
+    },
+    {
+      "number": 2,
+      "shape": "per-state structs + typed transition functions",
+      "types": "interface Draft { kind: 'draft' }\ninterface Submitted { kind: 'submitted' }\ninterface Paid { kind: 'paid' }\nfunction submit(o: Draft): Submitted { return { kind: 'submitted' }; }\nfunction pay(o: Submitted): Paid { return { kind: 'paid' }; }",
+      "callers": [
+        {
+          "id": "V1",
+          "kind": "valid",
+          "transition": "draft -> submitted",
+          "check": {
+            "exit": 0,
+            "excerpt": ""
+          }
+        },
+        {
+          "id": "X1",
+          "kind": "invalid",
+          "transition": "draft -> paid",
+          "check": {
+            "exit": 2,
+            "excerpt": "error TS2345: Argument of type 'Draft' is not assignable to parameter of type 'Submitted'."
+          }
+        }
+      ]
+    },
+    {
+      "number": 3,
+      "shape": "string status field + setter",
+      "types": "interface Order { status: string }\nfunction setStatus(o: Order, s: string): Order { return { status: s }; }",
+      "callers": [
+        {
+          "id": "V1",
+          "kind": "valid",
+          "transition": "draft -> submitted",
+          "check": {
+            "exit": 0,
+            "excerpt": ""
+          }
+        },
+        {
+          "id": "X1",
+          "kind": "invalid",
+          "transition": "draft -> paid",
+          "check": {
+            "exit": 0,
+            "excerpt": ""
+          }
+        }
+      ]
+    }
+  ],
+  "_expect": {
+    "verdict": "switch",
+    "selected": 1,
+    "distinct": true
+  }
+}

@@ -11,7 +11,7 @@
     },
     "issue-analysis": {
       "budget": 158617,
-      "measured": 158163
+      "measured": 158601
     },
     "issue-creator": {
       "budget": 178706,
@@ -22,8 +22,8 @@
       "measured": 267496
     },
     "issue-resolver": {
-      "budget": 380238,
-      "measured": 380238
+      "budget": 385959,
+      "measured": 385959
     },
     "issue-triage": {
       "budget": 131873,

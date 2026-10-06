@@ -361,6 +361,9 @@ jobs:
       - name: test-premise-reset-519
         run: bash tests/test-premise-reset-519.sh
 
+      - name: test-design-sketch-520
+        run: bash tests/test-design-sketch-520.sh
+
       - name: test-behavior-test-contracts-521
         run: bash tests/test-behavior-test-contracts-521.sh
 

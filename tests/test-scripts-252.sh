@@ -1295,6 +1295,8 @@ EXPECTED_SITES = {
     "gi-sensitive.py": 2,
     # 1 since issue #519: the resolver's premise-reset check (Step 4 QA).
     "gi-premise.py": 1,
+    # 1 since issue #520: the resolver's design-sketch check (Step 2).
+    "gi-sketch.py": 1,
 }
 # A call is any mention of a shared script by filename, however it is launched
 # (python3, python3.11, uv run, a bare ./path relying on the exec bit), plus the
@@ -1397,6 +1399,8 @@ ALLOWED_VARS = {
     "$sensitive_json": "labels + planned paths the resolver composed; reaches gi-sensitive on stdin",
     "$gate_ledger": "probe/challenge ledger the resolver composed; reaches gi-sensitive on stdin",
     "$premise_ledger": "QA premise ledger the resolver composed; reaches gi-premise on stdin",
+    # Issue #520. Same shape: composed by the resolver, delivered on stdin.
+    "$sketch_ledger": "design-sketch check results the resolver composed; reaches gi-sketch on stdin",
 }
 VAR = re.compile(r"\$\{?[A-Za-z_][A-Za-z0-9_]*\}?")
 # Command substitution pastes its output into the command line unquoted. Only

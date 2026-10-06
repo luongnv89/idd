@@ -121,6 +121,7 @@ references/scripts/gi-state.py
 references/scripts/gi-receipt.py
 references/scripts/gi-sensitive.py
 references/scripts/gi-premise.py
+references/scripts/gi-sketch.py
 ```
 
 ---
@@ -237,7 +238,7 @@ Understand the issue, the affected code and candidate solutions; the same pass v
 
 ## Step 2 — Plan
 
-Generate options and select one. Spawn the synthesizer (`shared/agents/synthesizer.md`); it returns minimal / balanced / comprehensive, balanced usually recommended (*Step 2 — Plan*).
+Generate options and select one. Spawn the synthesizer (`shared/agents/synthesizer.md`); it returns minimal / balanced / comprehensive options and recommends one (*Step 2 — Plan*). **Design sketches:** when the change adds or reshapes a domain type, state or transition and the repo has a static checker, options differ in structure instead, each carrying caller code the repo's checker type-checks, never runs; `shared/scripts/gi-sketch.py` rejects designs that accept an invalid transition and may switch the selection (*Step 2 — Plan → Design sketches*).
 
 **Profiles.** `light` — see the profile table in *Step 0g*. `analysis_reuse = fresh` (*0h*) skips the same spawn but **wins Step 2 when both apply** — a replacement, not an addition: lift `options[]`, `recommended_option`, `overall_complexity`, `overall_risk` from the analysis, each `rejection_reason` from `decision_record.options_rejected[]` (*→ `reuse`*).
 
