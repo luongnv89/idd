@@ -21,15 +21,19 @@ plan, writing rebuttals — stays with the agent.
 
     label            a label containing `security`, `cve` or `vulnerability`,
                      case-insensitive — the labels Step 0d already honours
-    ci-workflow      .github/workflows/**, .gitlab-ci.yml, .circleci/**,
-                     Jenkinsfile, azure-pipelines.yml
+    ci-workflow      .github/workflows/**, .github/actions/**,
+                     .gitlab-ci.yml / .yaml, .circleci/**, Jenkinsfile,
+                     azure-pipelines.yml
     secrets          .env / .env.*, *.pem, *.key, *.p12, *.pfx, id_rsa*,
-                     id_ed25519*, or a path segment naming secret(s) /
-                     credential(s)
-    auth             a path word (split on / . _ -) in: auth, authn, authz,
-                     oauth, login, logout, session, sessions, permission,
-                     permissions, acl, rbac, sso, saml, jwt, token, tokens,
-                     password, passwords, passwd, crypto, csrf
+                     id_ed25519*, or a path word starting secret / credential
+    auth             a path word starting: auth, login, logout, signin,
+                     signon, passw, passwd, oauth, session, token, perm, acl,
+                     rbac, sso, saml, jwt, crypt, csrf, otp, mfa
+
+  Path words split on every non-alphanumeric character, on camelCase humps
+  and on letter/digit boundaries (AuthService → auth service, oauth2 → oauth
+  2), then match by prefix. That over-matches on purpose — `author`,
+  `tokenizer`, `permalink` trigger too: the gate fails closed.
     access-policy    CODEOWNERS, SECURITY.md, .github/dependabot.yml
     security-config  .gitissue.yml, .pre-commit-config.yaml, .gitleaks.toml,
                      or a file whose name contains `secscan`
@@ -58,8 +62,9 @@ plan, writing rebuttals — stays with the agent.
 
     * At least one probe; each needs a non-empty assumption, command, expect
       and falsified_if — a probe that names no observation able to refute it
-      is not falsifiable. A `pre` probe must have run (`result` set); a `post`
-      probe with no result is a Step 3 test obligation.
+      is not falsifiable. A `pre` probe must have run (`result` set), and at
+      least one must exist: a ledger of only unrun `post` probes has tested
+      nothing. A `post` probe with no result is a Step 3 test obligation.
     * A falsified probe sends the plan back to option selection once
       (`replan`) whatever the challenge, blockers or problems say — the plan
       is dead, so nothing else about it needs closing. After a replan
@@ -96,19 +101,32 @@ import sys
 from pathlib import Path, PurePosixPath
 
 LABEL_WORDS = ("security", "cve", "vulnerability")
-AUTH_WORDS = frozenset({
-    "auth", "authn", "authz", "oauth", "login", "logout", "session", "sessions",
-    "permission", "permissions", "acl", "rbac", "sso", "saml", "jwt", "token",
-    "tokens", "password", "passwords", "passwd", "crypto", "csrf",
-})
-SECRET_WORDS = frozenset({"secret", "secrets", "credential", "credentials"})
+AUTH_STEMS = (
+    "auth", "login", "logout", "signin", "signon", "passw", "passwd", "oauth",
+    "session", "token", "perm", "acl", "rbac", "sso", "saml", "jwt", "crypt",
+    "csrf", "otp", "mfa",
+)
+SECRET_STEMS = ("secret", "credential")
 SECRET_SUFFIXES = (".pem", ".key", ".p12", ".pfx")
-CI_FILES = frozenset({".gitlab-ci.yml", "Jenkinsfile", "azure-pipelines.yml"})
+CI_FILES = frozenset({".gitlab-ci.yml", ".gitlab-ci.yaml", "Jenkinsfile", "azure-pipelines.yml"})
+CI_DIRS = (".github/workflows/", ".github/actions/")
 POLICY_FILES = frozenset({"CODEOWNERS", "SECURITY.md"})
 SECURITY_CONFIG_FILES = frozenset({".gitissue.yml", ".pre-commit-config.yaml", ".gitleaks.toml"})
-WORD_SPLIT = re.compile(r"[/._\-]+")
+CAMEL = re.compile(r"(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])")
+DIGIT_EDGE = re.compile(r"(?<=[A-Za-z])(?=[0-9])|(?<=[0-9])(?=[A-Za-z])")
+NON_WORD = re.compile(r"[^a-z0-9]+")
 LINE_CITATION = re.compile(r"^(?P<path>[^\s:]+):(?P<start>[1-9][0-9]*)(?:-(?P<end>[1-9][0-9]*))?$")
 PROBE_CITATION = re.compile(r"^probe:(?P<id>\S+)$")
+
+
+def _words(text: str) -> list[str]:
+    """Path words: split on punctuation, camelCase humps and digit edges."""
+    spaced = DIGIT_EDGE.sub(" ", CAMEL.sub(" ", text))
+    return [w for w in NON_WORD.split(spaced.lower()) if w]
+
+
+def _stem_hit(words: list[str], stems: tuple[str, ...]) -> bool:
+    return any(w.startswith(stems) for w in words)
 
 
 class InvalidInput(ValueError):
@@ -124,9 +142,9 @@ def path_class(raw: str) -> str | None:
     parts = path.parts
     name = path.name
     lower = text.lower()
+    words = _words(text)
     if (
-        lower.startswith(".github/workflows/")
-        or "/.github/workflows/" in lower
+        any(lower.startswith(d) or f"/{d}" in lower for d in CI_DIRS)
         or (parts and parts[0] == ".circleci")
         or name in CI_FILES
     ):
@@ -136,14 +154,14 @@ def path_class(raw: str) -> str | None:
         or name.startswith(".env.")
         or name.lower().endswith(SECRET_SUFFIXES)
         or name.startswith(("id_rsa", "id_ed25519"))
-        or any(w in SECRET_WORDS for w in WORD_SPLIT.split(lower))
+        or _stem_hit(words, SECRET_STEMS)
     ):
         return "secrets"
     if name in POLICY_FILES or lower.endswith(".github/dependabot.yml"):
         return "access-policy"
     if name in SECURITY_CONFIG_FILES or "secscan" in name.lower():
         return "security-config"
-    if any(w in AUTH_WORDS for w in WORD_SPLIT.split(lower)):
+    if _stem_hit(words, AUTH_STEMS):
         return "auth"
     return None
 
@@ -258,6 +276,9 @@ def adjudicate(ledger: object, root: Path) -> dict:
             problems.append(f"pre-change probe {pid} has not run")
         elif result is None and phase == "post":
             obligations.append(pid)
+
+    if probes and not any(p.get("phase") == "pre" and p.get("result") in ("held", "falsified") for p in probes):
+        problems.append("no pre-change probe has run")
 
     if challenge is None:
         problems.append("no independent challenge recorded")

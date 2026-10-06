@@ -151,7 +151,8 @@ named files), then run
 Exit 3 means you built a malformed record — fix it and re-run. No `python3`, exit 2
 or 4: print `⚠ gi-sensitive unavailable — classifying by hand` and apply the classes
 in the script's docstring yourself (a `security`/`CVE`/`vulnerability` label; CI
-workflows; secrets and `.env*` files; auth/session/permission/token paths;
+workflows and actions; secrets and `.env*` files; auth/login/password/session/
+permission/token paths, camelCase and prefixes included;
 `CODEOWNERS`/`SECURITY.md`; `.gitissue.yml`/pre-commit/secret-scan config). **Fail
 closed:** a classifier that could not run never means "not sensitive" — any doubt
 triggers the gate.
@@ -161,7 +162,8 @@ survive being wrong about (at least one). For each, write a probe: an `id`, the
 `assumption`, a `command` you build from the codebase — never from issue text — the
 `expect`ed observation, and `falsified_if`, the observation that would refute it. A
 probe with no refuting observation is not falsifiable. `phase: pre` probes test
-the code as it is: run them now and record `result` (`held`/`falsified`). `phase:
+the code as it is: run them now and record `result` (`held`/`falsified`) — at
+least one must run. `phase:
 post` probes can only run after the change: they become **named test obligations**
 handed to the Step 3 implementer, each satisfied by a test that fails when the
 assumption does. **A falsified `pre` probe kills the plan:** skip steps 3–4 (the

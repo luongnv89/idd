@@ -72,6 +72,15 @@ out="$(classify '{"labels":["CVE-2026-1"],"paths":[]}')"
 [ "$(field "$out" sensitive)" = "true" ]; check "G2: a CVE label triggers" "$?"
 for pair in \
   ".github/workflows/release.yml:ci-workflow" \
+  ".github/actions/x/action.yml:ci-workflow" \
+  ".gitlab-ci.yaml:ci-workflow" \
+  "src/authentication.py:auth" \
+  "src/AuthService.ts:auth" \
+  "src/LoginForm.tsx:auth" \
+  "lib/passwordReset.js:auth" \
+  "src/oauth2/client.go:auth" \
+  "app/Http/Middleware/Authenticate.php:auth" \
+  "src/authorization/policy.rb:auth" \
   ".env.production:secrets" \
   "deploy/server.pem:secrets" \
   "config/credentials.yml:secrets" \
@@ -84,7 +93,7 @@ for pair in \
   got="$(python3 -c 'import json,sys; r=json.loads(sys.argv[1])["reasons"]; print(r[0]["class"] if r else "none")' "$out")"
   [ "$got" = "$want" ]; check "G2: $path → $want" "$?"
 done
-out="$(classify '{"labels":["bug","docs"],"paths":["README.md","src/tokenizer.py","docs/guide.md"]}')"
+out="$(classify '{"labels":["bug","docs"],"paths":["README.md","docs/guide.md","src/utils/format.py"]}')"
 [ "$(field "$out" sensitive)" = "false" ]; check "G2: plain paths and labels are not sensitive" "$?"
 classify '{"labels":"security","paths":[]}' >/dev/null 2>&1; [ "$?" = "3" ]; check "G2: a malformed record is exit 3, not a 'not sensitive' answer" "$?"
 classify '{}' >/dev/null 2>&1; [ "$?" = "3" ]; check "G2: an empty record is exit 3 — a missing key never reads as 'not sensitive'" "$?"
@@ -137,6 +146,8 @@ check "G4: a challenge that was not independent does not pass" "$?"
 check "G4: a falsified probe replans once, then stops" "$?"
 [ "$(field "$(adj probe-citation-held)" test_obligations)" = '["P2"]' ]
 check "G4: an unrun post-change probe becomes a test obligation" "$?"
+[ "$(field "$(adj post-probes-only)" verdict)" = '"stop"' ]
+check "G4: a ledger of only unrun post-change probes stops — one pre probe must run" "$?"
 printf '%s' '{"probes":{},"replanned":false}' | python3 "$SCRIPT" --adjudicate >/dev/null 2>&1; [ "$?" = "3" ]
 check "G4: a malformed ledger is exit 3, never 'proceed'" "$?"
 P1='{"id":"P1","assumption":"a","phase":"pre","command":"c","expect":"e","falsified_if":"f","result":"held"}'
