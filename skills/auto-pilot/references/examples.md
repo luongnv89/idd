@@ -404,7 +404,7 @@ Three things in that transcript are the whole mechanism:
    been alive, the same call would have exited 3 with
    `✗ Another /auto-pilot run is in progress` and mutated nothing.
 2. **The checkpoint supplied the branch and PR.** Phase 2.3 wrote
-   `{"phase": "review", "current": {"issue": 42, "branch": "fix/42-…", "pr": 87}}`
+   `{"phase": "review", "current": {"issue": 42, "branch": "fix/42-…", "pr": 87, "phase": "review"}}`
    the moment the resolver returned, so the resume knows what exists.
 3. **GitHub, not the file, confirmed it.** The resume ran
    `gh pr list --head fix/42-auth-middleware-checkout --json number,state` and

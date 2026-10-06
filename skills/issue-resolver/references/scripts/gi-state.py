@@ -793,9 +793,20 @@ def _validate_current_phase(
     named: dict,
     merged: dict[str, object],
     lanes: list[object],
+    run_phase: object = None,
 ) -> None:
     same_record = isinstance(base, dict) and base.get("issue") == merged.get("issue")
     prior = base.get("phase") if same_record else None
+    if (
+        same_record
+        and prior is None
+        and isinstance(run_phase, str)
+        and run_phase in CURRENT_TRANSITIONS
+    ):
+        # A `current` recorded without its own phase (the post-resolve shape
+        # older checkpoints wrote) is in the run's phase: every documented
+        # checkpoint moves the two together.
+        prior = run_phase
     if "phase" in named:
         new = named["phase"]
         start = CURRENT_START
@@ -884,7 +895,11 @@ def merge_patch(
             merged = dict(base) if isinstance(base, dict) else {}
             merged.update({k: v for k, v in incoming.items() if k in patch["current"]})
             _validate_current_phase(
-                base, patch["current"], merged, out.get("lanes") or []
+                base,
+                patch["current"],
+                merged,
+                out.get("lanes") or [],
+                run_phase=state.get("phase"),
             )
             out["current"] = {key: merged[key] for key in sorted(merged)}
 

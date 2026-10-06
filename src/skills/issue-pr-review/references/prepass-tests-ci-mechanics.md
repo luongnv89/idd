@@ -19,7 +19,7 @@ From the repo root, after `gh pr checkout` and **before** any formatter runs, re
 ```bash
 scope="$(mktemp -d)"
 gh pr view {N} --json files > "$scope/pr.json"
-{ git diff --name-only -z --no-renames HEAD; git ls-files -z --others --exclude-standard; } > "$scope/dirty-before"
+{ git diff --name-only -z --no-renames HEAD; git diff --cached --name-only -z --no-renames; git ls-files -z --others --exclude-standard; } > "$scope/dirty-before"
 python3 - "$scope" <<'PY'
 import json, os, sys
 d = sys.argv[1]
@@ -38,7 +38,7 @@ with open(os.path.join(d, "approved-args"), "wb") as fh:
 PY
 ```
 
-`approved` holds repo-relative paths for git; `approved-args` holds the same paths prefixed `./`, so a file named `-x.js` reaches a formatter as a path, never as an option. A symlink is never approved: a formatter would rewrite its target, which can sit outside the PR. An empty `approved` means there is nothing to format: skip the formatters and the commit. If this block cannot run (no `python3`, a failed `gh` read), **skip the auto-fix and its commit** with `⚠ pre-pass: auto-fix skipped — approved paths unavailable`. Never fall back to a tree-wide formatter or `git add -A`.
+`--cached` catches a staged change whose working copy matches `HEAD`, which `git add` would overwrite. `approved` holds repo-relative paths for git; `approved-args` holds the same paths prefixed `./`, so a file named `-x.js` reaches a formatter as a path, never as an option. A symlink is never approved: a formatter would rewrite its target, which can sit outside the PR. An empty `approved` means there is nothing to format: skip the formatters and the commit. If this block cannot run (no `python3`, a failed `gh` read), **skip the auto-fix and its commit** with `⚠ pre-pass: auto-fix skipped — approved paths unavailable`. Never fall back to a tree-wide formatter or `git add -A`.
 
 | Tool type | Detection | Auto-fix command (approved paths only) |
 |-----------|-----------|-----------------|
@@ -75,7 +75,7 @@ spill-over: report it and leave it unstaged and untouched. Paths dirty at the
 baseline are not reported here either; they were never this step's.
 
 ```bash
-{ git diff --name-only -z --no-renames HEAD; git ls-files -z --others --exclude-standard; } > "$scope/dirty-after"
+{ git diff --name-only -z --no-renames HEAD; git diff --cached --name-only -z --no-renames; git ls-files -z --others --exclude-standard; } > "$scope/dirty-after"
 python3 - "$scope" <<'PY'
 import os, sys
 d = sys.argv[1]

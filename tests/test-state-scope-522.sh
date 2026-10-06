@@ -206,6 +206,11 @@ sequence("resume copies a draining lane into a fresh current", [
     {"current": None},
     {"current": dict(PR, branch="feat/42-a", phase="merge")},
 ])
+sequence("a current recorded without its phase advances from the run's phase", [
+    {"phase": "review", "current": {"issue": 42, "branch": "fix/42-a", "pr": 87}},
+    {"phase": "merge", "current": {"phase": "merge"}},
+    {"phase": "cleanup", "current": {"phase": "cleanup", "outcome": "merged"}},
+])
 sequence("phase-less borrowed_skills patches at any phase", [
     BORROW, REVIEW, BORROW, {"borrowed_skills": []},
 ])
@@ -360,8 +365,9 @@ BIN="$TMP/bin"
 mkdir -p "$REPO" "$BIN"
 cat > "$BIN/gh" <<'GH'
 #!/bin/sh
-# Fake `gh pr view 7 --json files`; gone.js is deleted on disk, link.js a symlink.
-printf '%s' '{"files":[{"path":"a.js"},{"path":"b.js"},{"path":"-x.js"},{"path":"sp ace.js"},{"path":"gone.js"},{"path":"link.js"}]}'
+# Fake `gh pr view 7 --json files`; gone.js is deleted on disk, link.js a symlink,
+# f.js carries a staged change whose working copy matches HEAD.
+printf '%s' '{"files":[{"path":"a.js"},{"path":"b.js"},{"path":"-x.js"},{"path":"sp ace.js"},{"path":"gone.js"},{"path":"link.js"},{"path":"f.js"}]}'
 GH
 chmod +x "$BIN/gh"
 # Fake formatter: records each argument and appends a marker to the file.
@@ -379,7 +385,7 @@ chmod +x "$BIN/fakefmt"
   git init -q -b main
   git config user.email t@example.com
   git config user.name t
-  for f in a.js b.js c.js d.js e.js -x.js "sp ace.js"; do printf 'base\n' > "./$f"; done
+  for f in a.js b.js c.js d.js e.js f.js -x.js "sp ace.js"; do printf 'base\n' > "./$f"; done
   printf 'outside\n' > "$OUTSIDE"
   ln -s "$OUTSIDE" link.js
   git add -A && git commit -qm base
@@ -387,6 +393,7 @@ chmod +x "$BIN/fakefmt"
   printf 'user edit\n' >> c.js          # unrelated dirty file
   printf 'staged edit\n' >> e.js && git add e.js   # unrelated staged entry
   printf 'scratch\n' > scratch.txt      # unrelated untracked file
+  printf 'index only\n' >> f.js && git add f.js && printf 'base\n' > f.js   # staged, worktree == HEAD
 ) >/dev/null 2>&1
 
 export FMT_LOG="$TMP/fmt.log"
@@ -421,6 +428,10 @@ check "P1: the already-dirty PR file is reported" "$?"
 check "P1: an unrelated dirty file stays dirty and unstaged" "$?"
 [ "$(git -C "$REPO" status --porcelain=v1 -- e.js)" = "M  e.js" ]
 check "P1: an unrelated pre-staged entry stays staged and uncommitted" "$?"
+[ "$(git -C "$REPO" status --porcelain=v1 -- f.js)" = "MM f.js" ] \
+  && git -C "$REPO" show :f.js | grep -qx 'index only' \
+  && grep -q 'skipping already-dirty PR file f.js' "$TMP/prepass.err"
+check "P1: a PR file with an index-only staged change is skipped and keeps its staged entry" "$?"
 [ "$(git -C "$REPO" status --porcelain=v1 -- scratch.txt)" = "?? scratch.txt" ]
 check "P1: an untracked file stays untracked" "$?"
 [ "$(git -C "$REPO" status --porcelain=v1 -- d.js)" = " M d.js" ] \
