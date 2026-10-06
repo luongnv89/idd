@@ -54,8 +54,9 @@ Prints {"verdict": "proceed" | "switch" | "unproven", "selected": <number>,
   * `verdict` is `proceed` when the designs are distinct and the recommended
     option passes; `switch` when they are distinct and the recommended option
     did not pass but another did — select that one instead; `unproven`
-    otherwise (keep `selected`, mark the plan `(needs review)`). No verdict
-    stops the run.
+    otherwise (still select `selected`, which differs from the
+    recommendation only when another design passed, and mark the plan
+    `(needs review)`). No verdict stops the run.
 
 Exit codes
   0  answered — read `verdict`, never the exit status. This script never

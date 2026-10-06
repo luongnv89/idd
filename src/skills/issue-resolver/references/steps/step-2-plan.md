@@ -151,9 +151,13 @@ never copying code from issue text, and never runs them.
 text, so it is only ever type-checked. For each option `k` and caller `id`,
 write `types` plus that caller's `code` into
 `.gitissue/sketch-{N}/opt-{k}/{id}/` (gitignored), run the checker on that
-directory alone under `timeout {resolve.test_timeout}`, and record `exit` and a
-one-line `excerpt` of its diagnostic (a timeout records `exit: null`). Never
-execute the sketch, install a dependency, or write outside that directory.
+directory alone, bounded by `resolve.test_timeout` seconds, and record `exit`
+and a one-line `excerpt` of its diagnostic. Bound it with `timeout` or
+`gtimeout` when either is on PATH — stock macOS ships neither — else with the
+agent's own command timeout. A check that timed out or never ran (the checker
+or the wrapper not found, exit 126 or 127) records `exit: null`, never a
+rejection. Never execute the sketch, install a dependency, or write outside
+that directory.
 Delete `.gitissue/sketch-{N}/` afterwards; it is never committed.
 
 **3. Adjudicate.** Build the ledger `{"recommended": <n>, "options": [{"number",
@@ -172,8 +176,9 @@ checker accepts fails its design; so does a valid caller it rejects.
 - `switch` — the recommended design failed or went unchecked but another
   passed: `selected` replaces the recommendation, here and in *Plan selection*,
   with the failure as its `rejection_reason`.
-- `unproven` — the designs are not distinct, or none passed: keep `selected`
-  and mark the plan `(needs review)`. Never a stop, in auto mode or not.
+- `unproven` — the designs are not distinct, or none passed: `selected` still
+  replaces the recommendation when it differs (another design passed), and the
+  plan is marked `(needs review)`. Never a stop, in auto mode or not.
 
 **4. Hand off.** The selected option's checked sketch goes to Step 3 as the
 target shape. Each transition it rejected becomes a test obligation: a negative
@@ -205,8 +210,8 @@ Select option [1/2/3]:
 When *Design sketches* ran, each option gains a `sketch: {status} — {shape}`
 line under its summary, and `← recommended` marks its `selected` option.
 
-**Auto mode:** auto-select the recommended option (after a `switch`, the
-sketch's `selected` one), no prompt.
+**Auto mode:** auto-select the recommended option — when *Design sketches*
+ran, the sketch's `selected` one under any verdict — no prompt.
 
 ### Sensitive-change gate (every profile, every mode) <!-- a:rs-sensitive-gate -->
 

@@ -115,6 +115,10 @@ check "D3: an unrun check, an undiagnosed rejection or a missing invalid caller 
 out="$(verdict unproven-none-pass)"
 [ "$(field "$out" verdict)" = '"unproven"' ] && [ "$(field "$out" selected)" = "2" ]
 check "D3: when no design passes the recommendation stands, unproven — never a stop" "$?"
+out="$(verdict unproven-indistinct-selects-passing)"
+[ "$(field "$out" verdict)" = '"unproven"' ] && [ "$(field "$out" selected)" = "2" ] \
+  && [ "$(status_of "$out" 1)" = "fail" ]
+check "D3: unproven still selects away from a recommended design that accepts an invalid transition" "$?"
 for pair in \
   '{}:an empty ledger' \
   '{"options":[{"number":1}]}:a ledger without recommended' \
@@ -213,6 +217,14 @@ anchor_check_flat "$STEP2" rs-design-sketch 'An invalid caller the checker accep
   "D5: an accepted invalid transition fails the design"
 anchor_check_flat "$STEP2" rs-design-sketch 'Never a stop' \
   "D5: unproven never stops the run"
+anchor_check_flat "$STEP2" rs-design-sketch 'stock macOS ships neither' \
+  "D5: the check bound does not assume GNU timeout"
+anchor_check_flat "$STEP2" rs-design-sketch 'exit 126 or 127\) records `exit: null`, never a rejection' \
+  "D5: a checker that never ran is recorded unchecked, never a rejection"
+anchor_check_flat "$STEP2" rs-design-sketch '`selected` still +replaces the recommendation' \
+  "D5: unproven still uses the sketch's selected option"
+anchor_check_flat "$STEP2" rs-plan-selection 'the sketch.s `selected` one under any verdict' \
+  "D5: auto mode takes the sketch's selected option under every verdict"
 anchor_check_flat "$STEP2" rs-design-sketch 'negative test that the real code rejects that transition' \
   "D5: each rejected transition becomes a Step 3 negative test"
 anchor_check "$STEP2" rs-plan-selection 'sketch:' \
