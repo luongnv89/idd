@@ -144,7 +144,7 @@ verdict.
   `action: "fix"` finding citing that capability's `drive.log`. Exit 3 (invalid
   base-ref recipe, nothing launched) stops with `✗ Invalid verification recipe:
   .gitissue-recipe.json at {ref}`, the helper's reason, and `To fix: correct or
-  remove it on the base branch`. Exit 4, exit 2 or no `python3`: print
+  remove it on the base branch`. Any other exit or no `python3`: print
   `⚠ Verification recipe skipped — {reason}` and continue. Never hand-run
   recipe commands: owned-only teardown is what the helper guarantees.
 

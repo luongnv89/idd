@@ -20,7 +20,8 @@ comments):
     {"version": 1,
      "auto": ["resolve", "review"],                 (optional, default [])
      "app_url": "http://127.0.0.1:{port}",          (optional; loopback only)
-     "launch": {"command": ["python3", "-m", "http.server", "{port}"],
+     "launch": {"command": ["python3", "-I", "-m", "http.server", "{port}",
+                            "--bind", "127.0.0.1"],
                 "ready": {"url": "/", "timeout_s": 30}},
      "capabilities": [
        {"name": "landing", "paths": ["*.html", "assets/*"],   (paths optional:
@@ -161,6 +162,17 @@ def _timeout(obj: dict, key: str, default: int, where: str) -> int:
     return value
 
 
+def _split(url: str, where: str) -> urllib.parse.SplitResult:
+    # urlsplit raises ValueError on input such as an unclosed IPv6 bracket;
+    # uncaught, that would be a traceback and exit 1 instead of exit 3.
+    try:
+        parts = urllib.parse.urlsplit(url)
+        parts.port  # noqa: B018 - validates the port, raising ValueError
+    except ValueError as exc:
+        raise InvalidRecipe(f"{where} is not a valid URL: {exc}") from exc
+    return parts
+
+
 def validate(obj: object) -> dict:
     """Return the recipe with defaults applied, or raise InvalidRecipe."""
     top = _keys(obj, TOP_KEYS, "recipe")
@@ -172,7 +184,7 @@ def validate(obj: object) -> dict:
     app_url = top.get("app_url", DEFAULT_APP_URL)
     if not isinstance(app_url, str):
         raise InvalidRecipe("recipe.app_url must be a string")
-    probe = urllib.parse.urlsplit(app_url.replace("{port}", "1"))
+    probe = _split(app_url.replace("{port}", "1"), "recipe.app_url")
     if probe.scheme not in ("http", "https") or probe.hostname not in LOOPBACK_HOSTS:
         raise InvalidRecipe("recipe.app_url must be an http(s) URL on a loopback host")
     launch = _keys(top.get("launch"), LAUNCH_KEYS, "recipe.launch")
@@ -183,7 +195,7 @@ def validate(obj: object) -> dict:
         raise InvalidRecipe("recipe.launch.ready.url must start with / or {app_url}")
     ready_probe = ready_url.replace("{app_url}", app_url.replace("{port}", "1"))
     ready_probe = app_url.replace("{port}", "1") + ready_probe if ready_probe.startswith("/") else ready_probe
-    if urllib.parse.urlsplit(ready_probe).hostname not in LOOPBACK_HOSTS:
+    if _split(ready_probe, "recipe.launch.ready.url").hostname not in LOOPBACK_HOSTS:
         raise InvalidRecipe("recipe.launch.ready.url must stay on the app_url host")
     ready_timeout = _timeout(ready, "timeout_s", 30, "recipe.launch.ready")
     caps_in = top.get("capabilities")

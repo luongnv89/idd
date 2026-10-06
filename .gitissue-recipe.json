@@ -1,9 +1,9 @@
 {
-  "_comment": "Verification recipe for this repo's static site. The skills read it from the base branch only; format in docs/ui-review.md (Verification recipe). auto is empty, so only interactive runs offer it.",
+  "_comment": "Verification recipe for this repo's static site. The skills read it from the base branch only; format in docs/ui-review.md (Verification recipe). auto is empty, so only interactive runs offer it. -I keeps the branch's own files off sys.path, so a branch cannot shadow the http.server module this launch runs.",
   "version": 1,
   "auto": [],
   "launch": {
-    "command": ["python3", "-m", "http.server", "{port}", "--bind", "127.0.0.1"],
+    "command": ["python3", "-I", "-m", "http.server", "{port}", "--bind", "127.0.0.1"],
     "ready": {"url": "/landing.html", "timeout_s": 20}
   },
   "capabilities": [

@@ -165,9 +165,13 @@ check "V4: the repo ships a pilot .gitissue-recipe.json" "$?"
 [ "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["auto"])' "$PILOT" 2>/dev/null)" = "[]" ]
 check "V4: the pilot opts in no auto consumer" "$?"
 R="$TMP/pilot"; new_repo "$R"; commit_recipe "$R" < "$PILOT"; branch_change "$R" '<h1>landing v2 from the branch</h1>'
+# The branch also plants an `http` package that would shadow the stdlib
+# module the launch runs; the pilot only passes if `python3 -I` ignores it.
+(cd "$R" && mkdir http && : > http/__init__.py && printf 'raise SystemExit(9)\n' > http/server.py \
+  && git add http && git commit -qm 'branch shadows http.server')
 recipe "$R" "$(printf 'landing.html\nREADME.md')" --consumer resolve
 [ "$EC" = 0 ] && [ "$(jget "$OUT" 'v["status"]')" = ran ] && [ "$(jget "$OUT" 'v["result"]')" = pass ]
-check "V4: the pilot runs and passes (exit 0)" "$?"
+check "V4: the pilot runs and passes (exit 0), never running a branch-shadowed http.server" "$?"
 [ "$(jget "$OUT" '[c["name"] for c in v["capabilities"] if c["driven"]]')" = "['landing']" ]
 check "V4: only the capability mapped to the diff is driven" "$?"
 EV="$(jget "$OUT" 'v["evidence_dir"]')"
@@ -259,6 +263,8 @@ GOOD_LAUNCH='"launch":{"command":["true"],"ready":{"url":"/"}}'
 bad "malformed JSON" '{"version": 1,'
 bad "an unknown key" "{\"version\":1,$GOOD_LAUNCH,\"capabilities\":[{\"name\":\"x\",\"drive\":[\"true\"]}],\"hooks\":[]}"
 bad "a non-loopback app_url" "{\"version\":1,\"app_url\":\"https://example.com\",$GOOD_LAUNCH,\"capabilities\":[{\"name\":\"x\",\"drive\":[\"true\"]}]}"
+bad "an unparsable app_url" "{\"version\":1,\"app_url\":\"http://[::1:{port}\",$GOOD_LAUNCH,\"capabilities\":[{\"name\":\"x\",\"drive\":[\"true\"]}]}"
+bad "a ready URL with an invalid port" '{"version":1,"launch":{"command":["true"],"ready":{"url":"{app_url}:99999999/"}},"capabilities":[{"name":"x","drive":["true"]}]}'
 bad "a shell-string command" '{"version":1,"launch":{"command":"python3 -m http.server","ready":{"url":"/"}},"capabilities":[{"name":"x","drive":["true"]}]}'
 bad "a duplicate capability name" "{\"version\":1,$GOOD_LAUNCH,\"capabilities\":[{\"name\":\"x\",\"drive\":[\"true\"]},{\"name\":\"x\",\"drive\":[\"true\"]}]}"
 bad "a ready URL that leaves the loopback host" '{"version":1,"launch":{"command":["true"],"ready":{"url":"{app_url}@example.com/"}},"capabilities":[{"name":"x","drive":["true"]}]}'
