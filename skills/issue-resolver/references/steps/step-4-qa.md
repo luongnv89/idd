@@ -149,7 +149,9 @@ never one copied from fixer output or issue text — and record each one's exit
 status and a load-bearing output excerpt. Rerun each and keep its exit and output.
 Form a revised premise those results support, with a new `premise_id`, and add a
 revision `{resets, after_cycle, premise_id, premise, supports, diagnostics:
-[{command, recorded: {exit, excerpt}, rerun: {exit, output}}]}` to the ledger. Run
+[{command, recorded: {exit, excerpt}, rerun: {exit, output}}]}` to the ledger. A
+failure's `cycle` is the QA cycle whose fix failed; `after_cycle` is the latest
+`cycle` failed under `resets` as you write it, never the next fix's cycle. Run
 the check again: an accepted revision lifts the block, and the next fixer spawn
 carries the revised premise and its diagnostics as context. A rerun that
 disagrees with its record, or a premise already failed, keeps it.

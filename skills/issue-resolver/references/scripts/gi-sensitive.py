@@ -25,12 +25,13 @@ plan, writing rebuttals — stays with the agent.
                      .gitlab-ci.yml / .yaml, .circleci/**, Jenkinsfile,
                      azure-pipelines.yml, .travis.yml,
                      bitbucket-pipelines.yml, .drone.yml (each also .yaml)
-    secrets          .env / .env.*, *.pem, *.key, *.p12, *.pfx, id_rsa*,
+    secrets          .env / .env.* / .envrc, *.pem, *.key, *.p12, *.pfx, id_rsa*,
                      id_ed25519*, or a path word starting secret / credential
     auth             a path word starting: auth, login, logout, signin,
                      signon, passw, passwd, oauth, session, token, perm, acl,
                      rbac, sso, saml, jwt, crypt, csrf, otp, mfa, secur,
-                     polic, guard, role
+                     polic, guard, role, passport, devise, abilit, omniauth,
+                     warden, pundit, cancan
 
   Path words split on every non-alphanumeric character and on letter/digit
   boundaries, taken both with and without a camelCase split (AuthService →
@@ -109,6 +110,7 @@ AUTH_STEMS = (
     "auth", "login", "logout", "signin", "signon", "passw", "passwd", "oauth",
     "session", "token", "perm", "acl", "rbac", "sso", "saml", "jwt", "crypt",
     "csrf", "otp", "mfa", "secur", "polic", "guard", "role",
+    "passport", "devise", "abilit", "omniauth", "warden", "pundit", "cancan",
 )
 SECRET_STEMS = ("secret", "credential")
 SECRET_SUFFIXES = (".pem", ".key", ".p12", ".pfx")
@@ -163,7 +165,7 @@ def path_class(raw: str) -> str | None:
     ):
         return "ci-workflow"
     if (
-        name == ".env"
+        name in (".env", ".envrc")
         or name.startswith(".env.")
         or name.lower().endswith(SECRET_SUFFIXES)
         or name.startswith(("id_rsa", "id_ed25519"))

@@ -104,6 +104,10 @@ check "R3: a revision with no diagnostics keeps the block" "$?"
 check "R3: a 'revised' premise that already failed keeps the block" "$?"
 [ "$(field "$(verdict revision-predates-latest-failure)" blocked)" = "true" ]
 check "R3: a later failure under the reset premise blocks again" "$?"
+[ "$(field "$(verdict same-premise-fails-after-revision)" blocked)" = "true" ]
+check "R3: the reset premise failing again after an accepted revision blocks again" "$?"
+[ "$(field "$(verdict revision-after-cycle-beyond-latest)" blocked)" = "true" ]
+check "R3: an after_cycle beyond the latest failure never pre-covers later failures" "$?"
 [ "$(field "$(verdict revised-premise-fails-twice)" blocking_premises)" = '["R1"]' ]
 check "R3: the revised premise is held to the same rule" "$?"
 printf '%s' '{"failures":[{"cycle":"1","premise_id":"A"}],"revisions":[]}' | python3 "$SCRIPT" >/dev/null 2>&1; [ "$?" = "3" ]

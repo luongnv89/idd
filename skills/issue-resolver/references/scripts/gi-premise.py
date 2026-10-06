@@ -38,7 +38,9 @@ Prints {"blocked": true | false, "blocking_premises": [...],
   * A premise_id carried by two or more failures is a shared premise. It
     blocks the next fix until an accepted revision resets it.
   * A revision is accepted only when it names that shared premise in `resets`,
-    is recorded at or after the premise's latest failure (`after_cycle`),
+    records `after_cycle` equal to the cycle of that premise's latest failure
+    (the latest failure under `resets` when the revision is written — never
+    the cycle the revised fix will run in; earlier or later is rejected),
     carries a premise_id no failure up to that cycle used, a non-empty premise and
     `supports`, and at least one diagnostic — and every diagnostic reran
     clean: the same exit status, and the recorded excerpt found in the rerun
@@ -145,8 +147,8 @@ def decide(ledger: object) -> dict:
         why = []
         if target not in shared:
             why.append(f"resets `{target}`, which is not a shared premise")
-        elif after is None or after < latest[target]:
-            why.append(f"predates the latest failure under `{target}`")
+        elif after is None or after != latest[target]:
+            why.append(f"after_cycle must equal the latest failure under `{target}` ({latest[target]})")
         failed_before = {pid for cycle, pid in seen if after is None or cycle <= after}
         if not new_id or new_id in failed_before:
             why.append("its premise_id is not new — a revised premise must differ from every failed one")

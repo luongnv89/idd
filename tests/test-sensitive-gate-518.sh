@@ -100,6 +100,11 @@ for pair in \
   "src/roles.guard.ts:auth" \
   ".travis.yml:ci-workflow" \
   "bitbucket-pipelines.yml:ci-workflow" \
+  "config/initializers/devise.rb:auth" \
+  "config/passport.js:auth" \
+  "app/models/ability.rb:auth" \
+  "config/initializers/omniauth.rb:auth" \
+  ".envrc:secrets" \
   ".env.production:secrets" \
   "deploy/server.pem:secrets" \
   "config/credentials.yml:secrets" \
