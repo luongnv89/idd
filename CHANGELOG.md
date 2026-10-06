@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixes
+- **merge:** every automated merge now checks that the commit and base its CI verdict covered are still the ones being merged. A new *Step 5.1c — Merge identity gate* in `/auto-pilot`, a matching check before `/issue-pr-review --auto`'s merge, and the partial and critical-issue merges all re-read the head and compare it with the **live** base branch (`gh api …/compare/<base>...<head> --jq .behind_by` must be `0`). They never use `baseRefOid`, which records the base at the PR's last sync. Every merge passes `--match-head-commit`. A moved head or a moved base leaves the PR open, and patch-id equality never replaces fresh integration checks. ([#516](https://github.com/luongnv89/idd/issues/516))
+- **qa-handoff:** `/issue-pr-review` used to trust a QA handoff marker that anyone who can edit a PR body can write. It now also requires a revision receipt for the PR's head. `/issue-resolver` writes that receipt at clean-QA exit with the new shared `gi-receipt.py`, which records the full SHA, a clean tree, the executor's identity, the suite's count, SHA and command, and artifact digests, and stores it under the git common dir, outside every branch and PR body. A forged marker plus unrelated green CI now skips nothing. ([#515](https://github.com/luongnv89/idd/issues/515))
+
 ### Changed
 - **brand:** the product is now called **IDD Stack** everywhere it is named: the website, the plugin listing (`displayName` "IDD Stack: Issue-Driven Development"), the marketplace descriptions, `llms.txt`, the logo kit's accessible names, the README and docs, and the comments `/issue-creator` posts on issues. The old product name "gitissue" is gone from prose. "IDD" still names the methodology (Issue-Driven Development and the IDD Spec), and identifiers are unchanged: the `idd` plugin id, the `/idd:` namespace, `IDD_*` variables, `.gitissue.yml` and the `gitissue:` markers. ([#512](https://github.com/luongnv89/idd/issues/512))
 

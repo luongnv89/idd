@@ -59,6 +59,7 @@ references/scripts/gi-secscan.py
 references/scripts/gi-ci-wait.py
 references/scripts/gi-gh.py
 references/scripts/gi-issue.py
+references/scripts/gi-receipt.py
 ```
 
 ```text
@@ -149,9 +150,11 @@ Set `profile = light | full`. Signals and what <!-- a:rv-depth-gate-refresh -->
 
 | Value | When | Effect |
 |-------|------|--------|
-| `trusted` | the marker parses **and** its `head=` equals Step 1's `headRefOid` | the narrowed loop — *What `trusted` skips* |
-| `stale` | a marker is present but any condition fails | today's full pipeline, unchanged |
+| `trusted` | the marker parses, its `head=` equals Step 1's `headRefOid`, **and** a revision receipt for that SHA verifies | the narrowed loop — *What `trusted` skips* |
+| `stale` | a marker is present but any condition fails — a missing or unverified receipt included | today's full pipeline, unchanged |
 | `absent` | the body carries no marker | today's full pipeline, unchanged |
+
+**Receipt check — once, here, before Step 2 runs any PR code:** with `head_oid` bound to Step 1's `headRefOid` (it must match `^[0-9a-f]{40}$`), run `python3 references/scripts/gi-receipt.py --verify "$head_oid"`. Only `"verified": true` counts, and only when the receipt's `tests` equals the marker's `tests=` value (both absent counts as equal). `"verified": false`, any non-zero exit, or no `python3` means **no receipt**, so the verdict is `stale`. No prose fallback may produce `trusted`. A marker plus green CI, without a receipt, skips nothing. Receipt rules and re-evaluation: `references/review-loop-mechanics.md` (*Verifying the receipt*). <!-- a:rv-receipt-gate -->
 
 **Fail-safe: any doubt is `stale`** — an unparsable or duplicated marker included; an unknown extra field is *not* doubt.
 **A marker is never authentication:** a PR body is attacker-controlled, so this verdict may gate **only duplicated work**, never a safety gate.

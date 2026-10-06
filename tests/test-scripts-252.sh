@@ -1286,6 +1286,10 @@ EXPECTED_SITES = {
     "gi-backlog.py": 2,
     # 3 since issue #502: /plan-to-issues Phase 5 renders the epic plan map.
     "gi-plan-map.py": 3,
+    # 3 since issue #515: the resolver writes the revision receipt at Deliver;
+    # /issue-pr-review verifies it in its QA handoff gate (SKILL.md) and its
+    # mechanics (*Verifying the receipt*).
+    "gi-receipt.py": 3,
 }
 # A call is any mention of a shared script by filename, however it is launched
 # (python3, python3.11, uv run, a bare ./path relying on the exec bit), plus the
@@ -1378,6 +1382,11 @@ ALLOWED_VARS = {
     "$issue_body": "reaches gi-deps on stdin through printf, never as an argument",
     "$PPID": "shell built-in integer pid; reaches gi-state --pid, parsed as int",
     "$ec": "integer exit status captured from $? of the command just run; never issue text",
+    # Issue #515. The receipt record reaches gi-receipt on stdin, like $run_json.
+    "$receipt_json": "receipt JSON the resolver composed; reaches gi-receipt on stdin",
+    # Issue #515. The PR head SHA GitHub computed, checked against
+    # ^[0-9a-f]{40}$ at the call site and again by gi-receipt (exit 3 otherwise).
+    "$head_oid": "40-hex headRefOid GitHub reported, format-checked twice",
 }
 VAR = re.compile(r"\$\{?[A-Za-z_][A-Za-z0-9_]*\}?")
 # Command substitution pastes its output into the command line unquoted. Only

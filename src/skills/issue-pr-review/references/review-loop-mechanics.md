@@ -263,15 +263,24 @@ any depth.
 The PR body is **attacker-controlled**: `gh pr edit --body` is available to
 whoever opened the PR, so any author can write this marker. Binding `head=` does
 **not** authenticate it either — an author can read their own head SHA and paste
-a matching one. The marker is therefore designed so that forging it buys
-nothing: the verdict may gate **only duplicated work** — a second run of a check
-that already ran, unchanged, on this exact commit — and **never a safety gate**.
-Open issue **#274** ("A PR can disable the secret-scanning gate via its own
-`.gitissue.yml`") is the standing proof that this repo can lose a security gate
-to repo-controlled input; that is the failure this design refuses to repeat. An
-edit that lets the marker suppress a secret scan, a CI wait, an
+a matching one. The verdict may gate **only duplicated work** — a second run of
+a check that already ran, unchanged, on this exact commit — and **never a safety
+gate**. Issue **#274** ("A PR can disable the secret-scanning gate via its
+own `.gitissue.yml`") is the standing proof that this repo can lose a security
+gate to repo-controlled input; that is the failure this design refuses to
+repeat. An edit that lets the marker suppress a secret scan, a CI wait, an
 acceptance-criteria check, or a traceability check converts a token optimization
 into a bypass. Do not make it.
+
+"Only duplicated work" is not enough by itself (issue #515). A skip is a
+duplicate only if the first run really happened, and the marker cannot show
+that. A forged marker with `tests=<n>@<head>`, plus any unrelated green check
+in the rollup (`ci_leg_runnable` asks only that one exists), used to skip both
+local test legs, the code UI review and cycle 1 on a commit no suite had ever
+run on. So `trusted` now also requires a **revision receipt**: a record the
+resolver writes outside the PR author's reach, for this exact SHA
+(*Verifying the receipt*). A forged marker with no receipt is `stale`, so
+forging the marker buys nothing.
 
 What the binding *does* buy is **self-invalidation for the price of one
 recomputation**: any commit this skill pushes — Step 2's lint/format auto-fix as
@@ -305,12 +314,50 @@ grep -oE '<!-- gitissue:qa v[0-9]+ [^>]*-->' <<<"$body"
   `stale`.
 - `trusted` **iff** the single parsed marker survives all of the above **and**
   its `head=` equals the PR's `headRefOid` from Step 1's
-  `gh pr view {N} --json …` field list. Any doubt ⇒ `stale`.
+  `gh pr view {N} --json …` field list **and** the revision receipt for that
+  SHA verifies and agrees with the marker (*Verifying the receipt*). Any doubt
+  ⇒ `stale`.
 
 `stale` and `absent` run today's pipeline **byte-identically** — no step
 shortened, no cycle cap lowered, no pass skipped. A human-authored PR never
 carries the marker, so it is `absent` and is therefore unaffected by this gate in
 every particular.
+
+### Verifying the receipt <!-- a:rvm-verify-receipt -->
+
+The receipt is the one input to `trusted` that the PR author cannot write.
+`/issue-resolver` stores it at clean-QA exit with `shared/scripts/gi-receipt.py
+--write`, under the git common dir (`idd/receipts/<sha40>.json`). That
+directory sits outside every branch and every PR body, and every worktree of
+the clone shares it (producer contract: *Revision receipt* in that skill's
+`references/report-templates.md`). The script itself measured what the receipt
+records: the full SHA, a clean tree, the executor's user, uid and host, the
+suite's count, SHA and command, and artifact digests.
+
+1. **Once, at Step 1, before Step 2 executes any PR code.** Bind `head_oid` to
+   Step 1's `headRefOid`, require `^[0-9a-f]{40}$`, and run
+   `python3 shared/scripts/gi-receipt.py --verify "$head_oid"`.
+2. **Only `"verified": true` counts.** The script returns that only for a
+   regular file that names this SHA, records a clean tree and `review: clean`,
+   was written by this user on this host, and whose surviving artifacts still
+   match their digests. `"verified": false` (`absent` is the common reason),
+   any non-zero exit, and no `python3` all mean **no receipt** ⇒ `stale`. No
+   prose procedure may stand in for the script and produce `trusted`. The
+   degrade costs a full pipeline, never a skip.
+3. **The receipt must agree with the marker.** Its `tests` (`<count>@<sha40>`,
+   or `null`) must equal the marker's `tests=` value, both absent counting as
+   equal. A marker whose `tests=` the receipt does not back is `stale`, so a
+   real receipt cannot lend trust to a forged count.
+4. **Re-evaluation never re-reads the store.** After a push the marker's
+   `head=` no longer matches the new head, so the verdict can only become
+   `stale` (*Re-evaluation after a push*). A receipt that PR code wrote during
+   this run, for example from a lint hook in Step 2, is never consulted.
+
+**What it does not cover.** The receipt is bookkeeping against the PR author's
+write surface: the body, the branch and its CI. It is not cryptographic
+authentication. Code already running on this host as this user can write the
+store, and a review on another machine finds no receipt and runs in full, which
+is the accepted cost.
 
 ### Field vocabulary
 
@@ -432,7 +479,8 @@ The procedure is the same for both:
 2. Recompute `qa_handoff` exactly as Step 1 did (*Parsing the marker*) against
    that new `headRefOid`. Re-read `body` in the same call if Step 6 edited it
    (the `Closes #N` read-modify-write); otherwise the body is unchanged and only
-   the SHA comparison can flip.
+   the SHA comparison can flip. Never re-read the receipt store here: a
+   recompute may only turn `trusted` into `stale` (*Verifying the receipt*).
 3. Apply the new verdict for the rest of the run: `stale` restores the full
    pipeline — the full cycle cap, the Step 2 and Step 4 test legs, the code UI
    review, and a cold-start cycle-1 reviewer if one is still to come.

@@ -165,9 +165,12 @@ FAIL=0
 # identity operation and the guarded squash-merge every merge site now runs
 # (`--match-head-commit`, live base ancestry, never `baseRefOid`). platform-
 # github.md ships to all 8 skills, so its +469 bytes cost 8 x 469 = 3,752 —
-# measured 551,512 + 3,750 = 555,262; the line keeps six bytes of headroom, so
-# the ratchet is not widened.
-BUDGET=555268
+# measured 551,512 + 3,750 = 555,262. Issue #515, in the same PR, adds one
+# clause to idd-methodology.md's digested QA-handoff sentence (the marker is
+# trusted only beside a revision receipt): +700 across its bundled copies, so
+# 555,262 + 700 = 555,962; the line keeps six bytes of headroom, so the
+# ratchet is not widened.
+BUDGET=555968
 
 pass() { echo "  ✓ $1"; PASS=$((PASS + 1)); }
 fail() { echo "  ✗ $1"; FAIL=$((FAIL + 1)); }
