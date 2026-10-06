@@ -81,6 +81,16 @@ for pair in \
   "src/oauth2/client.go:auth" \
   "app/Http/Middleware/Authenticate.php:auth" \
   "src/authorization/policy.rb:auth" \
+  "src/components/SignInForm.tsx:auth" \
+  "lib/signIn.js:auth" \
+  "src/LogIn.tsx:auth" \
+  "src/logOut.ts:auth" \
+  "src/SignOnHandler.ts:auth" \
+  "src/PassWordField.tsx:auth" \
+  "src/myJWTHelper.go:auth" \
+  "src/OAuth2Client.java:auth" \
+  "azure-pipelines.yaml:ci-workflow" \
+  ".github/dependabot.yaml:access-policy" \
   ".env.production:secrets" \
   "deploy/server.pem:secrets" \
   "config/credentials.yml:secrets" \

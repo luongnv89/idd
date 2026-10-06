@@ -23,18 +23,19 @@ plan, writing rebuttals — stays with the agent.
                      case-insensitive — the labels Step 0d already honours
     ci-workflow      .github/workflows/**, .github/actions/**,
                      .gitlab-ci.yml / .yaml, .circleci/**, Jenkinsfile,
-                     azure-pipelines.yml
+                     azure-pipelines.yml / .yaml
     secrets          .env / .env.*, *.pem, *.key, *.p12, *.pfx, id_rsa*,
                      id_ed25519*, or a path word starting secret / credential
     auth             a path word starting: auth, login, logout, signin,
                      signon, passw, passwd, oauth, session, token, perm, acl,
                      rbac, sso, saml, jwt, crypt, csrf, otp, mfa
 
-  Path words split on every non-alphanumeric character, on camelCase humps
-  and on letter/digit boundaries (AuthService → auth service, oauth2 → oauth
-  2), then match by prefix. That over-matches on purpose — `author`,
+  Path words split on every non-alphanumeric character and on letter/digit
+  boundaries, taken both with and without a camelCase split (AuthService →
+  auth service authservice, LogIn → log in login, oauth2 → oauth 2), then
+  match by prefix. That over-matches on purpose — `author`,
   `tokenizer`, `permalink` trigger too: the gate fails closed.
-    access-policy    CODEOWNERS, SECURITY.md, .github/dependabot.yml
+    access-policy    CODEOWNERS, SECURITY.md, .github/dependabot.yml / .yaml
     security-config  .gitissue.yml, .pre-commit-config.yaml, .gitleaks.toml,
                      or a file whose name contains `secscan`
 
@@ -108,7 +109,9 @@ AUTH_STEMS = (
 )
 SECRET_STEMS = ("secret", "credential")
 SECRET_SUFFIXES = (".pem", ".key", ".p12", ".pfx")
-CI_FILES = frozenset({".gitlab-ci.yml", ".gitlab-ci.yaml", "Jenkinsfile", "azure-pipelines.yml"})
+CI_FILES = frozenset({
+    ".gitlab-ci.yml", ".gitlab-ci.yaml", "Jenkinsfile", "azure-pipelines.yml", "azure-pipelines.yaml",
+})
 CI_DIRS = (".github/workflows/", ".github/actions/")
 POLICY_FILES = frozenset({"CODEOWNERS", "SECURITY.md"})
 SECURITY_CONFIG_FILES = frozenset({".gitissue.yml", ".pre-commit-config.yaml", ".gitleaks.toml"})
@@ -120,9 +123,14 @@ PROBE_CITATION = re.compile(r"^probe:(?P<id>\S+)$")
 
 
 def _words(text: str) -> list[str]:
-    """Path words: split on punctuation, camelCase humps and digit edges."""
-    spaced = DIGIT_EDGE.sub(" ", CAMEL.sub(" ", text))
-    return [w for w in NON_WORD.split(spaced.lower()) if w]
+    """Path words: split on punctuation and digit edges, both with and without
+    the camelCase split — the union, so `AuthService` yields `auth` and
+    `LogIn` / `PassWord` still yield `login` / `password`."""
+    words: list[str] = []
+    for variant in (CAMEL.sub(" ", text), text):
+        spaced = DIGIT_EDGE.sub(" ", variant)
+        words.extend(w for w in NON_WORD.split(spaced.lower()) if w)
+    return words
 
 
 def _stem_hit(words: list[str], stems: tuple[str, ...]) -> bool:
@@ -157,7 +165,7 @@ def path_class(raw: str) -> str | None:
         or _stem_hit(words, SECRET_STEMS)
     ):
         return "secrets"
-    if name in POLICY_FILES or lower.endswith(".github/dependabot.yml"):
+    if name in POLICY_FILES or lower.endswith((".github/dependabot.yml", ".github/dependabot.yaml")):
         return "access-policy"
     if name in SECURITY_CONFIG_FILES or "secscan" in name.lower():
         return "security-config"
