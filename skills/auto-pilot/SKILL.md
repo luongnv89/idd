@@ -218,7 +218,7 @@ Each phase closes with `√`/`×` per check plus a `Result: PASS | PARTIAL | FAI
 | 1 | Triage and Pick | Pick from the triage order (*Step 1.1a* reuses a `fresh` one); *Step 1.2b* captures each lane's `{issue_payload}` + `{triage_context}` | no |
 | 2 | Resolve | One in-place resolver, or resolver-only lanes in caller-managed worktrees | yes (/issue-resolver) |
 | 3-4 | PR Review | One lane at a time through /issue-pr-review --auto --no-merge (up to `review_cycles` fixes + CI) | yes (/issue-pr-review) |
-| 5 | Merge | Verify mergeability (*Step 5.1a*), squash-merge, close the issue, log, update state/cache, clean up | no |
+| 5 | Merge | Verify mergeability (*Step 5.1a*), bind head and live base (*Step 5.1c*), squash-merge with `--match-head-commit`, close the issue, log, update state/cache, clean up | no |
 
 **Caller-supplied context.** Issue bodies are read against a <!-- a:ap-snapshot-budget -->
 body-snapshot budget with three freshness boundaries:

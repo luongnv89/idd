@@ -53,8 +53,11 @@ REST, not `--json`: `gh repo view --json squashMergeCommitMessage` answers `Unkn
 | CI check status | `gh pr checks {N}` |
 | Read PR body (before edit) | `gh pr view {N} --json body` |
 | Update PR body | `gh pr edit {N} --body "{body}"` — read-modify-write only: fetch the body, apply the minimal change (e.g. prepend `Closes #N`), write back, verify per rule 2 |
-| Squash-merge + clean up | `gh pr merge {N} --squash --delete-branch` |
+| Merge identity (live base ancestry) | `gh api repos/{owner}/{repo}/compare/{base_ref}...{verified_head} --jq .behind_by` — merge only on `0` and an unchanged `headRefOid` |
+| Squash-merge + clean up | `gh pr merge {N} --squash --delete-branch --match-head-commit {verified_head}` |
 | Find PR for an issue | `gh search prs "is:open" "Closes #{N}" --json number,state,url --limit 5` |
+
+**Merges bind a head and a base** (#516): `{verified_head}` is the SHA the CI verdict covers; compare the base **branch name** (its live tip), never `baseRefOid` (the base at the PR's last sync). Patch-id equality never replaces fresh integration checks.
 
 ### Raw API (escape hatch)
 

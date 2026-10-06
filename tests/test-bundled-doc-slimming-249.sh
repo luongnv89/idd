@@ -160,7 +160,14 @@ FAIL=0
 # terminal-style.md. idd-methodology.md was deliberately left unbundled (an
 # absolute URL instead), saving ~11 KB. Measured 536,855 + 14,657 = 551,512;
 # the line keeps six bytes of headroom, so the ratchet is not widened.
-BUDGET=551518
+#
+# Issue #516 is the sixth raise. The GitHub driver catalog must name the merge
+# identity operation and the guarded squash-merge every merge site now runs
+# (`--match-head-commit`, live base ancestry, never `baseRefOid`). platform-
+# github.md ships to all 8 skills, so its +469 bytes cost 8 x 469 = 3,752 —
+# measured 551,512 + 3,750 = 555,262; the line keeps six bytes of headroom, so
+# the ratchet is not widened.
+BUDGET=555268
 
 pass() { echo "  ✓ $1"; PASS=$((PASS + 1)); }
 fail() { echo "  ✗ $1"; FAIL=$((FAIL + 1)); }

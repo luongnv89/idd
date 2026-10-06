@@ -293,6 +293,8 @@ Print the summary from `references/report-templates.md` and **apply its *Review 
 
 **Auto-merge is the one destructive action** (squash merge + head-branch deletion, irreversible). Every gate must hold: interactive runs never merge; `--auto` merges only when `review.auto_merge` is true **and** the PR is clean (pending CI is never clean; a CI failure held non-blocking by `review.ignore_ci_billing_failures` is never clean either); `--no-merge` suppresses the merge, leaving it to auto-pilot. On an unmet gate, report and stop — never delete a branch by hand.
 
+**Merge identity (last gate before the merge).** <!-- a:rv-merge-identity --> Bind `verified_head` = Step 5's `ci_sha` (or, with no `ci_sha`, the `headRefOid` the final review cycle read). Re-read `headRefOid` and `baseRefName`, then `gh api "repos/{owner}/{repo}/compare/${base_ref}...${verified_head}" --jq .behind_by`. Merge only when the head still equals `verified_head` **and** `behind_by` is exactly `0` (the live base branch, never `baseRefOid`); anything else is `BLOCKED`, never a re-wait. Merge with `--match-head-commit "$verified_head"`. Patch-id equality never replaces fresh integration checks. Commands and reasons: `references/report-templates.md` (*Auto-Merge*).
+
 **Then the run-stats footer** (`references/run-stats.md`; `tokens` only where the host reported a count) — the last thing printed at **every** terminal outcome, including a stop before Step 7.
 
 **Review-only mode (`--review-only`) — authoritative definition.**

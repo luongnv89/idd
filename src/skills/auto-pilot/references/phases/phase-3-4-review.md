@@ -115,12 +115,12 @@ Compute the **effective mode** per the *Resolution rules* under *Merge Modes* in
 
 **Step 2a — Dependency and CI gates (before any merge):**
 
-Whenever Step 2 would merge a PR (aggressive + `merge_partial: true`), run **Step 5.1b — Dependency Gate** first using the originating issue `#{issue_number}`, then run the shared **Step 5.1a — CI verdict gate** against the current PR head. SPEC §2 requires these checks before **any** automated merge, including partial merges. The CI gate may accept `ci_verdict = trusted` only when the live head still equals the `passed@<sha40>` `ci_status` SHA and the same live rollup is non-empty and entirely green. Otherwise run the documented waiter/fallback for this head; accept only a settled `pass`, `none` with `none_confirmed: true`, or a successfully verified equivalent manual fallback. A stale or absent status, failed or pending checks, an unsettled terminal snapshot, an unconfirmed empty result, an unavailable or failed fallback, or any head change leaves the PR open. If either gate finds an unsatisfied dependency or non-mergeable CI, do **not** merge: print the structured alert from `references/error-messages.md`, record the iteration outcome as `blocked_by_dependency` or `left_open`, leave the PR open, add the issue to the session skip list, and **continue to the next eligible issue** (same record-and-continue semantics as Phase 5). Only when both gates pass may the flow proceed to Step 2b.
+Whenever Step 2 would merge a PR (aggressive + `merge_partial: true`), run **Step 5.1b — Dependency Gate** first using the originating issue `#{issue_number}`, then run the shared **Step 5.1a — CI verdict gate** against the current PR head. SPEC §2 requires these checks before **any** automated merge, including partial merges. The CI gate may accept `ci_verdict = trusted` only when the live head still equals the `passed@<sha40>` `ci_status` SHA and the same live rollup is non-empty and entirely green. Otherwise run the documented waiter/fallback for this head; accept only a settled `pass`, `none` with `none_confirmed: true`, or a successfully verified equivalent manual fallback. A stale or absent status, failed or pending checks, an unsettled terminal snapshot, an unconfirmed empty result, an unavailable or failed fallback, or any head change leaves the PR open. If either gate finds an unsatisfied dependency or non-mergeable CI, do **not** merge: print the structured alert from `references/error-messages.md`, record the iteration outcome as `blocked_by_dependency` or `left_open`, leave the PR open, add the issue to the session skip list, and **continue to the next eligible issue** (same record-and-continue semantics as Phase 5). Last, immediately before the merge, run **Step 5.1c — Merge identity gate** with `verified_head` bound to the head this CI gate checked: a moved head, a live base that is ahead of that head, or any doubt is `stale`, so do **not** merge — record `left_open`, leave the PR open, add the issue to the session skip list, and continue to the next eligible issue. Patch-id equality never stands in for a fresh verdict here either. Only when all three gates pass may the flow proceed to Step 2b.
 
-**Step 2b — Merge (only when aggressive + merge_partial: true and both gates passed):** <!-- a:ap-step2b-merge -->
+**Step 2b — Merge (only when aggressive + merge_partial: true and all three gates passed):** <!-- a:ap-step2b-merge -->
 
 ```bash
-gh pr merge {pr_number} --squash --delete-branch
+gh pr merge {pr_number} --squash --delete-branch --match-head-commit "$verified_head"
 ```
 
 ```
@@ -146,7 +146,7 @@ Step 1.6 is the only thing that takes a closed issue back out of
 the cached order, on no skip list, for *Step 1.2* to pick again next iteration.
 The failed-merge path below closed nothing, so it runs nothing.
 
-If the merge command itself fails (branch protection, etc.):
+If the merge command itself fails (branch protection, a head `--match-head-commit` refused, etc.):
 ```
   ⚠ Merge failed for PR #{pr_number} — PR left open
     Unresolved issues tracked in #{followup_number}
@@ -205,7 +205,7 @@ If the original issue has any label in `autopilot.critical_labels` (default: `["
 ```
 
 The loop pauses and waits for the user's response. Based on the user's choice:
-- **Option 1:** Create follow-up issue (same as non-critical flow), merge PR, continue loop
+- **Option 1:** Create follow-up issue (same as non-critical flow), run the Step 2a gates (Step 5.1c included), merge PR with the Step 2b guarded command, continue loop
 - **Option 2:** Leave PR open, do not merge, continue loop to the next issue
 - **Option 3:** Skip issue, leave PR open, continue loop
 

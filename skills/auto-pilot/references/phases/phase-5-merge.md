@@ -10,6 +10,7 @@ Before merging, verify:
 
 1. **PR is mergeable** — no conflicts, CI passing (if configured)
 2. **No blocking reviews** — no "request changes" reviews from other humans
+3. **Fresh merge identity** — the head is still the one CI checked, and the live base has not moved past it (*Step 5.1c*, the last check before the merge)
 
 ```bash
 gh pr view {pr_number} --json mergeable,reviewDecision,statusCheckRollup,headRefOid
@@ -80,8 +81,9 @@ UNKNOWN: GitHub does recompute it against the current base, so it catches a base
 that moved **into conflict**, and nothing else — a clean, fast-forwardable
 advance leaves it MERGEABLE. The full wait this gate skips would not catch it
 either, since GitHub does not re-run a PR's checks merely because its base
-advanced, so the poll would read the same rollup this gate already read. The
-residual is unchanged from today; this gate neither widens nor closes it.
+advanced, so the poll would read the same rollup this gate already read. This
+gate does not answer it; *Step 5.1c — Merge identity gate* does, on both paths,
+before any merge.
 
 **`failed@<sha40>` is never `trusted`.** A failing verdict already leaves the PR
 open under Step 5.1's own rules; routing it through this gate would only let a
@@ -248,11 +250,82 @@ If all dependencies are satisfied, log and proceed:
 ○ Dependency gate passed — {n} dependency(ies) merged
 ```
 
-Continue to Step 5.2.
+Continue to Step 5.1c.
+
+### Step 5.1c — Merge identity gate <!-- a:ap-merge-identity-gate -->
+
+**Single home of the merge-identity rule** (issue #516). A CI verdict authorizes
+one commit merged onto one base. This gate refuses the merge when either has
+moved since that verdict. It runs last, immediately before `gh pr merge`, after
+the `trusted` fast path and after the full wait alike, and it guards every
+automated merge: Step 5.2's, Phase 3-4 Step 2b's partial merge, and the
+critical-issue Option 1 merge.
+
+Bind `verified_head` first. It is the 40-hex `headRefOid` from **Step 5.1's own
+read**, the head that Step 5.1a's verdict or the wait after it is about. Never
+take it from a later read: the guard pins the commit that was checked, so a SHA
+read after the wait would pin whatever the head became.
+
+Then one fresh read and one ancestry check. `{owner}` and `{repo}` are `gh api`'s
+own placeholders, filled from the current repository. The base name is bound
+through `--jq`, never pasted, because the PR author picks it:
+
+```bash
+read -r head_now base_ref <<<"$(gh pr view {pr_number} --json headRefOid,baseRefName --jq '"\(.headRefOid) \(.baseRefName)"')"
+behind_by="$(gh api "repos/{owner}/{repo}/compare/${base_ref}...${verified_head}" --jq .behind_by)"
+```
+
+| `merge_identity` | When | Effect |
+|------------------|------|--------|
+| `fresh` | `head_now` equals `verified_head` **and** `behind_by` is exactly `0`, meaning the live tip of `base_ref` is an ancestor of the verified head | Step 5.2 merges, guarded by `--match-head-commit` |
+| `stale` | anything else: a moved head, `behind_by` above 0, a failed read or API call, an empty or non-integer answer, a SHA that is not 40 hex, a base name the compare call cannot resolve | do **not** merge; outcome `left_open` |
+
+**Compare against the base branch, never `baseRefOid`.** `baseRefOid` is the
+base tip GitHub recorded at the PR's last synchronization, not the live branch,
+and it can sit many commits behind it. On one PR a compare against `baseRefOid`
+answered `behind_by: 0` while the same compare against the branch name answered
+`behind_by: 12`. A check against `baseRefOid` passes a moved base. The branch
+name resolves to the current tip at call time.
+
+**Why ancestry is enough.** When the live base tip is an ancestor of
+`verified_head`, a squash merge lands exactly `verified_head`'s tree, so the
+merge candidate *is* the commit the checks ran on and a green verdict on that
+head is a verdict on what lands. When the base has advanced past it, the merge
+candidate is a tree no check ran on. `mergeable` stays MERGEABLE on a clean
+advance and GitHub does not re-run checks when a base moves, so nothing else in
+this phase notices.
+
+**Patch-id equality never replaces fresh integration checks.** A commit whose
+`git patch-id`, diff or tree matches a verified one (a rebase, a cherry-pick, an
+`update-branch` result) is a different commit that no check has run on. It needs
+its own CI verdict on its own SHA and its own pass through this gate. No step
+carries a verdict from one commit to another by patch equality, and none skips a
+wait because the diff "did not change".
+
+**`stale` is never re-waited and never repaired.** This phase never pushes to a
+PR branch, so it never runs `gh pr update-branch` either. Leave the PR open. An
+updated branch is a new head with fresh CI, which a later run merges through this
+same gate. Under `max_parallel > 1` the first lane to merge moves the base, so
+its siblings reach this gate `stale` and stay open. That cost is intended.
+
+**One residual stays open: the compare-to-merge window.** `--match-head-commit`
+makes the head check atomic on GitHub's side. The base check is a read followed
+by a merge, so a base that advances in the seconds between the two is not
+caught here. Branch protection's *Require branches to be up to date before
+merging* closes that window on the server. This gate does not require it.
+
+One line, per `references/docs/terminal-style.md`. A `stale` answer prints the *Stale merge
+authorization* block from `references/error-messages.md`, records `left_open` and
+continues to the next issue, like any other unmergeable PR in Step 5.1:
+
+```
+○ Merge identity: fresh (head 9f2c1ab, base main not ahead) — merging
+⚠ Merge identity: stale (base main is 3 commits ahead of 9f2c1ab) — PR left open
+```
 
 ### Step 5.2 — Merge (mode-gated)
 
-Merge behavior is controlled by `autopilot.mode`. This step runs for clean PRs after review PASS. Partial merges (Phase 3-4 Step 2) use the same Step 5.1b dependency gate before `gh pr merge`.
+Merge behavior is controlled by `autopilot.mode`. This step runs for clean PRs after review PASS. Partial merges (Phase 3-4 Step 2) use the same Step 5.1b dependency gate, the Step 5.1a CI verdict gate and the Step 5.1c merge identity gate before `gh pr merge`.
 
 **Compute the effective mode** by applying the *Resolution rules* under *Merge Modes* in SKILL.md — the single home for this logic, including the legacy `autopilot.auto_merge` mapping. Zero-config shorthand: when neither `autopilot.mode` nor `autopilot.auto_merge` appears in the file, effective mode = `balanced`.
 
@@ -272,10 +345,12 @@ If the mode forbids merge (`conservative`):
   Continuing to next issue...
 ```
 
-If the mode allows merge (`balanced` or `aggressive`):
+If the mode allows merge (`balanced` or `aggressive`), and only on a `fresh`
+*Step 5.1c* answer, merge with the expected-head guard. `verified_head` is the
+SHA that step bound. GitHub refuses the merge if the head no longer matches it:
 
 ```bash
-gh pr merge {pr_number} --squash --delete-branch
+gh pr merge {pr_number} --squash --delete-branch --match-head-commit "$verified_head"
 ```
 
 ```
@@ -284,7 +359,7 @@ gh pr merge {pr_number} --squash --delete-branch
   Outcome: merged
 ```
 
-If the merge command fails (branch protection, required approvals, conflicts, etc.), leave the PR open and continue:
+If the merge command fails (branch protection, required approvals, conflicts, a head that moved after *Step 5.1c* and that `--match-head-commit` refused, etc.), leave the PR open and continue:
 ```
 ⚠ Merge failed for PR #{pr_number} — PR left open
   Outcome: left_open

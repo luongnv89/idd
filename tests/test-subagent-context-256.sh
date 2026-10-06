@@ -319,8 +319,12 @@ check_block_has "$STEP32_BLOCK" 'Step 5\.1a — CI verdict gate' \
 # a reader the residual is covered when nothing covers it.
 check_block_has "$CI_GATE_BLOCK" 'that moved \*\*into conflict\*\*, and nothing else' \
   "T3.15: the moved-base residual is scoped to what mergeable actually detects"
-check_block_has "$CI_GATE_BLOCK" 'this gate neither widens nor closes it' \
-  "T3.16: the section states the residual is open, not mitigated"
+# Inverted by issue #516: the moved-base residual is no longer accepted — the
+# CI gate hands it to the merge identity gate, which closes it before any merge.
+check_block_lacks "$CI_GATE_BLOCK" 'this gate neither widens nor closes it' \
+  "T3.16: the section no longer accepts the moved-base residual as open"
+check_block_has "$CI_GATE_BLOCK" 'Step 5\.1c — Merge identity gate' \
+  "T3.16b: the CI gate hands the moved base to the merge identity gate"
 
 # SIBLING PARITY. The home above is not the only place this gate is narrated:
 # examples.md walks the merge path and SKILL.md summarises it in the phase table.
@@ -684,8 +688,10 @@ check_block_has "$B_STEP32_BLOCK" 'Step 5\.1a — CI verdict gate' \
   "T7.52: built Step 3.2 names the gate that consumes it"
 check_block_has "$B_CI_GATE_BLOCK" 'that moved \*\*into conflict\*\*, and nothing else' \
   "T7.53: built CI verdict gate scopes the moved-base residual to mergeable's real answer"
-check_block_has "$B_CI_GATE_BLOCK" 'this gate neither widens nor closes it' \
-  "T7.54: built CI verdict gate states the residual is open, not mitigated"
+check_block_lacks "$B_CI_GATE_BLOCK" 'this gate neither widens nor closes it' \
+  "T7.54: built CI verdict gate no longer accepts the moved-base residual (#516)"
+check_block_has "$B_CI_GATE_BLOCK" 'Step 5\.1c — Merge identity gate' \
+  "T7.54b: built CI verdict gate hands the moved base to the merge identity gate"
 
 B_EXAMPLES_CI_BLOCK="$(anchor_span "$BUILT_AP_EXAMPLES" ap-ex-merge-requires-ci ap-ex-interrupted-run || true)"
 check_block_has "$B_EXAMPLES_CI_BLOCK" 'non-empty with every check in it green' \

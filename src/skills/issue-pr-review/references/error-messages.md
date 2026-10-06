@@ -190,13 +190,26 @@ failure.
 
 ### Merge failed
 
-**Trigger:** `gh pr merge` fails (auto mode only).
+**Trigger:** `gh pr merge` fails (auto mode only), including a head that moved after the merge identity check, which `--match-head-commit` refuses.
 
 ```
 ⚠ Auto-merge failed: {reason}
 
   Manual merge required.
   PR:  {pr_url}
+```
+
+### Stale merge authorization
+
+**Trigger:** the merge identity check before an auto-merge fails: the head no longer equals `verified_head`, the live base branch is ahead of it (`behind_by` above 0), or the read or compare call failed. Nothing was merged. Patch-id or diff equality with the checked commit never clears it.
+
+```
+⚠ Merge identity: stale ({reason}) — not merged
+
+  To fix:  gh pr update-branch {N}
+  Then:    re-run /issue-pr-review {N} --auto (the new head gets fresh CI)
+  PR:      {pr_url}
+  Docs:    https://github.com/luongnv89/idd/blob/main/docs/platform-github.md
 ```
 
 ### Merge conflict with base

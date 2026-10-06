@@ -2,36 +2,36 @@
   "headroom_bytes": 1024,
   "skills": {
     "auto-pilot": {
-      "budget": 403578,
-      "measured": 402560
+      "budget": 411133,
+      "measured": 410109
     },
     "init-gitissue": {
       "budget": 130846,
-      "measured": 130161
+      "measured": 130630
     },
     "issue-analysis": {
       "budget": 158617,
-      "measured": 157594
+      "measured": 158063
     },
     "issue-creator": {
       "budget": 178706,
-      "measured": 177688
+      "measured": 178157
     },
     "issue-pr-review": {
-      "budget": 257934,
-      "measured": 257330
+      "budget": 262254,
+      "measured": 261230
     },
     "issue-resolver": {
       "budget": 358913,
-      "measured": 357893
+      "measured": 358362
     },
     "issue-triage": {
       "budget": 130813,
-      "measured": 130280
+      "measured": 130749
     },
     "plan-to-issues": {
-      "budget": 163566,
-      "measured": 163563
+      "budget": 165056,
+      "measured": 164032
     }
   }
 }
