@@ -7,7 +7,12 @@
 #              offers a manual-copy alternative
 #   F-UX-004 — the primary "Read the full docs" button targets docs.html
 #   F-UX-010 — IDD, CursorBench, and SKILL.md are defined at first use;
-#              a single product brand (gitissue) is used on these two pages
+#              a single product brand (IDD) is used on these pages
+#   T8       — the single on-page product brand is IDD (user decision
+#              2026-10-06, superseding gitissue): after literal identifiers
+#              (.gitissue.yml, .gitissue/, init-gitissue, gitissue:normalized)
+#              are removed, no "gitissue" remains on landing.html, docs.html,
+#              or llms.txt
 #
 # Static HTML only — no browser, no JS runner.
 #
@@ -19,6 +24,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 LANDING="$REPO_ROOT/landing.html"
 DOCS="$REPO_ROOT/docs.html"
+LLMS="$REPO_ROOT/llms.txt"
 
 PASS=0
 FAIL=0
@@ -29,10 +35,10 @@ fail() { echo "  ✗ $1"; FAIL=$((FAIL + 1)); }
 echo "◆ Webpage UX clarity (#361)"
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 
-if [ -f "$LANDING" ] && [ -f "$DOCS" ]; then
-  pass "T0: landing.html and docs.html present"
+if [ -f "$LANDING" ] && [ -f "$DOCS" ] && [ -f "$LLMS" ]; then
+  pass "T0: landing.html, docs.html, and llms.txt present"
 else
-  fail "T0: landing.html or docs.html missing"
+  fail "T0: landing.html, docs.html, or llms.txt missing"
   echo "Result: $PASS passed, $FAIL failed"
   exit 1
 fi
@@ -115,7 +121,7 @@ else
   printf '%s\n' "$first_use_ok" | sed 's/^/        /'
 fi
 
-# ── F-UX-010: single on-page brand (gitissue), no issuedev dual-name ──
+# ── F-UX-010: single on-page brand (IDD), no issuedev dual-name ──
 if grep -q 'issuedev / gitissue' "$LANDING" "$DOCS" \
    || grep -q 'gitissue / issuedev' "$LANDING" "$DOCS"; then
   fail "T6: dual issuedev/gitissue naming still present"
@@ -127,9 +133,32 @@ issuedev_hits="$(grep -c 'issuedev' "$LANDING" "$DOCS" || true)"
 # grep -c with two files prints "file:n" per file; sum the numbers.
 issuedev_total="$(printf '%s\n' "$issuedev_hits" | awk -F: '{s+=$NF} END {print s+0}')"
 if [ "$issuedev_total" -eq 0 ]; then
-  pass "T7: issuedev is gone from landing.html and docs.html (brand is gitissue)"
+  pass "T7: issuedev is gone from landing.html and docs.html (brand is IDD)"
 else
   fail "T7: issuedev still appears $issuedev_total time(s) on landing.html/docs.html"
+fi
+
+# ── Single brand is IDD: "gitissue" survives only inside literal identifiers ──
+brand_out="$(python3 -c '
+import re, sys
+
+allow = re.compile(r"\.gitissue\.yml|\.gitissue/|init-gitissue|gitissue:normalized", re.I)
+bad = []
+for path in sys.argv[1:]:
+    text = open(path, encoding="utf-8").read()
+    scrubbed = allow.sub("", text)
+    for m in re.finditer(r"gitissue", scrubbed, re.I):
+        ctx = scrubbed[max(0, m.start() - 40): m.end() + 40].replace("\n", "\\n")
+        bad.append("%s: ...%s..." % (path, ctx))
+for line in bad:
+    print(line)
+sys.exit(1 if bad else 0)
+' "$LANDING" "$DOCS" "$LLMS")" && brand_status=0 || brand_status=$?
+if [ "$brand_status" -eq 0 ]; then
+  pass "T8: no \"gitissue\" outside literal identifiers on landing/docs/llms.txt"
+else
+  fail "T8: \"gitissue\" survives outside literal identifiers (brand is IDD)"
+  printf '%s\n' "$brand_out" | sed 's/^/        /'
 fi
 
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"

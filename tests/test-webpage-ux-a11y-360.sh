@@ -270,6 +270,7 @@ PAGES = {
         'controls': [
             ('.nav-links > a', 'header nav links (GitHub CTA included)', True),
             ('.brand', 'brand / home link', False),
+            ('.theme-toggle', 'theme toggle', True),
             ('.btn', 'hero and CTA buttons', False),
             ('.copy-btn', 'install copy button', True),
             ('.shots-nav', 'carousel prev / next arrows', True),
@@ -289,6 +290,7 @@ PAGES = {
         'controls': [
             ('.nav-links > a', 'header nav links (GitHub CTA included)', True),
             ('.brand', 'brand / home link', False),
+            ('.theme-toggle', 'theme toggle', True),
             ('.toc a', 'table-of-contents links', False),
             ('.foot-links a', 'footer links', True),
             ('.nav-menu > summary', 'mobile menu button', True),
@@ -304,6 +306,7 @@ PAGES = {
         'controls': [
             ('.nav-links > a', 'header nav links (GitHub CTA included)', True),
             ('.brand', 'brand / home link', False),
+            ('.theme-toggle', 'theme toggle', True),
             ('.tl-expand', 'release Details toggle', True),
             ('.foot-links a', 'footer links', True),
             ('.nav-menu > summary', 'mobile menu button', True),
