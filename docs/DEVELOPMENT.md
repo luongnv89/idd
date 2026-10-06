@@ -270,9 +270,12 @@ bash tests/test-eval-creator.sh
 bash tests/test-eval-resolver.sh
 bash tests/test-eval-pr-review.sh
 bash tests/test-eval-plan-to-issues.sh
+bash tests/test-eval-promotion-517.sh
 ```
 
 No `gh` auth and no network. `EVAL_RECORD=1` is for local cassette capture only and is fail-closed in `run_eval.sh` / CI. How to add cases, cassette format, and grading: [evals/README.md](../evals/README.md).
+
+Real-agent behavior is measured outside this hermetic suite, in the opt-in promotion lane (`evals/harness/agent_eval.py`, never run in CI): held-out tasks, private rubrics, leak checks, blind grading and recorded provenance — see [evals/README.md → Promotion lane](../evals/README.md#promotion-lane-real-agent-opt-in).
 
 When testing manually:
 1. Create a test repository (or use an existing one)

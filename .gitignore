@@ -34,6 +34,10 @@ env/
 .coverage.*
 coverage-report/
 
+# Promotion-lane private store (issue #517): held-out tasks, private rubrics,
+# run transcripts and sealed keys never enter the repository
+evals/promotion/private/
+
 # Test artifacts
 tests/tmp/
 tests/output/
