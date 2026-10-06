@@ -40,7 +40,9 @@ src/
 │       ├── gi-branch.py           # Derive a convention-conformant branch name
 │       ├── gi-ratelimit.py        # Rate-limit verdict, chunked pause, backoff, runtime budget
 │       ├── gi-plan-map.py         # Render plan-to-issues' static epic plan map
-│       └── gi-receipt.py          # Write/verify the revision receipt behind a QA handoff
+│       ├── gi-receipt.py          # Write/verify the revision receipt behind a QA handoff
+│       ├── gi-sensitive.py        # Classify a sensitive change; adjudicate its probe/challenge ledger
+│       └── gi-premise.py          # Premise-reset verdict: block a fix after two shared-premise failures
 │
 ├── skills/
 │   ├── auto-pilot/         # /auto-pilot — triage, resolve, review, merge loop
