@@ -1,6 +1,6 @@
 # Manual IDD Quickstart — no AI required
 
-Issue-Driven Development is a methodology, not a tool. This page gets a team to **L1 conformance** ([SPEC.md](https://github.com/luongnv89/idd/blob/main/SPEC.md) §6) with nothing installed — no gitissue skills, no AI agent, no build. A text editor and your existing tracker are enough. L2 and L3 are each one habit away.
+Issue-Driven Development is a methodology, not a tool. This page gets a team to **L1 conformance** ([SPEC.md](https://github.com/luongnv89/idd/blob/main/SPEC.md) §6) with nothing installed — no IDD Stack skills, no AI agent, no build. A text editor and your existing tracker are enough. L2 and L3 are each one habit away.
 
 ## 1. Structure your issues (L1)
 
@@ -88,4 +88,4 @@ python3 idd-lint.py issue - < issue-body.md   # the §1 contract
 python3 idd-lint.py stats                     # is it paying off?
 ```
 
-When you later want the automated version of each phase — elicitation, triage, analysis, resolution — the [gitissue skills](https://github.com/luongnv89/idd#get-started) are the reference implementation of this same spec. Nothing about your issues has to change; that is the point.
+When you later want the automated version of each phase — elicitation, triage, analysis, resolution — the [IDD Stack skills](https://github.com/luongnv89/idd#get-started) are the reference implementation of this same spec. Nothing about your issues has to change; that is the point.

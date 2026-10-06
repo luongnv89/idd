@@ -1,4 +1,4 @@
-# gitissue CLI Style Guide
+# IDD Stack CLI Style Guide
 
 The terminal is the interface. Every character of output is a design decision.
 
@@ -16,7 +16,7 @@ authoritative.
 2. **Transparency builds trust.** Show confidence scores, step progress, and what's happening at each phase. No black boxes.
 3. **Errors are help.** When something fails, show what went wrong + how to fix + where to learn more.
 4. **Warmth in empty states.** "No items found" is not a design. Every empty state has context and a next action.
-5. **Distinctive, not decorative.** Step counters, confidence markers, and semantic symbols give gitissue its own feel — not generic AI slop.
+5. **Distinctive, not decorative.** Step counters, confidence markers, and semantic symbols give IDD Stack its own feel — not generic AI slop.
 
 ## Symbol Vocabulary
 
@@ -149,7 +149,7 @@ Default option in uppercase. Alternatives in lowercase.
 
 ## Confidence Markers
 
-Unique to gitissue. Show honesty about what's inferred:
+Unique to IDD Stack. Show honesty about what's inferred:
 
 ```
   + Files:    auth.py (high), config.py (medium)

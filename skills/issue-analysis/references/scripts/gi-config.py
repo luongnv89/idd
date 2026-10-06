@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # gi-requires: references/docs/config-schema.md
-"""Resolve the effective gitissue configuration and print it as one JSON line.
+"""Resolve the effective IDD Stack configuration and print it as one JSON line.
 
 Every skill starts by merging the documented defaults with the repository's
 `.gitissue.yml`. Doing that by reading prose is where drift creeps in: a default
@@ -449,7 +449,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="gi-config.py",
         description=(
-            "Merge the documented gitissue defaults with the repository's "
+            "Merge the documented IDD Stack defaults with the repository's "
             f"{DEFAULT_CONFIG_NAME} and print the result as one JSON line."
         ),
         epilog=(

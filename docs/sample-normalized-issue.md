@@ -1,6 +1,6 @@
 # Sample Normalized Issue
 
-This shows how a gitissue-normalized bug report renders in GitHub's web UI.
+This shows how an IDD Stack-normalized bug report renders in GitHub's web UI.
 
 ---
 

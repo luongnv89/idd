@@ -1,6 +1,6 @@
 ---
 name: init-gitissue
-description: "Generate a .gitissue.yml by auto-detecting a repo's stack, test runner, and size. Use to init, setup, or configure gitissue, or set up IDD. Don't use for editing an existing .gitissue.yml, creating issues (use /issue-creator), or plain git/npm init."
+description: "Generate a .gitissue.yml by auto-detecting a repo's stack, test runner, and size. Use to init, setup, or configure IDD Stack, or set up IDD. Don't use for editing an existing .gitissue.yml, creating issues (use /issue-creator), or plain git/npm init."
 license: MIT
 compatibility: "Requires git. No GitHub CLI or authentication needed — generates a local config file only."
 metadata:
@@ -11,13 +11,13 @@ metadata:
 
 # /init-gitissue
 
-Initialize gitissue for the current repository. Scans the codebase to detect language, framework, test runner, and repo size, then generates a `.gitissue.yml` config file with project-specific defaults.
+Initialize IDD Stack for the current repository. Scans the codebase to detect language, framework, test runner, and repo size, then generates a `.gitissue.yml` config file with project-specific defaults.
 
 **Invocation**: `/init-gitissue` — interactive. `/init-gitissue --auto` (or `IDD_AUTO_MODE=1`) — no prompts; an existing `.gitissue.yml` is kept.
 
 ## When to Use
 
-- **Do** run this skill the first time a repository starts using gitissue, or when the existing `.gitissue.yml` is outdated after a stack migration.
+- **Do** run this skill the first time a repository starts using IDD Stack, or when the existing `.gitissue.yml` is outdated after a stack migration.
 - **Do** treat it as idempotent for the "already exists" path — merge or overwrite based on user confirmation.
 - **Avoid** running it every session — it is a one-time setup skill.
 - **Never** modify or delete files outside the repo root, and never commit the generated config (leave that to the user).

@@ -1,8 +1,8 @@
-# CLAUDE.md — gitissue / IDD
+# CLAUDE.md — IDD Stack
 
 ## Project Overview
 
-gitissue implements Issue-Driven Development (IDD) — a methodology where GitHub issues are the single source of truth for all development work. The product is a set of Claude Code skills that create, normalize, resolve, and triage GitHub issues.
+IDD Stack implements Issue-Driven Development (IDD) — a methodology where GitHub issues are the single source of truth for all development work. The product is a set of Claude Code skills that create, normalize, resolve, and triage GitHub issues.
 
 ## Commands
 

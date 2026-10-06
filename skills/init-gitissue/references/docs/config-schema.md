@@ -1,7 +1,7 @@
 <!-- Generated from /docs/config-schema.md. Do not edit. Edit source and run ./scripts/build.sh. -->
 # `.gitissue.yml` Configuration Schema
 
-gitissue works with zero configuration — every setting has a default. With no `.gitissue.yml`, the first-run hint is shown:
+IDD Stack works with zero configuration — every setting has a default. With no `.gitissue.yml`, the first-run hint is shown:
 
 ```
 ○ First run — using default config. Run /init-gitissue to customize.

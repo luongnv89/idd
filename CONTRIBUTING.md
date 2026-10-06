@@ -1,6 +1,6 @@
-# Contributing to gitissue
+# Contributing to IDD Stack
 
-Thanks for your interest in contributing! gitissue is a **prompt-first** project: each public skill is a self-contained SKILL.md package (`src/skills/<name>/SKILL.source.md`) that instructs an agent how to perform a task. The exception is `src/shared/scripts/` — small, stdlib-only Python helpers the skills shell out to when determinism beats prose (`src/shared/scripts/gi-config.py:3`).
+Thanks for your interest in contributing! IDD Stack is a **prompt-first** project: each public skill is a self-contained SKILL.md package (`src/skills/<name>/SKILL.source.md`) that instructs an agent how to perform a task. The exception is `src/shared/scripts/` — small, stdlib-only Python helpers the skills shell out to when determinism beats prose (`src/shared/scripts/gi-config.py:3`).
 
 ## How to Contribute
 

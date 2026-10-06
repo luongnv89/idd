@@ -3,7 +3,7 @@
 
 > **Per-skill excerpt (generated).** Only the configuration sections this skill reads are reproduced here: `agents`, `duplicate_detection`, `issue`, `model_suggestion`, `platform`, `projects`, `triage`. The complete schema — every section and the full defaults table — is at [config-schema.md](https://github.com/luongnv89/idd/blob/main/docs/config-schema.md).
 
-gitissue works with zero configuration — every setting has a default. With no `.gitissue.yml`, the first-run hint is shown:
+IDD Stack works with zero configuration — every setting has a default. With no `.gitissue.yml`, the first-run hint is shown:
 
 ```
 ○ First run — using default config. Run /init-gitissue to customize.

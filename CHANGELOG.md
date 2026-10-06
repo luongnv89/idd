@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- gitissue:normalized v1 -->
 
+## [Unreleased]
+
+### Changed
+- **brand:** the product is now called **IDD Stack** everywhere it is named: the website, the plugin listing (`displayName` "IDD Stack: Issue-Driven Development"), the marketplace descriptions, `llms.txt`, the logo kit's accessible names, the README and docs, and the comments `/issue-creator` posts on issues. The old product name "gitissue" is gone from prose. "IDD" still names the methodology (Issue-Driven Development and the IDD Spec), and identifiers are unchanged: the `idd` plugin id, the `/idd:` namespace, `IDD_*` variables, `.gitissue.yml` and the `gitissue:` markers. ([#512](https://github.com/luongnv89/idd/issues/512))
+
 ## v0.24.0 — 2026-10-05
 
 ### Features

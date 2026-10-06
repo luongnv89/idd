@@ -13,7 +13,7 @@ metadata:
 
 Fully autonomous development loop: triage, pick, resolve, review, fix, merge, repeat — zero user prompts.
 
-It orchestrates the other gitissue skills over the backlog. It triages **once** at loop start (reusing a fresh `.gitissue/triage.json`, *Mode Detection*) and picks from that order; with `autopilot.max_parallel` above 1, independent issues resolve concurrently in isolated worktrees, but PRs are reviewed and merged one at a time. After each merge, update the cached order in place. *Merge Modes* decide which PRs merge; a critical issue with unresolved review problems stops the loop for the user.
+It orchestrates the other IDD Stack skills over the backlog. It triages **once** at loop start (reusing a fresh `.gitissue/triage.json`, *Mode Detection*) and picks from that order; with `autopilot.max_parallel` above 1, independent issues resolve concurrently in isolated worktrees, but PRs are reviewed and merged one at a time. After each merge, update the cached order in place. *Merge Modes* decide which PRs merge; a critical issue with unresolved review problems stops the loop for the user.
 
 ## Autonomy Philosophy <!-- a:ap-autonomy -->
 
@@ -32,7 +32,7 @@ It orchestrates the other gitissue skills over the backlog. It triages **once** 
 
 When in doubt, skip rather than stop: a skipped issue can be retried.
 
-**Delegated skills inherit the autonomy.** Every gitissue skill `/auto-pilot` invokes gets `--auto` **and** `IDD_AUTO_MODE=1` exported, every time (`references/docs/auto-mode.md`). **Never rely on the callee detecting auto-pilot provenance** — only the flag and the variable are checkable.
+**Delegated skills inherit the autonomy.** Every IDD Stack skill `/auto-pilot` invokes gets `--auto` **and** `IDD_AUTO_MODE=1` exported, every time (`references/docs/auto-mode.md`). **Never rely on the callee detecting auto-pilot provenance** — only the flag and the variable are checkable.
 
 ## Invocation
 
@@ -74,7 +74,7 @@ Run these checks in order:
 
 ## Dependency Preflight (mandatory)
 
-`/auto-pilot` invokes sibling gitissue skills from its own distribution. Verify them **before** the run lock or any mutation, with `SKILL_DIR` bound to this SKILL.md's dirname:
+`/auto-pilot` invokes sibling IDD Stack skills from its own distribution. Verify them **before** the run lock or any mutation, with `SKILL_DIR` bound to this SKILL.md's dirname:
 
 ```bash
 missing=""
@@ -84,7 +84,7 @@ done
 if [ -n "$missing" ]; then echo "Missing required skill(s):$missing" >&2; exit 1; fi
 ```
 
-If any are missing, apply the stop rule with the `✗ Missing required gitissue skill(s)` block from `references/preflight.md`. `issue-creator` is optional: on a miss, warn and skip mid-loop normalization. Invoke it with `--auto` and `IDD_AUTO_MODE=1` — its Normalize apply gate sits directly in the loop's path.
+If any are missing, apply the stop rule with the `✗ Missing required IDD Stack skill(s)` block from `references/preflight.md`. `issue-creator` is optional: on a miss, warn and skip mid-loop normalization. Invoke it with `--auto` and `IDD_AUTO_MODE=1` — its Normalize apply gate sits directly in the loop's path.
 
 ### Bundled dependency precheck
 

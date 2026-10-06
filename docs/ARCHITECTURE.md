@@ -2,7 +2,7 @@
 
 ## Overview
 
-gitissue is a **prompt-first** project. Almost all of it is prose: each skill is a self-contained Claude Code skill (`SKILL.md` + `references/` + `templates/`) that instructs an AI agent how to perform a task. The exception is `src/shared/scripts/` — small, stdlib-only Python helpers the skills shell out to when determinism beats prose (`src/shared/scripts/gi-config.py:3`).
+IDD Stack is a **prompt-first** project. Almost all of it is prose: each skill is a self-contained Claude Code skill (`SKILL.md` + `references/` + `templates/`) that instructs an AI agent how to perform a task. The exception is `src/shared/scripts/` — small, stdlib-only Python helpers the skills shell out to when determinism beats prose (`src/shared/scripts/gi-config.py:3`).
 
 The only external dependency for GitHub interaction is the GitHub CLI (`gh`).
 

@@ -21,8 +21,8 @@
 | Say this... | Skill will... |
 |---|---|
 | `/init-gitissue` | Scan the repo and generate a `.gitissue.yml` with detected defaults |
-| "set up gitissue for this project" | Detect language/framework/tests and write a tailored config |
-| "configure my repo for IDD" | Generate project-specific gitissue configuration |
+| "set up IDD Stack for this project" | Detect language/framework/tests and write a tailored config |
+| "configure my repo for IDD" | Generate project-specific IDD Stack configuration |
 | "what settings should I use" | Scan the codebase and suggest appropriate settings |
 
 ## How It Works
@@ -67,7 +67,7 @@ asm install https://github.com/luongnv89/idd --skill init-gitissue
 ## Output
 
 A `.gitissue.yml` file in the repo root with:
-- All config fields from the gitissue schema
+- All config fields from the IDD Stack schema
 - Inline comments explaining each setting
 - Values tailored to the detected language, framework, test runner, and repo size
 - Header comment documenting what was detected

@@ -2,7 +2,7 @@
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="assets/logo/logo-white.svg">
     <source media="(prefers-color-scheme: light)" srcset="assets/logo/logo-black.svg">
-    <img src="assets/logo/logo-black.svg" alt="IDD logo" height="80">
+    <img src="assets/logo/logo-black.svg" alt="IDD Stack logo" height="80">
   </picture>
 </p>
 
@@ -20,7 +20,7 @@
 
 # Turn GitHub Issues Into Structured, Agent-Ready Work Orders
 
-Eight public skills that plan, structure, analyze, triage, resolve, review, and self-check GitHub issue workflows — so any developer or AI agent can pick up an issue and ship a tested PR (`src/skills/` — `/plan-to-issues`, `/issue-creator`, `/issue-analysis`, `/issue-resolver`, `/issue-triage`, `/init-gitissue`, `/auto-pilot`, `/issue-pr-review`).
+**IDD Stack** is eight public skills that plan, structure, analyze, triage, resolve, review, and self-check GitHub issue workflows — so any developer or AI agent can pick up an issue and ship a tested PR (`src/skills/` — `/plan-to-issues`, `/issue-creator`, `/issue-analysis`, `/issue-resolver`, `/issue-triage`, `/init-gitissue`, `/auto-pilot`, `/issue-pr-review`).
 
 [**Website**](https://luongnv.com/idd/) · [**Get Started**](#get-started) · [**What is IDD?**](#what-is-idd) · [**Capturing Intention**](#capturing-intention) · [**Why Good Issues & Commits Matter**](#why-good-issues-and-commit-messages-matter) · [**Works With Any Tool**](#works-with-any-tool)
 
@@ -38,7 +38,7 @@ GitHub issues were designed for humans to read, not for agents to execute. And c
 
 ## The Fix
 
-gitissue turns every GitHub issue into a self-contained work order: typed, structured, and enriched with acceptance criteria. Then it resolves them — with commit messages and PR titles that link every line of code back to the intention that created it.
+IDD Stack turns every GitHub issue into a self-contained work order: typed, structured, and enriched with acceptance criteria. Then it resolves them — with commit messages and PR titles that link every line of code back to the intention that created it.
 
 ```mermaid
 graph TD
@@ -92,7 +92,7 @@ Internal-only skills are not published in the public skill index and are not bui
   <img src="assets/screenshots/issue-creator.png" alt="issue-creator terminal output" width="680">
 </p>
 
-Describe a bug, feature, or improvement in plain text. gitissue classifies it, generates acceptance criteria, and creates a GitHub issue with labels.
+Describe a bug, feature, or improvement in plain text. IDD Stack classifies it, generates acceptance criteria, and creates a GitHub issue with labels.
 
 ### 2. Resolve it in one command
 
@@ -151,9 +151,9 @@ Triage, resolve, review, merge — repeated for every open issue. Up to three re
 
 ## Works With Any Tool
 
-IDD is a methodology, not a vendor lock-in. The structured issue format is plain GitHub markdown — any tool that reads GitHub issues can consume it. gitissue adds structure to your issues; your existing tools keep working exactly as before. No AI at all? The [manual IDD quickstart](docs/manual-idd-quickstart.md) proves L1 works with a text editor and your existing tracker.
+IDD is a methodology, not a vendor lock-in. The structured issue format is plain GitHub markdown — any tool that reads GitHub issues can consume it. IDD Stack adds structure to your issues; your existing tools keep working exactly as before. No AI at all? The [manual IDD quickstart](docs/manual-idd-quickstart.md) proves L1 works with a text editor and your existing tracker.
 
-| Tool | How it works with gitissue |
+| Tool | How it works with IDD Stack |
 |------|---------------------------|
 | **Claude Code** | Load skills directly — `/issue-creator`, `/issue-resolver` |
 | **Codex CLI** | `gh issue view 42 --json body` and pass to codex as context |
@@ -164,11 +164,11 @@ IDD is a methodology, not a vendor lock-in. The structured issue format is plain
 
 All tracker access is concentrated behind one **platform driver** document — [`docs/platform-github.md`](docs/platform-github.md), the operation catalog every skill's `gh` commands must match. GitHub is the only implemented driver; porting to another tracker means writing one equivalent document (e.g. `glab` mappings), not hunting through eight skills.
 
-gitissue is **complementary** to your existing workflow. Use it alongside TDD, BDD, CI/CD pipelines, project management tools, or any AI coding agent. It fills one gap — structuring and triaging issues — and stays out of the way for everything else.
+IDD Stack is **complementary** to your existing workflow. Use it alongside TDD, BDD, CI/CD pipelines, project management tools, or any AI coding agent. It fills one gap — structuring and triaging issues — and stays out of the way for everything else.
 
 ### Enforce the spec in CI — `idd-lint`
 
-[`scripts/idd-lint.py`](scripts/idd-lint.py) validates [IDD Spec](SPEC.md) conformance from plain data — no LLM, no network, no dependencies beyond the Python standard library. Any repo can run it, whether or not it uses the gitissue skills:
+[`scripts/idd-lint.py`](scripts/idd-lint.py) validates [IDD Spec](SPEC.md) conformance from plain data — no LLM, no network, no dependencies beyond the Python standard library. Any repo can run it, whether or not it uses the IDD Stack skills:
 
 ```bash
 # Lint the current branch name + commits against a base (local git only)
@@ -199,7 +199,7 @@ Checks are tagged with the spec section they enforce and mapped to the L1–L3 c
 IDD_HOME="$HOME/path/to/idd" bash -c '
   cat >> ~/.zshrc <<EOF
 
-# IDD (gitissue) — run idd-lint from anywhere. Docs: idd/README.md
+# IDD Stack — run idd-lint from anywhere. Docs: idd/README.md
 # IDD_HOME locates the tool; the repo analyzed is always your current directory.
 export IDD_HOME="\${IDD_HOME:-$IDD_HOME}"
 idd-lint() {
@@ -341,7 +341,7 @@ Browse the authored source for each skill — these links point to `src/` for re
 
 Issue-Driven Development treats GitHub issues as the atomic unit of all development work: *capture intention, resolve against current code, remember in git.* Every change starts as a structured issue and ends as a PR linked to that issue.
 
-IDD is a methodology, not a product. Its portable contract — issue format, naming grammar, Decision Records, traceability chain, and L1–L3 conformance levels — is defined in the tool-neutral [**IDD Spec**](SPEC.md). Any tool (or a human with a text editor) can implement it; the gitissue skills in this repo are the reference implementation for Claude Code + GitHub.
+IDD is a methodology, not a product. Its portable contract — issue format, naming grammar, Decision Records, traceability chain, and L1–L3 conformance levels — is defined in the tool-neutral [**IDD Spec**](SPEC.md). Any tool (or a human with a text editor) can implement it; IDD Stack, the set of skills in this repo, is the reference implementation for Claude Code + GitHub.
 
 The key idea: the gap between "someone describes a problem" and "someone ships a fix" is both a **translation gap** and an **intention gap**. IDD automates that translation — turning vague reports into structured work orders with acceptance criteria — while helping creators discover and articulate what they actually want through iterative refinement.
 
@@ -373,7 +373,7 @@ The full treatment of the loop is in the methodology doc: [Capturing Intention](
 
 ### Why Good Issues and Commit Messages Matter
 
-The issue captures the *why*, the commit captures the *how*, and the PR links them — so `git blame` on any line walks back to the original problem report. Structured history compounds: debugging becomes tracing instead of guessing, new contributors read the project's evolution, agents get instant context, and changelogs generate themselves. gitissue enforces the discipline automatically through the [naming conventions](docs/naming-conventions.md).
+The issue captures the *why*, the commit captures the *how*, and the PR links them — so `git blame` on any line walks back to the original problem report. Structured history compounds: debugging becomes tracing instead of guessing, new contributors read the project's evolution, agents get instant context, and changelogs generate themselves. IDD Stack enforces the discipline automatically through the [naming conventions](docs/naming-conventions.md).
 
 The full argument — executable project memory, the traceability chain, the compounding effect — lives in the methodology doc: [Executable Project Memory](docs/idd-methodology.md#executable-project-memory).
 
@@ -398,7 +398,7 @@ Only when you explicitly run `/issue-creator N`. A backup comment is posted befo
 Issues labeled `security`, `CVE`, or `vulnerability` are automatically skipped during normalization. Use `--force` to override.
 
 **Can I use it with my existing tools?**
-Yes. gitissue adds structure to issues. Your CI/CD, project boards, code review tools, and AI agents all keep working. Structured issues give them better input.
+Yes. IDD Stack adds structure to issues. Your CI/CD, project boards, code review tools, and AI agents all keep working. Structured issues give them better input.
 
 **Does it work with private repos?**
 Yes. It uses `gh` CLI authentication — whatever repos you can access via `gh auth login` will work.
@@ -544,7 +544,7 @@ Scans your repository and generates `.gitissue.yml` with sensible defaults: dete
 <details>
 <summary><strong>Configuration</strong></summary>
 
-gitissue works with **zero configuration**. All settings have sensible defaults.
+IDD Stack works with **zero configuration**. All settings have sensible defaults.
 
 To customize, create `.gitissue.yml` in your repo root (or run `/init-gitissue`):
 
