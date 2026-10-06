@@ -1,6 +1,6 @@
-# IDD — Issue-Driven Development
+# IDD Stack — Issue-Driven Development
 
-IDD makes GitHub issues the single source of truth for development work. This plugin bundles eight Claude Code skills that turn rough notes or a whole plan into structured issues, prioritize the backlog, investigate one issue, open a pull request that resolves it, review and merge that pull request, and run the whole loop unattended.
+IDD Stack makes GitHub issues the single source of truth for development work. This plugin bundles eight Claude Code skills that turn rough notes or a whole plan into structured issues, prioritize the backlog, investigate one issue, open a pull request that resolves it, review and merge that pull request, and run the whole loop unattended.
 
 ## Skills
 
@@ -33,7 +33,7 @@ No telemetry is collected, and no data leaves your machine except the GitHub cal
 
 ## Configuration
 
-IDD works with no configuration. To change labels, branch naming, test commands, review gates, or per-role agent models, run `/idd:init-gitissue` or edit `.gitissue.yml`. Full documentation, the methodology, and the configuration schema are at https://github.com/luongnv89/idd
+IDD Stack works with no configuration. To change labels, branch naming, test commands, review gates, or per-role agent models, run `/idd:init-gitissue` or edit `.gitissue.yml`. Full documentation, the methodology, and the configuration schema are at https://github.com/luongnv89/idd
 
 ## License
 

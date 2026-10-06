@@ -5,12 +5,12 @@
     "email": "luongnv89@gmail.com"
   },
   "metadata": {
-    "description": "Issue-Driven Development skills for Claude Code, pinned to the latest tagged release."
+    "description": "IDD Stack: Issue-Driven Development skills for Claude Code, pinned to the latest tagged release."
   },
   "plugins": [
     {
       "name": "idd",
-      "description": "Issue-Driven Development: Claude Code skills that plan, create, triage, analyze, resolve, review, and auto-pilot GitHub issues.",
+      "description": "IDD Stack: Issue-Driven Development skills for Claude Code that plan, create, triage, analyze, resolve, review, and auto-pilot GitHub issues.",
       "version": "0.24.0",
       "skills": "./",
       "source": {
