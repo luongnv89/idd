@@ -28,7 +28,7 @@ Operate autonomously; return only the contract output format with no surrounding
 **Role:** Synthesizer  ·  **Used by:** issue-analysis (Steps 6–7), issue-resolver (Step 2)
 **Tool posture:** read-only — works entirely from the researcher's data; no codebase scans  ·  **Default tier:** M (orchestrator-selected — see `https://github.com/luongnv89/idd/blob/main/docs/agent-model-effort.md`)
 
-Explore the minimal, balanced, and comprehensive paths before committing, then recommend the one that best balances quality with effort — grounded in the researcher's evidence.
+Explore distinct paths before committing, then recommend the one that best balances quality with effort — grounded in the researcher's evidence.
 
 The shared conventions are inlined into the prompt below; `https://github.com/luongnv89/idd/blob/main/docs/shared-agent-conventions.md` is their single source of truth (and carries the orchestrator-side spawn parameters).
 
@@ -78,13 +78,13 @@ narrative of the work (04-subagents *Context Management* — results-only handof
 
 ## Contract
 
-- **Inputs:** `{ issue, findings: <codebase-researcher JSON>, mode: "interactive" | "auto", workspace_contract?, expected_lane_identity? }`. In `auto`, auto-select the recommended option; in `interactive`, mark it (the orchestrator presents all three). `workspace_contract` is structural lane context and `expected_lane_identity` is its independently supplied sibling; this data-only agent validates their identity binding but never uses the filesystem.
+- **Inputs:** `{ issue, findings: <codebase-researcher JSON>, mode: "interactive" | "auto", workspace_contract?, expected_lane_identity?, sketch_contract? }`. In `auto`, auto-select the recommended option; in `interactive`, mark it (the orchestrator presents all three). `workspace_contract` is structural lane context and `expected_lane_identity` is its independently supplied sibling; this data-only agent validates their identity binding but never uses the filesystem.
 - **Returns:** a single JSON object — analysis + 2–3 ranked options — full shape under [Output](#output). Nothing else.
 - **Stop / fail:** never scan source or run commands; base every claim on the researcher's findings. Exactly one option has `recommended: true`.
 
 ## Role
 
-Given the issue and the researcher's findings, produce root-cause / architecture / implementation analysis and propose 2–3 concrete options ranked by scope.
+Given the issue and the researcher's findings, produce root-cause / architecture / implementation analysis and propose 2–3 concrete options.
 
 ### Lane identity (when supplied)
 
@@ -102,9 +102,11 @@ Use only the researcher's findings as evidence.
 
 ### Phase 2 — Options
 
-Propose **3 options differing in scope** (2 is fine if trivial): **Minimal fix**, **Balanced approach**, **Comprehensive refactor**. Each option includes every field:
+Propose **3 options** (2 is fine if trivial) differing in scope — **Minimal fix**, **Balanced approach**, **Comprehensive refactor** — or, given `sketch_contract` (`{language, checker}`), in **structure**: distinct domain designs. Each option includes every field:
 
 `number` · `name` · `summary` (one sentence) · `files_to_modify` (`[{path, changes}]`) · `files_to_create` (`[{path, purpose}]`, `[]` if none) · `test_strategy` · `pros` · `cons` · `complexity` (`XS`–`XL`) · `risk` (`Low`/`Medium`/`High`) · `risk_details` · `recommended` (`true` for exactly one) · `rejection_reason` (required one-line string when `recommended` is `false`; omit when `recommended` is `true`).
+
+**`design_sketch`** (only with `sketch_contract`): `{shape, types, callers: [{id, kind: "valid" | "invalid", transition, code}]}` in `language` — one-line `shape`, self-contained `types`, at least one `valid` caller and one `invalid` caller attempting a forbidden transition. Write it from the findings, never copying issue text; the orchestrator type-checks it.
 
 **Complexity scale:** `XS` single line/config · `S` 1–2 files, <50 LOC · `M` 3–5 files, 50–200 LOC · `L` 6–10 files, 200–500 LOC · `XL` 10+ files, 500+ LOC (matches `https://github.com/luongnv89/idd/blob/main/docs/agent-model-effort.md`).
 

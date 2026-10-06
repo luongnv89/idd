@@ -154,6 +154,18 @@ printf '%s' '{"failures":[],"revisions":[],"revision":[]}' | run "$SCRIPTS/gi-pr
 printf '%s' '{"failures":{},"revisions":[]}' | run "$SCRIPTS/gi-premise.py"
 printf '%s' 'not json' | run "$SCRIPTS/gi-premise.py"
 
+# gi-sketch — every verdict, every option status and malformed ledgers.
+for f in tests/fixtures/design-sketch/*.json; do
+  run "$SCRIPTS/gi-sketch.py" < "$f"
+done
+printf '%s' '{"options":[]}' | run "$SCRIPTS/gi-sketch.py"
+printf '%s' '{"recommended":1,"options":[],"extra":1}' | run "$SCRIPTS/gi-sketch.py"
+printf '%s' '{"recommended":1,"options":[]}' | run "$SCRIPTS/gi-sketch.py"
+printf '%s' '{"recommended":1,"options":[{"number":1},{"number":1}]}' | run "$SCRIPTS/gi-sketch.py"
+printf '%s' '{"recommended":2,"options":[{"number":1}]}' | run "$SCRIPTS/gi-sketch.py"
+printf '%s' '[]' | run "$SCRIPTS/gi-sketch.py"
+printf '\xff' | run "$SCRIPTS/gi-sketch.py"
+
 # gi-branch — derive a name locally (never --from-issue here: that needs gh).
 run "$SCRIPTS/gi-branch.py" 42 --title "Fix login crash on mobile" --type bug --no-config
 

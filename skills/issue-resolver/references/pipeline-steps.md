@@ -18,6 +18,7 @@ Main Agent (orchestrator)
 ├── Spawn: Synthesizer subagent (Step 2)
 │   Proposes 3 implementation options from research
 │   Returns: analysis + ranked options
+│   Then (domain changes): orchestrator type-checks design sketches; gi-sketch.py adjudicates
 │
 ├── Spawn: Implementer subagent (Step 3)
 │   Writes code + all tests based on selected plan
@@ -101,7 +102,7 @@ invariants (environment, workspace, deliver, no prompts). Under `--auto` /
 | *0e* — Workspace | The offer never appears. |
 | *0g* — Complexity gate | Still runs: it reads the pre-work `Effort` band, which needs no prompt. |
 | *Step 1* — Research | An already-resolved issue is closed with a comment and the run exits cleanly. |
-| *Step 2* — Plan | Auto-select the recommended option; the design-confirm checkpoint never fires. The sensitive-change gate still runs when triggered; its `stop` verdict is a safety stop — the run ends `failed`, no PR. |
+| *Step 2* — Plan | Auto-select the recommended option (when design sketches ran, the sketch's `selected` one under any verdict; `unproven` never stops); the design-confirm checkpoint never fires. The sensitive-change gate still runs when triggered; its `stop` verdict is a safety stop — the run ends `failed`, no PR. |
 | *Step 3* — Implement | Continue past the max-commits guard with a warning. Never prompt for skills: internal agents only, unless `resolve.borrow_skills` is `true`, in which case the auto-selected set is borrowed without asking. |
 | *Step 4* — QA | Run the cycles autonomously; on stagnation, deliver with the known issues recorded rather than stopping. A premise reset that rerunnable diagnostics cannot lift sends no further fix and takes the same deliver-with-known-issues path, with no QA marker. |
 | *Step 5* — Deliver | Create the PR; never merge. |
