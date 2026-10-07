@@ -240,7 +240,7 @@ has "$AUTOPILOT" "explicit-list-mode" "T7: auto-pilot SKILL points to the explic
 # which centralizes required-field validation, the 5→3 complexity collapse, and
 # the canonical key order. `--echo` is the machine form of the `--no-run-log`
 # contract — identical validation and normalization, but nothing is written.
-has "$RUNLOG" "references/scripts/gi-runlog.py" "T8: run-log-schema names the shipped gi-runlog script"
+has "$RUNLOG" "shared/scripts/gi-runlog.py" "T8: run-log-schema names the shipped gi-runlog script"
 has "$RUNLOG" "--append" "T8: run-log-schema documents the --append mode"
 has "$RUNLOG" "--echo" "T8: run-log-schema documents the --echo mode"
 has "$RUNLOG" "writes nothing" "T8: run-log-schema documents the --echo no-write contract"
