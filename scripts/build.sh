@@ -308,10 +308,35 @@ run_promote() {
     return 1
   fi
 
-  rm -rf "$ROOT_SKILLS"
-  cp -R "$skills_out" "$ROOT_SKILLS"
-  rm -rf "$ROOT_INTERNAL"
-  cp -R "$INTERNAL_STAGE" "$ROOT_INTERNAL"
+  local status
+  if rm -rf "$ROOT_SKILLS"; then
+    :
+  else
+    status=$?
+    err "promote failed: cannot remove $ROOT_SKILLS (exit $status)"
+    return "$status"
+  fi
+  if cp -R "$skills_out" "$ROOT_SKILLS"; then
+    :
+  else
+    status=$?
+    err "promote failed: cannot copy $skills_out to $ROOT_SKILLS (exit $status)"
+    return "$status"
+  fi
+  if rm -rf "$ROOT_INTERNAL"; then
+    :
+  else
+    status=$?
+    err "promote failed: cannot remove $ROOT_INTERNAL (exit $status)"
+    return "$status"
+  fi
+  if cp -R "$INTERNAL_STAGE" "$ROOT_INTERNAL"; then
+    :
+  else
+    status=$?
+    err "promote failed: cannot copy $INTERNAL_STAGE to $ROOT_INTERNAL (exit $status)"
+    return "$status"
+  fi
 
   if [[ "$BUILD_QUIET" -eq 0 ]]; then
     ok "skills/ updated → $ROOT_SKILLS"

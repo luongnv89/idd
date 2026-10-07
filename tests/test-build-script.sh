@@ -160,6 +160,7 @@ fi
 # All destructive/mutated builds use a copied checkout, never user installations.
 if PYTHONDONTWRITEBYTECODE=1 python3 - "$REPO_ROOT" <<'PY_INTERNAL'
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -168,9 +169,9 @@ from pathlib import Path
 
 repo = Path(sys.argv[1])
 
-def run(root, *args, ok=True):
+def run(root, *args, ok=True, env=None):
     result = subprocess.run(args, cwd=root, text=True, capture_output=True,
-                            env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"})
+                            env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1", **(env or {})})
     assert (result.returncode == 0) == ok, (
         f"command {args} exited {result.returncode}; expected {'success' if ok else 'rejection'}\n"
         + result.stdout + result.stderr)
@@ -283,6 +284,38 @@ with tempfile.TemporaryDirectory() as tmp:
     pipeline.write_text(original)
     run(root, "bash", wrapper, "--quiet")
     print("  ✓ T6.5: missing emitted SKILL/ref fails verification, BOTH canonical trees protected")
+
+    # Fail only the selected canonical promotion command, not compilation or cleanup.
+    shim_dir = Path(tmp) / "promotion-shims"
+    shim_dir.mkdir()
+    for command, target, quiet in (("cp", dest, False), ("rm", dest, False),
+                                   ("cp", root / "skills", False),
+                                   ("rm", root / "skills", False), ("cp", dest, True)):
+        real_command = shutil.which(command)
+        assert real_command, f"{command} unavailable for promotion fixture"
+        shim = shim_dir / command
+        shim.write_text(
+            "#!/usr/bin/env bash\n"
+            'for arg in "$@"; do last="$arg"; done\n'
+            f'if [[ "$last" == {shlex.quote(str(target))} ]]; then\n'
+            f"  echo 'injected {command} promotion failure' >&2\n"
+            "  exit 73\nfi\n"
+            f'exec {shlex.quote(real_command)} "$@"\n')
+        shim.chmod(0o755)
+        before_target = digest(target)
+        log = run(root, "bash", wrapper, *(("--quiet",) if quiet else ()), ok=False,
+                  env={"PATH": str(shim_dir) + os.pathsep + os.environ["PATH"]})
+        operation = "copy" if command == "cp" else "remove"
+        assert f"promote failed: cannot {operation}" in log, log
+        assert str(target) in log and "exit 73" in log, log
+        assert f"injected {command} promotion failure" in log, log
+        assert "\n✓ internal skills:" not in log and "build finished" not in log, log
+        assert "skills/ updated" not in log, log
+        if command == "rm":
+            assert before_target == digest(target), "failed removal continued to copy"
+        shim.unlink()
+        run(root, "bash", wrapper, "--quiet")
+    print("  ✓ T6.8: public/internal cp/rm promotion failures reject success, including quiet internal cp")
 
     # Metadata dirs must not become required skills; missing internal root is valid.
     (root / "src/skills/ordinary").mkdir()

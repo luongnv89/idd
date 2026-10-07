@@ -1,6 +1,6 @@
 # IDD Stack Skills Reference
 
-This page documents every public skill shipped by IDD Stack, what each skill does, and the supported input forms. Skills are invoked as slash commands in an agent session. One skill — `/idd-doctor` — is **repo-internal**: it lives in `src/internal-skills/`, is excluded from the built `skills/` and `dist/` surface (see `docs/ARCHITECTURE.md`), and is not distributed for external install.
+This page documents every public skill shipped by IDD Stack, what each skill does, and the supported input forms. Skills are invoked as slash commands in an agent session. One skill — `/idd-doctor` — is **repo-internal**: it is authored in `src/internal-skills/` and built by `./scripts/build.sh` into the local, gitignored `internal-skills/` package. Load that emitted package, not the source tree. It is excluded from the public `skills/` and `dist/` surface (see `docs/ARCHITECTURE.md`) and is not distributed for external install.
 
 ## Quick map
 
@@ -269,7 +269,7 @@ The loop pauses only for critical unresolved review failures, because that decis
 
 Runs a read-only health check for this IDD repository. It does not modify files, comments, issues, or PRs.
 
-`/idd-doctor` is a **repo-internal** skill: it lives in `src/internal-skills/`, is excluded from the built `skills/` and `dist/` distribution surface (per `docs/ARCHITECTURE.md`), and has no external install command. It is intended to run from a clone of this repository.
+`/idd-doctor` is a **repo-internal** skill authored in `src/internal-skills/`. From a clone of this repository, run `./scripts/build.sh` and load the emitted local, gitignored `internal-skills/` package, not the source tree. It is excluded from the public `skills/` and `dist/` distribution surface (per `docs/ARCHITECTURE.md`) and has no external install command.
 
 ### Input options
 
