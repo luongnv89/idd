@@ -82,8 +82,30 @@ Generated skill packages are self-contained. Shared agents remain canonical in
 skill that references them so installed skills do not rely on shared runtime
 paths.
 
-Internal-only skills live in `src/internal-skills/` (e.g., `idd-doctor`). Skills are excluded from `skills/` and `dist/`. Per issue #81, all documentation lives in a single top-level `docs/` tree: runtime docs (consumed by skills via the `docs/X.md` token; bundled into each skill's `references/docs/` by the build) and human-only project docs (architecture, changelog, development guide) coexist there.
-The build generates the committed `skills/` tree via a gitignored `dist/` staging tree (verified, then promoted).
+**Decision #434 — build internal skills locally, never distribute them.**
+Authored internal skills live in `src/internal-skills/` (e.g., `idd-doctor`).
+The existing closure and flattened emitter produce real, self-contained packages
+under repo-root `internal-skills/<name>/`, with `SKILL.md` and bundled dependencies.
+This output is gitignored and excluded from public `skills/`, all of `dist/`,
+plugin payloads/manifests, and supported public installs. `build.sh` stages
+internal packages in system temporary storage outside `dist/`, verifies both
+inventories before promoting either canonical tree, and discards the internal
+stage on custom `--out` or `--no-promote-skills` builds. No source-only invocation
+is supported: rebuild and load the emitted internal package. This chooses
+Option 2; the source-only conditional acceptance criterion is not applicable.
+
+The Python driver supports explicit `--internal-out` for independent inspection;
+its default emits canonical `internal-skills/` only with canonical `dist/` and
+root mirroring enabled. Custom output/no-root builds otherwise skip it. Unsafe
+internal destinations overlapping source, public skills or distribution roots
+(in either direction, resolving symlinks) fail before output cleanup. Inside
+an authored checkout only the designated `internal-skills/` output is allowed;
+retained inspection copies belong outside the checkout, never in `scripts/`,
+`docs/`, `tests/` or Git metadata. The driver's own source and public trees
+remain protected even when a different `--src` is selected.
+
+Per issue #81, all documentation lives in a single top-level `docs/` tree: runtime docs (consumed by skills via the `docs/X.md` token; bundled into each skill's `references/docs/` by the build) and human-only project docs (architecture, changelog, development guide) coexist there.
+The build generates the committed public `skills/` tree via a gitignored `dist/` staging tree (verified, then promoted), and the separate local-only `internal-skills/` tree from its verified temporary stage.
 
 ### SKILL.md
 

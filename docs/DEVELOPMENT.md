@@ -75,11 +75,28 @@ After editing anything under `src/`, rebuild before committing:
 
 CI's drift check fails any PR where the committed `skills/` output does not match a transient build.
 
+The same build emits local-only flattened packages in gitignored
+`internal-skills/` from `src/internal-skills/`. Load `internal-skills/idd-doctor/`
+to run the doctor; do not load the authored source. Both public and internal
+stages must pass verification before either canonical tree is promoted.
+Custom `--out` and `--no-promote-skills` builds leave both canonical trees
+untouched and discard the internal temporary stage (always outside `dist/`).
+For a retained inspection copy use the driver, for example:
+
+```bash
+python3 scripts/build.py --out /tmp/idd-public --no-root-skills --internal-out /tmp/idd-internal
+```
+
+`--internal-out` is driver-only; `build.sh` rejects it so callers cannot override
+wrapper-owned staging. Public installs use remote ASM, the tagged plugin, or
+local `skills/` only. A recursive filesystem scanner pointed at the entire built
+checkout can also see internal packages: gitignore is not a discovery filter.
+
 ### Skill bundle size budgets (issue #466)
 
 Every emitted bundle under `skills/<name>/` has a byte budget, and CI enforces it. Budgets and the current measurement of each bundle live in one committed file, `scripts/skill-budgets.json`, and `scripts/skill-budget.py` checks and ratchets them.
 
-- **What is measured** — the bundle's prompt surface: every regular file under `skills/<name>/`, summed in bytes, except `docs/README.md` (never auto-loaded), `references/scripts/**` (executed, not read), `*.json` data files (script-read; issue-creator's `model-data.json` is rewritten weekly by the model-data refresh bot), and dotfile or `__pycache__` paths. Symlinks are not counted. `idd-doctor` has no built tree, so it has no budget.
+- **What is measured** — the bundle's prompt surface: every regular file under `skills/<name>/`, summed in bytes, except `docs/README.md` (never auto-loaded), `references/scripts/**` (executed, not read), `*.json` data files (script-read; issue-creator's `model-data.json` is rewritten weekly by the model-data refresh bot), and dotfile or `__pycache__` paths. Symlinks are not counted. `idd-doctor` builds into local-only `internal-skills/`, outside this public-surface budget.
 - **The headroom rule** — a budget is at most `measured + headroom_bytes` (1024 today). CI fails when a bundle grows past its budget, when a recorded `measured` is not the current size, and when a bundle shrank by more than the headroom without its budget being lowered.
 - **After any change that touches `skills/`**, rebuild and ratchet, then commit both `skills/` and `scripts/skill-budgets.json`:
 
@@ -243,8 +260,9 @@ The anchor must be unique across the whole package, so a contract that moves
 between files keeps its assertion and a contract duplicated into two files still
 fails. Bundled `references/agents/`, `references/docs/` and `references/scripts/`
 are **outside** the package: they are copies of sources under `src/shared/` and
-`docs/`, and a copy is not a second contract site. `/idd-doctor` has no built
-tree, so its governed artifact is `src/internal-skills/idd-doctor/` alone.
+`docs/`, and a copy is not a second contract site. `/idd-doctor` is governed
+by `src/internal-skills/idd-doctor/` and its local-only built counterpart
+`internal-skills/idd-doctor/` (decision #434), not by a synthesized rename.
 
 Keep the **file** form where the contract's subject genuinely is placement —
 ordering, adjacency, or a gate that must be restated at each site that applies
