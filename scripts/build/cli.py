@@ -19,7 +19,8 @@ def _check_python_version() -> None:
 def main(argv: list[str]) -> int:
     _check_python_version()
     parser = argparse.ArgumentParser(
-        description="Build IDD distribution outputs (skills/, dist/skills/, and dist/agents/)."
+        description="Build public distributions and isolated local internal packages.",
+        allow_abbrev=False,
     )
     parser.add_argument(
         "--out",
@@ -36,6 +37,14 @@ def main(argv: list[str]) -> int:
         action="store_true",
         help="Do not copy output into repo-root skills/ (use ./scripts/build.sh for verify-then-promote).",
     )
+    parser.add_argument(
+        "--internal-out",
+        help="Separate local internal output (inside a checkout only internal-skills/; "
+        "never inside src/, skills/, or dist/). "
+        "Default: repo-root internal-skills/ only for canonical dist builds with "
+        "the root mirror enabled; custom --out/--no-root-skills skip internal "
+        "emission unless this option is explicit. Driver-only; build.sh owns staging.",
+    )
     parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args(argv)
     out = Path(args.out).resolve()
@@ -44,7 +53,10 @@ def main(argv: list[str]) -> int:
         print(f"✗ src not found: {src}", file=sys.stderr)
         return 1
     try:
-        build(out, src, verbose=args.verbose, no_root_skills=args.no_root_skills)
+        build(
+            out, src, verbose=args.verbose, no_root_skills=args.no_root_skills,
+            internal_out=Path(args.internal_out) if args.internal_out else None,
+        )
     except BuildError:
         return 1
     return 0

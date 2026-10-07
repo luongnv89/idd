@@ -51,7 +51,7 @@ Example lines:
   tolerate missing and unknown keys. Absent optional fields are omitted, never
   written as `null` — except `pr`, which is always present.
 
-**The `gi-runlog` helper.** A skill bundling `references/scripts/gi-runlog.py`
+**The `gi-runlog` helper.** A skill bundling `shared/scripts/gi-runlog.py`
 should pipe the record to it on stdin rather than hand-roll the append: it
 enforces every rule above — required-field and `outcome` validation, the 5→3
 `complexity` collapse, dropping `null` optional keys, filling an absent `ts` from

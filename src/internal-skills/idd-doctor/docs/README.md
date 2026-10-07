@@ -42,7 +42,7 @@ All four checks always run — a fail in Check 1 does not skip Checks 2-4. The o
 
 ## Installation
 
-`/idd-doctor` is a **repo-internal** skill. It lives in `src/internal-skills/` and is intentionally excluded from the built `skills/` and `dist/` distribution surface (see [`docs/ARCHITECTURE.md`](https://github.com/luongnv89/idd/blob/main/docs/ARCHITECTURE.md)), so there is no external `npx` or `asm` install command. Run it from a clone of this repository — the agent discovers it in place under `src/internal-skills/idd-doctor/`.
+`/idd-doctor` is a **repo-internal** skill. It lives in `src/internal-skills/` and is intentionally excluded from the built `skills/` and `dist/` distribution surface (see [`docs/ARCHITECTURE.md`](https://github.com/luongnv89/idd/blob/main/docs/ARCHITECTURE.md)), so there is no external `npx` or `asm` install command. From a clone, run `./scripts/build.sh`, then load the generated local-only package at `internal-skills/idd-doctor/` in your agent and invoke `/idd-doctor`. Authored `SKILL.source.md` is not an invokable package.
 
 ## Usage
 

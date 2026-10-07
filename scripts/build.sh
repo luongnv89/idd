@@ -3,8 +3,10 @@
 #
 # Workflow (local and CI):
 #   1. Compile all skills (and agents) under <out>/ — does not touch skills/
-#   2. Verify <out>/skills/ is complete and self-contained
-#   3. On success only, replace repo-root skills/ from <out>/skills/
+#   2. Verify public and separate temporary internal packages
+#   3. On success only, replace repo-root skills/ and internal-skills/
+# Internal staging is outside dist and discarded on custom/no-promote builds.
+# --internal-out is driver-only (python3 scripts/build.py), not accepted here.
 #
 # Usage:
 #   ./scripts/build.sh                 # out=dist/, then promote skills/
@@ -29,6 +31,8 @@ ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 BUILD_PY="$SCRIPT_DIR/build.py"
 VERIFY_SH="$SCRIPT_DIR/verify_flattened_skills.sh"
 ROOT_SKILLS="$ROOT/skills"
+ROOT_INTERNAL="$ROOT/internal-skills"
+INTERNAL_STAGE=""
 CANONICAL_DIST="$ROOT/dist"
 
 _log() { printf '%s\n' "$*"; }
@@ -76,8 +80,11 @@ filter_args() {
       --quiet|-q)
         BUILD_QUIET=1
         ;;
-      --no-promote-skills)
+      --no-promote-skills|--no-root-skills)
         PROMOTE_SKILLS=0
+        ;;
+      --internal-out|--internal-out=*)
+        die "--internal-out is driver-only; build.sh owns internal staging"
         ;;
       *)
         PY_ARGS+=("$arg")
@@ -169,6 +176,15 @@ preflight() {
     exit 1
   fi
 
+  local src_dir
+  src_dir="$(resolve_src_dir)"
+  if [[ ! -d "$src_dir" ]]; then
+    err "source tree not found: $src_dir"
+    exit 1
+  fi
+}
+
+resolve_src_dir() {
   local src_dir="$ROOT/src"
   local i=0
   while [[ $i -lt ${#PY_ARGS[@]} ]]; do
@@ -176,22 +192,18 @@ preflight() {
     case "$arg" in
       --src=*)
         src_dir="${arg#--src=}"
-        break
         ;;
       --src)
         local next=$((i + 1))
         if [[ $next -lt ${#PY_ARGS[@]} ]]; then
           src_dir="${PY_ARGS[$next]}"
         fi
-        break
         ;;
     esac
     i=$((i + 1))
   done
-  if [[ ! -d "$src_dir" ]]; then
-    err "source tree not found: $src_dir"
-    exit 1
-  fi
+  if [[ "$src_dir" != /* ]]; then src_dir="$ROOT/$src_dir"; fi
+  printf '%s\n' "$src_dir"
 }
 
 run_compile() {
@@ -201,7 +213,7 @@ run_compile() {
   fi
 
   # Never let build.py overwrite skills/; promote only after verify (step 3).
-  local compile_args=(--no-root-skills)
+  local compile_args=(--no-root-skills --internal-out "$INTERNAL_STAGE")
 
   local out_dir
   out_dir="$(resolve_out_dir)"
@@ -232,6 +244,13 @@ run_compile() {
   fi
 }
 
+verify_trees() {
+  local src_dir
+  src_dir="$(resolve_src_dir)"
+  bash "$VERIFY_SH" "$(resolve_out_dir)/skills" "$src_dir/skills" public || return $?
+  bash "$VERIFY_SH" "$INTERNAL_STAGE" "$src_dir/internal-skills" internal
+}
+
 run_verify() {
   local out_dir
   out_dir="$(resolve_out_dir)"
@@ -250,14 +269,14 @@ run_verify() {
   if [[ "$BUILD_QUIET" -eq 1 ]]; then
     if capture_logged idd-verify "skills verification failed" 0 \
       "  skills/ was not updated (previous tree unchanged)" \
-      bash "$VERIFY_SH" "$skills_out"; then
+      verify_trees; then
       return 0
     else
       return $?
     fi
   fi
 
-  if bash "$VERIFY_SH" "$skills_out"; then
+  if verify_trees; then
     ok "skills verification passed"
     return 0
   else
@@ -291,9 +310,14 @@ run_promote() {
 
   rm -rf "$ROOT_SKILLS"
   cp -R "$skills_out" "$ROOT_SKILLS"
+  rm -rf "$ROOT_INTERNAL"
+  cp -R "$INTERNAL_STAGE" "$ROOT_INTERNAL"
 
   if [[ "$BUILD_QUIET" -eq 0 ]]; then
     ok "skills/ updated → $ROOT_SKILLS"
+    local count
+    count="$(find "$ROOT_INTERNAL" -mindepth 2 -maxdepth 2 -name SKILL.md | wc -l | tr -d ' ')"
+    ok "internal skills: $count → $ROOT_INTERNAL (local only)"
     _log "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
     ok "build finished"
   fi
@@ -301,8 +325,12 @@ run_promote() {
 }
 
 main() {
+  cd -- "$ROOT"
   filter_args "$@"
   preflight
+  # Fixed system temp root: TMPDIR may itself be inside the distribution tree.
+  INTERNAL_STAGE="$(mktemp -d /tmp/idd-internal.XXXXXX)"
+  trap 'rm -rf "$INTERNAL_STAGE"' EXIT
   run_compile || exit 1
   run_verify || exit 1
   run_promote || exit 1

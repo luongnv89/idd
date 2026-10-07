@@ -13,7 +13,7 @@ from .agents import (
     _load_conventions_sections,
 )
 from .closure import _compute_closure
-from .common import CONFIG_SCHEMA_DOC, SOURCE_SKILL_MD, _reset_io_caches
+from .common import CONFIG_SCHEMA_DOC, SOURCE_SKILL_MD, _abort, _reset_io_caches
 from .doc_slimming import (
     _check_digest_coverage,
     _zero_mention_bundled_docs,
@@ -27,6 +27,7 @@ from .emit import (
 from .inventory import (
     _check_non_markdown_in,
     _discover_distributed_deprecated,
+    _discover_internal_skills,
     _discover_public_skills,
 )
 from .validation import (
@@ -167,13 +168,71 @@ def _scan_output_phase(out_skills: Path, out_agents: Path, pi_agents: Path) -> N
     _scan_pi_agents(pi_agents)
 
 
+def _internal_destination(
+    out: Path,
+    src: Path,
+    internal_out: Path | None,
+    no_root_skills: bool,
+) -> Path | None:
+    repo = src.resolve().parent
+    if internal_out is None:
+        if no_root_skills or out.resolve() != repo / "dist":
+            return None
+        internal_out = repo / "internal-skills"
+    destination = internal_out.resolve()
+    # Check both directions, including resolved symlinks, before any cleaning.
+    checkout = Path(__file__).resolve().parents[2]
+    protected_roots = (src, repo / "skills", repo / "dist", out,
+                       checkout / "src", checkout / "skills", checkout / "dist")
+    for protected in protected_roots:
+        protected = protected.resolve()
+        if (
+            destination == protected
+            or destination in protected.parents
+            or protected in destination.parents
+        ):
+            _abort(f"unsafe internal output {destination}: overlaps {protected}")
+    # An explicit output is a replaceable tree, not an arbitrary authored dir.
+    for root in {repo, checkout}:
+        if root in destination.parents and destination != root / "internal-skills":
+            _abort(f"unsafe internal output {destination}: inside checkout {root}; "
+                   "use internal-skills/ or an external inspection destination")
+    return destination
+
+
+def _emit_internal_phase(
+    src: Path,
+    destination: Path,
+    conventions: dict[str, str] | None,
+    config_defaults: dict[str, object] | None,
+    verbose: bool,
+) -> None:
+    if destination.exists():
+        shutil.rmtree(destination)
+    destination.mkdir(parents=True)
+    names = _discover_internal_skills(src)
+    for name in names:
+        root = src / "internal-skills" / name
+        agents, docs, scripts = _compute_closure(src, name, root)
+        emitted = destination / name
+        _emit_flattened_skill(
+            src, root, emitted, agents, docs, scripts, conventions, config_defaults
+        )
+        _check_script_requirements(name, emitted, scripts)
+    _scan_dist_skills(destination)
+    if verbose:
+        print(f"  ✓ internal skills: {len(names)} → {destination}")
+
+
 def build(
     out: Path,
     src: Path,
     *,
     verbose: bool = False,
     no_root_skills: bool = False,
+    internal_out: Path | None = None,
 ) -> None:
+    internal_out = _internal_destination(out, src, internal_out, no_root_skills)
     # One build, one cache lifetime: the read/listing memos never outlive a run.
     _reset_io_caches()
     if verbose:
@@ -184,6 +243,8 @@ def build(
     _emit_skills_phase(
         src, out_skills, public_skills, deprecated, conventions, config_defaults, verbose
     )
+    if internal_out is not None:
+        _emit_internal_phase(src, internal_out, conventions, config_defaults, verbose)
     _emit_plugin_manifest(src, out_skills)
     if not no_root_skills:
         _emit_repo_root_skills(src.parent, out_skills)
