@@ -337,6 +337,22 @@ run_promote() {
     err "promote failed: cannot copy $INTERNAL_STAGE to $ROOT_INTERNAL (exit $status)"
     return "$status"
   fi
+  if [[ -f "$out_dir/.agents/plugins/marketplace.json" ]]; then
+    if mkdir -p "$ROOT/.agents/plugins"; then
+      :
+    else
+      status=$?
+      err "promote failed: cannot create $ROOT/.agents/plugins (exit $status)"
+      return "$status"
+    fi
+    if cp "$out_dir/.agents/plugins/marketplace.json" "$ROOT/.agents/plugins/marketplace.json"; then
+      :
+    else
+      status=$?
+      err "promote failed: cannot copy marketplace.json to $ROOT/.agents/plugins (exit $status)"
+      return "$status"
+    fi
+  fi
 
   if [[ "$BUILD_QUIET" -eq 0 ]]; then
     ok "skills/ updated → $ROOT_SKILLS"

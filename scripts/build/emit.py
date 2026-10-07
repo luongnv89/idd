@@ -3,12 +3,14 @@
 
 from __future__ import annotations
 
+import json
 import shutil
 from pathlib import Path
 
 from .agents import _render_agent_body
 from .common import (
     BANNER_TMPL,
+    BuildError,
     OUTPUT_SKILL_MD,
     SOURCE_SKILL_MD,
     _copy_binary,
@@ -106,6 +108,39 @@ def _emit_plugin_manifest(src: Path, out_skills: Path) -> None:
         _copy_binary(icon, out_skills / ".claude-plugin" / "icon.png")
 
 
+    catalog_path = out_skills.parent / ".agents" / "plugins" / "marketplace.json"
+    catalog_path.unlink(missing_ok=True)
+    overlay_path = src / "plugin" / "codex.json"
+    if overlay_path.is_file():
+        canonical = json.loads(manifest.read_text())
+        overlay = json.loads(overlay_path.read_text())
+        # Identity and release metadata have one authoring source.
+        codex = {key: canonical[key] for key in
+                 ("name", "version", "author", "homepage", "repository", "license", "keywords")}
+        codex.update(description=overlay["description"],
+                     skills=["./" + p.name for p in sorted(out_skills.iterdir())
+                             if (p / "SKILL.md").is_file()])
+        codex["interface"] = dict(overlay["interface"],
+                                  developerName=canonical["author"]["name"],
+                                  websiteURL=canonical["homepage"])
+        _write_text(out_skills / ".codex-plugin" / "plugin.json",
+                    json.dumps(codex, indent=2) + "\n")
+        claude_market_path = src.parent / ".claude-plugin" / "marketplace.json"
+        if claude_market_path.is_file():
+            claude_market = json.loads(claude_market_path.read_text())
+            entry = next(item for item in claude_market["plugins"] if item["name"] == canonical["name"])
+            if entry["version"] != canonical["version"] or entry["source"]["ref"] != "v" + canonical["version"]:
+                raise BuildError("plugin version and Claude marketplace release pin disagree; update release metadata together")
+            catalog = {"name": canonical["name"], "interface": {"displayName": "IDD"},
+                       "plugins": [{"name": canonical["name"],
+                                    "source": {"source": "git-subdir", "url": canonical["repository"] + ".git",
+                                               "path": "./skills", "ref": entry["source"]["ref"]},
+                                    "policy": {"installation": "AVAILABLE", "authentication": "ON_INSTALL"},
+                                    "category": codex["interface"]["category"]}]}
+            _write_text(out_skills.parent / ".agents" / "plugins" / "marketplace.json",
+                        json.dumps(catalog, indent=2) + "\n")
+
+
 def _emit_repo_root_skills(repo_root: Path, out_skills: Path) -> None:
     """Mirror flattened skills to repo-root skills/ for ASM repo URL installs.
 
@@ -122,3 +157,6 @@ def _emit_repo_root_skills(repo_root: Path, out_skills: Path) -> None:
     if root_skills.exists():
         shutil.rmtree(root_skills)
     shutil.copytree(out_skills, root_skills)
+    catalog = out_skills.parent / ".agents" / "plugins" / "marketplace.json"
+    if catalog.is_file():
+        _copy_binary(catalog, repo_root / ".agents" / "plugins" / "marketplace.json")

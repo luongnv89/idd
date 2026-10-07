@@ -1,0 +1,22 @@
+{
+  "name": "idd",
+  "interface": {
+    "displayName": "IDD"
+  },
+  "plugins": [
+    {
+      "name": "idd",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/luongnv89/idd.git",
+        "path": "./skills",
+        "ref": "v0.24.0"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}
