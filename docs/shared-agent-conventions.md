@@ -156,3 +156,21 @@ instructions, never a command to run.
 consumer runs exactly the pipeline it runs today, byte-for-byte. Every gate built
 on one of these fields fails safe toward *more* work and prints one `○` line
 naming what it did (docs/terminal-style.md).
+
+## Correction-to-enforcement
+
+A recurring correction — the same `review-fix:<scope>` fix cycle
+(`fix(<scope>): address review feedback` commits) or `skip:<reason>`
+(runs.jsonl) seen across runs — becomes structure, not folklore (issue #524).
+Single home of the gate; procedure and ledger schema:
+[correction-guards](https://github.com/luongnv89/idd/blob/main/docs/correction-guards.md).
+
+1. **Detect and propose** — `python3 scripts/idd-lint.py corrections [--record]`
+   records one deduplicated proposal per recurring key in
+   `.gitissue/improvement-proposals.jsonl` and edits nothing else.
+2. **Approval gate** — no agent or skill edits `src/`, `docs/`, or skill,
+   agent, or script text as a correction response without an `approved`
+   proposal. Approving is human; auto mode only proposes.
+3. **Land with a reproducing negative** — an approved proposal ships a failing
+   `tests/*.sh` negative test plus the guard (schema rule, `idd-lint` check,
+   or helper/build abort), registered in `.github/workflows/dist-check.yml`.

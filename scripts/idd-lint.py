@@ -15,6 +15,10 @@ Validates Issue-Driven Development artifacts against the IDD Spec
                                         evidence report: trace-completeness,
                                         Decision-Record coverage, run outcomes,
                                         slowest recorded run phase
+  idd-lint corrections [--record] [--approve KEY | --reject KEY | --landed KEY]
+                                        recurring corrections → deduplicated,
+                                        approval-gated improvement proposals
+                                        (issue #524, docs/correction-guards.md)
 
 FILE of `-` (or omitted) reads stdin. `--level L1|L2|L3` (default L3) selects
 the conformance level to enforce; checks above the selected level are skipped.
@@ -98,6 +102,10 @@ DEFAULT_GITHUB_FETCH_LIMIT = 200
 # Bounded tail over rotated run-log segments (F-PERF-006): the same newest-N
 # window gi-runlog's readers scan, so every consumer sees one logical log.
 MAX_RUN_SEGMENTS = 10
+
+# Corrections subcommand (issue #524): key length cap and default history window.
+CORRECTION_KEY_MAX_LENGTH = 40
+DEFAULT_CORRECTION_COMMIT_LIMIT = 500
 
 
 class Finding:
@@ -1484,6 +1492,223 @@ def cmd_stats(args: argparse.Namespace) -> int:
     return 1 if unexplained else 0
 
 
+# --- Corrections (recurring correction → enforcement proposal, #524) ------------
+
+# Signal A: the fixer's conventional commit subject (references/steps/
+# step-4-qa.md, review-loop-mechanics.md) makes every review-driven fix cycle
+# greppable in git history. A scope whose fix cycle repeats is a correction
+# the review loop keeps re-teaching — a guard candidate.
+REVIEW_FIX_RE = re.compile(r"^fix\(([^)]+)\):\s*address review feedback\b", re.IGNORECASE)
+
+PROPOSAL_EVENTS = ("proposed", "approved", "rejected", "landed")
+# A key whose latest ledger event is one of these already has an open or
+# settled proposal, so detection never re-proposes it (the dedup rule).
+SUPPRESSING_EVENTS = ("proposed", "approved", "landed")
+
+
+def _correction_key(raw: str) -> str:
+    return re.sub(r"[^a-z0-9._-]+", "-", raw.strip().lower()).strip("-")[:CORRECTION_KEY_MAX_LENGTH]
+
+
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def collect_review_fix_signals(branch: str | None, limit: int) -> dict[str, list[str]]:
+    """Group `fix(<scope>): address review feedback` subjects by normalized scope.
+
+    Default ref is --all, not HEAD: squash-merged repos keep a PR's fix-cycle
+    commits on the PR branch only, so first-parent main never names them.
+    """
+    refs = [branch] if branch else ["--all"]
+    out = _run_soft(["git", "log", "--no-merges", "--format=%s", f"-{limit}", *refs])
+    signals: dict[str, list[str]] = {}
+    for subject in (out or "").splitlines():
+        match = REVIEW_FIX_RE.match(subject.strip())
+        if match:
+            scope = _correction_key(match.group(1)) or "unknown"
+            signals.setdefault(scope, []).append(subject.strip())
+    return signals
+
+
+def collect_skip_signals(rows: list[dict] | None) -> dict[str, list[str]]:
+    """Group run-log `skipped_reason` values; one skip of a kind is noise."""
+    signals: dict[str, list[str]] = {}
+    for row in rows or []:
+        reason = row.get("skipped_reason")
+        if not isinstance(reason, str) or not reason.strip():
+            continue
+        issue = row.get("issue")
+        evidence = f"issue #{issue}" if isinstance(issue, int) else str(row.get("ts", "?"))
+        signals.setdefault(_correction_key(reason) or "unknown", []).append(evidence)
+    return signals
+
+
+def load_proposals(path: Path) -> tuple[dict[str, dict], int]:
+    """Latest event per proposal key from the append-only ledger.
+
+    Tolerates malformed lines exactly like every runs.jsonl reader: skip and
+    count them, never raise. An unreadable ledger reports one malformed line
+    and an empty ledger rather than failing the report.
+    """
+    latest: dict[str, dict] = {}
+    malformed = 0
+    if path.is_file():
+        try:
+            text = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            return {}, 1
+        for line in text.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                record = json.loads(line)
+            except json.JSONDecodeError:
+                malformed += 1
+                continue
+            if (
+                not isinstance(record, dict)
+                or not isinstance(record.get("key"), str)
+                or record.get("event") not in PROPOSAL_EVENTS
+            ):
+                malformed += 1
+                continue
+            latest[record["key"]] = record
+    return latest, malformed
+
+
+def append_proposal(path: Path, record: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "a", encoding="utf-8") as fh:
+        fh.write(json.dumps(record) + "\n")
+
+
+def find_recurring_corrections(
+    branch: str | None, limit: int, threshold: int, rows: list[dict] | None
+) -> list[dict]:
+    recurring: list[dict] = []
+    for scope, subjects in sorted(collect_review_fix_signals(branch, limit).items()):
+        if len(subjects) >= threshold:
+            recurring.append({
+                "key": f"review-fix:{scope}",
+                "count": len(subjects),
+                "kind": "helper-guard",
+                "summary": f"{len(subjects)} review-feedback fix cycles under scope '{scope}'",
+                "evidence": subjects[:5],
+            })
+    for reason, evidence in sorted(collect_skip_signals(rows).items()):
+        if len(evidence) >= threshold:
+            recurring.append({
+                "key": f"skip:{reason}",
+                "count": len(evidence),
+                "kind": "convention",
+                "summary": f"{len(evidence)} runs skipped with reason '{reason}'",
+                "evidence": evidence[:5],
+            })
+    return recurring
+
+
+def cmd_corrections(args: argparse.Namespace) -> int:
+    root_out = _run_soft(["git", "rev-parse", "--show-toplevel"])
+    root = Path(root_out.strip()) if root_out else Path.cwd()
+    proposals_path = (
+        Path(args.proposals) if args.proposals
+        else root / ".gitissue" / "improvement-proposals.jsonl"
+    )
+    runs_path = Path(args.log) if args.log else root / ".gitissue" / "runs.jsonl"
+
+    event_by_flag = {"approve": "approved", "reject": "rejected", "landed": "landed"}
+    for flag, event in event_by_flag.items():
+        key = getattr(args, flag)
+        if key is None:
+            continue
+        latest, _ = load_proposals(proposals_path)
+        current = latest.get(key)
+        if current is None:
+            print(f"✗ idd-lint: no proposal recorded for key {key!r}", file=sys.stderr)
+            return 2
+        allowed = {"approved": "proposed", "rejected": "proposed", "landed": "approved"}
+        if current["event"] != allowed[event]:
+            print(
+                f"✗ idd-lint: {key!r} is {current['event']} — only a "
+                f"{allowed[event]} proposal can be marked {event}",
+                file=sys.stderr,
+            )
+            return 2
+        record = {"ts": _utc_now(), "key": key, "event": event}
+        if args.note:
+            record["note"] = args.note
+        append_proposal(proposals_path, record)
+        print(f"✓ {key}: {current['event']} → {event}")
+        return 0
+
+    rows = load_run_rows(runs_path)
+    latest, malformed = load_proposals(proposals_path)
+    recurring = find_recurring_corrections(args.branch, args.limit, args.threshold, rows)
+    for item in recurring:
+        current = latest.get(item["key"])
+        item["status"] = current["event"] if current else "new"
+
+    if args.record:
+        # Action confirmations go to stderr under --json so stdout stays pure.
+        note = sys.stderr if args.json else sys.stdout
+        recorded = 0
+        for item in recurring:
+            if item["status"] in SUPPRESSING_EVENTS:
+                continue
+            record = {
+                "ts": _utc_now(),
+                "key": item["key"],
+                "kind": item["kind"],
+                "summary": item["summary"],
+                "evidence": item["evidence"],
+                "count": item["count"],
+                "event": "proposed",
+            }
+            append_proposal(proposals_path, record)
+            latest[item["key"]] = record
+            item["status"] = "proposed"
+            recorded += 1
+            print(f"✓ proposed {item['key']} ({item['kind']}) — approval required before any edit", file=note)
+        if not recorded:
+            print("○ no new proposals — every recurring correction already has one", file=note)
+
+    if args.json:
+        print(json.dumps({
+            "recurring": recurring,
+            "ledger": {key: rec["event"] for key, rec in sorted(latest.items())},
+            "malformed": malformed,
+            "proposals": str(proposals_path),
+        }, indent=2, sort_keys=True))
+    else:
+        print("◆ idd-lint — corrections (recurring corrections → enforcement guards)")
+        print("┄" * 59)
+        if not recurring:
+            print("  ✓ no recurring corrections found")
+        for item in recurring:
+            status = item["status"]
+            if status == "new":
+                symbol, note = "⚠", "no proposal yet"
+            elif status == "rejected":
+                symbol, note = "○", "proposal rejected — recurred again"
+            else:
+                symbol, note = "✓", f"proposal {status}"
+            print(f"  {symbol} {item['key']} — {item['summary']} ({note})")
+            for line in item["evidence"]:
+                print(f"      {line}")
+        if malformed:
+            print(f"  ⚠ {malformed} malformed ledger line(s) skipped in {proposals_path}")
+        print("┄" * 59)
+        unhandled = sum(1 for item in recurring if item["status"] == "new")
+        print(f"  Recurring: {len(recurring)}   Unproposed: {unhandled}   Ledger: {proposals_path}")
+        if unhandled:
+            print("  To fix:  python3 scripts/idd-lint.py corrections --record")
+            print("  Docs:    https://github.com/luongnv89/idd/blob/main/docs/correction-guards.md")
+
+    return 1 if any(item["status"] == "new" for item in recurring) else 0
+
+
 # --- Rendering -----------------------------------------------------------------
 
 
@@ -1577,6 +1802,24 @@ def main(argv: list[str]) -> int:
     p_stats.add_argument("--no-github", action="store_true", help="skip gh-backed metrics (offline mode)")
     p_stats.add_argument("--json", action="store_true", help="emit machine-readable JSON instead of text")
 
+    p_corr = sub.add_parser(
+        "corrections",
+        help="detect recurring corrections and record deduplicated, approval-gated "
+             "improvement proposals (issue #524, docs/correction-guards.md)",
+    )
+    p_corr.add_argument("--branch", help="branch whose history is scanned (default: all refs — squash merges keep fix cycles off main's first-parent history)")
+    p_corr.add_argument("--limit", type=int, default=DEFAULT_CORRECTION_COMMIT_LIMIT, help=f"max commits scanned (default: {DEFAULT_CORRECTION_COMMIT_LIMIT})")
+    p_corr.add_argument("--threshold", type=int, default=2, help="occurrences before a correction recurs (default: 2)")
+    p_corr.add_argument("--log", help="run-log path (default: <repo>/.gitissue/runs.jsonl)")
+    p_corr.add_argument("--proposals", help="proposal ledger path (default: <repo>/.gitissue/improvement-proposals.jsonl)")
+    p_corr.add_argument("--record", action="store_true", help="append a `proposed` proposal for every recurring key without an open proposal")
+    p_corr.add_argument("--json", action="store_true", help="emit machine-readable JSON instead of text")
+    p_corr.add_argument("--note", help="optional note stored on an --approve/--reject/--landed event")
+    p_corr_events = p_corr.add_mutually_exclusive_group()
+    p_corr_events.add_argument("--approve", metavar="KEY", help="record human approval of a proposed key (agents never do this in auto mode)")
+    p_corr_events.add_argument("--reject", metavar="KEY", help="record rejection of a proposed key")
+    p_corr_events.add_argument("--landed", metavar="KEY", help="record that an approved key shipped its negative test + guard")
+
     args = parser.parse_args(argv)
 
     if args.kind == "issue":
@@ -1602,6 +1845,9 @@ def main(argv: list[str]) -> int:
 
     if args.kind == "stats":
         return cmd_stats(args)
+
+    if args.kind == "corrections":
+        return cmd_corrections(args)
 
     if args.kind == "repo":
         branch = git("rev-parse", "--abbrev-ref", "HEAD").strip()

@@ -63,6 +63,9 @@ dist/agents/
 .gitissue/runs.jsonl
 .gitissue/runs-*.jsonl
 
+# Correction-guard proposal ledger (local scratch; docs/correction-guards.md)
+.gitissue/improvement-proposals.jsonl
+
 # Analysis, triage, and issue-cache artifacts are local and regenerable; they
 # can carry issue bodies and repository findings that should not be committed.
 .gitissue/analysis-*.json

@@ -8,7 +8,7 @@ set, append rules, rotation, and the single-writer convention.
 
 `runs.jsonl` is an **append-only, schema-light, newline-delimited JSON** file,
 one self-contained object per run, deletable like the rest of `.gitissue/`. Its readers — `/idd-doctor`'s run-log
-summary, `scripts/idd-lint.py stats` and `gi-runlog.py --failure-streak` — are
+summary, `scripts/idd-lint.py stats` and `corrections`, and `gi-runlog.py --failure-streak` — are
 **best-effort by design**: truncation costs only *progress toward* a quarantine,
 never an existing one, whose durable record is the label `/auto-pilot` applies.
 **Rotation** (below) bounds the file's size.

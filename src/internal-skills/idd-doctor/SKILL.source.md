@@ -294,7 +294,10 @@ JSON object per line carrying at least `ts`, `issue`, `mode`, `outcome`, and
    rather than aborting the summary, and count them as `{m}`.
 3. Compute the five metrics — resolve rate, median QA cycles, common skip
    reasons, agent overrides, slowest phase — and print the section, both
-   exactly as `references/run-log-summary.md` defines them.
+   exactly as `references/run-log-summary.md` defines them. When a
+   `.gitissue/improvement-proposals.jsonl` ledger exists, that reference's
+   optional *Skill improvements* line also reports pending correction-guard
+   proposals (issue #524) — still informational, still read-only.
 
 ---
 
