@@ -2,7 +2,7 @@
 # verify_flattened_skills.sh — URL-aware self-containment check for flattened skills.
 #
 # Usage:
-#   ./scripts/verify_flattened_skills.sh <skills-root>
+#   ./scripts/verify_flattened_skills.sh <skills-root> [source-inventory] [label]
 #   ./scripts/verify_flattened_skills.sh /path/to/dist/skills
 #   ./scripts/verify_flattened_skills.sh /path/to/repo/skills
 #
@@ -20,10 +20,14 @@ fi
 SKILLS_ROOT="$(cd -- "$SKILLS_ROOT" && pwd)"
 SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" && pwd)"
 ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
-SRC_SKILLS="$ROOT/src/skills"
+SRC_SKILLS="${2:-$ROOT/src/skills}"
+INVENTORY_LABEL="${3:-public}"
+if [[ $# -eq 2 && "$(basename "$SRC_SKILLS")" == internal-skills ]]; then
+  INVENTORY_LABEL=internal
+fi
 
 scan_file() {
-  python3 - "$1" "$2" <<'PY'
+  python3 - "$1" "$2" "$INVENTORY_LABEL" <<'PY'
 import re
 import sys
 from pathlib import Path
@@ -84,6 +88,19 @@ for m in LOCAL_SCRIPT_RE.finditer(masked):
         line_no = masked[: m.start()].count("\n") + 1
         errors.append(f"missing referenced script file '{target.name}' at line {line_no}")
 
+# Internal inventories also require authored references, not only shared dirs.
+# Keep the established public verifier behavior (cross-skill prose exists there).
+LOCAL_REF_RE = re.compile(
+    r"(?<![\w/])references/([A-Za-z0-9_./-]+\.(?:md|py|sh|txt|ya?ml|json|toml))"
+)
+for m in LOCAL_REF_RE.finditer(masked) if sys.argv[3] == "internal" else ():
+    target = skill_dir / "references" / m.group(1)
+    if not target.is_file():
+        line_no = masked[: m.start()].count("\n") + 1
+        message = f"missing referenced file 'references/{m.group(1)}' at line {line_no}"
+        if not any(f"at line {line_no}" in error for error in errors):
+            errors.append(message)
+
 if errors:
     print(f"FAIL: {filepath}")
     for e in errors:
@@ -95,13 +112,15 @@ PY
 
 failures=0
 
-# Every public src skill must appear in the build output.
+# Only immediate authored packages are required (not metadata/ordinary dirs).
+# Explicit inventories may be absent, e.g. fixtures without internal skills.
 if [[ -d "$SRC_SKILLS" ]]; then
   for src_skill_dir in "$SRC_SKILLS"/*/; do
     [[ -d "$src_skill_dir" ]] || continue
+    [[ -f "$src_skill_dir/SKILL.source.md" ]] || continue
     name="$(basename "$src_skill_dir")"
     if [[ ! -f "$SKILLS_ROOT/$name/SKILL.md" ]]; then
-      printf '✗ missing public skill output: %s/SKILL.md\n' "$name" >&2
+      printf '✗ missing %s skill output: %s/SKILL.md\n' "$INVENTORY_LABEL" "$name" >&2
       failures=$((failures + 1))
     fi
   done

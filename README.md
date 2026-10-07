@@ -76,11 +76,24 @@ See [`docs/skills.md`](docs/skills.md) for the full skills reference, including 
 
 ### Internal tooling
 
-Internal-only skills are not published in the public skill index and are not built into `dist/`. They live alongside the source for repo maintainers to invoke directly from a working tree.
+Internal-only skills are not published in the public skill index, plugin, or any
+`dist/` output. Run `./scripts/build.sh` in a clone to generate real flattened,
+self-contained packages in gitignored repo-root `internal-skills/`, then load
+`internal-skills/idd-doctor/` in your agent and invoke `/idd-doctor`. Authoring
+stays in `src/internal-skills/`; do not invoke the source package.
+
+Custom `--out` or `--no-promote-skills` builds leave canonical public and internal
+trees untouched and discard internal staging outside `dist/`. For a retained
+separate copy, the Python driver accepts `--internal-out` (see
+[Development](docs/DEVELOPMENT.md)). Local public installs must target
+`skills/` (e.g. `asm install ./skills --all`), not recursively scan the entire built
+checkout. Gitignore hides files from Git, not filesystem skill discovery;
+arbitrary recursive local scanning can discover the internal package. Remote
+ASM installs and the tagged plugin contain only the public install surface.
 
 | Skill | Folder | Purpose |
 |-------|--------|---------|
-| `/idd-doctor` | [`src/internal-skills/idd-doctor/`](src/internal-skills/idd-doctor/) | Read-only health check for IDD repository invariants — runs against the local `src/` checkout; not distributed |
+| `/idd-doctor` | `internal-skills/idd-doctor/` (build from [`src/internal-skills/idd-doctor/`](src/internal-skills/idd-doctor/)) | Read-only health check for IDD repository invariants; local-only, not distributed |
 
 ---
 

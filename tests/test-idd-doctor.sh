@@ -73,6 +73,14 @@ else
   fail "T1.4: references/error-messages.md missing"
 fi
 
+# T1.5: repair hint must load the real artifact, never authored source (#434).
+if grep -qF 'then load internal-skills/idd-doctor/ and run /idd-doctor.' "$SKILL_DIR/SKILL.source.md" \
+   && ! grep -qF 'then run /idd-doctor from src/internal-skills/' "$SKILL_DIR/SKILL.source.md"; then
+  pass "T1.5: rebuild repair points at emitted internal package"
+else
+  fail "T1.5: rebuild repair still points at non-invokable source"
+fi
+
 # ───────────────────────────────────────────────────────────
 # T2: SKILL.md frontmatter and metadata
 # ───────────────────────────────────────────────────────────

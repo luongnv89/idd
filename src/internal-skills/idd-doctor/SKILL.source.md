@@ -4,7 +4,7 @@ description: "Scan an IDD repo for doc drift, missing autopilot mode, and unsafe
 license: MIT
 compatibility: Requires git. GitHub CLI (gh) is optional — used only for the merge-strategy check; skipped when gh is absent.
 metadata:
-  version: 0.4.0
+  version: 0.4.1
   author: "Luong NGUYEN <luongnv89@gmail.com>"
   effort: low
 ---
@@ -60,7 +60,7 @@ Verify this skill's bundled reference files are present. If any is missing, stop
   /idd-doctor is a repo-internal skill (not installed via asm/npx — see README).
   To fix:  from a clone of https://github.com/luongnv89/idd, run
            ./scripts/build.sh to regenerate the bundled references,
-           then run /idd-doctor from src/internal-skills/idd-doctor/.
+           then load internal-skills/idd-doctor/ and run /idd-doctor.
 
   Then restart the agent session and re-run /idd-doctor.
 ```

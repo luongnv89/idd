@@ -29,6 +29,17 @@ def _discover_public_skills(src: Path) -> list[str]:
     return out
 
 
+def _discover_internal_skills(src: Path) -> list[str]:
+    """Local-only authored packages; a missing internal root is valid."""
+    root = src / "internal-skills"
+    if not root.is_dir():
+        return []
+    return [
+        entry.name for entry in _sorted_iterdir(root)
+        if entry.is_dir() and (entry / SOURCE_SKILL_MD).is_file()
+    ]
+
+
 def _discover_distributed_deprecated(src: Path) -> list[str]:
     """Deprecated skills that opt in via 'distribute:' frontmatter. Returns
     skill names that should be built into both dist outputs."""

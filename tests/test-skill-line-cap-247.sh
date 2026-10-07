@@ -25,14 +25,20 @@ echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄�
 # ── T1: every built SKILL.md is within the cap ────────────────────────────────
 shopt -s nullglob
 built_any=0
-for skill_md in "$REPO_ROOT"/skills/*/SKILL.md; do
+for internal_source in "$REPO_ROOT"/src/internal-skills/*/SKILL.source.md; do
+  name="$(basename "$(dirname "$internal_source")")"
+  if [ ! -f "$REPO_ROOT/internal-skills/$name/SKILL.md" ]; then
+    fail "T1: internal-skills/$name/SKILL.md missing — run ./scripts/build.sh"
+  fi
+done
+for skill_md in "$REPO_ROOT"/skills/*/SKILL.md "$REPO_ROOT"/internal-skills/*/SKILL.md; do
   built_any=1
   name="$(basename "$(dirname "$skill_md")")"
   lines=$(wc -l < "$skill_md" | tr -d ' ')
   if [ "$lines" -le "$CAP" ]; then
-    pass "T1: skills/$name/SKILL.md within cap ($lines ≤ $CAP lines)"
+    pass "T1: ${skill_md#"$REPO_ROOT/"} within cap ($lines ≤ $CAP lines)"
   else
-    fail "T1: skills/$name/SKILL.md exceeds cap ($lines > $CAP lines) — move non-universal material into references/ behind a one-line pointer"
+    fail "T1: ${skill_md#"$REPO_ROOT/"} exceeds cap ($lines > $CAP lines) — move non-universal material into references/ behind a one-line pointer"
   fi
 done
 shopt -u nullglob

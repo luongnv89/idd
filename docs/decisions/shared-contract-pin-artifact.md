@@ -128,9 +128,12 @@ A shared-contract assertion pins a behaviour to `src/skills/<name>/` (body +
 that skill's own `references/*.md`) and to its built counterpart
 `skills/<name>/`. Which file inside the package carries the contract is an
 authoring choice, not part of the contract. For `/idd-doctor` the governed
-artifact is the source package `src/internal-skills/idd-doctor/` alone: it has
-no built tree, and `scripts/build.py` does not handle `src/internal-skills/`
-(that gap is #422's, and stays open).
+artifacts are the source package `src/internal-skills/idd-doctor/` and its
+local-only built counterpart `internal-skills/idd-doctor/` (decision #434,
+Option 2; see [Architecture](../ARCHITECTURE.md#skill-anatomy)). The latter is
+regenerated, gitignored, and never a public install/plugin/distribution surface.
+The historical measurements below predate this decision; fresh actual-artifact
+Gate 2 evidence is appended to the [doctor experiment](../experiments/skill-auto-improver-idd-doctor.md).
 
 "The skill's own files" deliberately excludes `references/agents/`,
 `references/docs/`, `references/scripts/`, `templates/`, and `docs/README.md`.

@@ -496,3 +496,84 @@ folded away:
    the four *Output* tables render the same four Pass lines (both are printed strings, so
    reconciling them changes output), and the `✗ Missing bundled dependency` block instructs a
    build that does not touch this directory (fixable only once #434 decides which way it goes).
+
+---
+
+## 8. Actual-artifact follow-up — decision #434 (2026-10-07)
+
+This section supplements, **not replaces**, the historical synthesized-copy
+measurements above. Decision #434 chooses Option 2: real flattened packages in
+local-only, gitignored repo-root `internal-skills/`, outside public `skills/`,
+all of `dist/`, plugins and supported public installation paths. Source-only
+AC3 is conditional and **not applicable**. The governed artifact now includes
+both the authored source and that emitted local package (ADR D1).
+
+### Artifact and commands of record
+
+- Artifact: `internal-skills/idd-doctor/`, produced by `bash scripts/build.sh`
+  (exit **0**, public and internal verification passed before promotion).
+- Skill version: **0.4.1**; emitted `SKILL.md`: **334 lines**.
+- Emitted `SKILL.md` SHA-256:
+  `ec8bc76f174ac749d6514567b531755863529181617e99389f2a9e72630ed9ef`.
+- Evaluator: **ASM v2.21.0 (7062c69)**, explicitly
+  `/Users/montimage/.local/bin/asm` (a shadowed Homebrew binary was not used).
+- `/Users/montimage/.local/bin/asm eval internal-skills/idd-doctor --json`:
+  exit **0**; evaluated at **2026-10-07T09:11:48.240Z**; overall **97 / A**.
+- `python3 /Users/montimage/.agents/skills/skill-creator/scripts/quick_validate.py internal-skills/idd-doctor`:
+  exit **0**, `Skill is valid!`.
+
+Numeric evaluation only: no auto-improver retrofit, evaluator `--fix`, tool
+installation, borrowing, or rubric-driven prose changes were performed.
+
+### Gate 2 — every actual-artifact quality category
+
+| Category | Score / 10 |
+|----------|-----------:|
+| structure | 10 |
+| description | 10 |
+| prompt-engineering | 10 |
+| context-efficiency | 8 |
+| safety | 9 |
+| testability | 10 |
+| license | 10 |
+| naming | 10 |
+| pii | 10 |
+| script-lint | 10 |
+
+**Gate 2 passes:** overall **97 > 85**, every category **>= 8**. The quality
+provider reports **97**, `passed: true`; the additional skill-best-practice
+provider reports **100**, `passed: true`, with its sole category `validation`
+**15 / 15**. These are fresh results on the repository's actual emitted artifact,
+not borrowed historical scores or a rename-only synthesized tree.
+
+### Build-attributable repair and verification
+
+The missing-bundle hint now rebuilds, loads `internal-skills/idd-doctor/`, and
+invokes `/idd-doctor`; it no longer claims the authored source is invokable.
+The run-log schema's helper citation now uses the logical `shared/scripts`
+token, so the unchanged closure bundles `gi-runlog.py` for the schema's emitted
+reference. Public emitted bytes remain unchanged. Internal bundled script
+bytes and executable modes are checked against their sources.
+
+Focused suites passed: build-script (236 assertions), root-install (20,
+including a real default-method ASM install from `skills/` into a throwaway
+HOME/library), line-cap (26), determinism (97), package-split (5), doctor (68),
+dependency-closure (47), negative-mutations (5), plugin-manifest (37). No full
+suite or GitHub operations ran. Recursive ASM discovery against an entire
+built checkout **can** see internal packages; the supported local public input
+is `skills/`, not the checkout root. Gitignore is not a filesystem filter.
+
+Hand mutations in disposable copies went red for missing internal emission,
+public leakage, script bytes/modes, unsafe-destination rejection, no-promote
+isolation, stale cleanup, selected-source verification, and bypassed internal
+SKILL/reference verification. Reverting the repair hint failed doctor T1.5;
+overfilling the emitted body failed the line cap. Removing the emitted
+artifact's description made the numeric gate fail (`description: 0`, overall
+86); restoring it recovered 97 with all categories >= 8. All mutations were
+restored, and focused checks returned green. Existing negative tests were not
+removed or weakened.
+
+The guarantee is verify-before-promote, not an atomic two-tree filesystem
+transaction: a copy/I/O failure during promotion is still a reported build
+failure. This follow-up does not reconcile the historical report's other
+prose advisories or claim unrelated issues are resolved.

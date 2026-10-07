@@ -33,9 +33,9 @@ What is measured
   Symlinks are not followed and are never counted. The walk is sorted, so the
   measurement is deterministic.
 
-  Only the emitted bundles under `skills/` are budgeted. The internal
-  `idd-doctor` skill (`src/internal-skills/idd-doctor/`) has no built tree
-  (issue #434), so it is not an emitted bundle and has no budget.
+  Only the public emitted bundles under `skills/` are budgeted. Local-only
+  bundles under `internal-skills/` (including `idd-doctor`, issue #434) are
+  deliberately outside this public install-surface budget.
 
 The budgets file (the single place budgets and measurements live)
 
