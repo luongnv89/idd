@@ -183,6 +183,9 @@ python3 scripts/idd-lint.py branch fix/42-mobile-auth-redirect
 # Evidence report: trace-completeness, Decision-Record coverage, and run
 # outcomes from .gitissue/runs.jsonl — tiered by issue quality when gh is available
 python3 scripts/idd-lint.py stats            # add --no-github for offline, --json for machines
+
+# Recurring corrections → deduplicated, approval-gated improvement proposals
+python3 scripts/idd-lint.py corrections      # add --record to propose; see docs/correction-guards.md
 ```
 
 Checks are tagged with the spec section they enforce and mapped to the L1–L3 conformance levels (`--level L2` skips Decision-Record checks for repos not claiming L3). Exit code 0/1 makes it CI-native; `/idd-doctor` remains the deep, agent-powered health check.

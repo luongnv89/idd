@@ -179,7 +179,17 @@ FAIL=0
 # 2,066, and the browser leg's duplicated report-only paragraphs paid back 694
 # more, leaving +1,372 per copy: measured 555,962 + 2,744 = 558,706; the line
 # keeps six bytes of headroom, so the ratchet is not widened.
-BUDGET=558712
+#
+# Issue #524 is the eighth raise. Its AC needs the correction-to-enforcement
+# gate (detect recurring corrections, deduplicated proposals, human approval
+# before any skill edit, reproducing negative + guard at landing) in its one
+# shared home, shared-agent-conventions.md, which ships to 2 skills
+# (auto-pilot, issue-resolver). The procedure and ledger schema live in the
+# unbundled project doc docs/correction-guards.md, not here. A 1,303-byte
+# first draft was cut to 1,047: +1,047 x 2 = +2,094; the reader-list clause in
+# run-log-schema.md adds +14 x 2 = +28. Measured 558,706 + 2,122 = 560,828;
+# the line keeps six bytes of headroom, so the ratchet is not widened.
+BUDGET=560834
 
 pass() { echo "  ✓ $1"; PASS=$((PASS + 1)); }
 fail() { echo "  ✗ $1"; FAIL=$((FAIL + 1)); }
