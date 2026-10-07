@@ -1,7 +1,7 @@
 {
   "name": "idd",
   "displayName": "IDD Stack: Issue-Driven Development",
-  "version": "0.24.0",
+  "version": "0.25.0",
   "description": "IDD Stack: Issue-Driven Development skills for Claude Code that plan, create, triage, analyze, resolve, review, and auto-pilot GitHub issues.",
   "author": {
     "name": "Luong NGUYEN",

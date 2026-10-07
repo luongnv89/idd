@@ -11,13 +11,13 @@
     {
       "name": "idd",
       "description": "IDD Stack: Issue-Driven Development skills for Claude Code that plan, create, triage, analyze, resolve, review, and auto-pilot GitHub issues.",
-      "version": "0.24.0",
+      "version": "0.25.0",
       "skills": "./",
       "source": {
         "source": "git-subdir",
         "url": "luongnv89/idd",
         "path": "skills",
-        "ref": "v0.24.0"
+        "ref": "v0.25.0"
       }
     }
   ]

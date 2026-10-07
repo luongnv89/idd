@@ -1,9 +1,9 @@
 # Prepare IDD for Codex submission
 
-IDD is a skills-only plugin. This change prepares the package; it does not publish
-it or create a release tag. The current tag predates Codex support, so installing
-from the release-pinned catalog requires a subsequent release containing these
-files. Use the local preview below until then.
+IDD is a skills-only plugin. The packaging command builds the package; it does not
+publish it or create a release tag. v0.25.0 is the first tag that carries the Codex
+package, so the release-pinned catalog installs from v0.25.0 or later. Use the
+local preview below to try an unreleased checkout.
 
 ## Build and inspect the submission ZIP
 
@@ -100,11 +100,12 @@ owner; a working Codex package alone does not establish public eligibility.
    video or MCP review test cases. Do not add a dummy server.
 4. Submit the draft for review, then publish only after approval. Uploading,
    submitting and publishing are separate owner actions and remain outstanding.
-5. To enable repository marketplace installs, release a new tag containing the
-   generated package. Follow [release coupling](DEVELOPMENT.md#codex-plugin-issue-489),
-   update the canonical version and existing Claude pin, rebuild, and publish the
-   tag with the release commit. Test installation from that tag. Do not claim the
-   old tag contains these files. Skill/metadata changes require another ZIP.
+5. Repository marketplace installs follow the release pin; v0.25.0 is the first
+   tag that contains the generated package. For each release, follow
+   [release coupling](DEVELOPMENT.md#codex-plugin-issue-489): update the canonical
+   version and existing Claude pin, rebuild, and publish the tag with the release
+   commit. Test installation from that tag. Tags before v0.25.0 do not contain
+   these files. Skill/metadata changes require another ZIP.
 
 Official references: [Package your plugin](https://developers.openai.com/plugins/build/plugins)
 (compatibility manifests, marketplace sources and CLI),

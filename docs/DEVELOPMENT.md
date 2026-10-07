@@ -130,7 +130,7 @@ contained assets and deterministic ZIP checks. Build a submission artifact with
 `python3 scripts/package-codex-plugin.py --output /tmp/idd-codex-plugin.zip`.
 See [Codex plugin submission](codex-plugin-submission.md) for local preview,
 release timing and the owner’s remaining portal steps. No tag is created by the
-packaging command; the existing tag does not yet contain Codex support.
+packaging command; v0.25.0 is the first tag that contains Codex support.
 
 ### Claude Code plugin (issues #469, #492)
 
