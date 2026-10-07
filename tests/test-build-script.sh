@@ -156,6 +156,158 @@ if [ -d "$REPO_ROOT/src/internal-skills" ]; then
   done
 fi
 
+# T6.1: local-only internal package and driver/wrapper boundaries (#434).
+# All destructive/mutated builds use a copied checkout, never user installations.
+if PYTHONDONTWRITEBYTECODE=1 python3 - "$REPO_ROOT" <<'PY_INTERNAL'
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+repo = Path(sys.argv[1])
+
+def run(root, *args, ok=True):
+    result = subprocess.run(args, cwd=root, text=True, capture_output=True,
+                            env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"})
+    assert (result.returncode == 0) == ok, (
+        f"command {args} exited {result.returncode}; expected {'success' if ok else 'rejection'}\n"
+        + result.stdout + result.stderr)
+    return result.stdout + result.stderr
+
+def digest(root):
+    return [(str(p.relative_to(root)), p.read_bytes(), p.stat().st_mode & 0o777)
+            for p in sorted(root.rglob("*")) if p.is_file()]
+
+internal = repo / "internal-skills"
+assert (internal / "idd-doctor/SKILL.md").is_file(), "actual doctor artifact missing"
+for name in (repo / "src/internal-skills").iterdir():
+    if not (name / "SKILL.source.md").is_file():
+        continue
+    assert (internal / name.name / "SKILL.md").is_file()
+    for path in (repo / "skills", repo / "dist"):
+        assert not list(path.rglob(name.name)), f"internal package leaked into {path}"
+assert not (internal / ".claude-plugin").exists(), "internal plugin manifest leaked"
+run(repo, "bash", "scripts/verify_flattened_skills.sh", str(internal),
+    "src/internal-skills", "internal")
+for script in (internal / "idd-doctor/references/scripts").glob("*.py"):
+    source = repo / "src/shared/scripts" / script.name
+    assert script.read_bytes() == source.read_bytes(), "internal script bytes changed"
+    assert script.stat().st_mode & 0o777 == source.stat().st_mode & 0o777, "internal script mode changed"
+assert (internal / "idd-doctor/references/scripts/gi-runlog.py").is_file()
+print("  ✓ T6.1: actual internal package complete, scripts byte/mode identical, no public/dist/plugin leak")
+
+with tempfile.TemporaryDirectory() as tmp:
+    root = Path(tmp) / "checkout"
+    root.mkdir()
+    for directory in ("src", "docs", "scripts"):
+        shutil.copytree(repo / directory, root / directory,
+                        ignore=shutil.ignore_patterns("__pycache__"))
+    # An internal-only fixture exercises all three existing closure kinds.
+    (root / "src/internal-skills/metadata").mkdir()
+    specimen = root / "src/internal-skills/specimen"
+    specimen.mkdir()
+    (specimen / "SKILL.source.md").write_text(
+        "---\nname: specimen\n---\n# Specimen\n"
+        "shared/agents/codebase-researcher.md\n"
+        "docs/config-schema.md\nshared/scripts/gi-config.py\n")
+    driver = str(root / "scripts/build.py")
+    wrapper = str(root / "scripts/build.sh")
+    dest = root / "internal-skills"
+    out = root / "dist"
+    run(root, "python3", driver)  # safe canonical default
+    assert (dest / "idd-doctor/SKILL.md").is_file(), "driver canonical default missing"
+    assert not (dest / "metadata").exists(), "ordinary internal directory emitted as a skill"
+    for bundled in ("agents/codebase-researcher.md", "docs/config-schema.md", "scripts/gi-config.py"):
+        assert (dest / "specimen/references" / bundled).is_file(), f"internal closure lost {bundled}"
+    # Sentinels prove no canonical promotion happened, even if bytes regenerate identically.
+    sentinels = (root / "skills/.isolation-sentinel", dest / ".isolation-sentinel")
+    for sentinel in sentinels:
+        sentinel.write_text("leave canonical tree untouched")
+    before = (digest(root / "skills"), digest(dest))
+    run(root, "python3", driver, "--out", str(root / "custom"), "--no-root-skills")
+    assert before == (digest(root / "skills"), digest(dest)), "custom driver changed canonical trees"
+    run(root, "python3", driver, "--no-root-skills")
+    assert before == (digest(root / "skills"), digest(dest)), "no-root driver changed canonical trees"
+    for args in (("--out", str(root / "custom")), ("--no-promote-skills",)):
+        run(root, "bash", wrapper, *args)
+        assert before == (digest(root / "skills"), digest(dest)), "wrapper isolation failed"
+    for args in (("--internal-out", str(dest)), (f"--internal-out={dest}",),
+                 ("--internal-o", str(dest))):
+        run(root, "bash", wrapper, "--out", str(root / "custom"), *args, ok=False)
+        assert before == (digest(root / "skills"), digest(dest)), "wrapper option overrode staging"
+    print("  ✓ T6.2: canonical driver default, custom/no-root/no-promote isolation, wrapper override rejected")
+
+    # Reject equality, ancestor, descendant, and symlink alias before cleanup.
+    alias = root / "alias"
+    alias.symlink_to(root / "src", target_is_directory=True)
+    for unsafe in (root, root / "src", root / "src/nested", root / "skills",
+                   root / "skills/nested", out, out / "nested", alias / "nested",
+                   root / "custom", root / "scripts", root / "docs", root / "tests",
+                   root / ".git"):
+        log = run(root, "python3", driver, "--out", str(root / "custom"),
+                  "--no-root-skills", "--internal-out", str(unsafe), ok=False)
+        assert "unsafe internal output" in log, log
+        assert before == (digest(root / "skills"), digest(dest))
+    print("  ✓ T6.3: unsafe overlaps (including symlinks) rejected before destructive cleanup")
+
+    for sentinel in sentinels:
+        sentinel.unlink()
+    before = (digest(root / "skills"), digest(dest))
+    separate = Path(tmp) / "inspection"
+    run(root, "python3", driver, "--out", str(root / "custom"),
+        "--no-root-skills", "--internal-out", str(separate))
+    assert (separate / "idd-doctor/SKILL.md").is_file(), "explicit driver output missing"
+    (separate / "obsolete/references").mkdir(parents=True)
+    (separate / "idd-doctor/references/stale.md").write_text("stale")
+    run(root, "python3", driver, "--out", str(root / "custom"),
+        "--no-root-skills", "--internal-out", str(separate))
+    assert not (separate / "obsolete").exists(), "obsolete internal skill survived cleanup"
+    assert not (separate / "idd-doctor/references/stale.md").exists(), "stale internal reference survived cleanup"
+    assert digest(dest) == digest(separate), "internal output nondeterministic"
+    print("  ✓ T6.4: retained explicit output, stale cleanup and internal bytes/modes deterministic")
+
+    # Corrupt emission *after* driver scans to exercise wrapper verification.
+    pipeline = root / "scripts/build/pipeline.py"
+    original = pipeline.read_text()
+    for relative, expected in (("SKILL.md", "missing internal skill output"),
+                               ("references/run-stats.md", "missing referenced")):
+        pipeline.write_text(original.replace(
+            "    _scan_dist_skills(destination)",
+            "    _scan_dist_skills(destination)\n"
+            f"    (destination / 'idd-doctor/{relative}').unlink()"))
+        log = run(root, "bash", wrapper, "--quiet", ok=False)
+        assert expected in log, log
+        assert before == (digest(root / "skills"), digest(dest)), "verification failure promoted a canonical tree"
+    pipeline.write_text(original)
+    run(root, "bash", wrapper, "--quiet")
+    print("  ✓ T6.5: missing emitted SKILL/ref fails verification, BOTH canonical trees protected")
+
+    # Metadata dirs must not become required skills; missing internal root is valid.
+    (root / "src/skills/ordinary").mkdir()
+    shutil.rmtree(root / "src/internal-skills")
+    run(root, "python3", driver, "--no-root-skills", "--internal-out", str(separate))
+    assert list(separate.iterdir()) == [], "obsolete internal package survived missing inventory"
+    run(root, "bash", wrapper, "--out", str(root / "custom"), "--quiet")
+    print("  ✓ T6.6: missing internal inventory builds empty; ordinary source dirs ignored")
+
+    shutil.copytree(root / "src", root / "alternate-src")
+    shutil.rmtree(root / "alternate-src/skills/issue-analysis")
+    alternate = root / "alternate-src/skills/probe"
+    alternate.mkdir(parents=True)
+    (alternate / "SKILL.source.md").write_text("---\nname: probe\n---\n# Probe\n")
+    run(root, "bash", wrapper, "--src", str(root / "alternate-src"),
+        "--out", str(root / "alternate-out"), "--quiet")
+    assert (root / "alternate-out/skills/probe/SKILL.md").is_file()
+    print("  ✓ T6.7: wrapper verification resolves the selected --src inventory")
+PY_INTERNAL
+then
+  pass "T6: internal emission and safety boundaries"
+else
+  fail "T6: internal emission or safety boundary regression"
+fi
+
 # ───────────────────────────────────────────────────────────
 # T7: deprecated-skills without distribute flag excluded
 # ───────────────────────────────────────────────────────────

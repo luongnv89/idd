@@ -28,7 +28,9 @@ echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄�
 OUT_A="$(mktemp -d)"
 OUT_B="$(mktemp -d)"
 MODE_REPORT="$(mktemp)"
-trap 'rm -rf "$OUT_A" "$OUT_B"; rm -f "$MODE_REPORT"' EXIT
+INTERNAL_A="$(mktemp -d)"
+INTERNAL_B="$(mktemp -d)"
+trap 'rm -rf "$OUT_A" "$OUT_B" "$INTERNAL_A" "$INTERNAL_B"; rm -f "$MODE_REPORT"' EXIT
 
 # ───────────────────────────────────────────────────────────
 # T1: build twice into distinct directories
@@ -99,6 +101,18 @@ if [ "$hash_a" = "$hash_b" ]; then
   pass "T3: SHA-256 of file contents + modes matches across builds ($hash_a)"
 else
   fail "T3: SHA-256 differs ($hash_a vs $hash_b)"
+fi
+
+# T3.1: internal packages have the same deterministic bytes/modes (#434).
+for pair in "$OUT_A|$INTERNAL_A" "$OUT_B|$INTERNAL_B"; do
+  python3 "$REPO_ROOT/scripts/build.py" --src "$REPO_ROOT/src" \
+    --out "${pair%%|*}" --no-root-skills --internal-out "${pair#*|}" >/dev/null
+done
+if [ -f "$INTERNAL_A/idd-doctor/SKILL.md" ] \
+   && [ "$(hash_tree "$INTERNAL_A")" = "$(hash_tree "$INTERNAL_B")" ]; then
+  pass "T3.1: internal packages emit deterministic bytes and modes"
+else
+  fail "T3.1: internal packages missing or nondeterministic"
 fi
 
 # ───────────────────────────────────────────────────────────

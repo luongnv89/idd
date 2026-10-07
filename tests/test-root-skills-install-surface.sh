@@ -58,6 +58,33 @@ else
   pass "T6: src/ uses SKILL.source.md and is hidden from asm discovery"
 fi
 
+# T7: supported local installs target public skills/, not a recursive repo scan.
+# Exercise the default ASM method when available; no CI dependency is installed.
+TMP_INSTALL="$(mktemp -d)"
+trap 'rm -rf "$TMP_INSTALL"' EXIT
+if command -v asm >/dev/null 2>&1; then
+  if HOME="$TMP_INSTALL/home" XDG_CONFIG_HOME="$TMP_INSTALL/config" \
+     XDG_CACHE_HOME="$TMP_INSTALL/cache" asm install "$ROOT_SKILLS" \
+       --library --all --yes >"$TMP_INSTALL/install.log" 2>&1; then
+    if python3 - "$ROOT_SKILLS" "$TMP_INSTALL" <<'PY'
+import sys
+from pathlib import Path
+public, installed = map(Path, sys.argv[1:])
+expected = {p.parent.name for p in public.glob("*/SKILL.md")}
+got = {p.parent.name for p in installed.rglob("SKILL.md")}
+assert expected and got == expected, (expected, got)
+assert "idd-doctor" not in got, "internal doctor leaked through default installer"
+PY
+    then pass "T7: default ASM local skills/ install discovers exactly public packages"
+    else fail "T7: ASM installed unexpected or incomplete skill inventory"; fi
+  else
+    fail "T7: default ASM local skills/ install failed"
+    tail -12 "$TMP_INSTALL/install.log"
+  fi
+else
+  echo "  ○ T7: real ASM install skipped — asm unavailable; manual public surface checked above"
+fi
+
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 echo "  Passed: $PASS"
 echo "  Failed: $FAIL"
