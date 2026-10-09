@@ -426,18 +426,24 @@ longer checked out:
 repo_root="$(git rev-parse --show-toplevel)"
 repo="$(basename "$repo_root")"
 wt_dir="$(dirname "$repo_root")/${repo}-worktrees/$(printf '%s' "$branch_name" | tr '/' '-')"
-git worktree remove "$wt_dir"
+if [ -z "$(git -C "$wt_dir" status --porcelain --untracked-files=all --ignored)" ]; then
+  git worktree remove "$wt_dir"
+fi
 git branch -d "$branch_name" 2>/dev/null || true
 ```
 
 Bind `branch_name` and `wt_dir` from the validated lane record; never re-derive
 or paste a literal read-back into a command. First require `git worktree list
 --porcelain` to map that exact path to this lane's branch and lane identity.
-Never use `--force`. A clean terminal worktree may be removed normally. A dirty
-worktree or active merge/rebase/cherry-pick/bisect state becomes `blocked_dirty`,
-is retained with explicit `git status` / path recovery guidance, and does not
-block the next returned sibling. A path mapped to another branch is ambiguous
-and also blocks only that lane.
+Never use `--force`. A plain remove silently deletes untracked files hidden by
+`status.showUntrackedFiles=no` and all ignored ones, so only a worktree whose
+probe above prints nothing may be removed. Any output (tracked changes,
+untracked or ignored files), a `locked` mark, or a merge/rebase/cherry-pick/
+bisect in progress (the markers in `references/docs/post-merge-cleanup.md`) makes the lane
+`blocked_dirty`: retained with its path and `git status` recovery guidance,
+named under the summary's *Uncertainty*, and never blocking the next returned
+sibling. A path mapped to another branch is ambiguous and also blocks only that
+lane.
 
 A lane whose PR merged (`merged` or `partial_followup`) then runs the
 post-merge cleanup from the original checkout, after its worktree is gone:

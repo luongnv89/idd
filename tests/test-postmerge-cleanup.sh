@@ -424,6 +424,9 @@ grep -q 'Delete these {n} untracked files and remove worktree {path}? \[y/N\]' "
 check "P4: issue-pr-review asks before deleting untracked files (default No)" "$?"
 ! grep -q -- '--remove-worktree "' "$AP_MERGE" && grep -q 'pass `--remove-worktree`' "$AP_MERGE"
 check "P4: auto-pilot never passes --remove-worktree" "$?"
+grep -q 'if \[ -z "$(git -C "$wt_dir" status --porcelain --untracked-files=all --ignored)" \]; then' "$AP_MERGE" \
+  && ! grep -q -- 'worktree remove .*--force' "$AP_MERGE"
+check "P4: auto-pilot removes a lane worktree only when the --untracked-files=all --ignored probe is empty, never forced" "$?"
 grep -q 'gi-postmerge\|/issue-pr-review {pr_number}' \
   "$REPO_ROOT/src/skills/issue-resolver/references/steps/step-0-preflight.md"
 check "P4: the resolver's kept-worktree note points at the post-merge cleanup" "$?"

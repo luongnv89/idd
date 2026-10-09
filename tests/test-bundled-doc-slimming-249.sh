@@ -208,6 +208,9 @@ FAIL=0
 # ratchet is not widened. The same review grows the two merging skills'
 # bundles (auto-pilot +1,594, issue-pr-review +1,720 in scripts/skill-budgets.json:
 # this doc, the reconciled `--delete-remote` command forms, the confirm prompt).
+# auto-pilot then grows +424 more (to 422,586): its parallel-lane Step 5.3
+# removes a lane worktree only when `status --porcelain --untracked-files=all
+# --ignored` is empty, else keeps it as blocked_dirty. No bundled doc changes.
 BUDGET=571082
 
 pass() { echo "  ✓ $1"; PASS=$((PASS + 1)); }
