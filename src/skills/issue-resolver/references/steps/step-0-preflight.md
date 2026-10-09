@@ -284,6 +284,7 @@ worktree is intentionally left in place after the PR is created so the user can 
 ```
 ○ Worktree left at {wt_dir} for inspection.
   Remove with:  git worktree remove {wt_dir}
+  After merge:  /issue-pr-review {pr_number} (cleans up, switches to {base})
 ```
 
-Do not auto-remove it — the user may still want the local artifacts.
+Do not auto-remove it — the user may still want the local artifacts (that cleanup keeps it while it holds any).

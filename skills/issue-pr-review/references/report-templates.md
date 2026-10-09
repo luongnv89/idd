@@ -312,12 +312,49 @@ own SHA. One residual stays open: a base that advances in the seconds between
 the compare and the merge. Branch protection's *Require branches to be up to
 date before merging* closes it on the server.
 
+**A non-zero exit is not proof the merge failed.** gh merges on the server
+before its local cleanup, which can fail (a dirty tree, a branch held by a
+worktree). On a non-zero exit from `gh pr merge` itself, re-read `gh pr view {N} --json state --jq .state`:
+`MERGED` is a merge (`Merge: ✓ pass (reconciled)`; run the cleanup with
+`--delete-remote`, since gh stopped before deleting the remote branch); anything
+else is the merge failure below.
+
+**Post-merge cleanup** <!-- a:rv-post-merge-cleanup --> runs after every merge
+this skill makes (`references/docs/post-merge-cleanup.md`):
+
+```bash
+python3 references/scripts/gi-postmerge.py --pr {N}
+```
+
+`merged: false` touched nothing: report its `problems[0]`, never a cleanup.
+Otherwise `ok: false` prints `⚠ Cleanup incomplete` (`references/error-messages.md`)
+and does **not** change `Result: MERGED`. Exit 4 or no `python3` runs that doc's
+manual procedure. When `cwd_removed` is true, `cd` to `main_worktree`.
+
 The merge runs after the summary prints, so close with a merge block whose first
 row supersedes the summary's `Result:`. On success:
 
 ```
   Result:            MERGED — PR #{N} squash merged, branch {branch_name} deleted
   Merge:             ✓ pass (gh pr merge exit 0)
+  Cleanup:           ✓ on {base} @ {base_sha7}; removed {branch_name}{, worktree {path}}
+  Decision:          No approval needed.
+```
+
+`Cleanup:` drops `on {base} @ …` unless `checkout.action` is `switched` or
+`already`, reads `⚠ partial — {n} kept (see below)` when `ok` is false, and
+`○ manual procedure (gi-postmerge unavailable)` on the degrade path.
+
+**Already merged.** Step 1 found the PR already `MERGED` (merged on GitHub, or
+by an earlier run). No review runs. `--review-only` reports only. Interactive
+runs `--dry-run` first, prints the plan, and asks
+`Clean up local branch and switch to {base}{ (stashing local changes)}? [Y/n]`,
+the suffix shown when the plan's `stash` is `planned`. `--auto` runs the cleanup
+directly unless `--no-merge` is set, because the caller then owns cleanup.
+
+```
+  Result:            PASS — PR #{N} already merged; local checkout cleaned up
+  Cleanup:           ✓ on {base} @ {base_sha7}; removed {branch_name}
   Decision:          No approval needed.
 ```
 

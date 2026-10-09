@@ -120,11 +120,13 @@ to qualify.
    CI verdict each merge relied on (`ci_status` or the CI wait), the follow-up
    issue numbers filed, the run-log append result, and the persisted report path.
    A PR the reviewer reported clean is evidence of a review verdict, not of a
-   merge; only `gh pr merge` success plus the closed issue establishes `merged`.
+   merge; only `gh pr merge` success (or a non-zero exit that Step 5.2's merge
+   reconciliation read back as `MERGED`) plus the closed issue establishes `merged`.
 3. **Uncertainty.** List what the loop did not verify: any `⚠` degrade (gi-config,
    gi-state, gi-runlog, gi-ratelimit), a CI verdict reused from the reviewer
    rather than re-polled, a follow-up issue that could not be filed, an iteration
-   that never reached review, a lane left `log_pending`, and an unsynced tree. If
+   that never reached review, a lane left `log_pending`, an unsynced tree, and
+   any post-merge cleanup that kept a worktree or branch (`ok: false`). If
    nothing applies, print `none observed`. Label inferences (triage priority,
    dependency edges) as inferences, never as verified facts.
 4. **Decision.** An autonomous run makes its own decisions, so print

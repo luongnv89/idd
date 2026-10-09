@@ -189,7 +189,19 @@ FAIL=0
 # first draft was cut to 1,047: +1,047 x 2 = +2,094; the reader-list clause in
 # run-log-schema.md adds +14 x 2 = +28. Measured 558,706 + 2,122 = 560,828;
 # the line keeps six bytes of headroom, so the ratchet is not widened.
-BUDGET=560834
+#
+# The ninth raise is post-merge cleanup: after a merge, remove the merged
+# branch and its clean worktrees and switch to the updated base. Its contract
+# (the gi-postmerge answer table, the no-force guarantees, and the manual
+# procedure every script call degrades to) lives in one new runtime doc,
+# post-merge-cleanup.md, shipped only to the 2 skills that merge (auto-pilot,
+# issue-pr-review). A first draft in sync-conventions.md would have shipped to
+# 6 skills, so it was moved out. An adversarial review then added the safety
+# rules a manual run must keep too (only this run's stash is popped, ignored
+# files and mid-operation checkouts are kept, fork heads match by SHA), so the
+# doc ends at +4,061 per copy: measured 560,828 + 8,122 = 568,950; the line
+# keeps six bytes of headroom, so the ratchet is not widened.
+BUDGET=568956
 
 pass() { echo "  ✓ $1"; PASS=$((PASS + 1)); }
 fail() { echo "  ✗ $1"; FAIL=$((FAIL + 1)); }

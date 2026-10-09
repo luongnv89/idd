@@ -121,7 +121,8 @@ Whenever Step 2 would merge a PR (aggressive + `merge_partial: true`), run **Ste
 
 Run it as **one** shell call (variables do not survive between calls),
 `{verified_head}` being the 40-hex SHA Step 5.1c bound. A non-zero exit is the
-merge-failed path below, `left_open`:
+merge-failed path below, `left_open`, unless Step 5.2's *merge reconciliation*
+reads the PR as `MERGED`:
 
 ```bash
 verified_head="{verified_head}"
@@ -156,6 +157,7 @@ Step 1.6 is the only thing that takes a closed issue back out of
 `summary.suggested_order` — a partial merge that skips it leaves the issue in
 the cached order, on no skip list, for *Step 1.2* to pick again next iteration.
 The failed-merge path below closed nothing, so it runs nothing.
+The merge, reconciled or not, also gets *Step 5.3*'s post-merge cleanup.
 
 If the merge command itself fails (branch protection, a head `--match-head-commit` refused, etc.):
 ```
@@ -226,6 +228,7 @@ That merge closed `#{issue_number}` exactly as finally as Step 5.2's
 does, and Step 1.6 is the only thing that takes a closed issue back out of
 `summary.suggested_order` — a user-chosen merge that skips it leaves the issue in
 the cached order, on no skip list, for *Step 1.2* to pick again next iteration.
+The same merge also gets *Step 5.3*'s post-merge cleanup.
 Options 2 and 3 merged nothing, so they run nothing.
 
 ---

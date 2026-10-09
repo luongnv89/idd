@@ -42,8 +42,9 @@ here means the file was written by something other than the script: treat it as
 a doubt and fall back to `absent`. Same rule as `/issue-pr-review` applies to
 `headRefName`.
 
-A PR that is `MERGED` means the issue was finished after the checkpoint — record
-it in `processed[]` and move to the next issue, never re-resolve it. A PR that is
+A PR that is `MERGED` means the issue was finished after the checkpoint — run
+*Step 5.3*'s post-merge cleanup for it, record it in `processed[]` and move to
+the next issue, never re-resolve it. A PR that is
 `OPEN` is the PR to review in Phase 3. No PR for a singleton `current.branch`, or
 a read that fails, is a doubt: fall back to `absent`.
 

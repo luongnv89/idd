@@ -350,7 +350,8 @@ If the mode forbids merge (`conservative`):
 If the mode allows merge (`balanced` or `aggressive`), and only on a `fresh`
 *Step 5.1c* answer, merge with the expected-head guard. Run it as **one** shell
 call (variables do not survive between calls), `{verified_head}` being the
-40-hex SHA that step bound. A non-zero exit is outcome `left_open`, never `merged`:
+40-hex SHA that step bound. A non-zero exit is outcome `left_open`, never `merged`,
+unless the *merge reconciliation* below reads the PR as `MERGED`:
 
 ```bash
 verified_head="{verified_head}"
@@ -368,6 +369,20 @@ fi
   https://github.com/owner/repo/pull/{pr_number}
   Outcome: merged
 ```
+
+**Merge reconciliation (non-zero `gh pr merge` exit only).** gh merges on the
+server before its local cleanup, which can fail (a dirty tree, a branch held by
+a worktree). The `merge_identity=stale` exit ran no merge and never reconciles.
+Otherwise, before recording `left_open`, read the PR state once:
+
+```bash
+gh pr view {pr_number} --json state --jq .state
+```
+
+`MERGED` means the merge landed: record `merged`, and run *Step 5.3*'s
+post-merge cleanup with `--delete-remote`, because gh stopped before deleting
+the remote branch. Any other answer, or a failed read, is the failure path
+below.
 
 If the merge command fails (branch protection, required approvals, conflicts, a head that moved after *Step 5.1c* and that `--match-head-commit` refused, etc.), leave the PR open and continue:
 ```
@@ -423,13 +438,44 @@ Never use `--force`. A clean terminal worktree may be removed normally. A dirty
 worktree or active merge/rebase/cherry-pick/bisect state becomes `blocked_dirty`,
 is retained with explicit `git status` / path recovery guidance, and does not
 block the next returned sibling. A path mapped to another branch is ambiguous
-and also blocks only that lane. Mark `completed` only after `logged`, cache
+and also blocks only that lane.
+
+A lane whose PR merged (`merged` or `partial_followup`) then runs
+`python3 references/scripts/gi-postmerge.py --pr {pr_number}` from the original
+checkout, after its worktree is gone. It deletes the squash-merged branch
+(`git branch -d` above always refuses one) and fast-forwards the default
+branch; it never removes an unclean worktree, so it cannot bypass
+`blocked_dirty`. Handle its answer as on the sequential path below. Mark
+`completed` only after `logged`, cache
 update, and non-forced cleanup; retain `failed`/`blocked_dirty` lanes for resume.
 Then clear `current` and select the next returned lane. Clear `lanes` only when
 every lane completed cleanly; otherwise retain terminal blocked records in the
 final report/state.
 
-**Sequential path (`max_parallel=1`):** use the original stash-first sync below
+**Sequential path (`max_parallel=1`).** When this iteration's PR merged
+(`merged` from *Step 5.2* or its reconciliation, `partial_followup` from Phase
+3-4 *Step 2b*, or a critical issue's Option 1 merge), run the post-merge cleanup
+<!-- a:ap-post-merge-cleanup --> (`references/docs/post-merge-cleanup.md`):
+
+```bash
+python3 references/scripts/gi-postmerge.py --pr {pr_number}
+```
+
+Read the JSON, never the exit status alone:
+
+- `merged: false`: nothing was touched; run the stash-first block below.
+- `ok: true`: print `✓ Cleaned up: removed {branch_name}`, adding
+  `on {base} @ {sha7}` when `checkout.action` is `switched` or `already`.
+- `ok: false`: print `⚠ Cleanup incomplete` with each `problems[]` line. The
+  outcome stays `merged`; record the kept items under the summary's
+  *Uncertainty*. Never retry with force. A `stash: pop_failed` is handled like
+  the failed pop in the block below.
+- `cwd_removed: true`: `cd` to `main_worktree` before the next command.
+- Exit 4 or no `python3`: run the stash-first block below, then that doc's
+  manual procedure (it is idempotent).
+
+When the PR did not merge (`left_open`, `blocked_by_dependency`, `failed`),
+or as the degrade path above, use the original stash-first sync below
 byte-for-byte to protect any uncommitted changes that may have accumulated
 between iterations (see `references/docs/sync-conventions.md`):
 
