@@ -1300,9 +1300,11 @@ EXPECTED_SITES = {
     # 2 since issue #523: the resolver's Step 4 and pr-review's Step 4 run the
     # base-ref verification recipe.
     "gi-recipe.py": 2,
-    # 4: pr-review cleans up after its auto-merge (SKILL.md + Auto-Merge
-    # template); auto-pilot Step 5.3 runs it on the sequential and parallel paths.
-    "gi-postmerge.py": 4,
+    # 8: pr-review cleans up after its auto-merge (SKILL.md + the Auto-Merge
+    # template's plain and reconciled `--delete-remote` forms + the confirmed
+    # `--remove-worktree` re-run); auto-pilot Step 5.3 shows the plain and
+    # reconciled forms on both the sequential and parallel paths.
+    "gi-postmerge.py": 8,
 }
 # A call is any mention of a shared script by filename, however it is launched
 # (python3, python3.11, uv run, a bare ./path relying on the exec bit), plus the
@@ -1407,6 +1409,10 @@ ALLOWED_VARS = {
     "$premise_ledger": "QA premise ledger the resolver composed; reaches gi-premise on stdin",
     # Issue #520. Same shape: composed by the resolver, delivered on stdin.
     "$sketch_ledger": "design-sketch check results the resolver composed; reaches gi-sketch on stdin",
+    # Issue #535. A worktree path gi-postmerge itself reported (worktrees[].path,
+    # read from `git worktree list --porcelain`), echoed back only after the
+    # user confirms; the script re-matches it against that list and re-probes.
+    "$wt": "worktree path gi-postmerge reported from git worktree list, user-confirmed",
 }
 VAR = re.compile(r"\$\{?[A-Za-z_][A-Za-z0-9_]*\}?")
 # Command substitution pastes its output into the command line unquoted. Only

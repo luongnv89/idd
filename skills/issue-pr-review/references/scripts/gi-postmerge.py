@@ -11,6 +11,7 @@ and it can exit non-zero after the merge already landed. This script is the
 idempotent cleanup every merge site runs afterwards, whoever did the merge.
 
 Usage:  gi-postmerge.py --pr N [--dry-run] [--delete-remote]
+                        [--remove-worktree PATH ...]
 
 Run it from anywhere inside the repository, in any of its worktrees. It reads
 `gh pr view N --json state,headRefName,headRefOid,baseRefName,isCrossRepository`
@@ -20,10 +21,14 @@ and does nothing unless `state` is `MERGED`. Then, all from the MAIN worktree
   1. `git fetch --prune origin`, so `origin/<base>` is current and the deleted
      head's remote-tracking ref disappears.
   2. Every linked worktree with the head branch checked out is removed with a
-     plain `git worktree remove` — never `--force`. A worktree with changes,
-     ignored files (which a plain remove would delete), an in-progress
-     merge/rebase/cherry-pick/bisect, or a lock is kept and reported. A stale
-     entry whose directory is gone is pruned.
+     plain `git worktree remove` — never `--force` on its own. A worktree with
+     tracked changes (`dirty`), untracked files (`untracked_files`), ignored
+     files (`ignored_files`; a remove deletes them too), an in-progress
+     merge/rebase/cherry-pick/bisect, or a lock is kept and reported; the
+     status probes pass `--untracked-files=all`, so `status.showUntrackedFiles=no`
+     cannot hide a file. A kept untracked/ignored worktree lists its `files`
+     (first 20) and `file_count`. A stale entry whose directory is gone is
+     pruned.
   3. The main worktree switches to the base branch and fast-forwards it to
      `origin/<base>`, but only when it is on the head branch or already on the
      base, and no operation is in progress there. A dirty tree is stashed
@@ -40,6 +45,14 @@ and does nothing unless `state` is `MERGED`. Then, all from the MAIN worktree
      --delete-branch` merged and gh stopped before deleting it. Never for a
      fork PR.
 
+`--remove-worktree PATH` (repeatable) is the user's confirmation, and the only
+way this script deletes untracked or ignored files: that one worktree is
+removed with `git worktree remove --force`, after the probes are re-run at
+removal time. It is refused (kept, reported) when the worktree now has
+tracked changes, a lock, or an operation in progress, or is not a linked
+worktree on the merged branch. The rest of the cleanup runs as usual, so the
+branch can be deleted in the same run. Never pass it without asking the user.
+
 The head branch is matched by name, except for a fork PR (isCrossRepository):
 its name can be an unrelated local branch, so only a local branch at exactly
 headRefOid counts, and a same-named branch elsewhere is reported, not touched.
@@ -53,7 +66,7 @@ Prints one JSON object:
   {"pr": N, "merged": bool, "dry_run": bool, "branch": str, "base": str,
    "main_worktree": str, "fetch": "ok|failed|skipped|planned",
    "worktrees": [{"path": str, "action": "removed|pruned|kept|planned",
-                  "reason": str}],
+                  "reason": str, "files": [str], "file_count": int}],
    "checkout": {"action": "switched|already|kept|failed|planned",
                 "from": str, "reason": str},
    "fast_forward": "updated|up_to_date|diverged|failed|skipped|planned",
@@ -62,9 +75,11 @@ Prints one JSON object:
    "remote_branch": "deleted|absent|kept|skipped|planned",
    "cwd_removed": bool, "ok": bool, "problems": [str, ...]}
 
-`ok` is true when every step reached its goal. Each kept item, failed step, or
-stash that would not pop adds one line to `problems`, and that line says how to
-finish by hand.
+`files`/`file_count` appear only on a worktree kept (or force-removed) for
+`untracked_files` or `ignored_files`. `ok` is true when every step reached its
+goal. Each kept item, failed step, or stash that would not pop adds one line
+to `problems`, and that line says how to finish by hand. A stash pop that
+conflicts names the unmerged paths and the kept stash.
 
 Exit codes
   0  answered: read `merged` and `ok`, never the exit status. A PR that is
@@ -99,6 +114,7 @@ _RUN_GH = runpy.run_path(str(Path(__file__).with_name("gi-gh.py")))["run_gh"]
 REMOTE = "origin"
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 PR_FIELDS = "state,headRefName,headRefOid,baseRefName,isCrossRepository"
+FILE_CAP = 20
 IN_PROGRESS = (
     "MERGE_HEAD",
     "CHERRY_PICK_HEAD",
@@ -190,30 +206,45 @@ def worktrees(cwd: str) -> list[dict]:
     return entries
 
 
-def busy_reason(path: str, ignored: bool = False) -> str:
-    """Why this worktree must not be removed or switched, or '' when it is clean.
+def busy_reason(path: str, ignored: bool = False) -> tuple[str, list[str]]:
+    """Why this worktree must not be removed or switched ('' when clean), and
+    the untracked/ignored files a forced removal would delete.
 
     An in-progress operation is checked first: stashing and switching in the
-    middle of a staged merge would carry MERGE_HEAD onto the base. `ignored`
-    also counts ignored files, which `git worktree remove` deletes silently.
+    middle of a staged merge would carry MERGE_HEAD onto the base. The probe
+    passes `--untracked-files=all`, so `status.showUntrackedFiles=no` cannot
+    hide an untracked file. `ignored` also counts ignored files, which
+    `git worktree remove` deletes silently. Tracked changes win (`dirty`),
+    then untracked files, then ignored-only.
     """
     git_dir = out(["rev-parse", "--absolute-git-dir"], path)
     if not git_dir:
-        return "unreadable"
+        return "unreadable", []
     if any(os.path.exists(os.path.join(git_dir, m)) for m in IN_PROGRESS):
-        return "operation_in_progress"
-    status = git(["status", "--porcelain"], path)
+        return "operation_in_progress", []
+    args = ["status", "--porcelain", "-z", "--untracked-files=all"]
+    status = git(args + (["--ignored"] if ignored else []), path)
     if status.returncode != 0:
-        return "unreadable"
-    if status.stdout.strip():
-        return "dirty"
-    if ignored:
-        extra = git(["status", "--porcelain", "--ignored"], path)
-        if extra.returncode != 0:
-            return "unreadable"
-        if extra.stdout.strip():
-            return "ignored_files"
-    return ""
+        return "unreadable", []
+    untracked: list[str] = []
+    ignored_files: list[str] = []
+    for record in status.stdout.split("\0"):
+        if not record:
+            continue
+        code, name = record[:2], record[3:]
+        if code == "??":
+            untracked.append(name)
+        elif code == "!!":
+            ignored_files.append(name)
+        else:
+            # Any tracked change; returning here also skips a rename's
+            # second NUL-separated field.
+            return "dirty", []
+    if untracked:
+        return "untracked_files", untracked + ignored_files
+    if ignored_files:
+        return "ignored_files", ignored_files
+    return "", []
 
 
 def is_inside(child: str, parent: str) -> bool:
@@ -224,7 +255,23 @@ def is_inside(child: str, parent: str) -> bool:
     return child_p == parent_p or parent_p in child_p.parents
 
 
-def cleanup(number: int, dry_run: bool, delete_remote: bool) -> dict:
+def canon(path: str) -> str:
+    try:
+        return str(Path(path).resolve())
+    except OSError:
+        return os.path.abspath(path)
+
+
+def kept_entry(path: str, reason: str, files: list[str]) -> dict:
+    entry = {"path": path, "action": "kept", "reason": reason}
+    if reason in ("untracked_files", "ignored_files"):
+        entry.update(files=files[:FILE_CAP], file_count=len(files))
+    return entry
+
+
+def cleanup(
+    number: int, dry_run: bool, delete_remote: bool, remove_worktrees: list[str] | None = None
+) -> dict:
     try:
         here = os.getcwd()
     except OSError as exc:
@@ -293,12 +340,16 @@ def cleanup(number: int, dry_run: bool, delete_remote: bool) -> dict:
             )
     have_remote_base = ok(["show-ref", "--verify", "--quiet", remote_base], main)
 
-    # 2. Linked worktrees that still hold the head branch.
+    # 2. Linked worktrees that still hold the head branch. A path in
+    #    `confirmed` is the user's yes to deleting its untracked/ignored files.
+    confirmed = {canon(p) for p in remove_worktrees or []}
+    matched: set[str] = set()
     for entry in worktrees(main)[1:]:
         if not head_local or entry["branch"] != head_local:
             continue
         path = entry["path"]
         if entry.get("prunable"):
+            matched.add(canon(path))
             if dry_run:
                 result["worktrees"].append({"path": path, "action": "planned", "reason": "prune"})
             elif ok(["worktree", "prune"], main):
@@ -307,9 +358,21 @@ def cleanup(number: int, dry_run: bool, delete_remote: bool) -> dict:
                 result["worktrees"].append({"path": path, "action": "kept", "reason": "prune_failed"})
                 problems.append(f"stale worktree entry {path}; run: git worktree prune")
             continue
-        reason = "locked" if entry.get("locked") else busy_reason(path, ignored=True)
+        if canon(path) in confirmed:
+            matched.add(canon(path))
+            _remove_confirmed(result, main, here, entry, dry_run)
+            continue
+        reason, files = ("locked", []) if entry.get("locked") else busy_reason(path, ignored=True)
+        if reason in ("untracked_files", "ignored_files"):
+            result["worktrees"].append(kept_entry(path, reason, files))
+            problems.append(
+                f"worktree {path} kept ({reason}: {len(files)} file(s) a removal would delete); "
+                f"list them with git -C {path} status --porcelain --untracked-files=all --ignored, "
+                f"and remove it only after the user confirms (never in auto mode)"
+            )
+            continue
         if reason:
-            result["worktrees"].append({"path": path, "action": "kept", "reason": reason})
+            result["worktrees"].append(kept_entry(path, reason, files))
             problems.append(
                 f"worktree {path} kept ({reason}); inspect with git -C {path} status, "
                 f"then: git worktree remove {path}"
@@ -330,12 +393,18 @@ def cleanup(number: int, dry_run: bool, delete_remote: bool) -> dict:
                 f"then: git worktree remove {path}"
             )
 
+    for path in sorted(confirmed - matched):
+        result["worktrees"].append({"path": path, "action": "kept", "reason": "not_merged_branch_worktree"})
+        problems.append(
+            f"--remove-worktree {path}: not a linked worktree on {head_local or branch}; left alone"
+        )
+
     # 3. The main worktree: switch to the base and fast-forward it.
     result["checkout"]["from"] = current or "(detached)"
     holders = {e["branch"]: e["path"] for e in worktrees(main)[1:] if e["branch"]}
     if current and current in (head_local, base):
         switch_needed = current != base
-        main_busy = busy_reason(main)
+        main_busy = busy_reason(main)[0]
         if main_busy in ("operation_in_progress", "unreadable"):
             result["checkout"].update(action="kept", reason=main_busy)
             problems.append(
@@ -354,7 +423,7 @@ def cleanup(number: int, dry_run: bool, delete_remote: bool) -> dict:
                 reason=f"switch to {base}" if switch_needed else "",
             )
             result["fast_forward"] = "planned" if have_remote_base else "skipped"
-            if main_busy == "dirty":
+            if main_busy in ("dirty", "untracked_files"):
                 result["stash"] = "planned"
         else:
             _switch_and_update(result, main, base, remote_base, have_remote_base, current)
@@ -457,7 +526,7 @@ def _switch_and_update(
 ) -> None:
     problems: list[str] = result["problems"]
     stashed = ""
-    if busy_reason(main) == "dirty":
+    if busy_reason(main)[0] in ("dirty", "untracked_files"):
         stamp = time.strftime("%Y-%m-%dT%H:%M:%S")
         before = out(["rev-parse", "--verify", "--quiet", "refs/stash"], main)
         proc = git(["stash", "push", "-u", "-m", f"post-merge: {branch} {stamp}"], main)
@@ -518,12 +587,53 @@ def _pop(result: dict, main: str, stashed: str) -> None:
         return
     if ok(["stash", "pop"], main):
         result["stash"] = "restored"
-    else:
-        result["stash"] = "pop_failed"
+        return
+    result["stash"] = "pop_failed"
+    conflicted = out(["diff", "--name-only", "--diff-filter=U"], main).splitlines()
+    if conflicted:
         result["problems"].append(
-            "stash pop failed; your changes are still in the stash: "
+            f"stash pop conflicted in {', '.join(conflicted)}; your changes are still in "
+            f"stash {stashed[:7]} (git stash list). Restore the clean base with "
+            f"git -C {main} reset --merge, then resolve and apply that stash by hand"
+        )
+    else:
+        result["problems"].append(
+            f"stash pop failed; your changes are still in stash {stashed[:7]}: "
             "git stash list && git stash show -p stash@{0}"
         )
+
+
+def _remove_confirmed(result: dict, main: str, here: str, entry: dict, dry_run: bool) -> None:
+    """Force-remove one confirmed worktree, re-probing it at removal time.
+
+    Only untracked/ignored files (or nothing) may be lost: tracked changes, a
+    lock, or an operation in progress keep it, whatever the user confirmed.
+    """
+    path = entry["path"]
+    reason, files = ("locked", []) if entry.get("locked") else busy_reason(path, ignored=True)
+    if reason not in ("", "untracked_files", "ignored_files"):
+        result["worktrees"].append(kept_entry(path, reason, files))
+        result["problems"].append(
+            f"--remove-worktree {path} refused ({reason}); inspect with git -C {path} status"
+        )
+        return
+    record = kept_entry(path, reason, files)
+    if dry_run:
+        record.update(action="planned", reason=reason or "remove")
+        result["worktrees"].append(record)
+        return
+    proc = git(["worktree", "remove", "--force", "--", path], main)
+    if proc.returncode != 0:
+        record["reason"] = "remove_failed"
+        result["worktrees"].append(record)
+        result["problems"].append(
+            f"worktree {path} kept ({first_line(proc.stderr)}); inspect with git -C {path} status"
+        )
+        return
+    record.update(action="removed", reason=reason)
+    result["worktrees"].append(record)
+    if is_inside(here, path):
+        result["cwd_removed"] = True
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -543,11 +653,23 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="also delete the remote head branch if it still exists",
     )
+    parser.add_argument(
+        "--remove-worktree",
+        action="append",
+        default=[],
+        metavar="PATH",
+        help=(
+            "the user confirmed deleting this worktree's untracked/ignored files: "
+            "remove it with --force after re-probing; refused on tracked changes, "
+            "a lock, an operation in progress, or a path not on the merged branch "
+            "(repeatable; never pass it without asking)"
+        ),
+    )
     args = parser.parse_args(argv)
     try:
         if not re.fullmatch(r"[1-9][0-9]*", args.pr):
             raise InvalidInput(f"--pr must be a positive integer, got {args.pr!r}")
-        result = cleanup(int(args.pr), args.dry_run, args.delete_remote)
+        result = cleanup(int(args.pr), args.dry_run, args.delete_remote, args.remove_worktree)
     except InvalidInput as exc:
         print(f"✗ gi-postmerge: {exc}", file=sys.stderr)
         return 3

@@ -126,7 +126,8 @@ to qualify.
    gi-state, gi-runlog, gi-ratelimit), a CI verdict reused from the reviewer
    rather than re-polled, a follow-up issue that could not be filed, an iteration
    that never reached review, a lane left `log_pending`, an unsynced tree, and
-   any post-merge cleanup that kept a worktree or branch (`ok: false`). If
+   any post-merge cleanup that kept a worktree or branch (`ok: false`; name
+   each worktree kept for untracked or ignored files). If
    nothing applies, print `none observed`. Label inferences (triage priority,
    dependency edges) as inferences, never as verified facts.
 4. **Decision.** An autonomous run makes its own decisions, so print

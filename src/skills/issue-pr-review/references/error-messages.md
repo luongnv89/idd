@@ -201,7 +201,7 @@ failure.
 
 ### Cleanup incomplete
 
-**Trigger:** the post-merge cleanup reported `ok: false`. The PR **is** merged; something local was kept on purpose (a dirty worktree, unmerged commits, a stash that would not pop, a diverged base). The result stays `MERGED`.
+**Trigger:** the post-merge cleanup reported `ok: false`. The PR **is** merged; something local was kept on purpose (a dirty worktree, one holding untracked or ignored files, unmerged commits, a stash that would not pop, a diverged base). The result stays `MERGED`.
 
 ```
 ⚠ Cleanup incomplete — PR #{N} is merged; {n} item(s) kept

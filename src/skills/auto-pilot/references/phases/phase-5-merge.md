@@ -379,10 +379,9 @@ Otherwise, before recording `left_open`, read the PR state once:
 gh pr view {pr_number} --json state --jq .state
 ```
 
-`MERGED` means the merge landed: record `merged`, and run *Step 5.3*'s
-post-merge cleanup with `--delete-remote`, because gh stopped before deleting
-the remote branch. Any other answer, or a failed read, is the failure path
-below.
+`MERGED` means the merge landed: record `merged` and set `reconciled` for
+*Step 5.3*, because gh stopped before deleting the remote branch. Any other
+answer, or a failed read, is the failure path below.
 
 If the merge command fails (branch protection, required approvals, conflicts, a head that moved after *Step 5.1c* and that `--match-head-commit` refused, etc.), leave the PR open and continue:
 ```
@@ -440,9 +439,15 @@ is retained with explicit `git status` / path recovery guidance, and does not
 block the next returned sibling. A path mapped to another branch is ambiguous
 and also blocks only that lane.
 
-A lane whose PR merged (`merged` or `partial_followup`) then runs
-`python3 shared/scripts/gi-postmerge.py --pr {pr_number}` from the original
-checkout, after its worktree is gone. It deletes the squash-merged branch
+A lane whose PR merged (`merged` or `partial_followup`) then runs the
+post-merge cleanup from the original checkout, after its worktree is gone:
+
+```bash
+python3 shared/scripts/gi-postmerge.py --pr {pr_number}                   # merged with exit 0
+python3 shared/scripts/gi-postmerge.py --pr {pr_number} --delete-remote   # reconciled
+```
+
+It deletes the squash-merged branch
 (`git branch -d` above always refuses one) and fast-forwards the default
 branch; it never removes an unclean worktree, so it cannot bypass
 `blocked_dirty`. Handle its answer as on the sequential path below. Mark
@@ -458,9 +463,12 @@ final report/state.
 <!-- a:ap-post-merge-cleanup --> (`docs/post-merge-cleanup.md`):
 
 ```bash
-python3 shared/scripts/gi-postmerge.py --pr {pr_number}
+python3 shared/scripts/gi-postmerge.py --pr {pr_number}                   # merged with exit 0
+python3 shared/scripts/gi-postmerge.py --pr {pr_number} --delete-remote   # reconciled
 ```
 
+`reconciled` lives only in this iteration (a resume runs the first form).
+Never pass `--remove-worktree`: auto mode never deletes untracked files.
 Read the JSON, never the exit status alone:
 
 - `merged: false`: nothing was touched; run the stash-first block below.
@@ -468,7 +476,8 @@ Read the JSON, never the exit status alone:
   `on {base} @ {sha7}` when `checkout.action` is `switched` or `already`.
 - `ok: false`: print `⚠ Cleanup incomplete` with each `problems[]` line. The
   outcome stays `merged`; record the kept items under the summary's
-  *Uncertainty*. Never retry with force. A `stash: pop_failed` is handled like
+  *Uncertainty* (with any worktree kept for untracked or ignored files).
+  Never retry with force. A `stash: pop_failed` is handled like
   the failed pop in the block below.
 - `cwd_removed: true`: `cd` to `main_worktree` before the next command.
 - Exit 4 or no `python3`: run the stash-first block below, then that doc's

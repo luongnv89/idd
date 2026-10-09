@@ -199,9 +199,16 @@ FAIL=0
 # 6 skills, so it was moved out. An adversarial review then added the safety
 # rules a manual run must keep too (only this run's stash is popped, ignored
 # files and mid-operation checkouts are kept, fork heads match by SHA), so the
-# doc ends at +4,061 per copy: measured 560,828 + 8,122 = 568,950; the line
-# keeps six bytes of headroom, so the ratchet is not widened.
-BUDGET=568956
+# doc ends at +4,061 per copy: measured 560,828 + 8,122 = 568,950. Review of
+# that draft (issue #535) made the manual path keep the script's promises:
+# untracked files found even under status.showUntrackedFiles=no and deleted
+# only on the user's yes (never in auto mode), locked and mid-operation
+# worktrees skipped, a conflicting stash pop named. +1,063 per copy: measured
+# 568,950 + 2,126 = 571,076; the line keeps six bytes of headroom, so the
+# ratchet is not widened. The same review grows the two merging skills'
+# bundles (auto-pilot +1,594, issue-pr-review +1,720 in scripts/skill-budgets.json:
+# this doc, the reconciled `--delete-remote` command forms, the confirm prompt).
+BUDGET=571082
 
 pass() { echo "  ✓ $1"; PASS=$((PASS + 1)); }
 fail() { echo "  ✗ $1"; FAIL=$((FAIL + 1)); }

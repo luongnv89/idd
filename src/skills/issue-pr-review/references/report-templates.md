@@ -315,21 +315,29 @@ date before merging* closes it on the server.
 **A non-zero exit is not proof the merge failed.** gh merges on the server
 before its local cleanup, which can fail (a dirty tree, a branch held by a
 worktree). On a non-zero exit from `gh pr merge` itself, re-read `gh pr view {N} --json state --jq .state`:
-`MERGED` is a merge (`Merge: ✓ pass (reconciled)`; run the cleanup with
-`--delete-remote`, since gh stopped before deleting the remote branch); anything
-else is the merge failure below.
+`MERGED` is a merge (`Merge: ✓ pass (reconciled)`; set `reconciled`, since gh
+stopped before deleting the remote branch); anything else is the merge failure
+below.
 
 **Post-merge cleanup** <!-- a:rv-post-merge-cleanup --> runs after every merge
 this skill makes (`docs/post-merge-cleanup.md`):
 
 ```bash
-python3 shared/scripts/gi-postmerge.py --pr {N}
+python3 shared/scripts/gi-postmerge.py --pr {N}                   # gh pr merge exited 0
+python3 shared/scripts/gi-postmerge.py --pr {N} --delete-remote   # reconciled
 ```
 
 `merged: false` touched nothing: report its `problems[0]`, never a cleanup.
 Otherwise `ok: false` prints `⚠ Cleanup incomplete` (`references/error-messages.md`)
 and does **not** change `Result: MERGED`. Exit 4 or no `python3` runs that doc's
 manual procedure. When `cwd_removed` is true, `cd` to `main_worktree`.
+
+**Untracked files are never deleted unasked.** For a worktree kept for
+`untracked_files` or `ignored_files`, an interactive run lists its `path` and
+`files` and asks `Delete these {n} untracked files and remove worktree {path}? [y/N]`
+({n} = `file_count`). Only an explicit yes re-runs
+`python3 shared/scripts/gi-postmerge.py --pr {N} --remove-worktree "$wt"`.
+`--auto` and `--review-only` never do: the worktree stays, reported.
 
 The merge runs after the summary prints, so close with a merge block whose first
 row supersedes the summary's `Result:`. On success:

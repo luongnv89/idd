@@ -48,7 +48,7 @@ chmod +x "$TMP/bin/gh"
 export PATH="$TMP/bin:$PATH"
 
 field() { python3 -c 'import json,sys; v=json.loads(sys.argv[1]); 
-for k in sys.argv[2].split("."): v=v[k]
+for k in sys.argv[2].split("."): v=v[int(k)] if isinstance(v,list) else v[k]
 print(v if isinstance(v,str) else json.dumps(v))' "$1" "$2"; }
 
 BRANCH="feat/42-dark-mode"
@@ -270,6 +270,111 @@ OUT="$(run "$R" --delete-remote)"
   && ! git -C "$TMP/remote/origin.git" show-ref --verify --quiet "refs/heads/$BRANCH"
 check "P2 --delete-remote: a remote branch gh left behind is deleted" "$?"
 
+# lane NAME — fixture NAME with the clone on main and $BRANCH in a linked
+# worktree at $TMP/NAME/lane.
+lane() {
+  fixture "$1"
+  git -C "$TMP/$1/repo" checkout -q main
+  git -C "$TMP/$1/repo" worktree add -q "$TMP/$1/lane" "$BRANCH" 2>/dev/null
+}
+
+# status.showUntrackedFiles=no hides untracked files from a plain `git status
+# --porcelain`; a plain `git worktree remove` then deletes them.
+lane untracked
+R="$TMP/untracked/repo"
+git -C "$R" config status.showUntrackedFiles no
+echo draft > "$TMP/untracked/lane/draft.txt"
+OUT="$(run "$R")"
+[ -f "$TMP/untracked/lane/draft.txt" ] && has_branch "$R" && [ "$(field "$OUT" ok)" = false ] \
+  && [ "$(field "$OUT" worktrees.0.reason)" = untracked_files ] \
+  && [ "$(field "$OUT" worktrees.0.files)" = '["draft.txt"]' ] && [ "$(field "$OUT" worktrees.0.file_count)" = 1 ]
+check "P2 untracked (showUntrackedFiles=no): worktree and file kept, reason untracked_files, file listed" "$?"
+OUT="$(run "$R" --remove-worktree "$TMP/untracked/lane")"
+[ ! -d "$TMP/untracked/lane" ] && ! has_branch "$R" && [ "$(field "$OUT" ok)" = true ] \
+  && [ "$(field "$OUT" worktrees.0.action)" = removed ]
+check "P2 --remove-worktree: the confirmed untracked-only worktree is removed and the branch deleted" "$?"
+
+lane refuse
+R="$TMP/refuse/repo"
+echo draft > "$TMP/refuse/lane/draft.txt" && echo wip >> "$TMP/refuse/lane/app.txt"
+OUT="$(run "$R" --remove-worktree "$TMP/refuse/lane")"
+[ -f "$TMP/refuse/lane/draft.txt" ] && grep -q wip "$TMP/refuse/lane/app.txt" && has_branch "$R" \
+  && [ "$(field "$OUT" worktrees.0.reason)" = dirty ] && [ "$(field "$OUT" ok)" = false ]
+check "P2 --remove-worktree: refused when the worktree has tracked changes" "$?"
+
+lane wrongpath
+R="$TMP/wrongpath/repo"
+OUT="$(run "$R" --remove-worktree "$TMP/wrongpath/repo")"
+[ -d "$TMP/wrongpath/repo/.git" ] && [ "$(field "$OUT" ok)" = false ] \
+  && echo "$OUT" | grep -q 'not_merged_branch_worktree'
+check "P2 --remove-worktree: a path that is not a worktree on the merged branch is left alone" "$?"
+
+lane ignonly
+R="$TMP/ignonly/repo"
+echo '*.log' >> "$R/.git/info/exclude" && echo keep > "$TMP/ignonly/lane/debug.log"
+OUT="$(run "$R")"
+[ -f "$TMP/ignonly/lane/debug.log" ] && [ "$(field "$OUT" worktrees.0.reason)" = ignored_files ] \
+  && [ "$(field "$OUT" worktrees.0.files)" = '["debug.log"]' ]
+check "P2 ignored only: reason ignored_files, the file listed" "$?"
+
+lane locked
+R="$TMP/locked/repo"
+git -C "$R" worktree lock "$TMP/locked/lane"
+OUT="$(run "$R")"
+[ -d "$TMP/locked/lane" ] && has_branch "$R" && [ "$(field "$OUT" worktrees.0.action)" = kept ] \
+  && [ "$(field "$OUT" worktrees.0.reason)" = locked ]
+check "P2 locked: a locked worktree is kept" "$?"
+
+# A local commit on main the remote never saw: fast-forward refuses, nothing resets.
+fixture divswitch
+R="$TMP/divswitch/repo"
+git -C "$R" checkout -q main && echo local > "$R/local.txt" && git -C "$R" add local.txt \
+  && git -C "$R" commit -q -m local && git -C "$R" checkout -q "$BRANCH"
+localmain="$(git -C "$R" rev-parse main)"
+OUT="$(run "$R")"
+[ "$(field "$OUT" fast_forward)" = diverged ] && [ "$(field "$OUT" ok)" = false ] \
+  && [ "$(git -C "$R" rev-parse main)" = "$localmain" ] && [ "$(on_branch "$R")" = main ]
+check "P2 diverged base (switch path): reported, ok false, main not reset" "$?"
+
+fixture divother
+R="$TMP/divother/repo"
+git -C "$R" checkout -q main && echo local > "$R/local.txt" && git -C "$R" add local.txt \
+  && git -C "$R" commit -q -m local && git -C "$R" checkout -q -b spike
+localmain="$(git -C "$R" rev-parse main)"
+OUT="$(run "$R")"
+[ "$(field "$OUT" fast_forward)" = diverged ] && [ "$(field "$OUT" ok)" = false ] \
+  && [ "$(git -C "$R" rev-parse main)" = "$localmain" ] && [ "$(on_branch "$R")" = spike ]
+check "P2 diverged base (other branch): reported, ok false, main not reset" "$?"
+
+fixture forkremote OPEN
+R="$TMP/forkremote/repo"
+setpr state '"MERGED"'; setpr isCrossRepository true
+OUT="$(run "$R" --delete-remote)"
+[ "$(field "$OUT" remote_branch)" = skipped ] \
+  && git -C "$TMP/forkremote/origin.git" show-ref --verify --quiet "refs/heads/$BRANCH"
+check "P2 fork + --delete-remote: the remote branch is skipped and still present" "$?"
+
+fixture baselinked
+R="$TMP/baselinked/repo"
+git -C "$R" worktree add -q "$TMP/baselinked/basewt" main 2>/dev/null
+OUT="$(run "$R")"
+[ "$(on_branch "$R")" = "$BRANCH" ] && [ "$(field "$OUT" checkout.reason)" = base_checked_out_elsewhere ] \
+  && has_branch "$R" && [ "$(field "$OUT" ok)" = false ] && [ "$(on_branch "$TMP/baselinked/basewt")" = main ]
+check "P2 base in a linked worktree: reported, never forced" "$?"
+
+# origin/main moved past the PR on the same line the local edit touches.
+fixture popconflict
+R="$TMP/popconflict/repo"
+(cd "$TMP/popconflict/merger" && git pull -q origin main 2>/dev/null && echo upstream >> app.txt \
+  && git commit -q -am upstream && git push -q origin main 2>/dev/null)
+echo wip >> "$R/app.txt"
+OUT="$(run "$R")"
+stash_sha="$(git -C "$R" rev-parse --short=7 refs/stash 2>/dev/null)"
+[ "$(field "$OUT" stash)" = pop_failed ] && [ "$(field "$OUT" ok)" = false ] && [ -n "$stash_sha" ] \
+  && echo "$OUT" | grep -q "conflicted in app.txt" && echo "$OUT" | grep -q "$stash_sha" \
+  && echo "$OUT" | grep -q 'reset --merge' && [ "$(git -C "$R" stash list | wc -l | tr -d ' ')" = 1 ]
+check "P2 stash pop conflict: ok false, the conflicted path and the kept stash named" "$?"
+
 # ── P3: degrade paths ────────────────────────────────────────
 fixture ghdown
 R="$TMP/ghdown/repo"
@@ -283,8 +388,11 @@ check "P3: outside a repository is exit 4" "$?"
 # ── P4: wiring ───────────────────────────────────────────────
 DOC="$REPO_ROOT/docs/post-merge-cleanup.md"
 [ -f "$DOC" ]; check "P4: docs/post-merge-cleanup.md is the runtime doc for the cleanup" "$?"
-! grep -q -- '--force' "$DOC"
-check "P4: the prose fallback never forces a worktree removal" "$?"
+[ -z "$(grep -- '--force' "$DOC" | grep -v 'only after the user confirms (never in auto mode)')" ]
+check "P4: the prose fallback forces a worktree removal only after the user confirms, never in auto mode" "$?"
+grep -q 'status --porcelain --untracked-files=all --ignored' "$DOC" && grep -q 'absolute-git-dir' "$DOC" \
+  && grep -q 'locked' "$DOC" && grep -q 'diff-filter=U' "$DOC"
+check "P4: the fallback probes untracked files, in-progress operations, locks, and a conflicting pop" "$?"
 grep -q 'git branch -D' "$DOC" && grep -q 'headRefOid' "$DOC" && grep -q 'merged_head' "$DOC"
 check "P4: the fallback deletes a squash-merged branch only against the merged head" "$?"
 for skill in issue-analysis issue-creator issue-triage issue-resolver; do
@@ -308,6 +416,14 @@ AP_MERGE="$REPO_ROOT/src/skills/auto-pilot/references/phases/phase-5-merge.md"
 check "P4: auto-pilot Step 5.3 runs the cleanup on both the sequential and parallel paths" "$?"
 grep -q 'state --jq .state' "$AP_MERGE"
 check "P4: auto-pilot reconciles a non-zero merge exit against the PR state" "$?"
+[ "$(grep -c 'shared/scripts/gi-postmerge.py --pr {pr_number} --delete-remote' "$AP_MERGE")" -ge 2 ] \
+  && grep -q 'shared/scripts/gi-postmerge.py --pr {N} --delete-remote' "$PR_SRC/references/report-templates.md"
+check "P4: a reconciled merge runs the cleanup with --delete-remote (both skills, both auto-pilot paths)" "$?"
+grep -q 'Delete these {n} untracked files and remove worktree {path}? \[y/N\]' "$PR_SRC/references/report-templates.md" \
+  && grep -q -- '--remove-worktree "$wt"' "$PR_SRC/references/report-templates.md"
+check "P4: issue-pr-review asks before deleting untracked files (default No)" "$?"
+! grep -q -- '--remove-worktree "' "$AP_MERGE" && grep -q 'pass `--remove-worktree`' "$AP_MERGE"
+check "P4: auto-pilot never passes --remove-worktree" "$?"
 grep -q 'gi-postmerge\|/issue-pr-review {pr_number}' \
   "$REPO_ROOT/src/skills/issue-resolver/references/steps/step-0-preflight.md"
 check "P4: the resolver's kept-worktree note points at the post-merge cleanup" "$?"
