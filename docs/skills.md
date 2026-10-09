@@ -187,14 +187,14 @@ Resolves one GitHub issue end-to-end and creates an atomic PR.
 
 ## `/issue-pr-review`
 
-Reviews an existing PR end-to-end: pre-pass, review, tests/build, CI, fix loop, and final report. By default, it fixes and repeats until clean; auto-merge only happens in `--auto` mode.
+Reviews an existing PR end-to-end: pre-pass, review, tests/build, CI, fix loop, and final report. By default, it fixes and repeats until clean; auto-merge only happens in `--auto` mode. After a merge, or on a PR it finds already merged, it cleans up the local checkout: it deletes the merged local branch, removes its clean worktrees, and switches from the merged branch to the updated base branch. Anything with uncommitted changes, untracked files, or commits the PR never had is kept and reported (an interactive run can delete untracked files after you confirm the list, never in auto mode); on an already-merged PR an interactive run shows the plan and asks first, and `--review-only` only reports.
 
 ### Input options
 
 | Input | Mode | Behavior |
 |---|---|---|
 | `/issue-pr-review <N>` | Interactive fix loop | Reviews PR #N, fixes `action: fix` issues, repeats until clean or stopped, and reports. Does not auto-merge. |
-| `/issue-pr-review <N> --auto` | Auto-pilot | Reviews, fixes, waits for CI, and auto-merges when clean. |
+| `/issue-pr-review <N> --auto` | Auto-pilot | Reviews, fixes, waits for CI, auto-merges when clean, then cleans up the local checkout (merged branch, clean worktrees, switch to the updated base). |
 | `/issue-pr-review` | Detect PR | Auto-detects the PR for the current branch and runs the default fix loop. |
 | `/issue-pr-review --review-only` | Read-only | Runs one review/test/CI pass, reports findings, never fixes, loops, or merges. |
 
@@ -256,7 +256,7 @@ Controlled by `.gitissue.yml`:
 - `autopilot.mode: balanced` — default; merges clean PRs, leaves unresolved PRs open.
 - `autopilot.mode: aggressive` — may merge partial PRs only when `autopilot.merge_partial: true` is also set.
 
-The loop pauses only for critical unresolved review failures, because that decision is not safely reversible. A dependency-blocked PR (`Depends on #N` / `Blocked by #N`) is never merged out of order, but it does not halt the run either: the PR is left open with outcome `blocked_by_dependency` and the loop continues to the next eligible issue.
+The loop pauses only for critical unresolved review failures, because that decision is not safely reversible. A dependency-blocked PR (`Depends on #N` / `Blocked by #N`) is never merged out of order, but it does not halt the run either: the PR is left open with outcome `blocked_by_dependency` and the loop continues to the next eligible issue. After every merge (clean, partial, or critical-issue, sequential or parallel, and for a merged PR found at resume) the loop cleans up the local checkout the same way `/issue-pr-review` does; anything it keeps is listed in the run summary's *Uncertainty* section.
 
 ### Requirements
 
