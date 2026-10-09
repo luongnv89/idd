@@ -4,7 +4,7 @@ description: "Run an autonomous triage-resolve-review-merge loop to auto-pilot t
 license: MIT
 compatibility: "Requires git and GitHub CLI (gh) with auth and push access. Requires merge permission for auto-merge. Requires issue-triage, issue-resolver, issue-analysis, and issue-pr-review to be installed from the same distribution. Optional: issue-creator for normalizing unstructured issues mid-loop."
 metadata:
-  version: 2.8.0
+  version: 2.9.0
   author: "Luong NGUYEN <luongnv89@gmail.com>"
   effort: max
 ---
@@ -117,6 +117,7 @@ Verify these files exist relative to this SKILL.md's dirname. A missing one is a
 - `references/docs/agent-overrides.md`
 - `references/docs/terminal-style.md`
 - `references/docs/auto-mode.md`
+- `references/docs/post-merge-cleanup.md`
 - `references/scripts/gi-config.py`
 - `references/scripts/gi-runlog.py`
 - `references/scripts/gi-deps.py`
@@ -126,6 +127,7 @@ Verify these files exist relative to this SKILL.md's dirname. A missing one is a
 - `references/scripts/gi-branch.py`
 - `references/scripts/gi-triage-graph.py`
 - `references/scripts/gi-state.py`
+- `references/scripts/gi-postmerge.py` — post-merge cleanup: worktrees, branch, switch to the updated default branch
 - `references/scripts/gi-ratelimit.py` — rate-limit verdict, chunked pause, transient-failure backoff, and the run's wall-clock budget
 
 ### Run lock and branch sync
@@ -218,7 +220,7 @@ Each phase closes with `√`/`×` per check plus a `Result: PASS | PARTIAL | FAI
 | 1 | Triage and Pick | Pick from the triage order (*Step 1.1a* reuses a `fresh` one); *Step 1.2b* captures each lane's `{issue_payload}` + `{triage_context}` | no |
 | 2 | Resolve | One in-place resolver, or resolver-only lanes in caller-managed worktrees | yes (/issue-resolver) |
 | 3-4 | PR Review | One lane at a time through /issue-pr-review --auto --no-merge (up to `review_cycles` fixes + CI) | yes (/issue-pr-review) |
-| 5 | Merge | Verify mergeability (*Step 5.1a*), bind head and live base (*Step 5.1c*), squash-merge with `--match-head-commit`, close the issue, log, update state/cache, clean up | no |
+| 5 | Merge | Verify mergeability (*Step 5.1a*), bind head and live base (*Step 5.1c*), squash-merge with `--match-head-commit`, close the issue, log, update state/cache, then post-merge cleanup onto the updated default branch (*Step 5.3*) | no |
 
 **Caller-supplied context.** Issue bodies are read against a <!-- a:ap-snapshot-budget -->
 body-snapshot budget with three freshness boundaries:

@@ -4,7 +4,7 @@ description: "Review a PR end-to-end with CI checks, fix cycles, and optional au
 license: MIT
 compatibility: "Requires git and GitHub CLI (gh) with authentication. Self-contained — uses shared agents from shared/agents/."
 metadata:
-  version: 2.8.0
+  version: 2.9.0
   author: "Luong NGUYEN <luongnv89@gmail.com>"
   effort: high
 ---
@@ -54,6 +54,7 @@ references/docs/agent-model-effort.md
 references/docs/agent-overrides.md
 references/docs/terminal-style.md
 references/docs/ui-review.md
+references/docs/post-merge-cleanup.md
 references/scripts/gi-config.py
 references/scripts/gi-secscan.py
 references/scripts/gi-ci-wait.py
@@ -61,6 +62,7 @@ references/scripts/gi-gh.py
 references/scripts/gi-issue.py
 references/scripts/gi-receipt.py
 references/scripts/gi-recipe.py
+references/scripts/gi-postmerge.py
 ```
 
 ```text
@@ -128,7 +130,7 @@ gh pr view {N} --json number,title,body,baseRefName,headRefName,headRefOid,state
 ```
 
 3. Extract base and head branches, `headRefOid`, linked issue numbers (from `Closes #N`, or a first-line `Refs #N` — *Intentional reference* in `references/verification-checks.md`), CI status, and changed files.
-4. If the PR is closed or merged, print `⚠ PR #{N} is already {state}` and stop.
+4. If the PR is closed, print `⚠ PR #{N} is already closed` and stop. If it is already merged, print `○ PR #{N} is already merged`, skip the review, and run the *Post-merge cleanup* (Step 7) under the *Already merged* rules in `references/report-templates.md`; then stop.
 5. Run `gh pr checkout {N}`, so pre-pass commits and the fixer operate on the PR head.
 6. **Bind the head-ref name — never paste the literal name into a command:** `branch_name="$(gh pr view {N} --json headRefName --jq .headRefName)"`, then use `"$branch_name"` in every **shell command**; display templates keep the plain name. Why: `references/review-loop-mechanics.md` (*Binding the head-ref name*).
 
@@ -300,6 +302,8 @@ Print the summary from `references/report-templates.md` and **apply its *Review 
 **Auto-merge is the one destructive action** (squash merge + head-branch deletion, irreversible). Every gate must hold: interactive runs never merge; `--auto` merges only when `review.auto_merge` is true **and** the PR is clean (pending CI is never clean; a CI failure held non-blocking by `review.ignore_ci_billing_failures` is never clean either); `--no-merge` suppresses the merge, leaving it to auto-pilot. On an unmet gate, report and stop — never delete a branch by hand.
 
 **Merge identity (last gate before the merge).** <!-- a:rv-merge-identity --> Bind `verified_head` = Step 5's `ci_sha` (or, with no `ci_sha`, the `headRefOid` the final review cycle read). Re-read `headRefOid` and `baseRefName`, then `gh api "repos/{owner}/{repo}/compare/${base_ref}...${verified_head}" --jq .behind_by`. Merge only when the head still equals `verified_head` **and** `behind_by` is exactly `0` (the live base branch, never `baseRefOid`); anything else is `BLOCKED`, never a re-wait. Merge with `--match-head-commit "$verified_head"`. Patch-id equality never replaces fresh integration checks. Commands and reasons: `references/report-templates.md` (*Auto-Merge*).
+
+**Post-merge cleanup (after every merge).** Run `python3 references/scripts/gi-postmerge.py --pr {N}` to remove the merged branch and its clean worktrees and switch to the updated base (`references/docs/post-merge-cleanup.md`). A non-zero merge exit on a PR that now reads `MERGED` is still a merge (add `--delete-remote`); `ok: false` never downgrades it. Untracked files are deleted only on an interactive yes to the exact list shown (its `digest`). Rules: `references/report-templates.md` (*Auto-Merge*).
 
 **Then the run-stats footer** (`references/run-stats.md`; `tokens` only where the host reported a count) — the last thing printed at **every** terminal outcome, including a stop before Step 7.
 

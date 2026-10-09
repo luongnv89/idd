@@ -210,7 +210,7 @@ has "T5i conventions prohibition" "$ROOT/docs/shared-agent-conventions.md" '**Do
 
 # ─── T6: registration and doc count ─────────────────────────────────────────
 has "T6a registered in dist-check.yml" "$WORKFLOW" 'bash tests/test-agent-overrides-455.sh'
-has "T6b CLAUDE.md counts 14 runtime docs" "$ROOT/CLAUDE.md" 'all 14 bundled by the closure'
+has "T6b CLAUDE.md counts 15 runtime docs" "$ROOT/CLAUDE.md" 'all 15 bundled by the closure'
 has "T6c CLAUDE.md lists the doc" "$ROOT/CLAUDE.md" '`agent-overrides.md`'
 
 echo ""

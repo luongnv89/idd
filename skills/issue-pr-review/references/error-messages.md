@@ -190,13 +190,25 @@ failure.
 
 ### Merge failed
 
-**Trigger:** `gh pr merge` fails (auto mode only), including a head that moved after the merge identity check, which `--match-head-commit` refuses.
+**Trigger:** `gh pr merge` fails (auto mode only) and a re-read of `state` is not `MERGED`, including a head that moved after the merge identity check, which `--match-head-commit` refuses.
 
 ```
 ⚠ Auto-merge failed: {reason}
 
   Manual merge required.
   PR:  {pr_url}
+```
+
+### Cleanup incomplete
+
+**Trigger:** the post-merge cleanup reported `ok: false`. The PR **is** merged; something local was kept on purpose (a dirty worktree, one holding untracked or ignored files, unmerged commits, a stash that would not pop, a diverged base). The result stays `MERGED`.
+
+```
+⚠ Cleanup incomplete — PR #{N} is merged; {n} item(s) kept
+  {problems[0]}
+  {problems[1]}
+
+  Docs:  https://github.com/luongnv89/idd/blob/main/docs/post-merge-cleanup.md
 ```
 
 ### Stale merge authorization

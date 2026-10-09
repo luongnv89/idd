@@ -189,7 +189,35 @@ FAIL=0
 # first draft was cut to 1,047: +1,047 x 2 = +2,094; the reader-list clause in
 # run-log-schema.md adds +14 x 2 = +28. Measured 558,706 + 2,122 = 560,828;
 # the line keeps six bytes of headroom, so the ratchet is not widened.
-BUDGET=560834
+#
+# The ninth raise is post-merge cleanup: after a merge, remove the merged
+# branch and its clean worktrees and switch to the updated base. Its contract
+# (the gi-postmerge answer table, the no-force guarantees, and the manual
+# procedure every script call degrades to) lives in one new runtime doc,
+# post-merge-cleanup.md, shipped only to the 2 skills that merge (auto-pilot,
+# issue-pr-review). A first draft in sync-conventions.md would have shipped to
+# 6 skills, so it was moved out. An adversarial review then added the safety
+# rules a manual run must keep too (only this run's stash is popped, ignored
+# files and mid-operation checkouts are kept, fork heads match by SHA), so the
+# doc ends at +4,061 per copy: measured 560,828 + 8,122 = 568,950. Review of
+# that draft (issue #535) made the manual path keep the script's promises:
+# untracked files found even under status.showUntrackedFiles=no and deleted
+# only on the user's yes (never in auto mode), locked and mid-operation
+# worktrees skipped, a conflicting stash pop named. +1,063 per copy: measured
+# 568,950 + 2,126 = 571,076; the line keeps six bytes of headroom, so the
+# ratchet is not widened. The same review grows the two merging skills'
+# bundles (auto-pilot +1,594, issue-pr-review +1,720 in scripts/skill-budgets.json:
+# this doc, the reconciled `--delete-remote` command forms, the confirm prompt).
+# auto-pilot then grows +424 more (to 422,586): its parallel-lane Step 5.3
+# removes a lane worktree only when `status --porcelain --untracked-files=all
+# --ignored` is empty, else keeps it as blocked_dirty. No bundled doc changes.
+# A last review round bound the user's yes to the file list shown (a digest
+# passed back as `--remove-worktree PATH=DIGEST`; the manual path re-lists
+# before removing), names nested git repos, and puts the lane's lock and
+# in-progress checks in code: the doc +272 per copy, measured 571,076 + 544 =
+# 571,620; auto-pilot +596 (to 423,182), issue-pr-review +583 (to 285,652).
+# The line keeps six bytes of headroom, so the ratchet is not widened.
+BUDGET=571626
 
 pass() { echo "  ✓ $1"; PASS=$((PASS + 1)); }
 fail() { echo "  ✗ $1"; FAIL=$((FAIL + 1)); }
