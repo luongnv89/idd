@@ -1413,6 +1413,9 @@ ALLOWED_VARS = {
     # read from `git worktree list --porcelain`), echoed back only after the
     # user confirms; the script re-matches it against that list and re-probes.
     "$wt": "worktree path gi-postmerge reported from git worktree list, user-confirmed",
+    # Issue #535. The 16-hex `digest` gi-postmerge computed for the file list
+    # the user confirmed; the script re-checks it against ^[0-9a-f]{16}$.
+    "$digest": "16-hex file-list digest gi-postmerge itself reported, format-checked",
 }
 VAR = re.compile(r"\$\{?[A-Za-z_][A-Za-z0-9_]*\}?")
 # Command substitution pastes its output into the command line unquoted. Only

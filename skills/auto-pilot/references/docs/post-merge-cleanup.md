@@ -12,11 +12,11 @@ Run the bundled `gi-postmerge` helper with `--pr {N}` from anywhere in the repos
 | exit 0, `merged: false` | nothing was touched (`ok` is false); never report it as cleaned |
 | exit 0, `ok: true` | `✓ Cleaned up: removed {branch}`, plus `on {base} @ {sha7}` when `checkout.action` is `switched` or `already` |
 | exit 0, `ok: false` | `⚠ Cleanup incomplete` plus each `problems[]` line (each says how to finish by hand); never retry with force |
-| a worktree kept for `untracked_files`/`ignored_files` | show its `files` (`file_count` total); only an interactive yes (default No) re-runs with `--remove-worktree "$wt"`. Auto mode never passes it |
+| a worktree kept for `untracked_files`/`ignored_files` | show its `files` (`file_count` total) and any `nested_repos` (a removal deletes their history); only an interactive yes (default No) re-runs with `--remove-worktree "$wt=$digest"`, `digest` from the answer shown. Auto mode never passes it |
 | exit 3 | invalid `--pr`; fix the call |
 | exit 4, or no `python3` | run the manual procedure (a mid-run git failure may have done a step already) |
 
-`--dry-run` reports the plan and changes nothing. `--delete-remote` also deletes a remote head branch gh left behind at the merged head; pass it only after this skill's own `gh pr merge --delete-branch` exited non-zero on a PR that reads `MERGED`. `--remove-worktree PATH` re-probes that worktree and refuses tracked changes, a lock or an operation in progress. When `cwd_removed` is `true`, `cd` to `main_worktree` before the next command.
+`--dry-run` reports the plan and changes nothing. `--delete-remote` also deletes a remote head branch gh left behind at the merged head; pass it only after this skill's own `gh pr merge --delete-branch` exited non-zero on a PR that reads `MERGED`. `--remove-worktree PATH=DIGEST` re-probes that worktree and refuses a changed file list, tracked changes, a lock or an operation in progress. When `cwd_removed` is `true`, `cd` to `main_worktree` before the next command.
 
 ## Guarantees (both paths)
 
@@ -31,7 +31,7 @@ Run the bundled `gi-postmerge` helper with `--pr {N}` from anywhere in the repos
 Stop unless `gh pr view {N} --json state --jq .state` is `MERGED`. Run from the main worktree (the first `worktree` line of `git worktree list --porcelain`). Unless the head is named like the base, for each linked worktree `$wt` on the branch:
 
 - skip it when `git worktree list --porcelain` marks it `locked`, or when any of `MERGE_HEAD`, `CHERRY_PICK_HEAD`, `REVERT_HEAD`, `BISECT_LOG`, `rebase-merge`, `rebase-apply` exists under `git -C "$wt" rev-parse --absolute-git-dir`;
-- read `git -C "$wt" status --porcelain --untracked-files=all --ignored`. Empty: `git worktree remove "$wt"`. Only `??`/`!!` lines: list them, and only after the user confirms (never in auto mode) run `git worktree remove --force "$wt"`. Anything else: keep it.
+- read `git -C "$wt" status --porcelain --untracked-files=all --ignored`. Empty: `git worktree remove "$wt"`. Only `??`/`!!` lines: list them, naming any listed directory holding a `.git` as a nested repository with its history; only after the user confirms (never in auto mode), re-list right before removing and only if the list is unchanged run `git worktree remove --force "$wt"`. Anything else: keep it.
 
 Then:
 

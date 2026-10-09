@@ -289,15 +289,45 @@ OUT="$(run "$R")"
   && [ "$(field "$OUT" worktrees.0.reason)" = untracked_files ] \
   && [ "$(field "$OUT" worktrees.0.files)" = '["draft.txt"]' ] && [ "$(field "$OUT" worktrees.0.file_count)" = 1 ]
 check "P2 untracked (showUntrackedFiles=no): worktree and file kept, reason untracked_files, file listed" "$?"
+DIGEST="$(field "$OUT" worktrees.0.digest)"
 OUT="$(run "$R" --remove-worktree "$TMP/untracked/lane")"
+[ -f "$TMP/untracked/lane/draft.txt" ] && [ "$(field "$OUT" worktrees.0.action)" = kept ] \
+  && echo "$OUT" | grep -q 'no digest was given'
+check "P2 --remove-worktree: refused without the digest of the confirmed list" "$?"
+OUT="$(run "$R" --remove-worktree "$TMP/untracked/lane=$DIGEST")"
 [ ! -d "$TMP/untracked/lane" ] && ! has_branch "$R" && [ "$(field "$OUT" ok)" = true ] \
   && [ "$(field "$OUT" worktrees.0.action)" = removed ]
-check "P2 --remove-worktree: the confirmed untracked-only worktree is removed and the branch deleted" "$?"
+check "P2 --remove-worktree: the confirmed digest removes the worktree and the branch is deleted" "$?"
+
+# A file that appears after the user answered was never shown: refused, kept.
+lane late
+R="$TMP/late/repo"
+echo draft > "$TMP/late/lane/draft.txt"
+DIGEST="$(field "$(run "$R")" worktrees.0.digest)"
+echo later > "$TMP/late/lane/later.txt"
+OUT="$(run "$R" --remove-worktree "$TMP/late/lane=$DIGEST")"
+[ -f "$TMP/late/lane/later.txt" ] && [ -f "$TMP/late/lane/draft.txt" ] && has_branch "$R" \
+  && [ "$(field "$OUT" worktrees.0.action)" = kept ] && [ "$(field "$OUT" ok)" = false ] \
+  && echo "$OUT" | grep -q 'files changed since the user confirmed'
+check "P2 --remove-worktree: a file added after the confirmation is refused and kept" "$?"
+
+# An untracked nested repository is one status entry; it must be named.
+lane nested
+R="$TMP/nested/repo"
+git init -q "$TMP/nested/lane/vendor" && git -C "$TMP/nested/lane/vendor" commit -q --allow-empty -m v1
+OUT="$(run "$R")"
+[ -d "$TMP/nested/lane/vendor/.git" ] && [ "$(field "$OUT" worktrees.0.nested_repos)" = '["vendor/"]' ]
+check "P2 nested repo: an untracked nested git repository is kept and flagged in nested_repos" "$?"
+DIGEST="$(field "$OUT" worktrees.0.digest)"
+git -C "$TMP/nested/lane/vendor" commit -q --allow-empty -m v2
+OUT="$(run "$R" --remove-worktree "$TMP/nested/lane=$DIGEST")"
+[ -d "$TMP/nested/lane/vendor/.git" ] && [ "$(field "$OUT" worktrees.0.action)" = kept ]
+check "P2 nested repo: new history inside it changes the digest, so the removal is refused" "$?"
 
 lane refuse
 R="$TMP/refuse/repo"
 echo draft > "$TMP/refuse/lane/draft.txt" && echo wip >> "$TMP/refuse/lane/app.txt"
-OUT="$(run "$R" --remove-worktree "$TMP/refuse/lane")"
+OUT="$(run "$R" --remove-worktree "$TMP/refuse/lane=0123456789abcdef")"
 [ -f "$TMP/refuse/lane/draft.txt" ] && grep -q wip "$TMP/refuse/lane/app.txt" && has_branch "$R" \
   && [ "$(field "$OUT" worktrees.0.reason)" = dirty ] && [ "$(field "$OUT" ok)" = false ]
 check "P2 --remove-worktree: refused when the worktree has tracked changes" "$?"
@@ -391,7 +421,7 @@ DOC="$REPO_ROOT/docs/post-merge-cleanup.md"
 [ -z "$(grep -- '--force' "$DOC" | grep -v 'only after the user confirms (never in auto mode)')" ]
 check "P4: the prose fallback forces a worktree removal only after the user confirms, never in auto mode" "$?"
 grep -q 'status --porcelain --untracked-files=all --ignored' "$DOC" && grep -q 'absolute-git-dir' "$DOC" \
-  && grep -q 'locked' "$DOC" && grep -q 'diff-filter=U' "$DOC"
+  && grep -q 'locked' "$DOC" && grep -q 'diff-filter=U' "$DOC" && grep -q 'only if the list is unchanged' "$DOC"
 check "P4: the fallback probes untracked files, in-progress operations, locks, and a conflicting pop" "$?"
 grep -q 'git branch -D' "$DOC" && grep -q 'headRefOid' "$DOC" && grep -q 'merged_head' "$DOC"
 check "P4: the fallback deletes a squash-merged branch only against the merged head" "$?"
@@ -419,14 +449,17 @@ check "P4: auto-pilot reconciles a non-zero merge exit against the PR state" "$?
 [ "$(grep -c 'shared/scripts/gi-postmerge.py --pr {pr_number} --delete-remote' "$AP_MERGE")" -ge 2 ] \
   && grep -q 'shared/scripts/gi-postmerge.py --pr {N} --delete-remote' "$PR_SRC/references/report-templates.md"
 check "P4: a reconciled merge runs the cleanup with --delete-remote (both skills, both auto-pilot paths)" "$?"
-grep -q 'Delete these {n} untracked files and remove worktree {path}? \[y/N\]' "$PR_SRC/references/report-templates.md" \
-  && grep -q -- '--remove-worktree "$wt"' "$PR_SRC/references/report-templates.md"
-check "P4: issue-pr-review asks before deleting untracked files (default No)" "$?"
+grep -q 'Delete these {n} untracked/ignored files and remove worktree {path}? \[y/N\]' "$PR_SRC/references/report-templates.md" \
+  && grep -q -- '--remove-worktree "$wt=$digest"' "$PR_SRC/references/report-templates.md" \
+  && grep -q 'nested git repo {repo} and its history' "$PR_SRC/references/report-templates.md"
+check "P4: issue-pr-review asks before deleting untracked files (default No), bound to the shown digest" "$?"
 ! grep -q -- '--remove-worktree "' "$AP_MERGE" && grep -q 'pass `--remove-worktree`' "$AP_MERGE"
 check "P4: auto-pilot never passes --remove-worktree" "$?"
-grep -q 'if \[ -z "$(git -C "$wt_dir" status --porcelain --untracked-files=all --ignored)" \]; then' "$AP_MERGE" \
-  && ! grep -q -- 'worktree remove .*--force' "$AP_MERGE"
-check "P4: auto-pilot removes a lane worktree only when the --untracked-files=all --ignored probe is empty, never forced" "$?"
+grep -q 'st="$(git -C "$wt_dir" status --porcelain --untracked-files=all --ignored)" || keep=1' "$AP_MERGE" \
+  && grep -q 'if \[ "$keep" = 0 \] && \[ -z "$st" \]; then' "$AP_MERGE" \
+  && grep -q 'for m in MERGE_HEAD CHERRY_PICK_HEAD REVERT_HEAD BISECT_LOG rebase-merge rebase-apply; do' "$AP_MERGE" \
+  && grep -q "f && /^locked/" "$AP_MERGE" && ! grep -q -- 'worktree remove .*--force' "$AP_MERGE"
+check "P4: auto-pilot's lane block removes a worktree only with no lock, no operation in progress and an empty --untracked-files=all --ignored probe, never forced" "$?"
 grep -q 'gi-postmerge\|/issue-pr-review {pr_number}' \
   "$REPO_ROOT/src/skills/issue-resolver/references/steps/step-0-preflight.md"
 check "P4: the resolver's kept-worktree note points at the post-merge cleanup" "$?"

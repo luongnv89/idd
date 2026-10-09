@@ -11,7 +11,7 @@ and it can exit non-zero after the merge already landed. This script is the
 idempotent cleanup every merge site runs afterwards, whoever did the merge.
 
 Usage:  gi-postmerge.py --pr N [--dry-run] [--delete-remote]
-                        [--remove-worktree PATH ...]
+                        [--remove-worktree PATH=DIGEST ...]
 
 Run it from anywhere inside the repository, in any of its worktrees. It reads
 `gh pr view N --json state,headRefName,headRefOid,baseRefName,isCrossRepository`
@@ -27,7 +27,9 @@ and does nothing unless `state` is `MERGED`. Then, all from the MAIN worktree
      merge/rebase/cherry-pick/bisect, or a lock is kept and reported; the
      status probes pass `--untracked-files=all`, so `status.showUntrackedFiles=no`
      cannot hide a file. A kept untracked/ignored worktree lists its `files`
-     (first 20) and `file_count`. A stale entry whose directory is gone is
+     (first 20), `file_count`, `nested_repos` (listed directories holding a
+     `.git`: a removal deletes that repository and its history) and `digest`,
+     a fingerprint of the full list. A stale entry whose directory is gone is
      pruned.
   3. The main worktree switches to the base branch and fast-forwards it to
      `origin/<base>`, but only when it is on the head branch or already on the
@@ -45,13 +47,17 @@ and does nothing unless `state` is `MERGED`. Then, all from the MAIN worktree
      --delete-branch` merged and gh stopped before deleting it. Never for a
      fork PR.
 
-`--remove-worktree PATH` (repeatable) is the user's confirmation, and the only
-way this script deletes untracked or ignored files: that one worktree is
-removed with `git worktree remove --force`, after the probes are re-run at
-removal time. It is refused (kept, reported) when the worktree now has
-tracked changes, a lock, or an operation in progress, or is not a linked
-worktree on the merged branch. The rest of the cleanup runs as usual, so the
-branch can be deleted in the same run. Never pass it without asking the user.
+`--remove-worktree PATH=DIGEST` (repeatable) is the user's confirmation, and
+the only way this script deletes untracked or ignored files. DIGEST is the
+`digest` an earlier run reported for the list the user was shown and said yes
+to. The probes are re-run at removal time, and the worktree is removed with
+`git worktree remove --force` only when the fresh digest equals DIGEST, so a
+file that appeared after the user answered is never deleted unseen. It is
+refused (kept, reported) when DIGEST is missing or differs, or the worktree
+now has tracked changes, a lock, or an operation in progress, or is not a
+linked worktree on the merged branch. A worktree that is clean by then gets
+a plain remove. The rest of the cleanup runs as usual, so the branch can be
+deleted in the same run. Never pass it without asking the user.
 
 The head branch is matched by name, except for a fork PR (isCrossRepository):
 its name can be an unrelated local branch, so only a local branch at exactly
@@ -66,7 +72,8 @@ Prints one JSON object:
   {"pr": N, "merged": bool, "dry_run": bool, "branch": str, "base": str,
    "main_worktree": str, "fetch": "ok|failed|skipped|planned",
    "worktrees": [{"path": str, "action": "removed|pruned|kept|planned",
-                  "reason": str, "files": [str], "file_count": int}],
+                  "reason": str, "files": [str], "file_count": int,
+                  "nested_repos": [str], "digest": str}],
    "checkout": {"action": "switched|already|kept|failed|planned",
                 "from": str, "reason": str},
    "fast_forward": "updated|up_to_date|diverged|failed|skipped|planned",
@@ -75,7 +82,7 @@ Prints one JSON object:
    "remote_branch": "deleted|absent|kept|skipped|planned",
    "cwd_removed": bool, "ok": bool, "problems": [str, ...]}
 
-`files`/`file_count` appear only on a worktree kept (or force-removed) for
+`files`/`file_count`/`nested_repos`/`digest` appear only on a worktree kept (or force-removed) for
 `untracked_files` or `ignored_files`. `ok` is true when every step reached its
 goal. Each kept item, failed step, or stash that would not pop adds one line
 to `problems`, and that line says how to finish by hand. A stash pop that
@@ -100,6 +107,7 @@ edit the source and run ./scripts/build.sh.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -262,11 +270,43 @@ def canon(path: str) -> str:
         return os.path.abspath(path)
 
 
+def file_digest(path: str, files: list[str], nested: list[str]) -> str:
+    """Fingerprint the files a forced removal would delete.
+
+    A nested repository is one status entry (`nested/`), so its own HEAD and
+    status are folded in: work added inside it also changes the digest.
+    """
+    h = hashlib.sha256("\0".join(sorted(files)).encode("utf-8", "surrogateescape"))
+    for name in sorted(nested):
+        sub = os.path.join(path, name)
+        h.update(b"\0\0" + out(["rev-parse", "--verify", "--quiet", "HEAD"], sub).encode())
+        probe = git(["status", "--porcelain", "-z", "--untracked-files=all", "--ignored"], sub)
+        h.update(b"\0" + probe.stdout.encode("utf-8", "surrogateescape"))
+    return h.hexdigest()[:16]
+
+
 def kept_entry(path: str, reason: str, files: list[str]) -> dict:
-    entry = {"path": path, "action": "kept", "reason": reason}
+    entry: dict = {"path": path, "action": "kept", "reason": reason}
     if reason in ("untracked_files", "ignored_files"):
-        entry.update(files=files[:FILE_CAP], file_count=len(files))
+        nested = [
+            f for f in files
+            if f.endswith("/") and os.path.lexists(os.path.join(path, f, ".git"))
+        ]
+        entry.update(
+            files=files[:FILE_CAP],
+            file_count=len(files),
+            nested_repos=nested[:FILE_CAP],
+            digest=file_digest(path, files, nested),
+        )
     return entry
+
+
+def parse_confirmation(value: str) -> tuple[str, str]:
+    """`PATH=DIGEST` → (canonical path, digest); a missing digest is ''."""
+    head, sep, tail = value.rpartition("=")
+    if sep and re.fullmatch(r"[0-9a-f]{16}", tail):
+        return canon(head), tail
+    return canon(value), ""
 
 
 def cleanup(
@@ -342,7 +382,7 @@ def cleanup(
 
     # 2. Linked worktrees that still hold the head branch. A path in
     #    `confirmed` is the user's yes to deleting its untracked/ignored files.
-    confirmed = {canon(p) for p in remove_worktrees or []}
+    confirmed = dict(parse_confirmation(v) for v in remove_worktrees or [])
     matched: set[str] = set()
     for entry in worktrees(main)[1:]:
         if not head_local or entry["branch"] != head_local:
@@ -360,7 +400,7 @@ def cleanup(
             continue
         if canon(path) in confirmed:
             matched.add(canon(path))
-            _remove_confirmed(result, main, here, entry, dry_run)
+            _remove_confirmed(result, main, here, entry, dry_run, confirmed[canon(path)])
             continue
         reason, files = ("locked", []) if entry.get("locked") else busy_reason(path, ignored=True)
         if reason in ("untracked_files", "ignored_files"):
@@ -393,7 +433,7 @@ def cleanup(
                 f"then: git worktree remove {path}"
             )
 
-    for path in sorted(confirmed - matched):
+    for path in sorted(set(confirmed) - matched):
         result["worktrees"].append({"path": path, "action": "kept", "reason": "not_merged_branch_worktree"})
         problems.append(
             f"--remove-worktree {path}: not a linked worktree on {head_local or branch}; left alone"
@@ -603,11 +643,14 @@ def _pop(result: dict, main: str, stashed: str) -> None:
         )
 
 
-def _remove_confirmed(result: dict, main: str, here: str, entry: dict, dry_run: bool) -> None:
+def _remove_confirmed(
+    result: dict, main: str, here: str, entry: dict, dry_run: bool, expect: str
+) -> None:
     """Force-remove one confirmed worktree, re-probing it at removal time.
 
-    Only untracked/ignored files (or nothing) may be lost: tracked changes, a
-    lock, or an operation in progress keep it, whatever the user confirmed.
+    Only the untracked/ignored files the user was shown may be lost: a digest
+    that is missing or no longer matches, tracked changes, a lock, or an
+    operation in progress keep it, whatever the user confirmed.
     """
     path = entry["path"]
     reason, files = ("locked", []) if entry.get("locked") else busy_reason(path, ignored=True)
@@ -618,11 +661,20 @@ def _remove_confirmed(result: dict, main: str, here: str, entry: dict, dry_run: 
         )
         return
     record = kept_entry(path, reason, files)
+    if reason and record["digest"] != expect:
+        why = "no digest was given" if not expect else "its files changed since the user confirmed"
+        result["worktrees"].append(record)
+        result["problems"].append(
+            f"--remove-worktree {path} refused: {why}; re-run without the flag, "
+            f"show the new list and ask again"
+        )
+        return
     if dry_run:
         record.update(action="planned", reason=reason or "remove")
         result["worktrees"].append(record)
         return
-    proc = git(["worktree", "remove", "--force", "--", path], main)
+    force = ["--force"] if reason else []
+    proc = git(["worktree", "remove", *force, "--", path], main)
     if proc.returncode != 0:
         record["reason"] = "remove_failed"
         result["worktrees"].append(record)
@@ -657,12 +709,14 @@ def main(argv: list[str] | None = None) -> int:
         "--remove-worktree",
         action="append",
         default=[],
-        metavar="PATH",
+        metavar="PATH=DIGEST",
         help=(
-            "the user confirmed deleting this worktree's untracked/ignored files: "
-            "remove it with --force after re-probing; refused on tracked changes, "
-            "a lock, an operation in progress, or a path not on the merged branch "
-            "(repeatable; never pass it without asking)"
+            "the user confirmed deleting the untracked/ignored files an earlier "
+            "run listed for this worktree under `digest`: re-probe and remove it "
+            "with --force only while the digest still matches; refused on a "
+            "missing or changed digest, tracked changes, a lock, an operation in "
+            "progress, or a path not on the merged branch (repeatable; never "
+            "pass it without asking)"
         ),
     )
     args = parser.parse_args(argv)

@@ -334,10 +334,13 @@ manual procedure. When `cwd_removed` is true, `cd` to `main_worktree`.
 
 **Untracked files are never deleted unasked.** For a worktree kept for
 `untracked_files` or `ignored_files`, an interactive run lists its `path` and
-`files` and asks `Delete these {n} untracked files and remove worktree {path}? [y/N]`
-({n} = `file_count`). Only an explicit yes re-runs
-`python3 shared/scripts/gi-postmerge.py --pr {N} --remove-worktree "$wt"`.
-`--auto` and `--review-only` never do: the worktree stays, reported.
+`files` and asks `Delete these {n} untracked/ignored files and remove worktree {path}? [y/N]`
+({n} = `file_count`), adding `(includes nested git repo {repo} and its history)`
+for each `nested_repos` entry. Only an explicit yes re-runs, binding `digest`
+from that same answer so a file added later is never deleted unseen:
+`python3 shared/scripts/gi-postmerge.py --pr {N} --remove-worktree "$wt=$digest"`.
+A refusal (the list changed) means show the new list and ask again.
+`--auto` and `--review-only` never pass the flag: the worktree stays, reported.
 
 The merge runs after the summary prints, so close with a merge block whose first
 row supersedes the summary's `Result:`. On success:

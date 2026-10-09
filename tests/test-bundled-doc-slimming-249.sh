@@ -211,7 +211,13 @@ FAIL=0
 # auto-pilot then grows +424 more (to 422,586): its parallel-lane Step 5.3
 # removes a lane worktree only when `status --porcelain --untracked-files=all
 # --ignored` is empty, else keeps it as blocked_dirty. No bundled doc changes.
-BUDGET=571082
+# A last review round bound the user's yes to the file list shown (a digest
+# passed back as `--remove-worktree PATH=DIGEST`; the manual path re-lists
+# before removing), names nested git repos, and puts the lane's lock and
+# in-progress checks in code: the doc +272 per copy, measured 571,076 + 544 =
+# 571,620; auto-pilot +596 (to 423,182), issue-pr-review +583 (to 285,652).
+# The line keeps six bytes of headroom, so the ratchet is not widened.
+BUDGET=571626
 
 pass() { echo "  ✓ $1"; PASS=$((PASS + 1)); }
 fail() { echo "  ✗ $1"; FAIL=$((FAIL + 1)); }

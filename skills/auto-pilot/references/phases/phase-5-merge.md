@@ -426,8 +426,18 @@ longer checked out:
 repo_root="$(git rev-parse --show-toplevel)"
 repo="$(basename "$repo_root")"
 wt_dir="$(dirname "$repo_root")/${repo}-worktrees/$(printf '%s' "$branch_name" | tr '/' '-')"
-if [ -z "$(git -C "$wt_dir" status --porcelain --untracked-files=all --ignored)" ]; then
+keep=0
+wt_git="$(git -C "$wt_dir" rev-parse --absolute-git-dir)" || keep=1
+for m in MERGE_HEAD CHERRY_PICK_HEAD REVERT_HEAD BISECT_LOG rebase-merge rebase-apply; do
+  [ -e "$wt_git/$m" ] && keep=1
+done
+git worktree list --porcelain | awk -v w="worktree $wt_dir" \
+  '$0 == w { f = 1; next } /^worktree / { f = 0 } f && /^locked/ { l = 1 } END { exit !l }' && keep=1
+st="$(git -C "$wt_dir" status --porcelain --untracked-files=all --ignored)" || keep=1
+if [ "$keep" = 0 ] && [ -z "$st" ]; then
   git worktree remove "$wt_dir"
+else
+  echo "blocked_dirty: $wt_dir"
 fi
 git branch -d "$branch_name" 2>/dev/null || true
 ```
@@ -436,11 +446,9 @@ Bind `branch_name` and `wt_dir` from the validated lane record; never re-derive
 or paste a literal read-back into a command. First require `git worktree list
 --porcelain` to map that exact path to this lane's branch and lane identity.
 Never use `--force`. A plain remove silently deletes untracked files hidden by
-`status.showUntrackedFiles=no` and all ignored ones, so only a worktree whose
-probe above prints nothing may be removed. Any output (tracked changes,
-untracked or ignored files), a `locked` mark, or a merge/rebase/cherry-pick/
-bisect in progress (the markers in `references/docs/post-merge-cleanup.md`) makes the lane
-`blocked_dirty`: retained with its path and `git status` recovery guidance,
+`status.showUntrackedFiles=no` and all ignored ones, so the block removes only
+a worktree with no lock, no merge/rebase/cherry-pick/bisect in progress, and
+an empty probe. Anything else makes the lane `blocked_dirty`: retained with its path and `git status` recovery guidance,
 named under the summary's *Uncertainty*, and never blocking the next returned
 sibling. A path mapped to another branch is ambiguous and also blocks only that
 lane.
