@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- gitissue:normalized v1 -->
 
+## [Unreleased]
+
+### Features
+- **pr-review, auto-pilot:** clean up the local checkout after every merge. The new shared `gi-postmerge.py` removes clean worktrees still on the merged branch, switches the checkout from that branch to the updated base (stash-first, fast-forward only), deletes the squash-merged local branch that `git branch -d` always refuses, and prunes stale remote-tracking refs. It never forces anything. A worktree with changes or ignored files, a checkout mid-merge, a branch with commits the PR never had, and a fork branch not at the PR head are kept and reported. A checkout on an unrelated branch stays put, and only the local base is fast-forwarded. `/issue-pr-review` runs it after its auto-merge and on a PR it finds already merged. `/auto-pilot` runs it after every merge (sequential, parallel lanes, partial and critical-issue merges) and on a merged PR found at resume. Both now re-read the PR state when `gh pr merge` exits non-zero, because gh merges on the server before its local cleanup can fail. The contract and the manual procedure live in the new runtime doc `docs/post-merge-cleanup.md`, shipped only to the two merging skills.
+
 ## v0.25.0 — 2026-10-07
 
 ### Features

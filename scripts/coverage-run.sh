@@ -42,6 +42,9 @@ run "$SCRIPTS/gi-gh.py" --help
 run "$SCRIPTS/gi-issue.py" --help
 run "$SCRIPTS/gi-ci-wait.py" --help
 run "$SCRIPTS/gi-secscan.py" --help
+# gi-postmerge — offline surface only: an invalid --pr (the git/gh paths are
+# exercised against a fixture repository by tests/test-postmerge-cleanup.sh).
+run "$SCRIPTS/gi-postmerge.py" --pr 0
 
 # gi-backlog — offline surface only: snapshot status, invalidation, bad input.
 run "$SCRIPTS/gi-backlog.py" --status --cache-dir "$TMP/backlog"

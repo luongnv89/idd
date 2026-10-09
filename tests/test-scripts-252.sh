@@ -1300,6 +1300,9 @@ EXPECTED_SITES = {
     # 2 since issue #523: the resolver's Step 4 and pr-review's Step 4 run the
     # base-ref verification recipe.
     "gi-recipe.py": 2,
+    # 4: pr-review cleans up after its auto-merge (SKILL.md + Auto-Merge
+    # template); auto-pilot Step 5.3 runs it on the sequential and parallel paths.
+    "gi-postmerge.py": 4,
 }
 # A call is any mention of a shared script by filename, however it is launched
 # (python3, python3.11, uv run, a bare ./path relying on the exec bit), plus the

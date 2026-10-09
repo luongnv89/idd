@@ -456,7 +456,7 @@ the single home of that mapping, never restated here.
 ⚠ Merge failed for PR #{pr_number} — PR left open
   Continuing to next issue...
 ```
-**Trigger:** `gh pr merge` returns non-zero exit code — including a head that moved after the merge identity gate, which `--match-head-commit` refuses.
+**Trigger:** `gh pr merge` returns non-zero exit code and the merge reconciliation does not read `MERGED` — including a head that moved after the merge identity gate, which `--match-head-commit` refuses.
 **Action:** Leave PR open, continue to next issue. Non-fatal.
 
 ### Stale merge authorization
