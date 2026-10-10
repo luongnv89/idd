@@ -149,7 +149,7 @@ Set `profile = light | full`. Signals and what <!-- a:rv-depth-gate-refresh -->
 
 ### QA handoff gate (trust an already-QA'd PR) <!-- a:rv-qa-handoff-gate -->
 
-`/issue-resolver` ends a clean QA loop by writing `<!-- idd:qa v1 head=… -->` as the PR body's last line. After the Depth gate, set `qa_handoff = trusted | stale | absent`, plus `ci_leg_runnable` from `review.check_ci` and Step 1's `statusCheckRollup`:
+`/issue-resolver` ends a clean QA loop by writing `<!-- idd:qa v1 head=… -->` as the PR body's last line (a legacy `gitissue:qa` one is read too). After the Depth gate, set `qa_handoff = trusted | stale | absent`, plus `ci_leg_runnable` from `review.check_ci` and Step 1's `statusCheckRollup`:
 
 | Value | When | Effect |
 |-------|------|--------|
@@ -272,7 +272,7 @@ Pending CI is **not clean** and is never merged. Interactive: ask whether to wai
 
 Fix only issues with `action: "fix"` — `action: "note"` issues are reported, never fixed. Sources: each `fail` dimension or UI fix finding, Step 4 test failures, Step 5 CI failures. With none, print `○ no fixable issues (noted: {note_count})` and exit the fix loop; soft-pass is evaluated next, never implied.
 
-The `Closes #{linked_issue}` fix is a **read-modify-write** PR-body edit (driver rule 2 in `docs/platform-github.md`): `gh pr view {N} --json body`, prepend `Closes #{linked_issue}` as the **first line** (`docs/naming-conventions.md`), `gh pr edit {N} --body "{merged_body}"`, then re-read and confirm `## Decision Record`, the AC Verification table, and any trailing `<!-- idd:qa v1 … -->` marker are still present. Never replace the body, and **never** prepend when line 1 is `Refs #{linked_issue}`. <!-- a:rv-closes-body-edit -->
+The `Closes #{linked_issue}` fix is a **read-modify-write** PR-body edit (driver rule 2 in `docs/platform-github.md`): `gh pr view {N} --json body`, prepend `Closes #{linked_issue}` as the **first line** (`docs/naming-conventions.md`), `gh pr edit {N} --body "{merged_body}"`, then re-read and confirm `## Decision Record`, the AC Verification table, and any trailing `<!-- idd:qa v1 … -->` marker are still present (a legacy `gitissue:qa` one counts). Never replace the body, and **never** prepend when line 1 is `Refs #{linked_issue}`. <!-- a:rv-closes-body-edit -->
 
 Delegate code fixes to the fixer subagent (`shared/agents/fixer.md`), reused across cycles — never edit code in the main context. It scans the staged set (`references/scripts/gi-secscan.py`, Step 2's `--policy-ref`) and commits; you push with `git push origin "$branch_name"`. Spawn: `references/review-loop-mechanics.md`.
 

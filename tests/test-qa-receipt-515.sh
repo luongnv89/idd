@@ -243,7 +243,7 @@ set -e
 # tests equal the marker's tests=. tests_skip adds the three-part AND of the
 # skips table: trusted, tests= SHA equal to head, and ci_leg_runnable.
 # ───────────────────────────────────────────────────────────
-PARSE_RE='<!-- idd:qa v[0-9]+ [^>]*-->'
+PARSE_RE='<!-- (gitissue|idd):qa v[0-9]+ [^>]*-->'
 marker_field() {  # marker_field MARKER KEY — the value of one whole key=value pair
   local tok
   for tok in $1; do
@@ -256,7 +256,7 @@ qa_verdict() {
   m="$(printf '%s\n' "$body" | grep -oE "$PARSE_RE" || true)"
   [ -n "$m" ] || { echo absent; return; }
   [ "$(printf '%s\n' "$m" | grep -c .)" = "1" ] || { echo stale; return; }
-  case "$m" in "<!-- idd:qa v1 "*) ;; *) echo stale; return ;; esac
+  case "$m" in "<!-- idd:qa v1 "*|"<!-- gitissue:qa v1 "*) ;; *) echo stale; return ;; esac
   head="$(marker_field "$m" head || true)"
   review="$(marker_field "$m" review || true)"
   tests="$(marker_field "$m" tests || echo null)"

@@ -28,6 +28,10 @@
 #        skill sources and runtime docs names the legacy file as well.
 #   B5   the reviewer's config-change warning names both config files and the
 #        supersede case.
+#   Q3   HTML markers: writers emit only `idd:`, readers accept `gitissue:` as
+#        well. The QA parse grep shipped in the built reviewer counts a legacy
+#        marker, an idd marker, and one of each as two (stale); idd-lint I01
+#        accepts either normalized marker and fails on neither.
 #
 # Usage: bash tests/test-rename-idd-537.sh
 # Returns: exit 0 if all checks pass, exit 1 on failure.
@@ -283,6 +287,99 @@ done)"
 MECH="$REPO_ROOT/src/skills/issue-pr-review/references/prepass-tests-ci-mechanics.md"
 grep -qF 'adds or modifies `.idd.yml` or `.gitissue.yml`' "$MECH" && grep -qF 'supersedes that file' "$MECH"
 check "B5: the review warns on either config file and on .idd.yml superseding .gitissue.yml" "$?"
+
+# ── Q3: HTML markers — write idd:, read both ─────────────────────────────
+# The QA parse grep, exactly as the BUILT reviewer ships it, located by its
+# anchor rather than a line number, then run on fixture bodies.
+BUILT_LOOP="$REPO_ROOT/skills/issue-pr-review/references/review-loop-mechanics.md"
+Q3_LINE="$(awk '/a:rvm-parse-marker/{f=1} f && /^grep -oE /{print; exit}' "$BUILT_LOOP")"
+[ -n "$Q3_LINE" ]; check "Q3: the built reviewer ships a QA-marker parse grep" "$?"
+# q3_count <body> — how many markers the shipped grep finds in a PR body.
+q3_count() { local body="$1"; eval "$Q3_LINE" | grep -c . ; }
+HEAD40="0123456789abcdef0123456789abcdef01234567"
+LEGACY_QA="<!-- gitissue:qa v1 head=$HEAD40 profile=full cycles=1 review=clean -->"
+IDD_QA="<!-- idd:qa v1 head=$HEAD40 profile=full cycles=1 review=clean -->"
+[ "$(q3_count "$(printf 'Closes #1\n\nbody\n%s' "$LEGACY_QA")")" = "1" ]
+check "Q3: a legacy-only gitissue:qa marker is one match (parsed, not absent)" "$?"
+[ "$(q3_count "$(printf 'Closes #1\n\nbody\n%s' "$IDD_QA")")" = "1" ]
+check "Q3: an idd-only marker is one match" "$?"
+[ "$(q3_count "$(printf 'Closes #1\n%s\nbody\n%s' "$LEGACY_QA" "$IDD_QA")")" = "2" ]
+check "Q3: one marker of each namespace is two matches — stale by the >1 rule" "$?"
+[ "$(q3_count "$(printf '<!-- idd:normalized v1 -->\n<!-- gitissue:normalized v1 -->\n')")" = "0" ]
+check "Q3: normalized markers are not QA markers (vacuity guard)" "$?"
+
+PR_SKILL="$REPO_ROOT/src/skills/issue-pr-review/SKILL.source.md"
+grep -F 'ends a clean QA loop by writing' "$PR_SKILL" | grep -qF 'gitissue:qa'
+check "Q3: the QA handoff gate names the legacy gitissue:qa marker" "$?"
+grep -F 'any trailing `<!-- idd:qa v1' "$PR_SKILL" | grep -qF 'gitissue:qa'
+check "Q3: the Closes-body re-check accepts a legacy gitissue:qa marker" "$?"
+
+# idd-lint I01 accepts either normalized marker; neither fails I01 itself.
+LINT="$REPO_ROOT/scripts/idd-lint.py"
+cat > "$TMP/q3-idd.md" <<'EOF'
+<!-- idd:normalized v1 -->
+
+## Type
+
+Feature
+
+## Description
+
+Add a dark mode toggle.
+
+## Acceptance Criteria
+
+- [ ] Toggle appears in settings
+
+## Metadata
+
+**Priority:** P2
+**Effort:** M
+**Labels:** feature
+EOF
+sed '1s/idd:normalized/gitissue:normalized/' "$TMP/q3-idd.md" > "$TMP/q3-legacy.md"
+sed '1d' "$TMP/q3-idd.md" > "$TMP/q3-none.md"
+for kind in idd legacy; do
+  out="$(python3 "$LINT" issue "$TMP/q3-$kind.md" 2>&1)"; st=$?
+  [ "$st" = "0" ] && printf '%s' "$out" | grep -qF '✓ [I01] normalization marker present (v1)'
+  check "Q3: idd-lint I01 accepts the $kind normalized marker" "$?"
+done
+out="$(python3 "$LINT" issue "$TMP/q3-none.md" 2>&1)"; st=$?
+[ "$st" = "1" ] && printf '%s' "$out" | grep -qF '✗ [I01] normalization marker'
+check "Q3: idd-lint I01 fails a body carrying neither marker" "$?"
+
+# Writers emit only idd:.
+for tpl in bug feature improvement; do
+  [ "$(head -1 "$REPO_ROOT/src/skills/issue-creator/templates/$tpl.md")" = '<!-- idd:normalized v1 -->' ]
+  check "Q3: the $tpl template's first line is the idd normalized marker" "$?"
+done
+for f in src/skills/issue-resolver/SKILL.source.md src/skills/issue-resolver/references/report-templates.md; do
+  grep -qF '<!-- idd:qa v1 head={head_sha} ' "$REPO_ROOT/$f" && ! grep -qF 'gitissue:qa' "$REPO_ROOT/$f"
+  check "Q3: $f writes the QA marker as idd:qa only" "$?"
+done
+RPT="$TMP/q3-report"; mkdir -p "$RPT"
+printf '{"run_id":"r537"}' | python3 "$STATE" --init --dir "$RPT" >/dev/null 2>&1
+printf '%s' '{"run_id":"r537","markdown":"summary\n"}' | python3 "$STATE" --report --dir "$RPT" >/dev/null 2>&1
+head -1 "$RPT/last-run-report.md" 2>/dev/null | grep -q '^<!-- idd:run-report v1 ' && ! grep -q 'gitissue' "$RPT/last-run-report.md"
+check "Q3: gi-state --report opens the report with an idd:run-report marker" "$?"
+# No writer anywhere in src/ emits a legacy marker: every `<!-- gitissue:`
+# literal sits on a line that also names the idd form (a dual-read mention).
+legacy_writers="$(cd "$REPO_ROOT" && git grep -nF '<!-- gitissue:' -- src | grep -vF 'idd:' || true)"
+[ -z "$legacy_writers" ]; check "Q3: no source line emits a gitissue: marker on its own${legacy_writers:+ — $legacy_writers}" "$?"
+
+# Readers name both namespaces.
+grep -F 'Look for `<!-- idd:normalized v1 -->`' "$REPO_ROOT/src/skills/issue-creator/references/modes.md" | grep -qF 'gitissue:normalized'
+check "Q3: issue-creator's already-normalized detection accepts the legacy marker" "$?"
+grep -F '**Trigger:** Issue body contains `<!-- idd:normalized v1 -->`' "$REPO_ROOT/src/skills/issue-creator/references/error-messages.md" | grep -qF 'gitissue:normalized'
+check "Q3: issue-creator's already-normalized message triggers on the legacy marker" "$?"
+grep -F 'the body lacks a `<!-- idd:normalized v1 -->` marker' "$REPO_ROOT/src/skills/issue-resolver/SKILL.source.md" | grep -qF 'gitissue:normalized'
+check "Q3: the resolver's auto_normalize check counts a legacy marker as normalized" "$?"
+for f in src/skills/plan-to-issues/SKILL.source.md \
+         src/skills/plan-to-issues/references/phase-contracts.md \
+         src/skills/plan-to-issues/references/epic-dashboard.md; do
+  grep -F '<!-- idd:normalized v1 -->' "$REPO_ROOT/$f" | grep -qF 'legacy `gitissue:`'
+  check "Q3: $f preserves either normalized marker byte-for-byte" "$?"
+done
 
 grep -q 'test-rename-idd-537' "$REPO_ROOT/.github/workflows/dist-check.yml"
 check "the suite is registered in dist-check.yml" "$?"

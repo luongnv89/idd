@@ -734,16 +734,18 @@ done
 for pair in "src:$SRC_LOOP" "built:$BUILT_LOOP"; do
   tag="${pair%%:*}"
   f="${pair#*:}"
-  grep_line="$(grep -E "grep -oE .<!-- idd:qa" "$f" | head -1 || true)"
-  check_block_has "$grep_line" 'idd:qa v\[0-9\]\+ ' \
-    "T16.1 ($tag): the parse grep matches any version, not just v1"
+  # Located by its form, not its namespace: the grep reads both (#537).
+  grep_line="$(grep -E "grep -oE .<!-- \(gitissue[|]idd\):qa" "$f" | head -1 || true)"
+  check_block_has "$grep_line" '\(gitissue[|]idd\):qa v\[0-9\]\+ ' \
+    "T16.1 ($tag): the parse grep matches any version, not just v1, in both namespaces"
   check_has "$f" 'version other than .v1.' \
     "T16.2 ($tag): the version rule the wider grep feeds is still stated"
 done
 # The regexes must actually behave that way: v2 reaches the parser, v1 matches,
 # and a non-marker comment does not.
-PARSE_RE='<!-- idd:qa v[0-9]+ [^>]*-->'
+PARSE_RE='<!-- (gitissue|idd):qa v[0-9]+ [^>]*-->'
 V_OK=1
+printf '%s\n' '<!-- gitissue:qa v1 head=abc review=clean -->' | grep -qE "$PARSE_RE" || V_OK=0
 printf '%s\n' '<!-- idd:qa v2 head=abc review=clean -->' | grep -qE "$PARSE_RE" || V_OK=0
 printf '%s\n' '<!-- idd:qa v1 head=abc review=clean -->' | grep -qE "$PARSE_RE" || V_OK=0
 printf '%s\n' '<!-- idd:normalized v1 -->' | grep -qE "$PARSE_RE" && V_OK=0
@@ -970,7 +972,7 @@ qa_handoff_verdict() {
   # Exactly one match ⇒ read it as space-separated key=value pairs.
   # shellcheck disable=SC2086
   set -- $inner
-  [ "${1:-}" = "idd:qa" ] || { printf 'stale\n'; return 0; }
+  case "${1:-}" in idd:qa|gitissue:qa) ;; *) printf 'stale\n'; return 0 ;; esac
   # A version other than v1 ⇒ stale.
   [ "${2:-}" = "v1" ] || { printf 'stale\n'; return 0; }
   shift 2

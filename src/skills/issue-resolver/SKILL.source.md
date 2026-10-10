@@ -161,7 +161,7 @@ Only a **merged** PR or a closing commit on the default branch is `already_resol
 
 ### 0d — Auto-normalize
 
-If `issue.auto_normalize` is true and the body lacks a `<!-- idd:normalized v1 -->` marker:
+If `issue.auto_normalize` is true and the body lacks a `<!-- idd:normalized v1 -->` marker (a legacy `gitissue:normalized` one counts):
 
 1. **Security label check (SPEC §1.4)** — before any rewrite scan labels for `security`, `CVE`, `vulnerability` (case-insensitive). On a match:
    - **Auto mode (`--auto` / `IDD_AUTO_MODE=1`):** print the `⚠ … Skipping auto-normalization` warning (`references/error-messages.md` → *Security-labeled issue (skip)*), first matching label as `{label}`, continue **without** rewriting.

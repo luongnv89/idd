@@ -55,7 +55,7 @@ from pathlib import Path
 SPEC_VERSION = "1.1"
 SPEC_URL = "https://github.com/luongnv89/idd/blob/main/SPEC.md"
 
-MARKER_RE = re.compile(r"<!--\s*idd:normalized\s+v(\d+)\s*-->")
+MARKER_RE = re.compile(r"<!--\s*(?:gitissue|idd):normalized\s+v(\d+)\s*-->")
 SECTION_RE = re.compile(r"^## +(.+?)\s*$")
 CONFIDENCE_RE = re.compile(r"\((?:high|medium) confidence\)|\(needs review\)")
 CHECKBOX_RE = re.compile(r"^\s*[-*] \[[ xX]\] \S", re.MULTILINE)

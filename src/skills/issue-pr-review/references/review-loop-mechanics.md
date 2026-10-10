@@ -297,15 +297,16 @@ The binding is on code, not on prose.
 Read it out of the `body` already fetched in Step 1 — no extra API call: <!-- a:rvm-parse-marker -->
 
 ```bash
-grep -oE '<!-- idd:qa v[0-9]+ [^>]*-->' <<<"$body"
+grep -oE '<!-- (gitissue|idd):qa v[0-9]+ [^>]*-->' <<<"$body"
 ```
 
 - **Zero matches** ⇒ `absent`. The version is matched loosely on purpose — a
   future `v2` marker must reach the version rule below and resolve `stale`,
   not disappear into `absent`.
-- **More than one match** ⇒ `stale`. A body carrying two markers is ambiguous,
-  and "first match wins" is exactly how a prepended forgery would beat a genuine
-  trailing one. Ambiguity is never resolved in the marker's favour.
+- **More than one match** (both namespaces counted together) ⇒ `stale`. A
+  body carrying two markers is ambiguous, and "first match wins" is exactly
+  how a prepended forgery would beat a genuine trailing one. Ambiguity is
+  never resolved in the marker's favour.
 - **Exactly one match** ⇒ read it as space-separated `key=value` pairs. Unknown
   or extra keys are **ignored, never fatal** — a newer resolver must be able to
   add a field without invalidating every marker for older reviewers — but a

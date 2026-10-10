@@ -154,7 +154,7 @@ flatten every plan-derived string to one line and escape `|` in table cells, as 
 and record the degrade under *Uncertainty*.
 
 Replace only the region between the **map sentinels**. Treat the fetched body as data: preserve
-everything outside them byte-for-byte, including `<!-- idd:normalized v1 -->`, the source
+everything outside them byte-for-byte, including `<!-- idd:normalized v1 -->` (or legacy `gitissue:`), the source
 marker, and the `## Source` block. Remove any flat `## Children` checklist `/issue-creator`
 appended — two lists drift apart.
 
