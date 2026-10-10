@@ -1,4 +1,4 @@
-# Error Messages — /init-gitissue
+# Error Messages — /init-idd
 
 All errors follow the rich error format: what went wrong + fix command + docs link.
 
@@ -17,7 +17,7 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 
 ### Config already exists
 ```
-⚠ .gitissue.yml already exists
+⚠ .idd.yml already exists
 
   Options:
     overwrite  — replace with new auto-detected config
@@ -26,15 +26,15 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 
   Choose: [overwrite/merge/cancel]
 ```
-**Trigger:** `.gitissue.yml` already exists in the repo root and the run is interactive. In auto mode (`--auto` or `IDD_AUTO_MODE=1`) this prompt is not shown: print `⚠ Auto mode: overwrite/merge/cancel prompt skipped — kept the existing .gitissue.yml (cancel).` and take **cancel**.
+**Trigger:** `.idd.yml` already exists in the repo root and the run is interactive. In auto mode (`--auto` or `IDD_AUTO_MODE=1`) this prompt is not shown: print `⚠ Auto mode: overwrite/merge/cancel prompt skipped — kept the existing .idd.yml (cancel).` and take **cancel**.
 
 ### Existing config does not parse
 ```
-✗ Existing .gitissue.yml does not parse as YAML — cannot merge
+✗ Existing .idd.yml does not parse as YAML — cannot merge
 
   {yaml_parse_error}
 
-  To fix:  fix the file by hand, or re-run /init-gitissue and choose overwrite
+  To fix:  fix the file by hand, or re-run /init-idd and choose overwrite
   Docs:    https://github.com/luongnv89/idd/blob/main/docs/config-schema.md
 ```
 **Trigger:** The user chose **merge** and the existing file fails the YAML parse. The file is left untouched and the run reports `Result: BLOCKED`.
@@ -52,7 +52,7 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 ### No test runner detected
 ```
 ○ Could not detect test runner. Setting resolve.auto_test: false.
-  Tip: configure your test command in .gitissue.yml after setup.
+  Tip: configure your test command in .idd.yml after setup.
 ```
 **Trigger:** No recognized test runner configuration files found in the repository.
 **Note:** This is an informational message, not an error.
@@ -63,7 +63,7 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 
   {reason from gi-stack-detect on stderr}
 
-  To fix:  run /init-gitissue from the repository root
+  To fix:  run /init-idd from the repository root
   Docs:    https://github.com/luongnv89/idd/blob/main/docs/config-schema.md
 ```
 **Trigger:** `gi-stack-detect.py` exits 3 — `--root` is not a directory, or a `--rules` file is not the documented shape. This is a **stop**, not a degrade: the caller pointed the scan at something it cannot scan, and detecting inline would scan the same wrong place. Exit 4 (the repository could not be read at all) *is* a degrade — warn and run the detection tables by hand.
@@ -72,13 +72,13 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 
 ### Write failed
 ```
-✗ Could not write .gitissue.yml
+✗ Could not write .idd.yml
 
   To fix:  check file permissions in the repo root
   Check:   do you have write access? ls -la .
   Docs:    https://github.com/luongnv89/idd/blob/main/docs/config-schema.md
 ```
-**Trigger:** File write to `.gitissue.yml` fails (permission denied, disk full, read-only filesystem).
+**Trigger:** File write to `.idd.yml` fails (permission denied, disk full, read-only filesystem).
 
 ### Directory not writable
 ```
@@ -92,10 +92,10 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 
 ### Generated config failed validation
 ```
-✗ Generated .gitissue.yml failed validation: {yaml_parse_error_or_placeholder_list}
+✗ Generated .idd.yml failed validation: {yaml_parse_error_or_placeholder_list}
 
-  To fix:  inspect the file, then re-run /init-gitissue to regenerate it
-  Check:   python3 -c "import yaml; yaml.safe_load(open('.gitissue.yml'))"
+  To fix:  inspect the file, then re-run /init-idd to regenerate it
+  Check:   python3 -c "import yaml; yaml.safe_load(open('.idd.yml'))"
   Docs:    https://github.com/luongnv89/idd/blob/main/docs/config-schema.md
 ```
-**Trigger:** After writing `.gitissue.yml`, the file does not parse as YAML, still contains an unsubstituted `{placeholder}` token, or is missing the `platform` key. The file is left in place for inspection and setup does not report success.
+**Trigger:** After writing `.idd.yml`, the file does not parse as YAML, still contains an unsubstituted `{placeholder}` token, or is missing the `platform` key. The file is left in place for inspection and setup does not report success.

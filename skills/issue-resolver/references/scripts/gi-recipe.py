@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Run a project-local verification recipe against an owned app instance (issue #523).
 
-A repository may commit `.gitissue-recipe.json` to describe how to verify it
+A repository may commit `.idd-recipe.json` to describe how to verify it
 end to end: how to **launch** the app, how to tell it is ready, which
 **capabilities** to **drive** for which changed paths, and what extra
 **cleanup** to run. This script executes that recipe deterministically and
@@ -96,7 +96,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-RECIPE_PATH = ".gitissue-recipe.json"
+RECIPE_PATH = ".idd-recipe.json"
 CONSUMERS = ("resolve", "review")
 DEFAULT_APP_URL = "http://127.0.0.1:{port}"
 LOOPBACK_HOSTS = ("127.0.0.1", "localhost", "::1")

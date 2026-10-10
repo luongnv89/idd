@@ -171,7 +171,7 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 ✗ Tests timed out after {timeout}s — PR not created
 
   The test suite did not complete within the configured timeout.
-  To fix:  increase resolve.test_timeout in .gitissue.yml
+  To fix:  increase resolve.test_timeout in .idd.yml
   Check:   are tests hanging? Run manually: {test_command}
 ```
 **Trigger:** Test runner does not complete within `resolve.test_timeout` seconds.
@@ -338,26 +338,26 @@ Not confirmations: auto mode keeps every one of these.
 ⚠ Skill {name} is recorded as borrowed but carries no borrow marker — not removing
 
   Path:    ~/.claude/skills/{name}
-  Missing: ~/.claude/skills/{name}/.gitissue-borrowed
+  Missing: ~/.claude/skills/{name}/.idd-borrowed
   Treated as your own install; the stale record is dropped.
 ```
-**Trigger:** Teardown found a recorded `origin: borrowed` directory with no `.gitissue-borrowed` marker. A stale record can outlive a failed uninstall, and the operator may have installed that skill deliberately since. Never `rm -rf` an unmarked directory — drop the `borrowed_skills` entry and warn instead.
+**Trigger:** Teardown found a recorded `origin: borrowed` directory with no `.idd-borrowed` marker. A stale record can outlive a failed uninstall, and the operator may have installed that skill deliberately since. Never `rm -rf` an unmarked directory — drop the `borrowed_skills` entry and warn instead.
 
 ### gi-state unavailable (borrow record)
 ```
 ⚠ gi-state unavailable — skipping leftover borrow teardown
 ```
-**Trigger:** Any failure of `gi-state.py --read` / `--update` / `--init` on the borrow-record path — no `python3`, exit 2, exit 4, or **exit 3** (invalid patch or corrupt state). All of them degrade the same way, because borrowing is an opt-in sub-step over a machine-local, gitignored file: borrow nothing, tear nothing down, continue the resolve (`references/steps/step-3-implement.md` → *Step 3 — Propose relevant skills*, the exit-code rule at the head of the sub-step — the one scoped exception to `3` = stop). Do not invent a second writer for `.gitissue/run-state.json` and never repair it by hand. A missing bundled file is still fatal (`✗ Missing bundled dependency`).
+**Trigger:** Any failure of `gi-state.py --read` / `--update` / `--init` on the borrow-record path — no `python3`, exit 2, exit 4, or **exit 3** (invalid patch or corrupt state). All of them degrade the same way, because borrowing is an opt-in sub-step over a machine-local, gitignored file: borrow nothing, tear nothing down, continue the resolve (`references/steps/step-3-implement.md` → *Step 3 — Propose relevant skills*, the exit-code rule at the head of the sub-step — the one scoped exception to `3` = stop). Do not invent a second writer for `.idd/run-state.json` and never repair it by hand. A missing bundled file is still fatal (`✗ Missing bundled dependency`).
 
 ## Configuration
 
 ### Invalid config
 ```
-✗ Invalid config: .gitissue.yml
+✗ Invalid config: .idd.yml
 
   Line {N}: {field} {validation_message}
 
-  To fix:  edit .gitissue.yml and correct the values above
+  To fix:  edit .idd.yml and correct the values above
   Docs:    https://github.com/luongnv89/idd/blob/main/docs/config-schema.md
 ```
 **Trigger:** Config file exists but contains invalid values (wrong type, out of range, unknown field).

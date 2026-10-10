@@ -36,14 +36,14 @@ The policy-provenance contract
 `security.allow_pattern` suppresses **scanning**, not findings: a path it
 matches is skipped before any rule runs. That is correct for the pre-commit
 caller, where the repository is the operator's own. It is wrong for a caller
-reviewing a branch it does not control, because `.gitissue.yml` is repository
+reviewing a branch it does not control, because `.idd.yml` is repository
 data: a pull request committing `allow_pattern: "."` skips every path, and the
 gate reports `verdict: clean` with `scanned: 0` having examined nothing. A
 *narrow* pattern naming only the file that carries the key is the same hole with
 a healthy-looking `scanned`, so a threshold on `scanned` does not close it.
 
 `--policy-ref REF` closes it by provenance: `security.*` is read from
-`REF:.gitissue.yml`, a ref the reviewed branch cannot write, and the work tree's
+`REF:.idd.yml`, a ref the reviewed branch cannot write, and the work tree's
 own file is not consulted at all. `policy_source` reports what was actually
 used — `ref:<REF>`, `file:<path>`, or `defaults` — so a caller can assert it got
 the policy it asked for. The flag is opt-in and changes nothing when absent: the
@@ -101,14 +101,14 @@ of them for every combination:
      missing entry is reported as an `unreadable-path` warning, so it is
      visible rather than silently counted as clean.
 
-Rule extensions come from the `security:` block of `.gitissue.yml`, which this
-script reads itself. That is a security decision: `.gitissue.yml` is
+Rule extensions come from the `security:` block of `.idd.yml`, which this
+script reads itself. That is a security decision: `.idd.yml` is
 repository-controlled, so a design where the caller passes config *values* on
 the command line lets a crafted value break out of its shell quoting and run a
 command — during a pull-request review, on the reviewer's machine, at the moment
 the gate runs. `--config-json` remains for programmatic callers that already
 hold the parsed config and can pass it without a shell. The search for that file
-stops at the top of the working tree: a `.gitissue.yml` in `$HOME` must not be
+stops at the top of the working tree: a `.idd.yml` in `$HOME` must not be
 able to set `security.allow_pattern` for every repository underneath it.
 
 `confirm_required` is the mode contract, pre-computed: it is true only when
@@ -125,7 +125,7 @@ Exit codes
      outcome this gate exists to prevent.
   2  usage error
   3  invalid input — an unusable `--config-json`, a `security.*` value in
-     `.gitissue.yml` that is the wrong type, or a regex that does not compile
+     `.idd.yml` that is the wrong type, or a regex that does not compile
      (stderr: `✗ gi-secscan: <why>`). Stop; a scan configured wrongly has not
      run, so its silence means nothing.
   4  cannot complete — no file list could be determined, a declared byte source
@@ -664,7 +664,7 @@ SECURITY_KEYS = (
     "max_file_size_mb",
 )
 
-CONFIG_NAME = ".gitissue.yml"
+CONFIG_NAME = ".idd.yml"
 
 # Only the `security:` block, only its four documented scalars. This is not a
 # general YAML parser and must not become one — it exists so a config value
@@ -688,7 +688,7 @@ def _parse_scalar(raw: str, key: str) -> object:
 
 
 def read_security_config(path: str) -> dict[str, object]:
-    """Read the `security:` block of a `.gitissue.yml`, or {} when absent."""
+    """Read the `security:` block of a `.idd.yml`, or {} when absent."""
     try:
         text = open(path, encoding="utf-8", errors="replace").read()
     except OSError:
@@ -698,7 +698,7 @@ def read_security_config(path: str) -> dict[str, object]:
 
 
 def parse_security_config(text: str) -> dict[str, object]:
-    """Parse the `security:` block out of `.gitissue.yml` text.
+    """Parse the `security:` block out of `.idd.yml` text.
 
     Split from `read_security_config` so the same restricted parser serves both
     byte sources — the file on disk, and the blob `--policy-ref` reads out of a
@@ -727,7 +727,7 @@ def config_search_ceiling() -> str:
 
     The top of the working tree, or the working directory itself when there is
     no working tree to speak of. Without a ceiling the search walks to `/`, so a
-    `.gitissue.yml` in `$HOME` — or in `/tmp`, or anywhere else a repository
+    `.idd.yml` in `$HOME` — or in `/tmp`, or anywhere else a repository
     happens to be checked out under — governs `security.allow_pattern` for every
     repository beneath it, and `allow_pattern: .` turns this gate off entirely.
     A file outside the repository under review is not that repository's
@@ -742,7 +742,7 @@ def config_search_ceiling() -> str:
 
 
 def find_config(explicit: str | None) -> str | None:
-    """Locate the config file: the explicit path, else `.gitissue.yml` at or
+    """Locate the config file: the explicit path, else `.idd.yml` at or
     above the working directory but never above the working-tree root."""
     if explicit:
         return explicit
@@ -784,7 +784,7 @@ def _reject_ambiguous_ref(ref: str) -> None:
     `gh pr checkout`, which materialises the pull request's own — attacker
     chosen — `headRefName` as a *local branch*: a branch literally named
     `origin/main` therefore wins the lookup and re-supplies the reviewed
-    branch's `.gitissue.yml` as the "trusted" policy, while `policy_source`
+    branch's `.idd.yml` as the "trusted" policy, while `policy_source`
     still reports `ref:origin/main`, exactly the ref the caller asked for.
 
     Detected mechanically rather than by reading git's `warning: refname ... is
@@ -820,9 +820,9 @@ def _reject_ambiguous_ref(ref: str) -> None:
 
 
 def read_policy_ref(ref: str) -> tuple[dict[str, object], str]:
-    """Read `security.*` from `<ref>:.gitissue.yml`, never from the work tree.
+    """Read `security.*` from `<ref>:.idd.yml`, never from the work tree.
 
-    The trust boundary this closes. `.gitissue.yml` is repository-controlled and
+    The trust boundary this closes. `.idd.yml` is repository-controlled and
     `/issue-pr-review` runs with the pull request's branch checked out, so the
     file the ordinary upward walk finds is written by the author of the artifact
     under review. A branch that commits `allow_pattern: "."` — or a narrow
@@ -832,7 +832,7 @@ def read_policy_ref(ref: str) -> tuple[dict[str, object], str]:
     supply the policy.
 
     Fail-closed in three directions. A ref that resolves but carries no
-    `.gitissue.yml` yields the built-in defaults (no allow pattern at all) —
+    `.idd.yml` yields the built-in defaults (no allow pattern at all) —
     never a silent fall back to the branch's file, which would hand the decision
     straight back to the artifact. A ref that does not resolve is `Unavailable`
     (exit 4, the documented degrade), because a policy that could not be read is
@@ -862,7 +862,7 @@ def read_policy_ref(ref: str) -> tuple[dict[str, object], str]:
     spec = f"{ref}:{CONFIG_NAME}"
     # Ask whether a blob exists at that path *before* reading it, so the two
     # non-zero outcomes below stay distinguishable. Without this probe every
-    # failure to read collapses into "the ref has no config": a `.gitissue.yml`
+    # failure to read collapses into "the ref has no config": a `.idd.yml`
     # that is a tree, a blobless or shallow clone that has the commit but not
     # the blob, and a corrupt object would each silently drop the trusted ref's
     # real `security.*` — including its extra secret patterns — while the
@@ -909,9 +909,9 @@ def read_policy_ref(ref: str) -> tuple[dict[str, object], str]:
 def load_overrides(args: argparse.Namespace) -> tuple[dict[str, object], str]:
     """Resolve the rule extensions: config file, then `--config-json`, then flags.
 
-    This script reads `.gitissue.yml` itself rather than taking the resolved
+    This script reads `.idd.yml` itself rather than taking the resolved
     config as an argument, and that is a security decision, not a convenience.
-    `.gitissue.yml` is repository-controlled, and `/issue-pr-review` runs with a
+    `.idd.yml` is repository-controlled, and `/issue-pr-review` runs with a
     pull request's branch checked out. Any design where a caller interpolates a
     config *value* into the command line — `--allow-pattern '<value>'`, or the
     whole JSON envelope inside a quoted word — lets a crafted value close the

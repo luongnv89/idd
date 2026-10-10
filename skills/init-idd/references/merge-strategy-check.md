@@ -1,4 +1,4 @@
-# Merge strategy check — /init-gitissue
+# Merge strategy check — /init-idd
 
 The optional post-write check SKILL.md *Step 3* points at. It reads two
 repository settings and warns when either one defeats the IDD durable-memory

@@ -30,7 +30,7 @@ Closes #{issue_number}
 - **Design-confirm:** {high-complexity issues only — "confirmed Option {N} at design-confirm checkpoint (complexity: {level})" in interactive mode, or "auto-selected Option {N} (complexity: {level})" in auto mode; omit this line for trivial/low/medium complexity}
 - **Sensitive-change gate:** {only when it triggered — "triggered by {reasons}; probes {id held | id → test obligation}; blockers {id amended+cleared | id rebutted ({citation})}; verdict {proceed | stop | operator override}"; omit this line when it did not trigger}
 - **Design sketches:** {only when they ran — "compared {k} designs; Option {n} rejects {transitions} ({checker}); verdict {proceed | switch from Option {r}: {reason} | unproven (needs review): {problems}}"; when skipped on the full profile — "skipped ({reason})"; omit on the light profile}
-- **Verification recipe:** {only when `.gitissue-recipe.json` exists at the base ref — "drove {k}/{n} capabilities ({names}), {pass | fail}; evidence `{evidence_dir}`" when it ran, else "skipped ({reason})"; omit when the base ref has no recipe}
+- **Verification recipe:** {only when `.idd-recipe.json` exists at the base ref — "drove {k}/{n} capabilities ({names}), {pass | fail}; evidence `{evidence_dir}`" when it ran, else "skipped ({reason})"; omit when the base ref has no recipe}
 - **Premise reset:** {only when it blocked — "premise {premise_id} failed in cycles {cycles}; {lifted by revision {new_id} ({diagnostic commands}) | not lifted — no further fix}"; omit otherwise}
 - **Reproduction:** {bug issues only — success: `<command>` confirmed red for the stated reason → regression test `<path>` (or "manual — no seam"); degraded: `not reproduced — <one-line reason> (fix applied without confirmed red; criterion marked unverified)`; omit for non-bug issues}
 
@@ -64,7 +64,7 @@ Use `pass`, `fail`, or `unverified` per criterion. Always cite evidence (a file 
 
 **Every issue — sensitivity evidence.** A criterion proved by a test cites the implementer's *Sensitivity* row (*Step 3 — Sensitivity and test integrity*): `Sensitive: <test> fails with <mutation> → restored green`. A `not_verified` row marks that criterion `unverified` and notes `sensitivity not verified: <reason>`.
 
-<!-- gitissue:qa v1 head={head_sha} profile={profile} cycles={qa_cycles} review=clean tests={test_count}@{tests_sha} ui={ui_legs}:{ui_result}@{ui_sha} --> {omit this entire line unless QA exited clean, and omit the ` tests=…` field when no final suite ran — see *QA handoff marker* below}
+<!-- idd:qa v1 head={head_sha} profile={profile} cycles={qa_cycles} review=clean tests={test_count}@{tests_sha} ui={ui_legs}:{ui_result}@{ui_sha} --> {omit this entire line unless QA exited clean, and omit the ` tests=…` field when no final suite ran — see *QA handoff marker* below}
 ```
 
 The PR title follows `{type}({scope}): {description} (#{issue_number})` — see `references/docs/naming-conventions.md`.
@@ -80,7 +80,7 @@ consumer is `/issue-pr-review`'s *QA handoff gate*
 **producer** contract.
 
 ```
-<!-- gitissue:qa v1 head=<sha40> profile=<light|full> cycles=<n> review=clean tests=<count>@<sha40> ui=<none|code|code+browser>:<clean|noted>@<sha40> -->
+<!-- idd:qa v1 head=<sha40> profile=<light|full> cycles=<n> review=clean tests=<count>@<sha40> ui=<none|code|code+browser>:<clean|noted>@<sha40> -->
 ```
 
 | Field | Value | Derivation |
@@ -111,7 +111,7 @@ omissions the field table above documents; nothing else may be dropped.
    consumer would be a safety gate, and a marker that can gate safety is a
    safety gate an attacker can write: the PR body is editable by whoever opened
    the PR (`gh pr edit --body`). Issue #274 — a PR disabling the secret-scanning
-   gate through its own `.gitissue.yml` — is the standing proof this repo can
+   gate through its own `.idd.yml` — is the standing proof this repo can
    lose a security gate to repo-controlled input. A field nobody is allowed to
    act on is a field a future edit eventually acts on, so it is not written at
    all.

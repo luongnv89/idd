@@ -275,9 +275,9 @@ After output:
 
 ## Persist <!-- a:ia-persist -->
 
-After Step 8, save the analysis to `.gitissue/analysis-<N>.json`.
+After Step 8, save the analysis to `.idd/analysis-<N>.json`.
 
-1. Create the directory if it doesn't exist: `mkdir -p .gitissue/`
+1. Create the directory if it doesn't exist: `mkdir -p .idd/`
 2. Capture `git_state` so the analysis is pinned to a specific point in time. Run each command and write its output to the **exact JSON key named beside it** — the key names are a contract, not a suggestion, so never rename one on the way in:
    ```bash
    git rev-parse --abbrev-ref HEAD            # → git_state.branch
@@ -294,21 +294,21 @@ After Step 8, save the analysis to `.gitissue/analysis-<N>.json`.
    - `selected_option` ← `options[recommended_option - 1]` reduced to number + name + summary
    - `residual_risk` ← the highest-severity con of the selected option, or `"none identified"` if none
 4. Build the full JSON object from Steps 1-8 analysis results plus `git_state` and `decision_record` using the schema below. `issue.updatedAt` is **required**: copy it verbatim from the Step 1 issue fetch (whose field list already requests `updatedAt`) — never omit it, never re-derive it, and never substitute the capture time.
-5. Apply *Validate analysis data* to the complete object. Write formatted JSON to a unique temporary file in `.gitissue/`, then parse it back and compare it with that object. If validation or writing fails, remove only this run's temporary file and retain the previous cache.
-6. Atomically replace `.gitissue/analysis-<N>.json` with the verified temporary file. Re-read the destination and compare the complete object before reporting success.
-7. Only after verification, print: `✓ Analysis saved to .gitissue/analysis-<N>.json`
+5. Apply *Validate analysis data* to the complete object. Write formatted JSON to a unique temporary file in `.idd/`, then parse it back and compare it with that object. If validation or writing fails, remove only this run's temporary file and retain the previous cache.
+6. Atomically replace `.idd/analysis-<N>.json` with the verified temporary file. Re-read the destination and compare the complete object before reporting success.
+7. Only after verification, print: `✓ Analysis saved to .idd/analysis-<N>.json`
 
 **These key names are a consumer contract.** `/issue-resolver`'s *Step 0h — Analysis reuse gate* reads `git_state.commit_sha` and `issue.updatedAt` to decide whether this analysis is still true — the commit-SHA pin exists precisely so that check is possible, and `issue.updatedAt` is the GitHub-clock value the resolver compares its own fresh fetch against. The top-level `timestamp` and `git_state.captured_at` record when the analysis was taken; they are the *local* clock and the gate never compares them against GitHub's. Renaming a key (writing `git_state.sha` instead of `commit_sha`), omitting one, or inventing the clock does not fail loudly: it silently answers `stale` forever, so the resolver re-runs the very research this file was written to save.
 
 If writing fails:
 ```
-⚠ Could not save analysis to .gitissue/analysis-N.json
+⚠ Could not save analysis to .idd/analysis-N.json
 
-  To fix:  check file permissions in the .gitissue/ directory
+  To fix:  check file permissions in the .idd/ directory
 ```
 Keep the Step 8 report available, but mark the final result `PARTIAL` and persistence as failed or unverified. Do not print `Saved:` for this run. If replacement failed, state that the previous cache remains; if readback failed after replacement, state that the new cache is unverified.
 
-### JSON Schema (`.gitissue/analysis-<N>.json`) <!-- a:ia-json-schema -->
+### JSON Schema (`.idd/analysis-<N>.json`) <!-- a:ia-json-schema -->
 
 ```json
 {

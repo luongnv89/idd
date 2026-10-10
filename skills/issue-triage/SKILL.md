@@ -17,8 +17,8 @@ Analyze open GitHub issues to surface dependencies, suggest priorities, group pa
 
 | Invocation | What happens |
 |------------|--------------|
-| `/issue-triage` | Show cached triage from `.gitissue/triage.json`; with no cache, run a full analysis and persist, then suggest an update if the repo changed. |
-| `/issue-triage update` | Force a full re-analysis: **Prerequisites** (rate-budget preflight included), then Steps 1-9, overwriting `.gitissue/triage.json` |
+| `/issue-triage` | Show cached triage from `.idd/triage.json`; with no cache, run a full analysis and persist, then suggest an update if the repo changed. |
+| `/issue-triage update` | Force a full re-analysis: **Prerequisites** (rate-budget preflight included), then Steps 1-9, overwriting `.idd/triage.json` |
 | `/issue-triage --limit N` | The same, capped at N issues |
 | `/issue-triage … --auto` | (modifier) Run non-interactively — every gate logs a `⚠` and takes its safe default rather than prompting |
 
@@ -32,7 +32,7 @@ Invoked as `/issue-triage` (no `update`, no `--limit`), first run the *Bundled d
 
 ### 1. Check for cached data
 
-Look for `.gitissue/triage.json` at the repo root. **If absent**, print this notice and fall through to a full analysis (Steps 1-9):
+Look for `.idd/triage.json` at the repo root. **If absent**, print this notice and fall through to a full analysis (Steps 1-9):
 
 ```
 ○ No cached triage found — running first analysis...
@@ -45,9 +45,9 @@ Run the full pipeline from Prerequisites and stop after Step 9. **If it exists**
 Parse the JSON. If it is malformed, output the error from `references/error-messages.md` and stop:
 
 ```
-✗ .gitissue/triage.json is corrupted
+✗ .idd/triage.json is corrupted
 
-  To fix:  rm .gitissue/triage.json && /issue-triage update
+  To fix:  rm .idd/triage.json && /issue-triage update
   Check:   was the file edited manually?
 ```
 
@@ -172,21 +172,21 @@ The prompt skip matches `/issue-analysis`; failure handling is exactly as above 
 
 Load config once at skill start with `python3 references/scripts/gi-config.py`; never re-read it.
 
-- **Working directory:** the repo root. The script resolves `.gitissue.yml` against the working directory; elsewhere it exits 0 with `config_file: null`/`first_run: true`, silently discarding the repo's real config.
+- **Working directory:** the repo root. The script resolves `.idd.yml` against the working directory; elsewhere it exits 0 with `config_file: null`/`first_run: true`, silently discarding the repo's real config.
 - **Script path:** resolve it to an absolute path relative to this SKILL.md, as the *Bundled dependency precheck* resolves its list — never relative to the working directory.
 - **Run clock:** chain that same `python3` invocation as `python3 …; ec=$?; date +%s >&2; exit "$ec"` and keep the stderr epoch as `run_started_epoch`. Stdout and exit status stay intact; the *Run Stats Footer* (`references/run-stats.md`) measures `elapsed` from it.
 
 Classify the result:
 
 - Exit 0: use `config` from `{"config": {…dotted keys…}, "config_file": …, "first_run": …}`. If `first_run` is `true`, print the `○ First run` line below.
-- Exit 3: `.gitissue.yml` is invalid. Print *Invalid config* from `references/error-messages.md` and stop.
+- Exit 3: `.idd.yml` is invalid. Print *Invalid config* from `references/error-messages.md` and stop.
 - Script file absent: a broken install and not a degrade. Stop with the `✗ Missing bundled dependency` block.
 - No `python3`, another non-zero exit, or unparsable stdout: print `⚠ gi-config unavailable — using the inline defaults below` and use the manual fallback *instead of* the script.
 
-Manual fallback: load `.gitissue.yml` from the repo root; if absent, use the defaults below and print:
+Manual fallback: load `.idd.yml` from the repo root; if absent, use the defaults below and print:
 
 ```
-○ First run — using default config. Run /init-gitissue to customize.
+○ First run — using default config. Run /init-idd to customize.
 ```
 
 Triage settings and their defaults — `triage.stale_threshold_days` `14`,
@@ -319,7 +319,7 @@ are arithmetic with one correct answer each. Run
 `references/scripts/gi-triage-graph.py` rather than recompute them from prose, so
 identical runs produce an identical order.
 
-Write the merged scan to `.gitissue/cache/triage-scan.json` with the Write tool
+Write the merged scan to `.idd/cache/triage-scan.json` with the Write tool
 — **never** put an issue title on a command line; titles are reporter-written
 text and this skill runs unattended under `/auto-pilot`.
 
@@ -335,10 +335,10 @@ its documented heuristics; pass an already-directed pair as `from`/`to`. Then,
 from the repo root (script path resolved as the precheck resolves its list):
 
 ```bash
-python3 references/scripts/gi-triage-graph.py --source /issue-triage --out .gitissue/triage.json < .gitissue/cache/triage-scan.json
+python3 references/scripts/gi-triage-graph.py --source /issue-triage --out .idd/triage.json < .idd/cache/triage-scan.json
 ```
 
-Exit 0 prints — and `--out` persists — the whole `.gitissue/triage.json` payload,
+Exit 0 prints — and `--out` persists — the whole `.idd/triage.json` payload,
 which is Step 9 done — top-level `version`, `updated`, `source`, `analyzed_count`,
 `issues[]`, `summary` (`parallel_groups`, `stale_count`, `stale_threshold_days`,
 `potentially_fixed_count`, `suggested_order`, `circular_deps`, `co_dependent`)
@@ -384,7 +384,7 @@ After Step 9, print the summary block below. **Read `references/output-and-persi
   Parallelizable:    ✓ pass ({group_count} parallel groups)
   Stale detection:   ✓ pass ({stale_count} stale issues)
   Priority:          ✓ pass ({p1} P1, {p2} P2, {p3} P3)
-  Persist:           ✓ pass (saved to .gitissue/triage.json)
+  Persist:           ✓ pass (saved to .idd/triage.json)
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Evidence:          {checks run; commit/PR links behind each maybe-fixed flag}
   Uncertainty:       {inferred edges and flags; unsynced tree; skipped checks}

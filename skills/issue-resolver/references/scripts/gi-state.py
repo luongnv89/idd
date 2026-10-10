@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """Own `/auto-pilot`'s resumable run state, its run lock, and its final report.
 
-Every write to `.gitissue/run-state.json`, `.gitissue/run.lock`, and
-`.gitissue/last-run-report.md` goes through this one script. That is the point:
+Every write to `.idd/run-state.json`, `.idd/run.lock`, and
+`.idd/last-run-report.md` goes through this one script. That is the point:
 a single choke point is what makes `--dry-run` enforceable ("a dry run leaves no
 state mutation" is a property of one file, not of a dozen prose call sites) and
 what keeps a half-written state file from ever existing (every state write is a
 temp file in the same directory followed by `os.replace`).
 
 The three artifacts are machine-local and gitignored. They are **not** the run
-log: `.gitissue/runs.jsonl` is append-only cross-run telemetry written once per
+log: `.idd/runs.jsonl` is append-only cross-run telemetry written once per
 processed issue, while the run state is mutable, single-run, and deleted or
 overwritten by the next run. Neither substitutes for the other.
 There is no verdict exit code 1.
@@ -44,7 +44,7 @@ Modes
             completed. An unknown phase, an illegal edge, or a missing piece of
             evidence is refused at exit 3 before anything is written — the
             state on disk is unchanged, under `--dry-run` too
-  --lock    create `.gitissue/run.lock` with O_CREAT|O_EXCL; refuse a lock held
+  --lock    create `.idd/run.lock` with O_CREAT|O_EXCL; refuse a lock held
             by a live run, reclaim one that is stale. Mints a fresh run id, so
             a leftover state file from a finished run cannot lend its id to an
             unrelated one; `--lock --resume` adopts the recorded id instead and
@@ -98,7 +98,7 @@ try:
 except ImportError:  # pragma: no cover - non-POSIX hosts fail closed at runtime
     fcntl = None
 
-DEFAULT_DIR = ".gitissue"
+DEFAULT_DIR = ".idd"
 STATE_NAME = "run-state.json"
 LOCK_NAME = "run.lock"
 REPORT_NAME = "last-run-report.md"
@@ -387,7 +387,7 @@ def _atomic_write(path: Path, text: str) -> None:
 
 
 def _render_json(obj: object) -> str:
-    """Indented JSON with a trailing newline — the `.gitissue/` house format."""
+    """Indented JSON with a trailing newline — the `.idd/` house format."""
     return json.dumps(obj, indent=2, ensure_ascii=False) + "\n"
 
 
@@ -1505,7 +1505,7 @@ def run_report(args, paths) -> int:
         "generated_at": submitted.get("generated_at") or _now(),
     }
     body = (
-        "<!-- gitissue:run-report v1 "
+        "<!-- idd:run-report v1 "
         + json.dumps(header, ensure_ascii=False, sort_keys=True)
         + " -->\n\n"
         + markdown.rstrip("\n")

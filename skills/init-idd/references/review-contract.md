@@ -1,4 +1,4 @@
-# Review contract — /init-gitissue
+# Review contract — /init-idd
 
 The rules for the *Step 4 — Report* block in SKILL.md. Apply them at every
 terminal outcome: a generated, merged, or replaced config, a cancel, and an early
@@ -11,15 +11,15 @@ finding or stop reason:
 
 | Status | Condition |
 |---|---|
-| `DONE` | `.gitissue.yml` was written, re-read, and passed all three checks in *Validate the written config* (parses as YAML, no placeholder left, `platform` present). |
-| `PARTIAL` | `.gitissue.yml` was written, but no YAML parser was available, so the parse check did not run. |
+| `DONE` | `.idd.yml` was written, re-read, and passed all three checks in *Validate the written config* (parses as YAML, no placeholder left, `platform` present). |
+| `PARTIAL` | `.idd.yml` was written, but no YAML parser was available, so the parse check did not run. |
 | `BLOCKED` | The run stopped before a validated config existed: failed prerequisite, missing bundled dependency, `gi-stack-detect` exit 3, an existing file that does not parse in merge mode, a failed write, or a failed validation. Name the error block that stopped it. |
-| `CANCELLED` | `.gitissue.yml` already existed and was kept unchanged — the user chose `cancel`, or auto mode took the safe default. |
+| `CANCELLED` | `.idd.yml` already existed and was kept unchanged — the user chose `cancel`, or auto mode took the safe default. |
 
 A merge-strategy warning or skip does not change the status: it is a repository
 setting, not part of the generated config.
 
-The header names the outcome: `◆ Init Gitissue — setup complete` for `DONE` and
+The header names the outcome: `◆ Init IDD — setup complete` for `DONE` and
 `PARTIAL`, `— stopped` for `BLOCKED`, `— cancelled` for `CANCELLED`. On `BLOCKED`
 and `CANCELLED`, print only `Result`, `Evidence`, `Uncertainty`, `Decision`, and
 `Next action` — no detection rows for a scan that did not run.
@@ -60,10 +60,10 @@ commits nothing. The overwrite/merge/cancel prompt is the only gate, and it is
 answered before the report (auto mode answers it with cancel). Name the remaining user actions separately on the
 `Next action:` row:
 
-- `DONE` / `PARTIAL`: review and commit `.gitissue.yml`, then `/issue-creator`.
+- `DONE` / `PARTIAL`: review and commit `.idd.yml`, then `/issue-creator`.
   Add each merge-strategy `To fix:` command, and the parse check on `PARTIAL`.
 - `BLOCKED`: the `To fix:` command of the error that stopped the run.
-- `CANCELLED`: re-run `/init-gitissue` and choose `merge` or `overwrite` to change
+- `CANCELLED`: re-run `/init-idd` and choose `merge` or `overwrite` to change
   the file.
 
 ## Format rule
@@ -71,7 +71,7 @@ answered before the report (auto mode answers it with cancel). Name the remainin
 The default format is the static terminal block in SKILL.md *Step 4 — Report*:
 one config file and about ten rows, inspectable at once. An interactive report
 does not apply — there is nothing to filter, and project convention forbids
-terminal animation; the written `.gitissue.yml` is the inspectable artifact. If
+terminal animation; the written `.idd.yml` is the inspectable artifact. If
 the user asks for another format (for example a Markdown table or a diff against
 the previous file), produce it from the same values and keep the `Result`,
 `Evidence`, `Uncertainty`, and `Decision` rows. If the host cannot render the
@@ -83,7 +83,7 @@ Grade actual outputs against these criteria as well as config correctness:
 
 | Criterion | Observable check |
 |---|---|
-| Result is findable | The first row states the status and what happened to `.gitissue.yml` without reading other rows. |
+| Result is findable | The first row states the status and what happened to `.idd.yml` without reading other rows. |
 | Facts and assumptions are separate | Observed checks (script exit, file re-read, parser, `gh` reads) are distinct from marker-file inferences and hand-resolved fields. |
 | Claims are traceable | Each detected value names its marker file; `BLOCKED` names the error block; `PARTIAL` names the skipped check. |
 | Next decision is clear | The output says `No approval needed.` and names the remaining user actions, including commit and any merge-settings fix. |

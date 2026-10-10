@@ -334,10 +334,10 @@ is record-and-continue, exactly like the dependency-blocked merge: it never stop
 the run. The reason exists so *Step 1.2*'s no-eligible-issues block can attribute
 the skip; see the reason-to-bucket table there.
 
-**Why the label is the state.** `.gitissue/runs.jsonl` is deletable, gitignored
+**Why the label is the state.** `.idd/runs.jsonl` is deletable, gitignored
 telemetry, so the streak it yields is *progress toward* a quarantine and never
 the quarantine itself. The label lives on the issue: it survives a clone, a new
-machine, and a deleted `.gitissue/`, a human can see it and remove it, and
+machine, and a deleted `.idd/`, a human can see it and remove it, and
 "until the label is removed" is then literally true. From the next run's
 perspective there is no new gate to consult — the label is in the effective
 `skip_labels` set (SKILL.md → *Configuration*), so *Step 1.2* already skips it.
@@ -347,13 +347,13 @@ perspective there is no new gate to consult — the label is in the effective
 - **The label is unusable.** `autopilot.quarantine_label` failed the format
   check above. Print `⚠ Quarantine label is not a usable label name — skipping
   the label write`, never substitute the value, and continue. The streak stays
-  in the run log, so a run started with a corrected `.gitissue.yml` quarantines
+  in the run log, so a run started with a corrected `.idd.yml` quarantines
   on this issue's very next failure.
 - **The count is unavailable.** No `python3`, or exit 4 (the log is missing or
   unreadable — note the script still prints its line, with `streak: 0`): print
   `⚠ gi-runlog unavailable — skipping the quarantine check` and continue without
   quarantining. Counting by hand is the documented fallback if the log is
-  readable at all: read `.gitissue/runs.jsonl` bottom-up, skip other issues, and
+  readable at all: read `.idd/runs.jsonl` bottom-up, skip other issues, and
   stop at this issue's first non-`failed` record. **Never quarantine on missing
   evidence** — the failure direction is deliberate, because an unquarantined
   issue costs tokens while a wrongly quarantined one costs a fix nobody is

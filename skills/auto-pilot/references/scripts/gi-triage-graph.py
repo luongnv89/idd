@@ -41,7 +41,7 @@ unaffected (`acyclic` is always genuinely acyclic), and removing the reported
 edge still resolves the cycles that share it. A self-dependency (`{"from": 7,
 "to": 7}`) carries no ordering information and is dropped rather than reported.
 
-Output on stdout (or `--out FILE`) is the `.gitissue/triage.json` payload:
+Output on stdout (or `--out FILE`) is the `.idd/triage.json` payload:
 `version`, `updated`, `source`, `analyzed_count`, `issues[]`, `summary`, and
 `history[]`, exactly as documented in the triage output reference.
 
@@ -75,7 +75,7 @@ TYPE_RANK = {"bug": 0, "feature": 1, "improvement": 2}
 ESCALATING_LABELS = frozenset({"critical", "urgent"})
 KNOWN_SOURCES = ("/issue-triage", "/auto-pilot")
 
-CONFIG_NAME = ".gitissue.yml"
+CONFIG_NAME = ".idd.yml"
 CONFIG_SECTION = "triage"
 CONFIG_KEYS = ("stale_threshold_days", "auto_priority")
 

@@ -1,6 +1,6 @@
 ---
-name: init-gitissue
-description: "Generate a .gitissue.yml by auto-detecting a repo's stack, test runner, and size. Use to init, setup, or configure IDD Stack, or set up IDD. Don't use for editing an existing .gitissue.yml, creating issues (use /issue-creator), or plain git/npm init."
+name: init-idd
+description: "Generate a .idd.yml by auto-detecting a repo's stack, test runner, and size. Use to init, setup, or configure IDD Stack, or set up IDD. Don't use for editing an existing .idd.yml, creating issues (use /issue-creator), or plain git/npm init."
 license: MIT
 compatibility: "Requires git. No GitHub CLI or authentication needed — generates a local config file only."
 metadata:
@@ -9,15 +9,15 @@ metadata:
   effort: low
 ---
 
-# /init-gitissue
+# /init-idd
 
-Initialize IDD Stack for the current repository. Scans the codebase to detect language, framework, test runner, and repo size, then generates a `.gitissue.yml` config file with project-specific defaults.
+Initialize IDD Stack for the current repository. Scans the codebase to detect language, framework, test runner, and repo size, then generates a `.idd.yml` config file with project-specific defaults.
 
-**Invocation**: `/init-gitissue` — interactive. `/init-gitissue --auto` (or `IDD_AUTO_MODE=1`) — no prompts; an existing `.gitissue.yml` is kept.
+**Invocation**: `/init-idd` — interactive. `/init-idd --auto` (or `IDD_AUTO_MODE=1`) — no prompts; an existing `.idd.yml` is kept.
 
 ## When to Use
 
-- **Do** run this skill the first time a repository starts using IDD Stack, or when the existing `.gitissue.yml` is outdated after a stack migration.
+- **Do** run this skill the first time a repository starts using IDD Stack, or when the existing `.idd.yml` is outdated after a stack migration.
 - **Do** treat it as idempotent for the "already exists" path — merge or overwrite based on user confirmation.
 - **Avoid** running it every session — it is a one-time setup skill.
 - **Never** modify or delete files outside the repo root, and never commit the generated config (leave that to the user).
@@ -27,10 +27,10 @@ Initialize IDD Stack for the current repository. Scans the codebase to detect la
 ## Instructions
 
 1. Verify prerequisites (git repo present).
-2. Check for an existing `.gitissue.yml` and follow the merge path if found.
+2. Check for an existing `.idd.yml` and follow the merge path if found.
 3. Scan the repository to detect language, framework, test runner, and size.
 4. Suggest defaults based on detection.
-5. Write `.gitissue.yml` to the repo root.
+5. Write `.idd.yml` to the repo root.
 6. Print a report of detected values and next-step suggestions.
 
 ## Prerequisites
@@ -49,18 +49,18 @@ stop immediately and print:
 ```text
 ✗ Missing bundled dependency: {missing_file}
 
-  To fix:  asm install https://github.com/luongnv89/idd --skill init-gitissue
+  To fix:  asm install https://github.com/luongnv89/idd --skill init-idd
            (or reinstall the full distribution)
   Plugin:  claude plugin marketplace add luongnv89/idd
            claude plugin install idd@idd
            (or: claude plugin update idd@idd)
 
-  Then restart the agent session and re-run /init-gitissue.
+  Then restart the agent session and re-run /init-idd.
 ```
 
 Check these files relative to the skill's directory (the dirname of this SKILL.md):
 
-- `templates/gitissue-template.yml` — canonical config template with all schema fields
+- `templates/idd-template.yml` — canonical config template with all schema fields
 - `references/error-messages.md` — complete error catalog with triggers and exact output
 - `references/examples.md` — worked example runs
 - `references/run-stats.md` — run-stats footer contract (shape, fields, unavailable marker)
@@ -76,14 +76,14 @@ Check these files relative to the skill's directory (the dirname of this SKILL.m
 
 ## Configuration Check
 
-This skill GENERATES the config — it does not read one. Check if `.gitissue.yml` already exists in the repo root before proceeding. **Capture the run clock in that same check:** chain the first shell as `…; ec=$?; date +%s >&2; exit "$ec"` and keep the stderr epoch as `run_started_epoch` — the check's exit stays intact, it costs no extra round trip, and it is what the *Run Stats Footer* (`references/run-stats.md`) measures `elapsed` from.
+This skill GENERATES the config — it does not read one. Check if `.idd.yml` already exists in the repo root before proceeding. **Capture the run clock in that same check:** chain the first shell as `…; ec=$?; date +%s >&2; exit "$ec"` and keep the stderr epoch as `run_started_epoch` — the check's exit stays intact, it costs no extra round trip, and it is what the *Run Stats Footer* (`references/run-stats.md`) measures `elapsed` from.
 
 ### File does NOT exist — always create
 
 When the file is missing, **always create it** without prompting. This happens regardless of context — even when the skill is invoked non-interactively from another skill. No early exit, no conditions, no cancel option.
 
 ```
-○ No .gitissue.yml found — generating config...
+○ No .idd.yml found — generating config...
 ```
 
 Proceed directly to **Step 1 — Scan Repository**.
@@ -93,7 +93,7 @@ Proceed directly to **Step 1 — Scan Repository**.
 If the file already exists, show the prompt from `references/error-messages.md`:
 
 ```
-⚠ .gitissue.yml already exists
+⚠ .idd.yml already exists
 
   Options:
     overwrite  — replace with new auto-detected config
@@ -106,7 +106,7 @@ If the file already exists, show the prompt from `references/error-messages.md`:
 - **overwrite** — run full generation. Keep the existing file until Step 3 replaces it in one write.
 - **merge** — read the existing file. If it does not parse as YAML, print *Existing config does not parse* (`references/error-messages.md`), leave it untouched, and stop with `Result: BLOCKED`. Otherwise preserve every user-set value and add only the schema fields it lacks.
 - **cancel** — make no change. Report `Result: CANCELLED`.
-- **Auto mode** (`--auto` or `IDD_AUTO_MODE=1`) — do not prompt. Print `⚠ Auto mode: overwrite/merge/cancel prompt skipped — kept the existing .gitissue.yml (cancel).` and take **cancel**, the safe default.
+- **Auto mode** (`--auto` or `IDD_AUTO_MODE=1`) — do not prompt. Print `⚠ Auto mode: overwrite/merge/cancel prompt skipped — kept the existing .idd.yml (cancel).` and take **cancel**, the safe default.
 
 ---
 
@@ -271,7 +271,7 @@ These are comments only — they do not change default values.
 
 ## Step 3 — Write Config
 
-Write `.gitissue.yml` to the repo root. The file must include:
+Write `.idd.yml` to the repo root. The file must include:
 
 1. A header comment with detection results
 2. Every field from the full schema (`references/docs/config-schema.md`)
@@ -288,13 +288,13 @@ Write `.gitissue.yml` to the repo root. The file must include:
 
 ### Template
 
-Use the canonical template at `templates/gitissue-template.yml` — it contains every field from `references/docs/config-schema.md` with inline comments. At write time, substitute the placeholder tokens (`{language}`, `{framework}`, `{test_runner}`, `{repo_size}`, `{file_count}`, `{true_or_false}`, `{timeout_value}`, `{stale_value}`) with the values computed in Step 2. Read `templates/gitissue-template.yml` to see the exact field layout.
+Use the canonical template at `templates/idd-template.yml` — it contains every field from `references/docs/config-schema.md` with inline comments. At write time, substitute the placeholder tokens (`{language}`, `{framework}`, `{test_runner}`, `{repo_size}`, `{file_count}`, `{true_or_false}`, `{timeout_value}`, `{stale_value}`) with the values computed in Step 2. Read `templates/idd-template.yml` to see the exact field layout.
 
 In **merge** mode, write the existing file's values plus the missing fields, per the *File exists* rules.
 
 If the file write fails, output the error from `references/error-messages.md` and stop:
 ```
-✗ Could not write .gitissue.yml
+✗ Could not write .idd.yml
 
   To fix:  check file permissions in the repo root
   Check:   do you have write access? ls -la .
@@ -305,8 +305,8 @@ If the file write fails, output the error from `references/error-messages.md` an
 A write that succeeded is not a config that works. Before reporting success,
 re-read the file just written and verify three things:
 
-1. **It parses as YAML.** `python3 -c "import yaml,sys; yaml.safe_load(open('.gitissue.yml'))"` — or, when PyYAML is unavailable, `ruby -ryaml -e "YAML.load_file('.gitissue.yml')"`. If neither parser is available, print `○ Config validation skipped — no YAML parser available` and treat the validation check as `PARTIAL`, never `PASS`.
-2. **No placeholder token survived substitution.** `grep -nE '\{(language|framework|test_runner|repo_size|file_count|true_or_false|timeout_value|stale_value)\}' .gitissue.yml` must return nothing. Any hit means Step 3 substitution missed a token.
+1. **It parses as YAML.** `python3 -c "import yaml,sys; yaml.safe_load(open('.idd.yml'))"` — or, when PyYAML is unavailable, `ruby -ryaml -e "YAML.load_file('.idd.yml')"`. If neither parser is available, print `○ Config validation skipped — no YAML parser available` and treat the validation check as `PARTIAL`, never `PASS`.
+2. **No placeholder token survived substitution.** `grep -nE '\{(language|framework|test_runner|repo_size|file_count|true_or_false|timeout_value|stale_value)\}' .idd.yml` must return nothing. Any hit means Step 3 substitution missed a token.
 3. **The `platform` key is present** — it is the driver selector every skill resolves on load, so a config without it is unusable.
 
 On a parse error, a surviving placeholder, or a missing `platform` key, do **not**
@@ -332,17 +332,17 @@ a check that ran and passed.
 **Then the run-stats footer.** Close with the *Run Stats Footer* — `references/run-stats.md` — `elapsed`, `tokens` only where the host reported a count (otherwise left out), `agents`, run cost only, `n/a` for anything else undetermined. It is the last thing printed at **every** terminal outcome, including a run that wrote no config — a failed prerequisite, a declined overwrite, or a scan that could not complete. This skill spawns no subagents, so `agents 0` is the determined value here, not `n/a`.
 
 ```
-◆ Init Gitissue — setup complete
+◆ Init IDD — setup complete
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
 
-  Result:            DONE — .gitissue.yml generated and validated
+  Result:            DONE — .idd.yml generated and validated
   Git repo:          ✓ pass
   Language:          ✓ {language} (from {file})
   Framework:         ✓ {framework} (from {file})
   Test runner:       ✓ {test_runner} (from {file})
   Templates:         ✓ {template_status}
   Repo size:         ✓ {size} ({count} files, via {file_count_source})
-  Config:            ✓ generated .gitissue.yml
+  Config:            ✓ generated .idd.yml
   Validation:        ✓ parses as YAML, no placeholders left, platform set
   Merge settings:    ✓ squash-only, PR_BODY
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
@@ -350,8 +350,8 @@ a check that ran and passed.
   Uncertainty:       values from marker files; no test command run
   Decision:          No approval needed.
 
-  Config: .gitissue.yml
-  Next action: review and commit .gitissue.yml, then /issue-creator
+  Config: .idd.yml
+  Next action: review and commit .idd.yml, then /issue-creator
 ```
 
 ### Variations
@@ -378,7 +378,7 @@ And earlier in the flow, print:
 And earlier in the flow, print:
 ```
 ○ Could not detect test runner. Setting resolve.auto_test: false.
-  Tip: configure your test command in .gitissue.yml after setup.
+  Tip: configure your test command in .idd.yml after setup.
 ```
 
 **Validation could not run** — no YAML parser available; show:
@@ -399,12 +399,12 @@ and set `Result: PARTIAL — config written; parse check skipped`.
 
 **Merge mode** — change Config line:
 ```
-  Config:            ✓ merged into existing .gitissue.yml ({N} new, {M} preserved)
+  Config:            ✓ merged into existing .idd.yml ({N} new, {M} preserved)
 ```
 
 **Overwrite mode** — change Config line:
 ```
-  Config:            ✓ replaced .gitissue.yml with new config
+  Config:            ✓ replaced .idd.yml with new config
 ```
 
 ---
@@ -421,7 +421,7 @@ Terminal output follows the `references/docs/terminal-style.md` contract — sym
 
 ## Expected Output
 
-After a successful run the repo root contains a validated `.gitissue.yml` and the
+After a successful run the repo root contains a validated `.idd.yml` and the
 terminal prints the *Step 4 — Report* block above — the `Validation:` row is the
 checkable bar: the run only reports `DONE` after the written file parsed as YAML
 with no placeholder tokens left and a `platform` key. Variations (merge mode,

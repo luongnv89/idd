@@ -168,7 +168,7 @@ Single home of the gate; procedure and ledger schema:
 
 1. **Detect and propose** — `python3 scripts/idd-lint.py corrections [--record]`
    records one deduplicated proposal per recurring key in
-   `.gitissue/improvement-proposals.jsonl` and edits nothing else.
+   `.idd/improvement-proposals.jsonl` and edits nothing else.
 2. **Approval gate** — no agent or skill edits `src/`, `docs/`, or skill,
    agent, or script text as a correction response without an `approved`
    proposal. Approving is human; auto mode only proposes.

@@ -7,7 +7,7 @@ one JSON object on stdin. Existing issues are either fetched by this script via
 ``gh --json`` or read from ``--issues-from`` for tests/debugging. Issue text is
 never accepted as a command-line argument. With ``--snapshot`` the fetch goes
 through the sibling ``gi-backlog.py`` shared open-issue snapshot (TTL 300 s,
-``--cache-dir`` defaulting to ``.gitissue/cache``). Any snapshot *failure* —
+``--cache-dir`` defaulting to ``.idd/cache``). Any snapshot *failure* —
 missing or broken script, gh error, bad cache — falls through to this script's
 own live fetch, so a failure never changes the scores; but a snapshot served
 inside its TTL may be up to 300 s stale (only ``/issue-creator``'s own creates
@@ -625,7 +625,7 @@ def main(argv: list[str] | None = None) -> int:
         help="read the backlog through the shared gi-backlog.py snapshot",
     )
     parser.add_argument("--cache-dir", metavar="DIR",
-                        help="snapshot location for --snapshot (default .gitissue/cache)")
+                        help="snapshot location for --snapshot (default .idd/cache)")
     parser.add_argument("--limit", type=int, metavar="N")
     parser.add_argument("--high", type=int, metavar="N")
     parser.add_argument("--medium", type=int, metavar="N")

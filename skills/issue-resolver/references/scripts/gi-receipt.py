@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Write or verify a revision receipt for a QA-handed-off commit (issue #515).
 
-/issue-resolver ends a clean QA loop by writing a `<!-- gitissue:qa v1 … -->`
+/issue-resolver ends a clean QA loop by writing a `<!-- idd:qa v1 … -->`
 marker into its PR body, and /issue-pr-review uses that marker to skip work the
 resolver already did. A PR body is written by whoever opened the PR, and the
 head SHA it binds to is public, so the marker alone authenticates nothing: a

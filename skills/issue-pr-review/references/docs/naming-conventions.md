@@ -70,7 +70,7 @@ Standard conventions for naming branches, commits, pull requests, and issues acr
 
 ### Custom Prefix Override
 
-If the user has configured `resolve.branch_prefix` in `.gitissue.yml` to a string other than `"auto"`, use that fixed prefix instead of type-based prefixes:
+If the user has configured `resolve.branch_prefix` in `.idd.yml` to a string other than `"auto"`, use that fixed prefix instead of type-based prefixes:
 
 - `branch_prefix: "auto"` (default) → type-based: `fix/42-description`
 - `branch_prefix: "issue-"` → fixed: `issue-42-description`

@@ -1,21 +1,21 @@
 <!-- Generated from /docs/config-schema.md. Do not edit. Edit source and run ./scripts/build.sh. -->
-# `.gitissue.yml` Configuration Schema
+# `.idd.yml` Configuration Schema
 
 > **Per-skill excerpt (generated).** Only the configuration sections this skill reads are reproduced here: `agents`, `platform`, `triage`. The complete schema — every section and the full defaults table — is at [config-schema.md](https://github.com/luongnv89/idd/blob/main/docs/config-schema.md).
 
-IDD Stack works with zero configuration — every setting has a default. With no `.gitissue.yml`, the first-run hint is shown:
+IDD Stack works with zero configuration — every setting has a default. With no `.idd.yml`, the first-run hint is shown:
 
 ```
-○ First run — using default config. Run /init-gitissue to customize.
+○ First run — using default config. Run /init-idd to customize.
 ```
 
-Place `.gitissue.yml` at the repo root to customize behavior.
+Place `.idd.yml` at the repo root to customize behavior.
 
 ### Config Loading Flow
 
 Loaded **once** at skill start. Valid file → use it. Invalid → stop with the
 line-numbered *Validation* errors. Absent → defaults + first-run hint above.
-`.gitissue.yml` is config; `.gitissue/` is runtime state; built-ins are fallback.
+`.idd.yml` is config; `.idd/` is runtime state; built-ins are fallback.
 
 ## Core Fields
 
@@ -91,18 +91,18 @@ agents:
     autopilot-analyzer: null
 ```
 
-## `.gitissue/` Directory
+## `.idd/` Directory
 
-Repo-root state beside `.gitissue.yml`, created on first use.
+Repo-root state beside `.idd.yml`, created on first use.
 
 | File | Written by | Description |
 |------|-----------|-------------|
-| `.gitissue/triage.json` | `/issue-triage`, `/auto-pilot` | Cached triage: priorities, deps, order, history |
-| `.gitissue/analysis-<N>.json` | `/issue-analysis` | Deep analysis of issue #N |
-| `.gitissue/runs.jsonl` | `/issue-resolver`, `/auto-pilot` | Append-only run log (one line per issue) |
-| `.gitissue/run-state.json`, `run.lock`, `last-run-report.md` | `/auto-pilot`; `/issue-resolver` (`borrowed_skills` only) | Resume state, lock, report |
+| `.idd/triage.json` | `/issue-triage`, `/auto-pilot` | Cached triage: priorities, deps, order, history |
+| `.idd/analysis-<N>.json` | `/issue-analysis` | Deep analysis of issue #N |
+| `.idd/runs.jsonl` | `/issue-resolver`, `/auto-pilot` | Append-only run log (one line per issue) |
+| `.idd/run-state.json`, `run.lock`, `last-run-report.md` | `/auto-pilot`; `/issue-resolver` (`borrowed_skills` only) | Resume state, lock, report |
 
-> **Not in `.gitissue/`:** the model-suggestion cache is **user-level** (`~/.cache/gitissue/`, all repos).
+> **Not in `.idd/`:** the model-suggestion cache is **user-level** (`~/.cache/idd/`, all repos).
 
 **Conventions:**
 - Create via `mkdir -p`
@@ -110,7 +110,7 @@ Repo-root state beside `.gitissue.yml`, created on first use.
 - `runs.jsonl` is **append-only**; absence non-fatal
 - **Carve-out** — commit the directory (project state, not secrets), never the three machine-local files: gitignored, `gi-state.py` the only writer, `--dry-run` mutates nothing
 
-### `.gitissue/runs.jsonl` — run log
+### `.idd/runs.jsonl` — run log
 
 Field set, append rules, and the single-writer / `--no-run-log` convention in [run-log-schema.md](https://github.com/luongnv89/idd/blob/main/docs/run-log-schema.md).
 
@@ -119,12 +119,12 @@ Field set, append rules, and the single-writer / `--no-run-log` convention in [r
 Config is validated at every skill start; errors include line numbers:
 
 ```
-✗ Invalid config: .gitissue.yml
+✗ Invalid config: .idd.yml
 
   Line 8: issue.template must be "default" or a valid directory path
   Line 15: resolve.test_timeout must be between 30 and 3600
 
-  To fix:  edit .gitissue.yml and correct the values above
+  To fix:  edit .idd.yml and correct the values above
   Docs:    https://github.com/luongnv89/idd/blob/main/docs/config-schema.md
 ```
 

@@ -36,7 +36,7 @@ An epic whose sentinel region is **empty** is a normal, expected state — a cre
 reached Phase 5 yet. It is not a corrupt epic, and sync handles it (see `references/sync-mode.md`).
 
 Everything outside the sentinels — the binding marker, `/issue-creator`'s
-`<!-- gitissue:normalized v1 -->` marker, the epic's Description, Reporter Context, Acceptance
+`<!-- idd:normalized v1 -->` marker, the epic's Description, Reporter Context, Acceptance
 Criteria, Metadata — is preserved byte-for-byte. Absent sentinels mean: in Phase 5, append the block
 at the end of the body; in Sync mode, **stop** (the issue is not this skill's epic).
 

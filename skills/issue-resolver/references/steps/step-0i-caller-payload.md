@@ -70,7 +70,7 @@ The payload substitutes for **Step 0a's fetch and nothing else**: <!-- a:rs-step
   *pre*-normalization body by construction, so it can never stand in for the
   post-rewrite re-read.
 - **Step 1 and Step 5 still read through the cache**, unchanged — those reads are
-  already served from `.gitissue/cache/` and are what the invalidation exists for.
+  already served from `.idd/cache/` and are what the invalidation exists for.
   On the `supplied` path only, 0a writes no cache entry of its own (the caller's
   capture used a different field set), so a later repeat read for the same issue
   may be a one-time miss-and-refetch: still served fresh, gated by the same

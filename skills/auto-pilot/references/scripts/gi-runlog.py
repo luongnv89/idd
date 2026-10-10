@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate, normalize, and append one `.gitissue/runs.jsonl` telemetry record.
+"""Validate, normalize, and append one `.idd/runs.jsonl` telemetry record.
 
 Reads a single JSON object on stdin — the record a skill wants to log — and
 either appends it to the run log (`--append`, the default) or prints the
@@ -75,7 +75,7 @@ try:
 except ImportError:  # pragma: no cover - non-POSIX hosts fail closed at runtime
     fcntl = None
 
-DEFAULT_LOG_PATH = ".gitissue/runs.jsonl"
+DEFAULT_LOG_PATH = ".idd/runs.jsonl"
 
 # Rotation (F-PERF-006): the active log never grows without bound. Before an
 # append-mode write, a log at or above the byte ceiling — or idle past the day
@@ -616,7 +616,7 @@ def main(argv: list[str] | None = None) -> int:
         prog="gi-runlog.py",
         description=(
             "Validate and normalize one run-log record read as JSON on stdin, "
-            "then append it to .gitissue/runs.jsonl (--append) or print it "
+            "then append it to .idd/runs.jsonl (--append) or print it "
             "without writing (--echo); or read the log back to count an issue's "
             "consecutive-failure streak (--failure-streak)."
         ),

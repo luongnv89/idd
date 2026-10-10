@@ -19,7 +19,7 @@ When skills perform actions (create issues, start/complete work, reprioritize), 
 
 ## Configuration
 
-The `projects` section in `.gitissue.yml` controls this utility:
+The `projects` section in `.idd.yml` controls this utility:
 
 ```yaml
 projects:
@@ -187,7 +187,7 @@ If the target status value does not match any option:
 ⚠ Status value "{value}" not found in project field options
 
   Available options: {comma-separated list of option names}
-  To fix:  update projects.status_map in .gitissue.yml to match your board
+  To fix:  update projects.status_map in .idd.yml to match your board
 ```
 
 Skip this status update. Non-fatal.
@@ -290,7 +290,7 @@ Follow `references/docs/terminal-style.md` conventions for all sync output:
 ⚠ Status value "{value}" not found in project field options
 
   Available options: {option1}, {option2}, {option3}
-  To fix:  update projects.status_map in .gitissue.yml to match your board
+  To fix:  update projects.status_map in .idd.yml to match your board
 ```
 
 ### Generic API failure

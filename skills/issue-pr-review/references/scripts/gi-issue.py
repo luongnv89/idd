@@ -5,7 +5,7 @@ One issue is read four or five times across a single resolve lifecycle —
 preflight, normalization, the researcher's scan, acceptance-criteria
 verification, the closing report — and every read is a network round trip whose
 answer has not changed. This script serves those repeat reads from
-`.gitissue/cache/`, so the first call pays for the fetch and the rest do not.
+`.idd/cache/`, so the first call pays for the fetch and the rest do not.
 
 The cache is deliberately *short*-lived and per-repository. An issue's body can
 change mid-run (the resolver normalizes it), so a stale read is a real hazard;
@@ -54,7 +54,7 @@ from pathlib import Path
 _RUN_GH = runpy.run_path(str(Path(__file__).with_name("gi-gh.py")))["run_gh"]
 
 DEFAULT_TTL_S = 300
-CACHE_DIRNAME = Path(".gitissue") / "cache"
+CACHE_DIRNAME = Path(".idd") / "cache"
 
 # gh's own field vocabulary is lowerCamelCase; anything else is a typo that
 # would otherwise surface as an opaque gh error several layers away.

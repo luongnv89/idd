@@ -40,7 +40,7 @@ plan, writing rebuttals — stays with the agent.
   `tokenizer`, `permalink`, `guardrail`, `policyholder` trigger
   too: the gate fails closed.
     access-policy    CODEOWNERS, SECURITY.md, .github/dependabot.yml / .yaml
-    security-config  .gitissue.yml, .pre-commit-config.yaml, .gitleaks.toml,
+    security-config  .idd.yml, .pre-commit-config.yaml, .gitleaks.toml,
                      or a file whose name contains `secscan`
 
 --adjudicate
@@ -124,7 +124,7 @@ CI_FILES = frozenset({
 })
 CI_DIRS = (".github/workflows/", ".github/actions/")
 POLICY_FILES = frozenset({"CODEOWNERS", "SECURITY.md"})
-SECURITY_CONFIG_FILES = frozenset({".gitissue.yml", ".pre-commit-config.yaml", ".gitleaks.toml"})
+SECURITY_CONFIG_FILES = frozenset({".idd.yml", ".pre-commit-config.yaml", ".gitleaks.toml"})
 CAMEL = re.compile(r"(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])")
 DIGIT_EDGE = re.compile(r"(?<=[A-Za-z])(?=[0-9])|(?<=[0-9])(?=[A-Za-z])")
 NON_WORD = re.compile(r"[^a-z0-9]+")

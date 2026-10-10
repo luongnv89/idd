@@ -66,17 +66,17 @@ durable files to the working tree syncs first, with the stash-first pattern in
 
 ## Configuration
 
-Load config once at skill start with `python3 references/scripts/gi-config.py`. **Working directory:** the repo root — the script resolves `.gitissue.yml` against the working directory, so running it elsewhere exits 0 with `config_file: null`/`first_run: true`, silently discarding the repo's real config. Resolve the script relative to this SKILL.md, as in the *Bundled dependency precheck*; never relative to the working directory. Never re-read the config.
+Load config once at skill start with `python3 references/scripts/gi-config.py`. **Working directory:** the repo root — the script resolves `.idd.yml` against the working directory, so running it elsewhere exits 0 with `config_file: null`/`first_run: true`, silently discarding the repo's real config. Resolve the script relative to this SKILL.md, as in the *Bundled dependency precheck*; never relative to the working directory. Never re-read the config.
 
 Capture `run_started_epoch` from stderr by chaining that same `python3` invocation as `python3 …; ec=$?; date +%s >&2; exit "$ec"`, preserving stdout and exit status for `references/run-stats.md`.
 
 - Exit 0: use `config` from `{"config": {…dotted keys…}, "config_file": …, "first_run": …}`. If `first_run` is true, print the hint below.
 - Exit 3: stop with *Invalid config* from `references/error-messages.md`.
 - Script file absent: a bundled dependency is missing, which is a broken install and not a degrade — stop and print the `✗ Missing bundled dependency` block.
-- No `python3`, other non-zero exit, or unparsable stdout: print `⚠ gi-config unavailable — using the inline defaults below`. Read `.gitissue.yml` from the repo root once, or use defaults if absent. Use this fallback instead of the script result.
+- No `python3`, other non-zero exit, or unparsable stdout: print `⚠ gi-config unavailable — using the inline defaults below`. Read `.idd.yml` from the repo root once, or use defaults if absent. Use this fallback instead of the script result.
 
 ```
-○ First run — using default config. Run /init-gitissue to customize.
+○ First run — using default config. Run /init-idd to customize.
 ```
 
 Defaults: `issue.template: "default"`, `issue.labels_auto_suggest: true`, `issue.normalize_comment: true`, `model_suggestion.enabled: true`, `duplicate_detection.backlog_limit: 100`. Remaining `duplicate_detection.*` defaults and validation: `references/docs/config-schema.md`.
@@ -87,7 +87,7 @@ When `model_suggestion.enabled` is false, skip model suggestions silently. Other
 python3 references/scripts/gi-model-cache.py --skill-dir "$skill_dir"
 ```
 
-The user-level cache lives in `${XDG_CACHE_HOME:-$HOME/.cache}/gitissue/` (`IDD_CACHE_DIR` overrides), never per-repo or inside the skill folder. The bundled seed is read-only.
+The user-level cache lives in `${XDG_CACHE_HOME:-$HOME/.cache}/idd/` (`IDD_CACHE_DIR` overrides), never per-repo or inside the skill folder. The bundled seed is read-only.
 
 - Exit 0: use `state` (`fresh` | `stale` | `seeded` | `installed`), `stale`, `age_days`, `data_version`, `data_date`, `persisted`, and `bands` (effort → two models with per-task costs). Echo every `⚠ gi-model-cache:` stderr line, including `persisted: false`. Stale data warns, never fails; auto mode uses it.
 - Exit 3: stop and print the validation error.
@@ -169,24 +169,24 @@ Extract from the description:
 
 #### Score deterministically
 
-Refuse a planted `.gitissue/cache` symlink, create that ignored directory only
+Refuse a planted `.idd/cache` symlink, create that ignored directory only
 when it is a real directory, then create a unique exclusive request file
 (`mktemp`, mode 0600) holding the classified `items` and once-loaded `config`.
 Feed `"$dup_request"` on stdin; never put a title, keyword, body, or config
 value on the command line, and never reuse a shared
-`.gitissue/cache/dup-request.json`.
+`.idd/cache/dup-request.json`.
 
 ```bash
-if [ -L .gitissue/cache ]; then
-  echo "✗ .gitissue/cache is a symlink — refusing to write the scorer request"
+if [ -L .idd/cache ]; then
+  echo "✗ .idd/cache is a symlink — refusing to write the scorer request"
   exit 1
 fi
-mkdir -p .gitissue/cache
-if [ -L .gitissue/cache ]; then
-  echo "✗ .gitissue/cache is a symlink — refusing to write the scorer request"
+mkdir -p .idd/cache
+if [ -L .idd/cache ]; then
+  echo "✗ .idd/cache is a symlink — refusing to write the scorer request"
   exit 1
 fi
-dup_request="$(mktemp .gitissue/cache/dup-request.XXXXXX)"
+dup_request="$(mktemp .idd/cache/dup-request.XXXXXX)"
 chmod 600 "$dup_request"
 ```
 
@@ -297,7 +297,7 @@ When `issue.labels_auto_suggest` is true, pass the suggested labels; when false,
 gh issue create --title "{title}" --body "{populated_template}" [--label "{labels}"]
 ```
 
-The body is the populated template, `<!-- gitissue:normalized v1 -->` at the top. After each successful create, **mandatory**: `python3 references/scripts/gi-backlog.py --invalidate` (on failure, `rm -f .gitissue/cache/backlog-open-*.json`), so the next dedup scan sees the new issue. Print a step-by-step summary:
+The body is the populated template, `<!-- idd:normalized v1 -->` at the top. After each successful create, **mandatory**: `python3 references/scripts/gi-backlog.py --invalidate` (on failure, `rm -f .idd/cache/backlog-open-*.json`), so the next dedup scan sees the new issue. Print a step-by-step summary:
 
 ```
 ◆ Issue Created

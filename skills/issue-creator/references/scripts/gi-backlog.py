@@ -6,7 +6,7 @@
 backlog, and each used to pay for its own `gh issue list`. This script fetches
 the list once — always the full field superset, so any consumer's projection is
 a subset of what is on disk — and writes it to
-`.gitissue/cache/backlog-open-<sha12(repo)>.json`. The next consumer inside the
+`.idd/cache/backlog-open-<sha12(repo)>.json`. The next consumer inside the
 TTL reads the file instead of the network.
 
 Freshness rule. A snapshot is served only when *all* of these hold:
@@ -76,7 +76,7 @@ _RUN_GH = runpy.run_path(str(Path(__file__).with_name("gi-gh.py")))["run_gh"]
 
 DEFAULT_TTL_S = 300
 DEFAULT_LIMIT = 100
-CACHE_DIRNAME = Path(".gitissue") / "cache"
+CACHE_DIRNAME = Path(".idd") / "cache"
 SUPERSET = (
     "number", "title", "body", "labels", "assignees", "state", "createdAt",
     "updatedAt",

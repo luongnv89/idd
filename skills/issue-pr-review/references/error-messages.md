@@ -144,7 +144,7 @@ none.
            {check_link}
   Result:  PARTIAL — ci_status recorded as failed@{sha40}, PR not merged
   To fix:  gh run view {run_id} --log-failed
-  Undo:    set review.ignore_ci_billing_failures: false in .gitissue.yml
+  Undo:    set review.ignore_ci_billing_failures: false in .idd.yml
   Docs:    https://github.com/luongnv89/idd/blob/main/docs/config-schema.md
 ```
 
