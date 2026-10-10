@@ -43,7 +43,8 @@ gate reports `verdict: clean` with `scanned: 0` having examined nothing. A
 a healthy-looking `scanned`, so a threshold on `scanned` does not close it.
 
 `--policy-ref REF` closes it by provenance: `security.*` is read from
-`REF:.idd.yml`, a ref the reviewed branch cannot write, and the work tree's
+`REF:.idd.yml` (else the legacy `REF:.gitissue.yml`, only when `.idd.yml` is
+absent at the ref), a ref the reviewed branch cannot write, and the work tree's
 own file is not consulted at all. `policy_source` reports what was actually
 used — `ref:<REF>`, `file:<path>`, or `defaults` — so a caller can assert it got
 the policy it asked for. The flag is opt-in and changes nothing when absent: the
@@ -665,6 +666,8 @@ SECURITY_KEYS = (
 )
 
 CONFIG_NAME = ".idd.yml"
+# Read as a fallback at each level of the walk (issue #537).
+LEGACY_CONFIG_NAME = ".gitissue.yml"
 
 # Only the `security:` block, only its four documented scalars. This is not a
 # general YAML parser and must not become one — it exists so a config value
@@ -742,16 +745,31 @@ def config_search_ceiling() -> str:
 
 
 def find_config(explicit: str | None) -> str | None:
-    """Locate the config file: the explicit path, else `.idd.yml` at or
-    above the working directory but never above the working-tree root."""
+    """Locate the config file: the explicit path, else `.idd.yml` — or, when
+    that is absent at a level, the legacy `.gitissue.yml` — at or above the
+    working directory but never above the working-tree root."""
     if explicit:
         return explicit
     here = os.path.abspath(os.getcwd())
     ceiling = os.path.abspath(config_search_ceiling())
     while True:
+        # Both names at each level, new first, under the one ceiling: a legacy
+        # file is this level's config only when `.idd.yml` is absent here.
         candidate = os.path.join(here, CONFIG_NAME)
+        legacy = os.path.join(here, LEGACY_CONFIG_NAME)
         if os.path.isfile(candidate):
+            if os.path.isfile(legacy):
+                print(
+                    f"⚠ legacy {LEGACY_CONFIG_NAME} ignored — {CONFIG_NAME} takes precedence",
+                    file=sys.stderr,
+                )
             return candidate
+        if os.path.isfile(legacy):
+            print(
+                f"⚠ legacy {LEGACY_CONFIG_NAME} found — rename to {CONFIG_NAME}",
+                file=sys.stderr,
+            )
+            return legacy
         parent = os.path.dirname(here)
         if here == ceiling or parent == here:
             return None
@@ -822,6 +840,10 @@ def _reject_ambiguous_ref(ref: str) -> None:
 def read_policy_ref(ref: str) -> tuple[dict[str, object], str]:
     """Read `security.*` from `<ref>:.idd.yml`, never from the work tree.
 
+    When the ref carries no `.idd.yml` at all, the legacy `<ref>:.gitissue.yml`
+    is read instead (issue #537), with a ⚠ line on stderr — a base branch that
+    predates the rename still supplies its policy.
+
     The trust boundary this closes. `.idd.yml` is repository-controlled and
     `/issue-pr-review` runs with the pull request's branch checked out, so the
     file the ordinary upward walk finds is written by the author of the artifact
@@ -859,7 +881,39 @@ def read_policy_ref(ref: str) -> tuple[dict[str, object], str]:
     # is a malformed invocation (exit 2), while an ambiguous one is a policy that
     # could not be identified (exit 4). Reordering these flips a pinned contract.
     _reject_ambiguous_ref(ref)
-    spec = f"{ref}:{CONFIG_NAME}"
+    text = _read_ref_config(ref, CONFIG_NAME)
+    if text is None:
+        # The legacy name is consulted only when `.idd.yml` is *absent* at the
+        # ref. A `.idd.yml` that is present but unreadable has already raised
+        # Unavailable above: falling through to the legacy file there would
+        # let an unreadable trusted policy be replaced by an older one.
+        text = _read_ref_config(ref, LEGACY_CONFIG_NAME)
+        if text is not None:
+            print(
+                f"⚠ legacy {LEGACY_CONFIG_NAME} found at {ref} — rename to {CONFIG_NAME}",
+                file=sys.stderr,
+            )
+    if text is None:
+        # Either the ref itself is absent — exit 4, because a policy that could
+        # not be read permitted nothing — or it resolves and simply ships no
+        # config, which is the built-in defaults and never the work-tree file.
+        try:
+            _git(["rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}"])
+        except Unavailable as exc:
+            raise Unavailable(
+                f"--policy-ref {ref} does not resolve — the reviewing side's "
+                "policy could not be read, so nothing was scanned under it"
+            ) from exc
+        return {}, f"ref:{ref}"
+    return parse_security_config(text), f"ref:{ref}"
+
+
+def _read_ref_config(ref: str, name: str) -> str | None:
+    """The text of `<ref>:<name>`, or None when no such path exists there.
+
+    Raises Unavailable when the path exists but is not a readable blob.
+    """
+    spec = f"{ref}:{name}"
     # Ask whether a blob exists at that path *before* reading it, so the two
     # non-zero outcomes below stay distinguishable. Without this probe every
     # failure to read collapses into "the ref has no config": a `.idd.yml`
@@ -876,17 +930,7 @@ def read_policy_ref(ref: str) -> tuple[dict[str, object], str]:
     except OSError as exc:
         raise Unavailable(f"cannot read {spec} — {exc}") from exc
     if not present:
-        # Either the ref itself is absent — exit 4, because a policy that could
-        # not be read permitted nothing — or it resolves and simply ships no
-        # config, which is the built-in defaults and never the work-tree file.
-        try:
-            _git(["rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}"])
-        except Unavailable as exc:
-            raise Unavailable(
-                f"--policy-ref {ref} does not resolve — the reviewing side's "
-                "policy could not be read, so nothing was scanned under it"
-            ) from exc
-        return {}, f"ref:{ref}"
+        return None
     try:
         proc = subprocess.run(
             ["git", "--no-replace-objects", "cat-file", "blob", spec],
@@ -902,8 +946,7 @@ def read_policy_ref(ref: str) -> tuple[dict[str, object], str]:
             f"{spec} exists but could not be read — the reviewing side's policy "
             "was never applied"
         )
-    text = proc.stdout.decode("utf-8", errors="replace")
-    return parse_security_config(text), f"ref:{ref}"
+    return proc.stdout.decode("utf-8", errors="replace")
 
 
 def load_overrides(args: argparse.Namespace) -> tuple[dict[str, object], str]:
@@ -1571,7 +1614,8 @@ def main(argv: list[str] | None = None) -> int:
         "--config",
         metavar="PATH",
         help=f"{CONFIG_NAME} to read security.* from (default: found upward from "
-        "cwd, stopping at the working-tree root)",
+        f"cwd, stopping at the working-tree root; {LEGACY_CONFIG_NAME} is read "
+        "at a level with no " + CONFIG_NAME + ")",
     )
     tuning.add_argument(
         "--no-config", action="store_true", help="ignore any config file"
@@ -1580,7 +1624,8 @@ def main(argv: list[str] | None = None) -> int:
         "--policy-ref",
         metavar="REF",
         help=(
-            f"read security.* from REF:{CONFIG_NAME} instead of the work tree. "
+            f"read security.* from REF:{CONFIG_NAME} (else REF:{LEGACY_CONFIG_NAME} "
+            f"when REF has no {CONFIG_NAME}) instead of the work tree. "
             "For callers reviewing code they do not control: the checked-out "
             "config is written by the branch under review and can allow-list "
             "its own secrets. Reported as policy_source"

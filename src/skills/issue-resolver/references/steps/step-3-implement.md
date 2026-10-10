@@ -73,7 +73,8 @@ run's teardown can remove the other's borrow. Borrow in one run at a time.
 
 Read `.idd/run-state.json` through `python3 shared/scripts/gi-state.py --read`
 (resolve the path like the bundled-dependency list; invoke the bundled copy as
-`python3 references/scripts/gi-state.py --read`). If `borrowed_skills` contains
+`python3 references/scripts/gi-state.py --read`, which first migrates a legacy
+`.gitissue/` run). If `borrowed_skills` contains
 any `origin: borrowed` entries, run *Teardown* below first — a crashed or
 resumed run must not leave borrowed skills behind. Missing/`{}`/corrupt state:
 nothing to tear down. No `python3`, any non-zero exit including 3, or
@@ -214,7 +215,7 @@ Skip — do not remove, do not repair — any entry whose `name` does not match
 
 For each surviving name, `rm -rf "$HOME/.claude/skills/<name>"` **only if**
 that directory exists **and** it carries the `.idd-borrowed` marker
-written at install time. Teardown checks the marker's **existence only** and
+written at install time (or the legacy `.gitissue-borrowed` an older install wrote). Teardown checks the marker's **existence only** and
 never reads its contents — which is why it is written empty. Leftover teardown
 legitimately releases a *different* (crashed) run's borrow, so an owner
 comparison would silently break cross-run cleanup, and reading the file at all

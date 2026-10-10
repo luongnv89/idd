@@ -215,12 +215,13 @@ Verify that `.idd.yml`, when present, sets `autopilot.mode`. That key makes the 
 
 ### Procedure
 
-1. Check whether `.idd.yml` exists in the repo root. If not, skip with `○ [3/4] Autopilot mode        skipped — no .idd.yml`.
+1. Check whether `.idd.yml` exists in the repo root, else legacy `.gitissue.yml` (print `⚠ legacy .gitissue.yml found — rename to .idd.yml`). If neither, skip with `○ [3/4] Autopilot mode        skipped — no .idd.yml`.
 2. Read the file as text — no YAML parser required; a regex check suffices and adds no dependency. If the file exists but cannot be read, print the *Fail (unreadable)* line and go to Check 4.
 3. Look for a line matching `^[[:space:]]+mode:[[:space:]]*[^#[:space:]]+` inside an `autopilot:` block. Any non-empty value matches; the value is not validated in v1. Equivalent shell heuristic:
 
    ```bash
-   awk '/^autopilot:/{f=1;next} /^[^[:space:]#]/{f=0} f' .idd.yml | grep -E '^[[:space:]]+mode:[[:space:]]*[^#[:space:]]+'
+   cfg=.idd.yml; [ -f "$cfg" ] || cfg=.gitissue.yml
+   awk '/^autopilot:/{f=1;next} /^[^[:space:]#]/{f=0} f' "$cfg" | grep -E '^[[:space:]]+mode:[[:space:]]*[^#[:space:]]+'
    ```
 
 4. If a line matches, the check passes; capture the value for the pass line.

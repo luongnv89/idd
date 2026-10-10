@@ -98,7 +98,7 @@ Load config once at skill start with `python3 shared/scripts/gi-config.py`; neve
 - **Script path:** resolve it relative to this SKILL.md, as the *Bundled dependency precheck* resolves its list — never relative to the working directory.
 - **Run clock:** chain that same `python3` invocation as `python3 …; ec=$?; date +%s >&2; exit "$ec"` and keep the stderr epoch as `run_started_epoch`; the *Run Stats Footer* (`references/run-stats.md`) measures `elapsed` from it.
 
-Exit 0: use `config`; if `first_run` is `true`, print the `○ First run` line below. Exit 3: print *Invalid config* from `references/error-messages.md` and stop. Script file absent: a broken install — stop with the `✗ Missing bundled dependency` block. No `python3`, another non-zero exit, or unparsable stdout: print `⚠ gi-config unavailable — reading .idd.yml by hand` and read it yourself instead. No `.idd.yml` on either path:
+Exit 0: use `config`; if `first_run` is `true`, print the `○ First run` line below. Exit 3: print *Invalid config* from `references/error-messages.md` and stop. Script file absent: a broken install — stop with the `✗ Missing bundled dependency` block. No `python3`, another non-zero exit, or unparsable stdout: print `⚠ gi-config unavailable — reading .idd.yml by hand` and read it yourself instead (else legacy `.gitissue.yml`, printing `⚠ legacy .gitissue.yml found — rename to .idd.yml`). No config file on either path:
 
 ```
 ○ First run — using default config. Run /init-idd to customize.

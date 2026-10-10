@@ -88,7 +88,7 @@ Load config once at skill start; never re-read it. Run `python3 shared/scripts/g
 - **Exit 0** — use `config`.
 - **Exit 3** — print `✗ Invalid config: .idd.yml` with the offending key and reason from stderr, and stop.
 - **Script file absent** — a broken install and not a degrade: stop and print the `✗ Missing bundled dependency` block.
-- **Anything else** (no `python3`, non-zero exit, unparsable stdout) — print `⚠ gi-config unavailable — reading .idd.yml by hand` and read it yourself *instead of* the script.
+- **Anything else** (no `python3`, non-zero exit, unparsable stdout) — print `⚠ gi-config unavailable — reading .idd.yml by hand` and read it yourself *instead of* the script (else legacy `.gitissue.yml`, printing `⚠ legacy .gitissue.yml found — rename to .idd.yml`).
 
 **Capture the run clock here:** chain that same `python3` invocation as `python3 …; ec=$?; date +%s >&2; exit "$ec"`; the stderr epoch is `run_started_epoch`, from which the *Run Stats Footer* (`references/run-stats.md`) measures `elapsed`.
 
@@ -232,7 +232,7 @@ This skill produces `acceptance_criteria` and `traceability` itself, per `refere
 - **Under `qa_handoff = trusted`, skip this step** and report `○ tests skipped (qa handoff @ {commit_sha_short})` — `trusted` holds only against the **live** head, so the soft-pass conjunction therefore treats the test leg as satisfied — only when the marker carries a `tests=` field whose SHA equals `head` **and `ci_leg_runnable` is true**; with no `tests=` field, or a SHA that differs, run the step in full. When `ci_leg_runnable` is false (no CI / empty `statusCheckRollup` / `no_ci` / `review.check_ci: false`), ignore `tests=` and run the local suite as unmarked.
 - **Otherwise:** run the build, then every test type present, with a `review.test_timeout`-second timeout (default 300) — `references/prepass-tests-ci-mechanics.md` (*Step 4*).
 
-**Verification recipe:** when the base branch commits `.idd-recipe.json`, run it in this step with `shared/scripts/gi-recipe.py`, even when the suite is skipped (`qa_handoff = trusted` included). Auto mode runs it only when the recipe opts in `review`. A `result: fail` is fixable and blocks soft-pass (`references/ui-review-mechanics.md`, *Verification recipe*).
+**Verification recipe:** when the base branch commits `.idd-recipe.json` (or legacy `.gitissue-recipe.json`), run it in this step with `shared/scripts/gi-recipe.py`, even when the suite is skipped (`qa_handoff = trusted` included). Auto mode runs it only when the recipe opts in `review`. A `result: fail` is fixable and blocks soft-pass (`references/ui-review-mechanics.md`, *Verification recipe*).
 
 A skip satisfies the soft-pass test leg but evaluated neither check: it reports `× Suite passed` / `× Build clean` with `Result: PARTIAL`, never a silent `√`.
 

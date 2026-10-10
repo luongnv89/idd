@@ -56,6 +56,9 @@ corrupt each other's state long before either reaches a PR.
 python3 shared/scripts/gi-state.py --lock --pid "$PPID"
 ```
 
+A legacy `.gitissue/` run is migrated into `.idd/` first; a live legacy lock
+is held in place, exactly like an `.idd/` one.
+
 **`--pid` names the process that owns the run, not the shell that ran the
 command.** Each of these calls runs in its own throwaway shell that exits the
 instant it finishes, so recording *that* pid would leave a lock whose owner is

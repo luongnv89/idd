@@ -23,7 +23,8 @@ work is involved, then run only the review that *can* and *should* run:
   so it only runs when there is a reachable running app *and* the user opted in.
   When it can't run, it **skips with a warning and the code UI review still
   runs** — fail-soft to code-only, never block.
-- **Verification recipe** is opt-in: a base-ref `.idd-recipe.json`
+- **Verification recipe** is opt-in: a base-ref `.idd-recipe.json` (or legacy
+  `.gitissue-recipe.json`)
   launches, drives and tears down an owned instance (*Verification recipe*).
 
 ## Detection
@@ -119,7 +120,8 @@ success so the review output always states that the headless path ran and where:
 
 ## Verification recipe (optional, opt-in) <!-- a:ui-verification-recipe -->
 
-Project-wide, independent of UI detection: `.idd-recipe.json` maps
+Project-wide, independent of UI detection: `.idd-recipe.json` (legacy
+`.gitissue-recipe.json`, read only when the new name is absent) maps
 **capabilities** to changed paths. The consuming skill runs it through its
 bundled recipe helper (schema in the helper's docstring), which prints one JSON
 verdict.
@@ -142,7 +144,7 @@ verdict.
 - **Verdict:** `result: fail` (a drive exited non-zero or timed out) is an
   `action: "fix"` finding citing that capability's `drive.log`. Exit 3 (invalid
   base-ref recipe, nothing launched) stops with `✗ Invalid verification recipe:
-  .idd-recipe.json at {ref}`, the helper's reason, and `To fix: correct or
+  {recipe file} at {ref}`, the helper's reason, and `To fix: correct or
   remove it on the base branch`. Any other exit or no `python3`: print
   `⚠ Verification recipe skipped — {reason}` and continue. Never hand-run
   recipe commands: owned-only teardown is what the helper guarantees.

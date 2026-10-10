@@ -341,7 +341,7 @@ Not confirmations: auto mode keeps every one of these.
   Missing: ~/.claude/skills/{name}/.idd-borrowed
   Treated as your own install; the stale record is dropped.
 ```
-**Trigger:** Teardown found a recorded `origin: borrowed` directory with no `.idd-borrowed` marker. A stale record can outlive a failed uninstall, and the operator may have installed that skill deliberately since. Never `rm -rf` an unmarked directory — drop the `borrowed_skills` entry and warn instead.
+**Trigger:** Teardown found a recorded `origin: borrowed` directory with neither the `.idd-borrowed` nor the legacy `.gitissue-borrowed` marker. A stale record can outlive a failed uninstall, and the operator may have installed that skill deliberately since. Never `rm -rf` an unmarked directory — drop the `borrowed_skills` entry and warn instead.
 
 ### gi-state unavailable (borrow record)
 ```

@@ -149,7 +149,7 @@ Load config once with `python3 shared/scripts/gi-config.py`:
 - **Exit 0:** use the printed `config`; if `first_run` is `true`, print the `○ First run` line below.
 - **Exit 3:** `.idd.yml` is invalid — apply the stop rule with *Invalid config*.
 - **Script file absent:** a broken install and not a degrade — stop with `✗ Missing bundled dependency`.
-- **Anything else:** print `⚠ gi-config unavailable — using the inline defaults below`, load `.idd.yml` once, and fill missing keys from the defaults below. With no `.idd.yml`, print:
+- **Anything else:** print `⚠ gi-config unavailable — using the inline defaults below`, load `.idd.yml` (else legacy `.gitissue.yml`, printing `⚠ legacy .gitissue.yml found — rename to .idd.yml`) once, and fill missing keys from the defaults below. With neither file, print:
 
 ```
 ○ First run — using default config. Run /init-idd to customize.
@@ -288,7 +288,7 @@ The loop stops on any row except those marked *loop continues* (outcome recorded
 | API rate budget too low to wait out | `✗ Insufficient GitHub API rate budget for auto-pilot`; the summary is persisted with `--report` and reports `Result: RATE LIMITED` |
 | User cancellation | `○ Auto-pilot stopped by user` |
 
-**Release the run lock on every exit path** — every row above, the critical-issue pause, and any unhandled failure — with `python3 shared/scripts/gi-state.py --unlock` as the run's last mutation. If the script is unavailable, delete `.idd/run.lock` by hand.
+**Release the run lock on every exit path** — every row above, the critical-issue pause, and any unhandled failure — with `python3 shared/scripts/gi-state.py --unlock` as the run's last mutation. If the script is unavailable, delete `.idd/run.lock` (or legacy `.gitissue/run.lock`) by hand.
 
 ## Final Summary
 
