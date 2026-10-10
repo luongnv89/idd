@@ -32,6 +32,12 @@
 #        well. The QA parse grep shipped in the built reviewer counts a legacy
 #        marker, an idd marker, and one of each as two (stale); idd-lint I01
 #        accepts either normalized marker and fails on neither.
+#   AC2  the setup skill ships as init-idd (source, build, plugin manifests).
+#   AC1  default constants and a fresh run's files use the idd names.
+#   AC3  `git grep -il gitissue` is empty outside history and an explicit,
+#        file-by-file allowlist; allowlisted prose names `legacy` or the idd
+#        form on every gitissue line. (T8 in test-webpage-ux-clarity-361.sh
+#        stays as the stricter exact-line pin for the public pages.)
 #   Q7   the init-idd Ignore Rule, extracted from the built skill and run:
 #        creates .gitignore, newline-guards, never duplicates, matches
 #        literally (a global excludesFile cannot suppress it), mirrors legacy
@@ -387,8 +393,121 @@ for f in src/skills/plan-to-issues/SKILL.source.md \
   check "Q3: $f preserves either normalized marker byte-for-byte" "$?"
 done
 
+# ── AC2: the setup skill is /init-idd ────────────────────────────────────
 INIT_SRC="$REPO_ROOT/src/skills/init-idd"
 INIT_BUILT="$REPO_ROOT/skills/init-idd/SKILL.md"
+[ -f "$INIT_SRC/SKILL.source.md" ] && sed -n '2,3p' "$INIT_SRC/SKILL.source.md" | grep -qx 'name: init-idd'
+check "AC2: src/skills/init-idd/SKILL.source.md declares name: init-idd" "$?"
+[ ! -e "$REPO_ROOT/src/skills/init-gitissue" ] && [ ! -e "$REPO_ROOT/skills/init-gitissue" ]
+check "AC2: no init-gitissue skill directory in src/ or skills/" "$?"
+[ -f "$INIT_BUILT" ] && grep -qx 'name: init-idd' "$INIT_BUILT"
+check "AC2: the built skills/init-idd/SKILL.md ships as init-idd" "$?"
+grep -qF '"./init-idd"' "$REPO_ROOT/skills/.codex-plugin/plugin.json" \
+  && ! grep -qi 'gitissue' "$REPO_ROOT/skills/.codex-plugin/plugin.json" "$REPO_ROOT/skills/.claude-plugin/plugin.json"
+check "AC2: the plugin manifests list init-idd and never init-gitissue" "$?"
+
+# ── AC1: config and working files under the idd names ────────────────────
+grep -qx 'DEFAULT_CONFIG_NAME = ".idd.yml"' "$CONFIG" \
+  && grep -qx 'CONFIG_NAME = ".idd.yml"' "$SECSCAN" \
+  && grep -qx 'RECIPE_PATH = ".idd-recipe.json"' "$RECIPE" \
+  && grep -qx 'DEFAULT_DIR = ".idd"' "$STATE" \
+  && grep -qx 'DEFAULT_LOG_PATH = ".idd/runs.jsonl"' "$SCRIPTS/gi-runlog.py"
+check "AC1: the default config, recipe, state-dir and run-log constants name idd" "$?"
+F="$TMP/ac1"; mkdir -p "$F"
+out="$(cd "$F" && python3 "$CONFIG" --schema "$SCHEMA" 2>"$F.err")"; rc=$?
+[ "$rc" = "0" ] && [ "$(jget "$out" 'v["first_run"]')" = "True" ] && ! grep -qi 'legacy' "$F.err"
+check "AC1: a fresh gi-config run reports first_run true and no legacy warning (exit $rc)" "$?"
+printf '%s' '{"ts":"2026-01-01T00:00:00Z","event_id":"run-537:42","issue":42,"mode":"balanced","skill":"auto-pilot","outcome":"merged","pr":87}' \
+  | (cd "$F" && python3 "$SCRIPTS/gi-runlog.py" --append >/dev/null 2>&1)
+(cd "$F" && printf '{}' | python3 "$STATE" --init >/dev/null 2>&1)
+[ -s "$F/.idd/runs.jsonl" ] && [ -f "$F/.idd/run-state.json" ] && [ ! -e "$F/.gitissue" ]
+check "AC1: gi-runlog and gi-state write under .idd/ by default, never .gitissue/" "$?"
+
+# ── AC3: no gitissue outside history and intentional legacy mentions ─────
+# History keeps the names each release shipped with; everything else that
+# still says gitissue does so on purpose — a legacy constant, fallback,
+# fixture, dual-namespace reader, or migration pointer — and is named here
+# file by file. A built copy under skills/ is allowed only when its source is.
+# Prose files additionally pass a same-line rule: every line naming gitissue
+# also says `legacy` or names the idd form, so an un-renamed reference inside
+# an allowlisted file still fails.
+ac3_out="$(cd "$REPO_ROOT" && git grep -il gitissue | python3 -c '
+import re, sys
+HISTORY_DIRS = ("docs/release-notes/", "docs/decisions/", "docs/experiments/")
+HISTORY = {"CHANGELOG.md", "changelog.html", "docs/prd.md", "docs/tasks.md",
+           "docs/idea.md", "docs/validate.md", "docs/migrating-from-gitissue.md"}
+CODE = {
+    ".gitignore",                                    # mirrored legacy ignore lines
+    "evals/cases/plan-to-issues/sync/cassettes.json",  # legacy-marker eval fixture
+    "scripts/idd-lint.py",                           # I01 accepts both markers
+    "src/shared/scripts/gi-branch.py", "src/shared/scripts/gi-config.py",
+    "src/shared/scripts/gi-model-cache.py", "src/shared/scripts/gi-recipe.py",
+    "src/shared/scripts/gi-secscan.py", "src/shared/scripts/gi-sensitive.py",
+    "src/shared/scripts/gi-state.py", "src/shared/scripts/gi-triage-graph.py",
+    "tests/test-config-search-ceiling-parity-339.sh", "tests/test-qa-handoff-255.sh",
+    "tests/test-qa-receipt-515.sh", "tests/test-rename-idd-537.sh",
+    "tests/test-webpage-ux-clarity-361.sh",
+}
+PROSE = {
+    "README.md", "SPEC.md", "docs.html", "docs/DEVELOPMENT.md",
+    "docs/config-schema.md", "docs/pre-commit-security.md", "docs/ui-review.md",
+    "src/internal-skills/idd-doctor/SKILL.source.md",
+    "src/skills/auto-pilot/SKILL.source.md",
+    "src/skills/auto-pilot/references/phases/phase-0-lock-resume.md",
+    "src/skills/auto-pilot/references/preflight.md",
+    "src/skills/init-idd/SKILL.source.md", "src/skills/init-idd/docs/README.md",
+    "src/skills/init-idd/references/error-messages.md",
+    "src/skills/init-idd/references/examples.md",
+    "src/skills/init-idd/references/review-contract.md",
+    "src/skills/issue-analysis/SKILL.source.md",
+    "src/skills/issue-creator/SKILL.source.md",
+    "src/skills/issue-creator/references/error-messages.md",
+    "src/skills/issue-creator/references/modes.md",
+    "src/skills/issue-pr-review/SKILL.source.md",
+    "src/skills/issue-pr-review/references/prepass-tests-ci-mechanics.md",
+    "src/skills/issue-pr-review/references/review-loop-mechanics.md",
+    "src/skills/issue-resolver/SKILL.source.md",
+    "src/skills/issue-resolver/references/error-messages.md",
+    "src/skills/issue-resolver/references/report-templates.md",
+    "src/skills/issue-resolver/references/steps/step-3-implement.md",
+    "src/skills/issue-triage/SKILL.source.md",
+    "src/skills/plan-to-issues/SKILL.source.md",
+    "src/skills/plan-to-issues/references/epic-dashboard.md",
+    "src/skills/plan-to-issues/references/phase-contracts.md",
+}
+SAME_LINE = re.compile(r"legacy|\.idd|idd:|init-idd|/idd\b|gitissue\|idd", re.I)
+def source_of(path):
+    parts = path.split("/")
+    if parts[0] != "skills" or len(parts) < 3:
+        return path
+    skill, rest = parts[1], "/".join(parts[2:])
+    if rest == "SKILL.md":
+        return "src/skills/%s/SKILL.source.md" % skill
+    for sub, src in (("references/docs/", "docs/"), ("references/scripts/", "src/shared/scripts/"),
+                     ("references/agents/", "src/shared/agents/")):
+        if rest.startswith(sub):
+            return src + rest[len(sub):]
+    return "src/skills/%s/%s" % (skill, rest)
+bad = []
+for path in sys.stdin.read().split():
+    src = source_of(path)
+    if src in HISTORY or src.startswith(HISTORY_DIRS) or src in CODE:
+        continue
+    if src not in PROSE:
+        bad.append("%s (not allowlisted)" % path)
+        continue
+    for n, line in enumerate(open(path, encoding="utf-8"), 1):
+        if re.search("gitissue", line, re.I) and not SAME_LINE.search(line):
+            bad.append("%s:%d (no legacy/idd on the line)" % (path, n))
+print("\n".join(bad))
+')"
+[ -z "$ac3_out" ]
+check "AC3: gitissue survives only in history and allowlisted legacy mentions${ac3_out:+ — }" "$?"
+[ -z "$ac3_out" ] || printf '%s\n' "$ac3_out" | sed 's/^/      /'
+# A project-wide search covers paths too: only a history record and the
+# migration guide may carry the legacy name in their file name.
+ac3_paths="$(cd "$REPO_ROOT" && git ls-files | grep -i gitissue | grep -vxE 'docs/experiments/[^/]+|docs/migrating-from-gitissue\.md' || true)"
+[ -z "$ac3_paths" ]; check "AC3: no tracked path names gitissue outside history and the migration guide${ac3_paths:+ — $ac3_paths}" "$?"
 
 # ── Q7: the init-idd Ignore Rule (AC4 + mirrored legacy lines) ───────────
 # The snippet is extracted from the BUILT skill, so the test runs what ships.

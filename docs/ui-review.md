@@ -23,9 +23,9 @@ work is involved, then run only the review that *can* and *should* run:
   so it only runs when there is a reachable running app *and* the user opted in.
   When it can't run, it **skips with a warning and the code UI review still
   runs** — fail-soft to code-only, never block.
-- **Verification recipe** is opt-in: a base-ref `.idd-recipe.json` (or legacy
-  `.gitissue-recipe.json`)
-  launches, drives and tears down an owned instance (*Verification recipe*).
+- **Verification recipe** is opt-in: a base-ref `.idd-recipe.json` (or
+  legacy `.gitissue-recipe.json`) launches, drives and tears down an owned
+  instance (*Verification recipe*).
 
 ## Detection
 
@@ -120,8 +120,8 @@ success so the review output always states that the headless path ran and where:
 
 ## Verification recipe (optional, opt-in) <!-- a:ui-verification-recipe -->
 
-Project-wide, independent of UI detection: `.idd-recipe.json` (legacy
-`.gitissue-recipe.json`, read only when the new name is absent) maps
+Project-wide, independent of UI detection: `.idd-recipe.json`
+(legacy `.gitissue-recipe.json`, read only when the new name is absent) maps
 **capabilities** to changed paths. The consuming skill runs it through its
 bundled recipe helper (schema in the helper's docstring), which prints one JSON
 verdict.

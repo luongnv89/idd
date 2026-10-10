@@ -359,6 +359,7 @@ graph TD
 | `docs/naming-conventions.md` | Branch / commit / PR / issue naming |
 | `docs/sample-normalized-issue.md` | Example normalized issue (intent-only) |
 | `docs/ARCHITECTURE.md` | System design, data flow, durable-memory model |
+| `docs/migrating-from-gitissue.md` | Upgrade path from the legacy `gitissue` names to `idd` (issue #537) — project doc, not bundled |
 | `CHANGELOG.md` | Per-release notes |
 | `.claude-plugin/marketplace.json`, `src/plugin/plugin.json` | Self-hosted Claude Code marketplace (git-subdir source `skills/`, pinned to the release tag) and the plugin manifest source the build emits to `skills/.claude-plugin/plugin.json` (issues #469, #492) |
 | `src/internal-skills/idd-doctor/SKILL.source.md` | Read-only health check — run before submitting a PR |

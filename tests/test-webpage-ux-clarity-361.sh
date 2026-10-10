@@ -14,8 +14,11 @@
 #              README-level docs, or docs/config-schema.md, except the
 #              intentional legacy mentions — SPEC.md's legacy
 #              `gitissue:normalized` marker sentence, docs.html's
-#              `id="init-gitissue"` alias anchor for old deep links, and the
-#              release history mirrored on changelog.html
+#              `id="init-gitissue"` alias anchor for old deep links, the
+#              migration pointers (the README upgrade note, the config-schema
+#              note — exact whole lines), and the release history mirrored on
+#              changelog.html. The repo-wide AC3 sweep lives in
+#              tests/test-rename-idd-537.sh
 #   T9       — "IDD Stack" fills every product-name slot: page titles,
 #              og:site_name, JSON-LD names, llms.txt H1, the plugin
 #              displayName, and the plugin README H1. "IDD" alone stays the
@@ -153,8 +156,17 @@ brand_out="$(python3 -c '
 import re, sys
 
 # Intentional legacy survivors only (issue #537): the legacy marker SPEC.md
-# names for deployed issues, and the docs.html alias anchor for old deep links.
+# names for deployed issues, the docs.html alias anchor for old deep links,
+# and the migration pointers — the README upgrade note and the config-schema
+# note init-idd ships — each pinned as an exact whole line. This is the strict
+# per-page pin for the public surface; tests/test-rename-idd-537.sh (AC3)
+# sweeps the whole repository with a looser same-line legacy rule.
 allow = re.compile(r"<!-- gitissue:normalized v1 -->|<span id=\"init-gitissue\" aria-hidden=\"true\"></span>")
+ALLOW_LINES = {
+    "#### Upgrading from the legacy `gitissue` names",
+    "Repos set up before the rename to `idd` keep working: legacy `.gitissue.yml` / `.gitissue/` names are still read, with a ⚠ rename hint. Upgrade every client first, then follow the [legacy-name migration guide](docs/migrating-from-gitissue.md).",
+    "A legacy `.gitissue.yml` / `.gitissue/` still works (⚠ rename hint; `.idd.yml` wins when both exist). Steps: https://github.com/luongnv89/idd/blob/main/docs/migrating-from-gitissue.md",
+}
 # changelog.html mirrors CHANGELOG.md release history, which keeps the names
 # each release shipped with.
 HISTORY = ("changelog.html",)
@@ -163,6 +175,7 @@ for path in sys.argv[1:]:
     if path.endswith(HISTORY):
         continue
     text = open(path, encoding="utf-8").read()
+    text = "".join(l for l in text.splitlines(keepends=True) if l.rstrip("\n") not in ALLOW_LINES)
     scrubbed = allow.sub("", text)
     for m in re.finditer(r"gitissue", scrubbed, re.I):
         ctx = scrubbed[max(0, m.start() - 40): m.end() + 40].replace("\n", "\\n")

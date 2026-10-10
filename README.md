@@ -324,6 +324,10 @@ cp -r idd/skills/<name> ~/.claude/skills/
 
 `skills/` is committed, so this works on a fresh clone with no build step. For other tools, copy into that tool's skills directory instead (e.g. `~/.codex/skills/`). Optional Claude Code extra: `./scripts/build.sh && cp dist/agents/*.md ~/.claude/agents/` registers the shared subagents natively — skills work without it, since every skill bundles its agent prompts.
 
+#### Upgrading from the legacy `gitissue` names
+
+Repos set up before the rename to `idd` keep working: legacy `.gitissue.yml` / `.gitissue/` names are still read, with a ⚠ rename hint. Upgrade every client first, then follow the [legacy-name migration guide](docs/migrating-from-gitissue.md).
+
 ### First issue in 30 seconds
 
 Create a structured issue:

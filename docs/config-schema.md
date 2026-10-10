@@ -612,6 +612,10 @@ graph TD
     style R fill:#4CAF50,color:#fff
 ```
 
+### Migrating from the legacy names
+
+A legacy `.gitissue.yml` / `.gitissue/` still works (⚠ rename hint; `.idd.yml` wins when both exist). Steps: https://github.com/luongnv89/idd/blob/main/docs/migrating-from-gitissue.md
+
 ## `.idd/` Directory
 
 Repo-root state beside `.idd.yml`, created on first use.
