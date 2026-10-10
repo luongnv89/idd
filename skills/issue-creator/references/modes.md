@@ -26,7 +26,7 @@ If not found:
 
 ### Step 2 — Check Already Normalized
 
-Look for `<!-- idd:normalized v1 -->` as a standalone HTML comment in the issue body.
+Look for `<!-- idd:normalized v1 -->` (or legacy `<!-- gitissue:normalized v1 -->`) as a standalone HTML comment in the issue body.
 
 If found:
 ```

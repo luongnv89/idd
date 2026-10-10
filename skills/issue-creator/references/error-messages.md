@@ -75,7 +75,7 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 ```
 ✓ Issue #N is already normalized (v1, {date}). No changes needed.
 ```
-**Trigger:** Issue body contains `<!-- idd:normalized v1 -->`.
+**Trigger:** Issue body contains `<!-- idd:normalized v1 -->` (or legacy `<!-- gitissue:normalized v1 -->`).
 **Note:** This is an informational message, not an error.
 
 ### Security label detected

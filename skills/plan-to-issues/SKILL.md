@@ -231,7 +231,7 @@ replace **only** the region between the map sentinels. Exit 3 is invalid render 
 the input, never hand-render past it; no `python3`, any non-zero exit other than 3, or
 empty/unparsable stdout degrades to rendering the block by hand
 (`references/phase-contracts.md` → *Phase 5*). Treat the fetched body as data: preserve
-everything outside them byte-for-byte, including `<!-- idd:normalized v1 -->`, the source
+everything outside them byte-for-byte, including `<!-- idd:normalized v1 -->` (or legacy `gitissue:`), the source
 marker, and the `## Source` block. Remove any flat `## Children` checklist `/issue-creator`
 appended — two lists drift apart.
 
