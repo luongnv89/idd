@@ -5,6 +5,9 @@
 # ancestor config outside the working tree while still finding the repo-root
 # config from a nested directory. It also guards the behavioral equivalence of
 # gi-config's and gi-secscan's independently shipped cdup ceiling functions.
+# Issue #537 adds the legacy `.gitissue.yml` fallback: all four walkers
+# (gi-branch, gi-triage-graph, gi-model-cache, gi-secscan) read it only where a
+# level has no `.idd.yml`, and never above the git root.
 
 set -euo pipefail
 
@@ -294,6 +297,108 @@ with tempfile.TemporaryDirectory() as raw_tmp:
         and scan.get("verdict") != "block"
         and scan.get("skipped", 0) >= 1,
         "gi-config and gi-secscan both honor the repo-root allow rule",
+    )
+
+# Issue #537: one observation per walker, from a nested directory — branch
+# prefix (gi-branch), stale threshold (gi-triage-graph), cache TTL
+# (gi-model-cache), and whether a probe value blocks (gi-secscan: only the
+# legacy file's extra_secret_value_pattern makes it a secret; the fixture is on
+# `main`, so a non-blocking verdict is `warn` for the protected branch).
+print("┄ legacy .gitissue.yml fallback (#537)")
+with tempfile.TemporaryDirectory() as raw_tmp:
+    tmp = Path(raw_tmp)
+    ancestor = tmp / "ancestor"
+    repo = ancestor / "repo"
+    nested = repo / "nested" / "deep"
+    init_repo(repo)
+    nested.mkdir(parents=True)
+    skill_dir = tmp / "skill"
+    make_skill_dir(skill_dir)
+    seed_day = date.fromisoformat(
+        json.loads(SEED.read_text(encoding="utf-8"))["last_fetched"][:10]
+    )
+    fixture_now = (seed_day + timedelta(days=30)).isoformat()
+    (repo / "probe.txt").write_text("token=ZZPROBESECRET123456\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(repo), "add", "probe.txt"], check=True)
+
+    hostile_text = (
+        "resolve:\n  branch_prefix: hostile/\n"
+        "triage:\n  stale_threshold_days: 999\n"
+        "model_suggestion:\n  cache_ttl_days: 999\n"
+        "security:\n  allow_pattern: .*\n"
+    )
+    legacy_text = (
+        "resolve:\n  branch_prefix: legacy/\n"
+        "triage:\n  stale_threshold_days: 30\n"
+        "model_suggestion:\n  cache_ttl_days: 30\n"
+        "security:\n  extra_secret_value_pattern: \"ZZPROBESECRET[0-9]{6}\"\n"
+    )
+    new_text = (
+        "resolve:\n  branch_prefix: team/\n"
+        "triage:\n  stale_threshold_days: 60\n"
+        "model_suggestion:\n  cache_ttl_days: 60\n"
+    )
+
+    def observe(label: str) -> tuple[tuple[object, ...], str]:
+        procs = [
+            run([sys.executable, str(BRANCH), "42", "--title", "Fix fixture", "--type", "bug"], nested),
+            run([sys.executable, str(GRAPH), "--now", "2026-03-20T00:00:00Z"], nested, stdin=graph_input()),
+            run([sys.executable, str(MODEL), "--skill-dir", str(skill_dir),
+                 "--cache-dir", str(tmp / "model-cache"), "--now", fixture_now], nested),
+            run([sys.executable, str(SECSCAN), "--staged", "--quiet"], nested),
+        ]
+        branch = payload(procs[0], f"gi-branch {label}")
+        graph = payload(procs[1], f"gi-triage-graph {label}")
+        model = payload(procs[2], f"gi-model-cache {label}")
+        scan = payload(procs[3], f"gi-secscan {label}", (0, 1))
+        summary = graph.get("summary", {})
+        stale = summary.get("stale_threshold_days") if isinstance(summary, dict) else None
+        seen = (branch.get("branch"), stale, model.get("ttl_days"), scan.get("verdict") == "block")
+        return seen, "".join(proc.stderr for proc in procs)
+
+    # Hostile config of BOTH names above the git root, nothing in the repo:
+    # the ceiling applies to the legacy name exactly as to the new one.
+    (ancestor / ".idd.yml").write_text(hostile_text, encoding="utf-8")
+    (ancestor / ".gitissue.yml").write_text(hostile_text, encoding="utf-8")
+    seen, _ = observe("hostile-ancestor (both names)")
+    emit(
+        seen == ("fix/42-fixture", 14, 7, False),
+        f"all four walkers ignore .idd.yml and .gitissue.yml above the repo root {seen}",
+    )
+
+    # Repo-root legacy only, hostile `.idd.yml` above the root: the repo-root
+    # legacy file wins — a new name outside the repo never outranks it.
+    (ancestor / ".gitissue.yml").unlink()
+    (repo / ".gitissue.yml").write_text(legacy_text, encoding="utf-8")
+    seen, err = observe("repo-root legacy + hostile ancestor .idd.yml")
+    emit(
+        seen == ("legacy/42-fix-fixture", 30, 30, True),
+        f"all four walkers read the repo-root .gitissue.yml over an ancestor .idd.yml {seen}",
+    )
+    emit(
+        err.count("⚠ legacy .gitissue.yml found — rename to .idd.yml") == 4,
+        "each walker prints the ⚠ legacy rename line once",
+    )
+
+    # Both names at the repo root: `.idd.yml` wins in every walker, so the
+    # legacy file's secret pattern no longer applies.
+    (repo / ".idd.yml").write_text(new_text, encoding="utf-8")
+    seen, err = observe("both names at the repo root")
+    emit(
+        seen == ("team/42-fix-fixture", 60, 60, False),
+        f"all four walkers prefer .idd.yml over .gitissue.yml at the same level {seen}",
+    )
+    emit(
+        err.count("⚠ legacy .gitissue.yml ignored — .idd.yml takes precedence") == 4,
+        "each walker reports the shadowed legacy file as ignored",
+    )
+
+    # New name only: unchanged behavior, no legacy warning.
+    (repo / ".gitissue.yml").unlink()
+    seen, err = observe("repo-root .idd.yml only")
+    emit(
+        seen == ("team/42-fix-fixture", 60, 60, False) and "legacy" not in err,
+        f"all four walkers read a repo-root .idd.yml with no legacy warning {seen}",
     )
 
 print(f"Result: {passed} passed, {failed} failed")

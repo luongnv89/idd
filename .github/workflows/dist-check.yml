@@ -376,6 +376,9 @@ jobs:
       - name: test-verification-recipes-523
         run: bash tests/test-verification-recipes-523.sh
 
+      - name: test-rename-idd-537
+        run: bash tests/test-rename-idd-537.sh
+
       - name: test-postmerge-cleanup
         run: bash tests/test-postmerge-cleanup.sh
 
