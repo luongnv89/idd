@@ -32,6 +32,12 @@
 #        well. The QA parse grep shipped in the built reviewer counts a legacy
 #        marker, an idd marker, and one of each as two (stale); idd-lint I01
 #        accepts either normalized marker and fails on neither.
+#   Q7   the init-idd Ignore Rule, extracted from the built skill and run:
+#        creates .gitignore, newline-guards, never duplicates, matches
+#        literally (a global excludesFile cannot suppress it), mirrors legacy
+#        `.gitissue/` lines; prose pins it ahead of every terminal path.
+#   Q8   init-idd treats a legacy-only `.gitissue.yml` as the existing config;
+#        after the auto-mode cancel its security.* still governs the scan.
 #
 # Usage: bash tests/test-rename-idd-537.sh
 # Returns: exit 0 if all checks pass, exit 1 on failure.
@@ -380,6 +386,92 @@ for f in src/skills/plan-to-issues/SKILL.source.md \
   grep -F '<!-- idd:normalized v1 -->' "$REPO_ROOT/$f" | grep -qF 'legacy `gitissue:`'
   check "Q3: $f preserves either normalized marker byte-for-byte" "$?"
 done
+
+INIT_SRC="$REPO_ROOT/src/skills/init-idd"
+INIT_BUILT="$REPO_ROOT/skills/init-idd/SKILL.md"
+
+# ── Q7: the init-idd Ignore Rule (AC4 + mirrored legacy lines) ───────────
+# The snippet is extracted from the BUILT skill, so the test runs what ships.
+SNIP="$TMP/idd-gitignore.sh"
+awk '/^# idd-gitignore$/{f=1} f && /^```$/{exit} f' "$INIT_BUILT" > "$SNIP"
+grep -q '^add \.idd/cache/$' "$SNIP"
+check "Q7: the shipped Ignore Rule snippet is extracted from skills/init-idd/SKILL.md" "$?"
+gi_run() { (cd "$1" && sh "$SNIP") >"$1.out" 2>&1; }
+lines_of() { grep -cxF -- "$2" "$1/.gitignore" 2>/dev/null; }
+
+G="$TMP/q7-absent"; new_repo "$G"
+gi_run "$G"; gi_run "$G"
+[ -f "$G/.gitignore" ] && [ "$(cat "$G/.gitignore")" = ".idd/cache/" ]
+check "Q7: an absent .gitignore is created holding exactly one .idd/cache/ line after two runs" "$?"
+
+G="$TMP/q7-nonl"; new_repo "$G"; printf 'node_modules/\n*.log' > "$G/.gitignore"
+gi_run "$G"
+[ "$(sed -n 2p "$G/.gitignore")" = "*.log" ] && [ "$(sed -n 3p "$G/.gitignore")" = ".idd/cache/" ] \
+  && [ "$(wc -l < "$G/.gitignore" | tr -d ' ')" = "3" ]
+check "Q7: a file with no trailing newline keeps its last line and gets .idd/cache/ on its own line" "$?"
+gi_run "$G"; [ "$(lines_of "$G" .idd/cache/)" = "1" ]
+check "Q7: a second run adds no duplicate" "$?"
+
+for form in '.idd/' '/.idd/' '.idd/cache' '/.idd/cache/' '  .idd/cache/  '; do
+  G="$TMP/q7-form"; rm -rf "$G" "$G.out"; new_repo "$G"; printf '%s\n' "$form" > "$G/.gitignore"
+  gi_run "$G"
+  [ "$(cat "$G/.gitignore")" = "$form" ] && [ ! -s "$G.out" ]
+  check "Q7: an existing '$form' line already ignores the cache — nothing appended" "$?"
+done
+
+# A global excludesFile and .git/info/exclude must not stand in for the
+# committed rule: the match is literal against the repo's own .gitignore.
+G="$TMP/q7-global"; new_repo "$G"; printf 'dist/\n' > "$G/.gitignore"
+printf '.idd/\n' > "$TMP/global-excludes"; printf '.idd/cache/\n' >> "$G/.git/info/exclude"
+printf '[core]\n\texcludesFile = %s\n' "$TMP/global-excludes" > "$TMP/gitconfig-global"
+(cd "$G" && GIT_CONFIG_GLOBAL="$TMP/gitconfig-global" git check-ignore -q .idd/cache/x)
+check "Q7: control — git check-ignore already reports .idd/cache/ ignored in this fixture" "$?"
+(cd "$G" && GIT_CONFIG_GLOBAL="$TMP/gitconfig-global" sh "$SNIP") >/dev/null 2>&1
+[ "$(lines_of "$G" .idd/cache/)" = "1" ]
+check "Q7: a global excludesFile / info/exclude rule does not suppress the committed .idd/cache/ line" "$?"
+
+G="$TMP/q7-mirror"; new_repo "$G"; printf '.gitissue/run-state.json\n.gitissue/cache/\n' > "$G/.gitignore"
+gi_run "$G"; gi_run "$G"
+[ "$(lines_of "$G" .idd/run-state.json)" = "1" ] && [ "$(lines_of "$G" .idd/cache/)" = "1" ] \
+  && [ "$(lines_of "$G" .gitissue/run-state.json)" = "1" ] && [ "$(wc -l < "$G/.gitignore" | tr -d ' ')" = "4" ]
+check "Q7: legacy .gitissue/ lines are mirrored as .idd/ lines, each exactly once after two runs" "$?"
+
+G="$TMP/q7-dogfood"; new_repo "$G"; cp "$REPO_ROOT/.gitignore" "$G/.gitignore"
+gi_run "$G"; cmp -s "$REPO_ROOT/.gitignore" "$G/.gitignore"
+check "Q7: this repository's own .gitignore already carries every mirror — the rule appends nothing" "$?"
+
+# Prose pins: the rule runs before the Configuration Check, so every outcome
+# after it — cancel, auto-mode cancel, every BLOCKED stop — has run it.
+. "$REPO_ROOT/tests/lib/anchors.bash"
+anchor_check "$INIT_SRC/SKILL.source.md" init-gitignore 'auto-mode cancel' "Q7: the Ignore Rule names the auto-mode cancel path"
+anchor_check "$INIT_SRC/SKILL.source.md" init-gitignore '`BLOCKED` stop' "Q7: the Ignore Rule names every BLOCKED stop"
+anchor_check "$INIT_SRC/SKILL.source.md" init-gitignore '\*\*never\*\* `git check-ignore`' "Q7: the presence check is literal, never git check-ignore"
+awk '/^## Ignore Rule$/{i=NR} /^## Configuration Check$/{c=NR} END{exit !(i && c && i < c)}' "$INIT_SRC/SKILL.source.md"
+check "Q7: the Ignore Rule section precedes the Configuration Check" "$?"
+grep -qF -- '- **cancel** — make no change to the config (the *Ignore Rule* already ran).' "$INIT_SRC/SKILL.source.md" \
+  && grep -qF 'take **cancel**, the safe default (the *Ignore Rule* still ran).' "$INIT_SRC/SKILL.source.md"
+check "Q7: the cancel and auto-mode cancel bullets no longer say make no change without the exemption" "$?"
+grep -qF '### Could not update .gitignore' "$INIT_SRC/references/error-messages.md"
+check "Q7: init-idd's error catalog carries the non-fatal .gitignore write failure" "$?"
+
+# ── Q8: a legacy-only .gitissue.yml is the existing config ───────────────
+anchor_check "$INIT_SRC/SKILL.source.md" init-legacy-config '\*\*never\*\* create a fresh file' "Q8: init-idd never creates a fresh config over a legacy-only one"
+anchor_check "$INIT_SRC/SKILL.source.md" init-legacy-config 'Auto mode takes cancel' "Q8: auto mode cancels on a legacy-only config"
+anchor_check "$INIT_SRC/SKILL.source.md" init-legacy-config 'no `\.idd\.yml` is written' "Q8: the auto-mode cancel writes no .idd.yml"
+anchor_check "$INIT_SRC/SKILL.source.md" init-legacy-config '⚠ legacy \.gitissue\.yml found — rename to \.idd\.yml \(git mv \.gitissue\.yml \.idd\.yml\)' "Q8: the auto-mode cancel prints the rename hint"
+anchor_check "$INIT_SRC/SKILL.source.md" init-legacy-config '`security:` included' "Q8: merge keeps every legacy key, security: included"
+anchor_check "$INIT_SRC/SKILL.source.md" init-legacy-config 'git rm \.gitissue\.yml' "Q8: a legacy merge or overwrite ends with git rm .gitissue.yml"
+# Effect: the auto-mode outcome (Ignore Rule ran, nothing else written) leaves
+# the legacy policy in force — the work-tree scan still blocks its pattern.
+R="$TMP/q8"; new_repo "$R"; printf '%s' "$LEGACY_POLICY" > "$R/.gitissue.yml"; commit_all "$R" base
+legacy_sum="$(cksum < "$R/.gitissue.yml")"
+gi_run "$R"
+[ ! -e "$R/.idd.yml" ] && [ "$(cksum < "$R/.gitissue.yml")" = "$legacy_sum" ]
+check "Q8: after the auto-mode outcome no .idd.yml exists and the legacy file is untouched" "$?"
+(cd "$R" && printf 'token=ZZPROBESECRET123456\n' > leak.txt && git add leak.txt)
+out="$(cd "$R" && python3 "$SECSCAN" --staged --quiet 2>/dev/null)"; rc=$?
+[ "$rc" = "1" ] && [ "$(jget "$out" 'v["verdict"]')" = "block" ]
+check "Q8: the legacy security.extra_secret_value_pattern still blocks a matching file (exit $rc)" "$?"
 
 grep -q 'test-rename-idd-537' "$REPO_ROOT/.github/workflows/dist-check.yml"
 check "the suite is registered in dist-check.yml" "$?"

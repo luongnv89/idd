@@ -26,7 +26,13 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 
   Choose: [overwrite/merge/cancel]
 ```
-**Trigger:** `.idd.yml` already exists in the repo root and the run is interactive. In auto mode (`--auto` or `IDD_AUTO_MODE=1`) this prompt is not shown: print `⚠ Auto mode: overwrite/merge/cancel prompt skipped — kept the existing .idd.yml (cancel).` and take **cancel**.
+**Trigger:** `.idd.yml` (or, with no `.idd.yml`, the legacy `.gitissue.yml` — the prompt then names it) already exists in the repo root and the run is interactive. In auto mode (`--auto` or `IDD_AUTO_MODE=1`) this prompt is not shown: print `⚠ Auto mode: overwrite/merge/cancel prompt skipped — kept the existing .idd.yml (cancel).` and take **cancel**.
+
+### Legacy config found
+```
+⚠ legacy .gitissue.yml found — rename to .idd.yml (git mv .gitissue.yml .idd.yml)
+```
+**Trigger:** only the legacy `.gitissue.yml` exists and the run is in auto mode. It is kept untouched and no `.idd.yml` is written (`Result: CANCELLED`). Interactive runs show the *Config already exists* prompt instead and, after merge or overwrite, tell the user to `git rm .gitissue.yml`. Steps: https://github.com/luongnv89/idd/blob/main/docs/migrating-from-gitissue.md
 
 ### Existing config does not parse
 ```
@@ -79,6 +85,17 @@ All errors follow the rich error format: what went wrong + fix command + docs li
   Docs:    https://github.com/luongnv89/idd/blob/main/docs/config-schema.md
 ```
 **Trigger:** File write to `.idd.yml` fails (permission denied, disk full, read-only filesystem).
+
+### Could not update .gitignore
+```
+⚠ Could not update .gitignore — .idd/cache/ may not be ignored
+
+  {error output from the Ignore Rule}
+
+  To fix:  printf '.idd/cache/\n' >> .gitignore
+  Check:   ls -la .gitignore
+```
+**Trigger:** the *Ignore Rule* snippet printed an error (permission denied, read-only file). A warning, not a stop: the config result stands, and the `.gitignore:` row shows `⚠ warn (write failed)`.
 
 ### Directory not writable
 ```

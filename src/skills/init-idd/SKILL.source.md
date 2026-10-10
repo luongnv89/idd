@@ -4,7 +4,7 @@ description: "Generate a .idd.yml by auto-detecting a repo's stack, test runner,
 license: MIT
 compatibility: "Requires git. No GitHub CLI or authentication needed — generates a local config file only."
 metadata:
-  version: 0.4.0
+  version: 0.5.0
   author: "Luong NGUYEN <luongnv89@gmail.com>"
   effort: low
 ---
@@ -20,18 +20,19 @@ Initialize IDD Stack for the current repository. Scans the codebase to detect la
 - **Do** run this skill the first time a repository starts using IDD Stack, or when the existing `.idd.yml` is outdated after a stack migration.
 - **Do** treat it as idempotent for the "already exists" path — merge or overwrite based on user confirmation.
 - **Avoid** running it every session — it is a one-time setup skill.
-- **Never** modify or delete files outside the repo root, and never commit the generated config (leave that to the user).
+- **Never** modify or delete files outside the repo root, and never commit anything (leave that to the user). Inside it, write only `.idd.yml` and the repo's own `.gitignore` (*Ignore Rule*).
 
 **Context and token budget:** this skill stays small — it reads only a handful of files (`package.json`, `requirements.txt`, etc.) to keep the main agent's context window compact.
 
 ## Instructions
 
 1. Verify prerequisites (git repo present).
-2. Check for an existing `.idd.yml` and follow the merge path if found.
-3. Scan the repository to detect language, framework, test runner, and size.
-4. Suggest defaults based on detection.
-5. Write `.idd.yml` to the repo root.
-6. Print a report of detected values and next-step suggestions.
+2. Make `.gitignore` ignore `.idd/cache/` (*Ignore Rule* — every path).
+3. Check for an existing `.idd.yml` (or legacy `.gitissue.yml`) and follow the merge path if found.
+4. Scan the repository to detect language, framework, test runner, and size.
+5. Suggest defaults based on detection.
+6. Write `.idd.yml` to the repo root.
+7. Print a report of detected values and next-step suggestions.
 
 ## Prerequisites
 
@@ -74,19 +75,43 @@ Check these files relative to the skill's directory (the dirname of this SKILL.m
 - `references/docs/terminal-style.md` — terminal output style contract (symbols, output structure, table/error formats)
 - `references/scripts/gi-stack-detect.py` — language, framework, test-runner, and size detection
 
+## Ignore Rule
+
+Runs once the prerequisites pass, before the *Configuration Check*, so **every** later outcome — create, overwrite, merge, cancel, auto-mode cancel, and each `BLOCKED` stop — has run it. It creates `.gitignore` when absent, mirrors each legacy `.gitissue/<x>` line as `.idd/<x>`, then adds `.idd/cache/`; a line already present is never added twice. "Present" is a literal match against this repo's own `.gitignore` (trimmed, one leading `/` ignored; `.idd/` also covers the cache) — **never** `git check-ignore`: a global or `.git/info/exclude` rule must not stand in for the committed one. Run it exactly, with `sh`, from `git rev-parse --show-toplevel`: <!-- a:init-gitignore -->
+
+```sh
+# idd-gitignore
+f=.gitignore; if [ ! -f "$f" ]; then : > "$f" && echo "created $f"; fi
+has() { awk -v t="$1" 'function n(s) { gsub(/^[ \t]+|[ \t\r]+$/, "", s); sub(/^\//, "", s); return s }
+  BEGIN { t = n(t); a = t; if (!sub(/\/$/, "", a)) a = a "/" }
+  { l = n($0) } l == t || l == a || (l == ".idd/" && t !~ /^!/) { h = 1 } END { exit !h }' "$f"; }
+add() { has "$1" && return 0
+  [ -s "$f" ] && [ -n "$(tail -c 1 "$f")" ] && printf '\n' >> "$f"
+  printf '%s\n' "$1" >> "$f" && echo "added $1"; }
+m=$(awk '{ gsub(/^[ \t]+|[ \t\r]+$/, "") } /^!?\/?\.gitissue\/./ { sub(/\.gitissue\//, ".idd/"); print }' "$f")
+printf '%s\n' "$m" | while IFS= read -r x; do [ -z "$x" ] || add "$x"; done
+add .idd/cache/
+```
+
+Each `created` / `added` line is a change; none means `○ already ignored`. Any error output means the write failed: print *Could not update .gitignore* (`references/error-messages.md`) and continue — the config result stands. It feeds the `.gitignore:` report row.
+
 ## Configuration Check
 
 This skill GENERATES the config — it does not read one. Check if `.idd.yml` already exists in the repo root before proceeding. **Capture the run clock in that same check:** chain the first shell as `…; ec=$?; date +%s >&2; exit "$ec"` and keep the stderr epoch as `run_started_epoch` — the check's exit stays intact, it costs no extra round trip, and it is what the *Run Stats Footer* (`references/run-stats.md`) measures `elapsed` from.
 
 ### File does NOT exist — always create
 
-When the file is missing, **always create it** without prompting. This happens regardless of context — even when the skill is invoked non-interactively from another skill. No early exit, no conditions, no cancel option.
+When the file is missing (and no legacy `.gitissue.yml` stands in for it — *Legacy names*), **always create it** without prompting. This happens regardless of context — even when the skill is invoked non-interactively from another skill. No early exit, no conditions, no cancel option.
 
 ```
 ○ No .idd.yml found — generating config...
 ```
 
 Proceed directly to **Step 1 — Scan Repository**.
+
+### Legacy names
+
+A legacy `.gitissue.yml` with no `.idd.yml` beside it **is** the existing config — **never** create a fresh file over it. <!-- a:init-legacy-config --> Take *File exists* below with it as that file (the prompt names `.gitissue.yml`): merge reads it (every key kept, `security:` included) and writes `.idd.yml`; overwrite writes `.idd.yml`; after either, tell the user to `git rm .gitissue.yml`. Auto mode takes cancel: the legacy file stays untouched, no `.idd.yml` is written, and it prints `⚠ legacy .gitissue.yml found — rename to .idd.yml (git mv .gitissue.yml .idd.yml)`. When both exist, `.idd.yml` is the existing config. A legacy `.gitissue/` directory prints `○ legacy .gitissue/ found — move or delete its machine-local files:` and, on its own line, https://github.com/luongnv89/idd/blob/main/docs/migrating-from-gitissue.md
 
 ### File exists — ask user
 
@@ -105,8 +130,8 @@ If the file already exists, show the prompt from `references/error-messages.md`:
 
 - **overwrite** — run full generation. Keep the existing file until Step 3 replaces it in one write.
 - **merge** — read the existing file. If it does not parse as YAML, print *Existing config does not parse* (`references/error-messages.md`), leave it untouched, and stop with `Result: BLOCKED`. Otherwise preserve every user-set value and add only the schema fields it lacks.
-- **cancel** — make no change. Report `Result: CANCELLED`.
-- **Auto mode** (`--auto` or `IDD_AUTO_MODE=1`) — do not prompt. Print `⚠ Auto mode: overwrite/merge/cancel prompt skipped — kept the existing .idd.yml (cancel).` and take **cancel**, the safe default.
+- **cancel** — make no change to the config (the *Ignore Rule* already ran). Report `Result: CANCELLED`.
+- **Auto mode** (`--auto` or `IDD_AUTO_MODE=1`) — do not prompt. Print `⚠ Auto mode: overwrite/merge/cancel prompt skipped — kept the existing .idd.yml (cancel).` and take **cancel**, the safe default (the *Ignore Rule* still ran).
 
 ---
 
@@ -345,6 +370,7 @@ a check that ran and passed.
   Config:            ✓ generated .idd.yml
   Validation:        ✓ parses as YAML, no placeholders left, platform set
   Merge settings:    ✓ squash-only, PR_BODY
+  .gitignore:        ✓ added .idd/cache/
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Evidence:          gi-stack-detect exit 0; re-read with {parser}
   Uncertainty:       values from marker files; no test command run
@@ -407,6 +433,8 @@ and set `Result: PARTIAL — config written; parse check skipped`.
   Config:            ✓ replaced .idd.yml with new config
 ```
 
+**Ignore rule** — `○ already ignored` when nothing was added; `⚠ warn (write failed)` after *Could not update .gitignore*.
+
 ---
 
 ## Example Runs
@@ -421,9 +449,9 @@ Terminal output follows the `docs/terminal-style.md` contract — symbols `● �
 
 ## Expected Output
 
-After a successful run the repo root contains a validated `.idd.yml` and the
-terminal prints the *Step 4 — Report* block above — the `Validation:` row is the
-checkable bar: the run only reports `DONE` after the written file parsed as YAML
+After a successful run the repo root contains a validated `.idd.yml`, a
+`.gitignore` that ignores `.idd/cache/`, and the terminal prints the *Step 4 —
+Report* block above — the `Validation:` row is the checkable bar: the run only reports `DONE` after the written file parsed as YAML
 with no placeholder tokens left and a `platform` key. Variations (merge mode,
 missing framework, missing test runner) are listed under that step. Grade report
 understanding — findable result, separated facts, traceable claims, clear next
@@ -431,7 +459,7 @@ decision — with the criteria in `references/review-contract.md`.
 
 ## Edge Cases
 
-- **Config already exists** — interactive runs show an overwrite / merge / cancel prompt; auto mode skips it, takes cancel, and prints the `⚠ Auto mode:` line. Neither prints a diff of detected vs current values.
+- **Config already exists** (or only legacy `.gitissue.yml`) — interactive runs show an overwrite / merge / cancel prompt; auto mode skips it, takes cancel, and prints the `⚠ Auto mode:` line. Neither prints a diff of detected vs current values, and neither skips the *Ignore Rule*.
 - **Unrecognized language** — falls back to a minimal generic config with inline comments guiding manual edits.
 - **Not a git repository** — prints the exact error from `references/error-messages.md` and stops; no file is written.
 - **Empty repo (no source files)** — writes a minimal default config; the Language and Test runner rows print their `⚠ warn` variants.
