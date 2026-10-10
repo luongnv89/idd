@@ -555,6 +555,27 @@ gi_run "$G"; gi_run "$G"
   && [ "$(lines_of "$G" .gitissue/run-state.json)" = "1" ] && [ "$(wc -l < "$G/.gitignore" | tr -d ' ')" = "4" ]
 check "Q7: legacy .gitissue/ lines are mirrored as .idd/ lines, each exactly once after two runs" "$?"
 
+# A whole-directory legacy line mirrors too. `.idd/` covers the cache under
+# the presence rule; a bare `.idd` does not, so `.idd/cache/` is still added.
+G="$TMP/q7-wholedir"; new_repo "$G"; printf '.gitissue/\n' > "$G/.gitignore"
+gi_run "$G"; gi_run "$G"
+[ "$(lines_of "$G" .idd/)" = "1" ] && [ "$(lines_of "$G" .idd/cache/)" = "0" ] \
+  && [ "$(wc -l < "$G/.gitignore" | tr -d ' ')" = "2" ]
+check "Q7: a whole-dir .gitissue/ line is mirrored as .idd/ once after two runs (cache covered, not appended)" "$?"
+G="$TMP/q7-wholedir-bare"; new_repo "$G"; printf '/.gitissue\n' > "$G/.gitignore"
+gi_run "$G"; gi_run "$G"
+[ "$(lines_of "$G" /.idd)" = "1" ] && [ "$(lines_of "$G" .idd/cache/)" = "1" ] \
+  && [ "$(wc -l < "$G/.gitignore" | tr -d ' ')" = "3" ]
+check "Q7: a bare /.gitissue line is mirrored as /.idd once after two runs" "$?"
+G="$TMP/q7-wholedir-have"; new_repo "$G"; printf '.gitissue/\n/.idd/\n' > "$G/.gitignore"
+gi_run "$G"
+[ "$(cat "$G/.gitignore")" = "$(printf '.gitissue/\n/.idd/')" ] && [ ! -s "$G.out" ]
+check "Q7: an existing /.idd/ line suppresses the whole-dir mirror — nothing appended" "$?"
+G="$TMP/q7-yml"; new_repo "$G"; printf '.gitissue.yml\n' > "$G/.gitignore"
+gi_run "$G"
+[ "$(cat "$G/.gitignore")" = "$(printf '.gitissue.yml\n.idd/cache/')" ]
+check "Q7: a .gitissue.yml line is not a directory line — it is not mirrored" "$?"
+
 G="$TMP/q7-dogfood"; new_repo "$G"; cp "$REPO_ROOT/.gitignore" "$G/.gitignore"
 gi_run "$G"; cmp -s "$REPO_ROOT/.gitignore" "$G/.gitignore"
 check "Q7: this repository's own .gitignore already carries every mirror — the rule appends nothing" "$?"
@@ -580,13 +601,16 @@ anchor_check "$INIT_SRC/SKILL.source.md" init-legacy-config 'no `\.idd\.yml` is 
 anchor_check "$INIT_SRC/SKILL.source.md" init-legacy-config '⚠ legacy \.gitissue\.yml found — rename to \.idd\.yml \(git mv \.gitissue\.yml \.idd\.yml\)' "Q8: the auto-mode cancel prints the rename hint"
 anchor_check "$INIT_SRC/SKILL.source.md" init-legacy-config '`security:` included' "Q8: merge keeps every legacy key, security: included"
 anchor_check "$INIT_SRC/SKILL.source.md" init-legacy-config 'git rm \.gitissue\.yml' "Q8: a legacy merge or overwrite ends with git rm .gitissue.yml"
-# Effect: the auto-mode outcome (Ignore Rule ran, nothing else written) leaves
-# the legacy policy in force — the work-tree scan still blocks its pattern.
+# The auto-mode-cancel contract itself is pinned by the init-legacy-config
+# prose checks above. The effect check below runs only the Ignore Rule (the
+# one shell step that cancel path executes): it guards that the rule leaves
+# a legacy config alone, and that the legacy policy then still governs the
+# work-tree scan.
 R="$TMP/q8"; new_repo "$R"; printf '%s' "$LEGACY_POLICY" > "$R/.gitissue.yml"; commit_all "$R" base
 legacy_sum="$(cksum < "$R/.gitissue.yml")"
 gi_run "$R"
 [ ! -e "$R/.idd.yml" ] && [ "$(cksum < "$R/.gitissue.yml")" = "$legacy_sum" ]
-check "Q8: after the auto-mode outcome no .idd.yml exists and the legacy file is untouched" "$?"
+check "Q8: the Ignore Rule writes no .idd.yml and leaves the legacy .gitissue.yml untouched" "$?"
 (cd "$R" && printf 'token=ZZPROBESECRET123456\n' > leak.txt && git add leak.txt)
 out="$(cd "$R" && python3 "$SECSCAN" --staged --quiet 2>/dev/null)"; rc=$?
 [ "$rc" = "1" ] && [ "$(jget "$out" 'v["verdict"]')" = "block" ]

@@ -72,8 +72,9 @@ files. Copy every key you rely on before you add the new file.
 3. **Rename the recipe**, if you have one:
    `git mv .gitissue-recipe.json .idd-recipe.json`.
 4. **Mirror your ignore lines.** For every `.gitissue/<x>` line in
-   `.gitignore`, add `.idd/<x>`. Re-running `/init-idd` does this for you and
-   also adds `.idd/cache/`. It never adds a line twice.
+   `.gitignore`, add `.idd/<x>`; for a whole-directory `.gitissue/` (or
+   `.gitissue`) line, add `.idd/` (or `.idd`). Re-running `/init-idd` does
+   this for you and also adds `.idd/cache/`. It never adds a line twice.
 5. **Clear out `.gitissue/`.** Its files are machine-local. Only `runs.jsonl`
    (the run log) and `run-state.json` (an unfinished auto-pilot run) are worth
    moving into `.idd/`. Everything else is regenerated, and `gi-state.py`

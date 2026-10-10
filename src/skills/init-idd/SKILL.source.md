@@ -77,7 +77,7 @@ Check these files relative to the skill's directory (the dirname of this SKILL.m
 
 ## Ignore Rule
 
-Runs once the prerequisites pass, before the *Configuration Check*, so **every** later outcome — create, overwrite, merge, cancel, auto-mode cancel, and each `BLOCKED` stop — has run it. It creates `.gitignore` when absent, mirrors each legacy `.gitissue/<x>` line as `.idd/<x>`, then adds `.idd/cache/`; a line already present is never added twice. "Present" is a literal match against this repo's own `.gitignore` (trimmed, one leading `/` ignored; `.idd/` also covers the cache) — **never** `git check-ignore`: a global or `.git/info/exclude` rule must not stand in for the committed one. Run it exactly, with `sh`, from `git rev-parse --show-toplevel`: <!-- a:init-gitignore -->
+Runs once the prerequisites pass, before the *Configuration Check*, so **every** later outcome — create, overwrite, merge, cancel, auto-mode cancel, and each `BLOCKED` stop — has run it. It creates `.gitignore` when absent, mirrors each legacy `.gitissue[/<x>]` line as `.idd[/<x>]`, then adds `.idd/cache/`; a line already present is never added twice. "Present" is a literal match against this repo's own `.gitignore` (trimmed, one leading `/` ignored; `.idd/` also covers the cache) — **never** `git check-ignore`: a global or `.git/info/exclude` rule must not stand in for the committed one. Run it exactly, with `sh`, from `git rev-parse --show-toplevel`: <!-- a:init-gitignore -->
 
 ```sh
 # idd-gitignore
@@ -88,7 +88,7 @@ has() { awk -v t="$1" 'function n(s) { gsub(/^[ \t]+|[ \t\r]+$/, "", s); sub(/^\
 add() { has "$1" && return 0
   [ -s "$f" ] && [ -n "$(tail -c 1 "$f")" ] && printf '\n' >> "$f"
   printf '%s\n' "$1" >> "$f" && echo "added $1"; }
-m=$(awk '{ gsub(/^[ \t]+|[ \t\r]+$/, "") } /^!?\/?\.gitissue\/./ { sub(/\.gitissue\//, ".idd/"); print }' "$f")
+m=$(awk '{ gsub(/^[ \t]+|[ \t\r]+$/, "") } /^!?\/?\.gitissue(\/|$)/ { sub(/\.gitissue/, ".idd"); print }' "$f")
 printf '%s\n' "$m" | while IFS= read -r x; do [ -z "$x" ] || add "$x"; done
 add .idd/cache/
 ```
