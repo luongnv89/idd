@@ -41,7 +41,7 @@ Load config once; never re-read it. Run `python3 references/scripts/gi-config.py
 - **Exit 0** — use `config`.
 - **Exit 3** — invalid `.idd.yml`: print the `references/error-messages.md` error (*Invalid config*), stop.
 - **Script file absent** — a broken install and not a degrade: stop, print `✗ Missing bundled dependency`.
-- **Anything else** (no `python3`, non-zero exit, unparsable stdout) — print `⚠ gi-config unavailable — reading .idd.yml by hand` and read it yourself *instead of* the script, over the keys and defaults below.
+- **Anything else** (no `python3`, non-zero exit, unparsable stdout) — print `⚠ gi-config unavailable — reading .idd.yml by hand` and read it yourself *instead of* the script (else legacy `.gitissue.yml`, printing `⚠ legacy .gitissue.yml found — rename to .idd.yml`), over the keys and defaults below.
 
 Either path: no `.idd.yml` (`first_run`) prints `○ First run — using default config. Run /init-idd to customize.`
 
@@ -275,7 +275,7 @@ Spawn a **fresh** reviewer (`references/agents/code-reviewer.md`) each cycle. On
 
 UI review is **auto-detected per issue** (no config flag): scan the issue body and diff for UI work before cycling. The **code UI review** always runs; the **browser UI review** runs only when a running app is reachable *and* opted in, else **skips with a warning**. Detection, the `ui-reviewer` spawn and the `ui_review.browser_review` gate: `references/docs/ui-review.md`; mechanics: *Step 4 — UI/UX review*.
 
-**Verification recipe:** when the base branch commits `.idd-recipe.json`, each cycle also runs it through `references/scripts/gi-recipe.py`: launch, drive the capabilities the diff maps, keep evidence, tear down the owned instance. Auto mode runs it only when the recipe opts in `resolve` (*Step 4 — QA → Verification recipe*).
+**Verification recipe:** when the base branch commits `.idd-recipe.json` (or legacy `.gitissue-recipe.json`), each cycle also runs it through `references/scripts/gi-recipe.py`: launch, drive the capabilities the diff maps, keep evidence, tear down the owned instance. Auto mode runs it only when the recipe opts in `resolve` (*Step 4 — QA → Verification recipe*).
 
 ---
 
@@ -296,7 +296,7 @@ A failure prints `✗ Final test run failed — PR not created` and stops, even 
 
 ### Push branch and create PR
 
-Run the branch-diff scan first: export `IDD_AUTO_MODE=1` in auto mode, then from the repo root run `python3 references/scripts/gi-secscan.py --range "origin/${base}" --policy-ref "origin/${base}"`. It reads `security.*` from `.idd.yml` **at the base ref**: never pass a config *value* on the command line, never let the scanned branch supply its policy (*Pre-push secret scan*).
+Run the branch-diff scan first: export `IDD_AUTO_MODE=1` in auto mode, then from the repo root run `python3 references/scripts/gi-secscan.py --range "origin/${base}" --policy-ref "origin/${base}"`. It reads `security.*` from `.idd.yml` (else legacy `.gitissue.yml`) **at the base ref**: never pass a config *value* on the command line, never let the scanned branch supply its policy (*Pre-push secret scan*).
 
 - **Pass** needs all four: exit 0, `policy_source` equal to the requested `ref:origin/…`, `verdict` not `block`, `scanned` not 0 while `skipped` is above 0.
 - **Exit 1 is the block verdict** — stop, do not push, report `blocking[]`. **Exit 3** (uncompilable `security.*`) also stops.

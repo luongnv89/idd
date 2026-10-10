@@ -35,6 +35,12 @@ be a short opaque token (letters, digits and `._:/[]-`), else exit 3. After the
 merge a null `agents.<knob>.<role>` is filled from `agents.<knob>.default`, so a
 caller reads one key per role; all-null means "inherit the main agent".
 
+Legacy name (issue #537). With no `--config`, `.idd.yml` in the working
+directory is read; when it is absent the pre-rename `.gitissue.yml` is read in
+its place (`first_run` false, `config_file` naming it) with
+`⚠ legacy .gitissue.yml found — rename to .idd.yml` on stderr. When both exist
+`.idd.yml` wins and the legacy file is reported as ignored.
+
 Exit codes
   0  merged config printed
   2  usage error
@@ -59,6 +65,7 @@ from pathlib import Path
 
 SCHEMA_NAME = "config-schema.md"
 DEFAULT_CONFIG_NAME = ".idd.yml"
+LEGACY_CONFIG_NAME = ".gitissue.yml"
 
 # `git rev-parse --show-cdup` can only ever be empty or a run of `../`. Anything
 # else is not an answer this script will resolve a path against.
@@ -460,7 +467,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--config",
         default=DEFAULT_CONFIG_NAME,
-        help=f"config file to read (default: {DEFAULT_CONFIG_NAME}, relative to cwd)",
+        help=(
+            f"config file to read (default: {DEFAULT_CONFIG_NAME}, else the legacy "
+            f"{LEGACY_CONFIG_NAME}, relative to cwd)"
+        ),
     )
     parser.add_argument(
         "--schema",
@@ -479,9 +489,26 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     explicit_config = args.config != DEFAULT_CONFIG_NAME
+    config_path = Path(args.config)
+    # The name an exit-3 message blames: the file actually parsed.
+    config_name = DEFAULT_CONFIG_NAME
+    if not explicit_config:
+        legacy_path = Path(LEGACY_CONFIG_NAME)
+        if config_path.is_file():
+            if legacy_path.is_file():
+                print(
+                    f"⚠ legacy {LEGACY_CONFIG_NAME} ignored — {DEFAULT_CONFIG_NAME} takes precedence",
+                    file=sys.stderr,
+                )
+        elif legacy_path.is_file():
+            print(
+                f"⚠ legacy {LEGACY_CONFIG_NAME} found — rename to {DEFAULT_CONFIG_NAME}",
+                file=sys.stderr,
+            )
+            config_path = legacy_path
+            config_name = LEGACY_CONFIG_NAME
     try:
         defaults, removed, complete = load_schema(find_schema(args.schema))
-        config_path = Path(args.config)
         if config_path.is_file():
             overrides = load_user_config(config_path)
         elif explicit_config:
@@ -491,7 +518,7 @@ def main(argv: list[str] | None = None) -> int:
         config, warnings = merge(defaults, overrides, removed, complete)
     except ConfigError as exc:
         for line in str(exc).splitlines():
-            print(f"✗ Invalid {DEFAULT_CONFIG_NAME}: {line}", file=sys.stderr)
+            print(f"✗ Invalid {config_name}: {line}", file=sys.stderr)
         return 3
     except Unavailable as exc:
         print(f"⚠ gi-config: {exc}", file=sys.stderr)

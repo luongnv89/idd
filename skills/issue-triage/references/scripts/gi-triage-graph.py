@@ -76,6 +76,8 @@ ESCALATING_LABELS = frozenset({"critical", "urgent"})
 KNOWN_SOURCES = ("/issue-triage", "/auto-pilot")
 
 CONFIG_NAME = ".idd.yml"
+# Read as a fallback at each level of the walk (issue #537).
+LEGACY_CONFIG_NAME = ".gitissue.yml"
 CONFIG_SECTION = "triage"
 CONFIG_KEYS = ("stale_threshold_days", "auto_priority")
 
@@ -162,15 +164,32 @@ def config_search_ceiling() -> str:
 
 
 def find_config(explicit: str | None) -> str | None:
-    """The explicit file, else search upward to the working-tree root."""
+    """The explicit file, else search upward to the working-tree root.
+
+    Each level tries `.idd.yml`, then the legacy `.gitissue.yml` (issue #537).
+    """
     if explicit:
         return explicit if os.path.isfile(explicit) else None
     here = os.path.abspath(os.getcwd())
     ceiling = os.path.abspath(config_search_ceiling())
     while True:
+        # Both names at each level, new first, under the one ceiling: a legacy
+        # file is this level's config only when `.idd.yml` is absent here.
         candidate = os.path.join(here, CONFIG_NAME)
+        legacy = os.path.join(here, LEGACY_CONFIG_NAME)
         if os.path.isfile(candidate):
+            if os.path.isfile(legacy):
+                print(
+                    f"⚠ legacy {LEGACY_CONFIG_NAME} ignored — {CONFIG_NAME} takes precedence",
+                    file=sys.stderr,
+                )
             return candidate
+        if os.path.isfile(legacy):
+            print(
+                f"⚠ legacy {LEGACY_CONFIG_NAME} found — rename to {CONFIG_NAME}",
+                file=sys.stderr,
+            )
+            return legacy
         parent = os.path.dirname(here)
         if here == ceiling or parent == here:
             return None

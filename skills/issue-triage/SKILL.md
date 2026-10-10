@@ -183,7 +183,7 @@ Classify the result:
 - Script file absent: a broken install and not a degrade. Stop with the `✗ Missing bundled dependency` block.
 - No `python3`, another non-zero exit, or unparsable stdout: print `⚠ gi-config unavailable — using the inline defaults below` and use the manual fallback *instead of* the script.
 
-Manual fallback: load `.idd.yml` from the repo root; if absent, use the defaults below and print:
+Manual fallback: load `.idd.yml` (else legacy `.gitissue.yml`, printing `⚠ legacy .gitissue.yml found — rename to .idd.yml`) from the repo root; if neither exists, use the defaults below and print:
 
 ```
 ○ First run — using default config. Run /init-idd to customize.

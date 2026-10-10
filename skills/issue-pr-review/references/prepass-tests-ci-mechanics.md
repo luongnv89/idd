@@ -139,8 +139,10 @@ reduce this to `scanned > 0` — a *narrow* allow pattern naming only the
 secret-bearing file leaves `scanned` healthy and still hides the secret. The
 provenance check, not the count, is what closes that variant.
 
-When the PR **adds or modifies `.idd.yml`**, say so in the review report
-and treat its `security:` block as a reviewable change on its own. It is a
+When the PR **adds or modifies `.idd.yml` or `.gitissue.yml`**, say so in the
+review report and treat its `security:` block as a reviewable change on its own.
+A PR that adds `.idd.yml` while `.gitissue.yml` exists supersedes that file
+entirely, including its `security:` block — name that in the warning too. It is a
 warning, not a hard stop — `--policy-ref` already denies it any effect on this
 scan, and legitimate config PRs must stay mergeable.
 

@@ -112,7 +112,7 @@ Capture `run_started_epoch` from stderr by chaining that same `python3` invocati
 - Exit 0: use `config` from `{"config": {…dotted keys…}, "config_file": …, "first_run": …}`. Print the hint below when `first_run` is true.
 - Exit 3: stop with *Invalid config* from `references/error-messages.md`.
 - Script file absent: a bundled dependency is missing, which is a broken install and not a degrade — stop and print the `✗ Missing bundled dependency` block.
-- No `python3`, another non-zero exit, or unparsable stdout: print `⚠ gi-config unavailable — using the inline defaults below`. Read `.idd.yml` once from the repo root, or use defaults if absent. Use this manual fallback instead of the script result.
+- No `python3`, another non-zero exit, or unparsable stdout: print `⚠ gi-config unavailable — using the inline defaults below`. Read `.idd.yml` (else legacy `.gitissue.yml`, printing `⚠ legacy .gitissue.yml found — rename to .idd.yml`) once from the repo root, or use defaults if neither exists. Use this manual fallback instead of the script result.
 
 When config is absent, print:
 

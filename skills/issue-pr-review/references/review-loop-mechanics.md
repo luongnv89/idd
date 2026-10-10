@@ -6,7 +6,7 @@ Exact spawn calls and the token-trade rationale for the reviewer/fixer agents us
 
 SKILL.md's *Configuration* section names the loader and its degrade path; this is
 the full key list — every default value, and what each key does to the pipeline.
-It is also the list to read `.idd.yml` against by hand when `gi-config` is
+It is also the list to read `.idd.yml` (else legacy `.gitissue.yml`) against by hand when `gi-config` is
 unavailable. Value syntax and validation live in `references/docs/config-schema.md`.
 
 **Why the working directory and the script path both matter.** `gi-config.py`

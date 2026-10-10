@@ -10,8 +10,8 @@ re-picked the issue it was supposed to continue.
 
 ### Step 1.0 — Resume entry gate <!-- a:ap-step10-resume -->
 
-Read the recorded state — `python3 references/scripts/gi-state.py --read` — and set
-exactly one value:
+Read the recorded state — `python3 references/scripts/gi-state.py --read`, which
+first migrates a legacy `.gitissue/` run into `.idd/` — and set exactly one value:
 
 ```
 resume_state = resumable | stale | absent
@@ -107,7 +107,7 @@ proceeds to `--init` as before.
 The read-back rule above binds here too: skip any entry whose `name` does not
 match `^[a-z][a-z0-9-]{0,63}$` or whose `origin` is not exactly the string
 `borrowed` before it reaches an `rm -rf`, and remove a directory only when it
-carries the resolver's `.idd-borrowed` marker — an unmarked directory is
+carries the resolver's `.idd-borrowed` (or legacy `.gitissue-borrowed`) marker — an unmarked directory is
 the operator's own copy, so drop the record and warn instead of deleting.
 Under `--dry-run`, compute the removal and print the leftover names, but write
 nothing: no uninstall, no `--update`.
