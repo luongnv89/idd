@@ -24,7 +24,7 @@ tree. Keep the destination outside the repository. The ZIP root contains
 shared icon), `README.md`, and these eight skill directories:
 
 - `auto-pilot`
-- `init-gitissue`
+- `init-idd`
 - `issue-analysis`
 - `issue-creator`
 - `issue-pr-review`

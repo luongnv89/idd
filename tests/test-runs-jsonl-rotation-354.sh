@@ -159,7 +159,7 @@ with tempfile.TemporaryDirectory() as tmp:
         calls.append('parse')
         return orig(path)
     m.load_run_rows = counting
-    m._gh_json = lambda *a: [{'number': 1, 'body': '<!-- gitissue:normalized v1 -->'}]
+    m._gh_json = lambda *a: [{'number': 1, 'body': '<!-- idd:normalized v1 -->'}]
     m.collect_issue_normalization_stats = lambda limit: {'open_issues': 0}
     m.collect_merged_pr_stats = lambda limit, window: None
     m.collect_github_stats(200, log)
@@ -261,13 +261,13 @@ fi
 # T10: rotated segments are gitignored (regression — a segment is
 # machine-local telemetry and must never become committable)
 # ───────────────────────────────────────────────────────────
-if git -C "$REPO_ROOT" check-ignore -q .gitissue/runs.jsonl; then
+if git -C "$REPO_ROOT" check-ignore -q .idd/runs.jsonl; then
   pass "T10: active run log is gitignored"
 else
-  fail "T10: .gitissue/runs.jsonl is NOT gitignored"
+  fail "T10: .idd/runs.jsonl is NOT gitignored"
 fi
 SEG_IGNORED=1
-for seg in .gitissue/runs-20260101T000000Z.jsonl .gitissue/runs-20260824T120000Z.jsonl; do
+for seg in .idd/runs-20260101T000000Z.jsonl .idd/runs-20260824T120000Z.jsonl; do
   git -C "$REPO_ROOT" check-ignore -q "$seg" || { SEG_IGNORED=0; fail "T10: $seg is NOT gitignored"; }
 done
 if [ "$SEG_IGNORED" = "1" ]; then

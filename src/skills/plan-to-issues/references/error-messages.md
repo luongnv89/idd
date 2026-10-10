@@ -43,18 +43,18 @@ Phase 0's per-probe failure blocks — `gh` too old, token scope, permission, am
 
 ### Invalid config
 ```
-✗ Invalid config: .gitissue.yml
+✗ Invalid config: .idd.yml
 
   Line {N}: {field} {validation_message}
 
-  To fix:  edit .gitissue.yml and correct the values above
+  To fix:  edit .idd.yml and correct the values above
   Docs:    https://github.com/luongnv89/idd/blob/main/docs/config-schema.md
 ```
 **Trigger:** `gi-config.py` exits 3 — the file exists but holds an invalid value. Stop before Phase 0's first probe.
 
 ### gi-config unavailable (warn, continue)
 ```
-⚠ gi-config unavailable — reading .gitissue.yml by hand
+⚠ gi-config unavailable — reading .idd.yml by hand
 ```
 **Trigger:** no `python3`, a non-zero exit other than 3, or unparsable stdout. Not a terminal outcome.
 

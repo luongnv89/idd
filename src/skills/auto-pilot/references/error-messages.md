@@ -157,7 +157,7 @@ LIMITED`'s `Next action:` line on the same value for the same reason.
            /auto-pilot --force-unlock
   Docs:    https://github.com/luongnv89/idd/blob/main/docs/config-schema.md
 ```
-**Trigger:** `--lock` exits 3 — `.gitissue/run.lock` exists, is younger than the TTL (default 3600s), and either its `pid` is alive on this host, the lock was taken on another host (liveness cannot be checked), or its owner is unknown (`pid` 0 — the default when `--pid` is absent, which carries no liveness signal and is never read as dead).
+**Trigger:** `--lock` exits 3 — `.idd/run.lock` exists, is younger than the TTL (default 3600s), and either its `pid` is alive on this host, the lock was taken on another host (liveness cannot be checked), or its owner is unknown (`pid` 0 — the default when `--pid` is absent, which carries no liveness signal and is never read as dead).
 **Action:** Stop before any mutation. Exit 3 is a stop, never a degrade: starting anyway is the concurrent-mutation case the lock exists to prevent.
 
 ### Resuming an interrupted run
@@ -315,7 +315,7 @@ the single home of that mapping, never restated here.
 ⚠ #{issue_number} quarantined after {streak} consecutive failed runs
 
   Label:  {quarantine_label} — remove it to let /auto-pilot try again
-  The streak comes from .gitissue/runs.jsonl; the label is the durable
+  The streak comes from .idd/runs.jsonl; the label is the durable
   state, so deleting that file never clears a quarantine.
   Continuing to next issue...
 ```
@@ -507,10 +507,10 @@ the single home of that mapping, never restated here.
     2. Re-run /auto-pilot — a later run re-evaluates the gate for
        PR #{pr_number} and merges it once the dependency is in
     3. To bypass entirely: set autopilot.respect_dependencies: false in
-       .gitissue.yml (not recommended unless the marker is wrong)
+       .idd.yml (not recommended unless the marker is wrong)
 ```
 **Trigger:** Phase 5.1b (Dependency Gate) finds at least one `Depends on #N` / `Blocked by #N` reference whose target issue is still open, or whose target issue is closed but has an unmerged linked PR. Only fires when `autopilot.respect_dependencies: true`.
-**Action:** Do **not** merge. Leave the PR open and unchanged, record iteration outcome as `blocked_by_dependency`, add the issue to the session skip list, and continue to the next eligible issue. **Non-fatal — the run is not paused.** The gate never merges out of order, but it never strands the rest of the backlog either; the loop ends on dependency grounds only when no eligible issue is left (`⚠ No eligible issues to pick`). The audit trail is the iteration line in the final summary table plus the alert above, and exactly one `.gitissue/runs.jsonl` line with `outcome: blocked_by_dependency`.
+**Action:** Do **not** merge. Leave the PR open and unchanged, record iteration outcome as `blocked_by_dependency`, add the issue to the session skip list, and continue to the next eligible issue. **Non-fatal — the run is not paused.** The gate never merges out of order, but it never strands the rest of the backlog either; the loop ends on dependency grounds only when no eligible issue is left (`⚠ No eligible issues to pick`). The audit trail is the iteration line in the final summary table plus the alert above, and exactly one `.idd/runs.jsonl` line with `outcome: blocked_by_dependency`.
 
 ### Dependency cycle detected (auto-skip)
 ```
@@ -531,11 +531,11 @@ the single home of that mapping, never restated here.
 
 ### Invalid config
 ```
-✗ Invalid config: .gitissue.yml
+✗ Invalid config: .idd.yml
 
   Line {N}: {field} {validation_message}
 
-  To fix:  edit .gitissue.yml and correct the values above
+  To fix:  edit .idd.yml and correct the values above
   Docs:    https://github.com/luongnv89/idd/blob/main/docs/config-schema.md
 ```
 **Trigger:** Config file exists but contains invalid values (wrong type, out of range, unknown field).

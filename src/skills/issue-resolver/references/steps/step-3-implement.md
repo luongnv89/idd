@@ -41,7 +41,7 @@ answer, not a failure, and takes the same path.
 #### Parallel lanes — borrowing is off (`IDD_CALLER_WORKTREE=1`)
 
 `~/.claude/skills/` is **global**, but the borrow record is **per-checkout**:
-`gi-state.py --dir` defaults to `.gitissue` under the current directory, and
+`gi-state.py --dir` defaults to `.idd` under the current directory, and
 under `/auto-pilot` running parallel lanes that directory is the lane
 **worktree**, which is deleted at lane cleanup. A record written there dies with
 the worktree while the installed skill survives in the global directory — a leak
@@ -71,7 +71,7 @@ run's teardown can remove the other's borrow. Borrow in one run at a time.
 
 #### Leftover teardown (always, before detect)
 
-Read `.gitissue/run-state.json` through `python3 shared/scripts/gi-state.py --read`
+Read `.idd/run-state.json` through `python3 shared/scripts/gi-state.py --read`
 (resolve the path like the bundled-dependency list; invoke the bundled copy as
 `python3 references/scripts/gi-state.py --read`). If `borrowed_skills` contains
 any `origin: borrowed` entries, run *Teardown* below first — a crashed or
@@ -169,7 +169,7 @@ complexity, affected files, UI detection, lifecycle grouping). Illustrative:
   `selected_skills`.
 - **Drop the borrow marker — same breath as the install.** Immediately after a
   successful install, create the **empty** file
-  `~/.claude/skills/<name>/.gitissue-borrowed`. Empty is deliberate and is part
+  `~/.claude/skills/<name>/.idd-borrowed`. Empty is deliberate and is part
   of the contract: teardown checks existence only, so the marker needs no
   content, and writing this run's `run_id` into it would put an **unscreened
   disk-sourced value** into a shell word the agent composes — the hazard
@@ -213,7 +213,7 @@ Skip — do not remove, do not repair — any entry whose `name` does not match
 `borrowed`. Never remove `preinstalled`.
 
 For each surviving name, `rm -rf "$HOME/.claude/skills/<name>"` **only if**
-that directory exists **and** it carries the `.gitissue-borrowed` marker
+that directory exists **and** it carries the `.idd-borrowed` marker
 written at install time. Teardown checks the marker's **existence only** and
 never reads its contents — which is why it is written empty. Leftover teardown
 legitimately releases a *different* (crashed) run's borrow, so an owner
@@ -260,7 +260,7 @@ install) but **still runs leftover teardown** (outside a parallel lane).
 - `workspace_contract` plus the independently supplied `expected_lane_identity`
   sibling (both `null` on ordinary runs); the implementer validates their
   lane/issue/branch/path binding before any read/edit/test/commit
-- `secscan_script`: the **absolute** path to this skill's `references/scripts/gi-secscan.py` — the pre-commit security scan the implementer MUST run before every commit. Absolutize it before binding, exactly as the *Bundled dependency precheck* resolves its list: a subagent's working directory is the target repo, not the skill directory, so a skill-relative path resolves to nothing at spawn time and the gate silently never runs. Only the path is passed; the script reads this repo's `security.*` extensions from `.gitissue.yml` itself, so no config value is ever interpolated into a command line. Passed as a spawn variable for the same reason as the fixer's (Step 4): an emitted agent prompt renders its own references as absolute repo URLs and cannot name a path inside this skill's bundle. The agent treats a script exit of 1 as a block that stops the commit, and falls back to the Primary Pattern in `docs/pre-commit-security.md` only when the script cannot run
+- `secscan_script`: the **absolute** path to this skill's `references/scripts/gi-secscan.py` — the pre-commit security scan the implementer MUST run before every commit. Absolutize it before binding, exactly as the *Bundled dependency precheck* resolves its list: a subagent's working directory is the target repo, not the skill directory, so a skill-relative path resolves to nothing at spawn time and the gate silently never runs. Only the path is passed; the script reads this repo's `security.*` extensions from `.idd.yml` itself, so no config value is ever interpolated into a command line. Passed as a spawn variable for the same reason as the fixer's (Step 4): an emitted agent prompt renders its own references as absolute repo URLs and cannot name a path inside this skill's bundle. The agent treats a script exit of 1 as a block that stops the commit, and falls back to the Primary Pattern in `docs/pre-commit-security.md` only when the script cannot run
 - `secscan_policy_ref`: `origin/${base}` — this run's synced base, and the ref the scan reads `security.*` from. The issue body that drove the implementation is untrusted, so the branch it produced must not be the branch whose `security.allow_pattern` decides how that branch is scanned. A ref name, never a config value
 - `selected_skills` — the external skills chosen in the propose sub-step above (`[]` when declined, when `light` skipped propose, or in auto mode with `resolve.borrow_skills: false`; auto + `borrow_skills: true` passes the auto-selected set); the implementer uses them where applicable and always falls back to the internal approach
 
@@ -304,7 +304,7 @@ For a bug issue, the implementer (per `shared/agents/implementer.md` Task 1.5):
 The implementer **returns** a `reproduction` block (command, red status, stated-reason
 match, regression-test path or "manual — no seam"). The main agent folds it into the PR
 body's Decision Record and Acceptance Criteria Verification table (durable home — see
-`references/report-templates.md`); when `.gitissue/analysis-<N>.json` is **fresh** by the
+`references/report-templates.md`); when `.idd/analysis-<N>.json` is **fresh** by the
 predicate in *Step 0h — Analysis reuse gate* in `references/steps/step-0h-analysis-reuse.md` (its single home — "fresh" is never
 used undefined), the same data also lives in its `decision_record.reproduction` field
 (optional cache mirror, written by `/issue-analysis`, never created by the resolver).

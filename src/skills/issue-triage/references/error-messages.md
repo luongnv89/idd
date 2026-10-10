@@ -88,7 +88,7 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 ⚠ Scan timeout for #{N} — skipping file analysis
 
   Issue will appear as no-deps (timeout) in the dependency graph.
-  To fix:  increase triage.scan_timeout_per_issue in .gitissue.yml
+  To fix:  increase triage.scan_timeout_per_issue in .idd.yml
 ```
 **Trigger:** Keyword scan for a single issue exceeds `triage.scan_timeout_per_issue` seconds.
 
@@ -124,25 +124,25 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 ```
 ○ No cached triage found — running first analysis...
 ```
-**Trigger:** `/issue-triage` or `/issue-triage view` invoked but `.gitissue/triage.json` does not exist. The skill automatically falls through to a full analysis.
+**Trigger:** `/issue-triage` or `/issue-triage view` invoked but `.idd/triage.json` does not exist. The skill automatically falls through to a full analysis.
 **Note:** This is an informational message, not an error.
 
 ### Corrupted triage report
 ```
-✗ .gitissue/triage.json is corrupted
+✗ .idd/triage.json is corrupted
 
-  To fix:  rm .gitissue/triage.json && /issue-triage update
+  To fix:  rm .idd/triage.json && /issue-triage update
   Check:   was the file edited manually?
 ```
 **Trigger:** `/issue-triage` or `/issue-triage view` finds the file but JSON parsing fails.
 
 ### Could not save triage report
 ```
-⚠ Could not save triage report to .gitissue/triage.json
+⚠ Could not save triage report to .idd/triage.json
 
-  To fix:  check file permissions in the .gitissue/ directory
+  To fix:  check file permissions in the .idd/ directory
 ```
-**Trigger:** File write to `.gitissue/triage.json` fails (permission denied, disk full, etc.) — including `gi-triage-graph.py` exiting 4, which still printed the payload on stdout.
+**Trigger:** File write to `.idd/triage.json` fails (permission denied, disk full, etc.) — including `gi-triage-graph.py` exiting 4, which still printed the payload on stdout.
 
 ### Invalid triage scan
 ```
@@ -159,11 +159,11 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 
 ### Invalid config
 ```
-✗ Invalid config: .gitissue.yml
+✗ Invalid config: .idd.yml
 
   Line {N}: {field} {validation_message}
 
-  To fix:  edit .gitissue.yml and correct the values above
+  To fix:  edit .idd.yml and correct the values above
   Docs:    https://github.com/luongnv89/idd/blob/main/docs/config-schema.md
 ```
 **Trigger:** Config file exists but contains invalid values (wrong type, out of range, unknown field).

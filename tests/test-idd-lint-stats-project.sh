@@ -104,10 +104,10 @@ fi
 
 # ── T6: unexplained QA ceiling breach is a distinct stats failure (#308) ──
 R6="$(make_repo ceil-repo git@github.com:acme/ceil.git)"
-mkdir -p "$R6/.gitissue"
+mkdir -p "$R6/.idd"
 printf '%s\n' \
   '{"ts":"2026-07-09T00:00:00Z","issue":10,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":1,"complexity":"medium","qa_cycles":3}' \
-  > "$R6/.gitissue/runs.jsonl"
+  > "$R6/.idd/runs.jsonl"
 set +e
 ( cd "$R6" && python3 scripts/idd-lint.py stats --no-github >/dev/null 2>&1 )
 RC6=$?
@@ -119,7 +119,7 @@ else
 fi
 printf '%s\n' \
   '{"ts":"2026-07-09T00:00:00Z","issue":260,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":1,"complexity":"high","qa_cycles":5}' \
-  > "$R6/.gitissue/runs.jsonl"
+  > "$R6/.idd/runs.jsonl"
 if ( cd "$R6" && python3 scripts/idd-lint.py stats --no-github >/dev/null 2>&1 ); then
   pass "T6b: high-class qa_cycles=5 without reason still passes"
 else

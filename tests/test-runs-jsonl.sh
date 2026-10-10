@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# test-runs-jsonl.sh — Validate the .gitissue/runs.jsonl run-log + idd-doctor
+# test-runs-jsonl.sh — Validate the .idd/runs.jsonl run-log + idd-doctor
 # run-log summary documentation (issue #141 / weakness W3).
 #
 # This is a documentation/contract test in the same style as
@@ -51,7 +51,7 @@ has_skill() {
   fi
 }
 
-echo "◆ Run-log (.gitissue/runs.jsonl) Tests"
+echo "◆ Run-log (.idd/runs.jsonl) Tests"
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 
 CONFIG="$REPO_ROOT/docs/config-schema.md"
@@ -65,7 +65,7 @@ DOCTOR="$REPO_ROOT/src/internal-skills/idd-doctor/SKILL.source.md"
 DOCTOR_RUNLOG="$REPO_ROOT/src/internal-skills/idd-doctor/references/run-log-summary.md"
 
 # --- T1: canonical schema in run-log-schema.md -------------------------------
-has "$RUNLOG" ".gitissue/runs.jsonl" "T1: run-log-schema documents .gitissue/runs.jsonl"
+has "$RUNLOG" ".idd/runs.jsonl" "T1: run-log-schema documents .idd/runs.jsonl"
 has "$RUNLOG" "append-only" "T1: run-log-schema documents append-only nature"
 has "$RUNLOG" "non-fatal" "T1: run-log-schema documents non-fatal write"
 for field in "skipped_reason" "qa_cycles" "ceiling" "breach_reason" "duration_s" "complexity" "outcome"; do
@@ -87,10 +87,10 @@ has "$RESOLVER" "runs.jsonl" "T2: issue-resolver source references runs.jsonl"
 has "$RESOLVER" "one JSON line" "T2: issue-resolver appends one JSON line"
 has "$RESOLVER" "already_resolved" "T2: issue-resolver logs already_resolved outcome"
 has "$RESOLVER" "non-fatal" "T2: issue-resolver documents non-fatal write"
-if grep -qi "mkdir -p .gitissue" "$RESOLVER" 2>/dev/null; then
-  pass "T2: issue-resolver creates .gitissue dir before append"
+if grep -qi "mkdir -p .idd" "$RESOLVER" 2>/dev/null; then
+  pass "T2: issue-resolver creates .idd dir before append"
 else
-  fail "T2: issue-resolver missing mkdir -p .gitissue"
+  fail "T2: issue-resolver missing mkdir -p .idd"
 fi
 
 # --- T3: auto-pilot writes one line per processed issue incl. skips ---------
@@ -235,7 +235,7 @@ has "$AUTOPILOT" "fan" "T7: auto-pilot SKILL describes fanning the batch result 
 has "$AUTOPILOT" "explicit-list-mode" "T7: auto-pilot SKILL points to the explicit-list-mode spec"
 
 # --- T8: the gi-runlog helper (issue #251) ----------------------------------
-# The hand-rolled `mkdir -p .gitissue && printf … >>` append (asserted at T2) is
+# The hand-rolled `mkdir -p .idd && printf … >>` append (asserted at T2) is
 # now the *fallback*: the primary path pipes the record to the shipped script,
 # which centralizes required-field validation, the 5→3 complexity collapse, and
 # the canonical key order. `--echo` is the machine form of the `--no-run-log`
@@ -287,7 +287,7 @@ if [ -f "$GEN_RESOLVER" ]; then
   has "$GEN_RESOLVER" "--no-run-log" "T5: generated issue-resolver SKILL.md documents --no-run-log"
 fi
 if [ -f "$GEN_CONFIG" ]; then
-  has "$GEN_CONFIG" ".gitissue/runs.jsonl" "T5: bundled run-log-schema carries the runs.jsonl schema"
+  has "$GEN_CONFIG" ".idd/runs.jsonl" "T5: bundled run-log-schema carries the runs.jsonl schema"
   has "$GEN_CONFIG" "references/scripts/gi-runlog.py" "T5: bundled run-log-schema names the shipped gi-runlog script"
   has "$GEN_CONFIG" "writes nothing" "T5: bundled run-log-schema keeps the --echo no-write contract"
 else

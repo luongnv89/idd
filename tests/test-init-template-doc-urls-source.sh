@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# test-init-template-doc-urls-source.sh — Verify init-gitissue source template
+# test-init-template-doc-urls-source.sh — Verify init-idd source template
 # does not reference moved runtime docs at the old path
-# (issue #58, §9 of refactor-plan-v10.md, §3 init-gitissue special case;
+# (issue #58, §9 of refactor-plan-v10.md, §3 init-idd special case;
 # updated for issue #81 single-tree consolidation).
 #
-# Rule: comments inside src/skills/init-gitissue/templates/gitissue-template.yml
+# Rule: comments inside src/skills/init-idd/templates/idd-template.yml
 # may reference runtime docs as absolute GitHub URLs pinned to `main`. They
 # MUST point at `docs/<file>.md` for any `<file>` that exists in `docs/`
 # (top-level, post-#81 consolidation). A URL of the form
@@ -19,7 +19,7 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-TEMPLATE="$REPO_ROOT/src/skills/init-gitissue/templates/gitissue-template.yml"
+TEMPLATE="$REPO_ROOT/src/skills/init-idd/templates/idd-template.yml"
 RUNTIME_DOCS="$REPO_ROOT/docs"
 
 PASS=0

@@ -243,7 +243,7 @@ set -e
 # tests equal the marker's tests=. tests_skip adds the three-part AND of the
 # skips table: trusted, tests= SHA equal to head, and ci_leg_runnable.
 # ───────────────────────────────────────────────────────────
-PARSE_RE='<!-- gitissue:qa v[0-9]+ [^>]*-->'
+PARSE_RE='<!-- idd:qa v[0-9]+ [^>]*-->'
 marker_field() {  # marker_field MARKER KEY — the value of one whole key=value pair
   local tok
   for tok in $1; do
@@ -256,7 +256,7 @@ qa_verdict() {
   m="$(printf '%s\n' "$body" | grep -oE "$PARSE_RE" || true)"
   [ -n "$m" ] || { echo absent; return; }
   [ "$(printf '%s\n' "$m" | grep -c .)" = "1" ] || { echo stale; return; }
-  case "$m" in "<!-- gitissue:qa v1 "*) ;; *) echo stale; return ;; esac
+  case "$m" in "<!-- idd:qa v1 "*) ;; *) echo stale; return ;; esac
   head="$(marker_field "$m" head || true)"
   review="$(marker_field "$m" review || true)"
   tests="$(marker_field "$m" tests || echo null)"
@@ -279,7 +279,7 @@ tests_skip() {  # tests_skip VERDICT MARKER HEAD CI_LEG_RUNNABLE — yes | no
 
 # The forged marker is rendered from the producer's own template, so it is
 # exactly what a genuine resolver would write — only the receipt is missing.
-TEMPLATE="$(grep -oE '<!-- gitissue:qa v1 [^>]*-->' "$SRC_RES_PKG/references/report-templates.md" | grep -F '{head_sha}' | head -1 || true)"
+TEMPLATE="$(grep -oE '<!-- idd:qa v1 [^>]*-->' "$SRC_RES_PKG/references/report-templates.md" | grep -F '{head_sha}' | head -1 || true)"
 [ -n "$TEMPLATE" ]; check "R11.0: the producer template still renders the marker" "$?"
 F="$TMP/forge"
 mkrepo "$F"

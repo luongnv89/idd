@@ -90,11 +90,11 @@ check_flow_lacks() {
 }
 
 # Every skill that carries a final report — the six the issue names, plus
-# init-gitissue and the repo-internal idd-doctor, which also print one, and
+# init-idd and the repo-internal idd-doctor, which also print one, and
 # plan-to-issues (issue #502).
 SKILL_DIRS=(
   "src/skills/auto-pilot"
-  "src/skills/init-gitissue"
+  "src/skills/init-idd"
   "src/skills/issue-analysis"
   "src/skills/issue-creator"
   "src/skills/issue-pr-review"
@@ -330,16 +330,16 @@ check_flow "$REPO_ROOT/src/skills/auto-pilot/SKILL.source.md" \
 check_lacks "$REPO_ROOT/src/skills/auto-pilot/SKILL.source.md" \
   'captures a second start time' \
   "AC4: auto-pilot does not capture a second start time"
-check_has "$REPO_ROOT/src/skills/init-gitissue/SKILL.source.md" \
-  'run_started_epoch' "AC3: init-gitissue names the run_started_epoch anchor"
+check_has "$REPO_ROOT/src/skills/init-idd/SKILL.source.md" \
+  'run_started_epoch' "AC3: init-idd names the run_started_epoch anchor"
 check_has "$REPO_ROOT/src/internal-skills/idd-doctor/SKILL.source.md" \
   'run_started_epoch' "AC3: idd-doctor names the run_started_epoch anchor"
 check_flow "$REPO_ROOT/src/internal-skills/idd-doctor/SKILL.source.md" \
   'not a repo mutation' \
   "AC3: idd-doctor's clock read is reconciled with its read-only guarantee"
-check_flow "$REPO_ROOT/src/skills/init-gitissue/SKILL.source.md" \
+check_flow "$REPO_ROOT/src/skills/init-idd/SKILL.source.md" \
   'agents 0. is the determined value here' \
-  "AC5: init-gitissue spawns none, so it reports 0 rather than n/a"
+  "AC5: init-idd spawns none, so it reports 0 rather than n/a"
 echo ""
 
 # ── The contract has to ship, not just live in src/ ───────────────────────

@@ -8,7 +8,7 @@
 # Acceptance criteria covered:
 #   AC2  Triage ordering is produced by a script emitting the same cache payload
 #        shape; keyword extraction stays with the agents.
-#   AC3  init-gitissue detection runs scripted with an LLM fallback on unknown
+#   AC3  init-idd detection runs scripted with an LLM fallback on unknown
 #        stacks.
 #   AC4  The model-cache lifecycle runs scripted; its reference doc becomes
 #        refresh/debug-only reading.
@@ -231,8 +231,8 @@ fi
 # Config-driven staleness and the auto_priority: false contract.
 TCFG="$TMP/tcfg"
 mkdir -p "$TCFG"
-printf 'triage:\n  stale_threshold_days: 60\n  auto_priority: false\n' > "$TCFG/.gitissue.yml"
-out3="$(python3 "$GRAPH" --config "$TCFG/.gitissue.yml" --now 2026-03-20T14:30:00Z < "$SCAN")"
+printf 'triage:\n  stale_threshold_days: 60\n  auto_priority: false\n' > "$TCFG/.idd.yml"
+out3="$(python3 "$GRAPH" --config "$TCFG/.idd.yml" --now 2026-03-20T14:30:00Z < "$SCAN")"
 if [ "$(printf '%s' "$out3" | jkey 'summary.stale_count')" = "0" ] \
    && [ "$(printf '%s' "$out3" | jkey 'summary.stale_threshold_days')" = "60" ] \
    && [ "$(printf '%s' "$out3" | jkey 'issues.0.priority')" = "None" ]; then
@@ -280,7 +280,7 @@ fi
 # --out really persists, so Step 9 is the same call.
 run_status out st bash -c "python3 '$GRAPH' --no-config --now 2026-03-20T00:00:00Z --out '$TMP/persisted/triage.json' < '$SCAN'"
 if [ "$st" = "0" ] && python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$TMP/persisted/triage.json" 2>/dev/null; then
-  pass "AC2: --out writes a parsable .gitissue/triage.json (Step 9 is the same call)"
+  pass "AC2: --out writes a parsable .idd/triage.json (Step 9 is the same call)"
 else
   fail "AC2: --out did not persist a parsable payload (exit $st)"
 fi
@@ -472,13 +472,13 @@ else
   fail "AC4: the band mapping is wrong (got: $out)"
 fi
 
-# TTL is config-overridable through .gitissue.yml.
+# TTL is config-overridable through .idd.yml.
 MCFG="$TMP/mcfg"
 mkdir -p "$MCFG"
-printf 'model_suggestion:\n  cache_ttl_days: 60\n' > "$MCFG/.gitissue.yml"
-out="$(python3 "$MODEL" --skill-dir "$SK1" --cache-dir "${SK1}-cache" --config "$MCFG/.gitissue.yml" --now 2026-07-30)"
+printf 'model_suggestion:\n  cache_ttl_days: 60\n' > "$MCFG/.idd.yml"
+out="$(python3 "$MODEL" --skill-dir "$SK1" --cache-dir "${SK1}-cache" --config "$MCFG/.idd.yml" --now 2026-07-30)"
 [ "$(printf '%s' "$out" | jkey stale)" = "False" ] \
-  && pass "AC4: model_suggestion.cache_ttl_days from .gitissue.yml is honoured" \
+  && pass "AC4: model_suggestion.cache_ttl_days from .idd.yml is honoured" \
   || fail "AC4: model_suggestion.cache_ttl_days is ignored"
 
 # --install writes the new dated file AND prunes every other one.
@@ -710,14 +710,14 @@ git -C "$AC2" -c user.email=t@example.com -c user.name=t -c commit.gpgsign=false
 ( cd "$AC2" && env -u IDD_CACHE_DIR XDG_CACHE_HOME="$TMP/xdg-ac2" \
     python3 "$MODEL" --skill-dir "$AC2/skills/issue-creator" --no-config --now 2026-06-14 >/dev/null )
 porcelain="$(git -C "$AC2" status --porcelain --untracked-files=all)"
-if [ -z "$porcelain" ] && [ -f "$TMP/xdg-ac2/gitissue/model-data-2026-06-12.json" ]; then
+if [ -z "$porcelain" ] && [ -f "$TMP/xdg-ac2/idd/model-data-2026-06-12.json" ]; then
   pass "#491 AC2: a run from a --plugin-dir checkout leaves no untracked file; the cache goes to XDG"
 else
   fail "#491 AC2: the run dirtied the checkout or missed XDG (status: $porcelain)"
 fi
 
-# Root resolution: --cache-dir > $IDD_CACHE_DIR > $XDG_CACHE_HOME/gitissue >
-# $HOME/.cache/gitissue; a relative XDG_CACHE_HOME is ignored (XDG spec).
+# Root resolution: --cache-dir > $IDD_CACHE_DIR > $XDG_CACHE_HOME/idd >
+# $HOME/.cache/idd; a relative XDG_CACHE_HOME is ignored (XDG spec).
 RS="$TMP/root-skill"
 seed_dated "$RS" 2026-06-12
 cd_of() { printf '%s' "$1" | jkey cache_dir; }
@@ -728,8 +728,8 @@ out="$(IDD_CACHE_DIR="$TMP/env-root" python3 "$MODEL" --skill-dir "$RS" --cache-
 [ "$(cd_of "$out")" = "$TMP/flag-root" ] && pass "#491: --cache-dir overrides \$IDD_CACHE_DIR" \
   || fail "#491: --cache-dir not honoured (got: $(cd_of "$out"))"
 out="$(env -u IDD_CACHE_DIR XDG_CACHE_HOME=relative/xdg HOME="$TMP/home" python3 "$MODEL" --skill-dir "$RS" --no-config)"
-[ "$(cd_of "$out")" = "$TMP/home/.cache/gitissue" ] && [ ! -e relative ] \
-  && pass "#491: a relative XDG_CACHE_HOME is ignored; \$HOME/.cache/gitissue is used" \
+[ "$(cd_of "$out")" = "$TMP/home/.cache/idd" ] && [ ! -e relative ] \
+  && pass "#491: a relative XDG_CACHE_HOME is ignored; \$HOME/.cache/idd is used" \
   || fail "#491: relative XDG_CACHE_HOME handling (got: $(cd_of "$out"))"
 
 # Unusable root (a regular file, or a symlink): serve the seed from memory —
@@ -795,7 +795,7 @@ else
   fail "#491: a symlinked dated cache entry was followed (exit $st, data_date $sl_date)"
 fi
 
-if [ ! -e "$TMP/xdg-default/gitissue" ]; then
+if [ ! -e "$TMP/xdg-default/idd" ]; then
   pass "#491: every invocation in this file pinned its cache root"
 else
   fail "#491: an unpinned invocation wrote to the default cache root"
@@ -816,7 +816,7 @@ expect_bundled issue-creator gi-dup-score.py
 expect_bundled issue-creator gi-model-cache.py
 expect_bundled issue-triage gi-triage-graph.py
 expect_bundled auto-pilot gi-triage-graph.py
-expect_bundled init-gitissue gi-stack-detect.py
+expect_bundled init-idd gi-stack-detect.py
 
 expect_grep() {
   local label="$1" pattern="$2" file="$3"
@@ -829,16 +829,16 @@ expect_grep() {
 expect_grep "AC1: issue-creator calls gi-dup-score from its own orchestrator" \
   "references/scripts/gi-dup-score.py" "$SKILLS/issue-creator/SKILL.md"
 expect_grep "AC1: issue-creator creates the ignored scorer cache on first run" \
-  "mkdir -p .gitissue/cache" "$SKILLS/issue-creator/SKILL.md"
+  "mkdir -p .idd/cache" "$SKILLS/issue-creator/SKILL.md"
 expect_grep "AC1: issue-creator refuses a planted cache symlink" \
-  ".gitissue/cache is a symlink" "$SKILLS/issue-creator/SKILL.md"
+  ".idd/cache is a symlink" "$SKILLS/issue-creator/SKILL.md"
 expect_grep "AC1: issue-creator creates a unique exclusive scorer request" \
-  'mktemp .gitissue/cache/dup-request.XXXXXX' "$SKILLS/issue-creator/SKILL.md"
+  'mktemp .idd/cache/dup-request.XXXXXX' "$SKILLS/issue-creator/SKILL.md"
 expect_grep "AC1: unique scorer request is owner-only" \
   'chmod 600 "$dup_request"' "$SKILLS/issue-creator/SKILL.md"
 expect_grep "AC1: issue-creator sends the unique scorer request on stdin" \
   '< "$dup_request"' "$SKILLS/issue-creator/SKILL.md"
-if grep -q -- '< .gitissue/cache/dup-request.json' "$SKILLS/issue-creator/SKILL.md"; then
+if grep -q -- '< .idd/cache/dup-request.json' "$SKILLS/issue-creator/SKILL.md"; then
   fail "AC1: issue-creator still uses a shared dup-request.json path"
 else
   pass "AC1: issue-creator no longer uses a shared dup-request.json path"
@@ -875,16 +875,16 @@ printf '[]\n' > "$FLOW/issues.json"
 cat > "$FLOW/run-cleanup.sh" <<'EOF'
 #!/usr/bin/env bash
 mode="$1"
-if [ -L .gitissue/cache ]; then
-  echo "✗ .gitissue/cache is a symlink — refusing to write the scorer request"
+if [ -L .idd/cache ]; then
+  echo "✗ .idd/cache is a symlink — refusing to write the scorer request"
   exit 1
 fi
-mkdir -p .gitissue/cache
-if [ -L .gitissue/cache ]; then
-  echo "✗ .gitissue/cache is a symlink — refusing to write the scorer request"
+mkdir -p .idd/cache
+if [ -L .idd/cache ]; then
+  echo "✗ .idd/cache is a symlink — refusing to write the scorer request"
   exit 1
 fi
-dup_request="$(mktemp .gitissue/cache/dup-request.XXXXXX)"
+dup_request="$(mktemp .idd/cache/dup-request.XXXXXX)"
 chmod 600 "$dup_request"
 printf '%s\n' "$dup_request" > request.path
 printf '%s' '{"mode":"create","items":[{"index":1,"title":"x","keywords":[],"type":"feature"}]}' > "$dup_request"
@@ -942,10 +942,10 @@ done
 # Unique exclusive files: two mktemp names must differ, and mode must be 0600.
 (
   cd "$FLOW"
-  rm -rf .gitissue/cache
-  mkdir -p .gitissue/cache
-  a="$(mktemp .gitissue/cache/dup-request.XXXXXX)"
-  b="$(mktemp .gitissue/cache/dup-request.XXXXXX)"
+  rm -rf .idd/cache
+  mkdir -p .idd/cache
+  a="$(mktemp .idd/cache/dup-request.XXXXXX)"
+  b="$(mktemp .idd/cache/dup-request.XXXXXX)"
   chmod 600 "$a" "$b"
   mode_a="$(python3 -c 'import os,sys; print(oct(os.stat(sys.argv[1]).st_mode & 0o777))' "$a")"
   if [ "$a" != "$b" ] && [ "$mode_a" = "0o600" ]; then
@@ -956,16 +956,16 @@ done
   || fail "AC1: concurrent request files are unique and owner-only"
 # Planted cache symlink must be refused before any write.
 SYMLINK_FLOW="$TMP/dup-symlink"; rm -rf "$SYMLINK_FLOW"
-mkdir -p "$SYMLINK_FLOW/.gitissue" "$SYMLINK_FLOW/outside"
-ln -s "$SYMLINK_FLOW/outside" "$SYMLINK_FLOW/.gitissue/cache"
+mkdir -p "$SYMLINK_FLOW/.idd" "$SYMLINK_FLOW/outside"
+ln -s "$SYMLINK_FLOW/outside" "$SYMLINK_FLOW/.idd/cache"
 run_status out st bash -c "
   cd '$SYMLINK_FLOW'
-  if [ -L .gitissue/cache ]; then
-    echo '✗ .gitissue/cache is a symlink — refusing to write the scorer request'
+  if [ -L .idd/cache ]; then
+    echo '✗ .idd/cache is a symlink — refusing to write the scorer request'
     exit 1
   fi
-  mkdir -p .gitissue/cache
-  mktemp .gitissue/cache/dup-request.XXXXXX >/dev/null
+  mkdir -p .idd/cache
+  mktemp .idd/cache/dup-request.XXXXXX >/dev/null
   exit 0
 "
 if [ "$st" = 1 ] && [ -z "$(ls -A "$SYMLINK_FLOW/outside" 2>/dev/null)" ]; then
@@ -1076,7 +1076,7 @@ for key in weights.phrase weights.title_overlap weights.keyword weights.same_typ
   fi
 done
 expect_grep "AC1: init template emits duplicate_detection" \
-  "duplicate_detection:" "$REPO_ROOT/src/skills/init-gitissue/templates/gitissue-template.yml"
+  "duplicate_detection:" "$REPO_ROOT/src/skills/init-idd/templates/idd-template.yml"
 expect_grep "AC1: dedicated non-vacuous scorer suite is CI-wired" \
   "bash tests/test-scripts-278.sh" "$REPO_ROOT/.github/workflows/dist-check.yml"
 
@@ -1084,8 +1084,8 @@ expect_grep "AC2: issue-triage's ordering step calls gi-triage-graph" \
   "references/scripts/gi-triage-graph.py" "$SKILLS/issue-triage/SKILL.md"
 expect_grep "AC2: auto-pilot Phase 1 calls the SAME script, not a reimplementation" \
   "references/scripts/gi-triage-graph.py" "$(spec_concat "$SKILLS/auto-pilot/references/phases.md")"
-expect_grep "AC3: init-gitissue Step 1 calls gi-stack-detect" \
-  "references/scripts/gi-stack-detect.py" "$SKILLS/init-gitissue/SKILL.md"
+expect_grep "AC3: init-idd Step 1 calls gi-stack-detect" \
+  "references/scripts/gi-stack-detect.py" "$SKILLS/init-idd/SKILL.md"
 expect_grep "AC4: issue-creator's config step calls gi-model-cache" \
   "references/scripts/gi-model-cache.py" "$SKILLS/issue-creator/SKILL.md"
 
@@ -1094,10 +1094,10 @@ expect_grep "AC5: issue-triage keeps the ordering rules as a runnable procedure"
   "Steps 3-7 — the prose procedure" "$SKILLS/issue-triage/references/detection.md"
 expect_grep "AC5: the prose procedure still carries the priority buckets" \
   "P1 (Critical)" "$SKILLS/issue-triage/references/detection.md"
-expect_grep "AC5: init-gitissue keeps the language detection table" \
-  "### Language Detection" "$SKILLS/init-gitissue/SKILL.md"
-expect_grep "AC5: init-gitissue keeps the test-runner detection table" \
-  "### Test Runner Detection" "$SKILLS/init-gitissue/SKILL.md"
+expect_grep "AC5: init-idd keeps the language detection table" \
+  "### Language Detection" "$SKILLS/init-idd/SKILL.md"
+expect_grep "AC5: init-idd keeps the test-runner detection table" \
+  "### Test Runner Detection" "$SKILLS/init-idd/SKILL.md"
 expect_grep "AC4: the model-suggestion doc is marked refresh/debug-only reading" \
   "refresh- and debug-only reading" "$SKILLS/issue-creator/references/model-suggestion.md"
 expect_grep "AC4: the model-suggestion doc keeps the by-hand lifecycle" \
@@ -1106,7 +1106,7 @@ expect_grep "AC4: the model-suggestion doc keeps the by-hand lifecycle" \
 # Exit 3 must never be swallowed by a degrade path, and exit 4 must be named.
 for entry in \
   "issue-triage|SKILL.md" \
-  "init-gitissue|SKILL.md" \
+  "init-idd|SKILL.md" \
 ; do
   skill="${entry%%|*}"; f="$SKILLS/$skill/${entry##*|}"
   if grep -qi "never degrade past exit 3" "$f"; then
@@ -1256,7 +1256,7 @@ SQUOTED = re.compile(r"'[^']*'")
 # claim a reviewer had to check against the code, so the code states it.
 ALLOWED_VARS = {
     "$skill_dir": "path the skill resolves from its own SKILL.md dirname",
-    "$dup_request": "mktemp path under .gitissue/cache/; exclusive, never issue text",
+    "$dup_request": "mktemp path under .idd/cache/; exclusive, never issue text",
 }
 
 

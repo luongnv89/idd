@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # test-init-template-doc-urls-dist.sh — Verify the built copy of the
-# init-gitissue template holds the URL policy after build (issue #58, §9 of
+# init-idd template holds the URL policy after build (issue #58, §9 of
 # refactor-plan-v10.md; updated for issue #81 and #106).
 #
 # Same rule as the source variant, applied to:
-#   skills/init-gitissue/templates/gitissue-template.yml (committed)
+#   skills/init-idd/templates/idd-template.yml (committed)
 #
 # Stale pattern: any GitHub URL to /src/docs/<file>.md where <file> exists
 # at top-level docs/. Post-#81 the canonical path is /docs/<file>.md.
@@ -17,7 +17,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 RUNTIME_DOCS="$REPO_ROOT/docs"
 BUILD_SH="$REPO_ROOT/scripts/build.sh"
-SKILL_TEMPLATE="$REPO_ROOT/skills/init-gitissue/templates/gitissue-template.yml"
+SKILL_TEMPLATE="$REPO_ROOT/skills/init-idd/templates/idd-template.yml"
 
 PASS=0
 FAIL=0
@@ -79,18 +79,18 @@ PY
 }
 
 # ───────────────────────────────────────────────────────────
-# T1: skills/init-gitissue copy (committed)
+# T1: skills/init-idd copy (committed)
 # ───────────────────────────────────────────────────────────
 if [ -f "$SKILL_TEMPLATE" ]; then
   flat_violations="$(scan "$SKILL_TEMPLATE" || true)"
   if [ -z "$flat_violations" ]; then
-    pass "T1: skills/init-gitissue/.../gitissue-template.yml passes URL policy"
+    pass "T1: skills/init-idd/.../idd-template.yml passes URL policy"
   else
     fail "T1: stale URLs in skills template copy"
     printf '%s\n' "$flat_violations" | sed 's/^/    /'
   fi
 else
-  fail "T1: skills/init-gitissue/.../gitissue-template.yml missing"
+  fail "T1: skills/init-idd/.../idd-template.yml missing"
 fi
 
 # ───────────────────────────────────────────────────────────

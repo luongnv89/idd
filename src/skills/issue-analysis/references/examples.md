@@ -111,7 +111,7 @@ Full example runs (happy path, view mode, closed issue), extracted from SKILL.md
     Risk:         Low
     Recommended:  Option 1 — Minimal fix
 
-  ✓ Analysis saved to .gitissue/analysis-42.json
+  ✓ Analysis saved to .idd/analysis-42.json
 
 ◆ Issue Analysis: #42 — Fix mobile auth redirect loop
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
@@ -129,7 +129,7 @@ Full example runs (happy path, view mode, closed issue), extracted from SKILL.md
 
   Complexity: S │ Risk: Low
   Recommended: Option 1 — Minimal fix
-  Saved: .gitissue/analysis-42.json
+  Saved: .idd/analysis-42.json
 ```
 
 ---

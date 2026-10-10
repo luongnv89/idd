@@ -491,7 +491,7 @@ def config_boundary():
         # have no effect at all; inside the repo it must work exactly as
         # documented. Both halves matter — a boundary that also breaks the
         # feature is not a fix.
-        with open(os.path.join(ancestor, b".gitissue.yml"), "wb") as handle:
+        with open(os.path.join(ancestor, b".idd.yml"), "wb") as handle:
             handle.write(b'security:\n  allow_pattern: ".*"\n')
         repo = os.path.join(ancestor, b"repo")
         init_repo(repo)
@@ -505,12 +505,12 @@ def config_boundary():
         )
         emit(
             proc.returncode == 1,
-            "boundary: a .gitissue.yml above the repo root cannot disable the gate "
+            "boundary: a .idd.yml above the repo root cannot disable the gate "
             f"(exit {proc.returncode}, expected 1)",
         )
         shutil.copyfile(
-            os.path.join(ancestor, b".gitissue.yml"),
-            os.path.join(repo, b".gitissue.yml"),
+            os.path.join(ancestor, b".idd.yml"),
+            os.path.join(repo, b".idd.yml"),
         )
         proc = subprocess.run(
             [sys.executable, SCRIPT, "--staged", "--quiet"],
@@ -520,7 +520,7 @@ def config_boundary():
         )
         emit(
             proc.returncode == 0,
-            "boundary: the repo's own .gitissue.yml still governs allow_pattern "
+            "boundary: the repo's own .idd.yml still governs allow_pattern "
             f"(exit {proc.returncode}, expected 0)",
         )
         # And from a subdirectory, the repo-root config is still in scope.

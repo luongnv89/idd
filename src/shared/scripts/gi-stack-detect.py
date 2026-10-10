@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """Detect a repository's language, framework, test runner, and size.
 
-`/init-gitissue` decides four things by looking at the filesystem: which marker
+`/init-idd` decides four things by looking at the filesystem: which marker
 files exist, which dependency names appear in them, and how many files are
 tracked. That is lookup, not reasoning — and doing it with an agent means
 reading `package.json`, `pyproject.toml`, `go.mod` and friends into a context
 window to answer a question a table already answers. This script runs the
 table; the model keeps the part the table cannot do, which is deciding what to
-write into `.gitissue.yml` when nothing in the table matched.
+write into `.idd.yml` when nothing in the table matched.
 
 An unmatched field comes back `null` and is listed in `unresolved`, so the
 caller knows exactly which fields to fall back to prose for. A `null` language
@@ -56,7 +56,7 @@ import re
 import subprocess
 import sys
 
-# Directories excluded from the file count, per the init-gitissue spec.
+# Directories excluded from the file count, per the init-idd spec.
 EXCLUDED_DIRS = (
     ".git",
     "node_modules",
@@ -201,7 +201,7 @@ def list_files(root: str) -> tuple[list[str], str]:
 
         `os.walk` swallows every `OSError` by default, and `os.path.isdir`
         succeeds on a `chmod 000` directory, so the old guard let an unreadable
-        root return exit 0 with `file_count: 0` — which `/init-gitissue` reads
+        root return exit 0 with `file_count: 0` — which `/init-idd` reads
         as a confident `repo_size: small`. A directory this scan could not read
         is not a directory with nothing in it, and there is no way to tell the
         two apart from the count. Raising here makes the whole class

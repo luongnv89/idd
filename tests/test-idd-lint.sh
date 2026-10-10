@@ -41,7 +41,7 @@ echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄�
 # Fixtures
 # ───────────────────────────────────────────────────────────
 cat > "$TMP/issue-good.md" <<'EOF'
-<!-- gitissue:normalized v1 -->
+<!-- idd:normalized v1 -->
 
 ## Type
 
@@ -75,7 +75,7 @@ sed 's/^- \[ \] .*$//' "$TMP/issue-good.md" > "$TMP/issue-no-checkboxes.md"
 sed 's/\*\*Current behavior:\*\*//' "$TMP/issue-good.md" > "$TMP/issue-bug-no-fields.md"
 
 cat > "$TMP/issue-feature.md" <<'EOF'
-<!-- gitissue:normalized v1 -->
+<!-- idd:normalized v1 -->
 
 ## Type
 
@@ -227,11 +227,11 @@ fi
 - **Options rejected:** none
 - **Selected option:** Option 1
 - **Residual risk:** none identified"
-  mkdir -p .gitissue
+  mkdir -p .idd
   printf '%s\n%s\n' \
     '{"ts":"2026-07-09T00:00:00Z","issue":3,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":4,"complexity":"low","qa_cycles":1}' \
     '{"ts":"2026-07-09T00:01:00Z","issue":9,"mode":"auto","skill":"issue-resolver","outcome":"failed","pr":null,"complexity":"high","qa_cycles":3}' \
-    > .gitissue/runs.jsonl
+    > .idd/runs.jsonl
 )
 STATS_OUT="$(cd "$SYN" && python3 "$LINT" stats --no-github 2>&1)" && STATS_EXIT=0 || STATS_EXIT=$?
 if [ "$STATS_EXIT" -eq 0 ]; then
@@ -277,12 +277,12 @@ fi
 # Medium qa_cycles=3 with breach_reason → pass.
 (
   cd "$SYN"
-  mkdir -p .gitissue
+  mkdir -p .idd
   printf '%s\n' \
     '{"ts":"2026-07-09T00:00:00Z","issue":260,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":1,"complexity":"high","qa_cycles":5}' \
     '{"ts":"2026-07-09T00:01:00Z","issue":253,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":2,"complexity":"high","qa_cycles":5}' \
     '{"ts":"2026-07-09T00:02:00Z","issue":295,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":3,"complexity":"medium","qa_cycles":3}' \
-    > .gitissue/runs.jsonl
+    > .idd/runs.jsonl
 )
 if (cd "$SYN" && python3 "$LINT" stats --no-github >/dev/null 2>&1); then
   fail "T26: unexplained medium>2 must fail stats"
@@ -294,7 +294,7 @@ fi
   printf '%s\n' \
     '{"ts":"2026-07-09T00:00:00Z","issue":260,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":1,"complexity":"high","qa_cycles":5}' \
     '{"ts":"2026-07-09T00:01:00Z","issue":273,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":2,"complexity":"high","qa_cycles":7}' \
-    > .gitissue/runs.jsonl
+    > .idd/runs.jsonl
 )
 if (cd "$SYN" && python3 "$LINT" stats --no-github >/dev/null 2>&1); then
   fail "T26b: high qa_cycles=7 without reason must fail"
@@ -307,7 +307,7 @@ fi
     '{"ts":"2026-07-09T00:00:00Z","issue":260,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":1,"complexity":"high","qa_cycles":5}' \
     '{"ts":"2026-07-09T00:01:00Z","issue":273,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":2,"complexity":"high","qa_cycles":7,"breach_reason":"stagnation plus CI flake"}' \
     '{"ts":"2026-07-09T00:02:00Z","issue":295,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":3,"complexity":"medium","qa_cycles":3,"breach_reason":"reviewer loop on squash-binding"}' \
-    > .gitissue/runs.jsonl
+    > .idd/runs.jsonl
 )
 if (cd "$SYN" && python3 "$LINT" stats --no-github >/dev/null 2>&1); then
   pass "T26c: explained over-ceiling rows do not fail stats"
@@ -319,7 +319,7 @@ fi
   printf '%s\n' \
     '{"ts":"2026-07-09T00:00:00Z","issue":3,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":4,"complexity":"low","qa_cycles":1}' \
     '{"ts":"2026-07-09T00:01:00Z","issue":9,"mode":"auto","skill":"issue-resolver","outcome":"failed","pr":null,"complexity":"high","qa_cycles":3}' \
-    > .gitissue/runs.jsonl
+    > .idd/runs.jsonl
 )
 # Light profile qa_cycles=2 without reason is an unexplained breach
 # (light ceiling is 1) → exit 1.
@@ -327,7 +327,7 @@ fi
   cd "$SYN"
   printf '%s\n' \
     '{"ts":"2026-07-09T00:00:00Z","issue":260,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":1,"profile":"light","qa_cycles":2}' \
-    > .gitissue/runs.jsonl
+    > .idd/runs.jsonl
 )
 if (cd "$SYN" && python3 "$LINT" stats --no-github >/dev/null 2>&1); then
   fail "T26d: unexplained light-profile qa_cycles=2 must fail stats"
@@ -340,7 +340,7 @@ fi
   cd "$SYN"
   printf '%s\n' \
     '{"ts":"2026-07-09T00:00:00Z","issue":260,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":1,"complexity":"high","ceiling":7,"qa_cycles":6}' \
-    > .gitissue/runs.jsonl
+    > .idd/runs.jsonl
 )
 if (cd "$SYN" && python3 "$LINT" stats --no-github >/dev/null 2>&1); then
   pass "T26e: recorded ceiling=7 allows qa_cycles=6 without breach_reason"
@@ -354,14 +354,14 @@ fi
 # Median per phase name across rows carrying `phases`; auto-pilot rows carry the
 # resolver's phases, so they pool with resolver rows. Malformed phases (a
 # raw-appended row bypasses gi-runlog) are skipped, never fatal.
-cp "$SYN/.gitissue/runs.jsonl" "$SYN/.gitissue/runs.jsonl.t28" 2>/dev/null || true
+cp "$SYN/.idd/runs.jsonl" "$SYN/.idd/runs.jsonl.t28" 2>/dev/null || true
 printf '%s\n' \
   '{"ts":"2026-07-09T00:00:00Z","issue":11,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":1,"phases":{"preflight":10,"research":60,"qa":200}}' \
   '{"ts":"2026-07-09T00:01:00Z","issue":12,"mode":"balanced","skill":"auto-pilot","outcome":"merged","pr":2,"phases":{"preflight":12,"research":300,"qa":100}}' \
   '{"ts":"2026-07-09T00:02:00Z","issue":13,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":3,"phases":"garbage"}' \
   '{"ts":"2026-07-09T00:03:00Z","issue":14,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":4,"phases":{"qa":-5,"plan":true,"implement":"9","deliver":null}}' \
   '{"ts":"2026-07-09T00:04:00Z","issue":15,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":5}' \
-  > "$SYN/.gitissue/runs.jsonl"
+  > "$SYN/.idd/runs.jsonl"
 T28_OUT="$(cd "$SYN" && python3 "$LINT" stats --no-github 2>&1)" && T28_EXIT=0 || T28_EXIT=$?
 if [ "$T28_EXIT" -eq 0 ] && printf '%s' "$T28_OUT" | grep -qE "slowest phase +research \(median 180s · 2 runs\)"; then
   pass "T28a: stats names the slowest phase (highest median) and tolerates malformed phases"
@@ -384,7 +384,7 @@ fi
 # Rows without phases: no slowest-phase line, slowest_phase null, still exit 0.
 printf '%s\n' \
   '{"ts":"2026-07-09T00:00:00Z","issue":11,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":1}' \
-  > "$SYN/.gitissue/runs.jsonl"
+  > "$SYN/.idd/runs.jsonl"
 T28_OUT="$(cd "$SYN" && python3 "$LINT" stats --no-github 2>&1)" && T28_EXIT=0 || T28_EXIT=$?
 T28_JSON="$(cd "$SYN" && python3 "$LINT" stats --no-github --json 2>/dev/null \
   | python3 -c "import json,sys; r=json.load(sys.stdin)['runs']; print(r['slowest_phase'], r['phases'])" 2>/dev/null)"
@@ -394,7 +394,7 @@ if [ "$T28_EXIT" -eq 0 ] && ! printf '%s' "$T28_OUT" | grep -q "slowest phase" \
 else
   fail "T28c: pre-#467 rows changed the report (exit $T28_EXIT, json '$T28_JSON')"
 fi
-mv "$SYN/.gitissue/runs.jsonl.t28" "$SYN/.gitissue/runs.jsonl" 2>/dev/null || true
+mv "$SYN/.idd/runs.jsonl.t28" "$SYN/.idd/runs.jsonl" 2>/dev/null || true
 
 # ───────────────────────────────────────────────────────────
 # T25b: bucket identity — the union is a real union (#180)
@@ -683,7 +683,7 @@ m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
 DR = "## Decision Record\n\n- **Root cause:** none."
 def fake_gh(*args):
     if args[0] == "issue":
-        return [{"number": 1, "body": "<!-- gitissue:normalized v1 -->"}]
+        return [{"number": 1, "body": "<!-- idd:normalized v1 -->"}]
     return [{"number": 9, "body": "Closes #9\n\n" + DR,
              "mergedAt": "2026-01-10T12:00:00Z",
              "mergeCommit": {"oid": "$LANDED_OID"}}]
@@ -750,7 +750,7 @@ fi
 # T21: the repo's own sample issue passes L1 (docs/sample-normalized-issue.md)
 # ───────────────────────────────────────────────────────────
 # Strip the doc's explanatory header (everything before the marker line).
-awk '/<!-- gitissue:normalized/{found=1} found' "$REPO_ROOT/docs/sample-normalized-issue.md" > "$TMP/sample.md"
+awk '/<!-- idd:normalized/{found=1} found' "$REPO_ROOT/docs/sample-normalized-issue.md" > "$TMP/sample.md"
 expect 0 "T21: docs/sample-normalized-issue.md body passes L1" issue "$TMP/sample.md"
 
 # ───────────────────────────────────────────────────────────

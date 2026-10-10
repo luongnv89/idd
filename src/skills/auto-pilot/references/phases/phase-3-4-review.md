@@ -74,7 +74,7 @@ For non-critical issues (no `critical` or `priority:critical` label), the auto-p
 | `aggressive` | `false` (default) | follow-up created, PR left open | `left_open` |
 | `aggressive` | `true` | follow-up created, PR merged anyway | `partial_followup` |
 
-The default install (`mode: balanced`) **never** auto-merges a PR with unresolved fixable review issues; only clean PRs are merged. Aggressive partial-merge is unreachable without setting both `mode: aggressive` and `merge_partial: true` in `.gitissue.yml`.
+The default install (`mode: balanced`) **never** auto-merges a PR with unresolved fixable review issues; only clean PRs are merged. Aggressive partial-merge is unreachable without setting both `mode: aggressive` and `merge_partial: true` in `.idd.yml`.
 
 **Step 1 — Create follow-up issue (always, regardless of mode):**
 
@@ -83,7 +83,7 @@ gh issue create \
   --title "Follow-up: unresolved review issues from #{issue_number}" \
   --label "auto-pilot-followup" \
   --body "$(cat <<'EOF'
-<!-- gitissue:normalized v1 -->
+<!-- idd:normalized v1 -->
 
 ## Type
 Improvement

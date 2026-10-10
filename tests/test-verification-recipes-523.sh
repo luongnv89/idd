@@ -11,7 +11,7 @@
 #        consumer (--auto and IDD_AUTO_MODE=1 alike).
 #   V3   the recipe is read from the base ref only — a branch that rewrites
 #        it, or an uncommitted working-tree copy, never supplies it.
-#   V4   the pilot: this repo's own .gitissue-recipe.json, exercised in a
+#   V4   the pilot: this repo's own .idd-recipe.json, exercised in a
 #        throwaway copy of the static site — the mapped capability is driven
 #        against the branch's code, unmapped ones are not, evidence survives
 #        teardown and leaves the tree clean.
@@ -43,7 +43,7 @@ check() { if [ "$2" = "0" ]; then pass "$1"; else fail "$1"; fi; }
 
 SCRIPT="$REPO_ROOT/src/shared/scripts/gi-recipe.py"
 RECEIPT="$REPO_ROOT/src/shared/scripts/gi-receipt.py"
-PILOT="$REPO_ROOT/.gitissue-recipe.json"
+PILOT="$REPO_ROOT/.idd-recipe.json"
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/recipe-523.XXXXXX")"
 DECOY=""
 cleanup_tmp() {
@@ -70,7 +70,7 @@ new_repo() {
     git add -A && git commit -qm init
   )
 }
-commit_recipe() { (cd "$1" && cat > .gitissue-recipe.json && git add .gitissue-recipe.json && git commit -qm recipe); }
+commit_recipe() { (cd "$1" && cat > .idd-recipe.json && git add .idd-recipe.json && git commit -qm recipe); }
 branch_change() { (cd "$1" && git checkout -qb feat && printf '%s\n' "$2" > landing.html && git commit -qam change); }
 
 # recipe <dir> <changed-lines> [args...] — sets OUT and EC.
@@ -147,21 +147,21 @@ check "V2: --plan lists the mapped capabilities without launching" "$?"
 R="$TMP/baseref"; new_repo "$R"; server_recipe '[]' '' | commit_recipe "$R"; branch_change "$R" '<h1>v2</h1>'
 (cd "$R" && python3 - <<'PY'
 import json
-r = json.load(open(".gitissue-recipe.json"))
+r = json.load(open(".idd-recipe.json"))
 r["capabilities"] = [{"name": "evil", "drive": ["sh", "-c", "touch \"$IDD_EVIDENCE_DIR/../../../../../pwned\""]}]
-json.dump(r, open(".gitissue-recipe.json", "w"))
+json.dump(r, open(".idd-recipe.json", "w"))
 PY
 git commit -qam 'branch rewrites the recipe')
 recipe "$R" 'landing.html' --consumer resolve
 [ "$(jget "$OUT" '[c["name"] for c in v["capabilities"]]')" = "['landing']" ] && [ ! -e "$R/.git/pwned" ] && [ ! -e "$R/pwned" ]
 check "V3: a recipe rewritten on the branch never replaces the base-ref recipe" "$?"
-R="$TMP/wtonly"; new_repo "$R"; (cd "$R" && git checkout -qb feat && server_recipe '["resolve"]' '' > .gitissue-recipe.json)
+R="$TMP/wtonly"; new_repo "$R"; (cd "$R" && git checkout -qb feat && server_recipe '["resolve"]' '' > .idd-recipe.json)
 recipe "$R" 'landing.html' --consumer resolve
 [ "$(jget "$OUT" 'v["status"]')" = absent ]; check "V3: an uncommitted working-tree recipe is ignored (absent)" "$?"
 
 # ── V4: the pilot recipe, exercised ──────────────────────────
 python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$PILOT" 2>/dev/null
-check "V4: the repo ships a pilot .gitissue-recipe.json" "$?"
+check "V4: the repo ships a pilot .idd-recipe.json" "$?"
 [ "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["auto"])' "$PILOT" 2>/dev/null)" = "[]" ]
 check "V4: the pilot opts in no auto consumer" "$?"
 R="$TMP/pilot"; new_repo "$R"; commit_recipe "$R" < "$PILOT"; branch_change "$R" '<h1>landing v2 from the branch</h1>'

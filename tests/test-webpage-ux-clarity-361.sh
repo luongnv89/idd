@@ -9,12 +9,13 @@
 #   F-UX-010 — IDD, CursorBench, and SKILL.md are defined at first use;
 #              a single product brand (IDD Stack) is used on these pages
 #   T8       — the single product brand is IDD Stack (issue #512, superseding
-#              IDD and gitissue): after literal identifiers (.gitissue.yml,
-#              .gitissue/, init-gitissue, the gitissue:normalized,
-#              gitissue:qa, and gitissue:run-report markers, the
-#              ~/.cache/gitissue path) are removed, no "gitissue" remains on
-#              the website, llms.txt, the README-level docs, or
-#              docs/config-schema.md
+#              IDD and gitissue; identifiers renamed to idd by issue #537):
+#              no "gitissue" remains on the website, llms.txt, the
+#              README-level docs, or docs/config-schema.md, except the
+#              intentional legacy mentions — SPEC.md's legacy
+#              `gitissue:normalized` marker sentence, docs.html's
+#              `id="init-gitissue"` alias anchor for old deep links, and the
+#              release history mirrored on changelog.html
 #   T9       — "IDD Stack" fills every product-name slot: page titles,
 #              og:site_name, JSON-LD names, llms.txt H1, the plugin
 #              displayName, and the plugin README H1. "IDD" alone stays the
@@ -147,13 +148,20 @@ else
   fail "T7: issuedev still appears $issuedev_total time(s) on landing.html/docs.html"
 fi
 
-# ── Single brand is IDD Stack: "gitissue" survives only inside literal identifiers ──
+# ── Single brand is IDD Stack: "gitissue" survives only as an intentional legacy mention ──
 brand_out="$(python3 -c '
 import re, sys
 
-allow = re.compile(r"\.gitissue\.yml|\.gitissue/|init-gitissue|gitissue:(normalized|qa|run-report)|cache\}?/gitissue", re.I)
+# Intentional legacy survivors only (issue #537): the legacy marker SPEC.md
+# names for deployed issues, and the docs.html alias anchor for old deep links.
+allow = re.compile(r"<!-- gitissue:normalized v1 -->|<span id=\"init-gitissue\" aria-hidden=\"true\"></span>")
+# changelog.html mirrors CHANGELOG.md release history, which keeps the names
+# each release shipped with.
+HISTORY = ("changelog.html",)
 bad = []
 for path in sys.argv[1:]:
+    if path.endswith(HISTORY):
+        continue
     text = open(path, encoding="utf-8").read()
     scrubbed = allow.sub("", text)
     for m in re.finditer(r"gitissue", scrubbed, re.I):
@@ -166,9 +174,9 @@ sys.exit(1 if bad else 0)
   "$REPO_ROOT/README.md" "$REPO_ROOT/CONTRIBUTING.md" "$REPO_ROOT/SPEC.md" \
   "$REPO_ROOT/docs/skills.md" "$REPO_ROOT/docs/config-schema.md")" && brand_status=0 || brand_status=$?
 if [ "$brand_status" -eq 0 ]; then
-  pass "T8: no \"gitissue\" outside literal identifiers on the site, llms.txt, or README-level docs"
+  pass "T8: no \"gitissue\" outside intentional legacy mentions on the site, llms.txt, or README-level docs"
 else
-  fail "T8: \"gitissue\" survives outside literal identifiers (brand is IDD Stack)"
+  fail "T8: \"gitissue\" survives outside intentional legacy mentions (brand is IDD Stack)"
   printf '%s\n' "$brand_out" | sed 's/^/        /'
 fi
 

@@ -99,7 +99,7 @@ has "$SKILL" "argument is a number → Normalize" "T3: mode detection routes a n
 # --- T4: Normalize mode documented behavior (modes.md) ----------------------
 # Idempotency marker, security-label skip, backup-before-edit safety, and the
 # normalized marker are the stable documented contract of Normalize mode.
-has "$MODES" "gitissue:normalized v1"          "T4: normalize checks/writes the normalized marker"
+has "$MODES" "idd:normalized v1"          "T4: normalize checks/writes the normalized marker"
 has "$MODES" "already normalized"              "T4: normalize is idempotent (already-normalized skip)"
 has "$MODES" "security label"                  "T4: normalize skips security-labeled issues"
 has "$MODES" "Backup Original Body"            "T4: normalize backs up the original body before edit"

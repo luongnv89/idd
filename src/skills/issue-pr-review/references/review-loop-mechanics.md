@@ -6,11 +6,11 @@ Exact spawn calls and the token-trade rationale for the reviewer/fixer agents us
 
 SKILL.md's *Configuration* section names the loader and its degrade path; this is
 the full key list — every default value, and what each key does to the pipeline.
-It is also the list to read `.gitissue.yml` against by hand when `gi-config` is
+It is also the list to read `.idd.yml` against by hand when `gi-config` is
 unavailable. Value syntax and validation live in `docs/config-schema.md`.
 
 **Why the working directory and the script path both matter.** `gi-config.py`
-resolves `.gitissue.yml` against the *current working directory*, so it must be
+resolves `.idd.yml` against the *current working directory*, so it must be
 run from the repo root. Run anywhere else it does not fail loudly: it exits 0
 reporting `config_file: null` / `first_run: true`, silently discarding the repo's
 real config and handing the run a full set of defaults. The script *path*, by
@@ -266,7 +266,7 @@ whoever opened the PR, so any author can write this marker. Binding `head=` does
 a matching one. The verdict may gate **only duplicated work** — a second run of
 a check that already ran, unchanged, on this exact commit — and **never a safety
 gate**. Issue **#274** ("A PR can disable the secret-scanning gate via its
-own `.gitissue.yml`") is the standing proof that this repo can lose a security
+own `.idd.yml`") is the standing proof that this repo can lose a security
 gate to repo-controlled input; that is the failure this design refuses to
 repeat. An edit that lets the marker suppress a secret scan, a CI wait, an
 acceptance-criteria check, or a traceability check converts a token optimization
@@ -297,7 +297,7 @@ The binding is on code, not on prose.
 Read it out of the `body` already fetched in Step 1 — no extra API call: <!-- a:rvm-parse-marker -->
 
 ```bash
-grep -oE '<!-- gitissue:qa v[0-9]+ [^>]*-->' <<<"$body"
+grep -oE '<!-- idd:qa v[0-9]+ [^>]*-->' <<<"$body"
 ```
 
 - **Zero matches** ⇒ `absent`. The version is matched loosely on purpose — a
@@ -610,8 +610,8 @@ Delegate fixes to the fixer subagent instead of applying code changes in the mai
 - `test_output`: trimmed relevant failure output from Steps 4-5
 - `commit_message`: `fix({scope}): address review feedback` (append `(#{linked_issue})` only if a linked issue exists)
 - `security_convention`: `references/docs/pre-commit-security.md` — the bundled pre-commit security contract, and the fallback procedure when the script cannot run
-- `secscan_script`: the **absolute** path to `references/scripts/gi-secscan.py` — the bundled script that implements it, and what the fixer MUST run before committing. Absolutize it before binding (a subagent's working directory is the target repo, so a skill-relative path resolves to nothing and the gate silently never runs). Only the path is passed; the script reads `security.*` from `.gitissue.yml` itself, so no repo-controlled config value reaches a command line. This and `security_convention` are spawn *variables* rather than references inside `fixer.md`, because an emitted agent prompt renders its own references as absolute repo URLs and so cannot name a path inside this skill's bundle
-- `secscan_policy_ref`: `origin/<default-branch>` — the ref the scan reads `security.*` from, bound from `gh repo view --json defaultBranchRef --jq .defaultBranchRef.name`, never from the PR's author-chosen `baseRefName`. This skill reviews the branch that wrote the checked-out `.gitissue.yml`, so without it the artifact under review supplies the policy governing its own review and can allow-list its own secret. A ref name, not a config value — nothing repo-controlled reaches a command line either way
+- `secscan_script`: the **absolute** path to `references/scripts/gi-secscan.py` — the bundled script that implements it, and what the fixer MUST run before committing. Absolutize it before binding (a subagent's working directory is the target repo, so a skill-relative path resolves to nothing and the gate silently never runs). Only the path is passed; the script reads `security.*` from `.idd.yml` itself, so no repo-controlled config value reaches a command line. This and `security_convention` are spawn *variables* rather than references inside `fixer.md`, because an emitted agent prompt renders its own references as absolute repo URLs and so cannot name a path inside this skill's bundle
+- `secscan_policy_ref`: `origin/<default-branch>` — the ref the scan reads `security.*` from, bound from `gh repo view --json defaultBranchRef --jq .defaultBranchRef.name`, never from the PR's author-chosen `baseRefName`. This skill reviews the branch that wrote the checked-out `.idd.yml`, so without it the artifact under review supplies the policy governing its own review and can allow-list its own secret. A ref name, not a config value — nothing repo-controlled reaches a command line either way
 
 ```python
 Agent(

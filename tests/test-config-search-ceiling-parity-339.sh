@@ -127,7 +127,7 @@ with tempfile.TemporaryDirectory() as raw_tmp:
     init_repo(repo)
     nested.mkdir(parents=True)
 
-    hostile = ancestor / ".gitissue.yml"
+    hostile = ancestor / ".idd.yml"
     hostile.write_text(
         "resolve:\n"
         "  branch_prefix: hostile/\n"
@@ -187,7 +187,7 @@ with tempfile.TemporaryDirectory() as raw_tmp:
         "gi-model-cache ignores model_suggestion settings above the repo root",
     )
 
-    root_config = repo / ".gitissue.yml"
+    root_config = repo / ".idd.yml"
     root_config.write_text(
         "resolve:\n"
         "  branch_prefix: team/\n"

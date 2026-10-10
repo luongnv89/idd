@@ -5,13 +5,13 @@
 ## Start here
 
 - [Landing page](https://luongnv.com/idd/): Product overview, installation command, and workflow summary.
-- [Skills reference](https://luongnv.com/idd/docs.html): Complete command reference for `/init-gitissue`, `/issue-creator`, `/plan-to-issues`, `/issue-analysis`, `/issue-triage`, `/issue-resolver`, `/issue-pr-review`, `/auto-pilot`, and `/idd-doctor`.
+- [Skills reference](https://luongnv.com/idd/docs.html): Complete command reference for `/init-idd`, `/issue-creator`, `/plan-to-issues`, `/issue-analysis`, `/issue-triage`, `/issue-resolver`, `/issue-pr-review`, `/auto-pilot`, and `/idd-doctor`.
 - [GitHub repository](https://github.com/luongnv89/idd): Source code, issues, releases, and contribution workflow.
 - [README](https://github.com/luongnv89/idd/blob/main/README.md): Installation, methodology, examples, and command table.
 
 ## Commands
 
-- [`/init-gitissue`](https://luongnv.com/idd/docs.html#init-gitissue): Generate a repository-specific `.gitissue.yml` config.
+- [`/init-idd`](https://luongnv.com/idd/docs.html#init-idd): Generate a repository-specific `.idd.yml` config.
 - [`/issue-creator`](https://luongnv.com/idd/docs.html#issue-creator): Create, normalize, or batch-create structured GitHub issues.
 - [`/plan-to-issues`](https://luongnv.com/idd/docs.html#plan-to-issues): Turn a phased plan file or a conversation into labelled issues under one tracking epic.
 - [`/issue-analysis`](https://luongnv.com/idd/docs.html#issue-analysis): Analyze one issue for root cause, affected files, implementation options, complexity, and risk.
@@ -24,7 +24,7 @@
 ## Documentation
 
 - [IDD methodology](https://github.com/luongnv89/idd/blob/main/docs/idd-methodology.md): Issue-Driven Development concepts and operating model.
-- [Configuration schema](https://github.com/luongnv89/idd/blob/main/docs/config-schema.md): `.gitissue.yml` options and defaults.
+- [Configuration schema](https://github.com/luongnv89/idd/blob/main/docs/config-schema.md): `.idd.yml` options and defaults.
 - [Naming conventions](https://github.com/luongnv89/idd/blob/main/docs/naming-conventions.md): Branch, commit, PR, and issue naming rules.
 - [Development guide](https://github.com/luongnv89/idd/blob/main/docs/DEVELOPMENT.md): Maintainer workflow and build/test instructions.
 

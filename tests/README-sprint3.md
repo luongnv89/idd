@@ -1,12 +1,12 @@
-# Integration Tests — gitissue Sprint 3
+# Integration Tests — IDD Stack Sprint 3
 
-These are manual integration tests for `/issue-triage`, `/init-gitissue`, and the formalized confidence scoring system.
+These are manual integration tests for `/issue-triage`, `/init-idd`, and the formalized confidence scoring system.
 
 ## Prerequisites
 
 - A test GitHub repository with push access
 - `gh` CLI authenticated (`gh auth status`)
-- Claude Code with `/issue-triage`, `/init-gitissue`, and `/issue-creator` skills loaded
+- Claude Code with `/issue-triage`, `/init-idd`, and `/issue-creator` skills loaded
 - Test files in the repo for codebase scanning (see Sprint 1 setup)
 
 ## Setup
@@ -15,9 +15,9 @@ If not already set up from Sprint 1:
 
 1. Create a test repo:
    ```bash
-   gh repo create test-gitissue --public --clone
-   cd test-gitissue
-   echo "# Test repo for gitissue" > README.md
+   gh repo create test-idd --public --clone
+   cd test-idd
+   echo "# Test repo for IDD Stack" > README.md
    git add README.md && git commit -m "init"
    git push -u origin main
    ```
@@ -36,7 +36,7 @@ If not already set up from Sprint 1:
 3. Create 10+ open issues for triage tests (lean format — no affected files in body):
    ```bash
    # Issue 1: bug about auth (triage will find auth files via keyword scan)
-   gh issue create --title "Fix login redirect loop" --body '<!-- gitissue:normalized v1 -->
+   gh issue create --title "Fix login redirect loop" --body '<!-- idd:normalized v1 -->
    ## Type
    Bug
    ## Description
@@ -48,7 +48,7 @@ If not already set up from Sprint 1:
    **Labels:** bug, auth'
 
    # Issue 2: feature about api
-   gh issue create --title "Add pagination to users endpoint" --body '<!-- gitissue:normalized v1 -->
+   gh issue create --title "Add pagination to users endpoint" --body '<!-- idd:normalized v1 -->
    ## Type
    Feature
    ## Description
@@ -60,7 +60,7 @@ If not already set up from Sprint 1:
    **Labels:** feature, api'
 
    # Issue 3: improvement about auth (triage should detect overlap with issue 1 via keyword scan)
-   gh issue create --title "Refactor auth middleware for OAuth2" --body '<!-- gitissue:normalized v1 -->
+   gh issue create --title "Refactor auth middleware for OAuth2" --body '<!-- idd:normalized v1 -->
    ## Type
    Improvement
    ## Description
@@ -72,7 +72,7 @@ If not already set up from Sprint 1:
    **Labels:** improvement, auth'
 
    # Issue 4: bug about db
-   gh issue create --title "Fix database connection leak" --body '<!-- gitissue:normalized v1 -->
+   gh issue create --title "Fix database connection leak" --body '<!-- idd:normalized v1 -->
    ## Type
    Bug
    ## Description
@@ -84,7 +84,7 @@ If not already set up from Sprint 1:
    **Labels:** bug, db'
 
    # Issue 5: feature (independent)
-   gh issue create --title "Add dark mode toggle" --body '<!-- gitissue:normalized v1 -->
+   gh issue create --title "Add dark mode toggle" --body '<!-- idd:normalized v1 -->
    ## Type
    Feature
    ## Description
@@ -142,7 +142,7 @@ If not already set up from Sprint 1:
 **Setup:** Create an issue whose keywords overlap with both issue 1 (auth) and issue 2 (API users):
 
 ```bash
-gh issue create --title "Refactor API auth integration" --body '<!-- gitissue:normalized v1 -->
+gh issue create --title "Refactor API auth integration" --body '<!-- idd:normalized v1 -->
 ## Type
 Improvement
 ## Description
@@ -200,14 +200,14 @@ done
 
 ### T24: Triage stale detection
 
-**Setup:** Ensure at least one issue has `updatedAt` older than 14 days. If all test issues were just created, this test requires waiting or using an issue known to be old. Alternatively, set `triage.stale_threshold_days: 0` in `.gitissue.yml`:
+**Setup:** Ensure at least one issue has `updatedAt` older than 14 days. If all test issues were just created, this test requires waiting or using an issue known to be old. Alternatively, set `triage.stale_threshold_days: 0` in `.idd.yml`:
 
 ```bash
-cat > .gitissue.yml << 'EOF'
+cat > .idd.yml << 'EOF'
 triage:
   stale_threshold_days: 0
 EOF
-git add .gitissue.yml && git commit -m "temp: zero stale threshold" && git push
+git add .idd.yml && git commit -m "temp: zero stale threshold" && git push
 ```
 
 **Input:**
@@ -221,7 +221,7 @@ git add .gitissue.yml && git commit -m "temp: zero stale threshold" && git push
 
 **Cleanup:**
 ```bash
-git rm .gitissue.yml && git commit -m "remove temp config" && git push
+git rm .idd.yml && git commit -m "remove temp config" && git push
 ```
 
 ---
@@ -243,15 +243,15 @@ git rm .gitissue.yml && git commit -m "remove temp config" && git push
 
 ---
 
-## Test Cases: /init-gitissue
+## Test Cases: /init-idd
 
-### T26: Init on fresh repo (no .gitissue.yml)
+### T26: Init on fresh repo (no .idd.yml)
 
-**Setup:** Ensure no `.gitissue.yml` exists in the repo root.
+**Setup:** Ensure no `.idd.yml` exists in the repo root.
 
 **Input:**
 ```
-/init-gitissue
+/init-idd
 ```
 
 **Expected:**
@@ -260,7 +260,7 @@ git rm .gitissue.yml && git commit -m "remove temp config" && git push
 - [ ] Output shows detected test runner or `Could not detect test runner`
 - [ ] Output shows repo size estimate
 - [ ] Output shows `◆ Configuration` section
-- [ ] `.gitissue.yml` file created in repo root
+- [ ] `.idd.yml` file created in repo root
 - [ ] File contains all config sections: `platform`, `issue`, `resolve`, `triage`
 - [ ] File contains inline `#` comments explaining each setting
 - [ ] Output shows `✓ Setup complete`
@@ -269,39 +269,39 @@ git rm .gitissue.yml && git commit -m "remove temp config" && git push
 **Verify:**
 ```bash
 # Check file exists
-cat .gitissue.yml
+cat .idd.yml
 
 # Check it has the expected sections
-grep "platform:" .gitissue.yml
-grep "issue:" .gitissue.yml
-grep "resolve:" .gitissue.yml
-grep "triage:" .gitissue.yml
+grep "platform:" .idd.yml
+grep "issue:" .idd.yml
+grep "resolve:" .idd.yml
+grep "triage:" .idd.yml
 
 # Check inline comments exist
-grep "#" .gitissue.yml | head -5
+grep "#" .idd.yml | head -5
 ```
 
 **Cleanup:**
 ```bash
-rm .gitissue.yml
+rm .idd.yml
 ```
 
 ---
 
-### T27: Init with existing .gitissue.yml
+### T27: Init with existing .idd.yml
 
 **Setup:**
 ```bash
-echo "platform: github" > .gitissue.yml
+echo "platform: github" > .idd.yml
 ```
 
 **Input:**
 ```
-/init-gitissue
+/init-idd
 ```
 
 **Expected:**
-- [ ] Output shows `⚠ .gitissue.yml already exists`
+- [ ] Output shows `⚠ .idd.yml already exists`
 - [ ] Output shows three options: `overwrite`, `merge`, `cancel`
 - [ ] Selecting `overwrite` replaces the file with a new auto-detected config
 - [ ] Selecting `merge` keeps existing values and adds new fields
@@ -309,7 +309,7 @@ echo "platform: github" > .gitissue.yml
 
 **Cleanup:**
 ```bash
-rm .gitissue.yml
+rm .idd.yml
 ```
 
 ---
@@ -324,7 +324,7 @@ git add requirements.txt && git commit -m "add requirements" && git push
 
 **Input:**
 ```
-/init-gitissue
+/init-idd
 ```
 
 **Expected:**
@@ -336,7 +336,7 @@ git add requirements.txt && git commit -m "add requirements" && git push
 **Cleanup:**
 ```bash
 git rm requirements.txt && git commit -m "remove requirements" && git push
-rm .gitissue.yml
+rm .idd.yml
 ```
 
 ---
@@ -351,13 +351,13 @@ git init && git commit --allow-empty -m "init"
 
 **Input:**
 ```
-/init-gitissue
+/init-idd
 ```
 
 **Expected:**
 - [ ] Output shows `○ Could not detect project language. Using generic defaults.`
 - [ ] Output shows `○ Could not detect test runner. Setting resolve.auto_test: false.`
-- [ ] `.gitissue.yml` still created with generic defaults
+- [ ] `.idd.yml` still created with generic defaults
 - [ ] `resolve.auto_test` is set to `false` in the generated config
 
 **Cleanup:**
@@ -476,7 +476,7 @@ gh issue create --title "Auth login is slow" --body "The login function takes fo
 **Verify:**
 ```bash
 # Check triage.json was created
-cat .gitissue/triage.json | jq '.issues[0].affected_files'
+cat .idd/triage.json | jq '.issues[0].affected_files'
 # Should contain files found by keyword scan (e.g., ["src/auth/login.py"])
 # NOT files read from the issue body
 ```
@@ -502,13 +502,13 @@ cat .gitissue/triage.json | jq '.issues[0].affected_files'
 
 ### T36: Triage scan timeout
 
-**Setup:** Create a `.gitissue.yml` with a very short timeout to force timeout behavior:
+**Setup:** Create a `.idd.yml` with a very short timeout to force timeout behavior:
 ```bash
-cat > .gitissue.yml << 'EOF'
+cat > .idd.yml << 'EOF'
 triage:
   scan_timeout_per_issue: 1
 EOF
-git add .gitissue.yml && git commit -m "temp: 1s scan timeout" && git push
+git add .idd.yml && git commit -m "temp: 1s scan timeout" && git push
 ```
 
 **Input:**
@@ -524,7 +524,7 @@ git add .gitissue.yml && git commit -m "temp: 1s scan timeout" && git push
 
 **Cleanup:**
 ```bash
-git rm .gitissue.yml && git commit -m "remove temp config" && git push
+git rm .idd.yml && git commit -m "remove temp config" && git push
 ```
 
 ---
@@ -537,13 +537,13 @@ git rm .gitissue.yml && git commit -m "remove temp config" && git push
 ```
 
 **Expected:**
-- [ ] `.gitissue/triage.json` is created/updated
+- [ ] `.idd/triage.json` is created/updated
 - [ ] Each issue entry has `affected_files` populated from keyword scan (not from issue body)
 - [ ] `affected_files` reflect current codebase state
 
 **Verify:**
 ```bash
-cat .gitissue/triage.json | jq '.issues[] | {number, affected_files}'
+cat .idd/triage.json | jq '.issues[] | {number, affected_files}'
 # Each issue should have affected_files from scan results
 ```
 
@@ -560,7 +560,7 @@ gh issue list --state open --json number --jq '.[].number' | while read n; do
 done
 
 # Remove config file
-rm -f .gitissue.yml
+rm -f .idd.yml
 
 # Remove test branches
 git branch | grep "issue-" | xargs -I {} git branch -D {}

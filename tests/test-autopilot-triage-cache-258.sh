@@ -376,7 +376,7 @@ check_has "$SCHEMA" '^  triage_cache_max_age_minutes: 60' \
   "T5.5: config-schema documents autopilot.triage_cache_max_age_minutes"
 check_has "$SCHEMA" '\| .autopilot\.retriage_every. \| .0.' \
   "T5.6: the defaults table carries the new keys"
-check_has "$SCHEMA" '\.gitissue/triage\.json. \| ./issue-triage., ./auto-pilot' \
+check_has "$SCHEMA" '\.idd/triage\.json. \| ./issue-triage., ./auto-pilot' \
   "T5.7: config-schema records /auto-pilot as a triage.json writer"
 # The eligibility criteria must keep naming the session skip list — the pick
 # miss is defined against it, and a cached order makes re-picking easier, not
@@ -1030,7 +1030,7 @@ check_block_has "$GATE_BLOCK" 'Lettered onto \*Step 1\.1\*' \
   "T13.11: the gate says why it is lettered onto 1.1"
 check_block_has "$GATE_BLOCK" 'are a different thing entirely' \
   "T13.12: the gate disambiguates itself from Phase 0's Step 1.0"
-check_block_has "$GATE_BLOCK" 'run-state\.json., not .\.gitissue/triage\.json' \
+check_block_has "$GATE_BLOCK" 'run-state\.json., not .\.idd/triage\.json' \
   "T13.13: the gate names the file each feature owns"
 
 # --- R2: `queue` and `summary.suggested_order` are two facts, not two copies. ---
@@ -1103,10 +1103,10 @@ check_block_has "$STEP12_BLOCK" 'counts sum to the candidates' \
 # --- R4: --dry-run for the two steps #258 added. ---
 # #257's convention: every state-mutating call takes `--dry-run`, and Step 1.1
 # drops `--out` so nothing is persisted ahead of the dry-run stop. Step 1.6
-# writes `.gitissue/triage.json`, so it owes the same rule; Step 1.1a only reads.
+# writes `.idd/triage.json`, so it owes the same rule; Step 1.1a only reads.
 check_block_has "$UPDATE_BLOCK" 'Under .--dry-run., compute the removal and print it, but write nothing' \
   "T13.35: Step 1.6 states the dry-run rule"
-check_block_has "$UPDATE_BLOCK" 'never write .\.gitissue/triage\.json' \
+check_block_has "$UPDATE_BLOCK" 'never write .\.idd/triage\.json' \
   "T13.36: Step 1.6 names the file it must not write under --dry-run"
 check_block_has "$GATE_BLOCK" 'read-only, so .--dry-run. does not change it' \
   "T13.37: Step 1.1a states that it is unaffected by --dry-run"

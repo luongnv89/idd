@@ -12,7 +12,7 @@
 
 - Four mechanical checks, run in one pass — no short-circuit on failure
 - Read-only by design — never modifies files, never opens issues, never creates PRs
-- Skips gracefully when `.gitissue.yml`, `gh`, or templates are missing
+- Skips gracefully when `.idd.yml`, `gh`, or templates are missing
 - Per-finding output points at the exact file and line for fast remediation
 - Plain bash + `gh` — no extra runtime, no extra dependencies
 
@@ -23,7 +23,7 @@
 | `/idd-doctor` | Run the four-check health pass and report PASS / WARN / FAIL |
 | "is my IDD setup healthy" | Run the doctor and surface drift before it becomes a footgun |
 | "check the intent-only contract" | Verify `/issue-creator` claims and issue templates haven't drifted |
-| "verify autopilot mode is set" | Confirm `.gitissue.yml` has `autopilot.mode` (when the file exists) |
+| "verify autopilot mode is set" | Confirm `.idd.yml` has `autopilot.mode` (when the file exists) |
 | "what's my repo's merge strategy" | Report whether the repo is squash-only or has loose defaults |
 
 ## How It Works
@@ -58,13 +58,13 @@ No arguments. The skill reads from the current repo and prints a four-line repor
 |---|-------|-------------|
 | 1 | Stale `/issue-creator` claims in skill README/SKILL files | PASS / FAIL |
 | 2 | Forbidden fields in `src/skills/issue-creator/templates/*.md` and `.github/ISSUE_TEMPLATE/*` | PASS / FAIL |
-| 3 | `autopilot.mode` is set in `.gitissue.yml` (when the file exists) | PASS / FAIL / SKIP |
+| 3 | `autopilot.mode` is set in `.idd.yml` (when the file exists) | PASS / FAIL / SKIP |
 | 4 | Repo's default merge strategy is squash-only | PASS / WARN / SKIP |
 
 ### Out of scope for v1
 
 - `gh` authentication checks (only the merge-strategy check uses `gh`, and it skips when `gh` is unavailable)
-- Full schema validation of `.gitissue.yml`
+- Full schema validation of `.idd.yml`
 - Stale-triage detection
 - PR-format checks
 - Commit-message linting
@@ -79,7 +79,7 @@ No arguments. The skill reads from the current repo and prints a four-line repor
 
     ✓ [1/4] Stale skill claims    no stale language in /issue-creator
     ✓ [2/4] Issue-template fields no forbidden fields in 5 templates
-    ○ [3/4] Autopilot mode        skipped — no .gitissue.yml
+    ○ [3/4] Autopilot mode        skipped — no .idd.yml
     ⚠ [4/4] Squash-merge default  squash + merge-commit + rebase enabled; squash message source PR_BODY — recommend squash-only
         Fix: in repo Settings → General → Pull Requests, allow only "Squash merging",
              and set the squash commit message to "Pull request title and description"
@@ -92,7 +92,7 @@ No arguments. The skill reads from the current repo and prints a four-line repor
 
     ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
     Result: WARN  (4 checks, 0 failed, 1 warned)
-    Evidence:    ran 1 2 4 · skipped 3 (no .gitissue.yml) · scanned 2 skill files, 5 templates
+    Evidence:    ran 1 2 4 · skipped 3 (no .idd.yml) · scanned 2 skill files, 5 templates
     Uncertainty: check 3 not verified (skipped); checks 1-3 are text heuristics
     Decision:    No approval needed — report-only, nothing changed. Next: apply the check 4 Fix hint, then re-run /idd-doctor
 ```
@@ -102,7 +102,7 @@ say what was actually checked, what was not, and what to do next. A skipped
 check is never counted as a pass.
 
 After the result, a non-gating, read-only **run-log summary** over the last 50
-lines of `.gitissue/runs.jsonl` prints the resolve rate, median QA cycles, top
+lines of `.idd/runs.jsonl` prints the resolve rate, median QA cycles, top
 skip reasons, an `Agent overrides:` line — how many runs recorded their
 configured per-role `agents.*` overrides as `applied`, `partial` or `fallback`
 (`none configured` when no run carries the field) — and a `Slowest phase:` line
@@ -121,6 +121,6 @@ recorded per-phase timing (`n/a` when none did).
 
 ## Related Skills
 
-- `/init-gitissue` — generates the `.gitissue.yml` that Check 3 verifies
+- `/init-idd` — generates the `.idd.yml` that Check 3 verifies
 - `/issue-creator` — the intent-only contract that Checks 1 and 2 enforce
-- `/auto-pilot` — uses `autopilot.mode` from `.gitissue.yml`
+- `/auto-pilot` — uses `autopilot.mode` from `.idd.yml`

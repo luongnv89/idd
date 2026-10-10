@@ -207,8 +207,8 @@ anchor_check_flat "$STEP2" rs-design-sketch 'only ever type-checked' \
   "D5: sketches are only ever type-checked"
 anchor_check_flat "$STEP2" rs-design-sketch 'Never execute the sketch' \
   "D5: sketches are never executed"
-anchor_check_flat "$STEP2" rs-design-sketch '\.gitissue/sketch-\{N\}/' \
-  "D5: checks run in the gitignored .gitissue/sketch-{N}/ scratch"
+anchor_check_flat "$STEP2" rs-design-sketch '\.idd/sketch-\{N\}/' \
+  "D5: checks run in the gitignored .idd/sketch-{N}/ scratch"
 anchor_check_flat "$STEP2" rs-design-sketch 'it is never committed' \
   "D5: the scratch is deleted and never committed"
 anchor_check_flat "$STEP2" rs-design-sketch 'never copying code from issue text' \

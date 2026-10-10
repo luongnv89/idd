@@ -29,7 +29,7 @@ FAIL=0
 # Raised to 506,000 in issue #255, which added the QA handoff marker: +610 bytes
 # to idd-methodology.md (the marker as a durable-memory field, inside the
 # digested *Analysis Artifacts* section), +228 to terminal-style.md (one line of
-# marker vocabulary beside `gitissue:normalized`), +11 to platform-github.md
+# marker vocabulary beside `idd:normalized`), +11 to platform-github.md
 # (`headRefOid` in the canonical `gh pr view` field list). All three are bundled
 # into 7 skills, so 849 authored bytes cost 5,943 here — and 5,943 is what the
 # raise is for, measured, not estimated. Two things paid for part of it first:
@@ -62,7 +62,7 @@ FAIL=0
 #
 # One trap paid for part of it first, in the same shape #255 documented: the
 # resolver's new triage prose originally spelled the artifact path
-# `.gitissue/triage.json`, and _config_sections_used in scripts/build.py reads
+# `.idd/triage.json`, and _config_sections_used in scripts/build.py reads
 # `triage.json` as a `triage.<key>` config reference — pulling the entire
 # `triage` config section into the resolver's per-skill excerpt for +1,194
 # bytes, none of which the resolver reads. The prose now names the triage graph
@@ -78,7 +78,7 @@ FAIL=0
 # reinstating one whole document across the skills that excerpt it costs on the
 # order of 165KB (config-schema.md is 27.5KB x 6 non-init skills), so a
 # regression of that shape fails this assertion by more than 3x the headroom.
-# Raised to 512,029 in issue #257, which documents three new `.gitissue/`
+# Raised to 512,029 in issue #257, which documents three new `.idd/`
 # artifacts — `run-state.json`, `run.lock`, `last-run-report.md` — and the
 # carve-out saying they are machine-local and gitignored, contradicting the
 # blanket "the directory should be committed" line directly above them. Measured,
@@ -107,10 +107,10 @@ FAIL=0
 # the merge kept one payment and both sets of additions — #258's two
 # `autopilot.*` keys plus its `/auto-pilot` writer note on `triage.json`, +2,140
 # measured across the bundle against 288 bytes of headroom. The overrun was paid
-# the way this message asks, by compressing the `.gitissue/` section again rather
+# the way this message asks, by compressing the `.idd/` section again rather
 # than by raising the line: 512,222 -> 512,012, and the ratchet still holds.
 # Issue #309's review fixes moved it again without raising it. Two additions to
-# the `.gitissue/` section: the `run-state.json` row now names `/issue-resolver`
+# the `.idd/` section: the `run-state.json` row now names `/issue-resolver`
 # as a writer (`borrowed_skills` only), and the carve-out bullet regained the
 # `commit the directory (project state, not secrets)` rule that 34b56a0's own
 # compression had deleted. Both were paid for inside the same section — the
@@ -122,7 +122,7 @@ FAIL=0
 # top-level `agents` section: 24 keys (2 knobs x 11 roles + `default`) that the
 # Full Schema fence must list one per line, because gi-config derives its
 # defaults — and its unknown-role rejection — from that fence. The section is
-# named by no skill yet, so only /init-gitissue (which keeps the schema whole)
+# named by no skill yet, so only /init-idd (which keeps the schema whole)
 # carries it: the cost is paid once, not 7 times. The first draft measured
 # +1,921; compressing its own comment block, map labels and Defaults Table rows
 # brought it to +1,396, of which the bare key lines alone are ~700. Nothing
@@ -296,14 +296,14 @@ else
 fi
 
 # ── Per-skill config excerpts ────────────────────────────────────────────────
-# /init-gitissue renders .gitissue.yml and keeps the whole schema; every other
+# /init-idd renders .idd.yml and keeps the whole schema; every other
 # skill gets only the sections it names.
-INIT_SCHEMA="$REPO_ROOT/skills/init-gitissue/references/docs/config-schema.md"
+INIT_SCHEMA="$REPO_ROOT/skills/init-idd/references/docs/config-schema.md"
 TRIAGE_SCHEMA="$REPO_ROOT/skills/issue-triage/references/docs/config-schema.md"
 if grep -q '^autopilot:' "$INIT_SCHEMA"; then
-  pass "excerpt: init-gitissue keeps the complete schema"
+  pass "excerpt: init-idd keeps the complete schema"
 else
-  fail "excerpt: init-gitissue lost a schema section it needs to render .gitissue.yml"
+  fail "excerpt: init-idd lost a schema section it needs to render .idd.yml"
 fi
 if grep -q '^triage:' "$TRIAGE_SCHEMA" && ! grep -q '^autopilot:' "$TRIAGE_SCHEMA"; then
   pass "excerpt: issue-triage carries triage but not autopilot"

@@ -35,7 +35,7 @@ Which skill(s) would this change?
 - [ ] `/issue-creator`
 - [ ] `/issue-resolver`
 - [ ] `/issue-triage`
-- [ ] `/init-gitissue`
+- [ ] `/init-idd`
 - [ ] New skill
 
 ## Additional Context

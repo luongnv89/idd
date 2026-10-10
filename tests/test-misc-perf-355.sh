@@ -545,7 +545,7 @@ PY
 # ─── Bundled copies stay byte-identical to their sources ────
 DRIFT=0
 for pair in \
-  "init-gitissue/references/scripts/gi-stack-detect.py:$STACK" \
+  "init-idd/references/scripts/gi-stack-detect.py:$STACK" \
   "issue-triage/references/scripts/gi-triage-graph.py:$GRAPH" \
   "auto-pilot/references/scripts/gi-triage-graph.py:$GRAPH" \
   "issue-resolver/references/scripts/gi-state.py:$STATE" \

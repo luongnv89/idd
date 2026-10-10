@@ -371,7 +371,7 @@ issue. Re-invoking `/auto-pilot` alone would re-triage, re-pick #42, and the
 resolver would find its own PR — the case that used to end as `skipped`, and,
 worse, as a closed issue behind an unreviewed PR. `--resume` re-enters the run
 instead. Nothing about this depends on the loop *remembering* anything: the
-memory is `.gitissue/run-state.json`, written at each phase boundary.
+memory is `.idd/run-state.json`, written at each phase boundary.
 
 ```
 $ /auto-pilot --resume
@@ -443,7 +443,7 @@ Issue #42 declares `Depends on #38` in its body. Auto-pilot resolves both #38 an
     2. Re-run /auto-pilot — a later run re-evaluates the gate for
        PR #87 and merges it once the dependency is in
     3. To bypass entirely: set autopilot.respect_dependencies: false in
-       .gitissue.yml (not recommended unless the marker is wrong)
+       .idd.yml (not recommended unless the marker is wrong)
 
   Iteration 2/10:    ⚠ blocked_by_dependency — #42 → PR #87 (dep: #38, PR #84)
 
@@ -524,7 +524,7 @@ persisted and the lock released on the way out:
 
   Remaining:               12 open issues
   Next action:             /auto-pilot to continue
-  Report:                  .gitissue/last-run-report.md
+  Report:                  .idd/last-run-report.md
 ```
 
 The next run picks up from exactly there — #61 is skipped by its label without

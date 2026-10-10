@@ -2,8 +2,8 @@
 # test-ci-billing-431.sh — Validate review.ignore_ci_billing_failures (issue #431).
 #
 # This script verifies issue #431 acceptance criteria:
-#  AC1. /init-gitissue emits the key on a fresh install — it renders
-#       templates/gitissue-template.yml wholesale, so the key must be there.
+#  AC1. /init-idd emits the key on a fresh install — it renders
+#       templates/idd-template.yml wholesale, so the key must be there.
 #  AC2. The default is `false`, identically in docs/config-schema.md and in the
 #       init template (the build aborts if those two disagree, but a wrong
 #       *shared* default would satisfy parity and still be wrong).
@@ -54,9 +54,9 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 KEY='ignore_ci_billing_failures'
 
 SCHEMA="$REPO_ROOT/docs/config-schema.md"
-TEMPLATE="$REPO_ROOT/src/skills/init-gitissue/templates/gitissue-template.yml"
-DIST_TEMPLATE="$REPO_ROOT/skills/init-gitissue/templates/gitissue-template.yml"
-DIST_INIT_SCHEMA="$REPO_ROOT/skills/init-gitissue/references/docs/config-schema.md"
+TEMPLATE="$REPO_ROOT/src/skills/init-idd/templates/idd-template.yml"
+DIST_TEMPLATE="$REPO_ROOT/skills/init-idd/templates/idd-template.yml"
+DIST_INIT_SCHEMA="$REPO_ROOT/skills/init-idd/references/docs/config-schema.md"
 
 SRC_SKILL="$REPO_ROOT/src/skills/issue-pr-review/SKILL.source.md"
 DIST_SKILL="$REPO_ROOT/skills/issue-pr-review/SKILL.md"
@@ -127,10 +127,10 @@ else
 fi
 
 # ───────────────────────────────────────────────────────────
-# T2: AC1 — /init-gitissue renders the key on a fresh install
+# T2: AC1 — /init-idd renders the key on a fresh install
 # ───────────────────────────────────────────────────────────
-# /init-gitissue names no review.* key in its own prose; it emits
-# templates/gitissue-template.yml wholesale. So the template is the AC.
+# /init-idd names no review.* key in its own prose; it emits
+# templates/idd-template.yml wholesale. So the template is the AC.
 for t in "$TEMPLATE" "$DIST_TEMPLATE"; do
   if grep -qE "^\s*${KEY}:\s*false\s*$" "$t"; then
     pass "T2.AC1: ${t#"$REPO_ROOT"/} emits '${KEY}: false'"
@@ -147,12 +147,12 @@ else
   fail "T2.AC1: ${KEY} is not inside the template's review: block"
 fi
 
-# The bundled schema /init-gitissue reads keeps the whole doc, so the key is
+# The bundled schema /init-idd reads keeps the whole doc, so the key is
 # reachable at run time too.
 if grep -qE "^\s*${KEY}:\s*false\s*$" "$DIST_INIT_SCHEMA"; then
-  pass "T2.AC1: init-gitissue's bundled config-schema.md carries the key"
+  pass "T2.AC1: init-idd's bundled config-schema.md carries the key"
 else
-  fail "T2.AC1: init-gitissue's bundled config-schema.md is missing the key"
+  fail "T2.AC1: init-idd's bundled config-schema.md is missing the key"
 fi
 
 # ───────────────────────────────────────────────────────────

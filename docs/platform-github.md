@@ -1,6 +1,6 @@
 # Platform Driver: GitHub
 
-IDD skills reach the issue tracker through a **platform driver** — the workflow's operations mapped to one tool's commands. This is the **GitHub driver**, implemented with the [GitHub CLI](https://cli.github.com) (`gh`) and the only one implemented; `.gitissue.yml` selects it with `platform: github`. Skills inline these commands at the step where they run; this catalog is the contract they must match — when a command here changes, the skills follow.
+IDD skills reach the issue tracker through a **platform driver** — the workflow's operations mapped to one tool's commands. This is the **GitHub driver**, implemented with the [GitHub CLI](https://cli.github.com) (`gh`) and the only one implemented; `.idd.yml` selects it with `platform: github`. Skills inline these commands at the step where they run; this catalog is the contract they must match — when a command here changes, the skills follow.
 
 ## Driver rules
 

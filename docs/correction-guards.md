@@ -25,7 +25,7 @@ Two signals, both free — the data already exists:
 | Signal | Key | Source | Recurrence |
 |--------|-----|--------|------------|
 | Review-feedback fix cycle | `review-fix:<scope>` | commit subjects matching `fix(<scope>): address review feedback` (the fixer's commit convention) | scope seen ≥ `--threshold` times (default 2) |
-| Repeated skip reason | `skip:<reason>` | `skipped_reason` in `.gitissue/runs.jsonl` | reason seen ≥ `--threshold` times |
+| Repeated skip reason | `skip:<reason>` | `skipped_reason` in `.idd/runs.jsonl` | reason seen ≥ `--threshold` times |
 
 The commit scan defaults to `--all` refs, not `HEAD`: this repo squash-merges,
 so a PR's fix-cycle commits live on the PR branch and never appear on main's
@@ -38,7 +38,7 @@ first-parent history. Scopes and reasons are normalized to lowercase
    any recurring key has no proposal — the same "findings exit 1" contract as
    the lint subcommands. `--json` emits the machine-readable form.
 2. **Propose.** `... corrections --record` appends one `proposed` record per
-   recurring key to `.gitissue/improvement-proposals.jsonl`, each carrying a
+   recurring key to `.idd/improvement-proposals.jsonl`, each carrying a
    suggested guard kind (`helper-guard`, `convention`, …) and its evidence.
    **Dedup:** a key whose latest event is `proposed`, `approved`, or `landed`
    is never re-proposed; fresh evidence accrues to the open record. A
@@ -57,8 +57,8 @@ first-parent history. Scopes and reasons are normalized to lowercase
 
 ## Ledger schema
 
-`.gitissue/improvement-proposals.jsonl` — append-only, newline-delimited JSON,
-one event per line, local and deletable like the rest of `.gitissue/`. Readers
+`.idd/improvement-proposals.jsonl` — append-only, newline-delimited JSON,
+one event per line, local and deletable like the rest of `.idd/`. Readers
 tolerate malformed lines (skip, never raise). A key's current status is its
 **latest** event. Promote a proposal that matters to a GitHub issue; the ledger
 is scratch, not the durable record.

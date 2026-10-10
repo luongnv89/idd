@@ -64,19 +64,30 @@ dist/.agents/plugins/marketplace.json
 
 # Autopilot/resolver run log and its rotated segments (local activity, not committed)
 .gitissue/runs.jsonl
+.idd/runs.jsonl
 .gitissue/runs-*.jsonl
+.idd/runs-*.jsonl
 
 # Correction-guard proposal ledger (local scratch; docs/correction-guards.md)
 .gitissue/improvement-proposals.jsonl
+.idd/improvement-proposals.jsonl
 
 # Analysis, triage, and issue-cache artifacts are local and regenerable; they
 # can carry issue bodies and repository findings that should not be committed.
 .gitissue/analysis-*.json
+.idd/analysis-*.json
 .gitissue/triage.json
+.idd/triage.json
 .gitissue/cache/
+.idd/cache/
 
 # /auto-pilot run state, run lock, and last-run report — machine-local, single-run,
-# and regenerated on the next run (docs/config-schema.md → `.gitissue/` carve-out)
+# and regenerated on the next run (docs/config-schema.md → `.idd/` carve-out).
+# Each `.idd/` line is mirrored by its legacy `.gitissue/` line (issue #537):
+# installed pre-rename skills still write the legacy directory.
 .gitissue/run.lock
+.idd/run.lock
 .gitissue/run-state.json
+.idd/run-state.json
 .gitissue/last-run-report.md
+.idd/last-run-report.md

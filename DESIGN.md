@@ -160,10 +160,10 @@ Levels: `high` (direct match), `medium` (keyword inference), `low` (best guess, 
 
 ## First-Run Experience
 
-When no `.gitissue.yml` exists:
+When no `.idd.yml` exists:
 
 ```
-  ○ First run — using default config. Run /init-gitissue to customize.
+  ○ First run — using default config. Run /init-idd to customize.
 ```
 
 One line, then proceed normally. Non-intrusive.
@@ -186,7 +186,7 @@ Normalized issues must render cleanly in GitHub's web UI:
 - Use standard markdown (no HTML except the invisible marker)
 - Section headers: `## Type`, `## Description`, `## Acceptance Criteria`
 - Code blocks for file paths and technical details
-- Normalization marker: `<!-- gitissue:normalized v1 -->` (invisible in rendered view)
+- Normalization marker: `<!-- idd:normalized v1 -->` (invisible in rendered view)
 - Reporter's original text: in a `> Reporter Context` blockquote
 - Confidence markers in parentheses: `(high confidence)`, `(needs review)`
 
@@ -297,7 +297,7 @@ Normalized issues must render cleanly in GitHub's web UI:
     Recommended:  Option 1 — Minimal fix
 
   ✓ Done — analysis of #42: Fix mobile auth ...
-    Saved: .gitissue/analysis-42.json
+    Saved: .idd/analysis-42.json
 ```
 
 ### /issue-triage

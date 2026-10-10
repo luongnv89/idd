@@ -83,7 +83,7 @@ A pid means nothing off the host that recorded it, so dropping the host check
 would let a pid collision hand one lock to two runs. Either way `--init` adopts
 the id of the lock this run holds, so lock → init → unlock stays one run.
 
-The lock is `.gitissue/run.lock`, created with `O_CREAT|O_EXCL` so two runs
+The lock is `.idd/run.lock`, created with `O_CREAT|O_EXCL` so two runs
 racing for it cannot both win, and it records four fields:
 
 | Field | Why it is there |
@@ -113,7 +113,7 @@ python3 shared/scripts/gi-state.py --lock --force --pid "$PPID"
 ```
 
 That is what `/auto-pilot --force-unlock` runs. It is the only documented way
-past a live-looking lock; deleting `.gitissue/run.lock` by hand is the same
+past a live-looking lock; deleting `.idd/run.lock` by hand is the same
 thing without the audit line. **`--force` is a single-operator escape hatch, not
 a concurrency-safe mode**: it says "reclaim regardless of who holds this", so
 several `--lock --force` calls issued at once all succeed and the mutual
@@ -134,7 +134,7 @@ run and the release needs `--unlock --force`.
 install: stop with the `✗ Missing bundled dependency` block above. But no
 `python3`, exit 2, or exit 4 is an environment problem — print
 `⚠ gi-state unavailable — running without the run lock` and continue: check for
-`.gitissue/run.lock` with `test -f`, treat a file younger than an hour as a live
+`.idd/run.lock` with `test -f`, treat a file younger than an hour as a live
 holder and stop, otherwise proceed and skip every checkpoint. The run is then
 correct but not resumable, which is exactly today's behavior.
 
@@ -205,7 +205,7 @@ python3 shared/scripts/gi-ratelimit.py --wait \
 
 After **every** chunk, refresh the heartbeat with the ordinary checkpoint of
 `references/phases/phase-0-lock-resume.md` (*Step 1.0b*) — `gi-state.py` stays the single writer of
-`.gitissue/run.lock`, and nothing here may touch that file directly. Repeat until
+`.idd/run.lock`, and nothing here may touch that file directly. Repeat until
 the line reports `done: true`, then re-probe. A line with `done: false` and
 `waited_s: 0` means a further chunk would run past the deadline: stop cleanly,
 exactly as `action: stop` does. Check the runtime budget before and after the
@@ -220,7 +220,7 @@ Prerequisite 8:
 
 - the between-chunk heartbeat refresh **does not apply** — there is no lock to
   age out and nothing to refresh. Skip it, and in particular do **not** run
-  *Step 1.0b*'s checkpoint here: that would create `.gitissue/run-state.json`
+  *Step 1.0b*'s checkpoint here: that would create `.idd/run-state.json`
   ahead of the `--init` that owns creating it, and the next run would read a
   state no run ever started. The chunked `--wait` call itself is unchanged; only
   the refresh between chunks drops away.

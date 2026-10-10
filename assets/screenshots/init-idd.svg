@@ -7,10 +7,10 @@
   <circle fill="#f38ba8" cx="20" cy="18" r="6"/>
   <circle fill="#f9e2af" cx="40" cy="18" r="6"/>
   <circle fill="#a6e3a1" cx="60" cy="18" r="6"/>
-  <text fill="#cdd6f4" font-family="monospace" font-size="12" x="320" y="22" text-anchor="middle">/init-gitissue</text>
+  <text fill="#cdd6f4" font-family="monospace" font-size="12" x="320" y="22" text-anchor="middle">/init-idd</text>
   <!-- Terminal content -->
   <text fill="#cba6f7" font-family="monospace" font-size="13" x="20" y="64">$</text>
-  <text fill="#cdd6f4" font-family="monospace" font-size="13" x="34" y="64">/init-gitissue</text>
+  <text fill="#cdd6f4" font-family="monospace" font-size="13" x="34" y="64">/init-idd</text>
 
   <text fill="#6c7086" font-family="monospace" font-size="13" x="20" y="96">  &#x25CF; Scanning repository...</text>
 
@@ -34,10 +34,10 @@
   </text>
 
   <text font-family="monospace" font-size="13" x="20" y="304">
-    <tspan fill="#cdd6f4">  Write </tspan><tspan fill="#89dceb">.gitissue.yml</tspan><tspan fill="#cdd6f4">? </tspan><tspan fill="#6c7086">[Y/n] </tspan><tspan fill="#a6e3a1">Y</tspan>
+    <tspan fill="#cdd6f4">  Write </tspan><tspan fill="#89dceb">.idd.yml</tspan><tspan fill="#cdd6f4">? </tspan><tspan fill="#6c7086">[Y/n] </tspan><tspan fill="#a6e3a1">Y</tspan>
   </text>
 
-  <text fill="#a6e3a1" font-family="monospace" font-size="13" x="20" y="336">  &#x2713; Created .gitissue.yml</text>
+  <text fill="#a6e3a1" font-family="monospace" font-size="13" x="20" y="336">  &#x2713; Created .idd.yml</text>
   <text fill="#6c7086" font-family="monospace" font-size="13" x="20" y="356">    test_timeout: 300 (adjusted for repo size)</text>
   <text fill="#6c7086" font-family="monospace" font-size="13" x="20" y="376">    auto_test: true (pytest detected)</text>
 </svg>

@@ -1,4 +1,4 @@
-# Integration Tests — gitissue Sprint 2
+# Integration Tests — IDD Stack Sprint 2
 
 These are manual integration tests for `/issue-resolver N` and `/issue-creator` batch mode.
 
@@ -15,9 +15,9 @@ If not already set up from Sprint 1:
 
 1. Create a test repo:
    ```bash
-   gh repo create test-gitissue --public --clone
-   cd test-gitissue
-   echo "# Test repo for gitissue" > README.md
+   gh repo create test-idd --public --clone
+   cd test-idd
+   echo "# Test repo for IDD Stack" > README.md
    git add README.md && git commit -m "init"
    git push -u origin main
    ```
@@ -34,7 +34,7 @@ If not already set up from Sprint 1:
 
 3. Create a normalized issue for resolver tests (lean format — no affected files or technical notes):
    ```bash
-   gh issue create --title "Fix login redirect loop on mobile" --body '<!-- gitissue:normalized v1 -->
+   gh issue create --title "Fix login redirect loop on mobile" --body '<!-- idd:normalized v1 -->
 
    ## Type
 
@@ -184,7 +184,7 @@ git add tests/test_no_changes.py && git commit -m "add guard test" && git push
 Then create the issue:
 
 ```bash
-gh issue create --title "Add broken feature" --body '<!-- gitissue:normalized v1 -->
+gh issue create --title "Add broken feature" --body '<!-- idd:normalized v1 -->
 
 ## Type
 
@@ -262,7 +262,7 @@ git branch -D issue-<N>/fix-login-redirect-loop-on-mobile 2>/dev/null
 
 **Setup:**
 ```bash
-gh issue create --title "Fix auth validation" --body '<!-- gitissue:normalized v1 -->
+gh issue create --title "Fix auth validation" --body '<!-- idd:normalized v1 -->
 
 ## Type
 
@@ -306,13 +306,13 @@ The actual bug: auth validation skips empty passwords.
 
 ### T19: Resolve with approval gate (comment-and-wait)
 
-**Setup:** Create or use a `.gitissue.yml` in the test repo:
+**Setup:** Create or use a `.idd.yml` in the test repo:
 ```bash
-cat > .gitissue.yml << 'EOF'
+cat > .idd.yml << 'EOF'
 resolve:
   approval_gate: comment-and-wait
 EOF
-git add .gitissue.yml && git commit -m "add config" && git push
+git add .idd.yml && git commit -m "add config" && git push
 ```
 
 **Input:**
@@ -330,10 +330,10 @@ git add .gitissue.yml && git commit -m "add config" && git push
 
 **Cleanup (run before any other resolver tests):**
 ```bash
-git rm .gitissue.yml && git commit -m "remove config" && git push
+git rm .idd.yml && git commit -m "remove config" && git push
 ```
 
-**Note:** This test commits `.gitissue.yml` to the repo. Run cleanup before running T13–T18, or results will be affected by the approval gate config.
+**Note:** This test commits `.idd.yml` to the repo. Run cleanup before running T13–T18, or results will be affected by the approval gate config.
 
 ---
 
@@ -357,7 +357,7 @@ git rm .gitissue.yml && git commit -m "remove config" && git push
 - [ ] Item 3 classified as `improvement`
 - [ ] Output shows `Create 3 issues? [A]ll / [e]dit / [c]ancel`
 - [ ] On "All": each issue created sequentially with progress `● Creating issue 1/3...`
-- [ ] Each created issue has full template structure with `<!-- gitissue:normalized v1 -->` marker
+- [ ] Each created issue has full template structure with `<!-- idd:normalized v1 -->` marker
 - [ ] Final output shows `✓ 3/3 issues created` with all issue numbers and URLs
 
 **Verify:**
@@ -367,13 +367,13 @@ gh issue list --state open --json number,title --limit 5
 
 # Check each issue has the normalization marker
 gh issue view <issue1> --json body --jq '.body' | head -1
-# Should be: <!-- gitissue:normalized v1 -->
+# Should be: <!-- idd:normalized v1 -->
 
 gh issue view <issue2> --json body --jq '.body' | head -1
-# Should be: <!-- gitissue:normalized v1 -->
+# Should be: <!-- idd:normalized v1 -->
 
 gh issue view <issue3> --json body --jq '.body' | head -1
-# Should be: <!-- gitissue:normalized v1 -->
+# Should be: <!-- idd:normalized v1 -->
 ```
 
 ---

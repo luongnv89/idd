@@ -3,11 +3,11 @@
 # configuration schema shipped for issue #38.
 #
 # This script verifies issue #38 acceptance criteria:
-#  AC1. .gitissue.yml schema documents the four keys with defaults:
+#  AC1. .idd.yml schema documents the four keys with defaults:
 #         autopilot.mode (balanced), autopilot.merge_partial (false),
 #         review.require_acceptance_criteria_check (true),
 #         review.require_traceability_check (true).
-#  AC2. /init-gitissue emits these defaults on a fresh install.
+#  AC2. /init-idd emits these defaults on a fresh install.
 #  AC3. No additional speculative keys are added in this milestone — the
 #       four keys above are the only Phase 1b + Phase 2 schema additions.
 #  AC4. Skills consuming these keys behave per Phase 1b and Phase 2 ACs:
@@ -28,9 +28,9 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SCHEMA="$REPO_ROOT/docs/config-schema.md"
-TEMPLATE="$REPO_ROOT/src/skills/init-gitissue/templates/gitissue-template.yml"
+TEMPLATE="$REPO_ROOT/src/skills/init-idd/templates/idd-template.yml"
 PR_REVIEW_SKILL="$REPO_ROOT/src/skills/issue-pr-review/SKILL.source.md"
-INIT_SKILL="$REPO_ROOT/src/skills/init-gitissue/SKILL.source.md"
+INIT_SKILL="$REPO_ROOT/src/skills/init-idd/SKILL.source.md"
 
 PASS=0
 FAIL=0
@@ -130,7 +130,7 @@ else
 fi
 
 # ───────────────────────────────────────────────────────────
-# T2: AC2 — /init-gitissue emits the four defaults
+# T2: AC2 — /init-idd emits the four defaults
 # ───────────────────────────────────────────────────────────
 # autopilot.mode and merge_partial come from #33; verify they are still
 # emitted as part of the unified schema.
@@ -273,12 +273,12 @@ else
   fail "T5.1: /issue-pr-review SKILL.md below 0.4.1 — expected a bump for #38 (got '${pr_review_ver:-none}')"
 fi
 
-# /init-gitissue bumped past 0.3.1
+# /init-idd bumped past 0.3.1
 if grep -qE '^[[:space:]]*version:[[:space:]]+0\.3\.[2-9]' "$INIT_SKILL" \
    || grep -qE '^[[:space:]]*version:[[:space:]]+0\.[4-9]\.' "$INIT_SKILL"; then
-  pass "T5.3: /init-gitissue SKILL.md bumped past 0.3.1"
+  pass "T5.3: /init-idd SKILL.md bumped past 0.3.1"
 else
-  fail "T5.3: /init-gitissue SKILL.md still at 0.3.1 — expected a bump for #38"
+  fail "T5.3: /init-idd SKILL.md still at 0.3.1 — expected a bump for #38"
 fi
 
 # ───────────────────────────────────────────────────────────

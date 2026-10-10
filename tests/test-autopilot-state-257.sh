@@ -65,7 +65,7 @@ expect_grep() {
   fi
 }
 
-# A fresh .gitissue-style directory, echoed so callers can `--dir` into it.
+# A fresh .idd-style directory, echoed so callers can `--dir` into it.
 new_dir() {
   local d="$TMP/$1"
   mkdir -p "$d"
@@ -312,7 +312,7 @@ D2="$(new_dir d2)"
 run_status out st python3 "$STATE" --lock --dir "$D2" --run-id runA --pid $$
 if [ "$st" = "0" ] && [ "$(printf '%s' "$out" | jkey status)" = "acquired" ] \
    && [ -f "$D2/run.lock" ]; then
-  pass "AC3: --lock creates .gitissue/run.lock"
+  pass "AC3: --lock creates .idd/run.lock"
 else
   fail "AC3: --lock did not create the lock (exit $st)"
 fi
@@ -707,7 +707,7 @@ fi
 
 run_status out st python3 "$STATE" --unlock --dir "$D9"
 if [ "$st" = "0" ] && [ ! -f "$D9/run.lock" ]; then
-  pass "AC3: lock → init → unlock exits 0 and removes .gitissue/run.lock"
+  pass "AC3: lock → init → unlock exits 0 and removes .idd/run.lock"
 else
   fail "AC3: the documented unlock exited $st and left the lock behind"
 fi
@@ -789,7 +789,7 @@ if [ "$st" = "0" ] && [ -f "$D6/last-run-report.md" ] \
 else
   fail "AC4: --report did not persist the run report (exit $st)"
 fi
-if grep -q "gitissue:run-report v1" "$D6/last-run-report.md" \
+if grep -q "idd:run-report v1" "$D6/last-run-report.md" \
    && grep -q "r257" "$D6/last-run-report.md" \
    && grep -q "Auto-Pilot Summary" "$D6/last-run-report.md"; then
   pass "AC4: the report carries the run marker, the run id and the summary"
@@ -888,7 +888,7 @@ run_status out st bash -c "printf '{\"current\":{\"issue\":\"not-an-int\"}}' | p
 run_status out st bash -c "printf '{\"markdown\":\"\"}' | python3 '$STATE' --report --dir '$D8'"
 [ "$st" = "3" ] && pass "T4: an empty report markdown exits 3" \
                 || fail "T4: an empty report markdown exits 3 (got $st)"
-# generated_at is interpolated into the `<!-- gitissue:run-report v1 … -->`
+# generated_at is interpolated into the `<!-- idd:run-report v1 … -->`
 # marker, so a value carrying `-->` would end the marker early: it is
 # pattern-checked exactly like run_id, not passed through.
 run_status out st bash -c "printf '%s' '{\"markdown\":\"x\",\"generated_at\":\"--> oops\"}' | python3 '$STATE' --report --dir '$D8'"
@@ -1122,7 +1122,7 @@ expect_grep "AC1: the end-of-iteration checkpoint clears current and appends pro
 if python3 - "$AP_PHASES" <<'PY'
 import re, sys
 text = open(sys.argv[1], encoding="utf-8").read()
-out_write = text.find("--out .gitissue/triage.json")
+out_write = text.find("--out .idd/triage.json")
 guard = text.find("Under `--dry-run`, drop the `--out` flag")
 stop = text.find("○ Dry run complete")
 if out_write == -1 or guard == -1:
@@ -1214,23 +1214,23 @@ expect_grep "AC1: run-log.md contrasts the run log with the run state" \
 # The three artifacts are documented and gitignored — a committed lock would
 # make every clone look busy.
 for f in run-state.json run.lock last-run-report.md; do
-  if grep -q "\.gitissue/$f" "$REPO_ROOT/.gitignore" \
+  if grep -q "\.idd/$f" "$REPO_ROOT/.gitignore" \
      && grep -q "$f" "$REPO_ROOT/docs/config-schema.md"; then
-    pass "AC4: .gitissue/$f is gitignored and documented"
+    pass "AC4: .idd/$f is gitignored and documented"
   else
-    fail "AC4: .gitissue/$f is missing from .gitignore or config-schema.md"
+    fail "AC4: .idd/$f is missing from .gitignore or config-schema.md"
   fi
 done
 expect_grep "AC4: config-schema.md carries the machine-local carve-out" \
   "Carve-out" "$REPO_ROOT/docs/config-schema.md"
 # The carve-out is only meaningful beside the rule it carves out of: the rest of
-# .gitissue/ is committed. A byte-budget squeeze dropped this line once already.
+# .idd/ is committed. A byte-budget squeeze dropped this line once already.
 expect_grep "AC4: config-schema.md still states the commit-the-directory rule" \
   "commit the directory (project state, not secrets)" "$REPO_ROOT/docs/config-schema.md"
 
 # No new config key: the defaults table and the init template stay untouched.
 if grep -q "run_state\|resume_ttl\|autopilot.lock" "$REPO_ROOT/docs/config-schema.md" \
-   || grep -q "run_state\|resume_ttl" "$REPO_ROOT/src/skills/init-gitissue/templates/gitissue-template.yml"; then
+   || grep -q "run_state\|resume_ttl" "$REPO_ROOT/src/skills/init-idd/templates/idd-template.yml"; then
   fail "AC4: a new config key was introduced — #257 is deliberately key-free"
 else
   pass "AC4: no new config key was introduced"

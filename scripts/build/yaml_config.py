@@ -102,16 +102,16 @@ def _check_init_template_schema_parity(src: Path) -> None:
     """Ensure init's source template has every documented config default.
 
     The three replacement tokens are intentionally dynamic values selected by
-    /init-gitissue after repository detection; every other key must exactly
+    /init-idd after repository detection; every other key must exactly
     match the documented Full Schema default.
     """
     schema = src.parent / "docs" / "config-schema.md"
-    template = src / "skills" / "init-gitissue" / "templates" / "gitissue-template.yml"
+    template = src / "skills" / "init-idd" / "templates" / "idd-template.yml"
     schema_exists = schema.is_file()
     template_exists = template.is_file()
     if not schema_exists and not template_exists:
         # Self-contained synthetic source fixtures may intentionally omit the
-        # entire init-gitissue contract surface.
+        # entire init-idd contract surface.
         return
     if not schema_exists or not template_exists:
         missing = schema if not schema_exists else template
@@ -143,4 +143,4 @@ def _check_init_template_schema_parity(src: Path) -> None:
             details.append("undocumented template keys: " + ", ".join(extra))
         if mismatches:
             details.append("default mismatches: " + "; ".join(mismatches))
-        _abort("init-gitissue template/schema parity failed — " + " | ".join(details))
+        _abort("init-idd template/schema parity failed — " + " | ".join(details))

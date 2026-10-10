@@ -150,7 +150,7 @@ phases = " · ".join(f"{p['id']} {p['title']}" for p in w["phases"])
 ids = [p["id"] for p in w["phases"]]
 Path("epic-title.txt").write_text(f"Epic: Modernize {w['project']} — {ids[0]}–{ids[-1]}\n", encoding="utf-8")
 criteria = "".join(f"- [ ] {p['milestone']['id']} — {p['milestone']['exit']}\n" for p in w["phases"])
-Path("epic-create.md").write_text(f"""<!-- gitissue:normalized v1 -->
+Path("epic-create.md").write_text(f"""<!-- idd:normalized v1 -->
 
 ## Type
 
@@ -213,7 +213,7 @@ w = json.loads(Path("worklist.json").read_text(encoding="utf-8"))
 phase, t = next((p, t) for p in w["phases"] for t in p["tasks"] if t["task_id"] == task_id)
 criteria = "".join(f"- [ ] {c}\n" for c in t["criteria"])
 Path(f"child-{task_id}-title.txt").write_text(f"{task_id}: {t['title']}\n", encoding="utf-8")
-Path(f"child-{task_id}.md").write_text(f"""<!-- gitissue:normalized v1 -->
+Path(f"child-{task_id}.md").write_text(f"""<!-- idd:normalized v1 -->
 
 ## Type
 

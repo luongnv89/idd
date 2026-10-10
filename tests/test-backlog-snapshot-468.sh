@@ -180,7 +180,7 @@ REQ='{"mode":"create","items":[{"index":1,"title":"Ship duplicate scorer","keywo
 LIVE_DIR="$TMP/live"; mkdir -p "$LIVE_DIR"; reset_log
 live="$(cd "$LIVE_DIR" && printf '%s' "$REQ" | python3 "$DUP")"
 live_calls="$(calls)"
-[ -d "$LIVE_DIR/.gitissue" ] && fail "AC2: dup-score without --snapshot wrote a snapshot" \
+[ -d "$LIVE_DIR/.idd" ] && fail "AC2: dup-score without --snapshot wrote a snapshot" \
   || pass "AC2: dup-score without --snapshot never touches the snapshot (opt-in)"
 
 W="$TMP/ws-a"; mkdir -p "$W"; reset_log
@@ -298,9 +298,9 @@ for variant in missing broken exits3; do
     fail "AC4: dup-score with gi-backlog.py $variant (exit $s)"
   fi
 done
-W="$TMP/ws-corrupt"; mkdir -p "$W/.gitissue/cache"
+W="$TMP/ws-corrupt"; mkdir -p "$W/.idd/cache"
 (cd "$W" && python3 "$BACKLOG" --limit 3 >/dev/null)
-for f in "$W"/.gitissue/cache/backlog-open-*.json; do printf '{{{' > "$f"; done
+for f in "$W"/.idd/cache/backlog-open-*.json; do printf '{{{' > "$f"; done
 out="$(cd "$W" && printf '%s' "$REQ" | python3 "$DUP" --snapshot)"; s=$?
 [ "$s" = 0 ] && [ "$out" = "$live" ] && pass "AC4: dup-score over a corrupt snapshot scores from a live fetch" \
   || fail "AC4: dup-score over corrupt snapshot (exit $s)"

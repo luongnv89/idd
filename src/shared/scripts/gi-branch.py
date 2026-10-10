@@ -29,9 +29,9 @@ different branch than the one they configured.
 
 Untrusted input never travels on the command line. Pass `--from-issue` and the
 script reads the title (and, absent `--type`, the type from the labels) straight
-from GitHub, and `resolve.branch_prefix` from `.gitissue.yml`. Both are
+from GitHub, and `resolve.branch_prefix` from `.idd.yml`. Both are
 attacker-controlled — anyone can file an issue on a public repository, and
-`.gitissue.yml` arrives with a pull request's branch — so a value interpolated
+`.idd.yml` arrives with a pull request's branch — so a value interpolated
 into a shell word could close its quote and append a command, which
 `/auto-pilot` would then run unattended. `--title` and `--prefix` remain for
 tests and programmatic callers that can pass arguments without a shell.
@@ -109,7 +109,7 @@ _LEADING_WORD_RE = re.compile(r"^([a-z0-9]+)-(?=.)")
 FALLBACK_SLUG = "update"
 
 
-CONFIG_NAME = ".gitissue.yml"
+CONFIG_NAME = ".idd.yml"
 
 # `git rev-parse --show-cdup` is empty at the working-tree root and otherwise
 # consists only of `../` segments. Refuse to resolve any other output as a path.
@@ -379,7 +379,7 @@ def main(argv: list[str] | None = None) -> int:
         "--prefix",
         help=(
             "resolve.branch_prefix override: 'auto' for type-based, else a "
-            "literal prefix. Default: read from .gitissue.yml, then 'auto'"
+            "literal prefix. Default: read from .idd.yml, then 'auto'"
         ),
     )
     parser.add_argument(
