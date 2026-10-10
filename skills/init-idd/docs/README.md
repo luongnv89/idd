@@ -13,7 +13,8 @@
 - Auto-detects language, framework, test runner, and repo size
 - Generates config with inline comments explaining every setting
 - Adjusts timeouts and thresholds based on project characteristics
-- Handles existing configs with overwrite/merge/cancel options
+- Handles existing configs with overwrite/merge/cancel options, including a legacy `.gitissue.yml`
+- Adds `.idd/cache/` to `.gitignore` on every run, never twice
 - Works offline — no GitHub authentication required
 
 ## When to Use

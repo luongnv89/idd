@@ -1,6 +1,6 @@
 # /init-idd — Examples
 
-Full example outputs for four scenarios. Every report follows `references/review-contract.md`: `Result` first, then the `Evidence`, `Uncertainty`, and `Decision` rows.
+Full example outputs for five scenarios. Every report follows `references/review-contract.md`: `Result` first, then the `Evidence`, `Uncertainty`, and `Decision` rows.
 
 ## Example: TypeScript + Next.js project
 
@@ -34,6 +34,7 @@ Full example outputs for four scenarios. Every report follows `references/review
   Config:            ✓ generated .idd.yml
   Validation:        ✓ parses as YAML, no placeholders left, platform set
   Merge settings:    ⚠ warn (message is COMMIT_MESSAGES)
+  .gitignore:        ✓ added .idd/cache/
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Evidence:          gi-stack-detect exit 0; re-read with PyYAML
   Uncertainty:       values from marker files; Jest not run
@@ -80,6 +81,7 @@ Full example outputs for four scenarios. Every report follows `references/review
   Config:            ✓ generated .idd.yml
   Validation:        ✓ parses as YAML, no placeholders left, platform set
   Merge settings:    ○ skip (gh not installed)
+  .gitignore:        ✓ created, added .idd/cache/
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Evidence:          gi-stack-detect exit 0; re-read with PyYAML
   Uncertainty:       merge settings unread; values from marker files
@@ -115,6 +117,7 @@ Full example outputs for four scenarios. Every report follows `references/review
   Config:            ✓ merged into existing .idd.yml (3 new, 8 preserved)
   Validation:        ✓ parses as YAML, no placeholders left, platform set
   Merge settings:    ✓ squash-only, PR_BODY
+  .gitignore:        ○ already ignored
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Evidence:          gi-stack-detect exit 0; re-read with PyYAML
   Uncertainty:       8 preserved values not re-checked against the scan
@@ -140,11 +143,35 @@ Full example outputs for four scenarios. Every report follows `references/review
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
 
   Result:            CANCELLED — existing .idd.yml kept unchanged
+  .gitignore:        ○ already ignored
   Evidence:          .idd.yml present; IDD_AUTO_MODE=1
   Uncertainty:       existing file not scanned or validated
   Decision:          No approval needed.
 
   Next action: re-run /init-idd interactively to merge or overwrite
+```
+
+## Example: legacy `.gitissue.yml` only (auto mode)
+
+**Invoked by:** an orchestrator with `IDD_AUTO_MODE=1`, in a repo set up before the rename
+
+1. Prerequisites pass; the *Ignore Rule* mirrors `.gitissue/cache/` and adds `.idd/cache/` — one line
+2. No `.idd.yml`, but `.gitissue.yml` exists — it is the existing config, so auto mode cancels
+3. Report:
+
+```
+⚠ legacy .gitissue.yml found — rename to .idd.yml (git mv .gitissue.yml .idd.yml)
+
+◆ Init IDD — cancelled
+┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+
+  Result:            CANCELLED — legacy .gitissue.yml kept; no .idd.yml written
+  .gitignore:        ✓ added .idd/cache/
+  Evidence:          .gitissue.yml present, .idd.yml absent; IDD_AUTO_MODE=1
+  Uncertainty:       legacy file not scanned or validated
+  Decision:          No approval needed.
+
+  Next action: git mv .gitissue.yml .idd.yml
 ```
 
 ---

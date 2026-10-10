@@ -73,8 +73,8 @@ run's teardown can remove the other's borrow. Borrow in one run at a time.
 
 Read `.idd/run-state.json` through `python3 references/scripts/gi-state.py --read`
 (resolve the path like the bundled-dependency list; invoke the bundled copy as
-`python3 references/scripts/gi-state.py --read`, which first migrates a legacy
-`.gitissue/` run). If `borrowed_skills` contains
+`python3 references/scripts/gi-state.py --read`, which first migrates a
+legacy `.gitissue/` run). If `borrowed_skills` contains
 any `origin: borrowed` entries, run *Teardown* below first — a crashed or
 resumed run must not leave borrowed skills behind. Missing/`{}`/corrupt state:
 nothing to tear down. No `python3`, any non-zero exit including 3, or

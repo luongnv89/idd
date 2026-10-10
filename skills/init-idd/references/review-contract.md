@@ -14,15 +14,17 @@ finding or stop reason:
 | `DONE` | `.idd.yml` was written, re-read, and passed all three checks in *Validate the written config* (parses as YAML, no placeholder left, `platform` present). |
 | `PARTIAL` | `.idd.yml` was written, but no YAML parser was available, so the parse check did not run. |
 | `BLOCKED` | The run stopped before a validated config existed: failed prerequisite, missing bundled dependency, `gi-stack-detect` exit 3, an existing file that does not parse in merge mode, a failed write, or a failed validation. Name the error block that stopped it. |
-| `CANCELLED` | `.idd.yml` already existed and was kept unchanged — the user chose `cancel`, or auto mode took the safe default. |
+| `CANCELLED` | `.idd.yml` (or a legacy-only `.gitissue.yml`) already existed and was kept unchanged — the user chose `cancel`, or auto mode took the safe default. |
 
 A merge-strategy warning or skip does not change the status: it is a repository
 setting, not part of the generated config.
 
 The header names the outcome: `◆ Init IDD — setup complete` for `DONE` and
 `PARTIAL`, `— stopped` for `BLOCKED`, `— cancelled` for `CANCELLED`. On `BLOCKED`
-and `CANCELLED`, print only `Result`, `Evidence`, `Uncertainty`, `Decision`, and
-`Next action` — no detection rows for a scan that did not run.
+and `CANCELLED`, print only `Result`, `.gitignore`, `Evidence`, `Uncertainty`,
+`Decision`, and `Next action` — no detection rows for a scan that did not run.
+The *Ignore Rule* runs before every later outcome, so its row is always real;
+it is `○ skip (not reached)` only after a prerequisite or precheck stop.
 
 ## Evidence
 
@@ -55,16 +57,18 @@ Print `Uncertainty: none beyond marker-file detection` when nothing else applies
 
 ## Decision
 
-Print `Decision: No approval needed.` This skill writes one local file and
-commits nothing. The overwrite/merge/cancel prompt is the only gate, and it is
+Print `Decision: No approval needed.` This skill writes `.idd.yml` and the
+`.gitignore` entry, and commits nothing. The overwrite/merge/cancel prompt is the only gate, and it is
 answered before the report (auto mode answers it with cancel). Name the remaining user actions separately on the
 `Next action:` row:
 
-- `DONE` / `PARTIAL`: review and commit `.idd.yml`, then `/issue-creator`.
+- `DONE` / `PARTIAL`: review and commit `.idd.yml` (and `.gitignore` when it
+  changed), then `/issue-creator`.
+  After a legacy merge or overwrite, also `git rm .gitissue.yml`.
   Add each merge-strategy `To fix:` command, and the parse check on `PARTIAL`.
 - `BLOCKED`: the `To fix:` command of the error that stopped the run.
 - `CANCELLED`: re-run `/init-idd` and choose `merge` or `overwrite` to change
-  the file.
+  the file; for a legacy-only `.gitissue.yml`, `git mv .gitissue.yml .idd.yml`.
 
 ## Format rule
 
