@@ -1,4 +1,4 @@
-# Integration Tests — gitissue Sprint 1 (Lean Issues)
+# Integration Tests — IDD Stack Sprint 1 (Lean Issues)
 
 These are manual integration tests for `/issue-creator` and `/issue-creator N` (normalization).
 
@@ -20,9 +20,9 @@ Updated for the **lean issues architecture**: issues contain only human intent (
 
 1. Create a test repo (or use an existing one):
    ```bash
-   gh repo create test-gitissue --public --clone
-   cd test-gitissue
-   echo "# Test repo for gitissue" > README.md
+   gh repo create test-idd --public --clone
+   cd test-idd
+   echo "# Test repo for IDD Stack" > README.md
    git add README.md && git commit -m "init"
    git push -u origin main
    ```
@@ -60,7 +60,7 @@ Updated for the **lean issues architecture**: issues contain only human intent (
 - [ ] Preview does NOT contain a `Files:` line
 - [ ] Issue type is classified as `bug`
 - [ ] Issue is created on GitHub with structured template
-- [ ] Issue body contains `<!-- gitissue:normalized v1 -->` marker
+- [ ] Issue body contains `<!-- idd:normalized v1 -->` marker
 - [ ] Issue body contains `## Type`, `## Description`, `## Acceptance Criteria`, `## Metadata` sections
 - [ ] Issue body does NOT contain `## Context` or `## Technical Notes` sections
 - [ ] Output shows `✓ Created issue #N` with GitHub URL on its own line
@@ -68,7 +68,7 @@ Updated for the **lean issues architecture**: issues contain only human intent (
 **Verify:**
 ```bash
 gh issue view <N> --json body | jq -r '.body' | head -5
-# Should start with: <!-- gitissue:normalized v1 -->
+# Should start with: <!-- idd:normalized v1 -->
 
 # Verify NO affected files section
 gh issue view <N> --json body | jq -r '.body' | grep -c "Affected files"
@@ -131,7 +131,7 @@ gh issue view <N> --json comments --jq '.comments[-2].body' | head -3
 
 # Check normalized body
 gh issue view <N> --json body --jq '.body' | head -1
-# Should be: <!-- gitissue:normalized v1 -->
+# Should be: <!-- idd:normalized v1 -->
 
 # Check Reporter Context preserved
 gh issue view <N> --json body --jq '.body' | grep "Reporter Context"
@@ -274,7 +274,7 @@ Create an issue with the marker text inside a code block:
 ```bash
 gh issue create --title "Document normalization marker" --body '```
 The marker looks like this:
-<!-- gitissue:normalized v1 -->
+<!-- idd:normalized v1 -->
 ```
 
 This issue is NOT normalized.'
@@ -313,7 +313,7 @@ gh issue create --title "Fix login redirect loop" --body "The login page redirec
 
 ### T12: Config loading — first run hint
 
-**Setup:** Ensure no `.gitissue.yml` exists in the repo root.
+**Setup:** Ensure no `.idd.yml` exists in the repo root.
 
 **Input:**
 ```
@@ -321,7 +321,7 @@ gh issue create --title "Fix login redirect loop" --body "The login page redirec
 ```
 
 **Expected:**
-- [ ] First line of output includes: `○ First run — using default config. Run /init-gitissue to customize.`
+- [ ] First line of output includes: `○ First run — using default config. Run /init-idd to customize.`
 - [ ] Skill proceeds normally with default settings
 
 ---

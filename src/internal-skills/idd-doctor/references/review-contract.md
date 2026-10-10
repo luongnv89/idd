@@ -12,7 +12,7 @@ on every run that reached the summary footer:
 
 ```
     Result: WARN  (4 checks, 0 failed, 1 warned)
-    Evidence:    ran 1 2 4 · skipped 3 (no .gitissue.yml) · scanned 2 skill files, 3 templates
+    Evidence:    ran 1 2 4 · skipped 3 (no .idd.yml) · scanned 2 skill files, 3 templates
     Uncertainty: check 3 not verified (skipped); checks 1-3 are text heuristics
     Decision:    No approval needed — report-only, nothing changed. Next: apply the check 4 Fix hint, then re-run /idd-doctor
 ```
@@ -40,7 +40,7 @@ output and never carry `PASS`, `WARN`, or `FAIL` as a status token.
      ran. Check 1 is a per-line substring match with a negation guard, so a
      claim worded differently is missed and a negation on the same line hides
      a claim. Check 3 confirms the key is present, not that the value or the
-     rest of `.gitissue.yml` is valid.
+     rest of `.idd.yml` is valid.
 4. **Decision.** Always start with `No approval needed — report-only, nothing
    changed.` Then, when at least one check failed or warned, add
    `Next: apply the check {N…} Fix hint(s), then re-run /idd-doctor`. When

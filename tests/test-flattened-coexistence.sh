@@ -5,7 +5,7 @@
 # committed install surface).
 #
 # Strategy:
-#   1. Copy `skills/issue-creator/` and `skills/init-gitissue/`
+#   1. Copy `skills/issue-creator/` and `skills/init-idd/`
 #      into a fresh temp directory.
 #   2. Verify each skill remains self-contained: every `references/agents/*.md`
 #      and `references/docs/*.md` referenced from the skill exists inside its
@@ -43,12 +43,12 @@ fi
 # T1: required source skills are present
 # ───────────────────────────────────────────────────────────
 SKILL_A="$SKILLS/issue-creator"
-SKILL_B="$SKILLS/init-gitissue"
+SKILL_B="$SKILLS/init-idd"
 
 if [ -d "$SKILL_A" ] && [ -d "$SKILL_B" ]; then
   pass "T1: both candidate skills exist in skills/"
 else
-  fail "T1: missing skills/issue-creator or skills/init-gitissue"
+  fail "T1: missing skills/issue-creator or skills/init-idd"
   echo "  Cannot continue."
   echo "  Passed: $PASS"
   echo "  Failed: $FAIL"
@@ -65,7 +65,7 @@ trap 'rm -rf "$TMP" "$HELPER_DIR"' EXIT
 cp -R "$SKILL_A" "$TMP/"
 cp -R "$SKILL_B" "$TMP/"
 
-if [ -d "$TMP/issue-creator" ] && [ -d "$TMP/init-gitissue" ]; then
+if [ -d "$TMP/issue-creator" ] && [ -d "$TMP/init-idd" ]; then
   pass "T2: both skills copied to a single skills directory"
 else
   fail "T2: copy step did not produce both skill directories"
@@ -121,7 +121,7 @@ if errors:
 sys.exit(0)
 PY
 
-for skill_dir in "$TMP/issue-creator" "$TMP/init-gitissue"; do
+for skill_dir in "$TMP/issue-creator" "$TMP/init-idd"; do
   name="$(basename "$skill_dir")"
   if python3 "$HELPER" "$skill_dir"; then
     pass "T4: $name local references resolve inside the skill"
@@ -142,5 +142,5 @@ if [ "$FAIL" -gt 0 ]; then
   exit 1
 fi
 
-echo "  ✓ issue-creator and init-gitissue coexist cleanly"
+echo "  ✓ issue-creator and init-idd coexist cleanly"
 exit 0

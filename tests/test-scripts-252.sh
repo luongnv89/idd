@@ -193,12 +193,12 @@ fi
 # assertion would prove nothing about how the rules really get extended.
 CFG="$TMP/cfgfile"
 mkdir -p "$CFG"
-printf 'security:\n  allow_pattern: "^leak\\\\.env\\\\.txt$"\n' > "$CFG/.gitissue.yml"
-run_status out st python3 "$SECSCAN" leak.env.txt --config "$CFG/.gitissue.yml"
+printf 'security:\n  allow_pattern: "^leak\\\\.env\\\\.txt$"\n' > "$CFG/.idd.yml"
+run_status out st python3 "$SECSCAN" leak.env.txt --config "$CFG/.idd.yml"
 if [ "$st" = "0" ] && [ "$(printf '%s' "$out" | jkey skipped)" = "1" ]; then
-  pass "AC1: security.allow_pattern from .gitissue.yml excludes a path from every rule"
+  pass "AC1: security.allow_pattern from .idd.yml excludes a path from every rule"
 else
-  fail "AC1: security.allow_pattern from .gitissue.yml excludes a path (exit $st)"
+  fail "AC1: security.allow_pattern from .idd.yml excludes a path (exit $st)"
 fi
 
 # A config value containing a quote must be inert data, never shell syntax.
@@ -217,7 +217,7 @@ run_status out st python3 "$SECSCAN" clean.txt --config "$CFG/badtype.yml"
 [ "$st" = "3" ] && pass "AC1: a non-integer security.max_file_size_mb exits 3" \
                 || fail "AC1: a non-integer security.max_file_size_mb exits 3 (got $st)"
 
-run_status out st python3 "$SECSCAN" clean.txt --config "$CFG/.gitissue.yml" --no-config
+run_status out st python3 "$SECSCAN" clean.txt --config "$CFG/.idd.yml" --no-config
 [ "$st" = "0" ] && pass "AC1: --no-config ignores the config file" \
                 || fail "AC1: --no-config ignores the config file (got $st)"
 
@@ -1387,7 +1387,7 @@ PLACEHOLDER = re.compile(
 # script on stdin rather than on the command line.
 ALLOWED_VARS = {
     "$skill_dir": "path the skill resolves from its own SKILL.md dirname",
-    "$dup_request": "mktemp path under .gitissue/cache/; exclusive, never issue text",
+    "$dup_request": "mktemp path under .idd/cache/; exclusive, never issue text",
     "$wt_dir": "worktree path the skill composes itself",
     "$base": "base branch name read from the repo, never reporter text",
     "${base}": "base branch name read from the repo, never reporter text",
@@ -1735,7 +1735,7 @@ done
 # T6: the new security.* config keys exist in both parity surfaces
 # ───────────────────────────────────────────────────────────
 for key in extra_secret_file_pattern extra_secret_value_pattern allow_pattern max_file_size_mb; do
-  if grep -q "^  $key:" "$REPO_ROOT/src/skills/init-gitissue/templates/gitissue-template.yml" \
+  if grep -q "^  $key:" "$REPO_ROOT/src/skills/init-idd/templates/idd-template.yml" \
      && grep -q "security\.$key" "$REPO_ROOT/docs/config-schema.md"; then
     pass "AC1: security.$key is documented and present in the init template"
   else

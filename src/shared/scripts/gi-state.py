@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """Own `/auto-pilot`'s resumable run state, its run lock, and its final report.
 
-Every write to `.gitissue/run-state.json`, `.gitissue/run.lock`, and
-`.gitissue/last-run-report.md` goes through this one script. That is the point:
+Every write to `.idd/run-state.json`, `.idd/run.lock`, and
+`.idd/last-run-report.md` goes through this one script. That is the point:
 a single choke point is what makes `--dry-run` enforceable ("a dry run leaves no
 state mutation" is a property of one file, not of a dozen prose call sites) and
 what keeps a half-written state file from ever existing (every state write is a
 temp file in the same directory followed by `os.replace`).
 
 The three artifacts are machine-local and gitignored. They are **not** the run
-log: `.gitissue/runs.jsonl` is append-only cross-run telemetry written once per
+log: `.idd/runs.jsonl` is append-only cross-run telemetry written once per
 processed issue, while the run state is mutable, single-run, and deleted or
 overwritten by the next run. Neither substitutes for the other.
 There is no verdict exit code 1.
@@ -44,7 +44,7 @@ Modes
             completed. An unknown phase, an illegal edge, or a missing piece of
             evidence is refused at exit 3 before anything is written — the
             state on disk is unchanged, under `--dry-run` too
-  --lock    create `.gitissue/run.lock` with O_CREAT|O_EXCL; refuse a lock held
+  --lock    create `.idd/run.lock` with O_CREAT|O_EXCL; refuse a lock held
             by a live run, reclaim one that is stale. Mints a fresh run id, so
             a leftover state file from a finished run cannot lend its id to an
             unrelated one; `--lock --resume` adopts the recorded id instead and
@@ -74,6 +74,16 @@ Exit codes
 There is deliberately **no** verdict exit code 1: "the lock is held" is a stop
 (3), so every non-zero code keeps its usual meaning at every call site.
 
+Legacy directory (issue #537). Before any mode runs with the default `--dir`,
+a run left by an older install under `.gitissue/` is migrated once: when
+`.idd/` holds neither `run-state.json` nor `run.lock` and `.gitissue/` holds
+any of the three artifacts, each is moved into `.idd/` (one
+`⚠ migrated legacy .gitissue/<file> → .idd/<file>` line per file) and the mode
+then acts on `.idd/` alone. Two cases move nothing and act on `.gitissue/` in
+place instead: a legacy lock whose known owner is still live by the `--lock` rule (dead pid
+or `--ttl` retire it) — that run is still writing there, and it is held exactly
+as an `.idd/` lock would be — and `--dry-run`, which never mutates.
+
 Authored at src/shared/scripts/gi-state.py — do not edit installed copies;
 edit the source and run ./scripts/build.sh.
 """
@@ -98,7 +108,11 @@ try:
 except ImportError:  # pragma: no cover - non-POSIX hosts fail closed at runtime
     fcntl = None
 
-DEFAULT_DIR = ".gitissue"
+DEFAULT_DIR = ".idd"
+# Where an older install kept the same three artifacts (issue #537). Chosen
+# only by `migrate_legacy_dir`: a live legacy run (and a dry run) is acted on
+# there in place, everything else is moved into DEFAULT_DIR first.
+LEGACY_DIR = ".gitissue"
 STATE_NAME = "run-state.json"
 LOCK_NAME = "run.lock"
 REPORT_NAME = "last-run-report.md"
@@ -387,7 +401,7 @@ def _atomic_write(path: Path, text: str) -> None:
 
 
 def _render_json(obj: object) -> str:
-    """Indented JSON with a trailing newline — the `.gitissue/` house format."""
+    """Indented JSON with a trailing newline — the `.idd/` house format."""
     return json.dumps(obj, indent=2, ensure_ascii=False) + "\n"
 
 
@@ -1166,6 +1180,83 @@ def _create_lock_exclusive(path: Path, payload: dict) -> bool:
                 pass
 
 
+# --- legacy directory -------------------------------------------------------
+
+
+def _legacy_owner_live(lock_path: Path, ttl: int) -> bool:
+    """True when the legacy lock names an owner that may still be running.
+
+    `lock_status` decides, so the rule is the one every `.idd/` lock gets: a
+    known owner is live until its pid is dead on this host or the lock ages
+    past `ttl`. An unknown owner (absent or `pid 0`) carries no liveness
+    signal, so there is no run to leave in place — moving such a lock keeps it
+    held exactly as before, it just lives in `.idd/`.
+    """
+    parsed, error = _read_json_file(lock_path)
+    if error is not None or not isinstance(parsed, dict):
+        return False
+    if not _pid_known(parsed.get("pid")):
+        return False
+    return not lock_status(parsed, ttl)["stale"]
+
+
+def _move_exclusive(src: Path, dst: Path) -> bool:
+    """Move `src` to `dst` without ever replacing an existing `dst`.
+
+    `os.rename` would silently overwrite a lock another process published in
+    the window since the absence check, so this links (which refuses an
+    existing destination, as `_create_lock_exclusive` relies on) and then
+    unlinks the source. False when there was nothing to move or `dst` won.
+    """
+    try:
+        os.link(src, dst)
+    except FileExistsError:
+        return False
+    except FileNotFoundError:
+        return False
+    except OSError as exc:
+        raise WriteError(f"cannot migrate {src} → {dst} — {exc}") from exc
+    try:
+        os.unlink(src)
+    except FileNotFoundError:
+        pass
+    except OSError as exc:
+        raise WriteError(f"cannot remove {src} after migrating it — {exc}") from exc
+    return True
+
+
+def migrate_legacy_dir(base: Path, legacy: Path, *, ttl: int, dry_run: bool) -> Path:
+    """The directory this invocation acts on, migrating a legacy run first.
+
+    Returns `base` unless the one-time migration applies and cannot run — a
+    live legacy owner, or a dry run — in which case the legacy directory is
+    returned so every mode sees the same files the older run is using.
+    """
+    names = (STATE_NAME, LOCK_NAME, REPORT_NAME)
+
+    def pending() -> bool:
+        if (base / STATE_NAME).exists() or (base / LOCK_NAME).exists():
+            return False
+        return any((legacy / name).is_file() for name in names)
+
+    if not pending():
+        return base
+    if dry_run or _legacy_owner_live(legacy / LOCK_NAME, ttl):
+        return legacy
+    with _lock_guard(base / LOCK_NAME):
+        # Re-check under the directory mutex: a concurrent invocation may have
+        # migrated, or taken a fresh `.idd/` lock, since the first look.
+        if not pending() or _legacy_owner_live(legacy / LOCK_NAME, ttl):
+            return base if not pending() else legacy
+        for name in names:
+            if (legacy / name).is_file() and _move_exclusive(legacy / name, base / name):
+                print(
+                    f"⚠ migrated legacy {LEGACY_DIR}/{name} → {DEFAULT_DIR}/{name}",
+                    file=sys.stderr,
+                )
+    return base
+
+
 # --- modes ------------------------------------------------------------------
 
 
@@ -1505,7 +1596,7 @@ def run_report(args, paths) -> int:
         "generated_at": submitted.get("generated_at") or _now(),
     }
     body = (
-        "<!-- gitissue:run-report v1 "
+        "<!-- idd:run-report v1 "
         + json.dumps(header, ensure_ascii=False, sort_keys=True)
         + " -->\n\n"
         + markdown.rstrip("\n")
@@ -1614,14 +1705,25 @@ def main(argv: list[str] | None = None) -> int:
         return 3
 
     base = Path(args.dir)
-    paths = {
-        "state": base / STATE_NAME,
-        "lock": base / LOCK_NAME,
-        "report": base / REPORT_NAME,
-    }
     selected = next(name for name in MODES if getattr(args, name))
 
     try:
+        if args.dir == DEFAULT_DIR:
+            try:
+                base = migrate_legacy_dir(
+                    base, Path(LEGACY_DIR), ttl=args.ttl, dry_run=args.dry_run
+                )
+            except OSError as exc:
+                if not args.read:
+                    raise
+                # --read never fails: answer from the legacy files in place.
+                print(f"⚠ gi-state: {exc}", file=sys.stderr)
+                base = Path(LEGACY_DIR)
+        paths = {
+            "state": base / STATE_NAME,
+            "lock": base / LOCK_NAME,
+            "report": base / REPORT_NAME,
+        }
         return MODES[selected](args, paths)
     except InputError as exc:
         print(f"✗ gi-state: {exc}", file=sys.stderr)

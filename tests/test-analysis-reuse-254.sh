@@ -336,7 +336,7 @@ fi
 
 # ───────────────────────────────────────────────────────────
 # T9 (AC1/AC3): the artifact is resolved against the ORIGINAL
-# checkout, not this run's workspace. `.gitissue/` is gitignored,
+# checkout, not this run's workspace. `.idd/` is gitignored,
 # so a Step 0e worktree never has it — a bare relative path there
 # answers `absent` forever and the gate silently never fires.
 # ───────────────────────────────────────────────────────────
@@ -345,9 +345,9 @@ BUILT_PREDICATE_BLOCK="$(anchor_span "$BUILT_STEPS" rs-step0h-predicate rs-step0
 
 check_block_has "$PREDICATE_BLOCK" 'git rev-parse --git-common-dir' \
   "T9.1: the predicate resolves the original checkout via --git-common-dir"
-check_block_has "$PREDICATE_BLOCK" 'analysis="\$origin_root/\.gitissue/analysis-[{]N[}]\.json"' \
+check_block_has "$PREDICATE_BLOCK" 'analysis="\$origin_root/\.idd/analysis-[{]N[}]\.json"' \
   "T9.2: the artifact path is anchored to that original checkout"
-check_block_lacks "$PREDICATE_BLOCK" 'analysis="\.gitissue/' \
+check_block_lacks "$PREDICATE_BLOCK" 'analysis="\.idd/' \
   "T9.3: the artifact is never read from a bare workspace-relative path"
 check_has "$SRC_STEPS" 'gitignored, so a .*worktree never contains' \
   "T9.4: the gitignored-in-a-worktree reason is documented, not just avoided"
@@ -355,7 +355,7 @@ check_block_has "$PREDICATE_BLOCK" 'base_ref="origin/\$\{base\}"' \
   "T9.5: anchoring the artifact leaves the base ref this run's synced base"
 check_block_has "$BUILT_PREDICATE_BLOCK" 'git rev-parse --git-common-dir' \
   "T9.6: built pipeline-steps.md ships the original-checkout resolution"
-check_block_lacks "$BUILT_PREDICATE_BLOCK" 'analysis="\.gitissue/' \
+check_block_lacks "$BUILT_PREDICATE_BLOCK" 'analysis="\.idd/' \
   "T9.7: built pipeline-steps.md ships no workspace-relative artifact path"
 
 # ───────────────────────────────────────────────────────────

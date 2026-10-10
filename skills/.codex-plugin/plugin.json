@@ -19,7 +19,7 @@
   "description": "Issue-Driven Development: skills that create, triage, analyze, resolve, review, and auto-pilot GitHub issues.",
   "skills": [
     "./auto-pilot",
-    "./init-gitissue",
+    "./init-idd",
     "./issue-analysis",
     "./issue-creator",
     "./issue-pr-review",

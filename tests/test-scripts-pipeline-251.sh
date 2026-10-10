@@ -10,7 +10,7 @@
 #        as references/scripts/gi-deps.py; the old dev-tree module name
 #        (dependency_gate_parse) survives nowhere, and phases.md cites the
 #        shipped path rather than a scripts/*.py dev path.
-#   AC3  gi-config — merges the documented defaults with .gitissue.yml and
+#   AC3  gi-config — merges the documented defaults with .idd.yml and
 #        prints one JSON line; exit 3 on an invalid config, exit 4 when it
 #        cannot complete.
 #   AC4  gi-runlog — --echo normalizes and writes nothing, --append writes
@@ -18,7 +18,7 @@
 #        and an invalid record exits 3 without writing.
 #   AC5  Prose fallback — every wiring skill keeps its inline defaults and the
 #        `gi-config unavailable` degrade path, both run-log sites keep the
-#        `mkdir -p .gitissue` fallback, and phases.md keeps the manual parse.
+#        `mkdir -p .idd` fallback, and phases.md keeps the manual parse.
 #
 # Also asserted: source and shipped copies are byte-identical and share the
 # same 0755 mode, every script's --help exits 0, and gi-config's vendored
@@ -86,8 +86,8 @@ from pathlib import Path
 skills_root = Path(sys.argv[1])
 WIRED = [
     "auto-pilot",
-    # init-gitissue joined the wired set in issue #253 (gi-stack-detect.py).
-    "init-gitissue",
+    # init-idd joined the wired set in issue #253 (gi-stack-detect.py).
+    "init-idd",
     "issue-analysis",
     "issue-creator",
     "issue-pr-review",
@@ -243,12 +243,12 @@ fi
 # ───────────────────────────────────────────────────────────
 GI_CONFIG="$SKILLS/issue-resolver/references/scripts/gi-config.py"
 GI_SCHEMA="$SKILLS/issue-resolver/references/docs/config-schema.md"
-REPO_CONFIG="$REPO_ROOT/.gitissue.yml"
+REPO_CONFIG="$REPO_ROOT/.idd.yml"
 REPO_CONFIG_BEFORE=""
 [ -f "$REPO_CONFIG" ] && REPO_CONFIG_BEFORE="$(python3 -c 'import hashlib,sys;print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "$REPO_CONFIG")"
 
 # --config always points at a scratch file: this test never reads or mutates
-# the repository's own .gitissue.yml.
+# the repository's own .idd.yml.
 printf 'resolve:\n  max_commits: 7\n' > "$TMP/good.yml"
 printf 'resolve:\n  max_commits: "ten"\n' > "$TMP/bad.yml"
 
@@ -361,14 +361,14 @@ set +e
 bad_rc=$?
 set -e
 if [ "$bad_rc" -eq 3 ]; then
-  pass "T3.7: an invalid .gitissue.yml (resolve.max_commits: \"ten\") exits 3"
+  pass "T3.7: an invalid .idd.yml (resolve.max_commits: \"ten\") exits 3"
 else
   fail "T3.7: invalid config exited $bad_rc (expected 3)"
 fi
-if grep -qF '✗ Invalid .gitissue.yml:' "$TMP/bad.err"; then
-  pass "T3.8: the exit-3 path reports '✗ Invalid .gitissue.yml:' on stderr"
+if grep -qF '✗ Invalid .idd.yml:' "$TMP/bad.err"; then
+  pass "T3.8: the exit-3 path reports '✗ Invalid .idd.yml:' on stderr"
 else
-  fail "T3.8: exit-3 stderr missing the '✗ Invalid .gitissue.yml:' prefix"
+  fail "T3.8: exit-3 stderr missing the '✗ Invalid .idd.yml:' prefix"
 fi
 
 set +e
@@ -389,9 +389,9 @@ fi
 if [ -n "$REPO_CONFIG_BEFORE" ]; then
   after="$(python3 -c 'import hashlib,sys;print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "$REPO_CONFIG")"
   if [ "$after" = "$REPO_CONFIG_BEFORE" ]; then
-    pass "T3.11: the repository's own .gitissue.yml was not modified"
+    pass "T3.11: the repository's own .idd.yml was not modified"
   else
-    fail "T3.11: the repository's own .gitissue.yml changed during the run"
+    fail "T3.11: the repository's own .idd.yml changed during the run"
   fi
 fi
 
@@ -642,7 +642,7 @@ WIRED = [
     "issue-resolver",
     "issue-triage",
 ]
-# init-gitissue is deliberately absent: it *generates* .gitissue.yml and has no
+# init-idd is deliberately absent: it *generates* .idd.yml and has no
 # '## Configuration' block to keep a gi-config degrade path in.
 DOTTED_RE = re.compile(r"^[a-z_][a-z0-9_]*(?:\.[a-z0-9_]+)+$")
 out = []
@@ -726,8 +726,8 @@ for name in ("issue-resolver", "auto-pilot"):
     ):
         text = path.read_text(encoding="utf-8") if path.is_file() else ""
         emit(
-            "mkdir -p .gitissue" in text,
-            f"T5: {name} ({label}) keeps the 'mkdir -p .gitissue' run-log fallback",
+            "mkdir -p .idd" in text,
+            f"T5: {name} ({label}) keeps the 'mkdir -p .idd' run-log fallback",
         )
         # Exit 3 rejects the record itself, so the fallback must not fire for
         # it — an unqualified "best-effort" degrade would append the very
@@ -885,9 +885,9 @@ else:
         "T7.2: build.py and gi-config.py agree on docs/config-schema.md's defaults",
     )
 
-template = root / "src" / "skills" / "init-gitissue" / "templates" / "gitissue-template.yml"
+template = root / "src" / "skills" / "init-idd" / "templates" / "idd-template.yml"
 if not template.is_file():
-    emit(False, "T7.3: the init-gitissue template is missing")
+    emit(False, "T7.3: the init-idd template is missing")
 else:
     text = template.read_text(encoding="utf-8")
     build_map = build._parse_config_mapping(text, template.name)
@@ -895,7 +895,7 @@ else:
     emit(bool(build_map), f"T7.3: the init template parses to {len(build_map)} key(s)")
     emit(
         build_map == gi_map,
-        "T7.4: build.py and gi-config.py agree on the init-gitissue template",
+        "T7.4: build.py and gi-config.py agree on the init-idd template",
     )
 
 print("\n".join(out))

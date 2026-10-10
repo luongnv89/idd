@@ -148,7 +148,7 @@ check "missing scanner names the infrastructure failure" \
 mv "$fixture/src/shared/scripts/gi-secscan.py.missing" \
   "$fixture/src/shared/scripts/gi-secscan.py"
 
-printf '%s\n' 'security:' '  allow_pattern: "["' > "$fixture/.gitissue.yml"
+printf '%s\n' 'security:' '  allow_pattern: "["' > "$fixture/.idd.yml"
 set +e
 (cd "$fixture" && .githooks/pre-commit) >"$TMP/config.out" 2>"$TMP/config.err"
 config_status=$?
@@ -156,7 +156,7 @@ set -e
 check "invalid scanner policy fails closed with exit 3" test "$config_status" -eq 3
 check "invalid policy preserves the scanner diagnostic" \
   grep -q "security.allow_pattern is not a valid regex" "$TMP/config.err"
-rm "$fixture/.gitissue.yml"
+rm "$fixture/.idd.yml"
 
 mkdir -p "$fixture/custom-hooks"
 git -C "$fixture" config --worktree --unset core.hooksPath

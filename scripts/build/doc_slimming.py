@@ -203,7 +203,7 @@ def _filter_defaults_table(text: str, sections: frozenset[str], known: frozenset
     """Drop Defaults Table rows documenting a section the excerpt omits.
 
     Scoped to the `## Defaults Table` section: other pipe-delimited tables in
-    the document (notably the `.gitissue/` directory table) must survive intact.
+    the document (notably the `.idd/` directory table) must survive intact.
     Fenced code blocks are skipped, so a `## ` inside an example never flips the
     section boundary (same rule as `_split_h2_sections`).
     """

@@ -153,7 +153,7 @@ downgrade:
 
 - On the pipeline **tracker line** for the step where it is decided (e.g. the
   resolver's `[0/5] Preflight` line names `effort: light` or `effort: full`).
-- In the **run log** (`.gitissue/runs.jsonl`) as the optional `profile` field, so
+- In the **run log** (`.idd/runs.jsonl`) as the optional `profile` field, so
   `/idd-doctor` and audits can see how often the fast path fired (see
   [run-log-schema.md](https://github.com/luongnv89/idd/blob/main/docs/run-log-schema.md)).
 

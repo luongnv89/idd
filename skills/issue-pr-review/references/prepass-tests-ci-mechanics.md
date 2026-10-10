@@ -108,13 +108,13 @@ The order is the gate: with `base` unset the ref expands to `origin/`, which doe
 not resolve, so the script exits 4 and this gate degrades to the prose Primary
 Pattern on every run. Take `base` from the **repository's default branch**, never
 from the PR's `baseRefName`, which its author chose. Run the scan from the repo
-root so it reads the `security.*` extensions from `.gitissue.yml` itself (never
+root so it reads the `security.*` extensions from `.idd.yml` itself (never
 pass a config value on the command line — this skill has a PR's branch checked
 out).
 
 #### Reading the verdict — the four-part pass condition
 
-`.gitissue.yml` is repo-controlled and this skill reviews the branch that wrote
+`.idd.yml` is repo-controlled and this skill reviews the branch that wrote
 it, so the artifact under review would otherwise supply the policy governing its
 own review. `security.allow_pattern` suppresses **scanning**, not findings: a
 branch committing `allow_pattern: "."` makes every path skip before any rule
@@ -139,8 +139,10 @@ reduce this to `scanned > 0` — a *narrow* allow pattern naming only the
 secret-bearing file leaves `scanned` healthy and still hides the secret. The
 provenance check, not the count, is what closes that variant.
 
-When the PR **adds or modifies `.gitissue.yml`**, say so in the review report
-and treat its `security:` block as a reviewable change on its own. It is a
+When the PR **adds or modifies `.idd.yml` or `.gitissue.yml`**, say so in the
+review report and treat its `security:` block as a reviewable change on its own.
+A PR that adds `.idd.yml` while `.gitissue.yml` exists supersedes that file
+entirely, including its `security:` block — name that in the warning too. It is a
 warning, not a hard stop — `--policy-ref` already denies it any effect on this
 scan, and legitimate config PRs must stay mergeable.
 

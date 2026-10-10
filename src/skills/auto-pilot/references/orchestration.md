@@ -38,8 +38,8 @@ The main agent handles lightweight orchestration only:
 
 The main agent never reads source files or PR diffs, runs tests, or writes code.
 The only concurrent stage is resolver execution. Review, fixes, CI decisions,
-merge, `.gitissue/runs.jsonl`, `.gitissue/run-state.json`,
-`.gitissue/triage.json`, issue labels, and worktree cleanup have one writer: the
+merge, `.idd/runs.jsonl`, `.idd/run-state.json`,
+`.idd/triage.json`, issue labels, and worktree cleanup have one writer: the
 main agent's serialized drain.
 
 ## Compatibility branch (`max_parallel = 1`)

@@ -51,9 +51,9 @@ def _check_stale_doc_urls(src: Path) -> None:
 
 def _check_init_template_urls(src: Path) -> None:
     """Phase E init-template build-time check: scan
-    src/skills/init-gitissue/templates/gitissue-template.yml for stale URLs.
+    src/skills/init-idd/templates/idd-template.yml for stale URLs.
     After issue #81 consolidation, runtime docs live at top-level docs/."""
-    template = src / "skills" / "init-gitissue" / "templates" / "gitissue-template.yml"
+    template = src / "skills" / "init-idd" / "templates" / "idd-template.yml"
     if not template.is_file():
         return
     text = _read_text(template)
@@ -63,7 +63,7 @@ def _check_init_template_urls(src: Path) -> None:
         file_name = m.group(1)
         if file_name in runtime_docs:
             _abort(
-                f"init-gitissue template has stale doc URL: {m.group(0)} "
+                f"init-idd template has stale doc URL: {m.group(0)} "
                 f"(should reference docs/{file_name} — see issue #81)"
             )
 

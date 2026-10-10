@@ -75,7 +75,7 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 ```
 ✓ Issue #N is already normalized (v1, {date}). No changes needed.
 ```
-**Trigger:** Issue body contains `<!-- gitissue:normalized v1 -->`.
+**Trigger:** Issue body contains `<!-- idd:normalized v1 -->` (or legacy `<!-- gitissue:normalized v1 -->`).
 **Note:** This is an informational message, not an error.
 
 ### Security label detected
@@ -199,11 +199,11 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 
 ### Invalid config
 ```
-✗ Invalid config: .gitissue.yml
+✗ Invalid config: .idd.yml
 
   Line {N}: {field} {validation_message}
 
-  To fix:  edit .gitissue.yml and correct the values above
+  To fix:  edit .idd.yml and correct the values above
   Docs:    https://github.com/luongnv89/idd/blob/main/docs/config-schema.md
 ```
 **Trigger:** Config file exists but contains invalid values (wrong type, out of range, unknown field) — including `gi-model-cache.py` exiting 3 on an out-of-range `model_suggestion.*` value.
@@ -233,10 +233,10 @@ All model-suggestion failures are **non-fatal** — they warn and continue creat
 ```
 ⚠ gi-model-cache: {reason}; nothing is cached this run
   Using the bundled model data from memory for this run.
-  To fix:  make ~/.cache/gitissue a writable directory, or set IDD_CACHE_DIR
+  To fix:  make ~/.cache/idd a writable directory, or set IDD_CACHE_DIR
   Docs:    https://github.com/luongnv89/idd/blob/main/docs/config-schema.md
 ```
-**Trigger:** The cache directory (`$IDD_CACHE_DIR`, else `${XDG_CACHE_HOME:-$HOME/.cache}/gitissue`) is unwritable, a symlink, or not a directory — `gi-model-cache.py` exit 0 with `persisted: false`. Suggestions still render from the seed.
+**Trigger:** The cache directory (`$IDD_CACHE_DIR`, else `${XDG_CACHE_HOME:-$HOME/.cache}/idd`) is unwritable, a symlink, or not a directory — `gi-model-cache.py` exit 0 with `persisted: false`. Suggestions still render from the seed.
 
 ### Model data malformed
 ```

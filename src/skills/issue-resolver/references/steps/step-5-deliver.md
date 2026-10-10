@@ -13,7 +13,7 @@ and are not.
 **Why no config value ever reaches the command line.** `gi-secscan.py` reads
 `security.allow_pattern`, `security.extra_secret_file_pattern`,
 `security.extra_secret_value_pattern` and `security.max_file_size_mb` out of
-`.gitissue.yml` itself. `.gitissue.yml` is repo-controlled, so its values are attacker
+`.idd.yml` itself. `.idd.yml` is repo-controlled, so its values are attacker
 -influenced on a public repository; interpolating one into a shell word lets a crafted
 value close its quote and append a command to a step that `/auto-pilot` runs unattended.
 Passing only flags and a ref name keeps every untrusted string inside the script's own
@@ -29,7 +29,7 @@ That is also why the pass condition checks `policy_source`: an exit 0 whose
 to some other policy, and the scan that ran is not the scan that was requested.
 
 **Why `scanned: 0` with `skipped > 0` is not a pass.** An allow pattern suppresses
-*scanning*, not findings. A `.gitissue.yml` whose allow pattern matches everything
+*scanning*, not findings. A `.idd.yml` whose allow pattern matches everything
 produces a clean verdict over nothing at all, which is indistinguishable from a clean
 verdict over the diff unless the counts are read. Treat "examined nothing" as a failure
 to scan and degrade to the documented prose pass instead.

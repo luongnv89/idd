@@ -17,7 +17,7 @@ Every install mode replaces or tracks that folder — a plugin update swaps the
 versioned plugin directory, an `asm` reinstall replaces the copy, and
 `claude --plugin-dir .` points it at a git checkout — so nothing is written
 there. The dated cache lives in a **user-level cache root**, resolved as
-`--cache-dir`, else `$IDD_CACHE_DIR`, else `${XDG_CACHE_HOME:-$HOME/.cache}/gitissue`
+`--cache-dir`, else `$IDD_CACHE_DIR`, else `${XDG_CACHE_HOME:-$HOME/.cache}/idd`
 (a relative `XDG_CACHE_HOME` is ignored, as the XDG spec requires). It is outside
 every skill folder and every repository, so it survives upgrades and is never
 committed. A root that is itself a symlink is refused.
@@ -29,8 +29,8 @@ written to the cache root and the older dated copies are pruned.
 
 Output on stdout, one JSON object:
 
-    {"state": "fresh", "cache_file": "…/gitissue/model-data-2026-09-02.json",
-     "cache_dir": "…/gitissue", "persisted": true,
+    {"state": "fresh", "cache_file": "…/idd/model-data-2026-09-02.json",
+     "cache_dir": "…/idd", "persisted": true,
      "last_fetched": "2026-09-02T00:00:00Z", "data_date": "2026-09-02",
      "data_version": "3.2", "source": "CursorBench 3.2",
      "age_days": 3, "stale": false, "ttl_days": 7, "pruned": [],
@@ -91,7 +91,7 @@ DEFAULT_TTL_DAYS = 7
 CACHE_GLOB_RE = re.compile(r"^model-data-(\d{4}-\d{2}-\d{2})\.json$")
 SEED_REL = os.path.join("templates", "model-data.json")
 CACHE_DIR_ENV = "IDD_CACHE_DIR"
-CACHE_SUBDIR = "gitissue"
+CACHE_SUBDIR = "idd"
 
 # --- the validation boundary --------------------------------------------------
 #
@@ -129,7 +129,9 @@ _UNSAFE_TEXT_RE = re.compile(
     "|[\\u2060-\\u2064\\ufeff]"
 )
 
-CONFIG_NAME = ".gitissue.yml"
+CONFIG_NAME = ".idd.yml"
+# Read as a fallback at each level of the walk (issue #537).
+LEGACY_CONFIG_NAME = ".gitissue.yml"
 CONFIG_SECTION = "model_suggestion"
 CONFIG_KEYS = ("cache_ttl_days", "enabled")
 
@@ -217,15 +219,32 @@ def config_search_ceiling() -> str:
 
 
 def find_config(explicit: str | None) -> str | None:
-    """The explicit file, else search upward to the working-tree root."""
+    """The explicit file, else search upward to the working-tree root.
+
+    Each level tries `.idd.yml`, then the legacy `.gitissue.yml` (issue #537).
+    """
     if explicit:
         return explicit if os.path.isfile(explicit) else None
     here = os.path.abspath(os.getcwd())
     ceiling = os.path.abspath(config_search_ceiling())
     while True:
+        # Both names at each level, new first, under the one ceiling: a legacy
+        # file is this level's config only when `.idd.yml` is absent here.
         candidate = os.path.join(here, CONFIG_NAME)
+        legacy = os.path.join(here, LEGACY_CONFIG_NAME)
         if os.path.isfile(candidate):
+            if os.path.isfile(legacy):
+                print(
+                    f"⚠ legacy {LEGACY_CONFIG_NAME} ignored — {CONFIG_NAME} takes precedence",
+                    file=sys.stderr,
+                )
             return candidate
+        if os.path.isfile(legacy):
+            print(
+                f"⚠ legacy {LEGACY_CONFIG_NAME} found — rename to {CONFIG_NAME}",
+                file=sys.stderr,
+            )
+            return legacy
         parent = os.path.dirname(here)
         if here == ceiling or parent == here:
             return None
@@ -253,7 +272,7 @@ def resolve_ttl(args: argparse.Namespace) -> int:
 
 
 def resolve_cache_root(explicit: str | None) -> str | None:
-    """`--cache-dir`, else `$IDD_CACHE_DIR`, else the XDG user cache + `gitissue`.
+    """`--cache-dir`, else `$IDD_CACHE_DIR`, else the XDG user cache + `idd`.
 
     Never the skill folder and never a repository: both are replaced or tracked
     by every install mode (issue #491). Returns None when no absolute location

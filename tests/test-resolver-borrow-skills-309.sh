@@ -16,7 +16,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 STATE="$REPO_ROOT/src/shared/scripts/gi-state.py"
 SCHEMA="$REPO_ROOT/docs/config-schema.md"
-TEMPLATE="$REPO_ROOT/src/skills/init-gitissue/templates/gitissue-template.yml"
+TEMPLATE="$REPO_ROOT/src/skills/init-idd/templates/idd-template.yml"
 RESOLVER="$REPO_ROOT/src/skills/issue-resolver/SKILL.source.md"
 . "$(cd "$(dirname "$0")" && pwd)/lib/spec.bash"  # spec_concat — split reference specs read as one file (#323)
 STEPS="$(spec_concat "$REPO_ROOT/src/skills/issue-resolver/references/pipeline-steps.md")"
@@ -130,7 +130,7 @@ expect_grep "T2: light still leftover teardown" \
 expect_grep "T2: record intent before install" \
   'Accept, record, install' "$STEPS"
 expect_grep "T2: teardown requires the borrow marker" \
-  '\.gitissue-borrowed' "$STEPS"
+  '\.idd-borrowed' "$STEPS"
 expect_grep "T2: teardown carries back only the failed removals" \
   'entries whose `rm -rf` failed' "$STEPS"
 expect_grep "T2: teardown re-screens read-back names" \
@@ -159,7 +159,7 @@ expect_grep "T3: borrow marker absent" \
 # T3b: the bundled config-schema the resolver ships names it as a run-state writer
 BUNDLED_SCHEMA="$REPO_ROOT/skills/issue-resolver/references/docs/config-schema.md"
 for f in "$SCHEMA" "$BUNDLED_SCHEMA"; do
-  if grep -qE '^\| `\.gitissue/run-state\.json`.*/issue-resolver' "$f"; then
+  if grep -qE '^\| `\.idd/run-state\.json`.*/issue-resolver' "$f"; then
     pass "T3b: run-state.json row names /issue-resolver (${f#$REPO_ROOT/})"
   else
     fail "T3b: run-state.json row omits /issue-resolver (${f#$REPO_ROOT/})"
@@ -178,7 +178,7 @@ expect_grep "T5: auto-pilot leftover borrowed skills" \
 expect_grep "T5: auto-pilot leftover teardown is dry-run safe" \
   'no uninstall, no `--update`' "$AP_PHASES"
 expect_grep "T5: auto-pilot leftover teardown requires the marker" \
-  '\.gitissue-borrowed' "$AP_PHASES"
+  '\.idd-borrowed' "$AP_PHASES"
 expect_no_grep "T5: auto-pilot does not restate an unconditional write-back" \
   'borrowed_skills\": \[\]' "$AP_PHASES"
 
@@ -324,7 +324,7 @@ install_and_mark() {  # name -> 0 installed+marked, 1 install failed
   local name="$1"
   mkdir -p "$SKILLS_ROOT/$name" || return 1
   printf 'stub\n' > "$SKILLS_ROOT/$name/SKILL.md" || return 1
-  : > "$SKILLS_ROOT/$name/.gitissue-borrowed" || return 1
+  : > "$SKILLS_ROOT/$name/.idd-borrowed" || return 1
   return 0
 }
 teardown_one() {  # name origin -> 0 removed, 1 skipped (screen/marker/absent)
@@ -332,7 +332,7 @@ teardown_one() {  # name origin -> 0 removed, 1 skipped (screen/marker/absent)
   printf '%s' "$name" | grep -qE '^[a-z][a-z0-9-]{0,63}$' || return 1
   [ "$origin" = "borrowed" ] || return 1
   [ -d "$SKILLS_ROOT/$name" ] || return 1
-  [ -f "$SKILLS_ROOT/$name/.gitissue-borrowed" ] || return 1
+  [ -f "$SKILLS_ROOT/$name/.idd-borrowed" ] || return 1
   rm -rf "$SKILLS_ROOT/$name"
   return 0
 }
@@ -342,7 +342,7 @@ state_borrowed() { python3 "$STATE" --read --dir "$CYCLE_DIR" | jkey borrowed_sk
 printf '%s' '{"borrowed_skills":[{"name":"test-coverage","origin":"borrowed"}]}' \
   | python3 "$STATE" --update --dir "$CYCLE_DIR" >/dev/null
 install_and_mark test-coverage
-if [ -f "$SKILLS_ROOT/test-coverage/.gitissue-borrowed" ]; then
+if [ -f "$SKILLS_ROOT/test-coverage/.idd-borrowed" ]; then
   pass "T12: install drops the borrow marker in the same step"
 else
   fail "T12: install did not drop the borrow marker"
@@ -446,7 +446,7 @@ fi
 
 # 5. Install failure leaves nothing untracked behind (the #322 fix).
 mkdir -p "$SKILLS_ROOT/half-installed"   # tool died before the marker
-if [ ! -f "$SKILLS_ROOT/half-installed/.gitissue-borrowed" ]; then
+if [ ! -f "$SKILLS_ROOT/half-installed/.idd-borrowed" ]; then
   printf '%s' "half-installed" | grep -qE '^[a-z][a-z0-9-]{0,63}$' \
     && rm -rf "$SKILLS_ROOT/half-installed"
 fi

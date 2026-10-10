@@ -29,9 +29,9 @@ different branch than the one they configured.
 
 Untrusted input never travels on the command line. Pass `--from-issue` and the
 script reads the title (and, absent `--type`, the type from the labels) straight
-from GitHub, and `resolve.branch_prefix` from `.gitissue.yml`. Both are
+from GitHub, and `resolve.branch_prefix` from `.idd.yml`. Both are
 attacker-controlled — anyone can file an issue on a public repository, and
-`.gitissue.yml` arrives with a pull request's branch — so a value interpolated
+`.idd.yml` arrives with a pull request's branch — so a value interpolated
 into a shell word could close its quote and append a command, which
 `/auto-pilot` would then run unattended. `--title` and `--prefix` remain for
 tests and programmatic callers that can pass arguments without a shell.
@@ -109,7 +109,9 @@ _LEADING_WORD_RE = re.compile(r"^([a-z0-9]+)-(?=.)")
 FALLBACK_SLUG = "update"
 
 
-CONFIG_NAME = ".gitissue.yml"
+CONFIG_NAME = ".idd.yml"
+# Read as a fallback at each level of the walk (issue #537).
+LEGACY_CONFIG_NAME = ".gitissue.yml"
 
 # `git rev-parse --show-cdup` is empty at the working-tree root and otherwise
 # consists only of `../` segments. Refuse to resolve any other output as a path.
@@ -162,15 +164,32 @@ def config_search_ceiling() -> str:
 
 
 def find_config(explicit: str | None) -> str | None:
-    """Locate config explicitly or upward, never above the working-tree root."""
+    """Locate config explicitly or upward, never above the working-tree root.
+
+    Each level tries `.idd.yml`, then the legacy `.gitissue.yml` (issue #537).
+    """
     if explicit:
         return explicit
     here = os.path.abspath(os.getcwd())
     ceiling = os.path.abspath(config_search_ceiling())
     while True:
+        # Both names at each level, new first, under the one ceiling: a legacy
+        # file is this level's config only when `.idd.yml` is absent here.
         candidate = os.path.join(here, CONFIG_NAME)
+        legacy = os.path.join(here, LEGACY_CONFIG_NAME)
         if os.path.isfile(candidate):
+            if os.path.isfile(legacy):
+                print(
+                    f"⚠ legacy {LEGACY_CONFIG_NAME} ignored — {CONFIG_NAME} takes precedence",
+                    file=sys.stderr,
+                )
             return candidate
+        if os.path.isfile(legacy):
+            print(
+                f"⚠ legacy {LEGACY_CONFIG_NAME} found — rename to {CONFIG_NAME}",
+                file=sys.stderr,
+            )
+            return legacy
         parent = os.path.dirname(here)
         if here == ceiling or parent == here:
             return None
@@ -379,7 +398,7 @@ def main(argv: list[str] | None = None) -> int:
         "--prefix",
         help=(
             "resolve.branch_prefix override: 'auto' for type-based, else a "
-            "literal prefix. Default: read from .gitissue.yml, then 'auto'"
+            "literal prefix. Default: read from .idd.yml, then 'auto'"
         ),
     )
     parser.add_argument(

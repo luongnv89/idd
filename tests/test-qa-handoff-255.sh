@@ -113,7 +113,7 @@ SRC_PLATFORM="$REPO_ROOT/docs/platform-github.md"
 SRC_TERMINAL="$REPO_ROOT/docs/terminal-style.md"
 SRC_METHODOLOGY="$REPO_ROOT/docs/idd-methodology.md"
 SRC_CONFIG_SCHEMA="$REPO_ROOT/docs/config-schema.md"
-SRC_CONFIG_TEMPLATE="$REPO_ROOT/src/skills/init-gitissue/templates/gitissue-template.yml"
+SRC_CONFIG_TEMPLATE="$REPO_ROOT/src/skills/init-idd/templates/idd-template.yml"
 
 BUILT_PR="$REPO_ROOT/skills/issue-pr-review/SKILL.md"
 BUILT_LOOP="$REPO_ROOT/skills/issue-pr-review/references/review-loop-mechanics.md"
@@ -401,7 +401,7 @@ check_has "$SRC_PR" '[Nn]o new config key is introduced' \
 check_lacks "$SRC_CONFIG_SCHEMA" 'qa_handoff|qa_trust|handoff_' \
   "T7.3: docs/config-schema.md gained no qa-handoff key"
 check_lacks "$SRC_CONFIG_TEMPLATE" 'qa_handoff|qa_trust|handoff_' \
-  "T7.4: the /init-gitissue template gained no qa-handoff key"
+  "T7.4: the /init-idd template gained no qa-handoff key"
 check_has "$BUILT_PR" '[Nn]o new config key is introduced' \
   "T7.5: the built SKILL.md ships the no-new-key rule"
 
@@ -454,7 +454,7 @@ for pair in "src:$SRC_TEMPLATES" "built:$BUILT_TEMPLATES"; do
   f="${pair#*:}"
   anchor_present "$f" rt-qa-handoff \
     "T9.1 ($tag): report-templates.md owns the producer contract"
-  check_has "$f" '<!-- gitissue:qa v1 head=<sha40> profile=<light\|full> cycles=<n> review=clean' \
+  check_has "$f" '<!-- idd:qa v1 head=<sha40> profile=<light\|full> cycles=<n> review=clean' \
     "T9.2 ($tag): the grammar is written out in full"
   check_has "$f" 'tests=<count>@<sha40>' \
     "T9.3 ($tag): tests= carries the SHA the suite actually ran against"
@@ -471,7 +471,7 @@ done
 # The marker must be the LAST line inside the PR body template fence.
 TEMPLATE_FENCE="$(anchor_region "$SRC_TEMPLATES" rt-pr-body-template || true)"
 LAST_IN_FENCE="$(printf '%s\n' "$TEMPLATE_FENCE" | grep -vE '^\s*$' | awk '/^```$/{last=prev} {prev=$0} END {print last}')"
-if printf '%s' "$LAST_IN_FENCE" | grep -q 'gitissue:qa v1'; then
+if printf '%s' "$LAST_IN_FENCE" | grep -q 'idd:qa v1'; then
   pass "T9.8: the marker is the last content line of the PR body template"
 else
   fail "T9.8: the PR body template does not end with the qa marker (got: ${LAST_IN_FENCE:0:60})"
@@ -480,7 +480,7 @@ fi
 for pair in "src:$SRC_RESOLVER" "built:$BUILT_RESOLVER"; do
   tag="${pair%%:*}"
   f="${pair#*:}"
-  check_has "$f" 'gitissue:qa v1' \
+  check_has "$f" 'idd:qa v1' \
     "T9.9 ($tag): the resolver SKILL points at the marker"
   check_has "$f" 'only when QA exited clean' \
     "T9.10 ($tag): the resolver SKILL gates emission on a clean QA exit"
@@ -506,18 +506,18 @@ if [ -f "$BUILT_METHODOLOGY" ]; then
 else
   fail "T10.4: bundled idd-methodology.md missing from issue-pr-review"
 fi
-check_has "$SRC_TERMINAL" 'QA handoff marker: .<!-- gitissue:qa v1' \
+check_has "$SRC_TERMINAL" 'QA handoff marker: .<!-- idd:qa v1' \
   "T10.5: terminal-style.md lists the marker in the marker vocabulary"
-check_has "$REPO_ROOT/skills/issue-resolver/references/docs/terminal-style.md" 'gitissue:qa v1' \
+check_has "$REPO_ROOT/skills/issue-resolver/references/docs/terminal-style.md" 'idd:qa v1' \
   "T10.6: the bundled terminal-style doc ships the marker vocabulary"
 
 # ───────────────────────────────────────────────────────────
 # T11 (AC3): Step 6's PR-body edit preserves the marker, and the
 # auto-pilot narration does not go stale about skipped tests.
 # ───────────────────────────────────────────────────────────
-check_has "$SRC_PR" 'gitissue:qa v1 … -->. marker are still present' \
+check_has "$SRC_PR" 'idd:qa v1 … -->. marker are still present' \
   "T11.1: Step 6's post-edit re-read confirms the marker survived"
-check_has "$BUILT_PR" 'gitissue:qa v1' \
+check_has "$BUILT_PR" 'idd:qa v1' \
   "T11.2: the built SKILL.md ships the preserved-content confirmation"
 
 AP_PROMPTS="$REPO_ROOT/src/skills/auto-pilot/references/subagent-prompts.md"
@@ -734,19 +734,21 @@ done
 for pair in "src:$SRC_LOOP" "built:$BUILT_LOOP"; do
   tag="${pair%%:*}"
   f="${pair#*:}"
-  grep_line="$(grep -E "grep -oE .<!-- gitissue:qa" "$f" | head -1 || true)"
-  check_block_has "$grep_line" 'gitissue:qa v\[0-9\]\+ ' \
-    "T16.1 ($tag): the parse grep matches any version, not just v1"
+  # Located by its form, not its namespace: the grep reads both (#537).
+  grep_line="$(grep -E "grep -oE .<!-- \(gitissue[|]idd\):qa" "$f" | head -1 || true)"
+  check_block_has "$grep_line" '\(gitissue[|]idd\):qa v\[0-9\]\+ ' \
+    "T16.1 ($tag): the parse grep matches any version, not just v1, in both namespaces"
   check_has "$f" 'version other than .v1.' \
     "T16.2 ($tag): the version rule the wider grep feeds is still stated"
 done
 # The regexes must actually behave that way: v2 reaches the parser, v1 matches,
 # and a non-marker comment does not.
-PARSE_RE='<!-- gitissue:qa v[0-9]+ [^>]*-->'
+PARSE_RE='<!-- (gitissue|idd):qa v[0-9]+ [^>]*-->'
 V_OK=1
-printf '%s\n' '<!-- gitissue:qa v2 head=abc review=clean -->' | grep -qE "$PARSE_RE" || V_OK=0
 printf '%s\n' '<!-- gitissue:qa v1 head=abc review=clean -->' | grep -qE "$PARSE_RE" || V_OK=0
-printf '%s\n' '<!-- gitissue:normalized v1 -->' | grep -qE "$PARSE_RE" && V_OK=0
+printf '%s\n' '<!-- idd:qa v2 head=abc review=clean -->' | grep -qE "$PARSE_RE" || V_OK=0
+printf '%s\n' '<!-- idd:qa v1 head=abc review=clean -->' | grep -qE "$PARSE_RE" || V_OK=0
+printf '%s\n' '<!-- idd:normalized v1 -->' | grep -qE "$PARSE_RE" && V_OK=0
 if [ "$V_OK" = "1" ]; then
   pass "T16.3: the documented grep reaches a v2 marker and ignores other markers"
 else
@@ -970,7 +972,7 @@ qa_handoff_verdict() {
   # Exactly one match ⇒ read it as space-separated key=value pairs.
   # shellcheck disable=SC2086
   set -- $inner
-  [ "${1:-}" = "gitissue:qa" ] || { printf 'stale\n'; return 0; }
+  case "${1:-}" in idd:qa|gitissue:qa) ;; *) printf 'stale\n'; return 0 ;; esac
   # A version other than v1 ⇒ stale.
   [ "${2:-}" = "v1" ] || { printf 'stale\n'; return 0; }
   shift 2
@@ -1018,7 +1020,7 @@ T21_TESTS_SHA="8f70f8213c0a4b6e5d9c1f2a3b4c5d6e7f809a1b"
 T21_UI_SHA="a084c8544e1b2c3d4e5f60718293a4b5c6d7e8f9"
 T21_OTHER_HEAD="0123456789abcdef0123456789abcdef01234567"
 
-T21_TEMPLATE_LINE="$(grep -oE '<!-- gitissue:qa v1 [^>]*-->' "$SRC_TEMPLATES" \
+T21_TEMPLATE_LINE="$(grep -oE '<!-- idd:qa v1 [^>]*-->' "$SRC_TEMPLATES" \
   | grep -F '{head_sha}' | head -1 || true)"
 if [ -n "$T21_TEMPLATE_LINE" ]; then
   pass "T21.1: the PR body template renders the marker with {braced} fill-in slots"
@@ -1060,7 +1062,7 @@ check_verdict "$T21_BODY_OK" "$T21_HEAD" trusted \
 
 # AC2 — the literal marker observed on PR #445. Well-formed to PARSE_RE, and
 # still never trusted, because `verdict=` is not `review=`.
-T21_BAD_445='<!-- gitissue:qa v1 head=5d73a6ee7c732ec69d8dc5ea17dabe33b0284570 cycles=1 verdict=clean -->'
+T21_BAD_445='<!-- idd:qa v1 head=5d73a6ee7c732ec69d8dc5ea17dabe33b0284570 cycles=1 verdict=clean -->'
 check_verdict "${T21_BODY_HEAD}
 ${T21_BAD_445}" "$T21_HEAD" stale \
   "T21.4 (AC2): the verdict=clean marker shipped on PR #445 is stale, not trusted"
@@ -1080,7 +1082,7 @@ check_verdict "${T21_BODY_HEAD}
 ${T21_EXTRA}" "$T21_HEAD" trusted \
   "T21.7: an unknown extra key is ignored, never fatal"
 
-T21_V2="${T21_TRUSTED/gitissue:qa v1/gitissue:qa v2}"
+T21_V2="${T21_TRUSTED/idd:qa v1/idd:qa v2}"
 check_verdict "${T21_BODY_HEAD}
 ${T21_V2}" "$T21_HEAD" stale \
   "T21.8 (AC2): a v2 marker resolves stale, not absent"
@@ -1160,7 +1162,7 @@ for pair in "src:$SRC_RESOLVER" "built:$BUILT_RESOLVER"; do
     "T21.28 ($tag): Step 5 states review=clean has no synonym"
   # Strongest form: the operative instruction renders the marker exactly as the
   # producer template does, so the two can never drift apart again.
-  resolver_marker="$(grep -oE '<!-- gitissue:qa v1 [^>]*-->' "$f" \
+  resolver_marker="$(grep -oE '<!-- idd:qa v1 [^>]*-->' "$f" \
     | grep -F '{head_sha}' | head -1 || true)"
   if [ -n "$resolver_marker" ] && [ "$resolver_marker" = "$T21_TEMPLATE_LINE" ]; then
     pass "T21.29 ($tag): Step 5's marker line is byte-identical to the producer template's"

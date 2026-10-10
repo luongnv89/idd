@@ -133,7 +133,7 @@ printf '%s' '{"tool":"issue-resolver","profile":"full","cycles":1,"review":"note
   rcpt "$SCRIPTS/gi-receipt.py" --write
 
 # gi-sensitive — classify (hit, miss, malformed) and adjudicate the gate ledger.
-printf '%s' '{"labels":["Security"],"paths":[".github/workflows/ci.yml","src/auth/login.py",".env.local","CODEOWNERS",".gitissue.yml","README.md"]}' | \
+printf '%s' '{"labels":["Security"],"paths":[".github/workflows/ci.yml","src/auth/login.py",".env.local","CODEOWNERS",".idd.yml","README.md"]}' | \
   run "$SCRIPTS/gi-sensitive.py" --classify
 printf '%s' '[]' | run "$SCRIPTS/gi-sensitive.py" --classify
 printf '%s' '{"labels":"x","paths":[]}' | run "$SCRIPTS/gi-sensitive.py" --classify
@@ -184,7 +184,7 @@ rcp() { printf 'index.html\n' | GIT_DIR="$RCP/.git" GIT_WORK_TREE="$RCP" "$PY" -
   "$SCRIPTS/gi-recipe.py" --ref main --consumer resolve --changed - "$@" >/dev/null 2>&1 || true; }
 printf '<h1>cov</h1>\n' > "$RCP/index.html" && rcp_commit init
 rcp
-cat > "$RCP/.gitissue-recipe.json" <<'EOF'
+cat > "$RCP/.idd-recipe.json" <<'EOF'
 {"version": 1, "auto": ["review"],
  "launch": {"command": ["python3", "-m", "http.server", "{port}", "--bind", "127.0.0.1"],
             "ready": {"url": "/index.html", "timeout_s": 20}},
@@ -197,13 +197,13 @@ rcp_commit recipe
 rcp --plan
 rcp --auto
 rcp
-printf '%s' '{"version":1,"launch":{"command":["sleep","5"],"ready":{"url":"/","timeout_s":1}},"capabilities":[{"name":"x","drive":["true"]}]}' > "$RCP/.gitissue-recipe.json"
+printf '%s' '{"version":1,"launch":{"command":["sleep","5"],"ready":{"url":"/","timeout_s":1}},"capabilities":[{"name":"x","drive":["true"]}]}' > "$RCP/.idd-recipe.json"
 rcp_commit unready
 rcp
-printf '%s' '{"version":1,"app_url":"http://example.com","launch":{"command":["true"],"ready":{"url":"/"}},"capabilities":[]}' > "$RCP/.gitissue-recipe.json"
+printf '%s' '{"version":1,"app_url":"http://example.com","launch":{"command":["true"],"ready":{"url":"/"}},"capabilities":[]}' > "$RCP/.idd-recipe.json"
 rcp_commit invalid
 rcp
-printf '{' > "$RCP/.gitissue-recipe.json" && rcp_commit malformed
+printf '{' > "$RCP/.idd-recipe.json" && rcp_commit malformed
 rcp
 GIT_DIR="$RCP/.git" GIT_WORK_TREE="$RCP" "$PY" -m coverage run -a --rcfile="$RC" \
   "$SCRIPTS/gi-recipe.py" --ref nope --consumer review --changed /dev/null >/dev/null 2>&1 || true

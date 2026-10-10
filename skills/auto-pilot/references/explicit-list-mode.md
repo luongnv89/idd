@@ -178,7 +178,7 @@ same reordering Phase 1 applies (`references/phases/phase-1-triage-pick.md` → 
 `--dry-run` the analysis is computed and printed but nothing is persisted, the
 run lock is taken with `--dry-run` (reporting a holder, creating nothing), and
 every run-state write carries `--dry-run` too. A dry run leaves the repository
-byte-identical apart from the transient scratch file under `.gitissue/cache/`
+byte-identical apart from the transient scratch file under `.idd/cache/`
 that the same step deletes.
 
 ### Loop behavior
@@ -199,7 +199,7 @@ for batch in analyzer.batches:
 Also maintain a `processed` set (initially empty) that tracks which issues have been resolved — either individually or as part of a batch.
 
 **`processed` and the session skip list are run-state fields, not pure memory.**
-Both live in `.gitissue/run-state.json` (`processed[]`, `skip_list[]`) and are
+Both live in `.idd/run-state.json` (`processed[]`, `skip_list[]`) and are
 appended de-duplicated at each end-of-iteration checkpoint
 (`references/phases/phase-0-lock-resume.md` → *Step 1.0b*; `references/phases/phase-5-merge.md` → *End-of-iteration checkpoint*). The
 in-memory copies stay the working set — every lookup above reads them — but a
@@ -263,7 +263,7 @@ after repeated failures* procedure in `references/phases/phase-2-resolve.md`.
 
 When advancing to the next item in `optimized_order`:
 1. **If already processed** (in the `processed` set): emit a skip line and advance.
-   This skip is **display only** — it writes **no** `.gitissue/runs.jsonl` line,
+   This skip is **display only** — it writes **no** `.idd/runs.jsonl` line,
    because the issue was already logged once at batch time (see *Run-log fan-out for
    the batch* — the last row of its disposition table). It is the single
    exception to logging every processed issue:
@@ -357,7 +357,7 @@ Build each written line from `references/docs/run-log-schema.md`, with these bat
 The Batch Resolver **returns** `qa_cycles`, `complexity`, `agent_overrides`,
 `duration_s` and `phases` so
 auto-pilot can populate them. Each append uses the same best-effort, non-fatal
-`mkdir -p .gitissue` + single-`\n` rule as everywhere else — a failed append never
+`mkdir -p .idd` + single-`\n` rule as everywhere else — a failed append never
 stops the loop. Append only; never rewrite prior lines.
 
 For non-batched issues, the flow is identical to before:
@@ -379,7 +379,7 @@ here with the rest of Phase 1
 
 Explicit list mode does **not** re-triage between iterations. The analysis determined the order upfront — respect it. The only per-iteration pre-work is syncing to the default branch (Step 2.1).
 
-Triage mode triages once, reuses a `fresh` `.gitissue/triage.json`, and updates that payload in place after each merge. Explicit list mode remains the stronger form of the same property — it never triages at all, so there is no cache to keep current and no pick miss to recover from.
+Triage mode triages once, reuses a `fresh` `.idd/triage.json`, and updates that payload in place after each merge. Explicit list mode remains the stronger form of the same property — it never triages at all, so there is no cache to keep current and no pick miss to recover from.
 
-That is why *Step 1.6 — Update the triage cache after a merge* is skipped here, and the step's own note says so: with no payload this run wrote or read, a `.gitissue/triage.json` that is missing, stale, or absent is not a degrade. Skip it silently — no `⚠ Could not update the triage cache` line, and no `retriage_required` flag, which this mode has no *Step 1.1* to clear. Step 1.6's `Fail-safe: any doubt is "run it."` is a triage-mode rule; the mode is known at invocation, so reaching it here is never a doubt.
+That is why *Step 1.6 — Update the triage cache after a merge* is skipped here, and the step's own note says so: with no payload this run wrote or read, a `.idd/triage.json` that is missing, stale, or absent is not a degrade. Skip it silently — no `⚠ Could not update the triage cache` line, and no `retriage_required` flag, which this mode has no *Step 1.1* to clear. Step 1.6's `Fail-safe: any doubt is "run it."` is a triage-mode rule; the mode is known at invocation, so reaching it here is never a doubt.
 

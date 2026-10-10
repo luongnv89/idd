@@ -184,7 +184,7 @@ Each skill has `references/error-messages.md`. Follow the three-part format:
 ### Modifying Templates
 
 Issue templates are in `src/skills/issue-creator/templates/`. Each template must:
-- Include the `<!-- gitissue:normalized v1 -->` marker
+- Include the `<!-- idd:normalized v1 -->` marker
 - Use intent-only sections: Type, Context, Description, Acceptance Criteria, Metadata
 - Preserve the Reporter Context blockquote
 - **Never** include sections that imply codebase analysis (no Affected Files, no Technical Notes, no Architecture Constraints, no Implementation Hints) — `/issue-creator` is intent-only; consumer skills (resolver, triage, analysis) scan the codebase fresh at execution time
@@ -330,7 +330,7 @@ When testing manually:
 - **`gh` CLI** — every call must use `--json` with explicit field selection
 - **Terminal symbols** — `✓ ✗ ● ◆ ⚡ ⚠ ○` per `DESIGN.md`
 - **No cross-skill state** — skills are fully isolated
-- **Config loaded once** — `.gitissue.yml` is read at skill start, not per-step
+- **Config loaded once** — `.idd.yml` is read at skill start, not per-step
 - **Backup before edit** — always post a backup comment before modifying an issue
 
 ## File Reference
@@ -343,7 +343,7 @@ graph TD
     AR --> SK["src/skills/*/SKILL.source.md<br/>Skill definitions"]
     SK --> EM["src/skills/*/references/<br/>Error messages"]
     SK --> TM["src/skills/*/templates/<br/>Issue templates"]
-    CS --> GY[".gitissue.yml<br/>Project config"]
+    CS --> GY[".idd.yml<br/>Project config"]
 
     style CM fill:#4CAF50,color:#fff
     style SK fill:#2196F3,color:#fff
@@ -353,12 +353,13 @@ graph TD
 |------|---------|
 | `CLAUDE.md` | Project conventions for AI agents |
 | `DESIGN.md` | Terminal output style guide |
-| `docs/config-schema.md` | Full `.gitissue.yml` schema (autopilot + review sections) — bundled into skills as a per-skill excerpt (issue #249) |
-| `docs/run-log-schema.md` | `.gitissue/runs.jsonl` run-log schema (fields, append rules, single-writer) |
+| `docs/config-schema.md` | Full `.idd.yml` schema (autopilot + review sections) — bundled into skills as a per-skill excerpt (issue #249) |
+| `docs/run-log-schema.md` | `.idd/runs.jsonl` run-log schema (fields, append rules, single-writer) |
 | `docs/idd-methodology.md` | IDD methodology overview + analysis-artifact dual-write rule — bundled into skills as a normative-sections digest (issue #249) |
 | `docs/naming-conventions.md` | Branch / commit / PR / issue naming |
 | `docs/sample-normalized-issue.md` | Example normalized issue (intent-only) |
 | `docs/ARCHITECTURE.md` | System design, data flow, durable-memory model |
+| `docs/migrating-from-gitissue.md` | Upgrade path from the legacy `gitissue` names to `idd` (issue #537) — project doc, not bundled |
 | `CHANGELOG.md` | Per-release notes |
 | `.claude-plugin/marketplace.json`, `src/plugin/plugin.json` | Self-hosted Claude Code marketplace (git-subdir source `skills/`, pinned to the release tag) and the plugin manifest source the build emits to `skills/.claude-plugin/plugin.json` (issues #469, #492) |
 | `src/internal-skills/idd-doctor/SKILL.source.md` | Read-only health check — run before submitting a PR |

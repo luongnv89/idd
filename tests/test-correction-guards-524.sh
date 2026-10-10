@@ -31,7 +31,7 @@ trap 'rm -rf "$TMP"' EXIT
 # Throwaway repo whose history carries two review-feedback fix cycles on one
 # scope and one on another, plus a runs.jsonl with a repeated skip reason.
 R="$TMP/repo"
-mkdir -p "$R/.gitissue"
+mkdir -p "$R/.idd"
 git -C "$R" init -q
 git -C "$R" config user.email t@t.co
 git -C "$R" config user.name t
@@ -47,8 +47,8 @@ printf '%s\n' \
   '{"ts":"2026-07-09T00:00:00Z","issue":10,"mode":"auto","skill":"auto-pilot","outcome":"skipped","pr":null,"skipped_reason":"blocked_label"}' \
   '{"ts":"2026-07-10T00:00:00Z","issue":11,"mode":"auto","skill":"auto-pilot","outcome":"skipped","pr":null,"skipped_reason":"blocked_label"}' \
   'not json at all' \
-  > "$R/.gitissue/runs.jsonl"
-LEDGER="$R/.gitissue/improvement-proposals.jsonl"
+  > "$R/.idd/runs.jsonl"
+LEDGER="$R/.idd/improvement-proposals.jsonl"
 run_lint() { ( cd "$R" && python3 "$LINT" corrections "$@" ); }
 
 # ── T1: recurring review-fix scope is detected; one-off scope is not ──

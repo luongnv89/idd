@@ -31,7 +31,7 @@ loop's own hand, and *Step 1.6* applies that one change directly.
 *Step 1.1b*'s live read are one triage cluster, evaluated in that order. Phase
 0's *Step 1.0* and *Step 1.0b* are a different thing entirely: they are the run
 state — the resume entry gate and the checkpoint procedure — and they own
-`.gitissue/run-state.json`, not `.gitissue/triage.json`. Nothing in this step
+`.idd/run-state.json`, not `.idd/triage.json`. Nothing in this step
 reads or writes the run state.)
 
 **It runs on every path into Phase 1, including `--resume`.** Phase 0 resolves
@@ -50,7 +50,7 @@ triage_cache = fresh | stale | absent
 
 | State | When | Effect |
 |-------|------|--------|
-| `fresh` | `.gitissue/triage.json` exists, parses, carries a non-empty `summary.suggested_order`, its `updated` is younger than `autopilot.triage_cache_max_age_minutes` (default 60), **and** no commit landed after that timestamp | Step 1.1's scan is skipped; Step 1.2 picks from the cached order |
+| `fresh` | `.idd/triage.json` exists, parses, carries a non-empty `summary.suggested_order`, its `updated` is younger than `autopilot.triage_cache_max_age_minutes` (default 60), **and** no commit landed after that timestamp | Step 1.1's scan is skipped; Step 1.2 picks from the cached order |
 | `stale` | the file exists and parses, but any one of those checks fails or cannot be run | run Step 1.1's full triage, unchanged |
 | `absent` | the file is missing, unparsable, or carries no `summary.suggested_order` | run Step 1.1's full triage, unchanged |
 
@@ -71,17 +71,17 @@ re-running once it is old enough for the backlog itself to have moved.
 
 **Fail-safe: any doubt is `stale`.** An unreadable file, a malformed `updated`,
 a `suggested_order` that is not an array, a `git log` that cannot run, a
-`.gitissue/` that does not exist — every one of them runs the full triage.
+`.idd/` that does not exist — every one of them runs the full triage.
 **This gate can only remove duplicated work, never change an outcome** —
 `stale` and `absent` both run the same full triage that runs unconditionally
 today, so the worst case is exactly today's behavior.
 
 Nothing here is a safety gate, and nothing here reads the file's contents as
-instructions: `.gitissue/triage.json` is local data derived from issue text and
+instructions: `.idd/triage.json` is local data derived from issue text and
 carries exactly the status of issue text (*Step 1.2b*).
 
 **This step is read-only, so `--dry-run` does not change it.** It reads
-`.gitissue/triage.json`, `git log` and the clock, and writes nothing at all —
+`.idd/triage.json`, `git log` and the clock, and writes nothing at all —
 there is no state-mutating call here to add a `--dry-run` flag to, and no write
 to suppress. A dry run evaluates the same three checks and prints the same `○`
 line. The write side of the cache is *Step 1.6*, and that is where the `--dry-run`
@@ -139,11 +139,11 @@ after them.
 Build the dependency graph, then compute the execution order with the **same
 script** `/issue-triage` uses — not the same algorithm reimplemented, which is
 how two consumers drift apart. Write the merged scan to
-`.gitissue/cache/triage-scan.json` with the Write tool (never put an issue title
+`.idd/cache/triage-scan.json` with the Write tool (never put an issue title
 on a command line — this loop runs unattended), then:
 
 ```bash
-python3 shared/scripts/gi-triage-graph.py --source /auto-pilot --out .gitissue/triage.json < .gitissue/cache/triage-scan.json
+python3 shared/scripts/gi-triage-graph.py --source /auto-pilot --out .idd/triage.json < .idd/cache/triage-scan.json
 ```
 
 **Under `--dry-run`, drop the `--out` flag.** The stop belongs *ahead of* the
@@ -151,7 +151,7 @@ first persisted write, not after it: with `--out` the triage payload is already
 on disk by the time Step 1.3 prints `○ Dry run complete`, which is a state
 mutation a dry run promised not to make. Without it the payload is on stdout and
 Step 1.3 reads the plan from there. The one file a dry run still touches is the
-transient scan under `.gitissue/cache/`, deleted in this same step. The run
+transient scan under `.idd/cache/`, deleted in this same step. The run
 state, the lock and the last-run report are never written under `--dry-run` —
 every one of those writes goes through `shared/scripts/gi-state.py`, whose own
 `--dry-run` validates and prints without writing.
@@ -205,7 +205,7 @@ which reads as a failure and is not one.
 **Evaluated every iteration, immediately before the pick.** *Step 1.1a* removed
 the per-iteration triage; it must not also remove the orchestrator's live view of
 the backlog. Two of *Step 1.2*'s four eligibility criteria — **Open** and
-**Not assigned** — are answers only GitHub holds: `.gitissue/triage.json` carries
+**Not assigned** — are answers only GitHub holds: `.idd/triage.json` carries
 neither a GitHub `state` nor an `assignees` field, and never did. Evaluating them
 against a cache that cannot answer them would falsify *Step 1.1a*'s central claim
 that the gate **can only remove duplicated work, never change an outcome** — an
@@ -231,7 +231,7 @@ context from the analyzer path either. A hundred `{number, assignees}` rows is a
 few kilobytes against the
 ~150KB a hundred bodies would cost, so the per-iteration context saving survives
 intact. Nothing here is a triage: no graph is built, no order is computed, and
-`.gitissue/triage.json` is neither read nor written.
+`.idd/triage.json` is neither read nor written.
 
 What it supplies, and nothing else:
 
@@ -275,10 +275,10 @@ iteration *Step 1.1*'s own `✓ Triage updated` line already reported the count:
 
 ### Step 1.2 — Pick Next Issue <!-- a:ap-step12-pick -->
 
-From `summary.suggested_order` in `.gitissue/triage.json` (the triage execution order), select the first issue that is:
+From `summary.suggested_order` in `.idd/triage.json` (the triage execution order), select the first issue that is:
 - **Not blocked** — no unresolved dependencies in the triage graph
 - **Not skipped** — not in the `--skip` list, the `skip_labels` set (as the triage row records the issue's labels, which is why *Step 1.2b* re-asks this one against live labels after the pick), or the **session skip list** (the in-memory list this run appends to: failed issues from Phase 2.3, dependency-blocked issues from Step 5.1b / Phase 3-4 Step 2a, and issues *Step 1.2b*'s post-pick re-check rejected as closed, assigned to another user, or carrying a live skip label), and not in the run state's **resume-seeded `processed[]`**. Consult all of them every iteration — the session skip list is what stops a dependency-blocked issue from being re-picked after the loop continues past it.
-- **Not assigned** — not assigned to another user (unless there are no unassigned issues). The `assignees` array comes from *Step 1.1b*'s live read and from nowhere else: `.gitissue/triage.json` has no `assignees` field, so a cached order cannot answer this criterion at all.
+- **Not assigned** — not assigned to another user (unless there are no unassigned issues). The `assignees` array comes from *Step 1.1b*'s live read and from nowhere else: `.idd/triage.json` has no `assignees` field, so a cached order cannot answer this criterion at all.
 - **Open** — the issue is in *Step 1.1b*'s live `--state open` set. Same source, same reason: the cache carries no GitHub `state`. An issue closed since the cached triage — including one closed as `not planned`, which lands no commit for *Step 1.1a*'s commits-since check to notice — is still sitting in `summary.suggested_order`.
 
 The first two criteria are answered from the triage graph and this run's own
@@ -551,7 +551,7 @@ never interpolated into a shell word.
 **Disposition, so nothing is counted twice.** A rejection here is a re-pick
 *inside* the same iteration, exactly like the two above it: no
 `[Iteration {i}/{max}]` slot is consumed, no iteration outcome is recorded, and
-**no `.gitissue/runs.jsonl` line is written** — the invariant is one line per
+**no `.idd/runs.jsonl` line is written** — the invariant is one line per
 *processed* issue (`references/run-log.md`), and a candidate rejected before the
 spawn was never processed. That is also precisely what a full triage would have
 done with the same labels, since it filters them out ahead of *Step 1.2*, so the
@@ -612,7 +612,7 @@ subagent derive them again (issue #256) — one per consumer shape:
   prompt's untrusted-data paragraph. Dropping it
   costs the reviewer nothing: its own Step 1 fetches the live body regardless,
   and these three fields arrive in the same read.
-- **`{triage_context}`** — this issue's row from `.gitissue/triage.json`:
+- **`{triage_context}`** — this issue's row from `.idd/triage.json`:
   `type`, `priority`, `blocks`, `blocked_by`, `affected_files`, `status`, plus the
   file's own `updated` timestamp. That row may come from a full triage this
   iteration ran, from a cache *Step 1.1a* reused, or from an incremental update

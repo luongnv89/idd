@@ -21,7 +21,7 @@ src/
 │   │   ├── issue-relationship-scanner.md  # File deps + already-fixed detection
 │   │   └── ui-reviewer.md         # UI/UX + screenshot accessibility review
 │   └── scripts/                   # Shared executable helpers (stdlib-only, mode 0755)
-│       ├── gi-config.py           # Defaults + .gitissue.yml → one JSON line
+│       ├── gi-config.py           # Defaults + .idd.yml → one JSON line
 │       ├── gi-runlog.py           # Validate/normalize/append a runs.jsonl record
 │       ├── gi-deps.py             # Parse local dependency issue numbers
 │       ├── gi-secscan.py          # Pre-commit secret/artifact scan → JSON verdict
@@ -61,7 +61,7 @@ src/
 │   ├── plan-to-issues/     # /plan-to-issues — plan or conversation → epic + issues
 │   │   ├── SKILL.source.md
 │   │   └── references/
-│   └── init-gitissue/      # /init-gitissue — generate .gitissue.yml
+│   └── init-idd/      # /init-idd — generate .idd.yml
 │       ├── SKILL.source.md
 │       └── references/
 │
@@ -133,7 +133,7 @@ Shared executable helpers are a third closure kind alongside agents and runtime 
 - Rich error format: what went wrong + fix command + docs link
 
 ### Issue Templates
-- Normalization marker: `<!-- gitissue:normalized v1 -->`
+- Normalization marker: `<!-- idd:normalized v1 -->`
 - Standard sections (SPEC §1.1): Type, Description, Screenshots, Acceptance Criteria, Metadata
 - Reporter's original text preserved in `> Reporter Context` blockquote
 - Confidence markers: `(high confidence)`, `(needs review)`
@@ -200,10 +200,10 @@ Examples:
 - Include context when helpful: "Bug: App crashes when clicking login on iOS"
 
 ### Configuration
-- `.gitissue.yml` loaded ONCE at skill start, not re-read at each step
+- `.idd.yml` loaded ONCE at skill start, not re-read at each step
 - Zero-config: all defaults applied when no config file exists
-- First-run hint: `○ First run — using default config. Run /init-gitissue to customize.`
-- init-gitissue always creates `.gitissue.yml` when missing (even from non-interactive skill invocation)
+- First-run hint: `○ First run — using default config. Run /init-idd to customize.`
+- init-idd always creates `.idd.yml` when missing (even from non-interactive skill invocation)
 
 ### Skills
 - Each skill follows the skill-creator standard (frontmatter with name/description, progressive disclosure)

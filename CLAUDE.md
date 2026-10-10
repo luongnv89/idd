@@ -30,7 +30,7 @@ src/
 │   │   ├── issue-relationship-scanner.md  # File deps + already-fixed detection
 │   │   └── ui-reviewer.md         # UI/UX + screenshot accessibility review
 │   └── scripts/                   # Shared executable helpers (stdlib-only, mode 0755)
-│       ├── gi-config.py           # Defaults + .gitissue.yml → one JSON line
+│       ├── gi-config.py           # Defaults + .idd.yml → one JSON line
 │       ├── gi-runlog.py           # Validate/normalize/append a runs.jsonl record
 │       ├── gi-deps.py             # Parse local dependency issue numbers
 │       ├── gi-secscan.py          # Pre-commit secret/artifact scan → JSON verdict
@@ -70,7 +70,7 @@ src/
 │   ├── plan-to-issues/     # /plan-to-issues — plan or conversation → epic + issues
 │   │   ├── SKILL.source.md
 │   │   └── references/
-│   └── init-gitissue/      # /init-gitissue — generate .gitissue.yml
+│   └── init-idd/      # /init-idd — generate .idd.yml
 │       ├── SKILL.source.md
 │       └── references/
 │
@@ -116,7 +116,7 @@ All documentation lives in top-level `docs/`. Two kinds coexist there:
 
 1. **Runtime docs** — read by skills at execution time. A skill source file references them as bare `docs/X.md` tokens. `scripts/build.py` discovers these references via transitive-closure scan and copies the matching files into each skill's `references/docs/`. To add a runtime doc: drop the new `.md` file at `docs/<name>.md` and reference it from a **skill** — the build picks it up automatically. Today's runtime docs — all 15 bundled by the closure — are: `config-schema.md`, `run-log-schema.md`, `idd-methodology.md`, `naming-conventions.md`, `sync-conventions.md`, `github-projects-sync.md`, `platform-github.md`, `shared-agent-conventions.md`, `agent-model-effort.md`, `agent-overrides.md`, `pre-commit-security.md`, `terminal-style.md`, `auto-mode.md`, `ui-review.md`, `post-merge-cleanup.md`.
 
-   Three build-time rules shape what actually lands in a skill (issue #249). **(a) Skill-reachable only** — a doc reachable only through a shared agent is validated but not bundled: emitted agent prompts render their references as absolute repo URLs (issue #245), so a bundled copy would be unreferenceable. **(b) Per-skill config excerpt** — `config-schema.md` is emitted carrying only the top-level sections a skill's own text names (plus `platform`); `/init-gitissue`, which renders `.gitissue.yml`, keeps it whole. **(c) Runtime digest** — docs in `DOC_SECTION_DIGESTS` (today: `idd-methodology.md`) are emitted as their normative sections only, plus any optional section the skill names. Both (b) and (c) are verified in `build.py` and fail the build on a hole; a doc bundled with no runtime mention outside the index/precheck blocks prints a `⚠` warning.
+   Three build-time rules shape what actually lands in a skill (issue #249). **(a) Skill-reachable only** — a doc reachable only through a shared agent is validated but not bundled: emitted agent prompts render their references as absolute repo URLs (issue #245), so a bundled copy would be unreferenceable. **(b) Per-skill config excerpt** — `config-schema.md` is emitted carrying only the top-level sections a skill's own text names (plus `platform`); `/init-idd`, which renders `.idd.yml`, keeps it whole. **(c) Runtime digest** — docs in `DOC_SECTION_DIGESTS` (today: `idd-methodology.md`) are emitted as their normative sections only, plus any optional section the skill names. Both (b) and (c) are verified in `build.py` and fail the build on a hole; a doc bundled with no runtime mention outside the index/precheck blocks prints a `⚠` warning.
 2. **Project docs** — read by humans only. Architecture, changelog, dev guide, decision records, experiments, release notes. They are not referenced by any skill, so the build does not bundle them. Place new project docs at `docs/<name>.md` (top-level) or under a topical subdirectory (`docs/decisions/`, `docs/experiments/`, `docs/release-notes/`).
 
 When in doubt: if a skill source needs to read it at runtime, it is a runtime doc and goes at the top level of `docs/`. Otherwise it is a project doc.
@@ -139,7 +139,7 @@ Shared executable helpers are a third closure kind alongside agents and runtime 
 **Fatal vs. degrade.** These are two different failures and the skills treat them differently:
 
 - **File absent from the bundle → fatal.** The precheck list guarantees the script shipped (the build fails both ways if the list and the bundle disagree), so a missing file means a broken or partial install. Stop and print the `✗ Missing bundled dependency` block.
-- **Runtime failure → degrade.** No `python3` on PATH, a non-zero exit other than 3, or unparsable stdout is an environment problem, not a broken install. Print a `⚠` line and follow the documented prose procedure the skill keeps beside every invocation. Exit 3 is the exception: it means the *user's input* is invalid (e.g. a malformed `.gitissue.yml`), which is a real stop, not a degrade.
+- **Runtime failure → degrade.** No `python3` on PATH, a non-zero exit other than 3, or unparsable stdout is an environment problem, not a broken install. Print a `⚠` line and follow the documented prose procedure the skill keeps beside every invocation. Exit 3 is the exception: it means the *user's input* is invalid (e.g. a malformed `.idd.yml`), which is a real stop, not a degrade.
 
 The shared exit-code vocabulary is `0` ok · `2` usage error · `3` invalid input (stop) · `4` cannot complete (degrade to prose).
 
@@ -161,7 +161,7 @@ Code `1` is reserved for a **script-specific verdict** — an answer the script 
 - Rich error format: what went wrong + fix command + docs link
 
 ### Issue Templates
-- Normalization marker: `<!-- gitissue:normalized v1 -->`
+- Normalization marker: `<!-- idd:normalized v1 -->`
 - Standard sections (SPEC §1.1): Type, Description, Screenshots, Acceptance Criteria, Metadata
 - Reporter's original text preserved in `> Reporter Context` blockquote
 - Confidence markers: `(high confidence)`, `(needs review)`
@@ -228,9 +228,9 @@ Examples:
 - Include context when helpful: "Bug: App crashes when clicking login on iOS"
 
 ### Configuration
-- `.gitissue.yml` loaded ONCE at skill start, not re-read at each step
+- `.idd.yml` loaded ONCE at skill start, not re-read at each step
 - Zero-config: all defaults applied when no config file exists
-- First-run hint: `○ First run — using default config. Run /init-gitissue to customize.`
+- First-run hint: `○ First run — using default config. Run /init-idd to customize.`
 
 ### Skills
 - Each skill follows the skill-creator standard (frontmatter with name/description, progressive disclosure)

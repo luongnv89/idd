@@ -5,7 +5,7 @@
 # This is a documentation/contract test in the same style as
 # tests/test-runs-jsonl.sh: it greps the authored src/ sources
 # (SKILL.source.md + references/output-and-persist.md) and asserts the
-# documented `.gitissue/analysis-<N>.json` schema is internally consistent and
+# documented `.idd/analysis-<N>.json` schema is internally consistent and
 # that the view-mode prerequisites match the corrected contract (#207
 # corrected the analysis JSON `summary` key placement and the view-mode
 # prerequisites). It does NOT call the GitHub API or run the skill (no network).
@@ -58,8 +58,8 @@ fi
 
 # --- T2: canonical persistence target (per-issue filename) ------------------
 # Both the SKILL and its persist reference name the same per-issue output file.
-has "$SKILL"   ".gitissue/analysis-" "T2: SKILL persists to .gitissue/analysis-<N>.json"
-has "$PERSIST" ".gitissue/analysis-" "T2: persist reference names .gitissue/analysis-<N>.json"
+has "$SKILL"   ".idd/analysis-" "T2: SKILL persists to .idd/analysis-<N>.json"
+has "$PERSIST" ".idd/analysis-" "T2: persist reference names .idd/analysis-<N>.json"
 
 # --- T3: top-level schema keys ----------------------------------------------
 # These live in the schema body + field-reference table (stable contract; not

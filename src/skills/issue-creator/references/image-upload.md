@@ -51,7 +51,7 @@ Embed uploaded images in a **Screenshots** section placed between the Descriptio
 
 If no images are provided, omit the Screenshots section entirely.
 
-> **Repo visibility caveat:** Durable embedded images require a **public** repository — on a private repo the `raw.githubusercontent.com` link carries an expiring token and the embed breaks shortly after upload. The *source* image's location on disk (e.g. inside a gitignored `.gitissue/`) does not affect embedding; only repository visibility does.
+> **Repo visibility caveat:** Durable embedded images require a **public** repository — on a private repo the `raw.githubusercontent.com` link carries an expiring token and the embed breaks shortly after upload. The *source* image's location on disk (e.g. inside a gitignored `.idd/`) does not affect embedding; only repository visibility does.
 
 ## Multiple images
 

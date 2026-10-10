@@ -1,6 +1,6 @@
 # Run-log monitoring contract
 
-`/auto-pilot` appends to `.gitissue/runs.jsonl` — the same append-only run log
+`/auto-pilot` appends to `.idd/runs.jsonl` — the same append-only run log
 written by `/issue-resolver`. The schema and field list live in
 `references/docs/run-log-schema.md`; follow it rather
 than re-deriving fields. This file documents the two contracts that keep the log
@@ -12,7 +12,7 @@ and the **batch fan-out**.
 They are different files with opposite lifetimes, and neither substitutes for
 the other:
 
-| | `.gitissue/runs.jsonl` (run log) | `.gitissue/run-state.json` (run state) |
+| | `.idd/runs.jsonl` (run log) | `.idd/run-state.json` (run state) |
 |---|---|---|
 | Shape | append-only, one JSON line per processed issue | one mutable JSON object, rewritten at each checkpoint |
 | Scope | cross-run telemetry, grows forever | this run only; the next run overwrites it |

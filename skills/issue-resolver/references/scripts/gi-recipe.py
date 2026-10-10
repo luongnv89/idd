@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Run a project-local verification recipe against an owned app instance (issue #523).
 
-A repository may commit `.gitissue-recipe.json` to describe how to verify it
+A repository may commit `.idd-recipe.json` to describe how to verify it
 end to end: how to **launch** the app, how to tell it is ready, which
 **capabilities** to **drive** for which changed paths, and what extra
 **cleanup** to run. This script executes that recipe deterministically and
@@ -13,6 +13,10 @@ Trust boundary
   The recipe's commands run in the working tree — the code under test.
   In auto mode (`--auto`, or `IDD_AUTO_MODE=1`) nothing runs unless the
   base-ref recipe's `auto` list names `--consumer`.
+  A base ref with no `.idd-recipe.json` is read for the pre-rename
+  `.gitissue-recipe.json` instead (issue #537, ⚠ line on stderr). Only absence
+  falls back: a present `.idd-recipe.json` that is invalid is exit 3, never a
+  reason to run the older recipe.
 
 Recipe (JSON, every key outside this list is invalid, `_`-prefixed keys are
 comments):
@@ -60,6 +64,7 @@ Output: one JSON line on stdout —
      "evidence": [<absolute paths>], "owned": {"pgid"} | null,
      "torn_down": true | false | null, "cleanup": [<exit> ...]}
   `result` is `fail` when any driven capability exited non-zero or timed out.
+  `recipe` is the path actually loaded, or null when the ref carries none.
 
 Exit codes
   0  answered — `absent` (no recipe at the ref), `skipped` (auto opt-in not
@@ -96,7 +101,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-RECIPE_PATH = ".gitissue-recipe.json"
+RECIPE_PATH = ".idd-recipe.json"
+LEGACY_RECIPE_PATH = ".gitissue-recipe.json"
 CONSUMERS = ("resolve", "review")
 DEFAULT_APP_URL = "http://127.0.0.1:{port}"
 LOOPBACK_HOSTS = ("127.0.0.1", "localhost", "::1")
@@ -234,18 +240,27 @@ def validate(obj: object) -> dict:
     }
 
 
-def load_recipe(ref: str) -> dict | None:
-    """The validated recipe at `ref`, or None when the ref carries none."""
+def load_recipe(ref: str) -> tuple[dict, str] | None:
+    """(validated recipe, path loaded) at `ref`, or None when it carries none."""
     if _git("rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}").returncode != 0:
         raise CannotComplete(f"ref does not resolve to a commit: {ref}")
+    path = RECIPE_PATH
     if _git("cat-file", "-e", f"{ref}:{RECIPE_PATH}").returncode != 0:
-        return None
-    text = _git_out("show", f"{ref}:{RECIPE_PATH}")
+        # Absence alone falls back to the legacy name; a present new recipe is
+        # validated below and an invalid one stops at exit 3.
+        if _git("cat-file", "-e", f"{ref}:{LEGACY_RECIPE_PATH}").returncode != 0:
+            return None
+        path = LEGACY_RECIPE_PATH
+        print(
+            f"⚠ legacy {LEGACY_RECIPE_PATH} found at {ref} — rename to {RECIPE_PATH}",
+            file=sys.stderr,
+        )
+    text = _git_out("show", f"{ref}:{path}")
     try:
         obj = json.loads(text)
     except ValueError as exc:
-        raise InvalidRecipe(f"{RECIPE_PATH} at {ref} is not JSON: {exc}") from exc
-    return validate(obj)
+        raise InvalidRecipe(f"{path} at {ref} is not JSON: {exc}") from exc
+    return validate(obj), path
 
 
 def mapped(cap: dict, changed: list[str]) -> bool:
@@ -476,7 +491,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     auto = args.auto or os.environ.get("IDD_AUTO_MODE") == "1"
     verdict: dict = {
-        "status": "absent", "reason": None, "recipe": RECIPE_PATH, "ref": args.ref,
+        "status": "absent", "reason": None, "recipe": None, "ref": args.ref,
         "consumer": args.consumer, "head": None, "capabilities": [], "result": "none",
         "app_url": None, "evidence_dir": None, "evidence": [], "owned": None,
         "torn_down": None, "cleanup": [],
@@ -484,8 +499,9 @@ def main(argv: list[str] | None = None) -> int:
     code = 0
     try:
         changed = _read_changed(args.changed)
-        recipe = load_recipe(args.ref)
-        if recipe is not None:
+        loaded = load_recipe(args.ref)
+        if loaded is not None:
+            recipe, verdict["recipe"] = loaded
             verdict["capabilities"] = [
                 {"name": c["name"], "mapped": mapped(c, changed), "driven": False,
                  "exit": None, "timed_out": False}

@@ -8,7 +8,7 @@
 # produces the documented behavior.
 #
 #  AC1. Model-suggestion cache is stored once per machine, not per-repo under
-#       .gitissue/. Since #491 that is a user-level cache root, not the skill
+#       .idd/. Since #491 that is a user-level cache root, not the skill
 #       folder (which plugin updates and reinstalls replace).
 #  AC2. A new repo reuses the existing shared cache without creating a
 #       project-local model-data.json copy.
@@ -32,7 +32,7 @@ REF="$SKILL_DIR/references/model-suggestion.md"
 SEED="$SKILL_DIR/templates/model-data.json"
 ERRORS="$SKILL_DIR/references/error-messages.md"
 SCHEMA="$REPO_ROOT/docs/config-schema.md"
-INIT_TEMPLATE="$REPO_ROOT/src/skills/init-gitissue/templates/gitissue-template.yml"
+INIT_TEMPLATE="$REPO_ROOT/src/skills/init-idd/templates/idd-template.yml"
 
 PASS=0
 FAIL=0
@@ -73,7 +73,7 @@ fi
 
 # The reference must root the cache at the {cache_dir} placeholder, never at
 # {skill_dir} (replaced by every plugin update and reinstall, #491), and must
-# NOT instruct writing the live cache under .gitissue/ anymore.
+# NOT instruct writing the live cache under .idd/ anymore.
 if grep -qE '\{cache_dir\}/model-data' "$REF" \
    && ! grep -qE '\{skill_dir\}/model-data-' "$REF"; then
   pass "T1.AC1.2: cache path uses {cache_dir}/model-data-<date>.json, never {skill_dir}"
@@ -81,10 +81,10 @@ else
   fail "T1.AC1.2: cache path not rooted at {cache_dir} (or still at {skill_dir})"
 fi
 
-if grep -qE 'cp[^\n]*\.gitissue/model-data\.json' "$REF"; then
-  fail "T1.AC1.3: reference still seeds the cache into .gitissue/ (per-repo)"
+if grep -qE 'cp[^\n]*\.idd/model-data\.json' "$REF"; then
+  fail "T1.AC1.3: reference still seeds the cache into .idd/ (per-repo)"
 else
-  pass "T1.AC1.3: reference no longer writes the cache under .gitissue/"
+  pass "T1.AC1.3: reference no longer writes the cache under .idd/"
 fi
 
 # ───────────────────────────────────────────────────────────
@@ -147,14 +147,14 @@ fi
 # ───────────────────────────────────────────────────────────
 # T4: AC7 — legacy per-repo cache handled gracefully (ignored)
 # ───────────────────────────────────────────────────────────
-if grep -qiE '\.gitissue/model-data\.json' "$REF" && grep -qiE 'ignore|legacy' "$REF"; then
+if grep -qiE '\.idd/model-data\.json' "$REF" && grep -qiE 'ignore|legacy' "$REF"; then
   pass "T4.AC7.1: reference states the legacy per-repo cache is ignored"
 else
   fail "T4.AC7.1: reference does not address the legacy per-repo cache"
 fi
 
 # The durable docs (config-schema) must record that the cache is no longer in
-# .gitissue/ and that a legacy file is ignored.
+# .idd/ and that a legacy file is ignored.
 if grep -qiE 'user-level' "$SCHEMA" && grep -qiE 'ignored|legacy' "$SCHEMA"; then
   pass "T4.AC7.2: config-schema documents the move + legacy handling"
 else
@@ -164,11 +164,11 @@ fi
 # ───────────────────────────────────────────────────────────
 # T5: AC2 — no instruction to create a project-local copy remains
 # ───────────────────────────────────────────────────────────
-# The init template comment must no longer claim the cache lives in .gitissue/.
-if grep -qE '\.gitissue/model-data\.json' "$INIT_TEMPLATE"; then
-  fail "T5.AC2.1: init template still points cache at .gitissue/model-data.json"
+# The init template comment must no longer claim the cache lives in .idd/.
+if grep -qE '\.idd/model-data\.json' "$INIT_TEMPLATE"; then
+  fail "T5.AC2.1: init template still points cache at .idd/model-data.json"
 else
-  pass "T5.AC2.1: init template no longer points cache at .gitissue/"
+  pass "T5.AC2.1: init template no longer points cache at .idd/"
 fi
 
 # Error catalog must reference the user-level cache, not the per-repo path.

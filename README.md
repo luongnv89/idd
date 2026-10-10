@@ -20,7 +20,7 @@
 
 # Turn GitHub Issues Into Structured, Agent-Ready Work Orders
 
-**IDD Stack** is eight public skills that plan, structure, analyze, triage, resolve, review, and self-check GitHub issue workflows — so any developer or AI agent can pick up an issue and ship a tested PR (`src/skills/` — `/plan-to-issues`, `/issue-creator`, `/issue-analysis`, `/issue-resolver`, `/issue-triage`, `/init-gitissue`, `/auto-pilot`, `/issue-pr-review`).
+**IDD Stack** is eight public skills that plan, structure, analyze, triage, resolve, review, and self-check GitHub issue workflows — so any developer or AI agent can pick up an issue and ship a tested PR (`src/skills/` — `/plan-to-issues`, `/issue-creator`, `/issue-analysis`, `/issue-resolver`, `/issue-triage`, `/init-idd`, `/auto-pilot`, `/issue-pr-review`).
 
 [**Website**](https://luongnv.com/idd/) · [**Get Started**](#get-started) · [**What is IDD?**](#what-is-idd) · [**Capturing Intention**](#capturing-intention) · [**Why Good Issues & Commits Matter**](#why-good-issues-and-commit-messages-matter) · [**Works With Any Tool**](#works-with-any-tool)
 
@@ -66,7 +66,7 @@ graph TD
 | `/issue-analysis N` | Root cause, git history, implementation options, complexity and risk | high |
 | `/issue-resolver N` | 6-step pipeline: preflight, research, plan, implement, QA, deliver PR with `Closes #N` | max |
 | `/issue-triage` | Dependency graph, stale detection, already-fixed detection via commit/PR scanning, priority and execution order | medium |
-| `/init-gitissue` | Auto-detect language/framework/test runner, generate `.gitissue.yml` | low |
+| `/init-idd` | Auto-detect language/framework/test runner, generate `.idd.yml` | low |
 | `/auto-pilot` | Triage → resolve → review → merge loop. Balanced-by-default merge modes (`conservative`/`balanced`/`aggressive`), explicit issue lists for targeted runs, and a dependency-aware merge gate (`Depends on #N` / `Blocked by #N`) | max |
 | `/issue-pr-review` | Review PR end-to-end: script pre-pass (lint/format/test auto-fix), per-criterion AC verification, five-dimension scoring (correctness, acceptance_criteria, traceability, maintainability, safety), reuses reviewer/fixer agents across cycles | high |
 
@@ -141,7 +141,7 @@ Dependency detection, priority suggestions, parallelizable work, stale issue war
   [5/8] Cross-refs     ✓ 2 related issues
   [6/8] Analysis       ✓ root cause identified
   [7/8] Options        ✓ 3 approaches proposed
-  [8/8] Report         ✓ saved to .gitissue/analysis-42.json
+  [8/8] Report         ✓ saved to .idd/analysis-42.json
 ```
 
 ### 5. Go hands-free with auto-pilot
@@ -194,7 +194,7 @@ python3 scripts/idd-lint.py commit "fix(auth): resolve redirect loop (#42)"
 python3 scripts/idd-lint.py branch fix/42-mobile-auth-redirect
 
 # Evidence report: trace-completeness, Decision-Record coverage, and run
-# outcomes from .gitissue/runs.jsonl — tiered by issue quality when gh is available
+# outcomes from .idd/runs.jsonl — tiered by issue quality when gh is available
 python3 scripts/idd-lint.py stats            # add --no-github for offline, --json for machines
 
 # Recurring corrections → deduplicated, approval-gated improvement proposals
@@ -207,7 +207,7 @@ Checks are tagged with the spec section they enforce and mapped to the L1–L3 c
 
 #### Run `idd-lint` from anywhere — shell shortcut
 
-`idd-lint` lives in this repo (`scripts/idd-lint.py`) and its `stats` command reads a repo's `.gitissue/runs.jsonl` and git history. You don't have to `cd` into the idd checkout to run it — add a small shell wrapper once and call `idd-lint` (or the `idd-stats` shortcut) from any directory. **The wrapper analyzes whatever repository you are currently in**, using the idd checkout only to locate the tool itself.
+`idd-lint` lives in this repo (`scripts/idd-lint.py`) and its `stats` command reads a repo's `.idd/runs.jsonl` and git history. You don't have to `cd` into the idd checkout to run it — add a small shell wrapper once and call `idd-lint` (or the `idd-stats` shortcut) from any directory. **The wrapper analyzes whatever repository you are currently in**, using the idd checkout only to locate the tool itself.
 
 **Single-command setup** (zsh — appends a wrapper to `~/.zshrc`, idempotent, no clone required beyond having this repo somewhere):
 
@@ -238,7 +238,7 @@ Then, from within any repository:
 
 ```bash
 idd-lint stats              # full evidence report (git + run log + GitHub)
-idd-lint stats --no-github  # offline: git history + .gitissue/runs.jsonl only
+idd-lint stats --no-github  # offline: git history + .idd/runs.jsonl only
 idd-lint stats --json       # machine-readable
 idd-stats --no-github       # shorthand for `idd-lint stats`
 idd-lint repo --base origin/main   # any idd-lint subcommand works
@@ -274,7 +274,7 @@ asm install https://github.com/luongnv89/idd --skill issue-resolver
 
 Don't have `asm`? `npm install -g agent-skill-manager`.
 
-`asm` is idempotent — re-running the same command updates installed skills in place with no duplicate files. Each installed skill is complete, so there is no separate shared-agent install step. After install, restart your agent tool so it picks up the new skill(s). The full install surface lives under [`skills/`](skills/): `issue-creator`, `plan-to-issues`, `issue-analysis`, `issue-resolver`, `issue-triage`, `issue-pr-review`, `auto-pilot`, and `init-gitissue`.
+`asm` is idempotent — re-running the same command updates installed skills in place with no duplicate files. Each installed skill is complete, so there is no separate shared-agent install step. After install, restart your agent tool so it picks up the new skill(s). The full install surface lives under [`skills/`](skills/): `issue-creator`, `plan-to-issues`, `issue-analysis`, `issue-resolver`, `issue-triage`, `issue-pr-review`, `auto-pilot`, and `init-idd`.
 
 #### Alternative — Claude Code plugin
 
@@ -324,6 +324,10 @@ cp -r idd/skills/<name> ~/.claude/skills/
 
 `skills/` is committed, so this works on a fresh clone with no build step. For other tools, copy into that tool's skills directory instead (e.g. `~/.codex/skills/`). Optional Claude Code extra: `./scripts/build.sh && cp dist/agents/*.md ~/.claude/agents/` registers the shared subagents natively — skills work without it, since every skill bundles its agent prompts.
 
+#### Upgrading from the legacy `gitissue` names
+
+Repos set up before the rename to `idd` keep working: legacy `.gitissue.yml` / `.gitissue/` names are still read, with a ⚠ rename hint. Upgrade every client first, then follow the [legacy-name migration guide](docs/migrating-from-gitissue.md).
+
 ### First issue in 30 seconds
 
 Create a structured issue:
@@ -356,7 +360,7 @@ Or go hands-free — triage, resolve, review, and merge everything:
 /auto-pilot
 ```
 
-Zero config required. Run `/init-gitissue` to customize.
+Zero config required. Run `/init-idd` to customize.
 
 Browse the authored source for each skill — these links point to `src/` for reading; install copies come from `skills/<name>/` (see [Install](#install)):
 
@@ -369,7 +373,7 @@ Browse the authored source for each skill — these links point to `src/` for re
 | `/issue-triage` | [`src/skills/issue-triage/`](src/skills/issue-triage/) |
 | `/auto-pilot` | [`src/skills/auto-pilot/`](src/skills/auto-pilot/) |
 | `/issue-pr-review` | [`src/skills/issue-pr-review/`](src/skills/issue-pr-review/) |
-| `/init-gitissue` | [`src/skills/init-gitissue/`](src/skills/init-gitissue/) |
+| `/init-idd` | [`src/skills/init-idd/`](src/skills/init-idd/) |
 | `/idd-doctor` _(internal)_ | [`src/internal-skills/idd-doctor/`](src/internal-skills/idd-doctor/) |
 
 ---
@@ -495,7 +499,7 @@ Analyzes issue #N in depth without making code changes:
 [5/8] Cross-refs     — Related issues/PRs, duplicates, already resolved
 [6/8] Analysis       — Root cause (bugs), architecture fit (features)
 [7/8] Options        — 2-3 implementation approaches with pros/cons
-[8/8] Report         — Terminal report + .gitissue/analysis-N.json
+[8/8] Report         — Terminal report + .idd/analysis-N.json
 ```
 
 ### /issue-resolver N -- Resolve Issues
@@ -526,7 +530,7 @@ Fully automated loop: triage open issues, pick the highest-priority task, resolv
 /auto-pilot --dry-run                # show plan without resolving
 ```
 
-Merge modes (configured under `autopilot.mode` in `.gitissue.yml`):
+Merge modes (configured under `autopilot.mode` in `.idd.yml`):
 
 | Mode | Clean PR | Partial PR (review issues remain) |
 |------|----------|-----------------------------------|
@@ -572,9 +576,9 @@ Pipeline:
 
 Max 3 review-fix cycles with stagnation detection.
 
-### /init-gitissue -- Generate Config
+### /init-idd -- Generate Config
 
-Scans your repository and generates `.gitissue.yml` with sensible defaults: detects language, framework, test runner, existing templates, and adjusts timeouts based on repo size.
+Scans your repository and generates `.idd.yml` with sensible defaults: detects language, framework, test runner, existing templates, and adjusts timeouts based on repo size.
 
 </details>
 
@@ -583,7 +587,7 @@ Scans your repository and generates `.gitissue.yml` with sensible defaults: dete
 
 IDD Stack works with **zero configuration**. All settings have sensible defaults.
 
-To customize, create `.gitissue.yml` in your repo root (or run `/init-gitissue`):
+To customize, create `.idd.yml` in your repo root (or run `/init-idd`):
 
 These ten fields cover almost every customization in practice:
 
@@ -624,7 +628,7 @@ Three default templates:
 - **Improvement** -- current state, proposed change
 
 Each normalized issue includes:
-- `<!-- gitissue:normalized v1 -->` marker (invisible in GitHub UI)
+- `<!-- idd:normalized v1 -->` marker (invisible in GitHub UI)
 - Reporter's original text in a `> Reporter Context` blockquote
 - Acceptance criteria derived from the reporter's intent
 
@@ -656,7 +660,7 @@ src/
 │   ├── issue-triage/       # /issue-triage
 │   ├── issue-pr-review/    # /issue-pr-review — review, test, CI, fix, merge
 │   ├── plan-to-issues/     # /plan-to-issues — plan or conversation → epic + issues
-│   └── init-gitissue/      # /init-gitissue
+│   └── init-idd/      # /init-idd
 │       (each skill has SKILL.source.md, README.md, references/)
 │
 ├── internal-skills/

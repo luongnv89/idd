@@ -4,7 +4,7 @@ This shows how an IDD Stack-normalized bug report renders in GitHub's web UI.
 
 ---
 
-<!-- gitissue:normalized v1 -->
+<!-- idd:normalized v1 -->
 
 ## Type
 

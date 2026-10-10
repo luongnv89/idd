@@ -13,7 +13,7 @@ IDD Stack makes GitHub issues the single source of truth for development work. T
 | `/idd:issue-resolver N` | Branches, implements, tests, commits, and opens one pull request that closes issue N |
 | `/idd:issue-pr-review` | Reviews a pull request, checks CI and acceptance criteria, applies fixes, and optionally merges |
 | `/idd:auto-pilot` | Repeats triage, resolve, review, and merge across the backlog without prompts |
-| `/idd:init-gitissue` | Writes a `.gitissue.yml` tuned to the repository's stack |
+| `/idd:init-idd` | Writes a `.idd.yml` tuned to the repository's stack |
 
 In Codex, invoke the same skills as `$idd:issue-creator`, `$idd:issue-resolver N`,
 and `$idd:auto-pilot` (or select them in the skill picker). The table above uses
@@ -31,7 +31,7 @@ The plugin has no hooks, MCP servers, or background processes. Everything happen
 
 - **GitHub, through your own `gh` login.** The skills read and write issues, labels, comments, pull requests, and CI status in the repository you point them at. `/idd:issue-resolver` and `/idd:auto-pilot` create branches, commit, and push with `git`. `/idd:issue-pr-review` and `/idd:auto-pilot` can merge pull requests: auto-pilot does so without asking, which is its purpose, and both respect the repository's own branch rules. The plugin never reads or forwards your token itself.
 - **One optional public page.** `/idd:issue-creator` can refresh its model-suggestion table by fetching the public page `https://cursor.com/cursorbench`, only after you accept a refresh prompt or pass `--refresh-model-data`. Nothing about your repository is sent, and the bundled data works offline.
-- **Local state.** Run logs, triage and analysis results, and caches go to `.gitissue/` in your repository. The model-suggestion cache goes to `${XDG_CACHE_HOME:-~/.cache}/gitissue`. Before any commit, a scan checks staged changes for secrets and build artifacts.
+- **Local state.** Run logs, triage and analysis results, and caches go to `.idd/` in your repository. The model-suggestion cache goes to `${XDG_CACHE_HOME:-~/.cache}/idd`. Before any commit, a scan checks staged changes for secrets and build artifacts.
 
 IDD adds no telemetry service. Your agent host processes repository content and
 prompts under its own data settings. Skills can also use the host’s search or
@@ -43,7 +43,7 @@ and the selected workflow determine which actions require confirmation.
 
 ## Configuration
 
-IDD Stack works with no configuration. To change labels, branch naming, test commands, review gates, or per-role agent models, run `/idd:init-gitissue` or edit `.gitissue.yml`. Full documentation, the methodology, and the configuration schema are at https://github.com/luongnv89/idd
+IDD Stack works with no configuration. To change labels, branch naming, test commands, review gates, or per-role agent models, run `/idd:init-idd` or edit `.idd.yml`. Full documentation, the methodology, and the configuration schema are at https://github.com/luongnv89/idd
 
 ## License
 

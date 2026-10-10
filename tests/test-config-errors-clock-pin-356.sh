@@ -3,7 +3,7 @@
 # clock (issue #356, findings F-TEST-003 and F-TEST-006).
 #
 # Part 1 (F-TEST-003) covers the four gi-config.py branches that reject or
-# degrade on a bad `.gitissue.yml`: malformed YAML, non-UTF-8 bytes, a
+# degrade on a bad `.idd.yml`: malformed YAML, non-UTF-8 bytes, a
 # top-level sequence, and the no-PyYAML fallback. Each is asserted in *both*
 # parser worlds, because the exit vocabulary deliberately differs between them:
 # with a YAML parser a syntax error is the user's mistake (exit 3, stop);
@@ -51,11 +51,11 @@ echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄�
 [ -f "$LINT_TEST" ] || { echo "  ✗ missing $LINT_TEST"; exit 1; }
 
 # ─── Fixtures ───────────────────────────────────────────────
-# One directory per fixture, each holding a `.gitissue.yml` under gi-config's
+# One directory per fixture, each holding a `.idd.yml` under gi-config's
 # default name so the default discovery path is what runs.
 fixture() {  # fixture <name>; body on stdin
   mkdir -p "$TMP/$1"
-  cat > "$TMP/$1/.gitissue.yml"
+  cat > "$TMP/$1/.idd.yml"
 }
 
 # Malformed: an unclosed flow sequence. Rejected by PyYAML, by json.loads, and
@@ -68,7 +68,7 @@ YML
 # encoding leaves behind. Read fails before any YAML parser is consulted.
 printf 'issue: {branch_prefix: "caf\xe9"}\n' > "$TMP/nonutf8.tmp"
 mkdir -p "$TMP/nonutf8"
-mv "$TMP/nonutf8.tmp" "$TMP/nonutf8/.gitissue.yml"
+mv "$TMP/nonutf8.tmp" "$TMP/nonutf8/.idd.yml"
 
 # Top-level sequence: parses fine, but a config is a mapping.
 fixture toplist <<'YML'
@@ -179,15 +179,15 @@ fi
 
 RC="$(run_case with malformed)"
 check "T1.1: malformed YAML is invalid config (exit 3)" 3 "$RC" \
-  "✗ Invalid .gitissue.yml:" "is not valid YAML"
+  "✗ Invalid .idd.yml:" "is not valid YAML"
 
 RC="$(run_case with nonutf8)"
 check "T1.2: non-UTF-8 bytes are invalid config (exit 3)" 3 "$RC" \
-  "✗ Invalid .gitissue.yml:" "is not valid UTF-8" "re-save the file as UTF-8"
+  "✗ Invalid .idd.yml:" "is not valid UTF-8" "re-save the file as UTF-8"
 
 RC="$(run_case with toplist)"
 check "T1.3: a top-level sequence is invalid config (exit 3)" 3 "$RC" \
-  "✗ Invalid .gitissue.yml:" "must contain a mapping at the top level"
+  "✗ Invalid .idd.yml:" "must contain a mapping at the top level"
 
 RC="$(run_case with flowok)"
 if [ "$RC" = "0" ] && python3 -c '
@@ -213,7 +213,7 @@ fi
 RC="$(run_case without malformed)"
 check "T2.1: malformed YAML degrades, never exit 3 (exit 4)" 4 "$RC" \
   "⚠ gi-config:" "without PyYAML"
-if grep -qF "✗ Invalid .gitissue.yml" "$TMP/err.txt"; then
+if grep -qF "✗ Invalid .idd.yml" "$TMP/err.txt"; then
   fail "T2.1b: the degrade path claimed the config was invalid"
 else
   pass "T2.1b: the degrade path does not blame the config it cannot parse"
@@ -221,7 +221,7 @@ fi
 
 RC="$(run_case without nonutf8)"
 check "T2.2: non-UTF-8 stays a user error without PyYAML (exit 3)" 3 "$RC" \
-  "✗ Invalid .gitissue.yml:" "is not valid UTF-8"
+  "✗ Invalid .idd.yml:" "is not valid UTF-8"
 
 RC="$(run_case without toplist)"
 check "T2.3: flow-style YAML outside the restricted grammar degrades (exit 4)" 4 "$RC" \
@@ -232,7 +232,7 @@ if [ "$RC" = "0" ] && python3 -c '
 import json, sys
 payload = json.load(open(sys.argv[1], encoding="utf-8"))
 assert payload["config"]["issue.auto_normalize"] is False, payload["config"]["issue.auto_normalize"]
-assert payload["config_file"] == ".gitissue.yml", payload["config_file"]
+assert payload["config_file"] == ".idd.yml", payload["config_file"]
 assert payload["first_run"] is False, payload["first_run"]
 ' "$TMP/out.txt" 2>/dev/null; then
   pass "T2.4: without PyYAML a restricted-grammar config still loads and overrides"

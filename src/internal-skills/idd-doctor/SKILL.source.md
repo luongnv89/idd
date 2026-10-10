@@ -18,7 +18,7 @@ Run a report-only health check on an IDD repository, surfacing doc drift on the 
 ## When to Use
 
 - **Do** run it before landing a change to `src/skills/issue-creator/` README/SKILL text or the issue templates.
-- **Do** run it after `/init-gitissue`, to confirm the generated config sets `autopilot.mode`.
+- **Do** run it after `/init-idd`, to confirm the generated config sets `autopilot.mode`.
 - **Do** wire it into pre-merge or pre-release checks.
 - **Avoid** running it as a fix tool — v1 is **report-only**: no file modified, no issue commented on, no PR created.
 - **Never** treat its output as a substitute for code review; it catches only the four classes of drift below.
@@ -27,19 +27,19 @@ Run a report-only health check on an IDD repository, surfacing doc drift on the 
 
 The doctor performs exactly four **gating checks** (each PASS / WARN / FAIL), then
 one **informational, non-gating** section — the *run-log summary* — reporting
-`.gitissue/runs.jsonl` telemetry that never affects the result. Anything beyond
+`.idd/runs.jsonl` telemetry that never affects the result. Anything beyond
 those is **out of scope**:
 
 | # | Check | What it verifies | Failure mode |
 |---|-------|-----------------|--------------|
 | 1 | Stale skill claims | The `/issue-creator` README and SKILL text make no claim that the skill inspects code (Check 1 lists the files and the forbidden phrases). | `FAIL` |
 | 2 | Issue-template fields | No issue template asks the reporter for resolver-owned content (Check 2 lists the directories and the forbidden labels). | `FAIL` |
-| 3 | Autopilot mode set | `.gitissue.yml`, if present in the repo root, carries an `autopilot.mode` key. | `FAIL` (only when `.gitissue.yml` exists) |
+| 3 | Autopilot mode set | `.idd.yml`, if present in the repo root, carries an `autopilot.mode` key. | `FAIL` (only when `.idd.yml` exists) |
 | 4 | Squash-merge default | Squash is the only merge strategy allowed **and** the squash message source is the PR body (SPEC §4.3 B1). | `WARN` |
 
 ### Explicitly out of scope for v1
 
-`gh` authentication checks; full schema validation of `.gitissue.yml`; stale-triage detection; PR-format checks; commit-message linting; README link validation; and autofix of any kind.
+`gh` authentication checks; full schema validation of `.idd.yml`; stale-triage detection; PR-format checks; commit-message linting; README link validation; and autofix of any kind.
 
 ## Prerequisites
 
@@ -76,9 +76,9 @@ Check these, relative to this SKILL.md's directory:
 
 ## Configuration
 
-This skill **reads** `.gitissue.yml` only to determine whether Check 3's `autopilot.mode` is set (that field is documented in `docs/config-schema.md`); it is otherwise config-free, with no `doctor:` section and no per-check toggles in v1.
+This skill **reads** `.idd.yml` only to determine whether Check 3's `autopilot.mode` is set (that field is documented in `docs/config-schema.md`); it is otherwise config-free, with no `doctor:` section and no per-check toggles in v1.
 
-If `.gitissue.yml` does **not** exist, Check 3 skips rather than fails (see *Check 3*) — a repo that has not yet run `/init-gitissue` is not punished for it.
+If `.idd.yml` does **not** exist, Check 3 skips rather than fails (see *Check 3*) — a repo that has not yet run `/init-idd` is not punished for it.
 
 ---
 
@@ -138,7 +138,7 @@ src/skills/issue-creator/docs/README.md
 src/skills/issue-creator/SKILL.source.md
 ```
 
-These two are the only files in scope. Other skills (`/issue-analysis`, `/init-gitissue`, `/auto-pilot`, etc.) legitimately scan code, so flagging them would be a false positive. Do **not** scan `references/`, `templates/`, `docs/`, the top-level `README.md`, or another skill's files. Add a future intent-only skill's files here explicitly; mechanical "scan all skills" matching is deliberately avoided in v1.
+These two are the only files in scope. Other skills (`/issue-analysis`, `/init-idd`, `/auto-pilot`, etc.) legitimately scan code, so flagging them would be a false positive. Do **not** scan `references/`, `templates/`, `docs/`, the top-level `README.md`, or another skill's files. Add a future intent-only skill's files here explicitly; mechanical "scan all skills" matching is deliberately avoided in v1.
 
 ### Forbidden patterns (case-insensitive substring match, with surrounding negation)
 
@@ -211,16 +211,17 @@ Check 1's *Pattern match algorithm* without its negation steps: every matching l
 
 ## Check 3 — Autopilot mode
 
-Verify that `.gitissue.yml`, when present, sets `autopilot.mode`. That key makes the conservative-merge default reachable; without it, legacy `auto_merge` falls back to the old aggressive behavior in some code paths.
+Verify that `.idd.yml`, when present, sets `autopilot.mode`. That key makes the conservative-merge default reachable; without it, legacy `auto_merge` falls back to the old aggressive behavior in some code paths.
 
 ### Procedure
 
-1. Check whether `.gitissue.yml` exists in the repo root. If not, skip with `○ [3/4] Autopilot mode        skipped — no .gitissue.yml`.
+1. Check whether `.idd.yml` exists in the repo root, else legacy `.gitissue.yml` (print `⚠ legacy .gitissue.yml found — rename to .idd.yml`). If neither, skip with `○ [3/4] Autopilot mode        skipped — no .idd.yml`.
 2. Read the file as text — no YAML parser required; a regex check suffices and adds no dependency. If the file exists but cannot be read, print the *Fail (unreadable)* line and go to Check 4.
 3. Look for a line matching `^[[:space:]]+mode:[[:space:]]*[^#[:space:]]+` inside an `autopilot:` block. Any non-empty value matches; the value is not validated in v1. Equivalent shell heuristic:
 
    ```bash
-   awk '/^autopilot:/{f=1;next} /^[^[:space:]#]/{f=0} f' .gitissue.yml | grep -E '^[[:space:]]+mode:[[:space:]]*[^#[:space:]]+'
+   cfg=.idd.yml; [ -f "$cfg" ] || cfg=.gitissue.yml
+   awk '/^autopilot:/{f=1;next} /^[^[:space:]#]/{f=0} f' "$cfg" | grep -E '^[[:space:]]+mode:[[:space:]]*[^#[:space:]]+'
    ```
 
 4. If a line matches, the check passes; capture the value for the pass line.
@@ -273,20 +274,20 @@ After all four checks, print the separator, then `Result: {RESULT}  ({total} che
 ## Run-log summary (informational, non-gating)
 
 After the summary footer, print a short **run-log summary** over the last N runs
-in `.gitissue/runs.jsonl` — the cross-run `monitoring` signal (resolve rate, QA
+in `.idd/runs.jsonl` — the cross-run `monitoring` signal (resolve rate, QA
 effort, recurring skip reasons) the per-run output otherwise forgets. It is
 **informational only**: it never changes the PASS/WARN/FAIL result, has no exit
 code, and (like every part of this skill) is strictly **read-only** — it reads
 `runs.jsonl` and writes nothing.
 
-The schema is `docs/run-log-schema.md` (*`.gitissue/runs.jsonl` — run log*): one
+The schema is `docs/run-log-schema.md` (*`.idd/runs.jsonl` — run log*): one
 JSON object per line carrying at least `ts`, `issue`, `mode`, `outcome`, and
 `pr`, plus optional `qa_cycles`, `skipped_reason`, `agent_overrides` and `phases`.
 
 ### Procedure
 
-1. If `.gitissue/runs.jsonl` does **not** exist or is empty, **degrade gracefully**
-   — print `○ Run-log summary           no runs recorded yet (.gitissue/runs.jsonl)`
+1. If `.idd/runs.jsonl` does **not** exist or is empty, **degrade gracefully**
+   — print `○ Run-log summary           no runs recorded yet (.idd/runs.jsonl)`
    and stop the section. Absence is never a failure.
 2. Otherwise take the **last N** lines (default `N = 50`). That cap bounds the
    agent's context budget — never load a long-lived repo's whole log into the
@@ -295,7 +296,7 @@ JSON object per line carrying at least `ts`, `issue`, `mode`, `outcome`, and
 3. Compute the five metrics — resolve rate, median QA cycles, common skip
    reasons, agent overrides, slowest phase — and print the section, both
    exactly as `references/run-log-summary.md` defines them. When a
-   `.gitissue/improvement-proposals.jsonl` ledger exists, that reference's
+   `.idd/improvement-proposals.jsonl` ledger exists, that reference's
    optional *Skill improvements* line also reports pending correction-guard
    proposals (issue #524) — still informational, still read-only.
 
@@ -303,13 +304,13 @@ JSON object per line carrying at least `ts`, `issue`, `mode`, `outcome`, and
 
 ## Run stats footer
 
-After the run-log summary, close with the *Run Stats Footer* — `references/run-stats.md` — `elapsed`, `tokens` only where the host reported a count (otherwise left out), `agents`, run cost only, `n/a` for anything else undetermined. It is the last thing printed at **every** terminal outcome, including a run that never reached Check 1: not a git repository, an unreadable repo root, or a missing bundled dependency. A missing `/issue-creator` or an unreadable `.gitissue.yml` is a check finding, not a stop. The doctor spawns no subagents, so `agents 0` is the determined value here, not `n/a`. It reports the run's own cost and never a metric a check already printed.
+After the run-log summary, close with the *Run Stats Footer* — `references/run-stats.md` — `elapsed`, `tokens` only where the host reported a count (otherwise left out), `agents`, run cost only, `n/a` for anything else undetermined. It is the last thing printed at **every** terminal outcome, including a run that never reached Check 1: not a git repository, an unreadable repo root, or a missing bundled dependency. A missing `/issue-creator` or an unreadable `.idd.yml` is a check finding, not a stop. The doctor spawns no subagents, so `agents 0` is the determined value here, not `n/a`. It reports the run's own cost and never a metric a check already printed.
 
 ---
 
 ## Read-only guarantee
 
-The skill MUST NOT modify any file in the repo, create branches, commits, tags, or PRs, edit issue bodies or post comments, or mutate `.gitissue.yml` or any config file.
+The skill MUST NOT modify any file in the repo, create branches, commits, tags, or PRs, edit issue bodies or post comments, or mutate `.idd.yml` or any config file.
 
 It reads files (via `Read` / `cat`) and runs read-only `gh` queries (`gh repo view --json …`, `gh api repos/{owner}/{repo}`, `gh auth status`). Test fixtures (see *Testing*) assert the working tree is unchanged after a doctor run.
 
@@ -327,7 +328,7 @@ Terminal output follows the `DESIGN.md` contract (repo root) — symbols `● �
 
 ## Edge Cases
 
-- **`.gitissue.yml` has no `autopilot:` section** — Check 3 fails with the standard fix hint.
+- **`.idd.yml` has no `autopilot:` section** — Check 3 fails with the standard fix hint.
 - **`autopilot.mode` set to a non-canonical value** (e.g. `mode: yolo`) — Check 3 still passes; any non-empty value satisfies "key set", and a future v2 may validate values.
 - **A skill README carries a forbidden pattern inside a code block or fenced quote** — Check 1 still flags it; v1 is mechanically strict, not contextually nuanced.
 - **GitHub Enterprise repos without `gh` auth** — Check 4 is skipped, never failed.

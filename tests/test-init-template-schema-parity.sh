@@ -31,12 +31,12 @@ module._check_init_template_schema_parity(root / "src")
 # gate compares parsed keys/defaults rather than merely grepping for prose.
 with tempfile.TemporaryDirectory() as temporary:
     fixture = Path(temporary)
-    (fixture / "src" / "skills" / "init-gitissue" / "templates").mkdir(parents=True)
+    (fixture / "src" / "skills" / "init-idd" / "templates").mkdir(parents=True)
     (fixture / "docs").mkdir()
     schema = fixture / "docs" / "config-schema.md"
-    template = fixture / "src" / "skills" / "init-gitissue" / "templates" / "gitissue-template.yml"
+    template = fixture / "src" / "skills" / "init-idd" / "templates" / "idd-template.yml"
     shutil.copyfile(root / "docs" / "config-schema.md", schema)
-    template_text = (root / "src" / "skills" / "init-gitissue" / "templates" / "gitissue-template.yml").read_text(encoding="utf-8")
+    template_text = (root / "src" / "skills" / "init-idd" / "templates" / "idd-template.yml").read_text(encoding="utf-8")
     template.write_text(template_text.replace("  max_commits: 10", "  max_commits: 11", 1), encoding="utf-8")
     try:
         module._check_init_template_schema_parity(fixture / "src")
@@ -55,7 +55,7 @@ with tempfile.TemporaryDirectory() as temporary:
     schema = fixture / "docs" / "config-schema.md"
     schema.parent.mkdir(parents=True)
     schema.write_text("# Schema\n", encoding="utf-8")
-    expected_template = source / "skills" / "init-gitissue" / "templates" / "gitissue-template.yml"
+    expected_template = source / "skills" / "init-idd" / "templates" / "idd-template.yml"
     try:
         module._check_init_template_schema_parity(source)
     except module.BuildError as exc:

@@ -1,6 +1,6 @@
 ---
 name: "issue-analysis"
-description: "Analyze one GitHub issue for root cause, complexity, and risk into .gitissue/analysis-N.json. Use when you need to analyze or scope issue #N. Don't use for creating issues (/issue-creator), triaging (/issue-triage), or resolving (/issue-resolver)."
+description: "Analyze one GitHub issue for root cause, complexity, and risk into .idd/analysis-N.json. Use when you need to analyze or scope issue #N. Don't use for creating issues (/issue-creator), triaging (/issue-triage), or resolving (/issue-resolver)."
 license: MIT
 compatibility: "Requires git and GitHub CLI (gh) with authentication. View mode (`/issue-analysis N view`) needs only local file access — no gh required."
 metadata:
@@ -11,14 +11,14 @@ metadata:
 
 # /issue-analysis N
 
-Deep analysis of a single GitHub issue — root cause, architecture impact, implementation options, complexity, and risk. Produces a terminal report and persists results to `.gitissue/analysis-<N>.json`.
+Deep analysis of a single GitHub issue — root cause, architecture impact, implementation options, complexity, and risk. Produces a terminal report and persists results to `.idd/analysis-<N>.json`.
 
 ## Invocation
 
 | Invocation | What happens |
 |------------|--------------|
-| `/issue-analysis <N>` | Full deep analysis of issue #N, persist to `.gitissue/analysis-<N>.json` |
-| `/issue-analysis <N> view` | Render cached analysis from `.gitissue/analysis-<N>.json` without re-scanning |
+| `/issue-analysis <N>` | Full deep analysis of issue #N, persist to `.idd/analysis-<N>.json` |
+| `/issue-analysis <N> view` | Render cached analysis from `.idd/analysis-<N>.json` without re-scanning |
 
 Require a positive integer issue number; reject invalid input before resolving paths or running commands.
 
@@ -26,7 +26,7 @@ Require a positive integer issue number; reject invalid input before resolving p
 
 When invoked as `/issue-analysis <N> view`, run the *Bundled dependency precheck* below, then skip the entire analysis pipeline (Steps 1-8) and the persist step. Instead:
 
-1. Check for `.gitissue/analysis-<N>.json` at the repo root
+1. Check for `.idd/analysis-<N>.json` at the repo root
 2. If the file does not exist, output the empty-state message from `references/error-messages.md` and stop:
    ```
    ○ No analysis found for issue #N. Run /issue-analysis N to generate one.
@@ -34,9 +34,9 @@ When invoked as `/issue-analysis <N> view`, run the *Bundled dependency precheck
 3. Read and parse the JSON file. Read `references/output-and-persist.md` and apply its *Validate analysis data* checks, including the requested issue number, before rendering.
 4. If the JSON is malformed, unparseable, or fails validation, output the error from `references/error-messages.md` and stop:
    ```
-   ✗ .gitissue/analysis-N.json is corrupted
+   ✗ .idd/analysis-N.json is corrupted
 
-     To fix:  rm .gitissue/analysis-N.json && /issue-analysis N
+     To fix:  rm .idd/analysis-N.json && /issue-analysis N
      Check:   was the file edited manually?
    ```
 5. Compute report age from the `timestamp` field relative to now
@@ -60,7 +60,7 @@ Every view-mode exit — empty state, corrupted JSON, rendered report — closes
 
 ## Prerequisites
 
-**View mode** (`/issue-analysis <N> view`) needs only a local `.gitissue/analysis-<N>.json` — skip the `gh` checks below.
+**View mode** (`/issue-analysis <N> view`) needs only a local `.idd/analysis-<N>.json` — skip the `gh` checks below.
 
 For the full pipeline, verify the environment before any operation; on failure, output the exact error from `references/error-messages.md` and stop.
 
@@ -105,19 +105,19 @@ If `origin` is missing or fetch, rebase, or stash restoration fails, stop and re
 
 ## Configuration
 
-Load config once at skill start with `python3 references/scripts/gi-config.py`. **Working directory:** the repo root — the script resolves `.gitissue.yml` against the working directory, so running it elsewhere exits 0 with `config_file: null`/`first_run: true`, silently discarding the repo's real config. Resolve the script to an absolute path relative to this SKILL.md, as in the *Bundled dependency precheck*, never relative to the working directory.
+Load config once at skill start with `python3 references/scripts/gi-config.py`. **Working directory:** the repo root — the script resolves `.idd.yml` against the working directory, so running it elsewhere exits 0 with `config_file: null`/`first_run: true`, silently discarding the repo's real config. Resolve the script to an absolute path relative to this SKILL.md, as in the *Bundled dependency precheck*, never relative to the working directory.
 
 Capture `run_started_epoch` from stderr by chaining that same `python3` invocation as `python3 …; ec=$?; date +%s >&2; exit "$ec"`. Preserve JSON stdout and exit status for the *Run Stats Footer* (`references/run-stats.md`).
 
 - Exit 0: use `config` from `{"config": {…dotted keys…}, "config_file": …, "first_run": …}`. Print the hint below when `first_run` is true.
 - Exit 3: stop with *Invalid config* from `references/error-messages.md`.
 - Script file absent: a bundled dependency is missing, which is a broken install and not a degrade — stop and print the `✗ Missing bundled dependency` block.
-- No `python3`, another non-zero exit, or unparsable stdout: print `⚠ gi-config unavailable — using the inline defaults below`. Read `.gitissue.yml` once from the repo root, or use defaults if absent. Use this manual fallback instead of the script result.
+- No `python3`, another non-zero exit, or unparsable stdout: print `⚠ gi-config unavailable — using the inline defaults below`. Read `.idd.yml` (else legacy `.gitissue.yml`, printing `⚠ legacy .gitissue.yml found — rename to .idd.yml`) once from the repo root, or use defaults if neither exists. Use this manual fallback instead of the script result.
 
 When config is absent, print:
 
 ```
-○ First run — using default config. Run /init-gitissue to customize.
+○ First run — using default config. Run /init-idd to customize.
 ```
 
 Analysis settings and defaults (full semantics in `references/docs/config-schema.md`):
@@ -198,7 +198,7 @@ Check these files:
 - `references/docs/agent-model-effort.md` — per-agent model and effort mapping
 - `references/docs/agent-overrides.md` — per-role `agents.model` / `agents.effort` spawn rule
 - `references/docs/terminal-style.md` — terminal output style contract
-- `references/scripts/gi-config.py` — config resolver: defaults merged with `.gitissue.yml`, one JSON line
+- `references/scripts/gi-config.py` — config resolver: defaults merged with `.idd.yml`, one JSON line
 - `references/scripts/gi-gh.py` — GitHub CLI subprocess boundary
 - `references/scripts/gi-issue.py` — TTL-cached issue fetcher (Step 1)
 
@@ -301,7 +301,7 @@ Quick summary — **2** extract keywords & file refs from the issue · **3** cod
 ---
 ## Step 8-9 — Output & Persist
 
-Step 8 renders the analysis as a structured terminal report following `references/docs/terminal-style.md` conventions; Step 9 persists the same data to `.gitissue/analysis-<N>.json`. **Read `references/output-and-persist.md` now** — the rendering spec (section layout, color codes, truncation rules) and the JSON schema are the only definition of what Steps 8-9 must emit, so every run needs them.
+Step 8 renders the analysis as a structured terminal report following `references/docs/terminal-style.md` conventions; Step 9 persists the same data to `.idd/analysis-<N>.json`. **Read `references/output-and-persist.md` now** — the rendering spec (section layout, color codes, truncation rules) and the JSON schema are the only definition of what Steps 8-9 must emit, so every run needs them.
 
 Summary:
 - Terminal report has 8 sections: header, classification, root cause, affected files, options, complexity, risk, recommendation.
@@ -341,7 +341,7 @@ Apply the *Review contract* in `references/output-and-persist.md` to every termi
 
   Complexity: {XS|S|M|L|XL} │ Risk: {Low|Medium|High}
   Recommended: Option {N} — {name}
-  Saved: .gitissue/analysis-N.json
+  Saved: .idd/analysis-N.json
 ```
 
 If a step produced no results (e.g. no git history), mark it with a note:
@@ -362,7 +362,7 @@ If the issue may already be resolved, the same block marks the research row and 
 
 ## Expected Output
 
-A successful analysis prints the 8-step tracker and a condensed report, then persists the full result to `.gitissue/analysis-<N>.json`:
+A successful analysis prints the 8-step tracker and a condensed report, then persists the full result to `.idd/analysis-<N>.json`:
 
 ```
   ◆ Analysis Pipeline
@@ -418,7 +418,7 @@ Stop. Analysis requires at least one relevant file.
 
 ### Re-analysis (existing JSON)
 
-If `.gitissue/analysis-<N>.json` already exists when running a full analysis (not view mode), overwrite it silently only after the new analysis passes validation; replace it atomically per `references/output-and-persist.md`. If validation or replacement fails, retain the old cache; report failed readback as unverified.
+If `.idd/analysis-<N>.json` already exists when running a full analysis (not view mode), overwrite it silently only after the new analysis passes validation; replace it atomically per `references/output-and-persist.md`. If validation or replacement fails, retain the old cache; report failed readback as unverified.
 
 ---
 

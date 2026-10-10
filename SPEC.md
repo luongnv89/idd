@@ -28,7 +28,7 @@ This document defines the *contract* only. It requires no specific AI agent, edi
 
 A conforming issue body consists of, in order:
 
-1. **Normalization marker** — first line: `<!-- gitissue:normalized v1 -->`. Invisible when rendered, detectable by tools. The marker string is retained verbatim from the reference implementation for compatibility with deployed issues; the trailing `v1` tracks this spec's major version.
+1. **Normalization marker** — first line: `<!-- idd:normalized v1 -->`. Invisible when rendered, detectable by tools. Writers emit `<!-- idd:normalized v1 -->`; readers also accept the legacy `<!-- gitissue:normalized v1 -->` on deployed issues. The trailing `v1` tracks this spec's major version.
 2. **`## Type`** — one of `Bug`, `Feature`, `Improvement`. Implementations MAY define additional types.
 3. **`## Description`** — the intent, with type-specific fields:
    - `Bug` MUST include `**Current behavior:**` and `**Expected behavior:**`

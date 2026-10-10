@@ -55,7 +55,7 @@ from pathlib import Path
 SPEC_VERSION = "1.1"
 SPEC_URL = "https://github.com/luongnv89/idd/blob/main/SPEC.md"
 
-MARKER_RE = re.compile(r"<!--\s*gitissue:normalized\s+v(\d+)\s*-->")
+MARKER_RE = re.compile(r"<!--\s*(?:gitissue|idd):normalized\s+v(\d+)\s*-->")
 SECTION_RE = re.compile(r"^## +(.+?)\s*$")
 CONFIDENCE_RE = re.compile(r"\((?:high|medium) confidence\)|\(needs review\)")
 CHECKBOX_RE = re.compile(r"^\s*[-*] \[[ xX]\] \S", re.MULTILINE)
@@ -179,7 +179,7 @@ class IssueLintContext:
 def _check_issue_marker(context: IssueLintContext) -> list[Finding]:
     m = MARKER_RE.search(context.body)
     if not m:
-        return [err("I01", "normalization marker '<!-- gitissue:normalized v1 -->' missing (§1.1)")]
+        return [err("I01", "normalization marker '<!-- idd:normalized v1 -->' missing (§1.1)")]
     if not MARKER_RE.search(first_content_line(context.body)):
         return [warn("I01", "normalization marker present but not on the first line (§1.1)")]
     return [ok("I01", f"normalization marker present (v{m.group(1)}) (§1.1)")]
@@ -1327,12 +1327,12 @@ def _render_git_history_stats(commit_s: dict | None) -> list[str]:
 def _render_run_log_stats(run_s: dict | None) -> list[str]:
     if run_s is None:
         return [_c(
-            "  ○ run log — skipped: .gitissue/runs.jsonl not found or empty", "dim"
+            "  ○ run log — skipped: .idd/runs.jsonl not found or empty", "dim"
         )]
     lines = [
         _section(
             "Run log",
-            f".gitissue/runs.jsonl · {run_s['runs']} run{'s' if run_s['runs'] != 1 else ''}",
+            f".idd/runs.jsonl · {run_s['runs']} run{'s' if run_s['runs'] != 1 else ''}",
         ),
         _info_row(
             "outcomes", " · ".join(f"{key} {value}" for key, value in run_s["outcomes"].items())
@@ -1447,7 +1447,7 @@ def render_stats(
 def cmd_stats(args: argparse.Namespace) -> int:
     root_out = _run_soft(["git", "rev-parse", "--show-toplevel"])
     root = Path(root_out.strip()) if root_out else Path.cwd()
-    runs_path = root / ".gitissue" / "runs.jsonl"
+    runs_path = root / ".idd" / "runs.jsonl"
 
     project = collect_project_info(root, use_github=not args.no_github)
 
@@ -1614,9 +1614,9 @@ def cmd_corrections(args: argparse.Namespace) -> int:
     root = Path(root_out.strip()) if root_out else Path.cwd()
     proposals_path = (
         Path(args.proposals) if args.proposals
-        else root / ".gitissue" / "improvement-proposals.jsonl"
+        else root / ".idd" / "improvement-proposals.jsonl"
     )
-    runs_path = Path(args.log) if args.log else root / ".gitissue" / "runs.jsonl"
+    runs_path = Path(args.log) if args.log else root / ".idd" / "runs.jsonl"
 
     event_by_flag = {"approve": "approved", "reject": "rejected", "landed": "landed"}
     for flag, event in event_by_flag.items():
@@ -1810,8 +1810,8 @@ def main(argv: list[str]) -> int:
     p_corr.add_argument("--branch", help="branch whose history is scanned (default: all refs — squash merges keep fix cycles off main's first-parent history)")
     p_corr.add_argument("--limit", type=int, default=DEFAULT_CORRECTION_COMMIT_LIMIT, help=f"max commits scanned (default: {DEFAULT_CORRECTION_COMMIT_LIMIT})")
     p_corr.add_argument("--threshold", type=int, default=2, help="occurrences before a correction recurs (default: 2)")
-    p_corr.add_argument("--log", help="run-log path (default: <repo>/.gitissue/runs.jsonl)")
-    p_corr.add_argument("--proposals", help="proposal ledger path (default: <repo>/.gitissue/improvement-proposals.jsonl)")
+    p_corr.add_argument("--log", help="run-log path (default: <repo>/.idd/runs.jsonl)")
+    p_corr.add_argument("--proposals", help="proposal ledger path (default: <repo>/.idd/improvement-proposals.jsonl)")
     p_corr.add_argument("--record", action="store_true", help="append a `proposed` proposal for every recurring key without an open proposal")
     p_corr.add_argument("--json", action="store_true", help="emit machine-readable JSON instead of text")
     p_corr.add_argument("--note", help="optional note stored on an --approve/--reject/--landed event")

@@ -13,7 +13,7 @@ Which skill is affected?
 - [ ] `/issue-creator`
 - [ ] `/issue-resolver`
 - [ ] `/issue-triage`
-- [ ] `/init-gitissue`
+- [ ] `/init-idd`
 
 ## Description
 
@@ -42,4 +42,4 @@ paste terminal output here
 - OS: [e.g., macOS 15, Ubuntu 24.04]
 - `gh` version: [e.g., 2.45.0]
 - Agent: [e.g., Claude Code, Codex CLI]
-- `.gitissue.yml`: [default / custom — paste relevant config if custom]
+- `.idd.yml`: [default / custom — paste relevant config if custom]

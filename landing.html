@@ -172,7 +172,7 @@
       {
         "@type": "Question",
         "name": "What do I need to get started?",
-        "acceptedAnswer": { "@type": "Answer", "text": "The GitHub CLI (gh) 2.0+ signed in with gh auth login, Git 2.30+, and any coding agent that loads SKILL.md skills. No config file is needed. When you want to tune settings, /init-gitissue detects your stack and writes a .gitissue.yml." }
+        "acceptedAnswer": { "@type": "Answer", "text": "The GitHub CLI (gh) 2.0+ signed in with gh auth login, Git 2.30+, and any coding agent that loads SKILL.md skills. No config file is needed. When you want to tune settings, /init-idd detects your stack and writes a .idd.yml." }
       },
       {
         "@type": "Question",
@@ -1209,15 +1209,15 @@
       <div class="feat-grid">
         <div class="feat-card reveal"><span class="feat-cmd">/plan-to-issues</span><p style="margin-top:2px">Turn a plan file, or the conversation you just had, into a tracking epic with one labelled issue per task and <code>Depends on #N</code> markers <code>/auto-pilot</code> respects.</p></div>
         <div class="feat-card reveal"><span class="feat-cmd">/issue-creator</span><p style="margin-top:2px">Classify, size (XS–XL), and write acceptance criteria. Also suggests a model and thinking level for the job, from CursorBench (a public coding-agent benchmark).</p></div>
-        <div class="feat-card reveal"><span class="feat-cmd">/issue-analysis N</span><p style="margin-top:2px">Root cause, git history, implementation options, complexity, and risk, saved to <code>.gitissue/</code>.</p></div>
+        <div class="feat-card reveal"><span class="feat-cmd">/issue-analysis N</span><p style="margin-top:2px">Root cause, git history, implementation options, complexity, and risk, saved to <code>.idd/</code>.</p></div>
         <div class="feat-card reveal"><span class="feat-cmd">/issue-resolver N</span><p style="margin-top:2px">Preflight, research, plan, implement, and QA, then a PR with <code>Closes #N</code>.</p></div>
         <div class="feat-card reveal"><span class="feat-cmd">/issue-triage</span><p style="margin-top:2px">Dependency graph, stale and already-fixed detection, priority, and an execution order.</p></div>
         <div class="feat-card reveal"><span class="feat-cmd">/issue-pr-review</span><p style="margin-top:2px">Lint and test pre-pass, a check per acceptance criterion, five-dimension scoring, and fix cycles. Merges only with <code>--auto</code>.</p></div>
         <div class="feat-card reveal"><span class="feat-cmd">/auto-pilot</span><p style="margin-top:2px">Triage, resolve, review, and merge across the backlog in <code>conservative</code>, <code>balanced</code> (default), or <code>aggressive</code> mode.</p></div>
-        <div class="feat-card reveal"><span class="feat-cmd">/init-gitissue</span><p style="margin-top:2px">Detect your language, framework, and test runner, and write a tuned <code>.gitissue.yml</code>.</p></div>
+        <div class="feat-card reveal"><span class="feat-cmd">/init-idd</span><p style="margin-top:2px">Detect your language, framework, and test runner, and write a tuned <code>.idd.yml</code>.</p></div>
       </div>
 
-      <p class="hood-note reveal">Under the hood, eight shared agents do the work: duplicate detector, codebase researcher, synthesizer, implementer, code reviewer, fixer, relationship scanner, and UI/UX reviewer. Set each one’s model and thinking effort in <code class="mono green">.gitissue.yml</code>, or keep the defaults.</p>
+      <p class="hood-note reveal">Under the hood, eight shared agents do the work: duplicate detector, codebase researcher, synthesizer, implementer, code reviewer, fixer, relationship scanner, and UI/UX reviewer. Set each one’s model and thinking effort in <code class="mono green">.idd.yml</code>, or keep the defaults.</p>
 
       <div class="model-highlight reveal">
         <div class="model-panel">
@@ -1323,7 +1323,7 @@
         </details>
         <details>
           <summary>What do I need to get started? <span class="q-ico">+</span></summary>
-          <div class="a">The GitHub CLI (<code>gh</code>) 2.0+ signed in with <code>gh auth login</code>, Git 2.30+, and any coding agent that loads SKILL.md skills. No config file is needed. When you want to tune settings, <code>/init-gitissue</code> detects your stack and writes a <code>.gitissue.yml</code>.</div>
+          <div class="a">The GitHub CLI (<code>gh</code>) 2.0+ signed in with <code>gh auth login</code>, Git 2.30+, and any coding agent that loads SKILL.md skills. No config file is needed. When you want to tune settings, <code>/init-idd</code> detects your stack and writes a <code>.idd.yml</code>.</div>
         </details>
         <details>
           <summary>How much does it cost? <span class="q-ico">+</span></summary>

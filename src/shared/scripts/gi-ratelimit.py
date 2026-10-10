@@ -62,7 +62,7 @@ Modes
              `{"mode":"budget","elapsed_s":N,"remaining_s":N|null,
              "expired":bool}`. `--started-at` takes either a bare epoch or the
              `YYYY-MM-DDTHH:MM:SSZ` stamp `gi-state.py` writes into
-             `.gitissue/run-state.json`. `--max-minutes 0` means unbounded:
+             `.idd/run-state.json`. `--max-minutes 0` means unbounded:
              `remaining_s` is null and `expired` is always false. A
              `started_at` in the future clamps `elapsed_s` to 0 rather than
              going negative — a skewed clock must not manufacture an expiry.
@@ -126,7 +126,7 @@ BACKOFF_MAX_DELAY_S = 16
 BACKOFF_MAX_ATTEMPTS = 4
 
 TS_FMT = "%Y-%m-%dT%H:%M:%SZ"
-# The same instant format `gi-state.py` writes into `.gitissue/run-state.json`.
+# The same instant format `gi-state.py` writes into `.idd/run-state.json`.
 TS_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z\Z")
 EPOCH_RE = re.compile(r"^\d+\Z")
 

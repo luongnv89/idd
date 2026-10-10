@@ -8,7 +8,7 @@
 #  - Forbidden Check 2 patterns (issue-template fields) are enumerated
 #  - The read-only guarantee is explicit
 #  - The gh field selection for Check 4 matches the documented contract
-#  - Skip behavior for missing gh / no .gitissue.yml / no templates is documented
+#  - Skip behavior for missing gh / no .idd.yml / no templates is documented
 #  - Exit-code mapping (PASS=0, WARN=0, FAIL=1) is documented
 #  - The four AC scenarios are demonstrably covered by the spec:
 #      1. Doctor passes on this repo (after §1a doc fixes)
@@ -189,7 +189,7 @@ else
 fi
 
 # ───────────────────────────────────────────────────────────
-# T6: Check 3 — .gitissue.yml autopilot.mode
+# T6: Check 3 — .idd.yml autopilot.mode
 # ───────────────────────────────────────────────────────────
 if grep -qF 'autopilot.mode' "$SKILL"; then
   pass "T6: Check 3 references autopilot.mode"
@@ -197,8 +197,8 @@ else
   fail "T6: Check 3 does not reference autopilot.mode"
 fi
 
-if grep -qE 'skipped[^.]*no \.gitissue\.yml' "$SKILL"; then
-  pass "T6: Check 3 documents skip when .gitissue.yml is absent"
+if grep -qE 'skipped[^.]*no \.idd\.yml' "$SKILL"; then
+  pass "T6: Check 3 documents skip when .idd.yml is absent"
 else
   fail "T6: Check 3 does not document skip-when-missing"
 fi

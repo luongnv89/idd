@@ -8,7 +8,7 @@ Full rationale for SKILL.md *Configuration*, which owns the command, the exit-co
 handling and the default field list. Three details there are load-bearing and easy
 to get wrong.
 
-**Run it from the repo root.** `gi-config.py` resolves `.gitissue.yml` against the
+**Run it from the repo root.** `gi-config.py` resolves `.idd.yml` against the
 *working directory*. Run it anywhere else and it still exits 0 — reporting
 `config_file: null` and `first_run: true` — so the repo's real configuration is
 discarded silently, with no error to notice. A wrong working directory therefore
@@ -22,7 +22,7 @@ resolves its list, and pass that absolute path to `python3`.
 
 **The script and the manual read are alternatives, never a pair.** On exit 0 the
 returned `config` is the whole answer; the defaults printed in SKILL.md are then
-reference material only, and re-reading `.gitissue.yml` on top of a successful run
+reference material only, and re-reading `.idd.yml` on top of a successful run
 can only introduce a disagreement. The manual read runs *instead*, on the degrade
 path, and only there.
 

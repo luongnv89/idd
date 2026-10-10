@@ -2,7 +2,7 @@
 
 How `/issue-creator` suggests a cost-effective model + thinking level for each
 issue, and how it manages the local CursorBench data cache. This procedure
-runs when `model_suggestion.enabled` is `true` in `.gitissue.yml`
+runs when `model_suggestion.enabled` is `true` in `.idd.yml`
 (default: `true`). When disabled, every step here is skipped
 silently — create the issue without a model suggestion.
 
@@ -16,7 +16,7 @@ and the skill continues (mirroring the image-upload degradation pattern).
 |------|-------|
 | Source | CursorBench 3.2 — `https://cursor.com/cursorbench` |
 | Cache file | `{cache_dir}/model-data-{YYYY-MM-DD}.json` — **user-level, dated, one per machine** |
-| Cache dir | `{cache_dir}` = `$IDD_CACHE_DIR`, else `${XDG_CACHE_HOME:-$HOME/.cache}/gitissue` |
+| Cache dir | `{cache_dir}` = `$IDD_CACHE_DIR`, else `${XDG_CACHE_HOME:-$HOME/.cache}/idd` |
 | Bundled seed | `{skill_dir}/templates/model-data.json` — undated, ships inside the skill, read-only |
 | Staleness threshold | 7 days (compared against the cache's `last_fetched`) |
 
@@ -34,7 +34,7 @@ the date portion of the cache's own `last_fetched`, so the two can never
 disagree, and a glance at the filename tells you whether a refresh is likely
 needed without opening the file.
 
-The cache is **never per-repo** — not under `.gitissue/` — and is **never
+The cache is **never per-repo** — not under `.idd/` — and is **never
 committed**: it is regenerable runtime state, not project state. It is also
 **never inside the skill folder**: a plugin update replaces the versioned plugin
 directory, an `asm install` replaces the copy, and `claude --plugin-dir .` points
@@ -99,7 +99,7 @@ script lists `{cache_dir}` for `model-data-*.json` and selects the newest by its
 filename date; by hand, that is:
 
 ```bash
-cache_dir="${IDD_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/gitissue}"
+cache_dir="${IDD_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/idd}"
 # Newest user-level cache, or empty if none exists yet.
 cache="$(ls -1 "$cache_dir"/model-data-*.json 2>/dev/null | sort | tail -n1)"
 ```
@@ -120,7 +120,7 @@ absolute `$HOME`), nothing is written: the seed is served from memory for this
 run, the script exits 0 with `persisted: false` and `cache_file: null`, and
 prints a `⚠` line. Suggestions keep working; only the cache is skipped.
 
-> **Per-repo legacy cache (AC7).** A pre-existing `.gitissue/model-data.json`
+> **Per-repo legacy cache (AC7).** A pre-existing `.idd/model-data.json`
 > from an older skill version is **ignored** — the skill neither reads nor
 > writes it, so model suggestions keep working unchanged. It is stale project
 > state, safe to delete; the skill does not touch or migrate it.
@@ -192,7 +192,7 @@ scoring tables. On success:
    content into a command line — and install it:
 
    ```bash
-   python3 shared/scripts/gi-model-cache.py --skill-dir "$skill_dir" --install .gitissue/cache/model-data-new.json
+   python3 shared/scripts/gi-model-cache.py --skill-dir "$skill_dir" --install .idd/cache/model-data-new.json
    ```
 
    The script names the file from the date portion of the payload's own

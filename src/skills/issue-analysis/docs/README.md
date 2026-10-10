@@ -6,11 +6,11 @@
 
 # Issue Analysis
 
-> Deep analysis of a single GitHub issue — root cause, architecture impact, implementation options, complexity, and risk — persisted to `.gitissue/analysis-N.json`.
+> Deep analysis of a single GitHub issue — root cause, architecture impact, implementation options, complexity, and risk — persisted to `.idd/analysis-N.json`.
 
 ## Intent-Code Boundary
 
-`/issue-analysis` respects the intent-code boundary that separates durable intent from time-sensitive code understanding. The **issue body** is the source of truth for *what* should change — problem, reporter context, acceptance criteria. This skill does the *where and why* against the **current codebase**: root cause, affected files, implementation options, complexity, and risk. Those findings are written to `.gitissue/analysis-N.json` so they stay attached to a specific point in time, not frozen into the issue body. A fresh `/issue-analysis N` always re-scans current code rather than trusting cached file lists. See [`idd-methodology.md`](https://github.com/luongnv89/idd/blob/main/docs/idd-methodology.md) for the full boundary contract.
+`/issue-analysis` respects the intent-code boundary that separates durable intent from time-sensitive code understanding. The **issue body** is the source of truth for *what* should change — problem, reporter context, acceptance criteria. This skill does the *where and why* against the **current codebase**: root cause, affected files, implementation options, complexity, and risk. Those findings are written to `.idd/analysis-N.json` so they stay attached to a specific point in time, not frozen into the issue body. A fresh `/issue-analysis N` always re-scans current code rather than trusting cached file lists. See [`idd-methodology.md`](https://github.com/luongnv89/idd/blob/main/docs/idd-methodology.md) for the full boundary contract.
 
 ## Highlights
 
@@ -18,7 +18,7 @@
 - Traces root cause across modules rather than just symptoms
 - Generates multiple implementation options with trade-offs (effort, risk, blast radius)
 - Scores complexity and risk so planning decisions are explicit
-- Persists full analysis to `.gitissue/analysis-N.json` for later reuse
+- Persists full analysis to `.idd/analysis-N.json` for later reuse
 - Offers a fast `view` mode that re-renders the cached report without re-scanning
 
 ## When to Use
@@ -78,4 +78,4 @@ A structured analysis report in the terminal with:
 - Root cause + affected files
 - 2–3 implementation options with effort/risk trade-offs
 - Complexity score and recommended approach
-- Persistent JSON report at `.gitissue/analysis-N.json`
+- Persistent JSON report at `.idd/analysis-N.json`

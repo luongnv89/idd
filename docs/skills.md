@@ -6,7 +6,7 @@ This page documents every public skill shipped by IDD Stack, what each skill doe
 
 | Skill | Primary purpose | Typical input |
 |---|---|---|
-| `/init-gitissue` | Generate `.gitissue.yml` for a repo | No arguments |
+| `/init-idd` | Generate `.idd.yml` for a repo | No arguments |
 | `/issue-creator` | Create, normalize, or batch-create structured GitHub issues | Text, issue number, multi-item text, screenshots |
 | `/plan-to-issues` | Turn a phased plan or a conversation into an epic plus one labelled issue per task | Plan file path, `--from-conversation`, `--dry-run`, `--phase`, `sync <epic#>` |
 | `/issue-analysis` | Deep-analysis report for one issue | Issue number, optional `view` |
@@ -20,26 +20,26 @@ This page documents every public skill shipped by IDD Stack, what each skill doe
 
 - `N` means a GitHub issue or PR number, depending on the skill.
 - Skills that use GitHub require `gh` to be installed and authenticated unless noted otherwise.
-- Skills load `.gitissue.yml` once at startup when they use config.
+- Skills load `.idd.yml` once at startup when they use config.
 - `--auto` means autonomous mode: no user prompts where the skill can safely decide.
 - `--review-only` means no fixes and no merge.
 - Slash commands shown here are the documented public interface; natural-language requests may trigger the same skills when the agent supports skill discovery.
 
 ---
 
-## `/init-gitissue`
+## `/init-idd`
 
-Initializes IDD Stack configuration for the current repository by detecting language, framework, test runner, and repo size, then writing `.gitissue.yml`.
+Initializes IDD Stack configuration for the current repository by detecting language, framework, test runner, and repo size, then writing `.idd.yml`.
 
 ### Input options
 
 | Input | Mode | Behavior |
 |---|---|---|
-| `/init-gitissue` | Generate config | Scans the repo and creates `.gitissue.yml` if missing. |
+| `/init-idd` | Generate config | Scans the repo and creates `.idd.yml` if missing. |
 
 ### Existing config behavior
 
-If `.gitissue.yml` already exists, the skill asks whether to:
+If `.idd.yml` already exists, the skill asks whether to:
 
 - `overwrite` — replace it with a freshly generated config.
 - `merge` — preserve existing values and add missing schema fields.
@@ -118,14 +118,14 @@ Converts a phased plan file — any path, any producer — or a conversation abo
 
 ## `/issue-analysis`
 
-Performs deep analysis for one GitHub issue and persists the result to `.gitissue/analysis-<N>.json`.
+Performs deep analysis for one GitHub issue and persists the result to `.idd/analysis-<N>.json`.
 
 ### Input options
 
 | Input | Mode | Behavior |
 |---|---|---|
-| `/issue-analysis <N>` | Full analysis | Fetches issue #N, scans the codebase, identifies root cause, affected areas, options, risk, and complexity, then writes `.gitissue/analysis-<N>.json`. |
-| `/issue-analysis <N> view` | Cached view | Reads `.gitissue/analysis-<N>.json` and renders the cached report without rescanning or calling GitHub. |
+| `/issue-analysis <N>` | Full analysis | Fetches issue #N, scans the codebase, identifies root cause, affected areas, options, risk, and complexity, then writes `.idd/analysis-<N>.json`. |
+| `/issue-analysis <N> view` | Cached view | Reads `.idd/analysis-<N>.json` and renders the cached report without rescanning or calling GitHub. |
 
 ### Requirements
 
@@ -136,14 +136,14 @@ Performs deep analysis for one GitHub issue and persists the result to `.gitissu
 
 ## `/issue-triage`
 
-Analyzes the open issue backlog for priority, dependencies, parallelizable work, stale issues, and already-fixed signals. Results are cached in `.gitissue/triage.json`.
+Analyzes the open issue backlog for priority, dependencies, parallelizable work, stale issues, and already-fixed signals. Results are cached in `.idd/triage.json`.
 
 ### Input options
 
 | Input | Mode | Behavior |
 |---|---|---|
 | `/issue-triage` | Cached view | Shows cached triage immediately. If no cache exists, runs the first full analysis automatically. |
-| `/issue-triage update` | Full update | Re-analyzes open issues and overwrites `.gitissue/triage.json`. |
+| `/issue-triage update` | Full update | Re-analyzes open issues and overwrites `.idd/triage.json`. |
 | `/issue-triage --limit N` | Limited update | Re-analyzes up to N issues and overwrites the cache. |
 | `/issue-triage … --auto` | Autonomous | Runs non-interactively (combines with any invocation): the repo-sync gate logs a `⚠` and syncs instead of prompting — see `docs/auto-mode.md`. |
 
@@ -168,7 +168,7 @@ Resolves one GitHub issue end-to-end and creates an atomic PR.
 |---|---|---|
 | `/issue-resolver <N>` | Interactive | Resolves issue #N, asks the user to pick an implementation plan, implements, tests, and opens a PR. |
 | `/issue-resolver <N> --auto` | Auto-pilot | Resolves issue #N autonomously with no user prompts. |
-| `/issue-resolver <N> --no-run-log` | Modifier | Suppresses the resolver's own `.gitissue/runs.jsonl` append and returns telemetry to the caller instead. Orthogonal to `--auto`; passed only by `/auto-pilot`, which is the single writer of the run-log line. |
+| `/issue-resolver <N> --no-run-log` | Modifier | Suppresses the resolver's own `.idd/runs.jsonl` append and returns telemetry to the caller instead. Orthogonal to `--auto`; passed only by `/auto-pilot`, which is the single writer of the run-log line. |
 
 ### Pipeline summary
 
@@ -250,7 +250,7 @@ Example:
 
 ### Merge behavior
 
-Controlled by `.gitissue.yml`:
+Controlled by `.idd.yml`:
 
 - `autopilot.mode: conservative` — creates/reviews PRs but never auto-merges.
 - `autopilot.mode: balanced` — default; merges clean PRs, leaves unresolved PRs open.
@@ -283,10 +283,10 @@ Runs a read-only health check for this IDD repository. It does not modify files,
 |---|---|
 | Stale skill claims in issue-creator docs | `FAIL` on drift |
 | Forbidden issue-template fields | `FAIL` on forbidden fields |
-| Missing `autopilot.mode` when `.gitissue.yml` exists | `FAIL` |
+| Missing `autopilot.mode` when `.idd.yml` exists | `FAIL` |
 | Repository squash-merge default | `WARN` when not squash-only; skipped (`○`) when `gh` is absent or unauthenticated |
 
-After the four gating checks, the doctor prints one **informational, non-gating** section — a *run-log summary* over the last N runs (default 50) recorded in `.gitissue/runs.jsonl`. It reports resolve rate, median QA cycles, and common skip reasons, and never affects the PASS/WARN/FAIL result. When no runs are recorded, it degrades gracefully to a single `○` line.
+After the four gating checks, the doctor prints one **informational, non-gating** section — a *run-log summary* over the last N runs (default 50) recorded in `.idd/runs.jsonl`. It reports resolve rate, median QA cycles, and common skip reasons, and never affects the PASS/WARN/FAIL result. When no runs are recorded, it degrades gracefully to a single `○` line.
 
 ### Requirements
 
@@ -299,7 +299,7 @@ After the four gating checks, the doctor prints one **informational, non-gating*
 
 | Goal | Use |
 |---|---|
-| First-time setup | `/init-gitissue` |
+| First-time setup | `/init-idd` |
 | Turn a bug report or feature request into a structured issue | `/issue-creator <text>` |
 | Normalize an existing issue | `/issue-creator <N>` |
 | File a phased plan or a conversation as an epic plus issues | `/plan-to-issues` or `/plan-to-issues <path.md>` |

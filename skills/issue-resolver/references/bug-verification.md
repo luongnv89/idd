@@ -102,7 +102,7 @@ the durable artifacts, with the local-cache JSON as an optional mirror:
    prior `/issue-analysis` ran. Under squash-merge it carries into git history when the repo's squash commit message is `PR_BODY`.
 
 3. **Optional cache mirror.** The `decision_record.reproduction` field in
-   `.gitissue/analysis-<N>.json` is defined in `/issue-analysis`'s output schema
+   `.idd/analysis-<N>.json` is defined in `/issue-analysis`'s output schema
    (`references/output-and-persist.md`) so the two skills agree on its shape, but it is
    usually empty: `/issue-analysis` is read-only and runs *before* the fix, so it cannot
    produce the post-fix `regression_test` proof. The resolver **lifts** the field on the

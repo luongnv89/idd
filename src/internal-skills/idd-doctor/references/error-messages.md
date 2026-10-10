@@ -92,30 +92,30 @@ All errors follow the rich error format: what went wrong + fix command (+ docs l
 
 ### Skip (no config)
 ```
-  ○ [3/4] Autopilot mode        skipped — no .gitissue.yml
+  ○ [3/4] Autopilot mode        skipped — no .idd.yml
 ```
-**Trigger:** `.gitissue.yml` does not exist in the repo root.
+**Trigger:** `.idd.yml` does not exist in the repo root.
 
 ### Pass
 ```
   ✓ [3/4] Autopilot mode        autopilot.mode = {value}
 ```
-**Trigger:** `.gitissue.yml` exists and contains an `autopilot.mode` line with a non-empty value.
+**Trigger:** `.idd.yml` exists and contains an `autopilot.mode` line with a non-empty value.
 
 ### Fail
 ```
-  ✗ [3/4] Autopilot mode        .gitissue.yml has no autopilot.mode
-        Fix: add to .gitissue.yml under `autopilot:`
+  ✗ [3/4] Autopilot mode        .idd.yml has no autopilot.mode
+        Fix: add to .idd.yml under `autopilot:`
           mode: conservative
 ```
-**Trigger:** `.gitissue.yml` exists but does not contain a recognizable `autopilot.mode` line.
+**Trigger:** `.idd.yml` exists but does not contain a recognizable `autopilot.mode` line.
 
 ### Fail (unreadable)
 ```
-  ✗ [3/4] Autopilot mode        .gitissue.yml unreadable
-        Fix: check the file's permissions:  ls -l .gitissue.yml
+  ✗ [3/4] Autopilot mode        .idd.yml unreadable
+        Fix: check the file's permissions:  ls -l .idd.yml
 ```
-**Trigger:** `.gitissue.yml` exists but cannot be read. The check fails rather than stopping the run; Check 4 still runs.
+**Trigger:** `.idd.yml` exists but cannot be read. The check fails rather than stopping the run; Check 4 still runs.
 
 ---
 

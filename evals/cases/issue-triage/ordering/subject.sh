@@ -242,7 +242,7 @@ PY
 # /issue-resolver must be spec-conformant, so idd-lint grades it. The pick
 # itself is graded separately, by the pick-<n>-<priority> artifact above.
 cat > "$EVAL_OUT/issue-top.md" <<'EOF'
-<!-- gitissue:normalized v1 -->
+<!-- idd:normalized v1 -->
 
 ## Type
 

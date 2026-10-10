@@ -19,7 +19,7 @@ Issue → atomic PR in 6 steps.
 |------------|--------------|
 | `/issue-resolver <N>` | Interactive; user picks the plan |
 | `/issue-resolver <N> --auto` | No prompts; set by `/auto-pilot` |
-| `/issue-resolver <N> --no-run-log` | Modifier, **orthogonal to `--auto`**: append nothing to `.gitissue/runs.jsonl`, return telemetry (*Run-log entry*) |
+| `/issue-resolver <N> --no-run-log` | Modifier, **orthogonal to `--auto`**: append nothing to `.idd/runs.jsonl`, return telemetry (*Run-log entry*) |
 
 ## Prerequisites
 
@@ -39,11 +39,11 @@ In-place path only; worktree paths start from the fetched base, and an invalid `
 Load config once; never re-read it. Run `python3 shared/scripts/gi-config.py` — **Working directory:** the repo root; **Script path:** absolute, as the *Bundled dependency precheck* resolves its list. It prints `{"config": …, "config_file": …, "first_run": …}` merged over the defaults below (rationale: `references/steps/step-0-preflight.md`, *Configuration load*).
 
 - **Exit 0** — use `config`.
-- **Exit 3** — invalid `.gitissue.yml`: print the `references/error-messages.md` error (*Invalid config*), stop.
+- **Exit 3** — invalid `.idd.yml`: print the `references/error-messages.md` error (*Invalid config*), stop.
 - **Script file absent** — a broken install and not a degrade: stop, print `✗ Missing bundled dependency`.
-- **Anything else** (no `python3`, non-zero exit, unparsable stdout) — print `⚠ gi-config unavailable — reading .gitissue.yml by hand` and read it yourself *instead of* the script, over the keys and defaults below.
+- **Anything else** (no `python3`, non-zero exit, unparsable stdout) — print `⚠ gi-config unavailable — reading .idd.yml by hand` and read it yourself *instead of* the script (else legacy `.gitissue.yml`, printing `⚠ legacy .gitissue.yml found — rename to .idd.yml`), over the keys and defaults below.
 
-Either path: no `.gitissue.yml` (`first_run`) prints `○ First run — using default config. Run /init-gitissue to customize.`
+Either path: no `.idd.yml` (`first_run`) prints `○ First run — using default config. Run /init-idd to customize.`
 
 **Capture the run clock here:** chain that same `python3` invocation as `python3 …; ec=$?; date +%s >&2; exit "$ec"`; the stderr epoch is `run_started_epoch`, the *Run Stats Footer*'s `elapsed` anchor. Take `date +%s` again as each `[N/5]` step starts and at the terminal outcome: those boundaries are the run log's `phases` (`references/report-templates.md`).
 
@@ -161,7 +161,7 @@ Only a **merged** PR or a closing commit on the default branch is `already_resol
 
 ### 0d — Auto-normalize
 
-If `issue.auto_normalize` is true and the body lacks a `<!-- gitissue:normalized v1 -->` marker:
+If `issue.auto_normalize` is true and the body lacks a `<!-- idd:normalized v1 -->` marker (a legacy `gitissue:normalized` one counts):
 
 1. **Security label check (SPEC §1.4)** — before any rewrite scan labels for `security`, `CVE`, `vulnerability` (case-insensitive). On a match:
    - **Auto mode (`--auto` / `IDD_AUTO_MODE=1`):** print the `⚠ … Skipping auto-normalization` warning (`references/error-messages.md` → *Security-labeled issue (skip)*), first matching label as `{label}`, continue **without** rewriting.
@@ -275,7 +275,7 @@ Spawn a **fresh** reviewer (`shared/agents/code-reviewer.md`) each cycle. On blo
 
 UI review is **auto-detected per issue** (no config flag): scan the issue body and diff for UI work before cycling. The **code UI review** always runs; the **browser UI review** runs only when a running app is reachable *and* opted in, else **skips with a warning**. Detection, the `ui-reviewer` spawn and the `ui_review.browser_review` gate: `docs/ui-review.md`; mechanics: *Step 4 — UI/UX review*.
 
-**Verification recipe:** when the base branch commits `.gitissue-recipe.json`, each cycle also runs it through `shared/scripts/gi-recipe.py`: launch, drive the capabilities the diff maps, keep evidence, tear down the owned instance. Auto mode runs it only when the recipe opts in `resolve` (*Step 4 — QA → Verification recipe*).
+**Verification recipe:** when the base branch commits `.idd-recipe.json` (or legacy `.gitissue-recipe.json`), each cycle also runs it through `shared/scripts/gi-recipe.py`: launch, drive the capabilities the diff maps, keep evidence, tear down the owned instance. Auto mode runs it only when the recipe opts in `resolve` (*Step 4 — QA → Verification recipe*).
 
 ---
 
@@ -296,7 +296,7 @@ A failure prints `✗ Final test run failed — PR not created` and stops, even 
 
 ### Push branch and create PR
 
-Run the branch-diff scan first: export `IDD_AUTO_MODE=1` in auto mode, then from the repo root run `python3 shared/scripts/gi-secscan.py --range "origin/${base}" --policy-ref "origin/${base}"`. It reads `security.*` from `.gitissue.yml` **at the base ref**: never pass a config *value* on the command line, never let the scanned branch supply its policy (*Pre-push secret scan*).
+Run the branch-diff scan first: export `IDD_AUTO_MODE=1` in auto mode, then from the repo root run `python3 shared/scripts/gi-secscan.py --range "origin/${base}" --policy-ref "origin/${base}"`. It reads `security.*` from `.idd.yml` (else legacy `.gitissue.yml`) **at the base ref**: never pass a config *value* on the command line, never let the scanned branch supply its policy (*Pre-push secret scan*).
 
 - **Pass** needs all four: exit 0, `policy_source` equal to the requested `ref:origin/…`, `verdict` not `block`, `scanned` not 0 while `skipped` is above 0.
 - **Exit 1 is the block verdict** — stop, do not push, report `blocking[]`. **Exit 3** (uncompilable `security.*`) also stops.
@@ -317,7 +317,7 @@ gh pr create --title "{pr_title}" --body "{pr_body}"
 Copy that line out of the template **character-for-character** and substitute **only** the `{braced}` tokens; never re-word or recall a field name:
 
 ```
-<!-- gitissue:qa v1 head={head_sha} profile={profile} cycles={qa_cycles} review=clean tests={test_count}@{tests_sha} ui={ui_legs}:{ui_result}@{ui_sha} -->
+<!-- idd:qa v1 head={head_sha} profile={profile} cycles={qa_cycles} review=clean tests={test_count}@{tests_sha} ui={ui_legs}:{ui_result}@{ui_sha} -->
 ```
 
 `review=clean` has **no synonym**: `verdict=`, `status=` or `result=` make the marker `stale` (*QA handoff marker* explains why).
@@ -340,12 +340,12 @@ With `projects.sync_enabled` true, set `status_map.done` (`docs/github-projects-
 
 ### Run-log entry (monitoring)
 
-At **every terminal outcome** — `success`, `already_resolved`, `failed` — append exactly **one JSON line** to `.gitissue/runs.jsonl`, **unless invoked with `--no-run-log`**, which appends **nothing** and returns telemetry. That is the **single writer** rule under `/auto-pilot`, independent of `--auto`: a standalone `/issue-resolver <N> --auto` still writes. Derivation: `references/report-templates.md` (*Run-log entry — field derivation and suppression*), per `docs/run-log-schema.md`.
+At **every terminal outcome** — `success`, `already_resolved`, `failed` — append exactly **one JSON line** to `.idd/runs.jsonl`, **unless invoked with `--no-run-log`**, which appends **nothing** and returns telemetry. That is the **single writer** rule under `/auto-pilot`, independent of `--auto`: a standalone `/issue-resolver <N> --auto` still writes. Derivation: `references/report-templates.md` (*Run-log entry — field derivation and suppression*), per `docs/run-log-schema.md`.
 
 ```bash
 # Exactly one runs. --echo validates the telemetry you return and writes nothing.
 if [ -n "$no_run_log" ]; then printf '%s' "$run_json" | python3 shared/scripts/gi-runlog.py --echo; else printf '%s' "$run_json" | python3 shared/scripts/gi-runlog.py --append; fi
-# Fallback when `python3` is unavailable or the script exits 4: mkdir -p .gitissue && printf '%s\n' "$run_json" >> .gitissue/runs.jsonl
+# Fallback when `python3` is unavailable or the script exits 4: mkdir -p .idd && printf '%s\n' "$run_json" >> .idd/runs.jsonl
 ```
 
 **Exit 3:** the record is invalid and nothing was written — a stop, not a degrade: never append `$run_json` raw. Correct the record and re-run, or drop the line. Every other write failure is **non-fatal** — use the fallback append, never block the result. Only append; never rewrite or reorder lines.

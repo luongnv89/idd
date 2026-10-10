@@ -77,7 +77,7 @@ The entire research phase is bounded by `analysis.scan_timeout` (default 120s). 
 ```
 ⚠ Scan timeout after {N}s — analysis based on {M} files read
 
-  To fix:  increase analysis.scan_timeout in .gitissue.yml
+  To fix:  increase analysis.scan_timeout in .idd.yml
 ```
 Set `scan_stats.scan_timed_out` to true. If at least one relevant file was read, continue with the collected evidence and mark the final result `PARTIAL`. Otherwise follow the no-relevant-files stop in SKILL.md.
 
@@ -162,7 +162,7 @@ Cross-reference this issue against other open issues and triage data to surface 
 
 ### 5a — Load triage data
 
-If `.gitissue/triage.json` exists:
+If `.idd/triage.json` exists:
 1. Read and parse the file
 2. Find this issue in the `issues[]` array
 3. Extract `blocks`, `blocked_by`, `affected_files`, and `priority`

@@ -51,7 +51,7 @@ outcome. Later runs skip the issue as an ordinary label skip.
 
   Remaining:               {remaining_count} open issues
   Next action:             /auto-pilot to continue
-  Report:                  .gitissue/last-run-report.md
+  Report:                  .idd/last-run-report.md
 ```
 
 The `Result:` row is the first row under the header so the outcome is findable
@@ -145,8 +145,8 @@ to qualify.
 The default format is the static terminal summary above: one row per iteration,
 at most `autopilot.max_iterations` rows, inspectable at once. Project convention
 forbids terminal animation, so auto-pilot produces no interactive report;
-`.gitissue/runs.jsonl` is the machine-readable form for later filtering and
-`.gitissue/last-run-report.md` the persisted copy. If the user asks for another
+`.idd/runs.jsonl` is the machine-readable form for later filtering and
+`.idd/last-run-report.md` the persisted copy. If the user asks for another
 format (for example a Markdown table or a Mermaid timeline), render it from the
 same summary and keep the `Result`, `Evidence`, `Uncertainty` and `Decision`
 rows. If the host cannot render that format, say so and print the terminal
@@ -173,7 +173,7 @@ inspection cannot confirm it.
 ## Persisted run report
 
 The summary above is printed to the terminal and written to
-`.gitissue/last-run-report.md`, so a run that scrolled past — or that nobody was
+`.idd/last-run-report.md`, so a run that scrolled past — or that nobody was
 watching — leaves a readable artifact. It is machine-local and gitignored, like
 the run state and the lock.
 
@@ -188,20 +188,20 @@ reaches the script on **stdin**, never on a command line:
 
 Both header values are pattern-checked on **every** path that can produce one —
 the value submitted here, and the `run_id` the script falls back to reading out
-of `.gitissue/run-state.json`. A state file is machine-local but it is still
+of `.idd/run-state.json`. A state file is machine-local but it is still
 input: a recorded `run_id` that does not conform is dropped from the marker
 rather than passed through, so the marker cannot be broken by editing the state
 file.
 
-The file it writes opens with a `<!-- gitissue:run-report v1 {…} -->` marker
+The file it writes opens with a `<!-- idd:run-report v1 {…} -->` marker
 carrying `run_id` and `generated_at`, so a later reader can tell which run it
 describes. Each run overwrites it — there is one *last* run report, not a
-history; `.gitissue/runs.jsonl` is where cross-run history lives.
+history; `.idd/runs.jsonl` is where cross-run history lives.
 
 Exit 0 prints the path. Exit 3 is a stop — the payload is invalid (an empty
 `markdown`, an unknown key); fix the payload rather than writing the file by
 hand. No `python3`, exit 2, or exit 4: print `⚠ gi-state unavailable` and write
-the same markdown to `.gitissue/last-run-report.md` with the **Write** tool
+the same markdown to `.idd/last-run-report.md` with the **Write** tool
 instead. Either way the run is over, so neither path changes an outcome.
 
 **A run that ends early still leaves a complete report.** A run that *paused*

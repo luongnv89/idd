@@ -2,10 +2,10 @@
 # test-autopilot-modes.sh — Validate balanced-by-default merge modes
 #
 # This script verifies issue #33 acceptance criteria:
-#  - .gitissue.yml supports `autopilot.mode` with values conservative|balanced|aggressive
+#  - .idd.yml supports `autopilot.mode` with values conservative|balanced|aggressive
 #  - Default install never merges a PR with unresolved fixable review issues
 #  - Aggressive behavior is unreachable without explicit config (no casual flag)
-#  - /init-gitissue emits balanced defaults
+#  - /init-idd emits balanced defaults
 #  - /auto-pilot final report uses the six categories: merged, left_open,
 #    partial_followup, blocked_by_dependency, failed, skipped
 #
@@ -32,9 +32,9 @@ echo "◆ Auto-Pilot Balanced Merge Modes Tests (issue #33)"
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 
 # ───────────────────────────────────────────────────────────
-# T1: init-gitissue template ships balanced defaults
+# T1: init-idd template ships balanced defaults
 # ───────────────────────────────────────────────────────────
-TEMPLATE="$REPO_ROOT/src/skills/init-gitissue/templates/gitissue-template.yml"
+TEMPLATE="$REPO_ROOT/src/skills/init-idd/templates/idd-template.yml"
 
 if [ -f "$TEMPLATE" ]; then
   pass "T1.0: template file exists"

@@ -26,7 +26,7 @@ Full example runs for each mode (first run, cached view, explicit update, empty 
   ⚠  Stale: 1 issue (>14 days inactive)
   ○  Suggested order: #12 → #8 → #3 → #15
 
-  ✓ Triage saved to .gitissue/triage.json
+  ✓ Triage saved to .idd/triage.json
 ```
 
 ---
@@ -122,7 +122,7 @@ Full example runs for each mode (first run, cached view, explicit update, empty 
       Target issue: #12
     → Verify and close: gh issue close 3 -c "Fixed by #14"
 
-  ✓ Triage saved to .gitissue/triage.json
+  ✓ Triage saved to .idd/triage.json
 ```
 
 ---
@@ -169,7 +169,7 @@ Full example runs for each mode (first run, cached view, explicit update, empty 
 
   ○  Suggested order: #5 → #9
 
-  ✓ Triage saved to .gitissue/triage.json
+  ✓ Triage saved to .idd/triage.json
 ```
 
 ---

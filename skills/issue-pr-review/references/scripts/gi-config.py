@@ -3,7 +3,7 @@
 """Resolve the effective IDD Stack configuration and print it as one JSON line.
 
 Every skill starts by merging the documented defaults with the repository's
-`.gitissue.yml`. Doing that by reading prose is where drift creeps in: a default
+`.idd.yml`. Doing that by reading prose is where drift creeps in: a default
 gets restated in six skills and one of them goes stale. This script instead
 *derives* the defaults from the canonical schema document at run time — there is
 no defaults table in this file, on purpose — validates the user's overrides
@@ -12,7 +12,7 @@ against it, and emits the merged result.
 Output on success is exactly one line of JSON on stdout:
 
     {"config": {"<dotted.key>": <value>, ...},
-     "config_file": ".gitissue.yml" or null,
+     "config_file": ".idd.yml" or null,
      "first_run": true or false}
 
 Unknown-key policy. The schema handed to this script may be the complete
@@ -27,7 +27,7 @@ document or a per-skill excerpt carrying only the sections that skill reads, so
     Section Map, which the per-skill excerpt drops) an unknown section is a
     typo and does fail;
   * a key the schema tombstones as *(removed)* is dropped with a warning — the
-    documentation deprecated it, so an untouched old `.gitissue.yml` must not
+    documentation deprecated it, so an untouched old `.idd.yml` must not
     become a hard stop.
 
 The `agents` section gets two extra steps. Every non-null `agents.*` value must
@@ -35,10 +35,16 @@ be a short opaque token (letters, digits and `._:/[]-`), else exit 3. After the
 merge a null `agents.<knob>.<role>` is filled from `agents.<knob>.default`, so a
 caller reads one key per role; all-null means "inherit the main agent".
 
+Legacy name (issue #537). With no `--config`, `.idd.yml` in the working
+directory is read; when it is absent the pre-rename `.gitissue.yml` is read in
+its place (`first_run` false, `config_file` naming it) with
+`⚠ legacy .gitissue.yml found — rename to .idd.yml` on stderr. When both exist
+`.idd.yml` wins and the legacy file is reported as ignored.
+
 Exit codes
   0  merged config printed
   2  usage error
-  3  `.gitissue.yml` is invalid (stderr: `✗ Invalid .gitissue.yml: <key> — <why>`)
+  3  `.idd.yml` is invalid (stderr: `✗ Invalid .idd.yml: <key> — <why>`)
   4  cannot complete — schema missing/unparsable, or the config file could not
      be read (stderr: `⚠ gi-config: <reason>`). Callers fall back to their
      inline defaults rather than failing the run.
@@ -58,7 +64,8 @@ import sys
 from pathlib import Path
 
 SCHEMA_NAME = "config-schema.md"
-DEFAULT_CONFIG_NAME = ".gitissue.yml"
+DEFAULT_CONFIG_NAME = ".idd.yml"
+LEGACY_CONFIG_NAME = ".gitissue.yml"
 
 # `git rev-parse --show-cdup` can only ever be empty or a run of `../`. Anything
 # else is not an answer this script will resolve a path against.
@@ -91,7 +98,7 @@ _REMOVED_ROW_RE = re.compile(
 # own signal that the section list in front of us is complete.
 _SECTION_MAP_RE = re.compile(r"^#{2,4}\s+Config Section Map\s*$", re.MULTILINE)
 
-# `.gitissue.yml` is repo-controlled, and an `agents.*` value travels into a
+# `.idd.yml` is repo-controlled, and an `agents.*` value travels into a
 # spawn-tool parameter and a subagent prompt. The guard is a shape check only —
 # the strings stay opaque to IDD — and is applied with `fullmatch`, because `$`
 # would let a trailing newline through.
@@ -101,7 +108,7 @@ _AGENT_KNOBS = ("model", "effort")
 
 
 class ConfigError(Exception):
-    """`.gitissue.yml` is invalid — exit 3."""
+    """`.idd.yml` is invalid — exit 3."""
 
 
 class Unavailable(Exception):
@@ -196,7 +203,7 @@ def search_ceiling() -> Path:
     The top of the working tree, or the working directory itself when there is
     none. Without a ceiling an upward walk leaves the repository entirely, and
     then a file in `$HOME` — or in whatever directory the checkout happens to
-    sit under — governs the run. gi-secscan bounds its `.gitissue.yml` search
+    sit under — governs the run. gi-secscan bounds its `.idd.yml` search
     the same way and for the same reason: a `security.allow_pattern` an
     ancestor directory can set is a security gate an ancestor directory can
     switch off. The two searches are kept identical on purpose; letting them
@@ -460,7 +467,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--config",
         default=DEFAULT_CONFIG_NAME,
-        help=f"config file to read (default: {DEFAULT_CONFIG_NAME}, relative to cwd)",
+        help=(
+            f"config file to read (default: {DEFAULT_CONFIG_NAME}, else the legacy "
+            f"{LEGACY_CONFIG_NAME}, relative to cwd)"
+        ),
     )
     parser.add_argument(
         "--schema",
@@ -479,9 +489,26 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     explicit_config = args.config != DEFAULT_CONFIG_NAME
+    config_path = Path(args.config)
+    # The name an exit-3 message blames: the file actually parsed.
+    config_name = DEFAULT_CONFIG_NAME
+    if not explicit_config:
+        legacy_path = Path(LEGACY_CONFIG_NAME)
+        if config_path.is_file():
+            if legacy_path.is_file():
+                print(
+                    f"⚠ legacy {LEGACY_CONFIG_NAME} ignored — {DEFAULT_CONFIG_NAME} takes precedence",
+                    file=sys.stderr,
+                )
+        elif legacy_path.is_file():
+            print(
+                f"⚠ legacy {LEGACY_CONFIG_NAME} found — rename to {DEFAULT_CONFIG_NAME}",
+                file=sys.stderr,
+            )
+            config_path = legacy_path
+            config_name = LEGACY_CONFIG_NAME
     try:
         defaults, removed, complete = load_schema(find_schema(args.schema))
-        config_path = Path(args.config)
         if config_path.is_file():
             overrides = load_user_config(config_path)
         elif explicit_config:
@@ -491,7 +518,7 @@ def main(argv: list[str] | None = None) -> int:
         config, warnings = merge(defaults, overrides, removed, complete)
     except ConfigError as exc:
         for line in str(exc).splitlines():
-            print(f"✗ Invalid {DEFAULT_CONFIG_NAME}: {line}", file=sys.stderr)
+            print(f"✗ Invalid {config_name}: {line}", file=sys.stderr)
         return 3
     except Unavailable as exc:
         print(f"⚠ gi-config: {exc}", file=sys.stderr)

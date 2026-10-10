@@ -103,7 +103,7 @@ src/                        # SOURCE OF TRUTH — hand-edit here
 │   ├── plan-to-issues/     # /plan-to-issues — plan or conversation → epic + issues
 │   │   ├── SKILL.source.md
 │   │   └── references/
-│   └── init-gitissue/      # /init-gitissue — config generator
+│   └── init-idd/      # /init-idd — config generator
 │       ├── SKILL.source.md
 │       └── references/
 ├── internal-skills/        # /idd-doctor and other internal-only skills
@@ -233,7 +233,7 @@ Authored work is SKILL.md, references, templates, and the stdlib helpers under `
 - **Terminal output** — follow the symbol vocabulary and formatting rules in `DESIGN.md`
 - **Error messages** — include what went wrong, how to fix it, and where to learn more
 - **Skills are isolated** — no cross-skill imports or shared state
-- **Templates** — include the `<!-- gitissue:normalized v1 -->` marker
+- **Templates** — include the `<!-- idd:normalized v1 -->` marker
 
 ## Code of Conduct
 

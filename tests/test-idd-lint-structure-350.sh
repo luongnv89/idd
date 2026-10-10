@@ -67,7 +67,7 @@ check(called[0][1] is called[1][1],
 check([(f.code, f.severity) for f in dispatched] == [("T01", "ok"), ("T02", "warn")],
       "lint_issue preserves flattened finding order")
 
-fixture = """<!-- gitissue:normalized v1 -->
+fixture = """<!-- idd:normalized v1 -->
 
 ## Type
 
@@ -94,7 +94,7 @@ check([(f.code, f.severity) for f in module.lint_issue(fixture)] == [
 
 original_gh = module._gh_json
 module._gh_json = lambda *args: [
-    {"number": 1, "body": "<!-- gitissue:normalized v1 -->"},
+    {"number": 1, "body": "<!-- idd:normalized v1 -->"},
     {"number": 2, "body": "plain"},
 ]
 issue_stats = module.collect_issue_normalization_stats(20)
@@ -124,7 +124,7 @@ with tempfile.TemporaryDirectory() as tmp:
         json.dumps({"issue": 2, "outcome": "failed", "qa_cycles": 3}),
     )) + "\n", encoding="utf-8")
     module._gh_json = lambda *args: [
-        {"number": 1, "body": "<!-- gitissue:normalized v1 -->"},
+        {"number": 1, "body": "<!-- idd:normalized v1 -->"},
         {"number": 2, "body": "plain"},
     ]
     tier_stats = module.collect_run_tier_stats(20, module.load_run_rows(runs))

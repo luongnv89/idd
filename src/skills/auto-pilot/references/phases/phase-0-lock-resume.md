@@ -10,8 +10,8 @@ re-picked the issue it was supposed to continue.
 
 ### Step 1.0 — Resume entry gate <!-- a:ap-step10-resume -->
 
-Read the recorded state — `python3 shared/scripts/gi-state.py --read` — and set
-exactly one value:
+Read the recorded state — `python3 shared/scripts/gi-state.py --read`, which
+first migrates a legacy `.gitissue/` run into `.idd/` — and set exactly one value:
 
 ```
 resume_state = resumable | stale | absent
@@ -107,7 +107,7 @@ proceeds to `--init` as before.
 The read-back rule above binds here too: skip any entry whose `name` does not
 match `^[a-z][a-z0-9-]{0,63}$` or whose `origin` is not exactly the string
 `borrowed` before it reaches an `rm -rf`, and remove a directory only when it
-carries the resolver's `.gitissue-borrowed` marker — an unmarked directory is
+carries the resolver's `.idd-borrowed` (or legacy `.gitissue-borrowed`) marker — an unmarked directory is
 the operator's own copy, so drop the record and warn instead of deleting.
 Under `--dry-run`, compute the removal and print the leftover names, but write
 nothing: no uninstall, no `--update`.
@@ -115,11 +115,11 @@ nothing: no uninstall, no `--update`.
 **`stale` and `absent` both write a fresh state, and this is the call that does
 it** — the state every later checkpoint patches and every later resume reads
 exists only because this step ran. Write the payload with the **Write** tool to
-`.gitissue/cache/state-init.json` (`invocation` and `queue` are this run's own
+`.idd/cache/state-init.json` (`invocation` and `queue` are this run's own
 values, but nothing about the run state ever goes on a command line), then:
 
 ```bash
-python3 shared/scripts/gi-state.py --init < .gitissue/cache/state-init.json
+python3 shared/scripts/gi-state.py --init < .idd/cache/state-init.json
 ```
 
 | Key | Value |
@@ -132,7 +132,7 @@ python3 shared/scripts/gi-state.py --init < .gitissue/cache/state-init.json
 
 Every key is optional, so `{}` is a valid payload — the file is a hint about
 this run, not a contract. Exit 0 wrote the state. **Exit 3** is a stop for the
-state machinery: print the reason, never write `.gitissue/run-state.json` by
+state machinery: print the reason, never write `.idd/run-state.json` by
 hand, and continue the loop un-resumable. No `python3`, exit 2, or exit 4:
 print `⚠ gi-state unavailable` and continue — the loop's own work is unaffected,
 only resume is lost. Under `--dry-run` add `--dry-run` to the call. Delete the
@@ -141,11 +141,11 @@ payload file afterwards.
 ### Step 1.0b — Checkpoint procedure <!-- a:ap-step10b-checkpoint -->
 
 Every checkpoint below is the same two steps: write the patch object with the
-**Write** tool to `.gitissue/cache/state-patch.json` (it carries an issue title —
+**Write** tool to `.idd/cache/state-patch.json` (it carries an issue title —
 never put one on a command line), then merge it:
 
 ```bash
-python3 shared/scripts/gi-state.py --update --pid "$PPID" < .gitissue/cache/state-patch.json
+python3 shared/scripts/gi-state.py --update --pid "$PPID" < .idd/cache/state-patch.json
 ```
 
 `current` merges key-by-key (an explicit `null` clears it); `lanes` merges
@@ -179,7 +179,7 @@ nothing. Delete the patch file afterwards.
 
 `autopilot.max_runtime_minutes` bounds the whole run by the wall clock, measured
 from the `started_at` that *Step 1.0*'s `--init` wrote into
-`.gitissue/run-state.json`. `0` — the default — means unbounded: skip this check
+`.idd/run-state.json`. `0` — the default — means unbounded: skip this check
 entirely and never invoke the script.
 
 ```bash

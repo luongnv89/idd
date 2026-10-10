@@ -10,7 +10,7 @@ TITLE="Bug: Fix mobile login redirect loop"
 BODY_FILE="$EVAL_OUT/issue.md"
 
 cat > "$BODY_FILE" <<'EOF'
-<!-- gitissue:normalized v1 -->
+<!-- idd:normalized v1 -->
 
 ## Type
 

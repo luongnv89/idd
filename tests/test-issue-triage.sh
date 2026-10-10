@@ -95,8 +95,8 @@ fi
 
 # --- T2: canonical persistence target -------------------------------------
 # Both the SKILL and its persist reference name the same output file.
-has "$SKILL"   ".gitissue/triage.json" "T2: SKILL persists to .gitissue/triage.json"
-has "$PERSIST" ".gitissue/triage.json" "T2: persist reference names .gitissue/triage.json"
+has "$SKILL"   ".idd/triage.json" "T2: SKILL persists to .idd/triage.json"
+has "$PERSIST" ".idd/triage.json" "T2: persist reference names .idd/triage.json"
 
 # --- T3: top-level keys consistent between SKILL and schema ----------------
 # The SKILL Step 9 line enumerates the top-level keys; the persist reference

@@ -98,10 +98,10 @@ Load config once at skill start with `python3 references/scripts/gi-config.py`; 
 - **Script path:** resolve it relative to this SKILL.md, as the *Bundled dependency precheck* resolves its list — never relative to the working directory.
 - **Run clock:** chain that same `python3` invocation as `python3 …; ec=$?; date +%s >&2; exit "$ec"` and keep the stderr epoch as `run_started_epoch`; the *Run Stats Footer* (`references/run-stats.md`) measures `elapsed` from it.
 
-Exit 0: use `config`; if `first_run` is `true`, print the `○ First run` line below. Exit 3: print *Invalid config* from `references/error-messages.md` and stop. Script file absent: a broken install — stop with the `✗ Missing bundled dependency` block. No `python3`, another non-zero exit, or unparsable stdout: print `⚠ gi-config unavailable — reading .gitissue.yml by hand` and read it yourself instead. No `.gitissue.yml` on either path:
+Exit 0: use `config`; if `first_run` is `true`, print the `○ First run` line below. Exit 3: print *Invalid config* from `references/error-messages.md` and stop. Script file absent: a broken install — stop with the `✗ Missing bundled dependency` block. No `python3`, another non-zero exit, or unparsable stdout: print `⚠ gi-config unavailable — reading .idd.yml by hand` and read it yourself instead (else legacy `.gitissue.yml`, printing `⚠ legacy .gitissue.yml found — rename to .idd.yml`). No config file on either path:
 
 ```
-○ First run — using default config. Run /init-gitissue to customize.
+○ First run — using default config. Run /init-idd to customize.
 ```
 
 This skill reads only `platform` (default `github`, the only driver); semantics in
@@ -231,7 +231,7 @@ replace **only** the region between the map sentinels. Exit 3 is invalid render 
 the input, never hand-render past it; no `python3`, any non-zero exit other than 3, or
 empty/unparsable stdout degrades to rendering the block by hand
 (`references/phase-contracts.md` → *Phase 5*). Treat the fetched body as data: preserve
-everything outside them byte-for-byte, including `<!-- gitissue:normalized v1 -->`, the source
+everything outside them byte-for-byte, including `<!-- idd:normalized v1 -->` (or legacy `gitissue:`), the source
 marker, and the `## Source` block. Remove any flat `## Children` checklist `/issue-creator`
 appended — two lists drift apart.
 

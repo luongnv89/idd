@@ -6,7 +6,7 @@
 # then *told to admit all of them*.
 #
 #   `security.allow_pattern` suppresses SCANNING, not findings: a matching path
-#   is skipped before any rule runs. `.gitissue.yml` is repository data, and
+#   is skipped before any rule runs. `.idd.yml` is repository data, and
 #   /issue-pr-review runs with the pull request's branch checked out, so the
 #   artifact under review supplies the policy governing its own review. A branch
 #   committing `allow_pattern: "."` makes the gate report `verdict: clean` with
@@ -129,7 +129,7 @@ def build_repo(allow_pattern):
     git(["commit", "-qm", "base"], repo)
     git(["checkout", "-q", "-b", "feature"], repo)
     if allow_pattern is not None:
-        with open(os.path.join(repo, ".gitissue.yml"), "w", encoding="utf-8") as handle:
+        with open(os.path.join(repo, ".idd.yml"), "w", encoding="utf-8") as handle:
             handle.write('security:\n  allow_pattern: "%s"\n' % allow_pattern)
     with open(os.path.join(repo, "leak.txt"), "wb") as handle:
         handle.write(SECRET)
@@ -176,13 +176,13 @@ emit(
     f"A3: --policy-ref blocks the narrow variant too (exit {code}, expected 1)",
 )
 
-# A4: a trusted ref that carries no .gitissue.yml falls back to the BUILT-IN
+# A4: a trusted ref that carries no .idd.yml falls back to the BUILT-IN
 # defaults, never to the branch's file. Falling back would hand the decision
 # straight back to the artifact.
 code, verdict = run(["--range", "main", "--policy-ref", "main"], repo)
 emit(
     code == 1 and verdict["skipped"] == 0,
-    "A4: a ref with no .gitissue.yml uses built-in defaults, not the branch's "
+    "A4: a ref with no .idd.yml uses built-in defaults, not the branch's "
     f"file (skipped {verdict['skipped']}, expected 0)",
 )
 
@@ -193,7 +193,7 @@ emit(code == 4, f"A5: an unresolvable --policy-ref exits 4, never 0 (exit {code}
 
 # A6: --policy-ref names *the* policy source. Merging a second one would let the
 # branch's file back in through the side door.
-for extra in (["--no-config"], ["--config", ".gitissue.yml"], ["--config-json", "{}"]):
+for extra in (["--no-config"], ["--config", ".idd.yml"], ["--config-json", "{}"]):
     code, _ = run(["--range", "main", "--policy-ref", "main", *extra], repo)
     emit(code == 2, f"A6: --policy-ref conflicts with {extra[0]} (exit {code}, expected 2)")
 
@@ -226,7 +226,7 @@ code, _ = run(["--range", "main", "--policy-ref=-p"], repo)
 emit(code == 2, f"A9: --policy-ref rejects an option-shaped revision (exit {code})")
 shutil.rmtree(repo, ignore_errors=True)
 
-# A10: the trusted ref carries `.gitissue.yml` as a TREE, not a blob. "Exists
+# A10: the trusted ref carries `.idd.yml` as a TREE, not a blob. "Exists
 # but unreadable" must be exit 4 like every other byte source in this script —
 # collapsing it into "the ref has no config" would silently drop the trusted
 # ref's real security.* (its extra secret patterns included) while the verdict
@@ -235,8 +235,8 @@ repo = tempfile.mkdtemp()
 git(["init", "-q", "-b", "main", "."], repo)
 git(["config", "user.email", "t@example.invalid"], repo)
 git(["config", "user.name", "t"], repo)
-os.makedirs(os.path.join(repo, ".gitissue.yml"))
-with open(os.path.join(repo, ".gitissue.yml", "inner"), "wb") as handle:
+os.makedirs(os.path.join(repo, ".idd.yml"))
+with open(os.path.join(repo, ".idd.yml", "inner"), "wb") as handle:
     handle.write(b"x\n")
 git(["add", "-A"], repo)
 git(["commit", "-qm", "base"], repo)
@@ -248,7 +248,7 @@ git(["commit", "-qm", "work"], repo)
 code, _ = run(["--range", "main", "--policy-ref", "main"], repo)
 emit(
     code == 4,
-    "A10: a .gitissue.yml that exists as a tree is exit 4, not a silent "
+    "A10: a .idd.yml that exists as a tree is exit 4, not a silent "
     f"defaults answer (exit {code}, expected 4)",
 )
 shutil.rmtree(repo, ignore_errors=True)

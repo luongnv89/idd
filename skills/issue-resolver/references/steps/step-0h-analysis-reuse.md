@@ -5,7 +5,7 @@ One part of `references/pipeline-steps.md` — the index that maps every step to
 ## Step 0h — Analysis reuse gate <!-- a:rs-step0h-gate -->
 
 **The single home of the freshness predicate.** `/issue-analysis` writes
-`.gitissue/analysis-<N>.json` carrying everything Steps 1–2 would otherwise
+`.idd/analysis-<N>.json` carrying everything Steps 1–2 would otherwise
 re-derive — extraction, affected files, options, recommendation, complexity and
 risk — pinned to the commit it ran against. This gate decides whether that
 artifact is still true, so an analyze-then-resolve sequence on an unchanged tree
@@ -44,8 +44,8 @@ can point at an unrelated branch and an ancestry test against the wrong tip
 passes silently.
 
 **Resolve the artifact against the original checkout, never against this run's
-workspace.** `.gitissue/` is gitignored, so a *0e* worktree never contains the
-analysis — a bare relative `.gitissue/…` path evaluated there answers `absent` on
+workspace.** `.idd/` is gitignored, so a *0e* worktree never contains the
+analysis — a bare relative `.idd/…` path evaluated there answers `absent` on
 every interactive run and the gate silently never fires. `git rev-parse
 --git-common-dir` points back at the original checkout's `.git` from inside a
 linked worktree and is this repo's own `.git` on the in-place path, so it names
@@ -61,7 +61,7 @@ shell variables.
 # The analysis artifact lives in the ORIGINAL checkout, not in a 0e worktree.
 # `cd`+`pwd` absolutizes --git-common-dir, which is relative (`.git`) in place.
 origin_root="$(dirname "$(cd "$(git rev-parse --git-common-dir)" && pwd)")"
-analysis="$origin_root/.gitissue/analysis-{N}.json"
+analysis="$origin_root/.idd/analysis-{N}.json"
 base_ref="origin/${base}"      # this run's synced base — never a bare HEAD
 
 # 1. Exists and parses as JSON — else `absent`. Never fatal: having no analysis

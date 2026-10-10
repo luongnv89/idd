@@ -10,7 +10,7 @@ authorizes no change to any issue.
 
 1. **Result first.** The first row after the header is `Result:` with one status
    and the main finding or stop reason:
-   - `DONE` — every step ran, every check passed, and `.gitissue/triage.json`
+   - `DONE` — every step ran, every check passed, and `.idd/triage.json`
      was written.
    - `PARTIAL` — a report rendered, but at least one check is `×` or `⚠`: a
      rate-limited or timed-out scan, a degraded script, an unsynced tree after a
@@ -18,7 +18,7 @@ authorizes no change to any issue.
    - `BLOCKED` — the run stopped before a report rendered: failed
      prerequisite, insufficient rate budget, invalid config, missing bundled
      dependency, or a corrupted cache.
-   - `CACHED` — a view-mode render from `.gitissue/triage.json`.
+   - `CACHED` — a view-mode render from `.idd/triage.json`.
 2. **Evidence.** Name the checks that actually ran (fetch count, scanner
    batches returned, script exit code, persisted path). For each `maybe-fixed`
    issue, link the commit or PR that triggered the flag. A `✓ pass` row is
@@ -47,7 +47,7 @@ Cached view mode prints the *Final Report* block under the header
   Cache load:        ✓ pass (age: {Nd Nh})
   Issues:            {N} analyzed
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  Evidence:          .gitissue/triage.json, updated {timestamp}
+  Evidence:          .idd/triage.json, updated {timestamp}
   Uncertainty:       backlog and code not re-checked since {timestamp}
   Decision:          No approval needed.
   Suggested start:   #{first} — {title}
@@ -59,7 +59,7 @@ Cached view mode prints the *Final Report* block under the header
 The default format is the static terminal table plus the summary lines below:
 one row per issue, at most `--limit` rows, inspectable at once. Project
 convention forbids terminal animation, so triage produces no interactive report;
-`.gitissue/triage.json` is the machine-readable form for later filtering. If the
+`.idd/triage.json` is the machine-readable form for later filtering. If the
 user asks for another format (for example a Mermaid dependency graph or a
 Markdown table), produce it from the same payload and keep the `Result`,
 `Evidence`, `Uncertainty` and `Decision` rows. If the host cannot render the
@@ -159,22 +159,22 @@ For each flagged issue, show:
 
 ## Step 9 — Persist
 
-After Step 8 (terminal output is always shown regardless of persistence success), save the triage results to `.gitissue/triage.json`.
+After Step 8 (terminal output is always shown regardless of persistence success), save the triage results to `.idd/triage.json`.
 
 ### Write process
 
-`shared/scripts/gi-triage-graph.py --out .gitissue/triage.json` does steps 1-4
+`shared/scripts/gi-triage-graph.py --out .idd/triage.json` does steps 1-4
 below in one call — it emits exactly this schema, so the payload and the
 document cannot drift. Do them by hand only when that script degraded (see
 SKILL.md, *Steps 3-7*):
 
-1. Create the directory if it doesn't exist: `mkdir -p .gitissue/`
+1. Create the directory if it doesn't exist: `mkdir -p .idd/`
 2. Build the JSON object from Steps 1-8 analysis results using the schema below
 3. Append one entry to the `history` array
-4. Write `.gitissue/triage.json` with formatted JSON (readable diffs in git)
-5. Print: `✓ Triage saved to .gitissue/triage.json`
+4. Write `.idd/triage.json` with formatted JSON (readable diffs in git)
+5. Print: `✓ Triage saved to .idd/triage.json`
 
-### JSON Schema (`.gitissue/triage.json`)
+### JSON Schema (`.idd/triage.json`)
 
 ```json
 {
@@ -264,9 +264,9 @@ The schema is unchanged by this — no field is added, none is removed, and a pa
 
 If writing fails (e.g., permission denied):
 ```
-⚠ Could not save triage report to .gitissue/triage.json
+⚠ Could not save triage report to .idd/triage.json
 
-  To fix:  check file permissions in the .gitissue/ directory
+  To fix:  check file permissions in the .idd/ directory
 ```
 This is a warning, not a fatal error — the terminal output from Step 8 was already displayed.
 
@@ -310,7 +310,7 @@ Rules that make the report worth reading:
 | 1 — Fetch Issues | `Issues fetched` · `Config applied` |
 | 1b & 2 — Already-Fixed & Dependencies | `Scanner returned` · `Dependencies mapped` |
 | 3-7 — Order, Parallel Sets, Staleness, Priority | `Order computed` · `No cycle left unreported` · `Disjoint sets identified` · `Threshold applied` · `Every open issue scored` · `Every issue ranked` |
-| 8-9 — Output & Persist | `Report rendered` · `.gitissue/triage.json written` |
+| 8-9 — Output & Persist | `Report rendered` · `.idd/triage.json written` |
 
 When the scripted block degraded to the prose procedure, the step still reports —
 mark the checks it could not evaluate `×` and use `PARTIAL`, never `√`.

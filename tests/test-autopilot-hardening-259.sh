@@ -340,12 +340,12 @@ assert_json "AC1: --log is accepted as the alias of --path" "$out" streak=3
 # still answers (fail-open) rather than crashing in a repo with no run log.
 run_status out st bash -c "cd '$TMP' && python3 '$LOG' --failure-streak 61"
 if [ "$st" = "0" ] || [ "$st" = "4" ]; then
-  pass "AC1: the default log path is .gitissue/runs.jsonl and answers either way"
+  pass "AC1: the default log path is .idd/runs.jsonl and answers either way"
 else
   fail "AC1: the default-path invocation exited $st (want 0 or 4)"
 fi
 expect_grep "AC1: the default path is the documented run log" \
-  '.gitissue/runs.jsonl' "$LOG"
+  '.idd/runs.jsonl' "$LOG"
 
 # The read mode writes nothing — it is telemetry read-back, not a second writer.
 touch "$TMP/immutable.jsonl"
@@ -1205,7 +1205,7 @@ expect_block "AC1: any other skip label records the reason 'blocked_label'" \
 expect_block "AC1: 1.2b still defers the bucket to Step 1.2's table" \
   "$CAPTURE_BLOCK" 'reason-to-bucket table is the single home'
 expect_block "AC1: a label rejection writes no run-log line" \
-  "$CAPTURE_BLOCK" '**no `.gitissue/runs.jsonl` line is written**'
+  "$CAPTURE_BLOCK" '**no `.idd/runs.jsonl` line is written**'
 expect_block "AC1: a label rejection consumes no iteration slot" \
   "$CAPTURE_BLOCK" '`[Iteration {i}/{max}]` slot is consumed'
 expect_block "AC1: the reuse path is stated to match what a full triage would do" \

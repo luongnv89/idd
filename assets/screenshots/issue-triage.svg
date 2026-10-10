@@ -42,5 +42,5 @@
     <tspan fill="#cdd6f4">  &#x25CB;  Suggested order: </tspan><tspan fill="#89dceb">#12</tspan><tspan fill="#cdd6f4"> &#x2192; </tspan><tspan fill="#89dceb">#15</tspan><tspan fill="#cdd6f4"> &#x2192; </tspan><tspan fill="#89dceb">#8</tspan><tspan fill="#cdd6f4"> &#x2192; </tspan><tspan fill="#89dceb">#3</tspan>
   </text>
 
-  <text fill="#a6e3a1" font-family="monospace" font-size="13" x="20" y="420">  &#x2713; Triage saved to .gitissue/triage.json</text>
+  <text fill="#a6e3a1" font-family="monospace" font-size="13" x="20" y="420">  &#x2713; Triage saved to .idd/triage.json</text>
 </svg>

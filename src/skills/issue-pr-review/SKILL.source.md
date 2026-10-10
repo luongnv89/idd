@@ -86,9 +86,9 @@ Before any fix, sync with the **stash-first pattern** (`docs/sync-conventions.md
 Load config once at skill start; never re-read it. Run `python3 shared/scripts/gi-config.py` — **Working directory:** the repo root; **Script path:** resolved against this SKILL.md's directory (why: `references/review-loop-mechanics.md`).
 
 - **Exit 0** — use `config`.
-- **Exit 3** — print `✗ Invalid config: .gitissue.yml` with the offending key and reason from stderr, and stop.
+- **Exit 3** — print `✗ Invalid config: .idd.yml` with the offending key and reason from stderr, and stop.
 - **Script file absent** — a broken install and not a degrade: stop and print the `✗ Missing bundled dependency` block.
-- **Anything else** (no `python3`, non-zero exit, unparsable stdout) — print `⚠ gi-config unavailable — reading .gitissue.yml by hand` and read it yourself *instead of* the script.
+- **Anything else** (no `python3`, non-zero exit, unparsable stdout) — print `⚠ gi-config unavailable — reading .idd.yml by hand` and read it yourself *instead of* the script (else legacy `.gitissue.yml`, printing `⚠ legacy .gitissue.yml found — rename to .idd.yml`).
 
 **Capture the run clock here:** chain that same `python3` invocation as `python3 …; ec=$?; date +%s >&2; exit "$ec"`; the stderr epoch is `run_started_epoch`, from which the *Run Stats Footer* (`references/run-stats.md`) measures `elapsed`.
 
@@ -149,7 +149,7 @@ Set `profile = light | full`. Signals and what <!-- a:rv-depth-gate-refresh -->
 
 ### QA handoff gate (trust an already-QA'd PR) <!-- a:rv-qa-handoff-gate -->
 
-`/issue-resolver` ends a clean QA loop by writing `<!-- gitissue:qa v1 head=… -->` as the PR body's last line. After the Depth gate, set `qa_handoff = trusted | stale | absent`, plus `ci_leg_runnable` from `review.check_ci` and Step 1's `statusCheckRollup`:
+`/issue-resolver` ends a clean QA loop by writing `<!-- idd:qa v1 head=… -->` as the PR body's last line (a legacy `gitissue:qa` one is read too). After the Depth gate, set `qa_handoff = trusted | stale | absent`, plus `ci_leg_runnable` from `review.check_ci` and Step 1's `statusCheckRollup`:
 
 | Value | When | Effect |
 |-------|------|--------|
@@ -232,7 +232,7 @@ This skill produces `acceptance_criteria` and `traceability` itself, per `refere
 - **Under `qa_handoff = trusted`, skip this step** and report `○ tests skipped (qa handoff @ {commit_sha_short})` — `trusted` holds only against the **live** head, so the soft-pass conjunction therefore treats the test leg as satisfied — only when the marker carries a `tests=` field whose SHA equals `head` **and `ci_leg_runnable` is true**; with no `tests=` field, or a SHA that differs, run the step in full. When `ci_leg_runnable` is false (no CI / empty `statusCheckRollup` / `no_ci` / `review.check_ci: false`), ignore `tests=` and run the local suite as unmarked.
 - **Otherwise:** run the build, then every test type present, with a `review.test_timeout`-second timeout (default 300) — `references/prepass-tests-ci-mechanics.md` (*Step 4*).
 
-**Verification recipe:** when the base branch commits `.gitissue-recipe.json`, run it in this step with `shared/scripts/gi-recipe.py`, even when the suite is skipped (`qa_handoff = trusted` included). Auto mode runs it only when the recipe opts in `review`. A `result: fail` is fixable and blocks soft-pass (`references/ui-review-mechanics.md`, *Verification recipe*).
+**Verification recipe:** when the base branch commits `.idd-recipe.json` (or legacy `.gitissue-recipe.json`), run it in this step with `shared/scripts/gi-recipe.py`, even when the suite is skipped (`qa_handoff = trusted` included). Auto mode runs it only when the recipe opts in `review`. A `result: fail` is fixable and blocks soft-pass (`references/ui-review-mechanics.md`, *Verification recipe*).
 
 A skip satisfies the soft-pass test leg but evaluated neither check: it reports `× Suite passed` / `× Build clean` with `Result: PARTIAL`, never a silent `√`.
 
@@ -272,7 +272,7 @@ Pending CI is **not clean** and is never merged. Interactive: ask whether to wai
 
 Fix only issues with `action: "fix"` — `action: "note"` issues are reported, never fixed. Sources: each `fail` dimension or UI fix finding, Step 4 test failures, Step 5 CI failures. With none, print `○ no fixable issues (noted: {note_count})` and exit the fix loop; soft-pass is evaluated next, never implied.
 
-The `Closes #{linked_issue}` fix is a **read-modify-write** PR-body edit (driver rule 2 in `docs/platform-github.md`): `gh pr view {N} --json body`, prepend `Closes #{linked_issue}` as the **first line** (`docs/naming-conventions.md`), `gh pr edit {N} --body "{merged_body}"`, then re-read and confirm `## Decision Record`, the AC Verification table, and any trailing `<!-- gitissue:qa v1 … -->` marker are still present. Never replace the body, and **never** prepend when line 1 is `Refs #{linked_issue}`. <!-- a:rv-closes-body-edit -->
+The `Closes #{linked_issue}` fix is a **read-modify-write** PR-body edit (driver rule 2 in `docs/platform-github.md`): `gh pr view {N} --json body`, prepend `Closes #{linked_issue}` as the **first line** (`docs/naming-conventions.md`), `gh pr edit {N} --body "{merged_body}"`, then re-read and confirm `## Decision Record`, the AC Verification table, and any trailing `<!-- idd:qa v1 … -->` marker are still present (a legacy `gitissue:qa` one counts). Never replace the body, and **never** prepend when line 1 is `Refs #{linked_issue}`. <!-- a:rv-closes-body-edit -->
 
 Delegate code fixes to the fixer subagent (`shared/agents/fixer.md`), reused across cycles — never edit code in the main context. It scans the staged set (`references/scripts/gi-secscan.py`, Step 2's `--policy-ref`) and commits; you push with `git push origin "$branch_name"`. Spawn: `references/review-loop-mechanics.md`.
 

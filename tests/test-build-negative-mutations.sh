@@ -12,7 +12,7 @@
 #     M1  broken docs/X.md token reference   → unresolved doc reference
 #     M2  dropped digest section             → missing digest section(s)
 #     M3  drifted config default (init's
-#         .gitissue.yml template vs schema)  → template/schema parity failed
+#         .idd.yml template vs schema)  → template/schema parity failed
 #     M4  perturbed digest byte-size budget  → measured size drift
 #
 #   A T0 baseline first builds an unmutated copy so a broken main-branch tree
@@ -127,19 +127,19 @@ PY
 assert_build_fails m2 "M2: dropped digest section" "$copy"
 
 # ───────────────────────────────────────────────────────────
-# M3: drifted config excerpt vs .gitissue.yml defaults
-# init-gitissue renders .gitissue.yml field by field from its template; one
+# M3: drifted config excerpt vs .idd.yml defaults
+# init-idd renders .idd.yml field by field from its template; one
 # drifted documented default must abort parity validation.
 # ───────────────────────────────────────────────────────────
 copy="$(make_copy m3-config-drift)"
-template="$copy/src/skills/init-gitissue/templates/gitissue-template.yml"
+template="$copy/src/skills/init-idd/templates/idd-template.yml"
 if ! grep -q '^  max_commits: 10$' "$template"; then
-  fail "M3: fixture drift — 'max_commits: 10' not found in gitissue-template.yml"
+  fail "M3: fixture drift — 'max_commits: 10' not found in idd-template.yml"
 elif ! sed -i.bak 's/^  max_commits: 10$/  max_commits: 99/' "$template"; then
-  fail "M3: could not apply config drift to gitissue-template.yml"
+  fail "M3: could not apply config drift to idd-template.yml"
 else
   rm -f "$template.bak"
-  assert_build_fails m3 "M3: drifted config excerpt vs .gitissue.yml" "$copy"
+  assert_build_fails m3 "M3: drifted config excerpt vs .idd.yml" "$copy"
 fi
 
 # ───────────────────────────────────────────────────────────

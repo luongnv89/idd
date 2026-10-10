@@ -98,7 +98,7 @@ asm install https://github.com/luongnv89/idd --skill issue-creator
 
 ## Output
 
-- A structured GitHub issue with `<!-- gitissue:normalized v1 -->` marker, populated only with intent-capture content (type, description, reporter context, screenshots, acceptance criteria, metadata)
+- A structured GitHub issue with `<!-- idd:normalized v1 -->` marker, populated only with intent-capture content (type, description, reporter context, screenshots, acceptance criteria, metadata)
 - Terminal preview with confidence scores before creation
 - For batch: preview table of all items, per-item progress, summary with retry hints for failures
 - For normalization: backup comment preserving original body, normalization summary comment

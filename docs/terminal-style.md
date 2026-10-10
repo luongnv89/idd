@@ -124,10 +124,10 @@ Levels: `high` (direct match), `medium` (keyword inference), `low` (best guess, 
 
 ## First-Run Experience
 
-When no `.gitissue.yml` exists:
+When no `.idd.yml` exists:
 
 ```
-  ○ First run — using default config. Run /init-gitissue to customize.
+  ○ First run — using default config. Run /init-idd to customize.
 ```
 
 One line, then proceed normally. Non-intrusive.
@@ -150,7 +150,7 @@ Normalized issues must render cleanly in GitHub's web UI:
 - Use standard markdown (no HTML except the invisible marker)
 - Section headers: `## Type`, `## Description`, `## Acceptance Criteria`
 - Code blocks for file paths and technical details
-- Normalization marker: `<!-- gitissue:normalized v1 -->` (invisible in rendered view)
-- QA handoff marker: `<!-- gitissue:qa v1 head=<sha40> … -->` — same invisible shape, written by `/issue-resolver` as a PR body's last line and read by `/issue-pr-review`; it gates duplicated work only, never a safety check
+- Normalization marker: `<!-- idd:normalized v1 -->` (invisible in rendered view)
+- QA handoff marker: `<!-- idd:qa v1 head=<sha40> … -->` — same invisible shape, written by `/issue-resolver` as a PR body's last line and read by `/issue-pr-review`; it gates duplicated work only, never a safety check
 - Reporter's original text: in a `> Reporter Context` blockquote
 - Confidence markers in parentheses: `(high confidence)`, `(needs review)`

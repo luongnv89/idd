@@ -1,5 +1,5 @@
 <!-- Generated from /docs/run-log-schema.md. Do not edit. Edit source and run ./scripts/build.sh. -->
-# `.gitissue/runs.jsonl` — Run Log Schema
+# `.idd/runs.jsonl` — Run Log Schema
 
 The cross-run telemetry file written by `/issue-resolver` and `/auto-pilot`: field
 set, append rules, rotation, and the single-writer convention.
@@ -7,7 +7,7 @@ set, append rules, rotation, and the single-writer convention.
 ## Schema
 
 `runs.jsonl` is an **append-only, schema-light, newline-delimited JSON** file,
-one self-contained object per run, deletable like the rest of `.gitissue/`. Its readers — `/idd-doctor`'s run-log
+one self-contained object per run, deletable like the rest of `.idd/`. Its readers — `/idd-doctor`'s run-log
 summary, `scripts/idd-lint.py stats` and `corrections`, and `gi-runlog.py --failure-streak` — are
 **best-effort by design**: truncation costs only *progress toward* a quarantine,
 never an existing one, whose durable record is the label `/auto-pilot` applies.
@@ -43,7 +43,7 @@ Example lines:
 ```
 
 **Append rules:**
-- Create `.gitissue/` with `mkdir -p` if absent, then append one line ending in a
+- Create `.idd/` with `mkdir -p` if absent, then append one line ending in a
   single `\n`. Never rewrite or reorder existing lines.
 - Legacy `--append` writes are **best-effort and non-fatal**. A parallel lane's
   `--append-once` failure instead leaves its durable state at `log_pending`; it
@@ -57,8 +57,8 @@ should pipe the record to it on stdin rather than hand-roll the append: it
 enforces every rule above — required-field and `outcome` validation, the 5→3
 `complexity` collapse, dropping `null` optional keys, filling an absent `ts` from
 UTC, and the canonical key order (the example lines', not the table's). Its modes
-are mutually exclusive. `--append` (default) creates `.gitissue/` and appends one
-`\n`-terminated line to `--path` (default `.gitissue/runs.jsonl`); `--echo`
+are mutually exclusive. `--append` (default) creates `.idd/` and appends one
+`\n`-terminated line to `--path` (default `.idd/runs.jsonl`); `--echo`
 validates identically, prints the line and **writes nothing**; `--append-once`
 requires `event_id`, locks its cross-process read/check/append/fsync transaction,
 reuses an identical event and exits `3` on conflict. Exits: `0` ok; `2` usage;

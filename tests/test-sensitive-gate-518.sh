@@ -110,7 +110,7 @@ for pair in \
   "config/credentials.yml:secrets" \
   "app/permissions/rbac.py:auth" \
   "CODEOWNERS:access-policy" \
-  ".gitissue.yml:security-config" \
+  ".idd.yml:security-config" \
   ".pre-commit-config.yaml:security-config"; do
   path="${pair%%:*}"; want="${pair##*:}"
   out="$(classify "{\"labels\":[],\"paths\":[\"$path\"]}")"

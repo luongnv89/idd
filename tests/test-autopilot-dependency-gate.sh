@@ -39,7 +39,7 @@ ERRORS="$REPO_ROOT/src/skills/auto-pilot/references/error-messages.md"
 EXAMPLES="$REPO_ROOT/src/skills/auto-pilot/references/examples.md"
 SCHEMA="$REPO_ROOT/docs/config-schema.md"
 METHODOLOGY="$REPO_ROOT/docs/idd-methodology.md"
-TEMPLATE="$REPO_ROOT/src/skills/init-gitissue/templates/gitissue-template.yml"
+TEMPLATE="$REPO_ROOT/src/skills/init-idd/templates/idd-template.yml"
 
 # ───────────────────────────────────────────────────────────
 # T1: AC #1 — markers are identified before merge

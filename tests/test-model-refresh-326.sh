@@ -298,7 +298,7 @@ fi
 # ───────────────────────────────────────────────────────────
 # T9 (issue #341): private regenerable state stays local-only
 # ───────────────────────────────────────────────────────────
-PRIVATE_STATE=(.gitissue/analysis-19.json .gitissue/triage.json)
+PRIVATE_STATE=(.idd/analysis-19.json .idd/triage.json)
 if [ -z "$(git -C "$REPO_ROOT" ls-files -- "${PRIVATE_STATE[@]}")" ]; then
   pass "T9: private analysis and triage state are absent from the index"
 else

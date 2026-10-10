@@ -194,7 +194,7 @@ _SCRIPT_REQUIRES_RE = re.compile(r"^#\s*gi-requires:\s*(\S+)\s*$", re.MULTILINE)
 
 CONFIG_SCHEMA_DOC = "config-schema.md"
 
-FULL_CONFIG_SCHEMA_SKILLS = frozenset({"init-gitissue"})
+FULL_CONFIG_SCHEMA_SKILLS = frozenset({"init-idd"})
 
 CONFIG_SECTIONS_ALWAYS = frozenset({"platform"})
 
@@ -210,8 +210,8 @@ _CONFIG_EXCERPT_NOTICE = (
 # keeping the size accounting executable instead of burying it in comments.
 DOC_DIGEST_EXPECTED_BYTES: dict[str, tuple[int, int]] = {
     # document: (authored document, emitted runtime digest)
-    "platform-github.md": (5998, 5688),
-    "pre-commit-security.md": (28277, 19719),
+    "platform-github.md": (5993, 5683),
+    "pre-commit-security.md": (28404, 19846),
 }
 
 DOC_SECTION_DIGESTS: dict[str, tuple[str, ...]] = {

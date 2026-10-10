@@ -13,7 +13,7 @@ metadata:
 
 Fully autonomous development loop: triage, pick, resolve, review, fix, merge, repeat — zero user prompts.
 
-It orchestrates the other IDD Stack skills over the backlog. It triages **once** at loop start (reusing a fresh `.gitissue/triage.json`, *Mode Detection*) and picks from that order; with `autopilot.max_parallel` above 1, independent issues resolve concurrently in isolated worktrees, but PRs are reviewed and merged one at a time. After each merge, update the cached order in place. *Merge Modes* decide which PRs merge; a critical issue with unresolved review problems stops the loop for the user.
+It orchestrates the other IDD Stack skills over the backlog. It triages **once** at loop start (reusing a fresh `.idd/triage.json`, *Mode Detection*) and picks from that order; with `autopilot.max_parallel` above 1, independent issues resolve concurrently in isolated worktrees, but PRs are reviewed and merged one at a time. After each merge, update the cached order in place. *Merge Modes* decide which PRs merge; a critical issue with unresolved review problems stops the loop for the user.
 
 ## Autonomy Philosophy <!-- a:ap-autonomy -->
 
@@ -43,7 +43,7 @@ When in doubt, skip rather than stop: a skipped issue can be retried.
 | `/auto-pilot --limit N` | Process at most N issues |
 | `/auto-pilot --dry-run` | Show the execution plan; resolve nothing |
 | `/auto-pilot --skip N` | Skip issue #N this session |
-| `/auto-pilot --resume` | Resume the run in `.gitissue/run-state.json` at its recorded phase |
+| `/auto-pilot --resume` | Resume the run in `.idd/run-state.json` at its recorded phase |
 | `/auto-pilot --fresh` | Ignore recorded run state (the default when none exists) |
 | `/auto-pilot --force-unlock` | Reclaim a lock whose run is dead, then start |
 
@@ -147,12 +147,12 @@ Load config once with `python3 shared/scripts/gi-config.py`:
 
 - **Working directory:** the repo root (elsewhere it reports `first_run: true` and discards the real config). **Script path:** relative to this SKILL.md, not the working directory.
 - **Exit 0:** use the printed `config`; if `first_run` is `true`, print the `○ First run` line below.
-- **Exit 3:** `.gitissue.yml` is invalid — apply the stop rule with *Invalid config*.
+- **Exit 3:** `.idd.yml` is invalid — apply the stop rule with *Invalid config*.
 - **Script file absent:** a broken install and not a degrade — stop with `✗ Missing bundled dependency`.
-- **Anything else:** print `⚠ gi-config unavailable — using the inline defaults below`, load `.gitissue.yml` once, and fill missing keys from the defaults below. With no `.gitissue.yml`, print:
+- **Anything else:** print `⚠ gi-config unavailable — using the inline defaults below`, load `.idd.yml` (else legacy `.gitissue.yml`, printing `⚠ legacy .gitissue.yml found — rename to .idd.yml`) once, and fill missing keys from the defaults below. With neither file, print:
 
 ```
-○ First run — using default config. Run /init-gitissue to customize.
+○ First run — using default config. Run /init-idd to customize.
 ```
 
 Never re-read the config. **The run clock is `run_state.started_at`**; the run-stats footer measures `elapsed` from it.
@@ -176,7 +176,7 @@ Defaults (rationale: `references/configuration.md`): `autopilot.mode: balanced` 
 **Resolution rules:**
 
 - `autopilot.mode` set: it wins; legacy `autopilot.auto_merge` is ignored.
-- Neither key in `.gitissue.yml`: `balanced`.
+- Neither key in `.idd.yml`: `balanced`.
 - Only `autopilot.auto_merge` **explicitly present**: `auto_merge: true` ≈ `aggressive` + `merge_partial: true`; `auto_merge: false` ≈ `conservative`.
 
 Gate logic: `references/phases/phase-3-4-review.md` (partial) and `references/phases/phase-5-merge.md` (merge).
@@ -189,7 +189,7 @@ The main agent is a **lightweight orchestrator**; subagents with fresh context d
 
 `--issues` selects explicit list mode; its comma-separated list fixes **which** issues run and **in what order**.
 
-- **Triage mode** (default). Triages **once** at loop start (reusing `.gitissue/triage.json` when *Step 1.1a*'s cache gate reads `fresh`), then updates the cache in place after each merge (*Step 1.6*); it re-triages only on a pick miss or every `autopilot.retriage_every` iterations.
+- **Triage mode** (default). Triages **once** at loop start (reusing `.idd/triage.json` when *Step 1.1a*'s cache gate reads `fresh`), then updates the cache in place after each merge (*Step 1.6*); it re-triages only on a pick miss or every `autopilot.retriage_every` iterations.
 - **Explicit list mode** — an analysis pass that validates, deduplicates and orders the list replaces Phase 1 (`references/explicit-list-mode.md`).
 
 ## Loop Overview
@@ -250,13 +250,13 @@ After each iteration print a brief status; `Outcome` takes one of the six catego
 
 ### Run-log entry (monitoring)
 
-Append exactly **one JSON line** to `.gitissue/runs.jsonl` (schema: `docs/run-log-schema.md`) for **every processed issue including skips**, except the in-batch `already resolved in batch` skip. Read `references/run-log.md` first: it holds the single-writer, parallel-lane and batch fan-out contracts. Resolvers run with `--no-run-log` and return telemetry for it: `ts`, `issue`, `mode`, `skill`, `outcome`, `pr`, plus `qa_cycles` / `ceiling` / `breach_reason` / `complexity` / `profile` / `agent_overrides` / `duration_s` / `phases` when present. **A `skipped` outcome always carries `skipped_reason`.** The sequential/batch write is non-fatal (no `python3`, exit 2 or 4 → raw fallback); a parallel lane persists `event_id` as `log_pending`, appends once, then checkpoints `logged`.
+Append exactly **one JSON line** to `.idd/runs.jsonl` (schema: `docs/run-log-schema.md`) for **every processed issue including skips**, except the in-batch `already resolved in batch` skip. Read `references/run-log.md` first: it holds the single-writer, parallel-lane and batch fan-out contracts. Resolvers run with `--no-run-log` and return telemetry for it: `ts`, `issue`, `mode`, `skill`, `outcome`, `pr`, plus `qa_cycles` / `ceiling` / `breach_reason` / `complexity` / `profile` / `agent_overrides` / `duration_s` / `phases` when present. **A `skipped` outcome always carries `skipped_reason`.** The sequential/batch write is non-fatal (no `python3`, exit 2 or 4 → raw fallback); a parallel lane persists `event_id` as `log_pending`, appends once, then checkpoints `logged`.
 
 ```bash
 # Sequential/batch path — legacy behavior:
 printf '%s' "$run_json" | python3 shared/scripts/gi-runlog.py --append
 # Fallback when `python3` is unavailable or the script exits 4 (legacy only):
-# mkdir -p .gitissue && printf '%s\n' "$run_json" >> .gitissue/runs.jsonl
+# mkdir -p .idd && printf '%s\n' "$run_json" >> .idd/runs.jsonl
 
 # Parallel lane — event_id is persisted before this call:
 printf '%s' "$run_json" | python3 shared/scripts/gi-runlog.py --append-once
@@ -288,13 +288,13 @@ The loop stops on any row except those marked *loop continues* (outcome recorded
 | API rate budget too low to wait out | `✗ Insufficient GitHub API rate budget for auto-pilot`; the summary is persisted with `--report` and reports `Result: RATE LIMITED` |
 | User cancellation | `○ Auto-pilot stopped by user` |
 
-**Release the run lock on every exit path** — every row above, the critical-issue pause, and any unhandled failure — with `python3 shared/scripts/gi-state.py --unlock` as the run's last mutation. If the script is unavailable, delete `.gitissue/run.lock` by hand.
+**Release the run lock on every exit path** — every row above, the critical-issue pause, and any unhandled failure — with `python3 shared/scripts/gi-state.py --unlock` as the run's last mutation. If the script is unavailable, delete `.idd/run.lock` (or legacy `.gitissue/run.lock`) by hand.
 
 ## Final Summary
 
 When the loop ends, for any reason, print the final summary: one row per iteration tagged with one of the six categorical outcomes — **`merged`**, **`left_open`**, **`partial_followup`**, **`blocked_by_dependency`**, **`failed`**, **`skipped`**. Read `references/summary-format.md` first and follow its **Review contract**: `Result:` first (status, `complete` or `partial`, main finding), then `Evidence` (observed checks only), `Uncertainty`, and `Decision` (`No approval needed.`, or the pending critical-issue decision on `PAUSED`); remaining user actions go on `Next action:`.
 
-**Persist it:** pipe the payload into `python3 shared/scripts/gi-state.py --report` (stdin, never a command line) to write `.gitissue/last-run-report.md`, then release the lock. A dry run skips both.
+**Persist it:** pipe the payload into `python3 shared/scripts/gi-state.py --report` (stdin, never a command line) to write `.idd/last-run-report.md`, then release the lock. A dry run skips both.
 
 **Then the *Run Stats Footer*** (`references/run-stats.md`): `elapsed`, `tokens` only where the host reported a count, `agents` (every subagent the loop spawned), run cost only, `n/a` when undetermined. It is the last thing printed at **every** terminal outcome — every *Stop Conditions* row and every abort that never reaches the summary.
 

@@ -22,7 +22,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 GI_CONFIG="$ROOT/src/shared/scripts/gi-config.py"
 SCHEMA="$ROOT/docs/config-schema.md"
-TEMPLATE="$ROOT/src/skills/init-gitissue/templates/gitissue-template.yml"
+TEMPLATE="$ROOT/src/skills/init-idd/templates/idd-template.yml"
 WORKFLOW="$ROOT/.github/workflows/dist-check.yml"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT

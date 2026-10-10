@@ -7,7 +7,7 @@ Issue-Driven Development is a methodology, not a tool. This page gets a team to 
 Paste this skeleton into a new issue and fill it in. It is the spec's issue contract (§1) in its bug form:
 
 ```markdown
-<!-- gitissue:normalized v1 -->
+<!-- idd:normalized v1 -->
 
 ## Type
 

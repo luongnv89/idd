@@ -5,7 +5,7 @@
 #   AC1: Every-run-mandatory material sits behind "read now" pointers; the
 #        no-Agent-tool inline fallback is a separate file, gated on the Agent
 #        tool being unavailable.
-#   AC2: /init-gitissue validates the generated config (YAML parse + no leftover
+#   AC2: /init-idd validates the generated config (YAML parse + no leftover
 #        placeholders) before reporting success.
 #   AC3: resolver, pr-review, auto-pilot and triage emit Step Completion Reports
 #        with √/× checks and a Result line.
@@ -74,18 +74,18 @@ else
   fail "AC1.6: issue-triage still defers references/detection.md to tuning time"
 fi
 
-# ── AC2: init-gitissue completion bar ─────────────────────────────────────────
-INIT_SRC="$SRC/init-gitissue/SKILL.source.md"
+# ── AC2: init-idd completion bar ─────────────────────────────────────────
+INIT_SRC="$SRC/init-idd/SKILL.source.md"
 if grep -qE 'yaml\.safe_load|YAML\.load_file' "$INIT_SRC"; then
-  pass "AC2.1: init-gitissue parses the written config as YAML"
+  pass "AC2.1: init-idd parses the written config as YAML"
 else
-  fail "AC2.1: init-gitissue never parses the generated config"
+  fail "AC2.1: init-idd never parses the generated config"
 fi
 
 if grep -qE 'placeholder' "$INIT_SRC"; then
-  pass "AC2.2: init-gitissue checks for leftover placeholder tokens"
+  pass "AC2.2: init-idd checks for leftover placeholder tokens"
 else
-  fail "AC2.2: init-gitissue has no leftover-placeholder check"
+  fail "AC2.2: init-idd has no leftover-placeholder check"
 fi
 
 if grep -qE '^  Validation: ' "$INIT_SRC"; then
@@ -94,7 +94,7 @@ else
   fail "AC2.3: the completion report has no Validation row"
 fi
 
-if grep -qE '^### Generated config failed validation' "$SRC/init-gitissue/references/error-messages.md"; then
+if grep -qE '^### Generated config failed validation' "$SRC/init-idd/references/error-messages.md"; then
   pass "AC2.4: validation failure has a rich error message"
 else
   fail "AC2.4: no error-message entry for a failed config validation"

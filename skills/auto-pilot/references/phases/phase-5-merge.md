@@ -227,7 +227,7 @@ If the unsatisfied set is non-empty, do **not** merge. Print the structured aler
     2. Re-run /auto-pilot — a later run re-evaluates the gate for
        PR #{pr_number} and merges it once the dependency is in
     3. To bypass entirely: set autopilot.respect_dependencies: false in
-       .gitissue.yml (not recommended unless the marker is wrong)
+       .idd.yml (not recommended unless the marker is wrong)
 ```
 
 When a dependency issue has no linked PR (`closedByPullRequestsReferences` is empty and the issue is still open), the bullet shows `no linked PR` in place of the PR state — the user knows they need to drive that issue forward, not wait on a PR. When the dependency is open with multiple linked PRs, list each one. The headline picks the first unsatisfied dependency to keep the one-line summary actionable; the bullets enumerate the rest.
@@ -550,14 +550,14 @@ because a merge is what makes it necessary.
 
 It runs alongside *Step 5.3*'s **End-of-iteration checkpoint**, and the two own
 **different files**: this step owns the triage payload
-(`.gitissue/triage.json`), that checkpoint owns the run state
-(`.gitissue/run-state.json`). Neither reads or writes the other's file, so their
+(`.idd/triage.json`), that checkpoint owns the run state
+(`.idd/run-state.json`). Neither reads or writes the other's file, so their
 order relative to each other does not matter.
 
 **Two lists, two facts — never sync them.** `summary.suggested_order` in
-`.gitissue/triage.json` is the **live pick order**: this step maintains it after
+`.idd/triage.json` is the **live pick order**: this step maintains it after
 every merge, and it is the only thing *Step 1.2* reads when choosing an issue.
-`queue` in `.gitissue/run-state.json` is the run's **recorded intent at
+`queue` in `.idd/run-state.json` is the run's **recorded intent at
 `--init`** (*Step 1.0*), kept for the resume gate and the final report; it is
 deliberately **not** re-derived here, and this step never patches the run state.
 After the first merge the two therefore differ — by exactly the issue just
@@ -571,7 +571,7 @@ one with two homes that can drift.
 
 > **Note:** Skipped in explicit list mode (`--issues`), with the rest of Phase 1
 > (the note at the top of `references/phases/phase-1-triage-pick.md`). That mode never triages, so there is no
-> payload to maintain: a `.gitissue/triage.json` this run neither wrote nor read
+> payload to maintain: a `.idd/triage.json` this run neither wrote nor read
 > is not a cache that went stale, and a missing one there is not a degrade. Skip
 > the step silently — no `⚠`, no `retriage_required`, which that mode has no
 > *Step 1.1* to clear. The fail-safe below governs triage mode alone.
@@ -599,13 +599,13 @@ step is the one place in #258's work that persists anything, so it takes the sam
 rule *Step 1.1*'s `--out` and every `gi-state.py` call take: a dry run mutates no
 file on disk. Apply the nine rules below in memory, print the `✓ Triage cache
 updated` line with the counts the update *would* have produced, and skip the
-write-back — never write `.gitissue/triage.json`. Nothing downstream is harmed:
+write-back — never write `.idd/triage.json`. Nothing downstream is harmed:
 `--dry-run` stops at *Step 1.3* before any merge, so in practice this step is
 unreachable under it, and the rule is stated here so that it stays unreachable
 by design rather than by accident. *Step 1.1a*, the read side of this cache, is
 read-only and needs no such rule.
 
-Read `.gitissue/triage.json`, apply **removal only**, and write it back with the
+Read `.idd/triage.json`, apply **removal only**, and write it back with the
 Write tool:
 
 1. Drop the resolved number from `issues[]`.

@@ -72,7 +72,7 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 ```
 ⚠ Scan timeout after {N}s — analysis based on {M} files read
 
-  To fix:  increase analysis.scan_timeout in .gitissue.yml
+  To fix:  increase analysis.scan_timeout in .idd.yml
 ```
 **Trigger:** The research phase exceeds `analysis.scan_timeout` seconds (default 120). Analysis continues with partial results.
 
@@ -92,35 +92,35 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 ```
 ○ No analysis found for issue #N. Run /issue-analysis N to generate one.
 ```
-**Trigger:** `/issue-analysis N view` invoked but `.gitissue/analysis-N.json` does not exist.
+**Trigger:** `/issue-analysis N view` invoked but `.idd/analysis-N.json` does not exist.
 **Note:** This is an informational message, not an error.
 
 ### Corrupted analysis file
 ```
-✗ .gitissue/analysis-N.json is corrupted
+✗ .idd/analysis-N.json is corrupted
 
-  To fix:  rm .gitissue/analysis-N.json && /issue-analysis N
+  To fix:  rm .idd/analysis-N.json && /issue-analysis N
   Check:   was the file edited manually?
 ```
 **Trigger:** `/issue-analysis N view` finds the file but JSON parsing fails.
 
 ### Could not save analysis
 ```
-⚠ Could not save analysis to .gitissue/analysis-N.json
+⚠ Could not save analysis to .idd/analysis-N.json
 
-  To fix:  check file permissions in the .gitissue/ directory
+  To fix:  check file permissions in the .idd/ directory
 ```
-**Trigger:** File write to `.gitissue/analysis-N.json` fails (permission denied, disk full, etc.).
+**Trigger:** File write to `.idd/analysis-N.json` fails (permission denied, disk full, etc.).
 
 ## Configuration
 
 ### Invalid config
 ```
-✗ Invalid config: .gitissue.yml
+✗ Invalid config: .idd.yml
 
   Line {N}: {field} {validation_message}
 
-  To fix:  edit .gitissue.yml and correct the values above
+  To fix:  edit .idd.yml and correct the values above
   Docs:    https://github.com/luongnv89/idd/blob/main/docs/config-schema.md
 ```
 **Trigger:** Config file exists but contains invalid values (wrong type, out of range, unknown field).

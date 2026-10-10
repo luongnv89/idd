@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- gitissue:normalized v1 -->
 
+## [Unreleased]
+
+### Changed
+- **all skills, scripts, init:** rename the last `gitissue` identifiers to `idd`: `.gitissue.yml` → `.idd.yml`, `.gitissue/` → `.idd/`, `.gitissue-recipe.json` → `.idd-recipe.json`, `.gitissue-borrowed` → `.idd-borrowed`, `/init-gitissue` → `/init-idd`, the `gitissue:normalized` / `gitissue:qa` / `gitissue:run-report` markers → `idd:`, and `~/.cache/gitissue` → `~/.cache/idd`. Existing repos keep working. Every legacy name is still read as a fallback with a `⚠ … rename to …` warning, and the new name wins when both exist. The base-ref security policy and the verification recipe fall back to the legacy file only when the new name is absent at the ref; a present but unreadable or invalid new file fails closed. Readers accept both marker namespaces, and the QA handoff's more-than-one-marker rule counts both. `gi-state` migrates a legacy `run.lock` and `run-state.json` once and leaves a live legacy lock held. `/init-idd` now adds `.idd/cache/` to `.gitignore` on every run, creating the file when it is missing and never duplicating a line. It mirrors existing `.gitissue…` ignore lines and treats a legacy-only `.gitissue.yml` as the existing config, so a legacy `security:` block is never replaced. Upgrade every client before renaming the files; the steps are in `docs/migrating-from-gitissue.md`. ([#537](https://github.com/luongnv89/idd/issues/537))
+
 ## v0.26.0 — 2026-10-09
 
 ### Features

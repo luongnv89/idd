@@ -8,7 +8,7 @@
 # produces the documented behavior.
 #
 #  AC1. Model scoring data is shipped as a seed and cached at
-#       .gitissue/model-data.json (seed at templates/model-data.json).
+#       .idd/model-data.json (seed at templates/model-data.json).
 #  AC2. On skill start the cache is checked; if missing, the bundled seed is
 #       used / a fetch is offered.
 #  AC3. A cache older than 7 days triggers a staleness warning + refresh prompt.
@@ -16,8 +16,8 @@
 #  AC5. Each complexity maps to exactly one OpenAI + one Anthropic model.
 #  AC6. The suggestion appears in BOTH the Step 5 preview AND the body
 #       ## Metadata section (all three templates).
-#  AC7. .gitissue.yml supports an optional model_suggestion section, generated
-#       by /init-gitissue.
+#  AC7. .idd.yml supports an optional model_suggestion section, generated
+#       by /init-idd.
 #
 # Also guards the cross-cutting constraints: SKILL.source.md stays within the
 # 500-line skill-creator budget, the Output Contract admits the suggestion, the
@@ -36,7 +36,7 @@ REF="$SKILL_DIR/references/model-suggestion.md"
 SEED="$SKILL_DIR/templates/model-data.json"
 ERRORS="$SKILL_DIR/references/error-messages.md"
 SCHEMA="$REPO_ROOT/docs/config-schema.md"
-INIT_TEMPLATE="$REPO_ROOT/src/skills/init-gitissue/templates/gitissue-template.yml"
+INIT_TEMPLATE="$REPO_ROOT/src/skills/init-idd/templates/idd-template.yml"
 BUG="$SKILL_DIR/templates/bug.md"
 FEATURE="$SKILL_DIR/templates/feature.md"
 IMPROVEMENT="$SKILL_DIR/templates/improvement.md"
@@ -173,9 +173,9 @@ else
 fi
 # init template
 if grep -qE '^model_suggestion:' "$INIT_TEMPLATE"; then
-  pass "T5.AC7.4: init-gitissue template generates model_suggestion"
+  pass "T5.AC7.4: init-idd template generates model_suggestion"
 else
-  fail "T5.AC7.4: init-gitissue template missing model_suggestion"
+  fail "T5.AC7.4: init-idd template missing model_suggestion"
 fi
 
 # ───────────────────────────────────────────────────────────
