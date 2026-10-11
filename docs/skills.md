@@ -29,13 +29,13 @@ This page documents every public skill shipped by IDD Stack, what each skill doe
 
 ## `/init-idd`
 
-Initializes IDD Stack configuration for the current repository by detecting language, framework, test runner, and repo size, then writing `.idd.yml`.
+Initializes IDD Stack configuration for the current repository by detecting language, framework, test runner, and repo size, then writing `.idd.yml`. On every run, including when you cancel, it also makes the repo's `.gitignore` ignore `.idd/cache/`: it creates `.gitignore` when missing and never adds a line twice.
 
 ### Input options
 
 | Input | Mode | Behavior |
 |---|---|---|
-| `/init-idd` | Generate config | Scans the repo and creates `.idd.yml` if missing. |
+| `/init-idd` | Generate config | Scans the repo, creates `.idd.yml` if missing, and adds `.idd/cache/` to `.gitignore`. |
 
 ### Existing config behavior
 
