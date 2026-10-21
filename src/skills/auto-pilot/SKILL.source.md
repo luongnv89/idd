@@ -43,7 +43,7 @@ When in doubt, skip rather than stop: a skipped issue can be retried.
 | `/auto-pilot --limit N` | Process at most N issues |
 | `/auto-pilot --dry-run` | Show the execution plan; resolve nothing |
 | `/auto-pilot --skip N` | Skip issue #N this session |
-| `/auto-pilot --resume` | Resume the run in `.idd/run-state.json` at its recorded phase |
+| `/auto-pilot --resume` | Resume the run in `.idd/run-state.json` at its recorded phase, and the in-flight resolver or reviewer from that skill's progress record |
 | `/auto-pilot --fresh` | Ignore recorded run state (the default when none exists) |
 | `/auto-pilot --force-unlock` | Reclaim a lock whose run is dead, then start |
 
@@ -138,6 +138,7 @@ Verify these files exist relative to this SKILL.md's dirname. A missing one is a
 - `references/scripts/gi-triage-graph.py`
 - `references/scripts/gi-state.py`
 - `references/scripts/gi-postmerge.py` — post-merge cleanup: worktrees, branch, switch to the updated default branch
+- `references/scripts/gi-progress.py` — list and clear the resolver's and reviewer's progress records
 - `references/scripts/gi-ratelimit.py` — rate-limit verdict, chunked pause, transient-failure backoff, and the run's wall-clock budget
 
 ### Run lock and branch sync

@@ -66,7 +66,8 @@ Run the original path exactly:
 ```
 
 Use the **Resolver Subagent** prompt from `references/subagent-prompts.md`,
-substituting `{issue_number}` and the optional payload/context. Omit the
+substituting `{issue_number}`, `{run_id}`, `{resume}` (`yes` only when *Step
+1.0*'s progress-record set names this issue) and the optional payload/context. Omit the
 `parallel_lane` block, launch from the original checkout, and wait for this one
 result before Step 2.3. No caller-managed worktree or `lanes[]` checkpoint is
 created.
@@ -172,7 +173,8 @@ Substitute its own payload/context plus the persisted structural record:
 Within every quoted shell command, export from that already-validated record:
 `IDD_AUTO_MODE=1`, `IDD_CALLER_WORKTREE=1`, `IDD_LANE_ID`,
 `IDD_EVENT_ID`, `IDD_WORKTREE_PATH`, `IDD_LANE_BRANCH`, and `IDD_BASE_SHA`; a resumed resolver
-also exports `IDD_RESUME_LANE=1`. Exports are repeated per command because Agent
+also exports `IDD_RESUME_LANE=1`, and its prompt says `resume: yes` only when *Step
+1.0*'s progress-record set names its issue. Exports are repeated per command because Agent
 shell calls do not share process state. Before invoking resolver logic the
 worker runs Step 0e's caller-managed validation in full rather than skipping it.
 Every lane still uses `--auto --no-run-log`; the caller
