@@ -88,6 +88,14 @@ singleton `current.branch`" as a doubt and falls back to `absent`.
 
 - **Known limitation:** on models without the in-band figure the check is inert;
   only the re-entry rules act, after a compaction the host performed.
+- **`--resume` after a crash mid-resolve changes slightly.** A sequential run
+  that died during the resolver spawn used to leave `current: null`, which a
+  resume could continue with `processed[]` and `skip_list[]` seeded. The
+  pre-spawn checkpoint now leaves `current` at `resolve` with no branch, which
+  Step 1.0 reads as a doubt, so the resume falls back to `absent` and starts
+  fresh. That is safe, because the resolver's Step 0b finds any PR the dead run
+  opened, but those seeds are lost. `compaction.enabled: false` restores the
+  old behavior.
 - The three re-entry rules are bounded: a lost loop counter takes the existing
   cap path instead of restarting at cycle 1, and a caller-managed resolver lane
   re-validates its worktree and never falls back to the ambient checkout.
