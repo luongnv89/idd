@@ -54,7 +54,7 @@ When in doubt, skip rather than stop: a skipped issue can be retried.
 **Only when `compaction.enabled` is true; otherwise skip this section** (`references/docs/context-threshold.md`). After a compaction inside a live run:
 
 - This run still holds the lock: never re-take or re-validate it, and **never run Step 1.0's resume gate**, which classifies a dead run's leftovers.
-- Read `python3 references/scripts/gi-state.py --read`, then re-read the current phase file, `references/subagent-prompts.md` and `references/summary-format.md`.
+- Read `python3 references/scripts/gi-state.py --read` (if it cannot run or the state is unreadable, every recorded step is a doubt under (3) below), then re-read the current phase file, `references/subagent-prompts.md` and `references/summary-format.md`.
 - **Never re-spawn a lane or subagent this run spawned that has not returned**: it is in flight, so wait for its notification. Decide in order: (1) this conversation's spawn record or task notification; (2) else the pre-spawn checkpoint (`current.phase` `resolve` or `review` for that issue) plus a live `gh … --json` read for its open PR or branch, or new PR activity since that checkpoint; (3) any doubt counts as in flight — wait, never re-spawn.
 - Resume at the last checkpointed phase. Re-review a PR, re-post a comment, re-create a follow-up issue, push, create a PR or merge only after a live `gh … --json` read shows the recorded step did not happen.
 

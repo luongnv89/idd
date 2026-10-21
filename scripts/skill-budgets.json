@@ -2,8 +2,8 @@
   "headroom_bytes": 1024,
   "skills": {
     "auto-pilot": {
-      "budget": 430734,
-      "measured": 430734
+      "budget": 430828,
+      "measured": 430828
     },
     "init-idd": {
       "budget": 141899,
