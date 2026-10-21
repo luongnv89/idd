@@ -132,6 +132,28 @@ rcpt "$SCRIPTS/gi-receipt.py" --verify not-a-sha
 printf '%s' '{"tool":"issue-resolver","profile":"full","cycles":1,"review":"noted"}' | \
   rcpt "$SCRIPTS/gi-receipt.py" --write
 
+# gi-progress — start, write, resume, read, list and clear against a throwaway
+# repo, plus a refused forbidden key and an illegal transition (behaviour is
+# pinned by tests/test-progress-records-542.sh).
+PROG="$TMP/progress-repo"
+git init -q -b main "$PROG" && git -C "$PROG" -c user.email=c@example.invalid -c user.name=cov \
+  commit -q --allow-empty -m one
+prog() { GIT_DIR="$PROG/.git" GIT_WORK_TREE="$PROG" "$PY" -m coverage run -a --rcfile="$RC" "$SCRIPTS/gi-progress.py" "$@" >/dev/null 2>&1 || true; }
+printf '%s' '{"step":0,"base":"main","plan":{"selected":{"name":"x","files_to_modify":["a.py"]},"overall_risk":"Low"}}' | \
+  prog --start --skill issue-resolver --number 1
+printf '%s' '{"step":1,"qa":{"cycle":1,"premise_ledger":[{"kind":"failure","cycle":1}]}}' | \
+  prog --write --skill issue-resolver --number 1
+printf '%s' '{"resume":true,"effect":{"kind":"push","state":"intent","key":{"sha":"0123456789abcdef0123456789abcdef01234567"}}}' | \
+  prog --write --skill issue-resolver --number 1
+printf '%s' '{"tests_state":"1@x"}' | prog --write --skill issue-resolver --number 1
+printf '%s' '{"step":3}' | prog --write --skill issue-resolver --number 1
+printf '%s' '{"step":1,"cycle":1,"findings":{"open":[{"file":"a.py","description":"x"}]},"history":[["a"]]}' | \
+  prog --start --skill issue-pr-review --number 2
+prog --read --skill issue-resolver --number 1
+prog --list
+prog --clear --skill issue-resolver --number 1
+prog --read --skill issue-resolver --number 1
+
 # gi-sensitive — classify (hit, miss, malformed) and adjudicate the gate ledger.
 printf '%s' '{"labels":["Security"],"paths":[".github/workflows/ci.yml","src/auth/login.py",".env.local","CODEOWNERS",".idd.yml","README.md"]}' | \
   run "$SCRIPTS/gi-sensitive.py" --classify
