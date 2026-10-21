@@ -4,7 +4,7 @@ description: "Create structured GitHub issues from text, screenshots, or lists, 
 license: MIT
 compatibility: "Requires git and GitHub CLI (gh) with authentication. Run `gh auth status` to verify."
 metadata:
-  version: 0.10.0
+  version: 0.11.0
   author: "Luong NGUYEN <luongnv89@gmail.com>"
   effort: medium
 ---
@@ -79,7 +79,9 @@ Capture `run_started_epoch` from stderr by chaining that same `python3` invocati
 ○ First run — using default config. Run /init-idd to customize.
 ```
 
-Defaults: `issue.template: "default"`, `issue.labels_auto_suggest: true`, `issue.normalize_comment: true`, `model_suggestion.enabled: true`, `duplicate_detection.backlog_limit: 100`. Remaining `duplicate_detection.*` defaults and validation: `docs/config-schema.md`.
+Defaults: `issue.template: "default"`, `issue.labels_auto_suggest: true`, `issue.normalize_comment: true`, `model_suggestion.enabled: true`, `duplicate_detection.backlog_limit: 100`, `compaction.enabled: true`, `compaction.threshold.issue-creator: 40`. Remaining `duplicate_detection.*` defaults and validation: `docs/config-schema.md`.
+
+**Context threshold.** <!-- a:ctx-check --> Only when `compaction.enabled` is true (`docs/context-threshold.md`): once, right after this config load, compare the remaining-context figure the host placed in your context (none: skip silently, never estimate) with `compaction.threshold.issue-creator`. At or below it, print the `⚠` line and a `/compact <focus>` line (skill and mode only), then continue — no pause; auto mode prints only the `⚠` line.
 
 When `model_suggestion.enabled` is false, skip model suggestions silently. Otherwise run once before Step 1, with `skill_dir` the absolute dirname of this SKILL.md:
 
@@ -132,7 +134,8 @@ Each is named again at the step that reads it:
   `references/docs/github-projects-sync.md`, `references/docs/config-schema.md`,
   `references/docs/idd-methodology.md`, `references/docs/sync-conventions.md`,
   `references/docs/platform-github.md`, `references/docs/auto-mode.md`,
-  `references/docs/terminal-style.md`, `references/docs/agent-overrides.md`
+  `references/docs/terminal-style.md`, `references/docs/agent-overrides.md`,
+  `references/docs/context-threshold.md`
 - `references/scripts/gi-config.py`, `references/scripts/gi-gh.py`,
   `references/scripts/gi-issue.py`, `references/scripts/gi-dup-score.py`,
   `references/scripts/gi-backlog.py`, `references/scripts/gi-model-cache.py`

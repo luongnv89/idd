@@ -4,7 +4,7 @@ description: "Create an atomic PR closing a GitHub issue end-to-end via a 6-step
 license: MIT
 compatibility: "Requires git and GitHub CLI (gh) with authentication and push access. Self-contained — uses shared agents from shared/agents/."
 metadata:
-  version: 0.20.1
+  version: 0.21.0
   author: "Luong NGUYEN <luongnv89@gmail.com>"
   effort: max
 ---
@@ -20,6 +20,15 @@ Issue → atomic PR in 6 steps.
 | `/issue-resolver <N>` | Interactive; user picks the plan |
 | `/issue-resolver <N> --auto` | No prompts; set by `/auto-pilot` |
 | `/issue-resolver <N> --no-run-log` | Modifier, **orthogonal to `--auto`**: append nothing to `.idd/runs.jsonl`, return telemetry (*Run-log entry*) |
+
+## Context re-entry <!-- a:ctx-reentry -->
+
+**Only when `compaction.enabled` is true; otherwise skip this section** (`docs/context-threshold.md`). After a compaction mid-run, durable state is git plus GitHub; no file is written.
+
+- **Caller-managed lane** (`IDD_CALLER_WORKTREE=1`, this conversation's `parallel_lane` record) first: recover that record, then re-run Step 0e's caller-managed validation from a command that starts `cd -- "$IDD_WORKTREE_PATH" && …`, its exports repeated. Bind the branch and PR only inside that validated root. A record not recovered intact stops the lane with `failure_step: preflight`, `status: blocked_dirty`. **Never fall back to the ambient checkout.**
+- Re-bind the branch live, `branch="$(git rev-parse --abbrev-ref HEAD)"`, then the PR with `gh pr list --head "$branch" --json number,state` — never a branch name pasted from the compaction summary.
+- Read the current step from this conversation's `[N/5]` lines and re-read that step's reference file. Before repeating a push, `gh pr create`, comment or label change, confirm with a live `--json` read that it has not happened.
+- **Step 4 loop:** if **either** the cycle count **or** the premise-reset ledger cannot be read from this conversation, treat the cycle cap as reached and take Step 4's cap-reached path: deliver with known issues and **no** QA marker. Interactive re-entry also treats the premise gate as blocked, so no `continue` sends another fix. **Never restart the loop at cycle 1.**
 
 ## Prerequisites
 
@@ -47,7 +56,9 @@ Either path: no `.idd.yml` (`first_run`) prints `○ First run — using default
 
 **Capture the run clock here:** chain that same `python3` invocation as `python3 …; ec=$?; date +%s >&2; exit "$ec"`; the stderr epoch is `run_started_epoch`, the *Run Stats Footer*'s `elapsed` anchor. Take `date +%s` again as each `[N/5]` step starts and at the terminal outcome: those boundaries are the run log's `phases` (`references/report-templates.md`).
 
-Defaults and behavior per key: `docs/config-schema.md` — `issue.auto_normalize` · `resolve.approval_gate` · `resolve.branch_prefix` · `resolve.auto_test` · `resolve.test_timeout` · `resolve.max_commits` · `resolve.qa_max_cycles` · `resolve.adaptive_effort` · `resolve.ui_review.browser_review` · `resolve.borrow_skills: false`.
+**Context threshold.** <!-- a:ctx-check --> Only when `compaction.enabled` is true (`docs/context-threshold.md`). At each `[N/5]` step start, beside that clock read, compare the remaining-context figure the host placed in your context (none: skip silently, never estimate) with `compaction.threshold.issue-resolver`. At or below it, interactive prints the `⚠` line and a `/compact <focus>` line (skill, `#N`, step id and name only) and pauses **at most once per run**; `--auto` / `IDD_AUTO_MODE=1` prints one `⚠` line per run and continues — never a pause or stop.
+
+Defaults and behavior per key: `docs/config-schema.md` — `issue.auto_normalize` · `resolve.approval_gate` · `resolve.branch_prefix` · `resolve.auto_test` · `resolve.test_timeout` · `resolve.max_commits` · `resolve.qa_max_cycles` · `resolve.adaptive_effort` · `resolve.ui_review.browser_review` · `resolve.borrow_skills: false` · `compaction.enabled: true` · `compaction.threshold.issue-resolver: 40`.
 
 ---
 
@@ -111,6 +122,7 @@ references/docs/shared-agent-conventions.md
 references/docs/platform-github.md
 references/docs/terminal-style.md
 references/docs/ui-review.md
+references/docs/context-threshold.md
 references/scripts/gi-config.py
 references/scripts/gi-runlog.py
 references/scripts/gi-secscan.py
