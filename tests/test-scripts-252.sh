@@ -1279,7 +1279,9 @@ EXPECTED_SITES = {
     # drain both call --append-once, beside the legacy --append and the
     # --failure-streak read from issue #259.
     # 5 since issue #261: the behavioral eval grader invokes gi-runlog.py.
-    "gi-model-cache.py": 2, "gi-runlog.py": 5, "gi-secscan.py": 4,
+    # 5 since issue #542: pr-review's progress record re-scans unpushed commits
+    # with --range "$head_oid" before a resumed push (progress-record-mechanics).
+    "gi-model-cache.py": 2, "gi-runlog.py": 5, "gi-secscan.py": 5,
     "gi-stack-detect.py": 1, "gi-triage-graph.py": 2,
     # 2 since issue #468: /issue-triage Step 1 reads the shared open-issue
     # snapshot, and /issue-creator Step 6 invalidates it after each create.
@@ -1305,6 +1307,10 @@ EXPECTED_SITES = {
     # `--remove-worktree` re-run); auto-pilot Step 5.3 shows the plain and
     # reconciled forms on both the sequential and parallel paths.
     "gi-postmerge.py": 8,
+    # 11 since issue #542: the resolver's Step 0j and pr-review's progress-record
+    # mechanics each --start, --write, --read and --clear their record (4 + 4);
+    # auto-pilot Step 1.0 runs --list once and Step 5.3 clears both records (3).
+    "gi-progress.py": 11,
 }
 # A call is any mention of a shared script by filename, however it is launched
 # (python3, python3.11, uv run, a bare ./path relying on the exec bit), plus the

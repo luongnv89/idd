@@ -463,3 +463,6 @@ jobs:
 
       - name: test-context-threshold-540
         run: bash tests/test-context-threshold-540.sh
+
+      - name: test-progress-records-542
+        run: bash tests/test-progress-records-542.sh
