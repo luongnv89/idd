@@ -10,7 +10,7 @@ implementing or debugging that phase.
 
 | Phase | File | Steps inside | Read when |
 |-------|------|--------------|-----------|
-| 0 — Run lock, resume entry, and checkpoints | `references/phases/phase-0-lock-resume.md` | 1.0, 1.0b, checkpoints, *Runtime budget check* | Once, before the loop |
+| 0 — Run lock, resume entry, and checkpoints | `references/phases/phase-0-lock-resume.md` | 1.0, 1.0b, checkpoints, *Runtime budget check*, *Context threshold check* | Once, before the loop |
 | 1 — Triage and Pick | `references/phases/phase-1-triage-pick.md` | 1.1a, 1.1, 1.1b, 1.2, 1.2b, 1.3 | Top of each iteration |
 | 2 — Resolve (subagent) | `references/phases/phase-2-resolve.md` | 2.x | Before spawning a resolver lane |
 | 3 & 4 — PR Review (via /issue-pr-review) | `references/phases/phase-3-4-review.md` | 3.x, 4.x | Before spawning the reviewer |

@@ -4,7 +4,7 @@ description: "Analyze one GitHub issue for root cause, complexity, and risk into
 license: MIT
 compatibility: "Requires git and GitHub CLI (gh) with authentication. View mode (`/issue-analysis N view`) needs only local file access — no gh required."
 metadata:
-  version: 0.7.0
+  version: 0.8.0
   author: "Luong NGUYEN <luongnv89@gmail.com>"
   effort: high
 ---
@@ -127,10 +127,14 @@ Analysis settings and defaults (full semantics in `references/docs/config-schema
 | `analysis.max_files` | `30` | Max files to read during deep analysis |
 | `analysis.trace_depth` | `3` | How many levels of import dependencies to trace |
 | `analysis.scan_timeout` | `120` | Max seconds for the full codebase scan phase |
+| `compaction.enabled` | `true` | Context-threshold check below; `false` = as before |
+| `compaction.threshold.issue-analysis` | `40` | % of context remaining that triggers it |
 
 If the config file exists but contains invalid values, output the validation error from `references/error-messages.md` and stop.
 
 Do not re-read the config at each step.
+
+**Context threshold.** <!-- a:ctx-check --> Only when `compaction.enabled` is true (`references/docs/context-threshold.md`): once, right after this config load, compare the remaining-context figure the host placed in your context (none: skip silently, never estimate) with `compaction.threshold.issue-analysis`. At or below it, print the `⚠` line and a `/compact <focus>` line (skill, `#N`, step id and name only), then continue — no pause; auto mode prints only the `⚠` line.
 
 ---
 
@@ -198,6 +202,7 @@ Check these files:
 - `references/docs/agent-model-effort.md` — per-agent model and effort mapping
 - `references/docs/agent-overrides.md` — per-role `agents.model` / `agents.effort` spawn rule
 - `references/docs/terminal-style.md` — terminal output style contract
+- `references/docs/context-threshold.md` — context-threshold check contract
 - `references/scripts/gi-config.py` — config resolver: defaults merged with `.idd.yml`, one JSON line
 - `references/scripts/gi-gh.py` — GitHub CLI subprocess boundary
 - `references/scripts/gi-issue.py` — TTL-cached issue fetcher (Step 1)

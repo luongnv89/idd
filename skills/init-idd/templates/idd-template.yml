@@ -240,6 +240,27 @@ security:
   # Warn (never block) when a scanned file exceeds this size, in megabytes
   max_file_size_mb: 10
 
+# Context-threshold compaction (long-running runs)
+# When the host shows the agent how much context is left and it is at or below
+# a skill's threshold, the skill confirms its progress is checkpointed and
+# prompts /compact (it never compacts by itself). After a compaction it resumes
+# from durable state. Contract:
+# https://github.com/luongnv89/idd/blob/main/docs/context-threshold.md
+compaction:
+  # false = every skill behaves exactly as without this section
+  enabled: true
+
+  # Percent of context remaining, integer 1-99, one key per skill
+  threshold:
+    auto-pilot: 15
+    issue-resolver: 40
+    issue-pr-review: 40
+    issue-analysis: 40
+    issue-creator: 40
+    issue-triage: 40
+    plan-to-issues: 40
+    init-idd: 40
+
 # Per-role subagent model / thinking-effort overrides (optional)
 # null = pass nothing; the subagent inherits the main agent's configuration.
 # Values are opaque strings your harness accepts (letters, digits and

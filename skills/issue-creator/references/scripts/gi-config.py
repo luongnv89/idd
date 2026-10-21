@@ -35,6 +35,12 @@ be a short opaque token (letters, digits and `._:/[]-`), else exit 3. After the
 merge a null `agents.<knob>.<role>` is filled from `agents.<knob>.default`, so a
 caller reads one key per role; all-null means "inherit the main agent".
 
+The `compaction` section (issue #540) gets a value guard the type check cannot
+give it: every accepted `compaction.threshold.<skill>` must be an integer from
+1 to 99 (a percent of context remaining) and `compaction.enabled` a boolean,
+else exit 3. Like the agents guard it runs whether or not the section is in
+view.
+
 Legacy name (issue #537). With no `--config`, `.idd.yml` in the working
 directory is read; when it is absent the pre-rename `.gitissue.yml` is read in
 its place (`first_run` false, `config_file` naming it) with
@@ -105,6 +111,14 @@ _SECTION_MAP_RE = re.compile(r"^#{2,4}\s+Config Section Map\s*$", re.MULTILINE)
 _AGENTS_PREFIX = "agents."
 _AGENT_VALUE_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/\[\]-]{0,63}")
 _AGENT_KNOBS = ("model", "effort")
+
+# `compaction.threshold.<skill>` is a percent of context *remaining*. The schema
+# documents 1-99, but its Min/Max comments are not enforced by the type check:
+# 0 would never fire and 100 would fire on every step, so both are exit 3.
+_COMPACTION_ENABLED = "compaction.enabled"
+_COMPACTION_THRESHOLD_PREFIX = "compaction.threshold."
+_COMPACTION_MIN = 1
+_COMPACTION_MAX = 99
 
 
 class ConfigError(Exception):
@@ -419,6 +433,22 @@ def merge(
                 f"{key} — must be null or a string of 1-64 letters, digits and "
                 "._:/[]- that starts with a letter or digit"
             )
+
+    # Same scope as the agents guard: every accepted `compaction.*` key, in view
+    # or not. An in-view value of the wrong type was already refused above and
+    # never reaches `accepted`, so nothing is reported twice.
+    for key in sorted(accepted):
+        value = accepted[key]
+        if key == _COMPACTION_ENABLED:
+            if not isinstance(value, bool):
+                errors.append(f"{key} — must be true or false")
+        elif key.startswith(_COMPACTION_THRESHOLD_PREFIX):
+            is_int = isinstance(value, int) and not isinstance(value, bool)
+            if not is_int or not _COMPACTION_MIN <= value <= _COMPACTION_MAX:
+                errors.append(
+                    f"{key} — must be an integer from {_COMPACTION_MIN} to "
+                    f"{_COMPACTION_MAX} (percent of context remaining)"
+                )
 
     merged = {**defaults, **accepted}
     # Default fill: a null `agents.<knob>.<role>` takes `agents.<knob>.default`,

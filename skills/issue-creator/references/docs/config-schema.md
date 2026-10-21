@@ -1,7 +1,7 @@
 <!-- Generated from /docs/config-schema.md. Do not edit. Edit source and run ./scripts/build.sh. -->
 # `.idd.yml` Configuration Schema
 
-> **Per-skill excerpt (generated).** Only the configuration sections this skill reads are reproduced here: `agents`, `duplicate_detection`, `issue`, `model_suggestion`, `platform`, `projects`, `triage`. The complete schema — every section and the full defaults table — is at [config-schema.md](https://github.com/luongnv89/idd/blob/main/docs/config-schema.md).
+> **Per-skill excerpt (generated).** Only the configuration sections this skill reads are reproduced here: `agents`, `compaction`, `duplicate_detection`, `issue`, `model_suggestion`, `platform`, `projects`, `triage`. The complete schema — every section and the full defaults table — is at [config-schema.md](https://github.com/luongnv89/idd/blob/main/docs/config-schema.md).
 
 IDD Stack works with zero configuration — every setting has a default. With no `.idd.yml`, the first-run hint is shown:
 
@@ -133,6 +133,23 @@ model_suggestion:
   # .github/workflows/model-data-refresh.yml): skips while the bundled
   # seed is younger than cache_ttl_days.
 
+# Context-threshold check + re-entry rules. Contract:
+# https://github.com/luongnv89/idd/blob/main/docs/context-threshold.md
+compaction:
+  # Type: boolean. Default: true. false = behave as before.
+  enabled: true
+  # Type: integer 1-99 per skill, % of context remaining (else exit 3).
+  # Default: as listed (auto-pilot 15, every other skill 40).
+  threshold:
+    auto-pilot: 15
+    issue-resolver: 40
+    issue-pr-review: 40
+    issue-analysis: 40
+    issue-creator: 40
+    issue-triage: 40
+    plan-to-issues: 40
+    init-idd: 40
+
 # Per-role subagent overrides. null = inherit main agent. Values: opaque
 # harness strings, ^[A-Za-z0-9][A-Za-z0-9._:/\[\]-]{0,63}$ (else exit 3: they
 # reach a spawn call and a prompt); quote one with [ or ]: "opus[1m]".
@@ -205,6 +222,8 @@ Config is validated at every skill start; errors include line numbers:
   Docs:    https://github.com/luongnv89/idd/blob/main/docs/config-schema.md
 ```
 
+Each `compaction.threshold.<skill>` must be an integer from 1 to 99 and `compaction.enabled` a boolean.
+
 ## Defaults Table
 
 | Setting | Default | Description |
@@ -242,3 +261,6 @@ Config is validated at every skill start; errors include line numbers:
 | `agents.model` per-role keys | `null` | Overrides `default`; a `null` role resolves to it |
 | `agents.effort.default` | `null` | Thinking effort, same rules |
 | `agents.effort` per-role keys | `null` | As `agents.model` |
+| `compaction.enabled` | `true` | Context-threshold check and re-entry rules; `false` = behave as before |
+| `compaction.threshold` · `auto-pilot` | `15` | % of context remaining (1-99) at or below which the skill prompts compaction |
+| `compaction.threshold` · every other skill | `40` | Same, one key per skill |

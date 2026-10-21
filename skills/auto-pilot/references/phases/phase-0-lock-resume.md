@@ -237,3 +237,25 @@ passes `max_runtime_minutes × 60`. Exit 3 means the inputs are invalid (a
 malformed `started_at`, a negative `--max-minutes`): stop *this check*, and treat
 the budget as unenforced rather than as expired — a broken clock must never
 manufacture a stop.
+
+### Context threshold check <!-- a:ctx-check -->
+
+Only when `compaction.enabled` is true; `false` skips this check entirely and
+the loop behaves exactly as before. The contract, including the signal rule, is
+`references/docs/context-threshold.md`. Evaluate it at the **top of every iteration** only,
+right after the *Runtime budget check*, against
+`compaction.threshold.auto-pilot` (default 15). It reads only a
+remaining-context figure the host already placed in this agent's context; with
+none, skip it silently and never estimate one.
+
+At or below the threshold, confirm the run-state checkpoint is current — the
+last phase's checkpoint (or *Step 1.0*'s `--init`) already wrote it, so nothing
+extra is written — then print one line and **continue** the loop:
+
+```
+⚠ Context threshold: {remaining}% left ≤ {threshold}% — checkpoint current; continuing (host auto-compact + re-entry rule)
+```
+
+It never stops the loop, never prompts, and adds no `Result:` value and no
+*Stop Conditions* row. The host's auto-compact and SKILL.md's *Context re-entry*
+rule carry the run across a compaction.

@@ -4,7 +4,7 @@ description: "Scan open GitHub issues for dependencies, priority, parallel work,
 license: MIT
 compatibility: "Requires git and GitHub CLI (gh) with authentication. Default mode (cached view) needs only local file access — no gh required."
 metadata:
-  version: 0.7.0
+  version: 0.8.0
   author: "Luong NGUYEN <luongnv89@gmail.com>"
   effort: medium
 ---
@@ -192,7 +192,10 @@ Manual fallback: load `.idd.yml` (else legacy `.gitissue.yml`, printing `⚠ leg
 Triage settings and their defaults — `triage.stale_threshold_days` `14`,
 `triage.auto_priority` `true`, `triage.include_closed` `false`,
 `triage.scan_timeout_per_issue` `30` — with full semantics for each in
-`references/docs/config-schema.md` (*triage*). Invalid values in an existing file are the exit-3 case above.
+`references/docs/config-schema.md` (*triage*), plus `compaction.enabled` `true` and
+`compaction.threshold.issue-triage` `40`. Invalid values in an existing file are the exit-3 case above.
+
+**Context threshold.** <!-- a:ctx-check --> Only when `compaction.enabled` is true (`references/docs/context-threshold.md`): once, right after this config load, compare the remaining-context figure the host placed in your context (none: skip silently, never estimate) with `compaction.threshold.issue-triage`. At or below it, print the `⚠` line and a `/compact <focus>` line (skill and mode only), then continue — no pause; auto mode prints only the `⚠` line.
 
 ---
 
@@ -251,6 +254,7 @@ Verify these bundled files are present, each path resolved against the skill's d
 - `references/docs/auto-mode.md` — auto-mode gate rule
 - `references/docs/agent-overrides.md` — per-role `agents.model` / `agents.effort` spawn rule
 - `references/docs/terminal-style.md` — symbols, tables, errors
+- `references/docs/context-threshold.md` — context-threshold check contract
 - `references/scripts/gi-config.py` — config resolver
 - `references/scripts/gi-backlog.py` — shared open-issue snapshot (Step 1)
 - `references/scripts/gi-gh.py` — GitHub CLI subprocess boundary

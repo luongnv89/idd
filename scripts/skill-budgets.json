@@ -2,36 +2,36 @@
   "headroom_bytes": 1024,
   "skills": {
     "auto-pilot": {
-      "budget": 423182,
-      "measured": 422894
+      "budget": 430734,
+      "measured": 430734
     },
     "init-idd": {
-      "budget": 136092,
-      "measured": 136092
+      "budget": 141899,
+      "measured": 141899
     },
     "issue-analysis": {
-      "budget": 158617,
-      "measured": 158375
+      "budget": 163390,
+      "measured": 163390
     },
     "issue-creator": {
-      "budget": 178706,
-      "measured": 178118
+      "budget": 182973,
+      "measured": 182973
     },
     "issue-pr-review": {
-      "budget": 286079,
-      "measured": 286079
+      "budget": 291937,
+      "measured": 291937
     },
     "issue-resolver": {
-      "budget": 391549,
-      "measured": 391549
+      "budget": 398024,
+      "measured": 398024
     },
     "issue-triage": {
-      "budget": 131533,
-      "measured": 130613
+      "budget": 135512,
+      "measured": 135512
     },
     "plan-to-issues": {
-      "budget": 164901,
-      "measured": 164055
+      "budget": 168983,
+      "measured": 168983
     }
   }
 }

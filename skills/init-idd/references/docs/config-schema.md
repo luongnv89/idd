@@ -486,6 +486,23 @@ security:
   # Type: integer. Default: 10. Minimum: 1. Warn (never block) above this MB.
   max_file_size_mb: 10
 
+# Context-threshold check + re-entry rules. Contract:
+# https://github.com/luongnv89/idd/blob/main/docs/context-threshold.md
+compaction:
+  # Type: boolean. Default: true. false = behave as before.
+  enabled: true
+  # Type: integer 1-99 per skill, % of context remaining (else exit 3).
+  # Default: as listed (auto-pilot 15, every other skill 40).
+  threshold:
+    auto-pilot: 15
+    issue-resolver: 40
+    issue-pr-review: 40
+    issue-analysis: 40
+    issue-creator: 40
+    issue-triage: 40
+    plan-to-issues: 40
+    init-idd: 40
+
 # Per-role subagent overrides. null = inherit main agent. Values: opaque
 # harness strings, ^[A-Za-z0-9][A-Za-z0-9._:/\[\]-]{0,63}$ (else exit 3: they
 # reach a spawn call and a prompt); quote one with [ or ]: "opus[1m]".
@@ -537,6 +554,7 @@ graph TD
     R --> MS["model_suggestion"]
     R --> SEC["security"]
     R --> AG["agents"]
+    R --> CP["compaction"]
 
     I --> I1["auto_normalize"]
     I --> I2["template"]
@@ -610,6 +628,9 @@ graph TD
     AG --> AG1["model"]
     AG --> AG2["effort"]
 
+    CP --> CP1["enabled"]
+    CP --> CP2["threshold<br/>(per skill)"]
+
     style R fill:#4CAF50,color:#fff
 ```
 
@@ -653,6 +674,8 @@ Config is validated at every skill start; errors include line numbers:
   To fix:  edit .idd.yml and correct the values above
   Docs:    https://github.com/luongnv89/idd/blob/main/docs/config-schema.md
 ```
+
+Each `compaction.threshold.<skill>` must be an integer from 1 to 99 and `compaction.enabled` a boolean.
 
 ## Defaults Table
 
@@ -739,3 +762,6 @@ Config is validated at every skill start; errors include line numbers:
 | `agents.model` per-role keys | `null` | Overrides `default`; a `null` role resolves to it |
 | `agents.effort.default` | `null` | Thinking effort, same rules |
 | `agents.effort` per-role keys | `null` | As `agents.model` |
+| `compaction.enabled` | `true` | Context-threshold check and re-entry rules; `false` = behave as before |
+| `compaction.threshold` · `auto-pilot` | `15` | % of context remaining (1-99) at or below which the skill prompts compaction |
+| `compaction.threshold` · every other skill | `40` | Same, one key per skill |

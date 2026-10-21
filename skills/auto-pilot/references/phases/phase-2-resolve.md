@@ -71,6 +71,19 @@ substituting `{issue_number}` and the optional payload/context. Omit the
 result before Step 2.3. No caller-managed worktree or `lanes[]` checkpoint is
 created.
 
+**Pre-spawn checkpoint.** <!-- a:ctx-prespawn-resolve --> Only when
+`compaction.enabled` is true; `false` skips it, exactly as before. Before this
+spawn, record the issue with the *Step 1.0b* checkpoint procedure:
+
+```json
+{"phase": "resolve", "current": {"issue": 42, "phase": "resolve"}}
+```
+
+It names the resolver in flight for SKILL.md's *Context re-entry* rule, so a
+compaction during the spawn never re-spawns it. A run that dies after this
+checkpoint leaves a `current` with no branch, which *Step 1.0* already treats as
+a doubt (`absent`).
+
 #### Parallel path (`max_parallel > 1` and at least two lanes)
 
 Prepare every worktree **sequentially before any resolver starts**, from the same
