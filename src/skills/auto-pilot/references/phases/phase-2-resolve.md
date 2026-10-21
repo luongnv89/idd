@@ -76,10 +76,13 @@ created.
 spawn, record the issue with the *Step 1.0b* checkpoint procedure:
 
 ```json
-{"phase": "resolve", "current": {"issue": 42, "phase": "resolve"}}
+{"phase": "resolve", "current": {"issue": 42, "title": null, "branch": null, "pr": null, "outcome": null, "started_at": null, "phase": "resolve"}}
 ```
 
-It names the resolver in flight for SKILL.md's *Context re-entry* rule, so a
+The explicit nulls are deliberate: `current` merges key by key, and Phase 3's
+`left_open` exit leaves the previous issue's record set, so a marker naming
+only `issue` and `phase` would inherit that issue's branch and PR. It names the
+resolver in flight for SKILL.md's *Context re-entry* rule, so a
 compaction during the spawn never re-spawns it. A run that dies after this
 checkpoint leaves a `current` with no branch and no PR. *Step 1.0* reads that
 shape as this marker, **not** as a doubt: it clears `current` and stays

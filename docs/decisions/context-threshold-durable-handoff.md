@@ -62,15 +62,21 @@ value. `compaction.enabled: false` turns every part off.
 
 Nothing new reaches disk, with one exception: when `compaction.enabled` is true,
 `/auto-pilot` writes a pre-spawn checkpoint into its **existing** run-state file
-before the sequential resolver spawn (`{"phase":"resolve","current":{"issue":N,"phase":"resolve"}}`)
+before the sequential resolver spawn (`{"phase":"resolve","current":{"issue":N,"title":null,"branch":null,"pr":null,"outcome":null,"started_at":null,"phase":"resolve"}}`)
 and, only when the post-resolve checkpoint is not already in place, before the
-Phase 3 reviewer spawn. Both patches are legal `gi-state.py` transitions
-(`init`/`triage`/`cleanup` → `resolve` in `RUN_TRANSITIONS`, `resolve` in
-`CURRENT_START`, and `review` → `review` as an idempotent re-checkpoint), so
-`gi-state.py` is unchanged. A run that dies after the resolve marker leaves a
-`current` with no branch and no PR. Step 1.0's resume gate recognizes that shape
-as the marker, clears it with `{"current": null}` (an explicit null already
-clears `current`), and stays resumable (see *Consequences*).
+Phase 3 reviewer spawn (the post-resolve record, with this PR's branch and
+`outcome`/`started_at` null). Both markers name every `current` key on purpose.
+`gi-state.py` merges `current` key by key, and Phase 3's `left_open` exit leaves
+the previous issue's record set, so a marker naming only `issue` and `phase`
+would inherit that issue's branch and PR, and a resume would reconcile the wrong
+PR. Both patches are legal `gi-state.py` transitions
+(`init`/`triage`/`cleanup` → `resolve` in `RUN_TRANSITIONS`, `resolve` and
+`review` in `CURRENT_START`, and `review` → `review` as an idempotent
+re-checkpoint), so `gi-state.py` is unchanged. A run that dies after the resolve
+marker leaves a `current` with no branch and no PR (both `null`). Step 1.0's
+resume gate recognizes that shape as the marker, clears it with
+`{"current": null}` (an explicit null already clears `current`), and stays
+resumable (see *Consequences*).
 
 ## Rejected alternatives
 

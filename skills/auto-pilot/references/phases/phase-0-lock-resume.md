@@ -50,9 +50,10 @@ a read that fails, is a doubt: fall back to `absent`.
 
 **The resolver pre-spawn marker is the one exception.** <!-- a:ap-step10-prespawn-marker -->
 A singleton `current` whose `phase` is `resolve` and that carries **no**
-`branch` and **no** `pr` is *Step 2.2*'s pre-spawn checkpoint: the run died
-with that resolver in flight, or the iteration ended before its
-end-of-iteration checkpoint cleared `current`. That shape is **not** a doubt.
+`branch` and **no** `pr` (each absent or `null`) is *Step 2.2*'s pre-spawn
+checkpoint: the run died with that resolver in flight, or the iteration ended
+before its end-of-iteration checkpoint cleared `current`. That shape is
+**not** a doubt.
 Key the exception on the shape alone, never on this run's `compaction.enabled`,
 because a state an enabled run wrote can be resumed by a disabled one. Clear the
 marker with the *Step 1.0b* checkpoint procedure:

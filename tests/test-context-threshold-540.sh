@@ -22,6 +22,7 @@
 #   T10 auto-pilot re-entry: no re-spawn, no resume gate, pre-spawn checkpoints
 #       that gi-state.py accepts, live checks before effectful repeats, and a
 #       --resume gate that clears a dead run's marker and keeps its seeds;
+#       both markers inherit no key from a left_open issue's `current`;
 #   T11 bounded loops; T12 the resolver lane clause; T13 /compact line safety;
 #   T14 the CI step is one plain name/run pair (obligation q1).
 #
@@ -368,6 +369,8 @@ anchor_region "$P2" ctx-prespawn-resolve | tr '\n' ' ' | grep -qE 'treats? as a 
 P0="$AP/references/phases/phase-0-lock-resume.md"
 anchor_check_flat "$P0" ap-step10-prespawn-marker '.phase. is .resolve. and that carries \*\*no\*\* .branch. and \*\*no\*\* .pr.' \
   "T10l Step 1.0 names the marker by shape: resolve, no branch, no pr"
+anchor_check_flat "$P0" ap-step10-prespawn-marker '\*\*no\*\* .pr. \(each absent or .null.\)' \
+  "T10l2 the shape covers the marker's explicit nulls"
 anchor_check_flat "$P0" ap-step10-prespawn-marker 'That shape is \*\*not\*\* a doubt' \
   "T10m Step 1.0 does not treat the marker as a doubt"
 anchor_check_flat "$P0" ap-step10-prespawn-marker "never on this run.s .compaction\.enabled." \
@@ -379,9 +382,10 @@ anchor_check_flat "$P0" ap-step10-prespawn-marker 'clear exits non-zero, treat i
   "T10p a clear that fails falls back to absent"
 CLEAR_PATCH="$(anchor_region "$P0" ap-step10-prespawn-marker | grep -E '^\{"current": null\}$' || true)"
 RESOLVE_PATCH="$(anchor_region "$P2" ctx-prespawn-resolve | grep -E '^\{"phase": "resolve"' || true)"
-REVIEW_PATCH="$(anchor_region "$P3" ctx-prespawn-review | grep -oE '\{"phase": "review", "current": \{[^}]*\}\}' || true)"
+REVIEW_PATCH="$(anchor_region "$P3" ctx-prespawn-review | grep -oE '\{"phase": "review", "current": \{[^}]*\}\}' | sed 's/"…"/"t"/; s/"fix\/42-…"/"fix\/42-a"/' || true)"
 POST_RESOLVE="$(grep -E '^\{"phase": "review", "current": \{"issue": 42' "$P2" | head -1 | sed 's/"…"/"t"/; s/"fix\/42-…"/"fix\/42-a"/')"
 END_ITER="$(grep -E '^\{"phase": "triage", "current": null' "$AP/references/phases/phase-5-merge.md" | head -1)"
+LEFT_OPEN="$(grep -oE '\{"phase": "cleanup", "current": \{"phase": "cleanup", "outcome": "left_open"\}\}' "$P3" | head -1 || true)"
 if [ -n "$RESOLVE_PATCH" ] && [ -n "$REVIEW_PATCH" ] && [ -n "$POST_RESOLVE" ] && [ -n "$END_ITER" ]; then
   pass "T10i the documented checkpoint payloads were extracted"
   STATE_DIR="$TMP/state"
@@ -411,7 +415,8 @@ if [ -n "$RESOLVE_PATCH" ] && [ -n "$REVIEW_PATCH" ] && [ -n "$POST_RESOLVE" ] &
        && st "$RESOLVE_PATCH" --update
 import json, sys
 before, after = (json.load(open(p)) for p in sys.argv[1:3])
-assert before["current"] == {"issue": 42, "phase": "resolve"}, before["current"]
+assert before["current"] == {"issue": 42, "title": None, "branch": None, "pr": None,
+                             "outcome": None, "started_at": None, "phase": "resolve"}, before["current"]
 assert after["current"] is None, after["current"]
 assert after["processed"] == [{"issue": 41, "outcome": "left_open", "pr": 90}], after["processed"]
 assert after["skip_list"] == [40], after["skip_list"]
@@ -424,6 +429,38 @@ PY
     fi
   else
     fail "T10q could not extract Step 1.0's marker-clear patch"
+  fi
+  # T10r/T10s: both markers are self-contained. Phase 3's left_open exit leaves
+  # the previous issue's `current` set (no end-of-iteration clear between), and
+  # gi-state merges `current` key by key, so a marker that names only some keys
+  # inherits issue 41's branch, PR, title and outcome. A resume would then
+  # reconcile 41's PR under issue 42. No END_ITER patch runs here on purpose.
+  if [ -n "$LEFT_OPEN" ]; then
+    PREV_ISSUE="$(printf '%s' "$POST_RESOLVE" | sed 's/"issue": 42/"issue": 41/; s/fix\/42-a/fix\/41-a/; s/"pr": 87/"pr": 86/; s/"title": "t"/"title": "k"/')"
+    for marker in resolve review; do
+      if [ "$marker" = resolve ]; then LABEL=T10r; else LABEL=T10s; fi
+      STATE_DIR="$TMP/state-stale-$marker"
+      mkdir -p "$STATE_DIR"
+      if [ "$marker" = resolve ]; then PATCH="$RESOLVE_PATCH"; else PATCH="$REVIEW_PATCH"; fi
+      if st '' --lock --pid 0 && st '{}' --init \
+         && st "$(printf '%s' "$RESOLVE_PATCH" | sed 's/"issue": 42/"issue": 41/')" --update \
+         && st "$PREV_ISSUE" --update && st "$LEFT_OPEN" --update && st "$PATCH" --update \
+         && python3 "$GI_STATE" --dir "$STATE_DIR" --read >"$TMP/stale.json" \
+         && python3 - "$TMP/stale.json" "$marker" <<'PY'
+import json, sys
+current = json.load(open(sys.argv[1]))["current"]
+want = {"resolve": {"issue": 42, "phase": "resolve"},
+        "review": {"issue": 42, "title": "t", "branch": "fix/42-a", "pr": 87, "phase": "review"}}[sys.argv[2]]
+assert {k: v for k, v in current.items() if v is not None} == want, current
+PY
+      then
+        pass "$LABEL the $marker marker after a left_open issue inherits none of its keys"
+      else
+        fail "$LABEL the $marker marker after a left_open issue kept stale keys: $(cat "$TMP/stale.json" "$TMP/st.err" 2>/dev/null)"
+      fi
+    done
+  else
+    fail "T10r could not extract Phase 3's left_open checkpoint"
   fi
 else
   fail "T10i could not extract checkpoint payloads (resolve='$RESOLVE_PATCH' review='$REVIEW_PATCH')"
