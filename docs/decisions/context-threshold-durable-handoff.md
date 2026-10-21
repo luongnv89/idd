@@ -115,7 +115,8 @@ resumable (see *Consequences*).
 ## Follow-ups
 
 - An opt-in `SessionStart(compact)` hook that re-injects the re-entry rule.
-- `--resume` for `/issue-resolver` and `/issue-pr-review`.
+- `--resume` for `/issue-resolver` and `/issue-pr-review`, from durable progress
+  records that survive a killed session ([#542](https://github.com/luongnv89/idd/issues/542)).
 - A `compaction.threshold.default` key.
 - A Codex note ([#489](https://github.com/luongnv89/idd/issues/489)).
 
