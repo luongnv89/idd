@@ -28,6 +28,7 @@
 |---|---|
 | `/issue-resolver 42` | Resolve issue #42 through the full 6-step pipeline |
 | `/issue-resolver 42 --auto` | Resolve autonomously without user prompts |
+| `/issue-resolver 42 --resume` | Resume a run whose session was killed, from its progress record, after validating it against git and GitHub (interactive runs offer this on their own) |
 | "fix issue #42" | Fetch, research, implement, test, and ship a PR for #42 |
 | "work on #15" | Branch, implement changes, write tests, verify, create PR closing #15 |
 

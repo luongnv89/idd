@@ -31,6 +31,7 @@
 | `/issue-pr-review 42` | Review PR #42, fix issues, and repeat until clean; report findings (no auto-merge) |
 | `/issue-pr-review 42 --auto` | Review, fix, wait for CI, and auto-merge when green |
 | `/issue-pr-review --review-only` | Review and report only — never fix or merge |
+| `/issue-pr-review 42 --resume` | Resume a review whose session was killed, from its progress record (combines with `--auto`) |
 | "is this PR ready?" | Run the pipeline against the current branch's PR |
 | "clean up this PR" | Iterate fix cycles until the review is clean |
 
