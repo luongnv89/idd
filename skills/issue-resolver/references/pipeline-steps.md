@@ -80,6 +80,7 @@ SKILL.md or another reference resolves here:
 | Configuration load · 0e — Workspace | `references/steps/step-0-preflight.md` | Every run, at Step 0 |
 | 0h — Analysis reuse gate | `references/steps/step-0h-analysis-reuse.md` | Step 0h, unless `resolve.adaptive_effort: false` |
 | 0i — Caller payload gate | `references/steps/step-0i-caller-payload.md` | Step 0i, when a caller payload is present |
+| 0j — Progress record | `references/steps/step-0j-progress-record.md` | Every run, after the precheck: it reads the record and owns every write |
 | 1 — Research | `references/steps/step-1-research.md` | Before spawning the researcher |
 | 2 — Plan | `references/steps/step-2-plan.md` | Before spawning the synthesizer |
 | 3 — Implement | `references/steps/step-3-implement.md` | Before spawning the implementer |
@@ -98,6 +99,7 @@ invariants (environment, workspace, deliver, no prompts). Under `--auto` /
 | Step | Auto behavior |
 |------|---------------|
 | *0c* — Guards | Skip the assignment guard; log blocking labels as warnings and continue. |
+| *0j* — Progress record | Resume only with `--resume`, never prompt; without it the record is ignored and this run's `--start` replaces it. |
 | *0d* — Auto-normalize | A security-labelled issue prints the skip warning and continues **without** rewriting the body — no operator confirmation is sought. |
 | *0e* — Workspace | The offer never appears. |
 | *0g* — Complexity gate | Still runs: it reads the pre-work `Effort` band, which needs no prompt. |
@@ -131,3 +133,7 @@ PR body notes: `> **Note:** No acceptance criteria defined — manual review rec
 ### Branch already exists
 - Interactive: `continue` or `fresh` prompt.
 - Auto: resume from the existing branch.
+
+### Resumed run (a killed session's progress record)
+- The run-log line is written once: `duration_s` and `phases` cover this session only; `qa_cycles` is the restored count plus this session's.
+- A resume past Step 4 delivers without the QA marker, so the reviewer runs its full pipeline (*Step 0j — Progress record*).

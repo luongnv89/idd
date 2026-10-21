@@ -39,3 +39,12 @@ script could not answer. Exit 1 here means it *did* answer, and the answer was `
 Reading it as a degrade inverts the verdict and pushes the secret. The one exception is
 exit 1 with no parsable JSON on stdout — that is a crash, not a verdict, and is handled
 as exit 2.
+
+### Progress record at Deliver
+
+Write each effect's intent to the progress record **before** the effect — the push,
+`gh pr create`, then the `closing` step before the run-log write — so a killed
+session's successor reconciles it live instead of repeating it (*Step 0j — Progress
+record*, `references/steps/step-0j-progress-record.md`). A run that resumed past
+Step 4 did not see QA exit clean in this session: it drops the QA marker and writes
+no receipt, and the reviewer runs its full pipeline.

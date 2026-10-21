@@ -522,6 +522,10 @@ Both #36 hard-blocks â€” `acceptance_criteria: fail` and a missing `Closes #N` â
 keep blocking soft-pass and merge under `trusted`, exactly as they do under
 `light`.
 
+A progress record never skips any of these either: a resumed review runs every
+gate above live, and `qa_handoff` is always recomputed through the receipt
+check, never restored (`references/progress-record-mechanics.md`).
+
 ## Why reuse the reviewer
 
 To minimize token usage, the review loop **reuses the same reviewer agent** across fix cycles instead of spawning a fresh one each time. The reviewer already has the codebase context loaded, so subsequent reviews are cheaper.

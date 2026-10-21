@@ -197,11 +197,13 @@ fields a caller reads and the run-log record keep their shape.
    returned, the docs search (*Update documentation*), and the run-log write
    (`appended`, `echoed`, or `fallback`). For `already_resolved`, cite the fixing
    commit or PR. For `BLOCKED`, cite the failed check and its observed output.
+   A resumed run adds `resumed from step {k}/5 (record {age} old)`.
 3. **Uncertainty.** List what this run did not verify: PR-body AC rows not marked
    `pass`, a skipped browser UI review, `resolve.auto_test: false`, a script that
    degraded to its prose procedure, the inline fallback without the Agent tool,
    a reused analysis (`analysis_reuse = fresh` — verified first, not re-derived),
-   and the `light` profile's single QA cycle. Label `risk_rating` as a judgment,
+   the `light` profile's single QA cycle, and a resumed run's restored plan and
+   findings (verified, not re-derived). Label `risk_rating` as a judgment,
    not a measurement. Write `none identified` only when no item applies.
 4. **Decision.** Print `Decision: No approval needed.` in interactive and auto
    mode alike. Name the remaining user action on `Next action:`:
