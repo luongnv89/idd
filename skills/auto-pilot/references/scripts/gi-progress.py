@@ -43,8 +43,10 @@ Patch keys (a closed set — anything else is exit 3, and nothing is written)
             complexity, risk}, rejected[] <= 5 of {number, name,
             rejection_reason}, overall_complexity, overall_risk, sensitive}
             (<= 32 KiB), qa {cycle, ceiling, breach_reason, premise_ledger[]
-            <= 20 of {kind: failure|revision, ...}, open_findings[] <= 50},
-            repro {status, test}
+            <= 20 of {kind: failure, ...}, open_findings[] <= 50},
+            repro {status, test}. The ledger holds failures only: a premise
+            revision lifts a block, so it is earned again in the session that
+            relies on it, its diagnostics rerun, and never recorded
   reviewer  linked_issue, profile, prepass_head, cycle, findings {open[] <= 50,
             noted[] <= 50}, history[] <= 2 lists of finding signatures
   Effect kinds: resolver issue_edit, issue_close, push, pr_create, run_log;
@@ -98,8 +100,10 @@ Binding (--read, measured live against git from the current directory)
   (null outside a lane). `verdict` is `bound` or `stale` with `reasons[]`:
   another executor, a missing workspace, a head that is not equal or a
   descendant, a dirty `branch_only` host, a lane mismatch, or a moved head or
-  dirty tree while the recorded step is not one that commits (resolver 3-5,
-  reviewer 2 and 6). Records not written for seven days read as `expired`.
+  dirty tree while the high-water mark `step` is not one that commits
+  (resolver 3-5, reviewer 2 and 6) — `step`, never `current`, which a resumed
+  session's re-walk lowers. Records not written for seven days read as
+  `expired`.
   The GitHub half of the check is the skill's: this script never calls `gh`.
 
 Exit codes
@@ -497,8 +501,9 @@ def _qa(value) -> None:
     if not isinstance(ledger, list) or len(ledger) > 20:
         raise InvalidInput("qa.premise_ledger must be a list of at most 20 entries")
     for n, entry in enumerate(ledger):
-        if not isinstance(entry, dict) or entry.get("kind") not in ("failure", "revision"):
-            raise InvalidInput(f"qa.premise_ledger[{n}] must be an object with kind failure|revision")
+        if not isinstance(entry, dict) or entry.get("kind") != "failure":
+            raise InvalidInput(f"qa.premise_ledger[{n}] must be an object with kind failure — "
+                               "a revision is earned in its own session, never recorded")
         _size(entry, LEDGER_ENTRY_MAX, f"qa.premise_ledger[{n}]")
     _findings(value.get("open_findings", []), 50, "qa.open_findings")
 
@@ -802,7 +807,9 @@ def binding(record: dict, skill: str) -> dict:
     if lane_match is False or (env_lane is not None and workspace != "here"):
         reasons.append("lane")
     moved = relation == "descendant" or (dirty and workspace != "branch_only")
-    if moved and record["current"] not in COMMIT_STEPS[skill]:
+    # The high-water mark, never `current`: a resumed session's re-walk writes
+    # lower `current`, and a second kill must not turn a valid resume stale.
+    if moved and record["step"] not in COMMIT_STEPS[skill]:
         reasons.append("moved")
     return {"verdict": "stale" if reasons else "bound", "reasons": reasons,
             "executor_match": executor_match, "workspace": workspace,

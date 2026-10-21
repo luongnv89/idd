@@ -192,9 +192,10 @@ with the known issues recorded, as stagnation does; no QA marker is written.
 Record it in the Decision Record's conditional *Premise reset* line
 (`references/report-templates.md`).
 
-**On a resume** the ledger restored from the progress record is kept and only
-grows: a restored failure can add a block, never lift one, and an unreadable
-ledger leaves the gate blocked.
+**On a resume** the ledger restored from the progress record is failures only,
+with `revisions: []`, and only grows: a restored failure can add a block, never
+lift one — only a revision earned in this session, its diagnostics rerun, does —
+and an unreadable ledger leaves the gate blocked.
 
 ### After QA
 

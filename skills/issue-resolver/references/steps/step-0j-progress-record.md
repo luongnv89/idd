@@ -38,9 +38,9 @@ python3 references/scripts/gi-progress.py --start --skill issue-resolver --numbe
 
 | When | Patch |
 |------|-------|
-| After *0c — Guards* passes, fresh runs only (a resumed run never calls `--start`) | `{"step": 0, "base": "<base>", "issue_updated_at": "<0a's updatedAt>", "worktree": <bool>}`, plus `"caller_run_id": "<run_id>"` under `/auto-pilot` (the spawn prompt's `run_id:` line) |
+| After *0c — Guards* passes, fresh runs only (a resumed run's only `--start` is the verify-first reset under *Where a resume re-enters*) | `{"step": 0, "base": "<base>", "issue_updated_at": "<0a's updatedAt>", "worktree": <bool>}`, plus `"caller_run_id": "<run_id>"` under `/auto-pilot` (the spawn prompt's `run_id:` line) |
 | Each `[N/5]` start from `[1/5]`, beside the clock read | `{"step": k}` plus what the previous step settled: `profile` and `analysis_reuse` at `[1/5]`, `research` (the researcher's JSON) at `[2/5]`, `plan` at `[3/5]`, `repro` once Step 3 returns one |
-| Each Step 4 cycle start, then after it | `{"qa": {"cycle": c, "ceiling": n}}`; after it, the whole `premise_ledger` (each failure or revision one entry carrying `"kind": "failure"` or `"revision"`) and `open_findings` |
+| Each Step 4 cycle start, then after it | `{"qa": {"cycle": c, "ceiling": n}}`; after it, the `premise_ledger`'s failures — each one entry carrying `"kind": "failure"`; a revision is never written (the script refuses it) — and `open_findings` |
 | Immediately **before** an effect | `{"effect": {"kind": "…", "state": "intent", "key": {…}}}` — 0d's backup comment and `gh issue edit` (`issue_edit`), Step 1's auto-close (`issue_close`), the Step 5 push (`push`, `key.sha` = HEAD) and `gh pr create` (`pr_create`, `key.branch`); once the PR exists, `{"pr": <number>}` |
 | Before the run-log write | `{"step": "closing", "outcome": "<status>", "effect": {"kind": "run_log", "state": "intent", "key": {}}}` |
 
@@ -93,8 +93,9 @@ continue as a fresh run.
 
 **Git half — the script's `binding`.** `bound` already means: the same user and
 host wrote it; the recorded branch exists; HEAD equals the recorded head or
-descends from it; and a moved head or a dirty tree only while the recorded step
-commits (3, 4 or 5), which then restarts from its beginning. Bind the workspace
+descends from it; and a moved head or a dirty tree only while the high-water
+mark `step` commits (3, 4 or 5) — `step`, never `current`, which a resumed
+re-walk lowers — and that step then restarts from its beginning. Bind the workspace
 by `binding.workspace`:
 
 - `here` — this checkout is the record's; continue in place.
@@ -154,7 +155,10 @@ the recorded workspace, 0g and 0h. Then, by the recorded step `k`:
 
 A verify-first pass that refutes the record — the issue is already resolved, or
 the plan no longer fits — runs `--start` and continues as a fresh run on the
-existing branch. That reset is the only way a resume point is lowered on disk.
+existing branch: 0c's patch (`base`, `issue_updated_at`, `worktree`, and
+`caller_run_id` under `/auto-pilot`) with `"step": 1`, because Step 0 already ran
+live and the run re-enters at Step 1's full pass. That reset is the only
+`--start` on a resumed run and the only way a resume point is lowered on disk.
 
 ### Sensitive restored plan <!-- a:rs-0j-sensitive -->
 
@@ -180,7 +184,11 @@ a resume, exactly as written: Prerequisites, the config load and the precheck;
 Repo Sync (in place: stash-first plus fetch, and `git pull --rebase` only when
 the remote branch exists; a worktree only fetches); 0a; 0b (its ownership
 exception only); 0c; the already-resolved check, always inside Step 1's pass;
-the *Sensitive-change gate*; *Premise reset*; the QA cycles; the final test run —
+the *Sensitive-change gate*; *Premise reset*; the QA cycles, live from the
+restored cycle at a `k` ≤ 4 resume — at `k` = 5 QA is not re-run, so no QA
+marker and no receipt are written, `/issue-pr-review` runs its full pipeline, and
+the PR body's *Test integrity* and *Sensitivity* entries read `not restored
+(resumed at Deliver)`; the final test run —
 `tests_state` **is never restored**, so Step 5 skips the suite only on this
 session's own green run; `gi-secscan`; and the QA marker and its receipt, written
 only when QA exited clean in this session. A resume never pops a stash that
@@ -191,8 +199,10 @@ only when QA exited clean in this session. A resume never pops a stash that
 A restore only moves toward more work. The effective `profile` is the higher of
 the recorded one and 0g's (`light` < `full`). The recorded cycle is a floor, and
 the cycle in flight when the session died counts as consumed, so a next cycle
-above the ceiling takes Step 4's cap path with no marker. Restored premise-ledger
-entries only add blocks. `open_findings` reach the fresh reviewer as hints to
+above the ceiling takes Step 4's cap path with no marker. The restored premise
+ledger is failures only, handed to `gi-premise` as `failures` with
+`revisions: []`, so it only adds blocks: a block lifts only on a revision earned
+in this session, its diagnostics rerun. `open_findings` reach the fresh reviewer as hints to
 verify, never as verdicts. A missing or unreadable `qa` while the record says
 step 4 or later takes the cap path with the premise gate blocked — the loop
 never restarts at cycle 1.

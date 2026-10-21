@@ -14,7 +14,7 @@
 #   S6   the prose contract in the built skills, and the ADR amendment.
 #
 # The sensitive-change gate's test obligations are named after their probe ids
-# (p4 … p15b), so `grep -n 'p7-' tests/test-progress-records-542.sh` finds the
+# (p4 … p16), so `grep -n 'p7-' tests/test-progress-records-542.sh` finds the
 # case that discharges p7.
 #
 # Usage: bash tests/test-progress-records-542.sh
@@ -332,6 +332,56 @@ put "$K" write issue-resolver 21 "{\"qa\": {\"premise_ledger\": [$E2]}}"
 check "p7-rewalk-kill-twice: lowering the cycle or shrinking the ledger exits 3 and writes nothing" "$?"
 put "$K" write issue-pr-review 19 '{"cycle": 1}'
 [ "$RC" = 3 ]; check "p7-rewalk-kill-twice: the reviewer cycle cannot decrease either" "$?"
+# Kill twice with a dirty tree: the moved/dirty rule reads the high-water mark
+# `step`, so the re-walk write a resumed session makes (which lowers `current`)
+# cannot turn the second resume stale.
+KD="$TMP/rewalk-dirty"; new_repo "$KD" feat/25-dirty
+BAD=""
+put "$KD" start issue-resolver 25 '{"step": 0}'
+for p in '{"step": 1}' '{"step": 2}' '{"step": 3}'; do
+  put "$KD" write issue-resolver 25 "$p"; [ "$RC" = 0 ] || BAD="$BAD $p(rc=$RC)"
+done
+printf 'half-done edit\n' > "$KD/uncommitted.txt"
+gp "$KD" --read --skill issue-resolver --number 25
+FIRST="$(js 'd["binding"]["verdict"]')"
+for p in '{"resume": true}' '{"step": 1}'; do
+  put "$KD" write issue-resolver 25 "$p"; [ "$RC" = 0 ] || BAD="$BAD $p(rc=$RC)"
+done
+gp "$KD" --read --skill issue-resolver --number 25
+[ -z "$BAD" ] && [ "$FIRST" = "bound" ] && [ "$(js 'd["record"]["step"]')" = 3 ] \
+  && [ "$(js 'd["record"]["current"]')" = 1 ] && [ "$(js 'd["binding"]["dirty"]')" = "True" ] \
+  && [ "$(js 'd["binding"]["verdict"]')" = "bound" ]
+st=$?  # captured before the label's command substitution resets it
+check "p7-rewalk-kill-twice: dirty at step 3, then resume:true and a step-1 re-walk write, killed again → still bound on the high-water mark (first $FIRST, got $(js 'd["binding"]')${BAD:+ —$BAD})" "$st"
+
+# ─── p16: a premise revision is never recorded, so never restored ────────────
+# A revision lifts the premise-reset block. Restored from a dead session it would
+# lift the block with no diagnostics rerun in this one (AC3), so the ledger holds
+# failures only: every write refuses a revision, and one planted on disk makes
+# the record corrupt.
+V="$TMP/revision"; new_repo "$V" feat/26-rev
+VREC="$V/.git/idd/progress/issue-resolver-26.json"
+F1='{"kind": "failure", "cycle": 1, "premise_id": "p1", "premise": "cache key"}'
+F2='{"kind": "failure", "cycle": 2, "premise_id": "p1", "premise": "cache key again"}'
+REV='{"kind": "revision", "resets": "p1", "after_cycle": 2, "premise_id": "p2", "premise": "stale index", "supports": "the rerun shows it", "diagnostics": [{"command": "make test", "recorded": {"exit": 1, "excerpt": "stale index"}, "rerun": {"exit": 1, "output": "stale index"}}]}'
+put "$V" start issue-resolver 26 "{\"step\": 0, \"qa\": {\"premise_ledger\": [$REV]}}"
+[ "$RC" = 3 ] && [ ! -e "$VREC" ]
+check "p16-premise-revisions-never-restored: --start with a revision exits 3 and writes nothing (rc=$RC)" "$?"
+put "$V" start issue-resolver 26 '{"step": 0}'
+put "$V" write issue-resolver 26 "{\"qa\": {\"cycle\": 2, \"premise_ledger\": [$F1, $F2]}}"
+[ "$RC" = 0 ]; check "p16-premise-revisions-never-restored: control — a failures-only ledger is written (rc=$RC)" "$?"
+BEFORE="$(cat "$VREC")"
+put "$V" write issue-resolver 26 "{\"qa\": {\"cycle\": 3, \"premise_ledger\": [$F1, $F2, $REV]}}"
+[ "$RC" = 3 ] && [ "$(cat "$VREC")" = "$BEFORE" ]
+check "p16-premise-revisions-never-restored: --write appending a revision exits 3, the record byte-identical (rc=$RC)" "$?"
+python3 - "$VREC" "$REV" <<'PY'
+import json, sys
+p = sys.argv[1]; r = json.load(open(p)); r["qa"]["premise_ledger"].append(json.loads(sys.argv[2])); json.dump(r, open(p, "w"))
+PY
+gp "$V" --read --skill issue-resolver --number 26
+[ "$RC" = 0 ] && [ "$(js 'd["status"]')" = "corrupt" ] && [ "$(js 'd["record"]')" = "None" ]
+st=$?  # captured before the label's command substitution resets it
+check "p16-premise-revisions-never-restored: a revision planted in a stored record reads corrupt, so nothing restores it (got $(js 'd["status"]'))" "$st"
 
 # ─── p8: --list on an absent store; numbers are integers ─────────────────────
 LS="$TMP/list"; new_repo "$LS"
@@ -510,6 +560,14 @@ for which in RES_PROMPT REV_PROMPT; do
 done
 anchor_check_flat "$RS" rs-0j-restore 'nulls the stamp' "p15b-restamp-on-resume: the resolver states the restamp rule"
 anchor_check_flat "$RV" rvm-progress-resume 'nulls the stamp' "p15b-restamp-on-resume: the reviewer states the restamp rule"
+
+# p16: the prose restores the premise ledger as failures only.
+anchor_check_flat "$RS" rs-0j-writes 'revision is never written' \
+  "p16-premise-revisions-never-restored: step 0j writes the ledger's failures, never a revision"
+anchor_check_flat "$RS" rs-0j-monotone 'failures only.*revisions: \[\]' \
+  "p16-premise-revisions-never-restored: step 0j restores failures only, revisions: []"
+anchor_check_flat "$RS" rs-premise-reset 'failures only, with .revisions: \[\]' \
+  "p16-premise-revisions-never-restored: step 4's resume paragraph restores failures only, revisions: []"
 
 # The rest of the contract (AC1-AC5).
 anchor_check_flat "$RS" rs-progress '[Nn]ever satisfies or skips a safety gate' "S6a resolver SKILL: a record never satisfies or skips a safety gate"
