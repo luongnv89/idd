@@ -241,6 +241,38 @@ force-push to "clear" it.
 
 ---
 
+## Progress record
+
+### Progress record found
+```
+◆ Progress record for PR #N — stopped at step {k}/7 {step_name}, cycle {c}
+  Completed:   steps {completed}
+  Findings:    {open} open, {noted} noted
+  Head:        {sha7} ({workspace})
+  Written:     {age} ago by {user}@{host}
+  ⚠ another session may still be running        (written < 10 min ago only)
+
+  Resume from step {k}/7? [Y/n]
+```
+**Trigger:** interactive run; `gi-progress.py --read` returned `status: ok` with `verdict: bound` (`references/progress-record-mechanics.md`). `--resume` answers yes without the prompt; a decline clears the record and the review starts fresh.
+
+### Progress record is stale
+```
+⚠ Progress record is stale ({reason}) — starting from Step 1
+
+  The record for PR #N no longer matches git or GitHub; it was cleared.
+  Docs:  https://github.com/luongnv89/idd/blob/main/src/skills/issue-pr-review/references/progress-record-mechanics.md
+```
+**Trigger:** the record is `corrupt` or `expired`, the script's `verdict` is `stale`, or a live read disagrees (a closed PR, another head branch, an author push, a cross-repository PR). Non-fatal — `--clear`, then a fresh review.
+
+### Progress record unavailable
+```
+⚠ Progress record unavailable — this review cannot resume if it is killed
+
+  To fix:  check that python3 and git run here, then re-run /issue-pr-review N
+```
+**Trigger:** `gi-progress.py` exited 4, exited 3 twice, or `python3` is missing. Printed once; the review stops writing records and continues.
+
 ## Stagnation
 
 ### Same issues across cycles

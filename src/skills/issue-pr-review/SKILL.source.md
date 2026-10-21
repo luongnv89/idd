@@ -22,6 +22,7 @@ Review a PR end-to-end — analyze, test, fix, check CI, repeat until clean.
 | `/issue-pr-review <N> --auto --no-merge` | auto-pilot | Review and fix, but skip auto-merge |
 | `/issue-pr-review` | detect | Auto-detect PR for current branch |
 | `/issue-pr-review --review-only` | read-only | Review and report, never fix or merge |
+| `/issue-pr-review <N> --resume` | interactive or auto | Resume a killed review from its progress record (*Progress record*); combines with `--auto` and `--no-merge`, never with `--review-only` |
 
 `--auto` is set by `/auto-pilot`; in auto mode export `IDD_AUTO_MODE=1` so the pre-commit scan logs warnings instead of prompting (`docs/pre-commit-security.md`). `--no-merge` suppresses auto-merge even under `--auto`.
 
@@ -49,6 +50,7 @@ references/ui-review-mechanics.md
 references/prepass-tests-ci-mechanics.md
 references/verification-checks.md
 references/review-loop-mechanics.md
+references/progress-record-mechanics.md
 references/report-templates.md
 references/run-stats.md
 references/error-messages.md
@@ -72,6 +74,7 @@ references/scripts/gi-issue.py
 references/scripts/gi-receipt.py
 references/scripts/gi-recipe.py
 references/scripts/gi-postmerge.py
+references/scripts/gi-progress.py
 ```
 
 ```text
@@ -104,6 +107,10 @@ Load config once at skill start; never re-read it. Run `python3 shared/scripts/g
 **Context threshold.** <!-- a:ctx-check --> Only when `compaction.enabled` is true (`docs/context-threshold.md`). At each `[N/7]` step start, compare the remaining-context figure the host placed in your context (none: skip silently, never estimate) with `compaction.threshold.issue-pr-review`. At or below it, interactive prints the `⚠` line and a `/compact <focus>` line (skill, `PR #N`, step id and name only) and pauses **at most once per run**; `--auto` / `IDD_AUTO_MODE=1` prints one `⚠` line per run and continues — never a pause or stop.
 
 Inline defaults: `review.max_cycles: 3`, `review.soft_pass: true`, `review.auto_merge: false` (auto mode overrides to `true`), `compaction.enabled: true`, `compaction.threshold.issue-pr-review: 40`. Every key and its gate: `references/review-loop-mechanics.md` (*Config keys and what they gate*).
+
+## Progress record <!-- a:rv-progress -->
+
+A killed review can resume (`--resume`). Except under `--review-only`, which never reads or writes one, write a record per PR with `shared/scripts/gi-progress.py` at every `[N/7]` start, at each cycle, and before every push, body edit or merge; read it once Step 1 has fixed `N`. It holds only the step, the cycle count, findings, the profile and the last effect. **A record never satisfies or skips a safety gate:** Step 1 always runs live, `qa_handoff` is never restored, and any doubt is stale (start from Step 1). Rules: `references/progress-record-mechanics.md` — **read it now**.
 
 ---
 
@@ -303,6 +310,7 @@ After Step 6, return to Step 3. Mechanics: `references/review-loop-mechanics.md`
 - **Soft pass (`review.soft_pass: true`, default):** stop when zero `action: "fix"` issues remain, tests pass (or are skipped by config), CI passes (or is absent, disabled, or held non-blocking by `review.ignore_ci_billing_failures: true` — loop exit only, **never clean at the auto-merge gate**), and traceability is not `fail`.
 - **Strict pass (`review.soft_pass: false`):** strict mode keeps the same test/CI legs (`review.ignore_ci_billing_failures` included, still **never clean at the auto-merge gate**) and adds zero remaining `action: "note"` findings and `pass` on every enabled dimension; any `partial` dimension is a strict blocker — stop, report it under Remaining, never merge.
 - **Stagnation:** the same findings (dimension + file + description) in 2 consecutive cycles → stop and report.
+- **Resumed review:** cycles restored from the progress record count toward `review.max_cycles`; the next cycle is the restored one plus one (*Progress record*).
 
 ---
 
@@ -316,7 +324,7 @@ Print the summary from `references/report-templates.md` and **apply its *Review 
 
 **Post-merge cleanup (after every merge).** Run `python3 shared/scripts/gi-postmerge.py --pr {N}` to remove the merged branch and its clean worktrees and switch to the updated base (`docs/post-merge-cleanup.md`). A non-zero merge exit on a PR that now reads `MERGED` is still a merge (add `--delete-remote`); `ok: false` never downgrades it. Untracked files are deleted only on an interactive yes to the exact list shown (its `digest`). Rules: `references/report-templates.md` (*Auto-Merge*).
 
-**Then the run-stats footer** (`references/run-stats.md`; `tokens` only where the host reported a count) — the last thing printed at **every** terminal outcome, including a stop before Step 7.
+**Then the run-stats footer** (`references/run-stats.md`; `tokens` only where the host reported a count) — the last thing printed at **every** terminal outcome, including a stop before Step 7. After it, clear the progress record (*Progress record*) at every Result.
 
 **Review-only mode (`--review-only`) — authoritative definition.**
 
