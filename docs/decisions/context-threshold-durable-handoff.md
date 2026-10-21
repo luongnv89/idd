@@ -68,8 +68,9 @@ Phase 3 reviewer spawn. Both patches are legal `gi-state.py` transitions
 (`init`/`triage`/`cleanup` → `resolve` in `RUN_TRANSITIONS`, `resolve` in
 `CURRENT_START`, and `review` → `review` as an idempotent re-checkpoint), so
 `gi-state.py` is unchanged. A run that dies after the resolve marker leaves a
-`current` with no branch; Step 1.0's resume gate already treats "no PR for a
-singleton `current.branch`" as a doubt and falls back to `absent`.
+`current` with no branch and no PR. Step 1.0's resume gate recognizes that shape
+as the marker, clears it with `{"current": null}` (an explicit null already
+clears `current`), and stays resumable (see *Consequences*).
 
 ## Rejected alternatives
 
@@ -88,14 +89,19 @@ singleton `current.branch`" as a doubt and falls back to `absent`.
 
 - **Known limitation:** on models without the in-band figure the check is inert;
   only the re-entry rules act, after a compaction the host performed.
-- **`--resume` after a crash mid-resolve changes slightly.** A sequential run
+- **`--resume` after a crash mid-resolve keeps its seeds.** A sequential run
   that died during the resolver spawn used to leave `current: null`, which a
-  resume could continue with `processed[]` and `skip_list[]` seeded. The
-  pre-spawn checkpoint now leaves `current` at `resolve` with no branch, which
-  Step 1.0 reads as a doubt, so the resume falls back to `absent` and starts
-  fresh. That is safe, because the resolver's Step 0b finds any PR the dead run
-  opened, but those seeds are lost. `compaction.enabled: false` restores the
-  old behavior.
+  resume continued with `processed[]` and `skip_list[]` seeded. The pre-spawn
+  checkpoint now leaves `current` at `resolve` with no branch and no PR. Step
+  1.0 reads that shape as the marker, not as a doubt: it clears `current` and
+  stays resumable with both lists seeded, as before. Falling back to `absent`
+  instead would start a fresh `--init`, which drops the seeds and resets
+  `started_at`. This run's earlier `left_open`, `failed` and
+  `blocked_by_dependency` issues are still open, so the fresh run would pick
+  them again and write a second run-log line for each. The gate keys on the
+  record's shape, not on `compaction.enabled`, because a state an enabled run
+  wrote can be resumed by a disabled one. Issue N itself is picked again, and
+  the resolver's Step 0b finds any PR the dead run opened.
 - The three re-entry rules are bounded: a lost loop counter takes the existing
   cap path instead of restarting at cycle 1, and a caller-managed resolver lane
   re-validates its worktree and never falls back to the ambient checkout.

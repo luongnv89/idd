@@ -48,6 +48,25 @@ the next issue, never re-resolve it. A PR that is
 `OPEN` is the PR to review in Phase 3. No PR for a singleton `current.branch`, or
 a read that fails, is a doubt: fall back to `absent`.
 
+**The resolver pre-spawn marker is the one exception.** <!-- a:ap-step10-prespawn-marker -->
+A singleton `current` (`lanes[]` empty) whose `phase` is `resolve` and that
+carries **no** `branch` and **no** `pr` is *Step 2.2*'s pre-spawn checkpoint:
+the run died with that resolver in flight, or the iteration ended before its
+end-of-iteration checkpoint cleared `current`. That shape is **not** a doubt.
+Key the exception on the shape alone, never on this run's `compaction.enabled`,
+because a state an enabled run wrote can be resumed by a disabled one. Clear the
+marker with the *Step 1.0b* checkpoint procedure:
+
+```json
+{"current": null}
+```
+
+Then stay `resumable`, still subject to the gate's `--resume` and lock
+conditions, and seed `processed[]` and `skip_list[]` exactly as for a state
+whose `current` was already `null`. The issue is picked again normally, and the
+resolver's Step 0b finds any PR the dead run opened. If that clear exits
+non-zero, treat it as a doubt and fall back to `absent`.
+
 **Parallel-lane reconciliation.** When `lanes[]` is non-empty, validate every
 record before advancing any of them. `gi-state.py` already rejects a
 non-conventional `lanes[].branch`; check it again before binding it to a shell

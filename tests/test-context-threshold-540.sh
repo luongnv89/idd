@@ -20,7 +20,8 @@
 #       bytes of the built SKILL.md (obligation q3);
 #   T9  no on-disk handoff record anywhere;
 #   T10 auto-pilot re-entry: no re-spawn, no resume gate, pre-spawn checkpoints
-#       that gi-state.py accepts, live checks before effectful repeats;
+#       that gi-state.py accepts, live checks before effectful repeats, and a
+#       --resume gate that clears a dead run's marker and keeps its seeds;
 #   T11 bounded loops; T12 the resolver lane clause; T13 /compact line safety;
 #   T14 the CI step is one plain name/run pair (obligation q1).
 #
@@ -356,7 +357,27 @@ anchor_check_flat "$AP" ctx-reentry 'gi-state\.py --read' "T10f reads the run st
 P2="$AP/references/phases/phase-2-resolve.md"
 P3="$AP/references/phases/phase-3-4-review.md"
 anchor_check_flat "$P2" ctx-prespawn-resolve 'Before this spawn' "T10g resolver pre-spawn checkpoint precedes the spawn"
-anchor_check_flat "$P2" ctx-prespawn-resolve 'treats? as a doubt \(.absent.\)' "T10h a dead run after it falls back to absent"
+anchor_check_flat "$P2" ctx-prespawn-resolve '\*\*not\*\* as a doubt.*stays .resumable.' \
+  "T10h a dead run after it is not a doubt: Step 1.0 stays resumable"
+anchor_region "$P2" ctx-prespawn-resolve | tr '\n' ' ' | grep -qE 'treats? as a doubt|\(.absent.\)' \
+  && fail "T10h2 the pre-spawn checkpoint still sends a dead run to absent" \
+  || pass "T10h2 the pre-spawn checkpoint no longer sends a dead run to absent"
+# Step 1.0's exception for that marker. A fresh --init would drop processed[]
+# and skip_list[], so this run's earlier left_open/failed issues (still open)
+# would be picked again. The gate keys on the record's shape, not on config.
+P0="$AP/references/phases/phase-0-lock-resume.md"
+anchor_check_flat "$P0" ap-step10-prespawn-marker '.phase. is .resolve. and that carries \*\*no\*\* .branch. and \*\*no\*\* .pr.' \
+  "T10l Step 1.0 names the marker by shape: resolve, no branch, no pr"
+anchor_check_flat "$P0" ap-step10-prespawn-marker 'That shape is \*\*not\*\* a doubt' \
+  "T10m Step 1.0 does not treat the marker as a doubt"
+anchor_check_flat "$P0" ap-step10-prespawn-marker "never on this run.s .compaction\.enabled." \
+  "T10n the exception keys on the shape, never on compaction.enabled"
+anchor_lacks "$P0" ap-step10-prespawn-marker "$GATE" "T10n2 the exception is not gated on compaction.enabled"
+anchor_check_flat "$P0" ap-step10-prespawn-marker 'Then stay .resumable., still subject to .* seed .processed\[\]. and .skip_list\[\].' \
+  "T10o the marker is cleared and the resume stays resumable with both lists seeded"
+anchor_check_flat "$P0" ap-step10-prespawn-marker 'clear exits non-zero, treat it as a doubt and fall back to .absent.' \
+  "T10p a clear that fails falls back to absent"
+CLEAR_PATCH="$(anchor_region "$P0" ap-step10-prespawn-marker | grep -E '^\{"current": null\}$' || true)"
 RESOLVE_PATCH="$(anchor_region "$P2" ctx-prespawn-resolve | grep -E '^\{"phase": "resolve"' || true)"
 REVIEW_PATCH="$(anchor_region "$P3" ctx-prespawn-review | grep -oE '\{"phase": "review", "current": \{[^}]*\}\}' || true)"
 POST_RESOLVE="$(grep -E '^\{"phase": "review", "current": \{"issue": 42' "$P2" | head -1 | sed 's/"…"/"t"/; s/"fix\/42-…"/"fix\/42-a"/')"
@@ -376,6 +397,34 @@ if [ -n "$RESOLVE_PATCH" ] && [ -n "$REVIEW_PATCH" ] && [ -n "$POST_RESOLVE" ] &
   fi
   RC=0; st '{"phase": "merge", "current": {"issue": 44, "phase": "merge"}}' --update || RC=$?
   [ "$RC" -eq 3 ] && pass "T10k control: gi-state still refuses an illegal fresh merge" || fail "T10k control rc=$RC"
+  # T10q: Step 1.0's documented clear, applied to a dead run's marker, keeps the
+  # seeds and started_at, and the issue can then be marked again.
+  if [ -n "$CLEAR_PATCH" ]; then
+    STATE_DIR="$TMP/state-resume"
+    mkdir -p "$STATE_DIR"
+    SEED='{"phase": "triage", "current": null, "processed": [{"issue": 41, "outcome": "left_open", "pr": 90}], "skip_list": [40]}'
+    if st '' --lock --pid 0 && st '{}' --init && st "$SEED" --update && st "$RESOLVE_PATCH" --update \
+       && python3 "$GI_STATE" --dir "$STATE_DIR" --read >"$TMP/before.json" \
+       && st "$CLEAR_PATCH" --update \
+       && python3 "$GI_STATE" --dir "$STATE_DIR" --read >"$TMP/after.json" \
+       && python3 - "$TMP/before.json" "$TMP/after.json" <<'PY' \
+       && st "$RESOLVE_PATCH" --update
+import json, sys
+before, after = (json.load(open(p)) for p in sys.argv[1:3])
+assert before["current"] == {"issue": 42, "phase": "resolve"}, before["current"]
+assert after["current"] is None, after["current"]
+assert after["processed"] == [{"issue": 41, "outcome": "left_open", "pr": 90}], after["processed"]
+assert after["skip_list"] == [40], after["skip_list"]
+assert after["started_at"] == before["started_at"] and after["run_id"] == before["run_id"]
+PY
+    then
+      pass "T10q gi-state clears the marker with Step 1.0's patch, keeping processed[], skip_list[] and started_at"
+    else
+      fail "T10q the documented marker clear failed or lost the seeds: $(cat "$TMP/st.err")"
+    fi
+  else
+    fail "T10q could not extract Step 1.0's marker-clear patch"
+  fi
 else
   fail "T10i could not extract checkpoint payloads (resolve='$RESOLVE_PATCH' review='$REVIEW_PATCH')"
 fi

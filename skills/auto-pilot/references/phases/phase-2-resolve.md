@@ -81,8 +81,9 @@ spawn, record the issue with the *Step 1.0b* checkpoint procedure:
 
 It names the resolver in flight for SKILL.md's *Context re-entry* rule, so a
 compaction during the spawn never re-spawns it. A run that dies after this
-checkpoint leaves a `current` with no branch, which *Step 1.0* already treats as
-a doubt (`absent`).
+checkpoint leaves a `current` with no branch and no PR. *Step 1.0* reads that
+shape as this marker, **not** as a doubt: it clears `current` and stays
+`resumable`, so `processed[]` and `skip_list[]` still seed the resume.
 
 #### Parallel path (`max_parallel > 1` and at least two lanes)
 
