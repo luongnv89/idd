@@ -125,11 +125,12 @@ BASE_SHA="$(git -C "$L" rev-parse HEAD)"
 PHYS_WT="$(cd "$TMP/real/lane-wt" && pwd -P)"
 lane_env() { IDD_CALLER_WORKTREE=1 IDD_LANE_ID=run-1:9 IDD_EVENT_ID=run-1:9 IDD_BASE_SHA="$BASE_SHA" IDD_WORKTREE_PATH="$1" "${@:2}"; }
 RC=0; OUT="$(cd "$PHYS_WT" && printf '{"step": 0}' | lane_env "$PHYS_WT" python3 "$SCRIPT" --start --skill issue-resolver --number 9 2>"$TMP/err")" || RC=$?
-[ "$RC" = 0 ]; check "p5b-lane-symlink: a lane record is written under IDD_CALLER_WORKTREE=1 (rc=$RC $(cat "$TMP/err"))" "$?"
+[ "$RC" = 0 ]; st=$?; check "p5b-lane-symlink: a lane record is written under IDD_CALLER_WORKTREE=1 (rc=$RC $(cat "$TMP/err"))" "$st"
 RC=0; OUT="$(cd "$TMP/link/lane-wt" && lane_env "$TMP/link/lane-wt" python3 "$SCRIPT" --read --skill issue-resolver --number 9 2>"$TMP/err")" || RC=$?
 [ "$RC" = 0 ] && [ "$(js 'd["binding"]["lane_match"]')" = "True" ] \
   && [ "$(js 'd["binding"]["workspace"]')" = "here" ] && [ "$(js 'd["binding"]["verdict"]')" = "bound" ]
-check "p5b-lane-symlink: IDD_WORKTREE_PATH through an ln -s parent yields lane_match, here, bound (got $(js 'd["binding"]'))" "$?"
+st=$?  # captured before the label's command substitution resets it
+check "p5b-lane-symlink: IDD_WORKTREE_PATH through an ln -s parent yields lane_match, here, bound (got $(js 'd["binding"]'))" "$st"
 RC=0; OUT="$(cd "$TMP/link/lane-wt" && IDD_CALLER_WORKTREE=1 IDD_LANE_ID=run-2:9 IDD_EVENT_ID=run-1:9 IDD_BASE_SHA="$BASE_SHA" \
   IDD_WORKTREE_PATH="$TMP/link/lane-wt" python3 "$SCRIPT" --read --skill issue-resolver --number 9 2>"$TMP/err")" || RC=$?
 [ "$(js 'd["binding"]["lane_match"]')" = "False" ] && [ "$(js 'd["binding"]["verdict"]')" = "stale" ]
@@ -152,7 +153,8 @@ git -C "$W" checkout -q main
 gp "$W" --read --skill issue-resolver --number 11
 [ "$(js 'd["binding"]["workspace"]')" = "branch_only" ] && [ "$(js 'd["binding"]["dirty"]')" = "False" ] \
   && [ "$(js 'd["binding"]["verdict"]')" = "bound" ]
-check "p10-workspace-verdicts: S2 in place, switched to main, clean → branch_only, resumable (got $(js 'd["binding"]'))" "$?"
+st=$?  # captured before the label's command substitution resets it
+check "p10-workspace-verdicts: S2 in place, switched to main, clean → branch_only, resumable (got $(js 'd["binding"]'))" "$st"
 printf 'dirty\n' > "$W/untracked-host.txt"
 gp "$W" --read --skill issue-resolver --number 11
 [ "$(js 'd["binding"]["workspace"]')" = "branch_only" ] && [ "$(js 'd["binding"]["dirty"]')" = "True" ] \
@@ -260,7 +262,8 @@ for key in $FORBIDDEN; do
   [ "$RC" = 3 ] && [ ! -e "$F/.git/idd/progress/issue-pr-review-15.json" ] || ACCEPTED="$ACCEPTED reviewer:$key(rc=$RC)"
 done
 [ -z "$ACCEPTED" ]
-check "p6-forbidden-keys: each of $(printf '%s' "$FORBIDDEN" | wc -w | tr -d ' ') keys exits 3 and writes nothing${ACCEPTED:+ —$ACCEPTED}" "$?"
+st=$?  # captured before the label's command substitution resets it
+check "p6-forbidden-keys: each of $(printf '%s' "$FORBIDDEN" | wc -w | tr -d ' ') keys exits 3 and writes nothing${ACCEPTED:+ —$ACCEPTED}" "$st"
 put "$F" write issue-resolver 15 '{"qa": {"cycle": 1, "tests_state": "3@x"}}'
 [ "$RC" = 3 ] && [ "$(cat "$F/.git/idd/progress/issue-resolver-15.json")" = "$BEFORE" ]
 check "p6-forbidden-keys: a forbidden key nested in qa is refused too" "$?"
@@ -421,8 +424,8 @@ fi
 
 # p9: a cross-repository PR is never this run's own.
 anchor_check_flat "$RS" rs-0j-reconcile 'isCrossRepository' "p9-cross-repo: the resolver reconcile reads isCrossRepository"
-anchor_check_flat "$RS" rs-0j-reconcile 'isCrossRepository: false.*pr_in_progress' \
-  "p9-cross-repo: ownership needs isCrossRepository false; anything else stays pr_in_progress"
+anchor_check_flat "$RS" rs-0j-reconcile 'this run.s own only when [^.]*isCrossRepository: false.*Anything else.*returns .pr_in_progress.' \
+  "p9-cross-repo: 0b ownership needs isCrossRepository false; anything else stays pr_in_progress"
 anchor_check_flat "$RS" rs-0j-reconcile '[Cc]ross-repository PR.*returns .pr_in_progress.' \
   "p9-cross-repo: a cross-repository PR returns pr_in_progress"
 anchor_check_flat "$RV" rvm-progress-reconcile 'isCrossRepository: false' \
@@ -543,7 +546,8 @@ for pair in "$RS/SKILL.md:references/steps/step-0j-progress-record.md" "$RS/SKIL
             "$AP/SKILL.md:references/scripts/gi-progress.py"; do
   f="${pair%%:*}"; want="${pair#*:}"
   grep -qE "^(- \`)?${want//./\\.}(\`.*)?$" "$f" && [ -f "$(dirname "$f")/$want" ]
-  check "S6v $(basename "$(dirname "$f")") prechecks and bundles $want" "$?"
+  st=$?  # captured before the label's command substitution resets it
+  check "S6v $(basename "$(dirname "$f")") prechecks and bundles $want" "$st"
 done
 grep -qE '^\| `/auto-pilot --resume` \|.*progress record' "$AP/SKILL.md"
 check "S6w auto-pilot --resume also resumes the in-flight skill from its progress record" "$?"
