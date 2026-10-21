@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- gitissue:normalized v1 -->
 
+## [Unreleased]
+
+### Features
+- **all skills, config:** add context-threshold compaction for long-running runs, after the pi durable model (checkpoint, compact, re-enter, reconcile). A new `compaction` section in `.idd.yml` sets `enabled` (default `true`) and one `threshold.<skill>` per skill, an integer 1-99 percent of context remaining (default 15 for `/auto-pilot`, 40 for every other skill); `gi-config.py` rejects any other value with exit 3. The check reads only a remaining-context figure the host has already placed in the agent's context and is skipped silently without one; it never estimates the figure and never reads transcripts or session files. At or below the threshold, interactive `/issue-resolver` and `/issue-pr-review` print a `⚠` line and a ready-to-run `/compact <focus>` line built only from the skill name, issue or PR number and step, then pause at most once per run; the five single-pass skills print the same lines without pausing; auto mode prints one `⚠` line and continues. `/auto-pilot` checks at the top of each iteration, confirms its run-state checkpoint is current, warns and continues: it never stops, prompts, or adds a `Result:` value. A skill never triggers compaction itself — the user's `/compact` or the host's auto-compact does. `/auto-pilot`, `/issue-resolver` and `/issue-pr-review` gain a re-entry rule at the top of SKILL.md, the part the host re-injects after a compaction: re-read durable state (run state, git, GitHub) and the current step, never re-spawn an in-flight subagent, confirm with a live `gh … --json` read before repeating a push, PR, comment, label or merge, and take the existing cap path when a loop counter is lost instead of restarting at cycle 1. `/auto-pilot` also writes a pre-spawn checkpoint into its existing run state before the sequential resolver spawn. `compaction.enabled: false` turns all of it off. The contract is the new runtime doc `docs/context-threshold.md`, and the design record is `docs/decisions/context-threshold-durable-handoff.md`. ([#540](https://github.com/luongnv89/idd/issues/540))
+
 ## v0.26.1 — 2026-10-11
 
 ### Changed
