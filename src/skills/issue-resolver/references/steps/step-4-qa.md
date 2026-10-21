@@ -50,7 +50,8 @@ ran on this commit" drift apart, so this is the only place either is stated.
 tests_state = <passing_count>@<tests_sha>        # e.g. 128@9f2c1ab…  (sha40)
 ```
 
-Captured **where the work ran**, never reconstructed: the count the suite
+Captured **where the work ran**, never reconstructed and never restored from a
+progress record: the count the suite
 reported, and `tests_sha` = `git rev-parse HEAD` evaluated in the same step,
 *before* anything else commits. Full 40-character SHA — the short form is
 display-only. It is a
@@ -145,6 +146,9 @@ The contract, opt-in, lifecycle and verdict handling live in `docs/ui-review.md`
 - **Premise reset:** two failed fixes sharing a premise block the next fix until
   rerunnable diagnostics support a revised one (*Premise reset* below) — it
   catches what stagnation misses, the same wrong hypothesis behind reworded findings
+- **Resumed run** (*Step 0j — Progress record*): the restored cycle is a floor and
+  the cycle in flight when the session died counts as consumed; a lost count or
+  ledger takes the cap path, never cycle 1
 
 ### Premise reset <!-- a:rs-premise-reset -->
 
@@ -187,6 +191,10 @@ the remaining issues; a continue alone never sends the fix. **Auto:** continue t
 with the known issues recorded, as stagnation does; no QA marker is written.
 Record it in the Decision Record's conditional *Premise reset* line
 (`references/report-templates.md`).
+
+**On a resume** the ledger restored from the progress record is kept and only
+grows: a restored failure can add a block, never lift one, and an unreadable
+ledger leaves the gate blocked.
 
 ### After QA
 
