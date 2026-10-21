@@ -216,6 +216,7 @@ Some infrastructure procedures are shared across multiple skills as reference do
 | IDD methodology + analysis-artifact rule | `docs/idd-methodology.md` | issue-resolver, issue-pr-review, issue-analysis |
 | Configuration schema (autopilot + review) | `docs/config-schema.md` | auto-pilot, issue-pr-review, init-idd |
 | Run-log schema (`.idd/runs.jsonl`) | `docs/run-log-schema.md` | issue-resolver, auto-pilot, idd-doctor |
+| Context-threshold check + post-compaction re-entry (`compaction.*`) | `docs/context-threshold.md` | all eight public skills |
 
 ### GitHub Projects Sync
 

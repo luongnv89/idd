@@ -48,6 +48,26 @@ the next issue, never re-resolve it. A PR that is
 `OPEN` is the PR to review in Phase 3. No PR for a singleton `current.branch`, or
 a read that fails, is a doubt: fall back to `absent`.
 
+**The resolver pre-spawn marker is the one exception.** <!-- a:ap-step10-prespawn-marker -->
+A singleton `current` whose `phase` is `resolve` and that carries **no**
+`branch` and **no** `pr` (each absent or `null`) is *Step 2.2*'s pre-spawn
+checkpoint: the run died with that resolver in flight, or the iteration ended
+before its end-of-iteration checkpoint cleared `current`. That shape is
+**not** a doubt.
+Key the exception on the shape alone, never on this run's `compaction.enabled`,
+because a state an enabled run wrote can be resumed by a disabled one. Clear the
+marker with the *Step 1.0b* checkpoint procedure:
+
+```json
+{"current": null}
+```
+
+Then stay `resumable`, still subject to the gate's `--resume` and lock
+conditions, and seed `processed[]` and `skip_list[]` exactly as for a state
+whose `current` was already `null`. The issue is picked again normally, and the
+resolver's Step 0b finds any PR the dead run opened. If that clear exits
+non-zero, treat it as a doubt and fall back to `absent`.
+
 **Parallel-lane reconciliation.** When `lanes[]` is non-empty, validate every
 record before advancing any of them. `gi-state.py` already rejects a
 non-conventional `lanes[].branch`; check it again before binding it to a shell
@@ -237,3 +257,25 @@ passes `max_runtime_minutes × 60`. Exit 3 means the inputs are invalid (a
 malformed `started_at`, a negative `--max-minutes`): stop *this check*, and treat
 the budget as unenforced rather than as expired — a broken clock must never
 manufacture a stop.
+
+### Context threshold check <!-- a:ctx-check -->
+
+Only when `compaction.enabled` is true; `false` skips this check entirely and
+the loop behaves exactly as before. The contract, including the signal rule, is
+`references/docs/context-threshold.md`. Evaluate it at the **top of every iteration** only,
+right after the *Runtime budget check*, against
+`compaction.threshold.auto-pilot` (default 15). It reads only a
+remaining-context figure the host already placed in this agent's context; with
+none, skip it silently and never estimate one.
+
+At or below the threshold, confirm the run-state checkpoint is current — the
+last phase's checkpoint (or *Step 1.0*'s `--init`) already wrote it, so nothing
+extra is written — then print one line and **continue** the loop:
+
+```
+⚠ Context threshold: {remaining}% left ≤ {threshold}% — checkpoint current; continuing (host auto-compact + re-entry rule)
+```
+
+It never stops the loop, never prompts, and adds no `Result:` value and no
+*Stop Conditions* row. The host's auto-compact and SKILL.md's *Context re-entry*
+rule carry the run across a compaction.

@@ -4,7 +4,7 @@ description: "Review a PR end-to-end with CI checks, fix cycles, and optional au
 license: MIT
 compatibility: "Requires git and GitHub CLI (gh) with authentication. Self-contained — uses shared agents from shared/agents/."
 metadata:
-  version: 2.9.0
+  version: 2.10.0
   author: "Luong NGUYEN <luongnv89@gmail.com>"
   effort: high
 ---
@@ -24,6 +24,14 @@ Review a PR end-to-end — analyze, test, fix, check CI, repeat until clean.
 | `/issue-pr-review --review-only` | read-only | Review and report, never fix or merge |
 
 `--auto` is set by `/auto-pilot`; in auto mode export `IDD_AUTO_MODE=1` so the pre-commit scan logs warnings instead of prompting (`docs/pre-commit-security.md`). `--no-merge` suppresses auto-merge even under `--auto`.
+
+## Context re-entry <!-- a:ctx-reentry -->
+
+**Only when `compaction.enabled` is true; otherwise skip this section** (`docs/context-threshold.md`). After a compaction mid-run:
+
+- Re-bind with `gh pr view {N} --json state,headRefName,headRefOid`, where `N` is the PR number already bound in this conversation. Any use of the fork-controlled `headRefName` keeps *Step 1* item 6's `branch_name="$(gh pr view {N} --json headRefName --jq .headRefName)"` form; never paste the literal.
+- Read the current step from this conversation's `[N/7]` lines and re-read its reference. Before repeating a comment, fixer commit or push, label or merge, confirm with a live `--json` read that it has not happened.
+- **Review loop:** if the review/fix cycle count cannot be read from this conversation, treat `review.max_cycles` as reached and take the existing max-cycles path. **Never restart the loop at cycle 1.**
 
 ## Prerequisites
 
@@ -55,6 +63,7 @@ references/docs/agent-overrides.md
 references/docs/terminal-style.md
 references/docs/ui-review.md
 references/docs/post-merge-cleanup.md
+references/docs/context-threshold.md
 references/scripts/gi-config.py
 references/scripts/gi-secscan.py
 references/scripts/gi-ci-wait.py
@@ -92,7 +101,9 @@ Load config once at skill start; never re-read it. Run `python3 shared/scripts/g
 
 **Capture the run clock here:** chain that same `python3` invocation as `python3 …; ec=$?; date +%s >&2; exit "$ec"`; the stderr epoch is `run_started_epoch`, from which the *Run Stats Footer* (`references/run-stats.md`) measures `elapsed`.
 
-Inline defaults: `review.max_cycles: 3`, `review.soft_pass: true`, `review.auto_merge: false` (auto mode overrides to `true`). Every key and its gate: `references/review-loop-mechanics.md` (*Config keys and what they gate*).
+**Context threshold.** <!-- a:ctx-check --> Only when `compaction.enabled` is true (`docs/context-threshold.md`). At each `[N/7]` step start, compare the remaining-context figure the host placed in your context (none: skip silently, never estimate) with `compaction.threshold.issue-pr-review`. At or below it, interactive prints the `⚠` line and a `/compact <focus>` line (skill, `PR #N`, step id and name only) and pauses **at most once per run**; `--auto` / `IDD_AUTO_MODE=1` prints one `⚠` line per run and continues — never a pause or stop.
+
+Inline defaults: `review.max_cycles: 3`, `review.soft_pass: true`, `review.auto_merge: false` (auto mode overrides to `true`), `compaction.enabled: true`, `compaction.threshold.issue-pr-review: 40`. Every key and its gate: `references/review-loop-mechanics.md` (*Config keys and what they gate*).
 
 ---
 

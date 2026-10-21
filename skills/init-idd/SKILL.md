@@ -4,7 +4,7 @@ description: "Generate a .idd.yml by auto-detecting a repo's stack, test runner,
 license: MIT
 compatibility: "Requires git. No GitHub CLI or authentication needed — generates a local config file only."
 metadata:
-  version: 0.5.0
+  version: 0.6.0
   author: "Luong NGUYEN <luongnv89@gmail.com>"
   effort: low
 ---
@@ -73,6 +73,7 @@ Check these files relative to the skill's directory (the dirname of this SKILL.m
 - `references/docs/github-projects-sync.md` — GitHub Projects status sync reference
 - `references/docs/platform-github.md` — GitHub platform driver reference
 - `references/docs/terminal-style.md` — terminal output style contract (symbols, output structure, table/error formats)
+- `references/docs/context-threshold.md` — context-threshold check contract
 - `references/scripts/gi-stack-detect.py` — language, framework, test-runner, and size detection
 
 ## Ignore Rule
@@ -98,6 +99,8 @@ Each `created` / `added` line is a change; none means `○ already ignored`. Any
 ## Configuration Check
 
 This skill GENERATES the config — it does not read one. Check if `.idd.yml` already exists in the repo root before proceeding. **Capture the run clock in that same check:** chain the first shell as `…; ec=$?; date +%s >&2; exit "$ec"` and keep the stderr epoch as `run_started_epoch` — the check's exit stays intact, it costs no extra round trip, and it is what the *Run Stats Footer* (`references/run-stats.md`) measures `elapsed` from.
+
+**Context threshold.** <!-- a:ctx-check --> Only when `compaction.enabled` is true (`references/docs/context-threshold.md`). This skill loads no config, so read `compaction.enabled` (default `true`) and `compaction.threshold.init-idd` (default `40`) from an existing `.idd.yml` when there is one, else use those defaults. Once, right after this check, compare the remaining-context figure the host placed in your context (none: skip silently, never estimate) with that threshold. At or below it, print the `⚠` line and a `/compact <focus>` line (skill and step only), then continue — no pause; auto mode prints only the `⚠` line.
 
 ### File does NOT exist — always create
 

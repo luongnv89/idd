@@ -460,3 +460,6 @@ jobs:
 
       - name: test-run-stats-373
         run: bash tests/test-run-stats-373.sh
+
+      - name: test-context-threshold-540
+        run: bash tests/test-context-threshold-540.sh

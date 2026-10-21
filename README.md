@@ -614,7 +614,7 @@ review:
   require_acceptance_criteria_check: true  # block soft-pass if AC verification fails
 ```
 
-Everything you don't set falls back to a sensible default. Set `agents.model.<role>` and `agents.effort.<role>` to choose a model and thinking effort for individual subagent roles; each role falls back to its `agents.model.default` or `agents.effort.default` setting, then to the main agent configuration. See [agent overrides](docs/agent-overrides.md) for harness support and fallback behavior. Custom templates, approval gates, GitHub Projects sync, and all other settings are documented in the [full configuration schema](docs/config-schema.md).
+Everything you don't set falls back to a sensible default. Set `agents.model.<role>` and `agents.effort.<role>` to choose a model and thinking effort for individual subagent roles; each role falls back to its `agents.model.default` or `agents.effort.default` setting, then to the main agent configuration. See [agent overrides](docs/agent-overrides.md) for harness support and fallback behavior. Set `compaction.threshold.<skill>` (percent of context remaining; `auto-pilot` defaults to 15, every other skill to 40) to choose when a long run warns that it is time to compact, and `compaction.enabled: false` to turn the check off; skills never compact on their own, and the check fires only where the host reports remaining context (see [context threshold](docs/context-threshold.md)). Custom templates, approval gates, GitHub Projects sync, and all other settings are documented in the [full configuration schema](docs/config-schema.md).
 
 </details>
 

@@ -4,7 +4,7 @@ description: "Convert any phased plan file, or a conversation about what to buil
 license: MIT
 compatibility: "Requires git and GitHub CLI (gh) with authentication (`gh auth status`), plus the sibling issue-creator skill from the same idd distribution."
 metadata:
-  version: 2.3.0
+  version: 2.4.0
   author: "Luong NGUYEN <luongnv89@gmail.com>"
   effort: high
   architecture: "orchestrator (resolve input → worklist → label set → epic → per-phase issue-creator batch → sub-issue registration → static map render → verify-by-re-read)"
@@ -104,8 +104,11 @@ Exit 0: use `config`; if `first_run` is `true`, print the `○ First run` line b
 ○ First run — using default config. Run /init-idd to customize.
 ```
 
-This skill reads only `platform` (default `github`, the only driver); semantics in
-`references/docs/config-schema.md` (*platform*).
+This skill reads `platform` (default `github`, the only driver), `compaction.enabled`
+(default `true`) and `compaction.threshold.plan-to-issues` (default `40`); semantics in
+`references/docs/config-schema.md` (*platform*, *compaction*).
+
+**Context threshold.** <!-- a:ctx-check --> Only when `compaction.enabled` is true (`references/docs/context-threshold.md`): once, right after this config load, compare the remaining-context figure the host placed in your context (none: skip silently, never estimate) with `compaction.threshold.plan-to-issues`. At or below it, print the `⚠` line and a `/compact <focus>` line (skill and phase only), then continue — no pause; auto mode prints only the `⚠` line.
 
 ## Mode selection
 
@@ -296,6 +299,7 @@ the `✗ Missing bundled dependency` block from `references/error-messages.md` a
 - `references/docs/config-schema.md` — configuration schema (`platform`)
 - `references/docs/platform-github.md` — GitHub driver
 - `references/docs/terminal-style.md` — symbols, tables, errors
+- `references/docs/context-threshold.md` — context-threshold check contract
 - `references/scripts/gi-config.py` — config resolver
 - `references/scripts/gi-plan-map.py` — plan-map renderer
 

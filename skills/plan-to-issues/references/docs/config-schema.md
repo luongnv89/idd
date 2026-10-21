@@ -1,7 +1,7 @@
 <!-- Generated from /docs/config-schema.md. Do not edit. Edit source and run ./scripts/build.sh. -->
 # `.idd.yml` Configuration Schema
 
-> **Per-skill excerpt (generated).** Only the configuration sections this skill reads are reproduced here: `platform`. The complete schema — every section and the full defaults table — is at [config-schema.md](https://github.com/luongnv89/idd/blob/main/docs/config-schema.md).
+> **Per-skill excerpt (generated).** Only the configuration sections this skill reads are reproduced here: `compaction`, `platform`. The complete schema — every section and the full defaults table — is at [config-schema.md](https://github.com/luongnv89/idd/blob/main/docs/config-schema.md).
 
 IDD Stack works with zero configuration — every setting has a default. With no `.idd.yml`, the first-run hint is shown:
 
@@ -30,6 +30,23 @@ Everyday knobs: `platform`, `issue.auto_normalize`, `resolve.branch_prefix`, `re
 #         a new driver becomes valid here once its docs/platform-<name>.md exists
 # Default: "github"
 platform: github
+
+# Context-threshold check + re-entry rules. Contract:
+# https://github.com/luongnv89/idd/blob/main/docs/context-threshold.md
+compaction:
+  # Type: boolean. Default: true. false = behave as before.
+  enabled: true
+  # Type: integer 1-99 per skill, % of context remaining (else exit 3).
+  # Default: as listed (auto-pilot 15, every other skill 40).
+  threshold:
+    auto-pilot: 15
+    issue-resolver: 40
+    issue-pr-review: 40
+    issue-analysis: 40
+    issue-creator: 40
+    issue-triage: 40
+    plan-to-issues: 40
+    init-idd: 40
 ```
 
 ## `.idd/` Directory
@@ -69,8 +86,13 @@ Config is validated at every skill start; errors include line numbers:
   Docs:    https://github.com/luongnv89/idd/blob/main/docs/config-schema.md
 ```
 
+Each `compaction.threshold.<skill>` must be an integer from 1 to 99 and `compaction.enabled` a boolean.
+
 ## Defaults Table
 
 | Setting | Default | Description |
 |---------|---------|-------------|
 | `platform` | `github` | Tracker platform driver — `github` is the only implemented driver (references/docs/platform-github.md) |
+| `compaction.enabled` | `true` | Context-threshold check and re-entry rules; `false` = behave as before |
+| `compaction.threshold` · `auto-pilot` | `15` | % of context remaining (1-99) at or below which the skill prompts compaction |
+| `compaction.threshold` · every other skill | `40` | Same, one key per skill |

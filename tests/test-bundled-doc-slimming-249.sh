@@ -217,7 +217,19 @@ FAIL=0
 # in-progress checks in code: the doc +272 per copy, measured 571,076 + 544 =
 # 571,620; auto-pilot +596 (to 423,182), issue-pr-review +583 (to 285,652).
 # The line keeps six bytes of headroom, so the ratchet is not widened.
-BUDGET=571626
+#
+# Issue #540 is the tenth raise (2026-10-21): context-threshold compaction.
+# Every skill needs the contract (signal rule, actions by mode, the /compact
+# composition rule, the disabled clause), so its one runtime doc,
+# context-threshold.md, ships to all 8 skills. A 3,587-byte first draft was cut
+# to 3,201, so it costs 3,306 per copy with the generated header: +26,448. The
+# `compaction` section rides in all 8 config-schema.md copies (fence block,
+# three Defaults rows, one Validation line; terser comments cut it from ~1,150
+# to 969 per excerpt, 1,053 in init-idd's full copy with the Section Map):
+# +7,836. Main measured 571,052 (the #537 rename had shrunk it from 571,620
+# without moving the line), so 571,052 + 26,448 + 7,836 = 605,336; the line
+# keeps six bytes of headroom, so the ratchet is not widened.
+BUDGET=605342
 
 pass() { echo "  ✓ $1"; PASS=$((PASS + 1)); }
 fail() { echo "  ✗ $1"; FAIL=$((FAIL + 1)); }
