@@ -15,7 +15,7 @@
 #
 # The sensitive-change gate's test obligations are named after their probe ids
 # (p4 … p16), so `grep -n 'p7-' tests/test-progress-records-542.sh` finds the
-# case that discharges p7.
+# case that discharges p7. p17 … p19 pin review findings the same way.
 #
 # Usage: bash tests/test-progress-records-542.sh
 # Returns: exit 0 if all checks pass, exit 1 on failure.
@@ -383,6 +383,23 @@ gp "$V" --read --skill issue-resolver --number 26
 st=$?  # captured before the label's command substitution resets it
 check "p16-premise-revisions-never-restored: a revision planted in a stored record reads corrupt, so nothing restores it (got $(js 'd["status"]'))" "$st"
 
+# ─── p17: the research pin holds the issue as the session left it ───────────
+# 0c's --start carries 0a's pre-0d updatedAt, and 0d's backup comment and body
+# edit bump it. research_pin is measured from the merged record on the write that
+# carries `research`, so issue_updated_at re-sent in that same patch is pinned.
+Q="$TMP/pin"; new_repo "$Q" feat/27-pin
+put "$Q" start issue-resolver 27 '{"step": 0, "issue_updated_at": "2026-10-01T00:00:00Z"}'
+put "$Q" write issue-resolver 27 '{"step": 1}'
+put "$Q" write issue-resolver 27 '{"step": 2, "research": {"summary": "x"}}'
+gp "$Q" --read --skill issue-resolver --number 27
+PIN0="$(js 'd["record"]["research_pin"]["issue_updated_at"]')"
+put "$Q" write issue-resolver 27 '{"step": 2, "research": {"summary": "x"}, "issue_updated_at": "2026-10-01T00:05:00Z"}'
+gp "$Q" --read --skill issue-resolver --number 27
+[ "$PIN0" = "2026-10-01T00:00:00Z" ] && [ "$RC" = 0 ] \
+  && [ "$(js 'd["record"]["research_pin"]["issue_updated_at"]')" = "2026-10-01T00:05:00Z" ]
+st=$?  # captured before the label's command substitution resets it
+check "p17-research-pin-post-normalize: issue_updated_at sent with research is the pinned value; without it the pre-0d start value is (got $PIN0 → $(js 'd["record"]["research_pin"]["issue_updated_at"]'))" "$st"
+
 # ─── p8: --list on an absent store; numbers are integers ─────────────────────
 LS="$TMP/list"; new_repo "$LS"
 gp "$LS" --list
@@ -447,6 +464,45 @@ done
 wait
 gp "$C" --read --skill issue-resolver --number 24
 [ "$(js 'd["status"]')" = "ok" ]; check "S5f concurrent writers leave a parseable record" "$?"
+
+# ─── p19: the store flock serializes a writer behind a lock holder ───────────
+# A helper process holds LOCK_EX on <store>/.lock. A --write started meanwhile
+# must still be running, its record untouched, after a window in which an
+# unlocked writer finishes; it completes once the helper lets go.
+L="$TMP/flock"; new_repo "$L" feat/28-flock
+LREC="$L/.git/idd/progress/issue-resolver-28.json"
+put "$L" start issue-resolver 28 '{"step": 0}'
+LBEFORE="$(cat "$LREC")"
+python3 -c '
+import fcntl, os, sys, time
+fd = os.open(sys.argv[1], os.O_RDWR | os.O_CREAT, 0o600)
+fcntl.flock(fd, fcntl.LOCK_EX)
+open(sys.argv[2], "w").close()
+deadline = time.monotonic() + 30
+while not os.path.exists(sys.argv[3]) and time.monotonic() < deadline:
+    time.sleep(0.05)
+' "$L/.git/idd/progress/.lock" "$TMP/p19-ready" "$TMP/p19-release" &
+HOLDER=$!
+python3 -c '
+import os, sys, time
+deadline = time.monotonic() + 10
+while not os.path.exists(sys.argv[1]) and time.monotonic() < deadline:
+    time.sleep(0.05)
+sys.exit(0 if os.path.exists(sys.argv[1]) else 1)
+' "$TMP/p19-ready"
+READY=$?
+(cd "$L" && printf '{"step": 1}' | python3 "$SCRIPT" --write --skill issue-resolver --number 28 \
+  >/dev/null 2>"$TMP/p19-err"; echo "$?" > "$TMP/p19-rc") &
+WRITER=$!
+python3 -c 'import time; time.sleep(2)'
+kill -0 "$WRITER" 2>/dev/null && [ ! -e "$TMP/p19-rc" ] && [ "$(cat "$LREC")" = "$LBEFORE" ] && [ "$READY" = 0 ]
+check "p19-flock-serializes: a --write does not complete while another process holds the store lock" "$?"
+touch "$TMP/p19-release"
+wait "$WRITER"; wait "$HOLDER"
+gp "$L" --read --skill issue-resolver --number 28
+[ "$(cat "$TMP/p19-rc" 2>/dev/null)" = 0 ] && [ "$(js 'd["record"]["current"]')" = 1 ]
+st=$?  # captured before the label's command substitution resets it
+check "p19-flock-serializes: the --write completes once the lock is released (rc=$(cat "$TMP/p19-rc" 2>/dev/null))" "$st"
 
 # ─── S6: the prose contract in the built skills ──────────────────────────────
 # p4: the CI step is one plain name/run pair (the gate's CI-shape obligation).
@@ -568,6 +624,36 @@ anchor_check_flat "$RS" rs-0j-monotone 'failures only.*revisions: \[\]' \
   "p16-premise-revisions-never-restored: step 0j restores failures only, revisions: []"
 anchor_check_flat "$RS" rs-premise-reset 'failures only, with .revisions: \[\]' \
   "p16-premise-revisions-never-restored: step 4's resume paragraph restores failures only, revisions: []"
+
+# p17: the write that pins research re-sends the post-0d updatedAt in the same
+# cell — never 0c's pre-0d value, which a resume's live 0a can never match.
+anchor_region "$RS" rs-0j-writes > "$TMP/writes-region.txt" 2>/dev/null || true
+P17="$(python3 - "$TMP/writes-region.txt" <<'PY'
+import sys
+rows = [l for l in open(sys.argv[1], encoding="utf-8").read().splitlines() if l.startswith("|")]
+cells = [c for r in rows for c in r.split("|") if "`research`" in c]
+if len(cells) != 1:
+    print(f"{len(cells)} research cells"); sys.exit()
+cell = cells[0]
+if '"issue_updated_at": "<updatedAt after 0d>"' not in cell:
+    print("no post-0d issue_updated_at"); sys.exit()
+if "0a's updatedAt" in cell:
+    print("pins 0a's pre-0d updatedAt"); sys.exit()
+print("ok")
+PY
+)"
+[ "$P17" = "ok" ]
+check "p17-research-pin-post-normalize: the research write carries issue_updated_at after 0d (${P17:-no region})" "$?"
+anchor_check_flat "$RS" rs-0j-writes 'same patch.*0d.s re-fetch' \
+  "p17-research-pin-post-normalize: the value is 0d's re-fetch, sent in the same patch as research"
+
+# p18: a k = 4 resume skips Step 3, the only producer of the provenance records.
+anchor_check_flat "$RS" rs-0j-gates '.k. = 4.*no \*Test Integrity\* record.*commit messages' \
+  "p18-k4-provenance: at k = 4 the reviewer gets no Test Integrity record and checks the plan and commit messages"
+anchor_check_flat "$RS" rs-0j-gates 'not restored \(resumed at QA\).*.unverified.' \
+  "p18-k4-provenance: the PR body reads not restored (resumed at QA), its criteria unverified"
+anchor_check_flat "$RS" rs-0j-gates 'not restored \(resumed at Deliver\)' \
+  "p18-k4-provenance: k = 5 still reads not restored (resumed at Deliver)"
 
 # The rest of the contract (AC1-AC5).
 anchor_check_flat "$RS" rs-progress '[Nn]ever satisfies or skips a safety gate' "S6a resolver SKILL: a record never satisfies or skips a safety gate"

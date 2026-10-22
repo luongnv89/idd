@@ -39,10 +39,18 @@ python3 references/scripts/gi-progress.py --start --skill issue-resolver --numbe
 | When | Patch |
 |------|-------|
 | After *0c — Guards* passes, fresh runs only (a resumed run's only `--start` is the verify-first reset under *Where a resume re-enters*) | `{"step": 0, "base": "<base>", "issue_updated_at": "<0a's updatedAt>", "worktree": <bool>}`, plus `"caller_run_id": "<run_id>"` under `/auto-pilot` (the spawn prompt's `run_id:` line) |
-| Each `[N/5]` start from `[1/5]`, beside the clock read | `{"step": k}` plus what the previous step settled: `profile` and `analysis_reuse` at `[1/5]`, `research` (the researcher's JSON) at `[2/5]`, `plan` at `[3/5]`, `repro` once Step 3 returns one |
+| Each `[N/5]` start from `[1/5]`, beside the clock read | `{"step": k}` plus what the previous step settled: `profile` and `analysis_reuse` at `[1/5]`, `research` (the researcher's JSON) at `[2/5]` with `"issue_updated_at": "<updatedAt after 0d>"` in the same patch (*research pin*, below), `plan` at `[3/5]`, `repro` once Step 3 returns one |
 | Each Step 4 cycle start, then after it | `{"qa": {"cycle": c, "ceiling": n}}`; after it, the `premise_ledger`'s failures — each one entry carrying `"kind": "failure"`; a revision is never written (the script refuses it) — and `open_findings` |
 | Immediately **before** an effect | `{"effect": {"kind": "…", "state": "intent", "key": {…}}}` — 0d's backup comment and `gh issue edit` (`issue_edit`), Step 1's auto-close (`issue_close`), the Step 5 push (`push`, `key.sha` = HEAD) and `gh pr create` (`pr_create`, `key.branch`); once the PR exists, `{"pr": <number>}` |
 | Before the run-log write | `{"step": "closing", "outcome": "<status>", "effect": {"kind": "run_log", "state": "intent", "key": {}}}` |
+
+**Research pin.** The script measures `research_pin` from the patch that
+carries `research`, so that same patch re-sends `issue_updated_at` as the issue
+this session left it: the `updatedAt` 0d's re-fetch returns, after its backup
+comment and `gh issue edit` — 0a's only when 0d edited nothing. A resume's live
+0a reads the normalized issue, so 0c's pre-0d value would never match and the
+seeded Step 1 would always run in full. This is the reverse of 0h's condition 5,
+which compares an analysis against the pre-normalization value.
 
 `plan` is a summary, never the synthesizer's whole return: the selected option's
 `number`, `name`, `summary` (at most 2,000 characters), `files_to_modify` and
@@ -193,6 +201,15 @@ the PR body's *Test integrity* and *Sensitivity* entries read `not restored
 session's own green run; `gi-secscan`; and the QA marker and its receipt, written
 only when QA exited clean in this session. A resume never pops a stash that
 `/auto-pilot` made.
+
+**Provenance a `k` = 4 resume cannot restore.** Step 3's implementer is the
+only producer of the *Sensitivity* and *Test Integrity* records, and neither is
+recorded. At `k` = 4 Step 3 is skipped, so the Step 4 reviewer's `{pr_context}`
+carries the acceptance criteria and the restored plan but no *Test Integrity*
+record: the reviewer checks each removed or weakened test against the plan and
+the branch's commit messages instead. The PR body's *Test integrity* and
+*Sensitivity* entries read `not restored (resumed at QA)`, and every criterion
+whose evidence would cite a *Sensitivity* row is `unverified`.
 
 ### Monotone restore <!-- a:rs-0j-monotone -->
 
