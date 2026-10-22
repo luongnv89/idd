@@ -169,6 +169,7 @@ Resolves one GitHub issue end-to-end and creates an atomic PR.
 | `/issue-resolver <N>` | Interactive | Resolves issue #N, asks the user to pick an implementation plan, implements, tests, and opens a PR. |
 | `/issue-resolver <N> --auto` | Auto-pilot | Resolves issue #N autonomously with no user prompts. |
 | `/issue-resolver <N> --no-run-log` | Modifier | Suppresses the resolver's own `.idd/runs.jsonl` append and returns telemetry to the caller instead. Orthogonal to `--auto`; passed only by `/auto-pilot`, which is the single writer of the run-log line. |
+| `/issue-resolver <N> --resume` | Modifier | Resumes a killed run from its durable progress record under the git common dir, after validating it against live git and GitHub state. Every safety gate re-runs, and a stale record means the run starts over. `--auto` resumes only with this flag; interactive mode offers to resume whenever a record exists. |
 
 ### Pipeline summary
 
@@ -197,6 +198,7 @@ Reviews an existing PR end-to-end: pre-pass, review, tests/build, CI, fix loop, 
 | `/issue-pr-review <N> --auto` | Auto-pilot | Reviews, fixes, waits for CI, auto-merges when clean, then cleans up the local checkout (merged branch, clean worktrees, switch to the updated base). |
 | `/issue-pr-review` | Detect PR | Auto-detects the PR for the current branch and runs the default fix loop. |
 | `/issue-pr-review --review-only` | Read-only | Runs one review/test/CI pass, reports findings, never fixes, loops, or merges. |
+| `/issue-pr-review <N> --resume` | Modifier | Resumes a killed review from its durable progress record. Step 1 and every safety gate re-run live. Combines with `--auto` and `--no-merge`, never with `--review-only`, which never reads or writes a record. |
 
 ### Fix-loop stop conditions
 
