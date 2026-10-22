@@ -711,6 +711,17 @@ def screen(record, skill: str, number: int) -> str | None:
         _step(record.get("current"), skill, "current")
         if record.get("base_sha") is not None:
             _sha(record["base_sha"], "base_sha")
+        pin = record.get("research_pin")
+        if pin is not None:
+            # Read back into git commands by step 0j: null or exactly the shape
+            # the script measures, each field screened, or the record is corrupt.
+            if not isinstance(pin, dict) or set(pin) != {"base_sha", "issue_updated_at"}:
+                raise InvalidInput("research_pin must be null or {base_sha, issue_updated_at}")
+            if pin["base_sha"] is not None:
+                _sha(pin["base_sha"], "research_pin.base_sha")
+            if pin["issue_updated_at"] is not None and not (
+                    isinstance(pin["issue_updated_at"], str) and TS_RE.match(pin["issue_updated_at"])):
+                raise InvalidInput("research_pin.issue_updated_at must be YYYY-MM-DDTHH:MM:SSZ")
         if record.get("caller_run_id") is not None and not (
                 isinstance(record["caller_run_id"], str) and RUN_ID_RE.match(record["caller_run_id"])):
             raise InvalidInput("caller_run_id")

@@ -15,7 +15,7 @@
 #
 # The sensitive-change gate's test obligations are named after their probe ids
 # (p4 … p16), so `grep -n 'p7-' tests/test-progress-records-542.sh` finds the
-# case that discharges p7. p17 … p19 pin review findings the same way.
+# case that discharges p7. p17 … p21 pin review findings the same way.
 #
 # Usage: bash tests/test-progress-records-542.sh
 # Returns: exit 0 if all checks pass, exit 1 on failure.
@@ -400,6 +400,43 @@ gp "$Q" --read --skill issue-resolver --number 27
 st=$?  # captured before the label's command substitution resets it
 check "p17-research-pin-post-normalize: issue_updated_at sent with research is the pinned value; without it the pre-0d start value is (got $PIN0 → $(js 'd["record"]["research_pin"]["issue_updated_at"]'))" "$st"
 
+# ─── p20: a planted research_pin is screened on read ─────────────────────────
+# Step 0j's k = 2 row feeds the pin's base_sha to git, so the read screen admits
+# only null or exactly {base_sha: 40 lowercase hex | null, issue_updated_at:
+# timestamp | null}. Anything else reads corrupt, and nothing restores it.
+PS="$TMP/pin-screen"; new_repo "$PS" feat/29-pin
+git -C "$PS" update-ref refs/remotes/origin/main HEAD
+PSREC="$PS/.git/idd/progress/issue-resolver-29.json"
+put "$PS" start issue-resolver 29 '{"step": 0, "base": "main", "issue_updated_at": "2026-10-01T00:00:00Z"}'
+put "$PS" write issue-resolver 29 '{"step": 1}'
+put "$PS" write issue-resolver 29 '{"step": 2, "research": {"summary": "x"}}'
+gp "$PS" --read --skill issue-resolver --number 29
+[ "$RC" = 0 ] && [ "$(js 'd["status"]')" = "ok" ] \
+  && [ "$(js 'd["record"]["research_pin"]["base_sha"]')" = "$(git -C "$PS" rev-parse HEAD)" ]
+st=$?  # captured before the label's command substitution resets it
+check "p20-research-pin-screened: control — a measured pin carrying a full base SHA reads ok (got $(js 'd["status"]'))" "$st"
+PSCLEAN="$(cat "$PSREC")"
+for variant in sha ts extra shape; do
+  printf '%s' "$PSCLEAN" > "$PSREC"
+  python3 - "$PSREC" "$variant" <<'PY'
+import json, sys
+p, v = sys.argv[1], sys.argv[2]; r = json.load(open(p))
+if v == "sha":
+    r["research_pin"]["base_sha"] = "$(touch PWNED)"
+elif v == "ts":
+    r["research_pin"]["issue_updated_at"] = "`id`"
+elif v == "extra":
+    r["research_pin"]["cmd"] = "x"
+else:
+    r["research_pin"] = "$(touch PWNED)"
+json.dump(r, open(p, "w"))
+PY
+  gp "$PS" --read --skill issue-resolver --number 29
+  [ "$RC" = 0 ] && [ "$(js 'd["status"]')" = "corrupt" ] && [ "$(js 'd["record"]')" = "None" ] && [ ! -e "$PS/PWNED" ]
+  st=$?  # captured before the label's command substitution resets it
+  check "p20-research-pin-screened: a planted research_pin ($variant) reads corrupt, with no record (got $(js 'd["status"]'))" "$st"
+done
+
 # ─── p8: --list on an absent store; numbers are integers ─────────────────────
 LS="$TMP/list"; new_repo "$LS"
 gp "$LS" --list
@@ -654,6 +691,41 @@ anchor_check_flat "$RS" rs-0j-gates 'not restored \(resumed at QA\).*.unverified
   "p18-k4-provenance: the PR body reads not restored (resumed at QA), its criteria unverified"
 anchor_check_flat "$RS" rs-0j-gates 'not restored \(resumed at Deliver\)' \
   "p18-k4-provenance: k = 5 still reads not restored (resumed at Deliver)"
+
+# p20: the k = 2 row re-screens the pin's base_sha as a full SHA (0h condition 2).
+anchor_check_flat "$RS" rs-0j-resume-table "conditions 2-5 hold for its .research_pin." \
+  "p20-research-pin-screened: the k = 2 row requires 0h's conditions 2-5 for the research_pin"
+
+# p21: a review killed before its cycle's Step 6 started re-runs that cycle, so a
+# capped depth (trusted/light: min(1, cap)) can still finish; only a started
+# Step 6 re-enters at cycle + 1. The mark stays 6 after any Step 6, so current
+# picks the row.
+anchor_region "$RV" rvm-progress-table > "$TMP/rv-table.txt" 2>/dev/null || true
+P21="$(python3 - "$TMP/rv-table.txt" <<'PY'
+import sys
+text = open(sys.argv[1], encoding="utf-8").read()
+rows = {}
+for line in text.splitlines():
+    if line.startswith("|"):
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        rows[cells[0]] = " ".join(cells[1:])
+if "3-6" in rows:
+    print("a 3-6 row re-enters every loop step at one cycle"); sys.exit()
+if "3-5" not in rows or "6" not in rows:
+    print("no separate 3-5 and 6 rows"); sys.exit()
+if "cycle + 1" in rows["3-5"]:
+    print("the 3-5 row re-enters at cycle + 1"); sys.exit()
+if "restored `cycle`" not in rows["3-5"]:
+    print("the 3-5 row does not re-run the restored cycle"); sys.exit()
+if "cycle + 1" not in rows["6"] or "max-cycles path" not in rows["6"]:
+    print("the 6 row lacks cycle + 1 and the max-cycles path"); sys.exit()
+if "`current`" not in text:
+    print("the table does not name current as the discriminator"); sys.exit()
+print("ok")
+PY
+)"
+[ "$P21" = "ok" ]
+check "p21-reviewer-resume-cap: steps 3-5 re-run the restored cycle, only step 6 re-enters at cycle + 1 (${P21:-no region})" "$?"
 
 # The rest of the contract (AC1-AC5).
 anchor_check_flat "$RS" rs-progress '[Nn]ever satisfies or skips a safety gate' "S6a resolver SKILL: a record never satisfies or skips a safety gate"

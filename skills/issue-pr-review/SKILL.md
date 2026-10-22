@@ -310,7 +310,7 @@ After Step 6, return to Step 3. Mechanics: `references/review-loop-mechanics.md`
 - **Soft pass (`review.soft_pass: true`, default):** stop when zero `action: "fix"` issues remain, tests pass (or are skipped by config), CI passes (or is absent, disabled, or held non-blocking by `review.ignore_ci_billing_failures: true` — loop exit only, **never clean at the auto-merge gate**), and traceability is not `fail`.
 - **Strict pass (`review.soft_pass: false`):** strict mode keeps the same test/CI legs (`review.ignore_ci_billing_failures` included, still **never clean at the auto-merge gate**) and adds zero remaining `action: "note"` findings and `pass` on every enabled dimension; any `partial` dimension is a strict blocker — stop, report it under Remaining, never merge.
 - **Stagnation:** the same findings (dimension + file + description) in 2 consecutive cycles → stop and report.
-- **Resumed review:** cycles restored from the progress record count toward `review.max_cycles`; the next cycle is the restored one plus one (*Progress record*).
+- **Resumed review:** cycles restored from the progress record count toward `review.max_cycles`; a cycle killed before its Step 6 started is re-run, and only a new fix cycle is the restored one plus one (*Progress record*).
 
 ---
 

@@ -155,7 +155,7 @@ the recorded workspace, 0g and 0h. Then, by the recorded step `k`:
 |-----|----------|
 | 0 | A fresh run on the recorded workspace |
 | 1 | Step 1 in full |
-| 2 | Step 1 as the seeded **verify-first** pass — the recorded `research` as `prior_analysis`, only when 0h's conditions 3-5 hold for its `research_pin`, else in full — then Step 2 in full |
+| 2 | Step 1 as the seeded **verify-first** pass — the recorded `research` as `prior_analysis`, only when 0h's conditions 2-5 hold for its `research_pin`, else in full — then Step 2 in full |
 | 3 | As 2 through Step 1; the plan is restored and Step 2's synthesizer is skipped, but the *Sensitive-change gate* re-runs (*Sensitive restored plan*). Step 3 restarts, naming the branch's existing commits to the implementer as data |
 | 4 | As 3 through the gate; Step 3 is skipped; Step 4 resumes at cycle `qa.cycle + 1` |
 | 5 | Steps 3-4 are skipped; Step 5 runs from its start — the final test run, docs, `gi-secscan`, effects reconciled. **No QA marker and no receipt:** print `○ QA handoff marker omitted — QA did not finish in this session` |

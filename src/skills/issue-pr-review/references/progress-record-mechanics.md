@@ -35,7 +35,7 @@ python3 shared/scripts/gi-progress.py --start --skill issue-pr-review --number {
 |------|-------|
 | After Step 1 binds the PR and `branch_name`, fresh reviews only | `{"step": 1, "linked_issue": <n or null>, "profile": "light|full"}`, plus `"caller_run_id": "<run_id>"` under `/auto-pilot` (the spawn prompt's `run_id:` line) |
 | Each `[N/7]` start | `{"step": k}`; at `[3/7]` after Step 2, also `prepass_head` (HEAD after the auto-fix) |
-| Each cycle start, then after Step 6 | `{"cycle": c}`; after Step 6, `findings` (`open`, `noted`) and `history` (the last two cycles' finding signatures) |
+| Each cycle start, then after Step 6 | `{"cycle": c}`, in the same patch as that cycle's `{"step": 3}`, so `current` 3 never pairs with the previous cycle's count; after Step 6, `findings` (`open`, `noted`) and `history` (the last two cycles' finding signatures) |
 | Immediately **before** an effect | `{"effect": {"kind": "…", "state": "intent", "key": {…}}}` — Step 2's auto-fix push and each Step 6 push (`push`, `key.sha` = the local HEAD), the `Closes #N` body edit (`body_edit`), the standalone `--auto` merge (`merge`, `key.sha` = the head being merged) |
 | Before the Step 7 report | `{"step": "closing", "outcome": "<Result>"}` |
 
@@ -109,10 +109,15 @@ auto-fixes*' four conditions, and exit 1 blocks the push. Only after a pass,
 
 ### Where a resume re-enters <!-- a:rvm-progress-table -->
 
+The row is the recorded mark `step`, except that the mark stays 6 once any
+cycle's Step 6 has started (the loop's 6 → 3 is a re-walk), so under a mark of 6
+`current` picks it: 3-5 takes the 3-5 row, anything else the 6 row.
+
 | Recorded step | Re-entry |
 |---------------|----------|
 | 1-2 | Step 1 live, then Step 2 in full (it is idempotent) |
-| 3-6 | Step 2 is skipped when `prepass_head` equals the live head or is its ancestor. The loop re-enters Step 3 at `cycle + 1` with a **fresh** reviewer — the dead one cannot be re-messaged — seeded with `findings.open` as hints to verify. Acceptance criteria and traceability are recomputed; Step 4 runs unless this session's own skip rule applies; the Step 5 CI wait always runs. A cycle above `review.max_cycles` takes the max-cycles path |
+| 3-5 | That cycle's Step 6 never started, so the loop re-runs it: Step 2 is skipped when `prepass_head` equals the live head or is its ancestor, and Step 3 re-enters at the restored `cycle` with a **fresh** reviewer — the dead one cannot be re-messaged — seeded with `findings.open` as hints to verify. It adds no cycle: fixable issues go to that same cycle's Step 6, and only the cycle after it counts as new. Acceptance criteria and traceability are recomputed; Step 4 runs unless this session's own skip rule applies; the Step 5 CI wait always runs. A run killed in Steps 3-5 at the cap — the CI wait included — can still finish; a restored cycle already above this session's cap takes the max-cycles path |
+| 6 | Its fixes may be applied, pushed or in flight: as 3-5, but Step 3 re-enters at `cycle + 1`, a new fix cycle. A cycle above `review.max_cycles` takes the max-cycles path |
 | 7 | The fix-conditional *Confirmation pass* — a fresh reviewer, then Steps 4-5 — because soft-pass and the merge need this session's review, acceptance-criteria, traceability and CI legs. It consumes a cycle only when it finds fixable issues, so a run killed at a clean Step 7 at the cap can still finish. Then Step 7, with *Merge identity* live |
 | `closing` | Report from live state, then `--clear` |
 
