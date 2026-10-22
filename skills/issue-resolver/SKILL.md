@@ -20,10 +20,11 @@ Issue → atomic PR in 6 steps.
 | `/issue-resolver <N>` | Interactive; user picks the plan |
 | `/issue-resolver <N> --auto` | No prompts; set by `/auto-pilot` |
 | `/issue-resolver <N> --no-run-log` | Modifier, **orthogonal to `--auto`**: append nothing to `.idd/runs.jsonl`, return telemetry (*Run-log entry*) |
+| `/issue-resolver <N> --resume` | Modifier: resume a killed run from its progress record (*Progress record*); the only way `--auto` resumes, while interactive also offers it whenever a record exists |
 
 ## Context re-entry <!-- a:ctx-reentry -->
 
-**Only when `compaction.enabled` is true; otherwise skip this section** (`references/docs/context-threshold.md`). After a compaction mid-run, durable state is git plus GitHub; no file is written.
+**Only when `compaction.enabled` is true; otherwise skip this section** (`references/docs/context-threshold.md`). After a compaction mid-run, durable state is git plus GitHub; the *Progress record* serves only a killed session and is never read here.
 
 - **Caller-managed lane** (`IDD_CALLER_WORKTREE=1`, this conversation's `parallel_lane` record) first: recover that record, then re-run Step 0e's caller-managed validation from a command that starts `cd -- "$IDD_WORKTREE_PATH" && …`, its exports repeated. Bind the branch and PR only inside that validated root. A record not recovered intact stops the lane with `failure_step: preflight`, `status: blocked_dirty`. **Never fall back to the ambient checkout.**
 - Re-bind the branch live, `branch="$(git rev-parse --abbrev-ref HEAD)"`, then the PR with `gh pr list --head "$branch" --json number,state` — never a branch name pasted from the compaction summary.
@@ -99,6 +100,7 @@ references/pipeline-steps.md
 references/steps/step-0-preflight.md
 references/steps/step-0h-analysis-reuse.md
 references/steps/step-0i-caller-payload.md
+references/steps/step-0j-progress-record.md
 references/steps/step-1-research.md
 references/steps/step-2-plan.md
 references/steps/step-3-implement.md
@@ -135,7 +137,14 @@ references/scripts/gi-sensitive.py
 references/scripts/gi-premise.py
 references/scripts/gi-sketch.py
 references/scripts/gi-recipe.py
+references/scripts/gi-progress.py
 ```
+
+---
+
+## Progress record <!-- a:rs-progress -->
+
+A killed session can resume (`--resume`). Read the record after the precheck, before *0a*; from *0c* on, write it with `references/scripts/gi-progress.py` at every `[N/5]` start, at each Step 4 cycle, and before every effect. It holds only what git and GitHub cannot reproduce: the step, the plan summary, cycle counts, the premise ledger, open findings, the last effect. **A record never satisfies or skips a safety gate:** every gate re-runs live, and any doubt is stale (start from Step 0). Write points, resume, validation and reconciliation: `references/steps/step-0j-progress-record.md` (*Step 0j — Progress record*) — **read it now**.
 
 ---
 
@@ -163,7 +172,7 @@ GitHub reads share the boundary in `references/scripts/gi-gh.py`. Classify any f
 
 1. List branches: `git branch -a | grep -i "{N}"`.
 2. List open PRs: `gh pr list --state open --json number,title,body,headRefName --limit 20`. A PR targets the issue when its body has `Closes #N`, `Fixes #N` or `Resolves #N`.
-3. If an **open** PR targets it: print the `⚠ PR already targets issue` block from `references/error-messages.md` (*Guards*), stop, return `status: pr_in_progress` with its `pr_number` and `branch_name`, and **never close the issue** (*Early exit*).
+3. If an **open** PR targets it: print the `⚠ PR already targets issue` block from `references/error-messages.md` (*Guards*), stop, return `status: pr_in_progress` with its `pr_number` and `branch_name`, and **never close the issue** (*Early exit*) — unless a resume's ownership check (*Progress record*) proves the PR is this run's own.
 
 Only a **merged** PR or a closing commit on the default branch is `already_resolved`.
 
@@ -324,7 +333,7 @@ gh pr create --title "{pr_title}" --body "{pr_body}"
 
 **PR title:** `{type}({scope}): {description} (#{issue_number})` (`references/docs/naming-conventions.md`)
 
-**PR body:** fill *PR Body Template* in `references/report-templates.md`; never omit its **Decision Record**, Test Results or **Acceptance Criteria Verification** (`references/docs/idd-methodology.md`). Its **last line** is the QA handoff marker: fill it **only when QA exited clean**, else drop it — never append a second copy (*QA handoff marker* owns the per-field omit rules). `head=` is `git rev-parse HEAD` after the last commit.
+**PR body:** fill *PR Body Template* in `references/report-templates.md`; never omit its **Decision Record**, Test Results or **Acceptance Criteria Verification** (`references/docs/idd-methodology.md`). Its **last line** is the QA handoff marker: fill it **only when QA exited clean** in this session, else drop it — never append a second copy (*QA handoff marker* owns the per-field omit rules). `head=` is `git rev-parse HEAD` after the last commit.
 
 Copy that line out of the template **character-for-character** and substitute **only** the `{braced}` tokens; never re-word or recall a field name:
 
@@ -366,7 +375,7 @@ if [ -n "$no_run_log" ]; then printf '%s' "$run_json" | python3 references/scrip
 
 ## Closing Summary
 
-Emit **one** closing block at **every** terminal outcome, stops included. Read the *Review contract* in `references/report-templates.md` (*Closing Summary*), then print its matching variant: `Result:` first (`DONE`, `PARTIAL` or `BLOCKED`), then `Evidence:`, `Uncertainty:`, `Decision:` and `Next action:`. **Then the run-stats footer** (`references/run-stats.md`) prints last, with tokens only where the host reported a count.
+Emit **one** closing block at **every** terminal outcome, stops included. Read the *Review contract* in `references/report-templates.md` (*Closing Summary*), then print its matching variant: `Result:` first (`DONE`, `PARTIAL` or `BLOCKED`), then `Evidence:`, `Uncertainty:`, `Decision:` and `Next action:`. **Then the run-stats footer** (`references/run-stats.md`) prints last, with tokens only where the host reported a count. Then clear the progress record (*Progress record*), at every outcome.
 
 ---
 

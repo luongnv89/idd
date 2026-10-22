@@ -45,7 +45,8 @@ src/
 │       ├── gi-premise.py          # Premise-reset verdict: block a fix after two shared-premise failures
 │       ├── gi-sketch.py           # Design-sketch verdict: distinct designs, invalid transitions rejected
 │       ├── gi-recipe.py           # Base-ref verification recipe: launch, drive, evidence, owned-only teardown
-│       └── gi-postmerge.py        # Post-merge cleanup: worktrees, merged branch, switch to updated base
+│       ├── gi-postmerge.py        # Post-merge cleanup: worktrees, merged branch, switch to updated base
+│       └── gi-progress.py         # Durable progress record so a killed resolver/reviewer run can resume
 │
 ├── skills/
 │   ├── auto-pilot/         # /auto-pilot — triage, resolve, review, merge loop

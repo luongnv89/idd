@@ -441,11 +441,13 @@ CODE = {
     "evals/cases/plan-to-issues/sync/cassettes.json",  # legacy-marker eval fixture
     "scripts/idd-lint.py",                           # I01 accepts both markers
     "src/shared/scripts/gi-branch.py", "src/shared/scripts/gi-config.py",
-    "src/shared/scripts/gi-model-cache.py", "src/shared/scripts/gi-recipe.py",
+    "src/shared/scripts/gi-model-cache.py", "src/shared/scripts/gi-progress.py",
+    "src/shared/scripts/gi-recipe.py",
     "src/shared/scripts/gi-secscan.py", "src/shared/scripts/gi-sensitive.py",
     "src/shared/scripts/gi-state.py", "src/shared/scripts/gi-triage-graph.py",
     "tests/test-config-search-ceiling-parity-339.sh", "tests/test-qa-handoff-255.sh",
-    "tests/test-qa-receipt-515.sh", "tests/test-rename-idd-537.sh",
+    "tests/test-progress-records-542.sh", "tests/test-qa-receipt-515.sh",
+    "tests/test-rename-idd-537.sh",
     "tests/test-webpage-ux-clarity-361.sh",
 }
 PROSE = {

@@ -242,6 +242,39 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 ```
 **Trigger:** Research phase identifies more than 20 potentially affected files.
 
+## Progress record
+
+### Progress record found
+```
+◆ Progress record for issue #N — stopped at step {k}/5 {step_name}
+  Completed:   steps {completed}
+  Plan:        option {n} — {name}
+  QA:          cycle {c}/{ceiling}
+  Branch:      {branch_name} @ {sha7} ({workspace})
+  Written:     {age} ago by {user}@{host}
+  ⚠ another session may still be running        (written < 10 min ago only)
+
+  Resume from step {k}/5? [Y/n]
+```
+**Trigger:** interactive run; `gi-progress.py --read` returned `status: ok` with `verdict: bound` (*Step 0j — Progress record*). `--resume` answers yes without the prompt. A decline clears the record and the run starts fresh.
+
+### Progress record is stale
+```
+⚠ Progress record is stale ({reason}) — starting from Step 0
+
+  The record for issue #N no longer matches git or GitHub; it was cleared.
+  Docs:  https://github.com/luongnv89/idd/blob/main/src/skills/issue-resolver/references/steps/step-0j-progress-record.md
+```
+**Trigger:** the record is `corrupt` or `expired`, the script's `verdict` is `stale`, or the GitHub half of *Step 0j* disagrees (a merged or closed PR, another head branch, a cross-repository PR). Non-fatal — `--clear`, then a fresh run.
+
+### Progress record unavailable
+```
+⚠ Progress record unavailable — this run cannot resume if it is killed
+
+  To fix:  check that python3 and git run here, then re-run /issue-resolver N
+```
+**Trigger:** `gi-progress.py` exited 4, exited 3 twice, or `python3` is missing. Printed once; the run stops writing records and continues — only a later resume is lost.
+
 ## Safety stops
 
 Not confirmations: auto mode keeps every one of these.

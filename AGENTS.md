@@ -36,7 +36,8 @@ src/
 │       ├── gi-triage-graph.py     # Triage execution order, status, staleness, priority
 │       ├── gi-plan-map.py         # Render plan-to-issues' static epic plan map
 │       ├── gi-receipt.py          # Write/verify the revision receipt behind a QA handoff
-│       └── gi-postmerge.py        # Post-merge cleanup: worktrees, merged branch, switch to updated base
+│       ├── gi-postmerge.py        # Post-merge cleanup: worktrees, merged branch, switch to updated base
+│       └── gi-progress.py         # Durable progress record so a killed resolver/reviewer run can resume
 │
 ├── skills/
 │   ├── auto-pilot/         # /auto-pilot — triage, resolve, review, merge loop

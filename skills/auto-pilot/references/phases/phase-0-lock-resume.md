@@ -158,6 +158,25 @@ print `⚠ gi-state unavailable` and continue — the loop's own work is unaffec
 only resume is lost. Under `--dry-run` add `--dry-run` to the call. Delete the
 payload file afterwards.
 
+**Resuming the in-flight resolver or reviewer.** <!-- a:ap-step10-skill-resume -->
+Only on `resume_state = resumable`, once, and whatever `compaction.enabled`
+says, list the two skills' progress records:
+
+```bash
+python3 references/scripts/gi-progress.py --list
+```
+
+Keep the `{skill, number}` pair of each row whose `status` is `ok` and whose
+`caller_run_id` equals the `run_id` this resume re-acquired with `--resume`. A
+record with a null or different `caller_run_id` was written by a session this
+run did not spawn, and it stays unbound. Carry that set through the whole run,
+into Phase 2 and Phase 3; this run's own state clears never touch it. The
+**first** resolver spawn whose issue is in the set and the first reviewer spawn
+whose PR is in it get `resume: yes` in their prompt; every other spawn gets
+`resume: no`. Auto-pilot reads nothing else from a record: the skill validates
+it against live git and GitHub, and a stale one simply starts fresh. No
+`python3`, or a non-zero exit, is an empty set — every spawn starts fresh.
+
 ### Step 1.0b — Checkpoint procedure <!-- a:ap-step10b-checkpoint -->
 
 Every checkpoint below is the same two steps: write the patch object with the

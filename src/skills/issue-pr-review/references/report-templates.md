@@ -48,6 +48,7 @@ human-facing summary: the report-back fields `/auto-pilot` reads (`result`,
    `policy_source`, the PR-body re-read after a `Closes` edit. Print `✓ pass` only
    for a check that ran and passed; print `○ skipped ({reason})` for one that did
    not run. Each remaining finding keeps its `[dimension]` tag and `file:line`.
+   A resumed review adds `resumed from step {k}/7, cycle {c}`.
    End with the PR URL on its own line.
 3. **Uncertainty.** Label what was inferred or not executed here: tests
    inherited from a `trusted` QA marker (run by `/issue-resolver`, not by this

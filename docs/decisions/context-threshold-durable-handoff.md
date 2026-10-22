@@ -1,6 +1,6 @@
 # ADR — Context-Threshold Compaction and Durable Re-entry
 
-**Status:** Accepted (2026-10-21).
+**Status:** Accepted (2026-10-21); amended 2026-10-22 by [#542](https://github.com/luongnv89/idd/issues/542) — see *Amendment — durable progress records (#542)*.
 **Issue:** [#540](https://github.com/luongnv89/idd/issues/540).
 **Runtime contract:** [context-threshold.md](https://github.com/luongnv89/idd/blob/main/docs/context-threshold.md).
 
@@ -50,12 +50,12 @@ value. `compaction.enabled: false` turns every part off.
 
 | pi durable concept | IDD realization |
 |---|---|
-| Checkpoint at every step | auto-pilot's `.idd/run-state.json` (`gi-state.py`); git and GitHub for the resolver and reviewer |
+| Checkpoint at every step | auto-pilot's `.idd/run-state.json` (`gi-state.py`); git and GitHub for the resolver and reviewer, and since #542 a progress record per resolver and reviewer run (`gi-progress.py`) |
 | Transcript vs. work | GitHub is the source of truth; the conversation is a lossy view of it |
 | Lossy compaction | The re-entry rule: re-read durable state and the current step's reference before acting |
 | `settings.compaction{enabled, reserveTokens}` | The `compaction` section: `enabled` and per-skill `threshold` |
 | `compact(instructions)` / `beforeCompact` | The generated `/compact <focus>` line (skill-authored literals and integers only) |
-| `reset(handoffNote)` | The existing `/auto-pilot --resume` |
+| `reset(handoffNote)` | The existing `/auto-pilot --resume`, and since #542 `--resume` on `/issue-resolver` and `/issue-pr-review` |
 | Idempotency / reconcile | A live `gh … --json` read before any effectful repeat (push, PR, comment, label, merge) |
 
 ### What default-on writes
@@ -88,6 +88,8 @@ resumable (see *Consequences*).
   published "no hooks" posture and are Claude-Code-only.
 - **An on-disk handoff record**: stale-record, working-directory, worktree and
   read-back hazards, for facts git, GitHub and the run state already hold.
+  *Reversed by #542 for killed sessions* — see *Amendment*; this ADR's
+  compaction contract still writes nothing new.
 - **A clean `/auto-pilot` stop at the threshold**: it regresses unattended runs,
   which the host's auto-compact plus the re-entry rule carry through.
 
@@ -115,10 +117,45 @@ resumable (see *Consequences*).
 ## Follow-ups
 
 - An opt-in `SessionStart(compact)` hook that re-injects the re-entry rule.
-- `--resume` for `/issue-resolver` and `/issue-pr-review`, from durable progress
-  records that survive a killed session ([#542](https://github.com/luongnv89/idd/issues/542)).
+- Done: `--resume` for `/issue-resolver` and `/issue-pr-review`, from durable progress
+  records that survive a killed session ([#542](https://github.com/luongnv89/idd/issues/542)) — see *Amendment*.
 - A `compaction.threshold.default` key.
 - A Codex note ([#489](https://github.com/luongnv89/idd/issues/489)).
+
+## Amendment — durable progress records (#542)
+
+**Accepted:** 2026-10-22. **Issue:** [#542](https://github.com/luongnv89/idd/issues/542).
+
+The decision above rejected an on-disk handoff record because git, GitHub and
+the run state already held what a *compaction* loses. A **killed** session loses
+more: a fresh `/issue-resolver N` or `/issue-pr-review N` has no conversation to
+read, so it started over from its first step and repeated research, planning,
+QA or review cycles that had already finished. Issue #542 reverses that one
+rejection, for killed sessions only.
+
+`gi-progress.py` now keeps one progress record per skill and issue or PR number.
+Each skill writes it at every step boundary, at each QA or review cycle, and
+immediately before every effect (a write-ahead intent). It holds only what git
+and GitHub cannot reproduce: the step high-water mark, the plan summary, cycle
+counts, the premise-reset ledger, open findings and the last effect. A fresh
+session resumes from it with `--resume` (or, interactively, after a prompt),
+validates it against live git and GitHub, re-runs every gate, and prints what it
+restored. `/auto-pilot --resume` passes `--resume` only to the spawn it is
+resuming. The compaction contract above is unchanged: *What default-on writes*
+still describes the threshold check, the re-entry rules never read a progress
+record, and records are written whatever `compaction.enabled` says.
+
+| Hazard | Answer |
+|---|---|
+| **Stale records** | The script binds each record to the head, branch, toplevel and executor it measured itself, and re-measures them on every read. Another user or host, a missing branch, a head that is neither equal nor a descendant, or a moved head or dirty tree outside a committing step reads `stale`. The skill adds the GitHub half: a closed issue, a merged or closed PR, another head branch, a cross-repository PR. Stale is reported, cleared, and the run starts from the beginning. Records expire after seven days and are cleared at every terminal outcome. |
+| **Working directory** | The store is `<git common dir>/idd/progress/`, inside `.git`: no branch can commit it, no PR body reaches it, and one clone finds it from any directory. Every path comparison is canonicalized with `realpath` on both sides, so a symlinked parent cannot split one checkout into two. |
+| **Worktrees** | The common dir is shared by every worktree, so a record written in a parallel lane or a resolver worktree is visible from the main checkout. The read reports the workspace as `here`, `elsewhere` (with the registered path), `branch_only` or `missing`. A recorded path never reaches `cd`: the resolver recomposes it from the re-derived branch and compares physical paths. A lane resumes only with `IDD_RESUME_LANE=1`, `--resume` and a matching lane identity, and `/auto-pilot` binds a record only when its `caller_run_id` equals the run it is resuming. |
+| **Read-back trust** | A record is a hint, never an authority. A closed key set refuses every gate-satisfying fact (`tests_state`, `qa_handoff`, a receipt, a marker, a verdict) and every fact the script measures, and counters only grow. A record never satisfies or skips a safety gate: the secret scan, the CI wait, the acceptance-criteria and traceability checks, the sensitive-change gate (a sensitive restored plan never resumes past Step 3) and the QA marker (written only when QA exited clean in this session) all run live. Free text never reaches a shell word, and every effect in flight is reconciled with a live `gh … --json` read before it repeats. |
+
+Rejected for #542: extending `gi-state.py` (its store is relative to the working
+directory and holds one run, so each worktree would keep its own copy) and a
+marker on GitHub (a PR body or comment is attacker-writable, and no PR exists
+before the resolver delivers).
 
 ## Sources
 

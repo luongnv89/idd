@@ -520,6 +520,19 @@ fi
 git branch -d "{branch_name}" 2>/dev/null
 ```
 
+**Progress records.** At this issue's terminal outcome, whatever it is, clear
+both skills' records. It is idempotent, and it is what removes a dead resolver's
+record when its PR was adopted through reconciliation instead of a re-spawn:
+
+```bash
+python3 references/scripts/gi-progress.py --clear --skill issue-resolver --number {issue_number}
+python3 references/scripts/gi-progress.py --clear --skill issue-pr-review --number {pr_number}
+```
+
+Skip the second line when the iteration has no PR. A non-zero exit or no
+`python3` prints one `⚠` line and continues; a record left behind expires on
+its own after seven days.
+
 **End-of-iteration checkpoint.** Close the iteration in the run state with the
 *Step 1.0b* procedure: append this issue to `processed[]` with its final
 outcome, append it to `skip_list[]` when this iteration added it there (failed
