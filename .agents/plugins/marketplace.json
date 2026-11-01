@@ -10,7 +10,7 @@
         "source": "git-subdir",
         "url": "https://github.com/luongnv89/idd.git",
         "path": "./skills",
-        "ref": "v0.26.1"
+        "ref": "v0.27.0"
       },
       "policy": {
         "installation": "AVAILABLE",

@@ -114,6 +114,7 @@ The skill definition file. Contains:
 2. **Steps** — sequential instructions the agent follows
 3. **Guards** — pre-conditions checked before execution
 4. **Output format** — terminal output patterns per DESIGN.md
+5. **Self-Improve** — the closing `## Self-Improve` section, after the final workflow step and before any appendix material: an optional, propose-only edit that fits the skill to the user, applied only on the user's explicit approval
 
 ### references/error-messages.md
 

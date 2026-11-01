@@ -8,7 +8,7 @@
 
 <p align="center">
   <a href="https://luongnv.com/idd/"><img src="https://img.shields.io/badge/website-luongnv.com%2Fidd-00FF41.svg?labelColor=0A0A0A" alt="Website"></a>
-  <a href="https://github.com/luongnv89/idd/releases/latest"><img src="https://img.shields.io/badge/version-0.26.1-blue.svg" alt="Version 0.26.1"></a>
+  <a href="https://github.com/luongnv89/idd/releases/latest"><img src="https://img.shields.io/badge/version-0.27.0-blue.svg" alt="Version 0.27.0"></a>
   <a href="https://github.com/luongnv89/idd/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="MIT License"></a>
   <a href="https://github.com/luongnv89/idd"><img src="https://img.shields.io/badge/commands-8-blue.svg" alt="8 commands"></a>
   <a href="https://github.com/luongnv89/idd/blob/main/CONTRIBUTING.md"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs Welcome"></a>
@@ -435,6 +435,9 @@ The skills are designed for Claude Code, but the structured issue format works w
 **Will it modify my existing issues?**
 Only when you explicitly run `/issue-creator N`. A backup comment is posted before any changes. If the backup fails, it aborts.
 
+**Will the skills change themselves?**
+Only with your approval. After a run, any skill may propose one optional edit that fits it to your style, environment, or habits, such as a test command that failed and a workaround that worked. Nothing changes unless you explicitly approve that proposal, and a skill running unattended or as a subagent proposes nothing.
+
 **How does it handle security issues?**
 Issues labeled `security`, `CVE`, or `vulnerability` are automatically skipped during normalization. Use `--force` to override.
 
@@ -504,7 +507,7 @@ Analyzes issue #N in depth without making code changes:
 
 ### /issue-resolver N -- Resolve Issues
 
-Resolves issue #N through a 6-step pipeline:
+Resolves issue #N through a 6-step pipeline. If the session dies mid-run (a crash, a closed terminal, a host restart), `/issue-resolver N --resume` picks up at the recorded step instead of starting over; an interactive run offers this on its own. The progress record is first checked against live git and GitHub, and every safety gate runs again:
 
 ```
 [0/5] Preflight    — Check issue status, verify not already resolved
@@ -528,6 +531,7 @@ Fully automated loop: triage open issues, pick the highest-priority task, resolv
 /auto-pilot --issues 5,12,3          # resolve these issues in this order
 /auto-pilot --limit 5                # cap to 5 iterations
 /auto-pilot --dry-run                # show plan without resolving
+/auto-pilot --resume                 # resume an interrupted run where it stopped
 ```
 
 Merge modes (configured under `autopilot.mode` in `.idd.yml`):
@@ -560,6 +564,7 @@ Reviews a PR end-to-end: script pre-pass (lint/format/test auto-fix, zero LLM co
 ```
 /issue-pr-review 87              # review PR #87
 /issue-pr-review                 # auto-detect PR for current branch
+/issue-pr-review 87 --resume     # resume a killed review of PR #87
 ```
 
 Pipeline:

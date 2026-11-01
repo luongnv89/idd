@@ -11,9 +11,9 @@ This page documents every public skill shipped by IDD Stack, what each skill doe
 | `/plan-to-issues` | Turn a phased plan or a conversation into an epic plus one labelled issue per task | Plan file path, `--from-conversation`, `--dry-run`, `--phase`, `sync <epic#>` |
 | `/issue-analysis` | Deep-analysis report for one issue | Issue number, optional `view` |
 | `/issue-triage` | Prioritize and order the issue backlog | No args, `update`, `--limit N` |
-| `/issue-resolver` | Resolve one issue and open an atomic PR | Issue number, optional `--auto` |
+| `/issue-resolver` | Resolve one issue and open an atomic PR | Issue number, optional `--auto` or `--resume` |
 | `/issue-pr-review` | Review a PR, run tests/CI, fix issues in cycles | PR number or current branch PR, optional modes |
-| `/auto-pilot` | Fully autonomous backlog loop | Optional issue list, limit, dry-run, skip |
+| `/auto-pilot` | Fully autonomous backlog loop | Optional issue list, limit, dry-run, skip, resume |
 | `/idd-doctor` (repo-internal) | Read-only IDD repository health check | No arguments |
 
 ## Shared conventions
@@ -23,6 +23,8 @@ This page documents every public skill shipped by IDD Stack, what each skill doe
 - Skills load `.idd.yml` once at startup when they use config.
 - `--auto` means autonomous mode: no user prompts where the skill can safely decide.
 - `--review-only` means no fixes and no merge.
+- Long runs check how much context the host reports is left. At or below `compaction.threshold.<skill>` in `.idd.yml` (default 15% for `/auto-pilot`, 40% for every other skill), the skill prints a `⚠` line and a ready-to-run `/compact <focus>` command; interactive `/issue-resolver` and `/issue-pr-review` pause once, and every other case continues. A skill never compacts on its own, and `compaction.enabled: false` turns the check off. See `docs/context-threshold.md`.
+- After a run, every skill may propose one optional edit that fits it to your style, environment, or habits (its `## Self-Improve` section). Nothing changes unless you explicitly approve the proposal.
 - Slash commands shown here are the documented public interface; natural-language requests may trigger the same skills when the agent supports skill discovery.
 
 ---
@@ -238,11 +240,13 @@ Runs the full IDD loop over the issue backlog: triage, pick, resolve, review, fi
 | `/auto-pilot --limit N` | Process at most N issues, then stop. |
 | `/auto-pilot --dry-run` | Run triage and show the execution plan without resolving anything. |
 | `/auto-pilot --skip N` | Skip issue #N for this session. |
+| `/auto-pilot --resume` | Resume the interrupted run in `.idd/run-state.json` at its recorded phase, and resume the in-flight resolver or reviewer it spawned from that skill's durable progress record. |
 
 ### Flag combinations
 
 - `--issues` can combine with `--dry-run` and `--skip`.
 - `--issues` cannot combine with `--limit` because the explicit issue list is already the limit.
+- `--resume` cannot combine with `--dry-run` (a dry run changes nothing) or with `--fresh`.
 
 Example:
 
