@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixes
+- **auto-pilot:** stop the unconditional hard reset on a sync conflict. When Step 2.1's `git pull --rebase` fails, auto-pilot now aborts the rebase and runs `git reset --hard origin/{default_branch}` only behind an empty-range guard — `git rev-list --count origin/{default_branch}..HEAD` prints `0` and no tracked file is modified. Local-only commits, an uncommitted tracked change, or a failed `rev-list` stop the run with the existing "cannot recover automatically" block and discard nothing; the block now lists what was kept. `tests/test-sync-safety.sh` fails on any fenced `reset --hard` in `src/` or `docs/` without that guard, and runs the recovery block against scratch repos. ([#548](https://github.com/luongnv89/idd/issues/548))
+
 ## v0.27.0 — 2026-11-01
 
 ### Features

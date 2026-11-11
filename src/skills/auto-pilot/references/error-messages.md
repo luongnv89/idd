@@ -362,20 +362,20 @@ the single home of that mapping, never restated here.
 
 ### Sync conflict (auto-resolved)
 ```
-⚠ Sync conflict — auto-reset to origin/{default_branch}
-  Any local-only changes were discarded (all work is already pushed to PRs).
+⚠ Sync conflict — auto-reset to origin/{default_branch}, nothing discarded
 ```
-**Trigger:** `git pull --rebase origin {default_branch}` fails with merge conflicts.
-**Action:** Auto-recover with `git rebase --abort && git reset --hard origin/{default_branch}`. Non-fatal — auto-pilot continues.
+**Trigger:** The sync rebase fails and the *Step 2.1* empty-range guard holds.
+**Action:** Guarded `git reset --hard` (*Step 2.1*). Non-fatal — auto-pilot continues.
 
 ### Sync failure (unrecoverable)
 ```
 ✗ Failed to sync with {default_branch} — cannot recover automatically
 
-  To fix:  resolve conflicts manually: git rebase --continue
+  Kept:    git log origin/{default_branch}..HEAD · git stash list
+  To fix:  rebase them onto origin/{default_branch} by hand
   Then:    /auto-pilot to resume
 ```
-**Trigger:** Both rebase and hard reset fail. Fatal — auto-pilot stops.
+**Trigger:** The *Step 2.1* guard fails (local-only commits, a modified tracked file, a failed `rev-list`) or the reset fails. Fatal — auto-pilot stops.
 
 ## Review
 

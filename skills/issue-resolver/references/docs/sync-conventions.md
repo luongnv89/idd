@@ -57,7 +57,7 @@ fi
 | Failure | Cause | Recovery |
 |---------|-------|----------|
 | `fatal: 'origin' does not appear to be a git repository` | No remote configured | Stop and ask the user to add a remote: `git remote add origin <url>`. In auto mode, abort with a clear error. |
-| `error: Could not apply <commit>` (rebase conflict) | Local commits conflict with incoming | Stop. In interactive mode, ask the user to resolve. In auto mode, run `git rebase --abort` and report. |
+| `error: Could not apply <commit>` (rebase conflict) | Local commits conflict with incoming | Stop. In interactive mode, ask the user to resolve. In auto mode, run `git rebase --abort` and report; reset only if `git rev-list origin/<base>..HEAD` is empty. |
 | `error: Your local changes to the following files would be overwritten by merge` | Stash-first was skipped (do not let this reach the user) | Indicates a skill bypassed the convention. Report the skill bug. |
 | `CONFLICT (content): Merge conflict in <file>` (during stash pop) | Rebased commits touch the same lines as the stash | Use the recovery output above. Stash is preserved on the stack. |
 
@@ -76,7 +76,7 @@ Every IDD skill that performs a sync step MUST:
 
 ## Lint Enforcement
 
-`tests/test-sync-safety.sh` recursively scans every Markdown file under `src/skills/` (both `SKILL.source.md` files and everything under each skill's `references/`). It walks the **fenced code blocks** (```` ``` ````-delimited, e.g. ```` ```bash ````/```` ```sh ````) and checks each one: if a fenced block contains `git pull --rebase`, that **same fenced block** must also contain a preceding `git stash` invocation. There is no line-distance window and no comment escape hatch — the guard is purely per-block. Inline mentions in single backticks and ordinary prose are ignored, because only fenced code blocks are what the skill actually instructs the agent to execute. Failing the lint blocks merges. This is the regression guard — without it, future skill edits could silently reintroduce the unsafe form.
+`tests/test-sync-safety.sh` walks the **fenced code blocks** of every Markdown file under `src/skills/` (`SKILL.source.md` and `references/`). A block containing `git pull --rebase` must also contain a preceding `git stash`. A block under `src/` or top-level `docs/` containing `reset --hard` must contain a preceding `git rev-list …..HEAD` empty-range guard (issue #548). Both checks are per-block, with no line window and no comment escape hatch; inline backticks and prose are ignored, since only fenced blocks are executed. Failing the lint blocks merges, so skill edits cannot silently reintroduce an unsafe form.
 
 ---
 

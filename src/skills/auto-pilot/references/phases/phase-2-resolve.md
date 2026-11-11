@@ -29,23 +29,28 @@ if [ "$dirty" -eq 1 ]; then
 fi
 ```
 
-If the rebase itself fails (merge conflict from a prior iteration), attempt auto-resolution:
+If the rebase itself fails (merge conflict from a prior iteration), reset only
+when nothing local would be lost; otherwise stop, discarding nothing:
 
 ```bash
 git rebase --abort
-git reset --hard origin/{default_branch}
+# Empty-range guard (#548): reset only on 0 and a clean tracked tree.
+ahead="$(git rev-list --count "origin/{default_branch}..HEAD")" || ahead=""
+if [ "$ahead" = "0" ] && [ -z "$(git status --porcelain --untracked-files=no)" ] &&
+  git reset --hard "origin/{default_branch}"; then
+  echo "⚠ Sync conflict — auto-reset to origin/{default_branch}, nothing discarded"
+else
+  echo "✗ Failed to sync with {default_branch} — cannot recover automatically"
+  exit 1
+fi
 ```
 
-```
-⚠ Sync conflict — auto-reset to origin/{default_branch}
-  Any local-only changes were discarded (all work is already pushed to PRs).
-```
-
-This is safe because the auto-pilot always pushes work to remote PRs before cleanup. Note: `git stash` entries created during pre-flight (with the user's uncommitted work) are stored under their own ref (`refs/stash`) and survive `git reset --hard` — the user's stashed work is preserved (`git stash list` will still show them). If the hard reset also fails (unlikely), then stop:
+Stashes (`refs/stash`) are never touched. On `✗`, print this and stop:
 ```
 ✗ Failed to sync with {default_branch} — cannot recover automatically
 
-  To fix:  resolve conflicts manually: git rebase --continue
+  Kept:    git log origin/{default_branch}..HEAD · git stash list
+  To fix:  rebase them onto origin/{default_branch} by hand
   Then:    /auto-pilot to resume
 ```
 
