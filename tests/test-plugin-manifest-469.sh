@@ -20,6 +20,9 @@
 #   S4  entry ref == "v" + entry version, and entry version == plugin version
 #   S5  plugin version == the first `## vX.Y.Z` heading in CHANGELOG.md
 #   S6  plugin version == the README version badge
+#   S13 docs/release-costs.md has a `## v<plugin version>` section with one
+#       row per flow that writes a run-log row (issue-resolver, auto-pilot),
+#       each stating a median token count or the explicit `no data` (#562)
 #   S7  the manifest's only component key is `"skills": "./"`, the entry
 #       description matches the manifest's, no plugin component (agents/,
 #       commands/, hooks/, .mcp.json, .lsp.json, settings.json) sits in the
@@ -145,6 +148,36 @@ with open(os.path.join(root, "README.md"), encoding="utf-8") as f:
     badge = re.search(r"img\.shields\.io/badge/version-([0-9]+\.[0-9]+\.[0-9]+)-", f.read())
 badge = badge.group(1) if badge else None
 check(badge == pv, f"S6: plugin version matches README version badge (badge {badge!r}, plugin {pv!r})")
+
+# S13 (#562): every release records what a run cost. The section for the
+# plugin version must name each flow with a median or the explicit `no data`;
+# a blank, a zero or a missing row would let a release ship with no record.
+costs_path = os.path.join(root, "docs", "release-costs.md")
+section, in_section = [], False
+try:
+    with open(costs_path, encoding="utf-8") as f:
+        for line in f:
+            if line.startswith("## "):
+                in_section = bool(re.match(r"^## v" + re.escape(pv or "") + r"\s*$", line))
+            elif in_section:
+                section.append(line)
+except OSError:
+    pass
+check(bool(section), f"S13: docs/release-costs.md has a section for v{pv}")
+for flow in ("issue-resolver", "auto-pilot"):
+    cells = None
+    for line in section:
+        parts = [c.strip() for c in line.strip().strip("|").split("|")]
+        if len(parts) >= 3 and parts[0] == f"`{flow}`":
+            cells = parts
+            break
+    median = cells[1] if cells else None
+    samples = cells[2] if cells else None
+    measured = bool(median) and bool(re.fullmatch(r"[1-9][0-9]{0,2}(,[0-9]{3})*", median)) \
+        and bool(samples) and bool(re.fullmatch(r"[1-9][0-9]*", samples))
+    no_data = median == "no data" and samples == "0"
+    check(measured or no_data,
+          f"S13: v{pv} records a median or `no data` for {flow} (median {median!r}, samples {samples!r})")
 
 keys = ["skills", "agents", "commands", "hooks", "mcpServers", "lspServers", "outputStyles"]
 declared = {k: plugin[k] for k in keys if k in plugin}
