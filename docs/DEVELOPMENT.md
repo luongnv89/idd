@@ -108,6 +108,34 @@ Every emitted bundle under `skills/<name>/` has a byte budget, and CI enforces i
 - **Raising a budget is a deliberate hand edit.** Set that skill's `budget` to a value at or above its measured size, run the ratchet command above (it clamps the budget back to `measured + headroom`), commit both files, and justify the growth in the PR.
 - **Check locally** with `python3 scripts/skill-budget.py` (`--check` is the default; `--json` prints the table as JSON). The CI step is `tests/test-skill-bundle-budget-466.sh`.
 
+Issue #558 adds two more budgets per skill and a cap on growth between releases. All three are checked by the same script and the same CI step.
+
+- **SKILL.md ceiling** — `skills.<name>.skill_md` records the bytes of the built `skills/<name>/SKILL.md` (`measured`) and its ceiling (`budget`). SKILL.md is the one file every run of a skill loads in full, so it has its own ceiling inside the bundle budget.
+- **Always-read budget** — `skills.<name>.always_read` records the files SKILL.md tells the agent to read unconditionally (`files`, sorted), their summed bytes (`measured`) and the ceiling (`budget`). A line of the built SKILL.md points at a file when it says "read `references/x.md` now" or "read `references/x.md` first" (a parenthesis may sit between the path and that word), or names a `references/….md` path and later on the same line says "read it now"; the nearest path before those words is the one meant. The first form may list several paths joined by commas or "and" ("read `references/a.md` and `references/b.md` now"), and every listed file counts. Matching ignores case. A plain "Read `references/x.md`", "First read …", "now reads" and "Sync now?" are not pointers. The match is on the wording only, so a pointer inside a conditional sentence still counts and the figure errs high. Each file counts once per skill. A skill with no pointer records `files: []` and `measured: 0`.
+- **Same rules, same headroom.** Both figures follow the bundle rules with the same `headroom_bytes`: over budget fails, slack beyond the headroom fails, a stale `measured` fails, and `--ratchet` lowers a ceiling but never raises one. Raise one by hand the same way: set `skill_md.budget` or `always_read.budget`, then ratchet. Two more failures apply to `always_read`: a pointer to a file that is not in the bundle, and a detected file set that differs from the recorded `files` (the ratchet rewrites it). An entry that lacks either field fails `--check` and names the ratchet command.
+- **Growth cap** — a bundle more than 2% larger than its `measured` at the last release tag fails, unless the change log exempts it. Exactly +2% passes, and a skill the tagged file does not name is new and uncapped. The script does not run git, so the caller extracts the tagged budgets file:
+
+  ```bash
+  tag="$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -1)"
+  git show "${tag}:scripts/skill-budgets.json" > /tmp/tag-budgets.json
+  python3 scripts/skill-budget.py --baseline /tmp/tag-budgets.json --baseline-tag "$tag"
+  ```
+
+  Only `skills.<name>.measured` is read from the baseline, so a tagged file older than #558 still loads.
+- **Change-log row** — the exemption is a table row in the `## Change log` section of `docs/VALUES.md` (`--changelog FILE` reads another file). The section runs from that heading to the next heading of the same or a higher level. A row exempts a skill for a tag when it holds both the skill name and the tag as whole words, in any column:
+
+  ```markdown
+  ## Change log
+
+  | Date | Item | Change | Requested by |
+  |------|------|--------|--------------|
+  | 2026-11-12 | issue-pr-review | Growth-cap exemption against v0.27.0: … | maintainer |
+  ```
+
+  `issue-pr-review-x` does not name `issue-pr-review`, and `v0.27.01` does not name `v0.27.0`. A row outside the section, a row for another tag and a row for another skill exempt nothing. An absent or unreadable `docs/VALUES.md`, or one with no `## Change log` section, means no exemption. `docs/VALUES.md` changes only on the maintainer's request, so ask before adding a row.
+- **In CI** the `drift` job fetches the release tags before the budget step and sets `IDD_REQUIRE_RELEASE_TAG=1`, so a checkout where no tag resolves fails. Without the variable (a local clone with no tags, or the model-data refresh workflow) the test prints a `⚠` line and skips the growth case.
+- **Exemptions for v0.27.0.** `issue-pr-review`, `issue-resolver` and `auto-pilot` grew past 2% on `main` between `v0.27.0` and the cap's introduction in #558; `auto-pilot` crossed the line when #588 merged on 2026-11-12, before the cap landed. `docs/VALUES.md` carries one change-log row for each, approved by the maintainer on 2026-11-12. The test supplies no row of its own: it reads the committed `docs/VALUES.md` and nothing else, so removing any of the three rows turns the growth case red. The rows stop mattering at the next release tag, which resets the baseline.
+
 ### Codex plugin (issue #489)
 
 The build derives `skills/.codex-plugin/plugin.json` from the canonical release
