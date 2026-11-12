@@ -9,7 +9,7 @@
 
 ## Issue Readiness
 
-An issue is **ready** when its body has an `Acceptance Criteria` heading with at least one list item, and neither the `Type` value nor any criterion ends with `(needs review)` — on its last wrapped line, and counting items under a sub-heading of that section. Blockquotes, fenced code and inline code are not read. The bundled readiness script applies this rule; this section is its fallback.
+An issue is **ready** when its body has an `Acceptance Criteria` heading with at least one list item, and neither the `Type` value nor any criterion ends with `(needs review)` — on any of its lines, and counting items under a sub-heading of that section. Blockquotes, fenced code and inline code are not read. The bundled readiness script applies this rule; this section is its fallback.
 
 - Auto mode never resolves an issue that is not ready: it is skipped with `skipped_reason: needs_clarification`. Triage marks it `unclear` and orders it after the ready issues, above any `maybe-fixed` one, the auto-pilot pick passes over it, and the resolver's gate takes No. Interactive `/issue-resolver` asks.
 - Criteria the resolver writes end with `(needs review)`; a person confirms one by removing the marker.

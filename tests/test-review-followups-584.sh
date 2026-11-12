@@ -99,6 +99,10 @@ bare="$(grep -nE 'confidence >= \{confidence_threshold\}|Report only >= \{confid
 has "$AP/explicit-list-mode.md" 'pipe the retained `explicit_issue_records[N]`' "T5.1: the readiness check pipes the retained record"
 lacks "$AP/explicit-list-mode.md" 'gi-issue.py {N} --fields number,body' "T5.2: it no longer re-reads the body with gi-issue.py"
 
+# T5b — the *Issue Readiness* fallback matches gi-ready.py: a marker ending any line of a criterion.
+has "$ROOT/docs/idd-methodology.md" 'ends with `(needs review)` — on any of its lines' "T5.3: the readiness fallback reads a marker on any wrapped line"
+lacks "$ROOT/docs/idd-methodology.md" 'on its last wrapped line' "T5.4: the fallback no longer limits the marker to the last line"
+
 # T6 — issue-analysis numbers the criteria for its synthesizer.
 has "$SRC/issue-analysis/references/subagent-steps.md" '"criteria": <numbered criteria>' "T6.1: the synthesizer payload carries criteria"
 has "$SRC/issue-analysis/references/subagent-steps.md" 'shared/scripts/gi-ready.py --criteria' "T6.2: the criteria come from gi-ready.py --criteria"
