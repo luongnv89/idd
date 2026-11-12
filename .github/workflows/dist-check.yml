@@ -469,3 +469,6 @@ jobs:
 
       - name: test-auto-mode-gates-549
         run: bash tests/test-auto-mode-gates-549.sh
+
+      - name: test-issue-readiness-553
+        run: bash tests/test-issue-readiness-553.sh

@@ -59,6 +59,10 @@ run "$SCRIPTS/gi-config.py" --key resolve.qa_max_cycles
 printf '%s' 'Depends on #12, blocked by #8. Cross-repo org/repo#77 is ignored.' | \
   run "$SCRIPTS/gi-deps.py"
 
+# gi-ready — a gi-backlog envelope on stdin (issue #553).
+printf '%s' '{"issues":[{"number":1,"body":"## Type\n\nbug (needs review)\n\n## Acceptance Criteria\n\n- [ ] works (needs review)\n"},{"number":2,"body":null}]}' | \
+  run "$SCRIPTS/gi-ready.py"
+
 # gi-dup-score — scorer request on stdin, existing issues from a file.
 printf '%s' '{"mode":"create","items":[{"index":1,"title":"login broken","keywords":[],"type":"bug"}]}' > "$TMP/dup-request.json"
 printf '[]\n' > "$TMP/dup-issues.json"

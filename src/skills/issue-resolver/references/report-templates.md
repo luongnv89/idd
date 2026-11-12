@@ -182,8 +182,8 @@ fields a caller reads and the run-log record keep their shape.
    - `DONE` — a PR was created and every step's completion report printed
      `Result: PASS`; or the issue was `already_resolved`.
    - `PARTIAL` — a PR was created, but at least one step printed
-     `Result: PARTIAL` (residual QA findings, a failed board sync or run-log
-     append, a check that could not be evaluated).
+     `Result: PARTIAL` (an issue not ready, residual QA findings, a failed
+     board sync or run-log append, a check that could not be evaluated).
    - `BLOCKED` — the run stopped before a PR was created: a failed
      prerequisite, an invalid config, a missing bundled dependency, `not found`,
      `closed`, `pr_in_progress`, a declined design confirm, a step that printed
@@ -389,13 +389,13 @@ These derivations are the resolver's own:
   (`gi-runlog.py` exit 3 otherwise).
 - **`verification`** — `success` only, by the `docs/run-log-schema.md` rule
   applied to the PR's AC table: any row not `pass` → `partial`, deferred rows
-  excluded. Not returned under `--no-run-log`.
+  excluded; so does Step 0's `Criteria confirmed` at `×`. Not returned under `--no-run-log`.
 
 `outcome` is one of `success` (a PR was delivered), `already_resolved` (Step 0/1
 found the issue already fixed and exited early), or `failed` (a step failed). A
 `failed` run an auto-mode default No stopped also carries — and, under
 `--no-run-log`, returns — `skipped_reason` (`assigned_to_other`, `blocked_label`,
-`empty_body`, `large_scope`, `max_commits_exceeded`).
+`needs_clarification`, `empty_body`, `large_scope`, `max_commits_exceeded`).
 
 ### Suppression rule (single writer under `/auto-pilot`)
 
@@ -450,14 +450,15 @@ Rules that make the report worth reading:
 
 | Step | Checks |
 |------|--------|
-| 0 — Preflight | `Issue fetched` · `No PR already targets it` · `Guards clear` · `Branch created` |
+| 0 — Preflight | `Issue fetched` · `No PR already targets it` · `Guards clear` · `Criteria confirmed` · `Branch created` |
 | 1 — Research | `Codebase scanned` · `Not already resolved` · `Complexity rated` |
 | 2 — Plan | `Options produced` · `Option selected` · `Scope inside the issue` |
 | 3 — Implement | `Every AC addressed` · `Tests written` · `Commits conventional` |
 | 4 — QA | `Review clean` · `Tests pass` · `Build clean` · `AC verified` |
 | 5 — Deliver | `Tests green` · `Branch pushed` · `PR opens with Closes #N` |
 
-`PARTIAL` is legitimate in exactly two places: *Step 4 — QA* when the loop hits
+`PARTIAL` is legitimate in exactly three places: *Step 0 — Preflight* when only
+`Criteria confirmed` is `×` (an issue not ready, resolved on a yes, or criteria 0d wrote); *Step 4 — QA* when the loop hits
 `review_cycles` with residual non-blocking findings (delivered with known
 issues), and *Step 5 — Deliver* when the PR is created but an optional extra
 (project-board sync, run-log append) failed. Anywhere else a `×` is blocking.

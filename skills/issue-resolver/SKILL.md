@@ -138,6 +138,7 @@ references/scripts/gi-premise.py
 references/scripts/gi-sketch.py
 references/scripts/gi-recipe.py
 references/scripts/gi-progress.py
+references/scripts/gi-ready.py
 ```
 
 ---
@@ -178,7 +179,9 @@ Only a **merged** PR or a closing commit on the default branch is `already_resol
 
 ### 0c — Guards
 
-Warn and ask if assigned elsewhere, or on `wontfix`/`blocked`/`do-not-merge` labels — both `[y/N]`. **Auto** never waits but takes the printed No: stop at Step 0, `status: failure`, `skipped_reason` `assigned_to_other` or `blocked_label`. Every `[y/N]` gate in this skill does the same ([auto mode](https://github.com/luongnv89/idd/blob/main/docs/auto-mode.md), *The gate rule*).
+Warn and ask if assigned elsewhere, on `wontfix`/`blocked`/`do-not-merge` labels, or when a non-empty body is not ready — each `[y/N]`. **Auto** never waits but takes the printed No: stop at Step 0, `status: failure`, `skipped_reason` `assigned_to_other`, `blocked_label` or `needs_clarification`. Every `[y/N]` gate in this skill does the same ([auto mode](https://github.com/luongnv89/idd/blob/main/docs/auto-mode.md), *The gate rule*).
+
+**Readiness** (`references/docs/idd-methodology.md`, *Issue Readiness*) is judged on 0a's body, before 0d: pipe 0a's `gi-issue.py` command (a cache hit) into `python3 references/scripts/gi-ready.py`; a non-zero exit judges by that section. An empty body is Step 1's gate. A body not ready, or any criterion 0d writes, prints `×` on Step 0's `Criteria confirmed`, so the run ends `PARTIAL`.
 
 ### 0d — Auto-normalize
 
@@ -189,7 +192,7 @@ If `issue.auto_normalize` is true and the body lacks a `<!-- idd:normalized v1 -
    - **Interactive mode:** same warning, then ask for explicit operator confirmation; default **no**, a decline continuing without normalization.
 
 2. **Normalize inline** — otherwise, structure-only as `/issue-creator` Normalize mode (the resolver does **not** invoke `/issue-creator` as a subprocess):
-   1. Classify the type and generate the body with the marker.
+   1. Classify the type and generate the body with the marker; each criterion the original body did not state ends with `(needs review)`.
    2. Back up the original body in a comment.
    3. Run `gh issue edit`, then `python3 references/scripts/gi-issue.py {N} --invalidate`, then re-fetch.
    4. On any failure, **warn** and continue with the original body (`references/error-messages.md` → *Auto-normalization failed*).

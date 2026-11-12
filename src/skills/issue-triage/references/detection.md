@@ -170,11 +170,12 @@ Perform a topological sort on the dependency graph (after breaking any cycles fr
 
 Assign a status to each issue, in this precedence order:
 - **maybe-fixed** — flagged in Step 1b as potentially already resolved (high or medium confidence)
+- **unclear** — not ready (`needs_clarification`, SKILL.md Step 1)
 - **blocked #N** — depends on issue #N being resolved first
 - **stale (Nd)** — no activity beyond the threshold (Step 6)
 - **ready** — none of the above
 
-Issues flagged as `maybe-fixed` are sorted to the bottom of the execution order — there's no point working on them until someone verifies whether the fix actually landed. They still appear in the triage table so the team can review and close them.
+Issues flagged as `maybe-fixed` are sorted to the bottom of the execution order — there's no point working on them until someone verifies whether the fix actually landed. They still appear in the triage table so the team can review and close them. `unclear` issues sort just above them: kept in the order, never resolved unattended.
 
 ### Step 5 — Identify Parallelizable Issues
 

@@ -239,7 +239,16 @@ FAIL=0
 # stops (+104 in 2 copies) and pre-commit-security.md's digest +6 in 2 copies:
 # +220. Main measured 604,532, so 604,532 + 2,671 = 607,203; the line keeps six
 # bytes of headroom, so the ratchet is not widened.
-BUDGET=607209
+#
+# Issue #553 is the twelfth raise (2026-11-12): a readiness gate before an
+# unattended resolve. idd-methodology.md gains *Issue Readiness*, the one home
+# of the rule triage, the auto-pilot pick and the resolver all apply. It is an
+# optional digest section, so only the 3 skills that name it pay for it: a
+# 1,089-byte first draft was cut to 893 per copy, +2,679. run-log-schema.md
+# names `needs_clarification` and the resolver's `partial` for an issue not
+# ready, +57 in 2 copies: +114. Main measured 607,144, so 607,144 + 2,793 =
+# 609,937; the line keeps six bytes of headroom, so the ratchet is not widened.
+BUDGET=609943
 
 pass() { echo "  ✓ $1"; PASS=$((PASS + 1)); }
 fail() { echo "  ✗ $1"; FAIL=$((FAIL + 1)); }

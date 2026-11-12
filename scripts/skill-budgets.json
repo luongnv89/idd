@@ -2,8 +2,8 @@
   "headroom_bytes": 1024,
   "skills": {
     "auto-pilot": {
-      "budget": 441942,
-      "measured": 441896
+      "budget": 443928,
+      "measured": 443928
     },
     "init-idd": {
       "budget": 144000,
@@ -19,15 +19,15 @@
     },
     "issue-pr-review": {
       "budget": 307009,
-      "measured": 306940
+      "measured": 306984
     },
     "issue-resolver": {
-      "budget": 425176,
-      "measured": 425172
+      "budget": 427286,
+      "measured": 427286
     },
     "issue-triage": {
-      "budget": 138274,
-      "measured": 138274
+      "budget": 139888,
+      "measured": 139888
     },
     "plan-to-issues": {
       "budget": 171072,

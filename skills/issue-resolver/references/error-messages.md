@@ -106,6 +106,15 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 **Trigger:** Issue labels include `wontfix`, `blocked`, or `do-not-merge` (case-insensitive).
 **Auto:** takes the default No — stop, `skipped_reason: blocked_label`. <!-- auto:no -->
 
+### Issue needs clarification
+```
+⚠ Issue #N needs clarification: {reasons}
+
+  Resolve anyway? [y/N]
+```
+**Trigger:** *0c* judges a non-empty body not ready.
+**Auto:** takes the default No — stop, `skipped_reason: needs_clarification`. <!-- auto:no -->
+
 ## Branch
 
 ### Branch already exists (worktree path — Step 0e)

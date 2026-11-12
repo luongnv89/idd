@@ -169,6 +169,14 @@ The reference implementation works without any configuration file — all settin
 
 `/init-idd` auto-detects the project's language, framework, and test runner, and generates a tailored config.
 
+## Issue Readiness
+
+An issue is **ready** when its body has an `Acceptance Criteria` heading with at least one list item, and neither the `Type` value nor any criterion ends with `(needs review)`. Blockquotes, fenced code and inline code are not read. The bundled readiness script applies this rule; this section is its fallback.
+
+- Auto mode never resolves an issue that is not ready: it is skipped with `skipped_reason: needs_clarification`. Triage marks it `unclear` and orders it last, the auto-pilot pick passes over it, and the resolver's gate takes No. Interactive `/issue-resolver` asks.
+- Criteria the resolver writes end with `(needs review)`; a person confirms one by removing the marker.
+- Resolving an issue not ready, or with criteria the resolver wrote, ends `PARTIAL`, and the merge floor stays unmet while a criterion ends with the marker, so its PR never merges unattended.
+
 ## Intent-Code Boundary
 
 The most important design rule in IDD is the **intent-code boundary**: do not freeze guessed code context into the issue. Code changes. Intent should remain stable.

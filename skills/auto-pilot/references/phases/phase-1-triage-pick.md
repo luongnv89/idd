@@ -277,7 +277,7 @@ iteration *Step 1.1*'s own `✓ Triage updated` line already reported the count:
 
 From `summary.suggested_order` in `.idd/triage.json` (the triage execution order), select the first issue that is:
 - **Not blocked** — no unresolved dependencies in the triage graph
-- **Not skipped** — not in the `--skip` list, the `skip_labels` set (as the triage row records the issue's labels, which is why *Step 1.2b* re-asks this one against live labels after the pick), or the **session skip list** (the in-memory list this run appends to: failed, gate-declined and already-resolved issues from Phase 2.3, dependency-blocked issues from Step 5.1b / Phase 3-4 Step 2a, and issues *Step 1.2b*'s post-pick re-check rejected as closed, assigned to another user, or carrying a live skip label), and not in the run state's **resume-seeded `processed[]`**. Consult all of them every iteration — the session skip list is what stops a dependency-blocked issue from being re-picked after the loop continues past it.
+- **Not skipped** — not in the `--skip` list, the `skip_labels` set (as the triage row records the issue's labels, which is why *Step 1.2b* re-asks this one against live labels after the pick), or the **session skip list** (the in-memory list this run appends to: failed, gate-declined and already-resolved issues from Phase 2.3, dependency-blocked issues from Step 5.1b / Phase 3-4 Step 2a, and issues *Step 1.2b*'s post-pick re-check rejected as closed, assigned to another user, carrying a live skip label, or not ready), and not in the run state's **resume-seeded `processed[]`**. Consult all of them every iteration — the session skip list is what stops a dependency-blocked issue from being re-picked after the loop continues past it.
 - **Not assigned** — not assigned to another user (unless there are no unassigned issues). The `assignees` array comes from *Step 1.1b*'s live read and from nowhere else: `.idd/triage.json` has no `assignees` field, so a cached order cannot answer this criterion at all.
 - **Open** — the issue is in *Step 1.1b*'s live `--state open` set. Same source, same reason: the cache carries no GitHub `state`. An issue closed since the cached triage — including one closed as `not planned`, which lands no commit for *Step 1.1a*'s commits-since check to notice — is still sitting in `summary.suggested_order`.
 
@@ -409,6 +409,7 @@ one bucket** — this is the single home of that mapping:
 | `assigned` | *Step 1.2b*'s post-pick re-check (assigned to another user) | `Assigned` |
 | `quarantined` | *Step 1.2b*'s post-pick re-check (live `autopilot.quarantine_label`) | `Skipped` |
 | `blocked_label` | *Step 1.2b*'s post-pick re-check (any other live `skip_labels` value) | `Skipped` |
+| `needs_clarification` | *Step 1.2b*'s post-pick re-check (not ready) | `Skipped` |
 | `resumed` | *Step 1.0*'s resume seeding of `processed[]` / `skip_list[]` | `Skipped` |
 
 `quarantined` counts under `Skipped` rather than earning a fifth bucket for the
@@ -511,12 +512,15 @@ already describes as possibly old before the caller ever held it. On that
 footing it is still the freshest answer this step has to criteria *Step 1.2*
 could otherwise take only from a list read moments earlier or from a cached
 triage row.
-Reject the pick on any one of three readings of this record — `.issue.state` is
+Reject the pick on any one of four readings of this record — `.issue.state` is
 not `open`; the issue is assigned to another user and *Step 1.2*'s **Not
 assigned** criterion would therefore have rejected it (that criterion, escape
 clause included, stays the single home of the rule); or a name in
 `.issue.labels[].name` is in the effective `skip_labels` set (*Live labels close
-the reused cache's blind spot* below). On any of them **do not spawn**: add
+the reused cache's blind spot* below); or the body is not ready
+(`references/docs/idd-methodology.md`, *Issue Readiness*: pipe this same fetch, a cache
+hit, into `python3 references/scripts/gi-ready.py`; a non-zero exit judges by that
+section). On any of them **do not spawn**: add
 `#{issue_number}` to the session skip list with the reason this table gives,
 print the matching line below, and return to *Step 1.2* for the next candidate.
 Every re-pick appends to that list, so the candidate set shrinks by one each time
@@ -528,6 +532,7 @@ and this cannot spin.
 | assigned to another user | `assigned` |
 | a live label matches `autopilot.quarantine_label` | `quarantined` |
 | a live label matches any other `skip_labels` value | `blocked_label` |
+| the body is not ready | `needs_clarification` |
 
 *Step 1.2*'s reason-to-bucket table is the single home of which of its four
 counts each of those lands in — never restated here.
@@ -573,7 +578,7 @@ there, and that a stale-cache quarantine costs one wasted resolve, never a
 lost one — the label stays on the issue for the next pick.
 
 ```
-○ #{issue_number} no longer eligible ({closed | assigned to @{login} | quarantined ({autopilot.quarantine_label}) | labelled {matched_label}}) — picking again
+○ #{issue_number} no longer eligible ({closed | assigned to @{login} | quarantined ({autopilot.quarantine_label}) | labelled {matched_label} | needs clarification}) — picking again
 ```
 
 One reason per line, chosen by the table above: `quarantined (…)` names the
