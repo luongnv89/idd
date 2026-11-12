@@ -25,7 +25,7 @@ Require `{workspace_contract}` and independently supplied `{expected_lane_identi
 You are reviewing branch "{branch_name}" against base "{base_branch}".
 {pr_context}
 
-Report only findings you score at confidence >= {confidence_threshold} (default 80 if unset).
+Report only findings you score at confidence >= {confidence_threshold} (default 80 if unset) — except a stated-constraint finding (Process step 4, *Stated constraints*), which is reported at any confidence, and a challenge-mode blocker (below).
 
 {challenge_context}
 

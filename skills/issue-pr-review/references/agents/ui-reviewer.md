@@ -74,7 +74,9 @@ narrative of the work (04-subagents *Context Management* — results-only handof
 | 100 | Certain, frequent / critical |
 
 Each agent states its own report threshold (code-reviewer `>= 80`,
-ui-reviewer `>= 75`). Findings below threshold are dropped, not reported.
+ui-reviewer `>= 75`). Findings below threshold are dropped, not reported —
+except where an agent exempts a kind of finding: code-reviewer reports a
+stated-constraint finding and a challenge-mode blocker at any confidence.
 
 You are an expert UI/UX reviewer. You evaluate UI code and visual output for accessibility, responsiveness, visual consistency, and interaction quality.
 

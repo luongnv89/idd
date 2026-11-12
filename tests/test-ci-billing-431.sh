@@ -549,20 +549,27 @@ for s in "$SCHEMA" "$DIST_INIT_SCHEMA"; do
                   c && /^[[:space:]]*ignore_ci_billing_failures:/{exit} c' "$s" | tr '\n' ' ')"
   if printf '%s' "$comment" | grep -qF 'only the review gate stops' \
      && printf '%s' "$comment" | grep -qF 'Merge by' \
-     && printf '%s' "$comment" | grep -qF 'hand: no merge gate is relaxed (/issue-pr-review --auto, /auto-pilot)'; then
+     && printf '%s' "$comment" | grep -qF 'hand: no merge gate is relaxed (/issue-pr-review in any mode, /auto-pilot)'; then
     pass "T12.I7: $label schema comment says no merge gate is relaxed, naming both (merge by hand)"
   else
     fail "T12.I7: $label schema comment does not state the merge-by-hand boundary for both merge gates"
   fi
   # Old wording named only /auto-pilot's merge gate, hiding that
   # /issue-pr-review --auto with review.auto_merge: true refuses too (#451).
+  # Since #576 /issue-pr-review merges in interactive and --auto runs alike,
+  # so naming only its --auto mode is stale (#584).
+  if grep -qF '(/issue-pr-review --auto, /auto-pilot)' "$s"; then
+    fail "T12.I7: $label still names only /issue-pr-review --auto as a merge gate"
+  else
+    pass "T12.I7: $label dropped the --auto-only merge-gate wording"
+  fi
   if grep -qF "/auto-pilot's merge gate still refuses" "$s"; then
     fail "T12.I7: $label still names only /auto-pilot's merge gate"
   else
     pass "T12.I7: $label dropped the /auto-pilot-only merge-gate wording"
   fi
   if grep -E "\| \`review\.${KEY}\` \|" "$s" | grep -qF "review gate ignores" \
-     && grep -E "\| \`review\.${KEY}\` \|" "$s" | grep -qF "no merge gate is relaxed (/issue-pr-review --auto, /auto-pilot) — merge by hand"; then
+     && grep -E "\| \`review\.${KEY}\` \|" "$s" | grep -qF "no merge gate is relaxed (/issue-pr-review in any mode, /auto-pilot) — merge by hand"; then
     pass "T12.I7: $label defaults-table row says review gate only, naming both merge gates"
   else
     fail "T12.I7: $label defaults-table row does not say review gate only for both merge gates"
@@ -573,10 +580,15 @@ for t in "$TEMPLATE" "$DIST_TEMPLATE"; do
   label="${t#"$REPO_ROOT"/}"
   comment="$(awk '/# Opt-in: report a terminal CI failure without blocking the review gate/{c=1}
                   c && /^[[:space:]]*ignore_ci_billing_failures:/{exit} c' "$t" | sed 's/^[[:space:]]*#[[:space:]]*//' | tr '\n' ' ')"
-  if printf '%s' "$comment" | grep -qF "Review gate only: no merge gate is relaxed (/issue-pr-review --auto, /auto-pilot), so merge that PR by hand"; then
+  if printf '%s' "$comment" | grep -qF "Review gate only: no merge gate is relaxed (/issue-pr-review in any mode, /auto-pilot), so merge that PR by hand"; then
     pass "T12.I7: $label comment says review gate only (merge by hand)"
   else
     fail "T12.I7: $label comment does not state the merge-by-hand boundary"
+  fi
+  if grep -qF '(/issue-pr-review --auto, /auto-pilot)' "$t"; then
+    fail "T12.I7: $label still names only /issue-pr-review --auto as a merge gate"
+  else
+    pass "T12.I7: $label dropped the --auto-only merge-gate wording"
   fi
   if grep -qF 'merge gate is unaffected' "$t"; then
     fail "T12.I7: $label still carries the old 'merge gate is unaffected' wording"
