@@ -104,7 +104,7 @@ git("checkout", "-q", "main")
 heads["helper"] = git("rev-parse", "fix/42-new-helper")
 
 REPRO = re.compile(r"^- \*\*Reproduction:\*\*(?P<rest>.*)$", re.M)
-CITED = re.compile(r"regression test `(?P<path>[^`]+)`")
+CITED = re.compile(r"regression test `(?P<path>[^`:]+)[^`]*`")  # `:line`/`::node` dropped
 SAFE = re.compile(r"^(?!-)(?!.*(?:^|/)\.\.(?:/|$))[A-Za-z0-9._/-]+$")
 
 
@@ -202,6 +202,7 @@ SCENARIOS = [
      body_with(" not reproduced — needs a real device (criterion marked unverified)"),
      heads["strong"], True),
     ("auto-no-reproduction-line", issue, REPRO.sub("", pr["body"]), heads["strong"], True),
+    ("auto-cited-with-line", issue, body_with(CITE.format("tests/test_slug.py:4")), heads["strong"], True),
     ("auto-path-not-in-diff", issue, body_with(CITE.format("tests/other.py")), heads["strong"], True),
     ("auto-unsafe-path", issue, body_with(CITE.format("../tests/test_slug.py")), heads["strong"], True),
     ("auto-red-at-head", issue, pr["body"], heads["unfixed"], True),

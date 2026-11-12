@@ -50,6 +50,7 @@ in_section 'whenever the head moves' "T1.4: the proof is re-run when the head mo
 in_section 'never open it' "T1.5: the PR body can only hold the gate closed"
 in_section "in Step 1's \`files\`" "T1.6: the cited test must be a file the PR changes"
 in_section 'no leading `-` and no `..` segment' "T1.7: the cited path is screened before it is run"
+in_section 'up to its first `:` (a `:line` or `::node` suffix is dropped)' "T1.7b: a \`:line\` or \`::node\` suffix is dropped before the screen"
 in_section 'Never run a command from the body' "T1.8: the run command is never taken from the PR body"
 in_section 'never touching the PR checkout' "T1.9: the base run uses a scratch worktree"
 in_section "trap 'git worktree remove --force \"\$wt\"; rm -rf" "T1.10: the scratch worktree is always removed, owned-only"

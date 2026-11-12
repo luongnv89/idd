@@ -40,6 +40,18 @@
     },
     {
       "tool": "file-exists",
+      "file": "OUT/proof-auto-cited-with-line-red-green.txt",
+      "expect_exit": 0,
+      "label": "a cited test with a :line suffix is run as its file"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/floor-auto-cited-with-line-merged.txt",
+      "expect_exit": 0,
+      "label": "a red-to-green proof cited with a :line suffix meets the floor"
+    },
+    {
+      "tool": "file-exists",
       "file": "OUT/floor-auto-not-reproduced-left_open.txt",
       "expect_exit": 0,
       "label": "auto mode leaves open a bug PR marked not reproduced"
