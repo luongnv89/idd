@@ -11,7 +11,8 @@
 #
 #   T1  gi-ready.py judges bodies (behavioural), including one shaped like this
 #       issue's own, which only *discusses* the marker;
-#   T2  gi-triage-graph.py gives `unclear` and orders it last, above maybe-fixed;
+#       (incl. a marker on a wrapped line or under a sub-heading, #584);
+#   T2  gi-triage-graph.py gives `unclear` and orders it after ready issues, above maybe-fixed;
 #   T3  gi-runlog accepts the needs_clarification records both writers return;
 #   T4  the one rule, and each consumer pointing to it (prose pins);
 #   T5  the built bundles carry the script and the digest section where named;
@@ -129,6 +130,31 @@ for input in "" "not json" '{"number":1}' '{"issues":[{"number":1,"body":3}]}'; 
 done
 python3 "$READY" --help >/dev/null && pass "T1.10 --help exits 0" || fail "T1.10 --help"
 [ -x "$READY" ] && pass "T1.11 the script is executable" || fail "T1.11 gi-ready.py not 0755"
+
+# T1.12-T1.15 (#584): a marker on a wrapped line, or under a sub-heading of the
+# Acceptance Criteria section, used to be missed.
+# crit <markdown> — prints the --criteria texts, joined by '|'
+crit() { body "$1" | python3 "$READY" --criteria | python3 -c 'import json,sys; print("|".join(c["id"] + "=" + c["text"] for c in json.load(sys.stdin)["criteria"]))'; }
+wrapped=$'## Acceptance Criteria\n\n- [ ] Login works on every device we\n  support today (needs review)\n- [ ] Logout works\n'
+[ "$(judge "$(body "$wrapped")")" = "false|criteria_need_review" ] \
+  && pass "T1.12 a (needs review) on a criterion's wrapped continuation line counts" \
+  || fail "T1.12 wrapped marker: $(judge "$(body "$wrapped")")"
+[ "$(crit "$wrapped")" = "AC1=Login works on every device we|AC2=Logout works" ] \
+  && pass "T1.13 a wrapped line keeps the numbering and the first-line text" \
+  || fail "T1.13 wrapped numbering: $(crit "$wrapped")"
+subhead=$'## Acceptance Criteria\n\n- [ ] Login works\n\n### Edge cases\n\n- [ ] Expired tokens redirect (needs review)\n\n## Metadata\n\n- [ ] not a criterion (needs review)\n'
+[ "$(judge "$(body "$subhead")")" = "false|criteria_need_review" ] \
+  && [ "$(crit "$subhead")" = "AC1=Login works|AC2=Expired tokens redirect (needs review)" ] \
+  && pass "T1.14 items under a deeper sub-heading are criteria; a same-level heading ends the section" \
+  || fail "T1.14 sub-heading: $(judge "$(body "$subhead")") / $(crit "$subhead")"
+firstline=$'## Acceptance Criteria\n\n- [ ] Login works (needs review)\n  on mobile and desktop\n'
+[ "$(judge "$(body "$firstline")")" = "false|criteria_need_review" ] \
+  && pass "T1.16 a marker ending the first line still counts when the item wraps" \
+  || fail "T1.16 first-line marker before a continuation: $(judge "$(body "$firstline")")"
+sibling=$'## Acceptance Criteria\n\n- [ ] Login works\n\n## Notes\n\n- [ ] aside (needs review)\n'
+[ "$(judge "$(body "$sibling")")" = "true|" ] && [ "$(crit "$sibling")" = "AC1=Login works" ] \
+  && pass "T1.15 a marker under a sibling heading is not a criterion" \
+  || fail "T1.15 sibling heading: $(judge "$(body "$sibling")") / $(crit "$sibling")"
 
 
 # ── T2: triage status `unclear` ───────────────────────────────────────────
