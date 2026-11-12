@@ -36,6 +36,7 @@ run_case() {
 run_case "missing-closes"
 run_case "clean-traceability"
 run_case "intentional-refs"
+run_case "unverified-only-auto"
 
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 echo "Results: $PASS passed, $FAIL failed"

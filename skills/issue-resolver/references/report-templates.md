@@ -388,8 +388,7 @@ These derivations are the resolver's own:
 - **`breach_reason`** — required when `qa_cycles` exceeds `ceiling`; omit
   otherwise. `gi-runlog.py` rejects an over-ceiling row without it (exit 3).
 - **`verification`** — `success` only, by the `references/docs/run-log-schema.md` rule
-  applied to the PR's AC table: any row not `pass` → `partial`. Not returned
-  under `--no-run-log`.
+  applied to the PR's AC table. Not returned under `--no-run-log`.
 
 `outcome` is one of `success` (a PR was delivered), `already_resolved` (Step 0/1
 found the issue already fixed and exited early), or `failed` (a step failed). A

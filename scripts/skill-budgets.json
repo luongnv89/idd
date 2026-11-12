@@ -3,11 +3,11 @@
   "skills": {
     "auto-pilot": {
       "budget": 441942,
-      "measured": 441942
+      "measured": 441879
     },
     "init-idd": {
       "budget": 144000,
-      "measured": 143983
+      "measured": 143969
     },
     "issue-analysis": {
       "budget": 165651,
@@ -19,11 +19,11 @@
     },
     "issue-pr-review": {
       "budget": 307009,
-      "measured": 306964
+      "measured": 306940
     },
     "issue-resolver": {
       "budget": 425176,
-      "measured": 425176
+      "measured": 425135
     },
     "issue-triage": {
       "budget": 138274,

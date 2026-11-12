@@ -1,0 +1,90 @@
+{
+  "name": "issue-pr-review/unverified-only-auto",
+  "skill": "issue-pr-review",
+  "prompt": "Auto mode with review.auto_merge: true: a PR whose acceptance criteria are all unverified passes review but is never merged (#552)",
+  "grade": [
+    {
+      "tool": "idd-lint",
+      "args": [
+        "pr",
+        "OUT/pr-body.md",
+        "--title",
+        "fix(auth): resolve mobile redirect loop (#42)"
+      ],
+      "expect_exit": 0,
+      "label": "the fixture PR body is otherwise conforming"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/floor-auto-all-unverified-left_open.txt",
+      "expect_exit": 0,
+      "label": "auto mode leaves open a PR whose criteria are all unverified"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/floor-auto-no-criteria-left_open.txt",
+      "expect_exit": 0,
+      "label": "auto mode leaves open a PR with no passing criterion"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/floor-auto-pass-and-unverified-left_open.txt",
+      "expect_exit": 0,
+      "label": "one unverified criterion holds the floor even beside a pass"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/floor-auto-check-disabled-left_open.txt",
+      "expect_exit": 0,
+      "label": "review.require_acceptance_criteria_check: false refuses an unattended merge"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/floor-auto-all-pass-merged.txt",
+      "expect_exit": 0,
+      "label": "a PR whose criteria all pass meets the floor"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/floor-auto-refs-deferred-merged.txt",
+      "expect_exit": 0,
+      "label": "deferred rows on a Refs #N PR are excluded from the floor"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/floor-auto-closes-deferred-text-left_open.txt",
+      "expect_exit": 0,
+      "label": "a deferred-looking row on a Closes PR still counts as unverified"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/floor-interactive-all-unverified-ask.txt",
+      "expect_exit": 0,
+      "label": "an interactive run asks the maintainer instead of deciding"
+    },
+    {
+      "tool": "gh-calls",
+      "expect_by_command": {
+        "pr view": 1,
+        "pr merge": 0
+      },
+      "label": "the PR was read once and never merged"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/report.txt",
+      "expect_exit": 0,
+      "label": "review summary states result, evidence, uncertainty, and decision"
+    }
+  ],
+  "human_review": {
+    "criteria": [
+      "The first summary row states PASS and that the PR was left open because the merge floor is unmet; it names the reason.",
+      "Nothing in the summary calls the PR merged or ready to merge.",
+      "The Merge row says the merge was not attempted and why.",
+      "The summary says No approval needed and names the remaining user action (verify the criteria, then merge the PR yourself)."
+    ],
+    "feedback": "Record each reviewer answer; absent, blank, or nonresponsive feedback leaves understanding unconfirmed.",
+    "scope": "This deterministic stand-in tests the merge-floor decision table and a report fixture, not live agent behavior. Apply these criteria to actual agent outputs in behavioral evaluations."
+  }
+}

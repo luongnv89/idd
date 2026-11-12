@@ -71,26 +71,26 @@ Detailed example runs and edge-case behaviors referenced from SKILL.md.
 
 ◆ Auto-Pilot Summary — 3/3 iterations
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  Result:                  LIMIT REACHED — partial: 3 merged (1 with an unverified criterion), 5 issues remain
+  Result:                  LIMIT REACHED — partial: 2 merged, 1 left open (merge floor unmet), 5 issues remain
 
   Iteration 1:       ✓ merged                — #12 Fix auth redirect loop → PR #45 · AC 3/0/0 pass/fail/unverified
-  Iteration 2:       ✓ merged                — #8 Add pagination to API → PR #46 · AC 2/0/1 pass/fail/unverified; partial: acceptance_criteria
+  Iteration 2:       ⚠ left_open             — #8 Add pagination to API → PR #46 · merge floor unmet: 1 criterion unverified
   Iteration 3:       ✓ merged                — #15 Refactor middleware → PR #47 · AC 2/0/0 pass/fail/unverified
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  merged:                  3
-  left_open:               0
+  merged:                  2
+  left_open:               1
   partial_followup:        0
   blocked_by_dependency:   0
   failed:                  0
   skipped:                 0
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Mode:                    balanced
-  Evidence:                PRs #45, #46, #47 merged after green CI; 3 run-log lines appended
-  Uncertainty:             PR #46 merged with 1 unverified acceptance criterion
+  Evidence:                PRs #45, #47 merged after green CI; 3 run-log lines appended
+  Uncertainty:             PR #46 has 1 unverified acceptance criterion
   Decision:                No approval needed.
 
   Remaining:               5 open issues
-  Next action:             /auto-pilot to continue
+  Next action:             verify PR #46's criterion and merge it; /auto-pilot to continue
 ```
 
 ---

@@ -13,7 +13,7 @@ Two `.idd.yml` flags decide whether the acceptance-criteria and traceability che
 | `review.require_acceptance_criteria_check` | `true` | Run per-criterion verification described below; any `fail` blocks soft-pass. | Skip the check entirely. Report `○ acceptance_criteria: disabled (review.require_acceptance_criteria_check: false)`, never `pass`. Never blocks soft-pass; emit no fixable issues for this dimension. |
 | `review.require_traceability_check` | `true` | Run the four traceability checks below; missing `Closes #N` blocks soft-pass. | Skip the check entirely. Report `○ traceability: disabled (review.require_traceability_check: false)`, never `pass`. Never blocks soft-pass; emit no fixable issues for this dimension. |
 
-Both default to `true`, which preserves the issue #36 contract verbatim. Setting either flag to `false` is an explicit opt-out — the corresponding hard-block conditions in *Loop controls* (see SKILL.md Review Loop) no longer apply for that dimension.
+Both default to `true` (the issue #36 contract); `false` lifts that dimension's hard-block (SKILL.md *Review Loop*).
 
 A separate, narrower opt-out exists for refactor/chore PRs (see *Refactor/chore exemption* below). It relaxes only check 1 (`Closes #N`) for the matching PR; the other three traceability checks still run.
 
@@ -30,7 +30,7 @@ The five dimensions are reported under **two named axes** that separate *does th
 | **Spec axis** | Does the PR satisfy the issue's acceptance criteria — does it do the right thing? | `acceptance_criteria`, `correctness`, `safety` |
 | **Standards axis** | Does the PR follow documented project conventions? | `traceability`, `maintainability` |
 
-Rationale for the split: `acceptance_criteria` is the literal Spec contract; `correctness` is "does the implementation actually do the right thing"; `safety` (security, crash paths, edge cases) is correctness-of-behavior, so it sits on Spec, not on convention conformance. `traceability` (`Closes #N`, Decision Record, commit references) and `maintainability` (code quality, test coverage, style, a11y/interaction conventions) are conformance to documented project conventions, so they sit on Standards.
+Rationale: `safety` (security, crash paths, edge cases) is correctness of behavior, so it sits on Spec with `acceptance_criteria` and `correctness`; `traceability` (`Closes #N`, Decision Record, commit references) and `maintainability` (code quality, test coverage, style, a11y) are conformance to documented project conventions, so they sit on Standards.
 
 **The axes are a presentation grouping only — they change nothing about analysis or gating.** The same findings, the same `action: "fix" | "note"` semantics, and the same per-dimension `pass`/`partial`/`fail` status rules apply unchanged. With `review.soft_pass: true`, `acceptance_criteria: fail` and a missing `Closes #N` are the only hard-blocks; with `review.soft_pass: false`, every note or partial is also a strict blocker. It is **not** recomputed as "Spec axis fail" or "Standards axis fail". Do not derive a per-axis verdict that gates the loop — the axis headers organize the report, the per-dimension statuses gate the configured pass.
 

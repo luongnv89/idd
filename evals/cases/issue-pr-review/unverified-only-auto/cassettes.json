@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "calls": [
+    {
+      "match": "prefix",
+      "argv": [
+        "auth",
+        "status"
+      ],
+      "stdout": "github.com\n  ✓ Logged in to github.com as eval-bot (key)\n",
+      "stderr": "",
+      "exit": 0
+    },
+    {
+      "argv": [
+        "pr",
+        "view",
+        "9",
+        "--json",
+        "number,title,body,state"
+      ],
+      "stdout": "{\"number\": 9, \"title\": \"fix(auth): resolve mobile redirect loop (#42)\", \"body\": \"Closes #42\\n\\n## Summary\\n\\nFix the mobile redirect loop.\\n\\n## Decision Record\\n\\n- **Root cause:** session cookie rejected on cross-origin SSO redirects.\\n- **Options considered:** Option 1 \\u2014 proxy; Option 2 \\u2014 SameSite=None\\n- **Options rejected:** Option 1 \\u2014 heavier infra change\\n- **Selected option:** Option 2 \\u2014 SameSite=None\\n- **Residual risk:** none identified\\n- **Reproduction:** not reproduced \\u2014 needs a real mobile device\\n\\nAnalyzed at: `fix/42-mobile-auth @ abc1234` (2026-07-08)\\n\\n## Acceptance Criteria Verification\\n\\n| Criterion | Status | Evidence |\\n|-----------|--------|----------|\\n| Mobile login completes | unverified | needs a real mobile device |\\n| Desktop login unchanged | unverified | manual review needed |\\n\", \"state\": \"OPEN\"}\n",
+      "stderr": "",
+      "exit": 0
+    }
+  ]
+}

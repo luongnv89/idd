@@ -89,6 +89,24 @@
     },
     {
       "tool": "file-exists",
+      "file": "OUT/gate-floor-unmet-stays-open-left_open.txt",
+      "expect_exit": 0,
+      "label": "an unmet merge floor (all criteria unverified) leaves a clean-reviewed PR open"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/gate-floor-missing-stays-open-left_open.txt",
+      "expect_exit": 0,
+      "label": "a missing merge_floor verdict counts as unmet"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/gate-aggressive-partial-optin-floor-unmet-left_open.txt",
+      "expect_exit": 0,
+      "label": "the merge floor also holds an aggressive partial merge"
+    },
+    {
+      "tool": "file-exists",
       "file": "OUT/gate-critical-partial-conservative-stops-stop.txt",
       "expect_exit": 0,
       "label": "critical handling is unchanged under conservative"

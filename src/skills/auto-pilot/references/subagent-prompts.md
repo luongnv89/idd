@@ -171,6 +171,7 @@ When done, report back ONLY these fields:
   disabled
 - partial_dimensions: dimensions reported partial in the final cycle ([] if none)
 - disabled_dimensions: dimensions reported disabled by config ([] if none)
+- merge_floor: "met" or "unmet: {reason}" — the skill's *Merge floor* verdict
 - pre_pass_fixes: number of files auto-fixed by lint/format tools
 - tests_passed: true/false
 - ci_status: "passed@<sha40>", "failed@<sha40>", or "no_ci" — the Step 5 verdict

@@ -8,6 +8,7 @@
 # Covers:
 #   AC1 — each consolidated rule is stated once; other occurrences are pointers
 #   #550 — `review.auto_merge` has one definition (T10)
+#   #552 — the unattended *Merge floor* has one home (T11)
 #   AC2 — UI-review mechanics live in one shared doc bundled into BOTH
 #         issue-resolver and issue-pr-review
 
@@ -339,6 +340,76 @@ if ! grep -qE '≤ ?2 medium|medium "note" issues allowed' "$AP_PROMPTS"; then
 else
   fail "T10.6: auto-pilot reviewer prompt still allows '≤ 2 medium notes'"
 fi
+
+# ───────────────────────────────────────────────────────────
+# T11 (#552): the unattended *Merge floor* has one home
+# ───────────────────────────────────────────────────────────
+# The rule is stated once, in /issue-pr-review Step 7; /auto-pilot reads the
+# reviewer's `merge_floor` verdict and never re-derives it from the counts.
+AP_REVIEW="src/skills/auto-pilot/references/phases/phase-3-4-review.md"
+AP_MERGE="src/skills/auto-pilot/references/phases/phase-5-merge.md"
+PR_DIST="skills/issue-pr-review/SKILL.md"
+floor_rule='at least one criterion is `pass` and none is `unverified`'
+
+n=$(grep -c 'a:rv-merge-floor' "$PR_SKILL")
+[ "$n" -eq 1 ] && pass "T11.1: issue-pr-review Step 7 carries exactly one *Merge floor* anchor" \
+  || fail "T11.1: expected one a:rv-merge-floor anchor in $PR_SKILL, found $n"
+
+homes=$(grep -rlF "$floor_rule" src docs --include='*.md' | grep -v -e '^docs/release-notes/' -e '^docs/decisions/')
+if [ "$homes" = "$PR_SKILL" ] && [ "$(grep -cF "$floor_rule" "$PR_SKILL")" -eq 1 ]; then
+  pass "T11.2: the floor rule is stated once, in $PR_SKILL"
+else
+  fail "T11.2: the floor rule must be stated once, in $PR_SKILL only (found in: ${homes:-nowhere})"
+fi
+
+line=$(grep -F 'a:rv-merge-floor' "$PR_SKILL")
+if printf '%s' "$line" | grep -qF 'acceptance-criteria check enabled' \
+   && printf '%s' "$line" | grep -qF 'deferred rows excluded' \
+   && printf '%s' "$line" | grep -qE '`--auto` / `IDD_AUTO_MODE=1` run never merges `unmet`' \
+   && printf '%s' "$line" | grep -qE '\? \[y/N\].*<!-- auto:no -->'; then
+  pass "T11.3: the floor needs the AC check enabled, excludes deferred rows, never merges unmet in auto, asks interactively"
+else
+  fail "T11.3: the *Merge floor* line lost a condition (AC check enabled, deferred rows, auto never merges, interactive [y/N] with auto:no)"
+fi
+
+rule_ln=$(grep -nF 'a:rv-merge-rule' "$PR_SKILL" | cut -d: -f1)
+floor_ln=$(grep -nF 'a:rv-merge-floor' "$PR_SKILL" | cut -d: -f1)
+[ -n "$rule_ln" ] && [ -n "$floor_ln" ] && [ "$floor_ln" -eq $((rule_ln + 2)) ] \
+  && pass "T11.4: the *Merge floor* sits directly after the *Merge rule* in Step 7" \
+  || fail "T11.4: the *Merge floor* is not the paragraph after the *Merge rule*"
+
+grep -qE '^- merge_floor: "met" or "unmet: \{reason\}"' "$AP_PROMPTS" \
+  && pass "T11.5: the auto-pilot reviewer returns merge_floor" \
+  || fail "T11.5: the auto-pilot reviewer prompt lacks the merge_floor report-back field"
+
+if grep -qF '**Merge floor met** — Step 3.2'"'"'s `merge_floor` is `met`' "$AP_MERGE" \
+   && grep -qF 'never re-derive it' "$AP_MERGE" \
+   && grep -qF 'missing included, is `left_open`' "$AP_MERGE"; then
+  pass "T11.6: Phase 5.1 merges only on merge_floor: met, a missing verdict leaves the PR open"
+else
+  fail "T11.6: Phase 5.1 lacks the merge_floor check, or re-derives it"
+fi
+
+grep -qF "apply Step 5.1's merge-floor check" "$AP_REVIEW" \
+  && pass "T11.7: the aggressive partial merge (Step 2a) applies the floor" \
+  || fail "T11.7: Step 2a does not apply the merge floor"
+
+if grep -rqF "$floor_rule" src/skills/auto-pilot; then
+  fail "T11.8: auto-pilot restates the floor rule instead of reading merge_floor"
+else
+  pass "T11.8: auto-pilot never restates the floor rule"
+fi
+
+if [ -f "$PR_DIST" ] && grep -qF 'a:rv-merge-floor' "$PR_DIST" \
+   && grep -rqF 'merge_floor' skills/auto-pilot/references/phases/phase-5-merge.md; then
+  pass "T11.9: the built skills carry the floor and its reader"
+else
+  fail "T11.9: the built skills lack the floor or its reader — rebuild skills/"
+fi
+
+grep -qE '^run_case "unverified-only-auto"$' tests/test-eval-pr-review.sh \
+  && pass "T11.10: the unverified-only auto-mode eval case is registered" \
+  || fail "T11.10: tests/test-eval-pr-review.sh does not run unverified-only-auto"
 
 # ───────────────────────────────────────────────────────────
 # T9 (AC3): no skill regressed past the 500-line cap

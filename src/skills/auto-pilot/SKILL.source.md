@@ -292,7 +292,7 @@ The loop stops on any row except those marked *loop continues* (outcome recorded
 | Resolution failure (pause_on_failure: true) | `⚠ Auto-pilot paused` |
 | Review exhausted (non-critical, mode-dependent) | Follow-up issue created; `partial_followup` or `left_open` per *Merge Modes* (*loop continues*) |
 | Review exhausted (critical issue) | `⚠ CRITICAL — auto-pilot requires your decision` (loop pauses) |
-| Merge blocked (CI/conflicts) | `⚠ PR #{pr_number} is not mergeable — PR left open, continuing` (`left_open`, *loop continues*) |
+| Merge blocked (CI/conflicts, or merge floor unmet) | `⚠ PR #{pr_number} is not mergeable — PR left open, continuing` (`left_open`, *loop continues*) |
 | Mode forbids merge (clean PR in `conservative`) | `○ PR #{pr_number} ready for manual merge (mode: conservative)` (`left_open`, *loop continues*) |
 | PR blocked by an unmerged dependency | `⚠ BLOCKED — PR #{pr_number} cannot merge until dependency #{N} is merged` (`blocked_by_dependency`, *loop continues*) |
 | Run lock held by a live run | `✗ Another /auto-pilot run is in progress` (nothing mutated) |

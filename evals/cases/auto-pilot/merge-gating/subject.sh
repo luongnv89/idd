@@ -98,7 +98,7 @@ def effective_mode(mode, merge_partial, auto_merge):
     return "balanced", False
 
 
-def gate(mode, merge_partial, auto_merge, review, deps_ok, critical, mergeable=True):
+def gate(mode, merge_partial, auto_merge, review, deps_ok, critical, mergeable=True, floor="met"):
     """The merge decision, in the order the loop actually reaches each check.
 
     Review exhaustion on a critical issue stops the loop while reviewing, so it
@@ -121,6 +121,10 @@ def gate(mode, merge_partial, auto_merge, review, deps_ok, critical, mergeable=T
         return "left_open"
     if not mergeable:
         # Conflicts or red CI: leave the PR open and continue the loop.
+        return "left_open"
+    if floor != "met":
+        # Step 5.1 reads the reviewer's `merge_floor` verbatim (#552); any value
+        # but `met`, a missing one included, leaves the PR open.
         return "left_open"
     if not deps_ok:
         # Never merge out of order — but never stop the run for it either.
@@ -202,6 +206,12 @@ SCENARIOS = [
     ("dependency-closed-unmerged-pr", "balanced", False, None, "clean", unmerged_ok, False, pr_mergeable),
     # Conflicts or red CI outrank a clean review and a cleared dependency gate.
     ("unmergeable-pr-stays-open", "balanced", False, None, "clean", True, False, False),
+    # A clean review whose criteria are all unverified: the merge floor is unmet,
+    # so even balanced leaves the PR open (#552), as does a missing verdict.
+    ("floor-unmet-stays-open", "balanced", False, None, "clean", True, False, pr_mergeable, "unmet: 2 criteria unverified"),
+    ("floor-missing-stays-open", "balanced", False, None, "clean", True, False, pr_mergeable, None),
+    # The floor applies to the aggressive partial merge too.
+    ("aggressive-partial-optin-floor-unmet", "aggressive", True, None, "partial", True, False, pr_mergeable, "unmet: 1 criteria unverified"),
     # The critical stop is scoped to an exhausted review: a critical issue whose
     # PR reviews clean merges like any other.
     ("critical-clean-merges", "balanced", False, None, "clean", True, True, pr_mergeable),
@@ -213,15 +223,16 @@ SCENARIOS = [
 ]
 
 decisions = {}
-for name, mode, partial, auto_merge, review, deps_ok, critical, mergeable in SCENARIOS:
-    decision = gate(mode, partial, auto_merge, review, deps_ok, critical, mergeable)
+for name, mode, partial, auto_merge, review, deps_ok, critical, mergeable, *floor in SCENARIOS:
+    floor = floor[0] if floor else "met"
+    decision = gate(mode, partial, auto_merge, review, deps_ok, critical, mergeable, floor)
     decisions[name] = decision
     path = os.path.join(out, f"gate-{name}-{decision}.txt")
     with open(path, "w", encoding="utf-8") as fh:
         fh.write(
             f"mode={mode} merge_partial={partial} auto_merge={auto_merge} "
             f"review={review} deps_ok={deps_ok} critical={critical} "
-            f"mergeable={mergeable} -> {decision}\n"
+            f"mergeable={mergeable} merge_floor={floor} -> {decision}\n"
         )
 
 with open(os.path.join(out, "gate-decisions.json"), "w", encoding="utf-8") as fh:
@@ -309,7 +320,8 @@ not_merged = [r for r in rows if r["outcome"] != "merged"]
 # complete needs every merged PR fully verified (summary-format.md, #551).
 status = "partial" if not_merged or any(r.get("verification") != "full" for r in merged) else "complete"
 # Stand-in review counts (pass/fail/unverified) for the rows that merged a PR.
-COUNTS = {"merged": (3, 0, 0), "partial_followup": (2, 0, 1)}
+# A partial_followup merge still met the floor (#552): no unverified criterion.
+COUNTS = {"merged": (3, 0, 0), "partial_followup": (2, 1, 0)}
 summary = (
     f"Result: LIMIT REACHED — {status}: {len(merged)} merged, {len(not_merged)} not cleanly merged\n"
     + "".join(f"Iteration {i}: {r['outcome']} — #{r['issue']}"
