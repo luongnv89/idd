@@ -119,6 +119,14 @@ row1 '{"kind":"note","text":"x"}' passed; [ "$st" = unverified ] \
 judge '[{"n":7,"status":"pass"},{"status":"pass"},"x"]'
 [ "$ec" = 0 ] && [ "$(printf '%s' "$out" | js 'd["rows"][0]["status"], len(d["problems"])')" = "('unverified', 4)" ] \
   && pass "T3.4 rows with no valid criterion number are ignored and reported" || fail "T3.4 $out"
+# T3.8 (#584): a lone surrogate (a JSON "\ud800" escape) in judge output used to
+# crash the output encode with exit 1. The row is unreadable, so unverified.
+row1 "{\"kind\":\"test\",\"name\":\"rejects empty\",\"exit\":0,\"sha\":\"$HEAD_SHA\",\"note\":\"\\ud800\"}"
+[ "$ec" = 0 ] && [ "$st" = unverified ] \
+  && pass "T3.8 a pass row carrying a lone surrogate exits 0 and is unverified" || fail "T3.8 ec=$ec st=$st $out"
+judge "[{\"n\":1,\"status\":\"fail\",\"evidence\":\"x \\ud800\"}]" '["one \ud800"]'
+[ "$ec" = 0 ] && [ "$(printf '%s' "$out" | js 'd["rows"][0]["status"]')" = fail ] \
+  && pass "T3.9 a fail row carrying a lone surrogate stays fail and prints, exit 0" || fail "T3.9 ec=$ec $out"
 bad() {
   set +e
   printf '%s' "$1" | python3 "$CRIT" >/dev/null 2>&1
