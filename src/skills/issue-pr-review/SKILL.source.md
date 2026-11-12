@@ -254,7 +254,7 @@ This skill produces `acceptance_criteria` and `traceability` itself, per `refere
 
 **Verification recipe:** when the base branch commits `.idd-recipe.json` (or legacy `.gitissue-recipe.json`), run it in this step with `shared/scripts/gi-recipe.py`, even when the suite is skipped (`qa_handoff = trusted` included). Auto mode runs it only when the recipe opts in `review`. A `result: fail` is fixable and blocks soft-pass (`references/ui-review-mechanics.md`, *Verification recipe*).
 
-**Bug proof:** on a bug PR, re-run the regression test its `Reproduction` line cites, red at base and green at head, and report `sensitivity not verified` rows, under `qa_handoff = trusted` too (`references/verification-checks.md`, *Bug proof*).
+**Bug proof:** on a bug PR, re-run the regression test its `Reproduction` line cites, red at base and green at head, under `qa_handoff = trusted` too (`references/verification-checks.md`, *Bug proof*). On every PR, report `sensitivity not verified` rows (*Sensitivity rows*, same file).
 
 A skip satisfies the soft-pass test leg but evaluated neither check: it reports `× Suite passed` / `× Build clean` with `Result: PARTIAL`, never a silent `√`.
 

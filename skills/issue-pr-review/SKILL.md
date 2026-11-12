@@ -249,12 +249,12 @@ This skill produces `acceptance_criteria` and `traceability` itself, per `refere
 ## Step 4 — Run Tests & Build [4/7] <!-- a:rv-step4-tests -->
 
 - **`review.run_tests` is false:** skip; report `○ tests skipped (review.run_tests: false)`.
-- **Under `qa_handoff = trusted`, skip this step** and report `○ tests skipped (qa handoff @ {commit_sha_short})` — `trusted` holds only against the **live** head, so the soft-pass conjunction therefore treats the test leg as satisfied — only when the marker carries a `tests=` field whose SHA equals `head` **and `ci_leg_runnable` is true**; with no `tests=` field, or a SHA that differs, run the step in full. When `ci_leg_runnable` is false (no CI / empty `statusCheckRollup` / `no_ci` / `review.check_ci: false`), ignore `tests=` and run the local suite as unmarked.
+- **Under `qa_handoff = trusted`, skip this step** and report `○ tests skipped (qa handoff @ {commit_sha_short})` — `trusted` holds only against the **live** head, so the soft-pass conjunction treats the test leg as satisfied — only when the marker carries a `tests=` field whose SHA equals `head` **and `ci_leg_runnable` is true**; with no `tests=` field, or a SHA that differs, run the step in full. When `ci_leg_runnable` is false (no CI / empty `statusCheckRollup` / `no_ci` / `review.check_ci: false`), ignore `tests=` and run the local suite as unmarked.
 - **Otherwise:** run the build, then every test type present, with a `review.test_timeout`-second timeout (default 300) — `references/prepass-tests-ci-mechanics.md` (*Step 4*).
 
 **Verification recipe:** when the base branch commits `.idd-recipe.json` (or legacy `.gitissue-recipe.json`), run it in this step with `references/scripts/gi-recipe.py`, even when the suite is skipped (`qa_handoff = trusted` included). Auto mode runs it only when the recipe opts in `review`. A `result: fail` is fixable and blocks soft-pass (`references/ui-review-mechanics.md`, *Verification recipe*).
 
-**Bug proof:** on a bug PR, re-run the regression test its `Reproduction` line cites, red at base and green at head, and report `sensitivity not verified` rows, under `qa_handoff = trusted` too (`references/verification-checks.md`, *Bug proof*).
+**Bug proof:** on a bug PR, re-run the regression test its `Reproduction` line cites, red at base and green at head, under `qa_handoff = trusted` too (`references/verification-checks.md`, *Bug proof*). On every PR, report `sensitivity not verified` rows (*Sensitivity rows*, same file).
 
 A skip satisfies the soft-pass test leg but evaluated neither check: it reports `× Suite passed` / `× Build clean` with `Result: PARTIAL`, never a silent `√`.
 

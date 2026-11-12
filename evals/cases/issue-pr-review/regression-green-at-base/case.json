@@ -118,6 +118,12 @@
     },
     {
       "tool": "file-exists",
+      "file": "OUT/sensitivity-auto-not-a-bug-1.txt",
+      "expect_exit": 0,
+      "label": "the not_verified Sensitivity row is reported on a non-bug PR too"
+    },
+    {
+      "tool": "file-exists",
       "file": "OUT/worktrees-clean.txt",
       "expect_exit": 0,
       "label": "every base run leaves one worktree and an untouched PR checkout"

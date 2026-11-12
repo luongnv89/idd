@@ -6,9 +6,11 @@
 # re-running it, and never read the Sensitivity rows. Now *Bug proof* (one
 # home, verification-checks.md) re-runs the cited regression test red at base
 # and green at head, and the single *Merge floor* holds a bug PR open unless
-# that proof is `red→green`.
+# that proof is `red→green`. *Sensitivity rows* (same file) reports every
+# `sensitivity not verified` row on every PR, bug or not.
 #
-#   T1  *Bug proof* has one home and its safety rules (prose pins);
+#   T1  *Bug proof* has one home and its safety rules (prose pins), and
+#       *Sensitivity rows* sits outside its bug gate;
 #   T2  the *Merge floor* line carries the proof clause (one home kept);
 #   T3  Step 4 points at it, the summary contract reports it, and the
 #       resolver and auto-pilot do not restate it;
@@ -40,12 +42,13 @@ n=$(grep -rlF 'a:rvc-bug-proof' "$ROOT/src" "$ROOT/docs" | wc -l | tr -d ' ')
 [ "$n" -eq 1 ] && [ "$(grep -cF 'a:rvc-bug-proof' "$VC")" -eq 1 ] \
   && pass "T1.1: *Bug proof* has one home, verification-checks.md" \
   || fail "T1.1: expected one a:rvc-bug-proof anchor, in $VC only (found in $n files)"
-section="$(awk '/a:rvc-bug-proof/{on=1} on&&/^## Traceability checks/{exit} on' "$VC")"
+section="$(awk '/a:rvc-bug-proof/{on=1;print;next} on&&/^## /{exit} on' "$VC")"
+sens="$(awk '/^## Sensitivity rows$/{on=1;print;next} on&&/^## /{exit} on' "$VC")"
 in_section() {
   printf '%s' "$section" | grep -qF -- "$1" && pass "$2" || fail "$2 (missing in *Bug proof*)"
 }
 in_section 'never decided from the PR' "T1.2: bug-ness comes from the linked issue, not the PR"
-has "$SKILL" 'and report `sensitivity not verified` rows, under `qa_handoff = trusted` too' "T1.3: a trusted QA marker never skips the proof (SKILL.md Step 4)"
+has "$SKILL" 'red at base and green at head, under `qa_handoff = trusted` too' "T1.3: a trusted QA marker never skips the proof (SKILL.md Step 4)"
 in_section 'whenever the head moves' "T1.4: the proof is re-run when the head moves"
 in_section 'never open it' "T1.5: the PR body can only hold the gate closed"
 in_section "in Step 1's \`files\`" "T1.6: the cited test must be a file the PR changes"
@@ -67,8 +70,22 @@ in_section "Give the base run the head's dependencies without installing any" "T
 in_section 'a base green that may have loaded head code' "T1.12h: a base green that may have run head code is unproven"
 in_section '`green at base`' "T1.13: a test that passes at base is reported, not accepted"
 in_section 'never a Step 4 failure, and changes no criterion row' "T1.14: the base red is not a test failure and leaves #555's rows alone"
-in_section 'sensitivity not verified — {criterion}: {reason}' "T1.15: not_verified Sensitivity rows are reported"
-in_section 'goes under `Uncertainty`' "T1.16: they are reported under Uncertainty"
+in_sens() {
+  printf '%s' "$sens" | grep -qF -- "$1" && pass "$2" || fail "$2 (missing in *Sensitivity rows*)"
+}
+in_sens 'sensitivity not verified — {criterion}: {reason}' "T1.15: not_verified Sensitivity rows are reported"
+in_sens 'goes under `Uncertainty`' "T1.16: they are reported under Uncertainty"
+in_sens 'Runs on every PR, bug or not, whatever skips Step 4 or the criteria check' "T1.17: the Sensitivity rule is not bug-gated, nor skipped with Step 4 or the criteria check"
+in_sens "the PR body's \`## Acceptance Criteria Verification\` table" "T1.18: the rule names its source, the PR body's criteria table"
+in_sens 'report only, changing no criterion status or gate' "T1.19: the untrusted rows are report-only"
+if printf '%s' "$section" | grep -qF 'sensitivity not verified'; then
+  fail "T1.20: the Sensitivity rule sits inside the bug-gated *Bug proof*"
+else
+  pass "T1.20: the Sensitivity rule sits outside the bug-gated *Bug proof*"
+fi
+[ "$(grep -cF 'sensitivity not verified — {criterion}' "$ROOT/src/skills/issue-pr-review/SKILL.source.md" "$RV"/references/*.md | awk -F: '{s+=$NF} END{print s}')" -eq 1 ] \
+  && pass "T1.21: the Sensitivity rule keeps one home" || fail "T1.21: the Sensitivity rule is restated"
+has "$SKILL" 'On every PR, report `sensitivity not verified` rows (*Sensitivity rows*, same file).' "T1.22: Step 4's Sensitivity pointer is not bug-gated"
 
 # T2 — the single Merge floor carries the clause
 floor="$(grep -F 'a:rv-merge-floor' "$SKILL")"

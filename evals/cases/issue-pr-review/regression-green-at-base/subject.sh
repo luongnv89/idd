@@ -16,7 +16,8 @@
 #     diff or an unsafe path, a test red at head, and a base red from an
 #     import rather than the test's assertion all leave the PR open;
 #   - a non-bug issue has no proof to run;
-#   - the `sensitivity not verified` row is reported;
+#   - the `sensitivity not verified` row is reported on a bug PR and on a
+#     non-bug PR alike (*Sensitivity rows* is not bug-gated);
 #   - every base run leaves `git worktree list` and the PR checkout unchanged.
 #
 # Criteria are modelled as all `pass`, so each floor decision isolates the
@@ -235,14 +236,26 @@ with open(os.path.join(out, "proof-decisions.json"), "w", encoding="utf-8") as f
     json.dump(decisions, fh, indent=2, sort_keys=True, ensure_ascii=False)
     fh.write("\n")
 
-# Sensitivity rows: every `sensitivity not verified` Evidence cell is reported.
+# Sensitivity rows: every `sensitivity not verified` Evidence cell of the PR
+# body's criteria table is reported, on every PR — never gated on is_bug().
 ROW = re.compile(r"^\|\s*(?P<crit>[^|]+?)\s*\|\s*(?:pass|fail|unverified)\s*\|\s*(?P<ev>[^|]*?)\s*\|\s*$")
-not_verified = [(m["crit"], m["ev"].split("sensitivity not verified:", 1)[1].strip())
-                for m in map(ROW.match, pr["body"].splitlines())
-                if m and "sensitivity not verified:" in m["ev"]]
-assert not_verified == [("Letters are lowercased", "no hunk to mutate")], not_verified
-with open(os.path.join(out, "sensitivity-not-verified-1.txt"), "w", encoding="utf-8") as fh:
-    fh.write("".join(f"{c}: {r}\n" for c, r in not_verified))
+
+
+def sensitivity_rows(body):
+    """verification-checks.md *Sensitivity rows*: reads only the PR body."""
+    return [(m["crit"], m["ev"].split("sensitivity not verified:", 1)[1].strip())
+            for m in map(ROW.match, body.splitlines())
+            if m and "sensitivity not verified:" in m["ev"]]
+
+
+assert is_bug(issue) and not is_bug(not_bug)
+for fname, snapshot in (("sensitivity-not-verified-1.txt", issue),
+                        ("sensitivity-auto-not-a-bug-1.txt", not_bug)):
+    rows = sensitivity_rows(pr["body"])
+    assert rows == [("Letters are lowercased", "no hunk to mutate")], (fname, rows)
+    with open(os.path.join(out, fname), "w", encoding="utf-8") as fh:
+        fh.write(f"bug={is_bug(snapshot)} " + "".join(f"{c}: {r}\n" for c, r in rows))
+not_verified = sensitivity_rows(pr["body"])
 
 fixture = decisions["auto-fixture-green-at-base"]
 reason = fixture["merge_floor"].split(": ", 1)[1]
