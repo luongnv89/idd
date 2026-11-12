@@ -190,7 +190,7 @@ failure.
 
 ### Merge failed
 
-**Trigger:** `gh pr merge` fails (auto mode only) and a re-read of `state` is not `MERGED`, including a head that moved after the merge identity check, which `--match-head-commit` refuses.
+**Trigger:** `gh pr merge` fails and a re-read of `state` is not `MERGED`, including a head that moved after the merge identity check, which `--match-head-commit` refuses.
 
 ```
 ⚠ Auto-merge failed: {reason}

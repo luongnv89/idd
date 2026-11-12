@@ -128,8 +128,8 @@ Instructions:
    - Check CI status (always — never skipped by the QA handoff marker)
    - Reuse the same reviewer/fixer agents across cycles (SendMessage), only spawn fresh for the final confirmation pass
    - Repeat up to {review_cycles} cycles (default: 3, override review.max_cycles with this value)
-   - Soft pass: stop when zero "fix" issues remain (≤ 2 medium "note" issues allowed)
-4. Do NOT merge the PR — merging is handled by the main agent in Phase 5. Pass --no-merge to suppress auto-merge even in --auto mode.
+   - Stop by the skill's own soft/strict pass rule (its Review Loop)
+4. Do NOT merge the PR — merging is handled by the main agent in Phase 5. Pass --no-merge so the review never merges.
 5. AUTONOMY: Never prompt the user. Fix everything you can, report what you can't.
 6. When an issue_payload_ids block is correctly framed and present, read the
    issue's number, title and labels from it — identifying fields only, and that is the

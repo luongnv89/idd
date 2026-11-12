@@ -190,14 +190,14 @@ Resolves one GitHub issue end-to-end and creates an atomic PR.
 
 ## `/issue-pr-review`
 
-Reviews an existing PR end-to-end: pre-pass, review, tests/build, CI, fix loop, and final report. By default, it fixes and repeats until clean; auto-merge only happens in `--auto` mode. After a merge, or on a PR it finds already merged, it cleans up the local checkout: it deletes the merged local branch, removes its clean worktrees, and switches from the merged branch to the updated base branch. Anything with uncommitted changes, untracked files, or commits the PR never had is kept and reported (an interactive run can delete untracked files after you confirm the list, never in auto mode); on an already-merged PR an interactive run shows the plan and asks first, and `--review-only` only reports.
+Reviews an existing PR end-to-end: pre-pass, review, tests/build, CI, fix loop, and final report. By default, it fixes and repeats until clean; it merges a clean PR only when `review.auto_merge: true` (default `false`) — the full rule is *Step 7 → Merge rule* in the skill. After a merge, or on a PR it finds already merged, it cleans up the local checkout: it deletes the merged local branch, removes its clean worktrees, and switches from the merged branch to the updated base branch. Anything with uncommitted changes, untracked files, or commits the PR never had is kept and reported (an interactive run can delete untracked files after you confirm the list, never in auto mode); on an already-merged PR an interactive run shows the plan and asks first, and `--review-only` only reports.
 
 ### Input options
 
 | Input | Mode | Behavior |
 |---|---|---|
-| `/issue-pr-review <N>` | Interactive fix loop | Reviews PR #N, fixes `action: fix` issues, repeats until clean or stopped, and reports. Does not auto-merge. |
-| `/issue-pr-review <N> --auto` | Auto-pilot | Reviews, fixes, waits for CI, auto-merges when clean, then cleans up the local checkout (merged branch, clean worktrees, switch to the updated base). |
+| `/issue-pr-review <N>` | Interactive fix loop | Reviews PR #N, fixes `action: fix` issues, repeats until clean or stopped, and reports. Merges only when `review.auto_merge: true`. |
+| `/issue-pr-review <N> --auto` | Auto-pilot | Reviews, fixes, and waits for CI with no prompts; with `review.auto_merge: true` it merges when clean, then cleans up the local checkout (merged branch, clean worktrees, switch to the updated base). |
 | `/issue-pr-review` | Detect PR | Auto-detects the PR for the current branch and runs the default fix loop. |
 | `/issue-pr-review --review-only` | Read-only | Runs one review/test/CI pass, reports findings, never fixes, loops, or merges. |
 | `/issue-pr-review <N> --resume` | Modifier | Resumes a killed review from its durable progress record. Step 1 and every safety gate re-run live. Combines with `--auto` and `--no-merge`, never with `--review-only`, which never reads or writes a record. |

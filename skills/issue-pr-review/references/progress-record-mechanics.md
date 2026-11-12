@@ -36,7 +36,7 @@ python3 references/scripts/gi-progress.py --start --skill issue-pr-review --numb
 | After Step 1 binds the PR and `branch_name`, fresh reviews only | `{"step": 1, "linked_issue": <n or null>, "profile": "light|full"}`, plus `"caller_run_id": "<run_id>"` under `/auto-pilot` (the spawn prompt's `run_id:` line) |
 | Each `[N/7]` start | `{"step": k}`; at `[3/7]` after Step 2, also `prepass_head` (HEAD after the auto-fix) |
 | Each cycle start, then after Step 6 | `{"cycle": c}`, in the same patch as that cycle's `{"step": 3}`, so `current` 3 never pairs with the previous cycle's count; after Step 6, `findings` (`open`, `noted`) and `history` (the last two cycles' finding signatures) |
-| Immediately **before** an effect | `{"effect": {"kind": "…", "state": "intent", "key": {…}}}` — Step 2's auto-fix push and each Step 6 push (`push`, `key.sha` = the local HEAD), the `Closes #N` body edit (`body_edit`), the standalone `--auto` merge (`merge`, `key.sha` = the head being merged) |
+| Immediately **before** an effect | `{"effect": {"kind": "…", "state": "intent", "key": {…}}}` — Step 2's auto-fix push and each Step 6 push (`push`, `key.sha` = the local HEAD), the `Closes #N` body edit (`body_edit`), the merge in any mode (`merge`, `key.sha` = the head being merged) |
 | Before the Step 7 report | `{"step": "closing", "outcome": "<Result>"}` |
 
 Exit 0 is written. Exit 3 is a wrong patch: fix it and retry once, else treat it

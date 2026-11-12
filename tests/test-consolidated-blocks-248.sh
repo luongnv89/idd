@@ -7,6 +7,7 @@
 #
 # Covers:
 #   AC1 — each consolidated rule is stated once; other occurrences are pointers
+#   #550 — `review.auto_merge` has one definition (T10)
 #   AC2 — UI-review mechanics live in one shared doc bundled into BOTH
 #         issue-resolver and issue-pr-review
 
@@ -273,6 +274,70 @@ if grep -qF 'Render the cached report' "$TRIAGE_SKILL"; then
   pass "T8.2: *Step 3 — Render the cached report* is the rendering home"
 else
   fail "T8.2: triage lost its cached-render home section"
+fi
+
+# ───────────────────────────────────────────────────────────
+# T10 (#550): `review.auto_merge` has one definition
+# ───────────────────────────────────────────────────────────
+# The key was specified three ways ("auto mode overrides to true", "merges only
+# when review.auto_merge is true", "Honored only in --auto mode"). One sentence
+# in issue-pr-review Step 7 (*Merge rule*) now defines when the skill merges;
+# the inline defaults, the config-key table and the schema comment point to it.
+MERGE_RULE='`/issue-pr-review` merges a PR only when `review.auto_merge` is `true` and the PR is clean, in interactive and `--auto` runs alike, and never under `--no-merge` or `--review-only`.'
+PR_LOOP="src/skills/issue-pr-review/references/review-loop-mechanics.md"
+SCHEMA="docs/config-schema.md"
+AP_PROMPTS="src/skills/auto-pilot/references/subagent-prompts.md"
+
+rule_src=$(grep -rlF -- "$MERGE_RULE" src docs | wc -l | tr -d ' ')
+rule_home=$(grep -cF -- "$MERGE_RULE" "$PR_SKILL")
+if [ "$rule_src" -eq 1 ] && [ "$rule_home" -eq 1 ]; then
+  pass "T10.1: the merge rule is stated exactly once, in issue-pr-review SKILL.md"
+else
+  fail "T10.1: merge rule found in $rule_src file(s), $rule_home time(s) in the home — expected 1/1"
+fi
+
+if grep -F -- "$MERGE_RULE" "$PR_SKILL" | grep -qF '<!-- a:rv-merge-rule -->'; then
+  pass "T10.2: the merge rule carries its a:rv-merge-rule anchor"
+else
+  fail "T10.2: the merge rule lost its a:rv-merge-rule anchor"
+fi
+
+if [ -f skills/issue-pr-review/SKILL.md ] && [ "$(grep -cF -- "$MERGE_RULE" skills/issue-pr-review/SKILL.md)" -eq 1 ]; then
+  pass "T10.3: the built issue-pr-review SKILL.md carries the merge rule once"
+else
+  fail "T10.3: the built issue-pr-review SKILL.md does not carry the merge rule exactly once"
+fi
+
+# Each of the three former definition sites now points to *Merge rule* and
+# carries no rule of its own.
+inline_defaults=$(grep -F 'Inline defaults:' "$PR_SKILL" | grep -F 'review.auto_merge')
+loop_row=$(grep -F '| `review.auto_merge' "$PR_LOOP")
+schema_comment=$(grep -B3 -E '^  auto_merge: false' "$SCHEMA")
+for pair in "SKILL.md inline defaults:$inline_defaults" \
+            "review-loop-mechanics.md key row:$loop_row" \
+            "config-schema.md comment:$schema_comment"; do
+  site="${pair%%:*}"; text="${pair#*:}"
+  if printf '%s' "$text" | grep -qF 'Merge rule' \
+     && ! printf '%s' "$text" | grep -qiE 'overrid|Honored only|only in `?--auto'; then
+    pass "T10.4: $site points to *Merge rule* and restates no rule"
+  else
+    fail "T10.4: $site does not point to *Merge rule*, or still restates a rule"
+  fi
+done
+
+stale_override=$(grep -rnE 'auto mode overrides to `true`|overridden to true in --auto|Honored only in `--auto`|merge` fails \(auto mode only\)' src docs \
+  --include='*.md' --include='*.yml' | grep -v -e '^docs/release-notes/' -e '^docs/decisions/' | wc -l | tr -d ' ')
+if [ "$stale_override" -eq 0 ]; then
+  pass "T10.5: no source restates an --auto-only or overriding merge rule"
+else
+  fail "T10.5: $stale_override line(s) still restate an --auto-only or overriding merge rule"
+fi
+
+# The auto-pilot reviewer prompt carries no merge/exit rule the skill lacks.
+if ! grep -qE '≤ ?2 medium|medium "note" issues allowed' "$AP_PROMPTS"; then
+  pass "T10.6: auto-pilot reviewer prompt drops the '≤ 2 medium notes' rule"
+else
+  fail "T10.6: auto-pilot reviewer prompt still allows '≤ 2 medium notes'"
 fi
 
 # ───────────────────────────────────────────────────────────
