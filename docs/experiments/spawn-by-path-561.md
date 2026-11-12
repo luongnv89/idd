@@ -7,8 +7,10 @@ instead of reading the file and re-emitting it, and what does each form cost?
 **Date:** 2026-11-12
 **Status:** complete. Decision: **adopt per host**, provisional. Adopt on Claude
 Code through a follow-up issue; keep the re-emit form on Codex CLI and on every
-unmeasured host. This record changes no skill. Every number below is copied or
-computed from the reduced results of the 12 runs in §3.
+unmeasured host. This record changes no skill. Token and behaviour figures
+below are copied or computed from the reduced results of the 12 runs in §3.
+Wall-clock figures for Codex CLI, run times, the session-file counts and the
+pilot cross-check in §2.4 come from the raw run files.
 
 ## 1. Question
 
@@ -34,7 +36,9 @@ Code only. It measured no tokens and no second host.
 So the question has two parts, on Claude Code and on one other host:
 
 1. **Behaviour.** Does the path form start one subagent that reads the file,
-   honours every binding, and returns the agent's output contract?
+   honours its bindings, and returns the agent's output contract? The harness
+   can observe two of the nine bindings, `{diff_command}` and `{pr_context}`
+   (§6).
 2. **Tokens.** Does it lower what the main agent and the whole session process?
 
 ## 2. Method
@@ -96,7 +100,7 @@ failed.
 - **Codex CLI order:** `path-0, reemit-0, path-1, reemit-1, path-2, reemit-2`
   (16:46–16:53 UTC).
 - **Claude Code order:** `path-0` at about 16:44 UTC, then `reemit-0, path-1,
-  reemit-1, path-2, reemit-2` at about 17:31–17:38 UTC. The gap was a wait for
+  reemit-1, path-2, reemit-2` at about 17:31–17:37 UTC. The gap was a wait for
   the account's usage window.
 - **Pilot kept:** run 0 of the `path` arm on each host was the first run made
   and also the pilot that validated the harness. Its prompt and command are
@@ -108,7 +112,7 @@ Tokens are host-reported only. Nothing is estimated.
 
 | Field | Host | Source |
 |-------|------|--------|
-| `main` tokens | Claude Code | `usage` of the stream's final `result` event. It covers the main loop only: on the pilot it equals the sum of the main-loop messages' per-message usage |
+| `main` tokens | Claude Code | `usage` of the stream's final `result` event. It covers the main loop only: on the pilot its three input-side counters equal the sum of the main-loop messages' per-message usage (`input` 6, `cache_write` 16,929, `cache_read` 41,588). The stream's per-message `output_tokens` do not sum to the result's figure (808 against 1,560 on the pilot; stream events carry a message's usage before the message is complete), so the main-only attribution of `output` rests on the input-side match and is not independently shown |
 | `total` tokens | Claude Code | `modelUsage` of the same event: the whole session |
 | `sub` tokens | Claude Code | `total` − `main` |
 | counters | Claude Code | four each: `input`, `cache_write`, `cache_read`, `output`. "Processed" below is their sum |
@@ -339,8 +343,8 @@ Median (min–max) of the 3 runs per arm.
 
 **Rule.** Adopt the path form on a host when, in every run, it:
 
-- (a) starts exactly one subagent that reads the file and honours every
-  binding;
+- (a) starts exactly one subagent that reads the file and honours the two
+  bindings the harness can observe, `{diff_command}` and `{pr_context}`;
 - (b) returns the output contract with both seeded defects found as often as
   the re-emit form does; and
 - (c) lowers the main agent's output tokens and the session's total processed
@@ -357,11 +361,13 @@ post-hoc bar, not a pre-registered one.
 
 **Decision: adopt per host. Provisional.**
 
-- **Claude Code.** Every condition held in every run. This issue changes
-  nothing, so adoption needs a follow-up issue that amends
+- **Claude Code.** Every condition held in every run, with (a) judged on the
+  two observed bindings only (§6). This issue changes nothing, so adoption
+  needs a follow-up issue that amends
   [shared-agent-conventions.md](https://github.com/luongnv89/idd/blob/main/docs/shared-agent-conventions.md)
   and the spawn sites.
-- **Codex CLI.** The path form worked mechanically in 3 of 3 runs and the main
+- **Codex CLI.** The path form worked mechanically in 3 of 3 runs (one
+  subagent, the file read, the two observed bindings honoured) and the main
   thread wrote less. But one of three path runs missed a seeded defect, and
   total tokens did not fall in every run. With n = 3, one miss is not evidence
   of a quality loss. It still means condition (b) did not hold in every run,
@@ -390,4 +396,14 @@ post-hoc bar, not a pre-registered one.
 - **Order and timing.** Arms were interleaved, not randomized, and the Claude
   Code pilot ran earlier than the other five Claude Code runs (§2.3).
 - **Post-hoc rule.** See §5.
+- **Two of nine bindings observed.** The harness observed `{diff_command}`
+  (`sub_ran_bound_diff`) and `{pr_context}` (the `constraints` finding). The
+  other seven (`{branch_name}`, `{base_branch}`, `{confidence_threshold}`,
+  `{challenge_context}`, `{review_mode}`, `{workspace_contract}`,
+  `{expected_lane_identity}`) were not individually verified in either arm on
+  either host.
+- **Main/sub split of output tokens on Claude Code.** The split is the host's
+  `usage` against `modelUsage`. It was cross-checked on the input-side
+  counters only: the stream's per-message `output_tokens` do not sum to the
+  result's figure (808 against 1,560 on the pilot).
 - **Codex re-emit fidelity unobservable.** See §2.4.
