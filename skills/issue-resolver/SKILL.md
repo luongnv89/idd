@@ -181,7 +181,7 @@ Only a **merged** PR or a closing commit on the default branch is `already_resol
 
 Warn and ask if assigned elsewhere, on `wontfix`/`blocked`/`do-not-merge` labels, or when a non-empty body is not ready — each `[y/N]`. **Auto** never waits but takes the printed No: stop at Step 0, `status: failure`, `skipped_reason` `assigned_to_other`, `blocked_label` or `needs_clarification`. Every `[y/N]` gate in this skill does the same ([auto mode](https://github.com/luongnv89/idd/blob/main/docs/auto-mode.md), *The gate rule*).
 
-**Readiness** (`references/docs/idd-methodology.md`, *Issue Readiness*) is judged on 0a's body, before 0d: pipe 0a's `gi-issue.py` command (a cache hit) into `python3 references/scripts/gi-ready.py`; a non-zero exit judges by that section. An empty body is Step 1's gate. Any body not ready prints `×` on Step 0's `Criteria confirmed`, so the run ends `PARTIAL`.
+**Readiness** (`references/docs/idd-methodology.md`, *Issue Readiness*) is judged on 0a's body, before 0d: pipe 0a's `gi-issue.py` command (a cache hit) into `python3 references/scripts/gi-ready.py`; a non-zero exit judges by that section. An empty body is Step 1's gate. A body not ready, or any criterion 0d writes, prints `×` on Step 0's `Criteria confirmed`, so the run ends `PARTIAL`.
 
 ### 0d — Auto-normalize
 

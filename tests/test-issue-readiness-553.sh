@@ -177,6 +177,10 @@ done
 has "$RS/references/error-messages.md" 'skipped_reason: needs_clarification`. <!-- auto:no -->' \
   "T4.6 the resolver's readiness gate takes No in auto"
 has "$RS/SKILL.source.md" 'ends with `(needs review)`' "T4.7 0d marks the criteria it writes"
+has "$RS/SKILL.source.md" 'or any criterion 0d writes, prints `×`' \
+  "T4.15 a criterion 0d writes fails Criteria confirmed, so the run never ends PASS"
+has "$METHOD" 'or with criteria the resolver wrote, ends `PARTIAL`' \
+  "T4.16 the rule caps a run whose criteria the resolver wrote"
 has "$RS/references/report-templates.md" '`Criteria confirmed`' "T4.8 Step 0 carries the Criteria confirmed check"
 has "$RS/references/report-templates.md" 'legitimate in exactly three places: *Step 0 — Preflight*' \
   "T4.9 Step 0 PARTIAL is a listed legitimate place"

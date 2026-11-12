@@ -458,7 +458,7 @@ Rules that make the report worth reading:
 | 5 — Deliver | `Tests green` · `Branch pushed` · `PR opens with Closes #N` |
 
 `PARTIAL` is legitimate in exactly three places: *Step 0 — Preflight* when only
-`Criteria confirmed` is `×` (an issue not ready, resolved on a yes); *Step 4 — QA* when the loop hits
+`Criteria confirmed` is `×` (an issue not ready, resolved on a yes, or criteria 0d wrote); *Step 4 — QA* when the loop hits
 `review_cycles` with residual non-blocking findings (delivered with known
 issues), and *Step 5 — Deliver* when the PR is created but an optional extra
 (project-board sync, run-log append) failed. Anywhere else a `×` is blocking.
