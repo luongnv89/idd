@@ -23,7 +23,9 @@ human-facing summary: the report-back fields `/auto-pilot` reads (`result`,
    - `PASS` — the loop-exit condition held (soft or strict, per
      `review.soft_pass`) with every CI and test leg satisfied by a real pass, a
      config skip, or a `qa_handoff = trusted` test skip (listed under
-     *Uncertainty*, never as `✓ pass`). The PR is clean. When an auto-merge
+     *Uncertainty*, never as `✓ pass`). Say `clean; ready to merge` only when
+     every criterion is `pass` and no dimension `partial` or `disabled`;
+     otherwise name that gap (`{u} criteria unverified`). When an auto-merge
      follows, its `MERGED` or `BLOCKED (manual merge required)` block supersedes
      this row; otherwise (no merge under SKILL.md *Merge rule*) it is the
      final status.
@@ -95,10 +97,10 @@ or nonresponsive feedback leaves human understanding unconfirmed.
 ## Summary — Clean PR
 
 ```
-◆ PR Review: #{pr_number} (pass {N} — clean)
+◆ PR Review: #{pr_number} (pass {N} — clean or the gap)
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
 
-  Result:            PASS — {main finding, e.g. "clean; ready to merge"}
+  Result:            PASS — {main finding: "clean; ready to merge", or the gap}
   Script pre-pass:   ✓ lint/format auto-fixed ({auto_fixed} files)
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Review dimensions:
@@ -108,7 +110,7 @@ or nonresponsive feedback leaves human understanding unconfirmed.
       safety:              ✓ pass
     Standards axis (follows project conventions?):
       traceability:        ✓ pass (Closes #{N}, commit ref, Decision Record, AC block, B1/squash: squash-only + PR_BODY)
-      maintainability:     ○ partial ({note_count} note-level findings)
+      maintainability:     ⚠ partial ({note_count} note-level findings)
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Tests:             ✓ pass ({count} passed)
   CI status:         ✓ pass ({checks_count} checks passed)
@@ -118,7 +120,7 @@ or nonresponsive feedback leaves human understanding unconfirmed.
   Evidence:          tests {count} passed @ {sha7}; CI {ci_status}
   Uncertainty:       {inherited/skipped/model-judged items, or "none"}
   Decision:          No approval needed.
-  Next action:       merge PR #{pr_number} (this run does not merge)
+  Next action:       {check the gap named on Result:, then} merge PR #{pr_number} (this run does not merge)
 
   {pr_url}
 ```
@@ -407,7 +409,7 @@ A clean review prints the 7-step tracker and a summary:
   [4/7] Tests         ✓ 12 passed
   [5/7] CI            ✓ all checks green
   [6/7] Fix           ○ skipped — nothing to fix
-  [7/7] Summary       ✓ PR ready to merge
+  [7/7] Summary       ✓ PR passed review — 1 note to check before merging
 
   ✓ PR #87 passed review (soft-pass: 1 medium note)
 ```

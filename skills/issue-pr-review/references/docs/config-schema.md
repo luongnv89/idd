@@ -115,7 +115,7 @@ review:
   # Default: true
   # True: each criterion of the linked issue's `## Acceptance Criteria` is
   # reported pass/fail/unverified, and any `fail` blocks soft-pass. False: the
-  # dimension reports `pass — verification disabled` and never blocks.
+  # dimension reports `disabled` (never `pass`) and never blocks.
   require_acceptance_criteria_check: true
 
   # Run the four traceability checks against the PR body and commit history.
@@ -126,7 +126,7 @@ review:
   # soft-pass even on green tests/CI — unless line 1 is `Refs #N` on a partial
   # PR whose AC table defers the open criteria (status `unverified`, evidence
   # `deferred`). Not an exemption, always on. False: the dimension reports
-  # `pass — verification disabled` and never blocks.
+  # `disabled` (never `pass`) and never blocks.
   require_traceability_check: true
 
   # PR labels that exempt a PR from the `Closes #N` hard-fail (check 1 only).

@@ -358,7 +358,7 @@ actually writing the line.
 
 Build the object from values already known during the run — `ts`, `issue`,
 `mode`, `skill`, `outcome`, `pr`, plus the optional `complexity`, `profile`,
-`agent_overrides`, `qa_cycles`, `ceiling`, `breach_reason`, `duration_s`, `phases`, and `skipped_reason` —
+`agent_overrides`, `qa_cycles`, `ceiling`, `breach_reason`, `verification`, `duration_s`, `phases`, and `skipped_reason` —
 following the schema in `references/docs/run-log-schema.md` rather than re-deriving fields
 here.
 
@@ -387,6 +387,9 @@ These derivations are the resolver's own:
   profile/complexity as full + medium (`2`).
 - **`breach_reason`** — required when `qa_cycles` exceeds `ceiling`; omit
   otherwise. `gi-runlog.py` rejects an over-ceiling row without it (exit 3).
+- **`verification`** — `success` only, by the `references/docs/run-log-schema.md` rule
+  applied to the PR's AC table: any row not `pass` → `partial`. Not returned
+  under `--no-run-log`.
 
 `outcome` is one of `success` (a PR was delivered), `already_resolved` (Step 0/1
 found the issue already fixed and exited early), or `failed` (a step failed). A

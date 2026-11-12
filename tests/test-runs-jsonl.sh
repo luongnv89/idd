@@ -510,6 +510,77 @@ has "$DOCTOR_RUNLOG" "Slowest phase:" "T12i: idd-doctor prints the slowest-phase
 has "$DOCTOR_RUNLOG" 'skip a non-object `phases`' "T12i: idd-doctor skips malformed phase entries"
 has "$DOCTOR_RUNLOG" '`n/a` when no run carries the field' "T12i: idd-doctor degrades when no run carries phases"
 
+# --- T13: verification field — honest verdicts (issue #551) -----------------
+vr_rec() { # $1 = raw JSON value for verification
+  printf '{"ts":"2026-01-01T00:00:00Z","issue":551,"mode":"balanced","skill":"auto-pilot","outcome":"merged","pr":9,"duration_s":5,"verification":%s}' "$1"
+}
+for v in full partial disabled; do
+  rc=0; out="$(vr_rec "\"$v\"" | python3 "$HELPER" --echo 2>/dev/null)" || rc=$?
+  if [ "$rc" = 0 ] && printf '%s' "$out" | grep -qF "\"verification\":\"$v\""; then
+    pass "T13a: gi-runlog accepts verification=$v"
+  else
+    fail "T13a: gi-runlog should accept verification=$v (exit $rc)"
+  fi
+done
+for bad in '"clean"' '"FULL"' '""' 'true' '["full"]'; do
+  rc=0; vr_rec "$bad" | python3 "$HELPER" --echo >/dev/null 2>&1 || rc=$?
+  if [ "$rc" = 3 ]; then
+    pass "T13b: gi-runlog rejects verification=$bad with exit 3"
+  else
+    fail "T13b: verification=$bad returned exit $rc, expected 3"
+  fi
+done
+rc=0; out="$(vr_rec null | python3 "$HELPER" --echo 2>/dev/null)" || rc=$?
+if [ "$rc" = 0 ] && ! printf '%s' "$out" | grep -qF "verification"; then
+  pass "T13c: a null verification is omitted, never written"
+else
+  fail "T13c: null verification should be dropped (exit $rc): $out"
+fi
+# A legacy line without the field stays valid and gains no key.
+rc=0; out="$(printf '{"ts":"2026-01-01T00:00:00Z","issue":551,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":9}' | python3 "$HELPER" --echo 2>/dev/null)" || rc=$?
+if [ "$rc" = 0 ] && ! printf '%s' "$out" | grep -qF "verification"; then
+  pass "T13d: a legacy line without verification stays valid"
+else
+  fail "T13d: legacy line rejected or altered (exit $rc): $out"
+fi
+# Canonical position: right after pr, whatever order the writer used.
+out="$(printf '{"verification":"partial","pr":9,"outcome":"success","skill":"issue-resolver","mode":"auto","issue":551,"duration_s":5,"ts":"2026-01-01T00:00:00Z"}' | python3 "$HELPER" --echo 2>/dev/null)" || true
+if printf '%s' "$out" | grep -qF '"pr":9,"verification":"partial","duration_s":5'; then
+  pass "T13e: verification is emitted right after pr"
+else
+  fail "T13e: verification out of canonical order: $out"
+fi
+has "$RUNLOG" '| `verification` | string | no |' "T13f: run-log schema documents verification"
+has "$RUNLOG" 'missing counts are `partial`, never `full`' "T13f: a review without counts is never logged full"
+has "$REPO_ROOT/src/skills/issue-resolver/references/report-templates.md" 'applied to the PR'"'"'s AC table: any row not `pass` → `partial`' \
+  "T13g: a resolver PR with an unverified criterion is logged partial, not clean"
+has "$REPO_ROOT/src/skills/auto-pilot/references/phases/phase-3-4-review.md" 'field is `partial`' \
+  "T13g: a reviewer report-back without counts is partial, never full"
+has "$REPO_ROOT/src/skills/auto-pilot/references/explicit-list-mode.md" '`verification` on the primary line only' \
+  "T13g: batch fan-out never stamps unreviewed issues as verified"
+has "$REPO_ROOT/src/skills/auto-pilot/references/subagent-prompts.md" '- criteria: {"pass": n, "fail": n, "unverified": n}' \
+  "T13h: the PR reviewer returns the criteria counts"
+has "$REPO_ROOT/src/skills/auto-pilot/references/subagent-prompts.md" '- disabled_dimensions:' \
+  "T13h: the PR reviewer returns disabled dimensions"
+has "$REPO_ROOT/src/skills/auto-pilot/references/summary-format.md" '→ PR #{pr1} · AC {p}/{f}/{u} pass/fail/unverified' \
+  "T13i: the merged row prints the criteria counts"
+has "$REPO_ROOT/src/skills/auto-pilot/references/summary-format.md" 'ended `merged` with `verification:' \
+  "T13i: complete requires full verification on every merged PR"
+has "$REPO_ROOT/src/skills/auto-pilot/references/run-log.md" '**`verification`** comes from the PR review' \
+  "T13j: auto-pilot logs the review's verification"
+# A disabled check reads as disabled, never pass.
+if git -C "$REPO_ROOT" grep -qF 'pass — verification disabled' -- src docs ':!docs/experiments' ':!docs/release-notes'; then
+  fail "T13k: a disabled dimension is still reported as pass somewhere in src/ or docs/"
+else
+  pass "T13k: no disabled dimension is reported as pass"
+fi
+has "$REPO_ROOT/src/skills/issue-pr-review/references/verification-checks.md" '`○ acceptance_criteria: disabled (review.require_acceptance_criteria_check: false)`' \
+  "T13k: a disabled acceptance-criteria check prints disabled"
+has "$REPO_ROOT/src/skills/issue-pr-review/references/verification-checks.md" '`○ traceability: disabled (review.require_traceability_check: false)`' \
+  "T13k: a disabled traceability check prints disabled"
+has "$REPO_ROOT/src/skills/issue-pr-review/references/report-templates.md" 'Say `clean; ready to merge` only when' \
+  "T13l: PASS says ready to merge only with every criterion pass"
+
 echo ""
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 echo "  Results: $PASS passed, $FAIL failed"

@@ -225,7 +225,7 @@ A pass is all four: exit 0, `policy_source` exactly the `ref:origin/…` asked f
 
 Then run per-criterion acceptance-criteria verification on `linked_issue_snapshot` directly; do not call `gi-issue.py` or `gh` again. A PR with **no** linked issue is a different state, not a fail-safe case: `acceptance_criteria` reports `○ pass — none defined; manual review recommended`. <!-- a:rv-step3-ac-snapshot -->
 
-**Dimensions:** `correctness`, `acceptance_criteria`, `traceability`, `maintainability`, `safety` — each `pass`, `partial`, or `fail`, grouped under a **Spec axis** and a **Standards axis**; UI findings fold into `maintainability`. Mapping: `references/verification-checks.md` — **read it now.**
+**Dimensions:** `correctness`, `acceptance_criteria`, `traceability`, `maintainability`, `safety` — each `pass`, `partial`, `fail` or `disabled`, grouped under a **Spec axis** and a **Standards axis**; UI findings fold into `maintainability`. Mapping: `references/verification-checks.md` — **read it now.**
 
 ```
 [3/7] Review       ✓ spec[ac:pass correctness:pass safety:pass]
@@ -237,7 +237,7 @@ Then run per-criterion acceptance-criteria verification on `linked_issue_snapsho
 
 This skill produces `acceptance_criteria` and `traceability` itself, per `references/verification-checks.md`. Gating rules: <!-- a:rv-traceability-outcomes -->
 
-- `review.require_acceptance_criteria_check` / `review.require_traceability_check` (default `true`): when `false`, that dimension reports `pass — verification disabled` and never blocks.
+- `review.require_acceptance_criteria_check` / `review.require_traceability_check` (default `true`): when `false`, that dimension reports `disabled` — never `pass` — and never blocks.
 - **Any `acceptance_criteria: fail`** → Step 6 fixable (`category: acceptance_criteria`); **hard-blocks** soft-pass.
 - **`Closes #{linked_issue}` absent** (unless refactor/chore-exempt or a valid intentional `Refs`) → `traceability: fail`, Step 6 fixable "Add `Closes #{linked_issue}` to the PR body."; **hard-blocks** soft-pass, even with green tests. A failing `Refs #{linked_issue}` line 1 hard-blocks as `action: note`, **never** auto-fixed.
 - Other traceability gaps (missing commit ref; a human-authored PR with the Decision Record absent) report `traceability: partial` and do **not** block.

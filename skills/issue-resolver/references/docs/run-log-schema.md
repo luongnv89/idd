@@ -6,12 +6,11 @@ set, append rules, rotation, and the single-writer convention.
 
 ## Schema
 
-`runs.jsonl` is an **append-only, schema-light, newline-delimited JSON** file,
-one self-contained object per run, deletable like the rest of `.idd/`. Its readers — `/idd-doctor`'s run-log
-summary, `scripts/idd-lint.py stats` and `corrections`, and `gi-runlog.py --failure-streak` — are
-**best-effort by design**: truncation costs only *progress toward* a quarantine,
-never an existing one, whose durable record is the label `/auto-pilot` applies.
-**Rotation** (below) bounds the file's size.
+`runs.jsonl` is an **append-only, newline-delimited JSON** file, one object per
+run, deletable like the rest of `.idd/`. Its readers — `/idd-doctor`,
+`scripts/idd-lint.py stats` and `corrections`, `gi-runlog.py --failure-streak` —
+are **best-effort**: truncation costs only *progress toward* a quarantine, whose
+durable record is the label `/auto-pilot` applies. **Rotation** bounds its size.
 
 Full field set; *Always present* is the required minimum:
 
@@ -30,6 +29,7 @@ Full field set; *Always present* is the required minimum:
 | `qa_cycles` | integer | no | QA review-fix cycles run |
 | `ceiling` | integer | no | Class QA-cycle policy ceiling: 1 for `light`, `resolve.qa_max_cycles` (default 5) for `full`+`high`, else 2. Omit unless recorded; a recorded value must be a positive integer and overrides the computed one. |
 | `breach_reason` | string | no | Why `qa_cycles` exceeded `ceiling`. Required when `qa_cycles` > `ceiling`; omit otherwise; `gi-runlog` rejects an over-ceiling row without it (exit 3) and `idd-lint stats` exits 1 on such rows. |
+| `verification` | string | no | `disabled` if config turned a check off, else `partial` if any criterion or dimension is not `pass`, else `full`. Auto-pilot: from the PR review; missing counts are `partial`, never `full`. Resolver: from its PR's AC table. Omitted when nothing was reviewed. |
 | `duration_s` | integer | no | Wall-clock run duration in seconds |
 | `phases` | object | no | Seconds per pipeline phase, `{name: int ≥ 0}` in run order; only phases that ran; need not sum to `duration_s`. ≤16 names of `[a-z][a-z0-9_-]`, ≤32 chars. |
 | `skipped_reason` | string | no | Why the issue was skipped (auto-pilot skips, any `skipped`/`already_resolved` outcome, or a `failed` run an auto-mode default No stopped): e.g. `already_resolved`, `blocked_label`, `blocked_by_dependency`, `in_skip_list`, `assigned_to_other`, `quarantined`, `empty_body`, `large_scope`, `max_commits_exceeded` |
@@ -67,24 +67,21 @@ parallel lanes leave `log_pending` and retry.
 
 The one read: `--failure-streak N [--threshold F] [--log PATH]` prints
 `{"mode":"failure_streak","issue":N,"streak":N,"threshold":F,"quarantine":bool}`
-— that issue's most recent consecutive `failed` records, stopping at its first
-record with any other outcome (`--threshold 0` disables quarantine). Malformed
-lines are skipped. Exit `4` (log missing or unreadable) still prints the line
+— that issue's latest run of consecutive `failed` records (`--threshold 0`
+disables quarantine). Malformed lines are skipped. Exit `4` (log missing or unreadable) still prints the line
 with `streak: 0`, so nothing is quarantined on unread evidence. Without the
 script: count bottom-up, skipping other issues, stopping at the first
 non-`failed` record.
 
-**Rotation (size/age).** The active log never grows without bound. Before an
-append-mode write, `gi-runlog.py` renames it to a sibling segment
-`runs-<YYYYMMDDTHHMMSSZ>.jsonl` (UTC stamp, `-N` on a same-second collision) once
+**Rotation (size/age).** Before an append-mode write, `gi-runlog.py` renames it to a sibling segment
+`runs-<YYYYMMDDTHHMMSSZ>.jsonl` (UTC, `-N` on a collision) once
 it has reached `--rotate-max-bytes` (default 1048576) **or** sat idle past
 `--rotate-max-days` (default 30); the record then starts a fresh log. Age is the
-file's mtime, never a `ts`. Rotation is best-effort: a failed rename warns on stderr and the record
-still appends. `--no-rotate` disables it, `--echo` never rotates, and the raw
-fallback bypasses it entirely.
+file's mtime, never a `ts`. A failed rename warns and the record still appends.
+`--no-rotate` disables it; `--echo` and the raw fallback never rotate.
 
-Readers window rather than slurp: the streak read, the `--append-once` dedup scan
-and `scripts/idd-lint.py stats` all read the newest `--tail-segments` (default
+Readers window: the streak read, the `--append-once` dedup scan and
+`scripts/idd-lint.py stats` read the newest `--tail-segments` (default
 10) segments plus the active log, oldest first, as one logical log. A record past
 that window is out of every reader's scope, so its `event_id` may be reused.
 

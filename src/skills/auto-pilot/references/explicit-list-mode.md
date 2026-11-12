@@ -347,6 +347,7 @@ of a batch line, not a fresh processed issue. Ordinary skips —
 Build each written line from `docs/run-log-schema.md`, with these batch attributions:
 
 - **Shared fields on every line:** the batch `pr` (the one PR number) and `complexity`.
+- **`verification` on the primary line only:** the review checked only the primary issue's criteria.
 - **Scalar telemetry attributed once:** `qa_cycles`, `duration_s`, `phases` and
   `agent_overrides` (when the batch returned one) describe the
   *whole batch*, so put them on **one line only — the primary (first) issue's

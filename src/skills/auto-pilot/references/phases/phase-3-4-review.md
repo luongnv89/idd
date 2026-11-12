@@ -32,8 +32,14 @@ Use the **PR Reviewer Subagent** prompt from `references/subagent-prompts.md`, s
 ### Step 3.2 — Process Review Result <!-- a:ap-step32-review-result -->
 
 Parse the subagent's response. Extract: `result`, `review_cycles`, `issues_found`,
-`issues_fixed`, `issues_noted`, `remaining_issues`, `pre_pass_fixes`,
+`issues_fixed`, `issues_noted`, `remaining_issues`, `criteria`,
+`partial_dimensions`, `disabled_dimensions`, `pre_pass_fixes`,
 `tests_passed`, `ci_status`.
+
+**`PASS` is not proof.** Derive `verification` from `criteria`, `partial_dimensions` and
+`disabled_dimensions` by `docs/run-log-schema.md` (*`verification`*); a missing
+field is `partial` (`null` `criteria` under a disabled check is not missing). The
+iteration report, summary row and run-log line all carry it and the counts.
 
 **Retain `ci_status` verbatim** — the string exactly as returned (`passed@<sha40>`,
 `failed@<sha40>`, `no_ci`, or a bare value), never re-derived and never summarised
@@ -58,6 +64,7 @@ on the recorded PR rather than re-running the resolve.
   ✓ PR #{pr_number} review passed
     Review cycles: {review_cycles}
     Issues found/fixed: {issues_found}/{issues_fixed}
+    Verification: {verification} — AC {p}/{f}/{u} pass/fail/unverified{; partial: {dims}}{; disabled: {dims}}
 ```
 Proceed to Phase 5 (Merge).
 

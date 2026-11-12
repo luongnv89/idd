@@ -119,6 +119,7 @@ KEY_ORDER = (
     "breach_reason",
     "outcome",
     "pr",
+    "verification",
     "duration_s",
     "phases",
     "skipped_reason",
@@ -133,6 +134,7 @@ OPTIONAL_KEYS = (
     "qa_cycles",
     "ceiling",
     "breach_reason",
+    "verification",
     "duration_s",
     "phases",
     "skipped_reason",
@@ -171,6 +173,9 @@ PROFILES = frozenset({"light", "full"})
 # #456). Absent means no override was configured — never written as a value.
 AGENT_OVERRIDES = frozenset({"applied", "partial", "fallback"})
 
+# What the run verified (#551): full, partial, or disabled by config.
+VERIFICATION = frozenset({"full", "partial", "disabled"})
+
 # Per-phase wall-clock seconds (issue #467): the one object-valued field, a flat
 # {phase name: non-negative int} map in the writer's pipeline order. Names are
 # open (any skill may record its own phases) but bounded, so a reader can print
@@ -199,6 +204,7 @@ STR_KEYS = (
     "complexity",
     "skipped_reason",
     "breach_reason",
+    "verification",
 )
 
 
@@ -302,18 +308,16 @@ def normalize_record(record: object, *, now: str | None = None) -> dict[str, obj
             "([A-Za-z0-9._:-])"
         )
 
-    profile = out.get("profile")
-    if profile is not None and profile not in PROFILES:
-        raise RecordError(
-            f"profile '{profile}' is not one of " + ", ".join(sorted(PROFILES))
-        )
-
-    agent_overrides = out.get("agent_overrides")
-    if agent_overrides is not None and agent_overrides not in AGENT_OVERRIDES:
-        raise RecordError(
-            f"agent_overrides '{agent_overrides}' is not one of "
-            + ", ".join(sorted(AGENT_OVERRIDES))
-        )
+    for key, allowed in (
+        ("profile", PROFILES),
+        ("agent_overrides", AGENT_OVERRIDES),
+        ("verification", VERIFICATION),
+    ):
+        value = out.get(key)
+        if value is not None and value not in allowed:
+            raise RecordError(
+                f"{key} '{value}' is not one of " + ", ".join(sorted(allowed))
+            )
 
     phases = out.get("phases")
     if phases is not None:

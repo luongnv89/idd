@@ -52,17 +52,27 @@ assert pr["state"] == "OPEN", pr["state"]
 assert first_line == "Closes #42", first_line
 unverified = sum(1 for line in body.splitlines() if line.startswith("|") and "| unverified |" in line)
 
+# An unverified criterion is a gap, never "ready to merge" (issue #551).
+if unverified:
+    finding = f"review passed; {unverified} acceptance criterion unverified"
+    next_action = f"verify the unverified criterion, then merge PR #{pr['number']}"
+else:
+    finding = "clean; ready to merge"
+    next_action = f"merge PR #{pr['number']}"
+
 report = (
-    f"Result: PASS — PR #{pr['number']} clean; ready to merge\n"
+    f"Result: PASS — PR #{pr['number']} {finding}\n"
     f"Evidence: PR #{pr['number']} read (state {pr['state']}); body line 1 is '{first_line}'; "
     "Decision Record and AC Verification table present\n"
     f"Uncertainty: {unverified} acceptance criterion unverified (manual review needed); "
     "tests and CI not run by this stand-in\n"
     "Decision: No approval needed.\n"
-    f"Next action: merge PR #{pr['number']} (this run does not merge)\n"
+    f"Next action: {next_action} (this run does not merge)\n"
 )
 lines = report.splitlines()
 assert lines[0].startswith("Result: ")
+assert not (unverified and "ready to merge" in lines[0]), lines[0]
+assert not unverified or f"{unverified} acceptance criterion unverified" in lines[0], lines[0]
 for label in ("Evidence: ", "Uncertainty: ", "Decision: "):
     assert any(line.startswith(label) for line in lines), label
 with open(os.path.join(out, "report.txt"), "w", encoding="utf-8") as fh:

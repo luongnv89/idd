@@ -188,7 +188,7 @@
     "criteria": [
       "The first summary line states the run status, complete or partial, and the main finding.",
       "Observed checks (merged PRs, validated run-log records) are separate from simulated or unverified items listed under Uncertainty.",
-      "Each merged row names its PR, and each left_open or blocked_by_dependency row names what blocks it.",
+      "Each merged row names its PR and its AC pass/fail/unverified counts, and each left_open or blocked_by_dependency row names what blocks it.",
       "The summary says No approval needed and names the remaining user actions on Next action."
     ],
     "feedback": "Record each reviewer answer; absent, blank, or nonresponsive feedback leaves understanding unconfirmed.",

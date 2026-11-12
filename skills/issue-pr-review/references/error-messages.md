@@ -94,7 +94,7 @@ would otherwise verify acceptance criteria against an empty snapshot and report
 the `acceptance_criteria` hard-block as `pass`. That describes the default
 configuration, and the stop is **not** conditional on it. When
 `review.require_acceptance_criteria_check` is `false` the hard-block does not
-run at all — Step 3 reports `pass — verification disabled` for that dimension —
+run at all — Step 3 reports `○ acceptance_criteria: disabled` for that dimension —
 yet this error is still raised, because the flag governs how the dimension is
 reported, not whether the linked issue was read. Printing that note past a
 failed read would credit a deliberate opt-out for a gap nobody opted into.

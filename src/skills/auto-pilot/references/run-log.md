@@ -108,6 +108,10 @@ chose, `light` or `full`; omit it when the resolver returned none). Fold
 gate decline (a `failure` carrying `skipped_reason`) is a `skipped` line with that
 reason, never `failed`.
 
+**`verification`** comes from the PR review (*Step 3.2*), never the resolver.
+Write it on every line whose PR was reviewed (batch: primary line only); omit
+it on `failed` and `skipped`.
+
 **`agent_overrides`** records whether the configured `agents.*` overrides
 reached this issue's spawns (`docs/run-log-schema.md`). Merge the resolver's
 returned value with the tally of auto-pilot's **own** per-issue spawns that had

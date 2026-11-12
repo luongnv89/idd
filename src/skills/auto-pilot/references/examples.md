@@ -48,6 +48,7 @@ Detailed example runs and edge-case behaviors referenced from SKILL.md.
   ✓ PR #45 reviewed
     Review cycles: 1
     Issues found/fixed: 0/0
+    Verification: full — AC 3/0/0 pass/fail/unverified
     CI: all checks passed
 
 ✓ PR #45 merged — #12 closed
@@ -58,6 +59,7 @@ Detailed example runs and edge-case behaviors referenced from SKILL.md.
   Issue:    #12 — Fix auth redirect loop
   PR:       #45
   Outcome:  merged
+  Verified: full — AC 3/0/0 pass/fail/unverified
   Duration: 4m 05s
   ────────────────────────────────────
   Remaining: 4 eligible issues
@@ -69,11 +71,11 @@ Detailed example runs and edge-case behaviors referenced from SKILL.md.
 
 ◆ Auto-Pilot Summary — 3/3 iterations
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-  Result:                  LIMIT REACHED — complete: 3 merged, 5 issues remain
+  Result:                  LIMIT REACHED — partial: 3 merged (1 with an unverified criterion), 5 issues remain
 
-  Iteration 1:       ✓ merged                — #12 Fix auth redirect loop → PR #45
-  Iteration 2:       ✓ merged                — #8 Add pagination to API → PR #46
-  Iteration 3:       ✓ merged                — #15 Refactor middleware → PR #47
+  Iteration 1:       ✓ merged                — #12 Fix auth redirect loop → PR #45 · AC 3/0/0 pass/fail/unverified
+  Iteration 2:       ✓ merged                — #8 Add pagination to API → PR #46 · AC 2/0/1 pass/fail/unverified; partial: acceptance_criteria
+  Iteration 3:       ✓ merged                — #15 Refactor middleware → PR #47 · AC 2/0/0 pass/fail/unverified
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   merged:                  3
   left_open:               0
@@ -84,7 +86,7 @@ Detailed example runs and edge-case behaviors referenced from SKILL.md.
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Mode:                    balanced
   Evidence:                PRs #45, #46, #47 merged after green CI; 3 run-log lines appended
-  Uncertainty:             none observed
+  Uncertainty:             PR #46 merged with 1 unverified acceptance criterion
   Decision:                No approval needed.
 
   Remaining:               5 open issues
@@ -194,8 +196,8 @@ Detailed example runs and edge-case behaviors referenced from SKILL.md.
   Result:                  COMPLETED — complete: 2 merged, #8 resolved in batch
   Analysis: ✓ pass (3 issues, 1 batch groups)
 
-  Iteration 1:       ✓ merged                — #12 Refactor auth middleware → PR #50
-  Iteration 2:       ✓ merged                — #5 Fix login crash on mobile → PR #51 (batch: +#8)
+  Iteration 1:       ✓ merged                — #12 Refactor auth middleware → PR #50 · AC 2/0/0 pass/fail/unverified
+  Iteration 2:       ✓ merged                — #5 Fix login crash on mobile → PR #51 (batch: +#8) · AC 4/0/0 pass/fail/unverified
   Iteration 3:       ○ skipped               — #8 Add dark mode toggle (already resolved in batch)
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   merged:                  2

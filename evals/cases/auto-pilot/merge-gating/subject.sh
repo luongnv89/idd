@@ -241,6 +241,7 @@ RECORDS = {
         "qa_cycles": 1,
         "outcome": "merged",
         "pr": 101,
+        "verification": "full",
         "duration_s": 42,
     },
     "left_open": {
@@ -253,6 +254,7 @@ RECORDS = {
         "qa_cycles": 2,
         "outcome": "left_open",
         "pr": 101,
+        "verification": "partial",
         "duration_s": 51,
     },
     "partial_followup": {
@@ -265,6 +267,7 @@ RECORDS = {
         "qa_cycles": 2,
         "outcome": "partial_followup",
         "pr": 101,
+        "verification": "partial",
         "duration_s": 63,
     },
     "blocked_by_dependency": {
@@ -303,11 +306,16 @@ with open(os.path.join(out, "run-uncapped-cycles.json"), "w", encoding="utf-8") 
 rows = [RECORDS[k] for k in ("merged", "left_open", "partial_followup", "blocked_by_dependency")]
 merged = [r for r in rows if r["outcome"] == "merged"]
 not_merged = [r for r in rows if r["outcome"] != "merged"]
-status = "partial" if not_merged else "complete"
+# complete needs every merged PR fully verified (summary-format.md, #551).
+status = "partial" if not_merged or any(r.get("verification") != "full" for r in merged) else "complete"
+# Stand-in review counts (pass/fail/unverified) for the rows that merged a PR.
+COUNTS = {"merged": (3, 0, 0), "partial_followup": (2, 0, 1)}
 summary = (
     f"Result: LIMIT REACHED — {status}: {len(merged)} merged, {len(not_merged)} not cleanly merged\n"
     + "".join(f"Iteration {i}: {r['outcome']} — #{r['issue']}"
-              + (f" → PR #{r['pr']}" if r["pr"] else "") + "\n"
+              + (f" → PR #{r['pr']}" if r["pr"] else "")
+              + (" · AC {}/{}/{} pass/fail/unverified".format(*COUNTS[r["outcome"]])
+                 if r["outcome"] in COUNTS else "") + "\n"
               for i, r in enumerate(rows, 1))
     + "Evidence: " + "; ".join(f"PR #{r['pr']} merged" for r in merged)
     + f"; {len(rows)} run-log records validated by gi-runlog\n"
