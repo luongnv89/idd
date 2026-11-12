@@ -54,6 +54,7 @@ agent's default tier and let the orchestrator scale **up** as signals arrive.
 | synthesizer | M | researcher reported `high`/`complex` (→ L) |
 | implementer | L | selected option is `L`/`XL`, or many files/tests (→ XL) |
 | code-reviewer | M | large diff or security-sensitive change (→ L) |
+| criteria-judge | S | many criteria or slow tests (→ M) |
 | ui-reviewer | S | multi-viewport / accessibility-heavy change (→ M) |
 | fixer | M | findings span multiple files or root-cause is unclear (→ L) |
 | duplicate-detector | S | 50+ open issues (→ M) |
@@ -95,10 +96,9 @@ classifier for the profile.
 | **light** | XS, S | Trivial/small work — collapse optional phases, cap the review-fix loop to one cycle. |
 | **full**  | M, L, XL | Everything today runs unchanged — the current pipeline in full. |
 
-The profile is a **coarse** switch (two states), deliberately not one profile per
-band: the goal is a fast path for the long tail of trivial work, not five
-gradations. Model/effort selection already provides the fine-grained,
-per-agent scaling within either profile.
+The profile is a **coarse** two-state switch, not one profile per band: a fast
+path for the long tail of trivial work. Model/effort selection already scales
+each agent within either profile.
 
 ### Selecting the profile (pre-work signal)
 

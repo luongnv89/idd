@@ -25,6 +25,7 @@ src/
 │   │   ├── synthesizer.md         # Analysis + implementation options
 │   │   ├── implementer.md         # Code + tests implementation
 │   │   ├── code-reviewer.md       # Confidence-based code review
+│   │   ├── criteria-judge.md      # Isolated per-criterion verdicts with re-runnable evidence
 │   │   ├── fixer.md               # Targeted fixes for review/test/CI/AC failures
 │   │   ├── duplicate-detector.md  # Issue dedup scoring
 │   │   ├── issue-relationship-scanner.md  # File deps + already-fixed detection
@@ -46,7 +47,8 @@ src/
 │       ├── gi-sketch.py           # Design-sketch verdict: distinct designs, invalid transitions rejected
 │       ├── gi-recipe.py           # Base-ref verification recipe: launch, drive, evidence, owned-only teardown
 │       ├── gi-postmerge.py        # Post-merge cleanup: worktrees, merged branch, switch to updated base
-│       └── gi-progress.py         # Durable progress record so a killed resolver/reviewer run can resume
+│       ├── gi-progress.py         # Durable progress record so a killed resolver/reviewer run can resume
+│       └── gi-criteria.py         # Downgrade a criterion pass without re-runnable evidence
 │
 ├── skills/
 │   ├── auto-pilot/         # /auto-pilot — triage, resolve, review, merge loop

@@ -78,6 +78,9 @@ AGENT_DESCRIPTIONS = {
     "code-reviewer": (
         "Review IDD code changes and PRs with confidence-based findings."
     ),
+    "criteria-judge": (
+        "Judge acceptance criteria from the issue and diff alone, with re-runnable evidence."
+    ),
     "codebase-researcher": (
         "Research GitHub issues against a codebase without modifying files."
     ),
@@ -122,6 +125,18 @@ _PI_READONLY_PREAMBLE = (
     "Operate autonomously; return only the contract output format with no surrounding "
     "commentary.\n\n"
 )
+
+# Read-only agents that must also run the repo's own tests to observe evidence
+# (issue #555): the criteria judge. Same tools and preamble, with the test
+# runner allowed in place of the strictly read-only Bash line.
+_TEST_RUNNER_AGENTS = frozenset({"criteria-judge"})
+_PI_TEST_RUNNER_PREAMBLE = _PI_READONLY_PREAMBLE.replace(
+    "Use Bash only for read-only operations (`git log`, `git diff`, "
+    "`git status`, `gh … --json`).\n",
+    "Use Bash only for read-only operations (`git log`, `git diff`, "
+    "`git status`, `gh … --json`) and to run the repository's own tests.\n",
+)
+assert _PI_TEST_RUNNER_PREAMBLE != _PI_READONLY_PREAMBLE
 
 # --- Issue #245 — shared-agent conventions inlined into injected prompts ------
 #

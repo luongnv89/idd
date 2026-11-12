@@ -37,6 +37,7 @@ run_case "missing-closes"
 run_case "clean-traceability"
 run_case "intentional-refs"
 run_case "unverified-only-auto"
+run_case "unsupported-pass"
 
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 echo "Results: $PASS passed, $FAIL failed"

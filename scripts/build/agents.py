@@ -21,6 +21,8 @@ from .common import (
     _FIRST_H2_RE,
     _FULL_ACCESS_AGENTS,
     _PI_READONLY_PREAMBLE,
+    _PI_TEST_RUNNER_PREAMBLE,
+    _TEST_RUNNER_AGENTS,
     _PI_TOOLS_FULL_ACCESS,
     _PI_TOOLS_READ_ONLY,
     _PROMPT_FENCE_RE,
@@ -234,7 +236,9 @@ def _render_pi_agent_definition(agent_name: str, source_text: str, source_rel: s
         "Do not edit installed copies; edit source and run ./scripts/build.sh. -->\n"
     )
     body = source_text
-    if agent_name not in _FULL_ACCESS_AGENTS:
+    if agent_name in _TEST_RUNNER_AGENTS:
+        body = _PI_TEST_RUNNER_PREAMBLE + body
+    elif agent_name not in _FULL_ACCESS_AGENTS:
         body = _PI_READONLY_PREAMBLE + body
     return frontmatter + "\n" + marker + BANNER_TMPL.format(rel=source_rel) + body
 

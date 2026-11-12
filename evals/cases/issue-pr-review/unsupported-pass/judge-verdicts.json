@@ -1,0 +1,24 @@
+{
+  "criteria": [
+    {
+      "n": 1,
+      "status": "pass",
+      "evidence": {
+        "kind": "test",
+        "name": "mobile login completes without a redirect loop",
+        "command": "npm test -- redirect",
+        "exit": 0,
+        "sha": "1f2e3d4c5b6a79881f2e3d4c5b6a79881f2e3d4c"
+      }
+    },
+    {
+      "n": 2,
+      "status": "pass",
+      "evidence": {
+        "kind": "note",
+        "text": "the login path looks rate-limited"
+      }
+    }
+  ],
+  "summary": "criterion 2 asserted from a description only"
+}

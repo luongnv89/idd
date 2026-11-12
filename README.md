@@ -652,6 +652,7 @@ src/
 │       ├── synthesizer.md         # Analysis + implementation options
 │       ├── implementer.md         # Code + tests implementation
 │       ├── code-reviewer.md       # Confidence-based code review
+│       ├── criteria-judge.md      # Isolated per-criterion verdicts with re-runnable evidence
 │       ├── duplicate-detector.md  # Issue dedup scoring
 │       ├── issue-relationship-scanner.md  # File deps + already-fixed detection
 │       ├── fixer.md               # Applies fixes during PR review cycles

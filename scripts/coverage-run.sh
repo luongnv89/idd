@@ -80,6 +80,17 @@ done
 printf '%s' '{"issue":{"body":""},"options":[{"number":1,"criteria_covered":[]}],"selected":1}' | run "$SCRIPTS/gi-ready.py" --coverage
 printf '%s' '{"options":[]}' | run "$SCRIPTS/gi-ready.py" --coverage
 
+# gi-criteria — the criteria judge's verdicts held to re-runnable evidence (issue #555).
+CRIT_HEAD="$(printf 'a%.0s' $(seq 40))"
+for verdicts in \
+  "[{\"n\":1,\"status\":\"pass\",\"evidence\":{\"kind\":\"test\",\"name\":\"t\",\"exit\":0,\"sha\":\"$CRIT_HEAD\"}},{\"n\":2,\"status\":\"pass\",\"evidence\":{\"kind\":\"command\",\"command\":\"c\",\"output\":\"o\",\"sha\":\"$CRIT_HEAD\"}},{\"n\":3,\"status\":\"pass\",\"evidence\":{\"kind\":\"note\",\"text\":\"x\"}}]" \
+  '{"criteria":[{"n":1,"status":"fail","evidence":{"kind":"note","text":"x"}},{"n":1,"status":"pass"},{"n":9},{"n":2,"status":"maybe"},"x"]}' \
+  '"unreadable"'; do
+  printf '%s' "{\"head\":\"$CRIT_HEAD\",\"criteria\":[\"a\",\"b\",\"c\",\"d\"],\"deferred\":[4],\"verdicts\":$verdicts}" | run "$SCRIPTS/gi-criteria.py"
+done
+printf '%s' '{"head":"x","criteria":[],"deferred":[],"verdicts":[]}' | run "$SCRIPTS/gi-criteria.py"
+printf '%s' 'not json' | run "$SCRIPTS/gi-criteria.py"
+
 # gi-dup-score — scorer request on stdin, existing issues from a file.
 printf '%s' '{"mode":"create","items":[{"index":1,"title":"login broken","keywords":[],"type":"bug"}]}' > "$TMP/dup-request.json"
 printf '[]\n' > "$TMP/dup-issues.json"

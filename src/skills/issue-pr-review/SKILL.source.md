@@ -44,6 +44,7 @@ Verify **every** path below exists relative to the skill's directory (the dirnam
 
 ```text
 references/agents/code-reviewer.md
+references/agents/criteria-judge.md
 references/agents/ui-reviewer.md
 references/agents/fixer.md
 references/ui-review-mechanics.md
@@ -75,6 +76,7 @@ references/scripts/gi-receipt.py
 references/scripts/gi-recipe.py
 references/scripts/gi-postmerge.py
 references/scripts/gi-progress.py
+references/scripts/gi-criteria.py
 ```
 
 ```text
@@ -223,7 +225,7 @@ A pass is all four: exit 0, `policy_source` exactly the `ref:origin/…` asked f
 
 **UI review** is auto-detected per PR — no config flag. The **code** leg runs on any host, including a no-GUI host; the optional **browser** leg skips with a warning. When `ui: detected`, apply `docs/ui-review.md` and `references/ui-review-mechanics.md`. Under `qa_handoff = trusted` the **code** UI review is skipped only when the marker's `ui=` leg ran (`ui=code…` or `ui=code+browser…`) **and** carries an `@<sha40>` equal to `head` — never on `ui=none`, never on an unsuffixed `ui=`, never for the browser leg.
 
-Then run per-criterion acceptance-criteria verification on `linked_issue_snapshot` directly; do not call `gi-issue.py` or `gh` again. A PR with **no** linked issue is a different state, not a fail-safe case: `acceptance_criteria` reports `○ pass — none defined; manual review recommended`. <!-- a:rv-step3-ac-snapshot -->
+Then judge each criterion of `linked_issue_snapshot` **in isolation**; do not call `gi-issue.py` or `gh` again for the issue. Spawn `shared/agents/criteria-judge.md` (`code-reviewer` role overrides) with the issue, `gh pr diff {N}` and `headRefOid` only — **never the PR title, body or comments** — and pipe its JSON through `shared/scripts/gi-criteria.py`, which downgrades a `pass` without a test green at head or a command and its observed output to `unverified`. Re-judge whenever the head moves (*Acceptance-criteria verification*). A PR with **no** linked issue is a different state, not a fail-safe case: `acceptance_criteria` reports `○ pass — none defined; manual review recommended`. <!-- a:rv-step3-ac-snapshot -->
 
 **Dimensions:** `correctness`, `acceptance_criteria`, `traceability`, `maintainability`, `safety` — each `pass`, `partial`, `fail` or `disabled`, grouped under a **Spec axis** and a **Standards axis**; UI findings fold into `maintainability`. Mapping: `references/verification-checks.md` — **read it now.**
 

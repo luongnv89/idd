@@ -1,0 +1,59 @@
+{
+  "name": "issue-pr-review/unsupported-pass",
+  "skill": "issue-pr-review",
+  "prompt": "Auto mode: the PR body claims a pass the diff does not support; the isolated criteria judge and gi-criteria.py downgrade it and the PR is never merged (#555)",
+  "repo_scripts": [
+    "src/shared/scripts/gi-criteria.py"
+  ],
+  "grade": [
+    {
+      "tool": "file-exists",
+      "file": "OUT/judge-isolated.txt",
+      "expect_exit": 0,
+      "label": "the criteria judge is bound from the issue and the diff only, never the PR body"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/criterion-1-pass.txt",
+      "expect_exit": 0,
+      "label": "a test that ran green at head keeps its pass"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/criterion-2-downgraded.txt",
+      "expect_exit": 0,
+      "label": "a pass resting on a description is downgraded to unverified"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/floor-left_open.txt",
+      "expect_exit": 0,
+      "label": "the downgraded criterion holds the merge floor, so auto mode leaves the PR open"
+    },
+    {
+      "tool": "gh-calls",
+      "expect_by_command": {
+        "pr view": 1,
+        "issue view": 1,
+        "pr diff": 1,
+        "pr merge": 0
+      },
+      "label": "the PR, issue and diff were each read once and the PR was never merged"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/report.txt",
+      "expect_exit": 0,
+      "label": "review summary states result, evidence, uncertainty, and decision"
+    }
+  ],
+  "human_review": {
+    "criteria": [
+      "The summary does not repeat the PR body's claim that every criterion passed.",
+      "The Evidence row names the downgraded criterion and why it was downgraded.",
+      "The PR is left open, and the next action asks for criterion 2 to be shown at head."
+    ],
+    "feedback": "Record each reviewer answer; absent, blank, or nonresponsive feedback leaves understanding unconfirmed.",
+    "scope": "This deterministic stand-in tests the judge's input isolation and the evidence rule with a fixture verdict, not live agent behavior. Apply these criteria to actual agent outputs in behavioral evaluations."
+  }
+}
