@@ -4,7 +4,7 @@ description: "Run an autonomous triage-resolve-review-merge loop to auto-pilot t
 license: MIT
 compatibility: "Requires git and GitHub CLI (gh) with auth and push access. Requires merge permission for auto-merge. Requires issue-triage, issue-resolver, issue-analysis, and issue-pr-review to be installed from the same distribution. Optional: issue-creator for normalizing unstructured issues mid-loop."
 metadata:
-  version: 2.10.1
+  version: 2.10.2
   author: "Luong NGUYEN <luongnv89@gmail.com>"
   effort: max
 ---

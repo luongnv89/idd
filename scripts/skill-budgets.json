@@ -11,23 +11,23 @@
     },
     "issue-analysis": {
       "budget": 165496,
-      "measured": 165496
+      "measured": 165362
     },
     "issue-creator": {
       "budget": 185097,
-      "measured": 185097
+      "measured": 184963
     },
     "issue-pr-review": {
       "budget": 307009,
-      "measured": 307009
+      "measured": 306875
     },
     "issue-resolver": {
       "budget": 421981,
-      "measured": 421981
+      "measured": 421847
     },
     "issue-triage": {
       "budget": 137591,
-      "measured": 137591
+      "measured": 137457
     },
     "plan-to-issues": {
       "budget": 171072,
