@@ -71,7 +71,10 @@ for plan in \
   '{"options":[{"number":1}],"selected":1}' \
   '{"options":[{"number":1,"criteria_covered":[]},{"number":1,"criteria_covered":[]}],"selected":1}' \
   '{"options":[{"number":1,"criteria_covered":[]}],"selected":2}' \
-  '{"options":[],"selected":1}'; do
+  '{"options":[],"selected":1}' \
+  '{"options":[{"number":1,"criteria_covered":["AC1"]}],"selected":1,"criteria":[{"id":"AC1","text":"one"},{"id":"AC2","text":"two"}]}' \
+  '{"options":[{"number":1,"criteria_covered":["AC1"]}],"selected":1,"criteria":"AC1"}' \
+  '{"options":[{"number":1,"criteria_covered":[]}],"selected":[1]}'; do
   printf '%s' "{\"issue\":{\"body\":\"$COVER_BODY\"},${plan#\{}" | run "$SCRIPTS/gi-ready.py" --coverage
 done
 printf '%s' '{"issue":{"body":""},"options":[{"number":1,"criteria_covered":[]}],"selected":1}' | run "$SCRIPTS/gi-ready.py" --coverage

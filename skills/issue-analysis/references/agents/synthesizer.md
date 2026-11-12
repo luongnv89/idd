@@ -54,7 +54,7 @@ narrative of the work (04-subagents *Context Management* — results-only handof
 
 ## Contract
 
-- **Inputs:** `{ issue, findings: <codebase-researcher JSON>, mode: "interactive" | "auto", criteria?, workspace_contract?, expected_lane_identity?, sketch_contract? }`. `criteria` is `[{id, text}]`; without it, number the issue's `Acceptance Criteria` items `AC1`… in order, never a quoted Reporter Context. In `auto`, auto-select the recommended option; in `interactive`, mark it (the orchestrator presents all three). `workspace_contract` is structural lane context and `expected_lane_identity` is its independently supplied sibling; this data-only agent validates their identity binding but never uses the filesystem.
+- **Inputs:** `{ issue, findings: <codebase-researcher JSON>, mode: "interactive" | "auto", criteria?, workspace_contract?, expected_lane_identity?, sketch_contract? }`. `criteria` is `[{id, text}]`; without it, number the issue's top-level `Acceptance Criteria` items `AC1`… in order, never a quoted Reporter Context. Return the list your IDs refer to as `criteria`, texts verbatim. In `auto`, auto-select the recommended option; in `interactive`, mark it (the orchestrator presents all three). `workspace_contract` is structural lane context and `expected_lane_identity` is its independently supplied sibling; this data-only agent validates their identity binding but never uses the filesystem.
 - **Returns:** a single JSON object — analysis + 2–3 ranked options — full shape under [Output](#output). Nothing else.
 - **Stop / fail:** never scan source or run commands; base every claim on the researcher's findings. Exactly one option has `recommended: true`.
 
@@ -127,6 +127,7 @@ Return a single JSON object (nothing outside the block):
       "criteria_covered": ["AC1", "AC2"], "recommended": true
     }
   ],
+  "criteria": [ { "id": "AC1", "text": "Login redirects to the dashboard" }, { "id": "AC2", "text": "Unauthenticated routes stay reachable" } ],
   "recommended_option": 2,
   "overall_complexity": "M",
   "overall_risk": "Medium",

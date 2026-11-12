@@ -510,6 +510,7 @@ The `reproduction` object is **optional** and present only for `type: bug` issue
 | `options[].risk_details` | string | Brief risk explanation |
 | `options[].criteria_covered` | string[] | Acceptance-criterion IDs (`AC1`…) the option satisfies |
 | `recommended_option` | integer | Option number recommended |
+| `criteria` | array | `[{id, text}]` the synthesizer numbered `criteria_covered` against |
 | `overall_complexity` | string | Overall complexity estimate |
 | `overall_risk` | string | Overall risk level |
 | `scan_stats.scan_timed_out` | boolean | `true` when the bounded scan returned partial findings; final result is `PARTIAL` |

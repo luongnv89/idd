@@ -86,6 +86,8 @@ for bad in \
   '[{"number":1,"criteria_covered":[]},{"number":1,"criteria_covered":[]}]|1|duplicate option numbers' \
   '[{"number":1,"criteria_covered":[]}]|2|a selected number no option has' \
   '[{"number":1,"criteria_covered":[]}]|true|a boolean selected' \
+  '[{"number":1,"criteria_covered":[]}]|[1]|an unhashable selected' \
+  '[{"number":1,"criteria_covered":[]}]|1.0|a float selected' \
   '[]|1|no options'; do
   IFS='|' read -r opts sel why <<<"$bad"
   coverage "$opts" "$sel"
@@ -96,6 +98,27 @@ printf '' | python3 "$READY" --coverage >/dev/null 2>&1; ec=$?
 set -e
 [ "$ec" -eq 4 ] && pass "T2.6 empty stdin is exit 4 (degrade)" || fail "T2.6 empty stdin: exit $ec"
 
+# The basis: the list the IDs were numbered against.
+basis() {
+  printf '%s' "{\"issue\":$ISSUE,\"options\":[{\"number\":1,\"criteria_covered\":[\"AC1\",\"AC2\"]}],\"selected\":1,\"criteria\":$1}" \
+    | python3 "$READY" --coverage | js 'd["verdict"]'
+}
+[ "$(basis '[{"id":"ac1","text":"every plan option  lists the criteria it covers"},{"id":"AC2","text":"Selecting an option that leaves a criterion uncovered stops planning (high confidence)"}]')" = covered ] \
+  && pass "T2.7 a matching basis (case, spacing, confidence marker aside) stays covered" \
+  || fail "T2.7 matching basis was not covered"
+[ "$(basis '[{"id":"AC1","text":"Selecting an option that leaves a criterion uncovered stops planning"},{"id":"AC2","text":"Every plan option lists the criteria it covers"}]')" = renumbered ] \
+  && pass "T2.8 IDs numbered against a reordered list are renumbered, never covered" \
+  || fail "T2.8 reordered basis was not renumbered"
+[ "$(basis '[{"id":"AC1","text":"Every plan option lists the criteria it covers"}]')" = renumbered ] \
+  && pass "T2.9 a basis with a different criterion count is renumbered" \
+  || fail "T2.9 short basis was not renumbered"
+[ "$(basis '"AC1"')" = renumbered ] && pass "T2.10 a malformed basis is renumbered" \
+  || fail "T2.10 malformed basis was not renumbered"
+NESTED='{"body":"## Acceptance Criteria\n\n- [ ] parent\n  - detail a\n  - detail b\n- [ ] second\n"}'
+[ "$(printf '%s' "$NESTED" | python3 "$READY" --criteria | js '[c["text"] for c in d["criteria"]]')" = "['parent', 'second']" ] \
+  && pass "T2.11 nested sub-bullets are detail, never their own criterion" \
+  || fail "T2.11 nested sub-bullets were numbered"
+
 # ── T3: readiness is unchanged ───────────────────────────────────────────
 out="$(printf '%s' "$ISSUE" | python3 "$READY")"
 [ "$(printf '%s' "$out" | js 'd["ready"]')" = "True" ] \
@@ -103,6 +126,15 @@ out="$(printf '%s' "$ISSUE" | python3 "$READY")"
 out="$(printf '%s' '{"number":1,"body":"## Acceptance Criteria\n\n- `only code`\n"}' | python3 "$READY")"
 [ "$(printf '%s' "$out" | js 'd["reasons"]')" = "['no_criteria']" ] \
   && pass "T3.2 a code-span-only item is still not a criterion" || fail "T3.2 code-span item: $out"
+for b in '`x` - foo' '-`x` foo'; do
+  out="$(printf '%s' "{\"number\":1,\"body\":\"## Acceptance Criteria\\n\\n$b\\n\"}" | python3 "$READY")"
+  [ "$(printf '%s' "$out" | js 'd["ready"]')" = "True" ] \
+    && pass "T3.3 '$b' is still a criterion (marker found once code spans drop)" \
+    || fail "T3.3 '$b': $out"
+done
+out="$(printf '%s' '{"number":1,"body":"## Acceptance Criteria\n\n- [ ] a\n  - b (needs review)\n"}' | python3 "$READY")"
+[ "$(printf '%s' "$out" | js 'd["reasons"]')" = "['criteria_need_review']" ] \
+  && pass "T3.4 a nested item's marker still fails readiness" || fail "T3.4 nested marker: $out"
 
 # ── T4: the contract and the gate's one home ─────────────────────────────
 has "$SYN" '`criteria_covered` (IDs of the criteria this option fully satisfies)' \
@@ -118,8 +150,13 @@ n="$(grep -c 'a:rs-criteria-coverage' "$PLAN")"
   || fail "T4.5 expected one a:rs-criteria-coverage anchor, found $n"
 has "$PLAN" '`gap` — **stop planning**, auto mode too' "T4.6 a gap stops planning in auto mode"
 has "$PLAN" 'gi-ready.py --coverage' "T4.7 the gate runs the deterministic check"
-has "$PLAN" 'or a selected option with no `criteria_covered` list — set `analysis_reuse = stale`' \
-  "T4.8 a reused analysis without the field is stale"
+has "$PLAN" 'or a *Criteria coverage gate* verdict other than `covered` — set `analysis_reuse = stale`' \
+  "T4.8 a reused analysis that does not cover is stale"
+has "$PLAN" '`analysis_reuse = stale` and spawns the synthesizer with the binding' \
+  "T4.13 on reuse a non-covered verdict re-synthesizes instead of stopping"
+has "$SYN" 'Return the list your IDs refer to as `criteria`' "T4.14 the synthesizer returns its numbering"
+has "$ROOT/src/skills/issue-analysis/references/output-and-persist.md" '| `criteria` | array |' \
+  "T4.15 the analysis persists the numbering its IDs refer to"
 has "$RS/SKILL.source.md" '*Step 2 — Plan → Criteria coverage gate*' "T4.9 SKILL.md points to the one home"
 has "$RS/references/error-messages.md" '### Plan leaves a criterion uncovered' "T4.10 the stop has an error block"
 has "$RS/references/report-templates.md" '`Scope inside the issue` is `√` when the *Criteria coverage gate* returns' \

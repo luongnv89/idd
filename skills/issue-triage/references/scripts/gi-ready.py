@@ -33,23 +33,30 @@ Plan coverage (issue #554) reuses the same parser. `--criteria` takes one issue
 
     {"number": 12, "criteria": [{"id": "AC1", "text": "..."}, ...]}
 
+Only top-level items are numbered; a nested sub-bullet is detail, not a
+criterion (readiness still reads every item's marker).
+
 `--coverage` takes `{"issue": {...}, "options": [{"number": 1,
-"criteria_covered": ["AC1", ...]}, ...], "selected": 1}` and checks the selected
-option against those IDs (case-insensitive). An ID no criterion carries is
-listed in `unknown` and never counts as covered:
+"criteria_covered": ["AC1", ...]}, ...], "selected": 1, "criteria": [...]}` and
+checks the selected option against those IDs (case-insensitive). An ID no
+criterion carries is listed in `unknown` and never counts as covered. The
+optional `criteria` is the `[{id, text}]` list the options' IDs were numbered
+against; when it differs from this body's numbering (text compared ignoring
+case, backticks, spacing and a trailing confidence marker) the verdict is
+`renumbered`, because the IDs no longer name the same criteria:
 
     {"number": 12, "verdict": "gap", "selected": 1, "criteria": [...],
      "missing": [{"id": "AC2", "text": "..."}], "unknown": []}
 
-`verdict` is `covered`, `gap` (some criterion is uncovered) or `no_criteria`
-(the body has none, so nothing can be mapped).
+`verdict` is `covered`, `gap` (some criterion is uncovered), `no_criteria`
+(the body has none, so nothing can be mapped) or `renumbered`.
 
 Exit codes
   0  judged (a `gap` is a verdict, not an error)
   2  usage error
   3  invalid plan (`--coverage` only) — `options` is not a non-empty list, an
-     option lacks a `criteria_covered` list of strings or a unique `number`, or
-     `selected` names no option. Fix the plan and re-run.
+     option lacks a `criteria_covered` list of strings or a unique integer
+     `number`, or `selected` is not an integer naming an option. Fix the plan and re-run.
   4  cannot complete — empty or unparsable stdin, or an issue without a `body`
      key (stderr: `⚠ gi-ready: <reason>`). Callers apply the prose rule.
 
@@ -69,6 +76,7 @@ FENCE_RE = re.compile(r"^\s{0,3}(```|~~~)")
 ITEM_RE = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s+(?:\[[ xX]\]\s*)?(.*)$")
 CODE_SPAN_RE = re.compile(r"`+[^`]*`+")
 MARKER_RE = re.compile(r"\(needs review\)\s*$", re.IGNORECASE)
+CONFIDENCE_RE = re.compile(r"\((?:high confidence|needs review)\)\s*$", re.IGNORECASE)
 
 
 class CannotComplete(ValueError):
@@ -97,22 +105,36 @@ def _sections(body: str) -> list[tuple[str, list[str]]]:
     return sections
 
 
-def criteria(body: str) -> list[str]:
-    """The list items under every Acceptance Criteria heading, in body order."""
-    found: list[str] = []
+def _items(body: str) -> list[tuple[str, str, bool]]:
+    """Each list item under an Acceptance Criteria heading, in body order, as
+    (text with code spans dropped, display text, top level?). An item is found
+    on the code-span-stripped line, as readiness always has; top level is the
+    section's shallowest indent, so a nested detail is never its own criterion."""
+    found: list[tuple[str, str, bool]] = []
     for heading, lines in _sections(body or ""):
         if heading != "acceptance criteria":
             continue
+        section: list[tuple[str, str, int]] = []
         for line in lines:
-            item = ITEM_RE.match(line)
-            if item and CODE_SPAN_RE.sub("", item.group(1)).strip():
-                found.append(item.group(1).strip())
+            item = ITEM_RE.match(CODE_SPAN_RE.sub("", line))
+            if item and item.group(1).strip():
+                raw = ITEM_RE.match(line)
+                text = (raw.group(1) if raw else item.group(1)).strip()
+                expanded = line.expandtabs(4)
+                section.append((item.group(1), text, len(expanded) - len(expanded.lstrip())))
+        top = min((indent for _, _, indent in section), default=0)
+        found += [(bare, text, indent == top) for bare, text, indent in section]
     return found
+
+
+def criteria(body: str) -> list[str]:
+    """The top-level criteria texts, in body order."""
+    return [text for _, text, top in _items(body) if top]
 
 
 def readiness(body: str) -> list[str]:
     """Return the reasons the body is not ready; an empty list means ready."""
-    texts = [CODE_SPAN_RE.sub("", text) for text in criteria(body)]
+    texts = [bare for bare, _, _ in _items(body)]
     type_values: list[str] = []
     for heading, lines in _sections(body or ""):
         if heading == "type":
@@ -155,6 +177,18 @@ def _ids(option: dict, where: str) -> list[str]:
     return [i.strip().upper() for i in covered]
 
 
+def _norm(text: object) -> str:
+    """Compare criterion text loosely: case, backticks, spacing, confidence marker."""
+    text = CONFIDENCE_RE.sub("", str(text).replace("`", ""))
+    return " ".join(text.lower().split())
+
+
+def _basis(entries: object) -> list[tuple[str, str]] | None:
+    if not isinstance(entries, list) or not all(isinstance(e, dict) for e in entries):
+        return None
+    return [(str(e.get("id", "")).strip().upper(), _norm(e.get("text", ""))) for e in entries]
+
+
 def coverage(data: object) -> dict[str, object]:
     """Check the selected option's criteria_covered against the issue's criteria."""
     if not isinstance(data, dict) or "issue" not in data:
@@ -170,13 +204,15 @@ def coverage(data: object) -> dict[str, object]:
             raise InvalidPlan(f"options[{k}] needs a unique integer number")
         by_number[number] = _ids(option, f"option {number}")
     selected = data.get("selected")
-    if isinstance(selected, bool) or selected not in by_number:
+    if not isinstance(selected, int) or isinstance(selected, bool) or selected not in by_number:
         raise InvalidPlan("selected names no option")
     claimed = by_number[selected]
     known = {entry["id"] for entry in listed}
     missing = [entry for entry in listed if entry["id"] not in claimed]
     unknown = sorted({i for i in claimed if i not in known})
     verdict = "no_criteria" if not listed else ("gap" if missing else "covered")
+    if "criteria" in data and _basis(data["criteria"]) != _basis(listed):
+        verdict = "renumbered"
     return {"number": data["issue"].get("number"), "verdict": verdict,
             "selected": selected, "criteria": listed, "missing": missing,
             "unknown": unknown}

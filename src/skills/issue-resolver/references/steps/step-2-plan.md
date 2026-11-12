@@ -83,7 +83,7 @@ read the file again, resolve it the one way that section resolves it.
 
 **Fail-safe: an unreadable artifact here is `stale`.** If the analysis cannot be
 read or parsed at this point — for any reason, including a path that resolved
-wrong, or a selected option with no `criteria_covered` list — set `analysis_reuse = stale` from here on and spawn the synthesizer as
+wrong, or a *Criteria coverage gate* verdict other than `covered` — set `analysis_reuse = stale` from here on and spawn the synthesizer as
 usual, exactly as *Step 0h*'s *any doubt is `stale`* rule prescribes. Step 2 never
 ends without a plan.
 
@@ -223,8 +223,14 @@ that list as the synthesizer's `criteria`; a `light` or inline plan states its
 own `criteria_covered`.
 
 **Check.** Pipe `{"issue", "options": [{"number", "criteria_covered"}],
-"selected"}` into `python3 shared/scripts/gi-ready.py --coverage` (a `light`
-plan is option 1).
+"selected", "criteria"}` into `python3 shared/scripts/gi-ready.py --coverage`
+(a `light` plan is option 1). `criteria` is the list the IDs were numbered
+against: the bound list, or on `reuse` the analysis's `criteria`.
+
+**On `reuse`** the IDs predate this run (and 0d), so any result but `covered` —
+`gap`, `renumbered`, exit 3, no `criteria` in the analysis — sets
+`analysis_reuse = stale` and spawns the synthesizer with the binding. Only a
+plan made this run stops:
 
 - `covered` — print `✓ Criteria coverage: Option {n} covers {k}/{k}`. An
   `unknown` ID prints `⚠` and covers nothing.
@@ -233,8 +239,9 @@ plan is option 1).
   No prompt, no switch to a wider option; auto ends `failed` at Step 2.
 - `no_criteria` — print `○ Criteria coverage: skipped (no criteria)`; Step 0's
   `Criteria confirmed` already carries it.
-- Exit 3 — an option lacks `criteria_covered`: its author (the synthesizer,
-  once) supplies it; a second exit 3 stops like a `gap`. No `python3`, exit 2
+- `renumbered` or exit 3 (an option lacks `criteria_covered`) — its author
+  (the synthesizer, once) re-maps against the bound list; a second failure
+  stops like a `gap`. No `python3`, exit 2
   or 4: print `⚠ gi-ready unavailable — mapping by hand` and compare the IDs
   yourself.
 
