@@ -1316,8 +1316,9 @@ EXPECTED_SITES = {
     # auto-pilot Step 1.0 runs --list once and Step 5.3 clears both records (3).
     "gi-progress.py": 11,
     # issue #553: readiness — triage Step 1, auto-pilot Step 1.2b, explicit-list
-    # validation and the resolver's 0c gate.
-    "gi-ready.py": 4,
+    # validation and the resolver's 0c gate. 6 since issue #554: the resolver's
+    # Step 2 Criteria coverage gate runs --criteria and --coverage.
+    "gi-ready.py": 6,
 }
 # A call is any mention of a shared script by filename, however it is launched
 # (python3, python3.11, uv run, a bare ./path relying on the exec bit), plus the

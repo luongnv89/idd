@@ -9,6 +9,7 @@ One part of `references/pipeline-steps.md` — the index that maps every step to
 - Issue data
 - Research findings (JSON from Step 1)
 - Mode: `"auto"` if auto-pilot, `"interactive"` otherwise
+- `criteria` — the numbered list from *Criteria coverage gate* below
 - `workspace_contract` plus the independent `expected_lane_identity` sibling —
   the same pair Step 1 received (both `null` on ordinary runs); the data-only
   synthesizer validates their lane/issue/branch/path binding before carrying
@@ -32,14 +33,13 @@ functions — and each carries a `design_sketch` that *Design sketches* checks.
 
 When *Step 0g* selected `profile = light` **and *Step 0h* did not set
 `analysis_reuse = fresh`** (when both apply, `reuse` wins Step 2 — see *Step 0h →
-What `fresh` unlocks*), do **not** spawn the synthesizer at all — the 3-option
-comparison is overkill for a trivial change, and skipping the spawn is a direct
-token saving. Instead, derive a **direct minimal plan** inline from the Step 1
-research:
+What `fresh` unlocks*), do **not** spawn the synthesizer; derive a **direct
+minimal plan** inline from the Step 1 research:
 
 - The plan is the single obvious change that satisfies the acceptance criteria
   (e.g. "update the copy string in `X`", "bump the timeout constant in `Y`").
-- Record it as the **selected option** with a one-line name and summary, so
+- Record it as the **selected option** with a one-line name, summary and
+  `criteria_covered` (*Criteria coverage gate* below), so
   Step 5's Decision Record has a real `Selected option` to lift and
   `Options rejected` is simply "n/a — trivial change, direct plan (light profile)".
 - The **design-confirm checkpoint does not apply** — it fires only on
@@ -48,14 +48,10 @@ research:
 - The **sensitive-change gate still applies** — size never exempts a change
   from it (*Sensitive-change gate* below). The direct plan's named files are
   its planned paths.
-- **`approval_gate: comment-and-wait` does not present options on the `light`
-  path.** That gate exists to show the 3 synthesized options and wait for a pick,
-  but the `light` path produces none — so it proceeds with the direct minimal
-  plan **without** an option prompt (the same way the `light` path skips the
-  *Propose relevant skills* prompt). A maintainer who wants to approve every plan
-  regardless of size sets `resolve.adaptive_effort: false`, which pins the full
-  pipeline and restores the `comment-and-wait` option prompt — and so does a
-  `fresh` analysis, whose lifted options `reuse` below presents in full.
+- **`approval_gate: comment-and-wait` presents no options on the `light`
+  path** — there are none, so it proceeds with the direct plan, as it skips the
+  *Propose relevant skills* prompt. `resolve.adaptive_effort: false` (the full
+  pipeline) restores the option prompt, and so does a `fresh` analysis.
 
 If Step 1 upgraded the profile to `full` (a `high`/`complex` signal), run the
 normal synthesizer spawn below instead — the `light` skip is only for runs that
@@ -87,7 +83,7 @@ read the file again, resolve it the one way that section resolves it.
 
 **Fail-safe: an unreadable artifact here is `stale`.** If the analysis cannot be
 read or parsed at this point — for any reason, including a path that resolved
-wrong — set `analysis_reuse = stale` from here on and spawn the synthesizer as
+wrong, or a *Criteria coverage gate* verdict other than `covered` — set `analysis_reuse = stale` from here on and spawn the synthesizer as
 usual, exactly as *Step 0h*'s *any doubt is `stale`* rule prescribes. Step 2 never
 ends without a plan.
 
@@ -208,10 +204,47 @@ Select option [1/2/3]:
 ```
 
 When *Design sketches* ran, each option gains a `sketch: {status} — {shape}`
-line under its summary, and `← recommended` marks its `selected` option.
+line under its summary, and `← recommended` marks its `selected` option. Each
+option also shows `covers: {criteria_covered}`.
 
 **Auto mode:** auto-select the recommended option — when *Design sketches*
 ran, the sketch's `selected` one under any verdict — no prompt.
+
+### Criteria coverage gate (every profile, every mode) <!-- a:rs-criteria-coverage -->
+
+The one home for mapping the plan to the criteria (auto mode has no one to
+confirm the design). It runs on every path once an option is selected, before
+the sensitive-change gate.
+
+**IDs, never text.** Pipe 0d's re-fetched `gi-issue.py` envelope (the post-0d
+body) into `python3 shared/scripts/gi-ready.py --criteria`; it numbers the
+`Acceptance Criteria` items `AC1`…`ACn`, never quoted Reporter Context. Bind
+that list as the synthesizer's `criteria`; a `light` or inline plan states its
+own `criteria_covered`.
+
+**Check.** Pipe `{"issue", "options": [{"number", "criteria_covered"}],
+"selected", "criteria"}` into `python3 shared/scripts/gi-ready.py --coverage`
+(a `light` plan is option 1). `criteria` is the list the IDs were numbered
+against: the synthesizer's returned `criteria` (a `light`/inline plan: the bound
+list), or on `reuse` the analysis's.
+
+**On `reuse`** the IDs predate this run (and 0d), so any result but `covered` —
+`gap`, `renumbered`, exit 3, no `criteria` in the analysis — sets
+`analysis_reuse = stale` and spawns the synthesizer with the binding. Only a
+plan made this run stops:
+
+- `covered` — print `✓ Criteria coverage: Option {n} covers {k}/{k}`; an
+  `unknown` ID is a `⚠` and covers nothing.
+- `gap` — **stop planning**, auto mode too: print *Plan leaves a criterion
+  uncovered* (`references/error-messages.md`) naming each `missing` criterion.
+  No prompt, no switch to a wider option; auto ends `failed` at Step 2.
+- `no_criteria` — print `○ Criteria coverage: skipped (no criteria)`; Step 0's
+  `Criteria confirmed` already carries it.
+- `renumbered` or exit 3 (an option lacks `criteria_covered`) — its author
+  (the synthesizer, once) re-maps against the bound list; a second failure
+  stops like a `gap`. No `python3`, exit 2
+  or 4: print `⚠ gi-ready unavailable — mapping by hand` and compare the IDs
+  yourself.
 
 ### Sensitive-change gate (every profile, every mode) <!-- a:rs-sensitive-gate -->
 
@@ -300,22 +333,18 @@ line (`references/report-templates.md`).
 
 ### Design-confirm checkpoint (high-complexity, interactive only)
 
-The minimum-viable risk gate from SKILL.md (*Step 2 — Plan → Design-confirm checkpoint*).
-The pipeline shape is unchanged for most work; only high-complexity work in interactive
-mode earns one extra confirmation before Step 3. It reuses the synthesizer's already-
-returned recommended option — no new phase, artifact, or config key of its own. It is
-separate from the sensitive-change gate above, which keys off sensitivity, not size.
+The minimum-viable risk gate from SKILL.md (*Step 2 — Plan → Design-confirm checkpoint*):
+only high-complexity interactive work earns one extra confirmation before Step 3. It
+reuses the recommended option — no new phase, artifact or config key — and is separate
+from the sensitive-change gate, which keys off sensitivity, not size.
 
 #### When it fires
 
 Both conditions must hold:
 
-1. **High-complexity tier.** Use the most-recent complexity signal the orchestrator
-   already tracks (researcher `complexity` → synthesizer `overall_complexity`). Fire when
-   the synthesizer reports `overall_complexity: L` or `XL`, **or** `overall_risk: High`
-   (equivalently the researcher's `complexity` is `high` or `complex`). For
-   `trivial`/`low`/`medium` (`overall_complexity` `XS`/`S`/`M` with non-`High` risk) the
-   checkpoint is skipped and the pipeline runs the fast path.
+1. **High-complexity tier.** The synthesizer reports `overall_complexity: L` or `XL`,
+   **or** `overall_risk: High` (the researcher's `complexity` `high`/`complex`).
+   `XS`/`S`/`M` with non-`High` risk skips it.
 2. **Interactive mode.** In auto mode (`--auto` / `IDD_AUTO_MODE=1`) the checkpoint is
    never presented — see *Auto mode* below.
 
@@ -343,15 +372,11 @@ generate anything new. Pull `name`, `summary`, `files_to_modify` (count), and
     Re-run /issue-resolver {N} to try again, or refine the issue scope first.
   ```
 
-Beside the sensitive-change gate's stop, this is the **only** interactive pause Step 2 adds. It is **not suppressed by `approval_gate: auto`**:
-even with `approval_gate: auto` (which otherwise proceeds silently with the recommended
-option), the high-complexity checkpoint still asks — that is the entire point of the gate.
-With `approval_gate: comment-and-wait` the user has **already made an explicit option choice
-above**, so that selection itself served as the agreement point — the design-confirm prompt
-is redundant and is skipped regardless of whether the chosen option was the recommended one.
-The checkpoint therefore only ever fires on the auto-gate/default path, where the recommended
-option is exactly what proceeds to Step 3 — which is why the prompt box above keys off
-`recommended.*`.
+Beside the sensitive-change gate's stop, this is the **only** interactive pause Step 2 adds,
+and `approval_gate: auto` does **not** suppress it — that is the gate's point. Under
+`comment-and-wait` the user's explicit pick was the agreement point, so it is skipped. It
+fires only on the auto-gate path, where the recommended option proceeds — hence
+`recommended.*` in the prompt.
 
 #### Auto mode
 
@@ -364,11 +389,10 @@ auditable, then proceed to Step 3:
 
 #### Recording the decision (durable memory)
 
-Whether confirmed interactively or auto-selected, record the decision — selected option
-and complexity — in the PR **Decision Record** via the conditional *Design-confirm* line
-(`references/report-templates.md`). No separate artifact or config key is introduced; the
-decision rides the existing durable-memory channel into git history on squash-merge, under the
-`squash_merge_commit_message` condition in `references/docs/idd-methodology.md`.
+Confirmed or auto-selected, record the selected option and complexity in the PR
+**Decision Record**'s conditional *Design-confirm* line (`references/report-templates.md`);
+it reaches git history on squash-merge under the `squash_merge_commit_message` condition in
+`references/docs/idd-methodology.md`.
 
 ### Inline fallback
 
@@ -376,5 +400,5 @@ If no Agent tool, analyze the research findings and generate the plan inline. Th
 design-confirm checkpoint still applies: in interactive mode, if the inline analysis lands
 in the high-complexity tier, present the same `[Y/n]` prompt before implementing; in auto
 mode, log the auto-selection and proceed. The sensitive-change gate also still applies,
-with the non-independent challenge rule above, and so does *Design sketches*: author
+with the non-independent challenge rule above, as do the *Criteria coverage gate* and *Design sketches*: author
 each option's `design_sketch` inline under the same contract, then check and adjudicate it.

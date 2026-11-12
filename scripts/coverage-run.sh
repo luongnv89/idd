@@ -62,6 +62,23 @@ printf '%s' 'Depends on #12, blocked by #8. Cross-repo org/repo#77 is ignored.' 
 # gi-ready — a gi-backlog envelope on stdin (issue #553).
 printf '%s' '{"issues":[{"number":1,"body":"## Type\n\nbug (needs review)\n\n## Acceptance Criteria\n\n- [ ] works (needs review)\n"},{"number":2,"body":null}]}' | \
   run "$SCRIPTS/gi-ready.py"
+# gi-ready --criteria / --coverage — plan-to-criteria mapping (issue #554).
+COVER_BODY='## Acceptance Criteria\n\n- [ ] one\n  - detail\n- [ ] two\n'
+printf '%s' "{\"issue\":{\"number\":1,\"body\":\"$COVER_BODY\"}}" | run "$SCRIPTS/gi-ready.py" --criteria
+for plan in \
+  '{"options":[{"number":1,"criteria_covered":["AC1"]}],"selected":1}' \
+  '{"options":[{"number":1,"criteria_covered":["ac1","AC2","AC9"]}],"selected":1}' \
+  '{"options":[{"number":1}],"selected":1}' \
+  '{"options":[{"number":1,"criteria_covered":[]},{"number":1,"criteria_covered":[]}],"selected":1}' \
+  '{"options":[{"number":1,"criteria_covered":[]}],"selected":2}' \
+  '{"options":[],"selected":1}' \
+  '{"options":[{"number":1,"criteria_covered":["AC1"]}],"selected":1,"criteria":[{"id":"AC1","text":"one"},{"id":"AC2","text":"two"}]}' \
+  '{"options":[{"number":1,"criteria_covered":["AC1"]}],"selected":1,"criteria":"AC1"}' \
+  '{"options":[{"number":1,"criteria_covered":[]}],"selected":[1]}'; do
+  printf '%s' "{\"issue\":{\"body\":\"$COVER_BODY\"},${plan#\{}" | run "$SCRIPTS/gi-ready.py" --coverage
+done
+printf '%s' '{"issue":{"body":""},"options":[{"number":1,"criteria_covered":[]}],"selected":1}' | run "$SCRIPTS/gi-ready.py" --coverage
+printf '%s' '{"options":[]}' | run "$SCRIPTS/gi-ready.py" --coverage
 
 # gi-dup-score — scorer request on stdin, existing issues from a file.
 printf '%s' '{"mode":"create","items":[{"index":1,"title":"login broken","keywords":[],"type":"bug"}]}' > "$TMP/dup-request.json"
