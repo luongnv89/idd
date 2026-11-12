@@ -83,9 +83,10 @@ Runs in Step 4 when `linked_issue_snapshot` is a bug (label or `## Type`; never 
    ```bash
    d="$(mktemp -d)"; wt="$d/wt"; trap 'git worktree remove --force "$wt"; rm -rf "$d"' EXIT
    git fetch --no-tags origin "$base"
-   git worktree add --detach "$wt" "$(git merge-base "origin/${base}" "$head_oid")"
+   mb="$(git merge-base "origin/$base" "$head_oid")"; git worktree add --detach "$wt" "$mb"
    git --literal-pathspecs -C "$wt" checkout "$head_oid" -- "$test_path"
-   (cd "$wt" && {runner} "$test_path") 2>&1; echo "base_rc=$?"
+   (cd "$wt" || exit 99
+    {runner} "$test_path") 2>&1; echo "base_rc=$?"
    ```
 3. **Verdict `bug_proof`,** recorded with `head_oid`: `red→green` when, at base, the output shows the cited test itself failing an assertion, and it exits 0 at head; else `green at base`, `red at head`, or `unproven: {reason}` (`review.run_tests: false`, a timeout, no merge-base, a base red from collection, an import or a missing fixture, a base green that may have loaded head code). The base red is the proof, never a Step 4 failure, and changes no criterion row. Print `bug proof: red@{base7} → green@{head7} ({path})`, or the verdict, under `Evidence`.
 4. **Sensitivity rows.** Each Evidence cell reading `sensitivity not verified: {reason}` goes under `Uncertainty` as `sensitivity not verified — {criterion}: {reason}`. Report only.
