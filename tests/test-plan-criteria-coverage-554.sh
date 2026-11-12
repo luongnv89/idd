@@ -122,6 +122,16 @@ SIBLINGS='{"body":"## Acceptance Criteria\n\n - [ ] one\n- [ ] two\n 9. three\n1
 [ "$(printf '%s' "$SIBLINGS" | python3 "$READY" --criteria | js '[c["text"] for c in d["criteria"]]')" = "['one', 'two', 'three', 'four']" ] \
   && pass "T2.12 a 1-3-space sibling and a right-aligned number stay criteria" \
   || fail "T2.12 indented siblings were dropped"
+for body in '- `gi-ready.py --criteria` numbers items\n  - detail\n- second' \
+            '1. `--coverage` reports gaps\n   - detail\n2. second'; do
+  got="$(printf '%s' "{\"body\":\"## Acceptance Criteria\\n\\n$body\\n\"}" | python3 "$READY" --criteria | js 'len(d["criteria"])')"
+  [ "$got" = 2 ] && pass "T2.13 a criterion opening with a code span keeps its detail nested" \
+    || fail "T2.13 code-span criterion: $got criteria"
+done
+PARA='{"body":"## Acceptance Criteria\n\n- [ ] Users can log in\n\nEdge cases:\n\n  - [ ] Login fails cleanly\n"}'
+[ "$(printf '%s' "$PARA" | python3 "$READY" --criteria | js 'len(d["criteria"])')" = 2 ] \
+  && pass "T2.14 a paragraph after a blank line ends the list; the next item is a criterion" \
+  || fail "T2.14 the item after a paragraph was dropped"
 
 # ── T3: readiness is unchanged ───────────────────────────────────────────
 out="$(printf '%s' "$ISSUE" | python3 "$READY")"

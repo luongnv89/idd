@@ -113,20 +113,31 @@ def _items(body: str) -> list[tuple[str, str, bool]]:
     on the code-span-stripped line, as readiness always has. As in CommonMark,
     an item is nested only when it is indented to the content column of the
     last top-level item, so a nested detail is never its own criterion while a
-    sibling indented 1-3 spaces (or a right-aligned number) still is."""
+    sibling indented 1-3 spaces (or a right-aligned number) still is, and an
+    unindented paragraph after a blank line ends the list."""
     found: list[tuple[str, str, bool]] = []
     for heading, lines in _sections(body or ""):
         if heading != "acceptance criteria":
             continue
         content_col = None
+        after_blank = False
         for line in lines:
             bare_line = CODE_SPAN_RE.sub("", line)
             item = ITEM_RE.match(bare_line)
             if not (item and item.group(1).strip()):
+                indent = len(line.expandtabs(4)) - len(line.expandtabs(4).lstrip())
+                if line.strip() and after_blank and not item and (
+                        content_col is None or indent < content_col):
+                    content_col = None  # a paragraph ends the list
+                after_blank = not line.strip()
                 continue
+            after_blank = False
             raw = ITEM_RE.match(line)
             text = (raw.group(1) if raw else item.group(1)).strip()
-            marker = MARKER_COL_RE.match(bare_line.expandtabs(4))
+            # The column is measured on the raw line: a stripped code span
+            # would leave its spaces behind and push the column right.
+            marker = (MARKER_COL_RE.match(line.expandtabs(4))
+                      or MARKER_COL_RE.match(bare_line.expandtabs(4)))
             top = content_col is None or len(marker.group(1)) < content_col
             if top:
                 content_col = marker.end()
