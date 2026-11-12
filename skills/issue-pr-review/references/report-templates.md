@@ -23,10 +23,9 @@ human-facing summary: the report-back fields `/auto-pilot` reads (`result`,
    - `PASS` — the loop-exit condition held (soft or strict, per
      `review.soft_pass`) with every CI and test leg satisfied by a real pass, a
      config skip, or a `qa_handoff = trusted` test skip (listed under
-     *Uncertainty*, never as `✓ pass`). The PR is clean. Its main finding says
-     `ready to merge` only when every criterion is `pass` and no dimension is
-     `partial` or `disabled`; otherwise it names that gap (`{u} criteria
-     unverified`), to check before merging. When an auto-merge
+     *Uncertainty*, never as `✓ pass`). Say `clean; ready to merge` only when
+     every criterion is `pass` and no dimension `partial` or `disabled`;
+     otherwise name that gap (`{u} criteria unverified`). When an auto-merge
      follows, its `MERGED` or `BLOCKED (manual merge required)` block supersedes
      this row; otherwise (no merge under SKILL.md *Merge rule*) it is the
      final status.
@@ -98,7 +97,7 @@ or nonresponsive feedback leaves human understanding unconfirmed.
 ## Summary — Clean PR
 
 ```
-◆ PR Review: #{pr_number} (pass {N} — clean)
+◆ PR Review: #{pr_number} (pass {N} — clean or the gap)
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
 
   Result:            PASS — {main finding: "clean; ready to merge", or the gap}

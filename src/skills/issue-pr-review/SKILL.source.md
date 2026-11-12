@@ -225,7 +225,7 @@ A pass is all four: exit 0, `policy_source` exactly the `ref:origin/…` asked f
 
 Then run per-criterion acceptance-criteria verification on `linked_issue_snapshot` directly; do not call `gi-issue.py` or `gh` again. A PR with **no** linked issue is a different state, not a fail-safe case: `acceptance_criteria` reports `○ pass — none defined; manual review recommended`. <!-- a:rv-step3-ac-snapshot -->
 
-**Dimensions:** `correctness`, `acceptance_criteria`, `traceability`, `maintainability`, `safety` — each `pass`, `partial`, or `fail`, grouped under a **Spec axis** and a **Standards axis**; UI findings fold into `maintainability`. Mapping: `references/verification-checks.md` — **read it now.**
+**Dimensions:** `correctness`, `acceptance_criteria`, `traceability`, `maintainability`, `safety` — each `pass`, `partial`, `fail` or `disabled`, grouped under a **Spec axis** and a **Standards axis**; UI findings fold into `maintainability`. Mapping: `references/verification-checks.md` — **read it now.**
 
 ```
 [3/7] Review       ✓ spec[ac:pass correctness:pass safety:pass]

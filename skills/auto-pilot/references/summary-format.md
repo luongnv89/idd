@@ -54,6 +54,9 @@ outcome. Later runs skip the issue as an ordinary label skip.
   Report:                  .idd/last-run-report.md
 ```
 
+A merged PR with no counts this session (merged before a resume) prints
+`· AC n/a` and counts as `partial`.
+
 The `Result:` row is the first row under the header so the outcome is findable
 without scrolling past the iteration rows. Its value set is unchanged — the five
 values below; `complete | partial` and the main finding follow it after `—`.

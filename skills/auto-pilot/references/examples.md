@@ -48,7 +48,7 @@ Detailed example runs and edge-case behaviors referenced from SKILL.md.
   ✓ PR #45 reviewed
     Review cycles: 1
     Issues found/fixed: 0/0
-    Verification: full — AC 3 pass/0 fail/0 unverified
+    Verification: full — AC 3/0/0 pass/fail/unverified
     CI: all checks passed
 
 ✓ PR #45 merged — #12 closed
@@ -74,7 +74,7 @@ Detailed example runs and edge-case behaviors referenced from SKILL.md.
   Result:                  LIMIT REACHED — partial: 3 merged (1 with an unverified criterion), 5 issues remain
 
   Iteration 1:       ✓ merged                — #12 Fix auth redirect loop → PR #45 · AC 3/0/0 pass/fail/unverified
-  Iteration 2:       ✓ merged                — #8 Add pagination to API → PR #46 · AC 2/0/1 pass/fail/unverified
+  Iteration 2:       ✓ merged                — #8 Add pagination to API → PR #46 · AC 2/0/1 pass/fail/unverified; partial: acceptance_criteria
   Iteration 3:       ✓ merged                — #15 Refactor middleware → PR #47 · AC 2/0/0 pass/fail/unverified
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   merged:                  3

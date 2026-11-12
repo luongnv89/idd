@@ -63,7 +63,7 @@ on the recorded PR rather than re-running the resolve.
   ✓ PR #{pr_number} review passed
     Review cycles: {review_cycles}
     Issues found/fixed: {issues_found}/{issues_fixed}
-    Verification: {verification} — AC {p} pass/{f} fail/{u} unverified{; partial: {dims}}{; disabled: {dims}}
+    Verification: {verification} — AC {p}/{f}/{u} pass/fail/unverified{; partial: {dims}}{; disabled: {dims}}
 ```
 Proceed to Phase 5 (Merge).
 

@@ -552,8 +552,12 @@ else
 fi
 has "$RUNLOG" '| `verification` | string | no |' "T13f: run-log schema documents verification"
 has "$RUNLOG" 'missing counts are `partial`, never `full`' "T13f: a review without counts is never logged full"
-has "$REPO_ROOT/src/skills/issue-resolver/references/report-templates.md" '`PARTIAL` → `partial`' \
-  "T13g: a resolver PARTIAL is logged as partial, not clean"
+has "$REPO_ROOT/src/skills/issue-resolver/references/report-templates.md" 'applied to the PR'"'"'s AC table: any `unverified` row → `partial`' \
+  "T13g: a resolver PR with an unverified criterion is logged partial, not clean"
+has "$REPO_ROOT/src/skills/auto-pilot/references/phases/phase-3-4-review.md" 'a missing field is `partial`' \
+  "T13g: a reviewer report-back without counts is partial, never full"
+has "$REPO_ROOT/src/skills/auto-pilot/references/explicit-list-mode.md" '`verification` on the primary line only' \
+  "T13g: batch fan-out never stamps unreviewed issues as verified"
 has "$REPO_ROOT/src/skills/auto-pilot/references/subagent-prompts.md" '- criteria: {"pass": n, "fail": n, "unverified": n}' \
   "T13h: the PR reviewer returns the criteria counts"
 has "$REPO_ROOT/src/skills/auto-pilot/references/subagent-prompts.md" '- disabled_dimensions:' \
@@ -574,7 +578,7 @@ has "$REPO_ROOT/src/skills/issue-pr-review/references/verification-checks.md" '`
   "T13k: a disabled acceptance-criteria check prints disabled"
 has "$REPO_ROOT/src/skills/issue-pr-review/references/verification-checks.md" '`○ traceability: disabled (review.require_traceability_check: false)`' \
   "T13k: a disabled traceability check prints disabled"
-has "$REPO_ROOT/src/skills/issue-pr-review/references/report-templates.md" '`ready to merge` only when every criterion is `pass`' \
+has "$REPO_ROOT/src/skills/issue-pr-review/references/report-templates.md" 'Say `clean; ready to merge` only when' \
   "T13l: PASS says ready to merge only with every criterion pass"
 
 echo ""
