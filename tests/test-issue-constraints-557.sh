@@ -116,9 +116,9 @@ case "$r" in *"Warnings: 0"*) pass "T1.6: labelled items raise no warning" ;;
 for kind in empty checkbox unlabelled; do
   r="$(lint "$TMP/$kind.md")"
   if [ "${r%%|*}" = 0 ] && printf '%s' "$r" | grep -q '⚠ \[I10\]'; then
-    pass "T1.7: a $kind section warns (I10) without failing"
+    pass "T1.7: the $kind section warns (I10) without failing"
   else
-    fail "T1.7: a $kind section warns (I10) without failing"
+    fail "T1.7: the $kind section warns (I10) without failing"
   fi
 done
 
@@ -171,7 +171,7 @@ has "$IC/references/confidence-scoring.md" "| **Constraints** | high = the repor
 has "$REVIEWER" "**Stated constraints** (category \`constraints\`)" "T3.12: the reviewer checks stated constraints"
 has "$REVIEWER" "is always reported, at any confidence" "T3.13: an invariant touch is never dropped by the threshold"
 has "$REVIEWER" "edge_cases|constraints" "T3.14: the output shape carries the constraints category"
-has "$QA" "its \`## Constraints\` section verbatim, the selected plan" "T3.15: the resolver's reviewer gets the issue's Constraints"
+has "$QA" "plus the issue's \`## Constraints\` section verbatim" "T3.15: the resolver's reviewer gets the issue's Constraints"
 has "$LOOP" "plus the linked issue's \`## Constraints\` section, verbatim" "T3.16: the PR reviewer gets the issue's Constraints"
 
 # ── T4: built bundles ─────────────────────────────────────────────────────

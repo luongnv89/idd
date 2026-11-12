@@ -61,7 +61,7 @@ Report only findings you score at confidence >= {confidence_threshold} (default 
     {
       "category": "correctness|test_coverage|code_quality|security|edge_cases|constraints",
       "severity": "high|medium",
-      "confidence": <threshold-100; any score for a blocker>,
+      "confidence": <threshold-100; any score for a blocker or a constraints finding>,
       "action": "fix|note|blocker",
       "description": "One-line concrete problem",
       "file": "path/to/file",
