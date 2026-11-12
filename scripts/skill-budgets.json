@@ -3,11 +3,13 @@
   "skills": {
     "auto-pilot": {
       "always_read": {
-        "budget": 19276,
+        "budget": 47303,
         "files": [
+          "references/preflight.md",
+          "references/run-log.md",
           "references/summary-format.md"
         ],
-        "measured": 18252
+        "measured": 46279
       },
       "budget": 447905,
       "measured": 447905,
@@ -102,11 +104,12 @@
     },
     "issue-triage": {
       "always_read": {
-        "budget": 14333,
+        "budget": 30412,
         "files": [
-          "references/detection.md"
+          "references/detection.md",
+          "references/output-and-persist.md"
         ],
-        "measured": 13309
+        "measured": 29388
       },
       "budget": 141039,
       "measured": 140015,

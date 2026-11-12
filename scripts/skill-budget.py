@@ -66,13 +66,17 @@ Two more budgets per skill (issue #558)
     file every invocation of the skill loads in full.
   - `always_read` — the summed bytes of the files SKILL.md tells the agent
     to read unconditionally. A line of SKILL.md names such a file when it
-    says, case-insensitively, either "read `references/x.md` now" (an
-    optional parenthesis may sit between the path and "now"), or names a
-    `references/….md` path and later on the same line says "read it now"
-    (the nearest path before those words is the one meant). "Read … first",
-    a plain "Read `references/x.md`", "now reads" and "Sync now?" are not
-    pointers. Each file counts once per skill; `files` records the sorted
-    set. A pointer to a file that is not in the bundle fails, and a set
+    says, case-insensitively, either "read `references/x.md` now" or
+    "read `references/x.md` first" (an optional parenthesis may sit between
+    the path and that word), or names a `references/….md` path and later on
+    the same line says "read it now" (the nearest path before those words
+    is the one meant). The first form may list several paths joined by
+    commas or "and" ("read `references/a.md` and `references/b.md` now");
+    every listed file counts. A plain "Read `references/x.md`", "First read
+    …", "now reads" and "Sync now?" are not pointers. The match is on the
+    wording only: a pointer inside a conditional sentence still counts, so
+    the figure errs high. Each file counts once per skill; `files` records
+    the sorted set. A pointer to a file that is not in the bundle fails, and a set
     that differs from the recorded `files` is stale until ratcheted. A
     skill with no pointer records `files: []` and `measured: 0`.
 
@@ -172,10 +176,16 @@ GROWTH_CAP_PCT = 2
 
 # Always-read pointers in a built SKILL.md (see the module docstring).
 _PTR_PATH = r"(references/[A-Za-z0-9_./-]+\.md)"
+_PTR_PAREN = r"(?:\s*\([^)\n]*\))?"
+_PTR_ITEM = r"`?references/[A-Za-z0-9_./-]+\.md`?" + _PTR_PAREN
+# "read A now", "read A first", "read A, B and C now" — group 1 is the list.
 _PTR_READ_NOW = re.compile(
-    r"\bread\s+`?" + _PTR_PATH + r"`?(?:\s*\([^)\n]*\))?\s+now\b",
+    r"\bread\s+(" + _PTR_ITEM
+    + r"(?:(?:\s*,\s*(?:and\s+)?|\s+and\s+)" + _PTR_ITEM + r")*)"
+    + r"\s+(?:now|first)\b",
     re.IGNORECASE,
 )
+_PTR_PAREN_TEXT = re.compile(r"\([^)\n]*\)")
 _PTR_READ_IT_NOW = re.compile(
     _PTR_PATH + r"(?:(?!references/)[^\n])*?\bread\s+it\s+now\b",
     re.IGNORECASE,
@@ -246,9 +256,12 @@ def always_read_pointers(text: str) -> list[str]:
     """Sorted, de-duplicated `references/….md` paths SKILL.md says to read now."""
     found = set()
     for line in text.splitlines():
-        for pattern in (_PTR_READ_NOW, _PTR_READ_IT_NOW):
-            for match in pattern.finditer(line):
-                found.add(posixpath.normpath(match.group(1)))
+        for match in _PTR_READ_NOW.finditer(line):
+            listed = _PTR_PAREN_TEXT.sub("", match.group(1))
+            for path in re.findall(_PTR_PATH, listed):
+                found.add(posixpath.normpath(path))
+        for match in _PTR_READ_IT_NOW.finditer(line):
+            found.add(posixpath.normpath(match.group(1)))
     return sorted(found)
 
 
@@ -571,7 +584,7 @@ def check(sizes: dict[str, int], data: dict, surfaces: dict[str, dict],
             for rel in surface["missing"]:
                 row["problems"].append(
                     f"always-read file missing — SKILL.md says to read {rel} "
-                    f"now, and skills/{name}/{rel} is not in the bundle. "
+                    f"up front, and skills/{name}/{rel} is not in the bundle. "
                     "Restore the file or remove the pointer, then rebuild"
                 )
             if growth is not None and name in growth["baseline"]:

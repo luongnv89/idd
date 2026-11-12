@@ -505,8 +505,9 @@ else
 fi
 
 # ── AC3: the always-read budget ───────────────────────────────────────────
-# pointer_fixture <dir> — alpha's SKILL.md points at a.md (700 bytes, twice)
-# and b.md (300 bytes) and merely mentions c.md, d.md and e.md.
+# pointer_fixture <dir> — alpha's SKILL.md points at a.md (700 bytes, twice),
+# b.md (300), f.md (40, "read … first") and g.md + h.md (50 + 60, one two-file
+# pointer), and merely mentions c.md, d.md and e.md.
 pointer_fixture() {
   rm -rf "$1"
   mkdir -p "$1/skills/alpha/references"
@@ -516,7 +517,9 @@ pointer_fixture() {
 Read `references/a.md` now.
 Mechanics: `references/b.md` (*Step 5*) — **read it now.**
 Before the loop, read `references/a.md` (the table) now, not later.
-Read `references/c.md` first.
+Read `references/f.md` (*Contract*) first.
+Read `references/g.md` and `references/h.md` now.
+First read `references/c.md`.
 Read `references/d.md` when the step needs it.
 The step now reads `references/e.md`. Sync now? [y/N]
 EOF
@@ -525,15 +528,18 @@ EOF
   write_bytes "$1/skills/alpha/references/c.md" 9000
   write_bytes "$1/skills/alpha/references/d.md" 9000
   write_bytes "$1/skills/alpha/references/e.md" 9000
+  write_bytes "$1/skills/alpha/references/f.md" 40
+  write_bytes "$1/skills/alpha/references/g.md" 50
+  write_bytes "$1/skills/alpha/references/h.md" 60
   write_bytes "$1/skills/beta/SKILL.md" 3000
   python3 "$SCRIPT" --skills-dir "$1/skills" --budgets "$1/budgets.json" --ratchet >/dev/null
 }
 
 pointer_fixture "$F"
-if [ "$(sub "$F/budgets.json" alpha always_read files)" = "references/a.md references/b.md" ] && \
-   [ "$(sub "$F/budgets.json" alpha always_read measured)" = "1000" ] && \
-   [ "$(sub "$F/budgets.json" alpha always_read budget)" = "2024" ]; then
-  pass "(u) both pointer phrasings are detected, a repeated file counts once, near-misses are not counted"
+if [ "$(sub "$F/budgets.json" alpha always_read files)" = "references/a.md references/b.md references/f.md references/g.md references/h.md" ] && \
+   [ "$(sub "$F/budgets.json" alpha always_read measured)" = "1150" ] && \
+   [ "$(sub "$F/budgets.json" alpha always_read budget)" = "2174" ]; then
+  pass "(u) every pointer phrasing is detected (now, first, it-now, two files), a repeated file counts once, near-misses are not counted"
 else
   fail "(u) always-read detection: $(cat "$F/budgets.json")"
 fi
@@ -587,9 +593,9 @@ else
 fi
 python3 "$SCRIPT" --skills-dir "$F/skills" --budgets "$F/budgets.json" --ratchet >/dev/null
 run --skills-dir "$F/skills" --budgets "$F/budgets.json" --check
-if [ "$RC" -eq 0 ] && [ "$(sub "$F/budgets.json" alpha always_read files)" = "references/a.md" ] && \
-   [ "$(sub "$F/budgets.json" alpha always_read budget)" = "1724" ]; then
-  pass "(w) --ratchet rewrites the file set and lowers the budget (1724)"
+if [ "$RC" -eq 0 ] && [ "$(sub "$F/budgets.json" alpha always_read files)" = "references/a.md references/f.md references/g.md references/h.md" ] && \
+   [ "$(sub "$F/budgets.json" alpha always_read budget)" = "1874" ]; then
+  pass "(w) --ratchet rewrites the file set and lowers the budget (1874)"
 else
   fail "(w) after --ratchet: exit $RC, $(cat "$F/budgets.json")"
 fi
@@ -634,7 +640,7 @@ fi
 python3 "$SCRIPT" --skills-dir "$F/skills" --budgets "$F/budgets.json" --ratchet >/dev/null
 run --skills-dir "$F/skills" --budgets "$F/budgets.json" --check
 if [ "$RC" -eq 0 ] && [ "$(field "$F/budgets.json" alpha budget)" = "$alpha_budget" ] && \
-   [ "$(sub "$F/budgets.json" alpha always_read measured)" = "1000" ]; then
+   [ "$(sub "$F/budgets.json" alpha always_read measured)" = "1150" ]; then
   pass "(y) --ratchet seeds the missing fields and --check passes"
 else
   fail "(y) after --ratchet: exit $RC, $(cat "$F/budgets.json")"
@@ -655,8 +661,8 @@ fi
 
 # ── AC2 / AC3 on the committed tree ───────────────────────────────────────
 # The pointer counts are the ones SKILL.md carries today. A PR that adds or
-# drops a "read … now" pointer on purpose updates this line with the ratchet.
-want_counts="auto-pilot=1 init-idd=0 issue-analysis=2 issue-creator=6 issue-pr-review=5 issue-resolver=2 issue-triage=1 plan-to-issues=1"
+# drops a "read … now" or "read … first" pointer on purpose updates this line with the ratchet.
+want_counts="auto-pilot=3 init-idd=0 issue-analysis=2 issue-creator=6 issue-pr-review=5 issue-resolver=2 issue-triage=2 plan-to-issues=1"
 got_counts="$(python3 -c '
 import json, sys
 skills = json.load(open(sys.argv[1]))["skills"]
@@ -735,23 +741,9 @@ verdict="$(baseline_verdict "$REPO_ROOT" "$TMP/tag-budgets.json")"
 case "$verdict" in
   ok\ *)
     tag="${verdict#ok }"
-    # The change log is docs/VALUES.md, exclusively, once that file exists.
+    # The change log is docs/VALUES.md, exclusively: this test supplies no
+    # row of its own, so an over-cap bundle passes only on a committed row.
     values="$REPO_ROOT/docs/VALUES.md"
-    if [ ! -f "$values" ] && [ "$tag" = "v0.27.0" ]; then
-      # TRANSITIONAL ALLOWANCE — delete this branch after the next release.
-      # Two bundles grew past 2% under epic #547, merged before this cap
-      # existed, and docs/VALUES.md (the change log that would exempt them) is
-      # not tracked yet. The two rows below stand in for it. They apply only
-      # while v0.27.0 is the latest release tag — the next tag resets the
-      # baseline and this branch is dead — and they are ignored the moment
-      # docs/VALUES.md exists, which then has to carry its own rows.
-      values="$TMP/transitional-values.md"
-      {
-        printf '## Change log\n\n| Skill | Tag | Reason |\n|---|---|---|\n'
-        printf '| issue-pr-review | v0.27.0 | grew under epic #547, before the cap (#558) |\n'
-        printf '| issue-resolver | v0.27.0 | grew under epic #547, before the cap (#558) |\n'
-      } > "$values"
-    fi
     run --check --baseline "$TMP/tag-budgets.json" --baseline-tag "$tag" --changelog "$values"
     if [ "$RC" -eq 0 ]; then
       pass "no committed bundle is more than 2% above $tag without a change-log row"
@@ -774,7 +766,10 @@ if python3 - "$REPO_ROOT/.github/workflows/dist-check.yml" <<'EOF' 2>/dev/null
 import re, sys
 text = open(sys.argv[1], encoding="utf-8").read()
 lines = [re.sub(r"(^|\s)#.*$", "", l) for l in text.splitlines()]
-steps = re.split(r"(?m)^\s*- (?=name:|uses:)", "\n".join(lines))
+# Only the `drift` job counts: from its key to the next two-space job key.
+job = re.search(r"(?ms)^  drift:\n(.*?)(?=^  [A-Za-z0-9_-]+:|\Z)", "\n".join(lines))
+assert job
+steps = re.split(r"(?m)^\s*- (?=name:|uses:)", job.group(1))
 idx = [i for i, s in enumerate(steps) if s.startswith("name: test-skill-bundle-budget-466\n")]
 assert len(idx) == 1
 step = steps[idx[0]]
@@ -784,9 +779,9 @@ fetch = "git fetch --depth=1 origin 'refs/tags/v*:refs/tags/v*'"
 assert any(fetch in s for s in steps[:idx[0]])
 EOF
 then
-  pass "dist-check.yml fetches the release tags and sets IDD_REQUIRE_RELEASE_TAG on this step"
+  pass "dist-check.yml's drift job fetches the release tags and sets IDD_REQUIRE_RELEASE_TAG on this step"
 else
-  fail "dist-check.yml must fetch refs/tags/v* before test-skill-bundle-budget-466 and set IDD_REQUIRE_RELEASE_TAG: \"1\" on it"
+  fail "dist-check.yml's drift job must fetch refs/tags/v* before test-skill-bundle-budget-466 and set IDD_REQUIRE_RELEASE_TAG: \"1\" on it"
 fi
 
 echo ""

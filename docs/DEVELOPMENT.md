@@ -111,7 +111,7 @@ Every emitted bundle under `skills/<name>/` has a byte budget, and CI enforces i
 Issue #558 adds two more budgets per skill and a cap on growth between releases. All three are checked by the same script and the same CI step.
 
 - **SKILL.md ceiling** — `skills.<name>.skill_md` records the bytes of the built `skills/<name>/SKILL.md` (`measured`) and its ceiling (`budget`). SKILL.md is the one file every run of a skill loads in full, so it has its own ceiling inside the bundle budget.
-- **Always-read budget** — `skills.<name>.always_read` records the files SKILL.md tells the agent to read unconditionally (`files`, sorted), their summed bytes (`measured`) and the ceiling (`budget`). A line of the built SKILL.md points at a file when it says "read `references/x.md` now" (a parenthesis may sit between the path and "now"), or names a `references/….md` path and later on the same line says "read it now"; the nearest path before those words is the one meant. Matching ignores case. "Read … first", a plain "Read `references/x.md`", "now reads" and "Sync now?" are not pointers. Each file counts once per skill. A skill with no pointer records `files: []` and `measured: 0`.
+- **Always-read budget** — `skills.<name>.always_read` records the files SKILL.md tells the agent to read unconditionally (`files`, sorted), their summed bytes (`measured`) and the ceiling (`budget`). A line of the built SKILL.md points at a file when it says "read `references/x.md` now" or "read `references/x.md` first" (a parenthesis may sit between the path and that word), or names a `references/….md` path and later on the same line says "read it now"; the nearest path before those words is the one meant. The first form may list several paths joined by commas or "and" ("read `references/a.md` and `references/b.md` now"), and every listed file counts. Matching ignores case. A plain "Read `references/x.md`", "First read …", "now reads" and "Sync now?" are not pointers. The match is on the wording only, so a pointer inside a conditional sentence still counts and the figure errs high. Each file counts once per skill. A skill with no pointer records `files: []` and `measured: 0`.
 - **Same rules, same headroom.** Both figures follow the bundle rules with the same `headroom_bytes`: over budget fails, slack beyond the headroom fails, a stale `measured` fails, and `--ratchet` lowers a ceiling but never raises one. Raise one by hand the same way: set `skill_md.budget` or `always_read.budget`, then ratchet. Two more failures apply to `always_read`: a pointer to a file that is not in the bundle, and a detected file set that differs from the recorded `files` (the ratchet rewrites it). An entry that lacks either field fails `--check` and names the ratchet command.
 - **Growth cap** — a bundle more than 2% larger than its `measured` at the last release tag fails, unless the change log exempts it. Exactly +2% passes, and a skill the tagged file does not name is new and uncapped. The script does not run git, so the caller extracts the tagged budgets file:
 
@@ -127,14 +127,14 @@ Issue #558 adds two more budgets per skill and a cap on growth between releases.
   ```markdown
   ## Change log
 
-  | Date | Skill | Tag | Reason |
-  |------|-------|-----|--------|
-  | 2026-11-12 | issue-pr-review | v0.27.0 | criterion judge added under epic #547 |
+  | Date | Item | Change | Requested by |
+  |------|------|--------|--------------|
+  | 2026-11-12 | issue-pr-review | Growth-cap exemption against v0.27.0: … | maintainer |
   ```
 
   `issue-pr-review-x` does not name `issue-pr-review`, and `v0.27.01` does not name `v0.27.0`. A row outside the section, a row for another tag and a row for another skill exempt nothing. An absent or unreadable `docs/VALUES.md`, or one with no `## Change log` section, means no exemption. `docs/VALUES.md` changes only on the maintainer's request, so ask before adding a row.
 - **In CI** the `drift` job fetches the release tags before the budget step and sets `IDD_REQUIRE_RELEASE_TAG=1`, so a checkout where no tag resolves fails. Without the variable (a local clone with no tags, or the model-data refresh workflow) the test prints a `⚠` line and skips the growth case.
-- **Transitional allowance for v0.27.0.** `issue-pr-review` and `issue-resolver` grew past 2% under epic #547, before the cap existed. While `docs/VALUES.md` is not tracked and the latest release tag is `v0.27.0`, the test supplies those two rows itself. The allowance expires at the next release tag, which resets the baseline, and it is ignored as soon as `docs/VALUES.md` exists: that file must then carry its own rows. The allowance lives only in the test, so the local `--baseline` command above reports those two skills over the cap until one of those happens.
+- **Exemptions for v0.27.0.** `issue-pr-review` and `issue-resolver` grew past 2% on `main` between `v0.27.0` and the cap's introduction in #558. `docs/VALUES.md` carries one change-log row for each, approved by the maintainer on 2026-11-12. The test supplies no row of its own: it reads the committed `docs/VALUES.md` and nothing else, so removing either row turns the growth case red. Both rows stop mattering at the next release tag, which resets the baseline.
 
 ### Codex plugin (issue #489)
 
