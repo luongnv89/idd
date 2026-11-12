@@ -228,6 +228,10 @@ own `criteria_covered`.
 against: the synthesizer's returned `criteria` (a `light`/inline plan: the bound
 list), or on `reuse` the analysis's.
 
+**Recorded.** The `[3/5]` progress write (`references/steps/step-0j-progress-record.md`)
+carries the selected option's `criteria_covered` and this `criteria` list, so a
+resume re-runs this check against the live body.
+
 **On `reuse`** the IDs predate this run (and 0d), so any result but `covered` —
 `gap`, `renumbered`, exit 3, no `criteria` in the analysis — sets
 `analysis_reuse = stale` and spawns the synthesizer with the binding. Only a
