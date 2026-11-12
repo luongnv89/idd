@@ -40,13 +40,19 @@ When the verification gates disable a dimension (`review.require_acceptance_crit
 
 > Run only when `review.require_acceptance_criteria_check` is `true`. When `false`, skip this entire subsection and emit `○ acceptance_criteria: disabled (review.require_acceptance_criteria_check: false)`.
 
-Fetch the linked issue and parse its `## Acceptance Criteria` section into individual checklist items. For each criterion, evaluate against the PR diff and produce one of three statuses:
+Number the `## Acceptance Criteria` items of `linked_issue_snapshot` from 1. **Never judge them yourself:** you have read the PR body, which carries the author's own Decision Record and criteria table. <!-- a:rvc-criteria-judge -->
+
+1. **Judge in isolation.** Spawn `shared/agents/criteria-judge.md` (default agent; the `code-reviewer` role's overrides, `docs/agent-overrides.md`) with only `issue_context` (the snapshot's number, title and body, then the numbered criteria), `diff_command` = `gh pr diff {N}`, `head_sha` = `headRefOid`, `branch_name`, `base_branch`, `run_tests` = `review.run_tests` and `test_timeout` = `review.test_timeout`. Nothing from the PR title, body or comments reaches it. A verdict holds for one head: after a push moves it, whoever pushed, spawn a fresh judge, and re-judge before Step 7 reads the *Merge floor* when the judged head is not `verified_head`.
+2. **Hold `pass` to its evidence.** Pipe `{"head", "criteria", "deferred", "verdicts"}` into `python3 references/scripts/gi-criteria.py` — `deferred` lists the numbers whose criterion text matches a deferred row's Criterion cell in a body whose line 1 is `Refs #{N}` (*Intentional reference*; check 1 alone judges its form) — trimmed, case and a trailing `(…)` marker ignored; a row matching none defers nothing — else `[]`; `verdicts` is the judge's JSON verbatim. Render its `rows`, and never change a status it returns; a judge `summary` reporting a changed `git status --porcelain` goes under `Uncertainty`.
+   - **Exit 0:** use `rows` and `counts`. Malformed judge output never stops the run; the rows it affects are already `unverified`.
+   - **Exit 3:** the record you built is malformed. Fix it and re-run; never read it as a verdict.
+   - **No `python3`, exit 2 or 4:** print `⚠ gi-criteria unavailable — applying the evidence rule by hand` and apply the `pass` row below to each verdict; a missing or unreadable verdict is `unverified`.
 
 | Status | When |
 |--------|------|
-| `pass` | The PR demonstrably satisfies the criterion. Evidence is required: a file path with line range, a test name, or a one-line description of how the change fulfills the criterion. For **bug** issues, evidence for the fixed-symptom criterion MUST cite the Decision Record **Reproduction** line (command and red→green path), not only a checkmark. |
-| `fail` | The PR does not satisfy the criterion. Evidence is required: what's missing or what contradicts the criterion. |
-| `unverified` | The criterion cannot be verified from the diff alone (e.g., needs production validation, manual user testing, or behavior outside the change set). Explanation is required. |
+| `pass` | Shown at head with evidence anyone can re-run: a named test that exited 0 at `headRefOid`, or a command and its observed output at `headRefOid`. For a **bug**, the fixed-symptom criterion needs the regression test or reproduction command run green; the Decision Record **Reproduction** line is traceability check 3. |
+| `fail` | The PR does not satisfy the criterion; the evidence says what is missing or contradicts it. |
+| `unverified` | It cannot be shown at head (production, a device, manual testing), **or `gi-criteria.py` downgraded a `pass`** that rested on a description, a file path, a red test, empty output or another SHA. |
 
 Output a structured block:
 
@@ -54,7 +60,7 @@ Output a structured block:
 ○ Acceptance Criteria
   | # | Criterion | Status | Evidence |
   |---|-----------|--------|----------|
-  | 1 | "{criterion text}" | pass | tests/foo.test.ts: case 'rejects empty' |
+  | 1 | "{criterion text}" | pass | test `rejects empty` green @ abc1234 |
   | 2 | "{criterion text}" | fail | exclusion list still hard-codes /login |
   | 3 | "{criterion text}" | unverified | needs manual mobile-device test |
 ```

@@ -475,3 +475,6 @@ jobs:
 
       - name: test-plan-criteria-coverage-554
         run: bash tests/test-plan-criteria-coverage-554.sh
+
+      - name: test-criteria-evidence-555
+        run: bash tests/test-criteria-evidence-555.sh
