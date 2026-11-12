@@ -167,8 +167,8 @@ When done, report back ONLY these fields:
 - issues_noted: total issues noted but not fixed ("note" action issues)
 - remaining_issues: array of unfixed issue descriptions (empty if clean)
 - criteria: {"pass": n, "fail": n, "unverified": n} — the final cycle's
-  acceptance-criteria counts (deferred rows excluded); null when that check is
-  disabled
+  acceptance-criteria counts (deferred rows excluded only on a `Refs #N` PR);
+  null when that check is disabled
 - partial_dimensions: dimensions reported partial in the final cycle ([] if none)
 - disabled_dimensions: dimensions reported disabled by config ([] if none)
 - merge_floor: "met" or "unmet: {reason}" — the skill's *Merge floor* verdict

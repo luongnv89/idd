@@ -385,11 +385,12 @@ These derivations are the resolver's own:
 - **`ceiling`** — class policy: `1` if `profile` is `light`; `resolve.qa_max_cycles`
   (default 5) if complexity is `high`; otherwise `2`. Fail-safe omitted
   profile/complexity as full + medium (`2`).
-- **`breach_reason`** — required only when `qa_cycles` exceeds `ceiling`
-  (`gi-runlog.py` exit 3 otherwise).
+- **`breach_reason`** — required when `qa_cycles` exceeds `ceiling`
+  (`gi-runlog.py` exits 3 without it); omit otherwise.
 - **`verification`** — `success` only, by the `docs/run-log-schema.md` rule
   applied to the PR's AC table: any row not `pass` → `partial`, deferred rows
-  excluded; so does Step 0's `Criteria confirmed` at `×`. Not returned under `--no-run-log`.
+  excluded only on a `Refs #N` PR (`/issue-pr-review` *Intentional reference*);
+  so does Step 0's `Criteria confirmed` at `×`. Not returned under `--no-run-log`.
 
 `outcome` is one of `success` (a PR was delivered), `already_resolved` (Step 0/1
 found the issue already fixed and exited early), or `failed` (a step failed). A
