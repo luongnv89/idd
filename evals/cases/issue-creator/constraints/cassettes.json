@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "calls": [
+    {
+      "match": "prefix",
+      "argv": [
+        "auth",
+        "status"
+      ],
+      "stdout": "github.com\n  ✓ Logged in to github.com as eval-bot (key)\n",
+      "stderr": "",
+      "exit": 0
+    },
+    {
+      "match": "prefix",
+      "argv": [
+        "issue",
+        "create"
+      ],
+      "stdout": "https://github.com/eval/harness/issues/1\n",
+      "stderr": "",
+      "exit": 0
+    },
+    {
+      "argv": [
+        "issue",
+        "view",
+        "1",
+        "--json",
+        "number,title,body,state"
+      ],
+      "stdout": "{\"number\":1,\"title\":\"Feature: Add CSV export to the reports page\",\"body\":\"<!-- idd:normalized v1 -->\\n\\n## Type\\n\\nfeature (high confidence)\\n\\n## Description\\n\\nUsers can download the reports table as a CSV file.\\n\\n> **Reporter Context**\\n> Add CSV export to the reports page. Don't change the existing JSON API. An export of 10,000 rows must finish in under 5 seconds. PDF export is out of scope.\\n\\n## Acceptance Criteria\\n\\n- [ ] The reports page offers a CSV download of the visible table (high confidence)\\n- [ ] The CSV holds one header row and one row per report (medium confidence)\\n\\n## Constraints\\n\\n- **Invariant:** The existing JSON API does not change (high confidence)\\n- **Limit:** An export of 10,000 rows finishes in under 5 seconds (high confidence)\\n- **Non-goal:** PDF export (high confidence)\\n\\n## Metadata\\n\\n**Priority:** P2 (medium confidence)\\n**Effort:** S (medium confidence)\\n**Labels:** feature, reports (medium confidence)\\n\",\"state\":\"OPEN\"}\n",
+      "stderr": "",
+      "exit": 0
+    }
+  ]
+}

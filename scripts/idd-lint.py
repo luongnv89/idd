@@ -52,7 +52,7 @@ from datetime import datetime, timezone
 from typing import Callable, NamedTuple
 from pathlib import Path
 
-SPEC_VERSION = "1.1"
+SPEC_VERSION = "1.2"
 SPEC_URL = "https://github.com/luongnv89/idd/blob/main/SPEC.md"
 
 MARKER_RE = re.compile(r"<!--\s*(?:gitissue|idd):normalized\s+v(\d+)\s*-->")
@@ -63,6 +63,8 @@ DEP_MARKER_RE = re.compile(r"(?i)\b(?:depends on|blocked by)\b")
 CROSS_REPO_TOKEN_RE = re.compile(r"\S+/\S+#\d+")
 BARE_ISSUE_RE = re.compile(r"(?<![\w/])#(\d+)")
 PART_MARKER_RE = re.compile(r"\bpart of:?\s*(#\d+)", re.IGNORECASE)
+LIST_ITEM_RE = re.compile(r"^[-*] +(.*\S)")
+CONSTRAINT_LABEL_RE = re.compile(r"^(?:\[[ xX]\] )?\*\*(?:Non-goal|Invariant|Limit):\*\*")
 
 ISSUE_TYPES = ("bug", "feature", "improvement")
 BRANCH_TYPES = ("fix", "feat", "refactor", "docs", "test", "chore")
@@ -268,6 +270,25 @@ def _check_issue_hierarchy(context: IssueLintContext) -> list[Finding]:
     return [info("I09", f"hierarchy marker: Part of {', '.join(parents)} (§2.1)")]
 
 
+def _check_issue_constraints(context: IssueLintContext) -> list[Finding]:
+    """Optional `## Constraints` (spec 1.2): absent is silent, so every issue
+    normalized before the section existed stays conformant."""
+    section = context.sections.get("Constraints")
+    if section is None:
+        return []
+    items = [m.group(1) for m in map(LIST_ITEM_RE.match, section.splitlines()) if m]
+    if not items:
+        return [warn("I10", "'## Constraints' has no list items — omit the section when none were stated (§1.1)")]
+    findings: list[Finding] = []
+    if CHECKBOX_RE.search(section):
+        findings.append(warn("I10", "'## Constraints' uses checkboxes — constraints are plain list items, not acceptance criteria (§1.1)"))
+    unlabeled = sum(1 for item in items if not CONSTRAINT_LABEL_RE.match(item))
+    if unlabeled:
+        findings.append(warn("I10", f"{unlabeled} constraint item(s) lack a **Non-goal:**/**Invariant:**/**Limit:** label (§1.1)"))
+    findings.append(ok("I10", f"constraints present ({len(items)} item{'s' if len(items) != 1 else ''}) (§1.1)"))
+    return findings
+
+
 IssueCheck = Callable[[IssueLintContext], list[Finding]]
 ISSUE_CHECKS: tuple[IssueCheck, ...] = (
     _check_issue_marker,
@@ -279,6 +300,7 @@ ISSUE_CHECKS: tuple[IssueCheck, ...] = (
     _check_issue_metadata,
     _check_issue_dependencies,
     _check_issue_hierarchy,
+    _check_issue_constraints,
 )
 
 

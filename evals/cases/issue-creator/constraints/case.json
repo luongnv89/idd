@@ -1,0 +1,40 @@
+{
+  "name": "issue-creator/constraints",
+  "skill": "issue-creator",
+  "prompt": "Add CSV export to the reports page. Don't change the existing JSON API. An export of 10,000 rows must finish in under 5 seconds. PDF export is out of scope.",
+  "grade": [
+    {
+      "tool": "idd-lint",
+      "args": [
+        "issue",
+        "OUT/issue.md"
+      ],
+      "expect_exit": 0,
+      "label": "body with a Constraints section after the criteria passes idd-lint"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/report.txt",
+      "expect_exit": 0,
+      "label": "every constraint is labelled, confidence-marked and taken from the reporter's text"
+    },
+    {
+      "tool": "gh-calls",
+      "expect_by_command": {
+        "issue create": 1,
+        "issue view": 1
+      },
+      "expect_exit": 0,
+      "label": "created issue is read back before reporting completion"
+    }
+  ],
+  "human_review": {
+    "criteria": [
+      "The Constraints section holds only boundaries the reporter stated, never one inferred from code.",
+      "Each item carries one Non-goal/Invariant/Limit label and a confidence marker.",
+      "The section is omitted when the reporter stated no boundary."
+    ],
+    "feedback": "Record each reviewer answer; absent, blank, or nonresponsive feedback leaves understanding unconfirmed.",
+    "scope": "This deterministic stand-in tests a fixture, not live agent behavior. Apply these criteria to actual agent outputs in behavioral evaluations."
+  }
+}

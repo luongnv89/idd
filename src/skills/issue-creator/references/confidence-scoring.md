@@ -16,6 +16,7 @@ Auto-enriched fields include a confidence level. Confidence is displayed in prev
 |-------|------------------------------|
 | **Type classification** | high = explicit error/crash keywords (bug) or "add"/"new" (feature); medium = inferred from description tone; low = ambiguous, defaulted |
 | **Acceptance criteria** | high = directly derived from explicit requirements in description; medium = inferred from problem description; low = generic criteria from template |
+| **Constraints** | high = the reporter's words; medium = paraphrased from them; never low — leave it out |
 | **Metadata — Priority** | high = reporter stated urgency or blocking impact; medium = inferred from type/severity; low = defaulted band (e.g. P2) |
 | **Metadata — Effort** | high = scope explicit in description; medium = inferred from described change size; low = defaulted XS/S/M/L/XL from template |
 | **Metadata — Labels** | high = labels explicitly named by reporter; medium = inferred from keywords/paths; low = generic type-based defaults |

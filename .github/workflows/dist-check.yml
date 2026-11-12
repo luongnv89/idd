@@ -481,3 +481,6 @@ jobs:
 
       - name: test-bug-proof-556
         run: bash tests/test-bug-proof-556.sh
+
+      - name: test-issue-constraints-557
+        run: bash tests/test-issue-constraints-557.sh

@@ -30,6 +30,10 @@
 - [ ] {criterion_2} {criterion_2_confidence}
 - [ ] {criterion_3} {criterion_3_confidence}
 
+## Constraints
+
+{constraints}
+
 ## Metadata
 
 **Priority:** {priority} {priority_confidence}

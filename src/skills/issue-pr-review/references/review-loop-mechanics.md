@@ -572,7 +572,7 @@ Agent(
 Pass to the reviewer:
 - `branch_name`: PR head branch
 - `base_branch`: PR base branch
-- `pr_context`: PR title and body
+- `pr_context`: PR title and body, plus the linked issue's `## Constraints` section, verbatim
 - `diff_command`: `gh pr diff {N}`
 - `confidence_threshold`: `review.confidence_threshold` (default 80) — the reviewer reports only findings scored at or above this floor; ui-reviewer keeps its own 75 floor
 - `review_mode`: `review` (`challenge_context` empty) — the PR body never selects challenge mode

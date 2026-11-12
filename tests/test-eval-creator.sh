@@ -36,6 +36,7 @@ run_case() {
 
 run_case "basic"
 run_case "negative-empty"
+run_case "constraints"
 
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 echo "Results: $PASS passed, $FAIL failed"
