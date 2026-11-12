@@ -66,7 +66,7 @@ Stop.
 Classify type from the existing issue content, then resolve templates from `issue.template` (same rule as Create Step 4: `"default"` → bundled `templates/`, else the configured directory):
 
 1. Preserve the entire original issue body in `> **Reporter Context**` blockquote
-2. Fill all template sections from the issue text (type, description, acceptance criteria, metadata)
+2. Fill all template sections from the issue text (type, description, acceptance criteria, constraints per Create Step 4 item 6 — omitted when none are stated, metadata)
 3. Place `<!-- idd:normalized v1 -->` at the top
 4. If original body > 60K chars, truncate Metadata to fit under 65KB
 

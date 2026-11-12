@@ -167,6 +167,7 @@ for t in bug feature improvement; do
 done
 has "$IC/SKILL.source.md" "6. **Constraints** — only non-goals, invariants and non-functional limits the reporter stated" "T3.9: the creator fills it only from the reporter"
 has "$IC/SKILL.source.md" "item each with its confidence; never inferred. None stated: omit the section" "T3.10: each item is confidence-marked, and an empty section is omitted"
+has "$IC/references/modes.md" "constraints per Create Step 4 item 6" "T3.10b: Normalize mode applies the same Constraints rule"
 has "$IC/references/confidence-scoring.md" "| **Constraints** | high = the reporter's words" "T3.11: confidence-scoring has a Constraints row"
 has "$REVIEWER" "**Stated constraints** (category \`constraints\`)" "T3.12: the reviewer checks stated constraints"
 has "$REVIEWER" "is always reported, at any confidence" "T3.13: an invariant touch is never dropped by the threshold"
@@ -177,6 +178,7 @@ has "$LOOP" "plus the linked issue's \`## Constraints\` section, verbatim" "T3.1
 # ── T4: built bundles ─────────────────────────────────────────────────────
 has "$ROOT/skills/issue-creator/templates/feature.md" "## Constraints" "T4.1: the built creator template carries the section"
 has "$ROOT/skills/issue-creator/SKILL.md" "6. **Constraints** —" "T4.2: the built creator skill carries the fill rule"
+has "$ROOT/skills/issue-creator/references/modes.md" "constraints per Create Step 4 item 6" "T4.2b: the built creator bundle carries the Normalize rule"
 for s in issue-resolver issue-pr-review; do
   has "$ROOT/skills/$s/references/agents/code-reviewer.md" "**Stated constraints**" "T4.3: $s bundles the reviewer rule"
 done
