@@ -162,7 +162,7 @@ Some PRs track no single issue — skill quality passes, dependency bumps, doc-o
 
 The exemption applies **only to check 1**; checks 2-4 still run, and a missing commit reference or Decision Record is `partial`, never `fail`. Check 4's non-`pass` outcomes — *qualified-only*, *defeated*, *unverified* — are not exempt-able: the exemption concerns this PR's issue link, check 4 the repository, so **a non-`pass` check 4 keeps the dimension at `partial` even on an exempt PR**. Check 2 needs an issue number: with no linked issue it reports `n/a — no linked issue`; with one but no referencing commit, `○ pass — exempt; no commit references #{N} (note)`.
 
-Report wording is the table's *exempt* row; check 2-3 partials are appended to it (e.g. `; no commit references #{N}`).
+Report wording is the table's *exempt* row, check 2-3 partials appended (e.g. `; no commit references #{N}`).
 
 To **disable** the exemption, set `traceability_exempt_labels: []` and `traceability_exempt_pattern: ""` in `.idd.yml`. The *Intentional reference* form is not an exemption and stays in force.
 
