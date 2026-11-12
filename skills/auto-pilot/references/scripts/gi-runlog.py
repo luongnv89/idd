@@ -14,6 +14,14 @@ value is null are dropped rather than written, a missing `ts` is filled from the
 UTC clock, and the keys are emitted in the canonical order so the file stays
 greppable and diffable.
 
+Cost and provenance (issue #562) are five optional keys, validated here and
+never invented: `tokens` (integer >= 1) and `agents` (integer >= 0) are the
+values the run's Run Stats Footer printed, `model` and `effort` name the
+session that ran it, and `skill_version` is the writing skill's own `X.Y.Z`.
+A writer omits what it does not know; `tokens: 0` is rejected because a
+host-reported count is never zero and a zero-filled one would pull the
+per-release median toward a number nobody measured.
+
 `--failure-streak N` is the one **read** mode. It scans the log backwards and
 counts the issue's leading run of `failed` outcomes — the consecutive
 most-recent records for that issue — stopping at the first record for that
@@ -122,6 +130,11 @@ KEY_ORDER = (
     "verification",
     "duration_s",
     "phases",
+    "tokens",
+    "agents",
+    "model",
+    "effort",
+    "skill_version",
     "skipped_reason",
 )
 
@@ -137,6 +150,11 @@ OPTIONAL_KEYS = (
     "verification",
     "duration_s",
     "phases",
+    "tokens",
+    "agents",
+    "model",
+    "effort",
+    "skill_version",
     "skipped_reason",
 )
 
@@ -183,6 +201,14 @@ VERIFICATION = frozenset({"full", "partial", "disabled"})
 PHASE_NAME_RE = re.compile(r"^[a-z][a-z0-9_-]{0,31}$")
 MAX_PHASES = 16
 
+# Cost and provenance (issue #562). `model` and `effort` are whatever the host
+# calls them, so the shape is open but bounded: one short token with no
+# whitespace or control characters, so a reader can print it unescaped.
+# `skill_version` is the writing skill's `metadata.version`, always X.Y.Z.
+# Both end on `\Z`, not `$`, which would let a trailing newline through.
+PROVENANCE_TOKEN_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/\[\]@+-]{0,63}\Z")
+SKILL_VERSION_RE = re.compile(r"^(0|[1-9]\d{0,5})\.(0|[1-9]\d{0,5})\.(0|[1-9]\d{0,5})\Z")
+
 # The researcher estimates on five values; the run log stores three.
 COMPLEXITY_COLLAPSE = {
     "trivial": "low",
@@ -192,7 +218,7 @@ COMPLEXITY_COLLAPSE = {
     "complex": "high",
 }
 
-INT_KEYS = ("issue", "qa_cycles", "ceiling", "duration_s")
+INT_KEYS = ("issue", "qa_cycles", "ceiling", "duration_s", "tokens", "agents")
 STR_KEYS = (
     "ts",
     "event_id",
@@ -205,6 +231,9 @@ STR_KEYS = (
     "skipped_reason",
     "breach_reason",
     "verification",
+    "model",
+    "effort",
+    "skill_version",
 )
 
 
@@ -335,6 +364,27 @@ def normalize_record(record: object, *, now: str | None = None) -> dict[str, obj
                 raise RecordError(f"phases.{name} must be a non-negative integer")
         if not phases:
             out["phases"] = None  # an empty map is absent, dropped below
+
+    # Cost and provenance (#562). INT_KEYS/STR_KEYS above already rejected the
+    # wrong type (a bool included); these are the range and shape checks.
+    tokens = out.get("tokens")
+    if tokens is not None and tokens < 1:
+        raise RecordError(
+            "tokens must be a positive integer (omit it when the host reported no count)"
+        )
+    agents = out.get("agents")
+    if agents is not None and agents < 0:
+        raise RecordError("agents must be a non-negative integer")
+    for key in ("model", "effort"):
+        value = out.get(key)
+        if value is not None and not PROVENANCE_TOKEN_RE.match(value):
+            raise RecordError(
+                f"{key} must be 1-64 characters of [A-Za-z0-9._:/[]@+-], "
+                "starting with a letter or digit"
+            )
+    skill_version = out.get("skill_version")
+    if skill_version is not None and not SKILL_VERSION_RE.match(skill_version):
+        raise RecordError("skill_version must be X.Y.Z")
 
     # Absent optional fields are omitted, never written as null. `pr` is the
     # single documented exception and is required, so it is never dropped.
