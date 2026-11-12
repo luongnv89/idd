@@ -1276,7 +1276,9 @@ EXPECTED_SITES = {
     # it had inherited from before that boundary existed.
     # 14 since issue #553: explicit-list validation pipes each listed issue's
     # body into gi-ready.py for the readiness check.
-    "gi-deps.py": 1, "gi-issue.py": 14,
+    # 13 since issue #584: that check pipes the retained explicit_issue_records
+    # entry instead — one body snapshot, so the re-read site is gone by design.
+    "gi-deps.py": 1, "gi-issue.py": 13,
     # 4 since issue #260: parallel failed-lane quarantine and the serialized
     # drain both call --append-once, beside the legacy --append and the
     # --failure-streak read from issue #259.
@@ -1317,8 +1319,10 @@ EXPECTED_SITES = {
     "gi-progress.py": 11,
     # issue #553: readiness — triage Step 1, auto-pilot Step 1.2b, explicit-list
     # validation and the resolver's 0c gate. 6 since issue #554: the resolver's
-    # Step 2 Criteria coverage gate runs --criteria and --coverage.
-    "gi-ready.py": 6,
+    # Step 2 Criteria coverage gate runs --criteria and --coverage. 8 since
+    # issue #584: issue-analysis numbers the criteria for its synthesizer
+    # (subagent-steps.md) and its inline fallback (inline-fallback.md).
+    "gi-ready.py": 8,
 }
 # A call is any mention of a shared script by filename, however it is launched
 # (python3, python3.11, uv run, a bare ./path relying on the exec bit), plus the
