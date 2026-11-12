@@ -103,9 +103,9 @@ fi
 # ── AC3: step completion reports ──────────────────────────────────────────────
 # "<skill>|<reference file that owns the format>"
 for entry in \
-  "issue-resolver|report-templates.md" \
+  "issue-resolver|step-reports.md" \
   "issue-pr-review|report-templates.md" \
-  "auto-pilot|summary-format.md" \
+  "auto-pilot|step-reports.md" \
   "issue-triage|output-and-persist.md" \
 ; do
   skill="${entry%%|*}"

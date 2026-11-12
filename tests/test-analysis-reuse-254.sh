@@ -286,7 +286,7 @@ if printf '%s' "$PLAN_BLOCK" | grep -qE 'rejection_reason'; then
 else
   fail "T6.5: the reuse path must account for the mandatory rejection_reason field"
 fi
-check_has "$SRC_TEMPLATES" 'Options produced' \
+check_has "$REPO_ROOT/src/skills/issue-resolver/references/step-reports.md" 'Options produced' \
   "T6.6: the Step 2 completion check is reconciled with option-less synthesis"
 check_has "$SRC_TEMPLATES" 'analysis_reuse = fresh' \
   "T6.7: the completion-report rule names the reuse state"

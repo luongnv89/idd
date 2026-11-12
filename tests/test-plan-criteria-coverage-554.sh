@@ -173,7 +173,7 @@ has "$ROOT/src/skills/issue-analysis/references/output-and-persist.md" '| `crite
   "T4.15 the analysis persists the numbering its IDs refer to"
 has "$RS/SKILL.source.md" '*Step 2 — Plan → Criteria coverage gate*' "T4.9 SKILL.md points to the one home"
 has "$RS/references/error-messages.md" '### Plan leaves a criterion uncovered' "T4.10 the stop has an error block"
-has "$RS/references/report-templates.md" '`Scope inside the issue` is `√` when the *Criteria coverage gate* returns' \
+has "$RS/references/step-reports.md" '`Scope inside the issue` is `√` when the *Criteria coverage gate* returns' \
   "T4.11 Scope inside the issue has a procedure"
 has "$ROOT/src/skills/issue-analysis/references/output-and-persist.md" '`options[].criteria_covered`' \
   "T4.12 the analysis schema lists the field"

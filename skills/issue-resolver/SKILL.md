@@ -101,12 +101,14 @@ references/steps/step-0-preflight.md
 references/steps/step-0h-analysis-reuse.md
 references/steps/step-0i-caller-payload.md
 references/steps/step-0j-progress-record.md
+references/steps/step-0j-resume.md
 references/steps/step-1-research.md
 references/steps/step-2-plan.md
 references/steps/step-3-implement.md
 references/steps/step-4-qa.md
 references/steps/step-5-deliver.md
 references/report-templates.md
+references/step-reports.md
 references/run-stats.md
 references/bug-verification.md
 references/skill-index.md
@@ -146,7 +148,7 @@ references/scripts/gi-ready.py
 
 ## Progress record <!-- a:rs-progress -->
 
-A killed session can resume (`--resume`). Read the record after the precheck, before *0a*; from *0c* on, write it with `references/scripts/gi-progress.py` at every `[N/5]` start, at each Step 4 cycle, and before every effect. It holds only what git and GitHub cannot reproduce: the step, the plan summary, cycle counts, the premise ledger, open findings, the last effect. **A record never satisfies or skips a safety gate:** every gate re-runs live, and any doubt is stale (start from Step 0). Write points, resume, validation and reconciliation: `references/steps/step-0j-progress-record.md` (*Step 0j — Progress record*) — **read it now**.
+A killed session can resume (`--resume`). Read the record after the precheck, before *0a*; from *0c* on, write it with `references/scripts/gi-progress.py` at every `[N/5]` start, at each Step 4 cycle, and before every effect. It holds only what git and GitHub cannot reproduce: the step, the plan summary, cycle counts, the premise ledger, open findings, the last effect. **A record never satisfies or skips a safety gate:** every gate re-runs live, and any doubt is stale (start from Step 0). Write points and resume entry: `references/steps/step-0j-progress-record.md` (*Step 0j — Progress record*) — **read it now**; a resuming run then reads `references/steps/step-0j-resume.md`.
 
 ---
 
@@ -156,7 +158,7 @@ A killed session can resume (`--resume`). Read the record after the precheck, be
 
 ### Step completion reports
 
-Each step closes with `√`/`×` per check and a `Result: PASS | PARTIAL | FAIL` line (*Step Completion Reports* in `references/report-templates.md`, **read it now**). A step is incomplete until `Result:` prints.
+Each step closes with `√`/`×` per check and a `Result: PASS | PARTIAL | FAIL` line (*Step Completion Reports* in `references/step-reports.md`, **read it now**). A step is incomplete until `Result:` prints.
 
 ---
 
