@@ -10,8 +10,8 @@ Two `.idd.yml` flags decide whether the acceptance-criteria and traceability che
 
 | Flag | Default | When `true` (default) | When `false` |
 |------|---------|----------------------|--------------|
-| `review.require_acceptance_criteria_check` | `true` | Run per-criterion verification described below; any `fail` blocks soft-pass. | Skip the check entirely. Report `○ acceptance_criteria: pass` with the explicit note `verification disabled (review.require_acceptance_criteria_check: false)`. Never blocks soft-pass; emit no fixable issues for this dimension. |
-| `review.require_traceability_check` | `true` | Run the four traceability checks below; missing `Closes #N` blocks soft-pass. | Skip the check entirely. Report `○ traceability: pass` with the explicit note `verification disabled (review.require_traceability_check: false)`. Never blocks soft-pass; emit no fixable issues for this dimension. |
+| `review.require_acceptance_criteria_check` | `true` | Run per-criterion verification described below; any `fail` blocks soft-pass. | Skip the check entirely. Report `○ acceptance_criteria: disabled (review.require_acceptance_criteria_check: false)`, never `pass`. Never blocks soft-pass; emit no fixable issues for this dimension. |
+| `review.require_traceability_check` | `true` | Run the four traceability checks below; missing `Closes #N` blocks soft-pass. | Skip the check entirely. Report `○ traceability: disabled (review.require_traceability_check: false)`, never `pass`. Never blocks soft-pass; emit no fixable issues for this dimension. |
 
 Both default to `true`, which preserves the issue #36 contract verbatim. Setting either flag to `false` is an explicit opt-out — the corresponding hard-block conditions in *Loop controls* (see SKILL.md Review Loop) no longer apply for that dimension.
 
@@ -19,7 +19,7 @@ A separate, narrower opt-out exists for refactor/chore PRs (see *Refactor/chore 
 
 ## Reviewer-category → dimension mapping
 
-SKILL.md (Step 3, *Dimensions*) names the five user-facing dimensions; this section owns the fixed mapping from reviewer categories. The reviewer's JSON output partitions findings by its own categories; this skill aggregates them: `correctness` → `correctness`; `code_quality` + `test_coverage` → `maintainability`; `security` + `edge_cases` → `safety`. The remaining two dimensions (`acceptance_criteria`, `traceability`) are produced by the checks below. Each dimension's status: any `action: fix` finding → ✗ `fail`; only `action: note` findings → ⚠ `partial`; no findings → ✓ `pass`.
+SKILL.md (Step 3, *Dimensions*) names the five user-facing dimensions; this section owns the fixed mapping from reviewer categories. The reviewer's JSON output partitions findings by its own categories; this skill aggregates them: `correctness` → `correctness`; `code_quality` + `test_coverage` → `maintainability`; `security` + `edge_cases` → `safety`. The remaining two dimensions (`acceptance_criteria`, `traceability`) are produced by the checks below. Each dimension's status: any `action: fix` finding → ✗ `fail`; only `action: note` findings → ⚠ `partial`; no findings → ✓ `pass`. ○ `disabled` is reserved for a dimension a verification gate switched off.
 
 ## Two-axis grouping — Spec vs Standards
 
@@ -34,11 +34,11 @@ Rationale for the split: `acceptance_criteria` is the literal Spec contract; `co
 
 **The axes are a presentation grouping only — they change nothing about analysis or gating.** The same findings, the same `action: "fix" | "note"` semantics, and the same per-dimension `pass`/`partial`/`fail` status rules apply unchanged. With `review.soft_pass: true`, `acceptance_criteria: fail` and a missing `Closes #N` are the only hard-blocks; with `review.soft_pass: false`, every note or partial is also a strict blocker. It is **not** recomputed as "Spec axis fail" or "Standards axis fail". Do not derive a per-axis verdict that gates the loop — the axis headers organize the report, the per-dimension statuses gate the configured pass.
 
-When the verification gates disable a dimension (`review.require_acceptance_criteria_check: false` or `review.require_traceability_check: false`), that dimension still appears under its axis, reported as `pass — verification disabled`. A disabled dimension never changes which axis the others sit under.
+When the verification gates disable a dimension (`review.require_acceptance_criteria_check: false` or `review.require_traceability_check: false`), that dimension still appears under its axis, reported as `disabled`. A disabled dimension never changes which axis the others sit under.
 
 ## Acceptance-criteria verification (per criterion)
 
-> Run only when `review.require_acceptance_criteria_check` is `true`. When `false`, skip this entire subsection and emit `○ acceptance_criteria: pass — verification disabled (review.require_acceptance_criteria_check: false)`.
+> Run only when `review.require_acceptance_criteria_check` is `true`. When `false`, skip this entire subsection and emit `○ acceptance_criteria: disabled (review.require_acceptance_criteria_check: false)`.
 
 Fetch the linked issue and parse its `## Acceptance Criteria` section into individual checklist items. For each criterion, evaluate against the PR diff and produce one of three statuses:
 
@@ -76,7 +76,7 @@ Each `fail` criterion becomes a fixable issue in Step 6 with `category: acceptan
 
 ## Traceability checks <!-- a:rvc-traceability-checks -->
 
-> Run only when `review.require_traceability_check` is `true`. When `false`, skip this entire subsection and emit `○ traceability: pass — verification disabled (review.require_traceability_check: false)`.
+> Run only when `review.require_traceability_check` is `true`. When `false`, skip this entire subsection and emit `○ traceability: disabled (review.require_traceability_check: false)`.
 
 Per the dual-write rule (see *Analysis Artifacts and Durable Memory* in `references/docs/idd-methodology.md`), the durable analysis signal must survive the squash-merge into git history. Run the following four checks against the PR body, the commits in the PR, and the repo's merge configuration:
 

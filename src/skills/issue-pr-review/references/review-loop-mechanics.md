@@ -29,8 +29,8 @@ produces a run that looks configured and is not.
 | `review.ignore_ci_billing_failures: false` | `true` makes a terminal Step 5 `fail` non-blocking **at this skill's review gate only**: CI is still polled and reported, Step 6 raises no CI fixable, and the soft-pass conjunction treats the CI leg as satisfied (in strict `soft_pass: false` mode too). `ci_status` still binds as `failed@<sha40>` and the step reports `PARTIAL`. The satisfied leg is **loop exit only**: Step 7's auto-merge gate excludes this path by name — an ignored CI failure is never clean, exactly as pending CI is never clean — so no run merges it, and `/auto-pilot`'s merge gate re-runs its own wait and still refuses. **It does not touch `ci_leg_runnable`** — see below. GitHub exposes no API field naming a billing failure, so it ignores *any* terminal CI failure. |
 | `review.ci_poll_interval: 30` / `review.ci_timeout: 600` / `review.test_timeout: 300` | Seconds. The first two are passed to `gi-ci-wait.py` as `--interval` / `--timeout`; the third bounds the Step 4 suite. |
 | `review.soft_pass: true` | `true` (default): when zero `action: fix` issues remain and the tests/CI/traceability legs pass, remaining `note` findings and `partial` dimensions are report-only. **`false` (strict):** the same tests/CI gates apply, and in addition every enabled dimension must be `pass` and no `action: "note"` finding may remain — a `partial` dimension or any note blocks a clean result **and blocks merge**. Notes never become fixer inputs (Step 6 fixes only `action: "fix"`), so strict mode surfaces them for manual remediation rather than looping without a fixable action. |
-| `review.require_acceptance_criteria_check: true` | `true` (default) gates per-criterion AC verification. When `false`, `acceptance_criteria` reports `pass — verification disabled` and never blocks soft-pass. |
-| `review.require_traceability_check: true` | `true` (default) gates the four traceability checks. When `false`, `traceability` reports `pass — verification disabled` and never blocks soft-pass. |
+| `review.require_acceptance_criteria_check: true` | `true` (default) gates per-criterion AC verification. When `false`, `acceptance_criteria` reports `disabled` (never `pass`) and never blocks soft-pass. |
+| `review.require_traceability_check: true` | `true` (default) gates the four traceability checks. When `false`, `traceability` reports `disabled` (never `pass`) and never blocks soft-pass. |
 | `review.traceability_exempt_labels: ["refactor", "chore"]` | Labels that exempt a PR from the `Closes #N` hard-fail; the exemption reports `traceability: pass — exempt`. It cannot relax check 4 — a non-`pass` check 4 still stands. Full scope in `verification-checks.md` (*Refactor/chore exemption*). |
 | `review.traceability_exempt_pattern: "^\\s*Type:\\s*(refactor|chore)\\s*$"` | Body-line regex granting the same exemption, for PRs that carry the type in the body rather than as a label. |
 | `review.ui_review.browser_review: "ask"` | `"false"` \| `"ask"` \| `"true"` — the optional browser (screenshot) review only. `"ask"` prompts interactive users and skips in auto mode. It does **not** gate the auto-detected code-level UI review, which has no config flag at all. |
@@ -156,7 +156,7 @@ opt-out path their reasoning does not hold on its own terms — so this branch i
 decided here rather than left as an unstated consequence. With that flag
 `false`, `references/verification-checks.md` (*Acceptance-criteria
 verification*) skips per-criterion verification entirely and reports
-`○ acceptance_criteria: pass — verification disabled`, so the hard-block cited
+`○ acceptance_criteria: disabled`, so the hard-block cited
 above never runs. That does not leave the record unread. It still feeds the
 Depth gate signals this same refresh supplies — the `Effort` band taken out of
 `linked_issue_snapshot`, and the labels fetched alongside it — and those do
@@ -173,7 +173,7 @@ three reasons:
   acceptance criteria, not a statement that the linked issue no longer matters
   to the review. Whether the review boundary's read succeeded is a different
   question from how one dimension is reported, and no flag answers it.
-- **It keeps the disabled note truthful.** `pass — verification disabled` names
+- **It keeps the disabled note truthful.** `○ acceptance_criteria: disabled` names
   exactly one reason the criteria went unverified: the operator switched the
   check off. Continuing past an unreadable record would print that note while a
   second, unchosen reason also applied, crediting a deliberate opt-out for a gap

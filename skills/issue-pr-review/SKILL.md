@@ -237,7 +237,7 @@ Then run per-criterion acceptance-criteria verification on `linked_issue_snapsho
 
 This skill produces `acceptance_criteria` and `traceability` itself, per `references/verification-checks.md`. Gating rules: <!-- a:rv-traceability-outcomes -->
 
-- `review.require_acceptance_criteria_check` / `review.require_traceability_check` (default `true`): when `false`, that dimension reports `pass — verification disabled` and never blocks.
+- `review.require_acceptance_criteria_check` / `review.require_traceability_check` (default `true`): when `false`, that dimension reports `disabled` — never `pass` — and never blocks.
 - **Any `acceptance_criteria: fail`** → Step 6 fixable (`category: acceptance_criteria`); **hard-blocks** soft-pass.
 - **`Closes #{linked_issue}` absent** (unless refactor/chore-exempt or a valid intentional `Refs`) → `traceability: fail`, Step 6 fixable "Add `Closes #{linked_issue}` to the PR body."; **hard-blocks** soft-pass, even with green tests. A failing `Refs #{linked_issue}` line 1 hard-blocks as `action: note`, **never** auto-fixed.
 - Other traceability gaps (missing commit ref; a human-authored PR with the Decision Record absent) report `traceability: partial` and do **not** block.

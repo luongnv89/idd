@@ -166,6 +166,11 @@ When done, report back ONLY these fields:
 - issues_fixed: total issues fixed (only "fix" action issues)
 - issues_noted: total issues noted but not fixed ("note" action issues)
 - remaining_issues: array of unfixed issue descriptions (empty if clean)
+- criteria: {"pass": n, "fail": n, "unverified": n} — the final cycle's
+  acceptance-criteria counts (deferred rows excluded); null when that check is
+  disabled
+- partial_dimensions: dimensions reported partial in the final cycle ([] if none)
+- disabled_dimensions: dimensions reported disabled by config ([] if none)
 - pre_pass_fixes: number of files auto-fixed by lint/format tools
 - tests_passed: true/false
 - ci_status: "passed@<sha40>", "failed@<sha40>", or "no_ci" — the Step 5 verdict

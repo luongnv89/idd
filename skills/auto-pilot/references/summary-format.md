@@ -30,9 +30,9 @@ outcome. Later runs skip the issue as an ordinary label skip.
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Result:                  {COMPLETED / PAUSED / LIMIT REACHED / BUDGET REACHED / RATE LIMITED} — {complete | partial}: {main finding}
 
-  Iteration 1:       ✓ merged                — #{n1} {title1} → PR #{pr1}
+  Iteration 1:       ✓ merged                — #{n1} {title1} → PR #{pr1} · AC {p}/{f}/{u} pass/fail/unverified{; partial: …}{; disabled: …}
   Iteration 2:       ⚠ left_open             — #{n2} {title2} → PR #{pr2}
-  Iteration 3:       ⚠ partial_followup      — #{n5} {title5} → PR #{pr5}, follow-up #{f5}
+  Iteration 3:       ⚠ partial_followup      — #{n5} {title5} → PR #{pr5}, follow-up #{f5} · AC {p}/{f}/{u} …
   Iteration 4:       ⚠ blocked_by_dependency — #{n6} {title6} → PR #{pr6} (dep: #{dep})
   Iteration 5:       ○ skipped               — #{n3} {title3} (blocked)
   Iteration 6:       ✗ failed                — #{n4} {title4} (resolver step {step})
@@ -108,12 +108,14 @@ to qualify.
 
 1. **Result first.** The first row is `Result:` with one of the five values, then
    `complete` or `partial`, then the main finding:
-   - `complete` — every processed iteration ended `merged`, or `skipped` for a
-     reason the user chose (`--skip`, a skip label, already resolved), and no
-     completion-report check was `×`.
+   - `complete` — every processed iteration ended `merged` with `verification:
+     full` (zero `unverified` criteria, no `partial` or `disabled` dimension),
+     or `skipped` for a reason the user chose (`--skip`, a skip label, already
+     resolved), and no completion-report check was `×`.
    - `partial` — at least one iteration ended `left_open`, `partial_followup`,
-     `blocked_by_dependency` or `failed`, or a check was `×` (a degraded script,
-     an unread quarantine streak, a run-log line left `log_pending`).
+     `blocked_by_dependency` or `failed`, a merged PR's `verification` was not
+     `full`, or a check was `×` (a degraded script, an unread quarantine
+     streak, a run-log line left `log_pending`).
    - The main finding is one clause: for example `3 merged, 1 left open (CI red)`
      or `paused on critical #42`.
 2. **Evidence.** Name only checks the loop observed: the merged PR numbers, the
@@ -124,7 +126,9 @@ to qualify.
    reconciliation read back as `MERGED`) plus the closed issue establishes `merged`.
 3. **Uncertainty.** List what the loop did not verify: any `⚠` degrade (gi-config,
    gi-state, gi-runlog, gi-ratelimit), a CI verdict reused from the reviewer
-   rather than re-polled, a follow-up issue that could not be filed, an iteration
+   rather than re-polled, each merged PR whose `verification` is not `full`
+   (its unverified count and its `partial` or `disabled` dimensions), a
+   follow-up issue that could not be filed, an iteration
    that never reached review, a lane left `log_pending`, an unsynced tree, and
    any post-merge cleanup that kept a worktree or branch (`ok: false`; name
    each worktree kept for untracked or ignored files, and each `blocked_dirty`
@@ -160,7 +164,7 @@ Grade actual summaries against these criteria as well as merge-gate correctness:
 |---|---|
 | Result is findable | The first row states the status, `complete`/`partial`, and the main finding without reading the iteration rows or logs. |
 | Facts and assumptions are separate | Observed checks (merge, CI verdict, follow-up filed, persisted report) are distinct from degraded or reused verdicts listed under `Uncertainty`. |
-| Claims are traceable | Each `merged` row names its PR; each `left_open`/`blocked_by_dependency` row names its blocker; `partial` names what made it partial. |
+| Claims are traceable | Each `merged` row names its PR and its AC pass/fail/unverified counts; each `left_open`/`blocked_by_dependency` row names its blocker; `partial` names what made it partial. |
 | Next decision is clear | The summary says `No approval needed.` or names the one pending critical decision, and lists remaining user actions on `Next action:`. |
 
 When running behavioral evaluations, include a clean run, a run with a

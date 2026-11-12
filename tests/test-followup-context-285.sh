@@ -217,7 +217,7 @@ for pair in "rvm:$RVM" "rvm:$BRVM" "rve:$RVE" "rve:$BRVE"; do
   n="${f#"$ROOT/"}"
   case "$a" in rvm) id=rvm-verification-flag-false ;; *) id=rve-linked-issue-unreadable ;; esac
   anchor_check "$f" "$id" 'review\.require_acceptance_criteria_check' "the fail-safe names the verification flag: $n"
-  anchor_check "$f" "$id" 'pass — verification disabled' "the flag-false path cites the disabled-verification contract: $n"
+  anchor_check "$f" "$id" 'acceptance_criteria: disabled' "the flag-false path cites the disabled-verification contract: $n"
 done
 for f in "$RVM" "$BRVM"; do
   n="${f#"$ROOT/"}"
