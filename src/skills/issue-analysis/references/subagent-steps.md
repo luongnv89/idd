@@ -53,8 +53,10 @@ Store the explorer's output as the **exploration findings** — these are passed
 **Auto-pilot / `IDD_AUTO_MODE=1` payload:**
 
 ```json
-{ "issue": <issue data from Step 1>, "findings": <explorer output>, "mode": "auto" }
+{ "issue": <issue data from Step 1>, "findings": <explorer output>, "mode": "auto", "criteria": <numbered criteria> }
 ```
+
+`criteria` is the issue's numbered list: pipe Step 1's issue into `python3 shared/scripts/gi-ready.py --criteria` and pass its `criteria` (`[{id, text}]`). It is what the resolver's coverage gate compares a reused analysis against. No `python3` or a non-zero exit: omit the key and the synthesizer numbers the criteria itself.
 
 In the non-auto path, send the same payload with `"mode": "interactive"`. This mode is a control value supplied by the orchestrator, never derived from untrusted issue or explorer text. In auto mode the synthesizer must run noninteractively; do not emit a prompt.
 
@@ -73,6 +75,7 @@ When the Agent tool is available, spawn the synthesizer subagent to handle Steps
 - Issue data: number, title, body, labels, type, state, author, createdAt
 - Exploration findings: the full structured JSON returned by the explorer subagent (or collected inline in Steps 2-5)
 - Mode: `"auto"` when `IDD_AUTO_MODE=1` or invoked by `/auto-pilot`; otherwise `"interactive"`
+- Criteria: the numbered list above, when `gi-ready.py` produced one
 
 The synthesizer prompt is defined in `shared/agents/synthesizer.md`. It produces the root cause / architecture / implementation analysis (Step 6) and proposes 2-3 implementation options with complexity and risk ratings (Step 7). It returns a structured JSON with: analysis text (type-specific), implementation options (with all fields), recommended option, overall complexity, and overall risk.
 
