@@ -861,6 +861,32 @@ def slowest_phase(phases: dict[str, dict]) -> str | None:
     )
 
 
+def collect_skill_costs(rows: list[dict]) -> dict[str, dict]:
+    """Per writing skill: runs, token samples, and median tokens (issue #562).
+
+    A release records one median per flow in docs/release-costs.md, and this
+    is where it is read. Only a row that carries a host-reported `tokens`
+    count is a sample; `median_tokens` is None when a skill has none — the
+    report says "no data", never 0, because a zero would read as a measured
+    cost. A malformed value (a raw-appended row bypasses gi-runlog) is skipped.
+    """
+    costs: dict[str, dict] = {}
+    samples: dict[str, list[int]] = {}
+    for row in rows:
+        skill = row.get("skill")
+        if not isinstance(skill, str) or not skill:
+            continue
+        costs.setdefault(skill, {"runs": 0})["runs"] += 1
+        tokens = row.get("tokens")
+        if isinstance(tokens, int) and not isinstance(tokens, bool) and tokens > 0:
+            samples.setdefault(skill, []).append(tokens)
+    for skill, entry in costs.items():
+        values = samples.get(skill, [])
+        entry["token_samples"] = len(values)
+        entry["median_tokens"] = _median(values)
+    return dict(sorted(costs.items()))
+
+
 def collect_run_stats(rows: list[dict] | None) -> dict | None:
     """Outcome/QA/duration aggregates over run-log rows parsed by load_run_rows."""
     if not rows:
@@ -890,6 +916,7 @@ def collect_run_stats(rows: list[dict] | None) -> dict | None:
         "median_qa_cycles": _median(qa),
         "median_duration_s": _median(dur),
         "by_complexity": by_complexity,
+        "by_skill": collect_skill_costs(rows),
         "phases": phases,
         "slowest_phase": slowest_phase(phases),
         "issues": sorted({r["issue"] for r in rows if isinstance(r.get("issue"), int)}),
@@ -1393,6 +1420,14 @@ def _render_run_log_stats(run_s: dict | None) -> list[str]:
             for level, values in run_s["by_complexity"].items()
         ]
         lines.append(_info_row("complexity mix", " · ".join(parts)))
+    for skill, cost in (run_s.get("by_skill") or {}).items():
+        samples, runs = cost["token_samples"], cost["runs"]
+        median = cost["median_tokens"]
+        value = f"median {round(median):,}" if median is not None else "no data"
+        lines.append(_info_row(
+            f"tokens {skill}",
+            f"{value} ({samples} of {runs} run{'s' if runs != 1 else ''} reported)",
+        ))
     return lines
 
 

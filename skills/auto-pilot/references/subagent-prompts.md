@@ -95,6 +95,9 @@ When done, report back ONLY these fields:
 - agent_overrides: "applied", "partial" or "fallback" — whether the configured agents.* overrides reached this resolve's spawns (see references/docs/run-log-schema.md); omit when no spawned role had an override configured
 - duration_s: wall-clock seconds for the resolve, when measurable, for the run-log line
 - phases: per-step seconds as a JSON object in run order, e.g. {"preflight":9,"research":21,"plan":6,"implement":38,"qa":14,"deliver":6} (see references/docs/run-log-schema.md); only steps that started; omit when none was measured
+- tokens: the token count your Run Stats Footer printed; omit when the host reported none — never derived, estimated or 0
+- agents: the agents count your Run Stats Footer printed; omit when it printed n/a
+- model, effort: your session's model and reasoning effort, only when the host states them; omit otherwise
 - failure_step: which step failed (if status is failure)
 - failure_reason: short error description (if status is failure)
 - skipped_reason: the gate whose default No stopped the run (if status is failure because an auto-mode gate declined, e.g. blocked_label, needs_clarification, empty_body, large_scope, max_commits_exceeded)
@@ -350,6 +353,12 @@ When done, report back ONLY these fields:
   qa_cycles it is attributed to the primary issue's line only
 - phases: per-step seconds of the batch resolve as a JSON object (see
   references/docs/run-log-schema.md); primary issue's line only, like duration_s
+- tokens: the token count your Run Stats Footer printed; omit when the host
+  reported none — never derived, estimated or 0. Primary issue's line only
+- agents: the agents count your Run Stats Footer printed; omit when it printed
+  n/a. Primary issue's line only
+- model, effort: your session's model and reasoning effort, only when the host
+  states them; shared on every fanned-out line
 - failure_step: which step failed (if status is failure)
 - failure_reason: short error description (if status is failure)
 - skipped_reason: the gate whose default No stopped the run (if status is failure because an auto-mode gate declined, e.g. blocked_label, needs_clarification, empty_body, large_scope, max_commits_exceeded)

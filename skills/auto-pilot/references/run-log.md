@@ -35,7 +35,7 @@ is invoked with `--no-run-log` (see *Resolver Subagent* in
 auto-pilot writes here. Writing in both places would double-write one line per
 issue and skew `/idd-doctor`'s resolve-rate and median-QA metrics. The resolver
 **returns** its telemetry (`qa_cycles`, `ceiling`, `breach_reason`, `complexity`,
-`profile`, `agent_overrides`, `duration_s`, `phases`) in its result; fold those into the **single line**
+`profile`, `agent_overrides`, `duration_s`, `phases`, `tokens`, `agents`, `model`, `effort`) in its result; fold those into the **single line**
 auto-pilot writes (enriched with that telemetry) so the per-issue QA signal
 survives even though the resolver stayed silent. The resolver's run `status` informs auto-pilot's decision but is **not**
 copied into the row's `outcome` — that field stays auto-pilot's own six
@@ -102,11 +102,21 @@ auto-pilot merge mode — `conservative` / `balanced` / `aggressive`), `skill`
 (`auto-pilot`), `outcome` (one of the six categorical labels), `pr` (the PR
 number when one was created, else `null`), and — from the resolver's report-back
 — `qa_cycles`, `ceiling`, `breach_reason`, `complexity`, `profile`,
-`agent_overrides`, `duration_s`, and `phases` when present (`profile` is the adaptive-effort profile the resolve
+`agent_overrides`, `duration_s`, `phases`, `tokens`, `agents`, `model` and `effort` when present (`profile` is the adaptive-effort profile the resolve
 chose, `light` or `full`; omit it when the resolver returned none). Fold
 `ceiling` / `breach_reason` / `phases` through unchanged when the resolver returned them. A
 gate decline (a `failure` carrying `skipped_reason`) is a `skipped` line with that
 reason, never `failed`.
+
+**`tokens`, `agents`, `duration_s` — the row agrees with a footer.** A per-issue
+row carries what that issue's resolver reported, the values its own *Run Stats
+Footer* printed: fold them through unchanged. Write `tokens` only when the
+resolver returned a host-reported count — never derived, estimated or `0` — and
+omit `agents` when it returned none. The loop-wide footer auto-pilot prints
+(`references/run-stats.md`) covers the whole loop — triage, reviews, every lane
+— and is written to no row, so rows never sum to it. `model` / `effort` are the
+resolver's, when it returned them. **`skill_version`** is auto-pilot's own
+`metadata.version`, on every line.
 
 **`verification`** comes from the PR review (*Step 3.2*), never the resolver.
 Write it on every line whose PR was reviewed (batch: primary line only); omit

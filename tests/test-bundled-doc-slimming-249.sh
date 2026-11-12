@@ -258,7 +258,16 @@ FAIL=0
 # merge gate (+130 in 3 copies): +1,328. Main measured 609,939, so 609,939 +
 # 1,328 = 611,267; the line keeps six bytes of headroom, so the ratchet is not
 # widened.
-BUDGET=611273
+#
+# Issue #562 is the fourteenth raise (2026-11-12): the run log records what a
+# run cost and what produced it. run-log-schema.md gains five field rows
+# (`tokens`, `agents`, `model`, `effort`, `skill_version`), the cost fields on
+# one example line, the *Footer agreement* rule and the fields in the
+# single-writer and batch fan-out lists: +902 per copy, shipped to its 2
+# skills (auto-pilot, issue-resolver): +1,804. Main measured 611,252, so
+# 611,252 + 1,804 = 613,056; the line keeps six bytes of headroom, so the
+# ratchet is not widened.
+BUDGET=613062
 
 pass() { echo "  ✓ $1"; PASS=$((PASS + 1)); }
 fail() { echo "  ✗ $1"; FAIL=$((FAIL + 1)); }

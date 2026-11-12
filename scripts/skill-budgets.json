@@ -2,8 +2,8 @@
   "headroom_bytes": 1024,
   "skills": {
     "auto-pilot": {
-      "budget": 446323,
-      "measured": 445299
+      "budget": 447905,
+      "measured": 447905
     },
     "init-idd": {
       "budget": 145128,
@@ -22,8 +22,8 @@
       "measured": 318450
     },
     "issue-resolver": {
-      "budget": 433190,
-      "measured": 432166
+      "budget": 433905,
+      "measured": 433905
     },
     "issue-triage": {
       "budget": 141039,

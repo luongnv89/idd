@@ -590,6 +590,125 @@ has "$REPO_ROOT/src/skills/issue-pr-review/references/verification-checks.md" '`
 has "$REPO_ROOT/src/skills/issue-pr-review/references/report-templates.md" 'Say `clean; ready to merge` only when' \
   "T13l: PASS says ready to merge only with every criterion pass"
 
+# --- T14: cost and provenance fields (issue #562) ---------------------------
+# AC1: gi-runlog accepts and validates tokens, agents, model, effort and
+# skill_version. AC2: the row and the Run Stats Footer agree — the rule lives
+# beside both writers and in the schema, never in run-stats.md.
+cost_rec() { # $1 = raw JSON members for the cost/provenance keys
+  printf '{"ts":"2026-01-01T00:00:00Z","issue":562,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":9,"skipped_reason":"x",%s,"phases":{"qa":1},"duration_s":94}' "$1"
+}
+all='"skill_version":"0.21.1","effort":"high","model":"claude-opus-4-1[1m]","agents":4,"tokens":128400'
+rc=0; out="$(cost_rec "$all" | python3 "$HELPER" --echo 2>/dev/null)" || rc=$?
+if [ "$rc" -eq 0 ] && printf '%s' "$out" | grep -qF \
+  '"duration_s":94,"phases":{"qa":1},"tokens":128400,"agents":4,"model":"claude-opus-4-1[1m]","effort":"high","skill_version":"0.21.1","skipped_reason":"x"}'; then
+  pass "T14a: gi-runlog accepts the five cost fields in canonical order (after phases)"
+else
+  fail "T14a: cost fields rejected or out of canonical order (exit $rc): $out"
+fi
+rc=0; out="$(cost_rec '"agents":0' | python3 "$HELPER" --echo 2>/dev/null)" || rc=$?
+if [ "$rc" -eq 0 ] && printf '%s' "$out" | grep -qF '"agents":0'; then
+  pass "T14b: agents=0 is a determined value and is written"
+else
+  fail "T14b: agents=0 was rejected or dropped (exit $rc): $out"
+fi
+for bad in '"tokens":-1' '"tokens":0' '"tokens":true' '"tokens":"128400"' '"tokens":1.5' \
+  '"agents":-1' '"agents":false' '"agents":"4"' '"agents":[4]' \
+  '"model":""' '"model":7' '"model":"two words"' '"model":"line\nbreak"' \
+  '"model":"0123456789012345678901234567890123456789012345678901234567890123456789"' \
+  '"effort":""' '"effort":true' '"effort":"very high"' \
+  '"skill_version":""' '"skill_version":"1.2"' '"skill_version":"v1.2.3"' '"skill_version":"1.2.3-rc1"' \
+  '"skill_version":"1.02.3"' '"skill_version":"1.2.3\n"' '"skill_version":123'; do
+  rc=0; cost_rec "$bad" | python3 "$HELPER" --echo >/dev/null 2>&1 || rc=$?
+  if [ "$rc" -eq 3 ]; then
+    pass "T14c: gi-runlog rejects $bad with exit 3"
+  else
+    fail "T14c: $bad returned exit $rc, expected 3"
+  fi
+done
+rc=0; out="$(cost_rec '"tokens":null,"agents":null,"model":null,"effort":null,"skill_version":null' \
+  | python3 "$HELPER" --echo 2>/dev/null)" || rc=$?
+if [ "$rc" -eq 0 ] && ! printf '%s' "$out" | grep -qE '"(tokens|agents|model|effort|skill_version)"'; then
+  pass "T14d: null cost fields are omitted, never written"
+else
+  fail "T14d: null cost fields should be dropped (exit $rc): $out"
+fi
+T14_LOG="$TMP_RUNLOG/t14-runs.jsonl"
+rm -f "$T14_LOG"
+cost_rec '"tokens":0' | python3 "$HELPER" --append --path "$T14_LOG" >/dev/null 2>&1 || true
+if [ ! -s "$T14_LOG" ]; then
+  pass "T14e: a rejected cost record writes nothing"
+else
+  fail "T14e: an invalid cost record was appended"
+fi
+cost_rec "$all" | python3 "$HELPER" --append --path "$T14_LOG" >/dev/null 2>&1 || true
+streak="$(python3 "$HELPER" --failure-streak 562 --log "$T14_LOG" 2>/dev/null \
+  | python3 -c 'import json,sys; print(json.load(sys.stdin)["streak"])' 2>/dev/null)"
+if [ "$(grep -c '"tokens":128400' "$T14_LOG" 2>/dev/null)" = "1" ] && [ "$streak" = "0" ]; then
+  pass "T14f: a valid cost record appends one line an existing reader still reads"
+else
+  fail "T14f: cost record not appended once, or --failure-streak failed on it (streak '${streak:-?}')"
+fi
+for field in tokens agents model effort skill_version; do
+  has "$RUNLOG" "| \`$field\` |" "T14g: run-log schema documents $field"
+done
+has "$RUNLOG" 'never derived, estimated or `0`' "T14g: schema says tokens is never derived, estimated or zero-filled"
+has "$RUNLOG" "The writer's own \`metadata.version\`" "T14g: schema says skill_version is the writer's own version"
+has "$RUNLOG" '"tokens":128400,"agents":4,"skill_version":"0.21.1"}' "T14g: a schema example line carries the cost fields"
+if grep -F '"tokens":128400' "$RUNLOG" | python3 "$HELPER" --echo >/dev/null 2>&1; then
+  pass "T14g: the schema's cost example line validates"
+else
+  fail "T14g: the schema's cost example line is rejected by gi-runlog"
+fi
+# AC2 — the agreement rule, in the schema and beside each writer.
+RESOLVER_RUNLOG="$REPO_ROOT/src/skills/issue-resolver/references/report-templates.md"
+AP_RUNLOG_REF="$AUTOPILOT_DIR/references/run-log.md"
+has "$RUNLOG" '**Footer agreement.**' "T14h: schema states the footer-agreement rule"
+has "$RUNLOG" "are the values the run's Run Stats Footer printed" "T14h: schema ties tokens and agents to the footer's values"
+has "$RUNLOG" 'reads the same clock as its `elapsed`' "T14h: schema ties duration_s to the footer's elapsed clock"
+has "$RUNLOG" 'No footer value, no field.' "T14h: schema omits a field the footer did not state"
+has "$RESOLVER_RUNLOG" '(`references/run-stats.md`) agree' "T14i: resolver says the row and the footer agree"
+has "$RESOLVER_RUNLOG" '`tokens` is the count the footer prints' "T14i: resolver writes the footer's token count"
+has "$RESOLVER_RUNLOG" 'write it only when the host reported one, never derived, estimated or `0`' \
+  "T14i: resolver writes tokens only when the host reported a count"
+has "$RESOLVER_RUNLOG" "\`agents\` is the footer's spawn count; omit it when the footer prints \`n/a\`" \
+  "T14i: resolver writes the footer's agents count, omitted on n/a"
+has "$RESOLVER_RUNLOG" "footer's \`elapsed\` reads." "T14i: resolver measures duration_s on the footer's clock"
+has "$RESOLVER_RUNLOG" "this skill's own \`metadata.version\`" "T14i: resolver writes its own skill_version"
+has "$RESOLVER_RUNLOG" 'the host states them; never guessed from a tier or a config default' "T14i: resolver writes model and effort only when the host states them"
+has "$RESOLVER_RUNLOG" '`agents`, `model` and `effort` by the same rules' \
+  "T14i: resolver returns the cost fields under --no-run-log"
+has "$AP_RUNLOG_REF" 'the row agrees with a footer' "T14j: auto-pilot says the row agrees with a footer"
+has "$AP_RUNLOG_REF" 'fold them through unchanged' "T14j: auto-pilot folds the resolver's footer values through unchanged"
+has "$AP_RUNLOG_REF" 'never derived, estimated or `0`' "T14j: auto-pilot never derives or zero-fills tokens"
+has "$AP_RUNLOG_REF" 'is written to no row, so rows never sum to it' \
+  "T14j: auto-pilot's loop-wide footer is written to no row"
+has "$AP_RUNLOG_REF" "is auto-pilot's own" "T14j: auto-pilot writes its own skill_version"
+has "$AUTOPILOT" "\`tokens\` / \`agents\` / \`model\` / \`effort\` as the resolver's footer reported them" \
+  "T14j: auto-pilot run-log entry lists the cost fields"
+has "$AUTOPILOT_DIR/references/subagent-prompts.md" "- tokens: the token count your Run Stats Footer printed" \
+  "T14k: resolver subagent returns its footer's token count"
+has "$AUTOPILOT_DIR/references/subagent-prompts.md" "- agents: the agents count your Run Stats Footer printed" \
+  "T14k: resolver subagent returns its footer's agents count"
+has "$AUTOPILOT_DIR/references/subagent-prompts.md" "- model, effort:" \
+  "T14k: resolver subagent returns model and effort"
+if [ "$(grep -cF -e '- tokens: the token count your Run Stats Footer printed' \
+        "$AUTOPILOT_DIR/references/subagent-prompts.md")" = "2" ]; then
+  pass "T14k: both the Resolver and the Batch Resolver return tokens"
+else
+  fail "T14k: tokens is not in both resolver report-back lists"
+fi
+has "$AUTOPILOT_DIR/references/explicit-list-mode.md" 'plus the cost scalars' \
+  "T14l: batch fan-out attributes tokens and agents once"
+has "$RUNLOG" 'on **one line only** (`tokens` and `agents` too)' \
+  "T14l: schema puts batch tokens and agents on one line only"
+# The rule stays out of the footer contract: run-stats.md is byte-identical in
+# every skill and names no run-log field.
+if grep -rlE 'skill_version|runs\.jsonl' "$REPO_ROOT"/src/skills/*/references/run-stats.md >/dev/null 2>&1; then
+  fail "T14m: a run-stats.md copy carries run-log wording"
+else
+  pass "T14m: the agreement rule is not written into run-stats.md"
+fi
+
 echo ""
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 echo "  Results: $PASS passed, $FAIL failed"

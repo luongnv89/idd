@@ -31,15 +31,24 @@ Full field set; *Always present* is the required minimum:
 | `verification` | string | no | `disabled` if config turned a check off, else `partial` if any criterion or dimension is not `pass` — a deferred row excluded only on a `Refs #N` PR (`/issue-pr-review` *Intentional reference*; on `Closes #N` it is `unverified`) — else `full`. Auto-pilot: from the PR review; missing counts are `partial`, never `full`. Resolver: from its PR's AC table, `partial` for an issue not ready. Omitted when nothing was reviewed. |
 | `duration_s` | integer | no | Wall-clock run duration in seconds |
 | `phases` | object | no | Seconds per pipeline phase, `{name: int ≥ 0}` in run order; only phases that ran; need not sum to `duration_s`. ≤16 names of `[a-z][a-z0-9_-]`, ≤32 chars. |
+| `tokens` | integer | no | Tokens the run consumed, ≥ 1: the count its Run Stats Footer printed. Omitted when the host reported none; never derived, estimated or `0`. |
+| `agents` | integer | no | Subagents the run spawned, ≥ 0: the footer's `agents`. Omitted when that printed `n/a`. |
+| `model` | string | no | Model of the session that ran it, only when the host states it. ≤64 chars, no spaces. |
+| `effort` | string | no | That session's reasoning effort; same rule. |
+| `skill_version` | string | no | The writer's own `metadata.version`, `X.Y.Z`. |
 | `skipped_reason` | string | no | Why the issue was skipped (auto-pilot skips, any `skipped`/`already_resolved` outcome, or a `failed` run an auto-mode default No stopped): e.g. `already_resolved`, `blocked_label`, `blocked_by_dependency`, `in_skip_list`, `assigned_to_other`, `quarantined`, `needs_clarification`, `empty_body`, `large_scope`, `max_commits_exceeded` |
 
 Example lines:
 
 ```jsonl
-{"ts":"2026-06-26T14:31:07Z","issue":141,"mode":"auto","skill":"issue-resolver","complexity":"medium","profile":"full","qa_cycles":2,"outcome":"success","pr":150,"duration_s":372}
+{"ts":"2026-06-26T14:31:07Z","issue":141,"mode":"auto","skill":"issue-resolver","complexity":"medium","profile":"full","qa_cycles":2,"outcome":"success","pr":150,"duration_s":372,"tokens":128400,"agents":4,"skill_version":"0.21.1"}
 {"ts":"2026-06-26T15:02:41Z","issue":152,"mode":"auto","skill":"issue-resolver","complexity":"low","profile":"light","qa_cycles":1,"outcome":"success","pr":161,"duration_s":94,"phases":{"preflight":9,"research":21,"plan":6,"implement":38,"qa":14,"deliver":6}}
 {"ts":"2026-06-26T14:48:12Z","issue":118,"mode":"balanced","skill":"auto-pilot","outcome":"skipped","pr":null,"skipped_reason":"blocked_by_dependency"}
 ```
+
+**Footer agreement.** A row states no cost its footer did not: `tokens` and
+`agents` are the values the run's Run Stats Footer printed, and `duration_s`
+reads the same clock as its `elapsed`. No footer value, no field.
 
 **Append rules:**
 - Create `.idd/` with `mkdir -p` if absent, then append one line ending in a
@@ -89,7 +98,7 @@ subagent; both appending would double-count every issue in `/idd-doctor`'s
 metrics. So it passes the resolver `--no-run-log`, which **returns** its
 telemetry — run `status` (the `outcome`),
 `qa_cycles`, `ceiling`, `breach_reason`, `complexity`, `agent_overrides`,
-`duration_s`, `phases` — and the orchestrator folds it into one enriched line. The flag is **orthogonal to
+`duration_s`, `phases`, `tokens`, `agents`, `model`, `effort` — and the orchestrator folds it into one enriched line. The flag is **orthogonal to
 `--auto`/`IDD_AUTO_MODE`**: a standalone `/issue-resolver <N> --auto` still logs.
 The rule: the outermost skill is the single writer; an inner resolver stays silent.
 
@@ -97,7 +106,7 @@ The rule: the outermost skill is the single writer; an inner resolver stays sile
 (`/auto-pilot --issues`) **fans the one batch result out into one line per
 attempted issue**, never per PR — the shared
 `pr` and `complexity` on every line, the batch-scalar `qa_cycles`,
-`duration_s`, `phases` and `agent_overrides` on **one line only** so `/idd-doctor`'s medians and counts are not weighted
+`duration_s`, `phases` and `agent_overrides` on **one line only** (`tokens` and `agents` too) so `/idd-doctor`'s medians and counts are not weighted
 N-fold. At batch time only the issues in `issues_resolved` get a line. No `failed` line is written at batch time; every
 unresolved attempted issue — including the batch's primary (spawn-position)
 issue, whose `optimized_order` slot is already consumed — is re-queued for

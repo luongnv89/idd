@@ -397,6 +397,50 @@ fi
 mv "$SYN/.idd/runs.jsonl.t28" "$SYN/.idd/runs.jsonl" 2>/dev/null || true
 
 # ───────────────────────────────────────────────────────────
+# T30: per-skill token median — the per-release cost record (#562)
+# ───────────────────────────────────────────────────────────
+# Only a row carrying a host-reported `tokens` count is a sample. A skill with
+# no sample reports "no data" (null in --json), never 0. Malformed values (a
+# raw-appended row bypasses gi-runlog) are skipped, never fatal.
+cp "$SYN/.idd/runs.jsonl" "$SYN/.idd/runs.jsonl.t30" 2>/dev/null || true
+printf '%s\n' \
+  '{"ts":"2026-07-09T00:00:00Z","issue":21,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":1,"tokens":100000}' \
+  '{"ts":"2026-07-09T00:01:00Z","issue":22,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":2,"tokens":300000}' \
+  '{"ts":"2026-07-09T00:02:00Z","issue":23,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":3,"tokens":1400000}' \
+  '{"ts":"2026-07-09T00:03:00Z","issue":24,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":4}' \
+  '{"ts":"2026-07-09T00:04:00Z","issue":25,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":5,"tokens":0}' \
+  '{"ts":"2026-07-09T00:05:00Z","issue":26,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":6,"tokens":"900"}' \
+  '{"ts":"2026-07-09T00:06:00Z","issue":27,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":7,"tokens":true}' \
+  '{"ts":"2026-07-09T00:07:00Z","issue":28,"mode":"balanced","skill":"auto-pilot","outcome":"merged","pr":8}' \
+  '{"ts":"2026-07-09T00:08:00Z","issue":29,"mode":"balanced","skill":"auto-pilot","outcome":"skipped","pr":null,"skipped_reason":"blocked_label"}' \
+  > "$SYN/.idd/runs.jsonl"
+T30_OUT="$(cd "$SYN" && python3 "$LINT" stats --no-github 2>&1)" && T30_EXIT=0 || T30_EXIT=$?
+if [ "$T30_EXIT" -eq 0 ] \
+   && printf '%s' "$T30_OUT" | grep -qE "tokens issue-resolver +median 300,000 \(3 of 7 runs reported\)"; then
+  pass "T30a: stats prints the per-skill median over the rows that reported tokens"
+else
+  fail "T30a: per-skill token median line missing or wrong (exit $T30_EXIT)"
+fi
+if printf '%s' "$T30_OUT" | grep -qE "tokens auto-pilot +no data \(0 of 2 runs reported\)" \
+   && ! printf '%s' "$T30_OUT" | grep -qE "tokens auto-pilot +median"; then
+  pass "T30b: a skill with no token sample reports no data, not 0"
+else
+  fail "T30b: a skill with no token sample must print no data"
+fi
+if (cd "$SYN" && python3 "$LINT" stats --no-github --json) | python3 -c "
+import json, sys
+b = json.load(sys.stdin)['runs']['by_skill']
+assert b['issue-resolver'] == {'runs': 7, 'token_samples': 3, 'median_tokens': 300000}, b
+assert b['auto-pilot'] == {'runs': 2, 'token_samples': 0, 'median_tokens': None}, b
+assert list(b) == ['auto-pilot', 'issue-resolver'], b
+" 2>/dev/null; then
+  pass "T30c: stats --json carries by_skill with a null median where no row reported tokens"
+else
+  fail "T30c: stats --json by_skill aggregate is wrong"
+fi
+mv "$SYN/.idd/runs.jsonl.t30" "$SYN/.idd/runs.jsonl" 2>/dev/null || true
+
+# ───────────────────────────────────────────────────────────
 # T25b: bucket identity — the union is a real union (#180)
 # ───────────────────────────────────────────────────────────
 # subject_ref + closes_body - both == pr_derived. If this drifts, the
