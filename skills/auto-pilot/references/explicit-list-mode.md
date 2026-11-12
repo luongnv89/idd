@@ -355,17 +355,17 @@ of a batch line, not a fresh processed issue. Ordinary skips —
 
 Build each written line from `references/docs/run-log-schema.md`, with these batch attributions:
 
-- **Shared fields on every line:** the batch `pr` (the one PR number) and `complexity`.
+- **Shared fields on every line:** the batch `pr` (the one PR number), `complexity`, `skill_version`, and `model` / `effort` when returned.
 - **`verification` on the primary line only:** the review checked only the primary issue's criteria.
 - **Scalar telemetry attributed once:** `qa_cycles`, `duration_s`, `phases` and
-  `agent_overrides` (when the batch returned one) describe the
+  `agent_overrides` (when the batch returned one), plus the cost scalars `tokens` and `agents`, describe the
   *whole batch*, so put them on **one line only — the primary (first) issue's
   line** — and omit them from the others. Writing them on all N lines would weight
   one batch N-fold in `/idd-doctor`'s median-QA-cycles, duration and
   agent-override aggregates.
 
 The Batch Resolver **returns** `qa_cycles`, `complexity`, `agent_overrides`,
-`duration_s` and `phases` so
+`duration_s`, `phases`, `tokens`, `agents`, `model` and `effort` so
 auto-pilot can populate them. Each append uses the same best-effort, non-fatal
 `mkdir -p .idd` + single-`\n` rule as everywhere else — a failed append never
 stops the loop. Append only; never rewrite prior lines.

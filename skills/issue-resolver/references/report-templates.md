@@ -358,7 +358,7 @@ actually writing the line.
 
 Build the object from values already known during the run — `ts`, `issue`,
 `mode`, `skill`, `outcome`, `pr`, plus the optional `complexity`, `profile`,
-`agent_overrides`, `qa_cycles`, `ceiling`, `breach_reason`, `verification`, `duration_s`, `phases`, and `skipped_reason` —
+`agent_overrides`, `qa_cycles`, `ceiling`, `breach_reason`, `verification`, `duration_s`, `phases`, `tokens`, `agents`, `model`, `effort`, `skill_version`, and `skipped_reason` —
 following the schema in `references/docs/run-log-schema.md` rather than re-deriving fields
 here.
 
@@ -392,6 +392,16 @@ These derivations are the resolver's own:
   excluded only on a `Refs #N` PR (`/issue-pr-review` *Intentional reference*);
   so does Step 0's `Criteria confirmed` at `×`. Not returned under `--no-run-log`.
 
+- **`tokens`, `agents`, `duration_s`** — the row and the *Run Stats Footer*
+  (`references/run-stats.md`) agree. `tokens` is the count the footer prints:
+  write it only when the host reported one, never derived, estimated or `0`.
+  `agents` is the footer's spawn count; omit it when the footer prints `n/a`.
+  `duration_s` is the terminal epoch minus `run_started_epoch`, the clock the
+  footer's `elapsed` reads.
+- **`skill_version`** — this skill's own `metadata.version` (SKILL.md frontmatter).
+- **`model`, `effort`** — this session's model and reasoning effort, only when
+  the host states them; never guessed from a tier or a config default.
+
 `outcome` is one of `success` (a PR was delivered), `already_resolved` (Step 0/1
 found the issue already fixed and exited early), or `failed` (a step failed). A
 `failed` run an auto-mode default No stopped also carries — and, under
@@ -404,7 +414,9 @@ found the issue already fixed and exited early), or `failed` (a step failed). A
 subagent and writes the **single** run-log line per issue itself — appending here
 too would double-write and skew `/idd-doctor`'s metrics. Instead **return** the
 telemetry (`outcome`, `qa_cycles`, `ceiling`, `breach_reason`, `complexity`, `profile`, `agent_overrides`, `duration_s`, `phases`) in the
-subagent result so the orchestrator folds it into its own line.
+subagent result so the orchestrator folds it into its own line — with `tokens`,
+`agents`, `model` and `effort` by the same rules (`skill_version` is the
+writer's, so it is not returned).
 
 The flag is independent of `--auto`: a standalone `/issue-resolver <N> --auto`
 run is *not* suppressed and still writes its own line.
