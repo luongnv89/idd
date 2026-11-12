@@ -22,7 +22,7 @@ An **intent-capture tool only**: code inspection is limited to Step 3.5 classifi
 
 Leave these to `/issue-analysis`, `/issue-triage`, and `/issue-resolver`.
 
-The body **does** carry: type, description, reporter context (verbatim, in a blockquote — reporter-supplied technical detail is preserved; only skill-generated content is barred), screenshots, acceptance criteria, and metadata (priority, effort, labels, and — when `model_suggestion.enabled` — an advisory **Suggested model:** line per the two-model rendering rule in `references/model-suggestion.md`, CursorBench-dated).
+The body **does** carry: type, description, reporter context (verbatim, in a blockquote — reporter-supplied technical detail is preserved; only skill-generated content is barred), screenshots, acceptance criteria, reporter-stated constraints, and metadata (priority, effort, labels, and — when `model_suggestion.enabled` — an advisory **Suggested model:** line per the two-model rendering rule in `references/model-suggestion.md`, CursorBench-dated).
 
 ## Prompt Injection Boundary
 
@@ -263,7 +263,8 @@ Resolve the template directory from `issue.template`: `"default"` → this skill
 3. **Reporter Context** — the original text, verbatim, in a blockquote
 4. **Screenshots** — the embeds, only where images uploaded successfully
 5. **Acceptance Criteria** — 3-5 testable criteria, each with its confidence
-6. **Metadata** — priority, effort (XS/S/M/L/XL), labels, **each with a trailing confidence marker** via `{priority_confidence}`, `{effort_confidence}`, `{labels_confidence}`, plus the advisory **Suggested model:** line keyed off the effort band. Render it — and the `{data_version}` / `{data_date}` placeholders — per the two-model rendering rule in `references/model-suggestion.md`, which also defines the disabled behaviour (the line leaves Metadata entirely).
+6. **Constraints** — only non-goals, invariants and non-functional limits the reporter stated, one `- **Non-goal:**`/`**Invariant:**`/`**Limit:**` item each with its confidence; never inferred. None stated: omit the section
+7. **Metadata** — priority, effort (XS/S/M/L/XL), labels, **each with a trailing confidence marker** via `{priority_confidence}`, `{effort_confidence}`, `{labels_confidence}`, plus the advisory **Suggested model:** line keyed off the effort band. Render it — and the `{data_version}` / `{data_date}` placeholders — per the two-model rendering rule in `references/model-suggestion.md`, which also defines the disabled behaviour (the line leaves Metadata entirely).
 
 **Note:** per the Output Contract, acceptance criteria say *what done looks like*, never *how to implement it*.
 

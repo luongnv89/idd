@@ -754,6 +754,22 @@ awk '/<!-- idd:normalized/{found=1} found' "$REPO_ROOT/docs/sample-normalized-is
 expect 0 "T21: docs/sample-normalized-issue.md body passes L1" issue "$TMP/sample.md"
 
 # ───────────────────────────────────────────────────────────
+# T29: optional Constraints section (spec 1.2, issue #557) — accepted after the
+# criteria; the v1 bodies above, which lack it, keep passing (T1, T5, T21).
+# ───────────────────────────────────────────────────────────
+sed 's/^## Metadata$/## Constraints\
+\
+- **Invariant:** Desktop login behavior does not change\
+\
+## Metadata/' "$TMP/issue-good.md" > "$TMP/issue-constraints.md"
+expect 0 "T29: issue with a Constraints section passes" issue "$TMP/issue-constraints.md"
+if python3 "$LINT" issue "$TMP/issue-constraints.md" | grep -qF "[I10] constraints present (1 item)"; then
+  pass "T29b: Constraints section reported (I10)"
+else
+  fail "T29b: Constraints section reported (I10)"
+fi
+
+# ───────────────────────────────────────────────────────────
 # Summary
 # ───────────────────────────────────────────────────────────
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"

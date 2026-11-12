@@ -11,7 +11,7 @@ The shared conventions are inlined into the prompt below; `docs/shared-agent-con
 
 - **Inputs:** `{branch_name}`, `{base_branch}`, `{pr_context}` (PR title/body or empty), `{diff_command}` (e.g. `gh pr diff 47` or `git diff main...HEAD`), `{confidence_threshold}` (minimum confidence to report; the orchestrator passes `review.confidence_threshold`, default 80), `{review_mode}` (`review`, the default, or `challenge` for Step 2's plan challenge — bound only by the orchestrator), optional `{challenge_context}` (the challenge brief; empty for ordinary review), and optional `{workspace_contract}` (`lane_id`, canonical absolute `repo_root` / `worktree_path`, branch, full base SHA) plus independently supplied `{expected_lane_identity}` (`lane_id`, issue, branch, worktree path).
 - **Returns:** a single JSON block — `result` + scored `issues` — full shape under [Output](#output). Nothing else.
-- **Stop / fail:** report only confidence `>= {confidence_threshold}` — challenge-mode blockers excepted; if nothing qualifies, return `PASS` with an empty array (never invent issues).
+- **Stop / fail:** report only confidence `>= {confidence_threshold}` — challenge-mode blockers and constraint findings excepted; if nothing qualifies, return `PASS` with an empty array (never invent issues).
 
 ## Prompt
 
@@ -43,7 +43,8 @@ Report only findings you score at confidence >= {confidence_threshold} (default 
    - **Code quality**: dead code, unused imports, duplicated logic, overly complex functions (NOT style)
    - **Security**: injection (SQL/XSS/command), hardcoded secrets, auth bypass, unsafe deserialization, path traversal
    - **Edge cases**: null/undefined, empty arrays, boundaries, crashing error paths
-5. Score each candidate 0–100 (scale in the *Shared agent conventions* above). **Report only >= {confidence_threshold}.**
+   - **Stated constraints** (category `constraints`): check the diff against each item of a `## Constraints` section in `{pr_context}`. Touching an `**Invariant:**`, doing a `**Non-goal:**` or plausibly exceeding a `**Limit:**` is always reported, at any confidence: "fix" if it breaks the item, else "note". Quote the item.
+5. Score each candidate 0–100 (scale in the *Shared agent conventions* above). **Report only >= {confidence_threshold}** (constraints excepted).
 6. Set each issue's **severity**: `high` if a realistic input/timing reaches it and it corrupts data, breaks auth, or crashes a user-facing path; `medium` if real but needs an unlikely precondition, or is confined to an internal/admin/dev-only path.
 7. Set each issue's **action**:
    - **"fix"**: high-severity correctness / security / edge_cases; test failures (broken tests block merge); a test-integrity break at any severity
@@ -58,9 +59,9 @@ Report only findings you score at confidence >= {confidence_threshold} (default 
   "fixable_count": <count of action "fix">,
   "issues": [
     {
-      "category": "correctness|test_coverage|code_quality|security|edge_cases",
+      "category": "correctness|test_coverage|code_quality|security|edge_cases|constraints",
       "severity": "high|medium",
-      "confidence": <threshold-100; any score for a blocker>,
+      "confidence": <threshold-100; any score for a blocker or a constraints finding>,
       "action": "fix|note|blocker",
       "description": "One-line concrete problem",
       "file": "path/to/file",

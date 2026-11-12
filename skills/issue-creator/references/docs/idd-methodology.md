@@ -44,9 +44,10 @@ graph TD
 A normalized issue contains:
 
 - **Type classification** — bug, feature, or improvement (with confidence level)
-- **Description** — synthesized from the original text with current/expected behavior
+- **Description** — from the original text, with current/expected behavior
 - **Acceptance criteria** — testable conditions for "done" (with confidence level)
-- **Reporter Context** — original text preserved verbatim
+- **Reporter Context** — the original text, verbatim
+- **Constraints** — optional: reporter-stated non-goals, invariants, limits
 - **Metadata** — suggested priority, effort, labels
 
 Issues intentionally do **not** include predicted affected files, generated technical notes, or guessed architecture constraints. They may include file paths or constraints explicitly supplied by the reporter, but generated codebase analysis lives in the Analyze, Triage, and Resolve phases, because those scan the current code when they run.

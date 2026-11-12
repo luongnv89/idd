@@ -42,9 +42,10 @@ expected_checks = (
     "_check_issue_metadata",
     "_check_issue_dependencies",
     "_check_issue_hierarchy",
+    "_check_issue_constraints",
 )
 check(tuple(fn.__name__ for fn in module.ISSUE_CHECKS) == expected_checks,
-      "lint_issue exposes the nine ordered per-check functions")
+      "lint_issue exposes the ten ordered per-check functions")
 
 original_checks = module.ISSUE_CHECKS
 called = []

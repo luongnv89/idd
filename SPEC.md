@@ -2,7 +2,7 @@
 
 **Issue-Driven Development (IDD)** — a tool-neutral contract for turning an issue tracker and git history into executable project memory.
 
-- **Spec version:** 1.1
+- **Spec version:** 1.2
 - **Marker version:** `v1`
 - **Status:** Stable
 
@@ -38,17 +38,18 @@ A conforming issue body consists of, in order:
 4. **Reporter Context** — inside the Description, a blockquote beginning `> **Reporter Context**` preserving the reporter's original text **verbatim**. Required when normalizing an existing issue. When an issue is authored in structured form from the start, the author's raw input SHOULD still be preserved here.
 5. **`## Screenshots`** — optional; omit when empty.
 6. **`## Acceptance Criteria`** — one or more markdown checkboxes (`- [ ] …`). Each criterion MUST be a testable condition, not an implementation step.
-7. **`## Metadata`** — bold-label lines: `**Priority:**`, `**Effort:**`, `**Labels:**`. Value scales (e.g. `P0–P3`, `XS–XL`) are project-defined. Implementations MAY add advisory fields; consumers MUST ignore fields they do not recognize.
+7. **`## Constraints`** — optional; omit when the reporter stated none. The issue's boundaries, as plain list items (`- …`, never checkboxes — a constraint is not an acceptance criterion), each SHOULD begin with one label: `**Non-goal:**` (out of scope), `**Invariant:**` (behavior or interface that MUST NOT change) or `**Limit:**` (a non-functional limit — performance, size, compatibility). Every item is reporter testimony (§1.2). A reviewer SHOULD report a change that touches a stated invariant.
+8. **`## Metadata`** — bold-label lines: `**Priority:**`, `**Effort:**`, `**Labels:**`. Value scales (e.g. `P0–P3`, `XS–XL`) are project-defined. Implementations MAY add advisory fields; consumers MUST ignore fields they do not recognize.
 
 ### 1.2 The intent–code boundary
 
 An issue owns **intent**: problem, expected outcome, acceptance criteria, priority. It MUST NOT contain generated or guessed code-level claims — predicted affected files, inferred root cause, or assumed architecture constraints. Code changes; frozen guesses go stale and mislead the next resolver.
 
-File paths or constraints **explicitly stated by the reporter** MAY appear (they are reporter testimony, not tool inference). All code-level analysis belongs in resolution-time artifacts (§4), produced by scanning the codebase **as it exists when work begins**.
+File paths or constraints **explicitly stated by the reporter** MAY appear (they are reporter testimony, not tool inference); stated constraints belong in `## Constraints` (§1.1). A tool MUST NOT add a constraint the reporter did not state. All code-level analysis belongs in resolution-time artifacts (§4), produced by scanning the codebase **as it exists when work begins**.
 
 ### 1.3 Confidence vocabulary
 
-Inferred fields (Type, individual acceptance criteria, Metadata values) MAY carry a trailing confidence marker:
+Inferred fields (Type, individual acceptance criteria, Constraints items, Metadata values) MAY carry a trailing confidence marker:
 
 | Marker | Meaning |
 |--------|---------|
@@ -204,7 +205,7 @@ Conformance is claimed per level, e.g. *"IDD L2 (spec v1.0)"*. Each level includ
 
 This spec follows semantic versioning. Additive, backward-compatible clarifications bump the minor version; any change that invalidates a previously conforming artifact bumps the major version and the normalization marker (`v1` → `v2`). Issues normalized under an older major version remain valid instances of that version.
 
-Changes: **1.1** — added the `Part of #N` hierarchy marker (§2.1). **1.0** — initial release.
+Changes: **1.2** — added the optional `## Constraints` section (§1.1); the marker stays `v1` and issues without it remain conforming. **1.1** — added the `Part of #N` hierarchy marker (§2.1). **1.0** — initial release.
 
 ---
 
