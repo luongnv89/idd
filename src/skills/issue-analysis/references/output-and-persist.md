@@ -62,6 +62,10 @@ Before rendering cached data or replacing a cache, check the schema below:
   `options_rejected` must contain exactly the unselected options with reasons.
   Require `selected_option` to match the recommended number, name, and summary.
   Overall complexity/risk must match that option's values.
+- A fresh run writes `criteria`, a list of `{id, text}` with IDs `AC1`…`ACn` in
+  order, and each option's `criteria_covered`, a list of IDs from it (`[]` when
+  the issue has no criteria); require both when present. An older cache without
+  them still renders; the resolver reuses it only as `stale`.
 - Require `git_state.commit_sha` to be a full 40-character hexadecimal SHA and
   `commit_sha_short` its first seven characters. The top-level `timestamp` must
   equal `git_state.captured_at`; preserve the fetched `issue.updatedAt` verbatim.
@@ -371,9 +375,11 @@ Keep the Step 8 report available, but mark the final result `PARTIAL` and persis
       "cons": ["Hardcoded exclusion list grows over time"],
       "complexity": "S",
       "risk": "Low",
-      "risk_details": "Single file, clear behavior change"
+      "risk_details": "Single file, clear behavior change",
+      "criteria_covered": ["AC1"]
     }
   ],
+  "criteria": [{ "id": "AC1", "text": "Login on mobile reaches the dashboard" }],
   "recommended_option": 1,
   "overall_complexity": "S",
   "overall_risk": "Low",

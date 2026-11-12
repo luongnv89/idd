@@ -60,8 +60,9 @@ For each issue, check:
   quarantined issue in the list; *Loop behavior* below owns that skip, and owning
   it there is what gives it an `[Issue {i}/{total}]` slot and its one run-log
   line. Nothing else is exempt: `wontfix` and the rest are still removed here.
-- **Ready** — `python3 shared/scripts/gi-issue.py {N} --fields number,body | python3 shared/scripts/gi-ready.py`
-  (non-zero exit: `docs/idd-methodology.md`, *Issue Readiness*). An issue not
+- **Ready** — pipe the retained `explicit_issue_records[N]` (it carries
+  `number` and `body`) into `python3 shared/scripts/gi-ready.py`; never read the
+  body again (non-zero exit: `docs/idd-methodology.md`, *Issue Readiness*). An issue not
   ready is kept like a quarantined one, and *Loop behavior* skips it.
 
 ```

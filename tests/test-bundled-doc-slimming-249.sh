@@ -248,7 +248,17 @@ FAIL=0
 # names `needs_clarification` and the resolver's `partial` for an issue not
 # ready, +57 in 2 copies: +114. Main measured 607,144, so 607,144 + 2,793 =
 # 609,937; the line keeps six bytes of headroom, so the ratchet is not widened.
-BUDGET=609943
+#
+# Issue #584 is the thirteenth raise (2026-11-12): the epic #547 review
+# follow-ups. run-log-schema.md scopes the deferred-row exclusion to `Refs #N`
+# PRs (+121 in 2 copies); idd-methodology.md's *Issue Readiness* states the
+# triage order and the wrapped/sub-heading marker rule (+132 in 3 copies);
+# shared-agent-conventions.md's confidence scale exempts constraint findings
+# (+150 in 2 copies); config-schema.md names the exemption and the any-mode
+# merge gate (+130 in 3 copies): +1,328. Main measured 609,939, so 609,939 +
+# 1,328 = 611,267; the line keeps six bytes of headroom, so the ratchet is not
+# widened.
+BUDGET=611273
 
 pass() { echo "  ✓ $1"; PASS=$((PASS + 1)); }
 fail() { echo "  ✗ $1"; FAIL=$((FAIL + 1)); }

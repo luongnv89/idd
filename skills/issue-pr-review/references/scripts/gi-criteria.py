@@ -32,8 +32,9 @@ A pass keeps its status only with one of:
 Every other pass is downgraded to `unverified`: a description, a file path, a
 test that did not exit 0, an empty output, or a SHA other than `head` (a
 verdict for an older commit is stale). A `fail` or `unverified` row keeps its
-status. A criterion with no row, a duplicated row, an unknown status or
-unreadable `verdicts` is `unverified` — this script never stops on agent
+status. A criterion with no row, a duplicated row, an unknown status, a pass
+row carrying a lone surrogate anywhere (a `\\ud800` escape: unencodable, so
+unreadable) or unreadable `verdicts` is `unverified` — this script never stops on agent
 output and never turns a row into `pass`.
 
 Prints {"head", "rows": [{"n", "criterion", "status", "evidence",
@@ -67,6 +68,19 @@ class InvalidInput(ValueError):
 REQUIRED_KEYS = ("head", "criteria", "deferred", "verdicts")
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 STATUSES = ("pass", "fail", "unverified")
+SURROGATE_RE = re.compile("[\ud800-\udfff]")
+
+
+def _unreadable(value: object) -> bool:
+    """True when any string in the value carries a lone surrogate (a JSON
+    `\\ud800` escape): it cannot be encoded, so nothing in it can be read."""
+    if isinstance(value, str):
+        return bool(SURROGATE_RE.search(value))
+    if isinstance(value, dict):
+        return any(_unreadable(k) or _unreadable(v) for k, v in value.items())
+    if isinstance(value, list):
+        return any(_unreadable(v) for v in value)
+    return False
 
 
 def _text(entry: dict, key: str) -> str:
@@ -173,7 +187,13 @@ def decide(record: object) -> dict:
             row = found[0]
             status = row.get("status")
             evidence = row.get("evidence")
-            if status not in STATUSES:
+            if status == "pass" and _unreadable(row):
+                problems.append(f"criterion {n}: judge output carries an unencodable character")
+                downgraded += 1
+                out.update(status="unverified",
+                           evidence="downgraded from pass: unreadable judge output",
+                           downgraded=True)
+            elif status not in STATUSES:
                 problems.append(f"criterion {n}: unknown status {status!r}")
                 out.update(status="unverified", evidence=f"unknown status {status!r}")
             elif status == "pass" and (gap := evidence_gap(evidence, head)):
@@ -213,7 +233,10 @@ def main(argv: list[str] | None = None) -> int:
     except OSError as exc:
         print(f"⚠ gi-criteria: {exc}", file=sys.stderr)
         return 4
-    print(json.dumps(result, ensure_ascii=False))
+    try:
+        print(json.dumps(result, ensure_ascii=False))
+    except UnicodeEncodeError:  # a surrogate in the criteria, or a narrow stdout
+        print(json.dumps(result))
     return 0
 
 

@@ -166,7 +166,8 @@ review:
   # Default: false
   auto_merge: false
 
-  # Only report issues at or above this confidence level (0-100)
+  # Only report issues at or above this confidence level (0-100); a stated-
+  # constraint finding is reported at any confidence
   # Type: integer
   # Default: 80
   # Minimum: 50
@@ -189,7 +190,7 @@ review:
   # No GitHub API field identifies a billing-related CI failure, so when true
   # this ignores ANY terminal CI failure. CI is still polled and reported
   # (unlike check_ci: false); only the review gate stops blocking. Merge by
-  # hand: no merge gate is relaxed (/issue-pr-review --auto, /auto-pilot).
+  # hand: no merge gate is relaxed (/issue-pr-review in any mode, /auto-pilot).
   ignore_ci_billing_failures: false
 
   # Seconds between CI status polls
@@ -698,10 +699,10 @@ Each `compaction.threshold.<skill>` must be an integer from 1 to 99 and `compact
 | `review.max_cycles` | `3` | Max review-fix cycles |
 | `review.adaptive_depth` | `true` | Scale review depth to PR complexity — a trivial PR caps the review-fix loop at 1 cycle and skips optional passes (AC + traceability hard-blocks still run); `false` pins every PR to full depth and disables the QA handoff gate and #256's CI verdict gate too ([agent-model-effort.md](https://github.com/luongnv89/idd/blob/main/docs/agent-model-effort.md)) |
 | `review.auto_merge` | `false` | Merge clean PRs (*Merge rule*) |
-| `review.confidence_threshold` | `80` | Min confidence level for issues |
+| `review.confidence_threshold` | `80` | Min confidence level for issues (a `constraints` finding is reported at any confidence) |
 | `review.run_tests` | `true` | Run tests during review |
 | `review.check_ci` | `true` | Check CI status during review |
-| `review.ignore_ci_billing_failures` | `false` | Opt-in: review gate ignores **any** terminal CI failure; no merge gate is relaxed (/issue-pr-review --auto, /auto-pilot) — merge by hand |
+| `review.ignore_ci_billing_failures` | `false` | Opt-in: review gate ignores **any** terminal CI failure; no merge gate is relaxed (/issue-pr-review in any mode, /auto-pilot) — merge by hand |
 | `review.ci_poll_interval` | `30` | Seconds between CI polls |
 | `review.ci_timeout` | `600` | CI polling timeout |
 | `review.test_timeout` | `300` | Review test timeout |

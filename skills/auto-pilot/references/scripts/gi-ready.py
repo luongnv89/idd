@@ -4,8 +4,10 @@
 The rule's prose home is *Issue Readiness* in the IDD methodology document;
 this script is its deterministic form. An issue is **ready** when its body has an
 `Acceptance Criteria` heading (any level, any case, an optional trailing colon)
-with at least one list item under it, and neither the value under the `Type`
-heading nor any of those criteria ends with the `(needs review)` marker.
+with at least one list item under it — a sub-heading deeper than it stays inside
+it — and neither the value under the `Type` heading nor any of those criteria
+ends with the `(needs review)` marker. A marker ending any line of a criterion,
+its wrapped continuation lines included, counts.
 
 Only a *trailing* marker counts, so an issue that merely discusses the marker is
 not flagged: inline code spans are dropped first, and blockquote lines (the
@@ -72,7 +74,7 @@ import json
 import re
 import sys
 
-HEADING_RE = re.compile(r"^\s{0,3}#{1,6}\s+(.*?)\s*#*\s*$")
+HEADING_RE = re.compile(r"^\s{0,3}(#{1,6})\s+(.*?)\s*#*\s*$")
 FENCE_RE = re.compile(r"^\s{0,3}(```|~~~)")
 ITEM_RE = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s+(?:\[[ xX]\]\s*)?(.*)$")
 MARKER_COL_RE = re.compile(r"^(\s*)(?:[-*+]|\d+[.)])\s+")
@@ -89,9 +91,9 @@ class InvalidPlan(ValueError):
     """The plan handed to --coverage is malformed (exit 3)."""
 
 
-def _sections(body: str) -> list[tuple[str, list[str]]]:
-    """Split a body into (heading, lines) pairs, skipping fences and quotes."""
-    sections: list[tuple[str, list[str]]] = [("", [])]
+def _sections(body: str) -> list[tuple[str, int, list[str]]]:
+    """Split a body into (heading, level, lines), skipping fences and quotes."""
+    sections: list[tuple[str, int, list[str]]] = [("", 0, [])]
     fenced = False
     for line in body.splitlines():
         if FENCE_RE.match(line):
@@ -101,9 +103,10 @@ def _sections(body: str) -> list[tuple[str, list[str]]]:
             continue
         heading = HEADING_RE.match(line)
         if heading:
-            sections.append((heading.group(1).strip().rstrip(":").strip().lower(), []))
+            title = heading.group(2).strip().rstrip(":").strip().lower()
+            sections.append((title, len(heading.group(1)), []))
         else:
-            sections[-1][1].append(line)
+            sections[-1][2].append(line)
     return sections
 
 
@@ -114,13 +117,26 @@ def _items(body: str) -> list[tuple[str, str, bool]]:
     an item is nested only when it is indented to the content column of the
     last top-level item, so a nested detail is never its own criterion while a
     sibling indented 1-3 spaces (or a right-aligned number) still is, and an
-    unindented paragraph after a blank line ends the list."""
+    unindented paragraph after a blank line ends the list.
+
+    A sub-heading strictly deeper than the Acceptance Criteria heading stays
+    inside it, so its items are criteria too. A line that continues an item (a
+    wrapped line, or a paragraph indented to its content column) joins that
+    item's marker text as a line of its own: readiness reads a marker ending
+    any of them, while the display text, and so the numbering, stays the
+    first line."""
     found: list[tuple[str, str, bool]] = []
-    for heading, lines in _sections(body or ""):
-        if heading != "acceptance criteria":
+    level = 0  # the open Acceptance Criteria heading's level; 0 when none is open
+    for heading, depth, lines in _sections(body or ""):
+        if heading == "acceptance criteria":
+            level = depth
+        elif not (level and depth > level):
+            level = 0
+        if not level:
             continue
         content_col = None
         after_blank = False
+        last = None  # index in `found` of the item a continuation line extends
         for line in lines:
             bare_line = CODE_SPAN_RE.sub("", line)
             item = ITEM_RE.match(bare_line)
@@ -129,6 +145,10 @@ def _items(body: str) -> list[tuple[str, str, bool]]:
                 if line.strip() and after_blank and not item and (
                         content_col is None or indent < content_col):
                     content_col = None  # a paragraph ends the list
+                    last = None
+                elif line.strip() and not item and last is not None:
+                    bare, text, top = found[last]
+                    found[last] = (f"{bare}\n{bare_line.strip()}", text, top)
                 after_blank = not line.strip()
                 continue
             after_blank = False
@@ -142,6 +162,7 @@ def _items(body: str) -> list[tuple[str, str, bool]]:
             if top:
                 content_col = marker.end()
             found.append((item.group(1), text, top))
+            last = len(found) - 1
     return found
 
 
@@ -154,7 +175,7 @@ def readiness(body: str) -> list[str]:
     """Return the reasons the body is not ready; an empty list means ready."""
     texts = [bare for bare, _, _ in _items(body)]
     type_values: list[str] = []
-    for heading, lines in _sections(body or ""):
+    for heading, _, lines in _sections(body or ""):
         if heading == "type":
             stripped = (CODE_SPAN_RE.sub("", line) for line in lines)
             type_values.append(next((line for line in stripped if line.strip()), ""))
@@ -163,7 +184,7 @@ def readiness(body: str) -> list[str]:
         reasons.append("no_criteria")
     if any(MARKER_RE.search(value) for value in type_values):
         reasons.append("type_needs_review")
-    if any(MARKER_RE.search(text) for text in texts):
+    if any(MARKER_RE.search(part) for text in texts for part in text.splitlines()):
         reasons.append("criteria_need_review")
     return reasons
 

@@ -41,8 +41,10 @@ Patch keys (a closed set — anything else is exit 3, and nothing is written)
             research (opaque JSON object, <= 64 KiB), plan {selected {number,
             name, summary, files_to_modify[], files_to_create[], test_strategy,
             complexity, risk}, rejected[] <= 5 of {number, name,
-            rejection_reason}, overall_complexity, overall_risk, sensitive}
-            (<= 32 KiB), qa {cycle, ceiling, breach_reason, premise_ledger[]
+            rejection_reason}, overall_complexity, overall_risk, sensitive,
+            criteria_covered[] <= 100 IDs `AC<n>`, criteria[] <= 100 of {id,
+            text}} (<= 32 KiB; an option's own `number` is allowed there and
+            nowhere else below the top level; both criteria fields optional), qa {cycle, ceiling, breach_reason, premise_ledger[]
             <= 20 of {kind: failure, ...}, open_findings[] <= 50},
             repro {status, test}. The ledger holds failures only: a premise
             revision lifts a block, so it is earned again in the session that
@@ -158,6 +160,8 @@ LANE_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\Z")
 SHA_RE = re.compile(r"^[0-9a-f]{40}\Z")
 TS_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z\Z")
 WORD_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_-]{0,31}\Z")
+CRITERION_ID_RE = re.compile(r"^AC[1-9][0-9]{0,3}\Z")
+CRITERIA_MAX = 100
 NAME_RE = re.compile(r"^(issue-resolver|issue-pr-review)-([1-9][0-9]{0,9})\.json\Z")
 
 CLOSING = "closing"
@@ -379,11 +383,13 @@ def _text(value, limit: int, name: str, nullable: bool = False) -> None:
         raise InvalidInput(f"{name} must be a string of at most {limit} characters")
 
 
-def _closed(value, keys, name: str) -> dict:
+def _closed(value, keys, name: str, allow=frozenset()) -> dict:
+    """`allow` names forbidden keys this object may still carry — an option's
+    own `number` is plan data, not the record's measured `number`."""
     if not isinstance(value, dict):
         raise InvalidInput(f"{name} must be a JSON object")
     for key in value:
-        if key in FORBIDDEN_KEYS:
+        if key in FORBIDDEN_KEYS and key not in allow:
             raise InvalidInput(f"{name}.{key} is never recorded — a record cannot carry it")
         if key not in keys:
             raise InvalidInput(f"{name}.{key} is not a known key")
@@ -450,14 +456,38 @@ def _effect(value, skill: str) -> None:
         raise InvalidInput("effect.key.pr must be an integer >= 1")
 
 
+def _criterion_id(value, name: str) -> None:
+    if not isinstance(value, str) or not CRITERION_ID_RE.match(value):
+        raise InvalidInput(f"{name} must be a criterion ID such as AC1")
+
+
+def _criteria(value) -> None:
+    """`plan.criteria_covered` and `plan.criteria` — the selected option's IDs
+    and the numbered list they were mapped against, so a resume can re-run the
+    coverage gate against the live body. Both optional; an older record lacks them."""
+    covered = value.get("criteria_covered", [])
+    if not isinstance(covered, list) or len(covered) > CRITERIA_MAX:
+        raise InvalidInput(f"plan.criteria_covered must be a list of at most {CRITERIA_MAX} IDs")
+    for n, item in enumerate(covered):
+        _criterion_id(item, f"plan.criteria_covered[{n}]")
+    listed = value.get("criteria", [])
+    if not isinstance(listed, list) or len(listed) > CRITERIA_MAX:
+        raise InvalidInput(f"plan.criteria must be a list of at most {CRITERIA_MAX} criteria")
+    for n, entry in enumerate(listed):
+        _closed(entry, {"id", "text"}, f"plan.criteria[{n}]")
+        _criterion_id(entry.get("id"), f"plan.criteria[{n}].id")
+        _text(entry.get("text"), SUMMARY_MAX, f"plan.criteria[{n}].text")
+
+
 def _plan(value) -> None:
     _closed(value, {"selected", "rejected", "overall_complexity", "overall_risk",
-                    "sensitive"}, "plan")
+                    "sensitive", "criteria_covered", "criteria"}, "plan")
+    _criteria(value)
     selected = value.get("selected")
     if selected is not None:
         _closed(selected, {"number", "name", "summary", "files_to_modify",
                            "files_to_create", "test_strategy", "complexity", "risk"},
-                "plan.selected")
+                "plan.selected", allow={"number"})
         if "number" in selected and not _is_int(selected["number"], 1):
             raise InvalidInput("plan.selected.number must be an integer >= 1")
         _text(selected.get("name", ""), 200, "plan.selected.name")
@@ -475,7 +505,8 @@ def _plan(value) -> None:
     if not isinstance(rejected, list) or len(rejected) > 5:
         raise InvalidInput("plan.rejected must be a list of at most 5 options")
     for n, option in enumerate(rejected):
-        _closed(option, {"number", "name", "rejection_reason"}, f"plan.rejected[{n}]")
+        _closed(option, {"number", "name", "rejection_reason"}, f"plan.rejected[{n}]",
+                allow={"number"})
         if "number" in option and not _is_int(option["number"], 1):
             raise InvalidInput(f"plan.rejected[{n}].number must be an integer >= 1")
         _text(option.get("name", ""), 200, f"plan.rejected[{n}].name")

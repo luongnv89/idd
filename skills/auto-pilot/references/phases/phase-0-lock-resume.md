@@ -48,6 +48,11 @@ the next issue, never re-resolve it. A PR that is
 `OPEN` is the PR to review in Phase 3. No PR for a singleton `current.branch`, or
 a read that fails, is a doubt: fall back to `absent`.
 
+**A recorded `merge` phase re-enters at review.** <!-- a:ap-step10-merge-reentry -->
+The checkpoint carries no `merge_floor` — state is a hint, never a gate fact —
+so re-enter at *Step 3.1* on that OPEN PR: `/issue-pr-review --auto --no-merge`
+re-derives `merge_floor` from the live PR, and Phase 5 reads that fresh value.
+
 **The resolver pre-spawn marker is the one exception.** <!-- a:ap-step10-prespawn-marker -->
 A singleton `current` whose `phase` is `resolve` and that carries **no**
 `branch` and **no** `pr` (each absent or `null`) is *Step 2.2*'s pre-spawn
@@ -78,7 +83,7 @@ variable, exactly as for `current.branch`. Then reconcile by phase:
 | `planned` | No work was promised yet. Recreate its worktree from the recorded branch and synced base, then spawn it |
 | `resolve` | Look for an open PR by the recorded branch. Found → checkpoint `returned`; absent but the registered path/branch exists → reject any active merge/rebase/cherry-pick/bisect state, then re-run with `IDD_RESUME_LANE=1` while preserving staged/unstaged/untracked edits; ambiguous ownership → `blocked_dirty`; neither exists → recreate from the recorded base SHA and run |
 | `returned` | Require the recorded open PR, or derive it from the conventional branch and checkpoint it; then queue the lane for the serialized drain |
-| `review` / `fix` / `merge` | Copy that lane into `current` and re-enter the existing singleton review/merge phase. Exactly one lane may be in these draining phases at a time |
+| `review` / `fix` / `merge` | Copy that lane into `current` and re-enter the existing singleton review phase (a `merge` lane re-enters at review, as above). Exactly one lane may be in these draining phases at a time |
 | `log_pending` | Retry this lane's persisted normalized telemetry with `gi-runlog.py --append-once`; identical `event_id` succeeds without a second line, conflicting data stops |
 | `logged` / `cleanup` | Reconcile the PR outcome, then finish cache/worktree cleanup; never append a raw fallback line |
 | `completed` / `failed` / `blocked_dirty` | Do not spawn again; retain the worktree for failed/blocked recovery and continue draining ready siblings |

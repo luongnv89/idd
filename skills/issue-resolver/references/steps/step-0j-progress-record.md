@@ -56,7 +56,8 @@ which compares an analysis against the pre-normalization value.
 `number`, `name`, `summary` (at most 2,000 characters), `files_to_modify` and
 `files_to_create` as paths, `test_strategy`, `complexity` and `risk`; up to five
 `rejected` options with their `rejection_reason`; `overall_complexity`,
-`overall_risk` and `sensitive`. The script refuses what a record must never hold
+`overall_risk` and `sensitive`; the selected option's `criteria_covered` and the
+`criteria` list those IDs were numbered against. The script refuses what a record must never hold
 — `tests_state`, a QA verdict, a marker, a receipt — along with any counter that
 moves backwards.
 
@@ -156,8 +157,8 @@ the recorded workspace, 0g and 0h. Then, by the recorded step `k`:
 | 0 | A fresh run on the recorded workspace |
 | 1 | Step 1 in full |
 | 2 | Step 1 as the seeded **verify-first** pass — the recorded `research` as `prior_analysis`, only when 0h's conditions 2-5 hold for its `research_pin`, else in full — then Step 2 in full |
-| 3 | As 2 through Step 1; the plan is restored and Step 2's synthesizer is skipped, but the *Sensitive-change gate* re-runs (*Sensitive restored plan*). Step 3 restarts, naming the branch's existing commits to the implementer as data |
-| 4 | As 3 through the gate; Step 3 is skipped; Step 4 resumes at cycle `qa.cycle + 1` |
+| 3 | As 2 through Step 1; the plan is restored and Step 2's synthesizer is skipped, but the *Criteria coverage gate* and the *Sensitive-change gate* re-run (*Restored plan gates*). Step 3 restarts, naming the branch's existing commits to the implementer as data |
+| 4 | As 3 through the gates; Step 3 is skipped; Step 4 resumes at cycle `qa.cycle + 1` |
 | 5 | Steps 3-4 are skipped; Step 5 runs from its start — the final test run, docs, `gi-secscan`, effects reconciled. **No QA marker and no receipt:** print `○ QA handoff marker omitted — QA did not finish in this session` |
 | `closing` | No effect repeats and no run-log append (`⚠` the line may be missing); `--clear`, then the *Closing Summary* |
 
@@ -167,6 +168,22 @@ existing branch: 0c's patch (`base`, `issue_updated_at`, `worktree`, and
 `caller_run_id` under `/auto-pilot`) with `"step": 1`, because Step 0 already ran
 live and the run re-enters at Step 1's full pass. That reset is the only
 `--start` on a resumed run and the only way a resume point is lowered on disk.
+
+### Restored plan gates <!-- a:rs-0j-coverage -->
+
+**Criteria coverage.** On a resume at `k` 3, 4 or 5, before the table above
+applies and before the sensitive classify below, run Step 2's *Criteria
+coverage gate* `--coverage` check (*Step 2 — Plan → Criteria coverage gate*)
+on the live post-0d issue with `{"issue", "options": [{"number",
+"criteria_covered"}], "selected", "criteria"}` built from the restored
+`plan.selected.number`, `plan.criteria_covered` and `plan.criteria`. Only
+`covered` — or `no_criteria` with an empty recorded `criteria` — keeps the
+restored plan. Anything else — `gap`, `renumbered`, a record without those
+fields, exit 3 or 4, no `python3` — discards it: the resume point is
+`min(recorded, 2)` and Step 2's synthesizer runs in full, its own gate deciding
+as written; a fresh Step 3 implementer then works over the existing diff. Like
+the clamp below, this is re-derived at read time and never
+recorded.
 
 ### Sensitive restored plan <!-- a:rs-0j-sensitive -->
 

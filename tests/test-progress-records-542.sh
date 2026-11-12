@@ -472,6 +472,54 @@ gp "$C" --list
 [ "$(js 'd["records"][0]["caller_run_id"]')" = "20261022T000000Z-7" ]
 check "p15b-restamp-on-resume: a resume:true write with caller_run_id takes the new holder's stamp" "$?"
 
+# ─── p584: the plan records its criteria mapping, and a resume can re-check it ─
+# Issue #584: plan.criteria_covered and plan.criteria let a resumed run re-run
+# the Criteria coverage gate against the live body. Both are optional (an older
+# record still loads), malformed values are exit 3, and an option's own
+# `number` is plan data — the documented plan.selected.number is recordable.
+K="$TMP/plan584"; new_repo "$K" feat/40-plan
+READY="$REPO_ROOT/src/shared/scripts/gi-ready.py"
+PLAN584='{"step": 2, "plan": {"selected": {"number": 2, "name": "Balanced"}, "rejected": [{"number": 1, "name": "Minimal", "rejection_reason": "x"}], "criteria_covered": ["AC1", "AC2"], "criteria": [{"id": "AC1", "text": "Login works"}, {"id": "AC2", "text": "Logout works"}]}}'
+put "$K" start issue-resolver 40 "$PLAN584"; RC1=$RC
+gp "$K" --read --skill issue-resolver --number 40
+[ "$RC1" = 0 ] && [ "$(js 'd["status"]')" = "ok" ] \
+  && [ "$(js 'd["record"]["plan"]["selected"]["number"]')" = "2" ] \
+  && [ "$(js 'd["record"]["plan"]["rejected"][0]["number"]')" = "1" ] \
+  && [ "$(js '",".join(d["record"]["plan"]["criteria_covered"])')" = "AC1,AC2" ] \
+  && [ "$(js 'd["record"]["plan"]["criteria"][1]["text"]')" = "Logout works" ]
+check "p584a-plan-criteria: criteria_covered, criteria and plan.selected/rejected[].number are recorded and read back (rc=$RC1)" "$?"
+BEFORE="$(cat "$K/.git/idd/progress/issue-resolver-40.json")"
+BADP=""
+for bad in '{"criteria_covered": ["X1"]}' '{"criteria_covered": "AC1"}' '{"criteria_covered": [1]}' \
+           '{"criteria": [{"id": "AC1"}]}' '{"criteria": [{"id": "1", "text": "t"}]}' \
+           '{"criteria": [{"id": "AC1", "text": "t", "extra": 1}]}' '{"criteria": {"AC1": "t"}}' \
+           '{"selected": {"number": 0}}' '{"criteria_covered": ['"$(python3 -c 'print(",".join(["\"AC1\""] * 101))')"']}'; do
+  put "$K" write issue-resolver 40 "{\"step\": 2, \"plan\": $bad}"
+  [ "$RC" = 3 ] && [ "$(cat "$K/.git/idd/progress/issue-resolver-40.json")" = "$BEFORE" ] || BADP="$BADP $bad(rc=$RC)"
+done
+[ -z "$BADP" ]; check "p584b-plan-criteria-malformed: malformed criteria fields exit 3 and write nothing${BADP:+ (accepted:$BADP)}" "$?"
+put "$K" start issue-resolver 41 '{"step": 2, "plan": {"selected": {"name": "Old"}, "overall_risk": "Low"}}'; RC1=$RC
+gp "$K" --read --skill issue-resolver --number 41
+[ "$RC1" = 0 ] && [ "$(js 'd["status"]')" = "ok" ] && [ "$(js '"criteria" in d["record"]["plan"]')" = "False" ]
+check "p584c-old-plan-loads: a plan recorded without the criteria fields still loads" "$?"
+put "$K" start issue-resolver 42 '{"step": 2, "number": 5}'
+[ "$RC" = 3 ]; check "p584d-top-number-forbidden: a top-level number stays forbidden (rc=$RC)" "$?"
+# The resumed gate: the recorded criteria against a body whose AC2 was edited
+# between sessions. Same count, same IDs — only the renumber check catches it.
+gp "$K" --read --skill issue-resolver --number 40
+COV="$(printf '%s' "$OUT" | python3 -c '
+import json, sys
+plan = json.load(sys.stdin)["record"]["plan"]
+body = "## Acceptance Criteria\n- [ ] Login works\n- [ ] Logout works on every device\n"
+print(json.dumps({"issue": {"number": 40, "body": body},
+                  "options": [{"number": plan["selected"]["number"],
+                               "criteria_covered": plan["criteria_covered"]}],
+                  "selected": plan["selected"]["number"], "criteria": plan["criteria"]}))')"
+V1="$(printf '%s' "$COV" | python3 "$READY" --coverage | python3 -c 'import json,sys; print(json.load(sys.stdin)["verdict"])')"
+V2="$(printf '%s' "$COV" | sed 's/ on every device//' | python3 "$READY" --coverage | python3 -c 'import json,sys; print(json.load(sys.stdin)["verdict"])')"
+[ "$V1" = "renumbered" ] && [ "$V2" = "covered" ]
+check "p584e-resume-coverage: a criterion edited between sessions is not covered (got $V1; unedited $V2)" "$?"
+
 # ─── S5: clear, usage and degrade exits; text stays data ─────────────────────
 gp "$C" --clear --skill issue-resolver --number 23
 FIRST="$(js 'd["cleared"]')"

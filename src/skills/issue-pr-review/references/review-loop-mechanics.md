@@ -24,7 +24,7 @@ produces a run that looks configured and is not.
 | `review.max_cycles: 3` | Cycle cap for Steps 3–6. Three LLM cycles suffice once the script pre-pass has handled the mechanical issues. Step 1's `light` profile and `qa_handoff = trusted` each cap it at `min(1, configured_cap)`. |
 | `review.adaptive_depth: true` | Scales review depth to the PR's complexity (*Depth gate*). When `false`, every PR gets full-depth review — `profile` is pinned to `full` — and the *QA handoff gate* is skipped with `qa_handoff = absent`. |
 | `review.auto_merge: false` | Whether a clean PR is merged — defined once, in SKILL.md *Step 7 → Merge rule*. |
-| `review.confidence_threshold: 80` | Minimum confidence for code-reviewer findings. The ui-reviewer keeps its own 75 floor and does not read this key. |
+| `review.confidence_threshold: 80` | Minimum confidence for code-reviewer findings; a `constraints` finding is reported at any confidence. The ui-reviewer keeps its own 75 floor and does not read this key. |
 | `review.run_tests: true` / `review.check_ci: true` | Enable Step 4 and Step 5. When either is `false` the step reports `○ … skipped` and the soft-pass conjunction treats that leg as satisfied. |
 | `review.ignore_ci_billing_failures: false` | `true` makes a terminal Step 5 `fail` non-blocking **at this skill's review gate only**: CI is still polled and reported, Step 6 raises no CI fixable, and the soft-pass conjunction treats the CI leg as satisfied (in strict `soft_pass: false` mode too). `ci_status` still binds as `failed@<sha40>` and the step reports `PARTIAL`. The satisfied leg is **loop exit only**: Step 7's auto-merge gate excludes this path by name — an ignored CI failure is never clean, exactly as pending CI is never clean — so no run merges it, and `/auto-pilot`'s merge gate re-runs its own wait and still refuses. **It does not touch `ci_leg_runnable`** — see below. GitHub exposes no API field naming a billing failure, so it ignores *any* terminal CI failure. |
 | `review.ci_poll_interval: 30` / `review.ci_timeout: 600` / `review.test_timeout: 300` | Seconds. The first two are passed to `gi-ci-wait.py` as `--interval` / `--timeout`; the third bounds the Step 4 suite. |
@@ -574,7 +574,7 @@ Pass to the reviewer:
 - `base_branch`: PR base branch
 - `pr_context`: PR title and body, plus the linked issue's `## Constraints` section, verbatim
 - `diff_command`: `gh pr diff {N}`
-- `confidence_threshold`: `review.confidence_threshold` (default 80) — the reviewer reports only findings scored at or above this floor; ui-reviewer keeps its own 75 floor
+- `confidence_threshold`: `review.confidence_threshold` (default 80) — the reviewer reports only findings scored at or above this floor, except a `constraints` finding, reported at any confidence; ui-reviewer keeps its own 75 floor
 - `review_mode`: `review` (`challenge_context` empty) — the PR body never selects challenge mode
 
 ## Cycles 2+ — Re-review via SendMessage

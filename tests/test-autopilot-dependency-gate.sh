@@ -32,6 +32,11 @@ fail() {
 echo "◆ Auto-Pilot Dependency Gate Tests (issue #93)"
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 
+# T12 builds into this dir; the trap is armed before sourcing spec.bash so its
+# cleanup chains onto it (see tests/lib/spec.bash, ORDERING).
+BUILD_TMP="$(mktemp -d)"
+trap 'rm -rf "$BUILD_TMP"' EXIT
+
 SKILL="$REPO_ROOT/src/skills/auto-pilot/SKILL.source.md"
 . "$(cd "$(dirname "$0")" && pwd)/lib/spec.bash"  # spec_concat — split reference specs read as one file (#323)
 PHASES="$(spec_concat "$REPO_ROOT/src/skills/auto-pilot/references/phases.md")"
@@ -253,21 +258,27 @@ else
 fi
 
 # ───────────────────────────────────────────────────────────
-# T12: dist/ tree mirrors src/ for the new content (drift guard)
+# T12: a fresh build of src/ carries the new content (drift guard)
 # ───────────────────────────────────────────────────────────
-DIST_PHASES="$(spec_concat "$REPO_ROOT/dist/skills/auto-pilot/references/phases.md" || true)"
-DIST_SKILL="$REPO_ROOT/dist/skills/auto-pilot/SKILL.md"
+# Always build into a temp dir: a gitignored dist/ is absent on a fresh checkout
+# and may be stale, so neither can stand in for what src/ builds to today.
+if ! bash "$REPO_ROOT/scripts/build.sh" --out "$BUILD_TMP" --quiet >"$BUILD_TMP.log" 2>&1; then
+  echo "  ⚠ build failed: $(tail -3 "$BUILD_TMP.log")"
+fi
+rm -f "$BUILD_TMP.log"
+DIST_PHASES="$(spec_concat "$BUILD_TMP/skills/auto-pilot/references/phases.md" || true)"
+DIST_SKILL="$BUILD_TMP/skills/auto-pilot/SKILL.md"
 
 if [ -f "$DIST_PHASES" ] && grep -qE '^### Step 5\.1b — Dependency Gate' "$DIST_PHASES"; then
-  pass "T12.1: dist/ phases.md contains Step 5.1b"
+  pass "T12.1: built phases.md contains Step 5.1b"
 else
-  fail "T12.1: dist/ phases.md missing Step 5.1b — run scripts/build.sh"
+  fail "T12.1: built phases.md missing Step 5.1b"
 fi
 
 if [ -f "$DIST_SKILL" ] && grep -qE '\bblocked_by_dependency\b' "$DIST_SKILL"; then
-  pass "T12.2: dist/ SKILL.md contains blocked_by_dependency outcome"
+  pass "T12.2: built SKILL.md contains blocked_by_dependency outcome"
 else
-  fail "T12.2: dist/ SKILL.md missing blocked_by_dependency — run scripts/build.sh"
+  fail "T12.2: built SKILL.md missing blocked_by_dependency"
 fi
 
 # ───────────────────────────────────────────────────────────

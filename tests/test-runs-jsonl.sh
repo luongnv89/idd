@@ -569,10 +569,19 @@ has "$REPO_ROOT/src/skills/auto-pilot/references/summary-format.md" 'ended `merg
 has "$REPO_ROOT/src/skills/auto-pilot/references/run-log.md" '**`verification`** comes from the PR review' \
   "T13j: auto-pilot logs the review's verification"
 # A disabled check reads as disabled, never pass.
-if git -C "$REPO_ROOT" grep -qF 'pass — verification disabled' -- src docs ':!docs/experiments' ':!docs/release-notes'; then
+# #584 widened this: the older `○ acceptance_criteria: pass` + `verification
+# disabled (…)` form counts too, on one line in either order.
+disabled_as_pass_re='pass — verification disabled|[a-z_]+: pass`?.*verification disabled|verification disabled.*: pass'
+if git -C "$REPO_ROOT" grep -qE "$disabled_as_pass_re" -- src docs ':!docs/experiments' ':!docs/release-notes'; then
   fail "T13k: a disabled dimension is still reported as pass somewhere in src/ or docs/"
 else
   pass "T13k: no disabled dimension is reported as pass"
+fi
+if printf '%s\n' 'Report `○ acceptance_criteria: pass` with the explicit note `verification disabled (review.require_acceptance_criteria_check: false)`.' \
+   | grep -qE "$disabled_as_pass_re"; then
+  pass "T13k: the guard catches the older pass + verification disabled (…) form"
+else
+  fail "T13k: the guard misses the older pass + verification disabled (…) form"
 fi
 has "$REPO_ROOT/src/skills/issue-pr-review/references/verification-checks.md" '`○ acceptance_criteria: disabled (review.require_acceptance_criteria_check: false)`' \
   "T13k: a disabled acceptance-criteria check prints disabled"

@@ -206,6 +206,7 @@ Check these files:
 - `references/scripts/gi-config.py` — config resolver: defaults merged with `.idd.yml`, one JSON line
 - `references/scripts/gi-gh.py` — GitHub CLI subprocess boundary
 - `references/scripts/gi-issue.py` — TTL-cached issue fetcher (Step 1)
+- `references/scripts/gi-ready.py` — numbers the acceptance criteria for the synthesizer (Steps 6-7)
 
 ---
 

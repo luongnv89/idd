@@ -185,7 +185,7 @@ Each skill has `references/error-messages.md`. Follow the three-part format:
 
 Issue templates are in `src/skills/issue-creator/templates/`. Each template must:
 - Include the `<!-- idd:normalized v1 -->` marker
-- Use intent-only sections: Type, Context, Description, Acceptance Criteria, Metadata
+- Use intent-only sections: Type, Context, Description, Acceptance Criteria, the optional Constraints (reporter-stated non-goals, invariants and limits only), Metadata
 - Preserve the Reporter Context blockquote
 - **Never** include sections that imply codebase analysis (no Affected Files, no Technical Notes, no Architecture Constraints, no Implementation Hints) — `/issue-creator` is intent-only; consumer skills (resolver, triage, analysis) scan the codebase fresh at execution time
 

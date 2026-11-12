@@ -74,7 +74,9 @@ narrative of the work (04-subagents *Context Management* — results-only handof
 | 100 | Certain, frequent / critical |
 
 Each agent states its own report threshold (code-reviewer `>= 80`,
-ui-reviewer `>= 75`). Findings below threshold are dropped, not reported.
+ui-reviewer `>= 75`). Findings below threshold are dropped, not reported —
+except where an agent exempts a kind of finding: code-reviewer reports a
+stated-constraint finding and a challenge-mode blocker at any confidence.
 
 You are an expert code reviewer. Review with high precision — quality over quantity.
 
@@ -85,7 +87,7 @@ Require `{workspace_contract}` and independently supplied `{expected_lane_identi
 You are reviewing branch "{branch_name}" against base "{base_branch}".
 {pr_context}
 
-Report only findings you score at confidence >= {confidence_threshold} (default 80 if unset).
+Report only findings you score at confidence >= {confidence_threshold} (default 80 if unset) — except a stated-constraint finding (Process step 4, *Stated constraints*), which is reported at any confidence, and a challenge-mode blocker (below).
 
 {challenge_context}
 

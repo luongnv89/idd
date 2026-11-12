@@ -336,7 +336,6 @@ jobs:
       - name: test-agent-conventions-inline-245
         run: bash tests/test-agent-conventions-inline-245.sh
 
-      # Reads dist/ — fails on a fresh checkout if run before the build.
       - name: test-autopilot-dependency-gate
         run: bash tests/test-autopilot-dependency-gate.sh
 
@@ -484,3 +483,6 @@ jobs:
 
       - name: test-issue-constraints-557
         run: bash tests/test-issue-constraints-557.sh
+
+      - name: test-review-followups-584
+        run: bash tests/test-review-followups-584.sh
