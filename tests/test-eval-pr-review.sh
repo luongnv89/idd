@@ -38,6 +38,7 @@ run_case "clean-traceability"
 run_case "intentional-refs"
 run_case "unverified-only-auto"
 run_case "unsupported-pass"
+run_case "regression-green-at-base"
 
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 echo "Results: $PASS passed, $FAIL failed"

@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "calls": [
+    {
+      "match": "prefix",
+      "argv": [
+        "auth",
+        "status"
+      ],
+      "stdout": "github.com\n  \u2713 Logged in to github.com as eval-bot (key)\n",
+      "stderr": "",
+      "exit": 0
+    },
+    {
+      "argv": [
+        "pr",
+        "view",
+        "12",
+        "--json",
+        "number,title,body,state,files"
+      ],
+      "stdout": "{\"number\": 12, \"title\": \"fix(slug): keep digits in slugs (#42)\", \"body\": \"Closes #42\\n\\n## Summary\\n\\nKeep digits in slugs.\\n\\n## Decision Record\\n\\n- **Root cause:** `slugify` dropped every digit.\\n- **Options considered:** Option 1 \\u2014 keep digits; Option 2 \\u2014 rewrite slugify\\n- **Options rejected:** Option 2 \\u2014 larger change\\n- **Selected option:** Option 1 \\u2014 keep digits\\n- **Residual risk:** none identified\\n- **Reproduction:** `python3 tests/test_slug.py` confirmed red for the stated reason \\u2192 regression test `tests/test_slug.py`\\n\\nAnalyzed at: `fix/42-keep-digits @ abc1234` (2026-11-12)\\n\\n## Acceptance Criteria Verification\\n\\n| Criterion | Status | Evidence |\\n|-----------|--------|----------|\\n| Slugs keep their digits | pass | Verified red: `python3 tests/test_slug.py` \\u2192 fixed \\u2192 tests/test_slug.py |\\n| Letters are lowercased | unverified | sensitivity not verified: no hunk to mutate |\\n\", \"state\": \"OPEN\", \"files\": [{\"path\": \"src/slug.py\"}, {\"path\": \"tests/test_slug.py\"}]}\n",
+      "stderr": "",
+      "exit": 0
+    },
+    {
+      "argv": [
+        "issue",
+        "view",
+        "42",
+        "--json",
+        "number,title,body,labels"
+      ],
+      "stdout": "{\"number\": 42, \"title\": \"Bug: slugs drop digits\", \"body\": \"<!-- idd:normalized v1 -->\\n\\n## Type\\n\\nbug (high confidence)\\n\\n## Description\\n\\n`slugify(\\\"Room 101\\\")` returns `room-` instead of `room-101`.\\n\\n## Acceptance Criteria\\n\\n- [ ] Slugs keep their digits\\n- [ ] Letters are lowercased\\n\", \"labels\": [{\"name\": \"bug\"}]}\n",
+      "stderr": "",
+      "exit": 0
+    }
+  ]
+}

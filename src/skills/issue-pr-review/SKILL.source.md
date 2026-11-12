@@ -254,6 +254,8 @@ This skill produces `acceptance_criteria` and `traceability` itself, per `refere
 
 **Verification recipe:** when the base branch commits `.idd-recipe.json` (or legacy `.gitissue-recipe.json`), run it in this step with `shared/scripts/gi-recipe.py`, even when the suite is skipped (`qa_handoff = trusted` included). Auto mode runs it only when the recipe opts in `review`. A `result: fail` is fixable and blocks soft-pass (`references/ui-review-mechanics.md`, *Verification recipe*).
 
+**Bug proof:** on a bug PR, re-run the regression test its `Reproduction` line cites, red at base and green at head, and report `sensitivity not verified` rows, under `qa_handoff = trusted` too (`references/verification-checks.md`, *Bug proof*).
+
 A skip satisfies the soft-pass test leg but evaluated neither check: it reports `× Suite passed` / `× Build clean` with `Result: PARTIAL`, never a silent `√`.
 
 ```
@@ -322,7 +324,7 @@ Print the summary from `references/report-templates.md` and **apply its *Review 
 
 **Merge rule.** <!-- a:rv-merge-rule --> `/issue-pr-review` merges a PR only when `review.auto_merge` is `true` and the PR is clean, in interactive and `--auto` runs alike, and never under `--no-merge` or `--review-only`. Clean excludes two cases: pending CI is never clean; a CI failure held non-blocking by `review.ignore_ci_billing_failures` is never clean either. A squash merge deletes the head branch and is irreversible: on an unmet gate, report and stop — never delete a branch by hand.
 
-**Merge floor.** <!-- a:rv-merge-floor --> One home; `/auto-pilot` reads the `merge_floor` returned. `met` needs the acceptance-criteria check enabled, at least one criterion is `pass` and none is `unverified` or ends with `(needs review)` (unconfirmed), deferred rows excluded; else `unmet: {reason}`. Print it under `Evidence`. An `--auto` / `IDD_AUTO_MODE=1` run never merges `unmet`; interactive asks `Merge with the floor unmet ({reason})? [y/N]`. <!-- auto:no -->
+**Merge floor.** <!-- a:rv-merge-floor --> One home; `/auto-pilot` reads the `merge_floor` returned. `met` needs the acceptance-criteria check enabled, at least one criterion is `pass` and none is `unverified` or ends with `(needs review)` (unconfirmed), deferred rows excluded, and on a bug PR a `red→green` *Bug proof* at `verified_head` (`not reproduced` never is); else `unmet: {reason}`. Print it under `Evidence`. An `--auto` / `IDD_AUTO_MODE=1` run never merges `unmet`; interactive asks `Merge with the floor unmet ({reason})? [y/N]`. <!-- auto:no -->
 
 **Merge identity (last gate before the merge).** <!-- a:rv-merge-identity --> Bind `verified_head` = Step 5's `ci_sha` (or, with no `ci_sha`, the `headRefOid` the final review cycle read). Re-read `headRefOid` and `baseRefName`, then `gh api "repos/{owner}/{repo}/compare/${base_ref}...${verified_head}" --jq .behind_by`. Merge only when the head still equals `verified_head` **and** `behind_by` is exactly `0` (the live base branch, never `baseRefOid`); anything else is `BLOCKED`, never a re-wait. Merge with `--match-head-commit "$verified_head"`. Patch-id equality never replaces fresh integration checks. Commands and reasons: `references/report-templates.md` (*Auto-Merge*).
 
