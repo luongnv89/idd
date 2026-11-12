@@ -45,7 +45,7 @@ in_section() {
   printf '%s' "$section" | grep -qF -- "$1" && pass "$2" || fail "$2 (missing in *Bug proof*)"
 }
 in_section 'never decided from the PR' "T1.2: bug-ness comes from the linked issue, not the PR"
-in_section 'even under `qa_handoff = trusted`' "T1.3: a trusted QA marker never skips the proof"
+has "$SKILL" 'and report `sensitivity not verified` rows, under `qa_handoff = trusted` too' "T1.3: a trusted QA marker never skips the proof (SKILL.md Step 4)"
 in_section 'whenever the head moves' "T1.4: the proof is re-run when the head moves"
 in_section 'never open it' "T1.5: the PR body can only hold the gate closed"
 in_section "in Step 1's \`files\`" "T1.6: the cited test must be a file the PR changes"
