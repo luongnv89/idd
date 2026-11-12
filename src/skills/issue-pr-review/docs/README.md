@@ -6,7 +6,7 @@
 
 # Issue PR Review
 
-> Review a pull request end-to-end — analyze, test, fix, check CI, and auto-merge when clean — with up to 3 token-optimized fix cycles.
+> Review a pull request end-to-end — analyze, test, fix, check CI, and optionally merge when clean — with up to 3 token-optimized fix cycles.
 
 ## Intent-Code Boundary
 
@@ -18,7 +18,7 @@
 - Up to 3 LLM-driven review-fix cycles, ending early when clean
 - Runs the project's real test suite, not mocks
 - Monitors CI status and waits for green before merging
-- Auto-merge in `--auto` mode (used by `/auto-pilot`); read-only mode available
+- Merges a clean PR only when `review.auto_merge: true` (default `false`), in any mode; `--no-merge` (used by `/auto-pilot`) and read-only mode never merge
 - Five-dimension review output — correctness, acceptance_criteria, traceability, maintainability, safety — grouped under two axes (**Spec**: does it satisfy the acceptance criteria? · **Standards**: does it follow project conventions?) so clean-but-wrong and correct-but-ugly stay separate, and a PR can pass tests yet still be flagged for missing issue links or unmet acceptance criteria
 - Per-criterion acceptance-criteria verification (`pass` / `fail` / `unverified` with evidence) against the linked issue
 - Soft-pass when zero "fix" issues remain, with **hard blocks** on `traceability: fail` (missing `Closes #N`) and any `acceptance_criteria: fail` — green tests do not override these
@@ -28,8 +28,8 @@
 
 | Say this... | Skill will... |
 |---|---|
-| `/issue-pr-review 42` | Review PR #42, fix issues, and repeat until clean; report findings (no auto-merge) |
-| `/issue-pr-review 42 --auto` | Review, fix, wait for CI, and auto-merge when green |
+| `/issue-pr-review 42` | Review PR #42, fix issues, and repeat until clean; report findings (merges only with `review.auto_merge: true`) |
+| `/issue-pr-review 42 --auto` | Same, with no prompts; waits for CI and merges when green only with `review.auto_merge: true` |
 | `/issue-pr-review --review-only` | Review and report only — never fix or merge |
 | `/issue-pr-review 42 --resume` | Resume a review whose session was killed, from its progress record (combines with `--auto`) |
 | "is this PR ready?" | Run the pipeline against the current branch's PR |
@@ -46,7 +46,7 @@ graph TD
     E --> C
     D -- Yes --> F["Run tests"]
     F --> G["Wait for CI"]
-    G --> H["Auto-merge (if --auto)"]
+    G --> H["Merge (if review.auto_merge)"]
     style A fill:#4CAF50,color:#fff
     style H fill:#2196F3,color:#fff
 ```

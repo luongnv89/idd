@@ -17,14 +17,14 @@ Review a PR end-to-end — analyze, test, fix, check CI, repeat until clean.
 
 | Invocation | Mode | What happens |
 |------------|------|--------------|
-| `/issue-pr-review <N>` | interactive | Review, fix, repeat until clean; report (no auto-merge) |
-| `/issue-pr-review <N> --auto` | auto-pilot | Review, fix, and auto-merge when clean |
-| `/issue-pr-review <N> --auto --no-merge` | auto-pilot | Review and fix, but skip auto-merge |
+| `/issue-pr-review <N>` | interactive | Review, fix, repeat until clean; report; merge per *Merge rule* |
+| `/issue-pr-review <N> --auto` | auto-pilot | Same, with no prompts |
+| `/issue-pr-review <N> --auto --no-merge` | auto-pilot | Review and fix, never merge |
 | `/issue-pr-review` | detect | Auto-detect PR for current branch |
 | `/issue-pr-review --review-only` | read-only | Review and report, never fix or merge |
 | `/issue-pr-review <N> --resume` | interactive or auto | Resume a killed review from its progress record (*Progress record*); combines with `--auto` and `--no-merge`, never with `--review-only` |
 
-`--auto` is set by `/auto-pilot`; in auto mode export `IDD_AUTO_MODE=1` so the pre-commit scan logs warnings instead of prompting (`docs/pre-commit-security.md`). `--no-merge` suppresses auto-merge even under `--auto`.
+`--auto` is set by `/auto-pilot`; in auto mode export `IDD_AUTO_MODE=1` so the pre-commit scan logs warnings instead of prompting (`docs/pre-commit-security.md`). `--no-merge` suppresses the merge in any mode.
 
 ## Context re-entry <!-- a:ctx-reentry -->
 
@@ -106,7 +106,7 @@ Load config once at skill start; never re-read it. Run `python3 shared/scripts/g
 
 **Context threshold.** <!-- a:ctx-check --> Only when `compaction.enabled` is true (`docs/context-threshold.md`). At each `[N/7]` step start, compare the remaining-context figure the host placed in your context (none: skip silently, never estimate) with `compaction.threshold.issue-pr-review`. At or below it, interactive prints the `⚠` line and a `/compact <focus>` line (skill, `PR #N`, step id and name only) and pauses **at most once per run**; `--auto` / `IDD_AUTO_MODE=1` prints one `⚠` line per run and continues — never a pause or stop.
 
-Inline defaults: `review.max_cycles: 3`, `review.soft_pass: true`, `review.auto_merge: false` (auto mode overrides to `true`), `compaction.enabled: true`, `compaction.threshold.issue-pr-review: 40`. Every key and its gate: `references/review-loop-mechanics.md` (*Config keys and what they gate*).
+Inline defaults: `review.max_cycles: 3`, `review.soft_pass: true`, `review.auto_merge: false` (see Step 7 *Merge rule*), `compaction.enabled: true`, `compaction.threshold.issue-pr-review: 40`. Every key and its gate: `references/review-loop-mechanics.md` (*Config keys and what they gate*).
 
 ## Progress record <!-- a:rv-progress -->
 
@@ -318,7 +318,7 @@ After Step 6, return to Step 3. Mechanics: `references/review-loop-mechanics.md`
 
 Print the summary from `references/report-templates.md` and **apply its *Review contract* to every terminal outcome**, including a stop before Step 7: first row `Result:` (`PASS`, `MERGED`, `PARTIAL`, `WARN`, or `BLOCKED`), then `Evidence`, `Uncertainty`, and `Decision` rows — **read it now**.
 
-**Auto-merge is the one destructive action** (squash merge + head-branch deletion, irreversible). Every gate must hold: interactive runs never merge; `--auto` merges only when `review.auto_merge` is true **and** the PR is clean (pending CI is never clean; a CI failure held non-blocking by `review.ignore_ci_billing_failures` is never clean either); `--no-merge` suppresses the merge, leaving it to auto-pilot. On an unmet gate, report and stop — never delete a branch by hand.
+**Merge rule.** <!-- a:rv-merge-rule --> `/issue-pr-review` merges a PR only when `review.auto_merge` is `true` and the PR is clean, in interactive and `--auto` runs alike, and never under `--no-merge` or `--review-only`. Clean excludes two cases: pending CI is never clean; a CI failure held non-blocking by `review.ignore_ci_billing_failures` is never clean either. A squash merge deletes the head branch and is irreversible: on an unmet gate, report and stop — never delete a branch by hand.
 
 **Merge identity (last gate before the merge).** <!-- a:rv-merge-identity --> Bind `verified_head` = Step 5's `ci_sha` (or, with no `ci_sha`, the `headRefOid` the final review cycle read). Re-read `headRefOid` and `baseRefName`, then `gh api "repos/{owner}/{repo}/compare/${base_ref}...${verified_head}" --jq .behind_by`. Merge only when the head still equals `verified_head` **and** `behind_by` is exactly `0` (the live base branch, never `baseRefOid`); anything else is `BLOCKED`, never a re-wait. Merge with `--match-head-commit "$verified_head"`. Patch-id equality never replaces fresh integration checks. Commands and reasons: `references/report-templates.md` (*Auto-Merge*).
 

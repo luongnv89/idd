@@ -559,7 +559,7 @@ Read-only by design — never modifies files, branches, or remote state.
 
 ### /issue-pr-review -- PR Review Pipeline
 
-Reviews a PR end-to-end: script pre-pass (lint/format/test auto-fix, zero LLM cost), code review with confidence-based filtering classified as `fix` (critical/high) vs `note` (medium), per-criterion acceptance-criteria verification, traceability checks (Closes link, Decision Record, AC Verification table), runs tests and build, checks CI status, fixes only `fix` issues, and repeats until clean. Soft-pass when zero `fix` issues remain. Supports auto-merge in auto-pilot mode. After a merge, or on a PR it finds already merged, it cleans up the local checkout (merged branch, its clean worktrees, switch off the merged branch to the updated base) and never forces anything: work it cannot remove safely is kept and reported.
+Reviews a PR end-to-end: script pre-pass (lint/format/test auto-fix, zero LLM cost), code review with confidence-based filtering classified as `fix` (critical/high) vs `note` (medium), per-criterion acceptance-criteria verification, traceability checks (Closes link, Decision Record, AC Verification table), runs tests and build, checks CI status, fixes only `fix` issues, and repeats until clean. Soft-pass when zero `fix` issues remain. Merges a clean PR only when `review.auto_merge: true`. After a merge, or on a PR it finds already merged, it cleans up the local checkout (merged branch, its clean worktrees, switch off the merged branch to the updated base) and never forces anything: work it cannot remove safely is kept and reported.
 
 ```
 /issue-pr-review 87              # review PR #87

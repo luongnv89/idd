@@ -25,8 +25,8 @@ human-facing summary: the report-back fields `/auto-pilot` reads (`result`,
      config skip, or a `qa_handoff = trusted` test skip (listed under
      *Uncertainty*, never as `✓ pass`). The PR is clean. When an auto-merge
      follows, its `MERGED` or `BLOCKED (manual merge required)` block supersedes
-     this row; otherwise (interactive, `--no-merge`, or
-     `review.auto_merge: false`) it is the final status.
+     this row; otherwise (no merge under SKILL.md *Merge rule*) it is the
+     final status.
    - `MERGED` — `PASS`, and the auto-merge succeeded.
    - `PARTIAL` — the loop exited with no finding left, but a leg was not
      verified: a CI failure held non-blocking by
@@ -59,7 +59,7 @@ human-facing summary: the report-back fields `/auto-pilot` reads (`result`,
 4. **Decision.** Print `Decision: No approval needed.` — the merge gates are
    configuration, not a prompt, and `--auto` runs never ask. Name the remaining
    user action separately on a `Next action:` row: merge the PR yourself
-   (interactive `PASS` never merges), fix the listed findings and re-run, or the
+   (a `PASS` the *Merge rule* did not merge), fix the listed findings and re-run, or the
    `To fix:` command of a `BLOCKED` error.
 
 Rows that a stop before Step 7 cannot fill are omitted, never invented: a
@@ -280,9 +280,9 @@ The `acceptance_criteria` line shows the common no-linked-issue case; a linked i
 
 Log the matching mechanism (label name or pattern). Emptying both keys disables the exemption; an intentional `Refs #N` PR (*Intentional reference*) is not an exemption and still renders `○ pass — intentional reference (Refs #{N}; {k} AC deferred)`, its deferred criteria as `○ deferred`.
 
-## Auto-Merge (auto mode only)
+## Auto-Merge
 
-If the PR is clean AND `--auto` is set (and `--no-merge` is **not** set), run the
+When SKILL.md *Step 7 → Merge rule* allows the merge, run the
 merge identity check, then merge with the expected-head guard (issue #516):
 
 ```bash
@@ -390,9 +390,9 @@ On a stale merge identity (nothing was merged):
 
 Auto-merge is gated on the configured loop-exit pass condition **plus exclusions the loop exit does not apply**: pending CI is never clean, and a terminal CI failure held non-blocking by `review.ignore_ci_billing_failures: true` is never clean either — that key satisfies the loop's CI leg so the fix loop can stop and report `PARTIAL`, and it never satisfies this gate. The shared part includes `traceability != fail` and zero `acceptance_criteria: fail`. With `review.soft_pass: false`, it additionally requires zero notes and no partial dimensions. A PR that passes tests and CI but fails traceability or acceptance criteria — or has a strict-pass blocker — is **not** auto-merged.
 
-When `--no-merge` is set (even in auto mode): skip the merge step entirely and report status only. The PR stays open for the owning agent (e.g. auto-pilot Phase 5) to merge through its own mode gate and dependency gate.
+When `--no-merge` is set (in any mode): skip the merge step entirely and report status only. The PR stays open for the owning agent (e.g. auto-pilot Phase 5) to merge through its own mode gate and dependency gate.
 
-In interactive mode: never auto-merge — just report status.
+When the *Merge rule* does not allow the merge (`review.auto_merge: false`, or the PR is not clean): skip the merge step and report status only.
 
 ## Expected Inline Output
 

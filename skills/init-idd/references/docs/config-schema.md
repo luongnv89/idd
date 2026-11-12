@@ -162,7 +162,7 @@ review:
   # (Complexity → pipeline profile).
   adaptive_depth: true
 
-  # Auto-merge PR when clean (overridden to true in --auto mode)
+  # When /issue-pr-review merges: its Step 7 Merge rule
   # Type: boolean
   # Default: false
   auto_merge: false
@@ -698,7 +698,7 @@ Each `compaction.threshold.<skill>` must be an integer from 1 to 99 and `compact
 | `resolve.ui_review.browser_review` | `"ask"` | Browser (screenshot) UI review mode; code UI review is auto-detected and always runs |
 | `review.max_cycles` | `3` | Max review-fix cycles |
 | `review.adaptive_depth` | `true` | Scale review depth to PR complexity — a trivial PR caps the review-fix loop at 1 cycle and skips optional passes (AC + traceability hard-blocks still run); `false` pins every PR to full depth and disables the QA handoff gate and #256's CI verdict gate too ([agent-model-effort.md](https://github.com/luongnv89/idd/blob/main/docs/agent-model-effort.md)) |
-| `review.auto_merge` | `false` | Auto-merge PR when clean |
+| `review.auto_merge` | `false` | Merge clean PRs (*Merge rule*) |
 | `review.confidence_threshold` | `80` | Min confidence level for issues |
 | `review.run_tests` | `true` | Run tests during review |
 | `review.check_ci` | `true` | Check CI status during review |
