@@ -146,7 +146,7 @@ The contract, opt-in, lifecycle and verdict handling live in `docs/ui-review.md`
 - **Premise reset:** two failed fixes sharing a premise block the next fix until
   rerunnable diagnostics support a revised one (*Premise reset* below) — it
   catches what stagnation misses, the same wrong hypothesis behind reworded findings
-- **Resumed run** (*Step 0j — Progress record*): the restored cycle is a floor and
+- **Resumed run** (*Monotone restore*, *0j — Resume*): the restored cycle is a floor and
   the cycle in flight when the session died counts as consumed; a lost count or
   ledger takes the cap path, never cycle 1
 

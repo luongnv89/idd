@@ -44,7 +44,7 @@ as exit 2.
 
 Write each effect's intent to the progress record **before** the effect — the push,
 `gh pr create`, then the `closing` step before the run-log write — so a killed
-session's successor reconciles it live instead of repeating it (*Step 0j — Progress
-record*, `references/steps/step-0j-progress-record.md`). A run that resumed past
+session's successor reconciles it live instead of repeating it (*Reconciling
+effects*, `references/steps/step-0j-resume.md`). A run that resumed past
 Step 4 did not see QA exit clean in this session: it drops the QA marker and writes
 no receipt, and the reviewer runs its full pipeline.

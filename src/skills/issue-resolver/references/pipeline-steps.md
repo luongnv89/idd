@@ -137,4 +137,4 @@ PR body notes: `> **Note:** No acceptance criteria defined — manual review rec
 
 ### Resumed run (a killed session's progress record)
 - The run-log line is written once: `duration_s` and `phases` cover this session only; `qa_cycles` is the restored count plus this session's.
-- A resume past Step 4 delivers without the QA marker, so the reviewer runs its full pipeline (*Step 0j — Progress record*).
+- A resume past Step 4 delivers without the QA marker, so the reviewer runs its full pipeline (*0j — Resume*).
