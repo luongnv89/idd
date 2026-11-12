@@ -4,12 +4,7 @@ Templates for the Step 7 summary report and the expected inline pipeline output.
 
 The Step 7 summary always shows the **five review dimensions** explicitly so reviewers can see, at a glance, that a PR is being judged on more than just tests. A PR can pass tests and still fail on `traceability` or `acceptance_criteria` — those dimensions are reported with their own status line.
 
-The five dimensions are grouped under **two named axes** so *does it do the right thing* and *does it follow our conventions* read as separate tracks (see `verification-checks.md` → *Two-axis grouping — Spec vs Standards*):
-
-- **Spec axis** — does the PR satisfy the issue's acceptance criteria? Groups `acceptance_criteria`, `correctness`, `safety`.
-- **Standards axis** — does the PR follow documented project conventions? Groups `traceability`, `maintainability`.
-
-The axes are a presentation grouping only. The status symbol on each dimension line, the `fix`/`note` semantics, and the soft-pass gate are all unchanged and stay per-dimension — there is no separate per-axis verdict line. Keep every dimension on its own line under the right axis header; the same five dimension names always appear.
+The five dimensions sit under the **Spec axis** (`acceptance_criteria`, `correctness`, `safety`) and the **Standards axis** (`traceability`, `maintainability`), a presentation grouping only (`verification-checks.md` → *Two-axis grouping — Spec vs Standards*): no per-axis verdict, and every dimension keeps its own line under its axis header.
 
 ## Review contract
 
@@ -379,6 +374,15 @@ On merge failure:
   Merge:             ✗ fail ({reason})
   Decision:          No approval needed.
   Next action:       resolve {reason}, then re-run /issue-pr-review {N} --auto
+```
+
+On an unmet *Merge floor* (nothing was merged):
+
+```
+  Result:            PASS — PR #{N} left open; merge floor unmet ({reason})
+  Merge:             ○ not attempted
+  Decision:          No approval needed.
+  Next action:       verify the criteria, then merge PR #{N} yourself
 ```
 
 On a stale merge identity (nothing was merged):

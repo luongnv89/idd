@@ -8,9 +8,9 @@ After the PR is created, the auto-pilot delegates review, testing, CI checking, 
 
 ### What issue-pr-review does in auto mode
 
-1. **Script pre-pass** — runs lint/format auto-fix tools (always), then tests (zero LLM tokens) — that test run is skipped when the PR carries a valid QA handoff marker, backed by a verified revision receipt, recording the suite already passing on the current head SHA
-2. Analyzes PR changes (cycle 1: fresh reviewer; cycles 2+: reuses same reviewer via SendMessage). On a resolver-authored PR still carrying a valid QA handoff marker bound to the current head SHA and backed by a verified revision receipt, cycle 1 collapses into the fresh confirmation pass, so the one independent full-strength review the PR gets is the unbiased one — no reviewer spawn is saved (the confirmation pass is fix-conditional, so a clean PR gets one pass either way); the saving is the skipped local test runs in step 3
-3. Runs all tests (unit, integration, e2e) and build/compile — skipped only when that same marker records the suite already passing on this exact commit
+1. **Script pre-pass** — lint/format auto-fix (always), then tests (zero LLM tokens), skipped when a valid QA handoff marker backed by a verified revision receipt records the suite passing on the current head SHA
+2. Analyzes PR changes (cycle 1: fresh reviewer; cycles 2+: same reviewer via SendMessage). On a resolver-authored PR with that marker and receipt, cycle 1 collapses into the fresh confirmation pass, the one unbiased full-strength review — no reviewer spawn is saved (that pass is fix-conditional); the saving is step 3's skipped test run
+3. Runs all tests and build/compile — skipped only when that marker records the suite passing on this exact commit
 4. Checks CI status (polls GitHub Actions until complete) — always, never skipped by the marker
 5. Fixes only `action: "fix"` issues — reuses the same fixer agent across cycles
 6. Repeats steps 2-5 up to `review_cycles` cycles (default: 3)
@@ -33,7 +33,7 @@ Use the **PR Reviewer Subagent** prompt from `references/subagent-prompts.md`, s
 
 Parse the subagent's response. Extract: `result`, `review_cycles`, `issues_found`,
 `issues_fixed`, `issues_noted`, `remaining_issues`, `criteria`,
-`partial_dimensions`, `disabled_dimensions`, `pre_pass_fixes`,
+`partial_dimensions`, `disabled_dimensions`, `merge_floor`, `pre_pass_fixes`,
 `tests_passed`, `ci_status`.
 
 **`PASS` is not proof.** Derive `verification` from `criteria`, `partial_dimensions` and
@@ -42,15 +42,11 @@ field is `partial` (`null` `criteria` under a disabled check is not missing). Th
 iteration report, summary row and run-log line all carry it and the counts.
 
 **Retain `ci_status` verbatim** — the string exactly as returned (`passed@<sha40>`,
-`failed@<sha40>`, `no_ci`, or a bare value), never re-derived and never summarised
-to a boolean. It is the only input to *Step 5.1a — CI verdict gate* that **this
-step** supplies — the gate's other inputs, `headRefOid` and `statusCheckRollup`,
-it reads live in Phase 5, and it decides on its own conditions; never restate
-them here. It is also the one returned field nothing in this step prints, so it is
-the one an executing agent is likeliest to drop. Dropping it is not unsafe — the gate
-reads a missing field as `absent` and runs today's full wait — but the run then
-re-polls CI the reviewer already waited on, and the gate does nothing on every
-iteration while appearing to be in force.
+`failed@<sha40>`, `no_ci`, or a bare value), never re-derived or summarised to a
+boolean. It is the only input *Step 5.1a — CI verdict gate* takes from **this
+step**; the gate reads `headRefOid` and `statusCheckRollup` live in Phase 5 and
+decides on its own conditions. Nothing here prints it, so it is easy to drop:
+the gate then reads it as `absent` and re-polls CI the reviewer already waited on.
 
 **Checkpoint (post-review).** Before acting on the result, record it with the
 *Step 1.0b* procedure — `{"phase": "merge", "current": {"phase": "merge"}}` on a
@@ -65,6 +61,7 @@ on the recorded PR rather than re-running the resolve.
     Review cycles: {review_cycles}
     Issues found/fixed: {issues_found}/{issues_fixed}
     Verification: {verification} — AC {p}/{f}/{u} pass/fail/unverified{; partial: {dims}}{; disabled: {dims}}
+    Merge floor: {merge_floor}
 ```
 Proceed to Phase 5 (Merge).
 
@@ -124,7 +121,7 @@ Compute the **effective mode** per the *Resolution rules* under *Merge Modes* in
 
 **Step 2a — Dependency and CI gates (before any merge):**
 
-Whenever Step 2 would merge a PR (aggressive + `merge_partial: true`), run **Step 5.1b — Dependency Gate** first using the originating issue `#{issue_number}`, then run the shared **Step 5.1a — CI verdict gate** against the current PR head. SPEC §2 requires these checks before **any** automated merge, including partial merges. The CI gate may accept `ci_verdict = trusted` only when the live head still equals the `passed@<sha40>` `ci_status` SHA and the same live rollup is non-empty and entirely green. Otherwise run the documented waiter/fallback for this head; accept only a settled `pass`, `none` with `none_confirmed: true`, or a successfully verified equivalent manual fallback. A stale or absent status, failed or pending checks, an unsettled terminal snapshot, an unconfirmed empty result, an unavailable or failed fallback, or any head change leaves the PR open. If either gate finds an unsatisfied dependency or non-mergeable CI, do **not** merge: print the structured alert from `references/error-messages.md`, record the iteration outcome as `blocked_by_dependency` or `left_open`, leave the PR open, add the issue to the session skip list, and **continue to the next eligible issue** (same record-and-continue semantics as Phase 5). Last, immediately before the merge, run **Step 5.1c — Merge identity gate** with `verified_head` bound to the head this CI gate checked: a moved head, a live base that is ahead of that head, or any doubt is `stale`, so do **not** merge — record `left_open`, leave the PR open, add the issue to the session skip list, and continue to the next eligible issue. Patch-id equality never stands in for a fresh verdict here either. Only when all three gates pass may the flow proceed to Step 2b.
+Whenever Step 2 would merge a PR (aggressive + `merge_partial: true`), apply Step 5.1's merge-floor check (an unmet floor is `left_open`), then run **Step 5.1b — Dependency Gate** using the originating issue `#{issue_number}`, then run the shared **Step 5.1a — CI verdict gate** against the current PR head. SPEC §2 requires these checks before **any** automated merge, including partial merges. The CI gate may accept `ci_verdict = trusted` only when the live head still equals the `passed@<sha40>` `ci_status` SHA and the same live rollup is non-empty and entirely green. Otherwise run the documented waiter/fallback for this head; accept only a settled `pass`, `none` with `none_confirmed: true`, or a successfully verified equivalent manual fallback. A stale or absent status, failed or pending checks, an unsettled terminal snapshot, an unconfirmed empty result, an unavailable or failed fallback, or any head change leaves the PR open. If either gate finds an unsatisfied dependency or non-mergeable CI, do **not** merge: print the structured alert from `references/error-messages.md`, record the iteration outcome as `blocked_by_dependency` or `left_open`, leave the PR open, add the issue to the session skip list, and **continue to the next eligible issue** (same record-and-continue semantics as Phase 5). Last, immediately before the merge, run **Step 5.1c — Merge identity gate** with `verified_head` bound to the head this CI gate checked: a moved head, a live base that is ahead of that head, or any doubt is `stale`, so do **not** merge — record `left_open`, leave the PR open, add the issue to the session skip list, and continue to the next eligible issue. Patch-id equality never stands in for a fresh verdict here either. Only when all three gates pass may the flow proceed to Step 2b.
 
 **Step 2b — Merge (only when aggressive + merge_partial: true and all three gates passed):** <!-- a:ap-step2b-merge -->
 

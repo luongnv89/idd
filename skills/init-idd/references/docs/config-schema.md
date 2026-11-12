@@ -224,9 +224,9 @@ review:
   # Run per-criterion acceptance-criteria verification against the linked issue.
   # Type: boolean
   # Default: true
-  # True: each criterion of the linked issue's `## Acceptance Criteria` is
-  # reported pass/fail/unverified, and any `fail` blocks soft-pass. False: the
-  # dimension reports `disabled` (never `pass`) and never blocks.
+  # True: each linked-issue criterion is reported pass/fail/unverified; any
+  # `fail` blocks soft-pass. False: the dimension reports `disabled` (never
+  # `pass`), never blocks, and fails the Merge floor.
   require_acceptance_criteria_check: true
 
   # Run the four traceability checks against the PR body and commit history.

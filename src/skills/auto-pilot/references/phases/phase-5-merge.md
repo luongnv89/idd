@@ -10,7 +10,8 @@ Before merging, verify:
 
 1. **PR is mergeable** — no conflicts, CI passing (if configured)
 2. **No blocking reviews** — no "request changes" reviews from other humans
-3. **Fresh merge identity** — the head is still the one CI checked, and the live base has not moved past it (*Step 5.1c*, the last check before the merge)
+3. **Merge floor met** — Step 3.2's `merge_floor` is `met`. Its one home is the `{{skill:issue-pr-review}}` skill's *Merge floor*; never re-derive it. Anything else, missing included, is `left_open`: `⚠ PR #{pr_number} left open — merge floor unmet ({reason})`
+4. **Fresh merge identity** — the head is still the one CI checked, and the live base has not moved past it (*Step 5.1c*, the last check before the merge)
 
 ```bash
 gh pr view {pr_number} --json mergeable,reviewDecision,statusCheckRollup,headRefOid
@@ -341,7 +342,7 @@ Merge behavior is controlled by `autopilot.mode`. This step runs for clean PRs a
 
 If the mode forbids merge (`conservative`):
 ```
-○ PR #{pr_number} ready for manual merge (mode: conservative)
+○ PR #{pr_number} ready for manual merge (mode: conservative{; merge floor unmet: {reason}})
   https://github.com/owner/repo/pull/{pr_number}
   Outcome: left_open
   Continuing to next issue...
