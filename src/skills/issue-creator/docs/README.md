@@ -10,7 +10,7 @@
 
 ## Highlights
 
-- Captures durable human intent in a standard template (type, description, reporter context, acceptance criteria, metadata)
+- Captures durable human intent in a standard template (type, description, reporter context, acceptance criteria, optional constraints, metadata)
 - Auto-classifies issues as bug, feature, or improvement with confidence levels (high/medium/low)
 - **Batch mode**: extract multiple issues from a single input with preview table and approval
 - Normalizes messy existing issues with backup safety and security-label protection
@@ -98,7 +98,7 @@ asm install https://github.com/luongnv89/idd --skill issue-creator
 
 ## Output
 
-- A structured GitHub issue with `<!-- idd:normalized v1 -->` marker, populated only with intent-capture content (type, description, reporter context, screenshots, acceptance criteria, metadata)
+- A structured GitHub issue with `<!-- idd:normalized v1 -->` marker, populated only with intent-capture content (type, description, reporter context, screenshots, acceptance criteria, optional constraints, metadata)
 - Terminal preview with confidence scores before creation
 - For batch: preview table of all items, per-item progress, summary with retry hints for failures
 - For normalization: backup comment preserving original body, normalization summary comment

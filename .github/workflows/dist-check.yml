@@ -484,3 +484,6 @@ jobs:
 
       - name: test-issue-constraints-557
         run: bash tests/test-issue-constraints-557.sh
+
+      - name: test-review-followups-584
+        run: bash tests/test-review-followups-584.sh
