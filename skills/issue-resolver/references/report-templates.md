@@ -266,7 +266,7 @@ so the PR reference is omitted:
   Evidence:     fixed by {sha7} ({merged PR #M | closing commit})
   Uncertainty:  matched by commit and PR text; the suite was not re-run
   Decision:     No approval needed.
-  Next action:  {"none — issue closed", or "close #{issue_number}"}
+  Next action:  close #{issue_number} — the resolver never closes it
 ```
 
 ### Blocked
@@ -389,7 +389,10 @@ These derivations are the resolver's own:
   otherwise. `gi-runlog.py` rejects an over-ceiling row without it (exit 3).
 
 `outcome` is one of `success` (a PR was delivered), `already_resolved` (Step 0/1
-found the issue already fixed and exited early), or `failed` (a step failed).
+found the issue already fixed and exited early), or `failed` (a step failed). A
+`failed` run an auto-mode default No stopped also carries — and, under
+`--no-run-log`, returns — `skipped_reason` (`assigned_to_other`, `blocked_label`,
+`empty_body`, `large_scope`, `max_commits_exceeded`).
 
 ### Suppression rule (single writer under `/auto-pilot`)
 

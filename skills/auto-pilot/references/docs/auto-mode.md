@@ -50,11 +50,11 @@ An **interactive gate** is any point where a skill prints a prompt and waits —
 | Mode | Behavior at a gate |
 |------|--------------------|
 | Interactive | Unchanged — print the prompt, wait for the answer, honor it |
-| Auto | **Never block.** Log one `⚠` line, take the gate's documented safe default, continue |
+| Auto | **Never block.** Log one `⚠` line, take the gate's **printed default** (or a narrower answer it documents), continue |
 
-Every gate MUST document its own safe default at the gate. This document defines
-only *when* auto mode applies and *that* the gate must log-and-proceed — it does
-not enumerate the defaults, because each one belongs with the gate it governs.
+A `[y/N]` gate takes **No**: the guarded action is not taken, and a run it ends
+records a `skipped_reason`. Each gate documents its auto behavior; one wider than
+its default MUST be a row of the [exception table](#exception-table).
 
 A skill with no unguarded gate is the goal: **no `[y/N]` prompts, no `Choose:`
 prompts, no `Continue?` prompts — every decision point has a defined auto
@@ -96,5 +96,19 @@ These still abort the run in auto mode, exactly as in interactive mode:
   exhausted.
 
 Auto mode also never *widens* scope: it takes the default the interactive prompt
-already offered, never a more destructive option that the prompt did not have as
-its default.
+already offered, never a more destructive option. It **never closes an issue**
+(only a merged PR's `Closes #N` does): on closing evidence it comments once and
+records `already_resolved`; dependents stay blocked until a person closes it.
+
+## Exception table
+
+The only auto behaviors wider than the printed default:
+
+| Id | Gate | Auto | Why |
+|----|------|------|-----|
+| `secscan-warnings` | Pre-commit scan warnings | Proceed | Hygiene signals, not leaks; a real secret still blocks |
+| `analysis-empty-body` | `/issue-analysis` empty body | Title-only analysis | Read-only, local file; the resolver's own gate takes No |
+| `already-resolved-comment` | Resolver already-resolved exit | Comment, never close | No one reads an unattended terminal |
+
+Every `[y/N]` prompt is followed, before the next prompt or heading, by
+`<!-- auto:no -->` or `<!-- auto:exception=<id> -->`; CI lints this.

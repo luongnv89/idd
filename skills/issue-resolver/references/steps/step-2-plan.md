@@ -289,7 +289,7 @@ docstring rules by hand.
 - `stop` — print the matching `references/error-messages.md` block (*Safety stops*).
   **Interactive:** ask `Proceed anyway? [y/N]` (default no); a yes is recorded as an
   operator override. **Auto:** a safety stop, never auto-resolved — the run ends
-  `failed` at Step 2, no PR ([auto mode](https://github.com/luongnv89/idd/blob/main/docs/auto-mode.md), *What auto mode does NOT change*).
+  `failed` at Step 2, no PR ([auto mode](https://github.com/luongnv89/idd/blob/main/docs/auto-mode.md), *What auto mode does NOT change*). <!-- auto:no -->
 
 Without the Agent tool the challenge cannot be independent: write it as a separate
 pass arguing against the plan and record `independent: false`, which the verdict

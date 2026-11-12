@@ -140,6 +140,7 @@ prints a `⚠` line. Suggestions keep working; only the cache is skipped.
    ⚠ Model data is {age} old (CursorBench 3.2).
      Refresh now? [y/N]
    ```
+   <!-- auto:no -->
 
 3. **Cache missing, invalid, or older than the seed** (script
    `state: "seeded"`) → seed it from the bundled `templates/model-data.json`
@@ -157,6 +158,7 @@ prints a `⚠` line. Suggestions keep working; only the cache is skipped.
    ○ Seeded model data from bundled CursorBench 3.2 snapshot.
      Fetch the latest now? [y/N]
    ```
+   <!-- auto:no -->
 
 4. **No valid cache and bundled seed also missing** (script exit 4) → emit the rich error
    `Model data unavailable` from `references/error-messages.md`, disable

@@ -213,7 +213,7 @@ advances to `cleanup` only when its deterministic path is still registered by
 without a cleanup attempt. Only then apply the existing result handling below.
 Finish this lane before choosing the next one.
 
-Parse the subagent's response. Extract: `status`, `branch_name`, `pr_number`, `pr_url`, `tests_written`, `failure_step`, `failure_reason`. For a parallel lane, require the returned `branch_name` to equal its validated planned branch and verify `gh pr view {pr_number} --json headRefName,state` reports that same head and `OPEN` before queuing review. Bind both returned values to shell variables rather than pasting them. A mismatch is a failed lane and never reaches review or merge.
+Parse the subagent's response. Extract: `status`, `branch_name`, `pr_number`, `pr_url`, `tests_written`, `failure_step`, `failure_reason`, `skipped_reason`. For a parallel lane, require the returned `branch_name` to equal its validated planned branch and verify `gh pr view {pr_number} --json headRefName,state` reports that same head and `OPEN` before queuing review. Bind both returned values to shell variables rather than pasting them. A mismatch is a failed lane and never reaches review or merge.
 
 **Checkpoint (post-resolve).** As soon as `branch_name` and `pr_number` are
 known — before Phase 3 spawns anything — record them with the *Step 1.0b*
@@ -275,6 +275,16 @@ other PR.
 If the report-back carries no `pr_number` (an older resolver, or a PR it could
 not identify), there is nothing to review: record `skipped` with
 `skipped_reason: pr_in_progress`, leave the issue **open**, and continue.
+
+**On a gate decline — `failure` carrying `skipped_reason`:** an auto-mode gate
+took its printed default No (`docs/auto-mode.md`) — a deterministic answer, not a
+failure. Record outcome `skipped` with that `skipped_reason`, add the issue to the
+skip list and continue: it never feeds the failure streak, quarantine or
+`pause_on_failure`.
+
+```
+○ #{issue_number} skipped — {skipped_reason} (auto mode took the default No)
+```
 
 **On failure:**
 

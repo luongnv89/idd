@@ -736,7 +736,7 @@ anchor_check_flat "$RS" rs-0j-gates '.tests_state. \*\*is never restored\*\*' "S
 anchor_check_flat "$RS" rs-0j-gates 'only when QA exited clean in this session' "S6e the marker and receipt only after a clean QA in this session"
 grep -qF '**only when QA exited clean** in this session' "$RS/SKILL.md"
 check "S6f resolver Step 5 keeps 'only when QA exited clean' and adds 'in this session'" "$?"
-for effect in 'issue_edit' 'issue_close' '`push`' '`pr_create`' 'run_log'; do
+for effect in 'issue_edit' 'issue_comment' '`push`' '`pr_create`' 'run_log'; do
   anchor_check "$RS" rs-0j-reconcile "$effect" "S6g resolver reconciles $effect"
 done
 anchor_check "$RS" rs-0j-reconcile 'gh pr list --head "\$branch_name" --state all --json' "S6h the PR-create reconcile is a live --json read"

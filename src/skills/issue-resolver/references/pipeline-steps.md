@@ -98,14 +98,14 @@ invariants (environment, workspace, deliver, no prompts). Under `--auto` /
 
 | Step | Auto behavior |
 |------|---------------|
-| *0c* — Guards | Skip the assignment guard; log blocking labels as warnings and continue. |
+| *0c* — Guards | Take each guard's printed default, No: assigned elsewhere or a blocking label stops the run `failed` with `skipped_reason` `assigned_to_other` / `blocked_label`. |
 | *0j* — Progress record | Resume only with `--resume`, never prompt; without it the record is ignored and this run's `--start` replaces it. |
 | *0d* — Auto-normalize | A security-labelled issue prints the skip warning and continues **without** rewriting the body — no operator confirmation is sought. |
 | *0e* — Workspace | The offer never appears. |
 | *0g* — Complexity gate | Still runs: it reads the pre-work `Effort` band, which needs no prompt. |
-| *Step 1* — Research | An already-resolved issue is closed with a comment and the run exits cleanly. |
+| *Step 1* — Research | An already-resolved issue gets one comment recommending the close — **never a close** — and the run exits `already_resolved`. An empty body or 20+ estimated files takes the gate's default No: stop `failed`, `skipped_reason` `empty_body` / `large_scope`. |
 | *Step 2* — Plan | Auto-select the recommended option (when design sketches ran, the sketch's `selected` one under any verdict; `unproven` never stops); the design-confirm checkpoint never fires. The sensitive-change gate still runs when triggered; its `stop` verdict is a safety stop — the run ends `failed`, no PR. |
-| *Step 3* — Implement | Continue past the max-commits guard with a warning. Never prompt for skills: internal agents only, unless `resolve.borrow_skills` is `true`, in which case the auto-selected set is borrowed without asking. |
+| *Step 3* — Implement | The max-commits guard takes its default No: no push, no PR, the commits kept on the local branch, `failed` with `skipped_reason: max_commits_exceeded`. Never prompt for skills: internal agents only, unless `resolve.borrow_skills` is `true`, in which case the auto-selected set is borrowed without asking. |
 | *Step 4* — QA | Run the cycles autonomously; on stagnation, deliver with the known issues recorded rather than stopping. A premise reset that rerunnable diagnostics cannot lift sends no further fix and takes the same deliver-with-known-issues path, with no QA marker. The verification recipe runs only when the base-ref recipe's `auto` list names `resolve`. |
 | *Step 5* — Deliver | Create the PR; never merge. |
 
@@ -120,12 +120,12 @@ Full behavior for the edge cases named in SKILL.md.
 PR body notes: `> **Note:** No acceptance criteria defined — manual review recommended.`
 
 ### Issue body is empty
-- Interactive: warn and ask to continue
-- Auto: warn in log, continue with title-only context
+- Interactive: warn and ask to continue (default No)
+- Auto: take the default No — stop, `skipped_reason: empty_body`
 
 ### Large issues (20+ files estimated)
-- Interactive: warn and ask
-- Auto: warn in log, continue
+- Interactive: warn and ask (default No)
+- Auto: take the default No — stop, `skipped_reason: large_scope`
 
 ### Tests fail or timeout
 - PR is not created. The Verify step stops with the failing test output and a resume hint.

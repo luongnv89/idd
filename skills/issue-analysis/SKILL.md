@@ -423,7 +423,7 @@ Otherwise, in interactive mode:
 
   Continue anyway? [y/N]
 ```
-Default is No. If declined, stop. If accepted, proceed with title-only keywords — the analysis will note limited confidence.
+Default is No. If declined, stop. If accepted, proceed with title-only keywords — the analysis will note limited confidence. Auto mode's title-only continuation is a listed exception ([auto mode](https://github.com/luongnv89/idd/blob/main/docs/auto-mode.md), *Exception table*). <!-- auto:exception=analysis-empty-body -->
 
 ### No relevant files found
 

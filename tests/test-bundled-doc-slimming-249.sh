@@ -229,7 +229,17 @@ FAIL=0
 # +7,836. Main measured 571,052 (the #537 rename had shrunk it from 571,620
 # without moving the line), so 571,052 + 26,448 + 7,836 = 605,336; the line
 # keeps six bytes of headroom, so the ratchet is not widened.
-BUDGET=605342
+#
+# Issue #549 is the eleventh raise (2026-11-12): auto mode takes the printed
+# default. auto-mode.md gains the one exception table every auto gate is held
+# to, the never-closes-an-issue rule (scoped: a merged PR's `Closes #N` still
+# closes; dependents stay blocked) and the gate-marker rule; a first draft of
+# +1,724 per copy was cut to +817, shipped to its 3 skills: +2,451.
+# run-log-schema.md's `skipped_reason` row names the resolver's default-No
+# stops (+104 in 2 copies) and pre-commit-security.md's digest +6 in 2 copies:
+# +220. Main measured 604,532, so 604,532 + 2,671 = 607,203; the line keeps six
+# bytes of headroom, so the ratchet is not widened.
+BUDGET=607209
 
 pass() { echo "  ✓ $1"; PASS=$((PASS + 1)); }
 fail() { echo "  ✗ $1"; FAIL=$((FAIL + 1)); }
