@@ -392,6 +392,8 @@ else
 fi
 
 # The per-phase completion check may not assert a refresh that no longer happens.
+check_lacks "$REPO_ROOT/src/skills/auto-pilot/references/summary-format.md" 'Triage refreshed' \
+  "T5.9a: summary-format.md never names the old check either"
 check_lacks "$SRC_SUMMARY" 'Triage refreshed' \
   "T5.9: the Phase 1 check no longer asserts a per-iteration refresh"
 check_has "$SRC_SUMMARY" 'Triage current' \

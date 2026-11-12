@@ -95,7 +95,7 @@ live git (`binding`): `verdict: stale` is stale (name its `reasons`), and only
 the record: print *Progress record is stale* with the reason, run `--clear`, and
 continue as a fresh run.
 
-**A record that may resume:** read `references/steps/step-0j-resume.md` before
+**A run that resumes:** read `references/steps/step-0j-resume.md` before
 going on — never on a fresh run.
 
 ### Terminal outcomes and the run log <!-- a:rs-0j-cleanup -->

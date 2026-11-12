@@ -288,7 +288,7 @@ else
 fi
 check_has "$REPO_ROOT/src/skills/issue-resolver/references/step-reports.md" 'Options produced' \
   "T6.6: the Step 2 completion check is reconciled with option-less synthesis"
-check_has "$SRC_TEMPLATES" 'analysis_reuse = fresh' \
+check_has "$REPO_ROOT/src/skills/issue-resolver/references/step-reports.md" 'analysis_reuse = fresh' \
   "T6.7: the completion-report rule names the reuse state"
 
 # ───────────────────────────────────────────────────────────

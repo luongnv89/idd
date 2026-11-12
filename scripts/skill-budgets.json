@@ -89,15 +89,15 @@
     },
     "issue-resolver": {
       "always_read": {
-        "budget": 11202,
+        "budget": 11196,
         "files": [
           "references/step-reports.md",
           "references/steps/step-0j-progress-record.md"
         ],
-        "measured": 10178
+        "measured": 10172
       },
       "budget": 433905,
-      "measured": 433884,
+      "measured": 433878,
       "skill_md": {
         "budget": 33856,
         "measured": 32932
