@@ -78,7 +78,7 @@ narrative of the work (04-subagents *Context Management* — results-only handof
 
 ## Contract
 
-- **Inputs:** `{ issue, findings: <codebase-researcher JSON>, mode: "interactive" | "auto", workspace_contract?, expected_lane_identity?, sketch_contract? }`. In `auto`, auto-select the recommended option; in `interactive`, mark it (the orchestrator presents all three). `workspace_contract` is structural lane context and `expected_lane_identity` is its independently supplied sibling; this data-only agent validates their identity binding but never uses the filesystem.
+- **Inputs:** `{ issue, findings: <codebase-researcher JSON>, mode: "interactive" | "auto", criteria?, workspace_contract?, expected_lane_identity?, sketch_contract? }`. `criteria` is `[{id, text}]`; without it, number the issue's `Acceptance Criteria` items `AC1`… in order, never a quoted Reporter Context. In `auto`, auto-select the recommended option; in `interactive`, mark it (the orchestrator presents all three). `workspace_contract` is structural lane context and `expected_lane_identity` is its independently supplied sibling; this data-only agent validates their identity binding but never uses the filesystem.
 - **Returns:** a single JSON object — analysis + 2–3 ranked options — full shape under [Output](#output). Nothing else.
 - **Stop / fail:** never scan source or run commands; base every claim on the researcher's findings. Exactly one option has `recommended: true`.
 
@@ -104,13 +104,13 @@ Use only the researcher's findings as evidence.
 
 Propose **3 options** (2 is fine if trivial) differing in scope — **Minimal fix**, **Balanced approach**, **Comprehensive refactor** — or, given `sketch_contract` (`{language, checker}`), in **structure**: distinct domain designs. Each option includes every field:
 
-`number` · `name` · `summary` (one sentence) · `files_to_modify` (`[{path, changes}]`) · `files_to_create` (`[{path, purpose}]`, `[]` if none) · `test_strategy` · `pros` · `cons` · `complexity` (`XS`–`XL`) · `risk` (`Low`/`Medium`/`High`) · `risk_details` · `recommended` (`true` for exactly one) · `rejection_reason` (required one-line string when `recommended` is `false`; omit when `recommended` is `true`).
+`number` · `name` · `summary` (one sentence) · `files_to_modify` (`[{path, changes}]`) · `files_to_create` (`[{path, purpose}]`, `[]` if none) · `test_strategy` · `pros` · `cons` · `complexity` (`XS`–`XL`) · `risk` (`Low`/`Medium`/`High`) · `risk_details` · `criteria_covered` (IDs of the criteria this option fully satisfies) · `recommended` (`true` for exactly one) · `rejection_reason` (required one-line string when `recommended` is `false`; omit when `recommended` is `true`).
 
 **`design_sketch`** (only with `sketch_contract`): `{shape, types, callers: [{id, kind: "valid" | "invalid", transition, code}]}` in `language` — one-line `shape`, self-contained `types`, at least one `valid` caller and one `invalid` caller attempting a forbidden transition. Write it from the findings, never copying issue text; the orchestrator type-checks it.
 
 **Complexity scale:** `XS` single line/config · `S` 1–2 files, <50 LOC · `M` 3–5 files, 50–200 LOC · `L` 6–10 files, 200–500 LOC · `XL` 10+ files, 500+ LOC (matches `https://github.com/luongnv89/idd/blob/main/docs/agent-model-effort.md`).
 
-**Recommend:** the option with the best balance of quality, effort and risk for this issue, judged from the researcher's findings and complexity. In `auto`, the recommended option is the one selected. If the researcher provided `solution_research`, map each approach onto the option it best fits.
+**Recommend:** the option with the best balance of quality, effort and risk for this issue, judged from the researcher's findings and complexity — never one that leaves a criterion uncovered while another option covers them all. In `auto`, the recommended option is the one selected. If the researcher provided `solution_research`, map each approach onto the option it best fits.
 
 ## Output
 
@@ -133,7 +133,7 @@ Return a single JSON object (nothing outside the block):
       "test_strategy": "Add unit test for redirect exclusion",
       "pros": ["Smallest change, lowest risk"], "cons": ["Hardcoded exclusion list grows over time"],
       "complexity": "S", "risk": "Low", "risk_details": "Single file, clear behavior change",
-      "recommended": false,
+      "criteria_covered": ["AC1"], "recommended": false,
       "rejection_reason": "Hardcoded exclusion list does not scale as routes grow"
     },
     {
@@ -148,7 +148,7 @@ Return a single JSON object (nothing outside the block):
       "pros": ["Declarative auth per route", "Solves class of problems"],
       "cons": ["Moderate refactor", "Config migration needed"],
       "complexity": "M", "risk": "Medium", "risk_details": "Two files, config migration needed",
-      "recommended": true
+      "criteria_covered": ["AC1", "AC2"], "recommended": true
     }
   ],
   "recommended_option": 2,

@@ -508,6 +508,7 @@ The `reproduction` object is **optional** and present only for `type: bug` issue
 | `options[].complexity` | string | `"XS"`, `"S"`, `"M"`, `"L"`, or `"XL"` |
 | `options[].risk` | string | `"Low"`, `"Medium"`, or `"High"` |
 | `options[].risk_details` | string | Brief risk explanation |
+| `options[].criteria_covered` | string[] | Acceptance-criterion IDs (`AC1`…) the option satisfies |
 | `recommended_option` | integer | Option number recommended |
 | `overall_complexity` | string | Overall complexity estimate |
 | `overall_risk` | string | Overall risk level |

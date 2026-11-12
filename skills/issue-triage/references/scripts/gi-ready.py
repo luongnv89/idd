@@ -28,9 +28,28 @@ A list:
 `reasons` is a subset of `no_criteria`, `type_needs_review`,
 `criteria_need_review`, in that order; empty when ready.
 
+Plan coverage (issue #554) reuses the same parser. `--criteria` takes one issue
+(an envelope or a bare object) and numbers its criteria in body order:
+
+    {"number": 12, "criteria": [{"id": "AC1", "text": "..."}, ...]}
+
+`--coverage` takes `{"issue": {...}, "options": [{"number": 1,
+"criteria_covered": ["AC1", ...]}, ...], "selected": 1}` and checks the selected
+option against those IDs (case-insensitive). An ID no criterion carries is
+listed in `unknown` and never counts as covered:
+
+    {"number": 12, "verdict": "gap", "selected": 1, "criteria": [...],
+     "missing": [{"id": "AC2", "text": "..."}], "unknown": []}
+
+`verdict` is `covered`, `gap` (some criterion is uncovered) or `no_criteria`
+(the body has none, so nothing can be mapped).
+
 Exit codes
-  0  judged
+  0  judged (a `gap` is a verdict, not an error)
   2  usage error
+  3  invalid plan (`--coverage` only) — `options` is not a non-empty list, an
+     option lacks a `criteria_covered` list of strings or a unique `number`, or
+     `selected` names no option. Fix the plan and re-run.
   4  cannot complete — empty or unparsable stdin, or an issue without a `body`
      key (stderr: `⚠ gi-ready: <reason>`). Callers apply the prose rule.
 
@@ -56,6 +75,10 @@ class CannotComplete(ValueError):
     """The input cannot be judged; the caller degrades to the prose rule."""
 
 
+class InvalidPlan(ValueError):
+    """The plan handed to --coverage is malformed (exit 3)."""
+
+
 def _sections(body: str) -> list[tuple[str, list[str]]]:
     """Split a body into (heading, lines) pairs, skipping fences and quotes."""
     sections: list[tuple[str, list[str]]] = [("", [])]
@@ -70,41 +93,93 @@ def _sections(body: str) -> list[tuple[str, list[str]]]:
         if heading:
             sections.append((heading.group(1).strip().rstrip(":").strip().lower(), []))
         else:
-            sections[-1][1].append(CODE_SPAN_RE.sub("", line))
+            sections[-1][1].append(line)
     return sections
+
+
+def criteria(body: str) -> list[str]:
+    """The list items under every Acceptance Criteria heading, in body order."""
+    found: list[str] = []
+    for heading, lines in _sections(body or ""):
+        if heading != "acceptance criteria":
+            continue
+        for line in lines:
+            item = ITEM_RE.match(line)
+            if item and CODE_SPAN_RE.sub("", item.group(1)).strip():
+                found.append(item.group(1).strip())
+    return found
 
 
 def readiness(body: str) -> list[str]:
     """Return the reasons the body is not ready; an empty list means ready."""
-    criteria: list[str] = []
+    texts = [CODE_SPAN_RE.sub("", text) for text in criteria(body)]
     type_values: list[str] = []
     for heading, lines in _sections(body or ""):
-        if heading == "acceptance criteria":
-            for line in lines:
-                item = ITEM_RE.match(line)
-                if item and item.group(1).strip():
-                    criteria.append(item.group(1))
-        elif heading == "type":
-            value = next((line for line in lines if line.strip()), "")
-            type_values.append(value)
+        if heading == "type":
+            stripped = (CODE_SPAN_RE.sub("", line) for line in lines)
+            type_values.append(next((line for line in stripped if line.strip()), ""))
     reasons = []
-    if not criteria:
+    if not texts:
         reasons.append("no_criteria")
     if any(MARKER_RE.search(value) for value in type_values):
         reasons.append("type_needs_review")
-    if any(MARKER_RE.search(text) for text in criteria):
+    if any(MARKER_RE.search(text) for text in texts):
         reasons.append("criteria_need_review")
     return reasons
 
 
-def judge(issue: object) -> dict[str, object]:
+def _body(issue: object) -> str:
     if not isinstance(issue, dict) or "body" not in issue:
         raise CannotComplete("an issue has no 'body' field")
     body = issue["body"]
     if body is not None and not isinstance(body, str):
         raise CannotComplete("an issue 'body' is not a string")
-    reasons = readiness(body or "")
+    return body or ""
+
+
+def judge(issue: object) -> dict[str, object]:
+    reasons = readiness(_body(issue))
     return {"number": issue.get("number"), "ready": not reasons, "reasons": reasons}
+
+
+def numbered(issue: object) -> list[dict[str, str]]:
+    """The issue's criteria as `[{id: "AC<k>", text}]`, 1-based in body order."""
+    return [{"id": f"AC{k}", "text": text}
+            for k, text in enumerate(criteria(_body(issue)), 1)]
+
+
+def _ids(option: dict, where: str) -> list[str]:
+    covered = option.get("criteria_covered")
+    if not isinstance(covered, list) or not all(isinstance(i, str) for i in covered):
+        raise InvalidPlan(f"{where} has no criteria_covered list of strings")
+    return [i.strip().upper() for i in covered]
+
+
+def coverage(data: object) -> dict[str, object]:
+    """Check the selected option's criteria_covered against the issue's criteria."""
+    if not isinstance(data, dict) or "issue" not in data:
+        raise CannotComplete("--coverage needs {issue, options, selected}")
+    listed = numbered(data["issue"])
+    options = data.get("options")
+    if not isinstance(options, list) or not options:
+        raise InvalidPlan("options must be a non-empty list")
+    by_number: dict[int, list[str]] = {}
+    for k, option in enumerate(options):
+        number = option.get("number") if isinstance(option, dict) else None
+        if not isinstance(number, int) or isinstance(number, bool) or number in by_number:
+            raise InvalidPlan(f"options[{k}] needs a unique integer number")
+        by_number[number] = _ids(option, f"option {number}")
+    selected = data.get("selected")
+    if isinstance(selected, bool) or selected not in by_number:
+        raise InvalidPlan("selected names no option")
+    claimed = by_number[selected]
+    known = {entry["id"] for entry in listed}
+    missing = [entry for entry in listed if entry["id"] not in claimed]
+    unknown = sorted({i for i in claimed if i not in known})
+    verdict = "no_criteria" if not listed else ("gap" if missing else "covered")
+    return {"number": data["issue"].get("number"), "verdict": verdict,
+            "selected": selected, "criteria": listed, "missing": missing,
+            "unknown": unknown}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -114,7 +189,12 @@ def main(argv: list[str] | None = None) -> int:
             "present, and no trailing (needs review) on Type or a criterion."
         )
     )
-    parser.parse_args(argv)
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--criteria", action="store_true",
+                      help="number one issue's criteria AC1..ACn")
+    mode.add_argument("--coverage", action="store_true",
+                      help="check a selected plan option's criteria_covered")
+    args = parser.parse_args(argv)
     try:
         raw = sys.stdin.read()
         if not raw.strip():
@@ -123,14 +203,24 @@ def main(argv: list[str] | None = None) -> int:
             data = json.loads(raw)
         except json.JSONDecodeError as exc:
             raise CannotComplete(f"stdin is not JSON ({exc.msg})") from exc
-        if isinstance(data, dict) and "issue" in data:
-            result: dict[str, object] = judge(data["issue"])
+        result: dict[str, object]
+        if args.coverage:
+            result = coverage(data)
+        elif args.criteria:
+            issue = data["issue"] if isinstance(data, dict) and "issue" in data else data
+            result = {"number": issue.get("number") if isinstance(issue, dict) else None,
+                      "criteria": numbered(issue)}
+        elif isinstance(data, dict) and "issue" in data:
+            result = judge(data["issue"])
         elif isinstance(data, dict) and isinstance(data.get("issues"), list):
             result = _judge_all(data["issues"])
         elif isinstance(data, list):
             result = _judge_all(data)
         else:
             result = judge(data)
+    except InvalidPlan as exc:
+        sys.stderr.write(f"✗ gi-ready: {exc}\n")
+        return 3
     except CannotComplete as exc:
         sys.stderr.write(f"⚠ gi-ready: {exc}\n")
         return 4

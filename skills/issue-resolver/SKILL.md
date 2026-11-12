@@ -267,6 +267,10 @@ Generate options and select one. Spawn the synthesizer (`references/agents/synth
 
 **Profiles.** `light` — see the profile table in *Step 0g*. `analysis_reuse = fresh` (*0h*) skips the same spawn but **wins Step 2 when both apply** — a replacement, not an addition: lift `options[]`, `recommended_option`, `overall_complexity`, `overall_risk` from the analysis, each `rejection_reason` from `decision_record.options_rejected[]` (*→ `reuse`*).
 
+### Criteria coverage gate (every profile, every mode)
+
+Every option lists `criteria_covered` (IDs from `references/scripts/gi-ready.py --criteria`); a selected option with a `gap` stops planning, naming each uncovered criterion, auto mode included (*Step 2 — Plan → Criteria coverage gate*).
+
 ### Sensitive-change gate (every profile, every mode)
 
 Size never exempts a change. Once an option is selected, `references/scripts/gi-sensitive.py --classify` checks the labels and planned paths; when sensitive, run falsifiable load-bearing probes, a **fresh** code-reviewer challenge, and adjudication where one unrebutted blocker at any confidence holds the plan. `--adjudicate` decides; `stop` is a safety stop in auto mode (*Step 2 — Plan → Sensitive-change gate*).

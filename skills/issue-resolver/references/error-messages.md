@@ -319,6 +319,17 @@ Not confirmations: auto mode keeps every one of these.
 ```
 **Trigger:** `stop` with `falsified` non-empty and `replanned: true` — the plan already went back to option selection once. The first falsification is a `replan`, not this stop. Same interactive/auto handling as above.
 
+### Plan leaves a criterion uncovered
+```
+✗ Criteria coverage stopped issue #N — Option {n} leaves {k} uncovered
+
+  Missing:  {id} — {text}
+
+  To fix:  plan an option covering every criterion, or narrow the criteria,
+           then re-run /issue-resolver N
+```
+**Trigger:** `gi-ready.py --coverage` returns `gap`. No prompt; auto ends `failed` at Step 2.
+
 ### Premise reset — third fix blocked
 ```
 ✗ Premise reset: fix blocked for issue #N — {n} failed fixes share one premise

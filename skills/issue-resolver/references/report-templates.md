@@ -442,6 +442,8 @@ Rules that make the report worth reading:
   profile's direct minimal plan — and `×`/`PARTIAL` only when the step ends with
   no plan at all. The check asks whether the plan exists, not which machinery
   produced it.
+- `Scope inside the issue` is `√` when the *Criteria coverage gate* returns
+  `covered` or `no_criteria`; a `gap` is `×`.
 
 `√` and `×` are the completion-report check glyphs defined in
 `references/docs/terminal-style.md`; the run's own status symbols stay `✓ ✗ ⚠ ○`.

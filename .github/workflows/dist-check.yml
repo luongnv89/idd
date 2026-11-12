@@ -472,3 +472,6 @@ jobs:
 
       - name: test-issue-readiness-553
         run: bash tests/test-issue-readiness-553.sh
+
+      - name: test-plan-criteria-coverage-554
+        run: bash tests/test-plan-criteria-coverage-554.sh
