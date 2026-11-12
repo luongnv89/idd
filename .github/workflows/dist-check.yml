@@ -283,10 +283,21 @@ jobs:
       - name: test-bundled-doc-slimming
         run: bash tests/test-bundled-doc-slimming-249.sh
 
+      # Issue #558: the growth cap compares each bundle with its size at the
+      # last release tag, and the checkout above carries no tags.
+      - name: Fetch release tags for the bundle growth cap
+        run: git fetch --depth=1 origin 'refs/tags/v*:refs/tags/v*'
+
       # Issue #466: every skills/<name>/ bundle stays within its ratcheted
       # budget in scripts/skill-budgets.json — growth and unratcheted shrinks fail.
+      # Issue #558 adds a SKILL.md ceiling, an always-read budget, and a 2% cap
+      # on growth since the last release tag. IDD_REQUIRE_RELEASE_TAG turns
+      # "no release tag resolved" from a skip into a failure, so the growth
+      # cap can never silently vanish from CI.
       - name: test-skill-bundle-budget-466
         run: bash tests/test-skill-bundle-budget-466.sh
+        env:
+          IDD_REQUIRE_RELEASE_TAG: "1"
 
       - name: test-disclosure-gates
         run: bash tests/test-disclosure-gates-250.sh
