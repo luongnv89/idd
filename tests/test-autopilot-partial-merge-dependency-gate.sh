@@ -87,9 +87,9 @@ else
   pass "T4: PASS-only scoping text removed from Step 5.2"
 fi
 
-if grep -qE 'Partial merges \(Phase 3-4 Step 2\) use the same Step 5\.1b' "$PHASES" \
+if grep -qE 'Partial merges \(Phase 3-4 Step 2\) use the same Step 5\.1 merge floor, the Step 5\.1b dependency gate' "$PHASES" \
   && grep -qE 'Step 5\.1a — CI verdict gate' "$PHASES"; then
-  pass "T4.1: Step 5.2 documents partial path uses dependency and CI gates"
+  pass "T4.1: Step 5.2 documents partial path uses the merge floor, dependency and CI gates"
 else
   fail "T4.1: Step 5.2 does not document partial path dependency gate"
 fi

@@ -10,7 +10,7 @@ Before merging, verify:
 
 1. **PR is mergeable** — no conflicts, CI passing (if configured)
 2. **No blocking reviews** — no "request changes" reviews from other humans
-3. **Merge floor met** — Step 3.2's `merge_floor` is `met`. Its one home is the `../issue-pr-review/SKILL.md` skill's *Merge floor*; never re-derive it. Anything else, missing included, is `left_open`: `⚠ PR #{pr_number} left open — merge floor unmet ({reason})`
+3. **Merge floor met** — Step 3.2's `merge_floor` is `met`. Its one home is the `../issue-pr-review/SKILL.md` skill's *Merge floor*; never re-derive it. Anything else is `left_open`: `⚠ PR #{pr_number} left open — merge floor unmet ({reason})`. A missing `merge_floor` (no review ran this session) is `left_open` too, with its own reason: `⚠ PR #{pr_number} left open — merge floor not derived (resumed run)`
 4. **Fresh merge identity** — the head is still the one CI checked, and the live base has not moved past it (*Step 5.1c*, the last check before the merge)
 
 ```bash
@@ -328,7 +328,7 @@ continues to the next issue, like any other unmergeable PR in Step 5.1:
 
 ### Step 5.2 — Merge (mode-gated)
 
-Merge behavior is controlled by `autopilot.mode`. This step runs for clean PRs after review PASS. Partial merges (Phase 3-4 Step 2) use the same Step 5.1b dependency gate, the Step 5.1a CI verdict gate and the Step 5.1c merge identity gate before `gh pr merge`.
+Merge behavior is controlled by `autopilot.mode`. This step runs for clean PRs after review PASS. Partial merges (Phase 3-4 Step 2) use the same Step 5.1 merge floor, the Step 5.1b dependency gate, the Step 5.1a CI verdict gate and the Step 5.1c merge identity gate before `gh pr merge`.
 
 **Compute the effective mode** by applying the *Resolution rules* under *Merge Modes* in SKILL.md — the single home for this logic, including the legacy `autopilot.auto_merge` mapping. Zero-config shorthand: when neither `autopilot.mode` nor `autopilot.auto_merge` appears in the file, effective mode = `balanced`.
 

@@ -326,8 +326,20 @@ for pair in "SKILL.md inline defaults:$inline_defaults" \
   fi
 done
 
-stale_override=$(grep -rnE 'auto mode overrides to `true`|overridden to true in --auto|Honored only in `--auto`|merge` fails \(auto mode only\)' src docs \
-  --include='*.md' --include='*.yml' | grep -v -e '^docs/release-notes/' -e '^docs/decisions/' | wc -l | tr -d ' ')
+# #584 widened this: alternative wordings (case-insensitive), and README.md.
+# docs.html is regenerated at release, so it is not scanned.
+stale_merge_re='auto mode overrides to `true`|overridden to true in --auto|Honored only in `--auto`|merge` fails \(auto mode only\)'
+stale_merge_re="$stale_merge_re"'|auto-?merg(e|es|ing) (only )?(needs|requires) `?--auto|merg(e|es|ing) only (happens |runs )?(in|with|under) `?--auto|`?--auto`? (is )?required (to|for|before) (auto-?)?merg|only `?--auto`? (runs )?(auto-?)?merges'
+stale_override=$( (cd "$REPO_ROOT" && grep -rniE "$stale_merge_re" src docs README.md \
+  --include='*.md' --include='*.yml') | grep -v -e '^docs/release-notes/' -e '^docs/decisions/' | wc -l | tr -d ' ')
+# The widened pattern must still catch the wordings it exists for.
+for probe in 'auto-merge only happens with `--auto`' 'Auto-merge requires --auto' 'it merges only in `--auto` mode' '`--auto` is required to merge'; do
+  if printf '%s\n' "$probe" | grep -qiE "$stale_merge_re"; then
+    pass "T10.5b: the stale-merge pattern catches \"$probe\""
+  else
+    fail "T10.5b: the stale-merge pattern misses \"$probe\""
+  fi
+done
 if [ "$stale_override" -eq 0 ]; then
   pass "T10.5: no source restates an --auto-only or overriding merge rule"
 else
@@ -384,7 +396,8 @@ grep -qE '^- merge_floor: "met" or "unmet: \{reason\}"' "$AP_PROMPTS" \
 
 if grep -qF '**Merge floor met** — Step 3.2'"'"'s `merge_floor` is `met`' "$AP_MERGE" \
    && grep -qF 'never re-derive it' "$AP_MERGE" \
-   && grep -qF 'missing included, is `left_open`' "$AP_MERGE"; then
+   && grep -qF 'A missing `merge_floor` (no review ran this session) is `left_open` too' "$AP_MERGE" \
+   && grep -qF '⚠ PR #{pr_number} left open — merge floor not derived (resumed run)' "$AP_MERGE"; then
   pass "T11.6: Phase 5.1 merges only on merge_floor: met, a missing verdict leaves the PR open"
 else
   fail "T11.6: Phase 5.1 lacks the merge_floor check, or re-derives it"

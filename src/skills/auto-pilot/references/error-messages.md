@@ -169,7 +169,7 @@ LIMITED`'s `Next action:` line on the same value for the same reason.
   Done:    {processed_count} issue(s) already processed this run
 ```
 **Trigger:** `/auto-pilot --resume` and *Step 1.0*'s gate resolved to `resumable` — the recorded state parsed, and `gh pr list --head "{branch_name}"` confirms the recorded PR.
-**Action:** Re-enter at the recorded phase on the recorded branch/PR; never re-resolve the issue and never open a second PR.
+**Action:** Re-enter at the recorded phase on the recorded branch/PR — a recorded `merge` re-enters at review, which re-derives `merge_floor` (*Step 1.0*); never re-resolve the issue and never open a second PR.
 
 ### Recorded run state is stale
 ```
