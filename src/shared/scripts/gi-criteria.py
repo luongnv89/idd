@@ -15,7 +15,7 @@ Reads one JSON object on stdin:
      "verdicts": <the judge's JSON, verbatim>}
 
 `head`, `criteria` and `deferred` come from the orchestrator; `deferred` lists
-the rows a valid `Refs #N` PR body defers (`[]` otherwise). All four keys are
+the rows a `Refs #N` PR body defers (`[]` otherwise). All four keys are
 required. A missing key, any other top-level key not starting with `_`, a
 `head` that is not 40 lowercase hex, criteria that are not strings, or a
 deferred number out of range is exit 3: the orchestrator built a bad record.
@@ -107,7 +107,9 @@ def render(evidence: object) -> str:
         return str(evidence).strip() if evidence else "none given"
     kind = evidence.get("kind")
     if kind == "test":
-        return f"test `{_text(evidence, 'name')}` green @ {_text(evidence, 'sha')[:7]}"
+        code = _int(evidence.get("exit"))
+        ran = "green" if code == 0 else f"exit {'?' if code is None else code}"
+        return f"test `{_text(evidence, 'name')}` {ran} @ {_text(evidence, 'sha')[:7]}"
     if kind == "command":
         lines = [ln.strip() for ln in _text(evidence, "output").splitlines() if ln.strip()]
         first = lines[0][:80] if lines else ""

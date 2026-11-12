@@ -99,6 +99,14 @@ judge "{\"criteria\":[{\"n\":1,\"status\":\"pass\",\"evidence\":{\"kind\":\"test
   && pass "T2.5 a deferred row is reported deferred whatever the judge said, and counted apart" \
   || fail "T2.5 deferred: $out"
 
+row1 "{\"kind\":\"test\",\"name\":\"rejects empty\",\"exit\":1,\"sha\":\"$HEAD_SHA\"}" fail; [ "$st" = fail ] \
+  && [ "$(printf '%s' "$out" | js 'd["rows"][0]["evidence"]')" = 'test `rejects empty` exit 1 @ aaaaaaa' ] \
+  && pass "T2.6 a fail row backed by a red test renders its exit code, never green" || fail "T2.6 red test row: $out"
+row1 "{\"kind\":\"test\",\"name\":\"rejects empty\",\"sha\":\"$HEAD_SHA\"}" unverified; [ "$st" = unverified ] \
+  && [ "$(printf '%s' "$out" | js 'd["rows"][0]["evidence"]')" = 'test `rejects empty` exit ? @ aaaaaaa' ] \
+  && pass "T2.7 a test row with no integer exit renders exit ?, never green" || fail "T2.7 no exit: $out"
+has "$VC" 'a body whose line 1 is `Refs #{N}`' "T2.8 deferral needs only a Refs #N line 1 — check 1 alone judges the form"
+
 # ── T3: agent output never stops it; orchestrator mistakes do ────────────
 judge '"I could not decide"' '["one","two"]'
 [ "$ec" = 0 ] && [ "$(printf '%s' "$out" | js 'd["counts"]')" = "{'pass': 0, 'fail': 0, 'unverified': 2, 'deferred': 0}" ] \
