@@ -350,7 +350,7 @@ name: "a failed batch drops fully-processed issues").
 exception** to auto-pilot's "log every processed issue including skips" rule: an *in-batch* skip is the already-counted other half
 of a batch line, not a fresh processed issue. Ordinary skips —
 `blocked_label`, `blocked_by_dependency`, `in_skip_list`, `assigned_to_other`,
-`quarantined`, `needs_clarification` — still log their one line with a `skipped_reason`.
+`needs_clarification`, `quarantined` — still log their one line with a `skipped_reason`.
 
 Build each written line from `docs/run-log-schema.md`, with these batch attributions:
 

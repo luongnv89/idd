@@ -1274,7 +1274,9 @@ EXPECTED_SITES = {
     # `linked_issue_snapshot` — the record SKILL.md already retained at the
     # review boundary — so review-loop-mechanics.md no longer restates the fetch
     # it had inherited from before that boundary existed.
-    "gi-deps.py": 1, "gi-issue.py": 13,
+    # 14 since issue #553: explicit-list validation pipes each listed issue's
+    # body into gi-ready.py for the readiness check.
+    "gi-deps.py": 1, "gi-issue.py": 14,
     # 4 since issue #260: parallel failed-lane quarantine and the serialized
     # drain both call --append-once, beside the legacy --append and the
     # --failure-streak read from issue #259.
@@ -1285,7 +1287,9 @@ EXPECTED_SITES = {
     "gi-stack-detect.py": 1, "gi-triage-graph.py": 2,
     # 2 since issue #468: /issue-triage Step 1 reads the shared open-issue
     # snapshot, and /issue-creator Step 6 invalidates it after each create.
-    "gi-backlog.py": 2,
+    # 3 since issue #553: /issue-triage Step 1 re-reads that snapshot into
+    # gi-ready.py for the readiness check.
+    "gi-backlog.py": 3,
     # 3 since issue #502: /plan-to-issues Phase 5 renders the epic plan map.
     "gi-plan-map.py": 3,
     # 3 since issue #515: the resolver writes the revision receipt at Deliver;
@@ -1311,6 +1315,9 @@ EXPECTED_SITES = {
     # mechanics each --start, --write, --read and --clear their record (4 + 4);
     # auto-pilot Step 1.0 runs --list once and Step 5.3 clears both records (3).
     "gi-progress.py": 11,
+    # issue #553: readiness — triage Step 1, auto-pilot Step 1.2b, explicit-list
+    # validation and the resolver's 0c gate.
+    "gi-ready.py": 4,
 }
 # A call is any mention of a shared script by filename, however it is launched
 # (python3, python3.11, uv run, a bare ./path relying on the exec bit), plus the
