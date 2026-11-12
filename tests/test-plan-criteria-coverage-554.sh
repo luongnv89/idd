@@ -118,6 +118,10 @@ NESTED='{"body":"## Acceptance Criteria\n\n- [ ] parent\n  - detail a\n  - detai
 [ "$(printf '%s' "$NESTED" | python3 "$READY" --criteria | js '[c["text"] for c in d["criteria"]]')" = "['parent', 'second']" ] \
   && pass "T2.11 nested sub-bullets are detail, never their own criterion" \
   || fail "T2.11 nested sub-bullets were numbered"
+SIBLINGS='{"body":"## Acceptance Criteria\n\n - [ ] one\n- [ ] two\n 9. three\n10. four\n    - detail\n"}'
+[ "$(printf '%s' "$SIBLINGS" | python3 "$READY" --criteria | js '[c["text"] for c in d["criteria"]]')" = "['one', 'two', 'three', 'four']" ] \
+  && pass "T2.12 a 1-3-space sibling and a right-aligned number stay criteria" \
+  || fail "T2.12 indented siblings were dropped"
 
 # ── T3: readiness is unchanged ───────────────────────────────────────────
 out="$(printf '%s' "$ISSUE" | python3 "$READY")"

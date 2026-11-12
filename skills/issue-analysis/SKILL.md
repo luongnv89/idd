@@ -310,7 +310,7 @@ Step 8 renders the analysis as a structured terminal report following `reference
 
 Summary:
 - Terminal report has 8 sections: header, classification, root cause, affected files, options, complexity, risk, recommendation.
-- JSON top-level keys: `version`, `timestamp`, `source`, `issue`, `extraction`, `affected_files`, `analysis`, `options`, `recommended_option`, `overall_complexity`, `overall_risk`, `history`, `cross_references`, `scan_stats`, `git_state`, `decision_record` — see `references/output-and-persist.md`.
+- JSON top-level keys: `version`, `timestamp`, `source`, `issue`, `extraction`, `affected_files`, `analysis`, `options`, `criteria`, `recommended_option`, `overall_complexity`, `overall_risk`, `history`, `cross_references`, `scan_stats`, `git_state`, `decision_record` — see `references/output-and-persist.md`.
 
 ### Durable analysis fields
 

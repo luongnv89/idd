@@ -33,8 +33,9 @@ Plan coverage (issue #554) reuses the same parser. `--criteria` takes one issue
 
     {"number": 12, "criteria": [{"id": "AC1", "text": "..."}, ...]}
 
-Only top-level items are numbered; a nested sub-bullet is detail, not a
-criterion (readiness still reads every item's marker).
+Only top-level items are numbered; an item indented to the content column of
+the last top-level item is detail, not a criterion (readiness still reads every
+item's marker).
 
 `--coverage` takes `{"issue": {...}, "options": [{"number": 1,
 "criteria_covered": ["AC1", ...]}, ...], "selected": 1, "criteria": [...]}` and
@@ -74,6 +75,7 @@ import sys
 HEADING_RE = re.compile(r"^\s{0,3}#{1,6}\s+(.*?)\s*#*\s*$")
 FENCE_RE = re.compile(r"^\s{0,3}(```|~~~)")
 ITEM_RE = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s+(?:\[[ xX]\]\s*)?(.*)$")
+MARKER_COL_RE = re.compile(r"^(\s*)(?:[-*+]|\d+[.)])\s+")
 CODE_SPAN_RE = re.compile(r"`+[^`]*`+")
 MARKER_RE = re.compile(r"\(needs review\)\s*$", re.IGNORECASE)
 CONFIDENCE_RE = re.compile(r"\((?:high confidence|needs review)\)\s*$", re.IGNORECASE)
@@ -108,22 +110,27 @@ def _sections(body: str) -> list[tuple[str, list[str]]]:
 def _items(body: str) -> list[tuple[str, str, bool]]:
     """Each list item under an Acceptance Criteria heading, in body order, as
     (text with code spans dropped, display text, top level?). An item is found
-    on the code-span-stripped line, as readiness always has; top level is the
-    section's shallowest indent, so a nested detail is never its own criterion."""
+    on the code-span-stripped line, as readiness always has. As in CommonMark,
+    an item is nested only when it is indented to the content column of the
+    last top-level item, so a nested detail is never its own criterion while a
+    sibling indented 1-3 spaces (or a right-aligned number) still is."""
     found: list[tuple[str, str, bool]] = []
     for heading, lines in _sections(body or ""):
         if heading != "acceptance criteria":
             continue
-        section: list[tuple[str, str, int]] = []
+        content_col = None
         for line in lines:
-            item = ITEM_RE.match(CODE_SPAN_RE.sub("", line))
-            if item and item.group(1).strip():
-                raw = ITEM_RE.match(line)
-                text = (raw.group(1) if raw else item.group(1)).strip()
-                expanded = line.expandtabs(4)
-                section.append((item.group(1), text, len(expanded) - len(expanded.lstrip())))
-        top = min((indent for _, _, indent in section), default=0)
-        found += [(bare, text, indent == top) for bare, text, indent in section]
+            bare_line = CODE_SPAN_RE.sub("", line)
+            item = ITEM_RE.match(bare_line)
+            if not (item and item.group(1).strip()):
+                continue
+            raw = ITEM_RE.match(line)
+            text = (raw.group(1) if raw else item.group(1)).strip()
+            marker = MARKER_COL_RE.match(bare_line.expandtabs(4))
+            top = content_col is None or len(marker.group(1)) < content_col
+            if top:
+                content_col = marker.end()
+            found.append((item.group(1), text, top))
     return found
 
 

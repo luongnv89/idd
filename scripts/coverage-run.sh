@@ -63,7 +63,7 @@ printf '%s' 'Depends on #12, blocked by #8. Cross-repo org/repo#77 is ignored.' 
 printf '%s' '{"issues":[{"number":1,"body":"## Type\n\nbug (needs review)\n\n## Acceptance Criteria\n\n- [ ] works (needs review)\n"},{"number":2,"body":null}]}' | \
   run "$SCRIPTS/gi-ready.py"
 # gi-ready --criteria / --coverage — plan-to-criteria mapping (issue #554).
-COVER_BODY='## Acceptance Criteria\n\n- [ ] one\n- [ ] two\n'
+COVER_BODY='## Acceptance Criteria\n\n- [ ] one\n  - detail\n- [ ] two\n'
 printf '%s' "{\"issue\":{\"number\":1,\"body\":\"$COVER_BODY\"}}" | run "$SCRIPTS/gi-ready.py" --criteria
 for plan in \
   '{"options":[{"number":1,"criteria_covered":["AC1"]}],"selected":1}' \

@@ -212,8 +212,8 @@ ran, the sketch's `selected` one under any verdict — no prompt.
 
 ### Criteria coverage gate (every profile, every mode) <!-- a:rs-criteria-coverage -->
 
-The one home for mapping the plan to the criteria: in auto mode no person
-confirms the design. It runs on every path once an option is selected, before
+The one home for mapping the plan to the criteria (auto mode has no one to
+confirm the design). It runs on every path once an option is selected, before
 the sensitive-change gate.
 
 **IDs, never text.** Pipe 0d's re-fetched `gi-issue.py` envelope (the post-0d
@@ -225,15 +225,16 @@ own `criteria_covered`.
 **Check.** Pipe `{"issue", "options": [{"number", "criteria_covered"}],
 "selected", "criteria"}` into `python3 references/scripts/gi-ready.py --coverage`
 (a `light` plan is option 1). `criteria` is the list the IDs were numbered
-against: the bound list, or on `reuse` the analysis's `criteria`.
+against: the synthesizer's returned `criteria` (a `light`/inline plan: the bound
+list), or on `reuse` the analysis's.
 
 **On `reuse`** the IDs predate this run (and 0d), so any result but `covered` —
 `gap`, `renumbered`, exit 3, no `criteria` in the analysis — sets
 `analysis_reuse = stale` and spawns the synthesizer with the binding. Only a
 plan made this run stops:
 
-- `covered` — print `✓ Criteria coverage: Option {n} covers {k}/{k}`. An
-  `unknown` ID prints `⚠` and covers nothing.
+- `covered` — print `✓ Criteria coverage: Option {n} covers {k}/{k}`; an
+  `unknown` ID is a `⚠` and covers nothing.
 - `gap` — **stop planning**, auto mode too: print *Plan leaves a criterion
   uncovered* (`references/error-messages.md`) naming each `missing` criterion.
   No prompt, no switch to a wider option; auto ends `failed` at Step 2.

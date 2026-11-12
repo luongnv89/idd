@@ -82,7 +82,7 @@ Return a single JSON object (nothing outside the block):
       "criteria_covered": ["AC1", "AC2"], "recommended": true
     }
   ],
-  "criteria": [ { "id": "AC1", "text": "Login redirects to the dashboard" }, { "id": "AC2", "text": "Unauthenticated routes stay reachable" } ],
+  "criteria": [ { "id": "AC1", "text": "Login reaches the dashboard" }, { "id": "AC2", "text": "Public routes stay open" } ],
   "recommended_option": 2,
   "overall_complexity": "M",
   "overall_risk": "Medium",
