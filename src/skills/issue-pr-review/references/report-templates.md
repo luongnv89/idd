@@ -42,7 +42,7 @@ human-facing summary: the report-back fields `/auto-pilot` reads (`result`,
 2. **Evidence.** Name the checks that actually ran, with their observed result
    and the commit they ran on: test count and `headRefOid` short SHA, the
    `gi-ci-wait` verdict and `ci_status`, the `gi-secscan` exit and
-   `policy_source`, the PR-body re-read after a `Closes` edit. Print `✓ pass` only
+   `policy_source`, the PR-body re-read after a `Closes` edit, the *Bug proof*. Print `✓ pass` only
    for a check that ran and passed; print `○ skipped ({reason})` for one that did
    not run. Each remaining finding keeps its `[dimension]` tag and `file:line`.
    A resumed review adds `resumed from step {k}/7, cycle {c}`.
@@ -50,7 +50,8 @@ human-facing summary: the report-back fields `/auto-pilot` reads (`result`,
 3. **Uncertainty.** Label what was inferred or not executed here: tests
    inherited from a `trusted` QA marker (run by `/issue-resolver`, not by this
    review); a skipped browser UI leg; a manual CI fallback; a `light` depth
-   profile; acceptance criteria marked `unverified`; reviewer findings, which are
+   profile; acceptance criteria marked `unverified`; `sensitivity not verified`
+   rows; reviewer findings, which are
    model judgments above `review.confidence_threshold`, not executed checks.
    Print `Uncertainty: none` only when every check ran here.
 4. **Decision.** Print `Decision: No approval needed.` — the merge gates are

@@ -478,3 +478,6 @@ jobs:
 
       - name: test-criteria-evidence-555
         run: bash tests/test-criteria-evidence-555.sh
+
+      - name: test-bug-proof-556
+        run: bash tests/test-bug-proof-556.sh

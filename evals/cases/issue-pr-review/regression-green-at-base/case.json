@@ -1,0 +1,157 @@
+{
+  "name": "issue-pr-review/regression-green-at-base",
+  "skill": "issue-pr-review",
+  "prompt": "Auto mode: a bug PR cites a regression test that already passes at base; the review re-runs it red-at-base/green-at-head, reports the proof and the not_verified Sensitivity row, and never merges a PR without a red-to-green proof (#556)",
+  "grade": [
+    {
+      "tool": "idd-lint",
+      "args": [
+        "pr",
+        "OUT/pr-body.md",
+        "--title",
+        "fix(slug): keep digits in slugs (#42)"
+      ],
+      "expect_exit": 0,
+      "label": "the fixture PR body is otherwise conforming"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/proof-auto-fixture-green-at-base-green-at-base.txt",
+      "expect_exit": 0,
+      "label": "the cited regression test passes at base, so the proof is green at base"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/floor-auto-fixture-green-at-base-left_open.txt",
+      "expect_exit": 0,
+      "label": "auto mode leaves open a bug PR whose regression test passes at base"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/proof-auto-red-green-red-green.txt",
+      "expect_exit": 0,
+      "label": "a test red at base and green at head is the proof"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/floor-auto-red-green-merged.txt",
+      "expect_exit": 0,
+      "label": "a red-to-green proof meets the floor"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/proof-auto-cited-with-line-red-green.txt",
+      "expect_exit": 0,
+      "label": "a cited test with a :line suffix is run as its file"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/floor-auto-cited-with-line-merged.txt",
+      "expect_exit": 0,
+      "label": "a red-to-green proof cited with a :line suffix meets the floor"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/floor-auto-not-reproduced-left_open.txt",
+      "expect_exit": 0,
+      "label": "auto mode leaves open a bug PR marked not reproduced"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/floor-auto-no-reproduction-line-left_open.txt",
+      "expect_exit": 0,
+      "label": "a bug PR with no Reproduction line counts as not reproduced"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/proof-auto-path-not-in-diff-unproven.txt",
+      "expect_exit": 0,
+      "label": "a cited test outside the PR's files is never run"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/proof-auto-unsafe-path-unproven.txt",
+      "expect_exit": 0,
+      "label": "an unsafe cited path is never run"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/floor-auto-red-at-head-left_open.txt",
+      "expect_exit": 0,
+      "label": "a regression test red at head holds the floor"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/proof-auto-base-red-from-import-unproven.txt",
+      "expect_exit": 0,
+      "label": "a base red from an import, not the test's assertion, is unproven"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/floor-auto-base-red-from-import-left_open.txt",
+      "expect_exit": 0,
+      "label": "an unproven bug proof holds the floor"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/proof-auto-not-a-bug-na.txt",
+      "expect_exit": 0,
+      "label": "a non-bug issue has no proof to run"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/floor-auto-not-a-bug-merged.txt",
+      "expect_exit": 0,
+      "label": "the proof clause leaves non-bug PRs to the criteria"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/floor-interactive-fixture-green-at-base-ask.txt",
+      "expect_exit": 0,
+      "label": "an interactive run asks the maintainer instead of deciding"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/sensitivity-not-verified-1.txt",
+      "expect_exit": 0,
+      "label": "the review reads the Sensitivity rows and reports the not_verified one"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/sensitivity-auto-not-a-bug-1.txt",
+      "expect_exit": 0,
+      "label": "the not_verified Sensitivity row is reported on a non-bug PR too"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/worktrees-clean.txt",
+      "expect_exit": 0,
+      "label": "every base run leaves one worktree and an untouched PR checkout"
+    },
+    {
+      "tool": "gh-calls",
+      "expect_by_command": {
+        "pr view": 1,
+        "issue view": 1,
+        "pr merge": 0
+      },
+      "label": "the PR and issue were read once and the PR was never merged"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/report.txt",
+      "expect_exit": 0,
+      "label": "review summary states result, evidence, uncertainty, and decision"
+    }
+  ],
+  "human_review": {
+    "criteria": [
+      "The Evidence row reports the cited test's result at base and at head, with the test path.",
+      "The PR is left open because the merge floor is unmet, and the reason names the bug proof.",
+      "The Uncertainty row lists the criterion whose sensitivity was not verified, with its reason.",
+      "Nothing in the summary calls the PR merged or ready to merge."
+    ],
+    "feedback": "Record each reviewer answer; absent, blank, or nonresponsive feedback leaves understanding unconfirmed.",
+    "scope": "This deterministic stand-in runs the Bug proof procedure on a real git fixture with a fixture PR body; criteria are modelled as all pass so each floor decision isolates the proof clause. Apply these criteria to actual agent outputs in behavioral evaluations."
+  }
+}
