@@ -228,6 +228,13 @@ grep -qF '`failure_reason`, `skipped_reason`.' "$P23" \
   && grep -qF 'it never feeds the failure streak, quarantine or' "$P23" \
   && pass "T4.5 auto-pilot records a gate decline as skipped, outside the failure streak" \
   || fail "T4.5 auto-pilot does not treat a gate decline as a skip"
+grep -qF 'with `skipped_reason: already_resolved`, add the issue to' "$P23" \
+  && grep -qF 'the session skip list — it stays open, so triage would re-pick it' "$P23" \
+  && pass "T4.7 auto-pilot adds an already-resolved issue to the session skip list" \
+  || fail "T4.7 the already_resolved handler does not add the issue to the session skip list"
+grep -qF 'body_file="$(mktemp)"' "$RS_SRC/references/steps/step-1-research.md" \
+  && pass "T4.8 the close-recommendation snippet creates its body file with mktemp" \
+  || fail "T4.8 the close-recommendation snippet never creates its body file"
 # A skipped line ends a failure streak: gi-runlog counts only `failed`.
 log="$TMP/runs.jsonl"
 for o in failed failed skipped; do

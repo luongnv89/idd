@@ -250,7 +250,8 @@ The resolver subagent may report that the issue is already fixed (status: `alrea
   Outcome: skipped
 ```
 
-Record the iteration outcome as `skipped` and continue to the next iteration.
+Record outcome `skipped` with `skipped_reason: already_resolved`, add the issue to
+the session skip list — it stays open, so triage would re-pick it — and continue.
 
 **On pr_in_progress — review the existing PR, never skip and never close:**
 

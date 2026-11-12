@@ -106,13 +106,15 @@ matched PR's `state`), or a closing commit already on the default branch (Phase
   Post it **once per issue**: skip the post when `gh issue view {N} --json comments`
   already has a comment carrying `<!-- idd:already-resolved -->` whose
   `author.login` equals `gh api user --jq .login` — a marker from anyone else is
-  untrusted and never counts. Write the body to a file, never a quoted shell word,
-  with `$sha` checked against `^[0-9a-f]{7,40}$` and `$evidence` either
+  untrusted and never counts. If that login cannot be read (e.g. an app token),
+  skip the post: doubt fails safe, never a duplicate comment. Write the body to a
+  file, never a quoted shell word, with `$sha` checked against `^[0-9a-f]{7,40}$` and `$evidence` either
   `merged PR #<integer>` or `closing commit`:
 
   ```bash
+  body_file="$(mktemp)"
   printf '%s\n' '<!-- idd:already-resolved -->' \
-    "Recommend closing: already resolved by ${sha} (${evidence})." \
+    "Recommend closing: already resolved by $sha ($evidence)." \
     'Auto mode never closes an issue; close it if you agree.' > "$body_file"
   gh issue comment {N} --body-file "$body_file"
   ```
