@@ -18,8 +18,13 @@ Input on stdin, one JSON object:
 
     {"issues": [{"number": 12, "title": "...", "type": "bug",
                  "labels": ["bug"], "createdAt": "...", "updatedAt": "...",
-                 "affected_files": ["auth.py"], "potentially_fixed_by": null}],
+                 "affected_files": ["auth.py"], "potentially_fixed_by": null,
+                 "needs_clarification": false}],
      "edges": [{"from": 12, "to": 15}, {"a": 8, "b": 9}]}
+
+`needs_clarification` (optional, default false) is the caller's `gi-ready.py`
+verdict: such an issue gets status `unclear` and sorts after every ready one,
+ahead of the `maybe-fixed` tail — kept in the order, never dropped from it.
 
 An edge with `from`/`to` is already directed. An edge with `a`/`b` (or a
 two-element array) is undirected and is directed here by the three heuristics
@@ -295,6 +300,7 @@ def normalize_issues(request: dict) -> list[dict]:
                 "updated": parse_time(entry.get("updatedAt"), f"issues[{position}].updatedAt"),
                 "affected_files": [str(f) for f in files],
                 "potentially_fixed_by": entry.get("potentially_fixed_by") or None,
+                "needs_clarification": entry.get("needs_clarification") is True,
             }
         )
     return issues
@@ -690,7 +696,11 @@ def main(argv: list[str] | None = None) -> int:
 
     order: list[int] = [n for level in levels for n in level]
     maybe_fixed = [n for n in order if index[n]["potentially_fixed_by"]]
-    order = [n for n in order if n not in maybe_fixed] + maybe_fixed
+    unclear = [
+        n for n in order if index[n]["needs_clarification"] and n not in maybe_fixed
+    ]
+    order = [n for n in order if n not in maybe_fixed and n not in unclear]
+    order += unclear + maybe_fixed
 
     records: list[dict] = []
     stale_count = 0
@@ -703,6 +713,8 @@ def main(argv: list[str] | None = None) -> int:
             stale_count += 1
         if issue["potentially_fixed_by"]:
             status = "maybe-fixed"
+        elif issue["needs_clarification"]:
+            status = "unclear"
         elif blocked_by[number]:
             status = "blocked"
         elif is_stale:

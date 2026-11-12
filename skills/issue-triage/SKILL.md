@@ -247,7 +247,7 @@ Verify these bundled files are present, each path resolved against the skill's d
 - `references/error-messages.md` — error catalog
 - `references/examples.md` — worked example runs
 - `references/docs/sync-conventions.md` — stash-first sync
-- `references/docs/idd-methodology.md` — dependency markers
+- `references/docs/idd-methodology.md` — dependency markers, readiness
 - `references/docs/github-projects-sync.md` — Projects status sync
 - `references/docs/config-schema.md` — configuration schema
 - `references/docs/platform-github.md` — GitHub driver
@@ -259,6 +259,7 @@ Verify these bundled files are present, each path resolved against the skill's d
 - `references/scripts/gi-backlog.py` — shared open-issue snapshot (Step 1)
 - `references/scripts/gi-gh.py` — GitHub CLI subprocess boundary
 - `references/scripts/gi-triage-graph.py` — cycles, order, parallel sets, staleness, priority
+- `references/scripts/gi-ready.py` — issue readiness (Step 1)
 
 ---
 
@@ -307,6 +308,8 @@ Progress output:
 ● Fetching {N} open issues...
 ```
 
+**Readiness** (`references/docs/idd-methodology.md`, *Issue Readiness*): run `python3 references/scripts/gi-backlog.py --limit {N} --fields number,body | python3 references/scripts/gi-ready.py` — a read of the snapshot Step 1 wrote — and keep its `not_ready` numbers. Any non-zero exit: judge each body by that section instead.
+
 ## Steps 1b & 2 — Already-Fixed & Dependency Detection
 
 One full-scope scanner per batch finds issues already fixed by commits/PRs **and** builds the file-overlap dependency map. **Read `references/detection.md` now** — its subagent prompts, confidence-scoring rules and merge logic are what these steps execute, not optional tuning detail. Where a scanned body carries a `Depends on #N` / `Blocked by #N` marker, take its grammar from `references/docs/idd-methodology.md` (*Issue Dependencies*), so the edges here match what `/auto-pilot`'s merge gate enforces.
@@ -334,7 +337,7 @@ text and this skill runs unattended under `/auto-pilot`.
  "edges": [{"a": 12, "b": 15}]}
 ```
 
-`edges` are the scanner's undirected pairs (`a`/`b`), which the script directs by
+Add `"needs_clarification": true` to each issue in Step 1's `not_ready`. `edges` are the scanner's undirected pairs (`a`/`b`), which the script directs by
 its documented heuristics; pass an already-directed pair as `from`/`to`. Then,
 from the repo root (script path resolved as the precheck resolves its list):
 
@@ -347,8 +350,8 @@ which is Step 9 done — top-level `version`, `updated`, `source`, `analyzed_cou
 `issues[]`, `summary` (`parallel_groups`, `stale_count`, `stale_threshold_days`,
 `potentially_fixed_count`, `suggested_order`, `circular_deps`, `co_dependent`)
 and `history[]`. Each `issues[]` entry has a `status` of `ready`, `blocked`,
-`stale` or `maybe-fixed` — that precedence order, `maybe-fixed` first — rendered
-as `ready`, `blocked #N`, `stale (Nd)` and `maybe-fixed`. Delete the scan file
+`stale`, `unclear` or `maybe-fixed` — precedence `maybe-fixed`, `unclear`,
+`blocked`, `stale` — rendered as `ready`, `blocked #N`, `stale (Nd)`, `unclear` and `maybe-fixed`. Delete the scan file
 afterwards. Classify **every** outcome:
 
 | Outcome | Meaning | Do |

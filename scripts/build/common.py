@@ -248,7 +248,7 @@ DOC_SECTION_DIGESTS: dict[str, tuple[str, ...]] = {
 }
 
 DOC_DIGEST_OPTIONAL_SECTIONS: dict[str, tuple[str, ...]] = {
-    "idd-methodology.md": ("Core Concepts",),
+    "idd-methodology.md": ("Core Concepts", "Issue Readiness"),
 }
 
 _DIGEST_NOTICE = (

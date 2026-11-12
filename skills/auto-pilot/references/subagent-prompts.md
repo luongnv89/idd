@@ -97,7 +97,7 @@ When done, report back ONLY these fields:
 - phases: per-step seconds as a JSON object in run order, e.g. {"preflight":9,"research":21,"plan":6,"implement":38,"qa":14,"deliver":6} (see references/docs/run-log-schema.md); only steps that started; omit when none was measured
 - failure_step: which step failed (if status is failure)
 - failure_reason: short error description (if status is failure)
-- skipped_reason: the gate whose default No stopped the run (if status is failure because an auto-mode gate declined, e.g. blocked_label, empty_body, large_scope, max_commits_exceeded)
+- skipped_reason: the gate whose default No stopped the run (if status is failure because an auto-mode gate declined, e.g. blocked_label, needs_clarification, empty_body, large_scope, max_commits_exceeded)
 - resolution_details: explanation (if status is already_resolved)
 ```
 
@@ -352,7 +352,7 @@ When done, report back ONLY these fields:
   references/docs/run-log-schema.md); primary issue's line only, like duration_s
 - failure_step: which step failed (if status is failure)
 - failure_reason: short error description (if status is failure)
-- skipped_reason: the gate whose default No stopped the run (if status is failure because an auto-mode gate declined, e.g. blocked_label, empty_body, large_scope, max_commits_exceeded)
+- skipped_reason: the gate whose default No stopped the run (if status is failure because an auto-mode gate declined, e.g. blocked_label, needs_clarification, empty_body, large_scope, max_commits_exceeded)
 ```
 
 ## Template Variables <!-- a:ap-template-vars -->

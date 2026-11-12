@@ -136,6 +136,7 @@ Verify these files exist relative to this SKILL.md's dirname. A missing one is a
 - `references/scripts/gi-issue.py`
 - `references/scripts/gi-branch.py`
 - `references/scripts/gi-triage-graph.py`
+- `references/scripts/gi-ready.py`
 - `references/scripts/gi-state.py`
 - `references/scripts/gi-postmerge.py` — post-merge cleanup: worktrees, branch, switch to the updated default branch
 - `references/scripts/gi-progress.py` — list and clear the resolver's and reviewer's progress records

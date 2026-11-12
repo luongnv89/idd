@@ -60,6 +60,9 @@ For each issue, check:
   quarantined issue in the list; *Loop behavior* below owns that skip, and owning
   it there is what gives it an `[Issue {i}/{total}]` slot and its one run-log
   line. Nothing else is exempt: `wontfix` and the rest are still removed here.
+- **Ready** — `python3 shared/scripts/gi-issue.py {N} --fields number,body | python3 shared/scripts/gi-ready.py`
+  (non-zero exit: `docs/idd-methodology.md`, *Issue Readiness*). An issue not
+  ready is kept like a quarantined one, and *Loop behavior* skips it.
 
 ```
 ● Validating issue list...
@@ -67,6 +70,7 @@ For each issue, check:
   ⚠ #10 — Add dark mode (closed, removing)
   ✓ #12 — Refactor auth module (open)
   ○ #14 — Flaky import path (quarantined, keeping — skipped at its turn)
+  ○ #16 — Make it faster (needs clarification, keeping — skipped at its turn)
 ```
 
 If all issues are invalid:
@@ -226,6 +230,10 @@ is the documented way to do that:
 ○ [Issue {i}/{total}] #{N} — quarantined ({quarantine_label}); remove the label to retry
 ```
 
+**Readiness rides this gate.** An issue kept as not ready takes the same
+disposition below, with `skipped_reason: needs_clarification` and the line
+`○ [Issue {i}/{total}] #{N} — needs clarification; add or confirm its criteria to retry`.
+
 **The gate covers a batch's co-members, not only the slot's own issue.** A
 quarantined issue that *Validate issues upfront* kept in the list can also sit in
 an analyzer batch group, and a batch resolves **every** member at the spawn
@@ -342,7 +350,7 @@ name: "a failed batch drops fully-processed issues").
 exception** to auto-pilot's "log every processed issue including skips" rule: an *in-batch* skip is the already-counted other half
 of a batch line, not a fresh processed issue. Ordinary skips —
 `blocked_label`, `blocked_by_dependency`, `in_skip_list`, `assigned_to_other`,
-`quarantined` — still log their one line with a `skipped_reason`.
+`quarantined`, `needs_clarification` — still log their one line with a `skipped_reason`.
 
 Build each written line from `docs/run-log-schema.md`, with these batch attributions:
 

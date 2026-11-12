@@ -231,7 +231,7 @@ SKILL.md, *Steps 3-7*):
 | `issues[].priority` | string | `"P1"`, `"P2"`, or `"P3"` (null if auto_priority is off) |
 | `issues[].blocks` | integer[] | Issue numbers this issue blocks |
 | `issues[].blocked_by` | integer[] | Issue numbers blocking this issue |
-| `issues[].status` | string | `"ready"`, `"blocked"`, `"stale"`, or `"maybe-fixed"` (potentially already fixed on a merged branch). Closed GitHub issues are not written into `issues[]` on a full re-triage. |
+| `issues[].status` | string | `"ready"`, `"blocked"`, `"stale"`, `"unclear"` (not ready — `needs_clarification`), or `"maybe-fixed"` (potentially already fixed on a merged branch). Closed GitHub issues are not written into `issues[]` on a full re-triage. |
 | `issues[].stale_days` | integer or null | Days since last update, null if not stale |
 | `issues[].labels` | string[] | GitHub labels |
 | `issues[].affected_files` | string[] | Files identified by keyword-based codebase scan at triage time |

@@ -29,10 +29,10 @@ Full field set; *Always present* is the required minimum:
 | `qa_cycles` | integer | no | QA review-fix cycles run |
 | `ceiling` | integer | no | Class QA-cycle policy ceiling: 1 for `light`, `resolve.qa_max_cycles` (default 5) for `full`+`high`, else 2. Omit unless recorded; a recorded value must be a positive integer and overrides the computed one. |
 | `breach_reason` | string | no | Why `qa_cycles` exceeded `ceiling`. Required when `qa_cycles` > `ceiling`; omit otherwise; `gi-runlog` rejects an over-ceiling row without it (exit 3) and `idd-lint stats` exits 1 on such rows. |
-| `verification` | string | no | `disabled` if config turned a check off, else `partial` if any non-deferred criterion or dimension is not `pass`, else `full`. Auto-pilot: from the PR review; missing counts are `partial`, never `full`. Resolver: from its PR's AC table. Omitted when nothing was reviewed. |
+| `verification` | string | no | `disabled` if config turned a check off, else `partial` if any non-deferred criterion or dimension is not `pass`, else `full`. Auto-pilot: from the PR review; missing counts are `partial`, never `full`. Resolver: from its PR's AC table, `partial` for an issue not ready. Omitted when nothing was reviewed. |
 | `duration_s` | integer | no | Wall-clock run duration in seconds |
 | `phases` | object | no | Seconds per pipeline phase, `{name: int ≥ 0}` in run order; only phases that ran; need not sum to `duration_s`. ≤16 names of `[a-z][a-z0-9_-]`, ≤32 chars. |
-| `skipped_reason` | string | no | Why the issue was skipped (auto-pilot skips, any `skipped`/`already_resolved` outcome, or a `failed` run an auto-mode default No stopped): e.g. `already_resolved`, `blocked_label`, `blocked_by_dependency`, `in_skip_list`, `assigned_to_other`, `quarantined`, `empty_body`, `large_scope`, `max_commits_exceeded` |
+| `skipped_reason` | string | no | Why the issue was skipped (auto-pilot skips, any `skipped`/`already_resolved` outcome, or a `failed` run an auto-mode default No stopped): e.g. `already_resolved`, `blocked_label`, `blocked_by_dependency`, `in_skip_list`, `assigned_to_other`, `quarantined`, `needs_clarification`, `empty_body`, `large_scope`, `max_commits_exceeded` |
 
 Example lines:
 

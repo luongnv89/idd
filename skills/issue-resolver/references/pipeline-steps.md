@@ -98,7 +98,7 @@ invariants (environment, workspace, deliver, no prompts). Under `--auto` /
 
 | Step | Auto behavior |
 |------|---------------|
-| *0c* — Guards | Take each guard's printed default, No: assigned elsewhere or a blocking label stops the run `failed` with `skipped_reason` `assigned_to_other` / `blocked_label`. |
+| *0c* — Guards | Take each guard's printed default, No: assigned elsewhere, a blocking label or a body not ready stops the run `failed` with `skipped_reason` `assigned_to_other` / `blocked_label` / `needs_clarification`. |
 | *0j* — Progress record | Resume only with `--resume`, never prompt; without it the record is ignored and this run's `--start` replaces it. |
 | *0d* — Auto-normalize | A security-labelled issue prints the skip warning and continues **without** rewriting the body — no operator confirmation is sought. |
 | *0e* — Workspace | The offer never appears. |
@@ -117,7 +117,7 @@ borrow teardown in *Step 3 — Propose relevant skills*.
 Full behavior for the edge cases named in SKILL.md.
 
 ### No acceptance criteria
-PR body notes: `> **Note:** No acceptance criteria defined — manual review recommended.`
+PR body notes: `> **Note:** No acceptance criteria defined — manual review recommended.` The body is not ready, so the run ends `PARTIAL` (SKILL.md *0c*).
 
 ### Issue body is empty
 - Interactive: warn and ask to continue (default No)
