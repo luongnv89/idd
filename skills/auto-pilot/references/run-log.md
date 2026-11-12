@@ -109,7 +109,8 @@ gate decline (a `failure` carrying `skipped_reason`) is a `skipped` line with th
 reason, never `failed`.
 
 **`verification`** comes from the PR review (*Step 3.2*), never the resolver.
-Write it on every line whose PR was reviewed; omit it on `failed` and `skipped`.
+Write it on every line whose PR was reviewed (batch: primary line only); omit
+it on `failed` and `skipped`.
 
 **`agent_overrides`** records whether the configured `agents.*` overrides
 reached this issue's spawns (`references/docs/run-log-schema.md`). Merge the resolver's

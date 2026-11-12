@@ -36,8 +36,9 @@ Parse the subagent's response. Extract: `result`, `review_cycles`, `issues_found
 `partial_dimensions`, `disabled_dimensions`, `pre_pass_fixes`,
 `tests_passed`, `ci_status`.
 
-**`PASS` is not proof.** Derive `verification` from the last three fields by
-`references/docs/run-log-schema.md` (*`verification`*); a missing field is `partial`. The
+**`PASS` is not proof.** Derive `verification` from `criteria`, `partial_dimensions` and
+`disabled_dimensions` by `references/docs/run-log-schema.md` (*`verification`*); a missing
+field is `partial` (`null` `criteria` under a disabled check is not missing). The
 iteration report, summary row and run-log line all carry it and the counts.
 
 **Retain `ci_status` verbatim** — the string exactly as returned (`passed@<sha40>`,

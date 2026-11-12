@@ -110,7 +110,7 @@ or nonresponsive feedback leaves human understanding unconfirmed.
       safety:              ✓ pass
     Standards axis (follows project conventions?):
       traceability:        ✓ pass (Closes #{N}, commit ref, Decision Record, AC block, B1/squash: squash-only + PR_BODY)
-      maintainability:     ○ partial ({note_count} note-level findings)
+      maintainability:     ⚠ partial ({note_count} note-level findings)
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Tests:             ✓ pass ({count} passed)
   CI status:         ✓ pass ({checks_count} checks passed)

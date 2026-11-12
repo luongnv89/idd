@@ -552,9 +552,9 @@ else
 fi
 has "$RUNLOG" '| `verification` | string | no |' "T13f: run-log schema documents verification"
 has "$RUNLOG" 'missing counts are `partial`, never `full`' "T13f: a review without counts is never logged full"
-has "$REPO_ROOT/src/skills/issue-resolver/references/report-templates.md" 'applied to the PR'"'"'s AC table: any `unverified` row → `partial`' \
+has "$REPO_ROOT/src/skills/issue-resolver/references/report-templates.md" 'applied to the PR'"'"'s AC table: any row not `pass` → `partial`' \
   "T13g: a resolver PR with an unverified criterion is logged partial, not clean"
-has "$REPO_ROOT/src/skills/auto-pilot/references/phases/phase-3-4-review.md" 'a missing field is `partial`' \
+has "$REPO_ROOT/src/skills/auto-pilot/references/phases/phase-3-4-review.md" 'field is `partial`' \
   "T13g: a reviewer report-back without counts is partial, never full"
 has "$REPO_ROOT/src/skills/auto-pilot/references/explicit-list-mode.md" '`verification` on the primary line only' \
   "T13g: batch fan-out never stamps unreviewed issues as verified"
