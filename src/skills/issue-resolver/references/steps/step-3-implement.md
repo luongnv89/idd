@@ -318,8 +318,9 @@ Interactive mode behaves the same — surface the evidence (or its absence); do 
 ### Max commits guard
 
 If commits exceed `resolve.max_commits`:
-- Interactive: warn and ask to continue
-- Auto: warn in log, continue anyway
+- Interactive: warn and ask to continue (default No)
+- Auto: take the default No — no push, no PR; the commits stay on the local
+  branch and the run ends `failed`, `skipped_reason: max_commits_exceeded`
 
 ### Inline fallback
 

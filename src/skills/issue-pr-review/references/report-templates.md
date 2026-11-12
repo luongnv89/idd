@@ -341,7 +341,7 @@ for each `nested_repos` entry. Only an explicit yes re-runs, binding `digest`
 from that same answer so a file added later is never deleted unseen:
 `python3 shared/scripts/gi-postmerge.py --pr {N} --remove-worktree "$wt=$digest"`.
 A refusal (the list changed) means show the new list and ask again.
-`--auto` and `--review-only` never pass the flag: the worktree stays, reported.
+`--auto` and `--review-only` never pass the flag: the worktree stays, reported. <!-- auto:no -->
 
 The merge runs after the summary prints, so close with a merge block whose first
 row supersedes the summary's `Result:`. On success:

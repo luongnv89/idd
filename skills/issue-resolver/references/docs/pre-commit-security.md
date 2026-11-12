@@ -158,6 +158,7 @@ if [ "${#warnings[@]}" -gt 0 ]; then
   fi
 fi
 ```
+<!-- auto:exception=secscan-warnings -->
 
 ### Behavior Notes
 
@@ -182,7 +183,7 @@ Both interactive and auto-pilot modes use **the same scan logic**, and both scan
 
 Real-secret detection is non-bypassable in both modes. If a real secret would block a commit in interactive mode, it blocks the commit in auto mode too — and the auto-pilot loop reports the issue and moves on rather than committing the leak.
 
-In **interactive mode**, when one or more warnings fire, the skill prints them and prompts `Proceed anyway? [y/N]` before running `git commit` or `git push`. A blank or `n` response stops the action; `y` proceeds. In **auto mode**, the prompt is skipped — warnings are logged via `○` and the action proceeds. Auto mode treats warnings the same way it treats blocking labels and other non-fatal risk signals: surfaced, recorded, but not blocking the loop.
+In **interactive mode**, when one or more warnings fire, the skill prints them and prompts `Proceed anyway? [y/N]` before running `git commit` or `git push`. A blank or `n` response stops the action; `y` proceeds. In **auto mode**, the prompt is skipped — warnings are logged via `○` and the action proceeds. Warnings are recorded, not blocking — a listed auto-mode exception. <!-- auto:exception=secscan-warnings -->
 
 ---
 

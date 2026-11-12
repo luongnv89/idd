@@ -49,7 +49,7 @@ Patch keys (a closed set — anything else is exit 3, and nothing is written)
             relies on it, its diagnostics rerun, and never recorded
   reviewer  linked_issue, profile, prepass_head, cycle, findings {open[] <= 50,
             noted[] <= 50}, history[] <= 2 lists of finding signatures
-  Effect kinds: resolver issue_edit, issue_close, push, pr_create, run_log;
+  Effect kinds: resolver issue_edit, issue_comment, push, pr_create, run_log;
   reviewer push, body_edit, merge. Nested objects are closed key sets too;
   `research` alone is opaque data, kept only to seed a verify-first research
   pass, and never read for a gate. Strings are capped (a summary at 2,000
@@ -175,7 +175,7 @@ FORWARD = {
 # Steps that commit: only there may a resume find a moved head or a dirty tree.
 COMMIT_STEPS = {"issue-resolver": {3, 4, 5}, "issue-pr-review": {2, 6}}
 EFFECT_KINDS = {
-    "issue-resolver": {"issue_edit", "issue_close", "push", "pr_create", "run_log"},
+    "issue-resolver": {"issue_edit", "issue_comment", "push", "pr_create", "run_log"},
     "issue-pr-review": {"push", "body_edit", "merge"},
 }
 PROFILES = ("light", "full")

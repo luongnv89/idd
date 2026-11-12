@@ -466,3 +466,6 @@ jobs:
 
       - name: test-progress-records-542
         run: bash tests/test-progress-records-542.sh
+
+      - name: test-auto-mode-gates-549
+        run: bash tests/test-auto-mode-gates-549.sh

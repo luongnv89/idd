@@ -94,6 +94,7 @@ All errors follow the rich error format: what went wrong + fix command + docs li
   Continue anyway? [y/N]
 ```
 **Trigger:** Issue `assignees` list contains a user other than the current authenticated user.
+**Auto:** takes the default No — stop, `skipped_reason: assigned_to_other`. <!-- auto:no -->
 
 ### Blocking label
 ```
@@ -103,6 +104,7 @@ All errors follow the rich error format: what went wrong + fix command + docs li
   Continue anyway? [y/N]
 ```
 **Trigger:** Issue labels include `wontfix`, `blocked`, or `do-not-merge` (case-insensitive).
+**Auto:** takes the default No — stop, `skipped_reason: blocked_label`. <!-- auto:no -->
 
 ## Branch
 
@@ -184,6 +186,7 @@ All errors follow the rich error format: what went wrong + fix command + docs li
   Continue creating PR? [y/N]
 ```
 **Trigger:** Number of commits created during Execute exceeds `resolve.max_commits`.
+**Auto:** takes the default No — no push, no PR; the commits stay on the local branch, `skipped_reason: max_commits_exceeded`. <!-- auto:no -->
 
 ## Ship
 
@@ -232,6 +235,7 @@ All errors follow the rich error format: what went wrong + fix command + docs li
   Continue anyway? [y/N]
 ```
 **Trigger:** Issue body is empty or null after fetch.
+**Auto:** takes the default No — stop, `skipped_reason: empty_body`. <!-- auto:no -->
 
 ### Large scope warning
 ```
@@ -241,6 +245,7 @@ All errors follow the rich error format: what went wrong + fix command + docs li
   Continue anyway? [y/N]
 ```
 **Trigger:** Research phase identifies more than 20 potentially affected files.
+**Auto:** takes the default No — stop before Step 2, `skipped_reason: large_scope`. <!-- auto:no -->
 
 ## Progress record
 
@@ -291,7 +296,7 @@ Not confirmations: auto mode keeps every one of these.
            file:line or held-probe citation, then re-run /issue-resolver N
   Docs:    https://github.com/luongnv89/idd/blob/main/src/skills/issue-resolver/references/steps/step-2-plan.md
 ```
-**Trigger:** `gi-sensitive.py --adjudicate` returns `stop` with open blockers or ledger problems (no falsifiable probe, a pre-change probe not run, no independent challenge). One blocker is enough — count and confidence never close one. **Interactive:** `Proceed anyway? [y/N]`, default no; a yes is an operator override recorded in the Decision Record. **Auto:** the run ends `failed` at Step 2; no PR.
+**Trigger:** `gi-sensitive.py --adjudicate` returns `stop` with open blockers or ledger problems (no falsifiable probe, a pre-change probe not run, no independent challenge). One blocker is enough — count and confidence never close one. **Interactive:** `Proceed anyway? [y/N]`, default no; a yes is an operator override recorded in the Decision Record. **Auto:** the run ends `failed` at Step 2; no PR. <!-- auto:no -->
 
 ### Load-bearing probe falsified
 ```

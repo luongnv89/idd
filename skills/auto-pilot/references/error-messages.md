@@ -339,7 +339,7 @@ the single home of that mapping, never restated here.
 ○ #{issue_number} already resolved — skipping
 ```
 **Trigger:** Resolver subagent returns `already_resolved` status — closing evidence, meaning a **merged** PR or a closing commit on the default branch.
-**Action:** Skip review/fix/merge phases, continue to next iteration.
+**Action:** Skip review/fix/merge phases, add the issue to the session skip list (it stays open), continue.
 
 ### Issue already has an open PR (review it)
 ```

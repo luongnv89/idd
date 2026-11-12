@@ -178,7 +178,7 @@ Only a **merged** PR or a closing commit on the default branch is `already_resol
 
 ### 0c — Guards
 
-**Interactive:** warn and ask if assigned elsewhere, or on `wontfix`/`blocked`/`do-not-merge` labels. **Auto:** skip the assignment guard, log blocking labels, never stop.
+Warn and ask if assigned elsewhere, or on `wontfix`/`blocked`/`do-not-merge` labels — both `[y/N]`. **Auto** never waits but takes the printed No: stop at Step 0, `status: failure`, `skipped_reason` `assigned_to_other` or `blocked_label`. Every `[y/N]` gate in this skill does the same ([auto mode](https://github.com/luongnv89/idd/blob/main/docs/auto-mode.md), *The gate rule*).
 
 ### 0d — Auto-normalize
 
@@ -252,7 +252,7 @@ Set `analysis_reuse` to `fresh`, `stale` or `absent` by the five-condition predi
 
 ## Step 1 — Research
 
-Understand the issue, the affected code and candidate solutions; the same pass verifies it is not already fixed (auto then closes it). Spawn the researcher (`shared/agents/codebase-researcher.md`). Payload, phases, early exit, fallback: *Step 1 — Research*.
+Understand the issue, the affected code and candidate solutions; the same pass verifies it is not already fixed (auto then comments a close recommendation; it never closes). Spawn the researcher (`shared/agents/codebase-researcher.md`). Payload, phases, early exit, fallback: *Step 1 — Research*.
 
 **Profiles.** `light` — see the profile table in *Step 0g*; a `high`/`complex` signal revises **upward** to `full`. `analysis_reuse = fresh` (*0h*) — pass `prior_analysis` for the seeded **verify-first** pass: confirm or refute, never trust; the already-resolved check still runs. `triage_context` has no commit pin, so it may only **reorder** a scan (*→ `reuse`*, *→ `triage_context`*).
 
@@ -403,7 +403,8 @@ With `--auto` (or under `/auto-pilot`) no step prompts. Invariants:
 
 - **Environment:** export `IDD_AUTO_MODE=1` before any shell snippet consulting it (`docs/pre-commit-security.md`).
 - **Workspace:** in-place is the default resolution path. Skip Step 0e and allow no `git worktree add` on the default resolution path; run mandatory Repo Sync, then *0f*. With `max_parallel > 1` a resolver may receive `IDD_CALLER_WORKTREE=1` and use that workspace, never creating or cleaning it up.
-- **Never blocks:** every decision point has an auto behavior (*Auto-mode behavior by step*); every terminal outcome runs borrow teardown. No `[y/N]`, `Choose:` or `Continue?` prompts.
+- **Never blocks:** every decision point has an auto behavior (*Auto-mode behavior by step*); every terminal outcome runs borrow teardown. No `[y/N]`, `Choose:` or `Continue?` prompts: a default-No gate takes No and records its `skipped_reason`.
+- **Never closes an issue:** an already-resolved issue gets a close recommendation comment and `already_resolved`.
 - **Deliver:** create the PR; never merge (`/auto-pilot`'s or `/issue-pr-review`'s job). Under `/auto-pilot` the `profile` is **returned** in telemetry; a standalone `--auto` run writes it.
 
 ## Edge Cases

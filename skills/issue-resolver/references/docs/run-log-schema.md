@@ -32,7 +32,7 @@ Full field set; *Always present* is the required minimum:
 | `breach_reason` | string | no | Why `qa_cycles` exceeded `ceiling`. Required when `qa_cycles` > `ceiling`; omit otherwise; `gi-runlog` rejects an over-ceiling row without it (exit 3) and `idd-lint stats` exits 1 on such rows. |
 | `duration_s` | integer | no | Wall-clock run duration in seconds |
 | `phases` | object | no | Seconds per pipeline phase, `{name: int ≥ 0}` in run order; only phases that ran; need not sum to `duration_s`. ≤16 names of `[a-z][a-z0-9_-]`, ≤32 chars. |
-| `skipped_reason` | string | no | Why the issue was skipped (auto-pilot skips, any `skipped`/`already_resolved` outcome): e.g. `already_resolved`, `blocked_label`, `blocked_by_dependency`, `in_skip_list`, `assigned_to_other`, `quarantined` |
+| `skipped_reason` | string | no | Why the issue was skipped (auto-pilot skips, any `skipped`/`already_resolved` outcome, or a `failed` run an auto-mode default No stopped): e.g. `already_resolved`, `blocked_label`, `blocked_by_dependency`, `in_skip_list`, `assigned_to_other`, `quarantined`, `empty_body`, `large_scope`, `max_commits_exceeded` |
 
 Example lines:
 

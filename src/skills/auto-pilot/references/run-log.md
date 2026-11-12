@@ -104,7 +104,9 @@ number when one was created, else `null`), and — from the resolver's report-ba
 — `qa_cycles`, `ceiling`, `breach_reason`, `complexity`, `profile`,
 `agent_overrides`, `duration_s`, and `phases` when present (`profile` is the adaptive-effort profile the resolve
 chose, `light` or `full`; omit it when the resolver returned none). Fold
-`ceiling` / `breach_reason` / `phases` through unchanged when the resolver returned them.
+`ceiling` / `breach_reason` / `phases` through unchanged when the resolver returned them. A
+gate decline (a `failure` carrying `skipped_reason`) is a `skipped` line with that
+reason, never `failed`.
 
 **`agent_overrides`** records whether the configured `agents.*` overrides
 reached this issue's spawns (`docs/run-log-schema.md`). Merge the resolver's
