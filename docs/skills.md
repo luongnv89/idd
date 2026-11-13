@@ -24,7 +24,7 @@ This page documents every public skill shipped by IDD Stack, what each skill doe
 - `--auto` means autonomous mode: no user prompts where the skill can safely decide.
 - `--review-only` means no fixes and no merge.
 - Long runs check how much context the host reports is left. At or below `compaction.threshold.<skill>` in `.idd.yml` (default 15% for `/auto-pilot`, 40% for every other skill), the skill prints a `⚠` line and a ready-to-run `/compact <focus>` command; interactive `/issue-resolver` and `/issue-pr-review` pause once, and every other case continues. A skill never compacts on its own, and `compaction.enabled: false` turns the check off. See `docs/context-threshold.md`.
-- After a run, every skill may propose one optional edit that fits it to your style, environment, or habits (its `## Self-Improve` section). Nothing changes unless you explicitly approve the proposal.
+- After a run, every skill may propose one optional edit that fits it to your style, environment, or habits (its `## Self-Improve` section; the rules are in the bundled `references/self-improve.md`). Nothing changes unless you explicitly approve the proposal.
 - Slash commands shown here are the documented public interface; natural-language requests may trigger the same skills when the agent supports skill discovery.
 
 ---

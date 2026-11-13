@@ -40,6 +40,9 @@ src/
 │       ├── gi-postmerge.py        # Post-merge cleanup: worktrees, merged branch, switch to updated base
 │       ├── gi-progress.py         # Durable progress record so a killed resolver/reviewer run can resume
 │       └── gi-criteria.py         # Downgrade a criterion pass without re-runnable evidence
+│   └── references/                # Shared references, copied verbatim into each citing skill (issue #560)
+│       ├── run-stats.md           # Run-cost footer contract
+│       └── self-improve.md        # Rules behind every skill's Self-Improve section
 │
 ├── skills/
 │   ├── auto-pilot/         # /auto-pilot — triage, resolve, review, merge loop
@@ -120,6 +123,16 @@ Shared executable helpers are a third closure kind alongside agents and runtime 
 - **Source** lives at `src/shared/scripts/<name>.py` — stdlib-only, committed mode `0755`, invoked as `python3 references/scripts/<name>.py` (never `./references/scripts/<name>.py`; zip/tar installs drop the exec bit).
 - **Emitted** byte-identical to each skill's `references/scripts/<name>.py` by `scripts/build.py`, which discovers the bare `shared/scripts/<name>.py` token in skill prose.
 - **Never hand-edit `skills/` output** — edit sources under `src/`, then rebuild with `bash scripts/build.sh --out <tmp-dir> --quiet`.
+
+### Shared references placement rule
+
+A reference file that every skill needs unchanged has one authored source (issue #560):
+
+- **Source** lives at `src/shared/references/<name>.md` — flat, lowercase-hyphen names, `.md` only. Today: `run-stats.md` and `self-improve.md`.
+- **Discovery is the citation.** A skill gets the file when any of its authored files cites `references/<name>.md`; no other token exists. Add that path to the skill's *Bundled dependency precheck* list.
+- **Emitted** byte-identical to `references/<name>.md` in each citing skill, with no banner and no rewrite.
+- **Closure leaf.** The file is never scanned, so it must carry no rewritable token (a runtime-doc, shared-agent, shared-script or skill token); the build aborts on one.
+- **Collision aborts.** A skill that authors its own `references/<name>.md` under the same name fails the build. `tests/test-consolidated-blocks-248.sh` (T12) also fails when any authored file is byte-identical in two skills.
 
 ## Conventions
 
