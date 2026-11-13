@@ -136,6 +136,27 @@ Issue #558 adds two more budgets per skill and a cap on growth between releases.
 - **In CI** the `drift` job fetches the release tags before the budget step and sets `IDD_REQUIRE_RELEASE_TAG=1`, so a checkout where no tag resolves fails. Without the variable (a local clone with no tags, or the model-data refresh workflow) the test prints a `⚠` line and skips the growth case.
 - **Exemptions for v0.27.0.** `issue-pr-review`, `issue-resolver` and `auto-pilot` grew past 2% on `main` between `v0.27.0` and the cap's introduction in #558; `auto-pilot` crossed the line when #588 merged on 2026-11-12, before the cap landed. `docs/VALUES.md` carries one change-log row for each, approved by the maintainer on 2026-11-12. The test supplies no row of its own: it reads the committed `docs/VALUES.md` and nothing else, so removing any of the three rows turns the growth case red. The rows stop mattering at the next release tag, which resets the baseline.
 
+### Surface counts (issue #563)
+
+Six counts of the authored tree are recorded in one committed file, `scripts/surface-counts.json`, and `scripts/surface-count.py` compares the tree with it. CI fails when a count differs from its record.
+
+- **What is counted** — every walk is sorted, skips dotfile and `__pycache__` paths, and ignores symlinks.
+  - `skills` — directories directly under `src/skills/` and `src/internal-skills/` that hold a `SKILL.source.md`.
+  - `scripts` — `src/shared/scripts/*.py`.
+  - `script_lines` — the newline characters in those files, summed (`wc -l`).
+  - `config_keys` — the leaf keys of the Full Schema block of `docs/config-schema.md`, as dotted keys. The block is parsed by `load_schema()` of `src/shared/scripts/gi-config.py`, the parser the skills use.
+  - `flags` — for each skill, the distinct `--flag` tokens in the inline-code spans of its `SKILL.source.md` that start with that skill's own slash command, such as `` `/issue-triage --limit N` `` in issue-triage's file. The per-skill numbers are summed, so one flag name on two skills counts twice. A flag in prose, or in a span that starts with anything else, is not counted.
+  - `gate_headings` — Markdown headings (`#` to `######`) outside fenced code blocks, in every `.md` file under `src/`, whose text holds the whole word `gate` or `gates` in any case. `Gated` does not count.
+- **A rise needs a hand edit.** When a count is above its record, set that number in `scripts/surface-counts.json` to the new count by hand, commit it in the same PR, and say in the PR what the new part replaces or which step it removes (`docs/VALUES.md`, SI8). `--ratchet` **never raises** a record: it reports the rise and exits 1.
+- **A drop is one command.** When a count is below its record, lower the record and commit the file:
+
+  ```bash
+  python3 scripts/surface-count.py --ratchet
+  ```
+
+  `--ratchet` lowers every record above its count, adds a count that has no record, and drops a record for a count the script no longer measures.
+- **Check locally** with `python3 scripts/surface-count.py` (`--check` is the default; `--json` prints the result as JSON; `--root DIR` measures another tree). The script reads the working tree and the counts file and nothing else: it does not run git and needs no base ref. The CI step is `test-surface-counts-563`, which runs `tests/test-surface-counts-563.sh`. The same test fails when `CLAUDE.md` or `AGENTS.md` does not list a shared script in its `src/shared/scripts/` tree.
+
 ### Codex plugin (issue #489)
 
 The build derives `skills/.codex-plugin/plugin.json` from the canonical release
