@@ -8,14 +8,20 @@ import shutil
 from pathlib import Path
 
 from .agents import _render_agent_body
+from .closure import _scan_logical_refs
 from .common import (
     BANNER_TMPL,
     BuildError,
     OUTPUT_SKILL_MD,
+    SHARED_REFERENCE_CITE_RE,
+    SHARED_REFERENCE_NAME_RE,
     SOURCE_SKILL_MD,
+    _abort,
     _copy_binary,
     _is_text_file,
     _read_text,
+    _sorted_iterdir,
+    _strip_urls,
     _walk_files,
     _write_text,
 )
@@ -81,6 +87,46 @@ def _emit_flattened_skill(
             src / "shared" / "scripts" / name,
             out_dir / "references" / "scripts" / name,
         )
+
+    _emit_shared_references(src, skill_root, out_dir)
+
+
+def _emit_shared_references(src: Path, skill_root: Path, out_dir: Path) -> None:
+    """Copy each cited src/shared/references/<name>.md into the skill, verbatim.
+
+    A skill gets `<name>.md` when one of its authored text files cites
+    `references/<name>.md`. The copy is byte-identical to the source: no banner
+    and no rewrite. A shared reference is a closure leaf, so it must carry no
+    logical reference the build would have to resolve. A source tree without
+    the directory (a fixture build) emits nothing.
+    """
+    shared_dir = src / "shared" / "references"
+    if not shared_dir.is_dir():
+        return
+    for entry in _sorted_iterdir(shared_dir):
+        if entry.is_dir() or not SHARED_REFERENCE_NAME_RE.fullmatch(entry.name):
+            _abort(
+                f"src/shared/references/{entry.name} is not a flat "
+                "lowercase-hyphen .md file"
+            )
+        if any(_scan_logical_refs(_read_text(entry))):
+            _abort(
+                f"shared reference '{entry.name}' carries a logical reference "
+                "(a skill token, shared agent, runtime doc or shared script); "
+                "it is copied verbatim and never rewritten"
+            )
+        if (skill_root / "references" / entry.name).exists():
+            _abort(
+                f"skill '{skill_root.name}' authors references/{entry.name}, "
+                f"which collides with src/shared/references/{entry.name}"
+            )
+    cited: set[str] = set()
+    for f in _walk_files(skill_root):
+        if _is_text_file(f):
+            cited.update(SHARED_REFERENCE_CITE_RE.findall(_strip_urls(_read_text(f))))
+    for name in sorted(cited):
+        if (shared_dir / name).is_file():
+            _copy_binary(shared_dir / name, out_dir / "references" / name)
 
 
 def _emit_plugin_manifest(src: Path, out_skills: Path) -> None:
