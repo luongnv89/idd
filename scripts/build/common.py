@@ -50,6 +50,14 @@ ANY_SHARED_SCRIPT_RE = re.compile(r"(?<![\w/])shared/scripts/(\S+)")
 # catch-all has to keep working.
 SCRIPT_TOKEN_NAMES_A_FILE_RE = re.compile(r"\w")
 BARE_SKILL_PATH_RE = re.compile(r"(?<![\w/])skills/([a-z][a-z0-9-]+)/SKILL\.md")
+# Shared references (issue #560): a file authored once at
+# src/shared/references/<name>.md and copied verbatim into every skill that
+# cites it as `references/<name>.md`. The lookbehind keeps longer paths out:
+# `shared/references/x.md`, `../references/x.md` and `references/docs/x.md`
+# never name a shared reference. Adding one requires no change here —
+# discovery is this citation plus the filesystem.
+SHARED_REFERENCE_CITE_RE = re.compile(r"(?<![\w./-])references/([a-z][a-z0-9-]*\.md)")
+SHARED_REFERENCE_NAME_RE = re.compile(r"[a-z][a-z0-9-]*\.md")
 
 URL_RE = re.compile(r"https?://[^\s<>'\"\)]+")
 

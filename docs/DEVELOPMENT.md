@@ -198,6 +198,16 @@ Skills live in `src/skills/<name>/SKILL.source.md` (internal-only skills under `
 5. Run `./scripts/build.sh` to regenerate `skills/`
 6. Test against a real GitHub repository
 
+### Shared references
+
+A reference that every skill ships unchanged is authored once at `src/shared/references/<name>.md`. Today these are `run-stats.md` and `self-improve.md`.
+
+- **Edit** the one source, then rebuild. Every citing skill gets the new bytes.
+- **Add** one by dropping a flat, lowercase-hyphen `.md` file there, citing it as `references/<name>.md` from each skill that needs it, and adding that path to the skill's *Bundled dependency precheck* list. No build change is needed.
+- **Keep it a leaf.** The build copies it verbatim and aborts if it carries a runtime-doc, shared-agent, shared-script or skill token, or if a skill authors a `references/` file of the same name.
+
+`tests/test-consolidated-blocks-248.sh` (T12) fails when an authored file is byte-identical in two skills. Move such a file here.
+
 ### Adding Error Messages
 
 Each skill has `references/error-messages.md`. Follow the three-part format:

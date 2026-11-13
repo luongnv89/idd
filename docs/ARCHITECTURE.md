@@ -114,7 +114,7 @@ The skill definition file. Contains:
 2. **Steps** — sequential instructions the agent follows
 3. **Guards** — pre-conditions checked before execution
 4. **Output format** — terminal output patterns per DESIGN.md
-5. **Self-Improve** — the closing `## Self-Improve` section, after the final workflow step and before any appendix material: an optional, propose-only edit that fits the skill to the user, applied only on the user's explicit approval
+5. **Self-Improve** — the closing `## Self-Improve` section, after the final workflow step and before any appendix material: an optional, propose-only edit that fits the skill to the user, applied only on the user's explicit approval. The section holds a short pointer and the skill's own three examples; the rules live once in `src/shared/references/self-improve.md` and ship as `references/self-improve.md`, which a run opens only when a user is present to approve
 
 ### references/error-messages.md
 
@@ -224,6 +224,10 @@ Some infrastructure procedures are shared across multiple skills as reference do
 ### GitHub Projects Sync
 
 A shared utility reference that skills invoke to update issue status on a repo's GitHub Project board. It wraps the GitHub Projects v2 GraphQL API (`gh api graphql`) to discover linked projects, add issues, and update status fields (Todo, In Progress, Done). Controlled by the `projects` section in `.idd.yml`. Gracefully degrades when no project board exists or the API fails — skills continue without blocking. See `docs/github-projects-sync.md` for the full procedure reference.
+
+## Shared references
+
+A reference file that every skill needs unchanged is authored once under `src/shared/references/` (issue #560). The build copies it byte-identical to `references/<name>.md` in each skill whose authored files cite that path: no banner, no rewrite, and no closure walk. `SHARED_REFERENCE_CITE_RE` in `scripts/build/common.py` is the whole discovery rule, so `shared/references/x.md` and `references/docs/x.md` never match. The build aborts when a shared reference carries a rewritable token, breaks the flat lowercase-hyphen `.md` naming, or collides with a file a skill authors under the same name. Two files use it today: `run-stats.md` (the run-cost footer contract) and `self-improve.md` (the rules behind each `## Self-Improve` section).
 
 ## Scripts Pipeline
 

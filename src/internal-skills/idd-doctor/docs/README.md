@@ -117,7 +117,7 @@ recorded per-phase timing (`n/a` when none did).
 | `../references/error-messages.md` | Error catalog for prerequisite failures and per-check output formats |
 | `../references/review-contract.md` | Summary rows (evidence, uncertainty, decision), format rule, and understanding criteria |
 | `../references/run-log-summary.md` | Run-log summary metrics and output layout |
-| `../references/run-stats.md` | Shared run-stats footer contract |
+| `../references/run-stats.md` | Shared run-stats footer contract (bundled by the build from `src/shared/references/`) |
 
 ## Related Skills
 

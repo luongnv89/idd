@@ -8,7 +8,8 @@
 # `--skill skills/issue-creator`. Each of those is a convention break here.
 #
 #  AC1. Package shape: SKILL.source.md + LICENSE + docs/README.md +
-#       references/{error-messages,run-stats}.md; no SKILL.md, agents/,
+#       references/error-messages.md, and run-stats.md in the built package
+#       (its one source is src/shared/references/, #560); no SKILL.md, agents/,
 #       scripts/ or evals/ in the source package (evals/ would ship).
 #  AC2. Prose alignment: sibling issue-creator check (no $HOME probes, no
 #       `skills/issue-creator` path), no repo sync, gi-config load with the
@@ -46,9 +47,11 @@ echo "◆ /plan-to-issues in idd (issue #502)"
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 
 # ── AC1: package shape ───────────────────────────────────────────────────────
-for f in SKILL.source.md LICENSE docs/README.md references/error-messages.md references/run-stats.md references/plan-parser.md; do
+for f in SKILL.source.md LICENSE docs/README.md references/error-messages.md references/plan-parser.md; do
   if [ -f "$SRC/$f" ]; then pass "AC1: $f present"; else fail "AC1: $f missing"; fi
 done
+# #560: run-stats.md has one authored source, so the package carries it only once built.
+if [ -f "$ROOT/skills/plan-to-issues/references/run-stats.md" ]; then pass "AC1: built package bundles references/run-stats.md"; else fail "AC1: built package lacks references/run-stats.md — run ./scripts/build.sh"; fi
 for d in agents scripts evals; do
   if [ -e "$SRC/$d" ]; then fail "AC1: skill-local $d/ must not exist (use shared/ or references/)"; else pass "AC1: no skill-local $d/"; fi
 done

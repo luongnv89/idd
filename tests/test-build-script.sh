@@ -427,6 +427,70 @@ else
 fi
 
 # ───────────────────────────────────────────────────────────
+# T8b: shared references (issue #560). A file authored once under
+# src/shared/references/ ships verbatim into each skill that cites it as
+# `references/<name>.md`, and into no other. Fixture source trees only.
+# ───────────────────────────────────────────────────────────
+SR_TMP="$(mktemp -d)"
+sr_fixture() { # <name> <skill body> → a one-skill source tree under $SR_TMP/<name>
+  mkdir -p "$SR_TMP/$1/src/skills/probe/references" "$SR_TMP/$1/src/shared/references"
+  printf -- '---\nname: probe\n---\n# Probe\n\n%s\n' "$2" > "$SR_TMP/$1/src/skills/probe/SKILL.source.md"
+  printf '# Cited\n\nShared body, see `references/`.\n' > "$SR_TMP/$1/src/shared/references/cited.md"
+}
+sr_build() { # <name> → build log on stdout, build exit code as status
+  PYTHONDONTWRITEBYTECODE=1 python3 "$REPO_ROOT/scripts/build.py" --src "$SR_TMP/$1/src" \
+    --out "$SR_TMP/$1/out" --no-root-skills 2>&1
+}
+sr_aborts() { # <name> <expected message> <label>
+  local log
+  if log="$(sr_build "$1")"; then
+    fail "T8b: $3 — the build passed"
+  elif printf '%s' "$log" | grep -qF -- "$2"; then
+    pass "T8b: $3"
+  else
+    fail "T8b: $3 — aborted for another reason: $log"
+  fi
+}
+
+sr_fixture ok 'Follow `references/cited.md`. Not a citation: `shared/references/uncited.md`, `../references/uncited.md`.'
+printf '# Uncited\n' > "$SR_TMP/ok/src/shared/references/uncited.md"
+if sr_build ok >/dev/null && cmp -s "$SR_TMP/ok/src/shared/references/cited.md" \
+    "$SR_TMP/ok/out/skills/probe/references/cited.md"; then
+  pass "T8b: a cited shared reference is emitted byte-identical"
+else
+  fail "T8b: a cited shared reference was not emitted byte-identical"
+fi
+if [ ! -e "$SR_TMP/ok/out/skills/probe/references/uncited.md" ]; then
+  pass "T8b: an uncited shared reference is not emitted"
+else
+  fail "T8b: an uncited shared reference was emitted"
+fi
+
+sr_fixture collide 'Follow `references/cited.md`.'
+printf '# Authored copy\n' > "$SR_TMP/collide/src/skills/probe/references/cited.md"
+sr_aborts collide 'collides with src/shared/references/cited.md' \
+  "a skill authoring the same references/ file aborts the build"
+
+sr_fixture token 'Follow `references/cited.md`.'
+printf 'See docs/config-schema.md.\n' >> "$SR_TMP/token/src/shared/references/cited.md"
+sr_aborts token "shared reference 'cited.md' carries a logical reference" \
+  "a shared reference carrying a rewritable token aborts the build"
+
+sr_fixture badname 'Follow `references/cited.md`.'
+printf '# Bad\n' > "$SR_TMP/badname/src/shared/references/Bad_Name.md"
+sr_aborts badname 'Bad_Name.md is not a flat lowercase-hyphen .md file' \
+  "a shared reference off the naming rule aborts the build"
+
+sr_fixture absent 'Follow `references/cited.md`.'
+rm -rf "$SR_TMP/absent/src/shared"
+if sr_build absent >/dev/null && [ -f "$SR_TMP/absent/out/skills/probe/SKILL.md" ]; then
+  pass "T8b: a source tree with no src/shared/references/ builds"
+else
+  fail "T8b: a source tree with no src/shared/references/ failed to build"
+fi
+rm -rf "$SR_TMP"
+
+# ───────────────────────────────────────────────────────────
 # T9: every tests/*.sh is invoked by a workflow (issue #275)
 #
 # A test nobody runs is not a test. Issue #275 found 20 of 42 test files that no
