@@ -9,6 +9,8 @@
 #   AC1 — each consolidated rule is stated once; other occurrences are pointers
 #   #550 — `review.auto_merge` has one definition (T10)
 #   #552 — the unattended *Merge floor* has one home (T11)
+#   #560 — no authored file is byte-identical in two skills (T12); the
+#          Self-Improve rules have one home and each skill keeps a pointer (T13)
 #   AC2 — UI-review mechanics live in one shared doc bundled into BOTH
 #         issue-resolver and issue-pr-review
 
@@ -423,6 +425,120 @@ fi
 grep -qE '^run_case "unverified-only-auto"$' tests/test-eval-pr-review.sh \
   && pass "T11.10: the unverified-only auto-mode eval case is registered" \
   || fail "T11.10: tests/test-eval-pr-review.sh does not run unverified-only-auto"
+
+# ───────────────────────────────────────────────────────────
+# T12 (#560): no authored file is byte-identical in two skills
+# ───────────────────────────────────────────────────────────
+# A file two skills need unchanged belongs in src/shared/references/, where
+# the build copies it from one source. The check keys on content alone, so a
+# second copy under another name or path is caught too.
+
+# cross_skill_duplicates <root> — stdin: file paths relative to <root>, each
+# under src/skills/<s>/ or src/internal-skills/<s>/. Prints one line per
+# content found in two different skill directories, listing its paths.
+cross_skill_duplicates() {
+  local root="$1" paths
+  paths="$(cat)"
+  paste <(printf '%s\n' "$paths" | (cd "$root" && git hash-object --stdin-paths)) \
+        <(printf '%s\n' "$paths") |
+    awk -F'\t' '
+      { split($2, part, "/"); skill = part[1] "/" part[2] "/" part[3] }
+      # The one exemption, by exact package-root path: every package ships
+      # standalone, so each carries the licence text (and
+      # tests/test-plan-to-issues-502.sh requires it).
+      $2 == skill "/LICENSE" { next }
+      { if (!(($1, skill) in seen)) { seen[$1, skill] = 1; owners[$1]++ }
+        files[$1] = files[$1] " " $2 }
+      END { for (h in owners) if (owners[h] > 1) print substr(files[h], 2) }' | sort
+}
+
+# Tracked files only; one deleted but not yet staged has no bytes to compare.
+dups="$(git ls-files src/skills src/internal-skills |
+  while IFS= read -r f; do [ -f "$f" ] && printf '%s\n' "$f"; done |
+  cross_skill_duplicates "$REPO_ROOT")"
+if [ -z "$dups" ]; then
+  pass "T12.1: no authored file is byte-identical in two skills"
+else
+  fail "T12.1: authored content repeats across skills — move it to src/shared/references/:"
+  printf '%s\n' "$dups" | sed 's/^/      /'
+fi
+
+# The same function must fail on a tree that does repeat a file.
+T12_TMP="$(mktemp -d)"
+mkdir -p "$T12_TMP/src/skills/a/references" "$T12_TMP/src/skills/a/docs" \
+         "$T12_TMP/src/skills/b/references" "$T12_TMP/src/internal-skills/c/docs"
+printf 'same body\n' > "$T12_TMP/src/skills/a/references/x.md"
+printf 'same body\n' > "$T12_TMP/src/skills/b/references/x.md"
+printf 'licence\n'   > "$T12_TMP/src/skills/a/LICENSE"
+printf 'licence\n'   > "$T12_TMP/src/skills/b/LICENSE"
+printf 'renamed\n'   > "$T12_TMP/src/skills/a/references/one.md"
+printf 'renamed\n'   > "$T12_TMP/src/internal-skills/c/docs/other.md"
+printf 'nested\n'    > "$T12_TMP/src/skills/a/docs/LICENSE"
+printf 'nested\n'    > "$T12_TMP/src/skills/b/references/LICENSE"
+printf 'only a\n'    > "$T12_TMP/src/skills/a/references/unique.md"
+printf 'twice in a\n' > "$T12_TMP/src/skills/a/references/t1.md"
+printf 'twice in a\n' > "$T12_TMP/src/skills/a/references/t2.md"
+fixture_dups="$( (cd "$T12_TMP" && find src -type f | sort) | cross_skill_duplicates "$T12_TMP")"
+rm -rf "$T12_TMP"
+[ -n "$fixture_dups" ] \
+  && pass "T12.2: the check fails on a tree where two skills author the same bytes" \
+  || fail "T12.2: the check passes a tree where two skills author the same bytes"
+printf '%s\n' "$fixture_dups" | grep -qxF 'src/skills/a/references/x.md src/skills/b/references/x.md' \
+  && pass "T12.3: a file repeated at the same relative path is reported" \
+  || fail "T12.3: a file repeated at the same relative path is not reported"
+printf '%s\n' "$fixture_dups" | grep -qxF 'src/internal-skills/c/docs/other.md src/skills/a/references/one.md' \
+  && pass "T12.4: the same bytes under another name, in an internal skill, are reported" \
+  || fail "T12.4: the same bytes under another name are not reported"
+printf '%s\n' "$fixture_dups" | grep -qxF 'src/skills/a/docs/LICENSE src/skills/b/references/LICENSE' \
+  && pass "T12.5: a LICENSE outside the package root is not exempt" \
+  || fail "T12.5: a nested LICENSE duplicate is not reported"
+if printf '%s\n' "$fixture_dups" | grep -qE '/[ab]/LICENSE|unique\.md|t[12]\.md'; then
+  fail "T12.6: a root LICENSE, a unique file or a repeat inside one skill was reported"
+else
+  pass "T12.6: root LICENSE, unique files and repeats inside one skill are not reported"
+fi
+
+# ───────────────────────────────────────────────────────────
+# T13 (#560): the Self-Improve rules have one home
+# ───────────────────────────────────────────────────────────
+# Each SKILL.md keeps a short pointer and its own three examples; the eight
+# rules live once in src/shared/references/self-improve.md.
+SI_RULES="src/shared/references/self-improve.md"
+SI_CAP=720
+n=$(grep -cE '^[1-8]\. ' "$SI_RULES" 2>/dev/null)
+[ "${n:-0}" -eq 8 ] && pass "T13.1: $SI_RULES carries the eight rules" \
+  || fail "T13.1: $SI_RULES should carry eight numbered rules, found ${n:-0}"
+si_checked=0
+for f in src/skills/*/SKILL.source.md src/internal-skills/*/SKILL.source.md; do
+  si_checked=$((si_checked + 1))
+  section="$(awk '/^## Self-Improve$/ { on = 1; print; next } on && (/^## / || /^---[ \t]*$/) { exit } on' "$f")"
+  bytes=$(printf '%s\n' "$section" | wc -c | tr -d ' ')
+  if [ -n "$section" ] && [ "$bytes" -le "$SI_CAP" ] \
+     && printf '%s' "$section" | grep -qF '`references/self-improve.md`' \
+     && [ "$(printf '%s\n' "$section" | grep -cE '^- \*\*(Style|Environment|Behavior)\*\* — ')" -eq 3 ] \
+     && [ "$(printf '%s\n' "$section" | grep -cE '^([0-9]+\.|[[:space:]]*-) ')" -eq 3 ]; then
+    pass "T13.2: $f — Self-Improve is a pointer and three examples ($bytes B, cap $SI_CAP)"
+  else
+    fail "T13.2: $f — Self-Improve must cite references/self-improve.md and hold only three examples within $SI_CAP B (is $bytes B)"
+  fi
+done
+[ "$si_checked" -eq 9 ] && pass "T13.3: all nine skills were checked" \
+  || fail "T13.3: checked $si_checked SKILL.source.md files, expected 9"
+restated=0
+while IFS= read -r rule; do
+  hits="$(grep -lF -- "$rule" src/skills/*/SKILL.source.md src/internal-skills/*/SKILL.source.md 2>/dev/null)"
+  if [ -n "$hits" ]; then
+    fail "T13.4: a Self-Improve rule is restated in: $(printf '%s' "$hits" | tr '\n' ' ')"
+    restated=1
+  fi
+done < <(grep -E '^[1-8]\. ' "$SI_RULES" 2>/dev/null | sed -E 's/^[1-8]\. //; s/\. .*$/./')
+[ "$restated" -eq 0 ] && pass "T13.4: no SKILL.source.md restates a shared rule"
+si_built=0
+for d in skills/*/; do
+  cmp -s "$SI_RULES" "${d}references/self-improve.md" && si_built=$((si_built + 1))
+done
+[ "$si_built" -eq 8 ] && pass "T13.5: all eight built skills bundle the rules byte-identical" \
+  || fail "T13.5: $si_built of 8 built skills bundle $SI_RULES byte-identical — rebuild skills/"
 
 # ───────────────────────────────────────────────────────────
 # T9 (AC3): no skill regressed past the 500-line cap
