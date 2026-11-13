@@ -31,6 +31,7 @@ from .inventory import (
     _discover_public_skills,
 )
 from .validation import (
+    _check_gh_catalog,
     _check_init_template_urls,
     _check_precheck_drift,
     _check_script_requirements,
@@ -62,6 +63,7 @@ def _source_validation_phase(
     verbose: bool,
 ) -> tuple[dict[str, object] | None, dict[str, str] | None]:
     _check_stale_doc_urls(src)
+    _check_gh_catalog(src)
     _check_init_template_urls(src)
     _check_init_template_schema_parity(src)
     _check_digest_coverage(src, src.parent)

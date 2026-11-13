@@ -267,7 +267,14 @@ FAIL=0
 # skills (auto-pilot, issue-resolver): +1,804. Main measured 611,252, so
 # 611,252 + 1,804 = 613,056; the line keeps six bytes of headroom, so the
 # ratchet is not widened.
-BUDGET=613062
+#
+# Issue #566 is the fifteenth raise (2026-11-13): the build now fails on a
+# `gh` form in src/ with no row in the Operation catalog, so the catalog gains
+# three rows for the nine forms the skills already used (auth, default repo,
+# labels, CI run log, update-branch): +284 per digest copy, shipped to all 8
+# skills: +2,272. Main measured 613,056, so 613,056 + 2,272 = 615,328; the
+# line keeps its six bytes of headroom, so the ratchet is not widened.
+BUDGET=615334
 
 pass() { echo "  ✓ $1"; PASS=$((PASS + 1)); }
 fail() { echo "  ✗ $1"; FAIL=$((FAIL + 1)); }

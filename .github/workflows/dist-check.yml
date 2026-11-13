@@ -271,6 +271,9 @@ jobs:
       - name: test-build-negative-mutations
         run: bash tests/test-build-negative-mutations.sh
 
+      - name: test-gh-catalog-lint-566
+        run: bash tests/test-gh-catalog-lint-566.sh
+
       - name: test-skill-line-cap
         run: bash tests/test-skill-line-cap-247.sh
 

@@ -150,12 +150,12 @@ run --check --json
 if [ "$RC" -eq 0 ] && python3 -c '
 import json, sys
 d = json.loads(sys.argv[1])
-want = ["config_keys", "flags", "gate_headings", "script_lines", "scripts", "skills"]
+want = ["config_keys", "flags", "gate_headings", "gh_call_files", "script_lines", "scripts", "skills"]
 assert d["ok"] is True and d["problems"] == []
 assert sorted(d["measured"]) == want and d["measured"] == d["recorded"]
 assert d["recorded"] == json.load(open(sys.argv[2]))["counts"]
 ' "$OUT" "$COUNTS" 2>/dev/null; then
-  pass "--json prints the six measured and recorded counts as one JSON object"
+  pass "--json prints the seven measured and recorded counts as one JSON object"
 else
   fail "--json output is not the expected JSON object (exit $RC)"
 fi
@@ -220,6 +220,11 @@ rises "a new flag on a skill's own command" flags
 new_fixture
 printf '# Probe\n\n## Probe gate\n' > "$F/src/shared/references/zz-probe.md"
 rises "a new gate heading" gate_headings
+
+# gh_call_files (issue #566): a new file with a gh call is a rise.
+new_fixture
+printf 'Run `gh issue view 1 --json number`.\n' > "$F/src/shared/references/zz-gh.md"
+rises "a new file with a gh call" gh_call_files
 
 # ── --ratchet never raises; it still lowers the rest ──────────────────────
 new_fixture
