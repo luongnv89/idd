@@ -3,20 +3,20 @@
   "skills": {
     "auto-pilot": {
       "always_read": {
-        "budget": 47154,
+        "budget": 47140,
         "files": [
           "references/preflight.md",
           "references/run-log.md",
           "references/step-reports.md",
           "references/summary-format.md"
         ],
-        "measured": 46130
+        "measured": 46116
       },
-      "budget": 448189,
-      "measured": 448085,
+      "budget": 448916,
+      "measured": 448916,
       "skill_md": {
         "budget": 26986,
-        "measured": 26021
+        "measured": 26039
       }
     },
     "init-idd": {
@@ -26,10 +26,10 @@
         "measured": 0
       },
       "budget": 145114,
-      "measured": 144374,
+      "measured": 144720,
       "skill_md": {
         "budget": 26006,
-        "measured": 24982
+        "measured": 24994
       }
     },
     "issue-analysis": {
@@ -42,7 +42,7 @@
         "measured": 35908
       },
       "budget": 168699,
-      "measured": 167959,
+      "measured": 167766,
       "skill_md": {
         "budget": 25078,
         "measured": 24054
@@ -62,7 +62,7 @@
         "measured": 43682
       },
       "budget": 186712,
-      "measured": 186697,
+      "measured": 186504,
       "skill_md": {
         "budget": 26517,
         "measured": 25493
@@ -70,7 +70,7 @@
     },
     "issue-pr-review": {
       "always_read": {
-        "budget": 128816,
+        "budget": 128020,
         "files": [
           "references/prepass-tests-ci-mechanics.md",
           "references/progress-record-mechanics.md",
@@ -78,13 +78,13 @@
           "references/review-loop-mechanics.md",
           "references/verification-checks.md"
         ],
-        "measured": 127792
+        "measured": 126996
       },
-      "budget": 319435,
-      "measured": 318716,
+      "budget": 319091,
+      "measured": 318067,
       "skill_md": {
         "budget": 32125,
-        "measured": 31101
+        "measured": 31171
       }
     },
     "issue-resolver": {
@@ -96,8 +96,8 @@
         ],
         "measured": 10172
       },
-      "budget": 434189,
-      "measured": 434137,
+      "budget": 434939,
+      "measured": 434939,
       "skill_md": {
         "budget": 33856,
         "measured": 32932
@@ -113,7 +113,7 @@
         "measured": 29388
       },
       "budget": 141025,
-      "measured": 140285,
+      "measured": 140092,
       "skill_md": {
         "budget": 25696,
         "measured": 24672
@@ -128,7 +128,7 @@
         "measured": 5062
       },
       "budget": 171356,
-      "measured": 171342,
+      "measured": 171339,
       "skill_md": {
         "budget": 26657,
         "measured": 25633

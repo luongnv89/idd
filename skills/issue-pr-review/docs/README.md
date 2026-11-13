@@ -18,7 +18,7 @@
 - Up to 3 LLM-driven review-fix cycles, ending early when clean
 - Runs the project's real test suite, not mocks
 - Monitors CI status and waits for green before merging
-- Merges a clean PR only when `review.auto_merge: true` (default `false`), in any mode; `--no-merge` (used by `/auto-pilot`) and read-only mode never merge
+- Merges a clean PR only when `review.auto_merge: true` (default `false`), in any mode, by `review.merge_method` (`squash`, `merge` or `rebase`) and with the PR body as the commit body; `--no-merge` (used by `/auto-pilot`) and read-only mode never merge
 - Merge floor: an unattended run (`--auto` or `/auto-pilot`) merges only when at least one acceptance criterion is `pass` and none is `unverified` or still marked `(needs review)`; an interactive run shows the criteria and asks before merging below it. A bug PR also needs its cited regression test re-run red at base and green at head, so a PR marked `not reproduced` stays open
 - Five-dimension review output — correctness, acceptance_criteria, traceability, maintainability, safety — grouped under two axes (**Spec**: does it satisfy the acceptance criteria? · **Standards**: does it follow project conventions?) so clean-but-wrong and correct-but-ugly stay separate, and a PR can pass tests yet still be flagged for missing issue links or unmet acceptance criteria
 - Per-criterion acceptance-criteria verification (`pass` / `fail` / `unverified` with evidence) against the linked issue
