@@ -39,6 +39,13 @@ src/
 │       ├── gi-receipt.py          # Write/verify the revision receipt behind a QA handoff
 │       ├── gi-postmerge.py        # Post-merge cleanup: worktrees, merged branch, switch to updated base
 │       ├── gi-progress.py         # Durable progress record so a killed resolver/reviewer run can resume
+│       ├── gi-backlog.py          # TTL-cached open-issue snapshot shared by triage + dedup
+│       ├── gi-sensitive.py        # Classify a sensitive change; adjudicate its probe/challenge ledger
+│       ├── gi-premise.py          # Premise-reset verdict: block a fix after two shared-premise failures
+│       ├── gi-sketch.py           # Design-sketch verdict: distinct designs, invalid transitions rejected
+│       ├── gi-recipe.py           # Base-ref verification recipe: launch, drive, evidence, owned-only teardown
+│       ├── gi-gh.py               # Shared subprocess boundary for GitHub CLI calls
+│       ├── gi-ready.py            # Judge whether an issue is ready for an unattended resolve
 │       └── gi-criteria.py         # Downgrade a criterion pass without re-runnable evidence
 │   └── references/                # Shared references, copied verbatim into each citing skill (issue #560)
 │       ├── run-stats.md           # Run-cost footer contract

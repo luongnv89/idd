@@ -48,6 +48,13 @@ src/
 │       ├── gi-recipe.py           # Base-ref verification recipe: launch, drive, evidence, owned-only teardown
 │       ├── gi-postmerge.py        # Post-merge cleanup: worktrees, merged branch, switch to updated base
 │       ├── gi-progress.py         # Durable progress record so a killed resolver/reviewer run can resume
+│       ├── gi-dup-score.py        # Score stdin issue items for duplicate pairs
+│       ├── gi-model-cache.py      # Locate/seed/read the user-level model-data cache
+│       ├── gi-stack-detect.py     # Detect repo stack, test runner, size, issue templates
+│       ├── gi-state.py            # /auto-pilot resumable run state + run lock
+│       ├── gi-triage-graph.py     # Triage execution order, status, staleness, priority
+│       ├── gi-gh.py               # Shared subprocess boundary for GitHub CLI calls
+│       ├── gi-ready.py            # Judge whether an issue is ready for an unattended resolve
 │       └── gi-criteria.py         # Downgrade a criterion pass without re-runnable evidence
 │   └── references/                # Shared references, copied verbatim into each citing skill (issue #560)
 │       ├── run-stats.md           # Run-cost footer contract
