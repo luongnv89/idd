@@ -14,7 +14,8 @@
 #      1. Doctor passes on this repo (after §1a doc fixes)
 #      2. Reintroducing old /issue-creator README language → FAIL on Check 1
 #      3. Adding affected-files fields to issue templates → FAIL on Check 2
-#      4. Doctor warns when default merge strategy is not squash → WARN on Check 4
+#      4. Doctor warns when the repo does not allow the configured merge
+#         method, or the method is rebase (issue #564) → WARN on Check 4
 #  - Output is report-only — no files modified
 #
 # Usage: bash tests/test-idd-doctor.sh
@@ -117,7 +118,7 @@ for section in \
   "## Check 1 — Stale skill claims" \
   "## Check 2 — Issue-template fields" \
   "## Check 3 — Autopilot mode" \
-  "## Check 4 — Squash-merge default"; do
+  "## Check 4 — Merge method"; do
   if grep -qF "$section" "$SKILL"; then
     pass "T3: section '$section' present"
   else
@@ -204,9 +205,10 @@ else
 fi
 
 # ───────────────────────────────────────────────────────────
-# T7: Check 4 — squash-merge default + WARN semantic
+# T7: Check 4 — merge method + WARN semantic
 # ───────────────────────────────────────────────────────────
-# AC #4: doctor warns when default merge strategy is not squash.
+# AC #4, as changed by issue #564: the doctor judges the repo against the
+# configured review.merge_method instead of requiring squash-only + PR_BODY.
 # This is a WARN, not a FAIL — must be explicit in the spec.
 if grep -qE 'mergeCommitAllowed.*squashMergeAllowed.*rebaseMergeAllowed' "$SKILL"; then
   pass "T7: Check 4 specifies the gh repo view JSON field selection"
@@ -214,27 +216,49 @@ else
   fail "T7: Check 4 does not specify the gh JSON field selection"
 fi
 
-# SPEC §4.3 requires the message-source level too. `squashMergeCommitMessage`
-# is not a `gh repo view` field (it errors with `Unknown JSON field`), so this
-# must be a second, separate REST read.
-if grep -qE 'gh api repos/\{owner\}/\{repo\}.*squash_merge_commit_message' "$SKILL"; then
-  pass "T7: Check 4 reads squash_merge_commit_message via gh api"
+# The hand-merge message source is not a `gh repo view` field, so it is a
+# second, separate REST read covering both commit-writing methods.
+if grep -qF "gh api repos/{owner}/{repo} --jq '{squash_merge_commit_message, merge_commit_message}'" "$SKILL"; then
+  pass "T7: Check 4 reads both message sources via gh api"
 else
-  fail "T7: Check 4 does not read the squash message source"
+  fail "T7: Check 4 does not read the hand-merge message sources"
 fi
 
-if grep -qE 'squash_merge_commit_message == "PR_BODY"' "$SKILL"; then
-  pass "T7: Check 4 pass predicate requires message source PR_BODY"
+if grep -qE 'the `merge_method:` value inside the `review:` block of `\.idd\.yml`' "$SKILL" \
+   && grep -qE 'means the default, `squash`' "$SKILL"; then
+  pass "T7: Check 4 reads review.merge_method, defaulting to squash"
 else
-  fail "T7: Check 4 pass predicate does not require PR_BODY"
+  fail "T7: Check 4 does not read review.merge_method with a squash default"
 fi
 
-# SPEC §4.3: MUST NOT report the binding satisfied when the configuration
-# cannot be read. An unreadable message source is a WARN, never a PASS.
-if grep -qE 'binding unverified' "$SKILL"; then
-  pass "T7: Check 4 documents the unreadable-message-source WARN"
+# The documented classifier is what T14 mirrors; pin each line of it.
+for line in \
+  'method == "rebase"                               → WARN  (tracker-only)' \
+  'method == "squash" AND squashMergeAllowed == true → PASS' \
+  'method == "merge"  AND mergeCommitAllowed == true → PASS' \
+  'otherwise                                        → WARN  (method not allowed)'; do
+  if grep -qF "$line" "$SKILL"; then
+    pass "T7: Check 4 classifier has '$line'"
+  else
+    fail "T7: Check 4 classifier is missing '$line'"
+  fi
+done
+
+# A message source other than PR_BODY — or an unread one — is a note under the
+# pass line: IDD's own merge passes the body, so it is never a warn.
+if grep -qE 'is not `PR_BODY`, or step 4 did not answer, print the \*hand-merge note\*' "$SKILL" \
+   && grep -qE 'The note is `○`, never a warn' "$SKILL"; then
+  pass "T7: Check 4 reports a non-PR_BODY or unread message source as a note"
 else
-  fail "T7: Check 4 does not document 'binding unverified'"
+  fail "T7: Check 4 does not document the hand-merge note"
+fi
+
+# IDD never changes a repository setting: every fix is a .idd.yml edit.
+if grep -qE 'Never print a command that changes a repository setting' "$SKILL" \
+   && ! grep -qE 'gh api -X PATCH' "$SKILL" "$SKILL_DIR/references/error-messages.md"; then
+  pass "T7: Check 4 prints a .idd.yml fix, never a repo-settings command"
+else
+  fail "T7: Check 4 still prints a repo-settings command"
 fi
 
 if grep -qE 'warn \(not fail\)|⚠ \[4/4\]' "$SKILL"; then
@@ -295,7 +319,7 @@ for section in \
   "## Check 1 — Stale skill claims" \
   "## Check 2 — Issue-template fields" \
   "## Check 3 — Autopilot mode" \
-  "## Check 4 — Squash-merge default"; do
+  "## Check 4 — Merge method"; do
   if grep -qF "$section" "$ERR"; then
     pass "T10: error catalog covers '$section'"
   else
@@ -465,70 +489,44 @@ else
 fi
 
 # ───────────────────────────────────────────────────────────
-# T14: AC #4 fixture — non-squash merge strategy → WARN
+# T14: AC #4 fixture — merge method vs. the repo's allowed strategies
 # ───────────────────────────────────────────────────────────
 
 merge_check_classifier() {
-  # Args: squash mergeCommit rebase msg_source
-  #   squash/mergeCommit/rebase — "true" or "false"
-  #   msg_source — PR_BODY | COMMIT_MESSAGES | BLANK | unreadable
-  # Mirrors the classifier documented in SKILL.md Check 4. Both levels must
-  # hold (SPEC §4.3): strategy AND message source. An unreadable message
-  # source warns rather than passes — an unread setting is not a satisfied
-  # binding — but it is still not a *skip*, which belongs to a missing gh.
-  local squash="$1" mc="$2" rebase="$3" msg="$4"
-  if [ "$squash" = "true" ] && [ "$mc" = "false" ] && [ "$rebase" = "false" ] \
-     && [ "$msg" = "PR_BODY" ]; then
+  # Args: method squash mergeCommit rebase
+  #   method — squash | merge | rebase (review.merge_method)
+  #   squash/mergeCommit/rebase — "true" or "false" (the strategy read)
+  # Mirrors the classifier documented in SKILL.md Check 4, which T7 pins line
+  # by line. The message source is not an input: it only adds a note to a pass.
+  local method="$1" squash="$2" mc="$3"
+  if [ "$method" = "rebase" ]; then
+    echo "WARN"
+  elif [ "$method" = "squash" ] && [ "$squash" = "true" ]; then
+    echo "PASS"
+  elif [ "$method" = "merge" ] && [ "$mc" = "true" ]; then
     echo "PASS"
   else
     echo "WARN"
   fi
 }
 
-if [ "$(merge_check_classifier true false false PR_BODY)" = "PASS" ]; then
-  pass "T14.1: AC #4 — squash-only + PR_BODY PASSes"
-else
-  fail "T14.1: AC #4 — squash-only + PR_BODY did not PASS"
-fi
+t14() {
+  local label="$1" want="$2"; shift 2
+  if [ "$(merge_check_classifier "$@")" = "$want" ]; then
+    pass "$label"
+  else
+    fail "$label (wanted $want)"
+  fi
+}
 
-if [ "$(merge_check_classifier true true true COMMIT_MESSAGES)" = "WARN" ]; then
-  pass "T14.2: AC #4 — all three strategies → WARN"
-else
-  fail "T14.2: AC #4 — all three strategies did not WARN"
-fi
-
-if [ "$(merge_check_classifier true true false PR_BODY)" = "WARN" ]; then
-  pass "T14.3: AC #4 — squash + merge-commit → WARN"
-else
-  fail "T14.3: AC #4 — squash + merge-commit did not WARN"
-fi
-
-if [ "$(merge_check_classifier false true false COMMIT_MESSAGES)" = "WARN" ]; then
-  pass "T14.4: AC #4 — merge-commit only (no squash) → WARN"
-else
-  fail "T14.4: AC #4 — merge-commit only did not WARN"
-fi
-
-# #180 — the message-source level. Strategy alone must never carry a PASS.
-if [ "$(merge_check_classifier true false false COMMIT_MESSAGES)" = "WARN" ]; then
-  pass "T14.5: AC #4 — squash-only but COMMIT_MESSAGES → WARN (§4.3)"
-else
-  fail "T14.5: AC #4 — squash-only + COMMIT_MESSAGES wrongly PASSed"
-fi
-
-# #180 — this repo's current state: message source repaired, strategies not.
-if [ "$(merge_check_classifier true true true PR_BODY)" = "WARN" ]; then
-  pass "T14.6: AC #4 — PR_BODY but non-squash strategies allowed → WARN"
-else
-  fail "T14.6: AC #4 — PR_BODY with merge-commit/rebase wrongly PASSed"
-fi
-
-# #180 — SPEC §4.3: MUST NOT report satisfied when the config cannot be read.
-if [ "$(merge_check_classifier true false false unreadable)" = "WARN" ]; then
-  pass "T14.7: AC #4 — unreadable message source → WARN, never PASS (§4.3)"
-else
-  fail "T14.7: AC #4 — unreadable message source wrongly PASSed"
-fi
+t14 "T14.1: AC #4 — squash on a squash-only repo PASSes" PASS squash true false false
+t14 "T14.2: AC #4 — squash with all three strategies allowed PASSes" PASS squash true true true
+t14 "T14.3: AC #4 — squash on a merge-commit-only repo → WARN (method not allowed)" WARN squash false true false
+# Issue #564 AC1: a repo that merges by merge commit keeps its settings.
+t14 "T14.4: #564 — merge on a merge-commit-only repo PASSes" PASS merge false true false
+t14 "T14.5: #564 — merge on a squash-only repo → WARN (method not allowed)" WARN merge true false false
+t14 "T14.6: #564 — rebase on a rebase-only repo → WARN (tracker-only), never PASS" WARN rebase false false true
+t14 "T14.7: #564 — rebase with every strategy allowed → WARN, never PASS" WARN rebase true true true
 
 # ───────────────────────────────────────────────────────────
 # T15: README.md highlights and structure

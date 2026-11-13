@@ -302,6 +302,90 @@ else
 fi
 
 # ───────────────────────────────────────────────────────────
+# T7: review.merge_method (issue #564) — one key, default `squash`, present in
+# all three schema places and in the init template, with a value guard.
+# ───────────────────────────────────────────────────────────
+FULL_SCHEMA="$(awk '/^## Full Schema/{f=1} f && /^```yaml/{y=1; next} y && /^```/{exit} y' "$SCHEMA")"
+if printf '%s\n' "$FULL_SCHEMA" | awk '/^review:/{f=1; next} /^[^[:space:]#]/{f=0} f' \
+     | grep -qE '^  merge_method: "squash"$'; then
+  pass "T7.1: Full Schema review: block has merge_method defaulting to squash"
+else
+  fail "T7.1: Full Schema review: block lacks merge_method: \"squash\""
+fi
+
+if grep -qE '^    RV --> RV[0-9]+\["merge_method"\]$' "$SCHEMA"; then
+  pass "T7.2: Config Section Map lists review.merge_method"
+else
+  fail "T7.2: Config Section Map does not list merge_method"
+fi
+
+if grep -qE '^\| `review\.merge_method` \| `"squash"` \|.*`squash`, `merge` or `rebase`' "$SCHEMA"; then
+  pass "T7.3: Defaults Table documents review.merge_method = squash and its three values"
+else
+  fail "T7.3: Defaults Table lacks the review.merge_method row"
+fi
+
+if awk '/^review:/{f=1; next} /^[^[:space:]#]/{f=0} f' "$TEMPLATE" | grep -qE '^  merge_method: squash$'; then
+  pass "T7.4: init template emits review.merge_method: squash"
+else
+  fail "T7.4: init template does not emit review.merge_method: squash"
+fi
+
+# The guard is behavioural: run the real script against the real schema.
+GI_CONFIG="$REPO_ROOT/src/shared/scripts/gi-config.py"
+T7_TMP="$(mktemp -d)"
+trap 'rm -rf "$T7_TMP"' EXIT
+merge_method_rc() {
+  # $1 = the YAML value, or "" for no config file at all (cwd holds none).
+  rm -f "$T7_TMP/.idd.yml"
+  [ -z "$1" ] || printf 'review:\n  merge_method: %s\n' "$1" > "$T7_TMP/.idd.yml"
+  (cd "$T7_TMP" && python3 "$GI_CONFIG" --schema "$SCHEMA" \
+     --key review.merge_method > "$T7_TMP/out" 2> "$T7_TMP/err"); echo $?
+}
+
+if [ "$(merge_method_rc "")" = "0" ] && [ "$(cat "$T7_TMP/out")" = '"squash"' ]; then
+  pass "T7.5: gi-config resolves review.merge_method to squash with no config"
+else
+  fail "T7.5: gi-config default is not squash (out=$(cat "$T7_TMP/out") err=$(cat "$T7_TMP/err"))"
+fi
+
+for method in squash merge rebase; do
+  if [ "$(merge_method_rc "$method")" = "0" ] && [ "$(cat "$T7_TMP/out")" = "\"$method\"" ]; then
+    pass "T7.6: gi-config accepts review.merge_method: $method"
+  else
+    fail "T7.6: gi-config rejected review.merge_method: $method (err=$(cat "$T7_TMP/err"))"
+  fi
+done
+
+if [ "$(merge_method_rc fast-forward)" = "3" ] \
+   && grep -qF 'review.merge_method — must be one of: squash, merge, rebase' "$T7_TMP/err"; then
+  pass "T7.7: gi-config exits 3 on review.merge_method: fast-forward, naming the key and the allowed values"
+else
+  fail "T7.7: gi-config did not stop on an invalid merge method (err=$(cat "$T7_TMP/err"))"
+fi
+
+# The guard also holds for a skill whose schema excerpt hides the review
+# section: /issue-triage ships an excerpt without it.
+TRIAGE="$REPO_ROOT/skills/issue-triage/references"
+printf 'review:\n  merge_method: fast-forward\n' > "$T7_TMP/.idd.yml"
+T7_RC=0
+(cd "$T7_TMP" && python3 "$TRIAGE/scripts/gi-config.py" > "$T7_TMP/out" 2> "$T7_TMP/err") || T7_RC=$?
+if ! grep -qE '^review:' "$TRIAGE/docs/config-schema.md" && [ "$T7_RC" = "3" ] \
+   && grep -qF 'review.merge_method — must be one of: squash, merge, rebase' "$T7_TMP/err"; then
+  pass "T7.8: the guard runs when the review section is out of the schema view"
+else
+  fail "T7.8: an out-of-view invalid merge method was not refused (rc=$T7_RC err=$(cat "$T7_TMP/err"))"
+fi
+
+# The prose fallback states the same stop.
+if grep -qE '`review\.merge_method: squash` \|.*Any other value is `✗ Invalid config`: stop, also when reading `\.idd\.yml` by hand' \
+     "$REPO_ROOT/src/skills/issue-pr-review/references/review-loop-mechanics.md"; then
+  pass "T7.9: the prose fallback stops on an invalid merge method"
+else
+  fail "T7.9: the prose fallback does not state the invalid-merge-method stop"
+fi
+
+# ───────────────────────────────────────────────────────────
 # Summary
 # ───────────────────────────────────────────────────────────
 echo ""

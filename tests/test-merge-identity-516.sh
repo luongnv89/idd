@@ -127,7 +127,7 @@ for base in "$REPO_ROOT/src/skills" "$REPO_ROOT/skills"; do
              auto-pilot/references/phases/phase-3-4-review.md \
              issue-pr-review/references/report-templates.md; do
     f="$base/$rel"
-    if grep -A1 -E "$GUARD_RE" "$f" 2>/dev/null | grep -qE 'gh pr merge \{[^}]*\} --squash'; then
+    if grep -A1 -E "$GUARD_RE" "$f" 2>/dev/null | grep -qE 'gh pr merge \{[^}]*\} --\{merge_method\} --delete-branch --match-head-commit "\$verified_head" --body-file "\$body_file"$'; then
       pass "M6b (${f#$REPO_ROOT/}): the merge runs inside the identity predicate"
     else
       fail "M6b (${f#$REPO_ROOT/}): the merge is not guarded by an executable predicate"
@@ -166,6 +166,18 @@ for base in "$REPO_ROOT/src/skills" "$REPO_ROOT/skills"; do
     fi
   done
 done
+# M6d (#564): the same block reads the PR body into the file it passes, with
+# `--json`, and a failed read empties $verified_head so the guard refuses.
+for base in "$REPO_ROOT/src/skills" "$REPO_ROOT/skills"; do
+  for rel in auto-pilot/references/phases/phase-5-merge.md \
+             auto-pilot/references/phases/phase-3-4-review.md \
+             issue-pr-review/references/report-templates.md; do
+    f="$base/$rel"
+    blk="$(guarded_block "$f")"
+    check_block_has "$blk" '^body_file="\$\(mktemp\)"; gh pr view \{[^}]*\} --json body --jq \.body >"\$body_file" \|\| verified_head=""$' \
+      "M6d (${f#$REPO_ROOT/}): the merge block reads the PR body to a file, fail-closed"
+  done
+done
 for base in "$REPO_ROOT/src/skills" "$REPO_ROOT/skills"; do
   for rel in auto-pilot/references/phases/phase-5-merge.md \
              auto-pilot/references/phases/phase-3-4-review.md; do
@@ -188,11 +200,11 @@ for pair in "src:$SRC_AP" "built:$BUILT_AP"; do
     "M7.1 ($tag): Phase 3-4 Step 2a runs the merge identity gate"
   check_block_has "$step2a" 'do \*\*not\*\* merge' \
     "M7.2 ($tag): a stale identity on the partial path does not merge"
-  anchor_check "$pkg" ap-step2b-merge 'gh pr merge \{pr_number\} --squash --delete-branch --match-head-commit "\$verified_head"' \
+  anchor_check "$pkg" ap-step2b-merge 'gh pr merge \{pr_number\} --\{merge_method\} --delete-branch --match-head-commit "\$verified_head"' \
     "M7.3 ($tag): Step 2b merges with the expected-head guard"
   check_has "$phase34" 'Option 1:.*Step 5\.1c' \
     "M7.4 ($tag): the critical-issue Option 1 merge runs the same gate"
-  check_has "$pkg/references/phases/phase-5-merge.md" 'gh pr merge \{pr_number\} --squash --delete-branch --match-head-commit "\$verified_head"' \
+  check_has "$pkg/references/phases/phase-5-merge.md" 'gh pr merge \{pr_number\} --\{merge_method\} --delete-branch --match-head-commit "\$verified_head"' \
     "M7.5 ($tag): Step 5.2 merges with the expected-head guard"
 done
 
@@ -225,8 +237,8 @@ for f in "$REPO_ROOT/docs/platform-github.md" "$BUILT_AP/references/docs/platfor
   tag="${f#$REPO_ROOT/}"
   check_has "$f" '^\| Merge identity \(live base ancestry\) \|.*--jq \.behind_by' \
     "M10.1 ($tag): the driver catalog has the merge identity operation"
-  check_has "$f" '^\| Squash-merge \+ clean up \| `gh pr merge \{N\} --squash --delete-branch --match-head-commit \{verified_head\}`' \
-    "M10.2 ($tag): the catalog's squash-merge row is guarded"
+  check_has "$f" '^\| Merge \+ clean up \| `gh pr merge \{N\} --\{merge_method\} --delete-branch --match-head-commit \{verified_head\} --body-file \{f\}`' \
+    "M10.2 ($tag): the catalog's merge row is guarded and carries the PR body"
   check_has "$f" 'never `baseRefOid`' \
     "M10.3 ($tag): the catalog says never baseRefOid"
 done
