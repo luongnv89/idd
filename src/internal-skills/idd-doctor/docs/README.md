@@ -24,7 +24,7 @@
 | "is my IDD setup healthy" | Run the doctor and surface drift before it becomes a footgun |
 | "check the intent-only contract" | Verify `/issue-creator` claims and issue templates haven't drifted |
 | "verify autopilot mode is set" | Confirm `.idd.yml` has `autopilot.mode` (when the file exists) |
-| "what's my repo's merge strategy" | Report whether the repo is squash-only or has loose defaults |
+| "what's my repo's merge strategy" | Report whether the repo allows the configured merge method |
 
 ## How It Works
 
@@ -32,7 +32,7 @@
 graph TD
     A["Check 1: Stale skill claims"] --> B["Check 2: Issue-template fields"]
     B --> C["Check 3: autopilot.mode set"]
-    C --> D["Check 4: Squash-merge default"]
+    C --> D["Check 4: Merge method"]
     D --> E["Summary: PASS / WARN / FAIL"]
     style A fill:#4CAF50,color:#fff
     style E fill:#2196F3,color:#fff
@@ -59,7 +59,7 @@ No arguments. The skill reads from the current repo and prints a four-line repor
 | 1 | Stale `/issue-creator` claims in skill README/SKILL files | PASS / FAIL |
 | 2 | Forbidden fields in `src/skills/issue-creator/templates/*.md` and `.github/ISSUE_TEMPLATE/*` | PASS / FAIL |
 | 3 | `autopilot.mode` is set in `.idd.yml` (when the file exists) | PASS / FAIL / SKIP |
-| 4 | Repo's default merge strategy is squash-only | PASS / WARN / SKIP |
+| 4 | Repo allows the configured `review.merge_method`; `rebase` is tracker-only | PASS / WARN / SKIP |
 
 ### Out of scope for v1
 
@@ -80,15 +80,8 @@ No arguments. The skill reads from the current repo and prints a four-line repor
     ✓ [1/4] Stale skill claims    no stale language in /issue-creator
     ✓ [2/4] Issue-template fields no forbidden fields in 5 templates
     ○ [3/4] Autopilot mode        skipped — no .idd.yml
-    ⚠ [4/4] Squash-merge default  squash + merge-commit + rebase enabled; squash message source PR_BODY — recommend squash-only
-        Fix: in repo Settings → General → Pull Requests, allow only "Squash merging",
-             and set the squash commit message to "Pull request title and description"
-        Or:  gh api -X PATCH repos/:owner/:repo \
-               -f allow_squash_merge=true \
-               -f allow_merge_commit=false \
-               -f allow_rebase_merge=false \
-               -f squash_merge_commit_title=PR_TITLE \
-               -f squash_merge_commit_message=PR_BODY
+    ⚠ [4/4] Merge method           merge is not allowed by this repo (squash-only)
+        Fix: set review.merge_method in .idd.yml to one of: squash
 
     ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
     Result: WARN  (4 checks, 0 failed, 1 warned)
