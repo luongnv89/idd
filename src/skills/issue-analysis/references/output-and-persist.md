@@ -254,7 +254,7 @@ Omit the `Create:` line if no files need to be created for that option.
 
 ### Decision Record
 
-The Decision Record is the durable analysis signal that `/issue-resolver` lifts into the PR body and squash commit body. It uses the same five field labels as the JSON `decision_record` block — labels are stable across `/issue-analysis`, `/issue-resolver`, and `/issue-pr-review` because downstream presence checks are string-matched.
+The Decision Record is the durable analysis signal that `/issue-resolver` lifts into the PR body and, at merge, the commit body. It uses the same five field labels as the JSON `decision_record` block — labels are stable across `/issue-analysis`, `/issue-resolver`, and `/issue-pr-review` because downstream presence checks are string-matched.
 
 ```
   ◆ Decision Record

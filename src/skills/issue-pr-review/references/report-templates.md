@@ -216,6 +216,8 @@ Traceability check 4 judges the repository against `review.merge_method` (`refer
                              (merge_commit_message: {value})
 ```
 
+When IDD will not perform the merge (check 4), that note is the finding instead: `⚠ partial — hand merge will not carry the PR body ({field}: {value})`, then `To fix:  set review.auto_merge: true in .idd.yml, or merge with /auto-pilot`.
+
 When the repo does not allow the configured method, the dimension reports `partial`. The fix is a config edit; IDD never changes a repo setting:
 
 ```
@@ -246,7 +248,7 @@ When the strategy read does not answer — no `gh`, unauthenticated, 404, insuff
       traceability:        ⚠ partial — merge-method binding unverified ({reason})
 ```
 
-All three partial lines are `note` findings: they are never handed to the fixer in Step 6, because no edit to this PR can change a repo setting or `.idd.yml` on the base branch. Under `review.soft_pass: true` (default) they are report-only; under `soft_pass: false` they block like any other partial dimension.
+All four partial lines are `note` findings: they are never handed to the fixer in Step 6, because no edit to this PR can change a repo setting or `.idd.yml` on the base branch. Under `review.soft_pass: true` (default) they are report-only; under `soft_pass: false` they block like any other partial dimension.
 
 When `review.merge_method` is `squash` or `merge` and the merge-effective keyword set (raw body, no markdown strip) diverges from the markdown-aware PR-link set, append a `note` line naming the issues that will close at merge:
 
@@ -260,7 +262,7 @@ Under `rebase` do not treat code-span or blockquote keywords as merge-effective;
 
 ## Summary — Refactor/Chore Exempt PR
 
-A PR matching `review.traceability_exempt_labels` or `review.traceability_exempt_pattern` skips check 1 only (`references/verification-checks.md` → *Refactor/chore exemption*); checks 2-4 still run. Check 4 is the exception to the rendering below: a not-allowed, tracker-only, or unverified binding is a repository finding, not a PR one, so it holds the dimension at `partial` rather than being appended to an exempt `pass`.
+A PR matching `review.traceability_exempt_labels` or `review.traceability_exempt_pattern` skips check 1 only (`references/verification-checks.md` → *Refactor/chore exemption*); checks 2-4 still run. Check 4 is the exception to the rendering below: a not-allowed, hand-merge, tracker-only, or unverified binding is a repository finding, not a PR one, so it holds the dimension at `partial` rather than being appended to an exempt `pass`.
 
 ```
   Review dimensions:

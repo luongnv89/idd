@@ -59,7 +59,7 @@ No arguments. The skill reads from the current repo and prints a four-line repor
 | 1 | Stale `/issue-creator` claims in skill README/SKILL files | PASS / FAIL |
 | 2 | Forbidden fields in `src/skills/issue-creator/templates/*.md` and `.github/ISSUE_TEMPLATE/*` | PASS / FAIL |
 | 3 | `autopilot.mode` is set in `.idd.yml` (when the file exists) | PASS / FAIL / SKIP |
-| 4 | Repo allows the configured `review.merge_method`; `rebase` is tracker-only | PASS / WARN / SKIP |
+| 4 | Repo allows the configured `review.merge_method`; `rebase`, or a hand merge that drops the PR body, is tracker-only | PASS / WARN / SKIP |
 
 ### Out of scope for v1
 

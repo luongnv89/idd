@@ -17,7 +17,7 @@ Full example outputs for five scenarios. Every report follows `references/review
 4. Defaults: `test_timeout: 300`, `auto_test: true`, `stale_threshold_days: 14`, `scan_timeout_per_issue: 30`
 5. Write `.idd.yml` with Next.js-specific comments
 6. Validate the written file — parses as YAML, no placeholder tokens left, `platform` present
-7. Merge-settings reads: squash allowed, but `squash_merge_commit_message` is `COMMIT_MESSAGES`
+7. Merge-settings reads: squash allowed, but `squash_merge_commit_message` is `COMMIT_MESSAGES` and `review.auto_merge` is off
 8. Report:
 
 ```
@@ -33,7 +33,7 @@ Full example outputs for five scenarios. Every report follows `references/review
   Repo size:         ✓ medium (342 files, via git ls-files)
   Config:            ✓ generated .idd.yml
   Validation:        ✓ parses as YAML, no placeholders left, platform set
-  Merge settings:    ✓ squash allowed; hand merge drops the PR body
+  Merge settings:    ⚠ warn (hand merge drops the PR body)
   .gitignore:        ✓ added .idd/cache/
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Evidence:          gi-stack-detect exit 0; re-read with PyYAML
@@ -41,7 +41,7 @@ Full example outputs for five scenarios. Every report follows `references/review
   Decision:          No approval needed.
 
   Config: .idd.yml
-  Next action: review and commit .idd.yml, then /issue-creator
+  Next action: set review.auto_merge: true or merge with /auto-pilot; commit .idd.yml
 ```
 
 ## Example: Minimal Python project

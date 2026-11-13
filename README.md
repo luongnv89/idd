@@ -576,7 +576,7 @@ Quick read-only diagnostic that verifies the IDD invariants of the current repo.
 1. `/issue-creator` keeps its intent-only contract (no `affected_files` / `technical_notes` / `architecture_constraints` in templates or output)
 2. Every `gh` invocation in skills uses `--json` with explicit field selection
 3. Each skill has a `references/error-messages.md` using the three-part format
-4. The repo allows the configured merge method (`review.merge_method`: `squash` or `merge`), so the commit IDD's merge writes carries the PR body (Decision Record, AC verification) into git history; `rebase` is reported as tracker-only. A fix is always a `.idd.yml` edit, never a repo-settings change
+4. The repo allows the configured merge method (`review.merge_method`: `squash` or `merge`), so the commit IDD's merge writes carries the PR body (Decision Record, AC verification) into git history; `rebase`, and a hand merge that would drop the PR body, are reported as tracker-only. A fix is always a `.idd.yml` edit, never a repo-settings change
 
 Read-only by design — never modifies files, branches, or remote state.
 

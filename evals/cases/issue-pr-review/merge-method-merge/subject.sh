@@ -5,7 +5,9 @@
 # The fixture repo allows merge commits only and leaves both message sources at
 # GitHub's defaults. `.idd.yml` sets `review.merge_method: merge` and
 # `review.auto_merge: true`. Traceability check 4 judges the repo against that
-# method (verification-checks.md), so it passes with a hand-merge note, and the
+# method (verification-checks.md). IDD performs the merge (`auto_merge: true`,
+# no `--no-merge`), so it passes with a hand-merge note; with the merge left to
+# a human the same message source would be a partial. The
 # merge runs the Auto-Merge block from report-templates.md: `--merge`, the
 # head guard, and the PR body passed as a file so the merge commit carries it.
 # No call changes a repository setting — case.json asserts the whole gh argv
@@ -27,6 +29,7 @@ YML
 # Config load by hand (the prose fallback): one of three values, else stop.
 merge_method="$(awk '/^review:/{f=1; next} /^[^[:space:]#]/{f=0} f && $1 == "merge_method:" {print $2}' .idd.yml)"
 merge_method="${merge_method:-squash}"
+auto_merge="$(awk '/^review:/{f=1; next} /^[^[:space:]#]/{f=0} f && $1 == "auto_merge:" {print $2}' .idd.yml)"
 case "$merge_method" in
   squash|merge|rebase) ;;
   *) echo "✗ Invalid config: .idd.yml review.merge_method" >&2; exit 3 ;;
@@ -39,7 +42,7 @@ gh pr view 12 --json number,title,body,state,headRefOid > "$EVAL_OUT/pr-view.jso
 gh repo view --json mergeCommitAllowed,squashMergeAllowed,rebaseMergeAllowed > "$EVAL_OUT/strategy.json"
 gh api repos/acme/app --jq '{squash_merge_commit_message, merge_commit_message}' > "$EVAL_OUT/message-source.json"
 
-EVAL_OUT="$EVAL_OUT" METHOD="$merge_method" python3 - <<'PY'
+EVAL_OUT="$EVAL_OUT" METHOD="$merge_method" AUTO_MERGE="${auto_merge:-false}" python3 - <<'PY'
 import json
 import os
 
@@ -62,7 +65,11 @@ else:
     line, verdict = f"pass ({binding[method]}: body passed at merge)", f"pass-{method}"
     field = source_field[method]
     value = source.get(field, "unread")
-    if value != "PR_BODY":
+    # This run carries neither --no-merge nor --review-only, so IDD performs
+    # the merge exactly when review.auto_merge is true.
+    if value != "PR_BODY" and os.environ["AUTO_MERGE"] != "true":
+        line, verdict = f"partial — hand merge will not carry the PR body ({field}: {value})", "partial-hand-merge"
+    elif value != "PR_BODY":
         line += f"\n○ a hand merge will not carry the PR body ({field}: {value})"
         open(os.path.join(out, f"hand-merge-note-{field}-{value}.txt"), "w").close()
 open(os.path.join(out, f"traceability-{verdict}.txt"), "w").close()

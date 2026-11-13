@@ -35,7 +35,7 @@ those is **out of scope**:
 | 1 | Stale skill claims | The `/issue-creator` README and SKILL text make no claim that the skill inspects code (Check 1 lists the files and the forbidden phrases). | `FAIL` |
 | 2 | Issue-template fields | No issue template asks the reporter for resolver-owned content (Check 2 lists the directories and the forbidden labels). | `FAIL` |
 | 3 | Autopilot mode set | `.idd.yml`, if present in the repo root, carries an `autopilot.mode` key. | `FAIL` (only when `.idd.yml` exists) |
-| 4 | Merge method | The repository allows the configured `review.merge_method` (`squash` or `merge`), so IDD's merge carries the PR body into git history (SPEC §4.3 B1/B2). `rebase` is tracker-only. | `WARN` |
+| 4 | Merge method | The repository allows the configured `review.merge_method` (`squash` or `merge`), so IDD's merge carries the PR body into git history (SPEC §4.3 B1/B2). `rebase` is tracker-only; so is a hand merge whose message source is not `PR_BODY`. | `WARN` |
 
 ### Explicitly out of scope for v1
 
@@ -232,11 +232,11 @@ Verify that `.idd.yml`, when present, sets `autopilot.mode`. That key makes the 
 
 ## Check 4 — Merge method
 
-Verify that the repository allows the merge method IDD is configured to use. IDD's own merge passes the PR body as the commit body (`squash` → SPEC §4.3 **B1**, `merge` → **B2**), so the binding needs no repository setting — only a method the repo allows. `rebase` lands the PR's own commits and none carries the PR body: it is tracker-only and never passes. SPEC §4.3 forbids reporting the binding satisfied when the configuration cannot be read. The doctor never changes a repository setting; every fix it prints is a `.idd.yml` edit.
+Verify that the repository allows the merge method IDD is configured to use. IDD's own merge passes the PR body as the commit body (`squash` → SPEC §4.3 **B1**, `merge` → **B2**), so the binding needs no repository setting — only a method the repo allows and a merge IDD performs. For a merge made by hand the repo's message source decides (SPEC §4.3). `rebase` lands the PR's own commits and none carries the PR body: it is tracker-only and never passes. SPEC §4.3 forbids reporting the binding satisfied when the configuration cannot be read. The doctor never changes a repository setting; every fix it prints is a `.idd.yml` edit.
 
 ### Procedure
 
-1. Read `{method}`: the `merge_method:` value inside the `review:` block of `.idd.yml` (else legacy `.gitissue.yml`), read as text the way Check 3 reads `autopilot.mode`. No file, no `review:` block or no such line means the default, `squash`. A value other than `squash`, `merge` or `rebase` is invalid config: print the *Warn — invalid method* line and stop the check.
+1. Read `{method}`: the `merge_method:` value inside the `review:` block of `.idd.yml` (else legacy `.gitissue.yml`), read as text the way Check 3 reads `autopilot.mode`. No file, no `review:` block or no such line means the default, `squash`. A value other than `squash`, `merge` or `rebase` is invalid config: print the *Warn — invalid method* line and stop the check. Read `auto_merge:` from the same block the same way; anything but `true` means IDD's review leaves the merge to a human.
 2. Confirm `gh` is on `PATH` and authenticated.
    - If `gh` is missing: skip with `○ [4/4] Merge method           skipped — gh not installed`.
    - If `gh auth status` fails: skip with `○ [4/4] Merge method           skipped — gh not authenticated`.
@@ -263,7 +263,9 @@ Verify that the repository allows the merge method IDD is configured to use. IDD
    ```
 
    What else the repo allows does not change the answer.
-6. On a pass, look at that method's message source (`squash_merge_commit_message` for `squash`, `merge_commit_message` for `merge`). When it is not `PR_BODY`, or step 4 did not answer, print the *hand-merge note* under the pass line. The note is `○`, never a warn: IDD's own merge carries the body whatever the setting says.
+6. On a pass, look at that method's message source (`squash_merge_commit_message` for `squash`, `merge_commit_message` for `merge`). When it is not `PR_BODY`, or step 4 did not answer, `review.auto_merge` decides:
+   - `true` → print the *hand-merge note* under the pass line. The note is `○`, never a warn: IDD's own merge carries the body whatever the setting says.
+   - anything else → the check is a WARN, not a pass: print *Warn — hand merge*. The merge is made by hand and will not carry the PR body, so the binding is not reported satisfied on the strategy alone.
 7. On a warn, print `⚠ [4/4]` and the `.idd.yml` fix hint from `references/error-messages.md`. Never print a command that changes a repository setting.
 
 ---

@@ -151,7 +151,14 @@ All errors follow the rich error format: what went wrong + fix command (+ docs l
 ```
         ○ a hand merge in the GitHub UI will not carry the PR body ({field}: {value})
 ```
-**Trigger:** the check passed and `{field}` — `squash_merge_commit_message` for `squash`, `merge_commit_message` for `merge` — is not `PR_BODY`. When `gh api repos/{owner}/{repo}` did not answer, `{value}` is `unread`. The note never changes the result.
+**Trigger:** the check passed and `{field}` — `squash_merge_commit_message` for `squash`, `merge_commit_message` for `merge` — is not `PR_BODY`, and `review.auto_merge` is `true`. When `gh api repos/{owner}/{repo}` did not answer, `{value}` is `unread`. The note never changes the result.
+
+### Warn — hand merge
+```
+  ⚠ [4/4] Merge method           {method} allowed · a hand merge will not carry the PR body ({field}: {value})
+        Fix: set review.auto_merge: true in .idd.yml, or merge with /auto-pilot
+```
+**Trigger:** the same message-source condition, with `review.auto_merge` not `true`: the merge is made by hand, so the message source decides (SPEC §4.3). `/auto-pilot` merges with the PR body itself.
 
 ### Warn — method not allowed
 ```

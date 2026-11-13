@@ -245,12 +245,25 @@ for line in \
 done
 
 # A message source other than PR_BODY — or an unread one — is a note under the
-# pass line: IDD's own merge passes the body, so it is never a warn.
-if grep -qE 'is not `PR_BODY`, or step 4 did not answer, print the \*hand-merge note\*' "$SKILL" \
+# pass line only when IDD performs the merge (review.auto_merge: true). With
+# the merge left to a human it is a WARN: SPEC §4.3 lets the message source
+# decide for a merge the tool does not perform.
+if grep -qE 'is not `PR_BODY`, or step 4 did not answer, `review\.auto_merge` decides' "$SKILL" \
+   && grep -qE '`true` → print the \*hand-merge note\* under the pass line' "$SKILL" \
    && grep -qE 'The note is `○`, never a warn' "$SKILL"; then
-  pass "T7: Check 4 reports a non-PR_BODY or unread message source as a note"
+  pass "T7: Check 4 reports a non-PR_BODY or unread message source as a note when IDD merges"
 else
   fail "T7: Check 4 does not document the hand-merge note"
+fi
+
+if grep -qE 'anything else → the check is a WARN, not a pass: print \*Warn — hand merge\*' "$SKILL" \
+   && grep -qE 'Read `auto_merge:` from the same block' "$SKILL" \
+   && grep -qF '### Warn — hand merge' "$SKILL_DIR/references/error-messages.md" \
+   && grep -qF '⚠ [4/4] Merge method           {method} allowed · a hand merge will not carry the PR body ({field}: {value})' "$SKILL_DIR/references/error-messages.md" \
+   && grep -qF 'Fix: set review.auto_merge: true in .idd.yml, or merge with /auto-pilot' "$SKILL_DIR/references/error-messages.md"; then
+  pass "T7: Check 4 warns, with a .idd.yml fix, when a hand merge would drop the PR body"
+else
+  fail "T7: Check 4 passes a hand merge that drops the PR body"
 fi
 
 # IDD never changes a repository setting: every fix is a .idd.yml edit.
@@ -504,21 +517,29 @@ fi
 # ───────────────────────────────────────────────────────────
 
 merge_check_classifier() {
-  # Args: method squash mergeCommit rebase
+  # Args: method squash mergeCommit rebase [source] [auto_merge]
   #   method — squash | merge | rebase (review.merge_method)
   #   squash/mergeCommit/rebase — "true" or "false" (the strategy read)
-  # Mirrors the classifier documented in SKILL.md Check 4, which T7 pins line
-  # by line. The message source is not an input: it only adds a note to a pass.
-  local method="$1" squash="$2" mc="$3"
+  #   source — that method's message source, or "unread" (default PR_BODY)
+  #   auto_merge — review.auto_merge (default false)
+  # Mirrors the classifier documented in SKILL.md Check 4 (steps 5 and 6),
+  # which T7 pins. A strategy pass stays a PASS only when the message source
+  # is PR_BODY or IDD performs the merge.
+  local method="$1" squash="$2" mc="$3" source="${5:-PR_BODY}" auto_merge="${6:-false}"
+  local strategy
   if [ "$method" = "rebase" ]; then
-    echo "WARN"
+    strategy="WARN"
   elif [ "$method" = "squash" ] && [ "$squash" = "true" ]; then
-    echo "PASS"
+    strategy="PASS"
   elif [ "$method" = "merge" ] && [ "$mc" = "true" ]; then
-    echo "PASS"
+    strategy="PASS"
   else
-    echo "WARN"
+    strategy="WARN"
   fi
+  if [ "$strategy" = "PASS" ] && [ "$source" != "PR_BODY" ] && [ "$auto_merge" != "true" ]; then
+    strategy="WARN"
+  fi
+  echo "$strategy"
 }
 
 t14() {
@@ -538,6 +559,11 @@ t14 "T14.4: #564 — merge on a merge-commit-only repo PASSes" PASS merge false 
 t14 "T14.5: #564 — merge on a squash-only repo → WARN (method not allowed)" WARN merge true false false
 t14 "T14.6: #564 — rebase on a rebase-only repo → WARN (tracker-only), never PASS" WARN rebase false false true
 t14 "T14.7: #564 — rebase with every strategy allowed → WARN, never PASS" WARN rebase true true true
+# SPEC §4.3: a merge IDD does not perform is judged by the message source.
+t14 "T14.8: #564 — merge allowed, source PR_TITLE, auto_merge true PASSes (note)" PASS merge false true false PR_TITLE true
+t14 "T14.9: #564 — merge allowed, source PR_TITLE, auto_merge false → WARN (hand merge)" WARN merge false true false PR_TITLE false
+t14 "T14.10: #564 — squash allowed, source unread, auto_merge false → WARN (hand merge)" WARN squash true false false unread false
+t14 "T14.11: #564 — squash allowed, source PR_BODY, auto_merge false PASSes" PASS squash true false false PR_BODY false
 
 # ───────────────────────────────────────────────────────────
 # T15: README.md highlights and structure

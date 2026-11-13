@@ -66,22 +66,29 @@ To fix:  set review.merge_method in .idd.yml to one of: {carrying}
 allows neither, print `○ This repo allows only rebase — it stays tracker-only`
 in place of the `To fix:` line.
 
-**Hand merge.** If `{method}` is `squash` or `merge` and that method's message
-source (`squash_merge_commit_message` / `merge_commit_message`) is any value
-other than `PR_BODY`, print the note below. It is a note, not a warning: IDD's
-own merge passes the PR body as the commit body, so the durable record lands
-whatever this setting says. Only a merge made by hand in the GitHub UI loses
-it. GitHub's default is not `PR_BODY`, so this note fires on most fresh repos:
+**Hand merge.** If `{method}` is `squash` or `merge`, the repo allows it, and
+that method's message source (`squash_merge_commit_message` /
+`merge_commit_message`) is not `PR_BODY`, only a merge made by
+hand in the GitHub UI loses the PR body: IDD's own merge passes it as the
+commit body. When `review.auto_merge` in the written file is `true`, it is a note:
 
 ```
 ○ A merge made by hand in the GitHub UI will not carry the PR body ({field} is {value}). IDD's own merge passes it.
 ```
 
+Otherwise it is a warning:
+
+```
+⚠ A merge made by hand in the GitHub UI will not carry the PR body ({field} is {value}), and review.auto_merge is off.
+
+To fix:  set review.auto_merge: true in .idd.yml, or merge with /auto-pilot
+```
+
 **Unread setting.** If the strategy read fails, print `○ Merge strategy check
 skipped — {reason}` and continue. If the strategy read succeeds but the message
 read does not answer (404, insufficient permission, or the field is absent from
-the response), print `○ Hand-merge message source unread — {reason}` and
-continue. Never report an unread setting as satisfied.
+the response), apply *Hand merge* with `{value}` = `unread`.
+Never report an unread setting as satisfied.
 
 ## Report row
 
@@ -90,7 +97,7 @@ Print one `Merge settings:` row in the *Step 4 — Report* block:
 | Outcome | Row |
 |---|---|
 | The strategy read ran; `{method}` is `squash` or `merge` and the repo allows it | `✓ {method} allowed`, plus `; hand merge drops the PR body` when the note fired |
-| A warning fired | `⚠ warn ({method} not allowed)` or `⚠ warn (rebase is tracker-only)` |
+| A warning fired | `⚠ warn ({method} not allowed)`, `⚠ warn (rebase is tracker-only)` or `⚠ warn (hand merge drops the PR body)` |
 | Check skipped (no `gh`, not authenticated, unread strategy) | `○ skip ({reason})` |
 
 A warning or a skip leaves `Result` unchanged — the config was still written and
