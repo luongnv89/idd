@@ -395,8 +395,8 @@ auditable, then proceed to Step 3:
 
 Confirmed or auto-selected, record the selected option and complexity in the PR
 **Decision Record**'s conditional *Design-confirm* line (`references/report-templates.md`);
-it reaches git history on squash-merge under the `squash_merge_commit_message` condition in
-`references/docs/idd-methodology.md`.
+it reaches git history through the commit body IDD's merge writes
+(`references/docs/idd-methodology.md`).
 
 ### Inline fallback
 
