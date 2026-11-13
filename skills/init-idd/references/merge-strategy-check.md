@@ -59,8 +59,12 @@ To fix:  set review.merge_method in .idd.yml to one of: {allowed}
 ```
 ⚠ review.merge_method is rebase — tracker-only: no commit carries the PR body. See references/docs/idd-methodology.md.
 
-To fix:  set review.merge_method in .idd.yml to squash or merge
+To fix:  set review.merge_method in .idd.yml to one of: {carrying}
 ```
+
+`{carrying}` is `squash`, `merge` or both — only what the repo allows. When it
+allows neither, print `○ This repo allows only rebase — it stays tracker-only`
+in place of the `To fix:` line.
 
 **Hand merge.** If `{method}` is `squash` or `merge` and that method's message
 source (`squash_merge_commit_message` / `merge_commit_message`) is any value

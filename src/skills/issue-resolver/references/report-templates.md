@@ -72,8 +72,8 @@ Use `pass`, `fail`, or `unverified` per criterion. Always cite evidence (a file 
 With a template, build the body in this order:
 
 1. `Closes #{issue_number}` stays line 1.
-2. The template, in its own order, without any line that holds a closing keyword followed by `#` (`close`, `closes`, `closed`, `fix`, `fixes`, `fixed`, `resolve`, `resolves`, `resolved`, any case). A stray `Closes #` placeholder would be keyword-effective.
-3. Where a template heading has the same name as a section above (`## Summary`, `## Changes`, any case), write that section's content once, under the template's heading. Do not add the heading a second time.
+2. The template, in its own order, without any line that holds a closing keyword, an optional colon, then `#` (`close`, `closes`, `closed`, `fix`, `fixes`, `fixed`, `resolve`, `resolves`, `resolved`, any case). A stray `Closes #` placeholder would be keyword-effective.
+3. Where a template heading has the same name as a section above (`## Summary`, `## Changes`, any case), write that section's content once, under the template's heading. Do not add the heading a second time. A heading matches at any level; the first match wins, and later duplicates stay as the template wrote them.
 4. Every other section above, in the order above (Decision Record, Test Results, Acceptance Criteria Verification and the rest), after the template.
 5. The `<!-- idd:qa v1 … -->` marker stays the last line, exactly once, under its own rule.
 

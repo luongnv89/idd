@@ -163,9 +163,9 @@ All errors follow the rich error format: what went wrong + fix command (+ docs l
 ### Warn — rebase
 ```
   ⚠ [4/4] Merge method           rebase is tracker-only — no commit carries the PR body
-        Fix: set review.merge_method in .idd.yml to squash or merge
+        Fix: set review.merge_method in .idd.yml to one of: {carrying}
 ```
-**Trigger:** `{method}` is `rebase`, whatever the repo allows. A rebase lands the PR's own commits, so neither B1 nor B2 holds.
+**Trigger:** `{method}` is `rebase`, whatever the repo allows. A rebase lands the PR's own commits, so neither B1 nor B2 holds. `{carrying}` is `squash`, `merge` or both — only what the repo allows. When it allows neither, print `        ○ this repo allows only rebase — it stays tracker-only` in place of the `Fix:` line.
 
 ### Warn — invalid method
 ```

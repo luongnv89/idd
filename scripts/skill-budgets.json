@@ -12,8 +12,8 @@
         ],
         "measured": 46116
       },
-      "budget": 448916,
-      "measured": 448916,
+      "budget": 448990,
+      "measured": 448990,
       "skill_md": {
         "budget": 26986,
         "measured": 26039
@@ -26,7 +26,7 @@
         "measured": 0
       },
       "budget": 145114,
-      "measured": 144720,
+      "measured": 144920,
       "skill_md": {
         "budget": 26006,
         "measured": 24994
@@ -78,10 +78,10 @@
           "references/review-loop-mechanics.md",
           "references/verification-checks.md"
         ],
-        "measured": 126996
+        "measured": 127241
       },
       "budget": 319091,
-      "measured": 318067,
+      "measured": 318312,
       "skill_md": {
         "budget": 32125,
         "measured": 31171
@@ -96,8 +96,8 @@
         ],
         "measured": 10172
       },
-      "budget": 434939,
-      "measured": 434939,
+      "budget": 435060,
+      "measured": 435060,
       "skill_md": {
         "budget": 33856,
         "measured": 32932

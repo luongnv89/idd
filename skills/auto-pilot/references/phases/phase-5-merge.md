@@ -356,7 +356,7 @@ call (variables do not survive between calls), `{verified_head}` being the
 body file makes the commit body the PR body under any repo setting
 (`references/docs/platform-github.md`, *Merge + clean up*); a failed body read empties
 `verified_head`, so the guard refuses the merge. For `rebase`, drop the
-`body_file` line and the `--body-file` flag. A non-zero exit is outcome
+`body_file` and `trap` lines and the `--body-file` flag. A non-zero exit is outcome
 `left_open`, never `merged`, unless the *merge reconciliation* below reads the
 PR as `MERGED`:
 
@@ -365,6 +365,7 @@ verified_head="{verified_head}"
 read -r head_now base_ref <<<"$(gh pr view {pr_number} --json headRefOid,baseRefName --jq '"\(.headRefOid) \(.baseRefName)"')"
 behind_by="$(gh api "repos/{owner}/{repo}/compare/${base_ref}...${verified_head}" --jq .behind_by)"
 body_file="$(mktemp)"; gh pr view {pr_number} --json body --jq .body >"$body_file" || verified_head=""
+trap 'rm -f "$body_file"' EXIT
 if [ -n "$verified_head" ] && [ "$head_now" = "$verified_head" ] && [ "$behind_by" = "0" ]; then
   gh pr merge {pr_number} --{merge_method} --delete-branch --match-head-commit "$verified_head" --body-file "$body_file"
 else

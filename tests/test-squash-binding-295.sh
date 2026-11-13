@@ -119,6 +119,10 @@ expect_grep "T4: src templates print a .idd.yml fix for it" \
   'To fix:  set review\.merge_method in \.idd\.yml to one of: \{allowed\}' "$SRC_TEMPLATES"
 expect_grep "T4: src templates render the rebase partial" \
   '⚠ partial — tracker-only, no commit binding' "$SRC_TEMPLATES"
+expect_grep "T4: src rebase partial names only a method the repo allows" \
+  'To fix:  set review\.merge_method in \.idd\.yml to one of: \{carrying\}' "$SRC_TEMPLATES"
+expect_grep "T4: src rebase partial on a rebase-only repo prints no unsatisfiable fix" \
+  'When it allows neither, print `  ○ This repo allows only rebase — it stays tracker-only` in place of the `To fix:` line' "$SRC_TEMPLATES"
 expect_grep "T4: src templates keep unreadable config non-pass" \
   'binding unverified \(\{reason\}\)' "$SRC_TEMPLATES"
 expect_grep "T4: src templates keep check-4 findings note-only" \
@@ -145,6 +149,14 @@ expect_grep "T6: src init warns when the repo does not allow the method, with a 
   'To fix:  set review\.merge_method in \.idd\.yml to one of: \{allowed\}' "$SRC_INIT_CHECK"
 expect_grep "T6: src init warns that rebase is tracker-only" \
   '⚠ review\.merge_method is rebase — tracker-only' "$SRC_INIT_CHECK"
+expect_grep "T6: src init rebase fix names only a method the repo allows" \
+  'To fix:  set review\.merge_method in \.idd\.yml to one of: \{carrying\}' "$SRC_INIT_CHECK"
+expect_grep "T6: src init prints no unsatisfiable fix on a rebase-only repo" \
+  '^allows neither, print `○ This repo allows only rebase — it stays tracker-only`$' "$SRC_INIT_CHECK"
+for f in "$SRC_TEMPLATES" "$SRC_INIT_CHECK" "$BUILT_TEMPLATES" "$BUILT_INIT_CHECK"; do
+  forbid_grep "T6: no fixed 'to squash or merge' hint in ${f#"$REPO_ROOT"/}" \
+    'in \.idd\.yml to squash or merge' "$f"
+done
 expect_grep "T6: src init reports a non-PR_BODY source as a hand-merge note" \
   '○ A merge made by hand in the GitHub UI will not carry the PR body' "$SRC_INIT_CHECK"
 expect_grep "T6: src init never reports an unread setting as satisfied" \
@@ -164,9 +176,11 @@ for f in "$SRC_PR_BODY" "$BUILT_PR_BODY"; do
   expect_grep "T7 ($tag): Closes #N stays line 1" \
     '^1\. `Closes #\{issue_number\}` stays line 1' "$f"
   expect_grep "T7 ($tag): a template line with a closing keyword and # is removed" \
-    '^2\. The template, in its own order, without any line that holds a closing keyword followed by `#`' "$f"
+    '^2\. The template, in its own order, without any line that holds a closing keyword, an optional colon, then `#`' "$f"
   expect_grep "T7 ($tag): a same-named heading takes the IDD content once" \
     '^3\. Where a template heading has the same name as a section above.*write that section.s content once, under the template.s heading' "$f"
+  expect_grep "T7 ($tag): a heading matches at any level, first match wins" \
+    '^3\. .*A heading matches at any level; the first match wins, and later duplicates stay as the template wrote them\.' "$f"
   expect_grep "T7 ($tag): the other IDD sections follow the template" \
     '^4\. Every other section above.*Decision Record.*Acceptance Criteria Verification.*after the template' "$f"
   expect_grep "T7 ($tag): the QA marker stays last, exactly once" \
@@ -181,6 +195,8 @@ expect_grep "T8: README table has the four columns" \
   '^\| Area \| What IDD does \| Which skill \| Control \|$' "$README"
 expect_grep "T8: README says repo settings are never changed" \
   '^\| Repo settings \| Never changed\.' "$README"
+expect_grep "T8: README says which commit carries the PR body" \
+  'The squash or merge commit carries the PR body \(rebase: none does\)' "$README"
 expect_grep "T8: README has a PR template row" '^\| PR template \| Keeps your repository.s pull-request template' "$README"
 for area in 'Files in the worktree' 'Files outside the worktree' 'Git' 'Issues' 'Pull requests' 'Projects board'; do
   expect_grep "T8: README table has a '$area' row" "^\\| $area \\|" "$README"

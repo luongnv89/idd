@@ -235,8 +235,10 @@ When `review.merge_method` is `rebase`, no commit carries the PR body, so the di
                              (review.merge_method: rebase)
       maintainability:     ✓ pass
 
-  To fix:  set review.merge_method in .idd.yml to squash or merge
+  To fix:  set review.merge_method in .idd.yml to one of: {carrying}
 ```
+
+`{carrying}` is `squash`, `merge` or both — only what the repo allows. When it allows neither, print `  ○ This repo allows only rebase — it stays tracker-only` in place of the `To fix:` line.
 
 When the strategy read does not answer — no `gh`, unauthenticated, 404, insufficient permission, or the field is absent — the wording names the reason and the status is still `partial`, never `pass`:
 
@@ -290,6 +292,7 @@ verified_head="{ci_sha}"   # Step 5's ci_sha; with none, the headRefOid the fina
 read -r head_now base_ref <<<"$(gh pr view {N} --json headRefOid,baseRefName --jq '"\(.headRefOid) \(.baseRefName)"')"
 behind_by="$(gh api "repos/{owner}/{repo}/compare/${base_ref}...${verified_head}" --jq .behind_by)"
 body_file="$(mktemp)"; gh pr view {N} --json body --jq .body >"$body_file" || verified_head=""
+trap 'rm -f "$body_file"' EXIT
 if [ -n "$verified_head" ] && [ "$head_now" = "$verified_head" ] && [ "$behind_by" = "0" ]; then
   gh pr merge {N} --{merge_method} --delete-branch --match-head-commit "$verified_head" --body-file "$body_file"
 else
@@ -300,7 +303,7 @@ fi
 `{merge_method}` is `review.merge_method` (default `squash`). The body file makes the commit body
 the PR body under any repo setting (`references/docs/platform-github.md`, *Merge + clean
 up*); a failed body read empties `verified_head`, so the guard refuses the
-merge. For `rebase`, drop the `body_file` line and the `--body-file` flag.
+merge. For `rebase`, drop the `body_file` and `trap` lines and the `--body-file` flag.
 
 The check is the subset of `/auto-pilot`'s *Step 5.1c — Merge identity gate*
 that a standalone review needs. A CI verdict covers one commit on one base, so

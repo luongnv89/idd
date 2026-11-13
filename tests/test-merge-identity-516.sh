@@ -176,6 +176,8 @@ for base in "$REPO_ROOT/src/skills" "$REPO_ROOT/skills"; do
     blk="$(guarded_block "$f")"
     check_block_has "$blk" '^body_file="\$\(mktemp\)"; gh pr view \{[^}]*\} --json body --jq \.body >"\$body_file" \|\| verified_head=""$' \
       "M6d (${f#$REPO_ROOT/}): the merge block reads the PR body to a file, fail-closed"
+    check_block_has "$blk" "^trap 'rm -f \"\\\$body_file\"' EXIT" \
+      "M6d (${f#$REPO_ROOT/}): the merge block removes the body file on every path"
   done
 done
 for base in "$REPO_ROOT/src/skills" "$REPO_ROOT/skills"; do

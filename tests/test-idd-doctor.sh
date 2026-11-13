@@ -489,6 +489,17 @@ else
 fi
 
 # ───────────────────────────────────────────────────────────
+# #564 review: the rebase warn names only a method the repo allows; a
+# rebase-only repo gets no unsatisfiable fix.
+EM="$SKILL_DIR/references/error-messages.md"
+if grep -qF 'Fix: set review.merge_method in .idd.yml to one of: {carrying}' "$EM" \
+   && grep -qF 'When it allows neither, print `        ○ this repo allows only rebase — it stays tracker-only` in place of the `Fix:` line' "$EM" \
+   && ! grep -qF 'in .idd.yml to squash or merge' "$EM"; then
+  pass "T7: the rebase warn suggests only a method the repo allows"
+else
+  fail "T7: the rebase warn prints a fix a rebase-only repo cannot apply"
+fi
+
 # T14: AC #4 fixture — merge method vs. the repo's allowed strategies
 # ───────────────────────────────────────────────────────────
 
