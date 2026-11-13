@@ -497,3 +497,6 @@ jobs:
 
       - name: test-review-followups-584
         run: bash tests/test-review-followups-584.sh
+
+      - name: test-surface-counts-563
+        run: bash tests/test-surface-counts-563.sh
