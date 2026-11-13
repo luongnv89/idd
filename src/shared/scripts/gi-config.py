@@ -41,6 +41,9 @@ give it: every accepted `compaction.threshold.<skill>` must be an integer from
 else exit 3. Like the agents guard it runs whether or not the section is in
 view.
 
+`review.merge_method` (issue #564) is an enum the type check cannot see: an
+accepted value outside squash, merge and rebase is exit 3, in view or not.
+
 Legacy name (issue #537). With no `--config`, `.idd.yml` in the working
 directory is read; when it is absent the pre-rename `.gitissue.yml` is read in
 its place (`first_run` false, `config_file` naming it) with
@@ -119,6 +122,11 @@ _COMPACTION_ENABLED = "compaction.enabled"
 _COMPACTION_THRESHOLD_PREFIX = "compaction.threshold."
 _COMPACTION_MIN = 1
 _COMPACTION_MAX = 99
+
+# The value becomes a `gh pr merge --<method>` flag, so it is one of three
+# words or the config is invalid.
+_MERGE_METHOD = "review.merge_method"
+_MERGE_METHODS = ("squash", "merge", "rebase")
 
 
 class ConfigError(Exception):
@@ -449,6 +457,9 @@ def merge(
                     f"{key} — must be an integer from {_COMPACTION_MIN} to "
                     f"{_COMPACTION_MAX} (percent of context remaining)"
                 )
+
+    if _MERGE_METHOD in accepted and accepted[_MERGE_METHOD] not in _MERGE_METHODS:
+        errors.append(f"{_MERGE_METHOD} — must be one of: " + ", ".join(_MERGE_METHODS))
 
     merged = {**defaults, **accepted}
     # Default fill: a null `agents.<knob>.<role>` takes `agents.<knob>.default`,
