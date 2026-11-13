@@ -43,6 +43,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Tests:** `tests/test-consolidated-blocks-248.sh` fails when an authored file is byte-identical in two skills (T12) and when a SKILL.md restates the Self-Improve rules (T13). `tests/test-build-script.sh` (T8b) covers the new build kind.
   - **Not done:** the error blocks repeated across the `error-messages.md` files stay as they are.
 
+### Changed
+- **issue-resolver, auto-pilot:** split the reference files that were loaded whole for one section (#559). The step-completion report rules move out of `report-templates.md` and `summary-format.md` into a `references/step-reports.md` per skill. The resolver's step 0j is split in two: `step-0j-progress-record.md` keeps the write contract and the `--read` probe that every run needs, and `step-0j-resume.md` holds validation, restore, re-entry and effect reconciliation, read only by a run that resumes. The moved text is verbatim. The resolver's always-read budget falls from 50,493 to 10,172 bytes: a fresh run no longer loads the 11.3 KB resume file at all, and loads `report-templates.md` at the step that uses it (the PR body, the closing summary) instead of before Step 0. Auto-pilot reads 3,341 bytes before its first phase where it read 18,241, but still reads `summary-format.md` for the final summary, so its always-read budget moves only from 46,279 to 46,130. Neither bundle grew.
+
 ## v0.27.0 — 2026-11-01
 
 ### Features

@@ -193,8 +193,8 @@ for tree in "$RS_SRC" "$RS_DIST"; do
     fail "T3.3 ${tree#"$ROOT"/}: the already-resolved auto path is not comment-only"
   fi
 done
-grep -qF '`issue_comment` (Step 1)' "$RS_SRC/references/steps/step-0j-progress-record.md" \
-  && grep -qF 'never post a second' "$RS_SRC/references/steps/step-0j-progress-record.md" \
+grep -qF '`issue_comment` (Step 1)' "$RS_SRC/references/steps/step-0j-resume.md" \
+  && grep -qF 'never post a second' "$RS_SRC/references/steps/step-0j-resume.md" \
   && pass "T3.4 a resume reconciles the comment against live comments" \
   || fail "T3.4 the comment effect is not reconciled"
 grep -qF 'It **never closes an issue**' "$AUTOMODE" \

@@ -805,7 +805,8 @@ anchor_check_flat "$RS" rs-0j-cleanup 'every terminal outcome' "S6r AC5: the res
 anchor_check_flat "$RV" rvm-progress-cleanup 'every Result' "S6s AC5: the reviewer clears at every Result"
 grep -qE '^\| `/issue-resolver <N> --resume` \|' "$RS/SKILL.md"; check "S6t resolver Invocation lists --resume" "$?"
 grep -qE '^\| `/issue-pr-review <N> --resume` \|' "$RV/SKILL.md"; check "S6u reviewer Invocation lists --resume" "$?"
-for pair in "$RS/SKILL.md:references/steps/step-0j-progress-record.md" "$RS/SKILL.md:references/scripts/gi-progress.py" \
+for pair in "$RS/SKILL.md:references/steps/step-0j-progress-record.md" "$RS/SKILL.md:references/steps/step-0j-resume.md" \
+            "$RS/SKILL.md:references/scripts/gi-progress.py" \
             "$RV/SKILL.md:references/progress-record-mechanics.md" "$RV/SKILL.md:references/scripts/gi-progress.py" \
             "$AP/SKILL.md:references/scripts/gi-progress.py"; do
   f="${pair%%:*}"; want="${pair#*:}"
@@ -820,8 +821,23 @@ printf '%s\n' "$STEP53" | grep -qE 'gi-progress\.py --clear --skill issue-resolv
 check "S6x auto-pilot's Step 5.3 clears the resolver record at the issue's terminal outcome" "$?"
 printf '%s\n' "$STEP53" | grep -qE 'gi-progress\.py --clear --skill issue-pr-review --number \{pr_number\}'
 check "S6y auto-pilot's Step 5.3 clears the reviewer record too" "$?"
-NEWCTX="$(grep -rhoE '<!-- a:ctx-[a-z0-9-]+ -->' "$RS/references/steps/step-0j-progress-record.md" "$RV/references/progress-record-mechanics.md" 2>/dev/null || true)"
+NEWCTX="$(grep -rhoE '<!-- a:ctx-[a-z0-9-]+ -->' "$RS/references/steps/step-0j-progress-record.md" "$RS/references/steps/step-0j-resume.md" "$RV/references/progress-record-mechanics.md" 2>/dev/null || true)"
 [ -z "$NEWCTX" ]; check "S6z the new files add no ctx- anchor" "$?"
+# #559: step 0j is split. The file every run reads holds the write contract and
+# the --read probe; everything a resume alone needs lives in step-0j-resume.md,
+# which SKILL.md never tells a fresh run to read.
+RS0J_RUN="$RS/references/steps/step-0j-progress-record.md"; RS0J_RESUME="$RS/references/steps/step-0j-resume.md"
+for a in rs-0j-progress rs-0j-writes rs-0j-resume-entry rs-0j-cleanup; do
+  grep -qF "<!-- a:$a -->" "$RS0J_RUN"; check "S6z1 the every-run 0j file keeps $a" "$?"
+done
+for a in rs-0j-validate rs-0j-restore rs-0j-resume-table rs-0j-coverage rs-0j-sensitive rs-0j-gates rs-0j-monotone rs-0j-reconcile rs-0j-trust; do
+  grep -qF "<!-- a:$a -->" "$RS0J_RESUME" && ! grep -qF "<!-- a:$a -->" "$RS0J_RUN"
+  check "S6z2 $a lives in step-0j-resume.md only" "$?"
+done
+grep -qF 'references/steps/step-0j-resume.md' "$RS0J_RUN"; check "S6z3 the every-run 0j file points a resuming run at step-0j-resume.md" "$?"
+! grep -E 'step-0j-resume\.md' "$RS/SKILL.md" | grep -qiE 'step-0j-resume\.md[^.]*read it now|read `?references/steps/step-0j-resume\.md`? (now|first)'
+check "S6z4 SKILL.md never tells a fresh run to read step-0j-resume.md" "$?"
+[ "$(wc -c < "$RS0J_RUN")" -lt 8192 ]; check "S6z5 the every-run 0j file stays under 8 KB" "$?"
 
 # The ADR records the reversal and answers each hazard (AC6).
 grep -qE '^## Amendment — durable progress records \(#542\)$' "$ADR"; check "S7a ADR carries the #542 amendment section" "$?"

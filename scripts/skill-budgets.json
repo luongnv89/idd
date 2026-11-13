@@ -3,19 +3,20 @@
   "skills": {
     "auto-pilot": {
       "always_read": {
-        "budget": 47303,
+        "budget": 47154,
         "files": [
           "references/preflight.md",
           "references/run-log.md",
+          "references/step-reports.md",
           "references/summary-format.md"
         ],
-        "measured": 46279
+        "measured": 46130
       },
       "budget": 447905,
-      "measured": 447891,
+      "measured": 447801,
       "skill_md": {
         "budget": 26986,
-        "measured": 25962
+        "measured": 26021
       }
     },
     "init-idd": {
@@ -88,18 +89,18 @@
     },
     "issue-resolver": {
       "always_read": {
-        "budget": 51517,
+        "budget": 11196,
         "files": [
-          "references/report-templates.md",
+          "references/step-reports.md",
           "references/steps/step-0j-progress-record.md"
         ],
-        "measured": 50493
+        "measured": 10172
       },
       "budget": 433905,
-      "measured": 433887,
+      "measured": 433853,
       "skill_md": {
         "budget": 33856,
-        "measured": 32832
+        "measured": 32932
       }
     },
     "issue-triage": {

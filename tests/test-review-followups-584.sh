@@ -69,7 +69,7 @@ has "$AP/phases/phase-5-merge.md" 'use the same Step 5.1 merge floor, the Step 5
 has "$AP/phases/phase-3-4-review.md" 'run as `--auto --no-merge`; the merge itself is Phase 5'"'"'s' "T2.10: Phase 3-4 no longer says it delegates merging"
 
 # T3 — the restored plan re-runs the coverage gate against the live body.
-RS0J="$SRC/issue-resolver/references/steps/step-0j-progress-record.md"
+RS0J="$SRC/issue-resolver/references/steps/step-0j-resume.md"
 has "$RS0J" 'a:rs-0j-coverage' "T3.1: step-0j has a *Restored plan gates* section"
 has "$RS0J" "Step 2's *Criteria" "T3.2: it points at Step 2's gate rather than restating it"
 grep -qF '`covered` — or `no_criteria` with an empty recorded `criteria` — keeps the' "$RS0J" \
@@ -77,7 +77,7 @@ grep -qF '`covered` — or `no_criteria` with an empty recorded `criteria` — k
   || fail "T3.3: the keep condition is missing"
 has "$RS0J" '`renumbered`, a record without those' "T3.4: a renumbered verdict or an old record discards the plan"
 has "$RS0J" 'the *Criteria coverage gate* and the *Sensitive-change gate* re-run' "T3.5: the k=3 row re-runs both gates"
-tr '\n' ' ' < "$RS0J" | grep -qF '`criteria_covered` and the `criteria` list those IDs were numbered against' \
+tr '\n' ' ' < "$SRC/issue-resolver/references/steps/step-0j-progress-record.md" | grep -qF '`criteria_covered` and the `criteria` list those IDs were numbered against' \
   && pass "T3.6: the plan summary records the criteria fields" || fail "T3.6: the plan summary lacks the criteria fields"
 has "$SRC/issue-resolver/references/steps/step-2-plan.md" 'The `[3/5]` progress write' "T3.7: Step 2 says the progress write records the mapping"
 

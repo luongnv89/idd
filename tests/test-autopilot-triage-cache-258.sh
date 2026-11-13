@@ -128,7 +128,7 @@ SRC_SKILL="$REPO_ROOT/src/skills/auto-pilot/SKILL.source.md"
 SRC_PROMPTS="$REPO_ROOT/src/skills/auto-pilot/references/subagent-prompts.md"
 SRC_EXPLICIT="$REPO_ROOT/src/skills/auto-pilot/references/explicit-list-mode.md"
 SRC_EXAMPLES="$REPO_ROOT/src/skills/auto-pilot/references/examples.md"
-SRC_SUMMARY="$REPO_ROOT/src/skills/auto-pilot/references/summary-format.md"
+SRC_SUMMARY="$REPO_ROOT/src/skills/auto-pilot/references/step-reports.md"
 SRC_PERSIST="$REPO_ROOT/src/skills/issue-triage/references/output-and-persist.md"
 SRC_TRIAGE_SKILL="$REPO_ROOT/src/skills/issue-triage/SKILL.source.md"
 SCHEMA="$REPO_ROOT/docs/config-schema.md"
@@ -146,7 +146,7 @@ BUILT_SKILL="$REPO_ROOT/skills/auto-pilot/SKILL.md"
 BUILT_PROMPTS="$REPO_ROOT/skills/auto-pilot/references/subagent-prompts.md"
 BUILT_EXPLICIT="$REPO_ROOT/skills/auto-pilot/references/explicit-list-mode.md"
 BUILT_EXAMPLES="$REPO_ROOT/skills/auto-pilot/references/examples.md"
-BUILT_SUMMARY="$REPO_ROOT/skills/auto-pilot/references/summary-format.md"
+BUILT_SUMMARY="$REPO_ROOT/skills/auto-pilot/references/step-reports.md"
 BUILT_PERSIST="$REPO_ROOT/skills/issue-triage/references/output-and-persist.md"
 BUILT_RES_STEPS="$(spec_concat "$REPO_ROOT/skills/issue-resolver/references/pipeline-steps.md")"
 BUILT_RES_SKILL="$REPO_ROOT/skills/issue-resolver/SKILL.md"
@@ -392,6 +392,8 @@ else
 fi
 
 # The per-phase completion check may not assert a refresh that no longer happens.
+check_lacks "$REPO_ROOT/src/skills/auto-pilot/references/summary-format.md" 'Triage refreshed' \
+  "T5.9a: summary-format.md never names the old check either"
 check_lacks "$SRC_SUMMARY" 'Triage refreshed' \
   "T5.9: the Phase 1 check no longer asserts a per-iteration refresh"
 check_has "$SRC_SUMMARY" 'Triage current' \
@@ -683,7 +685,7 @@ check_lacks "$BUILT_SKILL" 'Each iteration: triage the backlog' \
 check_has "$BUILT_PROMPTS" 'captured in mode-neutral .Step 1.2b.' \
   "T9.9: built subagent-prompts.md ships mode-neutral payload provenance"
 check_has "$BUILT_SUMMARY" 'Triage current' \
-  "T9.10: built summary-format.md ships the reuse-safe check name"
+  "T9.10: built step-reports.md ships the reuse-safe check name"
 check_has "$BUILT_PERSIST" 'Cross-skill incremental updates' \
   "T9.11: built output-and-persist.md ships the cross-skill writer contract"
 check_has "$BUILT_PHASES" 'Run it after \*\*any step that merged a PR and closed its issue\*\*' \
@@ -1011,7 +1013,7 @@ check_has "$SRC_EXAMPLES" 'its own \*Step 1\.1a\* gate' \
 check_has "$SRC_PROMPTS" 'mode-neutral .Step 1.2b.' \
   "T13.6: subagent-prompts.md points at mode-neutral capture"
 check_has "$SRC_SUMMARY" 'a cache \*Step 1\.1a\* read as .fresh.' \
-  "T13.7: summary-format.md points at the renamed gate"
+  "T13.7: step-reports.md points at the renamed gate"
 # #257's own references must NOT have been renamed with it.
 check_has "$SRC_ERRORS" '\*Step 1\.0\*.s gate resolved to .resumable.' \
   "T13.8: #257's resume-gate reference is untouched"
@@ -1150,7 +1152,7 @@ check_has "$BUILT_CONFIG" 'reused by \*Step 1\.1a\*.s cache gate' \
 check_has "$BUILT_SKILL" '\*Step 1\.1a\*.s cache gate reads .fresh.' \
   "T13.49: built SKILL.md ships the renamed reference"
 check_has "$BUILT_SUMMARY" 'a cache \*Step 1\.1a\* read as .fresh.' \
-  "T13.50: built summary-format.md ships the renamed reference"
+  "T13.50: built step-reports.md ships the renamed reference"
 
 # Issue #260 consumes, rather than recomputes, the independent groups this
 # payload already persists. The priority anchor stays first and one fan-out may
