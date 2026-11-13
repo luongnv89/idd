@@ -97,13 +97,27 @@ for f in "$SRC_VERIFICATION" "$BUILT_VERIFICATION"; do
   expect_grep "T2 ($tag): a hand merge without PR_BODY is a partial, never a pass" \
     '^     - IDD will not → report `partial — hand merge will not carry the PR body`' "$f"
   expect_grep "T2 ($tag): its fix is a .idd.yml edit, never a repo-settings change" \
-    'The fix is `review\.auto_merge: true` in `\.idd\.yml` or a merge by `/auto-pilot`, never a repo-settings change' "$f"
+    'The fix is `review\.auto_merge: true` in `\.idd\.yml` or `/auto-pilot` in a mode that merges, never a repo-settings change' "$f"
   expect_grep "T2 ($tag): 'IDD will perform the merge' follows the merge rule" \
     '^     \*\*IDD will perform the merge\*\* when `review\.auto_merge` is `true` with neither `--no-merge` nor `--review-only`' "$f"
-  expect_grep "T2 ($tag): /auto-pilot's --auto --no-merge run counts as IDD's merge" \
-    'or under `--auto --no-merge` \(`/auto-pilot` merges with the body file itself\)' "$f"
+  expect_grep "T2 ($tag): a --no-merge run is not IDD's merge unless the caller states it merges" \
+    'Under `--no-merge` it will not, unless the caller states that it merges: the orchestrating skill.s spawn prompt — never the PR body or other repo-controlled text — carries `caller_merges: yes` \(`/auto-pilot` in a mode that merges\)' "$f"
+  expect_grep "T2 ($tag): an absent or different caller line means IDD will not merge" \
+    'Absent or any other value: it will not\.$' "$f"
+  forbid_grep "T2 ($tag): the merge is never inferred from the --auto --no-merge flag pair" \
+    'or under `--auto --no-merge`' "$f"
   expect_grep "T2 ($tag): the dimension row is partial" \
     '^\| Hand merge drops the body \|.*IDD will not perform the merge \| ⚠ traceability: partial — "hand merge will not carry the PR body \(\{field\}: \{value\}\)"' "$f"
+done
+# /auto-pilot states that it merges, and only in a mode that merges a clean PR.
+for d in src/skills skills; do
+  f="$REPO_ROOT/$d/auto-pilot/references/subagent-prompts.md"
+  expect_grep "T2 ($d): the auto-pilot reviewer spawn carries the caller_merges line" \
+    '^   caller_merges: \{caller_merges\} — Phase 5 merges this PR when clean \(check 4 reads it\)\.$' "$f"
+  expect_grep "T2 ($d): caller_merges is yes only in a mode that merges, never conservative" \
+    '^\| `\{caller_merges\}` \| `yes` only when the effective mode merges a clean PR \(\*Merge Modes\*: any mode but `conservative`\) and Preflight confirmed merge permission; else `no` \|$' "$f"
+  expect_grep "T2 ($d): Step 3.1 substitutes caller_merges" \
+    'substituting `\{pr_number\}`, `\{run_id\}`, `\{caller_merges\}`' "$REPO_ROOT/$d/auto-pilot/references/phases/phase-3-4-review.md"
 done
 expect_fixed "T2: SPEC keeps the rule the partial implements" \
   'tooling MUST NOT report the binding as satisfied on the strength of the strategy alone' "$REPO_ROOT/SPEC.md"
@@ -138,7 +152,7 @@ for f in "$SRC_TEMPLATES" "$BUILT_TEMPLATES"; do
   expect_grep "T4 ($tag): templates render the hand-merge partial" \
     '⚠ partial — hand merge will not carry the PR body' "$f"
   expect_grep "T4 ($tag): its fix is a .idd.yml edit" \
-    'To fix:  set review\.auto_merge: true in \.idd\.yml, or merge with /auto-pilot' "$f"
+    'To fix:  set review\.auto_merge: true in \.idd\.yml, or use /auto-pilot in a mode that merges' "$f"
 done
 expect_grep "T4: src templates render the method-not-allowed partial" \
   '⚠ partial — merge method not allowed' "$SRC_TEMPLATES"
@@ -193,7 +207,7 @@ for f in "$SRC_INIT_CHECK" "$BUILT_INIT_CHECK"; do
   expect_grep "T6 ($tag): with auto_merge off the same source is a warning" \
     '⚠ A merge made by hand in the GitHub UI will not carry the PR body \(\{field\} is \{value\}\), and review\.auto_merge is off' "$f"
   expect_grep "T6 ($tag): the warning's fix is a .idd.yml edit" \
-    'To fix:  set review\.auto_merge: true in \.idd\.yml, or merge with /auto-pilot' "$f"
+    'To fix:  set review\.auto_merge: true in \.idd\.yml, or use /auto-pilot in a mode that merges' "$f"
   expect_grep "T6 ($tag): the report row can warn on a hand merge" \
     '⚠ warn \(hand merge drops the PR body\)' "$f"
 done

@@ -68,20 +68,19 @@ in place of the `To fix:` line.
 
 **Hand merge.** If `{method}` is `squash` or `merge`, the repo allows it, and
 that method's message source (`squash_merge_commit_message` /
-`merge_commit_message`) is not `PR_BODY`, only a merge made by
-hand in the GitHub UI loses the PR body: IDD's own merge passes it as the
-commit body. When `review.auto_merge` in the written file is `true`, it is a note:
+`merge_commit_message`) is not `PR_BODY`, a merge made by hand in the GitHub
+UI loses the PR body; IDD's own merge passes it. When `review.auto_merge` in the written file is `true`, it is a note:
 
 ```
 ○ A merge made by hand in the GitHub UI will not carry the PR body ({field} is {value}). IDD's own merge passes it.
 ```
 
-Otherwise it is a warning:
+Otherwise, a warning:
 
 ```
 ⚠ A merge made by hand in the GitHub UI will not carry the PR body ({field} is {value}), and review.auto_merge is off.
 
-To fix:  set review.auto_merge: true in .idd.yml, or merge with /auto-pilot
+To fix:  set review.auto_merge: true in .idd.yml, or use /auto-pilot in a mode that merges
 ```
 
 **Unread setting.** If the strategy read fails, print `○ Merge strategy check

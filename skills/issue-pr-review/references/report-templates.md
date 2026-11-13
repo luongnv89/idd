@@ -216,7 +216,7 @@ Traceability check 4 judges the repository against `review.merge_method` (`refer
                              (merge_commit_message: {value})
 ```
 
-When IDD will not perform the merge (check 4), that note is the finding instead: `⚠ partial — hand merge will not carry the PR body ({field}: {value})`, then `To fix:  set review.auto_merge: true in .idd.yml, or merge with /auto-pilot`.
+When IDD will not perform the merge (check 4), that note is the finding instead: `⚠ partial — hand merge will not carry the PR body ({field}: {value})`, then `To fix:  set review.auto_merge: true in .idd.yml, or use /auto-pilot in a mode that merges`.
 
 When the repo does not allow the configured method, the dimension reports `partial`. The fix is a config edit; IDD never changes a repo setting:
 

@@ -156,9 +156,9 @@ All errors follow the rich error format: what went wrong + fix command (+ docs l
 ### Warn — hand merge
 ```
   ⚠ [4/4] Merge method           {method} allowed · a hand merge will not carry the PR body ({field}: {value})
-        Fix: set review.auto_merge: true in .idd.yml, or merge with /auto-pilot
+        Fix: set review.auto_merge: true in .idd.yml, or use /auto-pilot in a mode that merges
 ```
-**Trigger:** the same message-source condition, with `review.auto_merge` not `true`: the merge is made by hand, so the message source decides (SPEC §4.3). `/auto-pilot` merges with the PR body itself.
+**Trigger:** the same message-source condition, with `review.auto_merge` not `true`: the merge is made by hand, so the message source decides (SPEC §4.3). `/auto-pilot` merges with the PR body itself, except in `conservative` mode, which leaves the PR open.
 
 ### Warn — method not allowed
 ```

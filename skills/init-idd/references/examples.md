@@ -41,7 +41,7 @@ Full example outputs for five scenarios. Every report follows `references/review
   Decision:          No approval needed.
 
   Config: .idd.yml
-  Next action: set review.auto_merge: true or merge with /auto-pilot; commit .idd.yml
+  Next action: set review.auto_merge: true or use /auto-pilot in a mode that merges; commit .idd.yml
 ```
 
 ## Example: Minimal Python project

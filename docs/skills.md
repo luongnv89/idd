@@ -290,7 +290,7 @@ Runs a read-only health check for this IDD repository. It does not modify files,
 | Stale skill claims in issue-creator docs | `FAIL` on drift |
 | Forbidden issue-template fields | `FAIL` on forbidden fields |
 | Missing `autopilot.mode` when `.idd.yml` exists | `FAIL` |
-| Repository allows the configured `review.merge_method` | `WARN` when the repo does not allow it, or it is `rebase` (tracker-only); skipped (`○`) when `gh` is absent or unauthenticated |
+| Repository allows the configured `review.merge_method` | `WARN` when the repo does not allow it, it is `rebase` (tracker-only), or a hand merge would drop the PR body (`review.auto_merge` off and a message source other than `PR_BODY`); skipped (`○`) when `gh` is absent or unauthenticated |
 
 After the four gating checks, the doctor prints one **informational, non-gating** section — a *run-log summary* over the last N runs (default 50) recorded in `.idd/runs.jsonl`. It reports resolve rate, median QA cycles, and common skip reasons, and never affects the PASS/WARN/FAIL result. When no runs are recorded, it degrades gracefully to a single `○` line.
 

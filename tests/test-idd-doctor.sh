@@ -260,7 +260,7 @@ if grep -qE 'anything else → the check is a WARN, not a pass: print \*Warn —
    && grep -qE 'Read `auto_merge:` from the same block' "$SKILL" \
    && grep -qF '### Warn — hand merge' "$SKILL_DIR/references/error-messages.md" \
    && grep -qF '⚠ [4/4] Merge method           {method} allowed · a hand merge will not carry the PR body ({field}: {value})' "$SKILL_DIR/references/error-messages.md" \
-   && grep -qF 'Fix: set review.auto_merge: true in .idd.yml, or merge with /auto-pilot' "$SKILL_DIR/references/error-messages.md"; then
+   && grep -qF 'Fix: set review.auto_merge: true in .idd.yml, or use /auto-pilot in a mode that merges' "$SKILL_DIR/references/error-messages.md"; then
   pass "T7: Check 4 warns, with a .idd.yml fix, when a hand merge would drop the PR body"
 else
   fail "T7: Check 4 passes a hand merge that drops the PR body"
