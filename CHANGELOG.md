@@ -46,6 +46,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **issue-resolver, auto-pilot:** split the reference files that were loaded whole for one section (#559). The step-completion report rules move out of `report-templates.md` and `summary-format.md` into a `references/step-reports.md` per skill. The resolver's step 0j is split in two: `step-0j-progress-record.md` keeps the write contract and the `--read` probe that every run needs, and `step-0j-resume.md` holds validation, restore, re-entry and effect reconciliation, read only by a run that resumes. The moved text is verbatim. The resolver's always-read budget falls from 50,493 to 10,172 bytes: a fresh run no longer loads the 11.3 KB resume file at all, and loads `report-templates.md` at the step that uses it (the PR body, the closing summary) instead of before Step 0. Auto-pilot reads 3,341 bytes before its first phase where it read 18,241, but still reads `summary-format.md` for the final summary, so its always-read budget moves only from 46,279 to 46,130. Neither bundle grew.
 
+### Documentation
+- **README, development guide:** correct the install documentation (#565). The Prerequisites now list Node.js 22+ and npm 9+ for the `asm` install path only, and `python3` as optional. The Claude Code plugin size reads about 3.2 MB at v0.27.0, replacing the 2.7 MB measured at v0.22.0, in both `README.md` and `docs/DEVELOPMENT.md`. The Codex section no longer says "Release pending": the Codex plugin manifest ships in every release since v0.25.0.
+
 ## v0.27.0 — 2026-11-01
 
 ### Features
