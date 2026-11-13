@@ -12,10 +12,10 @@
         "measured": 46279
       },
       "budget": 447905,
-      "measured": 447905,
+      "measured": 447891,
       "skill_md": {
-        "budget": 28422,
-        "measured": 27398
+        "budget": 26986,
+        "measured": 25962
       }
     },
     "init-idd": {
@@ -24,11 +24,11 @@
         "files": [],
         "measured": 0
       },
-      "budget": 145128,
-      "measured": 144104,
+      "budget": 145114,
+      "measured": 144090,
       "skill_md": {
-        "budget": 27442,
-        "measured": 26418
+        "budget": 26006,
+        "measured": 24982
       }
     },
     "issue-analysis": {
@@ -40,11 +40,11 @@
         ],
         "measured": 35908
       },
-      "budget": 168713,
-      "measured": 167689,
+      "budget": 168699,
+      "measured": 167675,
       "skill_md": {
-        "budget": 26514,
-        "measured": 25490
+        "budget": 25078,
+        "measured": 24054
       }
     },
     "issue-creator": {
@@ -61,10 +61,10 @@
         "measured": 43682
       },
       "budget": 186428,
-      "measured": 186428,
+      "measured": 186413,
       "skill_md": {
-        "budget": 27954,
-        "measured": 26930
+        "budget": 26517,
+        "measured": 25493
       }
     },
     "issue-pr-review": {
@@ -80,10 +80,10 @@
         "measured": 127792
       },
       "budget": 319435,
-      "measured": 318450,
+      "measured": 318432,
       "skill_md": {
-        "budget": 33565,
-        "measured": 32541
+        "budget": 32125,
+        "measured": 31101
       }
     },
     "issue-resolver": {
@@ -96,10 +96,10 @@
         "measured": 50493
       },
       "budget": 433905,
-      "measured": 433905,
+      "measured": 433887,
       "skill_md": {
-        "budget": 35296,
-        "measured": 34272
+        "budget": 33856,
+        "measured": 32832
       }
     },
     "issue-triage": {
@@ -111,11 +111,11 @@
         ],
         "measured": 29388
       },
-      "budget": 141039,
-      "measured": 140015,
+      "budget": 141025,
+      "measured": 140001,
       "skill_md": {
-        "budget": 27132,
-        "measured": 26108
+        "budget": 25696,
+        "measured": 24672
       }
     },
     "plan-to-issues": {
@@ -127,10 +127,10 @@
         "measured": 5062
       },
       "budget": 171072,
-      "measured": 171072,
+      "measured": 171058,
       "skill_md": {
-        "budget": 28093,
-        "measured": 27069
+        "budget": 26657,
+        "measured": 25633
       }
     }
   }

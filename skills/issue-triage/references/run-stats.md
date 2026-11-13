@@ -1,10 +1,6 @@
 # Run Stats Footer
 
-The run-cost footer every IDD skill prints to close a run. This file is
-**byte-identical in every skill** — the shape is the contract, and a skill that
-diverges from it makes the same number read differently in two places.
-`tests/test-run-stats-373.sh` enforces that. Edit the copy in one skill only by
-editing every copy.
+The run-cost footer contract, authored once in `src/shared/references/`.
 
 ## The footer
 
