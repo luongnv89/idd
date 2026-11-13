@@ -36,6 +36,11 @@ What is counted (each name is a key of the counts file)
                  fenced code blocks, in every `.md` file under `src/`, whose
                  text holds the whole word `gate` or `gates` in any case.
                  `Gated` and `gateway` are not that word.
+  gh_call_files  Files under `src/` that carry at least one `gh` call
+                 (`gh issue view`, `gh api`, …), as the build's catalog lint
+                 defines one (issue #566). The definition and the walk are
+                 `scripts/build/gh_catalog.py`, loaded from this checkout —
+                 not from --root — so the count and the lint never disagree.
 
 The counts file (the single place the records live)
 
@@ -106,6 +111,7 @@ SKILL_SOURCE = "SKILL.source.md"
 SCRIPTS_REL = ("src", "shared", "scripts")
 SCHEMA_REL = ("docs", "config-schema.md")
 CONFIG_SCRIPT = "gi-config.py"
+GH_CATALOG = os.path.join(_HERE, "build", "gh_catalog.py")
 
 _CODE_SPAN = re.compile(r"`([^`\n]+)`")
 _FLAG = re.compile(r"(?<![\w-])--[a-z][a-z0-9-]*")
@@ -270,6 +276,20 @@ def count_gate_headings(root: str) -> int:
     return total
 
 
+def count_gh_call_files(root: str) -> int:
+    """Files under src/ with a gh call, by the build lint's own definition."""
+    top = _require_dir(os.path.join(root, "src"))
+    if not _is_regular(GH_CATALOG):
+        raise InputError(f"file not found: {GH_CATALOG}")
+    try:
+        spec = importlib.util.spec_from_file_location("_surface_gh_catalog", GH_CATALOG)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module.files_with_calls(top)
+    except Exception as exc:  # the loaded module's own errors are input errors
+        raise InputError(f"cannot count gh calls with {GH_CATALOG}: {exc}") from exc
+
+
 # The registry: a new count is one function above and one entry here.
 MEASURES = {
     "skills": count_skills,
@@ -278,6 +298,7 @@ MEASURES = {
     "config_keys": count_config_keys,
     "flags": count_flags,
     "gate_headings": count_gate_headings,
+    "gh_call_files": count_gh_call_files,
 }
 
 
@@ -422,8 +443,8 @@ def build_parser() -> argparse.ArgumentParser:
         prog="surface-count.py",
         description=(
             "Check (default) or ratchet the counts of skills, shared scripts, "
-            "script lines, config keys, flags and gate headings recorded in "
-            "scripts/surface-counts.json."
+            "script lines, config keys, flags, gate headings and files with gh "
+            "calls recorded in scripts/surface-counts.json."
         ),
         epilog=(
             "Exit codes: 0 ok · 1 a count rose, dropped or is unrecorded "

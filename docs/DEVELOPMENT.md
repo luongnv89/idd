@@ -138,7 +138,7 @@ Issue #558 adds two more budgets per skill and a cap on growth between releases.
 
 ### Surface counts (issue #563)
 
-Six counts of the authored tree are recorded in one committed file, `scripts/surface-counts.json`, and `scripts/surface-count.py` compares the tree with it. CI fails when a count differs from its record.
+Seven counts of the authored tree are recorded in one committed file, `scripts/surface-counts.json`, and `scripts/surface-count.py` compares the tree with it. CI fails when a count differs from its record.
 
 - **What is counted** — every walk is sorted, skips dotfile and `__pycache__` paths, and ignores symlinks.
   - `skills` — directories directly under `src/skills/` and `src/internal-skills/` that hold a `SKILL.source.md`.
@@ -147,6 +147,7 @@ Six counts of the authored tree are recorded in one committed file, `scripts/sur
   - `config_keys` — the leaf keys of the Full Schema block of `docs/config-schema.md`, as dotted keys. The block is parsed by `load_schema()` of `src/shared/scripts/gi-config.py`, the parser the skills use.
   - `flags` — for each skill, the distinct `--flag` tokens in the inline-code spans of its `SKILL.source.md` that start with that skill's own slash command, such as `` `/issue-triage --limit N` `` in issue-triage's file. The per-skill numbers are summed, so one flag name on two skills counts twice. A flag in prose, or in a span that starts with anything else, is not counted.
   - `gate_headings` — Markdown headings (`#` to `######`) outside fenced code blocks, in every `.md` file under `src/`, whose text holds the whole word `gate` or `gates` in any case. `Gated` does not count.
+  - `gh_call_files` — files under `src/` that carry at least one `gh` call, as the build's catalog lint defines one (*Tracker calls and the catalog*, below). `scripts/surface-count.py` loads that definition from `scripts/build/gh_catalog.py`, so the count and the lint cannot disagree.
 - **A rise needs a hand edit.** When a count is above its record, set that number in `scripts/surface-counts.json` to the new count by hand, commit it in the same PR, and say in the PR what the new part replaces or which step it removes (`docs/VALUES.md`, SI8). `--ratchet` **never raises** a record: it reports the rise and exits 1.
 - **A drop is one command.** When a count is below its record, lower the record and commit the file:
 
@@ -156,6 +157,17 @@ Six counts of the authored tree are recorded in one committed file, `scripts/sur
 
   `--ratchet` lowers every record above its count, adds a count that has no record, and drops a record for a count the script no longer measures.
 - **Check locally** with `python3 scripts/surface-count.py` (`--check` is the default; `--json` prints the result as JSON; `--root DIR` measures another tree). The script reads the working tree and the counts file and nothing else: it does not run git and needs no base ref. The CI step is `test-surface-counts-563`, which runs `tests/test-surface-counts-563.sh`. The same test fails when `CLAUDE.md` or `AGENTS.md` does not list a shared script in its `src/shared/scripts/` tree.
+
+### Tracker calls and the catalog (issue #566)
+
+The *Operation catalog* of `docs/platform-github.md` is the contract every tracker call in a skill must match, and the build enforces it: `scripts/build.sh` fails when a `gh` form in `src/` has no row there.
+
+- **What a form is** — `gh`, one of gh's own top-level command groups, then the verb: `gh issue view`, `gh pr merge`, `gh label create`. Flags and arguments are not part of the form. `gh api`, `gh status` and `gh browse` take no verb, so the group alone is the form. A group with no verb after it (`the gh pr commands`), prose such as `gh is not installed`, and a flag-only call such as `gh --version` are not calls. The definition lives in `scripts/build/gh_catalog.py`.
+- **What is scanned** — every `.md`, `.py`, `.sh`, `.txt`, `.yml`, `.yaml`, `.json` and `.toml` file under `src/`, in sorted order, skipping dotfile and `__pycache__` paths and symlinks. A `.py` file is also read for argv lists, the way the shared scripts hand a call to `src/shared/scripts/gi-gh.py`: a `[` with the group and verb as the first two string items, optionally after `"gh"` (`["issue", "view", str(n)]`). `api`, `status` and `browse` count there only after `"gh"`, since `["status", "--porcelain"]` is a git argv. A list built piece by piece is not seen, so write the group and verb as its first two literals.
+- **What counts as a row** — a table row (a line starting with `|`) in the `## Operation catalog` section, up to the next `## ` heading. A form named only in that section's prose is not a row. A `platform-github.md` without the section fails the build.
+- **When the build fails**, it lists every `file:line` and form with no row. Add the form to the closest table in the catalog, keeping the row terse: the catalog's runtime digest ships in every public skill, so each added byte moves the `platform-github.md` pin in `scripts/build/common.py` (`DOC_DIGEST_EXPECTED_BYTES`), the per-skill budgets in `scripts/skill-budgets.json`, and the bundled-doc budget in `tests/test-bundled-doc-slimming-249.sh`.
+- **The count of files with calls is ratcheted** as `gh_call_files` in `scripts/surface-counts.json` (*Surface counts*, above). A new file with a `gh` call raises it, which is a hand edit; a file that stops calling `gh` lowers it with `--ratchet`.
+- The CI step is `test-gh-catalog-lint-566`, which runs `tests/test-gh-catalog-lint-566.sh`.
 
 ### Codex plugin (issue #489)
 
@@ -319,7 +331,7 @@ next-highest-churn slice; they close issue #401 together. Remaining
 
 | Class | Suites (representative) | Why deferred |
 |-------|-------------------------|--------------|
-| Structural / build | `test-build-script.sh`, `test-build-negative-mutations.sh`, `test-bundled-doc-slimming-249.sh`, `test-dependency-closure.sh`, `test-disclosure-gates-250.sh`, `test-consolidated-blocks-248.sh`, `test-skill-frontmatter-keys-307.sh`, `test-skill-line-cap-247.sh`, `test-root-skills-install-surface.sh`, `test-init-template-doc-urls-source.sh` | Assert install/build shape, not skill wording. A heading rename should not be this slice. |
+| Structural / build | `test-build-script.sh`, `test-build-negative-mutations.sh`, `test-gh-catalog-lint-566.sh`, `test-bundled-doc-slimming-249.sh`, `test-dependency-closure.sh`, `test-disclosure-gates-250.sh`, `test-consolidated-blocks-248.sh`, `test-skill-frontmatter-keys-307.sh`, `test-skill-line-cap-247.sh`, `test-root-skills-install-surface.sh`, `test-init-template-doc-urls-source.sh` | Assert install/build shape, not skill wording. A heading rename should not be this slice. |
 | Script / schema contracts | `test-scripts-252.sh`, `test-scripts-253.sh`, `test-scripts-pipeline-251.sh`, `test-config-schema-38.sh`, `test-runs-jsonl.sh`, `test-pre-commit-security.sh` | Pin commands, keys, and exit codes; already token-shaped. |
 | Sibling feature suites | remaining `test-autopilot-*.sh`, `test-issue-*.sh`, `test-idd-doctor.sh`, `test-model-*.sh`, `test-projects-sync.sh`, `test-sync-safety.sh`, `test-squash-binding-295.sh`, `test-phase1-contract-truthfulness.sh`, `test-pr-body-closing-keywords-312.sh`, `test-resolver-borrow-skills-309.sh` | True remaining prose-coupling. Migrate in later slices the same way #358 then #401 did — one named cluster per PR, not the whole inventory. |
 

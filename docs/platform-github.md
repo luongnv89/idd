@@ -21,6 +21,7 @@ IDD skills reach the issue tracker through a **platform driver** — the workflo
 | Repo merge strategy | `gh repo view --json mergeCommitAllowed,squashMergeAllowed,rebaseMergeAllowed` |
 | Squash-commit message source | `gh api repos/{owner}/{repo} --jq '{squash_merge_commit_title, squash_merge_commit_message}'` |
 | Caller's permission | `gh repo view --json viewerPermission` |
+| Auth · default repo | `gh auth login` · `gh auth refresh` · `gh auth switch` · `gh repo set-default` |
 
 REST, not `--json`: `gh repo view --json squashMergeCommitMessage` answers `Unknown JSON field`. It is **not** interchangeable with the strategy row above — that answers *is squash allowed*, this whether the squash commit carries the PR body (`PR_BODY`) or the commit subjects (`COMMIT_MESSAGES`, the default); only this one decides whether B1 lands (#295). Writing `PR_BODY` requires title source `PR_TITLE`.
 
@@ -35,6 +36,7 @@ REST, not `--json`: `gh repo view --json squashMergeCommitMessage` answers `Unkn
 | Create issue | `gh issue create --title "{title}" --body "{body}" --label "{labels}"` |
 | Rewrite body (normalize) | `gh issue edit {N} --body "{normalized_body}"` |
 | Add labels | `gh issue edit {N} --add-label "{label1},{label2}"` |
+| Repo labels | `gh label list --json name` · `gh label create` |
 | Comment (backup, notice) | `gh issue comment {N} --body "{text}"` |
 | Close with comment | `gh issue close {N} -c "{reason}"` |
 | Reopen | `gh issue reopen {N}` |
@@ -51,6 +53,7 @@ REST, not `--json`: `gh repo view --json squashMergeCommitMessage` answers `Unkn
 | Diff / changed files | `gh pr diff {N}` · `gh pr diff {N} --name-only` |
 | Checkout PR head branch | `gh pr checkout {N}` |
 | CI check status | `gh pr checks {N}` |
+| CI log · sync head | `gh run list` · `gh run view {run_id} --log-failed` · `gh pr update-branch {N}` |
 | Read PR body (before edit) | `gh pr view {N} --json body` |
 | Update PR body | `gh pr edit {N} --body "{body}"` — read-modify-write only: fetch the body, apply the minimal change (e.g. prepend `Closes #N`), write back, verify per rule 2 |
 | Merge identity (live base ancestry) | `gh api repos/{owner}/{repo}/compare/{base_ref}...{verified_head} --jq .behind_by` — merge only on `0` and an unchanged `headRefOid` |
@@ -65,4 +68,4 @@ For operations with no first-class `gh` subcommand — uploading issue assets, s
 
 ## Adding a driver
 
-Porting IDD to another tracker (GitLab, Gitea, …) is deliberately scoped: write the equivalent driver document — `docs/platform-<name>.md` mapping every operation in this catalog to the new tool (e.g. `glab issue view`), then update the inlined commands in the skills to match it. The catalog above defines exactly which operations must exist; anything the new tool cannot express is a documented gap, not a silent one. Until that second document exists, the preamble's "only implemented driver" is also the only valid `platform` value.
+Porting IDD to another tracker (GitLab, Gitea, …) is deliberately scoped: write the equivalent driver document — `docs/platform-<name>.md` mapping every operation in this catalog to the new tool (e.g. `glab issue view`), then update the inlined commands in the skills to match it. The catalog above defines exactly which operations must exist — the build fails when a `gh` form in `src/` has no row in it (`gh` + group + verb; #566); anything the new tool cannot express is a documented gap, not a silent one. Until that second document exists, the preamble's "only implemented driver" is also the only valid `platform` value.

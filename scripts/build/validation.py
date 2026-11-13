@@ -26,6 +26,9 @@ from .common import (
     _strip_urls,
     _walk_files,
 )
+from .gh_catalog import catalog_forms, scan as _scan_gh_calls
+
+PLATFORM_DOC = "platform-github.md"
 
 
 def _check_stale_doc_urls(src: Path) -> None:
@@ -47,6 +50,39 @@ def _check_stale_doc_urls(src: Path) -> None:
                     f"stale GitHub URL in {f.relative_to(src.parent)}: {m.group(0)} "
                     f"(should reference docs/{file_name} — see issue #81)"
                 )
+
+
+def _check_gh_catalog(src: Path) -> None:
+    """Abort when a `gh` form in src/ has no row in the Operation catalog of
+    docs/platform-github.md (issue #566). The form definition lives in
+    gh_catalog.py, which scripts/surface-count.py also loads for its
+    `gh_call_files` count. A tree without the catalog document is left to the
+    closure check, like the doc-URL check above; a document that lost its
+    catalog section fails here."""
+    doc = src.parent / "docs" / PLATFORM_DOC
+    if not doc.is_file():
+        return
+    catalogued = catalog_forms(_read_text(doc))
+    if not catalogued:
+        _abort(
+            f"docs/{PLATFORM_DOC} has no `## Operation catalog` table rows — "
+            "the gh catalog lint has nothing to check against (issue #566)"
+        )
+    missing = [
+        (path, line, form)
+        for path, line, form in _scan_gh_calls(str(src))
+        if form not in catalogued
+    ]
+    if missing:
+        rows = "\n".join(
+            f"    src/{path}:{line}: `{form}`" for path, line, form in missing
+        )
+        _abort(
+            f"{len(missing)} gh call(s) in src/ match no row of the Operation "
+            f"catalog in docs/{PLATFORM_DOC}:\n{rows}\n"
+            f"  To fix:  add a row for each form to the Operation catalog in "
+            f"docs/{PLATFORM_DOC}, or use a catalogued command (issue #566)"
+        )
 
 
 def _check_init_template_urls(src: Path) -> None:
