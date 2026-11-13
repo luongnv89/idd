@@ -255,6 +255,8 @@ idd-lint repo --base origin/main   # any idd-lint subcommand works
 - [GitHub CLI](https://cli.github.com) (`gh`) 2.0+, authenticated via `gh auth login`
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) or any SKILL.md-compatible agent
 - Git 2.30+
+- [Node.js](https://nodejs.org) 22+ and npm 9+ — only for the `asm` install path below; the plugin and manual-copy paths do not need them
+- `python3` (optional) — the skills run small standard-library helper scripts when it is available and follow an equivalent written procedure when it is not
 
 ### Install
 
@@ -278,7 +280,7 @@ Don't have `asm`? `npm install -g agent-skill-manager`.
 
 #### Alternative — Claude Code plugin
 
-Claude Code users can install the same eight skills as one plugin. This repo is its own plugin marketplace, and the marketplace pins the plugin to the latest tagged release. A plugin install fetches only that release's `skills/` folder (about 2.7 MB), not the rest of the repository:
+Claude Code users can install the same eight skills as one plugin. This repo is its own plugin marketplace, and the marketplace pins the plugin to the latest tagged release. A plugin install fetches only that release's `skills/` folder (about 3.2 MB at v0.27.0), not the rest of the repository:
 
 ```bash
 claude plugin marketplace add luongnv89/idd   # register the marketplace (once)
@@ -293,9 +295,8 @@ Inside a session, `/plugin marketplace add luongnv89/idd` and `/plugin install i
 
 #### Alternative — Codex plugin
 
-The same eight skills ship with a Codex plugin manifest. **Release pending:**
-the current release tag predates this package. The commands below become usable
-once a new release includes it; for this checkout, use the
+The same eight skills ship with a Codex plugin manifest, included in every
+release since v0.25.0. To try an unreleased checkout instead, use the
 [local preview and submission guide](docs/codex-plugin-submission.md).
 
 ```bash
