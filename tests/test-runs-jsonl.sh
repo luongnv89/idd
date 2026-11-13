@@ -701,10 +701,13 @@ has "$AUTOPILOT_DIR/references/explicit-list-mode.md" 'plus the cost scalars' \
   "T14l: batch fan-out attributes tokens and agents once"
 has "$RUNLOG" 'on **one line only** (`tokens` and `agents` too)' \
   "T14l: schema puts batch tokens and agents on one line only"
-# The rule stays out of the footer contract: run-stats.md is byte-identical in
-# every skill and names no run-log field.
-if grep -rlE 'skill_version|runs\.jsonl' "$REPO_ROOT"/src/skills/*/references/run-stats.md >/dev/null 2>&1; then
-  fail "T14m: a run-stats.md copy carries run-log wording"
+# The rule stays out of the footer contract: run-stats.md has one authored
+# source (#560) and names no run-log field.
+RUN_STATS_SRC="$REPO_ROOT/src/shared/references/run-stats.md"
+if [ ! -f "$RUN_STATS_SRC" ]; then
+  fail "T14m: src/shared/references/run-stats.md missing"
+elif grep -qE 'skill_version|runs\.jsonl' "$RUN_STATS_SRC"; then
+  fail "T14m: run-stats.md carries run-log wording"
 else
   pass "T14m: the agreement rule is not written into run-stats.md"
 fi

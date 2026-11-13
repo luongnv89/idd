@@ -28,11 +28,12 @@
 # the contract's field limits and the ADR's rationale, so a silent widening fails
 # here without loading decision history into every skill run (#475).
 #
-# AC6 is enforced structurally: references/run-stats.md is byte-identical in
-# every skill, so "consistent across skills" is a checksum, not a promise. The
-# contract lives per skill rather than in docs/terminal-style.md because that
-# doc ships to 7 bundles and test-bundled-doc-slimming-249.sh's byte ratchet
-# (37 bytes of headroom) forbids growing it; references/ is not budget-covered.
+# AC6 is enforced structurally: the contract has one authored source,
+# src/shared/references/run-stats.md (issue #560), and the build copies it
+# verbatim into every skill, so "consistent across skills" is one file, not a
+# promise. It is a shared reference rather than part of docs/terminal-style.md
+# because that doc ships to 7 bundles and test-bundled-doc-slimming-249.sh's
+# byte ratchet forbids growing it.
 #
 # Asserts on the authored src/ sources AND on the built skills/ tree, because a
 # contract that ships only in src/ is not installed for anyone.
@@ -108,29 +109,22 @@ echo "◆ Run-stats footer Tests (issue #373)"
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 echo ""
 
-# ── AC6: one contract, byte-identical everywhere ─────────────────────────────
-echo "  AC6 — one contract, byte-identical in every skill"
-SUMS=""
-missing=0
+# ── AC6: one contract, one authored source (#560) ────────────────────────────
+echo "  AC6 — one contract, one authored source"
+SPEC="$REPO_ROOT/src/shared/references/run-stats.md"
+if [ -f "$SPEC" ]; then
+  pass "AC6: the contract is authored at src/shared/references/run-stats.md"
+else
+  fail "AC6: src/shared/references/run-stats.md missing"
+fi
+copies=0
 for d in "${SKILL_DIRS[@]}"; do
-  f="$REPO_ROOT/$d/references/run-stats.md"
-  if [ -f "$f" ]; then
-    SUMS="$SUMS$(cksum < "$f" | awk '{print $1"-"$2}')\n"
-  else
-    fail "AC6: $d/references/run-stats.md missing"
-    missing=$((missing + 1))
+  if [ -e "$REPO_ROOT/$d/references/run-stats.md" ]; then
+    fail "AC6: $d/references/run-stats.md is a second authored copy — the shape can drift"
+    copies=$((copies + 1))
   fi
 done
-if [ "$missing" -eq 0 ]; then
-  pass "AC1: all ${#SKILL_DIRS[@]} skills carry references/run-stats.md"
-  distinct=$(printf "$SUMS" | sort -u | grep -c .)
-  if [ "$distinct" -eq 1 ]; then
-    pass "AC6: every copy is byte-identical (1 distinct checksum) — labels cannot drift"
-  else
-    fail "AC6: $distinct distinct checksums across the copies — the shape has drifted"
-  fi
-fi
-SPEC="$REPO_ROOT/src/skills/issue-resolver/references/run-stats.md"
+[ "$copies" -eq 0 ] && pass "AC6: no skill authors its own copy — labels cannot drift"
 echo ""
 
 # ── AC3 + AC6: the footer's shape and fields ────────────────────────────────
@@ -143,8 +137,8 @@ check_has  "$SPEC" '^\| .agents. \|'  "AC6: agents is a defined field"
 check_flow "$SPEC" 'Fixed, in this order' "AC6: field order is pinned"
 check_flow "$SPEC" 'No skill adds, reorders, or renames one' \
   "AC6: adding, reordering, or renaming a field is forbidden"
-check_flow "$SPEC" 'byte-identical in every skill' \
-  "AC6: the contract states its own byte-identity rule"
+check_flow "$SPEC" 'authored once in .src/shared/references/.' \
+  "AC6: the contract states its single-source rule"
 check_flow "$SPEC" 'the leading unit is unpadded and every unit after it is zero-padded' \
   "AC6: the elapsed rendering is pinned, so two skills cannot format one duration differently"
 check_flow "$SPEC" 'Drop zero-valued \*leading\* units, never interior or trailing ones' \
@@ -351,7 +345,7 @@ for s in "$REPO_ROOT"/skills/*/SKILL.md; do
   check_has "$s" 'Run Stats Footer' "AC1: built $skill/SKILL.md names the footer"
   contract="$REPO_ROOT/skills/$skill/references/run-stats.md"
   if [ -f "$contract" ]; then
-    if cmp -s "$contract" "$REPO_ROOT/src/skills/$skill/references/run-stats.md"; then
+    if cmp -s "$contract" "$SPEC"; then
       pass "AC6: built $skill ships the contract byte-for-byte"
     else
       fail "AC6: built $skill/references/run-stats.md differs from its source — run ./scripts/build.sh"
