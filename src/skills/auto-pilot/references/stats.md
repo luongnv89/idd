@@ -11,7 +11,10 @@ section, Self-Improve included.
 
 ## Run the report
 
-From the repository root, with the script path resolved relative to SKILL.md:
+First check, read-only, that `shared/scripts/gi-stats.py` and
+`shared/scripts/gi-gh.py` exist relative to SKILL.md. Either one missing is a
+broken install: stop with the `✗ Missing bundled dependency` block from
+`references/preflight.md`. Then run it from the repository root, by that path:
 
 ```bash
 python3 shared/scripts/gi-stats.py
@@ -24,7 +27,7 @@ Add `--no-github` to stay offline, `--json` for a machine-readable object.
   look-back after merge per release (merged runs, reverts, reopened issues,
   follow-up bugs, flagged rate), names the walked ref, and prints any `⚠`
   freshness warning. A ceiling breach is data, never a failure.
-- **Exit 2 or 4, no `python3`, or unparsable output** — print
+- **Any other exit (1 included), no `python3`, or unparsable output** — print
   `⚠ gi-stats unavailable — counting the run log by hand` and use the fallback.
 
 ## Fallback: count the run log by hand

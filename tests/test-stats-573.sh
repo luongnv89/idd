@@ -401,6 +401,22 @@ if [ -f "$STATS_MD" ] \
 else
   fail "P: stats.md lacks a read-only guarantee or the fallback"
 fi
+# A missing gi-stats.py or gi-gh.py is a broken install (stop), not a degrade;
+# any other non-zero exit, exit 1 included, degrades to the hand count.
+if [ -f "$STATS_MD" ] && python3 - "$STATS_MD" <<'PY'
+import sys
+text = " ".join(open(sys.argv[1], encoding="utf-8").read().split())
+assert ("check, read-only, that `references/scripts/gi-stats.py` and "
+        "`references/scripts/gi-gh.py` exist relative to SKILL.md. Either one "
+        "missing is a broken install: stop with the `✗ Missing bundled "
+        "dependency` block from `references/preflight.md`") in text
+assert "**Any other exit (1 included), no `python3`, or unparsable output**" in text
+PY
+then
+  pass "P: stats.md stops on a missing gi-stats.py or gi-gh.py; other exits degrade"
+else
+  fail "P: stats.md lacks the missing-dependency stop or the exit-1 degrade"
+fi
 
 echo "  ┄"
 echo "  Passed: $PASS  Failed: $FAIL"
