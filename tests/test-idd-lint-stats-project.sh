@@ -209,6 +209,44 @@ else
   printf '%s\n' "$TEXT7" | sed 's/^/      /'
 fi
 
+# T7d: --since windows the look-back on each row's `ts`, using the one window
+# the report resolved; an unparseable window falls back to lifetime.
+if ( cd "$R7" && python3 scripts/idd-lint.py stats --no-github --json --since "2026-03-04 00:00:00" ) \
+   | python3 -c '
+import sys, json
+lb = json.load(sys.stdin)["lookback"]
+assert lb["window"] == "2026-03-04 00:00:00", lb
+assert lb["total"]["merged_runs"] == 2, lb["total"]          # PRs 17 and 19
+assert lb["prs"]["unconfirmed"] == [99] and lb["prs"]["reverted"] == [], lb
+assert sorted(lb["by_release"]) == ["unreleased"], lb["by_release"]
+' && ( cd "$R7" && python3 scripts/idd-lint.py stats --no-github --json --since garbage-typo 2>/dev/null ) \
+   | python3 -c '
+import sys, json
+lb = json.load(sys.stdin)["lookback"]
+assert lb["window"] is None and lb["total"]["merged_runs"] == 5, lb
+'; then
+  pass "T7d: --since windows the look-back on run ts; an unresolved window is lifetime"
+else
+  fail "T7d: look-back window not applied or not degraded"
+fi
+# git's decoration order is not ours to pin, so the index is also fed a commit
+# whose first tag is the non-version one.
+if printf '%s\n' "$JSON7" | python3 -c '
+import sys, json, importlib.util
+assert "latest" not in json.load(sys.stdin)["lookback"]["by_release"]
+spec = importlib.util.spec_from_file_location("idd_lint", sys.argv[1])
+m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+idx = m._index_history([
+    {"sha": "a" * 40, "ct": 1, "tags": ["latest", "v0.2.0"], "message": "feat: x (#1) (#2)\n"},
+    {"sha": "b" * 40, "ct": 0, "tags": ["deploy-7"], "message": "feat: y (#3) (#4)\n"},
+])
+assert idx.release_by_sha == {"a" * 40: "v0.2.0", "b" * 40: "v0.2.0"}, idx.release_by_sha
+' "$R7/scripts/idd-lint.py"; then
+  pass "T7e: a non-version tag is not a release boundary"
+else
+  fail "T7e: the non-version tag latest became a release"
+fi
+
 # T8: online — the join reads the gh pages the report already fetched. PR 13 is
 # both reverted and reopened (flagged once); PR 15's issue is open but its PR
 # never closed it (not reopened); PR 17 has a bug-labelled follow-up and PR 15
