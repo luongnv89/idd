@@ -814,6 +814,58 @@ else
 fi
 
 # ───────────────────────────────────────────────────────────
+# T31: Produced by provenance line (issue #567). The line is read from the
+# authored PR Body Template and its slots filled, so the lint, the template
+# and the trailer check all test the line that ships.
+# ───────────────────────────────────────────────────────────
+RT="$REPO_ROOT/src/skills/issue-resolver/references/report-templates.md"
+PRODUCED="$(grep -m1 '^- \*\*Produced by:\*\*' "$RT" || true)"
+PRODUCED="$(printf '%s' "$PRODUCED" | sed -e 's/{[^}]*}/claude-x/' -e 's/{[^}]*}/high/' \
+  -e 's/{[^}]*}/0.21.1/' -e 's/{[^}]*}/unknown/')"
+for rt in "$RT" "$REPO_ROOT/skills/issue-resolver/references/report-templates.md"; do
+  rel="${rt#"$REPO_ROOT"/}"
+  if sed -n '/^## Decision Record$/,/^Analyzed at:/p' "$rt" | grep -q '^- \*\*Produced by:\*\* model {'; then
+    pass "T31a: $rel puts the Produced by bullet in the Decision Record"
+  else
+    fail "T31a: $rel puts the Produced by bullet in the Decision Record"
+  fi
+  if grep '^<!-- idd:qa v1' "$rt" | grep -q 'Produced\|model='; then
+    fail "T31b: $rel QA marker carries provenance"
+  else
+    pass "T31b: $rel QA marker carries no provenance"
+  fi
+done
+
+awk -v l="$PRODUCED" '{print} /^- \*\*Reproduction:/{print l}' "$TMP/pr-good.md" > "$TMP/pr-produced.md"
+sed 's/locally modified unknown/locally modified no/' "$TMP/pr-produced.md" > "$TMP/pr-produced-bad.md"
+r="$(python3 "$LINT" pr "$TMP/pr-produced.md" --title "fix(auth): resolve mobile redirect loop (#42)" 2>&1; echo "|$?")"
+case "$r" in *"✓ [P07]"*"|0") pass "T31c: filled template line passes P07" ;;
+  *) fail "T31c: filled template line passes P07" ;; esac
+for f in pr-good pr-produced-bad; do
+  r="$(python3 "$LINT" pr "$TMP/$f.md" --title "fix(auth): resolve mobile redirect loop (#42)" 2>&1; echo "|$?")"
+  case "$r" in *"⚠ [P07]"*"Errors: 0"*"|0") pass "T31d: $f warns (P07) without failing" ;;
+    *) fail "T31d: $f warns (P07) without failing" ;; esac
+done
+
+# AC2: the line, as the last paragraph of a commit message, is never a trailer.
+# The control proves the detector sees a real trailer in the same position.
+TR="$TMP/trailers"
+mkdir -p "$TR"
+trailers_of() {
+  git -C "$TR" commit -q --allow-empty -m "feat(core): x (#1)" -m "Closes #1" -m "$1"
+  git -C "$TR" log -1 --format='%(trailers:only)'
+  git -C "$TR" log -1 --format=%B | git -C "$TR" interpret-trailers --parse
+}
+git -C "$TR" init -q && git -C "$TR" config user.email t@t && git -C "$TR" config user.name t \
+  && git -C "$TR" config commit.gpgsign false && git -C "$TR" config core.hooksPath /dev/null
+if [ -n "$PRODUCED" ] && [ -z "$(trailers_of "$PRODUCED" | tr -d '[:space:]')" ] \
+  && [ -n "$(trailers_of "Produced-by: claude-x" | tr -d '[:space:]')" ]; then
+  pass "T31e: the Produced by line is never parsed as a commit trailer"
+else
+  fail "T31e: the Produced by line is never parsed as a commit trailer"
+fi
+
+# ───────────────────────────────────────────────────────────
 # Summary
 # ───────────────────────────────────────────────────────────
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"

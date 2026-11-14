@@ -88,6 +88,12 @@ ADR_NO_BACKFILL = "docs/decisions/no-backfill-merged-decision-records.md"
 DR_FIELDS = ("Root cause", "Options considered", "Options rejected", "Selected option", "Residual risk")
 AC_STATUSES = ("pass", "fail", "unverified")
 NO_AC_NOTE_RE = re.compile(r"no acceptance criteria defined", re.IGNORECASE)
+# IDD resolver provenance line (issue #567) — an implementation field (§4.1 MAY).
+PRODUCED_BY_RE = re.compile(
+    r"^- \*\*Produced by:\*\* model [^·\s][^·\n]*? · effort [^·\s][^·\n]*?"
+    r" · skill [a-z0-9-]+@\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)? · locally modified (?:yes|unknown)[ \t]*$",
+    re.MULTILINE,
+)
 
 LEVELS = ("L1", "L2", "L3")
 
@@ -499,6 +505,12 @@ def lint_pr(body: str, title: str | None, issue_type: str | None, level: str) ->
             findings.append(ok("P06", "'Analyzed at:' line present (§4.1)"))
         else:
             findings.append(warn("P06", "no 'Analyzed at: `<branch> @ <sha>` (<date>)' line (§4.1, SHOULD)"))
+
+        # P07 (L3) — provenance line, an IDD resolver convention (§4.1 MAY field)
+        if PRODUCED_BY_RE.search(dr):
+            findings.append(ok("P07", "'**Produced by:**' provenance line present (IDD convention, §4.1 MAY)"))
+        else:
+            findings.append(warn("P07", "no well-formed '- **Produced by:** model … · effort … · skill <name>@<version> · locally modified yes|unknown' line (IDD convention, §4.1 MAY)"))
 
     return findings
 
