@@ -95,6 +95,8 @@ ASM installs and the tagged plugin contain only the public install surface.
 |-------|--------|---------|
 | `/idd-doctor` | `internal-skills/idd-doctor/` (build from [`src/internal-skills/idd-doctor/`](src/internal-skills/idd-doctor/)) | Read-only health check for IDD repository invariants; local-only, not distributed |
 
+Installed users get run outcomes and the post-merge look-back without it: `/auto-pilot --stats` (read-only).
+
 ---
 
 ## How It Works

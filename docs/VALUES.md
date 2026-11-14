@@ -155,7 +155,8 @@ Nothing is done on an agent's say-so. Three things are verified: the **intention
   joins each merged run to reverts, reopened issues and follow-up bugs and reports the counts
   per release (`tests/test-idd-lint-stats-project.sh`, behavioural). The trace is reported,
   not linked into the run record, except that a `/issue-pr-review --revert` row names the
-  reverted PR and its revert PR (#571); no skill runs the look-back (#573).
+  reverted PR and its revert PR (#571). `/auto-pilot --stats` (`gi-stats.py`) now reports
+  outcomes and the look-back from an installed skill, pinned by `tests/test-stats-573.sh`.
 
 ## Pillar 3 — Simplicity
 
@@ -268,8 +269,9 @@ These keep the pillars standing. The same rules apply.
   `tests/test-progress-records-542.sh`.
 - [ ] **SP3 — Observability.** A maintainer can tell whether the automation is getting
   better or worse. Partial: the resolver and auto-pilot write a local run log;
-  `/idd-doctor` and `idd-lint stats` are not shipped in any installed skill and there is no
-  trend view.
+  `/auto-pilot --stats` (`gi-stats.py`) now reports outcomes and the look-back from an
+  installed skill, pinned by `tests/test-stats-573.sh`; `/idd-doctor` is not shipped and
+  there is no trend view.
 - [ ] **SP4 — Enforcement over prose.** A rule that matters is a behavioural test, a lint
   check or a build abort. Partial: the build validators and shared scripts are tested this
   way; many skill rules are guarded by prose pins only.

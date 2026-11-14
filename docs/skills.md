@@ -242,12 +242,14 @@ Runs the full IDD loop over the issue backlog: triage, pick, resolve, review, fi
 | `/auto-pilot --dry-run` | Run triage and show the execution plan without resolving anything. |
 | `/auto-pilot --skip N` | Skip issue #N for this session. |
 | `/auto-pilot --resume` | Resume the interrupted run in `.idd/run-state.json` at its recorded phase, and resume the in-flight resolver or reviewer it spawned from that skill's durable progress record. |
+| `/auto-pilot --stats` | Report run outcomes and the post-merge look-back (reverts, reopened issues, follow-up bugs per release) from `.idd/runs.jsonl`. Read-only: no lock, no run state, no writes. Takes no other flag. |
 
 ### Flag combinations
 
 - `--issues` can combine with `--dry-run` and `--skip`.
 - `--issues` cannot combine with `--limit` because the explicit issue list is already the limit.
 - `--resume` cannot combine with `--dry-run` (a dry run changes nothing) or with `--fresh`.
+- `--stats` takes no other flag.
 
 Example:
 

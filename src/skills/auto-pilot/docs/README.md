@@ -33,6 +33,7 @@
 | "/auto-pilot --limit 3" | Process at most 3 issues then stop |
 | "/auto-pilot --dry-run" | Show the execution plan without resolving anything |
 | "/auto-pilot --skip 7" | Skip issue #7 (exclude from processing) |
+| "/auto-pilot --stats" | Report run outcomes and the post-merge look-back from the local run log; read-only |
 
 ## How It Works
 
@@ -84,6 +85,7 @@ When something fails, the auto-pilot skips and continues rather than stopping. A
 | `../references/step-reports.md` | Phase completion report rules and the per-phase check table |
 | `../references/run-log.md` | `.idd/runs.jsonl` run-log schema, single-writer rules, and the `agent_overrides` outcome field |
 | `../references/examples.md` | Full example sessions and edge-case scenarios |
+| `../references/stats.md` | The read-only `--stats` report and its by-hand fallback |
 | `../references/error-messages.md` | Complete error catalog with triggers and autonomous recovery actions |
 
 ## Output
