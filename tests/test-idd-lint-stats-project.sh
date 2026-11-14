@@ -429,6 +429,16 @@ if grep -qF 'Reverts {owner}/{repo}#{M}' "$REPO_ROOT/src/skills/issue-pr-review/
 else
   fail "T10b: revert-path.md's body template no longer carries both marker lines"
 fi
+# PR #600 review F1: M's title is author text, so it must reach `gh pr create`
+# only through a bound variable, never as a placeholder pasted into a shell word.
+REVERT_DOC="$REPO_ROOT/src/skills/issue-pr-review/references/revert-path.md"
+if grep -qF 'title="$(gh pr view {M} --json title --jq .title)"' "$REVERT_DOC" \
+   && grep -qF -- '--title "Revert \"$title\""' "$REVERT_DOC" \
+   && ! grep -qE '\{M title\}' "$REVERT_DOC"; then
+  pass "T10d: revert-path.md binds M's title from gh output, never pastes it into a shell word"
+else
+  fail "T10d: revert-path.md pastes M's title into a command instead of binding it"
+fi
 
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 echo "Results: $PASS passed, $FAIL failed"
