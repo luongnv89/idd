@@ -1411,6 +1411,8 @@ ALLOWED_VARS = {
     "$wt_dir": "worktree path the skill composes itself",
     "$base": "base branch name read from the repo, never reporter text",
     "${base}": "base branch name read from the repo, never reporter text",
+    # Issue #571. The revert path's policy ref: the default branch `gh repo view` reports.
+    "${policy_base}": "default branch name read from the repo, never reporter text",
     "$branch_name": "derived by gi-branch.py --from-issue, which sanitizes it",
     "$run_json": "run-log JSON the skill composed; reaches gi-runlog on stdin",
     "$no_run_log": "a flag the skill sets itself, tested by `[ -n … ]`",

@@ -369,8 +369,8 @@ fi
 # ── T10: a revert made by the revert path counts (#571, AC3) ──
 # `/issue-pr-review 21 --revert` opens PR 22, which IDD squash-merges with the
 # PR body as the commit body (references/revert-path.md). PR 21 is counted
-# reverted; PR 22 is no run and no landing commit; the `revert_opened` row
-# (pr 21, revert_pr 22) folds into PR 21's run and is not a failed attempt.
+# reverted from git; PR 22 is no run and no landing commit; the
+# `revert_opened` row (pr 21, revert_pr 22) is neither a run nor a failed attempt.
 R10="$(make_repo revert-path-repo git@github.com:acme/look.git)"
 echo a > "$R10/a.txt"; git -C "$R10" add a.txt; git -C "$R10" commit -qm 'feat(a): add a (#20) (#21)'
 SHA21="$(git -C "$R10" rev-parse HEAD)"
@@ -405,6 +405,23 @@ assert runs["attempted"] == 1 and runs["succeeded"] == 1, runs
   pass "T10: the revert path counts PR 21 reverted; its row is no failed attempt"
 else
   fail "T10: revert path not counted, or its row skews run stats (exit $RC10)"
+fi
+# T10c: a revert_opened row is never a run. Under a window that holds only the
+# row, PR 21 (merged before it) is out; with no IDD run for PR 21, no phantom.
+lb10() { # $1 = runs.jsonl lines, then extra stats args
+  printf '%s\n' "$1" > "$R10/.idd/runs.jsonl"; shift
+  ( cd "$R10" && python3 scripts/idd-lint.py stats --no-github --json "$@" 2>/dev/null ) | python3 -c '
+import sys, json
+lb = json.load(sys.stdin)["lookback"]
+assert lb is not None and lb["total"]["merged_runs"] == 0 and lb["prs"]["reverted"] == [], lb'
+}
+ROW10_OK='{"ts":"2026-03-04T12:00:00Z","issue":20,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":21}'
+ROW10_RV='{"ts":"2026-03-05T12:00:00Z","issue":20,"mode":"auto","skill":"issue-pr-review","outcome":"revert_opened","pr":21,"revert_pr":22}'
+if lb10 "$ROW10_OK
+$ROW10_RV" --since "2026-03-05 00:00:00" && lb10 "$ROW10_RV"; then
+  pass "T10c: a revert_opened row pulls no PR into the window and adds no phantom run"
+else
+  fail "T10c: a revert_opened row was counted as a run"
 fi
 if grep -qF 'Reverts {owner}/{repo}#{M}' "$REPO_ROOT/src/skills/issue-pr-review/references/revert-path.md" \
    && grep -qF 'This reverts commit {oid}.' "$REPO_ROOT/src/skills/issue-pr-review/references/revert-path.md"; then

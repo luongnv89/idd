@@ -23,7 +23,8 @@ host-reported count is never zero and a zero-filled one would pull the
 per-release median toward a number nobody measured.
 
 `revert_pr` (issue #571) is the PR a `/issue-pr-review --revert` row opened;
-that row's `pr` is the reverted PR, and it needs both as integers.
+that row's `pr` is the reverted PR, and it needs both as integers; no other
+row may carry `revert_pr`.
 
 `--failure-streak N` is the one **read** mode. It scans the log backwards and
 counts the issue's leading run of `failed` outcomes — the consecutive
@@ -188,8 +189,8 @@ OUTCOMES_BY_SKILL = {
             "skipped",
         }
     ),
-    # `/issue-pr-review <M> --revert` (#571): `pr` is the reverted PR M, so
-    # readers fold the row into the run it undoes; `revert_pr` is the new PR.
+    # `/issue-pr-review <M> --revert` (#571): `pr` is the reverted PR M and
+    # `revert_pr` the new PR; the row links them, it is not a run.
     "issue-pr-review": frozenset({"revert_opened"}),
 }
 
@@ -326,6 +327,8 @@ def normalize_record(record: object, *, now: str | None = None) -> dict[str, obj
     ):
         raise RecordError("a revert_opened row needs integer pr (the reverted PR) and revert_pr")
     revert_pr = record.get("revert_pr")
+    if revert_pr is not None and record["outcome"] != "revert_opened":
+        raise RecordError("revert_pr is only allowed on a revert_opened row")
     if revert_pr is not None and revert_pr < 1:
         raise RecordError("revert_pr must be a positive integer")
 

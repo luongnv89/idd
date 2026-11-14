@@ -714,8 +714,8 @@ fi
 
 # --- T15: the revert path's row (issue #571) --------------------------------
 # `/issue-pr-review <M> --revert` writes one `revert_opened` row: `pr` is the
-# reverted PR M (so readers fold it into the run it undoes), `revert_pr` the
-# new PR, emitted right after `pr`.
+# reverted PR M, `revert_pr` the new PR, emitted right after `pr`; no other
+# row may carry `revert_pr`.
 rv_rec() { # $1 = outcome, $2 = raw JSON members after outcome
   printf '{"ts":"2026-01-01T00:00:00Z","issue":7,"mode":"auto","skill":"issue-pr-review","outcome":"%s",%s}' "$1" "$2"
 }
@@ -725,7 +725,7 @@ if [ "$rc" -eq 0 ] && printf '%s' "$out" | grep -qF '"outcome":"revert_opened","
 else
   fail "T15a: revert_opened row rejected or out of order (exit $rc): $out"
 fi
-for bad in 'success|"pr":12' 'merged|"pr":12,"revert_pr":13' \
+for bad in 'success|"pr":12' \
   'revert_opened|"pr":12' 'revert_opened|"pr":12,"revert_pr":null' 'revert_opened|"pr":null,"revert_pr":13' \
   'revert_opened|"pr":12,"revert_pr":"13"' 'revert_opened|"pr":12,"revert_pr":true' 'revert_opened|"pr":12,"revert_pr":0'; do
   rc=0; rv_rec "${bad%%|*}" "${bad#*|}" | python3 "$HELPER" --echo >/dev/null 2>&1 || rc=$?
@@ -735,6 +735,14 @@ for bad in 'success|"pr":12' 'merged|"pr":12,"revert_pr":13' \
     fail "T15b: issue-pr-review $bad returned exit $rc, expected 3"
   fi
 done
+rv_ok='{"ts":"2026-01-01T00:00:00Z","issue":7,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":12'
+rc=0; printf '%s}' "$rv_ok" | python3 "$HELPER" --echo >/dev/null 2>&1 || rc=$?
+rc2=0; printf '%s,"revert_pr":13}' "$rv_ok" | python3 "$HELPER" --echo >/dev/null 2>&1 || rc2=$?
+if [ "$rc" -eq 0 ] && [ "$rc2" -eq 3 ]; then
+  pass "T15b: gi-runlog rejects revert_pr on an otherwise legal resolver row"
+else
+  fail "T15b: resolver row exit $rc, with revert_pr exit $rc2 (want 0, 3)"
+fi
 has "$RUNLOG" '| `revert_pr` |' "T15c: run-log schema documents revert_pr"
 has "$RUNLOG" 'Revert path: `revert_opened`' "T15c: run-log schema lists the revert_opened outcome"
 
