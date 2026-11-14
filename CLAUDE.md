@@ -4,6 +4,10 @@
 
 IDD Stack implements Issue-Driven Development (IDD) — a methodology where GitHub issues are the single source of truth for all development work. The product is a set of Claude Code skills that create, normalize, resolve, and triage GitHub issues.
 
+## Core Values
+
+`docs/VALUES.md` is the checklist every skill, shared agent, shared script and runtime doc is held to: token efficiency, verification of work, simplicity, trustworthiness, and the properties that support them. Read it before changing any of those files. A change must not weaken a checked item, and the values themselves change only on the maintainer's explicit request — stop and ask instead of trading one away.
+
 ## Commands
 
 Recorded build/test commands (verified in `docs/agent-environment.md` — see that file for toolchain requirements, environment variables, and verification notes):

@@ -4,6 +4,10 @@
 
 IDD Stack implements Issue-Driven Development (IDD) — a methodology where GitHub issues are the single source of truth for all development work. The product is a set of Codex skills that create, normalize, resolve, and triage GitHub issues.
 
+## Core Values
+
+`docs/VALUES.md` is the checklist every skill, shared agent, shared script and runtime doc is held to: token efficiency, verification of work, simplicity, trustworthiness, and the properties that support them. Read it before changing any of those files. A change must not weaken a checked item, and the values themselves change only on the maintainer's explicit request — stop and ask instead of trading one away.
+
 ## Architecture
 
 This is a **prompt-first** project. Almost all of it is prose: each skill is a self-contained Codex skill (SKILL.md + references/ + templates/) that instructs the agent how to perform a task, and there is no application runtime. The one exception is `src/shared/scripts/` — small, stdlib-only Python helpers that skills shell out to for the few jobs where determinism beats prose. Every one of them is optional at run time: the skill prose that invokes a script also documents the manual procedure, so a skill still works where the script cannot run. Shared agents live in `src/shared/agents/` and are referenced by multiple skills. All authored skill sources live under `src/`. Per issue #81, all documentation — both runtime docs consumed by skills and human-only project docs — lives in a single top-level `docs/` tree.
