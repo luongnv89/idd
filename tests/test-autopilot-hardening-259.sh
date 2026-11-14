@@ -1436,7 +1436,7 @@ expect_grep "#570: SKILL.md documents autopilot.max_open_prs with its default" \
 expect_grep "#570: SKILL.md validates the cap's range at config load" \
   'and `autopilot.max_open_prs` (`0..50`); anything else is invalid config' "$AP_SKILL"
 expect_grep "#570: Stop Conditions names the cap stop in the widened limit row" \
-  '| Iteration limit or open PR cap (`autopilot.max_open_prs`) reached | `○ Limit reached ({max} iterations)` · `○ Open PR cap reached ({count}/{max})` |' \
+  '| Iteration limit or open PR cap (`autopilot.max_open_prs`) reached | `○ Limit reached ({max} iterations)` · `○ Open PR cap reached ({count}/{max}) — stopping cleanly` |' \
   "$AP_SKILL"
 expect_grep_re "#570: the bundled config schema carries max_open_prs: 0" \
   '^  max_open_prs: 0$' "$AP_SCHEMA"
@@ -1460,6 +1460,13 @@ expect_grep "#570: an untrustworthy count fails closed" \
   'It fails closed: a' "$AP_P0"
 expect_grep "#570: the fail-closed stop has its own line" \
   '⚠ Open PR count unavailable — stopping (autopilot.max_open_prs is set)' "$AP_P0"
+expect_grep "#570: the cap read goes through the transient-failure retry" \
+  'non-transient failure, an exhausted *Transient-failure retry*' "$AP_P0"
+expect_grep "#570: the fail-closed stop is listed under Uncertainty" \
+  'under `Uncertainty:`, and stop the same way' "$AP_P0"
+expect_grep "#570: explicit-list mode runs the budget and cap checks per iteration" \
+  'per-iteration pre-work is the *Runtime budget check* and *Open PR cap check*' \
+  "$AP/references/explicit-list-mode.md"
 expect_grep "#570: a fan-out takes only the slots left under the cap" \
   'the slots left' "$AP_P1"
 expect_grep "#570: phase 1 evaluates the cap check at the top of the iteration" \

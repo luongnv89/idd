@@ -289,7 +289,7 @@ The loop stops on any row except those marked *loop continues* (outcome recorded
 | Condition | Output |
 |-----------|--------|
 | No open issues | `✓ All issues resolved!` |
-| Iteration limit or open PR cap (`autopilot.max_open_prs`) reached | `○ Limit reached ({max} iterations)` · `○ Open PR cap reached ({count}/{max})` |
+| Iteration limit or open PR cap (`autopilot.max_open_prs`) reached | `○ Limit reached ({max} iterations)` · `○ Open PR cap reached ({count}/{max}) — stopping cleanly` |
 | Explicit list exhausted | `✓ All requested issues resolved!` |
 | No eligible issues (all blocked/skipped) | `⚠ No eligible issues to pick` |
 | Resolution failure (pause_on_failure: true) | `⚠ Auto-pilot paused` |

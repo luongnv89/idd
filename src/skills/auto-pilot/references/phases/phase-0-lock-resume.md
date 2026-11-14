@@ -304,10 +304,13 @@ At or above the cap, stop cleanly:
 
 Then follow the *Runtime budget check*'s exit sequence (Final Summary,
 `--report`, `--unlock`, footer) with Result `LIMIT REACHED`. It fails closed: a
-failed call, or a full page of 100 with fewer matches than the cap, is a count
-that cannot be trusted — print
-`⚠ Open PR count unavailable — stopping (autopilot.max_open_prs is set)` and
-stop the same way. A full page with at least cap matches is an ordinary cap stop.
+non-transient failure, an exhausted *Transient-failure retry*
+(`references/preflight.md`), or a full page of 100 with fewer matches than the
+cap is a count that cannot be trusted. For an opted-in cap that degrade is this
+stop: print
+`⚠ Open PR count unavailable — stopping (autopilot.max_open_prs is set)`, list it
+under `Uncertainty:`, and stop the same way. A full page with at least cap
+matches is an ordinary cap stop.
 
 ### Context threshold check <!-- a:ctx-check -->
 

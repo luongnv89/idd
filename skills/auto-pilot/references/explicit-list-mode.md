@@ -387,7 +387,7 @@ here with the rest of Phase 1
 
 ### Re-triage between iterations
 
-Explicit list mode does **not** re-triage between iterations. The analysis determined the order upfront — respect it. The only per-iteration pre-work is syncing to the default branch (Step 2.1).
+Explicit list mode does **not** re-triage between iterations. The analysis determined the order upfront — respect it. The only per-iteration pre-work is the *Runtime budget check* and *Open PR cap check* (`references/phases/phase-0-lock-resume.md`), then syncing to the default branch (Step 2.1).
 
 Triage mode triages once, reuses a `fresh` `.idd/triage.json`, and updates that payload in place after each merge. Explicit list mode remains the stronger form of the same property — it never triages at all, so there is no cache to keep current and no pick miss to recover from.
 
