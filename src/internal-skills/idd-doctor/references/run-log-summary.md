@@ -11,7 +11,8 @@ already skipped):
 
 - **Resolve rate** — share of runs whose `outcome` is a delivered resolution.
   Count `success` (resolver) and `merged` (auto-pilot) as resolved, and report
-  `resolved / total` with a percentage.
+  `resolved / total` with a percentage; `revert_opened` rows are not resolve
+  attempts and stay out of the denominator.
 - **Median QA cycles** — median `qa_cycles` across the runs carrying it (omit
   runs without the field); `n/a` if none carry it.
 - **Common skip reasons** — the top 3 `skipped_reason` values by frequency

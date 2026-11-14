@@ -534,7 +534,7 @@ def commit_subjects(rev_range: str) -> list[str]:
 # --- Stats (evidence report) -----------------------------------------------------
 
 SUCCESS_OUTCOMES = {"success", "merged"}
-SKIP_OUTCOMES = {"skipped", "already_resolved"}
+SKIP_OUTCOMES = {"skipped", "already_resolved", "revert_opened"}
 
 # A collector that fetched a gh page hands it back under this private key, and
 # collect_github_stats pops it before merging the metrics, so the look-back join

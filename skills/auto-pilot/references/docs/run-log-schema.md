@@ -1,7 +1,7 @@
 <!-- Generated from /docs/run-log-schema.md. Do not edit. Edit source and run ./scripts/build.sh. -->
 # `.idd/runs.jsonl` — Run Log Schema
 
-The cross-run telemetry file written by `/issue-resolver` and `/auto-pilot`: field
+The cross-run telemetry file written by `/issue-resolver`, `/auto-pilot` and `/issue-pr-review --revert`: field
 set, append rules, rotation, and the single-writer convention.
 
 ## Schema
@@ -20,9 +20,10 @@ Full field set; *Always present* is the required minimum:
 | `event_id` | string | no | Idempotency key for a parallel lane, minted at scheduling. Used only with `--append-once`; legacy writers omit it. |
 | `issue` | integer | yes | Issue number the run processed |
 | `mode` | string | yes | Resolver rows: `interactive`/`auto`. Auto-pilot rows: its merge mode (`conservative`/`balanced`/`aggressive`) |
-| `skill` | string | yes | `issue-resolver` or `auto-pilot` — the writer |
-| `outcome` | string | yes | Terminal outcome. Resolver: `success`, `already_resolved`, `failed`. Auto-pilot: `merged`, `left_open`, `partial_followup`, `blocked_by_dependency`, `failed`, `skipped`. |
+| `skill` | string | yes | `issue-resolver`, `auto-pilot` or `issue-pr-review` — the writer |
+| `outcome` | string | yes | Terminal outcome. Resolver: `success`, `already_resolved`, `failed`. Auto-pilot: `merged`, `left_open`, `partial_followup`, `blocked_by_dependency`, `failed`, `skipped`. Revert path: `revert_opened`. |
 | `pr` | integer or null | yes | PR number when a PR was created, else `null` |
+| `revert_pr` | integer | no | Revert PR a `revert_opened` row opened; its `pr` is the reverted PR |
 | `complexity` | string | no | Research complexity on the **3-value** run-log scale, when known. Collapse the researcher's 5-value estimate: `trivial`/`low` → `low`, `medium` → `medium`, `high`/`complex` → `high`. Never emit `trivial` or `complex`. |
 | `profile` | string | no | Adaptive-effort pipeline profile: `light` (trivial fast path) or `full`. Omitted when `resolve.adaptive_effort` is `false` or the signal was unavailable. See [agent-model-effort.md](https://github.com/luongnv89/idd/blob/main/docs/agent-model-effort.md) (Complexity → profile). |
 | `agent_overrides` | string | no | Whether the configured `agents.*` overrides reached the run's spawns: `applied` (all — a prompt-hint effort counts), `partial` (some), `fallback` (none: unsupported, a rejected spawn, or no Agent tool). **Omitted when no spawned role had an override configured.** |
