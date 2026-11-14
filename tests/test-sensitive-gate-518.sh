@@ -23,7 +23,11 @@
 #           `sensitive`; an Effort key is refused, never read (AC2); a `diff`
 #           range is classified from git in a temp repo (renames list both
 #           sides, non-ASCII paths are not quoted), a bad range is exit 3, a
-#           git failure or a shadowed (ambiguous) base ref exit 4, and `diff.relative` cannot hide a path; the
+#           git failure or a shadowed (ambiguous) base ref exit 4, and `diff.relative` cannot hide a path;
+#           the base must be a remote-tracking ref and the head HEAD or a commit
+#           id (#605), so a branch named origin/<base> in a single-branch clone,
+#           a branch-name head, an empty diff or a head inside the base is exit
+#           4, and git runs under LC_ALL=C; the
 #           resolver's Deliver (any delivered sensitive path Step 2 did not
 #           mark) and pr-review's Depth gate and Merge floor read it (AC1, AC3).
 #
@@ -164,42 +168,61 @@ check "G7: a stated XS Effort leaves the tier of the same labels and paths uncha
 
 GITREPO="$(mktemp -d)"
 AMBREPO="$(mktemp -d)"
-trap 'rm -rf "$GITREPO" "$AMBREPO"' EXIT
+R3REPO="$(mktemp -d)"
+STUBDIR="$(mktemp -d)"
+trap 'rm -rf "$GITREPO" "$AMBREPO" "$R3REPO" "$STUBDIR"' EXIT
 g() { git -C "$GITREPO" -c user.name=t -c user.email=t@example.invalid -c commit.gpgsign=false "$@"; }
 dclassify() { (cd "$GITREPO" && printf '%s' "{\"labels\":[],\"paths\":[],\"diff\":\"$1\"}" | python3 "$SCRIPT" --classify); }
+# The callers pass origin/<base>...HEAD or ...<head sha> (#605): point the
+# remote-tracking ref at the base branch now, and name the head by its commit id.
+rng() { g update-ref "refs/remotes/origin/$1" "$1" && printf 'origin/%s...%s' "$1" "$(g rev-parse "$2")"; }
 g init -q -b main && mkdir -p "$GITREPO/.github/workflows" "$GITREPO/docs" \
   && echo 'on: push' > "$GITREPO/.github/workflows/ci.yml" && echo '# guide' > "$GITREPO/docs/guide.md" \
   && echo '{}' > "$GITREPO/package.json" && g add -A && g commit -q -m base
 check "G7: temp git repo for the diff cases" "$?"
 g checkout -q -b rename main && g mv .github/workflows/ci.yml docs/ci.yml && g commit -q -m mv
-out="$(dclassify main...rename)"
+out="$(dclassify "$(rng main rename)")"
 [ "$(field "$out" tier)" = '"sensitive"' ]
 check "G7: renaming .github/workflows/ci.yml to docs/ci.yml is sensitive — both sides are listed" "$?"
 g checkout -q -b unicode main && echo 'on: push' > "$GITREPO/.github/workflows/déploy.yml" && g add -A && g commit -q -m u
-out="$(dclassify main...unicode)"
+out="$(dclassify "$(rng main unicode)")"
 python3 -c 'import json,sys; r=json.loads(sys.argv[1]); sys.exit(0 if r["tier"] == "sensitive" and r["reasons"][0]["class"] == "ci-workflow" and r["reasons"][0]["source"] == "diff" else 1)' "$out"
 check "G7: a non-ASCII file under .github/workflows/ is sensitive (ci-workflow), never a quoted miss" "$?"
 g checkout -q -b deps main && echo '{"dependencies":{}}' > "$GITREPO/package.json" && g commit -q -am d
-out="$(dclassify main...deps)"
+out="$(dclassify "$(rng main deps)")"
 python3 -c 'import json,sys; r=json.loads(sys.argv[1]); sys.exit(0 if r["tier"] == "sensitive" and r["reasons"][0]["class"] == "dependency-manifest" else 1)' "$out"
 check "G7: a dependency manifest change is sensitive" "$?"
 g checkout -q -b plain main && echo 'more' >> "$GITREPO/docs/guide.md" && g commit -q -am p
-out="$(dclassify main...plain)"
-[ "$(field "$out" tier)" = '"standard"' ]; check "G7: a plain docs change is standard" "$?"
+out="$(dclassify "$(rng main plain)")"; ec=$?
+[ "$ec" = "0" ] && [ "$(field "$out" tier)" = '"standard"' ]; check "G7: a plain docs change at a 40-hex head is standard (exit 0)" "$?"
+dclassify 'origin/main...plain' >/dev/null 2>&1; [ "$?" = "4" ]
+check "G7: a head named by a branch, never HEAD or a commit id, is exit 4 (#605)" "$?"
+dclassify 'main...HEAD' >/dev/null 2>&1; [ "$?" = "4" ]
+check "G7: a base that is a local branch, not a remote-tracking ref, is exit 4 (#605)" "$?"
+dclassify "$(rng main main)" >/dev/null 2>&1; [ "$?" = "4" ]
+check "G7: an empty diff (head = base) is exit 4, never tier standard (#605)" "$?"
+g checkout -q -b empty main && g commit -q --allow-empty -m e
+dclassify "$(rng main empty)" >/dev/null 2>&1; [ "$?" = "4" ]
+check "G7: a head with commits but no changed path is exit 4 (#605)" "$?"
 # A PR into `rel` whose head carries default-branch commits `rel` lacks: the
 # manifest change drops out of main...feat yet still lands in rel, so the range
 # must use the PR's own base, never the default branch.
 g branch rel main && g checkout -q main && echo '{"dependencies":{"x":"1"}}' > "$GITREPO/package.json" \
   && g commit -q -am dep && g checkout -q -b feat && echo 'feat' >> "$GITREPO/docs/guide.md" && g commit -q -am f
-[ "$(field "$(dclassify rel...feat)" tier)" = '"sensitive"' ] && [ "$(field "$(dclassify main...feat)" tier)" = '"standard"' ]
-check "G7: a PR into rel classifies rel...feat (sensitive), not main...feat (standard) — the PR's base is the range" "$?"
-for bad in '-p...main' 'main..plain' 'main...plain...x' 'main....plain' 'main...' 'main...pl;ain' 'main~1...plain'; do
+[ "$(field "$(dclassify "$(rng rel feat)")" tier)" = '"sensitive"' ] && [ "$(field "$(dclassify "$(rng main feat)")" tier)" = '"standard"' ]
+check "G7: a PR into rel classifies origin/rel...feat (sensitive), not origin/main...feat (standard) — the PR's base is the range" "$?"
+dclassify "$(rng main rel)" >/dev/null 2>&1; [ "$?" = "4" ]
+check "G7: a head already contained in the base (rel inside main) is exit 4 (#605)" "$?"
+for bad in '-p...main' 'main..plain' 'main...plain...x' 'main....plain' 'main...' 'main...pl;ain' 'main~1...plain' 'origin/main...HEAD\n'; do
   dclassify "$bad" >/dev/null 2>&1; [ "$?" = "3" ]; check "G7: the range '$bad' is exit 3" "$?"
 done
-dclassify 'main...no-such-ref' >/dev/null 2>&1; [ "$?" = "4" ]
-check "G7: an unknown ref is exit 4 (cannot complete), never 'not sensitive'" "$?"
+dclassify 'origin/no-such-ref...HEAD' >/dev/null 2>&1; [ "$?" = "4" ]
+check "G7: an unknown base ref is exit 4 (cannot complete), never 'not sensitive'" "$?"
+dclassify "origin/main...$(printf 'de%.0s' $(seq 20))" >/dev/null 2>&1; [ "$?" = "4" ]
+check "G7: an unknown 40-hex head is exit 4 (cannot complete), never 'not sensitive'" "$?"
 g config diff.relative true
-out="$(cd "$GITREPO/docs" && printf '%s' '{"labels":[],"paths":[],"diff":"main...unicode"}' | python3 "$SCRIPT" --classify)"
+urng="$(rng main unicode)"
+out="$(cd "$GITREPO/docs" && printf '%s' "{\"labels\":[],\"paths\":[],\"diff\":\"$urng\"}" | python3 "$SCRIPT" --classify)"
 [ "$(field "$out" tier)" = '"sensitive"' ]
 check "G7: diff.relative=true and a subdirectory cwd still list a .github/workflows change (sensitive)" "$?"
 # `gh pr checkout` names the local branch after the PR's head branch, so a fork
@@ -218,6 +241,25 @@ a checkout -q -b origin/main
 out="$(aclassify 2>/dev/null)"; ec=$?
 [ "$ec" = "4" ] && ! { [ "$ec" = "0" ] && [ "$(field "$out" tier)" = '"standard"' ]; }
 check "G7: a local branch named origin/main shadowing the base is exit 4, never tier standard with exit 0" "$?"
+# R3 (#605): a single-branch clone fetching a non-default base writes only
+# FETCH_HEAD, so a fork head branch named origin/rel is the only match — no
+# ambiguity warning — and origin/rel...HEAD would diff the PR against itself.
+r() { git -C "$R3REPO" -c user.name=t -c user.email=t@example.invalid -c commit.gpgsign=false "$@"; }
+git clone -q --single-branch -b main "$GITREPO" "$R3REPO" && r fetch -q origin -- rel \
+  && ! r rev-parse --verify -q refs/remotes/origin/rel >/dev/null && r checkout -q -b origin/rel FETCH_HEAD \
+  && mkdir -p "$R3REPO/.github/workflows" && echo 'on: push' > "$R3REPO/.github/workflows/x.yml" && r add -A && r commit -q -m x
+check "G7: single-branch clone where only FETCH_HEAD holds rel and a local branch origin/rel is checked out" "$?"
+r3_err="$(LC_ALL=C r -c core.warnAmbiguousRefs=true diff --name-only origin/rel...HEAD 2>&1 >/dev/null)"
+out="$(cd "$R3REPO" && printf '%s' '{"labels":[],"paths":[],"diff":"origin/rel...HEAD"}' | python3 "$SCRIPT" --classify 2>/dev/null)"; ec=$?
+[ "$ec" = "4" ] && ! { [ "$ec" = "0" ] && [ "$(field "$out" tier)" = '"standard"' ]; } && ! printf '%s' "$r3_err" | grep -q ambiguous
+check "G7: an unambiguous local branch origin/rel standing in for a missing base is exit 4, never tier standard (#605)" "$?"
+# N3 (#605): every git call runs under LC_ALL=C, so the `ambiguous` check
+# reads git's English stderr whatever the caller's locale.
+printf '#!/bin/sh\necho "$LC_ALL" >> "%s/log"\nexit 1\n' "$STUBDIR" > "$STUBDIR/git" && chmod +x "$STUBDIR/git"
+(cd "$GITREPO" && printf '%s' '{"labels":[],"paths":[],"diff":"origin/main...HEAD"}' \
+  | PATH="$STUBDIR:$PATH" LC_ALL=fr_FR.UTF-8 LANGUAGE=fr python3 "$SCRIPT" --classify >/dev/null 2>&1); ec=$?
+[ "$ec" = "4" ] && [ -s "$STUBDIR/log" ] && ! grep -qvx C "$STUBDIR/log"
+check "G7: git runs with LC_ALL=C whatever the caller's locale (#605)" "$?"
 
 DELIVER="$SRC_PKG/references/steps/step-5-deliver.md"
 PR_SRC="$REPO_ROOT/src/skills/issue-pr-review/SKILL.source.md"

@@ -26,13 +26,21 @@ plan, writing rebuttals — stays with the agent.
 
   `diff` is optional: a range `<base>...<head>` whose two sides are each
   non-empty, start with neither `-` nor `.`, use only `[A-Za-z0-9._/-]` and
-  hold no `..` (anything else is exit 3). The script runs
-  `git --no-replace-objects diff -z --no-renames --no-relative --name-only
-  <range> --` in the working directory and classifies every changed path (a
-  rename lists both sides, NUL-split so no path is quoted, and `diff.relative`
-  cannot drop a path outside the cwd) together with `paths`, source `diff`.
-  A git failure — git missing, an unknown or ambiguous ref, not a repository —
-  is exit 4, never "not sensitive".
+  hold no `..` (anything else, a trailing newline included, is exit 3). Each
+  side is resolved before the diff so no ref name can shadow it (issue #605):
+  `<base>` must be a remote-tracking ref — `git rev-parse --symbolic-full-name`
+  must print exactly `refs/remotes/<base>` (or `<base>` when it already starts
+  `refs/remotes/`), so a local branch `origin/<base>` is refused — and
+  `<head>` must be the literal `HEAD` or a full 40- or 64-hex commit id. Both
+  resolve to commit ids, and the script runs `git --no-replace-objects diff
+  -z --no-renames --no-relative --name-only <base_id>...<head_id> --` in the
+  working directory and classifies every changed path (a rename lists both
+  sides, NUL-split so no path is quoted, and `diff.relative` cannot drop a
+  path outside the cwd) together with `paths`, source `diff`. Exit 4, never
+  "not sensitive": git missing or failing, not a repository, an unknown or
+  ambiguous ref, a base that is not that remote-tracking ref, any other head,
+  no merge base, a head already contained in the base, or an empty diff (a
+  real PR always changes a path). Every git call runs with `LC_ALL=C`.
 
     label            a label containing `security`, `cve` or `vulnerability`,
                      case-insensitive — the labels Step 0d already honours
@@ -142,6 +150,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -187,7 +196,10 @@ INFRA_DIRS = frozenset({
 })
 MIGRATION_DIRS = frozenset({"migrations", "migration", "migrate", "alembic"})
 # One side of a `diff` range: no leading `-` (an option) or `.`, no `..`.
-RANGE_SIDE = re.compile(r"^[A-Za-z0-9_/][A-Za-z0-9._/-]*$")
+RANGE_SIDE = re.compile(r"[A-Za-z0-9_/][A-Za-z0-9._/-]*")
+# The head side is a commit, never a ref name a branch could shadow (#605).
+HEAD_SIDE = re.compile(r"HEAD|[0-9a-f]{40}|[0-9a-f]{64}")
+GIT_ENV = {**os.environ, "LC_ALL": "C"}  # the `ambiguous` check reads English stderr
 CAMEL = re.compile(r"(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])")
 DIGIT_EDGE = re.compile(r"(?<=[A-Za-z])(?=[0-9])|(?<=[0-9])(?=[A-Za-z])")
 NON_WORD = re.compile(r"[^a-z0-9]+")
@@ -287,25 +299,47 @@ class Unavailable(OSError):
     """The `diff` range could not be listed (exit 4): the tier is unknown."""
 
 
-def diff_paths(rng: object) -> list[str]:
-    """Every path `git diff <base>...<head>` changes; a rename lists both sides."""
-    if not isinstance(rng, str):
-        raise InvalidInput("`diff` must be a string <base>...<head>")
-    sides = rng.split("...")
-    if len(sides) != 2 or not all(RANGE_SIDE.match(s) and ".." not in s for s in sides):
-        raise InvalidInput("`diff` must be <base>...<head> using only [A-Za-z0-9._/-]")
+def _git(*args: str) -> str:
+    """Run one git command; any failure or ambiguity warning is Unavailable."""
     try:
         proc = subprocess.run(
-            ["git", "-c", "core.warnAmbiguousRefs=true", "--no-replace-objects", "diff", "-z", "--no-renames", "--no-relative", "--name-only", rng, "--"],
-            stdin=subprocess.DEVNULL, capture_output=True, check=False,
+            ["git", "-c", "core.warnAmbiguousRefs=true", "--no-replace-objects", *args],
+            stdin=subprocess.DEVNULL, capture_output=True, check=False, env=GIT_ENV,
         )
     except (OSError, ValueError) as exc:
         raise Unavailable(f"cannot run git — {exc}") from exc
     if proc.returncode != 0 or b"ambiguous" in proc.stderr:
         detail = proc.stderr.decode("utf-8", errors="replace").strip().splitlines()
-        raise Unavailable(f"git diff {rng} failed: {detail[-1] if detail else 'unknown'}")
-    out = proc.stdout.decode("utf-8", errors="surrogateescape")
-    return [p for p in out.split("\0") if p]
+        raise Unavailable(f"git {args[0]} failed: {detail[-1] if detail else 'unknown'}")
+    return proc.stdout.decode("utf-8", errors="surrogateescape")
+
+
+def _commit(rev: str) -> str:
+    return _git("rev-parse", "--verify", "--end-of-options", f"{rev}^{{commit}}").strip()
+
+
+def diff_paths(rng: object) -> list[str]:
+    """Every path `git diff <base>...<head>` changes; a rename lists both sides."""
+    if not isinstance(rng, str):
+        raise InvalidInput("`diff` must be a string <base>...<head>")
+    sides = rng.split("...")
+    if len(sides) != 2 or not all(RANGE_SIDE.fullmatch(s) and ".." not in s for s in sides):
+        raise InvalidInput("`diff` must be <base>...<head> using only [A-Za-z0-9._/-]")
+    base, head = sides
+    want = base if base.startswith("refs/remotes/") else f"refs/remotes/{base}"
+    full = _git("rev-parse", "--verify", "--symbolic-full-name", "--end-of-options", base).strip()
+    if full != want:
+        raise Unavailable(f"base {base} is {full or 'not a ref'}, not the remote-tracking {want}")
+    if not HEAD_SIDE.fullmatch(head):
+        raise Unavailable(f"head {head} must be HEAD or a full commit id, never a ref name")
+    base_id, head_id = _commit(full), _commit(head)
+    if _git("merge-base", base_id, head_id).strip() == head_id:
+        raise Unavailable(f"head {head} is already contained in {base}: nothing to classify")
+    out = _git("diff", "-z", "--no-renames", "--no-relative", "--name-only", f"{base_id}...{head_id}", "--")
+    paths = [p for p in out.split("\0") if p]
+    if not paths:
+        raise Unavailable(f"git diff {rng} lists no path: a real change always has one")
+    return paths
 
 
 def classify(record: object) -> dict:
