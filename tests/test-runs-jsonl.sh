@@ -712,6 +712,32 @@ else
   pass "T14m: the agreement rule is not written into run-stats.md"
 fi
 
+# --- T15: the revert path's row (issue #571) --------------------------------
+# `/issue-pr-review <M> --revert` writes one `revert_opened` row: `pr` is the
+# reverted PR M (so readers fold it into the run it undoes), `revert_pr` the
+# new PR, emitted right after `pr`.
+rv_rec() { # $1 = outcome, $2 = raw JSON members after outcome
+  printf '{"ts":"2026-01-01T00:00:00Z","issue":7,"mode":"auto","skill":"issue-pr-review","outcome":"%s",%s}' "$1" "$2"
+}
+rc=0; out="$(rv_rec revert_opened '"revert_pr":13,"pr":12' | python3 "$HELPER" --echo 2>/dev/null)" || rc=$?
+if [ "$rc" -eq 0 ] && printf '%s' "$out" | grep -qF '"outcome":"revert_opened","pr":12,"revert_pr":13}'; then
+  pass "T15a: gi-runlog accepts the revert_opened row, revert_pr right after pr"
+else
+  fail "T15a: revert_opened row rejected or out of order (exit $rc): $out"
+fi
+for bad in 'success|"pr":12' 'merged|"pr":12,"revert_pr":13' \
+  'revert_opened|"pr":12' 'revert_opened|"pr":12,"revert_pr":null' 'revert_opened|"pr":null,"revert_pr":13' \
+  'revert_opened|"pr":12,"revert_pr":"13"' 'revert_opened|"pr":12,"revert_pr":true' 'revert_opened|"pr":12,"revert_pr":0'; do
+  rc=0; rv_rec "${bad%%|*}" "${bad#*|}" | python3 "$HELPER" --echo >/dev/null 2>&1 || rc=$?
+  if [ "$rc" -eq 3 ]; then
+    pass "T15b: gi-runlog rejects issue-pr-review $bad with exit 3"
+  else
+    fail "T15b: issue-pr-review $bad returned exit $rc, expected 3"
+  fi
+done
+has "$RUNLOG" '| `revert_pr` |' "T15c: run-log schema documents revert_pr"
+has "$RUNLOG" 'Revert path: `revert_opened`' "T15c: run-log schema lists the revert_opened outcome"
+
 echo ""
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 echo "  Results: $PASS passed, $FAIL failed"

@@ -366,6 +366,53 @@ else
   fail "T9: GitHub Revert-button form not counted"
 fi
 
+# ── T10: a revert made by the revert path counts (#571, AC3) ──
+# `/issue-pr-review 21 --revert` opens PR 22, which IDD squash-merges with the
+# PR body as the commit body (references/revert-path.md). PR 21 is counted
+# reverted; PR 22 is no run and no landing commit; the `revert_opened` row
+# (pr 21, revert_pr 22) folds into PR 21's run and is not a failed attempt.
+R10="$(make_repo revert-path-repo git@github.com:acme/look.git)"
+echo a > "$R10/a.txt"; git -C "$R10" add a.txt; git -C "$R10" commit -qm 'feat(a): add a (#20) (#21)'
+SHA21="$(git -C "$R10" rev-parse HEAD)"
+git -C "$R10" rm -q a.txt
+git -C "$R10" commit -qm 'Revert "feat(a): add a (#20) (#21)" (#22)' -m "Reverts acme/look#21
+
+This reverts commit $SHA21.
+
+Rolls back a after a regression. Reopens #20.
+
+> **Note:** No acceptance criteria defined — a revert restores the code before #21."
+mkdir -p "$R10/.idd"
+printf '%s\n' \
+  '{"ts":"2026-03-04T12:00:00Z","issue":20,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":21}' \
+  '{"ts":"2026-03-05T12:00:00Z","issue":20,"mode":"auto","skill":"issue-pr-review","outcome":"revert_opened","pr":21,"revert_pr":22}' \
+  > "$R10/.idd/runs.jsonl"
+set +e
+JSON10="$( cd "$R10" && python3 scripts/idd-lint.py stats --no-github --json 2>/dev/null )"
+RC10=$?
+set -e
+if [ "$RC10" -eq 0 ] && printf '%s\n' "$JSON10" | python3 -c '
+import sys, json
+report = json.load(sys.stdin)
+lb = report["lookback"]
+assert lb["prs"]["reverted"] == [21], lb["prs"]
+assert lb["total"]["merged_runs"] == 1 and lb["total"]["reverted"] == 1, lb["total"]
+for name, prs in lb["prs"].items():
+    assert 22 not in (prs or []), (name, prs)
+runs = report["runs"]
+assert runs["attempted"] == 1 and runs["succeeded"] == 1, runs
+'; then
+  pass "T10: the revert path counts PR 21 reverted; its row is no failed attempt"
+else
+  fail "T10: revert path not counted, or its row skews run stats (exit $RC10)"
+fi
+if grep -qF 'Reverts {owner}/{repo}#{M}' "$REPO_ROOT/src/skills/issue-pr-review/references/revert-path.md" \
+   && grep -qF 'This reverts commit {oid}.' "$REPO_ROOT/src/skills/issue-pr-review/references/revert-path.md"; then
+  pass "T10b: revert-path.md's body template carries the two lines T10 lands"
+else
+  fail "T10b: revert-path.md's body template no longer carries both marker lines"
+fi
+
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 echo "Results: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
