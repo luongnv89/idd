@@ -221,6 +221,7 @@ fields a caller reads and the run-log record keep their shape.
 4. **Decision.** Print `Decision: No approval needed.` in interactive and auto
    mode alike. Name the remaining user action on `Next action:`:
    - a created PR: `/issue-pr-review {pr_number}` (review, then merge);
+   - `large_scope`, `max_commits_exceeded`: split #{issue_number} into smaller issues;
    - under `/auto-pilot`: `none — auto-pilot reviews and merges`;
    - `pr_in_progress`: `/issue-pr-review {pr_number}` for the existing PR;
    - any other `BLOCKED`: the `To fix:` command of the error block.
