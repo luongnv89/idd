@@ -185,6 +185,13 @@ check "G7: a dependency manifest change is sensitive" "$?"
 g checkout -q -b plain main && echo 'more' >> "$GITREPO/docs/guide.md" && g commit -q -am p
 out="$(dclassify main...plain)"
 [ "$(field "$out" tier)" = '"standard"' ]; check "G7: a plain docs change is standard" "$?"
+# A PR into `rel` whose head carries default-branch commits `rel` lacks: the
+# manifest change drops out of main...feat yet still lands in rel, so the range
+# must use the PR's own base, never the default branch.
+g branch rel main && g checkout -q main && echo '{"dependencies":{"x":"1"}}' > "$GITREPO/package.json" \
+  && g commit -q -am dep && g checkout -q -b feat && echo 'feat' >> "$GITREPO/docs/guide.md" && g commit -q -am f
+[ "$(field "$(dclassify rel...feat)" tier)" = '"sensitive"' ] && [ "$(field "$(dclassify main...feat)" tier)" = '"standard"' ]
+check "G7: a PR into rel classifies rel...feat (sensitive), not main...feat (standard) — the PR's base is the range" "$?"
 for bad in '-p...main' 'main..plain' 'main...plain...x' 'main....plain' 'main...' 'main...pl;ain' 'main~1...plain'; do
   dclassify "$bad" >/dev/null 2>&1; [ "$?" = "3" ]; check "G7: the range '$bad' is exit 3" "$?"
 done
@@ -214,13 +221,16 @@ grep -q 'Deliver-time risk tier' "$SRC_PKG/SKILL.source.md"
 check "G7: resolver SKILL.md Step 5 points at the Deliver-time risk tier" "$?"
 anchor_check "$PR_SRC" rv-depth-gate-refresh 'gi-sensitive\.py --classify' \
   "G7: pr-review's Depth gate classifies the PR diff (AC1)"
-grep -E 'gi-sensitive\.py --classify' "$PR_SRC" | grep -F -e 'origin/${base}...HEAD' | grep -qE '^4\. .*review\.adaptive_depth` is `false`.*skip step 5'
+grep -E 'gi-sensitive\.py --classify' "$PR_SRC" | grep -F -e 'origin/${base_ref}...HEAD' | grep -qE '^4\. .*review\.adaptive_depth` is `false`.*skip step 5'
 check "G7: the Depth gate classify runs in step 4, outside the adaptive_depth-skippable step 5 (AC2)" "$?"
+grep -E '^4\. ' "$PR_SRC" | grep -qF 'base_ref="$(gh pr view {N} --json baseRefName --jq .baseRefName)"' \
+  && ! grep -E 'gi-sensitive\.py --classify' "$PR_SRC" | grep -qF 'origin/${base}...'
+check "G7: pr-review classifies against the PR's own baseRefName, never the default branch (AC3)" "$?"
 ! grep -E '^5\. ' "$PR_SRC" | grep -qE 'gi-sensitive|CVE'
 check "G7: step 5 weighs no label list and runs no classify of its own" "$?"
 floor="$(grep -F 'a:rv-merge-floor' "$PR_SRC")"
 printf '%s' "$floor" | grep -qF 'gi-sensitive.py --classify' \
-  && printf '%s' "$floor" | grep -qF 'origin/${base}...${verified_head}' \
+  && printf '%s' "$floor" | grep -qF 'origin/${base_ref}...${verified_head}' \
   && printf '%s' "$floor" | grep -qF '`sensitive` is `sensitive change ({classes})`' \
   && printf '%s' "$floor" | grep -qF '`risk tier unknown`'
 check "G7: the Merge floor is unmet on a sensitive or unknown tier of the verified head (AC3)" "$?"
