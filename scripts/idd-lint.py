@@ -1835,7 +1835,7 @@ def _render_github_stats(gh_s: dict | None, skipped: str | None) -> list[str]:
     return lines
 
 
-def _render_lookback_stats(lb: dict | None) -> list[str]:
+def _render_lookback_stats(lb: dict | None, gh_skipped: str | None = None) -> list[str]:
     """`Look back after merge`: totals, then one row per release (#568).
 
     Counts, not ratio rows: a high rate here is bad, and the ratio rail's
@@ -1886,7 +1886,13 @@ def _render_lookback_stats(lb: dict | None) -> list[str]:
         )
         lines.append(_info_row(f"release {release}", f"{merged} merged · {flag_bit}"))
     if not lb["github"]:
-        lines.append(_c("      reopened and follow-up bugs need GitHub — run without --no-github", "dim"))
+        # Only tell the reader to drop --no-github when they passed it; a failed
+        # gh call would otherwise send them to re-run what they just ran.
+        why = (
+            "run without --no-github" if gh_skipped == "--no-github"
+            else gh_skipped or "gh unavailable, unauthenticated, or offline"
+        )
+        lines.append(_c(f"      reopened and follow-up bugs need GitHub — {why}", "dim"))
     if lb["window"]:
         lines.append(_c(f"      window — runs logged since {lb['window']}", "dim"))
     if lb["truncated"]:
@@ -1910,7 +1916,7 @@ def render_stats(
     out.extend(_render_run_log_stats(run_s))
     out.append("")
     out.extend(_render_github_stats(gh_s, gh_skipped))
-    out.extend(_render_lookback_stats(lookback))
+    out.extend(_render_lookback_stats(lookback, gh_skipped))
     out.extend(("", _c("┄" * 59, "dim")))
     print("\n".join(out))
 

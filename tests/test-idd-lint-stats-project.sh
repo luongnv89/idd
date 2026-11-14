@@ -229,6 +229,18 @@ assert lb["window"] is None and lb["total"]["merged_runs"] == 5, lb
 else
   fail "T7d: look-back window not applied or not degraded"
 fi
+# T7f: gh failing WITHOUT --no-github must not tell the reader to drop a flag
+# they never passed; the hint names why GitHub was unavailable instead.
+TEXT7F="$( cd "$R7" && PATH="$FAKEBIN:$PATH" python3 scripts/idd-lint.py stats 2>/dev/null )"
+if printf '%s\n' "$TEXT7F" | grep -qF "need GitHub — gh unavailable, unauthenticated, or offline" \
+   && ! printf '%s\n' "$TEXT7F" | grep -qF "run without --no-github" \
+   && printf '%s\n' "$TEXT7" | grep -qF "need GitHub — run without --no-github"; then
+  pass "T7f: the look-back GitHub hint matches why GitHub was skipped"
+else
+  fail "T7f: look-back hint tells a failed-gh run to drop --no-github"
+  printf '%s\n' "$TEXT7F" | sed 's/^/      /'
+fi
+
 # git's decoration order is not ours to pin, so the index is also fed a commit
 # whose first tag is the non-version one.
 if printf '%s\n' "$JSON7" | python3 -c '
@@ -315,12 +327,43 @@ assert (rel["v0.1.0"]["flagged"], rel["v0.1.0"]["merged_runs"]) == (0, 1), rel
 assert (rel["unreleased"]["flagged"], rel["unreleased"]["flagged_pct"]) == (1, 50), rel
 assert rel["unreleased"]["planned_followups"] == 1, rel
 assert "_page" not in out.getvalue(), "a private page leaked into the report"
+assert lb["truncated"] is False, lb
+# --limit equal to the PR page size means the page may have been cut short.
+out = io.StringIO()
+with contextlib.redirect_stdout(out):
+    assert m.main(["stats", "--json", "--limit", str(len(prs))]) == 0
+assert json.loads(out.getvalue())["lookback"]["truncated"] is True
 PY
 ) 2>"$T8_ERR"; then
   pass "T8: online look-back joins reopened issues and follow-up bugs from the shared gh pages"
 else
   fail "T8: online look-back join is wrong"
   sed 's/^/      /' "$T8_ERR"
+fi
+
+# ── T9: GitHub's Revert button form, `Reverts owner/repo#N` (#571's contract) ──
+# A squash-merged revert PR (#20) whose body names PR 17. PR 17 is counted
+# reverted; the revert commit is not PR 20's landing, and PR 20 is not logged.
+R9="$(make_repo revert-pr-repo git@github.com:acme/look.git)"
+echo d > "$R9/d.txt"; git -C "$R9" add d.txt; git -C "$R9" commit -qm 'feat(d): add d (#16) (#17)'
+echo e > "$R9/e.txt"; git -C "$R9" add e.txt; git -C "$R9" commit -qm 'feat(e): add e (#18) (#19)'
+git -C "$R9" rm -q d.txt
+git -C "$R9" commit -qm 'Revert "feat(d): add d (#16) (#17)" (#20)' -m 'Reverts acme/look#17'
+mkdir -p "$R9/.idd"
+printf '%s\n' \
+  '{"ts":"2026-03-04T12:00:00Z","issue":16,"mode":"auto","skill":"auto-pilot","outcome":"merged","pr":17}' \
+  '{"ts":"2026-03-05T12:00:00Z","issue":18,"mode":"auto","skill":"auto-pilot","outcome":"merged","pr":19}' \
+  > "$R9/.idd/runs.jsonl"
+if ( cd "$R9" && python3 scripts/idd-lint.py stats --no-github --json 2>/dev/null ) | python3 -c '
+import sys, json
+lb = json.load(sys.stdin)["lookback"]
+assert lb["prs"]["reverted"] == [17], lb["prs"]
+assert lb["total"]["merged_runs"] == 2 and lb["total"]["reverted"] == 1, lb["total"]
+assert lb["prs"]["unconfirmed"] == [], lb["prs"]
+'; then
+  pass "T9: a Reverts owner/repo#N body line counts the named PR reverted"
+else
+  fail "T9: GitHub Revert-button form not counted"
 fi
 
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
