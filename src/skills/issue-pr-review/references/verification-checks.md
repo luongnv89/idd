@@ -107,6 +107,7 @@ Per the dual-write rule (see *Analysis Artifacts and Durable Memory* in `docs/id
    - `squash` or `merge`: evaluate the regex against the **raw** PR body. Do **not** strip markdown. Keywords that appear only inside fenced code, inline code spans, or blockquotes **are** merge-effective — IDD's merge writes the body bytes into the commit message (as does a hand merge under `PR_BODY`), and commit-message closing keywords do not honour markdown.
    - `rebase`: evaluate the regex with **markdown-aware** PR-body rules (ignore matches that live only in fenced code, inline code spans, or blockquotes). No commit carries the body, so those matches are not closers.
    Collect every issue number the merge-effective surface would close. If that set differs from the markdown-aware PR-link set, report a `note` (never `action: fix`) naming the extra and/or missing numbers as issues that will close — or will not close — at merge. The #36 hard-fail still keys off the PR-link requirement for `{N}`, not off extra merge-only numbers.
+   A revert PR (line 1 `Reverts {owner}/{repo}#{M}` plus a `This reverts commit` line) passes check 1 with no closing keyword: it must not re-close the issue it reopened. Checks 2-4 still run.
 2. **Commit references issue** — at least one commit between base and head references the issue number:
    ```bash
    git log "{base_branch}..{head_branch}" --grep="#{N}" --oneline

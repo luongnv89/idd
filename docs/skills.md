@@ -201,6 +201,7 @@ Reviews an existing PR end-to-end: pre-pass, review, tests/build, CI, fix loop, 
 | `/issue-pr-review` | Detect PR | Auto-detects the PR for the current branch and runs the default fix loop. |
 | `/issue-pr-review --review-only` | Read-only | Runs one review/test/CI pass, reports findings, never fixes, loops, or merges. |
 | `/issue-pr-review <N> --resume` | Modifier | Resumes a killed review from its durable progress record. Step 1 and every safety gate re-run live. Combines with `--auto` and `--no-merge`, never with `--review-only`, which never reads or writes a record. |
+| `/issue-pr-review <M> --revert` | Revert | Reverts merged PR #M through a new PR from a `fix/` branch, never on the base branch, reopens its issue with a comment linking the revert, and logs a `revert_opened` run-log row. Never merges; combines with `--auto` only. |
 
 ### Fix-loop stop conditions
 
