@@ -15,7 +15,9 @@
 #   T3  auto mode never closes an issue: it comments and records already_resolved;
 #   T4  the resolver's default-No gates stop in auto with a skipped_reason, and
 #       gi-runlog accepts that record;
-#   T5  the CI step exists.
+#   T5  the CI step exists;
+#   T6  an oversized change (large_scope, max_commits_exceeded) stops in auto
+#       with a split recommendation, in the resolver and in auto-pilot (#570).
 #
 # Usage: bash tests/test-auto-mode-gates-549.sh
 # Returns: exit 0 if all checks pass, exit 1 on failure
@@ -244,6 +246,32 @@ streak="$(python3 "$ROOT/src/shared/scripts/gi-runlog.py" --failure-streak 7 --p
   | python3 -c 'import json,sys; print(json.load(sys.stdin)["streak"])' 2>/dev/null || echo err)"
 [ "$streak" = "0" ] && pass "T4.6 a gate-decline skipped line resets the failure streak" \
   || fail "T4.6 failure streak after a skipped line is '$streak', want 0"
+
+# ── T6 (#570): an oversized change stops in auto with a split recommendation ─
+AP_SRC="$ROOT/src/skills/auto-pilot"
+AP_DIST="$ROOT/skills/auto-pilot"
+for tree in "$RS_SRC" "$RS_DIST"; do
+  for reason in large_scope max_commits_exceeded; do
+    grep -qE '^\*\*Auto:\*\* takes the default No — .*recommend splitting the issue, `skipped_reason: '"$reason"'`\. <!-- auto:no -->$' \
+      "$tree/references/error-messages.md" \
+      && pass "T6.1 ${tree#$ROOT/}: auto No for $reason recommends a split" \
+      || fail "T6.1 ${tree#$ROOT/}: auto No for $reason does not recommend a split"
+  done
+  grep -qF '`large_scope`, `max_commits_exceeded`: split #{issue_number} into smaller issues;' \
+    "$tree/references/report-templates.md" \
+    && pass "T6.2 ${tree#$ROOT/}: the closing summary's Next action names the split" \
+    || fail "T6.2 ${tree#$ROOT/}: the closing summary's Next action omits the split"
+done
+for tree in "$AP_SRC" "$AP_DIST"; do
+  grep -qF 'For `large_scope` or `max_commits_exceeded`, append' "$tree/references/phases/phase-2-resolve.md" \
+    && grep -qF '`— split #{issue_number} into smaller issues`.' "$tree/references/phases/phase-2-resolve.md" \
+    && pass "T6.3 ${tree#$ROOT/}: auto-pilot's skip line recommends a split for both size gates" \
+    || fail "T6.3 ${tree#$ROOT/}: auto-pilot's skip line has no split recommendation"
+  tr '\n' ' ' < "$tree/references/summary-format.md" | tr -s ' ' \
+    | grep -qF 'issues to split (`large_scope`, `max_commits_exceeded`)' \
+    && pass "T6.4 ${tree#$ROOT/}: the run summary's Next action names issues to split" \
+    || fail "T6.4 ${tree#$ROOT/}: the run summary's Next action omits issues to split"
+done
 
 # ── T5: CI runs this lint ─────────────────────────────────────────────────
 grep -qF 'run: bash tests/test-auto-mode-gates-549.sh' "$WORKFLOW" \

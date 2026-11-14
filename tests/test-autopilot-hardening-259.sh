@@ -14,6 +14,8 @@
 #        report.                                           → T3, T8
 #   AC4  No unattended stop occurs for recoverable transient API errors.
 #                                                          → T4, T9
+#   #570 Auto-pilot stops opening PRs when the open PR cap is reached and
+#        says so.                                          → T11
 #
 # T0 and T5 are hygiene that every AC leans on: the exit-code vocabulary
 # (0 ok · 2 usage · 3 invalid input · 4 degrade, and never the reserved verdict
@@ -1423,6 +1425,85 @@ expect_grep "AC3: the mid-run truth is stated beside it" \
   'mid-run the stop lands between units of work' "$AP_ERRORS"
 expect_grep "AC3: the mid-run case says what happens to work already done" \
   'what merged stays merged, and a PR left open carries the outcome' "$AP_ERRORS"
+
+# ───────────────────────────────────────────────────────────
+# T11 (#570): an open PR cap stops the loop before new work, and says so
+# ───────────────────────────────────────────────────────────
+AP_P0="$AP/references/phases/phase-0-lock-resume.md"
+AP_P1="$AP/references/phases/phase-1-triage-pick.md"
+expect_grep "#570: SKILL.md documents autopilot.max_open_prs with its default" \
+  'autopilot.max_open_prs: 0' "$AP_SKILL"
+expect_grep "#570: SKILL.md validates the cap's range at config load" \
+  'and `autopilot.max_open_prs` (`0..50`); anything else is invalid config' "$AP_SKILL"
+expect_grep "#570: Stop Conditions names the cap stop in the widened limit row" \
+  '| Iteration limit or open PR cap (`autopilot.max_open_prs`) reached | `○ Limit reached ({max} iterations)` · `○ Open PR cap reached ({count}/{max})` |' \
+  "$AP_SKILL"
+expect_grep_re "#570: the bundled config schema carries max_open_prs: 0" \
+  '^  max_open_prs: 0$' "$AP_SCHEMA"
+expect_grep "#570: the bundled Defaults Table carries the max_open_prs row" \
+  '| `autopilot.max_open_prs` | `0` |' "$AP_SCHEMA"
+expect_grep "#570: phase 0 owns a named open PR cap check" \
+  '### Open PR cap check' "$AP_P0"
+expect_grep "#570: the default 0 is no cap and makes no call" \
+  'means no cap: skip this check and make no call' "$AP_P0"
+expect_grep "#570: the check reads open PRs with one catalogued call" \
+  'gh pr list --state open --json number,headRefName --limit 100' "$AP_P0"
+expect_grep "#570: the stop says so" \
+  '○ Open PR cap reached ({count}/{autopilot.max_open_prs}) — stopping cleanly' "$AP_P0"
+expect_grep "#570: the stop reuses the budget stop's exit sequence and Result" \
+  'exit sequence (Final Summary,' "$AP_P0"
+expect_grep "#570: the cap stop reports Result LIMIT REACHED" \
+  'with Result `LIMIT REACHED`' "$AP_P0"
+expect_grep "#570: the cap gates only new work" \
+  'only new work: a resumed or in-flight PR always finishes' "$AP_P0"
+expect_grep "#570: an untrustworthy count fails closed" \
+  'It fails closed: a' "$AP_P0"
+expect_grep "#570: the fail-closed stop has its own line" \
+  '⚠ Open PR count unavailable — stopping (autopilot.max_open_prs is set)' "$AP_P0"
+expect_grep "#570: a fan-out takes only the slots left under the cap" \
+  'the slots left' "$AP_P1"
+expect_grep "#570: phase 1 evaluates the cap check at the top of the iteration" \
+  'evaluate the *Runtime budget check* and the *Open PR cap check*' "$AP_P1"
+expect_grep "#570: LIMIT REACHED covers the cap stop" \
+  '`autopilot.max_iterations` or the `autopilot.max_open_prs` cap' "$AP_SUMMARY"
+budget_ln="$(grep -n '^### Runtime budget check$' "$AP_P0" | cut -d: -f1 || true)"
+cap_ln="$(grep -n '^### Open PR cap check$' "$AP_P0" | cut -d: -f1 || true)"
+ctx_ln="$(grep -n '^### Context threshold check' "$AP_P0" | cut -d: -f1 || true)"
+if [ -n "$budget_ln" ] && [ -n "$cap_ln" ] && [ -n "$ctx_ln" ] \
+   && [ "$budget_ln" -lt "$cap_ln" ] && [ "$cap_ln" -lt "$ctx_ln" ]; then
+  pass "#570: the cap check sits between the budget and context checks"
+else
+  fail "#570: heading order budget=$budget_ln cap=$cap_ln ctx=$ctx_ln"
+fi
+
+# Behaviour: the key resolves through gi-config against the shipped schema.
+GC="$SRC_SCRIPTS/gi-config.py"
+mkdir -p "$TMP/cap" && printf 'autopilot:\n  max_open_prs: 5\n' > "$TMP/cap/set.yml"
+printf 'autopilot:\n  max_open_prs: "five"\n' > "$TMP/cap/bad.yml"
+run_status out st bash -c "cd '$TMP/cap' && python3 '$GC' --schema '$AP_SCHEMA' --key autopilot.max_open_prs"
+[ "$st" = "0" ] && [ "$out" = "0" ] && pass "#570: gi-config defaults max_open_prs to 0 with no config" \
+  || fail "#570: gi-config default max_open_prs is '$out' (exit $st), want 0"
+run_status out st python3 "$GC" --config "$TMP/cap/set.yml" --schema "$AP_SCHEMA" --key autopilot.max_open_prs
+[ "$st" = "0" ] && [ "$out" = "5" ] && pass "#570: gi-config reads a configured cap" \
+  || fail "#570: gi-config configured max_open_prs is '$out' (exit $st), want 5"
+run_status out st python3 "$GC" --config "$TMP/cap/bad.yml" --schema "$AP_SCHEMA" --key autopilot.max_open_prs
+expect_status "#570: gi-config rejects a non-integer cap as invalid config" 3 "$st"
+
+# Behaviour: the shipped branch regex counts IDD-convention heads only.
+cap_re="$(grep -oE 'matches `[^`]+`' "$AP_P0" | head -1 | sed -E 's/^matches `//; s/`$//')"
+if python3 - "$cap_re" <<'PY'
+import re, sys
+rx = re.compile(sys.argv[1])
+ok = ["fix/570-x", "chore/1-y", "feat/12-a", "refactor/8-b", "docs/23-c", "test/31-d"]
+no = ["feature/570-x", "fix/abc-1", "dependabot/npm/x", "main", "auto-570", "hotfix/9-z"]
+bad = [b for b in ok if not rx.search(b)] + [b for b in no if rx.search(b)]
+sys.exit(1 if bad else 0)
+PY
+then
+  pass "#570: the cap regex counts the six convention prefixes and nothing else"
+else
+  fail "#570: the cap regex '$cap_re' misclassifies a branch"
+fi
 
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 echo "  Results: $PASS passed, $FAIL failed"
