@@ -151,8 +151,11 @@ Nothing is done on an agent's say-so. Three things are verified: the **intention
   evals replay fixed stand-ins, the real-agent promotion lane has no locked tasks, and
   three skills have no eval cases.
 - [ ] **VW19 — The outcome is checked after merge.** A reopened issue, a revert or a
-  follow-up bug is linked back to the run that shipped the change. Partial: none; the trace
-  ends at merge.
+  follow-up bug is linked back to the run that shipped the change. Partial: `idd-lint stats`
+  joins each merged run to reverts, reopened issues and follow-up bugs and reports the counts
+  per release (`tests/test-idd-lint-stats-project.sh`, behavioural). The trace is reported,
+  not linked into the run record; a revert has no path back to its run yet (#571), and no
+  skill runs the look-back (#573).
 
 ## Pillar 3 — Simplicity
 
