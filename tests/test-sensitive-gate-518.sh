@@ -19,6 +19,12 @@
 #   G5      the prose contract: the gate runs on the light path and in auto
 #           mode, stops are safety stops, the challenger keeps blockers.
 #   G6      the built bundle ships the script byte-identically and cites it.
+#   G7      one risk tier from the actual diff (#569): `tier` tracks
+#           `sensitive`; an Effort key is refused, never read (AC2); a `diff`
+#           range is classified from git in a temp repo (renames list both
+#           sides, non-ASCII paths are not quoted), a bad range is exit 3 and a
+#           git failure exit 4; the resolver's Deliver and pr-review's Depth
+#           gate and Merge floor read it (AC1, AC3).
 #
 # Usage: bash tests/test-sensitive-gate-518.sh
 # Returns: exit 0 if all checks pass, exit 1 on failure.
@@ -111,7 +117,23 @@ for pair in \
   "app/permissions/rbac.py:auth" \
   "CODEOWNERS:access-policy" \
   ".idd.yml:security-config" \
-  ".pre-commit-config.yaml:security-config"; do
+  ".pre-commit-config.yaml:security-config" \
+  "package.json:dependency-manifest" \
+  "services/api/requirements-dev.txt:dependency-manifest" \
+  "go.sum:dependency-manifest" \
+  "Cargo.lock:dependency-manifest" \
+  "app.gemspec:dependency-manifest" \
+  "web/pnpm-lock.yaml:dependency-manifest" \
+  "Dockerfile:infrastructure" \
+  "docker/Dockerfile.prod:infrastructure" \
+  "docker-compose.override.yml:infrastructure" \
+  "modules/vpc/main.tf:infrastructure" \
+  "infra/main.go:infrastructure" \
+  "deploy/k8s/app.yaml:infrastructure" \
+  "charts/web/Chart.yaml:infrastructure" \
+  "db/migrations/0001_init.sql:migration" \
+  "db/migrate/20260101_add_index.rb:migration" \
+  "alembic/versions/abc.py:migration"; do
   path="${pair%%:*}"; want="${pair##*:}"
   out="$(classify "{\"labels\":[],\"paths\":[\"$path\"]}")"
   got="$(python3 -c 'import json,sys; r=json.loads(sys.argv[1])["reasons"]; print(r[0]["class"] if r else "none")' "$out")"
@@ -128,6 +150,75 @@ check "G2: an unknown top-level key is exit 3" "$?"
 out="$(classify '{"labels":[],"paths":["README.md"],"_note":"x"}')"
 [ "$(field "$out" sensitive)" = "false" ]; check "G2: a top-level key starting with _ is ignored" "$?"
 classify 'not json' >/dev/null 2>&1; [ "$?" = "3" ]; check "G2: non-JSON stdin is exit 3" "$?"
+
+# ── G7: one risk tier from the actual diff (#569) ────────────
+tier_of() { python3 -c 'import json,sys; r=json.loads(sys.argv[1]); print(r["tier"] if r["sensitive"] == (r["tier"] == "sensitive") else "mismatch")' "$1"; }
+[ "$(tier_of "$(classify '{"labels":[],"paths":["src/auth/session.py"]}')")" = "sensitive" ] \
+  && [ "$(tier_of "$(classify '{"labels":["bug"],"paths":["README.md"]}')")" = "standard" ]
+check "G7: tier is sensitive exactly when sensitive is true, else standard" "$?"
+classify '{"labels":[],"paths":["src/auth/session.py"],"effort":"XS"}' >/dev/null 2>&1; [ "$?" = "3" ]
+check "G7: an effort key is exit 3 — Effort is never an input (AC2)" "$?"
+[ "$(tier_of "$(classify '{"labels":[],"paths":["src/auth/session.py"],"_effort":"XS"}')")" = "sensitive" ]
+check "G7: a stated XS Effort leaves the tier of the same labels and paths unchanged (AC2)" "$?"
+
+GITREPO="$(mktemp -d)"
+trap 'rm -rf "$GITREPO"' EXIT
+g() { git -C "$GITREPO" -c user.name=t -c user.email=t@example.invalid -c commit.gpgsign=false "$@"; }
+dclassify() { (cd "$GITREPO" && printf '%s' "{\"labels\":[],\"paths\":[],\"diff\":\"$1\"}" | python3 "$SCRIPT" --classify); }
+g init -q -b main && mkdir -p "$GITREPO/.github/workflows" "$GITREPO/docs" \
+  && echo 'on: push' > "$GITREPO/.github/workflows/ci.yml" && echo '# guide' > "$GITREPO/docs/guide.md" \
+  && echo '{}' > "$GITREPO/package.json" && g add -A && g commit -q -m base
+check "G7: temp git repo for the diff cases" "$?"
+g checkout -q -b rename main && g mv .github/workflows/ci.yml docs/ci.yml && g commit -q -m mv
+out="$(dclassify main...rename)"
+[ "$(field "$out" tier)" = '"sensitive"' ]
+check "G7: renaming .github/workflows/ci.yml to docs/ci.yml is sensitive — both sides are listed" "$?"
+g checkout -q -b unicode main && echo 'on: push' > "$GITREPO/.github/workflows/déploy.yml" && g add -A && g commit -q -m u
+out="$(dclassify main...unicode)"
+python3 -c 'import json,sys; r=json.loads(sys.argv[1]); sys.exit(0 if r["tier"] == "sensitive" and r["reasons"][0]["class"] == "ci-workflow" and r["reasons"][0]["source"] == "diff" else 1)' "$out"
+check "G7: a non-ASCII file under .github/workflows/ is sensitive (ci-workflow), never a quoted miss" "$?"
+g checkout -q -b deps main && echo '{"dependencies":{}}' > "$GITREPO/package.json" && g commit -q -am d
+out="$(dclassify main...deps)"
+python3 -c 'import json,sys; r=json.loads(sys.argv[1]); sys.exit(0 if r["tier"] == "sensitive" and r["reasons"][0]["class"] == "dependency-manifest" else 1)' "$out"
+check "G7: a dependency manifest change is sensitive" "$?"
+g checkout -q -b plain main && echo 'more' >> "$GITREPO/docs/guide.md" && g commit -q -am p
+out="$(dclassify main...plain)"
+[ "$(field "$out" tier)" = '"standard"' ]; check "G7: a plain docs change is standard" "$?"
+for bad in '-p...main' 'main..plain' 'main...plain...x' 'main....plain' 'main...' 'main...pl;ain' 'main~1...plain'; do
+  dclassify "$bad" >/dev/null 2>&1; [ "$?" = "3" ]; check "G7: the range '$bad' is exit 3" "$?"
+done
+dclassify 'main...no-such-ref' >/dev/null 2>&1; [ "$?" = "4" ]
+check "G7: an unknown ref is exit 4 (cannot complete), never 'not sensitive'" "$?"
+
+DELIVER="$SRC_PKG/references/steps/step-5-deliver.md"
+PR_SRC="$REPO_ROOT/src/skills/issue-pr-review/SKILL.source.md"
+PR_RVM="$REPO_ROOT/src/skills/issue-pr-review/references/review-loop-mechanics.md"
+anchor_check "$DELIVER" rs-deliver-tier 'gi-sensitive\.py --classify' \
+  "G7: the resolver's Deliver classifies the delivered diff (AC1)"
+anchor_check "$DELIVER" rs-deliver-tier '"diff": "origin/\$\{base\}\.\.\.HEAD"' \
+  "G7: the Deliver record carries the diff range"
+anchor_check_flat "$DELIVER" rs-deliver-tier 'is `tier: sensitive` \(fail closed\)' \
+  "G7: a Deliver classify that cannot run is sensitive"
+grep -q 'Deliver-time risk tier' "$SRC_PKG/SKILL.source.md"
+check "G7: resolver SKILL.md Step 5 points at the Deliver-time risk tier" "$?"
+anchor_check "$PR_SRC" rv-depth-gate-refresh 'gi-sensitive\.py --classify' \
+  "G7: pr-review's Depth gate classifies the PR diff (AC1)"
+grep -E 'gi-sensitive\.py --classify' "$PR_SRC" | grep -F -e 'origin/${base}...HEAD' | grep -qE '^4\. .*review\.adaptive_depth` is `false`.*skip step 5'
+check "G7: the Depth gate classify runs in step 4, outside the adaptive_depth-skippable step 5 (AC2)" "$?"
+! grep -E '^5\. ' "$PR_SRC" | grep -qE 'gi-sensitive|CVE'
+check "G7: step 5 weighs no label list and runs no classify of its own" "$?"
+floor="$(grep -F 'a:rv-merge-floor' "$PR_SRC")"
+printf '%s' "$floor" | grep -qF 'gi-sensitive.py --classify' \
+  && printf '%s' "$floor" | grep -qF 'origin/${base}...${verified_head}' \
+  && printf '%s' "$floor" | grep -qF '`sensitive` is `sensitive change ({classes})`' \
+  && printf '%s' "$floor" | grep -qF '`risk tier unknown`'
+check "G7: the Merge floor is unmet on a sensitive or unknown tier of the verified head (AC3)" "$?"
+anchor_check "$PR_RVM" rvm-depth-gate '\*\*Risk tier\*\*' "G7: the review-loop Depth gate weighs the risk tier"
+anchor_lacks "$PR_RVM" rvm-depth-gate 'CVE' "G7: the review-loop Depth gate re-lists no label words"
+anchor_lacks "$STEP2" rs-sensitive-gate 'classifying by hand' "G7: no hand classification fallback in Step 2"
+anchor_lacks "$STEP2" rs-sensitive-gate 'pundit' "G7: Step 2 re-lists no class names"
+anchor_check_flat "$STEP2" rs-sensitive-gate '`tier: sensitive` also revises the profile to `full`' \
+  "G7: a sensitive tier revises the resolver profile to full"
 
 # ── G3: --adjudicate over every fixture ──────────────────────
 count=0
@@ -266,6 +357,13 @@ grep -q 'references/scripts/gi-sensitive.py' "$BUILT/references/steps/step-2-pla
 check "G6: the built Step 2 invokes the bundled path" "$?"
 grep -qx 'references/scripts/gi-sensitive.py' "$BUILT/SKILL.md"
 check "G6: the built precheck list names the script" "$?"
+PR_BUILT="$REPO_ROOT/skills/issue-pr-review"
+cmp -s "$SCRIPT" "$PR_BUILT/references/scripts/gi-sensitive.py"
+check "G6: issue-pr-review ships the script byte-identically" "$?"
+grep -qx 'references/scripts/gi-sensitive.py' "$PR_BUILT/SKILL.md"
+check "G6: issue-pr-review's precheck list names the script" "$?"
+grep -q 'python3 references/scripts/gi-sensitive.py --classify' "$PR_BUILT/SKILL.md"
+check "G6: the built pr-review Depth gate invokes the bundled path" "$?"
 
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 echo "  Result: $PASS passed, $FAIL failed"

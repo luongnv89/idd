@@ -81,6 +81,7 @@ references/scripts/gi-postmerge.py
 references/scripts/gi-progress.py
 references/scripts/gi-criteria.py
 references/scripts/gi-runlog.py
+references/scripts/gi-sensitive.py
 ```
 
 ```text
@@ -168,8 +169,8 @@ Set `profile = light | full`. Signals and what <!-- a:rv-depth-gate-refresh -->
 2. On exit 3, stop. On no `python3`, exit 2, or exit 4, run `gh issue view {linked_issue} --json number,title,body,labels` instead.
 3. Retain the successful record as `linked_issue_snapshot`.
    **If neither path yields a usable record, apply the empty-record fail-safe in `references/review-loop-mechanics.md` (*Depth gate*) — never review a linked issue on an empty snapshot.**
-4. The refresh runs even when `review.adaptive_depth` is `false`; in that case set `profile = full` after the refresh and skip step 5.
-5. Weigh diff size, the snapshot's `## Metadata` `Effort` band, and labels (`security`/`CVE`/`vulnerability` forces `full`). Set `light` only when **every** signal agrees; otherwise `full`.
+4. **Risk tier, always:** with `base` bound as in *Commit auto-fixes* and `git fetch origin "$base"`, run `printf '%s' "$sensitive_json" | python3 references/scripts/gi-sensitive.py --classify` on `{"labels": <PR + snapshot labels>, "paths": [], "diff": "origin/${base}...HEAD"}`. `tier: sensitive`, exit 3 or 4, or no `python3` sets `profile = full`. The refresh runs even when `review.adaptive_depth` is `false`; in that case set `profile = full` after the refresh and skip step 5.
+5. Weigh diff size and the snapshot's `## Metadata` `Effort` band; `Effort` never lowers a `full` from step 4. Set `light` only when **every** signal agrees; otherwise `full`.
 
 ### QA handoff gate (trust an already-QA'd PR) <!-- a:rv-qa-handoff-gate -->
 
@@ -328,7 +329,7 @@ Print the summary from `references/report-templates.md` and **apply its *Review 
 
 **Merge rule.** <!-- a:rv-merge-rule --> `/issue-pr-review` merges a PR only when `review.auto_merge` is `true` and the PR is clean, in interactive and `--auto` runs alike, and never under `--no-merge` or `--review-only`. Clean excludes two cases: pending CI is never clean; a CI failure held non-blocking by `review.ignore_ci_billing_failures` is never clean either. The merge uses `review.merge_method` (default: squash merge), deletes the head branch and is irreversible: on an unmet gate, report and stop — never delete a branch by hand.
 
-**Merge floor.** <!-- a:rv-merge-floor --> One home; `/auto-pilot` reads the `merge_floor` returned. `met` needs the acceptance-criteria check enabled, at least one criterion is `pass` and none is `unverified` or ends with `(needs review)` (unconfirmed), deferred rows excluded only on a `Refs #N` PR (`references/verification-checks.md` *Intentional reference*), and on a bug PR a `red→green` *Bug proof* at `verified_head` (`not reproduced` never is); else `unmet: {reason}`. Print it under `Evidence`. An `--auto` / `IDD_AUTO_MODE=1` run never merges `unmet`; interactive asks `Merge with the floor unmet ({reason})? [y/N]`. <!-- auto:no -->
+**Merge floor.** <!-- a:rv-merge-floor --> One home; `/auto-pilot` reads the `merge_floor` returned. `met` needs the acceptance-criteria check enabled, at least one criterion is `pass` and none is `unverified` or ends with `(needs review)` (unconfirmed), deferred rows excluded only on a `Refs #N` PR (`references/verification-checks.md` *Intentional reference*), on a bug PR a `red→green` *Bug proof* at `verified_head` (`not reproduced` never is), and a `standard` risk tier for `origin/${base}...${verified_head}` from `references/scripts/gi-sensitive.py --classify` on the *Depth gate*'s labels, run again here (`sensitive` is `sensitive change ({classes})`, exit 3/4 `risk tier unknown`); else `unmet: {reason}`. Print it under `Evidence`. An `--auto` / `IDD_AUTO_MODE=1` run never merges `unmet`; interactive asks `Merge with the floor unmet ({reason})? [y/N]`. <!-- auto:no -->
 
 **Merge identity (last gate before the merge).** <!-- a:rv-merge-identity --> Bind `verified_head` = Step 5's `ci_sha` (or, with no `ci_sha`, the `headRefOid` the final review cycle read). Re-read `headRefOid` and `baseRefName`, then `gh api "repos/{owner}/{repo}/compare/${base_ref}...${verified_head}" --jq .behind_by`. Merge only when the head still equals `verified_head` **and** `behind_by` is exactly `0` (the live base branch, never `baseRefOid`); anything else is `BLOCKED`, never a re-wait. Merge with `--{merge_method}` and `--match-head-commit "$verified_head"`. Patch-id equality never replaces fresh integration checks. Commands and reasons: `references/report-templates.md` (*Auto-Merge*).
 

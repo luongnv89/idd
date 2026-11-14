@@ -4,35 +4,29 @@ One part of `references/pipeline-steps.md` — the index that maps every step to
 
 ## Step 5 — Deliver <!-- a:rs-step5-deliver -->
 
+### Deliver-time risk tier <!-- a:rs-deliver-tier -->
+
+Step 2 classified the *planned* files; the delivered diff can differ. After
+*Update documentation* commits and immediately before the pre-push secret scan, on
+the `HEAD` the QA marker's `head=` names, run
+`printf '%s' "$sensitive_json" | python3 shared/scripts/gi-sensitive.py --classify`
+with `{"labels": [the issue's labels], "paths": [], "diff": "origin/${base}...HEAD"}`.
+Exit 3 or 4, or no `python3`, is `tier: sensitive` (fail closed).
+
+If `tier` is `sensitive` and Step 2's classification was not (its probe/challenge
+gate never ran), run Step 2's *Sensitive-change gate* (steps 2–5) once on the
+diff's paths before pushing. Every probe is `phase: pre`, run on the delivered
+tree. Only `proceed` with empty `test_obligations` and no `amended` blocker
+delivers; `replan`, `stop` or an amendment is that gate's `stop`, before the push —
+**Auto:** the run ends `failed` at Step 5, no PR. Record it in the Decision
+Record's *Sensitive-change gate* line, marked "at deliver".
+
 ### Pre-push secret scan
 
 Full rationale for SKILL.md *Step 5 — Deliver → Push branch and create PR*, which owns
-the invocation, the pass condition and every exit code. Two of its rules look like style
-and are not.
-
-**Why no config value ever reaches the command line.** `gi-secscan.py` reads
-`security.allow_pattern`, `security.extra_secret_file_pattern`,
-`security.extra_secret_value_pattern` and `security.max_file_size_mb` out of
-`.idd.yml` itself. `.idd.yml` is repo-controlled, so its values are attacker
--influenced on a public repository; interpolating one into a shell word lets a crafted
-value close its quote and append a command to a step that `/auto-pilot` runs unattended.
-Passing only flags and a ref name keeps every untrusted string inside the script's own
-parser.
-
-**Why `--policy-ref` names the base, not the branch.** The branch being scanned was
-implemented from an untrusted issue body. If the scan read `security.*` from that same
-branch, a change that grew a permissive `security.allow_pattern` would be deciding how
-it is scanned — the gate would approve exactly the commit that disarmed it. Reading the
-policy from `origin/<base>` means the rules come from a ref the resolution cannot write.
-That is also why the pass condition checks `policy_source`: an exit 0 whose
-`policy_source` is not the `ref:origin/…` that was asked for means the script fell back
-to some other policy, and the scan that ran is not the scan that was requested.
-
-**Why `scanned: 0` with `skipped > 0` is not a pass.** An allow pattern suppresses
-*scanning*, not findings. A `.idd.yml` whose allow pattern matches everything
-produces a clean verdict over nothing at all, which is indistinguishable from a clean
-verdict over the diff unless the counts are read. Treat "examined nothing" as a failure
-to scan and degrade to the documented prose pass instead.
+the invocation, the pass condition and every exit code. Why no config value reaches
+the command line, why `--policy-ref` names the base, and why `scanned: 0` with
+`skipped > 0` is not a pass: `docs/pre-commit-security.md` (rule 5).
 
 **Why exit 1 never degrades.** Every other non-zero exit from a bundled script means the
 script could not answer. Exit 1 here means it *did* answer, and the answer was `block`.

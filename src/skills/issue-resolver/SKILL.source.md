@@ -327,7 +327,7 @@ A failure prints `✗ Final test run failed — PR not created` and stops, even 
 
 ### Push branch and create PR
 
-Run the branch-diff scan first: export `IDD_AUTO_MODE=1` in auto mode, then from the repo root run `python3 shared/scripts/gi-secscan.py --range "origin/${base}" --policy-ref "origin/${base}"`. It reads `security.*` from `.idd.yml` (else legacy `.gitissue.yml`) **at the base ref**: never pass a config *value* on the command line, never let the scanned branch supply its policy (*Pre-push secret scan*).
+**Risk tier first:** classify the delivered diff, and gate it before the push when Step 2 did not (*Deliver-time risk tier*, `references/steps/step-5-deliver.md`). Then run the branch-diff scan: export `IDD_AUTO_MODE=1` in auto mode, then from the repo root run `python3 shared/scripts/gi-secscan.py --range "origin/${base}" --policy-ref "origin/${base}"`. It reads `security.*` from `.idd.yml` (else legacy `.gitissue.yml`) **at the base ref**: never pass a config *value* on the command line, never let the scanned branch supply its policy (*Pre-push secret scan*).
 
 - **Pass** needs all four: exit 0, `policy_source` equal to the requested `ref:origin/…`, `verdict` not `block`, `scanned` not 0 while `skipped` is above 0.
 - **Exit 1 is the block verdict** — stop, do not push, report `blocking[]`. **Exit 3** (uncompilable `security.*`) also stops.

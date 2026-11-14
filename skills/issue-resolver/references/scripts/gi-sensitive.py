@@ -11,13 +11,27 @@ plan, writing rebuttals — stays with the agent.
 --classify
   Reads one JSON object on stdin:
 
-      {"labels": ["<issue label>", ...], "paths": ["<planned file>", ...]}
+      {"labels": ["<issue label>", ...], "paths": ["<planned file>", ...],
+       "diff": "<base>...<head>"}
 
-  and prints {"sensitive": true | false, "reasons": [{"source", "value",
-  "class"}]}. Size never enters: one sensitive path or label is enough. Both
-  keys are required (an empty list is fine); a missing key, or any other
-  top-level key not starting with `_`, is exit 3 — a misspelled `paths` must
-  never read as "no sensitive path".
+  and prints {"sensitive": true | false, "tier": "sensitive" | "standard",
+  "reasons": [{"source", "value", "class"}]}. `tier` is the one risk tier the
+  resolver (Step 2, and again at Deliver) and /issue-pr-review (Depth gate,
+  Merge floor) read: `sensitive` exactly when `sensitive` is true (issue #569).
+  Size never enters: one sensitive path or label is enough, and no Effort or
+  size field is an input — an issue cannot lower its own tier. `labels` and
+  `paths` are required (an empty list is fine); a missing key, or any other
+  top-level key not starting with `_` (`effort` included), is exit 3 — a
+  misspelled `paths` must never read as "no sensitive path".
+
+  `diff` is optional: a range `<base>...<head>` whose two sides are each
+  non-empty, start with neither `-` nor `.`, use only `[A-Za-z0-9._/-]` and
+  hold no `..` (anything else is exit 3). The script runs
+  `git --no-replace-objects diff -z --no-renames --name-only <range> --` in the
+  working directory and classifies every changed path (a rename lists both
+  sides, NUL-split so no path is quoted) together with `paths`, source `diff`.
+  A git failure — git missing, an unknown ref, not a repository — is exit 4,
+  never "not sensitive".
 
     label            a label containing `security`, `cve` or `vulnerability`,
                      case-insensitive — the labels Step 0d already honours
@@ -44,6 +58,25 @@ plan, writing rebuttals — stays with the agent.
                      .gitissue.yml and .gitissue-recipe.json (still read as a
                      fallback, so still policy), .pre-commit-config.yaml,
                      .gitleaks.toml, or a file whose name contains `secscan`
+
+  Checked after auth, in this order (file names case-insensitive):
+
+    dependency-manifest  package.json, package-lock.json, npm-shrinkwrap.json,
+                     yarn.lock, pnpm-lock.yaml, bun.lockb, requirements*.txt,
+                     pyproject.toml, setup.py, setup.cfg, Pipfile(.lock),
+                     poetry.lock, uv.lock, go.mod, go.sum, Cargo.toml/.lock,
+                     Gemfile(.lock), *.gemspec, composer.json/.lock, pom.xml,
+                     build.gradle(.kts), settings.gradle(.kts),
+                     gradle.lockfile, *.csproj, packages.config,
+                     Package.swift/.resolved, Podfile(.lock), mix.exs/.lock,
+                     pubspec.yaml/.lock — at any depth
+    infrastructure   Dockerfile, Dockerfile.*, *.dockerfile,
+                     docker-compose*.yml/.yaml, compose.yml/.yaml, *.tf,
+                     *.tfvars, Chart.yaml, Vagrantfile, or a directory named
+                     terraform, infra, infrastructure, k8s, kubernetes, helm,
+                     ansible, pulumi or cloudformation
+    migration        a directory named migrations, migration, migrate or
+                     alembic
 
 --adjudicate
   Reads the gate's ledger on stdin:
@@ -94,9 +127,11 @@ Exit codes
      `verdict`, never the exit status. This script never exits 1.
   2  usage error.
   3  invalid input — stdin is not a JSON object of the documented shape
-     (including a missing or unknown top-level key). Fix the record and
-     re-run; never read this as "not sensitive" or "proceed".
-  4  cannot complete — stdin unreadable.
+     (including a missing or unknown top-level key, or a malformed `diff`).
+     Fix the record and re-run; never read this as "not sensitive" or
+     "proceed".
+  4  cannot complete — stdin unreadable, or the `diff` range could not be
+     listed. The tier is unknown: callers treat it as sensitive.
 
 Authored at src/shared/scripts/gi-sensitive.py — do not edit installed copies;
 edit the source and run ./scripts/build.sh.
@@ -107,6 +142,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path, PurePosixPath
 
@@ -132,6 +168,25 @@ SECURITY_CONFIG_FILES = frozenset({
     ".idd.yml", ".gitissue.yml", ".idd-recipe.json", ".gitissue-recipe.json",
     ".pre-commit-config.yaml", ".gitleaks.toml",
 })
+DEPENDENCY_FILES = frozenset({
+    "package.json", "package-lock.json", "npm-shrinkwrap.json", "yarn.lock", "pnpm-lock.yaml",
+    "bun.lockb", "pyproject.toml", "setup.py", "setup.cfg", "pipfile", "pipfile.lock",
+    "poetry.lock", "uv.lock", "go.mod", "go.sum", "cargo.toml", "cargo.lock", "gemfile",
+    "gemfile.lock", "composer.json", "composer.lock", "pom.xml", "build.gradle",
+    "build.gradle.kts", "settings.gradle", "settings.gradle.kts", "gradle.lockfile",
+    "packages.config", "package.swift", "package.resolved", "podfile", "podfile.lock",
+    "mix.exs", "mix.lock", "pubspec.yaml", "pubspec.lock",
+})
+DEPENDENCY_SUFFIXES = (".gemspec", ".csproj")
+INFRA_FILES = frozenset({"dockerfile", "compose.yml", "compose.yaml", "chart.yaml", "vagrantfile"})
+INFRA_SUFFIXES = (".dockerfile", ".tf", ".tfvars")
+INFRA_DIRS = frozenset({
+    "terraform", "infra", "infrastructure", "k8s", "kubernetes", "helm", "ansible",
+    "pulumi", "cloudformation",
+})
+MIGRATION_DIRS = frozenset({"migrations", "migration", "migrate", "alembic"})
+# One side of a `diff` range: no leading `-` (an option) or `.`, no `..`.
+RANGE_SIDE = re.compile(r"^[A-Za-z0-9_/][A-Za-z0-9._/-]*$")
 CAMEL = re.compile(r"(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])")
 DIGIT_EDGE = re.compile(r"(?<=[A-Za-z])(?=[0-9])|(?<=[0-9])(?=[A-Za-z])")
 NON_WORD = re.compile(r"[^a-z0-9]+")
@@ -188,6 +243,24 @@ def path_class(raw: str) -> str | None:
         return "security-config"
     if _stem_hit(words, AUTH_STEMS):
         return "auth"
+    low_name = name.lower()
+    dirs = {p.lower() for p in parts[:-1]}
+    if (
+        low_name in DEPENDENCY_FILES
+        or low_name.endswith(DEPENDENCY_SUFFIXES)
+        or (low_name.startswith("requirements") and low_name.endswith(".txt"))
+    ):
+        return "dependency-manifest"
+    if (
+        low_name in INFRA_FILES
+        or low_name.startswith("dockerfile.")
+        or low_name.endswith(INFRA_SUFFIXES)
+        or (low_name.startswith("docker-compose") and low_name.endswith((".yml", ".yaml")))
+        or dirs & INFRA_DIRS
+    ):
+        return "infrastructure"
+    if dirs & MIGRATION_DIRS:
+        return "migration"
     return None
 
 
@@ -209,19 +282,54 @@ def _string_list(record: dict, key: str) -> list[str]:
     return value
 
 
+class Unavailable(OSError):
+    """The `diff` range could not be listed (exit 4): the tier is unknown."""
+
+
+def diff_paths(rng: object) -> list[str]:
+    """Every path `git diff <base>...<head>` changes; a rename lists both sides."""
+    if not isinstance(rng, str):
+        raise InvalidInput("`diff` must be a string <base>...<head>")
+    sides = rng.split("...")
+    if len(sides) != 2 or not all(RANGE_SIDE.match(s) and ".." not in s for s in sides):
+        raise InvalidInput("`diff` must be <base>...<head> using only [A-Za-z0-9._/-]")
+    try:
+        proc = subprocess.run(
+            ["git", "--no-replace-objects", "diff", "-z", "--no-renames", "--name-only", rng, "--"],
+            stdin=subprocess.DEVNULL, capture_output=True, check=False,
+        )
+    except (OSError, ValueError) as exc:
+        raise Unavailable(f"cannot run git — {exc}") from exc
+    if proc.returncode != 0:
+        detail = proc.stderr.decode("utf-8", errors="replace").strip().splitlines()
+        raise Unavailable(f"git diff {rng} failed: {detail[-1] if detail else 'unknown'}")
+    out = proc.stdout.decode("utf-8", errors="surrogateescape")
+    return [p for p in out.split("\0") if p]
+
+
 def classify(record: object) -> dict:
     if not isinstance(record, dict):
         raise InvalidInput("stdin must be a JSON object")
-    _require_keys(record, ("labels", "paths"))
+    _require_keys(record, ("labels", "paths"), ("diff",))
+    labels = _string_list(record, "labels")
+    paths = _string_list(record, "paths")
+    changed = diff_paths(record["diff"]) if "diff" in record else []
     reasons = []
-    for label in _string_list(record, "labels"):
+    for label in labels:
         if any(word in label.lower() for word in LABEL_WORDS):
             reasons.append({"source": "label", "value": label, "class": "label"})
-    for path in _string_list(record, "paths"):
-        cls = path_class(path)
-        if cls:
-            reasons.append({"source": "path", "value": path, "class": cls})
-    return {"sensitive": bool(reasons), "reasons": reasons}
+    seen = set()
+    for source, items in (("path", paths), ("diff", changed)):
+        for path in items:
+            if path in seen:
+                continue
+            seen.add(path)
+            cls = path_class(path)
+            if cls:
+                reasons.append({"source": source, "value": path, "class": cls})
+    sensitive = bool(reasons)
+    return {"sensitive": sensitive, "tier": "sensitive" if sensitive else "standard",
+            "reasons": reasons}
 
 
 def _text(entry: dict, key: str) -> str:
@@ -370,7 +478,8 @@ def main(argv: list[str] | None = None) -> int:
     )
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--classify", action="store_true",
-                      help="labels + planned paths on stdin → {sensitive, reasons}")
+                      help="labels + planned paths (+ optional diff range) on stdin → "
+                           "{sensitive, tier, reasons}")
     mode.add_argument("--adjudicate", action="store_true",
                       help="gate ledger on stdin → {verdict, open_blockers, …}")
     args = parser.parse_args(argv)

@@ -261,16 +261,12 @@ inline fallback — before Step 3, in auto mode too.
 the selected option's `files_to_modify` + `files_to_create` paths (the `light` plan's
 named files), then run
 `printf '%s' "$sensitive_json" | python3 references/scripts/gi-sensitive.py --classify`.
-`sensitive: false` prints `○ Sensitive-change gate: not triggered` and moves on.
+`sensitive: false` prints `○ Sensitive-change gate: not triggered` and moves on;
+`tier: sensitive` also revises the profile to `full` (upward only, *Step 0g*).
 Exit 3 means you built a malformed record — fix it and re-run. No `python3`, exit 2
-or 4: print `⚠ gi-sensitive unavailable — classifying by hand` and apply the classes
-in the script's docstring yourself (a `security`/`CVE`/`vulnerability` label; CI
-workflows and actions; secrets and `.env*` files; auth/login/password/session/
-permission/token/security/policy/guard/role/passport/devise/ability/omniauth/
-warden/pundit/cancan paths, camelCase and prefixes included;
-`CODEOWNERS`/`SECURITY.md`; `.idd.yml`/pre-commit/secret-scan config). **Fail
-closed:** a classifier that could not run never means "not sensitive" — any doubt
-triggers the gate.
+or 4: print `⚠ gi-sensitive unavailable — treating the change as sensitive` and run
+the gate; never re-derive the classes by hand. **Fail closed:** a classifier that
+could not run never means "not sensitive" — any doubt triggers the gate.
 
 **2. Falsifiable load-bearing probes.** Name each assumption the plan cannot
 survive being wrong about (at least one). For each, write a probe: an `id`, the
