@@ -856,7 +856,8 @@ trailers_of() {
   git -C "$TR" log -1 --format='%(trailers:only)'
   git -C "$TR" log -1 --format=%B | git -C "$TR" interpret-trailers --parse
 }
-git -C "$TR" init -q && git -C "$TR" config user.email t@t && git -C "$TR" config user.name t
+git -C "$TR" init -q && git -C "$TR" config user.email t@t && git -C "$TR" config user.name t \
+  && git -C "$TR" config commit.gpgsign false && git -C "$TR" config core.hooksPath /dev/null
 if [ -n "$PRODUCED" ] && [ -z "$(trailers_of "$PRODUCED" | tr -d '[:space:]')" ] \
   && [ -n "$(trailers_of "Produced-by: claude-x" | tr -d '[:space:]')" ]; then
   pass "T31e: the Produced by line is never parsed as a commit trailer"
