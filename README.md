@@ -248,6 +248,32 @@ idd-lint repo --base origin/main   # any idd-lint subcommand works
 
 ---
 
+## What IDD changes in your repo
+
+Everything the skills write, where it lands, and how to turn it off. Nothing in this table happens until you run a skill.
+
+| Area | What IDD does | Which skill | Control |
+|------|---------------|-------------|---------|
+| Files in the worktree | Writes `.idd.yml` and adds one line, `.idd/cache/`, to `.gitignore` | `/init-idd` | Runs only when you call it; it asks before it overwrites a config |
+| Files in the worktree | Writes local state under `.idd/`: `triage.json`, `analysis-<N>.json`, `runs.jsonl`, `run-state.json`, `run.lock`, `last-run-report.md`, `cache/` | `/issue-triage`, `/issue-analysis`, `/issue-resolver`, `/auto-pilot` | Local state, safe to delete |
+| Files outside the worktree | Stores review receipts and progress records under `<git common dir>/idd/`, and a model-data cache under `~/.cache/idd` | `/issue-resolver`, `/issue-pr-review`, `/auto-pilot`, `/issue-creator` | Safe to delete; `IDD_CACHE_DIR` moves the cache |
+| Git | Creates one branch per issue, commits on it and pushes it. Never commits to the default branch and never force-pushes | `/issue-resolver`, `/issue-pr-review` (fix commits) | `resolve.branch_prefix`, `resolve.max_commits` |
+| Git | Stashes uncommitted work, runs `git pull --rebase`, then restores the stash, before it reads or changes code | every skill that syncs | Commit or stash first to skip the stash step |
+| Git | Creates a worktree for an issue when you accept the offer, or for each parallel lane | `/issue-resolver`, `/auto-pilot` | Answer `n` to the offer; `autopilot.max_parallel: 1` |
+| Git | After a merge: deletes the merged local branch and its clean worktrees, and fast-forwards the base branch. Untracked files are deleted only when you say yes to the exact list | `/issue-pr-review`, `/auto-pilot` | No merge, no cleanup |
+| Git | Resets the local default branch to `origin` after a failed sync rebase, only when it holds no local commits and no tracked changes | `/auto-pilot` | Nothing local is discarded; otherwise the run stops |
+| Issues | Creates issues, with labels | `/issue-creator`, `/plan-to-issues`, `/auto-pilot` (follow-ups) | Interactive runs show a preview first |
+| Issues | Rewrites an issue body into the standard template, after it saves the original text in a comment | `/issue-creator`, `/issue-resolver` | `issue.auto_normalize: false`, `issue.normalize_comment` |
+| Issues | Adds comments and labels, including the quarantine label for an issue that keeps failing | `/issue-resolver`, `/auto-pilot`, `/plan-to-issues` (creates missing labels) | `autopilot.quarantine_after: 0` |
+| Issues | Closes an issue through the `Closes #N` line of a merged PR. `/issue-triage` only prints a close command | `/issue-pr-review`, `/auto-pilot` | Merging is opt-in (next rows) |
+| Pull requests | Opens a PR. A review edits its body only to add a missing `Closes #N` line, and pushes fix commits to its branch. A PR branch behind its base is never updated: the command is printed | `/issue-resolver`, `/issue-pr-review` | `--review-only` changes nothing |
+| Pull requests | Merges a clean PR and deletes its branch, with the merge method you choose. The squash or merge commit carries the PR body (rebase: none does) | `/issue-pr-review`, `/auto-pilot` | `review.auto_merge` (default `false`), `review.merge_method` (`squash`, `merge`, `rebase`), `--no-merge`, `autopilot.mode` |
+| PR template | Keeps your repository's pull-request template and adds the IDD sections to it | `/issue-resolver` | Automatic when a template exists |
+| Projects board | Adds issues to a GitHub Projects board and moves their status | `/issue-creator`, `/issue-resolver` | Off by default: `projects.sync_enabled` |
+| Repo settings | Never changed. When a setting does not fit, IDD prints the fix and you decide | all | Nothing to turn off |
+
+---
+
 ## Get Started
 
 ### Prerequisites
@@ -550,7 +576,7 @@ Quick read-only diagnostic that verifies the IDD invariants of the current repo.
 1. `/issue-creator` keeps its intent-only contract (no `affected_files` / `technical_notes` / `architecture_constraints` in templates or output)
 2. Every `gh` invocation in skills uses `--json` with explicit field selection
 3. Each skill has a `references/error-messages.md` using the three-part format
-4. Repo merge strategy carries the full squash-merge binding: squash-only **and** the repo's `squash_merge_commit_message` is set to `PR_BODY` — squash alone is not sufficient, since GitHub's default (`COMMIT_MESSAGES`) drops PR-body content (Decision Record, AC verification) at the merge boundary (durable analysis-artifact rule from #35; message-source enforcement from #295)
+4. The repo allows the configured merge method (`review.merge_method`: `squash` or `merge`), so the commit IDD's merge writes carries the PR body (Decision Record, AC verification) into git history; `rebase`, and a hand merge that would drop the PR body, are reported as tracker-only. A fix is always a `.idd.yml` edit, never a repo-settings change
 
 Read-only by design — never modifies files, branches, or remote state.
 
@@ -620,7 +646,7 @@ review:
   require_acceptance_criteria_check: true  # block soft-pass if AC verification fails
 ```
 
-Everything you don't set falls back to a sensible default. Set `agents.model.<role>` and `agents.effort.<role>` to choose a model and thinking effort for individual subagent roles; each role falls back to its `agents.model.default` or `agents.effort.default` setting, then to the main agent configuration. See [agent overrides](docs/agent-overrides.md) for harness support and fallback behavior. Set `compaction.threshold.<skill>` (percent of context remaining; `auto-pilot` defaults to 15, every other skill to 40) to choose when a long run warns that it is time to compact, and `compaction.enabled: false` to turn the check off; skills never compact on their own, and the check fires only where the host reports remaining context (see [context threshold](docs/context-threshold.md)). Custom templates, approval gates, GitHub Projects sync, and all other settings are documented in the [full configuration schema](docs/config-schema.md).
+Everything you don't set falls back to a sensible default. Set `review.merge_method` to `squash` (the default), `merge` or `rebase` to keep the merge method your repo already uses; no repo setting has to change. Set `agents.model.<role>` and `agents.effort.<role>` to choose a model and thinking effort for individual subagent roles; each role falls back to its `agents.model.default` or `agents.effort.default` setting, then to the main agent configuration. See [agent overrides](docs/agent-overrides.md) for harness support and fallback behavior. Set `compaction.threshold.<skill>` (percent of context remaining; `auto-pilot` defaults to 15, every other skill to 40) to choose when a long run warns that it is time to compact, and `compaction.enabled: false` to turn the check off; skills never compact on their own, and the check fires only where the host reports remaining context (see [context threshold](docs/context-threshold.md)). Custom templates, approval gates, GitHub Projects sync, and all other settings are documented in the [full configuration schema](docs/config-schema.md).
 
 </details>
 

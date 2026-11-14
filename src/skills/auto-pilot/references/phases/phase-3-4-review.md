@@ -27,7 +27,7 @@ See the `{{skill:issue-pr-review}}` skill for the full pipeline.
 
 **Pre-spawn marker.** <!-- a:ctx-prespawn-review --> Only when `compaction.enabled` is true; `false` skips it. Before this spawn the last checkpoint must read `current.phase: review` with this PR. The post-resolve checkpoint (or the drain's copy into `current`) already wrote it, so normally nothing is written; only when it does not, write `{"phase": "review", "current": {"issue": 42, "title": "…", "branch": "fix/42-…", "pr": 87, "outcome": null, "started_at": null, "phase": "review"}}` with the *Step 1.0b* procedure first. It names every `current` key, with this PR's own branch, because `current` merges key by key: a marker naming only `issue`, `pr` and `phase` would keep another issue's branch and outcome, and *Step 1.0* would reconcile that branch. SKILL.md's *Context re-entry* rule reads it as the reviewer in flight.
 
-Use the **PR Reviewer Subagent** prompt from `references/subagent-prompts.md`, substituting `{pr_number}`, `{run_id}`, `{resume}` (`yes` only when *Step 1.0*'s progress-record set names this PR) and, when Step 1.2b captured it, `{issue_payload_ids}` for the issue this PR closes. **The reviewer reads identifying fields from that payload only** — and gets only those, because Step 1.2b trimmed the block to `number`, `title` and `labels`, so the scope is structural rather than instruction-only. This spawn happens strictly *after* Phase 2's resolver ran its Step 0d normalization (`gh issue edit` + re-read), so a Phase-1 body would be superseded by construction — on an unnormalized backlog issue, 0d is what *creates* the structured Acceptance Criteria section. That is why the body is dropped from this block rather than fenced off in prose. The reviewer's acceptance-criteria verification therefore always re-fetches the live body, and the #36 `acceptance_criteria` hard-block is never evaluated against the payload. The subagent runs the full `/issue-pr-review --auto --no-merge` pipeline: review, test, CI check, fix, repeat. It does NOT merge — merging is the main agent's job in Phase 5. The `--no-merge` flag suppresses auto-merge in `--auto` mode so the reviewer never steals the merge step from Phase 5's mode gate and dependency gate.
+Use the **PR Reviewer Subagent** prompt from `references/subagent-prompts.md`, substituting `{pr_number}`, `{run_id}`, `{caller_merges}`, `{resume}` (`yes` only when *Step 1.0*'s progress-record set names this PR) and, when Step 1.2b captured it, `{issue_payload_ids}` for the issue this PR closes. **The reviewer reads identifying fields from that payload only** — and gets only those, because Step 1.2b trimmed the block to `number`, `title` and `labels`, so the scope is structural rather than instruction-only. This spawn happens strictly *after* Phase 2's resolver ran its Step 0d normalization (`gh issue edit` + re-read), so a Phase-1 body would be superseded by construction — on an unnormalized backlog issue, 0d is what *creates* the structured Acceptance Criteria section. That is why the body is dropped from this block rather than fenced off in prose. The reviewer's acceptance-criteria verification therefore always re-fetches the live body, and the #36 `acceptance_criteria` hard-block is never evaluated against the payload. The subagent runs the full `/issue-pr-review --auto --no-merge` pipeline: review, test, CI check, fix, repeat. It does NOT merge — merging is the main agent's job in Phase 5. The `--no-merge` flag suppresses auto-merge in `--auto` mode so the reviewer never steals the merge step from Phase 5's mode gate and dependency gate.
 
 ### Step 3.2 — Process Review Result <!-- a:ap-step32-review-result -->
 
@@ -127,7 +127,8 @@ Whenever Step 2 would merge a PR (aggressive + `merge_partial: true`), apply Ste
 **Step 2b — Merge (only when aggressive + merge_partial: true and all four gates passed):** <!-- a:ap-step2b-merge -->
 
 Run it as **one** shell call (variables do not survive between calls),
-`{verified_head}` being the 40-hex SHA Step 5.1c bound. A non-zero exit is the
+`{verified_head}` being the 40-hex SHA Step 5.1c bound and the method and body
+file as in *Step 5.2*. A non-zero exit is the
 merge-failed path below, `left_open`, unless Step 5.2's *merge reconciliation*
 reads the PR as `MERGED`:
 
@@ -135,8 +136,10 @@ reads the PR as `MERGED`:
 verified_head="{verified_head}"
 read -r head_now base_ref <<<"$(gh pr view {pr_number} --json headRefOid,baseRefName --jq '"\(.headRefOid) \(.baseRefName)"')"
 behind_by="$(gh api "repos/{owner}/{repo}/compare/${base_ref}...${verified_head}" --jq .behind_by)"
+body_file="$(mktemp)"; gh pr view {pr_number} --json body --jq .body >"$body_file" || verified_head=""
+trap 'rm -f "$body_file"' EXIT
 if [ -n "$verified_head" ] && [ "$head_now" = "$verified_head" ] && [ "$behind_by" = "0" ]; then
-  gh pr merge {pr_number} --squash --delete-branch --match-head-commit "$verified_head"
+  gh pr merge {pr_number} --{merge_method} --delete-branch --match-head-commit "$verified_head" --body-file "$body_file"
 else
   echo "merge_identity=stale (head_now=$head_now behind_by=$behind_by)"; exit 1
 fi

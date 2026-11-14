@@ -1,0 +1,116 @@
+{
+  "name": "issue-pr-review/merge-method-merge",
+  "skill": "issue-pr-review",
+  "prompt": "/issue-pr-review 12 --auto on a merge-commit repo with review.merge_method: merge and review.auto_merge: true",
+  "grade": [
+    {
+      "tool": "idd-lint",
+      "args": [
+        "pr",
+        "OUT/merge-body.txt",
+        "--title",
+        "feat(reports): add csv export (#77)"
+      ],
+      "expect_exit": 0,
+      "label": "the body file passed to the merge is the conforming PR body"
+    },
+    {
+      "tool": "gh-calls",
+      "expect_by_command": {
+        "pr merge": 1,
+        "repo edit": 0,
+        "api -X": 0
+      },
+      "expect_argv": [
+        [
+          "auth",
+          "status"
+        ],
+        [
+          "pr",
+          "view",
+          "12",
+          "--json",
+          "body,headRefOid,number,state,title"
+        ],
+        [
+          "repo",
+          "view",
+          "--json",
+          "mergeCommitAllowed,rebaseMergeAllowed,squashMergeAllowed"
+        ],
+        [
+          "api",
+          "repos/acme/app",
+          "--jq",
+          "{squash_merge_commit_message, merge_commit_message}"
+        ],
+        [
+          "pr",
+          "view",
+          "12",
+          "--json",
+          "body",
+          "--jq",
+          ".body"
+        ],
+        [
+          "pr",
+          "view",
+          "12",
+          "--json",
+          "baseRefName,headRefOid",
+          "--jq",
+          "\"\\(.headRefOid) \\(.baseRefName)\""
+        ],
+        [
+          "api",
+          "repos/acme/app/compare/main...4f2a9c1e7b3d5a6f8091a2b3c4d5e6f708192a3b",
+          "--jq",
+          ".behind_by"
+        ],
+        [
+          "pr",
+          "merge",
+          "12",
+          "--merge",
+          "--delete-branch",
+          "--match-head-commit",
+          "4f2a9c1e7b3d5a6f8091a2b3c4d5e6f708192a3b",
+          "--body-file",
+          "pr-body.txt"
+        ]
+      ],
+      "expect_exit": 0,
+      "label": "one merge with --merge, --delete-branch, --match-head-commit and --body-file; no repo-settings call"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/traceability-pass-merge.txt",
+      "expect_exit": 0,
+      "label": "traceability passes for a merge-commit repo with review.merge_method: merge"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/hand-merge-note-merge_commit_message-PR_TITLE.txt",
+      "expect_exit": 0,
+      "label": "the default message source is reported as a hand-merge note, not a partial"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/merged-by-merge.txt",
+      "expect_exit": 0,
+      "label": "the PR was merged with the configured method"
+    }
+  ],
+  "human_review": {
+    "criteria": [
+      "The first summary row states MERGED and names the merge method that was used.",
+      "The traceability line is a pass that names the B2/merge binding, and the hand-merge note is shown as a note, not as a failure.",
+      "Nothing in the output tells the user to change a repository setting.",
+      "The summary says No approval needed."
+    ],
+    "feedback": "Record each reviewer answer; absent, blank, or nonresponsive feedback leaves understanding unconfirmed.",
+    "scope": "This deterministic stand-in tests a report fixture, not live agent behavior. Apply these criteria to actual agent outputs in behavioral evaluations."
+  }
+}

@@ -35,7 +35,7 @@ those is **out of scope**:
 | 1 | Stale skill claims | The `/issue-creator` README and SKILL text make no claim that the skill inspects code (Check 1 lists the files and the forbidden phrases). | `FAIL` |
 | 2 | Issue-template fields | No issue template asks the reporter for resolver-owned content (Check 2 lists the directories and the forbidden labels). | `FAIL` |
 | 3 | Autopilot mode set | `.idd.yml`, if present in the repo root, carries an `autopilot.mode` key. | `FAIL` (only when `.idd.yml` exists) |
-| 4 | Squash-merge default | Squash is the only merge strategy allowed **and** the squash message source is the PR body (SPEC §4.3 B1). | `WARN` |
+| 4 | Merge method | The repository allows the configured `review.merge_method` (`squash` or `merge`), so IDD's merge carries the PR body into git history (SPEC §4.3 B1/B2). `rebase` is tracker-only; so is a hand merge whose message source is not `PR_BODY`. | `WARN` |
 
 ### Explicitly out of scope for v1
 
@@ -104,8 +104,8 @@ Expected output for a clean repo (verify against this when testing):
     ● [3/4] Autopilot mode...
     ✓ [3/4] Autopilot mode        autopilot.mode = conservative
 
-    ● [4/4] Squash-merge default...
-    ✓ [4/4] Squash-merge default  squash-only · squash message source PR_BODY
+    ● [4/4] Merge method...
+    ✓ [4/4] Merge method           squash allowed · IDD's merge carries the PR body
 
     ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
     Result: PASS  (4 checks, 0 failed, 0 warned)
@@ -230,39 +230,43 @@ Verify that `.idd.yml`, when present, sets `autopilot.mode`. That key makes the 
 
 ---
 
-## Check 4 — Squash-merge default
+## Check 4 — Merge method
 
-Verify the repository's merge configuration carries the SPEC §4.3 **B1** binding: squash is the only strategy, **and** the squash commit message is the PR body. IDD uses one-commit-per-PR semantics, so any non-squash strategy is a footgun — and a squash-only repo still defeats B1 if `squash_merge_commit_message` is GitHub's default `COMMIT_MESSAGES`, which writes the commit subjects and drops the Decision Record at the merge boundary. SPEC §4.3 requires warning at **both** levels, and forbids reporting the binding satisfied on the strategy alone or when the configuration cannot be read.
+Verify that the repository allows the merge method IDD is configured to use. IDD's own merge passes the PR body as the commit body (`squash` → SPEC §4.3 **B1**, `merge` → **B2**), so the binding needs no repository setting — only a method the repo allows and a merge IDD performs. For a merge made by hand the repo's message source decides (SPEC §4.3). `rebase` lands the PR's own commits and none carries the PR body: it is tracker-only and never passes. SPEC §4.3 forbids reporting the binding satisfied when the configuration cannot be read. The doctor never changes a repository setting; every fix it prints is a `.idd.yml` edit.
 
 ### Procedure
 
-1. Confirm `gh` is on `PATH` and authenticated.
-   - If `gh` is missing: skip with `○ [4/4] Squash-merge default  skipped — gh not installed`.
-   - If `gh auth status` fails: skip with `○ [4/4] Squash-merge default  skipped — gh not authenticated`.
-2. Read the **strategy**:
+1. Read `{method}`: the `merge_method:` value inside the `review:` block of `.idd.yml` (else legacy `.gitissue.yml`), read as text the way Check 3 reads `autopilot.mode`. No file, no `review:` block or no such line means the default, `squash`. A value other than `squash`, `merge` or `rebase` is invalid config: print the *Warn — invalid method* line and stop the check. Read `auto_merge:` from the same block the same way; anything but `true` means IDD's review leaves the merge to a human.
+2. Confirm `gh` is on `PATH` and authenticated.
+   - If `gh` is missing: skip with `○ [4/4] Merge method           skipped — gh not installed`.
+   - If `gh auth status` fails: skip with `○ [4/4] Merge method           skipped — gh not authenticated`.
+3. Read the **strategy**:
 
    ```bash
    gh repo view --json mergeCommitAllowed,squashMergeAllowed,rebaseMergeAllowed
    ```
 
-   If this call fails (for example, no GitHub remote), skip with `○ [4/4] Squash-merge default  skipped — repo settings unreadable` and stop the check; nothing was read, so nothing is claimed.
-3. Read the **message source** — a second, separate call. It is not a `gh repo view` field (`gh repo view --json squashMergeCommitMessage` fails with `Unknown JSON field`), so read the REST API:
+   If this call fails (for example, no GitHub remote), skip with `○ [4/4] Merge method           skipped — repo settings unreadable` and stop the check; nothing was read, so nothing is claimed.
+4. Read the **hand-merge message source** — a second, separate call. It is not a `gh repo view` field, so read the REST API:
 
    ```bash
-   gh api repos/{owner}/{repo} --jq '{squash_merge_commit_title,squash_merge_commit_message}'
+   gh api repos/{owner}/{repo} --jq '{squash_merge_commit_message, merge_commit_message}'
    ```
 
-4. Parse both. The check **passes** iff:
+5. Classify:
 
    ```
-   squashMergeAllowed == true
-     AND mergeCommitAllowed == false
-     AND rebaseMergeAllowed == false
-     AND squash_merge_commit_message == "PR_BODY"
+   method == "rebase"                               → WARN  (tracker-only)
+   method == "squash" AND squashMergeAllowed == true → PASS
+   method == "merge"  AND mergeCommitAllowed == true → PASS
+   otherwise                                        → WARN  (method not allowed)
    ```
 
-5. If step 2 succeeded but step 3 did not — a 404, a token lacking permission, an absent field — the message source is **unknown**. Print the *Warn — message source unreadable* line, which ends `binding unverified`. Never pass: an unread configuration is not a satisfied binding (SPEC §4.3). A missing or unauthenticated `gh` still **skips** (step 1): a skip claims nothing about the binding, which is not the same as claiming it holds.
-6. Otherwise, **warn** (not fail) with `⚠ [4/4]` and the fix hint — repo settings are owner-controlled and the doctor only nudges. Build `{summary}` from the strategy and message-source tables in `references/error-messages.md`.
+   What else the repo allows does not change the answer.
+6. On a pass, look at that method's message source (`squash_merge_commit_message` for `squash`, `merge_commit_message` for `merge`). When it is not `PR_BODY`, or step 4 did not answer, `review.auto_merge` decides:
+   - `true` → print the *hand-merge note* under the pass line. The note is `○`, never a warn: IDD's own merge carries the body whatever the setting says.
+   - anything else → the check is a WARN, not a pass: print *Warn — hand merge*. The merge is made by hand and will not carry the PR body, so the binding is not reported satisfied on the strategy alone.
+7. On a warn, print `⚠ [4/4]` and the `.idd.yml` fix hint from `references/error-messages.md`. Never print a command that changes a repository setting.
 
 ---
 

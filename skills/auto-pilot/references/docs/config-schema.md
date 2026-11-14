@@ -144,6 +144,10 @@ review:
   # Default: false
   auto_merge: false
 
+  # Merge method: squash | merge | rebase (tracker-only: no commit carries
+  # the PR body). Any other value is invalid config: stop.
+  merge_method: "squash"
+
   # Only report issues at or above this confidence level (0-100); a stated-
   # constraint finding is reported at any confidence
   # Type: integer
@@ -477,6 +481,7 @@ Each `compaction.threshold.<skill>` must be an integer from 1 to 99 and `compact
 | `review.max_cycles` | `3` | Max review-fix cycles |
 | `review.adaptive_depth` | `true` | Scale review depth to PR complexity — a trivial PR caps the review-fix loop at 1 cycle and skips optional passes (AC + traceability hard-blocks still run); `false` pins every PR to full depth and disables the QA handoff gate and #256's CI verdict gate too ([agent-model-effort.md](https://github.com/luongnv89/idd/blob/main/docs/agent-model-effort.md)) |
 | `review.auto_merge` | `false` | Merge clean PRs (*Merge rule*) |
+| `review.merge_method` | `"squash"` | Merge method: `squash`, `merge` or `rebase` (tracker-only) |
 | `review.confidence_threshold` | `80` | Min confidence level for issues (a `constraints` finding is reported at any confidence) |
 | `review.run_tests` | `true` | Run tests during review |
 | `review.check_ci` | `true` | Check CI status during review |

@@ -8,7 +8,7 @@ tracker line:
 
 ```
   Phase 5 — Merge
-    √ Mergeable   √ Squash-merged   × Issue closed
+    √ Mergeable   √ Merged   × Issue closed
     Result: PARTIAL
 ```
 
@@ -57,7 +57,7 @@ non-blocking, so the phase is `PARTIAL` and the loop continues. With
 | 1 — Triage and Pick | `Runtime budget` · `Triage current` · `Issue picked` · `Dependencies clear` |
 | 2 — Resolve | `Resolver returned` · `PR created` · `Telemetry returned` · `Quarantine checked` |
 | 3-4 — PR Review | `Review ran` · `Fix cycles converged` · `CI green` |
-| 5 — Merge | `Mergeable` · `Squash-merged` · `Issue closed` · `Follow-up filed when partial` |
+| 5 — Merge | `Mergeable` · `Merged` · `Issue closed` · `Follow-up filed when partial` |
 
 The report is per phase, printed above the *Iteration Report* block. It never
 stops the loop by itself: a `FAIL` phase resolves to the iteration's own

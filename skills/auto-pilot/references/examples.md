@@ -350,7 +350,7 @@ A settled green result, from the waiter or from this fallback, still reaches the
 merge only through *Step 5.1c*: re-read the head and base name, require the head
 to equal the one this wait checked and `behind_by` to be exactly `0` against the
 live base branch (never `baseRefOid`), then merge with
-`gh pr merge {pr_number} --squash --delete-branch --match-head-commit "$verified_head"`.
+`gh pr merge {pr_number} --{merge_method} --delete-branch --match-head-commit "$verified_head" --body-file "$body_file"`.
 A base that moved on while CI ran leaves the PR open:
 
 ```

@@ -190,7 +190,7 @@ Resolves one GitHub issue end-to-end and creates an atomic PR.
 
 ## `/issue-pr-review`
 
-Reviews an existing PR end-to-end: pre-pass, review, tests/build, CI, fix loop, and final report. By default, it fixes and repeats until clean; it merges a clean PR only when `review.auto_merge: true` (default `false`) — the full rule is *Step 7 → Merge rule* in the skill. Unattended runs (`--auto`, `/auto-pilot`) also need the *Merge floor*: at least one acceptance criterion `pass` and none `unverified` or still marked `(needs review)`, with the criteria check enabled, and on a bug PR the cited regression test re-run red at base and green at head; an interactive run shows the criteria and asks before merging below it. After a merge, or on a PR it finds already merged, it cleans up the local checkout: it deletes the merged local branch, removes its clean worktrees, and switches from the merged branch to the updated base branch. Anything with uncommitted changes, untracked files, or commits the PR never had is kept and reported (an interactive run can delete untracked files after you confirm the list, never in auto mode); on an already-merged PR an interactive run shows the plan and asks first, and `--review-only` only reports.
+Reviews an existing PR end-to-end: pre-pass, review, tests/build, CI, fix loop, and final report. By default, it fixes and repeats until clean; it merges a clean PR only when `review.auto_merge: true` (default `false`), with the method in `review.merge_method` (`squash` by default, or `merge` or `rebase`) — the full rule is *Step 7 → Merge rule* in the skill. Unattended runs (`--auto`, `/auto-pilot`) also need the *Merge floor*: at least one acceptance criterion `pass` and none `unverified` or still marked `(needs review)`, with the criteria check enabled, and on a bug PR the cited regression test re-run red at base and green at head; an interactive run shows the criteria and asks before merging below it. After a merge, or on a PR it finds already merged, it cleans up the local checkout: it deletes the merged local branch, removes its clean worktrees, and switches from the merged branch to the updated base branch. Anything with uncommitted changes, untracked files, or commits the PR never had is kept and reported (an interactive run can delete untracked files after you confirm the list, never in auto mode); on an already-merged PR an interactive run shows the plan and asks first, and `--review-only` only reports.
 
 ### Input options
 
@@ -290,7 +290,7 @@ Runs a read-only health check for this IDD repository. It does not modify files,
 | Stale skill claims in issue-creator docs | `FAIL` on drift |
 | Forbidden issue-template fields | `FAIL` on forbidden fields |
 | Missing `autopilot.mode` when `.idd.yml` exists | `FAIL` |
-| Repository squash-merge default | `WARN` when not squash-only; skipped (`○`) when `gh` is absent or unauthenticated |
+| Repository allows the configured `review.merge_method` | `WARN` when the repo does not allow it, it is `rebase` (tracker-only), or a hand merge would drop the PR body (`review.auto_merge` off and a message source other than `PR_BODY`); skipped (`○`) when `gh` is absent or unauthenticated |
 
 After the four gating checks, the doctor prints one **informational, non-gating** section — a *run-log summary* over the last N runs (default 50) recorded in `.idd/runs.jsonl`. It reports resolve rate, median QA cycles, and common skip reasons, and never affects the PASS/WARN/FAIL result. When no runs are recorded, it degrades gracefully to a single `○` line.
 

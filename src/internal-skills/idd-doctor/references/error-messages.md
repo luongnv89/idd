@@ -119,82 +119,84 @@ All errors follow the rich error format: what went wrong + fix command (+ docs l
 
 ---
 
-## Check 4 — Squash-merge default
+## Check 4 — Merge method
+
+`{method}` is `review.merge_method` from `.idd.yml`, or `squash` when the key is absent.
 
 ### Skip (no gh)
 ```
-  ○ [4/4] Squash-merge default  skipped — gh not installed
+  ○ [4/4] Merge method           skipped — gh not installed
 ```
 **Trigger:** `which gh` returns empty.
 
 ### Skip (gh unauthenticated)
 ```
-  ○ [4/4] Squash-merge default  skipped — gh not authenticated
+  ○ [4/4] Merge method           skipped — gh not authenticated
 ```
 **Trigger:** `gh auth status` exits non-zero.
 
 ### Skip (repo settings unreadable)
 ```
-  ○ [4/4] Squash-merge default  skipped — repo settings unreadable
+  ○ [4/4] Merge method           skipped — repo settings unreadable
 ```
 **Trigger:** `gh` is authenticated but `gh repo view --json mergeCommitAllowed,squashMergeAllowed,rebaseMergeAllowed` fails — for example, the repo has no GitHub remote. Nothing was read, so the binding is neither passed nor warned.
 
 ### Pass
 ```
-  ✓ [4/4] Squash-merge default  squash-only · squash message source PR_BODY
+  ✓ [4/4] Merge method           {method} allowed · IDD's merge carries the PR body
 ```
-**Trigger:** `squashMergeAllowed=true`, `mergeCommitAllowed=false`, `rebaseMergeAllowed=false`, **and** `squash_merge_commit_message=PR_BODY`.
+**Trigger:** `{method}` is `squash` and `squashMergeAllowed=true`, or `{method}` is `merge` and `mergeCommitAllowed=true`. Other allowed methods do not matter: IDD's merge passes the PR body as the commit body, so no repository setting is needed.
 
-All four conditions are required. SPEC §4.3 forbids reporting the B1 binding satisfied on the strength of the merge strategy alone: a squash-only repo whose message source is GitHub's default `COMMIT_MESSAGES` writes the list of commit subjects into the squash commit and the Decision Record never reaches git history.
-
-### Warn
+### Hand-merge note (under a pass)
 ```
-  ⚠ [4/4] Squash-merge default  {summary} — recommend squash-only
-        Fix: in repo Settings → General → Pull Requests, allow only "Squash merging",
-             and set the squash commit message to "Pull request title and description"
-        Or:  gh api -X PATCH repos/:owner/:repo \
-               -f allow_squash_merge=true \
-               -f allow_merge_commit=false \
-               -f allow_rebase_merge=false \
-               -f squash_merge_commit_title=PR_TITLE \
-               -f squash_merge_commit_message=PR_BODY
+        ○ a hand merge in the GitHub UI will not carry the PR body ({field}: {value})
 ```
-**Trigger:** Any of `mergeCommitAllowed`, `rebaseMergeAllowed` is `true`, or `squashMergeAllowed` is `false`, or `squash_merge_commit_message` is not `PR_BODY`.
+**Trigger:** the check passed and `{field}` — `squash_merge_commit_message` for `squash`, `merge_commit_message` for `merge` — is not `PR_BODY`, and `review.auto_merge` is `true`. When `gh api repos/{owner}/{repo}` did not answer, `{value}` is `unread`. The note never changes the result.
 
-Both `squash_merge_commit_*` fields go in one call: GitHub pairs `PR_BODY` only with `PR_TITLE` and rejects the message on its own with HTTP 422.
-
-### Warn — message source unreadable
+### Warn — hand merge
 ```
-  ⚠ [4/4] Squash-merge default  {summary}; squash message source unreadable — binding unverified
+  ⚠ [4/4] Merge method           {method} allowed · a hand merge will not carry the PR body ({field}: {value})
+        Fix: set review.auto_merge: true in .idd.yml, or use /auto-pilot in a mode that merges
 ```
-**Trigger:** `gh repo view` succeeded but `gh api repos/{owner}/{repo}` did not — a 404, a token without the permission, or the `squash_merge_commit_message` field absent from the response.
+**Trigger:** the same message-source condition, with `review.auto_merge` not `true`: the merge is made by hand, so the message source decides (SPEC §4.3). `/auto-pilot` merges with the PR body itself, except in `conservative` mode, which leaves the PR open.
 
-This is a **warn, never a pass**, even when the strategy half is perfect (`squash-only; squash message source unreadable — binding unverified`). SPEC §4.3: tooling MUST NOT report the binding satisfied when the configuration cannot be read. It is also not a *skip* — a skip belongs to a missing or unauthenticated `gh`, where nothing at all was read; here the strategy was read and the answer is genuinely unknown.
+### Warn — method not allowed
+```
+  ⚠ [4/4] Merge method           {method} is not allowed by this repo ({summary})
+        Fix: set review.merge_method in .idd.yml to one of: {allowed}
+```
+**Trigger:** `{method}` is `squash` or `merge` and the repo does not allow it. The fix is a config edit. The doctor never prints a repository-settings command.
+
+### Warn — rebase
+```
+  ⚠ [4/4] Merge method           rebase is tracker-only — no commit carries the PR body
+        Fix: set review.merge_method in .idd.yml to one of: {carrying}
+```
+**Trigger:** `{method}` is `rebase`, whatever the repo allows. A rebase lands the PR's own commits, so neither B1 nor B2 holds. `{carrying}` is `squash`, `merge` or both — only what the repo allows. When it allows neither, print `        ○ this repo allows only rebase — it stays tracker-only` in place of the `Fix:` line.
+
+### Warn — invalid method
+```
+  ⚠ [4/4] Merge method           review.merge_method: {value} is not squash, merge or rebase
+        Fix: set review.merge_method in .idd.yml to squash, merge or rebase
+```
+**Trigger:** the `merge_method:` line carries any other value. Nothing else is read.
 
 ### `{summary}` enumeration
 
-`{summary}` belongs to the **warn** lines only. The pass line has its own fixed wording — `squash-only · squash message source PR_BODY`, joined with `·` — because a pass has exactly one shape and needs no enumeration. Everything below describes the warn lines, which join their clauses with `;`.
+`{summary}` names what the strategy read returned; `{allowed}` lists the same methods as config values (`squash`, `merge`, `rebase`).
 
-`{summary}` is the strategy clause, then — when the message source was read — a `; squash message source {value}` clause appended.
-
-| Strategy state | Strategy clause |
+| Strategy state | `{summary}` |
 |-------|---------|
 | All three allowed | `squash + merge-commit + rebase enabled` |
 | Squash + merge-commit | `squash + merge-commit enabled` |
 | Squash + rebase | `squash + rebase enabled` |
+| Merge-commit + rebase | `merge-commit + rebase enabled` |
 | Squash only | `squash-only` |
-| Only merge-commit | `merge-commit enabled (no squash)` |
-| Only rebase | `rebase enabled (no squash)` |
+| Only merge-commit | `merge-commit only` |
+| Only rebase | `rebase only` |
 | Nothing allowed | `no merge strategies enabled` |
 
-| Message source | Clause |
-|-------|---------|
-| `PR_BODY` | `; squash message source PR_BODY` |
-| `COMMIT_MESSAGES` (GitHub default) | `; squash message source COMMIT_MESSAGES` |
-| `BLANK` | `; squash message source BLANK` |
-| Unreadable | `; squash message source unreadable — binding unverified` |
-
-This repo today reads `squash-only · squash message source PR_BODY` — the message source was repaired under #295 and the merge-commit and rebase strategies were disabled afterwards, so the full predicate holds and check 4 passes. See `docs/decisions/b1-binding-declaration.md`.
+This repo today sets no `review.merge_method` and allows squash only, so it reads `squash allowed · IDD's merge carries the PR body`. See `docs/decisions/b1-binding-declaration.md`.
 
 ---
 

@@ -105,7 +105,7 @@ or nonresponsive feedback leaves human understanding unconfirmed.
       correctness:         ✓ pass
       safety:              ✓ pass
     Standards axis (follows project conventions?):
-      traceability:        ✓ pass (Closes #{N}, commit ref, Decision Record, AC block, B1/squash: squash-only + PR_BODY)
+      traceability:        ✓ pass (Closes #{N}, commit ref, Decision Record, AC block, B1/squash: body passed at merge)
       maintainability:     ⚠ partial ({note_count} note-level findings)
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Tests:             ✓ pass ({count} passed)
@@ -206,57 +206,63 @@ When a human-authored PR (one not produced by `/issue-resolver`) is reviewed, th
 
 Acceptance-criteria checks still apply at full strength — they do not relax for human PRs. `Closes #{N}` checks also still apply at full strength — a human PR missing the issue link still fails traceability, **unless** the PR matches the refactor/chore exemption described below.
 
-## Summary — Squash-Only Binding Qualified, Defeated, or Unverified
+## Summary — Merge-Method Binding Not Allowed, Tracker-Only, or Unverified
 
-Traceability check 4 combines two independent repository reads: the merge strategy and the squash-commit message source (`references/verification-checks.md` → *Traceability checks*). A clean traceability pass needs squash-only + `PR_BODY`; anything else is a **repository** finding, not a PR defect.
+Traceability check 4 judges the repository against `review.merge_method` (`references/verification-checks.md` → *Traceability checks*). A clean pass needs `squash` or `merge` and a repo that allows it; anything else is a **repository and config** finding, not a PR defect. The pass line names the binding — `B1/squash` or `B2/merge` — and, when that method's message source is not `PR_BODY` or was not read, carries one note:
 
-When `squash_merge_commit_message` is `PR_BODY` but merge-commit and/or rebase remain enabled, B1 holds only for squash merges, so the dimension reports `partial`:
+```
+      traceability:        ✓ pass (Closes #{N}, commit ref, Decision Record, AC block, B2/merge: body passed at merge)
+                             ○ a hand merge will not carry the PR body
+                             (merge_commit_message: {value})
+```
+
+When IDD will not perform the merge (check 4), that note is the finding instead: `⚠ partial — hand merge will not carry the PR body ({field}: {value})`, then `To fix:  set review.auto_merge: true in .idd.yml, or use /auto-pilot in a mode that merges`.
+
+When the repo does not allow the configured method, the dimension reports `partial`. The fix is a config edit; IDD never changes a repo setting:
 
 ```
     Standards axis (follows project conventions?):
-      traceability:        ⚠ partial — B1/squash qualified only
-                             ({strategy_summary};
-                             squash_merge_commit_message: PR_BODY) — merge-commit
-                             and/or rebase can bypass the durable record
+      traceability:        ⚠ partial — merge method not allowed
+                             (review.merge_method: {method}; repo allows {allowed})
       maintainability:     ✓ pass
 
-  To fix (repo admin):
-    gh api -X PATCH repos/{owner}/{repo} -f allow_squash_merge=true -f allow_merge_commit=false -f allow_rebase_merge=false -f squash_merge_commit_title=PR_TITLE -f squash_merge_commit_message=PR_BODY
+  To fix:  set review.merge_method in .idd.yml to one of: {allowed}
 ```
 
-When the message-source read answers with anything but `PR_BODY`, the PR body is complete but the durable record will not reach git history via B1, so the dimension is still `partial`:
+When `review.merge_method` is `rebase`, no commit carries the PR body, so the dimension is `partial`, never `pass`:
 
 ```
     Standards axis (follows project conventions?):
-      traceability:        ⚠ partial — squash-merge binding defeated
-                             (squash_merge_commit_message: {value}); the durable
-                             record will not reach git history via B1
+      traceability:        ⚠ partial — tracker-only, no commit binding
+                             (review.merge_method: rebase)
       maintainability:     ✓ pass
+
+  To fix:  set review.merge_method in .idd.yml to one of: {carrying}
 ```
 
-The repo-settings patch above fixes both partials. Both `squash_merge_commit_*` flags are required: GitHub pairs `PR_BODY` only with `PR_TITLE`, so a PATCH naming the message alone against the default `COMMIT_OR_PR_TITLE` is rejected with HTTP 422 `invalid_squash_commit_setting_combo`.
+`{carrying}` is `squash`, `merge` or both — only what the repo allows. When it allows neither, print `  ○ This repo allows only rebase — it stays tracker-only` in place of the `To fix:` line.
 
-When either read does not answer — no `gh`, unauthenticated, 404, insufficient permission, or the field is absent — the wording names the reason and the status is still `partial`, never `pass`:
-
-```
-      traceability:        ⚠ partial — squash-merge binding unverified ({reason})
-```
-
-All three lines are `note` findings: they are never handed to the fixer in Step 6, because no edit to this PR can change a repo setting. Under `review.soft_pass: true` (default) they are report-only; under `soft_pass: false` they block like any other partial dimension.
-
-When check 4 read `squash_merge_commit_message: PR_BODY` and the merge-effective keyword set (raw body, no markdown strip) diverges from the markdown-aware PR-link set, append a `note` line naming the issues that will close at squash-merge under B1:
+When the strategy read does not answer — no `gh`, unauthenticated, 404, insufficient permission, or the field is absent — the wording names the reason and the status is still `partial`, never `pass`:
 
 ```
-      traceability:        ⚠ partial — merge-effective closers under B1
-                             differ from the PR-link surface; will close at
-                             squash-merge: #{extra_ids}
+      traceability:        ⚠ partial — merge-method binding unverified ({reason})
 ```
 
-Under `COMMIT_MESSAGES` (or any non-`PR_BODY` value) do not treat code-span or blockquote keywords as merge-effective; omit this divergence line.
+All four partial lines are `note` findings: they are never handed to the fixer in Step 6, because no edit to this PR can change a repo setting or `.idd.yml` on the base branch. Under `review.soft_pass: true` (default) they are report-only; under `soft_pass: false` they block like any other partial dimension.
+
+When `review.merge_method` is `squash` or `merge` and the merge-effective keyword set (raw body, no markdown strip) diverges from the markdown-aware PR-link set, append a `note` line naming the issues that will close at merge:
+
+```
+      traceability:        ⚠ partial — merge-effective closers differ from
+                             the PR-link surface; will close at merge:
+                             #{extra_ids}
+```
+
+Under `rebase` do not treat code-span or blockquote keywords as merge-effective; omit this divergence line.
 
 ## Summary — Refactor/Chore Exempt PR
 
-A PR matching `review.traceability_exempt_labels` or `review.traceability_exempt_pattern` skips check 1 only (`references/verification-checks.md` → *Refactor/chore exemption*); checks 2-4 still run. Check 4 is the exception to the rendering below: a qualified-only, defeated, or unverified binding is a repository finding, not a PR one, so it holds the dimension at `partial` rather than being appended to an exempt `pass`.
+A PR matching `review.traceability_exempt_labels` or `review.traceability_exempt_pattern` skips check 1 only (`references/verification-checks.md` → *Refactor/chore exemption*); checks 2-4 still run. Check 4 is the exception to the rendering below: a not-allowed, hand-merge, tracker-only, or unverified binding is a repository finding, not a PR one, so it holds the dimension at `partial` rather than being appended to an exempt `pass`.
 
 ```
   Review dimensions:
@@ -287,18 +293,25 @@ merge identity check, then merge with the expected-head guard (issue #516):
 verified_head="{ci_sha}"   # Step 5's ci_sha; with none, the headRefOid the final review cycle read
 read -r head_now base_ref <<<"$(gh pr view {N} --json headRefOid,baseRefName --jq '"\(.headRefOid) \(.baseRefName)"')"
 behind_by="$(gh api "repos/{owner}/{repo}/compare/${base_ref}...${verified_head}" --jq .behind_by)"
+body_file="$(mktemp)"; gh pr view {N} --json body --jq .body >"$body_file" || verified_head=""
+trap 'rm -f "$body_file"' EXIT
 if [ -n "$verified_head" ] && [ "$head_now" = "$verified_head" ] && [ "$behind_by" = "0" ]; then
-  gh pr merge {N} --squash --delete-branch --match-head-commit "$verified_head"
+  gh pr merge {N} --{merge_method} --delete-branch --match-head-commit "$verified_head" --body-file "$body_file"
 else
   echo "BLOCKED (stale merge authorization)"   # never merged; report it and stop
 fi
 ```
 
+`{merge_method}` is `review.merge_method` (default `squash`). The body file makes the commit body
+the PR body under any repo setting (`references/docs/platform-github.md`, *Merge + clean
+up*); a failed body read empties `verified_head`, so the guard refuses the
+merge. For `rebase`, drop the `body_file` and `trap` lines and the `--body-file` flag.
+
 The check is the subset of `/auto-pilot`'s *Step 5.1c — Merge identity gate*
 that a standalone review needs. A CI verdict covers one commit on one base, so
 the merge needs both unchanged. `head_now` must equal `verified_head`, and
 `behind_by` must be exactly `0`, meaning the live tip of the base branch is an
-ancestor of the checked head and the squash lands exactly the tree CI ran on.
+ancestor of the checked head and the merge lands exactly the tree CI ran on.
 Compare against the branch name, never `baseRefOid`: that field is the base as
 of the PR's last sync and can trail the live branch by many commits.
 `--match-head-commit` makes GitHub refuse the merge when the head moved after
@@ -345,7 +358,7 @@ The merge runs after the summary prints, so close with a merge block whose first
 row supersedes the summary's `Result:`. On success:
 
 ```
-  Result:            MERGED — PR #{N} squash merged, branch {branch_name} deleted
+  Result:            MERGED — PR #{N} merged ({merge_method}), branch {branch_name} deleted
   Merge:             ✓ pass (gh pr merge exit 0)
   Cleanup:           ✓ on {base} @ {base_sha7}; removed {branch_name}{, worktree {path}}
   Decision:          No approval needed.

@@ -203,7 +203,7 @@ Concretely, `/issue-resolver` lifts a five-field **Decision Record** — root ca
 
 The PR body carries one more durable field: a **QA handoff marker** — `<!-- idd:qa v1 head=<sha40> … -->` on its last line, written by `/issue-resolver` only on a clean QA exit — recording what it verified, pinned to the head commit, so `/issue-pr-review` collapses work it would otherwise repeat into one confirmation pass. The pin self-invalidates on any later commit yet survives a body edit: the binding is on code, not prose. It is deliberately **not** authentication — a PR body is author-editable — so it gates duplicated work only, and only beside a revision receipt the resolver stored outside the PR for that exact commit (#515); secret scanning, CI, acceptance-criteria verification and traceability always run at full strength.
 
-The git-history half of the dual write is satisfied by one of three bindings ([SPEC.md §4.3](https://github.com/luongnv89/idd/blob/main/SPEC.md)): the **squash-merge body** (PR body copied into the squash commit), a **merge-commit body** (record appended to the merge commit message), or **git notes** (record attached to the landing commit under a documented notes ref). The reference implementation assumes **squash-merge** — the only one needing zero extra tooling on GitHub — but that is **conditional on a repo setting, not platform behavior** (issue #295): the squash commit carries the PR body only where `squash_merge_commit_message` is `PR_BODY`. GitHub's default, `COMMIT_MESSAGES`, writes the commit subjects instead, so the strategy *is* squash and the record still dropped — which is why a strategy-only check passes while the binding is defeated. Read it, never assume it: `gh api repos/{owner}/{repo} --jq .squash_merge_commit_message`. Repos on another strategy or message source keep durable memory on the tracker only. `/init-idd` warns on the strategy **and** the `squash_merge_commit_*` sub-settings; `/issue-pr-review` reports a non-`pass` traceability status rather than asserting one. Commits landed under a defeated binding are **not** backfilled: [ADR: no backfill](https://github.com/luongnv89/idd/blob/main/docs/decisions/no-backfill-merged-decision-records.md).
+The git-history half of the dual write is satisfied by one of three bindings ([SPEC.md §4.3](https://github.com/luongnv89/idd/blob/main/SPEC.md)): the **squash-merge body** (PR body copied into the squash commit), a **merge-commit body** (record appended to the merge commit message), or **git notes** (record attached to the landing commit under a documented notes ref). The reference implementation merges by `review.merge_method` and **passes the PR body as the commit body at merge time**, so the first holds for `squash` (the default) and the second for `merge` under any repo setting. `rebase` lands the PR's own commits and none carries the body: its durable memory is tracker-only. A merge made by hand still depends on the repo's message source (`PR_BODY`; GitHub's default drops the body, issue #295). IDD never changes a repo setting: `/init-idd` and `/issue-pr-review` judge the repo against the configured method, report a non-`pass` traceability status rather than asserting one, and print the `.idd.yml` fix. Commits landed under a defeated binding are **not** backfilled: [ADR: no backfill](https://github.com/luongnv89/idd/blob/main/docs/decisions/no-backfill-merged-decision-records.md).
 
 ## Issue Dependencies
 
@@ -327,8 +327,8 @@ The memory story is only half-done at write time — the payoff is retrieval, an
 # Every commit that touched issue #42
 git log --oneline --grep "(#42)"
 
-# The full story of #42's resolution — with squash_merge_commit_message=PR_BODY,
-# the squash commit body carries the
+# The full story of #42's resolution — the squash or merge commit IDD's merge
+# writes carries the
 # PR body: Summary, Decision Record, acceptance verification
 git log -p --grep "Closes #42" --format=fuller
 

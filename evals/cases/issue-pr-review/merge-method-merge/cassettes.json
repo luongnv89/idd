@@ -1,0 +1,104 @@
+{
+  "version": 1,
+  "calls": [
+    {
+      "match": "prefix",
+      "argv": [
+        "auth",
+        "status"
+      ],
+      "stdout": "github.com\n  ✓ Logged in to github.com as eval-bot (key)\n",
+      "stderr": "",
+      "exit": 0
+    },
+    {
+      "argv": [
+        "pr",
+        "view",
+        "12",
+        "--json",
+        "number,title,body,state,headRefOid"
+      ],
+      "stdout": "{\"number\": 12, \"title\": \"feat(reports): add csv export (#77)\", \"body\": \"Closes #77\\n\\n## Summary\\n\\nAdd CSV export to the reports page.\\n\\n## Decision Record\\n\\n- **Root cause:** reports could only be read in the browser.\\n- **Options considered:** Option 1 \\u2014 server-side CSV; Option 2 \\u2014 client-side CSV\\n- **Options rejected:** Option 2 \\u2014 breaks on large reports\\n- **Selected option:** Option 1 \\u2014 server-side CSV\\n- **Residual risk:** none identified\\n\\nAnalyzed at: `feat/77-export-csv @ 4f2a9c1` (2026-11-13)\\n\\n## Acceptance Criteria Verification\\n\\n| Criterion | Status | Evidence |\\n|-----------|--------|----------|\\n| A report downloads as CSV | pass | tests/export.spec.ts |\\n\", \"state\": \"OPEN\", \"headRefOid\": \"4f2a9c1e7b3d5a6f8091a2b3c4d5e6f708192a3b\"}\n",
+      "stderr": "",
+      "exit": 0
+    },
+    {
+      "argv": [
+        "repo",
+        "view",
+        "--json",
+        "mergeCommitAllowed,squashMergeAllowed,rebaseMergeAllowed"
+      ],
+      "stdout": "{\"mergeCommitAllowed\": true, \"squashMergeAllowed\": false, \"rebaseMergeAllowed\": false}\n",
+      "stderr": "",
+      "exit": 0
+    },
+    {
+      "argv": [
+        "api",
+        "repos/acme/app",
+        "--jq",
+        "{squash_merge_commit_message, merge_commit_message}"
+      ],
+      "stdout": "{\"squash_merge_commit_message\": \"COMMIT_MESSAGES\", \"merge_commit_message\": \"PR_TITLE\"}\n",
+      "stderr": "",
+      "exit": 0
+    },
+    {
+      "argv": [
+        "pr",
+        "view",
+        "12",
+        "--json",
+        "body",
+        "--jq",
+        ".body"
+      ],
+      "stdout": "Closes #77\n\n## Summary\n\nAdd CSV export to the reports page.\n\n## Decision Record\n\n- **Root cause:** reports could only be read in the browser.\n- **Options considered:** Option 1 — server-side CSV; Option 2 — client-side CSV\n- **Options rejected:** Option 2 — breaks on large reports\n- **Selected option:** Option 1 — server-side CSV\n- **Residual risk:** none identified\n\nAnalyzed at: `feat/77-export-csv @ 4f2a9c1` (2026-11-13)\n\n## Acceptance Criteria Verification\n\n| Criterion | Status | Evidence |\n|-----------|--------|----------|\n| A report downloads as CSV | pass | tests/export.spec.ts |\n\n",
+      "stderr": "",
+      "exit": 0
+    },
+    {
+      "argv": [
+        "pr",
+        "view",
+        "12",
+        "--json",
+        "headRefOid,baseRefName",
+        "--jq",
+        "\"\\(.headRefOid) \\(.baseRefName)\""
+      ],
+      "stdout": "4f2a9c1e7b3d5a6f8091a2b3c4d5e6f708192a3b main\n",
+      "stderr": "",
+      "exit": 0
+    },
+    {
+      "argv": [
+        "api",
+        "repos/acme/app/compare/main...4f2a9c1e7b3d5a6f8091a2b3c4d5e6f708192a3b",
+        "--jq",
+        ".behind_by"
+      ],
+      "stdout": "0\n",
+      "stderr": "",
+      "exit": 0
+    },
+    {
+      "argv": [
+        "pr",
+        "merge",
+        "12",
+        "--merge",
+        "--delete-branch",
+        "--match-head-commit",
+        "4f2a9c1e7b3d5a6f8091a2b3c4d5e6f708192a3b",
+        "--body-file",
+        "pr-body.txt"
+      ],
+      "stdout": "",
+      "stderr": "✓ Merged pull request #12\n✓ Deleted branch feat/77-export-csv\n",
+      "exit": 0
+    }
+  ]
+}

@@ -2,13 +2,13 @@
 # gi-requires: references/scripts/gi-gh.py
 """Clean up the local checkout after a PR merged.
 
-A squash merge leaves three things behind locally: the head branch (whose tip
-is never an ancestor of the base, so `git branch -d` always refuses it), any
-worktree that still has that branch checked out, and a main checkout parked on
-a branch that no longer exists upstream. `gh pr merge --delete-branch` handles
-some of this, but only in some gh versions, only for the PR it just merged,
-and it can exit non-zero after the merge already landed. This script is the
-idempotent cleanup every merge site runs afterwards, whoever did the merge.
+A merge leaves three things behind locally: the head branch (after a squash or
+rebase merge its tip is never an ancestor of the base, so `git branch -d`
+refuses it), any worktree that still has that branch checked out, and a main
+checkout parked on a branch that no longer exists upstream. `gh pr merge
+--delete-branch` handles some of this, but only in some gh versions, only for
+the PR it just merged, and it can exit non-zero after the merge landed. This is
+the idempotent cleanup every merge site runs afterwards, whoever did the merge.
 
 Usage:  gi-postmerge.py --pr N [--dry-run] [--delete-remote]
                         [--remove-worktree PATH=DIGEST ...]

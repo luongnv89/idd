@@ -198,7 +198,7 @@ Two machine-local stores live under the git common dir instead, so every worktre
 `.idd/analysis-<N>.json` is **transient** — it can be deleted at any time without losing project memory. The durable signal lives in two places that survive deletion:
 
 1. **PR body** — `/issue-resolver` lifts the `decision_record` (Root cause, Options considered, Options rejected, Selected option, Residual risk) and per-criterion AC verification table directly into the PR body.
-2. **Squash-commit body** — under the project's squash-merge default, the PR body lands verbatim in `git log -p`, so a reviewer can answer "why does this change exist?" without ever opening GitHub. This half is conditional on the repo's `squash_merge_commit_message` being `PR_BODY`; GitHub's default (`COMMIT_MESSAGES`) writes the commit subjects instead and drops the record (issue #295), which is why `/issue-pr-review` reads the setting rather than assuming it.
+2. **Merge commit body** — IDD's merge passes the PR body as the body of the squash or merge commit (`review.merge_method`, default `squash`), so it lands verbatim in `git log -p` under any repo setting and a reviewer can answer "why does this change exist?" without ever opening GitHub. A `rebase` merge leaves no such commit, and a merge made by hand depends on the repo's message source (issue #295), which is why `/issue-pr-review` judges the repo against the configured method rather than assuming it.
 
 `/issue-pr-review` enforces this dual-write rule via presence-only and per-criterion verification gates (issues #35 and #36). See [`idd-methodology.md`](idd-methodology.md) for the full rationale.
 
@@ -291,5 +291,5 @@ Every script is stdlib-only and answers `--help` with exit 0, so a skill can pro
 3. **Static sequential output** — each step prints a new line, no terminal animation
 4. **Agent-agnostic** — structured issues are plain GitHub Markdown, consumable by any tool
 5. **Lean issues** — issues capture human intent only; codebase analysis is performed by consumer skills (resolver, triage, analysis) at execution time against current code
-6. **Durable memory in git** — every resolution dual-writes its Decision Record and AC verification into both the PR body and (via squash merge, where `squash_merge_commit_message` is `PR_BODY` — see *Analysis Artifacts and Durable Memory*, item 2) the commit body, so `git log -p` is a self-contained project history independent of `.idd/` files
+6. **Durable memory in git** — every resolution dual-writes its Decision Record and AC verification into both the PR body and (via the commit IDD's merge writes — see *Analysis Artifacts and Durable Memory*, item 2) the commit body, so `git log -p` is a self-contained project history independent of `.idd/` files
 7. **Balanced by default** — `/auto-pilot` auto-merges clean PRs (review passed); PRs with unresolved issues get a follow-up and stay open. Users can opt into `conservative` (never merge) or `aggressive` modes. Critical-labeled issues always pause for human review on partial fixes

@@ -346,8 +346,8 @@ validation*), leave the file in place for inspection, and stop with `Result: BLO
 
 After a validated write, run the two read-only repository-settings reads in
 `references/merge-strategy-check.md`. That file defines when the check is
-skipped, the two independent warnings, and the `Merge settings:` report row. The
-check never changes a setting and never changes `Result`.
+skipped, how `review.merge_method` is judged, and the `Merge settings:` report
+row. The check never changes a repository setting and never changes `Result`.
 
 ---
 
@@ -373,7 +373,7 @@ a check that ran and passed.
   Repo size:         ✓ {size} ({count} files, via {file_count_source})
   Config:            ✓ generated .idd.yml
   Validation:        ✓ parses as YAML, no placeholders left, platform set
-  Merge settings:    ✓ squash-only, PR_BODY
+  Merge settings:    ✓ squash allowed
   .gitignore:        ✓ added .idd/cache/
   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   Evidence:          gi-stack-detect exit 0; re-read with {parser}

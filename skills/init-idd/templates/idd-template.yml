@@ -100,6 +100,8 @@ review:
   # passes; complex or ambiguous PRs keep full depth. false: full depth always.
   adaptive_depth: true
   auto_merge: false
+  # squash | merge | rebase (rebase is tracker-only: no commit carries the PR body)
+  merge_method: squash
   confidence_threshold: 80
   run_tests: true
   check_ci: true

@@ -19,11 +19,11 @@ IDD skills reach the issue tracker through a **platform driver** — the workflo
 | Verify authentication | `gh auth status` |
 | Remaining API budget | `gh api rate_limit --jq '{remaining: .rate.remaining, reset: .rate.reset}'` |
 | Repo merge strategy | `gh repo view --json mergeCommitAllowed,squashMergeAllowed,rebaseMergeAllowed` |
-| Squash-commit message source | `gh api repos/{owner}/{repo} --jq '{squash_merge_commit_title, squash_merge_commit_message}'` |
+| Hand-merge message source | `gh api repos/{owner}/{repo} --jq '{squash_merge_commit_message, merge_commit_message}'` |
 | Caller's permission | `gh repo view --json viewerPermission` |
 | Auth · default repo | `gh auth login` · `gh auth refresh` · `gh auth switch` · `gh repo set-default` |
 
-REST, not `--json`: `gh repo view --json squashMergeCommitMessage` answers `Unknown JSON field`. It is **not** interchangeable with the strategy row above — that answers *is squash allowed*, this whether the squash commit carries the PR body (`PR_BODY`) or the commit subjects (`COMMIT_MESSAGES`, the default); only this one decides whether B1 lands (#295). Writing `PR_BODY` requires title source `PR_TITLE`.
+REST, not `--json`: whether a merge made by hand carries the PR body (`PR_BODY`); IDD's own merge passes it (*Merge + clean up*). IDD never changes a repo setting: it prints the fix.
 
 ### Issues
 
@@ -57,7 +57,7 @@ REST, not `--json`: `gh repo view --json squashMergeCommitMessage` answers `Unkn
 | Read PR body (before edit) | `gh pr view {N} --json body` |
 | Update PR body | `gh pr edit {N} --body "{body}"` — read-modify-write only: fetch the body, apply the minimal change (e.g. prepend `Closes #N`), write back, verify per rule 2 |
 | Merge identity (live base ancestry) | `gh api repos/{owner}/{repo}/compare/{base_ref}...{verified_head} --jq .behind_by` — merge only on `0` and an unchanged `headRefOid` |
-| Squash-merge + clean up | `gh pr merge {N} --squash --delete-branch --match-head-commit {verified_head}` |
+| Merge + clean up | `gh pr merge {N} --{merge_method} --delete-branch --match-head-commit {verified_head} --body-file {f}` — `{merge_method}` is `review.merge_method`; `{f}` is a file holding the PR body (`--json body`), never a shell word, so the commit carries it under any repo setting. `rebase`: no `--body-file`, tracker-only (#564) |
 | Find PR for an issue | `gh search prs "is:open" "Closes #{N}" --json number,state,url --limit 5` |
 
 **Merges bind a head and a base** (#516): `{verified_head}` is the SHA the CI verdict covers; compare the base **branch name** (its live tip), never `baseRefOid` (the base at the PR's last sync). Patch-id equality never replaces fresh integration checks.

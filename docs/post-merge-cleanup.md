@@ -1,6 +1,6 @@
 # Post-Merge Cleanup
 
-After a PR merges, the checkout may still hold the head branch, a worktree on it, or sit on that branch. A squash merge makes `git branch -d` refuse the branch (its tip is never an ancestor of the base). Every skill that merges a PR, or finds one already merged, runs this cleanup. It is idempotent, so it is safe after `gh pr merge --delete-branch` did part of it.
+After a PR merges, the checkout may still hold the head branch, a worktree on it, or sit on that branch. A squash or rebase merge makes `git branch -d` refuse the branch (its tip is never an ancestor of the base). Every skill that merges a PR, or finds one already merged, runs this cleanup. It is idempotent, so it is safe after `gh pr merge --delete-branch` did part of it.
 
 ## Primary path
 

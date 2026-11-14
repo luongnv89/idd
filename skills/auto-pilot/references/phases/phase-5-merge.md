@@ -291,7 +291,7 @@ answered `behind_by: 0` while the same compare against the branch name answered
 name resolves to the current tip at call time.
 
 **Why ancestry is enough.** When the live base tip is an ancestor of
-`verified_head`, a squash merge lands exactly `verified_head`'s tree, so the
+`verified_head`, the merge lands exactly `verified_head`'s tree, so the
 merge candidate *is* the commit the checks ran on and a green verdict on that
 head is a verdict on what lands. When the base has advanced past it, the merge
 candidate is a tree no check ran on. `mergeable` stays MERGEABLE on a clean
@@ -351,15 +351,23 @@ If the mode forbids merge (`conservative`):
 If the mode allows merge (`balanced` or `aggressive`), and only on a `fresh`
 *Step 5.1c* answer, merge with the expected-head guard. Run it as **one** shell
 call (variables do not survive between calls), `{verified_head}` being the
-40-hex SHA that step bound. A non-zero exit is outcome `left_open`, never `merged`,
-unless the *merge reconciliation* below reads the PR as `MERGED`:
+40-hex SHA that step bound. `{merge_method}` is `review.merge_method`: `squash`
+(default), `merge` or `rebase`; any other value is invalid config, a stop. The
+body file makes the commit body the PR body under any repo setting
+(`references/docs/platform-github.md`, *Merge + clean up*); a failed body read empties
+`verified_head`, so the guard refuses the merge. For `rebase`, drop the
+`body_file` and `trap` lines and the `--body-file` flag. A non-zero exit is outcome
+`left_open`, never `merged`, unless the *merge reconciliation* below reads the
+PR as `MERGED`:
 
 ```bash
 verified_head="{verified_head}"
 read -r head_now base_ref <<<"$(gh pr view {pr_number} --json headRefOid,baseRefName --jq '"\(.headRefOid) \(.baseRefName)"')"
 behind_by="$(gh api "repos/{owner}/{repo}/compare/${base_ref}...${verified_head}" --jq .behind_by)"
+body_file="$(mktemp)"; gh pr view {pr_number} --json body --jq .body >"$body_file" || verified_head=""
+trap 'rm -f "$body_file"' EXIT
 if [ -n "$verified_head" ] && [ "$head_now" = "$verified_head" ] && [ "$behind_by" = "0" ]; then
-  gh pr merge {pr_number} --squash --delete-branch --match-head-commit "$verified_head"
+  gh pr merge {pr_number} --{merge_method} --delete-branch --match-head-commit "$verified_head" --body-file "$body_file"
 else
   echo "merge_identity=stale (head_now=$head_now behind_by=$behind_by)"; exit 1
 fi
@@ -462,8 +470,8 @@ python3 references/scripts/gi-postmerge.py --pr {pr_number}                   # 
 python3 references/scripts/gi-postmerge.py --pr {pr_number} --delete-remote   # reconciled
 ```
 
-It deletes the squash-merged branch
-(`git branch -d` above always refuses one) and fast-forwards the default
+It deletes the merged branch
+(`git branch -d` above refuses a squash-merged one) and fast-forwards the default
 branch; it never removes an unclean worktree, so it cannot bypass
 `blocked_dirty`. Handle its answer as on the sequential path below. Mark
 `completed` only after `logged`, cache
