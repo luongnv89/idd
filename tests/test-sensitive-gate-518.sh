@@ -22,8 +22,8 @@
 #   G7      one risk tier from the actual diff (#569): `tier` tracks
 #           `sensitive`; an Effort key is refused, never read (AC2); a `diff`
 #           range is classified from git in a temp repo (renames list both
-#           sides, non-ASCII paths are not quoted), a bad range is exit 3 and a
-#           git failure exit 4, and `diff.relative` cannot hide a path; the
+#           sides, non-ASCII paths are not quoted), a bad range is exit 3, a
+#           git failure or a shadowed (ambiguous) base ref exit 4, and `diff.relative` cannot hide a path; the
 #           resolver's Deliver (any delivered sensitive path Step 2 did not
 #           mark) and pr-review's Depth gate and Merge floor read it (AC1, AC3).
 #
@@ -163,7 +163,8 @@ check "G7: an effort key is exit 3 — Effort is never an input (AC2)" "$?"
 check "G7: a stated XS Effort leaves the tier of the same labels and paths unchanged (AC2)" "$?"
 
 GITREPO="$(mktemp -d)"
-trap 'rm -rf "$GITREPO"' EXIT
+AMBREPO="$(mktemp -d)"
+trap 'rm -rf "$GITREPO" "$AMBREPO"' EXIT
 g() { git -C "$GITREPO" -c user.name=t -c user.email=t@example.invalid -c commit.gpgsign=false "$@"; }
 dclassify() { (cd "$GITREPO" && printf '%s' "{\"labels\":[],\"paths\":[],\"diff\":\"$1\"}" | python3 "$SCRIPT" --classify); }
 g init -q -b main && mkdir -p "$GITREPO/.github/workflows" "$GITREPO/docs" \
@@ -201,6 +202,22 @@ g config diff.relative true
 out="$(cd "$GITREPO/docs" && printf '%s' '{"labels":[],"paths":[],"diff":"main...unicode"}' | python3 "$SCRIPT" --classify)"
 [ "$(field "$out" tier)" = '"sensitive"' ]
 check "G7: diff.relative=true and a subdirectory cwd still list a .github/workflows change (sensitive)" "$?"
+# `gh pr checkout` names the local branch after the PR's head branch, so a fork
+# head called `origin/main` creates refs/heads/origin/main, which shadows the
+# remote-tracking ref: origin/main...HEAD would diff the PR against itself.
+a() { git -C "$AMBREPO" -c user.name=t -c user.email=t@example.invalid -c commit.gpgsign=false "$@"; }
+aclassify() { (cd "$AMBREPO" && printf '%s' '{"labels":[],"paths":[],"diff":"origin/main...HEAD"}' | python3 "$SCRIPT" --classify); }
+git clone -q -b main "$GITREPO" "$AMBREPO" && a checkout -q -b pr && echo 'on: push' > "$AMBREPO/.github/workflows/pr.yml" \
+  && a add -A && a commit -q -m pr
+check "G7: temp clone with a local origin for the ref-shadowing case" "$?"
+amb_err="$(a -c core.warnAmbiguousRefs=true diff --name-only origin/main...HEAD 2>&1 >/dev/null)"
+out="$(aclassify)"; ec=$?
+[ "$ec" = "0" ] && [ "$(field "$out" tier)" = '"sensitive"' ] && ! printf '%s' "$amb_err" | grep -q ambiguous
+check "G7: an unambiguous origin/main...HEAD classifies normally (sensitive, exit 0, no ambiguity warning)" "$?"
+a checkout -q -b origin/main
+out="$(aclassify 2>/dev/null)"; ec=$?
+[ "$ec" = "4" ] && ! { [ "$ec" = "0" ] && [ "$(field "$out" tier)" = '"standard"' ]; }
+check "G7: a local branch named origin/main shadowing the base is exit 4, never tier standard with exit 0" "$?"
 
 DELIVER="$SRC_PKG/references/steps/step-5-deliver.md"
 PR_SRC="$REPO_ROOT/src/skills/issue-pr-review/SKILL.source.md"

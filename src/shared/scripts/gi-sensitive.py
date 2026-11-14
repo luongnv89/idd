@@ -31,8 +31,8 @@ plan, writing rebuttals — stays with the agent.
   <range> --` in the working directory and classifies every changed path (a
   rename lists both sides, NUL-split so no path is quoted, and `diff.relative`
   cannot drop a path outside the cwd) together with `paths`, source `diff`.
-  A git failure — git missing, an unknown ref, not a repository — is exit 4,
-  never "not sensitive".
+  A git failure — git missing, an unknown or ambiguous ref, not a repository —
+  is exit 4, never "not sensitive".
 
     label            a label containing `security`, `cve` or `vulnerability`,
                      case-insensitive — the labels Step 0d already honours
@@ -296,12 +296,12 @@ def diff_paths(rng: object) -> list[str]:
         raise InvalidInput("`diff` must be <base>...<head> using only [A-Za-z0-9._/-]")
     try:
         proc = subprocess.run(
-            ["git", "--no-replace-objects", "diff", "-z", "--no-renames", "--no-relative", "--name-only", rng, "--"],
+            ["git", "-c", "core.warnAmbiguousRefs=true", "--no-replace-objects", "diff", "-z", "--no-renames", "--no-relative", "--name-only", rng, "--"],
             stdin=subprocess.DEVNULL, capture_output=True, check=False,
         )
     except (OSError, ValueError) as exc:
         raise Unavailable(f"cannot run git — {exc}") from exc
-    if proc.returncode != 0:
+    if proc.returncode != 0 or b"ambiguous" in proc.stderr:
         detail = proc.stderr.decode("utf-8", errors="replace").strip().splitlines()
         raise Unavailable(f"git diff {rng} failed: {detail[-1] if detail else 'unknown'}")
     out = proc.stdout.decode("utf-8", errors="surrogateescape")
