@@ -181,9 +181,10 @@ Easy to install, easy to fit into any workflow, low ceremony to keep using.
   budgeted; skills, scripts, config keys, flags and gates are not counted, and all have
   grown.
 - [ ] **SI9 — It fits an existing workflow without imposing its own.** Partial: branch
-  prefix, labels, merge mode and CI handling are configurable; squash merge, the PR body
-  template and Conventional Commit titles are fixed, and a full traceability pass needs the
-  repo set to squash-only with `PR_BODY`.
+  prefix, labels, merge mode, merge method (`review.merge_method`) and CI handling are
+  configurable, and a repo PR template is kept with the IDD sections added; Conventional
+  Commit titles are fixed, a rebase merge has no commit binding, and with the merge left to
+  a human a full traceability pass needs that method's message source set to `PR_BODY`.
 - [ ] **SI10 — It works with more than one tracker.** Partial: `SPEC.md` is tool-neutral and
   `docs/platform-github.md` catalogues the commands, but skills inline `gh` calls at each
   step and GitHub is the only driver.
@@ -287,3 +288,4 @@ Record every approved change to a value here: date, item, what changed, who aske
 | 2026-11-12 | issue-pr-review | Growth-cap exemption against v0.27.0: the bundle is 11,441 bytes (+3.72%) above its size at that tag (307,009 → 318,450). The growth accumulated on main between v0.27.0 and the cap's introduction in #558; approved on 2026-11-12 to let the cap land | maintainer |
 | 2026-11-12 | issue-resolver | Growth-cap exemption against v0.27.0: the bundle is 11,924 bytes (+2.82%) above its size at that tag (421,981 → 433,905). The growth accumulated on main between v0.27.0 and the cap's introduction in #558; approved on 2026-11-12 to let the cap land | maintainer |
 | 2026-11-12 | auto-pilot | Growth-cap exemption against v0.27.0: the bundle is 10,096 bytes (+2.30%) above its size at that tag (437,809 → 447,905). The growth accumulated on main between v0.27.0 and the cap's introduction in #558, and its last part came from #588 merging on 2026-11-12 before the cap landed; approved on 2026-11-12 to let the cap land | maintainer |
+| 2026-11-14 | SI9 | Re-graded after #564; still unchecked. The `Partial:` note now records that the merge method is configurable and a repo PR template is kept, and that Conventional Commit titles, the rebase binding and the hand-merge message source remain | maintainer |
