@@ -23,8 +23,9 @@
 #           `sensitive`; an Effort key is refused, never read (AC2); a `diff`
 #           range is classified from git in a temp repo (renames list both
 #           sides, non-ASCII paths are not quoted), a bad range is exit 3 and a
-#           git failure exit 4; the resolver's Deliver and pr-review's Depth
-#           gate and Merge floor read it (AC1, AC3).
+#           git failure exit 4, and `diff.relative` cannot hide a path; the
+#           resolver's Deliver (any delivered sensitive path Step 2 did not
+#           mark) and pr-review's Depth gate and Merge floor read it (AC1, AC3).
 #
 # Usage: bash tests/test-sensitive-gate-518.sh
 # Returns: exit 0 if all checks pass, exit 1 on failure.
@@ -189,6 +190,10 @@ for bad in '-p...main' 'main..plain' 'main...plain...x' 'main....plain' 'main...
 done
 dclassify 'main...no-such-ref' >/dev/null 2>&1; [ "$?" = "4" ]
 check "G7: an unknown ref is exit 4 (cannot complete), never 'not sensitive'" "$?"
+g config diff.relative true
+out="$(cd "$GITREPO/docs" && printf '%s' '{"labels":[],"paths":[],"diff":"main...unicode"}' | python3 "$SCRIPT" --classify)"
+[ "$(field "$out" tier)" = '"sensitive"' ]
+check "G7: diff.relative=true and a subdirectory cwd still list a .github/workflows change (sensitive)" "$?"
 
 DELIVER="$SRC_PKG/references/steps/step-5-deliver.md"
 PR_SRC="$REPO_ROOT/src/skills/issue-pr-review/SKILL.source.md"
@@ -199,6 +204,12 @@ anchor_check "$DELIVER" rs-deliver-tier '"diff": "origin/\$\{base\}\.\.\.HEAD"' 
   "G7: the Deliver record carries the diff range"
 anchor_check_flat "$DELIVER" rs-deliver-tier 'is `tier: sensitive` \(fail closed\)' \
   "G7: a Deliver classify that cannot run is sensitive"
+anchor_check_flat "$DELIVER" rs-deliver-tier 'Any non-zero exit, unparsable output, or no `python3` is `tier: sensitive`' \
+  "G7: any Deliver classify failure, exit 2 and unparsable output included, is sensitive"
+anchor_check_flat "$DELIVER" rs-deliver-tier '`reasons` name any path Step 2.s classify did not mark sensitive' \
+  "G7: Deliver gates a delivered sensitive path Step 2 did not plan, even when Step 2 was sensitive"
+anchor_check_flat "$DELIVER" rs-deliver-tier 'or the classify could not run' \
+  "G7: a Deliver classify that cannot run triggers the gate whatever Step 2 found"
 grep -q 'Deliver-time risk tier' "$SRC_PKG/SKILL.source.md"
 check "G7: resolver SKILL.md Step 5 points at the Deliver-time risk tier" "$?"
 anchor_check "$PR_SRC" rv-depth-gate-refresh 'gi-sensitive\.py --classify' \

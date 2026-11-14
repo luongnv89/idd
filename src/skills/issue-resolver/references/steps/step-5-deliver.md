@@ -8,25 +8,27 @@ One part of `references/pipeline-steps.md` — the index that maps every step to
 
 Step 2 classified the *planned* files; the delivered diff can differ. After
 *Update documentation* commits and immediately before the pre-push secret scan, on
-the `HEAD` the QA marker's `head=` names, run
+the `HEAD` the QA marker's `head=` names, run from the repo root
 `printf '%s' "$sensitive_json" | python3 shared/scripts/gi-sensitive.py --classify`
 with `{"labels": [the issue's labels], "paths": [], "diff": "origin/${base}...HEAD"}`.
-Exit 3 or 4, or no `python3`, is `tier: sensitive` (fail closed).
+Any non-zero exit, unparsable output, or no `python3` is `tier: sensitive` (fail closed).
 
-If `tier` is `sensitive` and Step 2's classification was not (its probe/challenge
-gate never ran), run Step 2's *Sensitive-change gate* (steps 2–5) once on the
-diff's paths before pushing. Every probe is `phase: pre`, run on the delivered
-tree. Only `proceed` with empty `test_obligations` and no `amended` blocker
-delivers; `replan`, `stop` or an amendment is that gate's `stop`, before the push —
-**Auto:** the run ends `failed` at Step 5, no PR. Record it in the Decision
-Record's *Sensitive-change gate* line, marked "at deliver".
+If `tier` is `sensitive` and Step 2's classification was not, or the classify could
+not run, or its `reasons` name any path Step 2's classify did not mark sensitive (a
+Step 2 that could not classify marked every planned path), run Step 2's
+*Sensitive-change gate* (steps 2–5) once on the diff's paths before pushing.
+Every probe is `phase: pre`, run on the delivered tree. Only `proceed` with empty
+`test_obligations` and no `amended` blocker delivers; `replan`, `stop` or an
+amendment is that gate's `stop`, before the push — **Auto:** the run ends `failed`
+at Step 5, no PR. Record it in the Decision Record's *Sensitive-change gate* line,
+marked "at deliver".
 
 ### Pre-push secret scan
 
 Full rationale for SKILL.md *Step 5 — Deliver → Push branch and create PR*, which owns
 the invocation, the pass condition and every exit code. Why no config value reaches
 the command line, why `--policy-ref` names the base, and why `scanned: 0` with
-`skipped > 0` is not a pass: `docs/pre-commit-security.md` (rule 5).
+`skipped > 0` is not a pass: `docs/pre-commit-security.md` (*Script Path* and rule 5).
 
 **Why exit 1 never degrades.** Every other non-zero exit from a bundled script means the
 script could not answer. Exit 1 here means it *did* answer, and the answer was `block`.

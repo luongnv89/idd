@@ -27,9 +27,10 @@ plan, writing rebuttals — stays with the agent.
   `diff` is optional: a range `<base>...<head>` whose two sides are each
   non-empty, start with neither `-` nor `.`, use only `[A-Za-z0-9._/-]` and
   hold no `..` (anything else is exit 3). The script runs
-  `git --no-replace-objects diff -z --no-renames --name-only <range> --` in the
-  working directory and classifies every changed path (a rename lists both
-  sides, NUL-split so no path is quoted) together with `paths`, source `diff`.
+  `git --no-replace-objects diff -z --no-renames --no-relative --name-only
+  <range> --` in the working directory and classifies every changed path (a
+  rename lists both sides, NUL-split so no path is quoted, and `diff.relative`
+  cannot drop a path outside the cwd) together with `paths`, source `diff`.
   A git failure — git missing, an unknown ref, not a repository — is exit 4,
   never "not sensitive".
 
@@ -295,7 +296,7 @@ def diff_paths(rng: object) -> list[str]:
         raise InvalidInput("`diff` must be <base>...<head> using only [A-Za-z0-9._/-]")
     try:
         proc = subprocess.run(
-            ["git", "--no-replace-objects", "diff", "-z", "--no-renames", "--name-only", rng, "--"],
+            ["git", "--no-replace-objects", "diff", "-z", "--no-renames", "--no-relative", "--name-only", rng, "--"],
             stdin=subprocess.DEVNULL, capture_output=True, check=False,
         )
     except (OSError, ValueError) as exc:

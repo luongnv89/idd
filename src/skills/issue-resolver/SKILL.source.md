@@ -327,11 +327,11 @@ A failure prints `✗ Final test run failed — PR not created` and stops, even 
 
 ### Push branch and create PR
 
-**Risk tier first:** classify the delivered diff, and gate it before the push when Step 2 did not (*Deliver-time risk tier*, `references/steps/step-5-deliver.md`). Then run the branch-diff scan: export `IDD_AUTO_MODE=1` in auto mode, then from the repo root run `python3 shared/scripts/gi-secscan.py --range "origin/${base}" --policy-ref "origin/${base}"`. It reads `security.*` from `.idd.yml` (else legacy `.gitissue.yml`) **at the base ref**: never pass a config *value* on the command line, never let the scanned branch supply its policy (*Pre-push secret scan*).
+**Risk tier first:** classify the delivered diff, and gate it before the push when Step 2 did not gate every sensitive path it touches (*Deliver-time risk tier*, `references/steps/step-5-deliver.md`). Then run the branch-diff scan: export `IDD_AUTO_MODE=1` in auto mode, then from the repo root run `python3 shared/scripts/gi-secscan.py --range "origin/${base}" --policy-ref "origin/${base}"`. It reads `security.*` from `.idd.yml` (else legacy `.gitissue.yml`) **at the base ref**: never pass a config *value* on the command line, never let the scanned branch supply its policy (*Pre-push secret scan*).
 
 - **Pass** needs all four: exit 0, `policy_source` equal to the requested `ref:origin/…`, `verdict` not `block`, `scanned` not 0 while `skipped` is above 0.
 - **Exit 1 is the block verdict** — stop, do not push, report `blocking[]`. **Exit 3** (uncompilable `security.*`) also stops.
-- **No `python3`, exit 2, exit 4** — degrade: print `⚠ gi-secscan unavailable — running the documented scan` and run the **Primary Pattern** in `docs/pre-commit-security.md` over `git diff --name-only "origin/${base}"...HEAD`. Exit 1 without JSON is a crash — treat as exit 2.
+- **No `python3`, exit 2, exit 4, or exit 0 with `scanned` 0 while `skipped` > 0** — degrade: print `⚠ gi-secscan unavailable — running the documented scan` and run the **Primary Pattern** in `docs/pre-commit-security.md` over `git diff --name-only "origin/${base}"...HEAD`. Exit 1 without JSON is a crash — treat as exit 2.
 
 Never read a non-zero exit as a pass. Only after it passes:
 
