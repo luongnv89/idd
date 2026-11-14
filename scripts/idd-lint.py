@@ -883,7 +883,7 @@ def slowest_phase(phases: dict[str, dict]) -> str | None:
 def collect_skill_costs(rows: list[dict]) -> dict[str, dict]:
     """Per writing skill: runs, token samples, and median tokens (issue #562).
 
-    A release records one median per flow in docs/release-costs.md, and this
+    A release records one median per flow in the release-costs.md doc, and this
     is where it is read. Only a row that carries a host-reported `tokens`
     count is a sample; `median_tokens` is None when a skill has none — the
     report says "no data", never 0, because a zero would read as a measured

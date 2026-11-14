@@ -271,6 +271,40 @@ rcp
 GIT_DIR="$RCP/.git" GIT_WORK_TREE="$RCP" "$PY" -m coverage run -a --rcfile="$RC" \
   "$SCRIPTS/gi-recipe.py" --ref nope --consumer review --changed /dev/null >/dev/null 2>&1 || true
 
+# gi-stats — the read-only --stats report (issue #573) against a throwaway repo:
+# offline JSON and text, the online join through a stub gh, a failing gh, and a
+# --branch that does not resolve (behaviour is pinned by tests/test-stats-573.sh).
+ST="$TMP/stats-repo"
+git init -q -b main "$ST"
+st_land() { echo "$1" > "$ST/$1.txt" && git -C "$ST" add -A && git -C "$ST" -c user.email=c@example.invalid -c user.name=cov commit -q -m "$2"; }
+st_land a 'feat(a): add a (#10) (#11)'
+git -C "$ST" tag v0.1.0
+st_land b 'feat(b): add b (#12) (#13)'
+git -C "$ST" -c user.email=c@example.invalid -c user.name=cov revert --no-edit HEAD >/dev/null
+mkdir -p "$ST/.idd" "$TMP/stats-bin" "$TMP/stats-bad"
+printf '%s\n' \
+  '{"ts":"2026-03-01T12:00:00Z","issue":10,"mode":"auto","skill":"auto-pilot","outcome":"merged","pr":11,"qa_cycles":3,"phases":{"qa":60}}' \
+  '{"ts":"2026-03-02T12:00:00Z","issue":12,"mode":"auto","skill":"issue-resolver","outcome":"success","pr":13,"skill_version":"0.2.0"}' \
+  '{"ts":"2026-03-03T12:00:00Z","issue":50,"mode":"auto","skill":"auto-pilot","outcome":"skipped","pr":null}' \
+  > "$ST/.idd/runs.jsonl"
+cat > "$TMP/stats-bin/gh" <<'EOF'
+#!/usr/bin/env bash
+case "$1 $2" in
+  "pr list") echo '[{"number":13,"body":"Closes #12","mergedAt":"2026-03-02T12:00:00Z","mergeCommit":{"oid":"0123456789abcdef0123456789abcdef01234567"}}]' ;;
+  "issue list") echo '[{"number":12,"state":"OPEN","stateReason":null,"createdAt":"2026-02-01T00:00:00Z","body":"","title":"t","labels":[]},{"number":30,"state":"OPEN","stateReason":null,"createdAt":"2026-03-09T00:00:00Z","body":"after #11","title":"Bug: x","labels":[]}]' ;;
+  *) exit 1 ;;
+esac
+EOF
+printf '#!/usr/bin/env bash\nexit 1\n' > "$TMP/stats-bad/gh"
+chmod +x "$TMP/stats-bin/gh" "$TMP/stats-bad/gh"
+st() { GIT_DIR="$ST/.git" GIT_WORK_TREE="$ST" "$PY" -m coverage run -a --rcfile="$RC" "$SCRIPTS/gi-stats.py" "$@" >/dev/null 2>&1 || true; }
+st --no-github --json
+st --no-github
+PATH="$TMP/stats-bin:$PATH" st --json
+PATH="$TMP/stats-bin:$PATH" st
+PATH="$TMP/stats-bad:$PATH" st
+st --no-github --branch no-such-ref
+
 # gi-branch — derive a name locally (never --from-issue here: that needs gh).
 run "$SCRIPTS/gi-branch.py" 42 --title "Fix login crash on mobile" --type bug --no-config
 

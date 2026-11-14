@@ -58,6 +58,7 @@ src/
 │       ├── gi-state.py            # /auto-pilot resumable run state + run lock
 │       ├── gi-triage-graph.py     # Triage execution order, status, staleness, priority
 │       ├── gi-gh.py               # Shared subprocess boundary for GitHub CLI calls
+│       ├── gi-stats.py            # Read-only run outcomes + post-merge look-back report
 │       ├── gi-ready.py            # Judge whether an issue is ready for an unattended resolve
 │       └── gi-criteria.py         # Downgrade a criterion pass without re-runnable evidence
 │   └── references/                # Shared references, copied verbatim into each citing skill (issue #560)
