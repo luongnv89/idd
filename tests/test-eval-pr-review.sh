@@ -40,6 +40,7 @@ run_case "unverified-only-auto"
 run_case "unsupported-pass"
 run_case "regression-green-at-base"
 run_case "merge-method-merge"
+run_case "revert-squash"
 
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 echo "Results: $PASS passed, $FAIL failed"

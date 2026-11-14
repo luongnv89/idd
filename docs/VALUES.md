@@ -154,8 +154,8 @@ Nothing is done on an agent's say-so. Three things are verified: the **intention
   follow-up bug is linked back to the run that shipped the change. Partial: `idd-lint stats`
   joins each merged run to reverts, reopened issues and follow-up bugs and reports the counts
   per release (`tests/test-idd-lint-stats-project.sh`, behavioural). The trace is reported,
-  not linked into the run record; a revert has no path back to its run yet (#571), and no
-  skill runs the look-back (#573).
+  not linked into the run record, except that a `/issue-pr-review --revert` row names the
+  reverted PR and its revert PR (#571); no skill runs the look-back (#573).
 
 ## Pillar 3 — Simplicity
 
@@ -243,7 +243,10 @@ A maintainer can hand work to the skills and believe what they report.
   mechanisms with separate inputs, and the profile is chosen from the issue's own Effort
   text.
 - [ ] **TR15 — Every change is cheap to undo.** A documented revert path that keeps the
-  trace intact. Partial: atomic PRs make it possible; no skill does it.
+  trace intact. Partial: `/issue-pr-review <M> --revert` reverts a squash or merge commit
+  through a new PR, reopens the issue with a link to the revert and logs a `revert_opened`
+  row (`tests/test-idd-lint-stats-project.sh` T10, eval `issue-pr-review/revert-squash`,
+  behavioural, against a stand-in); a rebase merge has no path, and no agent run is tested.
 - [ ] **TR16 — Human attention is protected.** PR size limits, a short human-first summary,
   and a cap on PRs waiting for review. Partial: the PR body is summary-first and
   `autopilot.max_parallel` caps resolver concurrency; the size warnings do not stop auto

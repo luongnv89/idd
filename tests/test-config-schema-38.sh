@@ -306,8 +306,10 @@ fi
 # all three schema places and in the init template, with a value guard.
 # ───────────────────────────────────────────────────────────
 FULL_SCHEMA="$(awk '/^## Full Schema/{f=1} f && /^```yaml/{y=1; next} y && /^```/{exit} y' "$SCHEMA")"
-if printf '%s\n' "$FULL_SCHEMA" | awk '/^review:/{f=1; next} /^[^[:space:]#]/{f=0} f' \
-     | grep -qE '^  merge_method: "squash"$'; then
+# Capture each review: block first, then grep the here-string: `awk | grep -q`
+# under pipefail fails at random when grep exits early and awk takes SIGPIPE.
+FULL_REVIEW="$(printf '%s\n' "$FULL_SCHEMA" | awk '/^review:/{f=1; next} /^[^[:space:]#]/{f=0} f')"
+if grep -qE '^  merge_method: "squash"$' <<<"$FULL_REVIEW"; then
   pass "T7.1: Full Schema review: block has merge_method defaulting to squash"
 else
   fail "T7.1: Full Schema review: block lacks merge_method: \"squash\""
@@ -325,7 +327,8 @@ else
   fail "T7.3: Defaults Table lacks the review.merge_method row"
 fi
 
-if awk '/^review:/{f=1; next} /^[^[:space:]#]/{f=0} f' "$TEMPLATE" | grep -qE '^  merge_method: squash$'; then
+TEMPLATE_REVIEW="$(awk '/^review:/{f=1; next} /^[^[:space:]#]/{f=0} f' "$TEMPLATE")"
+if grep -qE '^  merge_method: squash$' <<<"$TEMPLATE_REVIEW"; then
   pass "T7.4: init template emits review.merge_method: squash"
 else
   fail "T7.4: init template does not emit review.merge_method: squash"

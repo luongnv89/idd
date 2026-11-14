@@ -33,6 +33,7 @@
 | `/issue-pr-review 42 --auto` | Same, with no prompts; waits for CI and merges when green only with `review.auto_merge: true` |
 | `/issue-pr-review --review-only` | Review and report only — never fix or merge |
 | `/issue-pr-review 42 --resume` | Resume a review whose session was killed, from its progress record (combines with `--auto`) |
+| `/issue-pr-review 42 --revert` | Revert merged PR #42 through a new PR and reopen its issue; never merges |
 | "is this PR ready?" | Run the pipeline against the current branch's PR |
 | "clean up this PR" | Iterate fix cycles until the review is clean |
 
@@ -84,6 +85,7 @@ asm install https://github.com/luongnv89/idd --skill issue-pr-review
 | `../references/verification-checks.md` | Verification checks the reviewer runs against the diff |
 | `../references/ui-review-mechanics.md` | `/issue-pr-review`'s UI-review deltas (shared mechanics: [`ui-review.md`](https://github.com/luongnv89/idd/blob/main/docs/ui-review.md)) |
 | `../references/report-templates.md` | Per-cycle and final report templates |
+| `../references/revert-path.md` | The `--revert` procedure: revert PR, issue reopen, run-log row |
 | `../references/error-messages.md` | Error catalog for prerequisite (git, gh CLI, auth), PR, CI, and fix (push, merge) failures, each with a Docs link |
 
 ## Output

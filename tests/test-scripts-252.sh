@@ -1285,7 +1285,9 @@ EXPECTED_SITES = {
     # 5 since issue #261: the behavioral eval grader invokes gi-runlog.py.
     # 5 since issue #542: pr-review's progress record re-scans unpushed commits
     # with --range "$head_oid" before a resumed push (progress-record-mechanics).
-    "gi-model-cache.py": 2, "gi-runlog.py": 5, "gi-secscan.py": 5,
+    # 6 each since issue #571: pr-review's revert path scans the staged revert
+    # and appends its `revert_opened` row (revert-path.md).
+    "gi-model-cache.py": 2, "gi-runlog.py": 6, "gi-secscan.py": 6,
     "gi-stack-detect.py": 1, "gi-triage-graph.py": 2,
     # 2 since issue #468: /issue-triage Step 1 reads the shared open-issue
     # snapshot, and /issue-creator Step 6 invalidates it after each create.
@@ -1409,6 +1411,8 @@ ALLOWED_VARS = {
     "$wt_dir": "worktree path the skill composes itself",
     "$base": "base branch name read from the repo, never reporter text",
     "${base}": "base branch name read from the repo, never reporter text",
+    # Issue #571. The revert path's policy ref: the default branch `gh repo view` reports.
+    "${policy_base}": "default branch name read from the repo, never reporter text",
     "$branch_name": "derived by gi-branch.py --from-issue, which sanitizes it",
     "$run_json": "run-log JSON the skill composed; reaches gi-runlog on stdin",
     "$no_run_log": "a flag the skill sets itself, tested by `[ -n … ]`",

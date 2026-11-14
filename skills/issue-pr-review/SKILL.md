@@ -23,6 +23,7 @@ Review a PR end-to-end — analyze, test, fix, check CI, repeat until clean.
 | `/issue-pr-review` | detect | Auto-detect PR for current branch |
 | `/issue-pr-review --review-only` | read-only | Review and report, never fix or merge |
 | `/issue-pr-review <N> --resume` | interactive or auto | Resume a killed review from its progress record (*Progress record*); combines with `--auto` and `--no-merge`, never with `--review-only` |
+| `/issue-pr-review <M> --revert` | revert | Revert merged PR M through a new PR and reopen its issue, instead of Steps 1-7; never merges (`references/revert-path.md`) |
 
 `--auto` is set by `/auto-pilot`; in auto mode export `IDD_AUTO_MODE=1` so the pre-commit scan logs warnings instead of prompting (`references/docs/pre-commit-security.md`). `--no-merge` suppresses the merge in any mode.
 
@@ -53,6 +54,7 @@ references/verification-checks.md
 references/review-loop-mechanics.md
 references/progress-record-mechanics.md
 references/report-templates.md
+references/revert-path.md
 references/run-stats.md
 references/error-messages.md
 references/self-improve.md
@@ -78,6 +80,7 @@ references/scripts/gi-recipe.py
 references/scripts/gi-postmerge.py
 references/scripts/gi-progress.py
 references/scripts/gi-criteria.py
+references/scripts/gi-runlog.py
 ```
 
 ```text

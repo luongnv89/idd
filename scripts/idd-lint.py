@@ -534,7 +534,7 @@ def commit_subjects(rev_range: str) -> list[str]:
 # --- Stats (evidence report) -----------------------------------------------------
 
 SUCCESS_OUTCOMES = {"success", "merged"}
-SKIP_OUTCOMES = {"skipped", "already_resolved"}
+SKIP_OUTCOMES = {"skipped", "already_resolved", "revert_opened"}
 
 # A collector that fetched a gh page hands it back under this private key, and
 # collect_github_stats pops it before merging the metrics, so the look-back join
@@ -1387,7 +1387,9 @@ def collect_lookback_stats(
 
     Denominator. A run is a row with an integer `pr`, deduplicated on `pr`: a
     resolver `success` row and an auto-pilot `merged` row for one PR are one
-    run, and the outcome is not read, so an unknown outcome is tolerated. The
+    run, and the outcome is not read, so an unknown outcome is tolerated,
+    except that a `revert_opened` row (#571) is never a run: git alone detects
+    the revert. The
     run counts as merged when the PR page lists it or the walk holds a commit
     for it; otherwise it is `unconfirmed`, never clean. A window keeps rows
     whose `ts` is at or after its cutoff; an unresolved window is lifetime.
@@ -1443,6 +1445,8 @@ def collect_lookback_stats(
     for row in run_rows:
         pr = row.get("pr")
         if not isinstance(pr, int) or isinstance(pr, bool):
+            continue
+        if row.get("outcome") == "revert_opened":
             continue
         if cutoff is not None and (_merged_at_epoch(row.get("ts")) or -1) < cutoff:
             continue

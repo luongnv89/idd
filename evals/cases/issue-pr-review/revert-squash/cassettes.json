@@ -1,0 +1,95 @@
+{
+  "version": 1,
+  "calls": [
+    {
+      "argv": [
+        "pr",
+        "view",
+        "12",
+        "--json",
+        "number,title,body,state,baseRefName,url,mergeCommit"
+      ],
+      "stdout": "{\"number\": 12, \"title\": \"feat(x): add x (#7) (#12)\", \"body\": \"Closes #7\\n\\n## Summary\\n\\nAdd x.\\n\", \"state\": \"MERGED\", \"baseRefName\": \"main\", \"url\": \"https://github.com/acme/app/pull/12\", \"mergeCommit\": {\"oid\": \"3050ae3868708c54e5b4529908d23f977eb699c3\"}}\n",
+      "stderr": "",
+      "exit": 0
+    },
+    {
+      "argv": [
+        "repo",
+        "view",
+        "--json",
+        "defaultBranchRef",
+        "--jq",
+        ".defaultBranchRef.name"
+      ],
+      "stdout": "main\n",
+      "stderr": "",
+      "exit": 0
+    },
+    {
+      "argv": [
+        "pr",
+        "create",
+        "--base",
+        "main",
+        "--head",
+        "fix/7-revert-pr-12",
+        "--title",
+        "Revert \"feat(x): add x (#7) (#12)\"",
+        "--body-file",
+        "revert-body.md"
+      ],
+      "stdout": "https://github.com/acme/app/pull/13\n",
+      "stderr": "",
+      "exit": 0
+    },
+    {
+      "argv": [
+        "pr",
+        "view",
+        "13",
+        "--json",
+        "number,url,state"
+      ],
+      "stdout": "{\"number\": 13, \"url\": \"https://github.com/acme/app/pull/13\", \"state\": \"OPEN\"}\n",
+      "stderr": "",
+      "exit": 0
+    },
+    {
+      "argv": [
+        "issue",
+        "reopen",
+        "7"
+      ],
+      "stdout": "",
+      "stderr": "✓ Reopened issue acme/app#7\n",
+      "exit": 0
+    },
+    {
+      "argv": [
+        "issue",
+        "comment",
+        "7",
+        "--body-file",
+        "reopen-comment.md"
+      ],
+      "stdout": "https://github.com/acme/app/issues/7#issuecomment-1\n",
+      "stderr": "",
+      "exit": 0
+    },
+    {
+      "argv": [
+        "issue",
+        "view",
+        "7",
+        "--json",
+        "state",
+        "--jq",
+        ".state"
+      ],
+      "stdout": "OPEN\n",
+      "stderr": "",
+      "exit": 0
+    }
+  ]
+}

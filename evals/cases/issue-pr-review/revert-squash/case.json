@@ -1,0 +1,152 @@
+{
+  "name": "issue-pr-review/revert-squash",
+  "skill": "issue-pr-review",
+  "prompt": "/issue-pr-review 12 --revert --auto: revert squash-merged PR #12 (Closes #7) through a new PR and reopen #7",
+  "repo_scripts": [
+    "src/shared/scripts/gi-secscan.py"
+  ],
+  "grade": [
+    {
+      "tool": "gh-calls",
+      "expect_by_command": {
+        "pr create": 1,
+        "issue reopen": 1,
+        "issue comment": 1,
+        "pr merge": 0,
+        "repo edit": 0
+      },
+      "expect_argv": [
+        [
+          "pr",
+          "view",
+          "12",
+          "--json",
+          "baseRefName,body,mergeCommit,number,state,title,url"
+        ],
+        [
+          "repo",
+          "view",
+          "--json",
+          "defaultBranchRef",
+          "--jq",
+          ".defaultBranchRef.name"
+        ],
+        [
+          "pr",
+          "create",
+          "--base",
+          "main",
+          "--head",
+          "fix/7-revert-pr-12",
+          "--title",
+          "Revert \"feat(x): add x (#7) (#12)\"",
+          "--body-file",
+          "revert-body.md"
+        ],
+        [
+          "pr",
+          "view",
+          "13",
+          "--json",
+          "number,state,url"
+        ],
+        [
+          "issue",
+          "reopen",
+          "7"
+        ],
+        [
+          "issue",
+          "comment",
+          "7",
+          "--body-file",
+          "reopen-comment.md"
+        ],
+        [
+          "issue",
+          "view",
+          "7",
+          "--json",
+          "state",
+          "--jq",
+          ".state"
+        ]
+      ],
+      "expect_exit": 0,
+      "label": "one revert PR against main from the fix branch, one reopen and one comment; no merge, no repo-settings call"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/base-unchanged.txt",
+      "expect_exit": 0,
+      "label": "main on the remote is unchanged: the revert lands only through the PR (AC1)"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/revert-branch-pushed.txt",
+      "expect_exit": 0,
+      "label": "only the revert branch is pushed"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/change-reverted.txt",
+      "expect_exit": 0,
+      "label": "the revert removes what the squash commit added"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/commit-keeps-footer.txt",
+      "expect_exit": 0,
+      "label": "the revert commit keeps git's This reverts commit <sha> line"
+    },
+    {
+      "tool": "shell",
+      "args": [
+        "python3 scripts/idd-lint.py branch \"$(tr -d '\\n' < OUT/branch.txt)\""
+      ],
+      "expect_exit": 0,
+      "label": "the revert branch follows the naming convention"
+    },
+    {
+      "tool": "shell",
+      "args": [
+        "python3 scripts/idd-lint.py commit \"$(tr -d '\\n' < OUT/commit-subject.txt)\""
+      ],
+      "expect_exit": 0,
+      "label": "the Revert \"…\" subject is skipped by the commit check, not failed"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/body-ok.txt",
+      "expect_exit": 0,
+      "label": "the revert PR body carries both marker lines and no closing keyword"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/comment-links-revert.txt",
+      "expect_exit": 0,
+      "label": "the reopen comment links the revert PR (AC2)"
+    },
+    {
+      "tool": "file-exists",
+      "file": "OUT/issue-open.txt",
+      "expect_exit": 0,
+      "label": "issue #7 reads OPEN after the reopen (AC2)"
+    },
+    {
+      "tool": "gi-runlog-echo",
+      "file": "OUT/run-log-row.json",
+      "expect_exit": 0,
+      "label": "the revert_opened row validates (pr = reverted PR, revert_pr = new PR)"
+    }
+  ],
+  "human_review": {
+    "criteria": [
+      "The report names the revert PR's URL on its own line.",
+      "The report says the issue was reopened and links the revert PR.",
+      "Nothing in the output says the revert was merged or pushed to main."
+    ],
+    "feedback": "Record each reviewer answer; absent, blank, or nonresponsive feedback leaves understanding unconfirmed.",
+    "scope": "This deterministic stand-in tests the documented revert procedure, not live agent behavior. Apply these criteria to actual agent outputs in behavioral evaluations."
+  }
+}

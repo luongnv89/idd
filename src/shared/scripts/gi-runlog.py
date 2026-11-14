@@ -22,6 +22,10 @@ A writer omits what it does not know; `tokens: 0` is rejected because a
 host-reported count is never zero and a zero-filled one would pull the
 per-release median toward a number nobody measured.
 
+`revert_pr` (issue #571) is the PR a `/issue-pr-review --revert` row opened;
+that row's `pr` is the reverted PR, and it needs both as integers; no other
+row may carry `revert_pr`.
+
 `--failure-streak N` is the one **read** mode. It scans the log backwards and
 counts the issue's leading run of `failed` outcomes — the consecutive
 most-recent records for that issue — stopping at the first record for that
@@ -127,6 +131,7 @@ KEY_ORDER = (
     "breach_reason",
     "outcome",
     "pr",
+    "revert_pr",
     "verification",
     "duration_s",
     "phases",
@@ -147,6 +152,7 @@ OPTIONAL_KEYS = (
     "qa_cycles",
     "ceiling",
     "breach_reason",
+    "revert_pr",
     "verification",
     "duration_s",
     "phases",
@@ -183,6 +189,9 @@ OUTCOMES_BY_SKILL = {
             "skipped",
         }
     ),
+    # `/issue-pr-review <M> --revert` (#571): `pr` is the reverted PR M and
+    # `revert_pr` the new PR; the row links them, it is not a run.
+    "issue-pr-review": frozenset({"revert_opened"}),
 }
 
 PROFILES = frozenset({"light", "full"})
@@ -218,7 +227,7 @@ COMPLEXITY_COLLAPSE = {
     "complex": "high",
 }
 
-INT_KEYS = ("issue", "qa_cycles", "ceiling", "duration_s", "tokens", "agents")
+INT_KEYS = ("issue", "qa_cycles", "ceiling", "duration_s", "tokens", "agents", "revert_pr")
 STR_KEYS = (
     "ts",
     "event_id",
@@ -312,6 +321,16 @@ def normalize_record(record: object, *, now: str | None = None) -> dict[str, obj
 
     if not record["mode"]:
         raise RecordError("mode must be a non-empty string")
+
+    if record["outcome"] == "revert_opened" and not (
+        _is_int(record["pr"]) and _is_int(record.get("revert_pr"))
+    ):
+        raise RecordError("a revert_opened row needs integer pr (the reverted PR) and revert_pr")
+    revert_pr = record.get("revert_pr")
+    if revert_pr is not None and record["outcome"] != "revert_opened":
+        raise RecordError("revert_pr is only allowed on a revert_opened row")
+    if revert_pr is not None and revert_pr < 1:
+        raise RecordError("revert_pr must be a positive integer")
 
     out: dict[str, object] = dict(record)
 
