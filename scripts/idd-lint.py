@@ -536,6 +536,13 @@ def commit_subjects(rev_range: str) -> list[str]:
 SUCCESS_OUTCOMES = {"success", "merged"}
 SKIP_OUTCOMES = {"skipped", "already_resolved"}
 
+# A collector that fetched a gh page hands it back under this private key, and
+# collect_github_stats pops it before merging the metrics, so the look-back join
+# reads the same page instead of fetching it a second time (#568). It never
+# reaches the report.
+PAGE_KEY = "_page"
+ISSUE_PAGE_FIELDS = "number,body,state,stateReason,createdAt,labels,title"
+
 
 def _run_soft(cmd: list[str], input_text: str | None = None) -> str | None:
     """Run a command, returning stdout or None on any failure (soft probe)."""
@@ -1087,7 +1094,10 @@ def collect_issue_normalization_stats(limit: int) -> dict | None:
 def collect_merged_pr_stats(
     limit: int, window: SinceWindow | None = None
 ) -> dict | None:
-    """Collect merged-PR linkage and durable Decision-Record binding metrics."""
+    """Collect merged-PR linkage and durable Decision-Record binding metrics.
+
+    The raw page rides along under `PAGE_KEY` for the look-back join (#568).
+    """
     # One page, three metrics: `truncated` below is only meaningful because
     # merged_prs, merged_with_dr and dr_binding all read the same fetch.
     merged = _gh_json(
@@ -1103,6 +1113,7 @@ def collect_merged_pr_stats(
     )
     with_dr = sum(1 for pr in merged if DR_HEADING in (pr.get("body") or ""))
     return {
+        PAGE_KEY: merged,
         "merged_prs": len(merged),
         "merged_with_closes": closes,
         "merged_closes_pct": _pct(closes, len(merged)),
@@ -1113,7 +1124,12 @@ def collect_merged_pr_stats(
 
 
 def collect_run_tier_stats(limit: int, run_rows: list[dict] | None) -> dict | None:
-    """Join resolver outcomes to normalized and unnormalized issue bodies."""
+    """Join resolver outcomes to normalized and unnormalized issue bodies.
+
+    The page it fetches is returned under `PAGE_KEY`, even when no tier forms,
+    because the look-back join (#568) reads the same issues; that is why the
+    page carries state, dates, labels and titles the tiers do not need.
+    """
     if not run_rows:
         return None
     issues = sorted(
@@ -1124,7 +1140,7 @@ def collect_run_tier_stats(limit: int, run_rows: list[dict] | None) -> dict | No
     all_issues = _gh_json(
         "issue", "list", "--state", "all",
         "--limit", str(max(limit, MIN_ISSUE_FETCH_LIMIT)),
-        "--json", "number,body",
+        "--json", ISSUE_PAGE_FIELDS,
     )
     if all_issues is None:
         return None
@@ -1160,9 +1176,9 @@ def collect_run_tier_stats(limit: int, run_rows: list[dict] | None) -> dict | No
             "median_qa": _median(qa_cycles),
         }
     if not tiers:
-        return None
+        return {PAGE_KEY: all_issues}
 
-    result: dict = {"tiers": tiers}
+    result: dict = {PAGE_KEY: all_issues, "tiers": tiers}
     normalized = tiers.get("normalized")
     unnormalized = tiers.get("unnormalized")
     if (
@@ -1183,25 +1199,350 @@ def collect_github_stats(
     window: SinceWindow | None = None,
     *,
     run_rows: list[dict] | None = None,
+    pages: dict | None = None,
 ) -> dict | None:
     """Orchestrate the three independent gh-backed stats collectors.
 
     runs.jsonl is parsed exactly once per call (F-PERF-007): load_run_rows runs
     here and the rows feed every downstream consumer. A caller that already
     parsed the log passes `run_rows` to share its read instead of re-parsing.
+
+    A caller that passes a `pages` dict gets the raw merged-PR and issue pages
+    back in it (`prs`, `issues`; None when not fetched), so the look-back join
+    reuses them and the report makes no extra gh call (#568).
     """
     if run_rows is None:
         run_rows = load_run_rows(run_rows_path)
     result = collect_issue_normalization_stats(limit)
     if result is None:
         return None  # gh missing, unauthenticated, or offline — skip the section
+    prs_page = issues_page = None
     merged = collect_merged_pr_stats(limit, window)
     if merged is not None:
+        prs_page = merged.pop(PAGE_KEY, None)
         result.update(merged)
     tiers = collect_run_tier_stats(limit, run_rows)
     if tiers is not None:
+        issues_page = tiers.pop(PAGE_KEY, None)
         result.update(tiers)
+    if pages is not None:
+        pages.update(prs=prs_page, issues=issues_page)
     return result
+
+
+# --- Look back after merge (VW19, #568) -------------------------------------------
+
+# `git revert` writes this footer; a squash body may carry it on any line.
+REVERT_FOOTER_RE = re.compile(r"^This reverts commit ([0-9a-fA-F]{40})\b", re.MULTILINE)
+# GitHub's Revert button names the reverted PR directly.
+REVERT_PR_RE = re.compile(r"^Reverts [\w.-]+/[\w.-]+#(\d+)\s*$", re.MULTILINE)
+# Only the LAST `(#N)` closing the subject is the PR: `feat: x (#567) (#598)`
+# carries the issue first and the PR last.
+SUBJECT_PR_RE = re.compile(r"\(#(\d+)\)\s*$")
+RELEASE_TAG_RE = re.compile(r"^v?(\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?)$")
+SHA_RE = re.compile(r"^[0-9a-f]{40}$")
+PLANNED_FOLLOWUP_LABEL = "auto-pilot-followup"
+UNRELEASED = "unreleased"
+HISTORY_FIELDS = 4  # sha, committer time, tag decorations, raw message
+
+
+def parse_merge_history(raw: str) -> list[dict] | None:
+    """Parse the NUL-framed walk into commits, newest first. None when malformed."""
+    fields = raw.split("\0")
+    if fields and fields[-1] == "":
+        fields.pop()
+    if len(fields) % HISTORY_FIELDS:
+        return None
+    commits = []
+    for sha, ct, decorations, message in zip(*[iter(fields)] * HISTORY_FIELDS):
+        sha = sha.strip().lower()
+        if not SHA_RE.match(sha):
+            return None
+        commits.append({
+            "sha": sha,
+            "ct": int(ct) if ct.strip().isdigit() else None,
+            "tags": [
+                ref.strip().removeprefix("tag: ")
+                for ref in decorations.split(",")
+                if ref.strip()
+            ],
+            "message": message,
+        })
+    return commits
+
+
+def collect_merge_history(branch: str) -> list[dict] | None:
+    """One offline `git log` walk of `branch`: messages, commit times, tags.
+
+    Not windowed: a revert can land long after the run it undoes, and the
+    release a commit shipped in is named by a tag above it.
+    """
+    out = _run_soft([
+        "git", "log", "-z", "--decorate-refs=refs/tags",
+        "--format=%H%x00%ct%x00%D%x00%B", branch,
+    ])
+    return None if out is None else parse_merge_history(out)
+
+
+def _release_name(value: object) -> str | None:
+    """`0.27.0` or `v0.27.0` → `v0.27.0`; anything that is not a version → None."""
+    if not isinstance(value, str):
+        return None
+    m = RELEASE_TAG_RE.match(value.strip())
+    return f"v{m.group(1)}" if m else None
+
+
+def _release_sort_key(name: str) -> tuple:
+    if name == UNRELEASED:
+        return (0,)
+    core = re.findall(r"\d+", name.split("-", 1)[0].split("+", 1)[0])
+    return (1, *(-int(part) for part in core), name)
+
+
+class _HistoryIndex(NamedTuple):
+    commits_by_pr: dict[int, list[str]]  # newest first
+    reverted_shas: set[str]
+    reverted_prs: set[int]
+    release_by_sha: dict[str, str]
+    time_by_sha: dict[str, int | None]
+
+
+def _index_history(history: list[dict]) -> _HistoryIndex:
+    commits_by_pr: dict[int, list[str]] = {}
+    reverted_shas: set[str] = set()
+    reverted_prs: set[int] = set()
+    release_by_sha: dict[str, str] = {}
+    time_by_sha: dict[str, int | None] = {}
+    release = UNRELEASED
+    for commit in history:  # newest first
+        sha, message = commit["sha"], commit.get("message") or ""
+        tag = next(filter(None, map(_release_name, commit.get("tags") or [])), None)
+        if tag:
+            release = tag
+        release_by_sha[sha] = release
+        time_by_sha[sha] = commit.get("ct")
+        reverted_shas.update(t.lower() for t in REVERT_FOOTER_RE.findall(message))
+        reverted_prs.update(int(n) for n in REVERT_PR_RE.findall(message))
+        subject = message.strip().split("\n", 1)[0].strip()
+        if subject.startswith('Revert "'):
+            continue  # a revert is never the commit that landed the PR it names
+        m = SUBJECT_PR_RE.search(subject)
+        if m:
+            commits_by_pr.setdefault(int(m.group(1)), []).append(sha)
+    return _HistoryIndex(commits_by_pr, reverted_shas, reverted_prs, release_by_sha, time_by_sha)
+
+
+def _label_names(issue: dict) -> set[str]:
+    names = set()
+    for label in issue.get("labels") or []:
+        name = label.get("name") if isinstance(label, dict) else label
+        if isinstance(name, str):
+            names.add(name.strip().lower())
+    return names
+
+
+def _is_bug_issue(issue: dict) -> bool:
+    if "bug" in _label_names(issue):
+        return True
+    if str(issue.get("title") or "").strip().lower().startswith("bug:"):
+        return True
+    type_section = split_sections(issue.get("body") or "").get("Type", "")
+    return strip_confidence(first_content_line(type_section)).lower() == "bug"
+
+
+def _new_bucket(joined: bool) -> dict:
+    gh_count = 0 if joined else None
+    return {
+        "merged_runs": 0,
+        "unconfirmed": 0,
+        "reverted": 0,
+        "reopened": gh_count,
+        "followed_up": gh_count,
+        "planned_followups": gh_count,
+        "flagged": gh_count,
+        "flagged_pct": None,
+        "keyed_by": {"skill_version": 0, "history": 0, "none": 0},
+    }
+
+
+def collect_lookback_stats(
+    run_rows: list[dict] | None,
+    merged_prs: list | None,
+    issues: list | None,
+    history: list[dict] | None,
+    window: SinceWindow | None,
+    *,
+    limit: int | None = None,
+) -> dict | None:
+    """Join merged runs to what happened after the merge (VW19). No I/O.
+
+    This docstring is the contract later work builds on (#571 links the trace
+    into the run record, #573 ships it in a skill).
+
+    Inputs: run-log rows; the merged-PR page (`number, body, mergedAt,
+    mergeCommit`) and the issue page (`number, body, state, stateReason,
+    createdAt, labels, title`), both None offline; the commits of one
+    `collect_merge_history` walk, newest first, or None when git failed (then
+    this returns None); and the already-resolved `--since` window.
+
+    Denominator. A run is a row with an integer `pr`, deduplicated on `pr`: a
+    resolver `success` row and an auto-pilot `merged` row for one PR are one
+    run, and the outcome is not read, so an unknown outcome is tolerated. The
+    run counts as merged when the PR page lists it or the walk holds a commit
+    for it; otherwise it is `unconfirmed`, never clean. A window keeps rows
+    whose `ts` is at or after its cutoff; an unresolved window is lifetime.
+
+    Commit for a PR: the page's `mergeCommit.oid` when given, plus every walk
+    commit whose subject ENDS in `(#pr)` — only the last `(#N)` counts, so
+    `feat: x (#567) (#598)` is PR 598, and a subject starting `Revert "` is
+    never the commit that landed a PR.
+
+    reverted: a commit's message has a line `This reverts commit <sha>` (git
+    revert's footer, also inside a squash body) naming one of the run's
+    commits, or a line `Reverts owner/repo#<pr>` (GitHub's Revert button). The
+    word "revert" without one of those lines does not count. A revert that was
+    itself reverted still counts.
+
+    reopened: the run's issue is OPEN now, or its stateReason is REOPENED, and
+    the PR body closed it (`Closes`, `Fixes` or `Resolves #<issue>`). A PR that
+    is not on the page cannot be judged and does not count.
+
+    followed_up: another issue, created after the merge (page `mergedAt`, else
+    the commit time), whose body references `#<pr>` or `/pull/<pr>` and which
+    is a bug: a `bug` label, a title starting `Bug:`, or a `## Type` of Bug.
+    The run's own issue is skipped. An issue labelled `auto-pilot-followup` is
+    planned work: it never counts as followed_up and counts as
+    `planned_followups` instead, bug or not.
+
+    reopened, followed_up, planned_followups and flagged are None, not 0, when
+    either gh page is missing: a count nobody measured must not read as clean,
+    and an offline flagged rate (reverts only) is not comparable with an online
+    one. Every count is a number of runs; flagged is the union of the three
+    signals and flagged_pct is flagged over merged runs.
+
+    Release key: the row's `skill_version` (the IDD release that ran) as
+    `vX.Y.Z`, else the version tag at or above the PR's commit in the walk (the
+    project release it shipped in; exact on a linear squash history,
+    approximate with merge commits), else `unreleased`. Tags that are not
+    versions are not boundaries. `keyed_by` counts which source keyed each run.
+    """
+    if not run_rows or history is None:
+        return None
+    index = _index_history(history)
+    joined = merged_prs is not None and issues is not None
+    page = {
+        pr["number"]: pr
+        for pr in merged_prs or []
+        if isinstance(pr, dict) and isinstance(pr.get("number"), int)
+    }
+    issue_list = [i for i in issues or [] if isinstance(i, dict)]
+    issue_by_number = {i.get("number"): i for i in issue_list}
+    cutoff = window.cutoff if window else None
+
+    runs: dict[int, dict] = {}
+    for row in run_rows:
+        pr = row.get("pr")
+        if not isinstance(pr, int) or isinstance(pr, bool):
+            continue
+        if cutoff is not None and (_merged_at_epoch(row.get("ts")) or -1) < cutoff:
+            continue
+        run = runs.setdefault(pr, {"issue": None, "version": None})
+        issue = row.get("issue")
+        if run["issue"] is None and isinstance(issue, int) and not isinstance(issue, bool):
+            run["issue"] = issue
+        if run["version"] is None:
+            run["version"] = _release_name(row.get("skill_version"))
+
+    total = _new_bucket(joined)
+    by_release: dict[str, dict] = {}
+    prs: dict[str, list[int]] = {
+        "reverted": [], "reopened": [], "followed_up": [], "unconfirmed": [],
+    }
+    for pr, run in sorted(runs.items()):
+        listed = page.get(pr)
+        oid = ""
+        if listed is not None and isinstance(listed.get("mergeCommit"), dict):
+            oid = str(listed["mergeCommit"].get("oid") or "").lower()
+        walk = index.commits_by_pr.get(pr, [])
+        shas = list(dict.fromkeys(([oid] if oid else []) + walk))
+        placed = [s for s in ([oid] if oid else []) + walk[::-1] if s in index.release_by_sha]
+
+        if run["version"]:
+            release, source = run["version"], "skill_version"
+        elif placed:
+            release, source = index.release_by_sha[placed[0]], "history"
+        else:
+            release, source = UNRELEASED, "none"
+        bucket = by_release.setdefault(release, _new_bucket(joined))
+        for target in (total, bucket):
+            target["keyed_by"][source] += 1
+
+        if listed is None and not walk:
+            prs["unconfirmed"].append(pr)
+            for target in (total, bucket):
+                target["unconfirmed"] += 1
+            continue
+
+        signals = {"reverted": any(s in index.reverted_shas for s in shas)
+                   or pr in index.reverted_prs}
+        planned = False
+        if joined:
+            issue = issue_by_number.get(run["issue"]) if run["issue"] is not None else None
+            closes = bool(
+                issue is not None and listed is not None
+                and re.search(CLOSING_KEYWORD_RE.format(n=run["issue"]), listed.get("body") or "")
+            )
+            signals["reopened"] = closes and (
+                str(issue.get("state") or "").upper() == "OPEN"
+                or str(issue.get("stateReason") or "").upper() == "REOPENED"
+            )
+            merged_at = _merged_at_epoch(listed.get("mergedAt")) if listed else None
+            if merged_at is None and placed:
+                merged_at = index.time_by_sha.get(placed[0])
+            reference = re.compile(rf"(?:#|/pull/){pr}\b")
+            followed = False
+            for other in issue_list:
+                created = _merged_at_epoch(other.get("createdAt"))
+                if (
+                    other.get("number") == run["issue"]
+                    or merged_at is None or created is None or created <= merged_at
+                    or not reference.search(other.get("body") or "")
+                ):
+                    continue
+                if PLANNED_FOLLOWUP_LABEL in _label_names(other):
+                    planned = True
+                elif _is_bug_issue(other):
+                    followed = True
+            signals["followed_up"] = followed
+
+        for target in (total, bucket):
+            target["merged_runs"] += 1
+            for name, hit in signals.items():
+                target[name] += hit
+            if joined:
+                target["planned_followups"] += planned
+                target["flagged"] += any(signals.values())
+        for name, hit in signals.items():
+            if hit:
+                prs[name].append(pr)
+
+    for bucket in (total, *by_release.values()):
+        if joined:
+            bucket["flagged_pct"] = _pct(bucket["flagged"], bucket["merged_runs"])
+    if not joined:
+        prs["reopened"] = prs["followed_up"] = None
+    truncated = bool(
+        joined and limit is not None
+        and (len(merged_prs) >= limit or len(issue_list) >= max(limit, MIN_ISSUE_FETCH_LIMIT))
+    )
+    return {
+        "github": joined,
+        "window": window.since if cutoff is not None else None,
+        "truncated": truncated,
+        "total": total,
+        "by_release": dict(sorted(by_release.items(), key=lambda kv: _release_sort_key(kv[0]))),
+        "prs": prs,
+    }
 
 
 # Report layout (DESIGN.md: symbols carry meaning without color; dim = secondary;
@@ -1494,6 +1835,65 @@ def _render_github_stats(gh_s: dict | None, skipped: str | None) -> list[str]:
     return lines
 
 
+def _render_lookback_stats(lb: dict | None) -> list[str]:
+    """`Look back after merge`: totals, then one row per release (#568).
+
+    Counts, not ratio rows: a high rate here is bad, and the ratio rail's
+    green-at-high verdicts would invert the reading.
+    """
+    if lb is None:
+        return []
+    total = lb["total"]
+    n = total["merged_runs"]
+    prs = lb["prs"]
+
+    def count(name: str) -> str:
+        value = total[name]
+        if value is None:
+            return _c("— needs GitHub", "dim")
+        listed = prs.get(name) or []
+        tail = f" (#{', #'.join(map(str, listed))})" if listed else ""
+        return f"{value} of {n}{tail}"
+
+    lines = ["", _section(
+        "Look back after merge",
+        f"{n} merged run{'s' if n != 1 else ''} · reverts, reopened issues, follow-up bugs",
+    )]
+    lines.append(_info_row("reverted", count("reverted")))
+    lines.append(_info_row("reopened", count("reopened")))
+    lines.append(_info_row("followed up by a bug", count("followed_up")))
+    if total["flagged"] is None:
+        lines.append(_info_row("flagged", _c("— needs GitHub", "dim")))
+    else:
+        pct = total["flagged_pct"]
+        lines.append(_info_row(
+            "flagged", f"{total['flagged']} of {n}" + (f" ({pct}%)" if pct is not None else "")
+        ))
+    if total["planned_followups"]:
+        lines.append(_info_row("planned follow-ups", f"{total['planned_followups']} (not counted)"))
+    if total["unconfirmed"]:
+        lines.append(_info_row(
+            "merge not confirmed",
+            f"{total['unconfirmed']} (#{', #'.join(map(str, prs['unconfirmed']))})",
+        ))
+    for release, bucket in lb["by_release"].items():
+        merged = bucket["merged_runs"]
+        flagged = bucket["flagged"]
+        flag_bit = (
+            f"{flagged} flagged ({bucket['flagged_pct']}%)"
+            if flagged is not None and bucket["flagged_pct"] is not None
+            else f"{bucket['reverted']} reverted"
+        )
+        lines.append(_info_row(f"release {release}", f"{merged} merged · {flag_bit}"))
+    if not lb["github"]:
+        lines.append(_c("      reopened and follow-up bugs need GitHub — run without --no-github", "dim"))
+    if lb["window"]:
+        lines.append(_c(f"      window — runs logged since {lb['window']}", "dim"))
+    if lb["truncated"]:
+        lines.append(_c("      PR or issue page hit --limit — older items are not in this sample", "dim"))
+    return lines
+
+
 def render_stats(
     commit_s: dict | None,
     run_s: dict | None,
@@ -1501,6 +1901,7 @@ def render_stats(
     gh_skipped: str | None,
     project: dict | None = None,
     window: SinceWindow | None = None,
+    lookback: dict | None = None,
 ) -> None:
     out = _render_stats_header(project)
     out.extend(_render_window_warning(window))
@@ -1509,6 +1910,7 @@ def render_stats(
     out.extend(_render_run_log_stats(run_s))
     out.append("")
     out.extend(_render_github_stats(gh_s, gh_skipped))
+    out.extend(_render_lookback_stats(lookback))
     out.extend(("", _c("┄" * 59, "dim")))
     print("\n".join(out))
 
@@ -1537,14 +1939,22 @@ def cmd_stats(args: argparse.Namespace) -> int:
     run_rows = load_run_rows(runs_path)
     run_s = collect_run_stats(run_rows)
     gh_s, gh_skipped = None, None
+    pages: dict = {}
     if args.no_github:
         gh_skipped = "--no-github"
     else:
         gh_s = collect_github_stats(
-            args.limit, runs_path, window, run_rows=run_rows
+            args.limit, runs_path, window, run_rows=run_rows, pages=pages
         )
         if gh_s is None:
             gh_skipped = "gh unavailable, unauthenticated, or offline"
+    # Informational: the look-back section never changes the exit code.
+    lookback = None
+    if run_rows:
+        lookback = collect_lookback_stats(
+            run_rows, pages.get("prs"), pages.get("issues"),
+            collect_merge_history(branch), window, limit=args.limit,
+        )
 
     unexplained = 0
     if run_s:
@@ -1552,12 +1962,15 @@ def cmd_stats(args: argparse.Namespace) -> int:
 
     if args.json:
         print(json.dumps(
-            {"spec_version": SPEC_VERSION, "project": project, "git": commit_s, "runs": run_s, "github": gh_s},
+            {
+                "spec_version": SPEC_VERSION, "project": project, "git": commit_s,
+                "runs": run_s, "github": gh_s, "lookback": lookback,
+            },
             indent=2, sort_keys=True,
         ))
         return 1 if unexplained else 0
 
-    render_stats(commit_s, run_s, gh_s, gh_skipped, project, window)
+    render_stats(commit_s, run_s, gh_s, gh_skipped, project, window, lookback)
     return 1 if unexplained else 0
 
 
