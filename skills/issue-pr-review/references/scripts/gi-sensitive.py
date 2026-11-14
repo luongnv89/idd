@@ -33,10 +33,12 @@ plan, writing rebuttals — stays with the agent.
   `refs/remotes/`), so a local branch `origin/<base>` is refused — and
   `<head>` must be the literal `HEAD` or a full 40- or 64-hex commit id. Both
   resolve to commit ids, and the script runs `git --no-replace-objects diff
-  -z --no-renames --no-relative --name-only <base_id>...<head_id> --` in the
-  working directory and classifies every changed path (a rename lists both
-  sides, NUL-split so no path is quoted, and `diff.relative` cannot drop a
-  path outside the cwd) together with `paths`, source `diff`. Exit 4, never
+  -z --no-renames --no-relative --ignore-submodules=none --name-only
+  <base_id>...<head_id> --` in the working directory and classifies every
+  changed path (a rename lists both sides, NUL-split so no path is quoted,
+  `diff.relative` cannot drop a path outside the cwd, and neither
+  `diff.ignoreSubmodules` nor a `.gitmodules` `ignore` can drop a gitlink)
+  together with `paths`, source `diff`. Exit 4, never
   "not sensitive": git missing or failing, not a repository, an unknown or
   ambiguous ref, a base that is not that remote-tracking ref, any other head,
   no merge base, a head already contained in the base, or an empty diff (a
@@ -335,7 +337,8 @@ def diff_paths(rng: object) -> list[str]:
     base_id, head_id = _commit(full), _commit(head)
     if _git("merge-base", base_id, head_id).strip() == head_id:
         raise Unavailable(f"head {head} is already contained in {base}: nothing to classify")
-    out = _git("diff", "-z", "--no-renames", "--no-relative", "--name-only", f"{base_id}...{head_id}", "--")
+    out = _git("diff", "-z", "--no-renames", "--no-relative", "--ignore-submodules=none",
+               "--name-only", f"{base_id}...{head_id}", "--")
     paths = [p for p in out.split("\0") if p]
     if not paths:
         raise Unavailable(f"git diff {rng} lists no path: a real change always has one")

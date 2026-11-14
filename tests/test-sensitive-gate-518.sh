@@ -27,7 +27,8 @@
 #           the base must be a remote-tracking ref and the head HEAD or a commit
 #           id (#605), so a branch named origin/<base> in a single-branch clone,
 #           a branch-name head, an empty diff or a head inside the base is exit
-#           4, and git runs under LC_ALL=C; the
+#           4, git runs under LC_ALL=C, and a gitlink is listed whatever
+#           the submodule ignore settings; the
 #           resolver's Deliver (any delivered sensitive path Step 2 did not
 #           mark) and pr-review's Depth gate and Merge floor read it (AC1, AC3).
 #
@@ -225,6 +226,20 @@ urng="$(rng main unicode)"
 out="$(cd "$GITREPO/docs" && printf '%s' "{\"labels\":[],\"paths\":[],\"diff\":\"$urng\"}" | python3 "$SCRIPT" --classify)"
 [ "$(field "$out" tier)" = '"sensitive"' ]
 check "G7: diff.relative=true and a subdirectory cwd still list a .github/workflows change (sensitive)" "$?"
+# R4 (#605): a gitlink the PR adds under .github/actions/ must be listed even
+# when the head's own .gitmodules says `ignore = all` or diff.ignoreSubmodules=all.
+g checkout -q -b submod main && printf '[submodule "evil"]\n\tpath = .github/actions/evil\n\turl = https://example.invalid/evil.git\n\tignore = all\n' > "$GITREPO/.gitmodules" \
+  && echo n > "$GITREPO/notes.txt" && g update-index --add --cacheinfo "160000,$(g rev-parse main),.github/actions/evil" \
+  && g add .gitmodules notes.txt && g commit -q -m sub
+check "G7: a branch adding a gitlink at .github/actions/evil with .gitmodules ignore = all" "$?"
+out="$(dclassify "$(rng main submod)")"; ec=$?
+[ "$ec" = "0" ] && python3 -c 'import json,sys; r=json.loads(sys.argv[1]); sys.exit(0 if r["tier"] == "sensitive" and {"source": "diff", "value": ".github/actions/evil", "class": "ci-workflow"} in r["reasons"] else 1)' "$out"
+check "G7: a gitlink added under .github/actions/ with .gitmodules ignore = all is sensitive (exit 0, #605)" "$?"
+g config diff.ignoreSubmodules all
+out="$(dclassify "$(rng main submod)")"; ec=$?
+[ "$ec" = "0" ] && [ "$(field "$out" tier)" = '"sensitive"' ]
+check "G7: diff.ignoreSubmodules=all still lists the gitlink (sensitive, exit 0, #605)" "$?"
+g config --unset diff.ignoreSubmodules
 # `gh pr checkout` names the local branch after the PR's head branch, so a fork
 # head called `origin/main` creates refs/heads/origin/main, which shadows the
 # remote-tracking ref: origin/main...HEAD would diff the PR against itself.
