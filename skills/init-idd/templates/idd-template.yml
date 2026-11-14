@@ -126,22 +126,16 @@ review:
 
 # Auto-pilot settings (used by /auto-pilot)
 autopilot:
-  # Merge mode — controls when /auto-pilot is allowed to merge PRs.
-  # Values: "conservative" | "balanced" | "aggressive"
-  # Default: "balanced" — auto-merge clean PRs (review passed). PRs with unresolved
-  #   review issues get a follow-up and stay open. Recommended for most projects.
-  # "conservative": create PR, run review-fix cycles, leave PR open.
-  #                 Never auto-merges.
-  # "aggressive":   auto-merge clean PRs AND merge partial PRs when
-  #                 merge_partial=true is also set (see below). Risky —
-  #                 only enable on disposable/experimental repos.
+  # Merge mode: "balanced" (default) auto-merges clean PRs; unresolved review
+  # issues get a follow-up and the PR stays open. "conservative" never merges.
+  # "aggressive" also merges partial PRs when merge_partial=true. Risky — only
+  # for disposable/experimental repos.
   mode: balanced
 
   # Allow merging PRs that still have unresolved fixable review issues.
-  # Default: false — never merge a partial PR.
-  # Only honored when mode is "aggressive". With any other mode this
-  # field is ignored. Combined opt-in (mode=aggressive AND merge_partial=true)
-  # is required to reach the prior 2.1.x "merge anyway with follow-up" path.
+  # Default: false — never merge a partial PR. Only honored when mode is
+  # "aggressive"; that combined opt-in reaches the prior 2.1.x "merge anyway
+  # with follow-up" path.
   merge_partial: false
   max_iterations: 10
   # Resolver-only concurrency for one independent triage group (1..8). Review,
@@ -174,6 +168,8 @@ autopilot:
   # state's started_at: at the budget the loop stops cleanly with its report
   # written and its lock released (0 = unbounded).
   max_runtime_minutes: 0
+  # Stop cleanly once this many IDD-convention PRs are open (0 = no cap).
+  max_open_prs: 0
 
 # Issue analysis settings
 analysis:

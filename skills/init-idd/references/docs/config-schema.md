@@ -279,46 +279,32 @@ review:
 
 # Auto-pilot settings (used by /auto-pilot)
 autopilot:
-  # Merge mode — controls when /auto-pilot is allowed to merge PRs.
-  # Type: string
+  # Merge mode — when /auto-pilot may merge PRs. Type: string. Default: "balanced".
   # Values: "conservative" | "balanced" | "aggressive"
-  # Default: "balanced"
-  # "balanced":     auto-merge clean PRs only. Unresolved issues create a follow-up
-  #                 and leave the PR open. Recommended default for most projects.
-  # "conservative": create PR, run review-fix cycles, leave PR open. Never auto-merges.
-  # "aggressive":   auto-merge clean PRs AND, when merge_partial=true, merge partial
-  #                 PRs with a follow-up issue. Documented as risky; opt-in only.
+  # "balanced": auto-merge clean PRs only; unresolved issues get a follow-up and
+  # the PR stays open (recommended). "conservative": run review-fix cycles, leave
+  # the PR open, never auto-merge. "aggressive": also merge partial PRs with a
+  # follow-up when merge_partial=true; documented as risky, opt-in only.
   # When set, this field is authoritative — autopilot.auto_merge is ignored.
   mode: balanced
 
   # Allow merging PRs that still have unresolved fixable review issues.
-  # Type: boolean
-  # Default: false
-  # Only honored when mode is "aggressive"; ignored otherwise. Both keys must be
+  # Type: boolean. Default: false. Only honored when mode is "aggressive"; ignored otherwise. Both keys must be
   # set explicitly to reach partial-merge behavior — there is no casual opt-in.
   merge_partial: false
 
-  # Max iterations (issues to process) before stopping
-  # Type: integer
-  # Default: 10
-  # Minimum: 1
-  # Maximum: 50
+  # Max iterations (issues to process) before stopping. Type: integer 1..50. Default: 10.
   max_iterations: 10
 
   # Resolver concurrency, integer 1..8 (default 1). Only independent resolves
   # overlap; review, merge and shared writes remain serialized.
   max_parallel: 1
 
-  # Max review-fix cycles per PR (overrides review.max_cycles in subagent prompt)
-  # Type: integer
-  # Default: 3
-  # Minimum: 1
-  # Maximum: 10
+  # Max review-fix cycles per PR (overrides review.max_cycles in subagent prompt).
+  # Type: integer 1..10. Default: 3.
   review_cycles: 3
 
-  # Auto-merge PRs after review passes
-  # Type: boolean
-  # Default: true
+  # Auto-merge PRs after review passes. Type: boolean. Default: true.
   # LEGACY: kept for backwards compatibility. Ignored when autopilot.mode is set.
   # When mode is unset and auto_merge is not explicitly present in the file, effective mode is balanced.
   # When mode is unset but auto_merge is explicitly present, legacy interpretation applies:
@@ -326,21 +312,18 @@ autopilot:
   #   auto_merge: false ≈ mode: conservative
   auto_merge: true
 
-  # Pause loop on failure instead of skipping to next issue
-  # Type: boolean
+  # Pause loop on failure instead of skipping to next issue. Type: boolean.
   # Default: false (skip failed issues and continue; set true to halt the loop on failure)
   pause_on_failure: false
 
-  # Labels that cause an issue to be skipped
-  # Type: array of strings
+  # Labels that cause an issue to be skipped. Type: array of strings.
   # Default: ["wontfix", "blocked", "do-not-merge"]
   skip_labels:
     - wontfix
     - blocked
     - do-not-merge
 
-  # Labels that mark an issue as critical (processed first)
-  # Type: array of strings
+  # Labels that mark an issue as critical (processed first). Type: array of strings.
   # Default: ["critical", "priority:critical"]
   critical_labels:
     - critical
@@ -350,8 +333,7 @@ autopilot:
   # https://github.com/luongnv89/idd/blob/main/docs/idd-methodology.md,
   # Issue Dependencies, for the syntax): never merge a PR whose dependencies
   # are unmerged. The run is not paused; disabling skips the merge gate.
-  # Type: boolean
-  # Default: true
+  # Type: boolean. Default: true.
   respect_dependencies: true
 
   # Reuse .idd/triage.json when it is younger than this many minutes AND
@@ -369,6 +351,9 @@ autopilot:
   # Wall-clock budget for one run, from the run state's started_at; it also
   # caps a rate-limit pause. Type: integer minutes. Default: 0 (unbounded).
   max_runtime_minutes: 0
+  # Stop before new work at this many open IDD-convention PRs (a custom
+  # branch_prefix is not counted). Integer 0..50. Default: 0 (no cap).
+  max_open_prs: 0
 
 # Triage settings
 triage:
@@ -734,6 +719,7 @@ Each `compaction.threshold.<skill>` must be an integer from 1 to 99 and `compact
 | `autopilot.quarantine_after` | `3` | Consecutive failed runs before labelling + skipping until human removal (`0` disables) |
 | `autopilot.quarantine_label` | `"auto-pilot-quarantined"` | The quarantine label; honored through the effective `skip_labels` set |
 | `autopilot.max_runtime_minutes` | `0` | Wall-clock run budget in minutes, from run state's `started_at`; loop stops cleanly at the budget (`0` = unbounded) |
+| `autopilot.max_open_prs` | `0` | Open IDD PRs that stop the loop before new work (`0..50`; `0` = no cap) |
 | `triage.stale_threshold_days` | `14` | Stale issue threshold |
 | `triage.auto_priority` | `true` | Auto-suggest priorities |
 | `triage.include_closed` | `false` | Exclude closed from triage |

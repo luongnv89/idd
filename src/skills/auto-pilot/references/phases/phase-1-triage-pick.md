@@ -6,7 +6,7 @@ One part of `references/phases.md` — the index that maps every step to its fil
 
 > **Note:** This entire phase is skipped in explicit list mode (`--issues`). The next issue is simply taken from the user-provided list in order. Jump directly to Phase 2.
 
-**Before anything else in this phase, evaluate the *Runtime budget check* in `references/phases/phase-0-lock-resume.md`.**
+**Before anything else in this phase, evaluate the *Runtime budget check* and the *Open PR cap check* in `references/phases/phase-0-lock-resume.md`.**
 It is the top of the iteration, and a budget already spent means this iteration
 never starts.
 
@@ -296,8 +296,9 @@ entry in persisted `summary.parallel_groups` that contains it. If none exists,
 plan one lane and follow the ordinary path; do **not** skip the top issue to find
 a fuller later group. If a group exists, walk `summary.suggested_order` and
 select eligible members of **that one group only**, stopping at the smallest of:
-`autopilot.max_parallel`, the remaining `max_iterations` budget, and the number
-of group members. Never combine two groups and never infer independence from
+`autopilot.max_parallel`, the remaining `max_iterations` budget, the slots left
+under a set `autopilot.max_open_prs` (cap minus the check's count), and the
+number of group members. Never combine two groups and never infer independence from
 file names here — `/issue-triage` already computed the group.
 
 Apply all four eligibility checks independently to every proposed member, then

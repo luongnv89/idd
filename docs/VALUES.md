@@ -248,9 +248,11 @@ A maintainer can hand work to the skills and believe what they report.
   row (`tests/test-idd-lint-stats-project.sh` T10, eval `issue-pr-review/revert-squash`,
   behavioural, against a stand-in); a rebase merge has no path, and no agent run is tested.
 - [ ] **TR16 — Human attention is protected.** PR size limits, a short human-first summary,
-  and a cap on PRs waiting for review. Partial: the PR body is summary-first and
-  `autopilot.max_parallel` caps resolver concurrency; the size warnings do not stop auto
-  mode and nothing caps the review queue.
+  and a cap on PRs waiting for review. Partial: the PR body is summary-first, the size
+  gates stop auto mode with a split recommendation, and an opt-in
+  `autopilot.max_open_prs` caps open IDD PRs (#570). Missing: the cap is off by default,
+  a custom branch prefix is not counted, and no PR size limit exists beyond the file and
+  commit gates.
 
 ---
 

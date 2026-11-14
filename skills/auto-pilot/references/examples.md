@@ -263,8 +263,6 @@ Detailed example runs and edge-case behaviors referenced from SKILL.md.
 ✓ PR #45 merged — #12 closed
 ```
 
-Note: the `/issue-pr-review --auto --no-merge` subagent handled the full review-fix cycle internally (review, fix, re-review). It found 2 issues in cycle 1, fixed them, then cycle 2 passed clean. Merge was handled by auto-pilot's Phase 5 after the review returned PASS.
-
 ### All eligible issues are blocked
 
 ```
@@ -368,12 +366,9 @@ Leave PR open, continue to next issue. Non-fatal.
 
 ### Interrupted run, resumed <!-- a:ap-ex-interrupted-run -->
 
-A run is killed (terminal closed, machine rebooted) during Phase 3 of its second
-issue. Re-invoking `/auto-pilot` alone would re-triage, re-pick #42, and the
-resolver would find its own PR — the case that used to end as `skipped`, and,
-worse, as a closed issue behind an unreviewed PR. `--resume` re-enters the run
-instead. Nothing about this depends on the loop *remembering* anything: the
-memory is `.idd/run-state.json`, written at each phase boundary.
+A run is killed during Phase 3 of its second issue. `--resume` re-enters it
+from `.idd/run-state.json`, written at each phase boundary, instead of
+re-triaging.
 
 ```
 $ /auto-pilot --resume
@@ -399,26 +394,9 @@ $ /auto-pilot --resume
   Selected:   #45 — Add rate-limit headers to the API client
 ```
 
-Three things in that transcript are the whole mechanism:
-
-1. **The lock was reclaimed, not refused.** The dead run's `pid` is gone, so the
-   lock is stale and this run takes it with a `⚠`. Had the original run still
-   been alive, the same call would have exited 3 with
-   `✗ Another /auto-pilot run is in progress` and mutated nothing.
-2. **The checkpoint supplied the branch and PR.** Phase 2.3 wrote
-   `{"phase": "review", "current": {"issue": 42, "branch": "fix/42-…", "pr": 87, "phase": "review"}}`
-   the moment the resolver returned, so the resume knows what exists.
-3. **GitHub, not the file, confirmed it.** The resume ran
-   `gh pr list --head fix/42-auth-middleware-checkout --json number,state` and
-   got `[{"number": 87, "state": "OPEN"}]`. Had that come back empty — branch
-   deleted, PR closed by someone — the gate would have fallen to `absent` and
-   started a fresh run. The state file is a hint; GitHub is the authority. Had
-   it come back `MERGED`, #42 would have gone straight to `processed[]` and the
-   loop to the next issue.
-
-The first issue is not re-processed: it is in `processed[]`, so the resumed run
-skips it and writes no second `runs.jsonl` line for it. The invariant of exactly
-one run-log line per processed issue survives the interruption.
+The dead run's lock was reclaimed, the checkpoint supplied the branch and PR,
+and GitHub confirmed them: the state file is a hint; GitHub is the authority.
+The first issue is in `processed[]`, so it gets no second `runs.jsonl` line.
 
 ### PR blocked by an unmerged dependency
 
