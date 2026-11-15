@@ -1,7 +1,6 @@
 # Glossary
 
-The full definitions of the terms SKILL.md uses. Read once before Phase 0.
-
+Look up a term here only when SKILL.md leaves it unclear.
 
 - **input** — what is being converted: a **plan file** at any path, or **conversational intent**
   from the user's turns. Resolution rules: `references/input-resolution.md`.
