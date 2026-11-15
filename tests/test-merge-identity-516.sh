@@ -11,6 +11,10 @@
 # merge site that drifts from the home is a merge that is not guarded, so every
 # site is pinned, on the authored src/ AND on the built skills/ tree.
 #
+# M12-M13 (#605, #606) run the shipped merge blocks against a stub `gh` and
+# gi-sensitive.py against real repos: the merge is bound to the head and base
+# tip the Merge floor classified.
+#
 # M8 is executable: it drives the gate's predicate against a real local git
 # history in which the base moved, and shows that the PR's recorded base oid
 # (what `baseRefOid` reports) says "fresh" while the live branch says "stale".
@@ -158,7 +162,7 @@ for base in "$REPO_ROOT/src/skills" "$REPO_ROOT/skills"; do
     if [ -n "$blk" ] \
        && printf '%s' "$blk" | grep -qE '^verified_head="' \
        && printf '%s' "$blk" | grep -qE '^read -r head_now base_ref <<<' \
-       && printf '%s' "$blk" | grep -qE '^behind_by="\$\(gh api ' \
+       && printf '%s' "$blk" | grep -qE '^read -r behind_by base_tip <<<"\$\(gh api .*\.base_commit\.sha' \
        && printf '%s' "$blk" | grep -qE '^else$'; then
       pass "$label"
     else
@@ -316,6 +320,117 @@ check_identity stale "M8.5 (AC1/AC2): a moved head is stale even when patch-id-e
 check_identity stale "M8.6: an empty behind_by (failed compare) is stale" "$verified" "$verified" ""
 check_identity stale "M8.7: a non-integer behind_by is stale" "$verified" "$verified" "null"
 check_identity stale "M8.8: a short head SHA is stale" "${verified:0:7}" "${verified:0:7}" "0"
+
+# ───────────────────────────────────────────────────────────
+# M11-M13 (#605, #606): the merge is bound to the head and base tip the Merge
+# floor classified. #605 N2: a push after review must not merge on the old
+# floor. #606 R5: a retargeted base (variant A) or a stale local origin/<base>
+# (variant B) must not merge on a floor classified against another base.
+# ───────────────────────────────────────────────────────────
+for pair in "src:$SRC_PR/SKILL.source.md" "built:$BUILT_PR/SKILL.md"; do
+  tag="${pair%%:*}"
+  f="${pair#*:}"
+  floor="$(grep -F 'a:rv-merge-floor' "$f")"
+  check_block_has "$floor" "step 4's bind, fetch and classify rerun here" \
+    "M11.1 ($tag): the floor re-binds and re-fetches the base right before its classify"
+  check_block_has "$floor" '`met` reads `met@\{verified_head\}:\{floor_base\}`' \
+    "M11.2 ($tag): a met floor names the head and base tip it classified"
+  check_block_has "$(grep -F 'a:rv-merge-identity' "$f")" 'base tip `floor_base`' \
+    "M11.3 ($tag): merge identity requires the live base tip the floor classified"
+done
+for base in "$REPO_ROOT/src/skills" "$REPO_ROOT/skills"; do
+  rt="$base/issue-pr-review/references/report-templates.md"
+  check_has "$rt" 'is the \*Merge floor\*.s `git rev-parse "origin/\$\{base_ref\}"`' \
+    "M11.4 (${rt#$REPO_ROOT/}): {floor_base} is the tip the floor fetched and classified"
+  check_has "$base/auto-pilot/references/subagent-prompts.md" '^  `met` returned whole as `met@<sha40>:<sha40>`' \
+    "M11.5 (${base#$REPO_ROOT/}): the auto-pilot reviewer returns the floor's binding"
+  anchor_check_flat "$base/auto-pilot" ap-merge-identity-gate 'pasted only as `met@<40 hex>:<40 hex>`' \
+    "M11.6 (${base#$REPO_ROOT/}): only a well-formed floor binding is pasted into the shell"
+  anchor_check_flat "$base/auto-pilot" ap-merge-identity-gate 'a floor bound to another head or base tip' \
+    "M11.7 (${base#$REPO_ROOT/}): a floor bound to another head or base tip is stale"
+done
+
+# M12 (executable): run each shipped guarded block, placeholders filled, with a
+# stub `gh` that answers the live head, base name, behind_by and base tip.
+STUB="$TMP/stub"
+mkdir -p "$STUB"
+cat > "$STUB/gh" <<'GH'
+#!/bin/sh
+case "$1 $2" in
+  "pr view") case "$*" in
+      *headRefOid,baseRefName*) printf '%s %s\n' "$STUB_HEAD" "$STUB_BASE" ;;
+      *"--json body"*) echo body ;;
+    esac ;;
+  "api "*) case "$*" in *base_commit*) printf '%s %s\n' "$STUB_BEHIND" "$STUB_TIP" ;;
+      *) echo "$STUB_BEHIND" ;; esac ;;
+  "pr merge") echo merged >> "$STUB_LOG" ;;
+esac
+GH
+chmod +x "$STUB/gh"
+H1="$(printf 'a%.0s' $(seq 40))"; H2="$(printf 'b%.0s' $(seq 40))"
+T1="$(printf 'c%.0s' $(seq 40))"; T2="$(printf 'd%.0s' $(seq 40))"
+# run_block BLOCK FLOOR_HEAD FLOOR_TIP HEAD_NOW BASE_NAME BEHIND LIVE_TIP → merged|blocked
+run_block() {
+  local blk="$1" filled log="$TMP/merge.log"
+  filled="$(printf '%s' "$blk" | sed -e "s|{ci_sha}|$4|; s|{verified_head}|$4|" \
+    -e "s|{floor_base}|$3|; s|{merge_floor}|met@$2:$3|" \
+    -e 's|{N}|7|g; s|{pr_number}|7|g; s|{merge_method}|squash|')"
+  rm -f "$log"
+  PATH="$STUB:$PATH" STUB_HEAD="$4" STUB_BASE="$5" STUB_BEHIND="$6" STUB_TIP="$7" STUB_LOG="$log" \
+    bash -c "$filled" >/dev/null 2>&1 || true
+  [ -s "$log" ] && echo merged || echo blocked
+}
+expect() { if [ "$2" = "$1" ]; then pass "$3"; else fail "$3 (got $2)"; fi; }
+for base in "$REPO_ROOT/src/skills" "$REPO_ROOT/skills"; do
+  for rel in auto-pilot/references/phases/phase-5-merge.md \
+             auto-pilot/references/phases/phase-3-4-review.md \
+             issue-pr-review/references/report-templates.md; do
+    f="$base/$rel"; tag="${f#$REPO_ROOT/}"
+    blk="$(guarded_block "$f")"
+    expect merged "$(run_block "$blk" "$H1" "$T1" "$H1" main 0 "$T1")" \
+      "M12.1 ($tag): (vacuity guard) an unchanged head and base tip merges"
+    expect blocked "$(run_block "$blk" "$H1" "$T1" "$H1" release 0 "$T2")" \
+      "M12.2 ($tag): variant A — a PR retargeted to a base the head contains is blocked"
+    expect blocked "$(run_block "$blk" "$H1" "$T1" "$H1" main 0 "$T2")" \
+      "M12.3 ($tag): variant B — a floor classified on a stale base tip is blocked"
+    # Without the floor-binding line the same two answers merge: the line is the fix.
+    unbound="$(printf '%s\n' "$blk" | grep -v '^\[ .*\] || verified_head=""$')"
+    expect merged "$(run_block "$unbound" "$H1" "$T1" "$H1" release 0 "$T2")" \
+      "M12.4 ($tag): (red without the fix) the unbound block merges the retargeted PR"
+    case "$rel" in auto-pilot/*)
+      # #605 N2: Step 5.1c's verified_head is Step 5.1's read (H2); the floor ran at H1.
+      expect blocked "$(run_block "$blk" "$H1" "$T1" "$H2" main 0 "$T1")" \
+        "M12.5 ($tag): #605 N2 — a push after review never merges on the old floor"
+      expect merged "$(run_block "$unbound" "$H1" "$T1" "$H2" main 0 "$T1")" \
+        "M12.6 ($tag): (red without the fix) the unbound block merges on the old floor" ;;
+    esac
+  done
+done
+
+# M13 (executable, #606 variant B): the floor's fresh fetch changes the tier.
+# The base gains a workflow (sensitive) commit; the head contains it and then
+# reverts it. Against a stale local origin/main the revert cancels out and the
+# range looks standard; after the fetch the range is the revert — sensitive.
+SEN="$REPO_ROOT/src/shared/scripts/gi-sensitive.py"
+gx() { git -C "$1" -c user.name=t -c user.email=t@example.invalid -c commit.gpgsign=false "${@:2}"; }
+tier() { (cd "$TMP/rev" && printf '{"labels":[],"paths":[],"diff":"origin/main...%s"}' "$1" \
+  | python3 "$SEN" --classify 2>/dev/null) | python3 -c 'import json,sys; print(json.load(sys.stdin)["tier"])' 2>/dev/null; }
+if git init -q --bare -b main "$TMP/origin.git" && git clone -q "$TMP/origin.git" "$TMP/w" 2>/dev/null \
+   && echo r > "$TMP/w/README" && gx "$TMP/w" add -A && gx "$TMP/w" commit -q -m base0 && gx "$TMP/w" push -q origin HEAD:main \
+   && git clone -q "$TMP/origin.git" "$TMP/rev" \
+   && mkdir -p "$TMP/w/.github/workflows" && echo 'on: push' > "$TMP/w/.github/workflows/s.yml" \
+   && gx "$TMP/w" add -A && gx "$TMP/w" commit -q -m sensitive && gx "$TMP/w" push -q origin HEAD:main \
+   && gx "$TMP/w" rm -q .github/workflows/s.yml && echo n > "$TMP/w/notes.txt" && gx "$TMP/w" add -A \
+   && gx "$TMP/w" commit -q -m revert && gx "$TMP/w" push -q origin HEAD:pr \
+   && gx "$TMP/rev" fetch -q origin pr:refs/remotes/origin/pr; then
+  pass "M13.1: (fixture) stale origin/main in the reviewer's clone; the head reverts a base workflow commit"
+else
+  fail "M13.1: (fixture) could not build the variant B repos"
+fi
+head="$(gx "$TMP/rev" rev-parse origin/pr)"
+expect standard "$(tier "$head")" "M13.2: (the hole) a stale origin/main classifies the reverting head standard"
+gx "$TMP/rev" fetch -q origin -- main
+expect sensitive "$(tier "$head")" "M13.3: after the floor's fresh fetch the same head is sensitive"
 
 echo ""
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"

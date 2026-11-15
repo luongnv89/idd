@@ -41,7 +41,7 @@ Confirm before any operation: a git repository (`git rev-parse --git-dir`), `gh`
 
 ### Bundled dependency precheck
 
-Verify **every** path below exists relative to the skill's directory (the dirname of this SKILL.md); this list is the authoritative guard. If any is missing, stop immediately, print the error, and never continue with an inline or guessed reviewer/fixer prompt:
+Verify **every** path below exists relative to the skill's directory; this list is the authoritative guard. If any is missing, stop immediately, print the error, and never continue with an inline or guessed reviewer/fixer prompt:
 
 ```text
 references/agents/code-reviewer.md
@@ -98,7 +98,7 @@ references/scripts/gi-sensitive.py
 
 ## Repo Sync Before Edits (mandatory)
 
-Before any fix, sync with the **stash-first pattern** (`docs/sync-conventions.md`): `git stash push -u` if the tree is dirty, `git fetch origin`, `git pull --rebase origin "$branch"`, `git stash pop`. On pop failure, stop and surface `git stash list` / `git stash show -p stash@{0}`. A missing `origin` or a conflicting rebase stops and asks (interactive), or aborts with a clear error (auto).
+Before any fix, sync with the **stash-first pattern** (`docs/sync-conventions.md`): `git stash push -u` if the tree is dirty, `git fetch origin`, `git pull --rebase origin "$branch"`, `git stash pop`. On pop failure, stop and surface `git stash list` / `git stash show -p stash@{0}`. A missing `origin` or a conflicting rebase stops and asks (interactive), or aborts (auto).
 
 ## Configuration
 
@@ -329,9 +329,9 @@ Print the summary from `references/report-templates.md` and **apply its *Review 
 
 **Merge rule.** <!-- a:rv-merge-rule --> `/issue-pr-review` merges a PR only when `review.auto_merge` is `true` and the PR is clean, in interactive and `--auto` runs alike, and never under `--no-merge` or `--review-only`. Clean excludes two cases: pending CI is never clean; a CI failure held non-blocking by `review.ignore_ci_billing_failures` is never clean either. The merge uses `review.merge_method` (default: squash merge), deletes the head branch and is irreversible: on an unmet gate, report and stop — never delete a branch by hand.
 
-**Merge floor.** <!-- a:rv-merge-floor --> One home; `/auto-pilot` reads the `merge_floor` returned. `met` needs the acceptance-criteria check enabled, at least one criterion is `pass` and none is `unverified` or ends with `(needs review)` (unconfirmed), deferred rows excluded only on a `Refs #N` PR (`references/verification-checks.md` *Intentional reference*), on a bug PR a `red→green` *Bug proof* at `verified_head` (`not reproduced` never is), and a `standard` risk tier for `origin/${base_ref}...${verified_head}` from `shared/scripts/gi-sensitive.py --classify` on the *Depth gate*'s labels, run again here (`sensitive` is `sensitive change ({classes})`, any other result `risk tier unknown`); else `unmet: {reason}`. Print it under `Evidence`. An `--auto` / `IDD_AUTO_MODE=1` run never merges `unmet`; interactive asks `Merge with the floor unmet ({reason})? [y/N]`. <!-- auto:no -->
+**Merge floor.** <!-- a:rv-merge-floor --> One home; `/auto-pilot` reads the `merge_floor` returned. `met` needs the acceptance-criteria check enabled, at least one criterion is `pass` and none is `unverified` or ends with `(needs review)` (unconfirmed), deferred rows excluded only on a `Refs #N` PR (`references/verification-checks.md` *Intentional reference*), on a bug PR a `red→green` *Bug proof* at `verified_head` (`not reproduced` never is), and a `standard` risk tier for `origin/${base_ref}...${verified_head}` from `shared/scripts/gi-sensitive.py --classify` on the *Depth gate*'s labels, step 4's bind, fetch and classify rerun here (`sensitive` is `sensitive change ({classes})`, any other result `risk tier unknown`); else `unmet: {reason}`. `met` reads `met@{verified_head}:{floor_base}`. Print it under `Evidence`. An `--auto` / `IDD_AUTO_MODE=1` run never merges `unmet`; interactive asks `Merge with the floor unmet ({reason})? [y/N]`. <!-- auto:no -->
 
-**Merge identity (last gate before the merge).** <!-- a:rv-merge-identity --> Bind `verified_head` = Step 5's `ci_sha` (or, with no `ci_sha`, the `headRefOid` the final review cycle read). Re-read `headRefOid` and `baseRefName`, then `gh api "repos/{owner}/{repo}/compare/${base_ref}...${verified_head}" --jq .behind_by`. Merge only when the head still equals `verified_head` **and** `behind_by` is exactly `0` (the live base branch, never `baseRefOid`); anything else is `BLOCKED`, never a re-wait. Merge with `--{merge_method}` and `--match-head-commit "$verified_head"`. Patch-id equality never replaces fresh integration checks. Commands and reasons: `references/report-templates.md` (*Auto-Merge*).
+**Merge identity (last gate before the merge).** <!-- a:rv-merge-identity --> Bind `verified_head` = Step 5's `ci_sha` (or, with no `ci_sha`, the `headRefOid` the final review cycle read). Re-read `headRefOid` and `baseRefName`, then compare that base with `verified_head`. Merge only when the head still equals `verified_head`, base tip `floor_base`, **and** `behind_by` is exactly `0` (the live base branch, never `baseRefOid`); anything else is `BLOCKED`, never a re-wait. Merge with `--{merge_method}` and `--match-head-commit "$verified_head"`. Patch-id equality never replaces fresh integration checks. Commands and reasons: `references/report-templates.md` (*Auto-Merge*).
 
 **Post-merge cleanup (after every merge).** Run `python3 shared/scripts/gi-postmerge.py --pr {N}` to remove the merged branch and its clean worktrees and switch to the updated base (`docs/post-merge-cleanup.md`). A non-zero merge exit on a PR that now reads `MERGED` is still a merge (add `--delete-remote`); `ok: false` never downgrades it. Untracked files are deleted only on an interactive yes to the exact list shown (its `digest`). Rules: `references/report-templates.md` (*Auto-Merge*).
 
