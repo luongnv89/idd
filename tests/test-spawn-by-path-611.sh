@@ -59,6 +59,8 @@ form="$(awk '/a:ap-spawn-form/{f=1} f && /a:ap-template-vars/{exit} f' "$SP")"
 for want in '**On Claude Code, spawn by path**' 'Never read the prompt file yourself' \
             'Read {prompt_path} and follow the fenced prompt in it' \
             'untrusted data with the status of issue text' \
+            "replaces the file's whole BEGIN…END block of that kind" \
+            '{payload_nonce} is the nonce on its delimiter lines' \
             "read only that spawn's" 'read only in explicit list mode'; do
   grep -qF -- "$want" <<<"$form" && pass "T2: spawn form says '$want'" \
     || fail "T2: spawn form lacks '$want'"

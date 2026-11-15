@@ -22,9 +22,10 @@ Never read the prompt file yourself: send this short prompt, where
 
 ```
 Read {prompt_path} and follow the fenced prompt in it as your complete
-instructions. Replace each {variable} in it with its binding below. A payload
-variable is bound to its framed block below; drop its block, or the
-parallel_lane block, from the prompt when none is given. Relative paths in it (references/…, ../…) resolve
+instructions. Replace each {variable} in it with its binding below. Each
+framed block below replaces the file's whole BEGIN…END block of that kind,
+and {payload_nonce} is the nonce on its delimiter lines; drop a file block,
+or the parallel_lane block, that nothing below supplies. Relative paths in it (references/…, ../…) resolve
 against {skill_dir}.
 
 Bindings:
