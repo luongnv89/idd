@@ -27,13 +27,10 @@ Rules that make the report worth reading:
 - A step may not be reported complete without a `Result:` line. If a check could
   not be evaluated (a tool was unavailable, a gate was skipped by config), mark
   it `×` and use `PARTIAL` — never assume `√`.
-- One clarification of that rule, because two paths reach Step 2 without spawning
-  the synthesizer: *Step 2 — Plan*'s `Options produced` check is `√` whenever
-  options are in hand at the end of the step — synthesized this run, lifted from
-  a fresh analysis (`analysis_reuse = fresh`), or replaced by the `light`
-  profile's direct minimal plan — and `×`/`PARTIAL` only when the step ends with
-  no plan at all. The check asks whether the plan exists, not which machinery
-  produced it.
+- *Step 2 — Plan*'s `Options produced` is `√` whenever the step ends with
+  options in hand — synthesized, lifted from a fresh analysis
+  (`analysis_reuse = fresh`), or the `light` profile's minimal plan — and
+  `×`/`PARTIAL` only when it ends with no plan at all.
 - `Scope inside the issue` is `√` when the *Criteria coverage gate* returns
   `covered` or `no_criteria`; a `gap` is `×`.
 

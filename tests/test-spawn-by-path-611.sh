@@ -11,7 +11,8 @@
 #       only in its precheck list, and each spawn site names its own file;
 #   T6  auto-pilot's summary: the common file is smaller, the rare sections
 #       moved, and the pointer to them is conditional;
-#   T7  issue-resolver's report-templates.md is split by the step that reads it;
+#   T7  issue-resolver's report-templates.md is split by the step that reads it,
+#       and its closing summary reads the contract plus one variant (#616);
 #   T8  the always-read sets main's detector records drop the split files;
 #   T9  the built skills carry the split, and the CI step exists.
 #
@@ -182,7 +183,7 @@ has "$RS/references/closing-summary.md" '## Review contract' "T7.3: closing-summ
 has "$RS/references/run-log-fields.md" '# Run-log entry — field derivation and suppression' "T7.4: run-log-fields.md owns the derivation"
 has "$RS/references/report-examples.md" '## Expected Inline Pipeline Output' "T7.5: report-examples.md owns the example"
 RSK="$RS/SKILL.source.md"
-has "$RSK" 'Read the *Review contract* in `references/closing-summary.md`' "T7.6: the closing summary reads only its own file"
+has "$RSK" 'Read `references/closing-summary.md` now — its *Review contract* holds for every outcome' "T7.6: the closing summary always reads the contract file, worded so the detector counts it"
 has "$RSK" 'fill *PR Body Template* in `references/report-templates.md`' "T7.7: Deliver reads the PR body file"
 # Every *Section* cited beside one of the four files names a heading it has.
 for f in report-templates closing-summary run-log-fields report-examples; do
@@ -191,6 +192,23 @@ for f in report-templates closing-summary run-log-fields report-examples; do
     grep -qE "^#+ .*${sec}" "$RS/references/$f.md" \
       && pass "T7.8: *$sec* is a heading of $f.md" || fail "T7.8: *$sec* is not a heading of $f.md"
   done < <(grep -oE "\\\`references/$f\\.md\\\`[^.;]*\\(\\*[^*]+\\*" "$RSK" | sed -E 's/.*\(\*([^*]+)\*$/\1/' | sort -u)
+done
+
+# ── T7.9-T7.12 (#616): the closing summary reads the contract plus one variant ─
+VARIANTS="closing-pr-created closing-already-resolved closing-blocked"
+for sec in '## PR created' '## Already Resolved' '## Blocked' '```'; do
+  lacks "$RS/references/closing-summary.md" "$sec" "T7.9: closing-summary.md carries no variant ('$sec')"
+done
+for v in $VARIANTS; do
+  has "$RSK" "\`references/$v.md\`" "T7.10: SKILL.md names $v.md as the outcome's variant"
+  blocks="$(awk '/^```/{n++; next} n%2==1' "$RS/references/$v.md")"
+  count="$(grep -c 'Result:' <<<"$blocks" || true)"
+  [ "$count" -ge 1 ] && pass "T7.11 ($v): has $count closing block(s)" || fail "T7.11 ($v): no closing block"
+  for row in 'Result:' 'Evidence:' 'Uncertainty:' 'Decision:' 'Next action:'; do
+    n="$(grep -c "^  $row" <<<"$blocks" || true)"
+    [ "$n" = "$count" ] && pass "T7.12 ($v): every block prints '$row'" \
+      || fail "T7.12 ($v): '$row' in $n of $count blocks"
+  done
 done
 
 # ── T8: always-read sets (main's detector, on the committed build) ──────────
@@ -208,6 +226,11 @@ if [ -n "$rsf" ] && ! grep -qE 'report-templates|run-log-fields|report-examples'
 else
   fail "T8.2: issue-resolver always-read set: ${rsf:-unreadable}"
 fi
+if grep -qx 'references/closing-summary.md' <<<"$rsf" && ! grep -qE 'closing-(pr-created|already-resolved|blocked)' <<<"$rsf"; then
+  pass "T8.3: issue-resolver always reads the closing contract, never a variant (#616)"
+else
+  fail "T8.3: issue-resolver always-read set: ${rsf:-unreadable}"
+fi
 
 # ── T9: built copies and CI wiring ──────────────────────────────────────────
 for p in $PROMPTS; do
@@ -217,7 +240,8 @@ for p in $PROMPTS; do
 done
 for f in auto-pilot/references/spawning.md auto-pilot/references/summary-variants.md \
          issue-resolver/references/closing-summary.md issue-resolver/references/run-log-fields.md \
-         issue-resolver/references/report-examples.md; do
+         issue-resolver/references/report-examples.md issue-resolver/references/closing-pr-created.md \
+         issue-resolver/references/closing-already-resolved.md issue-resolver/references/closing-blocked.md; do
   [ -f "$ROOT/skills/$f" ] && pass "T9.2: skills/$f is built" || fail "T9.2: skills/$f missing — run scripts/build.sh"
 done
 [ ! -e "$ROOT/skills/auto-pilot/references/subagent-prompts.md" ] \

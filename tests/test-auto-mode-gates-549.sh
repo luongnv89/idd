@@ -258,7 +258,7 @@ for tree in "$RS_SRC" "$RS_DIST"; do
       || fail "T6.1 ${tree#$ROOT/}: auto No for $reason does not recommend a split"
   done
   grep -qF '`large_scope`, `max_commits_exceeded`: split #{issue_number} into smaller issues;' \
-    "$tree/references/closing-summary.md" \
+    "$tree/references/closing-blocked.md" \
     && pass "T6.2 ${tree#$ROOT/}: the closing summary's Next action names the split" \
     || fail "T6.2 ${tree#$ROOT/}: the closing summary's Next action omits the split"
 done
