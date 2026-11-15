@@ -289,7 +289,7 @@ fi
 MERGE_RULE='`/issue-pr-review` merges a PR only when `review.auto_merge` is `true` and the PR is clean, in interactive and `--auto` runs alike, and never under `--no-merge` or `--review-only`.'
 PR_LOOP="src/skills/issue-pr-review/references/review-loop-mechanics.md"
 SCHEMA="docs/config-schema.md"
-AP_PROMPTS="src/skills/auto-pilot/references/subagent-prompts.md"
+AP_PROMPTS="$(spec_concat "src/skills/auto-pilot/references/spawning.md")"
 
 rule_src=$(grep -rlF -- "$MERGE_RULE" src docs | wc -l | tr -d ' ')
 rule_home=$(grep -cF -- "$MERGE_RULE" "$PR_SKILL")

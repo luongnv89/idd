@@ -70,8 +70,8 @@ Run the original path exactly:
   ⟶ Spawning resolver subagent...
 ```
 
-Use the **Resolver Subagent** prompt from `references/subagent-prompts.md`,
-substituting `{issue_number}`, `{run_id}`, `{resume}` (`yes` only when *Step
+Spawn the **Resolver Subagent** (`references/prompts/resolver.md`) per
+`references/spawning.md`, substituting `{issue_number}`, `{run_id}`, `{resume}` (`yes` only when *Step
 1.0*'s progress-record set names this issue) and the optional payload/context. Omit the
 `parallel_lane` block, launch from the original checkout, and wait for this one
 result before Step 2.3. No caller-managed worktree or `lanes[]` checkpoint is

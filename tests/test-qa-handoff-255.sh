@@ -520,7 +520,7 @@ check_has "$SRC_PR" 'idd:qa v1 … -->. marker are still present' \
 check_has "$BUILT_PR" 'idd:qa v1' \
   "T11.2: the built SKILL.md ships the preserved-content confirmation"
 
-AP_PROMPTS="$REPO_ROOT/src/skills/auto-pilot/references/subagent-prompts.md"
+AP_PROMPTS="$REPO_ROOT/src/skills/auto-pilot/references/prompts/reviewer.md"
 . "$(cd "$(dirname "$0")" && pwd)/lib/spec.bash"  # spec_concat — split reference specs read as one file (#323)
 AP_PHASES="$(spec_concat "$REPO_ROOT/src/skills/auto-pilot/references/phases.md")"
 check_has "$AP_PROMPTS" 'QA handoff marker' \

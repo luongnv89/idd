@@ -84,7 +84,7 @@ All errors follow the rich error format: what went wrong + fix command + docs li
   Docs:    https://github.com/luongnv89/idd/blob/main/docs/platform-github.md
 ```
 **Trigger:** `gi-ratelimit.py --verdict` returns `action: "stop"` — the pause would run past the runtime budget, or `reset` is unknown. Fatal.
-**Action:** Persist the final summary with `gi-state.py --report` — it reports `Result: RATE LIMITED` (`references/summary-format.md`) — release the run lock, and stop. At Prerequisite 8 nothing is left half-resolved because nothing was started; mid-run the stop lands between units of work, so nothing is abandoned there either — what merged stays merged, and a PR left open carries the outcome its own iteration already recorded. **At Prerequisite 8 there is no lock yet** — it is taken further down the prerequisites — so the release is the mid-run half of this action and the preflight stop is the report and this block alone; the deadline the verdict was given comes from the clock, read once at the first probe, rather than from a run state that does not exist. Both variants are in `references/preflight.md` (*Rate-limit pause*).
+**Action:** Persist the final summary with `gi-state.py --report` — it reports `Result: RATE LIMITED` (`references/summary-variants.md`) — release the run lock, and stop. At Prerequisite 8 nothing is left half-resolved because nothing was started; mid-run the stop lands between units of work, so nothing is abandoned there either — what merged stays merged, and a PR left open carries the outcome its own iteration already recorded. **At Prerequisite 8 there is no lock yet** — it is taken further down the prerequisites — so the release is the mid-run half of this action and the preflight stop is the report and this block alone; the deadline the verdict was given comes from the clock, read once at the first probe, rather than from a run state that does not exist. Both variants are in `references/preflight.md` (*Rate-limit pause*).
 
 **Two renderings, chosen by `resume_at`.** The block above is the **known-reset**
 form, and it is the only one that may carry `{resume_at}`. The `stop` verdict has
@@ -108,7 +108,7 @@ wait for. Print this **unknown-reset** form instead, and never mix the two:
 
 Raising `autopilot.max_runtime_minutes` is offered by the known-reset form only:
 with no reset instant the verdict is `stop` whatever the budget is, so a bigger
-one would change nothing. `references/summary-format.md` splits `Result: RATE
+one would change nothing. `references/summary-variants.md` splits `Result: RATE
 LIMITED`'s `Next action:` line on the same value for the same reason.
 
 **Low-budget warning (non-fatal):** on `action: "warn"` — `remaining` between 200 and 500 — print the same block with a `⚠` symbol and the line `Proceeding — budget may run low; the loop will pause and resume if it hits the limit.` instead of stopping. Drop **both** `{resume_at}` sentences from it as the unknown-reset form does: `warn` leaves `wait_s` at `0` too, so `resume_at` is `null` here as well — and nothing is being waited for in the first place.

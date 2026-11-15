@@ -238,7 +238,7 @@ Prerequisite 8:
   budget` block plus the persisted report and nothing else — and the report is
   written with no recorded `run_id`, which `gi-state.py --report` already handles.
   That report is a zero-iteration summary reporting `Result: RATE LIMITED`
-  (`references/summary-format.md`), the same value the mid-run stop reports.
+  (`references/summary-variants.md`), the same value the mid-run stop reports.
 - a pause that finishes resumes nothing: it re-probes, and on `proceed` or `warn`
   the prerequisites simply carry on to the run lock.
 

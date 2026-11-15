@@ -48,7 +48,7 @@ SRC_SKILL="$REPO_ROOT/src/skills/issue-resolver/SKILL.source.md"
 . "$(cd "$(dirname "$0")" && pwd)/lib/spec.bash"  # spec_concat — split reference specs read as one file (#323)
 SRC_STEPS="$(spec_concat "$REPO_ROOT/src/skills/issue-resolver/references/pipeline-steps.md")"
 SRC_ERRORS="$REPO_ROOT/src/skills/issue-resolver/references/error-messages.md"
-SRC_AUTOPILOT_PROMPTS="$REPO_ROOT/src/skills/auto-pilot/references/subagent-prompts.md"
+SRC_AUTOPILOT_PROMPTS="$(spec_concat "$REPO_ROOT/src/skills/auto-pilot/references/spawning.md")"
 ROOT_SKILL="$REPO_ROOT/skills/issue-resolver/SKILL.md"
 ROOT_STEPS="$(spec_concat "$REPO_ROOT/skills/issue-resolver/references/pipeline-steps.md")"
 ROOT_ERRORS="$REPO_ROOT/skills/issue-resolver/references/error-messages.md"

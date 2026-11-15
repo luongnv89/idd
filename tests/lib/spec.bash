@@ -21,6 +21,13 @@
 #   alike, since the layout is identical in all three. A missing index prints
 #   nothing and returns 1, so a caller's existence check still fires.
 #
+#   Issue #611 split auto-pilot's `references/subagent-prompts.md` into one
+#   file per spawn under `prompts/` plus `references/spawning.md`. Passing
+#   spawning.md joins the four prompts in their old order (resolver, reviewer,
+#   analyzer, batch resolver) with spawning.md LAST, where the Template
+#   Variables section used to sit, so anchor spans that cross from one prompt
+#   to the next still resolve.
+#
 # CLEANUP (issue #443)
 # ────────────────────
 # Every call used to `mktemp` a file nobody removed. A full suite run left ~150
@@ -106,11 +113,17 @@ spec_concat() {
   case "$base" in
     pipeline-steps.md) sub="steps" ;;
     phases.md)         sub="phases" ;;
+    spawning.md)       sub="prompts" ;;
     *) echo "spec_concat: no part directory known for $base" >&2; return 2 ;;
   esac
   out="$(mktemp "${TMPDIR:-/tmp}/spec-${base%.md}.XXXXXX")" || return 1
   printf '%s\n' "$out" >>"${SPEC_TMP_REGISTRY:-/dev/null}" 2>/dev/null || true
-  cat "$index" "$dir/$sub"/*.md >"$out"
+  if [ "$sub" = prompts ]; then
+    cat "$dir/prompts/resolver.md" "$dir/prompts/reviewer.md" \
+        "$dir/prompts/analyzer.md" "$dir/prompts/batch-resolver.md" "$index" >"$out"
+  else
+    cat "$index" "$dir/$sub"/*.md >"$out"
+  fi
   echo "$out"
 }
 

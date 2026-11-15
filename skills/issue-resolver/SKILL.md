@@ -55,7 +55,7 @@ Load config once; never re-read it. Run `python3 references/scripts/gi-config.py
 
 Either path: no `.idd.yml` (`first_run`) prints `○ First run — using default config. Run /init-idd to customize.`
 
-**Capture the run clock here:** chain that same `python3` invocation as `python3 …; ec=$?; date +%s >&2; exit "$ec"`; the stderr epoch is `run_started_epoch`, the *Run Stats Footer*'s `elapsed` anchor. Take `date +%s` again as each `[N/5]` step starts and at the terminal outcome: those boundaries are the run log's `phases` (`references/report-templates.md`).
+**Capture the run clock here:** chain that same `python3` invocation as `python3 …; ec=$?; date +%s >&2; exit "$ec"`; the stderr epoch is `run_started_epoch`, the *Run Stats Footer*'s `elapsed` anchor. Take `date +%s` again as each `[N/5]` step starts and at the terminal outcome: those boundaries are the run log's `phases` (`references/run-log-fields.md`).
 
 **Context threshold.** <!-- a:ctx-check --> Only when `compaction.enabled` is true (`references/docs/context-threshold.md`). At each `[N/5]` step start, beside that clock read, compare the remaining-context figure the host placed in your context (none: skip silently, never estimate) with `compaction.threshold.issue-resolver`. At or below it, interactive prints the `⚠` line and a `/compact <focus>` line (skill, `#N`, step id and name only) and pauses **at most once per run**; `--auto` / `IDD_AUTO_MODE=1` prints one `⚠` line per run and continues — never a pause or stop.
 
@@ -108,6 +108,9 @@ references/steps/step-3-implement.md
 references/steps/step-4-qa.md
 references/steps/step-5-deliver.md
 references/report-templates.md
+references/closing-summary.md
+references/report-examples.md
+references/run-log-fields.md
 references/step-reports.md
 references/run-stats.md
 references/bug-verification.md
@@ -154,7 +157,7 @@ A killed session can resume (`--resume`). Read the record after the precheck, be
 
 ## Pipeline Overview
 
-6 steps (0-5) — Preflight, Research, Plan, Implement, QA, Deliver — each printing a `[N/5]` line (`●` → `✓`/`✗`); expected output example: `references/report-templates.md` (*Expected Inline Pipeline Output*).
+6 steps (0-5) — Preflight, Research, Plan, Implement, QA, Deliver — each printing a `[N/5]` line (`●` → `✓`/`✗`); expected output example: `references/report-examples.md` (*Expected Inline Pipeline Output*).
 
 ### Step completion reports
 
@@ -371,7 +374,7 @@ With `projects.sync_enabled` true, set `status_map.done` (`references/docs/githu
 
 ### Run-log entry (monitoring)
 
-At **every terminal outcome** — `success`, `already_resolved`, `failed` — append exactly **one JSON line** to `.idd/runs.jsonl`, **unless invoked with `--no-run-log`**, which appends **nothing** and returns telemetry. That is the **single writer** rule under `/auto-pilot`, independent of `--auto`: a standalone `/issue-resolver <N> --auto` still writes. Derivation: `references/report-templates.md` (*Run-log entry — field derivation and suppression*), per `references/docs/run-log-schema.md`.
+At **every terminal outcome** — `success`, `already_resolved`, `failed` — append exactly **one JSON line** to `.idd/runs.jsonl`, **unless invoked with `--no-run-log`**, which appends **nothing** and returns telemetry. That is the **single writer** rule under `/auto-pilot`, independent of `--auto`: a standalone `/issue-resolver <N> --auto` still writes. Derivation: `references/run-log-fields.md` (*Run-log entry — field derivation and suppression*), per `references/docs/run-log-schema.md`.
 
 ```bash
 # Exactly one runs. --echo validates the telemetry you return and writes nothing.
@@ -385,7 +388,7 @@ if [ -n "$no_run_log" ]; then printf '%s' "$run_json" | python3 references/scrip
 
 ## Closing Summary
 
-Emit **one** closing block at **every** terminal outcome, stops included. Read the *Review contract* in `references/report-templates.md` (*Closing Summary*), then print its matching variant: `Result:` first (`DONE`, `PARTIAL` or `BLOCKED`), then `Evidence:`, `Uncertainty:`, `Decision:` and `Next action:`. **Then the run-stats footer** (`references/run-stats.md`) prints last, with tokens only where the host reported a count. Then clear the progress record (*Progress record*), at every outcome.
+Emit **one** closing block at **every** terminal outcome, stops included. Read the *Review contract* in `references/closing-summary.md`, then print its matching variant: `Result:` first (`DONE`, `PARTIAL` or `BLOCKED`), then `Evidence:`, `Uncertainty:`, `Decision:` and `Next action:`. **Then the run-stats footer** (`references/run-stats.md`) prints last, with tokens only where the host reported a count. Then clear the progress record (*Progress record*), at every outcome.
 
 ---
 

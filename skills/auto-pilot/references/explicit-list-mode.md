@@ -91,7 +91,7 @@ After validation, the auto-pilot analyzes all issues to find the smartest resolu
   ⟶ Spawning analyzer subagent...
 ```
 
-Spawn the **Analyzer Subagent** (see `references/subagent-prompts.md`) with the full list of validated issue numbers. The analyzer:
+Spawn the **Analyzer Subagent** (`references/prompts/analyzer.md`, per `references/spawning.md`) with the full list of validated issue numbers. The analyzer:
 
 1. **Runs `/issue-analysis` on each issue** — identifies affected files, root causes, complexity, and implementation approach
 2. **Builds a dependency graph** — issue A's fix may conflict with or depend on issue B's fix (e.g., both touch `auth.js`)
@@ -283,7 +283,7 @@ When advancing to the next item in `optimized_order`:
 3. **If yes**: collect all co-batch issue numbers and **run the quarantine gate
    above over that whole set before spawning anything** — every quarantined
    number is dropped from `batch_map` and is never sent to the resolver. Then use
-   the **Batch Resolver Subagent** (see `references/subagent-prompts.md`) on what
+   the **Batch Resolver Subagent** (`references/prompts/batch-resolver.md`) on what
    is left, or step 4's single-issue Resolver if the drops left only one. Do NOT
    pre-mark issues as processed — wait for the resolver result (see "Processing
    batch resolver results" below) to determine which issues were actually
@@ -314,8 +314,8 @@ The batch resolver creates a single branch and PR that addresses all issues in t
 
 #### Run-log fan-out for the batch (one line per attempted issue)
 
-The Batch Resolver runs with `--no-run-log` (see *Batch Resolver Subagent* in
-`references/subagent-prompts.md`), so auto-pilot is the single writer here too.
+The Batch Resolver runs with `--no-run-log` (see
+`references/prompts/batch-resolver.md`), so auto-pilot is the single writer here too.
 A batch resolves N issues in one PR, but the contract is **one line per processed
 (attempted) issue**, not per PR or per batch — so auto-pilot fans the one returned
 result out. The **attempted set** is the issue numbers sent into the Batch Resolver

@@ -116,11 +116,11 @@ for f in "$SRC_VERIFICATION" "$BUILT_VERIFICATION"; do
 done
 # /auto-pilot states that it merges, and only in a mode that merges a clean PR.
 for d in src/skills skills; do
-  f="$REPO_ROOT/$d/auto-pilot/references/subagent-prompts.md"
+  f="$REPO_ROOT/$d/auto-pilot/references/prompts/reviewer.md"
   expect_grep "T2 ($d): the auto-pilot reviewer spawn carries the caller_merges line" \
     '^   caller_merges: \{caller_merges\} — Phase 5 merges this PR when clean \(check 4 reads it\)\.$' "$f"
   expect_grep "T2 ($d): caller_merges is yes only in a mode that merges, never conservative" \
-    '^\| `\{caller_merges\}` \| `yes` only when the effective mode merges a clean PR \(\*Merge Modes\*: any mode but `conservative`\) and Preflight confirmed merge permission; else `no` \|$' "$f"
+    '^\| `\{caller_merges\}` \| `yes` only when the effective mode merges a clean PR \(\*Merge Modes\*: any mode but `conservative`\) and Preflight confirmed merge permission; else `no` \|$' "$REPO_ROOT/$d/auto-pilot/references/spawning.md"
   expect_grep "T2 ($d): Step 3.1 substitutes caller_merges" \
     'substituting `\{pr_number\}`, `\{run_id\}`, `\{caller_merges\}`' "$REPO_ROOT/$d/auto-pilot/references/phases/phase-3-4-review.md"
 done

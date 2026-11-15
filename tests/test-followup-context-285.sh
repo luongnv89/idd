@@ -16,7 +16,7 @@ lacks(){ if has "$1" "$2"; then fail "$3"; echo "      forbidden: $2"; else pass
 . "$(cd "$(dirname "$0")" && pwd)/lib/spec.bash"  # spec_concat — split reference specs read as one file (#323)
 PH="$(spec_concat "$ROOT/src/skills/auto-pilot/references/phases.md")"
 EX="$ROOT/src/skills/auto-pilot/references/explicit-list-mode.md"
-PR="$ROOT/src/skills/auto-pilot/references/subagent-prompts.md"
+PR="$(spec_concat "$ROOT/src/skills/auto-pilot/references/spawning.md")"
 AP="$ROOT/src/skills/auto-pilot/SKILL.source.md"
 RS="$(spec_concat "$ROOT/src/skills/issue-resolver/references/pipeline-steps.md")"
 SK="$ROOT/src/skills/issue-resolver/SKILL.source.md"
@@ -27,7 +27,7 @@ BRS="$(spec_concat "$ROOT/skills/issue-resolver/references/pipeline-steps.md")"
 BSK="$ROOT/skills/issue-resolver/SKILL.md"
 BEX="$ROOT/skills/auto-pilot/references/explicit-list-mode.md"
 BIA="$ROOT/skills/issue-analysis/SKILL.md"
-BPR="$ROOT/skills/auto-pilot/references/subagent-prompts.md"
+BPR="$(spec_concat "$ROOT/skills/auto-pilot/references/spawning.md")"
 BRV="$ROOT/skills/issue-pr-review/SKILL.md"
 RVM="$ROOT/src/skills/issue-pr-review/references/review-loop-mechanics.md"
 BRVM="$ROOT/skills/issue-pr-review/references/review-loop-mechanics.md"
@@ -86,7 +86,7 @@ anchor_check "$IA" ia-caller-payload-gate '[Nn]ever combine retained' "analysis 
 anchor_check "$IA" ia-caller-payload-gate 'already-resolved and cross-reference' "analysis safety phases still run in full"
 anchor_check "$PR" ap-analyzer-spawn 'persisted analysis timestamp must come from' "analyzer prompt carries the coherent snapshot rule"
 anchor_check "$BIA" ia-caller-payload-gate 'coherent|match exactly' "generated copy carries coherent analysis snapshot rule: skills/issue-analysis/SKILL.md"
-anchor_check "$BPR" ap-analyzer-spawn 'coherent|persisted analysis timestamp' "generated copy carries coherent analysis snapshot rule: skills/auto-pilot/references/subagent-prompts.md"
+anchor_check "$BPR" ap-analyzer-spawn 'coherent|persisted analysis timestamp' "generated copy carries coherent analysis snapshot rule: skills/auto-pilot/references/prompts/analyzer.md"
 python3 - <<'PY' && pass "explicit-list analyzer rejects stale body and persists one refreshed snapshot" || fail "analysis combined stale body with fresh metadata"
 from datetime import datetime
 
