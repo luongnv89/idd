@@ -155,7 +155,8 @@ Nothing is done on an agent's say-so. Three things are verified: the **intention
   joins each merged run to reverts, reopened issues and follow-up bugs and reports the counts
   per release (`tests/test-idd-lint-stats-project.sh`, behavioural). The trace is reported,
   not linked into the run record, except that a `/issue-pr-review --revert` row names the
-  reverted PR and its revert PR (#571); no skill runs the look-back (#573).
+  reverted PR and its revert PR (#571). `/auto-pilot --stats` (`gi-stats.py`) now reports
+  outcomes and the look-back from an installed skill, pinned by `tests/test-stats-573.sh`.
 
 ## Pillar 3 — Simplicity
 
@@ -268,8 +269,9 @@ These keep the pillars standing. The same rules apply.
   `tests/test-progress-records-542.sh`.
 - [ ] **SP3 — Observability.** A maintainer can tell whether the automation is getting
   better or worse. Partial: the resolver and auto-pilot write a local run log;
-  `/idd-doctor` and `idd-lint stats` are not shipped in any installed skill and there is no
-  trend view.
+  `/auto-pilot --stats` (`gi-stats.py`) now reports outcomes and the look-back from an
+  installed skill, pinned by `tests/test-stats-573.sh`; `/idd-doctor` is not shipped and
+  there is no trend view.
 - [ ] **SP4 — Enforcement over prose.** A rule that matters is a behavioural test, a lint
   check or a build abort. Partial: the build validators and shared scripts are tested this
   way; many skill rules are guarded by prose pins only.
@@ -298,3 +300,6 @@ Record every approved change to a value here: date, item, what changed, who aske
 | 2026-11-12 | auto-pilot | Growth-cap exemption against v0.27.0: the bundle is 10,096 bytes (+2.30%) above its size at that tag (437,809 → 447,905). The growth accumulated on main between v0.27.0 and the cap's introduction in #558, and its last part came from #588 merging on 2026-11-12 before the cap landed; approved on 2026-11-12 to let the cap land | maintainer |
 | 2026-11-14 | SI9 | Re-graded after #564; still unchecked. The `Partial:` note now records that the merge method is configurable and a repo PR template is kept, and that Conventional Commit titles, the rebase binding and the hand-merge message source remain | maintainer |
 | 2026-11-15 | TR5 | Accepted exception: the auto-pilot open-PR cap (`autopilot.max_open_prs`, #570) counts open IDD PRs and decides its stop in prose rather than in a script; the cap is opt-in and off by default | maintainer |
+| 2026-11-15 | auto-pilot | Growth-cap exemption against v0.27.0 raised: the bundle is 13,456 bytes (+3.07%) above its size at that tag (437,809 → 451,265). Covers the open-PR cap (#570) and the read-only `/auto-pilot --stats` path (#573); approved on 2026-11-15 | maintainer |
+| 2026-11-15 | issue-pr-review | Growth-cap exemption against v0.27.0 raised: the bundle is 17,169 bytes (+5.59%) above its size at that tag (307,009 → 324,178). Covers the revert path (#571) and the risk tier (#569); approved on 2026-11-15 | maintainer |
+| 2026-11-15 | TE10, SI8 | Accepted exception: gi-stats.py mirrors idd-lint.py's stats definitions byte for byte (pinned by tests/test-stats-573.sh T3) so idd-lint.py stays a single downloadable file, and `--stats` adds a script and a flag without replacing prose (#573) | maintainer |

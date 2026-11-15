@@ -46,8 +46,9 @@ When in doubt, skip rather than stop: a skipped issue can be retried.
 | `/auto-pilot --resume` | Resume the run in `.idd/run-state.json` at its recorded phase, and the in-flight resolver or reviewer from that skill's progress record |
 | `/auto-pilot --fresh` | Ignore recorded run state (the default when none exists) |
 | `/auto-pilot --force-unlock` | Reclaim a lock whose run is dead, then start |
+| `/auto-pilot --stats` | Report run outcomes and post-merge rates from the local run log; read-only |
 
-**Combining flags:** `--issues` combines with `--dry-run` and `--skip`, not with `--limit` (the list is the limit). `--resume` cannot combine with `--dry-run` (a dry run mutates nothing) or with `--fresh`. The resume entry gate, the run lock, and the checkpoints live in `references/phases/phase-0-lock-resume.md` (*Step 1.0*) and `references/preflight.md` (*Run lock*).
+**Combining flags:** `--stats` takes no other flag and runs only `references/stats.md`, opened before *Prerequisites*; nothing else here applies. `--issues` combines with `--dry-run` and `--skip`, not with `--limit` (the list is the limit). `--resume` cannot combine with `--dry-run` (a dry run mutates nothing) or with `--fresh`. The resume entry gate, the run lock, and the checkpoints live in `references/phases/phase-0-lock-resume.md` (*Step 1.0*) and `references/preflight.md` (*Run lock*).
 
 ## Context re-entry <!-- a:ctx-reentry -->
 
@@ -117,6 +118,7 @@ Verify these files exist relative to this SKILL.md's dirname. A missing one is a
 - `references/error-messages.md`
 - `references/self-improve.md`
 - `references/examples.md`
+- `references/stats.md`
 - `references/docs/idd-methodology.md`
 - `references/docs/sync-conventions.md`
 - `references/docs/config-schema.md`
@@ -143,6 +145,7 @@ Verify these files exist relative to this SKILL.md's dirname. A missing one is a
 - `references/scripts/gi-postmerge.py` — post-merge cleanup: worktrees, branch, switch to the updated default branch
 - `references/scripts/gi-progress.py` — list and clear the resolver's and reviewer's progress records
 - `references/scripts/gi-ratelimit.py` — rate-limit verdict, chunked pause, transient-failure backoff, and the run's wall-clock budget
+- `references/scripts/gi-stats.py` — the read-only `--stats` report
 
 ### Run lock and branch sync
 
