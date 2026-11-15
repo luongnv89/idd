@@ -81,9 +81,15 @@ for p in $PROMPTS; do
   missing=""
   # Inputs only: placeholders after "report back" are output shapes ({reason}).
   for v in $(fenced "$f" | awk '/^When done, report back/{exit} 1' | grep -oE '\{[a-z_]+\}' | sort -u); do
-    grep -qF -- "\`$v\`" "$SP" || missing="$missing $v"
+    row="$(grep -F "| \`references/prompts/$p.md\` |" "$SP" || true)"
+    n="${v#\{}"; n="${n%\}}"
+    # A binding row in Template Variables, and the spawn's own Variables cell,
+    # so a by-path spawn never leaves one unbound (e.g. {review_cycles}).
+    # {payload_nonce} travels inside the framed blocks' boundary lines instead.
+    { grep -qF -- "\`$v\`" "$SP" && { [ "$n" = payload_nonce ] || grep -qF -- "\`$n\`" <<<"$row"; }; } \
+      || missing="$missing $v"
   done
-  [ -z "$missing" ] && pass "T3 ($p): every {variable} has a binding row" \
+  [ -z "$missing" ] && pass "T3 ($p): every {variable} has a binding row and is listed on its spawn row" \
     || fail "T3 ($p): no binding row for:$missing"
 done
 

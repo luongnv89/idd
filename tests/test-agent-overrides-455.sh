@@ -146,7 +146,7 @@ role_of() { grep -F "| \`references/prompts/$1.md\` |" "$AP" | grep -oE '`autopi
 [ "$(role_of analyzer)" = '`autopilot-analyzer`' ] \
   && pass "T3l analyzer keyed to autopilot-analyzer" || fail "T3l analyzer role: $(role_of analyzer)"
 n_files="$(ls "$OUT/auto-pilot/references/prompts/"*.md 2>/dev/null | wc -l | tr -d ' ')"
-n_rows="$(grep -cE '^\| [A-Za-z ]+ \| `references/prompts/[a-z-]+\.md` \|.*`autopilot-[a-z]+`' "$AP" || true)"
+n_rows="$(grep -cE '^\| [^|]+ \| `references/prompts/[a-z-]+\.md` \|.*`autopilot-[a-z]+`' "$AP" || true)"
 [ "$n_files" -gt 0 ] && [ "$n_rows" -eq "$n_files" ] \
   && pass "T3m every spawn prompt file has a role row" || fail "T3m $n_rows role rows for $n_files prompt files"
 

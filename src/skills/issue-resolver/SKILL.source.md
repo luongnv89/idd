@@ -55,7 +55,7 @@ Load config once; never re-read it. Run `python3 shared/scripts/gi-config.py` �
 
 Either path: no `.idd.yml` (`first_run`) prints `○ First run — using default config. Run /init-idd to customize.`
 
-**Capture the run clock here:** chain that same `python3` invocation as `python3 …; ec=$?; date +%s >&2; exit "$ec"`; the stderr epoch is `run_started_epoch`, the *Run Stats Footer*'s `elapsed` anchor. Take `date +%s` again as each `[N/5]` step starts and at the terminal outcome: those boundaries are the run log's `phases` (`references/report-templates.md`).
+**Capture the run clock here:** chain that same `python3` invocation as `python3 …; ec=$?; date +%s >&2; exit "$ec"`; the stderr epoch is `run_started_epoch`, the *Run Stats Footer*'s `elapsed` anchor. Take `date +%s` again as each `[N/5]` step starts and at the terminal outcome: those boundaries are the run log's `phases` (`references/run-log-fields.md`).
 
 **Context threshold.** <!-- a:ctx-check --> Only when `compaction.enabled` is true (`docs/context-threshold.md`). At each `[N/5]` step start, beside that clock read, compare the remaining-context figure the host placed in your context (none: skip silently, never estimate) with `compaction.threshold.issue-resolver`. At or below it, interactive prints the `⚠` line and a `/compact <focus>` line (skill, `#N`, step id and name only) and pauses **at most once per run**; `--auto` / `IDD_AUTO_MODE=1` prints one `⚠` line per run and continues — never a pause or stop.
 

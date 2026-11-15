@@ -11,10 +11,10 @@
           "references/step-reports.md",
           "references/summary-format.md"
         ],
-        "measured": 46330
+        "measured": 46640
       },
       "budget": 448872,
-      "measured": 447848,
+      "measured": 448287,
       "skill_md": {
         "budget": 26986,
         "measured": 26725
@@ -98,10 +98,10 @@
         "measured": 10172
       },
       "budget": 435601,
-      "measured": 434767,
+      "measured": 434765,
       "skill_md": {
         "budget": 33856,
-        "measured": 33245
+        "measured": 33243
       }
     },
     "issue-triage": {
