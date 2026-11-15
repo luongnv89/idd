@@ -59,7 +59,7 @@ REST, not `--json`: whether a merge made by hand carries the PR body (`PR_BODY`)
 | CI log · sync head | `gh run list` · `gh run view {run_id} --log-failed` · `gh pr update-branch {N}` |
 | Read PR body (before edit) | `gh pr view {N} --json body` |
 | Update PR body | `gh pr edit {N} --body "{body}"` — read-modify-write only: fetch the body, apply the minimal change (e.g. prepend `Closes #N`), write back, verify per rule 2 |
-| Merge identity (live base ancestry) | `gh api repos/{owner}/{repo}/compare/{base_ref}...{verified_head} --jq .behind_by` — merge only on `0` and an unchanged `headRefOid` |
+| Merge identity (live base ancestry) | `gh api repos/{owner}/{repo}/compare/{base_ref}...{verified_head} --jq .behind_by` — merge on `0`, same `headRefOid`, floor base tip |
 | Merge + clean up | `gh pr merge {N} --{merge_method} --delete-branch --match-head-commit {verified_head} --body-file {f}` — `{merge_method}` is `review.merge_method`; `{f}` is a file holding the PR body (`--json body`), never a shell word, so the commit carries it under any repo setting. `rebase`: no `--body-file`, tracker-only (#564) |
 | Find PR for an issue | `gh search prs "is:open" "Closes #{N}" --json number,state,url --limit 5` |
 

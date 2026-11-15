@@ -297,7 +297,7 @@ merge identity check, then merge with the expected-head guard (issue #516):
 verified_head="{ci_sha}"   # Step 5's ci_sha; with none, the headRefOid the final review cycle read
 read -r head_now base_ref <<<"$(gh pr view {N} --json headRefOid,baseRefName --jq '"\(.headRefOid) \(.baseRefName)"')"
 read -r behind_by base_tip <<<"$(gh api "repos/{owner}/{repo}/compare/${base_ref}...${verified_head}" --jq '"\(.behind_by) \(.base_commit.sha)"')"
-[ "$base_tip" = "{floor_base}" ] || verified_head=""
+[ "{floor_base}" = "$base_tip" ] || verified_head=""
 body_file="$(mktemp)"; gh pr view {N} --json body --jq .body >"$body_file" || verified_head=""
 trap 'rm -f "$body_file"' EXIT
 if [ -n "$verified_head" ] && [ "$head_now" = "$verified_head" ] && [ "$behind_by" = "0" ]; then
