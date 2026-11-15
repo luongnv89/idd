@@ -53,10 +53,6 @@ outcome. Later runs skip the issue as an ordinary label skip.
 A merged PR with no counts this session (merged before a resume) prints
 `· AC n/a` and counts as `partial`.
 
-The `Result:` row is the first row under the header so the outcome is findable
-without scrolling past the iteration rows. Its value set is unchanged — the five
-values below; `complete | partial` and the main finding follow it after `—`.
-
 The `Report:` line is the path the summary was **persisted** to, printed after
 the write succeeds and omitted when it did not (or under `--dry-run`, which
 writes nothing).
@@ -65,37 +61,10 @@ writes nothing).
 explicit list is done. `PAUSED` — the loop stopped for a decision it may not make
 alone (a critical issue with unresolved review problems, `pause_on_failure`).
 `LIMIT REACHED` — `autopilot.max_iterations` or the `autopilot.max_open_prs` cap
-was reached (`Next action:` names the open PRs to review first). **`BUDGET REACHED`** — the
-wall-clock budget `autopilot.max_runtime_minutes` expired
-(`references/phases/phase-0-lock-resume.md` → *Runtime budget check*); the run stopped cleanly at an
-iteration boundary with nothing in flight, so `Next action:` is the ordinary
-`/auto-pilot to continue`. **`RATE LIMITED`** — the `✗ Insufficient API rate
-budget` stop fired: the API budget ran out and waiting for `reset` would not fit
-the runtime budget, or `reset` is unknown (`references/preflight.md` →
-*Rate-limit pause*, the `stop` row). Here `Next action:` is never the ordinary
-`/auto-pilot to continue` — that would walk straight back into the same stop —
-and it takes **one form per trigger**, because `resume_at` is `null` in exactly
-one of the two: an unknown `reset` leaves the verdict's `wait_s` at `0`, and
-`gi-ratelimit.py` derives `resume_at` from `wait_s`, so there is no instant to
-name.
-
-| Which trigger fired | `Next action:` |
-|---------------------|----------------|
-| the reset does not fit the runtime budget (`resume_at` is an instant) | `re-run /auto-pilot after {resume_at}` |
-| `reset` is unknown (`resume_at` is `null`) | `re-run /auto-pilot once the API budget resets` |
-
-Never substitute a null `resume_at` into the first form — `after null` names no
-instant anyone could wait for. The `✗ Insufficient API rate budget` block in
-`references/error-messages.md` splits on the same value for the same reason.
-
-`RATE LIMITED` covers **both** call sites of that block, which is why it is its
-own value rather than a reading of one of the other four. Mid-run the stop lands
-between units of work and the counts are whatever completed. At **Prerequisite
-8** nothing ever started, so the report is a `0/{max}` summary with every count
-at zero and no iteration rows — and `COMPLETED` (nothing was done), `PAUSED` (no
-decision is waiting), `LIMIT REACHED` (no iteration ran) and `BUDGET REACHED`
-(the wall clock had time left; it was the API budget that did not) are each false
-of it.
+was reached (`Next action:` names the open PRs to review first).
+**`BUDGET REACHED`** and **`RATE LIMITED`** — the runtime budget or the API rate
+budget stopped the run; their `Next action:` and report rules are in
+`references/summary-variants.md` (*Budget and rate-limit stops*).
 
 ## Review contract
 
@@ -145,82 +114,28 @@ to qualify.
    dependency to merge for a `blocked_by_dependency` PR. Never add an approval
    gate the loop does not already have.
 
-### Format rule
-
-Default: the static terminal summary above, one row per iteration, no
-animation; `.idd/runs.jsonl` is the machine-readable form and
-`.idd/last-run-report.md` the persisted copy. Another requested format renders
-the same summary and keeps the `Result`, `Evidence`, `Uncertainty` and
-`Decision` rows; if the host cannot render it, say so and print the terminal one.
-
-### Evaluate report understanding
-
-Grade actual summaries against these criteria as well as merge-gate correctness:
-
-| Criterion | Observable check |
-|---|---|
-| Result is findable | The first row states the status, `complete`/`partial`, and the main finding without reading the iteration rows or logs. |
-| Facts and assumptions are separate | Observed checks (merge, CI verdict, follow-up filed, persisted report) are distinct from degraded or reused verdicts listed under `Uncertainty`. |
-| Claims are traceable | Each `merged` row names its PR and its AC pass/fail/unverified counts; each `left_open`/`blocked_by_dependency` row names its blocker; `partial` names what made it partial. |
-| Next decision is clear | The summary says `No approval needed.` or names the one pending critical decision, and lists remaining user actions on `Next action:`. |
-
-When running behavioral evaluations, include a clean run, a run with a
-`left_open` PR, a critical-issue pause and a rate-limited stop, and grade each
-summary against all four rows. Ask human reviewers the matching four questions
-and record their answers in the eval case's `human_review` block. Missing, blank,
-or nonresponsive feedback leaves human understanding unconfirmed; agent
-inspection cannot confirm it.
 
 ## Persisted run report
 
-The summary above is printed to the terminal and written to
-`.idd/last-run-report.md`, so a run that scrolled past — or that nobody was
-watching — leaves a readable artifact. It is machine-local and gitignored, like
-the run state and the lock.
-
-Compose the payload and pipe it in; the markdown carries issue titles, so it
-reaches the script on **stdin**, never on a command line:
+The summary is also written to `.idd/last-run-report.md` (machine-local,
+gitignored), so an unwatched run leaves a readable artifact. The markdown
+carries issue titles, so the payload reaches the script on **stdin**, never on
+a command line:
 
 | Field | Type | Meaning |
 |-------|------|---------|
 | `run_id` | string | the run this report belongs to (defaults to the run state's) |
 | `markdown` | string | the rendered summary — the same text just printed |
-| `generated_at` | string | optional UTC instant, exactly `YYYY-MM-DDTHH:MM:SSZ`; defaults to now. Pattern-checked like `run_id`, because both are interpolated into the marker below and a value carrying `-->` would end it early |
+| `generated_at` | string | optional UTC instant, exactly `YYYY-MM-DDTHH:MM:SSZ`; defaults to now |
 
-Both header values are pattern-checked on **every** path that can produce one —
-the value submitted here, and the `run_id` the script falls back to reading out
-of `.idd/run-state.json`. A state file is machine-local but it is still
-input: a recorded `run_id` that does not conform is dropped from the marker
-rather than passed through, so the marker cannot be broken by editing the state
-file.
-
-The file it writes opens with a `<!-- idd:run-report v1 {…} -->` marker
-carrying `run_id` and `generated_at`, so a later reader can tell which run it
-describes. Each run overwrites it — there is one *last* run report, not a
-history; `.idd/runs.jsonl` is where cross-run history lives.
+The file opens with a `<!-- idd:run-report v1 {…} -->` marker carrying
+`run_id` and `generated_at`; the script pattern-checks both on every path
+(a `run_id` read back from `.idd/run-state.json` included) and drops a
+malformed one, since a value carrying `-->` would end the marker early. Each
+run overwrites the file; `.idd/runs.jsonl` holds cross-run history.
 
 Exit 0 prints the path. Exit 3 is a stop — the payload is invalid (an empty
 `markdown`, an unknown key); fix the payload rather than writing the file by
 hand. No `python3`, exit 2, or exit 4: print `⚠ gi-state unavailable` and write
 the same markdown to `.idd/last-run-report.md` with the **Write** tool
 instead. Either way the run is over, so neither path changes an outcome.
-
-**A run that ends early still leaves a complete report.** A run that *paused*
-for a rate limit and then resumed is not an early end at all — the pause happens
-inside the run, the lock is held across it, and the summary describes the whole
-run including the iterations that came after the pause; nothing about the report
-records that a pause occurred. A run stopped by the **runtime budget** does end
-early, and the report is written on that path exactly as on every other: the
-budget check stops before starting new work, so the summary is composed from
-completed iterations only and persisted before the lock is released. A run
-stopped by the rate-limit **`stop` verdict** ends early too and reports
-`RATE LIMITED`; at Prerequisite 8 that report has no completed iterations to
-describe and is written before any lock exists to release, which is still a
-complete report of what the run did — nothing. There is no partial-report path —
-a report that exists is always a report of finished iterations.
-
-If batch analysis was used (explicit issue list), use the same layout with two
-deltas: suffix the header with `(batch mode)` and add an
-`Analysis: ✓ pass ({N} issues, {batches} batch groups)` line directly under the
-header. Everything else — the per-iteration rows, the count block, and the
-footer — is identical.

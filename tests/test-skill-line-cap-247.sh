@@ -91,9 +91,9 @@ check_pointer() {
 }
 
 check_pointer "run-log field derivation + suppression rule" \
-  'references/report-templates\.md.*Run-log entry' \
-  "report-templates.md" \
-  '^## Run-log entry — field derivation and suppression'
+  'references/run-log-fields\.md.*Run-log entry' \
+  "run-log-fields.md" \
+  '^# Run-log entry — field derivation and suppression'
 
 check_pointer "missing-bundled-dependency error block" \
   'Missing bundled dependency.*references/error-messages\.md' \
@@ -111,8 +111,8 @@ check_pointer "security-label skip warning" \
   '^### Security-labeled issue \(skip\)'
 
 check_pointer "expected inline pipeline output" \
-  'references/report-templates\.md.*Expected Inline Pipeline Output' \
-  "report-templates.md" \
+  'references/report-examples\.md.*Expected Inline Pipeline Output' \
+  "report-examples.md" \
   '^## Expected Inline Pipeline Output'
 
 check_pointer "propose-relevant-skills procedure" \

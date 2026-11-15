@@ -80,8 +80,10 @@ When something fails, the auto-pilot skips and continues rather than stopping. A
 | `../references/preflight.md` | Environment and rate-budget preflight checks |
 | `../references/configuration.md` | Auto-pilot config options and merge-mode matrix |
 | `../references/explicit-list-mode.md` | Explicit `--issues` list mode: validation, analysis, batching |
-| `../references/subagent-prompts.md` | Exact prompts for resolver, reviewer, analyzer, and batch-resolver subagents |
+| `../references/spawning.md` | Spawn form (by path on Claude Code) and the bindings each spawn fills |
+| `../references/prompts/*.md` | One prompt per spawn: resolver, reviewer, analyzer, batch resolver |
 | `../references/summary-format.md` | Final summary template and the six iteration outcomes |
+| `../references/summary-variants.md` | Budget and rate-limit stops, batch mode, other formats |
 | `../references/step-reports.md` | Phase completion report rules and the per-phase check table |
 | `../references/run-log.md` | `.idd/runs.jsonl` run-log schema, single-writer rules, and the `agent_overrides` outcome field |
 | `../references/examples.md` | Full example sessions and edge-case scenarios |

@@ -133,18 +133,22 @@ else
   pass "T3o ui-review.md adds no doc→doc bundling edge"
 fi
 
-AP="$OUT/auto-pilot/references/subagent-prompts.md"
-has "T3i auto-pilot prompts cite the rule" "$AP" 'references/docs/agent-overrides.md'
-count() { grep -cF -- "$1" "$AP" || true; }
-[ "$(count '- `model` / effort: role `autopilot-resolver`')" -eq 2 ] \
+# #611: the role of each spawn lives in one table in spawning.md, one row per
+# prompt file, instead of a parameter block repeated in every prompt.
+AP="$OUT/auto-pilot/references/spawning.md"
+has "T3i auto-pilot spawns cite the rule" "$AP" 'references/docs/agent-overrides.md'
+role_of() { grep -F "| \`references/prompts/$1.md\` |" "$AP" | grep -oE '`autopilot-[a-z]+`' | head -1; }
+[ "$(role_of resolver)" = '`autopilot-resolver`' ] && [ "$(role_of batch-resolver)" = '`autopilot-resolver`' ] \
   && pass "T3j resolver + batch resolver keyed to autopilot-resolver" \
-  || fail "T3j expected 2 autopilot-resolver blocks, got $(count '- `model` / effort: role `autopilot-resolver`')"
-[ "$(count '- `model` / effort: role `autopilot-reviewer`')" -eq 1 ] \
-  && pass "T3k reviewer keyed to autopilot-reviewer" || fail "T3k autopilot-reviewer block count"
-[ "$(count '- `model` / effort: role `autopilot-analyzer`')" -eq 1 ] \
-  && pass "T3l analyzer keyed to autopilot-analyzer" || fail "T3l autopilot-analyzer block count"
-[ "$(count '- `model` / effort: role')" -eq "$(count '- `subagent_type`: omit')" ] \
-  && pass "T3m every spawn block carries a role line" || fail "T3m a spawn block has no role line"
+  || fail "T3j resolver/batch resolver roles: $(role_of resolver) / $(role_of batch-resolver)"
+[ "$(role_of reviewer)" = '`autopilot-reviewer`' ] \
+  && pass "T3k reviewer keyed to autopilot-reviewer" || fail "T3k reviewer role: $(role_of reviewer)"
+[ "$(role_of analyzer)" = '`autopilot-analyzer`' ] \
+  && pass "T3l analyzer keyed to autopilot-analyzer" || fail "T3l analyzer role: $(role_of analyzer)"
+n_files="$(ls "$OUT/auto-pilot/references/prompts/"*.md 2>/dev/null | wc -l | tr -d ' ')"
+n_rows="$(grep -cE '^\| [A-Za-z ]+ \| `references/prompts/[a-z-]+\.md` \|.*`autopilot-[a-z]+`' "$AP" || true)"
+[ "$n_files" -gt 0 ] && [ "$n_rows" -eq "$n_files" ] \
+  && pass "T3m every spawn prompt file has a role row" || fail "T3m $n_rows role rows for $n_files prompt files"
 
 # ─── T4: nothing configured → the same call as before ───────────────────────
 mkdir -p "$TMP/repo"
@@ -203,8 +207,10 @@ RLM="$OUT/issue-pr-review/references/review-loop-mechanics.md"
   && pass "T5d loop mechanics: both reviewer comments" || fail "T5d reviewer prohibition comments changed"
 has "T5e loop mechanics: fixer comment" "$RLM" '# do NOT set subagent_type — default general-purpose agent, not a custom "fixer" type'
 has "T5f auto-pilot CRITICAL paragraph" "$AP" '**CRITICAL — never set `subagent_type`:** Every subagent below is spawned with the **default general-purpose agent**. Do NOT pass a `subagent_type` parameter to the Agent tool.'
-[ "$(count '- `subagent_type`: omit (use the default general-purpose agent')" -eq 4 ] \
-  && pass "T5g auto-pilot: four omit lines" || fail "T5g auto-pilot omit lines changed"
+# #611: the four prompt files carry no Agent-tool parameters at all, so none can set one.
+n_prompts="$(ls "$OUT/auto-pilot/references/prompts/"*.md 2>/dev/null | wc -l | tr -d ' ')"
+[ "$n_prompts" -eq 4 ] && ! grep -qF 'subagent_type' "$OUT/auto-pilot/references/prompts/"*.md \
+  && pass "T5g auto-pilot: four prompt files, none sets subagent_type" || fail "T5g auto-pilot prompt files changed"
 has "T5h phase-2 prohibition" "$OUT/auto-pilot/references/phases/phase-2-resolve.md" 'do NOT set `subagent_type`'
 has "T5i conventions prohibition" "$ROOT/docs/shared-agent-conventions.md" '**Do NOT set `subagent_type`** — always use the default general-purpose agent.'
 

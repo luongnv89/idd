@@ -689,9 +689,9 @@ anchor_check_flat "$P0" ap-step10-skill-resume 'null or different .caller_run_id
   "p15-caller-run-id: a null or different stamp stays unbound"
 anchor_check_flat "$P0" ap-step10-skill-resume 'whatever .compaction\.enabled. says' \
   "p15-caller-run-id: the listing does not depend on compaction.enabled"
-PROMPTS="$AP/references/subagent-prompts.md"
-RES_PROMPT="$(anchor_span "$PROMPTS" ap-resolver-spawn ap-reviewer-spawn || true)"
-REV_PROMPT="$(anchor_span "$PROMPTS" ap-reviewer-spawn ap-analyzer-spawn || true)"
+# #611: one prompt file per spawn, so each file is that spawn's whole prompt.
+RES_PROMPT="$(cat "$AP/references/prompts/resolver.md" 2>/dev/null || true)"
+REV_PROMPT="$(cat "$AP/references/prompts/reviewer.md" 2>/dev/null || true)"
 for which in RES_PROMPT REV_PROMPT; do
   block="${!which}"
   printf '%s\n' "$block" | grep -qF 'resume: {resume}' && printf '%s\n' "$block" | grep -qF 'run_id: {run_id}' \

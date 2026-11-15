@@ -45,11 +45,11 @@ done < <(cd "$ROOT" && grep -rniE 'deferred rows? excluded|non-deferred' src doc
            --include='*.md' | grep -v -e '^docs/release-notes/' -e '^docs/decisions/' -e '^docs/experiments/' || true)
 [ -z "$unscoped" ] && pass "T1.1: every deferred-row exclusion is scoped to a \`Refs #N\` PR" \
   || fail "T1.1: unscoped deferred-row exclusion:$unscoped"
-has "$SRC/issue-resolver/references/report-templates.md" 'excluded only on a `Refs #N` PR' "T1.2: the resolver's verification bullet carries the scope"
+has "$SRC/issue-resolver/references/run-log-fields.md" 'excluded only on a `Refs #N` PR' "T1.2: the resolver's verification bullet carries the scope"
 has "$ROOT/docs/run-log-schema.md" 'a deferred row excluded only on a `Refs #N` PR' "T1.3: the run-log schema's verification row carries the scope"
 has "$SRC/issue-pr-review/SKILL.source.md" 'deferred rows excluded only on a `Refs #N` PR' "T1.4: the *Merge floor* carries the scope"
-has "$AP/subagent-prompts.md" '(deferred rows excluded only on a `Refs #N` PR)' "T1.5: the auto-pilot reviewer's criteria counts carry the scope"
-has "$SRC/issue-resolver/references/report-templates.md" '(`gi-runlog.py` exits 3 without it); omit otherwise.' "T1.6: breach_reason says when exit 3 happens, and to omit it otherwise"
+has "$AP/prompts/reviewer.md" '(deferred rows excluded only on a `Refs #N` PR)' "T1.5: the auto-pilot reviewer's criteria counts carry the scope"
+has "$SRC/issue-resolver/references/run-log-fields.md" '(`gi-runlog.py` exits 3 without it); omit otherwise.' "T1.6: breach_reason says when exit 3 happens, and to omit it otherwise"
 
 # T2 — a run resumed at merge re-derives merge_floor; never a bare "unmet".
 has "$AP/phases/phase-0-lock-resume.md" '**A recorded `merge` phase re-enters at review.**' "T2.1: a resumed singleton at merge re-enters at review"

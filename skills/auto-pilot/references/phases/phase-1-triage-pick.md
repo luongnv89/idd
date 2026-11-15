@@ -638,7 +638,7 @@ esac
 Serialize each block as compact JSON and substitute it into complete-line
 `BEGIN_UNTRUSTED_<kind>_{payload_nonce}` /
 `END_UNTRUSTED_<kind>_{payload_nonce}` boundaries from
-`references/subagent-prompts.md`. Operational `Instructions:` follow the final
+`references/spawning.md`. Operational `Instructions:` follow the final
 closing line. If nonce generation fails, omit all payload blocks for that spawn.
 A missing or mismatched boundary makes that payload unusable. Framing prevents
 accidental delimiter collision; it does **not** authenticate or validate the

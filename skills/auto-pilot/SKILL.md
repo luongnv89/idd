@@ -55,7 +55,7 @@ When in doubt, skip rather than stop: a skipped issue can be retried.
 **Only when `compaction.enabled` is true; otherwise skip this section** (`references/docs/context-threshold.md`). After a compaction inside a live run:
 
 - This run still holds the lock: never re-take or re-validate it, and **never run Step 1.0's resume gate**, which classifies a dead run's leftovers.
-- Read `python3 references/scripts/gi-state.py --read` (if it cannot run or the state is unreadable, every recorded step is a doubt under (3) below), then re-read the current phase file, `references/subagent-prompts.md`, `references/summary-format.md` and `references/step-reports.md`.
+- Read `python3 references/scripts/gi-state.py --read` (if it cannot run or the state is unreadable, every recorded step is a doubt under (3) below), then re-read the current phase file, `references/spawning.md` and `references/step-reports.md`.
 - **Never re-spawn a lane or subagent this run spawned that has not returned**: it is in flight, so wait for its notification. Decide in order: (1) this conversation's spawn record or task notification; (2) else the pre-spawn checkpoint (`current.phase` `resolve` or `review` for that issue) plus a live `gh … --json` read for its open PR or branch, or new PR activity since that checkpoint; (3) any doubt counts as in flight — wait, never re-spawn.
 - Resume at the last checkpointed phase. Re-review a PR, re-post a comment, re-create a follow-up issue, push, create a PR or merge only after a live `gh … --json` read shows the recorded step did not happen.
 
@@ -106,12 +106,17 @@ Verify these files exist relative to this SKILL.md's dirname. A missing one is a
 - `references/phases/phase-2-resolve.md`
 - `references/phases/phase-3-4-review.md`
 - `references/phases/phase-5-merge.md`
-- `references/subagent-prompts.md`
+- `references/spawning.md`
+- `references/prompts/resolver.md`
+- `references/prompts/reviewer.md`
+- `references/prompts/analyzer.md`
+- `references/prompts/batch-resolver.md`
 - `references/preflight.md`
 - `references/orchestration.md`
 - `references/explicit-list-mode.md`
 - `references/run-log.md`
 - `references/summary-format.md`
+- `references/summary-variants.md`
 - `references/step-reports.md`
 - `references/run-stats.md`
 - `references/configuration.md`
@@ -200,7 +205,7 @@ Gate logic: `references/phases/phase-3-4-review.md` (partial) and `references/ph
 
 ## Context Window Management
 
-The main agent is a **lightweight orchestrator**; subagents with fresh context do the heavy work. **The main agent never reads source files, reads PR diffs, runs tests, or writes code.** Each iteration spawns a resolver then a PR reviewer (`/issue-pr-review --auto --no-merge`, so merging stays the main agent's Phase 5 job); explicit list mode adds a one-time analyzer; `max_parallel > 1` fans out resolver-only lanes in isolated worktrees, then drains them one at a time. Delegated skills size their shared agents per `references/docs/agent-model-effort.md` and `references/docs/shared-agent-conventions.md`. Lanes and ownership: `references/orchestration.md`. Read `references/subagent-prompts.md` once at skill start.
+The main agent is a **lightweight orchestrator**; subagents with fresh context do the heavy work. **The main agent never reads source files, reads PR diffs, runs tests, or writes code.** Each iteration spawns a resolver then a PR reviewer (`/issue-pr-review --auto --no-merge`, so merging stays the main agent's Phase 5 job); explicit list mode adds a one-time analyzer; `max_parallel > 1` fans out resolver-only lanes in isolated worktrees, then drains them one at a time. Delegated skills size their shared agents per `references/docs/agent-model-effort.md` and `references/docs/shared-agent-conventions.md`. Lanes and ownership: `references/orchestration.md`. Spawn form and bindings: read `references/spawning.md` now. On Claude Code each subagent reads its own prompt file by path, so no prompt body enters this context.
 
 ## Mode Detection
 
@@ -310,7 +315,7 @@ The loop stops on any row except those marked *loop continues* (outcome recorded
 
 ## Final Summary
 
-When the loop ends, for any reason, print the final summary: one row per iteration tagged with one of the six categorical outcomes — **`merged`**, **`left_open`**, **`partial_followup`**, **`blocked_by_dependency`**, **`failed`**, **`skipped`**. Read `references/summary-format.md` first and follow its **Review contract**: `Result:` first (status, `complete` or `partial`, main finding), then `Evidence` (observed checks only), `Uncertainty`, and `Decision` (`No approval needed.`, or the pending critical-issue decision on `PAUSED`); remaining user actions go on `Next action:`.
+When the loop ends, for any reason, print the final summary: one row per iteration tagged with one of the six categorical outcomes — **`merged`**, **`left_open`**, **`partial_followup`**, **`blocked_by_dependency`**, **`failed`**, **`skipped`**. Read `references/summary-format.md` first and follow its **Review contract**: `Result:` first (status, `complete` or `partial`, main finding), then `Evidence` (observed checks only), `Uncertainty`, and `Decision` (`No approval needed.`, or the pending critical-issue decision on `PAUSED`); remaining user actions go on `Next action:`. On `BUDGET REACHED` or `RATE LIMITED`, in explicit list mode, or for another format, also read `references/summary-variants.md`.
 
 **Persist it:** pipe the payload into `python3 references/scripts/gi-state.py --report` (stdin, never a command line) to write `.idd/last-run-report.md`, then release the lock. A dry run skips both.
 

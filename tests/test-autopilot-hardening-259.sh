@@ -727,6 +727,7 @@ AP_PREFLIGHT="$AP/references/preflight.md"
 AP_ERRORS="$AP/references/error-messages.md"
 AP_CONFIG="$AP/references/configuration.md"
 AP_SUMMARY="$AP/references/summary-format.md"
+AP_SUMMARY_VAR="$AP/references/summary-variants.md"  # #592: budget and rate-limit stops
 AP_EXAMPLES="$AP/references/examples.md"
 AP_EXPLICIT="$AP/references/explicit-list-mode.md"
 AP_RUNLOG="$AP/references/run-log.md"
@@ -735,7 +736,7 @@ AP_SCHEMA="$AP/references/docs/config-schema.md"
 
 missing_built=0
 for f in "$AP_SKILL" "$AP_PHASES" "$AP_PREFLIGHT" "$AP_ERRORS" "$AP_CONFIG" \
-         "$AP_SUMMARY" "$AP_EXAMPLES" "$AP_EXPLICIT" "$AP_RUNLOG" \
+         "$AP_SUMMARY" "$AP_SUMMARY_VAR" "$AP_EXAMPLES" "$AP_EXPLICIT" "$AP_RUNLOG" \
          "$AP_PLATFORM" "$AP_SCHEMA"; do
   [ -f "$f" ] || { missing_built=$((missing_built + 1)); echo "      missing: ${f#$REPO_ROOT/}"; }
 done
@@ -896,7 +897,7 @@ expect_grep "AC1: …including the double-count direction" \
 # Batch detection list must have read the gate before reaching the only line
 # that spawns the resolver.
 gate_ln="$(grep -nF -m1 '**The gate covers a batch'"'"'s co-members' "$AP_EXPLICIT" | cut -d: -f1 || true)"
-spawn_ln="$(grep -nF -m1 'the **Batch Resolver Subagent** (see `references/subagent-prompts.md`)' "$AP_EXPLICIT" | cut -d: -f1 || true)"
+spawn_ln="$(grep -nF -m1 'the **Batch Resolver Subagent** (`references/prompts/batch-resolver.md`)' "$AP_EXPLICIT" | cut -d: -f1 || true)"
 if [ -n "$gate_ln" ] && [ -n "$spawn_ln" ] && [ "$gate_ln" -lt "$spawn_ln" ]; then
   pass "AC1: the co-batch gate is stated before the only Batch Resolver spawn"
 else
@@ -1052,7 +1053,7 @@ expect_grep "AC3: the budget stop persists the final summary with --report" \
 expect_grep "AC3: the stop-condition row names both the persisted report and the lock release" \
   'the final summary is persisted with `--report`, and the lock is released' "$AP_SKILL"
 expect_grep "AC3: summary-format.md ties the budget stop to the persisted report" \
-  'Runtime budget check' "$AP_SUMMARY"
+  'Runtime budget check' "$AP_SUMMARY_VAR"
 expect_grep "AC3: configuration.md explains why the budget is a start gate, not a kill switch" \
   '**start gate, not a kill switch**' "$AP_CONFIG"
 expect_grep "AC3: an unbounded default preserves today's behavior" \
@@ -1368,40 +1369,40 @@ else
   pass "AC3: no stale four-value Result claim survives in the built summary"
 fi
 expect_grep "AC3: RATE LIMITED is the value for the insufficient-rate-budget stop" \
-  '**`RATE LIMITED`** — the `✗ Insufficient API rate' "$AP_SUMMARY"
+  '**`RATE LIMITED`** — the `✗ Insufficient API rate' "$AP_SUMMARY_VAR"
 expect_grep "AC3: RATE LIMITED is stated to cover both call sites of that block" \
-  'covers **both** call sites of that block' "$AP_SUMMARY"
+  'covers **both** call sites of that block' "$AP_SUMMARY_VAR"
 expect_grep "AC3: the preflight variant is described as a zero-iteration report" \
-  '`0/{max}` summary with every count' "$AP_SUMMARY"
+  '`0/{max}` summary with every count' "$AP_SUMMARY_VAR"
 expect_grep "AC3: the other four values are ruled out for the preflight variant" \
-  '`LIMIT REACHED` (no iteration ran) and `BUDGET REACHED`' "$AP_SUMMARY"
+  '`LIMIT REACHED` (no iteration ran) and `BUDGET REACHED`' "$AP_SUMMARY_VAR"
 expect_grep "AC3: BUDGET REACHED is explicitly not the value for a rate-limit stop" \
-  'the wall clock had time left; it was the API budget that did not' "$AP_SUMMARY"
+  'the wall clock had time left; it was the API budget that did not' "$AP_SUMMARY_VAR"
 expect_grep "AC3: Next action for a rate-limit stop names the reset instant" \
-  're-run /auto-pilot after {resume_at}' "$AP_SUMMARY"
+  're-run /auto-pilot after {resume_at}' "$AP_SUMMARY_VAR"
 # …but only for the trigger that has one. The other trigger — an unknown reset —
 # is exactly the verdict T2 pins at `resume_at: null`, so a single Next-action
 # form would render `Next action: re-run /auto-pilot after null`.
 expect_grep "AC3: Next action takes one form per trigger, not one for both" \
-  'takes **one form per trigger**' "$AP_SUMMARY"
+  'takes **one form per trigger**' "$AP_SUMMARY_VAR"
 expect_grep "AC3: it says why the unknown-reset trigger has no instant" \
-  'an unknown `reset` leaves the verdict'"'"'s `wait_s` at `0`' "$AP_SUMMARY"
+  'an unknown `reset` leaves the verdict'"'"'s `wait_s` at `0`' "$AP_SUMMARY_VAR"
 expect_grep "AC3: the null-resume_at row carries an instant-free Next action" \
   '| `reset` is unknown (`resume_at` is `null`) | `re-run /auto-pilot once the API budget resets` |' \
-  "$AP_SUMMARY"
+  "$AP_SUMMARY_VAR"
 expect_grep "AC3: substituting a null resume_at is forbidden outright" \
-  'Never substitute a null `resume_at` into the first form' "$AP_SUMMARY"
+  'Never substitute a null `resume_at` into the first form' "$AP_SUMMARY_VAR"
 expect_grep "AC3: the summary and the error catalog are said to split on one value" \
-  'splits on the same value for the same reason' "$AP_SUMMARY"
+  'splits on the same value for the same reason' "$AP_SUMMARY_VAR"
 # The property: the row for the null trigger holds no {resume_at} placeholder.
-null_row="$(grep -F -m1 '| `reset` is unknown (`resume_at` is `null`) |' "$AP_SUMMARY" || true)"
+null_row="$(grep -F -m1 '| `reset` is unknown (`resume_at` is `null`) |' "$AP_SUMMARY_VAR" || true)"
 if [ -n "$null_row" ] && ! printf '%s' "$null_row" | grep -qF '{resume_at}'; then
   pass "AC3: the unknown-reset Next action substitutes no {resume_at}"
 else
   fail "AC3: the unknown-reset Next action still substitutes a {resume_at}"
 fi
 expect_grep "AC3: the persisted-report paragraph covers the rate-limit stop too" \
-  'stopped by the rate-limit **`stop` verdict** ends early too and reports' "$AP_SUMMARY"
+  'stopped by the rate-limit **`stop` verdict** ends early too and reports' "$AP_SUMMARY_VAR"
 expect_grep "AC3: Stop Conditions carries the rate-limit stop alongside the budget stop" \
   '| API rate budget too low to wait out | `✗ Insufficient GitHub API rate budget for auto-pilot`' \
   "$AP_SKILL"

@@ -30,8 +30,8 @@ support.
 ## Single-writer rule (per processed issue)
 
 **Auto-pilot is the single writer per processed issue.** The resolver subagent
-is invoked with `--no-run-log` (see *Resolver Subagent* in
-`references/subagent-prompts.md`), so it **does not** append its own line — only
+is invoked with `--no-run-log` (see
+`references/prompts/resolver.md`), so it **does not** append its own line — only
 auto-pilot writes here. Writing in both places would double-write one line per
 issue and skew `/idd-doctor`'s resolve-rate and median-QA metrics. The resolver
 **returns** its telemetry (`qa_cycles`, `ceiling`, `breach_reason`, `complexity`,

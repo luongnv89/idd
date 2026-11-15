@@ -506,3 +506,6 @@ jobs:
 
       - name: test-stats-573
         run: bash tests/test-stats-573.sh
+
+      - name: test-spawn-by-path-611
+        run: bash tests/test-spawn-by-path-611.sh
