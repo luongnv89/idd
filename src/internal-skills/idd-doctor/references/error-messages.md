@@ -144,8 +144,15 @@ All errors follow the rich error format: what went wrong + fix command (+ docs l
 ### Pass
 ```
   ✓ [4/4] Merge method           {method} allowed · IDD's merge carries the PR body
+  ✓ [4/4] Merge method           {method} allowed · {field}: PR_BODY
 ```
-**Trigger:** `{method}` is `squash` and `squashMergeAllowed=true`, or `{method}` is `merge` and `mergeCommitAllowed=true`. Other allowed methods do not matter: IDD's merge passes the PR body as the commit body, so no repository setting is needed.
+**Trigger:** `{method}` is `squash` and `squashMergeAllowed=true`, or `{method}` is `merge` and `mergeCommitAllowed=true`, and either `review.auto_merge` is `true` or `{field}` is `PR_BODY`. With `review.auto_merge: true`, print the first form: IDD's merge passes the PR body as the commit body, so other allowed methods do not matter. Otherwise print the second: the pass rests on the repo's message source, so add the *Other-method note*.
+
+### Other-method note (under a pass)
+```
+        ○ a hand merge by {other} will not carry the PR body
+```
+**Trigger:** the second *Pass* form, once for each other allowed method that would drop the body: `{other}` is `rebase` when `rebaseMergeAllowed=true`, or the other commit method and its `({field}: {value})` when that method is allowed and its source is not `PR_BODY` (`unread` included). No `Fix:` line; the note never changes the result.
 
 ### Hand-merge note (under a pass)
 ```

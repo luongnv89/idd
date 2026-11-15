@@ -266,6 +266,8 @@ Verify that the repository allows the merge method IDD is configured to use. IDD
 6. On a pass, look at that method's message source (`squash_merge_commit_message` for `squash`, `merge_commit_message` for `merge`). When it is not `PR_BODY`, or step 4 did not answer, `review.auto_merge` decides:
    - `true` → print the *hand-merge note* under the pass line. The note is `○`, never a warn: IDD's own merge carries the body whatever the setting says.
    - anything else → the check is a WARN, not a pass: print *Warn — hand merge*. The merge is made by hand and will not carry the PR body, so the binding is not reported satisfied on the strategy alone.
+
+   When it is `PR_BODY` and `review.auto_merge` is not `true`, the pass rests on that setting: print *Pass* in its `{field}: PR_BODY` form, plus an *other-method note* for each other allowed method that would drop the body — rebase, or the other commit method if its source is not `PR_BODY`. The note is `○`, never a warn.
 7. On a warn, print `⚠ [4/4]` and the `.idd.yml` fix hint from `references/error-messages.md`. Never print a command that changes a repository setting.
 
 ---

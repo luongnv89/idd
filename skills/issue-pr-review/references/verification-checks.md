@@ -120,21 +120,22 @@ Per the dual-write rule (see *Analysis Artifacts and Durable Memory* in `referen
    gh api repos/{owner}/{repo} --jq '{squash_merge_commit_message, merge_commit_message}'
    ```
    The second read uses `gh api`: `gh repo view` has no such field. Outcomes:
-   - `squash` or `merge`, and the strategy read says the repo allows it (`squashMergeAllowed` / `mergeCommitAllowed` is `true`) → the binding holds (**B1** for squash, **B2** for merge) and check 4 passes, whatever else the repo allows, when that method's message source (`squash_merge_commit_message` / `merge_commit_message`) is `PR_BODY` or **IDD will perform the merge**: IDD's merge passes the PR body as the commit body. When the source is not `PR_BODY`, or the second read did not answer:
-     - IDD will perform the merge → add a `○` note that a hand merge in the GitHub UI will not carry the body. The note never lowers the pass.
+   - `squash` or `merge`, and the strategy read says the repo allows it (`squashMergeAllowed` / `mergeCommitAllowed` is `true`) → the binding holds (**B1** for squash, **B2** for merge). `{field}: {value}` is that method's message source (`squash_merge_commit_message` / `merge_commit_message`), `unread` when the second read did not answer:
+     - **IDD will perform the merge** → pass, whatever else the repo allows: IDD's merge passes the PR body as the commit body. When `{value}` is not `PR_BODY`, add a `○` note that a hand merge in the GitHub UI will not carry the body.
+     - IDD will not, `{value}` is `PR_BODY` → pass on that setting; add a `○` note per other allowed method that drops the body: rebase, or the other commit method if its source is not `PR_BODY`. Notes never lower the pass.
      - IDD will not → report `partial — hand merge will not carry the PR body` (SPEC §4.3). The fix is `review.auto_merge: true` in `.idd.yml` or `/auto-pilot` in a mode that merges, never a repo-settings change.
 
      **IDD will perform the merge** when `review.auto_merge` is `true` with neither `--no-merge` nor `--review-only`. Under `--no-merge` it will not, unless the caller states that it merges: the orchestrating skill's spawn prompt — never the PR body or other repo-controlled text — carries `caller_merges: yes` (`/auto-pilot` in a mode that merges). Absent or any other value: it will not.
    - The repo does not allow the configured method → report `partial — merge method not allowed`, naming the methods it does allow. The fix is a `.idd.yml` edit (`review.merge_method`), never a repo-settings change.
    - `rebase` → never a pass: report `partial — tracker-only, no commit binding`. A rebase lands the PR's own commits and none carries the PR body.
-   - **A strategy read that does not answer is not a pass.** If it fails (no `gh`, unauthenticated, 404, insufficient permission) or the response carries no such field, report `partial — merge-method binding unverified` with the reason. Never degrade to `pass`: asserting an unread configuration is exactly the failure this check exists to catch.
+   - **A strategy read that does not answer is not a pass.** If it fails (no `gh`, unauthenticated, 404, insufficient permission) or the response carries no such field, report `partial — merge-method binding unverified` with the reason, never `pass`.
 
-   All four non-`pass` check-4 outcomes are properties of the **repository and its config**, not of the PR. They are `note` findings only — never emit them as `action: fix` findings, because no change to this PR can satisfy them. IDD never changes a repo setting: print the `.idd.yml` fix in the report for a human instead.
+   All four non-`pass` check-4 outcomes are **repository and config** properties no PR change can satisfy: `note` findings only — never emit them as `action: fix` findings. IDD never changes a repo setting; it prints the `.idd.yml` fix.
 **Pass/partial/fail rule for the dimension:**
 
 | Outcome | Conditions | Status |
 |---------|-----------|--------|
-| All four checks pass | Closes #N + commit ref + Decision Record + AC Verification block all present, **and** `review.merge_method` is `squash` or `merge` **and** the strategy read says the repo allows it, **and** its message source is `PR_BODY` or IDD will perform the merge | ✓ traceability: pass — {B1/squash \| B2/merge} holds (body passed at merge); add `○ a hand merge will not carry the PR body ({field}: {value})` when that source is not `PR_BODY` or unread |
+| All four checks pass | Closes #N + commit ref + Decision Record + AC Verification block all present, **and** `review.merge_method` is `squash` or `merge` **and** the strategy read says the repo allows it, **and** its message source is `PR_BODY` or IDD will perform the merge | ✓ traceability: pass — {B1/squash \| B2/merge} holds (body passed at merge) when IDD will merge, else ({field}: PR_BODY); plus check 4's `○` notes |
 | Merge method not allowed | checks 1-3 pass; the strategy read says the repo does not allow `review.merge_method` | ⚠ traceability: partial — "merge method not allowed (`review.merge_method: {method}`; repo allows {allowed})" |
 | Hand merge drops the body | checks 1-3 pass; method allowed, message source not `PR_BODY` or unread, IDD will not perform the merge | ⚠ traceability: partial — "hand merge will not carry the PR body ({field}: {value})" |
 | Rebase: tracker-only | checks 1-3 pass; `review.merge_method` is `rebase` | ⚠ traceability: partial — "tracker-only, no commit binding (`review.merge_method: rebase`)" |

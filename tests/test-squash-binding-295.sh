@@ -8,8 +8,10 @@
 # pass when the repo allows them and IDD performs the merge; a message source
 # other than PR_BODY is then a hand-merge note. When IDD does not perform the
 # merge, that source is a partial (SPEC §4.3: the message source decides for a
-# merge the tool does not perform). `rebase` is a tracker-only partial, and a
-# method the repo does not allow is a partial whose fix is a `.idd.yml` edit.
+# merge the tool does not perform). When it does not and the source is PR_BODY,
+# each other allowed method that drops the body is a note (#597). `rebase` is a
+# tracker-only partial, and a method the repo does not allow is a partial whose
+# fix is a `.idd.yml` edit.
 # No remedy changes a repository setting.
 #
 # The same file pins the two other #564 criteria: the resolver keeps a repo's
@@ -77,8 +79,11 @@ expect_fixed "T1: src verification-checks reads the hand-merge message source" "
 expect_fixed "T1: the catalog carries the same message-source read" "$MESSAGE_READ" "$CATALOG"
 expect_grep "T1: src judges the repo against review.merge_method, never one fixed method" \
   'Judge the repo against `review\.merge_method`, never against one fixed method' "$SRC_VERIFICATION"
-expect_grep "T1: src pass needs squash or merge, a repo that allows it, and PR_BODY or IDD's own merge" \
-  '`squash` or `merge`, and the strategy read says the repo allows it.*check 4 passes, whatever else the repo allows, when that method.s message source .*is `PR_BODY` or \*\*IDD will perform the merge\*\*' "$SRC_VERIFICATION"
+expect_grep "T1: src binding needs squash or merge and a repo that allows it" \
+  '`squash` or `merge`, and the strategy read says the repo allows it.*→ the binding holds' "$SRC_VERIFICATION"
+# Issue #597: "whatever else the repo allows" holds only for IDD's own merge.
+expect_grep "T1: src passes whatever else the repo allows only when IDD performs the merge" \
+  '^     - \*\*IDD will perform the merge\*\* → pass, whatever else the repo allows: IDD.s merge passes the PR body as the commit body' "$SRC_VERIFICATION"
 expect_grep "T1: src pass row needs PR_BODY or a merge IDD performs" \
   '^\| All four checks pass \|.*its message source is `PR_BODY` or IDD will perform the merge \|' "$SRC_VERIFICATION"
 expect_grep "T1: src pass row names the binding and the body passed at merge" \
@@ -88,9 +93,9 @@ forbid_grep "T1: src pass no longer needs squash-only" \
 
 echo "T2: a message source other than PR_BODY is a note only when IDD performs the merge"
 expect_grep "T2: src adds a ○ note for a hand merge when IDD will perform the merge" \
-  '^     - IDD will perform the merge → add a `○` note that a hand merge in the GitHub UI will not carry the body' "$SRC_VERIFICATION"
-expect_grep "T2: src note never lowers the pass" \
-  'The note never lowers the pass' "$SRC_VERIFICATION"
+  'When `\{value\}` is not `PR_BODY`, add a `○` note that a hand merge in the GitHub UI will not carry the body' "$SRC_VERIFICATION"
+expect_grep "T2: src notes never lower the pass" \
+  'Notes never lower the pass' "$SRC_VERIFICATION"
 # SPEC §4.3: for a merge the tool does not perform, the message source decides.
 for f in "$SRC_VERIFICATION" "$BUILT_VERIFICATION"; do
   tag="${f#"$REPO_ROOT"/}"; tag="${tag%%/*}"
@@ -273,6 +278,45 @@ expect_grep "T9: built templates keep check-4 findings note-only" \
   'All four partial lines are `note` findings' "$BUILT_TEMPLATES"
 expect_grep "T9: built init check ships the hand-merge note" \
   '○ A merge made by hand in the GitHub UI will not carry the PR body' "$BUILT_INIT_CHECK"
+
+echo "T10: a hand merge by another allowed method is noted (issue #597)"
+DOCTOR="$REPO_ROOT/src/internal-skills/idd-doctor/SKILL.source.md"
+DOCTOR_EM="$REPO_ROOT/src/internal-skills/idd-doctor/references/error-messages.md"
+for f in "$SRC_VERIFICATION" "$BUILT_VERIFICATION"; do
+  tag="${f#"$REPO_ROOT"/}"; tag="${tag%%/*}"
+  expect_grep "T10 ($tag): a PR_BODY pass with no IDD merge notes each other method that drops the body" \
+    '^     - IDD will not, `\{value\}` is `PR_BODY` → pass on that setting; add a `○` note per other allowed method that drops the body: rebase, or the other commit method if its source is not `PR_BODY`' "$f"
+  expect_grep "T10 ($tag): the pass row names both evidence forms" \
+    'holds \(body passed at merge\) when IDD will merge, else \(\{field\}: PR_BODY\)' "$f"
+done
+for f in "$SRC_TEMPLATES" "$BUILT_TEMPLATES"; do
+  tag="${f#"$REPO_ROOT"/}"; tag="${tag%%/*}"
+  expect_grep "T10 ($tag): templates name the pass evidence" \
+    'its evidence: `body passed at merge` when IDD will merge, else `\{field\}: PR_BODY`' "$f"
+  expect_grep "T10 ($tag): templates render the PR_BODY pass form" \
+    'traceability:        ✓ pass \(…, B1/squash: squash_merge_commit_message: PR_BODY\)' "$f"
+  expect_fixed "T10 ($tag): templates render the other-method note" \
+    '○ a hand merge by {other} will not carry the PR body' "$f"
+done
+for f in "$SRC_INIT_CHECK" "$BUILT_INIT_CHECK"; do
+  tag="${f#"$REPO_ROOT"/}"; tag="${tag%%/*}"
+  expect_grep "T10 ($tag): /init-idd notes another method when auto_merge is off and the source is PR_BODY" \
+    'When the source is `PR_BODY` and `review\.auto_merge` is not `true`, note each' "$f"
+  expect_fixed "T10 ($tag): /init-idd renders the other-method note" \
+    '○ A merge made by hand with {other} will not carry the PR body.' "$f"
+done
+expect_grep "T10: /idd-doctor applies the same rule" \
+  'When it is `PR_BODY` and `review\.auto_merge` is not `true`, the pass rests on that setting: print \*Pass\* in its `\{field\}: PR_BODY` form, plus an \*other-method note\*' "$DOCTOR"
+expect_fixed "T10: /idd-doctor pass form for IDD's merge" \
+  '✓ [4/4] Merge method           {method} allowed · IDD'"'"'s merge carries the PR body' "$DOCTOR_EM"
+expect_fixed "T10: /idd-doctor pass form for the repo setting" \
+  '✓ [4/4] Merge method           {method} allowed · {field}: PR_BODY' "$DOCTOR_EM"
+expect_fixed "T10: /idd-doctor renders the other-method note" \
+  '○ a hand merge by {other} will not carry the PR body' "$DOCTOR_EM"
+expect_grep "T10: /idd-doctor Pass trigger states the PR_BODY-or-auto_merge condition" \
+  'and either `review\.auto_merge` is `true` or `\{field\}` is `PR_BODY`' "$DOCTOR_EM"
+expect_grep "T10: /idd-doctor's other-method note carries no fix" \
+  'No `Fix:` line; the note never changes the result' "$DOCTOR_EM"
 
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 echo "  Results: $PASS passed, $FAIL failed"

@@ -14,16 +14,13 @@ just written. It never changes a repository setting and never changes the run's
 ## The two reads
 
 Run **both** merge preflight reads from `docs/platform-github.md` — the
-strategy allow-flags and the hand-merge message source. They answer different
-questions, and neither substitutes for the other:
+strategy allow-flags and the hand-merge message source; neither substitutes for
+the other:
 
 ```bash
 gh repo view --json mergeCommitAllowed,squashMergeAllowed,rebaseMergeAllowed
 gh api repos/{owner}/{repo} --jq '{squash_merge_commit_message, merge_commit_message}'
 ```
-
-The second read uses the REST endpoint on purpose: `gh repo view --json` has no
-such field.
 
 ## The method
 
@@ -83,6 +80,14 @@ Otherwise, a warning:
 To fix:  set review.auto_merge: true in .idd.yml, or use /auto-pilot in a mode that merges
 ```
 
+When the source is `PR_BODY` and `review.auto_merge` is not `true`, note each
+other allowed method that drops the body: `{other}` is `rebase`, or the other
+commit method and its `({field} is {value})` if that is not `PR_BODY`.
+
+```
+○ A merge made by hand with {other} will not carry the PR body.
+```
+
 **Unread setting.** If the strategy read fails, print `○ Merge strategy check
 skipped — {reason}` and continue. If the strategy read succeeds but the message
 read does not answer (404, insufficient permission, or the field is absent from
@@ -95,7 +100,7 @@ Print one `Merge settings:` row in the *Step 4 — Report* block:
 
 | Outcome | Row |
 |---|---|
-| The strategy read ran; `{method}` is `squash` or `merge` and the repo allows it | `✓ {method} allowed`, plus `; hand merge drops the PR body` when the note fired |
+| The strategy read ran; `{method}` is `squash` or `merge` and the repo allows it | `✓ {method} allowed`, plus `; hand merge drops the PR body` when a note fired |
 | A warning fired | `⚠ warn ({method} not allowed)`, `⚠ warn (rebase is tracker-only)` or `⚠ warn (hand merge drops the PR body)` |
 | Check skipped (no `gh`, not authenticated, unread strategy) | `○ skip ({reason})` |
 
