@@ -127,7 +127,7 @@ Whenever Step 2 would merge a PR (aggressive + `merge_partial: true`), apply Ste
 **Step 2b — Merge (only when aggressive + merge_partial: true and all four gates passed):** <!-- a:ap-step2b-merge -->
 
 Run it as **one** shell call (variables do not survive between calls),
-`{verified_head}` being the 40-hex SHA Step 5.1c bound and the method and body
+`{verified_head}` and `{merge_floor}` being what Step 5.1c bound and the method and body
 file as in *Step 5.2*. A non-zero exit is the
 merge-failed path below, `left_open`, unless Step 5.2's *merge reconciliation*
 reads the PR as `MERGED`:
@@ -135,7 +135,8 @@ reads the PR as `MERGED`:
 ```bash
 verified_head="{verified_head}"
 read -r head_now base_ref <<<"$(gh pr view {pr_number} --json headRefOid,baseRefName --jq '"\(.headRefOid) \(.baseRefName)"')"
-behind_by="$(gh api "repos/{owner}/{repo}/compare/${base_ref}...${verified_head}" --jq .behind_by)"
+read -r behind_by base_tip <<<"$(gh api "repos/{owner}/{repo}/compare/${base_ref}...${verified_head}" --jq '"\(.behind_by) \(.base_commit.sha)"')"
+[ '{merge_floor}' = "met@$verified_head:$base_tip" ] || verified_head=""
 body_file="$(mktemp)"; gh pr view {pr_number} --json body --jq .body >"$body_file" || verified_head=""
 trap 'rm -f "$body_file"' EXIT
 if [ -n "$verified_head" ] && [ "$head_now" = "$verified_head" ] && [ "$behind_by" = "0" ]; then

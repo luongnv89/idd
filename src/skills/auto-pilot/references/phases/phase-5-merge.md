@@ -10,14 +10,12 @@ Before merging, verify:
 
 1. **PR is mergeable** — no conflicts, CI passing (if configured)
 2. **No blocking reviews** — no "request changes" reviews from other humans
-3. **Merge floor met** — Step 3.2's `merge_floor` is `met`. Its one home is the `{{skill:issue-pr-review}}` skill's *Merge floor*; never re-derive it. Anything else is `left_open`: `⚠ PR #{pr_number} left open — merge floor unmet ({reason})`. A missing `merge_floor` (no review ran this session) is `left_open` too, with its own reason: `⚠ PR #{pr_number} left open — merge floor not derived (resumed run)`
+3. **Merge floor met** — Step 3.2's `merge_floor` is `met` (*Step 5.1c* checks its binding). Its one home is the `{{skill:issue-pr-review}}` skill's *Merge floor*; never re-derive it. Anything else is `left_open`: `⚠ PR #{pr_number} left open — merge floor unmet ({reason})`. A missing `merge_floor` (no review ran this session) is `left_open` too, with its own reason: `⚠ PR #{pr_number} left open — merge floor not derived (resumed run)`
 4. **Fresh merge identity** — the head is still the one CI checked, and the live base has not moved past it (*Step 5.1c*, the last check before the merge)
 
 ```bash
 gh pr view {pr_number} --json mergeable,reviewDecision,statusCheckRollup,headRefOid
 ```
-
-`headRefOid` rides along on this one read because *Step 5.1a* needs it and a second `gh pr view` three lines later would be the duplicated work this whole phase exists to remove. `statusCheckRollup` is likewise already in hand at that instant, so the gate can corroborate a `trusted` verdict for free.
 
 **Consult *Step 5.1a — CI verdict gate* first.** Under `ci_verdict = trusted` the whole wait below is already answered and is skipped; on `stale` or `absent` it runs exactly as written.
 
@@ -74,10 +72,8 @@ Corroborating positively keeps this gate's answer on the same side of that line.
 
 **Head-SHA equality does not cover a moved base.** `pull_request` checks run
 against the merge result, so a base branch that advanced under this PR since the
-reviewer's wait can change the answer with `headRefOid` unchanged. This is
-today's exposure, not something this gate introduces — but read "nothing left to
-wait for" as "nothing left to wait for *on this head*", and do **not** read Step
-5.1's `mergeable` as covering it. `mergeable` answers MERGEABLE / CONFLICTING /
+reviewer's wait can change the answer with `headRefOid` unchanged. Do **not**
+read Step 5.1's `mergeable` as covering it. `mergeable` answers MERGEABLE / CONFLICTING /
 UNKNOWN: GitHub does recompute it against the current base, so it catches a base
 that moved **into conflict**, and nothing else — a clean, fast-forwardable
 advance leaves it MERGEABLE. The full wait this gate skips would not catch it
@@ -265,7 +261,9 @@ critical-issue Option 1 merge.
 Bind `verified_head` first. It is the 40-hex `headRefOid` from **Step 5.1's own
 read**, the head that Step 5.1a's verdict or the wait after it is about. Never
 take it from a later read: the guard pins the commit that was checked, so a SHA
-read after the wait would pin whatever the head became.
+read after the wait would pin whatever the head became. `{merge_floor}` is
+check 3's value, pasted only as `met@<40 hex>:<40 hex>`: the floor must have
+classified this head on this live base tip (#605, #606).
 
 Then one fresh read and one ancestry check. `{owner}` and `{repo}` are `gh api`'s
 own placeholders, filled from the current repository. The base name is bound
@@ -274,29 +272,24 @@ through `--jq`, never pasted, because the PR author picks it:
 ```bash
 verified_head="{verified_head}"
 read -r head_now base_ref <<<"$(gh pr view {pr_number} --json headRefOid,baseRefName --jq '"\(.headRefOid) \(.baseRefName)"')"
-behind_by="$(gh api "repos/{owner}/{repo}/compare/${base_ref}...${verified_head}" --jq .behind_by)"
-echo "head_now=$head_now base_ref=$base_ref behind_by=$behind_by"
+read -r behind_by base_tip <<<"$(gh api "repos/{owner}/{repo}/compare/${base_ref}...${verified_head}" --jq '"\(.behind_by) \(.base_commit.sha)"')"
+echo "head_now=$head_now base_ref=$base_ref behind_by=$behind_by base_tip=$base_tip"
 ```
 
 | `merge_identity` | When | Effect |
 |------------------|------|--------|
-| `fresh` | `head_now` equals `verified_head` **and** `behind_by` is exactly `0`, meaning the live tip of `base_ref` is an ancestor of the verified head | Step 5.2 merges, guarded by `--match-head-commit` |
-| `stale` | anything else: a moved head, `behind_by` above 0, a failed read or API call, an empty or non-integer answer, a SHA that is not 40 hex, a base name the compare call cannot resolve | do **not** merge; outcome `left_open` |
+| `fresh` | `head_now` equals `verified_head` **and** `behind_by` is exactly `0`, meaning the live tip of `base_ref` is an ancestor of the verified head, **and** `merge_floor` is `met@{verified_head}:{base_tip}` | Step 5.2 merges, guarded by `--match-head-commit` |
+| `stale` | anything else: a moved head, `behind_by` above 0, a failed read or API call, an empty or non-integer answer, a SHA that is not 40 hex, a base name the compare call cannot resolve, a floor bound to another head or base tip (a push or retarget after review) | do **not** merge; outcome `left_open` |
 
 **Compare against the base branch, never `baseRefOid`.** `baseRefOid` is the
 base tip GitHub recorded at the PR's last synchronization, not the live branch,
-and it can sit many commits behind it. On one PR a compare against `baseRefOid`
-answered `behind_by: 0` while the same compare against the branch name answered
-`behind_by: 12`. A check against `baseRefOid` passes a moved base. The branch
+and it can sit many commits behind it. A check against `baseRefOid` passes a moved base. The branch
 name resolves to the current tip at call time.
 
 **Why ancestry is enough.** When the live base tip is an ancestor of
-`verified_head`, the merge lands exactly `verified_head`'s tree, so the
-merge candidate *is* the commit the checks ran on and a green verdict on that
-head is a verdict on what lands. When the base has advanced past it, the merge
-candidate is a tree no check ran on. `mergeable` stays MERGEABLE on a clean
-advance and GitHub does not re-run checks when a base moves, so nothing else in
-this phase notices.
+`verified_head`, the merge lands exactly the tree the checks ran on; when the
+base has advanced past it, it lands a tree no check ran on, and nothing else in
+this phase notices (*Step 5.1a*).
 
 **Patch-id equality never replaces fresh integration checks.** A commit whose
 `git patch-id`, diff or tree matches a verified one (a rebase, a cherry-pick, an
@@ -350,8 +343,8 @@ If the mode forbids merge (`conservative`):
 
 If the mode allows merge (`balanced` or `aggressive`), and only on a `fresh`
 *Step 5.1c* answer, merge with the expected-head guard. Run it as **one** shell
-call (variables do not survive between calls), `{verified_head}` being the
-40-hex SHA that step bound. `{merge_method}` is `review.merge_method`: `squash`
+call (variables do not survive between calls), `{verified_head}` and
+`{merge_floor}` being what that step bound. `{merge_method}` is `review.merge_method`: `squash`
 (default), `merge` or `rebase`; any other value is invalid config, a stop. The
 body file makes the commit body the PR body under any repo setting
 (`docs/platform-github.md`, *Merge + clean up*); a failed body read empties
@@ -363,7 +356,8 @@ PR as `MERGED`:
 ```bash
 verified_head="{verified_head}"
 read -r head_now base_ref <<<"$(gh pr view {pr_number} --json headRefOid,baseRefName --jq '"\(.headRefOid) \(.baseRefName)"')"
-behind_by="$(gh api "repos/{owner}/{repo}/compare/${base_ref}...${verified_head}" --jq .behind_by)"
+read -r behind_by base_tip <<<"$(gh api "repos/{owner}/{repo}/compare/${base_ref}...${verified_head}" --jq '"\(.behind_by) \(.base_commit.sha)"')"
+[ '{merge_floor}' = "met@$verified_head:$base_tip" ] || verified_head=""
 body_file="$(mktemp)"; gh pr view {pr_number} --json body --jq .body >"$body_file" || verified_head=""
 trap 'rm -f "$body_file"' EXIT
 if [ -n "$verified_head" ] && [ "$head_now" = "$verified_head" ] && [ "$behind_by" = "0" ]; then

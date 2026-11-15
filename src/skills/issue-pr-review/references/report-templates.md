@@ -296,7 +296,8 @@ merge identity check, then merge with the expected-head guard (issue #516):
 ```bash
 verified_head="{ci_sha}"   # Step 5's ci_sha; with none, the headRefOid the final review cycle read
 read -r head_now base_ref <<<"$(gh pr view {N} --json headRefOid,baseRefName --jq '"\(.headRefOid) \(.baseRefName)"')"
-behind_by="$(gh api "repos/{owner}/{repo}/compare/${base_ref}...${verified_head}" --jq .behind_by)"
+read -r behind_by base_tip <<<"$(gh api "repos/{owner}/{repo}/compare/${base_ref}...${verified_head}" --jq '"\(.behind_by) \(.base_commit.sha)"')"
+[ "{floor_base}" = "$base_tip" ] || verified_head=""
 body_file="$(mktemp)"; gh pr view {N} --json body --jq .body >"$body_file" || verified_head=""
 trap 'rm -f "$body_file"' EXIT
 if [ -n "$verified_head" ] && [ "$head_now" = "$verified_head" ] && [ "$behind_by" = "0" ]; then
@@ -311,13 +312,14 @@ the PR body under any repo setting (`docs/platform-github.md`, *Merge + clean
 up*); a failed body read empties `verified_head`, so the guard refuses the
 merge. For `rebase`, drop the `body_file` and `trap` lines and the `--body-file` flag.
 
+`{floor_base}` is the *Merge floor*'s `git rev-parse "origin/${base_ref}"`
+after its fresh fetch, the base tip it classified: a retargeted PR or a moved
+base has another live tip, so the merge is blocked.
+
 The check is the subset of `/auto-pilot`'s *Step 5.1c — Merge identity gate*
-that a standalone review needs. A CI verdict covers one commit on one base, so
-the merge needs both unchanged. `head_now` must equal `verified_head`, and
-`behind_by` must be exactly `0`, meaning the live tip of the base branch is an
-ancestor of the checked head and the merge lands exactly the tree CI ran on.
-Compare against the branch name, never `baseRefOid`: that field is the base as
-of the PR's last sync and can trail the live branch by many commits.
+that a standalone review needs. `behind_by` `0` means the live base tip is an
+ancestor of the checked head, so the merge lands exactly the tree CI ran on.
+Compare the branch name, never `baseRefOid` (the base at the PR's last sync).
 `--match-head-commit` makes GitHub refuse the merge when the head moved after
 the check. Anything else (a moved head, a base that moved ahead, a failed read
 or compare, an empty or non-integer answer) is **not** a merge. Report
