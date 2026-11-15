@@ -9,15 +9,10 @@ the full key list — every default value, and what each key does to the pipelin
 It is also the list to read `.idd.yml` (else legacy `.gitissue.yml`) against by hand when `gi-config` is
 unavailable. Value syntax and validation live in `docs/config-schema.md`.
 
-**Why the working directory and the script path both matter.** `gi-config.py`
-resolves `.idd.yml` against the *current working directory*, so it must be
-run from the repo root. Run anywhere else it does not fail loudly: it exits 0
-reporting `config_file: null` / `first_run: true`, silently discarding the repo's
-real config and handing the run a full set of defaults. The script *path*, by
-contrast, is resolved against the skill's own directory — the same way the
-*Bundled dependency precheck* resolves its list — because the bundled copy lives
-beside SKILL.md, not beside the repo being reviewed. Getting either one wrong
-produces a run that looks configured and is not.
+**Run `gi-config.py` from the repo root, by its skill-relative path.** It reads
+`.idd.yml` from the working directory: run elsewhere it exits 0 with
+`config_file: null`, silently running on defaults. The script path resolves like
+the *Bundled dependency precheck*, against the skill's directory.
 
 | Key (default) | What it gates |
 |-----|---------------|
@@ -65,32 +60,26 @@ straight to a script.
 
 ## Depth gate (adaptive review depth)
 
-The Step 1 *Depth gate* selects a review `profile` — `light` or `full` — from a <!-- a:rvm-depth-gate -->
-pre-work complexity signal, so a trivial PR is not reviewed as deeply as a
-multi-subsystem one. The mechanism and the shared `XS … XL` scale live in
-`docs/agent-model-effort.md` (*Complexity → pipeline profile*); this section is
-only how the review loop consumes the result.
+The Step 1 *Depth gate* selects a review `profile` — `light` or `full`; the <!-- a:rvm-depth-gate -->
+`XS … XL` scale lives in `docs/agent-model-effort.md` (*Complexity → pipeline
+profile*). With no researcher here, the signal comes from Step 1's data, and the
+**fuller** of any inputs that disagree wins:
 
-**Selecting the signal (no researcher here).** Unlike `/issue-resolver`,
-`/issue-pr-review` has no research subagent, so it derives the signal from data
-already fetched in Step 1 and takes the **fuller** of any inputs that disagree:
-
+- **Risk tier** — SKILL.md's `gi-sensitive.py --classify` of the PR diff:
+  `sensitive` or unknown forces `full`, and `Effort` never lowers it.
 - **Diff size / files-changed** (`gh pr view {N} --json files`) — small change
   (≈ ≤ 15 changed lines in 1 file) leans `light`.
 - **Linked-issue `Effort` band** — when the PR links an issue (`Closes #N` or a
   first-line `Refs #N`), read the `## Metadata` `Effort` band out of
-  `linked_issue_snapshot`, the record SKILL.md already retained at the review boundary. **Do not re-read the issue here**: the
-  snapshot is the fresher record, and a second read would reintroduce exactly the
-  duplicate the review boundary exists to remove. `XS`/`S` asserted leans
-  `light`, `M`/`L`/`XL` or low-confidence leans `full`.
-- **Security label** — any `security`/`CVE`/`vulnerability` label forces `full`.
+  `linked_issue_snapshot`. **Do not re-read the issue here**: the snapshot is the
+  fresher record. `XS`/`S` asserted leans `light`, `M`/`L`/`XL` or
+  low-confidence leans `full`.
 
 Resolve to `light` **only when every available signal agrees on trivial**; any
 `full` vote, or a missing/ambiguous signal, wins → `full`. When
 `review.adaptive_depth` is `false`, only the signal selection above is skipped
-and `profile = full`; the review-boundary refresh and the fail-safe below still
-run, because they are about the freshness of the record Step 3 reads, not about
-how deep this review goes.
+and `profile = full`; the risk tier, the review-boundary refresh and the
+fail-safe below still run.
 
 ### The empty-record fail-safe
 

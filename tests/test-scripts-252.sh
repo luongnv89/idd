@@ -1302,7 +1302,9 @@ EXPECTED_SITES = {
     "gi-receipt.py": 3,
     # 2 since issue #518: the resolver's sensitive-change gate classifies the
     # planned change and adjudicates its probe/challenge ledger (Step 2).
-    "gi-sensitive.py": 2,
+    # 4 since issue #569: the risk tier of the actual diff is classified at the
+    # resolver's Deliver (step-5-deliver.md) and pr-review's Depth gate.
+    "gi-sensitive.py": 4,
     # 1 since issue #519: the resolver's premise-reset check (Step 4 QA).
     "gi-premise.py": 1,
     # 1 since issue #520: the resolver's design-sketch check (Step 2).

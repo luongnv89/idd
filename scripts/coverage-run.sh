@@ -193,6 +193,15 @@ printf '%s' '[]' | run "$SCRIPTS/gi-sensitive.py" --classify
 printf '%s' '{"labels":"x","paths":[]}' | run "$SCRIPTS/gi-sensitive.py" --classify
 printf '%s' '{"labels":[],"files":[]}' | run "$SCRIPTS/gi-sensitive.py" --classify
 printf '%s' '{"labels":[],"paths":[],"path":[]}' | run "$SCRIPTS/gi-sensitive.py" --classify
+# #569: the new path classes, the `diff` range (an empty range in this checkout,
+# a malformed range → 3, an unknown ref → 4) and a refused Effort key.
+printf '%s' '{"labels":[],"paths":["package.json","app.gemspec","requirements-dev.txt","Dockerfile.prod","compose.yml","main.tf","infra/x.go","db/migrate/1.rb","README.md"]}' | \
+  run "$SCRIPTS/gi-sensitive.py" --classify
+printf '%s' '{"labels":[],"paths":[],"diff":"HEAD...HEAD"}' | run "$SCRIPTS/gi-sensitive.py" --classify
+printf '%s' '{"labels":[],"paths":[],"diff":"-p...HEAD"}' | run "$SCRIPTS/gi-sensitive.py" --classify
+printf '%s' '{"labels":[],"paths":[],"diff":1}' | run "$SCRIPTS/gi-sensitive.py" --classify
+printf '%s' '{"labels":[],"paths":[],"diff":"no-such-ref-569...HEAD"}' | run "$SCRIPTS/gi-sensitive.py" --classify
+printf '%s' '{"labels":[],"paths":[],"effort":"XS"}' | run "$SCRIPTS/gi-sensitive.py" --classify
 for f in tests/fixtures/sensitive-gate/*.json; do
   run "$SCRIPTS/gi-sensitive.py" --adjudicate < "$f"
 done

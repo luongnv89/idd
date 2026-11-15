@@ -19,6 +19,18 @@
 #   G5      the prose contract: the gate runs on the light path and in auto
 #           mode, stops are safety stops, the challenger keeps blockers.
 #   G6      the built bundle ships the script byte-identically and cites it.
+#   G7      one risk tier from the actual diff (#569): `tier` tracks
+#           `sensitive`; an Effort key is refused, never read (AC2); a `diff`
+#           range is classified from git in a temp repo (renames list both
+#           sides, non-ASCII paths are not quoted), a bad range is exit 3, a
+#           git failure or a shadowed (ambiguous) base ref exit 4, and `diff.relative` cannot hide a path;
+#           the base must be a remote-tracking ref and the head HEAD or a commit
+#           id (#605), so a branch named origin/<base> in a single-branch clone,
+#           a branch-name head, an empty diff or a head inside the base is exit
+#           4, git runs under LC_ALL=C, and a gitlink is listed whatever
+#           the submodule ignore settings; the
+#           resolver's Deliver (any delivered sensitive path Step 2 did not
+#           mark) and pr-review's Depth gate and Merge floor read it (AC1, AC3).
 #
 # Usage: bash tests/test-sensitive-gate-518.sh
 # Returns: exit 0 if all checks pass, exit 1 on failure.
@@ -111,7 +123,23 @@ for pair in \
   "app/permissions/rbac.py:auth" \
   "CODEOWNERS:access-policy" \
   ".idd.yml:security-config" \
-  ".pre-commit-config.yaml:security-config"; do
+  ".pre-commit-config.yaml:security-config" \
+  "package.json:dependency-manifest" \
+  "services/api/requirements-dev.txt:dependency-manifest" \
+  "go.sum:dependency-manifest" \
+  "Cargo.lock:dependency-manifest" \
+  "app.gemspec:dependency-manifest" \
+  "web/pnpm-lock.yaml:dependency-manifest" \
+  "Dockerfile:infrastructure" \
+  "docker/Dockerfile.prod:infrastructure" \
+  "docker-compose.override.yml:infrastructure" \
+  "modules/vpc/main.tf:infrastructure" \
+  "infra/main.go:infrastructure" \
+  "deploy/k8s/app.yaml:infrastructure" \
+  "charts/web/Chart.yaml:infrastructure" \
+  "db/migrations/0001_init.sql:migration" \
+  "db/migrate/20260101_add_index.rb:migration" \
+  "alembic/versions/abc.py:migration"; do
   path="${pair%%:*}"; want="${pair##*:}"
   out="$(classify "{\"labels\":[],\"paths\":[\"$path\"]}")"
   got="$(python3 -c 'import json,sys; r=json.loads(sys.argv[1])["reasons"]; print(r[0]["class"] if r else "none")' "$out")"
@@ -128,6 +156,164 @@ check "G2: an unknown top-level key is exit 3" "$?"
 out="$(classify '{"labels":[],"paths":["README.md"],"_note":"x"}')"
 [ "$(field "$out" sensitive)" = "false" ]; check "G2: a top-level key starting with _ is ignored" "$?"
 classify 'not json' >/dev/null 2>&1; [ "$?" = "3" ]; check "G2: non-JSON stdin is exit 3" "$?"
+
+# ── G7: one risk tier from the actual diff (#569) ────────────
+tier_of() { python3 -c 'import json,sys; r=json.loads(sys.argv[1]); print(r["tier"] if r["sensitive"] == (r["tier"] == "sensitive") else "mismatch")' "$1"; }
+[ "$(tier_of "$(classify '{"labels":[],"paths":["src/auth/session.py"]}')")" = "sensitive" ] \
+  && [ "$(tier_of "$(classify '{"labels":["bug"],"paths":["README.md"]}')")" = "standard" ]
+check "G7: tier is sensitive exactly when sensitive is true, else standard" "$?"
+classify '{"labels":[],"paths":["src/auth/session.py"],"effort":"XS"}' >/dev/null 2>&1; [ "$?" = "3" ]
+check "G7: an effort key is exit 3 — Effort is never an input (AC2)" "$?"
+[ "$(tier_of "$(classify '{"labels":[],"paths":["src/auth/session.py"],"_effort":"XS"}')")" = "sensitive" ]
+check "G7: a stated XS Effort leaves the tier of the same labels and paths unchanged (AC2)" "$?"
+
+GITREPO="$(mktemp -d)"
+AMBREPO="$(mktemp -d)"
+R3REPO="$(mktemp -d)"
+STUBDIR="$(mktemp -d)"
+trap 'rm -rf "$GITREPO" "$AMBREPO" "$R3REPO" "$STUBDIR"' EXIT
+g() { git -C "$GITREPO" -c user.name=t -c user.email=t@example.invalid -c commit.gpgsign=false "$@"; }
+dclassify() { (cd "$GITREPO" && printf '%s' "{\"labels\":[],\"paths\":[],\"diff\":\"$1\"}" | python3 "$SCRIPT" --classify); }
+# The callers pass origin/<base>...HEAD or ...<head sha> (#605): point the
+# remote-tracking ref at the base branch now, and name the head by its commit id.
+rng() { g update-ref "refs/remotes/origin/$1" "$1" && printf 'origin/%s...%s' "$1" "$(g rev-parse "$2")"; }
+g init -q -b main && mkdir -p "$GITREPO/.github/workflows" "$GITREPO/docs" \
+  && echo 'on: push' > "$GITREPO/.github/workflows/ci.yml" && echo '# guide' > "$GITREPO/docs/guide.md" \
+  && echo '{}' > "$GITREPO/package.json" && g add -A && g commit -q -m base
+check "G7: temp git repo for the diff cases" "$?"
+g checkout -q -b rename main && g mv .github/workflows/ci.yml docs/ci.yml && g commit -q -m mv
+out="$(dclassify "$(rng main rename)")"
+[ "$(field "$out" tier)" = '"sensitive"' ]
+check "G7: renaming .github/workflows/ci.yml to docs/ci.yml is sensitive — both sides are listed" "$?"
+g checkout -q -b unicode main && echo 'on: push' > "$GITREPO/.github/workflows/déploy.yml" && g add -A && g commit -q -m u
+out="$(dclassify "$(rng main unicode)")"
+python3 -c 'import json,sys; r=json.loads(sys.argv[1]); sys.exit(0 if r["tier"] == "sensitive" and r["reasons"][0]["class"] == "ci-workflow" and r["reasons"][0]["source"] == "diff" else 1)' "$out"
+check "G7: a non-ASCII file under .github/workflows/ is sensitive (ci-workflow), never a quoted miss" "$?"
+g checkout -q -b deps main && echo '{"dependencies":{}}' > "$GITREPO/package.json" && g commit -q -am d
+out="$(dclassify "$(rng main deps)")"
+python3 -c 'import json,sys; r=json.loads(sys.argv[1]); sys.exit(0 if r["tier"] == "sensitive" and r["reasons"][0]["class"] == "dependency-manifest" else 1)' "$out"
+check "G7: a dependency manifest change is sensitive" "$?"
+g checkout -q -b plain main && echo 'more' >> "$GITREPO/docs/guide.md" && g commit -q -am p
+out="$(dclassify "$(rng main plain)")"; ec=$?
+[ "$ec" = "0" ] && [ "$(field "$out" tier)" = '"standard"' ]; check "G7: a plain docs change at a 40-hex head is standard (exit 0)" "$?"
+dclassify 'origin/main...plain' >/dev/null 2>&1; [ "$?" = "4" ]
+check "G7: a head named by a branch, never HEAD or a commit id, is exit 4 (#605)" "$?"
+dclassify 'main...HEAD' >/dev/null 2>&1; [ "$?" = "4" ]
+check "G7: a base that is a local branch, not a remote-tracking ref, is exit 4 (#605)" "$?"
+dclassify "$(rng main main)" >/dev/null 2>&1; [ "$?" = "4" ]
+check "G7: an empty diff (head = base) is exit 4, never tier standard (#605)" "$?"
+g checkout -q -b empty main && g commit -q --allow-empty -m e
+dclassify "$(rng main empty)" >/dev/null 2>&1; [ "$?" = "4" ]
+check "G7: a head with commits but no changed path is exit 4 (#605)" "$?"
+# A PR into `rel` whose head carries default-branch commits `rel` lacks: the
+# manifest change drops out of main...feat yet still lands in rel, so the range
+# must use the PR's own base, never the default branch.
+g branch rel main && g checkout -q main && echo '{"dependencies":{"x":"1"}}' > "$GITREPO/package.json" \
+  && g commit -q -am dep && g checkout -q -b feat && echo 'feat' >> "$GITREPO/docs/guide.md" && g commit -q -am f
+[ "$(field "$(dclassify "$(rng rel feat)")" tier)" = '"sensitive"' ] && [ "$(field "$(dclassify "$(rng main feat)")" tier)" = '"standard"' ]
+check "G7: a PR into rel classifies origin/rel...feat (sensitive), not origin/main...feat (standard) — the PR's base is the range" "$?"
+dclassify "$(rng main rel)" >/dev/null 2>&1; [ "$?" = "4" ]
+check "G7: a head already contained in the base (rel inside main) is exit 4 (#605)" "$?"
+for bad in '-p...main' 'main..plain' 'main...plain...x' 'main....plain' 'main...' 'main...pl;ain' 'main~1...plain' 'origin/main...HEAD\n'; do
+  dclassify "$bad" >/dev/null 2>&1; [ "$?" = "3" ]; check "G7: the range '$bad' is exit 3" "$?"
+done
+dclassify 'origin/no-such-ref...HEAD' >/dev/null 2>&1; [ "$?" = "4" ]
+check "G7: an unknown base ref is exit 4 (cannot complete), never 'not sensitive'" "$?"
+dclassify "origin/main...$(printf 'de%.0s' $(seq 20))" >/dev/null 2>&1; [ "$?" = "4" ]
+check "G7: an unknown 40-hex head is exit 4 (cannot complete), never 'not sensitive'" "$?"
+g config diff.relative true
+urng="$(rng main unicode)"
+out="$(cd "$GITREPO/docs" && printf '%s' "{\"labels\":[],\"paths\":[],\"diff\":\"$urng\"}" | python3 "$SCRIPT" --classify)"
+[ "$(field "$out" tier)" = '"sensitive"' ]
+check "G7: diff.relative=true and a subdirectory cwd still list a .github/workflows change (sensitive)" "$?"
+# R4 (#605): a gitlink the PR adds under .github/actions/ must be listed even
+# when the head's own .gitmodules says `ignore = all` or diff.ignoreSubmodules=all.
+g checkout -q -b submod main && printf '[submodule "evil"]\n\tpath = .github/actions/evil\n\turl = https://example.invalid/evil.git\n\tignore = all\n' > "$GITREPO/.gitmodules" \
+  && echo n > "$GITREPO/notes.txt" && g update-index --add --cacheinfo "160000,$(g rev-parse main),.github/actions/evil" \
+  && g add .gitmodules notes.txt && g commit -q -m sub
+check "G7: a branch adding a gitlink at .github/actions/evil with .gitmodules ignore = all" "$?"
+out="$(dclassify "$(rng main submod)")"; ec=$?
+[ "$ec" = "0" ] && python3 -c 'import json,sys; r=json.loads(sys.argv[1]); sys.exit(0 if r["tier"] == "sensitive" and {"source": "diff", "value": ".github/actions/evil", "class": "ci-workflow"} in r["reasons"] else 1)' "$out"
+check "G7: a gitlink added under .github/actions/ with .gitmodules ignore = all is sensitive (exit 0, #605)" "$?"
+g config diff.ignoreSubmodules all
+out="$(dclassify "$(rng main submod)")"; ec=$?
+[ "$ec" = "0" ] && [ "$(field "$out" tier)" = '"sensitive"' ]
+check "G7: diff.ignoreSubmodules=all still lists the gitlink (sensitive, exit 0, #605)" "$?"
+g config --unset diff.ignoreSubmodules
+# `gh pr checkout` names the local branch after the PR's head branch, so a fork
+# head called `origin/main` creates refs/heads/origin/main, which shadows the
+# remote-tracking ref: origin/main...HEAD would diff the PR against itself.
+a() { git -C "$AMBREPO" -c user.name=t -c user.email=t@example.invalid -c commit.gpgsign=false "$@"; }
+aclassify() { (cd "$AMBREPO" && printf '%s' '{"labels":[],"paths":[],"diff":"origin/main...HEAD"}' | python3 "$SCRIPT" --classify); }
+git clone -q -b main "$GITREPO" "$AMBREPO" && a checkout -q -b pr && echo 'on: push' > "$AMBREPO/.github/workflows/pr.yml" \
+  && a add -A && a commit -q -m pr
+check "G7: temp clone with a local origin for the ref-shadowing case" "$?"
+amb_err="$(a -c core.warnAmbiguousRefs=true diff --name-only origin/main...HEAD 2>&1 >/dev/null)"
+out="$(aclassify)"; ec=$?
+[ "$ec" = "0" ] && [ "$(field "$out" tier)" = '"sensitive"' ] && ! printf '%s' "$amb_err" | grep -q ambiguous
+check "G7: an unambiguous origin/main...HEAD classifies normally (sensitive, exit 0, no ambiguity warning)" "$?"
+a checkout -q -b origin/main
+out="$(aclassify 2>/dev/null)"; ec=$?
+[ "$ec" = "4" ] && ! { [ "$ec" = "0" ] && [ "$(field "$out" tier)" = '"standard"' ]; }
+check "G7: a local branch named origin/main shadowing the base is exit 4, never tier standard with exit 0" "$?"
+# R3 (#605): a single-branch clone fetching a non-default base writes only
+# FETCH_HEAD, so a fork head branch named origin/rel is the only match — no
+# ambiguity warning — and origin/rel...HEAD would diff the PR against itself.
+r() { git -C "$R3REPO" -c user.name=t -c user.email=t@example.invalid -c commit.gpgsign=false "$@"; }
+git clone -q --single-branch -b main "$GITREPO" "$R3REPO" && r fetch -q origin -- rel \
+  && ! r rev-parse --verify -q refs/remotes/origin/rel >/dev/null && r checkout -q -b origin/rel FETCH_HEAD \
+  && mkdir -p "$R3REPO/.github/workflows" && echo 'on: push' > "$R3REPO/.github/workflows/x.yml" && r add -A && r commit -q -m x
+check "G7: single-branch clone where only FETCH_HEAD holds rel and a local branch origin/rel is checked out" "$?"
+r3_err="$(LC_ALL=C r -c core.warnAmbiguousRefs=true diff --name-only origin/rel...HEAD 2>&1 >/dev/null)"
+out="$(cd "$R3REPO" && printf '%s' '{"labels":[],"paths":[],"diff":"origin/rel...HEAD"}' | python3 "$SCRIPT" --classify 2>/dev/null)"; ec=$?
+[ "$ec" = "4" ] && ! { [ "$ec" = "0" ] && [ "$(field "$out" tier)" = '"standard"' ]; } && ! printf '%s' "$r3_err" | grep -q ambiguous
+check "G7: an unambiguous local branch origin/rel standing in for a missing base is exit 4, never tier standard (#605)" "$?"
+# N3 (#605): every git call runs under LC_ALL=C, so the `ambiguous` check
+# reads git's English stderr whatever the caller's locale.
+printf '#!/bin/sh\necho "$LC_ALL" >> "%s/log"\nexit 1\n' "$STUBDIR" > "$STUBDIR/git" && chmod +x "$STUBDIR/git"
+(cd "$GITREPO" && printf '%s' '{"labels":[],"paths":[],"diff":"origin/main...HEAD"}' \
+  | PATH="$STUBDIR:$PATH" LC_ALL=fr_FR.UTF-8 LANGUAGE=fr python3 "$SCRIPT" --classify >/dev/null 2>&1); ec=$?
+[ "$ec" = "4" ] && [ -s "$STUBDIR/log" ] && ! grep -qvx C "$STUBDIR/log"
+check "G7: git runs with LC_ALL=C whatever the caller's locale (#605)" "$?"
+
+DELIVER="$SRC_PKG/references/steps/step-5-deliver.md"
+PR_SRC="$REPO_ROOT/src/skills/issue-pr-review/SKILL.source.md"
+PR_RVM="$REPO_ROOT/src/skills/issue-pr-review/references/review-loop-mechanics.md"
+anchor_check "$DELIVER" rs-deliver-tier 'gi-sensitive\.py --classify' \
+  "G7: the resolver's Deliver classifies the delivered diff (AC1)"
+anchor_check "$DELIVER" rs-deliver-tier '"diff": "origin/\$\{base\}\.\.\.HEAD"' \
+  "G7: the Deliver record carries the diff range"
+anchor_check_flat "$DELIVER" rs-deliver-tier 'is `tier: sensitive` \(fail closed\)' \
+  "G7: a Deliver classify that cannot run is sensitive"
+anchor_check_flat "$DELIVER" rs-deliver-tier 'Any non-zero exit, unparsable output, or no `python3` is `tier: sensitive`' \
+  "G7: any Deliver classify failure, exit 2 and unparsable output included, is sensitive"
+anchor_check_flat "$DELIVER" rs-deliver-tier '`reasons` name any path Step 2.s classify did not mark sensitive' \
+  "G7: Deliver gates a delivered sensitive path Step 2 did not plan, even when Step 2 was sensitive"
+anchor_check_flat "$DELIVER" rs-deliver-tier 'or the classify could not run' \
+  "G7: a Deliver classify that cannot run triggers the gate whatever Step 2 found"
+grep -q 'Deliver-time risk tier' "$SRC_PKG/SKILL.source.md"
+check "G7: resolver SKILL.md Step 5 points at the Deliver-time risk tier" "$?"
+anchor_check "$PR_SRC" rv-depth-gate-refresh 'gi-sensitive\.py --classify' \
+  "G7: pr-review's Depth gate classifies the PR diff (AC1)"
+grep -E 'gi-sensitive\.py --classify' "$PR_SRC" | grep -F -e 'origin/${base_ref}...HEAD' | grep -qE '^4\. .*review\.adaptive_depth` is `false`.*skip step 5'
+check "G7: the Depth gate classify runs in step 4, outside the adaptive_depth-skippable step 5 (AC2)" "$?"
+grep -E '^4\. ' "$PR_SRC" | grep -qF 'base_ref="$(gh pr view {N} --json baseRefName --jq .baseRefName)"' \
+  && ! grep -E 'gi-sensitive\.py --classify' "$PR_SRC" | grep -qF 'origin/${base}...'
+check "G7: pr-review classifies against the PR's own baseRefName, never the default branch (AC3)" "$?"
+! grep -E '^5\. ' "$PR_SRC" | grep -qE 'gi-sensitive|CVE'
+check "G7: step 5 weighs no label list and runs no classify of its own" "$?"
+floor="$(grep -F 'a:rv-merge-floor' "$PR_SRC")"
+printf '%s' "$floor" | grep -qF 'gi-sensitive.py --classify' \
+  && printf '%s' "$floor" | grep -qF 'origin/${base_ref}...${verified_head}' \
+  && printf '%s' "$floor" | grep -qF '`sensitive` is `sensitive change ({classes})`' \
+  && printf '%s' "$floor" | grep -qF '`risk tier unknown`'
+check "G7: the Merge floor is unmet on a sensitive or unknown tier of the verified head (AC3)" "$?"
+anchor_check "$PR_RVM" rvm-depth-gate '\*\*Risk tier\*\*' "G7: the review-loop Depth gate weighs the risk tier"
+anchor_lacks "$PR_RVM" rvm-depth-gate 'CVE' "G7: the review-loop Depth gate re-lists no label words"
+anchor_lacks "$STEP2" rs-sensitive-gate 'classifying by hand' "G7: no hand classification fallback in Step 2"
+anchor_lacks "$STEP2" rs-sensitive-gate 'pundit' "G7: Step 2 re-lists no class names"
+anchor_check_flat "$STEP2" rs-sensitive-gate '`tier: sensitive` also revises the profile to `full`' \
+  "G7: a sensitive tier revises the resolver profile to full"
 
 # ── G3: --adjudicate over every fixture ──────────────────────
 count=0
@@ -266,6 +452,13 @@ grep -q 'references/scripts/gi-sensitive.py' "$BUILT/references/steps/step-2-pla
 check "G6: the built Step 2 invokes the bundled path" "$?"
 grep -qx 'references/scripts/gi-sensitive.py' "$BUILT/SKILL.md"
 check "G6: the built precheck list names the script" "$?"
+PR_BUILT="$REPO_ROOT/skills/issue-pr-review"
+cmp -s "$SCRIPT" "$PR_BUILT/references/scripts/gi-sensitive.py"
+check "G6: issue-pr-review ships the script byte-identically" "$?"
+grep -qx 'references/scripts/gi-sensitive.py' "$PR_BUILT/SKILL.md"
+check "G6: issue-pr-review's precheck list names the script" "$?"
+grep -q 'python3 references/scripts/gi-sensitive.py --classify' "$PR_BUILT/SKILL.md"
+check "G6: the built pr-review Depth gate invokes the bundled path" "$?"
 
 echo "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 echo "  Result: $PASS passed, $FAIL failed"
