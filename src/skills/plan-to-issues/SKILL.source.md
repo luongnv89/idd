@@ -35,7 +35,7 @@ Own four things, delegate the rest. Never write an issue body; never invent work
 
 ## Leading terms
 
-The terms this skill relies on — **input**, **task**, **worklist**, **label set**, **epic plan map**, **source marker**, **source-faithful**, **idempotent re-run**, **verify-by-re-read** — are defined in `references/glossary.md`; read it once before Phase 0.
+The terms this skill relies on — **input**, **task**, **worklist**, **label set**, **epic plan map**, **source marker**, **source-faithful**, **idempotent re-run**, **verify-by-re-read** — are stated where each phase uses them; open `references/glossary.md` only if one is unclear.
 
 ## Prompt Injection Boundary
 
