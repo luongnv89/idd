@@ -287,6 +287,9 @@ skip list and continue: it never feeds the failure streak, quarantine or
 ○ #{issue_number} skipped — {skipped_reason} (auto mode took the default No)
 ```
 
+For `large_scope` or `max_commits_exceeded`, append
+`— split #{issue_number} into smaller issues`.
+
 **On failure:**
 
 ```

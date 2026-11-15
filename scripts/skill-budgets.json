@@ -3,20 +3,20 @@
   "skills": {
     "auto-pilot": {
       "always_read": {
-        "budget": 47140,
+        "budget": 47034,
         "files": [
           "references/preflight.md",
           "references/run-log.md",
           "references/step-reports.md",
           "references/summary-format.md"
         ],
-        "measured": 46116
+        "measured": 46010
       },
       "budget": 449454,
-      "measured": 449454,
+      "measured": 449011,
       "skill_md": {
         "budget": 26986,
-        "measured": 26039
+        "measured": 26037
       }
     },
     "init-idd": {
@@ -26,7 +26,7 @@
         "measured": 0
       },
       "budget": 145114,
-      "measured": 145110,
+      "measured": 144838,
       "skill_md": {
         "budget": 26006,
         "measured": 24994
@@ -97,7 +97,7 @@
         "measured": 10172
       },
       "budget": 435601,
-      "measured": 435331,
+      "measured": 435315,
       "skill_md": {
         "budget": 33856,
         "measured": 33180

@@ -248,9 +248,11 @@ A maintainer can hand work to the skills and believe what they report.
   row (`tests/test-idd-lint-stats-project.sh` T10, eval `issue-pr-review/revert-squash`,
   behavioural, against a stand-in); a rebase merge has no path, and no agent run is tested.
 - [ ] **TR16 — Human attention is protected.** PR size limits, a short human-first summary,
-  and a cap on PRs waiting for review. Partial: the PR body is summary-first and
-  `autopilot.max_parallel` caps resolver concurrency; the size warnings do not stop auto
-  mode and nothing caps the review queue.
+  and a cap on PRs waiting for review. Partial: the PR body is summary-first, the size
+  gates stop auto mode with a split recommendation, and an opt-in
+  `autopilot.max_open_prs` caps open IDD PRs (#570). Missing: the cap is off by default,
+  a custom branch prefix is not counted, and no PR size limit exists beyond the file and
+  commit gates.
 
 ---
 
@@ -295,3 +297,4 @@ Record every approved change to a value here: date, item, what changed, who aske
 | 2026-11-12 | issue-resolver | Growth-cap exemption against v0.27.0: the bundle is 11,924 bytes (+2.82%) above its size at that tag (421,981 → 433,905). The growth accumulated on main between v0.27.0 and the cap's introduction in #558; approved on 2026-11-12 to let the cap land | maintainer |
 | 2026-11-12 | auto-pilot | Growth-cap exemption against v0.27.0: the bundle is 10,096 bytes (+2.30%) above its size at that tag (437,809 → 447,905). The growth accumulated on main between v0.27.0 and the cap's introduction in #558, and its last part came from #588 merging on 2026-11-12 before the cap landed; approved on 2026-11-12 to let the cap land | maintainer |
 | 2026-11-14 | SI9 | Re-graded after #564; still unchecked. The `Partial:` note now records that the merge method is configurable and a repo PR template is kept, and that Conventional Commit titles, the rebase binding and the hand-merge message source remain | maintainer |
+| 2026-11-15 | TR5 | Accepted exception: the auto-pilot open-PR cap (`autopilot.max_open_prs`, #570) counts open IDD PRs and decides its stop in prose rather than in a script; the cap is opt-in and off by default | maintainer |

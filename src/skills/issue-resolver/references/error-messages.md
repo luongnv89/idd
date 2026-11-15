@@ -195,7 +195,7 @@ All errors follow the rich error format: what went wrong + fix command + docs li
   Continue creating PR? [y/N]
 ```
 **Trigger:** Number of commits created during Execute exceeds `resolve.max_commits`.
-**Auto:** takes the default No — no push, no PR; the commits stay on the local branch, `skipped_reason: max_commits_exceeded`. <!-- auto:no -->
+**Auto:** takes the default No — no push, no PR; the commits stay on the local branch; recommend splitting the issue, `skipped_reason: max_commits_exceeded`. <!-- auto:no -->
 
 ## Ship
 
@@ -254,7 +254,7 @@ All errors follow the rich error format: what went wrong + fix command + docs li
   Continue anyway? [y/N]
 ```
 **Trigger:** Research phase identifies more than 20 potentially affected files.
-**Auto:** takes the default No — stop before Step 2, `skipped_reason: large_scope`. <!-- auto:no -->
+**Auto:** takes the default No — stop before Step 2 and recommend splitting the issue, `skipped_reason: large_scope`. <!-- auto:no -->
 
 ## Progress record
 

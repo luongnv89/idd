@@ -13,7 +13,7 @@ metadata:
 
 Fully autonomous development loop: triage, pick, resolve, review, fix, merge, repeat — zero user prompts.
 
-It orchestrates the other IDD Stack skills over the backlog. It triages **once** at loop start (reusing a fresh `.idd/triage.json`, *Mode Detection*) and picks from that order; with `autopilot.max_parallel` above 1, independent issues resolve concurrently in isolated worktrees, but PRs are reviewed and merged one at a time. After each merge, update the cached order in place. *Merge Modes* decide which PRs merge; a critical issue with unresolved review problems stops the loop for the user.
+It orchestrates the other IDD Stack skills over the backlog. It triages **once** at loop start (reusing a fresh `.idd/triage.json`, *Mode Detection*) and picks from that order. After each merge, update the cached order in place. *Merge Modes* decide which PRs merge; a critical issue with unresolved review problems stops the loop for the user.
 
 ## Autonomy Philosophy <!-- a:ap-autonomy -->
 
@@ -93,7 +93,7 @@ done
 if [ -n "$missing" ]; then echo "Missing required skill(s):$missing" >&2; exit 1; fi
 ```
 
-If any are missing, apply the stop rule with the `✗ Missing required IDD Stack skill(s)` block from `references/preflight.md`. `issue-creator` is optional: on a miss, warn and skip mid-loop normalization. Invoke it with `--auto` and `IDD_AUTO_MODE=1` — its Normalize apply gate sits directly in the loop's path.
+If any are missing, apply the stop rule with the `✗ Missing required IDD Stack skill(s)` block from `references/preflight.md`. `issue-creator` is optional: on a miss, warn and skip mid-loop normalization. Invoke it with `--auto` and `IDD_AUTO_MODE=1`.
 
 ### Bundled dependency precheck
 
@@ -171,9 +171,9 @@ Load config once with `python3 references/scripts/gi-config.py`:
 
 Never re-read the config. **The run clock is `run_state.started_at`**; the run-stats footer measures `elapsed` from it.
 
-Defaults (rationale: `references/configuration.md`): `autopilot.mode: balanced` · `autopilot.merge_partial: false` · `autopilot.max_iterations: 10` · `autopilot.max_parallel: 1` · `autopilot.review_cycles: 3` · `autopilot.auto_merge: true` (legacy) · `autopilot.pause_on_failure: false` · `autopilot.skip_labels: ["wontfix", "blocked", "do-not-merge"]` · `autopilot.critical_labels: ["critical", "priority:critical"]` · `autopilot.respect_dependencies: true` · `autopilot.quarantine_after: 3` · `autopilot.quarantine_label: "auto-pilot-quarantined"` · `autopilot.max_runtime_minutes: 0` (unbounded) · `compaction.enabled: true` · `compaction.threshold.auto-pilot: 15` (*Context threshold check*, `references/phases/phase-0-lock-resume.md`). Sub-skills inherit `resolve.*` and `triage.*`. Then:
+Defaults (rationale: `references/configuration.md`): `autopilot.mode: balanced` · `autopilot.merge_partial: false` · `autopilot.max_iterations: 10` · `autopilot.max_parallel: 1` · `autopilot.review_cycles: 3` · `autopilot.auto_merge: true` (legacy) · `autopilot.pause_on_failure: false` · `autopilot.skip_labels: ["wontfix", "blocked", "do-not-merge"]` · `autopilot.critical_labels: ["critical", "priority:critical"]` · `autopilot.respect_dependencies: true` · `autopilot.quarantine_after: 3` · `autopilot.quarantine_label: "auto-pilot-quarantined"` · `autopilot.max_runtime_minutes: 0` (unbounded) · `autopilot.max_open_prs: 0` (no cap) · `compaction.enabled: true` · `compaction.threshold.auto-pilot: 15` (*Context threshold check*, `references/phases/phase-0-lock-resume.md`). Sub-skills inherit `resolve.*` and `triage.*`. Then:
 
-- **Validate `autopilot.max_parallel`** (integer `1..8`); anything else is invalid config. `1` takes the legacy sequential path.
+- **Validate `autopilot.max_parallel`** (integer `1..8`) and `autopilot.max_open_prs` (`0..50`); anything else is invalid config. `1` takes the legacy sequential path.
 - **Quarantine label:** append it to the effective `skip_labels` set as part of this config load, so the pick skips quarantined issues.
 
 ### Merge Modes
@@ -197,7 +197,7 @@ Gate logic: `references/phases/phase-3-4-review.md` (partial) and `references/ph
 
 ## Context Window Management
 
-The main agent is a **lightweight orchestrator**; subagents with fresh context do the heavy work. **The main agent never reads source files, reads PR diffs, runs tests, or writes code.** Each iteration spawns a resolver then a PR reviewer (`/issue-pr-review --auto --no-merge`, so merging stays the main agent's Phase 5 job); explicit list mode adds a one-time analyzer; `max_parallel > 1` fans out resolver-only lanes, then drains them one at a time. Delegated skills size their shared agents per `references/docs/agent-model-effort.md` and `references/docs/shared-agent-conventions.md`. Lanes and ownership: `references/orchestration.md`. Read `references/subagent-prompts.md` once at skill start.
+The main agent is a **lightweight orchestrator**; subagents with fresh context do the heavy work. **The main agent never reads source files, reads PR diffs, runs tests, or writes code.** Each iteration spawns a resolver then a PR reviewer (`/issue-pr-review --auto --no-merge`, so merging stays the main agent's Phase 5 job); explicit list mode adds a one-time analyzer; `max_parallel > 1` fans out resolver-only lanes in isolated worktrees, then drains them one at a time. Delegated skills size their shared agents per `references/docs/agent-model-effort.md` and `references/docs/shared-agent-conventions.md`. Lanes and ownership: `references/orchestration.md`. Read `references/subagent-prompts.md` once at skill start.
 
 ## Mode Detection
 
@@ -289,7 +289,7 @@ The loop stops on any row except those marked *loop continues* (outcome recorded
 | Condition | Output |
 |-----------|--------|
 | No open issues | `✓ All issues resolved!` |
-| Iteration limit reached | `○ Limit reached ({max} iterations)` |
+| Iteration limit or open PR cap (`autopilot.max_open_prs`) reached | `○ Limit reached ({max} iterations)` · `○ Open PR cap reached ({count}/{max}) — stopping cleanly` |
 | Explicit list exhausted | `✓ All requested issues resolved!` |
 | No eligible issues (all blocked/skipped) | `⚠ No eligible issues to pick` |
 | Resolution failure (pause_on_failure: true) | `⚠ Auto-pilot paused` |

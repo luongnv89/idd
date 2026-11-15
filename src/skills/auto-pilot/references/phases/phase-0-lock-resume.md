@@ -282,12 +282,42 @@ malformed `started_at`, a negative `--max-minutes`): stop *this check*, and trea
 the budget as unenforced rather than as expired — a broken clock must never
 manufacture a stop.
 
+### Open PR cap check
+
+`autopilot.max_open_prs` caps the PRs waiting for a person. `0` — the default —
+means no cap: skip this check and make no call. Evaluate it at the **top of every
+iteration** only, right after the *Runtime budget check*, in both modes. It gates
+only new work: a resumed or in-flight PR always finishes.
+
+```bash
+gh pr list --state open --json number,headRefName --limit 100
+```
+
+Count the PRs whose `headRefName` matches `^(fix|feat|refactor|docs|test|chore)/[0-9]+-`
+(`docs/naming-conventions.md`; a custom `resolve.branch_prefix` is not counted).
+At or above the cap, stop cleanly:
+
+```
+○ Open PR cap reached ({count}/{autopilot.max_open_prs}) — stopping cleanly
+  Review or merge open PRs, then re-run /auto-pilot.
+```
+
+Then follow the *Runtime budget check*'s exit sequence (Final Summary,
+`--report`, `--unlock`, footer) with Result `LIMIT REACHED`. It fails closed: a
+non-transient failure, an exhausted *Transient-failure retry*
+(`references/preflight.md`), or a full page of 100 with fewer matches than the
+cap is a count that cannot be trusted. For an opted-in cap that degrade is this
+stop: print
+`⚠ Open PR count unavailable — stopping (autopilot.max_open_prs is set)`, list it
+under `Uncertainty:`, and stop the same way. A full page with at least cap
+matches is an ordinary cap stop.
+
 ### Context threshold check <!-- a:ctx-check -->
 
 Only when `compaction.enabled` is true; `false` skips this check entirely and
 the loop behaves exactly as before. The contract, including the signal rule, is
 `docs/context-threshold.md`. Evaluate it at the **top of every iteration** only,
-right after the *Runtime budget check*, against
+right after the *Open PR cap check*, against
 `compaction.threshold.auto-pilot` (default 15). It reads only a
 remaining-context figure the host already placed in this agent's context; with
 none, skip it silently and never estimate one.

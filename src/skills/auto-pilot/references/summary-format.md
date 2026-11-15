@@ -64,7 +64,8 @@ writes nothing).
 `Result:` takes exactly one of five values. `COMPLETED` — the backlog or the
 explicit list is done. `PAUSED` — the loop stopped for a decision it may not make
 alone (a critical issue with unresolved review problems, `pause_on_failure`).
-`LIMIT REACHED` — `autopilot.max_iterations` was hit. **`BUDGET REACHED`** — the
+`LIMIT REACHED` — `autopilot.max_iterations` or the `autopilot.max_open_prs` cap
+was reached (`Next action:` names the open PRs to review first). **`BUDGET REACHED`** — the
 wall-clock budget `autopilot.max_runtime_minutes` expired
 (`references/phases/phase-0-lock-resume.md` → *Runtime budget check*); the run stopped cleanly at an
 iteration boundary with nothing in flight, so `Next action:` is the ordinary
@@ -139,21 +140,18 @@ to qualify.
    issue with unresolved review problems: name that decision (merge, fix by hand,
    or close the PR) and the PR it concerns. Name remaining user actions
    separately on `Next action:` — open PRs a maintainer must merge (`left_open`,
-   no-merge mode, `conservative`), quarantined issues to inspect, and the
+   no-merge mode, `conservative`), quarantined issues to inspect, issues to
+   split (`large_scope`, `max_commits_exceeded`), and the
    dependency to merge for a `blocked_by_dependency` PR. Never add an approval
    gate the loop does not already have.
 
 ### Format rule
 
-The default format is the static terminal summary above: one row per iteration,
-at most `autopilot.max_iterations` rows, inspectable at once. Project convention
-forbids terminal animation, so auto-pilot produces no interactive report;
-`.idd/runs.jsonl` is the machine-readable form for later filtering and
-`.idd/last-run-report.md` the persisted copy. If the user asks for another
-format (for example a Markdown table or a Mermaid timeline), render it from the
-same summary and keep the `Result`, `Evidence`, `Uncertainty` and `Decision`
-rows. If the host cannot render that format, say so and print the terminal
-summary.
+Default: the static terminal summary above, one row per iteration, no
+animation; `.idd/runs.jsonl` is the machine-readable form and
+`.idd/last-run-report.md` the persisted copy. Another requested format renders
+the same summary and keeps the `Result`, `Evidence`, `Uncertainty` and
+`Decision` rows; if the host cannot render it, say so and print the terminal one.
 
 ### Evaluate report understanding
 
