@@ -73,7 +73,10 @@ asm install https://github.com/luongnv89/idd --skill issue-resolver
 | `../references/steps/step-*.md` | One file per step (0, 0h, 0i, 0j, 0j-resume, 1-5) with its full input/output spec and inline fallback — read per step, never all at once |
 | `../references/bug-verification.md` | Post-fix bug-verification checkpoint and reproduction capture |
 | `../references/report-templates.md` | PR body template, QA handoff marker and revision receipt |
-| `../references/closing-summary.md` | Closing summary: Review contract and variants |
+| `../references/closing-summary.md` | Closing summary: the Review contract, read at every outcome |
+| `../references/closing-pr-created.md` | Closing-summary variants for a created PR (DONE, PARTIAL) |
+| `../references/closing-already-resolved.md` | Closing-summary variant when the fix is already on the default branch |
+| `../references/closing-blocked.md` | Closing-summary variant when the run stops before a PR |
 | `../references/run-log-fields.md` | Run-log field derivation and suppression |
 | `../references/report-examples.md` | Expected pipeline output, format rule, evaluation rubric |
 | `../references/step-reports.md` | Step completion report rules and the per-step check table |

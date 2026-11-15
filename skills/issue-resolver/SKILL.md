@@ -109,6 +109,9 @@ references/steps/step-4-qa.md
 references/steps/step-5-deliver.md
 references/report-templates.md
 references/closing-summary.md
+references/closing-pr-created.md
+references/closing-already-resolved.md
+references/closing-blocked.md
 references/report-examples.md
 references/run-log-fields.md
 references/step-reports.md
@@ -388,7 +391,7 @@ if [ -n "$no_run_log" ]; then printf '%s' "$run_json" | python3 references/scrip
 
 ## Closing Summary
 
-Emit **one** closing block at **every** terminal outcome, stops included. Read the *Review contract* in `references/closing-summary.md`, then print its matching variant: `Result:` first (`DONE`, `PARTIAL` or `BLOCKED`), then `Evidence:`, `Uncertainty:`, `Decision:` and `Next action:`. **Then the run-stats footer** (`references/run-stats.md`) prints last, with tokens only where the host reported a count. Then clear the progress record (*Progress record*), at every outcome.
+Emit **one** closing block at **every** terminal outcome, stops included. Read `references/closing-summary.md` now — its *Review contract* holds for every outcome — then read only the outcome's variant and print it: `references/closing-pr-created.md` (a PR was created), `references/closing-already-resolved.md` or `references/closing-blocked.md`. `Result:` first (`DONE`, `PARTIAL` or `BLOCKED`), then `Evidence:`, `Uncertainty:`, `Decision:` and `Next action:`. **Then the run-stats footer** (`references/run-stats.md`) prints last, with tokens only where the host reported a count. Then clear the progress record (*Progress record*), at every outcome.
 
 ---
 

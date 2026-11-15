@@ -1,6 +1,6 @@
 # PR Body Template — /issue-resolver
 
-Read at Step 5 (Deliver). The closing summary is in `references/closing-summary.md`.
+Read at Step 5 (Deliver). The closing summary is in `references/closing-summary.md`, with one variant file per outcome.
 
 ## PR Body Template (Step 5 — Deliver) <!-- a:rt-pr-body-template -->
 

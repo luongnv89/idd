@@ -92,16 +92,17 @@
       "always_read": {
         "budget": 11196,
         "files": [
+          "references/closing-summary.md",
           "references/step-reports.md",
           "references/steps/step-0j-progress-record.md"
         ],
-        "measured": 10172
+        "measured": 11027
       },
       "budget": 435601,
-      "measured": 434765,
+      "measured": 435110,
       "skill_md": {
         "budget": 33856,
-        "measured": 33243
+        "measured": 33527
       }
     },
     "issue-triage": {
