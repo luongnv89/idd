@@ -565,6 +565,49 @@ t14 "T14.9: #564 — merge allowed, source PR_TITLE, auto_merge false → WARN (
 t14 "T14.10: #564 — squash allowed, source unread, auto_merge false → WARN (hand merge)" WARN squash true false false unread false
 t14 "T14.11: #564 — squash allowed, source PR_BODY, auto_merge false PASSes" PASS squash true false false PR_BODY false
 
+# Issue #597: a PR_BODY pass with the merge left to a human rests on the repo
+# setting, so each other allowed method that drops the body gets a ○ note.
+# Mirrors SKILL.md Check 4 step 6 and the *Other-method note* trigger.
+other_method_notes() {
+  # Args: method squash mergeCommit rebase source auto_merge other_source
+  local method="$1" squash="$2" mc="$3" rebase="$4" source="$5" auto_merge="$6" other_source="$7"
+  local notes=""
+  if [ "$(merge_check_classifier "$method" "$squash" "$mc" "$rebase" "$source" "$auto_merge")" != "PASS" ] \
+     || [ "$auto_merge" = "true" ] || [ "$source" != "PR_BODY" ]; then
+    echo "none"; return
+  fi
+  [ "$rebase" = "true" ] && notes="${notes}rebase "
+  if [ "$method" = "squash" ] && [ "$mc" = "true" ] && [ "$other_source" != "PR_BODY" ]; then
+    notes="${notes}merge "
+  elif [ "$method" = "merge" ] && [ "$squash" = "true" ] && [ "$other_source" != "PR_BODY" ]; then
+    notes="${notes}squash "
+  fi
+  notes="${notes% }"
+  echo "${notes:-none}"
+}
+
+t14n() {
+  local label="$1" want="$2"; shift 2
+  local got
+  got="$(other_method_notes "$@")"
+  if [ "$got" = "$want" ]; then pass "$label"; else fail "$label (wanted '$want', got '$got')"; fi
+}
+
+t14n "T14.12: #597 — squash PR_BODY, rebase allowed, auto_merge false → rebase note" rebase squash true false true PR_BODY false PR_BODY
+t14n "T14.13: #597 — squash PR_BODY, merge allowed with PR_TITLE → merge note" merge squash true true false PR_BODY false PR_TITLE
+t14n "T14.14: #597 — squash PR_BODY, merge allowed with PR_BODY → no note" none squash true true false PR_BODY false PR_BODY
+t14n "T14.15: #597 — auto_merge true → IDD merges, no other-method note" none squash true true true PR_BODY true PR_TITLE
+t14n "T14.16: #597 — merge PR_BODY, squash unread and rebase allowed → both notes" "rebase squash" merge true true true PR_BODY false unread
+
+if grep -qF '✓ [4/4] Merge method           {method} allowed · {field}: PR_BODY' "$EM" \
+   && grep -qF '### Other-method note (under a pass)' "$EM" \
+   && grep -qF '○ a hand merge by {other} will not carry the PR body' "$EM" \
+   && grep -qE 'print \*Pass\* in its `\{field\}: PR_BODY` form, plus an \*other-method note\*' "$SKILL"; then
+  pass "T14.17: #597 — Check 4 documents the PR_BODY pass form and the other-method note"
+else
+  fail "T14.17: #597 — Check 4 does not document the other-method note"
+fi
+
 # ───────────────────────────────────────────────────────────
 # T15: README.md highlights and structure
 # ───────────────────────────────────────────────────────────

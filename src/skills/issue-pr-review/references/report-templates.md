@@ -208,13 +208,17 @@ Acceptance-criteria checks still apply at full strength — they do not relax fo
 
 ## Summary — Merge-Method Binding Not Allowed, Tracker-Only, or Unverified
 
-Traceability check 4 judges the repository against `review.merge_method` (`references/verification-checks.md` → *Traceability checks*). A clean pass needs `squash` or `merge` and a repo that allows it; anything else is a **repository and config** finding, not a PR defect. The pass line names the binding — `B1/squash` or `B2/merge` — and, when that method's message source is not `PR_BODY` or was not read, carries one note:
+Traceability check 4 judges the repository against `review.merge_method` (`references/verification-checks.md` → *Traceability checks*). Anything but a pass is a **repository and config** finding, not a PR defect. The pass line names the binding — `B1/squash` or `B2/merge` — and its evidence: `body passed at merge` when IDD will merge, else `{field}: PR_BODY`. Check 4's notes print under it:
 
 ```
       traceability:        ✓ pass (Closes #{N}, commit ref, Decision Record, AC block, B2/merge: body passed at merge)
                              ○ a hand merge will not carry the PR body
                              (merge_commit_message: {value})
+      traceability:        ✓ pass (…, B1/squash: squash_merge_commit_message: PR_BODY)
+                             ○ a hand merge by {other} will not carry the PR body
 ```
+
+`{other}` is `rebase`, or the other commit method and its `({field}: {value})`; one note each.
 
 When IDD will not perform the merge (check 4), that note is the finding instead: `⚠ partial — hand merge will not carry the PR body ({field}: {value})`, then `To fix:  set review.auto_merge: true in .idd.yml, or use /auto-pilot in a mode that merges`.
 
@@ -248,7 +252,7 @@ When the strategy read does not answer — no `gh`, unauthenticated, 404, insuff
       traceability:        ⚠ partial — merge-method binding unverified ({reason})
 ```
 
-All four partial lines are `note` findings: they are never handed to the fixer in Step 6, because no edit to this PR can change a repo setting or `.idd.yml` on the base branch. Under `review.soft_pass: true` (default) they are report-only; under `soft_pass: false` they block like any other partial dimension.
+All four partial lines are `note` findings, never handed to the fixer; `review.soft_pass` decides whether they block (check 4).
 
 When `review.merge_method` is `squash` or `merge` and the merge-effective keyword set (raw body, no markdown strip) diverges from the markdown-aware PR-link set, append a `note` line naming the issues that will close at merge:
 
