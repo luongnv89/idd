@@ -63,10 +63,10 @@
         "measured": 43682
       },
       "budget": 186712,
-      "measured": 186504,
+      "measured": 186198,
       "skill_md": {
-        "budget": 26517,
-        "measured": 25493
+        "budget": 26490,
+        "measured": 25466
       }
     },
     "issue-pr-review": {
@@ -79,10 +79,10 @@
           "references/review-loop-mechanics.md",
           "references/verification-checks.md"
         ],
-        "measured": 127898
+        "measured": 127838
       },
       "budget": 324334,
-      "measured": 324263,
+      "measured": 324248,
       "skill_md": {
         "budget": 32125,
         "measured": 32123
@@ -115,7 +115,7 @@
         "measured": 29388
       },
       "budget": 141025,
-      "measured": 140092,
+      "measured": 140044,
       "skill_md": {
         "budget": 25696,
         "measured": 24672

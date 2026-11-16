@@ -176,12 +176,9 @@ proceeds normally. The flag is honored even under `IDD_AUTO_MODE=1` (an explicit
 request overrides the no-prompt-no-fetch default); a failed forced refresh
 degrades to a warning and the existing cache, like any other refresh.
 
-> **Automated seed refresh (CI).** The bundled `templates/model-data.json`
-> snapshot itself is refreshed weekly by this repository's
-> `.github/workflows/model-data-refresh.yml`, which skips while the seed is
-> younger than `cache_ttl_days` and pushes a new snapshot only when it is
-> stale. That automation updates installed skill copies only via skill
-> reinstalls — the manual procedure below remains the runtime fallback.
+A weekly CI job opens or updates a pull request when the bundled seed is stale;
+a run sees it only after a release and a skill reinstall, so the procedure below
+is how a run gets fresher data.
 
 ### Refresh procedure
 
@@ -304,9 +301,8 @@ The template placeholders fill from the cache: `{openai_model}` and
 `CursorBench 3.2` — do not repeat the `CursorBench` prefix), and `{data_date}` is
 the date portion of `last_fetched`.
 This is the one piece of externally-derived data the Output Contract admits
-into the body — see the
-**Output Contract** note in `SKILL.source.md`, which records why it is permitted
-(advisory metadata, like effort) and how the date label mitigates staleness.
+into the body (**Output Contract** in `SKILL.md`): it is advisory metadata, like
+effort, and its date label shows how stale it is.
 
 When the feature is disabled, omit the `**Suggested model:**` line entirely and
 do not render the preview `⚡ Model:` line — neither the body nor the preview

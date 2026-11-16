@@ -44,9 +44,9 @@ PY
 |-----------|-----------|-----------------|
 | ESLint | `.eslintrc*` or `eslint` in package.json | `grep -z -E '\.[cm]?[jt]sx?$' "$scope/approved-args" \| xargs -0 -r npx eslint --fix` |
 | Prettier | `.prettierrc*` or `prettier` in package.json | `xargs -0 -r npx prettier --write --ignore-unknown < "$scope/approved-args"` |
-| Black | `pyproject.toml` with `[tool.black]` | `grep -z -E '\.pyi?$' "$scope/approved-args" \| xargs -0 -r python -m black` |
+| Black | `pyproject.toml` with `[tool.black]` | `grep -z -E '\.pyi?$' "$scope/approved-args" \| xargs -0 -r python3 -m black` |
 | Ruff | `pyproject.toml` with `[tool.ruff]` or `ruff.toml` | `grep -z -E '\.pyi?$' "$scope/approved-args" \| xargs -0 -r ruff check --fix`, then the same pipe into `xargs -0 -r ruff format` |
-| isort | `pyproject.toml` with `[tool.isort]` | `grep -z -E '\.pyi?$' "$scope/approved-args" \| xargs -0 -r python -m isort` |
+| isort | `pyproject.toml` with `[tool.isort]` | `grep -z -E '\.pyi?$' "$scope/approved-args" \| xargs -0 -r python3 -m isort` |
 | gofmt | `go.mod` | `grep -z -E '\.go$' "$scope/approved-args" \| xargs -0 -r gofmt -w` |
 | rustfmt | `Cargo.toml` | `grep -z -E '\.rs$' "$scope/approved-args" \| xargs -0 -r rustfmt` |
 | clang-format | `.clang-format` | `grep -z -E '\.[ch]$' "$scope/approved-args" \| xargs -0 -r clang-format -i` |
@@ -178,7 +178,7 @@ Detect and run the project's build system:
 |-------------|-----------|---------|
 | Node.js (TS) | `tsconfig.json` | `npx tsc --noEmit` |
 | Node.js (JS) | `package.json` build script | `npm run build` |
-| Python | `pyproject.toml` | `python -m compileall` |
+| Python | `pyproject.toml` | `python3 -m compileall -q .` |
 | Go | `go.mod` | `go build ./...` |
 | Rust | `Cargo.toml` | `cargo build` |
 

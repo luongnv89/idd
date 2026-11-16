@@ -73,12 +73,11 @@ All errors follow the rich format: symbol + description + fix action.
 
 ### PR already closed/merged
 
-**Trigger:** PR state is `CLOSED` or `MERGED`.
+**Trigger:** PR state is `CLOSED` (stop) or `MERGED` (no review; SKILL.md Step 1.4).
 
 ```
-⚠ PR #{N} is already {state}
-
-  Nothing to review.
+⚠ PR #{N} is already closed
+○ PR #{N} is already merged
 ```
 
 ---

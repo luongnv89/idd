@@ -190,7 +190,7 @@ non-productive fix loop.
 
 ## Summary — Human-Authored PR (Decision Record absent)
 
-When a human-authored PR (one not produced by `/issue-resolver`) is reviewed, the Decision Record is typically absent. This is reported as `partial` traceability, not `fail`, per issue #36's "Human-Authored PRs" decision (see issue #36 body and the IDD methodology doc):
+A human-authored PR (one not produced by `/issue-resolver`) usually has no Decision Record. That is `partial` traceability, not `fail` (*Traceability checks* in `references/verification-checks.md`):
 
 ```
   Review dimensions:
@@ -483,7 +483,7 @@ Rules that make the report worth reading:
 
 `PARTIAL` covers the documented soft paths: no CI configured (Step 5); a Step 5
 CI failure held non-blocking by `review.ignore_ci_billing_failures: true`; the
-fix loop exhausting `review_cycles` with only non-blocking findings left (Step
+fix loop exhausting `review.max_cycles` with only non-blocking findings left (Step
 6); or Step 4's test + build run skipped under `qa_handoff = trusted`, which
 evaluates neither of that step's checks and so renders
 
