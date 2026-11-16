@@ -168,14 +168,11 @@ With no `python3` at all, the parse above cannot run either: read the body with
 non-zero `ec` is an unread body — and apply steps 1–2 above by hand.
 
 **A failed read is never an empty body.** When the read you kept exits
-non-zero, or its output does not parse as JSON with a string body, nothing was
-read: do **not** run `gi-deps.py`, whose empty answer would read as "no
-dependencies" and merge a PR whose dependency is still open. A held snapshot
-that does not parse, or carries no string `.body`, is the same failure. Do not
-merge: print the `⚠ … left open` line above, record the iteration outcome as
-`left_open`, add `#{issue_number}` to the session skip list, and continue to the
-next eligible issue (`references/error-messages.md` → *Dependency markers
-unreadable*). A later run re-reads the body and re-evaluates the gate.
+non-zero, or no string body parses from it or from a held snapshot, do **not**
+run `gi-deps.py`: its empty answer reads as "no dependencies" and would merge
+a PR whose dependency is still open. Do not merge: print the `⚠ … left open`
+line above, record `left_open`, add `#{issue_number}` to the session skip list,
+and continue to the next eligible issue.
 
 When Step 1.2b's snapshot is the source, parse `.body` from that compact JSON on
 stdin and make **no** extra GitHub read. Passing JSON on stdin keeps attacker-

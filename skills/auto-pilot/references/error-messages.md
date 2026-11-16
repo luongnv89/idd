@@ -516,8 +516,8 @@ the single home of that mapping, never restated here.
 ```
 ⚠ PR #{pr_number} left open — dependency markers unreadable ({reason})
 ```
-**Trigger:** Phase 5.1b (Dependency Gate) cannot read the issue body: the read it kept exits non-zero, or the body it returned — or Step 1.2b's held snapshot — does not parse as JSON with a string body. Only fires when `autopilot.respect_dependencies: true`.
-**Action:** Do **not** run `gi-deps.py` and do **not** merge — an unread body is never "no dependencies". Record iteration outcome `left_open`, add the issue to the session skip list, and continue to the next eligible issue (`references/phases/phase-5-merge.md` → *Parse dependency markers*). Non-fatal.
+**Trigger:** Phase 5.1b cannot read the issue body: the read it kept exits non-zero, or no string body parses from it or from Step 1.2b's held snapshot.
+**Action:** Do **not** run `gi-deps.py` or merge; outcome `left_open`, session skip list, continue (`references/phases/phase-5-merge.md` → *Parse dependency markers*). Non-fatal.
 
 ### Dependency cycle detected (auto-skip)
 ```
