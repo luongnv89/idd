@@ -18,7 +18,7 @@ the other:
 | Scope | cross-run telemetry, grows forever | this run only; the next run overwrites it |
 | Audience | `/idd-doctor` metrics, humans reading history | this loop, resuming itself after an interruption |
 | Read by the loop? | yes, in one place only: `gi-runlog.py --failure-streak` counts an issue's consecutive `failed` records for *Phase 2.3*'s quarantine. Best-effort **by design** — the log is gitignored and deletable, so the streak is *progress toward* a quarantine and the durable state is the label on the issue. A missing or unreadable log reports `streak: 0` and quarantines nothing | yes, by *Step 1.0*'s resume gate |
-| Lifetime | committed history of what ran | machine-local and gitignored, alongside `run.lock` and `last-run-report.md` |
+| Lifetime | machine-local, gitignored history of what ran, kept across runs | machine-local and gitignored, alongside `run.lock` and `last-run-report.md` |
 
 A checkpoint is **not** a run-log line: it records where the loop is, not what an
 issue's run concluded. Reading the run state to reconstruct telemetry would

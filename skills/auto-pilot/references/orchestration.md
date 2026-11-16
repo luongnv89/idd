@@ -86,7 +86,9 @@ fan-in and one at a time; `--no-merge` preserves Phase 5 as the sole merge site.
 - A resolver failure does not cancel returned siblings. Its terminal telemetry is
   handled when that lane reaches the serialized drain.
 - `run-state.json.lanes[]` persists the lane phases `planned`, `resolve`,
-  `returned`, `review`, `fix`, `merge`, `cleanup`, `completed`, and `failed`.
+  `returned`, `review`, `fix`, `merge`, `cleanup`, `log_pending`, `logged`,
+  `completed`, `failed`, and `blocked_dirty`; `references/scripts/gi-state.py`
+  defines them and the transitions between them.
   The existing singleton `current` remains the compatibility seam for the one
   lane currently draining.
 - On `--resume`, reconcile every lane against GitHub and git before acting:

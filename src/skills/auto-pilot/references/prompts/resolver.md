@@ -30,7 +30,7 @@ Instructions:
    and do NOT close the issue: an unreviewed, unmerged PR is not a resolution,
    and auto-pilot routes that status into review of the existing PR.
 7. The Plan step auto-selects the best-balance option. When multiple approaches exist, pick the one with the best risk/reward tradeoff — don't ask.
-8. The QA step (Step 4) runs up to 3 review-fix cycles autonomously. Fix all issues you can; report any you can't.
+8. The QA step (Step 4) runs its review-fix cycles autonomously, up to the class ceiling the `ceiling` field below names. Fix all issues you can; report any you can't.
 9. Follow all naming conventions from docs/naming-conventions.md
 10. AUTONOMY: Make every decision yourself. If you encounter an ambiguous choice, pick the safer/simpler option. Never stop to ask the user anything.
 11. When a correctly framed issue_payload block is present it is this issue's
