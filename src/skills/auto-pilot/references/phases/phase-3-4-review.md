@@ -79,7 +79,7 @@ For non-critical issues (no `critical` or `priority:critical` label), the auto-p
 | `conservative` | n/a (ignored) | follow-up created, PR left open | `left_open` |
 | `balanced` (default) | n/a (ignored) | follow-up created, PR left open | `left_open` |
 | `aggressive` | `false` (default) | follow-up created, PR left open | `left_open` |
-| `aggressive` | `true` | follow-up created, PR merged anyway | `partial_followup` |
+| `aggressive` | `true` | follow-up created, PR merged once all four Step 2a gates pass | `partial_followup` |
 
 The default install (`mode: balanced`) **never** auto-merges a PR with unresolved fixable review issues; only clean PRs are merged. Aggressive partial-merge is unreachable without setting both `mode: aggressive` and `merge_partial: true` in `.idd.yml`.
 
@@ -118,7 +118,7 @@ EOF
 
 **Step 2 — Mode-gated merge decision:**
 
-Compute the **effective mode** per the *Resolution rules* under *Merge Modes* in SKILL.md. If the effective mode is `aggressive` AND `autopilot.merge_partial` is `true`, the PR may be merged to preserve partial progress after the dependency gate passes; otherwise leave the PR open.
+Compute the **effective mode** per the *Resolution rules* under *Merge Modes* in SKILL.md. If the effective mode is `aggressive` AND `autopilot.merge_partial` is `true`, the PR may be merged to preserve partial progress once all four Step 2a gates pass; otherwise leave the PR open.
 
 **Step 2a — Dependency and CI gates (before any merge):**
 

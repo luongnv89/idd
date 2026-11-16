@@ -509,3 +509,6 @@ jobs:
 
       - name: test-spawn-by-path-611
         run: bash tests/test-spawn-by-path-611.sh
+
+      - name: test-merge-gate-copies-619
+        run: bash tests/test-merge-gate-copies-619.sh

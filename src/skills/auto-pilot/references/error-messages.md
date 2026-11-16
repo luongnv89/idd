@@ -55,7 +55,7 @@ All errors follow the rich error format: what went wrong + fix command + docs li
 ⚠ Was on branch {branch} — auto-switched to {default_branch}
 ```
 **Trigger:** `git rev-parse --abbrev-ref HEAD` returns a branch that is not `main` or `master`.
-**Action:** Auto-switch with `git checkout {default_branch} && git pull --rebase origin {default_branch}`. Non-fatal — auto-pilot continues.
+**Action:** Auto-switch and sync with the stash-first block in `references/preflight.md` (*Auto-stash and branch sync*), never a bare `git pull --rebase`. Non-fatal — auto-pilot continues; a failed rebase or stash pop stops the run as that block prints.
 
 ### Rate budget exhausted — pausing until reset (non-fatal)
 ```
@@ -188,7 +188,7 @@ LIMITED`'s `Next action:` line on the same value for the same reason.
   This run is not resumable; checkpoints are skipped.
 ```
 **Trigger:** No `python3`, exit 2 (the script path did not resolve), or exit 4 (the write failed) from any `gi-state.py` call. A **missing bundled file** is different — that is a broken install, and the `✗ Missing bundled dependency` block above is the answer.
-**Action:** Follow the prose fallback beside the call site in `references/preflight.md` (*Run lock*) and continue. The loop's own work is unaffected; only resume is lost.
+**Action:** Follow the prose fallback beside the call site in `references/preflight.md` (*Run lock*): an `.idd/run.lock` younger than an hour is a live holder and stops the run; otherwise continue. The loop's own work is unaffected; only resume is lost.
 
 ## Explicit List Mode
 
@@ -395,8 +395,8 @@ the single home of that mapping, never restated here.
     Outcome: partial_followup
   Continuing to next issue...
 ```
-**Trigger:** All review-fix cycles exhausted, the original issue does NOT have a `critical_labels` label, and the effective mode is `aggressive` with `autopilot.merge_partial: true`. Step 2a (Step 5.1b dependency gate) must pass before this output is shown.
-**Action:** Create follow-up issue, merge PR only after dependency gate passes. If the gate blocks, use *PR blocked by unmerged dependency* instead (PR left open, outcome `blocked_by_dependency`, loop still continues). Otherwise continue to next issue. Non-fatal either way.
+**Trigger:** All review-fix cycles exhausted, the original issue does NOT have a `critical_labels` label, and the effective mode is `aggressive` with `autopilot.merge_partial: true`. All four Step 2a gates in `references/phases/phase-3-4-review.md` — merge floor, dependency, CI and merge identity — must pass before this output is shown.
+**Action:** Create follow-up issue, merge PR only after all four Step 2a gates pass. An unsatisfied dependency uses *PR blocked by unmerged dependency* instead (outcome `blocked_by_dependency`); an unmet merge floor, non-mergeable CI or a stale merge identity leaves the PR open (outcome `left_open`). Either way the issue joins the session skip list and the loop continues. Non-fatal either way.
 
 ### Review cycles exhausted (non-critical issue, PR left open)
 ```
@@ -511,6 +511,13 @@ the single home of that mapping, never restated here.
 ```
 **Trigger:** Phase 5.1b (Dependency Gate) finds at least one `Depends on #N` / `Blocked by #N` reference whose target issue is still open, or whose target issue is closed but has an unmerged linked PR. Only fires when `autopilot.respect_dependencies: true`.
 **Action:** Do **not** merge. Leave the PR open and unchanged, record iteration outcome as `blocked_by_dependency`, add the issue to the session skip list, and continue to the next eligible issue. **Non-fatal — the run is not paused.** The gate never merges out of order, but it never strands the rest of the backlog either; the loop ends on dependency grounds only when no eligible issue is left (`⚠ No eligible issues to pick`). The audit trail is the iteration line in the final summary table plus the alert above, and exactly one `.idd/runs.jsonl` line with `outcome: blocked_by_dependency`.
+
+### Dependency markers unreadable (PR left open)
+```
+⚠ PR #{pr_number} left open — dependency markers unreadable ({reason})
+```
+**Trigger:** Phase 5.1b cannot read the issue body: the read it kept exits non-zero, or no string body parses from it or from Step 1.2b's held snapshot.
+**Action:** Do **not** run `gi-deps.py` or merge; outcome `left_open`, session skip list, continue (`references/phases/phase-5-merge.md` → *Parse dependency markers*). Non-fatal.
 
 ### Dependency cycle detected (auto-skip)
 ```

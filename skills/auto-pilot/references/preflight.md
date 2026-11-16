@@ -312,8 +312,11 @@ if [ -n "$(git status --porcelain)" ]; then
 fi
 git fetch origin
 git pull --rebase origin {default_branch} || {
-  echo "✗ Rebase failed — aborting and resetting to remote"
   git rebase --abort 2>/dev/null
+  echo "✗ Rebase failed — rebase aborted, nothing reset"
+  if [ "$dirty" -eq 1 ]; then
+    echo "  Your changes are in the stash — recover with: git stash list && git stash show -p stash@{0}"
+  fi
   exit 1
 }
 if [ "$dirty" -eq 1 ]; then

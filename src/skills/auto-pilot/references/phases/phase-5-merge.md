@@ -126,7 +126,7 @@ If `autopilot.respect_dependencies` is `true` (default), check whether the origi
 
 #### Parse dependency markers
 
-Read the issue body from Step 1.2b's held `{issue_payload}` resolution snapshot. Only when that issue has no complete held snapshot, fetch with `python3 shared/scripts/gi-issue.py N --fields body` — reading `.issue.body`; exit 3 is a stop, while no `python3`, exit 2, or exit 4 degrades to `gh issue view N --json body`. Extract every `Depends on #N` and `Blocked by #N` reference. The match is case-insensitive and tolerates list/sentence/colon shapes: <!-- a:ap-deps-reuse-snapshot -->
+Read the issue body from Step 1.2b's held `{issue_payload}` resolution snapshot. Only when that issue has no complete held snapshot, fetch it with the checked read below — `python3 shared/scripts/gi-issue.py N --fields body`, reading `.issue.body`; exit 3 is a stop, while no `python3`, exit 2, or exit 4 degrades to `gh issue view N --json body`, reading `.body`. Extract every `Depends on #N` and `Blocked by #N` reference. The match is case-insensitive and tolerates list/sentence/colon shapes: <!-- a:ap-deps-reuse-snapshot -->
 
 ```
 - Depends on #12
@@ -146,12 +146,33 @@ output is never re-evaluated. A held compact-JSON snapshot is parsed as data wit
 `python3`; never paste its body into shell syntax:
 
 ```bash
-issue_body="$(python3 shared/scripts/gi-issue.py N --fields body --jq .issue.body)"
-# Degrade form, when that exits 2 or 4 or there is no python3 — replace the
-# assignment above, do not add a second one:
-#   issue_body="$(gh issue view N --json body --jq .body)"
-printf '%s' "$issue_body" | python3 shared/scripts/gi-deps.py
+issue_json="$(python3 shared/scripts/gi-issue.py N --fields body)"; ec=$?
+case "$ec" in
+  0) ;;
+  3) exit 3 ;;  # invalid input: apply the stop rule, never left_open
+  *) issue_json="$(gh issue view N --json body)"; ec=$? ;;  # 2, 4, no python3: degrade
+esac
+if [ "$ec" -eq 0 ]; then
+  # gi-issue.py prints {"issue": {"body": …}}; gh prints {"body": …}.
+  issue_body="$(printf '%s' "$issue_json" | python3 -c 'import json,sys; d=json.load(sys.stdin); b=d.get("issue", d)["body"]; sys.stdout.write(b) if isinstance(b, str) else sys.exit(4)')"; ec=$?
+fi
+if [ "$ec" -eq 0 ]; then
+  printf '%s' "$issue_body" | python3 shared/scripts/gi-deps.py
+else
+  echo "⚠ PR #{pr_number} left open — dependency markers unreadable ({reason})"
+fi
 ```
+
+With no `python3` at all, the parse above cannot run either: read the body with
+`issue_body="$(gh issue view N --json body --jq .body)"; ec=$?` instead — a
+non-zero `ec` is an unread body — and apply steps 1–2 above by hand.
+
+**A failed read is never an empty body.** When the read you kept exits
+non-zero, or no string body parses from it or from a held snapshot, do **not**
+run `gi-deps.py`: its empty answer reads as "no dependencies" and would merge
+a PR whose dependency is still open. Do not merge: print the `⚠ … left open`
+line above, record `left_open`, add `#{issue_number}` to the session skip list,
+and continue to the next eligible issue.
 
 When Step 1.2b's snapshot is the source, parse `.body` from that compact JSON on
 stdin and make **no** extra GitHub read. Passing JSON on stdin keeps attacker-

@@ -159,7 +159,7 @@ Verify these files exist relative to this SKILL.md's dirname. A missing one is a
 1. From the repo root, run `python3 references/scripts/gi-state.py --lock --pid "$PPID"`. Add `--resume` under `/auto-pilot --resume`, and `--dry-run` under `--dry-run` (reports the holder, acquires nothing).
 2. Exit 0 (`acquired`, `reclaimed`, `reacquired`): this run holds the lock — evidence about the lock, never the run state.
 3. Exit 3: another run holds it. Apply the stop rule with `✗ Another /auto-pilot run is in progress`.
-4. No `python3`, exit 2, or exit 4: print `⚠ gi-state unavailable` and continue unlocked and un-resumable.
+4. No `python3`, exit 2, or exit 4: print `⚠ gi-state unavailable` and run the fallback in `references/preflight.md` → *Run lock*: an `.idd/run.lock` younger than an hour is a live holder, so apply the stop rule as in 3; otherwise continue unlocked and un-resumable.
 
 Then auto-stash a dirty tree and switch/rebase onto the default branch without confirmation (`references/preflight.md` → *Auto-stash and branch sync*); `git stash pop` after the run.
 
