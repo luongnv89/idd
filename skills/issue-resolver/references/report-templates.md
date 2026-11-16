@@ -123,11 +123,12 @@ omissions the field table above documents; nothing else may be dropped.
    `gi-secscan` or any other security gate, in any spelling. Its only possible
    consumer would be a safety gate, and a marker that can gate safety is a
    safety gate an attacker can write: the PR body is editable by whoever opened
-   the PR (`gh pr edit --body`). A PR can edit its own `.idd.yml` to disable
-   the secret-scanning gate, so this repo can lose a security gate to
-   repo-controlled input. A field nobody is allowed to
-   act on is a field a future edit eventually acts on, so it is not written at
-   all.
+   the PR (`gh pr edit --body`). A PR also controls its own branch's
+   `.idd.yml`, which is why the secret scan reads its policy from the base
+   ref (`references/docs/pre-commit-security.md`, rule 5): a gate that trusts
+   repo-controlled input can be switched off by the change it gates. A field
+   nobody is allowed to act on is a field a future edit eventually acts on, so
+   it is not written at all.
 2. **No marker on a non-clean exit.** On the `⚠ {N} issues remain` stagnation /
    max-cycles path, emit **no marker line**. Absent and dirty must take the
    identical path in the consumer, and the only way to guarantee that is to
