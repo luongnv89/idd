@@ -164,7 +164,7 @@ fi
 
 - **Real keys vs. placeholders.** Real-key detection is gated on prefix patterns (`sk-proj-`, `sk_live_`, `AKIA`, `ghp_`, `gho_`, `ghs_`, `xox[abp]-`, `glpat-`, `AIza...`) plus length, so common placeholders (`your-api-key`, `xxx`, `placeholder`, `<your-key>`, `${VAR}`) do not match. When extending the pattern, prefer **prefix + length** over **identifier + value** — the latter false-positives on docstrings and tests.
 - **Binary skip.** `binary`-charset files skip real-key scanning (avoids slow, FP-prone scans). **Residual risk (#276):** NUL-sniff proxy misses evasions; filename/size rules still fire. Gitleaks closed this ask (#1541) as not planned.
-- **Working set.** The scan operates on the file list the skill is about to stage/commit/push. Pre-stage skills (e.g., `implementer.md`'s atomic-commit step) pass the file list explicitly. Post-stage skills (e.g., `issue-pr-review` Step 2 auto-fix) fall back to `git diff --cached --name-only`.
+- **Working set.** A commit scans the staged set (`--staged`); a push-time scan, where a skill runs one, reads every commit in `BASE..HEAD` (`--range BASE`). The Primary Pattern reads only the on-disk files its `$files` names, so it misses a secret added and removed inside a range.
 - **Exit code.** Real secrets exit `1` and stop the skill. Warnings print and either prompt the user (interactive mode) or log-and-continue (auto mode); see *Mode Contract* below.
 - **`.gitignore` hygiene.** When a warning fires for a build artifact (`node_modules/`, `dist/`, etc.), the user is told to add it to `.gitignore` rather than the skill rewriting `.gitignore` itself — `.gitignore` edits are too consequential to do silently.
 

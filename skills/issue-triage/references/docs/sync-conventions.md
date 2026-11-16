@@ -89,7 +89,7 @@ For skills that want the minimal form inline:
 branch="$(git rev-parse --abbrev-ref HEAD)"
 dirty=0
 if [ -n "$(git status --porcelain)" ]; then
-  git stash push -u -m "pre-sync: ${branch}"
+  git stash push -u -m "pre-sync: ${branch} $(date +%Y-%m-%dT%H:%M:%S)"
   dirty=1
 fi
 git fetch origin

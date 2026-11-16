@@ -14,7 +14,7 @@
         "measured": 46893
       },
       "budget": 451160,
-      "measured": 451160,
+      "measured": 451158,
       "skill_md": {
         "budget": 26986,
         "measured": 26938
@@ -27,7 +27,7 @@
         "measured": 0
       },
       "budget": 145114,
-      "measured": 144905,
+      "measured": 144785,
       "skill_md": {
         "budget": 25914,
         "measured": 24890
@@ -42,8 +42,8 @@
         ],
         "measured": 36040
       },
-      "budget": 168699,
-      "measured": 167763,
+      "budget": 168660,
+      "measured": 167636,
       "skill_md": {
         "budget": 24945,
         "measured": 23921
@@ -63,7 +63,7 @@
         "measured": 43682
       },
       "budget": 186712,
-      "measured": 186198,
+      "measured": 186196,
       "skill_md": {
         "budget": 26490,
         "measured": 25466
@@ -82,7 +82,7 @@
         "measured": 127838
       },
       "budget": 324334,
-      "measured": 324248,
+      "measured": 324330,
       "skill_md": {
         "budget": 32125,
         "measured": 32123
@@ -99,7 +99,7 @@
         "measured": 11025
       },
       "budget": 435601,
-      "measured": 434893,
+      "measured": 435101,
       "skill_md": {
         "budget": 33856,
         "measured": 33527
@@ -114,8 +114,8 @@
         ],
         "measured": 29388
       },
-      "budget": 141025,
-      "measured": 140044,
+      "budget": 140902,
+      "measured": 139878,
       "skill_md": {
         "budget": 25696,
         "measured": 24672
@@ -130,7 +130,7 @@
         "measured": 5062
       },
       "budget": 171356,
-      "measured": 171334,
+      "measured": 171201,
       "skill_md": {
         "budget": 26657,
         "measured": 25660

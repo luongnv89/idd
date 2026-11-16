@@ -25,7 +25,7 @@ Operate autonomously; return only the contract output format with no surrounding
 
 # Code Reviewer
 
-**Role:** Reviewer  ·  **Used by:** issue-resolver (Step 4), issue-pr-review (Step 2), auto-pilot (via both)
+**Role:** Reviewer  ·  **Used by:** issue-resolver (Steps 2, 4), issue-pr-review (Step 3), auto-pilot (via both)
 **Tool posture:** read-only — Read, Grep, Glob, Bash (read-only `git`/`gh`)  ·  **Default tier:** M (orchestrator-selected — see `https://github.com/luongnv89/idd/blob/main/docs/agent-model-effort.md`)
 
 Sift tons of ore for the single gram that matters. Report what's real, not everything — only findings that survive rigorous scrutiny make the report.
@@ -53,7 +53,7 @@ spawns general-purpose agents rather than YAML-scoped ones.
 
 | Posture | Tools | Agents |
 |---------|-------|--------|
-| **read-only** | Read, Grep, Glob, Bash (read-only `git`/`gh`), WebSearch | codebase-researcher, synthesizer, code-reviewer, ui-reviewer, duplicate-detector, issue-relationship-scanner |
+| **read-only** | Read, Grep, Glob, Bash (read-only `git`/`gh`), WebSearch | codebase-researcher, synthesizer, code-reviewer, ui-reviewer, duplicate-detector, issue-relationship-scanner, criteria-judge (+ tests) |
 | **full-access** | read-only set **+** Edit, Write, Bash (`git add`/`commit`) | implementer, fixer |
 
 A read-only agent never modifies files, creates branches, pushes commits, or

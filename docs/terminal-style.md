@@ -73,7 +73,7 @@ Rules:
 
 **Single operation** (issue-creator):
 ```
-  ● Scanning codebase...
+  ● Parsing input...
 ```
 
 ## Table Format
@@ -138,7 +138,6 @@ Every empty state has warmth and a next action:
 
 | Scenario | Output |
 |----------|--------|
-| No files identified | `⚠ Could not identify affected files. Issue created with manual-review flag. Tip: mention specific filenames for better results.` |
 | No open issues (triage) | `○ No open issues found. Nothing to triage! Create issues with /issue-creator to get started.` |
 | Already normalized | `✓ Issue #42 is already normalized (v1, 2026-03-15). No changes needed.` |
 | Issue not found | `✗ Issue #42 not found\n\n  To fix: gh issue list\n  Check: is this the right repository?` |
