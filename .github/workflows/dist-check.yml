@@ -515,3 +515,6 @@ jobs:
 
       - name: test-autopilot-stale-facts-622
         run: bash tests/test-autopilot-stale-facts-622.sh
+
+      - name: test-eval-grading-out-of-bundle-630
+        run: bash tests/test-eval-grading-out-of-bundle-630.sh
