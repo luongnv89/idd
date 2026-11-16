@@ -19,7 +19,7 @@ The run is successful only if **all** hold:
       this input and one plan map between the sentinels — verified by re-reading, not by exit code.
 - [ ] The map groups every child by phase, in order, and asserts **no issue status**: no checkbox,
       progress bar, percentage, milestone verdict, or "next actionable". Re-rendering it after
-      issues close reproduces identical bytes.
+      issues close changes only the footer's date.
 - [ ] Milestones from the input appear in the map with their measurable exit conditions.
 - [ ] No source file was modified — including on the conversation path, which **never materializes a
       plan file**. `git status --porcelain` matches the pre-run snapshot — this skill runs no repo sync.

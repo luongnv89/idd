@@ -11,7 +11,7 @@ in one pass instead of three re-runs.
 ## gh readiness
 
 `command -v gh` proves a binary exists. It does not prove `gh` can file 50 issues into *this* repo as
-the *intended* user. These six probes do. Every command below was verified against `gh` 2.87.3.
+the *intended* user. These six probes do.
 
 ### The probes — G1–G6
 
@@ -184,7 +184,7 @@ Both probes failing means `issue-creator` is missing — stop with the missing-s
 | Skill | Required | Source repo | Install |
 |---|---|---|---|
 | `issue-creator` | **yes** | `luongnv89/idd` | `asm install https://github.com/luongnv89/idd --skill issue-creator` |
-| `codebase-modernizer` | only when no plan exists yet | `luongnv89/skills` | `asm install github:luongnv89/skills:skills/codebase-modernizer` |
+| `codebase-modernizer` | optional | `luongnv89/skills` | `asm install github:luongnv89/skills:skills/codebase-modernizer` |
 
 ## Failure blocks
 
@@ -388,7 +388,7 @@ On success, one line per check, then continue:
 ```text
 ◆ Preflight (phase 0 of 7 — dependencies)
 ··································································
-  Tools present:      √ pass (git, gh 2.87.3, python3)
+  Tools present:      √ pass (git, gh {version}, python3)
   gh ready:           √ pass (luongnv89 · scopes include repo · --json ok)
   Repo writable:      √ pass (luongnv89/skills · issues on · ADMIN)
   API budget:         √ pass (4905 remaining, ~324 needed · 1240 items)

@@ -320,7 +320,7 @@ The run succeeded only if **all** hold; the full wording is in `references/accep
 - [ ] The epic is labelled `epic` and holds exactly one source marker for this input and one map
       between the sentinels — verified by re-reading, not by exit code.
 - [ ] The map groups every child by phase and asserts **no issue status**; re-rendering after issues
-      close reproduces identical bytes. Milestones appear with their measurable exit conditions.
+      close changes only the footer's date. Milestones appear with their measurable exit conditions.
 - [ ] No source file was modified — the conversation path **never materializes a plan file**.
       `git status --porcelain` matches the pre-run snapshot — this skill runs no repo sync.
 - [ ] Re-running on the same input creates zero duplicate issues and zero new epics (file path
