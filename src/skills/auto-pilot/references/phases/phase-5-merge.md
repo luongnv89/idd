@@ -147,9 +147,11 @@ output is never re-evaluated. A held compact-JSON snapshot is parsed as data wit
 
 ```bash
 issue_json="$(python3 shared/scripts/gi-issue.py N --fields body)"; ec=$?
-# Exit 3 is a stop. Degrade form, when that exits 2 or 4 or there is no
-# python3 — replace the line above, do not add a second one:
-#   issue_json="$(gh issue view N --json body)"; ec=$?
+case "$ec" in
+  0) ;;
+  3) exit 3 ;;  # invalid input: apply the stop rule, never left_open
+  *) issue_json="$(gh issue view N --json body)"; ec=$? ;;  # 2, 4, no python3: degrade
+esac
 if [ "$ec" -eq 0 ]; then
   # gi-issue.py prints {"issue": {"body": …}}; gh prints {"body": …}.
   issue_body="$(printf '%s' "$issue_json" | python3 -c 'import json,sys; d=json.load(sys.stdin); b=d.get("issue", d)["body"]; sys.stdout.write(b) if isinstance(b, str) else sys.exit(4)')"; ec=$?
@@ -160,6 +162,10 @@ else
   echo "⚠ PR #{pr_number} left open — dependency markers unreadable ({reason})"
 fi
 ```
+
+With no `python3` at all, the parse above cannot run either: read the body with
+`issue_body="$(gh issue view N --json body --jq .body)"; ec=$?` instead — a
+non-zero `ec` is an unread body — and apply steps 1–2 above by hand.
 
 **A failed read is never an empty body.** When the read you kept exits
 non-zero, or its output does not parse as JSON with a string body, nothing was

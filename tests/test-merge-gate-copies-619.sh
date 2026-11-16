@@ -78,68 +78,72 @@ open("$SB/deps-ran", "w").close()
 sys.argv = ["gi-deps.py"]
 runpy.run_path("$ROOT/src/shared/scripts/gi-deps.py", run_name="__main__")
 PY
-# A fake gh for the degrade form: prints STUB_OUT, exits STUB_EC.
-cat > "$SB/bin/gh" <<'SH'
+# A fake gh for the degrade form: records that it ran, prints GH_OUT, exits GH_EC.
+cat > "$SB/bin/gh" <<SH
 #!/usr/bin/env bash
-printf '%s' "${STUB_OUT:-}"
-exit "${STUB_EC:-0}"
+: > "$SB/gh-ran"
+printf '%s' "\${GH_OUT:-}"
+exit "\${GH_EC:-1}"
 SH
 chmod +x "$SB/bin/gh"
 
 # Placeholders the agent substitutes before running the block.
 sed -e 's/ N / 42 /g' -e 's/{pr_number}/7/g' -e 's/{reason}/read failed/g' \
-  "$TMP/gate.sh" > "$SB/primary.sh"
-# The degrade form replaces the first line with the commented gh assignment.
-degrade="$(grep -E '^#[[:space:]]+issue_json=.*gh issue view' "$SB/primary.sh" | sed -E 's/^#[[:space:]]+//' || true)"
-if [ -n "$degrade" ]; then
-  { printf '%s\n' "$degrade"; tail -n +2 "$SB/primary.sh"; } > "$SB/degrade.sh"
-  pass "T1.3: the block documents a gh degrade form that keeps the exit status"
-else
-  : > "$SB/degrade.sh"
-  fail "T1.3: no checked gh degrade form (issue_json=\"\$(gh issue view …)\") in the block"
-fi
+  "$TMP/gate.sh" > "$SB/gate.sh"
+grep -qF 'issue_json="$(gh issue view 42 --json body)"; ec=$?' "$SB/gate.sh" \
+  && pass "T1.3: the block degrades to a gh read that keeps its exit status" \
+  || fail "T1.3: no checked gh degrade read (issue_json=\"\$(gh issue view …)\"; ec=\$?) in the block"
 
-# run_gate <script> <stub_ec> <stub_out> → prints the block's stdout; sets RAN.
+# run_gate <stub_ec> <stub_out> <gh_ec> <gh_out> → OUT, CODE, RAN (gi-deps), GH.
 run_gate() {
-  rm -f "$SB/deps-ran"
-  OUT="$(cd "$SB" && PATH="$SB/bin:$PATH" STUB_EC="$2" STUB_OUT="$3" bash "$1" 2>/dev/null || true)"
-  RAN=no
+  rm -f "$SB/deps-ran" "$SB/gh-ran"
+  CODE=0
+  OUT="$(cd "$SB" && PATH="$SB/bin:$PATH" STUB_EC="$1" STUB_OUT="$2" GH_EC="$3" GH_OUT="$4" \
+    bash "$SB/gate.sh" 2>/dev/null)" || CODE=$?
+  RAN=no; GH=no
   if [ -f "$SB/deps-ran" ]; then RAN=yes; fi
+  if [ -f "$SB/gh-ran" ]; then GH=yes; fi
 }
-# expect_unread <id> <script> <ec> <out> <what>
+# expect_unread <id> <stub_ec> <stub_out> <gh_ec> <gh_out> <what>
 expect_unread() {
-  run_gate "$2" "$3" "$4"
+  run_gate "$2" "$3" "$4" "$5"
   if [ "$RAN" = no ] && printf '%s' "$OUT" | grep -qF 'PR #7 left open — dependency markers unreadable'; then
-    pass "$1: $5 → gi-deps.py never runs, PR left open"
+    pass "$1: $6 → gi-deps.py never runs, PR left open"
   else
-    fail "$1: $5 → gi-deps ran=$RAN, output: ${OUT:-<empty>}"
+    fail "$1: $6 → gi-deps ran=$RAN, output: ${OUT:-<empty>}"
   fi
 }
-# expect_deps <id> <script> <out> <want> <what>
+# expect_deps <id> <stub_ec> <stub_out> <gh_ec> <gh_out> <want> <what>
 expect_deps() {
-  run_gate "$2" 0 "$3"
+  run_gate "$2" "$3" "$4" "$5"
   got="$(printf '%s' "$OUT" | tr '\n' ' ' | sed 's/ *$//')"
-  if [ "$RAN" = yes ] && [ "$got" = "$4" ]; then
-    pass "$1: $5 → dependencies: ${4:-none}"
+  if [ "$RAN" = yes ] && [ "$got" = "$6" ]; then
+    pass "$1: $7 → dependencies: ${6:-none}"
   else
-    fail "$1: $5 → gi-deps ran=$RAN, got '${got}', want '$4'"
+    fail "$1: $7 → gi-deps ran=$RAN, got '${got}', want '$6'"
   fi
 }
 
-P="$SB/primary.sh"
-expect_unread "T1.4" "$P" 2 "" "gi-issue.py exits 2 with empty stdout (the old --jq failure)"
-expect_unread "T1.5" "$P" 4 "" "gi-issue.py exits 4"
-expect_unread "T1.6" "$P" 0 "not json" "gi-issue.py prints unparsable output"
-expect_unread "T1.7" "$P" 0 '{"issue": {"body": null}}' "the envelope carries no string body"
-expect_deps   "T1.8" "$P" '{"issue": {"body": "Depends on #12\nBlocked by: acme/lib#15, #20"}, "cached": false}' "12 20" "a good envelope"
-expect_deps   "T1.9" "$P" '{"issue": {"body": "No markers here."}}' "" "a readable body with no markers"
-D="$SB/degrade.sh"
-expect_unread "T1.10" "$D" 1 "" "degrade gh read fails"
-expect_deps   "T1.11" "$D" '{"body": "Blocked by #9"}' "9" "degrade gh read succeeds"
+GOOD_GH='{"body": "Blocked by #9"}'
+expect_unread "T1.4" 2 "" 1 "" "gi-issue.py exits 2 (the old --jq failure) and the gh degrade fails"
+expect_deps   "T1.5" 2 "" 0 "$GOOD_GH" "9" "gi-issue.py exits 2, the gh degrade reads the body"
+expect_deps   "T1.6" 4 "" 0 "$GOOD_GH" "9" "gi-issue.py exits 4, the gh degrade reads the body"
+expect_unread "T1.7" 4 "" 0 "not json" "the gh degrade prints unparsable output"
+expect_unread "T1.8" 0 "not json" 1 "" "gi-issue.py prints unparsable output"
+expect_unread "T1.9" 0 '{"issue": {"body": null}}' 1 "" "the envelope carries no string body"
+expect_deps   "T1.10" 0 '{"issue": {"body": "Depends on #12\nBlocked by: acme/lib#15, #20"}, "cached": false}' 1 "" "12 20" "a good envelope"
+expect_deps   "T1.11" 0 '{"issue": {"body": "No markers here."}}' 1 "" "" "a readable body with no markers"
+run_gate 3 "" 0 "$GOOD_GH"
+if [ "$CODE" -eq 3 ] && [ "$RAN" = no ] && [ "$GH" = no ] && ! printf '%s' "$OUT" | grep -qF 'left open'; then
+  pass "T1.12: gi-issue.py exit 3 stops — no degrade, no gi-deps, not reported as left open"
+else
+  fail "T1.12: exit 3 → code=$CODE gi-deps ran=$RAN gh ran=$GH output: ${OUT:-<empty>}"
+fi
+has "$AP/references/phases/phase-5-merge.md" 'issue_body="$(gh issue view N --json body --jq .body)"; ec=$?' "T1.13: the no-python3 read is a checked gh read"
 
-has "$AP/references/phases/phase-5-merge.md" '**A failed read is never an empty body.**' "T1.12: the gate states the fail-closed rule"
-has "$AP/references/error-messages.md" '### Dependency markers unreadable (PR left open)' "T1.13: the catalog carries the unreadable-body entry"
-lacks "$AP/references/phases/phase-5-merge.md" '--jq .issue.body' "T1.14: no gi-issue.py --jq call remains"
+has "$AP/references/phases/phase-5-merge.md" '**A failed read is never an empty body.**' "T1.14: the gate states the fail-closed rule"
+has "$AP/references/error-messages.md" '### Dependency markers unreadable (PR left open)' "T1.15: the catalog carries the unreadable-body entry"
+lacks "$AP/references/phases/phase-5-merge.md" '--jq .issue.body' "T1.16: no gi-issue.py --jq call remains"
 
 # ── T2 — restated rules match their single home ──────────────────────────────
 EM="$AP/references/error-messages.md"
