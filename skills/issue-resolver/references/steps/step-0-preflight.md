@@ -174,7 +174,7 @@ Present the prompt from SKILL.md (*Step 0e — Workspace*). It must state, befor
 - the **worktree path** (the naming convention below), and
 - what **setup** will be copied/run (gitignored local config + the project's detected install/bootstrap).
 
-Default is **accept** (`[Y/n]`). This satisfies acceptance criterion 5 (the proposal states what is copied and the workspace/branch naming).
+Default is **accept** (`[Y/n]`).
 
 ### Naming convention
 

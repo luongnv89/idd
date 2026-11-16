@@ -66,7 +66,7 @@ narrative of the work (04-subagents *Context Management* — results-only handof
 
 Two optional artifacts, **one contract, two trust profiles**. Both are caller-supplied context payloads (https://github.com/luongnv89/idd/blob/main/docs/shared-agent-conventions.md, *Caller-supplied context payloads*) — never a reason to skip a safety check.
 
-**`prior_analysis`.** Its `affected_files`, `architecture`, `code_patterns` and `test_files` are
+**`prior_analysis`.** Its `extraction`, `affected_files`, `history` and `cross_references` are
 **verify-first hints to confirm or refute, never assertions to trust** — open the
 files, check each hint still holds, and drop any that does not, falling back to
 the ordinary scan for that part. Phase 0 (*Already resolved?*) runs **in full**

@@ -17,7 +17,7 @@ match, carry the live pre-normalization `updatedAt` forward into Step 0h.
 **Single home of the caller-payload rules for this skill.** A caller that already
 holds this issue's resolution snapshot — `/auto-pilot` captures it in its
 mode-neutral *Step 1.2b* — may hand it over in the spawn prompt instead of making
-Step 0a fetch the same body-bearing record a second time (issues #256, #285).
+Step 0a fetch the same body-bearing record a second time.
 Everything below is the whole of what that buys.
 
 Set exactly one variable:
@@ -105,8 +105,8 @@ The payload substitutes for **Step 0a's fetch and nothing else**: <!-- a:rs-step
   older answer is precisely the staleness these two fields exist to catch. Going
   through the cache here would also register the narrow three-field key as a
   separate cache entry, buying nothing.
-- **0b's existing-work guard, 0c's already-resolved check and the mandatory Repo
-  Sync run in full**, on every path.
+- **0b's existing-work guard, Step 1's already-resolved check and the mandatory
+  Repo Sync run in full**, on every path.
   A caller-supplied field may gate duplicated work, never a safety gate — the
   full exclusion list has one home, in docs/shared-agent-conventions.md
   (*Caller-supplied context payloads*).

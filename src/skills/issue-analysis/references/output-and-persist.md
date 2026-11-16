@@ -105,7 +105,7 @@ ordinary analysis:
 ```
 
 Render each applicable line. If `scan_stats.scan_timed_out` is true, also render
-the timeout warning from `subagent-steps.md` and label the summary result
+the *Scan timeout* warning from `references/error-messages.md` and label the summary result
 `PARTIAL`.
 
 ### Keywords & targets
@@ -465,7 +465,7 @@ Keep the Step 8 report available, but mark the final result `PARTIAL` and persis
 }
 ```
 
-The `reproduction` object is **optional** and present only for `type: bug` issues — omit it for feature/improvement issues. This schema defines its shape so both skills agree on it, but `/issue-analysis` does not itself populate it: it is read-only and runs *before* the fix, so it cannot produce the post-fix `regression_test` proof. The evidence is produced by `/issue-resolver` at its Step 3 bug-verification checkpoint; this field is the optional cache mirror it lifts into the PR Decision Record and acceptance table when present (the PR body is the always-present durable home). `status` is `red` (reproduced and failing for the stated reason) or `not_reproduced` (could not be made red).
+The `reproduction` object is **optional** and present only for `type: bug` issues — omit it for feature/improvement issues. This schema defines its shape so both skills agree on it, but `/issue-analysis` does not itself populate it: it is read-only and runs *before* the fix, so it cannot produce the post-fix `regression_test` proof. The evidence is produced by `/issue-resolver` at its Step 3 bug-verification checkpoint and written to the PR body, its durable home; the resolver never writes this file, so no skill populates this field. It is an optional cache mirror the resolver lifts into the PR Decision Record and acceptance table only when present. `status` is `red` (reproduced and failing for the stated reason) or `not_reproduced` (could not be made red).
 
 ### Schema field reference
 
@@ -570,7 +570,7 @@ The `reproduction` object is **optional** and present only for `type: bug` issue
 | `decision_record.selected_option.name` | string | Option name |
 | `decision_record.selected_option.summary` | string | One-sentence description of the chosen approach |
 | `decision_record.residual_risk` | string | What remains uncertain or accepted as a known limitation; `"none identified"` if empty |
-| `decision_record.reproduction` | object | **Bug issues only** (omit otherwise). Red-capable verification evidence mirrored from the resolver's bug-verification checkpoint |
+| `decision_record.reproduction` | object | **Bug issues only** (omit otherwise). Red-capable verification evidence in the shape of the resolver's bug-verification checkpoint; no skill writes it |
 | `decision_record.reproduction.command` | string | Exact command/test that reproduces the symptom |
 | `decision_record.reproduction.status` | string | `"red"` (reproduced, failing for the stated reason) or `"not_reproduced"` |
 | `decision_record.reproduction.stated_reason_match` | string | The failing line/message matching the issue symptom |

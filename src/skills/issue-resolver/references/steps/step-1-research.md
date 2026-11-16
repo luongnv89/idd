@@ -30,8 +30,8 @@ lets an ambient parent checkout become that lane's implicit workspace.
 
 `prior_analysis` is optional and is populated **only** when *Step 0h* set
 `analysis_reuse = fresh` — with the parsed `.idd/analysis-<N>.json` (its
-`extraction`, `affected_files`, `architecture`, `code_patterns`, `test_files`,
-`history` and `cross_references` blocks are the useful part). On every other
+`extraction`, `affected_files`, `history` and `cross_references` blocks are the
+useful part). On every other
 path pass `null` or omit the key, so the payload is byte-for-byte today's.
 
 ### `triage_context` (when supplied) <!-- a:rs-triage-context -->
@@ -40,7 +40,7 @@ path pass `null` or omit the key, so the payload is byte-for-byte today's.
 own row from the triage graph — `type`, `priority`, `blocks`, `blocked_by`,
 `affected_files`, `status` — plus the triage `updated` timestamp, so the
 researcher can weigh how old the hints are. Populate it from the caller's
-`triage_context` block when one was supplied (issue #256), or by reading this
+`triage_context` block when one was supplied, or by reading this
 issue's entry from the triage graph under `.idd/` when it is present; otherwise
 pass `null` or omit the key. Supplying it moves a read the researcher would
 otherwise make in its own Phase 5 up to the caller — the read is **moved, not

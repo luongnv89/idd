@@ -39,7 +39,7 @@ When `resolve.adaptive_effort` is `false`, **skip this gate**: set
 
 `{base}` is **this run's synced base** — the branch the mandatory Repo Sync
 rebased onto, or the `origin/${base}` that `git worktree add` forked from. Never
-a bare `HEAD`: resolutions run in parallel worktrees (issue #260), where `HEAD`
+a bare `HEAD`: resolutions run in parallel worktrees, where `HEAD`
 can point at an unrelated branch and an ancestry test against the wrong tip
 passes silently.
 

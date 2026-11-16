@@ -108,8 +108,8 @@ consumer is `/issue-pr-review`'s *QA handoff gate*
 **Copy the field names, never recall them.** The grammar above is a **closed
 literal vocabulary**. Render the marker by copying the *PR Body Template*'s last
 line character-for-character and substituting only its `{braced}` tokens; a
-field name reconstructed from memory is how issue #446 shipped a marker no
-consumer would ever trust. `review=clean` is that exact spelling and has **no
+field name reconstructed from memory yields a marker no consumer will ever
+trust. `review=clean` is that exact spelling and has **no
 synonym** — `verdict=`, `status=` and `result=` are not accepted, and a marker
 spelling it any of those ways still matches the consumer's parse grep, so it is
 never `absent`: the wrong key is ignored as an unknown one, `review=` is then
@@ -123,9 +123,9 @@ omissions the field table above documents; nothing else may be dropped.
    `gi-secscan` or any other security gate, in any spelling. Its only possible
    consumer would be a safety gate, and a marker that can gate safety is a
    safety gate an attacker can write: the PR body is editable by whoever opened
-   the PR (`gh pr edit --body`). Issue #274 — a PR disabling the secret-scanning
-   gate through its own `.idd.yml` — is the standing proof this repo can
-   lose a security gate to repo-controlled input. A field nobody is allowed to
+   the PR (`gh pr edit --body`). A PR can edit its own `.idd.yml` to disable
+   the secret-scanning gate, so this repo can lose a security gate to
+   repo-controlled input. A field nobody is allowed to
    act on is a field a future edit eventually acts on, so it is not written at
    all.
 2. **No marker on a non-clean exit.** On the `⚠ {N} issues remain` stagnation /
@@ -145,7 +145,7 @@ construction.
 ### Revision receipt <!-- a:rt-revision-receipt -->
 
 The marker is a claim in a body the PR author can edit, and its `head=` is a
-public SHA, so the marker on its own proves nothing (issue #515). The consumer
+public SHA, so the marker on its own proves nothing. The consumer
 therefore trusts it only beside a **revision receipt** for the same commit,
 which `references/scripts/gi-receipt.py --write` stores under the git common dir
 (`idd/receipts/<sha40>.json`). That store is outside every branch and every PR
