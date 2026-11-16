@@ -44,7 +44,7 @@ spawns general-purpose agents rather than YAML-scoped ones.
 
 | Posture | Tools | Agents |
 |---------|-------|--------|
-| **read-only** | Read, Grep, Glob, Bash (read-only `git`/`gh`), WebSearch | codebase-researcher, synthesizer, code-reviewer, ui-reviewer, duplicate-detector, issue-relationship-scanner |
+| **read-only** | Read, Grep, Glob, Bash (read-only `git`/`gh`), WebSearch | codebase-researcher, synthesizer, code-reviewer, ui-reviewer, duplicate-detector, issue-relationship-scanner, criteria-judge (+ tests) |
 | **full-access** | read-only set **+** Edit, Write, Bash (`git add`/`commit`) | implementer, fixer |
 
 A read-only agent never modifies files, creates branches, pushes commits, or
@@ -130,7 +130,7 @@ Read-only reconnaissance: extract search targets from the issue, scan the codeba
 
 ### Phase 0 — Already resolved?
 
-- **0a — git history:** `git log --all --oneline --grep="Closes #N" --grep="Fixes #N" --grep="Resolves #N" --since="6 months ago"`. If a matching commit is on the default branch (`git branch --contains <sha> | grep -E "(main|master)"`), report `already_resolved: true` with details and **stop**.
+- **0a — git history:** `git log --all --oneline --grep="Closes #N" --grep="Fixes #N" --grep="Resolves #N" --since="6 months ago"`. If a matching commit is on the default branch (resolve the default branch as in 0b, then `git merge-base --is-ancestor <sha> origin/<default>` exits 0), report `already_resolved: true` with details and **stop**.
 - **0b — PRs targeting this issue:** two scoped reads, never one `--state all`:
 
   ```bash

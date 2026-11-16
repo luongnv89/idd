@@ -116,7 +116,7 @@ Repo-root state beside `.idd.yml`, created on first use.
 |------|-----------|-------------|
 | `.idd/triage.json` | `/issue-triage`, `/auto-pilot` | Cached triage: priorities, deps, order, history |
 | `.idd/analysis-<N>.json` | `/issue-analysis` | Deep analysis of issue #N |
-| `.idd/runs.jsonl` | `/issue-resolver`, `/auto-pilot` | Append-only run log (one line per issue) |
+| `.idd/runs.jsonl` | `/issue-resolver`, `/auto-pilot`, `/issue-pr-review` | Append-only run log |
 | `.idd/run-state.json`, `run.lock`, `last-run-report.md` | `/auto-pilot`; `/issue-resolver` (`borrowed_skills` only) | Resume state, lock, report |
 
 > **Not in `.idd/`:** the model-suggestion cache is **user-level** (`~/.cache/idd/`, all repos).

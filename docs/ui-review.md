@@ -88,7 +88,7 @@ fi
 Then check `{ui_config_scope}.ui_review.browser_review`:
 
 - **`"false"`** — skip; code review already ran.
-- **`"ask"`** — prompt interactive users; skip silently in auto mode.
+- **`"ask"`** — prompt interactive users; skip with the warning below in auto mode.
 - **`"true"`** — proceed to the capability check.
 
 Then verify the runtime can actually capture screenshots — **all** must hold:

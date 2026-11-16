@@ -55,7 +55,7 @@ REST, not `--json`: whether a merge made by hand carries the PR body (`PR_BODY`)
 | List open PRs | `gh pr list --state open --json number,title,body,headRefName --limit 20` |
 | Diff / changed files | `gh pr diff {N}` · `gh pr diff {N} --name-only` |
 | Checkout PR head branch | `gh pr checkout {N}` |
-| CI check status | `gh pr checks {N}` |
+| CI check status | `gh pr checks {N} --json name,state,bucket,link` |
 | CI log · sync head | `gh run list` · `gh run view {run_id} --log-failed` · `gh pr update-branch {N}` |
 | Read PR body (before edit) | `gh pr view {N} --json body` |
 | Update PR body | `gh pr edit {N} --body "{body}"` — read-modify-write only: fetch the body, apply the minimal change (e.g. prepend `Closes #N`), write back, verify per rule 2 |

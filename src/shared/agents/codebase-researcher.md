@@ -61,7 +61,7 @@ Read-only reconnaissance: extract search targets from the issue, scan the codeba
 
 ### Phase 0 — Already resolved?
 
-- **0a — git history:** `git log --all --oneline --grep="Closes #N" --grep="Fixes #N" --grep="Resolves #N" --since="6 months ago"`. If a matching commit is on the default branch (`git branch --contains <sha> | grep -E "(main|master)"`), report `already_resolved: true` with details and **stop**.
+- **0a — git history:** `git log --all --oneline --grep="Closes #N" --grep="Fixes #N" --grep="Resolves #N" --since="6 months ago"`. If a matching commit is on the default branch (resolve the default branch as in 0b, then `git merge-base --is-ancestor <sha> origin/<default>` exits 0), report `already_resolved: true` with details and **stop**.
 - **0b — PRs targeting this issue:** two scoped reads, never one `--state all`:
 
   ```bash

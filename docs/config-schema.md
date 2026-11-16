@@ -381,7 +381,7 @@ triage:
 
 # Issue analysis settings
 analysis:
-  # Max files to read during deep analysis (more thorough than resolver's 20)
+  # Max files to read during deep analysis
   # Type: integer
   # Default: 30
   # Minimum: 5
@@ -554,7 +554,6 @@ graph TD
     RS --> R2["branch_prefix"]
     RS --> R3["auto_test"]
     RS --> R4["test_timeout"]
-    RS --> R5["pr_auto_link"]
     RS --> R6["max_commits"]
     RS --> R7["qa_max_cycles"]
     RS --> R8["adaptive_effort"]
@@ -636,7 +635,7 @@ Repo-root state beside `.idd.yml`, created on first use.
 |------|-----------|-------------|
 | `.idd/triage.json` | `/issue-triage`, `/auto-pilot` | Cached triage: priorities, deps, order, history |
 | `.idd/analysis-<N>.json` | `/issue-analysis` | Deep analysis of issue #N |
-| `.idd/runs.jsonl` | `/issue-resolver`, `/auto-pilot` | Append-only run log (one line per issue) |
+| `.idd/runs.jsonl` | `/issue-resolver`, `/auto-pilot`, `/issue-pr-review` | Append-only run log |
 | `.idd/run-state.json`, `run.lock`, `last-run-report.md` | `/auto-pilot`; `/issue-resolver` (`borrowed_skills` only) | Resume state, lock, report |
 
 > **Not in `.idd/`:** the model-suggestion cache is **user-level** (`~/.cache/idd/`, all repos).
